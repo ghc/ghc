@@ -159,6 +159,8 @@ simplifyTop wanteds
 
 pushLevelAndSolveEqualities :: SkolemInfo -> [TcTyVar] -> TcM a -> TcM a
 -- Push level, and solve all resulting equalities
+-- If there are any unsolved equalities, report them
+-- and fail (in the monad)
 pushLevelAndSolveEqualities skol_info skol_tvs thing_inside
   = do { (tclvl, wanted, res) <- pushLevelAndSolveEqualitiesX
                                       "pushLevelAndSolveEqualities" thing_inside
@@ -167,6 +169,9 @@ pushLevelAndSolveEqualities skol_info skol_tvs thing_inside
 
 pushLevelAndSolveEqualitiesX :: String -> TcM a
                              -> TcM (TcLevel, WantedConstraints, a)
+-- Push the level, gather equality constraints, and then solve them.
+-- Returns any remaining unsolved equalities.
+-- Does not report errors.
 pushLevelAndSolveEqualitiesX callsite thing_inside
   = do { traceTc "pushLevelAndSolveEqualitiesX {" (text "Called from" <+> text callsite)
        ; (tclvl, (wanted, res))
@@ -180,7 +185,7 @@ pushLevelAndSolveEqualitiesX callsite thing_inside
 
 -- | Type-check a thing that emits only equality constraints, solving any
 -- constraints we can and re-emitting constraints that we can't.
--- We'll get another crack at it later
+-- Use this variant only when we'll get another crack at it later
 -- See Note [Failure in local type signatures]
 solveEqualities :: String -> TcM a -> TcM a
 solveEqualities callsite thing_inside
@@ -347,6 +352,9 @@ See also #18062, #11506
 
 reportUnsolvedEqualities :: SkolemInfo -> [TcTyVar] -> TcLevel
                          -> WantedConstraints -> TcM ()
+-- Reports all unsolved wanteds provided; fails in the monad if there are any.
+-- The provided SkolemInfo and [TcTyVar] arguments are used in an implication to
+-- provide skolem info for any errors.
 reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
   | isEmptyWC wanted
   = return ()
@@ -2370,7 +2378,7 @@ beta! Concrete example is in indexed_types/should_fail/ExtraTcsUntch.hs:
     h :: F Int -> ()
     h = undefined
 
-o    data TEx where
+    data TEx where
       TEx :: a -> TEx
 
     f (x::beta) =

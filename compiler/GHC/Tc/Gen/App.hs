@@ -102,7 +102,7 @@ tcInferSigma inst (L loc rn_expr)
   = addExprCtxt rn_expr $
     setSrcSpan loc $
     do { do_ql <- wantQuickLook rn_fun
-       ; (tc_fun, fun_sigma) <- tcInferAppHead rn_fun rn_args
+       ; (tc_fun, fun_sigma) <- tcInferAppHead rn_fun rn_args Nothing
        ; (_delta, inst_args, app_res_sigma) <- tcInstFun do_ql inst rn_fun fun_sigma rn_args
        ; _tc_args <- tcValArgs do_ql tc_fun inst_args
        ; return app_res_sigma }
@@ -133,7 +133,10 @@ head ::= f             -- HsVar:    variables
 
 When tcExpr sees something that starts an application chain (namely,
 any of the constructors in 'app' or 'head'), it invokes tcApp to
-typecheck it: see Note [tcApp: typechecking applications].
+typecheck it: see Note [tcApp: typechecking applications].  However,
+for HsPar and HsPragE, there is no tcWrapResult (which would
+instantiate types, bypassing Quick Look), so nothing is gained by
+using the application chain route, and we can just recurse to tcExpr.
 
 A "head" has three special cases (for which we can infer a polytype
 using tcInferAppHead_maybe); otherwise is just any old expression (for
@@ -141,6 +144,14 @@ which we can infer a rho-type (via tcInfer).
 
 There is no special treatment for HsUnboundVar, HsOverLit etc, because
 we can't get a polytype from them.
+
+It may not be immediately obvious why ExprWithTySig (e::ty) should be
+dealt with by tcApp, even when it is not applied to anything. Consider
+   f :: [forall a. a->a] -> Int
+   ...(f (undefined :: forall b. b))...
+Clearly this should work!  But it will /only/ work because if we
+instantiate that (forall b. b) impredicatively!  And that only happens
+in tcApp.
 
 Note [tcApp: typechecking applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -211,6 +222,7 @@ tcApp :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcApp rn_expr exp_res_ty
   | (rn_fun, rn_args, rebuild) <- splitHsApps rn_expr
   = do { (tc_fun, fun_sigma) <- tcInferAppHead rn_fun rn_args
+                                    (checkingExpType_maybe exp_res_ty)
 
        -- Instantiate
        ; do_ql <- wantQuickLook rn_fun
@@ -706,7 +718,7 @@ quickLookArg1 :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaType
 quickLookArg1 guarded delta larg@(L loc arg) arg_ty
   = setSrcSpan loc $
     do { let (rn_fun,rn_args,rebuild) = splitHsApps arg
-       ; mb_fun_ty <- tcInferAppHead_maybe rn_fun rn_args
+       ; mb_fun_ty <- tcInferAppHead_maybe rn_fun rn_args (Just arg_ty)
        ; traceTc "quickLookArg 1" $
          vcat [ text "arg:" <+> ppr arg
               , text "head:" <+> ppr rn_fun <+> dcolon <+> ppr mb_fun_ty

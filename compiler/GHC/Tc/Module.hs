@@ -2631,7 +2631,7 @@ https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0179-printi
   re-generalising, as discussed in #11376.
 
   > :type reverse
-  reverse :: forall a. a -> a
+  reverse :: forall a. [a] -> [a]
 
   -- foo :: forall a f b. (Show a, Num b, Foldable f) => a -> f b -> String
   > :type +v foo @Int

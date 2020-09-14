@@ -19,16 +19,18 @@ module GHC.Tc.Gen.Head
 
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId
-       , tcCheckRecSelId
-       , disambiguateSelector, obviousSig, addAmbiguousNameErr
+       , obviousSig, addAmbiguousNameErr
        , tyConOf, tyConOfET, lookupParents, fieldNotInType
        , notSelector, nonBidirectionalErr
 
        , exprCtxt, addLExprCtxt, addExprCtxt, addFunResCtxt ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcExprWithSig )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExprNC )
 
-import GHC.Hs
+import GHC.Tc.Gen.HsType
+import GHC.Tc.Gen.Pat
+import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
+import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig )
 import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
@@ -39,13 +41,12 @@ import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.UsageEnv      ( unitUE )
 import GHC.Rename.Env         ( addUsedGRE )
 import GHC.Rename.Utils       ( addNameClashErrRn, unknownSubordinateErr )
+import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
-import GHC.Tc.Gen.HsType
-import GHC.Tc.Gen.Pat
-import GHC.Tc.Gen.Sig( isCompleteHsSig )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
+import GHC.Hs
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.ConLike
@@ -317,7 +318,8 @@ pprHsExprArgTc arg = ppr arg
 ********************************************************************* -}
 
 tcInferAppHead :: HsExpr GhcRn
-               -> [HsExprArg 'TcpRn]
+               -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
+               -- These two args are solely for tcInferRecSelId
                -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Infer type of the head of an application
 --   i.e. the 'f' in (f e1 ... en)
@@ -339,26 +341,29 @@ tcInferAppHead :: HsExpr GhcRn
 --     cases are dealt with by splitHsApps.
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
-tcInferAppHead fun args
-  = setSrcSpanFromArgs args $
-    do { mb_tc_fun <- tcInferAppHead_maybe fun args
+tcInferAppHead fun args mb_res_ty
+  = setSrcSpanFromArgs args                     $
+    do { mb_tc_fun <- tcInferAppHead_maybe fun args mb_res_ty
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
-            Nothing -> addExprCtxt fun $
-                       tcInfer (tcExpr fun) }
+            Nothing -> tcInfer (tcExpr fun) }
 
 tcInferAppHead_maybe :: HsExpr GhcRn
-                     -> [HsExprArg 'TcpRn]
+                     -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
+                        -- These two args are solely for tcInferRecSelId
                      -> TcM (Maybe (HsExpr GhcTc, TcSigmaType))
 -- Returns Nothing for a complicated head
-tcInferAppHead_maybe fun args
+tcInferAppHead_maybe fun args mb_res_ty
   = case fun of
       HsVar _ (L _ nm)          -> Just <$> tcInferId nm
-      HsRecFld _ f              -> Just <$> tcInferRecSelId f args
-      ExprWithTySig _ e hs_ty
-        | isCompleteHsSig hs_ty -> addErrCtxt (exprCtxt fun) $
+      HsRecFld _ f              -> Just <$> tcInferRecSelId f args mb_res_ty
+      ExprWithTySig _ e hs_ty   -> add_ctxt $
                                    Just <$> tcExprWithSig e hs_ty
       _                         -> return Nothing
+  where
+     add_ctxt thing_inside
+       | null args = thing_inside  -- We havea already pushed the context
+       | otherwise = addExprCtxt fun thing_inside
 
 
 {- *********************************************************************
@@ -456,38 +461,18 @@ non-obvious ways.
 See also Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat.
 -}
 
-tcCheckRecSelId :: HsExpr GhcRn -> AmbiguousFieldOcc GhcRn
-                -> ExpRhoType -> TcM (HsExpr GhcTc)
-tcCheckRecSelId rn_expr (Unambiguous sel_name lbl) res_ty
-  = do { sel_id <- tc_rec_sel_id lbl sel_name
-       ; let expr = HsRecFld noExtField (Unambiguous sel_id lbl)
-       ; tcWrapResult rn_expr expr (idType sel_id) res_ty }
-tcCheckRecSelId rn_expr (Ambiguous _ lbl) res_ty
-  = case tcSplitFunTy_maybe =<< checkingExpType_maybe res_ty of
-      Nothing       -> ambiguousSelector lbl
-      Just (arg, _) -> do { sel_name <- disambiguateSelector lbl (scaledThing arg)
-                          ; sel_id <- tc_rec_sel_id lbl sel_name
-                          ; let expr = HsRecFld noExtField (Ambiguous sel_id lbl)
-                          ; tcWrapResult rn_expr expr (idType sel_id) res_ty }
-
-tcInferRecSelId :: AmbiguousFieldOcc GhcRn -> [HsExprArg 'TcpRn]
+tcInferRecSelId :: AmbiguousFieldOcc GhcRn
+                -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
                 -> TcM (HsExpr GhcTc, TcSigmaType)
--- Disgusting special case for ambiguous record selectors
-tcInferRecSelId (Ambiguous _ lbl) args
-  | arg1 : _ <- dropWhile (not . isVisibleArg) args -- A value arg is first
-  , EValArg { eva_arg = ValArg (L _ arg) } <- arg1
-  , Just sig_ty <- obviousSig arg  -- A type sig on the arg disambiguates
-  = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
-       ; sel_name  <- disambiguateSelector lbl sig_tc_ty
-       ; sel_id <- tc_rec_sel_id lbl sel_name
-       ; let expr = HsRecFld noExtField (Ambiguous sel_id lbl)
-       ; return (expr, idType sel_id) }
-  | otherwise
-  = ambiguousSelector lbl
-
-tcInferRecSelId (Unambiguous sel_name lbl) _args
+tcInferRecSelId (Unambiguous sel_name lbl) _args _mb_res_ty
    = do { sel_id <- tc_rec_sel_id lbl sel_name
         ; let expr = HsRecFld noExtField (Unambiguous sel_id lbl)
+        ; return (expr, idType sel_id) }
+
+tcInferRecSelId (Ambiguous _ lbl) args mb_res_ty
+   = do { sel_name <- tcInferAmbiguousRecSelId lbl args mb_res_ty
+        ; sel_id   <- tc_rec_sel_id lbl sel_name
+        ; let expr = HsRecFld noExtField (Ambiguous sel_id lbl)
         ; return (expr, idType sel_id) }
 
 ------------------------
@@ -498,13 +483,11 @@ tc_rec_sel_id lbl sel_name
   = do { thing <- tcLookup sel_name
        ; case thing of
              ATcId { tct_id = id }
-               -> do { check_naughty occ id    -- Note [Local record selectors]
-                     ; checkThLocalId id
-                     ; tcEmitBindingUsage $ unitUE sel_name One
+               -> do { check_local_id occ id
                      ; return id }
 
              AGlobal (AnId id)
-               -> do { check_naughty occ id
+               -> do { check_global_id occ id
                      ; return id }
                     -- A global cannot possibly be ill-staged
                     -- nor does it need the 'lifting' treatment
@@ -515,28 +498,44 @@ tc_rec_sel_id lbl sel_name
   where
     occ = rdrNameOcc (unLoc lbl)
 
-check_naughty :: OccName -> TcId -> TcM ()
-check_naughty lbl id
-  | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel lbl)
-  | otherwise                  = return ()
-
 ------------------------
+tcInferAmbiguousRecSelId :: Located RdrName
+                         -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
+                         -> TcM Name
+-- Disgusting special case for ambiguous record selectors
 -- Given a RdrName that refers to multiple record fields, and the type
 -- of its argument, try to determine the name of the selector that is
 -- meant.
 -- See Note [Disambiguating record fields]
-disambiguateSelector :: Located RdrName -> Type -> TcM Name
-disambiguateSelector lr@(L _ rdr) parent_type
+tcInferAmbiguousRecSelId lbl args mb_res_ty
+  | arg1 : _ <- dropWhile (not . isVisibleArg) args -- A value arg is first
+  , EValArg { eva_arg = ValArg (L _ arg) } <- arg1
+  , Just sig_ty <- obviousSig arg  -- A type sig on the arg disambiguates
+  = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
+       ; finish_ambiguous_selector lbl sig_tc_ty }
+
+  | Just res_ty <- mb_res_ty
+  , Just (arg_ty,_) <- tcSplitFunTy_maybe res_ty
+  = finish_ambiguous_selector lbl (scaledThing arg_ty)
+
+  | otherwise
+  = ambiguousSelector lbl
+
+finish_ambiguous_selector :: Located RdrName -> Type -> TcM Name
+finish_ambiguous_selector lr@(L _ rdr) parent_type
  = do { fam_inst_envs <- tcGetFamInstEnvs
-      ; case tyConOf fam_inst_envs parent_type of
-          Nothing -> ambiguousSelector lr
+      ; case tyConOf fam_inst_envs parent_type of {
+          Nothing -> ambiguousSelector lr ;
           Just p  ->
-            do { xs <- lookupParents rdr
-               ; let parent = RecSelData p
-               ; case lookup parent xs of
-                   Just gre -> do { addUsedGRE True gre
-                                  ; return (gre_name gre) }
-                   Nothing  -> failWithTc (fieldNotInType parent rdr) } }
+
+    do { xs <- lookupParents rdr
+       ; let parent = RecSelData p
+       ; case lookup parent xs of {
+           Nothing  -> failWithTc (fieldNotInType parent rdr) ;
+           Just gre ->
+
+    do { addUsedGRE True gre
+       ; return (gre_name gre) } } } } }
 
 -- This field name really is ambiguous, so add a suitable "ambiguous
 -- occurrence" error, then give up.
@@ -610,6 +609,101 @@ naughtyRecordSel lbl
 
 {- *********************************************************************
 *                                                                      *
+                Expressions with a type signature
+                        expr :: type
+*                                                                      *
+********************************************************************* -}
+
+tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
+              -> TcM (HsExpr GhcTc, TcSigmaType)
+tcExprWithSig expr hs_ty
+  = do { sig_info <- checkNoErrs $  -- Avoid error cascade
+                     tcUserTypeSig loc hs_ty Nothing
+       ; (expr', poly_ty) <- tcExprSig expr sig_info
+       ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
+  where
+    loc = getLoc (hsSigWcType hs_ty)
+
+tcExprSig :: LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcType)
+tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
+  = setSrcSpan loc $   -- Sets the location for the implication constraint
+    do { let poly_ty = idType poly_id
+       ; (wrap, expr') <- tcSkolemiseScoped ExprSigCtxt poly_ty $ \rho_ty ->
+                          tcCheckMonoExprNC expr rho_ty
+       ; return (mkLHsWrap wrap expr', poly_ty) }
+
+tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
+  = setSrcSpan loc $   -- Sets the location for the implication constraint
+    do { (tclvl, wanted, (expr', sig_inst))
+             <- pushLevelAndCaptureConstraints  $
+                do { sig_inst <- tcInstSig sig
+                   ; expr' <- tcExtendNameTyVarEnv (mapSnd binderVar $ sig_inst_skols sig_inst) $
+                              tcExtendNameTyVarEnv (sig_inst_wcs   sig_inst) $
+                              tcCheckPolyExprNC expr (sig_inst_tau sig_inst)
+                   ; return (expr', sig_inst) }
+       -- See Note [Partial expression signatures]
+       ; let tau = sig_inst_tau sig_inst
+             infer_mode | null (sig_inst_theta sig_inst)
+                        , isNothing (sig_inst_wcx sig_inst)
+                        = ApplyMR
+                        | otherwise
+                        = NoRestrictions
+       ; (qtvs, givens, ev_binds, residual, _)
+                 <- simplifyInfer tclvl infer_mode [sig_inst] [(name, tau)] wanted
+       ; emitConstraints residual
+
+       ; tau <- zonkTcType tau
+       ; let inferred_theta = map evVarPred givens
+             tau_tvs        = tyCoVarsOfType tau
+       ; (binders, my_theta) <- chooseInferredQuantifiers inferred_theta
+                                   tau_tvs qtvs (Just sig_inst)
+       ; let inferred_sigma = mkInfSigmaTy qtvs inferred_theta tau
+             my_sigma       = mkInvisForAllTys binders (mkPhiTy  my_theta tau)
+       ; wrap <- if inferred_sigma `eqType` my_sigma -- NB: eqType ignores vis.
+                 then return idHsWrapper  -- Fast path; also avoids complaint when we infer
+                                          -- an ambiguous type and have AllowAmbiguousType
+                                          -- e..g infer  x :: forall a. F a -> Int
+                 else tcSubTypeSigma ExprSigCtxt inferred_sigma my_sigma
+
+       ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
+       ; let poly_wrap = wrap
+                         <.> mkWpTyLams qtvs
+                         <.> mkWpLams givens
+                         <.> mkWpLet  ev_binds
+       ; return (mkLHsWrap poly_wrap expr', my_sigma) }
+
+
+{- Note [Partial expression signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Partial type signatures on expressions are easy to get wrong.  But
+here is a guiding principile
+    e :: ty
+should behave like
+    let x :: ty
+        x = e
+    in x
+
+So for partial signatures we apply the MR if no context is given.  So
+   e :: IO _          apply the MR
+   e :: _ => IO _     do not apply the MR
+just like in GHC.Tc.Gen.Bind.decideGeneralisationPlan
+
+This makes a difference (#11670):
+   peek :: Ptr a -> IO CLong
+   peek ptr = peekElemOff undefined 0 :: _
+from (peekElemOff undefined 0) we get
+          type: IO w
+   constraints: Storable w
+
+We must NOT try to generalise over 'w' because the signature specifies
+no constraints so we'll complain about not being able to solve
+Storable w.  Instead, don't generalise; then _ gets instantiated to
+CLong, as it should.
+-}
+
+
+{- *********************************************************************
+*                                                                      *
                  tcInferId, tcCheckId
 *                                                                      *
 ********************************************************************* -}
@@ -653,19 +747,12 @@ tc_infer_id id_name
  = do { thing <- tcLookup id_name
       ; case thing of
              ATcId { tct_id = id }
-               -> do { check_naughty occ id
-                           -- See Note [HsVar: naughty record selectors]
-                     ; checkThLocalId id
-                     ; tcEmitBindingUsage $ unitUE id_name One
+               -> do { check_local_id occ id
                      ; return_id id }
 
              AGlobal (AnId id)
-               -> do { check_naughty occ id
-                           -- See Note [HsVar: naughty record selectors]
+               -> do { check_global_id occ id
                      ; return_id id }
-                    -- A global cannot possibly be ill-staged
-                    -- nor does it need the 'lifting' treatment
-                    -- hence no checkTh stuff here
 
              AGlobal (AConLike cl) -> case cl of
                  RealDataCon con -> return_data_con con
@@ -725,6 +812,23 @@ tc_infer_id id_name
                                   , mkInvisForAllTys tvs $ mkInvisFunTysMany theta $ mkVisFunTys scaled_arg_tys res)
            }
 
+check_local_id :: OccName -> Id -> TcM ()
+check_local_id occ id
+  = do { check_naughty occ id  -- See Note [HsVar: naughty record selectors]
+       ; checkThLocalId id
+       ; tcEmitBindingUsage $ unitUE (idName id) One }
+
+check_global_id :: OccName -> Id -> TcM ()
+check_global_id occ id
+  = check_naughty occ id  -- See Note [HsVar: naughty record selectors]
+  -- A global cannot possibly be ill-staged
+  -- nor does it need the 'lifting' treatment
+  -- Hence no checkTh stuff here
+
+check_naughty :: OccName -> TcId -> TcM ()
+check_naughty lbl id
+  | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel lbl)
+  | otherwise                  = return ()
 
 nonBidirectionalErr :: Outputable name => name -> TcM a
 nonBidirectionalErr name = failWithTc $

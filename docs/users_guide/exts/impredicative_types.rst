@@ -25,7 +25,7 @@ instantiate ``id``\'s type with ``b := (forall s. ST s a) -> a``, and
 that is not allowed. Instantiating polymorphic type variables with
 polymorphic types is called *impredicative polymorphism*.
 
-GHC has robut support for *impredicative polymorphism*,
+GHC has robust support for *impredicative polymorphism*,
 enabled with :extension:`ImpredicativeTypes`, using the so-called Quick Look
 inference algorithm.  It is described in the paper
 `A quick look at impredicativity
@@ -38,7 +38,7 @@ Switching on :extension:`ImpredicativeTypes`
   For example ``f :: Maybe (forall a. [a] -> [a])`` is a legal type signature.
 
 - Switches on the Quick Look type inference algorithm, as described
-  in the paper.  The allow the compiler to infer impredicative instantiations of polymorphic
+  in the paper.  This allows the compiler to infer impredicative instantiations of polymorphic
   functions in many cases. For example, ``reverse xs`` will typecheck even if ``xs :: [forall a. a->a]``,
   by instantiating ``reverse`` at type ``forall a. a->a``.
 

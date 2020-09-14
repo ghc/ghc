@@ -17,7 +17,7 @@ module GHC.Tc.Gen.Expr
        ( tcCheckPolyExpr, tcCheckPolyExprNC,
          tcCheckMonoExpr, tcCheckMonoExprNC, tcMonoExpr, tcMonoExprNC,
          tcInferRho, tcInferRhoNC,
-         tcExpr, tcExprWithSig,
+         tcExpr,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
          addAmbiguousNameErr,
@@ -39,9 +39,7 @@ import GHC.Core.UsageEnv
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
-import GHC.Tc.Gen.Bind        ( chooseInferredQuantifiers, tcLocalBinds )
-import GHC.Tc.Gen.Sig         ( tcUserTypeSig, tcInstSig )
-import GHC.Tc.Solver          ( simplifyInfer, InferMode(..) )
+import GHC.Tc.Gen.Bind        ( tcLocalBinds )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Rename.Env         ( addUsedGRE )
@@ -63,7 +61,6 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Core.TyCon
-import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
@@ -183,9 +180,13 @@ tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 --   - HsVar:     lone variables, to ensure that they can get an
 --                impredicative instantiation (via Quick Look
 --                driven by res_ty (in checking mode).
-tcExpr e@(HsVar {})          res_ty = tcApp e res_ty
-tcExpr e@(HsApp {})          res_ty = tcApp e res_ty
-tcExpr e@(HsAppType {})      res_ty = tcApp e res_ty
+--   - ExprWithTySig: (e :: type)
+-- See Note [Application chains and heads] in GHC.Tc.Gen.App
+tcExpr e@(HsVar {})         res_ty = tcApp e res_ty
+tcExpr e@(HsApp {})         res_ty = tcApp e res_ty
+tcExpr e@(HsAppType {})     res_ty = tcApp e res_ty
+tcExpr e@(ExprWithTySig {}) res_ty = tcApp e res_ty
+tcExpr e@(HsRecFld {})      res_ty = tcApp e res_ty
 
 -- Typecheck an occurrence of an unbound Id
 --
@@ -286,10 +287,6 @@ tcExpr e@(HsLamCase x matches) res_ty
     msg = sep [ text "The function" <+> quotes (ppr e)
               , text "requires"]
     match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
-
-tcExpr e@(ExprWithTySig _ expr hs_ty) res_ty
-  = do { (expr', poly_ty) <- tcExprWithSig expr hs_ty
-       ; tcWrapResult e expr' poly_ty res_ty }
 
 {-
 Note [Type-checking overloaded labels]
@@ -910,8 +907,6 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         ; tcWrapResult expr expr' rec_res_ty res_ty }
 
-tcExpr e@(HsRecFld _ f) res_ty
-    = tcCheckRecSelId e f res_ty
 
 {-
 ************************************************************************
@@ -1066,7 +1061,9 @@ tcSyntaxOpGen :: CtOrigin
               -> ([TcSigmaType] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferAppHead op []
+  = do { (expr, sigma) <- tcInferAppHead op [] Nothing
+             -- Nothing here might be improved, but all this
+             -- code is scheduled for demolition anyway
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
            <- tcSynArgA orig sigma arg_tys res_ty $
@@ -1239,99 +1236,6 @@ Here's an example where it actually makes a real difference
 With the change, f1 will type-check, because the 'Char' info from
 the signature is propagated into MkQ's argument. With the check
 in the other order, the extra signature in f2 is reqd.
-
-************************************************************************
-*                                                                      *
-                Expressions with a type signature
-                        expr :: type
-*                                                                      *
-********************************************************************* -}
-
-tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
-              -> TcM (HsExpr GhcTc, TcSigmaType)
-tcExprWithSig expr hs_ty
-  = do { sig_info <- checkNoErrs $  -- Avoid error cascade
-                     tcUserTypeSig loc hs_ty Nothing
-       ; (expr', poly_ty) <- tcExprSig expr sig_info
-       ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
-  where
-    loc = getLoc (hsSigWcType hs_ty)
-
-tcExprSig :: LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcType)
-tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
-  = setSrcSpan loc $   -- Sets the location for the implication constraint
-    do { let poly_ty = idType poly_id
-       ; (wrap, expr') <- tcSkolemiseScoped ExprSigCtxt poly_ty $ \rho_ty ->
-                          tcCheckMonoExprNC expr rho_ty
-       ; return (mkLHsWrap wrap expr', poly_ty) }
-
-tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
-  = setSrcSpan loc $   -- Sets the location for the implication constraint
-    do { (tclvl, wanted, (expr', sig_inst))
-             <- pushLevelAndCaptureConstraints  $
-                do { sig_inst <- tcInstSig sig
-                   ; expr' <- tcExtendNameTyVarEnv (mapSnd binderVar $ sig_inst_skols sig_inst) $
-                              tcExtendNameTyVarEnv (sig_inst_wcs   sig_inst) $
-                              tcCheckPolyExprNC expr (sig_inst_tau sig_inst)
-                   ; return (expr', sig_inst) }
-       -- See Note [Partial expression signatures]
-       ; let tau = sig_inst_tau sig_inst
-             infer_mode | null (sig_inst_theta sig_inst)
-                        , isNothing (sig_inst_wcx sig_inst)
-                        = ApplyMR
-                        | otherwise
-                        = NoRestrictions
-       ; (qtvs, givens, ev_binds, residual, _)
-                 <- simplifyInfer tclvl infer_mode [sig_inst] [(name, tau)] wanted
-       ; emitConstraints residual
-
-       ; tau <- zonkTcType tau
-       ; let inferred_theta = map evVarPred givens
-             tau_tvs        = tyCoVarsOfType tau
-       ; (binders, my_theta) <- chooseInferredQuantifiers inferred_theta
-                                   tau_tvs qtvs (Just sig_inst)
-       ; let inferred_sigma = mkInfSigmaTy qtvs inferred_theta tau
-             my_sigma       = mkInvisForAllTys binders (mkPhiTy  my_theta tau)
-       ; wrap <- if inferred_sigma `eqType` my_sigma -- NB: eqType ignores vis.
-                 then return idHsWrapper  -- Fast path; also avoids complaint when we infer
-                                          -- an ambiguous type and have AllowAmbiguousType
-                                          -- e..g infer  x :: forall a. F a -> Int
-                 else tcSubTypeSigma ExprSigCtxt inferred_sigma my_sigma
-
-       ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
-       ; let poly_wrap = wrap
-                         <.> mkWpTyLams qtvs
-                         <.> mkWpLams givens
-                         <.> mkWpLet  ev_binds
-       ; return (mkLHsWrap poly_wrap expr', my_sigma) }
-
-
-{- Note [Partial expression signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Partial type signatures on expressions are easy to get wrong.  But
-here is a guiding principile
-    e :: ty
-should behave like
-    let x :: ty
-        x = e
-    in x
-
-So for partial signatures we apply the MR if no context is given.  So
-   e :: IO _          apply the MR
-   e :: _ => IO _     do not apply the MR
-just like in GHC.Tc.Gen.Bind.decideGeneralisationPlan
-
-This makes a difference (#11670):
-   peek :: Ptr a -> IO CLong
-   peek ptr = peekElemOff undefined 0 :: _
-from (peekElemOff undefined 0) we get
-          type: IO w
-   constraints: Storable w
-
-We must NOT try to generalise over 'w' because the signature specifies
-no constraints so we'll complain about not being able to solve
-Storable w.  Instead, don't generalise; then _ gets instantiated to
-CLong, as it should.
 -}
 
 {- *********************************************************************
