@@ -161,6 +161,9 @@ pushLevelAndSolveEqualities :: SkolemInfo -> [TcTyVar] -> TcM a -> TcM a
 -- Push level, and solve all resulting equalities
 -- If there are any unsolved equalities, report them
 -- and fail (in the monad)
+--
+-- Panics if we solve any non-equality constraints.  (In runTCSEqualities
+-- we use an error thunk for the evidence bindings.)
 pushLevelAndSolveEqualities skol_info skol_tvs thing_inside
   = do { (tclvl, wanted, res) <- pushLevelAndSolveEqualitiesX
                                       "pushLevelAndSolveEqualities" thing_inside
@@ -172,6 +175,9 @@ pushLevelAndSolveEqualitiesX :: String -> TcM a
 -- Push the level, gather equality constraints, and then solve them.
 -- Returns any remaining unsolved equalities.
 -- Does not report errors.
+--
+-- Panics if we solve any non-equality constraints.  (In runTCSEqualities
+-- we use an error thunk for the evidence bindings.)
 pushLevelAndSolveEqualitiesX callsite thing_inside
   = do { traceTc "pushLevelAndSolveEqualitiesX {" (text "Called from" <+> text callsite)
        ; (tclvl, (wanted, res))
@@ -187,6 +193,9 @@ pushLevelAndSolveEqualitiesX callsite thing_inside
 -- constraints we can and re-emitting constraints that we can't.
 -- Use this variant only when we'll get another crack at it later
 -- See Note [Failure in local type signatures]
+--
+-- Panics if we solve any non-equality constraints.  (In runTCSEqualities
+-- we use an error thunk for the evidence bindings.)
 solveEqualities :: String -> TcM a -> TcM a
 solveEqualities callsite thing_inside
   = do { traceTc "solveEqualities {" (text "Called from" <+> text callsite)
