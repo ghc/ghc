@@ -3,6 +3,8 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 {-
 (c) The University of Glasgow 2006-2012
@@ -95,7 +97,6 @@ import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Unit.Module.Name( ModuleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
-import GHC.Platform
 import GHC.Utils.BufHandle (BufHandle)
 import GHC.Data.FastString
 import qualified GHC.Utils.Ppr as Pretty
@@ -953,9 +954,9 @@ instance Outputable Extension where
     ppr = text . show
 
 -- | Outputable class with an additional Platform value
-class OutputableP a where
-   pdoc :: Platform -> a -> SDoc
-   pdocPrec :: Rational -> Platform -> a -> SDoc
+class OutputableP env a where
+   pdoc :: env -> a -> SDoc
+   pdocPrec :: Rational -> env -> a -> SDoc
                 -- 0 binds least tightly
                 -- We use Rational because there is always a
                 -- Rational between any other two Rationals
@@ -966,33 +967,33 @@ class OutputableP a where
 -- is required.
 newtype PDoc a = PDoc a
 
-instance Outputable a => OutputableP (PDoc a) where
+instance Outputable a => OutputableP env (PDoc a) where
    pdoc _ (PDoc a) = ppr a
 
-instance OutputableP a => OutputableP [a] where
-   pdoc platform xs = ppr (fmap (pdoc platform) xs)
+instance OutputableP env a => OutputableP env [a] where
+   pdoc env xs = ppr (fmap (pdoc env) xs)
 
-instance OutputableP a => OutputableP (Maybe a) where
-   pdoc platform xs = ppr (fmap (pdoc platform) xs)
+instance OutputableP env a => OutputableP env (Maybe a) where
+   pdoc env xs = ppr (fmap (pdoc env) xs)
 
-instance (OutputableP a, OutputableP b) => OutputableP (a, b) where
-    pdoc platform (a,b) = ppr (pdoc platform a, pdoc platform b)
+instance (OutputableP env a, OutputableP env b) => OutputableP env (a, b) where
+    pdoc env (a,b) = ppr (pdoc env a, pdoc env b)
 
-instance (OutputableP a, OutputableP b, OutputableP c) => OutputableP (a, b, c) where
-    pdoc platform (a,b,c) = ppr (pdoc platform a, pdoc platform b, pdoc platform c)
+instance (OutputableP env a, OutputableP env b, OutputableP env c) => OutputableP env (a, b, c) where
+    pdoc env (a,b,c) = ppr (pdoc env a, pdoc env b, pdoc env c)
 
 
-instance (OutputableP key, OutputableP elt) => OutputableP (M.Map key elt) where
-    pdoc platform m = ppr $ fmap (\(x,y) -> (pdoc platform x, pdoc platform y)) $ M.toList m
+instance (OutputableP env key, OutputableP env elt) => OutputableP env (M.Map key elt) where
+    pdoc env m = ppr $ fmap (\(x,y) -> (pdoc env x, pdoc env y)) $ M.toList m
 
-instance OutputableP a => OutputableP (SCC a) where
-   pdoc platform scc = ppr (fmap (pdoc platform) scc)
+instance OutputableP env a => OutputableP env (SCC a) where
+   pdoc env scc = ppr (fmap (pdoc env) scc)
 
-instance OutputableP SDoc where
+instance OutputableP env SDoc where
    pdoc _ x = x
 
-instance (OutputableP a) => OutputableP (Set a) where
-    pdoc platform s = braces (fsep (punctuate comma (map (pdoc platform) (Set.toList s))))
+instance (OutputableP env a) => OutputableP env (Set a) where
+    pdoc env s = braces (fsep (punctuate comma (map (pdoc env) (Set.toList s))))
 
 
 {-

@@ -9,6 +9,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 
 module GHC.Cmm.CLabel (
         CLabel, -- abstract type
@@ -1210,7 +1213,7 @@ The info table label and the local block label are both local labels
 and are not externally visible.
 -}
 
-instance OutputableP CLabel where
+instance OutputableP Platform CLabel where
   pdoc platform lbl = sdocWithDynFlags (\dflags -> pprCLabel (backend dflags) platform lbl)
 
 pprCLabel :: Backend -> Platform -> CLabel -> SDoc
