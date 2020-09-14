@@ -17,7 +17,9 @@ module TcIface (
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceAnnotations, tcIfaceCompleteSigs,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
-        tcIfaceGlobal
+        tcIfaceGlobal,
+        tcIfaceType,
+        tcJoinInfo,
  ) where
 
 #include "HsVersions.h"

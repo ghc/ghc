@@ -250,6 +250,7 @@ module DynFlags (
 
 import GhcPrelude
 
+import Binary
 import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
 import PlatformConstants
@@ -593,6 +594,9 @@ data GeneralFlag
    | Opt_ExposeAllUnfoldings
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
    | Opt_WriteHie -- generate .hie files
+
+   -- Writing phase outputs
+   | Opt_Write_Phase_Core
 
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs
@@ -944,6 +948,24 @@ data SafeHaskellMode
    | Sf_SafeInferred  -- ^ inferred as safe
    | Sf_Ignore        -- ^ @-fno-safe-haskell@ state
    deriving (Eq)
+
+instance Binary SafeHaskellMode where
+  put_ bh Sf_None         = putByte bh 0
+  put_ bh Sf_Unsafe       = putByte bh 1
+  put_ bh Sf_Trustworthy  = putByte bh 2
+  put_ bh Sf_Safe         = putByte bh 3
+  put_ bh Sf_SafeInferred = putByte bh 4
+  put_ bh Sf_Ignore       = putByte bh 5
+  get bh = do
+    i <- getByte bh
+    case i of
+      0 -> return Sf_None
+      1 -> return Sf_Unsafe
+      2 -> return Sf_Trustworthy
+      3 -> return Sf_Safe
+      4 -> return Sf_SafeInferred
+      _ -> return Sf_Ignore
+
 
 instance Show SafeHaskellMode where
     show Sf_None         = "None"
@@ -3183,6 +3205,10 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "dynamic-too"
         (NoArg (setGeneralFlag Opt_BuildDynamicToo))
 
+        ------- Phase outputs -----------------------------------------------
+  , make_ord_flag defGhcFlag "write-phase-core"
+        (NoArg (setGeneralFlag Opt_Write_Phase_Core))
+
         ------- Keeping temporary files -------------------------------------
      -- These can be singular (think ghc -c) or plural (think ghc --make)
   , make_ord_flag defGhcFlag "keep-hc-file"
@@ -4593,6 +4619,9 @@ defaultFlags settings
       Opt_SharedImplib,
       Opt_SimplPreInlining,
       Opt_VersionMacros
+#if GHC_STAGE >= 2
+      , Opt_Write_Phase_Core
+#endif
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]

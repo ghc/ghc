@@ -22,6 +22,7 @@ module IfaceSyn (
         IfaceAxBranch(..),
         IfaceTyConParent(..),
         IfaceCompleteMatch(..),
+        IfaceModGuts(..),
 
         -- * Binding names
         IfaceTopBndr,
@@ -57,7 +58,7 @@ import Name
 import CostCentre
 import Literal
 import ForeignCall
-import Annotations( AnnPayload, AnnTarget )
+import Annotations( AnnPayload, AnnTarget, Annotation )
 import BasicTypes
 import Outputable
 import Module
@@ -72,6 +73,16 @@ import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 import TysWiredIn ( constraintKindTyConName )
 import Util (seqList)
+
+import ByteCodeTypes
+import DriverPhases
+import GHC.ForeignSrcLang.Type
+import GHC.Hs.Doc ( ArgDocMap, DeclDocMap, HsDocString )
+import Avail
+import RdrName
+import {-# SOURCE #-} HscTypes
+import NameEnv
+import DynFlags
 
 import Control.Monad
 import System.IO.Unsafe
@@ -571,7 +582,50 @@ type family (==) (a :: k) (b :: k) :: Bool
           -- incompatible with: #1, #0
 The comment after an equation refers to all previous equations (0-indexed)
 that are incompatible with it.
++-}
 
+{-
++************************************************************************
++*                                                                      *
++                Phases
++*                                                                      *
++************************************************************************
++-}
+
+data IfaceModGuts = IfaceModGuts {
+    img_module        :: !Module,
+    img_hsc_src       :: HscSource,
+    img_loc           :: SrcSpan,
+    img_exports       :: ![AvailInfo],
+    img_deps          :: !Dependencies,
+    img_usages        :: ![Usage],
+    img_used_th       :: !Bool,
+    img_rdr_env       :: !GlobalRdrEnv,
+    img_fix_env       :: !FixityEnv,
+    img_tcs           :: ![IfaceTyCon],
+    img_insts         :: ![IfaceClsInst],
+    img_fam_insts     :: ![IfaceFamInst],
+    img_patsyns       :: ![IfaceDecl],
+    img_rules         :: ![IfaceRule],
+    img_binds         :: ![IfaceBinding],
+    img_foreign       :: !ForeignStubs,
+    img_foreign_files :: ![(ForeignSrcLang, FilePath)],
+    img_warns         :: !Warnings,
+    img_anns          :: [Annotation],
+    img_complete_sigs :: [CompleteMatch],
+    img_hpc_info      :: !HpcInfo,
+    img_modBreaks     :: !(Maybe ModBreaks),
+    img_inst_env      :: [IfaceClsInst],
+    img_fam_inst_env  :: [IfaceFamInst],
+    img_safe_haskell  :: SafeHaskellMode,
+    img_trust_pkg     :: Bool,
+    img_doc_hdr       :: !(Maybe HsDocString),
+    img_decl_docs     :: !DeclDocMap,
+    img_arg_docs      :: !ArgDocMap
+  }
+
+
+{-
 ************************************************************************
 *                                                                      *
               Printing IfaceDecl
@@ -2418,6 +2472,43 @@ instance Binary IfaceCompleteMatch where
   put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
   get bh = IfaceCompleteMatch <$> get bh <*> get bh
 
+instance Binary IfaceModGuts where
+  put_ bh (IfaceModGuts f1 f2 f3 f4 f5 f6 f7 _f8 _f9 f10 f11 f12 f13 f14 f15 f16 f17 f18
+                        f19 f20 f21 _f22 f23 f24 f25 f26 f27 f28 f29) = do
+    put_ bh f1
+    put_ bh f2
+    put_ bh f3
+    put_ bh f4
+    put_ bh f5
+    put_ bh f6
+    put_ bh f7
+    -- put_ bh f8
+    -- put_ bh f9
+    put_ bh f10
+    put_ bh f11
+    put_ bh f12
+    put_ bh f13
+    put_ bh f14
+    put_ bh f15
+    put_ bh f16
+    put_ bh f17
+    put_ bh f18
+    put_ bh f19
+    put_ bh f20
+    put_ bh f21
+    put_ bh f23
+    put_ bh f24
+    put_ bh f25
+    put_ bh f26
+    put_ bh f27
+    put_ bh f28
+    put_ bh f29
+
+  get bh = IfaceModGuts <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+                        <*> get bh <*> return emptyOccEnv <*> return emptyNameEnv <*> get bh <*> get bh <*> get bh
+                        <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+                        <*> get bh <*> get bh <*> get bh <*> return Nothing <*> get bh <*> get bh
+                        <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
 
 {-
 ************************************************************************

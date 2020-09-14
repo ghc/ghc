@@ -23,7 +23,8 @@ module MkIface (
         mkIfaceExports,
 
         coAxiomToIfaceDecl,
-        tyThingToIfaceDecl -- Converting things to their Iface equivalents
+        tyThingToIfaceDecl, -- Converting things to their Iface equivalents
+        toIfaceModGuts
  ) where
 
 {-
@@ -67,6 +68,7 @@ import BinFingerprint
 import LoadIface
 import ToIface
 import FlagChecker
+import Binary
 
 import DsUsage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
@@ -104,7 +106,6 @@ import Unique
 import Util             hiding ( eqListBy )
 import FastString
 import Maybes
-import Binary
 import Fingerprint
 import Exception
 import UniqSet
@@ -138,25 +139,32 @@ import qualified Data.Semigroup
 mkPartialIface :: HscEnv
                -> ModDetails
                -> ModGuts
-               -> PartialModIface
+               -> IO PartialModIface
 mkPartialIface hsc_env mod_details
-  ModGuts{ mg_module       = this_mod
-         , mg_hsc_src      = hsc_src
-         , mg_usages       = usages
-         , mg_used_th      = used_th
-         , mg_deps         = deps
-         , mg_rdr_env      = rdr_env
-         , mg_fix_env      = fix_env
-         , mg_warns        = warns
-         , mg_hpc_info     = hpc_info
-         , mg_safe_haskell = safe_mode
-         , mg_trust_pkg    = self_trust
-         , mg_doc_hdr      = doc_hdr
-         , mg_decl_docs    = decl_docs
-         , mg_arg_docs     = arg_docs
-         }
-  = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
-             safe_mode usages doc_hdr decl_docs arg_docs mod_details
+  guts@ModGuts{ mg_module       = this_mod
+              , mg_hsc_src      = hsc_src
+              , mg_usages       = usages
+              , mg_used_th      = used_th
+              , mg_deps         = deps
+              , mg_rdr_env      = rdr_env
+              , mg_fix_env      = fix_env
+              , mg_warns        = warns
+              , mg_hpc_info     = hpc_info
+              , mg_safe_haskell = safe_mode
+              , mg_trust_pkg    = self_trust
+              , mg_doc_hdr      = doc_hdr
+              , mg_decl_docs    = decl_docs
+              , mg_arg_docs     = arg_docs
+              }
+  = do when (gopt Opt_Write_Phase_Core (hsc_dflags hsc_env)) $
+         registerInterfaceDataWith "ghc/phase/core" hsc_env $ \bh ->
+           -- putWithUserData (const $ return ()) bh (toIfaceModGuts guts)
+           putWithUserData (const $ return ()) bh (map toIfaceBind $ mg_binds guts)
+       ext_fs <- readIORef $ hsc_ext_fields hsc_env
+       return iface{mi_ext_fields = ext_fs}
+    where
+      iface = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
+                       safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
@@ -311,7 +319,8 @@ mkIface_ hsc_env
           mi_doc_hdr     = doc_hdr,
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
-          mi_final_exts        = () }
+          mi_final_exts  = (),
+          mi_ext_fields  = emptyExtensibleFields }
   where
      cmp_rule     = comparing ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
@@ -2076,3 +2085,39 @@ bogusIfaceRule id_name
         ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [],
         ifRuleRhs = IfaceExt id_name, ifRuleOrph = IsOrphan,
         ifRuleAuto = True }
+
+--------------------------
+
+toIfaceModGuts :: ModGuts -> IfaceModGuts
+toIfaceModGuts (ModGuts f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18
+                        f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29) =
+  IfaceModGuts
+    f1
+    f2
+    f3
+    f4
+    f5
+    f6
+    f7
+    f8
+    f9
+    (map toIfaceTyCon f10)
+    (map instanceToIfaceInst f11)
+    (map famInstToIfaceFamInst f12)
+    (map patSynToIfaceDecl f13)
+    (map coreRuleToIfaceRule f14)
+    (map toIfaceBind f15)
+    f16
+    f17
+    f18
+    f19
+    f20
+    f21
+    f22
+    (map instanceToIfaceInst $ instEnvElts f23)
+    (map famInstToIfaceFamInst $ famInstEnvElts f24)
+    f25
+    f26
+    f27
+    f28
+    f29

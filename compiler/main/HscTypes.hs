@@ -148,7 +148,17 @@ module HscTypes (
 
         -- * COMPLETE signature
         CompleteMatch(..), CompleteMatchMap,
-        mkCompleteMatchMap, extendCompleteMatchMap
+        mkCompleteMatchMap, extendCompleteMatchMap,
+
+
+        -- * Exstensible Iface fields
+        ExtensibleFields(..), FieldName,
+        emptyExtensibleFields,
+        readField, readIfaceField, readIfaceFieldWith,
+        writeField, writeIfaceField, writeIfaceFieldWith,
+        deleteField, deleteIfaceField,
+        registerInterfaceData, registerInterfaceDataWith,
+        unregisterInterfaceData,
     ) where
 
 #include "HsVersions.h"
@@ -216,7 +226,7 @@ import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Foreign
-import Control.Monad    ( guard, liftM, ap )
+import Control.Monad    ( guard, liftM, ap, forM, forM_, replicateM )
 import Data.IORef
 import Data.Time
 import Exception
@@ -224,6 +234,8 @@ import System.FilePath
 import Control.Concurrent
 import System.Process   ( ProcessHandle )
 import Control.DeepSeq
+import qualified Data.Map as Map
+import Data.Map (Map)
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -464,6 +476,10 @@ data HscEnv
 
         hsc_FC   :: {-# UNPACK #-} !(IORef FinderCache),
                 -- ^ The cached result of performing finding in the file system
+
+        hsc_ext_fields :: {-# UNPACK #-} !(IORef ExtensibleFields),
+                -- ^ Extensible interface field data stored by plugins to be later
+                -- output in the `.hi` file.
 
         hsc_type_env_var :: Maybe (Module, IORef TypeEnv)
                 -- ^ Used for one-shot compilation only, to initialise
@@ -1070,9 +1086,17 @@ data ModIface_ (phase :: ModIfacePhase)
         mi_arg_docs :: ArgDocMap,
                 -- ^ Docs on arguments.
 
-        mi_final_exts :: !(IfaceBackendExts phase)
+        mi_final_exts :: !(IfaceBackendExts phase),
                 -- ^ Either `()` or `ModIfaceBackend` for
                 -- a fully instantiated interface.
+
+        mi_ext_fields :: ExtensibleFields
+                -- ^ Additional optional fields, where the Map key represents
+                -- the field name, resulting in a (size, serialized data) pair.
+                -- Because the data is intended to be serialized through the
+                -- internal `Binary` class (increasing compatibility with types
+                -- using `Name` and `FastString`, such as HIE), this format is
+                -- chosen over `ByteString`s.
      }
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
@@ -1144,6 +1168,9 @@ instance Binary ModIface where
                  mi_doc_hdr   = doc_hdr,
                  mi_decl_docs = decl_docs,
                  mi_arg_docs  = arg_docs,
+                 mi_ext_fields = _ext_fields, -- Don't `put_` this in the instance so we
+                                              -- can deal with its pointer in the header
+                                              -- when we write the actual file
                  mi_final_exts = ModIfaceBackend {
                    mi_iface_hash = iface_hash,
                    mi_mod_hash = mod_hash,
@@ -1244,6 +1271,8 @@ instance Binary ModIface where
                  mi_doc_hdr     = doc_hdr,
                  mi_decl_docs   = decl_docs,
                  mi_arg_docs    = arg_docs,
+                 mi_ext_fields  = emptyExtensibleFields, -- placeholder because this is dealt
+                                                         -- with specially when the file is read
                  mi_final_exts = ModIfaceBackend {
                    mi_iface_hash = iface_hash,
                    mi_mod_hash = mod_hash,
@@ -1287,7 +1316,9 @@ emptyPartialModIface mod
                mi_doc_hdr     = Nothing,
                mi_decl_docs   = emptyDeclDocMap,
                mi_arg_docs    = emptyArgDocMap,
-               mi_final_exts        = () }
+               mi_final_exts  = (),
+               mi_ext_fields  = emptyExtensibleFields
+             }
 
 emptyFullModIface :: Module -> ModIface
 emptyFullModIface mod =
@@ -1495,6 +1526,16 @@ data ForeignStubs
       --
       --  2) C stubs to use when calling
       --     "foreign exported" functions
+
+instance Binary ForeignStubs where
+  put_ bh NoStubs = putByte bh 0
+  put_ bh (ForeignStubs _f1 _f2) = put_ bh NoStubs --putByte bh 1 >> put_ bh f1 >> put_ bh f2
+  get bh = do
+    i <- getByte bh
+    case i of
+      0 -> return NoStubs
+      _ -> return NoStubs --ForeignStubs <$> get bh <*> get bh
+
 
 appendStubC :: ForeignStubs -> SDoc -> ForeignStubs
 appendStubC NoStubs            c_code = ForeignStubs empty c_code
@@ -2413,6 +2454,10 @@ type FixityEnv = NameEnv FixItem
 -- so that we can generate an interface from it
 data FixItem = FixItem OccName Fixity
 
+instance Binary FixItem where
+  put_ bh (FixItem f1 f2) = put_ bh f1 >> put_ bh f2
+  get bh = FixItem <$> get bh <*> get bh
+
 instance Outputable FixItem where
   ppr (FixItem occ fix) = ppr fix <+> ppr occ
 
@@ -3022,6 +3067,15 @@ data HpcInfo
 -- even if there is no module-local HPC usage
 type AnyHpcUsage = Bool
 
+instance Binary HpcInfo where
+  put_ bh (HpcInfo f1 f2) = putByte bh 0 >> put_ bh f1 >> put_ bh f2
+  put_ bh (NoHpcInfo f1)  = putByte bh 1 >> put_ bh f1
+  get bh = do
+    i <- getByte bh
+    case i of
+      0 -> HpcInfo <$> get bh <*> get bh
+      _ -> NoHpcInfo <$> get bh
+
 emptyHpcInfo :: AnyHpcUsage -> HpcInfo
 emptyHpcInfo = NoHpcInfo
 
@@ -3170,6 +3224,10 @@ data CompleteMatch = CompleteMatch {
                             -- ^ The TyCon that they cover (e.g. Maybe)
                           }
 
+instance Binary CompleteMatch where
+  put_ bh (CompleteMatch f1 f2) = put_ bh f1 >> put_ bh f2
+  get bh = CompleteMatch <$> get bh <*> get bh
+
 instance Outputable CompleteMatch where
   ppr (CompleteMatch cl ty) = text "CompleteMatch:" <+> ppr cl
                                                     <+> dcolon <+> ppr ty
@@ -3254,7 +3312,119 @@ phaseForeignLanguage phase = case phase of
 -- avoid major space leaks.
 instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclExts (phase :: ModIfacePhase))) => NFData (ModIface_ phase) where
   rnf (ModIface f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12
-                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23) =
+                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24) =
     rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` f6 `seq` rnf f7 `seq` f8 `seq`
     f9 `seq` rnf f10 `seq` rnf f11 `seq` f12 `seq` rnf f13 `seq` rnf f14 `seq` rnf f15 `seq`
     rnf f16 `seq` f17 `seq` rnf f18 `seq` rnf f19 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23
+    `seq` rnf f24
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Extensible Iface Fields}
+*                                                                      *
+************************************************************************
+-}
+
+type FieldName = String
+
+newtype ExtensibleFields = ExtensibleFields { getExtensibleFields :: (Map FieldName BinData) }
+
+instance Binary ExtensibleFields where
+  put_ bh (ExtensibleFields fs) = do
+    put_ bh (Map.size fs :: Int)
+
+    -- Put the names of each field, and reserve a space
+    -- for a payload pointer after each name:
+    header_entries <- forM (Map.toList fs) $ \(name, dat) -> do
+      put_ bh name
+      field_p_p <- tellBin bh
+      put_ bh field_p_p
+      return (field_p_p, dat)
+
+    -- Now put the payloads and use the reserved space
+    -- to point to the start of each payload:
+    forM_ header_entries $ \(field_p_p, dat) -> do
+      field_p <- tellBin bh
+      putAt bh field_p_p field_p
+      seekBin bh field_p
+      put_ bh dat
+
+  get bh = do
+    n <- get bh :: IO Int
+
+    -- Get the names and field pointers:
+    header_entries <- replicateM n $ do
+      (,) <$> get bh <*> get bh
+
+    -- Seek to and get each field's payload:
+    fields <- forM header_entries $ \(name, field_p) -> do
+      seekBin bh field_p
+      dat <- get bh
+      return (name, dat)
+
+    return . ExtensibleFields . Map.fromList $ fields
+
+instance NFData ExtensibleFields where
+  rnf (ExtensibleFields fs) = rnf fs
+
+emptyExtensibleFields :: ExtensibleFields
+emptyExtensibleFields = ExtensibleFields Map.empty
+
+--------------------------------------------------------------------------------
+-- | Reading
+
+readIfaceField :: Binary a => FieldName -> ModIface -> IO (Maybe a)
+readIfaceField name = readIfaceFieldWith name get
+
+readField :: Binary a => FieldName -> ExtensibleFields -> IO (Maybe a)
+readField name = readFieldWith name get
+
+readIfaceFieldWith :: FieldName -> (BinHandle -> IO a) -> ModIface -> IO (Maybe a)
+readIfaceFieldWith name read iface = readFieldWith name read (mi_ext_fields iface)
+
+readFieldWith :: FieldName -> (BinHandle -> IO a) -> ExtensibleFields -> IO (Maybe a)
+readFieldWith name read fields = sequence $ ((read =<<) . dataHandle) <$>
+  Map.lookup name (getExtensibleFields fields)
+
+--------------------------------------------------------------------------------
+-- | Writing
+
+writeIfaceField :: Binary a => FieldName -> a -> ModIface -> IO ModIface
+writeIfaceField name x = writeIfaceFieldWith name (`put_` x)
+
+writeField :: Binary a => FieldName -> a -> ExtensibleFields -> IO ExtensibleFields
+writeField name x = writeFieldWith name (`put_` x)
+
+writeIfaceFieldWith :: FieldName -> (BinHandle -> IO ()) -> ModIface -> IO ModIface
+writeIfaceFieldWith name write iface = do
+  fields <- writeFieldWith name write (mi_ext_fields iface)
+  return iface{ mi_ext_fields = fields }
+
+writeFieldWith :: FieldName -> (BinHandle -> IO ()) -> ExtensibleFields -> IO ExtensibleFields
+writeFieldWith name write fields = do
+  bh <- openBinMem (1024 * 1024)
+  write bh
+  --
+  bd <- handleData bh
+  return $ ExtensibleFields (Map.insert name bd $ getExtensibleFields fields)
+
+deleteField :: FieldName -> ExtensibleFields -> ExtensibleFields
+deleteField name (ExtensibleFields fs) = ExtensibleFields $ Map.delete name fs
+
+deleteIfaceField :: FieldName -> ModIface -> ModIface
+deleteIfaceField name iface = iface { mi_ext_fields = deleteField name (mi_ext_fields iface) }
+
+registerInterfaceData :: Binary a => FieldName -> HscEnv -> a -> IO ()
+registerInterfaceData name env x = registerInterfaceDataWith name env (`put_` x)
+
+registerInterfaceDataWith :: FieldName -> HscEnv -> (BinHandle -> IO ()) -> IO ()
+registerInterfaceDataWith name env write = do
+  ext_fs  <- readIORef (hsc_ext_fields env)
+  ext_fs' <- writeFieldWith name write ext_fs
+  writeIORef (hsc_ext_fields env) ext_fs'
+
+unregisterInterfaceData :: FieldName -> HscEnv -> IO ()
+unregisterInterfaceData name env = do
+  ext_fs <- readIORef (hsc_ext_fields env)
+  writeIORef (hsc_ext_fields env) (deleteField name ext_fs)

@@ -41,6 +41,10 @@ data Annotation = Annotation {
         ann_value  :: AnnPayload
     }
 
+instance Binary Annotation where
+  put_ bh (Annotation f1 f2) = put_ bh f1 >> put_ bh f2
+  get bh = Annotation <$> get bh <*> get bh
+
 type AnnPayload = Serialized    -- ^ The "payload" of an annotation
                                 --   allows recovery of its value at a given type,
                                 --   and can be persisted to an interface file
