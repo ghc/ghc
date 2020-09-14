@@ -1,4 +1,8 @@
 {-# LANGUAGE BangPatterns, CPP, DeriveFunctor #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -113,7 +117,7 @@ data RegAllocStats statics instr
         deriving (Functor)
 
 
-instance (OutputableP statics, OutputableP instr)
+instance (OutputableP Platform statics, OutputableP Platform instr)
        => Outputable (RegAllocStats statics instr) where
 
  ppr (s@RegAllocStatsStart{})
