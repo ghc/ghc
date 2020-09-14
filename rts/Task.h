@@ -149,7 +149,7 @@ typedef struct Task_ {
     struct InCall_ *spare_incalls;
 
     bool    worker;          // == true if this is a worker Task
-    bool    stopped;         // == true between newBoundTask and
+    bool    stopped;         // == false between newBoundTask and
                                 // exitMyTask, or in a worker Task.
 
     // So that we can detect when a finalizer illegally calls back into Haskell
