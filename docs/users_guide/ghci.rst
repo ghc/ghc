@@ -2968,7 +2968,7 @@ commonly used commands.
 
     Infers and prints the type of ⟨expression⟩.  For polymorphic types
     it instantiates the 'inferred' forall quantifiers (but not the
-    'specified' ones), solves constraints, and re-generalises.
+    'specified' ones; see :ref:`inferred-vs-specified`), solves constraints, and re-generalises.
 
     .. code-block:: none
 
