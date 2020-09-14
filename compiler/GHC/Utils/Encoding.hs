@@ -277,7 +277,8 @@ utf8EncodedLength str = go 0 str
           | otherwise       = go (n+4) cs
 
 -- -----------------------------------------------------------------------------
--- The Z-encoding
+-- Note [Z-Encoding]
+-- ~~~~~~~~~~~~~~~~~
 
 {-
 This is the main name-encoding and decoding function.  It encodes any
