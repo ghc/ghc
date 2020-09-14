@@ -196,7 +196,7 @@ data FastString = FastString {
       n_chars :: {-# UNPACK #-} !Int, -- number of chars
       fs_sbs  :: {-# UNPACK #-} !ShortByteString,
       fs_zenc :: FastZString
-      -- ^ Lazily computed z-encoding of this string. See Note [Z-Encoding] in
+      -- ^ Lazily computed Z-encoding of this string. See Note [Z-Encoding] in
       -- GHC.Utils.Encoding.
       --
       -- Since 'FastString's are globally memoized this is computed at most
