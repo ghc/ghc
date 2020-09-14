@@ -64,6 +64,7 @@ categories = {
     'coverage': 'Program coverage',
     'cpp': 'C pre-processor',
     'debugging': 'Debugging the compiler',
+    'extended-interface-files': 'Extended interface files',
     'interactive': 'Interactive mode',
     'interface-files': 'Interface files',
     'keep-intermediates': 'Keeping intermediate files',

@@ -127,6 +127,21 @@ More details in :ref:`hi-options`
     :type: table
     :category: interface-files
 
+Extended interface file options
+-------------------------------
+
+More details in :ref:`hie-options`
+
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: extended-interface-files
+
 Recompilation checking
 ----------------------
 
