@@ -16,7 +16,7 @@ import qualified Language.Haskell.TH as TH
 
 plugin :: Plugin
 plugin = defaultPlugin {
-    installCoreToDos = install,
+    installCoreToDos = Just install,
     pluginRecompile  = purePlugin
   }
 

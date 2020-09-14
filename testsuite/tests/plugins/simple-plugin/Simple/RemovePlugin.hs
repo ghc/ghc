@@ -3,7 +3,7 @@ module Simple.RemovePlugin where
 
 import Control.Monad.IO.Class
 import Data.List (intercalate)
-import GHC.Driver.Plugins
+import GHC.Plugins
 import GHC.Data.Bag
 import GHC.Driver.Types
 import GHC.Tc.Types
@@ -21,10 +21,10 @@ import GHC.Types.Avail
 import GHC.Hs.Dump
 
 plugin :: Plugin
-plugin = defaultPlugin { parsedResultAction = parsedPlugin
-                       , typeCheckResultAction = typecheckPlugin
-                       , spliceRunAction = metaPlugin'
-                       , interfaceLoadAction = interfaceLoadPlugin'
+plugin = defaultPlugin { parsedResultAction    = Just parsedPlugin
+                       , typeCheckResultAction = Just typecheckPlugin
+                       , spliceRunAction       = Just metaPlugin'
+                       , interfaceLoadAction   = Just interfaceLoadPlugin'
                        }
 
 parsedPlugin :: [CommandLineOption] -> ModSummary -> HsParsedModule

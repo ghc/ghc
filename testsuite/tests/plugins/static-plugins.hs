@@ -13,7 +13,7 @@ import GHC.Hs.Extension
 import GHC.Hs.ImpExp
 import GHC.Driver.Types
 import GHC.Utils.Outputable
-import GHC.Driver.Plugins
+import GHC.Plugins
 import System.Environment
 import GHC.Tc.Types
 

@@ -28,9 +28,9 @@ main = do
   [libdir] <- getArgs
   modules <- parserDeps libdir
   let num = sizeUniqSet modules
---  print num
---  print (map moduleNameString $ nonDetEltsUniqSet modules)
-  unless (num <= 201) $ exitWith (ExitFailure num)
+  putStrLn $ "Found " ++ show num ++ " parser module dependencies"
+  --forM_ (map moduleNameString $ nonDetEltsUniqSet modules) putStrLn
+  unless (num <= 172) $ exitWith (ExitFailure num)
 
 parserDeps :: FilePath -> IO (UniqSet ModuleName)
 parserDeps libdir =

@@ -6,6 +6,8 @@
 
 {-# LANGUAGE CPP, DeriveFunctor, ExistentialQuantification, GeneralizedNewtypeDeriving,
              ViewPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Various types used during typechecking.
 --
@@ -85,6 +87,8 @@ module GHC.Tc.Types(
 import GHC.Prelude
 import GHC.Platform
 
+import qualified GHC.Plugins.Types
+
 import GHC.Hs
 import GHC.Driver.Types
 import GHC.Tc.Types.Evidence
@@ -124,6 +128,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Builtin.Names ( isUnboundName )
 import GHC.Types.CostCentre.State
+import GHC.Driver.Hooks
 
 import Control.Monad (ap)
 import Data.Set      ( Set )
@@ -1645,6 +1650,13 @@ data TcPlugin = forall s. TcPlugin
   , tcPluginStop  :: s -> TcPluginM ()
    -- ^ Clean up after the plugin, when exiting the type-checker.
   }
+
+type instance GHC.Driver.Hooks.ThMetaHook              = MetaHook TcM
+type instance GHC.Plugins.Types.TTypeCheckPlugin       = TcPlugin
+type instance GHC.Plugins.Types.TRenameResultAction    = TcGblEnv -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
+type instance GHC.Plugins.Types.TTypeCheckResultAction = ModSummary -> TcGblEnv -> TcM TcGblEnv
+type instance GHC.Plugins.Types.TSpliceRunAction       = LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
+
 
 data TcPluginResult
   = TcPluginContradiction [Ct]

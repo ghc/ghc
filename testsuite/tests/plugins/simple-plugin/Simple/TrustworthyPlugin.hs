@@ -5,8 +5,8 @@ import GHC.Tc.Utils.Monad
 
 plugin :: Plugin
 plugin = defaultPlugin
-  { renamedResultAction = keepRenamedSource
-  , typeCheckResultAction = printHaskellSafeMode
+  { renamedResultAction   = Just keepRenamedSource
+  , typeCheckResultAction = Just printHaskellSafeMode
   }
   where
     printHaskellSafeMode _ ms tcg = liftIO $ do

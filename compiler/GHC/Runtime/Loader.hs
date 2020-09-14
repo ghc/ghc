@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, MagicHash #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Dynamically lookup up values from modules and loading them.
 module GHC.Runtime.Loader (
@@ -36,7 +37,8 @@ import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                                , gre_name, mkRdrQual )
 import GHC.Types.Name.Occurrence ( OccName, mkVarOcc )
 import GHC.Rename.Names ( gresFromAvails )
-import GHC.Driver.Plugins
+import GHC.Plugins.Types
+import GHC.Plugins.Loaded
 import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
 
 import GHC.Driver.Types
@@ -58,6 +60,9 @@ import Control.Monad     ( unless )
 import Data.Maybe        ( mapMaybe )
 import Unsafe.Coerce     ( unsafeCoerce )
 
+
+type instance GHC.Driver.Hooks.GetValueSafelyHook = HscEnv -> Name -> Type -> IO (Maybe HValue)
+
 -- | Loads the plugins specified in the pluginModNames field of the dynamic
 -- flags. Should be called after command line arguments are parsed, but before
 -- actual compilation starts. Idempotent operation. Should be re-called if
@@ -73,11 +78,12 @@ initializePlugins hsc_env df
   | otherwise
   = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
        let df' = df { cachedPlugins = loadedPlugins }
-       df'' <- withPlugins df' runDflagsPlugin df'
+       df'' <- withPlugins df' dynflagsPlugin df'
        return df''
 
   where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
-        runDflagsPlugin p opts dynflags = dynflagsPlugin p opts dynflags
+
+type instance GHC.Plugins.Types.TDynFlagsPlugin = DynFlags -> IO DynFlags
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env

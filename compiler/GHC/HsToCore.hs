@@ -73,7 +73,7 @@ import GHC.HsToCore.Docs
 import Data.List
 import Data.IORef
 import Control.Monad( when )
-import GHC.Driver.Plugins ( LoadedPlugin(..) )
+import GHC.Plugins.Loaded ( LoadedPlugin(..) )
 
 {-
 ************************************************************************

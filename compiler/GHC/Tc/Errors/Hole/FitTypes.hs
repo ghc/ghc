@@ -1,4 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE TypeFamilies #-}
+
 module GHC.Tc.Errors.Hole.FitTypes (
   TypedHole (..), HoleFit (..), HoleFitCandidate (..),
   CandPlugin, FitPlugin, HoleFitPlugin (..), HoleFitPluginR (..),
@@ -7,6 +9,7 @@ module GHC.Tc.Errors.Hole.FitTypes (
 
 import GHC.Prelude
 
+import qualified GHC.Plugins.Types
 import GHC.Tc.Types
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.TcType
@@ -129,6 +132,8 @@ type FitPlugin =  TypedHole -> [HoleFit] -> TcM [HoleFit]
 data HoleFitPlugin = HoleFitPlugin
   { candPlugin :: CandPlugin
   , fitPlugin :: FitPlugin }
+
+type instance GHC.Plugins.Types.THoleFitPlugin = HoleFitPluginR
 
 -- | HoleFitPluginR adds a TcRef to hole fit plugins so that plugins can
 -- track internal state. Note the existential quantification, ensuring that

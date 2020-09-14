@@ -226,6 +226,12 @@ module GHC.Driver.Session (
 
         -- * SDoc
         initSDocContext, initDefaultSDocContext,
+
+        -- * Hooks
+        getHooked, lookupHook, lookupHook',
+
+        -- * Plugins
+        plugins, foldPluginsM, filterPlugins, withPlugins, withPlugins_
   ) where
 
 #include "HsVersions.h"
@@ -241,8 +247,9 @@ import GHC.Unit.Types
 import GHC.Unit.Parser
 import GHC.Unit.Module
 import GHC.Driver.Ppr
-import {-# SOURCE #-} GHC.Driver.Plugins
-import {-# SOURCE #-} GHC.Driver.Hooks
+import GHC.Plugins.Types
+import {-# SOURCE #-} GHC.Plugins.Loaded
+import GHC.Driver.Hooks
 import GHC.Builtin.Names ( mAIN )
 import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
@@ -5101,3 +5108,50 @@ initSDocContext dflags style = SDC
 initDefaultSDocContext :: DynFlags -> SDocContext
 initDefaultSDocContext dflags = initSDocContext dflags defaultUserStyle
 
+
+----------------------------------------
+-- Hooks
+----------------------------------------
+
+getHooked :: (Functor f, HasDynFlags f) => (Hooks -> Maybe a) -> a -> f a
+getHooked hook def = fmap (lookupHook hook def) getDynFlags
+
+lookupHook :: (Hooks -> Maybe a) -> a -> DynFlags -> a
+lookupHook hook def = fromMaybe def . hook . hooks
+
+lookupHook' :: (Hooks -> Maybe b) -> (b -> a) -> a -> DynFlags -> a
+lookupHook' hook unp def = fromMaybe def . fmap unp . hook . hooks
+
+----------------------------------------
+-- Plugins
+----------------------------------------
+
+
+plugins :: DynFlags -> [PluginWithArgs]
+plugins df =
+  map lpPlugin (cachedPlugins df) ++
+  map spPlugin (staticPlugins df)
+
+type PluginOperation f = Plugin -> Maybe ([CommandLineOption] -> f)
+
+-- | Perform an operation by using all of the plugins in turn.
+foldPluginsM :: Monad m => DynFlags -> PluginOperation f -> a -> (f -> a -> m a) -> m a
+foldPluginsM df op input app = foldM go input (plugins df)
+  where
+    go arg (PluginWithArgs p opts) = case op p of
+      Nothing -> return arg
+      Just f  -> app (f opts) arg
+
+withPlugins :: Monad m => DynFlags -> PluginOperation (a -> m a) -> a -> m a
+withPlugins df op input = foldPluginsM df op input id
+
+filterPlugins :: DynFlags -> PluginOperation p -> [p]
+filterPlugins df f = mapMaybe (\(PluginWithArgs p opts) -> ($ opts) <$> f p) (plugins df)
+
+type ConstPluginOperation m a = Plugin -> [CommandLineOption] -> a -> m ()
+
+-- | Perform a constant operation by using all of the plugins in turn.
+withPlugins_ :: Monad m => DynFlags -> ConstPluginOperation m a -> a -> m ()
+withPlugins_ df transformation input
+  = mapM_ (\(PluginWithArgs p opts) -> transformation p opts input)
+          (plugins df)

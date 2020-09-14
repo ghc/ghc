@@ -62,7 +62,7 @@ import GHC.Rename.Expr
 import GHC.Rename.Utils  ( HsDocContext(..) )
 import GHC.Rename.Fixity ( lookupFixityRn )
 import GHC.Builtin.Types ( unitTy, mkListTy )
-import GHC.Driver.Plugins
+import GHC.Plugins.Types
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Iface.Syntax ( ShowSub(..), showToHeader )
@@ -3039,7 +3039,7 @@ withTcPlugins hsc_env m =
        return (solve s, stop s)
 
 getTcPlugins :: DynFlags -> [GHC.Tc.Utils.Monad.TcPlugin]
-getTcPlugins dflags = catMaybes $ mapPlugins dflags (\p args -> tcPlugin p args)
+getTcPlugins dflags = filterPlugins dflags tcPlugin
 
 
 withHoleFitPlugins :: HscEnv -> TcM a -> TcM a
@@ -3061,8 +3061,7 @@ withHoleFitPlugins hsc_env m =
          return (plugin ref, stop ref)
 
 getHfPlugins :: DynFlags -> [HoleFitPluginR]
-getHfPlugins dflags =
-  catMaybes $ mapPlugins dflags (\p args -> holeFitPlugin p args)
+getHfPlugins dflags = filterPlugins dflags holeFitPlugin
 
 
 runRenamerPlugin :: TcGblEnv
@@ -3070,9 +3069,9 @@ runRenamerPlugin :: TcGblEnv
                  -> TcM (TcGblEnv, HsGroup GhcRn)
 runRenamerPlugin gbl_env hs_group = do
     dflags <- getDynFlags
-    withPlugins dflags
-      (\p opts (e, g) -> ( mark_plugin_unsafe dflags >> renamedResultAction p opts e g))
-      (gbl_env, hs_group)
+    foldPluginsM dflags renamedResultAction (gbl_env, hs_group) $ \m (e,g) -> do
+      mark_plugin_unsafe dflags
+      m e g
 
 
 -- XXX: should this really be a Maybe X?  Check under which circumstances this
@@ -3092,10 +3091,9 @@ getRenamedStuff tc_result
 runTypecheckerPlugin :: ModSummary -> HscEnv -> TcGblEnv -> TcM TcGblEnv
 runTypecheckerPlugin sum hsc_env gbl_env = do
     let dflags = hsc_dflags hsc_env
-    withPlugins dflags
-      (\p opts env -> mark_plugin_unsafe dflags
-                        >> typeCheckResultAction p opts sum env)
-      gbl_env
+    foldPluginsM dflags typeCheckResultAction gbl_env $ \m env -> do
+      mark_plugin_unsafe dflags
+      m sum env
 
 mark_plugin_unsafe :: DynFlags -> TcM ()
 mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $

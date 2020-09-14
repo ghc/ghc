@@ -6,7 +6,7 @@ import GHC.Plugins
 import Data.Bits
 
 plugin :: Plugin
-plugin = defaultPlugin {installCoreToDos = install}
+plugin = defaultPlugin {installCoreToDos = Just install}
   where install _ todos = return (test : todos)
 
         test = CoreDoPluginPass "Test" check

@@ -33,7 +33,8 @@ import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 
 -- Frontend plugins
 import GHC.Runtime.Loader   ( loadFrontendPlugin )
-import GHC.Driver.Plugins
+import GHC.Plugins.Types
+import GHC.Plugins.Frontend ()
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHC.Runtime.Loader   ( initializePlugins )
 #endif

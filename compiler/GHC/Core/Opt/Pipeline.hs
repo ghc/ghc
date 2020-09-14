@@ -53,8 +53,8 @@ import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Unit.Module.Env
-import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
-import GHC.Runtime.Loader -- ( initializePlugins )
+import GHC.Plugins.Types         ( installCoreToDos )
+import GHC.Runtime.Loader
 
 import GHC.Types.Unique.Supply ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import GHC.Types.Unique.FM

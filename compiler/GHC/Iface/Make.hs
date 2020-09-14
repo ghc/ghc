@@ -72,7 +72,7 @@ import Data.Function
 import Data.List ( findIndex, mapAccumL, sortBy )
 import Data.Ord
 import Data.IORef
-import GHC.Driver.Plugins (LoadedPlugin(..))
+import GHC.Plugins.Loaded (LoadedPlugin(..))
 
 {-
 ************************************************************************
