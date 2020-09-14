@@ -376,7 +376,7 @@ data SDocContext = SDC
       -- Note that we use `FastString` instead of `UnitId` to avoid boring
       -- module inter-dependency issues.
 
-  , sdocDynFlags                    :: DynFlags -- TODO: remove
+  , sdocDynFlags                    :: DynFlags -- TODO: remove (see Note [The OutputableP class])
   }
 
 instance IsString SDoc where
@@ -798,13 +798,9 @@ coloured col sdoc = sdocOption sdocShouldUseColor $ \case
 keyword :: SDoc -> SDoc
 keyword = coloured Col.colBold
 
-{-
-************************************************************************
-*                                                                      *
-\subsection[Outputable-class]{The @Outputable@ class}
-*                                                                      *
-************************************************************************
--}
+-----------------------------------------------------------------------
+-- The @Outputable@ class
+-----------------------------------------------------------------------
 
 -- | Class designating that some type has an 'SDoc' representation
 class Outputable a where
@@ -953,7 +949,110 @@ instance Outputable Serialized where
 instance Outputable Extension where
     ppr = text . show
 
--- | Outputable class with an additional Platform value
+-----------------------------------------------------------------------
+-- The @OutputableP@ class
+-----------------------------------------------------------------------
+
+-- Note [The OutputableP class]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- SDoc has become the common type to
+--    * display messages in the terminal
+--    * dump outputs (Cmm, Asm, C, etc.)
+--    * return messages to ghc-api clients
+--
+-- SDoc is a kind of state Monad: SDoc ~ State SDocContext Doc
+-- I.e. to render a SDoc, a SDocContext must be provided.
+--
+-- SDocContext contains legit rendering options (e.g., line length, color and
+-- unicode settings). Sadly SDocContext ended up also being used to thread
+-- values that were considered bothersome to thread otherwise:
+--    * current HomeModule: to decide if module names must be printed qualified
+--    * current UnitState: to print unit-ids as "packagename-version:component"
+--    * target platform: to render labels, instructions, etc.
+--    * selected backend: to display CLabel as C labels or Asm labels
+--
+-- In fact the whole compiler session state that is DynFlags was passed in
+-- SDocContext and these values were retrieved from it. (At the time of writing,
+-- a DynFlags field is still present into SDocContext but hopefully it shouldn't
+-- last long).
+--
+-- The Outputable class makes SDoc creation easy for many values by providing
+-- the ppr method:
+--
+--    class Outputable a where
+--       ppr :: a -> SDoc
+--
+-- Almost every type is Outputable in the compiler and it seems great because it
+-- is similar to the Show class. But it's a fallacious simplicity because `SDoc`
+-- needs a `SDocContext` to be transformed into a renderable `Doc`: who is going
+-- to provide the SDocContext with the correct values in it?
+--
+--    E.g. if a SDoc is returned in an exception, how could we know the home
+--    module at the time it was thrown?
+--
+-- A workaround is to pass dummy values (no home module, empty UnitState) at SDoc
+-- rendering time and to hope that the code that produced the SDoc has updated
+-- the SDocContext with meaningful values (e.g. using withPprStyle or
+-- pprWithUnitState). If the context isn't correctly updated, a dummy value is
+-- used and the printed result isn't what we expected. Note that the compiler
+-- doesn't help us finding spots where we need to update the SDocContext.
+--
+-- In some cases we can't pass a dummy value because we can't create one. For
+-- example, how can we create a dummy Platform value? In the old days, GHC only
+-- supported a single Platform set when it was built, so we could use it without
+-- any risk of mistake. But now GHC starts supporting several Platform in the
+-- same session so it becomes an issue. We could be tempted to use the
+-- workaround described above by using "undefined" as a dummy Platform value.
+-- However in this case, if we forget to update it we will get a runtime
+-- error/crash. We could use "Maybe Platform" and die with a better error
+-- message at places where we really really need to know if we are on Windows or
+-- not, or if we use 32- or 64-bit. Still the compiler would not help us in
+-- finding spots where to update the context with a valid Platform.
+--
+-- So finally here comes the OutputableP class:
+--
+--    class OutputableP env a where
+--       pdoc :: env -> a -> SDoc
+--
+-- OutputableP forces us to thread an environment necessary to print a value.
+-- For now we only use it to thread a Platform environment, so we have several
+-- "Outputable Platform XYZ" instances. In the future we could imagine using a
+-- Has class to retrieve a value from a generic environment to make the code
+-- more composable. E.g.:
+--
+--    instance Has Platform env => OutputableP env XYZ where
+--       pdoc env a = ... (getter env :: Platform)
+--
+-- A drawback of this approach over Outputable is that we have to thread an
+-- environment explicitly to use "pdoc" and it's more cumbersome. But it's the
+-- price to pay to have some help from the compiler to ensure that we... thread
+-- an environment down to the places where we need it, i.e. where SDoc are
+-- created (not rendered). On the other hand, it makes life easier for SDoc
+-- renderers as they only have to deal with pretty-printing related options in
+-- SDocContext.
+--
+-- TODO:
+--
+-- 1) we could use OutputableP to thread a UnitState and replace the Outputable
+-- instance of UnitId with:
+--
+--       instance OutputableP UnitState UnitId where ...
+--
+--    This would allow the removal of the `sdocUnitIdForUser` field.
+--
+--    Be warned: I've tried to do it, but there are A LOT of other Outputable
+--    instances depending on UnitId's one. In particular:
+--       UnitId <- Unit <- Module <- Name <- Var <- Core.{Type,Expr} <- ...
+--
+-- 2) Use it to pass the HomeModule (but I fear it will be as difficult as for
+-- UnitId).
+--
+--
+
+-- | Outputable class with an additional environment value
+--
+-- See Note [The OutputableP class]
 class OutputableP env a where
    pdoc :: env -> a -> SDoc
    pdocPrec :: Rational -> env -> a -> SDoc
