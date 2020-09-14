@@ -385,7 +385,10 @@ import GHC.Data.Maybe
 import System.IO.Error  ( isDoesNotExistError )
 import System.Environment ( getEnv )
 import System.Directory
+import System.Process
 
+type instance GHC.Driver.Hooks.CreateIservProcessHook
+   = CreateProcess -> IO ProcessHandle
 
 -- %************************************************************************
 -- %*                                                                      *

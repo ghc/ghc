@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns, MultiWayIf #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -88,6 +89,13 @@ import Data.Version
 import Data.Either      ( partitionEithers )
 
 import Data.Time        ( UTCTime )
+
+
+type instance GHC.Driver.Hooks.PhaseHook
+   = PhasePlus -> FilePath -> DynFlags -> CompPipeline (PhasePlus, FilePath)
+
+type instance GHC.Driver.Hooks.LinkHook
+   = GhcLink -> DynFlags -> Bool -> HomePackageTable -> IO SuccessFlag
 
 -- ---------------------------------------------------------------------------
 -- Pre-process

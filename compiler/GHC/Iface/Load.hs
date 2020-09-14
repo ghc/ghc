@@ -8,7 +8,9 @@ Loading interface files
 
 {-# LANGUAGE CPP, BangPatterns, RecordWildCards, NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module GHC.Iface.Load (
         -- Importing one thing
         tcLookupImported_maybe, importDecl,
@@ -81,7 +83,7 @@ import GHC.Driver.Hooks
 import GHC.Types.FieldLabel
 import GHC.Iface.Rename
 import GHC.Types.Unique.DSet
-import GHC.Driver.Plugins
+import GHC.Plugins.Types
 import GHC.Unit.Home
 
 import Control.Monad
@@ -91,6 +93,11 @@ import Data.Map ( toList )
 import System.FilePath
 import System.Directory
 
+type instance GHC.Plugins.Types.TInterfaceLoadAction
+   = ModIface -> IfM () ModIface
+
+type instance GHC.Driver.Hooks.GhcPrimIfaceHook
+   = ModIface
 {-
 ************************************************************************
 *                                                                      *
@@ -532,7 +539,7 @@ loadInterface doc_str mod from
 
         ; -- invoke plugins with *full* interface, not final_iface, to ensure
           -- that plugins have access to declarations, etc.
-          res <- withPlugins dflags (\p -> interfaceLoadAction p) iface
+          res <- setLclEnv () $ withPlugins dflags interfaceLoadAction iface
         ; return (Succeeded res)
     }}}}
 
@@ -1320,3 +1327,4 @@ homeModError mod location
            Just file -> space <> parens (text file)
            Nothing   -> Outputable.empty)
     <+> text "which is not loaded"
+

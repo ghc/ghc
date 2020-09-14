@@ -1,77 +1,63 @@
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Definitions for writing /plugins/ for GHC. Plugins can hook into
 -- several areas of the compiler. See the 'Plugin' type. These plugins
 -- include type-checker plugins, source plugins, and core-to-core plugins.
 
-module GHC.Driver.Plugins (
+module GHC.Plugins.Types (
       -- * Plugins
       Plugin(..)
+    , FrontendPlugin(..)
+    , StaticPlugin(..)
     , defaultPlugin
     , CommandLineOption
+
       -- ** Recompilation checking
     , purePlugin, impurePlugin, flagRecompile
     , PluginRecompile(..)
 
       -- * Plugin types
-      -- ** Frontend plugins
-    , FrontendPlugin(..), defaultFrontendPlugin, FrontendPluginAction
-      -- ** Core plugins
-      -- | Core plugins allow plugins to register as a Core-to-Core pass.
-    , CorePlugin
-      -- ** Typechecker plugins
-      -- | Typechecker plugins allow plugins to provide evidence to the
-      -- typechecker.
-    , TcPlugin
-      -- ** Source plugins
-      -- | GHC offers a number of points where plugins can access and modify its
-      -- front-end (\"source\") representation. These include:
-      --
-      -- - access to the parser result with 'parsedResultAction'
-      -- - access to the renamed AST with 'renamedResultAction'
-      -- - access to the typechecked AST with 'typeCheckResultAction'
-      -- - access to the Template Haskell splices with 'spliceRunAction'
-      -- - access to loaded interface files with 'interfaceLoadAction'
-      --
-    , keepRenamedSource
-      -- ** Hole fit plugins
-      -- | hole fit plugins allow plugins to change the behavior of valid hole
-      -- fit suggestions
-    , HoleFitPluginR
+    , TFrontendPluginAction
+    , TTypeCheckPlugin
+    , TCorePlugin
+    , THoleFitPlugin
+    , TDynFlagsPlugin
+    , TParseResultAction
+    , TRenameResultAction
+    , TTypeCheckResultAction
+    , TSpliceRunAction
+    , TInterfaceLoadAction
 
       -- * Internal
-    , PluginWithArgs(..), plugins, pluginRecompile'
-    , LoadedPlugin(..), lpModuleName
-    , StaticPlugin(..)
-    , mapPlugins, withPlugins, withPlugins_
+    , PluginWithArgs(..)
+    , pluginRecompile'
     ) where
 
 import GHC.Prelude
 
-import GHC.Core.Opt.Monad ( CoreToDo, CoreM )
-import qualified GHC.Tc.Types
-import GHC.Tc.Types ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
-import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR )
-import GHC.Hs
-import GHC.Driver.Session
-import GHC.Driver.Types
-import GHC.Driver.Monad
-import GHC.Driver.Phases
-import GHC.Unit.Module
 import GHC.Utils.Fingerprint
 import Data.List (sort)
 import GHC.Utils.Outputable (Outputable(..), text, (<+>))
+import Data.Kind (Type)
 
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
 
-import Control.Monad
-
 -- | Command line options gathered from the -PModule.Name:stuff syntax
 -- are given to you as this type
 type CommandLineOption = String
+
+type family TTypeCheckPlugin       :: Type
+type family TCorePlugin            :: Type
+type family THoleFitPlugin         :: Type
+type family TDynFlagsPlugin        :: Type
+type family TParseResultAction     :: Type
+type family TRenameResultAction    :: Type
+type family TTypeCheckResultAction :: Type
+type family TSpliceRunAction       :: Type
+type family TInterfaceLoadAction   :: Type
+type family TFrontendPluginAction  :: Type
 
 -- | 'Plugin' is the compiler plugin data type. Try to avoid
 -- constructing one of these directly, and just modify some fields of
@@ -81,43 +67,47 @@ type CommandLineOption = String
 -- Nonetheless, this API is preliminary and highly likely to change in
 -- the future.
 data Plugin = Plugin {
-    installCoreToDos :: CorePlugin
+    installCoreToDos :: Maybe ([CommandLineOption] -> TCorePlugin)
     -- ^ Modify the Core pipeline that will be used for compilation.
     -- This is called as the Core pipeline is built for every module
     -- being compiled, and plugins get the opportunity to modify the
     -- pipeline in a nondeterministic order.
-  , tcPlugin :: TcPlugin
+
+  , tcPlugin :: Maybe ([CommandLineOption] -> TTypeCheckPlugin)
     -- ^ An optional typechecker plugin, which may modify the
     -- behaviour of the constraint solver.
-  , holeFitPlugin :: HoleFitPlugin
+
+  , holeFitPlugin :: Maybe ([CommandLineOption] -> THoleFitPlugin)
     -- ^ An optional plugin to handle hole fits, which may re-order
     --   or change the list of valid hole fits and refinement hole fits.
-  , dynflagsPlugin :: [CommandLineOption] -> DynFlags -> IO DynFlags
+
+  , dynflagsPlugin :: Maybe([CommandLineOption] -> TDynFlagsPlugin)
     -- ^ An optional plugin to update 'DynFlags', right after
     --   plugin loading. This can be used to register hooks
     --   or tweak any field of 'DynFlags' before doing
     --   actual work on a module.
     --
     --   @since 8.10.1
+
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
-  , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
-                            -> Hsc HsParsedModule
+
+  , parsedResultAction :: Maybe ([CommandLineOption] -> TParseResultAction)
     -- ^ Modify the module when it is parsed. This is called by
     -- "GHC.Driver.Main" when the parsing is successful.
-  , renamedResultAction :: [CommandLineOption] -> TcGblEnv
-                                -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
+
+  , renamedResultAction :: Maybe ([CommandLineOption] -> TRenameResultAction)
     -- ^ Modify each group after it is renamed. This is called after each
     -- `HsGroup` has been renamed.
-  , typeCheckResultAction :: [CommandLineOption] -> ModSummary -> TcGblEnv
-                               -> TcM TcGblEnv
+
+  , typeCheckResultAction :: Maybe ([CommandLineOption] -> TTypeCheckResultAction)
     -- ^ Modify the module when it is type checked. This is called at the
     -- very end of typechecking.
-  , spliceRunAction :: [CommandLineOption] -> LHsExpr GhcTc
-                         -> TcM (LHsExpr GhcTc)
+
+  , spliceRunAction :: Maybe ([CommandLineOption] -> TSpliceRunAction)
     -- ^ Modify the TH splice or quasiqoute before it is run.
-  , interfaceLoadAction :: forall lcl . [CommandLineOption] -> ModIface
-                                          -> IfM lcl ModIface
+
+  , interfaceLoadAction :: Maybe ([CommandLineOption] -> TInterfaceLoadAction)
     -- ^ Modify an interface that have been loaded. This is called by
     -- "GHC.Iface.Load" when an interface is successfully loaded. Not applied to
     -- the loading of the plugin interface. Tools that rely on information from
@@ -149,23 +139,12 @@ data PluginWithArgs = PluginWithArgs
     -- ^ command line arguments for the plugin
   }
 
--- | A plugin with its arguments. The result of loading the plugin.
-data LoadedPlugin = LoadedPlugin
-  { lpPlugin :: PluginWithArgs
-  -- ^ the actual plugin together with its commandline arguments
-  , lpModule :: ModIface
-  -- ^ the module containing the plugin
-  }
-
 -- | A static plugin with its arguments. For registering compiled-in plugins
 -- through the GHC API.
 data StaticPlugin = StaticPlugin
   { spPlugin :: PluginWithArgs
   -- ^ the actual plugin together with its commandline arguments
   }
-
-lpModuleName :: LoadedPlugin -> ModuleName
-lpModuleName = moduleName . mi_module . lpModule
 
 pluginRecompile' :: PluginWithArgs -> IO PluginRecompile
 pluginRecompile' (PluginWithArgs plugin args) = pluginRecompile plugin args
@@ -187,10 +166,6 @@ instance Semigroup PluginRecompile where
 instance Monoid PluginRecompile where
   mempty = NoForceRecompile
 
-type CorePlugin = [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
-type TcPlugin = [CommandLineOption] -> Maybe GHC.Tc.Types.TcPlugin
-type HoleFitPlugin = [CommandLineOption] -> Maybe HoleFitPluginR
-
 purePlugin, impurePlugin, flagRecompile :: [CommandLineOption] -> IO PluginRecompile
 purePlugin _args = return NoForceRecompile
 
@@ -204,61 +179,19 @@ flagRecompile =
 -- compatibility reason you should base all your plugin definitions on this
 -- default value.
 defaultPlugin :: Plugin
-defaultPlugin = Plugin {
-        installCoreToDos      = const return
-      , tcPlugin              = const Nothing
-      , holeFitPlugin         = const Nothing
-      , dynflagsPlugin        = const return
-      , pluginRecompile       = impurePlugin
-      , renamedResultAction   = \_ env grp -> return (env, grp)
-      , parsedResultAction    = \_ _ -> return
-      , typeCheckResultAction = \_ _ -> return
-      , spliceRunAction       = \_ -> return
-      , interfaceLoadAction   = \_ -> return
-    }
+defaultPlugin = Plugin
+   { installCoreToDos      = Nothing
+   , tcPlugin              = Nothing
+   , holeFitPlugin         = Nothing
+   , dynflagsPlugin        = Nothing
+   , renamedResultAction   = Nothing
+   , parsedResultAction    = Nothing
+   , typeCheckResultAction = Nothing
+   , spliceRunAction       = Nothing
+   , interfaceLoadAction   = Nothing
+   , pluginRecompile       = impurePlugin
+   }
 
-
--- | A renamer plugin which mades the renamed source available in
--- a typechecker plugin.
-keepRenamedSource :: [CommandLineOption] -> TcGblEnv
-                  -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
-keepRenamedSource _ gbl_env group =
-  return (gbl_env { tcg_rn_decls = update (tcg_rn_decls gbl_env)
-                  , tcg_rn_exports = update_exports (tcg_rn_exports gbl_env) }, group)
-  where
-    update_exports Nothing = Just []
-    update_exports m = m
-
-    update Nothing = Just emptyRnGroup
-    update m       = m
-
-
-type PluginOperation m a = Plugin -> [CommandLineOption] -> a -> m a
-type ConstPluginOperation m a = Plugin -> [CommandLineOption] -> a -> m ()
-
-plugins :: DynFlags -> [PluginWithArgs]
-plugins df =
-  map lpPlugin (cachedPlugins df) ++
-  map spPlugin (staticPlugins df)
-
--- | Perform an operation by using all of the plugins in turn.
-withPlugins :: Monad m => DynFlags -> PluginOperation m a -> a -> m a
-withPlugins df transformation input = foldM go input (plugins df)
-  where
-    go arg (PluginWithArgs p opts) = transformation p opts arg
-
-mapPlugins :: DynFlags -> (Plugin -> [CommandLineOption] -> a) -> [a]
-mapPlugins df f = map (\(PluginWithArgs p opts) -> f p opts) (plugins df)
-
--- | Perform a constant operation by using all of the plugins in turn.
-withPlugins_ :: Monad m => DynFlags -> ConstPluginOperation m a -> a -> m ()
-withPlugins_ df transformation input
-  = mapM_ (\(PluginWithArgs p opts) -> transformation p opts input)
-          (plugins df)
-
-type FrontendPluginAction = [String] -> [(String, Maybe Phase)] -> Ghc ()
-data FrontendPlugin = FrontendPlugin {
-      frontend :: FrontendPluginAction
-    }
-defaultFrontendPlugin :: FrontendPlugin
-defaultFrontendPlugin = FrontendPlugin { frontend = \_ _ -> return () }
+data FrontendPlugin = FrontendPlugin
+   { frontend :: TFrontendPluginAction
+   }

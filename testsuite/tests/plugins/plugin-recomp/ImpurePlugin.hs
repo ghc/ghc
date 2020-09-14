@@ -5,6 +5,6 @@ import Common
 
 plugin :: Plugin
 plugin = defaultPlugin {
-    installCoreToDos = install,
+    installCoreToDos = Just install,
     pluginRecompile = impurePlugin
   }

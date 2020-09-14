@@ -1,4 +1,8 @@
 {-# LANGUAGE BangPatterns, CPP, MagicHash, NondecreasingIndentation #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RankNTypes #-}
+
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
 -------------------------------------------------------------------------------
@@ -82,6 +86,8 @@ module GHC.Driver.Main
     , ioMsgMaybe
     , showModuleIndex
     , hscAddSptEntries
+
+    , CmmToRawCmmHook(..)
     ) where
 
 import GHC.Prelude
@@ -144,7 +150,7 @@ import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Driver.Hooks
 import GHC.Tc.Utils.Env
 import GHC.Builtin.Names
-import GHC.Driver.Plugins
+import GHC.Plugins.Types
 import GHC.Runtime.Loader   ( initializePlugins )
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
 
@@ -185,6 +191,18 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 #include "HsVersions.h"
 
+type instance GHC.Plugins.Types.TParseResultAction
+   = ModSummary -> HsParsedModule -> Hsc HsParsedModule
+
+type instance GHC.Driver.Hooks.CompileCoreExprHook
+   = HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue
+
+type instance GHC.Driver.Hooks.StgToCmmHook
+   = DynFlags -> Module -> [TyCon] -> CollectedCCs -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos
+
+-- we need a data family because of the 'forall' quantifier
+data instance GHC.Driver.Hooks.CmmToRawCmmHook
+   = CmmToRawCmmHook { unCmmToRawCmmHook :: forall a. DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a -> IO (Stream IO RawCmmGroup a) }
 
 {- **********************************************************************
 %*                                                                      *
@@ -406,10 +424,8 @@ hscParse' mod_summary
                    }
 
             -- apply parse transformation of plugins
-            let applyPluginAction p opts
-                  = parsedResultAction p opts mod_summary
-            withPlugins dflags applyPluginAction res
-
+            foldPluginsM dflags parsedResultAction res $ \m pmod -> do
+               m mod_summary pmod
 
 -- -----------------------------------------------------------------------------
 -- | If the renamed source has been kept, extract it. Dump it if requested.
@@ -1441,7 +1457,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
             ------------------  Code output -----------------------
             rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
-                      lookupHook (\x -> cmmToRawCmmHook x)
+                      lookupHook' cmmToRawCmmHook (\h -> unCmmToRawCmmHook h @CgInfos)
                         (\dflg _ -> cmmToRawCmm dflg) dflags dflags (Just this_mod) cmms
 
             let dump a = do
@@ -1514,7 +1530,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
         unless (null cmmgroup) $
           dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm"
             FormatCMM (ppr cmmgroup)
-        rawCmms <- lookupHook (\x -> cmmToRawCmmHook x)
+        rawCmms <- lookupHook' cmmToRawCmmHook (\h -> unCmmToRawCmmHook h @())
                      (\dflgs _ -> cmmToRawCmm dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
         _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
              rawCmms

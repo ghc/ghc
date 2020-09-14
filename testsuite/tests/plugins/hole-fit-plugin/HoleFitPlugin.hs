@@ -77,10 +77,10 @@ modSortP _ ref hole hfs = do
             <> "this hole. Try again with a higher limit."
 
 plugin :: Plugin
-plugin = defaultPlugin { holeFitPlugin = holeFitP, pluginRecompile = purePlugin}
+plugin = defaultPlugin { holeFitPlugin = Just holeFitP, pluginRecompile = purePlugin}
 
-holeFitP :: [CommandLineOption] -> Maybe HoleFitPluginR
-holeFitP opts = Just (HoleFitPluginR initP pluginDef stopP)
+holeFitP :: [CommandLineOption] -> HoleFitPluginR
+holeFitP opts = HoleFitPluginR initP pluginDef stopP
   where initP = initPlugin opts
         stopP = const $ return ()
         pluginDef ref = HoleFitPlugin { candPlugin = modFilterTimeoutP opts ref

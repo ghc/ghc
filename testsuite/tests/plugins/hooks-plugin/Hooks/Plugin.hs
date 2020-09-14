@@ -10,7 +10,7 @@ import GHC.Driver.Hooks
 import GHC.Tc.Utils.Monad
 
 plugin :: Plugin
-plugin = defaultPlugin { dynflagsPlugin = hooksP }
+plugin = defaultPlugin { dynflagsPlugin = Just hooksP }
 
 hooksP :: [CommandLineOption] -> DynFlags -> IO DynFlags
 hooksP opts dflags = return $ dflags

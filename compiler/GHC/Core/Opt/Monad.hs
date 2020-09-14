@@ -5,6 +5,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -49,6 +50,8 @@ module GHC.Core.Opt.Monad (
   ) where
 
 import GHC.Prelude hiding ( read )
+
+import qualified GHC.Plugins.Types
 
 import GHC.Core
 import GHC.Core.Unfold
@@ -149,6 +152,8 @@ instance Outputable CoreToDo where
   ppr (CoreDoRuleCheck {})     = text "Rule check"
   ppr CoreDoNothing            = text "CoreDoNothing"
   ppr (CoreDoPasses passes)    = text "CoreDoPasses" <+> ppr passes
+
+type instance GHC.Plugins.Types.TCorePlugin = [CoreToDo] -> CoreM [CoreToDo]
 
 pprPassDetails :: CoreToDo -> SDoc
 pprPassDetails (CoreDoSimplify n md) = vcat [ text "Max iterations =" <+> int n

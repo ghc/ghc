@@ -370,6 +370,9 @@ Library
         GHC
         GHC.Driver.Make
         GHC.Plugins
+        GHC.Plugins.Types
+        GHC.Plugins.Loaded
+        GHC.Plugins.Frontend
         GHC.Prelude
         GHC.Parser.Header
         GHC.Driver.Main
@@ -380,7 +383,6 @@ Library
         GHC.Runtime.Loader
         GHC.Unit.Info
         GHC.Unit.State
-        GHC.Driver.Plugins
         GHC.Tc.Plugin
         GHC.Core.Ppr.TyThing
         GHC.Settings

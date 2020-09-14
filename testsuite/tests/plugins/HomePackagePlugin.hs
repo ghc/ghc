@@ -4,7 +4,7 @@ import GHC.Plugins
 
 plugin :: Plugin
 plugin = defaultPlugin {
-        installCoreToDos = install
+        installCoreToDos = Just install
     }
 
 install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]

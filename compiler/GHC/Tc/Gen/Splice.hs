@@ -17,6 +17,8 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -119,7 +121,7 @@ import GHC.Driver.Session
 import GHC.Utils.Panic as Panic
 import GHC.Utils.Lexeme
 import qualified GHC.Data.EnumSet as EnumSet
-import GHC.Driver.Plugins
+import GHC.Plugins.Types
 import GHC.Data.Bag
 
 import qualified Language.Haskell.TH as TH
@@ -142,6 +144,7 @@ import qualified Data.Map as Map
 import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
 import Data.Proxy    ( Proxy (..) )
+
 
 {-
 ************************************************************************

@@ -5,7 +5,7 @@ import GHC.Driver.Session
 
 plugin :: Plugin
 plugin = defaultPlugin {
-        installCoreToDos = install
+        installCoreToDos = Just install
     }
 
 -- This tests whether plugins are linking against the *running* GHC or a new

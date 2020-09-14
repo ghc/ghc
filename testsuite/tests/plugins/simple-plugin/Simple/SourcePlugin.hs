@@ -3,7 +3,7 @@ module Simple.SourcePlugin where
 import Control.Monad.IO.Class
 import Data.List (intercalate)
 import Data.Maybe (isJust)
-import GHC.Driver.Plugins
+import GHC.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Driver.Ppr
@@ -17,11 +17,11 @@ import GHC.Hs.Decls
 import GHC.Hs.Doc
 
 plugin :: Plugin
-plugin = defaultPlugin { parsedResultAction = parsedPlugin
-                       , typeCheckResultAction = typecheckPlugin
-                       , spliceRunAction = metaPlugin'
-                       , interfaceLoadAction = interfaceLoadPlugin'
-                       , renamedResultAction = renamedAction
+plugin = defaultPlugin { parsedResultAction    = Just parsedPlugin
+                       , typeCheckResultAction = Just typecheckPlugin
+                       , spliceRunAction       = Just metaPlugin'
+                       , interfaceLoadAction   = Just interfaceLoadPlugin'
+                       , renamedResultAction   = Just renamedAction
                        }
 
 parsedPlugin :: [CommandLineOption] -> ModSummary -> HsParsedModule

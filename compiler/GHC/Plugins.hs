@@ -8,7 +8,8 @@
 -- Particularly interesting modules for plugin writers include
 -- "GHC.Core" and "GHC.Core.Opt.Monad".
 module GHC.Plugins
-   ( module GHC.Driver.Plugins
+   ( module GHC.Plugins.Types
+   , module GHC.Plugins.Frontend
    , module GHC.Types.Name.Reader
    , module GHC.Types.Name.Occurrence
    , module GHC.Types.Name
@@ -51,13 +52,15 @@ module GHC.Plugins
    , module GHC.Types.Unique.Supply
    , module GHC.Data.FastString
    , module GHC.Tc.Errors.Hole.FitTypes   -- for hole-fit plugins
+   , keepRenamedSource
    , -- * Getting 'Name's
      thNameToGhcName
    )
 where
 
 -- Plugin stuff itself
-import GHC.Driver.Plugins
+import GHC.Plugins.Frontend
+import GHC.Plugins.Types
 
 -- Variable naming
 import GHC.Types.Name.Reader
@@ -126,7 +129,20 @@ import GHC.Utils.Monad  ( mapMaybeM )
 import GHC.ThToHs       ( thRdrNameGuesses )
 import GHC.Tc.Utils.Env ( lookupGlobal )
 
+-- import concrete plugin type instances
+import GHC.Tc.Types ()
+import GHC.Tc.Errors.Hole.FitTypes ()
+import GHC.Tc.Gen.Splice ()
+import GHC.Driver.Main ()
+import GHC.Runtime.Loader ()
+import GHC.Iface.Load ()
+import GHC.Driver.Types ()
+import GHC.Driver.Hooks ()
+
+-- for keepRenamedSource plugin
 import GHC.Tc.Errors.Hole.FitTypes
+import GHC.Tc.Types
+import GHC.Hs.Decls
 
 import qualified Language.Haskell.TH as TH
 
@@ -135,6 +151,21 @@ import qualified Language.Haskell.TH as TH
 instance MonadThings CoreM where
     lookupThing name = do { hsc_env <- getHscEnv
                           ; liftIO $ lookupGlobal hsc_env name }
+
+-- | A renamer plugin which makes the renamed source available (e.g. for a
+-- typechecker plugin).
+keepRenamedSource :: [CommandLineOption] -> GHC.Plugins.Types.TRenameResultAction
+keepRenamedSource _ gbl_env group =
+  return (gbl_env { tcg_rn_decls = update (tcg_rn_decls gbl_env)
+                  , tcg_rn_exports = update_exports (tcg_rn_exports gbl_env) }, group)
+  where
+    update_exports Nothing = Just []
+    update_exports m = m
+
+    update Nothing = Just emptyRnGroup
+    update m       = m
+
+
 
 {-
 ************************************************************************

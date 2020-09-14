@@ -10,6 +10,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Typechecking @foreign@ declarations
 --
@@ -71,6 +72,12 @@ import GHC.Driver.Hooks
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+
+type instance GHC.Driver.Hooks.TcForeignImportsHook
+   = [LForeignDecl GhcRn] -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt)
+type instance GHC.Driver.Hooks.TcForeignExportsHook
+   = [LForeignDecl GhcRn] -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)
+
 
 -- Defines a binding
 isForeignImport :: forall name. UnXRec name => LForeignDecl name -> Bool

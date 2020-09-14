@@ -65,6 +65,10 @@ import qualified Language.Haskell.TH as TH (Q)
 
 import qualified GHC.LanguageExtensions as LangExt
 
+
+type instance GHC.Driver.Hooks.RnSpliceHook = HsSplice GhcRn -> RnM (HsSplice GhcRn)
+
+
 {-
 ************************************************************************
 *                                                                      *
