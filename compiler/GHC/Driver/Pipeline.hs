@@ -1427,6 +1427,9 @@ runPhase (RealPhase Cmm) input_fn = do
 -----------------------------------------------------------------------------
 -- Cc phase
 
+-- we don't support preprocessing .c files (with -E) now.  Doing so introduces
+-- way too many hacks, and I can't say I've ever used it anyway.
+
 runPhase (RealPhase cc_phase) input_fn
    | any (cc_phase `eqPhase`) [Cc, Ccxx, HCc, Cobjc, Cobjcxx]
    = do
@@ -1454,16 +1457,6 @@ runPhase (RealPhase cc_phase) input_fn
               (includePathsQuote cmdline_include_paths ++
                includePathsQuoteImplicit cmdline_include_paths)
         let include_paths = include_paths_quote ++ include_paths_global
-
-        -- pass -D or -optP to preprocessor when compiling foreign C files
-        -- (#16737). Doing it in this way is simpler and also enable the C
-        -- compiler to perform preprocessing and parsing in a single pass,
-        -- but it may introduce inconsistency if a different pgm_P is specified.
-        let more_preprocessor_opts = concat
-              [ ["-Xpreprocessor", i]
-              | not hcc
-              , i <- getOpts dflags opt_P
-              ]
 
         let gcc_extra_viac_flags = extraGccViaCFlags dflags
         let pic_c_flags = picCCOpts dflags
@@ -1556,7 +1549,6 @@ runPhase (RealPhase cc_phase) input_fn
                        ++ [ "-include", ghcVersionH ]
                        ++ framework_paths
                        ++ include_paths
-                       ++ more_preprocessor_opts
                        ++ pkg_extra_cc_opts
                        ))
 
