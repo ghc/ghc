@@ -72,7 +72,6 @@ Library
                    transformers == 0.5.*,
                    exceptions == 0.10.*,
                    ghc-boot   == @ProjectVersionMunged@,
-                   ghc-boot-th == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
 
