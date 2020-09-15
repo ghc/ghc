@@ -477,6 +477,14 @@ validate-x86_64-darwin:
   tags:
     - aarch64-linux
 
+.build-aarch64-linux-deb10-llvm:
+  extends: .build-aarch64-linux-deb10
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: perf-llvm
+  tags:
+    - aarch64-linux
+
 validate-aarch64-linux-deb10:
   extends: .build-aarch64-linux-deb10
   artifacts:
