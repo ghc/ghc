@@ -19,8 +19,8 @@ ghc_stage2_CONFIGURE_OPTS += --flags=stage2
 ghc_stage3_CONFIGURE_OPTS += --flags=stage3
 
 ifeq "$(GhcWithInterpreter)" "YES"
-ghc_stage2_CONFIGURE_OPTS += --flags=ghci
-ghc_stage3_CONFIGURE_OPTS += --flags=ghci
+ghc_stage2_CONFIGURE_OPTS += --flags=internal-interpreter
+ghc_stage3_CONFIGURE_OPTS += --flags=internal-interpreter
 endif
 
 # This package doesn't pass the Cabal checks because data-dir

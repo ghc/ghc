@@ -203,7 +203,7 @@ compiler_stage1_CONFIGURE_OPTS += --ghc-option=-optc-DTHREADED_RTS
 endif
 
 ifeq "$(GhcWithInterpreter)" "YES"
-compiler_stage2_CONFIGURE_OPTS += --flags=ghci
+compiler_stage2_CONFIGURE_OPTS += --flags=internal-interpreter
 
 # Should the debugger commands be enabled?
 ifeq "$(GhciWithDebugger)" "YES"

@@ -19,8 +19,8 @@ Data-Files: settings
 Build-Type: Simple
 Cabal-Version: >=1.10
 
-Flag ghci
-    Description: Build GHCi support.
+Flag internal-interpreter
+    Description: Build with internal interpreter support.
     Default: False
     Manual: True
 
@@ -55,7 +55,7 @@ Executable ghc
                  -Wnoncanonical-monad-instances
                  -Wnoncanonical-monoid-instances
 
-    if flag(ghci)
+    if flag(internal-interpreter)
         -- NB: this is never built by the bootstrapping GHC+libraries
         Build-depends:
             deepseq        == 1.4.*,

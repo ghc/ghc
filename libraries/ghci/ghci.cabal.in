@@ -17,8 +17,8 @@ cabal-version:  >=1.10
 build-type:     Simple
 extra-source-files: changelog.md
 
-Flag ghci
-    Description: Build GHCi support.
+Flag internal-interpreter
+    Description: Build with internal interpreter support.
     Default: False
     Manual: True
 
@@ -47,7 +47,7 @@ library
         TupleSections
         UnboxedTuples
 
-    if flag(ghci)
+    if flag(internal-interpreter)
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         exposed-modules:
             GHCi.Run
