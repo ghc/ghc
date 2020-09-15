@@ -1792,7 +1792,7 @@ As is evident from the example, there are two components to this behavior:
 We need to be very careful here to remain consistent---neither part is
 optional!
 
-We need do make the continuation E duplicable (since we are duplicating it)
+We do need to make the continuation E duplicable (since we are duplicating it)
 with mkDupableCont.
 
 
@@ -1941,6 +1941,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) con
   | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
                                  -- continuation to discard, else we do it
                                  -- again and again!
+  , sm_case_bottom (getMode env) -- See Note [Case-of-bottom transformation]
   = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
     return (emptyFloats env, castBottomExpr res cont_ty)
   where
@@ -2101,6 +2102,20 @@ continuations.  We have to keep the right in-scope set around; AND we have
 to get the effect that finding (error "foo") in a strict arg position will
 discard the entire application and replace it with (error "foo").  Getting
 all this at once is TOO HARD!
+
+Note [Case-of-bottom transformation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider the program
+
+    case error "uh oh!" of
+      _ -> some_big_expression
+
+In this case it is beneficial for code size if we can drop
+`some_big_expression` since we know that it is unreachable. This is what the
+case-of-bottom transformation does. Specifically, it will rewrite the above to:
+
+    case error "uh oh!" of {}
 
 
 ************************************************************************
@@ -3225,21 +3240,43 @@ When we have
 then we can just duplicate those alts because the A and C cases
 will disappear immediately.  This is more direct than creating
 join points and inlining them away.  See #4930.
+
+
+Note [Duplicating case alternatives and case-of-bottom]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider the program:
+
+    case (case x of { A -> error ...; B -> error ...)
+      of alts
+
+If the case-of-bottom transformation (see Note [Case-of-bottom transformation])
+is enabled then we can safely conclude that the alternatives of the inner
+`case` would not duplicate `alts` since they all bottom and consequently
+case-of-bottom will throw out `alts` entirely.
+
+However, if case-of-bottom is *not* enabled then we must not conclude this
+since `alts` will be retained.
+
 -}
 
 --------------------
 mkDupableCaseCont :: SimplEnv -> [InAlt] -> SimplCont
                   -> SimplM (SimplFloats, SimplCont)
 mkDupableCaseCont env alts cont
-  | altsWouldDup alts = mkDupableCont env cont
-  | otherwise         = return (emptyFloats env, cont)
+  | altsWouldDup env alts = mkDupableCont env cont
+  | otherwise             = return (emptyFloats env, cont)
 
-altsWouldDup :: [InAlt] -> Bool -- True iff strictly > 1 non-bottom alternative
-altsWouldDup []  = False        -- See Note [Bottom alternatives]
-altsWouldDup [_] = False
-altsWouldDup (alt:alts)
-  | is_bot_alt alt = altsWouldDup alts
-  | otherwise      = not (all is_bot_alt alts)
+altsWouldDup :: SimplEnv -> [InAlt] -> Bool -- True iff strictly > 1 non-bottom alternative
+altsWouldDup _   []  = False        -- See Note [Bottom alternatives]
+altsWouldDup _   [_] = False
+altsWouldDup env _
+    -- See Note [Duplicating case alternatives and case-of-bottom].
+  | not (sm_case_bottom (getMode env))
+                     = True
+altsWouldDup env (alt:alts)
+  | is_bot_alt alt   = altsWouldDup env alts
+  | otherwise        = not (all is_bot_alt alts)
   where
     is_bot_alt (_,_,rhs) = exprIsDeadEnd rhs
 

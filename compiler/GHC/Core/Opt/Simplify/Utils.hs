@@ -304,7 +304,7 @@ instance Outputable ArgSpec where
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
   ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
-addValArgTo :: ArgInfo ->  OutExpr -> OutType -> ArgInfo
+addValArgTo :: ArgInfo -> OutExpr -> OutType -> ArgInfo
 addValArgTo ai arg hole_ty
   | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rules = rules } <- ai
       -- Pop the top demand and and discounts off
@@ -313,9 +313,18 @@ addValArgTo ai arg hole_ty
        , ai_dmds  = dmds
        , ai_discs = discs
        , ai_rules = decRules rules }
+
+    -- In the typical case that the case-of-bottom transformation is enabled
+    -- this cannot happen since we will stop rebuilding calls as soon as we
+    -- know that the application will diverge (indicating by running out of
+    -- demands). However, when case-of-bottom is disabled we can indeed end up
+    -- here.
+  | ArgInfo { ai_dmds = [] } <- ai
+  = addValArgTo (ai { ai_dmds = repeat topDmd }) arg hole_ty
+
   | otherwise
   = pprPanic "addValArgTo" (ppr ai $$ ppr arg)
-    -- There should always be enough demands and discounts
+    -- There should always be enough discounts.
 
 addTyArgTo :: ArgInfo -> OutType -> OutType -> ArgInfo
 addTyArgTo ai arg_ty hole_ty = ai { ai_args = arg_spec : ai_args ai
@@ -871,6 +880,7 @@ simplEnvForGHCi dflags
                               -- interpreter
                            , sm_eta_expand = eta_expand_on
                            , sm_case_case  = True
+                           , sm_case_bottom = True
                            , sm_pre_inline = pre_inline_on
                            }
   where
