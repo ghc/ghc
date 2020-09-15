@@ -49,6 +49,14 @@ Library
             GHC.UniqueSubdir
             GHC.Version
 
+    -- reexport modules from ghc-boot-th so that packages don't have to import
+    -- both ghc-boot and ghc-boot-th. It makes the dependency graph easier to
+    -- understand and to refactor.
+    reexported-modules:
+              GHC.LanguageExtensions.Type
+            , GHC.ForeignSrcLang.Type
+            , GHC.Lexeme
+
     -- but done by Hadrian
     -- autogen-modules:
     --         GHC.Version
