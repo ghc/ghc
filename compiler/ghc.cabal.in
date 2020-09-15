@@ -23,8 +23,8 @@ Category: Development
 Build-Type: Simple
 Cabal-Version: >=1.10
 
-Flag ghci
-    Description: Build GHCi support.
+Flag internal-interpreter
+    Description: Build with internal interpreter support.
     Default: False
     Manual: True
 
@@ -72,7 +72,6 @@ Library
                    transformers == 0.5.*,
                    exceptions == 0.10.*,
                    ghc-boot   == @ProjectVersionMunged@,
-                   ghc-boot-th == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
 
@@ -88,7 +87,7 @@ Library
                  -Wnoncanonical-monad-instances
                  -Wnoncanonical-monoid-instances
 
-    if flag(ghci)
+    if flag(internal-interpreter)
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         Include-Dirs: ../rts/dist/build @FFIIncludeDir@
 
