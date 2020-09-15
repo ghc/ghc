@@ -30,7 +30,15 @@
 #
 # The ways currently defined.
 #
-ALL_WAYS=v l debug dyn thr thr_l p_dyn p debug_dyn thr_dyn thr_p_dyn thr_debug_dyn thr_debug debug_p thr_debug_p l_dyn thr_l_dyn thr_p
+ALL_WAYS=v           l         p         debug     \
+	     dyn         l_dyn     p_dyn     debug_dyn \
+		 thr     thr_l     thr_p     thr_debug     \
+		 thr_dyn thr_l_dyn thr_p_dyn thr_debug_dyn \
+		 debug_p                     thr_debug_p \
+		 tsan    thr_tsan thr_debug_tsan thr_l_tsan \
+		 thr_p_tsan                                 \
+		 tsan_dyn debug_tsan_dyn thr_tsan_dyn thr_debug_tsan_dyn l_tsan_dyn thr_l_tsan_dyn
+
 
 #
 # The following ways currently are treated specially,
@@ -119,3 +127,13 @@ WAY_l_dyn_HC_OPTS= -fPIC -dynamic -eventlog
 # Way 'thr_l_dyn':
 WAY_thr_l_dyn_NAME=threaded event logging dynamic
 WAY_thr_l_dyn_HC_OPTS= -fPIC -dynamic -optc-DTHREADED_RTS -eventlog
+
+# Thread Sanatizer
+WAY_tsan_HC_OPTS=$(WAY_v_HC_OPTS)
+WAY_tsan_dyn_HC_OPTS=$(WAY_dyn_HC_OPTS)
+
+$(foreach way, $(ALL_WAYS),\
+	$(if $(findstring _tsan, $(way)),\
+		$(eval \
+			   WAY_$(way)_HC_OPTS = $(WAY_$(subst _tsan,,$(way))_HC_OPTS) \
+			   )))
