@@ -88,7 +88,6 @@ instance (a ~ Char) => IsString [a] where
          -- See Note [IsString String]
     fromString xs = xs
 
--- TODO: Verify release version
 -- | @since 4.15.0.0
 deriving instance IsString a => IsString (Const a (b :: k))
 
