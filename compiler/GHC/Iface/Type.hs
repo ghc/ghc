@@ -176,6 +176,11 @@ data IfaceType
        PromotionFlag                 -- A bit like IfaceTyCon
        IfaceAppArgs               -- arity = length args
           -- For promoted data cons, the kind args are omitted
+          -- Why have this? Only for efficiency: IfaceTupleTy can omit the
+          -- type arguments, as they can be recreated when deserializing.
+          -- In an experiment, removing IfaceTupleTy resulted in a 0.75% regression
+          -- in interface file size (in GHC's boot libraries).
+          -- See !3987.
 
 type IfaceMult = IfaceType
 
