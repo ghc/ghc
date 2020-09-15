@@ -1941,6 +1941,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) con
   | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
                                  -- continuation to discard, else we do it
                                  -- again and again!
+  , sm_case_bottom (getMode env)
   = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
     return (emptyFloats env, castBottomExpr res cont_ty)
   where
