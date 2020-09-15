@@ -1340,7 +1340,15 @@ data CompilerPhase
   = InitialPhase    -- The first phase -- number = infinity!
   | Phase PhaseNum  -- User-specificable phases
   | FinalPhase      -- The last phase  -- number = -infinity!
-  deriving Eq
+  deriving (Eq)
+
+instance Ord CompilerPhase where
+  compare a b | a == b = EQ
+  compare InitialPhase _ = LT
+  compare _ InitialPhase = GT
+  compare FinalPhase _ = GT
+  compare _ FinalPhase = LT
+  compare (Phase n) (Phase m) = m `compare` n
 
 instance Outputable CompilerPhase where
    ppr (Phase n)    = int n

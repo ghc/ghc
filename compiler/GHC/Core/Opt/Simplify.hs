@@ -2117,6 +2117,12 @@ case-of-bottom transformation does. Specifically, it will rewrite the above to:
 
     case error "uh oh!" of {}
 
+However, this transformation can wreak havoc with programs which use the
+quite-unsafe `touch#` primitive. For this reason we disable case-of-bottom
+during the last simplifier phase, allowing safe inlining of the safer
+`keepAlive#` primitive (which is implemented in terms of `touch#`) which we
+recommend that users rather use. See Note [The keepAlive# story] in
+GHC.Magic for details.
 
 ************************************************************************
 *                                                                      *

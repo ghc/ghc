@@ -160,6 +160,7 @@ getCoreToDo dflags
                           , sm_eta_expand = eta_expand_on
                           , sm_inline     = True
                           , sm_case_case  = True
+                          , sm_case_bottom = True
                           , sm_pre_inline = pre_inline_on
                           }
 
@@ -168,7 +169,13 @@ getCoreToDo dflags
       $   [ maybe_strictness_before phase
           , CoreDoSimplify iter
                 (base_mode { sm_phase = phase
-                           , sm_names = [name] })
+                           , sm_names = [name]
+                           , sm_case_bottom = phase > Phase 0
+                             -- We disable case-of-bottom during Phase 0 to
+                             -- allow safe inlining of the keepAlive# functions.
+                             -- See Note [The keepAlive# story] in GHC.Magic
+                             -- for details.
+                           })
 
           , maybe_rule_check phase ]
 
