@@ -73,7 +73,7 @@ packageArgs = do
               notStage0 ? arg "--ghc-pkg-option=--force" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ ghcWithInterpreter ? notStage0 ? arg "ghci"
+            [ ghcWithInterpreter ? notStage0 ? arg "internal-interpreter"
             , cross ? arg "-terminfo"
             ]
 
@@ -84,7 +84,7 @@ packageArgs = do
           [ builder Ghc ? arg ("-I" ++ compilerPath)
 
           , builder (Cabal Flags) ? mconcat
-            [ ghcWithInterpreter ? notStage0 ? arg "ghci"
+            [ ghcWithInterpreter ? notStage0 ? arg "internal-interpreter"
             , cross ? arg "-terminfo"
             -- Note [Linking ghc-bin against threaded stage0 RTS]
             -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -121,13 +121,13 @@ packageArgs = do
 
         --------------------------------- ghci ---------------------------------
         , package ghci ? mconcat
-          [ notStage0 ? builder (Cabal Flags) ? arg "ghci"
+          [ notStage0 ? builder (Cabal Flags) ? arg "internal-interpreter"
 
-          -- The use case here is that we want to build @ghc-proxy@ for the
+          -- The use case here is that we want to build @iserv-proxy@ for the
           -- cross compiler. That one needs to be compiled by the bootstrap
           -- compiler as it needs to run on the host. Hence @libiserv@ needs
           -- @GHCi.TH@, @GHCi.Message@ and @GHCi.Run@ from @ghci@. And those are
-          -- behind the @-fghci@ flag.
+          -- behind the @-finternal-interpreter@ flag.
           --
           -- But it may not build if we have made some changes to ghci's
           -- dependencies (see #16051).
@@ -142,13 +142,14 @@ packageArgs = do
           --
           -- The workaround we use is to check if the bootstrap compiler has
           -- the same version as the one we are building. In this case we can
-          -- avoid the first step above and directly build with `-fghci`.
+          -- avoid the first step above and directly build with
+          -- `-finternal-interpreter`.
           --
           -- TODO: Note that in that case we also do not need to build most of
           -- the Stage1 libraries, as we already know that the bootstrap
           -- compiler comes with the same versions as the one we are building.
           --
-          , cross ? stage0 ? bootCross ? builder (Cabal Flags) ? arg "ghci"
+          , cross ? stage0 ? bootCross ? builder (Cabal Flags) ? arg "internal-interpreter"
 
           ]
 
