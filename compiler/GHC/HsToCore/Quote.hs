@@ -945,13 +945,18 @@ repDerivClause :: LHsDerivingClause GhcRn
                -> MetaM (Core (M TH.DerivClause))
 repDerivClause (L _ (HsDerivingClause
                           { deriv_clause_strategy = dcs
-                          , deriv_clause_tys      = L _ dct }))
+                          , deriv_clause_tys      = dct }))
   = repDerivStrategy dcs $ \(MkC dcs') ->
-    do MkC dct' <- repListM typeTyConName (rep_deriv_ty . hsSigType) dct
+    do MkC dct' <- rep_deriv_clause_tys dct
        rep2 derivClauseName [dcs',dct']
   where
-    rep_deriv_ty :: LHsType GhcRn -> MetaM (Core (M TH.Type))
-    rep_deriv_ty ty = repLTy ty
+    rep_deriv_clause_tys :: LDerivClauseTys GhcRn -> MetaM (Core [M TH.Type])
+    rep_deriv_clause_tys (L _ dct) = case dct of
+      DctSingle _ ty -> rep_deriv_tys [ty]
+      DctMulti _ tys -> rep_deriv_tys tys
+
+    rep_deriv_tys :: [LHsSigType GhcRn] -> MetaM (Core [M TH.Type])
+    rep_deriv_tys = repListM typeTyConName (repLTy . hsSigType)
 
 rep_meth_sigs_binds :: [LSig GhcRn] -> LHsBinds GhcRn
                     -> MetaM ([GenSymBind], [Core (M TH.Dec)])
