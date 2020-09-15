@@ -411,19 +411,6 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
          includePathsQuoteImplicit cmdline_include_paths)
   let include_paths = include_paths_quote ++ include_paths_global
 
-  -- pass -D or -optP to preprocessor when compiling foreign C files
-  -- (#16737). Doing it in this way is simpler and also enable the C
-  -- compiler to perform preprocessing and parsing in a single pass,
-  -- but it may introduce inconsistency if a different pgm_P is specified.
-  let opts = getOpts dflags opt_P
-      aug_imports = augmentImports dflags opts
-
-      more_preprocessor_opts = concat
-        [ ["-Xpreprocessor", i]
-        | not hcc
-        , i <- aug_imports
-        ]
-
   let gcc_extra_viac_flags = extraGccViaCFlags dflags
   let pic_c_flags = picCCOpts dflags
 
@@ -512,7 +499,6 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
                  ++ [ "-include", ghcVersionH ]
                  ++ framework_paths
                  ++ include_paths
-                 ++ more_preprocessor_opts
                  ++ pkg_extra_cc_opts
                  ))
 

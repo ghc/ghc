@@ -29,4 +29,4 @@ Executable ghci
     -- We need to call the versioned ghc executable because the unversioned
     -- GHC executable is a wrapper that doesn't call FreeConsole and so
     -- breaks an interactive process like GHCi. See #21889, #14150 and #13411
-    CPP-Options: -DEXE_PATH="ghc-@ProjectVersion@"
+    cc-options: -DEXE_PATH="ghc-@ProjectVersion@"

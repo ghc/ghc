@@ -285,12 +285,6 @@ test('inline-check', [omit_ways(['hpc', 'profasm'])]
 test('T14452', js_broken(22261), makefile_test, [])
 test('T14923', normal, makefile_test, [])
 test('T15396', normal, compile_and_run, ['-package ghc'])
-test('T16737',
-     [extra_files(['T16737include/']),
-      req_th,
-      req_c,
-      expect_broken_for(16541, ghci_ways)],
-     compile_and_run, ['-optP=-isystem -optP=T16737include'])
 
 test('T17143', exit_code(1), run_command, ['{compiler} T17143.hs -S -fno-code'])
 test('T17786', unless(opsys('mingw32'), skip), makefile_test, [])

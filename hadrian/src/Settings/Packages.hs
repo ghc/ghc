@@ -297,14 +297,11 @@ rtsPackageArgs = package rts ? do
     libzstdIncludeDir <- getSetting LibZstdIncludeDir
     libzstdLibraryDir <- getSetting LibZstdLibDir
 
+
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
-          , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
-          -- Set the namespace for the rts fs functions
-          , arg $ "-DFS_NAMESPACE=rts"
-          , arg $ "-DCOMPILING_RTS"
           , notM targetSupportsSMP           ? arg "-DNOSMP"
           , way `elem` [debug, debugDynamic] ? pure [ "-DTICKY_TICKY"
                                                     , "-optc-DTICKY_TICKY"]
@@ -333,9 +330,16 @@ rtsPackageArgs = package rts ? do
                                                     , "-fno-omit-frame-pointer"
                                                     , "-g3"
                                                     , "-O0" ]
+          -- Set the namespace for the rts fs functions
+          , arg $ "-DFS_NAMESPACE=rts"
+
+          , arg $ "-DCOMPILING_RTS"
 
           , inputs ["**/RtsMessages.c", "**/Trace.c"] ?
-            arg ("-DProjectVersion=" ++ show projectVersion)
+            pure
+              ["-DProjectVersion=" ++ show projectVersion
+              , "-DRtsWay=\"rts_" ++ show way ++ "\""
+              ]
 
           , input "**/RtsUtils.c" ? pure
             [ "-DProjectVersion="            ++ show projectVersion
@@ -353,6 +357,7 @@ rtsPackageArgs = package rts ? do
             , "-DTargetVendor="              ++ show targetVendor
             , "-DGhcUnregisterised="         ++ show ghcUnreg
             , "-DTablesNextToCode="          ++ show ghcEnableTNC
+            , "-DRtsWay=\"rts_" ++ show way ++ "\""
             ]
 
           -- We're after pur performance here. So make sure fast math and

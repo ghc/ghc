@@ -515,8 +515,8 @@ createVersionWrapper pkg versioned_exe install_path = do
         | otherwise = 0
 
   cmd ghcPath (["-no-hs-main", "-o", install_path, "-I"++version_wrapper_dir
-              , "-DEXE_PATH=\"" ++ versioned_exe ++ "\""
-              , "-DINTERACTIVE_PROCESS=" ++ show interactive
+              , "-optc-DEXE_PATH=\"" ++ versioned_exe ++ "\""
+              , "-optc-DINTERACTIVE_PROCESS=" ++ show interactive
               ] ++ wrapper_files)
 
 {-
