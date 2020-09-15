@@ -306,6 +306,8 @@ instance Outputable ArgSpec where
 
 addValArgTo :: ArgInfo ->  OutExpr -> OutType -> ArgInfo
 addValArgTo ai arg hole_ty
+  | ArgInfo { ai_dmds = [] } <- ai
+  = addValArgTo (ai { ai_dmds = repeat topDmd }) arg hole_ty
   | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rules = rules } <- ai
       -- Pop the top demand and and discounts off
   , let arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty, as_dmd = dmd }
@@ -871,6 +873,7 @@ simplEnvForGHCi dflags
                               -- interpreter
                            , sm_eta_expand = eta_expand_on
                            , sm_case_case  = True
+                           , sm_case_bottom = True
                            , sm_pre_inline = pre_inline_on
                            }
   where

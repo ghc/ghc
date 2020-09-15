@@ -1941,6 +1941,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) con
   | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
                                  -- continuation to discard, else we do it
                                  -- again and again!
+  , sm_case_bottom (getMode env)
   = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
     return (emptyFloats env, castBottomExpr res cont_ty)
   where
@@ -3231,15 +3232,18 @@ join points and inlining them away.  See #4930.
 mkDupableCaseCont :: SimplEnv -> [InAlt] -> SimplCont
                   -> SimplM (SimplFloats, SimplCont)
 mkDupableCaseCont env alts cont
-  | altsWouldDup alts = mkDupableCont env cont
-  | otherwise         = return (emptyFloats env, cont)
+  | altsWouldDup env alts = mkDupableCont env cont
+  | otherwise             = return (emptyFloats env, cont)
 
-altsWouldDup :: [InAlt] -> Bool -- True iff strictly > 1 non-bottom alternative
-altsWouldDup []  = False        -- See Note [Bottom alternatives]
-altsWouldDup [_] = False
-altsWouldDup (alt:alts)
-  | is_bot_alt alt = altsWouldDup alts
-  | otherwise      = not (all is_bot_alt alts)
+altsWouldDup :: SimplEnv -> [InAlt] -> Bool -- True iff strictly > 1 non-bottom alternative
+altsWouldDup _   []  = False        -- See Note [Bottom alternatives]
+altsWouldDup _   [_] = False
+altsWouldDup env _
+  | not (sm_case_bottom (getMode env))
+                     = True
+altsWouldDup env (alt:alts)
+  | is_bot_alt alt   = altsWouldDup env alts
+  | otherwise        = not (all is_bot_alt alts)
   where
     is_bot_alt (_,_,rhs) = exprIsDeadEnd rhs
 

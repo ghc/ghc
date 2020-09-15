@@ -165,6 +165,8 @@ data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
         , sm_case_case  :: !Bool          -- ^ Whether case-of-case is enabled
         , sm_eta_expand :: !Bool          -- ^ Whether eta-expansion is enabled
         , sm_pre_inline :: !Bool          -- ^ Whether pre-inlining is enabled
+        , sm_case_bottom :: !Bool         -- ^ Whether to discard continuations
+                                          -- of bottoming case expressions
         , sm_dflags     :: DynFlags
             -- Just for convenient non-monadic access; we don't override these.
             --
@@ -181,14 +183,17 @@ data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
 instance Outputable SimplMode where
     ppr (SimplMode { sm_phase = p, sm_names = ss
                    , sm_rules = r, sm_inline = i
-                   , sm_eta_expand = eta, sm_case_case = cc })
+                   , sm_eta_expand = eta, sm_case_case = cc
+                   , sm_case_bottom = cb })
        = text "SimplMode" <+> braces (
          sep [ text "Phase =" <+> ppr p <+>
                brackets (text (concat $ intersperse "," ss)) <> comma
              , pp_flag i   (sLit "inline") <> comma
              , pp_flag r   (sLit "rules") <> comma
              , pp_flag eta (sLit "eta-expand") <> comma
-             , pp_flag cc  (sLit "case-of-case") ])
+             , pp_flag cc  (sLit "case-of-case")
+             , pp_flag cb  (sLit "case-of-bottom")
+             ])
          where
            pp_flag f s = ppUnless f (text "no") <+> ptext s
 
