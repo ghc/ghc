@@ -648,31 +648,51 @@ rts_unlock (Capability *cap)
 
 #if defined(THREADED_RTS)
 static bool rts_paused = false;
-// Halt execution of all Haskell threads.
-// It is different to rts_lock because it pauses all capabilities. rts_lock
-// only pauses a single capability.
-// rts_pause() and rts_unpause() have to be executed from the same OS thread
-// (i.e. myTask() must stay the same).
+
+// See RtsAPI.h
 RtsPaused rts_pause (void)
 {
-    struct RtsPaused_ paused;
-    paused.pausing_task = newBoundTask();
-    stopAllCapabilities(&paused.capabilities, paused.pausing_task);
+    if (rts_isPaused())
+    {
+        errorBelch("error: rts_pause: attempting to pause an already paused RTS.");
+        stg_exit(EXIT_FAILURE);
+    }
+
+    RtsPaused rtsPaused;
+    rtsPaused.pausing_task = newBoundTask();
+
+    // Check if we own a capability. This is needed to correctly call
+    // stopAllCapabilities() and to know if to keep ownership or release the
+    // capability on rts_unpause().
+    Capability * cap = rtsPaused.pausing_task->cap;
+    bool taskOwnsCap = cap != NULL && cap->running_task == rtsPaused.pausing_task;
+    rtsPaused.capability = taskOwnsCap ? cap : NULL;
+    stopAllCapabilities(taskOwnsCap ? &rtsPaused.capability : NULL, rtsPaused.pausing_task);
+
     rts_paused = true;
-    return paused;
+    return rtsPaused;
 }
 
-// Counterpart of rts_pause: Continue from a pause.
-// rts_pause() and rts_unpause() have to be executed from the same OS thread
-// (i.e. myTask() must stay the same).
-void rts_unpause (RtsPaused paused)
+// See RtsAPI.h
+void rts_unpause (RtsPaused rtsPaused)
 {
+    if (!rts_isPaused())
+    {
+        errorBelch("error: rts_pause: attempting to resume an RTS that is not paused.");
+        stg_exit(EXIT_FAILURE);
+    }
+    if (rtsPaused.pausing_task != getMyTask())
+    {
+        errorBelch("error: rts_unpause was called from a different OS thread than rts_pause.");
+        stg_exit(EXIT_FAILURE);
+    }
+
     rts_paused = false;
-    releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
+    releaseAllCapabilities(n_capabilities, rtsPaused.capability, getMyTask());
     exitMyTask();
 }
 
-// Tells the current state of the RTS regarding rts_pause() and rts_unpause().
+// See RtsAPI.h
 bool rts_isPaused(void)
 {
     return rts_paused;
@@ -684,7 +704,6 @@ bool rts_isPaused(void)
 // was called before.
 void rts_listThreads(ListThreadsCb cb, void *user)
 {
-    ASSERT(rts_paused);
     for (uint32_t g=0; g < RtsFlags.GcFlags.generations; g++) {
         StgTSO *tso = generations[g].threads;
         while (tso != END_TSO_QUEUE) {
@@ -716,7 +735,6 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
     ctx.cb = cb;
     ctx.user = user;
 
-    ASSERT(rts_paused);
     threadStableNameTable(&list_roots_helper, (void *)&ctx);
     threadStablePtrTable(&list_roots_helper, (void *)&ctx);
 }
@@ -726,19 +744,20 @@ RtsPaused rts_pause (void)
 {
     errorBelch("Warning: Pausing the RTS is only possible for "
                "multithreaded RTS.");
-    struct RtsPaused_ paused;
-    paused.pausing_task = NULL;
-    paused.capabilities = NULL;
-    return paused;
+    RtsPaused rtsPaused = {
+            .pausing_task = NULL,
+            .capability = NULL
+        };
+    return rtsPaused;
 }
 
-void rts_unpause (RtsPaused paused STG_UNUSED)
+void rts_unpause (RtsPaused cap STG_UNUSED)
 {
     errorBelch("Warning: Unpausing the RTS is only possible for "
                "multithreaded RTS.");
 }
 
-bool rts_isPaused(void)
+bool rts_isPaused()
 {
     errorBelch("Warning: (Un-) Pausing the RTS is only possible for "
                "multithreaded RTS.");
