@@ -280,8 +280,8 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = MaybeT $ do
         , ppr fuel
         ]
       runMaybeT $ do
-        addPhiCt nabla (PhiConCt x (PmAltConLike con) ex_tvs gammas arg_ids)
-        -- inhabitationTest fuel (nabla_ty_st nabla) nabla'
+        nabla' <- addPhiCt nabla (PhiConCt x (PmAltConLike con) ex_tvs gammas arg_ids)
+        inhabitationTest fuel (nabla_ty_st nabla) nabla'
     Nothing -> pure (Just nabla) -- Could not guess arg_tys. Just assume inhabited
 
 {- Note [Strict fields and variables of unlifted type]
@@ -953,16 +953,16 @@ addNotConCt nabla x nalt = do
       -- 2. Only record the new fact when it's not already implied by one of the
       -- solutions
       let implies nalt sol = eqPmAltCon (paca_con sol) nalt == Disjoint
-      let (neg_changed, neg')
-            | any (implies nalt) pos = (False, neg)
+      let neg'
+            | any (implies nalt) pos = neg
             -- See Note [Completeness checking with required Thetas]
-            | hasRequiredTheta nalt  = (False, neg)
-            | otherwise              = (True,  extendPmAltConSet neg nalt)
+            | hasRequiredTheta nalt  = neg
+            | otherwise              = extendPmAltConSet neg nalt
       MASSERT( isPmAltConMatchStrict nalt )
       let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
       -- 3. Make sure there's at least one other possible constructor
       case nalt of
-        PmAltConLike cl | neg_changed -> do
+        PmAltConLike cl -> do
           -- Mark dirty to force a delayed inhabitation test
           rcm' <- lift (markMatched cl rcm)
           pure (Just x', vi'{ vi_rcm = rcm' })
@@ -1082,16 +1082,16 @@ inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = do
                 | otherwise                                    = traverseDirty
   -- We have to start the inhabitation test with a Nabla where all dirty bits
   -- are cleared
-  ts' <- trv_dirty (test_one nabla{ nabla_tm_st = ts{ts_dirty=emptyDVarSet} }) ts
+  ts' <- trv_dirty (test_one nabla) ts
   pure nabla{ nabla_tm_st = ts'{ts_dirty=emptyDVarSet}}
   where
     test_one :: Nabla -> VarInfo -> MaybeT DsM VarInfo
-    test_one nabla vi =
+    test_one nabla vi = do
       lift (varNeedsTesting old_ty_st nabla vi) >>= \case
         True -> do
           -- No solution yet and needs testing
           _trcM "instantiate one" (ppr vi)
-          instantiate (fuel-1) nabla vi
+          instantiate (fuel-1) nabla{ nabla_tm_st = ts{ts_dirty=emptyDVarSet} } vi
         _ -> pure vi
 
 -- | Checks whether the given 'VarInfo' needs to be tested for inhabitants.
@@ -1111,7 +1111,7 @@ varNeedsTesting _         MkNabla{nabla_tm_st=tm_st}     vi
   | elemDVarSet (vi_id vi) (ts_dirty tm_st) = pure True
 varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} _
   -- Same type state => still inhabited
-  | tyStateChanged old_ty_st new_ty_st = pure False
+  | not (tyStateChanged old_ty_st new_ty_st) = pure False
 varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi = do
   (_, _, old_rep_ty) <- tntrGuts <$> pmTopNormaliseType old_ty_st (idType $ vi_id vi)
   (_, _, new_rep_ty) <- tntrGuts <$> pmTopNormaliseType new_ty_st (idType $ vi_id vi)

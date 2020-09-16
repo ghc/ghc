@@ -928,7 +928,7 @@ checkGrd grd = CA $ \inc -> case grd of
   -- let x = e: Refine with x ~ e
   PmLet x e -> do
     matched <- addPhiCtNablas inc (PhiCoreCt x e)
-    -- tracePm "check:Let" (ppr x <+> char '=' <+> ppr e)
+    tracePm "check:Let" (ppr x <+> char '=' <+> ppr e)
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
@@ -940,7 +940,7 @@ checkGrd grd = CA $ \inc -> case grd of
     -- mb_info = Just info <==> PmBang originates from bang pattern in source
     let bangs | Just info <- mb_info = unitOL (div, info)
               | otherwise            = NilOL
-    -- tracePm "check:Bang" (ppr x <+> ppr div)
+    tracePm "check:Bang" (ppr x <+> ppr div)
     pure CheckResult { cr_ret = RedSets { rs_cov = matched, rs_div = div, rs_bangs = bangs }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
@@ -949,9 +949,10 @@ checkGrd grd = CA $ \inc -> case grd of
     !div <- if isPmAltConMatchStrict con
       then addPhiCtNablas inc (PhiBotCt x)
       else pure mempty
+    tracePm "checkGrd:Con1" (ppr inc $$ ppr div)
     !matched <- addPhiCtNablas inc (PhiConCt x con tvs (map evVarPred dicts) args)
     !uncov   <- addPhiCtNablas inc (PhiNotConCt x con)
-    -- tracePm "checkGrd:Con" (ppr inc $$ ppr grd $$ ppr con_cts $$ ppr matched)
+    tracePm "checkGrd:Con2" (ppr inc $$ ppr grd $$ ppr matched)
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched, rs_div = div }
                      , cr_uncov = uncov
                      , cr_approx = Precise }
