@@ -57,6 +57,7 @@ import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.Unique.DSet
 import GHC.Unit
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -123,7 +124,9 @@ mkFullIface hsc_env partial_iface mb_cg_infos = do
       addFingerprints hsc_env partial_iface{ mi_decls = decls }
 
     -- Debug printing
-    dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText (pprModIface full_iface)
+    let unit_state = unitState (hsc_dflags hsc_env)
+    dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText
+      (pprWithUnitState unit_state $ pprModIface full_iface)
 
     return full_iface
 
@@ -218,7 +221,7 @@ mkIface_ hsc_env
                       md_anns      = anns,
                       md_types     = type_env,
                       md_exports   = exports,
-                      md_complete_sigs = complete_sigs }
+                      md_complete_matches = complete_matches }
 -- NB:  notice that mkIface does not look at the bindings
 --      only at the TypeEnv.  The previous Tidy phase has
 --      put exactly the info into the TypeEnv that we want
@@ -254,7 +257,7 @@ mkIface_ hsc_env
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
-        icomplete_sigs = map mkIfaceCompleteSig complete_sigs
+        icomplete_matches = map mkIfaceCompleteMatch complete_matches
 
     ModIface {
           mi_module      = this_mod,
@@ -283,14 +286,14 @@ mkIface_ hsc_env
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,
-          mi_complete_sigs = icomplete_sigs,
+          mi_complete_matches = icomplete_matches,
           mi_doc_hdr     = doc_hdr,
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
           mi_final_exts  = (),
           mi_ext_fields  = emptyExtensibleFields }
   where
-     cmp_rule     = comparing ifRuleName
+     cmp_rule     = lexicalCompareFS `on` ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
      -- because the latter is not stable across compilations:
      cmp_inst     = comparing (nameOccName . ifDFun)
@@ -320,8 +323,9 @@ mkIface_ hsc_env
 ************************************************************************
 -}
 
-mkIfaceCompleteSig :: CompleteMatch -> IfaceCompleteMatch
-mkIfaceCompleteSig (CompleteMatch cls tc) = IfaceCompleteMatch cls tc
+mkIfaceCompleteMatch :: CompleteMatch -> IfaceCompleteMatch
+mkIfaceCompleteMatch cls =
+  IfaceCompleteMatch (map conLikeName (uniqDSetToList cls))
 
 
 {-

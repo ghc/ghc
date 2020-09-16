@@ -4,7 +4,7 @@
 
 from my_typing import *
 from pathlib import Path
-from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles
+from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles, GitRef
 from datetime import datetime
 
 # -----------------------------------------------------------------------------
@@ -115,6 +115,9 @@ class TestConfig:
         self.way_flags = {}  # type: Dict[WayName, List[str]]
         self.way_rts_flags = {}  # type: Dict[WayName, List[str]]
 
+        # Do we have a functional LLVM toolchain?
+        self.have_llvm = False
+
         # Do we have vanilla libraries?
         self.have_vanilla = False
 
@@ -162,6 +165,9 @@ class TestConfig:
         # tests which should be considered to be broken during this testsuite
         # run.
         self.broken_tests = set() # type: Set[TestName]
+
+        # Baseline commit for performane metric comparisons.
+        self.baseline_commit = None # type: Optional[GitRef]
 
         # Should we skip performance tests
         self.skip_perf_tests = False

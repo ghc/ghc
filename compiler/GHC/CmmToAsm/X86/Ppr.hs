@@ -8,7 +8,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 module GHC.CmmToAsm.X86.Ppr (
         pprNatCmmDecl,
         pprData,
@@ -24,25 +23,27 @@ where
 
 import GHC.Prelude
 
+import GHC.Platform
+import GHC.Platform.Reg
+
 import GHC.CmmToAsm.X86.Regs
 import GHC.CmmToAsm.X86.Instr
 import GHC.CmmToAsm.X86.Cond
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
-import GHC.Platform.Reg
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils
 import GHC.CmmToAsm.Ppr
 
-
+import GHC.Cmm              hiding (topInfoTable)
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
-import GHC.Types.Basic (Alignment, mkAlignment, alignmentBytes)
-import GHC.Driver.Session
-import GHC.Cmm              hiding (topInfoTable)
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
+
+import GHC.Types.Basic (Alignment, mkAlignment, alignmentBytes)
 import GHC.Types.Unique ( pprUniqueAlways )
-import GHC.Platform
+
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -90,7 +91,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         pprProcAlignment config $$
         pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock config top_info) blocks) $$
-        (if ncgDebugLevel config > 0
+        (if ncgDwarfEnabled config
          then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
         pprSizeDecl platform lbl
 
@@ -124,7 +125,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) instrs) $$
-    (if ncgDebugLevel config > 0
+    (if ncgDwarfEnabled config
       then ppr (mkAsmTempEndLabel asmLbl) <> char ':'
       else empty
     )
@@ -139,7 +140,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
            vcat (map (pprData config) info) $$
            pprLabel platform infoLbl $$
            c $$
-           (if ncgDebugLevel config > 0
+           (if ncgDwarfEnabled config
                then ppr (mkAsmTempEndLabel infoLbl) <> char ':'
                else empty
            )
@@ -269,11 +270,6 @@ pprAlign platform alignment
         log2 4 = 2
         log2 8 = 3
         log2 n = 1 + log2 (n `quot` 2)
-
-instance Outputable Instr where
-    ppr instr = sdocWithDynFlags $ \dflags ->
-                  pprInstr (targetPlatform dflags) instr
-
 
 pprReg :: Platform -> Format -> Reg -> SDoc
 pprReg platform f r
@@ -427,9 +423,8 @@ pprImm (ImmInteger i) = integer i
 pprImm (ImmCLbl l)    = ppr l
 pprImm (ImmIndex l i) = ppr l <> char '+' <> int i
 pprImm (ImmLit s)     = s
-
-pprImm (ImmFloat _)  = text "naughty float immediate"
-pprImm (ImmDouble _) = text "naughty double immediate"
+pprImm (ImmFloat f)   = float $ fromRational f
+pprImm (ImmDouble d)  = double $ fromRational d
 
 pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
 pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
@@ -518,13 +513,8 @@ pprDataItem config lit
         ppr_item II16  _ = [text "\t.word\t" <> pprImm imm]
         ppr_item II32  _ = [text "\t.long\t" <> pprImm imm]
 
-        ppr_item FF32  (CmmFloat r _)
-           = let bs = floatToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
-
-        ppr_item FF64 (CmmFloat r _)
-           = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+        ppr_item FF32 _ = [text "\t.float\t" <> pprImm imm]
+        ppr_item FF64 _ = [text "\t.double\t" <> pprImm imm]
 
         ppr_item II64 _
             = case platformOS platform of
@@ -561,9 +551,6 @@ pprDataItem config lit
                        text "\t.long\t0"]
                   _ ->
                       [text "\t.quad\t" <> pprImm imm]
-
-        ppr_item _ _
-                = panic "X86.Ppr.ppr_item: no match"
 
 
 asmComment :: SDoc -> SDoc

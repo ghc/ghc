@@ -47,6 +47,7 @@ import GHC.Driver.Monad
 import GHC.Parser.Header
 import GHC.Driver.Types
 import GHC.Unit
+import GHC.Unit.State
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 import GHC.Driver.Main
@@ -1373,7 +1374,8 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
 --
 -- There better had not be any cyclic groups here -- we check for them.
 upsweep
-    :: GhcMonad m
+    :: forall m
+     . GhcMonad m
     => Maybe Messager
     -> HomePackageTable            -- ^ HPT from last time round (pruned)
     -> StableModules               -- ^ stable modules (see checkStability)
@@ -1415,8 +1417,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
     return (Failed, done')
 
   upsweep'
-    :: GhcMonad m
-    => HomePackageTable
+    :: HomePackageTable
     -> ModuleGraph
     -> [SCC ModSummary]
     -> Int

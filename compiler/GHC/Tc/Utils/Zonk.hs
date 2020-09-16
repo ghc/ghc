@@ -533,12 +533,12 @@ zonk_lbind env = wrapLocM (zonk_bind env)
 
 zonk_bind :: ZonkEnv -> HsBind GhcTc -> TcM (HsBind GhcTc)
 zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
-                            , pat_ext = NPatBindTc fvs ty})
+                            , pat_ext = ty})
   = do  { (_env, new_pat) <- zonkPat env pat            -- Env already extended
         ; new_grhss <- zonkGRHSs env zonkLExpr grhss
         ; new_ty    <- zonkTcTypeToTypeX env ty
         ; return (bind { pat_lhs = new_pat, pat_rhs = new_grhss
-                       , pat_ext = NPatBindTc fvs new_ty }) }
+                       , pat_ext = new_ty }) }
 
 zonk_bind env (VarBind { var_ext = x
                        , var_id = var, var_rhs = expr })
@@ -626,8 +626,8 @@ zonk_bind env (PatSynBind x bind@(PSB { psb_id = L loc id
                        , psb_dir = dir' } }
 
 zonkPatSynDetails :: ZonkEnv
-                  -> HsPatSynDetails (Located TcId)
-                  -> HsPatSynDetails (Located Id)
+                  -> HsPatSynDetails GhcTc
+                  -> HsPatSynDetails GhcTc
 zonkPatSynDetails env (PrefixCon as)
   = PrefixCon (map (zonkLIdOcc env) as)
 zonkPatSynDetails env (InfixCon a1 a2)
@@ -1450,10 +1450,8 @@ zonk_pat env (XPat (CoPat co_fn pat ty))
 zonk_pat _ pat = pprPanic "zonk_pat" (ppr pat)
 
 ---------------------------
-zonkConStuff :: ZonkEnv
-             -> HsConDetails (LPat GhcTc) (HsRecFields id (LPat GhcTc))
-             -> TcM (ZonkEnv,
-                    HsConDetails (LPat GhcTc) (HsRecFields id (LPat GhcTc)))
+zonkConStuff :: ZonkEnv -> HsConPatDetails GhcTc
+             -> TcM (ZonkEnv, HsConPatDetails GhcTc)
 zonkConStuff env (PrefixCon pats)
   = do  { (env', pats') <- zonkPats env pats
         ; return (env', PrefixCon pats') }

@@ -145,8 +145,8 @@ module GHC.Driver.Session (
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_lm, pgm_dll, pgm_T,
-        pgm_windres, pgm_libtool, pgm_ar, pgm_ranlib, pgm_lo, pgm_lc,
-        pgm_lcc, pgm_i,
+        pgm_windres, pgm_libtool, pgm_ar, pgm_otool, pgm_install_name_tool,
+        pgm_ranlib, pgm_lo, pgm_lc, pgm_lcc, pgm_i,
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
         opt_P_signature,
         opt_windres, opt_lo, opt_lc, opt_lcc,
@@ -226,9 +226,6 @@ module GHC.Driver.Session (
 
         -- * SDoc
         initSDocContext, initDefaultSDocContext,
-
-        -- * Make use of the Cmm CFG
-        CfgWeights(..)
   ) where
 
 #include "HsVersions.h"
@@ -253,6 +250,7 @@ import GHC.Driver.Flags
 import GHC.Driver.Backend
 import GHC.Settings.Config
 import GHC.Utils.CliOption
+import {-# SOURCE #-} GHC.Core.Unfold
 import GHC.Driver.CmdLine hiding (WarnReason(..))
 import qualified GHC.Driver.CmdLine as Cmd
 import GHC.Settings.Constants
@@ -268,6 +266,7 @@ import GHC.Data.FastString
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
 import GHC.Settings
+import GHC.CmmToAsm.CFG.Weight
 
 import {-# SOURCE #-} GHC.Utils.Error
                                ( Severity(..), MsgDoc, mkLocMessageAnn
@@ -695,14 +694,9 @@ data DynFlags = DynFlags {
   -- by template-haskell
   extensionFlags        :: EnumSet LangExt.Extension,
 
-  -- Unfolding control
+  -- | Unfolding control
   -- See Note [Discounts and thresholds] in GHC.Core.Unfold
-  ufCreationThreshold   :: Int,
-  ufUseThreshold        :: Int,
-  ufFunAppDiscount      :: Int,
-  ufDictDiscount        :: Int,
-  ufDearOp              :: Int,
-  ufVeryAggressive      :: Bool,
+  unfoldingOpts         :: !UnfoldingOpts,
 
   maxWorkerArgs         :: Int,
 
@@ -777,77 +771,8 @@ data DynFlags = DynFlags {
   uniqueIncrement       :: Int,
 
   -- | Temporary: CFG Edge weights for fast iterations
-  cfgWeightInfo         :: CfgWeights
+  cfgWeights            :: Weights
 }
-
--- | Edge weights to use when generating a CFG from CMM
-data CfgWeights
-    = CFGWeights
-    { uncondWeight :: Int
-    , condBranchWeight :: Int
-    , switchWeight :: Int
-    , callWeight :: Int
-    , likelyCondWeight :: Int
-    , unlikelyCondWeight :: Int
-    , infoTablePenalty :: Int
-    , backEdgeBonus :: Int
-    }
-
-defaultCfgWeights :: CfgWeights
-defaultCfgWeights
-    = CFGWeights
-    { uncondWeight = 1000
-    , condBranchWeight = 800
-    , switchWeight = 1
-    , callWeight = -10
-    , likelyCondWeight = 900
-    , unlikelyCondWeight = 300
-    , infoTablePenalty = 300
-    , backEdgeBonus = 400
-    }
-
-parseCfgWeights :: String -> CfgWeights -> CfgWeights
-parseCfgWeights s oldWeights =
-        foldl' (\cfg (n,v) -> update n v cfg) oldWeights assignments
-    where
-        assignments = map assignment $ settings s
-        update "uncondWeight" n w =
-            w {uncondWeight = n}
-        update "condBranchWeight" n w =
-            w {condBranchWeight = n}
-        update "switchWeight" n w =
-            w {switchWeight = n}
-        update "callWeight" n w =
-            w {callWeight = n}
-        update "likelyCondWeight" n w =
-            w {likelyCondWeight = n}
-        update "unlikelyCondWeight" n w =
-            w {unlikelyCondWeight = n}
-        update "infoTablePenalty" n w =
-            w {infoTablePenalty = n}
-        update "backEdgeBonus" n w =
-            w {backEdgeBonus = n}
-        update other _ _
-            = panic $ other ++
-                      " is not a cfg weight parameter. " ++
-                      exampleString
-        settings s
-            | (s1,rest) <- break (== ',') s
-            , null rest
-            = [s1]
-            | (s1,rest) <- break (== ',') s
-            = s1 : settings (drop 1 rest)
-
-        assignment as
-            | (name, _:val) <- break (== '=') as
-            = (name,read val)
-            | otherwise
-            = panic $ "Invalid cfg parameters." ++ exampleString
-
-        exampleString = "Example parameters: uncondWeight=1000," ++
-            "condBranchWeight=800,switchWeight=0,callWeight=300" ++
-            ",likelyCondWeight=900,unlikelyCondWeight=300" ++
-            ",infoTablePenalty=300,backEdgeBonus=400"
 
 class HasDynFlags m where
     getDynFlags :: m DynFlags
@@ -956,6 +881,10 @@ pgm_lcc               :: DynFlags -> (String,[Option])
 pgm_lcc dflags = toolSettings_pgm_lcc $ toolSettings dflags
 pgm_ar                :: DynFlags -> String
 pgm_ar dflags = toolSettings_pgm_ar $ toolSettings dflags
+pgm_otool             :: DynFlags -> String
+pgm_otool dflags = toolSettings_pgm_otool $ toolSettings dflags
+pgm_install_name_tool :: DynFlags -> String
+pgm_install_name_tool dflags = toolSettings_pgm_install_name_tool $ toolSettings dflags
 pgm_ranlib            :: DynFlags -> String
 pgm_ranlib dflags = toolSettings_pgm_ranlib $ toolSettings dflags
 pgm_lo                :: DynFlags -> (String,[Option])
@@ -1370,25 +1299,7 @@ defaultDynFlags mySettings llvmConfig =
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
 
-        ufCreationThreshold = 750,
-           -- The ufCreationThreshold threshold must be reasonably high
-           -- to take account of possible discounts.
-           -- E.g. 450 is not enough in 'fulsom' for Interval.sqr to
-           -- inline into Csg.calc (The unfolding for sqr never makes it
-           -- into the interface file.)
-
-        ufUseThreshold = 90,
-           -- Last adjusted upwards in #18282, when I reduced
-           -- the result discount for constructors.
-
-        ufFunAppDiscount = 60,
-           -- Be fairly keen to inline a function if that means
-           -- we'll be able to pick the right method from a dictionary
-
-        ufDictDiscount      = 30,
-        ufDearOp            = 40,
-        ufVeryAggressive    = False,
-
+        unfoldingOpts = defaultUnfoldingOpts,
         maxWorkerArgs = 10,
 
         ghciHistSize = 50, -- keep a log of length 50 by default
@@ -1430,7 +1341,7 @@ defaultDynFlags mySettings llvmConfig =
 
         reverseErrors = False,
         maxErrors     = Nothing,
-        cfgWeightInfo = defaultCfgWeights
+        cfgWeights    = defaultWeights
       }
 
 defaultWays :: Settings -> Ways
@@ -2338,6 +2249,10 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_libtool = f }
   , make_ord_flag defFlag "pgmar"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_ar = f }
+  , make_ord_flag defFlag "pgmotool"
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_otool = f}
+  , make_ord_flag defFlag "pgminstall_name_tool"
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_install_name_tool = f}
   , make_ord_flag defFlag "pgmranlib"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_ranlib = f }
 
@@ -2657,12 +2572,15 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_spec)
   , make_ord_flag defGhcFlag "ddump-prep"
         (setDumpFlag Opt_D_dump_prep)
-  , make_ord_flag defGhcFlag "ddump-stg"
-        (setDumpFlag Opt_D_dump_stg)
+  , make_ord_flag defGhcFlag "ddump-stg-from-core"
+        (setDumpFlag Opt_D_dump_stg_from_core)
   , make_ord_flag defGhcFlag "ddump-stg-unarised"
         (setDumpFlag Opt_D_dump_stg_unarised)
   , make_ord_flag defGhcFlag "ddump-stg-final"
         (setDumpFlag Opt_D_dump_stg_final)
+  , make_dep_flag defGhcFlag "ddump-stg"
+        (setDumpFlag Opt_D_dump_stg_from_core)
+        "Use `-ddump-stg-from-core` or `-ddump-stg-final` instead"
   , make_ord_flag defGhcFlag "ddump-call-arity"
         (setDumpFlag Opt_D_dump_call_arity)
   , make_ord_flag defGhcFlag "ddump-exitify"
@@ -2949,21 +2867,24 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { cmmProcAlignment = Just n }))
   , make_ord_flag defFlag "fblock-layout-weights"
         (HasArg (\s ->
-            upd (\d -> d { cfgWeightInfo =
-                parseCfgWeights s (cfgWeightInfo d)})))
+            upd (\d -> d { cfgWeights =
+                parseWeights s (cfgWeights d)})))
   , make_ord_flag defFlag "fhistory-size"
       (intSuffix (\n d -> d { historySize = n }))
+
   , make_ord_flag defFlag "funfolding-creation-threshold"
-      (intSuffix   (\n d -> d {ufCreationThreshold = n}))
+      (intSuffix   (\n d -> d { unfoldingOpts = updateCreationThreshold n (unfoldingOpts d)}))
   , make_ord_flag defFlag "funfolding-use-threshold"
-      (intSuffix   (\n d -> d {ufUseThreshold = n}))
+      (intSuffix   (\n d -> d { unfoldingOpts = updateUseThreshold n (unfoldingOpts d)}))
   , make_ord_flag defFlag "funfolding-fun-discount"
-      (intSuffix   (\n d -> d {ufFunAppDiscount = n}))
+      (intSuffix   (\n d -> d { unfoldingOpts = updateFunAppDiscount n (unfoldingOpts d)}))
   , make_ord_flag defFlag "funfolding-dict-discount"
-      (intSuffix   (\n d -> d {ufDictDiscount = n}))
+      (intSuffix   (\n d -> d { unfoldingOpts = updateDictDiscount n (unfoldingOpts d)}))
+
   , make_dep_flag defFlag "funfolding-keeness-factor"
       (floatSuffix (\_ d -> d))
       "-funfolding-keeness-factor is no longer respected as of GHC 8.12"
+
   , make_ord_flag defFlag "fmax-worker-args"
       (intSuffix (\n d -> d {maxWorkerArgs = n}))
   , make_ord_flag defGhciFlag "fghci-hist-size"
@@ -3387,6 +3308,7 @@ wWarningFlagsDeps = [
   flagSpec "unused-top-binds"            Opt_WarnUnusedTopBinds,
   flagSpec "unused-type-patterns"        Opt_WarnUnusedTypePatterns,
   flagSpec "unused-record-wildcards"     Opt_WarnUnusedRecordWildcards,
+  flagSpec "redundant-bang-patterns"     Opt_WarnRedundantBangPatterns,
   flagSpec "redundant-record-wildcards"  Opt_WarnRedundantRecordWildcards,
   flagSpec "warnings-deprecations"       Opt_WarnWarningsDeprecations,
   flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
@@ -3847,7 +3769,6 @@ defaultFlags settings
       Opt_OmitYields,
       Opt_PrintBindContents,
       Opt_ProfCountEntries,
-      Opt_RPath,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
       Opt_VersionMacros
@@ -3857,6 +3778,8 @@ defaultFlags settings
              -- The default -O0 options
 
     ++ default_PIC platform
+
+    ++ default_RPath platform
 
     ++ concatMap (wayGeneralFlags platform) (defaultWays settings)
     ++ validHoleFitDefaults
@@ -3897,6 +3820,29 @@ default_PIC platform =
                                          -- #10597 for more
                                          -- information.
     _                      -> []
+
+
+-- We usually want to use RPath, except on macOS (OSDarwin).  On recent macOS
+-- versions the number of load commands we can embed in a dynamic library is
+-- restricted.  Hence since b592bd98ff2 we rely on -dead_strip_dylib to only
+-- link the needed dylibs instead of linking the full dependency closure.
+--
+-- If we split the library linking into injecting -rpath and -l @rpath/...
+-- components, we will reduce the number of libraries we link, however we will
+-- still inject one -rpath entry for each library, independent of their use.
+-- That is, we even inject -rpath values for libraries that we dead_strip in
+-- the end. As such we can run afoul of the load command size limit simply
+-- by polluting the load commands with RPATH entries.
+--
+-- Thus, we disable Opt_RPath by default on OSDarwin.  The savvy user can always
+-- enable it with -use-rpath if they so wish.
+--
+-- See Note [Dynamic linking on macOS]
+
+default_RPath :: Platform -> [GeneralFlag]
+default_RPath platform | platformOS platform == OSDarwin = []
+default_RPath _                                          = [Opt_RPath]
+
 
 -- General flags that are switched on/off when other general flags are switched
 -- on
@@ -5146,6 +5092,8 @@ initSDocContext dflags style = SDC
   , sdocStarIsType                  = xopt LangExt.StarIsType dflags
   , sdocImpredicativeTypes          = xopt LangExt.ImpredicativeTypes dflags
   , sdocLinearTypes                 = xopt LangExt.LinearTypes dflags
+  , sdocPrintTypeAbbreviations      = True
+  , sdocUnitIdForUser               = ftext
   , sdocDynFlags                    = dflags
   }
 

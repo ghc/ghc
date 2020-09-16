@@ -243,7 +243,7 @@ data HsBindLR idL idR
           -- type         Int -> forall a'. a' -> a'
           -- Notice that the coercion captures the free a'.
 
-        fun_id :: XRec idL (IdP idL), -- Note [fun_id in Match] in GHC.Hs.Expr
+        fun_id :: LIdP idL, -- Note [fun_id in Match] in GHC.Hs.Expr
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
@@ -317,18 +317,13 @@ data HsBindLR idL idR
 
   | XHsBindsLR !(XXHsBindsLR idL idR)
 
-data NPatBindTc = NPatBindTc {
-     pat_fvs :: NameSet, -- ^ Free variables
-     pat_rhs_ty :: Type  -- ^ Type of the GRHSs
-     } deriving Data
-
 type instance XFunBind    (GhcPass pL) GhcPs = NoExtField
 type instance XFunBind    (GhcPass pL) GhcRn = NameSet    -- Free variables
 type instance XFunBind    (GhcPass pL) GhcTc = HsWrapper  -- See comments on FunBind.fun_ext
 
 type instance XPatBind    GhcPs (GhcPass pR) = NoExtField
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
-type instance XPatBind    GhcTc (GhcPass pR) = NPatBindTc
+type instance XPatBind    GhcTc (GhcPass pR) = Type    -- Type of the GRHSs
 
 type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = NoExtField
@@ -374,9 +369,8 @@ type instance XXABExport (GhcPass p) = NoExtCon
 data PatSynBind idL idR
   = PSB { psb_ext  :: XPSB idL idR,            -- ^ Post renaming, FVs.
                                                -- See Note [Bind free vars]
-          psb_id   :: XRec idL (IdP idL),       -- ^ Name of the pattern synonym
-          psb_args :: HsPatSynDetails (XRec idR (IdP idR)),
-                                               -- ^ Formal parameter names
+          psb_id   :: LIdP idL,                -- ^ Name of the pattern synonym
+          psb_args :: HsPatSynDetails idR,     -- ^ Formal parameter names
           psb_def  :: LPat idR,                -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
      }
@@ -898,7 +892,7 @@ data Sig pass
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     TypeSig
        (XTypeSig pass)
-       [XRec pass (IdP pass)]  -- LHS of the signature; e.g.  f,g,h :: blah
+       [LIdP pass]           -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 
       -- | A pattern synonym type signature
@@ -910,7 +904,7 @@ data Sig pass
       --           'GHC.Parser.Annotation.AnnDot','GHC.Parser.Annotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | PatSynSig (XPatSynSig pass) [XRec pass (IdP pass)] (LHsSigType pass)
+  | PatSynSig (XPatSynSig pass) [LIdP pass] (LHsSigType pass)
       -- P :: forall a b. Req => Prov => ty
 
       -- | A signature for a class method
@@ -923,7 +917,7 @@ data Sig pass
       --
       --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDefault',
       --           'GHC.Parser.Annotation.AnnDcolon'
-  | ClassOpSig (XClassOpSig pass) Bool [XRec pass (IdP pass)] (LHsSigType pass)
+  | ClassOpSig (XClassOpSig pass) Bool [LIdP pass] (LHsSigType pass)
 
         -- | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
@@ -955,8 +949,8 @@ data Sig pass
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | InlineSig   (XInlineSig pass)
-                (XRec pass (IdP pass)) -- Function name
-                InlinePragma         -- Never defaultInlinePragma
+                (LIdP pass)        -- Function name
+                InlinePragma       -- Never defaultInlinePragma
 
         -- | A specialisation pragma
         --
@@ -971,7 +965,7 @@ data Sig pass
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SpecSig     (XSpecSig pass)
-                (XRec pass (IdP pass)) -- Specialise a function or datatype  ...
+                (LIdP pass)        -- Specialise a function or datatype  ...
                 [LHsSigType pass]  -- ... to these types
                 InlinePragma       -- The pragma on SPECIALISE_INLINE form.
                                    -- If it's just defaultInlinePragma, then we said
@@ -1001,7 +995,7 @@ data Sig pass
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | MinimalSig (XMinimalSig pass)
-               SourceText (LBooleanFormula (XRec pass (IdP pass)))
+               SourceText (LBooleanFormula (LIdP pass))
                -- Note [Pragma source text] in GHC.Types.Basic
 
         -- | A "set cost centre" pragma for declarations
@@ -1013,8 +1007,8 @@ data Sig pass
         -- > {-# SCC funName "cost_centre_name" #-}
 
   | SCCFunSig  (XSCCFunSig pass)
-               SourceText              -- Note [Pragma source text] in GHC.Types.Basic
-               (XRec pass (IdP pass))  -- Function name
+               SourceText     -- Note [Pragma source text] in GHC.Types.Basic
+               (LIdP pass)    -- Function name
                (Maybe (XRec pass StringLiteral))
        -- | A complete match pragma
        --
@@ -1025,8 +1019,8 @@ data Sig pass
        -- synonym definitions.
   | CompleteMatchSig (XCompleteMatchSig pass)
                      SourceText
-                     (XRec pass [XRec pass (IdP pass)])
-                     (Maybe (XRec pass (IdP pass)))
+                     (XRec pass [LIdP pass])
+                     (Maybe (LIdP pass))
   | XSig !(XXSig pass)
 
 type instance XTypeSig          (GhcPass p) = NoExtField
@@ -1046,7 +1040,7 @@ type instance XXSig             (GhcPass p) = NoExtCon
 type LFixitySig pass = XRec pass (FixitySig pass)
 
 -- | Fixity Signature
-data FixitySig pass = FixitySig (XFixitySig pass) [XRec pass (IdP pass)] Fixity
+data FixitySig pass = FixitySig (XFixitySig pass) [LIdP pass] Fixity
                     | XFixitySig !(XXFixitySig pass)
 
 type instance XFixitySig  (GhcPass p) = NoExtField
@@ -1234,14 +1228,14 @@ pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 -}
 
 -- | Haskell Pattern Synonym Details
-type HsPatSynDetails arg = HsConDetails arg [RecordPatSynField arg]
+type HsPatSynDetails pass = HsConDetails (LIdP pass) [RecordPatSynField (LIdP pass)]
 
 -- See Note [Record PatSyn Fields]
 -- | Record Pattern Synonym Field
-data RecordPatSynField a
+data RecordPatSynField fld
   = RecordPatSynField {
-      recordPatSynSelectorId :: a  -- Selector name visible in rest of the file
-      , recordPatSynPatVar :: a
+      recordPatSynSelectorId :: fld  -- Selector name visible in rest of the file
+      , recordPatSynPatVar   :: fld
       -- Filled in by renamer, the name used internally
       -- by the pattern
       } deriving (Data, Functor)

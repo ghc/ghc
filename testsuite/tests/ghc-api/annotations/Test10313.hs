@@ -33,5 +33,3 @@ strictStream (Bitstream l v)
       Exact l
 
 b = {-# SCC "foo\x64"   #-} 006
-
-c = {-# GENERATED "foob\x61r" 1 : 2  -  3 :   4 #-} 0.00

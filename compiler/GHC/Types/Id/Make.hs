@@ -54,7 +54,8 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Core.Make
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Utils   ( mkCast, mkDefaultCase )
-import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
+import GHC.Core.SimpleOpt
 import GHC.Types.Literal
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -69,6 +70,7 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Types.Unique.Supply
 import GHC.Builtin.Names
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
@@ -117,7 +119,8 @@ Note [ghcPrimIds (aka pseudoops)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The ghcPrimIds
 
-  * Are exported from GHC.Prim
+  * Are exported from GHC.Prim (see ghcPrimExports, used in ghcPrimInterface)
+    See Note [GHC.Prim] in primops.txt.pp for the remaining items in GHC.Prim.
 
   * Can't be defined in Haskell, and hence no Haskell binding site,
     but have perfectly reasonable unfoldings in Core
@@ -140,7 +143,17 @@ The magicIds
   * May or may not have a CompulsoryUnfolding.
 
   * But have some special behaviour that can't be done via an
-    unfolding from an interface file
+    unfolding from an interface file.
+
+  * May have IdInfo that differs from what would be imported from GHC.Magic.hi.
+    For example, 'lazy' gets a lazy strictness signature, per Note [lazyId magic].
+
+  The two remaining identifiers in GHC.Magic, runRW# and inline, are not listed
+  in magicIds: they have special behavior but they can be known-key and
+  not wired-in.
+  runRW#: see Note [Simplification of runRW#] in Prep, runRW# code in
+  Simplifier, Note [Linting of runRW#].
+  inline: see Note [inlineId magic]
 -}
 
 wiredInIds :: [Id]
@@ -474,6 +487,7 @@ mkDictSelId name clas
     info | new_tycon
          = base_info `setInlinePragInfo` alwaysInlinePragma
                      `setUnfoldingInfo`  mkInlineUnfoldingWithArity 1
+                                           defaultSimpleOpts
                                            (mkDictSelRhs clas val_index)
                    -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
                    -- for why alwaysInlinePragma
@@ -588,7 +602,7 @@ mkDataConWorkId wkr_name data_con
                             isSingleton arg_tys
                           , ppr data_con  )
                               -- Note [Newtype datacons]
-                   mkCompulsoryUnfolding $
+                   mkCompulsoryUnfolding defaultSimpleOpts $
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 
@@ -721,9 +735,9 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- See Note [Inline partially-applied constructor wrappers]
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
-             wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding wrap_rhs
+             wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding defaultSimpleOpts wrap_rhs
                         -- See Note [Compulsory newtype unfolding]
-                      | otherwise        = mkInlineUnfolding wrap_rhs
+                      | otherwise        = mkInlineUnfolding defaultSimpleOpts wrap_rhs
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
                         wrapFamInstBody tycon res_ty_args $
@@ -1401,12 +1415,12 @@ These Ids can't be defined in Haskell.  They could be defined in
 unfoldings in the wired-in GHC.Prim interface file, but we'd have to
 ensure that they were definitely, definitely inlined, because there is
 no curried identifier for them.  That's what mkCompulsoryUnfolding
-does.  If we had a way to get a compulsory unfolding from an interface
-file, we could do that, but we don't right now.
+does. Alternatively, we could add the definitions to mi_decls of ghcPrimIface
+but it's not clear if this would be simpler.
 
-The type variables we use here are "open" type variables: this means
-they can unify with both unlifted and lifted types.  Hence we provide
-another gun with which to shoot yourself in the foot.
+coercionToken# is not listed in ghcPrimIds, since its type uses (~#)
+which is not supposed to be used in expressions (GHC throws an assertion
+failure when trying.)
 -}
 
 nullAddrName, seqName,
@@ -1421,6 +1435,7 @@ magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDict
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 
+-- Names listed in magicIds; see Note [magicIds]
 lazyIdName, oneShotName, noinlineIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
@@ -1450,7 +1465,7 @@ nullAddrId :: Id
 nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding (Lit nullAddrLit)
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts (Lit nullAddrLit)
                        `setNeverLevPoly`   addrPrimTy
 
 ------------------------------------------------
@@ -1458,7 +1473,7 @@ seqId :: Id     -- See Note [seqId magic]
 seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
 
     inline_prag
          = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter
@@ -1495,7 +1510,7 @@ oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
     ty  = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
                           , openAlphaTyVar, openBetaTyVar ]
                           (mkVisFunTyMany fun_ty fun_ty)
@@ -1521,7 +1536,7 @@ coerceId :: Id
 coerceId = pcMiscPrelId coerceName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
     eqRTy     = mkTyConApp coercibleTyCon [ tYPE r , a, b ]
     eqRPrimTy = mkTyConApp eqReprPrimTyCon [ tYPE r, tYPE r, a, b ]
     ty        = mkInvisForAllTys [ Bndr rv InferredSpec
@@ -1597,7 +1612,7 @@ See also: Note [User-defined RULES for seq] in GHC.Core.Opt.Simplify.
 
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~
-lazy :: forall a?. a? -> a?   (i.e. works for unboxed types too)
+lazy :: forall a. a -> a
 
 'lazy' is used to make sure that a sub-expression, and its free variables,
 are truly used call-by-need, with no code motion.  Key examples:
@@ -1615,7 +1630,7 @@ are truly used call-by-need, with no code motion.  Key examples:
 Implementing 'lazy' is a bit tricky:
 
 * It must not have a strictness signature: by being a built-in Id,
-  all the info about lazyId comes from here, not from GHC.Base.hi.
+  all the info about lazyId comes from here, not from GHC.Magic.hi.
   This is important, because the strictness analyser will spot it as
   strict!
 
@@ -1768,7 +1783,7 @@ voidPrimId :: Id     -- Global constant :: Void#
                      -- We cannot define it in normal Haskell, since it's
                      -- a top-level unlifted value.
 voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
-                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding defaultSimpleOpts rhs
                              `setNeverLevPoly`  unboxedUnitTy)
     where rhs = Var (dataConWorkId unboxedUnitDataCon)
 
@@ -1776,7 +1791,7 @@ voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
 voidArgId :: Id       -- Local lambda-bound :: Void#
 voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Many unboxedUnitTy
 
-coercionTokenId :: Id         -- :: () ~ ()
+coercionTokenId :: Id         -- :: () ~# ()
 coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"
   = pcMiscPrelId coercionTokenName
                  (mkTyConApp eqPrimTyCon [liftedTypeKind, liftedTypeKind, unitTy, unitTy])
@@ -1785,8 +1800,3 @@ coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"
 pcMiscPrelId :: Name -> Type -> IdInfo -> Id
 pcMiscPrelId name ty info
   = mkVanillaGlobalWithInfo name ty info
-    -- We lie and say the thing is imported; otherwise, we get into
-    -- a mess with dependency analysis; e.g., core2stg may heave in
-    -- random calls to GHCbase.unpackPS__.  If GHCbase is the module
-    -- being compiled, then it's just a matter of luck if the definition
-    -- will be in "the right place" to be in scope.

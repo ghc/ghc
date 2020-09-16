@@ -46,7 +46,7 @@ import Data.Char
 import Data.Maybe       ( maybeToList )
 import Control.Monad    ( mplus )
 import Control.Applicative ((<$))
-import qualified Prelude
+import qualified Prelude -- for happy-generated code
 
 -- compiler
 import GHC.Hs
@@ -514,7 +514,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# SOURCE'             { L _ (ITsource_prag _) }
  '{-# RULES'              { L _ (ITrules_prag _) }
  '{-# SCC'                { L _ (ITscc_prag _)}
- '{-# GENERATED'          { L _ (ITgenerated_prag _) }
  '{-# DEPRECATED'         { L _ (ITdeprecated_prag _) }
  '{-# WARNING'            { L _ (ITwarning_prag _) }
  '{-# UNPACK'             { L _ (ITunpack_prag _) }
@@ -1491,7 +1490,7 @@ pattern_synonym_decl :: { LHsDecl GhcPs }
                        (as ++ ((mj AnnPattern $1:mu AnnLarrow $3:(fst $ unLoc $5))) )
                    }}
 
-pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails (Located RdrName), [AddAnn]) }
+pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails GhcPs, [AddAnn]) }
         : con vars0 { ($1, PrefixCon $2, []) }
         | varid conop varid { ($2, InfixCon $1 $3, []) }
         | con '{' cvars1 '}' { ($1, RecCon $3, [moc $2, mcc $4] ) }
@@ -2279,15 +2278,13 @@ deriving :: { LHsDerivingClause GhcPs }
                  in ams (L full_loc $ HsDerivingClause noExtField (Just $3) $2)
                         [mj AnnDeriving $1] }
 
-deriv_clause_types :: { Located [LHsSigType GhcPs] }
+deriv_clause_types :: { LDerivClauseTys GhcPs }
         : qtycon              { let { tc = sL1 $1 (HsTyVar noExtField NotPromoted $1) } in
-                                sL1 $1 [mkLHsSigType tc] }
-        | '(' ')'             {% ams (sLL $1 $> [])
+                                sL1 $1 (DctSingle noExtField (mkLHsSigType tc)) }
+        | '(' ')'             {% ams (sLL $1 $> (DctMulti noExtField []))
                                      [mop $1,mcp $2] }
-        | '(' deriv_types ')' {% ams (sLL $1 $> $2)
+        | '(' deriv_types ')' {% ams (sLL $1 $> (DctMulti noExtField $2))
                                      [mop $1,mcp $3] }
-             -- Glasgow extension: allow partial
-             -- applications in derivings
 
 -----------------------------------------------------------------------------
 -- Value definitions
@@ -2527,8 +2524,7 @@ optSemi :: { ([Located Token],Bool) }
 
 {- Note [Pragmas and operator fixity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-'prag_e' is an expression pragma, such as {-# SCC ... #-} or
-{-# GENERATED ... #-}.
+'prag_e' is an expression pragma, such as {-# SCC ... #-}.
 
 It must be used with care, or else #15730 happens. Consider this infix
 expression:
@@ -2582,20 +2578,6 @@ prag_e :: { Located ([AddAnn], HsPragE GhcPs) }
                                                   HsPragSCC noExtField
                                                     (getSCC_PRAGs $1)
                                                     (StringLiteral NoSourceText (getVARID $2))) }
-      | '{-# GENERATED' STRING INTEGER ':' INTEGER HYPHEN INTEGER ':' INTEGER '#-}'
-                                      { let getINT = fromInteger . il_value . getINTEGER in
-                                        sLL $1 $> $ ([mo $1,mj AnnVal $2
-                                              ,mj AnnVal $3,mj AnnColon $4
-                                              ,mj AnnVal $5] ++ $6 ++
-                                              [mj AnnVal $7,mj AnnColon $8
-                                              ,mj AnnVal $9,mc $10],
-                                              HsPragTick noExtField
-                                                (getGENERATED_PRAGs $1)
-                                                (getStringLiteral $2,
-                                                 (getINT $3, getINT $5),
-                                                 (getINT $7, getINT $9))
-                                                ((getINTEGERs $3, getINTEGERs $5),
-                                                 (getINTEGERs $7, getINTEGERs $9) )) }
 fexp    :: { ECP }
         : fexp aexp                  { ECP $
                                           superFunArg $
@@ -3702,7 +3684,6 @@ getRULES_PRAGs        (L _ (ITrules_prag        src)) = src
 getWARNING_PRAGs      (L _ (ITwarning_prag      src)) = src
 getDEPRECATED_PRAGs   (L _ (ITdeprecated_prag   src)) = src
 getSCC_PRAGs          (L _ (ITscc_prag          src)) = src
-getGENERATED_PRAGs    (L _ (ITgenerated_prag    src)) = src
 getUNPACK_PRAGs       (L _ (ITunpack_prag       src)) = src
 getNOUNPACK_PRAGs     (L _ (ITnounpack_prag     src)) = src
 getANN_PRAGs          (L _ (ITann_prag          src)) = src

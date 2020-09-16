@@ -65,9 +65,10 @@ import GHC.Builtin.Types ( unitTy, mkListTy )
 import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Hs
-import GHC.Iface.Syntax ( ShowSub(..), showToHeader )
-import GHC.Iface.Type   ( ShowForAllFlag(..) )
-import GHC.Core.PatSyn( pprPatSynType )
+import GHC.Iface.Syntax   ( ShowSub(..), showToHeader )
+import GHC.Iface.Type     ( ShowForAllFlag(..) )
+import GHC.Core.PatSyn    ( pprPatSynType )
+import GHC.Core.Predicate ( classMethodTy )
 import GHC.Builtin.Names
 import GHC.Builtin.Utils
 import GHC.Types.Name.Reader
@@ -1014,10 +1015,8 @@ checkBootTyCon is_boot tc1 tc2
           name2 = idName id2
           pname1 = quotes (ppr name1)
           pname2 = quotes (ppr name2)
-          (_, rho_ty1) = splitForAllTys (idType id1)
-          op_ty1 = funResultTy rho_ty1
-          (_, rho_ty2) = splitForAllTys (idType id2)
-          op_ty2 = funResultTy rho_ty2
+          op_ty1 = classMethodTy id1
+          op_ty2 = classMethodTy id2
 
        eqAT (ATI tc1 def_ats1) (ATI tc2 def_ats2)
          = checkBootTyCon is_boot tc1 tc2 `andThenCheck`
@@ -2866,11 +2865,12 @@ rnDump rn = dumpOptTcRn Opt_D_dump_rn "Renamer" FormatHaskell (ppr rn)
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
  = do { dflags <- getDynFlags ;
+        unit_state <- unitState <$> getDynFlags ;
 
         -- Dump short output if -ddump-types or -ddump-tc
         when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
           (dumpTcRn True (dumpOptionsFromFlag Opt_D_dump_types)
-            "" FormatText short_dump) ;
+            "" FormatText (pprWithUnitState unit_state short_dump)) ;
 
         -- Dump bindings if -ddump-tc
         dumpOptTcRn Opt_D_dump_tc "Typechecker" FormatHaskell full_dump;

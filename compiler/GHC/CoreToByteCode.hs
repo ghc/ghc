@@ -50,6 +50,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds )
@@ -647,7 +648,7 @@ schemeE d s p (AnnCase (_,scrut) _ _ []) = schemeE d s p scrut
 
 -- handle pairs with one void argument (e.g. state token)
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
-   | isUnboxedTupleCon dc
+   | isUnboxedTupleDataCon dc
         -- Convert
         --      case .... of x { (# V'd-thing, a #) -> ... }
         -- to
@@ -666,7 +667,7 @@ schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
 
 -- handle unit tuples
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1], rhs)])
-   | isUnboxedTupleCon dc
+   | isUnboxedTupleDataCon dc
    , typePrimRep (idType bndr) `lengthAtMost` 1
    = doCase d s p scrut bind1 [(DEFAULT, [], rhs)] (Just bndr)
 
@@ -824,7 +825,7 @@ schemeT d s p app
 
    -- Case 2: Constructor application
    | Just con <- maybe_saturated_dcon
-   , isUnboxedTupleCon con
+   , isUnboxedTupleDataCon con
    = case args_r_to_l of
         [arg1,arg2] | isVAtom arg1 ->
                   unboxedTupleReturn d s p arg2
@@ -1089,7 +1090,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 
         my_discr (DEFAULT, _, _) = NoDiscr {-shouldn't really happen-}
         my_discr (DataAlt dc, _, _)
-           | isUnboxedTupleCon dc || isUnboxedSumCon dc
+           | isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
            = multiValException
            | otherwise
            = DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))

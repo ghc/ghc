@@ -53,6 +53,7 @@ import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -862,15 +863,21 @@ simplEnvForGHCi dflags
   = mkSimplEnv $ SimplMode { sm_names  = ["GHCi"]
                            , sm_phase  = InitialPhase
                            , sm_dflags = dflags
+                           , sm_uf_opts = uf_opts
                            , sm_rules  = rules_on
                            , sm_inline = False
+                              -- Do not do any inlining, in case we expose some
+                              -- unboxed tuple stuff that confuses the bytecode
+                              -- interpreter
                            , sm_eta_expand = eta_expand_on
-                           , sm_case_case  = True }
+                           , sm_case_case  = True
+                           , sm_pre_inline = pre_inline_on
+                           }
   where
     rules_on      = gopt Opt_EnableRewriteRules   dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
-   -- Do not do any inlining, in case we expose some unboxed
-   -- tuple stuff that confuses the bytecode interpreter
+    pre_inline_on = gopt Opt_SimplPreInlining     dflags
+    uf_opts       = unfoldingOpts                 dflags
 
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
 -- See Note [Simplifying inside stable unfoldings]
@@ -1256,7 +1263,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
                   , occ_int_cxt = IsInteresting } = canInlineInLam rhs
     one_occ _                                     = False
 
-    pre_inline_unconditionally = gopt Opt_SimplPreInlining (seDynFlags env)
+    pre_inline_unconditionally = sm_pre_inline mode
     mode   = getMode env
     active = isActive (sm_phase mode) (inlinePragmaActivation inline_prag)
              -- See Note [pre/postInlineUnconditionally in gentle mode]
@@ -1370,7 +1377,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
 
         -> n_br < 100  -- See Note [Suppress exponential blowup]
 
-           && smallEnoughToInline dflags unfolding     -- Small enough to dup
+           && smallEnoughToInline uf_opts unfolding     -- Small enough to dup
                         -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
                         --
                         -- NB: Do NOT inline arbitrarily big things, even if occ_n_br=1
@@ -1416,7 +1423,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
 
   where
     unfolding = idUnfolding bndr
-    dflags    = seDynFlags env
+    uf_opts   = seUnfoldingOpts env
     active    = isActive (sm_phase (getMode env)) (idInlineActivation bndr)
         -- See Note [pre/postInlineUnconditionally in gentle mode]
 
@@ -1908,9 +1915,9 @@ new binding is abstracted.  Note that
     which is obviously bogus.
 -}
 
-abstractFloats :: DynFlags -> TopLevelFlag -> [OutTyVar] -> SimplFloats
+abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
               -> OutExpr -> SimplM ([OutBind], OutExpr)
-abstractFloats dflags top_lvl main_tvs floats body
+abstractFloats uf_opts top_lvl main_tvs floats body
   = ASSERT( notNull body_floats )
     ASSERT( isNilOL (sfJoinFloats floats) )
     do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
@@ -1986,7 +1993,7 @@ abstractFloats dflags top_lvl main_tvs floats body
       = (poly_id `setIdUnfolding` unf, poly_rhs)
       where
         poly_rhs = mkLams tvs_here rhs
-        unf = mkUnfolding dflags InlineRhs is_top_lvl False poly_rhs
+        unf = mkUnfolding uf_opts InlineRhs is_top_lvl False poly_rhs
 
         -- We want the unfolding.  Consider
         --      let

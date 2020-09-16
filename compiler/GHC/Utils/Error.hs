@@ -18,6 +18,7 @@ module GHC.Utils.Error (
         -- * Messages
         ErrMsg, errMsgDoc, errMsgSeverity, errMsgReason,
         ErrDoc, errDoc, errDocImportant, errDocContext, errDocSupplementary,
+        mapErrDoc,
         WarnMsg, MsgDoc,
         Messages, ErrorMessages, WarningMessages,
         unionMessages,
@@ -161,6 +162,9 @@ data ErrDoc = ErrDoc {
 
 errDoc :: [MsgDoc] -> [MsgDoc] -> [MsgDoc] -> ErrDoc
 errDoc = ErrDoc
+
+mapErrDoc :: (MsgDoc -> MsgDoc) -> ErrDoc -> ErrDoc
+mapErrDoc f (ErrDoc a b c) = ErrDoc (map f a) (map f b) (map f c)
 
 type WarnMsg = ErrMsg
 
@@ -635,11 +639,12 @@ fatalErrorMsg dflags msg =
 fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg
 
-compilationProgressMsg :: DynFlags -> String -> IO ()
+compilationProgressMsg :: DynFlags -> SDoc -> IO ()
 compilationProgressMsg dflags msg = do
-    traceEventIO $ "GHC progress: " ++ msg
+    let str = showSDoc dflags msg
+    traceEventIO $ "GHC progress: " ++ str
     ifVerbose dflags 1 $
-        logOutput dflags $ withPprStyle defaultUserStyle (text msg)
+        logOutput dflags $ withPprStyle defaultUserStyle msg
 
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what

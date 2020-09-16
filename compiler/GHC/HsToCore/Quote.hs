@@ -945,13 +945,18 @@ repDerivClause :: LHsDerivingClause GhcRn
                -> MetaM (Core (M TH.DerivClause))
 repDerivClause (L _ (HsDerivingClause
                           { deriv_clause_strategy = dcs
-                          , deriv_clause_tys      = L _ dct }))
+                          , deriv_clause_tys      = dct }))
   = repDerivStrategy dcs $ \(MkC dcs') ->
-    do MkC dct' <- repListM typeTyConName (rep_deriv_ty . hsSigType) dct
+    do MkC dct' <- rep_deriv_clause_tys dct
        rep2 derivClauseName [dcs',dct']
   where
-    rep_deriv_ty :: LHsType GhcRn -> MetaM (Core (M TH.Type))
-    rep_deriv_ty ty = repLTy ty
+    rep_deriv_clause_tys :: LDerivClauseTys GhcRn -> MetaM (Core [M TH.Type])
+    rep_deriv_clause_tys (L _ dct) = case dct of
+      DctSingle _ ty -> rep_deriv_tys [ty]
+      DctMulti _ tys -> rep_deriv_tys tys
+
+    rep_deriv_tys :: [LHsSigType GhcRn] -> MetaM (Core [M TH.Type])
+    rep_deriv_tys = repListM typeTyConName (repLTy . hsSigType)
 
 rep_meth_sigs_binds :: [LSig GhcRn] -> LHsBinds GhcRn
                     -> MetaM ([GenSymBind], [Core (M TH.Dec)])
@@ -1575,7 +1580,6 @@ repE (HsUnboundVar _ uv)   = do
                                repUnboundVar sname
 repE (XExpr (HsExpanded _ b))        = repE b
 repE e@(HsPragE _ HsPragSCC  {} _)   = notHandled "Cost centres" (ppr e)
-repE e@(HsPragE _ HsPragTick {} _)   = notHandled "Tick Pragma" (ppr e)
 repE e                     = notHandled "Expression form" (ppr e)
 
 -----------------------------------------------------------------------------
@@ -1843,7 +1847,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
        ; patSynD'' <- wrapGenArgSyms args ss patSynD'
        ; return (loc, patSynD'') }
   where
-    mkGenArgSyms :: HsPatSynDetails (Located Name) -> MetaM [GenSymBind]
+    mkGenArgSyms :: HsPatSynDetails GhcRn -> MetaM [GenSymBind]
     -- for Record Pattern Synonyms we want to conflate the selector
     -- and the pattern-only names in order to provide a nicer TH
     -- API. Whereas inside GHC, record pattern synonym selectors and
@@ -1862,7 +1866,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
       = [ (pat, id) | (sel, id) <- genSyms, (sel', pat) <- selsPats
                     , sel == sel' ]
 
-    wrapGenArgSyms :: HsPatSynDetails (Located Name)
+    wrapGenArgSyms :: HsPatSynDetails GhcRn
                    -> [GenSymBind] -> Core (M TH.Dec) -> MetaM (Core (M TH.Dec))
     wrapGenArgSyms (RecCon _) _  dec = return dec
     wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
@@ -1875,7 +1879,7 @@ repPatSynD :: Core TH.Name
 repPatSynD (MkC syn) (MkC args) (MkC dir) (MkC pat)
   = rep2 patSynDName [syn, args, dir, pat]
 
-repPatSynArgs :: HsPatSynDetails (Located Name) -> MetaM (Core (M TH.PatSynArgs))
+repPatSynArgs :: HsPatSynDetails GhcRn -> MetaM (Core (M TH.PatSynArgs))
 repPatSynArgs (PrefixCon args)
   = do { args' <- repList nameTyConName lookupLOcc args
        ; repPrefixPatSynArgs args' }

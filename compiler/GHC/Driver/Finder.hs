@@ -37,6 +37,7 @@ module GHC.Driver.Finder (
 import GHC.Prelude
 
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Driver.Types
 import GHC.Data.FastString
 import GHC.Utils.Misc
@@ -620,11 +621,12 @@ findObjectLinkable mod obj_fn obj_time = return (LM obj_time mod [DotO obj_fn])
 -- Error messages
 
 cannotFindModule :: DynFlags -> ModuleName -> FindResult -> SDoc
-cannotFindModule flags mod res =
+cannotFindModule dflags mod res = pprWithUnitState unit_state $
   cantFindErr (sLit cannotFindMsg)
               (sLit "Ambiguous module name")
-              flags mod res
+              dflags mod res
   where
+    unit_state = unitState dflags
     cannotFindMsg =
       case res of
         NotFound { fr_mods_hidden = hidden_mods

@@ -25,7 +25,8 @@
 module GHC.Hs.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
-  HsDerivingClause(..), LHsDerivingClause, NewOrData(..), newOrDataToFlavour,
+  HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
+  NewOrData(..), newOrDataToFlavour,
   StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
@@ -592,7 +593,7 @@ data TyClDecl pass
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     SynDecl { tcdSExt   :: XSynDecl pass          -- ^ Post renameer, FVs
-            , tcdLName  :: XRec pass (IdP pass)     -- ^ Type constructor
+            , tcdLName  :: LIdP pass              -- ^ Type constructor
             , tcdTyVars :: LHsQTyVars pass        -- ^ Type variables; for an
                                                   -- associated type these
                                                   -- include outer binders
@@ -609,7 +610,7 @@ data TyClDecl pass
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
-             , tcdLName    :: XRec pass (IdP pass)   -- ^ Type constructor
+             , tcdLName    :: LIdP pass             -- ^ Type constructor
              , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
                               -- See Note [TyVar binders for associated declarations]
              , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
@@ -617,7 +618,7 @@ data TyClDecl pass
 
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
                 tcdCtxt    :: LHsContext pass,         -- ^ Context...
-                tcdLName   :: XRec pass (IdP pass),      -- ^ Name of the class
+                tcdLName   :: LIdP pass,               -- ^ Name of the class
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
@@ -637,7 +638,7 @@ data TyClDecl pass
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XTyClDecl !(XXTyClDecl pass)
 
-type LHsFunDep pass = XRec pass (FunDep (XRec pass (IdP pass)))
+type LHsFunDep pass = XRec pass (FunDep (LIdP pass))
 
 data DataDeclRn = DataDeclRn
              { tcdDataCusk :: Bool    -- ^ does this have a CUSK?
@@ -1135,7 +1136,7 @@ type LFamilyDecl pass = XRec pass (FamilyDecl pass)
 data FamilyDecl pass = FamilyDecl
   { fdExt            :: XCFamilyDecl pass
   , fdInfo           :: FamilyInfo pass              -- type/data, closed/open
-  , fdLName          :: XRec pass (IdP pass)           -- type constructor
+  , fdLName          :: LIdP pass                    -- type constructor
   , fdTyVars         :: LHsQTyVars pass              -- type variables
                        -- See Note [TyVar binders for associated declarations]
   , fdFixity         :: LexicalFixity                -- Fixity used in the declaration
@@ -1168,7 +1169,7 @@ type LInjectivityAnn pass = XRec pass (InjectivityAnn pass)
 --
 -- This will be represented as "InjectivityAnn `r` [`a`, `c`]"
 data InjectivityAnn pass
-  = InjectivityAnn (XRec pass (IdP pass)) [XRec pass (IdP pass)]
+  = InjectivityAnn (LIdP pass) [LIdP pass]
   -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' :
   --             'GHC.Parser.Annotation.AnnRarrow', 'GHC.Parser.Annotation.AnnVbar'
 
@@ -1321,15 +1322,8 @@ data HsDerivingClause pass
     , deriv_clause_strategy :: Maybe (LDerivStrategy pass)
       -- ^ The user-specified strategy (if any) to use when deriving
       -- 'deriv_clause_tys'.
-    , deriv_clause_tys :: XRec pass [LHsSigType pass]
+    , deriv_clause_tys :: LDerivClauseTys pass
       -- ^ The types to derive.
-      --
-      -- It uses 'LHsSigType's because, with @-XGeneralizedNewtypeDeriving@,
-      -- we can mention type variables that aren't bound by the datatype, e.g.
-      --
-      -- > data T b = ... deriving (C [a])
-      --
-      -- should produce a derived instance for @C [a] (T b)@.
     }
   | XHsDerivingClause !(XXHsDerivingClause pass)
 
@@ -1342,16 +1336,9 @@ instance OutputableBndrId p
                         , deriv_clause_tys      = L _ dct })
     = hsep [ text "deriving"
            , pp_strat_before
-           , pp_dct dct
+           , ppr dct
            , pp_strat_after ]
       where
-        -- This complexity is to distinguish between
-        --    deriving Show
-        --    deriving (Show)
-        pp_dct [HsIB { hsib_body = ty }]
-                 = ppr (parenthesizeHsType appPrec ty)
-        pp_dct _ = parens (interpp'SP dct)
-
         -- @via@ is unique in that in comes /after/ the class being derived,
         -- so we must special-case it.
         (pp_strat_before, pp_strat_after) =
@@ -1359,12 +1346,49 @@ instance OutputableBndrId p
             Just (L _ via@ViaStrategy{}) -> (empty, ppr via)
             _                            -> (ppDerivStrategy dcs, empty)
 
+type LDerivClauseTys pass = XRec pass (DerivClauseTys pass)
+
+-- | The types mentioned in a single @deriving@ clause. This can come in two
+-- forms, 'DctSingle' or 'DctMulti', depending on whether the types are
+-- surrounded by enclosing parentheses or not. These parentheses are
+-- semantically differnt than 'HsParTy'. For example, @deriving ()@ means
+-- \"derive zero classes\" rather than \"derive an instance of the 0-tuple\".
+--
+-- 'DerivClauseTys' use 'LHsSigType' because @deriving@ clauses can mention
+-- type variables that aren't bound by the datatype, e.g.
+--
+-- > data T b = ... deriving (C [a])
+--
+-- should produce a derived instance for @C [a] (T b)@.
+data DerivClauseTys pass
+  = -- | A @deriving@ clause with a single type. Moreover, that type can only
+    -- be a type constructor without any arguments.
+    --
+    -- Example: @deriving Eq@
+    DctSingle (XDctSingle pass) (LHsSigType pass)
+
+    -- | A @deriving@ clause with a comma-separated list of types, surrounded
+    -- by enclosing parentheses.
+    --
+    -- Example: @deriving (Eq, C a)@
+  | DctMulti (XDctMulti pass) [LHsSigType pass]
+
+  | XDerivClauseTys !(XXDerivClauseTys pass)
+
+type instance XDctSingle (GhcPass _) = NoExtField
+type instance XDctMulti  (GhcPass _) = NoExtField
+type instance XXDerivClauseTys (GhcPass _) = NoExtCon
+
+instance OutputableBndrId p => Outputable (DerivClauseTys (GhcPass p)) where
+  ppr (DctSingle _ ty) = ppr ty
+  ppr (DctMulti _ tys) = parens (interpp'SP tys)
+
 -- | Located Standalone Kind Signature
 type LStandaloneKindSig pass = XRec pass (StandaloneKindSig pass)
 
 data StandaloneKindSig pass
   = StandaloneKindSig (XStandaloneKindSig pass)
-      (XRec pass (IdP pass))  -- Why a single binder? See #16754
+      (LIdP pass)           -- Why a single binder? See #16754
       (LHsSigType pass)     -- Why not LHsSigWcType? See Note [Wildcards in standalone kind signatures]
   | XStandaloneKindSig !(XXStandaloneKindSig pass)
 
@@ -1435,7 +1459,7 @@ type LConDecl pass = XRec pass (ConDecl pass)
 data ConDecl pass
   = ConDeclGADT
       { con_g_ext   :: XConDeclGADT pass
-      , con_names   :: [XRec pass (IdP pass)]
+      , con_names   :: [LIdP pass]
 
       -- The following fields describe the type after the '::'
       -- See Note [GADT abstract syntax]
@@ -1458,7 +1482,7 @@ data ConDecl pass
 
   | ConDeclH98
       { con_ext     :: XConDeclH98 pass
-      , con_name    :: XRec pass (IdP pass)
+      , con_name    :: LIdP pass
 
       , con_forall  :: XRec pass Bool
                               -- ^ True <=> explicit user-written forall
@@ -1849,7 +1873,7 @@ type FamInstEqn pass rhs = HsImplicitBndrs pass (FamEqn pass rhs)
 data FamEqn pass rhs
   = FamEqn
        { feqn_ext    :: XCFamEqn pass rhs
-       , feqn_tycon  :: XRec pass (IdP pass)
+       , feqn_tycon  :: LIdP pass
        , feqn_bndrs  :: Maybe [LHsTyVarBndr () pass] -- ^ Optional quantified type vars
        , feqn_pats   :: HsTyPats pass
        , feqn_fixity :: LexicalFixity -- ^ Fixity used in the declaration
@@ -2214,13 +2238,13 @@ type LForeignDecl pass = XRec pass (ForeignDecl pass)
 data ForeignDecl pass
   = ForeignImport
       { fd_i_ext  :: XForeignImport pass   -- Post typechecker, rep_ty ~ sig_ty
-      , fd_name   :: XRec pass (IdP pass)    -- defines this name
+      , fd_name   :: LIdP pass             -- defines this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
       , fd_fi     :: ForeignImport }
 
   | ForeignExport
       { fd_e_ext  :: XForeignExport pass   -- Post typechecker, rep_ty ~ sig_ty
-      , fd_name   :: XRec pass (IdP pass)    -- uses this name
+      , fd_name   :: LIdP pass             -- uses this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
       , fd_fe     :: ForeignExport }
         -- ^
@@ -2402,8 +2426,8 @@ type LRuleBndr pass = XRec pass (RuleBndr pass)
 
 -- | Rule Binder
 data RuleBndr pass
-  = RuleBndr (XCRuleBndr pass)  (XRec pass (IdP pass))
-  | RuleBndrSig (XRuleBndrSig pass) (XRec pass (IdP pass)) (HsPatSigType pass)
+  = RuleBndr (XCRuleBndr pass)  (LIdP pass)
+  | RuleBndrSig (XRuleBndrSig pass) (LIdP pass) (HsPatSigType pass)
   | XRuleBndr !(XXRuleBndr pass)
         -- ^
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
@@ -2505,7 +2529,7 @@ type instance XXWarnDecls    (GhcPass _) = NoExtCon
 type LWarnDecl pass = XRec pass (WarnDecl pass)
 
 -- | Warning pragma Declaration
-data WarnDecl pass = Warning (XWarning pass) [XRec pass (IdP pass)] WarningTxt
+data WarnDecl pass = Warning (XWarning pass) [LIdP pass] WarningTxt
                    | XWarnDecl !(XXWarnDecl pass)
 
 type instance XWarning      (GhcPass _) = NoExtField
@@ -2592,7 +2616,7 @@ type LRoleAnnotDecl pass = XRec pass (RoleAnnotDecl pass)
 -- | Role Annotation Declaration
 data RoleAnnotDecl pass
   = RoleAnnotDecl (XCRoleAnnotDecl pass)
-                  (XRec pass (IdP pass))   -- type constructor
+                  (LIdP pass)              -- type constructor
                   [XRec pass (Maybe Role)] -- optional annotations
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnType',
       --           'GHC.Parser.Annotation.AnnRole'

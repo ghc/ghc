@@ -19,7 +19,7 @@ Main functions for .hie file generation
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts) where
+module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts, enrichHie) where
 
 import GHC.Utils.Outputable(ppr)
 
@@ -54,7 +54,7 @@ import GHC.Tc.Types
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var              ( Id, Var, EvId, setVarName, varName, varType, varUnique )
 import GHC.Types.Var.Env
-import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Iface.Make             ( mkIfaceExports )
 import GHC.Utils.Panic
 import GHC.Data.Maybe
@@ -342,7 +342,7 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
           , exps
           ]
 
-        modulify file xs' = do
+        modulify (HiePath file) xs' = do
 
           top_ev_asts <-
             toHie $ EvBindContext ModuleScope Nothing
@@ -363,12 +363,12 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
 
           case mergeSortAsts $ moduleNode : xs of
             [x] -> return x
-            xs -> panicDoc "enrichHie: mergeSortAsts returned more than one result" (ppr $ map nodeSpan xs)
+            xs -> panicDoc "enrichHie: mergeSortAsts retur:ed more than one result" (ppr $ map nodeSpan xs)
 
     asts' <- sequence
           $ M.mapWithKey modulify
           $ M.fromListWith (++)
-          $ map (\x -> (srcSpanFile (nodeSpan x),[x])) flat_asts
+          $ map (\x -> (HiePath (srcSpanFile (nodeSpan x)),[x])) flat_asts
 
     let asts = HieASTs $ resolveTyVarScopes asts'
     return asts
@@ -1507,11 +1507,15 @@ instance ToHie (Located [Located (HsDerivingClause GhcRn)]) where
 
 instance ToHie (Located (HsDerivingClause GhcRn)) where
   toHie (L span cl) = concatM $ makeNode cl span : case cl of
-      HsDerivingClause _ strat (L ispan tys) ->
+      HsDerivingClause _ strat dct ->
         [ toHie strat
-        , locOnly ispan
-        , toHie $ map (TS (ResolvedScopes [])) tys
+        , toHie dct
         ]
+
+instance ToHie (Located (DerivClauseTys GhcRn)) where
+  toHie (L span dct) = concatM $ makeNode dct span : case dct of
+      DctSingle _ ty -> [ toHie $ TS (ResolvedScopes[]) ty ]
+      DctMulti _ tys -> [ toHie $ map (TS (ResolvedScopes [])) tys ]
 
 instance ToHie (Located (DerivStrategy GhcRn)) where
   toHie (L span strat) = concatM $ makeNode strat span : case strat of

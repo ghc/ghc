@@ -38,7 +38,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecl, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
-   , tcIfaceAnnotations, tcIfaceCompleteSigs )
+   , tcIfaceAnnotations, tcIfaceCompleteMatches )
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -479,7 +479,7 @@ loadInterface doc_str mod from
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
-        ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
+        ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
 
         ; let { final_iface = iface {
                                 mi_decls     = panic "No mi_decls in PIT",
@@ -509,9 +509,7 @@ loadInterface doc_str mod from
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
                   eps_complete_matches
-                                   = extendCompleteMatchMap
-                                         (eps_complete_matches eps)
-                                         new_eps_complete_sigs,
+                                   = eps_complete_matches eps ++ new_eps_complete_matches,
                   eps_inst_env     = extendInstEnvList (eps_inst_env eps)
                                                        new_eps_insts,
                   eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
@@ -915,6 +913,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                      nest 4 (text "reason:" <+> doc_str)])
 
        -- Check for GHC.Prim, and return its static interface
+       -- See Note [GHC.Prim] in primops.txt.pp.
        -- TODO: make this check a function
        if mod `installedModuleEq` gHC_PRIM
            then do
@@ -1036,9 +1035,8 @@ initExternalPackageState home_unit
       eps_fam_inst_env     = emptyFamInstEnv,
       eps_rule_base        = mkRuleBase builtinRules',
         -- Initialise the EPS rule pool with the built-in rules
-      eps_mod_fam_inst_env
-                           = emptyModuleEnv,
-      eps_complete_matches = emptyUFM,
+      eps_mod_fam_inst_env = emptyModuleEnv,
+      eps_complete_matches = [],
       eps_ann_env          = emptyAnnEnv,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
                            , n_insts_in = 0, n_insts_out = 0
@@ -1059,6 +1057,7 @@ initExternalPackageState home_unit
 *********************************************************
 -}
 
+-- See Note [GHC.Prim] in primops.txt.pp.
 ghcPrimIface :: ModIface
 ghcPrimIface
   = empty_iface {
@@ -1071,7 +1070,7 @@ ghcPrimIface
   where
     empty_iface = emptyFullModIface gHC_PRIM
 
-    -- The fixities listed here for @`seq`@ or @->@ should match
+    -- The fixity listed here for @`seq`@ should match
     -- those in primops.txt.pp (from which Haddock docs are generated).
     fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
              : mapMaybe mkFixity allThePrimOps
@@ -1121,6 +1120,7 @@ For some background on this choice see trac #15269.
 showIface :: HscEnv -> FilePath -> IO ()
 showIface hsc_env filename = do
    let dflags  = hsc_dflags hsc_env
+       unit_state = unitState dflags
        printer = putLogMsg dflags NoReason SevOutput noSrcSpan . withPprStyle defaultDumpStyle
 
    -- skip the hi way check; we don't want to worry about profiled vs.
@@ -1136,7 +1136,9 @@ showIface hsc_env filename = do
                                    neverQualifyModules
                                    neverQualifyPackages
    putLogMsg dflags NoReason SevDump noSrcSpan
-      $ withPprStyle (mkDumpStyle print_unqual) (pprModIface iface)
+      $ withPprStyle (mkDumpStyle print_unqual)
+      $ pprWithUnitState unit_state
+      $ pprModIface iface
 
 -- Show a ModIface but don't display details; suitable for ModIfaces stored in
 -- the EPT.
@@ -1176,7 +1178,7 @@ pprModIface iface@ModIface{ mi_final_exts = exts }
         , ppr (mi_warns iface)
         , pprTrustInfo (mi_trust iface)
         , pprTrustPkg (mi_trust_pkg iface)
-        , vcat (map ppr (mi_complete_sigs iface))
+        , vcat (map ppr (mi_complete_matches iface))
         , text "module header:" $$ nest 2 (ppr (mi_doc_hdr iface))
         , text "declaration docs:" $$ nest 2 (ppr (mi_decl_docs iface))
         , text "arg docs:" $$ nest 2 (ppr (mi_arg_docs iface))

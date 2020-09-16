@@ -313,6 +313,7 @@ import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Tc.Types
 import GHC.Core.Predicate
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Hs
@@ -1682,7 +1683,7 @@ interpretPackageEnv dflags = do
         return dflags
       Just envfile -> do
         content <- readFile envfile
-        compilationProgressMsg dflags ("Loaded package environment from " ++ envfile)
+        compilationProgressMsg dflags (text "Loaded package environment from " <> text envfile)
         let (_, dflags') = runCmdLine (runEwM (setFlagsFromEnvFile envfile content)) dflags
 
         return dflags'

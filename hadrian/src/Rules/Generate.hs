@@ -245,6 +245,7 @@ generateGhcPlatformH = do
     hostOs         <- chooseSetting HostOs        TargetOs
     hostVendor     <- chooseSetting HostVendor    TargetVendor
     ghcUnreg       <- getFlag    GhcUnregisterised
+    inplaceTools   <- getFlag    SystemDistroMINGW
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
@@ -274,12 +275,15 @@ generateGhcPlatformH = do
         , ""
         ]
         ++
+        [ "#define USE_INPLACE_MINGW_TOOLCHAIN 1" | inplaceTools ]
+        ++
         [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
         ++
         [ ""
         , "#endif /* __GHCPLATFORM_H__ */"
         ]
 
+-- See Note [tooldir: How GHC finds mingw on Windows]
 generateSettings :: Expr String
 generateSettings = do
     ctx <- getContext
@@ -304,6 +308,8 @@ generateSettings = do
         , ("ar flags", expr $ lookupValueOrError configFile "ar-args")
         , ("ar supports at file", expr $ yesNo <$> flag ArSupportsAtFile)
         , ("ranlib command", expr $ settingsFileSetting SettingsFileSetting_RanlibCommand)
+        , ("otool command", expr $ settingsFileSetting SettingsFileSetting_OtoolCommand)
+        , ("install_name_tool command", expr $ settingsFileSetting SettingsFileSetting_InstallNameToolCommand)
         , ("touch command", expr $ settingsFileSetting SettingsFileSetting_TouchCommand)
         , ("dllwrap command", expr $ settingsFileSetting SettingsFileSetting_DllWrapCommand)
         , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)

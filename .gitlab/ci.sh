@@ -26,9 +26,6 @@ LT_CYAN="1;36"
 WHITE="1;37"
 LT_GRAY="0;37"
 
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-
 # GitLab Pipelines log section delimiters
 # https://gitlab.com/gitlab-org/gitlab-foss/issues/14664
 start_section() {
@@ -59,6 +56,39 @@ function run() {
 }
 
 TOP="$(pwd)"
+
+function setup_locale() {
+  # Musl doesn't provide locale support at all...
+  if ! which locale > /dev/null; then
+    info "No locale executable. Skipping locale setup..."
+    return
+  fi
+
+  # BSD grep terminates early with -q, consequently locale -a will get a
+  # SIGPIPE and the pipeline will fail with pipefail.
+  shopt -o -u pipefail
+  if locale -a | grep -q C.UTF-8; then
+    # Debian
+    export LANG=C.UTF-8
+  elif locale -a | grep -q C.utf8; then
+    # Fedora calls it this
+    export LANG=C.utf8
+  elif locale -a | grep -q en_US.UTF-8; then
+    # Centos doesn't have C.UTF-8
+    export LANG=en_US.UTF-8
+  elif locale -a | grep -q en_US.utf8; then
+    # Centos doesn't have C.UTF-8
+    export LANG=en_US.utf8
+  else
+    error "Failed to find usable locale"
+    info "Available locales:"
+    locale -a
+    fail "No usable locale, aborting..."
+  fi
+  info "Using locale $LANG..."
+  export LC_ALL=$LANG
+  shopt -o -s pipefail
+}
 
 function mingw_init() {
   case "$MSYSTEM" in
@@ -122,22 +152,26 @@ function show_tool() {
 function set_toolchain_paths() {
   needs_toolchain=1
   case "$(uname)" in
-    Linux) needs_toolchain="" ;;
+    Linux) needs_toolchain="0" ;;
     *) ;;
   esac
 
-  if [[ -n "$needs_toolchain" ]]; then
+  if [[ "$needs_toolchain" = 1 ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
       HAPPY="$toolchain/bin/happy$exe"
       ALEX="$toolchain/bin/alex$exe"
   else
-      GHC="$(which ghc)"
-      CABAL="/usr/local/bin/cabal"
-      HAPPY="$HOME/.cabal/bin/happy"
-      ALEX="$HOME/.cabal/bin/alex"
+      # These are generally set by the Docker image but
+      # we provide these handy fallbacks in case the
+      # script isn't run from within a GHC CI docker image.
+      if [ -z "$GHC" ]; then GHC="$(which ghc)"; fi
+      if [ -z "$CABAL" ]; then GHC="$(which cabal)"; fi
+      if [ -z "$HAPPY" ]; then GHC="$(which happy)"; fi
+      if [ -z "$ALEX" ]; then GHC="$(which alex)"; fi
   fi
+
   export GHC
   export CABAL
   export HAPPY
@@ -174,12 +208,12 @@ function setup() {
 }
 
 function fetch_ghc() {
-  local v="$GHC_VERSION"
-  if [[ -z "$v" ]]; then
-      fail "GHC_VERSION is not set"
-  fi
-
   if [ ! -e "$GHC" ]; then
+      local v="$GHC_VERSION"
+      if [[ -z "$v" ]]; then
+          fail "neither GHC nor GHC_VERSION are not set"
+      fi
+
       start_section "fetch GHC"
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
@@ -203,12 +237,12 @@ function fetch_ghc() {
 }
 
 function fetch_cabal() {
-  local v="$CABAL_INSTALL_VERSION"
-  if [[ -z "$v" ]]; then
-      fail "CABAL_INSTALL_VERSION is not set"
-  fi
-
   if [ ! -e "$CABAL" ]; then
+      local v="$CABAL_INSTALL_VERSION"
+      if [[ -z "$v" ]]; then
+          fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
+      fi
+
       start_section "fetch GHC"
       case "$(uname)" in
         # N.B. Windows uses zip whereas all others use .tar.xz
@@ -249,7 +283,11 @@ function fetch_cabal() {
 function setup_toolchain() {
   fetch_ghc
   fetch_cabal
-  cabal_install="$CABAL v2-install --index-state=$hackage_index_state --installdir=$toolchain/bin"
+
+  cabal_install="$CABAL v2-install \
+    --with-compiler=$GHC \
+    --index-state=$hackage_index_state --installdir=$toolchain/bin"
+
   # Avoid symlinks on Windows
   case "$(uname)" in
     MSYS_*|MINGW*) cabal_install="$cabal_install --install-method=copy" ;;
@@ -363,6 +401,13 @@ function push_perf_notes() {
   "$TOP/.gitlab/test-metrics.sh" push
 }
 
+# Figure out which commit should be used by the testsuite driver as a
+# performance baseline. See Note [The CI Story].
+function determine_metric_baseline() {
+  export PERF_BASELINE_COMMIT="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME HEAD)"
+  info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
+}
+
 function test_make() {
   run "$MAKE" test_bindist TEST_PREP=YES
   run "$MAKE" V=0 test \
@@ -399,10 +444,12 @@ function clean() {
 }
 
 function run_hadrian() {
+  if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
   run hadrian/build-cabal \
     --flavour="$FLAVOUR" \
     -j"$cores" \
     --broken-test="$BROKEN_TESTS" \
+    --bignum=$BIGNUM_BACKEND \
     $HADRIAN_ARGS \
     $@
 }
@@ -415,6 +462,8 @@ function shell() {
   fi
   run $cmd
 }
+
+setup_locale
 
 # Determine Cabal data directory
 case "$(uname)" in

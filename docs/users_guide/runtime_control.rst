@@ -1253,7 +1253,7 @@ recommended for everyday use!
 
 .. rts-flag:: -B
 
-    Sound the bell at the start of each (major) garbage collection.
+    Sound the bell at the start of each garbage collection.
 
     Oddly enough, people really do use this option! Our pal in Durham
     (England), Paul Callaghan, writes: “Some people here use it for a

@@ -387,7 +387,7 @@ STG representation
 
 These flags dump various phases of GHC's STG pipeline.
 
-.. ghc-flag:: -ddump-stg
+.. ghc-flag:: -ddump-stg-from-core
     :shortdesc: Show CoreToStg output
     :type: dynamic
 
@@ -410,6 +410,14 @@ These flags dump various phases of GHC's STG pipeline.
     :type: dynamic
 
     Show the output of the last STG pass before we generate Cmm.
+
+.. ghc-flag:: -ddump-stg
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-ddump-stg-from-core`
+    :type: dynamic
+
+    Alias for :ghc-flag:`-ddump-stg-from-core`. Deprecated in favor of more explicit
+    flags: :ghc-flag:`-ddump-stg-from-core`, :ghc-flag:`-ddump-stg-final`, etc.
+
 
 C-\\- representation
 ~~~~~~~~~~~~~~~~~~~~

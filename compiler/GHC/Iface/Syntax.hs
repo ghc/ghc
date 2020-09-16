@@ -45,6 +45,8 @@ module GHC.Iface.Syntax (
 
 import GHC.Prelude
 
+import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey )
+import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type
 import GHC.Iface.Recomp.Binary
 import GHC.Core( IsOrphan, isOrphan )
@@ -213,7 +215,7 @@ data IfaceClassOp
                  -- and the default method, are *not* quantified
                  -- over the class variables
 
-data IfaceAT = IfaceAT  -- See Class.ClassATItem
+data IfaceAT = IfaceAT  -- See GHC.Core.Class.ClassATItem
                   IfaceDecl          -- The associated type declaration
                   (Maybe IfaceType)  -- Default associated type instance, if any
 
@@ -322,11 +324,11 @@ data IfaceAnnotation
 
 type IfaceAnnTarget = AnnTarget OccName
 
-data IfaceCompleteMatch = IfaceCompleteMatch [IfExtName] IfExtName
+newtype IfaceCompleteMatch = IfaceCompleteMatch [IfExtName]
 
 instance Outputable IfaceCompleteMatch where
-  ppr (IfaceCompleteMatch cls ty) = text "COMPLETE" <> colon <+> ppr cls
-                                                    <+> dcolon <+> ppr ty
+  ppr (IfaceCompleteMatch cls) = text "COMPLETE" <> colon <+> ppr cls
+
 
 
 
@@ -947,12 +949,18 @@ pprIfaceDecl ss (IfaceSynonym { ifName    = tc
                               , ifResKind = res_kind})
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
          , hang (text "type" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tc binders <+> equals)
-           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau
+           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr_tau
                   , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
          ]
   where
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
     name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tc)
+
+    -- See Note [Printing type abbreviations] in GHC.Iface.Type
+    ppr_tau | tc `hasKey` liftedTypeKindTyConKey ||
+              tc `hasKey` unrestrictedFunTyConKey
+            = updSDocContext (\ctx -> ctx { sdocPrintTypeAbbreviations = False }) $ ppr tau
+            | otherwise = ppr tau
 
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
@@ -2473,8 +2481,8 @@ instance Binary IfaceTyConParent where
                 return $ IfDataInstance ax pr ty
 
 instance Binary IfaceCompleteMatch where
-  put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
-  get bh = IfaceCompleteMatch <$> get bh <*> get bh
+  put_ bh (IfaceCompleteMatch cs) = put_ bh cs
+  get bh = IfaceCompleteMatch <$> get bh
 
 
 {-
@@ -2630,7 +2638,7 @@ instance NFData IfaceConAlt where
     IfaceLitAlt lit -> lit `seq` ()
 
 instance NFData IfaceCompleteMatch where
-  rnf (IfaceCompleteMatch f1 f2) = rnf f1 `seq` rnf f2
+  rnf (IfaceCompleteMatch f1) = rnf f1
 
 instance NFData IfaceRule where
   rnf (IfaceRule f1 f2 f3 f4 f5 f6 f7 f8) =

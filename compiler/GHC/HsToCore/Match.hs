@@ -35,7 +35,7 @@ import GHC.Tc.Utils.Zonk
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.HsToCore.PmCheck
-import GHC.HsToCore.PmCheck.Types ( Deltas, initDeltas )
+import GHC.HsToCore.PmCheck.Types ( Nablas, initNablas )
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.Utils
@@ -66,7 +66,7 @@ import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
-import Control.Monad(zipWithM,  unless )
+import Control.Monad ( zipWithM, unless, when )
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as Map
@@ -766,31 +766,31 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                                                 (hsLMatchPats m))
 
         -- Pattern match check warnings for /this match-group/.
-        -- @rhss_deltas@ is a flat list of covered Deltas for each RHS.
-        -- Each Match will split off one Deltas for its RHSs from this.
-        ; matches_deltas <- if isMatchContextPmChecked dflags origin ctxt
-            then addScrutTmCs mb_scr new_vars $
-                 -- See Note [Type and Term Equality Propagation]
-                 checkMatches (DsMatchContext ctxt locn) new_vars matches
-            else pure (initDeltasMatches matches)
+        -- @rhss_nablas@ is a flat list of covered Nablas for each RHS.
+        -- Each Match will split off one Nablas for its RHSs from this.
+        ; matches_nablas <- if isMatchContextPmChecked dflags origin ctxt
+            then addHsScrutTmCs mb_scr new_vars $
+                 -- See Note [Long-distance information]
+                 covCheckMatches (DsMatchContext ctxt locn) new_vars matches
+            else pure (initNablasMatches matches)
 
-        ; eqns_info   <- zipWithM mk_eqn_info matches matches_deltas
+        ; eqns_info   <- zipWithM mk_eqn_info matches matches_nablas
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
         ; return (new_vars, result_expr) }
   where
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Deltas, NonEmpty Deltas) -> DsM EquationInfo
-    mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_deltas, rhss_deltas)
+    mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
+    mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
-           -- pat_deltas is the covered set *after* matching the pattern, but
-           -- before any of the GRHSs. We extend the environment with pat_deltas
-           -- (via updPmDeltas) so that the where-clause of 'grhss' can profit
+           -- pat_nablas is the covered set *after* matching the pattern, but
+           -- before any of the GRHSs. We extend the environment with pat_nablas
+           -- (via updPmNablas) so that the where-clause of 'grhss' can profit
            -- from that knowledge (#18533)
-           ; match_result <- updPmDeltas pat_deltas $
-                             dsGRHSs ctxt grhss rhs_ty rhss_deltas
+           ; match_result <- updPmNablas pat_nablas $
+                             dsGRHSs ctxt grhss rhs_ty rhss_nablas
            ; return EqnInfo { eqn_pats = upats
                             , eqn_orig = FromSource
                             , eqn_rhs  = match_result } }
@@ -799,14 +799,14 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                      then discardWarningsDs
                      else id
 
-    initDeltasMatches :: [LMatch GhcTc b] -> [(Deltas, NonEmpty Deltas)]
-    initDeltasMatches ms
-      = map (\(L _ m) -> (initDeltas, initDeltasGRHSs (m_grhss m))) ms
+    initNablasMatches :: [LMatch GhcTc b] -> [(Nablas, NonEmpty Nablas)]
+    initNablasMatches ms
+      = map (\(L _ m) -> (initNablas, initNablasGRHSs (m_grhss m))) ms
 
-    initDeltasGRHSs :: GRHSs GhcTc b -> NonEmpty Deltas
-    initDeltasGRHSs m = expectJust "GRHSs non-empty"
+    initNablasGRHSs :: GRHSs GhcTc b -> NonEmpty Nablas
+    initNablasGRHSs m = expectJust "GRHSs non-empty"
                       $ NEL.nonEmpty
-                      $ replicate (length (grhssGRHSs m)) initDeltas
+                      $ replicate (length (grhssGRHSs m)) initNablas
 
 
 matchEquations  :: HsMatchContext GhcRn
@@ -820,25 +820,24 @@ matchEquations ctxt vars eqns_info rhs_ty
         ; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_doc
         ; extractMatchResult match_result fail_expr }
 
-{-
-************************************************************************
-*                                                                      *
-\subsection[matchSimply]{@matchSimply@: match a single expression against a single pattern}
-*                                                                      *
-************************************************************************
-
-@mkSimpleMatch@ is a wrapper for @match@ which deals with the
-situation where we want to match a single expression against a single
-pattern. It returns an expression.
--}
-
+-- | @matchSimply@ is a wrapper for 'match' which deals with the
+-- situation where we want to match a single expression against a single
+-- pattern. It returns an expression.
 matchSimply :: CoreExpr                 -- ^ Scrutinee
             -> HsMatchContext GhcRn     -- ^ Match kind
             -> LPat GhcTc               -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
             -> CoreExpr                 -- ^ Return this if it doesn't
             -> DsM CoreExpr
--- Do not warn about incomplete patterns; see matchSinglePat comments
+-- Some reasons 'matchSimply' is not defined using 'matchWrapper' (#18572):
+--   * Some call sites like in 'deBindComp' specify a @fail_expr@ that isn't a
+--     straight @patError@
+--   * It receives an already desugared 'CoreExpr' for the scrutinee, not an
+--     'HsExpr' like 'matchWrapper' expects
+--   * Filling in all the phony fields for the 'MatchGroup' for a single pattern
+--     match is awkward
+--   * And we still export 'matchSinglePatVar', so not much is gained if we
+--     don't also implement it in terms of 'matchWrapper'
 matchSimply scrut hs_ctx pat result_expr fail_expr = do
     let
       match_result = cantFailMatchResult result_expr
@@ -858,7 +857,7 @@ matchSinglePat :: CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
 
 matchSinglePat (Var var) ctx pat ty match_result
   | not (isExternalName (idName var))
-  = matchSinglePatVar var ctx pat ty match_result
+  = matchSinglePatVar var Nothing ctx pat ty match_result
 
 matchSinglePat scrut hs_ctx pat ty match_result
   = do { var           <- selectSimpleMatchVarL Many pat
@@ -867,22 +866,22 @@ matchSinglePat scrut hs_ctx pat ty match_result
                             -- and to create field selectors. All of which only
                             -- bind unrestricted variables, hence the 'Many'
                             -- above.
-       ; match_result' <- matchSinglePatVar var hs_ctx pat ty match_result
+       ; match_result' <- matchSinglePatVar var (Just scrut) hs_ctx pat ty match_result
        ; return $ bindNonRec var scrut <$> match_result'
        }
 
 matchSinglePatVar :: Id   -- See Note [Match Ids]
+                  -> Maybe CoreExpr -- ^ The scrutinee the match id is bound to
                   -> HsMatchContext GhcRn -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
-matchSinglePatVar var ctx pat ty match_result
+matchSinglePatVar var mb_scrut ctx pat ty match_result
   = ASSERT2( isInternalName (idName var), ppr var )
     do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
-
        -- Pattern match check warnings
-       ; if isMatchContextPmChecked dflags FromSource ctx
-            then checkSingle dflags (DsMatchContext ctx locn) var (unLoc pat)
-            else pure ()
+       ; when (isMatchContextPmChecked dflags FromSource ctx) $
+           addCoreScrutTmCs mb_scrut [var] $
+           covCheckPatBind (DsMatchContext ctx locn) var (unLoc pat)
 
        ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
                                 , eqn_orig = FromSource

@@ -105,6 +105,7 @@ import GHC.Prelude
 
 import GHC.Utils.Misc
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Data.FastString
@@ -238,7 +239,7 @@ instance Eq OccName where
 instance Ord OccName where
         -- Compares lexicographically, *not* by Unique of the string
     compare (OccName sp1 s1) (OccName sp2 s2)
-        = (s1  `compare` s2) `thenCmp` (sp1 `compare` sp2)
+        = (s1  `lexicalCompareFS` s2) `thenCmp` (sp1 `compare` sp2)
 
 instance Data OccName where
   -- don't traverse?

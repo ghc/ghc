@@ -60,7 +60,7 @@ TEST_HC_OPTS += -Werror=compat
 # removing this line.
 TEST_HC_OPTS += -dno-debug-output
 
-TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-history +RTS --io-manager=native -RTS
+TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-history
 
 
 RUNTEST_OPTS =
@@ -194,18 +194,6 @@ else
 RUNTEST_OPTS += -e ghc_with_smp=False
 endif
 
-# Does the LLVM backend work?
-ifeq "$(LLC)" ""
-RUNTEST_OPTS += -e ghc_with_llvm=False
-else ifeq "$(TargetARCH_CPP)" "powerpc"
-RUNTEST_OPTS += -e ghc_with_llvm=False
-else ifneq "$(LLC)" "llc"
-# If we have a real detected value for LLVM, then it really ought to work
-RUNTEST_OPTS += -e ghc_with_llvm=True
-else
-RUNTEST_OPTS += -e ghc_with_llvm=False
-endif
-
 ifeq "$(WINDOWS)" "YES"
 RUNTEST_OPTS += -e windows=True
 else
@@ -230,6 +218,10 @@ endif
 
 ifneq "$(VERBOSE)" ""
 RUNTEST_OPTS += --verbose=$(VERBOSE)
+endif
+
+ifneq "$(PERF_TEST_BASELINE_COMMIT)" ""
+RUNTEST_OPTS += --perf-baseline=$(PERF_TEST_BASELINE_COMMIT)
 endif
 
 ifeq "$(SKIP_PERF_TESTS)" "YES"

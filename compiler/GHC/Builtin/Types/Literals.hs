@@ -54,6 +54,7 @@ import GHC.Tc.Types.Constraint ( Xi )
 import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import GHC.Unicode             ( GeneralCategory (..), generalCategory )
+import GHC.Types.Unique.FM
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders )
 import GHC.Builtin.Names
@@ -94,7 +95,6 @@ import GHC.Builtin.Names
                   )
 import GHC.Data.FastString
 import qualified Data.Char as Char
-import qualified Data.Map as Map
 import Data.Maybe ( isJust )
 import Control.Monad (guard, join )
 import Data.List  ( isPrefixOf, isSuffixOf )
@@ -615,7 +615,7 @@ axCmpSymbolDef =
            s2' <- isStrLitTy s2
            t2' <- isStrLitTy t2
            return (mkTyConApp typeSymbolCmpTyCon [s1,t1] ===
-                   ordering (compare s2' t2')) }
+                   ordering (lexicalCompareFS s2' t2')) }
 
 axAppendSymbolDef = CoAxiomRule
     { coaxrName      = fsLit "AppendSymbolDef"
@@ -756,8 +756,8 @@ axUnconsSymbol0 = mkAxiom1 "UnconsSymbolNull"
 -- The list of built-in type family axioms that GHC uses.
 -- If you define new axioms, make sure to include them in this list.
 -- See Note [Adding built-in type families]
-typeNatCoAxiomRules :: Map.Map FastString CoAxiomRule
-typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
+typeNatCoAxiomRules :: UniqFM FastString CoAxiomRule
+typeNatCoAxiomRules = listToUFM $ map (\x -> (coaxrName x, x))
   [ axAddDef
   , axMulDef
   , axExpDef
@@ -1085,7 +1085,7 @@ matchFamCmpNat _ = Nothing
 matchFamCmpSymbol :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamCmpSymbol [s,t]
   | Just x <- mbX, Just y <- mbY =
-    Just (axCmpSymbolDef, [s,t], ordering (compare x y))
+    Just (axCmpSymbolDef, [s,t], ordering (lexicalCompareFS x y))
   | tcEqType s t = Just (axCmpSymbolRefl, [s], ordering EQ)
   where mbX = isStrLitTy s
         mbY = isStrLitTy t

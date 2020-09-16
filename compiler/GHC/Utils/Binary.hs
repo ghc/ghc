@@ -5,6 +5,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 #if MIN_VERSION_base(4,15,0)
@@ -1215,6 +1217,9 @@ instance Binary FastString where
   get bh =
     case getUserData bh of
         UserData { ud_get_fs = get_fs } -> get_fs bh
+
+deriving instance Binary NonDetFastString
+deriving instance Binary LexicalFastString
 
 -- Here to avoid loop
 instance Binary LeftOrRight where

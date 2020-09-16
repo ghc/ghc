@@ -236,7 +236,7 @@ applyWhen :: Bool -> (a -> a) -> a -> a
 applyWhen True f x = f x
 applyWhen _    _ x = x
 
--- | A for loop: Compose a function with itself n times.  (nth rather than twice)
+-- | Apply a function @n@ times to a given value.
 nTimes :: Int -> (a -> a) -> (a -> a)
 nTimes 0 _ = id
 nTimes 1 f = f
@@ -556,9 +556,8 @@ isSingleton :: [a] -> Bool
 isSingleton [_] = True
 isSingleton _   = False
 
-notNull :: [a] -> Bool
-notNull [] = False
-notNull _  = True
+notNull :: Foldable f => f a -> Bool
+notNull = not . null
 
 only :: [a] -> a
 #if defined(DEBUG)

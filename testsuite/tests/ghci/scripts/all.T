@@ -141,8 +141,11 @@ test('T5979',
      normalise_slashes,
      normalise_version("transformers")],
     ghci_script, ['T5979.script'])
-test('T5975a', [pre_cmd('touch föøbàr1.hs')], ghci_script, ['T5975a.script'])
-test('T5975b', [pre_cmd('touch föøbàr2.hs'), extra_hc_opts('föøbàr2.hs')],
+test('T5975a',
+     [pre_cmd('touch föøbàr1.hs'), when(opsys('mingw32'), expect_broken(7305))],
+     ghci_script, ['T5975a.script'])
+test('T5975b',
+     [pre_cmd('touch föøbàr2.hs'), extra_hc_opts('föøbàr2.hs'), when(opsys('mingw32'), expect_broken(7305))],
      ghci_script, ['T5975b.script'])
 test('T6027ghci', normal, ghci_script, ['T6027ghci.script'])
 
@@ -315,3 +318,4 @@ test('T17403', normal, ghci_script, ['T17403.script'])
 test('T17431', normal, ghci_script, ['T17431.script'])
 test('T17549', normal, ghci_script, ['T17549.script'])
 test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code'), expect_broken(17669)], ghci_script, ['T17669.script'])
+test('T18644', normal, ghci_script, ['T18644.script'])

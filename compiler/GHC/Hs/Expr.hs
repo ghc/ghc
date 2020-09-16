@@ -242,9 +242,8 @@ is Less Cool because
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
-              (XRec p (IdP p)) -- ^ Variable
-
-                             -- See Note [Located RdrNames]
+              (LIdP p) -- ^ Variable
+                       -- See Note [Located RdrNames]
 
   | HsUnboundVar (XUnboundVar p)
                  OccName     -- ^ Unbound variable; also used for "holes"
@@ -439,7 +438,7 @@ data HsExpr p
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordCon
       { rcon_ext      :: XRecordCon p
-      , rcon_con_name :: XRec p (IdP p)     -- The constructor name;
+      , rcon_con_name :: LIdP p             -- The constructor name;
                                             --  not used after type checking
       , rcon_flds     :: HsRecordBinds p }  -- The fields
 
@@ -839,21 +838,10 @@ data HsPragE p
   --       'GHC.Parser.Annotation.AnnVal',
   --       'GHC.Parser.Annotation.AnnClose' @'\#-}'@
 
-  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsPragTick                        -- A pragma introduced tick
-     (XTickPragma p)
-     SourceText                       -- Note [Pragma source text] in GHC.Types.Basic
-     (StringLiteral,(Int,Int),(Int,Int))
-                                      -- external span for this tick
-     ((SourceText,SourceText),(SourceText,SourceText))
-        -- Source text for the four integers used in the span.
-        -- See note [Pragma source text] in GHC.Types.Basic
-
   | XHsPragE !(XXPragE p)
 
 type instance XSCC           (GhcPass _) = NoExtField
 type instance XCoreAnn       (GhcPass _) = NoExtField
-type instance XTickPragma    (GhcPass _) = NoExtField
 type instance XXPragE        (GhcPass _) = NoExtCon
 
 -- | Located Haskell Tuple Argument
@@ -1321,6 +1309,11 @@ hsExprNeedsParens p = go
     go (NegApp{})                     = p > topPrec
     go (SectionL{})                   = True
     go (SectionR{})                   = True
+    -- Special-case unary boxed tuple applications so that they are
+    -- parenthesized as `Identity (Solo x)`, not `Identity Solo x` (#18612)
+    -- See Note [One-tuples] in GHC.Builtin.Types
+    go (ExplicitTuple _ [L _ Present{}] Boxed)
+                                      = p >= appPrec
     go (ExplicitTuple{})              = False
     go (ExplicitSum{})                = False
     go (HsLam{})                      = p > topPrec
@@ -1398,13 +1391,6 @@ instance Outputable (HsPragE (GhcPass p)) where
      -- no doublequotes if stl empty, for the case where the SCC was written
      -- without quotes.
     <+> pprWithSourceText stl (ftext lbl) <+> text "#-}"
-  ppr (HsPragTick _ st (StringLiteral sta s, (v1,v2), (v3,v4)) ((s1,s2),(s3,s4))) =
-    pprWithSourceText st (text "{-# GENERATED")
-    <+> pprWithSourceText sta (doubleQuotes $ ftext s)
-    <+> pprWithSourceText s1 (ppr v1) <+> char ':' <+> pprWithSourceText s2 (ppr v2)
-    <+> char '-'
-    <+> pprWithSourceText s3 (ppr v3) <+> char ':' <+> pprWithSourceText s4 (ppr v4)
-    <+> text "#-}"
 
 {-
 ************************************************************************
@@ -2987,7 +2973,7 @@ matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
 matchSeparator PatSyn       = panic "unused"
 
-pprMatchContext :: Outputable (IdP p)
+pprMatchContext :: (Outputable (IdP p), UnXRec p)
                 => HsMatchContext p -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
@@ -2997,11 +2983,11 @@ pprMatchContext ctxt
     want_an ProcExpr    = True
     want_an _           = False
 
-pprMatchContextNoun :: Outputable (IdP id)
-                    => HsMatchContext id -> SDoc
-pprMatchContextNoun (FunRhs {mc_fun=L _ fun})
+pprMatchContextNoun :: forall p. (Outputable (IdP p), UnXRec p)
+                    => HsMatchContext p -> SDoc
+pprMatchContextNoun (FunRhs {mc_fun=fun})
                                     = text "equation for"
-                                      <+> quotes (ppr fun)
+                                      <+> quotes (ppr (unXRec @p fun))
 pprMatchContextNoun CaseAlt         = text "case alternative"
 pprMatchContextNoun IfAlt           = text "multi-way if alternative"
 pprMatchContextNoun RecUpd          = text "record-update construct"
@@ -3016,8 +3002,8 @@ pprMatchContextNoun (StmtCtxt ctxt) = text "pattern binding in"
 pprMatchContextNoun PatSyn          = text "pattern synonym declaration"
 
 -----------------
-pprAStmtContext, pprStmtContext :: Outputable (IdP id)
-                                => HsStmtContext id -> SDoc
+pprAStmtContext, pprStmtContext :: (Outputable (IdP p), UnXRec p)
+                                => HsStmtContext p -> SDoc
 pprAStmtContext ctxt = article <+> pprStmtContext ctxt
   where
     pp_an = text "an"

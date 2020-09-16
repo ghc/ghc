@@ -435,6 +435,7 @@ set_up_tarballs() {
     fi
 }
 
+# See Note [tooldir: How GHC finds mingw on Windows]
 if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"
 then
     test -d inplace || mkdir inplace
@@ -448,6 +449,8 @@ then
     NM="${mingwbin}nm.exe"
     RANLIB="${mingwbin}ranlib.exe"
     OBJDUMP="${mingwbin}objdump.exe"
+    MergeObjsCmd="$LD"
+    MergeObjsArgs="-r --oformat=pe-bigobj-x86-64"
     fp_prog_ar="${mingwbin}ar.exe"
 
     AC_PATH_PROG([Genlib],[genlib])
@@ -455,6 +458,7 @@ fi
 
 # We don't want to bundle a MinGW-w64 toolchain
 # So we have to find these individual tools.
+# See Note [tooldir: How GHC finds mingw on Windows]
 if test "$EnableDistroToolchain" = "YES"
 then
     # Ideally should use AC_CHECK_TARGET_TOOL but our triples
@@ -462,6 +466,7 @@ then
     # so never tried without the prefix.
     AC_PATH_PROG([CC],[gcc], [clang])
     AC_PATH_PROG([NM],[nm])
+    AC_PATH_PROG([LD],[ld])
     AC_PATH_PROG([AR],[ar])
     AC_PATH_PROG([RANLIB],[ranlib])
     AC_PATH_PROG([OBJDUMP],[objdump])
@@ -693,6 +698,18 @@ else
     LibtoolCmd="$LIBTOOL"
 fi
 AC_SUBST([LibtoolCmd])
+
+dnl ** Which otool to use on macOS
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([OTOOL], [otool])
+OtoolCmd="$OTOOL"
+AC_SUBST(OtoolCmd)
+
+dnl ** Which install_name_tool to use on macOS
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([INSTALL_NAME_TOOL], [install_name_tool])
+InstallNameToolCmd="$INSTALL_NAME_TOOL"
+AC_SUBST(InstallNameToolCmd)
 
 # Here is where we re-target which specific version of the LLVM
 # tools we are looking for. In the past, GHC supported a number of
@@ -1517,6 +1534,8 @@ echo "\
    libtool      : $LibtoolCmd
    objdump      : $ObjdumpCmd
    ranlib       : $RanlibCmd
+   otool        : $OtoolCmd
+   install_name_tool : $InstallNameToolCmd
    windres      : $WindresCmd
    dllwrap      : $DllWrapCmd
    genlib       : $GenlibCmd

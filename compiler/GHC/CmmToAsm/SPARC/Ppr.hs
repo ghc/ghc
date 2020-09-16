@@ -9,7 +9,6 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module GHC.CmmToAsm.SPARC.Ppr (
         pprNatCmmDecl,
         pprBasicBlock,
@@ -26,17 +25,24 @@ where
 
 import GHC.Prelude
 
+import Data.Word
+import qualified Data.Array.Unsafe as U ( castSTUArray )
+import Data.Array.ST
+
+import Control.Monad.ST
+
 import GHC.CmmToAsm.SPARC.Regs
 import GHC.CmmToAsm.SPARC.Instr
 import GHC.CmmToAsm.SPARC.Cond
 import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.SPARC.AddrMode
 import GHC.CmmToAsm.SPARC.Base
-import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Ppr
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils
 
 import GHC.Cmm hiding (topInfoTable)
 import GHC.Cmm.Ppr() -- For Outputable instances
@@ -368,6 +374,22 @@ pprDataItem platform lit
         ppr_item II16  _        = [text "\t.short\t" <> pprImm imm]
         ppr_item II64  _        = [text "\t.quad\t" <> pprImm imm]
         ppr_item _ _            = panic "SPARC.Ppr.pprDataItem: no match"
+
+floatToBytes :: Float -> [Int]
+floatToBytes f
+   = runST (do
+        arr <- newArray_ ((0::Int),3)
+        writeArray arr 0 f
+        arr <- castFloatToWord8Array arr
+        i0 <- readArray arr 0
+        i1 <- readArray arr 1
+        i2 <- readArray arr 2
+        i3 <- readArray arr 3
+        return (map fromIntegral [i0,i1,i2,i3])
+     )
+
+castFloatToWord8Array :: STUArray s Int Float -> ST s (STUArray s Int Word8)
+castFloatToWord8Array = U.castSTUArray
 
 
 -- | Pretty print an instruction.

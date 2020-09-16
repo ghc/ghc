@@ -43,6 +43,7 @@ import GHC.Prelude
 import GHC.Settings.Utils
 
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -138,15 +139,17 @@ lazyInitLlvmConfig :: String
                -> IO LlvmConfig
 lazyInitLlvmConfig top_dir
   = unsafeInterleaveIO $ do    -- see Note [LLVM configuration]
-      targets <- readAndParse "llvm-targets" mkLlvmTarget
-      passes <- readAndParse "llvm-passes" id
-      return $ LlvmConfig { llvmTargets = targets, llvmPasses = passes }
+      targets <- readAndParse "llvm-targets"
+      passes <- readAndParse "llvm-passes"
+      return $ LlvmConfig { llvmTargets = fmap mkLlvmTarget <$> targets,
+                            llvmPasses = passes }
   where
-    readAndParse name builder =
+    readAndParse :: Read a => String -> IO a
+    readAndParse name =
       do let llvmConfigFile = top_dir </> name
          llvmConfigStr <- readFile llvmConfigFile
          case maybeReadFuzzy llvmConfigStr of
-           Just s -> return (fmap builder <$> s)
+           Just s -> return s
            Nothing -> pgmError ("Can't parse " ++ show llvmConfigFile)
 
     mkLlvmTarget :: (String, String, String) -> LlvmTarget
@@ -259,7 +262,10 @@ linkDynLib dflags0 o_files dep_packages
          | ( osElfTarget (platformOS (targetPlatform dflags)) ||
              osMachOTarget (platformOS (targetPlatform dflags)) ) &&
            dynLibLoader dflags == SystemDependent &&
-           WayDyn `Set.member` ways dflags
+           -- Only if we want dynamic libraries
+           WayDyn `Set.member` ways dflags &&
+           -- Only use RPath if we explicitly asked for it
+           gopt Opt_RPath dflags
             = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]
               -- See Note [-Xlinker -rpath vs -Wl,-rpath]
          | otherwise = ["-L" ++ l]
@@ -384,8 +390,15 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_lib_path_opts
                  ++ map Option pkg_link_opts
                  ++ map Option pkg_framework_opts
-                 ++ [ Option "-Wl,-dead_strip_dylibs" ]
+                 -- dead_strip_dylibs, will remove unused dylibs, and thus save
+                 -- space in the load commands. The -headerpad is necessary so
+                 -- that we can inject more @rpath's later for the leftover
+                 -- libraries in the runInjectRpaths phase below.
+                 --
+                 -- See Note [Dynamic linking on macOS]
+                 ++ [ Option "-Wl,-dead_strip_dylibs", Option "-Wl,-headerpad,8000" ]
               )
+            runInjectRPaths dflags pkg_lib_paths output_fn
         _ -> do
             -------------------------------------------------------------------
             -- Making a DSO

@@ -41,6 +41,7 @@ import GHC.Runtime.Interpreter
 import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 import GHCi.BreakArray
+import GHC.Unit.State
 import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
@@ -2464,7 +2465,7 @@ browseModule bang modl exports_only = do
             annotate mts = concatMap (\(m,ts)->labels m:ts)
                          $ sortBy cmpQualifiers $ grp mts
               where cmpQualifiers =
-                      compare `on` (map (fmap (map moduleNameFS)) . fst)
+                      compare `on` (map (fmap (map (unpackFS . moduleNameFS))) . fst)
             grp []            = []
             grp mts@((m,_):_) = (m,map snd g) : grp ng
               where (g,ng) = partition ((==m).fst) mts

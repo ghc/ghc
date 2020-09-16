@@ -45,3 +45,12 @@
 
 <interactive>:22:12: warning: [-Woverflowed-literals (in -Wdefault)]
     Literal 264 is out of the Word8 range 0..255
+
+<interactive>:25:1: warning: [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty
+
+<interactive>:27:1: warning: [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty
+
+<interactive>:29:1: warning: [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty

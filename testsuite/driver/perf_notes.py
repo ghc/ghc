@@ -22,7 +22,7 @@ import sys
 from collections import namedtuple
 from math import ceil, trunc
 
-from testutil import passed, failBecause, testing_metrics
+from testutil import passed, failBecause, testing_metrics, print_table
 from term_color import Color, colored
 
 from my_typing import *
@@ -44,6 +44,14 @@ def inside_git_repo() -> bool:
 # Check if the worktree is dirty.
 def is_worktree_dirty() -> bool:
     return subprocess.check_output(['git', 'status', '--porcelain']) != b''
+
+# Get length of abbreviated git commit hash
+def get_abbrev_hash_length() -> int:
+    try:
+        return len(subprocess.check_output(['git', 'rev-parse',
+                                            '--short', 'HEAD']).strip())
+    except subprocess.CalledProcessError:
+        return 10
 
 #
 # Some data access functions. At the moment this uses git notes.
@@ -76,8 +84,7 @@ PerfStat = NamedTuple('PerfStat', [('test_env', TestEnv),
 
 # A baseline recovered form stored metrics.
 Baseline = NamedTuple('Baseline', [('perfStat', PerfStat),
-                                   ('commit', GitHash),
-                                   ('commitDepth', int)])
+                                   ('commit', GitHash)])
 
 class MetricChange(Enum):
     # The metric appears to have no baseline and is presumably a new test.
@@ -101,6 +108,15 @@ class MetricChange(Enum):
         }
         return strings[self]
 
+    def hint(self):
+        strings = {
+            MetricChange.NewMetric: colored(Color.BLUE,"NEW"),
+            MetricChange.NoChange:  "",
+            MetricChange.Increase:  colored(Color.RED, "BAD"),
+            MetricChange.Decrease:  colored(Color.GREEN,"GOOD")
+        }
+        return strings[self]
+
 AllowedPerfChange = NamedTuple('AllowedPerfChange',
                                [('direction', MetricChange),
                                 ('metrics', List[str]),
@@ -114,7 +130,13 @@ MetricOracles = NamedTuple("MetricOracles", [("baseline", MetricBaselineOracle),
 
 def parse_perf_stat(stat_str: str) -> PerfStat:
     field_vals = stat_str.strip('\t').split('\t')
-    return PerfStat(*field_vals) # type: ignore
+    stat = PerfStat(*field_vals) # type: ignore
+    if stat.test_env.startswith('"') and stat.test_env.endswith('"'):
+        # Due to a bug, in historical data sometimes the test_env
+        # contains additional quotation marks (#18656).
+        # Remove them, so that we can refer to past data in a uniform fashion.
+        stat = stat._replace(test_env=TestEnv(stat.test_env[1:-1]))
+    return stat
 
 # Get all recorded (in a git note) metrics for a given commit.
 # Returns an empty array if the note is not found.
@@ -402,7 +424,8 @@ def baseline_metric(commit: GitHash,
                     name: TestName,
                     test_env: TestEnv,
                     metric: MetricName,
-                    way: WayName
+                    way: WayName,
+                    baseline_ref: Optional[GitRef]
                     ) -> Optional[Baseline]:
     # For performance reasons (in order to avoid calling commit_hash), we assert
     # commit is already a commit hash.
@@ -411,6 +434,8 @@ def baseline_metric(commit: GitHash,
     # Get all recent commit hashes.
     commit_hashes = baseline_commit_log(commit)
 
+    baseline_commit = commit_hash(baseline_ref) if baseline_ref else None
+
     def has_expected_change(commit: GitHash) -> bool:
         return get_allowed_perf_changes(commit).get(name) is not None
 
@@ -418,11 +443,18 @@ def baseline_metric(commit: GitHash,
     def find_baseline(namespace: NoteNamespace,
                       test_env: TestEnv
                       ) -> Optional[Baseline]:
+        if baseline_commit is not None:
+            current_metric = get_commit_metric(namespace, baseline_commit, test_env, name, metric, way)
+            if current_metric is not None:
+                return Baseline(current_metric, baseline_commit)
+            else:
+                return None
+
         for depth, current_commit in list(enumerate(commit_hashes))[1:]:
             # Check for a metric on this commit.
             current_metric = get_commit_metric(namespace, current_commit, test_env, name, metric, way)
             if current_metric is not None:
-                return Baseline(current_metric, current_commit, depth)
+                return Baseline(current_metric, current_commit)
 
             # Stop if there is an expected change at this commit. In that case
             # metrics on ancestor commits will not be a valid baseline.
@@ -552,7 +584,7 @@ def check_stats_change(actual: PerfStat,
     result = passed()
     if not change_allowed:
         error = str(change) + ' from ' + baseline.perfStat.test_env + \
-                ' baseline @ HEAD~' + str(baseline.commitDepth)
+                ' baseline @ %s' % baseline.commit
         print(actual.metric, error + ':')
         result = failBecause('stat ' + error, tag='stat')
 
@@ -636,6 +668,8 @@ def main() -> None:
         metrics = [test for test in metrics if test.stat.way == args.way]
 
     if args.test_env:
+        if '"' in args.test_env:
+            raise Exception('test_env should not contain quotation marks')
         metrics = [test for test in metrics if test.stat.test_env == args.test_env]
 
     if args.test_name:
@@ -749,7 +783,7 @@ def main() -> None:
         exit(0)
 
     #
-    # String utilities for pretty-printing
+    # Print the data in tablular format
     #
 
     #                  T1234                 T1234
@@ -761,11 +795,12 @@ def main() -> None:
     # HEAD~1           10023                 10023
     # HEAD~2           21234                 21234
     # HEAD~3           20000                 20000
-
-    # Data is already in colum major format, so do that, calculate column widths
-    # then transpose and print each row.
     def strMetric(x):
         return '{:.2f}'.format(x.value) if x != None else ""
+    # Data is in colum major format, so transpose and pass to print_table.
+    T = TypeVar('T')
+    def transpose(xss: List[List[T]]) -> List[List[T]]:
+        return list(map(list, zip(*xss)))
 
     headerCols = [ ["","","","Commit"] ] \
                 + [ [name, metric, way, env] for (env, name, metric, way) in testSeries ]
@@ -773,17 +808,7 @@ def main() -> None:
                 + [ [strMetric(get_commit_metric(ref, commit, env, name, metric, way)) \
                         for commit in commits ] \
                         for (env, name, metric, way) in testSeries ]
-    colWidths = [max([2+len(cell) for cell in colH + colD]) for (colH,colD) in zip(headerCols, dataCols)]
-    col_fmts = ['{:>' + str(w) + '}' for w in colWidths]
-
-    def printCols(cols):
-        for row in zip(*cols):
-            # print(list(zip(col_fmts, row)))
-            print(''.join([f.format(cell) for (f,cell) in zip(col_fmts, row)]))
-
-    printCols(headerCols)
-    print('-'*(sum(colWidths)+2))
-    printCols(dataCols)
+    print_table(transpose(headerCols), transpose(dataCols))
 
 if __name__ == '__main__':
     main()

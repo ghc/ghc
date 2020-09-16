@@ -153,6 +153,7 @@ import GHC.Types.ForeignCall
 import GHC.Data.Maybe
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Builtin.Uniques (mkBuiltinUnique)
 import GHC.Types.Unique.Supply
 import GHC.Data.FastString
 import GHC.Core.Multiplicity
@@ -555,7 +556,7 @@ hasNoBinding :: Id -> Bool
 hasNoBinding id = case Var.idDetails id of
                         PrimOpId _       -> True    -- See Note [Eta expanding primops] in GHC.Builtin.PrimOps
                         FCallId _        -> True
-                        DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
+                        DataConWorkId dc -> isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
                         _                -> isCompulsoryUnfolding (idUnfolding id)
                                             -- See Note [Levity-polymorphic Ids]
 

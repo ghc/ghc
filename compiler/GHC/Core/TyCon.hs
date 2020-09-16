@@ -148,7 +148,10 @@ import {-# SOURCE #-} GHC.Builtin.Types
 import {-# SOURCE #-} GHC.Core.DataCon
    ( DataCon, dataConExTyCoVars, dataConFieldLabels
    , dataConTyCon, dataConFullSig
-   , isUnboxedSumCon )
+   , isUnboxedSumDataCon )
+import GHC.Builtin.Uniques
+  ( tyConRepNameUnique
+  , dataConTyRepNameUnique )
 
 import GHC.Utils.Binary
 import GHC.Types.Var
@@ -167,7 +170,6 @@ import GHC.Data.FastString.Env
 import GHC.Types.FieldLabel
 import GHC.Settings.Constants
 import GHC.Utils.Misc
-import GHC.Types.Unique( tyConRepNameUnique, dataConTyRepNameUnique )
 import GHC.Types.Unique.Set
 import GHC.Unit.Module
 
@@ -1321,7 +1323,7 @@ tyConRepName_maybe (AlgTyCon { algTcParent = parent })
 tyConRepName_maybe (FamilyTyCon { famTcFlav = DataFamilyTyCon rep_nm })
   = Just rep_nm
 tyConRepName_maybe (PromotedDataCon { dataCon = dc, tcRepName = rep_nm })
-  | isUnboxedSumCon dc   -- see #13276
+  | isUnboxedSumDataCon dc   -- see #13276
   = Nothing
   | otherwise
   = Just rep_nm

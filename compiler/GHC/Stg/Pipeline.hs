@@ -27,6 +27,7 @@ import GHC.Unit.Module ( Module )
 
 import GHC.Driver.Session
 import GHC.Utils.Error
+import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -52,7 +53,7 @@ stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes 
         -> IO [StgTopBinding]        -- output program
 
 stg2stg dflags this_mod binds
-  = do  { dump_when Opt_D_dump_stg "STG:" binds
+  = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass dflags "Stg2Stg"
         -- Do the main business!
         ; binds' <- runStgM 'g' $

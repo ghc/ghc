@@ -777,7 +777,7 @@ mkVarBind var rhs = L (getLoc rhs) $
                     VarBind { var_ext = noExtField,
                               var_id = var, var_rhs = rhs }
 
-mkPatSynBind :: Located RdrName -> HsPatSynDetails (Located RdrName)
+mkPatSynBind :: Located RdrName -> HsPatSynDetails GhcPs
              -> LPat GhcPs -> HsPatSynDir GhcPs -> HsBind GhcPs
 mkPatSynBind name details lpat dir = PatSynBind noExtField psb
   where
@@ -885,14 +885,14 @@ BUT we have a special case when abs_sig is true;
 -- | Should we treat this as an unlifted bind? This will be true for any
 -- bind that binds an unlifted variable, but we must be careful around
 -- AbsBinds. See Note [Unlifted id check in isUnliftedHsBind]. For usage
--- information, see Note [Strict binds check] is "GHC.HsToCore.Binds".
+-- information, see Note [Strict binds checks] is GHC.HsToCore.Binds.
 isUnliftedHsBind :: HsBind GhcTc -> Bool  -- works only over typechecked binds
 isUnliftedHsBind bind
   | AbsBinds { abs_exports = exports, abs_sig = has_sig } <- bind
   = if has_sig
     then any (is_unlifted_id . abe_poly) exports
     else any (is_unlifted_id . abe_mono) exports
-    -- If has_sig is True we wil never generate a binding for abe_mono,
+    -- If has_sig is True we will never generate a binding for abe_mono,
     -- so we don't need to worry about it being unlifted. The abe_poly
     -- binding might not be: e.g. forall a. Num a => (# a, a #)
 
@@ -990,7 +990,7 @@ collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = ps })) acc
 collect_bind _ (PatSynBind _ (XPatSynBind _)) acc = acc
 collect_bind _ (XHsBindsLR _) acc = acc
 
-collectMethodBinders :: forall idL idR. UnXRec idL => LHsBindsLR idL idR -> [XRec idL (IdP idL)]
+collectMethodBinders :: forall idL idR. UnXRec idL => LHsBindsLR idL idR -> [LIdP idL]
 -- ^ Used exclusively for the bindings of an instance decl which are all
 -- 'FunBinds'
 collectMethodBinders binds = foldr (get . unXRec @idL) [] binds
@@ -1173,7 +1173,7 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
 
 
 -------------------
-hsForeignDeclsBinders :: forall pass. (UnXRec pass, MapXRec pass) => [LForeignDecl pass] -> [XRec pass (IdP pass)]
+hsForeignDeclsBinders :: forall pass. (UnXRec pass, MapXRec pass) => [LForeignDecl pass] -> [LIdP pass]
 -- ^ See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
   = [ mapXRec @pass (const $ unXRec @pass n) fi

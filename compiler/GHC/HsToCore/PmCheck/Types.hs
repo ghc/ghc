@@ -15,6 +15,7 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 module GHC.HsToCore.PmCheck.Types (
         -- * Representations for Literals and AltCons
         PmLit(..), PmLitValue(..), PmAltCon(..), pmLitType, pmAltConType,
+        isPmAltConMatchStrict, pmAltConImplBangs,
 
         -- ** Equality on 'PmAltCon's
         PmEquality(..), eqPmAltCon,
@@ -23,8 +24,8 @@ module GHC.HsToCore.PmCheck.Types (
         literalToPmLit, negatePmLit, overloadPmLit,
         pmLitAsStringLit, coreExprAsPmLit,
 
-        -- * Caching partially matched COMPLETE sets
-        ConLikeSet, PossibleMatches(..),
+        -- * Caching residual COMPLETE sets
+        ConLikeSet, ResidualCompleteMatches(..), getRcm,
 
         -- * PmAltConSet
         PmAltConSet, emptyPmAltConSet, isEmptyPmAltConSet, elemPmAltConSet,
@@ -35,8 +36,8 @@ module GHC.HsToCore.PmCheck.Types (
         setIndirectSDIE, setEntrySDIE, traverseSDIE,
 
         -- * The pattern match oracle
-        VarInfo(..), TmState(..), TyState(..), Delta(..),
-        Deltas(..), initDeltas, liftDeltasM
+        BotInfo(..), VarInfo(..), TmState(..), TyState(..), Nabla(..),
+        Nablas(..), initNablas, liftNablasM
     ) where
 
 #include "HsVersions.h"
@@ -46,7 +47,6 @@ import GHC.Prelude
 import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Data.FastString
-import GHC.Types.Var (EvVar)
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Types.Unique.DSet
@@ -67,11 +67,11 @@ import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
-import GHC.Tc.Utils.TcType (evVarPred)
+import GHC.Tc.Solver.Monad (InertSet, emptyInert)
+import GHC.Driver.Types (ConLikeSet)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ratio
 import qualified Data.Semigroup as Semi
 
@@ -225,6 +225,19 @@ instance Eq PmAltCon where
 pmAltConType :: PmAltCon -> [Type] -> Type
 pmAltConType (PmAltLit lit)     _arg_tys = ASSERT( null _arg_tys ) pmLitType lit
 pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
+
+-- | Is a match on this constructor forcing the match variable?
+-- True of data constructors, literals and pattern synonyms (#17357), but not of
+-- newtypes.
+-- See Note [Coverage checking Newtype matches] in "GHC.HsToCore.PmCheck.Oracle".
+isPmAltConMatchStrict :: PmAltCon -> Bool
+isPmAltConMatchStrict PmAltLit{}                      = True
+isPmAltConMatchStrict (PmAltConLike PatSynCon{})      = True -- #17357
+isPmAltConMatchStrict (PmAltConLike (RealDataCon dc)) = not (isNewDataCon dc)
+
+pmAltConImplBangs :: PmAltCon -> [HsImplBang]
+pmAltConImplBangs PmAltLit{}         = []
+pmAltConImplBangs (PmAltConLike con) = conLikeImplBangs con
 
 {- Note [Undecidable Equality for PmAltCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -401,21 +414,32 @@ instance Outputable PmAltCon where
 instance Outputable PmEquality where
   ppr = text . show
 
-type ConLikeSet = UniqDSet ConLike
+-- | A data type that caches for the 'VarInfo' of @x@ the results of querying
+-- 'dsGetCompleteMatches' and then striking out all occurrences of @K@ for
+-- which we already know @x /~ K@ from these sets.
+--
+-- For motivation, see Section 5.3 in Lower Your Guards.
+-- See also Note [Implementation of COMPLETE pragmas]
+data ResidualCompleteMatches
+  = RCM
+  { rcm_vanilla :: !(Maybe ConLikeSet)
+  -- ^ The residual set for the vanilla COMPLETE set from the data defn.
+  -- Tracked separately from 'rcm_pragmas', because it might only be
+  -- known much later (when we have enough type information to see the 'TyCon'
+  -- of the match), or not at all even. Until that happens, it is 'Nothing'.
+  , rcm_pragmas :: !(Maybe [ConLikeSet])
+  -- ^ The residual sets for /all/ COMPLETE sets from pragmas that are
+  -- visible when compiling this module. Querying that set with
+  -- 'dsGetCompleteMatches' requires 'DsM', so we initialise it with 'Nothing'
+  -- until first needed in a 'DsM' context.
+  }
 
--- | A data type caching the results of 'completeMatchConLikes' with support for
--- deletion of constructors that were already matched on.
-data PossibleMatches
-  = PM (NonEmpty.NonEmpty ConLikeSet)
-  -- ^ Each ConLikeSet is a (subset of) the constructors in a COMPLETE set
-  -- 'NonEmpty' because the empty case would mean that the type has no COMPLETE
-  -- set at all, for which we have 'NoPM'.
-  | NoPM
-  -- ^ No COMPLETE set for this type (yet). Think of overloaded literals.
+getRcm :: ResidualCompleteMatches -> [ConLikeSet]
+getRcm (RCM vanilla pragmas) = maybeToList vanilla ++ fromMaybe [] pragmas
 
-instance Outputable PossibleMatches where
-  ppr (PM cs) = ppr (NonEmpty.toList cs)
-  ppr NoPM = text "<NoPM>"
+instance Outputable ResidualCompleteMatches where
+  -- formats as "[{Nothing,Just},{P,Q}]"
+  ppr rcm = ppr (getRcm rcm)
 
 -- | Either @Indirect x@, meaning the value is represented by that of @x@, or
 -- an @Entry@ containing containing the actual value it represents.
@@ -477,6 +501,13 @@ instance Outputable a => Outputable (Shared a) where
 instance Outputable a => Outputable (SharedDIdEnv a) where
   ppr (SDIE env) = ppr env
 
+-- | See 'vi_bot'.
+data BotInfo
+  = IsBot
+  | IsNotBot
+  | MaybeBot
+  deriving Eq
+
 -- | The term oracle state. Stores 'VarInfo' for encountered 'Id's. These
 -- entries are possibly shared when we figure out that two variables must be
 -- equal, thus represent the same set of values.
@@ -495,8 +526,8 @@ data TmState
 
 -- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
 -- and negative ('vi_neg') facts, like "x is not (:)".
--- Also caches the type ('vi_ty'), the 'PossibleMatches' of a COMPLETE set
--- ('vi_cache').
+-- Also caches the type ('vi_ty'), the 'ResidualCompleteMatches' of a COMPLETE set
+-- ('vi_rcm').
 --
 -- Subject to Note [The Pos/Neg invariant] in "GHC.HsToCore.PmCheck.Oracle".
 data VarInfo
@@ -531,12 +562,24 @@ data VarInfo
   -- because files like Cabal's `LicenseId` define relatively huge enums
   -- that lead to quadratic or worse behavior.
 
-  , vi_cache :: !PossibleMatches
+  , vi_bot :: BotInfo
+  -- ^ Can this variable be ⊥? Models (mutually contradicting) @x ~ ⊥@ and
+  --   @x ≁ ⊥@ constraints. E.g.
+  --    * 'MaybeBot': Don't know; Neither @x ~ ⊥@ nor @x ≁ ⊥@.
+  --    * 'IsBot': @x ~ ⊥@
+  --    * 'IsNotBot': @x ≁ ⊥@
+
+  , vi_rcm :: !ResidualCompleteMatches
   -- ^ A cache of the associated COMPLETE sets. At any time a superset of
   -- possible constructors of each COMPLETE set. So, if it's not in here, we
   -- can't possibly match on it. Complementary to 'vi_neg'. We still need it
   -- to recognise completion of a COMPLETE set efficiently for large enums.
   }
+
+instance Outputable BotInfo where
+  ppr MaybeBot = empty
+  ppr IsBot    = text "~⊥"
+  ppr IsNotBot = text "≁⊥"
 
 -- | Not user-facing.
 instance Outputable TmState where
@@ -544,8 +587,8 @@ instance Outputable TmState where
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI ty pos neg cache)
-    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache]))
+  ppr (VI ty pos neg bot cache)
+    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr bot, ppr cache]))
 
 -- | Initial state of the term oracle.
 initTmState :: TmState
@@ -553,44 +596,47 @@ initTmState = TmSt emptySDIE emptyCoreMap
 
 -- | The type oracle state. A poor man's 'GHC.Tc.Solver.Monad.InsertSet': The invariant is
 -- that all constraints in there are mutually compatible.
-newtype TyState = TySt (Bag EvVar)
+newtype TyState = TySt InertSet
 
 -- | Not user-facing.
 instance Outputable TyState where
-  ppr (TySt evs)
-    = braces $ hcat $ punctuate comma $ map (ppr . evVarPred) $ bagToList evs
+  ppr (TySt inert) = ppr inert
 
 initTyState :: TyState
-initTyState = TySt emptyBag
+initTyState = TySt emptyInert
 
--- | An inert set of canonical (i.e. mutually compatible) term and type
--- constraints.
-data Delta = MkDelta { delta_ty_st :: TyState    -- Type oracle; things like a~Int
-                     , delta_tm_st :: TmState }  -- Term oracle; things like x~Nothing
+-- | A normalised refinement type ∇ (\"nabla\"), comprised of an inert set of
+-- canonical (i.e. mutually compatible) term and type constraints that form the
+-- refinement type's predicate.
+data Nabla = MkNabla { nabla_ty_st :: TyState    -- Type oracle; things like a~Int
+                     , nabla_tm_st :: TmState }  -- Term oracle; things like x~Nothing
 
--- | An initial delta that is always satisfiable
-initDelta :: Delta
-initDelta = MkDelta initTyState initTmState
+-- | An initial nabla that is always satisfiable
+initNabla :: Nabla
+initNabla = MkNabla initTyState initTmState
 
-instance Outputable Delta where
-  ppr delta = hang (text "Delta") 2 $ vcat [
+instance Outputable Nabla where
+  ppr nabla = hang (text "Nabla") 2 $ vcat [
       -- intentionally formatted this way enable the dev to comment in only
       -- the info she needs
-      ppr (delta_tm_st delta),
-      ppr (delta_ty_st delta)
+      ppr (nabla_tm_st nabla),
+      ppr (nabla_ty_st nabla)
     ]
 
--- | A disjunctive bag of 'Delta's, representing a refinement type.
-newtype Deltas = MkDeltas (Bag Delta)
+-- | A disjunctive bag of 'Nabla's, representing a refinement type.
+newtype Nablas = MkNablas (Bag Nabla)
 
-initDeltas :: Deltas
-initDeltas = MkDeltas (unitBag initDelta)
+initNablas :: Nablas
+initNablas = MkNablas (unitBag initNabla)
 
-instance Outputable Deltas where
-  ppr (MkDeltas deltas) = ppr deltas
+instance Outputable Nablas where
+  ppr (MkNablas nablas) = ppr nablas
 
-instance Semigroup Deltas where
-  MkDeltas l <> MkDeltas r = MkDeltas (l `unionBags` r)
+instance Semigroup Nablas where
+  MkNablas l <> MkNablas r = MkNablas (l `unionBags` r)
 
-liftDeltasM :: Monad m => (Delta -> m (Maybe Delta)) -> Deltas -> m Deltas
-liftDeltasM f (MkDeltas ds) = MkDeltas . catBagMaybes <$> (traverse f ds)
+instance Monoid Nablas where
+  mempty = MkNablas emptyBag
+
+liftNablasM :: Monad m => (Nabla -> m (Maybe Nabla)) -> Nablas -> m Nablas
+liftNablasM f (MkNablas ds) = MkNablas . catBagMaybes <$> (traverse f ds)

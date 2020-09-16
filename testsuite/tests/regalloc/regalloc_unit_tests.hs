@@ -23,11 +23,11 @@ module Main where
 import qualified GHC.CmmToAsm.Reg.Graph.Stats as Color
 import qualified GHC.CmmToAsm.Reg.Linear.Base as Linear
 import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
+import qualified GHC.CmmToAsm.X86 as X86
 import GHC.Driver.Main
 import GHC.StgToCmm.CgUtils
 import GHC.CmmToAsm
 import GHC.CmmToAsm.Config
-import GHC.CmmToAsm.Monad as NCGConfig
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Parser
@@ -105,7 +105,7 @@ compileCmmForRegAllocStats ::
     IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
 compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
-    let ncgImpl = ncgImplF (NCGConfig.initConfig dflags)
+    let ncgImpl = ncgImplF (initNCGConfig dflags)
     hscEnv <- newHscEnv dflags
 
     -- parse the cmm file and output any warnings or errors
@@ -175,7 +175,7 @@ runTests dflags us = testGraphNoSpills dflags noSpillsCmmFile us >>= \res ->
 testGraphNoSpills :: DynFlags -> FilePath -> UniqSupply -> IO Bool
 testGraphNoSpills dflags' path us = do
         colorStats <- fst . concatTupledMaybes <$>
-                        compileCmmForRegAllocStats dflags path x86NcgImpl us
+                        compileCmmForRegAllocStats dflags path X86.ncgX86 us
 
         assertIO "testGraphNoSpills: color stats should not be empty"
                         $ not (null colorStats)

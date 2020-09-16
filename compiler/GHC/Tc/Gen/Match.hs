@@ -157,10 +157,17 @@ tcMatchLambda herald match_ctxt match res_ty
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 
-tcGRHSsPat :: GRHSs GhcRn (LHsExpr GhcRn) -> TcRhoType
+tcGRHSsPat :: GRHSs GhcRn (LHsExpr GhcRn) -> ExpRhoType
            -> TcM (GRHSs GhcTc (LHsExpr GhcTc))
 -- Used for pattern bindings
-tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss (mkCheckExpType res_ty)
+tcGRHSsPat grhss res_ty
+  = tcScalingUsage Many $
+      -- Like in tcMatchesFun, this scaling happens because all
+      -- let bindings are unrestricted. A difference, here, is
+      -- that when this is not the case, any more, we will have to
+      -- make sure that the pattern is strict, otherwise this will
+      -- desugar to incorrect code.
+    tcGRHSs match_ctxt grhss res_ty
   where
     match_ctxt = MC { mc_what = PatBindRhs,
                       mc_body = tcBody }

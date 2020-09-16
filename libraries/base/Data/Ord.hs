@@ -21,6 +21,7 @@ module Data.Ord (
    Ordering(..),
    Down(..),
    comparing,
+   clamp,
  ) where
 
 import Data.Bits (Bits, FiniteBits)
@@ -43,6 +44,25 @@ import GHC.Show
 -- >   ... sortBy (comparing fst) ...
 comparing :: (Ord a) => (b -> a) -> b -> b -> Ordering
 comparing p x y = compare (p x) (p y)
+
+-- |
+-- > clamp (low, high) a = min high (max a low)
+--
+-- Function for ensursing the value @a@ is within the inclusive bounds given by
+-- @low@ and @high@. If it is, @a@ is returned unchanged. The result
+-- is otherwise @low@ if @a <= low@, or @high@ if @high <= a@.
+--
+-- When clamp is used at Double and Float, it has NaN propagating semantics in
+-- its second argument. That is, @clamp (l,h) NaN = NaN@, but @clamp (NaN, NaN)
+-- x = x@.
+--
+-- >>> clamp (0, 10) 2
+-- 2
+--
+-- >>> clamp ('a', 'm') 'x'
+-- 'm'
+clamp :: (Ord a) => (a, a) -> a -> a
+clamp (low, high) a = min high (max a low)
 
 -- | The 'Down' type allows you to reverse sort order conveniently.  A value of type
 -- @'Down' a@ contains a value of type @a@ (represented as @'Down' a@).

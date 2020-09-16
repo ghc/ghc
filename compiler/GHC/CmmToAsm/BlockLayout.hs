@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module GHC.CmmToAsm.BlockLayout
     ( sequenceTop, backendMaintainsCfg)
@@ -16,12 +17,13 @@ where
 #include "HsVersions.h"
 import GHC.Prelude
 
-import GHC.Driver.Session (gopt, GeneralFlag(..), DynFlags, targetPlatform)
 import GHC.Driver.Ppr     (pprTrace)
 
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.CFG
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Config
 
 import GHC.Cmm.BlockId
 import GHC.Cmm
@@ -668,7 +670,7 @@ buildChains edges blocks
 
 -- | Place basic blocks based on the given CFG.
 -- See Note [Chain based CFG serialization]
-sequenceChain :: forall a i. (Instruction i, Outputable i)
+sequenceChain :: forall a i. Instruction i
               => LabelMap a -- ^ Keys indicate an info table on the block.
               -> CFG -- ^ Control flow graph and some meta data.
               -> [GenBasicBlock i] -- ^ List of basic blocks to be placed.
@@ -815,31 +817,33 @@ dropJumps info ((BasicBlock lbl ins):todo)
 -- fallthroughs.
 
 sequenceTop
-    :: (Instruction instr, Outputable instr)
-    => DynFlags -- Determine which layout algo to use
-    -> NcgImpl statics instr jumpDest
+    :: Instruction instr
+    => NcgImpl statics instr jumpDest
     -> Maybe CFG -- ^ CFG if we have one.
     -> NatCmmDecl statics instr -- ^ Function to serialize
     -> NatCmmDecl statics instr
 
-sequenceTop _     _       _           top@(CmmData _ _) = top
-sequenceTop dflags ncgImpl edgeWeights
-            (CmmProc info lbl live (ListGraph blocks))
-  | (gopt Opt_CfgBlocklayout dflags) && backendMaintainsCfg (targetPlatform dflags)
-  --Use chain based algorithm
-  , Just cfg <- edgeWeights
-  = CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
-                            {-# SCC layoutBlocks #-}
-                            sequenceChain info cfg blocks )
-  | otherwise
-  --Use old algorithm
-  = let cfg = if dontUseCfg then Nothing else edgeWeights
-    in  CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
-                                {-# SCC layoutBlocks #-}
-                                sequenceBlocks cfg info blocks)
-  where
-    dontUseCfg = gopt Opt_WeightlessBlocklayout dflags ||
-                 (not $ backendMaintainsCfg (targetPlatform dflags))
+sequenceTop _       _           top@(CmmData _ _) = top
+sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks))
+  = let
+      config     = ncgConfig ncgImpl
+      platform   = ncgPlatform config
+
+    in CmmProc info lbl live $ ListGraph $ ncgMakeFarBranches ncgImpl info $
+         if -- Chain based algorithm
+            | ncgCfgBlockLayout config
+            , backendMaintainsCfg platform
+            , Just cfg <- edgeWeights
+            -> {-# SCC layoutBlocks #-} sequenceChain info cfg blocks
+
+            -- Old algorithm without edge weights
+            | ncgCfgWeightlessLayout config
+               || not (backendMaintainsCfg platform)
+            -> {-# SCC layoutBlocks #-} sequenceBlocks Nothing info blocks
+
+            -- Old algorithm with edge weights (if any)
+            | otherwise
+            -> {-# SCC layoutBlocks #-} sequenceBlocks edgeWeights info blocks
 
 -- The old algorithm:
 -- It is very simple (and stupid): We make a graph out of

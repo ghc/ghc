@@ -95,6 +95,24 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the pre-processor (with :ghc-flag:`-F` only).
 
+.. ghc-flag:: -pgmotool ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the program to inspect mach-o dylibs on macOS
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the program to inspect mach-o dynamic libraries and
+    executables to read the dynamic library dependencies.  We will compute
+    the necessary ``runpath``s to embed for the dependencies based on the
+    result of the ``otool`` call.
+
+.. ghc-flag:: -pgminstall_name_tool ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the program to inject ``runpath`` into mach-o dylibs on macOS
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the program to inject ``runpath``s into mach-o dynamic
+    libraries and executables.  As detected by the ``otool`` call.
+
 .. ghc-flag:: -pgmwindres ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the program for embedding manifests on Windows.
     :type: dynamic
@@ -675,6 +693,19 @@ Options affecting code generation
     and ``-dynhisuf`` are the counterparts of ``-o``, ``-osuf``, and
     ``-hisuf`` respectively, but applying to the dynamic compilation.
 
+.. ghc-flag:: -split-objs
+    :shortdesc: Split generated object files into smaller files
+    :type: dynamic
+    :category: codegen
+
+    When using this option, the object file is split into many smaller objects.
+    This feature is used when building libraries, so that a program statically
+    linked against the library will pull in less of the library.
+
+    Since this uses platform specific techniques, it may not be available on
+    all target platforms. See the :ghc-flag:`--print-object-splitting-supported`
+    flag to check whether your GHC supports object splitting.
+
 .. _options-linker:
 
 Options affecting linking
@@ -997,7 +1028,7 @@ for example).
 
     This option affects the processing of RTS control options given
     either on the command line or via the :envvar:`GHCRTS` environment
-    variable. There are three possibilities:
+    variable. There are five possibilities:
 
     ``-rtsopts=none``
         Disable all processing of RTS options. If ``+RTS`` appears

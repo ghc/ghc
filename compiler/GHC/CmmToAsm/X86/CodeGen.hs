@@ -46,17 +46,18 @@ import GHC.CmmToAsm.X86.RegInfo
 
 import GHC.Platform.Regs
 import GHC.CmmToAsm.CPrim
+import GHC.CmmToAsm.Types
 import GHC.Cmm.DebugBlock
    ( DebugBlock(..), UnwindPoint(..), UnwindTable
    , UnwindExpr(UwReg), toUnwindExpr
    )
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
 import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat, getNewLabelNat, setDeltaNat
    , getDeltaNat, getBlockIdNat, getPicBaseNat, getNewRegPairNat
    , getPicBaseMaybeNat, getDebugBlock, getFileId
    , addImmediateSuccessorNat, updateCfgNat, getConfig, getPlatform
+   , getCfgWeights
    )
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Format
@@ -228,7 +229,7 @@ basicBlockCodeGen block = do
 addSpUnwindings :: Instr -> NatM (OrdList Instr)
 addSpUnwindings instr@(DELTA d) = do
     config <- getConfig
-    if ncgDebugLevel config >= 1
+    if ncgDwarfUnwindings config
         then do lbl <- mkAsmTempLabel <$> getUniqueM
                 let unwind = M.singleton MachSp (Just $ UwReg MachSp $ negate d)
                 return $ toOL [ instr, UNWIND lbl unwind ]
@@ -2106,10 +2107,10 @@ genCCall is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
       --  bid -> lbl2
       --  bid -> lbl1 -> lbl2
       --  We also changes edges originating at bid to start at lbl2 instead.
-      dflags <- getDynFlags
+      weights <- getCfgWeights
       updateCfgNat (addWeightEdge bid lbl1 110 .
                     addWeightEdge lbl1 lbl2 110 .
-                    addImmediateSuccessor dflags bid lbl2)
+                    addImmediateSuccessor weights bid lbl2)
 
       -- The following instruction sequence corresponds to the pseudo-code
       --

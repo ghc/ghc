@@ -447,25 +447,40 @@ AC_DEFUN([GET_ARM_ISA],
                      #endif]
                 )],
                 [AC_DEFINE(arm_HOST_ARCH_PRE_ARMv7, 1, [ARM pre v7])
-                 ARM_ISA=ARMv6
-                 AC_COMPILE_IFELSE([
-                        AC_LANG_PROGRAM(
-                                [],
-                                [#if defined(__VFP_FP__)
-                                     return 0;
-                                #else
-                                     no vfp
-                                #endif]
-                        )],
-                        [changequote(, )dnl
-                         ARM_ISA_EXT="[VFPv2]"
-                         changequote([, ])dnl
-                        ],
-                        [changequote(, )dnl
-                         ARM_ISA_EXT="[]"
-                         changequote([, ])dnl
-                        ]
-                )],
+                 if grep -q Raspbian /etc/issue && uname -m | grep -q armv7; then
+                   # Raspbian unfortunately makes some extremely questionable
+                   # packaging decisions, configuring gcc to compile for ARMv6
+                   # despite the fact that the RPi4 is ARMv8. As ARMv8 doesn't
+                   # support all instructions supported by ARMv6 this can
+                   # break. Work around this by checking uname to verify
+                   # that we aren't running on armv7.
+                   # See #17856.
+                   AC_MSG_NOTICE([Found compiler which claims to target ARMv6 running on ARMv7, assuming this is ARMv7 on Raspbian (see T17856)])
+                   ARM_ISA=ARMv7
+                   changequote(, )dnl
+                   ARM_ISA_EXT="[VFPv2]"
+                   changequote([, ])dnl
+                 else
+                   ARM_ISA=ARMv6
+                   AC_COMPILE_IFELSE([
+                          AC_LANG_PROGRAM(
+                                  [],
+                                  [#if defined(__VFP_FP__)
+                                       return 0;
+                                  #else
+                                       no vfp
+                                  #endif]
+                          )],
+                          [changequote(, )dnl
+                           ARM_ISA_EXT="[VFPv2]"
+                           changequote([, ])dnl
+                          ],
+                          [changequote(, )dnl
+                           ARM_ISA_EXT="[]"
+                           changequote([, ])dnl
+                          ]
+                  )
+                fi],
                 [changequote(, )dnl
                  ARM_ISA=ARMv7
                  ARM_ISA_EXT="[VFPv3,NEON]"
@@ -507,6 +522,7 @@ AC_DEFUN([GET_ARM_ISA],
 # FP_SETTINGS
 # ----------------------------------
 # Set the variables used in the settings file
+# See Note [tooldir: How GHC finds mingw on Windows]
 AC_DEFUN([FP_SETTINGS],
 [
     if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"
@@ -516,6 +532,10 @@ AC_DEFUN([FP_SETTINGS],
         SettingsHaskellCPPCommand="${mingw_bin_prefix}gcc.exe"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="${mingw_bin_prefix}ld.exe"
+        # Overrides FIND_MERGE_OBJECTS in order to avoid hard-coding linker
+        # path on Windows (#18550).
+        SettingsMergeObjectsCommand="${SettingsLdCommand}"
+        SettingsMergeObjectsFlags="-r --oformat=pe-bigobj-x86-64"
         SettingsArCommand="${mingw_bin_prefix}ar.exe"
         SettingsRanlibCommand="${mingw_bin_prefix}ranlib.exe"
         SettingsDllWrapCommand="${mingw_bin_prefix}dllwrap.exe"
@@ -529,6 +549,8 @@ AC_DEFUN([FP_SETTINGS],
         SettingsHaskellCPPCommand="$(basename $HaskellCPPCmd)"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$(basename $LdCmd)"
+        SettingsMergeObjectsCommand="$(basename $MergeObjsCmd)"
+        SettingsMergeObjectsFlags="$MergeObjsArgs"
         SettingsArCommand="$(basename $ArCmd)"
         SettingsDllWrapCommand="$(basename $DllWrapCmd)"
         SettingsWindresCommand="$(basename $WindresCmd)"
@@ -538,6 +560,8 @@ AC_DEFUN([FP_SETTINGS],
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$LdCmd"
+        SettingsMergeObjectsCommand="$MergeObjsCmd"
+        SettingsMergeObjectsFlags="$MergeObjsArgs"
         SettingsArCommand="$ArCmd"
         SettingsRanlibCommand="$RanlibCmd"
         if test -z "$DllWrapCmd"
@@ -578,11 +602,24 @@ AC_DEFUN([FP_SETTINGS],
     else
       SettingsOptCommand="$OptCmd"
     fi
+    if test -z "$OtoolCmd"
+    then
+      SettingsOtoolCommand="otool"
+    else
+      SettingsOtoolCommand="$OtoolCmd"
+    fi
+    if test -z "$InstallNameToolCmd"
+    then
+      SettingsInstallNameToolCommand="install_name_tool"
+    else
+      SettingsInstallNameToolCommand="$InstallNameToolCmd"
+    fi
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
     SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
     SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
+    SettingsUseDistroMINGW="$EnableDistroToolchain"
     AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)
@@ -592,8 +629,12 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsCCompilerSupportsNoPie)
     AC_SUBST(SettingsLdCommand)
     AC_SUBST(SettingsLdFlags)
+    AC_SUBST(SettingsMergeObjectsCommand)
+    AC_SUBST(SettingsMergeObjectsFlags)
     AC_SUBST(SettingsArCommand)
     AC_SUBST(SettingsRanlibCommand)
+    AC_SUBST(SettingsOtoolCommand)
+    AC_SUBST(SettingsInstallNameToolCommand)
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsLibtoolCommand)
@@ -601,6 +642,7 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsClangCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
+    AC_SUBST(SettingsUseDistroMINGW)
 ])
 
 # Helper for cloning a shell variable's state
@@ -1023,6 +1065,8 @@ if test ! -f compiler/GHC/Parser.hs || test ! -f compiler/GHC/Cmm/Parser.hs
 then
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.19.10],
       [AC_MSG_ERROR([Happy version 1.19.10 or later is required to compile GHC.])])[]
+    FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-ge],[1.21.0],
+      [AC_MSG_ERROR([Happy version 1.20 or earlier is required to compile GHC.])])[]
 fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
@@ -1597,37 +1641,37 @@ AC_SUBST([GccExtraViaCOpts],$fp_cv_gcc_extra_opts)
 # ---------------------
 AC_DEFUN([FP_SETUP_PROJECT_VERSION],
 [
-if test "$RELEASE" = "NO"; then
-    AC_MSG_CHECKING([for GHC version date])
-    if test -f VERSION_DATE; then
-        PACKAGE_VERSION=${PACKAGE_VERSION}.`cat VERSION_DATE`
-        AC_MSG_RESULT(given $PACKAGE_VERSION)
-    elif test -e .git; then
-        changequote(, )dnl
-        ver_posixtime=`git log -1 --pretty=format:%ct`
-        ver_date=`perl -MPOSIX -e "print strftime('%Y%m%d', gmtime($ver_posixtime));"`
-        if echo $ver_date | grep '^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$' 2>&1 >/dev/null; then true; else
-        changequote([, ])dnl
-                AC_MSG_ERROR([failed to detect version date: check that git and perl are in your path])
+    if test "$RELEASE" = "NO"; then
+        AC_MSG_CHECKING([for GHC version date])
+        if test -f VERSION_DATE; then
+            PACKAGE_VERSION=${PACKAGE_VERSION}.`cat VERSION_DATE`
+            AC_MSG_RESULT(given $PACKAGE_VERSION)
+        elif test -e .git; then
+            changequote(, )dnl
+            ver_posixtime=`git log -1 --pretty=format:%ct`
+            ver_date=`perl -MPOSIX -e "print strftime('%Y%m%d', gmtime($ver_posixtime));"`
+            if echo $ver_date | grep '^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$' 2>&1 >/dev/null; then true; else
+            changequote([, ])dnl
+                    AC_MSG_ERROR([failed to detect version date: check that git and perl are in your path])
+            fi
+            PACKAGE_VERSION=${PACKAGE_VERSION}.$ver_date
+            AC_MSG_RESULT(inferred $PACKAGE_VERSION)
+        elif test -f VERSION; then
+            PACKAGE_VERSION=`cat VERSION`
+            AC_MSG_RESULT(given $PACKAGE_VERSION)
+        else
+            AC_MSG_WARN([cannot determine snapshot version: no .git directory and no VERSION file])
+            dnl We'd really rather this case didn't happen, but it might
+            dnl do (in particular, people using lndir trees may find that
+            dnl the build system can't find any other date). If it does
+            dnl happen, then we use the current date.
+            dnl This way we get some idea about how recent a build is.
+            dnl It also means that packages built for 2 different builds
+            dnl will probably use different version numbers, so things are
+            dnl less likely to go wrong.
+            PACKAGE_VERSION=${PACKAGE_VERSION}.`date +%Y%m%d`
         fi
-        PACKAGE_VERSION=${PACKAGE_VERSION}.$ver_date
-        AC_MSG_RESULT(inferred $PACKAGE_VERSION)
-    elif test -f VERSION; then
-        PACKAGE_VERSION=`cat VERSION`
-        AC_MSG_RESULT(given $PACKAGE_VERSION)
-    else
-        AC_MSG_WARN([cannot determine snapshot version: no .git directory and no VERSION file])
-        dnl We'd really rather this case didn't happen, but it might
-        dnl do (in particular, people using lndir trees may find that
-        dnl the build system can't find any other date). If it does
-        dnl happen, then we use the current date.
-        dnl This way we get some idea about how recent a build is.
-        dnl It also means that packages built for 2 different builds
-        dnl will probably use different version numbers, so things are
-        dnl less likely to go wrong.
-        PACKAGE_VERSION=${PACKAGE_VERSION}.`date +%Y%m%d`
     fi
-fi
 
     AC_MSG_CHECKING([for GHC Git commit id])
     if test -e .git; then
@@ -1646,54 +1690,54 @@ fi
     fi
 
 
-# Some renamings
-AC_SUBST([ProjectName], [$PACKAGE_NAME])
-AC_SUBST([ProjectVersion], [$PACKAGE_VERSION])
-AC_SUBST([ProjectGitCommitId], [$PACKAGE_GIT_COMMIT_ID])
+    # Some renamings
+    AC_SUBST([ProjectName], [$PACKAGE_NAME])
+    AC_SUBST([ProjectVersion], [$PACKAGE_VERSION])
+    AC_SUBST([ProjectGitCommitId], [$PACKAGE_GIT_COMMIT_ID])
 
-# Split PACKAGE_VERSION into (possibly empty) parts
-VERSION_MAJOR=`echo $PACKAGE_VERSION | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1'/`
-VERSION_TMP=`echo $PACKAGE_VERSION | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3'/`
-VERSION_MINOR=`echo $VERSION_TMP | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1'/`
-ProjectPatchLevel=`echo $VERSION_TMP | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3'/`
+    # Split PACKAGE_VERSION into (possibly empty) parts
+    VERSION_MAJOR=`echo $PACKAGE_VERSION | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1'/`
+    VERSION_TMP=`echo $PACKAGE_VERSION | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3'/`
+    VERSION_MINOR=`echo $VERSION_TMP | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1'/`
+    ProjectPatchLevel=`echo $VERSION_TMP | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3'/`
 
-# Calculate project version as an integer, using 2 digits for minor version
-case $VERSION_MINOR in
-  ?) ProjectVersionInt=${VERSION_MAJOR}0${VERSION_MINOR} ;;
-  ??) ProjectVersionInt=${VERSION_MAJOR}${VERSION_MINOR} ;;
-  *) AC_MSG_ERROR([bad minor version in $PACKAGE_VERSION]) ;;
-esac
-AC_SUBST([ProjectVersionInt])
+    # Calculate project version as an integer, using 2 digits for minor version
+    case $VERSION_MINOR in
+      ?) ProjectVersionInt=${VERSION_MAJOR}0${VERSION_MINOR} ;;
+      ??) ProjectVersionInt=${VERSION_MAJOR}${VERSION_MINOR} ;;
+      *) AC_MSG_ERROR([bad minor version in $PACKAGE_VERSION]) ;;
+    esac
+    AC_SUBST([ProjectVersionInt])
 
-# The project patchlevel is zero unless stated otherwise
-test -z "$ProjectPatchLevel" && ProjectPatchLevel=0
+    # The project patchlevel is zero unless stated otherwise
+    test -z "$ProjectPatchLevel" && ProjectPatchLevel=0
 
-# Save split version of ProjectPatchLevel
-ProjectPatchLevel1=`echo $ProjectPatchLevel | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1/'`
-ProjectPatchLevel2=`echo $ProjectPatchLevel | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3/'`
+    # Save split version of ProjectPatchLevel
+    ProjectPatchLevel1=`echo $ProjectPatchLevel | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1/'`
+    ProjectPatchLevel2=`echo $ProjectPatchLevel | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3/'`
 
-AC_SUBST([ProjectPatchLevel1])
-AC_SUBST([ProjectPatchLevel2])
+    AC_SUBST([ProjectPatchLevel1])
+    AC_SUBST([ProjectPatchLevel2])
 
-# Remove dots from the patch level; this allows us to have versions like 6.4.1.20050508
-ProjectPatchLevel=`echo $ProjectPatchLevel | sed 's/\.//'`
+    # Remove dots from the patch level; this allows us to have versions like 6.4.1.20050508
+    ProjectPatchLevel=`echo $ProjectPatchLevel | sed 's/\.//'`
 
-AC_SUBST([ProjectPatchLevel])
+    AC_SUBST([ProjectPatchLevel])
 
-# The version of the GHC package changes every day, since the
-# patchlevel is the current date.  We don't want to force
-# recompilation of the entire compiler when this happens, so for
-# GHC HEAD we omit the patchlevel from the package version number.
-#
-# The ProjectPatchLevel1 > 20000000 iff GHC HEAD. If it's for a stable
-# release like 7.10.1 or for a release candidate such as 7.10.1.20141224
-# then we don't omit the patchlevel components.
+    # The version of the GHC package changes every day, since the
+    # patchlevel is the current date.  We don't want to force
+    # recompilation of the entire compiler when this happens, so for
+    # GHC HEAD we omit the patchlevel from the package version number.
+    #
+    # The ProjectPatchLevel1 > 20000000 iff GHC HEAD. If it's for a stable
+    # release like 7.10.1 or for a release candidate such as 7.10.1.20141224
+    # then we don't omit the patchlevel components.
 
-ProjectVersionMunged="$ProjectVersion"
-if test "$ProjectPatchLevel1" -gt 20000000; then
-  ProjectVersionMunged="${VERSION_MAJOR}.${VERSION_MINOR}"
-fi
-AC_SUBST([ProjectVersionMunged])
+    ProjectVersionMunged="$ProjectVersion"
+    if test "$ProjectPatchLevel1" -gt 20000000; then
+      ProjectVersionMunged="${VERSION_MAJOR}.${VERSION_MINOR}"
+    fi
+    AC_SUBST([ProjectVersionMunged])
 ])# FP_SETUP_PROJECT_VERSION
 
 # Check for a working timer_create().  We need a pretty detailed check
@@ -2605,7 +2649,7 @@ AC_DEFUN([CHECK_FOR_GOLD_T22266],[
         ])
 
         $CC -c -o conftest.a.o conftest.a.c || AC_MSG_ERROR([Failed to compile test])
-        $SettingsMergeObjectsCommand $SettingsMergeObjectsFlags -T conftest.t conftest.a.o -o conftest.ar.o || AC_MSG_ERROR([Failed to merge test object])
+        $MergeObjsCmd $MergeObjsArgs -T conftest.t conftest.a.o -o conftest.ar.o || AC_MSG_ERROR([Failed to merge test object])
 
         $CC -c -o conftest.main.o conftest.main.c || AC_MSG_ERROR([Failed to compile test driver])
         $CC conftest.ar.o conftest.main.o -o conftest || AC_MSG_ERROR([Failed to link test driver])
@@ -2625,33 +2669,30 @@ AC_DEFUN([CHECK_FOR_GOLD_T22266],[
 # ------------------
 # Find which linker to use to merge object files.
 #
+# See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
 AC_DEFUN([FIND_MERGE_OBJECTS],[
     AC_REQUIRE([FIND_LD])
 
-    if test -z "$SettingsMergeObjectsCommand"; then
-        SettingsMergeObjectsCommand="$LD"
+    if test -z "$MergeObjsCmd"; then
+        MergeObjsCmd="$LD"
     fi
-    if test -z "$SettingsMergeObjectsFlags"; then
-        SettingsMergeObjectsFlags="-r"
+    if test -z "$MergeObjsArgs"; then
+        MergeObjsArgs="-r"
     fi
 
-    CHECK_FOR_GOLD_T22266($SettingsMergeObjectsCommand)
+    CHECK_FOR_GOLD_T22266($MergeObjsCmd)
     if test "$result" = "1"; then
-        AC_MSG_NOTICE([$SettingsMergeObjectsCommand is broken due to binutils 22266, looking for another linker...])
-        SettingsMergeObjectsCommand=""
-        AC_CHECK_TARGET_TOOL([SettingsMergeObjectsCommand], [ld])
-        CHECK_FOR_GOLD_T22266($SettingsMergeObjectsCommand)
+        AC_MSG_NOTICE([$MergeObjsCmd is broken due to binutils 22266, looking for another linker...])
+        MergeObjsCmd=""
+        AC_CHECK_TARGET_TOOL([MergeObjsCmd], [ld])
+        CHECK_FOR_GOLD_T22266($MergeObjsCmd)
         if test "$result" = "1"; then
-            AC_MSG_ERROR([Linker is affected by binutils 22266 but couldn't find another unaffected linker. Please set the SettingsMergeObjectsCommand variable to a functional linker.])
+            AC_MSG_ERROR([Linker is affected by binutils 22266 but couldn't find another unaffected linker. Please set the MergeObjsCmd variable to a functional linker.])
         fi
     fi
 
-    if test "$windows" = YES -a "$EnableDistroToolchain" = "NO" -a "$WORD_SIZE" = 64; then
-        SettingsMergeObjectsFlags="$SettingsMergeObjectsFlags --oformat=pe-bigobj-x86-64"
-    fi
-
-    AC_SUBST(SettingsMergeObjectsCommand)
-    AC_SUBST(SettingsMergeObjectsFlags)
+    AC_SUBST([MergeObjsCmd])
+    AC_SUBST([MergeObjsArgs])
 ])
 
 # FIND_PYTHON

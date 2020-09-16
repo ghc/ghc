@@ -108,7 +108,7 @@ module GHC.Cmm.CLabel (
         -- * Conversions
         toClosureLbl, toSlowEntryLbl, toEntryLbl, toInfoLbl, hasHaskellName,
 
-        pprCLabel, pprCLabel_LLVM, pprCLabel_NCG,
+        pprCLabel, pprCLabel_LLVM, pprCLabel_NCG, pprCLabel_ViaC,
         isInfoTableLabel,
         isConInfoTableLabel,
         isIdLabel, isTickyLabel
@@ -311,19 +311,19 @@ instance Ord CLabel where
   compare (CmmLabel a1 b1 c1 d1) (CmmLabel a2 b2 c2 d2) =
     compare a1 a2 `thenCmp`
     compare b1 b2 `thenCmp`
-    compare c1 c2 `thenCmp`
+    uniqCompareFS c1 c2 `thenCmp`
     compare d1 d2
   compare (RtsLabel a1) (RtsLabel a2) = compare a1 a2
   compare (LocalBlockLabel u1) (LocalBlockLabel u2) = nonDetCmpUnique u1 u2
   compare (ForeignLabel a1 b1 c1 d1) (ForeignLabel a2 b2 c2 d2) =
-    compare a1 a2 `thenCmp`
+    uniqCompareFS a1 a2 `thenCmp`
     compare b1 b2 `thenCmp`
     compare c1 c2 `thenCmp`
     compare d1 d2
   compare (AsmTempLabel u1) (AsmTempLabel u2) = nonDetCmpUnique u1 u2
   compare (AsmTempDerivedLabel a1 b1) (AsmTempDerivedLabel a2 b2) =
     compare a1 a2 `thenCmp`
-    compare b1 b2
+    uniqCompareFS b1 b2
   compare (StringLitLabel u1) (StringLitLabel u2) =
     nonDetCmpUnique u1 u2
   compare (CC_Label a1) (CC_Label a2) =
@@ -451,13 +451,11 @@ data RtsLabelInfo
   | RtsApInfoTable       Bool{-updatable-} Int{-arity-}    -- ^ AP thunks
   | RtsApEntry           Bool{-updatable-} Int{-arity-}
 
-  | RtsPrimOp PrimOp
-  | RtsApFast     FastString    -- ^ _fast versions of generic apply
+  | RtsPrimOp            PrimOp
+  | RtsApFast            NonDetFastString    -- ^ _fast versions of generic apply
   | RtsSlowFastTickyCtr String
 
-  deriving (Eq, Ord)
-  -- NOTE: Eq on PtrString compares the pointer only, so this isn't
-  -- a real equality.
+  deriving (Eq,Ord)
 
 
 -- | What type of Cmm label we're dealing with.
@@ -708,7 +706,7 @@ mkCCLabel           cc          = CC_Label cc
 mkCCSLabel          ccs         = CCS_Label ccs
 
 mkRtsApFastLabel :: FastString -> CLabel
-mkRtsApFastLabel str = RtsLabel (RtsApFast str)
+mkRtsApFastLabel str = RtsLabel (RtsApFast (NonDetFastString str))
 
 mkRtsSlowFastTickyCtrLabel :: String -> CLabel
 mkRtsSlowFastTickyCtrLabel pat = RtsLabel (RtsSlowFastTickyCtr pat)
@@ -1220,10 +1218,14 @@ pprCLabel bcknd platform lbl =
    case bcknd of
       NCG  -> pprCLabel_NCG   platform lbl
       LLVM -> pprCLabel_LLVM  platform lbl
+      ViaC -> pprCLabel_ViaC  platform lbl
       _    -> pprCLabel_other platform lbl
 
 pprCLabel_LLVM :: Platform -> CLabel -> SDoc
 pprCLabel_LLVM = pprCLabel_NCG
+
+pprCLabel_ViaC :: Platform -> CLabel -> SDoc
+pprCLabel_ViaC = pprCLabel_other
 
 pprCLabel_NCG :: Platform -> CLabel -> SDoc
 pprCLabel_NCG platform lbl = getPprStyle $ \sty ->
@@ -1308,7 +1310,7 @@ pprCLabel_common platform = \case
 
    (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore platform <> text "blk_" <> pprUniqueAlways u
 
-   (RtsLabel (RtsApFast str)) -> ftext str <> text "_fast"
+   (RtsLabel (RtsApFast (NonDetFastString str))) -> ftext str <> text "_fast"
 
    (RtsLabel (RtsSelectorInfoTable upd_reqd offset)) ->
     hcat [text "stg_sel_", text (show offset),
@@ -1350,7 +1352,13 @@ pprCLabel_common platform = \case
 
    (ForeignLabel str _ _ _) -> ftext str
 
-   (IdLabel name _cafs flavor) -> internalNamePrefix platform name <> ppr name <> ppIdFlavor flavor
+   (IdLabel name _cafs flavor) -> internalNamePrefix <> ppr name <> ppIdFlavor flavor
+                                    where
+                                       isRandomGenerated = not (isExternalName name)
+                                       internalNamePrefix = getPprStyle $ \ sty ->
+                                          if asmStyle sty && isRandomGenerated
+                                             then ptext (asmTempLabelPrefix platform)
+                                             else empty
 
    (CC_Label cc)       -> ppr cc
    (CCS_Label ccs)     -> ppr ccs
@@ -1390,15 +1398,6 @@ instance Outputable ForeignLabelSource where
         ForeignLabelInPackage pkgId     -> parens $ text "package: " <> ppr pkgId
         ForeignLabelInThisPackage       -> parens $ text "this package"
         ForeignLabelInExternalPackage   -> parens $ text "external package"
-
-internalNamePrefix :: Platform -> Name -> SDoc
-internalNamePrefix platform name = getPprStyle $ \ sty ->
-  if asmStyle sty && isRandomGenerated then
-      ptext (asmTempLabelPrefix platform)
-  else
-    empty
-  where
-    isRandomGenerated = not $ isExternalName name
 
 tempLabelPrefixOrUnderscore :: Platform -> SDoc
 tempLabelPrefixOrUnderscore platform =

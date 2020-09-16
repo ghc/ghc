@@ -51,6 +51,7 @@ module GHC.Core.Opt.Monad (
 import GHC.Prelude hiding ( read )
 
 import GHC.Core
+import GHC.Core.Unfold
 import GHC.Driver.Types
 import GHC.Unit.Module
 import GHC.Driver.Session
@@ -63,6 +64,7 @@ import GHC.Types.Var
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
 import GHC.Utils.Error( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
+import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
 import GHC.Utils.Monad
 import GHC.Types.Name.Env
@@ -155,14 +157,25 @@ pprPassDetails _ = Outputable.empty
 
 data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
   = SimplMode
-        { sm_names      :: [String] -- Name(s) of the phase
+        { sm_names      :: [String]       -- ^ Name(s) of the phase
         , sm_phase      :: CompilerPhase
-        , sm_dflags     :: DynFlags -- Just for convenient non-monadic
-                                    -- access; we don't override these
-        , sm_rules      :: Bool     -- Whether RULES are enabled
-        , sm_inline     :: Bool     -- Whether inlining is enabled
-        , sm_case_case  :: Bool     -- Whether case-of-case is enabled
-        , sm_eta_expand :: Bool     -- Whether eta-expansion is enabled
+        , sm_uf_opts    :: !UnfoldingOpts -- ^ Unfolding options
+        , sm_rules      :: !Bool          -- ^ Whether RULES are enabled
+        , sm_inline     :: !Bool          -- ^ Whether inlining is enabled
+        , sm_case_case  :: !Bool          -- ^ Whether case-of-case is enabled
+        , sm_eta_expand :: !Bool          -- ^ Whether eta-expansion is enabled
+        , sm_pre_inline :: !Bool          -- ^ Whether pre-inlining is enabled
+        , sm_dflags     :: DynFlags
+            -- Just for convenient non-monadic access; we don't override these.
+            --
+            -- Used for:
+            --    - target platform (for `exprIsDupable` and `mkDupableAlt`)
+            --    - Opt_DictsCheap and Opt_PedanticBottoms general flags
+            --    - rules options (initRuleOpts)
+            --    - verbose_core2core, dump_inlinings, dump_rule_rewrites/firings
+            --    - traceAction, dumpAction
+            --    - inlineCheck
+            --    - touchDumpFile (generatedDumps, etc.)
         }
 
 instance Outputable SimplMode where
@@ -527,7 +540,7 @@ cmpEqTick :: Tick -> Tick -> Ordering
 cmpEqTick (PreInlineUnconditionally a)  (PreInlineUnconditionally b)    = a `compare` b
 cmpEqTick (PostInlineUnconditionally a) (PostInlineUnconditionally b)   = a `compare` b
 cmpEqTick (UnfoldingDone a)             (UnfoldingDone b)               = a `compare` b
-cmpEqTick (RuleFired a)                 (RuleFired b)                   = a `compare` b
+cmpEqTick (RuleFired a)                 (RuleFired b)                   = a `uniqCompareFS` b
 cmpEqTick (EtaExpansion a)              (EtaExpansion b)                = a `compare` b
 cmpEqTick (EtaReduction a)              (EtaReduction b)                = a `compare` b
 cmpEqTick (BetaReduction a)             (BetaReduction b)               = a `compare` b

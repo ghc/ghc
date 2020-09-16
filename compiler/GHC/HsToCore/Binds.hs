@@ -33,7 +33,7 @@ import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck ( addTyCsDs, checkGRHSs )
+import GHC.HsToCore.PmCheck ( addTyCs, covCheckGRHSs )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
@@ -42,7 +42,7 @@ import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity     ( etaExpand )
-import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Core.FVs
 import GHC.Data.Graph.Directed
 import GHC.Core.Predicate
@@ -72,6 +72,7 @@ import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Types.Unique.Set( nonDetEltsUniqSet )
@@ -151,14 +152,14 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
                            , fun_ext = co_fn
                            , fun_tick = tick })
- = do   { (args, body) <- addTyCsDs FromSource (hsWrapDictBinders co_fn) $
+ = do   { (args, body) <- addTyCs FromSource (hsWrapDictBinders co_fn) $
                           -- FromSource might not be accurate (we don't have any
                           -- origin annotations for things in this module), but at
                           -- worst we do superfluous calls to the pattern match
                           -- oracle.
-                          -- addTyCsDs: Add type evidence to the refinement type
+                          -- addTyCs: Add type evidence to the refinement type
                           --            predicate of the coverage checker
-                          -- See Note [Type and Term Equality Propagation] in "GHC.HsToCore.PmCheck"
+                          -- See Note [Long-distance information] in "GHC.HsToCore.PmCheck"
                           matchWrapper
                            (mkPrefixFunRhs (L loc (idName fun)))
                            Nothing matches
@@ -182,10 +183,10 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
           return (force_var, [core_binds]) }
 
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
-                         , pat_ext = NPatBindTc _ ty
+                         , pat_ext = ty
                          , pat_ticks = (rhs_tick, var_ticks) })
-  = do  { rhss_deltas <- checkGRHSs PatBindGuards grhss
-        ; body_expr <- dsGuarded grhss ty rhss_deltas
+  = do  { rhss_nablas <- covCheckGRHSs PatBindGuards grhss
+        ; body_expr <- dsGuarded grhss ty rhss_nablas
         ; let body' = mkOptTickBox rhs_tick body_expr
               pat'  = decideBangHood dflags pat
         ; (force_var,sel_binds) <- mkSelectorBinds var_ticks pat body'
@@ -200,11 +201,11 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- addTyCsDs FromSource (listToBag dicts) $
+  = do { ds_binds <- addTyCs FromSource (listToBag dicts) $
                      dsLHsBinds binds
-             -- addTyCsDs: push type constraints deeper
+             -- addTyCs: push type constraints deeper
              --            for inner pattern match check
-             -- See Check, Note [Type and Term Equality Propagation]
+             -- See Check, Note [Long-distance information]
 
        ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 
@@ -380,7 +381,7 @@ makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr
 makeCorePair dflags gbl_id is_default_method dict_arity rhs
   | is_default_method    -- Default methods are *always* inlined
                          -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
-  = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
+  = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding simpl_opts rhs, rhs)
 
   | otherwise
   = case inlinePragmaSpec inline_prag of
@@ -390,20 +391,21 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
           Inline       -> inline_pair
 
   where
+    simpl_opts    = initSimpleOpts dflags
     inline_prag   = idInlinePragma gbl_id
-    inlinable_unf = mkInlinableUnfolding dflags rhs
+    inlinable_unf = mkInlinableUnfolding simpl_opts rhs
     inline_pair
        | Just arity <- inlinePragmaSat inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)
         -- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
        , let real_arity = dict_arity + arity
         -- NB: The arity in the InlineRule takes account of the dictionaries
-       = ( gbl_id `setIdUnfolding` mkInlineUnfoldingWithArity real_arity rhs
+       = ( gbl_id `setIdUnfolding` mkInlineUnfoldingWithArity real_arity simpl_opts rhs
          , etaExpand real_arity rhs)
 
        | otherwise
        = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
-         (gbl_id `setIdUnfolding` mkInlineUnfolding rhs, rhs)
+         (gbl_id `setIdUnfolding` mkInlineUnfolding simpl_opts rhs, rhs)
 
 dictArity :: [Var] -> Arity
 -- Don't count coercion variables in arity
@@ -704,8 +706,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
        { this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
-             spec_unf  = specUnfolding dflags spec_bndrs core_app rule_lhs_args fn_unf
-             spec_id   = mkLocalId spec_name Many spec_ty -- Specialised binding is toplevel, hence Many.
+             simpl_opts = initSimpleOpts dflags
+             spec_unf   = specUnfolding simpl_opts spec_bndrs core_app rule_lhs_args fn_unf
+             spec_id    = mkLocalId spec_name Many spec_ty -- Specialised binding is toplevel, hence Many.
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
 
@@ -863,8 +866,9 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
   | otherwise
   = Left bad_shape_msg
  where
+   simpl_opts   = initSimpleOpts dflags
    lhs1         = drop_dicts orig_lhs
-   lhs2         = simpleOptExpr dflags lhs1  -- See Note [Simplify rule LHS]
+   lhs2         = simpleOptExpr simpl_opts lhs1  -- See Note [Simplify rule LHS]
    (fun2,args2) = collectArgs lhs2
 
    lhs_fvs    = exprFreeVars lhs2

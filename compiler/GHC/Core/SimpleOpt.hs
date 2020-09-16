@@ -7,6 +7,8 @@
 {-# LANGUAGE MultiWayIf #-}
 
 module GHC.Core.SimpleOpt (
+        SimpleOpts (..), defaultSimpleOpts,
+
         -- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith,
 
@@ -30,9 +32,9 @@ import GHC.Core
 import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.FVs
-import {-# SOURCE #-} GHC.Core.Unfold( mkUnfolding )
+import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Core.Make ( FloatBind(..) )
-import GHC.Core.Ppr  ( pprCoreBindings, pprRules )
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import GHC.Types.Literal
 import GHC.Types.Id
@@ -42,7 +44,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.DataCon
 import GHC.Types.Demand( etaConvertStrictSig )
-import GHC.Core.Coercion.Opt ( optCoercion )
+import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
@@ -52,8 +54,6 @@ import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Unit.Module ( Module )
-import GHC.Utils.Error
-import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -95,7 +95,21 @@ little dance in action; the full Simplifier is a lot more complicated.
 
 -}
 
-simpleOptExpr :: HasDebugCallStack => DynFlags -> CoreExpr -> CoreExpr
+-- | Simple optimiser options
+data SimpleOpts = SimpleOpts
+   { so_uf_opts :: !UnfoldingOpts   -- ^ Unfolding options
+   , so_co_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
+   }
+
+-- | Default options for the Simple optimiser.
+defaultSimpleOpts :: SimpleOpts
+defaultSimpleOpts = SimpleOpts
+   { so_uf_opts = defaultUnfoldingOpts
+   , so_co_opts = OptCoercionOpts
+      { optCoercionEnabled = False }
+   }
+
+simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
 -- See Note [The simple optimiser]
 -- Do simple optimisation on an expression
 -- The optimisation is very straightforward: just
@@ -111,10 +125,18 @@ simpleOptExpr :: HasDebugCallStack => DynFlags -> CoreExpr -> CoreExpr
 -- The result is NOT guaranteed occurrence-analysed, because
 -- in  (let x = y in ....) we substitute for x; so y's occ-info
 -- may change radically
+--
+-- Note that simpleOptExpr is a pure function that we want to be able to call
+-- from lots of places, including ones that don't have DynFlags (e.g to optimise
+-- unfoldings of statically defined Ids via mkCompulsoryUnfolding). It used to
+-- fetch its options directly from the DynFlags, however, so some callers had to
+-- resort to using unsafeGlobalDynFlags (a global mutable variable containing
+-- the DynFlags). It has been modified to take its own SimpleOpts that may be
+-- created from DynFlags, but not necessarily.
 
-simpleOptExpr dflags expr
+simpleOptExpr opts expr
   = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
-    simpleOptExprWith dflags init_subst expr
+    simpleOptExprWith opts init_subst expr
   where
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
         -- It's potentially important to make a proper in-scope set
@@ -127,32 +149,29 @@ simpleOptExpr dflags expr
         -- It's a bit painful to call exprFreeVars, because it makes
         -- three passes instead of two (occ-anal, and go)
 
-simpleOptExprWith :: HasDebugCallStack => DynFlags -> Subst -> InExpr -> OutExpr
+simpleOptExprWith :: HasDebugCallStack => SimpleOpts -> Subst -> InExpr -> OutExpr
 -- See Note [The simple optimiser]
-simpleOptExprWith dflags subst expr
+simpleOptExprWith opts subst expr
   = simple_opt_expr init_env (occurAnalyseExpr expr)
   where
-    init_env = SOE { soe_dflags = dflags
-                   , soe_inl = emptyVarEnv
-                   , soe_subst = subst }
+    init_env = (emptyEnv opts) { soe_subst = subst }
 
 ----------------------
-simpleOptPgm :: DynFlags -> Module
-             -> CoreProgram -> [CoreRule]
-             -> IO (CoreProgram, [CoreRule])
+simpleOptPgm :: SimpleOpts
+             -> Module
+             -> CoreProgram
+             -> [CoreRule]
+             -> (CoreProgram, [CoreRule], CoreProgram)
 -- See Note [The simple optimiser]
-simpleOptPgm dflags this_mod binds rules
-  = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
-            FormatCore (pprCoreBindings occ_anald_binds $$ pprRules rules );
-
-       ; return (reverse binds', rules') }
+simpleOptPgm opts this_mod binds rules =
+    (reverse binds', rules', occ_anald_binds)
   where
     occ_anald_binds  = occurAnalysePgm this_mod
                           (\_ -> True)  {- All unfoldings active -}
                           (\_ -> False) {- No rules active -}
                           rules binds
 
-    (final_env, binds') = foldl' do_one (emptyEnv dflags, []) occ_anald_binds
+    (final_env, binds') = foldl' do_one (emptyEnv opts, []) occ_anald_binds
     final_subst = soe_subst final_env
 
     rules' = substRulesForImportedIds final_subst rules
@@ -170,14 +189,19 @@ simpleOptPgm dflags this_mod binds rules
 type SimpleClo = (SimpleOptEnv, InExpr)
 
 data SimpleOptEnv
-  = SOE { soe_dflags :: DynFlags
+  = SOE { soe_co_opt_opts :: !OptCoercionOpts
+             -- ^ Options for the coercion optimiser
+
+        , soe_uf_opts :: !UnfoldingOpts
+             -- ^ Unfolding options
+
         , soe_inl   :: IdEnv SimpleClo
-             -- Deals with preInlineUnconditionally; things
+             -- ^ Deals with preInlineUnconditionally; things
              -- that occur exactly once and are inlined
              -- without having first been simplified
 
         , soe_subst :: Subst
-             -- Deals with cloning; includes the InScopeSet
+             -- ^ Deals with cloning; includes the InScopeSet
         }
 
 instance Outputable SimpleOptEnv where
@@ -186,11 +210,13 @@ instance Outputable SimpleOptEnv where
                             , text "soe_subst =" <+> ppr subst ]
                    <+> text "}"
 
-emptyEnv :: DynFlags -> SimpleOptEnv
-emptyEnv dflags
-  = SOE { soe_dflags = dflags
-        , soe_inl = emptyVarEnv
-        , soe_subst = emptySubst }
+emptyEnv :: SimpleOpts -> SimpleOptEnv
+emptyEnv opts = SOE
+   { soe_inl         = emptyVarEnv
+   , soe_subst       = emptySubst
+   , soe_co_opt_opts = so_co_opts opts
+   , soe_uf_opts     = so_uf_opts opts
+   }
 
 soeZapSubst :: SimpleOptEnv -> SimpleOptEnv
 soeZapSubst env@(SOE { soe_subst = subst })
@@ -263,7 +289,7 @@ simple_opt_expr env expr
         (env', b') = subst_opt_bndr env b
 
     ----------------------
-    go_co co = optCoercion (soe_dflags env) (getTCvSubst subst) co
+    go_co co = optCoercion (soe_co_opt_opts env) (getTCvSubst subst) co
 
     ----------------------
     go_alt env (con, bndrs, rhs)
@@ -392,7 +418,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion co <- in_rhs
-  , let out_co = optCoercion (soe_dflags env) (getTCvSubst (soe_subst rhs_env)) co
+  , let out_co = optCoercion (soe_co_opt_opts env) (getTCvSubst (soe_subst rhs_env)) co
   = ASSERT( isCoVar in_bndr )
     (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
 
@@ -624,7 +650,7 @@ add_info env old_bndr top_level new_rhs new_bndr
  | otherwise        = lazySetIdInfo new_bndr new_info
  where
    subst    = soe_subst env
-   dflags   = soe_dflags env
+   uf_opts  = soe_uf_opts env
    old_info = idInfo old_bndr
 
    -- Add back in the rules and unfolding which were
@@ -643,7 +669,7 @@ add_info env old_bndr top_level new_rhs new_bndr
                  | otherwise
                  = unfolding_from_rhs
 
-   unfolding_from_rhs = mkUnfolding dflags InlineRhs
+   unfolding_from_rhs = mkUnfolding uf_opts InlineRhs
                                     (isTopLevel top_level)
                                     False -- may be bottom or not
                                     new_rhs
@@ -1312,7 +1338,7 @@ exprIsLambda_maybe (in_scope_set, id_unf) e
     -- Make sure there is hope to get a lambda
     , Just rhs <- expandUnfolding_maybe (id_unf f)
     -- Optimize, for beta-reduction
-    , let e' = simpleOptExprWith unsafeGlobalDynFlags (mkEmptySubst in_scope_set) (rhs `mkApps` as)
+    , let e' = simpleOptExprWith defaultSimpleOpts (mkEmptySubst in_scope_set) (rhs `mkApps` as)
     -- Recurse, because of possible casts
     , Just (x', e'', ts') <- exprIsLambda_maybe (in_scope_set, id_unf) e'
     , let res = Just (x', e'', ts++ts')

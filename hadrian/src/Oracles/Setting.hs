@@ -114,6 +114,8 @@ data SettingsFileSetting
     | SettingsFileSetting_MergeObjectsFlags
     | SettingsFileSetting_ArCommand
     | SettingsFileSetting_RanlibCommand
+    | SettingsFileSetting_OtoolCommand
+    | SettingsFileSetting_InstallNameToolCommand
     | SettingsFileSetting_DllWrapCommand
     | SettingsFileSetting_WindresCommand
     | SettingsFileSetting_LibtoolCommand
@@ -184,6 +186,7 @@ settingList key = fmap words $ lookupValueOrError configFile $ case key of
 
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.
+-- See Note [tooldir: How GHC finds mingw on Windows]
 settingsFileSetting :: SettingsFileSetting -> Action String
 settingsFileSetting key = lookupValueOrError configFile $ case key of
     SettingsFileSetting_CCompilerCommand -> "settings-c-compiler-command"
@@ -199,6 +202,8 @@ settingsFileSetting key = lookupValueOrError configFile $ case key of
     SettingsFileSetting_MergeObjectsFlags -> "settings-merge-objects-flags"
     SettingsFileSetting_ArCommand -> "settings-ar-command"
     SettingsFileSetting_RanlibCommand -> "settings-ranlib-command"
+    SettingsFileSetting_OtoolCommand -> "settings-otool-command"
+    SettingsFileSetting_InstallNameToolCommand -> "settings-install_name_tool-command"
     SettingsFileSetting_DllWrapCommand -> "settings-dll-wrap-command"
     SettingsFileSetting_WindresCommand -> "settings-windres-command"
     SettingsFileSetting_LibtoolCommand -> "settings-libtool-command"

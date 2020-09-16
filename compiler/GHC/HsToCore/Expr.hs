@@ -31,7 +31,7 @@ import GHC.HsToCore.ListComp
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
-import GHC.HsToCore.PmCheck ( addTyCsDs, checkGRHSs )
+import GHC.HsToCore.PmCheck ( addTyCs, covCheckGRHSs )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Core.FamInstEnv( topNormaliseType )
@@ -212,11 +212,11 @@ dsUnliftedBind (FunBind { fun_id = L l fun
        ; return (bindNonRec fun rhs' body) }
 
 dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
-                        , pat_ext = NPatBindTc _ ty }) body
+                        , pat_ext = ty }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
-    do { match_deltas <- checkGRHSs PatBindGuards grhss
-       ; rhs          <- dsGuarded grhss ty match_deltas
+    do { match_nablas <- covCheckGRHSs PatBindGuards grhss
+       ; rhs          <- dsGuarded grhss ty match_nablas
        ; let upat = unLoc pat
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_orig = FromSource,
@@ -283,7 +283,7 @@ dsExpr hswrap@(XExpr (WrapExpr (HsWrap co_fn e)))
                  HsConLikeOut _ (RealDataCon dc) -> return $ varToCoreExpr (dataConWrapId dc)
                  XExpr (WrapExpr (HsWrap _ _)) -> pprPanic "dsExpr: HsWrap inside HsWrap" (ppr hswrap)
                  HsPar _ _ -> pprPanic "dsExpr: HsPar inside HsWrap" (ppr hswrap)
-                 _ -> addTyCsDs FromSource (hsWrapDictBinders co_fn) $
+                 _ -> addTyCs FromSource (hsWrapDictBinders co_fn) $
                       dsExpr e
                -- See Note [Detecting forced eta expansion]
        ; wrap' <- dsHsWrapper co_fn
@@ -486,8 +486,8 @@ dsExpr (HsMultiIf res_ty alts)
 
   | otherwise
   = do { let grhss = GRHSs noExtField alts (noLoc emptyLocalBinds)
-       ; rhss_deltas  <- checkGRHSs IfAlt grhss
-       ; match_result <- dsGRHSs IfAlt grhss res_ty rhss_deltas
+       ; rhss_nablas  <- covCheckGRHSs IfAlt grhss
+       ; match_result <- dsGRHSs IfAlt grhss res_ty rhss_nablas
        ; error_expr   <- mkErrorExpr
        ; extractMatchResult match_result error_expr }
   where
@@ -816,15 +816,10 @@ ds_prag_expr (HsPragSCC _ _ cc) expr = do
         mod_name <- getModule
         count <- goptM Opt_ProfCountEntries
         let nm = sl_fs cc
-        flavour <- ExprCC <$> getCCIndexM nm
+        flavour <- ExprCC <$> getCCIndexDsM nm
         Tick (ProfNote (mkUserCC nm mod_name (getLoc expr) flavour) count True)
                <$> dsLExpr expr
       else dsLExpr expr
-ds_prag_expr (HsPragTick _ _ _ _) expr = do
-  dflags <- getDynFlags
-  if gopt Opt_Hpc dflags
-    then panic "dsExpr:HsPragTick"
-    else dsLExpr expr
 
 ------------------------------
 dsSyntaxExpr :: SyntaxExpr GhcTc -> [CoreExpr] -> DsM CoreExpr
@@ -986,7 +981,7 @@ dsDo ctx stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
             ; var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
-            ; match <- matchSinglePatVar var (StmtCtxt ctx) pat
+            ; match <- matchSinglePatVar var Nothing (StmtCtxt ctx) pat
                          (xbstc_boundResultType xbs) (cantFailMatchResult body)
             ; match_code <- dsHandleMonadicFailure ctx pat match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
@@ -1007,7 +1002,7 @@ dsDo ctx stmts
 
            ; let match_args (pat, fail_op) (vs,body)
                    = do { var   <- selectSimpleMatchVarL Many pat
-                        ; match <- matchSinglePatVar var (StmtCtxt ctx) pat
+                        ; match <- matchSinglePatVar var Nothing (StmtCtxt ctx) pat
                                    body_ty (cantFailMatchResult body)
                         ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
                         ; return (var:vs, match_code)

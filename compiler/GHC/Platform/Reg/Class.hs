@@ -8,6 +8,7 @@ import GHC.Prelude
 
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 
 
 -- | The class of a register.

@@ -168,7 +168,7 @@ rn_hs_sig_wc_type scoping ctxt hs_ty thing_inside
        ; let nwc_rdrs = nubL nwc_rdrs'
        ; implicit_bndrs <- case scoping of
            AlwaysBind       -> pure tv_rdrs
-           BindUnlessForall -> forAllOrNothing (isLHsForAllTy hs_ty) tv_rdrs
+           BindUnlessForall -> forAllOrNothing (isLHsInvisForAllTy hs_ty) tv_rdrs
            NeverBind        -> pure []
        ; rnImplicitBndrs Nothing implicit_bndrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
@@ -321,7 +321,7 @@ rnHsSigType :: HsDocContext
 rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
        ; rdr_env <- getLocalRdrEnv
-       ; vars0 <- forAllOrNothing (isLHsForAllTy hs_ty)
+       ; vars0 <- forAllOrNothing (isLHsInvisForAllTy hs_ty)
            $ filterInScope rdr_env
            $ extractHsTyRdrTyVars hs_ty
        ; rnImplicitBndrs Nothing vars0 $ \ vars ->
@@ -331,17 +331,43 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
                        , hsib_body = body' }
                 , fvs ) } }
 
--- Note [forall-or-nothing rule]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Free variables in signatures are usually bound in an implicit
--- 'forall' at the beginning of user-written signatures. However, if the
--- signature has an explicit forall at the beginning, this is disabled.
---
--- The idea is nested foralls express something which is only
--- expressible explicitly, while a top level forall could (usually) be
--- replaced with an implicit binding. Top-level foralls alone ("forall.") are
--- therefore an indication that the user is trying to be fastidious, so
--- we don't implicitly bind any variables.
+{-
+Note [forall-or-nothing rule]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Free variables in signatures are usually bound in an implicit 'forall' at the
+beginning of user-written signatures. However, if the signature has an
+explicit, invisible forall at the beginning, this is disabled.
+
+The idea is nested foralls express something which is only expressible
+explicitly, while a top level forall could (usually) be replaced with an
+implicit binding. Top-level foralls alone ("forall.") are therefore an
+indication that the user is trying to be fastidious, so we don't implicitly
+bind any variables.
+
+Note that this rule only applies to outermost /in/visible 'forall's, and not
+outermost visible 'forall's. See #18660 for more on this point.
+
+Here are some concrete examples to demonstrate the forall-or-nothing rule in
+action:
+
+  type F1 :: a -> b -> b                    -- Legal; a,b are implicitly quantified.
+                                            -- Equivalently: forall a b. a -> b -> b
+
+  type F2 :: forall a b. a -> b -> b        -- Legal; explicitly quantified
+
+  type F3 :: forall a. a -> b -> b          -- Illegal; the forall-or-nothing rule says that
+                                            -- if you quantify a, you must also quantify b
+
+  type F4 :: forall a -> b -> b             -- Legal; the top quantifier (forall a) is a /visible/
+                                            -- quantifer, so the "nothing" part of the forall-or-nothing
+                                            -- rule applies, and b is therefore implicitly quantified.
+                                            -- Equivalently: forall b. forall a -> b -> b
+
+  type F5 :: forall b. forall a -> b -> c   -- Illegal; the forall-or-nothing rule says that
+                                            -- if you quantify b, you must also quantify c
+
+  type F6 :: forall a -> forall b. b -> c   -- Legal: just like F4.
+-}
 
 -- | See @Note [forall-or-nothing rule]@. This tiny little function is used
 -- (rather than its small body inlined) to indicate that we are implementing

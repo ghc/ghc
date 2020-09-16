@@ -22,7 +22,7 @@ module GHC.Types.Unique.Supply (
 
         -- ** Operations on supplies
         uniqFromSupply, uniqsFromSupply, -- basic ops
-        takeUniqFromSupply, uniqFromMask,
+        takeUniqFromSupply,
 
         mkSplitUniqSupply,
         splitUniqSupply, listSplitUniqSupply,
@@ -180,7 +180,7 @@ The magic `inline` function does two things
 
 * It helps ensure that 'm' really does inline.
 
-Note that 'inline' evaporates in phase 0.  See Note [inlineIdMagic]
+Note that 'inline' evaporates in phase 0.  See Note [inlineId magic]
 in GHC.Core.Opt.ConstantFold.match_inline.
 
 The INLINE pragma on multiShotIO is very important, else the
@@ -249,12 +249,6 @@ listSplitUniqSupply  (MkSplitUniqSupply _ s1 s2) = s1 : listSplitUniqSupply s2
 uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily n
 uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily n : uniqsFromSupply s2
 takeUniqFromSupply (MkSplitUniqSupply n s1 _) = (mkUniqueGrimily n, s1)
-
-uniqFromMask :: Char -> IO Unique
-uniqFromMask mask
-  = do { uqNum <- genSym
-       ; return $! mkUnique mask uqNum }
-
 
 {-
 ************************************************************************

@@ -20,3 +20,10 @@ ZipList [259] :: ZipList Word8
 
 :l T18172.hs
 Wombat [4, 264, 10]
+
+[1..5]::[Int]
+[5..2]::[Int]
+[6..9]::[Integer]
+[9..6]::[Integer]
+[10..15]::[Word8]
+[15..10]::[Word8]

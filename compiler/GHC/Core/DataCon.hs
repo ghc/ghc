@@ -51,9 +51,10 @@ module GHC.Core.DataCon (
         splitDataProductType_maybe,
 
         -- ** Predicates on DataCons
-        isNullarySrcDataCon, isNullaryRepDataCon, isTupleDataCon, isUnboxedTupleCon,
-        isUnboxedSumCon,
-        isVanillaDataCon, classDataCon, dataConCannotMatch,
+        isNullarySrcDataCon, isNullaryRepDataCon,
+        isTupleDataCon, isBoxedTupleDataCon, isUnboxedTupleDataCon,
+        isUnboxedSumDataCon,
+        isVanillaDataCon, isNewDataCon, classDataCon, dataConCannotMatch,
         dataConUserTyVarsArePermuted,
         isBanged, isMarkedStrict, eqHsBang, isSrcStrict, isSrcUnpacked,
         specialPromotedDc,
@@ -83,7 +84,7 @@ import GHC.Data.FastString
 import GHC.Unit
 import GHC.Utils.Binary
 import GHC.Types.Unique.Set
-import GHC.Types.Unique( mkAlphaTyVarUnique )
+import GHC.Builtin.Uniques( mkAlphaTyVarUnique )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -1467,15 +1468,22 @@ dataConIdentity dc = LBS.toStrict $ BSB.toLazyByteString $ mconcat
 isTupleDataCon :: DataCon -> Bool
 isTupleDataCon (MkData {dcRepTyCon = tc}) = isTupleTyCon tc
 
-isUnboxedTupleCon :: DataCon -> Bool
-isUnboxedTupleCon (MkData {dcRepTyCon = tc}) = isUnboxedTupleTyCon tc
+isBoxedTupleDataCon :: DataCon -> Bool
+isBoxedTupleDataCon (MkData {dcRepTyCon = tc}) = isBoxedTupleTyCon tc
 
-isUnboxedSumCon :: DataCon -> Bool
-isUnboxedSumCon (MkData {dcRepTyCon = tc}) = isUnboxedSumTyCon tc
+isUnboxedTupleDataCon :: DataCon -> Bool
+isUnboxedTupleDataCon (MkData {dcRepTyCon = tc}) = isUnboxedTupleTyCon tc
+
+isUnboxedSumDataCon :: DataCon -> Bool
+isUnboxedSumDataCon (MkData {dcRepTyCon = tc}) = isUnboxedSumTyCon tc
 
 -- | Vanilla 'DataCon's are those that are nice boring Haskell 98 constructors
 isVanillaDataCon :: DataCon -> Bool
 isVanillaDataCon dc = dcVanilla dc
+
+-- | Is this the 'DataCon' of a newtype?
+isNewDataCon :: DataCon -> Bool
+isNewDataCon dc = isNewTyCon (dataConTyCon dc)
 
 -- | Should this DataCon be allowed in a type even without -XDataKinds?
 -- Currently, only Lifted & Unlifted

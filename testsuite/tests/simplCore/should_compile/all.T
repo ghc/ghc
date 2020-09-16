@@ -210,7 +210,7 @@ test('T12076lit', normal, compile, ['-O'])
 test('T12076sat', normal, compile, ['-O'])
 test('T12212', normal, compile, ['-O'])
 
-test('noinline01', only_ways(['optasm']), compile, ['-ddump-stg -dsuppress-uniques -dsuppress-ticks -O'])
+test('noinline01', only_ways(['optasm']), compile, ['-ddump-stg-from-core -dsuppress-uniques -dsuppress-ticks -O'])
 test('par01', only_ways(['optasm']), compile, ['-ddump-prep -dsuppress-uniques -dsuppress-ticks -O2'])
 test('T12776', normal, compile, ['-O2'])
 test('T9509',
@@ -332,3 +332,8 @@ test('T18328', [ only_ways(['optasm']), grep_errmsg(r'Arity=') ], compile, ['-dd
 test('T18347', normal, compile, ['-dcore-lint -O'])
 test('T18355', [ grep_errmsg(r'OneShot') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T18399', normal, compile, ['-dcore-lint -O'])
+test('T18589', normal, compile, ['-dcore-lint -O'])
+
+# T18649 should /not/ generate a specialisation rule
+test('T18649', normal, compile, ['-O -ddump-rules -Wno-simplifiable-class-constraints'])
+

@@ -23,6 +23,7 @@ of arguments of combining function.
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module GHC.Types.Unique.FM (
@@ -34,6 +35,7 @@ module GHC.Types.Unique.FM (
         emptyUFM,
         unitUFM,
         unitDirectlyUFM,
+        zipToUFM,
         listToUFM,
         listToUFM_Directly,
         listToUFM_C,
@@ -75,11 +77,14 @@ module GHC.Types.Unique.FM (
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
 
+#include "HsVersions.h"
+
 import GHC.Prelude
 
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
 import GHC.Utils.Outputable
-
+import GHC.Utils.Panic (assertPanic)
+import GHC.Utils.Misc (debugIsOn)
 import qualified Data.IntMap as M
 import qualified Data.IntSet as S
 import Data.Data
@@ -112,6 +117,19 @@ unitUFM k v = UFM (M.singleton (getKey $ getUnique k) v)
 -- when you've got the Unique already
 unitDirectlyUFM :: Unique -> elt -> UniqFM key elt
 unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
+
+-- zipToUFM ks vs = listToUFM (zip ks vs)
+-- This function exists because it's a common case (#18535), and
+-- it's inefficient to first build a list of pairs, and then immediately
+-- take it apart. Astonishingly, fusing this one list away reduces total
+-- compiler allocation by more than 10% (in T12545, see !3935)
+-- Note that listToUFM (zip ks vs) performs similarly, but
+-- the explicit recursion avoids relying too much on fusion.
+zipToUFM :: Uniquable key => [key] -> [elt] -> UniqFM key elt
+zipToUFM ks vs = ASSERT( length ks == length vs ) innerZip emptyUFM ks vs
+  where
+    innerZip ufm (k:kList) (v:vList) = innerZip (addToUFM ufm k v) kList vList
+    innerZip ufm _ _ = ufm
 
 listToUFM :: Uniquable key => [(key,elt)] -> UniqFM key elt
 listToUFM = foldl' (\m (k, v) -> addToUFM m k v) emptyUFM

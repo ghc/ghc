@@ -12,10 +12,11 @@ import GHC.CmmToAsm.Reg.Linear.Base
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
 import GHC.Types.Unique (Unique)
+import GHC.CmmToAsm.Types
 
 import GHC.Types.Unique.FM
-import GHC.Utils.Outputable
 
+import GHC.Utils.Outputable
 import GHC.Utils.Monad.State
 
 -- | Build a map of how many times each reg was alloced, clobbered, loaded etc.

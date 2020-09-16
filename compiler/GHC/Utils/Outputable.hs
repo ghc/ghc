@@ -1,4 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-
 (c) The University of Glasgow 2006-2012
@@ -47,7 +51,7 @@ module GHC.Utils.Outputable (
         bufLeftRenderSDoc,
         pprCode, mkCodeStyle,
         showSDocOneLine,
-        renderWithStyle,
+        renderWithContext,
 
         pprInfixVar, pprPrefixVar,
         pprHsChar, pprHsString, pprHsBytes,
@@ -71,7 +75,7 @@ module GHC.Utils.Outputable (
         QualifyName(..), queryQual,
         sdocWithDynFlags, sdocOption,
         updSDocContext,
-        SDocContext (..), sdocWithContext,
+        SDocContext (..), sdocWithContext, defaultSDocContext,
         getPprStyle, withPprStyle, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, dumpStyle, asmStyle,
@@ -121,6 +125,7 @@ import qualified Data.List.NonEmpty as NEL
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Utils.Exception
+import GHC.Exts (oneShot)
 
 {-
 ************************************************************************
@@ -302,9 +307,19 @@ code (either C or assembly), or generating interface files.
 -- | Represents a pretty-printable document.
 --
 -- To display an 'SDoc', use 'printSDoc', 'printSDocLn', 'bufLeftRenderSDoc',
--- or 'renderWithStyle'.  Avoid calling 'runSDoc' directly as it breaks the
+-- or 'renderWithContext'.  Avoid calling 'runSDoc' directly as it breaks the
 -- abstraction layer.
-newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
+newtype SDoc = SDoc' (SDocContext -> Doc)
+
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+{-# COMPLETE SDoc #-}
+pattern SDoc :: (SDocContext -> Doc) -> SDoc
+pattern SDoc m <- SDoc' m
+  where
+    SDoc m = SDoc' (oneShot m)
+
+runSDoc :: SDoc -> (SDocContext -> Doc)
+runSDoc (SDoc m) = m
 
 data SDocContext = SDC
   { sdocStyle                       :: !PprStyle
@@ -344,6 +359,21 @@ data SDocContext = SDC
   , sdocStarIsType                  :: !Bool
   , sdocLinearTypes                 :: !Bool
   , sdocImpredicativeTypes          :: !Bool
+  , sdocPrintTypeAbbreviations      :: !Bool
+  , sdocUnitIdForUser               :: !(FastString -> SDoc)
+      -- ^ Used to map UnitIds to more friendly "package-version:component"
+      -- strings while pretty-printing.
+      --
+      -- Use `GHC.Unit.State.pprWithUnitState` to set it. Users should never
+      -- have to set it to pretty-print SDocs emitted by GHC, otherwise it's a
+      -- bug. It's an internal field used to thread the UnitState so that the
+      -- Outputable instance of UnitId can use it.
+      --
+      -- See Note [Pretty-printing UnitId] in "GHC.Unit" for more details.
+      --
+      -- Note that we use `FastString` instead of `UnitId` to avoid boring
+      -- module inter-dependency issues.
+
   , sdocDynFlags                    :: DynFlags -- TODO: remove
   }
 
@@ -354,6 +384,46 @@ instance IsString SDoc where
 instance Outputable SDoc where
   ppr = id
 
+-- | Default pretty-printing options
+defaultSDocContext :: SDocContext
+defaultSDocContext = SDC
+  { sdocStyle                       = defaultDumpStyle
+  , sdocColScheme                   = Col.defaultScheme
+  , sdocLastColour                  = Col.colReset
+  , sdocShouldUseColor              = False
+  , sdocDefaultDepth                = 5
+  , sdocLineLength                  = 100
+  , sdocCanUseUnicode               = False
+  , sdocHexWordLiterals             = False
+  , sdocPprDebug                    = False
+  , sdocPrintUnicodeSyntax          = False
+  , sdocPrintCaseAsLet              = False
+  , sdocPrintTypecheckerElaboration = False
+  , sdocPrintAxiomIncomps           = False
+  , sdocPrintExplicitKinds          = False
+  , sdocPrintExplicitCoercions      = False
+  , sdocPrintExplicitRuntimeReps    = False
+  , sdocPrintExplicitForalls        = False
+  , sdocPrintPotentialInstances     = False
+  , sdocPrintEqualityRelations      = False
+  , sdocSuppressTicks               = False
+  , sdocSuppressTypeSignatures      = False
+  , sdocSuppressTypeApplications    = False
+  , sdocSuppressIdInfo              = False
+  , sdocSuppressCoercions           = False
+  , sdocSuppressUnfoldings          = False
+  , sdocSuppressVarKinds            = False
+  , sdocSuppressUniques             = False
+  , sdocSuppressModulePrefixes      = False
+  , sdocSuppressStgExts             = False
+  , sdocErrorSpans                  = False
+  , sdocStarIsType                  = False
+  , sdocImpredicativeTypes          = False
+  , sdocLinearTypes                 = False
+  , sdocPrintTypeAbbreviations      = True
+  , sdocUnitIdForUser               = ftext
+  , sdocDynFlags                    = error "defaultSDocContext: DynFlags not available"
+  }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
 withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
@@ -490,8 +560,8 @@ pprCode cs d = withPprStyle (PprCode cs) d
 mkCodeStyle :: CodeStyle -> PprStyle
 mkCodeStyle = PprCode
 
-renderWithStyle :: SDocContext -> SDoc -> String
-renderWithStyle ctx sdoc
+renderWithContext :: SDocContext -> SDoc -> String
+renderWithContext ctx sdoc
   = let s = Pretty.style{ Pretty.mode       = PageMode,
                           Pretty.lineLength = sdocLineLength ctx }
     in Pretty.renderStyle s $ runSDoc sdoc ctx
@@ -858,6 +928,9 @@ instance (Outputable a, Outputable b, Outputable c, Outputable d, Outputable e, 
 instance Outputable FastString where
     ppr fs = ftext fs           -- Prints an unadorned string,
                                 -- no double quotes or anything
+
+deriving newtype instance Outputable NonDetFastString
+deriving newtype instance Outputable LexicalFastString
 
 instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)

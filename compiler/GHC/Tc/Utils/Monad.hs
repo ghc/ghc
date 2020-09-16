@@ -138,7 +138,7 @@ module GHC.Tc.Utils.Monad(
   withException,
 
   -- * Stuff for cost centres.
-  ContainsCostCentreState(..), getCCIndexM,
+  getCCIndexM, getCCIndexTcM,
 
   -- * Types etc.
   module GHC.Tc.Types,
@@ -180,6 +180,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
+import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import GHC.Data.FastString
@@ -976,13 +977,19 @@ mkLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ErrMsg
 mkLongErrAt loc msg extra
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
-         return $ mkLongErrMsg dflags loc printer msg extra }
+         unit_state <- unitState <$> getDynFlags ;
+         let msg' = pprWithUnitState unit_state msg in
+         return $ mkLongErrMsg dflags loc printer msg' extra }
 
 mkErrDocAt :: SrcSpan -> ErrDoc -> TcRn ErrMsg
 mkErrDocAt loc errDoc
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
-         return $ mkErrDoc dflags loc printer errDoc }
+         unit_state <- unitState <$> getDynFlags ;
+         let f = pprWithUnitState unit_state
+             errDoc' = mapErrDoc f errDoc
+         in
+         return $ mkErrDoc dflags loc printer errDoc' }
 
 addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError
@@ -2074,23 +2081,16 @@ discussion).  We don't currently know a general solution to this problem, but
 we can use uninterruptibleMask_ to avoid the situation.
 -}
 
--- | Environments which track 'CostCentreState'
-class ContainsCostCentreState e where
-  extractCostCentreState :: e -> TcRef CostCentreState
-
-instance ContainsCostCentreState TcGblEnv where
-  extractCostCentreState = tcg_cc_st
-
-instance ContainsCostCentreState DsGblEnv where
-  extractCostCentreState = ds_cc_st
-
 -- | Get the next cost centre index associated with a given name.
-getCCIndexM :: (ContainsCostCentreState gbl)
-            => FastString -> TcRnIf gbl lcl CostCentreIndex
-getCCIndexM nm = do
+getCCIndexM :: (gbl -> TcRef CostCentreState) -> FastString -> TcRnIf gbl lcl CostCentreIndex
+getCCIndexM get_ccs nm = do
   env <- getGblEnv
-  let cc_st_ref = extractCostCentreState env
+  let cc_st_ref = get_ccs env
   cc_st <- readTcRef cc_st_ref
   let (idx, cc_st') = getCCIndex nm cc_st
   writeTcRef cc_st_ref cc_st'
   return idx
+
+-- | See 'getCCIndexM'.
+getCCIndexTcM :: FastString -> TcM CostCentreIndex
+getCCIndexTcM = getCCIndexM tcg_cc_st

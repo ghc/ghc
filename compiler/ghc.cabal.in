@@ -51,7 +51,7 @@ Flag terminfo
 Flag dynamic-system-linker
     Description: The system can load dynamic code. This is not the case for musl.
     Default: True
-    Manual: False
+    Manual: True
 
 Library
     Default-Language: Haskell2010
@@ -153,6 +153,7 @@ Library
         NoImplicitPrelude
        ,BangPatterns
        ,ScopedTypeVariables
+       ,MonoLocalBinds
 
     Exposed-Modules:
         GHC.Iface.Ext.Types
@@ -300,6 +301,7 @@ Library
         GHC.Data.TrieMap
         GHC.Core.Tidy
         GHC.Core.Unfold
+        GHC.Core.Unfold.Make
         GHC.Core.Utils
         GHC.Core.Map
         GHC.Core.Seq
@@ -312,6 +314,7 @@ Library
         GHC.HsToCore.PmCheck
         GHC.HsToCore.Coverage
         GHC.HsToCore
+        GHC.HsToCore.Types
         GHC.HsToCore.Arrows
         GHC.HsToCore.Binds
         GHC.HsToCore.Foreign.Call
@@ -353,6 +356,7 @@ Library
         GHC.Iface.Recomp.Flags
         GHC.Types.Annotations
         GHC.Driver.CmdLine
+        GHC.Driver.Config
         GHC.Driver.CodeOutput
         GHC.Settings.Config
         GHC.Settings.Constants
@@ -581,24 +585,30 @@ Library
             GHC.CmmToAsm.Instr
             GHC.CmmToAsm.BlockLayout
             GHC.CmmToAsm.CFG
+            GHC.CmmToAsm.CFG.Weight
             GHC.CmmToAsm.CFG.Dominators
             GHC.CmmToAsm.Format
             GHC.Platform.Reg
             GHC.Platform.Reg.Class
             GHC.CmmToAsm.PIC
             GHC.CmmToAsm.CPrim
+            GHC.CmmToAsm.Types
+            GHC.CmmToAsm.Utils
+            GHC.CmmToAsm.X86
             GHC.CmmToAsm.X86.Regs
             GHC.CmmToAsm.X86.RegInfo
             GHC.CmmToAsm.X86.Instr
             GHC.CmmToAsm.X86.Cond
             GHC.CmmToAsm.X86.Ppr
             GHC.CmmToAsm.X86.CodeGen
+            GHC.CmmToAsm.PPC
             GHC.CmmToAsm.PPC.Regs
             GHC.CmmToAsm.PPC.RegInfo
             GHC.CmmToAsm.PPC.Instr
             GHC.CmmToAsm.PPC.Cond
             GHC.CmmToAsm.PPC.Ppr
             GHC.CmmToAsm.PPC.CodeGen
+            GHC.CmmToAsm.SPARC
             GHC.CmmToAsm.SPARC.Base
             GHC.CmmToAsm.SPARC.Regs
             GHC.CmmToAsm.SPARC.Imm
