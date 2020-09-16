@@ -43,9 +43,10 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Types.Id
-import GHC.Types.Var.Env
-import GHC.Types.Var      (EvVar)
 import GHC.Types.Name
+import GHC.Types.Var      (EvVar)
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Core
 import GHC.Core.FVs       (exprFreeVars)
 import GHC.Core.Map
@@ -85,8 +86,6 @@ import Data.Tuple    (swap)
 
 import GHC.Driver.Ppr (pprTrace)
 
-import GHC.Exts (reallyUnsafePtrEquality#, isTrue#)
-
 -- Debugging Infrastructure
 
 tracePm :: String -> SDoc -> DsM ()
@@ -105,8 +104,8 @@ trc :: String -> SDoc -> a -> a
 trc | debugOn () = pprTrace
     | otherwise  = \_ _ a -> a
 
-trcM :: Monad m => String -> SDoc -> m ()
-trcM header doc = trc header doc (return ())
+_trcM :: Monad m => String -> SDoc -> m ()
+_trcM header doc = trc header doc (return ())
 
 -- | Generate a fresh `Id` of a given type
 mkPmId :: Type -> DsM Id
@@ -278,10 +277,11 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = MaybeT $ do
         , ppr (zipWith (\tv ty -> ppr tv <+> char '↦' <+> ppr ty) univ_tvs arg_tys)
         , ppr gammas
         , ppr (map (\x -> ppr x <+> dcolon <+> ppr (idType x)) arg_ids)
+        , ppr fuel
         ]
       runMaybeT $ do
-        nabla' <- addPhiCt nabla (PhiConCt x (PmAltConLike con) ex_tvs gammas arg_ids)
-        inhabitationTest fuel (nabla_ty_st nabla) nabla'
+        addPhiCt nabla (PhiConCt x (PmAltConLike con) ex_tvs gammas arg_ids)
+        -- inhabitationTest fuel (nabla_ty_st nabla) nabla'
     Nothing -> pure (Just nabla) -- Could not guess arg_tys. Just assume inhabited
 
 {- Note [Strict fields and variables of unlifted type]
@@ -400,7 +400,7 @@ pmTopNormaliseType :: TyState -> Type -> DsM TopNormaliseTypeResult
 -- NB: Normalisation can potentially change kinds, if the head of the type
 -- is a type family with a variable result kind. I (Richard E) can't think
 -- of a way to cause trouble here, though.
-pmTopNormaliseType (TySt inert) typ
+pmTopNormaliseType (TySt _ inert) typ
   = do env <- dsGetFamInstEnvs
        -- Before proceeding, we chuck typ into the constraint solver, in case
        -- solving for given equalities may reduce typ some. See
@@ -582,7 +582,7 @@ nameTyCt pred_ty = do
 -- | Add some extra type constraints to the 'TyState'; return 'Nothing' if we
 -- find a contradiction (e.g. @Int ~ Bool@).
 tyOracle :: TyState -> Bag PredType -> DsM (Maybe TyState)
-tyOracle ty_st@(TySt inert) cts
+tyOracle ty_st@(TySt n inert) cts
   | isEmptyBag cts
   = pure (Just ty_st)
   | otherwise
@@ -590,7 +590,8 @@ tyOracle ty_st@(TySt inert) cts
        ; tracePm "tyOracle" (ppr cts $$ ppr inert)
        ; ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability inert evs
        ; case res of
-            Just mb_new_inert -> tracePm "res" (ppr mb_new_inert) >> return (TySt <$> mb_new_inert)
+            -- return the new inert set and increment the sequence number n
+            Just mb_new_inert -> return (TySt (n+1) <$> mb_new_inert)
             Nothing           -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
 
 {- *********************************************************************
@@ -720,12 +721,11 @@ emptyVarInfo x
   , vi_neg = emptyPmAltConSet
   , vi_bot = MaybeBot
   , vi_rcm = emptyRCM
-  , vi_dirty = False
   }
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
-lookupVarInfo (TmSt env _) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
+lookupVarInfo (TmSt env _ _) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
 
 -- | Like @lookupVarInfo ts x@, but @lookupVarInfo ts x = (y, vi)@ also looks
 -- through newtype constructors. We have @x ~ N1 (... (Nk y))@ such that the
@@ -781,7 +781,7 @@ where you can find the solution in a perhaps more digestible format.
 lookupRefuts :: Uniquable k => Nabla -> k -> [PmAltCon]
 -- Unfortunately we need the extra bit of polymorphism and the unfortunate
 -- duplication of lookupVarInfo here.
-lookupRefuts MkNabla{ nabla_tm_st = ts@(TmSt (SDIE env) _) } k =
+lookupRefuts MkNabla{ nabla_tm_st = ts@(TmSt{ts_facts = (SDIE env)}) } k =
   case lookupUDFM_Directly env (getUnique k) of
     Nothing -> []
     Just (Indirect y) -> pmAltConSetElems (vi_neg (lookupVarInfo ts y))
@@ -924,14 +924,14 @@ addPhiCt nabla (PhiNotBotCt x)           = addNotBotCt nabla x
 -- surely diverges. Quite similar to 'addConCt', only that it only cares about
 -- ⊥.
 addBotCt :: Nabla -> Id -> MaybeT DsM Nabla
-addBotCt nabla@MkNabla{ nabla_tm_st = TmSt env reps } x = do
+addBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x = do
   let (y, vi@VI { vi_bot = bot }) = lookupVarInfoNT (nabla_tm_st nabla) x
   case bot of
     IsNotBot -> mzero      -- There was x ≁ ⊥. Contradiction!
     IsBot    -> pure nabla -- There already is x ~ ⊥. Nothing left to do
     MaybeBot -> do         -- We add x ~ ⊥
       let vi' = vi{ vi_bot = IsBot }
-      pure nabla{ nabla_tm_st = TmSt (setEntrySDIE env y vi') reps}
+      pure nabla{ nabla_tm_st = ts{ts_facts = setEntrySDIE env y vi' } }
 
 -- | Record a @x ~/ K@ constraint, e.g. that a particular 'Id' @x@ can't
 -- take the shape of a 'PmAltCon' @K@ in the 'Nabla' and return @Nothing@ if
@@ -940,30 +940,34 @@ addBotCt nabla@MkNabla{ nabla_tm_st = TmSt env reps } x = do
 addNotConCt :: Nabla -> Id -> PmAltCon -> MaybeT DsM Nabla
 addNotConCt _     _ (PmAltConLike (RealDataCon dc))
   | isNewDataCon dc = mzero -- (3) in Note [Coverage checking Newtype matches]
-addNotConCt nabla x nalt = overVarInfo go nabla x
+addNotConCt nabla x nalt = do
+  (mb_mark_dirty, nabla') <- trvVarInfo go nabla x
+  pure $ case mb_mark_dirty of
+    Just x  -> markDirty x nabla'
+    Nothing -> nabla'
   where
-    go vi@(VI _ pos neg _ rcm _) = do
+    go vi@(VI x' pos neg _ rcm) = do
       -- 1. Bail out quickly when nalt contradicts a solution
       let contradicts nalt sol = eqPmAltCon (paca_con sol) nalt == Equal
       guard (not (any (contradicts nalt) pos))
       -- 2. Only record the new fact when it's not already implied by one of the
       -- solutions
       let implies nalt sol = eqPmAltCon (paca_con sol) nalt == Disjoint
-      let neg'
-            | any (implies nalt) pos = neg
+      let (neg_changed, neg')
+            | any (implies nalt) pos = (False, neg)
             -- See Note [Completeness checking with required Thetas]
-            | hasRequiredTheta nalt  = neg
-            | otherwise              = extendPmAltConSet neg nalt
+            | hasRequiredTheta nalt  = (False, neg)
+            | otherwise              = (True,  extendPmAltConSet neg nalt)
       MASSERT( isPmAltConMatchStrict nalt )
-      let vi1 = vi{ vi_neg = neg', vi_bot = IsNotBot }
+      let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
       -- 3. Make sure there's at least one other possible constructor
       case nalt of
-        PmAltConLike cl -> do
+        PmAltConLike cl | neg_changed -> do
           -- Mark dirty to force a delayed inhabitation test
           rcm' <- lift (markMatched cl rcm)
-          pure vi1{ vi_rcm = rcm', vi_dirty = True }
+          pure (Just x', vi'{ vi_rcm = rcm' })
         _ ->
-          pure vi1
+          pure (Nothing, vi')
 
 hasRequiredTheta :: PmAltCon -> Bool
 hasRequiredTheta (PmAltConLike cl) = notNull req_theta
@@ -1030,60 +1034,85 @@ guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
 -- | Adds the constraint @x ~/ ⊥@ to 'Nabla'. Quite similar to 'addNotConCt',
 -- but only cares for the ⊥ "constructor".
 addNotBotCt :: Nabla -> Id -> MaybeT DsM Nabla
-addNotBotCt nabla@MkNabla{ nabla_tm_st = TmSt env reps } x = do
+addNotBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts=env} } x = do
   let (y, vi@VI { vi_bot = bot }) = lookupVarInfoNT (nabla_tm_st nabla) x
   case bot of
     IsBot    -> mzero      -- There was x ~ ⊥. Contradiction!
     IsNotBot -> pure nabla -- There already is x ≁ ⊥. Nothing left to do
     MaybeBot -> do         -- We add x ≁ ⊥ and test if x is still inhabited
       -- Mark dirty for a delayed inhabitation test
-      let vi' = vi{ vi_bot = IsNotBot, vi_dirty = True}
-      pure nabla{ nabla_tm_st = TmSt (setEntrySDIE env y vi') reps}
+      let vi' = vi{ vi_bot = IsNotBot}
+      pure $ markDirty y
+           $ nabla{ nabla_tm_st = ts{ ts_facts = setEntrySDIE env y vi' } }
 
--- | Not as unsafe as it looks! Quite a cheap test.
-tyStateUnchanged :: TyState -> TyState -> Bool
-tyStateUnchanged a b = isTrue# (reallyUnsafePtrEquality# a b)
+tyStateChanged :: TyState -> TyState -> Bool
+-- Makes use of the fact that the two TyStates we compare
+-- will never have the same sequence number.
+tyStateChanged a b = ty_st_n a /= ty_st_n b
+
+markDirty :: Id -> Nabla -> Nabla
+markDirty x nabla@MkNabla{nabla_tm_st = ts@TmSt{ts_dirty = dirty} } =
+  nabla{ nabla_tm_st = ts{ ts_dirty = extendDVarSet dirty x } }
+
+traverseDirty :: Monad m => (VarInfo -> m VarInfo) -> TmState -> m TmState
+traverseDirty f ts@TmSt{ts_facts = env, ts_dirty = dirty} =
+  go (uniqDSetToList dirty) env
+  where
+    go []     env  = pure ts{ts_facts=env}
+    go (x:xs) !env = do
+      vi' <- f (lookupVarInfo ts x)
+      go xs (setEntrySDIE env x vi')
+
+traverseAll :: Monad m => (VarInfo -> m VarInfo) -> TmState -> m TmState
+traverseAll f ts@TmSt{ts_facts = env} = do
+  env' <- traverseSDIE f env
+  pure ts{ts_facts = env'}
 
 inhabitationTest :: Int -> TyState -> Nabla -> MaybeT DsM Nabla
 inhabitationTest 0     _         nabla             = pure nabla
-inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = TmSt env reps} = do
+inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = do
   lift $ tracePm "inhabitation test" $ vcat
     [ ppr fuel
     , ppr old_ty_st
     , ppr nabla
+    , text "tyStateChanged:" <+> ppr (tyStateChanged old_ty_st (nabla_ty_st nabla))
     ]
+  -- When type state didn't change, we only need to traverse dirty VarInfos
+  let trv_dirty | tyStateChanged old_ty_st (nabla_ty_st nabla) = traverseAll
+                | otherwise                                    = traverseDirty
   -- We have to start the inhabitation test with a Nabla where all dirty bits
   -- are cleared
-  let clear_dirty vi = pure vi{vi_dirty = False}
-  cleared_env <- traverseSDIE clear_dirty env
-  env' <- traverseSDIE (test_one nabla{ nabla_tm_st = TmSt cleared_env reps }) env
-  pure nabla{ nabla_tm_st = TmSt env' reps }
+  ts' <- trv_dirty (test_one nabla{ nabla_tm_st = ts{ts_dirty=emptyDVarSet} }) ts
+  pure nabla{ nabla_tm_st = ts'{ts_dirty=emptyDVarSet}}
   where
     test_one :: Nabla -> VarInfo -> MaybeT DsM VarInfo
     test_one nabla vi =
-      lift (varNeedsTesting old_ty_st (nabla_ty_st nabla) vi) >>= \case
-        True | null (vi_pos vi) -> do
+      lift (varNeedsTesting old_ty_st nabla vi) >>= \case
+        True -> do
           -- No solution yet and needs testing
-          trcM "instantiate one" (ppr vi)
+          _trcM "instantiate one" (ppr vi)
           instantiate (fuel-1) nabla vi
         _ -> pure vi
 
 -- | Checks whether the given 'VarInfo' needs to be tested for inhabitants.
 --
---     1. If it's marked dirty because of new negative term constraints, we have
+--     1. If it already has a solution, we don't have to test.
+--     2. If it's marked dirty because of new negative term constraints, we have
 --        to test.
---     2. Otherwise, if the type state didn't change, we don't need to test.
---     3. If the type state changed, we compare representation types. No need
+--     3. Otherwise, if the type state didn't change, we don't need to test.
+--     4. If the type state changed, we compare representation types. No need
 --        to test if unchanged.
---     4. If all the constructors of a TyCon are vanilla, we don't have to test.
+--     5. If all the constructors of a TyCon are vanilla, we don't have to test.
 --        "vanilla" = No strict fields and no Theta.
-varNeedsTesting :: TyState -> TyState -> VarInfo -> DsM Bool
-varNeedsTesting _         _         vi
-  | vi_dirty vi = pure True
-varNeedsTesting old_ty_st new_ty_st _
+varNeedsTesting :: TyState -> Nabla -> VarInfo -> DsM Bool
+varNeedsTesting _         _                              vi
+  | notNull (vi_pos vi)                     = pure False
+varNeedsTesting _         MkNabla{nabla_tm_st=tm_st}     vi
+  | elemDVarSet (vi_id vi) (ts_dirty tm_st) = pure True
+varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} _
   -- Same type state => still inhabited
-  | tyStateUnchanged old_ty_st new_ty_st = pure False
-varNeedsTesting old_ty_st new_ty_st vi = do
+  | tyStateChanged old_ty_st new_ty_st = pure False
+varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi = do
   (_, _, old_rep_ty) <- tntrGuts <$> pmTopNormaliseType old_ty_st (idType $ vi_id vi)
   (_, _, new_rep_ty) <- tntrGuts <$> pmTopNormaliseType new_ty_st (idType $ vi_id vi)
   if old_rep_ty `eqType` new_rep_ty
@@ -1118,14 +1147,14 @@ instBot _fuel nabla vi = do
   pure vi
 
 trvVarInfo :: Functor f => (VarInfo -> f (a, VarInfo)) -> Nabla -> Id -> f (a, Nabla)
-trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@(TmSt env reps) } x
+trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x
   = set_vi <$> f (lookupVarInfo ts x)
   where
     set_vi (a, vi') =
-      (a, nabla{ nabla_tm_st = TmSt (setEntrySDIE env (vi_id vi') vi') reps })
+      (a, nabla{ nabla_tm_st = ts{ ts_facts = setEntrySDIE env (vi_id vi') vi' } })
 
-overVarInfo :: Functor f => (VarInfo -> f VarInfo) -> Nabla -> Id -> f Nabla
-overVarInfo f nabla x = snd <$> trvVarInfo (\vi -> ((),) <$> f vi) nabla x
+--overVarInfo :: Functor f => (VarInfo -> f VarInfo) -> Nabla -> Id -> f Nabla
+--overVarInfo f nabla x = snd <$> trvVarInfo (\vi -> ((),) <$> f vi) nabla x
 
 addNormalisedTypeMatches :: Nabla -> Id -> DsM (ResidualCompleteMatches, Nabla)
 addNormalisedTypeMatches nabla@MkNabla{ nabla_ty_st = ty_st } x
@@ -1204,7 +1233,7 @@ instCompleteSet fuel nabla x cs
 --
 -- See Note [TmState invariants].
 addVarCt :: Nabla -> Id -> Id -> MaybeT DsM Nabla
-addVarCt nabla@MkNabla{ nabla_tm_st = TmSt env _ } x y
+addVarCt nabla@MkNabla{ nabla_tm_st = TmSt{ ts_facts = env } } x y
   -- It's important that we never @equate@ two variables of the same equivalence
   -- class, otherwise we might get cyclic substitutions.
   -- Cf. 'extendSubstAndSolve' and
@@ -1220,11 +1249,11 @@ addVarCt nabla@MkNabla{ nabla_tm_st = TmSt env _ } x y
 --
 -- See Note [TmState invariants].
 equate :: Nabla -> Id -> Id -> MaybeT DsM Nabla
-equate nabla@MkNabla{ nabla_tm_st = TmSt env reps } x y
+equate nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x y
   = ASSERT( not (sameRepresentativeSDIE env x y) )
     case (lookupSDIE env x, lookupSDIE env y) of
-      (Nothing, _) -> pure (nabla{ nabla_tm_st = TmSt (setIndirectSDIE env x y) reps })
-      (_, Nothing) -> pure (nabla{ nabla_tm_st = TmSt (setIndirectSDIE env y x) reps })
+      (Nothing, _) -> pure (nabla{ nabla_tm_st = ts{ ts_facts = setIndirectSDIE env x y } })
+      (_, Nothing) -> pure (nabla{ nabla_tm_st = ts{ ts_facts = setIndirectSDIE env y x } })
       -- Merge the info we have for x into the info for y
       (Just vi_x, Just vi_y) -> do
         -- This assert will probably trigger at some point...
@@ -1234,7 +1263,7 @@ equate nabla@MkNabla{ nabla_tm_st = TmSt env reps } x y
         let env_ind = setIndirectSDIE env x y
         -- Then sum up the refinement counters
         let env_refs = setEntrySDIE env_ind y vi_y
-        let nabla_refs = nabla{ nabla_tm_st = TmSt env_refs reps }
+        let nabla_refs = nabla{ nabla_tm_st = ts{ts_facts = env_refs} }
         -- and then gradually merge every positive fact we have on x into y
         let add_fact nabla (PACA cl tvs args) = addConCt nabla y cl tvs args
         nabla_pos <- foldlM add_fact nabla_refs (vi_pos vi_x)
@@ -1252,8 +1281,8 @@ equate nabla@MkNabla{ nabla_tm_st = TmSt env reps } x y
 --
 -- See Note [TmState invariants].
 addConCt :: Nabla -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Nabla
-addConCt nabla@MkNabla{ nabla_tm_st = ts@(TmSt env reps) } x alt tvs args = do
-  let vi@(VI _ pos neg bot _ _) = lookupVarInfo ts x
+addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args = do
+  let vi@(VI _ pos neg bot _) = lookupVarInfo ts x
   -- First try to refute with a negative fact
   guard (not (elemPmAltConSet alt neg))
   -- Then see if any of the other solutions (remember: each of them is an
@@ -1274,7 +1303,7 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@(TmSt env reps) } x alt tvs args = do
     Nothing -> do
       let pos' = PACA alt tvs args : pos
       let nabla_with bot' =
-            nabla{ nabla_tm_st = TmSt (setEntrySDIE env x (vi{vi_pos = pos', vi_bot = bot'})) reps}
+            nabla{ nabla_tm_st = ts{ts_facts = setEntrySDIE env x (vi{vi_pos = pos', vi_bot = bot'})} }
       -- Do (2) in Note [Coverage checking Newtype matches]
       case (alt, args) of
         (PmAltConLike (RealDataCon dc), [y]) | isNewDataCon dc ->
@@ -1527,7 +1556,7 @@ generateInhabitants _      0 _     = pure []
 generateInhabitants []     _ nabla = pure [nabla]
 generateInhabitants (x:xs) n nabla = do
   tracePm "generateInhabitants" (ppr x $$ ppr xs $$ ppr nabla)
-  let VI _ pos neg _ _ _ = lookupVarInfo (nabla_tm_st nabla) x
+  let VI _ pos neg _ _ = lookupVarInfo (nabla_tm_st nabla) x
   case pos of
     _:_ -> do
       -- All solutions must be valid at once. Try to find candidates for their

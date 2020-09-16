@@ -49,6 +49,7 @@ import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Types.Id
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Types.Name
@@ -521,6 +522,9 @@ data TmState
   -- ^ An environment for looking up whether we already encountered semantically
   -- equivalent expressions that we want to represent by the same 'Id'
   -- representative.
+  , ts_dirty :: !DIdSet
+  -- ^ Which 'VarInfo' needs to be checked for inhabitants because of new
+  -- negative constraints (e.g. @x ≁ ⊥@ or @x ≁ K@).
   }
 
 -- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
@@ -573,10 +577,6 @@ data VarInfo
   -- possible constructors of each COMPLETE set. So, if it's not in here, we
   -- can't possibly match on it. Complementary to 'vi_neg'. We still need it
   -- to recognise completion of a COMPLETE set efficiently for large enums.
-
-  , vi_dirty :: !Bool
-  -- ^ Whether this 'VarInfo' needs to be checked for inhabitants because of new
-  -- negative constraints (e.g. @x ≁ ⊥@ or @x ≁ K@).
   }
 
 data PmAltConApp
@@ -604,35 +604,34 @@ instance Outputable BotInfo where
 
 -- | Not user-facing.
 instance Outputable TmState where
-  ppr (TmSt state reps) = ppr state $$ ppr reps
+  ppr (TmSt state reps dirty) = ppr state $$ ppr reps $$ ppr dirty
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI x pos neg bot cache dirty)
-    = braces (hcat (punctuate comma [pp_x, pp_pos, pp_neg, ppr bot, ppr cache, pp_dirty]))
+  ppr (VI x pos neg bot cache)
+    = braces (hcat (punctuate comma [pp_x, pp_pos, pp_neg, ppr bot, ppr cache]))
     where
       pp_x = ppr x <> dcolon <> ppr (idType x)
       pp_pos
         | [p] <- pos = char '~' <> ppr p -- suppress outer [_] if singleton
         | otherwise  = char '~' <> ppr pos
       pp_neg = char '≁' <> ppr neg
-      pp_dirty | dirty     = text "dirty"
-               | otherwise = empty
 
 -- | Initial state of the term oracle.
 initTmState :: TmState
-initTmState = TmSt emptySDIE emptyCoreMap
+initTmState = TmSt emptySDIE emptyCoreMap emptyDVarSet
 
 -- | The type oracle state. An 'GHC.Tc.Solver.Monad.InsertSet' that we
--- incrementally add local type constraints to.
-newtype TyState = TySt InertSet
+-- incrementally add local type constraints to, together with a sequence
+-- number that counts the number of times we extended it with new facts.
+data TyState = TySt { ty_st_n :: !Int, ty_st_inert :: !InertSet }
 
 -- | Not user-facing.
 instance Outputable TyState where
-  ppr (TySt inert) = ppr inert
+  ppr (TySt n inert) = ppr n <+> ppr inert
 
 initTyState :: TyState
-initTyState = TySt emptyInert
+initTyState = TySt 0 emptyInert
 
 -- | A normalised refinement type ∇ (\"nabla\"), comprised of an inert set of
 -- canonical (i.e. mutually compatible) term and type constraints that form the
