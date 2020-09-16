@@ -1078,20 +1078,20 @@ inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = do
     , text "tyStateChanged:" <+> ppr (tyStateChanged old_ty_st (nabla_ty_st nabla))
     ]
   -- When type state didn't change, we only need to traverse dirty VarInfos
-  let trv_dirty | tyStateChanged old_ty_st (nabla_ty_st nabla) = traverseAll
-                | otherwise                                    = traverseDirty
-  -- We have to start the inhabitation test with a Nabla where all dirty bits
-  -- are cleared
-  ts' <- trv_dirty (test_one nabla) ts
+  ts' <- if tyStateChanged old_ty_st (nabla_ty_st nabla)
+            then traverseAll   test_one ts
+            else traverseDirty test_one ts
   pure nabla{ nabla_tm_st = ts'{ts_dirty=emptyDVarSet}}
   where
-    test_one :: Nabla -> VarInfo -> MaybeT DsM VarInfo
-    test_one nabla vi = do
+    nabla_not_dirty = nabla{ nabla_tm_st = ts{ts_dirty=emptyDVarSet} }
+    test_one :: VarInfo -> MaybeT DsM VarInfo
+    test_one vi = do
       lift (varNeedsTesting old_ty_st nabla vi) >>= \case
         True -> do
           -- No solution yet and needs testing
           _trcM "instantiate one" (ppr vi)
-          instantiate (fuel-1) nabla{ nabla_tm_st = ts{ts_dirty=emptyDVarSet} } vi
+          -- We have to test with a Nabla where all dirty bits are cleared
+          instantiate (fuel-1) nabla_not_dirty vi
         _ -> pure vi
 
 -- | Checks whether the given 'VarInfo' needs to be tested for inhabitants.
@@ -1102,8 +1102,6 @@ inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = do
 --     3. Otherwise, if the type state didn't change, we don't need to test.
 --     4. If the type state changed, we compare representation types. No need
 --        to test if unchanged.
---     5. If all the constructors of a TyCon are vanilla, we don't have to test.
---        "vanilla" = No strict fields and no Theta.
 varNeedsTesting :: TyState -> Nabla -> VarInfo -> DsM Bool
 varNeedsTesting _         _                              vi
   | notNull (vi_pos vi)                     = pure False
@@ -1117,17 +1115,7 @@ varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi = do
   (_, _, new_rep_ty) <- tntrGuts <$> pmTopNormaliseType new_ty_st (idType $ vi_id vi)
   if old_rep_ty `eqType` new_rep_ty
     then pure False
-    else case splitTyConApp_maybe new_rep_ty of
-      Just (tc, _args)
-        | Just dcs <- tyConDataCons_maybe tc
-        -> pure (atLength (any non_vanilla_dc) True dcs 10)
-      _ -> pure True
-  where
-    non_vanilla_dc :: DataCon -> Bool
-    non_vanilla_dc con =
-      notNull (dataConTheta con) || -- (1)
-      notNull (dataConImplBangs con) -- (2)
-
+    else pure True
 
 -- | Returns (Just vi) if at least one member of each ConLike in the COMPLETE
 -- set satisfies the oracle
@@ -1209,6 +1197,12 @@ instCompleteSet fuel nabla x cs
 
     go :: Nabla -> [ConLike] -> MaybeT DsM Nabla
     go _     []         = mzero
+    go nabla (RealDataCon dc:_)
+      -- micro-optimisation, shaves down -7% allocations for PmSeriesG
+      -- Recall that dc can't be in vi_neg, because then it would be
+      -- deleted from the residual COMPLETE set.
+      | isDataConTriviallyInhabited dc
+      = pure nabla
     go nabla (con:cons) = do
       let x = vi_id vi
       let recur_not_con = do
@@ -1219,7 +1213,12 @@ instCompleteSet fuel nabla x cs
             <|> recur_not_con -- Assume that x can't be con. Encode that fact
                               -- with addNotConCt and recur.
 
-
+-- | Is this 'DataCon' trivially inhabited, that is, without needing to perform
+-- any inhabitation testing because of strict fields or type equalities?
+isDataConTriviallyInhabited :: DataCon -> Bool
+isDataConTriviallyInhabited dc =
+  null (dataConTheta dc) &&  -- (1)
+  null (dataConImplBangs dc) -- (2)
 
 --------------------------------------
 -- * Term oracle unification procedure
