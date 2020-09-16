@@ -107,6 +107,14 @@ naturalToWord# (NB b) = bigNatIndex# b 0#
 naturalToWord :: Natural -> Word
 naturalToWord !n = W# (naturalToWord# n)
 
+-- | Convert a Natural into a Word# clamping to (maxBound :: Word#).
+naturalToWordClamp# :: Natural -> Word#
+naturalToWordClamp# (NS x) = x
+naturalToWordClamp# (NB _) = WORD_MAXBOUND##
+
+-- | Convert a Natural into a Word# clamping to (maxBound :: Word).
+naturalToWordClamp :: Natural -> Word
+naturalToWordClamp !n = W# (naturalToWordClamp# n)
 
 -- | Try downcasting 'Natural' to 'Word' value.
 -- Returns '()' if value doesn't fit in 'Word'.
