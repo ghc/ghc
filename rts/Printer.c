@@ -861,32 +861,60 @@ findPtr_default_callback(void *user STG_UNUSED, StgClosure * closure){
 
 int searched = 0;
 
+// Search through a block (and it's linked blocks) for closures that reference
+// p. The size of arr is respected and the search is stoped when arr is full.
+// TODO: This may produce false positives if e.g. a closure contains an Int that
+// happens to have the same value as memory address p. Returns the new i value
+// i.e. the next free position in the arr array.
 static int
-findPtrBlocks (FindPtrCb cb, void* user, StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
+findPtrBlocks
+    ( FindPtrCb cb      // [in] callback called whenever a closure referencing p is found.
+    , void* user        // [in] unused other than to pass to the callback.
+    , StgPtr p          // [in] The pointer to search for.
+    , bdescr *bd        // [in] The block descriptor of the block from which to start searching.
+    , StgPtr arr[]      // [in/out] All found closure addresses are written into this array.
+    , int arr_size      // [in] The size of arr.
+    , int i             // [in] The current position in arr.
+    )
 {
-    StgPtr q, r, end;
+    StgPtr candidate, retainer, end;
+
+    // Iterate over all blocks.
     for (; bd; bd = bd->link) {
         searched++;
-        for (q = bd->start; q < bd->free; q++) {
-            if (UNTAG_CONST_CLOSURE((StgClosure*)*q) == (const StgClosure *)p) {
+        // Scan the block looking for a pointer equal to p.
+        for (candidate = bd->start; candidate < bd->free; candidate++) {
+            if (UNTAG_CONST_CLOSURE((StgClosure*)*candidate) == (const StgClosure *)p) {
+                // *candidate looks like a pointer equal to p, but it might not
+                // be a pointer type i.e. it may just be an Int that happens to
+                // have the same value as memory address p.
+
+                // We stop if the output array is full.
                 if (i < arr_size) {
-                    for (r = bd->start; r < bd->free; r = end) {
+                    for (retainer = bd->start; retainer < bd->free; retainer = end) {
                         // skip over zeroed-out slop
-                        while (*r == 0) r++;
-                        if (!LOOKS_LIKE_CLOSURE_PTR(r)) {
+                        while (*retainer == 0) retainer++;
+
+                        // A quick check that retainer looks like a InfoTable pointer.
+                        if (!LOOKS_LIKE_CLOSURE_PTR(retainer)) {
                             debugBelch("%p found at %p, no closure at %p\n",
-                                       p, q, r);
+                                       p, candidate, retainer);
                             break;
                         }
-                        end = r + closure_sizeW((StgClosure*)r);
-                        if (q < end) {
-                            cb(user, (StgClosure *) r);
-                            arr[i++] = r;
+                        end = retainer + closure_sizeW((StgClosure*)retainer);
+                        if (candidate < end) {
+                            // end has just increased past candidate. Hence
+                            // candidate is in the closure starting at retainer.
+                            cb(user, (StgClosure *) retainer);
+                            arr[i++] = retainer;
                             break;
                         }
                     }
-                    if (r >= bd->free) {
-                        debugBelch("%p found at %p, closure?", p, q);
+                    if (retainer >= bd->free) {
+                        // TODO: How is this case reachable? Perhaps another
+                        // thread overwrote *q after we found q and before we
+                        // found the corresponding closure retainer.
+                        debugBelch("%p found at %p, closure?", p, candidate);
                     }
                 } else {
                     return i;
@@ -897,8 +925,19 @@ findPtrBlocks (FindPtrCb cb, void* user, StgPtr p, bdescr *bd, StgPtr arr[], int
     return i;
 }
 
+// Search for for closures that reference p. This may NOT find all such closures
+// (e.g. the nursery is not searched). This may also find false positives if
+// e.g. a closure contains an Int that happens to have the same value as memory
+// address p. The number of results is capped at 1024. The callback is called
+// for each closure found.
 static void
-findPtr_gen(FindPtrCb cb, void *user, P_ p, int follow)
+findPtr_gen
+    ( FindPtrCb cb  // [in] Callback called for each closure found referencing p.
+    , void *user    // [in] Unused other than to pass to the callback.
+    , P_ p          // [in] Search for closures referencing this address.
+    , int follow    // [in] If set to 1 and only a single closure was found,
+                    //      recursively find pointers to that  if to recurse (call findPtr on the ). May only be 1 if cb==findPtr_default_callback.
+    )
 {
   uint32_t g, n;
   bdescr *bd;

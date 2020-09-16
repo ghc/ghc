@@ -1411,7 +1411,15 @@ scheduleNeedHeapProfile( bool ready_to_gc )
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-void stopAllCapabilities (Capability **pCap, Task *task)
+void stopAllCapabilities
+    ( Capability **pCap     // [in/out] This thread's task's owned capability.
+                            //      pCap may be NULL if no capability is owned.
+                            //      *pCap != NULL
+                            // On return, set to the task's newly owned
+                            // capability (task->cap). Though, the Task will
+                            // technically own all capabilities.
+    , Task *task            // [in] This thread's task.
+    )
 {
     stopAllCapabilitiesWith(pCap, task, SYNC_OTHER);
 }
@@ -1463,9 +1471,15 @@ void stopAllCapabilitiesWith (Capability **pCap, Task *task, SyncType sync_type)
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-static bool requestSync (
-    Capability **pcap, Task *task, PendingSync *new_sync,
-    SyncType *prev_sync_type)
+static bool requestSync
+    ( Capability **pcap         // [in/out] This thread's task's owned capability.
+                                // May change if there is an existing sync (true is returned).
+                                //      pcap may be NULL
+                                //      *pcap != NULL
+    , Task *task                // [in] This thread's task.
+    , PendingSync *new_sync     // [in] The new requested synch.
+    , SyncType *prev_sync_type  // [out] Only set if there is an existing previous sync (true is returned).
+    )
 {
     PendingSync *sync;
 
