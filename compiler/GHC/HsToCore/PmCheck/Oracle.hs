@@ -613,18 +613,10 @@ initFuel = 4 -- 4 because it's the smallest number that passes f' in T17977b
 addPhiCts :: Nabla -> PhiCts -> DsM (Maybe Nabla)
 -- See Note [TmState invariants].
 addPhiCts nabla cts = runMaybeT $ do
-  nabla' <- addPhiCtsNoTest nabla cts
-  -- See Note [Delaying the inhabitation test]
-  inhabitationTest initFuel (nabla_ty_st nabla) nabla'
-
--- | Add 'PmCts' ('addPhiCts') without performing an inhabitation test by
--- instantiation afterwards. Very much for internal use only!
-addPhiCtsNoTest :: Nabla -> PhiCts -> MaybeT DsM Nabla
--- See Note [TmState invariants].
-addPhiCtsNoTest nabla cts = do
   let (ty_cts, tm_cts) = partitionPhiCts cts
   nabla' <- addTyCts nabla (listToBag ty_cts)
-  foldlM addPhiTmCt nabla' (listToBag tm_cts)
+  nabla'' <- foldlM addPhiTmCt nabla' (listToBag tm_cts)
+  inhabitationTest initFuel (nabla_ty_st nabla) nabla''
 
 partitionPhiCts :: PhiCts -> ([PredType], [PhiCt])
 partitionPhiCts = partitionEithers . map to_either . toList
@@ -791,7 +783,7 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args =
       let ty_cts = equateTys (map mkTyVarTy tvs) (map mkTyVarTy other_tvs)
       when (length args /= length other_args) $
         lift $ tracePm "error" (ppr x <+> ppr alt <+> ppr args <+> ppr other_args)
-      nabla' <- addPhiCtsNoTest nabla (listToBag ty_cts)
+      nabla' <- MaybeT $ addPhiCts nabla (listToBag ty_cts)
       let add_var_ct nabla (a, b) = addVarCt nabla a b
       foldlM add_var_ct nabla' $ zipEqual "addConCt" args other_args
     Nothing -> do
@@ -964,7 +956,7 @@ addCoreCt nabla x e = do
       when (not (isNewDataCon dc)) $
         modifyT $ \nabla -> addNotBotCt nabla x
       -- 2. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@. See also #17703
-      modifyT $ \nabla -> addPhiCtsNoTest nabla (listToBag ty_cts)
+      modifyT $ \nabla -> MaybeT $ addPhiCts nabla (listToBag ty_cts)
       -- 3. @y_1 ~ e_1, ..., y_m ~ e_m@ for fresh @y_i@
       arg_ids <- traverse bind_expr vis_args
       -- 4. @x ~ K as ys@
@@ -1526,13 +1518,6 @@ like
 
 Since the coverage won't bother to instantiate Down 4 levels deep to see that it
 is in fact uninhabited, it will emit a inexhaustivity warning for the case.
-
-Note [Delaying the Inhabitation test]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We delay the inhabitation test that normally happens after having added
-negative information or a type constraints. This has the potential to do
-less inhabitation tests for φ constructor constraints, which potentially add a
-bunch of ≁⊥ and type constraints at once.
 
 Note [DataCons that are definitely inhabitable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
