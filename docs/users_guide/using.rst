@@ -1255,14 +1255,6 @@ messages and in GHCi:
     the errors and warnings that originate later in the file are
     displayed first.
 
-.. ghc-flag:: -H ⟨size⟩
-    :shortdesc: Set the minimum size of the heap to ⟨size⟩
-    :type: dynamic
-    :category: misc
-
-    Set the minimum size of the heap to ⟨size⟩. This option is
-    equivalent to ``+RTS -Hsize``, see :ref:`rts-options-gc`.
-
 .. ghc-flag:: -Rghc-timing
     :shortdesc: Summarise timing stats for GHC (same as ``+RTS -tstderr``).
     :type: dynamic
@@ -1507,6 +1499,14 @@ Some flags only make sense for a particular use case.
     included. This option can be used to specify the path to the
     ``ghcversions.h`` file to be included. This is primarily intended to be
     used by GHC's build system.
+
+.. ghc-flag:: -H ⟨size⟩
+    :shortdesc: Set the minimum size of the heap to ⟨size⟩
+    :type: dynamic
+    :category: misc
+
+    Set the minimum size of the heap to ⟨size⟩. This option is
+    equivalent to ``+RTS -Hsize``, see :ref:`rts-options-gc`.
 
 Other environment variables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
