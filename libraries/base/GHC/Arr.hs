@@ -493,9 +493,15 @@ ixmap (l,u) f arr =
 {-# INLINE eqArray #-}
 eqArray :: (Ix i, Eq e) => Array i e -> Array i e -> Bool
 eqArray arr1@(Array l1 u1 n1 _) arr2@(Array l2 u2 n2 _) =
-    if n1 == 0 then n2 == 0 else
-    l1 == l2 && u1 == u2 &&
-    and [unsafeAt arr1 i == unsafeAt arr2 i | i <- [0 .. n1 - 1]]
+    n1 == n2 && (n1 == 0 || full_check)
+    where
+       -- Why do we need to check u1=u2 when we know l1=l2 and n1=n2?
+       -- Imagine an Ix instance that can count either up or down, so that
+       -- (0,10) and (0,-10) each represent a valid range. Then those have
+       -- the same length and "lower" bounds but have different "upper" bounds.
+       -- Ix is pretty wild.
+       full_check = l1 == l2 && u1 == u2 &&
+         and [unsafeAt arr1 i == unsafeAt arr2 i | i <- [0 .. n1 - 1]]
 
 {-# INLINE [1] cmpArray #-}
 cmpArray :: (Ix i, Ord e) => Array i e -> Array i e -> Ordering
