@@ -33,7 +33,7 @@ assertion was made, ::
     assert pred val ==> assertError "Main.hs|15" pred val
 
 The rewrite is only performed by the compiler when it spots applications
-of ``Control.Exception.assert``, so you can still define and use your
+of :base-ref:`Control.Exception.assert`, so you can still define and use your
 own versions of ``assert``, should you so wish. If not, import
 ``Control.Exception`` to make use ``assert`` in your code.
 
@@ -48,6 +48,6 @@ will be rewritten to ``e``. You can also disable assertions using the
 allows enabling assertions even when optimisation is turned on.
 
 Assertion failures can be caught, see the documentation for the
-:base-ref:`Control.Exception` library for the details.
+:base-ref:`Control.Exception.` library for the details.
 
 
