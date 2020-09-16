@@ -326,7 +326,7 @@ mkPatSynCase var ty alt fail = do
     matcher <- dsLExpr $ mkLHsWrap wrapper $
                          nlHsTyApp matcher [getRuntimeRep ty, ty]
     cont <- mkCoreLams bndrs <$> runMatchResult fail match_result
-    return $ mkCoreAppsDs (text "patsyn" <+> ppr var) matcher [Var var, ensure_unstrict cont, Lam voidArgId fail]
+    return $ mkCoreAppsDs matcher [Var var, ensure_unstrict cont, Lam voidArgId fail]
   where
     MkCaseAlt{ alt_pat = psyn,
                alt_bndrs = bndrs,
@@ -485,8 +485,8 @@ There are a few subtleties in the desugaring of `seq`:
 -}
 
 -- NB: Make sure the argument is not levity polymorphic
-mkCoreAppDs  :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
-mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg2
+mkCoreAppDs  :: HasDebugCallStack => CoreExpr -> CoreExpr -> CoreExpr
+mkCoreAppDs (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg2
   | f `hasKey` seqIdKey            -- Note [Desugaring seq], points (1) and (2)
   = Case arg1 case_bndr ty2 [(DEFAULT,[],arg2)]
   where
@@ -495,11 +495,11 @@ mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg
                           -> v1        -- Note [Desugaring seq], points (2) and (3)
                    _      -> mkWildValBinder Many ty1
 
-mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in GHC.Core.Make
+mkCoreAppDs fun arg = mkCoreApp fun arg  -- The rest is done in GHC.Core.Make
 
 -- NB: No argument can be levity polymorphic
-mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
-mkCoreAppsDs s fun args = foldl' (mkCoreAppDs s) fun args
+mkCoreAppsDs :: HasDebugCallStack => CoreExpr -> [CoreExpr] -> CoreExpr
+mkCoreAppsDs fun args = foldl' mkCoreAppDs fun args
 
 mkCastDs :: CoreExpr -> Coercion -> CoreExpr
 -- We define a desugarer-specific version of GHC.Core.Utils.mkCast,

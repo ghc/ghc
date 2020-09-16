@@ -315,10 +315,10 @@ dsExpr (HsLamCase _ matches)
   = do { ([discrim_var], matching_code) <- matchWrapper CaseAlt Nothing matches
        ; return $ Lam discrim_var matching_code }
 
-dsExpr e@(HsApp _ fun arg)
+dsExpr (HsApp _ fun arg)
   = do { fun' <- dsLExpr fun
        ; dsWhenNoErrs (dsLExprNoLP arg)
-                      (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg') }
+                      (\arg' -> mkCoreAppDs fun' arg') }
 
 dsExpr (HsAppType ty e _)
   = do { e' <- dsLExpr e
@@ -384,11 +384,11 @@ bindNonRec will automatically do the right thing, giving us:
 See #18151.
 -}
 
-dsExpr e@(OpApp _ e1 op e2)
+dsExpr (OpApp _ e1 op e2)
   = -- for the type of y, we need the type of op's 2nd argument
     do { op' <- dsLExpr op
        ; dsWhenNoErrs (mapM dsLExprNoLP [e1, e2])
-                      (\exprs' -> mkCoreAppsDs (text "opapp" <+> ppr e) op' exprs') }
+                      (\exprs' -> mkCoreAppsDs op' exprs') }
 
 -- dsExpr (SectionL op expr)  ===  (expr `op`)  ~>  \y -> op expr y
 --
@@ -404,26 +404,24 @@ dsExpr e@(SectionL _ expr op) = do
           (newSysLocalsDsNoLP [x_ty, y_ty])
           (\[x_id, y_id] ->
             bindNonRec x_id x_core
-            $ Lam y_id (mkCoreAppsDs (text "sectionl" <+> ppr e)
-                                     core_op [Var x_id, Var y_id]))
+            $ Lam y_id (mkCoreAppsDs core_op [Var x_id, Var y_id]))
 
       -- Postfix operator section
       (_:_, _) -> do
-        return $ mkCoreAppDs (text "sectionl" <+> ppr e) core_op x_core
+        return $ mkCoreAppDs core_op x_core
 
       _ -> pprPanic "dsExpr(SectionL)" (ppr e)
 
 -- dsExpr (SectionR op expr)  === (`op` expr)  ~>  \x -> op x expr
 --
 -- See Note [Desugaring operator sections].
-dsExpr e@(SectionR _ op expr) = do
+dsExpr (SectionR _ op expr) = do
     core_op <- dsLExpr op
     let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
     y_core <- dsLExpr expr
     dsWhenNoErrs (newSysLocalsDsNoLP [x_ty, y_ty])
                  (\[x_id, y_id] -> bindNonRec y_id y_core $
-                                   Lam x_id (mkCoreAppsDs (text "sectionr" <+> ppr e)
-                                                          core_op [Var x_id, Var y_id]))
+                                   Lam x_id (mkCoreAppsDs core_op [Var x_id, Var y_id]))
 
 dsExpr (ExplicitTuple _ tup_args boxity)
   = do { let go (lam_vars, args) (L _ (Missing (Scaled mult ty)))
@@ -1083,7 +1081,7 @@ dsConLike :: ConLike -> DsM CoreExpr
 dsConLike (RealDataCon dc) = dsHsVar (dataConWrapId dc)
 dsConLike (PatSynCon ps)   = return $ case patSynBuilder ps of
   Just (id, add_void)
-    | add_void  -> mkCoreApp (text "dsConLike" <+> ppr ps) (Var id) (Var voidPrimId)
+    | add_void  -> App (Var id) (Var voidPrimId)
     | otherwise -> Var id
   _ -> pprPanic "dsConLike" (ppr ps)
 

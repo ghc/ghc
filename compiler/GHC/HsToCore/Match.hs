@@ -300,7 +300,7 @@ matchView (var :| vars) ty (eqns@(eqn1 :| _))
          -- compile the view expressions
         ; viewExpr' <- dsLExpr viewExpr
         ; return (mkViewMatchResult var'
-                    (mkCoreAppDs (text "matchView") viewExpr' (Var var))
+                    (mkCoreAppDs viewExpr' (Var var))
                     match_result) }
 
 matchOverloadedList :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)

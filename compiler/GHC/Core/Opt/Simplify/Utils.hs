@@ -51,6 +51,7 @@ import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
 import GHC.Core.FVs
 import GHC.Core.Utils
+import GHC.Core.Make     ( mkCoreAppTyped )
 import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
@@ -124,7 +125,7 @@ data SimplCont
 
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
       { sc_dup     :: DupFlag   -- See Note [DupFlag invariants]
-      , sc_hole_ty :: OutType   -- Type of the function, presumably (forall a. blah)
+      , sc_hole_ty :: OutType   -- Type of the function, presumably (t1 -> t2)
                                 -- See Note [The hole type in ApplyToTy/Val]
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
@@ -358,10 +359,13 @@ argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
 argInfoExpr fun rev_args
   = go rev_args
   where
-    go []                              = Var fun
-    go (ValArg { as_arg = arg }  : as) = go as `App` arg
-    go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
-    go (CastBy co                : as) = mkCast (go as) co
+    go []                                     = Var fun
+    go (ValArg { as_arg = arg
+               , as_hole_ty = fun_ty } : as) = mkCoreAppTyped (go as) fun_ty arg
+       -- mkCoreAppTyped: see Note [RULEs can break let/app]
+       -- in GHC.Core.Opt.Simplify.Env
+    go (TyArg { as_arg_ty = ty }       : as) = go as `App` Type ty
+    go (CastBy co                      : as) = mkCast (go as) co
 
 
 type FunRules = Maybe (Int, [CoreRule]) -- Remaining rules for this function

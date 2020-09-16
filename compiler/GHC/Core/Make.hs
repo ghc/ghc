@@ -6,7 +6,7 @@
 module GHC.Core.Make (
         -- * Constructing normal syntax
         mkCoreLet, mkCoreLets,
-        mkCoreApp, mkCoreApps, mkCoreConApps,
+        mkCoreApp, mkCoreApps, mkCoreAppTyped, mkCoreConApps,
         mkCoreLams, mkWildCase, mkIfThenElse,
         mkWildValBinder, mkWildEvBinder,
         mkSingleAltCase,
@@ -139,19 +139,24 @@ mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 --   See Note [Core let/app invariant] in "GHC.Core"
 mkCoreApps :: CoreExpr -> [CoreExpr] -> CoreExpr
 mkCoreApps fun args
-  = fst $
-    foldl' (mkCoreAppTyped doc_string) (fun, fun_ty) args
+  = fst $ foldl' mk_core_app (fun, fun_ty) args
   where
-    doc_string = ppr fun_ty $$ ppr fun $$ ppr args
     fun_ty = exprType fun
 
 -- | Construct an expression which represents the application of one expression
 -- to the other
 -- Respects the let/app invariant by building a case expression where necessary
 --   See Note [Core let/app invariant] in "GHC.Core"
-mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
-mkCoreApp s fun arg
-  = fst $ mkCoreAppTyped s (fun, exprType fun) arg
+mkCoreApp :: HasDebugCallStack => CoreExpr -> CoreExpr -> CoreExpr
+mkCoreApp fun arg = mkCoreAppTyped fun (exprType fun) arg
+
+-- | Construct an expression which represents the application of one expression
+-- to the other.
+-- Precondition:  fun :: fun_ty
+-- Respects the let/app invariant by building a case expression where necessary
+--   See Note [Core let/app invariant] in "GHC.Core"
+mkCoreAppTyped :: HasDebugCallStack => CoreExpr -> Type -> CoreExpr -> CoreExpr
+mkCoreAppTyped fun fun_ty arg = fst $ mk_core_app (fun, fun_ty) arg
 
 -- | Construct an expression which represents the application of one expression
 -- paired with its type to an argument. The result is paired with its type. This
@@ -159,23 +164,24 @@ mkCoreApp s fun arg
 -- 'mkCoreApps'.
 -- Respects the let/app invariant by building a case expression where necessary
 --   See Note [Core let/app invariant] in "GHC.Core"
-mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
-mkCoreAppTyped _ (fun, fun_ty) (Type ty)
+mk_core_app :: HasDebugCallStack => (CoreExpr, Type) -> CoreExpr
+                                 -> (CoreExpr, Type)
+mk_core_app (fun, fun_ty) (Type ty)
   = (App fun (Type ty), piResultTy fun_ty ty)
-mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
+mk_core_app (fun, fun_ty) (Coercion co)
   = (App fun (Coercion co), funResultTy fun_ty)
-mkCoreAppTyped d (fun, fun_ty) arg
-  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
-    (mkValApp fun arg (Scaled mult arg_ty) res_ty, res_ty)
+mk_core_app (fun, fun_ty) arg
+  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg )
+    (mkValApp fun arg arg_mult arg_ty res_ty, res_ty)
   where
-    (mult, arg_ty, res_ty) = splitFunTy fun_ty
+    (arg_mult, arg_ty, res_ty) = splitFunTy fun_ty
 
-mkValApp :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
+mkValApp :: CoreExpr -> CoreExpr -> Mult -> Type -> Type -> CoreExpr
 -- Build an application (e1 e2),
 -- or a strict binding  (case e2 of x -> e1 x)
 -- using the latter when necessary to respect the let/app invariant
 --   See Note [Core let/app invariant] in GHC.Core
-mkValApp fun arg (Scaled w arg_ty) res_ty
+mkValApp fun arg w arg_ty res_ty
   | not (needsCaseBinding arg_ty arg)
   = App fun arg                -- The vastly common case
   | otherwise

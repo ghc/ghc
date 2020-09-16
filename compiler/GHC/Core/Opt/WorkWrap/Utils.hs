@@ -469,7 +469,7 @@ mkWWargs subst fun_ty demands
     apply_or_bind_then k arg (Lam bndr body)
       = mkCoreLet (NonRec bndr arg) (k body)    -- Important that arg is fresh!
     apply_or_bind_then k arg fun
-      = k $ mkCoreApp (text "mkWWargs") fun arg
+      = k $ mkCoreApp fun arg
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 

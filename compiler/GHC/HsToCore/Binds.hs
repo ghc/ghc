@@ -1136,7 +1136,7 @@ dsHsWrapper (WpFun c1 c2 (Scaled w t1) doc)
                               = do { x <- newSysLocalDsNoLP w t1
                                    ; w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
-                                   ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
+                                   ; let app f a = mkCoreAppDs f a
                                          arg     = w1 (Var x)
                                    ; (_, ok) <- askNoErrsDs $ dsNoLevPolyExpr arg doc
                                    ; if ok

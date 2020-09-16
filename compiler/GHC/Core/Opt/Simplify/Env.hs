@@ -615,9 +615,9 @@ mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs ff
 wrapFloats :: SimplFloats -> OutExpr -> OutExpr
 -- Wrap the floats around the expression; they should all
 -- satisfy the let/app invariant, so mkLets should do the job just fine
-wrapFloats (SimplFloats { sfLetFloats  = LetFloats bs _
+wrapFloats (SimplFloats { sfLetFloats  = lbs
                         , sfJoinFloats = jbs }) body
-  = foldrOL Let (wrapJoinFloats jbs body) bs
+  = wrapLetFloats lbs $ wrapJoinFloats jbs body
      -- Note: Always safe to put the joins on the inside
      -- since the values can't refer to them
 
@@ -640,6 +640,20 @@ getTopFloatBinds (SimplFloats { sfLetFloats  = lbs
   = ASSERT( isNilOL jbs )  -- Can't be any top-level join bindings
     letFloatBinds lbs
 
+wrapLetFloats :: LetFloats -> OutExpr -> OutExpr
+wrapLetFloats (LetFloats bs _) body
+  = foldr wrap_bind body bs
+  where
+    wrap_bind bind body
+      | -- Horrid special case for a binding that doesn't satisfy
+        -- the let/app invariant; see Note [RULEs can break let/app]
+        NonRec bndr rhs <- bind
+      , isUnliftedType (idType bndr)
+      , not (exprOkForSpeculation rhs)
+      = Case rhs bndr (exprType rhs) [(DEFAULT, [], body)]
+      | otherwise
+      = Let bind body
+
 mapLetFloats :: LetFloats -> ((Id,CoreExpr) -> (Id,CoreExpr)) -> LetFloats
 mapLetFloats (LetFloats fs ff) fun
    = LetFloats (mapOL app fs) ff
@@ -647,8 +661,11 @@ mapLetFloats (LetFloats fs ff) fun
     app (NonRec b e) = case fun (b,e) of (b',e') -> NonRec b' e'
     app (Rec bs)     = Rec (map fun bs)
 
-{-
-************************************************************************
+{- Note [RULEs can break let/app]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-}
+
+{- *********************************************************************
 *                                                                      *
                 Substitution of Vars
 *                                                                      *

@@ -27,7 +27,7 @@ import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
 import GHC.Types.Id
 import GHC.Types.Id.Make   ( seqId )
-import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
+import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr, mkCoreAppTyped )
 import qualified GHC.Core.Make
 import GHC.Types.Id.Info
 import GHC.Types.Name           ( mkSystemVarName, isExternalName, getOccFS )
@@ -1335,13 +1335,21 @@ rebuild env expr cont
               ; (floats2, expr') <- simplLam env' bs body cont
               ; return (floats1 `addFloats` floats2, expr') }
 
+      -- These next cases two don't happen much, because a call with
+      -- a variable at the head (f e1 ... en) is handled via rebuildCall,
+      -- which constructs ArgInfo, and with the final result being built
+      -- by argInfoExpr.  We only get here for non-variable heads, like
+      --     (case blah of alts) e1 e2
       ApplyToTy  { sc_arg_ty = ty, sc_cont = cont}
         -> rebuild env (App expr (Type ty)) cont
 
-      ApplyToVal { sc_arg = arg, sc_env = se, sc_dup = dup_flag, sc_cont = cont}
+      ApplyToVal { sc_arg = arg, sc_env = se, sc_dup = dup_flag
+                 , sc_cont = cont, sc_hole_ty = fun_ty }
         -- See Note [Avoid redundant simplification]
         -> do { (_, _, arg') <- simplArg env dup_flag se arg
-              ; rebuild env (App expr arg') cont }
+              ; rebuild env (mkCoreAppTyped expr fun_ty arg') cont }
+                 -- mkCoreAppTyped: see Note [RULEs can break let/app]
+                 -- in GHC.Core.Opt.Simplify.Env
 
 {-
 ************************************************************************
