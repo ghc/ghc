@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE ViewPatterns         #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -442,6 +443,12 @@ data HsWildCardBndrs pass thing
     }
   | XHsWildCardBndrs !(XXHsWildCardBndrs pass thing)
 
+instance IsPass p => Functor (HsWildCardBndrs (GhcPass p)) where
+  fmap f (HsWC { hswc_ext = x, hswc_body = body })
+    = case ghcPass @p of
+        GhcPs -> HsWC { hswc_ext = x, hswc_body = f body }
+        GhcRn -> HsWC { hswc_ext = x, hswc_body = f body }
+        GhcTc -> HsWC { hswc_ext = x, hswc_body = f body }
 
 type instance XHsWC GhcPs _ = NoExtField
 type instance XHsWC GhcRn _ = [Name]

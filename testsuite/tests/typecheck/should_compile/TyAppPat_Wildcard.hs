@@ -10,7 +10,7 @@ f Nothing = 0
 
 Just @_ x = Just "hello"
 
-Just @Int x = Just 5
+Just @Int y = Just 5
 
 main = do
   print x
