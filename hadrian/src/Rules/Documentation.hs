@@ -127,6 +127,21 @@ checkSphinxWarnings :: FilePath  -- ^ output directory
                     -> Action ()
 checkSphinxWarnings out = do
     log <- liftIO $ readFile (out -/- ".log")
+    when ("Inline literal start-string without end-string." `isInfixOf` log)
+      $ fail $ unlines
+        [ "Syntax error found in Sphinx log. "
+        , ""
+        , "This likely means that you have forgotten a \\ after inline code block. For instance,"
+        , "you might have written:"
+        , ""
+        , "    are not allowed to contain nested ``forall``s."
+        , ""
+        , "Whereas you need to write:"
+        , ""
+        , "    are not allowed to contain nested ``forall``\\s."
+        , ""
+        ]
+
     when ("reference target not found" `isInfixOf` log)
       $ fail "Undefined reference targets found in Sphinx log."
 
