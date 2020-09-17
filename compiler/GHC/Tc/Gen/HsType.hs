@@ -1799,10 +1799,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
            ATcTyCon tc_tc
-             -> do { -- See Note [GADT kind self-reference]
-                     unless (isTypeLevel (mode_tyki mode))
-                            (promotionErr name TyConPE)
-                   ; check_tc tc_tc
+             -> do { check_tc tc_tc
                    ; return (mkTyConTy tc_tc, tyConKind tc_tc) }
 
            AGlobal (ATyCon tc)
@@ -1843,26 +1840,6 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
     dc_theta_illegal_constraint = find (not . isEqPred)
 
 {-
-Note [GADT kind self-reference]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A promoted type cannot be used in the body of that type's declaration.
-#11554 shows this example, which made GHC loop:
-
-  import Data.Kind
-  data P (x :: k) = Q
-  data A :: Type where
-    B :: forall (a :: A). P a -> A
-
-In order to check the constructor B, we need to have the promoted type A, but in
-order to get that promoted type, B must first be checked. To prevent looping, a
-TyConPE promotion error is given when tcTyVar checks an ATcTyCon in kind mode.
-Any ATcTyCon is a TyCon being defined in the current recursive group (see data
-type decl for TcTyThing), and all such TyCons are illegal in kinds.
-
-#11962 proposes checking the head of a data declaration separately from
-its constructors. This would allow the example above to pass.
-
 Note [Body kind of a HsForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The body of a forall is usually a type, but in principle
