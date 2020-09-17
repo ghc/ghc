@@ -183,6 +183,13 @@ Event log output
 Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
 ⟨flags⟩`) is written through a custom :c:type:`EventLogWriter`:
 
+.. The size_t declaration below is simply to ensure that the build doesn't fail with an
+   undefined reference target warning as Sphinx doesn't know about size_t.
+
+.. c:type:: size_t
+
+   :hidden:
+
 .. c:type:: EventLogWriter
 
     A sink of event-log data.

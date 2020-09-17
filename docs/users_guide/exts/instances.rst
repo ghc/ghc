@@ -141,22 +141,22 @@ Where:
 
 - ``btype`` is a type that is not allowed to have an outermost
   ``forall``/``=>`` unless it is surrounded by parentheses. For example,
-  ``forall a. a`` and ``Eq a => a`` are not legal ``btype``s, but
+  ``forall a. a`` and ``Eq a => a`` are not legal ``btype``\s, but
   ``(forall a. a)`` and ``(Eq a => a)`` are legal.
 - ``ctype`` is a ``btype`` that has no restrictions on an outermost
-  ``forall``/``=>``, so ``forall a. a`` and ``Eq a => a`` are legal ``ctype``s.
-- ``arg_type`` is a type that is not allowed to have ``forall``s or ``=>``s
+  ``forall``/``=>``, so ``forall a. a`` and ``Eq a => a`` are legal ``ctype``\s.
+- ``arg_type`` is a type that is not allowed to have ``forall``s or ``=>``\s
 - ``prefix_cls_tycon`` is a class type constructor written prefix (e.g.,
   ``Show`` or ``(&&&)``), while ``infix_cls_tycon`` is a class type constructor
-  written infix (e.g., ```Show``` or ``&&&``).
+  written infix (e.g., ``\`Show\``` or ``&&&``).
 
 This is a simplified grammar that does not fully delve into all of the
 implementation details of GHC's parser (such as the placement of Haddock
 comments), but it is sufficient to attain an understanding of what is
 syntactically allowed. Some further various observations about this grammar:
 
-- Instance declarations are not allowed to be declared with nested ``forall``s
-  or ``=>``s. For example, this would be rejected: ::
+- Instance declarations are not allowed to be declared with nested ``forall``\s
+  or ``=>``\s. For example, this would be rejected: ::
 
     instance forall a. forall b. C (Either a b) where ...
 
