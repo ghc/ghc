@@ -20,6 +20,7 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeApplications #-}
 
 module GHC.Hs.Type (
         Mult, HsScaled(..),
@@ -412,7 +413,7 @@ emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 -- | Haskell Implicit Binders
 data HsImplicitBndrs pass thing   -- See Note [HsType binders]
   = HsIB
-      { hsib_ext  :: XHsIB pass
+      { hsib_ext  :: XHsIB pass thing
         -- ^ after renamer: [Name]
         -- Implicitly-bound kind & type vars
         -- Order is important; see
@@ -421,20 +422,26 @@ data HsImplicitBndrs pass thing   -- See Note [HsType binders]
       , hsib_body :: thing
         -- ^ Main payload (type or list of types)
       }
-  | XHsImplicitBndrs !(XXHsImplicitBndrs pass)
-  deriving (Functor)
+  | XHsImplicitBndrs !(XXHsImplicitBndrs pass thing)
 
-type instance XHsIB              GhcPs = NoExtField
-type instance XHsIB              GhcRn = [Name]
-type instance XHsIB              GhcTc = [Name]
+instance IsPass p => Functor (HsImplicitBndrs (GhcPass p)) where
+  fmap f (HsIB { hsib_ext = x, hsib_body = body })
+    = case ghcPass @p of
+        GhcPs -> HsIB { hsib_ext = x, hsib_body = f body }
+        GhcRn -> HsIB { hsib_ext = x, hsib_body = f body }
+        GhcTc -> HsIB { hsib_ext = x, hsib_body = f body }
 
-type instance XXHsImplicitBndrs  (GhcPass _) = NoExtCon
+type instance XHsIB              GhcPs _ = NoExtField
+type instance XHsIB              GhcRn _ = [Name]
+type instance XHsIB              GhcTc _ = [Name]
+
+type instance XXHsImplicitBndrs  (GhcPass _) _ = NoExtCon
 
 -- | Haskell Wildcard Binders
 data HsWildCardBndrs pass thing
     -- See Note [HsType binders]
     -- See Note [The wildcard story for types]
-  = HsWC { hswc_ext :: XHsWC pass
+  = HsWC { hswc_ext :: XHsWC pass thing
                 -- after the renamer
                 -- Wild cards, only named
                 -- See Note [Wildcards in visible kind application]
@@ -444,15 +451,20 @@ data HsWildCardBndrs pass thing
                 -- If there is an extra-constraints wildcard,
                 -- it's still there in the hsc_body.
     }
-  | XHsWildCardBndrs !(XXHsWildCardBndrs pass)
-  deriving (Functor)
+  | XHsWildCardBndrs !(XXHsWildCardBndrs pass thing)
 
+instance IsPass p => Functor (HsWildCardBndrs (GhcPass p)) where
+  fmap f (HsWC { hswc_ext = x, hswc_body = body })
+    = case ghcPass @p of
+        GhcPs -> HsWC { hswc_ext = x, hswc_body = f body }
+        GhcRn -> HsWC { hswc_ext = x, hswc_body = f body }
+        GhcTc -> HsWC { hswc_ext = x, hswc_body = f body }
 
-type instance XHsWC              GhcPs = NoExtField
-type instance XHsWC              GhcRn = [Name]
-type instance XHsWC              GhcTc = [Name]
+type instance XHsWC              GhcPs _ = NoExtField
+type instance XHsWC              GhcRn _ = [Name]
+type instance XHsWC              GhcTc _ = [Name]
 
-type instance XXHsWildCardBndrs  (GhcPass _) = NoExtCon
+type instance XXHsWildCardBndrs  (GhcPass _) _ = NoExtCon
 
 -- | Types that can appear in pattern signatures, as well as the signatures for
 -- term-level binders in RULES.

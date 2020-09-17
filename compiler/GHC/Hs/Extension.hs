@@ -730,13 +730,13 @@ type family XXLHsQTyVars  x
 
 -- -------------------------------------
 
-type family XHsIB              x
-type family XXHsImplicitBndrs  x
+type family XHsIB              x b
+type family XXHsImplicitBndrs  x b
 
 -- -------------------------------------
 
-type family XHsWC              x
-type family XXHsWildCardBndrs  x
+type family XHsWC              x b
+type family XXHsWildCardBndrs  x b
 
 -- -------------------------------------
 
