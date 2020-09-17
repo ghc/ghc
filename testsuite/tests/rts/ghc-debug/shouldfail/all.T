@@ -1,0 +1,1 @@
+test('unsafe_rts_pause', [ignore_stderr, exit_code(134)], compile_and_run, ['-threaded '])
