@@ -136,7 +136,7 @@ import GHC.Types
 -- If compaction encounters any of the above, a 'Control.Exception.CompactionFailed'
 -- exception will be thrown by the compaction operation.
 --
-data Compact a = Compact Compact# a (MVar ())
+data Compact a = Compact Compact# a !(MVar ())
     -- we can *read* from a Compact without taking a lock, but only
     -- one thread can be writing to the compact at any given time.
     -- The MVar here is to enforce mutual exclusion among writers.
