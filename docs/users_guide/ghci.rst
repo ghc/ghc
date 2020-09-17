@@ -40,7 +40,7 @@ command ``ghci``:
 
     $ ghci
     GHCi, version 8.y.z: https://www.haskell.org/ghc/  :? for help
-    Prelude>
+    ghci>
 
 There may be a short pause while GHCi loads the prelude and standard
 libraries, after which the prompt is shown. As the banner says, you can
@@ -56,11 +56,11 @@ Haskell expressions can be typed at the prompt:
 
 .. code-block:: none
 
-    Prelude> 1+2
+    ghci> 1+2
     3
-    Prelude> let x = 42 in x / 9
+    ghci> let x = 42 in x / 9
     4.666666666666667
-    Prelude>
+    ghci>
 
 GHCi interprets the whole line as an expression to evaluate. The
 expression may not span several lines - as soon as you press enter, GHCi
@@ -75,10 +75,10 @@ Since GHC 8.0.1, you can bind values and functions to names without ``let`` stat
 
 .. code-block:: none
 
-    Prelude> x = 42
-    Prelude> x
+    ghci> x = 42
+    ghci> x
     42
-    Prelude>
+    ghci>
 
 .. _loading-source-files:
 
@@ -99,7 +99,7 @@ right directory in GHCi:
 
 .. code-block:: none
 
-    Prelude> :cd dir
+    ghci> :cd dir
 
 where ⟨dir⟩ is the directory (or folder) in which you saved ``Main.hs``.
 
@@ -110,20 +110,20 @@ To load a Haskell source file into GHCi, use the :ghci-cmd:`:load` command:
 
 .. code-block:: none
 
-    Prelude> :load Main
+    ghci> :load Main
     Compiling Main             ( Main.hs, interpreted )
     Ok, modules loaded: Main.
-    *Main>
+    *ghci>
 
 GHCi has loaded the ``Main`` module, and the prompt has changed to
-``*Main>`` to indicate that the current context for expressions
+``*ghci>`` to indicate that the current context for expressions
 typed at the prompt is the ``Main`` module we just loaded (we'll explain
 what the ``*`` means later in :ref:`ghci-scope`). So we can now type
 expressions involving the functions from ``Main.hs``:
 
 .. code-block:: none
 
-    *Main> fac 17
+    *ghci> fac 17
     355687428096000
 
 Loading a multi-module program is just as straightforward; just give the
@@ -251,13 +251,13 @@ We can compile ``D``, then load the whole program, like this:
 
 .. code-block:: none
 
-    Prelude> :! ghc -c -dynamic D.hs
-    Prelude> :load A
+    ghci> :! ghc -c -dynamic D.hs
+    ghci> :load A
     Compiling B                ( B.hs, interpreted )
     Compiling C                ( C.hs, interpreted )
     Compiling A                ( A.hs, interpreted )
     Ok, modules loaded: A, B, C, D (D.o).
-    *Main>
+    *ghci>
 
 In the messages from the compiler, we see that there is no line for
 ``D``. This is because it isn't necessary to compile ``D``, because the
@@ -273,12 +273,12 @@ the modules currently loaded into GHCi:
 
 .. code-block:: none
 
-    *Main> :show modules
+    *ghci> :show modules
     D                ( D.hs, D.o )
     C                ( C.hs, interpreted )
     B                ( B.hs, interpreted )
     A                ( A.hs, interpreted )
-    *Main>
+    *ghci>
 
 If we now modify the source of ``D`` (or pretend to: using the Unix command
 ``touch`` on the source file is handy for this), the compiler will no
@@ -286,11 +286,11 @@ longer be able to use the object file, because it might be out of date:
 
 .. code-block:: none
 
-    *Main> :! touch D.hs
-    *Main> :reload
+    *ghci> :! touch D.hs
+    *ghci> :reload
     Compiling D                ( D.hs, interpreted )
     Ok, modules loaded: A, B, C, D.
-    *Main>
+    *ghci>
 
 Note that module ``D`` was compiled, but in this instance because its source
 hadn't really changed, its interface remained the same, and the
@@ -301,8 +301,8 @@ So let's try compiling one of the other modules:
 
 .. code-block:: none
 
-    *Main> :! ghc -c C.hs
-    *Main> :load A
+    *ghci> :! ghc -c C.hs
+    *ghci> :load A
     Compiling D                ( D.hs, interpreted )
     Compiling B                ( B.hs, interpreted )
     Compiling C                ( C.hs, interpreted )
@@ -316,8 +316,8 @@ rejected ``C``\'s object file. Ok, so let's also compile ``D``:
 
 .. code-block:: none
 
-    *Main> :! ghc -c D.hs
-    *Main> :reload
+    *ghci> :! ghc -c D.hs
+    *ghci> :reload
     Ok, modules loaded: A, B, C, D.
 
 Nothing happened! Here's another lesson: newly compiled modules aren't
@@ -325,7 +325,7 @@ picked up by :ghci-cmd:`:reload`, only :ghci-cmd:`:load`:
 
 .. code-block:: none
 
-    *Main> :load A
+    *ghci> :load A
     Compiling B                ( B.hs, interpreted )
     Compiling A                ( A.hs, interpreted )
     Ok, modules loaded: A, B, C (C.o), D (D.o).
@@ -340,9 +340,9 @@ when using :ghci-cmd:`:load`, for example
 
 .. code-block:: none
 
-    Prelude> :load *A
+    ghci> :load *A
     Compiling A                ( A.hs, interpreted )
-    *A>
+    *ghci>
 
 When the ``*`` is used, GHCi ignores any pre-compiled object code and
 interprets the module. If you have already loaded a number of modules as
@@ -373,9 +373,9 @@ and prints the result:
 
 .. code-block:: none
 
-    Prelude> reverse "hello"
+    ghci> reverse "hello"
     "olleh"
-    Prelude> 5+5
+    ghci> 5+5
     10
 
 .. _actions-at-prompt:
@@ -389,9 +389,9 @@ enter an expression of type ``IO a`` for some ``a``, then GHCi
 
 .. code-block:: none
 
-    Prelude> "hello"
+    ghci> "hello"
     "hello"
-    Prelude> putStrLn "hello"
+    ghci> putStrLn "hello"
     hello
 
 This works even if the type of the expression is more general, provided
@@ -399,7 +399,7 @@ it can be *instantiated* to ``IO a``. For example
 
 .. code-block:: none
 
-    Prelude> return True
+    ghci> return True
     True
 
 Furthermore, GHCi will print the result of the I/O action if (and only
@@ -413,9 +413,9 @@ For example, remembering that ``putStrLn :: String -> IO ()``:
 
 .. code-block:: none
 
-    Prelude> putStrLn "hello"
+    ghci> putStrLn "hello"
     hello
-    Prelude> do { putStrLn "hello"; return "yes" }
+    ghci> do { putStrLn "hello"; return "yes" }
     hello
     "yes"
 
@@ -439,10 +439,10 @@ prompt must be in the ``IO`` monad.
 
 .. code-block:: none
 
-    Prelude> x <- return 42
-    Prelude> print x
+    ghci> x <- return 42
+    ghci> print x
     42
-    Prelude>
+    ghci>
 
 The statement ``x <- return 42`` means “execute ``return 42`` in the
 ``IO`` monad, and bind the result to ``x``\ ”. We can then use ``x`` in
@@ -468,10 +468,10 @@ Of course, you can also bind normal non-IO expressions using the
 
 .. code-block:: none
 
-    Prelude> let x = 42
-    Prelude> x
+    ghci> let x = 42
+    ghci> x
     42
-    Prelude>
+    ghci>
 
 Another important difference between the two types of binding is that
 the monadic bind (``p <- e``) is *strict* (it evaluates ``e``), whereas
@@ -479,10 +479,10 @@ with the ``let`` form, the expression isn't evaluated immediately:
 
 .. code-block:: none
 
-    Prelude> let x = error "help!"
-    Prelude> print x
+    ghci> let x = error "help!"
+    ghci> print x
     *** Exception: help!
-    Prelude>
+    ghci>
 
 Note that ``let`` bindings do not automatically print the value bound,
 unlike monadic bindings.
@@ -491,10 +491,10 @@ You can also define functions at the prompt:
 
 .. code-block:: none
 
-    Prelude> add a b = a + b
-    Prelude> add 1 2
+    ghci> add a b = a + b
+    ghci> add 1 2
     3
-    Prelude>
+    ghci>
 
 However, this quickly gets tedious when defining functions with multiple
 clauses, or groups of mutually recursive functions, because the complete
@@ -503,10 +503,10 @@ instead of layout:
 
 .. code-block:: none
 
-    Prelude> f op n [] = n ; f op n (h:t) = h `op` f op n t
-    Prelude> f (+) 0 [1..3]
+    ghci> f op n [] = n ; f op n (h:t) = h `op` f op n t
+    ghci> f (+) 0 [1..3]
     6
-    Prelude>
+    ghci>
 
 .. ghci-cmd:: :{
               :}
@@ -519,11 +519,11 @@ own):
 
 .. code-block:: none
 
-    Prelude> :{
-    Prelude| g op n [] = n
-    Prelude| g op n (h:t) = h `op` g op n t
-    Prelude| :}
-    Prelude> g (*) 1 [1..3]
+    ghci> :{
+    | g op n [] = n
+    | g op n (h:t) = h `op` g op n t
+    | :}
+    ghci> g (*) 1 [1..3]
     6
 
 Such multiline commands can be used with any GHCi command, and note that
@@ -551,9 +551,9 @@ including entities that are in scope in the current module context.
 
     .. code-block:: none
 
-        Prelude> :show bindings
+        ghci> :show bindings
         x :: Int
-        Prelude>
+        ghci>
 
 .. hint::
     If you turn on the ``+t`` option, GHCi will show the type of each
@@ -561,8 +561,8 @@ including entities that are in scope in the current module context.
 
     .. code-block:: none
 
-        Prelude> :set +t
-        Prelude> let (x:xs) = [1..]
+        ghci> :set +t
+        ghci> let (x:xs) = [1..]
         x :: Integer
         xs :: [Integer]
 
@@ -583,9 +583,9 @@ multi-line input is terminated with an empty line. For example:
 
 .. code-block:: none
 
-    Prelude> :set +m
-    Prelude> let x = 42
-    Prelude|
+    ghci> :set +m
+    ghci> let x = 42
+    |
 
 Further bindings can be added to this ``let`` statement, so GHCi
 indicates that the next line continues the previous one by changing the
@@ -594,23 +594,23 @@ prompt. Note that layout is in effect, so to add more bindings to this
 
 .. code-block:: none
 
-    Prelude> :set +m
-    Prelude> let x = 42
-    Prelude|     y = 3
-    Prelude|
-    Prelude>
+    ghci> :set +m
+    ghci> let x = 42
+    |     y = 3
+    |
+    ghci>
 
 Explicit braces and semicolons can be used instead of layout:
 
 .. code-block:: none
 
-    Prelude> do {
-    Prelude| putStrLn "hello"
-    Prelude| ;putStrLn "world"
-    Prelude| }
+    ghci> do {
+    | putStrLn "hello"
+    | ;putStrLn "world"
+    | }
     hello
     world
-    Prelude>
+    ghci>
 
 Note that after the closing brace, GHCi knows that the current statement
 is finished, so no empty line is required.
@@ -619,25 +619,25 @@ Multiline mode is useful when entering monadic ``do`` statements:
 
 .. code-block:: none
 
-    Control.Monad.State> flip evalStateT 0 $ do
-    Control.Monad.State| i <- get
-    Control.Monad.State| lift $ do
-    Control.Monad.State|   putStrLn "Hello World!"
-    Control.Monad.State|   print i
-    Control.Monad.State|
+    ghci> flip evalStateT 0 $ do
+    | i <- get
+    | lift $ do
+    |   putStrLn "Hello World!"
+    |   print i
+    |
     "Hello World!"
     0
-    Control.Monad.State>
+    ghci>
 
 During a multiline interaction, the user can interrupt and return to the
 top-level prompt.
 
 .. code-block:: none
 
-    Prelude> do
-    Prelude| putStrLn "Hello, World!"
-    Prelude| ^C
-    Prelude>
+    ghci> do
+    | putStrLn "Hello, World!"
+    | ^C
+    ghci>
 
 .. _ghci-decls:
 
@@ -650,10 +650,10 @@ including ``data``, ``type``, ``newtype``, ``class``, ``instance``,
 
 .. code-block:: none
 
-    Prelude> data T = A | B | C deriving (Eq, Ord, Show, Enum)
-    Prelude> [A ..]
+    ghci> data T = A | B | C deriving (Eq, Ord, Show, Enum)
+    ghci> [A ..]
     [A,B,C]
-    Prelude> :i T
+    ghci> :i T
     data T = A | B | C      -- Defined at <interactive>:2:6
     instance Enum T -- Defined at <interactive>:2:45
     instance Eq T -- Defined at <interactive>:2:30
@@ -671,10 +671,10 @@ example:
 
 .. code-block:: none
 
-    Prelude> data T = A | B
-    Prelude> let f A = True; f B = False
-    Prelude> data T = A | B | C
-    Prelude> f A
+    ghci> data T = A | B
+    ghci> let f A = True; f B = False
+    ghci> data T = A | B | C
+    ghci> f A
 
     <interactive>:2:3:
         Couldn't match expected type `main::Interactive.T'
@@ -682,7 +682,7 @@ example:
         In the first argument of `f', namely `A'
         In the expression: f A
         In an equation for `it': it = f A
-    Prelude>
+    ghci>
 
 The old, shadowed, version of ``T`` is displayed as
 ``main::Interactive.T`` by GHCi in an attempt to distinguish it from the
@@ -697,11 +697,11 @@ the whole type-family. (See :ref:`type-families`.) For example:
 
 .. code-block:: none
 
-    Prelude> type family T a b
-    Prelude> type instance T a b = a
-    Prelude> let uc :: a -> T a b; uc = id
+    ghci> type family T a b
+    ghci> type instance T a b = a
+    ghci> let uc :: a -> T a b; uc = id
 
-    Prelude> type instance T a b = b
+    ghci> type instance T a b = b
 
     <interactive>:3:15: error:
         Conflicting family instance declarations:
@@ -710,10 +710,10 @@ the whole type-family. (See :ref:`type-families`.) For example:
 
     -- Darn! We have to re-declare T.
 
-    Prelude> type family T a b
+    ghci> type family T a b
     -- This is a brand-new T, unrelated to the old one
-    Prelude> type instance T a b = b
-    Prelude> uc 'a' :: Int
+    ghci> type instance T a b = b
+    ghci> uc 'a' :: Int
 
     <interactive>:8:1: error:
         • Couldn't match type ‘Char’ with ‘Int’
@@ -758,25 +758,12 @@ the prompt looks like this:
 
 .. code-block:: none
 
-    Prelude>
+    ghci>
 
-which indicates that everything from the module ``Prelude`` is currently
-in scope; the visible identifiers are exactly those that would be
-visible in a Haskell source file with no ``import`` declarations.
-
-If we now load a file into GHCi, the prompt will change:
-
-.. code-block:: none
-
-    Prelude> :load Main.hs
-    Compiling Main             ( Main.hs, interpreted )
-    *Main>
-
-The new prompt is ``*Main``, which indicates that we are typing
-expressions in the context of the top-level of the ``Main`` module.
-Everything that is in scope at the top-level in the module ``Main`` we
-just loaded is also in scope at the prompt (probably including
-``Prelude``, as long as ``Main`` doesn't explicitly hide it).
+By default, this means that everything from the module ``Prelude`` is currently
+in scope. Should the prompt be set to ``%s>`` in the ``.ghci`` configuration
+file, we would be seeing ``Prelude>`` displayed. However, it is not the default
+mechanism due to the large space the prompt can take if more imports are done.
 
 The syntax in the prompt ``*module`` indicates that it is the full
 top-level scope of ⟨module⟩ that is contributing to the scope for
@@ -795,18 +782,18 @@ the scope for the most recently loaded "target" module, in a ``*``-form
 if possible. For example, if you say ``:load foo.hs bar.hs`` and
 ``bar.hs`` contains module ``Bar``, then the scope will be set to
 ``*Bar`` if ``Bar`` is interpreted, or if ``Bar`` is compiled it will be
-set to ``Prelude Bar`` (GHCi automatically adds ``Prelude`` if it isn't
+set to ``Prelude`` and ``Bar`` (GHCi automatically adds ``Prelude`` if it isn't
 present and there aren't any ``*``-form modules). These
 automatically-added imports can be seen with :ghci-cmd:`:show imports`:
 
 .. code-block:: none
 
-    Prelude> :load hello.hs
+    ghci> :load hello.hs
     [1 of 1] Compiling Main             ( hello.hs, interpreted )
     Ok, modules loaded: Main.
-    *Main> :show imports
+    *ghci> :show imports
     :module +*Main -- added automatically
-    *Main>
+    *ghci>
 
 and the automatically-added import is replaced the next time you use
 :ghci-cmd:`:load`, :ghci-cmd:`:add`, or :ghci-cmd:`:reload`. It can also be
@@ -826,10 +813,9 @@ To add modules to the scope, use ordinary Haskell ``import`` syntax:
 
 .. code-block:: none
 
-    Prelude> import System.IO
-    Prelude System.IO> hPutStrLn stdout "hello\n"
+    ghci> import System.IO
+    ghci> hPutStrLn stdout "hello\n"
     hello
-    Prelude System.IO>
 
 The full Haskell import syntax is supported, including ``hiding`` and
 ``as`` clauses. The prompt shows the modules that are currently
@@ -838,13 +824,12 @@ see the full story, use :ghci-cmd:`:show imports`:
 
 .. code-block:: none
 
-    Prelude> import System.IO
-    Prelude System.IO> import Data.Map as Map
-    Prelude System.IO Map> :show imports
+    ghci> import System.IO
+    ghci> import Data.Map as Map
+    ghci Map> :show imports
     import Prelude -- implicit
     import System.IO
     import Data.Map as Map
-    Prelude System.IO Map>
 
 Note that the ``Prelude`` import is marked as implicit. It can be
 overridden with an explicit ``Prelude`` import, just like in a Haskell
@@ -934,8 +919,8 @@ arguments, e.g.:
 
 .. code-block:: none
 
-    Prelude> main = System.Environment.getArgs >>= print
-    Prelude> :main foo bar
+    ghci> main = System.Environment.getArgs >>= print
+    ghci> :main foo bar
     ["foo","bar"]
 
 We can also quote arguments which contains characters like spaces, and
@@ -944,9 +929,9 @@ syntax:
 
 .. code-block:: none
 
-    Prelude> :main foo "bar baz"
+    ghci> :main foo "bar baz"
     ["foo","bar baz"]
-    Prelude> :main ["foo", "bar baz"]
+    ghci> :main ["foo", "bar baz"]
     ["foo","bar baz"]
 
 Finally, other functions can be called, either with the ``-main-is``
@@ -954,13 +939,13 @@ flag or the :ghci-cmd:`:run` command:
 
 .. code-block:: none
 
-    Prelude> foo = putStrLn "foo" >> System.Environment.getArgs >>= print
-    Prelude> bar = putStrLn "bar" >> System.Environment.getArgs >>= print
-    Prelude> :set -main-is foo
-    Prelude> :main foo "bar baz"
+    ghci> foo = putStrLn "foo" >> System.Environment.getArgs >>= print
+    ghci> bar = putStrLn "bar" >> System.Environment.getArgs >>= print
+    ghci> :set -main-is foo
+    ghci> :main foo "bar baz"
     foo
     ["foo","bar baz"]
-    Prelude> :run bar ["foo", "bar baz"]
+    ghci> :run bar ["foo", "bar baz"]
     bar
     ["foo","bar baz"]
 
@@ -976,9 +961,9 @@ typed at the prompt, GHCi implicitly binds its value to the variable
 
 .. code-block:: none
 
-    Prelude> 1+2
+    ghci> 1+2
     3
-    Prelude> it * 2
+    ghci> it * 2
     6
 
 What actually happens is that GHCi typechecks the expression, and if it
@@ -997,7 +982,7 @@ the ``Show`` class, or GHCi will complain:
 
 .. code-block:: none
 
-    Prelude> id
+    ghci> id
 
     <interactive>:1:0:
         No instance for (Show (a -> a))
@@ -1015,9 +1000,9 @@ of type ``a``. eg.:
 
 .. code-block:: none
 
-    Prelude> Data.Time.getZonedTime
+    ghci> Data.Time.getZonedTime
     2017-04-10 12:34:56.93213581 UTC
-    Prelude> print it
+    ghci> print it
     2017-04-10 12:34:56.93213581 UTC
 
 The corresponding translation for an IO-typed ``e`` is
@@ -1342,19 +1327,19 @@ First, load the module into GHCi:
 
 .. code-block:: none
 
-    Prelude> :l qsort.hs
+    ghci> :l qsort.hs
     [1 of 1] Compiling Main             ( qsort.hs, interpreted )
     Ok, modules loaded: Main.
-    *Main>
+    *ghci>
 
 Now, let's set a breakpoint on the right-hand-side of the second
 equation of qsort:
 
 .. code-block:: none
 
-    *Main> :break 2
+    *ghci> :break 2
     Breakpoint 0 activated at qsort.hs:2:15-46
-    *Main>
+    *ghci>
 
 The command ``:break 2`` sets a breakpoint on line 2 of the most
 recently-loaded module, in this case ``qsort.hs``. Specifically, it
@@ -1366,13 +1351,13 @@ Now, we run the program:
 
 .. code-block:: none
 
-    *Main> main
+    *ghci> main
     Stopped at qsort.hs:2:15-46
     _result :: [a]
     a :: a
     left :: [a]
     right :: [a]
-    [qsort.hs:2:15-46] *Main>
+    [qsort.hs:2:15-46] *ghci>
 
 Execution has stopped at the breakpoint. The prompt has changed to
 indicate that we are currently stopped at a breakpoint, and the
@@ -1381,7 +1366,7 @@ can use the :ghci-cmd:`:list` command:
 
 .. code-block:: none
 
-    [qsort.hs:2:15-46] *Main> :list
+    [qsort.hs:2:15-46] *ghci> :list
     1  qsort [] = []
     2  qsort (a:as) = qsort left ++ [a] ++ qsort right
     3    where (left,right) = (filter (<=a) as, filter (>a) as)
@@ -1401,7 +1386,7 @@ types. For example, if we try to display the value of ``left``:
 
 .. code-block:: none
 
-    [qsort.hs:2:15-46] *Main> left
+    [qsort.hs:2:15-46] *ghci> left
 
     <interactive>:1:0:
         Ambiguous type variable `a' in the constraint:
@@ -1421,8 +1406,8 @@ attempt to reconstruct its type. If we try it on ``left``:
 
 .. code-block:: none
 
-    [qsort.hs:2:15-46] *Main> :set -fprint-evld-with-show
-    [qsort.hs:2:15-46] *Main> :print left
+    [qsort.hs:2:15-46] *ghci> :set -fprint-evld-with-show
+    [qsort.hs:2:15-46] *ghci> :print left
     left = (_t1::[a])
 
 This isn't particularly enlightening. What happened is that ``left`` is
@@ -1452,7 +1437,7 @@ evaluation of any thunks it encounters:
 
 .. code-block:: none
 
-    [qsort.hs:2:15-46] *Main> :force left
+    [qsort.hs:2:15-46] *ghci> :force left
     left = [4,0,3,1]
 
 Now, since :ghci-cmd:`:force` has inspected the runtime value of ``left``, it
@@ -1461,7 +1446,7 @@ reconstruction:
 
 .. code-block:: none
 
-    [qsort.hs:2:15-46] *Main> :show bindings
+    [qsort.hs:2:15-46] *ghci> :show bindings
     _result :: [Integer]
     a :: Integer
     left :: [Integer]
@@ -1474,7 +1459,7 @@ example:
 
 .. code-block:: none
 
-    [qsort.hs:2:15-46] *Main> a
+    [qsort.hs:2:15-46] *ghci> a
     8
 
 You might find it useful to use Haskell's ``seq`` function to evaluate
@@ -1483,11 +1468,11 @@ individual thunks rather than evaluating the whole expression with
 
 .. code-block:: none
 
-    [qsort.hs:2:15-46] *Main> :print right
+    [qsort.hs:2:15-46] *ghci> :print right
     right = (_t1::[Integer])
-    [qsort.hs:2:15-46] *Main> seq _t1 ()
+    [qsort.hs:2:15-46] *ghci> seq _t1 ()
     ()
-    [qsort.hs:2:15-46] *Main> :print right
+    [qsort.hs:2:15-46] *ghci> :print right
     right = 23 : (_t2::[Integer])
 
 We evaluated only the ``_t1`` thunk, revealing the head of the list, and
@@ -1499,13 +1484,13 @@ Finally, we can continue the current execution:
 
 .. code-block:: none
 
-    [qsort.hs:2:15-46] *Main> :continue
+    [qsort.hs:2:15-46] *ghci> :continue
     Stopped at qsort.hs:2:15-46
     _result :: [a]
     a :: a
     left :: [a]
     right :: [a]
-    [qsort.hs:2:15-46] *Main>
+    [qsort.hs:2:15-46] *ghci>
 
 The execution continued at the point it previously stopped, and has now
 stopped at the breakpoint for a second time.
@@ -1611,7 +1596,7 @@ The list of breakpoints currently defined can be displayed using
 
 .. code-block:: none
 
-    *Main> :show breaks
+    *ghci> :show breaks
     [0] Main qsort.hs:1:11-12 enabled
     [1] Main qsort.hs:2:15-46 enabled
 
@@ -1622,8 +1607,8 @@ To disable all breakpoints at once, use ``:disable *``.
 
 .. code-block:: none
 
-    *Main> :disable 0
-    *Main> :show breaks
+    *ghci> :disable 0
+    *ghci> :show breaks
     [0] Main qsort.hs:1:11-12 disabled
     [1] Main qsort.hs:2:15-46 enabled
 
@@ -1635,8 +1620,8 @@ given in the output from :ghci-cmd:`:show breaks`:
 
 .. code-block:: none
 
-    *Main> :delete 0
-    *Main> :show breaks
+    *ghci> :delete 0
+    *ghci> :show breaks
     [1] Main qsort.hs:2:15-46 disabled
 
 To delete all breakpoints at once, use ``:delete *``.
@@ -1657,7 +1642,7 @@ example:
 
 .. code-block:: none
 
-    *Main> :step main
+    *ghci> :step main
     Stopped at qsort.hs:5:7-47
     _result :: IO ()
 
@@ -1671,25 +1656,25 @@ see where you currently are:
 
 .. code-block:: none
 
-    [qsort.hs:5:7-47] *Main> :list
+    [qsort.hs:5:7-47] *ghci> :list
     4
     5  main = print (qsort [8, 4, 0, 3, 1, 23, 11, 18])
     6
-    [qsort.hs:5:7-47] *Main>
+    [qsort.hs:5:7-47] *ghci>
 
 In fact, GHCi provides a way to run a command when a breakpoint is hit,
 so we can make it automatically do :ghci-cmd:`:list`:
 
 .. code-block:: none
 
-    [qsort.hs:5:7-47] *Main> :set stop :list
-    [qsort.hs:5:7-47] *Main> :step
+    [qsort.hs:5:7-47] *ghci> :set stop :list
+    [qsort.hs:5:7-47] *ghci> :step
     Stopped at qsort.hs:5:14-46
     _result :: [Integer]
     4
     5  main = print (qsort [8, 4, 0, 3, 1, 23, 11, 18])
     6
-    [qsort.hs:5:14-46] *Main>
+    [qsort.hs:5:14-46] *ghci>
 
 .. _nested-breakpoints:
 
@@ -1703,10 +1688,10 @@ of breakpoint contexts can be built up in this way. For example:
 
 .. code-block:: none
 
-    [qsort.hs:2:15-46] *Main> :st qsort [1,3]
+    [qsort.hs:2:15-46] *ghci> :st qsort [1,3]
     Stopped at qsort.hs:(1,0)-(3,55)
     _result :: [a]
-    ... [qsort.hs:(1,0)-(3,55)] *Main>
+    ... [qsort.hs:(1,0)-(3,55)] *ghci>
 
 While stopped at the breakpoint on line 2 that we set earlier, we
 started a new evaluation with ``:step qsort [1,3]``. This new evaluation
@@ -1717,20 +1702,20 @@ breakpoints beyond the current one. To see the stack of contexts, use
 
 .. code-block:: none
 
-    ... [qsort.hs:(1,0)-(3,55)] *Main> :show context
+    ... [qsort.hs:(1,0)-(3,55)] *ghci> :show context
     --> main
       Stopped at qsort.hs:2:15-46
     --> qsort [1,3]
       Stopped at qsort.hs:(1,0)-(3,55)
-    ... [qsort.hs:(1,0)-(3,55)] *Main>
+    ... [qsort.hs:(1,0)-(3,55)] *ghci>
 
 To abandon the current evaluation, use :ghci-cmd:`:abandon`:
 
 .. code-block:: none
 
-    ... [qsort.hs:(1,0)-(3,55)] *Main> :abandon
-    [qsort.hs:2:15-46] *Main> :abandon
-    *Main>
+    ... [qsort.hs:(1,0)-(3,55)] *ghci> :abandon
+    [qsort.hs:2:15-46] *ghci> :abandon
+    *ghci>
 
 .. _ghci-debugger-result:
 
@@ -1777,29 +1762,29 @@ example, if we set a breakpoint on the base case of ``qsort``:
 
 .. code-block:: none
 
-    *Main> :list qsort
+    *ghci> :list qsort
     1  qsort [] = []
     2  qsort (a:as) = qsort left ++ [a] ++ qsort right
     3    where (left,right) = (filter (<=a) as, filter (>a) as)
     4
-    *Main> :b 1
+    *ghci> :b 1
     Breakpoint 1 activated at qsort.hs:1:11-12
-    *Main>
+    *ghci>
 
 and then run a small ``qsort`` with tracing:
 
 .. code-block:: none
 
-    *Main> :trace qsort [3,2,1]
+    *ghci> :trace qsort [3,2,1]
     Stopped at qsort.hs:1:11-12
     _result :: [a]
-    [qsort.hs:1:11-12] *Main>
+    [qsort.hs:1:11-12] *ghci>
 
 We can now inspect the history of evaluation steps:
 
 .. code-block:: none
 
-    [qsort.hs:1:11-12] *Main> :hist
+    [qsort.hs:1:11-12] *ghci> :hist
     -1  : qsort.hs:3:24-38
     -2  : qsort.hs:3:23-55
     -3  : qsort.hs:(1,0)-(3,55)
@@ -1822,12 +1807,12 @@ To examine one of the steps in the history, use :ghci-cmd:`:back`:
 
 .. code-block:: none
 
-    [qsort.hs:1:11-12] *Main> :back
+    [qsort.hs:1:11-12] *ghci> :back
     Logged breakpoint at qsort.hs:3:24-38
     _result :: [a]
     as :: [a]
     a :: a
-    [-1: qsort.hs:3:24-38] *Main>
+    [-1: qsort.hs:3:24-38] *ghci>
 
 Note that the local variables at each step in the history have been
 preserved, and can be examined as usual. Also note that the prompt has
@@ -1883,11 +1868,11 @@ example:
 
 .. code-block:: none
 
-    *Main> :set -fbreak-on-exception
-    *Main> :trace qsort ("abc" ++ undefined)
+    *ghci> :set -fbreak-on-exception
+    *ghci> :trace qsort ("abc" ++ undefined)
     “Stopped at <exception thrown>
     _exception :: e
-    [<exception thrown>] *Main> :hist
+    [<exception thrown>] *ghci> :hist
     -1  : qsort.hs:3:24-38
     -2  : qsort.hs:3:23-55
     -3  : qsort.hs:(1,0)-(3,55)
@@ -1895,14 +1880,14 @@ example:
     -5  : qsort.hs:2:15-46
     -6  : qsort.hs:(1,0)-(3,55)
     <end of history>
-    [<exception thrown>] *Main> :back
+    [<exception thrown>] *ghci> :back
     Logged breakpoint at qsort.hs:3:24-38
     _result :: [a]
     as :: [a]
     a :: a
-    [-1: qsort.hs:3:24-38] *Main> :force as
+    [-1: qsort.hs:3:24-38] *ghci> :force as
     *** Exception: Prelude.undefined
-    [-1: qsort.hs:3:24-38] *Main> :print as
+    [-1: qsort.hs:3:24-38] *ghci> :print as
     as = 'b' : 'c' : (_t1::[Char])
 
 The exception itself is bound to a new variable, ``_exception``.
@@ -1957,9 +1942,9 @@ We set a breakpoint on ``map``, and call it.
 
 .. code-block:: none
 
-    *Main> :break 5
+    *ghci> :break 5
     Breakpoint 0 activated at  map.hs:5:15-28
-    *Main> map Just [1..5]
+    *ghci> map Just [1..5]
     Stopped at map.hs:(4,0)-(5,12)
     _result :: [b]
     x :: a
@@ -1980,8 +1965,8 @@ part of ``f``.
 
 .. code-block:: none
 
-    *Main> seq x ()
-    *Main> :print x
+    *ghci> seq x ()
+    *ghci> :print x
     x = 1
 
 We can check now that as expected, the type of ``x`` has been
@@ -1989,9 +1974,9 @@ reconstructed, and with it the type of ``f`` has been too:
 
 .. code-block:: none
 
-    *Main> :t x
+    *ghci> :t x
     x :: Integer
-    *Main> :t f
+    *ghci> :t f
     f :: Integer -> b
 
 From here, we can apply f to any argument of type Integer and observe
@@ -1999,28 +1984,28 @@ the results.
 
 .. code-block:: none
 
-    *Main> let b = f 10
-    *Main> :t b
+    *ghci> let b = f 10
+    *ghci> :t b
     b :: b
-    *Main> b
+    *ghci> b
     <interactive>:1:0:
         Ambiguous type variable `b' in the constraint:
           `Show b' arising from a use of `print' at <interactive>:1:0
-    *Main> :p b
+    *ghci> :p b
     b = (_t2::a)
-    *Main> seq b ()
+    *ghci> seq b ()
     ()
-    *Main> :t b
+    *ghci> :t b
     b :: a
-    *Main> :p b
+    *ghci> :p b
     b = Just 10
-    *Main> :t b
+    *ghci> :t b
     b :: Maybe Integer
-    *Main> :t f
+    *ghci> :t f
     f :: Integer -> Maybe Integer
-    *Main> f 20
+    *ghci> f 20
     Just 20
-    *Main> map f [1..5]
+    *ghci> map f [1..5]
     [Just 1, Just 2, Just 3, Just 4, Just 5]
 
 In the first application of ``f``, we had to do some more type
@@ -2117,13 +2102,13 @@ by using the :ghc-flag:`-package ⟨pkg⟩` flag:
     GHCi, version 8.y.z: https://www.haskell.org/ghc/  :? for help
     Loading package base ... linking ... done.
     Loading package readline-1.0 ... linking ... done.
-    Prelude>
+    ghci>
 
 The following command works to load new packages into a running GHCi:
 
 .. code-block:: none
 
-    Prelude> :set -package name
+    ghci> :set -package name
 
 But note that doing this will cause all currently loaded modules to be
 unloaded, and you'll be dumped back into the ``Prelude``.
@@ -2256,7 +2241,7 @@ commonly used commands.
        listing with comments giving possible imports for each group of
        entries. Here is an example: ::
 
-           Prelude> :browse! Data.Maybe
+           ghci> :browse! Data.Maybe
            -- not currently imported
            Data.Maybe.catMaybes :: [Maybe a] -> [a]
            Data.Maybe.fromJust :: Maybe a -> a
@@ -2333,16 +2318,16 @@ commonly used commands.
 
     .. code-block:: none
 
-        Prelude> :complete repl 0 ""
+        ghci> :complete repl 0 ""
         0 470 ""
-        Prelude> :complete repl 5 "import For"
+        ghci> :complete repl 5 "import For"
         5 21 "import "
         "Foreign"
         "Foreign.C"
         "Foreign.C.Error"
         "Foreign.C.String"
         "Foreign.C.Types"
-        Prelude> :complete repl 5-10 "import For"
+        ghci> :complete repl 5-10 "import For"
         6 21 "import "
         "Foreign.C.Types"
         "Foreign.Concurrent"
@@ -2350,16 +2335,16 @@ commonly used commands.
         "Foreign.ForeignPtr.Safe"
         "Foreign.ForeignPtr.Unsafe"
         "Foreign.Marshal"
-        Prelude> :complete repl 20- "import For"
+        ghci> :complete repl 20- "import For"
         2 21 "import "
         "Foreign.StablePtr"
         "Foreign.Storable"
-        Prelude> :complete repl "map"
+        ghci> :complete repl "map"
         3 3 ""
         "map"
         "mapM"
         "mapM_"
-        Prelude> :complete repl 5-10 "map"
+        ghci> :complete repl 5-10 "map"
         0 3 ""
 
 .. ghci-cmd:: :continue
@@ -2392,9 +2377,9 @@ commonly used commands.
 
     .. code-block:: none
 
-        Prelude> let date _ = Data.Time.getZonedTime >>= print >> return ""
-        Prelude> :def date date
-        Prelude> :date
+        ghci> let date _ = Data.Time.getZonedTime >>= print >> return ""
+        ghci> :def date date
+        ghci> :date
         2017-04-10 12:34:56.93213581 UTC
 
     Here's an example of a command that takes an argument. It's a
@@ -2402,16 +2387,16 @@ commonly used commands.
 
     .. code-block:: none
 
-        Prelude> let mycd d = System.Directory.setCurrentDirectory d >> return ""
-        Prelude> :def mycd mycd
-        Prelude> :mycd ..
+        ghci> let mycd d = System.Directory.setCurrentDirectory d >> return ""
+        ghci> :def mycd mycd
+        ghci> :mycd ..
 
     Or I could define a simple way to invoke "``ghc --make Main``"
     in the current directory:
 
     .. code-block:: none
 
-        Prelude> :def make (\_ -> return ":! ghc --make Main")
+        ghci> :def make (\_ -> return ":! ghc --make Main")
 
     We can define a command that reads GHCi input from a file. This
     might be useful for creating a set of bindings that we want to
@@ -2419,8 +2404,8 @@ commonly used commands.
 
     .. code-block:: none
 
-        Prelude> :def . readFile
-        Prelude> :. cmds.ghci
+        ghci> :def . readFile
+        ghci> :. cmds.ghci
 
     Notice that we named the command ``:.``, by analogy with the
     "``.``" Unix shell command that does the same thing.
@@ -2679,8 +2664,8 @@ commonly used commands.
 
     .. code-block:: none
 
-        Prelude> main = System.Environment.getArgs >>= print
-        Prelude> :main foo bar
+        ghci> main = System.Environment.getArgs >>= print
+        ghci> :main foo bar
         ["foo","bar"]
 
     We can also quote arguments which contains characters like spaces,
@@ -2689,9 +2674,9 @@ commonly used commands.
 
     .. code-block:: none
 
-        Prelude> :main foo "bar baz"
+        ghci> :main foo "bar baz"
         ["foo","bar baz"]
-        Prelude> :main ["foo", "bar baz"]
+        ghci> :main ["foo", "bar baz"]
         ["foo","bar baz"]
 
     Finally, other functions can be called, either with the ``-main-is``
@@ -2699,13 +2684,13 @@ commonly used commands.
 
     .. code-block:: none
 
-        Prelude> foo = putStrLn "foo" >> System.Environment.getArgs >>= print
-        Prelude> bar = putStrLn "bar" >> System.Environment.getArgs >>= print
-        Prelude> :set -main-is foo
-        Prelude> :main foo "bar baz"
+        ghci> foo = putStrLn "foo" >> System.Environment.getArgs >>= print
+        ghci> bar = putStrLn "bar" >> System.Environment.getArgs >>= print
+        ghci> :set -main-is foo
+        ghci> :main foo "bar baz"
         foo
         ["foo","bar baz"]
-        Prelude> :run bar ["foo", "bar baz"]
+        ghci> :run bar ["foo", "bar baz"]
         bar
         ["foo","bar baz"]
 
@@ -2869,8 +2854,8 @@ commonly used commands.
 
     .. code-block:: none
 
-        *Main> :def cond \expr -> return (":cmd if (" ++ expr ++ ") then return \"\" else return \":continue\"")
-        *Main> :set stop 0 :cond (x < 3)
+        *ghci> :def cond \expr -> return (":cmd if (" ++ expr ++ ") then return \"\" else return \":continue\"")
+        *ghci> :set stop 0 :cond (x < 3)
 
     Ignoring breakpoints for a specified number of iterations is also
     possible using similar techniques.
@@ -3160,7 +3145,7 @@ example, to turn on :ghc-flag:`-Wmissing-signatures`, you would say:
 
 .. code-block:: none
 
-    Prelude> :set -Wmissing-signatures
+    ghci> :set -Wmissing-signatures
 
 Any GHC command-line option that is designated as dynamic (see the table
 in :ref:`flag-reference`), may be set using :ghci-cmd:`:set`. To unset an
@@ -3171,7 +3156,7 @@ option, you can set the reverse option:
 
 .. code-block:: none
 
-    Prelude> :set -Wno-incomplete-patterns -XNoMultiParamTypeClasses
+    ghci> :set -Wno-incomplete-patterns -XNoMultiParamTypeClasses
 
 :ref:`flag-reference` lists the reverse for each option where
 applicable.
@@ -3221,7 +3206,7 @@ clean GHCi session we might see something like this:
 
 .. code-block:: none
 
-    Prelude> :seti
+    ghci> :seti
     base language is: Haskell2010
     with the following modifiers:
       -XNoMonomorphismRestriction
