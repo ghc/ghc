@@ -2564,6 +2564,7 @@ commonly used commands.
     be used.
 
     .. code-block:: none
+
         ghci>:set -XDataKinds -XUndecidableInstances
         ghci>import GHC.TypeLits
         ghci>class A a
