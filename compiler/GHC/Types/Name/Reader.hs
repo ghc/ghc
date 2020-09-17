@@ -826,8 +826,7 @@ lookupGRE_Name_OccName :: GlobalRdrEnv -> Name -> OccName -> Maybe GlobalRdrElt
 -- Note [Parents for record fields].
 lookupGRE_Name_OccName env name occ
   = case [ gre | gre <- lookupGlobalRdrEnv env occ
-                , gre_name gre == name
-               ] of
+               , gre_name gre == name ] of
       []    -> Nothing
       [gre] -> Just gre
       gres  -> pprPanic "lookupGRE_Name_OccName"

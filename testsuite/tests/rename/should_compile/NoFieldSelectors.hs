@@ -22,6 +22,3 @@ foo1 = Foo 3 "bar"
 foo2 = Foo { foo = 3, bar = "bar" } -- disambiguate foo
 foo3 = foo1 { foo = 4 } -- update
 foo4 = foo1 { bar = "baz" } -- bar is unambiguous
-
-barY' :: Int
-barY' = barY
