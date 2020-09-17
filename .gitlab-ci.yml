@@ -6,7 +6,7 @@ variables:
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
-  WINDOWS_TOOLCHAIN_VERSION: 1
+  WINDOWS_TOOLCHAIN_VERSION: 2
 
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
@@ -48,7 +48,7 @@ workflow:
     - if: $CI_MERGE_REQUEST_ID
     - if: $CI_COMMIT_TAG
     - if: '$CI_COMMIT_BRANCH == "wip/marge_bot_batch_merge_job"'
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
 .nightly: &nightly
@@ -826,13 +826,16 @@ validate-x86_64-linux-fedora27:
       - ghc.tar.xz
       - junit.xml
 
-validate-x86_64-windows-hadrian:
+.build-x86_64-windows-hadrian:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW64
-    TEST_ENV: "x86_64-windows-hadrian"
+    TEST_ENV: "x86_64-windows"
   cache:
-    key: "x86_64-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
+    key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
+
+validate-x86_64-windows-hadrian:
+  extends: .build-x86_64-windows-hadrian
 
 .build-windows-make:
   extends: .build-windows
@@ -866,9 +869,6 @@ validate-x86_64-windows-hadrian:
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
-validate-x86_64-windows:
-  extends: .build-x86_64-windows-make
-
 nightly-x86_64-windows:
   <<: *nightly
   extends: .build-x86_64-windows-make
@@ -876,16 +876,17 @@ nightly-x86_64-windows:
   variables:
     BUILD_FLAVOUR: "validate"
 
-# Normal Windows validate builds are profiled; that won't do for releases.
+# Normal Windows validate builds lack profiled libraries; that won't do for
+# releases.
 release-x86_64-windows:
   <<: *release
-  extends: validate-x86_64-windows-hadrian
+  extends: .build-x86_64-windows-hadrian
   variables:
     BUILD_FLAVOUR: "perf"
 
 release-x86_64-windows-integer-simple:
   <<: *release
-  extends: validate-x86_64-windows-hadrian
+  extends: .build-x86_64-windows-hadrian
   variables:
     BIGNUM_BACKEND: native
     BUILD_FLAVOUR: "perf"
@@ -940,7 +941,7 @@ doc-tarball:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   dependencies:
     - validate-x86_64-linux-deb9-debug
-    - validate-x86_64-windows
+    - validate-x86_64-windows-hadrian
   variables:
     LINUX_BINDIST: "ghc-x86_64-deb9-linux-debug.tar.xz"
     WINDOWS_BINDIST: "ghc-x86_64-mingw32.tar.xz"
