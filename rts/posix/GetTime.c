@@ -71,7 +71,7 @@ Time getCurrentThreadCPUTime(void)
     // support clock_getcpuclockid. Hence we prefer to use the Darwin-specific
     // path on Darwin, even if clock_gettime is available.
 #if defined(darwin_HOST_OS)
-    thread_basic_info_data_t info = { 0 };
+    thread_basic_info_data_t info = { };
     mach_msg_type_number_t info_count = THREAD_BASIC_INFO_COUNT;
     kern_return_t kern_err = thread_info(mach_thread_self(), THREAD_BASIC_INFO,
                                          (thread_info_t) &info, &info_count);
