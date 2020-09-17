@@ -1798,11 +1798,9 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
+           -- See Note [Recursion through the kinds]
            ATcTyCon tc_tc
-             -> do { -- See Note [GADT kind self-reference]
-                     unless (isTypeLevel (mode_tyki mode))
-                            (promotionErr name TyConPE)
-                   ; check_tc tc_tc
+             -> do { check_tc tc_tc
                    ; return (mkTyConTy tc_tc, tyConKind tc_tc) }
 
            AGlobal (ATyCon tc)
@@ -1843,25 +1841,34 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
     dc_theta_illegal_constraint = find (not . isEqPred)
 
 {-
-Note [GADT kind self-reference]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Recursion through the kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider these examples
 
-A promoted type cannot be used in the body of that type's declaration.
-#11554 shows this example, which made GHC loop:
-
-  import Data.Kind
+#11554:
   data P (x :: k) = Q
   data A :: Type where
-    B :: forall (a :: A). P a -> A
+    MkA :: forall (a :: A). P a -> A
 
-In order to check the constructor B, we need to have the promoted type A, but in
-order to get that promoted type, B must first be checked. To prevent looping, a
-TyConPE promotion error is given when tcTyVar checks an ATcTyCon in kind mode.
-Any ATcTyCon is a TyCon being defined in the current recursive group (see data
-type decl for TcTyThing), and all such TyCons are illegal in kinds.
+#12174
+  data V a
+  data T = forall (a :: T). MkT (V a)
 
-#11962 proposes checking the head of a data declaration separately from
-its constructors. This would allow the example above to pass.
+The type is recursive (which is fine) but it is recursive /through the
+kinds/.  In earlier versions of GHC this caused a loop in the compiler
+(to do with knot-tying) but there is nothing fundamentally wrong with
+the code (kinds are types, and the recursive declarations are OK). But
+it's hard to distinguish "recursion through the kinds" from "recursion
+through the types". Consider this (also #11554):
+
+  data PB k (x :: k) = Q
+  data B :: Type where
+    MkB :: P B a -> B
+
+Here the occurrence of B is not obviously in a kind position.
+
+So now GHC allows all these programs.  #12081 and #15942 are other
+examples.
 
 Note [Body kind of a HsForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
