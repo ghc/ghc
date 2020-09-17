@@ -1,0 +1,1 @@
+test('unsafe_rts_pause', normal, compile_and_run, ['-threaded '])
