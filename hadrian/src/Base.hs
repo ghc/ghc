@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Base (
     -- * General utilities
     module Control.Applicative,
@@ -34,7 +36,11 @@ import Control.Monad.Reader
 import Data.List.Extra
 import Data.Maybe
 import Data.Semigroup
+#if MIN_VERSION_shake(0,19,0)
+import Development.Shake hiding (unit, Normal)
+#else
 import Development.Shake hiding (unit, (*>), Normal)
+#endif
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import Development.Shake.Util
