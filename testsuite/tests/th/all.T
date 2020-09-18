@@ -51,7 +51,8 @@ test('TH_NestedSplices', [], multimod_compile,
 # normal way first, which is why the work is done by a Makefile rule.
 test('TH_spliceE5_prof',
      [req_profiling, only_ways(['normal']),
-      when(ghc_dynamic(), expect_broken(11495))],
+      when(ghc_dynamic(), expect_broken(11495)),
+      when(opsys('mingw32'), expect_broken(18271))],
      makefile_test, ['TH_spliceE5_prof'])
 
 test('TH_spliceE5_prof_ext', [req_profiling, only_ways(['normal'])],
