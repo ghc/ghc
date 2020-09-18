@@ -1384,7 +1384,7 @@ jsonLogAction :: LogAction
 jsonLogAction dflags reason severity srcSpan msg
   = do
     defaultLogActionHPutStrDoc dflags stdout
-      (withPprStyle (mkCodeStyle CStyle) (doc $$ text ""))
+      (withPprStyle (PprCode CStyle) (doc $$ text ""))
     where
       doc = renderJSON $
               JSObject [ ( "span", json srcSpan )
