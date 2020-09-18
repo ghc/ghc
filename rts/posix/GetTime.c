@@ -85,7 +85,9 @@ Time getCurrentThreadCPUTime(void)
        defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
        defined(HAVE_SYSCONF)
     static bool have_checked_usability = false;
-    if (!have_checked_usability) {
+    // The RELAXED operation is fine here as it's okay if we do the check below
+    // more than once.
+    if (!RELAXED_LOAD(&have_checked_usability)) {
         // The Linux clock_getres(2) manpage claims that some early versions of
         // Linux will return values which are uninterpretable in the presence
         // of migration across CPUs. They claim that clock_getcpuclockid(0)
@@ -95,7 +97,7 @@ Time getCurrentThreadCPUTime(void)
             sysErrorBelch("getCurrentThreadCPUTime: no supported");
             stg_exit(EXIT_FAILURE);
         }
-        have_checked_usability = true;
+        RELAXED_STORE(&have_checked_usability, true);
     }
     return getClockTime(CLOCK_THREAD_CPUTIME_ID);
 #else
