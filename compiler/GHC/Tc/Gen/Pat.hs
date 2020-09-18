@@ -68,8 +68,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import Control.Monad
 import GHC.Data.List.SetOps ( getNth )
-import qualified Data.Map as Map
-import Data.Map (Map)
 
 {-
 ************************************************************************
