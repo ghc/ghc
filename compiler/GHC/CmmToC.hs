@@ -91,7 +91,7 @@ pprTop platform = \case
            blankLine,
            extern_decls,
            (if (externallyVisibleCLabel clbl)
-                    then mkFN_ else mkIF_) (pprCLabel_ViaC platform clbl) <+> lbrace,
+                    then mkFN_ else mkIF_) (pprCLabel platform CStyle clbl) <+> lbrace,
            nest 8 temp_decls,
            vcat (map (pprBBlock platform) blocks),
            rbrace ]
@@ -110,14 +110,14 @@ pprTop platform = \case
   (CmmData section (CmmStaticsRaw lbl [CmmString str])) ->
     pprExternDecl platform lbl $$
     hcat [
-      pprLocalness lbl, pprConstness (isSecConstant section), text "char ", pprCLabel_ViaC platform lbl,
+      pprLocalness lbl, pprConstness (isSecConstant section), text "char ", pprCLabel platform CStyle lbl,
       text "[] = ", pprStringInCStyle str, semi
     ]
 
   (CmmData section (CmmStaticsRaw lbl [CmmUninitialised size])) ->
     pprExternDecl platform lbl $$
     hcat [
-      pprLocalness lbl, pprConstness (isSecConstant section), text "char ", pprCLabel_ViaC platform lbl,
+      pprLocalness lbl, pprConstness (isSecConstant section), text "char ", pprCLabel platform CStyle lbl,
       brackets (int size), semi
     ]
 
@@ -153,7 +153,7 @@ pprWordArray platform is_ro lbl ds
   = -- TODO: align closures only
     pprExternDecl platform lbl $$
     hcat [ pprLocalness lbl, pprConstness is_ro, text "StgWord"
-         , space, pprCLabel_ViaC platform lbl, text "[]"
+         , space, pprCLabel platform CStyle lbl, text "[]"
          -- See Note [StgWord alignment]
          , pprAlignment (wordWidth platform)
          , text "= {" ]
@@ -238,7 +238,7 @@ pprStmt platform stmt =
             case fn of
               CmmLit (CmmLabel lbl)
                 | StdCallConv <- cconv ->
-                    pprCall platform (pprCLabel_ViaC platform lbl) cconv hresults hargs
+                    pprCall platform (pprCLabel platform CStyle lbl) cconv hresults hargs
                         -- stdcall functions must be declared with
                         -- a function type, otherwise the C compiler
                         -- doesn't add the @n suffix to the label.  We
@@ -247,7 +247,7 @@ pprStmt platform stmt =
                 | CmmNeverReturns <- ret ->
                     pprCall platform cast_fn cconv hresults hargs <> semi
                 | not (isMathFun lbl) ->
-                    pprForeignCall platform (pprCLabel_ViaC platform lbl) cconv hresults hargs
+                    pprForeignCall platform (pprCLabel platform CStyle lbl) cconv hresults hargs
               _ ->
                     pprCall platform cast_fn cconv hresults hargs <> semi
                         -- for a dynamic call, no declaration is necessary.
@@ -487,7 +487,7 @@ pprLit platform lit = case lit of
         -> mkW_ <> pprCLabelAddr clbl1 <> char '+' <> int i
 
     where
-        pprCLabelAddr lbl = char '&' <> pprCLabel_ViaC platform lbl
+        pprCLabelAddr lbl = char '&' <> pprCLabel platform CStyle lbl
 
 pprLit1 :: Platform -> CmmLit -> SDoc
 pprLit1 platform lit = case lit of
@@ -1047,7 +1047,7 @@ pprExternDecl platform lbl
   | not (needsCDecl lbl) = empty
   | Just sz <- foreignLabelStdcallInfo lbl = stdcall_decl sz
   | otherwise =
-        hcat [ visibility, label_type lbl , lparen, pprCLabel_ViaC platform lbl, text ");"
+        hcat [ visibility, label_type lbl , lparen, pprCLabel platform CStyle lbl, text ");"
              -- occasionally useful to see label type
              -- , text "/* ", pprDebugCLabel lbl, text " */"
              ]
@@ -1070,7 +1070,7 @@ pprExternDecl platform lbl
   -- we must generate an appropriate prototype for it, so that the C compiler will
   -- add the @n suffix to the label (#2276)
   stdcall_decl sz =
-        text "extern __attribute__((stdcall)) void " <> pprCLabel_ViaC platform lbl
+        text "extern __attribute__((stdcall)) void " <> pprCLabel platform CStyle lbl
         <> parens (commafy (replicate (sz `quot` platformWordSizeInBytes platform) (machRep_U_CType platform (wordWidth platform))))
         <> semi
 

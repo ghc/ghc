@@ -1334,8 +1334,7 @@ hpcInitCode dflags this_mod (HpcInfo tickCount hashNo)
     ]
   where
     platform  = targetPlatform dflags
-    bcknd     = backend dflags
-    tickboxes = pprCLabel bcknd platform (mkHpcTicksLabel $ this_mod)
+    tickboxes = pprCLabel platform CStyle (mkHpcTicksLabel $ this_mod)
 
     module_name  = hcat (map (text.charToC) $ BS.unpack $
                          bytesFS (moduleNameFS (moduleName this_mod)))
