@@ -105,7 +105,7 @@ writeChan (Chan _ writeVar) val = do
 -- Throws 'Control.Exception.BlockedIndefinitelyOnMVar' when the channel is
 -- empty and no other thread holds a reference to the channel.
 readChan :: Chan a -> IO a
-readChan (Chan readVar _) = do
+readChan (Chan readVar _) =
   modifyMVar readVar $ \read_end -> do
     (ChItem val new_read_end) <- readMVar read_end
         -- Use readMVar here, not takeMVar,

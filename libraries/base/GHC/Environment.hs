@@ -26,8 +26,8 @@ import qualified GHC.Foreign as GHC
 -- returns a list of the program's command line arguments, starting with the
 -- program name, and including those normally eaten by the RTS (+RTS ... -RTS).
 getFullArgs :: IO [String]
-getFullArgs = do
-  alloca $ \ p_argc -> do
+getFullArgs =
+  alloca $ \ p_argc ->
     alloca $ \ p_argv -> do
         getFullProgArgv p_argc p_argv
         p    <- fromIntegral `liftM` peek p_argc

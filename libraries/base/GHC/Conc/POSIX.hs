@@ -179,7 +179,7 @@ interruptIOManager :: IO ()
 interruptIOManager = return ()
 
 startIOManagerThread :: IO ()
-startIOManagerThread = do
+startIOManagerThread =
   modifyMVar_ ioManagerThread $ \old -> do
     let create = do t <- forkIO ioManager;
                     labelThread t "IOManagerThread";
@@ -251,7 +251,7 @@ service_loop wakeup old_delays = do
 
   r <- c_WaitForSingleObject wakeup timeout
   case r of
-    0xffffffff -> do throwGetLastError "service_loop"
+    0xffffffff -> throwGetLastError "service_loop"
     0 -> do
         r2 <- c_readIOManagerEvent
         exit <-

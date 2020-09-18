@@ -278,9 +278,9 @@ string :: String -> ReadP String
 -- ^ Parses and returns the specified string.
 string this = do s <- look; scan this s
  where
-  scan []     _               = do return this
+  scan []     _               = return this
   scan (x:xs) (y:ys) | x == y = do _ <- get; scan xs ys
-  scan _      _               = do pfail
+  scan _      _               = pfail
 
 munch :: (Char -> Bool) -> ReadP String
 -- ^ Parses the first zero or more characters satisfying the predicate.
@@ -291,7 +291,7 @@ munch p =
      scan s
  where
   scan (c:cs) | p c = do _ <- get; s <- scan cs; return (c:s)
-  scan _            = do return ""
+  scan _            = return ""
 
 munch1 :: (Char -> Bool) -> ReadP String
 -- ^ Parses the first one or more characters satisfying the predicate.
@@ -315,7 +315,7 @@ skipSpaces =
      skip s
  where
   skip (c:s) | isSpace c = do _ <- get; skip s
-  skip _                 = do return ()
+  skip _                 = return ()
 
 count :: Int -> ReadP a -> ReadP [a]
 -- ^ @count n p@ parses @n@ occurrences of @p@ in sequence. A list of
