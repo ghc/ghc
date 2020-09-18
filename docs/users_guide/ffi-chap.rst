@@ -245,6 +245,46 @@ allocated until ``hs_exit()`` is called. If you call it too often, the
 worst that can happen is that the next call to a Haskell function incurs
 some extra overhead.
 
+.. _ffi-stable-ptr-extras:
+
+Freeing many stable pointers efficiently
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The standard function ``hs_free_stable_ptr`` locks the stable pointer
+table, frees the given stable pointer, and then unlocks the stable pointer
+table again. When freeing many stable pointers at once, it is usually
+more efficient to lock and unlock the table only once.
+
+.. code-block:: c
+
+    extern void hs_lock_stable_ptr_table (void);
+
+    extern void hs_unlock_stable_ptr_table (void);
+
+    extern void hs_free_stable_ptr_unsafe (HsStablePtr sp);
+
+``hs_free_stable_ptr_unsafe`` must be used *only* when the table has been
+locked using ``hs_lock_stable_ptr_table``. It must be unlocked afterwards
+using ``hs_unlock_stable_ptr_table``. The Haskell garbage collector cannot
+run while the table is locked, so it should be unlocked promptly. The
+following operations are forbidden while the stable pointer table is locked:
+
+* Calling any Haskell function, whether or not that function
+  manipulates stable pointers.
+
+* Calling any FFI function that deals with the stable pointer table
+  except for arbitrarily many calls to ``hs_free_stable_ptr_unsafe``
+  and the final call to ``hs_unlock_stable_ptr_table``.
+
+* Calling ``hs_free_fun_ptr``.
+
+.. note::
+
+    GHC versions before 8.8 defined undocumented functions
+    ``hs_lock_stable_tables`` and ``hs_unlock_stable_tables`` instead
+    of ``hs_lock_stable_ptr_table`` and ``hs_unlock_stable_ptr_table``.
+    Those names are now deprecated.
+
 .. _ffi-ghc:
 
 Using the FFI with GHC

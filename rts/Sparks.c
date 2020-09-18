@@ -91,7 +91,7 @@ pruneSparkQueue (Capability *cap)
     SparkPool *pool;
     StgClosurePtr spark, tmp, *elements;
     uint32_t n, pruned_sparks; // stats only
-    StgWord botInd,oldBotInd,currInd; // indices in array (always < size)
+    StgInt botInd,oldBotInd,currInd; // indices in array (always < size)
     const StgInfoTable *info;
 
     n = 0;
@@ -110,7 +110,6 @@ pruneSparkQueue (Capability *cap)
     // stealing is happening during GC.
     pool->bottom  -= pool->top & ~pool->moduloSize;
     pool->top     &= pool->moduloSize;
-    pool->topBound = pool->top;
 
     debugTrace(DEBUG_sparks,
                "markSparkQueue: current spark queue len=%ld; (hd=%ld; tl=%ld)",
@@ -182,6 +181,7 @@ pruneSparkQueue (Capability *cap)
           traceEventSparkFizzle(cap);
       } else {
           info = spark->header.info;
+          load_load_barrier();
           if (IS_FORWARDING_PTR(info)) {
               tmp = (StgClosure*)UN_FORWARDING_PTR(info);
               /* if valuable work: shift inside the pool */
@@ -238,7 +238,6 @@ pruneSparkQueue (Capability *cap)
     ASSERT(currInd == oldBotInd);
 
     pool->top = oldBotInd; // where we started writing
-    pool->topBound = pool->top;
 
     pool->bottom = (oldBotInd <= botInd) ? botInd : (botInd + pool->size);
     // first free place we did not use (corrected by wraparound)

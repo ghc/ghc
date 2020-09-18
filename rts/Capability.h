@@ -96,6 +96,8 @@ struct Capability_ {
 
     // Context switch flag.  When non-zero, this means: stop running
     // Haskell code, and switch threads.
+    //
+    // Does not require lock to read or write.
     int context_switch;
 
     // Interrupt flag.  Like the context_switch flag, this also
@@ -106,6 +108,8 @@ struct Capability_ {
     // The interrupt flag is always reset before we start running
     // Haskell code, unlike the context_switch flag which is only
     // reset after we have executed the context switch.
+    //
+    // Does not require lock to read or write.
     int interrupt;
 
     // Total words allocated by this cap since rts start
@@ -172,10 +176,10 @@ struct Capability_ {
 #endif
 
 // These properties should be true when a Task is holding a Capability
-#define ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task)                     \
-  ASSERT(cap->running_task != NULL && cap->running_task == task);       \
-  ASSERT(task->cap == cap);                                             \
-  ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task)
+#define ASSERT_FULL_CAPABILITY_INVARIANTS(_cap,_task)                   \
+  ASSERT(_cap->running_task != NULL && _cap->running_task == _task);    \
+  ASSERT(_task->cap == _cap);                                           \
+  ASSERT_PARTIAL_CAPABILITY_INVARIANTS(_cap,_task)
 
 // This assert requires cap->lock to be held, so it can't be part of
 // ASSERT_PARTIAL_CAPABILITY_INVARIANTS()
@@ -264,7 +268,10 @@ typedef enum {
 //
 typedef struct {
     SyncType type;              // The kind of synchronisation
-    bool *idle;
+    bool *idle;                 // Array of size n_capabilities. idle[i] is true
+                                // if capability i will be idle during this GC
+                                // cycle. Only available when doing GC (when
+                                // type is SYNC_GC_*).
     Task *task;                 // The Task performing the sync
 } PendingSync;
 
@@ -405,14 +412,16 @@ recordMutableCap (const StgClosure *p, Capability *cap, uint32_t gen)
     //    ASSERT(cap->running_task == myTask());
     // NO: assertion is violated by performPendingThrowTos()
     bd = cap->mut_lists[gen];
-    if (bd->free >= bd->start + BLOCK_SIZE_W) {
+    if (RELAXED_LOAD(&bd->free) >= bd->start + BLOCK_SIZE_W) {
         bdescr *new_bd;
         new_bd = allocBlockOnNode_lock(cap->node);
         new_bd->link = bd;
+        new_bd->free = new_bd->start;
         bd = new_bd;
         cap->mut_lists[gen] = bd;
     }
-    *bd->free++ = (StgWord)p;
+    RELAXED_STORE(bd->free, (StgWord) p);
+    NONATOMIC_ADD(&bd->free, 1);
 }
 
 EXTERN_INLINE void
@@ -446,29 +455,34 @@ stopCapability (Capability *cap)
     // It may not work - the thread might be updating HpLim itself
     // at the same time - so we also have the context_switch/interrupted
     // flags as a sticky way to tell the thread to stop.
-    cap->r.rHpLim = NULL;
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->r.rHpLim, "stopCapability");
+    SEQ_CST_STORE(&cap->r.rHpLim, NULL);
 }
 
 INLINE_HEADER void
 interruptCapability (Capability *cap)
 {
     stopCapability(cap);
-    cap->interrupt = 1;
+    SEQ_CST_STORE(&cap->interrupt, true);
 }
 
 INLINE_HEADER void
 contextSwitchCapability (Capability *cap)
 {
     stopCapability(cap);
-    cap->context_switch = 1;
+    SEQ_CST_STORE(&cap->context_switch, true);
 }
 
 #if defined(THREADED_RTS)
 
 INLINE_HEADER bool emptyInbox(Capability *cap)
 {
-    return (cap->inbox == (Message*)END_TSO_QUEUE &&
-            cap->putMVars == NULL);
+    // This may race with writes to putMVars and inbox but this harmless for the
+    // intended uses of this function.
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->putMVars, "emptyInbox(cap->putMVars)");
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->inbox, "emptyInbox(cap->inbox)");
+    return (RELAXED_LOAD(&cap->inbox) == (Message*)END_TSO_QUEUE &&
+            RELAXED_LOAD(&cap->putMVars) == NULL);
 }
 
 #endif

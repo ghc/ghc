@@ -9,11 +9,15 @@
 -- -----------------------------------------------------------------------------
 
 module NCGMonad (
+        NcgImpl(..),
         NatM_State(..), mkNatM_State,
 
         NatM, -- instance Monad
         initNat,
         addImportNat,
+        addNodeBetweenNat,
+        addImmediateSuccessorNat,
+        updateCfgNat,
         getUniqueNat,
         mapAccumLNat,
         setDeltaNat,
@@ -57,6 +61,39 @@ import Module
 
 import Control.Monad    ( liftM, ap )
 
+import Instruction
+import Outputable (SDoc, pprPanic, ppr)
+import Cmm (RawCmmDecl, CmmStatics)
+import CFG
+
+data NcgImpl statics instr jumpDest = NcgImpl {
+    cmmTopCodeGen             :: RawCmmDecl -> NatM [NatCmmDecl statics instr],
+    generateJumpTableForInstr :: instr -> Maybe (NatCmmDecl statics instr),
+    getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
+    canShortcut               :: instr -> Maybe jumpDest,
+    shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
+    shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
+    pprNatCmmDecl             :: NatCmmDecl statics instr -> SDoc,
+    maxSpillSlots             :: Int,
+    allocatableRegs           :: [RealReg],
+    ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
+    ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
+    ncgAllocMoreStack         :: Int -> NatCmmDecl statics instr
+                              -> UniqSM (NatCmmDecl statics instr, [(BlockId,BlockId)]),
+    -- ^ The list of block ids records the redirected jumps to allow us to update
+    -- the CFG.
+    ncgMakeFarBranches        :: LabelMap CmmStatics -> [NatBasicBlock instr] -> [NatBasicBlock instr],
+    extractUnwindPoints       :: [instr] -> [UnwindPoint],
+    -- ^ given the instruction sequence of a block, produce a list of
+    -- the block's 'UnwindPoint's
+    -- See Note [What is this unwinding business?] in Debug
+    -- and Note [Unwinding information in the NCG] in this module.
+    invertCondBranches        :: CFG -> LabelMap CmmStatics -> [NatBasicBlock instr]
+                              -> [NatBasicBlock instr]
+    -- ^ Turn the sequence of `jcc l1; jmp l2` into `jncc l2; <block_l1>`
+    -- when possible.
+    }
+
 data NatM_State
         = NatM_State {
                 natm_us          :: UniqSupply,
@@ -67,7 +104,11 @@ data NatM_State
                 natm_this_module :: Module,
                 natm_modloc      :: ModLocation,
                 natm_fileid      :: DwarfFiles,
-                natm_debug_map   :: LabelMap DebugBlock
+                natm_debug_map   :: LabelMap DebugBlock,
+                natm_cfg         :: CFG
+        -- ^ Having a CFG with additional information is essential for some
+        -- operations. However we can't reconstruct all information once we
+        -- generated instructions. So instead we update the CFG as we go.
         }
 
 type DwarfFiles = UniqFM (FastString, Int)
@@ -78,9 +119,21 @@ unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
 
 mkNatM_State :: UniqSupply -> Int -> DynFlags -> Module -> ModLocation ->
-                DwarfFiles -> LabelMap DebugBlock -> NatM_State
+                DwarfFiles -> LabelMap DebugBlock -> CFG -> NatM_State
 mkNatM_State us delta dflags this_mod
-        = NatM_State us delta [] Nothing dflags this_mod
+        = \loc dwf dbg cfg ->
+                NatM_State
+                        { natm_us = us
+                        , natm_delta = delta
+                        , natm_imports = []
+                        , natm_pic = Nothing
+                        , natm_dflags = dflags
+                        , natm_this_module = this_mod
+                        , natm_modloc = loc
+                        , natm_fileid = dwf
+                        , natm_debug_map = dbg
+                        , natm_cfg = cfg
+                        }
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m
@@ -151,6 +204,36 @@ addImportNat :: CLabel -> NatM ()
 addImportNat imp
         = NatM $ \ st -> ((), st {natm_imports = imp : natm_imports st})
 
+updateCfgNat :: (CFG -> CFG) -> NatM ()
+updateCfgNat f
+        = NatM $ \ st -> ((), st { natm_cfg = f (natm_cfg st) })
+
+-- | Record that we added a block between `from` and `old`.
+addNodeBetweenNat :: BlockId -> BlockId -> BlockId -> NatM ()
+addNodeBetweenNat from between to
+ = do   df <- getDynFlags
+        let jmpWeight = fromIntegral . uncondWeight .
+                        cfgWeightInfo $ df
+        updateCfgNat (updateCfg jmpWeight from between to)
+  where
+    -- When transforming A -> B to A -> A' -> B
+    -- A -> A' keeps the old edge info while
+    -- A' -> B gets the info for an unconditional
+    -- jump.
+    updateCfg weight from between old m
+        | Just info <- getEdgeInfo from old m
+        = addEdge from between info .
+          addWeightEdge between old weight .
+          delEdge from old $ m
+        | otherwise
+        = pprPanic "Faild to update cfg: Untracked edge" (ppr (from,to))
+
+
+-- | Place `succ` after `block` and change any edges
+--   block -> X to `succ` -> X
+addImmediateSuccessorNat :: BlockId -> BlockId -> NatM ()
+addImmediateSuccessorNat block succ
+        = updateCfgNat (addImmediateSuccessor block succ)
 
 getBlockIdNat :: NatM BlockId
 getBlockIdNat

@@ -15,7 +15,7 @@
 #include "Prelude.h"
 #include "Schedule.h"
 #include "Capability.h"
-#include "Stable.h"
+#include "StablePtr.h"
 #include "Threads.h"
 #include "Weak.h"
 

@@ -242,16 +242,22 @@ static bool tidyWeakList(generation *gen)
     last_w = &gen->old_weak_ptr_list;
     for (w = gen->old_weak_ptr_list; w != NULL; w = next_w) {
 
+        info = w->header.info;
+        /* N.B. This function is executed only during the serial part of GC
+         * so consequently there is no potential for data races and therefore
+         * no need for memory barriers.
+         */
+
         /* There might be a DEAD_WEAK on the list if finalizeWeak# was
          * called on a live weak pointer object.  Just remove it.
          */
-        if (w->header.info == &stg_DEAD_WEAK_info) {
+        if (info == &stg_DEAD_WEAK_info) {
             next_w = w->link;
             *last_w = next_w;
             continue;
         }
 
-        info = get_itbl((StgClosure *)w);
+        info = INFO_PTR_TO_STRUCT(info);
         switch (info->type) {
 
         case WEAK:
@@ -408,14 +414,13 @@ markWeakPtrList ( void )
         StgWeak *w, **last_w;
 
         last_w = &gen->weak_ptr_list;
-        for (w = gen->weak_ptr_list; w != NULL; w = w->link) {
+        for (w = gen->weak_ptr_list; w != NULL; w = RELAXED_LOAD(&w->link)) {
             // w might be WEAK, EVACUATED, or DEAD_WEAK (actually CON_STATIC) here
 
 #if defined(DEBUG)
             {   // careful to do this assertion only reading the info ptr
                 // once, because during parallel GC it might change under our feet.
-                const StgInfoTable *info;
-                info = w->header.info;
+                const StgInfoTable *info = RELAXED_LOAD(&w->header.info);
                 ASSERT(IS_FORWARDING_PTR(info)
                        || info == &stg_DEAD_WEAK_info
                        || INFO_PTR_TO_STRUCT(info)->type == WEAK);

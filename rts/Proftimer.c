@@ -29,7 +29,7 @@ void
 stopProfTimer( void )
 {
 #if defined(PROFILING)
-    do_prof_ticks = false;
+    RELAXED_STORE(&do_prof_ticks, false);
 #endif
 }
 
@@ -37,14 +37,14 @@ void
 startProfTimer( void )
 {
 #if defined(PROFILING)
-    do_prof_ticks = true;
+    RELAXED_STORE(&do_prof_ticks, true);
 #endif
 }
 
 void
 stopHeapProfTimer( void )
 {
-    do_heap_prof_ticks = false;
+    RELAXED_STORE(&do_heap_prof_ticks, false);
 }
 
 void
@@ -73,7 +73,7 @@ handleProfTick(void)
 {
 #if defined(PROFILING)
     total_ticks++;
-    if (do_prof_ticks) {
+    if (RELAXED_LOAD(&do_prof_ticks)) {
         uint32_t n;
         for (n=0; n < n_capabilities; n++) {
             capabilities[n]->r.rCCCS->time_ticks++;
@@ -81,7 +81,7 @@ handleProfTick(void)
     }
 #endif
 
-    if (do_heap_prof_ticks) {
+    if (RELAXED_LOAD(&do_heap_prof_ticks)) {
         ticks_to_heap_profile--;
         if (ticks_to_heap_profile <= 0) {
             ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;

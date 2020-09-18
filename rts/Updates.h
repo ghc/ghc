@@ -39,10 +39,16 @@
                  PROF_HDR_FIELDS(w_,ccs,p2)              \
                  p_ updatee
 
-
+/*
+ * Getting the memory barriers correct here is quite tricky. Essentially
+ * the write barrier ensures that any writes to the new indirectee are visible
+ * before we introduce the indirection.
+ * See Note [Heap memory barriers] in SMP.h.
+ */
 #define updateWithIndirection(p1, p2, and_then) \
     W_ bd;                                                      \
                                                                 \
+    prim_write_barrier;                                         \
     OVERWRITING_CLOSURE(p1);                                    \
     StgInd_indirectee(p1) = p2;                                 \
     prim_write_barrier;                                         \
@@ -64,23 +70,21 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
                                           StgClosure *p1,
                                           StgClosure *p2)
 {
-    bdescr *bd;
-
     ASSERT( (P_)p1 != (P_)p2 );
     /* not necessarily true: ASSERT( !closure_IND(p1) ); */
     /* occurs in RaiseAsync.c:raiseAsync() */
-    OVERWRITING_CLOSURE(p1);
-    ((StgInd *)p1)->indirectee = p2;
-    write_barrier();
-    SET_INFO(p1, &stg_BLACKHOLE_info);
-    LDV_RECORD_CREATE(p1);
-    bd = Bdescr((StgPtr)p1);
+    /* See Note [Heap memory barriers] in SMP.h */
+    bdescr *bd = Bdescr((StgPtr)p1);
     if (bd->gen_no != 0) {
         recordMutableCap(p1, cap, bd->gen_no);
         TICK_UPD_OLD_IND();
     } else {
         TICK_UPD_NEW_IND();
     }
+    OVERWRITING_CLOSURE(p1);
+    RELEASE_STORE(&((StgInd *)p1)->indirectee, p2);
+    SET_INFO_RELEASE(p1, &stg_BLACKHOLE_info);
+    LDV_RECORD_CREATE(p1);
 }
 
 #endif /* CMINUSMINUS */

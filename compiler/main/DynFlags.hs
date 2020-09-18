@@ -171,7 +171,11 @@ module DynFlags (
         FilesToClean(..), emptyFilesToClean,
 
         -- * Include specifications
-        IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes
+        IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
+
+
+        -- * Make use of the Cmm CFG
+        CfgWeights(..), backendMaintainsCfg
   ) where
 
 #include "HsVersions.h"
@@ -344,6 +348,7 @@ data DumpFlag
    | Opt_D_dump_cmm_info
    | Opt_D_dump_cmm_cps
    -- end cmm subflags
+   | Opt_D_dump_cfg_weights -- ^ Dump the cfg used for block layout.
    | Opt_D_dump_asm
    | Opt_D_dump_asm_native
    | Opt_D_dump_asm_liveness
@@ -485,6 +490,8 @@ data GeneralFlag
    | Opt_DictsStrict                     -- be strict in argument dictionaries
    | Opt_DmdTxDictSel              -- use a special demand transformer for dictionary selectors
    | Opt_Loopification                  -- See Note [Self-recursive tail calls]
+   | Opt_CfgBlocklayout             -- ^ Use the cfg based block layout algorithm.
+   | Opt_WeightlessBlocklayout         -- ^ Layout based on last instruction per block.
    | Opt_CprAnal
    | Opt_WorkerWrapper
    | Opt_SolveConstantDicts
@@ -688,6 +695,8 @@ optimisationFlags = EnumSet.fromList
    , Opt_DictsStrict
    , Opt_DmdTxDictSel
    , Opt_Loopification
+   , Opt_CfgBlocklayout
+   , Opt_WeightlessBlocklayout
    , Opt_CprAnal
    , Opt_WorkerWrapper
    , Opt_SolveConstantDicts
@@ -1123,8 +1132,85 @@ data DynFlags = DynFlags {
 
   -- | Unique supply configuration for testing build determinism
   initialUnique         :: Int,
-  uniqueIncrement       :: Int
+  uniqueIncrement       :: Int,
+
+  -- | Temporary: CFG Edge weights for fast iterations
+  cfgWeightInfo         :: CfgWeights
 }
+
+-- | Edge weights to use when generating a CFG from CMM
+data CfgWeights
+    = CFGWeights
+    { uncondWeight :: Int
+    , condBranchWeight :: Int
+    , switchWeight :: Int
+    , callWeight :: Int
+    , likelyCondWeight :: Int
+    , unlikelyCondWeight :: Int
+    , infoTablePenalty :: Int
+    , backEdgeBonus :: Int
+    }
+
+defaultCfgWeights :: CfgWeights
+defaultCfgWeights
+    = CFGWeights
+    { uncondWeight = 1000
+    , condBranchWeight = 800
+    , switchWeight = 1
+    , callWeight = -10
+    , likelyCondWeight = 900
+    , unlikelyCondWeight = 300
+    , infoTablePenalty = 300
+    , backEdgeBonus = 400
+    }
+
+parseCfgWeights :: String -> CfgWeights -> CfgWeights
+parseCfgWeights s oldWeights =
+        foldl' (\cfg (n,v) -> update n v cfg) oldWeights assignments
+    where
+        assignments = map assignment $ settings s
+        update "uncondWeight" n w =
+            w {uncondWeight = n}
+        update "condBranchWeight" n w =
+            w {condBranchWeight = n}
+        update "switchWeight" n w =
+            w {switchWeight = n}
+        update "callWeight" n w =
+            w {callWeight = n}
+        update "likelyCondWeight" n w =
+            w {likelyCondWeight = n}
+        update "unlikelyCondWeight" n w =
+            w {unlikelyCondWeight = n}
+        update "infoTablePenalty" n w =
+            w {infoTablePenalty = n}
+        update "backEdgeBonus" n w =
+            w {backEdgeBonus = n}
+        update other _ _
+            = panic $ other ++
+                      " is not a cfg weight parameter. " ++
+                      exampleString
+        settings s
+            | (s1,rest) <- break (== ',') s
+            , null rest
+            = [s1]
+            | (s1,rest) <- break (== ',') s
+            = [s1] ++ settings (drop 1 rest)
+            | otherwise = panic $ "Invalid cfg parameters." ++ exampleString
+        assignment as
+            | (name, _:val) <- break (== '=') as
+            = (name,read val)
+            | otherwise
+            = panic $ "Invalid cfg parameters." ++ exampleString
+        exampleString = "Example parameters: uncondWeight=1000," ++
+            "condBranchWeight=800,switchWeight=0,callWeight=300" ++
+            ",likelyCondWeight=900,unlikelyCondWeight=300" ++
+            ",infoTablePenalty=300,backEdgeBonus=400"
+
+backendMaintainsCfg :: DynFlags -> Bool
+backendMaintainsCfg dflags = case (platformArch $ targetPlatform dflags) of
+    -- ArchX86 -- Should work but not tested so disabled currently.
+    ArchX86_64 -> True
+    _otherwise -> False
 
 class HasDynFlags m where
     getDynFlags :: m DynFlags
@@ -1547,6 +1633,7 @@ data Way
   | WayProf
   | WayEventLog
   | WayDyn
+  | WayTSan
   deriving (Eq, Ord, Show)
 
 allowed_combination :: [Way] -> Bool
@@ -1565,6 +1652,9 @@ allowed_combination way = and [ x `allowedWith` y
         _ `allowedWith` WayDebug                = True
         WayDebug `allowedWith` _                = True
 
+        _ `allowedWith` WayTSan                 = True
+        WayTSan `allowedWith` _                 = True
+
         (WayCustom {}) `allowedWith` _          = True
         WayThreaded `allowedWith` WayProf       = True
         WayThreaded `allowedWith` WayEventLog   = True
@@ -1581,6 +1671,7 @@ wayTag WayDebug    = "debug"
 wayTag WayDyn      = "dyn"
 wayTag WayProf     = "p"
 wayTag WayEventLog = "l"
+wayTag WayTSan     = "tsan"
 
 wayRTSOnly :: Way -> Bool
 wayRTSOnly (WayCustom {}) = False
@@ -1589,6 +1680,7 @@ wayRTSOnly WayDebug    = True
 wayRTSOnly WayDyn      = False
 wayRTSOnly WayProf     = False
 wayRTSOnly WayEventLog = True
+wayRTSOnly WayTSan     = True
 
 wayDesc :: Way -> String
 wayDesc (WayCustom xs) = xs
@@ -1597,6 +1689,7 @@ wayDesc WayDebug    = "Debug"
 wayDesc WayDyn      = "Dynamic"
 wayDesc WayProf     = "Profiling"
 wayDesc WayEventLog = "RTS Event Logging"
+wayDesc WayTSan     = "Thread Sanetizer"
 
 -- Turn these flags on when enabling this way
 wayGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -1613,6 +1706,7 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC, Opt_ExternalDynamicRefs]
     -- modules of the main program with -fPIC when using -dynamic.
 wayGeneralFlags _ WayProf     = [Opt_SccProfilingOn]
 wayGeneralFlags _ WayEventLog = []
+wayGeneralFlags _ WayTSan     = []
 
 -- Turn these flags off when enabling this way
 wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -1629,6 +1723,7 @@ wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting objects
                                       Opt_SplitSections]
 wayUnsetGeneralFlags _ WayProf     = []
 wayUnsetGeneralFlags _ WayEventLog = []
+wayUnsetGeneralFlags _ WayTSan     = []
 
 wayOptc :: Platform -> Way -> [String]
 wayOptc _ (WayCustom {}) = []
@@ -1640,6 +1735,7 @@ wayOptc _ WayDebug      = []
 wayOptc _ WayDyn        = []
 wayOptc _ WayProf       = ["-DPROFILING"]
 wayOptc _ WayEventLog   = ["-DTRACING"]
+wayOptc _ WayTSan       = ["-fsanitize=thread"]
 
 wayOptl :: Platform -> Way -> [String]
 wayOptl _ (WayCustom {}) = []
@@ -1653,6 +1749,7 @@ wayOptl _ WayDebug      = []
 wayOptl _ WayDyn        = []
 wayOptl _ WayProf       = []
 wayOptl _ WayEventLog   = []
+wayOptl _ WayTSan       = ["-fsanitize=thread"]
 
 wayOptP :: Platform -> Way -> [String]
 wayOptP _ (WayCustom {}) = []
@@ -1661,6 +1758,7 @@ wayOptP _ WayDebug    = []
 wayOptP _ WayDyn      = []
 wayOptP _ WayProf     = ["-DPROFILING"]
 wayOptP _ WayEventLog = ["-DTRACING"]
+wayOptP _ WayTSan     = []
 
 whenGeneratingDynamicToo :: MonadIO m => DynFlags -> m () -> m ()
 whenGeneratingDynamicToo dflags f = ifGeneratingDynamicToo dflags f (return ())
@@ -1930,7 +2028,8 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         uniqueIncrement = 1,
 
         reverseErrors = False,
-        maxErrors     = Nothing
+        maxErrors     = Nothing,
+        cfgWeightInfo = defaultCfgWeights
       }
 
 defaultWays :: Settings -> [Way]
@@ -2809,6 +2908,7 @@ dynamic_flags_deps = [
       (NoArg $ addWay WayThreaded) "Use -threaded instead"
   , make_ord_flag defGhcFlag "debug"          (NoArg (addWay WayDebug))
   , make_ord_flag defGhcFlag "threaded"       (NoArg (addWay WayThreaded))
+  , make_ord_flag defGhcFlag "tsan"           (NoArg (addWay WayTSan))
 
   , make_ord_flag defGhcFlag "ticky"
       (NoArg (setGeneralFlag Opt_Ticky >> addWay WayDebug))
@@ -3115,6 +3215,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_info)
   , make_ord_flag defGhcFlag "ddump-cmm-cps"
         (setDumpFlag Opt_D_dump_cmm_cps)
+  , make_ord_flag defGhcFlag "ddump-cfg-weights"
+        (setDumpFlag Opt_D_dump_cfg_weights)
   , make_ord_flag defGhcFlag "ddump-core-stats"
         (setDumpFlag Opt_D_dump_core_stats)
   , make_ord_flag defGhcFlag "ddump-asm"
@@ -3425,8 +3527,10 @@ dynamic_flags_deps = [
       (noArg (\d -> d { floatLamArgs = Nothing }))
   , make_ord_flag defFlag "fproc-alignment"
       (intSuffix (\n d -> d { cmmProcAlignment = Just n }))
-
-
+  , make_ord_flag defFlag "fblock-layout-weights"
+        (HasArg (\s ->
+            upd (\d -> d { cfgWeightInfo =
+                parseCfgWeights s (cfgWeightInfo d)})))
   , make_ord_flag defFlag "fhistory-size"
       (intSuffix (\n d -> d { historySize = n }))
   , make_ord_flag defFlag "funfolding-creation-threshold"
@@ -3960,6 +4064,8 @@ fFlagsDeps = [
   flagHiddenSpec "llvm-tbaa"                  Opt_LlvmTBAA,
   flagHiddenSpec "llvm-fill-undef-with-garbage" Opt_LlvmFillUndefWithGarbage,
   flagSpec "loopification"                    Opt_Loopification,
+  flagSpec "block-layout-cfg"                 Opt_CfgBlocklayout,
+  flagSpec "block-layout-weightless"          Opt_WeightlessBlocklayout,
   flagSpec "omit-interface-pragmas"           Opt_OmitInterfacePragmas,
   flagSpec "omit-yields"                      Opt_OmitYields,
   flagSpec "optimal-applicative-do"           Opt_OptimalApplicativeDo,
@@ -4452,6 +4558,8 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_FullLaziness)
     , ([1,2],   Opt_IgnoreAsserts)
     , ([1,2],   Opt_Loopification)
+    , ([1,2],   Opt_CfgBlocklayout)      -- Experimental
+
     , ([1,2],   Opt_Specialise)
     , ([1,2],   Opt_CrossModuleSpecialise)
     , ([1,2],   Opt_Strictness)

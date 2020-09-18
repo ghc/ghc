@@ -31,7 +31,7 @@
 
 #include "sm/MarkWeak.h"
 
-static void scavenge_stack (StgPtr p, StgPtr stack_end);
+#include <string.h> /* for memset */
 
 static void scavenge_large_bitmap (StgPtr p,
                                    StgLargeBitmap *large_bitmap,
@@ -44,13 +44,21 @@ static void scavenge_large_bitmap (StgPtr p,
 # define scavenge_block(a) scavenge_block1(a)
 # define scavenge_mutable_list(bd,g) scavenge_mutable_list1(bd,g)
 # define scavenge_capability_mut_lists(cap) scavenge_capability_mut_Lists1(cap)
+# define scavengeTSO(tso) scavengeTSO1(tso)
+# define scavenge_stack(p, stack_end) scavenge_stack1(p, stack_end)
+# define scavenge_fun_srt(info) scavenge_fun_srt1(info)
+# define scavenge_fun_srt(info) scavenge_fun_srt1(info)
+# define scavenge_thunk_srt(info) scavenge_thunk_srt1(info)
+# define scavenge_mut_arr_ptrs(info) scavenge_mut_arr_ptrs1(info)
+# define scavenge_PAP(pap) scavenge_PAP1(pap)
+# define scavenge_AP(ap) scavenge_AP1(ap)
 #endif
 
 /* -----------------------------------------------------------------------------
    Scavenge a TSO.
    -------------------------------------------------------------------------- */
 
-static void
+void
 scavengeTSO (StgTSO *tso)
 {
     bool saved_eager;
@@ -151,9 +159,9 @@ scavenge_compact(StgCompactNFData *str)
 
     gct->eager_promotion = saved_eager;
     if (gct->failed_to_evac) {
-        ((StgClosure *)str)->header.info = &stg_COMPACT_NFDATA_DIRTY_info;
+        RELEASE_STORE(&((StgClosure *)str)->header.info, &stg_COMPACT_NFDATA_DIRTY_info);
     } else {
-        ((StgClosure *)str)->header.info = &stg_COMPACT_NFDATA_CLEAN_info;
+        RELEASE_STORE(&((StgClosure *)str)->header.info, &stg_COMPACT_NFDATA_CLEAN_info);
     }
 }
 
@@ -161,7 +169,7 @@ scavenge_compact(StgCompactNFData *str)
    Mutable arrays of pointers
    -------------------------------------------------------------------------- */
 
-static StgPtr scavenge_mut_arr_ptrs (StgMutArrPtrs *a)
+StgPtr scavenge_mut_arr_ptrs (StgMutArrPtrs *a)
 {
     W_ m;
     bool any_failed;
@@ -311,14 +319,14 @@ scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     return p;
 }
 
-STATIC_INLINE GNUC_ATTR_HOT StgPtr
+GNUC_ATTR_HOT StgPtr
 scavenge_PAP (StgPAP *pap)
 {
     evacuate(&pap->fun);
     return scavenge_PAP_payload (pap->fun, pap->payload, pap->n_args);
 }
 
-STATIC_INLINE StgPtr
+StgPtr
 scavenge_AP (StgAP *ap)
 {
     evacuate(&ap->fun);
@@ -329,7 +337,7 @@ scavenge_AP (StgAP *ap)
    Scavenge SRTs
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE GNUC_ATTR_HOT void
+GNUC_ATTR_HOT void
 scavenge_thunk_srt(const StgInfoTable *info)
 {
     StgThunkInfoTable *thunk_info;
@@ -343,7 +351,7 @@ scavenge_thunk_srt(const StgInfoTable *info)
     }
 }
 
-STATIC_INLINE GNUC_ATTR_HOT void
+GNUC_ATTR_HOT void
 scavenge_fun_srt(const StgInfoTable *info)
 {
     StgFunInfoTable *fun_info;
@@ -394,7 +402,7 @@ scavenge_block (bdescr *bd)
   // time around the loop.
   while (p < bd->free || (bd == ws->todo_bd && p < ws->todo_free)) {
 
-      ASSERT(bd->link == NULL);
+    ASSERT(bd->link == NULL);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl((StgClosure *)p);
 
@@ -414,9 +422,9 @@ scavenge_block (bdescr *bd)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            mvar->header.info = &stg_MVAR_DIRTY_info;
+            RELEASE_STORE(&mvar->header.info, &stg_MVAR_DIRTY_info);
         } else {
-            mvar->header.info = &stg_MVAR_CLEAN_info;
+            RELEASE_STORE(&mvar->header.info, &stg_MVAR_CLEAN_info);
         }
         p += sizeofW(StgMVar);
         break;
@@ -431,9 +439,9 @@ scavenge_block (bdescr *bd)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            tvar->header.info = &stg_TVAR_DIRTY_info;
+            RELEASE_STORE(&tvar->header.info, &stg_TVAR_DIRTY_info);
         } else {
-            tvar->header.info = &stg_TVAR_CLEAN_info;
+            RELEASE_STORE(&tvar->header.info, &stg_TVAR_CLEAN_info);
         }
         p += sizeofW(StgTVar);
         break;
@@ -565,9 +573,9 @@ scavenge_block (bdescr *bd)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+            RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_VAR_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
+            RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_VAR_CLEAN_info);
         }
         p += sizeofW(StgMutVar);
         break;
@@ -584,9 +592,9 @@ scavenge_block (bdescr *bd)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+            RELEASE_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_DIRTY_info);
         } else {
-            bq->header.info = &stg_BLOCKING_QUEUE_CLEAN_info;
+            RELEASE_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_CLEAN_info);
         }
         p += sizeofW(StgBlockingQueue);
         break;
@@ -636,9 +644,9 @@ scavenge_block (bdescr *bd)
         p = scavenge_mut_arr_ptrs((StgMutArrPtrs*)p);
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+            RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+            RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_CLEAN_info);
         }
 
         gct->eager_promotion = saved_eager_promotion;
@@ -653,9 +661,9 @@ scavenge_block (bdescr *bd)
         p = scavenge_mut_arr_ptrs((StgMutArrPtrs*)p);
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+            RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+            RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info);
         }
         break;
     }
@@ -678,9 +686,9 @@ scavenge_block (bdescr *bd)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
+            RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_CLEAN_info;
+            RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_SMALL_MUT_ARR_PTRS_CLEAN_info);
         }
 
         gct->failed_to_evac = true; // always put it on the mutable list.
@@ -699,9 +707,9 @@ scavenge_block (bdescr *bd)
         }
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+            RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+            RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info);
         }
         break;
     }
@@ -784,7 +792,7 @@ scavenge_block (bdescr *bd)
 
   if (p > bd->free)  {
       gct->copied += ws->todo_free - bd->free;
-      bd->free = p;
+      RELEASE_STORE(&bd->free, p);
   }
 
   debugTrace(DEBUG_gc, "   scavenged %ld bytes",
@@ -839,9 +847,9 @@ scavenge_mark_stack(void)
             gct->eager_promotion = saved_eager_promotion;
 
             if (gct->failed_to_evac) {
-                mvar->header.info = &stg_MVAR_DIRTY_info;
+                RELEASE_STORE(&mvar->header.info, &stg_MVAR_DIRTY_info);
             } else {
-                mvar->header.info = &stg_MVAR_CLEAN_info;
+                RELEASE_STORE(&mvar->header.info, &stg_MVAR_CLEAN_info);
             }
             break;
         }
@@ -855,9 +863,9 @@ scavenge_mark_stack(void)
             gct->eager_promotion = saved_eager_promotion;
 
             if (gct->failed_to_evac) {
-                tvar->header.info = &stg_TVAR_DIRTY_info;
+                RELEASE_STORE(&tvar->header.info, &stg_TVAR_DIRTY_info);
             } else {
-                tvar->header.info = &stg_TVAR_CLEAN_info;
+                RELEASE_STORE(&tvar->header.info, &stg_TVAR_CLEAN_info);
             }
             break;
         }
@@ -961,9 +969,9 @@ scavenge_mark_stack(void)
             gct->eager_promotion = saved_eager_promotion;
 
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+                RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_VAR_DIRTY_info);
             } else {
-                ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
+                RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_VAR_CLEAN_info);
             }
             break;
         }
@@ -980,9 +988,9 @@ scavenge_mark_stack(void)
             gct->eager_promotion = saved_eager_promotion;
 
             if (gct->failed_to_evac) {
-                bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+                RELEASE_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_DIRTY_info);
             } else {
-                bq->header.info = &stg_BLOCKING_QUEUE_CLEAN_info;
+                RELEASE_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_CLEAN_info);
             }
             break;
         }
@@ -1028,9 +1036,9 @@ scavenge_mark_stack(void)
             scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+                RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_DIRTY_info);
             } else {
-                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+                RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_CLEAN_info);
             }
 
             gct->eager_promotion = saved_eager_promotion;
@@ -1047,9 +1055,9 @@ scavenge_mark_stack(void)
             scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+                RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info);
             } else {
-                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+                RELEASE_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info);
             }
             break;
         }
@@ -1074,9 +1082,9 @@ scavenge_mark_stack(void)
             gct->eager_promotion = saved_eager;
 
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
+                RELEASE_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
             } else {
-                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_CLEAN_info;
+                RELEASE_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_CLEAN_info);
             }
 
             gct->failed_to_evac = true; // mutable anyhow.
@@ -1095,9 +1103,9 @@ scavenge_mark_stack(void)
             }
 
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+                RELEASE_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info);
             } else {
-                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+                RELEASE_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info);
             }
             break;
         }
@@ -1201,9 +1209,9 @@ scavenge_one(StgPtr p)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            mvar->header.info = &stg_MVAR_DIRTY_info;
+            RELEASE_STORE(&mvar->header.info, &stg_MVAR_DIRTY_info);
         } else {
-            mvar->header.info = &stg_MVAR_CLEAN_info;
+            RELEASE_STORE(&mvar->header.info, &stg_MVAR_CLEAN_info);
         }
         break;
     }
@@ -1217,9 +1225,9 @@ scavenge_one(StgPtr p)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            tvar->header.info = &stg_TVAR_DIRTY_info;
+            RELEASE_STORE(&tvar->header.info, &stg_TVAR_DIRTY_info);
         } else {
-            tvar->header.info = &stg_TVAR_CLEAN_info;
+            RELEASE_STORE(&tvar->header.info, &stg_TVAR_CLEAN_info);
         }
         break;
     }
@@ -1281,9 +1289,9 @@ scavenge_one(StgPtr p)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+            RELEASE_STORE(&((StgClosure *)q)->header.info, &stg_MUT_VAR_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
+            RELEASE_STORE(&((StgClosure *)q)->header.info, &stg_MUT_VAR_CLEAN_info);
         }
         break;
     }
@@ -1300,9 +1308,9 @@ scavenge_one(StgPtr p)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+            RELEASE_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_DIRTY_info);
         } else {
-            bq->header.info = &stg_BLOCKING_QUEUE_CLEAN_info;
+            RELEASE_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_CLEAN_info);
         }
         break;
     }
@@ -1348,9 +1356,9 @@ scavenge_one(StgPtr p)
         scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+            RELEASE_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_DIRTY_info);
         } else {
-            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+            RELEASE_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_CLEAN_info);
         }
 
         gct->eager_promotion = saved_eager_promotion;
@@ -1365,9 +1373,9 @@ scavenge_one(StgPtr p)
         scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+            RELEASE_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info);
         } else {
-            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+            RELEASE_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info);
         }
         break;
     }
@@ -1392,9 +1400,9 @@ scavenge_one(StgPtr p)
         gct->eager_promotion = saved_eager;
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
+            RELEASE_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_CLEAN_info;
+            RELEASE_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_CLEAN_info);
         }
 
         gct->failed_to_evac = true;
@@ -1413,9 +1421,9 @@ scavenge_one(StgPtr p)
         }
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+            RELEASE_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+            RELEASE_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info);
         }
         break;
     }
@@ -1533,44 +1541,50 @@ static void
 scavenge_mutable_list(bdescr *bd, generation *gen)
 {
     StgPtr p, q;
-    uint32_t gen_no;
+#if defined(DEBUG)
+    MutListScavStats stats; // Local accumulator
+    zeroMutListScavStats(&stats);
+#endif
 
-    gen_no = gen->no;
+    uint32_t gen_no = gen->no;
     gct->evac_gen_no = gen_no;
+
     for (; bd != NULL; bd = bd->link) {
         for (q = bd->start; q < bd->free; q++) {
             p = (StgPtr)*q;
             ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 
 #if defined(DEBUG)
+            const StgInfoTable *pinfo;
             switch (get_itbl((StgClosure *)p)->type) {
             case MUT_VAR_CLEAN:
                 // can happen due to concurrent writeMutVars
             case MUT_VAR_DIRTY:
-                mutlist_MUTVARS++; break;
+                stats.n_MUTVAR++; break;
             case MUT_ARR_PTRS_CLEAN:
             case MUT_ARR_PTRS_DIRTY:
             case MUT_ARR_PTRS_FROZEN_CLEAN:
             case MUT_ARR_PTRS_FROZEN_DIRTY:
-                mutlist_MUTARRS++; break;
+                stats.n_MUTARR++; break;
             case MVAR_CLEAN:
                 barf("MVAR_CLEAN on mutable list");
             case MVAR_DIRTY:
-                mutlist_MVARS++; break;
+                stats.n_MVAR++; break;
             case TVAR:
-                mutlist_TVAR++; break;
+                stats.n_TVAR++; break;
             case TREC_CHUNK:
-                mutlist_TREC_CHUNK++; break;
+                stats.n_TREC_CHUNK++; break;
             case MUT_PRIM:
-                if (((StgClosure*)p)->header.info == &stg_TVAR_WATCH_QUEUE_info)
-                    mutlist_TVAR_WATCH_QUEUE++;
-                else if (((StgClosure*)p)->header.info == &stg_TREC_HEADER_info)
-                    mutlist_TREC_HEADER++;
+                pinfo = ((StgClosure*)p)->header.info;
+                if (pinfo == &stg_TVAR_WATCH_QUEUE_info)
+                    stats.n_TVAR_WATCH_QUEUE++;
+                else if (pinfo == &stg_TREC_HEADER_info)
+                    stats.n_TREC_HEADER++;
                 else
-                    mutlist_OTHERS++;
+                    stats.n_OTHERS++;
                 break;
             default:
-                mutlist_OTHERS++; break;
+                stats.n_OTHERS++; break;
             }
 #endif
 
@@ -1595,9 +1609,9 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                 scavenge_mut_arr_ptrs_marked((StgMutArrPtrs *)p);
 
                 if (gct->failed_to_evac) {
-                    ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+                    RELEASE_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_DIRTY_info);
                 } else {
-                    ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+                    RELEASE_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_CLEAN_info);
                 }
 
                 gct->eager_promotion = saved_eager_promotion;
@@ -1616,6 +1630,13 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
             }
         }
     }
+
+#if defined(DEBUG)
+    // For lack of a better option we protect mutlist_scav_stats with oldest_gen->sync
+    ACQUIRE_SPIN_LOCK(&oldest_gen->sync);
+    addMutListScavStats(&stats, &mutlist_scav_stats);
+    RELEASE_SPIN_LOCK(&oldest_gen->sync);
+#endif
 }
 
 void
@@ -1678,8 +1699,9 @@ scavenge_static(void)
     /* Take this object *off* the static_objects list,
      * and put it on the scavenged_static_objects list.
      */
-    gct->static_objects = *STATIC_LINK(info,p);
-    *STATIC_LINK(info,p) = gct->scavenged_static_objects;
+    StgClosure **link = STATIC_LINK(info,p);
+    gct->static_objects = RELAXED_LOAD(link);
+    RELAXED_STORE(link, gct->scavenged_static_objects);
     gct->scavenged_static_objects = flagged_p;
 
     switch (info -> type) {
@@ -1771,7 +1793,7 @@ scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, StgWord size )
    AP_STACK_UPDs, since these are just sections of copied stack.
    -------------------------------------------------------------------------- */
 
-static void
+void
 scavenge_stack(StgPtr p, StgPtr stack_end)
 {
   const StgRetInfoTable* info;

@@ -21,28 +21,19 @@ StgStablePtr getStablePtr  (StgPtr p);
    -------------------------------------------------------------------------- */
 
 typedef struct {
-    StgPtr  addr;        // Haskell object when entry is in use, next free
-                         // entry (NULL when this is the last free entry)
-                         // otherwise. May be NULL temporarily during GC (when
-                         // pointee dies).
-
-    StgPtr  old;         // Old Haskell object, used during GC
-
-    StgClosure *sn_obj;  // The StableName object, or NULL when the entry is
-                         // free
-} snEntry;
-
-typedef struct {
     StgPtr addr;         // Haskell object when entry is in use, next free
                          // entry (NULL when this is the last free entry)
                          // otherwise.
 } spEntry;
 
-extern DLL_IMPORT_RTS snEntry *stable_name_table;
 extern DLL_IMPORT_RTS spEntry *stable_ptr_table;
 
 EXTERN_INLINE
 StgPtr deRefStablePtr(StgStablePtr sp)
 {
-    return stable_ptr_table[(StgWord)sp].addr;
+    // acquire load to ensure that we see the new SPT if it has been recently
+    // enlarged.
+    const spEntry *spt = ACQUIRE_LOAD(&stable_ptr_table);
+    // acquire load to ensure that the referenced object is visible.
+    return ACQUIRE_LOAD(&spt[(StgWord)sp].addr);
 }

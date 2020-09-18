@@ -26,7 +26,8 @@
 #include "ThreadLabels.h"
 #include "sm/BlockAlloc.h"
 #include "Trace.h"
-#include "Stable.h"
+#include "StableName.h"
+#include "StablePtr.h"
 #include "StaticPtrTable.h"
 #include "Hash.h"
 #include "Profiling.h"
@@ -229,6 +230,13 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* Initialise libdw session pool */
     libdwPoolInit();
 
+    /* Start the "ticker" and profiling timer but don't start until the
+     * scheduler is up. However, the ticker itself needs to be initialized
+     * before the scheduler to ensure that the ticker mutex is initialized as
+     * moreCapabilities will attempt to acquire it.
+     */
+    initTimer();
+
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
      */
@@ -243,7 +251,10 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initStorage();
 
     /* initialise the stable pointer table */
-    initStableTables();
+    initStablePtrTable();
+
+    /* initialise the stable name table */
+    initStableNameTable();
 
     /* Add some GC roots for things in the base package that the RTS
      * knows about.  We don't know whether these turn out to be CAFs
@@ -299,7 +310,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initProfiling();
 
     /* start the virtual timer 'subsystem'. */
-    initTimer();
     startTimer();
 
 #if defined(RTS_USER_SIGNALS)
@@ -451,7 +461,10 @@ hs_exit_(bool wait_foreign)
     exitTopHandler();
 
     /* free the stable pointer table */
-    exitStableTables();
+    exitStablePtrTable();
+
+    /* free the stable name table */
+    exitStableNameTable();
 
 #if defined(DEBUG)
     /* free the thread label table */

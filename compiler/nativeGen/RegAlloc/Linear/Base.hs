@@ -28,6 +28,7 @@ import Outputable
 import Unique
 import UniqFM
 import UniqSupply
+import BlockId
 
 
 -- | Used to store the register assignment on entry to a basic block.
@@ -98,7 +99,10 @@ data SpillReason
 -- | Used to carry interesting stats out of the register allocator.
 data RegAllocStats
         = RegAllocStats
-        { ra_spillInstrs        :: UniqFM [Int] }
+        { ra_spillInstrs        :: UniqFM [Int]
+        , ra_fixupList     :: [(BlockId,BlockId,BlockId)]
+        -- ^ (from,fixup,to) : We inserted fixup code between from and to
+        }
 
 
 -- | The register allocator state
@@ -129,6 +133,9 @@ data RA_State freeRegs
         --      Just keep a list here instead of a map of regs -> reasons.
         --      We don't want to slow down the allocator if we're not going to emit the stats.
         , ra_spills     :: [SpillReason]
-        , ra_DynFlags   :: DynFlags }
+        , ra_DynFlags   :: DynFlags
+
+        -- | (from,fixup,to) : We inserted fixup code between from and to
+        , ra_fixups     :: [(BlockId,BlockId,BlockId)] }
 
 

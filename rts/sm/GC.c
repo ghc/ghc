@@ -46,7 +46,8 @@
 #include "RetainerProfile.h"
 #include "LdvProfile.h"
 #include "RaiseAsync.h"
-#include "Stable.h"
+#include "StableName.h"
+#include "StablePtr.h"
 #include "CheckUnload.h"
 #include "CNF.h"
 #include "RtsFlags.h"
@@ -113,14 +114,8 @@ static W_ g0_pcnt_kept = 30; // percentage of g0 live at last minor GC
 
 /* Mut-list stats */
 #if defined(DEBUG)
-uint32_t mutlist_MUTVARS,
-    mutlist_MUTARRS,
-    mutlist_MVARS,
-    mutlist_TVAR,
-    mutlist_TVAR_WATCH_QUEUE,
-    mutlist_TREC_CHUNK,
-    mutlist_TREC_HEADER,
-    mutlist_OTHERS;
+// For lack of a better option we protect mutlist_scav_stats with oldest_gen->sync
+MutListScavStats mutlist_scav_stats;
 #endif
 
 /* Thread-local data for each GC thread
@@ -186,6 +181,36 @@ bdescr *mark_stack_top_bd; // topmost block in the mark stack
 bdescr *mark_stack_bd;     // current block in the mark stack
 StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 
+
+/* -----------------------------------------------------------------------------
+   Statistics from mut_list scavenging
+   -------------------------------------------------------------------------- */
+
+#if defined(DEBUG)
+void
+zeroMutListScavStats(MutListScavStats *src)
+{
+    memset(src, 0, sizeof(MutListScavStats));
+}
+
+void
+addMutListScavStats(const MutListScavStats *src,
+                    MutListScavStats *dest)
+{
+#define ADD_STATS(field) dest->field += src->field;
+    ADD_STATS(n_MUTVAR);
+    ADD_STATS(n_MUTARR);
+    ADD_STATS(n_MVAR);
+    ADD_STATS(n_TVAR);
+    ADD_STATS(n_TREC_CHUNK);
+    ADD_STATS(n_TVAR_WATCH_QUEUE);
+    ADD_STATS(n_TREC_HEADER);
+    ADD_STATS(n_OTHERS);
+#undef ADD_STATS
+}
+#endif /* DEBUG */
+
+
 /* -----------------------------------------------------------------------------
    GarbageCollect: the main entry point to the garbage collector.
 
@@ -238,18 +263,12 @@ GarbageCollect (uint32_t collect_gen,
   // tell the stats department that we've started a GC
   stat_startGC(cap, gct);
 
-  // lock the StablePtr table
-  stableLock();
+  // Lock the StablePtr table. This prevents FFI calls manipulating
+  // the table from occurring during GC.
+  stablePtrLock();
 
 #if defined(DEBUG)
-  mutlist_MUTVARS = 0;
-  mutlist_MUTARRS = 0;
-  mutlist_MVARS = 0;
-  mutlist_TVAR = 0;
-  mutlist_TVAR_WATCH_QUEUE = 0;
-  mutlist_TREC_CHUNK = 0;
-  mutlist_TREC_HEADER = 0;
-  mutlist_OTHERS = 0;
+  zeroMutListScavStats(&mutlist_scav_stats);
 #endif
 
   // attribute any costs to CCS_GC
@@ -405,7 +424,10 @@ GarbageCollect (uint32_t collect_gen,
   initWeakForGC();
 
   // Mark the stable pointer table.
-  markStableTables(mark_root, gct);
+  markStablePtrTable(mark_root, gct);
+
+  // Remember old stable name addresses.
+  rememberOldStableNameAddresses ();
 
   /* -------------------------------------------------------------------------
    * Repeatedly scavenge all the areas we know about until there's no
@@ -431,7 +453,7 @@ GarbageCollect (uint32_t collect_gen,
   shutdown_gc_threads(gct->thread_index, idle_cap);
 
   // Now see which stable names are still alive.
-  gcStableTables();
+  gcStableNameTable();
 
 #if defined(THREADED_RTS)
   if (n_gc_threads == 1) {
@@ -484,37 +506,37 @@ GarbageCollect (uint32_t collect_gen,
       const gc_thread* thread;
 
       for (i=0; i < n_gc_threads; i++) {
-          copied += gc_threads[i]->copied;
+          copied += RELAXED_LOAD(&gc_threads[i]->copied);
       }
       for (i=0; i < n_gc_threads; i++) {
           thread = gc_threads[i];
           if (n_gc_threads > 1) {
               debugTrace(DEBUG_gc,"thread %d:", i);
               debugTrace(DEBUG_gc,"   copied           %ld",
-                         thread->copied * sizeof(W_));
+                         RELAXED_LOAD(&thread->copied) * sizeof(W_));
               debugTrace(DEBUG_gc,"   scanned          %ld",
-                         thread->scanned * sizeof(W_));
+                         RELAXED_LOAD(&thread->scanned) * sizeof(W_));
               debugTrace(DEBUG_gc,"   any_work         %ld",
-                         thread->any_work);
+                         RELAXED_LOAD(&thread->any_work));
               debugTrace(DEBUG_gc,"   no_work          %ld",
-                         thread->no_work);
+                         RELAXED_LOAD(&thread->no_work));
               debugTrace(DEBUG_gc,"   scav_find_work %ld",
-                         thread->scav_find_work);
+                         RELAXED_LOAD(&thread->scav_find_work));
 
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
-              gc_spin_spin += thread->gc_spin.spin;
-              gc_spin_yield += thread->gc_spin.yield;
-              mut_spin_spin += thread->mut_spin.spin;
-              mut_spin_yield += thread->mut_spin.yield;
+              gc_spin_spin += RELAXED_LOAD(&thread->gc_spin.spin);
+              gc_spin_yield += RELAXED_LOAD(&thread->gc_spin.yield);
+              mut_spin_spin += RELAXED_LOAD(&thread->mut_spin.spin);
+              mut_spin_yield += RELAXED_LOAD(&thread->mut_spin.yield);
 #endif
 
-              any_work += thread->any_work;
-              no_work += thread->no_work;
-              scav_find_work += thread->scav_find_work;
+              any_work += RELAXED_LOAD(&thread->any_work);
+              no_work += RELAXED_LOAD(&thread->no_work);
+              scav_find_work += RELAXED_LOAD(&thread->scav_find_work);
 
-              par_max_copied = stg_max(gc_threads[i]->copied, par_max_copied);
+              par_max_copied = stg_max(RELAXED_LOAD(&thread->copied), par_max_copied);
               par_balanced_copied_acc +=
-                  stg_min(n_gc_threads * gc_threads[i]->copied, copied);
+                  stg_min(n_gc_threads * RELAXED_LOAD(&thread->copied), copied);
           }
       }
       if (n_gc_threads > 1) {
@@ -554,10 +576,14 @@ GarbageCollect (uint32_t collect_gen,
         debugTrace(DEBUG_gc,
                    "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d others)",
                    (unsigned long)(mut_list_size * sizeof(W_)),
-                   mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS,
-                   mutlist_TVAR, mutlist_TVAR_WATCH_QUEUE,
-                   mutlist_TREC_CHUNK, mutlist_TREC_HEADER,
-                   mutlist_OTHERS);
+                   mutlist_scav_stats.n_MUTVAR,
+                   mutlist_scav_stats.n_MUTARR,
+                   mutlist_scav_stats.n_MVAR,
+                   mutlist_scav_stats.n_TVAR,
+                   mutlist_scav_stats.n_TVAR_WATCH_QUEUE,
+                   mutlist_scav_stats.n_TREC_CHUNK,
+                   mutlist_scav_stats.n_TREC_HEADER,
+                   mutlist_scav_stats.n_OTHERS);
     }
 
     bdescr *next, *prev;
@@ -730,15 +756,15 @@ GarbageCollect (uint32_t collect_gen,
   if (major_gc) { gcCAFs(); }
 #endif
 
-  // Update the stable pointer hash table.
-  updateStableTables(major_gc);
+  // Update the stable name hash table
+  updateStableNameTable(major_gc);
 
   // unlock the StablePtr table.  Must be before scheduleFinalizers(),
   // because a finalizer may call hs_free_fun_ptr() or
   // hs_free_stable_ptr(), both of which access the StablePtr table.
-  stableUnlock();
+  stablePtrUnlock();
 
-  // Must be after stableUnlock(), because it might free stable ptrs.
+  // Must be after stablePtrUnlock(), because it might free stable ptrs.
   if (major_gc) {
       checkUnload (gct->scavenged_static_objects);
   }
@@ -1020,7 +1046,7 @@ inc_running (void)
 static StgWord
 dec_running (void)
 {
-    ASSERT(gc_running_threads != 0);
+    ASSERT(RELAXED_LOAD(&gc_running_threads) != 0);
     return atomic_dec(&gc_running_threads);
 }
 
@@ -1030,7 +1056,7 @@ any_work (void)
     int g;
     gen_workspace *ws;
 
-    gct->any_work++;
+    NONATOMIC_ADD(&gct->any_work, 1);
 
     write_barrier();
 
@@ -1063,7 +1089,7 @@ any_work (void)
     }
 #endif
 
-    gct->no_work++;
+    __atomic_fetch_add(&gct->no_work, 1, __ATOMIC_RELAXED);
 #if defined(THREADED_RTS)
     yieldThread();
 #endif
@@ -1092,6 +1118,8 @@ loop:
 
     // scavenge_loop() only exits when there's no work to do
 
+    // This atomic decrement also serves as a full barrier to ensure that any
+    // writes we made during scavenging are visible to other threads.
 #if defined(DEBUG)
     r = dec_running();
 #else
@@ -1102,7 +1130,7 @@ loop:
 
     debugTrace(DEBUG_gc, "%d GC threads still running", r);
 
-    while (gc_running_threads != 0) {
+    while (SEQ_CST_LOAD(&gc_running_threads) != 0) {
         // usleep(1);
         if (any_work()) {
             inc_running();
@@ -1138,7 +1166,7 @@ gcWorkerThread (Capability *cap)
     //    measurements more accurate on Linux, perhaps because it syncs
     //    the CPU time across the multiple cores.  Without this, CPU time
     //    is heavily skewed towards GC rather than MUT.
-    gct->wakeup = GC_THREAD_STANDING_BY;
+    SEQ_CST_STORE(&gct->wakeup, GC_THREAD_STANDING_BY);
     debugTrace(DEBUG_gc, "GC thread %d standing by...", gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->gc_spin);
 
@@ -1165,7 +1193,7 @@ gcWorkerThread (Capability *cap)
 
     // Wait until we're told to continue
     RELEASE_SPIN_LOCK(&gct->gc_spin);
-    gct->wakeup = GC_THREAD_WAITING_TO_CONTINUE;
+    SEQ_CST_STORE(&gct->wakeup, GC_THREAD_WAITING_TO_CONTINUE);
     debugTrace(DEBUG_gc, "GC thread %d waiting to continue...",
                gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->mut_spin);
@@ -1192,7 +1220,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
     while(retry) {
         for (i=0; i < n_threads; i++) {
             if (i == me || idle_cap[i]) continue;
-            if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) {
+            if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
                 prodCapability(capabilities[i], cap->running_task);
             }
         }
@@ -1202,7 +1230,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
                 if (i == me || idle_cap[i]) continue;
                 write_barrier();
                 interruptCapability(capabilities[i]);
-                if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) {
+                if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
                     retry = true;
                 }
             }
@@ -1259,10 +1287,10 @@ wakeup_gc_threads (uint32_t me USED_IF_THREADS,
         if (i == me || idle_cap[i]) continue;
         inc_running();
         debugTrace(DEBUG_gc, "waking up gc thread %d", i);
-        if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY)
+        if (RELAXED_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY)
             barf("wakeup_gc_threads");
 
-        gc_threads[i]->wakeup = GC_THREAD_RUNNING;
+        RELAXED_STORE(&gc_threads[i]->wakeup, GC_THREAD_RUNNING);
         ACQUIRE_SPIN_LOCK(&gc_threads[i]->mut_spin);
         RELEASE_SPIN_LOCK(&gc_threads[i]->gc_spin);
     }
@@ -1283,9 +1311,8 @@ shutdown_gc_threads (uint32_t me USED_IF_THREADS,
 
     for (i=0; i < n_gc_threads; i++) {
         if (i == me || idle_cap[i]) continue;
-        while (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE) {
+        while (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_WAITING_TO_CONTINUE) {
             busy_wait_nop();
-            write_barrier();
         }
     }
 #endif
@@ -1300,15 +1327,27 @@ releaseGCThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
     uint32_t i;
     for (i=0; i < n_threads; i++) {
         if (i == me || idle_cap[i]) continue;
-        if (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE)
+        if (RELAXED_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_WAITING_TO_CONTINUE)
             barf("releaseGCThreads");
 
-        gc_threads[i]->wakeup = GC_THREAD_INACTIVE;
+        RELAXED_STORE(&gc_threads[i]->wakeup, GC_THREAD_INACTIVE);
         ACQUIRE_SPIN_LOCK(&gc_threads[i]->gc_spin);
         RELEASE_SPIN_LOCK(&gc_threads[i]->mut_spin);
     }
 }
 #endif
+
+/* ----------------------------------------------------------------------------
+   Save the mutable lists in saved_mut_lists where it will be scavenged
+   during GC
+   ------------------------------------------------------------------------- */
+
+static void
+stash_mut_list (Capability *cap, uint32_t gen_no)
+{
+    cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
+    RELEASE_STORE(&cap->mut_lists[gen_no], allocBlockOnNode_sync(cap->node));
+}
 
 /* ----------------------------------------------------------------------------
    Initialise a generation that is to be collected
@@ -1327,9 +1366,11 @@ prepare_collected_gen (generation *gen)
     g = gen->no;
     if (g != 0) {
         for (i = 0; i < n_capabilities; i++) {
-            freeChain(capabilities[i]->mut_lists[g]);
-            capabilities[i]->mut_lists[g] =
-                allocBlockOnNode(capNoToNumaNode(i));
+            bdescr *old = RELAXED_LOAD(&capabilities[i]->mut_lists[g]);
+            freeChain(old);
+
+            bdescr *new = allocBlockOnNode(capNoToNumaNode(i));
+            RELAXED_STORE(&capabilities[i]->mut_lists[g], new);
         }
     }
 
@@ -1443,17 +1484,6 @@ prepare_collected_gen (generation *gen)
 
 
 /* ----------------------------------------------------------------------------
-   Save the mutable lists in saved_mut_lists
-   ------------------------------------------------------------------------- */
-
-static void
-stash_mut_list (Capability *cap, uint32_t gen_no)
-{
-    cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
-    cap->mut_lists[gen_no] = allocBlockOnNode_sync(cap->node);
-}
-
-/* ----------------------------------------------------------------------------
    Initialise a generation that is *not* to be collected
    ------------------------------------------------------------------------- */
 
@@ -1544,8 +1574,8 @@ collect_pinned_object_blocks (void)
             if (g0->large_objects != NULL) {
                 g0->large_objects->u.back = prev;
             }
-            g0->large_objects = capabilities[n]->pinned_object_blocks;
-            capabilities[n]->pinned_object_blocks = 0;
+            g0->large_objects = RELAXED_LOAD(&capabilities[n]->pinned_object_blocks);
+            RELAXED_STORE(&capabilities[n]->pinned_object_blocks, NULL);
         }
     }
 }

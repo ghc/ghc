@@ -68,8 +68,7 @@ executeMessage (Capability *cap, Message *m)
     const StgInfoTable *i;
 
 loop:
-    write_barrier(); // allow m->header to be modified by another thread
-    i = m->header.info;
+    i = ACQUIRE_LOAD(&m->header.info);
     if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
@@ -130,7 +129,7 @@ loop:
     else if (i == &stg_WHITEHOLE_info)
     {
 #if defined(PROF_SPIN)
-        ++whitehole_executeMessage_spin;
+        NONATOMIC_ADD(&whitehole_executeMessage_spin, 1);
 #endif
         goto loop;
     }
@@ -172,7 +171,7 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
     debugTraceCap(DEBUG_sched, cap, "message: thread %d blocking on "
                   "blackhole %p", (W_)msg->tso->id, msg->bh);
 
-    info = bh->header.info;
+    info = ACQUIRE_LOAD(&bh->header.info);
 
     // If we got this message in our inbox, it might be that the
     // BLACKHOLE has already been updated, and GC has shorted out the
@@ -192,10 +191,11 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
     // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
     // or a value.
 loop:
-    // NB. VOLATILE_LOAD(), because otherwise gcc hoists the load
-    // and turns this into an infinite loop.
-    p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
-    info = p->header.info;
+    // If we are being called from stg_BLACKHOLE then TSAN won't know about the
+    // previous read barrier that makes the following access safe.
+    TSAN_ANNOTATE_BENIGN_RACE(&((StgInd*)bh)->indirectee, "messageBlackHole");
+    p = UNTAG_CLOSURE(ACQUIRE_LOAD(&((StgInd*)bh)->indirectee));
+    info = RELAXED_LOAD(&p->header.info);
 
     if (info == &stg_IND_info)
     {
@@ -226,7 +226,6 @@ loop:
         bq = (StgBlockingQueue*)allocate(cap, sizeofW(StgBlockingQueue));
 
         // initialise the BLOCKING_QUEUE object
-        SET_HDR(bq, &stg_BLOCKING_QUEUE_DIRTY_info, CCS_SYSTEM);
         bq->bh = bh;
         bq->queue = msg;
         bq->owner = owner;
@@ -238,8 +237,12 @@ loop:
         // a collision to update a BLACKHOLE and a BLOCKING_QUEUE
         // becomes orphaned (see updateThunk()).
         bq->link = owner->bq;
-        owner->bq = bq;
-        dirty_TSO(cap, owner); // we modified owner->bq
+        SET_HDR(bq, &stg_BLOCKING_QUEUE_DIRTY_info, CCS_SYSTEM);
+        // We are about to make the newly-constructed message visible to other cores;
+        // a barrier is necessary to ensure that all writes are visible.
+        // See Note [Heap memory barriers] in SMP.h.
+        dirty_TSO(cap, owner); // we will modify owner->bq
+        RELEASE_STORE(&owner->bq, bq);
 
         // If the owner of the blackhole is currently runnable, then
         // bump it to the front of the run queue.  This gives the
@@ -255,8 +258,8 @@ loop:
         }
 
         // point to the BLOCKING_QUEUE from the BLACKHOLE
-        write_barrier(); // make the BQ visible
-        ((StgInd*)bh)->indirectee = (StgClosure *)bq;
+        // RELEASE to make the BQ visible, see Note [Heap memory barriers].
+        RELEASE_STORE(&((StgInd*)bh)->indirectee, (StgClosure *)bq);
         recordClosureMutated(cap,bh); // bh was mutated
 
         debugTraceCap(DEBUG_sched, cap, "thread %d blocked on thread %d",
@@ -284,12 +287,16 @@ loop:
         }
 #endif
 
-        msg->link = bq->queue;
+        RELAXED_STORE(&msg->link, bq->queue);
         bq->queue = msg;
+        // No barrier is necessary here: we are only exposing the
+        // closure to the GC. See Note [Heap memory barriers] in SMP.h.
         recordClosureMutated(cap,(StgClosure*)msg);
 
         if (info == &stg_BLOCKING_QUEUE_CLEAN_info) {
-            bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+            RELAXED_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_DIRTY_info);
+            // No barrier is necessary here: we are only exposing the
+            // closure to the GC. See Note [Heap memory barriers] in SMP.h.
             recordClosureMutated(cap,(StgClosure*)bq);
         }
 
@@ -318,7 +325,7 @@ StgTSO * blackHoleOwner (StgClosure *bh)
     const StgInfoTable *info;
     StgClosure *p;
 
-    info = bh->header.info;
+    info = RELAXED_LOAD(&bh->header.info);
 
     if (info != &stg_BLACKHOLE_info &&
         info != &stg_CAF_BLACKHOLE_info &&
@@ -330,10 +337,8 @@ StgTSO * blackHoleOwner (StgClosure *bh)
     // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
     // or a value.
 loop:
-    // NB. VOLATILE_LOAD(), because otherwise gcc hoists the load
-    // and turns this into an infinite loop.
-    p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
-    info = p->header.info;
+    p = UNTAG_CLOSURE(ACQUIRE_LOAD(&((StgInd*)bh)->indirectee));
+    info = RELAXED_LOAD(&p->header.info);
 
     if (info == &stg_IND_info) goto loop;
 
@@ -345,7 +350,7 @@ loop:
              info == &stg_BLOCKING_QUEUE_DIRTY_info)
     {
         StgBlockingQueue *bq = (StgBlockingQueue *)p;
-        return bq->owner;
+        return RELAXED_LOAD(&bq->owner);
     }
 
     return NULL; // not blocked

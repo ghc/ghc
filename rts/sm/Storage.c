@@ -378,7 +378,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     Capability *cap = regTableToCapability(reg);
     StgInd *bh;
 
-    orig_info = caf->header.info;
+    orig_info = RELAXED_LOAD(&caf->header.info);
 
 #if defined(THREADED_RTS)
     const StgInfoTable *cur_info;
@@ -407,12 +407,13 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
 
     // Allocate the blackhole indirection closure
     bh = (StgInd *)allocate(cap, sizeofW(*bh));
-    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
+    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
 
-    caf->indirectee = (StgClosure *)bh;
-    write_barrier();
-    SET_INFO((StgClosure*)caf,&stg_IND_STATIC_info);
+    // RELEASE ordering to ensure that above writes are visible before we
+    // introduce reference as CAF indirectee.
+    RELEASE_STORE(&caf->indirectee, (StgClosure *) bh);
+    SET_INFO_RELEASE((StgClosure*)caf, &stg_IND_STATIC_info);
 
     return bh;
 }
@@ -887,8 +888,8 @@ allocateMightFail (Capability *cap, W_ n)
         g0->n_new_large_words += n;
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
-        bd->flags = BF_LARGE;
-        bd->free = bd->start + n;
+        RELAXED_STORE(&bd->flags, BF_LARGE);
+        RELAXED_STORE(&bd->free, bd->start + n);
         cap->total_allocated += n;
         return bd->start;
     }
@@ -1078,20 +1079,24 @@ allocatePinned (Capability *cap, W_ n)
    and is put on the mutable list.
 */
 void
-dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
+dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar)
 {
     Capability *cap = regTableToCapability(reg);
-    if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
-        p->header.info = &stg_MUT_VAR_DIRTY_info;
-        recordClosureMutated(cap,p);
+    // No barrier required here as no other heap object fields are read. See
+    // note [Heap memory barriers] in SMP.h.
+    if (RELAXED_LOAD(&mvar->header.info) == &stg_MUT_VAR_CLEAN_info) {
+        SET_INFO((StgClosure*) mvar, &stg_MUT_VAR_DIRTY_info);
+        recordClosureMutated(cap, (StgClosure *) mvar);
     }
 }
 
 void
 dirty_TVAR(Capability *cap, StgTVar *p)
 {
-    if (p->header.info == &stg_TVAR_CLEAN_info) {
-        p->header.info = &stg_TVAR_DIRTY_info;
+    // No barrier required here as no other heap object fields are read. See
+    // note [Heap memory barriers] in SMP.h.
+    if (RELAXED_LOAD(&p->header.info) == &stg_TVAR_CLEAN_info) {
+        SET_INFO((StgClosure*) p, &stg_TVAR_DIRTY_info);
         recordClosureMutated(cap,(StgClosure*)p);
     }
 }
@@ -1104,8 +1109,8 @@ dirty_TVAR(Capability *cap, StgTVar *p)
 void
 setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
     }
     tso->_link = target;
@@ -1114,8 +1119,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
     }
     tso->block_info.prev = target;
@@ -1124,8 +1129,8 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 dirty_TSO (Capability *cap, StgTSO *tso)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
     }
 }
@@ -1133,8 +1138,8 @@ dirty_TSO (Capability *cap, StgTSO *tso)
 void
 dirty_STACK (Capability *cap, StgStack *stack)
 {
-    if (stack->dirty == 0) {
-        stack->dirty = 1;
+    if (RELAXED_LOAD(&stack->dirty) == 0) {
+        RELAXED_STORE(&stack->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)stack);
     }
 }
@@ -1284,9 +1289,13 @@ calcNeeded (bool force_major, memcount *blocks_needed)
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         gen = &generations[g];
 
-        blocks = gen->n_blocks // or: gen->n_words / BLOCK_SIZE_W (?)
-               + gen->n_large_blocks
-               + gen->n_compact_blocks;
+        blocks = gen->live_estimate ? (gen->live_estimate / BLOCK_SIZE_W) : gen->n_blocks;
+
+        // This can race with allocate() and compactAllocateBlockInternal()
+        // but only needs to be approximate
+        TSAN_ANNOTATE_BENIGN_RACE(&gen->n_large_blocks, "n_large_blocks");
+        blocks += RELAXED_LOAD(&gen->n_large_blocks)
+                + RELAXED_LOAD(&gen->n_compact_blocks);
 
         // we need at least this much space
         needed += blocks;
@@ -1364,19 +1373,7 @@ StgWord calcTotalCompactW (void)
 #include <libkern/OSCacheControl.h>
 #endif
 
-#if defined(__clang__)
-/* clang defines __clear_cache as a builtin on some platforms.
- * For example on armv7-linux-androideabi. The type slightly
- * differs from gcc.
- */
 extern void __clear_cache(void * begin, void * end);
-#elif defined(__GNUC__)
-/* __clear_cache is a libgcc function.
- * It existed before __builtin___clear_cache was introduced.
- * See Trac #8562.
- */
-extern void __clear_cache(char * begin, char * end);
-#endif /* __GNUC__ */
 
 /* On ARM and other platforms, we need to flush the cache after
    writing code into memory, so the processor reliably sees it. */

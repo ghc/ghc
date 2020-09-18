@@ -3,7 +3,8 @@ module X86.Cond (
         condUnsigned,
         condToSigned,
         condToUnsigned,
-        maybeFlipCond
+        maybeFlipCond,
+        maybeInvertCond
 )
 
 where
@@ -68,3 +69,41 @@ maybeFlipCond cond  = case cond of
         LE    -> Just GE
         GE    -> Just LE
         _other -> Nothing
+
+-- | If we apply @maybeInvertCond@ to the condition of a jump we turn
+-- jumps taken into jumps not taken and vice versa.
+--
+-- Careful! If the used comparison and the conditional jump
+-- don't match the above behaviour will NOT hold.
+-- When used for FP comparisons this does not consider unordered
+-- numbers.
+-- Also inverting twice might return a synonym for the original condition.
+maybeInvertCond :: Cond -> Maybe Cond
+maybeInvertCond cond  = case cond of
+        ALWAYS  -> Nothing
+        EQQ     -> Just NE
+        NE      -> Just EQQ
+
+        NEG     -> Just POS
+        POS     -> Just NEG
+
+        GEU     -> Just LU
+        LU      -> Just GEU
+
+        GE      -> Just LTT
+        LTT     -> Just GE
+
+        GTT     -> Just LE
+        LE      -> Just GTT
+
+        GU      -> Just LEU
+        LEU     -> Just GU
+
+        --GEU "==" NOTCARRY, they are synonyms
+        --at the assembly level
+        CARRY   -> Just GEU
+
+        OFLO    -> Nothing
+
+        PARITY  -> Just NOTPARITY
+        NOTPARITY -> Just PARITY

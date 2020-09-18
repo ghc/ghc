@@ -62,6 +62,8 @@ again:
     W_  info;
     P_ untaggedfun;
     W_ arity;
+    // We must obey the correct heap object observation pattern in
+    // Note [Heap memory barriers] in SMP.h.
     untaggedfun = UNTAG(fun);
     info = %INFO_PTR(untaggedfun);
     switch [INVALID_OBJECT .. N_CLOSURE_TYPES]

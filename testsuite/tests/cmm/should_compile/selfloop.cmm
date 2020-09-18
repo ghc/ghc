@@ -1,0 +1,11 @@
+#include "Cmm.h"
+
+testLoop (W_ counter)
+{
+loop:
+  if (counter > 0) {
+    counter = counter - 1;
+    goto loop;
+  }
+  return (counter);
+}

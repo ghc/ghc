@@ -10,7 +10,7 @@
 #include "HsFFI.h"
 #include "Rts.h"
 
-#include "Stable.h"
+#include "StablePtr.h"
 #include "Task.h"
 
 // hs_init and hs_exit are defined in RtsStartup.c
@@ -28,14 +28,28 @@ hs_perform_gc(void)
     performMajorGC();
 }
 
-void hs_lock_stable_tables (void)
+// Lock the stable pointer table
+void hs_lock_stable_ptr_table (void)
 {
-    stableLock();
+    stablePtrLock();
 }
 
+// Deprecated version of hs_lock_stable_ptr_table
+void hs_lock_stable_tables (void)
+{
+    stablePtrLock();
+}
+
+// Unlock the stable pointer table
+void hs_unlock_stable_ptr_table (void)
+{
+    stablePtrUnlock();
+}
+
+// Deprecated version of hs_unlock_stable_ptr_table
 void hs_unlock_stable_tables (void)
 {
-    stableUnlock();
+    stablePtrUnlock();
 }
 
 void

@@ -195,6 +195,7 @@ threadPaused(Capability *cap, StgTSO *tso)
     const StgRetInfoTable *info;
     const StgInfoTable *bh_info;
     const StgInfoTable *cur_bh_info USED_IF_THREADS;
+    const StgInfoTable *frame_info;
     StgClosure *bh;
     StgPtr stack_end;
     uint32_t words_to_squeeze = 0;
@@ -218,6 +219,8 @@ threadPaused(Capability *cap, StgTSO *tso)
 
     frame = (StgClosure *)tso->stackobj->sp;
 
+    // N.B. We know that the TSO is owned by the current capability so no
+    // memory barriers are needed here.
     while ((P_)frame < stack_end) {
         info = get_ret_itbl(frame);
 
@@ -226,7 +229,8 @@ threadPaused(Capability *cap, StgTSO *tso)
         case UPDATE_FRAME:
 
             // If we've already marked this frame, then stop here.
-            if (frame->header.info == (StgInfoTable *)&stg_marked_upd_frame_info) {
+            frame_info = frame->header.info;
+            if (frame_info == (StgInfoTable *)&stg_marked_upd_frame_info) {
                 if (prev_was_update_frame) {
                     words_to_squeeze += sizeofW(StgUpdateFrame);
                     weight += weight_pending;
@@ -238,7 +242,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             SET_INFO(frame, (StgInfoTable *)&stg_marked_upd_frame_info);
 
             bh = ((StgUpdateFrame *)frame)->updatee;
-            bh_info = bh->header.info;
+            bh_info = RELAXED_LOAD(&bh->header.info);
 
 #if defined(THREADED_RTS)
         retry:
@@ -279,7 +283,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             // suspended by this mechanism. See Note [AP_STACKs must be eagerly
             // blackholed] for details.
             if (((bh_info == &stg_BLACKHOLE_info)
-                 && ((StgInd*)bh)->indirectee != (StgClosure*)tso)
+                 && (RELAXED_LOAD(&((StgInd*)bh)->indirectee) != (StgClosure*)tso))
                 || (bh_info == &stg_WHITEHOLE_info))
             {
                 debugTrace(DEBUG_squeeze,
@@ -330,7 +334,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             if (cur_bh_info != bh_info) {
                 bh_info = cur_bh_info;
 #if defined(PROF_SPIN)
-                ++whitehole_threadPaused_spin;
+                NONATOMIC_ADD(&whitehole_threadPaused_spin, 1);
 #endif
                 busy_wait_nop();
                 goto retry;
@@ -338,9 +342,8 @@ threadPaused(Capability *cap, StgTSO *tso)
 #endif
 
             // The payload of the BLACKHOLE points to the TSO
-            ((StgInd *)bh)->indirectee = (StgClosure *)tso;
-            write_barrier();
-            SET_INFO(bh,&stg_BLACKHOLE_info);
+            RELAXED_STORE(&((StgInd *)bh)->indirectee, (StgClosure *)tso);
+            SET_INFO_RELEASE(bh,&stg_BLACKHOLE_info);
 
             // .. and we need a write barrier, since we just mutated the closure:
             recordClosureMutated(cap,bh);

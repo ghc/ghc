@@ -303,7 +303,9 @@
 #define ENTER_(ret,x)                                   \
  again:                                                 \
   W_ info;                                              \
-  LOAD_INFO(ret,x)                                       \
+  LOAD_INFO(ret,x)                                      \
+  /* See Note [Heap memory barriers] in SMP.h */        \
+  prim_read_barrier;                                    \
   switch [INVALID_OBJECT .. N_CLOSURE_TYPES]            \
          (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {       \
   case                                                  \
@@ -626,6 +628,14 @@
 #define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
 #endif
 
+// Memory barriers.
+// For discussion of how these are used to fence heap object
+// accesses see Note [Heap memory barriers] in SMP.h.
+#if defined(THREADED_RTS)
+#define prim_read_barrier prim %read_barrier()
+#else
+#define prim_read_barrier /* nothing */
+#endif
 #if defined(THREADED_RTS)
 #define prim_write_barrier prim %write_barrier()
 #else

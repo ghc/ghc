@@ -75,7 +75,7 @@ isAlive(StgClosure *p)
         return p;
     }
 
-    info = q->header.info;
+    info = RELAXED_LOAD(&q->header.info);
 
     if (IS_FORWARDING_PTR(info)) {
         // alive!
@@ -83,6 +83,7 @@ isAlive(StgClosure *p)
     }
 
     info = INFO_PTR_TO_STRUCT(info);
+    load_load_barrier();
 
     switch (info->type) {
 
