@@ -1079,7 +1079,7 @@ allocatePinned (Capability *cap, W_ n)
    and is put on the mutable list.
 */
 void
-dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
+dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar)
 {
     Capability *cap = regTableToCapability(reg);
     // No barrier required here as no other heap object fields are read. See
@@ -1373,19 +1373,7 @@ StgWord calcTotalCompactW (void)
 #include <libkern/OSCacheControl.h>
 #endif
 
-#if defined(__clang__)
-/* clang defines __clear_cache as a builtin on some platforms.
- * For example on armv7-linux-androideabi. The type slightly
- * differs from gcc.
- */
 extern void __clear_cache(void * begin, void * end);
-#elif defined(__GNUC__)
-/* __clear_cache is a libgcc function.
- * It existed before __builtin___clear_cache was introduced.
- * See Trac #8562.
- */
-extern void __clear_cache(char * begin, char * end);
-#endif /* __GNUC__ */
 
 /* On ARM and other platforms, we need to flush the cache after
    writing code into memory, so the processor reliably sees it. */

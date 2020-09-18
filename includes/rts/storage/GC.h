@@ -229,7 +229,7 @@ void setKeepCAFs (void);
    and is put on the mutable list.
    -------------------------------------------------------------------------- */
 
-void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
+void dirty_MUT_VAR(StgRegTable *reg, StgMutVar *p);
 
 /* set to disable CAF garbage collection in GHCi. */
 /* (needed when dynamic libraries are used). */
@@ -240,10 +240,4 @@ INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
     RELAXED_STORE(&bd->gen, gen);
     RELAXED_STORE(&bd->gen_no, gen->no);
     RELAXED_STORE(&bd->dest_no, dest->no);
-
-#if !IN_STG_CODE
-    /* See Note [RtsFlags is a pointer in STG code] */
-    ASSERT(gen->no < RtsFlags.GcFlags.generations);
-    ASSERT(dest->no < RtsFlags.GcFlags.generations);
-#endif
 }

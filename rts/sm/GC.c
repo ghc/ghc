@@ -1484,17 +1484,6 @@ prepare_collected_gen (generation *gen)
 
 
 /* ----------------------------------------------------------------------------
-   Save the mutable lists in saved_mut_lists
-   ------------------------------------------------------------------------- */
-
-static void
-stash_mut_list (Capability *cap, uint32_t gen_no)
-{
-    cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
-    cap->mut_lists[gen_no] = allocBlockOnNode_sync(cap->node);
-}
-
-/* ----------------------------------------------------------------------------
    Initialise a generation that is *not* to be collected
    ------------------------------------------------------------------------- */
 
