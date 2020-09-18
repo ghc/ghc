@@ -8,24 +8,24 @@ import Foreign.C.Types
 import System.Mem
 import Control.Monad
 
-foreign import ccall safe "rts_pause_and_unpause_c.h pauseAndUnpause"
-    safe_pauseAndUnpause_c :: IO ()
+foreign import ccall safe "rts_pause_and_resume_c.h pauseAndResume"
+    safe_pauseAndResume_c :: IO ()
 
-foreign import ccall unsafe "rts_pause_and_unpause_c.h pauseAndUnpause"
-    unsafe_pauseAndUnpause_c :: IO ()
+foreign import ccall unsafe "rts_pause_and_resume_c.h pauseAndResume"
+    unsafe_pauseAndResume_c :: IO ()
 
-foreign import ccall unsafe "rts_pause_and_unpause_c.h pauseAndUnpauseViaNewThread"
-    unsafe_pauseAndUnpauseViaNewThread_c :: IO ()
+foreign import ccall unsafe "rts_pause_and_resume_c.h pauseAndResumeViaNewThread"
+    unsafe_pauseAndResumeViaNewThread_c :: IO ()
 
 -- Note that these should be unsafe FFI calls. rts_pause() does not pause or
 -- wait for safe FFI calls, as they do not own a capability.
-foreign import ccall unsafe "rts_pause_and_unpause_c.h getUnixTime"
+foreign import ccall unsafe "rts_pause_and_resume_c.h getUnixTime"
     getUnixTime_c :: IO CTime
 
-foreign import ccall unsafe "rts_pause_and_unpause_c.h getPauseBegin"
+foreign import ccall unsafe "rts_pause_and_resume_c.h getPauseBegin"
     getPauseBegin_c :: IO CTime
 
-foreign import ccall unsafe "rts_pause_and_unpause_c.h getPauseEnd"
+foreign import ccall unsafe "rts_pause_and_resume_c.h getPauseEnd"
     getPauseEnd_c :: IO CTime
 
 clockEachSecond :: IORef [CTime] -> IO ()
@@ -35,8 +35,8 @@ clockEachSecond ref = forever $ do
 
   sleepSeconds 1
 
-{- To show that rts_pause() and rts_unpause() work, clockEachSecond adds the
-current unix time to a list (once per Second). pauseAndUnpause_c stops the RTS
+{- To show that rts_pause() and rts_resume() work, clockEachSecond adds the
+current unix time to a list (once per Second). pauseAndResume_c stops the RTS
 for 5 Seconds. Thus there's an invariant that there should be no timestamp in
 the list that is in this 5 Seconds wide timeframe, which is defined by
 getPauseBegin_c and getPauseEnd_c. -}
@@ -46,26 +46,26 @@ main = do
   ref <- newIORef []
   forkIO $ clockEachSecond ref
 
-  -- Attempt pause and unpause in various forms
-  withPauseAndUnpause ref
-    "Pause and unpause via safe FFI call"
-    safe_pauseAndUnpause_c
+  -- Attempt pause and resume in various forms
+  withPauseAndResume ref
+    "Pause and resume via safe FFI call"
+    safe_pauseAndResume_c
 
-  withPauseAndUnpause ref
-    "Pause and unpause via unsafe FFI call"
-    unsafe_pauseAndUnpause_c
+  withPauseAndResume ref
+    "Pause and resume via unsafe FFI call"
+    unsafe_pauseAndResume_c
 
-  withPauseAndUnpause ref
-    "Pause and unpause via unsafe FFI call that creates a new OS thread"
-    unsafe_pauseAndUnpauseViaNewThread_c
+  withPauseAndResume ref
+    "Pause and resume via unsafe FFI call that creates a new OS thread"
+    unsafe_pauseAndResumeViaNewThread_c
 
-withPauseAndUnpause :: IORef [CTime] -> String -> IO () -> IO ()
-withPauseAndUnpause ref startMsg pauseAndUnpause = do
+withPauseAndResume :: IORef [CTime] -> String -> IO () -> IO ()
+withPauseAndResume ref startMsg pauseAndResume = do
     putStrLn startMsg
 
     writeIORef ref []
     sleepSeconds 3
-    pauseAndUnpause
+    pauseAndResume
 
     -- This seems to sleep for 8 - 5 Seconds. That's strange, but should be
     -- good enough for this test.

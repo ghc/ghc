@@ -26,7 +26,7 @@ void* listThreads_thread(void* unused){
     RtsPaused paused = rts_pause();
     rts_listThreads(&collectTSOsCallback, NULL);
     rts_listMiscRoots(&collectMiscRootsCallback, NULL);
-    rts_unpause(paused);
+    rts_resume(paused);
 
     return NULL;
 }

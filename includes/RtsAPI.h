@@ -486,32 +486,32 @@ void rts_checkSchedStatus (char* site, Capability *);
 SchedulerStatus rts_getSchedStatus (Capability *cap);
 
 // Various bits of information that need to be persisted between rts_pause and
-// rts_unpause.
+// rts_resume.
 typedef struct RtsPaused_ {
     // The task (i.e. OS thread) on which rts_pause() was called. This is used
-    // in rts_unpause() to check that it is called on the same OS thread.
+    // in rts_resume() to check that it is called on the same OS thread.
     Task *pausing_task;
 
     // The capability owned by pausing_task (possibly NULL) just before calling
-    // rts_unpause(). On rts_unpause(), the pausing_task will retain ownership
+    // rts_resume(). On rts_resume(), the pausing_task will retain ownership
     // of this capability (if not NULL).
     Capability *capability;
 } RtsPaused;
 
 // Halt execution of all Haskell threads by acquiring all capabilities. It is
 // different to rts_lock() because rts_pause() pauses all capabilities while
-// rts_lock() only pauses a single capability. rts_pause() and rts_unpause()
+// rts_lock() only pauses a single capability. rts_pause() and rts_resume()
 // have to be executed from the same OS thread (i.e. myTask() must stay the
 // same). Returns the currently owned capability (possibly NULL). This must be
-// passed back to rts_unpause().
+// passed back to rts_resume().
 RtsPaused rts_pause (void);
 
 // Counterpart of rts_pause: Continue from a pause.
-// rts_pause() and rts_unpause() have to be executed from the same OS thread
+// rts_pause() and rts_resume() have to be executed from the same OS thread
 // (i.e. myTask() must stay the same).
-void rts_unpause (RtsPaused);
+void rts_resume (RtsPaused);
 
-// Tells the current state of the RTS regarding rts_pause() and rts_unpause().
+// Tells the current state of the RTS regarding rts_pause() and rts_resume().
 bool rts_isPaused(void);
 
 // List all live threads. Must be done while RTS is paused (see rts_pause()).

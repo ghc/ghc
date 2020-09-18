@@ -663,7 +663,7 @@ RtsPaused rts_pause (void)
 
     // Check if we own a capability. This is needed to correctly call
     // stopAllCapabilities() and to know if to keep ownership or release the
-    // capability on rts_unpause().
+    // capability on rts_resume().
     Capability * cap = rtsPaused.pausing_task->cap;
     bool taskOwnsCap = cap != NULL && cap->running_task == rtsPaused.pausing_task;
     rtsPaused.capability = taskOwnsCap ? cap : NULL;
@@ -674,7 +674,7 @@ RtsPaused rts_pause (void)
 }
 
 // See RtsAPI.h
-void rts_unpause (RtsPaused rtsPaused)
+void rts_resume (RtsPaused rtsPaused)
 {
     if (!rts_isPaused())
     {
@@ -683,7 +683,7 @@ void rts_unpause (RtsPaused rtsPaused)
     }
     if (rtsPaused.pausing_task != getMyTask())
     {
-        errorBelch("error: rts_unpause was called from a different OS thread than rts_pause.");
+        errorBelch("error: rts_resume was called from a different OS thread than rts_pause.");
         stg_exit(EXIT_FAILURE);
     }
 
@@ -751,7 +751,7 @@ RtsPaused rts_pause (void)
     return rtsPaused;
 }
 
-void rts_unpause (RtsPaused cap STG_UNUSED)
+void rts_resume (RtsPaused cap STG_UNUSED)
 {
     errorBelch("Warning: Unpausing the RTS is only possible for "
                "multithreaded RTS.");

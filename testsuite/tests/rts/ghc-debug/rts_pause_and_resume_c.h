@@ -5,7 +5,7 @@ struct PauseTimestamps{
     time_t end;
 };
 
-void pauseAndUnpause(void);
+void pauseAndResume(void);
 time_t getPauseBegin(void);
 time_t getPauseEnd(void);
 time_t getUnixTime(void);

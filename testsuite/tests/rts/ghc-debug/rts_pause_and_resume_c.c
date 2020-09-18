@@ -1,7 +1,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <unistd.h>
-#include "rts_pause_and_unpause_c.h"
+#include "rts_pause_and_resume_c.h"
 #include "Rts.h"
 #include "RtsAPI.h"
 
@@ -9,7 +9,7 @@
 
 struct PauseTimestamps timestamps = {0, 0};
 
-void* pauseAndUnpause_thread(void* unused){
+void* pauseAndResume_thread(void* unused){
     RtsPaused rtsPaused = rts_pause();
 
     if(!rts_isPaused()) {
@@ -21,23 +21,23 @@ void* pauseAndUnpause_thread(void* unused){
     sleep(5);
     timestamps.end = time(NULL);
 
-    rts_unpause(rtsPaused);
+    rts_resume(rtsPaused);
 
     if(rts_isPaused()) {
-        errorBelch("Expected the RTS to be unpaused.");
+        errorBelch("Expected the RTS to be resumed.");
         exit(1);
     }
 
     return NULL;
 }
 
-void pauseAndUnpause(void){
-    pauseAndUnpause_thread(NULL);
+void pauseAndResume(void){
+    pauseAndResume_thread(NULL);
 }
 
-void pauseAndUnpauseViaNewThread(void){
+void pauseAndResumeViaNewThread(void){
     pthread_t threadId;
-    pthread_create(&threadId, NULL, &pauseAndUnpause_thread, NULL);
+    pthread_create(&threadId, NULL, &pauseAndResume_thread, NULL);
     pthread_detach(threadId);
 }
 
