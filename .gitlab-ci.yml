@@ -21,7 +21,6 @@ stages:
   - quick-build # A very quick smoke-test to weed out broken commits
   - build       # A quick smoke-test to weed out broken commits
   - full-build  # Build all the things
-  - cleanup     # See Note [Cleanup after the shell executor]
   - packaging   # Source distribution, etc.
   - testing     # head.hackage correctness and compiler performance testing
   - deploy      # push documentation
@@ -1035,46 +1034,6 @@ release-i386-windows:
 nightly-i386-windows:
   <<: *nightly
   extends: .build-i386-windows-make
-
-############################################################
-# Cleanup
-############################################################
-
-# Note [Cleaning up after shell executor]
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
-# As noted in [1], gitlab-runner's shell executor doesn't clean up its working
-# directory after builds. Unfortunately, we are forced to use the shell executor
-# on Darwin. To avoid running out of disk space we add a stage at the end of
-# the build to remove the /.../GitLabRunner/builds directory. Since we only run a
-# single build at a time on Darwin this should be safe.
-#
-# We used to have a similar cleanup job on Windows as well however it ended up
-# being quite fragile as we have multiple Windows builders yet there is no
-# guarantee that the cleanup job is run on the same machine as the build itself
-# was run. Consequently we were forced to instead handle cleanup with a separate
-# cleanup cron job on Windows.
-#
-# [1] https://gitlab.com/gitlab-org/gitlab-runner/issues/3856
-
-# See Note [Cleanup after shell executor]
-cleanup-darwin:
-  <<: *only-default
-  stage: cleanup
-  tags:
-    - x86_64-darwin
-  when: always
-  dependencies: []
-  before_script:
-    - echo "Time to clean up"
-  script:
-    - echo "Let's go"
-  after_script:
-    - BUILD_DIR=$CI_PROJECT_DIR
-    - echo "Cleaning $BUILD_DIR"
-    - cd $HOME
-    - rm -Rf $BUILD_DIR/*
-    - exit 0
 
 ############################################################
 # Packaging
