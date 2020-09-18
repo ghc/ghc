@@ -58,8 +58,8 @@ main = forM_ [ ("CP936",  2, "CP936",      Just "CP936-UTF8")  -- Representative
         utf8_bs <- BS.readFile ("encoded-data" </> utf8_file <.> "txt")
         Right expected <- decode utf8 utf8_bs
         Right actual   <- decode enc  bs
-        unless (expected == actual) $ do
-            putStrLn (bsDiff 0 actual expected)
+        unless (expected == actual) $
+          putStrLn (bsDiff 0 actual expected)
 
 forTruncations :: BS.ByteString -> (BS.ByteString -> IO a) -> IO [a]
 forTruncations bs f = forSplits bs $ \before _ -> f before

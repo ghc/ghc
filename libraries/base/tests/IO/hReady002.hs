@@ -5,6 +5,6 @@ import System.Exit
 
 main = do
   m <- newEmptyMVar
-  forkIO $ do threadDelay 500000; putMVar m Nothing
-  forkIO $ do hReady stdin >>= putMVar m . Just
+  forkIO $ threadDelay 500000 >> putMVar m Nothing
+  forkIO $ hReady stdin >>= putMVar m . Just
   takeMVar m >>= print

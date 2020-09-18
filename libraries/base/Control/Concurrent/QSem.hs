@@ -82,7 +82,7 @@ waitQSem (QSem m) =
          putMVar m (z, b1, b2)
          return ()
   where
-    wait b = takeMVar b `onException` do
+    wait b = takeMVar b `onException`
                 (uninterruptibleMask_ $ do -- Note [signal uninterruptible]
                    (i,b1,b2) <- takeMVar m
                    r <- tryTakeMVar b
