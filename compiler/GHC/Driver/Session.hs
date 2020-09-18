@@ -240,7 +240,6 @@ import GHC.Unit.Home
 import GHC.Unit.Types
 import GHC.Unit.Parser
 import GHC.Unit.Module
-import GHC.Driver.Ppr
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Builtin.Names ( mAIN )
@@ -1386,9 +1385,10 @@ jsonLogAction dflags reason severity srcSpan msg
     defaultLogActionHPutStrDoc dflags stdout
       (withPprStyle (PprCode CStyle) (doc $$ text ""))
     where
+      str = renderWithContext (initSDocContext dflags defaultUserStyle) msg
       doc = renderJSON $
               JSObject [ ( "span", json srcSpan )
-                       , ( "doc" , JSString (showSDoc dflags msg) )
+                       , ( "doc" , JSString str )
                        , ( "severity", json severity )
                        , ( "reason" ,   json reason )
                        ]
@@ -1990,8 +1990,9 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
           = runCmdLine (processArgs activeFlags args) dflags0
 
   -- See Note [Handling errors when parsing commandline flags]
+  let rdr = renderWithContext (initSDocContext dflags0 defaultUserStyle)
   unless (null errs) $ liftIO $ throwGhcExceptionIO $ errorsToGhcException $
-    map ((showPpr dflags0 . getLoc &&& unLoc) . errMsg) $ errs
+    map ((rdr . ppr . getLoc &&& unLoc) . errMsg) $ errs
 
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
