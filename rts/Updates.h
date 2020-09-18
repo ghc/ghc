@@ -70,8 +70,6 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
                                           StgClosure *p1,
                                           StgClosure *p2)
 {
-    bdescr *bd;
-
     ASSERT( (P_)p1 != (P_)p2 );
     /* not necessarily true: ASSERT( !closure_IND(p1) ); */
     /* occurs in RaiseAsync.c:raiseAsync() */
