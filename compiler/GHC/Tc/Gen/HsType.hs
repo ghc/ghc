@@ -2831,7 +2831,6 @@ expectedKindInCtxt :: UserTypeCtxt -> ContextKind
 -- Depending on the context, we might accept any kind (for instance, in a TH
 -- splice), or only certain kinds (like in type signatures).
 expectedKindInCtxt (TySynCtxt _)   = AnyKind
-expectedKindInCtxt ThBrackCtxt     = AnyKind
 expectedKindInCtxt (GhciCtxt {})   = AnyKind
 -- The types in a 'default' decl can have varying kinds
 -- See Note [Extended defaults]" in GHC.Tc.Utils.Env
