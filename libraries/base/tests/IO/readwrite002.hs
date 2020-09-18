@@ -29,7 +29,6 @@ main = do
    hSeek cd AbsoluteSeek 0
    hSetBuffering cd LineBuffering
    speak cd  `catchIOError` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else ioError err
-   return ()
    hSeek cd AbsoluteSeek 0
    hSetBuffering cd (BlockBuffering Nothing)
    speak cd  `catchIOError` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else ioError err
