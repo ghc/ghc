@@ -6,7 +6,6 @@ module Main where
 
 import Prelude hiding (foldr, foldl, foldl', foldr1, foldl1, length, null, sum,
                        product, all, any, and, or)
-import Data.Foldable
 import Control.Exception
 import Data.Array
 import Data.Foldable

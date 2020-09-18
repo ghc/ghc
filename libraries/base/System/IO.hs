@@ -368,10 +368,8 @@ appendFile f txt = withFile f AppendMode (\ hdl -> hPutStr hdl txt)
 
 -- | The 'readLn' function combines 'getLine' and 'readIO'.
 
-readLn          :: Read a => IO a
-readLn          =  do l <- getLine
-                      r <- readIO l
-                      return r
+readLn :: Read a => IO a
+readLn = getLine >>= readIO
 
 -- | The 'readIO' function is similar to 'read' except that it signals
 -- parse failure to the 'IO' monad instead of terminating the program.

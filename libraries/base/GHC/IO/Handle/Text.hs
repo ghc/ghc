@@ -87,7 +87,7 @@ import GHC.List
 --
 
 hWaitForInput :: Handle -> Int -> IO Bool
-hWaitForInput h msecs = do
+hWaitForInput h msecs =
   wantReadableHandle_ "hWaitForInput" h $ \ handle_@Handle__{..} -> do
   cbuf <- readIORef haCharBuffer
 
@@ -185,8 +185,8 @@ hGetChar handle =
 
 hGetLine :: Handle -> IO String
 hGetLine h =
-  wantReadableHandle_ "hGetLine" h $ \ handle_ -> do
-     hGetLineBuffered handle_
+  wantReadableHandle_ "hGetLine" h $ \ handle_ ->
+    hGetLineBuffered handle_
 
 hGetLineBuffered :: Handle__ -> IO String
 hGetLineBuffered handle_@Handle__{..} = do
@@ -299,12 +299,12 @@ unpack_nl !buf !r !w acc0
               c <- peekElemOff pbuf i
               if (c == '\n' && i > r)
                  then do
-                         c1 <- peekElemOff pbuf (i-1)
-                         if (c1 == '\r')
-                            then unpackRB ('\n':acc) (i-2)
-                            else unpackRB ('\n':acc) (i-1)
-                 else do
-                         unpackRB (c : acc) (i-1)
+                   c1 <- peekElemOff pbuf (i-1)
+                   if (c1 == '\r')
+                      then unpackRB ('\n':acc) (i-2)
+                      else unpackRB ('\n':acc) (i-1)
+                 else
+                   unpackRB (c : acc) (i-1)
      in do
      c <- peekElemOff pbuf (w-1)
      if (c == '\r')
@@ -437,15 +437,16 @@ getSomeCharacters handle_@Handle__{..} buf@Buffer{..} =
     1 | haInputNL == CRLF -> do
       (c,_) <- readCharBuf bufRaw bufL
       if c == '\r'
-         then do -- shuffle the '\r' to the beginning.  This is only safe
-                 -- if we're about to call readTextDevice, otherwise it
-                 -- would mess up flushCharBuffer.
-                 -- See [note Buffer Flushing], GHC.IO.Handle.Types
-                 _ <- writeCharBuf bufRaw 0 '\r'
-                 let buf' = buf{ bufL=0, bufR=1 }
-                 readTextDevice handle_ buf'
-         else do
-                 return buf
+      then do
+        -- shuffle the '\r' to the beginning.  This is only safe
+        -- if we're about to call readTextDevice, otherwise it
+        -- would mess up flushCharBuffer.
+        -- See [note Buffer Flushing], GHC.IO.Handle.Types
+        _ <- writeCharBuf bufRaw 0 '\r'
+        let buf' = buf{ bufL=0, bufR=1 }
+        readTextDevice handle_ buf'
+      else
+        return buf
 
     -- buffer has some chars in it already: just return it
     _otherwise ->
@@ -551,27 +552,27 @@ lazyBuffersToString CRLF = loop '\0' where
 hPutChar :: Handle -> Char -> IO ()
 hPutChar handle c = do
     c `seq` return ()
-    wantWritableHandle "hPutChar" handle $ \ handle_  -> do
-     hPutcBuffered handle_ c
+    wantWritableHandle "hPutChar" handle $ \ handle_  ->
+      hPutcBuffered handle_ c
 
 hPutcBuffered :: Handle__ -> Char -> IO ()
 hPutcBuffered handle_@Handle__{..} c = do
   buf <- readIORef haCharBuffer
   if c == '\n'
      then do buf1 <- if haOutputNL == CRLF
-                        then do
-                          buf1 <- putc buf '\r'
-                          putc buf1 '\n'
-                        else do
-                          putc buf '\n'
+                     then do
+                       buf1 <- putc buf '\r'
+                       putc buf1 '\n'
+                     else
+                       putc buf '\n'
              writeCharBuffer handle_ buf1
-             when is_line $ flushByteWriteBuffer handle_
+             when isLine $ flushByteWriteBuffer handle_
       else do
           buf1 <- putc buf c
           writeCharBuffer handle_ buf1
           return ()
   where
-    is_line = case haBufferMode of
+    isLine = case haBufferMode of
                 LineBuffering -> True
                 _             -> False
 
@@ -632,9 +633,9 @@ hPutStr' handle str add_nl =
        (NoBuffering, _) -> do
             hPutChars handle str        -- v. slow, but we don't care
             when add_nl $ hPutChar handle '\n'
-       (LineBuffering, buf) -> do
+       (LineBuffering, buf) ->
             writeBlocks handle True  add_nl nl buf str
-       (BlockBuffering _, buf) -> do
+       (BlockBuffering _, buf) ->
             writeBlocks handle False add_nl nl buf str
 
 hPutChars :: Handle -> [Char] -> IO ()
@@ -643,10 +644,7 @@ hPutChars handle (c:cs) = hPutChar handle c >> hPutChars handle cs
 
 -- Buffer offset is always zero.
 getSpareBuffer :: Handle__ -> IO (BufferMode, CharBuffer)
-getSpareBuffer Handle__{haCharBuffer=ref,
-                        haBuffers=spare_ref,
-                        haBufferMode=mode}
- = do
+getSpareBuffer Handle__{haCharBuffer=ref, haBuffers=spare_ref, haBufferMode=mode} =
    case mode of
      NoBuffering -> return (mode, errorWithoutStackTrace "no buffer!")
      _ -> do
@@ -667,9 +665,9 @@ writeBlocks hdl line_buffered add_nl nl
             buf@Buffer{ bufRaw=raw, bufSize=len } s =
   let
    shoveString :: Int -> [Char] -> [Char] -> IO ()
-   shoveString !n [] [] = do
+   shoveString !n [] [] =
         commitBuffer hdl raw len n False{-no flush-} True{-release-}
-   shoveString !n [] rest = do
+   shoveString !n [] rest =
         shoveString n rest []
    shoveString !n (c:cs) rest
      -- n+1 so we have enough room to write '\r\n' if necessary
@@ -678,18 +676,18 @@ writeBlocks hdl line_buffered add_nl nl
         shoveString 0 (c:cs) rest
      | c == '\n'  =  do
         n' <- if nl == CRLF
-                 then do
-                    n1 <- writeCharBuf raw n  '\r'
-                    writeCharBuf raw n1 '\n'
-                 else do
-                    writeCharBuf raw n c
+              then do
+                n1 <- writeCharBuf raw n  '\r'
+                writeCharBuf raw n1 '\n'
+              else
+                writeCharBuf raw n c
         if line_buffered
-           then do
-                -- end of line, so write and flush
-               commitBuffer hdl raw len n' True{-flush-} False
-               shoveString 0 cs rest
-           else do
-               shoveString n' cs rest
+        then do
+          -- end of line, so write and flush
+          commitBuffer hdl raw len n' True{-flush-} False
+          shoveString 0 cs rest
+        else
+          shoveString n' cs rest
      | otherwise = do
         n' <- writeCharBuf raw n c
         shoveString n' cs rest
@@ -701,36 +699,31 @@ writeBlocks hdl line_buffered add_nl nl
 --
 -- Write the contents of the buffer 'buf' ('sz' bytes long, containing
 -- 'count' bytes of data) to handle (handle must be block or line buffered).
-commitBuffer
-        :: Handle                       -- handle to commit to
-        -> RawCharBuffer -> Int         -- address and size (in bytes) of buffer
-        -> Int                          -- number of bytes of data in buffer
-        -> Bool                         -- True <=> flush the handle afterward
-        -> Bool                         -- release the buffer?
-        -> IO ()
-
+commitBuffer :: Handle                       -- handle to commit to
+             -> RawCharBuffer -> Int         -- address and size (in bytes) of buffer
+             -> Int                          -- number of bytes of data in buffer
+             -> Bool                         -- True <=> flush the handle afterward
+             -> Bool                         -- release the buffer?
+             -> IO ()
 commitBuffer hdl !raw !sz !count flush release =
   wantWritableHandle "commitBuffer" hdl $ \h_@Handle__{..} -> do
-      debugIO ("commitBuffer: sz=" ++ show sz ++ ", count=" ++ show count
-            ++ ", flush=" ++ show flush ++ ", release=" ++ show release ++ ", handle=" ++ show hdl)
-
+    let debugMsg = ("commitBuffer: sz=" ++ show sz ++ ", count=" ++ show count
+                    ++ ", flush=" ++ show flush ++ ", release=" ++ show release
+                    ++ ", handle=" ++ show hdl)
+    debugIO debugMsg
       -- Offset taken from handle
-      writeCharBuffer h_ Buffer{ bufRaw=raw, bufState=WriteBuffer, bufOffset=0,
-                                 bufL=0, bufR=count, bufSize=sz }
-
-      when flush $ flushByteWriteBuffer h_
-
-      -- release the buffer if necessary
-      when release $ do
-          -- find size of current buffer
-          old_buf@Buffer{ bufSize=size } <- readIORef haCharBuffer
-          when (sz == size) $ do
-               spare_bufs <- readIORef haBuffers
-               writeIORef haBuffers (BufferListCons raw spare_bufs)
-
-      -- bb <- readIORef haByteBuffer
-      -- debugIO ("commitBuffer: buffer=" ++ summaryBuffer bb ++ ", handle=" ++ show hdl)
-      return ()
+    writeCharBuffer h_ Buffer{ bufRaw=raw, bufState=WriteBuffer, bufOffset=0,
+                               bufL=0, bufR=count, bufSize=sz }
+    when flush $ flushByteWriteBuffer h_
+    -- release the buffer if necessary
+    when release $ do
+      -- find size of current buffer
+      old_buf@Buffer{ bufSize=size } <- readIORef haCharBuffer
+      when (sz == size) $ do
+        spare_bufs <- readIORef haBuffers
+        writeIORef haBuffers (BufferListCons raw spare_bufs)
+    -- bb <- readIORef haByteBuffer
+    -- debugIO ("commitBuffer: buffer=" ++ summaryBuffer bb ++ ", handle=" ++ show hdl)
 
 -- backwards compatibility; the text package uses this
 commitBuffer' :: RawCharBuffer -> Int -> Int -> Bool -> Bool -> Handle__
@@ -812,8 +805,8 @@ hPutBuf' handle ptr count can_block
           -- it is set to LineBuffering, be conservative and flush
           -- anyway (we didn't check for newlines in the data).
           case haBufferMode of
-             BlockBuffering _      -> do return ()
-             _line_or_no_buffering -> do flushWriteBuffer h_
+             BlockBuffering _      -> return ()
+             _line_or_no_buffering -> flushWriteBuffer h_
           return r
 
 -- TODO: Possible optimisation:
@@ -842,7 +835,7 @@ bufWrite h_@Handle__{..} ptr !count can_block = do
               else do
                 let offset = bufOffset flushed_buf
                 !bytes <- if can_block
-                            then do writeChunk         h_ (castPtr ptr) offset count
+                            then writeChunk            h_ (castPtr ptr) offset count
                             else writeChunkNonBlocking h_ (castPtr ptr) offset count
                 -- Update buffer with actual bytes written.
                 writeIORef haByteBuffer $! bufferAddOffset bytes flushed_buf
@@ -852,7 +845,7 @@ bufWrite h_@Handle__{..} ptr !count can_block = do
 
 -- Flush the given buffer via the handle, return the flushed buffer
 flushByteWriteBufferGiven :: Handle__ -> Buffer Word8 -> IO (Buffer Word8)
-flushByteWriteBufferGiven h_@Handle__{..} bbuf = do
+flushByteWriteBufferGiven h_@Handle__{..} bbuf =
   if (not (isEmptyBuffer bbuf))
     then do
       bbuf' <- Buffered.flushWriteBuffer haDevice bbuf
@@ -878,7 +871,7 @@ bufferChunk h_@Handle__{..} old_buf@Buffer{ bufRaw=raw, bufR=w, bufSize=size } p
         debugIO "hPutBuf: flushing full buffer after writing"
         _ <- flushByteWriteBufferGiven h_ copied_buf
         return ()
-      else do
+      else
         writeIORef haByteBuffer copied_buf
     return count
 

@@ -38,5 +38,5 @@ showPossibleException f = do
   sanitise' (x:xs) = if isDigit x then (sanitise' xs) else (x:(sanitise xs))
 
 naughtyClose h = 
-  withHandle_ "naughtyClose" h $ \ Handle__{haDevice=dev} -> do
+  withHandle_ "naughtyClose" h $ \ Handle__{haDevice=dev} ->
      IODevice.close dev

@@ -68,7 +68,7 @@ sem_fifo = do
 sem_kill :: Assertion
 sem_kill  = do
   q <- new 0
-  t <- forkIO $ do wait q
+  t <- forkIO $ wait q
   threadDelay 100000
   killThread t
   m <- newEmptyMVar
@@ -80,8 +80,8 @@ sem_kill  = do
 sem_bracket :: Assertion
 sem_bracket = do
   q <- new 1
-  ts <- forM [1..100000] $ \n -> do
-     forkIO $ do bracket_ (wait q) (signal q) (return ())
+  ts <- forM [1..100000] $ \n ->
+     forkIO $ bracket_ (wait q) (signal q) (return ())
   mapM_ killThread ts
   wait q
 

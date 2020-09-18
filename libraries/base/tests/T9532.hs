@@ -68,7 +68,7 @@ main = do
 
     -- Compare impl-under-test with reference-impl
     checkCLZ :: (Typeable a, Show a, Integral a, FiniteBits a) => a -> IO ()
-    checkCLZ v = unless (vri == viut) $ do
+    checkCLZ v = unless (vri == viut) $
         putStrLn $ concat [ "FAILED: clz (0x", showHex v " :: ", tyName
                           , ") ==> (RI=", show vri, " vs. IUT=", show viut, ")"
                           ]
@@ -79,7 +79,7 @@ main = do
 
     -- Compare impl-under-test with reference-impl
     checkCTZ :: (Typeable a, Show a, Integral a, FiniteBits a) => a -> IO ()
-    checkCTZ v = unless (vri == viut) $ do
+    checkCTZ v = unless (vri == viut) $
         putStrLn $ concat [ "FAILED: ctz (0x", showHex v " :: ", tyName
                           , ") ==> (RI=", show vri, " vs. IUT=", show viut, ")"
                           ]

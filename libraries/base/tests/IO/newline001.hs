@@ -101,7 +101,7 @@ testoutput b = do
   check "out2" b (toCRLF content) str
   hClose h
 
-check s b str1 str2 = do
+check s b str1 str2 =
   when (str1 /= str2) $ error ("failed: " ++ s ++ ", " ++ show b ++ '\n':show str1 ++ '\n':show str2)
 
 read_chars :: Handle -> IO String

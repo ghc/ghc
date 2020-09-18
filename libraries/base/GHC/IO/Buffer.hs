@@ -319,7 +319,7 @@ summaryBuffer !buf  -- Strict => slightly better code
 --     operation, a read buffer always has at least one character of space.
 
 checkBuffer :: Buffer a -> IO ()
-checkBuffer buf@Buffer{ bufState = state, bufL=r, bufR=w, bufSize=size } = do
+checkBuffer buf@Buffer{ bufState = state, bufL=r, bufR=w, bufSize=size } =
      check buf (
         size > 0
         && r <= w

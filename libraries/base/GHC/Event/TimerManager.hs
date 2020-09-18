@@ -226,7 +226,7 @@ registerTimeout mgr us cb = do
 
 -- | Unregister an active timeout.
 unregisterTimeout :: TimerManager -> TimeoutKey -> IO ()
-unregisterTimeout mgr (TK key) = do
+unregisterTimeout mgr (TK key) =
   editTimeouts mgr (Q.delete key)
 
 -- | Update an active timeout to fire in the given number of

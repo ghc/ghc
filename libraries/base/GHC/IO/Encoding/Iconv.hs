@@ -177,7 +177,7 @@ iconvRecode iconv_t
       iconv_trace ("iconvRecode after,  input=" ++ show (summaryBuffer new_input))
       iconv_trace ("iconvRecode after,  output=" ++ show (summaryBuffer new_output))
       if (res /= -1)
-        then do -- all input translated
+        then -- all input translated
            return (InputUnderflow, new_input, new_output)
         else do
       errno <- getErrno

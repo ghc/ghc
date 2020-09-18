@@ -89,9 +89,7 @@ with       :: Storable a => a -> (Ptr a -> IO b) -> IO b
 with val f  =
   alloca $ \ptr -> do
     poke ptr val
-    res <- f ptr
-    return res
-
+    f ptr
 
 -- marshalling of Boolean values (non-zero corresponds to 'True')
 -- -----------------------------

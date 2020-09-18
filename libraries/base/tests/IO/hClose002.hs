@@ -27,6 +27,6 @@ showPossibleException f = do e <- try f
                              print (e :: Either SomeException ())
 
 naughtyClose h = 
-  withHandle_ "naughtyClose" h $ \ Handle__{haDevice=dev} -> do
+  withHandle_ "naughtyClose" h $ \ Handle__{haDevice=dev} ->
      IODevice.close dev
 

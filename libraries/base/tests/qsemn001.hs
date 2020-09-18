@@ -92,7 +92,7 @@ semn3 = do
 semn_kill :: Assertion
 semn_kill  = do
   q <- new 0
-  t <- forkIO $ do wait q 1
+  t <- forkIO $ wait q 1
   threadDelay 10000
   killThread t
   m <- newEmptyMVar
@@ -103,7 +103,7 @@ semn_kill  = do
 sem_bracket :: Assertion
 sem_bracket = do
   q <- new 1
-  ts <- forM [1..100000] $ \n -> do
-     forkIO $ do bracket_ (wait q 1) (signal q 1) (return ())
+  ts <- forM [1..100000] $ \n ->
+     forkIO $ bracket_ (wait q 1) (signal q 1) (return ())
   mapM_ killThread ts
   wait q 1

@@ -53,10 +53,9 @@ module GHC.TypeLits
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), Ordering(..), otherwise)
+import GHC.Base(Eq(..), Ord(..), Ordering(..), String, otherwise)
 import GHC.Types( Nat, Symbol )
 import GHC.Num(Integer, fromInteger)
-import GHC.Base(String)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
 import GHC.Real(toInteger)

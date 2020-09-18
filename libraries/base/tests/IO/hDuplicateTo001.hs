@@ -18,7 +18,7 @@ main = do
    putStrLn "bla"
 
 
-getfd h@(FileHandle _ mvar) = do
+getfd h@(FileHandle _ mvar) =
   withMVar mvar $ \h__@Handle__{haDevice=dev} ->
    case cast dev of
      Just fd -> return (FD.fdFD fd)

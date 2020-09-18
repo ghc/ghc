@@ -33,7 +33,7 @@ main = do
   hClose h
 
   -- convert the UTF-32BE file into each other encoding
-  forM_ encodings $ \(enc,name) -> do
+  forM_ encodings $ \(enc,name) ->
      when (name /=  "utf32be") $ do
        hin <- openFile (file <.> "utf32be") ReadMode
        hSetEncoding hin utf32be

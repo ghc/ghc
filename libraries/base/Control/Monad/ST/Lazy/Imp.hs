@@ -42,7 +42,7 @@ import Control.Monad.Fix
 import qualified Control.Monad.ST as ST
 import qualified Control.Monad.ST.Unsafe as ST
 
-import qualified GHC.ST as GHC.ST
+import qualified GHC.ST
 import GHC.Base
 
 -- | The lazy @'ST'@ monad.
