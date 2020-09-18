@@ -81,7 +81,6 @@ newtype Down a = Down
       , Semigroup -- ^ @since 4.11.0.0
       , Monoid    -- ^ @since 4.11.0.0
       , Bits       -- ^ @since 4.14.0.0
-      , Bounded    -- ^ @since 4.14.0.0
       , Enum       -- ^ @since 4.14.0.0
       , FiniteBits -- ^ @since 4.14.0.0
       , Floating   -- ^ @since 4.14.0.0
@@ -113,6 +112,10 @@ instance (Show a) => Show (Down a) where
 -- | @since 4.6.0.0
 instance Ord a => Ord (Down a) where
     compare (Down x) (Down y) = y `compare` x
+
+instance Bounded a => Bounded (Down a) where
+    minBound = Down maxBound
+    maxBound = Down minBound
 
 -- | @since 4.11.0.0
 instance Functor Down where
