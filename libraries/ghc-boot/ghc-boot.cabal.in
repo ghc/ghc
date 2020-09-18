@@ -62,7 +62,7 @@ Library
     --         GHC.Version
     --         GHC.Platform.Host
 
-    build-depends: base       >= 4.7 && < 4.16,
+    build-depends: base       >= 4.7 && < 4.17,
                    binary     == 0.8.*,
                    bytestring == 0.10.*,
                    containers >= 0.5 && < 0.7,
