@@ -852,69 +852,37 @@ extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
 
 #endif /* USING_LIBBFD */
 
-static void
-findPtr_default_callback(void *user STG_UNUSED, StgClosure * closure){
-  debugBelch("%p = ", closure);
-  printClosure((StgClosure *)closure);
-}
-
+void findPtr(P_ p, int);                /* keep gcc -Wall happy */
 
 int searched = 0;
 
-// Search through a block (and it's linked blocks) for closures that reference
-// p. The size of arr is respected and the search is stoped when arr is full.
-// TODO: This may produce false positives if e.g. a closure contains an Int that
-// happens to have the same value as memory address p. Returns the new i value
-// i.e. the next free position in the arr array.
 static int
-findPtrBlocks
-    ( FindPtrCb cb      // [in] callback called whenever a closure referencing p is found.
-    , void* user        // [in] unused other than to pass to the callback.
-    , StgPtr p          // [in] The pointer to search for.
-    , bdescr *bd        // [in] The block descriptor of the block from which to start searching.
-    , StgPtr arr[]      // [in/out] All found closure addresses are written into this array.
-    , int arr_size      // [in] The size of arr.
-    , int i             // [in] The current position in arr.
-    )
+findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
 {
-    StgPtr candidate, retainer, end;
-
-    // Iterate over all blocks.
+    StgPtr q, r, end;
     for (; bd; bd = bd->link) {
         searched++;
-        // Scan the block looking for a pointer equal to p.
-        for (candidate = bd->start; candidate < bd->free; candidate++) {
-            if (UNTAG_CONST_CLOSURE((StgClosure*)*candidate) == (const StgClosure *)p) {
-                // *candidate looks like a pointer equal to p, but it might not
-                // be a pointer type i.e. it may just be an Int that happens to
-                // have the same value as memory address p.
-
-                // We stop if the output array is full.
+        for (q = bd->start; q < bd->free; q++) {
+            if (UNTAG_CONST_CLOSURE((StgClosure*)*q) == (const StgClosure *)p) {
                 if (i < arr_size) {
-                    for (retainer = bd->start; retainer < bd->free; retainer = end) {
+                    for (r = bd->start; r < bd->free; r = end) {
                         // skip over zeroed-out slop
-                        while (*retainer == 0) retainer++;
-
-                        // A quick check that retainer looks like a InfoTable pointer.
-                        if (!LOOKS_LIKE_CLOSURE_PTR(retainer)) {
+                        while (*r == 0) r++;
+                        if (!LOOKS_LIKE_CLOSURE_PTR(r)) {
                             debugBelch("%p found at %p, no closure at %p\n",
-                                       p, candidate, retainer);
+                                       p, q, r);
                             break;
                         }
-                        end = retainer + closure_sizeW((StgClosure*)retainer);
-                        if (candidate < end) {
-                            // end has just increased past candidate. Hence
-                            // candidate is in the closure starting at retainer.
-                            cb(user, (StgClosure *) retainer);
-                            arr[i++] = retainer;
+                        end = r + closure_sizeW((StgClosure*)r);
+                        if (q < end) {
+                            debugBelch("%p = ", r);
+                            printClosure((StgClosure *)r);
+                            arr[i++] = r;
                             break;
                         }
                     }
-                    if (retainer >= bd->free) {
-                        // TODO: How is this case reachable? Perhaps another
-                        // thread overwrote *q after we found q and before we
-                        // found the corresponding closure retainer.
-                        debugBelch("%p found at %p, closure?", p, candidate);
+                    if (r >= bd->free) {
+                        debugBelch("%p found at %p, closure?", p, q);
                     }
                 } else {
                     return i;
@@ -925,19 +893,8 @@ findPtrBlocks
     return i;
 }
 
-// Search for for closures that reference p. This may NOT find all such closures
-// (e.g. the nursery is not searched). This may also find false positives if
-// e.g. a closure contains an Int that happens to have the same value as memory
-// address p. The number of results is capped at 1024. The callback is called
-// for each closure found.
-static void
-findPtr_gen
-    ( FindPtrCb cb  // [in] Callback called for each closure found referencing p.
-    , void *user    // [in] Unused other than to pass to the callback.
-    , P_ p          // [in] Search for closures referencing this address.
-    , int follow    // [in] If set to 1 and only a single closure was found,
-                    //      recursively find pointers to that  if to recurse (call findPtr on the ). May only be 1 if cb==findPtr_default_callback.
-    )
+void
+findPtr(P_ p, int follow)
 {
   uint32_t g, n;
   bdescr *bd;
@@ -959,36 +916,22 @@ findPtr_gen
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       bd = generations[g].blocks;
-      i = findPtrBlocks(cb, user,p,bd,arr,arr_size,i);
+      i = findPtrBlocks(p,bd,arr,arr_size,i);
       bd = generations[g].large_objects;
-      i = findPtrBlocks(cb, user, p,bd,arr,arr_size,i);
+      i = findPtrBlocks(p,bd,arr,arr_size,i);
       if (i >= arr_size) return;
       for (n = 0; n < n_capabilities; n++) {
-          i = findPtrBlocks(cb, user, p, gc_threads[n]->gens[g].part_list,
+          i = findPtrBlocks(p, gc_threads[n]->gens[g].part_list,
                             arr, arr_size, i);
-          i = findPtrBlocks(cb, user, p, gc_threads[n]->gens[g].todo_bd,
+          i = findPtrBlocks(p, gc_threads[n]->gens[g].todo_bd,
                             arr, arr_size, i);
       }
       if (i >= arr_size) return;
   }
   if (follow && i == 1) {
-      ASSERT(cb == &findPtr_default_callback);
       debugBelch("-->\n");
-      // Non-standard callback expects follow=0
       findPtr(arr[0], 1);
   }
-}
-
-// Special case of findPtrCb: Uses a default callback, that prints the closure
-// pointed to by p.
-void findPtr(P_ p, int follow){
-  findPtr_gen(&findPtr_default_callback, NULL, p, follow);
-}
-
-// Call cb on the closure pointed to by p.
-// FindPtrCb is documented where it's defined.
-void findPtrCb(FindPtrCb cb, void* user, P_ p){
-  findPtr_gen(cb, user, p, 0);
 }
 
 const char *what_next_strs[] = {

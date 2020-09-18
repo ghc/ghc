@@ -10,8 +10,6 @@
 
 #include "BeginPrivate.h"
 
-#include "rts/PrinterAPI.h"
-
 extern void        printPtr        ( StgPtr p );
 extern void        printObj        ( StgClosure *obj );
 
