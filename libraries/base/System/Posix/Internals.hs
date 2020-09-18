@@ -95,7 +95,7 @@ fdFileSize fd =
 
 fileType :: FilePath -> IO IODeviceType
 fileType file =
-  allocaBytes sizeof_stat $ \ p_stat -> do
+  allocaBytes sizeof_stat $ \ p_stat ->
   withFilePath file $ \p_file -> do
     throwErrnoIfMinus1Retry_ "fileType" $
       c_stat p_file p_stat
@@ -187,7 +187,7 @@ peekFilePathLen fp = getFileSystemEncoding >>= \enc -> GHC.peekCStringLen enc fp
 #if defined(HTYPE_TCFLAG_T)
 
 setEcho :: FD -> Bool -> IO ()
-setEcho fd on = do
+setEcho fd on =
   tcSetAttr fd $ \ p_tios -> do
     lflag <- c_lflag p_tios :: IO CTcflag
     let new_lflag
@@ -196,7 +196,7 @@ setEcho fd on = do
     poke_c_lflag p_tios (new_lflag :: CTcflag)
 
 getEcho :: FD -> IO Bool
-getEcho fd = do
+getEcho fd =
   tcSetAttr fd $ \ p_tios -> do
     lflag <- c_lflag p_tios :: IO CTcflag
     return ((lflag .&. fromIntegral const_echo) /= 0)
@@ -220,7 +220,7 @@ setCooked fd cooked =
             poke vtime 0
 
 tcSetAttr :: FD -> (Ptr CTermios -> IO a) -> IO a
-tcSetAttr fd fun = do
+tcSetAttr fd fun =
      allocaBytes sizeof_termios  $ \p_tios -> do
         throwErrnoIfMinus1Retry_ "tcSetAttr"
            (c_tcgetattr fd p_tios)
@@ -239,7 +239,7 @@ tcSetAttr fd fun = do
         -- in its terminal flags (try it...).  This function provides a
         -- wrapper which temporarily blocks SIGTTOU around the call, making it
         -- transparent.
-        allocaBytes sizeof_sigset_t $ \ p_sigset -> do
+        allocaBytes sizeof_sigset_t $ \ p_sigset ->
           allocaBytes sizeof_sigset_t $ \ p_old_sigset -> do
              throwErrnoIfMinus1_ "sigemptyset" $
                  c_sigemptyset p_sigset
@@ -339,7 +339,7 @@ setNonBlockingFD _ _ = return ()
 
 #if !defined(mingw32_HOST_OS)
 setCloseOnExec :: FD -> IO ()
-setCloseOnExec fd = do
+setCloseOnExec fd =
   throwErrnoIfMinus1_ "setCloseOnExec" $
     c_fcntl_write fd const_f_setfd const_fd_cloexec
 #endif

@@ -93,7 +93,7 @@ waitQSemN qs@(QSemN m) sz = mask_ $ do
     JustMV b -> wait b
   where
     wait :: MVar () -> IO ()
-    wait b = do
+    wait b =
       takeMVar b `onException` do
         already_filled <- not <$> tryPutMVar b ()
         when already_filled $ signalQSemN qs sz
