@@ -17,7 +17,10 @@ test('readFloat', exit_code(1), compile_and_run, [''])
 test('enumDouble', normal, compile_and_run, [''])
 test('enumRatio', normal, compile_and_run, [''])
 test('enumNumeric', normal, compile_and_run, [''])
-test('tempfiles', normal, compile_and_run, [''])
+# N.B. the tempfile format is slightly different than this test expects on
+# Windows *except* if using WinIO. The `when` clause below can be removed
+# after WinIO becomes the default.
+test('tempfiles', when(opsys('mingw32'), only_ways(['winio'])), compile_and_run, [''])
 test('fixed', normal, compile_and_run, [''])
 test('quotOverflow', normal, compile_and_run, [''])
 test('assert', exit_code(1), compile_and_run, ['-fno-ignore-asserts'])
