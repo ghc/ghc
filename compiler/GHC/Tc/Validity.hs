@@ -470,18 +470,81 @@ forAllAllowed ArbitraryRank             = True
 forAllAllowed (LimitedRank forall_ok _) = forall_ok
 forAllAllowed _                         = False
 
+-- | Indicates whether a 'UserTypeCtxt' represents type-level contexts,
+-- kind-level contexts, or both.
+data TypeOrKindCtxt
+  = OnlyTypeCtxt
+    -- ^ A 'UserTypeCtxt' that only represents type-level positions.
+  | OnlyKindCtxt
+    -- ^ A 'UserTypeCtxt' that only represents kind-level positions.
+  | BothTypeAndKindCtxt
+    -- ^ A 'UserTypeCtxt' that can represent both type- and kind-level positions.
+  deriving Eq
+
+instance Outputable TypeOrKindCtxt where
+  ppr ctxt = text $ case ctxt of
+    OnlyTypeCtxt        -> "OnlyTypeCtxt"
+    OnlyKindCtxt        -> "OnlyKindCtxt"
+    BothTypeAndKindCtxt -> "BothTypeAndKindCtxt"
+
+-- | Determine whether a 'UserTypeCtxt' can represent type-level contexts,
+-- kind-level contexts, or both.
+typeOrKindCtxt :: UserTypeCtxt -> TypeOrKindCtxt
+typeOrKindCtxt (FunSigCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (InfSigCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (ExprSigCtxt {})     = OnlyTypeCtxt
+typeOrKindCtxt (TypeAppCtxt {})     = OnlyTypeCtxt
+typeOrKindCtxt (PatSynCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (PatSigCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (RuleSigCtxt {})     = OnlyTypeCtxt
+typeOrKindCtxt (ForSigCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (DefaultDeclCtxt {}) = OnlyTypeCtxt
+typeOrKindCtxt (InstDeclCtxt {})    = OnlyTypeCtxt
+typeOrKindCtxt (SpecInstCtxt {})    = OnlyTypeCtxt
+typeOrKindCtxt (GenSigCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (ClassSCCtxt {})     = OnlyTypeCtxt
+typeOrKindCtxt (SigmaCtxt {})       = OnlyTypeCtxt
+typeOrKindCtxt (DataTyCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (DerivClauseCtxt {}) = OnlyTypeCtxt
+typeOrKindCtxt (ConArgCtxt {})      = OnlyTypeCtxt
+  -- Although data constructors can be promoted with DataKinds, we always
+  -- validity-check them as though they are the types of terms. We may need
+  -- to revisit this decision if we ever allow visible dependent quantification
+  -- in the types of data constructors.
+
+typeOrKindCtxt (KindSigCtxt {})           = OnlyKindCtxt
+typeOrKindCtxt (StandaloneKindSigCtxt {}) = OnlyKindCtxt
+typeOrKindCtxt (TyVarBndrKindCtxt {})     = OnlyKindCtxt
+typeOrKindCtxt (DataKindCtxt {})          = OnlyKindCtxt
+typeOrKindCtxt (TySynKindCtxt {})         = OnlyKindCtxt
+typeOrKindCtxt (TyFamResKindCtxt {})      = OnlyKindCtxt
+
+typeOrKindCtxt (TySynCtxt {}) = BothTypeAndKindCtxt
+  -- Type synonyms can have types and kinds on their RHSs
+typeOrKindCtxt (GhciCtxt {})  = BothTypeAndKindCtxt
+  -- GHCi's :kind command accepts both types and kinds
+
+-- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
+-- context for a kind of a type, where the arbitrary use of constraints is
+-- currently disallowed.
+-- (See @Note [Constraints in kinds]@ in "GHC.Core.TyCo.Rep".)
+-- If the 'UserTypeCtxt' can refer to both types and kinds, this function
+-- conservatively returns 'True'.
+--
+-- An example of something that is unambiguously the kind of a type is the
+-- @Show a => a -> a@ in @type Foo :: Show a => a -> a@. On the other hand, the
+-- same type in @foo :: Show a => a -> a@ is unambiguously the type of a term,
+-- not the kind of a type, so it is permitted.
 allConstraintsAllowed :: UserTypeCtxt -> Bool
--- We don't allow arbitrary constraints in kinds
-allConstraintsAllowed (TyVarBndrKindCtxt {}) = False
-allConstraintsAllowed (DataKindCtxt {})      = False
-allConstraintsAllowed (TySynKindCtxt {})     = False
-allConstraintsAllowed (TyFamResKindCtxt {})  = False
-allConstraintsAllowed (StandaloneKindSigCtxt {}) = False
-allConstraintsAllowed _ = True
+allConstraintsAllowed ctxt = case typeOrKindCtxt ctxt of
+  OnlyTypeCtxt        -> True
+  OnlyKindCtxt        -> False
+  BothTypeAndKindCtxt -> True
 
 -- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
 -- context for the type of a term, where visible, dependent quantification is
--- currently disallowed.
+-- currently disallowed. If the 'UserTypeCtxt' can refer to both types and
+-- kinds, this function conservatively returns 'True'.
 --
 -- An example of something that is unambiguously the type of a term is the
 -- @forall a -> a -> a@ in @foo :: forall a -> a -> a@. On the other hand, the
@@ -494,38 +557,10 @@ allConstraintsAllowed _ = True
 -- @testsuite/tests/dependent/should_fail/T16326_Fail*.hs@ (for places where
 -- VDQ is disallowed).
 vdqAllowed :: UserTypeCtxt -> Bool
--- Currently allowed in the kinds of types...
-vdqAllowed (KindSigCtxt {}) = True
-vdqAllowed (StandaloneKindSigCtxt {}) = True
-vdqAllowed (TySynCtxt {}) = True
-vdqAllowed (GhciCtxt {}) = True
-vdqAllowed (TyVarBndrKindCtxt {}) = True
-vdqAllowed (DataKindCtxt {}) = True
-vdqAllowed (TySynKindCtxt {}) = True
-vdqAllowed (TyFamResKindCtxt {}) = True
--- ...but not in the types of terms.
-vdqAllowed (ConArgCtxt {}) = False
-  -- We could envision allowing VDQ in data constructor types so long as the
-  -- constructor is only ever used at the type level, but for now, GHC adopts
-  -- the stance that VDQ is never allowed in data constructor types.
-vdqAllowed (FunSigCtxt {}) = False
-vdqAllowed (InfSigCtxt {}) = False
-vdqAllowed (ExprSigCtxt {}) = False
-vdqAllowed (TypeAppCtxt {}) = False
-vdqAllowed (PatSynCtxt {}) = False
-vdqAllowed (PatSigCtxt {}) = False
-vdqAllowed (RuleSigCtxt {}) = False
-vdqAllowed (ForSigCtxt {}) = False
-vdqAllowed (DefaultDeclCtxt {}) = False
--- We count class constraints as "types of terms". All of the cases below deal
--- with class constraints.
-vdqAllowed (InstDeclCtxt {}) = False
-vdqAllowed (SpecInstCtxt {}) = False
-vdqAllowed (GenSigCtxt {}) = False
-vdqAllowed (ClassSCCtxt {}) = False
-vdqAllowed (SigmaCtxt {}) = False
-vdqAllowed (DataTyCtxt {}) = False
-vdqAllowed (DerivClauseCtxt {}) = False
+vdqAllowed ctxt = case typeOrKindCtxt ctxt of
+  OnlyTypeCtxt        -> False
+  OnlyKindCtxt        -> True
+  BothTypeAndKindCtxt -> True
 
 {-
 Note [Correctness and performance of type synonym validity checking]
