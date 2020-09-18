@@ -838,6 +838,9 @@ validate-x86_64-linux-fedora27:
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
   variables:
+    # LLVM 10 is not available for Fedora27
+    LLC: /bin/false
+    OPT: /bin/false
     TEST_ENV: "x86_64-linux-fedora27"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
   cache:
