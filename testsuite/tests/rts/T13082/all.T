@@ -16,6 +16,7 @@ def normalise_search_dirs (str):
 #--------------------------------------
 test('T13082_good',
      [extra_files(['foo.c', 'main.hs', 'foo_dll.c']),
+      expect_broken(18718),
       unless(opsys('mingw32'), skip)],
      makefile_test, ['T13082_good'])
 
