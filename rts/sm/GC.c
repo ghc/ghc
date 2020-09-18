@@ -1278,10 +1278,13 @@ gcWorkerThread (Capability *cap)
 
     // Wait until we're told to continue
     RELEASE_SPIN_LOCK(&gct->gc_spin);
-    SEQ_CST_STORE(&gct->wakeup, GC_THREAD_WAITING_TO_CONTINUE);
     debugTrace(DEBUG_gc, "GC thread %d waiting to continue...",
                gct->thread_index);
     stat_endGCWorker (cap, gct);
+    // This must come *after* stat_endGCWorker since it serves to
+    // synchronize us with the GC leader, which will later aggregate the
+    // GC statistics.
+    SEQ_CST_STORE(&gct->wakeup, GC_THREAD_WAITING_TO_CONTINUE);
     ACQUIRE_SPIN_LOCK(&gct->mut_spin);
     debugTrace(DEBUG_gc, "GC thread %d on my way...", gct->thread_index);
 
@@ -1373,10 +1376,10 @@ wakeup_gc_threads (uint32_t me USED_IF_THREADS,
         if (i == me || idle_cap[i]) continue;
         inc_running();
         debugTrace(DEBUG_gc, "waking up gc thread %d", i);
-        if (RELAXED_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY)
+        if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY)
             barf("wakeup_gc_threads");
 
-        RELAXED_STORE(&gc_threads[i]->wakeup, GC_THREAD_RUNNING);
+        SEQ_CST_STORE(&gc_threads[i]->wakeup, GC_THREAD_RUNNING);
         ACQUIRE_SPIN_LOCK(&gc_threads[i]->mut_spin);
         RELEASE_SPIN_LOCK(&gc_threads[i]->gc_spin);
     }
