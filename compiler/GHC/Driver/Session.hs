@@ -5094,7 +5094,6 @@ initSDocContext dflags style = SDC
   , sdocLinearTypes                 = xopt LangExt.LinearTypes dflags
   , sdocPrintTypeAbbreviations      = True
   , sdocUnitIdForUser               = ftext
-  , sdocDynFlags                    = dflags
   }
 
 -- | Initialize the pretty-printing options using the default user style
