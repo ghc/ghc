@@ -76,7 +76,7 @@ import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, ap )
+import Control.Monad       ( when, ap, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 import GHC.Types.FieldLabel (DuplicateRecordFields(..), FieldSelectors(..))
@@ -623,7 +623,9 @@ rnHsRecFields
 
 rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
   = do { pun_ok      <- xoptM LangExt.RecordPuns
-       ; flds1  <- mapM (rn_fld pun_ok mb_con) flds
+       ; disambig_ok <- xoptM LangExt.DisambiguateRecordFields
+       ; let parent = guard disambig_ok >> mb_con
+       ; flds1  <- mapM (rn_fld pun_ok parent) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
        ; let all_flds | null dotdot_flds = flds1
