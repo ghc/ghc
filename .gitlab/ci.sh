@@ -288,7 +288,9 @@ function setup_toolchain() {
 
   cabal_install="$CABAL v2-install \
     --with-compiler=$GHC \
-    --index-state=$hackage_index_state --installdir=$toolchain/bin"
+    --index-state=$hackage_index_state \
+    --installdir=$toolchain/bin \
+    --overwrite-policy=always"
 
   # Avoid symlinks on Windows
   case "$(uname)" in
