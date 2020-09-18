@@ -751,22 +751,24 @@ def normalise_win32_io_errors(name, opts):
     slightly in the error messages that they provide. Normalise these
     differences away, preferring the new WinIO errors.
 
-    This can be dropped when the old IO manager is removed.
+    This normalization can be dropped when the old IO manager is removed.
     """
 
     SUBS = [
-        ('Bad file descriptor', 'The handle is invalid'),
+        ('Bad file descriptor', 'The handle is invalid.'),
         ('Permission denied', 'Access is denied.'),
         ('No such file or directory', 'The system cannot find the file specified.'),
     ]
 
-    def f(s: str):
+    def normalizer(s: str) -> str:
         for old,new in SUBS:
             s = s.replace(old, new)
 
         return s
 
-    return when(opsys('mingw32'), normalise_fun(f))
+    if opsys('mingw32'):
+        _normalise_fun(name, opts, normalizer)
+        _normalise_errmsg_fun(name, opts, normalizer)
 
 def normalise_version_( *pkgs ):
     def normalise_version__( str ):
