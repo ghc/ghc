@@ -75,7 +75,7 @@ module GHC.Utils.Outputable (
         neverQualify, neverQualifyNames, neverQualifyModules,
         alwaysQualifyPackages, neverQualifyPackages,
         QualifyName(..), queryQual,
-        sdocWithDynFlags, sdocOption,
+        sdocOption,
         updSDocContext,
         SDocContext (..), sdocWithContext, defaultSDocContext,
         getPprStyle, withPprStyle, setStyleColoured,
@@ -92,7 +92,6 @@ module GHC.Utils.Outputable (
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Driver.Session ( DynFlags )
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Unit.Module.Name( ModuleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
@@ -384,8 +383,6 @@ data SDocContext = SDC
       --
       -- Note that we use `FastString` instead of `UnitId` to avoid boring
       -- module inter-dependency issues.
-
-  , sdocDynFlags                    :: DynFlags -- TODO: remove (see Note [The OutputableP class])
   }
 
 instance IsString SDoc where
@@ -433,7 +430,6 @@ defaultSDocContext = SDC
   , sdocLinearTypes                 = False
   , sdocPrintTypeAbbreviations      = True
   , sdocUnitIdForUser               = ftext
-  , sdocDynFlags                    = error "defaultSDocContext: DynFlags not available"
   }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
@@ -480,9 +476,6 @@ pprSetDepth depth doc = SDoc $ \ctx ->
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
 getPprStyle df = SDoc $ \ctx -> runSDoc (df (sdocStyle ctx)) ctx
-
-sdocWithDynFlags :: (DynFlags -> SDoc) -> SDoc
-sdocWithDynFlags f = SDoc $ \ctx -> runSDoc (f (sdocDynFlags ctx)) ctx
 
 sdocWithContext :: (SDocContext -> SDoc) -> SDoc
 sdocWithContext f = SDoc $ \ctx -> runSDoc (f ctx) ctx
