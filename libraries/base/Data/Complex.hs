@@ -211,7 +211,7 @@ instance  (RealFloat a) => Floating (Complex a) where
 
     asinh z        =  log (z + sqrt (1+z*z))
     -- Take care to allow (-1)::Complex, fixing #8532
-    acosh z        =  log (z + (sqrt $ z+1) * (sqrt $ z-1))
+    acosh z        =  log (z + sqrt (z+1) * sqrt (z-1))
     atanh z        =  0.5 * log ((1.0+z) / (1.0-z))
 
     log1p x@(a :+ b)

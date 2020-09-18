@@ -273,7 +273,7 @@ lexCharE =
   do c1 <- get
      if c1 == '\\'
        then do c2 <- lexEsc; return (c2, True)
-       else do return (c1, False)
+       else return (c1, False)
  where
   lexEsc =
     lexEscChar
@@ -341,7 +341,7 @@ lexCharE =
          _    -> pfail
 
   lexAscii =
-    do choice
+     choice
          [ (string "SOH" >> return '\SOH') <++
            (string "SO"  >> return '\SO')
                 -- \SO and \SOH need maximal-munch treatment
@@ -404,9 +404,9 @@ lexString =
     do _ <- char '\\'
        c <- get
        case c of
-         '&'           -> do return ()
+         '&'           -> return ()
          _ | isSpace c -> do skipSpaces; _ <- char '\\'; return ()
-         _             -> do pfail
+         _             -> pfail
 
 -- ---------------------------------------------------------------------------
 --  Lexing numbers
@@ -429,13 +429,14 @@ lexHexOct
 
 lexBaseChar :: ReadP Int
 -- Lex a single character indicating the base; fail if not there
-lexBaseChar = do { c <- get;
-                   case c of
-                        'o' -> return 8
-                        'O' -> return 8
-                        'x' -> return 16
-                        'X' -> return 16
-                        _   -> pfail }
+lexBaseChar = do
+  c <- get
+  case c of
+    'o' -> return 8
+    'O' -> return 8
+    'x' -> return 16
+    'X' -> return 16
+    _   -> pfail
 
 lexDecNumber :: ReadP Lexeme
 lexDecNumber =
@@ -471,8 +472,8 @@ lexDigits base =
  where
   scan (c:cs) f = case valDig base c of
                     Just n  -> do _ <- get; scan cs (f.(n:))
-                    Nothing -> do return (f [])
-  scan []     f = do return (f [])
+                    Nothing -> return (f [])
+  scan []     f = return (f [])
 
 lexInteger :: Base -> ReadP Integer
 lexInteger base =

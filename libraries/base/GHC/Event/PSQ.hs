@@ -160,7 +160,7 @@ null _   = False
 -- | /O(n)/ The number of elements stored in the queue.
 size :: IntPSQ v -> Int
 size Nil               = 0
-size (Tip _ _ _)       = 1
+size Tip {}            = 1
 size (Bin _ _ _ _ l r) = 1 + size l + size r
 -- TODO (SM): benchmark this against a tail-recursive variant
 

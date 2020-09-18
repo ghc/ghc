@@ -35,7 +35,7 @@ charCode :: Char -> String
 
 rapply a b = b a
 
-charCode c = (showCode c 5) ++ (foldr1 (++) $ map prtBool $ map (rapply c) preds)
+charCode c = (showCode c 5) ++ foldr1 (++) (map prtBool $ map (rapply c) preds)
 
 main = do
     putStrLn header

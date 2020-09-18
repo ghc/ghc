@@ -96,7 +96,7 @@ makeTableFile moduleName files maps = concat
              ]
     tablePart = [ "codePageMap :: [(Word32, CodePageArrays)]"
                 , "codePageMap = ["
-                ] ++ (intersperse "\n    ," $ map mkTableEntry maps)
+                ] ++ intersperse "\n    ," (map mkTableEntry maps)
                 ++ ["    ]"]
     mkTableEntry (i,m) = "    (" ++ show i ++ ", " ++ makeSBE m ++ "    )"
     blockSizeText = ["blockBitSize :: Int", "blockBitSize = " ++ show blockBitSize]

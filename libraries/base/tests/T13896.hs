@@ -64,12 +64,12 @@ main = do
   -- Given unescaped quotes, it should pass-through,
   -- without escaping everything inside
 
-  (filter (not . null) $
-   unescapeArgs "this\\ is\\ 'not escape\\d \"inside\"'\\ yo\n")
+  filter (not . null)
+   (unescapeArgs "this\\ is\\ 'not escape\\d \"inside\"'\\ yo\n")
    `assertEqual`
    ["this is not escaped \"inside\" yo"]
 
-  (filter (not . null) $
-   unescapeArgs "this\\ is\\ \"not escape\\d 'inside'\"\\ yo\n")
+  filter (not . null)
+   (unescapeArgs "this\\ is\\ \"not escape\\d 'inside'\"\\ yo\n")
    `assertEqual`
    ["this is not escaped 'inside' yo"]
