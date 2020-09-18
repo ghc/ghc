@@ -78,7 +78,7 @@ perform' mv (a:as) =
 
 
 actions :: Gen [Action]
-actions = do
+actions =
   oneof [liftM (NewEmptyMVar:) (actions' True),
          liftM2 (:) (liftM NewMVar arbitrary) (actions' False)]
 
