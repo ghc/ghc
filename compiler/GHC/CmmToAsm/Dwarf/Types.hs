@@ -164,9 +164,8 @@ pprDwarfInfo platform haveSrc d
 -- | Print a CLabel name in a ".stringz \"LABEL\""
 pprLabelString :: Platform -> CLabel -> SDoc
 pprLabelString platform label =
-   pprString' -- we don't need to escape the string as labels don't contain exotic characters
-    $ withPprStyle (mkCodeStyle CStyle) -- force CStyle (foreign labels may be printed differently in AsmStyle)
-    $ pprCLabel_NCG platform label
+   pprString'                         -- we don't need to escape the string as labels don't contain exotic characters
+    $ pprCLabel platform CStyle label -- pretty-print as C label (foreign labels may be printed differently in Asm)
 
 -- | Prints assembler data corresponding to DWARF info records. Note
 -- that the binary format of this is parameterized in @abbrevDecls@ and
