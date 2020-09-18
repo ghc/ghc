@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- Test that threadDelay actually sleeps for (at least) as long as we
 -- ask it
