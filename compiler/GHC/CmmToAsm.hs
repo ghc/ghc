@@ -803,7 +803,7 @@ makeImportsDoc dflags imports
 
         doPpr lbl = (lbl, renderWithContext
                               (ncgAsmContext config)
-                              (pprCLabel_NCG platform lbl))
+                              (pprCLabel platform AsmStyle lbl))
 
 -- -----------------------------------------------------------------------------
 -- Generate jump tables
@@ -1149,7 +1149,7 @@ cmmExprNative referenceKind expr = do
 initNCGConfig :: DynFlags -> NCGConfig
 initNCGConfig dflags = NCGConfig
    { ncgPlatform              = targetPlatform dflags
-   , ncgAsmContext            = initSDocContext dflags (mkCodeStyle AsmStyle)
+   , ncgAsmContext            = initSDocContext dflags (PprCode AsmStyle)
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
    , ncgPIC                   = positionIndependent dflags

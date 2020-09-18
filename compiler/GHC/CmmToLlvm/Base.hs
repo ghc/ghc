@@ -435,7 +435,7 @@ renderLlvm sdoc = do
     -- Write to output
     dflags <- getDynFlags
     out <- getEnv envOutput
-    let ctx = initSDocContext dflags (Outp.mkCodeStyle Outp.CStyle)
+    let ctx = initSDocContext dflags (Outp.PprCode Outp.CStyle)
     liftIO $ Outp.bufLeftRenderSDoc ctx out sdoc
 
     -- Dump, if requested
@@ -497,9 +497,9 @@ strCLabel_llvm :: CLabel -> LlvmM LMString
 strCLabel_llvm lbl = do
     dflags <- getDynFlags
     platform <- getPlatform
-    let sdoc = pprCLabel_LLVM platform lbl
+    let sdoc = pprCLabel platform CStyle lbl
         str = Outp.renderWithContext
-                  (initSDocContext dflags (Outp.mkCodeStyle Outp.CStyle))
+                  (initSDocContext dflags (Outp.PprCode Outp.CStyle))
                   sdoc
     return (fsLit str)
 
