@@ -492,8 +492,8 @@ onFdEvent mgr fd evs
                 -- if there are no saved events and we registered with one-shot
                 -- semantics then there is no need to re-arm
                 unless (OneShot == I.elLifetime allEls
-                        && mempty == I.elEvent savedEls) $ do
-                  void $ I.modifyFdOnce (emBackend mgr) fd (I.elEvent savedEls)
+                  && mempty == I.elEvent savedEls) $
+                    void $ I.modifyFdOnce (emBackend mgr) fd (I.elEvent savedEls)
               _ ->
                 -- we need to re-arm with multi-shot semantics
                 void $ I.modifyFd (emBackend mgr) fd

@@ -25,5 +25,5 @@ run = do
 quit :: MVar () -> IO ()
 quit m = do
   ref <- newIORef ()
-  void $ mkWeakIORef ref $ do
+  void $ mkWeakIORef ref $
     putMVar m ()
