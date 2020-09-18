@@ -84,15 +84,12 @@ data UserTypeCtxt
                         --   or  (x::t, y) = e
   | RuleSigCtxt Name    -- LHS of a RULE forall
                         --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
-  | ResSigCtxt          -- Result type sig
-                        --      f x :: t = ....
   | ForSigCtxt Name     -- Foreign import or export signature
   | DefaultDeclCtxt     -- Types in a default declaration
   | InstDeclCtxt Bool   -- An instance declaration
                         --    True:  stand-alone deriving
                         --    False: vanilla instance declaration
   | SpecInstCtxt        -- SPECIALISE instance pragma
-  | ThBrackCtxt         -- Template Haskell type brackets [t| ... |]
   | GenSigCtxt          -- Higher-rank or impredicative situations
                         -- e.g. (f e) where f has a higher-rank type
                         -- We might want to elaborate this
@@ -136,9 +133,7 @@ pprUserTypeCtxt (StandaloneKindSigCtxt n) = text "a standalone kind signature fo
 pprUserTypeCtxt TypeAppCtxt       = text "a type argument"
 pprUserTypeCtxt (ConArgCtxt c)    = text "the type of the constructor" <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)     = text "the RHS of the type synonym" <+> quotes (ppr c)
-pprUserTypeCtxt ThBrackCtxt       = text "a Template Haskell quotation [t|...|]"
 pprUserTypeCtxt PatSigCtxt        = text "a pattern type signature"
-pprUserTypeCtxt ResSigCtxt        = text "a result type signature"
 pprUserTypeCtxt (ForSigCtxt n)    = text "the foreign declaration for" <+> quotes (ppr n)
 pprUserTypeCtxt DefaultDeclCtxt   = text "a type in a `default' declaration"
 pprUserTypeCtxt (InstDeclCtxt False) = text "an instance declaration"

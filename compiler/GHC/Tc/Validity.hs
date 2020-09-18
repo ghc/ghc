@@ -348,7 +348,6 @@ checkValidType ctxt ty
              rank
                = case ctxt of
                  DefaultDeclCtxt-> MustBeMonoType
-                 ResSigCtxt     -> MustBeMonoType
                  PatSigCtxt     -> rank0
                  RuleSigCtxt _  -> rank1
                  TySynCtxt _    -> rank0
@@ -372,7 +371,6 @@ checkValidType ctxt ty
 
                  ForSigCtxt _   -> rank1
                  SpecInstCtxt   -> rank1
-                 ThBrackCtxt    -> rank1
                  GhciCtxt {}    -> ArbitraryRank
 
                  TyVarBndrKindCtxt _ -> rank0
@@ -500,7 +498,6 @@ vdqAllowed :: UserTypeCtxt -> Bool
 vdqAllowed (KindSigCtxt {}) = True
 vdqAllowed (StandaloneKindSigCtxt {}) = True
 vdqAllowed (TySynCtxt {}) = True
-vdqAllowed (ThBrackCtxt {}) = True
 vdqAllowed (GhciCtxt {}) = True
 vdqAllowed (TyVarBndrKindCtxt {}) = True
 vdqAllowed (DataKindCtxt {}) = True
@@ -518,7 +515,6 @@ vdqAllowed (TypeAppCtxt {}) = False
 vdqAllowed (PatSynCtxt {}) = False
 vdqAllowed (PatSigCtxt {}) = False
 vdqAllowed (RuleSigCtxt {}) = False
-vdqAllowed (ResSigCtxt {}) = False
 vdqAllowed (ForSigCtxt {}) = False
 vdqAllowed (DefaultDeclCtxt {}) = False
 -- We count class constraints as "types of terms". All of the cases below deal
@@ -1329,11 +1325,9 @@ okIPCtxt (InfSigCtxt {})        = True
 okIPCtxt ExprSigCtxt            = True
 okIPCtxt TypeAppCtxt            = True
 okIPCtxt PatSigCtxt             = True
-okIPCtxt ResSigCtxt             = True
 okIPCtxt GenSigCtxt             = True
 okIPCtxt (ConArgCtxt {})        = True
 okIPCtxt (ForSigCtxt {})        = True  -- ??
-okIPCtxt ThBrackCtxt            = True
 okIPCtxt (GhciCtxt {})          = True
 okIPCtxt SigmaCtxt              = True
 okIPCtxt (DataTyCtxt {})        = True
