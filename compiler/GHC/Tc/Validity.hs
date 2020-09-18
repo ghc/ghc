@@ -470,14 +470,37 @@ forAllAllowed ArbitraryRank             = True
 forAllAllowed (LimitedRank forall_ok _) = forall_ok
 forAllAllowed _                         = False
 
-allConstraintsAllowed :: UserTypeCtxt -> Bool
--- We don't allow arbitrary constraints in kinds
-allConstraintsAllowed (TyVarBndrKindCtxt {}) = False
-allConstraintsAllowed (DataKindCtxt {})      = False
-allConstraintsAllowed (TySynKindCtxt {})     = False
-allConstraintsAllowed (TyFamResKindCtxt {})  = False
-allConstraintsAllowed (StandaloneKindSigCtxt {}) = False
-allConstraintsAllowed _ = True
+-- | Returns 'True' is the supplied 'UserTypeCtxt' is unambiguously the context
+-- for a user-written kind.
+kindContext :: UserTypeCtxt -> Bool
+kindContext (KindSigCtxt {})           = True
+kindContext (StandaloneKindSigCtxt {}) = True
+kindContext (TyVarBndrKindCtxt {})     = True
+kindContext (DataKindCtxt {})          = True
+kindContext (TySynKindCtxt {})         = True
+kindContext (TyFamResKindCtxt {})      = True
+-- These two cases *might* correspond to a kind, but we cannot know for sure,
+-- so we conservatively return False.
+kindContext (TySynCtxt {})       = False
+kindContext (GhciCtxt {})        = False
+-- The remaining cases definitely do *not* correspond to kinds.
+kindContext (ConArgCtxt {})      = False
+kindContext (FunSigCtxt {})      = False
+kindContext (InfSigCtxt {})      = False
+kindContext (ExprSigCtxt {})     = False
+kindContext (TypeAppCtxt {})     = False
+kindContext (PatSynCtxt {})      = False
+kindContext (PatSigCtxt {})      = False
+kindContext (RuleSigCtxt {})     = False
+kindContext (ForSigCtxt {})      = False
+kindContext (DefaultDeclCtxt {}) = False
+kindContext (InstDeclCtxt {})    = False
+kindContext (SpecInstCtxt {})    = False
+kindContext (GenSigCtxt {})      = False
+kindContext (ClassSCCtxt {})     = False
+kindContext (SigmaCtxt {})       = False
+kindContext (DataTyCtxt {})      = False
+kindContext (DerivClauseCtxt {}) = False
 
 -- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
 -- context for the type of a term, where visible, dependent quantification is
@@ -493,17 +516,27 @@ allConstraintsAllowed _ = True
 -- where VDQ is permitted) and
 -- @testsuite/tests/dependent/should_fail/T16326_Fail*.hs@ (for places where
 -- VDQ is disallowed).
+--
+-- Note that 'vdqAllowed' is not the same thing as 'kindContext' because of
+-- their respective treatment of 'TySynCtxt' and 'GhciCtxt', which can refer
+-- to either types or kinds. 'vdqAllowed' returns 'True' for these cases, as
+-- it cannot know that these unambiguously correspond to the type of term.
+-- On the other hand, 'kindContext' returns 'False' for these cases, as it
+-- cannot know that these unambiguously refer to the kind of a type.
 vdqAllowed :: UserTypeCtxt -> Bool
 -- Currently allowed in the kinds of types...
 vdqAllowed (KindSigCtxt {}) = True
 vdqAllowed (StandaloneKindSigCtxt {}) = True
-vdqAllowed (TySynCtxt {}) = True
-vdqAllowed (GhciCtxt {}) = True
 vdqAllowed (TyVarBndrKindCtxt {}) = True
 vdqAllowed (DataKindCtxt {}) = True
 vdqAllowed (TySynKindCtxt {}) = True
 vdqAllowed (TyFamResKindCtxt {}) = True
--- ...but not in the types of terms.
+-- ...also allowed on the RHSs of type synonyms and in GHCi's :kind command. We
+-- technically do not know if these correspond to types or kinds, so we
+-- conversatively return True.
+vdqAllowed (TySynCtxt {}) = True
+vdqAllowed (GhciCtxt {}) = True
+-- Currently *not* allowed in the types of terms.
 vdqAllowed (ConArgCtxt {}) = False
   -- We could envision allowing VDQ in data constructor types so long as the
   -- constructor is only ever used at the type level, but for now, GHC adopts
@@ -937,8 +970,8 @@ ubxArgTyErr env ty
 
 checkConstraintsOK :: ValidityEnv -> ThetaType -> Type -> TcM ()
 checkConstraintsOK ve theta ty
-  | null theta                         = return ()
-  | allConstraintsAllowed (ve_ctxt ve) = return ()
+  | null theta                     = return ()
+  | not (kindContext (ve_ctxt ve)) = return ()
   | otherwise
   = -- We are in a kind, where we allow only equality predicates
     -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep, and #16263
