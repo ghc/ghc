@@ -35,7 +35,8 @@ ALL_WAYS=v           l         p         debug     \
 		 thr     thr_l     thr_p     thr_debug     \
 		 thr_dyn thr_l_dyn thr_p_dyn thr_debug_dyn \
 		 debug_p                     thr_debug_p \
-		 tsan    thr_tsan thr_debug_tsan thr_l_tsan \
+		 tsan    thr_tsan            thr_debug_tsan thr_l_tsan \
+		 debug_tsan  l_tsan \
 		 thr_p_tsan                                 \
 		 tsan_dyn debug_tsan_dyn thr_tsan_dyn thr_debug_tsan_dyn l_tsan_dyn thr_l_tsan_dyn
 
