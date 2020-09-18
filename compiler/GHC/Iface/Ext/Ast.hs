@@ -42,7 +42,7 @@ import GHC.Driver.Types
 import GHC.Unit.Module            ( ModuleName, ml_hs_file )
 import GHC.Utils.Monad            ( concatMapM, liftIO )
 import GHC.Types.Id               ( isDataConId_maybe )
-import GHC.Types.Name             ( Name, nameSrcSpan, setNameLoc, nameUnique )
+import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.SrcLoc
 import GHC.Tc.Utils.Zonk          ( hsLitType, hsPatType )
@@ -52,7 +52,7 @@ import GHC.Core.InstEnv
 import GHC.Builtin.Types          ( mkListTy, mkSumTy )
 import GHC.Tc.Types
 import GHC.Tc.Types.Evidence
-import GHC.Types.Var              ( Id, Var, EvId, setVarName, varName, varType, varUnique )
+import GHC.Types.Var              ( Id, Var, EvId, varName, setVarName, varType, varUnique )
 import GHC.Types.Var.Env
 import GHC.Types.Unique
 import GHC.Iface.Make             ( mkIfaceExports )
@@ -1274,26 +1274,22 @@ instance ( ToHie (RFContext (Located label))
       , toHie expr
       ]
 
-removeDefSrcSpan :: Name -> Name
-removeDefSrcSpan n = setNameLoc n noSrcSpan
-
 instance ToHie (RFContext (LFieldOcc GhcRn)) where
   toHie (RFC c rhs (L nspan f)) = concatM $ case f of
     FieldOcc name _ ->
-      [ toHie $ C (RecField c rhs) (L nspan $ removeDefSrcSpan name)
+      [ toHie $ C (RecField c rhs) (L nspan name)
       ]
 
 instance ToHie (RFContext (LFieldOcc GhcTc)) where
   toHie (RFC c rhs (L nspan f)) = concatM $ case f of
     FieldOcc var _ ->
-      let var' = setVarName var (removeDefSrcSpan $ varName var)
-      in [ toHie $ C (RecField c rhs) (L nspan var')
-         ]
+      [ toHie $ C (RecField c rhs) (L nspan var)
+      ]
 
 instance ToHie (RFContext (Located (AmbiguousFieldOcc GhcRn))) where
   toHie (RFC c rhs (L nspan afo)) = concatM $ case afo of
     Unambiguous name _ ->
-      [ toHie $ C (RecField c rhs) $ L nspan $ removeDefSrcSpan name
+      [ toHie $ C (RecField c rhs) $ L nspan name
       ]
     Ambiguous _name _ ->
       [ ]
@@ -1301,13 +1297,11 @@ instance ToHie (RFContext (Located (AmbiguousFieldOcc GhcRn))) where
 instance ToHie (RFContext (Located (AmbiguousFieldOcc GhcTc))) where
   toHie (RFC c rhs (L nspan afo)) = concatM $ case afo of
     Unambiguous var _ ->
-      let var' = setVarName var (removeDefSrcSpan $ varName var)
-      in [ toHie $ C (RecField c rhs) (L nspan var')
-         ]
+      [ toHie $ C (RecField c rhs) (L nspan var)
+      ]
     Ambiguous var _ ->
-      let var' = setVarName var (removeDefSrcSpan $ varName var)
-      in [ toHie $ C (RecField c rhs) (L nspan var')
-         ]
+      [ toHie $ C (RecField c rhs) (L nspan var)
+      ]
 
 instance HiePass p => ToHie (RScoped (ApplicativeArg (GhcPass p))) where
   toHie (RS sc (ApplicativeArgOne _ pat expr _)) = concatM
