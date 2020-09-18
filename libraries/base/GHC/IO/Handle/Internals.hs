@@ -309,7 +309,7 @@ checkReadableHandle act h_@Handle__{..} =
 -- Wrapper for seek operations.
 
 wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
-wantSeekableHandle fun h@(DuplexHandle _ _ _) _act =
+wantSeekableHandle fun h@(DuplexHandle {}) _act =
   ioException (IOError (Just h) IllegalOperation fun
                    "handle is not seekable" Nothing Nothing)
 wantSeekableHandle fun h@(FileHandle _ m) act =
@@ -477,10 +477,10 @@ flushBuffer :: Handle__ -> IO ()
 flushBuffer h_@Handle__{..} = do
   buf <- readIORef haCharBuffer
   case bufState buf of
-    ReadBuffer  -> do
+    ReadBuffer -> do
         flushCharReadBuffer h_
         flushByteReadBuffer h_
-    WriteBuffer -> do
+    WriteBuffer ->
         flushByteWriteBuffer h_
 
 -- | flushes the Char buffer only.  Works on all Handles.
@@ -488,7 +488,7 @@ flushCharBuffer :: Handle__ -> IO ()
 flushCharBuffer h_@Handle__{..} = do
   cbuf <- readIORef haCharBuffer
   case bufState cbuf of
-    ReadBuffer  -> do
+    ReadBuffer ->
         flushCharReadBuffer h_
     WriteBuffer ->
         -- Nothing to do here. Char buffer on a write Handle is always empty
@@ -581,7 +581,7 @@ flushCharReadBuffer Handle__{..} = do
      else do
 
   case haDecoder of
-    Nothing -> do
+    Nothing ->
       writeIORef haByteBuffer bbuf0 { bufL = bufL bbuf0 + bufL cbuf0 }
       -- no decoder: the number of bytes to decode is the same as the
       -- number of chars we have used up.
@@ -713,7 +713,7 @@ mkFileHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev)
              -> NewlineMode
                     -- Translate newlines?
              -> IO Handle
-mkFileHandle dev filepath iomode mb_codec tr_newlines = do
+mkFileHandle dev filepath iomode mb_codec tr_newlines =
    mkHandle dev filepath (ioModeToHandleType iomode) True{-buffered-} mb_codec
             tr_newlines
             (Just handleFinalizer) Nothing{-other_side-}
