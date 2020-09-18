@@ -636,12 +636,21 @@ nightly-x86_64-linux-deb9-integer-simple:
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
     TEST_TYPE: slowtest
 
-nightly-x86_64-linux-deb9-tsan:
+.build-x86_64-linux-deb9-tsan:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
     TEST_ENV: "x86_64-linux-deb9-tsan"
-    FLAVOUR: "thread-sanitizer"
+    BUILD_FLAVOUR: "thread-sanitizer"
+    TSAN_OPTIONS: "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
+
+nightly-x86_64-linux-deb9-tsan:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb9-tsan
+
+validate-x86_64-linux-deb9-tsan:
+  extends: .build-x86_64-linux-deb9-tsan
+  when: manual
 
 validate-x86_64-linux-deb9-dwarf:
   extends: .build-x86_64-linux-deb9
