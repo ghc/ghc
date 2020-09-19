@@ -115,6 +115,7 @@ checking phase.  For example:
 Suppose we compile this with -sig-of "A is ASig":
 
     module B where
+        {-# DEPRECATED T, f "Don't use" #-}
         data T = T
         f T = T
 
@@ -1043,8 +1044,8 @@ The final result (after the renamer) will be:
   HsTyVar ("Zero", DataName)
 -}
 
-lookupOccRn_overloaded_expr :: RdrName
-                       -> RnM (Maybe (Either Name [Name]))
+-- | Look up a global variable, local variable or one or more record selector functions.
+lookupOccRn_overloaded_expr :: RdrName -> RnM LookupOccRnOverloadedResult
 lookupOccRn_overloaded_expr = lookupOccRnX_maybe global_lookup Left
       where
         global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
@@ -1113,32 +1114,34 @@ lookupInfoOccRn rdr_name =
        ; qual_ns <- lookupQualifiedNameGHCi rdr_name
        ; return (ns ++ (qual_ns `minusList` ns)) }
 
--- | Like 'lookupOccRn_maybe', but with a more informative result if
--- the 'RdrName' happens to be a record selector:
---
---   * Nothing         -> name not in scope (no error reported)
+
+-- | * Nothing         -> name not in scope (no error reported)
 --   * Just (Left x)   -> name uniquely refers to x,
 --                        or there is a name clash (reported)
 --   * Just (Right xs) -> name refers to one or more record selectors;
 --                        if overload_ok was False, this list will be
 --                        a singleton.
+type LookupOccRnOverloadedResult = Maybe (Either Name [Name])
 
-lookupGlobalOccRn_resolve :: RdrName -> GreLookupResult -> RnM (Maybe (Either Name [Name]))
+-- | Like 'lookupOccRn_maybe', but with a more informative result if
+-- the 'RdrName' happens to be a record selector.
+lookupGlobalOccRn_resolve :: RdrName -> GreLookupResult -> RnM LookupOccRnOverloadedResult
 lookupGlobalOccRn_resolve rdr_name res = case res of
   GreNotFound  -> return Nothing
   OneNameMatch gre -> do
     let wrapper = if isRecFldGRE gre then Right . (:[]) else Left
-    return $ Just (wrapper (gre_name gre))
+    return $ Just $ wrapper $ gre_name gre
   MultipleNames gres | any isRecFldGRE gres ->
     -- Don't record usage for ambiguous selectors
     -- until we know which is meant
-    return $ Just (Right (map gre_name gres))
+    return $ Just $ Right $ map gre_name gres
   MultipleNames gres  -> do
     addNameClashErrRn rdr_name gres
-    return (Just (Left (gre_name (head gres))))
+    return $ Just $ Left $ gre_name (head gres)
 
-lookupGlobalOccRn_overloaded_expr :: RdrName
-                             -> RnM (Maybe (Either Name [Name]))
+-- | Look up a variable or record selector functions.
+-- It does NOT find a record selector created under NoFieldSelectors.
+lookupGlobalOccRn_overloaded_expr :: RdrName -> RnM LookupOccRnOverloadedResult
 lookupGlobalOccRn_overloaded_expr rdr_name =
   lookupExactOrOrig_maybe rdr_name (fmap Left) $
      do  { env <- getGlobalRdrEnv
@@ -1150,8 +1153,8 @@ lookupGlobalOccRn_overloaded_expr rdr_name =
          ; lookupGlobalOccRn_resolve rdr_name res
          }
 
-lookupGlobalOccRn_overloaded_pat :: RdrName
-                             -> RnM (Maybe (Either Name [Name]))
+-- | Look up a variable or record selectors.
+lookupGlobalOccRn_overloaded_pat :: RdrName -> RnM LookupOccRnOverloadedResult
 lookupGlobalOccRn_overloaded_pat rdr_name =
   lookupExactOrOrig_maybe rdr_name (fmap Left) $
      do  { res <- lookupGreRn_helper rdr_name
