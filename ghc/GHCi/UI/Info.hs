@@ -4,6 +4,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
 
+{-# OPTIONS -fno-warn-name-shadowing #-}
+
 -- | Get information on modules, expressions, and identifiers
 module GHCi.UI.Info
     ( ModInfo(..)

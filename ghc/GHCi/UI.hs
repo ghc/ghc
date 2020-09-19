@@ -11,6 +11,9 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS -fno-warn-name-shadowing #-}
+-- This module does a lot of it
+
 -----------------------------------------------------------------------------
 --
 -- GHC Interactive User Interface
@@ -427,8 +430,8 @@ default_progname = "<interactive>"
 default_stop = ""
 
 default_prompt, default_prompt_cont :: PromptFunction
-default_prompt = generatePromptFunctionFromString "%s> "
-default_prompt_cont = generatePromptFunctionFromString "%s| "
+default_prompt = generatePromptFunctionFromString "ghci> "
+default_prompt_cont = generatePromptFunctionFromString "| "
 
 default_args :: [String]
 default_args = []

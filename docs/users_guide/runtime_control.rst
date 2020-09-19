@@ -81,8 +81,8 @@ command line to go to the program (and not the RTS), use a
 the program, while ``--`` will.
 
 As always, for RTS options that take ⟨size⟩s: If the last character of
-⟨size⟩ is a K or k, multiply by 1000; if an M or m, by 1,000,000; if a G
-or G, by 1,000,000,000. (And any wraparound in the counters is *your*
+⟨size⟩ is a K or k, multiply by 1024; if an M or m, by 1024*1024; if a G
+or G, by 1024^3. (And any wraparound in the counters is *your*
 fault!)
 
 Giving a ``+RTS -?`` RTS option will print out the RTS
@@ -182,6 +182,13 @@ Event log output
 
 Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
 ⟨flags⟩`) is written through a custom :c:type:`EventLogWriter`:
+
+.. The size_t declaration below is simply to ensure that the build doesn't fail with an
+   undefined reference target warning as Sphinx doesn't know about size_t.
+
+.. c:type:: size_t
+
+   :hidden:
 
 .. c:type:: EventLogWriter
 

@@ -1,4 +1,8 @@
-module Settings.Flavours.Quick (quickFlavour) where
+module Settings.Flavours.Quick
+   ( quickFlavour
+   , quickValidateFlavour
+   )
+where
 
 import Expression
 import Flavour
@@ -30,3 +34,8 @@ quickArgs = sourceArgs SourceArgs
     , hsLibrary  = notStage0 ? arg "-O"
     , hsCompiler =    stage0 ? arg "-O2"
     , hsGhc      =    stage0 ? arg "-O" }
+
+quickValidateFlavour :: Flavour
+quickValidateFlavour = werror $ quickFlavour
+    { name = "quick-validate"
+    }
