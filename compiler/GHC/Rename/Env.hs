@@ -1153,6 +1153,14 @@ lookupGlobalOccRn_overloaded_expr overload_ok rdr_name =
          ; lookupGlobalOccRn_resolve overload_ok rdr_name res
          }
 
+{-
+Note [NoFieldSelectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Field selector functions are crucial to GHC's internal record mechanics.
+Therefore we generate selectors regardless of the FieldSelectors extension, and
+hide selectors only in the expression when they are created under NoFieldSelectos.
+-}
+
 -- | Look up a variable or record selectors.
 lookupGlobalOccRn_overloaded_pat :: DuplicateRecordFields -> RdrName -> RnM LookupOccRnOverloadedResult
 lookupGlobalOccRn_overloaded_pat overload_ok rdr_name =
