@@ -1045,13 +1045,13 @@ The final result (after the renamer) will be:
 -}
 
 -- | Look up a global variable, local variable or one or more record selector functions.
-lookupOccRn_overloaded_expr :: RdrName -> RnM LookupOccRnOverloadedResult
-lookupOccRn_overloaded_expr = lookupOccRnX_maybe global_lookup Left
+lookupOccRn_overloaded_expr :: DuplicateRecordFields -> RdrName -> RnM LookupOccRnOverloadedResult
+lookupOccRn_overloaded_expr overload_ok = lookupOccRnX_maybe global_lookup Left
       where
         global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
         global_lookup n =
           runMaybeT . msum . map MaybeT $
-            [ lookupGlobalOccRn_overloaded_expr n
+            [ lookupGlobalOccRn_overloaded_expr overload_ok n
             , fmap Left . listToMaybe <$> lookupQualifiedNameGHCi n ]
 
 lookupOccRnX_maybe :: (RdrName -> RnM (Maybe r)) -> (Name -> r) -> RdrName
@@ -1125,13 +1125,13 @@ type LookupOccRnOverloadedResult = Maybe (Either Name [Name])
 
 -- | Like 'lookupOccRn_maybe', but with a more informative result if
 -- the 'RdrName' happens to be a record selector.
-lookupGlobalOccRn_resolve :: RdrName -> GreLookupResult -> RnM LookupOccRnOverloadedResult
-lookupGlobalOccRn_resolve rdr_name res = case res of
+lookupGlobalOccRn_resolve :: DuplicateRecordFields -> RdrName -> GreLookupResult -> RnM LookupOccRnOverloadedResult
+lookupGlobalOccRn_resolve overload_ok rdr_name res = case res of
   GreNotFound  -> return Nothing
   OneNameMatch gre -> do
     let wrapper = if isRecFldGRE gre then Right . (:[]) else Left
     return $ Just $ wrapper $ gre_name gre
-  MultipleNames gres | any isRecFldGRE gres ->
+  MultipleNames gres | any isRecFldGRE gres, overload_ok == DuplicateRecordFields ->
     -- Don't record usage for ambiguous selectors
     -- until we know which is meant
     return $ Just $ Right $ map gre_name gres
@@ -1141,8 +1141,8 @@ lookupGlobalOccRn_resolve rdr_name res = case res of
 
 -- | Look up a variable or record selector functions.
 -- It does NOT find a record selector created under NoFieldSelectors.
-lookupGlobalOccRn_overloaded_expr :: RdrName -> RnM LookupOccRnOverloadedResult
-lookupGlobalOccRn_overloaded_expr rdr_name =
+lookupGlobalOccRn_overloaded_expr :: DuplicateRecordFields -> RdrName -> RnM LookupOccRnOverloadedResult
+lookupGlobalOccRn_overloaded_expr overload_ok rdr_name =
   lookupExactOrOrig_maybe rdr_name (fmap Left) $
      do  { env <- getGlobalRdrEnv
          ; res <- case filter (not . isNoFieldSelectorGRE) $ lookupGRE_RdrName rdr_name env of
@@ -1150,15 +1150,15 @@ lookupGlobalOccRn_overloaded_expr rdr_name =
             [gre] -> do { addUsedGRE True gre
                         ; return (OneNameMatch gre) }
             gres  -> return (MultipleNames gres)
-         ; lookupGlobalOccRn_resolve rdr_name res
+         ; lookupGlobalOccRn_resolve overload_ok rdr_name res
          }
 
 -- | Look up a variable or record selectors.
-lookupGlobalOccRn_overloaded_pat :: RdrName -> RnM LookupOccRnOverloadedResult
-lookupGlobalOccRn_overloaded_pat rdr_name =
+lookupGlobalOccRn_overloaded_pat :: DuplicateRecordFields -> RdrName -> RnM LookupOccRnOverloadedResult
+lookupGlobalOccRn_overloaded_pat overload_ok rdr_name =
   lookupExactOrOrig_maybe rdr_name (fmap Left) $
      do  { res <- lookupGreRn_helper rdr_name
-         ; lookupGlobalOccRn_resolve rdr_name res }
+         ; lookupGlobalOccRn_resolve overload_ok rdr_name res }
 
 
 --------------------------------------------------

@@ -752,7 +752,7 @@ rnHsRecUpdFields flds
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Expr
                       if overload_ok == DuplicateRecordFields || has_sel == NoFieldSelectors
-                          then do { mb <- lookupGlobalOccRn_overloaded_pat lbl
+                          then do { mb <- lookupGlobalOccRn_overloaded_pat overload_ok lbl
                                   ; case mb of
                                       Nothing ->
                                         do { addErr

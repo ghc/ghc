@@ -49,6 +49,7 @@ import GHC.Driver.Session
 import GHC.Builtin.Names
 
 import GHC.Types.Basic
+import GHC.Types.FieldLabel
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -119,7 +120,9 @@ rnUnboundVar v
                 ; return (HsVar noExtField (noLoc n), emptyFVs) } }
 
 rnExpr (HsVar _ (L l v))
-  = do { mb_name <- lookupOccRn_overloaded_expr v
+  = do { overload_ok_flag <- xoptM LangExt.DuplicateRecordFields
+       ; let overload_ok = if overload_ok_flag then DuplicateRecordFields else NoDuplicateRecordFields
+       ; mb_name <- lookupOccRn_overloaded_expr overload_ok v
        ; dflags <- getDynFlags
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;
