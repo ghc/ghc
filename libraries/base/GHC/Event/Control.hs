@@ -28,7 +28,6 @@ module GHC.Event.Control
 
 #include "EventConfig.h"
 
-import Foreign.ForeignPtr (ForeignPtr)
 import GHC.Base
 import GHC.IORef
 import GHC.Conc.Signal (Signal)
@@ -37,7 +36,7 @@ import GHC.Show (Show)
 import GHC.Word (Word8)
 import Foreign.C.Error (throwErrnoIfMinus1_, throwErrno, getErrno)
 import Foreign.C.Types (CInt(..), CSize(..))
-import Foreign.ForeignPtr (mallocForeignPtrBytes, withForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, withForeignPtr)
 import Foreign.Marshal (alloca, allocaBytes)
 import Foreign.Marshal.Array (allocaArray)
 import Foreign.Ptr (castPtr)

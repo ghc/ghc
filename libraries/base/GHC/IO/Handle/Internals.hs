@@ -309,7 +309,7 @@ checkReadableHandle act h_@Handle__{..} =
 -- Wrapper for seek operations.
 
 wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
-wantSeekableHandle fun h@(DuplexHandle _ _ _) _act =
+wantSeekableHandle fun h@(DuplexHandle {}) _act =
   ioException (IOError (Just h) IllegalOperation fun
                    "handle is not seekable" Nothing Nothing)
 wantSeekableHandle fun h@(FileHandle _ m) act =

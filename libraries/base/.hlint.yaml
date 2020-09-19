@@ -10,9 +10,13 @@
 - warn: {name: Redundant do}
 - warn: {name: Redundant variable capture}
 - warn: {name: Redundant void}
-- warn: {name: Builtin Bracket}
-- warn: {name: Builtin Pattern}
+- warn: {name: Move brackets to avoid $}
 - warn: {name: Redundant as}
+- warn: {name: Use fewer imports}
+- warn: {name: Redundant as-pattern}
+- warn: {name: Redundant where}
+- warn: {name: Use record patterns}
+- warn: {name: Used otherwise as a pattern}
 
 
 ## Exceptions
@@ -21,5 +25,5 @@
 # lints that we otherwise want applied elsewhere. Such exceptions are listed
 # below, although better documented at the function definition sites.
 
-- ignore: {name: Unused LANGUAGE pragma, within: GHC.IO.Encoding.CodePage}
-- ignore: {name: Redundant do, within: GHC.IO.Handle.Text.commitBuffer}
+- ignore: {name: Unused LANGUAGE pragma, within: [GHC.IO.Encoding.CodePage]}
+- ignore: {name: Redundant do, within: [GHC.IO.Handle.Text.commitBuffer]}

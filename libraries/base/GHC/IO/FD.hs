@@ -360,8 +360,8 @@ isSeekable fd = do
 
 seek :: FD -> SeekMode -> Integer -> IO Integer
 seek fd mode off = fromIntegral `fmap`
-  (throwErrnoIfMinus1Retry "seek" $
-     c_lseek (fdFD fd) (fromIntegral off) seektype)
+  throwErrnoIfMinus1Retry "seek"
+     (c_lseek (fdFD fd) (fromIntegral off) seektype)
  where
     seektype :: CInt
     seektype = case mode of
@@ -372,8 +372,8 @@ seek fd mode off = fromIntegral `fmap`
 tell :: FD -> IO Integer
 tell fd =
  fromIntegral `fmap`
-   (throwErrnoIfMinus1Retry "hGetPosn" $
-      c_lseek (fdFD fd) 0 sEEK_CUR)
+   throwErrnoIfMinus1Retry "hGetPosn"
+      (c_lseek (fdFD fd) 0 sEEK_CUR)
 
 getSize :: FD -> IO Integer
 getSize fd = fdFileSize (fdFD fd)

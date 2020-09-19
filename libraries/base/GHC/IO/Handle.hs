@@ -508,7 +508,7 @@ hIsClosed handle =
 -}
 
 hIsReadable :: Handle -> IO Bool
-hIsReadable (DuplexHandle _ _ _) = return True
+hIsReadable DuplexHandle {} = return True
 hIsReadable handle =
     withHandle_ "hIsReadable" handle $ \ handle_ -> do
     case haType handle_ of
@@ -517,7 +517,7 @@ hIsReadable handle =
       htype                -> return (isReadableHandleType htype)
 
 hIsWritable :: Handle -> IO Bool
-hIsWritable (DuplexHandle _ _ _) = return True
+hIsWritable DuplexHandle {} = return True
 hIsWritable handle =
     withHandle_ "hIsWritable" handle $ \ handle_ -> do
     case haType handle_ of
