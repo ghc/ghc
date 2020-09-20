@@ -30,7 +30,7 @@ parseUnit = parseVirtUnitId <++ parseDefUnitId
 
 parseUnitId :: ReadP UnitId
 parseUnitId = do
-   s <- Parse.munch1 (\c -> isAlphaNum c || c `elem` "-_.+")
+   s <- Parse.munch1 (\c -> isAlphaNum c || c `elem` ['-','_','.','+'])
    return (UnitId (mkFastString s))
 
 parseIndefUnitId :: ReadP IndefUnitId

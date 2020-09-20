@@ -1155,7 +1155,12 @@ notFollowedBy char _ _ _ (AI _ buf)
 
 notFollowedBySymbol :: AlexAccPred ExtsBitmap
 notFollowedBySymbol _ _ _ (AI _ buf)
-  = nextCharIsNot buf (`elem` "!#$%&*+./<=>?@\\^|-~")
+  = nextCharIsNot buf (`elem` chars)
+  where
+    chars :: [Char]
+    chars = ['!','#','$','%','&','*','+','.','/','<'
+            ,'=','>','?','@','\\','^','|','-','~'
+            ]
 
 followedByDigit :: AlexAccPred ExtsBitmap
 followedByDigit _ _ _ (AI _ buf)
@@ -1176,7 +1181,7 @@ isNormalComment bits _ _ (AI _ buf)
   | otherwise               = nextCharIsNot buf (== '#')
   where
     notFollowedByDocOrPragma
-       = afterOptionalSpace buf (\b -> nextCharIsNot b (`elem` "|^*$#"))
+       = afterOptionalSpace buf (\b -> nextCharIsNot b (`elem` ['|','^','*','$','#']))
 
 afterOptionalSpace :: StringBuffer -> (StringBuffer -> Bool) -> Bool
 afterOptionalSpace buf p

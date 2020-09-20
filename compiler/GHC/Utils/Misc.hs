@@ -1218,7 +1218,7 @@ readRational__ r = do
         (ds',t) <- lexDotDigits s
         return (read (ds++ds'), length ds', t)
 
-     readExp (e:s) | e `elem` "eE" = readExp' s
+     readExp (e:s) | e `elem` ['e', 'E'] = readExp' s
      readExp s                     = return (0,s)
 
      readExp' ('+':s) = readDec s
