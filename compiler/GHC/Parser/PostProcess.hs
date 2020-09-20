@@ -1374,19 +1374,24 @@ pBangTy lt@(L l1 _) xs =
     Nothing -> (False, lt, pure (), xs)
     Just (l2, anns, prag, unpk, xs') ->
       let bl = combineSrcSpans l1 l2
-          bt = addUnpackedness (prag, unpk) lt
-      in (True, L bl bt, addAnnsAt bl anns, xs')
+          (anns2, bt) = addUnpackedness (prag, unpk) lt
+      in (True, L bl bt, addAnnsAt bl (anns ++ anns2), xs')
 
 mkBangTy :: SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy strictness =
   HsBangTy noExtField (HsSrcBang NoSourceText NoSrcUnpack strictness)
 
-addUnpackedness :: (SourceText, SrcUnpackedness) -> LHsType GhcPs -> HsType GhcPs
-addUnpackedness (prag, unpk) (L _ (HsBangTy x bang t))
+addUnpackedness :: (SourceText, SrcUnpackedness) -> LHsType GhcPs -> ([AddAnn], HsType GhcPs)
+addUnpackedness (prag, unpk) (L l (HsBangTy x bang t))
   | HsSrcBang NoSourceText NoSrcUnpack strictness <- bang
-  = HsBangTy x (HsSrcBang prag unpk strictness) t
+  = let
+      anns = case strictness of
+        SrcLazy     -> [AddAnn AnnTilde (srcSpanFirstCharacter l)]
+        SrcStrict   -> [AddAnn AnnBang  (srcSpanFirstCharacter l)]
+        NoSrcStrict -> []
+    in (anns, HsBangTy x (HsSrcBang prag unpk strictness) t)
 addUnpackedness (prag, unpk) t
-  = HsBangTy noExtField (HsSrcBang prag unpk NoSrcStrict) t
+  = ([], HsBangTy noExtField (HsSrcBang prag unpk NoSrcStrict) t)
 
 -- | Merge a /reversed/ and /non-empty/ soup of operators and operands
 --   into a type.
