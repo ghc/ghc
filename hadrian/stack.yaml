@@ -12,3 +12,6 @@ nix:
    - git
    - ncurses
    - perl
+
+extra-deps:
+- happy-1.20.0
