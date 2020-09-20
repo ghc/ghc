@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -28,7 +29,7 @@ import Data.Bits (Bits, FiniteBits)
 import Foreign.Storable (Storable)
 import GHC.Ix (Ix)
 import GHC.Base
-import GHC.Enum (Bounded(..), Enum)
+import GHC.Enum (Bounded(..), Enum(..))
 import GHC.Float (Floating, RealFloat)
 import GHC.Num
 import GHC.Read
@@ -88,6 +89,20 @@ clamp (low, high) a = min high (max a low)
 -- >>> minBound :: Down Int
 -- Down 9223372036854775807
 --
+-- If @a@ has an @'Enum'@ instance then the wrapped instance reverses the
+-- enumeration ordering by swapping @'pred'@ and @'succ'@ of the underlying
+-- type and reverses enumeration numbering by negating the values of
+-- @'fromEnum'@ in the underlying type.
+--
+-- >>> [Down 'z' .. Down 'x']
+-- [Down 'z',Down 'y',Down 'x']
+--
+-- >>> fromEnum True
+-- 1
+--
+-- >>> fromEnum (Down True)
+-- -1
+--
 -- All other instances of @'Down' a@ behave as they do for @a@.
 --
 -- @since 4.6.0.0
@@ -100,7 +115,6 @@ newtype Down a = Down
       , Semigroup -- ^ @since 4.11.0.0
       , Monoid    -- ^ @since 4.11.0.0
       , Bits       -- ^ @since 4.14.0.0
-      , Enum       -- ^ @since 4.14.0.0
       , FiniteBits -- ^ @since 4.14.0.0
       , Floating   -- ^ @since 4.14.0.0
       , Fractional -- ^ @since 4.14.0.0
@@ -138,6 +152,31 @@ instance Ord a => Ord (Down a) where
 instance Bounded a => Bounded (Down a) where
     minBound = Down maxBound
     maxBound = Down minBound
+
+-- | Reverses the enumeration order of the underlying type. Achieved by
+--
+-- 1. switching @'pred'@ and @'succ'@ from the underlying @a@
+--
+--    >>> pred True
+--    False
+--
+--    >>> succ (Down True)
+--    Down False
+--
+-- 2. reversing the numbering by negating the values of the underlying type
+--
+--    >>> fromEnum True
+--    1
+--
+--    >>> fromEnum (Down True)
+--    -1
+--
+-- @since 4.14.0.0
+instance Enum a => Enum (Down a) where
+    succ = coerce (pred :: a -> a)
+    pred = coerce (succ :: a -> a)
+    toEnum = coerce (toEnum :: Int -> a) . negate
+    fromEnum = negate . coerce (fromEnum :: a -> Int)
 
 -- | @since 4.11.0.0
 instance Functor Down where
