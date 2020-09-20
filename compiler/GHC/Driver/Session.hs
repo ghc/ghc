@@ -4466,8 +4466,8 @@ exposePackage' p dflags
             parsePackageFlag "-package" parsePackageArg p : packageFlags dflags }
 
 parsePackageArg :: ReadP PackageArg
-parsePackageArg =
-    fmap PackageArg (munch1 (\c -> isAlphaNum c || c `elem` ":-_."))
+parsePackageArg = fmap PackageArg
+                $ munch1 (\c -> isAlphaNum c || c `elem` [':','-','_','.'])
 
 parseUnitArg :: ReadP PackageArg
 parseUnitArg =

@@ -712,7 +712,7 @@ checkLayout :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]
             -> [NatCmmDecl statics instr]
 checkLayout procsUnsequenced procsSequenced =
         ASSERT2(setNull diff,
-                ppr "Block sequencing dropped blocks:" <> ppr diff)
+                ppr ("Block sequencing dropped blocks:" :: String) <> ppr diff)
         procsSequenced
   where
         blocks1 = foldl' (setUnion) setEmpty $

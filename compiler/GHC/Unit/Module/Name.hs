@@ -94,5 +94,4 @@ moduleNameColons = dots_to_colons . moduleNameString
 
 parseModuleName :: ReadP ModuleName
 parseModuleName = fmap mkModuleName
-                $ Parse.munch1 (\c -> isAlphaNum c || c `elem` "_.")
-
+                $ Parse.munch1 (\c -> isAlphaNum c || c `elem` ['_', '.'])

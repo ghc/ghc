@@ -2061,7 +2061,7 @@ genDerivStuff mechanism loc clas inst_tys tyvars
           -- canDeriveAnyClass should ensure that this code can't be reached
           -- unless -XDeriveAnyClass is enabled.
           ASSERT2( isValid (canDeriveAnyClass dflags)
-                 , ppr "genDerivStuff: bad derived class" <+> ppr clas )
+                 , ppr ("genDerivStuff: bad derived class" :: String) <+> ppr clas )
           mapM (tcATDefault loc mini_subst emptyNameSet)
                (classATItems clas)
         return ( emptyBag, [] -- No method bindings are needed...
