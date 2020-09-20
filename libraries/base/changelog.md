@@ -33,6 +33,8 @@
 
   * Add `Ix` instances for tuples of size 6 through 15
    
+  * Correct the behaviour of `Bounded a => Bounded (Data.Ord.Down a)`.
+
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
 
