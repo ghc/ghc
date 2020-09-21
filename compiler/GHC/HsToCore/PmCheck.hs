@@ -221,7 +221,7 @@ safe (@f _ = error "boom"@ is not because of ⊥), doesn't trigger a warning
 exception into divergence (@f x = f x@).
 
 Semantically, unlike every other case expression, -XEmptyCase is strict in its
-match var x, which rules out ⊥ as an inhabitant. So we add x /~ ⊥ to the
+match var x, which rules out ⊥ as an inhabitant. So we add x ≁ ⊥ to the
 initial Nabla and check if there are any values left to match on.
 -}
 
@@ -781,28 +781,6 @@ This means we can't just desugar the pattern match to
 @[T a b <- x, 'a' <- a, 42 <- b]@. Instead we have to force them in the
 right order: @[T a b <- x, 42 <- b, 'a' <- a]@.
 
-Note [Strict fields and fields of unlifted type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-How do strict fields play into Note [Field match order for RecCon]? Answer:
-They don't. Desugaring is entirely unconcerned by strict fields; the forcing
-happens *before* pattern matching. But for each strict (or more generally,
-unlifted) field @s@ we have to add @s /~ ⊥@ constraints when we check the PmCon
-guard in 'checkGrd'. Strict fields are devoid of ⊥ by construction, there's
-nothing that a bang pattern would act on. Example from #18341:
-
-  data T = MkT !Int
-  f :: T -> ()
-  f (MkT  _) | False = () -- inaccessible
-  f (MkT !_) | False = () -- redundant, not only inaccessible!
-  f _                = ()
-
-The second clause desugars to @MkT n <- x, !n@. When coverage checked, the
-'PmCon' @MkT n <- x@ refines the set of values that reach the bang pattern with
-the constraints @x ~ MkT n, n /~ ⊥@ (this list is computed by 'pmConCts').
-Checking the 'PmBang' @!n@ will then try to add the constraint @n ~ ⊥@ to this
-set to get the diverging set, which is found to be empty. Hence the whole
-clause is detected as redundant, as expected.
-
 Note [Order of guards matters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Similar to Note [Field match order for RecCon], the order in which the guards
@@ -872,17 +850,17 @@ instance Outputable a => Outputable (CheckResult a) where
       field name value = text name <+> equals <+> ppr value
 
 -- | Lift 'addPmCts' over 'Nablas'.
-addPmCtsNablas :: Nablas -> PmCts -> DsM Nablas
-addPmCtsNablas nablas cts = liftNablasM (\d -> addPmCts d cts) nablas
+addPhiCtsNablas :: Nablas -> PhiCts -> DsM Nablas
+addPhiCtsNablas nablas cts = liftNablasM (\d -> addPhiCts d cts) nablas
 
 -- | 'addPmCtsNablas' for a single 'PmCt'.
-addPmCtNablas :: Nablas -> PmCt -> DsM Nablas
-addPmCtNablas nablas ct = addPmCtsNablas nablas (unitBag ct)
+addPhiCtNablas :: Nablas -> PhiCt -> DsM Nablas
+addPhiCtNablas nablas ct = addPhiCtsNablas nablas (unitBag ct)
 
 -- | Test if any of the 'Nabla's is inhabited. Currently this is pure, because
 -- we preserve the invariant that there are no uninhabited 'Nabla's. But that
 -- could change in the future, for example by implementing this function in
--- terms of @notNull <$> provideEvidence 1 ds@.
+-- terms of @notNull <$> generateInhabitingPatterns 1 ds@.
 isInhabited :: Nablas -> DsM Bool
 isInhabited (MkNablas ds) = pure (not (null ds))
 
@@ -938,26 +916,6 @@ throttle limit old@(MkNablas old_ds) new@(MkNablas new_ds)
   | length new_ds > max limit (length old_ds) = (Approximate, old)
   | otherwise                                 = (Precise,     new)
 
--- | The 'PmCts' arising from a successful  'PmCon' match @T gammas as ys <- x@.
--- These include
---
---   * @gammas@: Constraints arising from the bound evidence vars
---   * @y /~ ⊥@ constraints for each unlifted field (including strict fields)
---     @y@ in @ys@
---   * The constructor constraint itself: @x ~ T as ys@.
---
--- See Note [Strict fields and fields of unlifted type].
-pmConCts :: Id -> PmAltCon -> [TyVar] -> [EvVar] -> [Id] -> PmCts
-pmConCts x con tvs dicts args = gammas `unionBags` unlifted `snocBag` con_ct
-  where
-    gammas   = listToBag $ map (PmTyCt . evVarPred) dicts
-    con_ct   = PmConCt x con tvs args
-    unlifted = listToBag [ PmNotBotCt arg
-                         | (arg, bang) <-
-                             zipEqual "pmConCts" args (pmAltConImplBangs con)
-                         , isBanged bang || isUnliftedType (idType arg)
-                         ]
-
 checkSequence :: (grdtree -> CheckAction anntree) -> NonEmpty grdtree -> CheckAction (NonEmpty anntree)
 -- The implementation is pretty similar to
 -- @traverse1 :: Apply f => (a -> f b) -> NonEmpty a -> f (NonEmpty b)@
@@ -969,32 +927,37 @@ checkGrd :: PmGrd -> CheckAction RedSets
 checkGrd grd = CA $ \inc -> case grd of
   -- let x = e: Refine with x ~ e
   PmLet x e -> do
-    matched <- addPmCtNablas inc (PmCoreCt x e)
-    -- tracePm "check:Let" (ppr x <+> char '=' <+> ppr e)
+    matched <- addPhiCtNablas inc (PhiCoreCt x e)
+    tracePm "check:Let" (ppr x <+> char '=' <+> ppr e)
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
-  -- Bang x _: Diverge on x ~ ⊥, refine with x /~ ⊥
+  -- Bang x _: Diverge on x ~ ⊥, refine with x ≁ ⊥
   PmBang x mb_info -> do
-    div <- addPmCtNablas inc (PmBotCt x)
-    matched <- addPmCtNablas inc (PmNotBotCt x)
+    div <- addPhiCtNablas inc (PhiBotCt x)
+    matched <- addPhiCtNablas inc (PhiNotBotCt x)
     -- See Note [Dead bang patterns]
     -- mb_info = Just info <==> PmBang originates from bang pattern in source
     let bangs | Just info <- mb_info = unitOL (div, info)
               | otherwise            = NilOL
-    -- tracePm "check:Bang" (ppr x <+> ppr div)
+    tracePm "check:Bang" (ppr x <+> ppr div)
     pure CheckResult { cr_ret = RedSets { rs_cov = matched, rs_div = div, rs_bangs = bangs }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
-  -- Con: Fall through on x /~ K and refine with x ~ K ys and type info
+  -- Con: Fall through on x ≁ K and refine with x ~ K ys and type info
   PmCon x con tvs dicts args -> do
     !div <- if isPmAltConMatchStrict con
-      then addPmCtNablas inc (PmBotCt x)
+      then addPhiCtNablas inc (PhiBotCt x)
       else pure mempty
-    let con_cts = pmConCts x con tvs dicts args
-    !matched <- addPmCtsNablas inc con_cts
-    !uncov   <- addPmCtNablas  inc (PmNotConCt x con)
-    -- tracePm "checkGrd:Con" (ppr inc $$ ppr grd $$ ppr con_cts $$ ppr matched)
+    !matched <- addPhiCtNablas inc (PhiConCt x con tvs (map evVarPred dicts) args)
+    !uncov   <- addPhiCtNablas inc (PhiNotConCt x con)
+    tracePm "check:Con" $ vcat
+      [ ppr grd
+      , ppr inc
+      , hang (text "div") 2 (ppr div)
+      , hang (text "matched") 2 (ppr matched)
+      , hang (text "uncov") 2 (ppr uncov)
+      ]
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched, rs_div = div }
                      , cr_uncov = uncov
                      , cr_approx = Precise }
@@ -1028,7 +991,7 @@ checkGRHS (PmGRHS { pg_grds = grds, pg_rhs = rhs_info }) =
 
 checkEmptyCase :: PmEmptyCase -> CheckAction PmEmptyCase
 checkEmptyCase pe@(PmEmptyCase { pe_var = var }) = CA $ \inc -> do
-  unc <- addPmCtNablas inc (PmNotBotCt var)
+  unc <- addPhiCtNablas inc (PhiNotBotCt var)
   pure CheckResult { cr_ret = pe, cr_uncov = unc, cr_approx = mempty }
 
 checkPatBind :: (PmPatBind Pre) -> CheckAction (PmPatBind Post)
@@ -1048,7 +1011,7 @@ How do we do that? Consider
 
 And imagine we set our limit to 1 for the sake of the example. The first clause
 will be checked against the initial Nabla, {}. Doing so will produce an
-Uncovered set of size 2, containing the models {x/~True} and {x~True,y/~True}.
+Uncovered set of size 2, containing the models {x≁True} and {x~True,y≁True}.
 Also we find the first clause to cover the model {x~True,y~True}.
 
 But the Uncovered set we get out of the match is too huge! We somehow have to
@@ -1056,8 +1019,8 @@ ensure not to make things worse as they are already, so we continue checking
 with a singleton Uncovered set of the initial Nabla {}. Why is this
 sound (wrt. the notion in GADTs Meet Their Match)? Well, it basically amounts
 to forgetting that we matched against the first clause. The values represented
-by {} are a superset of those represented by its two refinements {x/~True} and
-{x~True,y/~True}.
+by {} are a superset of those represented by its two refinements {x≁True} and
+{x~True,y≁True}.
 
 This forgetfulness becomes very apparent in the example above: By continuing
 with {} we don't detect the second clause as redundant, as it again covers the
@@ -1275,7 +1238,7 @@ getNFirstUncovered vars n (MkNablas nablas) = go n (bagToList nablas)
     go 0 _              = pure []
     go _ []             = pure []
     go n (nabla:nablas) = do
-      front <- provideEvidence vars n nabla
+      front <- generateInhabitingPatterns vars n nabla
       back <- go (n - length front) nablas
       pure (front ++ back)
 
@@ -1415,7 +1378,8 @@ addTyCs :: Origin -> Bag EvVar -> DsM a -> DsM a
 addTyCs origin ev_vars m = do
   dflags <- getDynFlags
   applyWhen (needToRunPmCheck dflags origin)
-            (locallyExtendPmNablas (\nablas -> addPmCtsNablas nablas (PmTyCt . evVarPred <$> ev_vars)))
+            (locallyExtendPmNablas $ \nablas ->
+              addPhiCtsNablas nablas (PhiTyCt . evVarPred <$> ev_vars))
             m
 
 -- | Add equalities for the 'CoreExpr' scrutinee to the local 'DsM' environment
@@ -1427,7 +1391,7 @@ addCoreScrutTmCs :: Maybe CoreExpr -> [Id] -> DsM a -> DsM a
 addCoreScrutTmCs Nothing    _   k = k
 addCoreScrutTmCs (Just scr) [x] k =
   flip locallyExtendPmNablas k $ \nablas ->
-    addPmCtsNablas nablas (unitBag (PmCoreCt x scr))
+    addPhiCtsNablas nablas (unitBag (PhiCoreCt x scr))
 addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: scrutinee, but more than one match id"
 
 -- | 'addCoreScrutTmCs', but desugars the 'LHsExpr' first.

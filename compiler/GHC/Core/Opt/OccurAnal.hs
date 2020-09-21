@@ -61,10 +61,15 @@ import Data.List
 Here's the externally-callable interface:
 -}
 
+occurAnalyseExpr :: CoreExpr -> CoreExpr
+-- Do occurrence analysis, and discard occurrence info returned
+occurAnalyseExpr expr
+  = snd (occAnal initOccEnv expr)
+
 occurAnalysePgm :: Module         -- Used only in debug output
                 -> (Id -> Bool)         -- Active unfoldings
                 -> (Activation -> Bool) -- Active rules
-                -> [CoreRule]
+                -> [CoreRule]           -- Local rules for imported Ids
                 -> CoreProgram -> CoreProgram
 occurAnalysePgm this_mod active_unf active_rule imp_rules binds
   | isEmptyDetails final_usage
@@ -95,15 +100,21 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
     initial_uds = addManyOccs emptyDetails (rulesFreeVars imp_rules)
     -- The RULES declarations keep things alive!
 
-    -- Note [Preventing loops due to imported functions rules]
-    imp_rule_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
-                            [ mapVarEnv (const maps_to) $
-                                getUniqSet (exprFreeIds arg `delVarSetList` ru_bndrs imp_rule)
-                            | imp_rule <- imp_rules
-                            , not (isBuiltinRule imp_rule)  -- See Note [Plugin rules]
-                            , let maps_to = exprFreeIds (ru_rhs imp_rule)
-                                             `delVarSetList` ru_bndrs imp_rule
-                            , arg <- ru_args imp_rule ]
+    -- imp_rule_edges maps a top-level local binder 'f' to the
+    -- RHS free vars of any IMP-RULE, a local RULE for an imported function,
+    -- where 'f' appears on the LHS
+    --   e.g.  RULE foldr f = blah
+    --         imp_rule_edges contains f :-> fvs(blah)
+    -- We treat such RULES as extra rules for 'f'
+    -- See Note [Preventing loops due to imported functions rules]
+    imp_rule_edges :: ImpRuleEdges
+    imp_rule_edges = foldr (plusVarEnv_C (++)) emptyVarEnv
+                           [ mapVarEnv (const [(act,rhs_fvs)]) $ getUniqSet $
+                             exprsFreeIds args `delVarSetList` bndrs
+                           | Rule { ru_act = act, ru_bndrs = bndrs
+                                   , ru_args = args, ru_rhs = rhs } <- imp_rules
+                                   -- Not BuiltinRules; see Note [Plugin rules]
+                           , let rhs_fvs = exprFreeIds rhs `delVarSetList` bndrs ]
 
     go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
     go _ []
@@ -115,297 +126,64 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
            (final_usage, bind') = occAnalBind env TopLevel imp_rule_edges bind
                                               bs_usage
 
-occurAnalyseExpr :: CoreExpr -> CoreExpr
--- Do occurrence analysis, and discard occurrence info returned
-occurAnalyseExpr expr
-  = snd (occAnal initOccEnv expr)
-
-{- Note [Plugin rules]
-~~~~~~~~~~~~~~~~~~~~~~
-Conal Elliott (#11651) built a GHC plugin that added some
-BuiltinRules (for imported Ids) to the mg_rules field of ModGuts, to
-do some domain-specific transformations that could not be expressed
-with an ordinary pattern-matching CoreRule.  But then we can't extract
-the dependencies (in imp_rule_edges) from ru_rhs etc, because a
-BuiltinRule doesn't have any of that stuff.
-
-So we simply assume that BuiltinRules have no dependencies, and filter
-them out from the imp_rule_edges comprehension.
--}
-
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-                Bindings
+                IMP-RULES
+         Local rules for imported functions
 *                                                                      *
-************************************************************************
+********************************************************************* -}
 
-Note [Recursive bindings: the grand plan]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we come across a binding group
-  Rec { x1 = r1; ...; xn = rn }
-we treat it like this (occAnalRecBind):
+type ImpRuleEdges = IdEnv [(Activation, VarSet)]
+    -- Mapping from a local Id 'f' to info about its IMP-RULES,
+    -- i.e. /local/ rules for an imported Id that mention 'f' on the LHS
+    -- We record (a) its Activation and (b) the RHS free vars
+    -- See Note [IMP-RULES: local rules for imported functions]
 
-1. Occurrence-analyse each right hand side, and build a
-   "Details" for each binding to capture the results.
+noImpRuleEdges :: ImpRuleEdges
+noImpRuleEdges = emptyVarEnv
 
-   Wrap the details in a Node (details, node-id, dep-node-ids),
-   where node-id is just the unique of the binder, and
-   dep-node-ids lists all binders on which this binding depends.
-   We'll call these the "scope edges".
-   See Note [Forming the Rec groups].
+lookupImpRules :: ImpRuleEdges -> Id -> [(Activation,VarSet)]
+lookupImpRules imp_rule_edges bndr
+  = case lookupVarEnv imp_rule_edges bndr of
+      Nothing -> []
+      Just vs -> vs
 
-   All this is done by makeNode.
+impRulesScopeUsage :: [(Activation,VarSet)] -> UsageDetails
+-- Variable mentioned in RHS of an IMP-RULE for the bndr,
+-- whether active or not
+impRulesScopeUsage imp_rules_info
+  = foldr add emptyDetails imp_rules_info
+  where
+    add (_,vs) usage = addManyOccs usage vs
 
-2. Do SCC-analysis on these Nodes.  Each SCC will become a new Rec or
-   NonRec.  The key property is that every free variable of a binding
-   is accounted for by the scope edges, so that when we are done
-   everything is still in scope.
+impRulesActiveFvs :: (Activation -> Bool) -> VarSet
+                  -> [(Activation,VarSet)] -> VarSet
+impRulesActiveFvs is_active bndr_set vs
+  = foldr add emptyVarSet vs `intersectVarSet` bndr_set
+  where
+    add (act,vs) acc | is_active act = vs `unionVarSet` acc
+                     | otherwise     = acc
 
-3. For each Cyclic SCC of the scope-edge SCC-analysis in (2), we
-   identify suitable loop-breakers to ensure that inlining terminates.
-   This is done by occAnalRec.
+{- Note [IMP-RULES: local rules for imported functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We quite often have
+  * A /local/ rule
+  * for an /imported/ function
+like this:
+  foo x = blah
+  {-# RULE "map/foo" forall xs. map foo xs = xs #-}
+We call them IMP-RULES.  They are important in practice, and occur a
+lot in the libraries.
 
-4. To do so we form a new set of Nodes, with the same details, but
-   different edges, the "loop-breaker nodes". The loop-breaker nodes
-   have both more and fewer dependencies than the scope edges
-   (see Note [Choosing loop breakers])
+IMP-RULES are held in mg_rules of ModGuts, and passed in to
+occurAnalysePgm.
 
-   More edges: if f calls g, and g has an active rule that mentions h
-               then we add an edge from f -> h
+Main Invariant:
 
-   Fewer edges: we only include dependencies on active rules, on rule
-                RHSs (not LHSs) and if there is an INLINE pragma only
-                on the stable unfolding (and vice versa).  The scope
-                edges must be much more inclusive.
+* Throughout, we treat an IMP-RULE that mentions 'f' on its LHS
+  just like a RULE for f.
 
-5.  The "weak fvs" of a node are, by definition:
-       the scope fvs - the loop-breaker fvs
-    See Note [Weak loop breakers], and the nd_weak field of Details
-
-6.  Having formed the loop-breaker nodes
-
-Note [Dead code]
-~~~~~~~~~~~~~~~~
-Dropping dead code for a cyclic Strongly Connected Component is done
-in a very simple way:
-
-        the entire SCC is dropped if none of its binders are mentioned
-        in the body; otherwise the whole thing is kept.
-
-The key observation is that dead code elimination happens after
-dependency analysis: so 'occAnalBind' processes SCCs instead of the
-original term's binding groups.
-
-Thus 'occAnalBind' does indeed drop 'f' in an example like
-
-        letrec f = ...g...
-               g = ...(...g...)...
-        in
-           ...g...
-
-when 'g' no longer uses 'f' at all (eg 'f' does not occur in a RULE in
-'g'). 'occAnalBind' first consumes 'CyclicSCC g' and then it consumes
-'AcyclicSCC f', where 'body_usage' won't contain 'f'.
-
-------------------------------------------------------------
-Note [Forming Rec groups]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-We put bindings {f = ef; g = eg } in a Rec group if "f uses g"
-and "g uses f", no matter how indirectly.  We do a SCC analysis
-with an edge f -> g if "f uses g".
-
-More precisely, "f uses g" iff g should be in scope wherever f is.
-That is, g is free in:
-  a) the rhs 'ef'
-  b) or the RHS of a rule for f (Note [Rules are extra RHSs])
-  c) or the LHS or a rule for f (Note [Rule dependency info])
-
-These conditions apply regardless of the activation of the RULE (eg it might be
-inactive in this phase but become active later).  Once a Rec is broken up
-it can never be put back together, so we must be conservative.
-
-The principle is that, regardless of rule firings, every variable is
-always in scope.
-
-  * Note [Rules are extra RHSs]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    A RULE for 'f' is like an extra RHS for 'f'. That way the "parent"
-    keeps the specialised "children" alive.  If the parent dies
-    (because it isn't referenced any more), then the children will die
-    too (unless they are already referenced directly).
-
-    To that end, we build a Rec group for each cyclic strongly
-    connected component,
-        *treating f's rules as extra RHSs for 'f'*.
-    More concretely, the SCC analysis runs on a graph with an edge
-    from f -> g iff g is mentioned in
-        (a) f's rhs
-        (b) f's RULES
-    These are rec_edges.
-
-    Under (b) we include variables free in *either* LHS *or* RHS of
-    the rule.  The former might seems silly, but see Note [Rule
-    dependency info].  So in Example [eftInt], eftInt and eftIntFB
-    will be put in the same Rec, even though their 'main' RHSs are
-    both non-recursive.
-
-  * Note [Rule dependency info]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    The VarSet in a RuleInfo is used for dependency analysis in the
-    occurrence analyser.  We must track free vars in *both* lhs and rhs.
-    Hence use of idRuleVars, rather than idRuleRhsVars in occAnalBind.
-    Why both? Consider
-        x = y
-        RULE f x = v+4
-    Then if we substitute y for x, we'd better do so in the
-    rule's LHS too, so we'd better ensure the RULE appears to mention 'x'
-    as well as 'v'
-
-  * Note [Rules are visible in their own rec group]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    We want the rules for 'f' to be visible in f's right-hand side.
-    And we'd like them to be visible in other functions in f's Rec
-    group.  E.g. in Note [Specialisation rules] we want f' rule
-    to be visible in both f's RHS, and fs's RHS.
-
-    This means that we must simplify the RULEs first, before looking
-    at any of the definitions.  This is done by Simplify.simplRecBind,
-    when it calls addLetIdInfo.
-
-------------------------------------------------------------
-Note [Choosing loop breakers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Loop breaking is surprisingly subtle.  First read the section 4 of
-"Secrets of the GHC inliner".  This describes our basic plan.
-We avoid infinite inlinings by choosing loop breakers, and
-ensuring that a loop breaker cuts each loop.
-
-See also Note [Inlining and hs-boot files] in GHC.Core.ToIface, which
-deals with a closely related source of infinite loops.
-
-Fundamentally, we do SCC analysis on a graph.  For each recursive
-group we choose a loop breaker, delete all edges to that node,
-re-analyse the SCC, and iterate.
-
-But what is the graph?  NOT the same graph as was used for Note
-[Forming Rec groups]!  In particular, a RULE is like an equation for
-'f' that is *always* inlined if it is applicable.  We do *not* disable
-rules for loop-breakers.  It's up to whoever makes the rules to make
-sure that the rules themselves always terminate.  See Note [Rules for
-recursive functions] in GHC.Core.Opt.Simplify
-
-Hence, if
-    f's RHS (or its INLINE template if it has one) mentions g, and
-    g has a RULE that mentions h, and
-    h has a RULE that mentions f
-
-then we *must* choose f to be a loop breaker.  Example: see Note
-[Specialisation rules].
-
-In general, take the free variables of f's RHS, and augment it with
-all the variables reachable by RULES from those starting points.  That
-is the whole reason for computing rule_fv_env in occAnalBind.  (Of
-course we only consider free vars that are also binders in this Rec
-group.)  See also Note [Finding rule RHS free vars]
-
-Note that when we compute this rule_fv_env, we only consider variables
-free in the *RHS* of the rule, in contrast to the way we build the
-Rec group in the first place (Note [Rule dependency info])
-
-Note that if 'g' has RHS that mentions 'w', we should add w to
-g's loop-breaker edges.  More concretely there is an edge from f -> g
-iff
-        (a) g is mentioned in f's RHS `xor` f's INLINE rhs
-            (see Note [Inline rules])
-        (b) or h is mentioned in f's RHS, and
-            g appears in the RHS of an active RULE of h
-            or a transitive sequence of active rules starting with h
-
-Why "active rules"?  See Note [Finding rule RHS free vars]
-
-Note that in Example [eftInt], *neither* eftInt *nor* eftIntFB is
-chosen as a loop breaker, because their RHSs don't mention each other.
-And indeed both can be inlined safely.
-
-Note again that the edges of the graph we use for computing loop breakers
-are not the same as the edges we use for computing the Rec blocks.
-That's why we compute
-
-- rec_edges          for the Rec block analysis
-- loop_breaker_nodes for the loop breaker analysis
-
-  * Note [Finding rule RHS free vars]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Consider this real example from Data Parallel Haskell
-         tagZero :: Array Int -> Array Tag
-         {-# INLINE [1] tagZeroes #-}
-         tagZero xs = pmap (\x -> fromBool (x==0)) xs
-
-         {-# RULES "tagZero" [~1] forall xs n.
-             pmap fromBool <blah blah> = tagZero xs #-}
-    So tagZero's RHS mentions pmap, and pmap's RULE mentions tagZero.
-    However, tagZero can only be inlined in phase 1 and later, while
-    the RULE is only active *before* phase 1.  So there's no problem.
-
-    To make this work, we look for the RHS free vars only for
-    *active* rules. That's the reason for the occ_rule_act field
-    of the OccEnv.
-
-  * Note [Weak loop breakers]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~
-    There is a last nasty wrinkle.  Suppose we have
-
-        Rec { f = f_rhs
-              RULE f [] = g
-
-              h = h_rhs
-              g = h
-              ...more...
-        }
-
-    Remember that we simplify the RULES before any RHS (see Note
-    [Rules are visible in their own rec group] above).
-
-    So we must *not* postInlineUnconditionally 'g', even though
-    its RHS turns out to be trivial.  (I'm assuming that 'g' is
-    not chosen as a loop breaker.)  Why not?  Because then we
-    drop the binding for 'g', which leaves it out of scope in the
-    RULE!
-
-    Here's a somewhat different example of the same thing
-        Rec { g = h
-            ; h = ...f...
-            ; f = f_rhs
-              RULE f [] = g }
-    Here the RULE is "below" g, but we *still* can't postInlineUnconditionally
-    g, because the RULE for f is active throughout.  So the RHS of h
-    might rewrite to     h = ...g...
-    So g must remain in scope in the output program!
-
-    We "solve" this by:
-
-        Make g a "weak" loop breaker (OccInfo = IAmLoopBreaker True)
-        iff g is a "missing free variable" of the Rec group
-
-    A "missing free variable" x is one that is mentioned in an RHS or
-    INLINE or RULE of a binding in the Rec group, but where the
-    dependency on x may not show up in the loop_breaker_nodes (see
-    note [Choosing loop breakers} above).
-
-    A normal "strong" loop breaker has IAmLoopBreaker False.  So
-
-                                    Inline  postInlineUnconditionally
-   strong   IAmLoopBreaker False    no      no
-   weak     IAmLoopBreaker True     yes     no
-            other                   yes     yes
-
-    The **sole** reason for this kind of loop breaker is so that
-    postInlineUnconditionally does not fire.  Ugh.  (Typically it'll
-    inline via the usual callSiteInline stuff, so it'll be dead in the
-    next pass, so the main Ugh is the tiresome complication.)
-
-Note [Rules for imported functions]
+Note [IMP-RULES: unavoidable loops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this
    f = /\a. B.g a
@@ -428,13 +206,27 @@ B.g.  We could only spot such loops by exhaustively following
 unfoldings of C.h etc, in case we reach B.g, and hence (via the RULE)
 f.
 
-Note that RULES for imported functions are important in practice; they
-occur a lot in the libraries.
-
 We regard this potential infinite loop as a *programmer* error.
 It's up the programmer not to write silly rules like
      RULE f x = f x
 and the example above is just a more complicated version.
+
+Note [Specialising imported functions] (referred to from Specialise)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For *automatically-generated* rules, the programmer can't be
+responsible for the "programmer error" in Note [IMP-RULES: unavoidable
+loops].  In particular, consider specialising a recursive function
+defined in another module.  If we specialise a recursive function B.g,
+we get
+  g_spec = .....(B.g Int).....
+  RULE B.g Int = g_spec
+Here, g_spec doesn't look recursive, but when the rule fires, it
+becomes so.  And if B.g was mutually recursive, the loop might not be
+as obvious as it is here.
+
+To avoid this,
+ * When specialising a function that is a loop breaker,
+   give a NOINLINE pragma to the specialised function
 
 Note [Preventing loops due to imported functions rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -501,56 +293,54 @@ And we are in an infinite loop again, except that this time the loop is producin
 infinitely large *term* (an unrolling of filter) and so the simplifier finally
 dies with "ticks exhausted"
 
-Because of this problem, we make a small change in the occurrence analyser
-designed to mark functions like "filter" as strong loop breakers on the basis that:
-  1. The RHS of filter mentions the local function "filterFB"
-  2. We have a rule which mentions "filterFB" on the LHS and "filter" on the RHS
+SOLUTION: we treat the rule "filterList" as an extra rule for 'filterFB'
+because it mentions 'filterFB' on the LHS.  This is the Main Invariant
+in Note [IMP-RULES: local rules for imported functions].
 
-So for each RULE for an *imported* function we are going to add
-dependency edges between the *local* FVS of the rule LHS and the
-*local* FVS of the rule RHS. We don't do anything special for RULES on
-local functions because the standard occurrence analysis stuff is
-pretty good at getting loop-breakerness correct there.
+So, during loop-breaker analysis:
 
-It is important to note that even with this extra hack we aren't always going to get
-things right. For example, it might be that the rule LHS mentions an imported Id,
-and another module has a RULE that can rewrite that imported Id to one of our local
-Ids.
+- for each active RULE for a local function 'f' we add an edge bewteen
+  'f' and the local FVs of the rule RHS
 
-Note [Specialising imported functions] (referred to from Specialise)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-BUT for *automatically-generated* rules, the programmer can't be
-responsible for the "programmer error" in Note [Rules for imported
-functions].  In particular, consider specialising a recursive function
-defined in another module.  If we specialise a recursive function B.g,
-we get
-         g_spec = .....(B.g Int).....
-         RULE B.g Int = g_spec
-Here, g_spec doesn't look recursive, but when the rule fires, it
-becomes so.  And if B.g was mutually recursive, the loop might
-not be as obvious as it is here.
+- for each active RULE for an *imported* function we add dependency
+  edges between the *local* FVS of the rule LHS and the *local* FVS of
+  the rule RHS.
 
-To avoid this,
- * When specialising a function that is a loop breaker,
-   give a NOINLINE pragma to the specialised function
+Even with this extra hack we aren't always going to get things
+right. For example, it might be that the rule LHS mentions an imported
+Id, and another module has a RULE that can rewrite that imported Id to
+one of our local Ids.
+
+Note [Plugin rules]
+~~~~~~~~~~~~~~~~~~~
+Conal Elliott (#11651) built a GHC plugin that added some
+BuiltinRules (for imported Ids) to the mg_rules field of ModGuts, to
+do some domain-specific transformations that could not be expressed
+with an ordinary pattern-matching CoreRule.  But then we can't extract
+the dependencies (in imp_rule_edges) from ru_rhs etc, because a
+BuiltinRule doesn't have any of that stuff.
+
+So we simply assume that BuiltinRules have no dependencies, and filter
+them out from the imp_rule_edges comprehension.
 
 Note [Glomming]
 ~~~~~~~~~~~~~~~
-RULES for imported Ids can make something at the top refer to something at the bottom:
-        f = \x -> B.g (q x)
-        h = \y -> 3
+RULES for imported Ids can make something at the top refer to
+something at the bottom:
 
-        RULE:  B.g (q x) = h x
+        foo = ...(B.f @Int)...
+        $sf = blah
+        RULE:  B.f @Int = $sf
 
-Applying this rule makes f refer to h, although f doesn't appear to
-depend on h.  (And, as in Note [Rules for imported functions], the
-dependency might be more indirect. For example, f might mention C.t
-rather than B.g, where C.t eventually inlines to B.g.)
+Applying this rule makes foo refer to $sf, although foo doesn't appear to
+depend on $sf.  (And, as in Note [Rules for imported functions], the
+dependency might be more indirect. For example, foo might mention C.t
+rather than B.f, where C.t eventually inlines to B.f.)
 
 NOTICE that this cannot happen for rules whose head is a
 locally-defined function, because we accurately track dependencies
 through RULES.  It only happens for rules whose head is an imported
-function (B.g in the example above).
+function (B.f in the example above).
 
 Solution:
   - When simplifying, bring all top level identifiers into
@@ -565,6 +355,145 @@ Solution:
     then just glom all the bindings into a single Rec, so that
     the *next* iteration of the occurrence analyser will sort
     them all out.   This part happens in occurAnalysePgm.
+-}
+
+{-
+************************************************************************
+*                                                                      *
+                Bindings
+*                                                                      *
+************************************************************************
+
+Note [Recursive bindings: the grand plan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we come across a binding group
+  Rec { x1 = r1; ...; xn = rn }
+we treat it like this (occAnalRecBind):
+
+1. Note [Forming Rec groups]
+   Occurrence-analyse each right hand side, and build a
+   "Details" for each binding to capture the results.
+   Wrap the details in a LetrecNode, ready for SCC analysis.
+   All this is done by makeNode.
+
+2. Do SCC-analysis on these Nodes:
+   - Each CyclicSCC will become a new Rec
+   - Each AcyclicSCC will become a new NonRec
+   The key property is that every free variable of a binding is
+   accounted for by the scope edges, so that when we are done
+   everything is still in scope.
+
+3. For each AcyclicSCC, just make a NonRec binding.
+
+4. For each CyclicSCC of the scope-edge SCC-analysis in (2), we
+   identify suitable loop-breakers to ensure that inlining terminates.
+   This is done by occAnalRec.
+
+   4a To do so we form a new set of Nodes, with the same details, but
+      different edges, the "loop-breaker nodes". The loop-breaker nodes
+      have both more and fewer dependencies than the scope edges
+      (see Note [Choosing loop breakers])
+
+      More edges: if f calls g, and g has an active rule that mentions h
+                 then we add an edge from f -> h
+
+      Fewer edges: we only include dependencies on active rules, on rule
+                   RHSs (not LHSs) and if there is an INLINE pragma only
+                   on the stable unfolding (and vice versa).  The scope
+                   edges must be much more inclusive.
+
+   4b. The "weak fvs" of a node are, by definition:
+       the scope fvs - the loop-breaker fvs
+       See Note [Weak loop breakers], and the nd_weak field of Details
+
+Note [Dead code]
+~~~~~~~~~~~~~~~~
+Dropping dead code for a cyclic Strongly Connected Component is done
+in a very simple way:
+
+        the entire SCC is dropped if none of its binders are mentioned
+        in the body; otherwise the whole thing is kept.
+
+The key observation is that dead code elimination happens after
+dependency analysis: so 'occAnalBind' processes SCCs instead of the
+original term's binding groups.
+
+Thus 'occAnalBind' does indeed drop 'f' in an example like
+
+        letrec f = ...g...
+               g = ...(...g...)...
+        in
+           ...g...
+
+when 'g' no longer uses 'f' at all (eg 'f' does not occur in a RULE in
+'g'). 'occAnalBind' first consumes 'CyclicSCC g' and then it consumes
+'AcyclicSCC f', where 'body_usage' won't contain 'f'.
+
+------------------------------------------------------------
+Note [Forming Rec groups]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The key point about the "Forming Rec groups" step is that it /preserves
+scoping/.  If 'x' is mentioned, it had better be bound somewhere.  So if
+we start with
+  Rec { f = ...h...
+      ; g = ...f...
+      ; h = ...f... }
+we can split into SCCs
+  Rec { f = ...h...
+      ; h = ..f... }
+  NonRec { g = ...f... }
+
+We put bindings {f = ef; g = eg } in a Rec group if "f uses g" and "g
+uses f", no matter how indirectly.  We do a SCC analysis with an edge
+f -> g if "f mentions g". That is, g is free in:
+  a) the rhs 'ef'
+  b) or the RHS of a rule for f, whether active or inactive
+       Note [Rules are extra RHSs]
+  c) or the LHS or a rule for f, whether active or inactive
+       Note [Rule dependency info]
+  d) the RHS of an /active/ local IMP-RULE
+       Note [IMP-RULES: local rules for imported functions]
+
+(b) and (c) apply regardless of the activation of the RULE, because even if
+the rule is inactive its free variables must be bound.  But (d) doesn't need
+to worry about this because IMP-RULES are always notionally at the bottom
+of the file.
+
+  * Note [Rules are extra RHSs]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    A RULE for 'f' is like an extra RHS for 'f'. That way the "parent"
+    keeps the specialised "children" alive.  If the parent dies
+    (because it isn't referenced any more), then the children will die
+    too (unless they are already referenced directly).
+
+    So in Example [eftInt], eftInt and eftIntFB will be put in the
+    same Rec, even though their 'main' RHSs are both non-recursive.
+
+    We must also include inactive rules, so that their free vars
+    remain in scope.
+
+  * Note [Rule dependency info]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    The VarSet in a RuleInfo is used for dependency analysis in the
+    occurrence analyser.  We must track free vars in *both* lhs and rhs.
+    Hence use of idRuleVars, rather than idRuleRhsVars in occAnalBind.
+    Why both? Consider
+        x = y
+        RULE f x = v+4
+    Then if we substitute y for x, we'd better do so in the
+    rule's LHS too, so we'd better ensure the RULE appears to mention 'x'
+    as well as 'v'
+
+  * Note [Rules are visible in their own rec group]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    We want the rules for 'f' to be visible in f's right-hand side.
+    And we'd like them to be visible in other functions in f's Rec
+    group.  E.g. in Note [Specialisation rules] we want f' rule
+    to be visible in both f's RHS, and fs's RHS.
+
+    This means that we must simplify the RULEs first, before looking
+    at any of the definitions.  This is done by Simplify.simplRecBind,
+    when it calls addLetIdInfo.
 
 ------------------------------------------------------------
 Note [Inline rules]
@@ -724,6 +653,13 @@ propagate.
   This appears to be very rare in practice. TODO Perhaps we should gather
   statistics to be sure.
 
+Note [Unfoldings and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We assume that anything in an unfolding occurs multiple times, since
+unfoldings are often copied (that's the whole point!). But we still
+need to track tail calls for the purpose of finding join points.
+
+
 ------------------------------------------------------------
 Note [Adjusting right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -794,45 +730,50 @@ occAnalNonRecBind env lvl imp_rule_edges bndr rhs body_usage
   = (body_usage, [])
 
   | otherwise                   -- It's mentioned in the body
-  = (body_usage' `andUDs` rhs_usage4, [NonRec final_bndr rhs'])
+  = (body_usage' `andUDs` rhs_usage, [NonRec final_bndr rhs'])
   where
     (body_usage', tagged_bndr) = tagNonRecBinder lvl body_usage bndr
-    occ                        = idOccInfo tagged_bndr
+    final_bndr = tagged_bndr `setIdUnfolding` unf'
+                             `setIdSpecialisation` mkRuleInfo rules'
+    rhs_usage = rhs_uds `andUDs` unf_uds `andUDs` rule_uds
 
     -- Get the join info from the *new* decision
     -- See Note [Join points and unfoldings/rules]
     mb_join_arity = willBeJoinId_maybe tagged_bndr
     is_join_point = isJust mb_join_arity
 
-    final_bndr = tagged_bndr `setIdUnfolding` unf'
-                             `setIdSpecialisation` mkRuleInfo rules'
-
+    --------- Right hand side ---------
     env1 | is_join_point    = env  -- See Note [Join point RHSs]
          | certainly_inline = env  -- See Note [Cascading inlines]
          | otherwise        = rhsCtxt env
 
     -- See Note [Sources of one-shot information]
     rhs_env = env1 { occ_one_shots = argOneShots dmd }
+    (rhs_uds, rhs') = occAnalRhs rhs_env NonRecursive mb_join_arity rhs
 
-    (rhs_usage1, rhs') = occAnalRhs rhs_env mb_join_arity rhs
-
-    -- Unfoldings
+    --------- Unfolding ---------
     -- See Note [Unfoldings and join points]
     unf = idUnfolding bndr
-    (unf_usage, unf') = occAnalUnfolding rhs_env mb_join_arity unf
-    rhs_usage2 = rhs_usage1 `andUDs` unf_usage
+    (unf_uds, unf') = occAnalUnfolding rhs_env NonRecursive mb_join_arity unf
 
-    -- Rules
+    --------- Rules ---------
     -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
-    rules_w_uds = occAnalRules rhs_env mb_join_arity bndr
-    rule_uds    = map (\(_, l, r) -> l `andUDs` r) rules_w_uds
-    rules'      = map fstOf3 rules_w_uds
-    rhs_usage3 = foldr andUDs rhs_usage2 rule_uds
-    rhs_usage4 = case lookupVarEnv imp_rule_edges bndr of
-                   Nothing -> rhs_usage3
-                   Just vs -> addManyOccs rhs_usage3 vs
-       -- See Note [Preventing loops due to imported functions rules]
+    rules_w_uds  = occAnalRules rhs_env mb_join_arity bndr
+    rules'       = map fstOf3 rules_w_uds
+    imp_rule_uds = impRulesScopeUsage (lookupImpRules imp_rule_edges bndr)
+         -- imp_rule_uds: consider
+         --     h = ...
+         --     g = ...
+         --     RULE map g = h
+         -- Then we want to ensure that h is in scope everwhere
+         -- that g is (since the RULE might turn g into h), so
+         -- we make g mention h.
 
+    rule_uds = foldr add_rule_uds imp_rule_uds rules_w_uds
+    add_rule_uds (_, l, r) uds = l `andUDs` r `andUDs` uds
+
+    ----------
+    occ = idOccInfo tagged_bndr
     certainly_inline -- See Note [Cascading inlines]
       = case occ of
           OneOcc { occ_in_lam = NotInsideLam, occ_n_br = 1 }
@@ -846,13 +787,13 @@ occAnalNonRecBind env lvl imp_rule_edges bndr rhs body_usage
 -----------------
 occAnalRecBind :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
                -> UsageDetails -> (UsageDetails, [CoreBind])
+-- For a recursive group, we
+--      * occ-analyse all the RHSs
+--      * compute strongly-connected components
+--      * feed those components to occAnalRec
+-- See Note [Recursive bindings: the grand plan]
 occAnalRecBind env lvl imp_rule_edges pairs body_usage
   = foldr (occAnalRec rhs_env lvl) (body_usage, []) sccs
-        -- For a recursive group, we
-        --      * occ-analyse all the RHSs
-        --      * compute strongly-connected components
-        --      * feed those components to occAnalRec
-        -- See Note [Recursive bindings: the grand plan]
   where
     sccs :: [SCC Details]
     sccs = {-# SCC "occAnalBind.scc" #-}
@@ -866,14 +807,6 @@ occAnalRecBind env lvl imp_rule_edges pairs body_usage
     bndr_set = mkVarSet bndrs
     rhs_env  = env `addInScope` bndrs
 
-{-
-Note [Unfoldings and join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-We assume that anything in an unfolding occurs multiple times, since unfoldings
-are often copied (that's the whole point!). But we still need to track tail
-calls for the purpose of finding join points.
--}
 
 -----------------------------
 occAnalRec :: OccEnv -> TopLevelFlag
@@ -893,8 +826,8 @@ occAnalRec _ lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
      NonRec tagged_bndr rhs : binds)
   where
     (body_uds', tagged_bndr) = tagNonRecBinder lvl body_uds bndr
-    rhs_uds' = adjustRhsUsage (willBeJoinId_maybe tagged_bndr) NonRecursive
-                              rhs_bndrs rhs_uds
+    rhs_uds'   = adjustRhsUsage NonRecursive (willBeJoinId_maybe tagged_bndr)
+                                rhs_bndrs rhs_uds
 
         -- The Rec case is the interesting one
         -- See Note [Recursive bindings: the grand plan]
@@ -910,15 +843,14 @@ occAnalRec env lvl (CyclicSCC details_s) (body_uds, binds)
     (final_uds, Rec pairs : binds)
 
   where
-    bndrs    = map nd_bndr details_s
-    bndr_set = mkVarSet bndrs
+    bndrs = map nd_bndr details_s
 
     ------------------------------
-        -- See Note [Choosing loop breakers] for loop_breaker_nodes
+    -- Make the nodes for the loop-breaker analysis
+    -- See Note [Choosing loop breakers] for loop_breaker_nodes
     final_uds :: UsageDetails
     loop_breaker_nodes :: [LetrecNode]
-    (final_uds, loop_breaker_nodes)
-      = mkLoopBreakerNodes env lvl bndr_set body_uds details_s
+    (final_uds, loop_breaker_nodes) = mkLoopBreakerNodes env lvl body_uds details_s
 
     ------------------------------
     weak_fvs :: VarSet
@@ -927,8 +859,8 @@ occAnalRec env lvl (CyclicSCC details_s) (body_uds, binds)
     ---------------------------
     -- Now reconstruct the cycle
     pairs :: [(Id,CoreExpr)]
-    pairs | isEmptyVarSet weak_fvs = reOrderNodes   0 bndr_set weak_fvs loop_breaker_nodes []
-          | otherwise              = loopBreakNodes 0 bndr_set weak_fvs loop_breaker_nodes []
+    pairs | isEmptyVarSet weak_fvs = reOrderNodes   0 weak_fvs loop_breaker_nodes []
+          | otherwise              = loopBreakNodes 0 weak_fvs loop_breaker_nodes []
           -- If weak_fvs is empty, the loop_breaker_nodes will include
           -- all the edges in the original scope edges [remember,
           -- weak_fvs is the difference between scope edges and
@@ -937,14 +869,151 @@ occAnalRec env lvl (CyclicSCC details_s) (body_uds, binds)
           -- exactly that case
 
 
-------------------------------------------------------------------
---                 Loop breaking
-------------------------------------------------------------------
+{- *********************************************************************
+*                                                                      *
+                Loop breaking
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Choosing loop breakers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Loop breaking is surprisingly subtle.  First read the section 4 of
+"Secrets of the GHC inliner".  This describes our basic plan.
+We avoid infinite inlinings by choosing loop breakers, and
+ensuring that a loop breaker cuts each loop.
+
+See also Note [Inlining and hs-boot files] in GHC.Core.ToIface, which
+deals with a closely related source of infinite loops.
+
+Fundamentally, we do SCC analysis on a graph.  For each recursive
+group we choose a loop breaker, delete all edges to that node,
+re-analyse the SCC, and iterate.
+
+But what is the graph?  NOT the same graph as was used for Note
+[Forming Rec groups]!  In particular, a RULE is like an equation for
+'f' that is *always* inlined if it is applicable.  We do *not* disable
+rules for loop-breakers.  It's up to whoever makes the rules to make
+sure that the rules themselves always terminate.  See Note [Rules for
+recursive functions] in GHC.Core.Opt.Simplify
+
+Hence, if
+    f's RHS (or its INLINE template if it has one) mentions g, and
+    g has a RULE that mentions h, and
+    h has a RULE that mentions f
+
+then we *must* choose f to be a loop breaker.  Example: see Note
+[Specialisation rules].
+
+In general, take the free variables of f's RHS, and augment it with
+all the variables reachable by RULES from those starting points.  That
+is the whole reason for computing rule_fv_env in occAnalBind.  (Of
+course we only consider free vars that are also binders in this Rec
+group.)  See also Note [Finding rule RHS free vars]
+
+Note that when we compute this rule_fv_env, we only consider variables
+free in the *RHS* of the rule, in contrast to the way we build the
+Rec group in the first place (Note [Rule dependency info])
+
+Note that if 'g' has RHS that mentions 'w', we should add w to
+g's loop-breaker edges.  More concretely there is an edge from f -> g
+iff
+        (a) g is mentioned in f's RHS `xor` f's INLINE rhs
+            (see Note [Inline rules])
+        (b) or h is mentioned in f's RHS, and
+            g appears in the RHS of an active RULE of h
+            or a /transitive sequence/ of /active rules/ starting with h
+
+Why "active rules"?  See Note [Finding rule RHS free vars]
+
+Why "transitive sequence"?  Because active rules apply
+unconditionallly, without checking loop-breaker-ness.
+See Note [Loop breaker dependencies].
+
+Note that in Example [eftInt], *neither* eftInt *nor* eftIntFB is
+chosen as a loop breaker, because their RHSs don't mention each other.
+And indeed both can be inlined safely.
+
+Note again that the edges of the graph we use for computing loop breakers
+are not the same as the edges we use for computing the Rec blocks.
+That's why we use
+
+- makeNode             for the Rec block analysis
+- makeLoopBreakerNodes for the loop breaker analysis
+
+  * Note [Finding rule RHS free vars]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Consider this real example from Data Parallel Haskell
+         tagZero :: Array Int -> Array Tag
+         {-# INLINE [1] tagZeroes #-}
+         tagZero xs = pmap (\x -> fromBool (x==0)) xs
+
+         {-# RULES "tagZero" [~1] forall xs n.
+             pmap fromBool <blah blah> = tagZero xs #-}
+    So tagZero's RHS mentions pmap, and pmap's RULE mentions tagZero.
+    However, tagZero can only be inlined in phase 1 and later, while
+    the RULE is only active *before* phase 1.  So there's no problem.
+
+    To make this work, we look for the RHS free vars only for
+    *active* rules. That's the reason for the occ_rule_act field
+    of the OccEnv.
+
+  * Note [Weak loop breakers]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+    There is a last nasty wrinkle.  Suppose we have
+
+        Rec { f = f_rhs
+              RULE f [] = g
+
+              h = h_rhs
+              g = h
+              ...more...
+        }
+
+    Remember that we simplify the RULES before any RHS (see Note
+    [Rules are visible in their own rec group] above).
+
+    So we must *not* postInlineUnconditionally 'g', even though
+    its RHS turns out to be trivial.  (I'm assuming that 'g' is
+    not chosen as a loop breaker.)  Why not?  Because then we
+    drop the binding for 'g', which leaves it out of scope in the
+    RULE!
+
+    Here's a somewhat different example of the same thing
+        Rec { g = h
+            ; h = ...f...
+            ; f = f_rhs
+              RULE f [] = g }
+    Here the RULE is "below" g, but we *still* can't postInlineUnconditionally
+    g, because the RULE for f is active throughout.  So the RHS of h
+    might rewrite to     h = ...g...
+    So g must remain in scope in the output program!
+
+    We "solve" this by:
+
+        Make g a "weak" loop breaker (OccInfo = IAmLoopBreaker True)
+        iff g is a "missing free variable" of the Rec group
+
+    A "missing free variable" x is one that is mentioned in an RHS or
+    INLINE or RULE of a binding in the Rec group, but where the
+    dependency on x may not show up in the loop_breaker_nodes (see
+    note [Choosing loop breakers} above).
+
+    A normal "strong" loop breaker has IAmLoopBreaker False.  So
+
+                                    Inline  postInlineUnconditionally
+   strong   IAmLoopBreaker False    no      no
+   weak     IAmLoopBreaker True     yes     no
+            other                   yes     yes
+
+    The **sole** reason for this kind of loop breaker is so that
+    postInlineUnconditionally does not fire.  Ugh.  (Typically it'll
+    inline via the usual callSiteInline stuff, so it'll be dead in the
+    next pass, so the main Ugh is the tiresome complication.)
+-}
 
 type Binding = (Id,CoreExpr)
 
 loopBreakNodes :: Int
-               -> VarSet        -- All binders
                -> VarSet        -- Binders whose dependencies may be "missing"
                                 -- See Note [Weak loop breakers]
                -> [LetrecNode]
@@ -968,7 +1037,7 @@ recording inlinings for any Ids which aren't marked as "no-inline" as it goes.
 -}
 
 -- Return the bindings sorted into a plausible order, and marked with loop breakers.
-loopBreakNodes depth bndr_set weak_fvs nodes binds
+loopBreakNodes depth weak_fvs nodes binds
   = -- pprTrace "loopBreakNodes" (ppr nodes) $
     go (stronglyConnCompFromEdgedVerticesUniqR nodes)
   where
@@ -977,20 +1046,20 @@ loopBreakNodes depth bndr_set weak_fvs nodes binds
 
     loop_break_scc scc binds
       = case scc of
-          AcyclicSCC node  -> mk_non_loop_breaker weak_fvs node : binds
-          CyclicSCC nodes  -> reOrderNodes depth bndr_set weak_fvs nodes binds
+          AcyclicSCC node  -> nodeBinding (mk_non_loop_breaker weak_fvs) node : binds
+          CyclicSCC nodes  -> reOrderNodes depth weak_fvs nodes binds
 
 ----------------------------------
-reOrderNodes :: Int -> VarSet -> VarSet -> [LetrecNode] -> [Binding] -> [Binding]
+reOrderNodes :: Int -> VarSet -> [LetrecNode] -> [Binding] -> [Binding]
     -- Choose a loop breaker, mark it no-inline,
     -- and call loopBreakNodes on the rest
-reOrderNodes _ _ _ []     _     = panic "reOrderNodes"
-reOrderNodes _ _ _ [node] binds = mk_loop_breaker node : binds
-reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
+reOrderNodes _ _ []     _     = panic "reOrderNodes"
+reOrderNodes _ _ [node] binds = nodeBinding mk_loop_breaker node : binds
+reOrderNodes depth weak_fvs (node : nodes) binds
   = -- pprTrace "reOrderNodes" (vcat [ text "unchosen" <+> ppr unchosen
     --                               , text "chosen" <+> ppr chosen_nodes ]) $
-    loopBreakNodes new_depth bndr_set weak_fvs unchosen $
-    (map mk_loop_breaker chosen_nodes ++ binds)
+    loopBreakNodes new_depth weak_fvs unchosen $
+    (map (nodeBinding mk_loop_breaker) chosen_nodes ++ binds)
   where
     (chosen_nodes, unchosen) = chooseLoopBreaker approximate_lb
                                                  (nd_score (node_payload node))
@@ -1002,20 +1071,24 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
         -- After two iterations (d=0, d=1) give up
         -- and approximate, returning to d=0
 
-mk_loop_breaker :: LetrecNode -> Binding
-mk_loop_breaker (node_payload -> ND { nd_bndr = bndr, nd_rhs = rhs})
-  = (bndr `setIdOccInfo` strongLoopBreaker { occ_tail = tail_info }, rhs)
+nodeBinding :: (Id -> Id) -> LetrecNode -> Binding
+nodeBinding set_id_occ (node_payload -> ND { nd_bndr = bndr, nd_rhs = rhs})
+  = (set_id_occ bndr, rhs)
+
+mk_loop_breaker :: Id -> Id
+mk_loop_breaker bndr
+  = bndr `setIdOccInfo` occ'
   where
+    occ'      = strongLoopBreaker { occ_tail = tail_info }
     tail_info = tailCallInfo (idOccInfo bndr)
 
-mk_non_loop_breaker :: VarSet -> LetrecNode -> Binding
+mk_non_loop_breaker :: VarSet -> Id -> Id
 -- See Note [Weak loop breakers]
-mk_non_loop_breaker weak_fvs (node_payload -> ND { nd_bndr = bndr
-                                                 , nd_rhs = rhs})
-  | bndr `elemVarSet` weak_fvs = (setIdOccInfo bndr occ', rhs)
-  | otherwise                  = (bndr, rhs)
+mk_non_loop_breaker weak_fvs bndr
+  | bndr `elemVarSet` weak_fvs = setIdOccInfo bndr occ'
+  | otherwise                  = bndr
   where
-    occ' = weakLoopBreaker { occ_tail = tail_info }
+    occ'      = weakLoopBreaker { occ_tail = tail_info }
     tail_info = tailCallInfo (idOccInfo bndr)
 
 ----------------------------------
@@ -1178,11 +1251,6 @@ ToDo: try using the occurrence info for the inline'd binder.
 ************************************************************************
 -}
 
-type ImpRuleEdges = IdEnv IdSet     -- Mapping from FVs of imported RULE LHSs to RHS FVs
-
-noImpRuleEdges :: ImpRuleEdges
-noImpRuleEdges = emptyVarEnv
-
 type LetrecNode = Node Unique Details  -- Node comes from Digraph
                                        -- The Unique key is gotten from the Id
 data Details
@@ -1209,7 +1277,8 @@ data Details
                                 -- dependencies might not be respected by loop_breaker_nodes
                                 -- See Note [Weak loop breakers]
 
-       , nd_active_rule_fvs :: IdSet   -- Free variables of the RHS of active RULES
+       , nd_active_rule_fvs :: IdSet    -- Variables bound in this Rec group that are free
+                                        -- in the RHS of an active rule for this bndr
 
        , nd_score :: NodeScore
   }
@@ -1220,7 +1289,7 @@ instance Outputable Details where
                   , text "uds =" <+> ppr (nd_uds nd)
                   , text "inl =" <+> ppr (nd_inl nd)
                   , text "weak =" <+> ppr (nd_weak nd)
-                  , text "rule =" <+> ppr (nd_active_rule_fvs nd)
+                  , text "rule_rvs =" <+> ppr (nd_active_rule_fvs nd)
                   , text "score =" <+> ppr (nd_score nd)
              ])
 
@@ -1241,7 +1310,9 @@ makeNode :: OccEnv -> ImpRuleEdges -> VarSet
          -> (Var, CoreExpr) -> LetrecNode
 -- See Note [Recursive bindings: the grand plan]
 makeNode env imp_rule_edges bndr_set (bndr, rhs)
-  = DigraphNode details (varUnique bndr) (nonDetKeysUniqSet node_fvs)
+  = DigraphNode { node_payload      = details
+                , node_key          = varUnique bndr
+                , node_dependencies = nonDetKeysUniqSet node_fvs }
     -- It's OK to use nonDetKeysUniqSet here as stronglyConnCompFromEdgedVerticesR
     -- is still deterministic with edges in nondeterministic order as
     -- explained in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
@@ -1249,7 +1320,7 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     details = ND { nd_bndr            = bndr'
                  , nd_rhs             = rhs'
                  , nd_rhs_bndrs       = bndrs'
-                 , nd_uds             = rhs_usage3
+                 , nd_uds             = rhs_usage
                  , nd_inl             = inl_fvs
                  , nd_weak            = node_fvs `minusVarSet` inl_fvs
                  , nd_active_rule_fvs = active_rule_fvs
@@ -1258,6 +1329,11 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     bndr' = bndr `setIdUnfolding`      unf'
                  `setIdSpecialisation` mkRuleInfo rules'
 
+    rhs_usage = rhs_uds `andUDs` unf_uds `andUDs` rule_uds
+                   -- Note [Rules are extra RHSs]
+                   -- Note [Rule dependency info]
+    node_fvs   = udFreeVars bndr_set rhs_usage
+
     -- Get join point info from the *current* decision
     -- We don't know what the new decision will be!
     -- Using the old decision at least allows us to
@@ -1265,66 +1341,68 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     -- See Note [Join points and unfoldings/rules]
     mb_join_arity = isJoinId_maybe bndr
 
+    --------- Right hand side ---------
     -- Constructing the edges for the main Rec computation
     -- See Note [Forming Rec groups]
-    (bndrs, body) = collectBinders rhs
-    rhs_env       = rhsCtxt env
-    (rhs_usage1, bndrs', body') = occAnalLamOrRhs rhs_env bndrs body
-    rhs'       = mkLams bndrs' body'
-    rhs_usage3 = foldr andUDs rhs_usage1 rule_uds
-                 `andUDs` unf_uds
-                   -- Note [Rules are extra RHSs]
-                   -- Note [Rule dependency info]
-    node_fvs   = udFreeVars bndr_set rhs_usage3
+    -- Do not use occAnalRhs because we don't yet know
+    -- the final answer for mb_join_arity
+    (bndrs, body)            = collectBinders rhs
+    rhs_env                  = rhsCtxt env
+    (rhs_uds, bndrs', body') = occAnalLamOrRhs rhs_env bndrs body
+    rhs'                     = mkLams bndrs' body'
 
-    -- Finding the free variables of the rules
-    is_active = occ_rule_act env :: Activation -> Bool
-
-    rules_w_uds :: [(CoreRule, UsageDetails, UsageDetails)]
-    rules_w_uds = occAnalRules rhs_env mb_join_arity bndr
-
-    rules' = map fstOf3 rules_w_uds
-
-    rules_w_rhs_fvs :: [(Activation, VarSet)]    -- Find the RHS fvs
-    rules_w_rhs_fvs = maybe id (\ids -> ((AlwaysActive, ids):))
-                               (lookupVarEnv imp_rule_edges bndr)
-      -- See Note [Preventing loops due to imported functions rules]
-                      [ (ru_act rule, udFreeVars bndr_set rhs_uds)
-                      | (rule, _, rhs_uds) <- rules_w_uds ]
-    rule_uds = map (\(_, l, r) -> l `andUDs` r) rules_w_uds
-    active_rule_fvs = unionVarSets [fvs | (a,fvs) <- rules_w_rhs_fvs
-                                        , is_active a]
-
-    -- Finding the usage details of the INLINE pragma (if any)
+    --------- Unfolding ---------
+    -- See Note [Unfoldings and join points]
     unf = realIdUnfolding bndr -- realIdUnfolding: Ignore loop-breaker-ness
                                -- here because that is what we are setting!
-    (unf_uds, unf') = occAnalUnfolding rhs_env mb_join_arity unf
-
-    -- Find the "nd_inl" free vars; for the loop-breaker phase
-    -- These are the vars that would become free if the function
-    -- was inlinined; usually that means the RHS, unless the
-    -- unfolding is a stable one.
+    (unf_uds, unf') = occAnalUnfolding rhs_env Recursive mb_join_arity unf
+    inl_uds | isStableUnfolding unf = unf_uds
+            | otherwise             = rhs_uds
+    inl_fvs = udFreeVars bndr_set inl_uds
+    -- inl_fvs: the vars that would become free if the function was inlined;
+    -- usually that means the RHS, unless the unfolding is a stable one.
     -- Note: We could do this only for functions with an *active* unfolding
     --       (returning emptyVarSet for an inactive one), but is_active
     --       isn't the right thing (it tells about RULE activation),
     --       so we'd need more plumbing
-    inl_fvs | isStableUnfolding unf = udFreeVars bndr_set unf_uds
-            | otherwise             = udFreeVars bndr_set rhs_usage1
+
+
+    --------- IMP-RULES --------
+    is_active     = occ_rule_act env :: Activation -> Bool
+    imp_rule_info = lookupImpRules imp_rule_edges bndr
+    imp_rule_uds  = impRulesScopeUsage imp_rule_info
+    imp_rule_fvs  = impRulesActiveFvs is_active bndr_set imp_rule_info
+
+    --------- All rules --------
+    rules_w_uds :: [(CoreRule, UsageDetails, UsageDetails)]
+    rules_w_uds = occAnalRules rhs_env mb_join_arity bndr
+    rules'      = map fstOf3 rules_w_uds
+
+    rule_uds = foldr add_rule_uds imp_rule_uds rules_w_uds
+    add_rule_uds (_, l, r) uds = l `andUDs` r `andUDs` uds
+
+    active_rule_fvs = foldr add_active_rule imp_rule_fvs rules_w_uds
+    add_active_rule (rule, _, rhs_uds) fvs
+      | is_active (ruleActivation rule)
+      = udFreeVars bndr_set rhs_uds `unionVarSet` fvs
+      | otherwise
+      = fvs
+
 
 mkLoopBreakerNodes :: OccEnv -> TopLevelFlag
-                   -> VarSet
                    -> UsageDetails   -- for BODY of let
                    -> [Details]
                    -> (UsageDetails, -- adjusted
                        [LetrecNode])
--- Does four things
+-- This function primarily creates the Nodes for the
+-- loop-breaker SCC analysis.  More specifically:
 --   a) tag each binder with its occurrence info
 --   b) add a NodeScore to each node
 --   c) make a Node with the right dependency edges for
 --      the loop-breaker SCC analysis
 --   d) adjust each RHS's usage details according to
 --      the binder's (new) shotness and join-point-hood
-mkLoopBreakerNodes env lvl bndr_set body_uds details_s
+mkLoopBreakerNodes env lvl body_uds details_s
   = (final_uds, zipWithEqual "mkLoopBreakerNodes" mk_lb_node details_s bndrs')
   where
     (final_uds, bndrs')
@@ -1334,28 +1412,46 @@ mkLoopBreakerNodes env lvl bndr_set body_uds details_s
                  <- details_s ]
 
     mk_lb_node nd@(ND { nd_bndr = old_bndr, nd_inl = inl_fvs }) new_bndr
-      = DigraphNode nd' (varUnique old_bndr) (nonDetKeysUniqSet lb_deps)
+      = DigraphNode { node_payload      = new_nd
+                    , node_key          = varUnique old_bndr
+                    , node_dependencies = nonDetKeysUniqSet lb_deps }
               -- It's OK to use nonDetKeysUniqSet here as
               -- stronglyConnCompFromEdgedVerticesR is still deterministic with edges
               -- in nondeterministic order as explained in
               -- Note [Deterministic SCC] in GHC.Data.Graph.Directed.
       where
-        nd'     = nd { nd_bndr = new_bndr, nd_score = score }
-        score   = nodeScore env new_bndr lb_deps nd
+        new_nd = nd { nd_bndr = new_bndr, nd_score = score }
+        score  = nodeScore env new_bndr lb_deps nd
         lb_deps = extendFvs_ rule_fv_env inl_fvs
-
+        -- See Note [Loop breaker dependencies]
 
     rule_fv_env :: IdEnv IdSet
-        -- Maps a variable f to the variables from this group
-        --      mentioned in RHS of active rules for f
-        -- Domain is *subset* of bound vars (others have no rule fvs)
-    rule_fv_env = transClosureFV (mkVarEnv init_rule_fvs)
-    init_rule_fvs   -- See Note [Finding rule RHS free vars]
-      = [ (b, trimmed_rule_fvs)
-        | ND { nd_bndr = b, nd_active_rule_fvs = rule_fvs } <- details_s
-        , let trimmed_rule_fvs = rule_fvs `intersectVarSet` bndr_set
-        , not (isEmptyVarSet trimmed_rule_fvs) ]
+    -- Maps a variable f to the variables from this group
+    --      reachable by a sequence of RULES starting with f
+    -- Domain is *subset* of bound vars (others have no rule fvs)
+    -- See Note [Finding rule RHS free vars]
+    -- Why transClosureFV?  See Note [Loop breaker dependencies]
+    rule_fv_env = transClosureFV $ mkVarEnv $
+                  [ (b, rule_fvs)
+                  | ND { nd_bndr = b, nd_active_rule_fvs = rule_fvs } <- details_s
+                  , not (isEmptyVarSet rule_fvs) ]
 
+{- Note [Loop breaker dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The loop breaker dependencies of x in a recursive
+group { f1 = e1; ...; fn = en } are:
+
+- The "inline free variables" of f: the fi free in
+  either f's unfolding (if f has a stable unfolding)
+  of     f's RHS       (if not)
+
+- Any fi reachable from those inline free variables by a sequence
+  of RULE rewrites.  Remember, rule rewriting is not affected
+  by fi being a loop breaker, so we have to take the transitive
+  closure in case f is the only possible loop breaker in the loop.
+
+  Hence rule_fv_env.  We need only account for /active/ rules.
+-}
 
 ------------------------------------------
 nodeScore :: OccEnv
@@ -1567,29 +1663,31 @@ Hence the is_lb field of NodeScore
 ************************************************************************
 -}
 
-occAnalRhs :: OccEnv -> Maybe JoinArity
+occAnalRhs :: OccEnv -> RecFlag -> Maybe JoinArity
            -> CoreExpr   -- RHS
            -> (UsageDetails, CoreExpr)
-occAnalRhs env mb_join_arity rhs
+occAnalRhs env is_rec mb_join_arity rhs
   = case occAnalLamOrRhs env bndrs body of { (body_usage, bndrs', body') ->
-    let rhs' = mkLams (markJoinOneShots mb_join_arity bndrs') body'
+    let final_bndrs | isRec is_rec = bndrs'
+                    | otherwise    = markJoinOneShots mb_join_arity bndrs'
                -- For a /non-recursive/ join point we can mark all
                -- its join-lambda as one-shot; and it's a good idea to do so
 
         -- Final adjustment
-        rhs_usage = adjustRhsUsage mb_join_arity NonRecursive bndrs' body_usage
+        rhs_usage = adjustRhsUsage is_rec mb_join_arity final_bndrs body_usage
 
-    in (rhs_usage, rhs') }
+    in (rhs_usage, mkLams final_bndrs body') }
   where
     (bndrs, body) = collectBinders rhs
 
 occAnalUnfolding :: OccEnv
+                 -> RecFlag
                  -> Maybe JoinArity   -- See Note [Join points and unfoldings/rules]
                  -> Unfolding
                  -> (UsageDetails, Unfolding)
 -- Occurrence-analyse a stable unfolding;
 -- discard a non-stable one altogether.
-occAnalUnfolding env mb_join_arity unf
+occAnalUnfolding env is_rec mb_join_arity unf
   = case unf of
       unf@(CoreUnfolding { uf_tmpl = rhs, uf_src = src })
         | isStableSource src -> (usage,        unf')
@@ -1600,7 +1698,7 @@ occAnalUnfolding env mb_join_arity unf
               -- to guide its decisions.  It's ok to leave un-substituted
               -- expressions in the tree because all the variables that were in
               -- scope remain in scope; there is no cloning etc.
-          (usage, rhs') = occAnalRhs env mb_join_arity rhs
+          (usage, rhs') = occAnalRhs env is_rec mb_join_arity rhs
 
           unf' | noBinderSwaps env = unf -- Note [Unfoldings and rules]
                | otherwise         = unf { uf_tmpl = rhs' }
@@ -1897,7 +1995,7 @@ occAnalApp env (Var fun, args, ticks)
   --     This caused #18296
   | fun `hasKey` runRWKey
   , [t1, t2, arg]  <- args
-  , let (usage, arg') = occAnalRhs env (Just 1) arg
+  , let (usage, arg') = occAnalRhs env NonRecursive (Just 1) arg
   = (usage, mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
 
 occAnalApp env (Var fun, args, ticks)
@@ -2233,6 +2331,7 @@ addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
 addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
   = env { occ_one_shots = replicate (valArgCount args) OneShotLam ++ ctxt }
 
+--------------------
 transClosureFV :: VarEnv VarSet -> VarEnv VarSet
 -- If (f,g), (g,h) are in the input, then (f,h) is in the output
 --                                   as well as (f,g), (g,h)
@@ -2643,7 +2742,10 @@ v `usedIn` ud = isExportedId v || v `elemVarEnv` ud_env ud
 
 udFreeVars :: VarSet -> UsageDetails -> VarSet
 -- Find the subset of bndrs that are mentioned in uds
-udFreeVars bndrs ud = restrictUniqSetToUFM bndrs (ud_env ud)
+udFreeVars bndrs ud = restrictFreeVars bndrs (ud_env ud)
+
+restrictFreeVars :: VarSet -> OccInfoEnv -> VarSet
+restrictFreeVars bndrs fvs = restrictUniqSetToUFM bndrs fvs
 
 {- Note [Do not mark CoVars as dead]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2712,20 +2814,20 @@ flattenUsageDetails ud
 
 -------------------
 -- See Note [Adjusting right-hand sides]
-adjustRhsUsage :: Maybe JoinArity -> RecFlag
+adjustRhsUsage :: RecFlag -> Maybe JoinArity
                -> [CoreBndr]     -- Outer lambdas, AFTER occ anal
                -> UsageDetails   -- From body of lambda
                -> UsageDetails
-adjustRhsUsage mb_join_arity rec_flag bndrs usage
-  = markAllInsideLamIf     (not one_shot)   $
+adjustRhsUsage is_rec mb_join_arity bndrs usage
+  = markAllInsideLamIf (not one_shot) $
     markAllNonTailIf (not exact_join) $
     usage
   where
     one_shot = case mb_join_arity of
                  Just join_arity
-                   | isRec rec_flag -> False
-                   | otherwise      -> all isOneShotBndr (drop join_arity bndrs)
-                 Nothing            -> all isOneShotBndr bndrs
+                   | isRec is_rec -> False
+                   | otherwise    -> all isOneShotBndr (drop join_arity bndrs)
+                 Nothing          -> all isOneShotBndr bndrs
 
     exact_join = exactJoin mb_join_arity bndrs
 
@@ -2806,7 +2908,7 @@ tagRecBinders lvl body_uds triples
      --    join-point-hood decision
      rhs_udss' = map adjust triples
      adjust (bndr, rhs_uds, rhs_bndrs)
-       = adjustRhsUsage mb_join_arity Recursive rhs_bndrs rhs_uds
+       = adjustRhsUsage Recursive mb_join_arity rhs_bndrs rhs_uds
        where
          -- Can't use willBeJoinId_maybe here because we haven't tagged the
          -- binder yet (the tag depends on these adjustments!)
