@@ -21,7 +21,7 @@ module GHC.Tc.TyCl.Utils(
         checkClassCycles,
 
         -- * Implicits
-        addTyConsToGblEnv, mkDefaultMethodType,
+        addFamInsts, addTyConsToGblEnv, mkDefaultMethodType,
 
         -- * Record selectors
         tcRecSelBinds, mkRecSelBinds, mkOneRecordSelector
@@ -31,6 +31,7 @@ module GHC.Tc.TyCl.Utils(
 
 import GHC.Prelude
 
+import GHC.Tc.Instance.Family
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Bind( tcValBinds )
@@ -46,12 +47,14 @@ import GHC.Core.Multiplicity
 import GHC.Core.Predicate
 import GHC.Core.Make( rEC_SEL_ERROR_ID )
 import GHC.Core.Class
+import GHC.Core.FamInstEnv
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon.Set
 import GHC.Core.Coercion ( ltRole )
+import GHC.Core.Coercion.Axiom ( toBranchedAxiom )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -763,7 +766,23 @@ updateRoleEnv name n role
 *                                                                      *
 ********************************************************************* -}
 
-addTyConsToGblEnv :: [TyCon] -> TcM TcGblEnv
+addFamInsts :: [FamInst] -> TcM a -> TcM a
+-- Extend (a) the family instance envt
+--        (b) the type envt with stuff from data type decls
+addFamInsts fam_insts thing_inside
+  = tcExtendLocalFamInstEnv fam_insts $
+    tcExtendGlobalEnv axioms          $
+    do { traceTc "addFamInsts" (pprFamInsts fam_insts)
+       ; addTyConsToGblEnv data_rep_tycons thing_inside
+                    -- Does not add its axiom; that comes
+                    -- from adding the 'axioms' above
+       }
+  where
+    axioms = map (ACoAxiom . toBranchedAxiom . famInstAxiom) fam_insts
+    data_rep_tycons = famInstsRepTyCons fam_insts
+      -- The representation tycons for 'data instances' declarations
+
+addTyConsToGblEnv :: [TyCon] -> TcM a -> TcM a
 -- Given a [TyCon], add to the TcGblEnv
 --   * extend the TypeEnv with the tycons
 --   * extend the TypeEnv with their implicitTyThings
@@ -771,14 +790,14 @@ addTyConsToGblEnv :: [TyCon] -> TcM TcGblEnv
 --
 -- We do not add bindings for record selectors until later
 -- (see Note [Calling tcRecSelBinds]).
-addTyConsToGblEnv tyclss
+addTyConsToGblEnv tyclss thing_inside
   = tcExtendTyConEnv tyclss                    $
     tcExtendGlobalEnvImplicit implicit_things  $
     tcExtendGlobalValEnv def_meth_ids          $
     do { traceTc "tcAddTyCons" $ vcat
             [ text "tycons" <+> ppr tyclss
             , text "implicits" <+> ppr implicit_things ]
-       ; getGblEnv }
+       ; thing_inside }
  where
    implicit_things = concatMap implicitTyConThings tyclss
    def_meth_ids    = mkDefaultMethodIds tyclss

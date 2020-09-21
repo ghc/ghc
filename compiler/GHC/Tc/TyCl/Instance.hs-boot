@@ -14,4 +14,4 @@ import GHC.Tc.Deriv
 -- We need this because of the mutual recursion
 -- between GHC.Tc.TyCl and GHC.Tc.TyCl.Instance
 tcInstDecls1 :: [LInstDecl GhcRn]
-             -> TcM (TcGblEnv, [InstInfo GhcRn], [FamInst], [DerivInfo])
+             -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo])

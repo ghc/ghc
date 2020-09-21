@@ -28,7 +28,7 @@ module GHC.Tc.Utils.Instantiate (
 
      newClsInst,
      tcGetInsts, tcGetInstEnvs, getOverlapFlag,
-     tcExtendLocalInstEnv,
+     addClsInsts,
      instCallConstraints, newMethodFromName,
      tcSyntaxName,
 
@@ -847,6 +847,10 @@ instOrphWarn inst
       text "move the instance declaration to the module of the class or of the type, or" :
       text "wrap the type with a newtype and declare the instance on the new type." :
       []
+
+addClsInsts :: [InstInfo GhcRn] -> TcM a -> TcM a
+addClsInsts infos thing_inside
+  = tcExtendLocalInstEnv (map iSpec infos) thing_inside
 
 tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
   -- Add new locally-defined instances

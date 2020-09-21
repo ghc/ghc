@@ -26,7 +26,6 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Tc.Gen.Bind
 import GHC.Tc.TyCl
-import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
 import GHC.Tc.TyCl.Class ( tcClassDecl2, tcATDefault,
                            HsSigFun, mkHsSigFun, badMethodErr,
                            findMethodBind, instantiateMethod )
@@ -384,8 +383,7 @@ Gather up the instance declarations from their various sources
 
 tcInstDecls1    -- Deal with both source-code and imported instance decls
    :: [LInstDecl GhcRn]         -- Source code instance decls
-   -> TcM (TcGblEnv,            -- The full inst env
-           [InstInfo GhcRn],    -- Source-code instance decls to process;
+   -> TcM ([InstInfo GhcRn],    -- Source-code instance decls to process;
                                 -- contains all dfuns for this module
            [FamInst],           -- Family instances
            [DerivInfo])         -- From data family instances
@@ -393,19 +391,10 @@ tcInstDecls1    -- Deal with both source-code and imported instance decls
 tcInstDecls1 inst_decls
   = do {    -- Do class and family instance declarations
        ; stuff <- mapAndRecoverM tcLocalInstDecl inst_decls
-
-       ; let (local_infos_s, fam_insts_s, datafam_deriv_infos) = unzip3 stuff
-             fam_insts   = concat fam_insts_s
-             local_infos = concat local_infos_s
-
-       ; gbl_env <- addClsInsts local_infos $
-                    addFamInsts fam_insts   $
-                    getGblEnv
-
-       ; return ( gbl_env
-                , local_infos
-                , fam_insts
-                , concat datafam_deriv_infos ) }
+       ; let (local_infos_s, fam_insts_s, datafam_deriv_infos_s) = unzip3 stuff
+       ; return ( concat local_infos_s
+                , concat fam_insts_s
+                , concat datafam_deriv_infos_s ) }
 
 -- | Use DerivInfo for data family instances (produced by tcInstDecls1),
 --   datatype declarations (TyClDecl), and standalone deriving declarations
@@ -421,26 +410,6 @@ tcInstDeclsDeriv deriv_infos derivds
                ; return (gbl_env, bagToList emptyBag, emptyValBindsOut) }
        else do { (tcg_env, info_bag, valbinds) <- tcDeriving deriv_infos derivds
                ; return (tcg_env, bagToList info_bag, valbinds) }
-
-addClsInsts :: [InstInfo GhcRn] -> TcM a -> TcM a
-addClsInsts infos thing_inside
-  = tcExtendLocalInstEnv (map iSpec infos) thing_inside
-
-addFamInsts :: [FamInst] -> TcM a -> TcM a
--- Extend (a) the family instance envt
---        (b) the type envt with stuff from data type decls
-addFamInsts fam_insts thing_inside
-  = tcExtendLocalFamInstEnv fam_insts $
-    tcExtendGlobalEnv axioms          $
-    do { traceTc "addFamInsts" (pprFamInsts fam_insts)
-       ; gbl_env <- addTyConsToGblEnv data_rep_tycons
-                    -- Does not add its axiom; that comes
-                    -- from adding the 'axioms' above
-       ; setGblEnv gbl_env thing_inside }
-  where
-    axioms = map (ACoAxiom . toBranchedAxiom . famInstAxiom) fam_insts
-    data_rep_tycons = famInstsRepTyCons fam_insts
-      -- The representation tycons for 'data instances' declarations
 
 {-
 Note [Deriving inside TH brackets]

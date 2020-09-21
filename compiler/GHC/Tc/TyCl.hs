@@ -46,6 +46,7 @@ import GHC.Tc.TyCl.Utils
 import GHC.Tc.TyCl.Class
 import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
 import GHC.Tc.Deriv (DerivInfo(..))
+import GHC.Tc.Utils.Instantiate ( addClsInsts )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
@@ -208,19 +209,20 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
            -- Step 3: Add the implicit things;
            -- we want them in the environment because
            -- they may be mentioned in interface files
-       ; gbl_env <- addTyConsToGblEnv tyclss
+       ; addTyConsToGblEnv tyclss $ do {
 
            -- Step 4: check instance declarations
-       ; (gbl_env', inst_info, fam_insts, datafam_deriv_info) <-
-         setGblEnv gbl_env $
-         tcInstDecls1 instds
+       ; (inst_info, fam_insts, datafam_deriv_info) <- tcInstDecls1 instds
+       ; addClsInsts inst_info $
+         addFamInsts fam_insts $ do {
 
            -- Step 5: build record selectors/updaters, don't type-check them yet
            -- See Note [Calling tcRecSelBinds] in GHC.Tc.TyCl.Utils
        ; rec_sel_upd_binds <- mkRecSelBinds (tyclss ++ famInstsRepTyCons fam_insts)
 
+       ; gbl_env' <- getGblEnv
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
-       ; return (gbl_env', inst_info, deriv_info, rec_sel_upd_binds) }
+       ; return (gbl_env', inst_info, deriv_info, rec_sel_upd_binds) }}}
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind
