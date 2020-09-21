@@ -66,6 +66,7 @@ import Data.Version
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 -- | Entry point to compile a Backpack file.
 doBackpack :: [FilePath] -> Ghc ()
@@ -517,7 +518,7 @@ mkBackpackMsg = do
                      | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
                      | otherwise -> return ()
                  RecompBecause reason -> showMsg "Instantiating " (" [" ++ reason ++ "]")
-           ModuleNode _ _ ->
+           ModuleNode _ ->
              case recomp of
                MustCompile -> showMsg "Compiling " ""
                UpToDate
@@ -663,19 +664,21 @@ hsunitModuleGraph dflags unit = do
     --  2. For each hole which does not already have an hsig file,
     --  create an "empty" hsig file to induce compilation for the
     --  requirement.
-    let node_map = Map.fromList
-          [ ((ms_mod_name ms, ms_hsc_src ms == HsigFile), n)
-          | n@(EMS { emsModSummary = ms }) <- nodes
+    let hsig_set = Set.fromList
+          [ ms_mod_name ms
+          | ExtendedModSummary { emsModSummary = ms } <- nodes
+          , ms_hsc_src ms == HsigFile
           ]
     req_nodes <- fmap catMaybes . forM (homeUnitInstantiations dflags) $ \(mod_name, _) ->
-        let has_local = Map.member (mod_name, True) node_map
-        in if has_local
+        if Set.member mod_name hsig_set
             then return Nothing
-            else fmap (Just . toExtendedModSummary) $ summariseRequirement pn mod_name
+            else fmap (Just . extendModSummaryNoDeps) $ summariseRequirement pn mod_name
+            -- Using extendModSummaryNoDeps here is okay because we're making a leaf node
+            -- representing a signature that can't depend on any other unit.
 
     -- 3. Return the kaboodle
     return $ mkModuleGraph' $
-      (emsModuleNode <$> (nodes ++ req_nodes)) ++ instantiationNodes dflags
+      (ModuleNode <$> (nodes ++ req_nodes)) ++ instantiationNodes dflags
 
 summariseRequirement :: PackageName -> ModuleName -> BkpM ModSummary
 summariseRequirement pn mod_name = do
@@ -735,7 +738,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
          let dflags = hsc_dflags hsc_env
          -- TODO: this looks for modules in the wrong place
          r <- liftIO $ summariseModule hsc_env
-                         Map.empty -- GHC API recomp not supported
+                         emptyModNodeMap -- GHC API recomp not supported
                          (hscSourceToIsBoot hsc_src)
                          lmodname
                          True -- Target lets you disallow, but not here
@@ -809,7 +812,7 @@ hsModuleToModSummary pn hsc_src modname
 
     -- So that Finder can find it, even though it doesn't exist...
     this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location
-    return $ EMS
+    return $ ExtendedModSummary
       { emsModSummary =
           ModSummary {
             ms_mod = this_mod,
