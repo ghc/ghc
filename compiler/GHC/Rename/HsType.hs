@@ -46,7 +46,7 @@ import GHC.Rename.Env
 import GHC.Rename.Utils  ( HsDocContext(..), inHsDocContext, withHsDocContext
                          , mapFvRn, pprHsDocContext, bindLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNames
-                         , checkShadowedRdrNames )
+                         , checkShadowedRdrNames, checkTupSize, checkCTupSize )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
 import GHC.Tc.Utils.Monad
@@ -658,10 +658,17 @@ rnHsTyKi env t@(HsKindSig _ ty k)
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsTyKi env tupleTy@(HsTupleTy _ tup_con tys)
   = do { data_kinds <- xoptM LangExt.DataKinds
+       ; case tup_con of
+           HsUnboxedTuple           -> checkTupSize  arity
+           HsBoxedTuple             -> checkTupSize  arity
+           HsConstraintTuple        -> checkCTupSize arity
+           HsBoxedOrConstraintTuple -> checkTupSize  arity
        ; when (not data_kinds && isRnKindLevel env)
               (addErr (dataKindsErr env tupleTy))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsTupleTy noExtField tup_con tys', fvs) }
+  where
+    arity = length tys
 
 rnHsTyKi env sumTy@(HsSumTy _ tys)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -724,6 +731,7 @@ rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
 
 rnHsTyKi env ty@(HsExplicitTupleTy _ tys)
   = do { checkPolyKinds env ty
+       ; checkTupSize (length tys)
        ; data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr env ty))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys

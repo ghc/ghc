@@ -106,8 +106,6 @@ import GHC.Types.Var.Env
 import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import GHC.Settings.Constants ( mAX_CTUPLE_SIZE )
-import GHC.Utils.Error( MsgDoc )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
@@ -1266,8 +1264,6 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
          -- Drop any uses of 1-tuple constraints here.
          -- See Note [Ignore unary constraint tuples]
       -> check_expected_kind tau_ty constraintKind
-      |  arity > mAX_CTUPLE_SIZE
-      -> failWith (bigConstraintTuple arity)
       |  otherwise
       -> let tycon = cTupleTyCon arity in
          check_expected_kind (mkTyConApp tycon tau_tys) constraintKind
@@ -1286,12 +1282,6 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
     arity = length tau_tys
     check_expected_kind ty act_kind =
       checkExpectedKind rn_ty ty act_kind exp_kind
-
-bigConstraintTuple :: Arity -> MsgDoc
-bigConstraintTuple arity
-  = hang (text "Constraint tuple arity too large:" <+> int arity
-          <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
-       2 (text "Instead, use a nested tuple")
 
 {-
 Note [Ignore unary constraint tuples]

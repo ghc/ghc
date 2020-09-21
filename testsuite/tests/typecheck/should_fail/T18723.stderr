@@ -1,0 +1,35 @@
+
+T18723.hs:11:3: error:
+    A 63-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type
+
+T18723.hs:21:2: error:
+    A 63-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type
+
+T18723.hs:31:2: error:
+    A 63-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type
+
+T18723.hs:41:3: error:
+    A 63-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type
+
+T18723.hs:51:3: error:
+    A 63-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type
+
+T18723.hs:60:3: error:
+    A 63-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type
+
+T18723.hs:70:4: error:
+    A 63-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type

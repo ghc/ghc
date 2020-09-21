@@ -1,11 +1,5 @@
 
 T10451.hs:22:12: error:
-    Constraint tuple arity too large: 64 (max arity = 62)
-      Instead, use a nested tuple
-    In the type ‘(Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
-                  Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
-                  Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
-                  Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
-                  Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
-                  Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a)’
-    In the type declaration for ‘T’
+    A 64-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type

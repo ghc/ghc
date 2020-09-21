@@ -12,7 +12,7 @@ This module contains miscellaneous functions related to renaming.
 module GHC.Rename.Utils (
         checkDupRdrNames, checkShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,
-        checkTupSize,
+        checkTupSize, checkCTupSize,
         addFvRn, mapFvRn, mapMaybeFvRn,
         warnUnusedMatches, warnUnusedTypePatterns,
         warnUnusedTopBinds, warnUnusedLocalBinds,
@@ -58,7 +58,7 @@ import GHC.Driver.Session
 import GHC.Data.FastString
 import Control.Monad
 import Data.List
-import GHC.Settings.Constants ( mAX_TUPLE_SIZE )
+import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
 import qualified Data.List.NonEmpty as NE
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -573,14 +573,27 @@ typeAppErr what (L _ k)
             <+> quotes (char '@' <> ppr k))
        2 (text "Perhaps you intended to use TypeApplications")
 
+-- | Ensure that a boxed or unboxed tuple has arity no large than 'mAX_TUPLE_SIZE'.
 checkTupSize :: Int -> RnM ()
-checkTupSize tup_size
-  | tup_size <= mAX_TUPLE_SIZE
+checkTupSize = check_tup_size mAX_TUPLE_SIZE
+                 (text "use nested tuples or define a data type")
+
+-- | Ensure that a constraint tuple has arity no large than 'mAX_TUPLE_SIZE'.
+checkCTupSize :: Int -> RnM ()
+checkCTupSize = check_tup_size mAX_CTUPLE_SIZE
+                  (text "use nested constraint tuples")
+
+check_tup_size :: Int  -- ^ The maximum tuple size allowed
+               -> SDoc -- ^ The course of action to recommend in the error message
+               -> Int  -- ^ The arity of the tuple
+               -> RnM ()
+check_tup_size max_tup_size workaround tup_arity
+  | tup_arity <= max_tup_size
   = return ()
   | otherwise
-  = addErr (sep [text "A" <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
-                 nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
-                 nest 2 (text "Workaround: use nested tuples or define a data type")])
+  = addErr (sep [text "A" <+> int tup_arity <> ptext (sLit "-tuple is too large for GHC"),
+                 nest 2 (parens (text "max size is" <+> int max_tup_size)),
+                 nest 2 (text "Workaround:" <+> workaround)])
 
 
 {-
