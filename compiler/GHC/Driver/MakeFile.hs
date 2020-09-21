@@ -202,7 +202,7 @@ processDeps :: DynFlags
 processDeps dflags _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     throwGhcExceptionIO $ ProgramError $
-      showSDoc dflags $ GHC.cyclicModuleErr $ fmap (flip ModuleNode []) nodes
+      showSDoc dflags $ GHC.cyclicModuleErr $ fmap (\ms -> ModuleNode (extendModSummaryNoDeps ms)) nodes
 
 processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
   = do  { let extra_suffixes = depSuffixes dflags
@@ -402,7 +402,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           loop_breaker = head boot_only
           all_others   = tail boot_only ++ others
           groups = filterToposortToModules $
-            GHC.topSortModuleGraph True (mkModuleGraph $ toExtendedModSummary <$> all_others) Nothing
+            GHC.topSortModuleGraph True (mkModuleGraph $ extendModSummaryNoDeps <$> all_others) Nothing
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
                        <+> (pp_imps empty (map snd (ms_imps summary)) $$

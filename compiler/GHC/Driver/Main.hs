@@ -642,8 +642,8 @@ hscIncrementalFrontend
     hsc_env <- getHscEnv
 
     let msg what = case mHscMessage of
-          -- Empty list because extra backpack deps is only needed for batch mode
-          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode mod_summary [])
+          -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
+          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
           Nothing -> return ()
 
         skip iface = do
@@ -900,7 +900,7 @@ batchMsg hsc_env mod_index recomp node = case node of
                 | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
                 | otherwise -> return ()
             RecompBecause reason -> showMsg "Instantiating " (" [" ++ reason ++ "]")
-    ModuleNode _ _ ->
+    ModuleNode _ ->
         case recomp of
             MustCompile -> showMsg "Compiling " ""
             UpToDate
