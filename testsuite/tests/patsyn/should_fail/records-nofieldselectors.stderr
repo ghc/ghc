@@ -1,0 +1,5 @@
+
+records-nofieldselectors.hs:5:16: Not in scope: ‘x’
+
+records-nofieldselectors.hs:12:23:
+    ‘x’ is not a (visible) constructor field name

@@ -1,5 +1,6 @@
 {-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 
 module NoFieldSelectors
