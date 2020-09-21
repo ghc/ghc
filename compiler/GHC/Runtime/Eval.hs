@@ -1257,8 +1257,8 @@ showModule mod_summary =
     withSession $ \hsc_env -> do
         interpreted <- moduleIsBootOrNotObjectLinkable mod_summary
         let dflags = hsc_dflags hsc_env
-        -- Empty list because the message doesn't look at the deps
-        return (showModMsg dflags interpreted (ModuleNode mod_summary []))
+        -- extendModSummaryNoDeps because the message doesn't look at the deps
+        return (showModMsg dflags interpreted (ModuleNode (extendModSummaryNoDeps mod_summary)))
 
 moduleIsBootOrNotObjectLinkable :: GhcMonad m => ModSummary -> m Bool
 moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
