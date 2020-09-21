@@ -19,6 +19,7 @@ module GHC.Tc.Gen.App
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckPolyExprNC )
 
+import GHC.Builtin.Types (multiplicityTy)
 import GHC.Tc.Gen.Head
 import GHC.Hs
 import GHC.Tc.Utils.Monad
@@ -499,13 +500,17 @@ tcInstFun do_ql inst_final rn_fun fun_sigma rn_args
         --   - We need the freshly allocated unification variables, to extend
         --     delta with.
         -- It's easier just to do the job directly here.
-        do { arg_nus <- replicateM (countLeadingValArgs args) newOpenFlexiTyVar
+        do { let valArgsCount = countLeadingValArgs args
+           ; arg_nus <- replicateM valArgsCount newOpenFlexiTyVar
+             -- We need variables for multiplicity (#18731)
+             -- Otherwise, 'undefined x' wouldn't be linear in x
+           ; mults   <- replicateM valArgsCount (newFlexiTyVarTy multiplicityTy)
            ; res_nu  <- newOpenFlexiTyVar
            ; kind_co <- unifyKind Nothing liftedTypeKind (tyVarKind kappa)
            ; let delta'  = delta `extendVarSetList` (res_nu:arg_nus)
                  arg_tys = mkTyVarTys arg_nus
                  res_ty  = mkTyVarTy res_nu
-                 fun_ty' = mkVisFunTysMany arg_tys res_ty
+                 fun_ty' = mkVisFunTys (zipWithEqual "tcInstFun" mkScaled mults arg_tys) res_ty
                  co_wrap = mkWpCastN (mkTcGReflLeftCo Nominal fun_ty' kind_co)
                  acc'    = addArgWrap co_wrap acc
                  -- Suppose kappa :: kk
