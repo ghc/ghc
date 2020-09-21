@@ -84,8 +84,7 @@ doMkDependHS srcs = do
 
     -- Sort into dependency order
     -- There should be no cycles
-    let sorted = filterToposortToModules $
-          GHC.topSortModuleGraph False module_graph Nothing
+    let sorted = GHC.topSortModuleGraph False module_graph Nothing
 
     -- Print out the dependencies if wanted
     liftIO $ debugTraceMsg dflags 2 (text "Module dependencies" $$ ppr sorted)
@@ -182,7 +181,7 @@ processDeps :: DynFlags
             -> [ModuleName]
             -> FilePath
             -> Handle           -- Write dependencies to here
-            -> SCC ModSummary
+            -> SCC ModuleGraphNode
             -> IO ()
 -- Write suitable dependencies to handle
 -- Always:
@@ -202,12 +201,16 @@ processDeps :: DynFlags
 processDeps dflags _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     throwGhcExceptionIO $ ProgramError $
-      showSDoc dflags $ GHC.cyclicModuleErr $ fmap (\ms -> ModuleNode (extendModSummaryNoDeps ms)) nodes
-       -- NB: We're constructing the ExtendedModSummary values with no extra instantiated unit dependencies
-       -- when constructing the error message here. This will result in a message that doesn't list any
-       -- backpack instantiations, but that should hopefully do for now.
+      showSDoc dflags $ GHC.cyclicModuleErr nodes
 
-processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
+processDeps dflags _ _ _ _ (AcyclicSCC (InstantiationNode node))
+  =     -- There shouldn't be any backpack instantiations; report them as well
+    throwGhcExceptionIO $ ProgramError $
+      showSDoc dflags $
+        vcat [ text "Unexpected backpack instantiation in dependency graph while constructing Makefile:"
+             , nest 2 $ ppr node ]
+
+processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode (ExtendedModSummary node _)))
   = do  { let extra_suffixes = depSuffixes dflags
               include_pkg_deps = depIncludePkgDeps dflags
               src_file  = msHsFilePath node
