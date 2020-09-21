@@ -26,6 +26,7 @@ import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils
 import GHC.Core (Expr(Var,App))
 import GHC.Data.FastString (unpackFS, lengthFS)
+import GHC.Data.Bag (bagToList)
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Tc.Utils.Zonk (shortCutLit)
@@ -36,6 +37,7 @@ import GHC.Builtin.Types
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Misc
 import GHC.Core.DataCon
 import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
@@ -326,12 +328,14 @@ desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
   -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
   return PmMatch { pm_pats = GrdVec pats', pm_grhss = grhss' }
 
-desugarGRHSs :: SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM (NonEmpty (PmGRHS Pre))
-desugarGRHSs match_loc pp_pats grhss
-  = traverse (desugarLGRHS match_loc pp_pats)
-  . expectJust "desugarGRHSs"
-  . NE.nonEmpty
-  $ grhssGRHSs grhss
+desugarGRHSs :: SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM (PmGRHSs Pre)
+desugarGRHSs match_loc pp_pats grhss = do
+  lcls <- desugarLocalBinds (grhssLocalBinds grhss)
+  grhss' <- traverse (desugarLGRHS match_loc pp_pats)
+              . expectJust "desugarGRHSs"
+              . NE.nonEmpty
+              $ grhssGRHSs grhss
+  return PmGRHSs { pgs_lcls = GrdVec lcls, pgs_grhss = grhss' }
 
 -- | Desugar a guarded right-hand side to a single 'GrdTree'
 desugarLGRHS :: SrcSpan -> SDoc -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM (PmGRHS Pre)
@@ -351,7 +355,7 @@ desugarLGRHS match_loc pp_pats (L _loc (GRHS _ gs _)) = do
 desugarGuard :: GuardStmt GhcTc -> DsM [PmGrd]
 desugarGuard guard = case guard of
   BodyStmt _   e _ _ -> desugarBoolGuard e
-  LetStmt  _   binds -> desugarLet (unLoc binds)
+  LetStmt  _   binds -> desugarLocalBinds binds
   BindStmt _ p e     -> desugarBind p e
   LastStmt        {} -> panic "desugarGuard LastStmt"
   ParStmt         {} -> panic "desugarGuard ParStmt"
@@ -359,9 +363,39 @@ desugarGuard guard = case guard of
   RecStmt         {} -> panic "desugarGuard RecStmt"
   ApplicativeStmt {} -> panic "desugarGuard ApplicativeLastStmt"
 
--- | Desugar let-bindings
-desugarLet :: HsLocalBinds GhcTc -> DsM [PmGrd]
-desugarLet _binds = return []
+-- | Desugar local bindings to a bunch of 'PmLet' guards.
+-- Deals only with simple @let@ or @where@ bindings without any polymorphism,
+-- recursion, pattern bindings etc.
+-- See Note [Long-distance information for HsLocalBinds].
+desugarLocalBinds :: LHsLocalBinds GhcTc -> DsM [PmGrd]
+desugarLocalBinds (L _ (HsValBinds _ (XValBindsLR (NValBinds binds _)))) = do
+  concatMapM (concatMapM go . bagToList) (map snd binds)
+  where
+    go :: LHsBind GhcTc -> DsM [PmGrd]
+    go (L _ FunBind{fun_id = L _ x, fun_matches = mg})
+      -- See Note [Long-distance information for HsLocalBinds] for why this
+      -- pattern match is so very specific.
+      | L _ [L _ Match{m_pats = [], m_grhss = grhss}] <- mg_alts mg
+      , GRHSs{grhssGRHSs = [L _ (GRHS _ _grds rhs)]} <- grhss = do
+          core_rhs <- dsLExpr rhs
+          return [PmLet x core_rhs]
+    go (L _ AbsBinds{ abs_tvs = [], abs_ev_vars = []
+                    , abs_exports=exports, abs_binds = binds }) = do
+      -- Typechecked HsLocalBinds are wrapped in AbsBinds, which carry
+      -- renamings. See Note [Long-distance information for HsLocalBinds]
+      -- for the details.
+      let go_export :: ABExport GhcTc -> Maybe PmGrd
+          go_export ABE{abe_poly = x, abe_mono = y, abe_wrap = wrap}
+            | isIdHsWrapper wrap
+            = ASSERT2(idType x `eqType` idType y, ppr x $$ ppr (idType x) $$ ppr y $$ ppr (idType y))
+              Just $ PmLet x (Var y)
+            | otherwise
+            = Nothing
+      let exps = mapMaybe go_export exports
+      bs <- concatMapM go (bagToList binds)
+      return (exps ++ bs)
+    go _ = return []
+desugarLocalBinds _binds = return []
 
 -- | Desugar a pattern guard
 --   @pat <- e ==>  let x = e;  <guards for pat <- x>@
@@ -447,4 +481,43 @@ a lot of false warnings.
 
 But we can check whether the coercion is a hole or if it is just refl, in
 which case we can drop it.
+
+Note [Long-distance information for HsLocalBinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#18626)
+
+  f :: Int -> ()
+  f x | y = ()
+    where
+      y = True
+
+  x :: ()
+  x | let y = True, y = ()
+
+Both definitions are exhaustive, but to make the necessary long-distance
+connection from @y@'s binding to its use site in a guard, we have to collect
+'PmLet' guards for the 'HsLocalBinds' which contain @y@'s definitions.
+
+In principle, we are only interested in desugaring local binds that are
+'FunBind's, that
+
+  * Have no pattern matches. If @y@ above had any patterns, it would be a
+    function and we can't reason about them anyway.
+  * Have singleton match group with a single GRHS.
+    Otherwise, what expression to pick in the generated guard @let y = <rhs>@?
+
+It turns out that desugaring type-checked local binds in this way is a bit
+more complex than expected: Apparently, all bindings are wrapped in 'AbsBinds'
+Nfter type-checking. See Note [AbsBinds] in "GHC.Hs.Binds".
+
+We make sure that there is no polymorphism in the way by checking that there
+are no 'abs_tvs' or 'abs_ev_vars' (we don't reason about
+@y :: forall a. Eq a => ...@) and that the exports carry no 'HsWrapper's. In
+this case, the exports are a simple renaming substitution that we can capture
+with 'PmLet'. Ultimately we'll hit those renamed 'FunBind's, though, which is
+the whole point.
+
+The place to store the 'PmLet' guards for @where@ clauses (which are per
+'GRHSs') is as a field of 'PmGRHSs'. For plain @let@ guards as in the guards of
+@x@, we can simply add them to the 'pg_grds' field of 'PmGRHS'.
 -}
