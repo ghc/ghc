@@ -59,6 +59,7 @@ import GHC.HsToCore.Pmc.Ppr
 import GHC.Types.Basic (Origin(..))
 import GHC.Core (CoreExpr)
 import GHC.Driver.Session
+import GHC.Driver.Types
 import GHC.Hs
 import GHC.Types.Id
 import GHC.Types.SrcLoc
@@ -66,11 +67,12 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.Var (EvVar)
+import GHC.Tc.Types
 import GHC.Tc.Utils.TcType (evVarPred)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsLExpr)
 import GHC.HsToCore.Monad
 import GHC.Data.Bag
-import GHC.Data.IOEnv (unsafeInterleaveM)
+import GHC.Data.IOEnv (updEnv, unsafeInterleaveM)
 import GHC.Data.OrdList
 import GHC.Utils.Monad (mapMaybeM)
 
@@ -95,12 +97,22 @@ getLdiNablas = do
     True  -> pure nablas
     False -> pure initNablas
 
+-- | We need to call the Hs desugarer to get the Core of a let-binding or where
+-- clause. We don't want to run the coverage checker when doing so! Efficiency
+-- is one concern, but also a lack of properly set up long-distance information
+-- might trigger warnings that we normally wouldn't emit.
+noCheckDs :: DsM a -> DsM a
+noCheckDs k = do
+  dflags <- getDynFlags
+  let dflags' = foldl' wopt_unset dflags allPmCheckWarnings
+  updEnv (\env -> env{env_top = (env_top env) {hsc_dflags = dflags'} }) k
+
 -- | Check a pattern binding (let, where) for exhaustiveness.
 pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM ()
 -- See Note [pmcPatBind only checks PatBindRhs]
 pmcPatBind ctxt@(DsMatchContext PatBindRhs loc) var p = do
-  missing   <- getLdiNablas
-  pat_bind <- desugarPatBind loc var p
+  !missing <- getLdiNablas
+  pat_bind <- noCheckDs $ desugarPatBind loc var p
   tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
   result <- unCA (checkPatBind pat_bind) missing
   tracePm "}: " (ppr (cr_uncov result))
@@ -117,8 +129,8 @@ pmcGRHSs
 pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
   let combined_loc = foldl1 combineSrcSpans (map getLoc grhss)
       ctxt = DsMatchContext hs_ctxt combined_loc
-  matches <- desugarGRHSs combined_loc empty guards
-  missing   <- getLdiNablas
+  !missing <- getLdiNablas
+  matches  <- noCheckDs $ desugarGRHSs combined_loc empty guards
   tracePm "pmcGRHSs" (hang (vcat [ppr ctxt
                                 , text "Guards:"])
                                 2
@@ -126,7 +138,7 @@ pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
   result <- unCA (checkGRHSs matches) missing
   tracePm "}: " (ppr (cr_uncov result))
   formatReportWarnings cirbsGRHSs ctxt [] result
-  return (ldiGRHS <$> cr_ret result)
+  return (ldiGRHSs (cr_ret result))
 
 -- | Check a list of syntactic 'Match'es (part of case, functions, etc.), each
 -- with a 'Pat' and one or more 'GRHSs':
@@ -153,7 +165,7 @@ pmcMatches ctxt vars matches = do
   -- We have to force @missing@ before printing out the trace message,
   -- otherwise we get interleaved output from the solver. This function
   -- should be strict in @missing@ anyway!
-  !missing   <- getLdiNablas
+  !missing <- getLdiNablas
   tracePm "pmcMatches {" $
           hang (vcat [ppr ctxt, ppr vars, text "Matches:"])
                2
@@ -162,13 +174,13 @@ pmcMatches ctxt vars matches = do
     Nothing -> do
       -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
       let var = only vars
-      empty_case <- desugarEmptyCase var
+      empty_case <- noCheckDs $ desugarEmptyCase var
       result <- unCA (checkEmptyCase empty_case) missing
       tracePm "}: " (ppr (cr_uncov result))
       formatReportWarnings cirbsEmptyCase ctxt vars result
       return []
     Just matches -> do
-      matches <- desugarMatches vars matches
+      matches <- noCheckDs $ desugarMatches vars matches
       result <- unCA (checkMatchGroup matches) missing
       tracePm "}: " (ppr (cr_uncov result))
       formatReportWarnings cirbsMatchGroup ctxt vars result
@@ -201,7 +213,10 @@ ldiMatchGroup (PmMatchGroup matches) = ldiMatch <$> matches
 
 ldiMatch :: PmMatch Post -> (Nablas, NonEmpty Nablas)
 ldiMatch (PmMatch { pm_pats = red, pm_grhss = grhss }) =
-  (rs_cov red, ldiGRHS <$> grhss)
+  (rs_cov red, ldiGRHSs grhss)
+
+ldiGRHSs :: PmGRHSs Post -> NonEmpty Nablas
+ldiGRHSs (PmGRHSs { pgs_grhss = grhss }) = ldiGRHS <$> grhss
 
 ldiGRHS :: PmGRHS Post -> Nablas
 ldiGRHS (PmGRHS { pg_grds = red }) = rs_cov red
@@ -277,8 +292,8 @@ cirbsMatch PmMatch { pm_pats = red, pm_grhss = grhss } = do
        $ applyWhen (not is_covered) markAllRedundant
        $ cirb
 
-cirbsGRHSs :: NonEmpty (PmGRHS Post) -> DsM CIRB
-cirbsGRHSs grhss = Semi.sconcat <$> traverse cirbsGRHS grhss
+cirbsGRHSs :: PmGRHSs Post -> DsM CIRB
+cirbsGRHSs (PmGRHSs { pgs_grhss = grhss }) = Semi.sconcat <$> traverse cirbsGRHS grhss
 
 cirbsGRHS :: PmGRHS Post -> DsM CIRB
 cirbsGRHS PmGRHS { pg_grds = red, pg_rhs = info } = do

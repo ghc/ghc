@@ -22,7 +22,7 @@ module GHC.HsToCore.Pmc.Types (
         SrcInfo(..), PmGrd(..), GrdVec(..),
 
         -- ** Guard tree language
-        PmMatchGroup(..), PmMatch(..), PmGRHS(..), PmPatBind(..), PmEmptyCase(..),
+        PmMatchGroup(..), PmMatch(..), PmGRHSs(..), PmGRHS(..), PmPatBind(..), PmEmptyCase(..),
 
         -- * Coverage Checking types
         RedSets (..), Precision (..), CheckResult (..),
@@ -112,7 +112,13 @@ newtype PmMatchGroup p = PmMatchGroup (NonEmpty (PmMatch p))
 
 -- | A guard tree denoting 'Match': A payload describing the pats and a bunch of
 -- GRHS.
-data PmMatch p = PmMatch { pm_pats :: !p, pm_grhss :: !(NonEmpty (PmGRHS p)) }
+data PmMatch p = PmMatch { pm_pats :: !p, pm_grhss :: !(PmGRHSs p) }
+
+-- | A guard tree denoting 'GRHSs': A bunch of 'PmLet' guards for local
+-- bindings from the 'GRHSs's @where@ clauses and the actual list of 'GRHS'.
+-- See Note [Long-distance information for HsLocalBinds] in
+-- "GHC.HsToCore.Pmc.Desugar".
+data PmGRHSs p = PmGRHSs { pgs_lcls :: !p, pgs_grhss :: !(NonEmpty (PmGRHS p))}
 
 -- | A guard tree denoting 'GRHS': A payload describing the grds and a 'SrcInfo'
 -- useful for printing out in warnings messages.
@@ -148,6 +154,10 @@ instance Outputable p => Outputable (PmMatchGroup p) where
 instance Outputable p => Outputable (PmMatch p) where
   ppr (PmMatch { pm_pats = grds, pm_grhss = grhss }) =
     ppr grds <+> ppr grhss
+
+instance Outputable p => Outputable (PmGRHSs p) where
+  ppr (PmGRHSs { pgs_lcls = _lcls, pgs_grhss = grhss }) =
+    ppr grhss
 
 instance Outputable p => Outputable (PmGRHS p) where
   ppr (PmGRHS { pg_grds = grds, pg_rhs = rhs }) =
