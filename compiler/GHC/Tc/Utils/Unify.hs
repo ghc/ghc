@@ -340,9 +340,12 @@ matchActualFunTySigma herald ct_orig mb_thing err_info fun_ty
     defer fun_ty
       = do { arg_ty <- newOpenFlexiTyVarTy
            ; res_ty <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkVisFunTyMany arg_ty res_ty
+           ; mult  <- newFlexiTyVarTy multiplicityTy
+             -- We need a new variable for multiplicity (#18731)
+             -- Otherwise, 'undefined x' wouldn't be linear in x
+           ; let unif_fun_ty = mkVisFunTy mult arg_ty res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
-           ; return (mkWpCastN co, unrestricted arg_ty, res_ty) }
+           ; return (mkWpCastN co, Scaled mult arg_ty, res_ty) }
 
     ------------
     mk_ctxt :: TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
