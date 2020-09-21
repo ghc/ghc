@@ -357,7 +357,7 @@ data HsForAllTelescope pass
     { hsf_xvis      :: XHsForAllVis pass
     , hsf_vis_bndrs :: [LHsTyVarBndr () pass]
     }
-  | HsForAllInvis -- ^ An invisible @forall@ (e.g., @forall a {b} c -> {...}@),
+  | HsForAllInvis -- ^ An invisible @forall@ (e.g., @forall a {b} c. {...}@),
                   --   where each binder has a 'Specificity'.
     { hsf_xinvis       :: XHsForAllInvis pass
     , hsf_invis_bndrs  :: [LHsTyVarBndr Specificity pass]
@@ -416,6 +416,17 @@ emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 -- Used to quantify the implicit binders of a type
 --    * Implicit binders of a type signature (LHsSigType/LHsSigWcType)
 --    * Patterns in a type/data family instance (HsTyPats)
+--
+-- We support two forms:
+--   HsOuterImplicit (implicit quantification, added by renamer)
+--         f :: a -> a     -- Short for f :: forall {a}. a->a
+--   HsOuterExplicit (explicit user quantifiation):
+--         f :: forall a. a->a
+--
+-- When the user writes /visible/ quanitification
+--         T :: forall k -> k -> Type
+-- we use use HsOuterImplicit, wrapped around a HsForAllTy
+-- for the visible quantification
 
 -- | TODO RGS: Docs
 data HsOuterTyVarBndrs flag pass

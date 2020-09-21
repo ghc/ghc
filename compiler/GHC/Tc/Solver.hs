@@ -163,21 +163,28 @@ simplifyTop wanteds
 solveLocalEqualities :: String -> TcM a -> TcM a
 -- Note [Failure in local type signatures]
 solveLocalEqualities callsite thing_inside
-  = do { (wanted, res) <- solveLocalEqualitiesX callsite thing_inside
+  = do { traceTc "solveLocalEqualities {" (vcat [ text "Called from" <+> text callsite ])
+       ; (res, wanted) <- captureConstraints thing_inside
        ; emitFlatConstraints wanted
+       ; traceTc "solveLocalEqualitie }" empty
        ; return res }
 
 emitFlatConstraints :: WantedConstraints -> TcM ()
 -- See Note [Failure in local type signatures]
 emitFlatConstraints wanted
-  = do { wanted <- TcM.zonkWC wanted
+  = do { -- Solve and zonk to esablish the
+         -- preconditions for floatKindEqualities
+         wanted <- runTcSEqualities (solveWanteds wanted)
+       ; wanted <- TcM.zonkWC wanted
+
+       ; traceTc "emitFlatConstraints {" (ppr wanted)
        ; case floatKindEqualities wanted of
-           Nothing -> do { traceTc "emitFlatConstraints: failing" (ppr wanted)
+           Nothing -> do { traceTc "emitFlatConstraints } failing" (ppr wanted)
                          ; emitConstraints wanted -- So they get reported!
                          ; failM }
            Just (simples, holes)
               -> do { _ <- promoteTyVarSet (tyCoVarsOfCts simples)
-                    ; traceTc "emitFlatConstraints:" $
+                    ; traceTc "emitFlatConstraints }" $
                       vcat [ text "simples:" <+> ppr simples
                            , text "holes:  " <+> ppr holes ]
                     ; emitHoles holes -- Holes don't need promotion
@@ -188,6 +195,11 @@ floatKindEqualities :: WantedConstraints -> Maybe (Bag Ct, Bag Hole)
 -- Return Nothing if any constraints can't be floated (captured
 -- by skolems), or if there is an insoluble constraint, or
 -- IC_Telescope telescope error
+-- Precondition 1: we have tried to solve the 'wanteds', both so that
+--    the ic_status field is set, and because solving can make constraints
+--    more floatable.
+-- Precondition 2: the 'wanteds' are zonked, since floatKindEqualities
+--    is not monadic
 floatKindEqualities wc = float_wc emptyVarSet wc
   where
     float_wc :: TcTyCoVarSet -> WantedConstraints -> Maybe (Bag Ct, Bag Hole)

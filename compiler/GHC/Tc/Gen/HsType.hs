@@ -349,6 +349,7 @@ tcHsSigType ctxt sig_ty
 
        -- Spit out the implication (and perhaps fail fast)
        -- See Note [Failure in local type signatures] in GHC.Tc.Solver
+       ; traceTc "tcHsSigType 2" (ppr implic)
        ; emitFlatConstraints (mkImplicWC (unitBag implic))
 
        ; ty <- zonkTcType ty
@@ -358,59 +359,6 @@ tcHsSigType ctxt sig_ty
   where
     skol_info = SigTypeSkol ctxt
 
-{-
--- TODO RGS: Delete this (only for testing purposes)
-tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
-               -> ContextKind -> TcM (Implication, TcType)
--- Kind-checks/desugars an 'LHsSigType',
---   solve equalities,
---   and then kind-generalizes.
--- This will never emit constraints, as it uses solveEqualities internally.
--- No validity checking or zonking
--- Returns also an implication for the unsolved constraints
-tc_hs_sig_type skol_info hs_sig_type ctxt_kind
-  -- | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
-  | L l (HsSig { sig_bndrs = outer_bndrs, sig_body = body_ty }) <- hs_sig_type
-  = do { let sig_vars = case outer_bndrs of
-                          HsOuterImplicit{hso_ximplicit = imp_vars} -> imp_vars
-                          HsOuterExplicit{}                         -> []
-             hs_ty = case outer_bndrs of
-                       HsOuterImplicit{} -> body_ty
-                       HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-                         L l $ HsForAllTy { hst_xforall = noExtField
-                                          , hst_tele = HsForAllInvis { hsf_xinvis = noExtField
-                                                                     , hsf_invis_bndrs = exp_bndrs }
-                                          , hst_body = body_ty }
-       ; (tc_lvl, (wanted, (spec_tkvs, ty)))
-              <- pushTcLevelM                           $
-                 solveLocalEqualitiesX "tc_hs_sig_type" $
-                 -- See Note [Failure in local type signatures]
-                 bindImplicitTKBndrs_Skol sig_vars      $
-                 do { kind <- newExpectedKind ctxt_kind
-                    ; tcLHsType hs_ty kind }
-       -- Any remaining variables (unsolved in the solveLocalEqualities)
-       -- should be in the global tyvars, and therefore won't be quantified
-
-       ; spec_tkvs <- zonkAndScopedSort spec_tkvs
-       ; let ty1 = mkSpecForAllTys spec_tkvs ty
-
-       -- This bit is very much like decideMonoTyVars in GHC.Tc.Solver,
-       -- but constraints are so much simpler in kinds, it is much
-       -- easier here. (In particular, we never quantify over a
-       -- constraint in a type.)
-       ; constrained <- zonkTyCoVarsAndFV (tyCoVarsOfWC wanted)
-       ; let should_gen = not . (`elemVarSet` constrained)
-
-       ; kvs <- kindGeneralizeSome should_gen ty1
-
-       -- Build an implication for any as-yet-unsolved kind equalities
-       -- See Note [Skolem escape in type signatures]
-       ; implic <- buildTvImplication skol_info (kvs ++ spec_tkvs) tc_lvl wanted
-
-       ; return (implic, mkInfForAllTys kvs ty1) }
--}
-
--- TODO RGS: This is broken. Figure out why.
 tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
                -> ContextKind -> TcM (Implication, TcType)
 -- Kind-checks/desugars an 'LHsSigType',
@@ -420,20 +368,50 @@ tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- No validity checking or zonking
 -- Returns also an implication for the unsolved constraints
 tc_hs_sig_type skol_info (L loc (HsSig { sig_bndrs = outer_bndrs
-                                        , sig_body = hs_ty })) ctxt_kind
+                                       , sig_body = hs_ty })) ctxt_kind
   = setSrcSpan loc $
-    do { (tc_lvl, (wanted, (imp_or_exp_tkvs, ty)))
-              <- pushTcLevelM                           $
-                 solveLocalEqualitiesX "tc_hs_sig_type" $
+    do { -- When there are /explicit/ user-written binders, e.g.
+         --      f :: forall a {k} (b::k). blah
+         -- treat it exactly like HsForAllTy; including its own,
+         -- individual implication constraint, so we get proper
+         -- telescope checking.
+         -- NB1: Do not be tempted to combine this implication constraint
+         --      with the one from kind generalisation. That messes up the
+         --      telescope error message, by mixing the inferred kind
+         --      quantifiers with the explicit ones. See GHC.Tc.Types.Constraint
+         --      Note [Checking telescopes], in the "don't mix up" bullet.
+         -- NB2: There are no implicit binders (the forall-or-nothing rule),
+         --   hence implicit_bndrs = []
+         --
+         -- When there are only /implicit/ binders, added by the renamer, e.g.
+         --     f :: a -> t a -> t a
+         -- then bring those implicit binders into scope here.
+
+         let body_hs_ty     :: LHsType GhcRn
+             implicit_bndrs :: [Name]
+             (implicit_bndrs, body_hs_ty)
+                = case outer_bndrs of
+                    HsOuterExplicit { hso_bndrs = bndrs }
+                      -> ([], L loc $
+                              HsForAllTy { hst_xforall = noExtField
+                                         , hst_tele    = HsForAllInvis { hsf_xinvis = noExtField
+                                                                       , hsf_invis_bndrs = bndrs }
+                                         , hst_body    = hs_ty })
+                    HsOuterImplicit { hso_ximplicit = implicit_bndrs }
+                      -> (implicit_bndrs, hs_ty)
+
+       ; (tc_lvl, (wanted, (implicit_tkvs, ty)))
+              <- pushTcLevelM                            $
+                 solveLocalEqualitiesX "tc_hs_sig_type"  $
                  -- See Note [Failure in local type signatures]
-                 bindOuterSigTKBndrs_Skol outer_bndrs   $
+                 bindImplicitTKBndrs_Skol implicit_bndrs $
                  do { kind <- newExpectedKind ctxt_kind
-                    ; tcLHsType hs_ty kind }
+                    ; tcLHsType body_hs_ty kind }
        -- Any remaining variables (unsolved in the solveLocalEqualities)
        -- should be in the global tyvars, and therefore won't be quantified
 
-       ; imp_or_exp_tkvs <- bitraverse zonkAndScopedSort pure imp_or_exp_tkvs
-       ; let ty1 = either mkSpecForAllTys mkInvisForAllTys imp_or_exp_tkvs ty
+       ; implicit_tkvs <- zonkAndScopedSort implicit_tkvs
+       ; let ty1 = mkSpecForAllTys implicit_tkvs ty
 
        -- This bit is very much like decideMonoTyVars in GHC.Tc.Solver,
        -- but constraints are so much simpler in kinds, it is much
@@ -446,10 +424,7 @@ tc_hs_sig_type skol_info (L loc (HsSig { sig_bndrs = outer_bndrs
 
        -- Build an implication for any as-yet-unsolved kind equalities
        -- See Note [Skolem escape in type signatures]
-       ; implic <- buildTvImplication skol_info
-                     (kvs ++ either id binderVars imp_or_exp_tkvs) tc_lvl wanted
-         -- TODO RGS: The line above can put /visible/ foralls in a tyvar implication.
-         -- I'm not sure if that's kosher.
+       ; implic <- buildTvImplication skol_info (kvs ++ implicit_tkvs) tc_lvl wanted
 
        ; return (implic, mkInfForAllTys kvs ty1) }
 
@@ -1050,7 +1025,7 @@ tc_hs_type mode forall@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
             <- pushLevelAndCaptureConstraints      $
                bindExplicitTKTele_Skol_M mode tele $
                  -- The _M variant passes on the mode from the type, to
-                 -- any wildards in kind signatures on the forall'd variables
+                 -- any wildcards in kind signatures on the forall'd variables
                  -- e.g.      f :: _ -> Int -> forall (a :: _). blah
                tc_lhs_type mode ty exp_kind
                  -- Why exp_kind?  See Note [Body kind of HsForAllTy]
