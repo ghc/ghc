@@ -31,7 +31,7 @@
 module Main (main) where
 
 import qualified GHC.Unit.Database as GhcPkg
-import GHC.Unit.Database
+import GHC.Unit.Database hiding (mkMungePathUrl)
 import GHC.HandleEncoding
 import GHC.BaseDir (getBaseDir)
 import GHC.Settings.Utils (getTargetArchOS, maybeReadFuzzy)
@@ -56,6 +56,7 @@ import Distribution.Types.MungedPackageId
 import Distribution.Simple.Utils (toUTF8BS, writeUTF8File, readUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
+import qualified System.FilePath.Posix as FilePath.Posix
 import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
                           getModificationTime )
 import Text.Printf
@@ -84,6 +85,7 @@ import qualified Data.Traversable as F
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 
 #if defined(mingw32_HOST_OS)
 import GHC.ConsoleHandler
@@ -990,6 +992,36 @@ mungePackagePaths top_dir pkgroot pkg =
     munge_urls  = map munge_url
     (munge_path,munge_url) = mkMungePathUrl top_dir pkgroot
 
+mkMungePathUrl :: FilePath -> FilePath -> (FilePath -> FilePath, FilePath -> FilePath)
+mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
+   where
+    munge_path p
+      | Just p' <- stripVarPrefix "${pkgroot}" p = pkgroot ++ p'
+      | Just p' <- stripVarPrefix "$topdir"    p = top_dir ++ p'
+      | otherwise                                = p
+
+    munge_url p
+      | Just p' <- stripVarPrefix "${pkgrooturl}" p = toUrlPath pkgroot p'
+      | Just p' <- stripVarPrefix "$httptopdir"   p = toUrlPath top_dir p'
+      | otherwise                                   = p
+
+    toUrlPath r p = "file:///"
+                 -- URLs always use posix style '/' separators:
+                 ++ FilePath.Posix.joinPath
+                        (r : -- We need to drop a leading "/" or "\\"
+                             -- if there is one:
+                             dropWhile (all isPathSeparator)
+                                       (FilePath.splitDirectories p))
+
+    -- We could drop the separator here, and then use </> above. However,
+    -- by leaving it in and using ++ we keep the same path separator
+    -- rather than letting FilePath change it to use \ as the separator
+    stripVarPrefix var path = case stripPrefix var path of
+                              Just [] -> Just []
+                              Just cs@(c : _) | isPathSeparator c -> Just cs
+                              _ -> Nothing
+
+
 -- -----------------------------------------------------------------------------
 -- Workaround for old single-file style package dbs
 
@@ -1331,7 +1363,7 @@ recomputeValidAbiDeps db pkg =
     newAbiDeps =
       catMaybes . flip map (GhcPkg.unitAbiDepends pkg) $ \(k, _) ->
         case filter (\d -> installedUnitId d == k) db of
-          [x] -> Just (k, unAbiHash (abiHash x))
+          [x] -> Just (k, BS8.pack $ unAbiHash (abiHash x))
           _   -> Nothing
     abiDepsUpdated =
       GhcPkg.unitAbiDepends pkg /= newAbiDeps
@@ -1370,22 +1402,22 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.unitComponentName  =
          fmap (mkPackageName . unUnqualComponentName) (libraryNameString $ sourceLibName pkg),
        GhcPkg.unitDepends        = depends pkg,
-       GhcPkg.unitAbiDepends     = map (\(AbiDependency k v) -> (k,unAbiHash v)) (abiDepends pkg),
-       GhcPkg.unitAbiHash        = unAbiHash (abiHash pkg),
-       GhcPkg.unitImportDirs     = importDirs pkg,
-       GhcPkg.unitLibraries      = hsLibraries pkg,
-       GhcPkg.unitExtDepLibsSys  = extraLibraries pkg,
-       GhcPkg.unitExtDepLibsGhc  = extraGHCiLibraries pkg,
-       GhcPkg.unitLibraryDirs    = libraryDirs pkg,
-       GhcPkg.unitLibraryDynDirs = libraryDynDirs pkg,
-       GhcPkg.unitExtDepFrameworks = frameworks pkg,
-       GhcPkg.unitExtDepFrameworkDirs = frameworkDirs pkg,
-       GhcPkg.unitLinkerOptions  = ldOptions pkg,
-       GhcPkg.unitCcOptions      = ccOptions pkg,
-       GhcPkg.unitIncludes       = includes pkg,
-       GhcPkg.unitIncludeDirs    = includeDirs pkg,
-       GhcPkg.unitHaddockInterfaces = haddockInterfaces pkg,
-       GhcPkg.unitHaddockHTMLs   = haddockHTMLs pkg,
+       GhcPkg.unitAbiDepends     = map (\(AbiDependency k v) -> (k, BS8.pack $ unAbiHash v)) (abiDepends pkg),
+       GhcPkg.unitAbiHash        = BS8.pack $ unAbiHash (abiHash pkg),
+       GhcPkg.unitImportDirs     = map BS8.pack $ importDirs pkg,
+       GhcPkg.unitLibraries      = map BS8.pack $ hsLibraries pkg,
+       GhcPkg.unitExtDepLibsSys  = map BS8.pack $ extraLibraries pkg,
+       GhcPkg.unitExtDepLibsGhc  = map BS8.pack $ extraGHCiLibraries pkg,
+       GhcPkg.unitLibraryDirs    = map BS8.pack $ libraryDirs pkg,
+       GhcPkg.unitLibraryDynDirs = map BS8.pack $ libraryDynDirs pkg,
+       GhcPkg.unitExtDepFrameworks = map BS8.pack $ frameworks pkg,
+       GhcPkg.unitExtDepFrameworkDirs = map BS8.pack $ frameworkDirs pkg,
+       GhcPkg.unitLinkerOptions  = map BS8.pack $ ldOptions pkg,
+       GhcPkg.unitCcOptions      = map BS8.pack $ ccOptions pkg,
+       GhcPkg.unitIncludes       = map BS8.pack $ includes pkg,
+       GhcPkg.unitIncludeDirs    = map BS8.pack $ includeDirs pkg,
+       GhcPkg.unitHaddockInterfaces = map BS8.pack $ haddockInterfaces pkg,
+       GhcPkg.unitHaddockHTMLs   = map BS8.pack $ haddockHTMLs pkg,
        GhcPkg.unitExposedModules = map convertExposed (exposedModules pkg),
        GhcPkg.unitHiddenModules  = hiddenModules pkg,
        GhcPkg.unitIsIndefinite   = indefinite pkg,

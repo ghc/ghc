@@ -48,6 +48,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Data.Maybe    ( expectJust )
 
+import qualified Data.ByteString.Char8 as BS8
 import Data.IORef       ( IORef, readIORef, atomicModifyIORef' )
 import System.Directory
 import System.FilePath
@@ -378,7 +379,7 @@ findPackageModule_ hsc_env mod pkg_conf =
 
      mk_hi_loc = mkHiOnlyModLocation dflags package_hisuf
 
-     import_dirs = unitImportDirs pkg_conf
+     import_dirs = map BS8.unpack $ unitImportDirs pkg_conf
       -- we never look for a .hi-boot file in an external package;
       -- .hi-boot files only make sense for the home package.
   in

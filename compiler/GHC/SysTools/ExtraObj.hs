@@ -28,6 +28,7 @@ import GHC.Prelude
 
 import Control.Monad
 import Data.Maybe
+import qualified Data.ByteString.Char8 as BS8
 
 import Control.Monad.IO.Class
 
@@ -57,7 +58,7 @@ mkExtraObj dflags extn xs
       -- we're compiling C or assembler. When compiling C, we pass the usual
       -- set of include directories and PIC flags.
       cOpts = map Option (picCCOpts dflags)
-                    ++ map (FileOption "-I")
+                    ++ map (FileOption "-I" . BS8.unpack)
                             (unitIncludeDirs $ unsafeLookupUnit pkgs rtsUnit)
 
       -- When compiling assembler code, we drop the usual C options, and if the

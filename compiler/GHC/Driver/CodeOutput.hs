@@ -45,6 +45,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
 
 import Control.Exception
+import qualified Data.ByteString.Char8 as BS8
 import System.Directory
 import System.FilePath
 import System.IO
@@ -211,7 +212,7 @@ outputForeignStubs dflags mod location stubs
         let rts_includes =
                let rts_pkg = unsafeLookupUnitId (unitState dflags) rtsUnitId in
                concatMap mk_include (unitIncludes rts_pkg)
-            mk_include i = "#include \"" ++ i ++ "\"\n"
+            mk_include i = "#include \"" ++ (BS8.unpack i) ++ "\"\n"
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
