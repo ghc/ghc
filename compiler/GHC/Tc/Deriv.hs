@@ -238,8 +238,7 @@ tcDeriving deriv_infos deriv_decls
                         FormatHaskell
                         (ddump_deriving inst_info rn_binds famInsts))
 
-        ; gbl_env <- tcExtendLocalInstEnv (map iSpec (bagToList inst_info))
-                                          getGblEnv
+        ; gbl_env <- addClsInsts (bagToList inst_info) getGblEnv
         ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ concat fvs)
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) } }
   where
