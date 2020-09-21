@@ -126,7 +126,7 @@ rnExpr (HsVar _ (L l v))
        ; dflags <- getDynFlags
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;
-           Just (Left name)
+           Just (LookupOccRnUnique name)
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
                                        -- Note [Empty lists] in GHC.Hs.Expr
@@ -135,12 +135,12 @@ rnExpr (HsVar _ (L l v))
 
               | otherwise
               -> finishHsVar (L l name) ;
-            Just (Right [s]) ->
+            Just (LookupOccRnSelectors [s]) ->
               return ( HsRecFld noExtField (Unambiguous s (L l v) ), unitFV s) ;
-           Just (Right fs@(_:_:_)) ->
+           Just (LookupOccRnSelectors fs@(_:_:_)) ->
               return ( HsRecFld noExtField (Ambiguous noExtField (L l v))
                      , mkFVs fs);
-           Just (Right [])         -> panic "runExpr/HsVar" } }
+           Just (LookupOccRnSelectors [])         -> panic "runExpr/HsVar" } }
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
