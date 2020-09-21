@@ -1120,8 +1120,12 @@ data LookupOccRnOverloadedResult
   -- or there is a name clash (reported)
   | LookupOccRnSelectors [Name]
   -- ^ name refers to one or more record selectors;
-  -- if overload_ok was False, this list will be
+  -- If DuplicateRecordFields is disabled, this list will be
   -- a singleton.
+
+instance Outputable LookupOccRnOverloadedResult where
+  ppr (LookupOccRnUnique x) = text "LookupOccRnUnique " <> ppr x
+  ppr (LookupOccRnSelectors xs) = text "LoookupOccRnSelectors " <> ppr xs
 
 -- | Like 'lookupOccRn_maybe', but with a more informative result if
 -- the 'RdrName' happens to be a record selector.

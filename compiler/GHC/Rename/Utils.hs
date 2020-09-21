@@ -500,7 +500,7 @@ wildcardDoc herald =
 
 addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
 addNameClashErrRn rdr_name gres
-  | all isLocalGRE gres && not (all isRecFldGRE gres)
+  | all isLocalGRE gres && not (any isRecFldGRE gres)
                -- If there are two or more *local* defns, we'll have reported
   = return ()  -- that already, and we don't want an error cascade
   | otherwise
