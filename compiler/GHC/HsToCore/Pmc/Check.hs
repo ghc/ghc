@@ -167,8 +167,9 @@ checkMatch :: PmMatch Pre -> CheckAction (PmMatch Post)
 checkMatch (PmMatch { pm_pats = GrdVec grds, pm_grhss = grhss }) =
   leftToRight PmMatch (checkGrds grds) (checkGRHSs grhss)
 
-checkGRHSs :: NonEmpty (PmGRHS Pre) -> CheckAction (NonEmpty (PmGRHS Post))
-checkGRHSs = checkSequence checkGRHS
+checkGRHSs :: PmGRHSs Pre -> CheckAction (PmGRHSs Post)
+checkGRHSs (PmGRHSs { pgs_lcls = GrdVec lcls, pgs_grhss = grhss }) =
+  leftToRight PmGRHSs (checkGrds lcls) (checkSequence checkGRHS grhss)
 
 checkGRHS :: PmGRHS Pre -> CheckAction (PmGRHS Post)
 checkGRHS (PmGRHS { pg_grds = GrdVec grds, pg_rhs = rhs_info }) =
