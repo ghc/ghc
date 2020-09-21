@@ -58,6 +58,7 @@ import GHC.HsToCore.PmCheck.Ppr
 import GHC.Types.Basic (Origin(..), isGenerated)
 import GHC.Core (CoreExpr, Expr(Var,App))
 import GHC.Data.FastString (unpackFS, lengthFS)
+import GHC.Driver.Types
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Tc.Utils.Zonk (shortCutLit)
@@ -72,6 +73,7 @@ import GHC.Utils.Panic
 import GHC.Core.DataCon
 import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
+import GHC.Tc.Types
 import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
 import GHC.Tc.Utils.TcType (evVarPred)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
@@ -80,7 +82,7 @@ import GHC.HsToCore.Utils (selectMatchVar)
 import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
 import GHC.HsToCore.Monad
 import GHC.Data.Bag
-import GHC.Data.IOEnv (unsafeInterleaveM)
+import GHC.Data.IOEnv (updEnv, unsafeInterleaveM)
 import GHC.Data.OrdList
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
@@ -111,12 +113,22 @@ getLdiNablas = do
     True  -> pure nablas
     False -> pure initNablas
 
+-- | We need to call the Hs desugarer to get the Core of a let-binding or where
+-- clause. We don't want to run the coverage checker when doing so! Efficiency
+-- is one concern, but also a lack of properly set up long-distance information
+-- might trigger warnings that we normally wouldn't emit.
+noCheckDs :: DsM a -> DsM a
+noCheckDs k = do
+  dflags <- getDynFlags
+  let dflags' = foldl' wopt_unset dflags allPmCheckWarnings
+  updEnv (\env -> env{env_top = (env_top env) {hsc_dflags = dflags'} }) k
+
 -- | Check a pattern binding (let, where) for exhaustiveness.
 covCheckPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM ()
 -- See Note [covCheckPatBind only checks PatBindRhs]
 covCheckPatBind ctxt@(DsMatchContext PatBindRhs loc) var p = do
-  missing   <- getLdiNablas
-  pat_bind <- desugarPatBind loc var p
+  missing  <- getLdiNablas
+  pat_bind <- noCheckDs $ desugarPatBind loc var p
   tracePm "covCheckPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
   result <- unCA (checkPatBind pat_bind) missing
   tracePm "}: " (ppr (cr_uncov result))
@@ -133,8 +145,8 @@ covCheckGRHSs
 covCheckGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
   let combined_loc = foldl1 combineSrcSpans (map getLoc grhss)
       ctxt = DsMatchContext hs_ctxt combined_loc
-  matches <- desugarGRHSs combined_loc empty guards
-  missing   <- getLdiNablas
+  matches <- noCheckDs $ desugarGRHSs combined_loc empty guards
+  missing <- getLdiNablas
   tracePm "covCheckGRHSs" (hang (vcat [ppr ctxt
                                 , text "Guards:"])
                                 2
@@ -142,7 +154,7 @@ covCheckGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
   result <- unCA (checkGRHSs matches) missing
   tracePm "}: " (ppr (cr_uncov result))
   formatReportWarnings cirbsGRHSs ctxt [] result
-  return (ldiGRHS <$> cr_ret result)
+  return (ldiGRHSs (cr_ret result))
 
 -- | Check a list of syntactic 'Match'es (part of case, functions, etc.), each
 -- with a 'Pat' and one or more 'GRHSs':
@@ -178,13 +190,13 @@ covCheckMatches ctxt vars matches = do
     Nothing -> do
       -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
       let var = only vars
-      empty_case <- desugarEmptyCase var
+      empty_case <- noCheckDs $ desugarEmptyCase var
       result <- unCA (checkEmptyCase empty_case) missing
       tracePm "}: " (ppr (cr_uncov result))
       formatReportWarnings cirbsEmptyCase ctxt vars result
       return []
     Just matches -> do
-      matches <- desugarMatches vars matches
+      matches <- noCheckDs $ desugarMatches vars matches
       result <- unCA (checkMatchGroup matches) missing
       tracePm "}: " (ppr (cr_uncov result))
       formatReportWarnings cirbsMatchGroup ctxt vars result
@@ -322,7 +334,11 @@ newtype PmMatchGroup p = PmMatchGroup (NonEmpty (PmMatch p))
 
 -- | A guard tree denoting 'Match': A payload describing the pats and a bunch of
 -- GRHS.
-data PmMatch p = PmMatch { pm_pats :: !p, pm_grhss :: !(NonEmpty (PmGRHS p)) }
+data PmMatch p = PmMatch { pm_pats :: !p, pm_grhss :: !(PmGRHSs p) }
+
+-- | A guard tree denoting 'GRHSs': A bunch of local binds for long-distance
+-- information and the actual list of 'GRHS'.
+data PmGRHSs p = PmGRHSs { pgs_lcls :: !p, pgs_grhss :: !(NonEmpty (PmGRHS p))}
 
 -- | A guard tree denoting 'GRHS': A payload describing the grds and a 'SrcInfo'
 -- useful for printing out in warnings messages.
@@ -363,6 +379,10 @@ instance Outputable (PmMatch Pre) where
   ppr (PmMatch { pm_pats = grds, pm_grhss = grhss }) =
     pprLygGuards grds <+> ppr grhss
 
+instance Outputable (PmGRHSs Pre) where
+  ppr (PmGRHSs { pgs_lcls = _lcls, pgs_grhss = grhss }) =
+    ppr grhss
+
 instance Outputable (PmGRHS Pre) where
   ppr (PmGRHS { pg_grds = grds, pg_rhs = rhs }) =
     pprLygGuards grds <+> text "->" <+> pprSrcInfo rhs
@@ -387,6 +407,10 @@ instance Outputable (PmMatchGroup Post) where
 instance Outputable (PmMatch Post) where
   ppr (PmMatch { pm_pats = red, pm_grhss = grhss }) =
     pprRedSets red <+> ppr grhss
+
+instance Outputable (PmGRHSs Post) where
+  ppr (PmGRHSs { pgs_lcls = _lcls, pgs_grhss = grhss }) =
+    ppr grhss
 
 instance Outputable (PmGRHS Post) where
   ppr (PmGRHS { pg_grds = red, pg_rhs = rhs }) =
@@ -699,12 +723,14 @@ desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
   -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
   return PmMatch { pm_pats = pats', pm_grhss = grhss' }
 
-desugarGRHSs :: SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM (NonEmpty (PmGRHS Pre))
-desugarGRHSs match_loc pp_pats grhss
-  = traverse (desugarLGRHS match_loc pp_pats)
-  . expectJust "desugarGRHSs"
-  . NE.nonEmpty
-  $ grhssGRHSs grhss
+desugarGRHSs :: SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM (PmGRHSs Pre)
+desugarGRHSs match_loc pp_pats grhss = do
+  lcls <- desugarLocalBinds (grhssLocalBinds grhss)
+  grhss' <- traverse (desugarLGRHS match_loc pp_pats)
+              . expectJust "desugarGRHSs"
+              . NE.nonEmpty
+              $ grhssGRHSs grhss
+  return PmGRHSs { pgs_lcls = lcls, pgs_grhss = grhss' }
 
 -- | Desugar a guarded right-hand side to a single 'GrdTree'
 desugarLGRHS :: SrcSpan -> SDoc -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM (PmGRHS Pre)
@@ -724,7 +750,7 @@ desugarLGRHS match_loc pp_pats (L _loc (GRHS _ gs _)) = do
 desugarGuard :: GuardStmt GhcTc -> DsM GrdVec
 desugarGuard guard = case guard of
   BodyStmt _   e _ _ -> desugarBoolGuard e
-  LetStmt  _   binds -> desugarLet (unLoc binds)
+  LetStmt  _   binds -> desugarLocalBinds binds
   BindStmt _ p e     -> desugarBind p e
   LastStmt        {} -> panic "desugarGuard LastStmt"
   ParStmt         {} -> panic "desugarGuard ParStmt"
@@ -732,9 +758,32 @@ desugarGuard guard = case guard of
   RecStmt         {} -> panic "desugarGuard RecStmt"
   ApplicativeStmt {} -> panic "desugarGuard ApplicativeLastStmt"
 
--- | Desugar let-bindings
-desugarLet :: HsLocalBinds GhcTc -> DsM GrdVec
-desugarLet _binds = return []
+-- | Desugar local (let and where) bindings
+desugarLocalBinds :: LHsLocalBinds GhcTc -> DsM GrdVec
+desugarLocalBinds (L _ (HsValBinds _ (XValBindsLR (NValBinds binds _)))) = do
+  concatMapM (concatMapM go . bagToList) (map snd binds)
+  where
+    -- We are only interested in FunBinds with single match groups without any
+    -- patterns.
+    go :: LHsBind GhcTc -> DsM [PmGrd]
+    go (L _ FunBind{fun_id = L _ x, fun_matches = mg})
+      | L _ [L _ Match{m_pats = [], m_grhss = grhss}] <- mg_alts mg
+      , GRHSs{grhssGRHSs = [L _ (GRHS _ _grds rhs)]} <- grhss = do
+          core_rhs <- dsLExpr rhs
+          return [PmLet x core_rhs]
+    go (L _ AbsBinds{abs_exports=exports, abs_binds = binds}) = do
+      -- Just assign polymorphic binders the same semantics as their monomorphic
+      -- counterpart if their types match. This is crucial for making sense
+      -- about any HsLocalBinds at all.
+      let go_export :: ABExport GhcTc -> Maybe PmGrd
+          go_export ABE{abe_poly = x, abe_mono = y}
+            | idType x `eqType` idType y = Just $ PmLet x (Var y)
+            | otherwise                  = Nothing
+      let exps = mapMaybe go_export exports
+      bs <- concatMapM go (bagToList binds)
+      return (exps ++ bs)
+    go _ = return []
+desugarLocalBinds _binds = return []
 
 -- | Desugar a pattern guard
 --   @pat <- e ==>  let x = e;  <guards for pat <- x>@
@@ -1019,8 +1068,9 @@ checkMatch :: PmMatch Pre -> CheckAction (PmMatch Post)
 checkMatch (PmMatch { pm_pats = grds, pm_grhss = grhss }) =
   leftToRight PmMatch (checkGrds grds) (checkGRHSs grhss)
 
-checkGRHSs :: NonEmpty (PmGRHS Pre) -> CheckAction (NonEmpty (PmGRHS Post))
-checkGRHSs = checkSequence checkGRHS
+checkGRHSs :: PmGRHSs Pre -> CheckAction (PmGRHSs Post)
+checkGRHSs (PmGRHSs { pgs_lcls = lcls, pgs_grhss = grhss }) =
+  leftToRight PmGRHSs (checkGrds lcls) (checkSequence checkGRHS grhss)
 
 checkGRHS :: PmGRHS Pre -> CheckAction (PmGRHS Post)
 checkGRHS (PmGRHS { pg_grds = grds, pg_rhs = rhs_info }) =
@@ -1085,7 +1135,10 @@ ldiMatchGroup (PmMatchGroup matches) = ldiMatch <$> matches
 
 ldiMatch :: PmMatch Post -> (Nablas, NonEmpty Nablas)
 ldiMatch (PmMatch { pm_pats = red, pm_grhss = grhss }) =
-  (rs_cov red, ldiGRHS <$> grhss)
+  (rs_cov red, ldiGRHSs grhss)
+
+ldiGRHSs :: PmGRHSs Post -> NonEmpty Nablas
+ldiGRHSs (PmGRHSs { pgs_grhss = grhss }) = ldiGRHS <$> grhss
 
 ldiGRHS :: PmGRHS Post -> Nablas
 ldiGRHS (PmGRHS { pg_grds = red }) = rs_cov red
@@ -1161,8 +1214,8 @@ cirbsMatch PmMatch { pm_pats = red, pm_grhss = grhss } = do
        $ applyWhen (not is_covered) markAllRedundant
        $ cirb
 
-cirbsGRHSs :: NonEmpty (PmGRHS Post) -> DsM CIRB
-cirbsGRHSs grhss = Semi.sconcat <$> traverse cirbsGRHS grhss
+cirbsGRHSs :: PmGRHSs Post -> DsM CIRB
+cirbsGRHSs (PmGRHSs { pgs_grhss = grhss }) = Semi.sconcat <$> traverse cirbsGRHS grhss
 
 cirbsGRHS :: PmGRHS Post -> DsM CIRB
 cirbsGRHS PmGRHS { pg_grds = red, pg_rhs = info } = do
