@@ -382,8 +382,8 @@ tcInstDecls1    -- Deal with both source-code and imported instance decls
    -> TcM (TcGblEnv,            -- The full inst env
            [InstInfo GhcRn],    -- Source-code instance decls to process;
                                 -- contains all dfuns for this module
-           [DerivInfo],         -- From data family instances
-           [TyCon])             -- Data family instance representation tycons
+           [FamInst],           -- Family instances
+           [DerivInfo])         -- From data family instances
 
 tcInstDecls1 inst_decls
   = do {    -- Do class and family instance declarations
@@ -393,14 +393,14 @@ tcInstDecls1 inst_decls
              fam_insts   = concat fam_insts_s
              local_infos = concat local_infos_s
 
-       ; (data_rep_tycons, gbl_env) <- addClsInsts local_infos $
+       ; gbl_env <- addClsInsts local_infos $
                     addFamInsts fam_insts   $
                     getGblEnv
 
        ; return ( gbl_env
                 , local_infos
-                , concat datafam_deriv_infos
-                , data_rep_tycons ) }
+                , fam_insts
+                , concat datafam_deriv_infos ) }
 
 -- | Use DerivInfo for data family instances (produced by tcInstDecls1),
 --   datatype declarations (TyClDecl), and standalone deriving declarations
@@ -421,10 +421,9 @@ addClsInsts :: [InstInfo GhcRn] -> TcM a -> TcM a
 addClsInsts infos thing_inside
   = tcExtendLocalInstEnv (map iSpec infos) thing_inside
 
-addFamInsts :: [FamInst] -> TcM a -> TcM ([TyCon], a)
+addFamInsts :: [FamInst] -> TcM a -> TcM a
 -- Extend (a) the family instance envt
 --        (b) the type envt with stuff from data type decls
--- Additionally return the data family representation tycons
 addFamInsts fam_insts thing_inside
   = tcExtendLocalFamInstEnv fam_insts $
     tcExtendGlobalEnv axioms          $
@@ -432,8 +431,7 @@ addFamInsts fam_insts thing_inside
        ; gbl_env <- addTyConsToGblEnv data_rep_tycons
                     -- Does not add its axiom; that comes
                     -- from adding the 'axioms' above
-       ; x <- setGblEnv gbl_env thing_inside
-       ; return (data_rep_tycons, x) }
+       ; setGblEnv gbl_env thing_inside }
   where
     axioms = map (ACoAxiom . toBranchedAxiom . famInstAxiom) fam_insts
     data_rep_tycons = famInstsRepTyCons fam_insts

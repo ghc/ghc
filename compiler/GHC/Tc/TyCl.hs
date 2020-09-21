@@ -198,13 +198,13 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; gbl_env <- addTyConsToGblEnv tyclss
 
            -- Step 4: check instance declarations
-       ; (gbl_env', inst_info, datafam_deriv_info, data_rep_tycons) <-
+       ; (gbl_env', inst_info, fam_insts, datafam_deriv_info) <-
          setGblEnv gbl_env $
          tcInstDecls1 instds
 
            -- Step 5: build record selectors/updaters, don't type-check them yet
            -- See Note [Calling tcRecSelBinds] in GHC.Tc.TyCl.Utils
-       ; rec_sel_upd_binds <- mkRecSelBinds (tyclss ++ data_rep_tycons)
+       ; rec_sel_upd_binds <- mkRecSelBinds (tyclss ++ famInstsRepTyCons fam_insts)
 
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
        ; return (gbl_env', inst_info, deriv_info, rec_sel_upd_binds) }
