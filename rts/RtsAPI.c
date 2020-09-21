@@ -647,63 +647,173 @@ rts_unlock (Capability *cap)
 }
 
 #if defined(THREADED_RTS)
-static bool rts_paused = false;
+// The task that paused the RTS. The rts_pausing_task variable is owned by the
+// task that owns all capabilities (there is at most one such task).
+Task * rts_pausing_task = NULL;
 
 // See RtsAPI.h
-RtsPaused rts_pause (void)
+void rts_pause (void)
 {
-    if (rts_isPaused())
+    // The current task must not own a capability. This is true when a new
+    // thread is stareted, or when making a safe FFI call. If
+    // `task->cap->running_task == task` then that is also ok because the
+    // capability can be taken by other capabilities. Note that we always check
+    // (rather than ASSERT which only happens with `-debug`) because this is a
+    // user facing function and we want good error reporting. We also don't
+    // expect rts_pause to be performance critical.
+    Task * task = getMyTask();
+    if (task->cap && task->cap->running_task == task)
+    {
+        // This task owns a capability (at it can't be taken by other capabilities).
+        errorBelch(task->cap->in_haskell
+            ? ("error: rts_pause: attempting to pause via an unsafe FFI call.\n"
+               "   Perhaps a 'foreign import unsafe' should be 'safe'?")
+            : ("error: rts_pause: attempting to pause from a Task that owns a capability.\n"
+               "   Have you already acquired a capability e.g. with rts_lock?"));
+        stg_exit(EXIT_FAILURE);
+    }
+
+    // Note that if the rts was paused by another task/thread, then we block
+    // instead of error. It's only an error if the same thread tries to pause
+    // twice in a row.
+    if (rts_pausing_task == task)
     {
         errorBelch("error: rts_pause: attempting to pause an already paused RTS.");
         stg_exit(EXIT_FAILURE);
     }
 
-    RtsPaused rtsPaused;
-    rtsPaused.pausing_task = newBoundTask();
+    // NOTE ghc-debug deadlock:
+    //
+    // stopAllCapabilities attempts to acquire all capabilities and will only
+    // block if an existing thread/task:
+    //
+    // 1. Owns a capability and
+    // 2. Is deadlocked i.e. refuses to yield/release its capability.
+    //
+    // Let's assume the rest of the RTS is deadlock free (tasks will eventually
+    // yield their capability) outside of using the ghc-debug API:
+    //
+    // * rts_pause
+    // * rts_resume
+    // * rts_isPaused
+    // * rts_listThreads
+    // * rts_listMiscRoots
+    //
+    // Except rts_pause, none of these functions acquire a lock and so cannot
+    // block. rts_pause may block on stopAllCapabilities, but we ensure that the
+    // current task does not own a capability before calling
+    // stopAllCapabilities. Hence, (1) does not hold given an isolated call to
+    // rts_pause. The only lose end is that after rts_pause, we now have a task
+    // that (by design) owns all capabilities (point (1) above) and is refusing
+    // to yield them (point (2) above). Indeed, if 2 threads concurrently call
+    // rts_pause, one will block until the other calls rts_resume. As "correct
+    // usage" of this API requires calling rts_resume, this case is a non-issue,
+    // but does imply the awkward quirk that if you call rts_pause on many
+    // threads, they will all "take turns" pausing the rts, blocking until it is
+    // their turn. In adition, any API function that attempts to acquire a
+    // capability (e.g. rts_lock), will block until rts_resume is called. Of
+    // course, all ghc-debug API functions  besides rts_pause do not attempt to
+    // acquire a capability.
+    //
+    // The moral to this story is that you will not dealock as long as you, on
+    // the same thread:
+    //
+    // * First call rts_pause
+    // * Then avoid rts functions other than:
+    //      * rts_isPaused
+    //      * rts_listThreads
+    //      * rts_listMiscRoots
+    //      * AND dereferencing/inspect the heap directly e.g. using
+    //        rts_listThreads/rts_listMiscRoots and the ghc-heap library.
+    // * Finally call rts_resume
+    //
+    // TODO
+    //
+    // I think we should return Capability*. We should be able to use the rest
+    // of the rts API with that token. There are a few functions that take
+    // `Capability **` implying that it may change capabilities. I need to
+    // confirm, but I think that in our case, we'll just end up with the same
+    // capability since all others are acquired already. These other API
+    // functions may change the heap, but it is up to the caller to account for
+    // that. Is it possible that the API can be used to start executing a
+    // haskell thread?!?!?! That's perhaps ok as long as we reacquire the
+    // capability at the end so we're paused.
+    task = newBoundTask(); // TODO I'm not sure why we need this. rts_lock does this.
+    stopAllCapabilities(NULL, task);
 
-    // Check if we own a capability. This is needed to correctly call
-    // stopAllCapabilities() and to know if to keep ownership or release the
-    // capability on rts_resume().
-    Capability * cap = rtsPaused.pausing_task->cap;
-    bool taskOwnsCap = cap != NULL && cap->running_task == rtsPaused.pausing_task;
-    rtsPaused.capability = taskOwnsCap ? cap : NULL;
-    stopAllCapabilities(taskOwnsCap ? &rtsPaused.capability : NULL, rtsPaused.pausing_task);
-
-    rts_paused = true;
-    return rtsPaused;
+    // Now we own all capabilities so we own rts_pausing_task.
+    rts_pausing_task = task;
 }
 
 // See RtsAPI.h
-void rts_resume (RtsPaused rtsPaused)
+void rts_resume (void)
 {
-    if (!rts_isPaused())
+    Task * task = getMyTask(); // This thread has ownership over its Task.
+
+    if (task != rts_pausing_task)
     {
-        errorBelch("error: rts_pause: attempting to resume an RTS that is not paused.");
-        stg_exit(EXIT_FAILURE);
-    }
-    if (rtsPaused.pausing_task != getMyTask())
-    {
-        errorBelch("error: rts_resume was called from a different OS thread than rts_pause.");
+        // We don't have a lock on rts_pausing_task but we are garanteed that
+        // rts_pausing_task won't be set the current task (because the current
+        // task is here now!), so the error messages are still correct.
+        errorBelch (rts_isPaused()
+            ? "error: rts_resume: called from a different OS thread than rts_pause."
+            : "error: rts_resume: the rts is not paused. Did you forget to call rts_pause?");
+
         stg_exit(EXIT_FAILURE);
     }
 
-    rts_paused = false;
-    releaseAllCapabilities(n_capabilities, rtsPaused.capability, getMyTask());
+    // Check that we own all capabilities.
+    for (uint i = 0; i < n_capabilities; i++)
+    {
+        Capability *cap = capabilities[i];
+        if (cap->running_task != task)
+        {
+            errorBelch ("error: rts_resume: the pausing thread does not own all capabilities."
+                        "   Have you manually released a capability after calling rts_pause?");
+            stg_exit(EXIT_FAILURE);
+        }
+    }
+
+    // Now we own all capabilities so we own rts_pausing_task.
+    rts_pausing_task = NULL;
+
+    // releaseAllCapabilities will not block because the current task owns all
+    // capabilities.
+    releaseAllCapabilities(n_capabilities, NULL, task);
     exitMyTask();
 }
 
 // See RtsAPI.h
 bool rts_isPaused(void)
 {
-    return rts_paused;
+    return rts_pausing_task != NULL;
 }
 
-// Call cb for all StgTSOs. *user is a user defined payload to cb. It's not
-// used by the RTS.
-// rts_listThreads should only be called when the RTS is paused, i.e. rts_pause
-// was called before.
+// Check that the rts_pause was called on this thread/task. If not, outputs an
+// error and exits with EXIT_FAILURE.
+void assert_isPausedOnMyTask(void)
+{
+    if (rts_pausing_task == NULL)
+    {
+        errorBelch ("error: rts_listThreads: the rts is not paused. Did you forget to call rts_pause?");
+        stg_exit(EXIT_FAILURE);
+    }
+    else if (rts_pausing_task != myTask())
+    {
+        errorBelch ("error: rts_listThreads: must be called from the same thread as rts_pause.");
+        stg_exit(EXIT_FAILURE);
+    }
+}
+
+// See RtsAPI.h
 void rts_listThreads(ListThreadsCb cb, void *user)
 {
+    assert_isPausedOnMyTask();
+
+    // rts_pausing_task == myTask(). This implies that the rts is paused and can
+    // only be resumed by the current thread. Hence it is safe to read global
+    // thread data.
+
     for (uint32_t g=0; g < RtsFlags.GcFlags.generations; g++) {
         StgTSO *tso = generations[g].threads;
         while (tso != END_TSO_QUEUE) {
@@ -724,13 +834,11 @@ static void list_roots_helper(void *user, StgClosure **p) {
     ctx->cb(ctx->user, *p);
 }
 
-// Call cb for all StgClosures reachable from threadStableNameTable and
-// threadStablePtrTable. *user is a user defined payload to cb. It's not
-// used by the RTS.
-// rts_listMiscRoots should only be called when the RTS is paused, i.e.
-// rts_pause was called before.
+// See RtsAPI.h
 void rts_listMiscRoots (ListRootsCb cb, void *user)
 {
+    assert_isPausedOnMyTask();
+
     struct list_roots_ctx ctx;
     ctx.cb = cb;
     ctx.user = user;
@@ -740,21 +848,18 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
 }
 
 #else
-RtsPaused rts_pause (void)
+void rts_pause (void)
 {
     errorBelch("Warning: Pausing the RTS is only possible for "
                "multithreaded RTS.");
-    RtsPaused rtsPaused = {
-            .pausing_task = NULL,
-            .capability = NULL
-        };
-    return rtsPaused;
+    stg_exit(EXIT_FAILURE);
 }
 
-void rts_resume (RtsPaused cap STG_UNUSED)
+void rts_resume (void)
 {
     errorBelch("Warning: Unpausing the RTS is only possible for "
                "multithreaded RTS.");
+    stg_exit(EXIT_FAILURE);
 }
 
 bool rts_isPaused()

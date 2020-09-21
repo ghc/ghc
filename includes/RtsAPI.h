@@ -485,36 +485,23 @@ void rts_checkSchedStatus (char* site, Capability *);
 
 SchedulerStatus rts_getSchedStatus (Capability *cap);
 
-// Various bits of information that need to be persisted between rts_pause and
-// rts_resume.
-typedef struct RtsPaused_ {
-    // The task (i.e. OS thread) on which rts_pause() was called. This is used
-    // in rts_resume() to check that it is called on the same OS thread.
-    Task *pausing_task;
+// Halt execution of all Haskell threads (OS threads may continue) by acquiring
+// all capabilities. Blocks untill pausing is completed. This is different to
+// rts_lock() because rts_pause() pauses all capabilities while rts_lock() only
+// pauses a single capability. rts_pause() and rts_resume() must be executed
+// from the same OS thread. Must not be called when the rts is already paused.
+void rts_pause (void);
 
-    // The capability owned by pausing_task (possibly NULL) just before calling
-    // rts_resume(). On rts_resume(), the pausing_task will retain ownership
-    // of this capability (if not NULL).
-    Capability *capability;
-} RtsPaused;
-
-// Halt execution of all Haskell threads by acquiring all capabilities. It is
-// different to rts_lock() because rts_pause() pauses all capabilities while
-// rts_lock() only pauses a single capability. rts_pause() and rts_resume()
-// have to be executed from the same OS thread (i.e. myTask() must stay the
-// same). Returns the currently owned capability (possibly NULL). This must be
-// passed back to rts_resume().
-RtsPaused rts_pause (void);
-
-// Counterpart of rts_pause: Continue from a pause.
-// rts_pause() and rts_resume() have to be executed from the same OS thread
-// (i.e. myTask() must stay the same).
-void rts_resume (RtsPaused);
+// Counterpart of rts_pause: Continue from a pause. All capabilities are
+// released. Must be done while RTS is paused and on the same thread as
+// rts_pause().
+void rts_resume (void);
 
 // Tells the current state of the RTS regarding rts_pause() and rts_resume().
 bool rts_isPaused(void);
 
-// List all live threads. Must be done while RTS is paused (see rts_pause()).
+// List all live threads. Must be done while RTS is paused and on the same
+// thread as rts_pause().
 typedef void (*ListThreadsCb)(void *user, StgTSO *);
 void rts_listThreads(ListThreadsCb cb, void *user);
 
