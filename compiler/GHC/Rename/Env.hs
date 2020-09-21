@@ -146,6 +146,7 @@ This behavior might change in the future.  Consider this
 alternate module B:
 
     module B where
+        {-# DEPRECATED T, f "Don't use" #-}
         data T = T
         f T = T
 
@@ -1157,8 +1158,12 @@ lookupGlobalOccRn_overloaded_expr overload_ok rdr_name =
 Note [NoFieldSelectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Field selector functions are crucial to GHC's internal record mechanics.
-Therefore we generate selectors regardless of the FieldSelectors extension, and
-hide selectors only in the expression when they are created under NoFieldSelectos.
+Therefore we generate selector functions regardless of the FieldSelectors extension,
+but when they are created under NoFieldSelectors, they are hidden from the set of variables in expressions
+(i.e. they can't be used as functions).
+They are still available inside record construction, updates and patterns.
+In order to avoid name clashes, selector names are mangled in the same way as DuplicateRecordFields
+(cf. 'GHC.Types.FieldLabel.mkFieldLabelOccs').
 -}
 
 -- | Look up a variable or record selectors.
