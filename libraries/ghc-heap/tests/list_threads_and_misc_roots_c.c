@@ -23,10 +23,10 @@ void collectMiscRootsCallback(void *user, StgClosure* closure){
 }
 
 void* listThreads_thread(void* unused){
-    RtsPaused paused = rts_pause();
+    rts_pause();
     rts_listThreads(&collectTSOsCallback, NULL);
     rts_listMiscRoots(&collectMiscRootsCallback, NULL);
-    rts_resume(paused);
+    rts_resume();
 
     return NULL;
 }
