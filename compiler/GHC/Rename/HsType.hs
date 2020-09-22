@@ -28,7 +28,7 @@ module GHC.Rename.HsType (
         -- Binding related stuff
         bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
-        rnImplicitBndrs, bindSigTyVarsFV, bindHsQTyVars,
+        rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars, extractDataDefnKindVars,
@@ -173,7 +173,7 @@ rn_hs_sig_wc_type scoping ctxt hs_ty thing_inside
            AlwaysBind       -> pure tv_rdrs
            BindUnlessForall -> forAllOrNothing (isLHsInvisForAllTy hs_ty) tv_rdrs
            NeverBind        -> pure []
-       ; rnImplicitBndrs Nothing implicit_bndrs $ \ vars ->
+       ; rnImplicitTvOccs Nothing implicit_bndrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; (res, fvs2) <- thing_inside wcs vars hs_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
@@ -208,7 +208,7 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
           , text "Type applications in patterns must bind fresh variables, without shadowing."
           ]
     (wcVars, ibVars) <- partition_nwcs varsNotInScope
-    rnImplicitBndrsNoDups ctxt Nothing ibVars $ \ ibVars' -> do
+    rnImplicitTvBndrs ctxt Nothing ibVars $ \ ibVars' -> do
       (wcVars', hs_ty', fvs) <- rnWcBody ctxt wcVars hs_ty
       let sig_ty = HsPS
             { hsps_body = hs_ty'
@@ -360,7 +360,7 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
        ; vars0 <- forAllOrNothing (isLHsInvisForAllTy hs_ty)
            $ filterInScope rdr_env
            $ extractHsTyRdrTyVars hs_ty
-       ; rnImplicitBndrs Nothing vars0 $ \ vars ->
+       ; rnImplicitTvOccs Nothing vars0 $ \ vars ->
     do { (body', fvs) <- rnLHsTyKi (mkTyKiEnv ctx level RnTypeBody) hs_ty
 
        ; return ( HsIB { hsib_ext = vars
@@ -425,17 +425,17 @@ forAllOrNothing has_outer_forall fvs = case has_outer_forall of
     traceRn "forAllOrNothing" $ text "no explicit forall. implicit binders:" <+> ppr fvs
     pure fvs
 
-rnImplicitBndrs :: Maybe assoc
-                -- ^ @'Just' _@ => an associated type decl
-                -> FreeKiTyVars
-                -- ^ Surface-syntax free vars that we will implicitly bind.
-                -- May have duplicates, which are removed here.
-                -> ([Name] -> RnM (a, FreeVars))
-                -> RnM (a, FreeVars)
-rnImplicitBndrs mb_assoc implicit_vs_with_dups thing_inside
+rnImplicitTvOccs :: Maybe assoc
+                 -- ^ @'Just' _@ => an associated type decl
+                 -> FreeKiTyVars
+                 -- ^ Surface-syntax free vars that we will implicitly bind.
+                 -- May have duplicates, which are removed here.
+                 -> ([Name] -> RnM (a, FreeVars))
+                 -> RnM (a, FreeVars)
+rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
   = do { let implicit_vs = nubL implicit_vs_with_dups
 
-       ; traceRn "rnImplicitBndrs" $
+       ; traceRn "rnImplicitTvOccs" $
          vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
 
          -- Use the currently set SrcSpan as the new source location for each Name.
@@ -446,34 +446,10 @@ rnImplicitBndrs mb_assoc implicit_vs_with_dups thing_inside
        ; bindLocalNamesFV vars $
          thing_inside vars }
 
-rnImplicitBndrsNoDups :: HsDocContext
-                      -> Maybe assoc
-                      -- ^ @'Just' _@ => an associated type decl
-                      -> FreeKiTyVars
-                      -- ^ Surface-syntax free vars that we will implicitly bind.
-                      -- Duplicate variables will cause a compile-time error regarding repeated bindings.
-                      -> ([Name] -> RnM (a, FreeVars))
-                      -> RnM (a, FreeVars)
-rnImplicitBndrsNoDups ctx mb_assoc implicit_vs_with_dups thing_inside
-  = do { implicit_vs <- forM (NE.groupBy eqLocated $ sortBy cmpLocated implicit_vs_with_dups) $ \case
-           (x :| []) -> return x
-           (x :| _) -> do addErr $ text "Variable" <+> text "`" <> ppr x <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
-                          return x
-
-       ; traceRn "rnImplicitBndrsNoDups" $
-         vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
-
-         -- Use the currently set SrcSpan as the new source location for each Name.
-         -- See Note [Source locations for implicitly bound type variables].
-       ; loc <- getSrcSpanM
-       ; vars <- mapM (newTyVarNameRn mb_assoc . L loc . unLoc) implicit_vs
-
-       ; bindLocalNamesFV vars $
-         thing_inside vars }
 {-
 Note [Source locations for implicitly bound type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When bringing implicitly bound type variables into scope (in rnImplicitBndrs),
+When bringing implicitly bound type variables into scope (in rnImplicitTvOccs),
 we do something peculiar: we drop the original SrcSpan attached to each
 variable and replace it with the currently set SrcSpan. Moreover, this new
 SrcSpan is usually /less/ precise than the original one, and that's OK. To see
@@ -492,6 +468,31 @@ As a result, we make the `SrcSpan`s for `a` and `b` span the entirety of the
 type signature, since the type signature implicitly carries their binding
 sites. This is less precise, but more accurate.
 -}
+
+rnImplicitTvBndrs :: HsDocContext
+                  -> Maybe assoc
+                  -- ^ @'Just' _@ => an associated type decl
+                  -> FreeKiTyVars
+                  -- ^ Surface-syntax free vars that we will implicitly bind.
+                  -- Duplicate variables will cause a compile-time error regarding repeated bindings.
+                  -> ([Name] -> RnM (a, FreeVars))
+                  -> RnM (a, FreeVars)
+rnImplicitTvBndrs ctx mb_assoc implicit_vs_with_dups thing_inside
+  = do { implicit_vs <- forM (NE.groupBy eqLocated $ sortBy cmpLocated $ implicit_vs_with_dups) $ \case
+           (x :| []) -> return x
+           (x :| _) -> do addErr $ text "Variable" <+> text "`" <> ppr x <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
+                          return x
+
+       ; traceRn "rnImplicitTvBndrs" $
+         vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
+
+         -- Use the currently set SrcSpan as the new source location for each Name.
+         -- See Note [Source locations for implicitly bound type variables].
+       ; loc <- getSrcSpanM
+       ; vars <- mapM (newTyVarNameRn mb_assoc . L loc . unLoc) implicit_vs
+
+       ; bindLocalNamesFV vars $
+         thing_inside vars }
 
 {- ******************************************************
 *                                                       *
@@ -974,12 +975,12 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
                 , text "body_remaining" <+> ppr body_remaining
                 ]
 
-       ; rnImplicitBndrs mb_assoc implicit_kvs $ \ implicit_kv_nms' ->
+       ; rnImplicitTvOccs mb_assoc implicit_kvs $ \ implicit_kv_nms' ->
          bindLHsTyVarBndrs doc NoWarnUnusedForalls mb_assoc hs_tv_bndrs $ \ rn_bndrs ->
            -- This is the only call site for bindLHsTyVarBndrs where we pass
            -- NoWarnUnusedForalls, which suppresses -Wunused-foralls warnings.
            -- See Note [Suppress -Wunused-foralls when binding LHsQTyVars].
-    do { let -- The SrcSpan that rnImplicitBndrs will attach to each Name will
+    do { let -- The SrcSpan that rnImplicitTvOccs will attach to each Name will
              -- span the entire declaration to which the LHsQTyVars belongs,
              -- which will be reflected in warning and error messages. We can
              -- be a little more precise than that by pointing to the location
@@ -1033,7 +1034,7 @@ Then:
   bring Names into scope.
 
 * bndr_kv_occs, body_kv_occs, and implicit_kvs can contain duplicates. All
-  duplicate occurrences are removed when we bind them with rnImplicitBndrs.
+  duplicate occurrences are removed when we bind them with rnImplicitTvOccs.
 
 Finally, you may wonder why filterFreeVarsToBind removes in-scope variables
 from bndr/body_kv_occs.  How can anything be in scope?  Answer:
@@ -1666,7 +1667,7 @@ See Note [Ordering of implicit variables].
 
 It is common for lists of free type variables to contain duplicates. For
 example, in `f :: a -> a`, the free type variable list is [a, a]. When these
-implicitly bound variables are brought into scope (with rnImplicitBndrs),
+implicitly bound variables are brought into scope (with rnImplicitTvOccs),
 duplicates are removed with nubL.
 
 Note [Ordering of implicit variables]
@@ -1979,7 +1980,7 @@ extract_tv tv acc =
 -- Deletes duplicates in a list of Located things. This is used to:
 --
 -- * Delete duplicate occurrences of implicitly bound type/kind variables when
---   bringing them into scope (in rnImplicitBndrs).
+--   bringing them into scope (in rnImplicitTvOccs).
 --
 -- * Delete duplicate occurrences of named wildcards (in rn_hs_sig_wc_type and
 --   rnHsWcType).

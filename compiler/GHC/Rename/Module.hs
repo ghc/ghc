@@ -729,7 +729,7 @@ rnFamInstEqn doc atfi rhs_kvars
            -- to implicitly bind anything, per the previous comment.
            pat_kity_vars_with_dups ++ rhs_kvars
 
-       ; rnImplicitBndrs mb_cls all_imp_vars $ \all_imp_var_names' ->
+       ; rnImplicitTvOccs mb_cls all_imp_vars $ \all_imp_var_names' ->
          bindLHsTyVarBndrs doc WarnUnusedForalls
                            Nothing (fromMaybe [] mb_bndrs) $ \bndrs' ->
          -- Note: If we pass mb_cls instead of Nothing here,
@@ -742,7 +742,7 @@ rnFamInstEqn doc atfi rhs_kvars
 
           -- Report unused binders on the LHS
           -- See Note [Unused type variables in family instances]
-       ; let -- The SrcSpan that rnImplicitBndrs will attach to each Name will
+       ; let -- The SrcSpan that rnImplicitTvOccs will attach to each Name will
              -- span the entire type family instance, which will be reflected in
              -- -Wunused-type-patterns warnings. We can be a little more precise
              -- than that by pointing to the LHS of the instance instead, which
@@ -2250,7 +2250,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
 
         ; let ctxt = ConDeclCtx new_names
 
-        ; rnImplicitBndrs Nothing implicit_bndrs $ \ implicit_tkvs ->
+        ; rnImplicitTvOccs Nothing implicit_bndrs $ \ implicit_tkvs ->
           bindLHsTyVarBndrs ctxt WarnUnusedForalls
                             Nothing explicit_tkvs $ \ explicit_tkvs ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
