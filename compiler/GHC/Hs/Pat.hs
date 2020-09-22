@@ -615,14 +615,13 @@ pprPat (XPat ext) = case ghcPass @p of
 pprUserCon :: (OutputableBndr con, OutputableBndrId p)
            => con -> HsConPatDetails (GhcPass p) -> SDoc
 pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
-pprUserCon c details     = pprPrefixOcc c <+> pprConArgs details
+pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
 
-pprTyArgs :: (OutputableBndrId p) => [HsPatSigType (GhcPass p)] -> SDoc
-pprTyArgs tyargs = fsep (map (\ty -> char '@' <> ppr ty) tyargs)
 
 pprConArgs :: (OutputableBndrId p)
            => HsConPatDetails (GhcPass p) -> SDoc
 pprConArgs (PrefixCon ts pats) = fsep (pprTyArgs ts : map (pprParendLPat appPrec) pats)
+  where pprTyArgs tyargs = fsep (map (\ty -> char '@' <> ppr ty) tyargs)
 pprConArgs (InfixCon p1 p2)    = sep [ pprParendLPat appPrec p1
                                      , pprParendLPat appPrec p2 ]
 pprConArgs (RecCon rpats)      = ppr rpats
