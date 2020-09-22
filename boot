@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--validate', action='store_true', help='Run in validate mode')
 parser.add_argument('--required-tag', type=str, action='append', default=set())
 parser.add_argument('--hadrian', action='store_true', help='Do not assume the make base build system')
+parser.add_argument('--skip-url-rewrites', action='store_true', help='Do not check submodule urls')
 args = parser.parse_args()
 
 def print_err(s):
@@ -190,7 +191,8 @@ def check_build_mk():
                 http://ghc.haskell.org/trac/ghc/wiki/Building/Using#Buildconfiguration
             """))
 
-check_for_url_rewrites()
+if not args.skip_url_rewrites:
+    check_for_url_rewrites()
 if not args.hadrian:
     boot_pkgs()
 autoreconf()
