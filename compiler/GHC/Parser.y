@@ -53,7 +53,6 @@ import GHC.Hs
 
 import GHC.Driver.Phases  ( HscSource(..) )
 import GHC.Driver.Types   ( IsBootInterface(..), WarningTxt(..) )
-import GHC.Driver.Session
 import GHC.Driver.Backpack.Syntax
 import GHC.Unit.Info
 
