@@ -1,4 +1,4 @@
-module Rules.Lint
+module Rules.Lint.Base
   ( lintRules
   ) where
 
