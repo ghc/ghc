@@ -1113,8 +1113,7 @@ example of this is:
     data T a b = C (Show a) b => MkT b
 
 Here, the existential context (C (Show a) b) does technically mention the last
-type variable b. But this is OK, because expanding the type synonym C would
-give us the context (Show a), which doesn't mention b. Therefore, we must make
-sure to expand type synonyms before performing this check. Not doing so led to
-#13813.
+type variable b. But this is OK, because expanding the type synonym C would give
+us the context (Show a), which doesn't mention b. Therefore, we must make sure
+to expand type synonyms before performing this check. Not doing so led to #13813.
 -}

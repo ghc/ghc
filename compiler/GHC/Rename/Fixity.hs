@@ -1,11 +1,8 @@
-{-# LANGUAGE ViewPatterns #-}
-
 {-
-
 This module contains code which maintains and manipulates the
 fixity environment during renaming.
-
 -}
+
 module GHC.Rename.Fixity
    ( MiniFixityEnv
    , addLocalFixities
@@ -13,8 +10,7 @@ module GHC.Rename.Fixity
    , lookupFixityRn_help
    , lookupFieldFixityRn
    , lookupTyFixityRn
-   )
-where
+   ) where
 
 import GHC.Prelude
 
