@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, MagicHash #-}
+{-# LANGUAGE CPP #-}
 
 -- | Dynamically lookup up values from modules and loading them.
 module GHC.Runtime.Loader (
