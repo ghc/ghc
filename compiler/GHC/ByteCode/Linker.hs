@@ -31,7 +31,8 @@ import GHC.Driver.Types
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Builtin.PrimOps
-import GHC.Unit
+import GHC.Unit.Types
+import GHC.Unit.Module.Name
 import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
