@@ -1,10 +1,10 @@
-module Rules.Lint
+module Rules.Lint.Base
   ( lintRules
   ) where
 
-import Base
-import Settings.Builders.Common
-import System.Directory (findExecutable)
+import           Base
+import           Settings.Builders.Common
+import           System.Directory         (findExecutable)
 
 lintRules :: Rules ()
 lintRules = "lint:base" ~> lint base
