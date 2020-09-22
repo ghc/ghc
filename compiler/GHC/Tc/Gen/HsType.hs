@@ -428,7 +428,7 @@ tcHsSigType ctxt sig_ty
        -- Spit out the implication (and perhaps fail fast)
        -- See Note [Failure in local type signatures] in GHC.Tc.Solver
        ; traceTc "tcHsSigType 2" (ppr implic)
-       ; emitFlatConstraints (mkImplicWC (unitBag implic))
+       ; simplifyAndEmitFlatConstraints (mkImplicWC (unitBag implic))
 
        ; ty <- zonkTcType ty
        ; checkValidType ctxt ty
@@ -498,7 +498,7 @@ returned by buildTvImplication in tc_hs_sig_type.  See Note [Skolem
 escape prevention] in GHC.Tc.Utils.TcType for why it is unsolvable
 (the unification variable for b's kind is untouchable).
 
-Then, in GHC.Tc.Solver.emitFlatConstraints (called from tcHsSigType)
+Then, in GHC.Tc.Solver.simplifyAndEmitFlatConstraints (called from tcHsSigType)
 we'll try to float out the constraint, be unable to do so, and fail.
 See GHC.Tc.Solver Note [Failure in local type signatures] for more
 detail on this.
@@ -509,8 +509,9 @@ there are skolems from the class decl which are in scope; but it's fine
 not to because tcClassDecl1 has a solveEqualities wrapped around all
 the tcClassSigType calls.
 
-That's why tcHsSigType does emitFlatConstraints (which fails fast) but
-tcClassSigType just does emitImplication (which does not).  Ugh.
+That's why tcHsSigType does simplifyAndEmitFlatConstraints (which
+fails fast) but tcClassSigType just does emitImplication (which does
+not).  Ugh.
 
 c.f. see also Note [Skolem escape and forall-types]. The difference
 is that we don't need to simplify at a forall type, only at the
@@ -551,7 +552,8 @@ tc_top_lhs_type mode (L loc sig_ty@(HsSig { sig_bndrs = outer_bndrs
                     ; tc_lhs_type mode body kind }
 
        ; imp_or_exp_tkvs <- bitraverse zonkAndScopedSort pure imp_or_exp_tkvs
-       ; reportUnsolvedEqualities InstSkol imp_or_exp_tkvs tclvl wanted
+       ; reportUnsolvedEqualities InstSkol (either id binderVars imp_or_exp_tkvs) tclvl wanted
+            -- Yuk to all this either stuff.  TODO
        ; let ty1 = either mkSpecForAllTys mkInvisForAllTys imp_or_exp_tkvs ty
        ; kvs <- kindGeneralizeAll ty1  -- "All" because it's a top-level type
        ; final_ty <- zonkTcTypeToType (mkInfForAllTys kvs ty1)
