@@ -1119,7 +1119,7 @@ tcConArgs :: ConLike
           -> TCvSubst            -- Instantiating substitution for constructor type
           -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
 tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
-  PrefixCon type_args arg_pats -> do -- withTypecheckedTyArgPats type_args $ \ty_arg_types -> do
+  PrefixCon type_args arg_pats -> do
         { checkTc (con_arity == no_of_args)     -- Check correct arity
                   (arityErr (text "constructor") con_like con_arity no_of_args)
 
