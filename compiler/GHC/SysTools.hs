@@ -1,3 +1,6 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 {-
 -----------------------------------------------------------------------------
 --
@@ -7,8 +10,6 @@
 --
 -----------------------------------------------------------------------------
 -}
-
-{-# LANGUAGE CPP, MultiWayIf, ScopedTypeVariables #-}
 
 module GHC.SysTools (
         -- * Initialisation
