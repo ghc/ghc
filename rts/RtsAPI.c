@@ -652,14 +652,14 @@ rts_unlock (Capability *cap)
 Task * rts_pausing_task = NULL;
 
 // See RtsAPI.h
-void rts_pause (void)
+Capability * rts_pause (void)
 {
     // Return immediately if this thread already paused the RTS. If another
     // thread has paused the RTS, then rts_pause will block until rts_resume is
     // called (and compete with other threads calling rts_pause). The blocking
     // behavior is implied by the use of `stopAllCapabilities`.
     Task * task = getMyTask();
-    if (rts_pausing_task == task) return;
+    if (rts_pausing_task == task) return task->cap;
 
     // The current task must not own a capability. This is true when a new
     // thread is stareted, or when making a safe FFI call. If
@@ -740,10 +740,13 @@ void rts_pause (void)
 
     // Now we own all capabilities so we own rts_pausing_task.
     rts_pausing_task = task;
+
+    return task->cap;
 }
 
-// See RtsAPI.h
-void rts_resume (void)
+// See RtsAPI.h The cap argument is here just for symmetry with rts_pause and to
+// match the pattern of rts_lock/rts_unlock.
+void rts_resume (Capability * cap STG_UNUSED)
 {
     Task * task = getMyTask(); // This thread has ownership over its Task.
 
@@ -845,14 +848,14 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
 }
 
 #else
-void rts_pause (void)
+Capability * rts_pause (void)
 {
     errorBelch("Warning: Pausing the RTS is only possible for "
                "multithreaded RTS.");
     stg_exit(EXIT_FAILURE);
 }
 
-void rts_resume (void)
+void rts_resume (Capability * cap)
 {
     errorBelch("Warning: Unpausing the RTS is only possible for "
                "multithreaded RTS.");
