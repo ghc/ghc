@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP                #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE MultiWayIf         #-}
+
+{-# OPTIONS_HADDOCK not-home #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1998
@@ -18,9 +24,6 @@ Note [The Type-related module hierarchy]
 -}
 
 -- We expose the relevant stuff from this module via the Type module
-{-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE CPP, MultiWayIf, PatternSynonyms, BangPatterns, DeriveDataTypeable #-}
-
 module GHC.Core.TyCo.Rep (
         TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
 

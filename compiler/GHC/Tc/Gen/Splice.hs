@@ -570,8 +570,8 @@ For correct pattern-match warnings it's crucial that we annotate the Origin
 consistently (#17270). In the future we could offer the Origin as part of the
 TH AST. That would enable us to give quotes from the current module get
 FromSource origin, and/or third library authors to tag certain parts of
-generated code as FromSource to enable warnings. That effort is tracked in
-#14838.
+generated code as FromSource to enable warnings.
+That effort is tracked in #14838.
 -}
 
 {-
