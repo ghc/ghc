@@ -528,29 +528,32 @@ rnConPatAndThen :: NameMaker
 
 rnConPatAndThen mk con = \case
   PrefixCon tyargs pats -> do
-    con' <- lookupConCps con
-    tyargs' <- forM tyargs $ \t ->
-      liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
-    pats' <- rnLPatsAndThen mk pats
-    return $ ConPat
+    { con' <- lookupConCps con
+    ; tyargs' <- forM tyargs $ \t ->
+        liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
+    ; pats' <- rnLPatsAndThen mk pats
+    ; return $ ConPat
       { pat_con_ext = noExtField
       , pat_con = con'
       , pat_args = PrefixCon tyargs' pats'
       }
+    }
   InfixCon pat1 pat2 -> do
-    con' <- lookupConCps con
-    pat1' <- rnLPatAndThen mk pat1
-    pat2' <- rnLPatAndThen mk pat2
-    fixity <- liftCps $ lookupFixityRn (unLoc con')
-    liftCps $ mkConOpPatRn con' fixity pat1' pat2'
+    { con' <- lookupConCps con
+    ; pat1' <- rnLPatAndThen mk pat1
+    ; pat2' <- rnLPatAndThen mk pat2
+    ; fixity <- liftCps $ lookupFixityRn (unLoc con')
+    ; liftCps $ mkConOpPatRn con' fixity pat1' pat2'
+    }
   RecCon rpats -> do
-    con' <- lookupConCps con
-    rpats' <- rnHsRecPatsAndThen mk con' rpats
-    return $ ConPat
+    { con' <- lookupConCps con
+    ; rpats' <- rnHsRecPatsAndThen mk con' rpats
+    ; return $ ConPat
       { pat_con_ext = noExtField
       , pat_con = con'
       , pat_args = RecCon rpats'
       }
+    }
 
 checkUnusedRecordWildcardCps :: SrcSpan -> Maybe [Name] -> CpsRn ()
 checkUnusedRecordWildcardCps loc dotdot_names =
