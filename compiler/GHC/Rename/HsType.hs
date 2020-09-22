@@ -485,10 +485,7 @@ rnImplicitTvBndrs ctx mb_assoc implicit_vs_with_dups thing_inside
        ; traceRn "rnImplicitTvBndrs" $
          vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
 
-         -- Use the currently set SrcSpan as the new source location for each Name.
-         -- See Note [Source locations for implicitly bound type variables].
-       ; loc <- getSrcSpanM
-       ; vars <- mapM (newTyVarNameRn mb_assoc . L loc . unLoc) implicit_vs
+       ; vars <- mapM (newTyVarNameRn mb_assoc) implicit_vs
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
