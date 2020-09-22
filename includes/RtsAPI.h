@@ -485,11 +485,13 @@ void rts_checkSchedStatus (char* site, Capability *);
 
 SchedulerStatus rts_getSchedStatus (Capability *cap);
 
-// Halt execution of all Haskell threads (OS threads may continue) by acquiring
-// all capabilities. Blocks untill pausing is completed. This is different to
-// rts_lock() because rts_pause() pauses all capabilities while rts_lock() only
-// pauses a single capability. rts_pause() and rts_resume() must be executed
-// from the same OS thread. Must not be called when the rts is already paused.
+// Halt execution of all Haskell threads by acquiring all capabilities (safe FFI
+// calls may continue). This is different to rts_lock() which only pauses a
+// single capability. rts_resume() must later be called on the same thread to
+// resume the RTS. Only one thread at a time can keep the rts paused. The
+// rts_pause function will block until the current thread is given exclusive
+// permission to pause the RTS. If the RTS was already paused by the current OS
+// thread, then rts_pause will return immediately and have no effect.
 void rts_pause (void);
 
 // Counterpart of rts_pause: Continue from a pause. All capabilities are
@@ -501,12 +503,12 @@ void rts_resume (void);
 bool rts_isPaused(void);
 
 // List all live threads. Must be done while RTS is paused and on the same
-// thread as rts_pause().
+// thread that called rts_pause().
 typedef void (*ListThreadsCb)(void *user, StgTSO *);
 void rts_listThreads(ListThreadsCb cb, void *user);
 
-// List all non-thread GC roots. Must be done while RTS is paused (see
-// rts_pause()).
+// List all non-thread GC roots. Must be done while RTS is paused  on the same
+// thread that called rts_pause().
 typedef void (*ListRootsCb)(void *user, StgClosure *);
 void rts_listMiscRoots(ListRootsCb cb, void *user);
 

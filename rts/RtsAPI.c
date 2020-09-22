@@ -654,6 +654,13 @@ Task * rts_pausing_task = NULL;
 // See RtsAPI.h
 void rts_pause (void)
 {
+    // Return immediately if this thread already paused the RTS. If another
+    // thread has paused the RTS, then rts_pause will block until rts_resume is
+    // called (and compete with other threads calling rts_pause). The blocking
+    // behavior is implied by the use of `stopAllCapabilities`.
+    Task * task = getMyTask();
+    if (rts_pausing_task == task) return;
+
     // The current task must not own a capability. This is true when a new
     // thread is stareted, or when making a safe FFI call. If
     // `task->cap->running_task == task` then that is also ok because the
@@ -661,7 +668,6 @@ void rts_pause (void)
     // (rather than ASSERT which only happens with `-debug`) because this is a
     // user facing function and we want good error reporting. We also don't
     // expect rts_pause to be performance critical.
-    Task * task = getMyTask();
     if (task->cap && task->cap->running_task == task)
     {
         // This task owns a capability (at it can't be taken by other capabilities).
@@ -670,15 +676,6 @@ void rts_pause (void)
                "   Perhaps a 'foreign import unsafe' should be 'safe'?")
             : ("error: rts_pause: attempting to pause from a Task that owns a capability.\n"
                "   Have you already acquired a capability e.g. with rts_lock?"));
-        stg_exit(EXIT_FAILURE);
-    }
-
-    // Note that if the rts was paused by another task/thread, then we block
-    // instead of error. It's only an error if the same thread tries to pause
-    // twice in a row.
-    if (rts_pausing_task == task)
-    {
-        errorBelch("error: rts_pause: attempting to pause an already paused RTS.");
         stg_exit(EXIT_FAILURE);
     }
 

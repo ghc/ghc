@@ -30,6 +30,7 @@ void pauseAndResume
 
     // Pause and assert.
     rts_pause();
+    rts_pause(); // This should have no effect and return immediately.
     if(!rts_isPaused()) {
         errorBelch("Expected the RTS to be paused.");
         exit(1);
