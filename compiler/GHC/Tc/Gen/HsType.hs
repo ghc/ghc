@@ -30,7 +30,7 @@ module GHC.Tc.Gen.HsType (
         bindExplicitTKBndrs_Tv, bindExplicitTKBndrs_Skol,
             bindExplicitTKBndrs_Q_Tv, bindExplicitTKBndrs_Q_Skol,
 
-        tcOuterSigTKBndrs, zonkAndSortOuter,
+        tcOuterSigTKBndrs, scopedSortOuter,
 
         bindOuterFamEqnTKBndrs_Q_Skol, bindOuterFamEqnTKBndrs_Q_Tv,
         bindOuterSigTKBndrs_Tv, bindOuterSigTKBndrs_Skol,
@@ -474,7 +474,7 @@ tc_hs_sig_type skol_info (L loc (HsSig { sig_bndrs = outer_bndrs
        -- Any remaining variables (unsolved in the solveEqualities)
        -- should be in the global tyvars, and therefore won't be quantified
 
-       ; (outer_tv_bndrs :: [InvisTVBinder]) <- zonkAndSortOuter outer_bndrs
+       ; (outer_tv_bndrs :: [InvisTVBinder]) <- scopedSortOuter outer_bndrs
 
        ; let ty1 = mkInvisForAllTys outer_tv_bndrs ty
 
@@ -3056,13 +3056,16 @@ tcTKTelescope mode tele thing_inside = case tele of
             -- but we want [VarBndr TyVar ArgFlag]
           ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
 
-zonkAndSortOuter :: OuterTyVarBndrs [TcTyVar] [TcInvisTVBinder]
-                 -> TcM [TcInvisTVBinder]
-zonkAndSortOuter (OuterImplicit imp_tvs)
+scopedSortOuter :: OuterTyVarBndrs [TcTyVar] [TcInvisTVBinder]
+                -> TcM [TcInvisTVBinder]
+-- Sort any /implicit/ binders into dependency order
+--     (zonking first so we can see that ordre
+-- /Explicit/ ones are already in the right order
+scopedSortOuter (OuterImplicit imp_tvs)
   = do { imp_tvs <- zonkAndScopedSort imp_tvs
        ; return [Bndr tv SpecifiedSpec | tv <- imp_tvs] }
-zonkAndSortOuter (OuterExplicit exp_tvs)
-  = -- No need to dependency-sort explicit quantifiers
+scopedSortOuter (OuterExplicit exp_tvs)
+  = -- No need to dependency-sort (or zonk) explicit quantifiers
     return exp_tvs
 
 tcOuterSigTKBndrs
@@ -3085,7 +3088,7 @@ tcExplicitTKBndrs :: OutputableBndrFlag flag
                   -> [LHsTyVarBndr flag GhcRn]
                   -> TcM a
                   -> TcM ([VarBndr TyVar flag], a)
--- Push level, capture constraints, solve them, and emit an
+-- Push level, capture constraints, and emit an
 -- implication constraint with a ForAllSkol ic_info, so that it
 -- is subject to a telescope test.
 tcExplicitTKBndrs mode bndrs thing_inside

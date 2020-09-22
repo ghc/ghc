@@ -612,9 +612,7 @@ cvtConstr (ForallC tvs ctxt con)
 
         all_tvs = tvs' ++ outer_exp_tvs
 
-        outer_exp_tvs = case outer_bndrs of
-          OuterImplicit{}     -> []
-          OuterExplicit bndrs -> bndrs
+        outer_exp_tvs = outerExplicitBndrs outer_bndrs
 
     add_forall tvs' cxt' con@(ConDeclH98 { con_ex_tvs = ex_tvs, con_mb_cxt = cxt })
       = con { con_forall = noLoc $ not (null all_tvs)
