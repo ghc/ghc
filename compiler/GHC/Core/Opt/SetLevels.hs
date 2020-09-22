@@ -882,9 +882,8 @@ float a boxed version
 and replace the original (f x) with
    case (case y of I# r -> r) of r -> blah
 
-Being able to float unboxed expressions is sometimes important; see
-#12603.  I'm not sure how /often/ it is important, but it's
-not hard to achieve.
+Being able to float unboxed expressions is sometimes important; see #12603.
+I'm not sure how /often/ it is important, but it's not hard to achieve.
 
 We only do it for a fixed collection of types for which we have a
 convenient boxing constructor (see boxingDataCon_maybe).  In
