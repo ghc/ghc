@@ -93,8 +93,6 @@ import Data.IORef( IORef )
 import GHC.Types.Unique.Set
 import GHC.Core.Multiplicity
 
-import qualified Data.Semigroup as S
-
 {-
 Note [TcCoercions]
 ~~~~~~~~~~~~~~~~~~
@@ -279,12 +277,6 @@ instance Data.Data HsWrapper where
   toConstr (WpMultCoercion _) = wpMultCoercion_constr
 
   dataTypeOf _ = hsWrapper_dataType
-
-instance S.Semigroup HsWrapper where
-  (<>) = (<.>)
-
-instance Monoid HsWrapper where
-  mempty = WpHole
 
 hsWrapper_dataType :: Data.DataType
 hsWrapper_dataType
