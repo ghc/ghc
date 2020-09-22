@@ -32,6 +32,7 @@ import GHC.Prelude
 import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
 
 import GHC.Hs
+import GHC.Rename.Utils
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
@@ -1036,7 +1037,9 @@ arithSeqEltType (Just fl) res_ty
 ----------------
 tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTc]
 tcTupArgs args tys
-  = ASSERT( equalLength args tys ) mapM go (args `zip` tys)
+  = do MASSERT( equalLength args tys )
+       checkTupSize (length args)
+       mapM go (args `zip` tys)
   where
     go (L l (Missing {}),     arg_ty) = do { mult <- newFlexiTyVarTy multiplicityTy
                                            ; return (L l (Missing (Scaled mult arg_ty))) }
