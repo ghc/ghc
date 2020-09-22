@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
