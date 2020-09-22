@@ -105,7 +105,7 @@ import GHC.Data.OrdList
 import GHC.Utils.Misc ( readRational, readHexRational )
 
 import GHC.Types.SrcLoc
-import GHC.Unit
+import GHC.Unit.Types
 import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
                          IntegralLit(..), FractionalLit(..),
                          SourceText(..) )

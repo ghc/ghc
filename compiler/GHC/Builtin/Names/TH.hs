@@ -9,7 +9,8 @@ module GHC.Builtin.Names.TH where
 import GHC.Prelude ()
 
 import GHC.Builtin.Names( mk_known_key_name )
-import GHC.Unit
+import GHC.Unit.Types
+import GHC.Unit.Module.Name
 import GHC.Types.Name( Name )
 import GHC.Types.Name.Occurrence( tcName, clsName, dataName, varName )
 import GHC.Types.Name.Reader( RdrName, nameRdrName )

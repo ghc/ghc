@@ -36,8 +36,11 @@ module GHC.Driver.Finder (
 
 import GHC.Prelude
 
-import GHC.Unit
+import GHC.Unit.Types
+import GHC.Unit.Module
+import GHC.Unit.Home
 import GHC.Unit.State
+
 import GHC.Driver.Types
 import GHC.Data.FastString
 import GHC.Utils.Misc
