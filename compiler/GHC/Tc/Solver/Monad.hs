@@ -1300,7 +1300,7 @@ This is triggered by test case typecheck/should_compile/SplitWD.
 
 Note [Examples of how Derived shadows helps completeness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#10009, a very nasty example:
+Ticket #10009, a very nasty example:
 
     f :: (UnF (F b) ~ b) => F b -> ()
 

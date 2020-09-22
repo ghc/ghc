@@ -1,14 +1,15 @@
-{-
-(c) The University of Glasgow 2006
-(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-
--}
-
-{-# LANGUAGE CPP, DeriveFunctor, MultiWayIf, TupleSections,
-    ScopedTypeVariables #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
 
 -- | Type subsumption and unification
 module GHC.Tc.Utils.Unify (
