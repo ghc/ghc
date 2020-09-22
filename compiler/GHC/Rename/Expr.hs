@@ -282,7 +282,6 @@ rnExpr (ExplicitList x _  exps)
 
 rnExpr (ExplicitTuple x tup_args boxity)
   = do { checkTupleSection tup_args
-       ; checkTupSize (length tup_args)
        ; (tup_args', fvs) <- mapAndUnzipM rnTupArg tup_args
        ; return (ExplicitTuple x tup_args' boxity, plusFVs fvs) }
   where

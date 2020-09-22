@@ -1,0 +1,9 @@
+
+T6148b.hs:3:5: error:
+    • A 63-tuple is too large for GHC
+        (max size is 62)
+        Workaround: use nested tuples or define a data type
+    • In the expression:
+        (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)
+      In an equation for ‘b’:
+          b = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)

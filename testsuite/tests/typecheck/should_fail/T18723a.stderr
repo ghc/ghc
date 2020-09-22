@@ -1,0 +1,13 @@
+
+T18723a.hs:4:3: error:
+    • A 63-tuple is too large for GHC
+        (max size is 62)
+        Workaround: use nested tuples or define a data type
+    • In the type ‘(Int, Int, Int, Int, Int, Int, Int, Int, Int, Int,
+                    Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int,
+                    Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int,
+                    Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int,
+                    Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int,
+                    Int)’
+      In the definition of data constructor ‘MkT1’
+      In the data declaration for ‘T1’

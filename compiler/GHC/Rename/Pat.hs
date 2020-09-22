@@ -38,8 +38,8 @@ module GHC.Rename.Pat (-- main entry points
               -- Literals
               rnLit, rnOverLit,
 
-             -- Pattern Error messages that are also used elsewhere
-             checkTupSize, patSigErr
+             -- Pattern Error message that is also used elsewhere
+             patSigErr
              ) where
 
 -- ENH: thin imports to only what is necessary for patterns
@@ -60,7 +60,7 @@ import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
-                           , checkTupSize , unknownSubordinateErr )
+                           , unknownSubordinateErr )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 import GHC.Types.Name
@@ -498,8 +498,7 @@ rnPatAndThen mk (ListPat _ pats)
           False -> return (ListPat Nothing pats') }
 
 rnPatAndThen mk (TuplePat x pats boxed)
-  = do { liftCps $ checkTupSize (length pats)
-       ; pats' <- rnLPatsAndThen mk pats
+  = do { pats' <- rnLPatsAndThen mk pats
        ; return (TuplePat x pats' boxed) }
 
 rnPatAndThen mk (SumPat x pat alt arity)

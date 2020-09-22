@@ -83,6 +83,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Utils.Unify
 import GHC.IfaceToCore
+import GHC.Iface.Load
 import GHC.Tc.Solver
 import GHC.Tc.Utils.Zonk
 import GHC.Core.TyCo.Rep
@@ -106,8 +107,6 @@ import GHC.Types.Var.Env
 import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import GHC.Settings.Constants ( mAX_CTUPLE_SIZE )
-import GHC.Utils.Error( MsgDoc )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
@@ -1112,6 +1111,7 @@ tc_hs_type mode rn_ty@(HsExplicitTupleTy _ tys) exp_kind
        ; let kind_con   = tupleTyCon           Boxed arity
              ty_con     = promotedTupleDataCon Boxed arity
              tup_k      = mkTyConApp kind_con ks
+       ; checkTupSize arity
        ; checkExpectedKind rn_ty (mkTyConApp ty_con (ks ++ taus)) tup_k exp_kind }
   where
     arity = length tys
@@ -1266,32 +1266,27 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
          -- Drop any uses of 1-tuple constraints here.
          -- See Note [Ignore unary constraint tuples]
       -> check_expected_kind tau_ty constraintKind
-      |  arity > mAX_CTUPLE_SIZE
-      -> failWith (bigConstraintTuple arity)
       |  otherwise
-      -> let tycon = cTupleTyCon arity in
-         check_expected_kind (mkTyConApp tycon tau_tys) constraintKind
+      -> do let tycon = cTupleTyCon arity
+            checkCTupSize arity
+            check_expected_kind (mkTyConApp tycon tau_tys) constraintKind
     BoxedTuple -> do
       let tycon = tupleTyCon Boxed arity
+      checkTupSize arity
       checkWiredInTyCon tycon
       check_expected_kind (mkTyConApp tycon tau_tys) liftedTypeKind
-    UnboxedTuple ->
+    UnboxedTuple -> do
       let tycon    = tupleTyCon Unboxed arity
           tau_reps = map kindRep tau_kinds
           -- See also Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
           arg_tys  = tau_reps ++ tau_tys
-          res_kind = unboxedTupleKind tau_reps in
+          res_kind = unboxedTupleKind tau_reps
+      checkTupSize arity
       check_expected_kind (mkTyConApp tycon arg_tys) res_kind
   where
     arity = length tau_tys
     check_expected_kind ty act_kind =
       checkExpectedKind rn_ty ty act_kind exp_kind
-
-bigConstraintTuple :: Arity -> MsgDoc
-bigConstraintTuple arity
-  = hang (text "Constraint tuple arity too large:" <+> int arity
-          <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
-       2 (text "Instead, use a nested tuple")
 
 {-
 Note [Ignore unary constraint tuples]

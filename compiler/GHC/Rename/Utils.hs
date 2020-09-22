@@ -12,7 +12,6 @@ This module contains miscellaneous functions related to renaming.
 module GHC.Rename.Utils (
         checkDupRdrNames, checkShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,
-        checkTupSize,
         addFvRn, mapFvRn, mapMaybeFvRn,
         warnUnusedMatches, warnUnusedTypePatterns,
         warnUnusedTopBinds, warnUnusedLocalBinds,
@@ -58,7 +57,6 @@ import GHC.Driver.Session
 import GHC.Data.FastString
 import Control.Monad
 import Data.List
-import GHC.Settings.Constants ( mAX_TUPLE_SIZE )
 import qualified Data.List.NonEmpty as NE
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -572,15 +570,6 @@ typeAppErr what (L _ k)
   = hang (text "Illegal visible" <+> text what <+> text "application"
             <+> quotes (char '@' <> ppr k))
        2 (text "Perhaps you intended to use TypeApplications")
-
-checkTupSize :: Int -> RnM ()
-checkTupSize tup_size
-  | tup_size <= mAX_TUPLE_SIZE
-  = return ()
-  | otherwise
-  = addErr (sep [text "A" <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
-                 nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
-                 nest 2 (text "Workaround: use nested tuples or define a data type")])
 
 
 {-

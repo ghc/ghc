@@ -33,6 +33,7 @@ import GHC.Prelude
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferRho )
 
 import GHC.Hs
+import GHC.Iface.Load
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
 import GHC.Tc.Utils.Monad
@@ -511,6 +512,7 @@ Fortunately that's what matchExpectedFunTySigma returns anyway.
               tc = tupleTyCon boxity arity
               -- NB: tupleTyCon does not flatten 1-tuples
               -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
+        ; checkTupSize arity
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
                                                penv (scaledThing pat_ty)
                      -- Unboxed tuples have RuntimeRep vars, which we discard:

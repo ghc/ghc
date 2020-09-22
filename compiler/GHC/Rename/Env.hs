@@ -70,7 +70,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Error  ( MsgDoc )
 import GHC.Builtin.Names( rOOT_MAIN )
-import GHC.Types.Basic  ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )
+import GHC.Types.Basic  ( pprWarningTxtForMsg, TopLevelFlag(..) )
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique.Set ( uniqSetAny )
@@ -278,20 +278,6 @@ lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
 -- Note [Errors in lookup functions]
 lookupExactOcc_either :: Name -> RnM (Either MsgDoc Name)
 lookupExactOcc_either name
-  | Just thing <- wiredInNameTyThing_maybe name
-  , Just tycon <- case thing of
-                    ATyCon tc                 -> Just tc
-                    AConLike (RealDataCon dc) -> Just (dataConTyCon dc)
-                    _                         -> Nothing
-  , Just tupleSort <- tyConTuple_maybe tycon
-  = do { let tupArity = case tupleSort of
-               -- Unboxed tuples have twice as many arguments because of the
-               -- 'RuntimeRep's (#17837)
-               UnboxedTuple -> tyConArity tycon `div` 2
-               _ -> tyConArity tycon
-       ; checkTupSize tupArity
-       ; return (Right name) }
-
   | isExternalName name
   = return (Right name)
 
