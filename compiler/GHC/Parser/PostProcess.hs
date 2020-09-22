@@ -636,7 +636,7 @@ mkGadtDecl names ty = do
         = (RecCon (L loc rf), res_ty, [])
         | otherwise
         = let (arg_types, res_type, anns) = splitHsFunType body_ty
-          in (PrefixCon [] arg_types, res_type, anns)
+          in (PrefixCon noTypeArgs arg_types, res_type, anns)
   pure ( ConDeclGADT { con_g_ext  = noExtField
                      , con_names  = names
                      , con_forall = L (getLoc ty) $ isJust mtvs
@@ -1625,7 +1625,7 @@ dataConBuilderDetails (PrefixDataConBuilder flds _)
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
 dataConBuilderDetails (PrefixDataConBuilder flds _)
-  = PrefixCon [] (map hsLinear (toList flds))
+  = PrefixCon noTypeArgs (map hsLinear (toList flds))
 
 -- Infix constructor, e.g. data T = Int :! Bool
 dataConBuilderDetails (InfixDataConBuilder lhs _ rhs)
