@@ -11,7 +11,7 @@ This module contains miscellaneous functions related to renaming.
 module GHC.Rename.Utils (
         checkDupRdrNames, checkShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,
-        checkTupSize,
+        checkTupSize, checkCTupSize,
         addFvRn, mapFvRn, mapMaybeFvRn,
         warnUnusedMatches, warnUnusedTypePatterns,
         warnUnusedTopBinds, warnUnusedLocalBinds,
@@ -57,7 +57,7 @@ import GHC.Driver.Session
 import GHC.Data.FastString
 import Control.Monad
 import Data.List
-import GHC.Settings.Constants ( mAX_TUPLE_SIZE )
+import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
 import qualified Data.List.NonEmpty as NE
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -572,7 +572,9 @@ typeAppErr what (L _ k)
             <+> quotes (char '@' <> ppr k))
        2 (text "Perhaps you intended to use TypeApplications")
 
-checkTupSize :: Int -> RnM ()
+-- | Ensure that a boxed or unboxed tuple has arity no larger than
+-- 'mAX_TUPLE_SIZE'.
+checkTupSize :: Int -> TcM ()
 checkTupSize tup_size
   | tup_size <= mAX_TUPLE_SIZE
   = return ()
@@ -580,6 +582,16 @@ checkTupSize tup_size
   = addErr (sep [text "A" <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
                  nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
                  nest 2 (text "Workaround: use nested tuples or define a data type")])
+
+-- | Ensure that a constraint tuple has arity no larger than 'mAX_CTUPLE_SIZE'.
+checkCTupSize :: Int -> TcM ()
+checkCTupSize tup_size
+  | tup_size <= mAX_CTUPLE_SIZE
+  = return ()
+  | otherwise
+  = addErr (hang (text "Constraint tuple arity too large:" <+> int tup_size
+                  <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
+               2 (text "Instead, use a nested tuple"))
 
 
 {-
