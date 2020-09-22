@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
@@ -6,9 +11,6 @@
 A ``lint'' pass to check for Core correctness.
 See Note [Core Lint guarantee].
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ViewPatterns, ScopedTypeVariables, DeriveFunctor, MultiWayIf #-}
 
 module GHC.Core.Lint (
     lintCoreBindings, lintUnfolding,
