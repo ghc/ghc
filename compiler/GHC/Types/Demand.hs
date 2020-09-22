@@ -1,12 +1,14 @@
+{-# LANGUAGE CPP                  #-}
+{-# LANGUAGE FlexibleInstances    #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 \section[Demand]{@Demand@: A decoupled implementation of a demand domain}
 -}
-
-{-# LANGUAGE CPP, FlexibleInstances, TypeSynonymInstances, RecordWildCards #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Types.Demand (
         StrDmd, UseDmd(..), Count,

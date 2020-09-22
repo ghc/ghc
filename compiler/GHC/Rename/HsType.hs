@@ -1,12 +1,11 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 -}
-
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
 
 module GHC.Rename.HsType (
         -- Type related stuff

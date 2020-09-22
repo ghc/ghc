@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- | Free regs map for SPARC
 module GHC.CmmToAsm.Reg.Linear.SPARC where
