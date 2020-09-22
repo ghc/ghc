@@ -607,8 +607,8 @@ cvtConstr (ForallC tvs ctxt con)
             , con_mb_cxt = add_cxt cxt' cxt }
       where
         outer_bndrs'
-          | null all_tvs = mkHsOuterImplicit
-          | otherwise    = mkHsOuterExplicit all_tvs
+          | null all_tvs = OuterImplicit noExtField
+          | otherwise    = OuterExplicit all_tvs
 
         all_tvs = tvs' ++ outer_exp_tvs
 
@@ -646,7 +646,7 @@ mk_gadt_decl :: [Located RdrName] -> HsConDeclDetails GhcPs -> LHsType GhcPs
 mk_gadt_decl names args res_ty
   = ConDeclGADT { con_g_ext  = noExtField
                 , con_names  = names
-                , con_bndrs  = noLoc mkHsOuterImplicit
+                , con_bndrs  = noLoc (OuterImplicit noExtField)
                 , con_mb_cxt = Nothing
                 , con_args   = args
                 , con_res_ty = res_ty
@@ -1879,7 +1879,7 @@ mkHsQualTy ctxt loc ctxt' ty
                                  , hst_body  = ty }
 
 mkHsOuterFamEqnTyVarBndrs :: Maybe [LHsTyVarBndr () GhcPs] -> HsOuterFamEqnTyVarBndrs GhcPs
-mkHsOuterFamEqnTyVarBndrs = maybe mkHsOuterImplicit mkHsOuterExplicit
+mkHsOuterFamEqnTyVarBndrs = maybe (OuterImplicit noExtField) OuterExplicit
 
 --------------------------------------------------------------------
 --      Turning Name back into RdrName
