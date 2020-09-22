@@ -81,7 +81,8 @@ import GHC.Core.Predicate
 import GHC.Types.Var
 import GHC.Types.Basic
 import GHC.Data.FastString
-import GHC.Unit
+import GHC.Unit.Types
+import GHC.Unit.Module.Name
 import GHC.Utils.Binary
 import GHC.Types.Unique.Set
 import GHC.Builtin.Uniques( mkAlphaTyVarUnique )
