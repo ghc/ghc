@@ -68,7 +68,7 @@ import GHC.Platform
 -- Our intermediate code:
 import GHC.Types.Basic
 import GHC.Cmm.BlockId
-import GHC.Unit ( primUnitId )
+import GHC.Unit.Types ( primUnitId )
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm
