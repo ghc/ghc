@@ -205,14 +205,14 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
             <+> text "are already in scope."
           , text "Type applications in patterns must bind fresh variables, without shadowing."
           ]
-    (wcVars', ibVars') <- partition_nwcs varsNotInScope
-    rnImplicitBndrsNoDups ctxt Nothing ibVars' $ \ ibVars -> do
-      (wcVars, hs_ty', fvs) <- rnWcBody ctxt wcVars' hs_ty
+    (wcVars, ibVars) <- partition_nwcs varsNotInScope
+    rnImplicitBndrsNoDups ctxt Nothing ibVars $ \ ibVars' -> do
+      (wcVars', hs_ty', fvs) <- rnWcBody ctxt wcVars hs_ty
       let sig_ty = HsPS
             { hsps_body = hs_ty'
             , hsps_ext = HsPSRn
-              { hsps_nwcs    = wcVars
-              , hsps_imp_tvs = ibVars
+              { hsps_nwcs    = wcVars'
+              , hsps_imp_tvs = ibVars'
               }
             }
       (res, fvs') <- thing_inside sig_ty
