@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE MultiWayIf      #-}
+{-# LANGUAGE PatternSynonyms #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -60,9 +66,6 @@
   identity.
 -}
 
-{-# LANGUAGE CPP, MultiWayIf, PatternSynonyms #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.SetLevels (
         setLevels,
 

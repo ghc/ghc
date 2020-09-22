@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
-             DeriveTraversable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveTraversable  #-}
 
 --------------------------------------------------------------------------------
 -- | Boolean formulas without quantifiers and without negation.
