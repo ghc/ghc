@@ -138,7 +138,7 @@ import GHC.Utils.Misc
 import GHC.Parser.Annotation
 import Data.List
 import Data.Foldable
-import GHC.Driver.Session ( WarningFlag(..) )
+import GHC.Driver.Flags ( WarningFlag(..) )
 import GHC.Utils.Panic
 
 import Control.Monad

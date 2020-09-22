@@ -55,7 +55,7 @@ import GHC.Prelude hiding (mod)
 import GHC.Hs
 
 import GHC.Types.SrcLoc
-import GHC.Driver.Session ( WarningFlag(..) )
+import GHC.Driver.Flags ( WarningFlag(..) )
 import GHC.Utils.Panic
 import GHC.Data.Bag
 

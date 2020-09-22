@@ -49,7 +49,6 @@ import GHC.Data.Bag         ( Bag, emptyBag, listToBag, unitBag, isEmptyBag )
 import GHC.Utils.Monad
 import GHC.Utils.Exception as Exception
 import GHC.Types.Basic
-import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import System.IO
@@ -61,7 +60,8 @@ import Data.List
 -- | Parse the imports of a source file.
 --
 -- Throws a 'SourceError' if parsing fails.
-getImports :: DynFlags
+getImports :: ParserOpts   -- ^ Parser options
+           -> Bool         -- ^ Implicit Prelude?
            -> StringBuffer -- ^ Parse this.
            -> FilePath     -- ^ Filename the buffer came from.  Used for
                            --   reporting parse error locations.
@@ -74,9 +74,9 @@ getImports :: DynFlags
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
-getImports dflags buf filename source_filename = do
+getImports popts implicit_prelude buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
-  case unP parseHeader (initParserState (initParserOpts dflags) buf loc) of
+  case unP parseHeader (initParserState popts buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
       return $ Left $ getErrorMessages pst
@@ -100,7 +100,6 @@ getImports dflags buf filename source_filename = do
                                         . ideclName . unLoc)
                                        ord_idecls
 
-                implicit_prelude = xopt LangExt.ImplicitPrelude dflags
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
                 convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)
@@ -160,7 +159,7 @@ getOptionsFromFile dflags filename
               (hClose)
               (\handle -> do
                   opts <- fmap (getOptions' dflags)
-                               (lazyGetToks dflags' filename handle)
+                               (lazyGetToks (initParserOpts dflags') filename handle)
                   seqList opts $ return opts)
     where -- We don't need to get haddock doc tokens when we're just
           -- getting the options from pragmas, and lazily lexing them
@@ -176,10 +175,10 @@ blockSize :: Int
 -- blockSize = 17 -- for testing :-)
 blockSize = 1024
 
-lazyGetToks :: DynFlags -> FilePath -> Handle -> IO [Located Token]
-lazyGetToks dflags filename handle = do
+lazyGetToks :: ParserOpts -> FilePath -> Handle -> IO [Located Token]
+lazyGetToks popts filename handle = do
   buf <- hGetStringBufferBlock handle blockSize
-  let prag_state = initPragState (initParserOpts dflags) buf loc
+  let prag_state = initPragState popts buf loc
   unsafeInterleaveIO $ lazyLexBuf handle prag_state False blockSize
  where
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
@@ -215,10 +214,10 @@ lazyGetToks dflags filename handle = do
        unsafeInterleaveIO $ lazyLexBuf handle state{buffer=newbuf} False new_size
 
 
-getToks :: DynFlags -> FilePath -> StringBuffer -> [Located Token]
-getToks dflags filename buf = lexAll pstate
+getToks :: ParserOpts -> FilePath -> StringBuffer -> [Located Token]
+getToks popts filename buf = lexAll pstate
  where
-  pstate = initPragState (initParserOpts dflags) buf loc
+  pstate = initPragState popts buf loc
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
   lexAll state = case unP (lexer False return) state of
@@ -235,7 +234,7 @@ getOptions :: DynFlags
            -> FilePath     -- ^ Source filename.  Used for location info.
            -> [Located String] -- ^ Parsed options.
 getOptions dflags buf filename
-    = getOptions' dflags (getToks dflags filename buf)
+    = getOptions' dflags (getToks (initParserOpts dflags) filename buf)
 
 -- The token parser is written manually because Happy can't
 -- return a partial result when it encounters a lexer error.
