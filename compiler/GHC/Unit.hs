@@ -1,6 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DeriveFunctor #-}
 
 -- | Units are library components from Cabal packages compiled and installed in
 -- a database

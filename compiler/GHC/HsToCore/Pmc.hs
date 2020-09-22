@@ -1,12 +1,7 @@
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE TupleSections              #-}
-{-# LANGUAGE ViewPatterns               #-}
-{-# LANGUAGE MultiWayIf                 #-}
-{-# LANGUAGE LambdaCase                 #-}
-{-# LANGUAGE DeriveFunctor              #-}
-{-# LANGUAGE NamedFieldPuns             #-}
-{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE LambdaCase        #-}
 
 -- | This module coverage checks pattern matches. It finds
 --

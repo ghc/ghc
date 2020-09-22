@@ -1,12 +1,11 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+
 -- |
 -- Statistics for per-module compilations
 --
 -- (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 --
-
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Hs.Stats ( ppSourceStats ) where
 

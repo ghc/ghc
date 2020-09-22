@@ -924,15 +924,13 @@ which can still be specialised by the type-class specialiser, something like
 
 BUT if f is strict in the Ord dictionary, we might unpack it, to get
    fw :: (a->a->Bool) -> [a] -> Int# -> a
-and the type-class specialiser can't specialise that.  An example is
-#6056.
+and the type-class specialiser can't specialise that. An example is #6056.
 
 But in any other situation a dictionary is just an ordinary value,
 and can be unpacked.  So we track the INLINABLE pragma, and switch
 off the unpacking in mkWWstr_one (see the isClassPred test).
 
-Historical note: #14955 describes how I got this fix wrong
-the first time.
+Historical note: #14955 describes how I got this fix wrong the first time.
 -}
 
 -- | Context for a 'DataCon' application with a hole for every field, including

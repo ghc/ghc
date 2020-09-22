@@ -1,3 +1,14 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ViewPatterns        #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -9,18 +20,6 @@ Handles @Match@, @GRHSs@, @HsExpr@, and @Qualifier@ datatypes.  In
 general, all of these functions return a renamed thing, and a set of
 free variables.
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DeriveFunctor #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 module GHC.Rename.Pat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
 
@@ -161,8 +160,8 @@ Consider
   g _ = T1
 
 Arguably we should report T2 as unused, even though it appears in a
-pattern, because it never occurs in a constructed position.  See
-#7336.
+pattern, because it never occurs in a constructed position.
+See #7336.
 However, implementing this in the face of pattern synonyms would be
 less straightforward, since given two pattern synonyms
 

@@ -1,15 +1,19 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 {-
 %
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
-
-{-# LANGUAGE CPP, TupleSections, ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies, DataKinds, GADTs, TypeApplications #-}
-{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 module GHC.Tc.Gen.Head
        ( HsExprArg(..), EValArg(..), TcPass(..), Rebuilder
@@ -1089,8 +1093,8 @@ this by checking if the type of the applied function has more argument types
 than supplied arguments.
 
 Previously, GHC computed the number of argument types through tcSplitSigmaTy.
-This is incorrect in the face of nested foralls, however! This caused Trac
-#13311, for instance:
+This is incorrect in the face of nested foralls, however!
+This caused Ticket #13311, for instance:
 
   f :: forall a. (Monoid a) => forall b. (Monoid b) => Maybe a -> Maybe b
 

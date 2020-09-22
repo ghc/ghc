@@ -1,4 +1,5 @@
-{-# LANGUAGE MagicHash, RecordWildCards, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards            #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --

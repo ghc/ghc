@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -5,9 +7,6 @@
 
 Matching guarded right-hand-sides (GRHSs)
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module GHC.HsToCore.GuardedRHSs ( dsGuarded, dsGRHSs, isTrueLHsExpr ) where
 

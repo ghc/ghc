@@ -1,16 +1,16 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ViewPatterns        #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 -}
-
-{-# LANGUAGE CPP, TupleSections, MultiWayIf, RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | Typechecking user-specified @MonoTypes@
 module GHC.Tc.Gen.HsType (
@@ -1905,12 +1905,12 @@ Note [Recursion through the kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider these examples
 
-#11554:
+Ticket #11554:
   data P (x :: k) = Q
   data A :: Type where
     MkA :: forall (a :: A). P a -> A
 
-#12174
+Ticket #12174
   data V a
   data T = forall (a :: T). MkT (V a)
 

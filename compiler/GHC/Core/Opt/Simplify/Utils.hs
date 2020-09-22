@@ -1207,8 +1207,7 @@ Here f occurs just once, in the RHS of fInt. But if we inline it there
 it might make fInt look big, and we'll lose the opportunity to inline f
 at each of fInt's call sites.  The INLINE pragma will only inline when
 the application is saturated for exactly this reason; and we don't
-want PreInlineUnconditionally to second-guess it.  A live example is
-#3736.
+want PreInlineUnconditionally to second-guess it. A live example is #3736.
     c.f. Note [Stable unfoldings and postInlineUnconditionally]
 
 NB: if the pragma is INLINEABLE, then we don't want to behave in

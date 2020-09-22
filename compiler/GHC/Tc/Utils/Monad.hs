@@ -1,14 +1,16 @@
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE ExplicitForAll    #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RecordWildCards   #-}
+
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 {-
 (c) The University of Glasgow 2006
 
 -}
-
-{-# LANGUAGE CPP, ExplicitForAll, FlexibleInstances, BangPatterns #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# LANGUAGE ViewPatterns #-}
-
 
 -- | Functions for working with the typechecker environment (setters,
 -- getters...).

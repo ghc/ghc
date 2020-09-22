@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
@@ -6,9 +11,6 @@
 A ``lint'' pass to check for Core correctness.
 See Note [Core Lint guarantee].
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ViewPatterns, ScopedTypeVariables, DeriveFunctor, MultiWayIf #-}
 
 module GHC.Core.Lint (
     lintCoreBindings, lintUnfolding,
@@ -1864,14 +1866,14 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
 ~~~~~~~~~~~~~~~~~~~~~~~
 It's very bad if simplifying a rule means that one of the template
 variables (ru_bndrs) that /is/ mentioned on the RHS becomes
-not-mentioned in the LHS (ru_args).  How can that happen?  Well, in
-#10602, SpecConstr stupidly constructed a rule like
+not-mentioned in the LHS (ru_args).  How can that happen?  Well, in #10602,
+SpecConstr stupidly constructed a rule like
 
   forall x,c1,c2.
      f (x |> c1 |> c2) = ....
 
-But simplExpr collapses those coercions into one.  (Indeed in
-#10602, it collapsed to the identity and was removed altogether.)
+But simplExpr collapses those coercions into one.  (Indeed in #10602,
+it collapsed to the identity and was removed altogether.)
 
 We don't have a great story for what to do here, but at least
 this check will nail it.

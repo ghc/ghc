@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -48,7 +50,6 @@ The previous patch, to fix polymorphic floatout demand signatures, is
 essential to make this work well!
 -}
 
-{-# LANGUAGE CPP, PatternSynonyms #-}
 module GHC.Core.Opt.StaticArgs ( doStaticArgs ) where
 
 import GHC.Prelude

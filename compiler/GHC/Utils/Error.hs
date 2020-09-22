@@ -1,14 +1,13 @@
+{-# LANGUAGE BangPatterns    #-}
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE LambdaCase      #-}
+{-# LANGUAGE RankNTypes      #-}
+
 {-
 (c) The AQUA Project, Glasgow University, 1994-1998
 
 \section[ErrsUtils]{Utilities for error reporting}
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE LambdaCase #-}
 
 module GHC.Utils.Error (
         -- * Basic types

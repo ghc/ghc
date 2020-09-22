@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns,
-             MultiWayIf, ScopedTypeVariables, MagicHash #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Utility module for the pattern-match coverage checker.
 module GHC.HsToCore.Pmc.Utils (

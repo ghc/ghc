@@ -939,7 +939,7 @@ can change the behavior of the user's code.
 The following four modules produce a program whose output would change depending
 on whether we apply this optimization when IncoherentInstances is in effect:
 
-#########
+=========
     {-# LANGUAGE MultiParamTypeClasses #-}
     module A where
 
@@ -949,8 +949,9 @@ on whether we apply this optimization when IncoherentInstances is in effect:
     class A a => C a b where
       m :: b -> a -> a
 
-#########
-    {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+=========
+    {-# LANGUAGE FlexibleInstances     #-}
+    {-# LANGUAGE MultiParamTypeClasses #-}
     module B where
 
     import A
@@ -961,9 +962,11 @@ on whether we apply this optimization when IncoherentInstances is in effect:
     instance C a [b] where
       m _ = id
 
-#########
-    {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FlexibleContexts #-}
-    {-# LANGUAGE IncoherentInstances #-}
+=========
+    {-# LANGUAGE FlexibleContexts      #-}
+    {-# LANGUAGE FlexibleInstances     #-}
+    {-# LANGUAGE IncoherentInstances   #-}
+    {-# LANGUAGE MultiParamTypeClasses #-}
     module C where
 
     import A
@@ -977,7 +980,7 @@ on whether we apply this optimization when IncoherentInstances is in effect:
     intC :: C Int a => a -> Int -> Int
     intC _ x = int x
 
-#########
+=========
     module Main where
 
     import A

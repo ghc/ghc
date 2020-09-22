@@ -1,21 +1,21 @@
 module Main (main) where
 
-import System.Directory (getCurrentDirectory)
 import Development.Shake
 import Hadrian.Expression
 import Hadrian.Utilities
 import Settings.Parser
+import System.Directory (getCurrentDirectory)
 
 import qualified Base
 import qualified CommandLine
 import qualified Environment
 import qualified Rules
 import qualified Rules.Clean
-import qualified Rules.Lint
 import qualified Rules.Documentation
+import qualified Rules.Lint
 import qualified Rules.Nofib
-import qualified Rules.SourceDist
 import qualified Rules.Selftest
+import qualified Rules.SourceDist
 import qualified Rules.Test
 import qualified UserSettings
 

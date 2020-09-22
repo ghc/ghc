@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
-
 module GHC.Core.Opt.Exitify ( exitifyProgram ) where
 
 {-

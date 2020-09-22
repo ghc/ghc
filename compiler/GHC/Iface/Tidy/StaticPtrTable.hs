@@ -1,3 +1,5 @@
+{-# LANGUAGE ViewPatterns  #-}
+
 -- | Code generation for the Static Pointer Table
 --
 -- (c) 2014 I/O Tweag
@@ -45,7 +47,6 @@
 -- > }
 --
 
-{-# LANGUAGE ViewPatterns, TupleSections #-}
 module GHC.Iface.Tidy.StaticPtrTable
     ( sptCreateStaticBinds
     , sptModuleInitCode

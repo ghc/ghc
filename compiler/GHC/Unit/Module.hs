@@ -1,3 +1,8 @@
+{-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards #-}
+
 {-
 (c) The University of Glasgow, 2004-2006
 
@@ -8,14 +13,6 @@ Simply the name of a module, represented as a FastString.
 These are Uniquable, hence we can build Maps with Modules as
 the keys.
 -}
-
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 module GHC.Unit.Module
     ( module GHC.Unit.Types

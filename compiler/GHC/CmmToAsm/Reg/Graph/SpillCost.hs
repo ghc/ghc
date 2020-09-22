@@ -1,4 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables, GADTs, BangPatterns #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module GHC.CmmToAsm.Reg.Graph.SpillCost (
         SpillCostRecord,
         plusSpillCostRecord,

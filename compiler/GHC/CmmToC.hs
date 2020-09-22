@@ -1,5 +1,7 @@
-{-# LANGUAGE CPP, DeriveFunctor, GADTs, PatternSynonyms #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE CPP           #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GADTs         #-}
+{-# LANGUAGE LambdaCase    #-}
 
 -----------------------------------------------------------------------------
 --

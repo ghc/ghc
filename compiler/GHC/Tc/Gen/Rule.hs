@@ -1,11 +1,10 @@
+{-# LANGUAGE TypeFamilies #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The AQUA Project, Glasgow University, 1993-1998
 
 -}
-
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
 
 -- | Typechecking rewrite rules
 module GHC.Tc.Gen.Rule ( tcRules ) where

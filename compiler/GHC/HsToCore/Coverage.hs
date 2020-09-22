@@ -1,14 +1,13 @@
+{-# LANGUAGE DeriveFunctor            #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE TypeFamilies             #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 {-
 (c) Galois, 2006
 (c) University of Glasgow, 2007
 -}
-
-{-# LANGUAGE NondecreasingIndentation, RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DeriveFunctor #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.HsToCore.Coverage (addTicksToBinds, hpcInitCode) where
 

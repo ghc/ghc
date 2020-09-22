@@ -1,13 +1,12 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies     #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-
 
 This module contains miscellaneous functions related to renaming.
 
 -}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Rename.Utils (
         checkDupRdrNames, checkShadowedRdrNames,

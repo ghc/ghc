@@ -1,4 +1,8 @@
+{-# LANGUAGE CPP              #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections    #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-2012
@@ -193,10 +197,6 @@ STG programs after unarisation have these invariants:
 
   * Binders always have zero (for void arguments) or one PrimRep.
 -}
-
-{-# LANGUAGE CPP, TupleSections, PatternSynonyms #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Stg.Unarise (unarise) where
 

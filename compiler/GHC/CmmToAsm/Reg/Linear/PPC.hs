@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 -- | Free regs map for PowerPC
 module GHC.CmmToAsm.Reg.Linear.PPC where
 

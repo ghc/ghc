@@ -27,8 +27,8 @@ with this note:
     for Stg code that is currently perfectly acceptable for code
     generation.  Solution: don't use it!  (KSW 2000-05).
 
-Since then there were some attempts at enabling it again, as summarised in
-#14787. It's finally decided that we remove all type checking and only look for
+Since then there were some attempts at enabling it again, as summarised in #14787.
+It's finally decided that we remove all type checking and only look for
 basic properties listed above.
 -}
 

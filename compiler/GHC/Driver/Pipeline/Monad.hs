@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE NamedFieldPuns #-}
 -- | The CompPipeline monad and associated ops
 --
 -- Defined in separate module so that it can safely be imported from Hooks

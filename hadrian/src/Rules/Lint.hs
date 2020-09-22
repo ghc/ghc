@@ -7,7 +7,9 @@ import Settings.Builders.Common
 import System.Directory (findExecutable)
 
 lintRules :: Rules ()
-lintRules = "lint:base" ~> lint base
+lintRules = do
+  "lint:base" ~> lint base
+  "lint:compiler" ~> lint compiler
 
 lint :: Action () -> Action ()
 lint lintAction = do
@@ -43,3 +45,31 @@ base = do
                 " -h " <> hlintYaml <> " libraries/base"
   putBuild $ "| " <> cmdLine
   cmd_ cmdLine
+
+compiler :: Action ()
+compiler = do
+  topDir   <- topDirectory
+  buildDir <- buildRoot
+  let stage1Lib      = topDir </> buildDir </> "stage1/lib"
+  let stage1Compiler = topDir </> buildDir </> "stage1/compiler/build"
+  let machDeps       = topDir </> "includes/MachDeps.h"
+  let hsVersions     = topDir </> "compiler/HsVersions.h"
+  let compilerDir    = topDir </> "compiler"
+  let ghcautoconf    = stage1Lib </> "ghcautoconf.h"
+  let ghcplatform    = stage1Lib </> "ghcplatform.h"
+  let pmv            = stage1Compiler </> "primop-vector-uniques.hs-incl"
+  need [ghcautoconf, ghcplatform, machDeps, hsVersions, pmv]
+  let include0  = topDir </> "includes"
+  let include1  = stage1Lib
+  let hlintYaml = topDir </> "compiler/.hlint.yaml"
+  hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
+  let cmdLine = "hlint -j --cpp-define " <> hostArch <>
+                " --cpp-include=" <> include0 <>
+                " --cpp-include=" <> include1 <>
+                " --cpp-include=" <> compilerDir <>
+                " --cpp-include=" <> ghcplatform <>
+                " --cpp-include=" <> stage1Compiler <>
+                " -h " <> hlintYaml <> " compiler"
+  putBuild $ "| " <> cmdLine
+  cmd_ cmdLine
+
