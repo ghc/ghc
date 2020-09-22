@@ -13,6 +13,7 @@ import GHC.Types.Basic     ( IntegralLit(..) )
 import GHC.Driver.Session
 import GHC.Utils.Error     ( pprLocErrMsg )
 import GHC.Data.FastString ( mkFastString )
+import GHC.Parser.Errors.Ppr ( pprError )
 import GHC.Parser.Lexer    as Lexer
                            ( P(..), ParseResult(..), PState(..), Token(..)
                            , initParserState, lexer, mkParserOpts, getErrorMessages)
@@ -39,7 +40,7 @@ parse
 parse dflags fpath bs = case unP (go False []) initState of
     POk _ toks -> reverse toks
     PFailed pst ->
-      let err:_ = bagToList (getErrorMessages pst dflags) in
+      let err:_ = bagToList (fmap pprError (getErrorMessages pst)) in
       panic $ showSDoc dflags $
         text "Hyperlinker parse error:" $$ pprLocErrMsg err
   where
