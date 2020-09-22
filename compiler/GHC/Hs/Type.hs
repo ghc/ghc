@@ -58,7 +58,7 @@ module GHC.Hs.Type (
 
         mkAnonWildCardTy, pprAnonWildCard,
 
-        mkHsOuterImplicit, mkHsOuterExplicit, mapXHsOuterImplicit,
+        mapXHsOuterImplicit,
         mkHsImplicitSigType, mkHsExplicitSigType,
         hsTypeToHsSigType, hsTypeToHsSigWcType,
         mkHsWildCardBndrs, mkHsPatSigType,
@@ -620,27 +620,22 @@ variables so that they can be brought into scope during renaming and
 typechecking.
 -}
 
-mkHsOuterImplicit :: OuterTyVarBndrs NoExtField explicit
-mkHsOuterImplicit = OuterImplicit noExtField
-
-mkHsOuterExplicit :: explicit -> OuterTyVarBndrs implicit explicit
-mkHsOuterExplicit = OuterExplicit
-
-mapXHsOuterImplicit :: (implicit -> implicit) -> OuterTyVarBndrs implicit explicit
-                                              -> OuterTyVarBndrs implicit explicit
-mapXHsOuterImplicit f (OuterImplicit imp)    = OuterImplicit (f imp)
-mapXHsOuterImplicit _ hso@(OuterExplicit {}) = hso
+mapXHsOuterImplicit :: (implicit1 -> implicit2)
+                    -> OuterTyVarBndrs implicit1 explicit
+                    -> OuterTyVarBndrs implicit2 explicit
+mapXHsOuterImplicit f (OuterImplicit imp) = OuterImplicit (f imp)
+mapXHsOuterImplicit _ (OuterExplicit bs)  = OuterExplicit bs
 
 mkHsImplicitSigType :: LHsType GhcPs -> HsSigType GhcPs
 mkHsImplicitSigType body =
   HsSig { sig_ext   = noExtField
-        , sig_bndrs = mkHsOuterImplicit, sig_body = body }
+        , sig_bndrs = OuterImplicit noExtField, sig_body = body }
 
 mkHsExplicitSigType :: [LHsTyVarBndr Specificity GhcPs] -> LHsType GhcPs
                     -> HsSigType GhcPs
 mkHsExplicitSigType bndrs body =
   HsSig { sig_ext = noExtField
-        , sig_bndrs = mkHsOuterExplicit bndrs, sig_body = body }
+        , sig_bndrs = OuterExplicit bndrs, sig_body = body }
 
 -- TODO RGS: Docs
 -- TODO RGS: Consider moving this to GHC.Hs.Utils instead, as it is somewhat analogous
