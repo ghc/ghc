@@ -1,14 +1,12 @@
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE Rank2Types                 #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeFamilies               #-}
 --
 -- Copyright (c) 2018 Andreas Klebinger
 --
-
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DataKinds #-}
 
 module GHC.CmmToAsm.CFG
     ( CFG, CfgEdge(..), EdgeInfo(..), EdgeWeight(..)

@@ -1,8 +1,6 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ApplicativeDo       #-}
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ApplicativeDo #-}
 
 -- | Domain types used in "GHC.HsToCore.Pmc.Solver".
 -- The ultimate goal is to define 'Nabla', which models normalised refinement
