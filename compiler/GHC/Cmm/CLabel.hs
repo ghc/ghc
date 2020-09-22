@@ -1569,12 +1569,12 @@ T15155.a [InlPrag=NOINLINE] :: T15155.A
 
 The emitted assembly is
 
-#### INDIRECTEE
+==== INDIRECTEE
 a1_rXq_closure:                         -- module local haskell value
         .quad   GHC.Types.I#_con_info   -- an Int
         .quad   42
 
-#### BEFORE
+==== BEFORE
 .globl T15155.a_closure                 -- exported newtype wrapped value
 T15155.a_closure:
         .quad   stg_IND_STATIC_info     -- the closure info
@@ -1582,7 +1582,7 @@ T15155.a_closure:
         .quad   0
         .quad   0
 
-#### AFTER
+==== AFTER
 .globl T15155.a_closure                 -- exported newtype wrapped value
 .equiv a1_rXq_closure,T15155.a_closure  -- both are shared
 
