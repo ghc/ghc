@@ -1,0 +1,7 @@
+# HLint configuration file
+# https://github.com/ndmitchell/hlint
+##########################
+
+- ignore: {}
+- warn: {name: Unused LANGUAGE pragma}
+- warn: {name: Use fewer LANGUAGE pragmas}
