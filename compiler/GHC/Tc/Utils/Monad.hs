@@ -1828,8 +1828,8 @@ It's distressingly delicate though:
   the visible type application fails in the monad (throws an exception).
   We must not discard the out-of-scope error.
 
-  Also GHC.Tc.Solver.emitFlatConstraints may fail having emitted some
-  constraints with skolem-escape problems.
+  Also GHC.Tc.Solver.simplifyAndEmitFlatConstraints may fail having
+  emitted some constraints with skolem-escape problems.
 
 * If we discard too /few/ constraints, we may get the misleading
   class constraints mentioned above.  But we may /also/ end up taking

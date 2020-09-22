@@ -80,7 +80,6 @@ import GHC.Types.Basic
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.Bitraversable
 import Data.Function ( on )
 import Data.Functor.Identity
 import Data.List
