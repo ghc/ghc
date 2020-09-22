@@ -587,7 +587,7 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
         // debugBelch("New len: %zu, pageSize: %zu\n", *len, pageSize);
 
         /* Make sure we leave enough vmem for at least three threads.
-           This number was fround through trial and error. We're at least launching
+           This number was found through trial and error. We're at least launching
            that many threads (e.g., itimer). We can't know for sure how much we need,
            but at least we can fail early and give a useful error message in this case. */
         if (((W_) (asLimit.rlim_cur - *len )) < ((W_) (stacksz * 3))) {
