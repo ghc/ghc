@@ -448,7 +448,7 @@ rnImplicitBndrsNoDups :: HsDocContext
                       -- ^ @'Just' _@ => an associated type decl
                       -> FreeKiTyVars
                       -- ^ Surface-syntax free vars that we will implicitly bind.
-                      -- May have duplicates, which are removed here.
+                      -- Duplicate variables will cause a compile-time error regarding repeated bindings.
                       -> ([Name] -> RnM (a, FreeVars))
                       -> RnM (a, FreeVars)
 rnImplicitBndrsNoDups ctx mb_assoc implicit_vs_with_dups thing_inside
