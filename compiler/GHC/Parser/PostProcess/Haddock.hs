@@ -699,7 +699,7 @@ instance HasHaddock (Located (ConDecl GhcPs)) where
         con_doc' <- discardHasInnerDocs $ getConDoc (getLoc (head con_names))
         con_args' <-
           case con_args of
-            PrefixCon _ ts -> PrefixCon [] <$> addHaddock ts
+            PrefixCon _ ts -> PrefixCon noTypeArgs <$> addHaddock ts
             RecCon (L l_rec flds) -> do
               -- discardHasInnerDocs is ok because we don't need this info for GADTs.
               flds' <- traverse (discardHasInnerDocs . addHaddockConDeclField) flds
@@ -720,7 +720,7 @@ instance HasHaddock (Located (ConDecl GhcPs)) where
             pure $ L l_con_decl $
               ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
                            con_doc = con_doc',
-                           con_args = PrefixCon [] ts' }
+                           con_args = PrefixCon noTypeArgs ts' }
           InfixCon t1 t2 -> do
             t1' <- addHaddockConDeclFieldTy t1
             con_doc' <- getConDoc (getLoc con_name)
@@ -873,7 +873,7 @@ addConTrailingDoc l_sep =
               con_args' <- case con_args con_decl of
                 x@(PrefixCon _ [])  -> x <$ reportExtraDocs trailingDocs
                 x@(RecCon (L _ [])) -> x <$ reportExtraDocs trailingDocs
-                PrefixCon _ ts -> PrefixCon [] <$> mapLastM mk_doc_ty ts
+                PrefixCon _ ts -> PrefixCon noTypeArgs <$> mapLastM mk_doc_ty ts
                 InfixCon t1 t2 -> InfixCon t1 <$> mk_doc_ty t2
                 RecCon (L l_rec flds) -> do
                   flds' <- mapLastM mk_doc_fld flds

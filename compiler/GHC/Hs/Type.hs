@@ -50,7 +50,7 @@ module GHC.Hs.Type (
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
-        HsConDetails(..),
+        HsConDetails(..), noTypeArgs,
 
         FieldOcc(..), LFieldOcc, mkFieldOcc,
         AmbiguousFieldOcc(..), mkAmbiguousFieldOcc,
@@ -108,6 +108,7 @@ import GHC.Utils.Misc ( count )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
+import Data.Void
 
 {-
 ************************************************************************
@@ -1126,6 +1127,10 @@ data HsConDetails tyarg arg rec
   | RecCon    rec               -- C { x = p1, y = p2 }
   | InfixCon  arg arg           -- p1 `C` p2
   deriving Data
+
+-- | An empty list that can be used to indicate that there are no type arguments allowed in cases where HsConDetails is applied to Void.
+noTypeArgs :: [Void]
+noTypeArgs = []
 
 instance (Outputable tyarg, Outputable arg, Outputable rec)
          => Outputable (HsConDetails tyarg arg rec) where

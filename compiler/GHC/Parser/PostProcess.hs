@@ -675,7 +675,7 @@ mkGadtDecl names ty = do
         = let (arg_types, res_type) = splitHsFunType body_ty
               arg_types' | linearEnabled = arg_types
                          | otherwise     = map (hsLinear . hsScaledThing) arg_types
-          in (PrefixCon [] arg_types', res_type)
+          in (PrefixCon noTypeArgs arg_types', res_type)
 
   pure $ ConDeclGADT { con_g_ext  = noExtField
                      , con_names  = names
@@ -1813,7 +1813,7 @@ dataConBuilderDetails (PrefixDataConBuilder flds _)
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
 dataConBuilderDetails (PrefixDataConBuilder flds _)
-  = PrefixCon [] (map hsLinear (toList flds))
+  = PrefixCon noTypeArgs (map hsLinear (toList flds))
 
 -- Infix constructor, e.g. data T = Int :! Bool
 dataConBuilderDetails (InfixDataConBuilder lhs _ rhs)

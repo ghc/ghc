@@ -404,7 +404,7 @@ cvtDec (TH.PatSynD nm args dir pat)
        ; returnJustL $ Hs.ValD noExtField $ PatSynBind noExtField $
            PSB noExtField nm' args' pat' dir' }
   where
-    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon [] <$> mapM vNameL args
+    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon noTypeArgs <$> mapM vNameL args
     cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameL a1 <*> vNameL a2
     cvtArgs (TH.RecordPatSyn sels)
       = do { sels' <- mapM vNameL sels
@@ -571,7 +571,7 @@ cvtConstr :: TH.Con -> CvtM (LConDecl GhcPs)
 cvtConstr (NormalC c strtys)
   = do  { c'   <- cNameL c
         ; tys' <- mapM cvt_arg strtys
-        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon [] (map hsLinear tys')) }
+        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon noTypeArgs (map hsLinear tys')) }
 
 cvtConstr (RecC c varstrtys)
   = do  { c'    <- cNameL c
@@ -619,7 +619,7 @@ cvtConstr (GadtC c strtys ty)
   = do  { c'      <- mapM cNameL c
         ; args    <- mapM cvt_arg strtys
         ; ty'     <- cvtType ty
-        ; returnL $ mk_gadt_decl c' (PrefixCon [] $ map hsLinear args) ty'}
+        ; returnL $ mk_gadt_decl c' (PrefixCon noTypeArgs $ map hsLinear args) ty'}
 
 cvtConstr (RecGadtC [] _varstrtys _ty)
   = failWith (text "RecGadtC must have at least one constructor name")

@@ -629,7 +629,7 @@ zonkPatSynDetails :: ZonkEnv
                   -> HsPatSynDetails GhcTc
                   -> HsPatSynDetails GhcTc
 zonkPatSynDetails env (PrefixCon _ as)
-  = PrefixCon [] (map (zonkLIdOcc env) as)
+  = PrefixCon noTypeArgs (map (zonkLIdOcc env) as)
 zonkPatSynDetails env (InfixCon a1 a2)
   = InfixCon (zonkLIdOcc env a1) (zonkLIdOcc env a2)
 zonkPatSynDetails env (RecCon flds)
