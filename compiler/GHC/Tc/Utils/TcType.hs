@@ -1,11 +1,14 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 -}
-
-{-# LANGUAGE CPP, ScopedTypeVariables, MultiWayIf, FlexibleContexts #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Types used in the typechecker
 --

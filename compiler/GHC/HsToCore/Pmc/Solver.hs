@@ -1,11 +1,13 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns        #-}
+
 {-
 Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
          Sebastian Graf <sgraf1337@gmail.com>
          Ryan Scott <ryan.gl.scott@gmail.com>
 -}
-
-{-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns,
-             MultiWayIf, ScopedTypeVariables, MagicHash #-}
 
 -- | Model refinements type as per the
 -- [Lower Your Guards paper](https://dl.acm.org/doi/abs/10.1145/3408989).
@@ -17,6 +19,7 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 -- In terms of the LYG paper, this module is concerned with Sections 3.4, 3.6
 -- and 3.7. E.g., it represents refinement types directly as a bunch of
 -- normalised refinement types 'Nabla'.
+
 module GHC.HsToCore.Pmc.Solver (
 
         Nabla, Nablas(..), initNablas,

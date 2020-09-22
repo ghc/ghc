@@ -1,12 +1,7 @@
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE TupleSections              #-}
-{-# LANGUAGE ViewPatterns               #-}
-{-# LANGUAGE MultiWayIf                 #-}
-{-# LANGUAGE LambdaCase                 #-}
-{-# LANGUAGE DeriveFunctor              #-}
-{-# LANGUAGE NamedFieldPuns             #-}
-{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE LambdaCase        #-}
 
 -- | Desugaring step of the
 -- [Lower Your Guards paper](https://dl.acm.org/doi/abs/10.1145/3408989).

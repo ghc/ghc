@@ -1,12 +1,13 @@
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE MultiWayIf      #-}
+{-# LANGUAGE TupleSections   #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 -}
-
-{-# LANGUAGE CPP, TupleSections, MultiWayIf, PatternSynonyms, BangPatterns #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Monadic type operations
 --

@@ -1,11 +1,13 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 -- (c) The University of Glasgow 2006
 --
 -- FamInstEnv: Type checked family instance declarations
-
-{-# LANGUAGE CPP, GADTs, ScopedTypeVariables, BangPatterns, TupleSections,
-    DeriveFunctor #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Core.FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
