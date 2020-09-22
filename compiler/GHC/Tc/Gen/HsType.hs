@@ -1845,12 +1845,12 @@ Note [Recursion through the kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider these examples
 
-#11554:
+Ticket #11554:
   data P (x :: k) = Q
   data A :: Type where
     MkA :: forall (a :: A). P a -> A
 
-#12174
+Ticket #12174
   data V a
   data T = forall (a :: T). MkT (V a)
 
