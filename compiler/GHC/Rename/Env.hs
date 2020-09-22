@@ -1052,7 +1052,7 @@ lookupOccRn_overloaded_expr overload_ok = lookupOccRnX_maybe global_lookup Looku
         global_lookup n =
           runMaybeT . msum . map MaybeT $
             [ lookupGlobalOccRn_overloaded_expr overload_ok n
-            , fmap LookupOccRnUnique . listToMaybe <$> lookupQualifiedNameGHCi n ]
+            , listToMaybe <$> lookupQualifiedNameGHCi n ]
 
 lookupOccRnX_maybe :: (RdrName -> RnM (Maybe r)) -> (Name -> r) -> RdrName
                    -> RnM (Maybe r)
@@ -1095,7 +1095,8 @@ lookupGlobalOccRn_base :: RdrName -> RnM (Maybe Name)
 lookupGlobalOccRn_base rdr_name =
   runMaybeT . msum . map MaybeT $
     [ fmap gre_name <$> lookupGreRn_maybe rdr_name
-    , listToMaybe <$> lookupQualifiedNameGHCi rdr_name ]
+    , listToMaybe . concatMap nameFromLookupOccRnOverloadedResult
+          <$> lookupQualifiedNameGHCi rdr_name ]
                       -- This test is not expensive,
                       -- and only happens for failed lookups
 
@@ -1111,7 +1112,8 @@ lookupInfoOccRn rdr_name =
   lookupExactOrOrig rdr_name (:[]) $
     do { rdr_env <- getGlobalRdrEnv
        ; let ns = map gre_name (lookupGRE_RdrName rdr_name rdr_env)
-       ; qual_ns <- lookupQualifiedNameGHCi rdr_name
+       ; qual_ns <- concatMap nameFromLookupOccRnOverloadedResult
+          <$> lookupQualifiedNameGHCi rdr_name
        ; return (ns ++ (qual_ns `minusList` ns)) }
 
 data LookupOccRnOverloadedResult
@@ -1122,6 +1124,10 @@ data LookupOccRnOverloadedResult
   -- ^ name refers to one or more record selectors;
   -- If DuplicateRecordFields is disabled, this list will be
   -- a singleton.
+
+nameFromLookupOccRnOverloadedResult :: LookupOccRnOverloadedResult -> [Name]
+nameFromLookupOccRnOverloadedResult (LookupOccRnUnique x) = [x]
+nameFromLookupOccRnOverloadedResult (LookupOccRnSelectors xs) = xs
 
 instance Outputable LookupOccRnOverloadedResult where
   ppr (LookupOccRnUnique x) = text "LookupOccRnUnique " <> ppr x
@@ -1408,7 +1414,7 @@ this requires some refactoring so leave as a TODO
 
 
 
-lookupQualifiedNameGHCi :: RdrName -> RnM [Name]
+lookupQualifiedNameGHCi :: RdrName -> RnM [LookupOccRnOverloadedResult]
 lookupQualifiedNameGHCi rdr_name
   = -- We want to behave as we would for a source file import here,
     -- and respect hiddenness of modules/packages, hence loadSrcInterface.
@@ -1417,6 +1423,13 @@ lookupQualifiedNameGHCi rdr_name
        ; go_for_it dflags is_ghci }
 
   where
+    availNames' (Avail n) = [LookupOccRnUnique n]
+    availNames' (AvailTC _ ns fs) = map LookupOccRnUnique ns
+      ++ map (LookupOccRnSelectors . pure . flSelector) fs
+    check occ (LookupOccRnUnique n) = [ LookupOccRnUnique n | nameOccName n == occ]
+    check occ (LookupOccRnSelectors xs) = case filter ((==occ) . nameOccName) xs of
+      [] -> []
+      xs -> [LookupOccRnSelectors xs]
     go_for_it dflags is_ghci
       | Just (mod,occ) <- isQual_maybe rdr_name
       , is_ghci
@@ -1425,10 +1438,10 @@ lookupQualifiedNameGHCi rdr_name
       = do { res <- loadSrcInterface_maybe doc mod NotBoot Nothing
            ; case res of
                 Succeeded iface
-                  -> return [ name
+                  -> return [ r
                             | avail <- mi_exports iface
-                            , name  <- availNames avail
-                            , nameOccName name == occ ]
+                            , name <- availNames' avail
+                            , r <- check occ name ]
 
                 _ -> -- Either we couldn't load the interface, or
                      -- we could but we didn't find the name in it
