@@ -1,17 +1,11 @@
--- (c) The University of Glasgow, 1992-2006
-
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DeriveFunctor      #-}
-{-# LANGUAGE DeriveFoldable     #-}
 {-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE TypeFamilies       #-}
-{-# LANGUAGE ViewPatterns       #-}
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE PatternSynonyms    #-}
 
+-- (c) The University of Glasgow, 1992-2006
 
 -- | This module contains types that relate to the positions of things
 -- in source files, and allow tagging of those things with locations
