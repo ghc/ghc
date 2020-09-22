@@ -70,6 +70,8 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..))
 import Control.Monad
 
 #include "HsVersions.h"
@@ -453,11 +455,10 @@ rnImplicitBndrsNoDups :: HsDocContext
                       -> ([Name] -> RnM (a, FreeVars))
                       -> RnM (a, FreeVars)
 rnImplicitBndrsNoDups ctx mb_assoc implicit_vs_with_dups thing_inside
-  = do { implicit_vs <- forM (groupBy eqLocated $ sortBy cmpLocated implicit_vs_with_dups) $ \case
-           [x] -> return x
-           (x:_) -> do addErr $ text "Variable" <+> text "`" <> ppr x <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
-                       return x
-           [] -> pprPanic "rnImplicitBndrsNoDups" $ text "Data.List.group somehow managed to produce an empty group."
+  = do { implicit_vs <- forM (NE.groupBy eqLocated $ sortBy cmpLocated implicit_vs_with_dups) $ \case
+           (x :| []) -> return x
+           (x :| _) -> do addErr $ text "Variable" <+> text "`" <> ppr x <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
+                          return x
 
        ; traceRn "rnImplicitBndrsNoDups" $
          vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
