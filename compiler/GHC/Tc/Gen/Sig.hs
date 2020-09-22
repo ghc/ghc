@@ -270,8 +270,8 @@ isCompleteHsSig (HsWC { hswc_ext = wcs, hswc_body = hs_sig_ty })
 no_anon_wc_sig_ty :: LHsSigType GhcRn -> Bool
 no_anon_wc_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
   case outer_bndrs of
-    HsOuterImplicit{}                 -> no_anon_wc_ty body
-    HsOuterExplicit{hso_bndrs = ltvs} -> all no_anon_wc_tvb ltvs && no_anon_wc_ty body
+    OuterImplicit{}    -> no_anon_wc_ty body
+    OuterExplicit ltvs -> all no_anon_wc_tvb ltvs && no_anon_wc_ty body
 
 no_anon_wc_ty :: LHsType GhcRn -> Bool
 no_anon_wc_ty lty = go lty

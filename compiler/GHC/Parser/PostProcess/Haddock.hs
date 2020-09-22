@@ -941,8 +941,8 @@ instance HasHaddock (Located (HsSigType GhcPs)) where
     -- HasHaddock instance for HsType. Is this right? Need Vlad to check.
     extendHdkA l $ do
       case outer_bndrs of
-        HsOuterImplicit{}                  -> pure ()
-        HsOuterExplicit{hso_bndrs = bndrs} -> registerLocHdkA (getLHsTyVarBndrsLoc bndrs)
+        OuterImplicit{}     -> pure ()
+        OuterExplicit bndrs -> registerLocHdkA (getLHsTyVarBndrsLoc bndrs)
       body' <- addHaddock body
       pure $ L l $ HsSig noExtField outer_bndrs body'
 

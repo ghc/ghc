@@ -202,8 +202,8 @@ checkInferredVars ctxt (Just msg) ty =
   where
     sig_ty_bndrs :: LHsSigType GhcPs -> [HsTyVarBndr Specificity GhcPs]
     sig_ty_bndrs (L _ (HsSig{sig_bndrs = outer_bndrs})) = case outer_bndrs of
-      HsOuterImplicit{}                      -> []
-      HsOuterExplicit{hso_bndrs = exp_bndrs} -> map unLoc exp_bndrs
+      OuterImplicit{}         -> []
+      OuterExplicit exp_bndrs -> map unLoc exp_bndrs
 
 {-
 Note [Unobservably inferred type variables]

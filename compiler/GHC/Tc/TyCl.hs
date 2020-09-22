@@ -3252,11 +3252,11 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let (L _ name : _) = names
 
-       ; (imp_or_exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts))
+       ; (outer_bndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts))
            <- pushTcLevelM_    $  -- We are going to generalise
               solveEqualities  $  -- We won't get another crack, and we don't
                                   -- want an error cascade
-              bindOuterSigTKBndrs_Skol outer_bndrs $
+              tcOuterSigTKBndrs outer_bndrs $
               do { ctxt <- tcHsMbContext cxt
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
@@ -3269,16 +3269,14 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                  ; field_lbls <- lookupConstructorFields name
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
-       ; imp_or_exp_tvs <- bitraverse zonkAndScopedSort pure imp_or_exp_tvs
+       ; (outer_tv_bndrs :: [TcInvisTVBinder]) <- zonkAndSortOuter outer_bndrs
 
-       ; tkvs <- kindGeneralizeAll (either mkSpecForAllTys mkInvisForAllTys
-                                           imp_or_exp_tvs $
+       ; tkvs <- kindGeneralizeAll (mkInvisForAllTys outer_tv_bndrs $
                                     mkPhiTy ctxt $
                                     mkVisFunTys arg_tys $
                                     res_ty)
 
-       ; let tvbndrs =  (mkTyVarBinders InferredSpec tkvs)
-                     ++ either (mkTyVarBinders SpecifiedSpec) id imp_or_exp_tvs
+       ; let tvbndrs =  mkTyVarBinders InferredSpec tkvs ++ outer_tv_bndrs
 
              -- Zonk to Types
        ; (ze, tvbndrs) <- zonkTyVarBinders       tvbndrs

@@ -613,8 +613,8 @@ cvtConstr (ForallC tvs ctxt con)
         all_tvs = tvs' ++ outer_exp_tvs
 
         outer_exp_tvs = case outer_bndrs of
-          HsOuterImplicit{}                  -> []
-          HsOuterExplicit{hso_bndrs = bndrs} -> bndrs
+          OuterImplicit{}     -> []
+          OuterExplicit bndrs -> bndrs
 
     add_forall tvs' cxt' con@(ConDeclH98 { con_ex_tvs = ex_tvs, con_mb_cxt = cxt })
       = con { con_forall = noLoc $ not (null all_tvs)
@@ -1412,7 +1412,7 @@ cvtDerivClauseTys tys
          -- unless the TH.Cxt is a singleton list whose type is a bare type
          -- constructor with no arguments.
        ; case tys' of
-           [ty'@(L l (HsSig { sig_bndrs = HsOuterImplicit{}
+           [ty'@(L l (HsSig { sig_bndrs = OuterImplicit{}
                             , sig_body  = L _ (HsTyVar _ NotPromoted _) }))]
                  -> return $ L l $ DctSingle noExtField ty'
            _     -> returnL $ DctMulti noExtField tys' }

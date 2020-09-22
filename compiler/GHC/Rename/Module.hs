@@ -753,8 +753,8 @@ rnFamEqn doc atfi rhs_kvars
        ; let nms_used = extendNameSetList rhs_fvs $
                            inst_tvs ++ nms_dups
              all_nms = case rn_outer_bndrs' of
-                         HsOuterImplicit{hso_ximplicit = imp_var_nms} -> imp_var_nms
-                         HsOuterExplicit{hso_bndrs = bndrs} -> hsLTyVarNames bndrs
+                         OuterImplicit imp_var_nms -> imp_var_nms
+                         OuterExplicit bndrs       -> hsLTyVarNames bndrs
        ; warnUnusedTypePatterns all_nms nms_used
 
        ; let eqn_fvs = rhs_fvs `plusFV` pat_fvs
@@ -1956,8 +1956,8 @@ rnLDerivStrategy doc mds thing_inside
                  -- Consider factoring this out into its own function in the same
                  -- vein as hsScopedTvs.
                  via_tvs = case via_outer_bndrs of
-                             HsOuterImplicit{hso_ximplicit = imp_tvs} -> imp_tvs
-                             HsOuterExplicit{hso_bndrs = exp_bndrs} -> hsLTyVarNames exp_bndrs
+                             OuterImplicit imp_tvs   -> imp_tvs
+                             OuterExplicit exp_bndrs -> hsLTyVarNames exp_bndrs
              -- Check if there are any nested `forall`s, which are illegal in a
              -- `via` type.
              -- See Note [No nested foralls or contexts in instance types]
