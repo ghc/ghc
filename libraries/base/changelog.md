@@ -32,6 +32,9 @@
   * Add `MonadFix` and `MonadZip` instances for `Complex`
 
   * Add `Ix` instances for tuples of size 6 through 15
+
+  * `catMaybes` is now implemented using `mapMaybe`, so that it is both a "good
+    consumer" and "good producer" for list-fusion (#18574)
    
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
