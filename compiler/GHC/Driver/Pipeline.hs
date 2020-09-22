@@ -44,6 +44,7 @@ import GHC.Unit
 import GHC.Unit.State
 import GHC.Platform.Ways
 import GHC.Platform.ArchOS
+import GHC.Driver.Config
 import GHC.Parser.Header
 import GHC.Parser.Errors.Ppr
 import GHC.Driver.Phases
@@ -1116,7 +1117,9 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
         (hspp_buf,mod_name,imps,src_imps) <- liftIO $ do
           do
             buf <- hGetStringBuffer input_fn
-            eimps <- getImports dflags buf input_fn (basename <.> suff)
+            let imp_prelude = xopt LangExt.ImplicitPrelude dflags
+                popts = initParserOpts dflags
+            eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
               Left errs -> throwErrors (fmap pprError errs)
               Right (src_imps,imps,L _ mod_name) -> return
