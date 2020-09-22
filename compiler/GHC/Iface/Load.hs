@@ -13,6 +13,7 @@ module GHC.Iface.Load (
         -- Importing one thing
         tcLookupImported_maybe, importDecl,
         checkWiredInTyCon, ifCheckWiredInThing,
+        checkTupSize, checkCTupSize,
 
         -- RnM/TcM functions
         loadModuleInterface, loadModuleInterfaces,
@@ -56,6 +57,8 @@ import GHC.Builtin.Names
 import GHC.Builtin.Utils
 import GHC.Builtin.PrimOps    ( allThePrimOps, primOpFixity, primOpOcc )
 import GHC.Types.Id.Make      ( seqId, EnableBignumRules(..) )
+import GHC.Core.ConLike
+import GHC.Core.DataCon
 import GHC.Core.Rules
 import GHC.Core.TyCon
 import GHC.Types.Annotations
@@ -78,7 +81,6 @@ import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Fingerprint
 import GHC.Driver.Hooks
-import GHC.Types.FieldLabel
 import GHC.Iface.Rename
 import GHC.Types.Unique.DSet
 import GHC.Driver.Plugins
@@ -133,9 +135,30 @@ tcImportDecl_maybe name
   = do  { when (needWiredInHomeIface thing)
                (initIfaceTcRn (loadWiredInHomeIface name))
                 -- See Note [Loading instances for wired-in things]
+          -- Error if attempting to use a prefix tuple name (,, ... ,,) that
+          -- exceeds mAX_TUPLE_SIZE.
+        ; whenIsJust (tuple_ty_thing_maybe thing) checkTupSize
         ; return (Succeeded thing) }
   | otherwise
   = initIfaceTcRn (importDecl name)
+  where
+    -- Returns @Just arity@ if the supplied TyThing corresponds to a tuple
+    -- type or data constructor. Returns @Nothing@ otherwise.
+    tuple_ty_thing_maybe :: TyThing -> Maybe Arity
+    tuple_ty_thing_maybe thing
+      | Just tycon <- case thing of
+                        ATyCon tc                 -> Just tc
+                        AConLike (RealDataCon dc) -> Just (dataConTyCon dc)
+                        _                         -> Nothing
+      , Just tupleSort <- tyConTuple_maybe tycon
+      = Just $ case tupleSort of
+          -- Unboxed tuples have twice as many arguments because of the
+          -- 'RuntimeRep's (#17837)
+          UnboxedTuple -> tyConArity tycon `div` 2
+          _ -> tyConArity tycon
+
+      | otherwise
+      = Nothing
 
 importDecl :: Name -> IfM lcl (MaybeErr MsgDoc TyThing)
 -- Get the TyThing for this Name from an interface file
@@ -248,6 +271,27 @@ needWiredInHomeIface :: TyThing -> Bool
 -- Only for TyCons; see Note [Loading instances for wired-in things]
 needWiredInHomeIface (ATyCon {}) = True
 needWiredInHomeIface _           = False
+
+-- | Ensure that a boxed or unboxed tuple has arity no larger than
+-- 'mAX_TUPLE_SIZE'.
+checkTupSize :: Int -> TcM ()
+checkTupSize tup_size
+  | tup_size <= mAX_TUPLE_SIZE
+  = return ()
+  | otherwise
+  = addErr (sep [text "A" <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
+                 nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
+                 nest 2 (text "Workaround: use nested tuples or define a data type")])
+
+-- | Ensure that a constraint tuple has arity no larger than 'mAX_CTUPLE_SIZE'.
+checkCTupSize :: Int -> TcM ()
+checkCTupSize tup_size
+  | tup_size <= mAX_CTUPLE_SIZE
+  = return ()
+  | otherwise
+  = addErr (hang (text "Constraint tuple arity too large:" <+> int tup_size
+                  <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
+               2 (text "Instead, use a nested tuple"))
 
 
 {-

@@ -10,3 +10,15 @@ T10451.hs:22:12: error:
                     Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
                     Eq a, Eq a, Eq a)’
       In the type declaration for ‘T’
+
+T10451.hs:22:12: error:
+    • Constraint tuple arity too large: 66 (max arity = 64)
+        Instead, use a nested tuple
+    • In the type ‘(Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a, Eq a,
+                    Eq a, Eq a, Eq a)’
+      In the type declaration for ‘T’

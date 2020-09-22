@@ -1059,16 +1059,17 @@ four constructors of HsTupleSort:
 
         HsUnboxedTuple                  -> Produced by the parser
         HsBoxedTuple                    -> Certainly a boxed tuple
-        HsConstraintTuple               -> Certainly a constraint tuple
         HsBoxedOrConstraintTuple        -> Could be a boxed or a constraint
                                         tuple. Produced by the parser only,
                                         disappears after type checking
+
+After typechecking, we use TupleSort (which clearly distinguishes between
+constraint tuples and boxed tuples) rather than HsTupleSort.
 -}
 
 -- | Haskell Tuple Sort
 data HsTupleSort = HsUnboxedTuple
                  | HsBoxedTuple
-                 | HsConstraintTuple
                  | HsBoxedOrConstraintTuple
                  deriving Data
 
@@ -1986,11 +1987,10 @@ hsTypeNeedsParens p = go_hs_ty
     -- Special-case unary boxed tuple applications so that they are
     -- parenthesized as `Identity (Solo x)`, not `Identity Solo x` (#18612)
     -- See Note [One-tuples] in GHC.Builtin.Types
-    go_hs_ty (HsTupleTy _ con [L _ ty])
+    go_hs_ty (HsTupleTy _ con [_])
       = case con of
           HsBoxedTuple               -> p >= appPrec
           HsBoxedOrConstraintTuple   -> p >= appPrec
-          HsConstraintTuple          -> go_hs_ty ty
           HsUnboxedTuple             -> False
     go_hs_ty (HsTupleTy{})            = False
     go_hs_ty (HsSumTy{})              = False
