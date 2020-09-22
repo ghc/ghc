@@ -1,4 +1,9 @@
 
+TyAppPat_PatternBindingExistential.hs:9:1: error:
+    • Binding type variables is not allowed in pattern bindings
+    • In the pattern: Some @a x
+      In a pattern binding: Some @a x = Some (5 :: Integer)
+
 TyAppPat_PatternBindingExistential.hs:9:9: error:
     • Couldn't match expected type ‘p’ with actual type ‘a’
       ‘a’ is a rigid type variable bound by
