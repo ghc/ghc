@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP        #-}
 {-# LANGUAGE LambdaCase #-}
 
 --------------------------------------------------------------------------------

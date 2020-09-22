@@ -464,8 +464,7 @@ and them simplify them in simplifyInstanceContexts; see
 Note [Simplifying the instance context].
 
 In the functor-like case, we may need to unify some kind variables with * in
-order for the generated instance to be well-kinded. An example from
-#10524:
+order for the generated instance to be well-kinded. An example from #10524:
 
   newtype Compose (f :: k2 -> *) (g :: k1 -> k2) (a :: k1)
     = Compose (f (g a)) deriving Functor

@@ -713,8 +713,7 @@ Historical note 2: Much longer ago, Simon M tried a MUCH bigger
 discount: (10 * (10 + n_val_args)), and said it was an "unambiguous
 win", but its terribly dangerous because a function with many many
 case branches, each finishing with a constructor, can have an
-arbitrarily large discount.  This led to terrible code bloat: see
-#6099.
+arbitrarily large discount.  This led to terrible code bloat: see #6099.
 
 Note [Unboxed tuple size and result discount]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,15 +1,18 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 {-
 %
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
-
-{-# LANGUAGE CPP, TupleSections, ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies, DataKinds, GADTs, TypeApplications #-}
-{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 module GHC.Tc.Gen.App
        ( tcApp
@@ -645,8 +648,8 @@ Note [Visible type application zonk]
   (checkExpectedKind zonks as it goes).
 
 So we must zonk inner_ty as well, to guarantee consistency between zonk(tv)
-and inner_ty.  Otherwise we can build an ill-kinded type.  An example was
-#14158, where we had:
+and inner_ty. Otherwise we can build an ill-kinded type. An example was #14158,
+where we had:
    id :: forall k. forall (cat :: k -> k -> *). forall (a :: k). cat a a
 and we had the visible type application
   id @(->)
