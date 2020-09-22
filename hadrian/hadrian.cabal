@@ -74,7 +74,6 @@ executable hadrian
                        , Rules.Libffi
                        , Rules.Library
                        , Rules.Lint.Base
-                       , Rules.Lint.Compiler
                        , Rules.Nofib
                        , Rules.Program
                        , Rules.Register
