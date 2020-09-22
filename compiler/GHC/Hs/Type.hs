@@ -58,7 +58,8 @@ module GHC.Hs.Type (
 
         mkAnonWildCardTy, pprAnonWildCard,
 
-        mapXHsOuterImplicit,
+        outerExplicitBndrs, mapOuterImplicit,
+
         mkHsImplicitSigType, mkHsExplicitSigType,
         hsTypeToHsSigType, hsTypeToHsSigWcType,
         mkHsWildCardBndrs, mkHsPatSigType,
@@ -620,11 +621,15 @@ variables so that they can be brought into scope during renaming and
 typechecking.
 -}
 
-mapXHsOuterImplicit :: (implicit1 -> implicit2)
-                    -> OuterTyVarBndrs implicit1 explicit
-                    -> OuterTyVarBndrs implicit2 explicit
-mapXHsOuterImplicit f (OuterImplicit imp) = OuterImplicit (f imp)
-mapXHsOuterImplicit _ (OuterExplicit bs)  = OuterExplicit bs
+outerExplicitBndrs :: OuterTyVarBndrs implicit [explicit] -> [explicit]
+outerExplicitBndrs (OuterExplicit bndrs) = bndrs
+outerExplicitBndrs (OuterImplicit {})    = []
+
+mapOuterImplicit :: (implicit1 -> implicit2)
+                 -> OuterTyVarBndrs implicit1 explicit
+                 -> OuterTyVarBndrs implicit2 explicit
+mapOuterImplicit f (OuterImplicit imp) = OuterImplicit (f imp)
+mapOuterImplicit _ (OuterExplicit bs)  = OuterExplicit bs
 
 mkHsImplicitSigType :: LHsType GhcPs -> HsSigType GhcPs
 mkHsImplicitSigType body =
@@ -1215,9 +1220,9 @@ hsWcScopedTvs sig_wc_ty
 
 hsScopedTvs :: LHsSigType GhcRn -> [Name]
 -- Same as hsWcScopedTvs, but for a LHsSigType
-hsScopedTvs (L _ (HsSig{sig_bndrs = outer_bndrs})) = case outer_bndrs of
-  OuterImplicit{}   -> []
-  OuterExplicit tvs -> hsLTyVarNames tvs -- See Note [hsScopedTvs vis_flag]
+hsScopedTvs (L _ (HsSig{sig_bndrs = outer_bndrs}))
+  = hsLTyVarNames (outerExplicitBndrs outer_bndrs)
+    -- See Note [hsScopedTvs vis_flag]
 
 {- Note [Scoping of named wildcards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

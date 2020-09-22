@@ -711,8 +711,8 @@ rnFamEqn doc atfi rhs_kvars
              -- -Wunused-type-patterns warnings. We can be a little more precise
              -- than that by pointing to the LHS of the instance instead, which
              -- is what lhs_loc corresponds to.
-             rn_outer_bndrs' = mapXHsOuterImplicit (map (`setNameLoc` lhs_loc))
-                                                   rn_outer_bndrs
+             rn_outer_bndrs' = mapOuterImplicit (map (`setNameLoc` lhs_loc))
+                                                rn_outer_bndrs
 
              groups :: [NonEmpty (Located RdrName)]
              groups = equivClasses cmpLocated $

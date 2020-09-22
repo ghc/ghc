@@ -3277,7 +3277,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
 
-       ; (outer_tv_bndrs :: [TcInvisTVBinder]) <- zonkAndSortOuter outer_bndrs
+       ; (outer_tv_bndrs :: [TcInvisTVBinder]) <- scopedSortOuter outer_bndrs
 
        ; tkvs <- kindGeneralizeAll (mkInvisForAllTys outer_tv_bndrs $
                                     mkPhiTy ctxt $
