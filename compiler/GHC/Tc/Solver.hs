@@ -2317,8 +2317,7 @@ But this transitive closure stuff gives rise to a complex rule for
 when defaulting actually happens, and one that was never documented.
 Moreover (#12923), the more complex rule is sometimes NOT what
 you want.  So I simply removed the extra code to implement the
-contamination stuff.  There was zero effect on the testsuite (not even
-#8155).
+contamination stuff.  There was zero effect on the testsuite (not even #8155).
 ------ End of historical note -----------
 
 
