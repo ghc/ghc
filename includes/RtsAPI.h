@@ -335,11 +335,12 @@ extern void (*exitFn)(int);
 /* ----------------------------------------------------------------------------
    Locking.
 
-   You have to surround all access to the RtsAPI with these calls.
+   You have to surround all access to the RtsAPI with rts_lock and rts_unlock
+   or with rts_pause and rts_resume.
    ------------------------------------------------------------------------- */
 
-// acquires a token which may be used to create new objects and
-// evaluate them.
+// acquires a token which may be used to create new objects and evaluate them.
+// Calling rts_lock in between rts_pause/rts_resume will cause a deadlock.
 Capability *rts_lock (void);
 
 // releases the token acquired with rts_lock().
@@ -486,18 +487,22 @@ void rts_checkSchedStatus (char* site, Capability *);
 SchedulerStatus rts_getSchedStatus (Capability *cap);
 
 // Halt execution of all Haskell threads by acquiring all capabilities (safe FFI
-// calls may continue). This is different to rts_lock() which only pauses a
-// single capability. rts_resume() must later be called on the same thread to
+// calls may continue). rts_resume() must later be called on the same thread to
 // resume the RTS. Only one thread at a time can keep the rts paused. The
 // rts_pause function will block until the current thread is given exclusive
 // permission to pause the RTS. If the RTS was already paused by the current OS
-// thread, then rts_pause will return immediately and have no effect.
-void rts_pause (void);
+// thread, then rts_pause will return immediately and have no effect. Returns a
+// token which may be used to create new objects and evaluate them (like
+// rts_lock) .This is different to rts_lock() which only pauses a single
+// capability. Calling rts_pause in between rts_lock/rts_unlock will cause a
+// deadlock.
+Capability * rts_pause (void);
 
 // Counterpart of rts_pause: Continue from a pause. All capabilities are
 // released. Must be done while RTS is paused and on the same thread as
 // rts_pause().
-void rts_resume (void);
+// [in] cap: the token returned by rts_pause.
+void rts_resume (Capability * cap);
 
 // Tells the current state of the RTS regarding rts_pause() and rts_resume().
 bool rts_isPaused(void);
