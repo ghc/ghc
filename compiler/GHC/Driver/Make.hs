@@ -37,6 +37,7 @@ import GHC.Prelude
 
 import qualified GHC.Runtime.Linker as Linker
 
+import GHC.Driver.Config
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
@@ -2672,7 +2673,9 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
   (pi_srcimps, pi_theimps, L pi_mod_name_loc pi_mod_name)
       <- ExceptT $ do
-          mimps <- getImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
+          let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
+              popts = initParserOpts pi_local_dflags
+          mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
           return (first (fmap pprError) mimps)
   return PreprocessedImports {..}
 
