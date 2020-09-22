@@ -1514,8 +1514,8 @@ Note [Visible type application zonk]
   (checkExpectedKind zonks as it goes).
 
 So we must zonk inner_ty as well, to guarantee consistency between zonk(tv)
-and inner_ty.  Otherwise we can build an ill-kinded type.  An example was
-#14158, where we had:
+and inner_ty.  Otherwise we can build an ill-kinded type.
+An example was #14158, where we had:
    id :: forall k. forall (cat :: k -> k -> *). forall (a :: k). cat a a
 and we had the visible type application
   id @(->)
@@ -2747,8 +2747,8 @@ this by checking if the type of the applied function has more argument types
 than supplied arguments.
 
 Previously, GHC computed the number of argument types through tcSplitSigmaTy.
-This is incorrect in the face of nested foralls, however! This caused Trac
-#13311, for instance:
+This is incorrect in the face of nested foralls, however!
+This caused ticket #13311, for instance:
 
   f :: forall a. (Monoid a) => forall b. (Monoid b) => Maybe a -> Maybe b
 
