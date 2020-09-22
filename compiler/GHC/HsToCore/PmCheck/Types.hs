@@ -299,16 +299,17 @@ coreExprAsPmLit e = case collectArgs e of
     -- Take care of -XRebindableSyntax. The last argument should be the (only)
     -- integer literal, otherwise we can't really do much about it.
     | [Lit l] <- dropWhile (not . is_lit) args
-    -- getOccFS because of -XRebindableSyntax
-    , getOccFS (idName x) == getOccFS fromIntegerName
+    , is_rebound_name x fromIntegerName
     -> literalToPmLit (literalType l) l >>= overloadPmLit (exprType e)
   (Var x, args)
     -- Similar to fromInteger case
     | [r] <- dropWhile (not . is_ratio) args
-    , getOccFS (idName x) == getOccFS fromRationalName
+    , is_rebound_name x fromRationalName
     -> coreExprAsPmLit r >>= overloadPmLit (exprType e)
-  (Var x, [Type _ty, _dict, s])
-    | idName x == fromStringName
+  (Var x, args)
+    | is_rebound_name x fromStringName
+    -- With -XRebindableSyntax or without: The first String argument is what we are after
+    , s:_ <- filter (eqType stringTy . exprType) args
     -- NB: Calls coreExprAsPmLit and then overloadPmLit, so that we return PmLitOverStrings
     -> coreExprAsPmLit s >>= overloadPmLit (exprType e)
   -- These last two cases handle String literals
@@ -330,6 +331,11 @@ coreExprAsPmLit e = case collectArgs e of
       = tyConName tc == ratioTyConName
       | otherwise
       = False
+
+    -- | Compares the given Id to the Name based on OccName, to detect
+    -- -XRebindableSyntax.
+    is_rebound_name :: Id -> Name -> Bool
+    is_rebound_name x n = getOccFS (idName x) == getOccFS n
 
 instance Outputable PmLitValue where
   ppr (PmLitInt i)        = ppr i
