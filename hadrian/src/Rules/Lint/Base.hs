@@ -2,26 +2,26 @@ module Rules.Lint.Base
   ( lintRules
   ) where
 
-import Base
-import Settings.Builders.Common
-import System.Directory (findExecutable)
+import           Base
+import           Settings.Builders.Common
+import           System.Directory         (findExecutable)
 
 lintRules :: Rules ()
-lintRules = "lint:base" ~> lint
+lintRules = "lint:base" ~> lint base
 
-lint :: Action ()
-lint = do
+lint :: Action () -> Action ()
+lint lintAction = do
   isHlintPresent <- isJust <$> (liftIO $ findExecutable "hlint")
   if isHlintPresent
   then do
     putBuild "| Running the linter…"
-    lintBase
+    lintAction
     putSuccess "| Done."
   else
     putFailure "| Please make sure you have the `hlint` executable in your $PATH"
 
-lintBase :: Action ()
-lintBase = do
+base :: Action ()
+base = do
   topDir   <- topDirectory
   buildDir <- buildRoot
   let stage1Lib    = topDir </> buildDir </> "stage1/lib"
