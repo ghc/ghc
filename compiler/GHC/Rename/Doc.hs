@@ -1,5 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-
 module GHC.Rename.Doc ( rnHsDoc, rnLHsDoc, rnMbLHsDoc ) where
 
 import GHC.Prelude
