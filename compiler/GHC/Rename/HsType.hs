@@ -192,10 +192,10 @@ rnHsPatSigTypeBindingVars :: HsDocContext
                           -> (HsPatSigType GhcRn -> RnM (r, FreeVars))
                           -> RnM (r, FreeVars)
 rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
-  (HsPS { hsps_body = hs_ty' }) -> do
+  (HsPS { hsps_body = hs_ty }) -> do
     rdr_env <- getLocalRdrEnv
     let (varsInScope, varsNotInScope) =
-          partition (inScope rdr_env . unLoc) (extractHsTyRdrTyVars hs_ty')
+          partition (inScope rdr_env . unLoc) (extractHsTyRdrTyVars hs_ty)
     when (not (null varsInScope)) $
       addErr $
         vcat
@@ -206,9 +206,9 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
           ]
     (wcVars', ibVars') <- partition_nwcs varsNotInScope
     rnImplicitBndrsNoDups ctxt Nothing ibVars' $ \ ibVars -> do
-      (wcVars, hs_ty, fvs) <- rnWcBody ctxt wcVars' hs_ty'
+      (wcVars, hs_ty', fvs) <- rnWcBody ctxt wcVars' hs_ty
       let sig_ty = HsPS
-            { hsps_body = hs_ty
+            { hsps_body = hs_ty'
             , hsps_ext = HsPSRn
               { hsps_nwcs    = wcVars
               , hsps_imp_tvs = ibVars
