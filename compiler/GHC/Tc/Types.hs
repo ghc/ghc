@@ -1,11 +1,13 @@
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE ExistentialQuantification  #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 {-
 (c) The University of Glasgow 2006-2012
 (c) The GRASP Project, Glasgow University, 1992-2002
 
 -}
-
-{-# LANGUAGE CPP, DeriveFunctor, ExistentialQuantification, GeneralizedNewtypeDeriving,
-             ViewPatterns #-}
 
 -- | Various types used during typechecking.
 --

@@ -1,11 +1,13 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns        #-}
+
 {-
 Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
          Sebastian Graf <sgraf1337@gmail.com>
          Ryan Scott <ryan.gl.scott@gmail.com>
 -}
-
-{-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns,
-             MultiWayIf, ScopedTypeVariables, MagicHash #-}
 
 -- | The pattern match oracle. The main export of the module are the functions
 -- 'addPhiCts' for adding facts to the oracle, and 'generateInhabitingPatterns' to turn a

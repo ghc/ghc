@@ -1,9 +1,11 @@
-{-# LANGUAGE CPP, MagicHash, RecordWildCards, BangPatterns #-}
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RecordWildCards            #-}
+
 {-# OPTIONS_GHC -fprof-auto-top #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 --
 --  (c) The University of Glasgow 2002-2006
 --

@@ -1,13 +1,11 @@
+{-# LANGUAGE ApplicativeDo       #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 {-
 Author: George Karachalias <george.karachalias@cs.kuleuven.be>
         Sebastian Graf <sgraf1337@gmail.com>
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ApplicativeDo #-}
 
 -- | Types used through-out pattern match checking. This module is mostly there
 -- to be imported from "GHC.Tc.Types". The exposed API is that of
