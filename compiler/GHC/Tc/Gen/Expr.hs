@@ -1523,6 +1523,105 @@ fieldCtxt field_name
 mk_op_msg :: LHsExpr GhcRn -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
 
+addExprCtxt :: LHsExpr GhcRn -> TcRn a -> TcRn a
+addExprCtxt e thing_inside = addErrCtxt (exprCtxt (unLoc e)) thing_inside
+
+exprCtxt :: HsExpr GhcRn -> SDoc
+exprCtxt expr = hang (text "In the expression:") 2 (ppr (stripParensHsExpr expr))
+
+addFunResCtxt :: Bool  -- There is at least one argument
+              -> HsExpr GhcTc -> TcType -> ExpRhoType
+              -> TcM a -> TcM a
+-- When we have a mis-match in the return type of a function
+-- try to give a helpful message about too many/few arguments
+--
+-- Used for naked variables too; but with has_args = False
+addFunResCtxt has_args fun fun_res_ty env_ty
+  = addLandmarkErrCtxtM (\env -> (env, ) <$> mk_msg)
+      -- NB: use a landmark error context, so that an empty context
+      -- doesn't suppress some more useful context
+  where
+    mk_msg
+      = do { mb_env_ty <- readExpType_maybe env_ty
+                     -- by the time the message is rendered, the ExpType
+                     -- will be filled in (except if we're debugging)
+           ; fun_res' <- zonkTcType fun_res_ty
+           ; env'     <- case mb_env_ty of
+                           Just env_ty -> zonkTcType env_ty
+                           Nothing     ->
+                             do { dumping <- doptM Opt_D_dump_tc_trace
+                                ; MASSERT( dumping )
+                                ; newFlexiTyVarTy liftedTypeKind }
+           ; let -- See Note [Splitting nested sigma types in mismatched
+                 --           function types]
+                 (_, _, fun_tau) = tcSplitNestedSigmaTys fun_res'
+                 -- No need to call tcSplitNestedSigmaTys here, since env_ty is
+                 -- an ExpRhoTy, i.e., it's already instantiated.
+                 (_, _, env_tau) = tcSplitSigmaTy env'
+                 (args_fun, res_fun) = tcSplitFunTys fun_tau
+                 (args_env, res_env) = tcSplitFunTys env_tau
+                 n_fun = length args_fun
+                 n_env = length args_env
+                 info  | n_fun == n_env = Outputable.empty
+                       | n_fun > n_env
+                       , not_fun res_env
+                       = text "Probable cause:" <+> quotes (ppr fun)
+                         <+> text "is applied to too few arguments"
+
+                       | has_args
+                       , not_fun res_fun
+                       = text "Possible cause:" <+> quotes (ppr fun)
+                         <+> text "is applied to too many arguments"
+
+                       | otherwise
+                       = Outputable.empty  -- Never suggest that a naked variable is                                         -- applied to too many args!
+           ; return info }
+      where
+        not_fun ty   -- ty is definitely not an arrow type,
+                     -- and cannot conceivably become one
+          = case tcSplitTyConApp_maybe ty of
+              Just (tc, _) -> isAlgTyCon tc
+              Nothing      -> False
+
+{-
+Note [Splitting nested sigma types in mismatched function types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When one applies a function to too few arguments, GHC tries to determine this
+fact if possible so that it may give a helpful error message. It accomplishes
+this by checking if the type of the applied function has more argument types
+than supplied arguments.
+
+Previously, GHC computed the number of argument types through tcSplitSigmaTy.
+This is incorrect in the face of nested foralls, however!
+This caused ticket #13311, for instance:
+
+  f :: forall a. (Monoid a) => forall b. (Monoid b) => Maybe a -> Maybe b
+
+If one uses `f` like so:
+
+  do { f; putChar 'a' }
+
+Then tcSplitSigmaTy will decompose the type of `f` into:
+
+  Tyvars: [a]
+  Context: (Monoid a)
+  Argument types: []
+  Return type: forall b. Monoid b => Maybe a -> Maybe b
+
+That is, it will conclude that there are *no* argument types, and since `f`
+was given no arguments, it won't print a helpful error message. On the other
+hand, tcSplitNestedSigmaTys correctly decomposes `f`'s type down to:
+
+  Tyvars: [a, b]
+  Context: (Monoid a, Monoid b)
+  Argument types: [Maybe a]
+  Return type: Maybe b
+
+So now GHC recognizes that `f` has one more argument type than it was actually
+provided.
+-}
+>>>>>>> 3b023f90a3... Do not make lines start with a #
+
 badFieldTypes :: [(FieldLabelString,TcType)] -> SDoc
 badFieldTypes prs
   = hang (text "Record update for insufficiently polymorphic field"

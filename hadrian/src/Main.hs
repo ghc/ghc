@@ -85,12 +85,7 @@ main = do
             Rules.buildRules
             Rules.Documentation.documentationRules
             Rules.Clean.cleanRules
-<<<<<<< HEAD
             Rules.Lint.lintRules
-=======
-            Rules.Lint.Base.lintRules
-            Rules.Lint.Compiler.lintRules
->>>>>>> 15f27c6cde... Add a linting rule for the compiler folder
             Rules.Nofib.nofibRules
             Rules.oracleRules
             Rules.Selftest.selftestRules
