@@ -1,4 +1,4 @@
-module Rules.Lint
+module Rules.Lint.Base
   ( lintRules
   ) where
 
@@ -7,7 +7,7 @@ import Settings.Builders.Common
 import System.Directory (findExecutable)
 
 lintRules :: Rules ()
-lintRules = "lint" ~> lint
+lintRules = "lint:base" ~> lint
 
 lint :: Action ()
 lint = do
