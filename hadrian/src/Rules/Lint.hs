@@ -7,21 +7,21 @@ import Settings.Builders.Common
 import System.Directory (findExecutable)
 
 lintRules :: Rules ()
-lintRules = "lint" ~> lint
+lintRules = "lint:base" ~> lintBase
 
-lint :: Action ()
-lint = do
+lintBase :: Action ()
+lintBase = do
   isHlintPresent <- isJust <$> (liftIO $ findExecutable "hlint")
   if isHlintPresent
   then do
     putBuild "| Running the linter…"
-    lintBase
+    doLintBase
     putSuccess "| Done."
   else
     putFailure "| Please make sure you have the `hlint` executable in your $PATH"
 
-lintBase :: Action ()
-lintBase = do
+doLintBase :: Action ()
+doLintBase = do
   topDir   <- topDirectory
   buildDir <- buildRoot
   let stage1Lib    = topDir </> buildDir </> "stage1/lib"
