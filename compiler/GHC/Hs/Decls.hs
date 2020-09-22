@@ -1627,6 +1627,8 @@ or contexts in two parts:
 -- | Haskell data Constructor Declaration Details
 type HsConDeclDetails pass
    = HsConDetails Void (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
+-- The Void argument to HsConDetails here is a reflection of the fact that
+-- type applications are not allowed in data constructor declarations.
 
 getConNames :: ConDecl GhcRn -> [Located Name]
 getConNames ConDeclH98  {con_name  = name}  = [name]
