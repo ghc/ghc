@@ -48,52 +48,46 @@ import Control.Monad    ( mplus )
 import Control.Applicative ((<$))
 import qualified Prelude -- for happy-generated code
 
--- compiler
+import GHC.Prelude
+
 import GHC.Hs
+import GHC.Hs.Doc
 
 import GHC.Driver.Phases  ( HscSource(..) )
-import GHC.Driver.Types   ( IsBootInterface(..), WarningTxt(..) )
 import GHC.Driver.Backpack.Syntax
-import GHC.Unit.Info
 
--- compiler/utils
+import GHC.Unit.Types     ( IsBootInterface(..) )
+import GHC.Unit.Info
+import GHC.Unit.Module
+
 import GHC.Data.OrdList
 import GHC.Data.BooleanFormula ( BooleanFormula(..), LBooleanFormula(..), mkTrue )
 import GHC.Data.FastString
 import GHC.Data.Maybe          ( isJust, orElse )
+
 import GHC.Utils.Outputable
 import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
-import GHC.Prelude
 
--- compiler/basicTypes
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName,
                                    occNameFS, startsWithUnderscore )
-import GHC.Core.DataCon          ( DataCon, dataConName )
 import GHC.Types.SrcLoc
-import GHC.Unit.Module
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
-import GHC.Hs.Doc
 
 import GHC.Core.Type    ( unrestrictedFunTyCon, Mult(..), Specificity(..) )
 import GHC.Core.Class   ( FunDep )
+import GHC.Core.DataCon          ( DataCon, dataConName )
 
--- compiler/parser
 import GHC.Parser.PostProcess
 import GHC.Parser.PostProcess.Haddock
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
 import GHC.Parser.Errors
 
-import GHC.Tc.Types.Evidence  ( emptyTcEvBinds )
-
--- compiler/prelude
-import GHC.Builtin.Types.Prim ( eqPrimTyCon )
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                            unboxedUnitTyCon, unboxedUnitDataCon,
-                           listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR,
-                           manyDataConTyCon)
+                           listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR)
 }
 
 %expect 0 -- shift/reduce conflicts
