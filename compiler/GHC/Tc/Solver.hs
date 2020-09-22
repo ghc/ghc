@@ -18,7 +18,7 @@ module GHC.Tc.Solver(
 
        simplifyTopWanteds,
 
-       promoteTyVarSet, emitFlatConstraints,
+       promoteTyVarSet, simplifyAndEmitFlatConstraints,
 
        -- For Rules we need these
        solveWanteds, solveWantedsAndDrop,
@@ -200,15 +200,16 @@ solveEqualities :: String -> TcM a -> TcM a
 solveEqualities callsite thing_inside
   = do { traceTc "solveEqualities {" (text "Called from" <+> text callsite)
        ; (res, wanted)   <- captureConstraints thing_inside
-       ; emitFlatConstraints wanted
-            -- emitFlatConstraints fails outright unless the only unsolved
-            -- constraints are soluble-looking equalities that can float out
+       ; simplifyAndEmitFlatConstraints wanted
+            -- simplifyAndEmitFlatConstraints fails outright unless
+            --  the only unsolved constraints are soluble-looking
+            --  equalities that can float out
        ; traceTc "solveEqualities }" empty
        ; return res }
 
-emitFlatConstraints :: WantedConstraints -> TcM ()
+simplifyAndEmitFlatConstraints :: WantedConstraints -> TcM ()
 -- See Note [Failure in local type signatures]
-emitFlatConstraints wanted
+simplifyAndEmitFlatConstraints wanted
   = do { -- Solve and zonk to esablish the
          -- preconditions for floatKindEqualities
          wanted <- runTcSEqualities (solveWanteds wanted)
@@ -337,7 +338,7 @@ So here's the plan (see tcHsSigType):
 * buildTvImplication: build an implication for the residual, unsolved
   constraint
 
-* emitFlatConstraints: try to float out every unsolved equalities
+* simplifyAndEmitFlatConstraints: try to float out every unsolved equalities
   inside that implication, in the hope that it constrains only global
   type variables, not the locally-quantified ones.
 
