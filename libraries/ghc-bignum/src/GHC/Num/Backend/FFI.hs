@@ -13,7 +13,7 @@
 -- that replace bignat foreign calls with calls to the native platform bignat
 -- library (e.g. JavaScript's BigInt). You can also link an extra object
 -- providing the implementation.
-module GHC.Num.BigNat.FFI where
+module GHC.Num.Backend.FFI where
 
 import GHC.Prim
 import GHC.Types
