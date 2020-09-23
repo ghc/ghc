@@ -763,7 +763,7 @@ void rts_resume (Capability * cap STG_UNUSED)
     }
 
     // Check that we own all capabilities.
-    for (uint i = 0; i < n_capabilities; i++)
+    for (unsigned int i = 0; i < n_capabilities; i++)
     {
         Capability *cap = capabilities[i];
         if (cap->running_task != task)
