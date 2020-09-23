@@ -1,4 +1,11 @@
+[1 of 2] Compiling T13964           ( T13964.hs, T13964.o )
 
 T13964.hs:18:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘catchAll’: Patterns not matched: T
+[2 of 2] Compiling T13964b          ( T13964b.hs, T13964b.o )
+
+T13964b.hs:6:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘catchAll2’:
+        Patterns not matched: TooGoodToBeTrue

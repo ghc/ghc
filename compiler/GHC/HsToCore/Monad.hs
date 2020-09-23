@@ -27,9 +27,9 @@ module GHC.HsToCore.Monad (
         mkPrintUnqualifiedDs,
         newUnique,
         UniqSupply, newUniqueSupply,
-        getGhcModeDs, dsGetFamInstEnvs,
+        getGhcModeDs, dsGetFamInstEnvs, dsGetGlobalRdrEnv,
         dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon,
-        dsLookupDataCon, dsLookupConLike,
+        dsLookupDataCon,
         getCCIndexDsM,
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
@@ -72,7 +72,6 @@ import GHC.Driver.Types
 import GHC.Data.Bag
 import GHC.Types.Basic ( Origin )
 import GHC.Core.DataCon
-import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.HsToCore.Types
 import GHC.HsToCore.PmCheck.Types
@@ -302,6 +301,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
                                              (unitState dflags)
                                              (mkHomeUnitFromFlags dflags)
                                              rdr_env
+                           , ds_rdr_env = rdr_env
                            , ds_msgs    = msg_var
                            , ds_complete_matches = complete_matches
                            , ds_cc_st   = cc_st_var
@@ -522,10 +522,8 @@ dsLookupDataCon :: Name -> DsM DataCon
 dsLookupDataCon name
   = tyThingDataCon <$> dsLookupGlobal name
 
-dsLookupConLike :: Name -> DsM ConLike
-dsLookupConLike name
-  = tyThingConLike <$> dsLookupGlobal name
-
+dsGetGlobalRdrEnv :: DsM GlobalRdrEnv
+dsGetGlobalRdrEnv = ds_rdr_env <$> getGblEnv
 
 dsGetFamInstEnvs :: DsM FamInstEnvs
 -- Gets both the external-package inst-env

@@ -3,7 +3,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Bug (Boolean(F, TooGoodToBeTrue), catchAll) where
+module T13964 (Boolean(F, TooGoodToBeTrue), catchAll) where
 
 data Boolean = F | T
   deriving Eq
