@@ -791,7 +791,7 @@ bool rts_isPaused(void)
 
 // Check that the rts_pause was called on this thread/task. If not, outputs an
 // error and exits with EXIT_FAILURE.
-void assert_isPausedOnMyTask(void)
+static void assert_isPausedOnMyTask(void)
 {
     if (rts_pausing_task == NULL)
     {
@@ -848,14 +848,16 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
 }
 
 #else
-Capability * rts_pause (void)
+Capability * GNU_ATTRIBUTE(__noreturn__)
+rts_pause (void)
 {
     errorBelch("Warning: Pausing the RTS is only possible for "
                "multithreaded RTS.");
     stg_exit(EXIT_FAILURE);
 }
 
-void rts_resume (Capability * cap)
+void GNU_ATTRIBUTE(__noreturn__)
+rts_resume (Capability * cap STG_UNUSED)
 {
     errorBelch("Warning: Unpausing the RTS is only possible for "
                "multithreaded RTS.");
