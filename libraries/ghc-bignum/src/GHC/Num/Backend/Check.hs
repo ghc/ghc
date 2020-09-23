@@ -10,25 +10,17 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | Check Native implementation against another backend
-module GHC.Num.BigNat.Check where
+module GHC.Num.Backend.Check where
 
 import GHC.Prim
 import GHC.Types
 import GHC.Num.WordArray
 import GHC.Num.Primitives
-import qualified GHC.Num.BigNat.Native as Native
+import qualified GHC.Num.Backend.Native   as Native
+import qualified GHC.Num.Backend.Selected as Other
 
 #if defined(BIGNUM_NATIVE)
-#error You can't validate Native backed against itself. Choose another backend (e.g. gmp, ffi)
-
-#elif defined(BIGNUM_FFI)
-import qualified GHC.Num.BigNat.FFI as Other
-
-#elif defined(BIGNUM_GMP)
-import qualified GHC.Num.BigNat.GMP as Other
-
-#else
-#error Undefined BigNat backend. Use a flag to select it (e.g. gmp, native, ffi)`
+#error You can't validate Native backend against itself. Choose another backend (e.g. gmp, ffi)
 #endif
 
 default ()

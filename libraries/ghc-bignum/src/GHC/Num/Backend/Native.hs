@@ -9,7 +9,7 @@
 {-# LANGUAGE BinaryLiterals #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
-module GHC.Num.BigNat.Native where
+module GHC.Num.Backend.Native where
 
 #include "MachDeps.h"
 #include "WordSize.h"
