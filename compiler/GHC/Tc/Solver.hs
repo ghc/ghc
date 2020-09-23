@@ -1939,7 +1939,7 @@ checkBadTelescope :: Implication -> TcS Bool
 -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
 checkBadTelescope (Implic { ic_info  = info
                           , ic_skols = skols })
-  | ForAllSkol {} <- info
+  | checkTelescopeSkol info
   = do{ skols <- mapM TcS.zonkTyCoVarKind skols
       ; return (go emptyVarSet (reverse skols))}
 

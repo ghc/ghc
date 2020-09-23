@@ -35,7 +35,7 @@ module GHC.Tc.Types.Constraint (
         isDroppableCt, insolubleImplic,
         arisesFromGivens,
 
-        Implication(..), implicationPrototype,
+        Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
@@ -1176,8 +1176,8 @@ data ImplicStatus
 
   | IC_Insoluble  -- At least one insoluble constraint in the tree
 
-  | IC_BadTelescope  -- solved, but the skolems in the telescope are out of
-                     -- dependency order
+  | IC_BadTelescope  -- Solved, but the skolems in the telescope are out of
+                     -- dependency order. See Note [Checking telescopes]
 
   | IC_Unsolved   -- Neither of the above; might go either way
 
@@ -1206,6 +1206,11 @@ instance Outputable ImplicStatus where
   ppr IC_Unsolved     = text "Unsolved"
   ppr (IC_Solved { ics_dead = dead })
     = text "Solved" <+> (braces (text "Dead givens =" <+> ppr dead))
+
+checkTelescopeSkol :: SkolemInfo -> Bool
+-- See Note [Checking telescopes]
+checkTelescopeSkol (ForAllSkol {}) = True
+checkTelescopeSkol _               = False
 
 {- Note [Checking telescopes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
