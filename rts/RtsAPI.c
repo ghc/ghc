@@ -661,6 +661,38 @@ rts_unlock (Capability *cap)
 }
 
 #if defined(THREADED_RTS)
+
+/*
+ * NOTE RtsAPI thread safety:
+ *
+ * Although it's likely sufficient for many use cases to call RtsAPI.h functions
+ * from a single thread, we still want to ensure that the API is thread safe.
+ * This is achieved almost entirely by the mechanism of acquiring and releasing
+ * Capabilities, resulting in a sort of mutex / critical section pattern.
+ * Correct usage of this API requires that you surround API calls in
+ * rts_lock/rts_unlock or rts_pause/rts_resume. These ensure that the thread
+ * owns a capability while calling other RtsAPI functions (in the case of
+ * rts_pause/rts_resume the thread owns *all* capabilities).
+ *
+ * With the capability(s) acquired GC cannot run. That allows access to the heap
+ * without objects unexpectedly moving, which is important for many of the
+ * functions in RtsAPI.
+ *
+ * Another important consequence is:
+ *
+ *  * There are at most `n_capabilities` threads currently in a
+ *    rts_lock/rts_unlock section.
+ *  * There is at most 1 threads in a rts_pause/rts_resume section. In that case
+ *    there will be no threads in a rts_lock/rts_unlock section.
+ *  * rts_pause and rts_lock may block in order to enforce the above 2
+ *    invariants.
+ *
+ * In particular, by ensuring that that code does not block indefinitely in a
+ * rts_lock/rts_unlock or rts_pause/rts_resume section, we can be confident that
+ * the RtsAPI functions will not cause a deadlock even when many threads are
+ * attempting to use the RtsAPI concurrently.
+ */
+
 // See RtsAPI.h
 Capability * rts_pause (void)
 {
@@ -689,62 +721,6 @@ Capability * rts_pause (void)
         stg_exit(EXIT_FAILURE);
     }
 
-    // NOTE ghc-debug deadlock:
-    //
-    // stopAllCapabilities attempts to acquire all capabilities and will only
-    // block if an existing thread/task:
-    //
-    // 1. Owns a capability and
-    // 2. Is deadlocked i.e. refuses to yield/release its capability.
-    //
-    // Let's assume the rest of the RTS is deadlock free (tasks will eventually
-    // yield their capability) outside of using the ghc-debug API:
-    //
-    // * rts_pause
-    // * rts_resume
-    // * rts_isPaused
-    // * rts_listThreads
-    // * rts_listMiscRoots
-    //
-    // Except rts_pause, none of these functions acquire a lock and so cannot
-    // block. rts_pause may block on stopAllCapabilities, but we ensure that the
-    // current task does not own a capability before calling
-    // stopAllCapabilities. Hence, (1) does not hold given an isolated call to
-    // rts_pause. The only lose end is that after rts_pause, we now have a task
-    // that (by design) owns all capabilities (point (1) above) and is refusing
-    // to yield them (point (2) above). Indeed, if 2 threads concurrently call
-    // rts_pause, one will block until the other calls rts_resume. As "correct
-    // usage" of this API requires calling rts_resume, this case is a non-issue,
-    // but does imply the awkward quirk that if you call rts_pause on many
-    // threads, they will all "take turns" pausing the rts, blocking until it is
-    // their turn. In adition, any API function that attempts to acquire a
-    // capability (e.g. rts_lock), will block until rts_resume is called. Of
-    // course, all ghc-debug API functions  besides rts_pause do not attempt to
-    // acquire a capability.
-    //
-    // The moral to this story is that you will not dealock as long as you, on
-    // the same thread:
-    //
-    // * First call rts_pause
-    // * Then avoid rts functions other than:
-    //      * rts_isPaused
-    //      * rts_listThreads
-    //      * rts_listMiscRoots
-    //      * AND dereferencing/inspect the heap directly e.g. using
-    //        rts_listThreads/rts_listMiscRoots and the ghc-heap library.
-    // * Finally call rts_resume
-    //
-    // TODO
-    //
-    // I think we should return Capability*. We should be able to use the rest
-    // of the rts API with that token. There are a few functions that take
-    // `Capability **` implying that it may change capabilities. I need to
-    // confirm, but I think that in our case, we'll just end up with the same
-    // capability since all others are acquired already. These other API
-    // functions may change the heap, but it is up to the caller to account for
-    // that. Is it possible that the API can be used to start executing a
-    // haskell thread?!?!?! That's perhaps ok as long as we reacquire the
-    // capability at the end so we're paused.
     task = newBoundTask(); // TODO I'm not sure why we need this. rts_lock does this.
     stopAllCapabilities(NULL, task);
 
