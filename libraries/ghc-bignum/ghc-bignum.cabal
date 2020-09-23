@@ -66,15 +66,12 @@ library
   default-language:    Haskell2010
   other-extensions:
     BangPatterns
-    CApiFFI
     CPP
-    DeriveDataTypeable
     ExplicitForAll
     GHCForeignImportPrim
     MagicHash
     NegativeLiterals
     NoImplicitPrelude
-    StandaloneDeriving
     UnboxedTuples
     UnliftedFFITypes
     ForeignFunctionInterface
@@ -97,14 +94,14 @@ library
   if flag(gmp)
       cpp-options: -DBIGNUM_GMP
       other-modules:
-         GHC.Num.BigNat.GMP
+         GHC.Num.Backend.GMP
       c-sources:
          cbits/gmp_wrappers.c
 
   if flag(ffi)
       cpp-options: -DBIGNUM_FFI
       other-modules:
-         GHC.Num.BigNat.FFI
+         GHC.Num.Backend.FFI
 
   if flag(native)
       cpp-options: -DBIGNUM_NATIVE
@@ -112,13 +109,15 @@ library
   if flag(check)
       cpp-options: -DBIGNUM_CHECK
       other-modules:
-         GHC.Num.BigNat.Check
+         GHC.Num.Backend.Check
 
 
   exposed-modules:
     GHC.Num.Primitives
     GHC.Num.WordArray
     GHC.Num.BigNat
-    GHC.Num.BigNat.Native
+    GHC.Num.Backend
+    GHC.Num.Backend.Selected
+    GHC.Num.Backend.Native
     GHC.Num.Natural
     GHC.Num.Integer
