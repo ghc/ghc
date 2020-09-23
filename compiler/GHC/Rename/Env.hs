@@ -1116,6 +1116,7 @@ lookupInfoOccRn rdr_name =
           <$> lookupQualifiedNameGHCi rdr_name
        ; return (ns ++ (qual_ns `minusList` ns)) }
 
+-- | A datatype to distinguish record selector functions from regular symbols.
 data LookupOccRnOverloadedResult
   = LookupOccRnUnique Name
   -- ^  name uniquely refers to x,
@@ -1133,9 +1134,13 @@ instance Outputable LookupOccRnOverloadedResult where
   ppr (LookupOccRnUnique x) = text "LookupOccRnUnique " <> ppr x
   ppr (LookupOccRnSelectors xs) = text "LoookupOccRnSelectors " <> ppr xs
 
--- | Like 'lookupOccRn_maybe', but with a more informative result if
--- the 'RdrName' happens to be a record selector.
-lookupGlobalOccRn_resolve :: DuplicateRecordFields -> RdrName -> GreLookupResult -> RnM (Maybe LookupOccRnOverloadedResult)
+-- | Process a list of 'GlobalRdrElt's matching the given 'RdrName's
+-- and check if it is a unique 'Name' or a set of record selector functions.
+-- See Note [NoFieldSelectors]
+lookupGlobalOccRn_resolve :: DuplicateRecordFields
+  -> RdrName
+  -> GreLookupResult
+  -> RnM (Maybe LookupOccRnOverloadedResult)
 lookupGlobalOccRn_resolve overload_ok rdr_name res = case res of
   GreNotFound  -> return Nothing
   OneNameMatch gre -> do
@@ -1151,15 +1156,20 @@ lookupGlobalOccRn_resolve overload_ok rdr_name res = case res of
 
 -- | Look up a variable or record selector functions.
 -- It does NOT find a record selector created under NoFieldSelectors.
-lookupGlobalOccRn_overloaded_expr :: DuplicateRecordFields -> RdrName -> RnM (Maybe LookupOccRnOverloadedResult)
+-- See Note [NoFieldSelectors]
+lookupGlobalOccRn_overloaded_expr :: DuplicateRecordFields
+  -> RdrName
+  -> RnM (Maybe LookupOccRnOverloadedResult)
 lookupGlobalOccRn_overloaded_expr overload_ok rdr_name =
   lookupExactOrOrig_maybe rdr_name (fmap LookupOccRnUnique) $
      do  { env <- getGlobalRdrEnv
-         ; res <- case filter (not . isNoFieldSelectorGRE) $ lookupGRE_RdrName rdr_name env of
-            []    -> return GreNotFound
-            [gre] -> do { addUsedGRE True gre
-                        ; return (OneNameMatch gre) }
-            gres  -> return (MultipleNames gres)
+         ; res <- case filter (not . isNoFieldSelectorGRE)
+            -- filter out invisible selector functions
+            $ lookupGRE_RdrName rdr_name env of
+              []    -> return GreNotFound
+              [gre] -> do { addUsedGRE True gre
+                          ; return (OneNameMatch gre) }
+              gres  -> return (MultipleNames gres)
          ; lookupGlobalOccRn_resolve overload_ok rdr_name res
          }
 
@@ -1176,7 +1186,11 @@ In order to avoid name clashes, selector names are mangled in the same way as Du
 -}
 
 -- | Look up a variable or record selectors.
-lookupGlobalOccRn_overloaded_pat :: DuplicateRecordFields -> RdrName -> RnM (Maybe LookupOccRnOverloadedResult)
+-- It MAY find a selector function with NoFieldSelectors.
+-- See Note [NoFieldSelectors]
+lookupGlobalOccRn_overloaded_pat :: DuplicateRecordFields
+  -> RdrName
+  -> RnM (Maybe LookupOccRnOverloadedResult)
 lookupGlobalOccRn_overloaded_pat overload_ok rdr_name =
   lookupExactOrOrig_maybe rdr_name (fmap LookupOccRnUnique) $
      do  { res <- lookupGreRn_helper rdr_name

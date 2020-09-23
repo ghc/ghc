@@ -133,6 +133,8 @@ data FieldLbl a = FieldLabel {
       flIsOverloaded :: DuplicateRecordFields,             -- ^ Was DuplicateRecordFields on
                                           --   in the defining module for this datatype?
       flHasFieldSelector :: FieldSelectors,
+      -- ^ Was FieldSelectors enabled in the defining module for this datatype?
+      -- See Note [NoFieldSelectors]
       flSelector     :: a                 -- ^ Record selector function
     }
   deriving (Eq, Functor, Foldable, Traversable)

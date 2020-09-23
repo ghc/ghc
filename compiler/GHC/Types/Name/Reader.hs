@@ -654,6 +654,9 @@ gresFromAvail prov_fn avail
           Just is -> GRE { gre_name = n, gre_par = FldParent (availName avail) mb_lbl has_sel
                          , gre_lcl = False, gre_imp = [is] }
       where
+        -- Mangle selector names when one or more of 'DuplicateRecordFields' or 'NoFieldSelectors'
+        -- is enabled in order to avoid name clash.
+        -- See Note [NoFieldSelectors]
         mb_lbl | is_overloaded == DuplicateRecordFields || has_sel == NoFieldSelectors = Just lbl
                | otherwise     = Nothing
 

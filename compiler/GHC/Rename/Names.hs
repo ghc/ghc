@@ -646,7 +646,8 @@ extendGlobalRdrEnvRn avails new_fixities
         occ  = greOccName gre
         dups = filter isDupGRE (lookupGlobalRdrEnv env occ)
         -- Duplicate GREs are those defined locally with the same OccName,
-        -- except cases where *both* GREs are DuplicateRecordFields (#17965).
+        -- except cases where *both* GREs are DuplicateRecordFields (#17965),
+        -- or *one of them_ is NoFieldSelectors. See Note [NoFieldSelectors]
         isDupGRE gre' = isLocalGRE gre'
                 && not (isOverloadedRecFldGRE gre && isOverloadedRecFldGRE gre')
                 && not (isNoFieldSelectorGRE gre || isNoFieldSelectorGRE gre')
