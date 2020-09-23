@@ -397,7 +397,14 @@ tcGuardStmt _ (BodyStmt _ guard _ _) res_ty thing_inside
         ; return (BodyStmt boolTy guard' noSyntaxExpr noSyntaxExpr, thing) }
 
 tcGuardStmt ctxt (BindStmt _ pat rhs) res_ty thing_inside
-  = do  { (rhs', rhs_ty) <- tcInferRhoNC rhs
+  = do  { -- The Many on the next line and the unrestricted on the line after
+          -- are linked. These must be the same multiplicity. Consider
+          --   x <- rhs -> u
+          --
+          -- The multiplicity of x in u must be the same as the multiplicity at
+          -- which the rhs has been consumed. When solving #18738, we want these
+          -- two multiplicity to still be the same.
+          (rhs', rhs_ty) <- tcScalingUsage Many $ tcInferRhoNC rhs
                                    -- Stmt has a context already
         ; (pat', thing)  <- tcCheckPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
                                          pat (unrestricted rhs_ty) $
