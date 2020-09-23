@@ -476,7 +476,8 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap,
         debugBelch("   stk[%ld] (%p) = ", (long)(spBottom-(payload+i)), payload+i);
         if ((bitmap & 1) == 0) {
             printPtr((P_)payload[i]);
-            debugBelch("\n");
+            debugBelch(" -- ");
+            printObj((StgClosure*) payload[i]);
         } else {
             debugBelch("Word# %" FMT_Word "\n", (W_)payload[i]);
         }
@@ -498,7 +499,8 @@ printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap,
             debugBelch("   stk[%" FMT_Word "] (%p) = ", (W_)(spBottom-(payload+i)), payload+i);
             if ((bitmap & 1) == 0) {
                 printPtr((P_)payload[i]);
-                debugBelch("\n");
+                debugBelch(" -- ");
+                printObj((StgClosure*) payload[i]);
             } else {
                 debugBelch("Word# %" FMT_Word "\n", (W_)payload[i]);
             }
@@ -509,7 +511,6 @@ printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap,
 void
 printStackChunk( StgPtr sp, StgPtr spBottom )
 {
-    StgWord bitmap;
     const StgInfoTable *info;
 
     ASSERT(sp <= spBottom);
@@ -587,7 +588,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
             } else {
                 debugBelch("RET_SMALL (%p)\n", info);
             }
-            bitmap = info->layout.bitmap;
+            StgWord bitmap = info->layout.bitmap;
             printSmallBitmap(spBottom, sp+1,
                              BITMAP_BITS(bitmap), BITMAP_SIZE(bitmap));
             continue;
@@ -605,8 +606,13 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
         }
 
         case RET_BIG:
-            barf("todo");
-
+            debugBelch("RET_BIG (%p)\n", sp);
+            StgLargeBitmap* bitmap = GET_LARGE_BITMAP(info);
+            printLargeBitmap(spBottom,
+                            (StgPtr)((StgClosure *) sp)->payload,
+                            bitmap,
+                            bitmap->size);
+            continue;
         case RET_FUN:
         {
             const StgFunInfoTable *fun_info;
@@ -697,7 +703,7 @@ void printLargeAndPinnedObjects()
     for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
         Capability *cap = capabilities[cap_idx];
 
-        debugBelch("Capability %d: Current pinned object block: %p\n", 
+        debugBelch("Capability %d: Current pinned object block: %p\n",
                    cap_idx, (void*)cap->pinned_object_block);
         for (bdescr *bd = cap->pinned_object_blocks; bd; bd = bd->link) {
             debugBelch("%p\n", (void*)bd);
