@@ -27,3 +27,4 @@ test('LinearPolyType', expect_broken([436, broken_multiplicity_syntax]), compile
 test('LinearBottomMult', normal, compile_fail, [''])
 test('LinearSequenceExpr', normal, compile_fail, [''])
 test('LinearIf', normal, compile_fail, [''])
+test('LinearPatternGuardWildcard', normal, compile_fail, [''])
