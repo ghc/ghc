@@ -13,7 +13,7 @@
 --
 -- This has been adapted from the legacy `integer-gmp` package written by
 -- Herbert Valerio Riedel.
-module GHC.Num.BigNat.GMP where
+module GHC.Num.Backend.GMP where
 
 #include "MachDeps.h"
 #include "WordSize.h"
