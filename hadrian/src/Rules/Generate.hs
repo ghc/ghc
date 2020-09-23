@@ -166,7 +166,7 @@ copyRules = do
         prefix -/- "ghci-usage.txt"    <~ return "driver"
         prefix -/- "llvm-targets"      <~ return "."
         prefix -/- "llvm-passes"       <~ return "."
-        prefix -/- "template-hsc.h"    <~ return (pkgPath hsc2hs)
+        prefix -/- "template-hsc.h" <~ return (pkgPath hsc2hs -/- "data")
 
         prefix -/- "html/**"           <~ return "utils/haddock/haddock-api/resources"
         prefix -/- "latex/**"          <~ return "utils/haddock/haddock-api/resources"
