@@ -140,7 +140,7 @@ haddockDeps stage = do
 -- ref: utils/hsc2hs/ghc.mk
 -- | Path to 'hsc2hs' template.
 templateHscPath :: Stage -> Action FilePath
-templateHscPath stage = stageLibPath stage <&> (-/- "template-hsc.h")
+templateHscPath stage = stageLibPath stage <&> (-/- ("data" -/- "template-hsc.h"))
 
 -- | We use this stamp file to track whether we've moved the mingw toolchain
 --   under the build root (to make it accessible to the GHCs we build on
