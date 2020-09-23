@@ -269,10 +269,9 @@ isCompleteHsSig (HsWC { hswc_ext = wcs, hswc_body = hs_sig_ty })
    = null wcs && no_anon_wc_sig_ty hs_sig_ty
 
 no_anon_wc_sig_ty :: LHsSigType GhcRn -> Bool
-no_anon_wc_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
-  case outer_bndrs of
-    OuterImplicit{}    -> no_anon_wc_ty body
-    OuterExplicit ltvs -> all no_anon_wc_tvb ltvs && no_anon_wc_ty body
+no_anon_wc_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body}))
+  =  all no_anon_wc_tvb (outerExplicitBndrs outer_bndrs)
+  && no_anon_wc_ty body
 
 no_anon_wc_ty :: LHsType GhcRn -> Bool
 no_anon_wc_ty lty = go lty
@@ -385,15 +384,17 @@ completely solving them.
 tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
 -- See Note [Pattern synonym signatures]
 -- See Note [Recipe for checking a signature] in GHC.Tc.Gen.HsType
-tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = hs_ty}))
+tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty}))
   | (hs_req, hs_ty1) <- splitLHsQualTy hs_ty
   , (ex_hs_tvbndrs, hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
-  = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
-       ; (tclvl, wanted, (implicit_or_univ_tvbndrs, (ex_tvbndrs, (req, prov, body_ty))))
-           <- pushLevelAndSolveEqualitiesX "tcPatSynSig" $
+  = do { traceTc "tcPatSynSig 1" (ppr sig_ty)
+
+       ; let skol_info = DataConSkol name
+       ; (tclvl, wanted, (outer_bndrs, (ex_tvbndrs, (req, prov, body_ty))))
+           <- pushLevelAndSolveEqualitiesX "tcPatSynSig"           $
                      -- See Note [solveEqualities in tcPatSynSig]
-              bindOuterSigTKBndrs_Skol outer_bndrs   $
-              bindExplicitTKBndrs_Skol ex_hs_tvbndrs $
+              tcOuterSigTKBndrs TypeLevel skol_info hs_outer_bndrs $
+              tcExplicitTKBndrs TypeLevel           ex_hs_tvbndrs  $
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; body_ty <- tcHsOpenType hs_body_ty
@@ -401,11 +402,13 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = hs_ty}))
                      -- e.g. pattern Zero <- 0#   (#12094)
                  ; return (req, prov, body_ty) }
 
-         -- TODO RGS: Is this the cleanest way to do this?
-       ; let (implicit_tvs, univ_tvbndrs) = case implicit_or_univ_tvbndrs of
-               Left  implicit_tvs' -> (implicit_tvs', [])
-               Right univ_tvbndrs' -> ([], univ_tvbndrs')
+       ; let implicit_tvs  :: [TcTyVar]
+             univ_tvbndrs :: [TcInvisTVBinder]
+             (implicit_tvs, univ_tvbndrs) = case outer_bndrs of
+               OuterImplicit implicit_tvs -> (implicit_tvs, [])
+               OuterExplicit univ_tvbndrs -> ([], univ_tvbndrs)
 
+       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
        ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvbndrs
                                                  req ex_tvbndrs prov body_ty
 
@@ -413,9 +416,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = hs_ty}))
        ; kvs <- kindGeneralizeAll ungen_patsyn_ty
        ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
 
-       ; let skol_tvs  = kvs ++ implicit_tvs ++ binderVars (univ_tvbndrs ++ ex_tvbndrs)
-             skol_info = DataConSkol name
-       ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
+       ; reportUnsolvedEqualities skol_info kvs tclvl wanted
                -- See Note [Report unsolved equalities in tcPatSynSig]
 
        -- These are /signatures/ so we zonk to squeeze out any kind
