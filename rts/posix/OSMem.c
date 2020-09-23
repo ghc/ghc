@@ -591,7 +591,10 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
            that many threads (e.g., itimer). We can't know for sure how much we need,
            but at least we can fail early and give a useful error message in this case. */
         if (((W_) (asLimit.rlim_cur - *len )) < ((W_) (stacksz * 3))) {
-            sysErrorBelch("not enough available virtual memory! Please check your resource limits!");
+            // Three stacks is 1/3 of needed, then convert to Megabyte
+            size_t needed = (stacksz * 3 * 3) / (1024 * 1024);
+            errorBelch("the current resource limit for virtual memory ('ulimit -v' or RLIMIT_AS) is too low.\n"
+                "Please make sure that at least %zuMiB of virtual memory are available.", needed);
             stg_exit(EXIT_FAILURE);
         }
     }
