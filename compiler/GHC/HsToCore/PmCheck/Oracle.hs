@@ -44,6 +44,7 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Types.Id
 import GHC.Types.Name
+import GHC.Types.Name.Reader (GlobalRdrEnv, lookupGRE_Name)
 import GHC.Types.Var      (EvVar)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -1737,11 +1738,16 @@ generateInhabitingPatterns (x:xs) n nabla = do
 
 pickApplicableCompleteSets :: Type -> ResidualCompleteMatches -> DsM [ConLikeSet]
 pickApplicableCompleteSets ty rcm = do
+  gre <- dsGetGlobalRdrEnv
   env <- dsGetFamInstEnvs
-  pure $ filter (all (is_valid env) . uniqDSetToList) (getRcm rcm)
+  pure $ filter (all (is_valid gre env) . uniqDSetToList) (getRcm rcm)
   where
-    is_valid :: FamInstEnvs -> ConLike -> Bool
-    is_valid env cl = isJust (guessConLikeUnivTyArgsFromResTy env ty cl)
+    is_valid :: GlobalRdrEnv -> FamInstEnvs -> ConLike -> Bool
+    is_valid gre env cl =  isJust (guessConLikeUnivTyArgsFromResTy env ty cl)
+                        && isJust (lookupGRE_Name gre (conLikeName cl))
+                              -- filter out ConLikes that the User can't write,
+                              -- because they aren't imported or not even
+                              -- exported. This is #13964.
 
 {- Note [Why inhabitationTest doesn't call generateInhabitingPatterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

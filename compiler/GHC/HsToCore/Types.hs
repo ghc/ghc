@@ -10,6 +10,7 @@ import Data.IORef
 
 import GHC.Types.CostCentre.State
 import GHC.Types.Name.Env
+import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
@@ -46,6 +47,8 @@ data DsGblEnv
   , ds_msgs    :: IORef Messages          -- Warning messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                           -- possibly-imported things
+  , ds_rdr_env :: GlobalRdrEnv            -- ^ Used for looking up whether a
+                                          -- Name is imported or not
   , ds_complete_matches :: CompleteMatches
      -- Additional complete pattern matches
   , ds_cc_st   :: IORef CostCentreState
