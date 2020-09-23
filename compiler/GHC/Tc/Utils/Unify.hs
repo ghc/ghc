@@ -926,12 +926,17 @@ checkTvConstraints skol_info skol_tvs thing_inside
 emitResidualTvConstraint :: SkolemInfo -> [TcTyVar]
                          -> TcLevel -> WantedConstraints -> TcM ()
 emitResidualTvConstraint skol_info skol_tvs tclvl wanted
-  | isEmptyWC wanted
-  = return ()
-
-  | otherwise
-  = do { implic <- buildTvImplication skol_info skol_tvs tclvl wanted
+  | not (isEmptyWC wanted) ||
+    checkTelescopeSkol skol_info
+  = -- checkTelescopeSkol: in this case, /always/ emit this implication
+    -- even if 'wanted' is empty. We need the implication so that we check
+    -- for a bad telescope. See Note [Skolem escape and forall-types] in
+    -- GHC.Tc.Gen.HsType
+    do { implic <- buildTvImplication skol_info skol_tvs tclvl wanted
        ; emitImplication implic }
+
+  | otherwise  -- Empty 'wanted', emit nothing
+  = return ()
 
 buildTvImplication :: SkolemInfo -> [TcTyVar]
                    -> TcLevel -> WantedConstraints -> TcM Implication

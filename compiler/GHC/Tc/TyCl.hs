@@ -1619,7 +1619,7 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     -- If we don't look at MkT we won't get the correct kind
     -- for the type constructor T
     addErrCtxt (dataConCtxtName names) $
-    discardResult $
+    discardResult                      $
     bindOuterSigTKBndrs_Tv outer_bndrs $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
     do { _ <- tcHsMbContext cxt
@@ -3263,7 +3263,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
 
        ; (tclvl, wanted, (outer_bndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
-              tcOuterSigTKBndrs outer_bndrs $
+              tcOuterSigTKBndrs TypeLevel skol_info outer_bndrs $
               do { ctxt <- tcHsMbContext cxt
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
@@ -3283,10 +3283,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                                     mkPhiTy ctxt $
                                     mkVisFunTys arg_tys $
                                     res_ty)
+       ; reportUnsolvedEqualities skol_info tkvs tclvl wanted
 
        ; let tvbndrs =  mkTyVarBinders InferredSpec tkvs ++ outer_tv_bndrs
-
-       ; reportUnsolvedEqualities skol_info (binderVars tvbndrs) tclvl wanted
 
              -- Zonk to Types
        ; (ze, tvbndrs) <- zonkTyVarBinders       tvbndrs
