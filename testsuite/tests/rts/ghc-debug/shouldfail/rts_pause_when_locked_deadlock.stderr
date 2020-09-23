@@ -1,0 +1,2 @@
+rts_pause_when_locked_deadlock: error: rts_lock: The RTS is already paused by this thread.
+   There is no need to call rts_lock if you have already call rts_pause.

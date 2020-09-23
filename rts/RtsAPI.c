@@ -578,6 +578,12 @@ rts_getSchedStatus (Capability *cap)
     return cap->running_task->incall->rstat;
 }
 
+#if defined(THREADED_RTS)
+// The task that paused the RTS. The rts_pausing_task variable is owned by the
+// task that owns all capabilities (there is at most one such task).
+Task * rts_pausing_task = NULL;
+#endif
+
 Capability *
 rts_lock (void)
 {
@@ -593,6 +599,14 @@ rts_lock (void)
                    "   Foreign.Concurrent.newForeignPtr instead of Foreign.newForeignPtr.");
         stg_exit(EXIT_FAILURE);
     }
+
+#if defined(THREADED_RTS)
+    if (rts_pausing_task == task) {
+        errorBelch("error: rts_lock: The RTS is already paused by this thread.\n"
+                   "   There is no need to call rts_lock if you have already call rts_pause.");
+        stg_exit(EXIT_FAILURE);
+    }
+#endif
 
     cap = NULL;
     waitForCapability(&cap, task);
@@ -647,10 +661,6 @@ rts_unlock (Capability *cap)
 }
 
 #if defined(THREADED_RTS)
-// The task that paused the RTS. The rts_pausing_task variable is owned by the
-// task that owns all capabilities (there is at most one such task).
-Task * rts_pausing_task = NULL;
-
 // See RtsAPI.h
 Capability * rts_pause (void)
 {

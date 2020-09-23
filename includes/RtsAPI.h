@@ -487,13 +487,13 @@ void rts_checkSchedStatus (char* site, Capability *);
 SchedulerStatus rts_getSchedStatus (Capability *cap);
 
 // Halt execution of all Haskell threads by acquiring all capabilities (safe FFI
-// calls may continue). rts_resume() must later be called on the same thread to
+// calls may continue). rts_resume must later be called on the same thread to
 // resume the RTS. Only one thread at a time can keep the rts paused. The
 // rts_pause function will block until the current thread is given exclusive
-// permission to pause the RTS. If the RTS was already paused by the current OS
+// permission to pause the RTS. If the RTS is already paused by the current OS
 // thread, then rts_pause will return immediately and have no effect. Returns a
 // token which may be used to create new objects and evaluate them (like
-// rts_lock) .This is different to rts_lock() which only pauses a single
+// rts_lock) .This is different to rts_lock which only pauses a single
 // capability. Calling rts_pause in between rts_lock/rts_unlock will cause a
 // deadlock.
 Capability * rts_pause (void);

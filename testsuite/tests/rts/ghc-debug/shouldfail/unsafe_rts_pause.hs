@@ -8,10 +8,10 @@ import Foreign.Ptr
 import System.Mem
 import Control.Monad
 
-data RtsPause
+data Capability
 
 foreign import ccall unsafe "RtsAPI.h rts_pause"
-    unsafe_rts_pause_c :: IO (Ptr RtsPause)
+    unsafe_rts_pause_c :: IO (Ptr Capability)
 
 main :: IO ()
 main = do

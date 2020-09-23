@@ -1,0 +1,2 @@
+rts_lock_when_paused_deadlock: error: rts_pause: attempting to pause from a Task that owns a capability.
+   Have you already acquired a capability e.g. with rts_lock?
