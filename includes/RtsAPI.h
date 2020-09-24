@@ -340,7 +340,8 @@ extern void (*exitFn)(int);
    ------------------------------------------------------------------------- */
 
 // acquires a token which may be used to create new objects and evaluate them.
-// Calling rts_lock in between rts_pause/rts_resume will cause a deadlock.
+// Calling rts_lock in between rts_pause/rts_resume on the same thread will
+// cause an error.
 Capability *rts_lock (void);
 
 // releases the token acquired with rts_lock().
@@ -494,8 +495,8 @@ SchedulerStatus rts_getSchedStatus (Capability *cap);
 // thread, then rts_pause will return immediately and have no effect. Returns a
 // token which may be used to create new objects and evaluate them (like
 // rts_lock) .This is different to rts_lock which only pauses a single
-// capability. Calling rts_pause in between rts_lock/rts_unlock will cause a
-// deadlock.
+// capability. Calling rts_pause in between rts_lock/rts_unlock on the same
+// thread will cause an error.
 Capability * rts_pause (void);
 
 // Counterpart of rts_pause: Continue from a pause. All capabilities are
