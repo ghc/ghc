@@ -5,6 +5,7 @@ test('integerConstantFolding', normal, makefile_test, ['integerConstantFolding']
 test('fromToInteger', [], makefile_test, ['fromToInteger'])
 test('IntegerConversionRules', [], makefile_test, ['IntegerConversionRules'])
 test('gcdInteger', normal, compile_and_run, [''])
+test('gcdeInteger', normal, compile_and_run, [''])
 test('integerPowMod', [], compile_and_run, [''])
 
 # skip ghci as it doesn't support unboxed tuples
