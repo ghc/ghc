@@ -1926,6 +1926,16 @@ tc_infer_id lbl id_name
                  RealDataCon con -> return_data_con con
                  PatSynCon ps    -> tcPatSynBuilderOcc ps
 
+             ATyVar name _
+               -> failWithTc $
+                  text "Illegal term-level use of the type variable"
+                    <+> quotes (ppr name)
+
+             ATcTyCon ty_con
+               -> failWithTc $
+                  text "Illegal term-level use of the type constructor"
+                    <+> quotes (ppr (tyConName ty_con))
+
              _ -> failWithTc $
                   ppr thing <+> text "used where a value identifier was expected" }
   where
