@@ -69,6 +69,7 @@ import GHC.SysTools.FileCleanup
 import Control.Monad
 
 import qualified Data.Set as Set
+import qualified Data.ByteString.Char8 as BS8
 import Data.Char (isSpace)
 import Data.Function ((&))
 import Data.IORef
@@ -1282,10 +1283,10 @@ linkPackage hsc_env pkg
         let dflags    = hsc_dflags hsc_env
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic (hscInterp hsc_env)
-            dirs | is_dyn    = Packages.unitLibraryDynDirs pkg
-                 | otherwise = Packages.unitLibraryDirs pkg
+            dirs | is_dyn    = map BS8.unpack $ Packages.unitLibraryDynDirs pkg
+                 | otherwise = map BS8.unpack $ Packages.unitLibraryDirs pkg
 
-        let hs_libs   =  Packages.unitLibraries pkg
+        let hs_libs   = map BS8.unpack $ Packages.unitLibraries pkg
             -- The FFI GHCi import lib isn't needed as
             -- GHC.Runtime.Linker + rts/Linker.c link the
             -- interpreted references to FFI to the compiled FFI.
@@ -1300,11 +1301,12 @@ linkPackage hsc_env pkg
         -- libs do not exactly match the .so/.dll equivalents. So if the
         -- package file provides an "extra-ghci-libraries" field then we use
         -- that instead of the "extra-libraries" field.
-            extra_libs =
-                      (if null (Packages.unitExtDepLibsGhc pkg)
-                            then Packages.unitExtDepLibsSys pkg
-                            else Packages.unitExtDepLibsGhc pkg)
-                      ++ [ lib | '-':'l':lib <- Packages.unitLinkerOptions pkg ]
+            extdeplibs = map BS8.unpack (if null (Packages.unitExtDepLibsGhc pkg)
+                                              then Packages.unitExtDepLibsSys pkg
+                                              else Packages.unitExtDepLibsGhc pkg)
+            linkerlibs = [ lib | '-':'l':lib <- (map BS8.unpack $ Packages.unitLinkerOptions pkg) ]
+            extra_libs = extdeplibs ++ linkerlibs
+
         -- See Note [Fork/Exec Windows]
         gcc_paths <- getGCCPaths dflags (platformOS platform)
         dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
@@ -1434,8 +1436,8 @@ loadFrameworks :: HscEnv -> Platform -> UnitInfo -> IO ()
 loadFrameworks hsc_env platform pkg
     = when (platformUsesFrameworks platform) $ mapM_ load frameworks
   where
-    fw_dirs    = Packages.unitExtDepFrameworkDirs pkg
-    frameworks = Packages.unitExtDepFrameworks pkg
+    fw_dirs    = map BS8.unpack $ Packages.unitExtDepFrameworkDirs pkg
+    frameworks = map BS8.unpack $ Packages.unitExtDepFrameworks pkg
 
     load fw = do  r <- loadFramework hsc_env fw_dirs fw
                   case r of

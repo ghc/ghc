@@ -29,6 +29,7 @@ import GHC.Prelude
 import GHC.Unit.Database
 import Data.Version
 import Data.Bifunctor
+import qualified Data.ByteString.Char8 as BS8
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable
@@ -124,21 +125,21 @@ pprUnitInfo GenericUnitInfo {..} =
       field "exposed-modules"      (ppr unitExposedModules),
       field "hidden-modules"       (fsep (map ppr unitHiddenModules)),
       field "trusted"              (ppr unitIsTrusted),
-      field "import-dirs"          (fsep (map text unitImportDirs)),
-      field "library-dirs"         (fsep (map text unitLibraryDirs)),
-      field "dynamic-library-dirs" (fsep (map text unitLibraryDynDirs)),
-      field "hs-libraries"         (fsep (map text unitLibraries)),
-      field "extra-libraries"      (fsep (map text unitExtDepLibsSys)),
-      field "extra-ghci-libraries" (fsep (map text unitExtDepLibsGhc)),
-      field "include-dirs"         (fsep (map text unitIncludeDirs)),
-      field "includes"             (fsep (map text unitIncludes)),
+      field "import-dirs"          (fsep (map (text . BS8.unpack) unitImportDirs)),
+      field "library-dirs"         (fsep (map (text . BS8.unpack) unitLibraryDirs)),
+      field "dynamic-library-dirs" (fsep (map (text . BS8.unpack) unitLibraryDynDirs)),
+      field "hs-libraries"         (fsep (map (text . BS8.unpack) unitLibraries)),
+      field "extra-libraries"      (fsep (map (text . BS8.unpack) unitExtDepLibsSys)),
+      field "extra-ghci-libraries" (fsep (map (text . BS8.unpack) unitExtDepLibsGhc)),
+      field "include-dirs"         (fsep (map (text . BS8.unpack) unitIncludeDirs)),
+      field "includes"             (fsep (map (text . BS8.unpack) unitIncludes)),
       field "depends"              (fsep (map ppr  unitDepends)),
-      field "cc-options"           (fsep (map text unitCcOptions)),
-      field "ld-options"           (fsep (map text unitLinkerOptions)),
-      field "framework-dirs"       (fsep (map text unitExtDepFrameworkDirs)),
-      field "frameworks"           (fsep (map text unitExtDepFrameworks)),
-      field "haddock-interfaces"   (fsep (map text unitHaddockInterfaces)),
-      field "haddock-html"         (fsep (map text unitHaddockHTMLs))
+      field "cc-options"           (fsep (map (text . BS8.unpack) unitCcOptions)),
+      field "ld-options"           (fsep (map (text . BS8.unpack) unitLinkerOptions)),
+      field "framework-dirs"       (fsep (map (text . BS8.unpack) unitExtDepFrameworkDirs)),
+      field "frameworks"           (fsep (map (text . BS8.unpack) unitExtDepFrameworks)),
+      field "haddock-interfaces"   (fsep (map (text . BS8.unpack) unitHaddockInterfaces)),
+      field "haddock-html"         (fsep (map (text . BS8.unpack) unitHaddockHTMLs))
     ]
   where
     field name body = text name <> colon <+> nest 4 body
