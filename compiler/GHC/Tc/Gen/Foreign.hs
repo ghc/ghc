@@ -237,7 +237,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so GHC.Tc.Utils.Zonk.zonkForeignExports ignores it).
 
-       ; imp_decl' <- tcCheckFIType (map scaledThing arg_tys) res_ty imp_decl
+       ; imp_decl' <- tcCheckFIType arg_tys res_ty imp_decl
           -- Can't use sig_ty here because sig_ty :: Type and
           -- we need HsType Id hence the undefined
        ; let fi_decl = ForeignImport { fd_name = L nloc id
@@ -249,14 +249,14 @@ tcFImport d = pprPanic "tcFImport" (ppr d)
 
 -- ------------ Checking types for foreign import ----------------------
 
-tcCheckFIType :: [Type] -> Type -> ForeignImport -> TcM ForeignImport
+tcCheckFIType :: [Scaled Type] -> Type -> ForeignImport -> TcM ForeignImport
 
 tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh l@(CLabel _) src)
   -- Foreign import label
   = do checkCg checkCOrAsmOrLlvmOrInterp
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
-       check (isFFILabelTy (mkVisFunTysMany arg_tys res_ty)) (illegalForeignTyErr Outputable.empty)
+       check (isFFILabelTy (mkVisFunTys arg_tys res_ty)) (illegalForeignTyErr Outputable.empty)
        cconv' <- checkCConv cconv
        return (CImport (L lc cconv') safety mh l src)
 
@@ -268,7 +268,9 @@ tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh CWrapper src) = do
     checkCg checkCOrAsmOrLlvmOrInterp
     cconv' <- checkCConv cconv
     case arg_tys of
-        [arg1_ty] -> do checkForeignArgs isFFIExternalTy (map scaledThing arg1_tys)
+        [Scaled arg1_mult arg1_ty] -> do
+                        checkNoLinearFFI arg1_mult
+                        checkForeignArgs isFFIExternalTy arg1_tys
                         checkForeignRes nonIOok  checkSafe isFFIExportResultTy res1_ty
                         checkForeignRes mustBeIO checkSafe (isFFIDynTy arg1_ty) res_ty
                   where
@@ -284,9 +286,10 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       case arg_tys of           -- The first arg must be Ptr or FunPtr
         []                ->
           addErrTc (illegalForeignTyErr Outputable.empty (text "At least one argument expected"))
-        (arg1_ty:arg_tys) -> do
+        (Scaled arg1_mult arg1_ty:arg_tys) -> do
           dflags <- getDynFlags
-          let curried_res_ty = mkVisFunTysMany arg_tys res_ty
+          let curried_res_ty = mkVisFunTys arg_tys res_ty
+          checkNoLinearFFI arg1_mult
           check (isFFIDynTy curried_res_ty arg1_ty)
                 (illegalForeignTyErr argument)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
@@ -311,7 +314,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       dflags <- getDynFlags
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
       checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
-      checkMissingAmpersand dflags arg_tys res_ty
+      checkMissingAmpersand dflags (map scaledThing arg_tys) res_ty
       case target of
           StaticTarget _ _ _ False
            | not (null arg_tys) ->
@@ -399,7 +402,7 @@ tcCheckFEType sig_ty (CExport (L l (CExportStatic esrc str cconv)) src) = do
     checkCg checkCOrAsmOrLlvm
     checkTc (isCLabelString str) (badCName str)
     cconv' <- checkCConv cconv
-    checkForeignArgs isFFIExternalTy (map scaledThing arg_tys)
+    checkForeignArgs isFFIExternalTy arg_tys
     checkForeignRes nonIOok noCheckSafe isFFIExportResultTy res_ty
     return (CExport (L l (CExportStatic esrc str cconv')) src)
   where
@@ -416,10 +419,16 @@ tcCheckFEType sig_ty (CExport (L l (CExportStatic esrc str cconv)) src) = do
 -}
 
 ------------ Checking argument types for foreign import ----------------------
-checkForeignArgs :: (Type -> Validity) -> [Type] -> TcM ()
+checkForeignArgs :: (Type -> Validity) -> [Scaled Type] -> TcM ()
 checkForeignArgs pred tys = mapM_ go tys
   where
-    go ty = check (pred ty) (illegalForeignTyErr argument)
+    go (Scaled mult ty) = checkNoLinearFFI mult >>
+                          check (pred ty) (illegalForeignTyErr argument)
+
+checkNoLinearFFI :: Mult -> TcM ()  -- No linear types in FFI (#18472)
+checkNoLinearFFI Many = return ()
+checkNoLinearFFI _    = addErrTc $ illegalForeignTyErr argument
+                                   (text "Linear types are not supported in FFI declarations, see #18472")
 
 ------------ Checking result types for foreign calls ----------------------
 -- | Check that the type has the form
