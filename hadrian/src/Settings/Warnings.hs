@@ -31,6 +31,7 @@ ghcWarningsArgs = do
         , package bytestring   ? pure [ "-Wno-inline-rule-shadowing" ]
         , package compiler     ? pure [ "-Wcpp-undef" ]
         , package directory    ? pure [ "-Wno-unused-imports" ]
+        , package deepseq      ? pure [ "-Wno-deprecations" ]
         , package ghc          ? pure [ "-Wcpp-undef"
                                       , "-Wincomplete-uni-patterns"
                                       , "-Wincomplete-record-updates"
