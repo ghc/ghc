@@ -14,7 +14,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
 import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
-import GHC.HsToCore.PmCheck.Types (Nablas)
+import GHC.HsToCore.Pmc.Types (Nablas)
 import GHC.Core (CoreExpr)
 import GHC.Core.FamInstEnv
 import GHC.Utils.Error
@@ -61,7 +61,7 @@ data DsLclEnv
   { dsl_meta    :: DsMetaEnv   -- ^ Template Haskell bindings
   , dsl_loc     :: RealSrcSpan -- ^ To put in pattern-matching error msgs
   , dsl_nablas  :: Nablas
-  -- ^ See Note [Note [Long-distance information] in "GHC.HsToCore.PmCheck".
+  -- ^ See Note [Note [Long-distance information] in "GHC.HsToCore.Pmc".
   -- The set of reaching values Nablas is augmented as we walk inwards, refined
   -- through each pattern match in turn
   }

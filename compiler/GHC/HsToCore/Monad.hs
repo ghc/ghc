@@ -75,7 +75,7 @@ import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.HsToCore.Types
-import GHC.HsToCore.PmCheck.Types
+import GHC.HsToCore.Pmc.Solver.Types (Nablas, initNablas)
 import GHC.Types.Id
 import GHC.Unit.Module
 import GHC.Utils.Outputable
