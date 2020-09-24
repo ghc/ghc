@@ -35,3 +35,4 @@ test('MultConstructor', expect_broken(broken_multiplicity_syntax), compile, ['']
 test('LinearLetRec', expect_broken(405), compile, ['-O -dlinear-core-lint'])
 test('LinearTH1', normal, compile, [''])
 test('LinearTH2', expect_broken(broken_multiplicity_syntax), compile, [''])
+test('LinearHole', normal, compile, [''])

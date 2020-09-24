@@ -198,6 +198,8 @@ tcExpr e@(HsUnboundVar _ occ) res_ty
        ; name <- newSysName occ
        ; let ev = mkLocalId name Many ty
        ; emitNewExprHole occ ev ty
+       ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment
+                                       -- (#18491)
        ; tcWrapResultO (UnboundOccurrenceOf occ) e
                        (HsUnboundVar ev occ) ty res_ty }
 
