@@ -307,10 +307,14 @@ Library
         GHC.Core.Stats
         GHC.Core.Make
         GHC.Core.Ppr
-        GHC.HsToCore.PmCheck.Oracle
-        GHC.HsToCore.PmCheck.Ppr
-        GHC.HsToCore.PmCheck.Types
-        GHC.HsToCore.PmCheck
+        GHC.HsToCore.Pmc
+        GHC.HsToCore.Pmc.Types
+        GHC.HsToCore.Pmc.Utils
+        GHC.HsToCore.Pmc.Desugar
+        GHC.HsToCore.Pmc.Check
+        GHC.HsToCore.Pmc.Solver.Types
+        GHC.HsToCore.Pmc.Solver
+        GHC.HsToCore.Pmc.Ppr
         GHC.HsToCore.Coverage
         GHC.HsToCore
         GHC.HsToCore.Types

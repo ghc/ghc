@@ -247,7 +247,7 @@ NoExtCon. But since (1) the field is strict and (2) NoExtCon is an empty data
 type, there is no possible way to reach the right-hand side of the XHsDecl
 case. As a result, the coverage checker concludes that the XHsDecl case is
 inaccessible, so it can be removed.
-(See Note [Strict argument type constraints] in GHC.HsToCore.PmCheck.Oracle for
+(See Note [Strict argument type constraints] in GHC.HsToCore.Pmc.Solver for
 more on how this works.)
 
 Bottom line: if you add a TTG extension constructor that uses NoExtCon, make

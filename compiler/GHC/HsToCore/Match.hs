@@ -34,8 +34,8 @@ import GHC.Hs
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
-import GHC.HsToCore.PmCheck
-import GHC.HsToCore.PmCheck.Types ( Nablas, initNablas )
+import GHC.HsToCore.Pmc
+import GHC.HsToCore.Pmc.Types ( Nablas, initNablas )
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.Utils
@@ -771,7 +771,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; matches_nablas <- if isMatchContextPmChecked dflags origin ctxt
             then addHsScrutTmCs mb_scr new_vars $
                  -- See Note [Long-distance information]
-                 covCheckMatches (DsMatchContext ctxt locn) new_vars matches
+                 pmcMatches (DsMatchContext ctxt locn) new_vars matches
             else pure (initNablasMatches matches)
 
         ; eqns_info   <- zipWithM mk_eqn_info matches matches_nablas
@@ -881,7 +881,7 @@ matchSinglePatVar var mb_scrut ctx pat ty match_result
        -- Pattern match check warnings
        ; when (isMatchContextPmChecked dflags FromSource ctx) $
            addCoreScrutTmCs mb_scrut [var] $
-           covCheckPatBind (DsMatchContext ctx locn) var (unLoc pat)
+           pmcPatBind (DsMatchContext ctx locn) var (unLoc pat)
 
        ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
                                 , eqn_orig = FromSource
