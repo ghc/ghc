@@ -1057,6 +1057,9 @@ checkPat loc (L l e@(PatBuilderVar (L _ c))) tyargs args
       , pat_con = L l c
       , pat_args = PrefixCon tyargs args
       }
+  | not (null tyargs) =
+      localPV_msg (\_ -> text "Type applications in patterns are currently only supported on data constructors.") $
+      patFail l (ppr e <+> hsep [text "@" <> ppr t | t <- tyargs])
   | not (null args) && patIsRec c =
       localPV_msg (\_ -> text "Perhaps you intended to use RecursiveDo") $
       patFail l (ppr e)
