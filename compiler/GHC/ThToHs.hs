@@ -889,7 +889,7 @@ cvtImplicitParamBind n e = do
 cvtl :: TH.Exp -> CvtM (LHsExpr GhcPs)
 cvtl e = wrapL (cvt e)
   where
-    cvt (VarE s)        = do { s' <- vName s; return $ HsVar noExtField (noLoc s') }
+    cvt (VarE s)        = do { s' <- vcName s; return $ HsVar noExtField (noLoc s') }
     cvt (ConE s)        = do { s' <- cName s; return $ HsVar noExtField (noLoc s') }
     cvt (LitE l)
       | overloadedLit l = go cvtOverLit (HsOverLit noExtField)
