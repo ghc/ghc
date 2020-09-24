@@ -234,6 +234,14 @@ lint-release-changelogs:
   tags:
     - x86_64-linux
 
+stack-hadrian-build:
+  extends: .validate-linux-hadrian
+  script:
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - hadrian/build-stack --version
+  stage: build
+
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
   stage: build
