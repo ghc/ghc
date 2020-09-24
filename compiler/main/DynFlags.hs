@@ -3011,6 +3011,8 @@ dynamic_flags_deps = [
                                               -- Don't pass -no-pie with -pgmc
                                               -- (see Trac #15319)
                                               sGccSupportsNoPie = False})))
+  , make_ord_flag defFlag "pgmc-supports-no-pie"
+      (noArg $ alterSettings $ \s -> s { sGccSupportsNoPie = True })
   , make_ord_flag defFlag "pgms"
       (hasArg (\f -> alterSettings (\s -> s { sPgm_s   = (f,[])})))
   , make_ord_flag defFlag "pgma"
