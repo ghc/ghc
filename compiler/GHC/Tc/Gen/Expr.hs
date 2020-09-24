@@ -1926,9 +1926,19 @@ tc_infer_id lbl id_name
                  RealDataCon con -> return_data_con con
                  PatSynCon ps    -> tcPatSynBuilderOcc ps
 
+             ATyVar name _
+               -> failWithTc $
+                  text "Type variable" <+> quotes (ppr name) <+> text error_msg
+
+             ATcTyCon ty_con
+               -> failWithTc $
+                  text "Type constructor" <+> quotes (ppr (tyConName ty_con)) <+> text error_msg
+
              _ -> failWithTc $
-                  ppr thing <+> text "used where a value identifier was expected" }
+                  ppr thing <+> panic error_msg }
   where
+    error_msg = "used where a value identifier was expected"
+
     return_id id = return (HsVar noExtField (noLoc id), idType id)
 
     return_data_con con
