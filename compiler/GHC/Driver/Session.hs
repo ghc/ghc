@@ -2375,6 +2375,8 @@ dynamic_flags_deps = [
            -- (see #15319)
            toolSettings_ccSupportsNoPie = False
          }
+  , make_ord_flag defFlag "pgmc-supports-no-pie"
+      $ noArg $ alterToolSettings $ \s -> s { toolSettings_ccSupportsNoPie = True }
   , make_ord_flag defFlag "pgms"
       (HasArg (\_ -> addWarn "Object splitting was removed in GHC 8.8"))
   , make_ord_flag defFlag "pgma"
