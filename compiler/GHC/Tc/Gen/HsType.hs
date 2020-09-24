@@ -30,11 +30,11 @@ module GHC.Tc.Gen.HsType (
         bindExplicitTKBndrs_Tv, bindExplicitTKBndrs_Skol,
             bindExplicitTKBndrs_Q_Tv, bindExplicitTKBndrs_Q_Skol,
 
-        tcOuterSigTKBndrs, scopedSortOuter,
-        tcExplicitTKBndrs,
-        bindOuterSigTKBndrs_Tv,
-
         bindOuterFamEqnTKBndrs_Q_Skol, bindOuterFamEqnTKBndrs_Q_Tv,
+        tcOuterSigTKBndrs, scopedSortOuter,
+        bindOuterSigTKBndrs_Tv,
+        tcExplicitTKBndrs,
+        bindNamedWildCardBinders,
 
         -- Type checking type and class decls, and instances thereof
         bindTyClTyVars, tcFamTyPats,
@@ -49,7 +49,6 @@ module GHC.Tc.Gen.HsType (
         SAKS_or_CUSK(..),
         ContextKind(..),
         kcDeclHeader,
-        tcNamedWildCardBinders,
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcInferLHsTypeKind, tcInferLHsType, tcInferLHsTypeUnsaturated,
@@ -453,6 +452,7 @@ tc_hs_sig_type skol_info (L loc (HsSig { sig_bndrs = hs_outer_bndrs
        -- Any remaining variables (unsolved in the solveEqualities)
        -- should be in the global tyvars, and therefore won't be quantified
 
+       ; traceTc "tc_hs_sig_type" (ppr hs_outer_bndrs $$ ppr outer_bndrs)
        ; (outer_tv_bndrs :: [InvisTVBinder]) <- scopedSortOuter outer_bndrs
 
        ; let ty1 = mkInvisForAllTys outer_tv_bndrs ty
@@ -612,7 +612,7 @@ tcHsTypeApp wc_ty kind
                solveEqualities "tcHsTypeApp" $
                -- We are looking at a user-written type, very like a
                -- signature so we want to solve its equalities right now
-               tcNamedWildCardBinders sig_wcs $ \ _ ->
+               bindNamedWildCardBinders sig_wcs $ \ _ ->
                tc_lhs_type mode hs_ty kind
 
        -- We do not kind-generalize type applications: we just
@@ -2054,13 +2054,13 @@ addTypeCtxt (L _ ty) thing
 *                                                                      *
 ********************************************************************* -}
 
-tcNamedWildCardBinders :: [Name]
-                       -> ([(Name, TcTyVar)] -> TcM a)
-                       -> TcM a
+bindNamedWildCardBinders :: [Name]
+                         -> ([(Name, TcTyVar)] -> TcM a)
+                         -> TcM a
 -- Bring into scope the /named/ wildcard binders.  Remember that
 -- plain wildcards _ are anonymous and dealt with by HsWildCardTy
 -- Soe Note [The wildcard story for types] in GHC.Hs.Type
-tcNamedWildCardBinders wc_names thing_inside
+bindNamedWildCardBinders wc_names thing_inside
   = do { wcs <- mapM newNamedWildTyVar wc_names
        ; let wc_prs = wc_names `zip` wcs
        ; tcExtendNameTyVarEnv wc_prs $
@@ -3323,8 +3323,8 @@ bindTyClTyVars tycon_name thing_inside
 
 zonkAndScopedSort :: [TcTyVar] -> TcM [TcTyVar]
 zonkAndScopedSort spec_tkvs
-  = do { spec_tkvs <- mapM zonkAndSkolemise spec_tkvs
-          -- Use zonkAndSkolemise because a skol_tv might be a TyVarTv
+  = do { spec_tkvs <- mapM zonkTcTyVarToTyVar spec_tkvs
+         -- Zonk the kinds, to we can do the dependency analayis
 
        -- Do a stable topological sort, following
        -- Note [Ordering of implicit variables] in GHC.Rename.HsType
@@ -3733,7 +3733,7 @@ tcHsPartialSigType ctxt sig_ty
        ; (outer_bndrs, (wcs, wcx, theta, tau))
             <- solveEqualities "tcHsPartialSigType" $
                -- See Note [Failure in local type signatures]
-               tcNamedWildCardBinders sig_wcs               $ \ wcs ->
+               bindNamedWildCardBinders sig_wcs             $ \ wcs ->
                bindOuterSigTKBndrs_Tv_M mode hs_outer_bndrs $
                do {   -- Instantiate the type-class context; but if there
                       -- is an extra-constraints wildcard, just discard it here
@@ -3745,7 +3745,9 @@ tcHsPartialSigType ctxt sig_ty
 
                   ; return (wcs, wcx, theta, tau) }
 
+       ; traceTc "tcHsPartialSigType 2" empty
        ; outer_tv_bndrs <- scopedSortOuter outer_bndrs
+       ; traceTc "tcHsPartialSigType 3" empty
 
          -- No kind-generalization here:
        ; kindGeneralizeNone (mkInvisForAllTys outer_tv_bndrs $
@@ -3946,7 +3948,7 @@ tcHsPatSigType ctxt
                solveEqualities "tcHsPatSigType" $
                  -- See Note [Failure in local type signatures]
                  -- and c.f #16033
-               tcNamedWildCardBinders sig_wcs   $ \ wcs ->
+               bindNamedWildCardBinders sig_wcs $ \ wcs ->
                tcExtendNameTyVarEnv sig_tkv_prs $
                do { ek     <- newOpenTypeKind
                   ; sig_ty <- tc_lhs_type mode hs_ty ek
