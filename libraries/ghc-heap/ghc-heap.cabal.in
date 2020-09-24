@@ -26,7 +26,6 @@ library
                   , ghc-prim         > 0.2 && < 0.8
                   , rts              == 1.0.*
                   , containers       >= 0.6.2.1 && < 0.7
-                  , transformers     == 0.5.*
 
   ghc-options:      -Wall
   cmm-sources:      cbits/HeapPrim.cmm
