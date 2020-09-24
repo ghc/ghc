@@ -6,6 +6,7 @@ module T11351 where
 import GHC.TypeLits
 import Data.Proxy
 
+{-
 symbol :: forall s. KnownSymbol s => String
 symbol = symbolVal @s Proxy
 
@@ -14,6 +15,7 @@ symbol = symbolVal @s Proxy
 pattern Symbol :: forall s. KnownSymbol s => String
 pattern Symbol <- ((== symbol @s) -> True) where
          Symbol = symbol @s
+-}
 
 -- • Could not deduce (KnownSymbol n0)
 --     arising from a use of ‘symbolVal’

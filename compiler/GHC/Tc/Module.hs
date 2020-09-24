@@ -2591,7 +2591,7 @@ tcRnType hsc_env flexi normalise rdr_type
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
        ; (_tclvl, wanted, (ty, kind))
                <- pushLevelAndSolveEqualitiesX "tcRnType"  $
-                  tcNamedWildCardBinders wcs $ \ wcs' ->
+                  bindNamedWildCardBinders wcs $ \ wcs' ->
                   do { mapM_ emitNamedTypeHole wcs'
                      ; tcInferLHsTypeUnsaturated rn_type }
 
