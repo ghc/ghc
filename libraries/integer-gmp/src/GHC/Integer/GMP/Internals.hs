@@ -29,6 +29,7 @@ module GHC.Integer.GMP.Internals
 
       -- ** Additional 'Integer' operations
     , gcdInteger
+    , gcdExtInteger
     , lcmInteger
     , sqrInteger
 
@@ -169,6 +170,12 @@ isValidInteger# = I.integerCheck#
 {-# DEPRECATED gcdInteger "Use integerGcd instead" #-}
 gcdInteger :: Integer -> Integer -> Integer
 gcdInteger = I.integerGcd
+
+{-# DEPRECATED gcdExtInteger "Use integerGcde instead" #-}
+gcdExtInteger :: Integer -> Integer -> (# Integer, Integer #)
+gcdExtInteger a b = case I.integerGcde# a b of
+   (# g, s, _t #) -> (# g, s #)
+
 
 {-# DEPRECATED lcmInteger "Use integerLcm instead" #-}
 lcmInteger :: Integer -> Integer -> Integer
