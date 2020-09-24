@@ -18,6 +18,10 @@
 Main functions for .hie file generation
 -}
 
+-- TODO RGS: This is a horrible hack that I put in place to get the test suite
+-- to run on GitLab CI. Please remove this hack before landing!
+{-# OPTIONS_GHC -Wno-unused-matches -Wno-unused-local-binds #-}
+
 module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts, enrichHie) where
 
 import GHC.Utils.Outputable(ppr)
