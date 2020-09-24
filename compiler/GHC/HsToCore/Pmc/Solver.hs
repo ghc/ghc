@@ -45,10 +45,9 @@ import GHC.Utils.Error ( pprErrMsgBagWithLoc )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
-import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
-import GHC.Types.Unique.DFM
+import GHC.Types.Unique.SDFM
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var      (EvVar)
@@ -494,7 +493,7 @@ emptyVarInfo x
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
-lookupVarInfo (TmSt env _ _) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
+lookupVarInfo (TmSt env _ _) x = fromMaybe (emptyVarInfo x) (lookupUSDFM env x)
 
 -- | Like @lookupVarInfo ts x@, but @lookupVarInfo ts x = (y, vi)@ also looks
 -- through newtype constructors. We have @x ~ N1 (... (Nk y))@ such that the
@@ -521,7 +520,7 @@ trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x
   = set_vi <$> f (lookupVarInfo ts x)
   where
     set_vi (a, vi') =
-      (a, nabla{ nabla_tm_st = ts{ ts_facts = setEntrySDIE env (vi_id vi') vi' } })
+      (a, nabla{ nabla_tm_st = ts{ ts_facts = addToUSDFM env (vi_id vi') vi' } })
 
 {- Note [Coverage checking Newtype matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -554,14 +553,11 @@ where you can find the solution in a perhaps more digestible format.
 ------------------------------------------------
 -- * Exported utility functions querying 'Nabla'
 
-lookupRefuts :: Uniquable k => Nabla -> k -> [PmAltCon]
+lookupRefuts :: Nabla -> Id -> [PmAltCon]
 -- Unfortunately we need the extra bit of polymorphism and the unfortunate
 -- duplication of lookupVarInfo here.
-lookupRefuts MkNabla{ nabla_tm_st = ts@(TmSt{ts_facts = (SDIE env)}) } k =
-  case lookupUDFM_Directly env (getUnique k) of
-    Nothing -> []
-    Just (Indirect y) -> pmAltConSetElems (vi_neg (lookupVarInfo ts y))
-    Just (Entry vi)   -> pmAltConSetElems (vi_neg vi)
+lookupRefuts MkNabla{ nabla_tm_st = ts } x =
+  pmAltConSetElems $ vi_neg $ lookupVarInfo ts x
 
 isDataConSolution :: PmAltConApp -> Bool
 isDataConSolution PACA{paca_con = PmAltConLike (RealDataCon _)} = True
@@ -718,7 +714,7 @@ addBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x = do
     IsBot    -> pure nabla -- There already is x ~ ⊥. Nothing left to do
     MaybeBot -> do         -- We add x ~ ⊥
       let vi' = vi{ vi_bot = IsBot }
-      pure nabla{ nabla_tm_st = ts{ts_facts = setEntrySDIE env y vi' } }
+      pure nabla{ nabla_tm_st = ts{ts_facts = addToUSDFM env y vi' } }
 
 -- | Adds the constraint @x ~/ ⊥@ to 'Nabla'. Quite similar to 'addNotConCt',
 -- but only cares for the ⊥ "constructor".
@@ -732,7 +728,7 @@ addNotBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts=env} } x = do
       -- Mark dirty for a delayed inhabitation test
       let vi' = vi{ vi_bot = IsNotBot}
       pure $ markDirty y
-           $ nabla{ nabla_tm_st = ts{ ts_facts = setEntrySDIE env y vi' } }
+           $ nabla{ nabla_tm_st = ts{ ts_facts = addToUSDFM env y vi' } }
 
 -- | Record a @x ~/ K@ constraint, e.g. that a particular 'Id' @x@ can't
 -- take the shape of a 'PmAltCon' @K@ in the 'Nabla' and return @Nothing@ if
@@ -805,7 +801,7 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args =
     Nothing -> do
       let pos' = PACA alt tvs args : pos
       let nabla_with bot' =
-            nabla{ nabla_tm_st = ts{ts_facts = setEntrySDIE env x (vi{vi_pos = pos', vi_bot = bot'})} }
+            nabla{ nabla_tm_st = ts{ts_facts = addToUSDFM env x (vi{vi_pos = pos', vi_bot = bot'})} }
       -- Do (2) in Note [Coverage checking Newtype matches]
       case (alt, args) of
         (PmAltConLike (RealDataCon dc), [y]) | isNewDataCon dc ->
@@ -825,55 +821,27 @@ equateTys ts us =
   , not (eqType t u)
   ]
 
--- | Adds a @x ~ y@ constraint by trying to unify two 'Id's and record the
+-- | Adds a @x ~ y@ constraint by merging the two 'VarInfo's and record the
 -- gained knowledge in 'Nabla'.
 --
--- Returns @Nothing@ when there's a contradiction. Returns @Just nabla@
--- when the constraint was compatible with prior facts, in which case @nabla@
--- has integrated the knowledge from the equality constraint.
+-- Returns @Nothing@ when there's a contradiction while merging. Returns @Just
+-- nabla@ when the constraint was compatible with prior facts, in which case
+-- @nabla@ has integrated the knowledge from the equality constraint.
 --
 -- See Note [TmState invariants].
 addVarCt :: Nabla -> Id -> Id -> MaybeT DsM Nabla
-addVarCt nabla@MkNabla{ nabla_tm_st = TmSt{ ts_facts = env } } x y
-  -- It's important that we never @equate@ two variables of the same equivalence
-  -- class, otherwise we might get cyclic substitutions.
-  -- Cf. 'extendSubstAndSolve' and
-  -- @testsuite/tests/pmcheck/should_compile/CyclicSubst.hs@.
-  | sameRepresentativeSDIE env x y = pure nabla
-  | otherwise                      = equate nabla x y
-
--- | @equate ts@(TmSt env) x y@ merges the equivalence classes of @x@ and @y@ by
--- adding an indirection to the environment.
--- Makes sure that the positive and negative facts of @x@ and @y@ are
--- compatible.
--- Preconditions: @not (sameRepresentativeSDIE env x y)@
---
--- See Note [TmState invariants].
-equate :: Nabla -> Id -> Id -> MaybeT DsM Nabla
-equate nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x y
-  = ASSERT( not (sameRepresentativeSDIE env x y) )
-    case (lookupSDIE env x, lookupSDIE env y) of
-      (Nothing, _) -> pure (nabla{ nabla_tm_st = ts{ ts_facts = setIndirectSDIE env x y } })
-      (_, Nothing) -> pure (nabla{ nabla_tm_st = ts{ ts_facts = setIndirectSDIE env y x } })
-      -- Merge the info we have for x into the info for y
-      (Just vi_x, Just vi_y) -> do
-        -- This assert will probably trigger at some point...
-        -- We should decide how to break the tie
-        MASSERT2( idType (vi_id vi_x) `eqType` idType (vi_id vi_y), text "Not same type" )
-        -- First assume that x and y are in the same equivalence class
-        let env_ind = setIndirectSDIE env x y
-        -- Then sum up the refinement counters
-        let env_refs = setEntrySDIE env_ind y vi_y
-        let nabla_refs = nabla{ nabla_tm_st = ts{ts_facts = env_refs} }
-        -- and then gradually merge every positive fact we have on x into y
-        let add_fact nabla (PACA cl tvs args) = addConCt nabla y cl tvs args
-        nabla_pos <- foldlM add_fact nabla_refs (vi_pos vi_x)
-        -- Do the same for negative info
-        let add_refut nabla nalt = addNotConCt nabla y nalt
-        nabla_neg <- foldlM add_refut nabla_pos (pmAltConSetElems (vi_neg vi_x))
-        -- vi_rcm will be updated in addNotConCt, so we are good to
-        -- go!
-        pure nabla_neg
+addVarCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } } x y =
+  case equateUSDFM env x y of
+    (Nothing,   env') -> pure (nabla{ nabla_tm_st = ts{ ts_facts = env' } })
+    -- Add the constraints we had for x to y
+    (Just vi_x, env') -> do
+      let nabla_equated = nabla{ nabla_tm_st = ts{ts_facts = env'} }
+      -- and then gradually merge every positive fact we have on x into y
+      let add_pos nabla (PACA cl tvs args) = addConCt nabla y cl tvs args
+      nabla_pos <- foldlM add_pos nabla_equated (vi_pos vi_x)
+      -- Do the same for negative info
+      let add_neg nabla nalt = addNotConCt nabla y nalt
+      foldlM add_neg nabla_pos (pmAltConSetElems (vi_neg vi_x))
 
 -- | Inspects a 'PmCoreCt' @let x = e@ by recording constraints for @x@ based
 -- on the shape of the 'CoreExpr' @e@. Examples:
@@ -1221,11 +1189,11 @@ traverseDirty f ts@TmSt{ts_facts = env, ts_dirty = dirty} =
     go []     env  = pure ts{ts_facts=env}
     go (x:xs) !env = do
       vi' <- f (lookupVarInfo ts x)
-      go xs (setEntrySDIE env x vi')
+      go xs (addToUSDFM env x vi')
 
 traverseAll :: Monad m => (VarInfo -> m VarInfo) -> TmState -> m TmState
 traverseAll f ts@TmSt{ts_facts = env} = do
-  env' <- traverseSDIE f env
+  env' <- traverseUSDFM f env
   pure ts{ts_facts = env'}
 
 -- | Makes sure the given 'Nabla' is still inhabited, by trying to instantiate
