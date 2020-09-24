@@ -755,14 +755,15 @@ link_caf node = do
 -- name of the data constructor itself.  Otherwise it is determined by
 -- @closureDescription@ from the let binding information.
 
-closureDescription :: DynFlags
-           -> Module            -- Module
-                   -> Name              -- Id of closure binding
-                   -> String
+closureDescription
+   :: DynFlags
+   -> Module            -- Module
+   -> Name              -- Id of closure binding
+   -> String
         -- Not called for StgRhsCon which have global info tables built in
         -- CgConTbls.hs with a description generated from the data constructor
 closureDescription dflags mod_name name
-  = showSDocDump dflags (char '<' <>
+  = showSDocDump (initSDocContext dflags defaultDumpStyle) (char '<' <>
                     (if isExternalName name
                       then ppr name -- ppr will include the module name prefix
                       else pprModule mod_name <> char '.' <> ppr name) <>

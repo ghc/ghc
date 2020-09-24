@@ -1153,7 +1153,8 @@ tryUnfolding dflags id lone_variable
              , extra_doc
              , text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"]
 
-    str = "Considering inlining: " ++ showSDocDump dflags (ppr id)
+    ctx = initSDocContext dflags defaultDumpStyle
+    str = "Considering inlining: " ++ showSDocDump ctx (ppr id)
     n_val_args = length arg_infos
 
            -- some_benefit is used when the RHS is small enough
