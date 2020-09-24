@@ -31,7 +31,7 @@ module GHC.Exts.Heap (
     , WhatNext(..)
     , WhyBlocked(..)
     , TsoFlags(..)
-    , HasHeapRep(getClosureDataX)
+    , HasHeapRep(getClosureDataWith)
     , getClosureData
 
     -- * Info Table types
@@ -83,7 +83,6 @@ import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 
 import Control.Monad
 import Data.Bits
-import GHC.Arr
 import GHC.Exts
 import GHC.Int
 import GHC.Word
@@ -102,64 +101,65 @@ class HasHeapRep (a :: TYPE rep) where
 
     -- | Decode a closure to it's heap representation ('GenClosure').
     -- Inside a GHC context 'b' is usually a 'GHC.Exts.Heap.Closures.Box'
-    -- containing a thunk or an evaluated heap object. Outside it can be a
-    -- 'Word' for "raw" usage of pointers.
+    -- containing a thunk or an evaluated heap object. Outside it can be e.g.
+    -- a 'Word' for "raw" usage of pointers.
 
-    getClosureDataX ::
-        (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
-        -- ^ Helper function to get info table, memory and pointers of the
-        -- closure. The order of @[b]@ is significant and determined by
-        -- @collect_pointers()@ in @rts/Heap.c@.
-        -> a -- ^ Closure to decode
-        -> IO (GenClosure b) -- ^ Heap representation of the closure
+    getClosureDataWith ::
+        (forall c . c -> b)
+        -- ^ Convert any closure to some pointer type.
+        -> a
+        -- ^ Closure to decode.
+        -> IO (GenClosure b)
+        -- ^ Heap representation of the closure.
 
 instance HasHeapRep (a :: TYPE 'LiftedRep) where
-    getClosureDataX = getClosureX
+    getClosureDataWith = getClosureWith
 
 instance HasHeapRep (a :: TYPE 'UnliftedRep) where
-    getClosureDataX k x = getClosureX (k . unsafeCoerce#) (unsafeCoerce# x)
+    getClosureDataWith k x = getClosureWith (k . unsafeCoerce#) (unsafeCoerce# x)
 
 instance Int# ~ a => HasHeapRep (a :: TYPE 'IntRep) where
-    getClosureDataX _ x = return $
+    getClosureDataWith _ x = return $
         IntClosure { ptipe = PInt, intVal = I# x }
 
 instance Word# ~ a => HasHeapRep (a :: TYPE 'WordRep) where
-    getClosureDataX _ x = return $
+    getClosureDataWith _ x = return $
         WordClosure { ptipe = PWord, wordVal = W# x }
 
 instance Int64# ~ a => HasHeapRep (a :: TYPE 'Int64Rep) where
-    getClosureDataX _ x = return $
+    getClosureDataWith _ x = return $
         Int64Closure { ptipe = PInt64, int64Val = I64# (unsafeCoerce# x) }
 
 instance Word64# ~ a => HasHeapRep (a :: TYPE 'Word64Rep) where
-    getClosureDataX _ x = return $
+    getClosureDataWith _ x = return $
         Word64Closure { ptipe = PWord64, word64Val = W64# (unsafeCoerce# x) }
 
 instance Addr# ~ a => HasHeapRep (a :: TYPE 'AddrRep) where
-    getClosureDataX _ x = return $
+    getClosureDataWith _ x = return $
         AddrClosure { ptipe = PAddr, addrVal = I# (unsafeCoerce# x) }
 
 instance Float# ~ a => HasHeapRep (a :: TYPE 'FloatRep) where
-    getClosureDataX _ x = return $
+    getClosureDataWith _ x = return $
         FloatClosure { ptipe = PFloat, floatVal = F# x }
 
 instance Double# ~ a => HasHeapRep (a :: TYPE 'DoubleRep) where
-    getClosureDataX _ x = return $
+    getClosureDataWith _ x = return $
         DoubleClosure { ptipe = PDouble, doubleVal = D# x }
 
--- From GHC.Runtime.Heap.Inspect
-amap' :: (t -> b) -> Array Int t -> [b]
-amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
-    where g (I# i#) = case indexArray# arr# i# of
-                          (# e #) -> f e
-
--- | Takes any value (closure) as parameter and returns a tuple of:
--- * A 'Ptr' to the info table
--- * The memory of the closure as @[Word]@
--- * Pointers of the closure's @struct@ (in C code) in a @[Box]@.
--- The pointers are collected in @Heap.c@.
-getClosureRaw :: a -> IO (Ptr StgInfoTable, [Word], [Box])
-getClosureRaw x = do
+-- | Deconstruct any closure's heap representation.
+getClosureRaw
+    :: (forall c . c -> b)
+    -- ^ Convert any closure to some pointer type.
+    -> a
+    -- ^ Closure to deconstruct.
+    -> IO (Ptr StgInfoTable, [Word], [b])
+    -- ^ Tuple of:
+    -- * A 'Ptr' to the info table
+    -- * Non-pointer data of the closure.
+    -- * Pointer data of the closure. These are the closures pointed to by the
+    --   input closure, boxed with the given function. The pointers are
+    --   collected in @Heap.c@.
+getClosureRaw asBoxish x = do
     case unpackClosure# x of
 -- This is a hack to cover the bootstrap compiler using the old version of
 -- 'unpackClosure'. The new 'unpackClosure' return values are not merely
@@ -172,37 +172,29 @@ getClosureRaw x = do
              let nelems = (I# (sizeofByteArray# dat)) `div` wORD_SIZE
                  end = fromIntegral nelems - 1
                  rawWds = [W# (indexWordArray# dat i) | I# i <- [0.. end] ]
-                 pelems = I# (sizeofArray# pointers)
-                 ptrList = amap' Box $ Array 0 (pelems - 1) pelems pointers
+                 ptrList = [case indexArray# pointers i of (# ptr #) -> asBoxish ptr
+                            | I# i <- [0..(I# (sizeofArray# pointers)) - 1]
+                            ]
              pure (Ptr iptr, rawWds, ptrList)
 
 getClosureData :: forall rep (a :: TYPE rep) . HasHeapRep a => a -> IO Closure
-getClosureData = getClosureDataX getClosureRaw
+getClosureData = getClosureDataWith asBox
 
-
--- | This function returns a parsed heap representation ('GenClosure') of the
--- closure _at this moment_, even if it is unevaluated or an indirection or
--- other exotic stuff. Beware when passing something to this function, the same
--- caveats as for 'asBox' apply.
---
--- Inside a GHC context 'b' is usually a 'GHC.Exts.Heap.Closures.Box'
--- containing a thunk or an evaluated heap object. Outside it can be a
--- 'Word' for "raw" usage of pointers.
---
--- 'get_closure_raw' should provide low level details of the closure's heap
--- respresentation. The order of @[b]@ is significant and determined by
--- @collect_pointers()@ in @rts/Heap.c@.
+-- | Get the heap representation of a closure _at this moment_, even if it is
+-- unevaluated or an indirection or other exotic stuff. Beware when passing
+-- something to this function, the same caveats as for
+-- 'GHC.Exts.Heap.Closures.asBox' apply.
 --
 -- For most use cases 'getClosureData' is an easier to use alternative.
-
-getClosureX :: forall a b.
-            (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
-            -- ^ Helper function to get info table, memory and pointers of the
-            -- closure
-            -> a -- ^ Closure to decode
-            -> IO (GenClosure b) -- ^ Heap representation of the closure
-getClosureX get_closure_raw x = do
-    (iptr, wds, pts) <- get_closure_raw (unsafeCoerce# x)
+getClosureWith :: forall a b.
+    (forall c . c -> b)
+    -- ^ Convert any closure to some pointer type.
+    -> a
+    -- ^ Closure to decode.
+    -> IO (GenClosure b)
+    -- ^ Heap representation of the closure.
+getClosureWith asBoxish x = do
+    (iptr, wds, pts) <- getClosureRaw asBoxish (unsafeCoerce# x)
     itbl <- peekItbl iptr
     -- The remaining words after the header
     let rawWds = drop (closureTypeHeaderSize (tipe itbl)) wds
@@ -391,6 +383,6 @@ getClosureX get_closure_raw x = do
         _ ->
             pure $ UnsupportedClosure itbl
 
--- | Like 'getClosureDataX', but taking a 'Box', so it is easier to work with.
+-- | Like 'getClosureDataWith', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
