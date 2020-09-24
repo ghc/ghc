@@ -15,8 +15,6 @@
 --
 -------------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -fno-cse #-}
--- -fno-cse is needed for GLOBAL_VAR's to behave properly
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Driver.Session (
@@ -199,7 +197,7 @@ module GHC.Driver.Session (
 
         wordAlignment,
 
-        unsafeGlobalDynFlags, setUnsafeGlobalDynFlags,
+        setUnsafeGlobalDynFlags,
 
         -- * SSE and AVX
         isSseEnabled,
@@ -256,6 +254,7 @@ import GHC.Settings.Constants
 import GHC.Utils.Panic
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Misc
+import GHC.Utils.GlobalVars
 import GHC.Data.Maybe
 import GHC.Utils.Monad
 import qualified GHC.Utils.Ppr as Pretty
@@ -275,7 +274,6 @@ import GHC.Utils.Json
 import GHC.SysTools.Terminal ( stderrSupportsAnsiColors )
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
-import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
 import Control.Arrow ((&&&))
 import Control.Monad
@@ -304,11 +302,6 @@ import qualified GHC.Data.EnumSet as EnumSet
 
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
-
-#if GHC_STAGE >= 2
--- used by SHARED_GLOBAL_VAR
-import Foreign (Ptr)
-#endif
 
 -- Note [Updating flag description in the User's Guide]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4892,40 +4885,12 @@ makeDynFlagsConsistent dflags
           os   = platformOS   platform
 
 
---------------------------------------------------------------------------
--- Do not use unsafeGlobalDynFlags!
---
--- unsafeGlobalDynFlags is a hack, necessary because we need to be able
--- to show SDocs when tracing, but we don't always have DynFlags
--- available.
---
--- Do not use it if you can help it. You may get the wrong value, or this
--- panic!
-
--- | This is the value that 'unsafeGlobalDynFlags' takes before it is
--- initialized.
-defaultGlobalDynFlags :: DynFlags
-defaultGlobalDynFlags =
-    (defaultDynFlags settings llvmConfig) { verbosity = 2 }
-  where
-    settings = panic "v_unsafeGlobalDynFlags: settings not initialised"
-    llvmConfig = panic "v_unsafeGlobalDynFlags: llvmConfig not initialised"
-
-#if GHC_STAGE < 2
-GLOBAL_VAR(v_unsafeGlobalDynFlags, defaultGlobalDynFlags, DynFlags)
-#else
-SHARED_GLOBAL_VAR( v_unsafeGlobalDynFlags
-                 , getOrSetLibHSghcGlobalDynFlags
-                 , "getOrSetLibHSghcGlobalDynFlags"
-                 , defaultGlobalDynFlags
-                 , DynFlags )
-#endif
-
-unsafeGlobalDynFlags :: DynFlags
-unsafeGlobalDynFlags = unsafePerformIO $ readIORef v_unsafeGlobalDynFlags
-
 setUnsafeGlobalDynFlags :: DynFlags -> IO ()
-setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
+setUnsafeGlobalDynFlags dflags = do
+   writeIORef v_unsafeHasPprDebug (hasPprDebug dflags)
+   writeIORef v_unsafeHasNoDebugOutput (hasNoDebugOutput dflags)
+   writeIORef v_unsafeHasNoStateHack (hasNoStateHack dflags)
+
 
 -- -----------------------------------------------------------------------------
 -- SSE and AVX
