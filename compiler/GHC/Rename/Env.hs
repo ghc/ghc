@@ -5,7 +5,7 @@ GHC.Rename.Env contains functions which convert RdrNames into Names.
 
 -}
 
-{-# LANGUAGE CPP, MultiWayIf, NamedFieldPuns #-}
+{-# LANGUAGE CPP, MultiWayIf, NamedFieldPuns, TypeApplications #-}
 
 module GHC.Rename.Env (
         newTopSrcBinder,
@@ -1005,6 +1005,17 @@ lookup_demoted rdr_name
            , text "instead of"
            , quotes (ppr name) <> dot ]
 
+-- The function returns Name if the given RdrName is
+-- in scope and can be promoted to the type level.
+-- Otherwise, lookup_promoted returns Nothing.
+-- See Note [Promotion] below.
+lookup_promoted :: RdrName -> RnM (Maybe Name)
+lookup_promoted rdr_name
+  | Just promoted_rdr <- promoteRdrName rdr_name
+  = lookupOccRn_maybe promoted_rdr
+  | otherwise
+  = return Nothing
+
 badVarInType :: RdrName -> RnM Name
 badVarInType rdr_name
   = do { addErr (text "Illegal promoted term variable in a type:"
@@ -1040,6 +1051,23 @@ its namespace to DataName and do a second lookup.
 
 The final result (after the renamer) will be:
   HsTyVar ("Zero", DataName)
+
+Note [Promotion]
+~~~~~~~~~~~~~~~
+When the user mentions a type constructor or a type variable in a
+term-level context, then we report that a value identifier was expected
+instead of a type-level one. That makes error messages more precise.
+Previously, such errors contained only the info that a given value was
+out of scope. We promote the namespace of RdrName and look up after that
+(see the functions promotedRdrName and lookup_promoted).
+
+In particular, we have the following error message
+  • Type constructor 'Int' used where a value identifier was expected
+
+when the user writes the following term
+
+  id Int
+
 -}
 
 lookupOccRnX_maybe :: (RdrName -> RnM (Maybe r)) -> (Name -> r) -> RdrName
@@ -1054,14 +1082,22 @@ lookupOccRn_maybe = lookupOccRnX_maybe lookupGlobalOccRn_maybe id
 
 lookupOccRn_overloaded :: Bool -> RdrName
                        -> RnM (Maybe (Either Name [Name]))
-lookupOccRn_overloaded overload_ok
-  = lookupOccRnX_maybe global_lookup Left
-      where
-        global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
-        global_lookup n =
-          runMaybeT . msum . map MaybeT $
-            [ lookupGlobalOccRn_overloaded overload_ok n
-            , fmap Left . listToMaybe <$> lookupQualifiedNameGHCi n ]
+lookupOccRn_overloaded overload_ok rdr_name
+  = do { mb_name <- lookupOccRnX_maybe global_lookup Left rdr_name
+       ; case mb_name of
+           Nothing   -> fmap @Maybe Left <$> lookup_promoted rdr_name
+                        -- See Note [Promotion].
+                        -- If the name is failed to be looked up, then
+                        -- we figure out whether this name might be
+                        -- recognised as a type constructor or a type variable.
+           p         -> return p }
+
+  where
+    global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
+    global_lookup n =
+      runMaybeT . msum . map MaybeT $
+        [ lookupGlobalOccRn_overloaded overload_ok n
+        , fmap Left . listToMaybe <$> lookupQualifiedNameGHCi n ]
 
 
 
