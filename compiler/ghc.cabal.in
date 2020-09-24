@@ -177,6 +177,7 @@ Library
         GHC.Types.Cpr
         GHC.Cmm.DebugBlock
         GHC.Utils.Exception
+        GHC.Utils.GlobalVars
         GHC.Types.FieldLabel
         GHC.Driver.Monad
         GHC.Driver.Hooks
