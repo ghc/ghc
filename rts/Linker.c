@@ -1056,13 +1056,11 @@ mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset)
    IF_DEBUG(linker, debugBelch("mmapForLinker: start\n"));
    size = roundUpToPage(bytes);
 
-#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
 mmap_again:
 
    if (mmap_32bit_base != 0) {
        map_addr = mmap_32bit_base;
    }
-#endif
 
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tprotection %#0x\n",
