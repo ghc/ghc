@@ -768,6 +768,16 @@ tc_infer_id id_name
                    | otherwise
                    -> nonBidirectionalErr id_name
 
+             ATyVar name _
+                -> failWithTc $
+                   text "Illegal term-level use of the type variable"
+                     <+> quotes (ppr name)
+
+             ATcTyCon ty_con
+               -> failWithTc $
+                  text "Illegal term-level use of the type constructor"
+                    <+> quotes (ppr (tyConName ty_con))
+
              _ -> failWithTc $
                   ppr thing <+> text "used where a value identifier was expected" }
   where
@@ -1140,4 +1150,3 @@ addExprCtxt e thing_inside
 
 exprCtxt :: HsExpr GhcRn -> SDoc
 exprCtxt expr = hang (text "In the expression:") 2 (ppr (stripParensHsExpr expr))
-
