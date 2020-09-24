@@ -1,2 +1,7 @@
 
-T14627.hs:4:1: error: Data constructor not in scope: Bool
+T14627.hs:4:1:
+Illegal term-level use of the type constructor ‘Bool’
+  imported from ‘Prelude’ at T14627.hs:1:1
+  (and originally defined in ‘GHC.Types’)
+In the expression: Bool
+ In an equation for ‘f’: f = Bool

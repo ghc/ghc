@@ -1,0 +1,6 @@
+
+T18740b.hs:6:24: error:
+    • Illegal term-level use of the type variable ‘a’
+         bound at T18740b.hs:6:4
+    • In the expression: a
+      In an equation for ‘f’: f (Proxy :: Proxy a) = a
