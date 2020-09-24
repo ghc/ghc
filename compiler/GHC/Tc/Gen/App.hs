@@ -640,8 +640,8 @@ Note [Visible type application zonk]
   (checkExpectedKind zonks as it goes).
 
 So we must zonk inner_ty as well, to guarantee consistency between zonk(tv)
-and inner_ty.  Otherwise we can build an ill-kinded type.  An example was
-#14158, where we had:
+and inner_ty.  Otherwise we can build an ill-kinded type.
+An example was #14158, where we had:
    id :: forall k. forall (cat :: k -> k -> *). forall (a :: k). cat a a
 and we had the visible type application
   id @(->)
