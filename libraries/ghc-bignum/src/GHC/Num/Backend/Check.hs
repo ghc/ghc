@@ -16,6 +16,7 @@ import GHC.Prim
 import GHC.Types
 import GHC.Num.WordArray
 import GHC.Num.Primitives
+import {-# SOURCE #-} GHC.Num.Integer
 import qualified GHC.Num.Backend.Native   as Native
 import qualified GHC.Num.Backend.Selected as Other
 
@@ -453,3 +454,18 @@ bignat_powmod_words b e m =
    in case gr `eqWord#` nr of
        1# -> gr
        _  -> unexpectedValue_Word# (# #)
+
+integer_gcde
+   :: Integer
+   -> Integer
+   -> (# Integer, Integer, Integer #)
+integer_gcde a b =
+   let
+      !(# g0,x0,y0 #) = Other.integer_gcde a b
+      !(# g1,x1,y1 #) = Native.integer_gcde a b
+   in if isTrue# (integerEq# x0 x1
+                  &&# integerEq# y0 y1
+                  &&# integerEq# g0 g1)
+         then (# g0, x0, y0 #)
+         else case unexpectedValue of
+            !_ -> (# integerZero, integerZero, integerZero #)

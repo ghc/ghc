@@ -10,6 +10,7 @@ import GHC.Prim
 type BigNat# = WordArray#
 data BigNat = BN# { unBigNat :: BigNat# }
 
+bigNatSize# :: BigNat# -> Int#
 bigNatSubUnsafe :: BigNat# -> BigNat# -> BigNat#
 bigNatMulWord# :: BigNat# -> Word# -> BigNat#
 bigNatRem :: BigNat# -> BigNat# -> BigNat#
