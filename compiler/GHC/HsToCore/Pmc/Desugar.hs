@@ -1,0 +1,450 @@
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE MultiWayIf                 #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE FlexibleInstances          #-}
+
+-- | Desugaring step of the
+-- [Lower Your Guards paper](https://dl.acm.org/doi/abs/10.1145/3408989).
+--
+-- Desugars Haskell source syntax into guard tree variants Pm*.
+-- In terms of the paper, this module is concerned with Sections 3.1, Figure 4,
+-- in particular.
+module GHC.HsToCore.Pmc.Desugar (
+      desugarPatBind, desugarGRHSs, desugarMatches, desugarEmptyCase
+    ) where
+
+#include "HsVersions.h"
+
+import GHC.Prelude
+
+import GHC.HsToCore.Pmc.Types
+import GHC.HsToCore.Pmc.Utils
+import GHC.Core (Expr(Var,App))
+import GHC.Data.FastString (unpackFS, lengthFS)
+import GHC.Driver.Session
+import GHC.Hs
+import GHC.Tc.Utils.Zonk (shortCutLit)
+import GHC.Types.Id
+import GHC.Core.ConLike
+import GHC.Types.Name
+import GHC.Builtin.Types
+import GHC.Types.SrcLoc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Core.DataCon
+import GHC.Types.Var (EvVar)
+import GHC.Core.Coercion
+import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
+import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
+import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
+import GHC.HsToCore.Utils (selectMatchVar)
+import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
+import GHC.HsToCore.Monad
+import GHC.Core.TyCo.Rep
+import GHC.Core.Type
+import GHC.HsToCore.Utils       (isTrueLHsExpr)
+import GHC.Data.Maybe
+import qualified GHC.LanguageExtensions as LangExt
+import GHC.Utils.Monad (concatMapM)
+
+import Control.Monad (zipWithM)
+import Data.List (elemIndex)
+import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
+
+-- | Smart constructor that eliminates trivial lets
+mkPmLetVar :: Id -> Id -> [PmGrd]
+mkPmLetVar x y | x == y = []
+mkPmLetVar x y          = [PmLet x (Var y)]
+
+-- | ADT constructor pattern => no existentials, no local constraints
+vanillaConGrd :: Id -> DataCon -> [Id] -> PmGrd
+vanillaConGrd scrut con arg_ids =
+  PmCon { pm_id = scrut, pm_con_con = PmAltConLike (RealDataCon con)
+        , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = arg_ids }
+
+-- | Creates a '[PmGrd]' refining a match var of list type to a list,
+-- where list fields are matched against the incoming tagged '[PmGrd]'s.
+-- For example:
+--   @mkListGrds "a" "[(x, True <- x),(y, !y)]"@
+-- to
+--   @"[(x:b) <- a, True <- x, (y:c) <- b, !y, [] <- c]"@
+-- where @b@ and @c@ are freshly allocated in @mkListGrds@ and @a@ is the match
+-- variable.
+mkListGrds :: Id -> [(Id, [PmGrd])] -> DsM [PmGrd]
+-- See Note [Order of guards matter] for why we need to intertwine guards
+-- on list elements.
+mkListGrds a []                  = pure [vanillaConGrd a nilDataCon []]
+mkListGrds a ((x, head_grds):xs) = do
+  b <- mkPmId (idType a)
+  tail_grds <- mkListGrds b xs
+  pure $ vanillaConGrd a consDataCon [x, b] : head_grds ++ tail_grds
+
+-- | Create a '[PmGrd]' refining a match variable to a 'PmLit'.
+mkPmLitGrds :: Id -> PmLit -> DsM [PmGrd]
+mkPmLitGrds x (PmLit _ (PmLitString s)) = do
+  -- We desugar String literals to list literals for better overlap reasoning.
+  -- It's a little unfortunate we do this here rather than in
+  -- 'GHC.HsToCore.Pmc.Solver.trySolve' and
+  -- 'GHC.HsToCore.Pmc.Solver.addRefutableAltCon', but it's so much simpler
+  -- here. See Note [Representation of Strings in TmState] in
+  -- GHC.HsToCore.Pmc.Solver
+  vars <- traverse mkPmId (take (lengthFS s) (repeat charTy))
+  let mk_char_lit y c = mkPmLitGrds y (PmLit charTy (PmLitChar c))
+  char_grdss <- zipWithM mk_char_lit vars (unpackFS s)
+  mkListGrds x (zip vars char_grdss)
+mkPmLitGrds x lit = do
+  let grd = PmCon { pm_id = x
+                  , pm_con_con = PmAltLit lit
+                  , pm_con_tvs = []
+                  , pm_con_dicts = []
+                  , pm_con_args = [] }
+  pure [grd]
+
+-- | @desugarPat _ x pat@ transforms @pat@ into a '[PmGrd]', where
+-- the variable representing the match is @x@.
+desugarPat :: Id -> Pat GhcTc -> DsM [PmGrd]
+desugarPat x pat = case pat of
+  WildPat  _ty -> pure []
+  VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
+  ParPat _ p   -> desugarLPat x p
+  LazyPat _ _  -> pure [] -- like a wildcard
+  BangPat _ p@(L l p') ->
+    -- Add the bang in front of the list, because it will happen before any
+    -- nested stuff.
+    (PmBang x pm_loc :) <$> desugarLPat x p
+      where pm_loc = Just (SrcInfo (L l (ppr p')))
+
+  -- (x@pat)   ==>   Desugar pat with x as match var and handle impedance
+  --                 mismatch with incoming match var
+  AsPat _ (L _ y) p -> (mkPmLetVar y x ++) <$> desugarLPat y p
+
+  SigPat _ p _ty -> desugarLPat x p
+
+  -- See Note [Desugar CoPats]
+  -- Generally the translation is
+  -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat
+  XPat (CoPat wrapper p _ty)
+    | isIdHsWrapper wrapper                   -> desugarPat x p
+    | WpCast co <-  wrapper, isReflexiveCo co -> desugarPat x p
+    | otherwise -> do
+        (y, grds) <- desugarPatV p
+        wrap_rhs_y <- dsHsWrapper wrapper
+        pure (PmLet y (wrap_rhs_y (Var x)) : grds)
+
+  -- (n + k)  ===>   let b = x >= k, True <- b, let n = x-k
+  NPlusKPat _pat_ty (L _ n) k1 k2 ge minus -> do
+    b <- mkPmId boolTy
+    let grd_b = vanillaConGrd b trueDataCon []
+    [ke1, ke2] <- traverse dsOverLit [unLoc k1, k2]
+    rhs_b <- dsSyntaxExpr ge    [Var x, ke1]
+    rhs_n <- dsSyntaxExpr minus [Var x, ke2]
+    pure [PmLet b rhs_b, grd_b, PmLet n rhs_n]
+
+  -- (fun -> pat)   ===>   let y = fun x, pat <- y where y is a match var of pat
+  ViewPat _arg_ty lexpr pat -> do
+    (y, grds) <- desugarLPatV pat
+    fun <- dsLExpr lexpr
+    pure $ PmLet y (App fun (Var x)) : grds
+
+  -- list
+  ListPat (ListPatTc _elem_ty Nothing) ps ->
+    desugarListPat x ps
+
+  -- overloaded list
+  ListPat (ListPatTc elem_ty (Just (pat_ty, to_list))) pats -> do
+    dflags <- getDynFlags
+    case splitListTyConApp_maybe pat_ty of
+      Just _e_ty
+        | not (xopt LangExt.RebindableSyntax dflags)
+        -- Just desugar it as a regular ListPat
+        -> desugarListPat x pats
+      _ -> do
+        y <- mkPmId (mkListTy elem_ty)
+        grds <- desugarListPat y pats
+        rhs_y <- dsSyntaxExpr to_list [Var x]
+        pure $ PmLet y rhs_y : grds
+
+    -- (a) In the presence of RebindableSyntax, we don't know anything about
+    --     `toList`, we should treat `ListPat` as any other view pattern.
+    --
+    -- (b) In the absence of RebindableSyntax,
+    --     - If the pat_ty is `[a]`, then we treat the overloaded list pattern
+    --       as ordinary list pattern. Although we can give an instance
+    --       `IsList [Int]` (more specific than the default `IsList [a]`), in
+    --       practice, we almost never do that. We assume the `to_list` is
+    --       the `toList` from `instance IsList [a]`.
+    --
+    --     - Otherwise, we treat the `ListPat` as ordinary view pattern.
+    --
+    -- See #14547, especially comment#9 and comment#10.
+
+  ConPat { pat_con     = L _ con
+         , pat_args    = ps
+         , pat_con_ext = ConPatTc
+           { cpt_arg_tys = arg_tys
+           , cpt_tvs     = ex_tvs
+           , cpt_dicts   = dicts
+           }
+         } -> do
+    desugarConPatOut x con arg_tys ex_tvs dicts ps
+
+  NPat ty (L _ olit) mb_neg _ -> do
+    -- See Note [Literal short cut] in "GHC.HsToCore.Match.Literal"
+    -- We inline the Literal short cut for @ty@ here, because @ty@ is more
+    -- precise than the field of OverLitTc, which is all that dsOverLit (which
+    -- normally does the literal short cut) can look at. Also @ty@ matches the
+    -- type of the scrutinee, so info on both pattern and scrutinee (for which
+    -- short cutting in dsOverLit works properly) is overloaded iff either is.
+    dflags <- getDynFlags
+    let platform = targetPlatform dflags
+    core_expr <- case olit of
+      OverLit{ ol_val = val, ol_ext = OverLitTc rebindable _ }
+        | not rebindable
+        , Just expr <- shortCutLit platform val ty
+        -> dsExpr expr
+      _ -> dsOverLit olit
+    let lit  = expectJust "failed to detect OverLit" (coreExprAsPmLit core_expr)
+    let lit' = case mb_neg of
+          Just _  -> expectJust "failed to negate lit" (negatePmLit lit)
+          Nothing -> lit
+    mkPmLitGrds x lit'
+
+  LitPat _ lit -> do
+    core_expr <- dsLit (convertLit lit)
+    let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
+    mkPmLitGrds x lit
+
+  TuplePat _tys pats boxity -> do
+    (vars, grdss) <- mapAndUnzipM desugarLPatV pats
+    let tuple_con = tupleDataCon boxity (length vars)
+    pure $ vanillaConGrd x tuple_con vars : concat grdss
+
+  SumPat _ty p alt arity -> do
+    (y, grds) <- desugarLPatV p
+    let sum_con = sumDataCon alt arity
+    -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
+    pure $ vanillaConGrd x sum_con [y] : grds
+
+  SplicePat {} -> panic "Check.desugarPat: SplicePat"
+
+-- | 'desugarPat', but also select and return a new match var.
+desugarPatV :: Pat GhcTc -> DsM (Id, [PmGrd])
+desugarPatV pat = do
+  x <- selectMatchVar Many pat
+  grds <- desugarPat x pat
+  pure (x, grds)
+
+desugarLPat :: Id -> LPat GhcTc -> DsM [PmGrd]
+desugarLPat x = desugarPat x . unLoc
+
+-- | 'desugarLPat', but also select and return a new match var.
+desugarLPatV :: LPat GhcTc -> DsM (Id, [PmGrd])
+desugarLPatV = desugarPatV . unLoc
+
+-- | @desugarListPat _ x [p1, ..., pn]@ is basically
+--   @desugarConPatOut _ x $(mkListConPatOuts [p1, ..., pn]>@ without ever
+-- constructing the 'ConPatOut's.
+desugarListPat :: Id -> [LPat GhcTc] -> DsM [PmGrd]
+desugarListPat x pats = do
+  vars_and_grdss <- traverse desugarLPatV pats
+  mkListGrds x vars_and_grdss
+
+-- | Desugar a constructor pattern
+desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
+                 -> [EvVar] -> HsConPatDetails GhcTc -> DsM [PmGrd]
+desugarConPatOut x con univ_tys ex_tvs dicts = \case
+    PrefixCon ps                 -> go_field_pats (zip [0..] ps)
+    InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
+    RecCon    (HsRecFields fs _) -> go_field_pats (rec_field_ps fs)
+  where
+    -- The actual argument types (instantiated)
+    arg_tys     = map scaledThing $ conLikeInstOrigArgTys con (univ_tys ++ mkTyVarTys ex_tvs)
+
+    -- Extract record field patterns tagged by field index from a list of
+    -- LHsRecField
+    rec_field_ps fs = map (tagged_pat . unLoc) fs
+      where
+        tagged_pat f = (lbl_to_index (getName (hsRecFieldId f)), hsRecFieldArg f)
+        -- Unfortunately the label info is empty when the DataCon wasn't defined
+        -- with record field labels, hence we desugar to field index.
+        orig_lbls        = map flSelector $ conLikeFieldLabels con
+        lbl_to_index lbl = expectJust "lbl_to_index" $ elemIndex lbl orig_lbls
+
+    go_field_pats tagged_pats = do
+      -- The fields that appear might not be in the correct order. So
+      --   1. Do the PmCon match
+      --   2. Then pattern match on the fields in the order given by the first
+      --      field of @tagged_pats@.
+      -- See Note [Field match order for RecCon]
+
+      -- Desugar the mentioned field patterns. We're doing this first to get
+      -- the Ids for pm_con_args and bring them in order afterwards.
+      let trans_pat (n, pat) = do
+            (var, pvec) <- desugarLPatV pat
+            pure ((n, var), pvec)
+      (tagged_vars, arg_grdss) <- mapAndUnzipM trans_pat tagged_pats
+
+      let get_pat_id n ty = case lookup n tagged_vars of
+            Just var -> pure var
+            Nothing  -> mkPmId ty
+
+      -- 1. the constructor pattern match itself
+      arg_ids <- zipWithM get_pat_id [0..] arg_tys
+      let con_grd = PmCon x (PmAltConLike con) ex_tvs dicts arg_ids
+
+      -- 2. guards from field selector patterns
+      let arg_grds = concat arg_grdss
+
+      -- tracePm "ConPatOut" (ppr x $$ ppr con $$ ppr arg_ids)
+      pure (con_grd : arg_grds)
+
+desugarPatBind :: SrcSpan -> Id -> Pat GhcTc -> DsM (PmPatBind Pre)
+-- See 'GrdPatBind' for how this simply repurposes GrdGRHS.
+desugarPatBind loc var pat =
+  PmPatBind . flip PmGRHS (SrcInfo (L loc (ppr pat))) . GrdVec <$> desugarPat var pat
+
+desugarEmptyCase :: Id -> DsM PmEmptyCase
+desugarEmptyCase var = pure PmEmptyCase { pe_var = var }
+
+-- | Desugar the non-empty 'Match'es of a 'MatchGroup'.
+desugarMatches :: [Id] -> NonEmpty (LMatch GhcTc (LHsExpr GhcTc))
+               -> DsM (PmMatchGroup Pre)
+desugarMatches vars matches =
+  PmMatchGroup <$> traverse (desugarMatch vars) matches
+
+-- Desugar a single match
+desugarMatch :: [Id] -> LMatch GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
+desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
+  pats'  <- concat <$> zipWithM desugarLPat vars pats
+  grhss' <- desugarGRHSs match_loc (sep (map ppr pats)) grhss
+  -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
+  return PmMatch { pm_pats = GrdVec pats', pm_grhss = grhss' }
+
+desugarGRHSs :: SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM (NonEmpty (PmGRHS Pre))
+desugarGRHSs match_loc pp_pats grhss
+  = traverse (desugarLGRHS match_loc pp_pats)
+  . expectJust "desugarGRHSs"
+  . NE.nonEmpty
+  $ grhssGRHSs grhss
+
+-- | Desugar a guarded right-hand side to a single 'GrdTree'
+desugarLGRHS :: SrcSpan -> SDoc -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM (PmGRHS Pre)
+desugarLGRHS match_loc pp_pats (L _loc (GRHS _ gs _)) = do
+  -- _loc points to the match separator (ie =, ->) that comes after the guards.
+  -- Hence we have to pass in the match_loc, which we use in case that the RHS
+  -- is unguarded.
+  -- pp_pats is the space-separated pattern of the current Match this
+  -- GRHS belongs to, so the @A B x@ part in @A B x | 0 <- x@.
+  let rhs_info = case gs of
+        []              -> L match_loc pp_pats
+        (L grd_loc _):_ -> L grd_loc   (pp_pats <+> vbar <+> interpp'SP gs)
+  grds <- concatMapM (desugarGuard . unLoc) gs
+  pure PmGRHS { pg_grds = GrdVec grds, pg_rhs = SrcInfo rhs_info }
+
+-- | Desugar a guard statement to a '[PmGrd]'
+desugarGuard :: GuardStmt GhcTc -> DsM [PmGrd]
+desugarGuard guard = case guard of
+  BodyStmt _   e _ _ -> desugarBoolGuard e
+  LetStmt  _   binds -> desugarLet (unLoc binds)
+  BindStmt _ p e     -> desugarBind p e
+  LastStmt        {} -> panic "desugarGuard LastStmt"
+  ParStmt         {} -> panic "desugarGuard ParStmt"
+  TransStmt       {} -> panic "desugarGuard TransStmt"
+  RecStmt         {} -> panic "desugarGuard RecStmt"
+  ApplicativeStmt {} -> panic "desugarGuard ApplicativeLastStmt"
+
+-- | Desugar let-bindings
+desugarLet :: HsLocalBinds GhcTc -> DsM [PmGrd]
+desugarLet _binds = return []
+
+-- | Desugar a pattern guard
+--   @pat <- e ==>  let x = e;  <guards for pat <- x>@
+desugarBind :: LPat GhcTc -> LHsExpr GhcTc -> DsM [PmGrd]
+desugarBind p e = dsLExpr e >>= \case
+  Var y
+    | Nothing <- isDataConId_maybe y
+    -- RHS is a variable, so that will allow us to omit the let
+    -> desugarLPat y p
+  rhs -> do
+    (x, grds) <- desugarLPatV p
+    pure (PmLet x rhs : grds)
+
+-- | Desugar a boolean guard
+--   @e ==>  let x = e; True <- x@
+desugarBoolGuard :: LHsExpr GhcTc -> DsM [PmGrd]
+desugarBoolGuard e
+  | isJust (isTrueLHsExpr e) = return []
+    -- The formal thing to do would be to generate (True <- True)
+    -- but it is trivial to solve so instead we give back an empty
+    -- [PmGrd] for efficiency
+  | otherwise = dsLExpr e >>= \case
+      Var y
+        | Nothing <- isDataConId_maybe y
+        -- Omit the let by matching on y
+        -> pure [vanillaConGrd y trueDataCon []]
+      rhs -> do
+        x <- mkPmId boolTy
+        pure [PmLet x rhs, vanillaConGrd x trueDataCon []]
+
+{- Note [Field match order for RecCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The order for RecCon field patterns actually determines evaluation order of
+the pattern match. For example:
+
+  data T = T { a :: Char, b :: Int }
+  f :: T -> ()
+  f T{ b = 42, a = 'a' } = ()
+
+Then @f (T (error "a") (error "b"))@ errors out with "b" because it is mentioned
+first in the pattern match.
+
+This means we can't just desugar the pattern match to
+@[T a b <- x, 'a' <- a, 42 <- b]@. Instead we have to force them in the
+right order: @[T a b <- x, 42 <- b, 'a' <- a]@.
+
+Note [Order of guards matters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Similar to Note [Field match order for RecCon], the order in which the guards
+for a pattern match appear matter. Consider a situation similar to T5117:
+
+  f (0:_)  = ()
+  f (0:[]) = ()
+
+The latter clause is clearly redundant. Yet if we desugar the second clause as
+
+  [x:xs' <- xs, [] <- xs', 0 <- x]
+
+We will say that the second clause only has an inaccessible RHS. That's because
+we force the tail of the list before comparing its head! So the correct
+translation would have been
+
+  [x:xs' <- xs, 0 <- x, [] <- xs']
+
+And we have to take in the guards on list cells into @mkListGrds@.
+
+Note [Desugar CoPats]
+~~~~~~~~~~~~~~~~~~~~~~~
+The pattern match checker did not know how to handle coerced patterns
+`CoPat` efficiently, which gave rise to #11276. The original approach
+desugared `CoPat`s:
+
+    pat |> co    ===>    x (pat <- (x |> co))
+
+Why did we do this seemingly unnecessary expansion in the first place?
+The reason is that the type of @pat |> co@ (which is the type of the value
+abstraction we match against) might be different than that of @pat@. Data
+instances such as @Sing (a :: Bool)@ are a good example of this: If we would
+just drop the coercion, we'd get a type error when matching @pat@ against its
+value abstraction, with the result being that pmIsSatisfiable decides that every
+possible data constructor fitting @pat@ is rejected as uninhabitated, leading to
+a lot of false warnings.
+
+But we can check whether the coercion is a hole or if it is just refl, in
+which case we can drop it.
+-}

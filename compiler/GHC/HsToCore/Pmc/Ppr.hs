@@ -4,7 +4,7 @@
 
 -- | Provides factilities for pretty-printing 'Nabla's in a way appropriate for
 -- user facing pattern match warnings.
-module GHC.HsToCore.PmCheck.Ppr (
+module GHC.HsToCore.Pmc.Ppr (
         pprUncovered
     ) where
 
@@ -26,8 +26,8 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
-import GHC.HsToCore.PmCheck.Types
-import GHC.HsToCore.PmCheck.Oracle
+import GHC.HsToCore.Pmc.Types
+import GHC.HsToCore.Pmc.Solver
 
 -- | Pretty-print the guts of an uncovered value vector abstraction, i.e., its
 -- components and refutable shapes associated to any mentioned variables.
@@ -93,7 +93,7 @@ Unhandled constraints that refer to HsExpr are typically ignored by the solver
 (it does not even substitute in HsExpr so they are even printed as wildcards).
 Additionally, the oracle returns a substitution if it succeeds so we apply this
 substitution to the vectors before printing them out (see function `pprOne' in
-"GHC.HsToCore.PmCheck") to be more precise.
+"GHC.HsToCore.Pmc") to be more precise.
 -}
 
 -- | Extract and assigns pretty names to constraint variables with refutable

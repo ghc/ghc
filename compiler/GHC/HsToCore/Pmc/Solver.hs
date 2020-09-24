@@ -7,34 +7,41 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns,
              MultiWayIf, ScopedTypeVariables, MagicHash #-}
 
--- | The pattern match oracle. The main export of the module are the functions
--- 'addPhiCts' for adding facts to the oracle, and 'generateInhabitingPatterns' to turn a
--- 'Nabla' into a concrete evidence for an equation.
+-- | Model refinements type as per the
+-- [Lower Your Guards paper](https://dl.acm.org/doi/abs/10.1145/3408989).
+-- The main export of the module are the functions 'addPhiCtsNablas' for adding
+-- facts to the oracle, 'isInhabited' to check if a refinement type is inhabited
+-- and 'generateInhabitingPatterns' to turn a 'Nabla' into a concrete pattern
+-- for an equation.
 --
--- In terms of the [Lower Your Guards paper](https://dl.acm.org/doi/abs/10.1145/3408989)
--- describing the implementation, this module is concerned with Sections 3.4, 3.6 and 3.7.
--- E.g., it represents refinement types directly as a normalised refinement type 'Nabla'.
-module GHC.HsToCore.PmCheck.Oracle (
+-- In terms of the LYG paper, this module is concerned with Sections 3.4, 3.6
+-- and 3.7. E.g., it represents refinement types directly as a bunch of
+-- normalised refinement types 'Nabla'.
+module GHC.HsToCore.Pmc.Solver (
 
-        DsM, tracePm, mkPmId,
-        Nabla, initNablas, lookupRefuts, lookupSolution,
+        Nabla, Nablas(..), initNablas,
+        lookupRefuts, lookupSolution,
 
         PhiCt(..), PhiCts,
+        addPhiCtNablas,
+        addPhiCtsNablas,
 
-        addPhiCts,           -- Add a constraint to the oracle.
+        isInhabited,
         generateInhabitingPatterns
+
     ) where
 
 #include "HsVersions.h"
 
 import GHC.Prelude
 
-import GHC.HsToCore.PmCheck.Types
+import GHC.HsToCore.Pmc.Types
+import GHC.HsToCore.Pmc.Utils ( tracePm, mkPmId )
 
 import GHC.Driver.Session
 import GHC.Driver.Config
 import GHC.Utils.Outputable
-import GHC.Utils.Error
+import GHC.Utils.Error ( pprErrMsgBagWithLoc )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
@@ -68,7 +75,6 @@ import GHC.Core.Type
 import GHC.Tc.Solver   (tcNormalise, tcCheckSatisfiability)
 import GHC.Core.Unify    (tcMatchTy)
 import GHC.Core.Coercion
-import GHC.Utils.Monad hiding (foldlM)
 import GHC.HsToCore.Monad hiding (foldlM)
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
@@ -82,40 +88,32 @@ import Data.Foldable (foldlM, minimumBy, toList)
 import Data.List     (sortBy, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord      (comparing)
-import Data.Tuple    (swap)
 
-import GHC.Driver.Ppr (pprTrace)
+--
+-- * Main exports
+--
 
--- Debugging Infrastructure
+-- | Add a bunch of 'PhiCt's to all the 'Nabla's.
+-- Lifts 'addPhiCts' over many 'Nablas'.
+addPhiCtsNablas :: Nablas -> PhiCts -> DsM Nablas
+addPhiCtsNablas nablas cts = liftNablasM (\d -> addPhiCts d cts) nablas
 
-tracePm :: String -> SDoc -> DsM ()
-tracePm herald doc = do
-  dflags <- getDynFlags
-  printer <- mkPrintUnqualifiedDs
-  liftIO $ dumpIfSet_dyn_printer printer dflags
-            Opt_D_dump_ec_trace "" FormatText (text herald $$ (nest 2 doc))
-{-# INLINE tracePm #-}  -- see Note [INLINE conditional tracing utilities]
+-- | 'addPmCtsNablas' for a single 'PmCt'.
+addPhiCtNablas :: Nablas -> PhiCt -> DsM Nablas
+addPhiCtNablas nablas ct = addPhiCtsNablas nablas (unitBag ct)
 
-debugOn :: () -> Bool
-debugOn _ = False
--- debugOn _ = True
+liftNablasM :: Monad m => (Nabla -> m (Maybe Nabla)) -> Nablas -> m Nablas
+liftNablasM f (MkNablas ds) = MkNablas . catBagMaybes <$> (traverse f ds)
 
-trc :: String -> SDoc -> a -> a
-trc | debugOn () = pprTrace
-    | otherwise  = \_ _ a -> a
-
-_trcM :: Monad m => String -> SDoc -> m ()
-_trcM header doc = trc header doc (return ())
-
--- | Generate a fresh `Id` of a given type
-mkPmId :: Type -> DsM Id
-mkPmId ty = getUniqueM >>= \unique ->
-  let occname = mkVarOccFS $ fsLit "pm"
-      name    = mkInternalName unique occname noSrcSpan
-  in  return (mkLocalIdOrCoVar name Many ty)
+-- | Test if any of the 'Nabla's is inhabited. Currently this is pure, because
+-- we preserve the invariant that there are no uninhabited 'Nabla's. But that
+-- could change in the future, for example by implementing this function in
+-- terms of @notNull <$> generateInhabitingPatterns 1 ds@.
+isInhabited :: Nablas -> DsM Bool
+isInhabited (MkNablas ds) = pure (not (null ds))
 
 -----------------------------------------------
--- * Caching residual COMPLETE set
+-- * Caching residual COMPLETE sets
 
 -- See Note [Implementation of COMPLETE pragmas]
 
@@ -195,7 +193,7 @@ also be defined in the module of the pragma) and do not impact recompilation
 checking (#18675).
 
 The pattern-match checker will then initialise each variable's 'VarInfo' with
-*all* imported COMPLETE sets (in 'GHC.HsToCore.PmCheck.Oracle.addCompleteMatches'),
+*all* imported COMPLETE sets (in 'GHC.HsToCore.Pmc.Solver.addCompleteMatches'),
 well-typed or not, into a 'ResidualCompleteMatches'. The trick is that a
 COMPLETE set that is ill-typed for that match variable could never be written by
 the user! And we make sure not to report any ill-typed COMPLETE sets when
@@ -525,9 +523,6 @@ trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x
     set_vi (a, vi') =
       (a, nabla{ nabla_tm_st = ts{ ts_facts = setEntrySDIE env (vi_id vi') vi' } })
 
-------------------------------------------------
--- * Exported utility functions querying 'Nabla'
-
 {- Note [Coverage checking Newtype matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Newtypes have quite peculiar match semantics compared to ordinary DataCons. In a
@@ -555,6 +550,9 @@ clause as redundant, which clearly is unsound. The solution:
 Handling of Newtypes is also described in the Appendix of the Lower Your Guards paper,
 where you can find the solution in a perhaps more digestible format.
 -}
+
+------------------------------------------------
+-- * Exported utility functions querying 'Nabla'
 
 lookupRefuts :: Uniquable k => Nabla -> k -> [PmAltCon]
 -- Unfortunately we need the extra bit of polymorphism and the unfortunate
@@ -943,7 +941,7 @@ addCoreCt nabla x e = do
     -- @x ~ y@.
     equate_with_similar_expr :: Id -> CoreExpr -> StateT Nabla (MaybeT DsM) ()
     equate_with_similar_expr x e = do
-      rep <- StateT $ \nabla -> swap <$> lift (representCoreExpr nabla e)
+      rep <- StateT $ \nabla -> lift (representCoreExpr nabla e)
       -- Note that @rep == x@ if we encountered @e@ for the first time.
       modifyT (\nabla -> addVarCt nabla x rep)
 
@@ -996,14 +994,14 @@ addCoreCt nabla x e = do
 -- Which is the @x@ of a @let x = e'@ constraint (with @e@ semantically
 -- equivalent to @e'@) we encountered earlier, or a fresh identifier if
 -- there weren't any such constraints.
-representCoreExpr :: Nabla -> CoreExpr -> DsM (Nabla, Id)
+representCoreExpr :: Nabla -> CoreExpr -> DsM (Id, Nabla)
 representCoreExpr nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_reps = reps } } e
-  | Just rep <- lookupCoreMap reps e = pure (nabla, rep)
+  | Just rep <- lookupCoreMap reps e = pure (rep, nabla)
   | otherwise = do
       rep <- mkPmId (exprType e)
       let reps'  = extendCoreMap reps e rep
       let nabla' = nabla{ nabla_tm_st = ts{ ts_reps = reps' } }
-      pure (nabla', rep)
+      pure (rep, nabla')
 
 -- | Like 'modify', but with an effectful modifier action
 modifyT :: Monad m => (s -> m s) -> StateT s m ()
@@ -1159,9 +1157,9 @@ Note [Strict fields and variables of unlifted type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Binders of unlifted type (and strict fields) are unlifted by construction;
 they are conceived with an implicit @≁⊥@ constraint to begin with. Hence,
-desugaring in "GHC.HsToCore.PmCheck" is entirely unconcerned by strict fields,
+desugaring in "GHC.HsToCore.Pmc" is entirely unconcerned by strict fields,
 since the forcing happens *before* pattern matching.
-And the φ constructor constraints emitted by 'GHC.HsToCore.PmCheck.checkGrd'
+And the φ constructor constraints emitted by 'GHC.HsToCore.Pmc.checkGrd'
 have complex binding semantics (binding type constraints and unlifted fields),
 so unliftedness semantics are entirely confined to the oracle.
 

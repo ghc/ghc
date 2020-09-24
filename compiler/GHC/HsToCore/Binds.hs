@@ -33,7 +33,7 @@ import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck ( addTyCs, covCheckGRHSs )
+import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
@@ -159,7 +159,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                           -- oracle.
                           -- addTyCs: Add type evidence to the refinement type
                           --            predicate of the coverage checker
-                          -- See Note [Long-distance information] in "GHC.HsToCore.PmCheck"
+                          -- See Note [Long-distance information] in "GHC.HsToCore.Pmc"
                           matchWrapper
                            (mkPrefixFunRhs (L loc (idName fun)))
                            Nothing matches
@@ -185,7 +185,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                          , pat_ext = ty
                          , pat_ticks = (rhs_tick, var_ticks) })
-  = do  { rhss_nablas <- covCheckGRHSs PatBindGuards grhss
+  = do  { rhss_nablas <- pmcGRHSs PatBindGuards grhss
         ; body_expr <- dsGuarded grhss ty rhss_nablas
         ; let body' = mkOptTickBox rhs_tick body_expr
               pat'  = decideBangHood dflags pat
