@@ -47,8 +47,6 @@ import GHC.Prelude
 import GHC.Stack
 
 import GHC.Utils.Outputable
-import {-# SOURCE #-} GHC.Driver.Session (DynFlags, unsafeGlobalDynFlags)
-import {-# SOURCE #-} GHC.Driver.Ppr (showSDoc)
 import GHC.Utils.Panic.Plain
 
 import GHC.Utils.Exception as Exception
@@ -146,16 +144,14 @@ safeShowException e = do
 
 -- | Append a description of the given exception to this string.
 --
--- Note that this uses 'GHC.Driver.Session.unsafeGlobalDynFlags', which may have some
--- uninitialized fields if invoked before 'GHC.initGhcMonad' has been called.
--- If the error message to be printed includes a pretty-printer document
--- which forces one of these fields this call may bottom.
+-- Note that this uses 'defaultSDocContext', which doesn't use the options
+-- set by the user via DynFlags.
 showGhcExceptionUnsafe :: GhcException -> ShowS
-showGhcExceptionUnsafe = showGhcException unsafeGlobalDynFlags
+showGhcExceptionUnsafe = showGhcException defaultSDocContext
 
 -- | Append a description of the given exception to this string.
-showGhcException :: DynFlags -> GhcException -> ShowS
-showGhcException dflags = showPlainGhcException . \case
+showGhcException :: SDocContext -> GhcException -> ShowS
+showGhcException ctx = showPlainGhcException . \case
   Signal n -> PlainSignal n
   UsageError str -> PlainUsageError str
   CmdLineError str -> PlainCmdLineError str
@@ -165,11 +161,11 @@ showGhcException dflags = showPlainGhcException . \case
   ProgramError str -> PlainProgramError str
 
   PprPanic str sdoc -> PlainPanic $
-      concat [str, "\n\n", showSDoc dflags sdoc]
+      concat [str, "\n\n", renderWithContext ctx sdoc]
   PprSorry str sdoc -> PlainProgramError $
-      concat [str, "\n\n", showSDoc dflags sdoc]
+      concat [str, "\n\n", renderWithContext ctx sdoc]
   PprProgramError str sdoc -> PlainProgramError $
-      concat [str, "\n\n", showSDoc dflags sdoc]
+      concat [str, "\n\n", renderWithContext ctx sdoc]
 
 throwGhcException :: GhcException -> a
 throwGhcException = Exception.throw

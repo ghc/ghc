@@ -644,7 +644,9 @@
       SymI_HasProto(getRTSStatsEnabled)                                 \
       SymI_HasProto(getOrSetLibHSghcPersistentLinkerState)              \
       SymI_HasProto(getOrSetLibHSghcInitLinkerDone)                     \
-      SymI_HasProto(getOrSetLibHSghcGlobalDynFlags)                     \
+      SymI_HasProto(getOrSetLibHSghcGlobalHasPprDebug)                  \
+      SymI_HasProto(getOrSetLibHSghcGlobalHasNoDebugOutput)             \
+      SymI_HasProto(getOrSetLibHSghcGlobalHasNoStateHack)               \
       SymI_HasProto(genericRaise)                                       \
       SymI_HasProto(getProgArgv)                                        \
       SymI_HasProto(getFullProgArgv)                                    \

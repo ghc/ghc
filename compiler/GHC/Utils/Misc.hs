@@ -107,9 +107,6 @@ module GHC.Utils.Misc (
         modificationTimeIfExists,
         withAtomicRename,
 
-        global, consIORef, globalM,
-        sharedGlobal, sharedGlobalM,
-
         -- * Filenames and paths
         Suffix,
         splitLongestPrefix,
@@ -143,8 +140,6 @@ import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
 
 import Data.Data
-import Data.IORef       ( IORef, newIORef, atomicModifyIORef' )
-import System.IO.Unsafe ( unsafePerformIO )
 import Data.List        hiding (group)
 import Data.List.NonEmpty  ( NonEmpty(..) )
 
@@ -154,7 +149,6 @@ import GHC.Stack (HasCallStack)
 import Control.Applicative ( liftA2 )
 import Control.Monad    ( liftM, guard )
 import Control.Monad.IO.Class ( MonadIO, liftIO )
-import GHC.Conc.Sync ( sharedCAF )
 import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime, renameFile )
 import System.FilePath
@@ -1070,48 +1064,6 @@ strictMap f (x : xs) =
   in
     x' : xs'
 
-{-
-************************************************************************
-*                                                                      *
-                        Globals and the RTS
-*                                                                      *
-************************************************************************
-
-When a plugin is loaded, it currently gets linked against a *newly
-loaded* copy of the GHC package. This would not be a problem, except
-that the new copy has its own mutable state that is not shared with
-that state that has already been initialized by the original GHC
-package.
-
-(Note that if the GHC executable was dynamically linked this
-wouldn't be a problem, because we could share the GHC library it
-links to; this is only a problem if DYNAMIC_GHC_PROGRAMS=NO.)
-
-The solution is to make use of @sharedCAF@ through @sharedGlobal@
-for globals that are shared between multiple copies of ghc packages.
--}
-
--- Global variables:
-
-global :: a -> IORef a
-global a = unsafePerformIO (newIORef a)
-
-consIORef :: IORef [a] -> a -> IO ()
-consIORef var x = do
-  atomicModifyIORef' var (\xs -> (x:xs,()))
-
-globalM :: IO a -> IORef a
-globalM ma = unsafePerformIO (ma >>= newIORef)
-
--- Shared global variables:
-
-sharedGlobal :: a -> (Ptr (IORef a) -> IO (Ptr (IORef a))) -> IORef a
-sharedGlobal a get_or_set = unsafePerformIO $
-  newIORef a >>= flip sharedCAF get_or_set
-
-sharedGlobalM :: IO a -> (Ptr (IORef a) -> IO (Ptr (IORef a))) -> IORef a
-sharedGlobalM ma get_or_set = unsafePerformIO $
-  ma >>= newIORef >>= flip sharedCAF get_or_set
 
 -- Module names:
 

@@ -44,7 +44,7 @@ test('plugins06',
      [extra_files(['LinkerTicklingPlugin.hs']),
       unless(have_dynamic(), skip),
       only_ways([config.ghc_plugin_way])],
-     multimod_compile_and_run, ['plugins06', '-package ghc'])
+     multimod_compile_and_run, ['plugins06', '-package ghc -dppr-debug'])
 
 test('plugins07',
      [extra_files(['rule-defining-plugin/']),

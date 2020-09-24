@@ -820,13 +820,15 @@ prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags
     = MC.handle $ \e -> case e of
                       PprPanic str doc ->
-                          pprDebugAndThen dflags panic (text str) doc
+                          pprDebugAndThen ctx panic (text str) doc
                       PprSorry str doc ->
-                          pprDebugAndThen dflags sorry (text str) doc
+                          pprDebugAndThen ctx sorry (text str) doc
                       PprProgramError str doc ->
-                          pprDebugAndThen dflags pgmError (text str) doc
+                          pprDebugAndThen ctx pgmError (text str) doc
                       _ ->
                           liftIO $ throwIO e
+      where
+         ctx = initSDocContext dflags defaultUserStyle
 
 -- | Checks if given 'WarnMsg' is a fatal warning.
 isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe (Maybe WarningFlag)

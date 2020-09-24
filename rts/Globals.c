@@ -35,7 +35,9 @@ typedef enum {
     LibHSghcFastStringTable,
     LibHSghcPersistentLinkerState,
     LibHSghcInitLinkerDone,
-    LibHSghcGlobalDynFlags,
+    LibHSghcGlobalHasPprDebug,
+    LibHSghcGlobalHasNoDebugOutput,
+    LibHSghcGlobalHasNoStateHack,
     LibHSghcStaticOptions,
     LibHSghcStaticOptionsReady,
     MaxStoreKey
@@ -108,6 +110,8 @@ mkStoreAccessor(SystemTimerThreadIOManagerThreadStore)
 mkStoreAccessor(LibHSghcFastStringTable)
 mkStoreAccessor(LibHSghcPersistentLinkerState)
 mkStoreAccessor(LibHSghcInitLinkerDone)
-mkStoreAccessor(LibHSghcGlobalDynFlags)
+mkStoreAccessor(LibHSghcGlobalHasPprDebug)
+mkStoreAccessor(LibHSghcGlobalHasNoDebugOutput)
+mkStoreAccessor(LibHSghcGlobalHasNoStateHack)
 mkStoreAccessor(LibHSghcStaticOptions)
 mkStoreAccessor(LibHSghcStaticOptionsReady)
