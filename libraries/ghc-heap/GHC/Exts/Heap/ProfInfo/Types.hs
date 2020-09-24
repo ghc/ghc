@@ -6,10 +6,16 @@ import Prelude
 import Data.Word
 import GHC.Generics
 
+-- | This is a somewhat faithful representation of StgTSOProfInfo. See
+-- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/storage/TSO.h>
+-- for more details on this data structure.
 data StgTSOProfInfo = StgTSOProfInfo {
     cccs :: Maybe CostCentreStack
 } deriving (Show, Generic)
 
+-- | This is a somewhat faithful representation of CostCentreStack. See
+-- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/prof/CCS.h>
+-- for more details on this data structure.
 data CostCentreStack = CostCentreStack {
     ccs_ccsID :: Int,
     ccs_cc :: CostCentre,
@@ -25,6 +31,9 @@ data CostCentreStack = CostCentreStack {
     ccs_inherited_ticks :: Word
 } deriving (Show, Generic, Eq)
 
+-- | This is a somewhat faithful representation of CostCentre. See
+-- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/prof/CCS.h>
+-- for more details on this data structure.
 data CostCentre = CostCentre {
     cc_ccID :: Int,
     cc_label :: String,
@@ -36,6 +45,9 @@ data CostCentre = CostCentre {
     cc_link :: Maybe CostCentre
 } deriving (Show, Generic, Eq)
 
+-- | This is a somewhat faithful representation of IndexTable. See
+-- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/prof/CCS.h>
+-- for more details on this data structure.
 data IndexTable = IndexTable {
     it_cc :: CostCentre,
     it_ccs :: Maybe CostCentreStack,

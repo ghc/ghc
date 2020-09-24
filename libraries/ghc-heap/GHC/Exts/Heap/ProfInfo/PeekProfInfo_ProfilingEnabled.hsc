@@ -1,4 +1,7 @@
-{-# LANGUAGE CPP, DeriveGeneric #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE MagicHash #-}
+
 module GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled(
     peekStgTSOProfInfo
 ) where
@@ -17,21 +20,16 @@ module GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled(
 #undef BLOCKS_PER_MBLOCK
 #include "DerivedConstants.h"
 
-import Prelude
-import Foreign
-
-import Foreign.C.String
-import GHC.Exts.Heap.ProfInfo.Types
-
-import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
-
-import Data.IntSet (IntSet)
+import           Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-
-import GHC.Exts.Heap.Ptr.Utils
+import           Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
+import           Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import           Foreign
+import           Foreign.C.String
+import           GHC.Exts
+import           GHC.Exts.Heap.ProfInfo.Types
+import           Prelude
 
 -- Use Int based containers for pointers (addresses) for better performance.
 -- These will be queried a lot!
@@ -53,7 +51,7 @@ cccsOffset = (#const OFFSET_StgTSO_cccs) + (#size StgHeader)
 
 peekCostCentreStack :: AddressSet -> IORef (AddressMap CostCentre) -> Ptr costCentreStack -> IO (Maybe CostCentreStack)
 peekCostCentreStack _ _ ptr | ptr == nullPtr = return Nothing
-peekCostCentreStack loopBreakers costCenterCacheRef ptr | IntSet.member (ptrToInt ptr) loopBreakers = return Nothing
+peekCostCentreStack loopBreakers _ ptr | IntSet.member (ptrToInt ptr) loopBreakers = return Nothing
 peekCostCentreStack loopBreakers costCenterCacheRef ptr = do
         ccs_ccsID' <- (#peek struct CostCentreStack_, ccsID) ptr
         ccs_cc_ptr <- (#peek struct CostCentreStack_, cc) ptr
@@ -150,6 +148,10 @@ peekIndexTable loopBreakers costCenterCacheRef ptr = do
             it_next = it_next',
             it_back_edge = it_back_edge'
         }
+
+-- | casts a @Ptr@ to an @Int@
+ptrToInt :: Ptr a -> Int
+ptrToInt (Ptr a##) = I## (addr2Int## a##)
 
 #else
 import Prelude
