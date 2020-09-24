@@ -14,10 +14,6 @@ module GHC.HsToCore.Pmc.Solver.Types (
         BotInfo(..), PmAltConApp(..), VarInfo(..), TmState(..), TyState(..),
         Nabla(..), Nablas(..), initNablas,
 
-        -- ** A 'DIdEnv' where entries may be shared
-        Shared(..), SharedDIdEnv(..), emptySDIE, lookupSDIE, sameRepresentativeSDIE,
-        setIndirectSDIE, setEntrySDIE, traverseSDIE, entriesSDIE,
-
         -- ** Caching residual COMPLETE sets
         ConLikeSet, ResidualCompleteMatches(..), getRcm, isRcmInitialised,
 
@@ -46,10 +42,9 @@ import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Types.Id
-import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Unique.DSet
-import GHC.Types.Unique.DFM
+import GHC.Types.Unique.SDFM
 import GHC.Types.Name
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -135,7 +130,7 @@ initTyState = TySt 0 emptyInert
 -- See Note [TmState invariants] in "GHC.HsToCore.Pmc.Solver".
 data TmState
   = TmSt
-  { ts_facts :: !(SharedDIdEnv VarInfo)
+  { ts_facts :: !(UniqSDFM Id VarInfo)
   -- ^ Facts about term variables. Deterministic env, so that we generate
   -- deterministic error messages.
   , ts_reps  :: !(CoreMap Id)
@@ -245,75 +240,7 @@ instance Outputable VarInfo where
 
 -- | Initial state of the term oracle.
 initTmState :: TmState
-initTmState = TmSt emptySDIE emptyCoreMap emptyDVarSet
-
--- ** A 'DIdEnv' where entries may be shared
-
--- | Either @Indirect x@, meaning the value is represented by that of @x@, or
--- an @Entry@ containing containing the actual value it represents.
-data Shared a
-  = Indirect !Id
-  | Entry !a
-
--- | A 'DIdEnv' in which entries can be shared by multiple 'Id's.
--- Merge equivalence classes of two Ids by 'setIndirectSDIE' and set the entry
--- of an Id with 'setEntrySDIE'.
-newtype SharedDIdEnv a
-  = SDIE { unSDIE :: DIdEnv (Shared a) }
-
-emptySDIE :: SharedDIdEnv a
-emptySDIE = SDIE emptyDVarEnv
-
-lookupReprAndEntrySDIE :: SharedDIdEnv a -> Id -> (Id, Maybe a)
-lookupReprAndEntrySDIE sdie@(SDIE env) x = case lookupDVarEnv env x of
-  Nothing           -> (x, Nothing)
-  Just (Indirect y) -> lookupReprAndEntrySDIE sdie y
-  Just (Entry a)    -> (x, Just a)
-
--- | @lookupSDIE env x@ looks up an entry for @x@, looking through all
--- 'Indirect's until it finds a shared 'Entry'.
-lookupSDIE :: SharedDIdEnv a -> Id -> Maybe a
-lookupSDIE sdie x = snd (lookupReprAndEntrySDIE sdie x)
-
--- | Check if two variables are part of the same equivalence class.
-sameRepresentativeSDIE :: SharedDIdEnv a -> Id -> Id -> Bool
-sameRepresentativeSDIE sdie x y =
-  fst (lookupReprAndEntrySDIE sdie x) == fst (lookupReprAndEntrySDIE sdie y)
-
--- | @setIndirectSDIE env x y@ sets @x@'s 'Entry' to @Indirect y@, thereby
--- merging @x@'s equivalence class into @y@'s. This will discard all info on
--- @x@!
-setIndirectSDIE :: SharedDIdEnv a -> Id -> Id -> SharedDIdEnv a
-setIndirectSDIE sdie@(SDIE env) x y =
-  SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Indirect y)
-
--- | @setEntrySDIE env x a@ sets the 'Entry' @x@ is associated with to @a@,
--- thereby modifying its whole equivalence class.
-setEntrySDIE :: SharedDIdEnv a -> Id -> a -> SharedDIdEnv a
-setEntrySDIE sdie@(SDIE env) x a =
-  SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Entry a)
-
-entriesSDIE :: SharedDIdEnv a -> [a]
-entriesSDIE (SDIE env) = mapMaybe preview_entry (eltsUDFM env)
-  where
-    preview_entry (Entry e) = Just e
-    preview_entry _         = Nothing
-
-traverseSDIE :: forall a b f. Applicative f => (a -> f b) -> SharedDIdEnv a -> f (SharedDIdEnv b)
-traverseSDIE f = fmap (SDIE . listToUDFM_Directly) . traverse g . udfmToList . unSDIE
-  where
-    g :: (Unique, Shared a) -> f (Unique, Shared b)
-    g (u, Indirect y) = pure (u,Indirect y)
-    g (u, Entry a)    = do
-        a' <- f a
-        pure (u,Entry a')
-
-instance Outputable a => Outputable (Shared a) where
-  ppr (Indirect x) = ppr x
-  ppr (Entry a)    = ppr a
-
-instance Outputable a => Outputable (SharedDIdEnv a) where
-  ppr (SDIE env) = ppr env
+initTmState = TmSt emptyUSDFM emptyCoreMap emptyDVarSet
 
 -- | A data type that caches for the 'VarInfo' of @x@ the results of querying
 -- 'dsGetCompleteMatches' and then striking out all occurrences of @K@ for

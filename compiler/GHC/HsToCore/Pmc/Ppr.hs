@@ -98,20 +98,20 @@ substitution to the vectors before printing them out (see function `pprOne' in
 
 -- | Extract and assigns pretty names to constraint variables with refutable
 -- shapes.
-prettifyRefuts :: Nabla -> DIdEnv SDoc -> DIdEnv (SDoc, [PmAltCon])
+prettifyRefuts :: Nabla -> DIdEnv (Id, SDoc) -> DIdEnv (SDoc, [PmAltCon])
 prettifyRefuts nabla = listToUDFM_Directly . map attach_refuts . udfmToList
   where
-    attach_refuts (u, sdoc) = (u, (sdoc, lookupRefuts nabla u))
+    attach_refuts (u, (x, sdoc)) = (u, (sdoc, lookupRefuts nabla x))
 
 
-type PmPprM a = RWS Nabla () (DIdEnv SDoc, [SDoc]) a
+type PmPprM a = RWS Nabla () (DIdEnv (Id, SDoc), [SDoc]) a
 
 -- Try nice names p,q,r,s,t before using the (ugly) t_i
 nameList :: [SDoc]
 nameList = map text ["p","q","r","s","t"] ++
             [ text ('t':show u) | u <- [(0 :: Int)..] ]
 
-runPmPpr :: Nabla -> PmPprM a -> (a, DIdEnv SDoc)
+runPmPpr :: Nabla -> PmPprM a -> (a, DIdEnv (Id, SDoc))
 runPmPpr nabla m = case runRWS m nabla (emptyDVarEnv, nameList) of
   (a, (renamings, _), _) -> (a, renamings)
 
@@ -122,9 +122,9 @@ getCleanName x = do
   (renamings, name_supply) <- get
   let (clean_name:name_supply') = name_supply
   case lookupDVarEnv renamings x of
-    Just nm -> pure nm
+    Just (_, nm) -> pure nm
     Nothing -> do
-      put (extendDVarEnv renamings x clean_name, name_supply')
+      put (extendDVarEnv renamings x (x, clean_name), name_supply')
       pure clean_name
 
 checkRefuts :: Id -> PmPprM (Maybe SDoc) -- the clean name if it has negative info attached
@@ -139,8 +139,8 @@ checkRefuts x = do
 -- underscores. Even with a type signature, if it's not too noisy.
 pprPmVar :: PprPrec -> Id -> PmPprM SDoc
 -- Type signature is "too noisy" by my definition if it needs to parenthesize.
--- I like           "not matched: _ :: Proxy (DIdEnv SDoc)",
--- but I don't like "not matched: (_ :: stuff) (_:_) (_ :: Proxy (DIdEnv SDoc))"
+-- I like           "not matched: _ :: Proxy (DIdEnv (Id, SDoc))",
+-- but I don't like "not matched: (_ :: stuff) (_:_) (_ :: Proxy (DIdEnv (Id, SDoc)))"
 -- The useful information in the latter case is the constructor that we missed,
 -- not the types of the wildcards in the places that aren't matched as a result.
 pprPmVar prec x = do
