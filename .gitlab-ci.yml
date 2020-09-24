@@ -233,6 +233,17 @@ lint-release-changelogs:
   tags:
     - x86_64-linux
 
+# Verify that Hadrian builds with stack. Note that we don't actually perform a
+# build of GHC itself; we merely test that the Hadrian executable builds and
+# works (by invoking `hadrian --version`).
+stack-hadrian-build:
+  extends: .validate-linux-hadrian
+  stage: build
+  script:
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - hadrian/build-stack --version
+
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
   needs: [hadrian-ghc-in-ghci]
