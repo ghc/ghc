@@ -889,8 +889,19 @@ cvtImplicitParamBind n e = do
 cvtl :: TH.Exp -> CvtM (LHsExpr GhcPs)
 cvtl e = wrapL (cvt e)
   where
-    cvt (VarE s)        = do { s' <- vName s; return $ HsVar noExtField (noLoc s') }
-    cvt (ConE s)        = do { s' <- cName s; return $ HsVar noExtField (noLoc s') }
+    cvt (VarE s)
+      | isVarName s           = do { s' <- vName s; return $ HsVar noExtField (noLoc s') }
+      | isTyConName s         = cvt (ConE s)
+      -- If VarE contains a type constructor,
+      -- then we process this name as a data constructor
+      -- in order to cause an "Illegal term-level
+      -- use of a type constructor" error.
+      -- See Note [Promotion] in GHC.Rename.Env.
+      -- In particular, this clause (together with the next one)
+      -- improves the error messages in test cases like
+      -- T14627, T7667a, and T15270B.
+      | otherwise             = failWith (badOcc OccName.varName (nameBase s))
+    cvt (ConE s)              = do { s' <- cName s; return $ HsVar noExtField (noLoc s') }
     cvt (LitE l)
       | overloadedLit l = go cvtOverLit (HsOverLit noExtField)
                              (hsOverLitNeedsParens appPrec)
@@ -1914,6 +1925,12 @@ isVarName (TH.Name occ _)
   = case TH.occString occ of
       ""    -> False
       (c:_) -> startsVarId c || startsVarSym c
+
+isTyConName :: TH.Name -> Bool
+isTyConName name
+  = case nameSpace name of
+      Just TcClsName -> True
+      _              -> False
 
 badOcc :: OccName.NameSpace -> String -> SDoc
 badOcc ctxt_ns occ

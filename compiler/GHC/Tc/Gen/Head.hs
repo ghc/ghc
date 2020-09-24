@@ -751,6 +751,7 @@ tc_infer_assert assert_name
 tc_infer_id :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
 tc_infer_id id_name
  = do { thing <- tcLookup id_name
+      ; global_env <- getGlobalRdrEnv
       ; case thing of
              ATcId { tct_id = id }
                -> do { check_local_id occ id
@@ -768,9 +769,31 @@ tc_infer_id id_name
                    | otherwise
                    -> nonBidirectionalErr id_name
 
+             AGlobal (ATyCon ty_con)
+               -> fail_tycon global_env ty_con
+
+             ATyVar name _
+                -> failWithTc $
+                     text "Illegal term-level use of the type variable"
+                       <+> quotes (ppr name)
+                       $$ nest 2 (text "bound at" <+> ppr (getSrcLoc name))
+
+             ATcTyCon ty_con
+               -> fail_tycon global_env ty_con
+
              _ -> failWithTc $
                   ppr thing <+> text "used where a value identifier was expected" }
   where
+    fail_tycon global_env ty_con =
+      let pprov = case lookupGRE_Name global_env (tyConName ty_con) of
+            Just gre -> nest 2 (pprNameProvenance gre)
+            Nothing  -> empty
+      in failWithTc (term_level_tycons ty_con $$ pprov)
+
+    term_level_tycons ty_con
+      = text "Illegal term-level use of the type constructor"
+          <+> quotes (ppr (tyConName ty_con))
+
     occ = nameOccName id_name
 
     return_id id = return (HsVar noExtField (noLoc id), idType id)
@@ -1140,4 +1163,3 @@ addExprCtxt e thing_inside
 
 exprCtxt :: HsExpr GhcRn -> SDoc
 exprCtxt expr = hang (text "In the expression:") 2 (ppr (stripParensHsExpr expr))
-
