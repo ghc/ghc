@@ -25,7 +25,7 @@ import GHC.Core.Utils (bindNonRec)
 
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck.Types ( Nablas )
+import GHC.HsToCore.Pmc.Types ( Nablas )
 import GHC.Core.Type ( Type )
 import GHC.Utils.Misc
 import GHC.Types.SrcLoc

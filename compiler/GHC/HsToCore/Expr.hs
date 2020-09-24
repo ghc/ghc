@@ -31,7 +31,7 @@ import GHC.HsToCore.ListComp
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
-import GHC.HsToCore.PmCheck ( addTyCs, covCheckGRHSs )
+import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Core.FamInstEnv( topNormaliseType )
@@ -215,7 +215,7 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
                         , pat_ext = ty }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
-    do { match_nablas <- covCheckGRHSs PatBindGuards grhss
+    do { match_nablas <- pmcGRHSs PatBindGuards grhss
        ; rhs          <- dsGuarded grhss ty match_nablas
        ; let upat = unLoc pat
              eqn = EqnInfo { eqn_pats = [upat],
@@ -490,7 +490,7 @@ dsExpr (HsMultiIf res_ty alts)
 
   | otherwise
   = do { let grhss = GRHSs noExtField alts (noLoc emptyLocalBinds)
-       ; rhss_nablas  <- covCheckGRHSs IfAlt grhss
+       ; rhss_nablas  <- pmcGRHSs IfAlt grhss
        ; match_result <- dsGRHSs IfAlt grhss res_ty rhss_nablas
        ; error_expr   <- mkErrorExpr
        ; extractMatchResult match_result error_expr }
