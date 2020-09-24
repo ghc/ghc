@@ -889,8 +889,15 @@ cvtImplicitParamBind n e = do
 cvtl :: TH.Exp -> CvtM (LHsExpr GhcPs)
 cvtl e = wrapL (cvt e)
   where
-    cvt (VarE s)        = do { s' <- vName s; return $ HsVar noExtField (noLoc s') }
-    cvt (ConE s)        = do { s' <- cName s; return $ HsVar noExtField (noLoc s') }
+    cvt (VarE s)
+      | isVarName s           = do { s' <- vName s; return $ HsVar noExtField (noLoc s') }
+      | isTyConName s         = cvt (ConE s)
+      -- This clause is related to #18740.
+      -- If a variable name contains a type constructor,
+      -- then we process this name as a data constructor.
+      -- In particular, this clause is related to #14627.
+      | otherwise             = failWith (badOcc OccName.varName (nameBase s))
+    cvt (ConE s)              = do { s' <- cName s; return $ HsVar noExtField (noLoc s') }
     cvt (LitE l)
       | overloadedLit l = go cvtOverLit (HsOverLit noExtField)
                              (hsOverLitNeedsParens appPrec)
@@ -1914,6 +1921,12 @@ isVarName (TH.Name occ _)
   = case TH.occString occ of
       ""    -> False
       (c:_) -> startsVarId c || startsVarSym c
+
+isTyConName :: TH.Name -> Bool
+isTyConName name
+  = case nameSpace s of
+      Just TcClsName -> True
+      Nothing        -> False
 
 badOcc :: OccName.NameSpace -> String -> SDoc
 badOcc ctxt_ns occ
