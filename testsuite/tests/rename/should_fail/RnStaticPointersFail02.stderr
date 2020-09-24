@@ -1,3 +1,6 @@
 
-RnStaticPointersFail02.hs:5:12: error:
-    Data constructor not in scope: T
+RnStaticPointersFail02.hs:5:12:
+Type constructor ‘T’ used where a value identifier was expected
+In the body of a static form: T
+  In the expression: static T
+  In an equation for ‘f’: f = static T
