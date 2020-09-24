@@ -1,2 +1,5 @@
 
-mod147.hs:6:5: error: Data constructor not in scope: D :: t0 -> t
+mod147.hs:6:5:
+     Type constructor 'D' used where a value identifier was expected
+     In the expression: D 4
+      In an equation for 'x': x = D 4
