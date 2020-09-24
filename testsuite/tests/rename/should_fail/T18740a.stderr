@@ -1,0 +1,5 @@
+
+T18740a.hs:3:5: error:
+    • Type constructor ‘Int’ used where a value identifier was expected
+    • In the expression: Int
+      In an equation for ‘x’: x = Int

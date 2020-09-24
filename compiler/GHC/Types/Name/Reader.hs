@@ -32,7 +32,7 @@ module GHC.Types.Name.Reader (
         nameRdrName, getRdrName,
 
         -- ** Destruction
-        rdrNameOcc, rdrNameSpace, demoteRdrName,
+        rdrNameOcc, rdrNameSpace, demoteRdrName, promoteRdrName,
         isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
         isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
@@ -179,12 +179,20 @@ rdrNameSpace :: RdrName -> NameSpace
 rdrNameSpace = occNameSpace . rdrNameOcc
 
 -- demoteRdrName lowers the NameSpace of RdrName.
--- see Note [Demotion] in GHC.Types.Name.Occurrence
+-- see Note [Demotion] in GHC.Rename.Env
 demoteRdrName :: RdrName -> Maybe RdrName
 demoteRdrName (Unqual occ) = fmap Unqual (demoteOccName occ)
 demoteRdrName (Qual m occ) = fmap (Qual m) (demoteOccName occ)
 demoteRdrName (Orig _ _) = Nothing
 demoteRdrName (Exact _) = Nothing
+
+-- promoteRdrName promotes the NameSpace of RdrName
+-- see Note [Promotion] in GHC.Rename.Env
+promoteRdrName :: RdrName -> Maybe RdrName
+promoteRdrName (Unqual occ) = fmap Unqual (promoteOccName occ)
+promoteRdrName (Qual m occ) = fmap (Qual m) (promoteOccName occ)
+promoteRdrName (Orig _ _) = Nothing
+promoteRdrName (Exact _)  = Nothing
 
         -- These two are the basic constructors
 mkRdrUnqual :: OccName -> RdrName
