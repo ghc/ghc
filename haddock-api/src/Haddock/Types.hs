@@ -755,9 +755,14 @@ type instance XFamDecl      DocNameI = NoExtField
 type instance XXFamilyDecl  DocNameI = NoExtCon
 type instance XXTyClDecl    DocNameI = NoExtCon
 
-type instance XHsIB             DocNameI _ = NoExtField
-type instance XHsWC             DocNameI _ = NoExtField
-type instance XXHsImplicitBndrs DocNameI _ = NoExtCon
+type instance XHsWC DocNameI _ = NoExtField
+
+type instance XHsOuterExplicit    DocNameI _ = NoExtField
+type instance XHsOuterImplicit    DocNameI   = NoExtField
+type instance XXHsOuterTyVarBndrs DocNameI   = NoExtCon
+
+type instance XHsSig      DocNameI = NoExtField
+type instance XXHsSigType DocNameI = NoExtCon
 
 type instance XHsQTvs        DocNameI = NoExtField
 type instance XConDeclField  DocNameI = NoExtField

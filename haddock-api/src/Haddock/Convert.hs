@@ -58,7 +58,7 @@ import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 import Haddock.Types
 import Haddock.Interface.Specialize
 import Haddock.GhcUtils                      ( orderedFVs, defaultRuntimeRepVars )
-
+import Haddock.Utils                         ( mkEmptySigType )
 
 import Data.Maybe                            ( catMaybes, mapMaybe, maybeToList )
 
@@ -104,15 +104,14 @@ tyThingToLHsDecl prr t = case t of
 
            extractFamDefDecl :: FamilyDecl GhcRn -> Type -> TyFamDefltDecl GhcRn
            extractFamDefDecl fd rhs =
-             TyFamInstDecl $ HsIB { hsib_ext = hsq_ext (fdTyVars fd)
-                                  , hsib_body = FamEqn
+             TyFamInstDecl $ FamEqn
              { feqn_ext = noExtField
              , feqn_tycon = fdLName fd
-             , feqn_bndrs = Nothing
+             , feqn_bndrs = HsOuterImplicit{hso_ximplicit = hsq_ext (fdTyVars fd)}
              , feqn_pats = map (HsValArg . hsLTyVarBndrToType) $
                            hsq_explicit $ fdTyVars fd
              , feqn_fixity = fdFixity fd
-             , feqn_rhs = synifyType WithinType [] rhs }}
+             , feqn_rhs = synifyType WithinType [] rhs }
 
            extractAtItem
              :: ClassATItem
@@ -170,14 +169,14 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
         annot_typats    = zipWith3 annotHsType (mkIsPolyTvs fam_tvs)
                                    args_types_only typats
         hs_rhs          = synifyType WithinType [] rhs
-    in HsIB { hsib_ext = map tyVarName tkvs
-            , hsib_body   = FamEqn { feqn_ext    = noExtField
-                                   , feqn_tycon  = name
-                                   , feqn_bndrs  = Nothing
+        outer_bndrs     = HsOuterImplicit{hso_ximplicit = map tyVarName tkvs}
                                        -- TODO: this must change eventually
-                                   , feqn_pats   = map HsValArg annot_typats
-                                   , feqn_fixity = synifyFixity name
-                                   , feqn_rhs    = hs_rhs } }
+    in FamEqn { feqn_ext    = noExtField
+              , feqn_tycon  = name
+              , feqn_bndrs  = outer_bndrs
+              , feqn_pats   = map HsValArg annot_typats
+              , feqn_fixity = synifyFixity name
+              , feqn_rhs    = hs_rhs }
   where
     fam_tvs = tyConVisibleTyVars tc
 
@@ -371,6 +370,12 @@ synifyDataCon use_gadt_syntax dc =
   (_univ_tvs, ex_tvs, _eq_spec, theta, arg_tys, res_ty) = dataConFullSig dc
   user_tvbndrs = dataConUserTyVarBinders dc -- Used for GADT data constructors
 
+  outer_bndrs | null user_tvbndrs
+              = HsOuterImplicit { hso_ximplicit = [] }
+              | otherwise
+              = HsOuterExplicit { hso_xexplicit = noExtField
+                                , hso_bndrs = map synifyTyVarBndr user_tvbndrs }
+
   -- skip any EqTheta, use 'orig'inal syntax
   ctx | null theta = Nothing
       | otherwise = Just $ synifyCtx theta
@@ -407,10 +412,9 @@ synifyDataCon use_gadt_syntax dc =
        then do
          let hat = mk_gadt_arg_tys
          return $ noLoc $ ConDeclGADT
-           { con_g_ext  = []
+           { con_g_ext  = noExtField
            , con_names  = [name]
-           , con_forall = noLoc $ not $ null user_tvbndrs
-           , con_qvars  = map synifyTyVarBndr user_tvbndrs
+           , con_bndrs  = noLoc outer_bndrs
            , con_mb_cxt = ctx
            , con_g_args = hat
            , con_res_ty = synifyType WithinType [] res_ty
@@ -531,17 +535,17 @@ data SynifyTypeState
 
 
 synifySigType :: SynifyTypeState -> [TyVar] -> Type -> LHsSigType GhcRn
--- The empty binders is a bit suspicious;
--- what if the type has free variables?
-synifySigType s vs ty = mkEmptyImplicitBndrs (synifyType s vs ty)
+-- The use of mkEmptySigType (which uses empty binders in OuterImplicit)
+-- is a bit suspicious; what if the type has free variables?
+synifySigType s vs ty = mkEmptySigType (synifyType s vs ty)
 
 synifySigWcType :: SynifyTypeState -> [TyVar] -> Type -> LHsSigWcType GhcRn
 -- Ditto (see synifySigType)
-synifySigWcType s vs ty = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs (synifyType s vs ty))
+synifySigWcType s vs ty = mkEmptyWildCardBndrs (mkEmptySigType (synifyType s vs ty))
 
 synifyPatSynSigType :: PatSyn -> LHsSigType GhcRn
 -- Ditto (see synifySigType)
-synifyPatSynSigType ps = mkEmptyImplicitBndrs (synifyPatSynType ps)
+synifyPatSynSigType ps = mkEmptySigType (synifyPatSynType ps)
 
 -- | Depending on the first argument, try to default all type variables of kind
 -- 'RuntimeRep' to 'LiftedType'.

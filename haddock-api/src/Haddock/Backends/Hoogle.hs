@@ -71,27 +71,31 @@ ppModule dflags iface =
 ---------------------------------------------------------------------
 -- Utility functions
 
-dropHsDocTy :: HsType (GhcPass p) -> HsType (GhcPass p)
-dropHsDocTy = f
+dropHsDocTy :: HsSigType (GhcPass p) -> HsSigType (GhcPass p)
+dropHsDocTy = drop_sig_ty
     where
-        g (L src x) = L src (f x)
-        f (HsForAllTy x a e) = HsForAllTy x a (g e)
-        f (HsQualTy x a e) = HsQualTy x a (g e)
-        f (HsBangTy x a b) = HsBangTy x a (g b)
-        f (HsAppTy x a b) = HsAppTy x (g a) (g b)
-        f (HsAppKindTy x a b) = HsAppKindTy x (g a) (g b)
-        f (HsFunTy x w a b) = HsFunTy x w (g a) (g b)
-        f (HsListTy x a) = HsListTy x (g a)
-        f (HsTupleTy x a b) = HsTupleTy x a (map g b)
-        f (HsOpTy x a b c) = HsOpTy x (g a) b (g c)
-        f (HsParTy x a) = HsParTy x (g a)
-        f (HsKindSig x a b) = HsKindSig x (g a) b
-        f (HsDocTy _ a _) = f $ unL a
-        f x = x
+        drop_sig_ty (HsSig x a b)  = HsSig x a (drop_lty b)
+        drop_sig_ty x@XHsSigType{} = x
 
-outHsType :: (OutputableBndrId p)
-          => DynFlags -> HsType (GhcPass p) -> String
-outHsType dflags = out dflags . reparenType . dropHsDocTy
+        drop_lty (L src x) = L src (drop_ty x)
+
+        drop_ty (HsForAllTy x a e) = HsForAllTy x a (drop_lty e)
+        drop_ty (HsQualTy x a e) = HsQualTy x a (drop_lty e)
+        drop_ty (HsBangTy x a b) = HsBangTy x a (drop_lty b)
+        drop_ty (HsAppTy x a b) = HsAppTy x (drop_lty a) (drop_lty b)
+        drop_ty (HsAppKindTy x a b) = HsAppKindTy x (drop_lty a) (drop_lty b)
+        drop_ty (HsFunTy x w a b) = HsFunTy x w (drop_lty a) (drop_lty b)
+        drop_ty (HsListTy x a) = HsListTy x (drop_lty a)
+        drop_ty (HsTupleTy x a b) = HsTupleTy x a (map drop_lty b)
+        drop_ty (HsOpTy x a b c) = HsOpTy x (drop_lty a) b (drop_lty c)
+        drop_ty (HsParTy x a) = HsParTy x (drop_lty a)
+        drop_ty (HsKindSig x a b) = HsKindSig x (drop_lty a) b
+        drop_ty (HsDocTy _ a _) = drop_ty $ unL a
+        drop_ty x = x
+
+outHsSigType :: (OutputableBndrId p, NoGhcTcPass p ~ p)
+             => DynFlags -> HsSigType (GhcPass p) -> String
+outHsSigType dflags = out dflags . reparenSigType . dropHsDocTy
 
 
 dropComment :: String -> String
@@ -135,8 +139,8 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
         f (TyClD _ d@SynDecl{})   = ppSynonym dflags d
         f (TyClD _ d@ClassDecl{}) = ppClass dflags d subdocs
         f (TyClD _ (FamDecl _ d)) = ppFam dflags d
-        f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags [name] (hsSigType typ)]
-        f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags [name] (hsSigType typ)]
+        f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags [name] typ]
+        f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags [name] typ]
         f (SigD _ sig) = ppSig dflags sig
         f _ = []
 
@@ -145,8 +149,8 @@ ppExport _ _ = []
 
 ppSigWithDoc :: DynFlags -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppSigWithDoc dflags sig subdocs = case sig of
-    TypeSig _ names t -> concatMap (mkDocSig "" (hsSigWcType t)) names
-    PatSynSig _ names t -> concatMap (mkDocSig "pattern " (hsSigType t)) names
+    TypeSig _ names t -> concatMap (mkDocSig "" (dropWildCards t)) names
+    PatSynSig _ names t -> concatMap (mkDocSig "pattern " t) names
     _ -> []
   where
     mkDocSig leader typ n = mkSubdoc dflags n subdocs
@@ -155,9 +159,9 @@ ppSigWithDoc dflags sig subdocs = case sig of
 ppSig :: DynFlags -> Sig GhcRn -> [String]
 ppSig dflags x  = ppSigWithDoc dflags x []
 
-pp_sig :: DynFlags -> [Located Name] -> LHsType GhcRn -> String
+pp_sig :: DynFlags -> [Located Name] -> LHsSigType GhcRn -> String
 pp_sig dflags names (L _ typ)  =
-    operator prettyNames ++ " :: " ++ outHsType dflags typ
+    operator prettyNames ++ " :: " ++ outHsSigType dflags typ
     where
       prettyNames = intercalate ", " $ map (out dflags) names
 
@@ -250,7 +254,8 @@ ppCtor dflags dat subdocs con@ConDeclH98 { con_args = con_args' }
         funs = foldr1 (\x y -> reL $ HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) x y)
         apps = foldl1 (\x y -> reL $ HsAppTy noExtField x y)
 
-        typeSig nm flds = operator nm ++ " :: " ++ outHsType dflags (unL $ funs flds)
+        typeSig nm flds = operator nm ++ " :: " ++
+                          outHsSigType dflags (unL $ mkEmptySigType $ funs flds)
 
         -- We print the constructors as comma-separated list. See GHC
         -- docs for con_names on why it is a list to begin with.
@@ -269,7 +274,7 @@ ppCtor dflags _dat subdocs con@(ConDeclGADT { })
     where
         f = [typeSig name (getGADTConTypeG con)]
 
-        typeSig nm ty = operator nm ++ " :: " ++ outHsType dflags (unL ty)
+        typeSig nm ty = operator nm ++ " :: " ++ outHsSigType dflags (unL ty)
         name = out dflags $ map unL $ getConNames con
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]

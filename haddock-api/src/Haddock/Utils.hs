@@ -17,7 +17,8 @@ module Haddock.Utils (
   -- * Misc utilities
   restrictTo, emptyHsQTvs,
   toDescription, toInstalledDescription,
-  mkEmptySigWcType, addClassContext, lHsQTyVarsToTypes,
+  mkEmptySigWcType, mkEmptySigType,
+  addClassContext, lHsQTyVarsToTypes,
 
   -- * Filename utilities
   moduleHtmlFile, moduleHtmlFile',
@@ -131,21 +132,38 @@ mkMeta x = emptyMetaDoc { _doc = x }
 mkEmptySigWcType :: LHsType GhcRn -> LHsSigWcType GhcRn
 -- Dubious, because the implicit binders are empty even
 -- though the type might have free varaiables
-mkEmptySigWcType ty = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs ty)
+mkEmptySigWcType ty = mkEmptyWildCardBndrs (mkEmptySigType ty)
+
+mkEmptySigType :: LHsType GhcRn -> LHsSigType GhcRn
+-- Dubious, because the implicit binders are empty even
+-- though the type might have free varaiables
+mkEmptySigType lty@(L loc ty) = L loc $ case ty of
+  HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndrs }
+             , hst_body = body }
+    -> HsSig { sig_ext = noExtField
+             , sig_bndrs = HsOuterExplicit { hso_xexplicit = noExtField
+                                           , hso_bndrs     = bndrs }
+             , sig_body = body }
+  _ -> HsSig { sig_ext   = noExtField
+             , sig_bndrs = HsOuterImplicit{hso_ximplicit = []}
+             , sig_body = lty }
 
 addClassContext :: Name -> LHsQTyVars GhcRn -> LSig GhcRn -> LSig GhcRn
 -- Add the class context to a class-op signature
 addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype))
-  = L pos (TypeSig noExtField lname (mkEmptySigWcType (go (hsSigType ltype))))
-          -- The mkEmptySigWcType is suspicious
+  = L pos (TypeSig noExtField lname (mkEmptyWildCardBndrs (go_sig_ty ltype)))
   where
-    go (L loc (HsForAllTy { hst_tele = tele, hst_body = ty }))
+    go_sig_ty (L loc (HsSig { sig_bndrs = bndrs, sig_body = ty }))
+       = L loc (HsSig { sig_ext = noExtField
+                      , sig_bndrs = bndrs, sig_body = go_ty ty })
+
+    go_ty (L loc (HsForAllTy { hst_tele = tele, hst_body = ty }))
        = L loc (HsForAllTy { hst_xforall = noExtField
-                           , hst_tele = tele, hst_body = go ty })
-    go (L loc (HsQualTy { hst_ctxt = ctxt, hst_body = ty }))
+                           , hst_tele = tele, hst_body = go_ty ty })
+    go_ty (L loc (HsQualTy { hst_ctxt = ctxt, hst_body = ty }))
        = L loc (HsQualTy { hst_xqual = noExtField
                          , hst_ctxt = add_ctxt ctxt, hst_body = ty })
-    go (L loc ty)
+    go_ty (L loc ty)
        = L loc (HsQualTy { hst_xqual = noExtField
                          , hst_ctxt = add_ctxt (L loc []), hst_body = L loc ty })
 

@@ -422,7 +422,7 @@ mkMaps dflags pkgName gre instances decls = do
               -- The CoAx's loc is the whole line, but only for TFs. The
               -- workaround is to dig into the family instance declaration and
               -- get the identifier with the right location.
-              TyFamInstD _ (TyFamInstDecl d') -> getLoc (feqn_tycon (hsib_body d'))
+              TyFamInstD _ (TyFamInstDecl d') -> getLoc (feqn_tycon d')
               _ -> getInstLoc d
     names l (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See note [2].
     names _ decl = getMainDeclBinder decl
@@ -904,26 +904,23 @@ extractDecl declMap name decl
         | isValName name
         , Just (famInst:_) <- M.lookup name declMap
         -> extractDecl declMap name famInst
-      InstD _ (DataFamInstD _ (DataFamInstDecl (HsIB { hsib_body =
-                             FamEqn { feqn_tycon = L _ n
+      InstD _ (DataFamInstD _ (DataFamInstDecl
+                            (FamEqn { feqn_tycon = L _ n
                                     , feqn_pats  = tys
-                                    , feqn_rhs   = defn }}))) ->
+                                    , feqn_rhs   = defn }))) ->
         if isDataConName name
         then SigD noExtField <$> extractPatternSyn name n tys (dd_cons defn)
         else SigD noExtField <$> extractRecSel name n tys (dd_cons defn)
       InstD _ (ClsInstD _ ClsInstDecl { cid_datafam_insts = insts })
         | isDataConName name ->
-            let matches = [ d' | L _ d'@(DataFamInstDecl (HsIB { hsib_body =
-                                          FamEqn { feqn_rhs   = dd
-                                                 }
-                                         })) <- insts
+            let matches = [ d' | L _ d'@(DataFamInstDecl (FamEqn { feqn_rhs = dd })) <- insts
                                , name `elem` map unLoc (concatMap (getConNames . unLoc) (dd_cons dd))
                                ]
             in case matches of
                 [d0] -> extractDecl declMap name (noLoc (InstD noExtField (DataFamInstD noExtField d0)))
                 _    -> error "internal: extractDecl (ClsInstD)"
         | otherwise ->
-            let matches = [ d' | L _ d'@(DataFamInstDecl (HsIB { hsib_body = d }))
+            let matches = [ d' | L _ d'@(DataFamInstDecl d)
                                    <- insts
                                  -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (feqn_rhs d)
                                , Just rec <- map (getRecConArgs_maybe . unLoc) (dd_cons (feqn_rhs d))
@@ -963,7 +960,7 @@ extractPatternSyn nm t tvs cons =
             ConDeclH98 { con_mb_cxt = Just cxt } -> noLoc (HsQualTy noExtField cxt typ)
             _ -> typ
         typ'' = noLoc (HsQualTy noExtField (noLoc []) typ')
-    in PatSynSig noExtField [noLoc nm] (mkEmptyImplicitBndrs typ'')
+    in PatSynSig noExtField [noLoc nm] (mkEmptySigType typ'')
 
   longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn
   longArrow inputs output = foldr (\x y -> noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) x y)) output inputs

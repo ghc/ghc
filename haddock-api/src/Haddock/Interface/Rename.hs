@@ -191,10 +191,10 @@ renameLTypeArg (HsTypeArg l ki) = do { ki' <- renameLKind ki
 renameLTypeArg (HsArgPar sp) = return $ HsArgPar sp
 
 renameLSigType :: LHsSigType GhcRn -> RnM (LHsSigType DocNameI)
-renameLSigType = renameImplicit renameLType
+renameLSigType = mapM renameSigType
 
 renameLSigWcType :: LHsSigWcType GhcRn -> RnM (LHsSigWcType DocNameI)
-renameLSigWcType = renameWc (renameImplicit renameLType)
+renameLSigWcType = renameWc renameLSigType
 
 renameLKind :: LHsKind GhcRn -> RnM (LHsKind DocNameI)
 renameLKind = renameLType
@@ -293,6 +293,12 @@ renameType t = case t of
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
   HsSpliceTy _ s          -> renameHsSpliceTy s
   HsWildCardTy a          -> pure (HsWildCardTy a)
+
+renameSigType :: HsSigType GhcRn -> RnM (HsSigType DocNameI)
+renameSigType (HsSig { sig_bndrs = bndrs, sig_body = body }) = do
+  bndrs' <- renameOuterTyVarBndrs bndrs
+  body'  <- renameLType body
+  pure $ HsSig { sig_ext = noExtField, sig_bndrs = bndrs', sig_body = body' }
 
 -- | Rename splices, but _only_ those that turn out to be for types.
 -- I think this is actually safe for our possible inputs:
@@ -486,21 +492,20 @@ renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
                    , con_forall = forall -- Remove when #18311 is fixed
                    , con_args = details', con_doc = mbldoc' })
 
-renameCon ConDeclGADT { con_names = lnames, con_qvars = ltyvars
+renameCon ConDeclGADT { con_names = lnames, con_bndrs = bndrs
                             , con_mb_cxt = lcontext, con_g_args = details
-                            , con_res_ty = res_ty, con_forall = forall
+                            , con_res_ty = res_ty
                             , con_doc = mbldoc } = do
       lnames'   <- mapM renameL lnames
-      ltyvars'  <- mapM renameLTyVarBndr ltyvars
+      bndrs'    <- mapM renameOuterTyVarBndrs bndrs
       lcontext' <- traverse renameLContext lcontext
       details'  <- renameGADTDetails details
       res_ty'   <- renameLType res_ty
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
       return (ConDeclGADT
-                   { con_g_ext = noExtField, con_names = lnames', con_qvars = ltyvars'
+                   { con_g_ext = noExtField, con_names = lnames', con_bndrs = bndrs'
                    , con_mb_cxt = lcontext', con_g_args = details'
-                   , con_res_ty = res_ty', con_doc = mbldoc'
-                   , con_forall = forall}) -- Remove when #18311 is fixed
+                   , con_res_ty = res_ty', con_doc = mbldoc' })
 
 renameHsScaled :: HsScaled GhcRn (LHsType GhcRn)
                -> RnM (HsScaled DocNameI (LHsType DocNameI))
@@ -618,32 +623,26 @@ renameTyFamInstD (TyFamInstDecl { tfid_eqn = eqn })
        ; return (TyFamInstDecl { tfid_eqn = eqn' }) }
 
 renameTyFamInstEqn :: TyFamInstEqn GhcRn -> RnM (TyFamInstEqn DocNameI)
-renameTyFamInstEqn eqn
-  = renameImplicit rename_ty_fam_eqn eqn
-  where
-    rename_ty_fam_eqn
-      :: FamEqn GhcRn (LHsType GhcRn)
-      -> RnM (FamEqn DocNameI (LHsType DocNameI))
-    rename_ty_fam_eqn (FamEqn { feqn_tycon = tc, feqn_bndrs = bndrs
-                              , feqn_pats = pats, feqn_fixity = fixity
-                              , feqn_rhs = rhs })
-      = do { tc' <- renameL tc
-           ; bndrs' <- traverse (mapM renameLTyVarBndr) bndrs
-           ; pats' <- mapM renameLTypeArg pats
-           ; rhs' <- renameLType rhs
-           ; return (FamEqn { feqn_ext    = noExtField
-                            , feqn_tycon  = tc'
-                            , feqn_bndrs  = bndrs'
-                            , feqn_pats   = pats'
-                            , feqn_fixity = fixity
-                            , feqn_rhs    = rhs' }) }
+renameTyFamInstEqn (FamEqn { feqn_tycon = tc, feqn_bndrs = bndrs
+                           , feqn_pats = pats, feqn_fixity = fixity
+                           , feqn_rhs = rhs })
+  = do { tc' <- renameL tc
+       ; bndrs' <- renameOuterTyVarBndrs bndrs
+       ; pats' <- mapM renameLTypeArg pats
+       ; rhs' <- renameLType rhs
+       ; return (FamEqn { feqn_ext    = noExtField
+                        , feqn_tycon  = tc'
+                        , feqn_bndrs  = bndrs'
+                        , feqn_pats   = pats'
+                        , feqn_fixity = fixity
+                        , feqn_rhs    = rhs' }) }
 
 renameTyFamDefltD :: TyFamDefltDecl GhcRn -> RnM (TyFamDefltDecl DocNameI)
 renameTyFamDefltD = renameTyFamInstD
 
 renameDataFamInstD :: DataFamInstDecl GhcRn -> RnM (DataFamInstDecl DocNameI)
 renameDataFamInstD (DataFamInstDecl { dfid_eqn = eqn })
-  = do { eqn' <- renameImplicit rename_data_fam_eqn eqn
+  = do { eqn' <- rename_data_fam_eqn eqn
        ; return (DataFamInstDecl { dfid_eqn = eqn' }) }
   where
     rename_data_fam_eqn
@@ -653,7 +652,7 @@ renameDataFamInstD (DataFamInstDecl { dfid_eqn = eqn })
                                 , feqn_pats = pats, feqn_fixity = fixity
                                 , feqn_rhs = defn })
       = do { tc' <- renameL tc
-           ; bndrs' <- traverse (mapM renameLTyVarBndr) bndrs
+           ; bndrs' <- renameOuterTyVarBndrs bndrs
            ; pats' <- mapM renameLTypeArg pats
            ; defn' <- renameDataDefn defn
            ; return (FamEqn { feqn_ext    = noExtField
@@ -663,13 +662,12 @@ renameDataFamInstD (DataFamInstDecl { dfid_eqn = eqn })
                             , feqn_fixity = fixity
                             , feqn_rhs    = defn' }) }
 
-renameImplicit :: (in_thing -> RnM out_thing)
-               -> HsImplicitBndrs GhcRn in_thing
-               -> RnM (HsImplicitBndrs DocNameI out_thing)
-renameImplicit rn_thing (HsIB { hsib_body = thing })
-  = do { thing' <- rn_thing thing
-       ; return (HsIB { hsib_body = thing'
-                      , hsib_ext = noExtField }) }
+renameOuterTyVarBndrs :: HsOuterTyVarBndrs flag GhcRn
+                      -> RnM (HsOuterTyVarBndrs flag DocNameI)
+renameOuterTyVarBndrs (HsOuterImplicit{}) =
+  pure $ HsOuterImplicit{hso_ximplicit = noExtField}
+renameOuterTyVarBndrs (HsOuterExplicit{hso_bndrs = exp_bndrs}) =
+  HsOuterExplicit noExtField <$> mapM renameLTyVarBndr exp_bndrs
 
 renameWc :: (in_thing -> RnM out_thing)
          -> HsWildCardBndrs GhcRn in_thing

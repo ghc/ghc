@@ -56,7 +56,7 @@ specialize specs = go spec_map0
 --
 -- Again, it is just a convenience function around 'specialize'. Note that
 -- length of type list should be the same as the number of binders.
-specializeTyVarBndrs :: LHsQTyVars GhcRn -> [HsType GhcRn] -> HsType GhcRn -> HsType GhcRn
+specializeTyVarBndrs :: Data a => LHsQTyVars GhcRn -> [HsType GhcRn] -> a -> a
 specializeTyVarBndrs bndrs typs =
     specialize $ zip bndrs' typs
   where
@@ -77,13 +77,13 @@ specializeSig :: LHsQTyVars GhcRn -> [HsType GhcRn]
               -> Sig GhcRn
               -> Sig GhcRn
 specializeSig bndrs typs (TypeSig _ lnames typ) =
-  TypeSig noExtField lnames (typ {hswc_body = (hswc_body typ) {hsib_body = noLoc typ'}})
+  TypeSig noExtField lnames (typ {hswc_body = noLoc typ'})
   where
-    true_type :: HsType GhcRn
-    true_type = unLoc (hsSigWcType typ)
-    typ' :: HsType GhcRn
+    true_type :: HsSigType GhcRn
+    true_type = unLoc (dropWildCards typ)
+    typ' :: HsSigType GhcRn
     typ' = rename fv $ specializeTyVarBndrs bndrs typs true_type
-    fv = foldr Set.union Set.empty . map freeVariables $ typs
+    fv = foldr Set.union Set.empty . map freeVariablesType $ typs
 specializeSig _ _ sig = sig
 
 
@@ -207,25 +207,37 @@ setInternalOccName occ name =
     nname' = mkInternalName (nameUnique nname) occ (nameSrcSpan nname)
 
 
--- | Compute set of free variables of given type.
-freeVariables :: HsType GhcRn -> Set Name
-freeVariables =
-    everythingWithState Set.empty Set.union query
-  where
-    query :: forall a . Data a => a -> Set Name -> (Set Name, Set Name)
-    query term ctx = case cast term :: Maybe (HsType GhcRn) of
-        Just (HsForAllTy _ tele _) ->
-            (Set.empty, Set.union ctx (teleNames tele))
-        Just (HsTyVar _ _ (L _ name))
-            | getName name `Set.member` ctx -> (Set.empty, ctx)
-            | otherwise -> (Set.singleton $ getName name, ctx)
-        _ -> (Set.empty, ctx)
+-- | Compute set of free variables of a given 'HsType'.
+freeVariablesType :: HsType GhcRn -> Set Name
+freeVariablesType =
+    everythingWithState Set.empty Set.union
+      (mkQ (\ctx -> (Set.empty, ctx)) queryType)
 
+-- | Compute set of free variables of a given 'HsType'.
+freeVariablesSigType :: HsSigType GhcRn -> Set Name
+freeVariablesSigType =
+    everythingWithState Set.empty Set.union
+      (mkQ (\ctx -> (Set.empty, ctx)) queryType `extQ` querySigType)
+
+queryType :: HsType GhcRn -> Set Name -> (Set Name, Set Name)
+queryType term ctx = case term of
+    HsForAllTy _ tele _ ->
+        (Set.empty, Set.union ctx (teleNames tele))
+    HsTyVar _ _ (L _ name)
+        | getName name `Set.member` ctx -> (Set.empty, ctx)
+        | otherwise -> (Set.singleton $ getName name, ctx)
+    _ -> (Set.empty, ctx)
+  where
     teleNames :: HsForAllTelescope GhcRn -> Set Name
     teleNames (HsForAllVis   _ bndrs) = bndrsNames bndrs
     teleNames (HsForAllInvis _ bndrs) = bndrsNames bndrs
 
-    bndrsNames = Set.fromList . map (getName . tyVarName . unLoc)
+querySigType :: HsSigType GhcRn -> Set Name -> (Set Name, Set Name)
+querySigType (HsSig { sig_bndrs = outer_bndrs }) ctx =
+  (Set.empty, Set.union ctx (bndrsNames (hsOuterExplicitBndrs outer_bndrs)))
+
+bndrsNames :: [LHsTyVarBndr flag GhcRn] -> Set Name
+bndrsNames = Set.fromList . map (getName . tyVarName . unLoc)
 
 
 -- | Make given type visually unambiguous.
@@ -236,12 +248,12 @@ freeVariables =
 -- different type variable than latter one. Applying 'rename' function
 -- will fix that type to be visually unambiguous again (making it something
 -- like @(a -> b0) -> b@).
-rename :: Set Name -> HsType GhcRn -> HsType GhcRn
-rename fv typ = evalState (renameType typ) env
+rename :: Set Name -> HsSigType GhcRn -> HsSigType GhcRn
+rename fv typ = evalState (renameSigType typ) env
   where
     env = RenameEnv
       { rneHeadFVs = Map.fromList . map mkPair . Set.toList $ fv
-      , rneSigFVs = Set.map getNameRep $ freeVariables typ
+      , rneSigFVs = Set.map getNameRep $ freeVariablesSigType typ
       , rneCtx = Map.empty
       }
     mkPair name = (getNameRep name, name)
@@ -255,6 +267,17 @@ data RenameEnv name = RenameEnv
   , rneCtx :: Map Name name
   }
 
+
+renameSigType :: HsSigType GhcRn -> Rename (IdP GhcRn) (HsSigType GhcRn)
+renameSigType (HsSig x bndrs body) =
+  HsSig x <$> renameOuterTyVarBndrs bndrs <*> renameLType body
+
+renameOuterTyVarBndrs :: HsOuterTyVarBndrs flag GhcRn
+                      -> Rename (IdP GhcRn) (HsOuterTyVarBndrs flag GhcRn)
+renameOuterTyVarBndrs (HsOuterImplicit imp_tvs) =
+  HsOuterImplicit <$> mapM renameName imp_tvs
+renameOuterTyVarBndrs (HsOuterExplicit x exp_bndrs) =
+  HsOuterExplicit x <$> mapM renameLBinder exp_bndrs
 
 renameType :: HsType GhcRn -> Rename (IdP GhcRn) (HsType GhcRn)
 renameType (HsForAllTy x tele lt) =

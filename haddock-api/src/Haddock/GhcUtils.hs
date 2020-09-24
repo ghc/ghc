@@ -123,30 +123,28 @@ getConNamesI :: ConDecl DocNameI -> [Located DocName]
 getConNamesI ConDeclH98  {con_name  = name}  = [name]
 getConNamesI ConDeclGADT {con_names = names} = names
 
-hsImplicitBodyI :: HsImplicitBndrs DocNameI thing -> thing
-hsImplicitBodyI (HsIB { hsib_body = body }) = body
-
-hsSigTypeI :: LHsSigType DocNameI -> LHsType DocNameI
-hsSigTypeI = hsImplicitBodyI
-
 mkHsForAllInvisTeleI ::
   [LHsTyVarBndr Specificity DocNameI] -> HsForAllTelescope DocNameI
 mkHsForAllInvisTeleI invis_bndrs =
   HsForAllInvis { hsf_xinvis = noExtField, hsf_invis_bndrs = invis_bndrs }
 
-getGADTConType :: ConDecl DocNameI -> LHsType DocNameI
+mkHsImplicitSigTypeI :: LHsType DocNameI -> HsSigType DocNameI
+mkHsImplicitSigTypeI body =
+  HsSig { sig_ext   = noExtField
+        , sig_bndrs = HsOuterImplicit{hso_ximplicit = noExtField}
+        , sig_body  = body }
+
+getGADTConType :: ConDecl DocNameI -> LHsSigType DocNameI
 -- The full type of a GADT data constructor We really only get this in
 -- order to pretty-print it, and currently only in Haddock's code.  So
 -- we are cavalier about locations and extensions, hence the
 -- 'undefined's
-getGADTConType (ConDeclGADT { con_forall = L _ has_forall
-                            , con_qvars = qtvs
+getGADTConType (ConDeclGADT { con_bndrs = L _ outer_bndrs
                             , con_mb_cxt = mcxt, con_g_args = args
                             , con_res_ty = res_ty })
- | has_forall = noLoc (HsForAllTy { hst_xforall = noExtField
-                                  , hst_tele = mkHsForAllInvisTeleI qtvs
-                                  , hst_body  = theta_ty })
- | otherwise  = theta_ty
+ = noLoc (HsSig { sig_ext   = noExtField
+                , sig_bndrs = outer_bndrs
+                , sig_body  = theta_ty })
  where
    theta_ty | Just theta <- mcxt
             = noLoc (HsQualTy { hst_xqual = noExtField, hst_ctxt = theta, hst_body = tau_ty })
@@ -188,19 +186,17 @@ tcdNameI = unLoc . tyClDeclLNameI
 
 -- -------------------------------------
 
-getGADTConTypeG :: ConDecl GhcRn -> LHsType GhcRn
+getGADTConTypeG :: ConDecl GhcRn -> LHsSigType GhcRn
 -- The full type of a GADT data constructor We really only get this in
 -- order to pretty-print it, and currently only in Haddock's code.  So
 -- we are cavalier about locations and extensions, hence the
 -- 'undefined's
-getGADTConTypeG (ConDeclGADT { con_forall = L _ has_forall
-                            , con_qvars = qtvs
+getGADTConTypeG (ConDeclGADT { con_bndrs = L _ outer_bndrs
                             , con_mb_cxt = mcxt, con_g_args = args
                             , con_res_ty = res_ty })
- | has_forall = noLoc (HsForAllTy { hst_xforall = noExtField
-                                  , hst_tele = mkHsForAllInvisTele qtvs
-                                  , hst_body  = theta_ty })
- | otherwise  = theta_ty
+ = noLoc (HsSig { sig_ext   = noExtField
+                , sig_bndrs = outer_bndrs
+                , sig_body  = theta_ty })
  where
    theta_ty | Just theta <- mcxt
             = noLoc (HsQualTy { hst_xqual = noExtField, hst_ctxt = theta, hst_body = tau_ty })
@@ -244,7 +240,9 @@ data Precedence
 --
 -- We cannot add parens that may be required by fixities because we do not have
 -- any fixity information to work with in the first place :(.
-reparenTypePrec :: forall a. (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a) => Precedence -> HsType a -> HsType a
+reparenTypePrec :: forall a. ( XParTy a ~ NoExtField, NoGhcTc a ~ a
+                             , MapXRec a, UnXRec a, WrapXRec a )
+                => Precedence -> HsType a -> HsType a
 reparenTypePrec = go
   where
 
@@ -294,15 +292,37 @@ reparenTypePrec = go
 
 
 -- | Add parenthesis around the types in a 'HsType' (see 'reparenTypePrec')
-reparenType :: (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a) => HsType a -> HsType a
+reparenType :: ( XParTy a ~ NoExtField, NoGhcTc a ~ a
+               , MapXRec a, UnXRec a, WrapXRec a )
+            => HsType a -> HsType a
 reparenType = reparenTypePrec PREC_TOP
 
 -- | Add parenthesis around the types in a 'LHsType' (see 'reparenTypePrec')
-reparenLType :: forall a. (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a) => LHsType a -> LHsType a
+reparenLType :: forall a. ( XParTy a ~ NoExtField, NoGhcTc a ~ a
+                          , MapXRec a, UnXRec a, WrapXRec a )
+             => LHsType a -> LHsType a
 reparenLType = mapXRec @a reparenType
 
+-- | Add parentheses around the types in an 'HsSigType' (see 'reparenTypePrec')
+reparenSigType :: forall a. ( XParTy a ~ NoExtField, NoGhcTc a ~ a
+                            , MapXRec a, UnXRec a, WrapXRec a )
+               => HsSigType a -> HsSigType a
+reparenSigType (HsSig x bndrs body) =
+  HsSig x (reparenOuterTyVarBndrs bndrs) (reparenLType body)
+reparenSigType v@XHsSigType{} = v
+
+-- | Add parentheses around the types in an 'HsOuterTyVarBndrs' (see 'reparenTypePrec')
+reparenOuterTyVarBndrs :: forall flag a. ( XParTy a ~ NoExtField, NoGhcTc a ~ a
+                                         , MapXRec a, UnXRec a, WrapXRec a )
+                       => HsOuterTyVarBndrs flag a -> HsOuterTyVarBndrs flag a
+reparenOuterTyVarBndrs imp@HsOuterImplicit{} = imp
+reparenOuterTyVarBndrs (HsOuterExplicit x exp_bndrs) =
+  HsOuterExplicit x (map (mapXRec @(NoGhcTc a) reparenTyVar) exp_bndrs)
+reparenOuterTyVarBndrs v@XHsOuterTyVarBndrs{} = v
+
 -- | Add parentheses around the types in an 'HsForAllTelescope' (see 'reparenTypePrec')
-reparenHsForAllTelescope :: forall a. (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a)
+reparenHsForAllTelescope :: forall a. ( XParTy a ~ NoExtField, NoGhcTc a ~ a
+                                      , MapXRec a, UnXRec a, WrapXRec a )
                          => HsForAllTelescope a -> HsForAllTelescope a
 reparenHsForAllTelescope (HsForAllVis x bndrs) =
   HsForAllVis x (map (mapXRec @a reparenTyVar) bndrs)
@@ -311,13 +331,17 @@ reparenHsForAllTelescope (HsForAllInvis x bndrs) =
 reparenHsForAllTelescope v@XHsForAllTelescope{} = v
 
 -- | Add parenthesis around the types in a 'HsTyVarBndr' (see 'reparenTypePrec')
-reparenTyVar :: (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a) => HsTyVarBndr flag a -> HsTyVarBndr flag a
+reparenTyVar :: ( XParTy a ~ NoExtField, NoGhcTc a ~ a
+                , MapXRec a, UnXRec a, WrapXRec a )
+             => HsTyVarBndr flag a -> HsTyVarBndr flag a
 reparenTyVar (UserTyVar x flag n) = UserTyVar x flag n
 reparenTyVar (KindedTyVar x flag n kind) = KindedTyVar x flag n (reparenLType kind)
 reparenTyVar v@XTyVarBndr{} = v
 
 -- | Add parenthesis around the types in a 'ConDeclField' (see 'reparenTypePrec')
-reparenConDeclField :: (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a) => ConDeclField a -> ConDeclField a
+reparenConDeclField :: ( XParTy a ~ NoExtField, NoGhcTc a ~ a
+                       , MapXRec a, UnXRec a, WrapXRec a )
+                    => ConDeclField a -> ConDeclField a
 reparenConDeclField (ConDeclField x n t d) = ConDeclField x n (reparenLType t) d
 reparenConDeclField c@XConDeclField{} = c
 
