@@ -1,4 +1,5 @@
 
 mod132.hs:6:7: error:
-    • Data constructor not in scope: Foo
-    • Perhaps you meant variable ‘foo’ (line 6)
+     Type constructor ‘Foo’ used where a value identifier was expected
+     In the expression: Foo
+      In an equation for ‘foo’: foo = Foo
