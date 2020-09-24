@@ -13,6 +13,7 @@ import qualified Rules
 import qualified Rules.Clean
 import qualified Rules.Documentation
 import qualified Rules.Lint
+import qualified Rules.Lint
 import qualified Rules.Nofib
 import qualified Rules.Selftest
 import qualified Rules.SourceDist
