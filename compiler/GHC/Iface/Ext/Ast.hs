@@ -18,6 +18,8 @@
 Main functions for .hie file generation
 -}
 
+#include "HsVersions.h"
+
 module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts, enrichHie) where
 
 import GHC.Utils.Outputable(ppr)
@@ -56,6 +58,7 @@ import GHC.Types.Var.Env
 import GHC.Builtin.Uniques
 import GHC.Iface.Make             ( mkIfaceExports )
 import GHC.Utils.Panic
+import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
@@ -67,7 +70,6 @@ import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
-import Data.List                  ( foldl1' )
 import Data.Void                  ( Void )
 import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
@@ -878,7 +880,7 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
           detSpan = case detScope of
             LocalScope a -> Just a
             _ -> Nothing
-          toBind (PrefixCon ts args) = PrefixCon ts $ map (C Use) args
+          toBind (PrefixCon ts args) = ASSERT(null ts) PrefixCon ts $ map (C Use) args
           toBind (InfixCon a b) = InfixCon (C Use a) (C Use b)
           toBind (RecCon r) = RecCon $ map (PSC detSpan) r
 
