@@ -889,8 +889,12 @@ cvtImplicitParamBind n e = do
 cvtl :: TH.Exp -> CvtM (LHsExpr GhcPs)
 cvtl e = wrapL (cvt e)
   where
-    cvt (VarE s)        = do { s' <- vName s; return $ HsVar noExtField (noLoc s') }
-    cvt (ConE s)        = do { s' <- cName s; return $ HsVar noExtField (noLoc s') }
+    cvt (VarE s)
+      | isVarName s           = do { s' <- vName s; return $ HsVar noExtField (noLoc s') }
+      | Just TcClsName == nameSpace s
+      = cvt (ConE s)
+      | otherwise             = failWith (badOcc OccName.varName (nameBase s))
+    cvt (ConE s)              = do { s' <- cName s; return $ HsVar noExtField (noLoc s') }
     cvt (LitE l)
       | overloadedLit l = go cvtOverLit (HsOverLit noExtField)
                              (hsOverLitNeedsParens appPrec)

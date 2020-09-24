@@ -1,3 +1,7 @@
 
-RnStaticPointersFail02.hs:5:12: error:
-    Data constructor not in scope: T
+RnStaticPointersFail02.hs:5:12:
+Illegal term-level use of the type constructor ‘T’
+  defined at RnStaticPointersFail02.hs:7:1
+In the body of a static form: T
+  In the expression: static T
+  In an equation for ‘f’: f = static T
