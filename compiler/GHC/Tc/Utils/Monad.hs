@@ -1816,10 +1816,33 @@ Here 'p' is out of scope, so we get an insoluble Hole constraint. But
 the visible type application fails in the monad (throws an exception).
 We must not discard the out-of-scope error.
 
-So we /retain the insoluble constraints/ if there is an exception.
-Hence:
-  - insolublesOnly in tryCaptureConstraints
-  - emitConstraints in the Left case of captureConstraints
+It's distressingly delicate though:
+
+* If we discard too /many/ constraints we may fail to report the error
+  that led us to interrupte the constraint gathering process.
+
+  One particular example "variable out of scope" Hole constraints. For
+  example (#12529):
+   f = p @ Int
+  Here 'p' is out of scope, so we get an insoluble Hole constraint. But
+  the visible type application fails in the monad (throws an exception).
+  We must not discard the out-of-scope error.
+
+  Also GHC.Tc.Solver.emitFlatConstraints may fail having emitted some
+  constraints with skolem-escape problems.
+
+* If we discard too /few/ constraints, we may get the misleading
+  class constraints mentioned above.  But we may /also/ end up taking
+  constraints built at some inner level, and emitting them at some
+  outer level, and then breaking the TcLevel invariants
+  See Note [TcLevel and untouchable type variables] in GHC.Tc.Utils.TcType
+
+So dropMisleading has a horridly ad-hoc structure.  It keeps only
+/insoluble/ flat constraints (which are unlikely to very visibly trip
+up on the TcLevel invariant, but all /implication/ constraints (except
+the class constraints inside them).  The implication constraints are
+OK because they set the ambient level before attempting to solve any
+inner constraints.  Ugh! I hate this. But it seems to work.
 
 However note that freshly-generated constraints like (Int ~ Bool), or
 ((a -> b) ~ Int) are all CNonCanonical, and hence won't be flagged as

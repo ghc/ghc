@@ -25,33 +25,32 @@ instantiate ``id``\'s type with ``b := (forall s. ST s a) -> a``, and
 that is not allowed. Instantiating polymorphic type variables with
 polymorphic types is called *impredicative polymorphism*.
 
-GHC has extremely flaky support for *impredicative polymorphism*,
-enabled with :extension:`ImpredicativeTypes`. If it worked, this would mean
-that you *could* call a polymorphic function at a polymorphic type, and
-parameterise data structures over polymorphic types. For example: ::
+GHC has robust support for *impredicative polymorphism*,
+enabled with :extension:`ImpredicativeTypes`, using the so-called Quick Look
+inference algorithm.  It is described in the paper
+`A quick look at impredicativity
+<https://www.microsoft.com/en-us/research/publication/a-quick-look-at-impredicativity/>`__
+(Serrano et al, ICFP 2020).
 
-      f :: Maybe (forall a. [a] -> [a]) -> Maybe ([Int], [Char])
-      f (Just g) = Just (g [3], g "hello")
-      f Nothing  = Nothing
+Switching on :extension:`ImpredicativeTypes`
 
-Notice here that the ``Maybe`` type is parameterised by the
-*polymorphic* type ``(forall a. [a] -> [a])``. However *the extension
-should be considered highly experimental, and certainly un-supported*.
-You are welcome to try it, but please don't rely on it working
-consistently, or working the same in subsequent releases. See
-:ghc-wiki:`this wiki page <impredicative-polymorphism>` for more details.
+- Switches on :extension: `RankNTypes`
 
-If you want impredicative polymorphism, the main workaround is to use a
-newtype wrapper. The ``id runST`` example can be written using this
-workaround like this: ::
+- Allows user-written types to have foralls under type constructors, not just under arrows.
+  For example ``f :: Maybe (forall a. [a] -> [a])`` is a legal type signature.
 
-    runST :: (forall s. ST s a) -> a
-    id :: forall b. b -> b
+- Allows polymorphic types in Visible Type Application
+  (when :extension: `TypeApplications` is enabled).  For example, you
+  can write ``reverse @(forall b. b->b) xs``.  Using VTA with a
+  polymorphic type argument is useful in cases when Quick Look cannot
+  infer the correct instantiation.
 
-    newtype Wrap a = Wrap { unWrap :: (forall s. ST s a) -> a }
+- Switches on the Quick Look type inference algorithm, as described
+  in the paper.  This allows the compiler to infer impredicative instantiations of polymorphic
+  functions in many cases. For example, ``reverse xs`` will typecheck even if ``xs :: [forall a. a->a]``,
+  by instantiating ``reverse`` at type ``forall a. a->a``.
 
-    foo :: (forall s. ST s a) -> a
-    foo = unWrap (id (Wrap runST))
-          -- Here id is called at monomorphic type (Wrap a)
-
-
+For many years GHC has a special case for the function ``($)``, that allows it
+to typecheck an application like ``runST $ (do { ... })``, even though that
+instantiation may be impredicative.  This special case remains: even without
+:extension:`ImpredicativeTypes` GHC switches on Quick Look for applications of ``($)``.
