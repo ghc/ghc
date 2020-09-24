@@ -485,6 +485,18 @@ patScopes rsp useScope patScope xs =
   map (\(RS sc a) -> PS rsp useScope sc a) $
     listScopes patScope xs
 
+-- | 'listScopes' specialised to 'HsPatSigType'
+tScopes
+  :: Scope
+  -> Scope
+  -> [HsPatSigType (GhcPass a)]
+  -> [TScoped (HsPatSigType (GhcPass a))]
+tScopes scope rhsScope xs =
+  map (\(RS sc a) -> TS (ResolvedScopes [scope, sc]) (unLoc a)) $
+    listScopes rhsScope (map (\hsps -> L (getLoc $ hsps_body hsps) hsps) xs)
+  -- We make the HsPatSigType into a Located one by using the location of the underlying LHsType.
+  -- We then strip off the redundant location information afterward, and take the union of the given scope and those to the right when forming the TS.
+
 -- | 'listScopes' specialised to 'TVScoped' things
 tvScopes
   :: TyVarScope
@@ -1004,8 +1016,7 @@ instance HiePass p => ToHie (PScoped (Located (Pat (GhcPass p)))) where
     where
       contextify :: a ~ LPat (GhcPass p) => HsConDetails (HsPatSigType (NoGhcTc (GhcPass p))) a (HsRecFields (GhcPass p) a)
                  -> HsConDetails (TScoped (HsPatSigType (NoGhcTc (GhcPass p)))) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
-      contextify (PrefixCon tyargs args) = PrefixCon (map tyScope tyargs) (patScopes rsp scope pscope args)
-        where tyScope t = TS (ResolvedScopes [scope, pscope]) t
+      contextify (PrefixCon tyargs args) = PrefixCon (tScopes scope pscope tyargs) (patScopes rsp scope pscope args)
       contextify (InfixCon a b) = InfixCon a' b'
         where [a', b'] = patScopes rsp scope pscope [a,b]
       contextify (RecCon r) = RecCon $ RC RecFieldMatch $ contextify_rec r
