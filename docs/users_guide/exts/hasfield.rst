@@ -6,15 +6,23 @@ Record field selector polymorphism
 The module :base-ref:`GHC.Records.` defines the following: ::
 
   class HasField (x :: k) r a | x r -> a where
-    getField :: r -> a
+    hasField :: r -> (a -> r, a)
 
 A ``HasField x r a`` constraint represents the fact that ``x`` is a
 field of type ``a`` belonging to a record type ``r``.  The
-``getField`` method gives the record selector function.
+``hasField`` method gives the ability to select and update the field.
 
-This allows definitions that are polymorphic over record types with a specified
-field.  For example, the following works with any record type that has a field
-``name :: String``: ::
+This module also defines: ::
+
+  getField :: forall x r a . HasField x r a => r -> a
+  getField = snd . hasField @x
+
+  setField :: forall x r a . HasField x r a => r -> a -> r
+  setField = fst . hasField @x
+
+These make it possible to write functions that are polymorphic over record types
+with a specified field.  For example, the following works with any record type
+that has a field ``name :: String``: ::
 
   foo :: HasField "name" r String => r -> String
   foo r = reverse (getField @"name" r)
@@ -31,8 +39,8 @@ Solving HasField constraints
 
 If the constraint solver encounters a constraint ``HasField x r a``
 where ``r`` is a concrete datatype with a field ``x`` in scope, it
-will automatically solve the constraint using the field selector as
-the dictionary, unifying ``a`` with the type of the field if
+will automatically solve the constraint by generating a suitable
+dictionary, unifying ``a`` with the type of the field if
 necessary.  This happens irrespective of which extensions are enabled.
 
 For example, if the following datatype is in scope ::
@@ -52,12 +60,12 @@ to be solved.  This retains the existing representation hiding
 mechanism, whereby a module may choose not to export a field,
 preventing client modules from accessing or updating it directly.
 
-Solving ``HasField`` constraints depends on the field selector functions that
-are generated for each datatype definition:
+Solving ``HasField`` constraints depends on the type of the field:
 
--  If a record field does not have a selector function because its type would allow
-   an existential variable to escape, the corresponding ``HasField`` constraint
-   will not be solved.  For example, ::
+-  If a record field has a type containing an existential variable, it cannot
+   have a selector function, and the corresponding ``HasField`` constraint will
+   not be solved, because this would allow the existential variable to escape.
+   For example, ::
 
      {-# LANGUAGE ExistentialQuantification #-}
      data Exists t = forall x . MkExists { unExists :: t x }
@@ -67,14 +75,16 @@ are generated for each datatype definition:
 
 -  If a record field has a polymorphic type (and hence the selector function is
    higher-rank), the corresponding ``HasField`` constraint will not be solved,
-   because doing so would violate the functional dependency on ``HasField`` and/or
-   require impredicativity.  For example, ::
+   because doing so would violate the functional dependency on ``HasField``
+   and/or require an impredicative constraint (which is not allowed even with
+   :extension:`ImpredicativeTypes`).  For example, ::
 
      {-# LANGUAGE RankNTypes #-}
      data Higher = MkHigher { unHigher :: forall t . t -> t }
 
    gives rise to a selector ``unHigher :: Higher -> (forall t . t -> t)`` but does
-   not lead to solution of the constraint ``HasField "unHigher" Higher a``.
+   not lead to solution of the constraint ``HasField "unHigher" Higher a`` (which
+   would require an impredicative instantiation of ``a`` with ``forall t . t -> t``).
 
 -  A record GADT may have a restricted type for a selector function, which may lead
    to additional unification when solving ``HasField`` constraints.  For example, ::
@@ -116,7 +126,7 @@ For example, this instance would make the ``name`` field of ``Person``
 accessible using ``#fullname`` as well: ::
 
   instance HasField "fullname" Person String where
-    getField = name
+    hasField r = (\n -> r { name = n }, name r)
 
 More substantially, an anonymous records library could provide
 ``HasField`` instances for its anonymous records, and thus be
@@ -125,19 +135,34 @@ proposal.  For example, something like this makes it possible to use
 ``getField`` to access ``Record`` values with the appropriate
 string in the type-level list of fields: ::
 
+  {-# LANGUAGE DataKinds #-}
+  {-# LANGUAGE FlexibleContexts #-}
+  {-# LANGUAGE GADTs #-}
+  {-# LANGUAGE PolyKinds #-}
+  {-# LANGUAGE ScopedTypeVariables #-}
+  {-# LANGUAGE TypeApplications #-}
+  {-# LANGUAGE TypeOperators #-}
+  {-# LANGUAGE UndecidableInstances #-}
+
+  import Data.Kind (Type)
+  import Data.Proxy (Proxy(..))
+  import GHC.Records
+
   data Record (xs :: [(k, Type)]) where
     Nil  :: Record '[]
     Cons :: Proxy x -> a -> Record xs -> Record ('(x, a) ': xs)
 
-  instance HasField x (Record ('(x, a) ': xs)) a where
-    getField (Cons _ v _) = v
+  instance {-# OVERLAPS #-} HasField x (Record ('(x, a) ': xs)) a where
+    hasField (Cons p v r) = (\v' -> Cons p v' r, v)
   instance HasField x (Record xs) a => HasField x (Record ('(y, b) ': xs)) a where
-    getField (Cons _ _ r) = getField @x r
+    hasField (Cons p v r) = (\v' -> Cons p v (set v'), a)
+      where
+        (set,a) = hasField @x r
 
   r :: Record '[ '("name", String) ]
-  r = Cons Proxy "R" Nil)
+  r = Cons Proxy "R" Nil
 
-  x = getField @"name" r
+  x = getField @"name" (setField @"name" r "S")
 
 Since representations such as this can support field labels with kinds other
 than ``Symbol``, the ``HasField`` class is poly-kinded (even though the built-in
@@ -173,5 +198,27 @@ interests of simplicity we do not permit users to define their own instances
 either.  If a field is not in scope, the corresponding instance is still
 prohibited, to avoid conflicts in downstream modules.
 
+.. _compatibility-notes:
 
+Compatibility notes
+~~~~~~~~~~~~~~~~~~~
 
+``HasField`` was introduced in GHC 8.2.
+
+In versions of GHC prior to 9.2, the ``HasField`` class provided only a
+``getField`` method, so it was not possibly to update fields in a polymorphic
+way.  This means:
+
+- Code using ``hasField`` or ``setField`` will require at least GHC 9.2.
+
+- Code using ``getField`` only may support GHC 8.2 and later, and should use
+  ``import GHC.Records (HasField, getField)`` which works regardless of whether
+  ``getField`` is a class method (prior to 9.2) or a function (9.2 and later).
+
+- User-defined ``HasField`` instances must use :extension:`CPP` to support GHC
+  versions before and after 9.2.
+
+:ref:`record-patsyn` do not lead to automatic solution of ``HasField`` instances
+for their fields, so if you replace a datatype with a pattern synonym where
+``HasField`` is in use, you may need to define :ref:`virtual-record-fields`
+manually.
