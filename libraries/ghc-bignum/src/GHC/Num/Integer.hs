@@ -6,6 +6,7 @@
 {-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- |
 -- Module      :  GHC.Num.Integer
@@ -31,6 +32,7 @@ import GHC.Magic
 import GHC.Num.Primitives
 import GHC.Num.BigNat
 import GHC.Num.Natural
+import qualified GHC.Num.Backend as Backend
 
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
@@ -112,6 +114,17 @@ integerFromBigNatSign# !sign !bn
 
    | True
    = integerFromBigNatNeg# bn
+
+-- | Convert an Integer into a sign-bit and a BigNat
+integerToBigNatSign# :: Integer -> (# Int#, BigNat# #)
+integerToBigNatSign# = \case
+   IS x
+      | isTrue# (x >=# 0#)
+      -> (# 0#, bigNatFromWord# (int2Word# x) #)
+      | True
+      -> (# 1#, bigNatFromWord# (int2Word# (negateInt# x)) #)
+   IP x -> (# 0#, x #)
+   IN x -> (# 1#, x #)
 
 -- | Convert an Integer into a BigNat.
 --
@@ -853,7 +866,7 @@ integerDivMod# :: Integer -> Integer -> (# Integer, Integer #)
 {-# NOINLINE integerDivMod# #-}
 integerDivMod# !n !d
   | isTrue# (integerSignum# r ==# negateInt# (integerSignum# d))
-     = let !q' = integerAdd q (IS -1#) -- TODO: optimize
+     = let !q' = integerSub q (IS 1#)
            !r' = integerAdd r d
        in (# q', r' #)
   | True = qr
@@ -1169,3 +1182,35 @@ integerFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
 integerFromByteArray :: Word# -> ByteArray# -> Word# -> Bool# -> Integer
 integerFromByteArray sz ba off e = case runRW# (integerFromByteArray# sz ba off e) of
    (# _, i #) -> i
+
+
+-- | Get the extended GCD of two integers.
+--
+-- `integerGcde# a b` returns (# g,x,y #) where
+--    * ax + by = g = |gcd a b|
+integerGcde#
+   :: Integer
+   -> Integer
+   -> (# Integer, Integer, Integer #)
+integerGcde# a b
+   | integerIsZero a && integerIsZero b    =     (# integerZero, integerZero, integerZero #)
+   | integerIsZero a                       = fix (# b          , integerZero, integerOne #)
+   | integerIsZero b                       = fix (# a          , integerOne,  integerZero #)
+   | integerAbs a `integerEq` integerAbs b = fix (# b          , integerZero, integerOne #)
+   | True                                  = Backend.integer_gcde a b
+   where
+      -- returned "g" must be positive
+      fix (# g, x, y #)
+         | integerIsNegative g = (# integerNegate g, integerNegate x, integerNegate y #)
+         | True                = (# g,x,y #)
+
+-- | Get the extended GCD of two integers.
+--
+-- `integerGcde a b` returns (g,x,y) where
+--    * ax + by = g = |gcd a b|
+integerGcde
+   :: Integer
+   -> Integer
+   -> ( Integer, Integer, Integer)
+integerGcde a b = case integerGcde# a b of
+   (# g,x,y #) -> (g,x,y)

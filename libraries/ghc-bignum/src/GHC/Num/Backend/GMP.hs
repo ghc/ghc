@@ -8,6 +8,9 @@
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE LambdaCase #-}
+
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | Backend based on the GNU GMP library.
 --
@@ -22,6 +25,9 @@ import GHC.Num.WordArray
 import GHC.Num.Primitives
 import GHC.Prim
 import GHC.Types
+import GHC.Magic (runRW#)
+import {-# SOURCE #-} GHC.Num.Integer
+import {-# SOURCE #-} GHC.Num.BigNat
 
 default ()
 
@@ -352,6 +358,70 @@ bignat_powmod r b e m s =
    case ioInt# (integer_gmp_powm# r b (wordArraySize# b) e (wordArraySize# e) m (wordArraySize# m)) s of
       (# s', n #) -> mwaSetSize# r (narrowGmpSize# n) s'
 
+integer_gcde
+   :: Integer
+   -> Integer
+   -> (# Integer, Integer, Integer #)
+integer_gcde a b = case runRW# io of (# _, a #) -> a
+   where
+      !(# sa, ba #) = integerToBigNatSign# a
+      !(# sb, bb #) = integerToBigNatSign# b
+      !sza          = bigNatSize# ba
+      !szb          = bigNatSize# bb
+      -- signed sizes of a and b
+      !ssa          = case sa of
+                           0# -> sza
+                           _  -> negateInt# sza
+      !ssb          = case sb of
+                        0# -> szb
+                        _  -> negateInt# szb
+
+      -- gcd(a,b) < min(a,b)
+      !g_init_sz = minI# sza szb
+
+      -- According to https://gmplib.org/manual/Number-Theoretic-Functions.html#index-mpz_005fgcdext
+      -- a*x + b*y = g
+      -- abs(x) < abs(b) / (2 g) < abs(b)
+      -- abs(y) < abs(a) / (2 g) < abs(a)
+      !x_init_sz = szb
+      !y_init_sz = sza
+
+      io s =
+         -- allocate output arrays
+         case newWordArray# g_init_sz s     of { (# s, mbg #) ->
+         case newWordArray# x_init_sz s     of { (# s, mbx #) ->
+         case newWordArray# y_init_sz s     of { (# s, mby #) ->
+         -- allocate space to return sizes (3x4 = 12)
+         case newPinnedByteArray# 12# s     of { (# s, mszs #) ->
+         case unsafeFreezeByteArray# mszs s of { (# s, szs #) ->
+         let !ssx_ptr = byteArrayContents# szs in
+         let !ssy_ptr = ssx_ptr `plusAddr#` 4# in
+         let !sg_ptr  = ssy_ptr `plusAddr#` 4# in
+         -- call GMP
+         case ioVoid (integer_gmp_gcdext# mbx ssx_ptr mby ssy_ptr mbg sg_ptr ba ssa bb ssb) s of { s ->
+         -- read sizes
+         case readInt32OffAddr# ssx_ptr 0# s of { (# s, ssx #) ->
+         case readInt32OffAddr# ssy_ptr 0# s of { (# s, ssy #) ->
+         case readInt32OffAddr# sg_ptr  0# s of { (# s, sg #) ->
+         case touch# szs s of { s ->
+         -- shrink x, y and g to their actual sizes and freeze them
+         let !sx = absI# ssx in
+         let !sy = absI# ssy in
+         case mwaSetSize# mbx sx s of { s ->
+         case mwaSetSize# mby sy s of { s ->
+         case mwaSetSize# mbg sg s of { s ->
+
+         -- return x, y and g as Integer
+         case unsafeFreezeByteArray# mbx s of { (# s, bx #) ->
+         case unsafeFreezeByteArray# mby s of { (# s, by #) ->
+         case unsafeFreezeByteArray# mbg s of { (# s, bg #) ->
+
+         (# s, (# integerFromBigNat# bg
+               ,  integerFromBigNatSign# (ssx <# 0#) bx
+               ,  integerFromBigNatSign# (ssy <# 0#) by #) #)
+         }}}}}}}}}}}}}}}}
+
+
 
 ----------------------------------------------------------------------
 -- FFI ccall imports
@@ -366,10 +436,13 @@ foreign import ccall unsafe "integer_gmp_mpn_gcd"
   c_mpn_gcd# :: MutableByteArray# s -> ByteArray# -> GmpSize#
                 -> ByteArray# -> GmpSize# -> IO GmpSize
 
-foreign import ccall unsafe "integer_gmp_gcdext"
-  integer_gmp_gcdext# :: MutableByteArray# s -> MutableByteArray# s
-                         -> ByteArray# -> GmpSize#
-                         -> ByteArray# -> GmpSize# -> IO GmpSize
+foreign import ccall unsafe "integer_gmp_gcdext" integer_gmp_gcdext#
+  :: MutableByteArray# s -> Addr#
+  -> MutableByteArray# s -> Addr#
+  -> MutableByteArray# s -> Addr#
+  -> ByteArray# -> GmpSize#
+  -> ByteArray# -> GmpSize#
+  -> IO ()
 
 -- mp_limb_t mpn_add_1 (mp_limb_t *rp, const mp_limb_t *s1p, mp_size_t n,
 --                      mp_limb_t s2limb)

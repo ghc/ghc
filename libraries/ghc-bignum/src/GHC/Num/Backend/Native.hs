@@ -17,9 +17,11 @@ module GHC.Num.Backend.Native where
 #if defined(BIGNUM_NATIVE) || defined(BIGNUM_CHECK)
 import {-# SOURCE #-} GHC.Num.BigNat
 import {-# SOURCE #-} GHC.Num.Natural
+import {-# SOURCE #-} GHC.Num.Integer
 #else
 import GHC.Num.BigNat
 import GHC.Num.Natural
+import GHC.Num.Integer
 #endif
 import GHC.Num.WordArray
 import GHC.Num.Primitives
@@ -717,3 +719,21 @@ bignat_powmod_words b e m =
    bignat_powmod_word (wordArrayFromWord# b)
                       (wordArrayFromWord# e)
                       m
+
+
+integer_gcde
+   :: Integer
+   -> Integer
+   -> (# Integer, Integer, Integer #)
+integer_gcde a b = f (# a,integerOne,integerZero #) (# b,integerZero,integerOne #)
+  where
+    -- returned "g" must be positive
+    fix (# g, x, y #)
+       | integerIsNegative g = (# integerNegate g, integerNegate x, integerNegate y #)
+       | True                = (# g,x,y #)
+
+    f old@(# old_g, old_s, old_t #) new@(# g, s, t #)
+      | integerIsZero g = fix old
+      | True            = case integerQuotRem# old_g g of
+                              !(# q, r #) -> f new (# r , old_s `integerSub` (q `integerMul` s)
+                                                        , old_t `integerSub` (q `integerMul` t) #)
