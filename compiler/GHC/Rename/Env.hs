@@ -1005,6 +1005,16 @@ lookup_demoted rdr_name
            , text "instead of"
            , quotes (ppr name) <> dot ]
 
+lookup_promoted :: RdrName -> RnM Name
+lookup_promoted rdr_name
+  | Just promoted_rdr <- promoteRdrName rdr_name
+  = do { mb_promoted_rdr <- lookupOccRn_maybe promoted_rdr
+       ; case mb_promoted_rdr of
+           Nothing -> reportUnboundName rdr_name
+           Just name -> return name }
+  | otherwise
+  = reportUnboundName rdr_name
+
 badVarInType :: RdrName -> RnM Name
 badVarInType rdr_name
   = do { addErr (text "Illegal promoted term variable in a type:"
@@ -1054,14 +1064,18 @@ lookupOccRn_maybe = lookupOccRnX_maybe lookupGlobalOccRn_maybe id
 
 lookupOccRn_overloaded :: Bool -> RdrName
                        -> RnM (Maybe (Either Name [Name]))
-lookupOccRn_overloaded overload_ok
-  = lookupOccRnX_maybe global_lookup Left
-      where
-        global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
-        global_lookup n =
-          runMaybeT . msum . map MaybeT $
-            [ lookupGlobalOccRn_overloaded overload_ok n
-            , fmap Left . listToMaybe <$> lookupQualifiedNameGHCi n ]
+lookupOccRn_overloaded overload_ok rdr_name
+  = do { mb_name <- lookupOccRnX_maybe global_lookup Left rdr_name
+       ; case mb_name of
+           Nothing   -> sequenceA . Left <$> lookup_promoted rdr_name
+           p         -> return p }
+
+  where
+    global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
+    global_lookup n =
+      runMaybeT . msum . map MaybeT $
+        [ lookupGlobalOccRn_overloaded overload_ok n
+        , fmap Left . listToMaybe <$> lookupQualifiedNameGHCi n ]
 
 
 

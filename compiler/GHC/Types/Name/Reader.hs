@@ -32,7 +32,7 @@ module GHC.Types.Name.Reader (
         nameRdrName, getRdrName,
 
         -- ** Destruction
-        rdrNameOcc, rdrNameSpace, demoteRdrName,
+        rdrNameOcc, rdrNameSpace, demoteRdrName, promoteRdrName,
         isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
         isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
@@ -185,6 +185,12 @@ demoteRdrName (Unqual occ) = fmap Unqual (demoteOccName occ)
 demoteRdrName (Qual m occ) = fmap (Qual m) (demoteOccName occ)
 demoteRdrName (Orig _ _) = Nothing
 demoteRdrName (Exact _) = Nothing
+
+promoteRdrName :: RdrName -> Maybe RdrName
+promoteRdrName (Unqual occ) = fmap Unqual (promoteOccName occ)
+promoteRdrName (Qual m occ) = fmap (Qual m) (promoteOccName occ)
+promoteRdrName (Orig m occ) = fmap (Orig m) (promoteOccName occ)
+promoteRdrName (Exact _) = Nothing
 
         -- These two are the basic constructors
 mkRdrUnqual :: OccName -> RdrName

@@ -52,6 +52,7 @@ module GHC.Types.Name.Occurrence (
         mkDFunOcc,
         setOccNameSpace,
         demoteOccName,
+        promoteOccName,
         HasOccName(..),
 
         -- ** Derived 'OccName's
@@ -215,6 +216,12 @@ demoteNameSpace DataName = Nothing
 demoteNameSpace TvName = Nothing
 demoteNameSpace TcClsName = Just DataName
 
+promoteNameSpace :: NameSpace -> Maybe NameSpace
+promoteNameSpace DataName = Just TcClsName
+promoteNameSpace VarName = Nothing
+promoteNameSpace TcClsName = Nothing
+promoteNameSpace TvName = Nothing
+
 {-
 ************************************************************************
 *                                                                      *
@@ -341,6 +348,12 @@ demoteOccName :: OccName -> Maybe OccName
 demoteOccName (OccName space name) = do
   space' <- demoteNameSpace space
   return $ OccName space' name
+
+promoteOccName :: OccName -> Maybe OccName
+promoteOccName (OccName space name) = do
+  space' <- promoteNameSpace space
+  return $ OccName space' name
+
 
 -- Name spaces are related if there is a chance to mean the one when one writes
 -- the other, i.e. variables <-> data constructors and type variables <-> type constructors
