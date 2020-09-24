@@ -160,6 +160,7 @@ getCoreToDo dflags
                           , sm_eta_expand = eta_expand_on
                           , sm_inline     = True
                           , sm_case_case  = True
+                          , sm_case_bottom= False
                           , sm_pre_inline = pre_inline_on
                           }
 
