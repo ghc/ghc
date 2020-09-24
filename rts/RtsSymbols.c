@@ -642,8 +642,6 @@
       SymI_HasProto(getOrSetLibHSghcFastStringTable)                    \
       SymI_HasProto(getRTSStats)                                        \
       SymI_HasProto(getRTSStatsEnabled)                                 \
-      SymI_HasProto(getOrSetLibHSghcPersistentLinkerState)              \
-      SymI_HasProto(getOrSetLibHSghcInitLinkerDone)                     \
       SymI_HasProto(getOrSetLibHSghcGlobalHasPprDebug)                  \
       SymI_HasProto(getOrSetLibHSghcGlobalHasNoDebugOutput)             \
       SymI_HasProto(getOrSetLibHSghcGlobalHasNoStateHack)               \
