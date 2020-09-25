@@ -36,7 +36,7 @@ module GHC.Utils.Encoding (
         toBase62Padded
   ) where
 
-import GHC.Prelude
+import Prelude
 
 import Foreign
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
