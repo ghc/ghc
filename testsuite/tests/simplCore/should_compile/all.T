@@ -333,3 +333,6 @@ test('T18347', normal, compile, ['-dcore-lint -O'])
 test('T18355', [ grep_errmsg(r'OneShot') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T18399', normal, compile, ['-dcore-lint -O'])
 test('T18589', normal, compile, ['-dcore-lint -O'])
+
+test('T18747A', normal, compile, [''])
+test('T18747B', normal, compile, [''])
