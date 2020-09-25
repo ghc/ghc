@@ -25,6 +25,7 @@ module GHC.Core.Make (
         -- * Constructing small tuples
         mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup, mkCoreUbxSum,
         mkCoreTupBoxity, unitExpr,
+        mkCoreUbxSum, mkUbxSumAltTy,
 
         -- * Constructing big tuples
         mkBigCoreVarTup, mkBigCoreVarTup1,
@@ -413,6 +414,13 @@ mkCoreUbxSum arity alt tys exp
                   (map (Type . getRuntimeRep) tys
                    ++ map Type tys
                    ++ [exp])
+
+-- | Every alternative of an unboxed sum has exactly one field, and we use
+-- unboxed tuples when we need more than one field. This generates an unboxed
+-- tuple when necessary, to be used in unboxed sum alts.
+mkUbxSumAltTy :: [Type] -> Type
+mkUbxSumAltTy [ty] = ty
+mkUbxSumAltTy tys  = mkTupleTy Unboxed tys
 
 -- | Build a big tuple holding the specified variables
 -- One-tuples are flattened; see Note [Flattening one-tuples]
