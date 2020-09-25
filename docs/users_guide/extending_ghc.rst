@@ -800,8 +800,8 @@ displayed.
     import GHC.Hs.Decls
     import GHC.Hs.Expr
     import GHC.Hs.ImpExp
-    import Avail
-    import Outputable
+    import GHC.Types.Avail
+    import GHC.Utils.Outputable
     import GHC.Hs.Doc
 
     plugin :: Plugin
