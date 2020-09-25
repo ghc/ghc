@@ -338,3 +338,5 @@ test('T18603', normal, compile, ['-dcore-lint -O'])
 # T18649 should /not/ generate a specialisation rule
 test('T18649', normal, compile, ['-O -ddump-rules -Wno-simplifiable-class-constraints'])
 
+test('T18747A', normal, compile, [''])
+test('T18747B', normal, compile, [''])

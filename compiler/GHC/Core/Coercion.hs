@@ -1486,7 +1486,7 @@ instCoercion (Pair lty rty) g w
   | isFunTy lty && isFunTy rty
     -- g :: (t1 -> t2) ~ (t3 -> t4)
     -- returns t2 ~ t4
-  = Just $ mkNthCo Nominal 3 g -- extract result type, which is the 4th argument to (->)
+  = Just $ mkNthCo Nominal 4 g -- extract result type, which is the 5th argument to (->)
   | otherwise -- one forall, one funty...
   = Nothing
 
