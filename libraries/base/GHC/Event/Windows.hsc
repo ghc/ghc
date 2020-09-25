@@ -116,7 +116,6 @@ import GHC.Real
 import GHC.Enum (maxBound)
 import GHC.Windows
 import GHC.List (null)
-import GHC.Ptr
 import Text.Show
 
 #if defined(DEBUG)
@@ -307,8 +306,9 @@ cdOffset :: Int
 cdOffset = #{const __builtin_offsetof (HASKELL_OVERLAPPED, hoData)}
 
 -- | Terminator symbol for IOCP request
-nullReq :: Ptr (Ptr a)
-nullReq = castPtr $ unsafePerformIO $ new $ (nullPtr :: Ptr ())
+nullReq :: Ptr CompletionData
+nullReq = castPtr $ unsafePerformIO $ new (0 :: Int)
+{-# NOINLINE nullReq #-}
 
 -- I don't expect a lot of events, so a simple linked lists should be enough.
 type EventElements = [(Event, HandleData)]
