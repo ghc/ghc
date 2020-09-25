@@ -1,6 +1,7 @@
 TYPE CONSTRUCTORS
   data type T{14} ::
-    forall {k1} {k2} {k3} (k4 :: k2) k5. forall k6 ->
+    forall {k1} {k2} {k3} (k4 :: k2) k5.
+    forall k6 ->
     k6
     -> Proxy k4
     -> (k3 -> *)
@@ -21,7 +22,8 @@ TYPE CONSTRUCTORS
           nominal
           phantom
   data type T2{14} ::
-    forall {k1} {k2} (k3 :: k2) k7. forall k4 ->
+    forall {k1} {k2} (k3 :: k2) k7.
+    forall k4 ->
     k4
     -> Proxy k3
     -> (k7 -> *)
@@ -52,4 +54,4 @@ DATA CONSTRUCTORS
                 (d :: Proxy k5) (e :: Proxy k7).
          f c -> T k8 a b f c d e
 Dependent modules: []
-Dependent packages: [base-4.15.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
+Dependent packages: [base-4.16.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
