@@ -109,7 +109,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
     plusC = [| $oneC + $twoC |]
 
-- The precise type of a quotation depends on the types of the nested splices inside it::
+-  The precise type of a quotation depends on the types of the nested splices inside it::
 
       -- Add a redundant constraint to demonstrate that constraints on the
       -- monad used to build the representation are propagated when using nested
@@ -125,9 +125,8 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    Remember, a top-level splice still requires its argument to be of type ``Q Exp``.
    So then splicing in ``g`` will cause ``m`` to be instantiated to ``Q``::
 
-    h :: Int
-    h = $(g) -- m ~ Q
-
+      h :: Int
+      h = $(g) -- m ~ Q
 
 -  A *typed* expression splice is written ``$$x``, where ``x`` is
    is an arbitrary expression.
@@ -375,8 +374,6 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 -  Expression quotations accept most Haskell language constructs.
    However, there are some GHC-specific extensions which expression
    quotations currently do not support, including
-
-   -  Recursive ``do``-statements (see :ghc-ticket:`1262`)
 
    -  Type holes in typed splices (see :ghc-ticket:`10945` and
       :ghc-ticket:`10946`)

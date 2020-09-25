@@ -18,7 +18,6 @@
 -XAutoDeriveTypeable
 -XDoAndIfThenElse
 -XDoRec
--XGHCForeignImportPrim
 -XGenerics
 -XImplicitPrelude
 -XJavaScriptFFI
