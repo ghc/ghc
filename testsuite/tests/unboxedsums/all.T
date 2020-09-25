@@ -24,6 +24,12 @@ test('empty_sum', only_ways(['normal']), compile_and_run, [''])
 test('sum_rr', normal, compile, [''])
 test('T12711', only_ways(['ghci']), ghci_script, ['T12711.script'])
 
+test('unpack_sums_1', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('unpack_sums_2', omit_ways(['ghci']), compile, ['-O'])
+test('unpack_sums_3', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('unpack_sums_4', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('unpack_sums_5', omit_ways(['ghci']), compile, ['-O'])
+
 # TODO: Need to run this in --slow mode only
 # test('sum_api_annots',
 #      [only_ways(['normal']),
