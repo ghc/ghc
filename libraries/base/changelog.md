@@ -29,7 +29,7 @@
     `ConcFlags`, `DebugFlags`, `CCFlags`, `DoHeapProfile`, `ProfFlags`,
     `DoTrace`, `TraceFlags`, `TickyFlags`, `ParFlags`, `RTSFlags`, `RTSStats`,
     `GCStats`, `ByteOrder`, `GeneralCategory`, `SrcLoc`
-    
+
   * Add rules `unpackUtf8`, `unpack-listUtf8` and `unpack-appendUtf8` to `GHC.Base`.
     They correspond to their ascii versions and hopefully make it easier
     for libraries to handle utf8 encoded strings efficiently.
