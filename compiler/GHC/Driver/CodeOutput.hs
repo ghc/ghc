@@ -32,6 +32,7 @@ import GHC.Cmm.CLabel
 import GHC.Driver.Types
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import qualified GHC.Data.ShortText as ST
 import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
 import GHC.SysTools.FileCleanup
@@ -211,7 +212,7 @@ outputForeignStubs dflags mod location stubs
         let rts_includes =
                let rts_pkg = unsafeLookupUnitId (unitState dflags) rtsUnitId in
                concatMap mk_include (unitIncludes rts_pkg)
-            mk_include i = "#include \"" ++ i ++ "\"\n"
+            mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
