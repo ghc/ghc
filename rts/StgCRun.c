@@ -892,41 +892,30 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 #if defined(aarch64_HOST_ARCH)
 
-/* See also AArch64/Instr.hs
- *
- * Save caller save registers
- * This is x0-x18
- *
- * For SIMD/FP Registers:
- * Registers v8-v15 must be preserved by a callee across subroutine calls;
- * the remaining registers (v0-v7, v16-v31) do not need to be preserved (or
- * should be preserved by the caller). Additionally, only the bottom 64 bits
- * of each value stored in v8-v15 need to be preserved [7]; it is the
- * responsibility of the caller to preserve larger values.
- *
- * .---------------------------------------------------------------------------------------------------------------------------------------------------------------.
- * |  0 |  1 |  2 |  3 |  4 |  5 |  6 |  7 |  8 |  9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 |
- * | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 42 | 44 | 45 | 46 | 47 | 48 | 49 | 50 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 58 | 59 | 60 | 61 | 62 | 63 |
- * |== General Purpose registers ==================================================================================================================================|
- * | <---- argument passing -------------> | IR | <------- tmp registers --------> | IP0| IP1| PL | <------------------- callee saved ------------> | FP | LR | SP |
- * | <------ free registers --------------------------------------------------------------------> | BR | Sp | Hp | R1 | R2 | R3 | R4 | R5 | R6 | SL | -- | -- | -- |
- * |== SIMD/FP Registers ==========================================================================================================================================|
- * | <---- argument passing -------------> | <-- callee saved (lower 64 bits) ---> | <--------------------------------------- caller saved ----------------------> |
- * | <------ free registers -------------> | F1 | F2 | F3 | F4 | D1 | D2 | D3 | D4 | <------ free registers -----------------------------------------------------> |
- * '---------------------------------------------------------------------------------------------------------------------------------------------------------------'
- * IR: Indirect result location register, IP: Intra-procedure register, PL: Platform register, FP: Frame pointer, LR: Link register, SP: Stack pointer
- * BR: Base, SL: SpLim
- */
-
 StgRegTable *
 StgRun(StgFunPtr f, StgRegTable *basereg) {
     StgRegTable * r;
     __asm__ volatile (
         /*
          * Save callee-saves registers on behalf of the STG code.
-         * Note: The compiler will insert this for us if we specify the
-         *       Clobbered correctly. See below.
+         * Floating point registers only need the bottom 64 bits preserved.
+         * We need to use the names x16, x17, x29 and x30 instead of ip0
+         * ip1, fp and lp because one of either clang or gcc doesn't understand
+         * the later names.
          */
+        "stp x29,  x30,  [sp, #-16]!\n\t"
+        "mov x29, sp\n\t"
+        "stp x16, x17, [sp, #-16]!\n\t"
+        "stp x19, x20, [sp, #-16]!\n\t"
+        "stp x21, x22, [sp, #-16]!\n\t"
+        "stp x23, x24, [sp, #-16]!\n\t"
+        "stp x25, x26, [sp, #-16]!\n\t"
+        "stp x27, x28, [sp, #-16]!\n\t"
+        "stp d8,  d9,  [sp, #-16]!\n\t"
+        "stp d10, d11, [sp, #-16]!\n\t"
+        "stp d12, d13, [sp, #-16]!\n\t"
+        "stp d14, d15, [sp, #-16]!\n\t"
+
         /*
          * allocate some space for Stg machine's temporary storage.
          * Note: RESERVED_C_STACK_BYTES has to be a round number here or
@@ -955,28 +944,26 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
          * Return the new register table, taking it from Stg's R1 (AArch64's R22).
          */
         "mov %0, x22\n\t"
-
-        /* Restore callee-saves register
-         * Note: The compiler will insert this for us if we specify the
-         *       Clobbered correctly. See below.
+        /*
+         * restore callee-saves registers.
          */
 
-      /* Outputs (r) */
+        "ldp d14, d15, [sp], #16\n\t"
+        "ldp d12, d13, [sp], #16\n\t"
+        "ldp d10, d11, [sp], #16\n\t"
+        "ldp d8,  d9,  [sp], #16\n\t"
+        "ldp x27, x28, [sp], #16\n\t"
+        "ldp x25, x26, [sp], #16\n\t"
+        "ldp x23, x24, [sp], #16\n\t"
+        "ldp x21, x22, [sp], #16\n\t"
+        "ldp x19, x20, [sp], #16\n\t"
+        "ldp x16, x17, [sp], #16\n\t"
+        "ldp x29,  x30,  [sp], #16\n\t"
+
       : "=r" (r)
-      /* Inputs (f, regbase, RESERVED_C_STACK_BYTES) */
       : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
-      /* Clobbered */
-      :   // any of the stg calls may directly or indirectly modify these:
-          "%x19", "%x20", "%x21", "%x22", "%x23", "%x24", "%x25", "%x26", "%x27", "%x28",
-          // the IP usually, not, but better safe than sorry. However, I'm not sure
-          // we even have to save them. There is no expectation they survive a call.
-          "%x16", "%x17",
-          // The Link Register will hold the point we want to return to; and we may
-          // overwrite it with BL instructions in the haskell code.
-          "%x30",
-          // floating point registers
-          "%d8", "%d9", "%d10", "%d11", "%d12", "%d13", "%d14", "%d15",
-          "memory"
+        : "%x19", "%x20", "%x21", "%x22", "%x23", "%x24", "%x25", "%x26", "%x27", "%x28",
+          "%x16", "%x17", "%x30"
     );
     return r;
 }
