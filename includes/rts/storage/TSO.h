@@ -242,10 +242,23 @@ typedef struct StgTSO_ {
 
 typedef struct StgStack_ {
     StgHeader  header;
-    StgWord32  stack_size;     // stack size in *words*
-    StgWord8   dirty;          // non-zero => dirty
+
+    /* Size of the `stack` field in *words*. This is unaffected by how much of
+     * the stack space is used nor if more stack space is liked to by an
+     * UNDERFLOW_FRAME.
+     */
+    StgWord32  stack_size;
+
+    StgWord32  dirty;          // non-zero => dirty
     StgWord8   marking;        // non-zero => someone is currently marking the stack
-    StgPtr     sp;             // current stack pointer
+
+    /* Pointer to the "top" of the stack i.e. the most recently written address.
+     * The stack is filled downwards, so the "top" of the stack starts with `sp
+     * = stack + stack_size` and is decremented as the stack fills with data.
+     * The memory in `stack` strictly less than `sp` is free stack space.
+     * See comment on "Invariants" below.
+     */
+    StgPtr     sp;
     StgWord    stack[];
 } StgStack;
 
