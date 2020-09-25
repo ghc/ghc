@@ -781,7 +781,7 @@ And five warning flags:
     :shortdesc: warn when an explicitly Safe Haskell module imports a Safe-Inferred one
     :type: dynamic
     :reverse: -Wno-inferred-safe-imports
-    :category:
+    :category: warnings
 
     :since: 8.10.1
 
@@ -815,7 +815,7 @@ And five warning flags:
     :shortdesc: warn when the Safe Haskell mode is not explicitly specified.
     :type: dynamic
     :reverse: -Wno-missing-safe-haskell-mode
-    :category:
+    :category: warnings
 
     :since: 8.10.1
 
