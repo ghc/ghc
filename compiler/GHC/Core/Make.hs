@@ -23,7 +23,7 @@ module GHC.Core.Make (
         FloatBind(..), wrapFloat, wrapFloats, floatBindings,
 
         -- * Constructing small tuples
-        mkCoreVarTupTy, mkCoreTup, mkCoreUnboxedTuple, mkCoreUbxSum,
+        mkCoreVarTupTy, mkCoreTup, mkCoreUnboxedTuple, mkCoreUnboxedSum,
         mkCoreTupBoxity, unitExpr,
 
         -- * Constructing big tuples
@@ -405,8 +405,8 @@ mkCoreTup cs  = mkCoreBoxedTuple cs   -- non-1-tuples are uniform
 -- | Build an unboxed sum.
 --
 -- Alternative number ("alt") starts from 1.
-mkCoreUbxSum :: Int -> Int -> [Type] -> CoreExpr -> CoreExpr
-mkCoreUbxSum arity alt tys exp
+mkCoreUnboxedSum :: Int -> Int -> [Type] -> CoreExpr -> CoreExpr
+mkCoreUnboxedSum arity alt tys exp
   = assert (length tys == arity) $
     assert (alt <= arity) $
     mkCoreConApps (sumDataCon alt arity)

@@ -2097,7 +2097,7 @@ builtinBignumRules =
         x <- isNaturalLiteral a0
         y <- isNaturalLiteral a1
         -- return an unboxed sum: (# (# #) | Natural #)
-        let ret n v = pure $ mkCoreUbxSum 2 n [unboxedUnitTy,naturalTy] v
+        let ret n v = pure $ mkCoreUnboxedSum 2 n [unboxedUnitTy,naturalTy] v
         platform <- getPlatform
         if x < y
             then ret 1 unboxedUnitExpr

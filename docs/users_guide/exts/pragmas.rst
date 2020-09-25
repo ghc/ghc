@@ -845,8 +845,14 @@ flattening the pair. Multi-level unpacking is also supported: ::
 will store two unboxed ``Int#``\ s directly in the ``T`` constructor.
 The unpacker can see through newtypes, too.
 
+Since 9.6.1, data types with multiple constructors can also be unpacked, effectively
+transforming the field into an unboxed sum of the unpackings of each
+constructor (see :extension:`UnboxedSums`).
+
 See also the :ghc-flag:`-funbox-strict-fields` flag, which essentially has the
-effect of adding ``{-# UNPACK #-}`` to every strict constructor field.
+effect of adding ``{-# UNPACK #-}`` to every strict constructor field which is
+of a single-constructor data type. Sum types won't be unpacked automatically
+by this though, only with the explicit pragma.
 
 .. [1]
    In fact, :pragma:`UNPACK` has no effect without :ghc-flag:`-O`, for technical

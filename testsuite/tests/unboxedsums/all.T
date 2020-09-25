@@ -40,3 +40,18 @@ test('T22187',[only_ways(llvm_ways)],compile,[''])
 test('T22187_run',[only_ways(llvm_ways)
                   ,unless(arch('x86_64'), skip)],compile_and_run,[''])
 
+test('unpack_sums_1', normal, compile_and_run, ['-O'])
+test('unpack_sums_2', normal, compile, ['-O'])
+test('unpack_sums_3', normal, compile_and_run, ['-O'])
+test('unpack_sums_4', normal, compile_and_run, ['-O'])
+test('unpack_sums_5', normal, compile, ['-O'])
+test('unpack_sums_6', normal, compile_and_run, ['-O'])
+test('unpack_sums_7', [], makefile_test, [])
+test('unpack_sums_8', normal, compile_and_run, [""])
+test('unpack_sums_9', normal, compile, [""])
+
+# TODO: Need to run this in --slow mode only
+# test('sum_api_annots',
+#      [only_ways(['normal']),
+#       extra_files([ "unboxedsums" + str(i) + ".hs" for i in range(1, 12) ])],
+#      makefile_test, [])

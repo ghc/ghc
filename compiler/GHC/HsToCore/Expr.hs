@@ -369,7 +369,7 @@ dsExpr (ExplicitTuple _ tup_args boxity)
                         -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 
 dsExpr (ExplicitSum types alt arity expr)
-  = mkCoreUbxSum arity alt types <$> dsLExpr expr
+  = mkCoreUnboxedSum arity alt types <$> dsLExpr expr
 
 dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
