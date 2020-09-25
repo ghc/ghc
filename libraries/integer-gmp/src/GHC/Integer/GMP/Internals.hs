@@ -53,6 +53,7 @@ module GHC.Integer.GMP.Internals
 
       -- ** Conversions to/from 'BigNat'
 
+    , byteArrayToBigNat#
     , wordToBigNat
     , wordToBigNat2
     , bigNatToInt
@@ -432,3 +433,8 @@ importIntegerFromByteArray ba off sz endian = case runRW# (I.integerFromByteArra
 exportIntegerToMutableByteArray :: Integer -> MutableByteArray# RealWorld -> Word# -> Int# -> IO Word
 exportIntegerToMutableByteArray i mba off endian = IO (\s -> case I.integerToMutableByteArray# i mba off endian s of
    (# s', r #) -> (# s', W# r #))
+
+
+{-# DEPRECATED byteArrayToBigNat# "Use bigNatFromWordArray instead" #-}
+byteArrayToBigNat# :: ByteArray# -> GmpSize# -> BigNat
+byteArrayToBigNat# ba n = B.bigNatFromWordArray ba (int2Word# n)
