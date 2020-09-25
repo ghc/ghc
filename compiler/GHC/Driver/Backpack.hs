@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | This is the driver for the 'ghc --backpack' mode, which
 -- is a reimplementation of the "package manager" bits of
@@ -39,6 +40,7 @@ import GHC.Unit.State
 import GHC.Driver.Types
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
 import GHC.Utils.Error
 import GHC.Types.SrcLoc
 import GHC.Driver.Main
@@ -341,8 +343,8 @@ buildUnit session cid insts lunit = do
             unitAbiDepends = [],
             unitLinkerOptions = case session of
                                  TcSession -> []
-                                 _ -> obj_files,
-            unitImportDirs = [ hi_dir ],
+                                 _ -> map ST.pack $ obj_files,
+            unitImportDirs = [ ST.pack $ hi_dir ],
             unitIsExposed = False,
             unitIsIndefinite = case session of
                                  TcSession -> True
