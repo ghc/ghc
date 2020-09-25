@@ -850,6 +850,10 @@ emitPrimOp dflags primop = case primop of
     emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
   InterlockedExchange_Int -> \[src, value] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
+  AtomicCompareExchange_Int -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+    emitPrimCall [res] (MO_Cmpxchg (wordWidth platform)) [dst, expected, new]
+  AtomicCompareExchange_Addr -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+    emitPrimCall [res] (MO_Cmpxchg (wordWidth platform)) [dst, expected, new]
 
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opIntoRegs $ \[res] -> do

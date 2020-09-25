@@ -1,5 +1,7 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE ExistentialQuantification, NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module GHC.Event.Internal
     (
@@ -13,6 +15,9 @@ module GHC.Event.Internal
     , module GHC.Event.Internal.Types
     -- * Helpers
     , throwErrnoIfMinus1NoRetry
+
+    -- Atomic ptr exchange for WinIO
+    , exchangePtr
     ) where
 
 import Foreign.C.Error (eINTR, getErrno, throwErrno)
@@ -20,6 +25,8 @@ import System.Posix.Types (Fd)
 import GHC.Base
 import GHC.Num (Num(..))
 import GHC.Event.Internal.Types
+
+import GHC.Ptr (Ptr(..))
 
 -- | Event notification backend.
 data Backend = forall a. Backend {
@@ -95,3 +102,12 @@ throwErrnoIfMinus1NoRetry loc f = do
             err <- getErrno
             if err == eINTR then return 0 else throwErrno loc
         else return res
+
+{-# INLINE exchangePtr #-}
+-- | @exchangePtr pptr x@ swaps the pointer pointed to by @pptr@ with the value
+-- @x@, returning the old value.
+exchangePtr :: Ptr (Ptr a) -> Ptr a -> IO (Ptr a)
+exchangePtr (Ptr dst) (Ptr val) =
+  IO $ \s ->
+      case (atomicExchangeAddr# dst val s) of
+        (# s2, old_val #) -> (# s2, Ptr old_val #)
