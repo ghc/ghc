@@ -1,7 +1,10 @@
 {-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples #-}
-{-# OPTIONS_GHC -O2 #-}
+{-# OPTIONS_GHC -O2 -fno-warn-name-shadowing #-}
 -- We always optimise this, otherwise performance of a non-optimised
--- compiler is severely affected
+-- compiler is severely affected. This module used to live in the `ghc`
+-- package but has been moved to `ghc-boot` because the definition
+-- of the package database (needed in both ghc and in ghc-pkg) lives in
+-- `ghc-boot` and uses ShortText, which in turn depends on this module.
 
 -- -----------------------------------------------------------------------------
 --
@@ -36,7 +39,7 @@ module GHC.Utils.Encoding (
         toBase62Padded
   ) where
 
-import GHC.Prelude
+import Prelude
 
 import Foreign
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
