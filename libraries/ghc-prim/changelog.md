@@ -21,8 +21,8 @@
 
 - Add primops for atomic exchange:
 
-        interlockedExchangeAddr# :: Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
-        interlockedExchangeInt# :: Addr# -> Int# -> State# s -> (# State# s, Int# #)
+        atomicExchangeAddr# :: Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
+        atomicExchangeInt# :: Addr# -> Int# -> State# s -> (# State# s, Int# #)
 
 - Add an explicit fixity for `(~)` and `(~~)`: 
 

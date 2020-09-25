@@ -2561,6 +2561,8 @@ genCCall' config is32Bit (PrimTarget (MO_Xchg width)) [dst] [addr, value] _
     -- Copy the value into the target register, perform the exchange.
     let code     = toOL
                    [ MOV format (OpReg newval) (OpReg dst_r)
+                    -- On X86 xchg implies a lock prefix if we use a memory argument.
+                    -- so this is atomic.
                    , XCHG format (OpAddr amode) dst_r
                    ]
     return $ addr_code `appOL` newval_code `appOL` code
