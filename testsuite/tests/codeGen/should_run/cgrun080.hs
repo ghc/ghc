@@ -46,6 +46,6 @@ swapN n val ptr = do
 
 swap :: Ptr Int -> Int -> IO Int
 swap (Ptr ptr) (I# val) = do
-   IO $ \s -> case (interlockedExchangeInt# ptr val s) of
+   IO $ \s -> case (atomicExchangeInt# ptr val s) of
             (# s2, old_val #) -> (# s2, I# old_val #)
 

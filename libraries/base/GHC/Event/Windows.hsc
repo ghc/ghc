@@ -116,7 +116,6 @@ import GHC.Real
 import GHC.Enum (maxBound)
 import GHC.Windows
 import GHC.List (null)
-import GHC.Ptr
 import Text.Show
 
 #if defined(DEBUG)
@@ -307,8 +306,9 @@ cdOffset :: Int
 cdOffset = #{const __builtin_offsetof (HASKELL_OVERLAPPED, hoData)}
 
 -- | Terminator symbol for IOCP request
-nullReq :: Ptr (Ptr a)
-nullReq = castPtr $ unsafePerformIO $ new $ (nullPtr :: Ptr ())
+nullReq :: Ptr CompletionData
+nullReq = castPtr $ unsafePerformIO $ new (0 :: Int)
+{-# NOINLINE nullReq #-}
 
 -- I don't expect a lot of events, so a simple linked lists should be enough.
 type EventElements = [(Event, HandleData)]
@@ -667,7 +667,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                         -- the pointer.
                         debugIO $ "## Waiting for cancellation record... "
                         _ <- FFI.getOverlappedResult h lpol True
-                        oldDataPtr <- exchangePtr ptr_lpol nullReq
+                        oldDataPtr <- I.exchangePtr ptr_lpol nullReq
                         when (oldDataPtr == cdData) $
                           do reqs <- removeRequest
                              debugIO $ "-1.. " ++ show reqs ++ " requests queued after error."
@@ -1039,7 +1039,7 @@ processCompletion Manager{..} n delay = do
                     ++ " offset: " ++ show cdOffset
                     ++ " cdData: " ++ show cdDataCheck
                     ++ " at idx " ++ show idx
-          oldDataPtr <- exchangePtr ptr_lpol nullReq :: IO (Ptr CompletionData)
+          oldDataPtr <- I.exchangePtr ptr_lpol nullReq :: IO (Ptr CompletionData)
           debugIO $ ":: oldDataPtr " ++ show oldDataPtr
           when (oldDataPtr /= nullPtr) $
             do debugIO $ "exchanged: " ++ show oldDataPtr
