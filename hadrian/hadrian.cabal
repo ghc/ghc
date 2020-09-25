@@ -73,8 +73,7 @@ executable hadrian
                        , Rules.Gmp
                        , Rules.Libffi
                        , Rules.Library
-                       , Rules.Lint.Base
-                       , Rules.Lint.Compiler
+                       , Rules.Lint
                        , Rules.Nofib
                        , Rules.Program
                        , Rules.Register

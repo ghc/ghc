@@ -6,6 +6,7 @@
 {-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE ScopedTypeVariables     #-}
 {-# LANGUAGE TypeFamilies            #-}
+{-# LANGUAGE ViewPatterns            #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
