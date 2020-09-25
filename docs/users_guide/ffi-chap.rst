@@ -249,8 +249,13 @@ and is not permitted to appear nested within the type, as in the following
 Primitive imports
 ~~~~~~~~~~~~~~~~~
 
-GHC extends the FFI with an additional calling convention ``prim``,
-e.g.: ::
+.. extension:: GHCForeignImportPrim
+    :shortdesc: Enable prim calling convention. Intended for internal use only.
+
+    :since: 6.12.1
+
+With :extension:`GHCForeignImportPrim`, GHC extends the FFI with an additional
+calling convention ``prim``, e.g.: ::
 
        foreign import prim "foo" foo :: ByteArray# -> (# Int#, Int# #)
 
