@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.16.0.0 *TBA*
+
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
@@ -21,7 +24,7 @@
     `ConcFlags`, `DebugFlags`, `CCFlags`, `DoHeapProfile`, `ProfFlags`,
     `DoTrace`, `TraceFlags`, `TickyFlags`, `ParFlags`, `RTSFlags`, `RTSStats`,
     `GCStats`, `ByteOrder`, `GeneralCategory`, `SrcLoc`
-    
+
   * Add rules `unpackUtf8`, `unpack-listUtf8` and `unpack-appendUtf8` to `GHC.Base`.
     They correspond to their ascii versions and hopefully make it easier
     for libraries to handle utf8 encoded strings efficiently.
@@ -32,8 +35,8 @@
   * Add `MonadFix` and `MonadZip` instances for `Complex`
 
   * Add `Ix` instances for tuples of size 6 through 15
-   
-## 4.14.0.0 *TBA*
+
+## 4.14.0.0 *Jan 2020*
   * Bundled with GHC 8.10.1
 
   * Add a `TestEquality` instance for the `Compose` newtype.
