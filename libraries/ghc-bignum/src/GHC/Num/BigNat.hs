@@ -23,25 +23,10 @@ import GHC.Classes
 import GHC.Magic
 import GHC.Num.Primitives
 import GHC.Num.WordArray
+import GHC.Num.Backend
 
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
-#endif
-
-#if defined(BIGNUM_CHECK)
-import GHC.Num.BigNat.Check
-
-#elif defined(BIGNUM_NATIVE)
-import GHC.Num.BigNat.Native
-
-#elif defined(BIGNUM_FFI)
-import GHC.Num.BigNat.FFI
-
-#elif defined(BIGNUM_GMP)
-import GHC.Num.BigNat.GMP
-
-#else
-#error Undefined BigNat backend. Use a flag to select it (e.g. gmp, native, ffi)`
 #endif
 
 default ()

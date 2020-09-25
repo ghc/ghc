@@ -10,25 +10,18 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | Check Native implementation against another backend
-module GHC.Num.BigNat.Check where
+module GHC.Num.Backend.Check where
 
 import GHC.Prim
 import GHC.Types
 import GHC.Num.WordArray
 import GHC.Num.Primitives
-import qualified GHC.Num.BigNat.Native as Native
+import {-# SOURCE #-} GHC.Num.Integer
+import qualified GHC.Num.Backend.Native   as Native
+import qualified GHC.Num.Backend.Selected as Other
 
 #if defined(BIGNUM_NATIVE)
-#error You can't validate Native backed against itself. Choose another backend (e.g. gmp, ffi)
-
-#elif defined(BIGNUM_FFI)
-import qualified GHC.Num.BigNat.FFI as Other
-
-#elif defined(BIGNUM_GMP)
-import qualified GHC.Num.BigNat.GMP as Other
-
-#else
-#error Undefined BigNat backend. Use a flag to select it (e.g. gmp, native, ffi)`
+#error You can't validate Native backend against itself. Choose another backend (e.g. gmp, ffi)
 #endif
 
 default ()
@@ -461,3 +454,18 @@ bignat_powmod_words b e m =
    in case gr `eqWord#` nr of
        1# -> gr
        _  -> unexpectedValue_Word# (# #)
+
+integer_gcde
+   :: Integer
+   -> Integer
+   -> (# Integer, Integer, Integer #)
+integer_gcde a b =
+   let
+      !(# g0,x0,y0 #) = Other.integer_gcde a b
+      !(# g1,x1,y1 #) = Native.integer_gcde a b
+   in if isTrue# (integerEq# x0 x1
+                  &&# integerEq# y0 y1
+                  &&# integerEq# g0 g1)
+         then (# g0, x0, y0 #)
+         else case unexpectedValue of
+            !_ -> (# integerZero, integerZero, integerZero #)
