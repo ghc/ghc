@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -82,16 +83,16 @@ import Data.Bifunctor
 import Data.Binary as Bin
 import Data.Binary.Put as Bin
 import Data.Binary.Get as Bin
+import Data.List (intersperse)
 import Control.Exception as Exception
 import Control.Monad (when)
 import System.FilePath as FilePath
-import qualified System.FilePath.Posix as FilePath.Posix
 import System.IO
 import System.IO.Error
 import GHC.IO.Exception (IOErrorType(InappropriateType))
+import qualified GHC.Data.ShortText as ST
 import GHC.IO.Handle.Lock
 import System.Directory
-import Data.List (stripPrefix)
 
 -- | @ghc-boot@'s UnitInfo, serialized to the database.
 type DbUnitInfo      = GenericUnitInfo BS.ByteString BS.ByteString BS.ByteString BS.ByteString BS.ByteString DbModule
@@ -142,28 +143,28 @@ data GenericUnitInfo compid srcpkgid srcpkgname uid modulename mod = GenericUnit
       -- components that can be registered in a database and used by other
       -- modules.
 
-   , unitAbiHash        :: String
+   , unitAbiHash        :: ST.ShortText
       -- ^ ABI hash used to avoid mixing up units compiled with different
       -- dependencies, compiler, options, etc.
 
    , unitDepends        :: [uid]
       -- ^ Identifiers of the units this one depends on
 
-   , unitAbiDepends     :: [(uid, String)]
+   , unitAbiDepends     :: [(uid, ST.ShortText)]
      -- ^ Like 'unitDepends', but each dependency is annotated with the ABI hash
      -- we expect the dependency to respect.
 
-   , unitImportDirs     :: [FilePath]
+   , unitImportDirs     :: [FilePathST]
       -- ^ Directories containing module interfaces
 
-   , unitLibraries      :: [String]
+   , unitLibraries      :: [ST.ShortText]
       -- ^ Names of the Haskell libraries provided by this unit
 
-   , unitExtDepLibsSys  :: [String]
+   , unitExtDepLibsSys  :: [ST.ShortText]
       -- ^ Names of the external system libraries that this unit depends on. See
       -- also `unitExtDepLibsGhc` field.
 
-   , unitExtDepLibsGhc  :: [String]
+   , unitExtDepLibsGhc  :: [ST.ShortText]
       -- ^ Because of slight differences between the GHC dynamic linker (in
       -- GHC.Runtime.Linker) and the
       -- native system linker, some packages have to link with a different list
@@ -174,46 +175,46 @@ data GenericUnitInfo compid srcpkgid srcpkgname uid modulename mod = GenericUnit
       -- If this field is set, then we use that instead of the
       -- `unitExtDepLibsSys` field.
 
-   , unitLibraryDirs    :: [FilePath]
+   , unitLibraryDirs    :: [FilePathST]
       -- ^ Directories containing libraries provided by this unit. See also
       -- `unitLibraryDynDirs`.
       --
       -- It seems to be used to store paths to external library dependencies
       -- too.
 
-   , unitLibraryDynDirs :: [FilePath]
+   , unitLibraryDynDirs :: [FilePathST]
       -- ^ Directories containing the dynamic libraries provided by this unit.
       -- See also `unitLibraryDirs`.
       --
       -- It seems to be used to store paths to external dynamic library
       -- dependencies too.
 
-   , unitExtDepFrameworks :: [String]
+   , unitExtDepFrameworks :: [ST.ShortText]
       -- ^ Names of the external MacOS frameworks that this unit depends on.
 
-   , unitExtDepFrameworkDirs :: [FilePath]
+   , unitExtDepFrameworkDirs :: [FilePathST]
       -- ^ Directories containing MacOS frameworks that this unit depends
       -- on.
 
-   , unitLinkerOptions  :: [String]
+   , unitLinkerOptions  :: [ST.ShortText]
       -- ^ Linker (e.g. ld) command line options
 
-   , unitCcOptions      :: [String]
+   , unitCcOptions      :: [ST.ShortText]
       -- ^ C compiler options that needs to be passed to the C compiler when we
       -- compile some C code against this unit.
 
-   , unitIncludes       :: [String]
+   , unitIncludes       :: [ST.ShortText]
       -- ^ C header files that are required by this unit (provided by this unit
       -- or external)
 
-   , unitIncludeDirs    :: [FilePath]
+   , unitIncludeDirs    :: [FilePathST]
       -- ^ Directories containing C header files that this unit depends
       -- on.
 
-   , unitHaddockInterfaces :: [FilePath]
+   , unitHaddockInterfaces :: [FilePathST]
       -- ^ Paths to Haddock interface files for this unit
 
-   , unitHaddockHTMLs   :: [FilePath]
+   , unitHaddockHTMLs   :: [FilePathST]
       -- ^ Paths to Haddock directories containing HTML files
 
    , unitExposedModules :: [(modulename, Maybe mod)]
@@ -241,6 +242,8 @@ data GenericUnitInfo compid srcpkgid srcpkgname uid modulename mod = GenericUnit
 
    }
    deriving (Eq, Show)
+
+type FilePathST = ST.ShortText
 
 -- | Convert between GenericUnitInfo instances
 mapGenericUnitInfo
@@ -646,12 +649,12 @@ instance Binary DbInstUnitId where
 -- Also perform a similar substitution for the older GHC-specific
 -- "$topdir" variable. The "topdir" is the location of the ghc
 -- installation (obtained from the -B option).
-mkMungePathUrl :: FilePath -> FilePath -> (FilePath -> FilePath, FilePath -> FilePath)
+mkMungePathUrl :: FilePathST -> FilePathST -> (FilePathST -> FilePathST, FilePathST -> FilePathST)
 mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
    where
     munge_path p
-      | Just p' <- stripVarPrefix "${pkgroot}" p = pkgroot ++ p'
-      | Just p' <- stripVarPrefix "$topdir"    p = top_dir ++ p'
+      | Just p' <- stripVarPrefix "${pkgroot}" p = mappend pkgroot p'
+      | Just p' <- stripVarPrefix "$topdir"    p = mappend top_dir p'
       | otherwise                                = p
 
     munge_url p
@@ -659,20 +662,19 @@ mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
       | Just p' <- stripVarPrefix "$httptopdir"   p = toUrlPath top_dir p'
       | otherwise                                   = p
 
-    toUrlPath r p = "file:///"
-                 -- URLs always use posix style '/' separators:
-                 ++ FilePath.Posix.joinPath
-                        (r : -- We need to drop a leading "/" or "\\"
-                             -- if there is one:
-                             dropWhile (all isPathSeparator)
-                                       (FilePath.splitDirectories p))
+    toUrlPath r p = mconcat $ "file:///" : (intersperse "/" (r : (splitDirectories p)))
+                                          -- URLs always use posix style '/' separators
+
+    -- We need to drop a leading "/" or "\\" if there is one:
+    splitDirectories :: FilePathST -> [FilePathST]
+    splitDirectories p  = filter (not . ST.null) $ ST.splitFilePath p
 
     -- We could drop the separator here, and then use </> above. However,
     -- by leaving it in and using ++ we keep the same path separator
     -- rather than letting FilePath change it to use \ as the separator
-    stripVarPrefix var path = case stripPrefix var path of
-                              Just [] -> Just []
-                              Just cs@(c : _) | isPathSeparator c -> Just cs
+    stripVarPrefix var path = case ST.stripPrefix var path of
+                              Just "" -> Just ""
+                              Just cs | isPathSeparator (ST.head cs) -> Just cs
                               _ -> Nothing
 
 
@@ -684,7 +686,7 @@ mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
 -- Also perform a similar substitution for the older GHC-specific
 -- "$topdir" variable. The "topdir" is the location of the ghc
 -- installation (obtained from the -B option).
-mungeUnitInfoPaths :: FilePath -> FilePath -> GenericUnitInfo a b c d e f -> GenericUnitInfo a b c d e f
+mungeUnitInfoPaths :: FilePathST -> FilePathST -> GenericUnitInfo a b c d e f -> GenericUnitInfo a b c d e f
 mungeUnitInfoPaths top_dir pkgroot pkg =
    -- TODO: similar code is duplicated in utils/ghc-pkg/Main.hs
     pkg

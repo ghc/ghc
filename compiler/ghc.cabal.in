@@ -547,7 +547,6 @@ Library
         GHC.Data.BooleanFormula
         GHC.Utils.BufHandle
         GHC.Data.Graph.Directed
-        GHC.Utils.Encoding
         GHC.Utils.IO.Unsafe
         GHC.Data.FastMutInt
         GHC.Data.FastString

@@ -25,6 +25,7 @@ import GHC.Unit
 import GHC.SysTools.Elf
 import GHC.Utils.Misc
 import GHC.Prelude
+import qualified GHC.Data.ShortText as ST
 
 import Control.Monad
 import Data.Maybe
@@ -57,7 +58,7 @@ mkExtraObj dflags extn xs
       -- we're compiling C or assembler. When compiling C, we pass the usual
       -- set of include directories and PIC flags.
       cOpts = map Option (picCCOpts dflags)
-                    ++ map (FileOption "-I")
+                    ++ map (FileOption "-I" . ST.unpack)
                             (unitIncludeDirs $ unsafeLookupUnit pkgs rtsUnit)
 
       -- When compiling assembler code, we drop the usual C options, and if the

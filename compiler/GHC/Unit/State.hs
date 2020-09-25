@@ -99,6 +99,7 @@ import GHC.Data.Maybe
 
 import System.Environment ( getEnv )
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
 import GHC.Utils.Error  ( debugTraceMsg, MsgDoc, dumpIfSet_dyn,
                           withTiming, DumpFormat (..) )
 import GHC.Utils.Exception
@@ -749,7 +750,7 @@ mungeUnitInfo :: FilePath -> FilePath
                    -> UnitInfo -> UnitInfo
 mungeUnitInfo top_dir pkgroot =
     mungeDynLibFields
-  . mungeUnitInfoPaths top_dir pkgroot
+  . mungeUnitInfoPaths (ST.pack top_dir) (ST.pack pkgroot)
 
 mungeDynLibFields :: UnitInfo -> UnitInfo
 mungeDynLibFields pkg =
@@ -1797,7 +1798,7 @@ getUnitIncludePath ctx unit_state home_unit pkgs =
   collectIncludeDirs `fmap` getPreloadUnitsAnd ctx unit_state home_unit pkgs
 
 collectIncludeDirs :: [UnitInfo] -> [FilePath]
-collectIncludeDirs ps = ordNub (filter notNull (concatMap unitIncludeDirs ps))
+collectIncludeDirs ps = map ST.unpack $ ordNub (filter (not . ST.null) (concatMap unitIncludeDirs ps))
 
 -- | Find all the library paths in these and the preload packages
 getUnitLibraryPath :: SDocContext -> UnitState -> HomeUnit -> Ways -> [UnitId] -> IO [String]
@@ -1822,8 +1823,8 @@ collectLinkOpts :: DynFlags -> [UnitInfo] -> ([String], [String], [String])
 collectLinkOpts dflags ps =
     (
         concatMap (map ("-l" ++) . packageHsLibs dflags) ps,
-        concatMap (map ("-l" ++) . unitExtDepLibsSys) ps,
-        concatMap unitLinkerOptions ps
+        concatMap (map ("-l" ++) . map ST.unpack . unitExtDepLibsSys) ps,
+        concatMap (map ST.unpack . unitLinkerOptions) ps
     )
 collectArchives :: DynFlags -> UnitInfo -> IO [FilePath]
 collectArchives dflags pc =
@@ -1831,7 +1832,7 @@ collectArchives dflags pc =
                         | searchPath <- searchPaths
                         , lib <- libs ]
   where searchPaths = ordNub . filter notNull . libraryDirsForWay (ways dflags) $ pc
-        libs        = packageHsLibs dflags pc ++ unitExtDepLibsSys pc
+        libs        = packageHsLibs dflags pc ++ (map ST.unpack $ unitExtDepLibsSys pc)
 
 getLibs :: DynFlags -> [UnitId] -> IO [(String,String)]
 getLibs dflags pkgs = do
@@ -1846,7 +1847,7 @@ getLibs dflags pkgs = do
     filterM (doesFileExist . fst) candidates
 
 packageHsLibs :: DynFlags -> UnitInfo -> [String]
-packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
+packageHsLibs dflags p = map (mkDynName . addSuffix . ST.unpack) (unitLibraries p)
   where
         ways0 = ways dflags
 
@@ -1895,27 +1896,27 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
 
 -- | Either the 'unitLibraryDirs' or 'unitLibraryDynDirs' as appropriate for the way.
 libraryDirsForWay :: Ways -> UnitInfo -> [String]
-libraryDirsForWay ws
-  | WayDyn `elem` ws = unitLibraryDynDirs
-  | otherwise        = unitLibraryDirs
+libraryDirsForWay ws ui
+  | WayDyn `elem` ws = map ST.unpack $ unitLibraryDynDirs ui
+  | otherwise        = map ST.unpack $ unitLibraryDirs ui
 
 -- | Find all the C-compiler options in these and the preload packages
 getUnitExtraCcOpts :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
 getUnitExtraCcOpts ctx unit_state home_unit pkgs = do
   ps <- getPreloadUnitsAnd ctx unit_state home_unit pkgs
-  return (concatMap unitCcOptions ps)
+  return $ map ST.unpack (concatMap unitCcOptions ps)
 
 -- | Find all the package framework paths in these and the preload packages
 getUnitFrameworkPath :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
 getUnitFrameworkPath ctx unit_state home_unit pkgs = do
   ps <- getPreloadUnitsAnd ctx unit_state home_unit pkgs
-  return (ordNub (filter notNull (concatMap unitExtDepFrameworkDirs ps)))
+  return $ map ST.unpack (ordNub (filter (not . ST.null) (concatMap unitExtDepFrameworkDirs ps)))
 
 -- | Find all the package frameworks in these and the preload packages
 getUnitFrameworks :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
 getUnitFrameworks ctx unit_state home_unit pkgs = do
   ps <- getPreloadUnitsAnd ctx unit_state home_unit pkgs
-  return (concatMap unitExtDepFrameworks ps)
+  return $ map ST.unpack (concatMap unitExtDepFrameworks ps)
 
 -- -----------------------------------------------------------------------------
 -- Package Utils
