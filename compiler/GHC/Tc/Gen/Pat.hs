@@ -735,7 +735,7 @@ tcPatSig :: Bool                    -- True <=> pattern binding
                  HsWrapper)         -- Coercion due to unification with actual ty
                                     -- Of shape:  res_ty ~ sig_ty
 tcPatSig in_pat_bind sig res_ty
- = do  { (sig_wcs, sig_tvs, sig_ty) <- tcHsPatSigType PatSigCtxt sig
+ = do  { (sig_wcs, sig_tvs, sig_ty) <- tcHsPatSigType PatSigCtxt sig OpenKind
         -- sig_tvs are the type variables free in 'sig',
         -- and not already in scope. These are the ones
         -- that should be brought into scope
@@ -1194,7 +1194,13 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
 
 tcConTyArg :: Checker (HsPatSigType GhcRn) TcType
 tcConTyArg penv rn_ty thing_inside
-  = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt rn_ty
+  = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt rn_ty AnyKind
+               -- AnyKind is a bit suspect: it really should be the kind gotten
+               -- from instantiating the constructor type. But this would be
+               -- hard to get right, because earlier type patterns might influence
+               -- the kinds of later patterns. In any case, it all gets checked
+               -- by the calls to unifyType in tcConArgs, which will also unify
+               -- kinds.
        ; when (not (null sig_ibs) && inPatBind penv) $
            addErr (text "Binding type variables is not allowed in pattern bindings")
        ; result <- tcExtendNameTyVarEnv sig_wcs $
