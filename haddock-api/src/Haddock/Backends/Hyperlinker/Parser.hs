@@ -274,6 +274,7 @@ classify tok =
     ITdot                  -> TkOperator
     ITstar              {} -> TkOperator
     ITtypeApp              -> TkGlyph
+    ITpercent              -> TkGlyph
 
     ITbiglam               -> TkGlyph
 
