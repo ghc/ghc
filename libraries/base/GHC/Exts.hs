@@ -133,7 +133,7 @@ import Control.Applicative (ZipList(..))
 
 -- XXX This should really be in Data.Tuple, where the definitions are
 maxTupleSize :: Int
-maxTupleSize = 62
+maxTupleSize = 64
 
 -- | 'the' ensures that all the elements of the list are identical
 -- and then returns that unique element

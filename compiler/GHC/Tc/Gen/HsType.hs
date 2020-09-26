@@ -3745,7 +3745,7 @@ Consider
 
 * GHC.Tc.Errors.mkHoleError finally reports the error.
 
-An annoying difficulty happens if there are more than 62 inferred
+An annoying difficulty happens if there are more than 64 inferred
 constraints. Then we need to fill in the TcTyVar with (say) a 70-tuple.
 Where do we find the TyCon?  For good reasons we only have constraint
 tuples up to 62 (see Note [How tuples work] in GHC.Builtin.Types).  So how
