@@ -1047,6 +1047,8 @@ The final result (after the renamer) will be:
 -}
 
 -- | Look up a global variable, local variable or one or more record selector functions.
+-- It does NOT find a record selector created under NoFieldSelectors.
+-- See Note [NoFieldSelectors]
 lookupOccRn_overloaded_expr :: DuplicateRecordFields -> RdrName -> RnM (Maybe LookupOccRnOverloadedResult)
 lookupOccRn_overloaded_expr overload_ok = lookupOccRnX_maybe global_lookup LookupOccRnUnique
       where
@@ -1158,8 +1160,6 @@ lookupGlobalOccRn_resolve overload_ok rdr_name res = case res of
     return $ Just $ LookupOccRnUnique $ gre_name (NE.head gres)
 
 -- | Look up a variable or record selector functions.
--- It does NOT find a record selector created under NoFieldSelectors.
--- See Note [NoFieldSelectors]
 lookupGlobalOccRn_overloaded_expr :: DuplicateRecordFields
   -> RdrName
   -> RnM (Maybe LookupOccRnOverloadedResult)
