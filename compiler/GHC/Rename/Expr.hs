@@ -135,12 +135,11 @@ rnExpr (HsVar _ (L l v))
 
               | otherwise
               -> finishHsVar (L l name) ;
-            Just (LookupOccRnSelectors [s]) ->
+            Just (LookupOccRnSelectors (s NE.:| [])) ->
               return ( HsRecFld noExtField (Unambiguous s (L l v) ), unitFV s) ;
-           Just (LookupOccRnSelectors fs@(_:_:_)) ->
+           Just (LookupOccRnSelectors fs@(_ NE.:| _:_)) ->
               return ( HsRecFld noExtField (Ambiguous noExtField (L l v))
-                     , mkFVs fs);
-           Just (LookupOccRnSelectors [])         -> panic "runExpr/HsVar" } }
+                     , mkFVs $ NE.toList fs); } }
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)

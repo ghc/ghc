@@ -88,6 +88,7 @@ import GHC.Rename.Utils
 import qualified Data.Semigroup as Semi
 import Data.Either      ( partitionEithers )
 import Data.List        ( find, sortBy )
+import qualified Data.List.NonEmpty as NE
 import Control.Arrow    ( first )
 import Data.Function
 import GHC.Types.FieldLabel
@@ -656,19 +657,20 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name
             [g] -> return $ IncorrectParent parent
                               (gre_name g) (ppr $ gre_name g)
                               [p | Just p <- [getParent g]]
-            gss@(g:_:_) ->
+            gss@(g:gss'@(_:_)) ->
               if all isRecFldGRE gss && overload_ok
                 then return $
                       IncorrectParent parent
                         (gre_name g)
                         (ppr $ expectJust "noMatchingParentErr" (greLabel g))
                         [p | x <- gss, Just p <- [getParent x]]
-                else mkNameClashErr gss
+                else mkNameClashErr $ g NE.:| gss'
 
-        mkNameClashErr :: [GlobalRdrElt] -> RnM ChildLookupResult
+        mkNameClashErr :: NE.NonEmpty GlobalRdrElt -> RnM ChildLookupResult
         mkNameClashErr gres = do
           addNameClashErrRn rdr_name gres
-          return (FoundName (gre_par (head gres)) (gre_name (head gres)))
+          let gre = NE.head gres
+          return (FoundName (gre_par gre) (gre_name gre))
 
         getParent :: GlobalRdrElt -> Maybe Name
         getParent (GRE { gre_par = p } ) =
@@ -704,7 +706,7 @@ data DisambigInfo
           -- The GRE has no parent. It could be a pattern synonym.
        | DisambiguatedOccurrence GlobalRdrElt
           -- The parent of the GRE is the correct parent
-       | AmbiguousOccurrence [GlobalRdrElt]
+       | AmbiguousOccurrence (NE.NonEmpty GlobalRdrElt)
           -- For example, two normal identifiers with the same name are in
           -- scope. They will both be resolved to "UniqueOccurrence" and the
           -- monoid will combine them to this failing case.
@@ -724,13 +726,13 @@ instance Semi.Semigroup DisambigInfo where
   NoOccurrence <> m = m
   m <> NoOccurrence = m
   UniqueOccurrence g <> UniqueOccurrence g'
-    = AmbiguousOccurrence [g, g']
+    = AmbiguousOccurrence $ g NE.:| [g']
   UniqueOccurrence g <> AmbiguousOccurrence gs
-    = AmbiguousOccurrence (g:gs)
+    = AmbiguousOccurrence (g `NE.cons` gs)
   AmbiguousOccurrence gs <> UniqueOccurrence g'
-    = AmbiguousOccurrence (g':gs)
+    = AmbiguousOccurrence (g' `NE.cons` gs)
   AmbiguousOccurrence gs <> AmbiguousOccurrence gs'
-    = AmbiguousOccurrence (gs ++ gs')
+    = AmbiguousOccurrence (gs Semi.<> gs')
 
 instance Monoid DisambigInfo where
   mempty = NoOccurrence
@@ -1121,14 +1123,14 @@ data LookupOccRnOverloadedResult
   = LookupOccRnUnique Name
   -- ^  name uniquely refers to x,
   -- or there is a name clash (reported)
-  | LookupOccRnSelectors [Name]
+  | LookupOccRnSelectors (NE.NonEmpty Name)
   -- ^ name refers to one or more record selectors;
   -- If DuplicateRecordFields is disabled, this list will be
   -- a singleton.
 
 nameFromLookupOccRnOverloadedResult :: LookupOccRnOverloadedResult -> [Name]
 nameFromLookupOccRnOverloadedResult (LookupOccRnUnique x) = [x]
-nameFromLookupOccRnOverloadedResult (LookupOccRnSelectors xs) = xs
+nameFromLookupOccRnOverloadedResult (LookupOccRnSelectors xs) = NE.toList xs
 
 instance Outputable LookupOccRnOverloadedResult where
   ppr (LookupOccRnUnique x) = text "LookupOccRnUnique " <> ppr x
@@ -1144,15 +1146,15 @@ lookupGlobalOccRn_resolve :: DuplicateRecordFields
 lookupGlobalOccRn_resolve overload_ok rdr_name res = case res of
   GreNotFound  -> return Nothing
   OneNameMatch gre -> do
-    let wrapper = if isRecFldGRE gre then LookupOccRnSelectors . (:[]) else LookupOccRnUnique
+    let wrapper = if isRecFldGRE gre then LookupOccRnSelectors . pure else LookupOccRnUnique
     return $ Just $ wrapper $ gre_name gre
   MultipleNames gres | any isRecFldGRE gres, overload_ok == DuplicateRecordFields ->
     -- Don't record usage for ambiguous selectors
     -- until we know which is meant
-    return $ Just $ LookupOccRnSelectors $ map gre_name gres
+    return $ Just $ LookupOccRnSelectors $ fmap gre_name gres
   MultipleNames gres  -> do
     addNameClashErrRn rdr_name gres
-    return $ Just $ LookupOccRnUnique $ gre_name (head gres)
+    return $ Just $ LookupOccRnUnique $ gre_name (NE.head gres)
 
 -- | Look up a variable or record selector functions.
 -- It does NOT find a record selector created under NoFieldSelectors.
@@ -1169,7 +1171,7 @@ lookupGlobalOccRn_overloaded_expr overload_ok rdr_name =
               []    -> return GreNotFound
               [gre] -> do { addUsedGRE True gre
                           ; return (OneNameMatch gre) }
-              gres  -> return (MultipleNames gres)
+              gre : gres  -> return $ MultipleNames $ gre NE.:| gres
          ; lookupGlobalOccRn_resolve overload_ok rdr_name res
          }
 
@@ -1203,7 +1205,7 @@ lookupGlobalOccRn_overloaded_pat overload_ok rdr_name =
 
 data GreLookupResult = GreNotFound
                      | OneNameMatch GlobalRdrElt
-                     | MultipleNames [GlobalRdrElt]
+                     | MultipleNames (NE.NonEmpty GlobalRdrElt)
 
 lookupGreRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 -- Look up the RdrName in the GlobalRdrEnv
@@ -1219,7 +1221,7 @@ lookupGreRn_maybe rdr_name
         MultipleNames gres -> do
           traceRn "lookupGreRn_maybe:NameClash" (ppr gres)
           addNameClashErrRn rdr_name gres
-          return $ Just (head gres)
+          return $ Just (NE.head gres)
         GreNotFound -> return Nothing
 
 {-
@@ -1258,7 +1260,7 @@ lookupGreRn_helper rdr_name
             []    -> return GreNotFound
             [gre] -> do { addUsedGRE True gre
                         ; return (OneNameMatch gre) }
-            gres  -> return (MultipleNames gres) }
+            gre : gres  -> return (MultipleNames $ gre NE.:| gres) }
 
 lookupGreAvailRn :: RdrName -> RnM (Name, AvailInfo)
 -- Used in export lists
@@ -1441,9 +1443,9 @@ lookupQualifiedNameGHCi rdr_name
     availNames' (AvailTC _ ns fs) = map LookupOccRnUnique ns
       ++ map (LookupOccRnSelectors . pure . flSelector) fs
     check occ (LookupOccRnUnique n) = [ LookupOccRnUnique n | nameOccName n == occ]
-    check occ (LookupOccRnSelectors xs) = case filter ((==occ) . nameOccName) xs of
+    check occ (LookupOccRnSelectors xs) = case NE.filter ((==occ) . nameOccName) xs of
       [] -> []
-      xs -> [LookupOccRnSelectors xs]
+      x : xs -> [LookupOccRnSelectors $ x NE.:| xs]
     go_for_it dflags is_ghci
       | Just (mod,occ) <- isQual_maybe rdr_name
       , is_ghci

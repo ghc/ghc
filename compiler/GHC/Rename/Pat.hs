@@ -757,9 +757,9 @@ rnHsRecUpdFields flds
                                       Nothing ->
                                         do { addErr
                                                (unknownSubordinateErr doc lbl)
-                                           ; return (LookupOccRnSelectors []) }
-                                      Just r  -> return r }
-                          else fmap LookupOccRnUnique $ lookupGlobalOccRn lbl
+                                           ; return Nothing }
+                                      Just r  -> return $ Just r }
+                          else fmap (Just . LookupOccRnUnique) $ lookupGlobalOccRn lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                                -- Discard any module qualifier (#11662)
@@ -769,15 +769,15 @@ rnHsRecUpdFields flds
            ; (arg'', fvs) <- rnLExpr arg'
 
            ; let fvs' = case sel of
-                          LookupOccRnUnique sel_name -> fvs `addOneFV` sel_name
-                          LookupOccRnSelectors [sel_name] -> fvs `addOneFV` sel_name
-                          LookupOccRnSelectors _       -> fvs
+                          Just (LookupOccRnUnique sel_name) -> fvs `addOneFV` sel_name
+                          Just (LookupOccRnSelectors (sel_name NE.:| [])) -> fvs `addOneFV` sel_name
+                          _       -> fvs
                  lbl' = case sel of
-                          LookupOccRnUnique sel_name ->
+                          Just (LookupOccRnUnique sel_name) ->
                                      L loc (Unambiguous sel_name   (L loc lbl))
-                          LookupOccRnSelectors [sel_name] ->
+                          Just (LookupOccRnSelectors (sel_name NE.:| [])) ->
                                      L loc (Unambiguous sel_name   (L loc lbl))
-                          LookupOccRnSelectors _ -> L loc (Ambiguous   noExtField (L loc lbl))
+                          _ -> L loc (Ambiguous   noExtField (L loc lbl))
 
            ; return (L l (HsRecField { hsRecFieldLbl = lbl'
                                      , hsRecFieldArg = arg''

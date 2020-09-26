@@ -88,6 +88,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Function
 import Data.List (partition, sortBy, groupBy, intersect)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as Set
 
 {-
@@ -2389,7 +2390,9 @@ addAmbiguousNameErr :: RdrName -> TcM ()
 addAmbiguousNameErr rdr
   = do { env <- getGlobalRdrEnv
        ; let gres = lookupGRE_RdrName rdr env
-       ; setErrCtxt [] $ addNameClashErrRn rdr gres}
+       ; case gres of
+         [] -> panic "addAmbiguousNameErr: not found"
+         gre : gres -> setErrCtxt [] $ addNameClashErrRn rdr $ gre NE.:| gres}
 
 -- Disambiguate the fields in a record update.
 -- See Note [Disambiguating record fields]

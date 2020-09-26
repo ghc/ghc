@@ -498,7 +498,7 @@ wildcardDoc herald =
     $$ nest 2 (text "Possible fix" <> colon <+> text "omit the"
                                             <+> quotes (text ".."))
 
-addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
+addNameClashErrRn :: RdrName -> NE.NonEmpty GlobalRdrElt -> RnM ()
 addNameClashErrRn rdr_name gres
   | all isLocalGRE gres && not (any isRecFldGRE gres)
                -- If there are two or more *local* defns, we'll have reported
@@ -508,7 +508,7 @@ addNameClashErrRn rdr_name gres
                  , text "It could refer to"
                  , nest 3 (vcat (msg1 : msgs)) ])
   where
-    (np1:nps) = gres
+    np1 NE.:| nps = gres
     msg1 =  text "either" <+> ppr_gre np1
     msgs = [text "    or" <+> ppr_gre np | np <- nps]
     ppr_gre gre = sep [ pp_gre_name gre <> comma
