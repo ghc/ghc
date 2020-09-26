@@ -730,8 +730,7 @@ rnHsRecUpdFields
 rnHsRecUpdFields flds
   = do { pun_ok        <- xoptM LangExt.RecordPuns
        ; overload_ok   <- (\x -> if x then DuplicateRecordFields else NoDuplicateRecordFields) <$> xoptM LangExt.DuplicateRecordFields
-       ; has_sel       <- (\x -> if x then FieldSelectors else NoFieldSelectors) <$> xoptM LangExt.FieldSelectors
-       ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok has_sel) flds
+       ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok) flds
        ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds
 
        -- Check for an empty record update  e {}
@@ -742,24 +741,22 @@ rnHsRecUpdFields flds
   where
     doc = text "constructor field name"
 
-    rn_fld :: Bool -> DuplicateRecordFields -> FieldSelectors -> LHsRecUpdField GhcPs
+    rn_fld :: Bool -> DuplicateRecordFields -> LHsRecUpdField GhcPs
            -> RnM (LHsRecUpdField GhcRn, FreeVars)
-    rn_fld pun_ok overload_ok has_sel (L l (HsRecField { hsRecFieldLbl = L loc f
+    rn_fld pun_ok overload_ok (L l (HsRecField { hsRecFieldLbl = L loc f
                                                , hsRecFieldArg = arg
                                                , hsRecPun      = pun }))
       = do { let lbl = rdrNameAmbiguousFieldOcc f
            ; sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Expr
-                      if overload_ok == DuplicateRecordFields || has_sel == NoFieldSelectors
-                          then do { mb <- lookupGlobalOccRn_overloaded_pat overload_ok lbl
-                                  ; case mb of
-                                      Nothing ->
-                                        do { addErr
-                                               (unknownSubordinateErr doc lbl)
-                                           ; return Nothing }
-                                      Just r  -> return $ Just r }
-                          else fmap (Just . LookupOccRnUnique) $ lookupGlobalOccRn lbl
+                      do  { mb <- lookupGlobalOccRn_overloaded_pat overload_ok lbl
+                          ; case mb of
+                              Nothing ->
+                                do { addErr
+                                        (unknownSubordinateErr doc lbl)
+                                    ; return Nothing }
+                              Just r -> return $ Just r }
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                                -- Discard any module qualifier (#11662)
