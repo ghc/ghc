@@ -1179,12 +1179,21 @@ lookupGlobalOccRn_overloaded_expr overload_ok rdr_name =
 Note [NoFieldSelectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Field selector functions are crucial to GHC's internal record mechanics.
-Therefore we generate selector functions regardless of the FieldSelectors extension,
-but when they are created under NoFieldSelectors, they are hidden from the set of variables in expressions
-(i.e. they can't be used as functions).
-They are still available inside record construction, updates and patterns.
+Therefore we generate selector functions regardless of the FieldSelectors extension.
+Instead, we hide selector functions from 'lookupOccRn_overloaded_expr',
+the function which finds one or more selectors or a non-selector variable.
+Each 'FieldLabel' contains a field indicating whether FieldSelectors is enabled in the definition.
+'lookupOccRn_overloaded_expr' ignores ones that have been defined with NoFieldSelectors.
+Therefore the selectors can't be uses as functions.
+On the other hand, 'lookupOccRn_overloaded_pat', the function used to look up field selectors in record
+construction/update/patterns, does look at all selectors.
+
 In order to avoid name clashes, selector names are mangled in the same way as DuplicateRecordFields
-(cf. 'GHC.Types.FieldLabel.mkFieldLabelOccs').
+(cf. 'GHC.Types.FieldLabel.mkFieldLabelOccs'). For example, the following definition
+
+    data T = MkT { foo :: Int }
+
+generates @$sel:foo:MkT@.
 -}
 
 -- | Look up a variable or record selectors.
