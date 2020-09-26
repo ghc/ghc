@@ -1136,7 +1136,7 @@ instance Outputable LookupOccRnOverloadedResult where
   ppr (LookupOccRnUnique x) = text "LookupOccRnUnique " <> ppr x
   ppr (LookupOccRnSelectors xs) = text "LoookupOccRnSelectors " <> ppr xs
 
--- | Process a list of 'GlobalRdrElt's matching the given 'RdrName's
+-- | Process a list of 'GlobalRdrElt's in 'GreLookupResult' matching the given 'RdrName'
 -- and check if it is a unique 'Name' or a set of record selector functions.
 -- See Note [NoFieldSelectors]
 lookupGlobalOccRn_resolve :: DuplicateRecordFields
