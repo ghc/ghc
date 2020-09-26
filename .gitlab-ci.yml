@@ -17,14 +17,15 @@ variables:
   GIT_SUBMODULE_STRATEGY: "recursive"
 
 stages:
-  - tool-lint   # Source linting of the tools
-  - quick-build # A very quick smoke-test to weed out broken commits
-  - lint        # Source linting of GHC
-  - build       # A quick smoke-test to weed out broken commits
-  - full-build  # Build all the things
-  - packaging   # Source distribution, etc.
-  - testing     # head.hackage correctness and compiler performance testing
-  - deploy      # push documentation
+  - tool-lint      # Source linting of the tools
+  - quick-build    # A very quick smoke-test to weed out broken commits
+  - lint-bootstrap # A single stage that prepares the environment for `lint`
+  - lint           # Source linting of GHC
+  - build          # A quick smoke-test to weed out broken commits
+  - full-build     # Build all the things
+  - packaging      # Source distribution, etc.
+  - testing        # head.hackage correctness and compiler performance testing
+  - deploy         # push documentation
 
 # Note [The CI Story]
 # ~~~~~~~~~~~~~~~~~~~
@@ -274,10 +275,11 @@ hadrian-ghc-in-ghci:
       - cabal-cache
 
 ############################################################
-# GHC source code linting
+# GHC linting bootstrapping
 ############################################################
 
-.lint:
+lint-bootstrap:
+  stage: lint-bootstrap
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
@@ -290,7 +292,7 @@ hadrian-ghc-in-ghci:
     - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
     - export PATH=~/.cabal/bin:$PATH
-    - cabal install -j --with-compiler=$GHC --project-file=ci.project --avoid-reinstalls hlint-3.2
+    - cabal install -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project --avoid-reinstalls hlint-3.2
     - hadrian/build -c -j stage1:lib:base
   variables:
     GHC_FLAGS: -Werror
@@ -302,13 +304,21 @@ hadrian-ghc-in-ghci:
     key: lint
     paths:
       - cabal-cache
+      - _build
       - $HOME/.cabal/bin
 
+############################################################
+# GHC source code linting
+############################################################
+
 lint-base:
-  extends: .lint
   stage: lint
+  tags:
+    - lint
   script:
     - hadrian/build -j lint:base
+  cache:
+    key: lint
 
 ############################################################
 # Validation via Pipelines (make)
