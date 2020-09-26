@@ -111,26 +111,17 @@ import Control.Monad ( msum )
 ************************************************************************
 -}
 
--- The syntax of xi (ξ) types:
--- xi ::= a | T xis | xis -> xis | ... | forall a. tau
--- Two important notes:
---      (i) No type families, unless we are under a ForAll
---      (ii) Note that xi types can contain unexpanded type synonyms;
---           however, the (transitive) expansions of those type synonyms
---           will not contain any type functions, unless we are under a ForAll.
--- We enforce the structure of Xi types when we flatten (GHC.Tc.Solver.Canonical)
-
-type Xi = Type       -- In many comments, "xi" ranges over Xi
+type Xi = TcType  -- "RAE" Remove
 
 type Cts = Bag Ct
 
 data Ct
   -- Atomic canonical constraints
-  = CDictCan {  -- e.g.  Num xi
+  = CDictCan {  -- e.g.  Num ty
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
 
       cc_class  :: Class,
-      cc_tyargs :: [Xi],   -- cc_tyargs are function-free, hence Xi
+      cc_tyargs :: [TcType],
 
       cc_pend_sc :: Bool   -- See Note [The superclass story] in GHC.Tc.Solver.Canonical
                            -- True <=> (a) cc_class has superclasses
@@ -160,8 +151,8 @@ data Ct
        --   * (TyEq:F) If tv is a TauTv, then rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
        --   * (TyEq:K) tcTypeKind ty `tcEqKind` tcTypeKind tv; Note [Ct kind invariant]
-       --   * (TyEq:AFF) rhs (perhaps under the one cast) is *almost function-free*,
-       --       See Note [Almost function-free]
+       --   * (TyEq:Fun) rhs is not headed (even after looking under a cast) by a
+       --                type function; use CFunEqCan for this instead
        --   * (TyEq:N) If the equality is representational, rhs has no top-level newtype
        --     See Note [No top-level newtypes on RHS of representational
        --     equalities] in GHC.Tc.Solver.Canonical
@@ -173,8 +164,7 @@ data Ct
        --     Note [Equalities with incompatible kinds], wrinkle (2)
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_tyvar  :: TcTyVar,
-      cc_rhs    :: TcType,     -- Not necessarily function-free (hence not Xi)
-                               -- See invariants above
+      cc_rhs    :: TcType,     -- See invariants above
 
       cc_eq_rel :: EqRel       -- INVARIANT: cc_eq_rel = ctEvEqRel cc_ev
     }
@@ -183,18 +173,16 @@ data Ct
        -- Invariants:
        --   * isTypeFamilyTyCon cc_fun
        --   * tcTypeKind (F xis) = tyVarKind fsk; Note [Ct kind invariant]
-       --   * always Nominal role
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
 
-      cc_tyargs :: [Xi],        -- cc_tyargs are function-free (hence Xi)
-        -- Either under-saturated or exactly saturated
+      cc_tyargs :: [TcType],
+        --    exactly saturated
         --    *never* over-saturated (because if so
         --    we should have decomposed)
 
-      cc_fsk    :: TcTyVar  -- [G]  always a FlatSkolTv
-                            -- [W], [WD], or [D] always a FlatMetaTv
-        -- See Note [The flattening story] in GHC.Tc.Solver.Flatten
+      cc_rhs    :: TcType,
+      cc_eq_rel :: EqRel
     }
 
   | CNonCanonical {        -- See Note [NonCanonical Semantics] in GHC.Tc.Solver.Monad
