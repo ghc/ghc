@@ -1,6 +1,5 @@
 {-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE PatternSynonyms #-}
 
 
 module NoFieldSelectors
@@ -26,14 +25,6 @@ foo1 = Foo 3 "bar"
 
 foo2 = Foo { foo = 3, bar = "bar" } -- disambiguate foo
 
-{-
-foo3 :: Foo
-foo3 = foo1 { foo = 4 } -- update
-Ambiguous occurrence ‘foo’
--}
-
 foo4 = foo1 { bar = "baz" } -- bar is unambiguous
 
 bar0 = Bar { foo = 0, bar' = "bar'" }
-
--- bar1 = bar0 { foo = 1 }
