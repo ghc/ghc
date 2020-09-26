@@ -1123,8 +1123,8 @@ lookupInfoOccRn rdr_name =
 -- | A datatype to distinguish record selector functions from regular symbols.
 data LookupOccRnOverloadedResult
   = LookupOccRnUnique Name
-  -- ^  name uniquely refers to x,
-  -- or there is a name clash (reported)
+  -- ^ non-selector name uniquely refers to x
+  -- or there is a name clash
   | LookupOccRnSelectors (NE.NonEmpty Name)
   -- ^ name refers to one or more record selectors;
   -- If DuplicateRecordFields is disabled, this list will be
