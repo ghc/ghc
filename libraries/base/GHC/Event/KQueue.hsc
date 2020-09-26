@@ -1,10 +1,9 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CApiFFI
-           , GeneralizedNewtypeDeriving
-           , NoImplicitPrelude
-           , RecordWildCards
-           , BangPatterns
-  #-}
+{-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE CApiFFI                    #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE Trustworthy                #-}
 
 module GHC.Event.KQueue
     (
