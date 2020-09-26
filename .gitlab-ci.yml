@@ -17,8 +17,9 @@ variables:
   GIT_SUBMODULE_STRATEGY: "recursive"
 
 stages:
-  - lint        # Source linting
+  - tool-lint   # Source linting of the tools
   - quick-build # A very quick smoke-test to weed out broken commits
+  - lint        # Source linting of GHC
   - build       # A quick smoke-test to weed out broken commits
   - full-build  # Build all the things
   - packaging   # Source distribution, etc.
@@ -81,11 +82,11 @@ workflow:
 
 
 ############################################################
-# Linting
+# tool linting
 ############################################################
 
 ghc-linters:
-  stage: lint
+  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
@@ -105,7 +106,7 @@ ghc-linters:
 
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
-  stage: lint
+  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - mypy .gitlab/linters/*.py
@@ -115,7 +116,7 @@ lint-linters:
 
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
-  stage: lint
+  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
@@ -125,7 +126,7 @@ lint-testsuite:
 
 # Run mypy Python typechecker on testsuite driver
 typecheck-testsuite:
-  stage: lint
+  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - mypy testsuite/driver/runtests.py
@@ -137,7 +138,7 @@ typecheck-testsuite:
 # accommodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
 .lint-submods:
-  stage: lint
+  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
@@ -169,7 +170,7 @@ lint-submods-branch:
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
 
 .lint-changelogs:
-  stage: lint
+  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   dependencies: []
   tags:
@@ -188,7 +189,6 @@ lint-release-changelogs:
   extends: .lint-changelogs
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
-
 
 ############################################################
 # Validation via Pipelines (hadrian)
@@ -272,6 +272,43 @@ hadrian-ghc-in-ghci:
     key: hadrian-ghci
     paths:
       - cabal-cache
+
+############################################################
+# GHC source code linting
+############################################################
+
+.lint:
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  before_script:
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+    - .gitlab/ci.sh setup
+    - cabal update
+    - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
+    - git clean -xdf && git submodule foreach git clean -xdf
+    - export PATH=~/.cabal/bin:$PATH
+    - cabal install -j --with-compiler=$GHC --project-file=ci.project --avoid-reinstalls hlint-3.2
+    - hadrian/build -c -j stage1:lib:base
+  variables:
+    GHC_FLAGS: -Werror
+  tags:
+    - lint
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+  cache:
+    key: lint
+    paths:
+      - cabal-cache
+      - $HOME/.cabal/bin
+
+lint-base:
+  extends: .lint
+  stage: lint
+  script:
+    - hadrian/build -j lint:base
 
 ############################################################
 # Validation via Pipelines (make)
