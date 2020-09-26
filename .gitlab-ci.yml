@@ -285,15 +285,15 @@ hadrian-ghc-in-ghci:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
+    - .gitlab/ci.sh setup
+    - cabal update
+    - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
+    - git clean -xdf && git submodule foreach git clean -xdf
     - mkdir bin/
     - export PATH=./bin:$PATH
     - wget https://github.com/ndmitchell/hlint/releases/download/v3.2/hlint-3.2-x86_64-linux.tar.gz
     - tar -xzvf hlint-3.2-x86_64-linux.tar.gz
     - mv hlint-3.2/hlint ./bin/
-    - .gitlab/ci.sh setup
-    - cabal update
-    - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
-    - git clean -xdf && git submodule foreach git clean -xdf
     - hadrian/build -c -j stage1:lib:base
   variables:
     GHC_FLAGS: -Werror
