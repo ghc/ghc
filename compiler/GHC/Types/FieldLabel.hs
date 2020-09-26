@@ -134,7 +134,7 @@ data FieldLbl a = FieldLabel {
                                           --   in the defining module for this datatype?
       flHasFieldSelector :: FieldSelectors,
       -- ^ Was FieldSelectors enabled in the defining module for this datatype?
-      -- See Note [NoFieldSelectors]
+      -- See Note [NoFieldSelectors] in GHC.Rename.Env
       flSelector     :: a                 -- ^ Record selector function
     }
   deriving (Eq, Functor, Foldable, Traversable)
