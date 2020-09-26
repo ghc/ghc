@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# ANN delay ("HLint: "Unused LANGUAGE pragma) #-}
 
 -- Test that threadDelay actually sleeps for (at least) as long as we
 -- ask it
