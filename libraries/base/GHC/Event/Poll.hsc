@@ -91,7 +91,7 @@ poll p mtout f = do
         c_pollLoop ptr (fromIntegral len) (fromTimeout tout)
       Nothing   ->
         c_poll_unsafe ptr (fromIntegral len) 0
-  when (n /= 0) $ do
+  when (n /= 0) $
     A.loop a 0 $ \i e -> do
       let r = pfdRevents e
       if r /= 0
