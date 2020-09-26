@@ -9,7 +9,6 @@ import Prelude
 
 
 data Foo = Foo { foo :: Int, bar :: String }
-data Bar = Bar { foo :: Int, bar' :: String }
 
 foo = 3 -- should not conflict
 
@@ -25,6 +24,6 @@ foo1 = Foo 3 "bar"
 
 foo2 = Foo { foo = 3, bar = "bar" } -- disambiguate foo
 
-foo4 = foo1 { bar = "baz" } -- bar is unambiguous
+foo3 = foo1 { foo = 4 } -- bar is unambiguous
 
-bar0 = Bar { foo = 0, bar' = "bar'" }
+foo4 = foo1 { bar = "baz" } -- bar is unambiguous
