@@ -1267,16 +1267,6 @@ hsConDeclsBinders cons
                 (remSeen', flds) = get_flds remSeen args
                 (ns, fs) = go remSeen' rs
 
-           XConDecl x -> case ghcPass @p of
-             GhcPs |  ConDeclGADTPrefixPs { con_gp_names = names } <- x
-                   -> (map (L loc . unLoc) names ++ ns, fs)
-#if __GLASGOW_HASKELL__ < 811
-             GhcRn -> noExtCon x
-             GhcTc -> noExtCon x
-#endif
-             where
-               (ns, fs) = go remSeen rs
-
     get_flds :: Seen p -> HsConDeclDetails (GhcPass p)
              -> (Seen p, [LFieldOcc (GhcPass p)])
     get_flds remSeen (RecCon flds)

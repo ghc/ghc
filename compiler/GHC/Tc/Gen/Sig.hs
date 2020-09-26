@@ -52,7 +52,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
-import GHC.Utils.Misc( singleton )
+import GHC.Utils.Misc as Utils ( singleton )
 import GHC.Data.Maybe( orElse )
 import Data.Maybe( mapMaybe )
 import Control.Monad( unless )
@@ -551,7 +551,7 @@ lookupPragEnv :: TcPragEnv -> Name -> [LSig GhcRn]
 lookupPragEnv prag_fn n = lookupNameEnv prag_fn n `orElse` []
 
 extendPragEnv :: TcPragEnv -> (Name, LSig GhcRn) -> TcPragEnv
-extendPragEnv prag_fn (n, sig) = extendNameEnv_Acc (:) singleton prag_fn n sig
+extendPragEnv prag_fn (n, sig) = extendNameEnv_Acc (:) Utils.singleton prag_fn n sig
 
 ---------------
 mkPragEnv :: [LSig GhcRn] -> LHsBinds GhcRn -> TcPragEnv

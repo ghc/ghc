@@ -57,7 +57,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Data.Maybe
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Basic  ( TopLevelFlag(..), StringLiteral(..) )
-import GHC.Utils.Misc
+import GHC.Utils.Misc as Utils
 import GHC.Data.FastString
 import GHC.Data.FastString.Env
 import GHC.Types.Id
@@ -1180,8 +1180,8 @@ mkChildEnv :: [GlobalRdrElt] -> NameEnv [GlobalRdrElt]
 mkChildEnv gres = foldr add emptyNameEnv gres
   where
     add gre env = case gre_par gre of
-        FldParent p _  -> extendNameEnv_Acc (:) singleton env p gre
-        ParentIs  p    -> extendNameEnv_Acc (:) singleton env p gre
+        FldParent p _  -> extendNameEnv_Acc (:) Utils.singleton env p gre
+        ParentIs  p    -> extendNameEnv_Acc (:) Utils.singleton env p gre
         NoParent       -> env
 
 findChildren :: NameEnv [a] -> Name -> [a]
