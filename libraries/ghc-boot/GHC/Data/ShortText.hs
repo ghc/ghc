@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, GeneralizedNewtypeDeriving, DerivingStrategies #-}
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
+
+-- |
 -- An Unicode string for internal GHC use. Meant to replace String
 -- in places where being a lazy linked is not very useful and a more
 -- memory efficient data structure is desirable.
@@ -7,7 +9,20 @@
 -- Very similar to FastString, but not hash-consed and with some extra instances and
 -- functions for serialisation and I/O. Should be imported qualified.
 
-module GHC.Data.ShortText where
+module GHC.Data.ShortText (
+        -- * ShortText
+        ShortText(..),
+        -- ** Conversion to and from String
+        pack,
+        unpack,
+        -- ** Operations
+        codepointLength,
+        byteLength,
+        GHC.Data.ShortText.null,
+        splitFilePath,
+        GHC.Data.ShortText.head,
+        stripPrefix
+  ) where
 
 import Prelude
 
@@ -19,41 +34,56 @@ import GHC.IO.Unsafe
 import GHC.Utils.Encoding
 import System.FilePath (isPathSeparator)
 
+{-| A 'ShortText' is a UTF-8 encoded string meant for short strings like
+file paths, module descriptions, etc.
+-}
 newtype ShortText = ShortText { contents :: SBS.ShortByteString
                               }
                               deriving stock (Show)
                               deriving newtype (Eq, Ord, Binary, Semigroup, Monoid)
 
 -- We don't want to derive this one from ShortByteString since that one won't handle
--- UTF-8 characters correctly
+-- UTF-8 characters correctly.
 instance IsString ShortText where
   fromString = pack
 
-charLength :: ShortText -> Int
-charLength st = unsafeDupablePerformIO $ countUTF8Chars (contents st)
+-- | /O(n)/ Returns the length of the 'ShortText' in characters.
+codepointLength :: ShortText -> Int
+codepointLength st = unsafeDupablePerformIO $ countUTF8Chars (contents st)
+-- | /O(1)/ Returns the length of the 'ShortText' in bytes.
 byteLength :: ShortText -> Int
 byteLength st = SBS.length $ contents st
 
+-- | /O(n)/ Convert a 'String' into a 'ShortText'.
 pack :: String -> ShortText
 pack s = unsafeDupablePerformIO $ ShortText <$> utf8EncodeShortByteString s
 
+-- | /O(n)/ Convert a 'ShortText' into a 'String'.
 unpack :: ShortText -> String
 unpack st = utf8DecodeShortByteString $ contents st
 
+-- | /O(1)/ Test whether the 'ShortText' is the empty string.
 null :: ShortText -> Bool
 null st = SBS.null $ contents st
 
+-- | /O(n)/ Split a 'ShortText' representing a file path into its components by separating
+-- on the file separator characters for this platform.
+splitFilePath :: ShortText -> [ShortText]
 -- This seems dangerous, but since the path separators are in the ASCII set they map down
 -- to a single byte when encoded in UTF-8 and so this should work even when casting to ByteString.
-splitFilePath :: ShortText -> [ShortText]
 splitFilePath st = map (ShortText . SBS.toShort) $ B8.splitWith isPathSeparator st'
   where st' = SBS.fromShort $ contents st
 
+-- | /O(1)/ Returns the first UTF-8 codepoint in the 'ShortText'. Depending on the string in
+-- question, this may or may not be the actual first character in the string due to Unicode
+-- non-printable characters.
 head :: ShortText -> Char
 head st
   | SBS.null $ contents st = error "head: Empty ShortText"
   | otherwise              = Prelude.head $ unpack st
 
+-- | /O(n)/ The 'stripPrefix' function takes two ByteStrings and returns Just the remainder of
+-- the second iff the first is its prefix, and otherwise Nothing.
 stripPrefix :: ShortText -> ShortText -> Maybe ShortText
 stripPrefix prefix st = case B8.stripPrefix (SBS.fromShort $ contents prefix) (SBS.fromShort $ contents st) of
   Nothing -> Nothing
