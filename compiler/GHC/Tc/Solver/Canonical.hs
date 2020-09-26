@@ -994,13 +994,6 @@ can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
   | not (isTyVarTy ty1)  -- See (3) in Note [Equalities with incompatible kinds]
   = canEqCast flat ev eq_rel IsSwapped ty2 co2 ty1 ps_ty1
 
--- NB: pattern match on True: we want only flat types sent to canEqTyVar.
--- See also Note [No top-level newtypes on RHS of representational equalities]
-can_eq_nc' True _rdr_env _envs ev eq_rel (TyVarTy tv1) ps_ty1 ty2 ps_ty2
-  = canEqTyVar ev eq_rel NotSwapped tv1 ps_ty1 ty2 ps_ty2
-can_eq_nc' True _rdr_env _envs ev eq_rel ty1 ps_ty1 (TyVarTy tv2) ps_ty2
-  = canEqTyVar ev eq_rel IsSwapped tv2 ps_ty2 ty1 ps_ty1
-
 ----------------------
 -- Otherwise try to decompose
 ----------------------
@@ -1046,24 +1039,9 @@ can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ ty2 _
   , Just (t2, s2) <- tcSplitAppTy_maybe ty2
   = can_eq_app ev t1 s1 t2 s2
 
--- Now deal with type functions. Require flat types, so that we (try to)
--- reduce before trying to decompose.
-can_eq_nc' True _rdr_env _envs ev eq_rel (TyConApp tc1 args1) _ps_ty1 ty2 ps_ty2
-  | isTypeFamilyTyCon tc1
-  , args1 `lengthIs` tyConArity tc1
-     -- args1 really can't be less than tyConArity tc1. It could be *more*
-     -- than tyConArity, but then we should have handled the case as an AppTy.
-     -- That case only fires if *both* sides of the equality are AppTy-like...
-     -- but if one side is AppTy-like and the other isn't (and it also isn't
-     -- a variable or saturated type family application, both of which are
-     -- handled by can_eq_nc'), we're in a failure mode and can just fall through.
-  = canEqFun NotSwapped ev eq_rel tc1 args1 ty2 ps_ty2
-
-can_eq_nc' True _rdr_env _envs ev eq_rel ty1 ps_ty1 (TyConApp tc2 args2) _ps_ty2
-  | isTypeFamilyTyCon tc2
-  , args2 `lengthIs` tyConArity tc2
-    -- See commentary on previous case.
-  = canEqFun IsSwapped ev eq_rel tc2 args2 ty1 ps_ty1
+-------------------
+-- Can't decompose.
+-------------------
 
 -- No similarity in type structure detected. Flatten and try again.
 can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
@@ -1071,6 +1049,33 @@ can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
        ; (xi2, co2) <- flatten FM_FlattenAll ev ps_ty2
        ; new_ev <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
        ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
+
+----------------------------
+-- Look for a canonical LHS. See Note [Canonical LHS].
+-- Only flat types end up below here.
+----------------------------
+
+-- NB: pattern match on True: we want only flat types sent to canEqLHS
+-- This means we've rewritten any variables and reduced any type family redexes
+-- See also Note [No top-level newtypes on RHS of representational equalities]
+can_eq_nc' True _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
+  | isCanLHS ty1
+  = canEqCanLHS ev eq_rel NotSwapped ty1 ps_ty1 ty2 ps_ty2
+
+  | isCanLHS ty2
+  = canEqCanLHS ev eq_rel IsSwapped ty2 ps_ty2 ty1 ps_ty1
+
+     -- If the type is TyConApp tc1 args1, then args1 really can't be less
+     -- than tyConArity tc1. It could be *more* than tyConArity, but then we
+     -- should have handled the case as an AppTy. That case only fires if
+     -- *both* sides of the equality are AppTy-like... but if one side is
+     -- AppTy-like and the other isn't (and it also isn't a variable or
+     -- saturated type family application, both of which are handled by
+     -- can_eq_nc'), we're in a failure mode and can just fall through.
+
+----------------------------
+-- Fall-through. Give up.
+----------------------------
 
 -- We've flattened and the types don't match. Give up.
 can_eq_nc' True _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
@@ -2058,31 +2063,54 @@ canCFunEqCan ev fn tys fsk
                                  , cc_tyargs = tys', cc_fsk = fsk' }) }
 
 ---------------------
-canEqTyVar :: CtEvidence          -- ev :: lhs ~ rhs
-           -> EqRel -> SwapFlag
-           -> TcTyVar               -- tv1
-           -> TcType                -- lhs: pretty lhs, already flat
-           -> TcType -> TcType      -- rhs: already flat
-           -> TcS (StopOrContinue Ct)
-canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
+{- Note [Canonical LHS]
+~~~~~~~~~~~~~~~~~~~~~~~
+The inert set supports rewriting using equalities that have a so-called
+canonical LHS: these are tyvars (stored in CTyEqCans and the inert_eqs field
+of InertCans) and exactly-saturated type family applications (stored in
+CFunEqCans and the inert_funeqs field of InertCans). These two shapes of
+type are denoted by the type synonym CanLHS.
+-}
+
+type CanLHS = TcType   -- either a tyvar or exactly-saturated type family
+                       -- application. See Note [Canonical LHS].
+
+-- Is a type a canonical LHS? That is, is it a tyvar or an exactly-saturated
+-- type family application? See Note [Canonical LHS].
+-- Does not look through type synonyms.
+isCanLHS :: TcType -> Bool
+isCanLHS (TyVarTy {}) = True
+isCanLHS (TyConApp tc args)
+  | isTypeFamilyTyCon tc
+  , args `lengthIs` tyConArity tc
+  = True
+isCanLHS _other = False
+
+canEqCanLHS :: CtEvidence          -- ev :: lhs ~ rhs
+            -> EqRel -> SwapFlag
+            -> CanLHS                -- lhs (or, if swapped, rhs)
+            -> TcType                -- lhs: pretty lhs, already flat
+            -> TcType -> TcType      -- rhs: already flat
+            -> TcS (StopOrContinue Ct)
+canEqCanLHS ev eq_rel swapped xi1 ps_xi1 xi2 ps_xi2
   | k1 `tcEqType` k2
-  = canEqTyVarHomo ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
+  = canEqCanLHSHomo ev eq_rel swapped xi1 ps_xi1 xi2 ps_xi2
 
   | otherwise
-  = canEqTyVarHetero ev eq_rel swapped tv1 ps_xi1 k1 xi2 ps_xi2 k2
+  = canEqCanLHSHetero ev eq_rel swapped xi1 ps_xi1 k1 xi2 ps_xi2 k2
 
   where
-    k1 = tyVarKind tv1
+    k1 = tcTypeKind xi1
     k2 = tcTypeKind xi2
 
-canEqTyVarHetero :: CtEvidence         -- :: (tv1 :: ki1) ~ (xi2 :: ki2)
-                 -> EqRel -> SwapFlag
-                 -> TcTyVar -> TcType  -- tv1, pretty tv1
-                 -> TcKind             -- ki1
-                 -> TcType -> TcType   -- xi2, pretty xi2 :: ki2
-                 -> TcKind             -- ki2
-                 -> TcS (StopOrContinue Ct)
-canEqTyVarHetero ev eq_rel swapped tv1 ps_tv1 ki1 xi2 ps_xi2 ki2
+canEqCanLHSHetero :: CtEvidence         -- :: (xi1 :: ki1) ~ (xi2 :: ki2)
+                  -> EqRel -> SwapFlag
+                  -> CanLHS -> TcType   -- xi1, pretty xi1
+                  -> TcKind             -- ki1
+                  -> TcType -> TcType   -- xi2, pretty xi2 :: ki2
+                  -> TcKind             -- ki2
+                  -> TcS (StopOrContinue Ct)
+canEqCanLHSHetero ev eq_rel swapped xi1 ps_xi1 ki1 xi2 ps_xi2 ki2
   -- See Note [Equalities with incompatible kinds]
   = do { kind_co <- emit_kind_co   -- :: ki2 ~N ki1
 
@@ -2093,15 +2121,14 @@ canEqTyVarHetero ev eq_rel swapped tv1 ps_tv1 ki1 xi2 ps_xi2 ki2
              rhs_co  = mkTcGReflLeftCo role xi2 kind_co
                -- rhs_co :: (xi2 |> kind_co) ~ xi2
 
-             lhs'   = mkTyVarTy tv1  -- same as old lhs
-             lhs_co = mkTcReflCo role lhs'
+             lhs_co = mkTcReflCo role xi1
 
        ; traceTcS "Hetero equality gives rise to kind equality"
            (ppr kind_co <+> dcolon <+> sep [ ppr ki2, text "~#", ppr ki1 ])
-       ; type_ev <- rewriteEqEvidence ev swapped lhs' rhs' lhs_co rhs_co
+       ; type_ev <- rewriteEqEvidence ev swapped xi1 rhs' lhs_co rhs_co
 
           -- rewriteEqEvidence carries out the swap, so we're NotSwapped any more
-       ; canEqTyVarHomo type_ev eq_rel NotSwapped tv1 ps_tv1 rhs' ps_rhs' }
+       ; canEqTyVarHomo type_ev eq_rel NotSwapped xi1 ps_xi1 rhs' ps_rhs' }
   where
     emit_kind_co :: TcS CoercionN
     emit_kind_co
@@ -2116,7 +2143,7 @@ canEqTyVarHetero ev eq_rel swapped tv1 ps_tv1 ki1 xi2 ps_xi2 ki2
 
     loc      = ctev_loc ev
     role     = eqRelRole eq_rel
-    kind_loc = mkKindLoc (mkTyVarTy tv1) xi2 loc
+    kind_loc = mkKindLoc xi1 xi2 loc
     kind_pty = mkHeteroPrimEqPred liftedTypeKind liftedTypeKind ki2 ki1
 
     maybe_sym = case swapped of
@@ -2125,6 +2152,69 @@ canEqTyVarHetero ev eq_rel swapped tv1 ps_tv1 ki1 xi2 ps_xi2 ki2
           NotSwapped -> mkTcSymCo
 
 -- guaranteed that tcTypeKind lhs == tcTypeKind rhs
+canEqCanLHSHomo :: CtEvidence
+                -> EqRel -> SwapFlag
+                -> CanLHS             -- lhs (or, if swapped, rhs)
+                -> TcType             -- pretty lhs
+                -> TcType -> TcType   -- rhs, pretty rhs
+                -> TcS (StopOrContinue Ct)
+canEqCanLHSHomo ev eq_rel swapped xi1 ps_xi1 xi2 ps_xi2
+  | (xi2', mco) <- split_cast_ty xi2
+  , isCanLHS xi2'
+  = canEqCanLHS2 ev eq_rel swapped xi1 ps_xi1 xi2' ps_xi2 mco
+
+  | TyVarTy tv1 <- xi1
+  = canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
+
+  | TyConApp fun_tc fun_args <- xi1
+  = ASSERT( isTypeFamilyTyCon fun_tc )
+    canEqFun ev eq_rel swapped fun_tc fun_args xi2 ps_xi2
+
+  | otherwise
+  = pprPanic "canEqCanLHS is not CanLHS" (ppr xi1 $$ ppr ev)
+
+  where
+    split_cast_ty (CastTy ty co) = (ty, MCo co)
+    split_cast_ty other          = (other, MRefl)
+
+canEqCanLHS2 :: CtEvidence
+             -> EqRel -> SwapFlag
+             -> CanLHS                  -- lhs (or, if swapped, rhs)
+             -> TcType                  -- pretty lhs
+             -> CanLHS                  -- rhs
+             -> TcType                  -- pretty rhs
+             -> MCoercion               -- :: kind(rhs) ~N kind(lhs)
+             -> TcS (StopOrContinue Ct)
+canEqCanLHS2 ev eq_rel swapped xi1 ps_xi1 xi2 ps_xi2 mco
+  | xi1 `tcEqType` xi2
+  = canEqReflexive ev eq_rel xi1
+
+  | TyVarTy tv1 <- xi1
+  , TyVarTy tv2 <- xi2
+  , swapOverTyVars (isGiven ev) tv1 tv2
+  = do { traceTcS "canEqLHS2 swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
+       ; let role    = eqRelRole eq_rel
+             sym_mco = mkTcSymMCo mco
+             new_lhs = xi1 `mkCastTy` sym_mco
+             lhs_co  = mkTcGReflLeftMCo role xi1 sym_mco
+             rhs_co  = mkTcGReflRightMCo role xi2 mco
+
+       ; new_ev <- rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
+
+       ; canEqTyVar new_ev eq_rel IsSwapped tv2 (ps_xi1 `mkCastTyMCo` sym_mco) }
+
+  | TyVarTy tv1 <- xi1
+  , TyConApp fun_tc2 fun_args2 <- xi2
+  = canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2
+
+  | TyConApp fun_tc1 fun_args1 <- xi1
+  , TyVarTy tv2 <- xi2
+  = canEqTyVarFunEq ev eq_rel (flipSwap swapped) tv2 ps_xi2 fun_tc1 fun_args1 ps_xi1
+
+  | TyConApp fun_tc1 fun_args1 <- xi1
+  , TyConApp fun_tc2 fun_args2 <- xi2
+  = error "RAE isn't sure which order to prefer here."
+
 canEqTyVarHomo :: CtEvidence
                -> EqRel -> SwapFlag
                -> TcTyVar                -- lhs: tv1
@@ -2132,30 +2222,25 @@ canEqTyVarHomo :: CtEvidence
                -> TcType -> TcType       -- rhs, flat
                -> TcS (StopOrContinue Ct)
 canEqTyVarHomo ev eq_rel swapped tv1 ps_xi1 xi2 _
-  | Just (tv2, _) <- tcGetCastedTyVar_maybe xi2
+  | Just (tv2, _co) <- tcGetCastedTyVar_maybe xi2
   , tv1 == tv2
   = canEqReflexive ev eq_rel (mkTyVarTy tv1)
-    -- we don't need to check co because it must be reflexive
+    -- we don't need to check _co because it must be reflexive
 
     -- this guarantees (TyEq:TV)
   | Just (tv2, co2) <- tcGetCastedTyVar_maybe xi2
   , swapOverTyVars (isGiven ev) tv1 tv2
-  = do { traceTcS "canEqTyVar swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
-       ; let role    = eqRelRole eq_rel
-             sym_co2 = mkTcSymCo co2
-             ty1     = mkTyVarTy tv1
-             new_lhs = ty1 `mkCastTy` sym_co2
-             lhs_co  = mkTcGReflLeftCo role ty1 sym_co2
-
-             new_rhs = mkTyVarTy tv2
-             rhs_co  = mkTcGReflRightCo role new_rhs co2
-
-       ; new_ev <- rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
-
-       ; dflags <- getDynFlags
-       ; canEqTyVar2 dflags new_ev eq_rel IsSwapped tv2 (ps_xi1 `mkCastTy` sym_co2) }
-
+  =
 canEqTyVarHomo ev eq_rel swapped tv1 _ _ ps_xi2
+  = do { dflags <- getDynFlags
+       ; canEqTyVar2 dflags ev eq_rel swapped tv1 ps_xi2 }
+
+canEqTyVar :: CtEvidence
+           -> EqRel -> SwapFlag
+           -> TcTyVar ->           -- LHS tyvar
+           -> TcType               -- pretty RHS
+           -> TcS (StopOrContinue Ct)
+canEqTyVar ev eq_rel swapped tv1 ps_xi2
   = do { dflags <- getDynFlags
        ; canEqTyVar2 dflags ev eq_rel swapped tv1 ps_xi2 }
 
@@ -2166,7 +2251,7 @@ canEqTyVar2 :: DynFlags
             -> EqRel
             -> SwapFlag
             -> TcTyVar                  -- lhs = tv, flat
-            -> TcType                   -- rhs, flat
+            -> TcType                   -- pretty rhs, flat
             -> TcS (StopOrContinue Ct)
 -- LHS is an inert type variable,
 -- and RHS is fully rewritten, but with type synonyms
