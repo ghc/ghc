@@ -1151,10 +1151,12 @@ lookupGlobalOccRn_resolve overload_ok rdr_name res = case res of
   OneNameMatch gre -> do
     let wrapper = if isRecFldGRE gre then LookupOccRnSelectors . pure else LookupOccRnUnique
     return $ Just $ wrapper $ gre_name gre
-  MultipleNames gres | any isRecFldGRE gres, overload_ok == DuplicateRecordFields ->
+  MultipleNames gres_
+    | gre : gres' <- NE.filter isRecFldGRE gres_
+    , overload_ok == DuplicateRecordFields || null gres' ->
     -- Don't record usage for ambiguous selectors
     -- until we know which is meant
-    return $ Just $ LookupOccRnSelectors $ fmap gre_name gres
+    return $ Just $ LookupOccRnSelectors $ fmap gre_name $ gre NE.:| gres'
   MultipleNames gres  -> do
     addNameClashErrRn rdr_name gres
     return $ Just $ LookupOccRnUnique $ gre_name (NE.head gres)
