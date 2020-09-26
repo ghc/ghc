@@ -1,5 +1,7 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# HLINT ignore "Unused LANGUAGE pragma" #-}
+
 
 -- Test that threadDelay actually sleeps for (at least) as long as we
 -- ask it
@@ -16,6 +18,7 @@ import Data.Time
 #if defined(mingw32_HOST_OS)
 import GHC.Event.Windows.Clock
 #endif
+
 main :: IO ()
 main = mapM_ delay (0 : take 7 (iterate (*5) 100))
 
