@@ -1566,7 +1566,7 @@ all we are concerned about in the parser is identifying the overall shape of
 the argument and result types, which we can accomplish by piggybacking on the
 special treatment given to function arrows. In a future where function arrows
 aren't given special status in the parser, we will likely have to modify
-GHC.Parser.PostProcess.mergeOps to preserve this trick.
+GHC.Parser.PostProcess.mkHsOpTyPV to preserve this trick.
 
 -----
 -- Wrinkle: No nested foralls or contexts
