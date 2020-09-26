@@ -17,13 +17,15 @@ variables:
   GIT_SUBMODULE_STRATEGY: "recursive"
 
 stages:
-  - lint        # Source linting
-  - quick-build # A very quick smoke-test to weed out broken commits
-  - build       # A quick smoke-test to weed out broken commits
-  - full-build  # Build all the things
-  - packaging   # Source distribution, etc.
-  - testing     # head.hackage correctness and compiler performance testing
-  - deploy      # push documentation
+  - tool-lint      # Source linting of the tools
+  - quick-build    # A very quick smoke-test to weed out broken commits
+  - lint-bootstrap # A single stage to prepare the environment for `lint`
+  - lint           # Source linting of GHC
+  - build          # A quick smoke-test to weed out broken commits
+  - full-build     # Build all the things
+  - packaging      # Source distribution, etc.
+  - testing        # head.hackage correctness and compiler performance testing
+  - deploy         # push documentation
 
 # Note [The CI Story]
 # ~~~~~~~~~~~~~~~~~~~
@@ -81,11 +83,12 @@ workflow:
 
 
 ############################################################
-# Linting
+# tool linting
 ############################################################
 
 ghc-linters:
-  stage: lint
+  stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
@@ -105,7 +108,8 @@ ghc-linters:
 
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
-  stage: lint
+  stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - mypy .gitlab/linters/*.py
@@ -115,7 +119,8 @@ lint-linters:
 
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
-  stage: lint
+  stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
@@ -125,7 +130,8 @@ lint-testsuite:
 
 # Run mypy Python typechecker on testsuite driver
 typecheck-testsuite:
-  stage: lint
+  stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - mypy testsuite/driver/runtests.py
@@ -137,7 +143,8 @@ typecheck-testsuite:
 # accommodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
 .lint-submods:
-  stage: lint
+  stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
@@ -169,7 +176,8 @@ lint-submods-branch:
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
 
 .lint-changelogs:
-  stage: lint
+  stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   dependencies: []
   tags:
@@ -189,12 +197,12 @@ lint-release-changelogs:
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
 
-
 ############################################################
 # Validation via Pipelines (hadrian)
 ############################################################
 
 .validate-hadrian:
+  needs: [hadrian-ghc-in-ghci]
   variables:
     FLAVOUR: "validate"
   script:
@@ -246,6 +254,7 @@ validate-x86_64-linux-deb9-unreg-hadrian:
 
 hadrian-ghc-in-ghci:
   stage: quick-build
+  needs: [ghc-linters, lint-linters, lint-submods, lint-changelogs, lint-release-changelogs]
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
@@ -274,10 +283,67 @@ hadrian-ghc-in-ghci:
       - cabal-cache
 
 ############################################################
+# GHC linting bootstrapping
+############################################################
+
+lint-bootstrap:
+  stage: lint-bootstrap
+  needs: [ghc-linters, lint-submods]
+  tags:
+    - lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  script:
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+    - .gitlab/ci.sh setup
+    - cabal update
+    - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
+    - git clean -xdf && git submodule foreach git clean -xdf
+    - export PATH=~/.cabal/bin:$PATH
+    - cabal install -j$(mk/detect-cpu-count.sh) --with-compiler=$GHC --avoid-reinstalls hlint-3.2
+    - hadrian/build -c -j stage1:lib:base
+  variables:
+    GHC_FLAGS: -Werror
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+  cache:
+    key: lint
+    paths:
+      - cabal-cache
+      - _build
+
+############################################################
+# GHC source code linting
+############################################################
+
+.lint-params:
+  stage: lint
+  needs: [lint-bootstrap]
+  tags:
+    - lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  variables:
+    GHC_FLAGS: -Werror
+
+
+lint-base:
+  extends: .lint-params
+  before_script:
+    - mv cabal-cache $HOME/.cabal
+  script:
+    - hadrian/build -j lint:base
+  cache:
+    key: lint
+
+############################################################
 # Validation via Pipelines (make)
 ############################################################
 
 .validate:
+  needs: [hadrian-ghc-in-ghci]
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
@@ -301,6 +367,7 @@ hadrian-ghc-in-ghci:
 #################################
 
 .build-x86_64-freebsd:
+  stage: full-build
   extends: .validate
   tags:
     - x86_64-freebsd
@@ -331,23 +398,19 @@ hadrian-ghc-in-ghci:
 # Conditional due to lack of builder capacity
 validate-x86_64-freebsd:
   extends: .build-x86_64-freebsd
-  stage: full-build
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/'
 
 nightly-x86_64-freebsd:
   <<: *nightly
   extends: .build-x86_64-freebsd
-  stage: full-build
 
 release-x86_64-freebsd:
   <<: *release
   extends: .build-x86_64-freebsd
-  stage: full-build
 
 .build-x86_64-freebsd-hadrian:
   extends: .validate-hadrian
-  stage: full-build
   tags:
     - x86_64-freebsd
   allow_failure: true
@@ -374,7 +437,6 @@ release-x86_64-freebsd:
 # Disabled due to lack of builder capacity
 .validate-x86_64-freebsd-hadrian:
   extends: .build-x86_64-freebsd-hadrian
-  stage: full-build
 
 #################################
 # x86_64-darwin
@@ -587,6 +649,7 @@ nightly-x86_64-linux-deb9:
 # N.B. Has DEBUG assertions enabled in stage2
 validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
+  stage: full-build
   stage: full-build
   variables:
     BUILD_FLAVOUR: validate
@@ -809,6 +872,7 @@ validate-x86_64-linux-fedora27:
 
 .build-windows:
   # For the reasons given in #17777 this build isn't reliable.
+  needs: [validate-x86_64-linux-deb9-hadrian]
   allow_failure: true
   before_script:
     - git clean -xdf
@@ -929,6 +993,7 @@ release-x86_64-windows-integer-simple:
 
 doc-tarball:
   stage: packaging
+  needs: [validate-x86_64-linux-deb9-debug, validate-x86_64-windows-hadrian, validate-x86_64-linux-deb9-unreg-hadrian]
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -964,6 +1029,7 @@ doc-tarball:
 
 source-tarball:
   stage: packaging
+  needs: [validate-x86_64-linux-deb9-unreg-hadrian]
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -998,6 +1064,7 @@ source-tarball:
 
 .hackage:
   stage: testing
+  needs: [doc-tarball]
   image: ghcci/x86_64-linux-deb9:0.2
   tags:
     - x86_64-linux
@@ -1026,6 +1093,7 @@ nightly-hackage:
 
 perf-nofib:
   stage: testing
+  needs: [validate-x86_64-linux-deb9-dwarf, doc-tarball]
   dependencies:
     - validate-x86_64-linux-deb9-dwarf
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -1062,6 +1130,7 @@ perf-nofib:
 
 perf:
   stage: testing
+  needs: [validate-x86_64-linux-deb9-dwarf, doc-tarball]
   dependencies:
     - validate-x86_64-linux-deb9-dwarf
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -1097,6 +1166,7 @@ perf:
 
 pages:
   stage: deploy
+  needs: [doc-tarball]
   dependencies:
     - doc-tarball
   image: ghcci/x86_64-linux-deb9:0.2
