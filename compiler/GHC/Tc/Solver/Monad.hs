@@ -423,7 +423,7 @@ data InertSet
               -- level, but it seems simpler and more direct to capture the
               -- fsk as we generate them.
 
-       , inert_flat_cache :: ExactFunEqMap (TcCoercion, TcType, CtFlavour)
+       , inert_flat_cache :: FunEqMap (TcCoercion, TcType, CtFlavour)
               -- See Note [Type family equations]
               -- If    F tys :-> (co, rhs, flav),
               -- then  co :: F tys ~ rhs
@@ -435,8 +435,6 @@ data InertSet
               -- (w:F ty ~ a) by setting w:=w!  We just use the flat-cache
               -- when allocating a new flatten-skolem.
               -- Not necessarily inert wrt top-level equations (or inert_cans)
-
-              -- NB: An ExactFunEqMap -- this doesn't match via loose types!
 
        , inert_solved_dicts   :: DictMap CtEvidence
               -- All Wanteds, of form ev :: C t1 .. tn
@@ -469,7 +467,7 @@ emptyInert :: InertSet
 emptyInert
   = IS { inert_cans         = emptyInertCans
        , inert_fsks         = []
-       , inert_flat_cache   = emptyExactFunEqs
+       , inert_flat_cache   = emptyFunEqs
        , inert_solved_dicts = emptyDictMap }
 
 
@@ -2366,7 +2364,7 @@ lookupFlatCache fam_tc tys
       = Just (ctEvCoercion ctev, mkTyVarTy fsk, ctEvFlavour ctev)
       | otherwise = Nothing
 
-    lookup_flats flat_cache = findExactFunEq flat_cache fam_tc tys
+    lookup_flats flat_cache = findFunEq flat_cache fam_tc tys
 
 
 lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
@@ -2642,20 +2640,6 @@ partitionFunEqs f m = (yeses, foldr del m yeses)
 
 delFunEq :: FunEqMap a -> TyCon -> [Type] -> FunEqMap a
 delFunEq m tc tys = delTcApp m (getUnique tc) tys
-
-------------------------------
-type ExactFunEqMap a = TyConEnv (ListMap TypeMap a)
-
-emptyExactFunEqs :: ExactFunEqMap a
-emptyExactFunEqs = emptyUFM
-
-findExactFunEq :: ExactFunEqMap a -> TyCon -> [Type] -> Maybe a
-findExactFunEq m tc tys = do { tys_map <- lookupUFM m tc
-                             ; lookupTM tys tys_map }
-
-insertExactFunEq :: ExactFunEqMap a -> TyCon -> [Type] -> a -> ExactFunEqMap a
-insertExactFunEq m tc tys val = alterUFM alter_tm m tc
-  where alter_tm mb_tm = Just (insertTM tys val (mb_tm `orElse` emptyTM))
 
 {-
 ************************************************************************
@@ -3293,7 +3277,7 @@ extendFlatCache tc xi_args stuff@(_, ty, fl)
                                           , ppr fl, ppr ty ])
             -- 'co' can be bottom, in the case of derived items
        ; updInertTcS $ \ is@(IS { inert_flat_cache = fc }) ->
-            is { inert_flat_cache = insertExactFunEq fc tc xi_args stuff } } }
+            is { inert_flat_cache = insertFunEq fc tc xi_args stuff } } }
 
   | otherwise
   = return ()
