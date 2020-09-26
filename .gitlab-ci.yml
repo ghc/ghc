@@ -290,6 +290,8 @@ hadrian-ghc-in-ghci:
     - wget https://github.com/ndmitchell/hlint/releases/download/v3.2/hlint-3.2-x86_64-linux.tar.gz
     - tar -xzvf hlint-3.2-x86_64-linux.tar.gz
     - mv hlint-3.2/hlint ./bin/
+    - chmod +x bin/hlint
+    - echo $PATH
     - .gitlab/ci.sh setup
     - cabal update
     - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
