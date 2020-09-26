@@ -2357,10 +2357,8 @@ lookupFlatCache fam_tc tys
                              lookup_flats flat_cache]) }
   where
     lookup_inerts inert_funeqs
-      | Just (CFunEqCan { cc_ev = ctev, cc_fsk = fsk, cc_tyargs = xis })
+      | Just (CFunEqCan { cc_ev = ctev, cc_fsk = fsk })
            <- findFunEq inert_funeqs fam_tc tys
-      , tys `eqTypes` xis   -- The lookup might find a near-match; see
-                            -- Note [Use loose types in inert set]
       = Just (ctEvCoercion ctev, mkTyVarTy fsk, ctEvFlavour ctev)
       | otherwise = Nothing
 
@@ -2377,16 +2375,14 @@ lookupInInerts loc pty
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
 
--- | Look up a dictionary inert. NB: the returned 'CtEvidence' might not
--- match the input exactly. Note [Use loose types in inert set].
+-- | Look up a dictionary inert.
 lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
 lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
   = case findDict dicts loc cls tys of
       Just ct -> Just (ctEvidence ct)
       _       -> Nothing
 
--- | Look up a solved inert. NB: the returned 'CtEvidence' might not
--- match the input exactly. See Note [Use loose types in inert set].
+-- | Look up a solved inert.
 lookupSolvedDict :: InertSet -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
 -- Returns just if exactly this predicate type exists in the solved.
 lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
@@ -2412,12 +2408,24 @@ foldIrreds k irreds z = foldr k z irreds
 
 Note [Use loose types in inert set]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Say we know (Eq (a |> c1)) and we need (Eq (a |> c2)). One is clearly
-solvable from the other. So, we do lookup in the inert set using
-loose types, which omit the kind-check.
+Whenever we are looking up an inert dictionary (CDictCan) or function
+equality (CFunEqCan), we use a TcAppMap, which uses the Unique of the
+class/type family tycon and then a trie which maps the arguments. This
+trie does *not* need to match the kinds of the arguments; this Note
+explains why.
 
-We must be careful when using the result of a lookup because it may
-not match the requested info exactly!
+Consider the types ty0 = (T ty1 ty2 ty3 ty4) and ty0' = (T ty1' ty2' ty3' ty4'),
+where ty4 and ty4' have different kinds. Let's further assume that both types
+ty0 and ty0' are well-typed. Because the kind of T is closed, it must be that
+one of the ty1..ty3 does not match ty1'..ty3' (and that the kind of the fourth
+argument to T is dependent on whichever one changed). Since we are matching
+all arguments, during the inert-set lookup, we know that ty1..ty3 do indeed
+match ty1'..ty3'. Therefore, the kind of ty4 and ty4' must match, too --
+without ever looking at it.
+
+Accordingly, we use LooseTypeMap, which skips the kind check when looking
+up a type. I (Richard E) believe this is just an optimization, and that
+looking at kinds would be harmless.
 
 -}
 
