@@ -2121,7 +2121,7 @@ isClosedSynFamilyTyConWithAxiom_maybe
   (FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon mb}) = mb
 isClosedSynFamilyTyConWithAxiom_maybe _               = Nothing
 
--- | @'tyConInjectivityInfo' tc@ returns @'Injective' is@ is @tc@ is an
+-- | @'tyConInjectivityInfo' tc@ returns @'Injective' is@ if @tc@ is an
 -- injective tycon (where @is@ states for which 'tyConBinders' @tc@ is
 -- injective), or 'NotInjective' otherwise.
 tyConInjectivityInfo :: TyCon -> Injectivity

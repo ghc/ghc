@@ -1026,7 +1026,7 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel
                               [am2, ty2a_rep, ty2b_rep, ty2a, ty2b]
 
 -- Decompose type constructor applications
--- NB: e have expanded type synonyms already
+-- NB: we have expanded type synonyms already
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
            (TyConApp tc1 tys1) _
            (TyConApp tc2 tys2) _
@@ -1039,14 +1039,31 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel
   = can_eq_nc_forall ev eq_rel s1 s2
 
 -- See Note [Canonicalising type applications] about why we require flat types
-can_eq_nc' True _rdr_env _envs ev eq_rel (AppTy t1 s1) _ ty2 _
-  | NomEq <- eq_rel
+-- Use tcSplitAppTy, not matching on AppTy, to catch oversaturated type families
+-- NB: Only decompose AppTy for nominal equality. See Note [Decomposing equality]
+can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ ty2 _
+  | Just (t1, s1) <- tcSplitAppTy_maybe ty1
   , Just (t2, s2) <- tcSplitAppTy_maybe ty2
   = can_eq_app ev t1 s1 t2 s2
-can_eq_nc' True _rdr_env _envs ev eq_rel ty1 _ (AppTy t2 s2) _
-  | NomEq <- eq_rel
-  , Just (t1, s1) <- tcSplitAppTy_maybe ty1
-  = can_eq_app ev t1 s1 t2 s2
+
+-- Now deal with type functions. Require flat types, so that we (try to)
+-- reduce before trying to decompose.
+can_eq_nc' True _rdr_env _envs ev eq_rel (TyConApp tc1 args1) _ps_ty1 ty2 ps_ty2
+  | isTypeFamilyTyCon tc1
+  , args1 `lengthIs` tyConArity tc1
+     -- args1 really can't be less than tyConArity tc1. It could be *more*
+     -- than tyConArity, but then we should have handled the case as an AppTy.
+     -- That case only fires if *both* sides of the equality are AppTy-like...
+     -- but if one side is AppTy-like and the other isn't (and it also isn't
+     -- a variable or saturated type family application, both of which are
+     -- handled by can_eq_nc'), we're in a failure mode and can just fall through.
+  = canEqFun NotSwapped ev eq_rel tc1 args1 ty2 ps_ty2
+
+can_eq_nc' True _rdr_env _envs ev eq_rel ty1 ps_ty1 (TyConApp tc2 args2) _ps_ty2
+  | isTypeFamilyTyCon tc2
+  , args2 `lengthIs` tyConArity tc2
+    -- See commentary on previous case.
+  = canEqFun IsSwapped ev eq_rel tc2 args2 ty1 ps_ty1
 
 -- No similarity in type structure detected. Flatten and try again.
 can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
@@ -1402,7 +1419,7 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
 
 -- AppTys only decompose for nominal equality, so this case just leads
 -- to an irreducible constraint; see typecheck/should_compile/T10494
--- See Note [Decomposing equality], note {4}
+-- See Note [Decomposing AppTy at representational role]
 can_eq_app ev s1 t1 s2 t2
   | CtDerived {} <- ev
   = do { unifyDeriveds loc [Nominal, Nominal] [s1, t1] [s2, t2]
@@ -1585,35 +1602,33 @@ guessing, we want the same behavior regardless of evidence.
 Here is a table (discussion following) detailing where decomposition of
    (T s1 ... sn) ~r (T t1 .. tn)
 is allowed.  The first four lines (Data types ... type family) refer
-to TyConApps with various TyCons T; the last line is for AppTy, where
-there is presumably a type variable at the head, so it's actually
-   (s s1 ... sn) ~r (t t1 .. tn)
+to TyConApps with various TyCons T; the last line is for AppTy, covering
+both where there is a type variable at the head and the case for an over-
+saturated type family.
 
-NOMINAL               GIVEN                       WANTED
+NOMINAL               GIVEN        WANTED                         WHERE
 
-Datatype               YES                         YES
-Newtype                YES                         YES
-Data family            YES                         YES
-Type family            YES, in injective args{1}   YES, in injective args{1}
-Type variable          YES                         YES
+Datatype               YES          YES                           canTyConApp
+Newtype                YES          YES                           canTyConApp
+Data family            YES          YES                           canTyConApp
+Type family            NO{1}        YES, in injective args{1}     canEqFun
+AppTy                  YES          YES                           can_eq_app
 
-REPRESENTATIONAL      GIVEN                       WANTED
+REPRESENTATIONAL      GIVEN        WANTED
 
-Datatype               YES                         YES
-Newtype                NO{2}                      MAYBE{2}
-Data family            NO{3}                      MAYBE{3}
-Type family             NO                          NO
-Type variable          NO{4}                       NO{4}
+Datatype               YES          YES                           canTyConApp
+Newtype                NO{2}       MAYBE{2}                canTyConApp(can_decompose)
+Data family            NO{3}       MAYBE{3}                canTyConApp(can_decompose)
+Type family            NO           NO                            canEqFun
+AppTy                  NO{4}        NO{4}                         can_eq_nc'
 
 {1}: Type families can be injective in some, but not all, of their arguments,
 so we want to do partial decomposition. This is quite different than the way
 other decomposition is done, where the decomposed equalities replace the original
-one. We thus proceed much like we do with superclasses: emitting new Givens
-when "decomposing" a partially-injective type family Given and new Deriveds
-when "decomposing" a partially-injective type family Wanted. (As of the time of
-writing, 13 June 2015, the implementation of injective type families has not
-been merged, but it should be soon. Please delete this parenthetical if the
-implementation is indeed merged.)
+one. We thus proceed much like we do with superclasses, emitting new Deriveds
+when "decomposing" a partially-injective type family Wanted. Injective type
+families have no corresponding evidence of their injectivity, so we cannot
+decompose an injective-type-family Given.
 
 {2}: See Note [Decomposing newtypes at representational role]
 
@@ -1622,8 +1637,7 @@ data families like newtypes. See also Note [Decomposing newtypes at
 representational role]. See #10534 and test case
 typecheck/should_fail/T10534.
 
-{4}: Because type variables can stand in for newtypes, we conservatively do not
-decompose AppTys over representational equality.
+{4}: See Note [Decomposing AppTy at representational role]
 
 In the implementation of can_eq_nc and friends, we don't directly pattern
 match using lines like in the tables above, as those tables don't cover
@@ -1692,6 +1706,68 @@ constraints: see Note [Instance and Given overlap] in GHC.Tc.Solver.Interact.
 Conclusion:
   * Decompose [W] N s ~R N t  iff there no given constraint that could
     later solve it.
+
+Note [Decomposing AppTy at representational role]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We never decompose AppTy at a representational role. For Givens, doing
+so is simply unsound: the LRCo coercion former requires a nominal-roled
+arguments. (See (1) for an example of why.) For Wanteds, decomposing
+would be sound, but it would be a guess, and a non-confluent one at that.
+
+Here is an example:
+
+    [G] g1 :: a ~R b
+    [W] w1 :: Maybe b ~R alpha a
+    [W] w2 :: alpha ~ Maybe
+
+Suppose we see w1 before w2. If we were to decompose, we would decompose
+this to become
+
+    [W] w3 :: Maybe ~R alpha
+    [W] w4 :: b ~ a
+
+Note that w4 is *nominal*. A nominal role here is necessary because AppCo
+requires a nominal role on its second argument. (See (2) for an example of
+why.) If we decomposed w1 to w3,w4, we would then get stuck, because w4
+is insoluble. On the other hand, if we see w2 first, setting alpha := Maybe,
+all is well, as we can decompose Maybe b ~R Maybe a into b ~R a.
+
+Another example:
+
+    newtype Phant x = MkPhant Int
+
+    [W] w1 :: Phant Int ~R alpha Bool
+    [W] w2 :: alpha ~ Phant
+
+If we see w1 first, decomposing would be disastrous, as we would then try
+to solve Int ~ Bool. Instead, spotting w2 allows us to simplify w1 to become
+
+    [W] w1' :: Phant Int ~R Phant Bool
+
+which can then (assuming MkPhant is in scope) be simplified to Int ~R Int,
+and all will be well. See also Note [Unwrap newtypes first].
+
+Bottom line: never decompose AppTy with representational roles.
+
+(1) Decomposing a Given AppTy over a representational role is simply
+unsound. For example, if we have co1 :: Phant Int ~R a Bool (for
+the newtype Phant, above), then we surely don't want any relationship
+between Int and Bool, lest we also have co2 :: Phant ~ a around.
+
+(2) The role on the AppCo coercion is a conservative choice, because we don't
+know the role signature of the function. For example, let's assume we could
+have a representational role on the second argument of AppCo. Then, consider
+
+    data G a where    -- G will have a nominal role, as G is a GADT
+      MkG :: G Int
+    newtype Age = MkAge Int
+
+    co1 :: G ~R a        -- by assumption
+    co2 :: Age ~R Int    -- by newtype axiom
+    co3 = AppCo co1 co2 :: G Age ~R a Int    -- by our broken AppCo
+
+and now co3 can be used to cast MkG to have type G Age, in violation of
+the way GADTs are supposed to work (which is to use nominal equality).
 
 -}
 
@@ -1799,10 +1875,7 @@ unifyWanted etc to short-cut that work.
 Note [Canonicalising type applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given (s1 t1) ~ ty2, how should we proceed?
-The simple things is to see if ty2 is of form (s2 t2), and
-decompose.  By this time s1 and s2 can't be saturated type
-function applications, because those have been dealt with
-by an earlier equation in can_eq_nc, so it is always sound to
+The simple thing is to see if ty2 is of form (s2 t2), and
 decompose.
 
 However, over-eager decomposition gives bad error messages
@@ -1903,6 +1976,35 @@ whenever possible, but #15577 was an infinite loop because even
 though the coercion was homo-kinded, `kind_co` was not `Refl`, so we
 made a new (identical) CFunEqCan, and then the entire process repeated.
 -}
+
+canEqFun :: SwapFlag
+         -> CtEvidence
+         -> EqRel
+         -> TyCon      -- the type function
+         -> [TcType]   -- type function args; exactly saturated; flat
+         -> TcType     -- RHS; flat
+         -> TcType     -- pretty RHS; flat
+         -> TcS (StopOrContinue Ct)
+-- The types have already been flattened, so we know that F tys cannot
+-- reduce, w.r.t. both the top-level axioms (type instances) and any local
+-- assumptions (the inert set)
+canEqFun swapped ev eq_rel fun_tc fun_args rhs ps_rhs
+  = do { ev' <- maybe_swap
+       ; continueWith (CFunEqCan { cc_ev = ev'
+                                 , cc_fun = fun_tc
+                                 , cc_tyargs = fun_args
+                                 , cc_rhs = ps_rhs
+                                 , cc_eq_rel = eq_rel }) }
+  where
+    role = eqRelRole eq_rel
+    maybe_swap
+      | IsSwapped <- swapped
+      = rewriteEqEvidence ev IsSwapped lhs rhs
+                             (mkReflCo role lhs) (mkReflCo role rhs)
+
+      | otherwise
+      = return ev
+
 
 canCFunEqCan :: CtEvidence
              -> TyCon -> [TcType]   -- LHS

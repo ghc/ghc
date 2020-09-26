@@ -1444,29 +1444,13 @@ flatten_exact_fam_app_fully tc tys
                            ; case mOut of
                                Just out -> pure out
                                Nothing -> do
-                                 { loc <- getLoc
-                                 ; (ev, co, fsk) <- liftTcS $
-                                     newFlattenSkolem cur_flav loc tc xis
-
-                                 -- The new constraint (F xis ~ fsk) is not
-                                 -- necessarily inert (e.g. the LHS may be a
-                                 -- redex) so we must put it in the work list
-                                 ; let ct = CFunEqCan { cc_ev     = ev
-                                                      , cc_fun    = tc
-                                                      , cc_tyargs = xis
-                                                      , cc_fsk    = fsk }
-                                 ; emitFlatWork ct
-
-                                 ; traceFlat "flatten/flat-cache miss" $
-                                     (ppr tc <+> ppr xis $$ ppr fsk $$ ppr ev)
-
-                                 -- NB: fsk's kind is already flattened because
-                                 --     the xis are flattened
-                                 ; let fsk_ty = mkTyVarTy fsk
-                                       xi = fsk_ty `mkCastTy` kind_co
-                                       co' = mkTcCoherenceLeftCo role fsk_ty kind_co (maybeTcSubCo eq_rel (mkSymCo co))
-                                             `mkTransCo` ret_co
-                                 ; return (xi, co')
+                                 { traceFlat "flatten/flat-cache miss" $
+                                     ppr tc <+> ppr xis
+                                 ; let uncasted_ty = mkTyConApp tc xis
+                                       casted_ty   = uncasted_ty `mkCastTy` kind_co
+                                       final_co    = mkTcCoherenceLeftCo role uncasted_ty
+                                                       kind_co ret_co
+                                 ; return ( casted_ty, final_co )
                                  }
                            }
                }

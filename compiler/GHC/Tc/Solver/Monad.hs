@@ -2416,7 +2416,7 @@ Note [Use loose types in inert set]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Say we know (Eq (a |> c1)) and we need (Eq (a |> c2)). One is clearly
 solvable from the other. So, we do lookup in the inert set using
-loose types, which omit the kind-check.
+loose types, which omits the kind-check.
 
 We must be careful when using the result of a lookup because it may
 not match the requested info exactly!
