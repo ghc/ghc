@@ -52,14 +52,13 @@ import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim ( funTyConName )
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
 
 import GHC.Utils.Misc
-import GHC.Types.Basic  ( compareFixity, funTyFixity, negateFixity
+import GHC.Types.Basic  ( compareFixity, negateFixity
                         , Fixity(..), FixityDirection(..), LexicalFixity(..)
                         , TypeOrKind(..) )
 import GHC.Utils.Outputable
@@ -600,8 +599,7 @@ rnHsTyKi env ty@(HsOpTy _ ty1 l_op ty2)
         ; fix   <- lookupTyFixityRn l_op'
         ; (ty1', fvs2) <- rnLHsTyKi env ty1
         ; (ty2', fvs3) <- rnLHsTyKi env ty2
-        ; res_ty <- mkHsOpTyRn (\t1 t2 -> HsOpTy noExtField t1 l_op' t2)
-                               (unLoc l_op') fix ty1' ty2'
+        ; res_ty <- mkHsOpTyRn l_op' fix ty1' ty2'
         ; return (res_ty, plusFVs [fvs1, fvs2, fvs3]) }
 
 rnHsTyKi env (HsParTy _ ty)
@@ -632,12 +630,9 @@ rnHsTyKi env (HsFunTy _ mult ty1 ty2)
         -- Or as the result.  This happens when reading Prelude.hi
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
-        -- Check for fixity rearrangements
        ; (mult', w_fvs) <- rnHsArrow env mult
-       ; res_ty <- mkHsOpTyRn (hs_fun_ty mult') funTyConName funTyFixity ty1' ty2'
-       ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
-  where
-    hs_fun_ty w a b = HsFunTy noExtField w a b
+       ; return (HsFunTy noExtField mult' ty1' ty2'
+                , plusFVs [fvs1, fvs2, w_fvs]) }
 
 rnHsTyKi env listTy@(HsListTy _ ty)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -1210,46 +1205,41 @@ is always read in as
         a `op` (b `op` c)
 
 mkHsOpTyRn rearranges where necessary.  The two arguments
-have already been renamed and rearranged.  It's made rather tiresome
-by the presence of ->, which is a separate syntactic construct.
+have already been renamed and rearranged.
+
+In the past, mkHsOpTyRn used to handle (->), but this was unnecessary. In the
+syntax tree produced by the parser, the arrow already has the least possible
+precedence and does not require rearrangement.
 -}
 
 ---------------
 -- Building (ty1 `op1` (ty21 `op2` ty22))
-mkHsOpTyRn :: (LHsType GhcRn -> LHsType GhcRn -> HsType GhcRn)
-           -> Name -> Fixity -> LHsType GhcRn -> LHsType GhcRn
+mkHsOpTyRn :: Located Name -> Fixity -> LHsType GhcRn -> LHsType GhcRn
            -> RnM (HsType GhcRn)
 
-mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy noExtField ty21 op2 ty22))
+mkHsOpTyRn op1 fix1 ty1 (L loc2 (HsOpTy _ ty21 op2 ty22))
   = do  { fix2 <- lookupTyFixityRn op2
-        ; mk_hs_op_ty mk1 pp_op1 fix1 ty1
-                      (\t1 t2 -> HsOpTy noExtField t1 op2 t2)
-                      (unLoc op2) fix2 ty21 ty22 loc2 }
+        ; mk_hs_op_ty op1 fix1 ty1 op2 fix2 ty21 ty22 loc2 }
 
-mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy _ mult ty21 ty22))
-  = mk_hs_op_ty mk1 pp_op1 fix1 ty1
-                hs_fun_ty funTyConName funTyFixity ty21 ty22 loc2
-  where
-    hs_fun_ty a b = HsFunTy noExtField mult a b
-
-mkHsOpTyRn mk1 _ _ ty1 ty2              -- Default case, no rearrangment
-  = return (mk1 ty1 ty2)
+mkHsOpTyRn op1 _ ty1 ty2              -- Default case, no rearrangment
+  = return (HsOpTy noExtField ty1 op1 ty2)
 
 ---------------
-mk_hs_op_ty :: (LHsType GhcRn -> LHsType GhcRn -> HsType GhcRn)
-            -> Name -> Fixity -> LHsType GhcRn
-            -> (LHsType GhcRn -> LHsType GhcRn -> HsType GhcRn)
-            -> Name -> Fixity -> LHsType GhcRn -> LHsType GhcRn -> SrcSpan
+mk_hs_op_ty :: Located Name -> Fixity -> LHsType GhcRn
+            -> Located Name -> Fixity -> LHsType GhcRn
+            -> LHsType GhcRn -> SrcSpan
             -> RnM (HsType GhcRn)
-mk_hs_op_ty mk1 op1 fix1 ty1
-            mk2 op2 fix2 ty21 ty22 loc2
-  | nofix_error     = do { precParseErr (NormalOp op1,fix1) (NormalOp op2,fix2)
-                         ; return (mk1 ty1 (L loc2 (mk2 ty21 ty22))) }
-  | associate_right = return (mk1 ty1 (L loc2 (mk2 ty21 ty22)))
+mk_hs_op_ty op1 fix1 ty1 op2 fix2 ty21 ty22 loc2
+  | nofix_error     = do { precParseErr (NormalOp (unLoc op1),fix1)
+                                        (NormalOp (unLoc op2),fix2)
+                         ; return (ty1 `op1ty` (L loc2 (ty21 `op2ty` ty22))) }
+  | associate_right = return (ty1 `op1ty` (L loc2 (ty21 `op2ty` ty22)))
   | otherwise       = do { -- Rearrange to ((ty1 `op1` ty21) `op2` ty22)
-                           new_ty <- mkHsOpTyRn mk1 op1 fix1 ty1 ty21
-                         ; return (mk2 (noLoc new_ty) ty22) }
+                           new_ty <- mkHsOpTyRn op1 fix1 ty1 ty21
+                         ; return (noLoc new_ty `op2ty` ty22) }
   where
+    lhs `op1ty` rhs = HsOpTy noExtField lhs op1 rhs
+    lhs `op2ty` rhs = HsOpTy noExtField lhs op2 rhs
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 
