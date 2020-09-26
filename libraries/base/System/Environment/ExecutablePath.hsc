@@ -132,7 +132,7 @@ foreign import ccall unsafe "readlink"
 -- See readlink(2)
 readSymbolicLink :: FilePath -> IO FilePath
 readSymbolicLink file =
-    allocaArray0 4096 $ \buf -> do
+    allocaArray0 4096 $ \buf ->
         withFilePath file $ \s -> do
             len <- throwErrnoPathIfMinus1 "readSymbolicLink" file $
                    c_readlink s buf 4096

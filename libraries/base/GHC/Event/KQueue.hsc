@@ -1,10 +1,11 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CApiFFI
-           , GeneralizedNewtypeDeriving
-           , NoImplicitPrelude
-           , RecordWildCards
-           , BangPatterns
-  #-}
+{-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE CApiFFI                    #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE Trustworthy                #-}
+
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Unused LANGUAGE pragma" #-}
 
 module GHC.Event.KQueue
     (

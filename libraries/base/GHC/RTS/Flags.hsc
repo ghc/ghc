@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RecordWildCards   #-}
 
 -- | Accessors to GHC RTS flags.
 -- Descriptions of flags can be seen in
@@ -392,7 +391,7 @@ data RTSFlags = RTSFlags
 foreign import ccall "&RtsFlags" rtsFlagsPtr :: Ptr RTSFlags
 
 getRTSFlags :: IO RTSFlags
-getRTSFlags = do
+getRTSFlags =
   RTSFlags <$> getGCFlags
            <*> getConcFlags
            <*> getMiscFlags
