@@ -625,11 +625,7 @@ rnHsTyKi env ty@(HsRecTy _ flds)
 
 rnHsTyKi env (HsFunTy _ mult ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
-        -- Might find a for-all as the arg of a function type
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
-        -- Or as the result.  This happens when reading Prelude.hi
-        -- when we find return :: forall m. Monad m -> forall a. a -> m a
-
        ; (mult', w_fvs) <- rnHsArrow env mult
        ; return (HsFunTy noExtField mult' ty1' ty2'
                 , plusFVs [fvs1, fvs2, w_fvs]) }
