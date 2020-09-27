@@ -19,7 +19,7 @@ variables:
 stages:
   - tool-lint      # Source linting of the tools
   - quick-build    # A very quick smoke-test to weed out broken commits
-  - lint-bootstrap # A single stage that prepares the environment for `lint`
+  - lint-bootstrap # A single stage to prepare the environment for `lint`
   - lint           # Source linting of GHC
   - build          # A quick smoke-test to weed out broken commits
   - full-build     # Build all the things
@@ -88,6 +88,7 @@ workflow:
 
 ghc-linters:
   stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
@@ -108,6 +109,7 @@ ghc-linters:
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
   stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - mypy .gitlab/linters/*.py
@@ -118,6 +120,7 @@ lint-linters:
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
   stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
@@ -128,6 +131,7 @@ lint-testsuite:
 # Run mypy Python typechecker on testsuite driver
 typecheck-testsuite:
   stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - mypy testsuite/driver/runtests.py
@@ -140,6 +144,7 @@ typecheck-testsuite:
 # Marge jobs.
 .lint-submods:
   stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
@@ -172,6 +177,7 @@ lint-submods-branch:
 
 .lint-changelogs:
   stage: tool-lint
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   dependencies: []
   tags:
@@ -196,6 +202,7 @@ lint-release-changelogs:
 ############################################################
 
 .validate-hadrian:
+  needs: [hadrian-ghc-in-ghci]
   variables:
     FLAVOUR: "validate"
   script:
@@ -247,6 +254,7 @@ validate-x86_64-linux-deb9-unreg-hadrian:
 
 hadrian-ghc-in-ghci:
   stage: quick-build
+  needs: [ghc-linters, lint-linters, lint-submods, lint-changelogs, lint-release-changelogs]
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
@@ -280,6 +288,7 @@ hadrian-ghc-in-ghci:
 
 lint-bootstrap:
   stage: lint-bootstrap
+  needs: [ghc-linters, lint-submods]
   tags:
     - lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -312,6 +321,7 @@ lint-bootstrap:
 
 .lint-params:
   stage: lint
+  needs: [lint-bootstrap]
   tags:
     - lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -321,7 +331,6 @@ lint-bootstrap:
 
 lint-base:
   extends: .lint-params
-  stage: lint
   before_script:
     - mv cabal-cache $HOME/.cabal
   script:
@@ -334,6 +343,7 @@ lint-base:
 ############################################################
 
 .validate:
+  needs: [hadrian-ghc-in-ghci]
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
@@ -357,6 +367,7 @@ lint-base:
 #################################
 
 .build-x86_64-freebsd:
+  stage: full-build
   extends: .validate
   tags:
     - x86_64-freebsd
@@ -387,23 +398,19 @@ lint-base:
 # Conditional due to lack of builder capacity
 validate-x86_64-freebsd:
   extends: .build-x86_64-freebsd
-  stage: full-build
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/'
 
 nightly-x86_64-freebsd:
   <<: *nightly
   extends: .build-x86_64-freebsd
-  stage: full-build
 
 release-x86_64-freebsd:
   <<: *release
   extends: .build-x86_64-freebsd
-  stage: full-build
 
 .build-x86_64-freebsd-hadrian:
   extends: .validate-hadrian
-  stage: full-build
   tags:
     - x86_64-freebsd
   allow_failure: true
@@ -430,7 +437,6 @@ release-x86_64-freebsd:
 # Disabled due to lack of builder capacity
 .validate-x86_64-freebsd-hadrian:
   extends: .build-x86_64-freebsd-hadrian
-  stage: full-build
 
 #################################
 # x86_64-darwin
@@ -644,6 +650,7 @@ nightly-x86_64-linux-deb9:
 validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
   stage: full-build
+  stage: full-build
   variables:
     BUILD_FLAVOUR: validate
     # Ensure that stage2 also has DEBUG enabled
@@ -660,7 +667,6 @@ validate-x86_64-linux-deb9-debug:
 # Disabled to alleviate CI load
 .validate-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
-  stage: full-build
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
@@ -865,6 +871,7 @@ validate-x86_64-linux-fedora27:
 
 .build-windows:
   # For the reasons given in #17777 this build isn't reliable.
+  needs: [validate-x86_64-linux-deb9-hadrian]
   allow_failure: true
   before_script:
     - git clean -xdf
@@ -985,6 +992,7 @@ release-x86_64-windows-integer-simple:
 
 doc-tarball:
   stage: packaging
+  needs: [validate-x86_64-linux-deb9-unreg-hadrian]
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -1020,6 +1028,7 @@ doc-tarball:
 
 source-tarball:
   stage: packaging
+  needs: [validate-x86_64-linux-deb9-unreg-hadrian]
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -1054,6 +1063,7 @@ source-tarball:
 
 .hackage:
   stage: testing
+  needs: [doc-tarball]
   image: ghcci/x86_64-linux-deb9:0.2
   tags:
     - x86_64-linux
@@ -1082,6 +1092,7 @@ nightly-hackage:
 
 perf-nofib:
   stage: testing
+  needs: [doc-tarball]
   dependencies:
     - validate-x86_64-linux-deb9-dwarf
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -1118,6 +1129,7 @@ perf-nofib:
 
 perf:
   stage: testing
+  needs: [doc-tarball]
   dependencies:
     - validate-x86_64-linux-deb9-dwarf
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -1153,6 +1165,7 @@ perf:
 
 pages:
   stage: deploy
+  needs: [doc-tarball]
   dependencies:
     - doc-tarball
   image: ghcci/x86_64-linux-deb9:0.2
