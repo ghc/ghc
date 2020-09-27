@@ -1206,9 +1206,12 @@ lookupGlobalOccRn_overloaded_pat :: DuplicateRecordFields
   -> RdrName
   -> RnM (Maybe LookupOccRnOverloadedResult)
 lookupGlobalOccRn_overloaded_pat overload_ok rdr_name =
-  lookupExactOrOrig_maybe rdr_name (fmap LookupOccRnUnique) $
-     do  { res <- lookupGreRn_helper rdr_name
-         ; lookupGlobalOccRn_resolve overload_ok rdr_name res }
+  lookupExactOrOrig_maybe rdr_name (fmap LookupOccRnUnique) $ runMaybeT $ msum
+    [ MaybeT $ do
+      { res <- lookupGreRn_helper rdr_name
+      ; lookupGlobalOccRn_resolve overload_ok rdr_name res }
+    , MaybeT (listToMaybe <$> lookupQualifiedNameGHCi rdr_name)
+    ]
 
 
 --------------------------------------------------
