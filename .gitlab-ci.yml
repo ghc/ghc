@@ -317,6 +317,7 @@ lint-bootstrap:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     GHC_FLAGS: -Werror
+  needs: [lint-bootstrap]
 
 
 lint-base:
