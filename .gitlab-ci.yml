@@ -19,7 +19,6 @@ variables:
 stages:
   - tool-lint      # Source linting of the tools
   - quick-build    # A very quick smoke-test to weed out broken commits
-  - lint-bootstrap # A single stage that prepares the environment for `lint`
   - lint           # Source linting of GHC
   - build          # A quick smoke-test to weed out broken commits
   - full-build     # Build all the things
@@ -196,6 +195,7 @@ lint-release-changelogs:
 ############################################################
 
 .validate-hadrian:
+  needs: [hadrian-ghc-in-ghci]
   variables:
     FLAVOUR: "validate"
   script:
@@ -279,7 +279,7 @@ hadrian-ghc-in-ghci:
 ############################################################
 
 lint-bootstrap:
-  stage: lint-bootstrap
+  stage: quick-build
   tags:
     - lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -305,6 +305,7 @@ lint-bootstrap:
     paths:
       - cabal-cache
       - _build
+  needs: [ghc-linters, lint-linters, lint-submods]
 
 ############################################################
 # GHC source code linting
@@ -321,6 +322,7 @@ lint-bootstrap:
 
 lint-base:
   extends: .lint-params
+  needs: [lint-bootstrap]
   stage: lint
   before_script:
     - mv cabal-cache $HOME/.cabal
