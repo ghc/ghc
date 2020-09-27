@@ -19,8 +19,6 @@ variables:
 stages:
   - tool-lint      # Source linting of the tools
   - quick-build    # A very quick smoke-test to weed out broken commits
-  - lint-bootstrap # A single stage that prepares the environment for `lint`
-  - lint           # Source linting of GHC
   - build          # A quick smoke-test to weed out broken commits
   - full-build     # Build all the things
   - packaging      # Source distribution, etc.
@@ -305,6 +303,7 @@ lint-bootstrap:
     paths:
       - cabal-cache
       - _build
+  needs: [ghc-linters, lint-linters, lint-submods]
 
 ############################################################
 # GHC source code linting
@@ -317,6 +316,7 @@ lint-bootstrap:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     GHC_FLAGS: -Werror
+  needs: [lint-bootstrap]
 
 
 lint-base:
