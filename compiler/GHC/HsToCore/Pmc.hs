@@ -65,6 +65,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Types.Name (Name)
 import GHC.Types.Var (EvVar)
 import GHC.Tc.Utils.TcType (evVarPred)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsLExpr)
@@ -110,7 +111,7 @@ pmcPatBind _ _ _ = pure ()
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Nablas' covered by the RHSs.
 pmcGRHSs
-  :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
+  :: HsMatchContext Name          -- ^ Match context, for warning messages
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
   -> DsM (NonEmpty Nablas)        -- ^ Covered 'Nablas' for each RHS, for long
                                   --   distance info

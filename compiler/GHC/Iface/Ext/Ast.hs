@@ -900,12 +900,12 @@ instance ( HiePass p
         HieTc -> makeNode m span
         HieRn -> makeNode m span
 
-instance HiePass p => ToHie (HsMatchContext (GhcPass p)) where
+instance ToHie (Context (Located n)) => ToHie (HsMatchContext n) where
   toHie (FunRhs{mc_fun=name}) = toHie $ C MatchBind name
   toHie (StmtCtxt a) = toHie a
   toHie _ = pure []
 
-instance HiePass p => ToHie (HsStmtContext (GhcPass p)) where
+instance ToHie (Context (Located n)) => ToHie (HsStmtContext n) where
   toHie (PatGuard a) = toHie a
   toHie (ParStmtCtxt a) = toHie a
   toHie (TransStmtCtxt a) = toHie a

@@ -47,6 +47,7 @@ import GHC.Core.Make
 import GHC.HsToCore.Binds (dsHsWrapper)
 
 import GHC.Types.Id
+import GHC.Types.Name
 import GHC.Core.ConLike
 import GHC.Builtin.Types
 import GHC.Types.Basic
@@ -170,7 +171,7 @@ do_premap :: DsCmdEnv -> Type -> Type -> Type ->
 do_premap ids b_ty c_ty d_ty f g
    = do_compose ids b_ty c_ty d_ty (do_arr ids b_ty c_ty f) g
 
-mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
+mkFailExpr :: HsMatchContext Name -> Type -> DsM CoreExpr
 mkFailExpr ctxt ty
   = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
 
@@ -1144,7 +1145,7 @@ dsCmdStmts _ _ _ [] _ = panic "dsCmdStmts []"
 -- Match a list of expressions against a list of patterns, left-to-right.
 
 matchSimplys :: [CoreExpr]              -- Scrutinees
-             -> HsMatchContext GhcRn    -- Match kind
+             -> HsMatchContext Name     -- Match kind
              -> [LPat GhcTc]            -- Patterns they should match
              -> CoreExpr                -- Return this if they all match
              -> CoreExpr                -- Return this if they don't

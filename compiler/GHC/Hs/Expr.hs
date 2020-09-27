@@ -42,6 +42,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Core
 import GHC.Types.Id( Id )
 import GHC.Types.Name
+import GHC.Types.Name.Reader (RdrName)
 import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Core.ConLike
@@ -415,7 +416,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsDo        (XDo p)                  -- Type of the whole expression
-                (HsStmtContext GhcRn)    -- The parameterisation is unimportant
+                (HsStmtContext Name)     -- The parameterisation is unimportant
                                          -- because in this context we never use
                                          -- the PatGuard or ParStmt variant
                 (XRec p [ExprLStmt p])   -- "do":one or more stmts
@@ -1731,7 +1732,7 @@ type LMatch id body = XRec id (Match id body)
 data Match p body
   = Match {
         m_ext :: XCMatch p body,
-        m_ctxt :: HsMatchContext (NoGhcTc p),
+        m_ctxt :: HsMatchContext (IdP (NoGhcTc p)),
           -- See note [m_ctxt in Match]
         m_pats :: [LPat p], -- The patterns
         m_grhss :: (GRHSs p body)
@@ -2205,7 +2206,7 @@ data ApplicativeArg idL
     , app_stmts         :: [ExprLStmt idL] -- stmts
     , final_expr        :: HsExpr idL    -- return (v1,..,vn), or just (v1,..,vn)
     , bv_pattern        :: LPat idL      -- (v1,...,vn)
-    , stmt_context      :: HsStmtContext GhcRn -- context of the do expression
+    , stmt_context      :: HsStmtContext Name  -- context of the do expression
                                                -- used in pprArg
     }
   | XApplicativeArg !(XXApplicativeArg idL)
@@ -2875,8 +2876,8 @@ pp_dotdot = text " .. "
 --
 -- Context of a pattern match. This is more subtle than it would seem. See Note
 -- [Varieties of pattern matches].
-data HsMatchContext p
-  = FunRhs { mc_fun        :: LIdP p    -- ^ function binder of @f@
+data HsMatchContext id -- Not an extensible tag
+  = FunRhs { mc_fun        :: Located id    -- ^ function binder of @f@
            , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
            , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
                                             -- See Note [FunBind vs PatBind]
@@ -2896,14 +2897,16 @@ data HsMatchContext p
                                 --    tell matchWrapper what sort of
                                 --    runtime error message to generate]
 
-  | StmtCtxt (HsStmtContext p)  -- ^Pattern of a do-stmt, list comprehension,
-                                -- pattern guard, etc
+  | StmtCtxt (HsStmtContext id)  -- ^Pattern of a do-stmt, list comprehension,
+                                 -- pattern guard, etc
 
   | ThPatSplice            -- ^A Template Haskell pattern splice
   | ThPatQuote             -- ^A Template Haskell pattern quotation [p| (a,b) |]
   | PatSyn                 -- ^A pattern synonym declaration
+deriving instance Data (HsMatchContext RdrName)
+deriving instance Data (HsMatchContext Name)
 
-instance OutputableBndrId p => Outputable (HsMatchContext (GhcPass p)) where
+instance Outputable p => Outputable (HsMatchContext p) where
   ppr m@(FunRhs{})          = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
   ppr LambdaExpr            = text "LambdaExpr"
   ppr CaseAlt               = text "CaseAlt"
@@ -2924,7 +2927,7 @@ isPatSynCtxt ctxt =
     _      -> False
 
 -- | Haskell Statement Context.
-data HsStmtContext p
+data HsStmtContext id -- Not a pass
   = ListComp
   | MonadComp
 
@@ -2933,9 +2936,11 @@ data HsStmtContext p
   | ArrowExpr                        -- ^do-notation in an arrow-command context
 
   | GhciStmtCtxt                     -- ^A command-line Stmt in GHCi pat <- rhs
-  | PatGuard (HsMatchContext p)      -- ^Pattern guard for specified thing
-  | ParStmtCtxt (HsStmtContext p)    -- ^A branch of a parallel stmt
-  | TransStmtCtxt (HsStmtContext p)  -- ^A branch of a transform stmt
+  | PatGuard (HsMatchContext id)     -- ^Pattern guard for specified thing
+  | ParStmtCtxt (HsStmtContext id)   -- ^A branch of a parallel stmt
+  | TransStmtCtxt (HsStmtContext id) -- ^A branch of a transform stmt
+deriving instance Data (HsStmtContext RdrName)
+deriving instance Data (HsStmtContext Name)
 
 qualifiedDoModuleName_maybe :: HsStmtContext p -> Maybe ModuleName
 qualifiedDoModuleName_maybe ctxt = case ctxt of
@@ -2980,7 +2985,7 @@ matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
 matchSeparator PatSyn       = panic "unused"
 
-pprMatchContext :: (Outputable (IdP p), UnXRec p)
+pprMatchContext :: Outputable p
                 => HsMatchContext p -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
@@ -2990,11 +2995,11 @@ pprMatchContext ctxt
     want_an ProcExpr    = True
     want_an _           = False
 
-pprMatchContextNoun :: forall p. (Outputable (IdP p), UnXRec p)
-                    => HsMatchContext p -> SDoc
-pprMatchContextNoun (FunRhs {mc_fun=fun})
+pprMatchContextNoun :: Outputable id
+                    => HsMatchContext id -> SDoc
+pprMatchContextNoun (FunRhs {mc_fun=L _ fun})
                                     = text "equation for"
-                                      <+> quotes (ppr (unXRec @p fun))
+                                      <+> quotes (ppr fun)
 pprMatchContextNoun CaseAlt         = text "case alternative"
 pprMatchContextNoun IfAlt           = text "multi-way if alternative"
 pprMatchContextNoun RecUpd          = text "record-update construct"
@@ -3009,8 +3014,8 @@ pprMatchContextNoun (StmtCtxt ctxt) = text "pattern binding in"
 pprMatchContextNoun PatSyn          = text "pattern synonym declaration"
 
 -----------------
-pprAStmtContext, pprStmtContext :: (Outputable (IdP p), UnXRec p)
-                                => HsStmtContext p -> SDoc
+pprAStmtContext, pprStmtContext :: Outputable id
+                                => HsStmtContext id -> SDoc
 pprAStmtContext ctxt = article <+> pprStmtContext ctxt
   where
     pp_an = text "an"
@@ -3046,13 +3051,12 @@ prependQualified :: Maybe ModuleName -> SDoc -> SDoc
 prependQualified Nothing  t = t
 prependQualified (Just _) t = text "qualified" <+> t
 
-instance OutputableBndrId p
-      => Outputable (HsStmtContext (GhcPass p)) where
+instance Outputable id => Outputable (HsStmtContext id) where
     ppr = pprStmtContext
 
 -- Used to generate the string for a *runtime* error message
-matchContextErrString :: OutputableBndrId p
-                      => HsMatchContext (GhcPass p) -> SDoc
+matchContextErrString :: Outputable id
+                      => HsMatchContext id -> SDoc
 matchContextErrString (FunRhs{mc_fun=L _ fun})   = text "function" <+> ppr fun
 matchContextErrString CaseAlt                    = text "case"
 matchContextErrString IfAlt                      = text "multi-way if"
@@ -3083,7 +3087,7 @@ pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
 pprStmtInCtxt :: (OutputableBndrId idL,
                   OutputableBndrId idR,
                   Outputable body)
-              => HsStmtContext (GhcPass idL)
+              => HsStmtContext (IdP (GhcPass idL))
               -> StmtLR (GhcPass idL) (GhcPass idR) body
               -> SDoc
 pprStmtInCtxt ctxt (LastStmt _ e _ _)

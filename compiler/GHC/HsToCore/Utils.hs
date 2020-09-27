@@ -75,7 +75,7 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
 import GHC.Unit.Module
 import GHC.Builtin.Names
-import GHC.Types.Name( isInternalName )
+import GHC.Types.Name(Name, isInternalName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
@@ -900,7 +900,7 @@ CPR-friendly.  This matters a lot: if you don't get it right, you lose
 the tail call property.  For example, see #3403.
 -}
 
-dsHandleMonadicFailure :: HsStmtContext GhcRn -> LPat GhcTc -> MatchResult CoreExpr -> FailOperator GhcTc -> DsM CoreExpr
+dsHandleMonadicFailure :: HsStmtContext Name -> LPat GhcTc -> MatchResult CoreExpr -> FailOperator GhcTc -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
 dsHandleMonadicFailure ctx pat match m_fail_op =
@@ -921,7 +921,7 @@ dsHandleMonadicFailure ctx pat match m_fail_op =
       fail_expr <- dsSyntaxExpr fail_op [fail_msg]
       body fail_expr
 
-mk_fail_msg :: DynFlags -> HsStmtContext GhcRn -> Located e -> String
+mk_fail_msg :: DynFlags -> HsStmtContext Name -> Located e -> String
 mk_fail_msg dflags ctx pat
   = showPpr dflags $ text "Pattern match failure in" <+> pprStmtContext ctx <+> text "at" <+> ppr (getLoc pat)
 
