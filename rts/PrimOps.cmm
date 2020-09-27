@@ -2841,11 +2841,6 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     return ();
 }
 
-stg_cloneThreadStackzh () {
-    // TODO: Implement me! Consider locks, race-conditions, etc.
-    return ();
-}
-
 stg_cloneMyStackzh () {
     W_ stgStack;
     gcptr p;
