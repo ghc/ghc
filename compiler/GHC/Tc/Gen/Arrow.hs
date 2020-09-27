@@ -32,6 +32,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Core.Multiplicity
 import GHC.Types.Id( mkLocalId )
+import GHC.Types.Name
 import GHC.Tc.Utils.Instantiate
 import GHC.Builtin.Types
 import GHC.Types.Var.Set
@@ -270,7 +271,7 @@ tc_cmd env
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
   where
     n_pats     = length pats
-    match_ctxt = (LambdaExpr :: HsMatchContext GhcRn)    -- Maybe KappaExpr?
+    match_ctxt = (LambdaExpr :: HsMatchContext Name)    -- Maybe KappaExpr?
     pg_ctxt    = PatGuard match_ctxt
 
     tc_grhss (GRHSs x grhss (L l binds)) stk_ty res_ty

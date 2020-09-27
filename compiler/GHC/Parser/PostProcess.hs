@@ -59,7 +59,7 @@ module GHC.Parser.PostProcess (
         checkContext,         -- HsType -> P HsContext
         checkPattern,         -- HsExp -> P HsPat
         checkPattern_msg,
-        checkMonadComp,       -- P (HsStmtContext GhcPs)
+        checkMonadComp,       -- P (HsStmtContext RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
         LRuleTyTmVar, RuleTyTmVar(..),
@@ -1324,7 +1324,7 @@ addUnpackednessP (L lprag (UnpackednessPragma anns prag unpk)) ty = do
 -- If the flag MonadComprehensions is set, return a 'MonadComp' context,
 -- otherwise use the usual 'ListComp' context
 
-checkMonadComp :: PV (HsStmtContext GhcRn)
+checkMonadComp :: PV (HsStmtContext Name)
 checkMonadComp = do
     monadComprehensions <- getBit MonadComprehensionsBit
     return $ if monadComprehensions
@@ -2096,7 +2096,7 @@ data Frame
     -- ^ If-expression: if p then x else y
   | FrameCase LFrame [LFrameMatch]
     -- ^ Case-expression: case x of { p1 -> e1; p2 -> e2 }
-  | FrameDo (HsStmtContext GhcRn) [LFrameStmt]
+  | FrameDo (HsStmtContext Name) [LFrameStmt]
     -- ^ Do-expression: do { s1; a <- s2; s3 }
   ...
   | FrameExpr (HsExpr GhcPs)   -- unambiguously an expression

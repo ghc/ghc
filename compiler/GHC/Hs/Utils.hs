@@ -159,7 +159,7 @@ just attach 'noSrcSpan' to everything.
 mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsPar e = L (getLoc e) (HsPar noExtField e)
 
-mkSimpleMatch :: HsMatchContext (NoGhcTc (GhcPass p))
+mkSimpleMatch :: HsMatchContext (IdP (NoGhcTc (GhcPass p)))
               -> [LPat (GhcPass p)] -> Located (body (GhcPass p))
               -> LMatch (GhcPass p) (Located (body (GhcPass p)))
 mkSimpleMatch ctxt pats rhs
@@ -273,8 +273,8 @@ nlParPat p = noLoc (ParPat noExtField p)
 mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit -> HsOverLit GhcPs
 mkHsIsString   :: SourceText -> FastString -> HsOverLit GhcPs
-mkHsDo         :: HsStmtContext GhcRn -> [ExprLStmt GhcPs] -> HsExpr GhcPs
-mkHsComp       :: HsStmtContext GhcRn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkHsDo         :: HsStmtContext Name -> [ExprLStmt GhcPs] -> HsExpr GhcPs
+mkHsComp       :: HsStmtContext Name -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> HsExpr GhcPs
 
 mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs)
@@ -510,7 +510,7 @@ nlWildPat  = noLoc (WildPat noExtField )
 nlWildPatName :: LPat GhcRn
 nlWildPatName  = noLoc (WildPat noExtField )
 
-nlHsDo :: HsStmtContext GhcRn -> [LStmt GhcPs (LHsExpr GhcPs)]
+nlHsDo :: HsStmtContext Name -> [LStmt GhcPs (LHsExpr GhcPs)]
        -> LHsExpr GhcPs
 nlHsDo ctxt stmts = noLoc (mkHsDo ctxt stmts)
 
@@ -806,14 +806,14 @@ mkSimpleGeneratedFunBind loc fun pats expr
                        (noLoc emptyLocalBinds)]
 
 -- | Make a prefix, non-strict function 'HsMatchContext'
-mkPrefixFunRhs :: LIdP p -> HsMatchContext p
+mkPrefixFunRhs :: Located id -> HsMatchContext id
 mkPrefixFunRhs n = FunRhs { mc_fun = n
                           , mc_fixity = Prefix
                           , mc_strictness = NoSrcStrict }
 
 ------------
 mkMatch :: forall p. IsPass p
-        => HsMatchContext (NoGhcTc (GhcPass p))
+        => HsMatchContext (IdP (NoGhcTc (GhcPass p)))
         -> [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> Located (HsLocalBinds (GhcPass p))

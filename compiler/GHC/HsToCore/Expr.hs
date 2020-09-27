@@ -959,7 +959,7 @@ handled in GHC.HsToCore.ListComp).  Basically does the translation given in the
 Haskell 98 report:
 -}
 
-dsDo :: HsStmtContext GhcRn -> [ExprLStmt GhcTc] -> DsM CoreExpr
+dsDo :: HsStmtContext Name -> [ExprLStmt GhcTc] -> DsM CoreExpr
 dsDo ctx stmts
   = goL stmts
   where

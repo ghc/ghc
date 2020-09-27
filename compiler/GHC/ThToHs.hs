@@ -867,7 +867,7 @@ cvtLocalDecs doc ds
       ((_:_), (_:_)) ->
         failWith (text "Implicit parameters mixed with other bindings")
 
-cvtClause :: HsMatchContext GhcPs
+cvtClause :: HsMatchContext RdrName
           -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
@@ -1140,7 +1140,7 @@ cvtOpApp x op y
 --      Do notation and statements
 -------------------------------------
 
-cvtHsDo :: HsStmtContext GhcRn -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
+cvtHsDo :: HsStmtContext Name.Name -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
 cvtHsDo do_or_lc stmts
   | null stmts = failWith (text "Empty stmt list in do-block")
   | otherwise
@@ -1173,7 +1173,7 @@ cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss
                     ; return (ParStmtBlock noExtField ds' undefined noSyntaxExpr) }
 cvtStmt (TH.RecS ss) = do { ss' <- mapM cvtStmt ss; returnL (mkRecStmt ss') }
 
-cvtMatch :: HsMatchContext GhcPs
+cvtMatch :: HsMatchContext RdrName
          -> TH.Match -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p
