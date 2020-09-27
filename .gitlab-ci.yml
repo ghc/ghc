@@ -305,6 +305,7 @@ lint-bootstrap:
     paths:
       - cabal-cache
       - _build
+  needs: [ghc-linters, lint-linters, lint-submods, lint-submods-branch]
 
 ############################################################
 # GHC source code linting
@@ -317,6 +318,7 @@ lint-bootstrap:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     GHC_FLAGS: -Werror
+  needs: [lint-bootstrap]
 
 
 lint-base:
