@@ -25,9 +25,10 @@
 
 #include <string.h>
 
+#include "Disassembler.h"
+
 #if defined(DEBUG)
 
-#include "Disassembler.h"
 #include "Apply.h"
 
 /* --------------------------------------------------------------------------
@@ -58,31 +59,347 @@ void printObj( StgClosure *obj )
     printClosure(obj);
 }
 
-STATIC_INLINE void
-printStdObjHdr( const StgClosure *obj, char* tag )
+void
+printMutableList(bdescr *bd)
 {
-    debugBelch("%s(",tag);
-    printPtr((StgPtr)obj->header.info);
-#if defined(PROFILING)
-    debugBelch(", %s", obj->header.prof.ccs->cc->label);
+    StgPtr p;
+
+    debugBelch("mutable list %p: ", bd);
+
+    for (; bd != NULL; bd = bd->link) {
+        for (p = bd->start; p < bd->free; p++) {
+            debugBelch("%p (%s), ", (void *)*p, info_type((StgClosure *)*p));
+        }
+    }
+    debugBelch("\n");
+}
+
+void printTSO( StgTSO *tso )
+{
+    printStack( tso->stackobj );
+}
+
+void printStaticObjects( StgClosure *p )
+{
+    while (p != END_OF_STATIC_OBJECT_LIST) {
+        p = UNTAG_STATIC_LIST_PTR(p);
+        printClosure(p);
+
+        const StgInfoTable *info = get_itbl(p);
+        p = *STATIC_LINK(info, p);
+    }
+}
+
+void printWeakLists()
+{
+    debugBelch("======= WEAK LISTS =======\n");
+
+    for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
+        debugBelch("Capability %d:\n", cap_idx);
+        Capability *cap = capabilities[cap_idx];
+        for (StgWeak *weak = cap->weak_ptr_list_hd; weak; weak = weak->link) {
+            printClosure((StgClosure*)weak);
+        }
+    }
+
+    for (uint32_t gen_idx = 0; gen_idx <= oldest_gen->no; ++gen_idx) {
+        generation *gen = &generations[gen_idx];
+        debugBelch("Generation %d current weaks:\n", gen_idx);
+        for (StgWeak *weak = gen->weak_ptr_list; weak; weak = weak->link) {
+            printClosure((StgClosure*)weak);
+        }
+        debugBelch("Generation %d old weaks:\n", gen_idx);
+        for (StgWeak *weak = gen->old_weak_ptr_list; weak; weak = weak->link) {
+            printClosure((StgClosure*)weak);
+        }
+    }
+
+    debugBelch("=========================\n");
+}
+
+void printLargeAndPinnedObjects()
+{
+    debugBelch("====== PINNED OBJECTS ======\n");
+
+    for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
+        Capability *cap = capabilities[cap_idx];
+
+        debugBelch("Capability %d: Current pinned object block: %p\n",
+                   cap_idx, (void*)cap->pinned_object_block);
+        for (bdescr *bd = cap->pinned_object_blocks; bd; bd = bd->link) {
+            debugBelch("%p\n", (void*)bd);
+        }
+    }
+
+    debugBelch("====== LARGE OBJECTS =======\n");
+    for (uint32_t gen_idx = 0; gen_idx <= oldest_gen->no; ++gen_idx) {
+        generation *gen = &generations[gen_idx];
+        debugBelch("Generation %d current large objects:\n", gen_idx);
+        for (bdescr *bd = gen->large_objects; bd; bd = bd->link) {
+            debugBelch("%p: ", (void*)bd);
+            printClosure((StgClosure*)bd->start);
+        }
+
+        debugBelch("Generation %d scavenged large objects:\n", gen_idx);
+        for (bdescr *bd = gen->scavenged_large_objects; bd; bd = bd->link) {
+            debugBelch("%p: ", (void*)bd);
+            printClosure((StgClosure*)bd->start);
+        }
+    }
+
+    debugBelch("============================\n");
+}
+
+/* --------------------------------------------------------------------------
+ * Address printing code
+ *
+ * Uses symbol table in (unstripped executable)
+ * ------------------------------------------------------------------------*/
+
+/* --------------------------------------------------------------------------
+ * Simple lookup table
+ * address -> function name
+ * ------------------------------------------------------------------------*/
+
+static HashTable * add_to_fname_table = NULL;
+
+const char *lookupGHCName( void *addr )
+{
+    if (add_to_fname_table == NULL)
+        return NULL;
+
+    return lookupHashTable(add_to_fname_table, (StgWord)addr);
+}
+
+/* --------------------------------------------------------------------------
+ * Symbol table loading
+ * ------------------------------------------------------------------------*/
+
+/* Causing linking trouble on Win32 plats, so I'm
+   disabling this for now.
+*/
+#if defined(USING_LIBBFD)
+#    define PACKAGE 1
+#    define PACKAGE_VERSION 1
+/* Those PACKAGE_* defines are workarounds for bfd:
+ *     https://sourceware.org/bugzilla/show_bug.cgi?id=14243
+ * ghc's build system filter PACKAGE_* values out specifically to avoid clashes
+ * with user's autoconf-based Cabal packages.
+ * It's a shame <bfd.h> checks for unrelated fields instead of actually used
+ * macros.
+ */
+#    include <bfd.h>
+
+/* Fairly ad-hoc piece of code that seems to filter out a lot of
+ * rubbish like the obj-splitting symbols
+ */
+
+static bool isReal( flagword flags STG_UNUSED, const char *name )
+{
+#if 0
+    /* ToDo: make this work on BFD */
+    int tp = type & N_TYPE;
+    if (tp == N_TEXT || tp == N_DATA) {
+        return (name[0] == '_' && name[1] != '_');
+    } else {
+        return false;
+    }
+#else
+    if (*name == '\0'  ||
+        (name[0] == 'g' && name[1] == 'c' && name[2] == 'c') ||
+        (name[0] == 'c' && name[1] == 'c' && name[2] == '.')) {
+        return false;
+    }
+    return true;
 #endif
 }
 
-static void
-printStdObjPayload( const StgClosure *obj )
+extern void DEBUG_LoadSymbols( const char *name )
 {
-    StgWord i, j;
-    const StgInfoTable* info;
+    bfd* abfd;
+    char **matching;
 
-    info = get_itbl(obj);
-    for (i = 0; i < info->layout.payload.ptrs; ++i) {
-        debugBelch(", ");
-        printPtr((StgPtr)obj->payload[i]);
+    bfd_init();
+    abfd = bfd_openr(name, "default");
+    if (abfd == NULL) {
+        barf("can't open executable %s to get symbol table", name);
     }
-    for (j = 0; j < info->layout.payload.nptrs; ++j) {
-        debugBelch(", %pd#",obj->payload[i+j]);
+    if (!bfd_check_format_matches (abfd, bfd_object, &matching)) {
+        barf("mismatch");
     }
-    debugBelch(")\n");
+
+    {
+        long storage_needed;
+        asymbol **symbol_table;
+        long number_of_symbols;
+        long num_real_syms = 0;
+        long i;
+
+        storage_needed = bfd_get_symtab_upper_bound (abfd);
+
+        if (storage_needed < 0) {
+            barf("can't read symbol table");
+        }
+        symbol_table = (asymbol **) stgMallocBytes(storage_needed,"DEBUG_LoadSymbols");
+
+        number_of_symbols = bfd_canonicalize_symtab (abfd, symbol_table);
+
+        if (number_of_symbols < 0) {
+            barf("can't canonicalise symbol table");
+        }
+
+        if (add_to_fname_table == NULL)
+            add_to_fname_table = allocHashTable();
+
+        for( i = 0; i != number_of_symbols; ++i ) {
+            symbol_info info;
+            bfd_get_symbol_info(abfd,symbol_table[i],&info);
+            if (isReal(info.type, info.name)) {
+                insertHashTable(add_to_fname_table,
+                                info.value, (void*)info.name);
+                num_real_syms += 1;
+            }
+        }
+
+        IF_DEBUG(interpreter,
+                 debugBelch("Loaded %ld symbols. Of which %ld are real symbols\n",
+                         number_of_symbols, num_real_syms)
+                 );
+
+        stgFree(symbol_table);
+    }
+}
+
+#else /* USING_LIBBFD */
+
+extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
+{
+  /* nothing, yet */
+}
+
+#endif /* USING_LIBBFD */
+
+void findPtr(P_ p, int);                /* keep gcc -Wall happy */
+
+int searched = 0;
+
+static int
+findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
+{
+    StgPtr q, r, end;
+    for (; bd; bd = bd->link) {
+        searched++;
+        for (q = bd->start; q < bd->free; q++) {
+            if (UNTAG_CONST_CLOSURE((StgClosure*)*q) == (const StgClosure *)p) {
+                if (i < arr_size) {
+                    for (r = bd->start; r < bd->free; r = end) {
+                        // skip over zeroed-out slop
+                        while (*r == 0) r++;
+                        if (!LOOKS_LIKE_CLOSURE_PTR(r)) {
+                            debugBelch("%p found at %p, no closure at %p\n",
+                                       p, q, r);
+                            break;
+                        }
+                        end = r + closure_sizeW((StgClosure*)r);
+                        if (q < end) {
+                            debugBelch("%p = ", r);
+                            printClosure((StgClosure *)r);
+                            arr[i++] = r;
+                            break;
+                        }
+                    }
+                    if (r >= bd->free) {
+                        debugBelch("%p found at %p, closure?", p, q);
+                    }
+                } else {
+                    return i;
+                }
+            }
+        }
+    }
+    return i;
+}
+
+void
+findPtr(P_ p, int follow)
+{
+  uint32_t g, n;
+  bdescr *bd;
+  const int arr_size = 1024;
+  StgPtr arr[arr_size];
+  int i = 0;
+  searched = 0;
+
+#if 0
+  // We can't search the nursery, because we don't know which blocks contain
+  // valid data, because the bd->free pointers in the nursery are only reset
+  // just before a block is used.
+  for (n = 0; n < n_capabilities; n++) {
+      bd = nurseries[i].blocks;
+      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      if (i >= arr_size) return;
+  }
+#endif
+
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      bd = generations[g].blocks;
+      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      bd = generations[g].large_objects;
+      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      if (i >= arr_size) return;
+      for (n = 0; n < n_capabilities; n++) {
+          i = findPtrBlocks(p, gc_threads[n]->gens[g].part_list,
+                            arr, arr_size, i);
+          i = findPtrBlocks(p, gc_threads[n]->gens[g].todo_bd,
+                            arr, arr_size, i);
+      }
+      if (i >= arr_size) return;
+  }
+  if (follow && i == 1) {
+      debugBelch("-->\n");
+      findPtr(arr[0], 1);
+  }
+}
+
+const char *what_next_strs[] = {
+  [0]               = "(unknown)",
+  [ThreadRunGHC]    = "ThreadRunGHC",
+  [ThreadInterpret] = "ThreadInterpret",
+  [ThreadKilled]    = "ThreadKilled",
+  [ThreadComplete]  = "ThreadComplete"
+};
+
+#else /* DEBUG */
+void printPtr( StgPtr p )
+{
+    debugBelch("ptr 0x%p (enable -DDEBUG for more info) " , p );
+}
+
+void printObj( StgClosure *obj )
+{
+    debugBelch("obj 0x%p (enable -DDEBUG for more info) " , obj );
+}
+
+
+#endif /* DEBUG */
+
+// If you know you have an UPDATE_FRAME, but want to know exactly which.
+const char *info_update_frame(const StgClosure *closure)
+{
+    // Note: We intentionally don't take the info table pointer as
+    // an argument. As it will be confusing whether one should pass
+    // it pointing to the code or struct members when compiling with
+    // TABLES_NEXT_TO_CODE.
+    const StgInfoTable *info = closure->header.info;
+    if (info == &stg_upd_frame_info) {
+        return "NORMAL_UPDATE_FRAME";
+    } else if (info == &stg_bh_upd_frame_info) {
+        return "BH_UPDATE_FRAME";
+    } else if (info == &stg_marked_upd_frame_info) {
+        return "MARKED_UPDATE_FRAME";
+    } else {
+        return "ERROR: Not an update frame!!!";
+    }
 }
 
 static void
@@ -102,11 +419,38 @@ printThunkPayload( StgThunk *obj )
     debugBelch(")\n");
 }
 
+STATIC_INLINE void
+printStdObjHdr( const StgClosure *obj, char* tag )
+{
+    debugBelch("%s(",tag);
+    printPtr((StgPtr)obj->header.info);
+#if defined(PROFILING)
+    debugBelch(", %s", obj->header.prof.ccs->cc->label);
+#endif
+}
+
 static void
 printThunkObject( StgThunk *obj, char* tag )
 {
     printStdObjHdr( (StgClosure *)obj, tag );
     printThunkPayload( obj );
+}
+
+static void
+printStdObjPayload( const StgClosure *obj )
+{
+    StgWord i, j;
+    const StgInfoTable* info;
+
+    info = get_itbl(obj);
+    for (i = 0; i < info->layout.payload.ptrs; ++i) {
+        debugBelch(", ");
+        printPtr((StgPtr)obj->payload[i]);
+    }
+    for (j = 0; j < info->layout.payload.nptrs; ++j) {
+        debugBelch(", %pd#",obj->payload[i+j]);
+    }
+    debugBelch(")\n");
 }
 
 void
@@ -432,40 +776,6 @@ printClosure( const StgClosure *obj )
     }
 }
 
-void
-printMutableList(bdescr *bd)
-{
-    StgPtr p;
-
-    debugBelch("mutable list %p: ", bd);
-
-    for (; bd != NULL; bd = bd->link) {
-        for (p = bd->start; p < bd->free; p++) {
-            debugBelch("%p (%s), ", (void *)*p, info_type((StgClosure *)*p));
-        }
-    }
-    debugBelch("\n");
-}
-
-// If you know you have an UPDATE_FRAME, but want to know exactly which.
-const char *info_update_frame(const StgClosure *closure)
-{
-    // Note: We intentionally don't take the info table pointer as
-    // an argument. As it will be confusing whether one should pass
-    // it pointing to the code or struct members when compiling with
-    // TABLES_NEXT_TO_CODE.
-    const StgInfoTable *info = closure->header.info;
-    if (info == &stg_upd_frame_info) {
-        return "NORMAL_UPDATE_FRAME";
-    } else if (info == &stg_bh_upd_frame_info) {
-        return "BH_UPDATE_FRAME";
-    } else if (info == &stg_marked_upd_frame_info) {
-        return "MARKED_UPDATE_FRAME";
-    } else {
-        return "ERROR: Not an update frame!!!";
-    }
-}
-
 static void
 printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap,
                     uint32_t size )
@@ -648,319 +958,11 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
     }
 }
 
-static void printStack( StgStack *stack )
+void printStack( StgStack *stack )
 {
     printStackChunk( stack->sp, stack->stack + stack->stack_size );
 }
 
-void printTSO( StgTSO *tso )
-{
-    printStack( tso->stackobj );
-}
-
-void printStaticObjects( StgClosure *p )
-{
-    while (p != END_OF_STATIC_OBJECT_LIST) {
-        p = UNTAG_STATIC_LIST_PTR(p);
-        printClosure(p);
-
-        const StgInfoTable *info = get_itbl(p);
-        p = *STATIC_LINK(info, p);
-    }
-}
-
-void printWeakLists()
-{
-    debugBelch("======= WEAK LISTS =======\n");
-
-    for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
-        debugBelch("Capability %d:\n", cap_idx);
-        Capability *cap = capabilities[cap_idx];
-        for (StgWeak *weak = cap->weak_ptr_list_hd; weak; weak = weak->link) {
-            printClosure((StgClosure*)weak);
-        }
-    }
-
-    for (uint32_t gen_idx = 0; gen_idx <= oldest_gen->no; ++gen_idx) {
-        generation *gen = &generations[gen_idx];
-        debugBelch("Generation %d current weaks:\n", gen_idx);
-        for (StgWeak *weak = gen->weak_ptr_list; weak; weak = weak->link) {
-            printClosure((StgClosure*)weak);
-        }
-        debugBelch("Generation %d old weaks:\n", gen_idx);
-        for (StgWeak *weak = gen->old_weak_ptr_list; weak; weak = weak->link) {
-            printClosure((StgClosure*)weak);
-        }
-    }
-
-    debugBelch("=========================\n");
-}
-
-void printLargeAndPinnedObjects()
-{
-    debugBelch("====== PINNED OBJECTS ======\n");
-
-    for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
-        Capability *cap = capabilities[cap_idx];
-
-        debugBelch("Capability %d: Current pinned object block: %p\n",
-                   cap_idx, (void*)cap->pinned_object_block);
-        for (bdescr *bd = cap->pinned_object_blocks; bd; bd = bd->link) {
-            debugBelch("%p\n", (void*)bd);
-        }
-    }
-
-    debugBelch("====== LARGE OBJECTS =======\n");
-    for (uint32_t gen_idx = 0; gen_idx <= oldest_gen->no; ++gen_idx) {
-        generation *gen = &generations[gen_idx];
-        debugBelch("Generation %d current large objects:\n", gen_idx);
-        for (bdescr *bd = gen->large_objects; bd; bd = bd->link) {
-            debugBelch("%p: ", (void*)bd);
-            printClosure((StgClosure*)bd->start);
-        }
-
-        debugBelch("Generation %d scavenged large objects:\n", gen_idx);
-        for (bdescr *bd = gen->scavenged_large_objects; bd; bd = bd->link) {
-            debugBelch("%p: ", (void*)bd);
-            printClosure((StgClosure*)bd->start);
-        }
-    }
-
-    debugBelch("============================\n");
-}
-
-/* --------------------------------------------------------------------------
- * Address printing code
- *
- * Uses symbol table in (unstripped executable)
- * ------------------------------------------------------------------------*/
-
-/* --------------------------------------------------------------------------
- * Simple lookup table
- * address -> function name
- * ------------------------------------------------------------------------*/
-
-static HashTable * add_to_fname_table = NULL;
-
-const char *lookupGHCName( void *addr )
-{
-    if (add_to_fname_table == NULL)
-        return NULL;
-
-    return lookupHashTable(add_to_fname_table, (StgWord)addr);
-}
-
-/* --------------------------------------------------------------------------
- * Symbol table loading
- * ------------------------------------------------------------------------*/
-
-/* Causing linking trouble on Win32 plats, so I'm
-   disabling this for now.
-*/
-#if defined(USING_LIBBFD)
-#    define PACKAGE 1
-#    define PACKAGE_VERSION 1
-/* Those PACKAGE_* defines are workarounds for bfd:
- *     https://sourceware.org/bugzilla/show_bug.cgi?id=14243
- * ghc's build system filter PACKAGE_* values out specifically to avoid clashes
- * with user's autoconf-based Cabal packages.
- * It's a shame <bfd.h> checks for unrelated fields instead of actually used
- * macros.
- */
-#    include <bfd.h>
-
-/* Fairly ad-hoc piece of code that seems to filter out a lot of
- * rubbish like the obj-splitting symbols
- */
-
-static bool isReal( flagword flags STG_UNUSED, const char *name )
-{
-#if 0
-    /* ToDo: make this work on BFD */
-    int tp = type & N_TYPE;
-    if (tp == N_TEXT || tp == N_DATA) {
-        return (name[0] == '_' && name[1] != '_');
-    } else {
-        return false;
-    }
-#else
-    if (*name == '\0'  ||
-        (name[0] == 'g' && name[1] == 'c' && name[2] == 'c') ||
-        (name[0] == 'c' && name[1] == 'c' && name[2] == '.')) {
-        return false;
-    }
-    return true;
-#endif
-}
-
-extern void DEBUG_LoadSymbols( const char *name )
-{
-    bfd* abfd;
-    char **matching;
-
-    bfd_init();
-    abfd = bfd_openr(name, "default");
-    if (abfd == NULL) {
-        barf("can't open executable %s to get symbol table", name);
-    }
-    if (!bfd_check_format_matches (abfd, bfd_object, &matching)) {
-        barf("mismatch");
-    }
-
-    {
-        long storage_needed;
-        asymbol **symbol_table;
-        long number_of_symbols;
-        long num_real_syms = 0;
-        long i;
-
-        storage_needed = bfd_get_symtab_upper_bound (abfd);
-
-        if (storage_needed < 0) {
-            barf("can't read symbol table");
-        }
-        symbol_table = (asymbol **) stgMallocBytes(storage_needed,"DEBUG_LoadSymbols");
-
-        number_of_symbols = bfd_canonicalize_symtab (abfd, symbol_table);
-
-        if (number_of_symbols < 0) {
-            barf("can't canonicalise symbol table");
-        }
-
-        if (add_to_fname_table == NULL)
-            add_to_fname_table = allocHashTable();
-
-        for( i = 0; i != number_of_symbols; ++i ) {
-            symbol_info info;
-            bfd_get_symbol_info(abfd,symbol_table[i],&info);
-            if (isReal(info.type, info.name)) {
-                insertHashTable(add_to_fname_table,
-                                info.value, (void*)info.name);
-                num_real_syms += 1;
-            }
-        }
-
-        IF_DEBUG(interpreter,
-                 debugBelch("Loaded %ld symbols. Of which %ld are real symbols\n",
-                         number_of_symbols, num_real_syms)
-                 );
-
-        stgFree(symbol_table);
-    }
-}
-
-#else /* USING_LIBBFD */
-
-extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
-{
-  /* nothing, yet */
-}
-
-#endif /* USING_LIBBFD */
-
-void findPtr(P_ p, int);                /* keep gcc -Wall happy */
-
-int searched = 0;
-
-static int
-findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
-{
-    StgPtr q, r, end;
-    for (; bd; bd = bd->link) {
-        searched++;
-        for (q = bd->start; q < bd->free; q++) {
-            if (UNTAG_CONST_CLOSURE((StgClosure*)*q) == (const StgClosure *)p) {
-                if (i < arr_size) {
-                    for (r = bd->start; r < bd->free; r = end) {
-                        // skip over zeroed-out slop
-                        while (*r == 0) r++;
-                        if (!LOOKS_LIKE_CLOSURE_PTR(r)) {
-                            debugBelch("%p found at %p, no closure at %p\n",
-                                       p, q, r);
-                            break;
-                        }
-                        end = r + closure_sizeW((StgClosure*)r);
-                        if (q < end) {
-                            debugBelch("%p = ", r);
-                            printClosure((StgClosure *)r);
-                            arr[i++] = r;
-                            break;
-                        }
-                    }
-                    if (r >= bd->free) {
-                        debugBelch("%p found at %p, closure?", p, q);
-                    }
-                } else {
-                    return i;
-                }
-            }
-        }
-    }
-    return i;
-}
-
-void
-findPtr(P_ p, int follow)
-{
-  uint32_t g, n;
-  bdescr *bd;
-  const int arr_size = 1024;
-  StgPtr arr[arr_size];
-  int i = 0;
-  searched = 0;
-
-#if 0
-  // We can't search the nursery, because we don't know which blocks contain
-  // valid data, because the bd->free pointers in the nursery are only reset
-  // just before a block is used.
-  for (n = 0; n < n_capabilities; n++) {
-      bd = nurseries[i].blocks;
-      i = findPtrBlocks(p,bd,arr,arr_size,i);
-      if (i >= arr_size) return;
-  }
-#endif
-
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      bd = generations[g].blocks;
-      i = findPtrBlocks(p,bd,arr,arr_size,i);
-      bd = generations[g].large_objects;
-      i = findPtrBlocks(p,bd,arr,arr_size,i);
-      if (i >= arr_size) return;
-      for (n = 0; n < n_capabilities; n++) {
-          i = findPtrBlocks(p, gc_threads[n]->gens[g].part_list,
-                            arr, arr_size, i);
-          i = findPtrBlocks(p, gc_threads[n]->gens[g].todo_bd,
-                            arr, arr_size, i);
-      }
-      if (i >= arr_size) return;
-  }
-  if (follow && i == 1) {
-      debugBelch("-->\n");
-      findPtr(arr[0], 1);
-  }
-}
-
-const char *what_next_strs[] = {
-  [0]               = "(unknown)",
-  [ThreadRunGHC]    = "ThreadRunGHC",
-  [ThreadInterpret] = "ThreadInterpret",
-  [ThreadKilled]    = "ThreadKilled",
-  [ThreadComplete]  = "ThreadComplete"
-};
-
-#else /* DEBUG */
-void printPtr( StgPtr p )
-{
-    debugBelch("ptr 0x%p (enable -DDEBUG for more info) " , p );
-}
-
-void printObj( StgClosure *obj )
-{
-    debugBelch("obj 0x%p (enable -DDEBUG for more info) " , obj );
-}
-
-
-#endif /* DEBUG */
 
 /* -----------------------------------------------------------------------------
    Closure types
