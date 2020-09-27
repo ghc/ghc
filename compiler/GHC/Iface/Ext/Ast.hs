@@ -42,7 +42,8 @@ import GHC.Driver.Types
 import GHC.Unit.Module            ( ModuleName, ml_hs_file )
 import GHC.Utils.Monad            ( concatMapM, liftIO )
 import GHC.Types.Id               ( isDataConId_maybe )
-import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique )
+import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, getOccName )
+import GHC.Types.Name.Occurrence  ( isRecFldUpdOcc )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.SrcLoc
 import GHC.Tc.Utils.Zonk          ( hsLitType, hsPatType )
@@ -804,7 +805,12 @@ instance ToHie (Context (Located NoExtField)) where
   toHie _ = pure []
 
 instance HiePass p => ToHie (BindContext (Located (HsBind (GhcPass p)))) where
-  toHie (BC context scope b@(L span bind)) =
+  toHie (BC context scope b@(L span bind))
+    | FunBind{fun_id = name} <- bind
+    , case hiePass @p of { HieRn -> isRecFldUpdOcc (getOccName (unLoc name))
+                         ; HieTc -> isRecFldUpdOcc (getOccName (unLoc name))
+                         } = pure [] -- Exclude record updaters from HIE files
+    | otherwise =
     concatM $ getTypeNode b : case bind of
       FunBind{fun_id = name, fun_matches = matches, fun_ext = wrap} ->
         [ toHie $ C (ValBind context scope $ getRealSpan span) name
