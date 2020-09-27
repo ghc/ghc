@@ -12,6 +12,8 @@
 #include "Rts.h"
 #include "TopHandler.h"
 #include "HsFFI.h"
+#include "CloneStack.h"
+#include "rts/PrinterAPI.h"
 
 #include "sm/Storage.h"
 #include "sm/NonMovingMark.h"
@@ -979,6 +981,7 @@
       SymI_HasProto(stg_traceBinaryEventzh)                             \
       SymI_HasProto(stg_getThreadAllocationCounterzh)                   \
       SymI_HasProto(stg_setThreadAllocationCounterzh)                   \
+      SymI_HasProto(stg_cloneMyStackzh)                                 \
       SymI_HasProto(getMonotonicNSec)                                   \
       SymI_HasProto(lockFile)                                           \
       SymI_HasProto(unlockFile)                                         \
@@ -998,6 +1001,8 @@
       SymI_HasProto(cas)                                                \
       SymI_HasProto(_assertFail)                                        \
       SymI_HasProto(keepCAFs)                                           \
+      SymI_HasProto(sendCloneStackMessage)                              \
+      SymI_HasProto(printStack)                                         \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
