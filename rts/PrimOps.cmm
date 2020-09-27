@@ -2840,3 +2840,27 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
     return ();
 }
+
+stg_cloneThreadStackzh () {
+    // TODO: Implement me! Consider locks, race-conditions, etc.
+    return ();
+}
+
+stg_cloneMyStackzh () {
+    W_ stgStack;
+    gcptr p;
+    W_ neededMemorySize;
+
+    stgStack = StgTSO_stackobj(CurrentTSO);
+
+    neededMemorySize = BYTES_TO_WDS(SIZEOF_StgStack) + StgStack_stack_size(stgStack);
+
+    ("ptr" p) = ccall allocateMightFail(MyCapability() "ptr", neededMemorySize);
+    if (p == NULL) {
+        jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
+    }
+
+    prim %memcpy(p, stgStack, WDS(neededMemorySize), SIZEOF_W);
+
+    return (p);
+}
