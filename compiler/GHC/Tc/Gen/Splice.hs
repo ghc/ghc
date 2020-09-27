@@ -192,6 +192,8 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
        -- Throw away the typechecked expression but return its type.
        -- We'll typecheck it again when we splice it in somewhere
        ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var wrapper)) $
+                                tcScalingUsage Many $
+                                -- Scale by Many, TH lifting is currently nonlinear (#18465)
                                 tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
        ; let rep = getRuntimeRep expr_ty
@@ -289,7 +291,8 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
   = do { meta_ty <- tcMetaTy meta_ty_name
          -- Expected type of splice, e.g. m Exp
        ; let expected_type = mkAppTy m_var meta_ty
-       ; expr' <- tcCheckPolyExpr expr expected_type
+       ; expr' <- tcScalingUsage Many $ tcCheckPolyExpr expr expected_type
+                  -- Scale by Many, TH lifting is currently nonlinear (#18465)
        ; return (PendingTcSplice splice_name expr') }
   where
      meta_ty_name = case flavour of
