@@ -624,7 +624,7 @@ data PrimMVar
 -- @hs_try_putmvar()@.  The RTS wants a 'StablePtr' to the underlying
 -- 'MVar#', but a 'StablePtr#' can only refer to lifted types, so we
 -- have to cheat by coercing.
-newStablePtrPrimMVar :: MVar () -> IO (StablePtr PrimMVar)
+newStablePtrPrimMVar :: MVar a -> IO (StablePtr PrimMVar)
 newStablePtrPrimMVar (MVar m) = IO $ \s0 ->
   case makeStablePtr# (unsafeCoerce# m :: PrimMVar) s0 of
     -- Coerce unlifted  m :: MVar# RealWorld ()
