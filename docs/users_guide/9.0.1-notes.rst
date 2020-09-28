@@ -11,7 +11,7 @@ Highlights
 ----------
 
 * The :extension:`LinearTypes` extension enables linear function syntax
-  ``a #-> b``, as described in the `Linear Types GHC proposal
+  ``a %1 -> b``, as described in the `Linear Types GHC proposal
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0111-linear-types.rst>`__.
 
   The GADT syntax can be used to define data types with linear and nonlinear fields.

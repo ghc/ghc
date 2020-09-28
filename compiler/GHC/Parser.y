@@ -68,7 +68,8 @@ import GHC.Prelude
 
 -- compiler/basicTypes
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName,
+                                   occNameFS, startsWithUnderscore )
 import GHC.Core.DataCon          ( DataCon, dataConName )
 import GHC.Types.SrcLoc
 import GHC.Unit.Module
@@ -280,7 +281,7 @@ Context:
     context -> btype .
     type -> btype .
     type -> btype . '->' ctype
-    type -> btype . '#->' ctype
+    type -> btype . '->.' ctype
 
 Example:
     a :: Maybe Integer -> Bool
@@ -636,7 +637,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '|'            { L _ ITvbar }
  '<-'           { L _ (ITlarrow _) }
  '->'           { L _ (ITrarrow _) }
- '#->'          { L _ (ITlolly _) }
+ '->.'          { L _ ITlolly }
  TIGHT_INFIX_AT { L _ ITat }
  '=>'           { L _ (ITdarrow _) }
  '-'            { L _ ITminus }
@@ -650,6 +651,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '>>-'          { L _ (ITRarrowtail _) }            -- for arrow notation
  '.'            { L _ ITdot }
  PREFIX_AT      { L _ ITtypeApp }
+ PREFIX_PERCENT { L _ ITpercent }                   -- for linear types
 
  '{'            { L _ ITocurly }                        -- special symbols
  '}'            { L _ ITccurly }
@@ -2062,12 +2064,16 @@ type :: { LHsType GhcPs }
                                        >> ams (sLL $1 $> $ HsFunTy noExtField HsUnrestrictedArrow $1 $3)
                                               [mu AnnRarrow $2] }
 
-        | btype '#->' ctype             {% hintLinear (getLoc $2) >>
-                                         ams (sLL $1 $> $ HsFunTy noExtField HsLinearArrow $1 $3)
-                                             [mu AnnLolly $2] }
+        | btype mult '->' ctype        {% hintLinear (getLoc $2) >>
+                                          ams (sLL $1 $> $ HsFunTy noExtField (unLoc $2) $1 $4)
+                                              [mu AnnRarrow $3] }
 
-mult :: { LHsType GhcPs }
-        : btype                  { $1 }
+        | btype '->.' ctype            {% hintLinear (getLoc $2) >>
+                                          ams (sLL $1 $> $ HsFunTy noExtField HsLinearArrow $1 $3)
+                                              [mu AnnLollyU $2] }
+
+mult :: { Located (HsArrow GhcPs) }
+        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy $2) }
 
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }
@@ -2077,7 +2083,8 @@ infixtype :: { forall b. DisambTD b => PV (Located b) }
         : ftype %shift                  { $1 }
         | ftype tyop infixtype          { $1 >>= \ $1 ->
                                           $3 >>= \ $3 ->
-                                          mkHsOpTyPV $1 $2 $3 }
+                                          do { when (looksLikeMult $1 $2 $3) $ hintLinear (getLoc $2)
+                                             ; mkHsOpTyPV $1 $2 $3 } }
         | unpackedness infixtype        { $2 >>= \ $2 ->
                                           mkUnpackednessPV $1 $2 }
 
@@ -3823,7 +3830,7 @@ isUnicode (L _ (ITcparenbar      iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITopenExpQuote _ iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITcloseQuote     iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITstar           iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITlolly          iu)) = iu == UnicodeSyntax
+isUnicode (L _ ITlolly)               = True
 isUnicode _                           = False
 
 hasE :: Located Token -> Bool
@@ -3918,11 +3925,24 @@ fileSrcSpan = do
   return (mkSrcSpan loc loc)
 
 -- Hint about linear types
-hintLinear :: SrcSpan -> P ()
+hintLinear :: MonadP m => SrcSpan -> m ()
 hintLinear span = do
   linearEnabled <- getBit LinearTypesBit
   unless linearEnabled $ addError span $
     text "Enable LinearTypes to allow linear functions"
+
+-- Does this look like (a %m)?
+looksLikeMult :: LHsType GhcPs -> Located RdrName -> LHsType GhcPs -> Bool
+looksLikeMult ty1 l_op ty2
+  | Unqual op_name <- unLoc l_op
+  , occNameFS op_name == fsLit "%"
+  , Just ty1_pos <- getBufSpan (getLoc ty1)
+  , Just pct_pos <- getBufSpan (getLoc l_op)
+  , Just ty2_pos <- getBufSpan (getLoc ty2)
+  , bufSpanEnd ty1_pos /= bufSpanStart pct_pos
+  , bufSpanEnd pct_pos == bufSpanStart ty2_pos
+  = True
+  | otherwise = False
 
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()

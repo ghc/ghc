@@ -1,5 +1,5 @@
 
-LinearPartialSig.hs:5:13: error:
+LinearPartialSig.hs:5:9: error:
     • Found type wildcard ‘_’
         standing for ‘'Many :: GHC.Types.Multiplicity’
       To use the inferred type, enable PartialTypeSignatures
