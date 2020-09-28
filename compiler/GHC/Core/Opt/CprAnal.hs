@@ -301,32 +301,36 @@ cprAnalBind
   -> CoreExpr
   -> (Id, CoreExpr)
 cprAnalBind top_lvl env id rhs
+  -- See Note [CPR for expandable unfoldings]
+  | use_unfolding && isJust (cprExpandUnfolding_maybe id)
+  = (id, rhs)
+  | otherwise
   = (id', rhs')
   where
     (rhs_ty, rhs')  = cprAnal env rhs
     -- possibly trim thunk CPR info
     rhs_ty'
       -- See Note [CPR for thunks]
-      | stays_thunk = trimCprTy rhs_ty
-      -- See Note [CPR for sum types]
-      | returns_sum = trimCprTy rhs_ty
+      | stays_thunk   = trimCprTy rhs_ty
       -- See Note [CPR for expandable unfoldings]
-      | will_expand = topCprType
-      | otherwise   = rhs_ty
+      | use_unfolding = topCprType
+      -- See Note [CPR for sum types]
+      | returns_sum   = trimCprTy rhs_ty
+      | otherwise     = rhs_ty
     -- See Note [Arity trimming for CPR signatures]
-    sig             = mkCprSigForArity (idArity id) rhs_ty'
-    id'             = setIdCprInfo id sig
+    sig = mkCprSigForArity (idArity id) rhs_ty'
+    id' = setIdCprInfo id sig
 
     -- See Note [CPR for thunks]
-    stays_thunk = is_thunk && not_strict
-    is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
-    not_strict  = not (isStrictDmd (idDemandInfo id))
-    -- See Note [CPR for sum types]
-    (_, ret_ty) = splitPiTys (idType id)
-    not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
-    returns_sum = not (isTopLevel top_lvl) && not_a_prod
+    stays_thunk   = is_thunk && not_strict
+    is_thunk      = not (exprIsHNF rhs) && not (isJoinId id)
+    not_strict    = not (isStrictDmd (idDemandInfo id))
     -- See Note [CPR for expandable unfoldings]
-    will_expand = isJust (cprExpandUnfolding_maybe id)
+    use_unfolding = not is_thunk && idArity id == 0 && not_strict
+    -- See Note [CPR for sum types]
+    (_, ret_ty)   = splitPiTys (idType id)
+    not_a_prod    = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
+    returns_sum   = not (isTopLevel top_lvl) && not_a_prod
 
 cprExpandUnfolding_maybe :: Id -> Maybe CoreExpr
 cprExpandUnfolding_maybe id = do
@@ -683,6 +687,20 @@ instead we keep on cprAnal'ing through *expandable* unfoldings for these arity
 In practice, GHC generates a lot of (nested) TyCon and KindRep bindings, one
 for each data declaration. It's wasteful to attach CPR signatures to each of
 them (and intractable in case of Nested CPR).
+
+Rather than discarding CPR signatures for expandable data structures only, we
+also do so for non-expandable things ('use_unfolding'). The reason is that if a
+*data structure* has no unfolding (or if the user said NOINLINE), then we don't
+want to store CPR signatures. The generated KindReps fall into this category, so
+this special case is a mandatory.
+
+Also we don't need to analyse RHSs of expandable bindings: The CPR signature of
+the binding is never consulted and there may not be let or case expressions
+nested inside its RHS. In which case we also don't record a signature in the
+local AnalEnv. Doing so would override looking into the unfolding. Why not give
+the expandable case in cprTransform a higher priority then? Because then *all*
+case binders would get the CPR property, regardless of -fcase-binder-cpr-depth,
+because case binders have expandable unfoldings.
 
 Tracked by #18154.
 
