@@ -68,7 +68,8 @@ import GHC.Prelude
 
 -- compiler/basicTypes
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName,
+                                   occNameFS, startsWithUnderscore )
 import GHC.Core.DataCon          ( DataCon, dataConName )
 import GHC.Types.SrcLoc
 import GHC.Unit.Module
@@ -2082,7 +2083,8 @@ infixtype :: { forall b. DisambTD b => PV (Located b) }
         : ftype %shift                  { $1 }
         | ftype tyop infixtype          { $1 >>= \ $1 ->
                                           $3 >>= \ $3 ->
-                                          mkHsOpTyPV $1 $2 $3 }
+                                          do { when (looksLikeMult $1 $2 $3) $ hintLinear (getLoc $2)
+                                             ; mkHsOpTyPV $1 $2 $3 } }
         | unpackedness infixtype        { $2 >>= \ $2 ->
                                           mkUnpackednessPV $1 $2 }
 
@@ -3923,11 +3925,24 @@ fileSrcSpan = do
   return (mkSrcSpan loc loc)
 
 -- Hint about linear types
-hintLinear :: SrcSpan -> P ()
+hintLinear :: MonadP m => SrcSpan -> m ()
 hintLinear span = do
   linearEnabled <- getBit LinearTypesBit
   unless linearEnabled $ addError span $
     text "Enable LinearTypes to allow linear functions"
+
+-- Does this look like (a %m)?
+looksLikeMult :: LHsType GhcPs -> Located RdrName -> LHsType GhcPs -> Bool
+looksLikeMult ty1 l_op ty2
+  | Unqual op_name <- unLoc l_op
+  , occNameFS op_name == fsLit "%"
+  , Just ty1_pos <- getBufSpan (getLoc ty1)
+  , Just pct_pos <- getBufSpan (getLoc l_op)
+  , Just ty2_pos <- getBufSpan (getLoc ty2)
+  , bufSpanEnd ty1_pos /= bufSpanStart pct_pos
+  , bufSpanEnd pct_pos == bufSpanStart ty2_pos
+  = True
+  | otherwise = False
 
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()
