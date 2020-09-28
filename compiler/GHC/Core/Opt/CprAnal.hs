@@ -119,9 +119,9 @@ cprAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 cprAnalTopBind env (NonRec id rhs)
-  = (extendAnalEnv env id' (idCprInfo id'), NonRec id' rhs')
+  = (env', NonRec id' rhs')
   where
-    (id', rhs') = cprAnalBind TopLevel env id rhs
+    (id', rhs', env') = cprAnalBind TopLevel env id rhs
 
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
@@ -168,7 +168,7 @@ cprAnal' env (Lam var body)
   | otherwise
   = (lam_ty, Lam var body')
   where
-    env'             = extendAnalEnvForDemand env var (idDemandInfo var)
+    env'             = extendSigEnvForDemand env var (idDemandInfo var)
     (body_ty, body') = cprAnal env' body
     lam_ty           = abstractCprTy body_ty
 
@@ -184,9 +184,8 @@ cprAnal' env (Case scrut case_bndr ty alts)
 cprAnal' env (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
   where
-    (id', rhs')      = cprAnalBind NotTopLevel env id rhs
-    env'             = extendAnalEnv env id' (idCprInfo id')
-    (body_ty, body') = cprAnal env' body
+    (id', rhs', env') = cprAnalBind NotTopLevel env id rhs
+    (body_ty, body')  = cprAnal env' body
 
 cprAnal' env (Let (Rec pairs) body)
   = body_ty `seq` (body_ty, Let (Rec pairs') body')
@@ -240,18 +239,15 @@ cprTransform env id args
     sig
   where
     sig
-      -- See Note [CPR for expandable unfoldings]
-      | Just rhs <- cprExpandUnfolding_maybe id
+      -- Top-level binding, local let-binding or case binder
+      | Just sig <- lookupSigEnv env id
+      = getCprSig sig
+      -- See Note [CPR for data structures]
+      | Just rhs <- cprDataStructureUnfolding_maybe id
       = fst $ cprAnal env rhs
-      -- CPR transformers for special Ids
-      | Just cpr_ty <- cprTransformSpecial id args
-      = cpr_ty
       -- Imported function or data con worker
       | isGlobalId id
       = applyCprTy (getCprSig (idCprInfo id)) (length args)
-      -- Local let-bound
-      | Just sig <- lookupSigEnv env id
-      = applyCprTy (getCprSig sig) (length args)
       | otherwise
       = topCprType
 
@@ -271,46 +267,43 @@ cprTransformSpecial id args
 
 -- Recursive bindings
 cprFix :: TopLevelFlag
-       -> AnalEnv                            -- Does not include bindings for this binding
+       -> AnalEnv                    -- Does not include bindings for this binding
        -> [(Id,CoreExpr)]
-       -> (AnalEnv, [(Id,CoreExpr)]) -- Binders annotated with stricness info
-
-cprFix top_lvl env orig_pairs
-  = loop 1 initial_pairs
+       -> (AnalEnv, [(Id,CoreExpr)]) -- Binders annotated with CPR info
+cprFix top_lvl orig_env orig_pairs
+  = loop 1 init_env init_pairs
   where
-    bot_sig = mkCprSig 0 botCpr
+    init_sig id rhs
+      -- See Note [CPR for data structures]
+      | isDataStructure id rhs = topCprSig
+      | otherwise              = mkCprSig 0 botCpr
     -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
-    initial_pairs | ae_virgin env = [(setIdCprInfo id bot_sig, rhs) | (id, rhs) <- orig_pairs ]
-                  | otherwise     = orig_pairs
+    orig_virgin = ae_virgin orig_env
+    init_pairs | orig_virgin  = [(setIdCprInfo id (init_sig id rhs), rhs) | (id, rhs) <- orig_pairs ]
+               | otherwise    = orig_pairs
+    init_env = extendSigEnvList orig_env (map fst init_pairs)
 
-    -- The fixed-point varies the idCprInfo field of the binders, and terminates if that
-    -- annotation does not change any more.
-    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, [(Id,CoreExpr)])
-    loop n pairs
-      | found_fixpoint = (final_anal_env, pairs')
-      | otherwise      = loop (n+1) pairs'
-      where
-        found_fixpoint    = map (idCprInfo . fst) pairs' == map (idCprInfo . fst) pairs
-        first_round       = n == 1
-        pairs'            = step first_round pairs
-        final_anal_env    = extendAnalEnvs env (map fst pairs')
-
-    step :: Bool -> [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    step first_round pairs = pairs'
+    -- The fixed-point varies the idCprInfo field of the binders and and their
+    -- entries in the AnalEnv, and terminates if that annotation does not change
+    -- any more.
+    loop :: Int -> AnalEnv -> [(Id,CoreExpr)] -> (AnalEnv, [(Id,CoreExpr)])
+    loop n env pairs
+      | found_fixpoint = (reset_env', pairs')
+      | otherwise      = loop (n+1) env' pairs'
       where
         -- In all but the first iteration, delete the virgin flag
-        start_env | first_round = env
-                  | otherwise   = nonVirgin env
+        -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
+        (env', pairs') = step (applyWhen (n/=1) nonVirgin env) pairs
+        -- Make sure we reset the virgin flag to what it was when we are stable
+        reset_env'     = env'{ ae_virgin = orig_virgin }
+        found_fixpoint = map (idCprInfo . fst) pairs' == map (idCprInfo . fst) pairs
 
-        start = extendAnalEnvs start_env (map fst pairs)
-
-        (_, pairs') = mapAccumL my_downRhs start pairs
-
-        my_downRhs env (id,rhs)
-          = (env', (id', rhs'))
+    step :: AnalEnv -> [(Id, CoreExpr)] -> (AnalEnv, [(Id, CoreExpr)])
+    step env pairs = mapAccumL go env pairs
+      where
+        go env (id, rhs) = (env', (id', rhs'))
           where
-            (id', rhs') = cprAnalBind top_lvl env id rhs
-            env'        = extendAnalEnv env id (idCprInfo id')
+            (id', rhs', env') = cprAnalBind top_lvl env id rhs
 
 -- | Process the RHS of the binding for a sensible arity, add the CPR signature
 -- to the Id, and augment the environment with the signature as well.
@@ -319,9 +312,13 @@ cprAnalBind
   -> AnalEnv
   -> Id
   -> CoreExpr
-  -> (Id, CoreExpr)
+  -> (Id, CoreExpr, AnalEnv)
 cprAnalBind top_lvl env id rhs
-  = (id', rhs')
+  -- See Note [CPR for data structures]
+  | isDataStructure id rhs
+  = (id,  rhs,  env) -- Data structure => no code => need to analyse rhs
+  | otherwise
+  = (id', rhs', env')
   where
     (rhs_ty, rhs')  = cprAnal env rhs
     -- possibly trim thunk CPR info
@@ -330,12 +327,11 @@ cprAnalBind top_lvl env id rhs
       | stays_thunk = trimCprTy rhs_ty
       -- See Note [CPR for sum types]
       | returns_sum = trimCprTy rhs_ty
-      -- See Note [CPR for expandable unfoldings]
-      | will_expand = topCprType
       | otherwise   = rhs_ty
     -- See Note [Arity trimming for CPR signatures]
-    sig             = mkCprSigForArity (idArity id) rhs_ty'
-    id'             = setIdCprInfo id sig
+    sig  = mkCprSigForArity (idArity id) rhs_ty'
+    id'  = setIdCprInfo id sig
+    env' = extendSigEnv env id sig
 
     -- See Note [CPR for thunks]
     stays_thunk = is_thunk && not_strict
@@ -345,15 +341,22 @@ cprAnalBind top_lvl env id rhs
     (_, ret_ty) = splitPiTys (idType id)
     not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
     returns_sum = not (isTopLevel top_lvl) && not_a_prod
-    -- See Note [CPR for expandable unfoldings]
-    will_expand = isJust (cprExpandUnfolding_maybe id)
 
-cprExpandUnfolding_maybe :: Id -> Maybe CoreExpr
-cprExpandUnfolding_maybe id = do
-  guard (idArity id == 0)
+isDataStructure :: Id -> CoreExpr -> Bool
+-- See Note [CPR for data structures]
+isDataStructure id rhs =
+  idArity id == 0 && exprIsHNF rhs
+
+-- | Returns an expandable unfolding
+-- (See Note [exprIsExpandable] in "GHC.Core.Utils") that has
+-- So effectively is a constructor application.
+cprDataStructureUnfolding_maybe :: Id -> Maybe CoreExpr
+cprDataStructureUnfolding_maybe id = do
   -- There are only FinalPhase Simplifier runs after CPR analysis
   guard (activeInFinalPhase (idInlineActivation id))
-  expandUnfolding_maybe (idUnfolding id)
+  unf <- expandUnfolding_maybe (idUnfolding id)
+  guard (isDataStructure id unf)
+  return unf
 
 {- Note [Arity trimming for CPR signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -414,15 +417,15 @@ emptyAnalEnv fam_envs
   , ae_fam_envs = fam_envs
   }
 
--- | Extend an environment with the strictness IDs attached to the id
-extendAnalEnvs :: AnalEnv -> [Id] -> AnalEnv
-extendAnalEnvs env ids
+-- | Extend an environment with the CPR sigs attached to the id
+extendSigEnvList :: AnalEnv -> [Id] -> AnalEnv
+extendSigEnvList env ids
   = env { ae_sigs = sigs' }
   where
     sigs' = extendVarEnvList (ae_sigs env) [ (id, idCprInfo id) | id <- ids ]
 
-extendAnalEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
-extendAnalEnv env id sig
+extendSigEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
+extendSigEnv env id sig
   = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
 
 lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
@@ -431,17 +434,17 @@ lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
 
--- | A version of 'extendAnalEnv' for a binder of which we don't see the RHS
+-- | A version of 'extendSigEnv' for a binder of which we don't see the RHS
 -- needed to compute a 'CprSig' (e.g. lambdas and DataAlt field binders).
 -- In this case, we can still look at their demand to attach CPR signatures
 -- anticipating the unboxing done by worker/wrapper.
 -- See Note [CPR for binders that will be unboxed].
-extendAnalEnvForDemand :: AnalEnv -> Id -> Demand -> AnalEnv
-extendAnalEnvForDemand env id dmd
+extendSigEnvForDemand :: AnalEnv -> Id -> Demand -> AnalEnv
+extendSigEnvForDemand env id dmd
   | isId id
   , Just (_, DataConAppContext { dcac_dc = dc })
       <- wantToUnbox (ae_fam_envs env) has_inlineable_prag (idType id) dmd
-  = extendAnalEnv env id (CprSig (conCprType (dataConTag dc)))
+  = extendSigEnv env id (CprSig (conCprType (dataConTag dc)))
   | otherwise
   = env
   where
@@ -456,7 +459,7 @@ extendEnvForDataAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
 extendEnvForDataAlt env scrut case_bndr dc bndrs
   = foldl' do_con_arg env' ids_w_strs
   where
-    env' = extendAnalEnv env case_bndr (CprSig case_bndr_ty)
+    env' = extendSigEnv env case_bndr (CprSig case_bndr_ty)
 
     ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
 
@@ -480,7 +483,7 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
        | is_var scrut
        -- See Note [Add demands for strict constructors] in GHC.Core.Opt.WorkWrap.Utils
        , let dmd = applyWhen (isMarkedStrict str) strictifyDmd (idDemandInfo id)
-       = extendAnalEnvForDemand env id dmd
+       = extendSigEnvForDemand env id dmd
        | otherwise
        = env
 
@@ -665,46 +668,72 @@ assumption is that error cases are rarely entered and we are diverging anyway,
 so WW doesn't hurt.
 
 Should we also trim CPR on DataCon application bindings?
-See Note [CPR for expandable unfoldings]!
+See Note [CPR for data structures]!
 
-Note [CPR for expandable unfoldings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [CPR for data structures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Long static data structures (whether top-level or not) like
 
   xs = x1 : xs1
   xs1 = x2 : xs2
   xs2 = x3 : xs3
 
-should not get CPR signatures, because they
+should not get CPR signatures (#18154), because they
 
   * Never get WW'd, so their CPR signature should be irrelevant after analysis
     (in fact the signature might even be harmful for that reason)
   * Would need to be inlined/expanded to see their constructed product
   * Recording CPR on them blows up interface file sizes and is redundant with
     their unfolding. In case of Nested CPR, this blow-up can be quadratic!
+    Reason: the CPR info for xs1 contains the CPR info for xs; the CPR info
+    for xs2 contains that for xs1. And so on.
 
-But we can't just stop giving DataCon application bindings the CPR property,
+Hence we don't analyse or annotate data structures in 'cprAnalBind'. To
+implement this, the isDataStructure guard is triggered for bindings that satisfy
+
+  (1) idArity id == 0 (otherwise it's a function)
+  (2) exprIsHNF rhs   (otherwise it's a thunk, Note [CPR for thunks] applies)
+
+But we can't just stop giving DataCon application bindings the CPR *property*,
 for example
 
-  fac 0 = 1
+  fac 0 = I# 1#
   fac n = n * fac (n-1)
 
 fac certainly has the CPR property and should be WW'd! But FloatOut will
 transform the first clause to
 
-  lvl = 1
+  lvl = I# 1#
   fac 0 = lvl
 
-If lvl doesn't have the CPR property, fac won't either. But lvl doesn't have a
-CPR signature to extrapolate into a CPR transformer ('cprTransform'). So
-instead we keep on cprAnal'ing through *expandable* unfoldings for these arity
-0 bindings via 'cprExpandUnfolding_maybe'.
+If lvl doesn't have the CPR property, fac won't either. But lvl is a data
+structure, and hence (see above) will not have a CPR signature. So instead, when
+'cprAnal' meets a variable lacking a CPR signature to extrapolate into a CPR
+transformer, 'cprTransform' instead tries to get its unfolding (via
+'cprDataStructureUnfolding_maybe'), and analyses that instead.
 
 In practice, GHC generates a lot of (nested) TyCon and KindRep bindings, one
-for each data declaration. It's wasteful to attach CPR signatures to each of
-them (and intractable in case of Nested CPR).
+for each data declaration. They should not have CPR signatures (blow up!).
 
-Tracked by #18154.
+There is a perhaps surprising special case: KindRep bindings satisfy
+'isDataStructure' (so no CPR signature), but are marked NOINLINE at the same
+time (see the noinline wrinkle in Note [Grand plan for Typeable]). So there is
+no unfolding for 'cprDataStructureUnfolding_maybe' to look through and we'll
+return topCprType. And that is fine! We should refrain to look through NOINLINE
+data structures in general, as a constructed product could never be exposed
+after WW.
+
+It's also worth pointing out how ad-hoc this is: If we instead had
+
+    f1 x = x:[]
+    f2 x = x : f1 x
+    f3 x = x : f2 x
+    ...
+
+we still give every function an every deepening CPR signature. But it's very
+uncommon to find code like this, whereas the long static data structures from
+the beginning of this Note are very common because of GHC's strategy of ANF'ing
+data structure RHSs.
 
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~
