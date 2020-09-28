@@ -13,12 +13,13 @@
 -- that replace bignat foreign calls with calls to the native platform bignat
 -- library (e.g. JavaScript's BigInt). You can also link an extra object
 -- providing the implementation.
-module GHC.Num.BigNat.FFI where
+module GHC.Num.Backend.FFI where
 
 import GHC.Prim
 import GHC.Types
 import GHC.Num.WordArray
 import GHC.Num.Primitives
+import qualified GHC.Num.Backend.Native as Native
 
 default ()
 
@@ -579,3 +580,19 @@ bignat_powmod_words = ghc_bignat_powmod_words
 foreign import ccall unsafe ghc_bignat_powmod_words
    :: Word# -> Word# -> Word# -> Word#
 
+
+-- | Return extended GCD of two non-zero integers.
+--
+-- I.e. integer_gcde a b returns (g,x,y) so that ax + by = g
+--
+-- Input: a and b are non zero.
+-- Output: g must be > 0
+--
+integer_gcde
+   :: Integer
+   -> Integer
+   -> (# Integer, Integer, Integer #)
+integer_gcde = Native.integer_gcde
+   -- for now we use Native's implementation. If some FFI backend user needs a
+   -- specific implementation, we'll need to determine a prototype to pass and
+   -- return BigNat signs and sizes via FFI.

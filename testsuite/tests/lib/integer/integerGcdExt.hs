@@ -9,10 +9,10 @@ import Control.Monad
 
 import GHC.Word
 import GHC.Base
-import qualified GHC.Integer.GMP.Internals as I
+import qualified GHC.Num.Integer as I
 
 gcdExtInteger :: Integer -> Integer -> (Integer, Integer)
-gcdExtInteger a b = case I.gcdExtInteger a b of (# g, s #) -> (g, s)
+gcdExtInteger a b = case I.integerGcde a b of ( g, s, _t ) -> (g, s)
 
 main :: IO ()
 main = do

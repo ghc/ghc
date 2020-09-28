@@ -280,30 +280,32 @@ integer_gmp_mpn_gcd(mp_limb_t r[],
 /* wraps mpz_gcdext()
  *
  * Set g={g0,gn} to the greatest common divisor of x={x0,xn} and
- * y={y0,yn}, and in addition set s={s0,sn} to coefficient
- * satisfying x*s + y*t = g.
- *
- * The g0 array is zero-padded (so that gn is fixed).
+ * y={y0,yn}, and in addition set s={s0,sn} and t={t0,tn} to
+ * coefficients satisfying x*s + y*t = g.
  *
  * g0 must have space for exactly gn=min(xn,yn) limbs.
  * s0 must have space for at least yn limbs.
+ * t0 must have space for at least xn limbs.
  *
- * return value: signed 'sn' of s={s0,sn} where |sn| >= 1
+ * Actual sizes are returned by pointers.
+ *
  */
-mp_size_t
-integer_gmp_gcdext(mp_limb_t s0[], mp_limb_t g0[],
+void
+integer_gmp_gcdext(mp_limb_t s0[], int32_t * ssn,
+                   mp_limb_t t0[], int32_t * stn,
+                   mp_limb_t g0[], int32_t * gn,
                    const mp_limb_t x0[], const mp_size_t xn,
                    const mp_limb_t y0[], const mp_size_t yn)
 {
-  const mp_size_t gn0 = mp_size_minabs(xn, yn);
   const mpz_t x = CONST_MPZ_INIT(x0, mp_limb_zero_p(x0,xn) ? 0 : xn);
   const mpz_t y = CONST_MPZ_INIT(y0, mp_limb_zero_p(y0,yn) ? 0 : yn);
 
-  mpz_t g, s;
+  mpz_t g, s, t;
   mpz_init (g);
   mpz_init (s);
+  mpz_init (t);
 
-  mpz_gcdext (g, s, NULL, x, y);
+  mpz_gcdext (g, s, t, x, y);
 
   // g must be positive (0 <= gn).
   // According to the docs for mpz_gcdext(), we have:
@@ -311,28 +313,31 @@ integer_gmp_gcdext(mp_limb_t s0[], mp_limb_t g0[],
   // -->   g < min(|y|, |x|)
   // -->   gn <= min(yn, xn)
   // <->   gn <= gn0
-  const mp_size_t gn = g[0]._mp_size;
-  assert(0 <= gn && gn <= gn0);
-  memset(g0, 0, gn0*sizeof(mp_limb_t));
-  memcpy(g0, g[0]._mp_d, gn*sizeof(mp_limb_t));
+  const mp_size_t gn0 = mp_size_minabs(xn, yn);
+  *gn = g[0]._mp_size;
+  assert(0 <= *gn && *gn <= gn0);
+  memcpy(g0, g[0]._mp_d, *gn * sizeof(mp_limb_t));
   mpz_clear (g);
 
   // According to the docs for mpz_gcdext(), we have:
   //       |s| < |y| / 2g
   // -->   |s| < |y|         (note g > 0)
   // -->   sn <= yn
-  const mp_size_t ssn = s[0]._mp_size;
-  const mp_size_t sn  = mp_size_abs(ssn);
+  *ssn = s[0]._mp_size;
+  const mp_size_t sn  = mp_size_abs(*ssn);
   assert(sn <= mp_size_abs(yn));
   memcpy(s0, s[0]._mp_d, sn*sizeof(mp_limb_t));
   mpz_clear (s);
 
-  if (!sn) {
-    s0[0] = 0;
-    return 1;
-  }
-
-  return ssn;
+  // According to the docs for mpz_gcdext(), we have:
+  //       |t| < |x| / 2g
+  // -->   |t| < |x|         (note g > 0)
+  // -->   st <= xn
+  *stn = t[0]._mp_size;
+  const mp_size_t tn  = mp_size_abs(*stn);
+  assert(tn <= mp_size_abs(xn));
+  memcpy(t0, t[0]._mp_d, tn*sizeof(mp_limb_t));
+  mpz_clear (t);
 }
 
 /* Truncating (i.e. rounded towards zero) integer division-quotient of MPN */

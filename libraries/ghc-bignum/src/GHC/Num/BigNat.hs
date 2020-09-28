@@ -23,25 +23,10 @@ import GHC.Classes
 import GHC.Magic
 import GHC.Num.Primitives
 import GHC.Num.WordArray
+import GHC.Num.Backend
 
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
-#endif
-
-#if defined(BIGNUM_CHECK)
-import GHC.Num.BigNat.Check
-
-#elif defined(BIGNUM_NATIVE)
-import GHC.Num.BigNat.Native
-
-#elif defined(BIGNUM_FFI)
-import GHC.Num.BigNat.FFI
-
-#elif defined(BIGNUM_GMP)
-import GHC.Num.BigNat.GMP
-
-#else
-#error Undefined BigNat backend. Use a flag to select it (e.g. gmp, native, ffi)`
 #endif
 
 default ()
@@ -1535,3 +1520,42 @@ bigNatFromByteArrayBE# sz  ba moff s =
 bigNatFromByteArray# :: Word# -> ByteArray# -> Word# -> Bool# -> State# s -> (# State# s, BigNat# #)
 bigNatFromByteArray# sz ba off 0# s = bigNatFromByteArrayLE# sz ba off s
 bigNatFromByteArray# sz ba off _  s = bigNatFromByteArrayBE# sz ba off s
+
+
+
+
+-- | Create a BigNat# from a WordArray# containing /n/ limbs in
+-- least-significant-first order.
+--
+-- If possible 'WordArray#', will be used directly (i.e. shared
+-- /without/ cloning the 'WordArray#' into a newly allocated one)
+bigNatFromWordArray# :: WordArray# -> Word# -> BigNat#
+bigNatFromWordArray# wa n0
+   | isTrue# (n `eqWord#` 0##)
+   = bigNatZero# void#
+
+   | isTrue# (r `eqWord#` 0##) -- i.e. wa is multiple of limb-size
+   , isTrue# (q `eqWord#` n)
+   = wa
+
+   | True = withNewWordArray# (word2Int# n) \mwa s ->
+               mwaArrayCopy# mwa 0# wa 0# (word2Int# n) s
+   where
+      !(# q, r #) = quotRemWord# (int2Word# (sizeofByteArray# wa))
+                                 WORD_SIZE_IN_BYTES##
+      -- find real size in Words by removing trailing null limbs
+      !n = real_size n0
+      real_size 0## = 0##
+      real_size i
+           | 0## <- bigNatIndex# wa (word2Int# (i `minusWord#` 1##))
+           = real_size (i `minusWord#` 1##)
+      real_size i = i
+
+
+-- | Create a BigNat from a WordArray# containing /n/ limbs in
+-- least-significant-first order.
+--
+-- If possible 'WordArray#', will be used directly (i.e. shared
+-- /without/ cloning the 'WordArray#' into a newly allocated one)
+bigNatFromWordArray :: WordArray# -> Word# -> BigNat
+bigNatFromWordArray wa n = BN# (bigNatFromWordArray# wa n)

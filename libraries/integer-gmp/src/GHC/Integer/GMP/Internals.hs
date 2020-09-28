@@ -29,6 +29,7 @@ module GHC.Integer.GMP.Internals
 
       -- ** Additional 'Integer' operations
     , gcdInteger
+    , gcdExtInteger
     , lcmInteger
     , sqrInteger
 
@@ -52,6 +53,7 @@ module GHC.Integer.GMP.Internals
 
       -- ** Conversions to/from 'BigNat'
 
+    , byteArrayToBigNat#
     , wordToBigNat
     , wordToBigNat2
     , bigNatToInt
@@ -169,6 +171,12 @@ isValidInteger# = I.integerCheck#
 {-# DEPRECATED gcdInteger "Use integerGcd instead" #-}
 gcdInteger :: Integer -> Integer -> Integer
 gcdInteger = I.integerGcd
+
+{-# DEPRECATED gcdExtInteger "Use integerGcde instead" #-}
+gcdExtInteger :: Integer -> Integer -> (# Integer, Integer #)
+gcdExtInteger a b = case I.integerGcde# a b of
+   (# g, s, _t #) -> (# g, s #)
+
 
 {-# DEPRECATED lcmInteger "Use integerLcm instead" #-}
 lcmInteger :: Integer -> Integer -> Integer
@@ -425,3 +433,8 @@ importIntegerFromByteArray ba off sz endian = case runRW# (I.integerFromByteArra
 exportIntegerToMutableByteArray :: Integer -> MutableByteArray# RealWorld -> Word# -> Int# -> IO Word
 exportIntegerToMutableByteArray i mba off endian = IO (\s -> case I.integerToMutableByteArray# i mba off endian s of
    (# s', r #) -> (# s', W# r #))
+
+
+{-# DEPRECATED byteArrayToBigNat# "Use bigNatFromWordArray instead" #-}
+byteArrayToBigNat# :: ByteArray# -> GmpSize# -> BigNat
+byteArrayToBigNat# ba n = B.bigNatFromWordArray ba (int2Word# n)
