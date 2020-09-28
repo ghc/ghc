@@ -529,17 +529,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
         case RET_SMALL: {
             StgWord c = *sp;
-            if (c == (StgWord)&stg_ctoi_R1p_info) {
-                debugBelch("tstg_ctoi_ret_R1p_info\n" );
-            } else if (c == (StgWord)&stg_ctoi_R1n_info) {
-                debugBelch("stg_ctoi_ret_R1n_info\n" );
-            } else if (c == (StgWord)&stg_ctoi_F1_info) {
-                debugBelch("stg_ctoi_ret_F1_info\n" );
-            } else if (c == (StgWord)&stg_ctoi_D1_info) {
-                debugBelch("stg_ctoi_ret_D1_info\n" );
-            } else if (c == (StgWord)&stg_ctoi_V_info) {
-                debugBelch("stg_ctoi_ret_V_info\n" );
-            } else if (c == (StgWord)&stg_ap_v_info) {
+            if (c == (StgWord)&stg_ap_v_info) {
                 debugBelch("stg_ap_v_info\n" );
             } else if (c == (StgWord)&stg_ap_f_info) {
                 debugBelch("stg_ap_f_info\n" );
@@ -595,11 +585,51 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
         }
 
         case RET_BCO: {
-            StgBCO *bco;
+            StgWord c = *sp;
+            StgBCO *bco = ((StgBCO *)sp[1]);
 
-            bco = ((StgBCO *)sp[1]);
-
-            debugBelch("RET_BCO (%p)\n", sp);
+            if (c == (StgWord)&stg_ctoi_R1p_info) {
+                debugBelch("stg_ctoi_R1p_info" );
+            } else if (c == (StgWord)&stg_ctoi_R1unpt_info) {
+                debugBelch("stg_ctoi_R1unpt_info" );
+            } else if (c == (StgWord)&stg_ctoi_R1n_info) {
+                debugBelch("stg_ctoi_R1n_info" );
+            } else if (c == (StgWord)&stg_ctoi_F1_info) {
+                debugBelch("stg_ctoi_F1_info" );
+            } else if (c == (StgWord)&stg_ctoi_D1_info) {
+                debugBelch("stg_ctoi_D1_info" );
+            } else if (c == (StgWord)&stg_ctoi_V_info) {
+                debugBelch("stg_ctoi_V_info" );
+            } else if (c == (StgWord)&stg_BCO_info) {
+                debugBelch("stg_BCO_info" );
+            } else if (c == (StgWord)&stg_apply_interp_info) {
+                debugBelch("stg_apply_interp_info" );
+            } else if (c == (StgWord)&stg_ret_t_info) {
+                debugBelch("stg_ret_t_info" );
+            } else if (c == (StgWord)&stg_ctoi_t0_info) {
+                debugBelch("stg_ctoi_t0_info" );
+            } else if (c == (StgWord)&stg_ctoi_t1_info) {
+                debugBelch("stg_ctoi_t1_info" );
+            } else if (c == (StgWord)&stg_ctoi_t2_info) {
+                debugBelch("stg_ctoi_t2_info" );
+            } else if (c == (StgWord)&stg_ctoi_t3_info) {
+                debugBelch("stg_ctoi_t3_info" );
+            } else if (c == (StgWord)&stg_ctoi_t4_info) {
+                debugBelch("stg_ctoi_t4_info" );
+            } else if (c == (StgWord)&stg_ctoi_t5_info) {
+                debugBelch("stg_ctoi_t5_info" );
+            } else if (c == (StgWord)&stg_ctoi_t6_info) {
+                debugBelch("stg_ctoi_t6_info" );
+            } else if (c == (StgWord)&stg_ctoi_t7_info) {
+                debugBelch("stg_ctoi_t7_info" );
+            } else if (c == (StgWord)&stg_ctoi_t8_info) {
+                debugBelch("stg_ctoi_t8_info" );
+            /* there are more stg_ctoi_tN_info frames,
+               but we don't print them all */
+            } else {
+                debugBelch("RET_BCO");
+            }
+            debugBelch(" (%p)\n", sp);
             printLargeBitmap(spBottom, sp+2,
                              BCO_BITMAP(bco), BCO_BITMAP_SIZE(bco));
             continue;

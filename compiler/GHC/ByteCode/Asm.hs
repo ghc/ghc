@@ -9,10 +9,10 @@
 -- | Bytecode assembler and linker
 module GHC.ByteCode.Asm (
         assembleBCOs, assembleOneBCO,
-
         bcoFreeNames,
         SizedSeq, sizeSS, ssElts,
-        iNTERP_STACK_CHECK_THRESH
+        iNTERP_STACK_CHECK_THRESH,
+        mkTupleInfoSig
   ) where
 
 #include "HsVersions.h"
@@ -377,6 +377,16 @@ assembleI platform i = case i of
                            -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit (push_alts pk) [Op p]
+  PUSH_ALTS_T proto tuple_info tuple_proto
+                           -> do let ul_bco = assembleBCO platform proto
+                                     ul_tuple_bco = assembleBCO platform
+                                                                tuple_proto
+                                 p <- ioptr (liftM BCOPtrBCO ul_bco)
+                                 p_tup <- ioptr (liftM BCOPtrBCO ul_tuple_bco)
+                                 info <- int (fromIntegral $
+                                              mkTupleInfoSig tuple_info)
+                                 emit bci_PUSH_ALTS_T
+                                      [Op p, Op info, Op p_tup]
   PUSH_PAD8                -> emit bci_PUSH_PAD8 []
   PUSH_PAD16               -> emit bci_PUSH_PAD16 []
   PUSH_PAD32               -> emit bci_PUSH_PAD32 []
@@ -435,6 +445,7 @@ assembleI platform i = case i of
   ENTER                    -> emit bci_ENTER []
   RETURN                   -> emit bci_RETURN []
   RETURN_UBX rep           -> emit (return_ubx rep) []
+  RETURN_T                 -> emit bci_RETURN_T []
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [SmallOp off, Op np, SmallOp i]
   BRK_FUN index uniq cc    -> do p1 <- ptr BCOPtrBreakArray
@@ -501,6 +512,41 @@ return_ubx D   = bci_RETURN_D
 return_ubx V16 = error "return_ubx: vector"
 return_ubx V32 = error "return_ubx: vector"
 return_ubx V64 = error "return_ubx: vector"
+
+{-
+  Construct the tuple_info word that stg_ctoi_t and stg_ret_t use
+  to convert a tuple between the native calling convention and the
+  interpreter.
+
+  See StgMiscClosures.cmm for more information.
+ -}
+mkTupleInfoSig :: TupleInfo -> Word32
+mkTupleInfoSig ti@TupleInfo{..}
+  {-
+    we can only handle up to a fixed number of words on the stack,
+    because we need a stg_ctoi_tN stack frame for each size N
+
+    If needed, you can support larger tuples by adding more in
+    StgMiscClosures.cmm and MiscClosures.h
+  -}
+  | tupleNativeStackSize > 32 =
+    pprPanic "mkTupleInfoSig: tuple too big" (ppr tupleNativeStackSize)
+  | tupleNativeStackSize < 16384 &&
+    tupleDoubleRegs < 64 && -- 6 bit bitmap (these can be shared with float)
+    tupleFloatRegs < 64 && -- 6 bit bitmap (these can be shared with double)
+    tupleLongRegs < 4 && -- 2 bit bitmap
+    tupleVanillaRegs < 65536 && -- 4 bit count
+    -- check that there are no "holes", i.e. that R1..Rn are all in use
+    tupleVanillaRegs .&. (tupleVanillaRegs + 1) == 0
+    = fromIntegral tupleNativeStackSize .|.
+      w (tupleLongRegs `shiftL` 14) .|.
+      w (tupleDoubleRegs `shiftL` 16) .|.
+      w (tupleFloatRegs `shiftL` 22) .|.
+      w (countTrailingZeros (1 + tupleVanillaRegs) `shiftL` 28)
+  | otherwise = pprPanic "mkTupleInfoSig: unsupported tuple shape" (ppr ti)
+  where
+    w :: Int -> Word32
+    w = fromIntegral
 
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the

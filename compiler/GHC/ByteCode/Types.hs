@@ -6,7 +6,9 @@
 
 -- | Bytecode assembler types
 module GHC.ByteCode.Types
-  ( CompiledByteCode(..), seqCompiledByteCode, FFIInfo(..)
+  ( CompiledByteCode(..), seqCompiledByteCode
+  , FFIInfo(..), TupleInfo(..)
+  , ByteOff(..), WordOff(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
   , CgBreakInfo(..)
@@ -67,6 +69,34 @@ seqCompiledByteCode CompiledByteCode{..} =
   rnf bc_ffis `seq`
   rnf bc_strs `seq`
   rnf (fmap seqModBreaks bc_breaks)
+
+newtype ByteOff = ByteOff Int
+    deriving (Enum, Eq, Show, Integral, Num, Ord, Real, Outputable)
+
+newtype WordOff = WordOff Int
+    deriving (Enum, Eq, Show, Integral, Num, Ord, Real, Outputable)
+
+-- This contains the data we need for passing unboxed tuples between
+-- bytecode and native code
+data TupleInfo = TupleInfo
+  { tupleSize            :: !WordOff -- total size of tuple in words
+  , tupleVanillaRegs     :: !Int     -- vanilla registers used (bitmap)
+  , tupleLongRegs        :: !Int     -- long registers used (bitmap)
+  , tupleFloatRegs       :: !Int     -- float registers used (bitmap)
+  , tupleDoubleRegs      :: !Int     -- double registers used (bitmap)
+  , tupleNativeStackSize :: !WordOff {- words spilled on the stack by
+                                        native calling convention -}
+  } deriving (Show)
+
+instance Outputable TupleInfo where
+  ppr TupleInfo{..} = text "<size" <+> ppr tupleSize <+>
+                      text "stack" <+> ppr tupleNativeStackSize <+>
+                      text "regs"  <+>
+                          char 'R' <> ppr tupleVanillaRegs <+>
+                          char 'L' <> ppr tupleLongRegs <+>
+                          char 'F' <> ppr tupleFloatRegs <+>
+                          char 'D' <> ppr tupleDoubleRegs <>
+                      char '>'
 
 type ItblEnv = NameEnv (Name, ItblPtr)
         -- We need the Name in the range so we know which

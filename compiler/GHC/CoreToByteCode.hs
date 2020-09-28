@@ -21,6 +21,11 @@ import GHC.ByteCode.Instr
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 
+import GHC.Cmm.CallConv
+import GHC.Cmm.Expr
+import GHC.Cmm.Node
+import GHC.Cmm.Utils
+
 import GHC.Platform
 import GHC.Platform.Profile
 
@@ -204,12 +209,6 @@ simpleFreeVars = freeVars
 
 type BCInstrList = OrdList BCInstr
 
-newtype ByteOff = ByteOff Int
-    deriving (Enum, Eq, Integral, Num, Ord, Real)
-
-newtype WordOff = WordOff Int
-    deriving (Enum, Eq, Integral, Num, Ord, Real)
-
 wordsToBytes :: Platform -> WordOff -> ByteOff
 wordsToBytes platform = fromIntegral . (* platformWordSizeInBytes platform) . fromIntegral
 
@@ -239,7 +238,7 @@ ppBCEnv p
      $$ nest 4 (vcat (map pp_one (sortBy cmp_snd (Map.toList p))))
      $$ text "end-env"
      where
-        pp_one (var, offset) = int offset <> colon <+> ppr var <+> ppr (bcIdArgRep var)
+        pp_one (var, ByteOff offset) = int offset <> colon <+> ppr var <+> ppr (bcIdArgReps var)
         cmp_snd x y = compare (snd x) (snd y)
 -}
 
@@ -307,6 +306,11 @@ argBits _        [] = []
 argBits platform (rep : args)
   | isFollowableArg rep  = False : argBits platform args
   | otherwise = take (argRepSizeW platform rep) (repeat True) ++ argBits platform args
+
+non_void :: [ArgRep] -> [ArgRep]
+non_void = filter nv
+  where nv V = False
+        nv _ = True
 
 -- -----------------------------------------------------------------------------
 -- schemeTopBind
@@ -495,6 +499,59 @@ returnUnboxedAtom d s p e e_rep = do
            `appOL`  mkSlideB platform szb (d - s) -- clear to sequel
            `snocOL` RETURN_UBX e_rep)             -- go
 
+-- XXX merge the two functions below
+-- XXX use the old special cases if possible (more efficient)
+returnUnboxedTuple
+    :: StackDepth
+    -> Sequel
+    -> BCEnv
+    -> [AnnExpr' Id DVarSet]
+    -> BcM BCInstrList
+returnUnboxedTuple d s p es = do
+    profile <- getProfile
+    let platform = profilePlatform profile
+        arg_ty e = primRepCmmType platform (atomPrimRep e)
+        (tuple_info, tuple_components) = layoutTuple profile d arg_ty es
+        args_ptrs = map (\(e, off) -> (isFollowableArg (atomRep e), off)) tuple_components
+        go _   pushes [] = return (reverse pushes)
+        go !dd pushes ((a, off):cs) = do (push, szb) <- pushAtom dd p a
+                                         MASSERT(off == dd + szb)
+                                         go (dd + szb) (push:pushes) cs
+    pushes <- go d [] tuple_components
+    tuple_bco <- emitBc (tupleBCO platform tuple_info args_ptrs)
+    return (mconcat pushes
+            `appOL` mkSlideB platform (wordsToBytes platform $ tupleSize tuple_info) (d - s) -- clear to sequel
+            `snocOL` PUSH_UBX (mkLitWord platform . fromIntegral $ mkTupleInfoSig tuple_info) 1 -- add info word
+            `snocOL` PUSH_BCO tuple_bco -- add info BCO
+            `snocOL` RETURN_T) -- go
+
+
+
+-- return a tuple that's already on the stack in the right order
+returnUnboxedTuple'
+    :: StackDepth -- ^ current stack depth
+    -> Sequel     -- ^ depth of sequel
+    -> BCEnv
+    -> StackDepth -- ^ depth of start of tuple
+    -> [PrimRep]
+    -> BcM BCInstrList
+returnUnboxedTuple' d s _p d_tuple t_reps = do
+    profile <- getProfile
+    let platform = profilePlatform profile
+        arg_ty :: PrimRep -> CmmType
+        arg_ty e = primRepCmmType platform e
+        (tuple_info, tuple_components) = layoutTuple profile d arg_ty t_reps
+        args_ptrs = map (\(rep, off) -> (isFollowableArg (toArgRep rep), off)) tuple_components
+        tuple_offset = trunc16W $ bytesToWords platform (d - d_tuple) + tupleSize tuple_info - 1
+        copyTuple = replicate (fromIntegral $ tupleSize tuple_info)
+                              (PUSH_L tuple_offset)
+    tuple_bco <- emitBc (tupleBCO platform tuple_info args_ptrs)
+    return (toOL copyTuple
+            `appOL` mkSlideB platform (wordsToBytes platform $ tupleSize tuple_info) (d - s) -- clear to sequel
+            `snocOL` PUSH_UBX (mkLitWord platform . fromIntegral $ mkTupleInfoSig tuple_info) 1 -- add info word
+            `snocOL` PUSH_BCO tuple_bco
+            `snocOL` RETURN_T) -- go
+
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
 schemeE
@@ -512,6 +569,10 @@ schemeE d s p e@(AnnCoercion {}) = returnUnboxedAtom d s p e V
 schemeE d s p e@(AnnVar v)
       -- See Note [Not-necessarily-lifted join points], step 3.
     | isNNLJoinPoint v          = doTailCall d s p (protectNNLJoinPointId v) [AnnVar voidPrimId]
+    | isUnboxedTupleType (idType v) =
+        let d_tuple = fromMaybe (panic "CoreToByteCode.schemeE: global unboxed tuples are not supported")
+                                (lookupBCEnv_maybe v p)
+        in returnUnboxedTuple' d s p d_tuple (bcIdPrimReps v) --- XXX should this be arg reps instead?
     | isUnliftedType (idType v) = returnUnboxedAtom d s p e (bcIdArgRep v)
     | otherwise                 = schemeT d s p e
 
@@ -668,6 +729,7 @@ schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
    = res
 
 -- handle unit tuples
+-- XXX remove these special cases
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1], rhs)])
    | isUnboxedTupleDataCon dc
    , typePrimRep (idType bndr) `lengthAtMost` 1
@@ -833,7 +895,8 @@ schemeT d s p app
                   unboxedTupleReturn d s p arg2
         [arg1,arg2] | isVAtom arg2 ->
                   unboxedTupleReturn d s p arg1
-        _other -> multiValException
+        -- XXX find if we can work the above cases into the general version
+        other -> returnUnboxedTuple d s p (reverse other)
 
    -- Case 3: Ordinary data constructor
    | Just con <- maybe_saturated_dcon
@@ -999,15 +1062,14 @@ doCase
                  -- don't enter the result
     -> BcM BCInstrList
 doCase d s p (_,scrut) bndr alts is_unboxed_tuple
-  | typePrimRep (idType bndr) `lengthExceeds` 1
-  = multiValException
-
-  | otherwise
   = do
      profile <- getProfile
      hsc_env <- getHscEnv
      let
         platform = profilePlatform profile
+        -- XXX handle general unboxed tuples and the old special cased ones properly here
+        utup     = isUnboxedTupleType bndr_ty && length (non_void (typeArgReps bndr_ty)) > 1
+
 
         profiling
           | Just interp <- hsc_interp hsc_env
@@ -1019,7 +1081,8 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         -- When an alt is entered, it assumes the returned value is
         -- on top of the itbl.
         ret_frame_size_b :: StackDepth
-        ret_frame_size_b = 2 * wordSize platform
+        ret_frame_size_b | utup      = 4 * wordSize platform
+                         | otherwise = 2 * wordSize platform
 
         -- The extra frame we push to save/restore the CCCS when profiling
         save_ccs_size_b | profiling = 2 * wordSize platform
@@ -1029,16 +1092,22 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         -- when it is returned.
         unlifted_itbl_size_b :: StackDepth
         unlifted_itbl_size_b | isAlgCase = 0
+                             | utup      = 3 * wordSize platform
                              | otherwise = wordSize platform
+
+        bndr_size | utup      = let bndr_ty = primRepCmmType platform
+                                    (tuple_info, _) = layoutTuple profile 0 bndr_ty (bcIdPrimReps bndr)
+                                in wordsToBytes platform (tupleSize tuple_info)
+                  | otherwise = wordsToBytes platform (idSizeW platform bndr)
 
         -- depth of stack after the return value has been pushed
         d_bndr =
-            d + ret_frame_size_b + wordsToBytes platform (idSizeW platform bndr)
+            d + ret_frame_size_b + bndr_size
 
         -- depth of stack after the extra info table for an unboxed return
         -- has been pushed, if any.  This is the stack depth at the
         -- continuation.
-        d_alts = d_bndr + unlifted_itbl_size_b
+        d_alts = d + ret_frame_size_b + bndr_size + unlifted_itbl_size_b
 
         -- Env in which to compile the alts, not including
         -- any vars bound by the alts themselves
@@ -1061,11 +1130,26 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
            | null real_bndrs = do
                 rhs_code <- schemeE d_alts s p_alts rhs
                 return (my_discr alt, rhs_code)
-           -- If an alt attempts to match on an unboxed tuple or sum, we must
-           -- bail out, as the bytecode compiler can't handle them.
-           -- (See #14608.)
-           | any (\bndr -> typePrimRep (idType bndr) `lengthExceeds` 1) bndrs
-           = multiValException
+           | utup =
+             let bndr_ty = primRepCmmType platform . bcIdPrimRep
+                 tuple_start = d_bndr
+                 (tuple_info, args_offsets) =
+                   layoutTuple profile
+                               0
+                               bndr_ty
+                               bndrs
+
+                 stack_bot = d_alts
+
+                 p' = Map.insertList
+                        [ (arg, tuple_start - wordsToBytes platform (tupleSize tuple_info) + offset)
+                        | (arg, offset) <- args_offsets
+                        , not (isVoidRep $ bcIdPrimRep arg)]
+                        p_alts
+             in do
+               -- traceCBC ("ubx tup cont: " ++ show (stack_bot,tuple_start,tot_wds) ++ "\n" ++  show args_offsets)
+               rhs_code <- schemeE stack_bot s p' rhs
+               return (NoDiscr, rhs_code)
            -- algebraic alt with some binders
            | otherwise =
              let (tot_wds, _ptrs_wds, args_offsets) =
@@ -1093,7 +1177,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         my_discr (DEFAULT, _, _) = NoDiscr {-shouldn't really happen-}
         my_discr (DataAlt dc, _, _)
            | isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
-           = multiValException
+           = NoDiscr
            | otherwise
            = DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))
         my_discr (LitAlt l, _, _)
@@ -1125,17 +1209,22 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         -- really want a bitmap up to depth (d-s).  This affects compilation of
         -- case-of-case expressions, which is the only time we can be compiling a
         -- case expression with s /= 0.
-        bitmap_size = trunc16W $ bytesToWords platform (d - s)
+        bitmap_size | utup      = trunc16W $ 2 + bytesToWords platform (d - s)
+                    | otherwise = trunc16W $ bytesToWords platform (d - s)
         bitmap_size' :: Int
         bitmap_size' = fromIntegral bitmap_size
-        bitmap = intsToReverseBitmap platform bitmap_size'{-size-}
-                        (sort (filter (< bitmap_size') rel_slots))
+        -- unboxed tuples get two more words, the second is a pointer (tuple_bco)
+        bitmap | utup      = intsToReverseBitmap platform bitmap_size'{-size-}
+                               (1 : sort (filter (< bitmap_size') (map (+2) rel_slots)))
+               | otherwise = intsToReverseBitmap platform bitmap_size'{-size-}
+                               (sort (filter (< bitmap_size') rel_slots))
           where
           binds = Map.toList p
           -- NB: unboxed tuple cases bind the scrut binder to the same offset
           -- as one of the alt binders, so we have to remove any duplicates here:
           rel_slots = nub $ map fromIntegral $ concatMap spread binds
-          spread (id, offset) | isFollowableArg (bcIdArgRep id) = [ rel_offset ]
+          spread (id, offset) | isUnboxedTupleType (idType id) = []
+                              | isFollowableArg (bcIdArgRep id) = [ rel_offset ]
                               | otherwise                      = []
                 where rel_offset = trunc16W $ bytesToWords platform (d - offset)
 
@@ -1146,18 +1235,117 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
          alt_bco_name = getName bndr
          alt_bco = mkProtoBCO platform alt_bco_name alt_final (Left alts)
                        0{-no arity-} bitmap_size bitmap True{-is alts-}
---     trace ("case: bndr = " ++ showSDocDebug (ppr bndr) ++ "\ndepth = " ++ show d ++ "\nenv = \n" ++ showSDocDebug (ppBCEnv p) ++
---            "\n      bitmap = " ++ show bitmap) $ do
-
      scrut_code <- schemeE (d + ret_frame_size_b + save_ccs_size_b)
                            (d + ret_frame_size_b + save_ccs_size_b)
                            p scrut
      alt_bco' <- emitBc alt_bco
-     let push_alts
-            | isAlgCase = PUSH_ALTS alt_bco'
-            | otherwise = PUSH_ALTS_UNLIFTED alt_bco' (typeArgRep bndr_ty)
-     return (push_alts `consOL` scrut_code)
+     if utup
+       then do
+              -- XXX we shouldn't call layoutTuple twice
+              let (tuple_info, args_offsets) =
+                     layoutTuple profile
+                                 0
+                                 (primRepCmmType platform)
+                                 (bcIdPrimReps bndr)
+                  args_ptrs = map (\(rep, off) -> (isFollowableArg (toArgRep rep), off)) args_offsets
+              tuple_bco <- emitBc (tupleBCO platform tuple_info args_ptrs)
+              return (PUSH_ALTS_T alt_bco' tuple_info tuple_bco
+                      `consOL` scrut_code)
+       else let push_alts
+                  | isAlgCase = PUSH_ALTS alt_bco'
+                  | otherwise = PUSH_ALTS_UNLIFTED alt_bco'
+                                                   (typeArgRep bndr_ty)
+            in return (push_alts `consOL` scrut_code)
 
+
+-- -----------------------------------------------------------------------------
+-- Deal with tuples
+
+-- The native calling convention uses registers for tuples, but in the
+-- bytecode interpreter, all values live on the stack.
+
+layoutTuple :: Profile
+            -> ByteOff
+            -> (a -> CmmType)
+            -> [a]
+            -> ( TupleInfo
+               , [(a, ByteOff)] -- argument, offset on stack
+               )
+layoutTuple profile start_off arg_ty reps =
+  let platform = profilePlatform profile
+      (orig_stk_bytes, pos) = assignArgumentsPos profile
+                                                 0
+                                                 NativeReturn
+                                                 arg_ty
+                                                 reps
+
+      -- keep the stack parameters in the same place
+      orig_stk_params = [(x, fromIntegral off) | (x, StackParam off) <- pos]
+
+      -- sort the register parameters by register and add them to the stack
+      (regs, reg_params)
+          = unzip $ sortBy (comparing fst)
+                           [(reg, x) | (x, RegisterParam reg) <- pos]
+
+      (new_stk_bytes, new_stk_params) = assignStack platform
+                                                    orig_stk_bytes
+                                                    arg_ty
+                                                    reg_params
+
+      -- make live register bitmaps
+      bmp_reg r ~(v, f, d, l)
+        = case r of VanillaReg n _ -> (a v n, f,     d,     l    )
+                    FloatReg n     -> (v,     a f n, d,     l    )
+                    DoubleReg n    -> (v,     f,     a d n, l    )
+                    LongReg n      -> (v,     f,     d,     a l n)
+                    _              ->
+                      pprPanic "CoreToByteCode.layoutTuple count_reg"
+                               (ppr r)
+              where a bmp n = bmp .|. (1 `shiftL` (n-1))
+
+      (vanilla_regs, float_regs, double_regs, long_regs)
+          = foldr bmp_reg (0, 0, 0, 0) regs
+
+      get_byte_off (x, StackParam y) = (x, fromIntegral y)
+      get_byte_off _                 =
+          panic "CoreToByteCode.layoutTuple get_byte_off"
+
+  in ( TupleInfo
+         { tupleSize        = bytesToWords platform (ByteOff new_stk_bytes)
+         , tupleVanillaRegs = vanilla_regs
+         , tupleLongRegs    = long_regs
+         , tupleFloatRegs   = float_regs
+         , tupleDoubleRegs  = double_regs
+         , tupleNativeStackSize = bytesToWords platform
+                                               (ByteOff orig_stk_bytes)
+         }
+     , sortBy (comparing snd) $
+              map (\(x, o) -> (x, o + start_off))
+                  (orig_stk_params ++ map get_byte_off new_stk_params)
+     )
+
+tupleBCO :: Platform -> TupleInfo -> [(Bool, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
+tupleBCO platform info pointers =
+  mkProtoBCO platform invented_name body_code (Left [])
+             0{-no arity-} bitmap_size bitmap False{-is alts-}
+
+  where
+    {-
+      The tuple BCO is never referred to by name, so we can get away
+      with using a fake name here. We will need to change this if we want
+      to save some memory by sharing the BCO between places that have
+      the same tuple shape
+    -}
+    invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "tuple")
+
+    -- the first word in the frame is the tuple_info word,
+    -- which is not a pointer
+    bitmap_size = trunc16W $ 1 + tupleSize info
+    bitmap      = intsToReverseBitmap platform (fromIntegral bitmap_size) $
+                  map ((+1) . fromIntegral . bytesToWords platform . snd)
+                      (filter fst pointers)
+    body_code = mkSlideW 0 1      -- pop frame header
+                `snocOL` RETURN_T -- and add it again
 
 -- -----------------------------------------------------------------------------
 -- Deal with a CCall.
@@ -1585,6 +1773,9 @@ pushAtom d p (AnnVar var)
    | Just d_v <- lookupBCEnv_maybe var p  -- var is a local variable
    = do platform <- targetPlatform <$> getDynFlags
 
+        -- XXX I changed it to:
+        --   let !szb = wordsToBytes platform (idSizeW platform var)
+        -- but I forgot why. maybe wrong.
         let !szb = idSizeCon platform var
             with_instr instr = do
                 let !off_b = trunc16B $ d - d_v
@@ -1826,9 +2017,14 @@ lookupBCEnv_maybe = Map.lookup
 
 idSizeW :: Platform -> Id -> WordOff
 idSizeW platform = WordOff . argRepSizeW platform . bcIdArgRep
+-- XXX new, not needed anymore?
+-- idSizeW platform = WordOff . sum . map (argRepSizeW platform) . bcIdArgReps
 
+-- XXX this doesn't widen stuff to word width
 idSizeCon :: Platform -> Id -> ByteOff
 idSizeCon platform = ByteOff . primRepSizeB platform . bcIdPrimRep
+-- XXX new, not needed anymore?
+-- idSizeCon platform = ByteOff . sum . map (primRepSizeB platform) . bcIdPrimReps
 
 bcIdArgRep :: Id -> ArgRep
 bcIdArgRep = toArgRep . bcIdPrimRep
@@ -1839,6 +2035,15 @@ bcIdPrimRep id
   = rep
   | otherwise
   = pprPanic "bcIdPrimRep" (ppr id <+> dcolon <+> ppr (idType id))
+
+-- XXX we can remove these?
+{-
+bcIdArgReps :: Id -> [ArgRep]
+bcIdArgReps = map toArgRep . bcIdPrimReps
+-}
+
+bcIdPrimReps :: Id -> [PrimRep]
+bcIdPrimReps id = typePrimRepArgs (idType id)
 
 repSizeWords :: Platform -> PrimRep -> WordOff
 repSizeWords platform rep = WordOff $ argRepSizeW platform (toArgRep rep)
@@ -1958,6 +2163,10 @@ mkStackOffsets original_depth szsb = tail (scanl' (+) original_depth szsb)
 
 typeArgRep :: Type -> ArgRep
 typeArgRep = toArgRep . typePrimRep1
+
+-- XXX this can be removed?
+typeArgReps :: Type -> [ArgRep]
+typeArgReps = map toArgRep . typePrimRepArgs -- typePrimRepArgs (idType id)
 
 -- -----------------------------------------------------------------------------
 -- The bytecode generator's monad
