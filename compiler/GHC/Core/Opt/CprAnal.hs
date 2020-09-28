@@ -25,7 +25,7 @@ import GHC.Types.Basic
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core.Utils   ( dumpIdInfoOfProgram )
+import GHC.Core.Utils   (exprIsHNF,  dumpIdInfoOfProgram )
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
@@ -346,6 +346,8 @@ cprAnalBind top_lvl env widening args id rhs
     rhs_ty'
       -- See Note [CPR for thunks]
       | stays_thunk = trimCprTy rhs_ty
+      -- See Note [CPR for expandable unfoldings]
+      | stays_data  = topCprType
       -- See Note [CPR for sum types]
       | returns_sum = trimCprTy rhs_ty
       | otherwise   = rhs_ty
@@ -358,8 +360,10 @@ cprAnalBind top_lvl env widening args id rhs
 
     -- See Note [CPR for thunks]
     stays_thunk = is_thunk && not_strict
-    is_thunk    = idArity id == 0 && not (isJoinId id)
+    is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
     not_strict  = not (isStrictDmd (idDemandInfo id))
+    -- See Note [CPR for expandable unfoldings]
+    stays_data  = not is_thunk && idArity id == 0 && not_strict
     -- See Note [CPR for sum types]
     (_, ret_ty) = splitPiTys (idType id)
     not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
@@ -764,7 +768,13 @@ instead we keep on cprAnal'ing through *expandable* unfoldings for these arity
 
 In practice, GHC generates a lot of (nested) TyCon and KindRep bindings, one
 for each data declaration. It's wasteful to attach CPR signatures to each of
-them (and intractable in case of Nested CPR).
+them (and intractable in case of Nested CPR.
+
+Rather than discarding CPR signatures for expandable data structures only, we
+also do so for non-expandable things ('stays_data'). The reason is that if a
+data structure has no unfolding (or if the user said NOINLINE), then we don't
+want to store CPR signatures. The generated KindReps fall into this category, so
+this is really a mandatory special case.
 
 Also we don't need to analyse RHSs of expandable bindings: The CPR signature of
 the binding is never consulted and there may not be let or case expressions
