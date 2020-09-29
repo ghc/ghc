@@ -379,3 +379,9 @@ test('UniqLoop',
       ],
      compile_and_run,
      ['-O -package ghc'])
+
+test('T18574',
+    [collect_stats('bytes allocated', 5), only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])
+
