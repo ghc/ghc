@@ -362,6 +362,7 @@ by saying ``-fno-wombat``.
     :default: on
 
     Use a special demand transformer for dictionary selectors.
+    Behaviour is unconditionally enabled starting with 9.2
 
 .. ghc-flag:: -fdo-eta-reduction
     :shortdesc: Enable eta-reduction. Implied by :ghc-flag:`-O`.

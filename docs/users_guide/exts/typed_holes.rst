@@ -546,6 +546,7 @@ Sorting can be toggled with :ghc-flag:`-fsort-valid-hole-fits`
     :shortdesc: Sort valid hole fits by size.
     :type: dynamic
     :reverse: -fno-sort-by-size-hole-fits
+    :category: verbosity
 
     :default: on
 
@@ -557,6 +558,7 @@ Sorting can be toggled with :ghc-flag:`-fsort-valid-hole-fits`
     :shortdesc: Sort valid hole fits by subsumption.
     :type: dynamic
     :reverse: -fno-sort-by-subsumption-hole-fits
+    :category: verbosity
 
     :default: off
 
