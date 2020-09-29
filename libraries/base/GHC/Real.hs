@@ -413,43 +413,31 @@ instance  Real Integer  where
 instance Real Natural where
     toRational n = integerFromNatural n :% 1
 
--- Note [Integer division constant folding]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- Constant folding of quot, rem, div, mod, divMod and quotRem for Integer
--- arguments depends crucially on inlining. Constant folding rules defined in
--- GHC.Core.Opt.ConstantFold trigger for integerQuot, integerRem and so on.
--- So if calls to quot, rem and so on were not inlined the rules would not fire.
---
--- The rules would also not fire if calls to integerQuot and so on were inlined,
--- but this does not happen because they are all marked with NOINLINE pragma.
-
-
 -- | @since 2.0.1
 instance  Integral Integer where
     toInteger n      = n
 
-    {-# INLINE quot #-}
+    {-# INLINE quot #-} -- See Note [Integer constant folding]
     _ `quot` 0 = divZeroError
     n `quot` d = n `integerQuot` d
 
-    {-# INLINE rem #-}
+    {-# INLINE rem #-} -- See Note [Integer constant folding]
     _ `rem` 0 = divZeroError
     n `rem` d = n `integerRem` d
 
-    {-# INLINE div #-}
+    {-# INLINE div #-} -- See Note [Integer constant folding]
     _ `div` 0 = divZeroError
     n `div` d = n `integerDiv` d
 
-    {-# INLINE mod #-}
+    {-# INLINE mod #-} -- See Note [Integer constant folding]
     _ `mod` 0 = divZeroError
     n `mod` d = n `integerMod` d
 
-    {-# INLINE divMod #-}
+    {-# INLINE divMod #-} -- See Note [Integer constant folding]
     _ `divMod` 0 = divZeroError
     n `divMod` d = n `integerDivMod` d
 
-    {-# INLINE quotRem #-}
+    {-# INLINE quotRem #-} -- See Note [Integer constant folding]
     _ `quotRem` 0 = divZeroError
     n `quotRem` d = n `integerQuotRem` d
 
@@ -457,27 +445,27 @@ instance  Integral Integer where
 instance Integral Natural where
     toInteger = integerFromNatural
 
-    {-# INLINE quot #-}
+    {-# INLINE quot #-} -- See Note [Integer constant folding]
     _ `quot` 0 = divZeroError
     n `quot` d = n `naturalQuot` d
 
-    {-# INLINE rem #-}
+    {-# INLINE rem #-} -- See Note [Integer constant folding]
     _ `rem` 0 = divZeroError
     n `rem` d = n `naturalRem` d
 
-    {-# INLINE div #-}
+    {-# INLINE div #-} -- See Note [Integer constant folding]
     _ `div` 0 = divZeroError
     n `div` d = n `naturalQuot` d
 
-    {-# INLINE mod #-}
+    {-# INLINE mod #-} -- See Note [Integer constant folding]
     _ `mod` 0 = divZeroError
     n `mod` d = n `naturalRem` d
 
-    {-# INLINE divMod #-}
+    {-# INLINE divMod #-} -- See Note [Integer constant folding]
     _ `divMod` 0 = divZeroError
     n `divMod` d = n `naturalQuotRem` d
 
-    {-# INLINE quotRem #-}
+    {-# INLINE quotRem #-} -- See Note [Integer constant folding]
     _ `quotRem` 0 = divZeroError
     n `quotRem` d = n `naturalQuotRem` d
 

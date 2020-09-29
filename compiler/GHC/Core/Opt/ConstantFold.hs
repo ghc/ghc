@@ -1347,7 +1347,7 @@ builtinBignumRules _ =
       , rule_shift_op           "integerShiftL"       integerShiftLName       shiftL
       , rule_shift_op           "integerShiftR"       integerShiftRName       shiftR
       , rule_integerBit         "integerBit"          integerBitName
-        -- See Note [Integer division constant folding] in libraries/base/GHC/Real.hs
+        -- See Note [Integer constant folding] in libraries/base/GHC/Num/Integer.hs
       , rule_divop_one          "integerQuot"         integerQuotName         quot
       , rule_divop_one          "integerRem"          integerRemName          rem
       , rule_divop_one          "integerDiv"          integerDivName          div
