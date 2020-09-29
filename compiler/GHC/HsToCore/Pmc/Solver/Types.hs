@@ -62,6 +62,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.Monad (InertSet, emptyInert)
+import GHC.Tc.Utils.TcType (isStringTy)
 import GHC.Driver.Types (ConLikeSet)
 
 import Numeric (fromRat)
@@ -562,7 +563,7 @@ coreExprAsPmLit e = case collectArgs e of
   (Var x, args)
     | is_rebound_name x fromStringName
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
-    , s:_ <- filter (eqType stringTy . exprType) args
+    , s:_ <- filter (isStringTy . exprType) $ filter isValArg args
     -- NB: Calls coreExprAsPmLit and then overloadPmLit, so that we return PmLitOverStrings
     -> coreExprAsPmLit s >>= overloadPmLit (exprType e)
   -- These last two cases handle proper String literals
