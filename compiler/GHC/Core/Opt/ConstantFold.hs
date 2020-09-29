@@ -1317,7 +1317,6 @@ builtinBignumRules _ =
       , rule_IntegerFromLitNum  "Word64# -> Integer"  integerFromWord64Name
       , rule_IntegerFromLitNum  "Natural -> Integer"  integerFromNaturalName
       , rule_convert            "Integer -> Word#"    integerToWordName       mkWordLitWord
-      , rule_convert            "Integer -> Int#"     integerToIntName        mkIntLitInt
       , rule_convert            "Integer -> Word64#"  integerToWord64Name     (\_ -> mkWord64LitWord64)
       , rule_convert            "Integer -> Int64#"   integerToInt64Name      (\_ -> mkInt64LitInt64)
       , rule_binopi             "integerAdd"          integerAddName          (+)
@@ -1347,7 +1346,7 @@ builtinBignumRules _ =
       , rule_shift_op           "integerShiftL"       integerShiftLName       shiftL
       , rule_shift_op           "integerShiftR"       integerShiftRName       shiftR
       , rule_integerBit         "integerBit"          integerBitName
-        -- See Note [Integer division constant folding] in libraries/base/GHC/Real.hs
+        -- See Note [Integer constant folding] in "GHC.Num.Integer"
       , rule_divop_one          "integerQuot"         integerQuotName         quot
       , rule_divop_one          "integerRem"          integerRemName          rem
       , rule_divop_one          "integerDiv"          integerDivName          div

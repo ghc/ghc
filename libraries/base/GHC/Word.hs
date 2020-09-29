@@ -112,6 +112,7 @@ instance Num Word8 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = W8# (narrow8Word# (integerToWord# i))
 
 -- | @since 2.01
@@ -156,7 +157,8 @@ instance Integral Word8 where
     divMod  (W8# x#) y@(W8# y#)
         | y /= 0                  = (W8# (x# `quotWord#` y#), W8# (x# `remWord#` y#))
         | otherwise               = divZeroError
-    toInteger (W8# x#)            = IS (word2Int# x#)
+    {-# INLINE toInteger #-} -- See Note [Integer constant folding]
+    toInteger (W8# x#)            = integerFromWord# x#
 
 -- | @since 2.01
 instance Bounded Word8 where
@@ -303,6 +305,7 @@ instance Num Word16 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = W16# (narrow16Word# (integerToWord# i))
 
 -- | @since 2.01
@@ -347,7 +350,8 @@ instance Integral Word16 where
     divMod  (W16# x#) y@(W16# y#)
         | y /= 0                    = (W16# (x# `quotWord#` y#), W16# (x# `remWord#` y#))
         | otherwise                 = divZeroError
-    toInteger (W16# x#)             = IS (word2Int# x#)
+    {-# INLINE toInteger #-} -- See Note [Integer constant folding]
+    toInteger (W16# x#)             = integerFromWord# x#
 
 -- | @since 2.01
 instance Bounded Word16 where
@@ -533,6 +537,7 @@ instance Num Word32 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = W32# (narrow32Word# (integerToWord# i))
 
 -- | @since 2.01
@@ -587,15 +592,8 @@ instance Integral Word32 where
     divMod  (W32# x#) y@(W32# y#)
         | y /= 0                    = (W32# (x# `quotWord#` y#), W32# (x# `remWord#` y#))
         | otherwise                 = divZeroError
-    toInteger (W32# x#)
-#if WORD_SIZE_IN_BITS == 32
-        | isTrue# (i# >=# 0#)       = IS i#
-        | otherwise                 = integerFromWord# x#
-        where
-        !i# = word2Int# x#
-#else
-                                    = IS (word2Int# x#)
-#endif
+    {-# INLINE toInteger #-} -- See Note [Integer constant folding]
+    toInteger (W32# x#)             = integerFromWord# x#
 
 -- | @since 2.01
 instance Bits Word32 where
@@ -728,6 +726,7 @@ instance Num Word64 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = W64# (integerToWord64# i)
 
 -- | @since 2.01
@@ -770,6 +769,7 @@ instance Integral Word64 where
     divMod  (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
         | otherwise                 = divZeroError
+    {-# INLINE toInteger #-} -- See Note [Integer constant folding]
     toInteger (W64# x#)             = integerFromWord64# x#
 
 -- | @since 2.01
@@ -875,6 +875,7 @@ instance Num Word64 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = W64# (integerToWord# i)
 
 -- | @since 2.01
@@ -953,11 +954,8 @@ instance Integral Word64 where
     divMod  (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
         | otherwise                 = divZeroError
-    toInteger (W64# x#)
-        | isTrue# (i# >=# 0#)       = IS i#
-        | otherwise                 = integerFromWord# x#
-        where
-        !i# = word2Int# x#
+    {-# INLINE toInteger #-} -- See Note [Integer constant folding]
+    toInteger (W64# x#)             = integerFromWord# x#
 
 -- | @since 2.01
 instance Bits Word64 where
