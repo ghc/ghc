@@ -1312,7 +1312,8 @@ builtinRules enableBignumRules
 builtinBignumRules :: EnableBignumRules -> [CoreRule]
 builtinBignumRules (EnableBignumRules False) = []
 builtinBignumRules _ =
-      [ rule_IntegerFromLitNum  "Word# -> Integer"    integerFromWordName
+      [ rule_IntegerFromLitNum  "Int# -> Integer"     integerFromIntName
+      , rule_IntegerFromLitNum  "Word# -> Integer"    integerFromWordName
       , rule_IntegerFromLitNum  "Int64# -> Integer"   integerFromInt64Name
       , rule_IntegerFromLitNum  "Word64# -> Integer"  integerFromWord64Name
       , rule_IntegerFromLitNum  "Natural -> Integer"  integerFromNaturalName
@@ -1347,7 +1348,7 @@ builtinBignumRules _ =
       , rule_shift_op           "integerShiftL"       integerShiftLName       shiftL
       , rule_shift_op           "integerShiftR"       integerShiftRName       shiftR
       , rule_integerBit         "integerBit"          integerBitName
-        -- See Note [Integer division constant folding] in libraries/base/GHC/Real.hs
+        -- See Note [Integer constant folding] in "GHC.Num.Integer"
       , rule_divop_one          "integerQuot"         integerQuotName         quot
       , rule_divop_one          "integerRem"          integerRemName          rem
       , rule_divop_one          "integerDiv"          integerDivName          div

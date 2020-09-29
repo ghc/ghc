@@ -106,6 +106,7 @@ instance Num Int8 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = I8# (narrow8Int# (integerToInt# i))
 
 -- | @since 2.01
@@ -160,7 +161,8 @@ instance Integral Int8 where
                                        (# d, m #) ->
                                            (I8# (narrow8Int# d),
                                             I8# (narrow8Int# m))
-    toInteger (I8# x#)               = IS x#
+    {-# INLINE toInteger #-} -- See Note [Integer constant folding]
+    toInteger (I8# x)                = integerFromInt# x
 
 -- | @since 2.01
 instance Bounded Int8 where
@@ -313,6 +315,7 @@ instance Num Int16 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = I16# (narrow16Int# (integerToInt# i))
 
 -- | @since 2.01
@@ -367,7 +370,8 @@ instance Integral Int16 where
                                        (# d, m #) ->
                                            (I16# (narrow16Int# d),
                                             I16# (narrow16Int# m))
-    toInteger (I16# x#)              = IS x#
+    {-# INLINE toInteger #-} -- See Note [Integer constant folding]
+    toInteger (I16# x)               = integerFromInt# x
 
 -- | @since 2.01
 instance Bounded Int16 where
@@ -525,6 +529,7 @@ instance Num Int32 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = I32# (narrow32Int# (integerToInt# i))
 
 -- | @since 2.01
@@ -587,7 +592,8 @@ instance Integral Int32 where
                                        (# d, m #) ->
                                            (I32# (narrow32Int# d),
                                             I32# (narrow32Int# m))
-    toInteger (I32# x#)              = IS x#
+    {-# INLINE toInteger #-} -- See Note [Integer constant folding]
+    toInteger (I32# x)               = integerFromInt# x
 
 -- | @since 2.01
 instance Read Int32 where
@@ -748,6 +754,7 @@ instance Num Int64 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = I64# (integerToInt64# i)
 
 -- | @since 2.01
@@ -804,6 +811,7 @@ instance Integral Int64 where
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I64# (x# `divInt64#` y#),
                                         I64# (x# `modInt64#` y#))
+    {-# INLINE toInteger #-} -- See Note [Integer constant folding]
     toInteger (I64# x)               = integerFromInt64# x
 
 
@@ -953,6 +961,7 @@ instance Num Int64 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = I64# (integerToInt# i)
 
 -- | @since 2.01
@@ -1006,7 +1015,8 @@ instance Integral Int64 where
         | otherwise                  = case x# `divModInt#` y# of
                                        (# d, m #) ->
                                            (I64# d, I64# m)
-    toInteger (I64# x#)              = IS x#
+    {-# INLINE toInteger #-} -- See Note [Integer constant folding]
+    toInteger (I64# x)               = integerFromInt64# x
 
 -- | @since 2.01
 instance Read Int64 where
