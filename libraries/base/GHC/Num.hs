@@ -109,7 +109,7 @@ instance  Num Int  where
              | n `eqInt` 0 = 0
              | otherwise   = 1
 
-    {-# INLINE fromInteger #-}   -- Just to be sure!
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i = integerToInt i
 
 -- | @since 2.01
@@ -121,6 +121,7 @@ instance Num Word where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger i          = integerToWord i
 
 -- | @since 2.01
@@ -150,6 +151,7 @@ instance  Num Natural  where
       | naturalIsZero x = x
       | otherwise       = raise# underflowException
 
+    {-# INLINE fromInteger #-} -- See Note [Integer constant folding]
     fromInteger x
       | x < 0     = raise# underflowException
       | otherwise = integerToNaturalClamp x
@@ -160,4 +162,3 @@ instance  Num Natural  where
 {-# DEPRECATED quotRemInteger "Use integerQuotRem# instead" #-}
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
 quotRemInteger = integerQuotRem#
-
