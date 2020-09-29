@@ -145,7 +145,7 @@ integerFromInt (I# i) = IS i
 
 -- | Truncates 'Integer' to least-significant 'Int#'
 integerToInt# :: Integer -> Int#
-{-# NOINLINE integerToInt# #-}
+{-# INLINE[0] integerToInt# #-}
 integerToInt# (IS i) = i
 integerToInt# (IP b) = word2Int# (bigNatToWord# b)
 integerToInt# (IN b) = negateInt# (word2Int# (bigNatToWord# b))
@@ -156,7 +156,7 @@ integerToInt i = I# (integerToInt# i)
 
 -- | Convert a Word# into an Integer
 integerFromWord# :: Word# -> Integer
-{-# NOINLINE integerFromWord# #-}
+{-# INLINE[0] integerFromWord# #-}
 integerFromWord# w
    | i <- word2Int# w
    , isTrue# (i >=# 0#)
@@ -185,7 +185,7 @@ integerFromWordSign# _  w = integerFromWordNeg# w
 
 -- | Truncate an Integer into a Word
 integerToWord# :: Integer -> Word#
-{-# NOINLINE integerToWord# #-}
+{-# INLINE[0] integerToWord# #-}
 integerToWord# (IS i)  = int2Word# i
 integerToWord# (IP bn) = bigNatToWord# bn
 integerToWord# (IN bn) = int2Word# (negateInt# (word2Int# (bigNatToWord# bn)))
@@ -196,7 +196,7 @@ integerToWord !i = W# (integerToWord# i)
 
 -- | Convert a Natural into an Integer
 integerFromNatural :: Natural -> Integer
-{-# NOINLINE integerFromNatural #-}
+{-# INLINE[0] integerFromNatural #-}
 integerFromNatural (NS x) = integerFromWord# x
 integerFromNatural (NB x) = integerFromBigNat# x
 
@@ -209,7 +209,7 @@ integerFromWordList False ws = integerFromBigNat#    (bigNatFromWordList ws)
 --
 -- Return 0 for negative Integers.
 integerToNaturalClamp :: Integer -> Natural
-{-# NOINLINE integerToNaturalClamp #-}
+{-# INLINE[0] integerToNaturalClamp #-}
 integerToNaturalClamp (IS x)
    | isTrue# (x <# 0#) = naturalZero
    | True              = naturalFromWord# (int2Word# x)
@@ -220,7 +220,7 @@ integerToNaturalClamp (IN _) = naturalZero
 --
 -- Return absolute value
 integerToNatural :: Integer -> Natural
-{-# NOINLINE integerToNatural #-}
+{-# INLINE[0] integerToNatural #-}
 integerToNatural (IS x) = naturalFromWord# (wordFromAbsInt# x)
 integerToNatural (IP x) = naturalFromBigNat# x
 integerToNatural (IN x) = naturalFromBigNat# x
@@ -270,7 +270,7 @@ integerGe !x !y = isTrue# (integerGe# x y)
 
 -- | Equal predicate.
 integerEq# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerEq# #-}
+{-# INLINE[0] integerEq# #-}
 integerEq# (IS x) (IS y) = x ==# y
 integerEq# (IN x) (IN y) = bigNatEq# x y
 integerEq# (IP x) (IP y) = bigNatEq# x y
@@ -278,7 +278,7 @@ integerEq# _       _     = 0#
 
 -- | Not-equal predicate.
 integerNe# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerNe# #-}
+{-# INLINE[0] integerNe# #-}
 integerNe# (IS x) (IS y) = x /=# y
 integerNe# (IN x) (IN y) = bigNatNe# x y
 integerNe# (IP x) (IP y) = bigNatNe# x y
@@ -286,28 +286,28 @@ integerNe# _       _     = 1#
 
 -- | Greater predicate.
 integerGt# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerGt# #-}
+{-# INLINE[0] integerGt# #-}
 integerGt# (IS x) (IS y)                  = x ># y
 integerGt# x y | GT <- integerCompare x y = 1#
 integerGt# _ _                            = 0#
 
 -- | Lower-or-equal predicate.
 integerLe# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerLe# #-}
+{-# INLINE[0] integerLe# #-}
 integerLe# (IS x) (IS y)                  = x <=# y
 integerLe# x y | GT <- integerCompare x y = 0#
 integerLe# _ _                            = 1#
 
 -- | Lower predicate.
 integerLt# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerLt# #-}
+{-# INLINE[0] integerLt# #-}
 integerLt# (IS x) (IS y)                  = x <# y
 integerLt# x y | LT <- integerCompare x y = 1#
 integerLt# _ _                            = 0#
 
 -- | Greater-or-equal predicate.
 integerGe# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerGe# #-}
+{-# INLINE[0] integerGe# #-}
 integerGe# (IS x) (IS y)                  = x >=# y
 integerGe# x y | LT <- integerCompare x y = 0#
 integerGe# _ _                            = 1#
@@ -318,7 +318,7 @@ instance Eq Integer where
 
 -- | Compare two Integer
 integerCompare :: Integer -> Integer -> Ordering
-{-# NOINLINE integerCompare #-}
+{-# INLINE[0] integerCompare #-}
 integerCompare (IS x) (IS y) = compareInt# x y
 integerCompare (IP x) (IP y) = bigNatCompare x y
 integerCompare (IN x) (IN y) = bigNatCompare y x
@@ -338,7 +338,7 @@ instance Ord Integer where
 
 -- | Subtract one 'Integer' from another.
 integerSub :: Integer -> Integer -> Integer
-{-# NOINLINE integerSub #-}
+{-# INLINE[0] integerSub #-}
 integerSub !x      (IS 0#) = x
 integerSub (IS x#) (IS y#)
   = case subIntC# x# y# of
@@ -384,7 +384,7 @@ integerSub (IN x) (IS y#)
 
 -- | Add two 'Integer's
 integerAdd :: Integer -> Integer -> Integer
-{-# NOINLINE integerAdd #-}
+{-# INLINE[0] integerAdd #-}
 integerAdd !x      (IS 0#) = x
 integerAdd (IS 0#) y       = y
 integerAdd (IS x#) (IS y#)
@@ -413,7 +413,7 @@ integerAdd (IP x) (IN y)
 
 -- | Multiply two 'Integer's
 integerMul :: Integer -> Integer -> Integer
-{-# NOINLINE integerMul #-}
+{-# INLINE[0] integerMul #-}
 integerMul !_       (IS 0#)  = IS 0#
 integerMul (IS 0#)  _        = IS 0#
 integerMul x        (IS 1#)  = x
@@ -478,7 +478,7 @@ integerMul (IN x) (IS y)
 -- IP is used iff n > maxBound::Int
 -- IN is used iff n < minBound::Int
 integerNegate :: Integer -> Integer
-{-# NOINLINE integerNegate #-}
+{-# INLINE[0] integerNegate #-}
 integerNegate (IN b)             = IP b
 integerNegate (IS INT_MINBOUND#) = IP (bigNatFromWord# ABS_INT_MINBOUND##)
 integerNegate (IS i)             = IS (negateInt# i)
@@ -489,7 +489,7 @@ integerNegate (IP b)
 
 -- | Compute absolute value of an 'Integer'
 integerAbs :: Integer -> Integer
-{-# NOINLINE integerAbs #-}
+{-# INLINE[0] integerAbs #-}
 integerAbs   (IN i)     = IP i
 integerAbs n@(IP _)     = n
 integerAbs n@(IS i)
@@ -501,13 +501,13 @@ integerAbs n@(IS i)
 -- | Return @-1@, @0@, and @1@ depending on whether argument is
 -- negative, zero, or positive, respectively
 integerSignum :: Integer -> Integer
-{-# NOINLINE integerSignum #-}
+{-# INLINE[0] integerSignum #-}
 integerSignum !j = IS (integerSignum# j)
 
 -- | Return @-1#@, @0#@, and @1#@ depending on whether argument is
 -- negative, zero, or positive, respectively
 integerSignum# :: Integer -> Int#
-{-# NOINLINE integerSignum# #-}
+{-# INLINE[0] integerSignum# #-}
 integerSignum# (IN _)  = -1#
 integerSignum# (IS i#) = sgnI# i#
 integerSignum# (IP _ ) =  1#
@@ -515,7 +515,7 @@ integerSignum# (IP _ ) =  1#
 -- | Count number of set bits. For negative arguments returns
 -- the negated population count of the absolute value.
 integerPopCount# :: Integer -> Int#
-{-# NOINLINE integerPopCount# #-}
+{-# INLINE[0] integerPopCount# #-}
 integerPopCount# (IS i)
    | isTrue# (i >=# 0#)  = word2Int# (popCntI# i)
    | True                = negateInt# (word2Int# (popCntI# (negateInt# i)))
@@ -524,7 +524,7 @@ integerPopCount# (IN bn) = negateInt# (word2Int# (bigNatPopCount# bn))
 
 -- | Positive 'Integer' for which only /n/-th bit is set
 integerBit# :: Word# -> Integer
-{-# NOINLINE integerBit# #-}
+{-# INLINE[0] integerBit# #-}
 integerBit# i
   | isTrue# (i `ltWord#` (WORD_SIZE_IN_BITS## `minusWord#` 1##))
   = IS (uncheckedIShiftL# 1# (word2Int# i))
@@ -539,7 +539,7 @@ integerBit (W# i) = integerBit# i
 --
 -- Fake 2's complement for negative values (might be slow)
 integerTestBit# :: Integer -> Word# -> Bool#
-{-# NOINLINE integerTestBit# #-}
+{-# INLINE[0] integerTestBit# #-}
 integerTestBit# (IS x) i
    | isTrue# (i `ltWord#` WORD_SIZE_IN_BITS##)
    = testBitI# x i
@@ -575,7 +575,7 @@ integerTestBit !i (W# n) = isTrue# (integerTestBit# i n)
 --
 -- Fake 2's complement for negative values (might be slow)
 integerShiftR# :: Integer -> Word# -> Integer
-{-# NOINLINE integerShiftR# #-}
+{-# INLINE[0] integerShiftR# #-}
 integerShiftR# !x      0## = x
 integerShiftR# (IS i)  n   = IS (iShiftRA# i (word2Int# n))
   where
@@ -596,7 +596,7 @@ integerShiftR !x (W# w) = integerShiftR# x w
 
 -- | Shift-left operation
 integerShiftL# :: Integer -> Word# -> Integer
-{-# NOINLINE integerShiftL# #-}
+{-# INLINE[0] integerShiftL# #-}
 integerShiftL# !x      0## = x
 integerShiftL# (IS 0#) _   = IS 0#
 integerShiftL# (IS 1#) n   = integerBit# n
@@ -617,7 +617,7 @@ integerShiftL !x (W# w) = integerShiftL# x w
 --
 -- Fake 2's complement for negative values (might be slow)
 integerOr :: Integer -> Integer -> Integer
-{-# NOINLINE integerOr #-}
+{-# INLINE[0] integerOr #-}
 integerOr a b = case a of
    IS  0# -> b
    IS -1# -> IS -1#
@@ -676,7 +676,7 @@ integerOr a b = case a of
 --
 -- Fake 2's complement for negative values (might be slow)
 integerXor :: Integer -> Integer -> Integer
-{-# NOINLINE integerXor #-}
+{-# INLINE[0] integerXor #-}
 integerXor a b = case a of
    IS  0# -> b
    IS -1# -> integerComplement b
@@ -731,7 +731,7 @@ integerXor a b = case a of
 --
 -- Fake 2's complement for negative values (might be slow)
 integerAnd :: Integer -> Integer -> Integer
-{-# NOINLINE integerAnd #-}
+{-# INLINE[0] integerAnd #-}
 integerAnd a b = case a of
    IS 0#  -> IS 0#
    IS -1# -> b
@@ -766,7 +766,7 @@ integerAnd a b = case a of
 
 -- | Binary complement of the
 integerComplement :: Integer -> Integer
-{-# NOINLINE integerComplement #-}
+{-# INLINE[0] integerComplement #-}
 integerComplement (IS x) = IS (notI# x)
 integerComplement (IP x) = IN (bigNatAddWord# x 1##)
 integerComplement (IN x) = IP (bigNatSubWordUnsafe# x 1##)
@@ -777,7 +777,7 @@ integerComplement (IN x) = IP (bigNatSubWordUnsafe# x 1##)
 -- Divisor must be non-zero otherwise the GHC runtime will terminate
 -- with a division-by-zero fault.
 integerQuotRem# :: Integer -> Integer -> (# Integer, Integer #)
-{-# NOINLINE integerQuotRem# #-}
+{-# INLINE[0] integerQuotRem# #-}
 integerQuotRem# !n      (IS 1#) = (# n, IS 0# #)
 integerQuotRem# !n     (IS -1#) = let !q = integerNegate n in (# q, (IS 0#) #)
 integerQuotRem# !_      (IS 0#) = case raiseDivZero of
@@ -820,7 +820,7 @@ integerQuotRem !x !y = case integerQuotRem# x y of
 
 
 integerQuot :: Integer -> Integer -> Integer
-{-# NOINLINE integerQuot #-}
+{-# INLINE[0] integerQuot #-}
 integerQuot !n      (IS 1#)  = n
 integerQuot !n      (IS -1#) = integerNegate n
 integerQuot !_      (IS 0#)  = raiseDivZero
@@ -841,7 +841,7 @@ integerQuot (IN n) (IN d) = integerFromBigNat#    (bigNatQuot n d)
 integerQuot n d = case integerQuotRem# n d of (# q, _ #) -> q
 
 integerRem :: Integer -> Integer -> Integer
-{-# NOINLINE integerRem #-}
+{-# INLINE[0] integerRem #-}
 integerRem !_       (IS 1#) = IS 0#
 integerRem _       (IS -1#) = IS 0#
 integerRem _        (IS 0#) = IS (remInt# 0# 0#)
@@ -863,7 +863,7 @@ integerRem n d = case integerQuotRem# n d of (# _, r #) -> r
 -- Divisor must be non-zero otherwise the GHC runtime will terminate
 -- with a division-by-zero fault.
 integerDivMod# :: Integer -> Integer -> (# Integer, Integer #)
-{-# NOINLINE integerDivMod# #-}
+{-# INLINE[0] integerDivMod# #-}
 integerDivMod# !n !d
   | isTrue# (integerSignum# r ==# negateInt# (integerSignum# d))
      = let !q' = integerSub q (IS 1#)
@@ -883,7 +883,7 @@ integerDivMod !n !d = case integerDivMod# n d of
 
 
 integerDiv :: Integer -> Integer -> Integer
-{-# NOINLINE integerDiv #-}
+{-# INLINE[0] integerDiv #-}
 integerDiv !n !d
    -- same-sign ops can be handled by more efficient 'integerQuot'
    | isTrue# (integerIsNegative# n ==# integerIsNegative# d) = integerQuot n d
@@ -891,7 +891,7 @@ integerDiv !n !d
 
 
 integerMod :: Integer -> Integer -> Integer
-{-# NOINLINE integerMod #-}
+{-# INLINE[0] integerMod #-}
 integerMod !n !d
    -- same-sign ops can be handled by more efficient 'integerRem'
    | isTrue# (integerIsNegative# n ==# integerIsNegative# d) = integerRem n d
@@ -899,7 +899,7 @@ integerMod !n !d
 
 -- | Compute greatest common divisor.
 integerGcd :: Integer -> Integer -> Integer
-{-# NOINLINE integerGcd #-}
+{-# INLINE[0] integerGcd #-}
 integerGcd (IS 0#)  !b       = integerAbs b
 integerGcd a        (IS 0#)  = integerAbs a
 integerGcd (IS 1#)  _        = IS 1#
@@ -917,7 +917,7 @@ integerGcd (IP a)   (IS b)   = integerFromWord# (bigNatGcdWord# a (int2Word# (ab
 
 -- | Compute least common multiple.
 integerLcm :: Integer -> Integer -> Integer
-{-# NOINLINE integerLcm #-}
+{-# INLINE[0] integerLcm #-}
 integerLcm (IS 0#) !_  = IS 0#
 integerLcm (IS 1#)  b  = integerAbs b
 integerLcm (IS -1#) b  = integerAbs b
@@ -991,7 +991,7 @@ integerIsPowerOf2# (IP w) = bigNatIsPowerOf2# w
 
 -- | Convert an Int64# into an Integer on 32-bit architectures
 integerFromInt64# :: Int64# -> Integer
-{-# NOINLINE integerFromInt64# #-}
+{-# INLINE[0] integerFromInt64# #-}
 integerFromInt64# !i
   | isTrue# ((i `leInt64#` intToInt64#  0x7FFFFFFF#)
       &&# (i `geInt64#` intToInt64# -0x80000000#))
@@ -1005,7 +1005,7 @@ integerFromInt64# !i
 
 -- | Convert a Word64# into an Integer on 32-bit architectures
 integerFromWord64# :: Word64# -> Integer
-{-# NOINLINE integerFromWord64# #-}
+{-# INLINE[0] integerFromWord64# #-}
 integerFromWord64# !w
   | isTrue# (w `leWord64#` wordToWord64# 0x7FFFFFFF##)
   = IS (int64ToInt# (word64ToInt64# w))
@@ -1014,14 +1014,14 @@ integerFromWord64# !w
 
 -- | Convert an Integer into an Int64# on 32-bit architectures
 integerToInt64# :: Integer -> Int64#
-{-# NOINLINE integerToInt64# #-}
+{-# INLINE[0] integerToInt64# #-}
 integerToInt64# (IS i) = intToInt64# i
 integerToInt64# (IP b) = word64ToInt64# (bigNatToWord64# b)
 integerToInt64# (IN b) = negateInt64# (word64ToInt64# (bigNatToWord64# b))
 
 -- | Convert an Integer into a Word64# on 32-bit architectures
 integerToWord64# :: Integer -> Word64#
-{-# NOINLINE integerToWord64# #-}
+{-# INLINE[0] integerToWord64# #-}
 integerToWord64# (IS i) = int64ToWord64# (intToInt64# i)
 integerToWord64# (IP b) = bigNatToWord64# b
 integerToWord64# (IN b) = int64ToWord64# (negateInt64# (word64ToInt64# (bigNatToWord64# b)))
@@ -1040,7 +1040,7 @@ integerFromInt64# !x = IS x
 
 -- | Decode a Double# into (# Integer mantissa, Int# exponent #)
 integerDecodeDouble# :: Double# -> (# Integer, Int# #)
-{-# NOINLINE integerDecodeDouble# #-}
+{-# INLINE[0] integerDecodeDouble# #-}
 integerDecodeDouble# !x = case decodeDouble_Int64# x of
                             (# m, e #) -> (# integerFromInt64# m, e #)
 
@@ -1051,7 +1051,7 @@ integerDecodeDouble (D# x) = case integerDecodeDouble# x of
 
 -- | Encode (# Integer mantissa, Int# exponent #) into a Double#
 integerEncodeDouble# :: Integer -> Int# -> Double#
-{-# NOINLINE integerEncodeDouble# #-}
+{-# INLINE[0] integerEncodeDouble# #-}
 integerEncodeDouble# (IS i) 0# = int2Double# i
 integerEncodeDouble# (IS i) e  = intEncodeDouble# i e
 integerEncodeDouble# (IP b) e  = bigNatEncodeDouble# b e
@@ -1063,19 +1063,19 @@ integerEncodeDouble !m (I# e)  = D# (integerEncodeDouble# m e)
 
 -- | Encode an Integer (mantissa) into a Double#
 integerToDouble# :: Integer -> Double#
-{-# NOINLINE integerToDouble# #-}
+{-# INLINE[0] integerToDouble# #-}
 integerToDouble# !i = integerEncodeDouble# i 0#
 
 -- | Encode an Integer (mantissa) into a Float#
 integerToFloat# :: Integer -> Float#
-{-# NOINLINE integerToFloat# #-}
+{-# INLINE[0] integerToFloat# #-}
 integerToFloat# !i = integerEncodeFloat# i 0#
 
 -- | Encode (# Integer mantissa, Int# exponent #) into a Float#
 --
 -- TODO: Not sure if it's worth to write 'Float' optimized versions here
 integerEncodeFloat# :: Integer -> Int# -> Float#
-{-# NOINLINE integerEncodeFloat# #-}
+{-# INLINE[0] integerEncodeFloat# #-}
 integerEncodeFloat# !m 0# = double2Float# (integerToDouble# m)
 integerEncodeFloat# !m e  = double2Float# (integerEncodeDouble# m e)
 
