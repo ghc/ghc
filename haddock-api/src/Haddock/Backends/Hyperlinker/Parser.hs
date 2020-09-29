@@ -15,7 +15,7 @@ import GHC.Utils.Error     ( pprLocErrMsg )
 import GHC.Data.FastString ( mkFastString )
 import GHC.Parser.Lexer    as Lexer
                            ( P(..), ParseResult(..), PState(..), Token(..)
-                           , mkPStatePure, lexer, mkParserFlags', getErrorMessages)
+                           , initParserState, lexer, mkParserOpts, getErrorMessages)
 import GHC.Data.Bag         ( bagToList )
 import GHC.Utils.Outputable ( text, ($$) )
 import GHC.Utils.Panic      ( panic )
@@ -44,10 +44,10 @@ parse dflags fpath bs = case unP (go False []) initState of
         text "Hyperlinker parse error:" $$ pprLocErrMsg err
   where
 
-    initState = mkPStatePure pflags buf start
+    initState = initParserState pflags buf start
     buf = stringBufferFromByteString bs
     start = mkRealSrcLoc (mkFastString fpath) 1 1
-    pflags = mkParserFlags' (warningFlags dflags)
+    pflags = mkParserOpts   (warningFlags dflags)
                             (extensionFlags dflags)
                             (homeUnitId (mkHomeUnitFromFlags dflags))
                             (safeImportsOn dflags)

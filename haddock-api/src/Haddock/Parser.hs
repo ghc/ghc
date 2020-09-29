@@ -17,8 +17,9 @@ import qualified Documentation.Haddock.Parser as P
 import Documentation.Haddock.Types
 
 import GHC.Driver.Session ( DynFlags )
+import GHC.Driver.Config
 import GHC.Data.FastString   ( fsLit )
-import GHC.Parser.Lexer ( mkPState, unP, ParseResult(POk) )
+import GHC.Parser.Lexer ( initParserState, unP, ParseResult(POk) )
 import GHC.Parser       ( parseIdentifier )
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Types.SrcLoc ( mkRealSrcLoc, unLoc )
@@ -34,7 +35,7 @@ parseIdent :: DynFlags -> String -> Maybe RdrName
 parseIdent dflags str0 =
   let buffer = stringToStringBuffer str0
       realSrcLc = mkRealSrcLoc (fsLit "<unknown file>") 0 0
-      pstate = mkPState dflags buffer realSrcLc
+      pstate = initParserState (initParserOpts dflags) buffer realSrcLc
   in case unP parseIdentifier pstate of
     POk _ name -> Just (unLoc name)
     _ -> Nothing
