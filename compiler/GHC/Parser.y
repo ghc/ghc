@@ -3551,11 +3551,15 @@ varop   :: { Located RdrName }
 qop     :: { forall b. DisambInfixOp b => PV (Located b) }   -- used in sections
         : qvarop                { mkHsVarOpPV $1 }
         | qconop                { mkHsConOpPV $1 }
+        | SIMPLEQUOTE qvarop    { reportSimplequoteOp (comb2 $1 $>) }
+        | SIMPLEQUOTE qconop    { reportSimplequoteOp (comb2 $1 $>) }
         | hole_op               { $1 }
 
 qopm    :: { forall b. DisambInfixOp b => PV (Located b) }   -- used in sections
         : qvaropm               { mkHsVarOpPV $1 }
         | qconop                { mkHsConOpPV $1 }
+        | SIMPLEQUOTE qvaropm   { reportSimplequoteOp (comb2 $1 $>) }
+        | SIMPLEQUOTE qconop    { reportSimplequoteOp (comb2 $1 $>) }
         | hole_op               { $1 }
 
 hole_op :: { forall b. DisambInfixOp b => PV (Located b) }   -- used in sections
@@ -3999,6 +4003,11 @@ reportEmptyDoubleQuotes span = do
         [ text "Parser error on `''`"
         , text "Character literals may not be empty"
         ]
+
+reportSimplequoteOp :: MonadP m => SrcSpan -> m a
+reportSimplequoteOp span =
+  addFatalError span $
+  text "Illegal operator promotion syntax at the term-level"
 
 {-
 %************************************************************************
