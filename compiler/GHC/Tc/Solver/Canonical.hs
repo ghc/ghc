@@ -2161,17 +2161,10 @@ canEqCanLHSHomo :: CtEvidence
 canEqCanLHSHomo ev eq_rel swapped xi1 ps_xi1 xi2 ps_xi2
   | (xi2', mco) <- split_cast_ty xi2
   , isCanLHS xi2'
-  = canEqCanLHS2 ev eq_rel swapped xi1 ps_xi1 xi2' ps_xi2 mco
-
-  | TyVarTy tv1 <- xi1
-  = canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
-
-  | TyConApp fun_tc fun_args <- xi1
-  = ASSERT( isTypeFamilyTyCon fun_tc )
-    canEqFun ev eq_rel swapped fun_tc fun_args xi2 ps_xi2
+  = canEqCanLHS2 ev eq_rel swapped xi1 ps_xi1 xi2' (ps_xi2 `mkCastTyMCo` mkSymMCo mco) mco
 
   | otherwise
-  = pprPanic "canEqCanLHS is not CanLHS" (ppr xi1 $$ ppr ev)
+  = canEqCanLHSSplit ev eq_rel swapped xi1 ps_xi1 xi2 ps_xi2
 
   where
     split_cast_ty (CastTy ty co) = (ty, MCo co)
@@ -2205,35 +2198,36 @@ canEqCanLHS2 ev eq_rel swapped xi1 ps_xi1 xi2 ps_xi2 mco
 
   | TyVarTy tv1 <- xi1
   , TyConApp fun_tc2 fun_args2 <- xi2
-  = canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2
+  = canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
 
   | TyConApp fun_tc1 fun_args1 <- xi1
   , TyVarTy tv2 <- xi2
-  = canEqTyVarFunEq ev eq_rel (flipSwap swapped) tv2 ps_xi2 fun_tc1 fun_args1 ps_xi1
+  = canEqTyVarFunEq ev eq_rel (flipSwap swapped) tv2 ps_xi2
+                                                 fun_tc1 fun_args1 ps_xi1 (mkTcSymMCo mco)
 
-  | TyConApp fun_tc1 fun_args1 <- xi1
-  , TyConApp fun_tc2 fun_args2 <- xi2
-  = error "RAE isn't sure which order to prefer here."
+  -- that's all the special cases. Now we just figure out which non-special case
+  -- to continue to.
+  | otherwise
+  = canEqCanLHSSplit ev eq_rel swapped xi1 ps_xi1 (xi2 `mkCastTyMCo` mco)
+                                                  (ps_xi2 `mkCastTyMCo` mco)
 
-canEqTyVarHomo :: CtEvidence
-               -> EqRel -> SwapFlag
-               -> TcTyVar                -- lhs: tv1
-               -> TcType                 -- pretty lhs, flat
-               -> TcType -> TcType       -- rhs, flat
-               -> TcS (StopOrContinue Ct)
-canEqTyVarHomo ev eq_rel swapped tv1 ps_xi1 xi2 _
-  | Just (tv2, _co) <- tcGetCastedTyVar_maybe xi2
-  , tv1 == tv2
-  = canEqReflexive ev eq_rel (mkTyVarTy tv1)
-    -- we don't need to check _co because it must be reflexive
+canEqCanLHSSplit :: CtEvidence
+                 -> EqRel -> SwapFlag
+                 -> CanLHS                -- lhs (or, if swapped, rhs)
+                 -> TcType                -- pretty lhs
+                 -> TcType -> TcType      -- rhs, pretty rhs
+                 -> TcS (StopOrContinue Ct)
+  -- precondition: kind(xi1) `eqType` kind(xi2)
+canEqCanLHSSplit ev eq_rel swapped xi1 ps_xi1 xi2 ps_xi2
+  | TyVarTy tv1 <- xi1
+  = canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
 
-    -- this guarantees (TyEq:TV)
-  | Just (tv2, co2) <- tcGetCastedTyVar_maybe xi2
-  , swapOverTyVars (isGiven ev) tv1 tv2
-  =
-canEqTyVarHomo ev eq_rel swapped tv1 _ _ ps_xi2
-  = do { dflags <- getDynFlags
-       ; canEqTyVar2 dflags ev eq_rel swapped tv1 ps_xi2 }
+  | TyConApp fun_tc fun_args <- xi1
+  = ASSERT( isTypeFamilyTyCon fun_tc )
+    canEqFun ev eq_rel swapped fun_tc fun_args xi2 ps_xi2
+
+  | otherwise
+  = pprPanic "canEqCanLHS is not CanLHS" (ppr xi1 $$ ppr ev)
 
 canEqTyVar :: CtEvidence
            -> EqRel -> SwapFlag
@@ -2309,6 +2303,29 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 rhs
 
     rewrite_co1  = mkTcReflCo role lhs
     rewrite_co2  = mkTcReflCo role rhs
+
+canEqFun :: CtEvidence
+         -> EqRel -> SwapFlag
+         -> TyCon            -- type family
+         -> [TcType]         -- family arguments (exactly saturated)
+         -> TcType -> TcType -- rhs, pretty rhs
+         -> TcS (StopOrContinue Ct)
+canEqFun ev eq_rel swapped fun_tc fun_args rhs ps_rhs
+  = do { new_ev <- rewriteEqEvidence ev swapped lhs rhs rewrite_co1 rewrite_co2
+       ; if isTauTy rhs  -- establish CFunEqCan invariant
+         then
+           do { traceTcS "canEqFun makes canonical CFunEqCan" (ppr lhs $$ ppr ps_rhs)
+              ; continueWith (CFunEqCan { cc_ev = new_ev, cc_fun = fun_tc
+                                        , cc_tyargs = fun_args, cc_rhs = ps_rhs
+                                        , cc_eq_rel = eq_rel }) }
+       -- it is possible that cc_rhs mentions the LHS. This will cause later
+       -- flattening to potentially loop, but that will be caught by the
+       -- depth counter. The other option is an occurs-check for a function
+       -- application, which seems awkward.
+
+         else
+           do { traceTcS "canEqFun fails" (ppr lhs $$ ppr ps_rhs)
+              ; continueWith (mkIrredCt InsolubleCIS new_ev) }}
 
 -- | Solve a reflexive equality constraint
 canEqReflexive :: CtEvidence    -- ty ~ ty

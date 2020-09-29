@@ -173,6 +173,7 @@ data Ct
        -- Invariants:
        --   * isTypeFamilyTyCon cc_fun
        --   * tcTypeKind (F xis) = tyVarKind fsk; Note [Ct kind invariant]
+       --   * isTauTy cc_rhs; type family reducts are always tau-types
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
 
