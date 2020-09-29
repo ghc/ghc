@@ -58,7 +58,7 @@ import CoreUtils (exprType)
 import PrelNames
 import TysWiredIn
 import TysPrim
-import TcType (evVarPred)
+import TcType (evVarPred, isStringTy)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
@@ -309,7 +309,7 @@ coreExprAsPmLit e = case collectArgs e of
   (Var x, args)
     | is_rebound_name x fromStringName
     -- With -XRebindableSyntax or without: The first String argument is what we are after
-    , s:_ <- filter (eqType stringTy . exprType) args
+    , s:_ <- filter (isStringTy . exprType) $ filter isValArg args
     -- NB: Calls coreExprAsPmLit and then overloadPmLit, so that we return PmLitOverStrings
     -> coreExprAsPmLit s >>= overloadPmLit (exprType e)
   -- These last two cases handle String literals
