@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-spec-constr #-} -- See Note [Integer constant folding],
+                                     -- the bit about `integerAdd`
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns #-}
@@ -66,6 +68,7 @@ integerCheck# (IN bn) = bigNatCheck# bn &&# (bn `bigNatGtWord#` ABS_INT_MINBOUND
 
 -- | Check Integer invariants
 integerCheck :: Integer -> Bool
+{-# INLINE integerCheck #-}
 integerCheck i = isTrue# (integerCheck# i)
 
 -- | Integer Zero
@@ -137,26 +140,29 @@ integerToBigNatClamp# _     = bigNatZero# (# #)
 
 -- | Create an Integer from an Int#
 integerFromInt# :: Int# -> Integer
+{-# NOINLINE[0] integerFromInt# #-} -- See Note [Integer constant folding]
 integerFromInt# i = IS i
 
 -- | Create an Integer from an Int
 integerFromInt :: Int -> Integer
-integerFromInt (I# i) = IS i
+{-# INLINE integerFromInt #-} -- See Note [Integer constant folding]
+integerFromInt (I# i) = integerFromInt# i
 
 -- | Truncates 'Integer' to least-significant 'Int#'
 integerToInt# :: Integer -> Int#
-{-# NOINLINE integerToInt# #-}
+{-# NOINLINE[0] integerToInt# #-} -- See Note [Integer constant folding]
 integerToInt# (IS i) = i
 integerToInt# (IP b) = word2Int# (bigNatToWord# b)
 integerToInt# (IN b) = negateInt# (word2Int# (bigNatToWord# b))
 
 -- | Truncates 'Integer' to least-significant 'Int#'
 integerToInt :: Integer -> Int
+{-# INLINE integerToInt #-} -- See Note [Integer constant folding]
 integerToInt i = I# (integerToInt# i)
 
 -- | Convert a Word# into an Integer
 integerFromWord# :: Word# -> Integer
-{-# NOINLINE integerFromWord# #-}
+{-# NOINLINE[0] integerFromWord# #-} -- See Note [Integer constant folding]
 integerFromWord# w
    | i <- word2Int# w
    , isTrue# (i >=# 0#)
@@ -167,6 +173,7 @@ integerFromWord# w
 
 -- | Convert a Word into an Integer
 integerFromWord :: Word -> Integer
+{-# INLINE integerFromWord #-} -- See Note [Integer constant folding]
 integerFromWord (W# w) = integerFromWord# w
 
 -- | Create a negative Integer with the given Word magnitude
@@ -185,23 +192,25 @@ integerFromWordSign# _  w = integerFromWordNeg# w
 
 -- | Truncate an Integer into a Word
 integerToWord# :: Integer -> Word#
-{-# NOINLINE integerToWord# #-}
+{-# NOINLINE[0] integerToWord# #-} -- See Note [Integer constant folding]
 integerToWord# (IS i)  = int2Word# i
 integerToWord# (IP bn) = bigNatToWord# bn
 integerToWord# (IN bn) = int2Word# (negateInt# (word2Int# (bigNatToWord# bn)))
 
 -- | Truncate an Integer into a Word
 integerToWord :: Integer -> Word
+{-# INLINE integerToWord #-} -- See Note [Integer constant folding]
 integerToWord !i = W# (integerToWord# i)
 
 -- | Convert a Natural into an Integer
 integerFromNatural :: Natural -> Integer
-{-# NOINLINE integerFromNatural #-}
+{-# NOINLINE[0] integerFromNatural #-} -- See Note [Integer constant folding]
 integerFromNatural (NS x) = integerFromWord# x
 integerFromNatural (NB x) = integerFromBigNat# x
 
 -- | Convert a list of Word into an Integer
 integerFromWordList :: Bool -> [Word] -> Integer
+{-# INLINE integerFromWordList #-} -- See Note [Integer constant folding]
 integerFromWordList True  ws = integerFromBigNatNeg# (bigNatFromWordList ws)
 integerFromWordList False ws = integerFromBigNat#    (bigNatFromWordList ws)
 
@@ -209,7 +218,7 @@ integerFromWordList False ws = integerFromBigNat#    (bigNatFromWordList ws)
 --
 -- Return 0 for negative Integers.
 integerToNaturalClamp :: Integer -> Natural
-{-# NOINLINE integerToNaturalClamp #-}
+{-# NOINLINE[0] integerToNaturalClamp #-} -- See Note [Integer constant folding]
 integerToNaturalClamp (IS x)
    | isTrue# (x <# 0#) = naturalZero
    | True              = naturalFromWord# (int2Word# x)
@@ -220,7 +229,7 @@ integerToNaturalClamp (IN _) = naturalZero
 --
 -- Return absolute value
 integerToNatural :: Integer -> Natural
-{-# NOINLINE integerToNatural #-}
+{-# NOINLINE[0] integerToNatural #-} -- See Note [Integer constant folding]
 integerToNatural (IS x) = naturalFromWord# (wordFromAbsInt# x)
 integerToNatural (IP x) = naturalFromBigNat# x
 integerToNatural (IN x) = naturalFromBigNat# x
@@ -237,40 +246,50 @@ integerIsNegative# (IN _)  = 1#
 
 -- | Negative predicate
 integerIsNegative :: Integer -> Bool
+{-# INLINE integerIsNegative #-} -- See Note [Integer constant folding]
 integerIsNegative !i = isTrue# (integerIsNegative# i)
 
 -- | Zero predicate
 integerIsZero :: Integer -> Bool
+{-# INLINE integerIsZero #-} -- See Note [Integer constant folding]
 integerIsZero (IS 0#) = True
 integerIsZero _       = False
 
 -- | Not-equal predicate.
 integerNe :: Integer -> Integer -> Bool
+{-# INLINE integerNe #-} -- See Note [Integer constant folding]
 integerNe !x !y = isTrue# (integerNe# x y)
 
 -- | Equal predicate.
 integerEq :: Integer -> Integer -> Bool
+{-# INLINE integerEq #-} -- See Note [Integer constant folding]
 integerEq !x !y = isTrue# (integerEq# x y)
 
 -- | Lower-or-equal predicate.
 integerLe :: Integer -> Integer -> Bool
+{-# INLINE integerLe #-} -- See Note [Integer constant folding]
 integerLe !x !y = isTrue# (integerLe# x y)
 
 -- | Lower predicate.
 integerLt :: Integer -> Integer -> Bool
+{-# INLINE integerLt #-} -- See Note [Integer constant folding]
 integerLt !x !y = isTrue# (integerLt# x y)
 
 -- | Greater predicate.
 integerGt :: Integer -> Integer -> Bool
+{-# INLINE integerGt #-} -- See Note [Integer constant folding]
 integerGt !x !y = isTrue# (integerGt# x y)
 
 -- | Greater-or-equal predicate.
 integerGe :: Integer -> Integer -> Bool
+{-# INLINE integerGe #-} -- See Note [Integer constant folding]
 integerGe !x !y = isTrue# (integerGe# x y)
 
 -- | Equal predicate.
 integerEq# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerEq# #-}
+{-# NOINLINE integerEq# #-} -- See Note [Integer constant folding]
+                            -- But this function will be too huge if inlined
+                            -- at all. Hence NOINLINE, without [0]
 integerEq# (IS x) (IS y) = x ==# y
 integerEq# (IN x) (IN y) = bigNatEq# x y
 integerEq# (IP x) (IP y) = bigNatEq# x y
@@ -278,7 +297,9 @@ integerEq# _       _     = 0#
 
 -- | Not-equal predicate.
 integerNe# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerNe# #-}
+{-# NOINLINE integerNe# #-} -- See Note [Integer constant folding]
+                            -- But this function will be too huge if inlined
+                            -- at all. Hence NOINLINE, without [0]
 integerNe# (IS x) (IS y) = x /=# y
 integerNe# (IN x) (IN y) = bigNatNe# x y
 integerNe# (IP x) (IP y) = bigNatNe# x y
@@ -286,39 +307,43 @@ integerNe# _       _     = 1#
 
 -- | Greater predicate.
 integerGt# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerGt# #-}
+{-# NOINLINE[0] integerGt# #-} -- See Note [Integer constant folding]
 integerGt# (IS x) (IS y)                  = x ># y
 integerGt# x y | GT <- integerCompare x y = 1#
 integerGt# _ _                            = 0#
 
 -- | Lower-or-equal predicate.
 integerLe# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerLe# #-}
+{-# NOINLINE[0] integerLe# #-} -- See Note [Integer constant folding]
 integerLe# (IS x) (IS y)                  = x <=# y
 integerLe# x y | GT <- integerCompare x y = 0#
 integerLe# _ _                            = 1#
 
 -- | Lower predicate.
 integerLt# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerLt# #-}
+{-# NOINLINE[0] integerLt# #-} -- See Note [Integer constant folding]
 integerLt# (IS x) (IS y)                  = x <# y
 integerLt# x y | LT <- integerCompare x y = 1#
 integerLt# _ _                            = 0#
 
 -- | Greater-or-equal predicate.
 integerGe# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerGe# #-}
+{-# NOINLINE[0] integerGe# #-} -- See Note [Integer constant folding]
 integerGe# (IS x) (IS y)                  = x >=# y
 integerGe# x y | LT <- integerCompare x y = 0#
 integerGe# _ _                            = 1#
 
 instance Eq Integer where
+   {-# INLINE (==) #-} -- See Note [Integer constant folding]
    (==) = integerEq
+   {-# INLINE (/=) #-} -- See Note [Integer constant folding]
    (/=) = integerNe
 
 -- | Compare two Integer
 integerCompare :: Integer -> Integer -> Ordering
-{-# NOINLINE integerCompare #-}
+{-# NOINLINE integerCompare #-} -- See Note [Integer constant folding]
+                                -- But this function will be too huge if inlined
+                                -- at all. Hence NOINLINE, without [0]
 integerCompare (IS x) (IS y) = compareInt# x y
 integerCompare (IP x) (IP y) = bigNatCompare x y
 integerCompare (IN x) (IN y) = bigNatCompare y x
@@ -330,6 +355,7 @@ integerCompare (IP _) (IN _) = GT
 integerCompare (IN _) (IP _) = LT
 
 instance Ord Integer where
+   {-# INLINE compare #-} -- See Note [Integer constant folding]
    compare = integerCompare
 
 ---------------------------------------------------------------------
@@ -338,7 +364,7 @@ instance Ord Integer where
 
 -- | Subtract one 'Integer' from another.
 integerSub :: Integer -> Integer -> Integer
-{-# NOINLINE integerSub #-}
+{-# NOINLINE[0] integerSub #-} -- See Note [Integer constant folding]
 integerSub !x      (IS 0#) = x
 integerSub (IS x#) (IS y#)
   = case subIntC# x# y# of
@@ -384,7 +410,7 @@ integerSub (IN x) (IS y#)
 
 -- | Add two 'Integer's
 integerAdd :: Integer -> Integer -> Integer
-{-# NOINLINE integerAdd #-}
+{-# NOINLINE[0] integerAdd #-} -- See Note [Integer constant folding]
 integerAdd !x      (IS 0#) = x
 integerAdd (IS 0#) y       = y
 integerAdd (IS x#) (IS y#)
@@ -413,7 +439,7 @@ integerAdd (IP x) (IN y)
 
 -- | Multiply two 'Integer's
 integerMul :: Integer -> Integer -> Integer
-{-# NOINLINE integerMul #-}
+{-# NOINLINE[0] integerMul #-} -- See Note [Integer constant folding]
 integerMul !_       (IS 0#)  = IS 0#
 integerMul (IS 0#)  _        = IS 0#
 integerMul x        (IS 1#)  = x
@@ -478,7 +504,7 @@ integerMul (IN x) (IS y)
 -- IP is used iff n > maxBound::Int
 -- IN is used iff n < minBound::Int
 integerNegate :: Integer -> Integer
-{-# NOINLINE integerNegate #-}
+{-# NOINLINE[0] integerNegate #-} -- See Note [Integer constant folding]
 integerNegate (IN b)             = IP b
 integerNegate (IS INT_MINBOUND#) = IP (bigNatFromWord# ABS_INT_MINBOUND##)
 integerNegate (IS i)             = IS (negateInt# i)
@@ -492,7 +518,7 @@ integerNegate (IP b)
 
 -- | Compute absolute value of an 'Integer'
 integerAbs :: Integer -> Integer
-{-# NOINLINE integerAbs #-}
+{-# NOINLINE[0] integerAbs #-} -- See Note [Integer constant folding]
 integerAbs   (IN i)     = IP i
 integerAbs n@(IP _)     = n
 integerAbs n@(IS i)
@@ -504,13 +530,13 @@ integerAbs n@(IS i)
 -- | Return @-1@, @0@, and @1@ depending on whether argument is
 -- negative, zero, or positive, respectively
 integerSignum :: Integer -> Integer
-{-# NOINLINE integerSignum #-}
+{-# NOINLINE[0] integerSignum #-} -- See Note [Integer constant folding]
 integerSignum !j = IS (integerSignum# j)
 
 -- | Return @-1#@, @0#@, and @1#@ depending on whether argument is
 -- negative, zero, or positive, respectively
 integerSignum# :: Integer -> Int#
-{-# NOINLINE integerSignum# #-}
+{-# NOINLINE[0] integerSignum# #-} -- See Note [Integer constant folding]
 integerSignum# (IN _)  = -1#
 integerSignum# (IS i#) = sgnI# i#
 integerSignum# (IP _ ) =  1#
@@ -518,7 +544,7 @@ integerSignum# (IP _ ) =  1#
 -- | Count number of set bits. For negative arguments returns
 -- the negated population count of the absolute value.
 integerPopCount# :: Integer -> Int#
-{-# NOINLINE integerPopCount# #-}
+{-# NOINLINE[0] integerPopCount# #-} -- See Note [Integer constant folding]
 integerPopCount# (IS i)
    | isTrue# (i >=# 0#)  = word2Int# (popCntI# i)
    | True                = negateInt# (word2Int# (popCntI# (negateInt# i)))
@@ -527,7 +553,7 @@ integerPopCount# (IN bn) = negateInt# (word2Int# (bigNatPopCount# bn))
 
 -- | Positive 'Integer' for which only /n/-th bit is set
 integerBit# :: Word# -> Integer
-{-# NOINLINE integerBit# #-}
+{-# NOINLINE[0] integerBit# #-} -- See Note [Integer constant folding]
 integerBit# i
   | isTrue# (i `ltWord#` (WORD_SIZE_IN_BITS## `minusWord#` 1##))
   = IS (uncheckedIShiftL# 1# (word2Int# i))
@@ -536,13 +562,14 @@ integerBit# i
 
 -- | 'Integer' for which only /n/-th bit is set
 integerBit :: Word -> Integer
+{-# INLINE integerBit #-} -- See Note [Integer constant folding]
 integerBit (W# i) = integerBit# i
 
 -- | Test if /n/-th bit is set.
 --
 -- Fake 2's complement for negative values (might be slow)
 integerTestBit# :: Integer -> Word# -> Bool#
-{-# NOINLINE integerTestBit# #-}
+{-# NOINLINE[0] integerTestBit# #-} -- See Note [Integer constant folding]
 integerTestBit# (IS x) i
    | isTrue# (i `ltWord#` WORD_SIZE_IN_BITS##)
    = testBitI# x i
@@ -572,13 +599,14 @@ integerTestBit# (IN x) i
 --
 -- Fake 2's complement for negative values (might be slow)
 integerTestBit :: Integer -> Word -> Bool
+{-# INLINE integerTestBit #-} -- See Note [Integer constant folding]
 integerTestBit !i (W# n) = isTrue# (integerTestBit# i n)
 
 -- | Shift-right operation
 --
 -- Fake 2's complement for negative values (might be slow)
 integerShiftR# :: Integer -> Word# -> Integer
-{-# NOINLINE integerShiftR# #-}
+{-# NOINLINE[0] integerShiftR# #-} -- See Note [Integer constant folding]
 integerShiftR# !x      0## = x
 integerShiftR# (IS i)  n   = IS (iShiftRA# i (word2Int# n))
   where
@@ -595,11 +623,12 @@ integerShiftR# (IN bn) n   =
 --
 -- Fake 2's complement for negative values (might be slow)
 integerShiftR :: Integer -> Word -> Integer
+{-# INLINE integerShiftR #-} -- See Note [Integer constant folding]
 integerShiftR !x (W# w) = integerShiftR# x w
 
 -- | Shift-left operation
 integerShiftL# :: Integer -> Word# -> Integer
-{-# NOINLINE integerShiftL# #-}
+{-# NOINLINE[0] integerShiftL# #-} -- See Note [Integer constant folding]
 integerShiftL# !x      0## = x
 integerShiftL# (IS 0#) _   = IS 0#
 integerShiftL# (IS 1#) n   = integerBit# n
@@ -614,13 +643,14 @@ integerShiftL# (IN bn) n   = IN (bigNatShiftL# bn n)
 -- Remember that bits are stored in sign-magnitude form, hence the behavior of
 -- negative Integers is different from negative Int's behavior.
 integerShiftL :: Integer -> Word -> Integer
+{-# INLINE integerShiftL #-} -- See Note [Integer constant folding]
 integerShiftL !x (W# w) = integerShiftL# x w
 
 -- | Bitwise OR operation
 --
 -- Fake 2's complement for negative values (might be slow)
 integerOr :: Integer -> Integer -> Integer
-{-# NOINLINE integerOr #-}
+{-# NOINLINE[0] integerOr #-} -- See Note [Integer constant folding]
 integerOr a b = case a of
    IS  0# -> b
    IS -1# -> IS -1#
@@ -679,7 +709,7 @@ integerOr a b = case a of
 --
 -- Fake 2's complement for negative values (might be slow)
 integerXor :: Integer -> Integer -> Integer
-{-# NOINLINE integerXor #-}
+{-# NOINLINE[0] integerXor #-} -- See Note [Integer constant folding]
 integerXor a b = case a of
    IS  0# -> b
    IS -1# -> integerComplement b
@@ -734,7 +764,7 @@ integerXor a b = case a of
 --
 -- Fake 2's complement for negative values (might be slow)
 integerAnd :: Integer -> Integer -> Integer
-{-# NOINLINE integerAnd #-}
+{-# NOINLINE[0] integerAnd #-} -- See Note [Integer constant folding]
 integerAnd a b = case a of
    IS 0#  -> IS 0#
    IS -1# -> b
@@ -769,7 +799,7 @@ integerAnd a b = case a of
 
 -- | Binary complement of the
 integerComplement :: Integer -> Integer
-{-# NOINLINE integerComplement #-}
+{-# NOINLINE[0] integerComplement #-} -- See Note [Integer constant folding]
 integerComplement (IS x) = IS (notI# x)
 integerComplement (IP x) = IN (bigNatAddWord# x 1##)
 integerComplement (IN x) = IP (bigNatSubWordUnsafe# x 1##)
@@ -780,7 +810,7 @@ integerComplement (IN x) = IP (bigNatSubWordUnsafe# x 1##)
 -- Divisor must be non-zero otherwise the GHC runtime will terminate
 -- with a division-by-zero fault.
 integerQuotRem# :: Integer -> Integer -> (# Integer, Integer #)
-{-# NOINLINE integerQuotRem# #-}
+{-# NOINLINE[0] integerQuotRem# #-} -- See Note [Integer constant folding]
 integerQuotRem# !n      (IS 1#) = (# n, IS 0# #)
 integerQuotRem# !n     (IS -1#) = let !q = integerNegate n in (# q, (IS 0#) #)
 integerQuotRem# !_      (IS 0#) = case raiseDivZero of
@@ -818,12 +848,13 @@ integerQuotRem# n@(IS n#) (IP d) -- need to account for (IS minBound)
 -- Divisor must be non-zero otherwise the GHC runtime will terminate
 -- with a division-by-zero fault.
 integerQuotRem :: Integer -> Integer -> (Integer, Integer)
+{-# INLINE integerQuotRem #-} -- See Note [Integer constant folding]
 integerQuotRem !x !y = case integerQuotRem# x y of
    (# q, r #) -> (q, r)
 
 
 integerQuot :: Integer -> Integer -> Integer
-{-# NOINLINE integerQuot #-}
+{-# NOINLINE[0] integerQuot #-} -- See Note [Integer constant folding]
 integerQuot !n      (IS 1#)  = n
 integerQuot !n      (IS -1#) = integerNegate n
 integerQuot !_      (IS 0#)  = raiseDivZero
@@ -844,7 +875,7 @@ integerQuot (IN n) (IN d) = integerFromBigNat#    (bigNatQuot n d)
 integerQuot n d = case integerQuotRem# n d of (# q, _ #) -> q
 
 integerRem :: Integer -> Integer -> Integer
-{-# NOINLINE integerRem #-}
+{-# NOINLINE[0] integerRem #-} -- See Note [Integer constant folding]
 integerRem !_       (IS 1#) = IS 0#
 integerRem _       (IS -1#) = IS 0#
 integerRem _        (IS 0#) = IS (remInt# 0# 0#)
@@ -866,7 +897,7 @@ integerRem n d = case integerQuotRem# n d of (# _, r #) -> r
 -- Divisor must be non-zero otherwise the GHC runtime will terminate
 -- with a division-by-zero fault.
 integerDivMod# :: Integer -> Integer -> (# Integer, Integer #)
-{-# NOINLINE integerDivMod# #-}
+{-# NOINLINE[0] integerDivMod# #-} -- See Note [Integer constant folding]
 integerDivMod# !n !d
   | isTrue# (integerSignum# r ==# negateInt# (integerSignum# d))
      = let !q' = integerSub q (IS 1#)
@@ -881,12 +912,13 @@ integerDivMod# !n !d
 -- Divisor must be non-zero otherwise the GHC runtime will terminate
 -- with a division-by-zero fault.
 integerDivMod :: Integer -> Integer -> (Integer, Integer)
+{-# INLINE integerDivMod #-} -- See Note [Integer constant folding]
 integerDivMod !n !d = case integerDivMod# n d of
    (# q,r #) -> (q,r)
 
 
 integerDiv :: Integer -> Integer -> Integer
-{-# NOINLINE integerDiv #-}
+{-# NOINLINE[0] integerDiv #-} -- See Note [Integer constant folding]
 integerDiv !n !d
    -- same-sign ops can be handled by more efficient 'integerQuot'
    | isTrue# (integerIsNegative# n ==# integerIsNegative# d) = integerQuot n d
@@ -894,7 +926,7 @@ integerDiv !n !d
 
 
 integerMod :: Integer -> Integer -> Integer
-{-# NOINLINE integerMod #-}
+{-# NOINLINE[0] integerMod #-} -- See Note [Integer constant folding]
 integerMod !n !d
    -- same-sign ops can be handled by more efficient 'integerRem'
    | isTrue# (integerIsNegative# n ==# integerIsNegative# d) = integerRem n d
@@ -902,7 +934,7 @@ integerMod !n !d
 
 -- | Compute greatest common divisor.
 integerGcd :: Integer -> Integer -> Integer
-{-# NOINLINE integerGcd #-}
+{-# NOINLINE[0] integerGcd #-} -- See Note [Integer constant folding]
 integerGcd (IS 0#)  !b       = integerAbs b
 integerGcd a        (IS 0#)  = integerAbs a
 integerGcd (IS 1#)  _        = IS 1#
@@ -920,7 +952,7 @@ integerGcd (IP a)   (IS b)   = integerFromWord# (bigNatGcdWord# a (int2Word# (ab
 
 -- | Compute least common multiple.
 integerLcm :: Integer -> Integer -> Integer
-{-# NOINLINE integerLcm #-}
+{-# NOINLINE[0] integerLcm #-} -- See Note [Integer constant folding]
 integerLcm (IS 0#) !_  = IS 0#
 integerLcm (IS 1#)  b  = integerAbs b
 integerLcm (IS -1#) b  = integerAbs b
@@ -934,6 +966,7 @@ integerLcm a b         = (aa `integerQuot` (aa `integerGcd` ab)) `integerMul` ab
 
 -- | Square a Integer
 integerSqr :: Integer -> Integer
+{-# INLINE integerSqr #-} -- See Note [Integer constant folding]
 integerSqr !a = integerMul a a
 
 
@@ -951,6 +984,7 @@ integerLog2# (IP b)     = bigNatLog2# b
 --
 -- For numbers <= 0, return 0
 integerLog2 :: Integer -> Word
+{-# INLINE integerLog2 #-} -- See Note [Integer constant folding]
 integerLog2 !i = W# (integerLog2# i)
 
 -- | Logarithm (floor) for an arbitrary base
@@ -965,6 +999,7 @@ integerLogBaseWord# base !i
 --
 -- For numbers <= 0, return 0
 integerLogBaseWord :: Word -> Integer -> Word
+{-# INLINE integerLogBaseWord #-} -- See Note [Integer constant folding]
 integerLogBaseWord (W# base) !i = W# (integerLogBaseWord# base i)
 
 -- | Logarithm (floor) for an arbitrary base
@@ -980,6 +1015,7 @@ integerLogBase# !base !i
 --
 -- For numbers <= 0, return 0
 integerLogBase :: Integer -> Integer -> Word
+{-# INLINE integerLogBase #-} -- See Note [Integer constant folding]
 integerLogBase !base !i = W# (integerLogBase# base i)
 
 -- | Indicate if the value is a power of two and which one
@@ -994,7 +1030,7 @@ integerIsPowerOf2# (IP w) = bigNatIsPowerOf2# w
 
 -- | Convert an Int64# into an Integer on 32-bit architectures
 integerFromInt64# :: Int64# -> Integer
-{-# NOINLINE integerFromInt64# #-}
+{-# NOINLINE[0] integerFromInt64# #-} -- See Note [Integer constant folding]
 integerFromInt64# !i
   | isTrue# ((i `leInt64#` intToInt64#  0x7FFFFFFF#)
       &&# (i `geInt64#` intToInt64# -0x80000000#))
@@ -1008,7 +1044,7 @@ integerFromInt64# !i
 
 -- | Convert a Word64# into an Integer on 32-bit architectures
 integerFromWord64# :: Word64# -> Integer
-{-# NOINLINE integerFromWord64# #-}
+{-# NOINLINE[0] integerFromWord64# #-} -- See Note [Integer constant folding]
 integerFromWord64# !w
   | isTrue# (w `leWord64#` wordToWord64# 0x7FFFFFFF##)
   = IS (int64ToInt# (word64ToInt64# w))
@@ -1017,14 +1053,14 @@ integerFromWord64# !w
 
 -- | Convert an Integer into an Int64# on 32-bit architectures
 integerToInt64# :: Integer -> Int64#
-{-# NOINLINE integerToInt64# #-}
+{-# NOINLINE[0] integerToInt64# #-} -- See Note [Integer constant folding]
 integerToInt64# (IS i) = intToInt64# i
 integerToInt64# (IP b) = word64ToInt64# (bigNatToWord64# b)
 integerToInt64# (IN b) = negateInt64# (word64ToInt64# (bigNatToWord64# b))
 
 -- | Convert an Integer into a Word64# on 32-bit architectures
 integerToWord64# :: Integer -> Word64#
-{-# NOINLINE integerToWord64# #-}
+{-# NOINLINE[0] integerToWord64# #-} -- See Note [Integer constant folding]
 integerToWord64# (IS i) = int64ToWord64# (intToInt64# i)
 integerToWord64# (IP b) = bigNatToWord64# b
 integerToWord64# (IN b) = int64ToWord64# (negateInt64# (word64ToInt64# (bigNatToWord64# b)))
@@ -1033,6 +1069,7 @@ integerToWord64# (IN b) = int64ToWord64# (negateInt64# (word64ToInt64# (bigNatTo
 
 -- | Convert an Int64# into an Integer on 64-bit architectures
 integerFromInt64# :: Int# -> Integer
+{-# NOINLINE[0] integerFromInt64# #-} -- See Note [Integer constant folding]
 integerFromInt64# !x = IS x
 
 #endif
@@ -1043,18 +1080,19 @@ integerFromInt64# !x = IS x
 
 -- | Decode a Double# into (# Integer mantissa, Int# exponent #)
 integerDecodeDouble# :: Double# -> (# Integer, Int# #)
-{-# NOINLINE integerDecodeDouble# #-}
+{-# NOINLINE[0] integerDecodeDouble# #-} -- See Note [Integer constant folding]
 integerDecodeDouble# !x = case decodeDouble_Int64# x of
                             (# m, e #) -> (# integerFromInt64# m, e #)
 
 -- | Decode a Double# into (# Integer mantissa, Int# exponent #)
 integerDecodeDouble :: Double -> (Integer, Int)
+{-# INLINE integerDecodeDouble #-} -- See Note [Integer constant folding]
 integerDecodeDouble (D# x) = case integerDecodeDouble# x of
    (# m, e #) -> (m, I# e)
 
 -- | Encode (# Integer mantissa, Int# exponent #) into a Double#
 integerEncodeDouble# :: Integer -> Int# -> Double#
-{-# NOINLINE integerEncodeDouble# #-}
+{-# NOINLINE[0] integerEncodeDouble# #-} -- See Note [Integer constant folding]
 integerEncodeDouble# (IS i) 0# = int2Double# i
 integerEncodeDouble# (IS i) e  = intEncodeDouble# i e
 integerEncodeDouble# (IP b) e  = bigNatEncodeDouble# b e
@@ -1062,23 +1100,24 @@ integerEncodeDouble# (IN b) e  = negateDouble# (bigNatEncodeDouble# b e)
 
 -- | Encode (Integer mantissa, Int exponent) into a Double
 integerEncodeDouble :: Integer -> Int -> Double
+{-# INLINE integerEncodeDouble #-} -- See Note [Integer constant folding]
 integerEncodeDouble !m (I# e)  = D# (integerEncodeDouble# m e)
 
 -- | Encode an Integer (mantissa) into a Double#
 integerToDouble# :: Integer -> Double#
-{-# NOINLINE integerToDouble# #-}
+{-# NOINLINE[0] integerToDouble# #-} -- See Note [Integer constant folding]
 integerToDouble# !i = integerEncodeDouble# i 0#
 
 -- | Encode an Integer (mantissa) into a Float#
 integerToFloat# :: Integer -> Float#
-{-# NOINLINE integerToFloat# #-}
+{-# NOINLINE[0] integerToFloat# #-} -- See Note [Integer constant folding]
 integerToFloat# !i = integerEncodeFloat# i 0#
 
 -- | Encode (# Integer mantissa, Int# exponent #) into a Float#
 --
 -- TODO: Not sure if it's worth to write 'Float' optimized versions here
 integerEncodeFloat# :: Integer -> Int# -> Float#
-{-# NOINLINE integerEncodeFloat# #-}
+{-# NOINLINE[0] integerEncodeFloat# #-} -- See Note [Integer constant folding]
 integerEncodeFloat# !m 0# = double2Float# (integerToDouble# m)
 integerEncodeFloat# !m e  = double2Float# (integerEncodeDouble# m e)
 
@@ -1108,6 +1147,7 @@ integerToAddr# (IN n) = bigNatToAddr# n
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 integerToAddr :: Integer -> Addr# -> Bool# -> IO Word
+{-# INLINE integerToAddr #-} -- See Note [Integer constant folding]
 integerToAddr a addr e = IO \s -> case integerToAddr# a addr e s of
    (# s', w #) -> (# s', W# w #)
 
@@ -1135,6 +1175,7 @@ integerFromAddr# sz addr e s =
 --
 -- Null higher limbs are automatically trimed.
 integerFromAddr :: Word# -> Addr# -> Bool# -> IO Integer
+{-# INLINE integerFromAddr #-} -- See Note [Integer constant folding]
 integerFromAddr sz addr e = IO (integerFromAddr# sz addr e)
 
 
@@ -1157,6 +1198,7 @@ integerToMutableByteArray# (IN a) = bigNatToMutableByteArray# a
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 integerToMutableByteArray :: Integer -> MutableByteArray# RealWorld -> Word# -> Bool# -> IO Word
+{-# INLINE integerToMutableByteArray #-} -- See Note [Integer constant folding]
 integerToMutableByteArray i mba w e = IO \s -> case integerToMutableByteArray# i mba w e s of
    (# s', r #) -> (# s', W# r #)
 
@@ -1183,6 +1225,7 @@ integerFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
 --
 -- Null higher limbs are automatically trimed.
 integerFromByteArray :: Word# -> ByteArray# -> Word# -> Bool# -> Integer
+{-# INLINE integerFromByteArray #-} -- See Note [Integer constant folding]
 integerFromByteArray sz ba off e = case runRW# (integerFromByteArray# sz ba off e) of
    (# _, i #) -> i
 
@@ -1215,5 +1258,45 @@ integerGcde
    :: Integer
    -> Integer
    -> ( Integer, Integer, Integer)
+{-# INLINE integerGcde #-} -- See Note [Integer constant folding]
 integerGcde a b = case integerGcde# a b of
    (# g,x,y #) -> (g,x,y)
+
+{- Note [Integer constant folding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We define constant folding rules in "GHC.Core.Opt.ConstantFold" for most of the
+@integer*#@ operations in this module, hence they are marked NOINLINE[0].
+
+Why NOINLINE[0] rather than NOINLINE? Because
+
+  1. We still delay inlining long enough for the constant-folding RULEs
+     to fire
+  2. The compiler has the option to inlining the operations late, possibly
+     cancelling away boxes in the process.
+
+Why NOINLINE[0] rather than INLINE? Because
+
+  3. We don't unconditionally inline huge definitions such as
+     `integerDiv`, which would lead to code bloat at pretty much no
+     gain.
+  4. Since RULEs are unlikely to fire on the inlined RHS of e.g.
+     `integerDiv`, there is no gain in inlining the unoptimised
+     unfoldings.
+
+But since we potentially inline the constant folded operations in phase 0, we
+have to make sure that *all* callers that want to take part in constant folding
+are marked INLINE. Otherwise, we'd store optimised unfoldings for them, in which
+the constant folded functions are inlined.
+That concerns for most of the @integer*@ without trailing hash in this module,
+as well as the type class instances for 'Eq', 'Ord', 'Num', 'Integral',
+'RealFloat' (which is for 'Double'!), etc.
+
+There are a couple of constant-folded functions that require special treatment,
+though:
+
+  * `integerEq`, `integerNe`, `integerCompare`: They are huge and lead to
+    regressions when inlined. Solution: mark these NOINLINE.
+  * Under -O2, `integerAdd` will be specialised by SpecConstr. These
+    specialisations defeat constant folding.
+    Solution: -fno-spec-constr for this module.
+-}

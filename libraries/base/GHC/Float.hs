@@ -494,6 +494,7 @@ instance  Num Double  where
 
 -- | @since 2.01
 instance  Real Double  where
+    {-# INLINE toRational #-} -- See Note [Integer constant folding]
     toRational (D# x#)  =
         case integerDecodeDouble# x# of
           (# m, e# #)
@@ -580,11 +581,7 @@ instance  Floating Double  where
 -- | @since 2.01
 instance  RealFrac Double  where
 
-        -- ceiling, floor, and truncate are all small
-    {-# INLINE [1] ceiling #-}
-    {-# INLINE [1] floor #-}
-    {-# INLINE [1] truncate #-}
-
+    {-# INLINE properFraction #-} -- See Note [Integer constant folding]
     properFraction x
       = case (decodeFloat x)      of { (m,n) ->
         if n >= 0 then
@@ -595,9 +592,11 @@ instance  RealFrac Double  where
             }
         }
 
+    {-# INLINE truncate #-} -- See Note [Integer constant folding]
     truncate x  = case properFraction x of
                      (n,_) -> n
 
+    {-# INLINE round #-} -- See Note [Integer constant folding]
     round x     = case properFraction x of
                      (n,r) -> let
                                 m         = if r < 0.0 then n - 1 else n + 1
@@ -608,9 +607,11 @@ instance  RealFrac Double  where
                                 EQ -> if even n then n else m
                                 GT -> m
 
+    {-# INLINE ceiling #-} -- See Note [Integer constant folding]
     ceiling x   = case properFraction x of
                     (n,r) -> if r > 0.0 then n + 1 else n
 
+    {-# INLINE floor #-} -- See Note [Integer constant folding]
     floor x     = case properFraction x of
                     (n,r) -> if r < 0.0 then n - 1 else n
 
@@ -620,18 +621,23 @@ instance  RealFloat Double  where
     floatDigits _       =  DBL_MANT_DIG     -- ditto
     floatRange _        =  (DBL_MIN_EXP, DBL_MAX_EXP) -- ditto
 
+    {-# INLINE decodeFloat #-} -- See Note [Integer constant folding]
     decodeFloat (D# x#)
       = case integerDecodeDouble# x#   of
           (# i, j #) -> (i, I# j)
 
+    {-# INLINE encodeFloat #-} -- See Note [Integer constant folding]
     encodeFloat i (I# j) = D# (integerEncodeDouble# i j)
 
+    {-# INLINE exponent #-} -- See Note [Integer constant folding]
     exponent x          = case decodeFloat x of
                             (m,n) -> if m == 0 then 0 else n + floatDigits x
 
+    {-# INLINE significand #-} -- See Note [Integer constant folding]
     significand x       = case decodeFloat x of
                             (m,_) -> encodeFloat m (negate (floatDigits x))
 
+    {-# INLINE scaleFloat #-} -- See Note [Integer constant folding]
     scaleFloat 0 x      = x
     scaleFloat k x
       | isFix           = x

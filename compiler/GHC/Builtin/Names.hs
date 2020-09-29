@@ -354,6 +354,7 @@ basicKnownKeyNames
         integerToWord64Name,
         integerToInt64Name,
         integerFromWordName,
+        integerFromIntName,
         integerFromWord64Name,
         integerFromInt64Name,
         integerAddName,
@@ -1129,6 +1130,7 @@ integerFromNaturalName
    , integerToWord64Name
    , integerToInt64Name
    , integerFromWordName
+   , integerFromIntName
    , integerFromWord64Name
    , integerFromInt64Name
    , integerAddName
@@ -1197,6 +1199,7 @@ integerToIntName          = bniVarQual "integerToInt#"             integerToIntI
 integerToWord64Name       = bniVarQual "integerToWord64#"          integerToWord64IdKey
 integerToInt64Name        = bniVarQual "integerToInt64#"           integerToInt64IdKey
 integerFromWordName       = bniVarQual "integerFromWord#"          integerFromWordIdKey
+integerFromIntName        = bniVarQual "integerFromInt#"           integerFromIntIdKey
 integerFromWord64Name     = bniVarQual "integerFromWord64#"        integerFromWord64IdKey
 integerFromInt64Name      = bniVarQual "integerFromInt64#"         integerFromInt64IdKey
 integerAddName            = bniVarQual "integerAdd"                integerAddIdKey
@@ -2463,6 +2466,7 @@ integerFromNaturalIdKey
    , integerShiftLIdKey
    , integerShiftRIdKey
    , integerFromWordIdKey
+   , integerFromIntIdKey
    , integerFromWord64IdKey
    , integerFromInt64IdKey
    , integerDecodeDoubleIdKey
@@ -2518,6 +2522,7 @@ integerFromWordIdKey       = mkPreludeMiscIdUnique 638
 integerFromWord64IdKey     = mkPreludeMiscIdUnique 639
 integerFromInt64IdKey      = mkPreludeMiscIdUnique 640
 integerDecodeDoubleIdKey   = mkPreludeMiscIdUnique 641
+integerFromIntIdKey        = mkPreludeMiscIdUnique 642
 
 naturalToWordIdKey         = mkPreludeMiscIdUnique 650
 naturalAddIdKey            = mkPreludeMiscIdUnique 651
