@@ -1142,7 +1142,7 @@ tcConArgs con_like arg_tys penv con_args thing_inside = case con_args of
       tc_field :: Checker (LHsRecField GhcRn (LPat GhcRn))
                           (LHsRecField GhcTc (LPat GhcTc))
       tc_field penv
-               (L l (HsRecField (L loc (FieldOcc sel (L lr rdr))) pat pun))
+               (L l (HsRecField (L loc (FieldOcc (Box sel) (L lr rdr))) pat pun))
                thing_inside
         = do { sel'   <- tcLookupId sel
              ; pat_ty <- setSrcSpan loc $ find_field_ty sel

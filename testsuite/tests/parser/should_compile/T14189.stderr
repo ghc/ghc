@@ -78,7 +78,8 @@
                  (NoExtField)
                  [({ T14189.hs:6:33 }
                    (FieldOcc
-                    {Name: T14189.f}
+                    (Box
+                     {Name: T14189.f})
                     ({ T14189.hs:6:33 }
                      (Unqual
                       {OccName: f}))))]

@@ -1633,7 +1633,7 @@ repFields (HsRecFields { rec_flds = flds })
   where
     rep_fld :: LHsRecField GhcRn (LHsExpr GhcRn)
             -> MetaM (Core (M TH.FieldExp))
-    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldSel fld)
+    rep_fld (L _ fld) = do { fn <- lookupLOcc (mapLoc unBox (hsRecFieldSel fld))
                            ; e  <- repLE (hsRecFieldArg fld)
                            ; repFieldExp fn e }
 
@@ -1992,7 +1992,7 @@ repP (ConPat NoExtField dc details)
    }
  where
    rep_fld :: LHsRecField GhcRn (LPat GhcRn) -> MetaM (Core (M (TH.Name, TH.Pat)))
-   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
+   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (mapLoc unBox (hsRecFieldSel fld))
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
@@ -2626,7 +2626,7 @@ repConstr (RecCon ips) resTy cons
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
 
       rep_one_ip :: LBangType GhcRn -> LFieldOcc GhcRn -> MetaM (Core (M TH.VarBangType))
-      rep_one_ip t n = do { MkC v  <- lookupOcc (extFieldOcc $ unLoc n)
+      rep_one_ip t n = do { MkC v  <- lookupOcc (unBox (extFieldOcc (unLoc n)))
                           ; MkC ty <- repBangTy  t
                           ; rep2 varBangTypeName [v,ty] }
 

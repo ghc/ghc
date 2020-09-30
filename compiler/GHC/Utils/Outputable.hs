@@ -126,6 +126,7 @@ import qualified Data.List.NonEmpty as NEL
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Utils.Exception
+import GHC.Utils.Misc   (Box(Box))
 import GHC.Exts (oneShot)
 
 {-
@@ -858,6 +859,9 @@ instance (Outputable a) => Outputable (NonEmpty a) where
 
 instance (Outputable a) => Outputable (Set a) where
     ppr s = braces (fsep (punctuate comma (map ppr (Set.toList s))))
+
+instance Outputable a => Outputable (Box a) where
+    ppr (Box a) = ppr a
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])

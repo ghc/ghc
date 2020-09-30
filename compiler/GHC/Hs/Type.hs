@@ -102,7 +102,7 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Data.FastString
-import GHC.Utils.Misc ( count )
+import GHC.Utils.Misc ( count, Box )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
@@ -1690,7 +1690,8 @@ data FieldOcc pass = FieldOcc { extFieldOcc     :: !(XCFieldOcc pass)
 deriving instance Eq  (XCFieldOcc (GhcPass p)) => Eq  (FieldOcc (GhcPass p))
 
 type instance XCFieldOcc GhcPs = NoExtField
-type instance XCFieldOcc GhcRn = Name
+type instance XCFieldOcc GhcRn = Box Name -- the Box is needed due to 'expectJust' in 'rnField'
+                                          -- TODO: refactor to remove it
 type instance XCFieldOcc GhcTc = Id
 
 type instance XXFieldOcc (GhcPass _) = NoExtCon
