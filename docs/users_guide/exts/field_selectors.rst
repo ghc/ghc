@@ -17,4 +17,5 @@ Set the visibility of `record field selector functions
 Field labels are still usable within record construction, updates and patterns.
 
 Note that if you have multiple datatypes with the same field name, you need `DuplicateRecordFields` to disambiguate them.
-Also, ambigous selectors should be imported/exported along with a constructor, because currently there is no other way to distinguish them.
+
+See also the `Import and export of record fields` section of :ref:`duplicate-record-fields`.
