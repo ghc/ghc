@@ -856,9 +856,7 @@ validate-x86_64-linux-fedora27:
 ############################################################
 
 .build-windows:
-  # For the reasons given in #17777 this build isn't reliable.
   needs: [validate-x86_64-linux-deb9-hadrian]
-  allow_failure: true
   before_script:
     - git clean -xdf
 
@@ -988,8 +986,6 @@ doc-tarball:
   variables:
     LINUX_BINDIST: "ghc-x86_64-deb9-linux-debug.tar.xz"
     WINDOWS_BINDIST: "ghc-x86_64-mingw32.tar.xz"
-  # Due to Windows allow_failure
-  allow_failure: true
   artifacts:
     paths:
       - haddock.html.tar.xz
@@ -1155,8 +1151,6 @@ pages:
   dependencies:
     - doc-tarball
   image: ghcci/x86_64-linux-deb9:0.2
-  # Due to Windows allow_failure
-  allow_failure: true
   tags:
     - x86_64-linux
   script:
