@@ -423,7 +423,6 @@ Library
         GHC.Rename.Bind
         GHC.Rename.Env
         GHC.Rename.Expr
-        GHC.Rename.Doc
         GHC.Rename.Names
         GHC.Rename.Pat
         GHC.Rename.Module

@@ -41,7 +41,6 @@ import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType )
 
 import GHC.Driver.Session
 import GHC.Hs
-import GHC.Rename.Doc    ( rnLHsDoc, rnMbLHsDoc )
 import GHC.Rename.Env
 import GHC.Rename.Utils  ( HsDocContext(..), inHsDocContext, withHsDocContext
                          , mapFvRn, pprHsDocContext, bindLocalNamesFV
@@ -698,8 +697,7 @@ rnHsTyKi _ (HsSpliceTy _ sp)
 
 rnHsTyKi env (HsDocTy _ ty haddock_doc)
   = do { (ty', fvs) <- rnLHsTyKi env ty
-       ; haddock_doc' <- rnLHsDoc haddock_doc
-       ; return (HsDocTy noExtField ty' haddock_doc', fvs) }
+       ; return (HsDocTy noExtField ty' haddock_doc, fvs) }
 
 rnHsTyKi _ (XHsType (NHsCoreTy ty))
   = return (XHsType (NHsCoreTy ty), emptyFVs)
@@ -1168,8 +1166,7 @@ rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LConDeclField GhcPs
 rnField fl_env env (L l (ConDeclField _ names ty haddock_doc))
   = do { let new_names = map (fmap lookupField) names
        ; (new_ty, fvs) <- rnLHsTyKi env ty
-       ; new_haddock_doc <- rnMbLHsDoc haddock_doc
-       ; return (L l (ConDeclField noExtField new_names new_ty new_haddock_doc)
+       ; return (L l (ConDeclField noExtField new_names new_ty haddock_doc)
                 , fvs) }
   where
     lookupField :: FieldOcc GhcPs -> FieldOcc GhcRn
