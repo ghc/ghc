@@ -469,3 +469,18 @@ integer_gcde a b =
          then (# g0, x0, y0 #)
          else case unexpectedValue of
             !_ -> (# integerZero, integerZero, integerZero #)
+
+integer_recip_mod
+   :: Integer
+   -> Integer
+   -> (# Integer | () #)
+integer_recip_mod x m =
+   let
+      !r0 = Other.integer_recip_mod x m
+      !r1 = Native.integer_recip_mod x m
+   in case (# r0, r1 #) of
+         (# (# | () #), (# | () #) #) -> r0
+         (# (# y0 | #), (# y1 | #) #)
+            | isTrue# (integerEq# y0 y1) -> r0
+         _ -> case unexpectedValue of
+            !_ -> (# | () #)

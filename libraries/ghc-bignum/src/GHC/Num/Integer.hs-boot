@@ -17,11 +17,15 @@ integerEq# :: Integer -> Integer -> Int#
 integerEq :: Integer -> Integer -> Bool
 integerGt :: Integer -> Integer -> Bool
 integerIsZero :: Integer -> Bool
+integerIsOne :: Integer -> Bool
 integerIsNegative :: Integer -> Bool
 
 integerSub :: Integer -> Integer -> Integer
 integerMul :: Integer -> Integer -> Integer
+integerMod :: Integer -> Integer -> Integer
+integerRem :: Integer -> Integer -> Integer
 integerNegate :: Integer -> Integer
+integerAbs :: Integer -> Integer
 integerDivMod# :: Integer -> Integer -> (# Integer, Integer #)
 integerQuotRem# :: Integer -> Integer -> (# Integer, Integer #)
 
