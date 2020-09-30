@@ -109,8 +109,18 @@ unknownNameSuggestions_ where_look dflags hpt curr_mod global_env local_env
     similarNameSuggestions where_look dflags global_env local_env tried_rdr_name $$
     importSuggestions where_look global_env hpt
                       curr_mod imports tried_rdr_name $$
-    extensionSuggestions tried_rdr_name
+    extensionSuggestions tried_rdr_name $$
+    fieldSelectorSuggestions global_env tried_rdr_name
 
+fieldSelectorSuggestions :: GlobalRdrEnv -> RdrName -> SDoc
+fieldSelectorSuggestions global_env tried_rdr_name
+  = case filter isNoFieldSelectorGRE $ lookupGRE_RdrName tried_rdr_name global_env of
+    gre : _ | FldParent parent _ _ <- gre_par gre -> text "NB:"
+      <+> ppr tried_rdr_name
+      <+> text "is"
+      <+> ppr parent
+      <> text "'s field selector that has been suppressed by NoFieldSelectors"
+    _ -> Outputable.empty
 
 similarNameSuggestions :: WhereLooking -> DynFlags
                         -> GlobalRdrEnv -> LocalRdrEnv
