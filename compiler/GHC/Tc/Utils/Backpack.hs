@@ -58,7 +58,6 @@ import GHC.Data.Maybe
 import GHC.Tc.Utils.Env
 import GHC.Types.Var
 import GHC.Iface.Syntax
-import GHC.Builtin.Names
 import qualified Data.Map as Map
 
 import GHC.Driver.Finder
@@ -346,7 +345,7 @@ tcRnCheckUnit hsc_env uid =
    initTc hsc_env
           HsigFile -- bogus
           False
-          mAIN -- bogus
+          (mainModIs dflags)
           (realSrcLocSpan (mkRealSrcLoc (fsLit loc_str) 0 0)) -- bogus
     $ checkUnit uid
   where
