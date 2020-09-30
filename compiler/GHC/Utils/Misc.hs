@@ -7,6 +7,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -130,6 +131,9 @@ module GHC.Utils.Misc (
         -- * Utils for flags
         OverridingBool(..),
         overrideWith,
+
+        -- * Box
+        Box(Box, unBox),
     ) where
 
 #include "HsVersions.h"
@@ -166,7 +170,7 @@ import qualified Data.Set as Set
 import Data.Time
 
 #if defined(DEBUG)
-import {-# SOURCE #-} GHC.Utils.Outputable ( text )
+import {-# SOURCE #-} GHC.Utils.Outputable ( Outputable(ppr), text )
 import {-# SOURCE #-} GHC.Driver.Ppr ( warnPprTrace )
 #endif
 
@@ -1476,3 +1480,12 @@ overrideWith :: Bool -> OverridingBool -> Bool
 overrideWith b Auto   = b
 overrideWith _ Always = True
 overrideWith _ Never  = False
+
+-- A wrapper to make a strict field into a lazy one.
+data Box a = Box { unBox :: a }
+  deriving (Eq, Ord, Data)
+
+instance Show a => Show (Box a) where
+  showsPrec n (Box a) = showsPrec n a
+  show (Box a) = show a
+  showList xs = showList (map unBox xs)

@@ -24,6 +24,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Tc.Types
+import GHC.Utils.Misc (unBox)
 
 import Control.Applicative
 import Data.Bifunctor (first)
@@ -188,7 +189,7 @@ subordinates instMap decl = case decl of
                     , maybeToList $ fmap unLoc $ con_doc c
                     , conArgDocs c)
                   | c <- cons, cname <- getConNames c ]
-        fields  = [ (extFieldOcc n, maybeToList $ fmap unLoc doc, M.empty)
+        fields  = [ (unBox (extFieldOcc n), maybeToList $ fmap unLoc doc, M.empty)
                   | RecCon flds <- map getConArgs cons
                   , (L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
                   , (L _ n) <- ns ]

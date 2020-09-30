@@ -1135,7 +1135,7 @@ hsTyClForeignBinders tycl_decls foreign_decls
          foldMap (foldMap hsLInstDeclBinders . group_instds) tycl_decls)
   where
     getSelectorNames :: ([Located Name], [LFieldOcc GhcRn]) -> [Name]
-    getSelectorNames (ns, fs) = map unLoc ns ++ map (extFieldOcc . unLoc) fs
+    getSelectorNames (ns, fs) = map unLoc ns ++ map (unBox . extFieldOcc . unLoc) fs
 
 -------------------
 hsLTyClDeclBinders :: IsPass p

@@ -1174,7 +1174,7 @@ rnField fl_env env (L l (ConDeclField _ names ty haddock_doc))
   where
     lookupField :: FieldOcc GhcPs -> FieldOcc GhcRn
     lookupField (FieldOcc _ (L lr rdr)) =
-        FieldOcc (flSelector fl) (L lr rdr)
+        FieldOcc (Box (flSelector fl)) (L lr rdr)
       where
         lbl = occNameFS $ rdrNameOcc rdr
         fl  = expectJust "rnField" $ lookupFsEnv fl_env lbl

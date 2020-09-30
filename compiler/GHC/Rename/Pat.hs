@@ -654,7 +654,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                      else return arg
            ; return (L l (HsRecField
                              { hsRecFieldLbl = (L loc (FieldOcc
-                                                          sel (L ll lbl)))
+                                                          (Box sel) (L ll lbl)))
                              , hsRecFieldArg = arg'
                              , hsRecPun      = pun })) }
 
@@ -697,7 +697,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
 
            ; addUsedGREs dot_dot_gres
            ; return [ L loc (HsRecField
-                        { hsRecFieldLbl = L loc (FieldOcc sel (L loc arg_rdr))
+                        { hsRecFieldLbl = L loc (FieldOcc (Box sel) (L loc arg_rdr))
                         , hsRecFieldArg = L loc (mk_arg loc arg_rdr)
                         , hsRecPun      = False })
                     | fl <- dot_dot_fields
@@ -792,7 +792,7 @@ rnHsRecUpdFields flds
 
 
 getFieldIds :: [LHsRecField GhcRn arg] -> [Name]
-getFieldIds flds = map (unLoc . hsRecFieldSel . unLoc) flds
+getFieldIds flds = map (unBox . unLoc . hsRecFieldSel . unLoc) flds
 
 getFieldLbls :: [LHsRecField id arg] -> [RdrName]
 getFieldLbls flds
