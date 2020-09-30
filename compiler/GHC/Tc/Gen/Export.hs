@@ -41,7 +41,6 @@ import GHC.Data.FastString (fsLit)
 
 import Control.Monad
 import GHC.Driver.Session
-import GHC.Rename.Doc         ( rnHsDoc )
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import Data.Either            ( partitionEithers )
 
@@ -323,9 +322,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                               , new_exports))) }
 
     exports_from_item acc@(ExportAccum occs mods) (L loc ie)
-        | isDoc ie
-        = do new_ie <- lookup_doc_ie ie
-             return (Just (acc, (L loc new_ie, [])))
+        | Just new_ie <- lookup_doc_ie ie
+        = return (Just (acc, (L loc new_ie, [])))
 
         | otherwise
         = do (new_ie, avail) <- lookup_ie ie
@@ -406,13 +404,11 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              return (L l name, non_flds, flds)
 
     -------------
-    lookup_doc_ie :: IE GhcPs -> RnM (IE GhcRn)
-    lookup_doc_ie (IEGroup _ lev doc) = do rn_doc <- rnHsDoc doc
-                                           return (IEGroup noExtField lev rn_doc)
-    lookup_doc_ie (IEDoc _ doc)       = do rn_doc <- rnHsDoc doc
-                                           return (IEDoc noExtField rn_doc)
-    lookup_doc_ie (IEDocNamed _ str)  = return (IEDocNamed noExtField str)
-    lookup_doc_ie _ = panic "lookup_doc_ie"    -- Other cases covered earlier
+    lookup_doc_ie :: IE GhcPs -> Maybe (IE GhcRn)
+    lookup_doc_ie (IEGroup _ lev doc) = Just (IEGroup noExtField lev doc)
+    lookup_doc_ie (IEDoc _ doc)       = Just (IEDoc noExtField doc)
+    lookup_doc_ie (IEDocNamed _ str)  = Just (IEDocNamed noExtField str)
+    lookup_doc_ie _ = Nothing
 
     -- In an export item M.T(A,B,C), we want to treat the uses of
     -- A,B,C as if they were M.A, M.B, M.C
@@ -430,12 +426,6 @@ classifyGRE gre = case gre_par gre of
   _                      -> Left  n
   where
     n = gre_name gre
-
-isDoc :: IE GhcPs -> Bool
-isDoc (IEDoc {})      = True
-isDoc (IEDocNamed {}) = True
-isDoc (IEGroup {})    = True
-isDoc _ = False
 
 -- Renaming and typechecking of exports happens after everything else has
 -- been typechecked.

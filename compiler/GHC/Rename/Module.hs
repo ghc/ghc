@@ -38,7 +38,6 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr )
 import GHC.Rename.Names
-import GHC.Rename.Doc   ( rnHsDoc, rnMbLHsDoc )
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 
@@ -199,8 +198,6 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    (rn_default_decls, src_fvs5) <- rnList rnDefaultDecl   default_decls ;
    (rn_deriv_decls,   src_fvs6) <- rnList rnSrcDerivDecl  deriv_decls ;
    (rn_splice_decls,  src_fvs7) <- rnList rnSpliceDecl    splice_decls ;
-      -- Haddock docs; no free vars
-   rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
    last_tcg_env <- getGblEnv ;
    -- (I) Compute the results and return
@@ -216,7 +213,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                              hs_annds  = rn_ann_decls,
                              hs_defds  = rn_default_decls,
                              hs_ruleds = rn_rule_decls,
-                             hs_docs   = rn_docs } ;
+                             hs_docs   = docs } ;
 
         tcf_bndrs = hsTyClForeignBinders rn_tycl_decls rn_foreign_decls ;
         other_def  = (Just (mkNameSet tcf_bndrs), emptyNameSet) ;
@@ -244,28 +241,6 @@ addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
 
 rnList :: (a -> RnM (b, FreeVars)) -> [Located a] -> RnM ([Located b], FreeVars)
 rnList f xs = mapFvRn (wrapLocFstM f) xs
-
-{-
-*********************************************************
-*                                                       *
-        HsDoc stuff
-*                                                       *
-*********************************************************
--}
-
-rnDocDecl :: DocDecl -> RnM DocDecl
-rnDocDecl (DocCommentNext doc) = do
-  rn_doc <- rnHsDoc doc
-  return (DocCommentNext rn_doc)
-rnDocDecl (DocCommentPrev doc) = do
-  rn_doc <- rnHsDoc doc
-  return (DocCommentPrev rn_doc)
-rnDocDecl (DocCommentNamed str doc) = do
-  rn_doc <- rnHsDoc doc
-  return (DocCommentNamed str rn_doc)
-rnDocDecl (DocGroup lev doc) = do
-  rn_doc <- rnHsDoc doc
-  return (DocGroup lev rn_doc)
 
 {-
 *********************************************************
@@ -1770,15 +1745,12 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
                 -- and the methods are already in scope
 
-  -- Haddock docs
-        ; docs' <- mapM (wrapLocM rnDocDecl) docs
-
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds', tcdSigs = sigs',
                               tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
-                              tcdDocs = docs', tcdCExt = all_fvs },
+                              tcdDocs = docs, tcdCExt = all_fvs },
                   all_fvs ) }
   where
     cls_doc  = ClassDeclCtx lcls
@@ -2196,7 +2168,6 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_doc = mb_doc, con_forall = forall })
   = do  { _        <- addLocM checkConName name
         ; new_name <- lookupLocatedTopBndrRn name
-        ; mb_doc'  <- rnMbLHsDoc mb_doc
 
         -- We bind no implicit binders here; this is just like
         -- a nested HsForAllTy.  E.g. consider
@@ -2220,7 +2191,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
         ; return (decl { con_ext = noExtField
                        , con_name = new_name, con_ex_tvs = new_ex_tvs
                        , con_mb_cxt = new_context, con_args = new_args
-                       , con_doc = mb_doc'
+                       , con_doc = mb_doc
                        , con_forall = forall }, -- Remove when #18311 is fixed
                   all_fvs) }}
 
@@ -2233,7 +2204,6 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                             , con_doc = mb_doc })
   = do  { mapM_ (addLocM checkConName) names
         ; new_names <- mapM lookupLocatedTopBndrRn names
-        ; mb_doc'   <- rnMbLHsDoc mb_doc
 
         ; let theta         = hsConDeclTheta mcxt
               arg_tys       = hsConDeclArgTys args
@@ -2269,7 +2239,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; return (decl { con_g_ext = implicit_tkvs, con_names = new_names
                        , con_qvars = explicit_tkvs, con_mb_cxt = new_cxt
                        , con_args = new_args, con_res_ty = new_res_ty
-                       , con_doc = mb_doc'
+                       , con_doc = mb_doc
                        , con_forall = forall }, -- Remove when #18311 is fixed
                   all_fvs) } }
 
