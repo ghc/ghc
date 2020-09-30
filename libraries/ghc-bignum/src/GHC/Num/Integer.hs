@@ -244,6 +244,11 @@ integerIsZero :: Integer -> Bool
 integerIsZero (IS 0#) = True
 integerIsZero _       = False
 
+-- | One predicate
+integerIsOne :: Integer -> Bool
+integerIsOne (IS 1#) = True
+integerIsOne _       = False
+
 -- | Not-equal predicate.
 integerNe :: Integer -> Integer -> Bool
 integerNe !x !y = isTrue# (integerNe# x y)
@@ -1217,3 +1222,22 @@ integerGcde
    -> ( Integer, Integer, Integer)
 integerGcde a b = case integerGcde# a b of
    (# g,x,y #) -> (g,x,y)
+
+
+-- | Computes the modular inverse.
+--
+-- I.e. y = integerRecipMod# x m
+--        = x^(-1) `mod` m
+--
+-- with 0 < y < |m|
+--
+integerRecipMod#
+   :: Integer
+   -> Integer
+   -> (# Integer | () #)
+integerRecipMod# x m
+   | integerIsZero x = (# | () #)
+   | integerIsZero m = (# | () #)
+   | IS 1#    <- m   = (# | () #)
+   | IS (-1#) <- m   = (# | () #)
+   | True            = Backend.integer_recip_mod x m

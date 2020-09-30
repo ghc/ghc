@@ -737,3 +737,17 @@ integer_gcde a b = f (# a,integerOne,integerZero #) (# b,integerZero,integerOne 
       | True            = case integerQuotRem# old_g g of
                               !(# q, r #) -> f new (# r , old_s `integerSub` (q `integerMul` s)
                                                         , old_t `integerSub` (q `integerMul` t) #)
+
+integer_recip_mod
+   :: Integer
+   -> Integer
+   -> (# Integer | () #)
+integer_recip_mod x m =
+   let m' = integerAbs m
+   in case integer_gcde x m' of
+      (# g, a, _b #)
+         -- gcd(x,m) = ax+mb = 1
+         -- ==> ax - 1 = -mb
+         -- ==> ax     = 1 [m]
+         | g `integerEq` integerOne -> (# a `integerMod` m' | #)
+         | True                     -> (# | () #)
