@@ -204,7 +204,8 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
         vcat
           [ text "Type variable" <> plural varsInScope
             <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
-            <+> text "are already in scope."
+            <+> isOrAre varsInScope
+            <+> text "already in scope."
           , text "Type applications in patterns must bind fresh variables, without shadowing."
           ]
     (wcVars, ibVars) <- partition_nwcs varsNotInScope
