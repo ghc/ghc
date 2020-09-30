@@ -1429,7 +1429,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                                  , hsRecFieldArg = rhs }))
       = do { let lbl = rdrNameAmbiguousFieldOcc af
                  sel_id = selectorAmbiguousFieldOcc af
-                 f = L loc (FieldOcc (idName sel_id) (L loc lbl))
+                 f = L loc (FieldOcc (Box (idName sel_id)) (L loc lbl))
            ; mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
@@ -1444,7 +1444,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
 tcRecordField :: ConLike -> Assoc Name Type
               -> LFieldOcc GhcRn -> LHsExpr GhcRn
               -> TcM (Maybe (LFieldOcc GhcTc, LHsExpr GhcTc))
-tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
+tcRecordField con_like flds_w_tys (L loc (FieldOcc (Box sel_name) lbl)) rhs
   | Just field_ty <- assocMaybe flds_w_tys sel_name
       = addErrCtxt (fieldCtxt field_lbl) $
         do { rhs' <- tcCheckPolyExprNC rhs field_ty
@@ -1506,7 +1506,7 @@ checkMissingFields con_like rbinds
 
     field_strs = conLikeImplBangs con_like
 
-    fl `elemField` flds = any (\ fl' -> flSelector fl == fl') flds
+    fl `elemField` flds = any (\ fl' -> flSelector fl == unBox fl') flds
 
 {-
 ************************************************************************

@@ -21,6 +21,7 @@ Main functions for .hie file generation
 
 module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts, enrichHie) where
 
+import GHC.Utils.Misc (Box(Box))
 import GHC.Utils.Outputable(ppr)
 
 import GHC.Prelude
@@ -1278,7 +1279,7 @@ instance ( ToHie (RFContext (Located label))
 
 instance ToHie (RFContext (Located (FieldOcc GhcRn))) where
   toHie (RFC c rhs (L nspan f)) = concatM $ case f of
-    FieldOcc name _ ->
+    FieldOcc (Box name) _ ->
       [ toHie $ C (RecField c rhs) (L nspan name)
       ]
 
