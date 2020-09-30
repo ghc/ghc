@@ -847,7 +847,6 @@ data HsPragE p
   | XHsPragE !(XXPragE p)
 
 type instance XSCC           (GhcPass _) = NoExtField
-type instance XCoreAnn       (GhcPass _) = NoExtField
 type instance XXPragE        (GhcPass _) = NoExtCon
 
 -- | Located Haskell Tuple Argument
@@ -2403,7 +2402,7 @@ pprStmt (LastStmt _ expr m_dollar_stripped _)
         Just False -> text "return"
         Nothing -> empty) <+>
       ppr expr
-pprStmt (BindStmt _ pat expr) = hsep [ppr pat, larrow, ppr expr]
+pprStmt (BindStmt _ pat expr) = pprBindStmt pat expr
 pprStmt (LetStmt _ (L _ binds))   = hsep [text "let", pprBinds binds]
 pprStmt (BodyStmt _ expr _ _)     = ppr expr
 pprStmt (ParStmt _ stmtss _ _)   = sep (punctuate (text " | ") (map ppr stmtss))
@@ -2439,11 +2438,8 @@ pprStmt (ApplicativeStmt _ args mb_join)
 
    flattenArg :: forall a . (a, ApplicativeArg (GhcPass idL)) -> [SDoc]
    flattenArg (_, ApplicativeArgOne _ pat expr isBody)
-     | isBody =  -- See Note [Applicative BodyStmt]
-     [ppr (BodyStmt (panic "pprStmt") expr noSyntaxExpr noSyntaxExpr
-             :: ExprStmt (GhcPass idL))]
-     | otherwise =
-     [ppr (BindStmt (panic "pprStmt") pat expr :: ExprStmt (GhcPass idL))]
+     | isBody =  [ppr expr] -- See Note [Applicative BodyStmt]
+     | otherwise = [pprBindStmt pat expr]
    flattenArg (_, ApplicativeArgMany _ stmts _ _ _) =
      concatMap flattenStmt stmts
 
@@ -2457,6 +2453,8 @@ pprStmt (ApplicativeStmt _ args mb_join)
    pp_arg :: (a, ApplicativeArg (GhcPass idL)) -> SDoc
    pp_arg (_, applicativeArg) = ppr applicativeArg
 
+pprBindStmt :: (Outputable pat, Outputable expr) => pat -> expr -> SDoc
+pprBindStmt pat expr = hsep [ppr pat, larrow, ppr expr]
 
 instance (OutputableBndrId idL)
       => Outputable (ApplicativeArg (GhcPass idL)) where
@@ -2464,18 +2462,13 @@ instance (OutputableBndrId idL)
 
 pprArg :: forall idL . (OutputableBndrId idL) => ApplicativeArg (GhcPass idL) -> SDoc
 pprArg (ApplicativeArgOne _ pat expr isBody)
-  | isBody =  -- See Note [Applicative BodyStmt]
-    ppr (BodyStmt (panic "pprStmt") expr noSyntaxExpr noSyntaxExpr
-            :: ExprStmt (GhcPass idL))
-  | otherwise =
-    ppr (BindStmt (panic "pprStmt") pat expr :: ExprStmt (GhcPass idL))
+  | isBody = ppr expr -- See Note [Applicative BodyStmt]
+  | otherwise = pprBindStmt pat expr
 pprArg (ApplicativeArgMany _ stmts return pat ctxt) =
      ppr pat <+>
      text "<-" <+>
-     ppr (HsDo (panic "pprStmt") ctxt (noLoc
-               (stmts ++
-                   [noLoc (LastStmt noExtField (noLoc return) Nothing noSyntaxExpr)]))
-          :: HsExpr (GhcPass idL))
+     pprDo ctxt (stmts ++
+                   [noLoc (LastStmt noExtField (noLoc return) Nothing noSyntaxExpr)])
 
 pprTransformStmt :: (OutputableBndrId p)
                  => [IdP (GhcPass p)] -> LHsExpr (GhcPass p)
