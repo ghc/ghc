@@ -423,6 +423,32 @@ integer_gcde a b = case runRW# io of (# _, a #) -> a
 
 
 
+integer_recip_mod
+   :: Integer
+   -> Integer
+   -> (# Integer | () #)
+integer_recip_mod x m =
+   let
+      !(#  sign_x, bx #) = integerToBigNatSign# x
+      !(# _sign_m, bm #) = integerToBigNatSign# m
+      !br = sbignat_recip_mod sign_x bx bm
+   in if isTrue# (bigNatIsZero# br)
+         then (# | () #)
+         else (# integerFromBigNat# br | #)
+
+
+-- | Return 0 for invalid inputs
+sbignat_recip_mod :: Int# -> BigNat# -> BigNat# -> BigNat#
+sbignat_recip_mod sign_x x m = withNewWordArray# szm io
+  where
+    io r s = case ioInt# (integer_gmp_invert# r x ssx m szm) s of
+               (# s, rn #) -> mwaSetSize# r (narrowGmpSize# rn) s
+    !szx  = bigNatSize# x
+    !szm  = bigNatSize# m
+    !ssx = case sign_x of -- signed size of x
+            0# -> szx
+            _  -> negateInt# szx
+
 ----------------------------------------------------------------------
 -- FFI ccall imports
 
@@ -443,6 +469,11 @@ foreign import ccall unsafe "integer_gmp_gcdext" integer_gmp_gcdext#
   -> ByteArray# -> GmpSize#
   -> ByteArray# -> GmpSize#
   -> IO ()
+
+foreign import ccall unsafe "integer_gmp_invert"
+  integer_gmp_invert# :: MutableByteArray# RealWorld
+                         -> ByteArray# -> GmpSize#
+                         -> ByteArray# -> GmpSize# -> IO GmpSize
 
 -- mp_limb_t mpn_add_1 (mp_limb_t *rp, const mp_limb_t *s1p, mp_size_t n,
 --                      mp_limb_t s2limb)

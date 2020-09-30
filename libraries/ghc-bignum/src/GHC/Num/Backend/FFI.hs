@@ -596,3 +596,19 @@ integer_gcde = Native.integer_gcde
    -- for now we use Native's implementation. If some FFI backend user needs a
    -- specific implementation, we'll need to determine a prototype to pass and
    -- return BigNat signs and sizes via FFI.
+
+
+-- | Computes the modular inverse of two non-zero integers.
+--
+-- I.e. y = integer_recip_mod x m
+--        = x^(-1) `mod` m
+--
+-- with 0 < y < abs m
+integer_recip_mod
+   :: Integer
+   -> Integer
+   -> (# Integer | () #)
+integer_recip_mod = Native.integer_recip_mod
+   -- for now we use Native's implementation. If some FFI backend user needs a
+   -- specific implementation, we'll need to determine a prototype to pass and
+   -- return BigNat signs and sizes via FFI.
