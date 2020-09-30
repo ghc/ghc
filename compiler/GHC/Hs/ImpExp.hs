@@ -79,7 +79,7 @@ isImportDeclQualified _ = True
 -- A single Haskell @import@ declaration.
 data ImportDecl pass
   = ImportDecl {
-      ideclExt       :: XCImportDecl pass,
+      ideclExt       :: !(XCImportDecl pass),
       ideclSourceSrc :: SourceText,
                                  -- Note [Pragma source text] in GHC.Types.Basic
       ideclName      :: XRec pass ModuleName, -- ^ Module name.
@@ -203,10 +203,10 @@ type LIE pass = XRec pass (IE pass)
 
 -- | Imported or exported entity.
 data IE pass
-  = IEVar       (XIEVar pass) (LIEWrappedName (IdP pass))
+  = IEVar       !(XIEVar pass) (LIEWrappedName (IdP pass))
         -- ^ Imported or Exported Variable
 
-  | IEThingAbs  (XIEThingAbs pass) (LIEWrappedName (IdP pass))
+  | IEThingAbs  !(XIEThingAbs pass) (LIEWrappedName (IdP pass))
         -- ^ Imported or exported Thing with Absent list
         --
         -- The thing is a Class/Type (can't tell)
@@ -215,7 +215,7 @@ data IE pass
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
-  | IEThingAll  (XIEThingAll pass) (LIEWrappedName (IdP pass))
+  | IEThingAll  !(XIEThingAll pass) (LIEWrappedName (IdP pass))
         -- ^ Imported or exported Thing with All imported or exported
         --
         -- The thing is a Class/Type and the All refers to methods/constructors
@@ -227,7 +227,7 @@ data IE pass
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
 
-  | IEThingWith (XIEThingWith pass)
+  | IEThingWith !(XIEThingWith pass)
                 (LIEWrappedName (IdP pass))
                 IEWildcard
                 [LIEWrappedName (IdP pass)]
@@ -242,7 +242,7 @@ data IE pass
         --                                   'GHC.Parser.Annotation.AnnType'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
+  | IEModuleContents  !(XIEModuleContents pass) (XRec pass ModuleName)
         -- ^ Imported or exported module contents
         --
         -- (Export Only)
@@ -250,9 +250,9 @@ data IE pass
         -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnModule'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | IEGroup             (XIEGroup pass) Int HsDocString -- ^ Doc section heading
-  | IEDoc               (XIEDoc pass) HsDocString       -- ^ Some documentation
-  | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
+  | IEGroup             !(XIEGroup pass) Int HsDocString -- ^ Doc section heading
+  | IEDoc               !(XIEDoc pass) HsDocString       -- ^ Some documentation
+  | IEDocNamed          !(XIEDocNamed pass) String    -- ^ Reference to named doc
   | XIE !(XXIE pass)
 
 type instance XIEVar             (GhcPass _) = NoExtField

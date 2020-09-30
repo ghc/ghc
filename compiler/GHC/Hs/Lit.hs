@@ -48,36 +48,36 @@ import Data.Data hiding ( Fixity )
 -- Note [Trees that grow] in GHC.Hs.Extension for the Xxxxx fields in the following
 -- | Haskell Literal
 data HsLit x
-  = HsChar (XHsChar x) {- SourceText -} Char
+  = HsChar !(XHsChar x) {- SourceText -} Char
       -- ^ Character
-  | HsCharPrim (XHsCharPrim x) {- SourceText -} Char
+  | HsCharPrim !(XHsCharPrim x) {- SourceText -} Char
       -- ^ Unboxed character
-  | HsString (XHsString x) {- SourceText -} FastString
+  | HsString !(XHsString x) {- SourceText -} FastString
       -- ^ String
-  | HsStringPrim (XHsStringPrim x) {- SourceText -} !ByteString
+  | HsStringPrim !(XHsStringPrim x) {- SourceText -} !ByteString
       -- ^ Packed bytes
-  | HsInt (XHsInt x)  IntegralLit
+  | HsInt !(XHsInt x)  IntegralLit
       -- ^ Genuinely an Int; arises from
       -- "GHC.Tc.Deriv.Generate", and from TRANSLATION
-  | HsIntPrim (XHsIntPrim x) {- SourceText -} Integer
+  | HsIntPrim !(XHsIntPrim x) {- SourceText -} Integer
       -- ^ literal @Int#@
-  | HsWordPrim (XHsWordPrim x) {- SourceText -} Integer
+  | HsWordPrim !(XHsWordPrim x) {- SourceText -} Integer
       -- ^ literal @Word#@
-  | HsInt64Prim (XHsInt64Prim x) {- SourceText -} Integer
+  | HsInt64Prim !(XHsInt64Prim x) {- SourceText -} Integer
       -- ^ literal @Int64#@
-  | HsWord64Prim (XHsWord64Prim x) {- SourceText -} Integer
+  | HsWord64Prim !(XHsWord64Prim x) {- SourceText -} Integer
       -- ^ literal @Word64#@
-  | HsInteger (XHsInteger x) {- SourceText -} Integer Type
+  | HsInteger !(XHsInteger x) {- SourceText -} Integer Type
       -- ^ Genuinely an integer; arises only
       -- from TRANSLATION (overloaded
       -- literals are done with HsOverLit)
-  | HsRat (XHsRat x)  FractionalLit Type
+  | HsRat !(XHsRat x)  FractionalLit Type
       -- ^ Genuinely a rational; arises only from
       -- TRANSLATION (overloaded literals are
       -- done with HsOverLit)
-  | HsFloatPrim (XHsFloatPrim x)   FractionalLit
+  | HsFloatPrim !(XHsFloatPrim x)   FractionalLit
       -- ^ Unboxed Float
-  | HsDoublePrim (XHsDoublePrim x) FractionalLit
+  | HsDoublePrim !(XHsDoublePrim x) FractionalLit
       -- ^ Unboxed Double
 
   | XLit !(XXLit x)
@@ -116,7 +116,7 @@ instance Eq (HsLit x) where
 -- | Haskell Overloaded Literal
 data HsOverLit p
   = OverLit {
-      ol_ext :: (XOverLit p),
+      ol_ext :: !(XOverLit p),
       ol_val :: OverLitVal,
       ol_witness :: HsExpr p}         -- Note [Overloaded literal witnesses]
 

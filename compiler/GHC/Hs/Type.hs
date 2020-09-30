@@ -345,12 +345,12 @@ data HsForAllTelescope pass
   = HsForAllVis -- ^ A visible @forall@ (e.g., @forall a -> {...}@).
                 --   These do not have any notion of specificity, so we use
                 --   '()' as a placeholder value.
-    { hsf_xvis      :: XHsForAllVis pass
+    { hsf_xvis      :: !(XHsForAllVis pass)
     , hsf_vis_bndrs :: [LHsTyVarBndr () pass]
     }
   | HsForAllInvis -- ^ An invisible @forall@ (e.g., @forall a {b} c. {...}@),
                   --   where each binder has a 'Specificity'.
-    { hsf_xinvis       :: XHsForAllInvis pass
+    { hsf_xinvis       :: !(XHsForAllInvis pass)
     , hsf_invis_bndrs  :: [LHsTyVarBndr Specificity pass]
     }
   | XHsForAllTelescope !(XXHsForAllTelescope pass)
@@ -366,7 +366,7 @@ type LHsTyVarBndr flag pass = XRec pass (HsTyVarBndr flag pass)
 
 -- | Located Haskell Quantified Type Variables
 data LHsQTyVars pass   -- See Note [HsType binders]
-  = HsQTvs { hsq_ext :: XHsQTvs pass
+  = HsQTvs { hsq_ext :: !(XHsQTvs pass)
 
            , hsq_explicit :: [LHsTyVarBndr () pass]
                 -- Explicit variables, written by the user
@@ -410,7 +410,7 @@ emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 
 -- | Haskell Implicit Binders
 data HsImplicitBndrs pass thing   -- See Note [HsType binders]
-  = HsIB { hsib_ext  :: XHsIB pass thing -- after renamer: [Name]
+  = HsIB { hsib_ext  :: !(XHsIB pass thing) -- after renamer: [Name]
                                          -- Implicitly-bound kind & type vars
                                          -- Order is important; see
                                          -- Note [Ordering of implicit variables]
@@ -430,7 +430,7 @@ type instance XXHsImplicitBndrs  (GhcPass _) _ = NoExtCon
 data HsWildCardBndrs pass thing
     -- See Note [HsType binders]
     -- See Note [The wildcard story for types]
-  = HsWC { hswc_ext :: XHsWC pass thing
+  = HsWC { hswc_ext :: !(XHsWC pass thing)
                 -- after the renamer
                 -- Wild cards, only named
                 -- See Note [Wildcards in visible kind application]
@@ -456,7 +456,7 @@ type instance XXHsWildCardBndrs  (GhcPass _) b = NoExtCon
 -- slightly different semantics: see @Note [HsType binders]@.
 -- See also @Note [The wildcard story for types]@.
 data HsPatSigType pass
-  = HsPS { hsps_ext  :: XHsPS pass   -- ^ After renamer: 'HsPSRn'
+  = HsPS { hsps_ext  :: !(XHsPS pass) -- ^ After renamer: 'HsPSRn'
          , hsps_body :: LHsType pass -- ^ Main payload (the type itself)
     }
   | XHsPatSigType !(XXHsPatSigType pass)
@@ -635,13 +635,13 @@ instance OutputableBndr HsIPName where
 -- '()' in other places.
 data HsTyVarBndr flag pass
   = UserTyVar        -- no explicit kinding
-         (XUserTyVar pass)
+         !(XUserTyVar pass)
          flag
          (LIdP pass)
         -- See Note [Located RdrNames] in GHC.Hs.Expr
 
   | KindedTyVar
-         (XKindedTyVar pass)
+         !(XKindedTyVar pass)
          flag
          (LIdP pass)
          (LHsKind pass)  -- The user-supplied kind signature
@@ -687,7 +687,7 @@ instance NamedThing (HsTyVarBndr flag GhcRn) where
 -- | Haskell Type
 data HsType pass
   = HsForAllTy   -- See Note [HsType binders]
-      { hst_xforall :: XForAllTy pass
+      { hst_xforall :: !(XForAllTy pass)
       , hst_tele    :: HsForAllTelescope pass
                                      -- Explicit, user-supplied 'forall a {b} c'
       , hst_body    :: LHsType pass  -- body type
@@ -697,11 +697,11 @@ data HsType pass
       -- For details on above see note [Api annotations] in "GHC.Parser.Annotation"
 
   | HsQualTy   -- See Note [HsType binders]
-      { hst_xqual :: XQualTy pass
+      { hst_xqual :: !(XQualTy pass)
       , hst_ctxt  :: LHsContext pass       -- Context C => blah
       , hst_body  :: LHsType pass }
 
-  | HsTyVar  (XTyVar pass)
+  | HsTyVar  !(XTyVar pass)
               PromotionFlag    -- Whether explicitly promoted,
                                -- for the pretty printer
              (LIdP pass)
@@ -712,18 +712,18 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsAppTy             (XAppTy pass)
+  | HsAppTy             !(XAppTy pass)
                         (LHsType pass)
                         (LHsType pass)
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsAppKindTy         (XAppKindTy pass) -- type level type app
+  | HsAppKindTy         !(XAppKindTy pass) -- type level type app
                         (LHsType pass)
                         (LHsKind pass)
 
-  | HsFunTy             (XFunTy pass)
+  | HsFunTy             !(XFunTy pass)
                         (HsArrow pass)
                         (LHsType pass)   -- function type
                         (LHsType pass)
@@ -731,14 +731,14 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsListTy            (XListTy pass)
+  | HsListTy            !(XListTy pass)
                         (LHsType pass)  -- Element type
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'['@,
       --         'GHC.Parser.Annotation.AnnClose' @']'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsTupleTy           (XTupleTy pass)
+  | HsTupleTy           !(XTupleTy pass)
                         HsTupleSort
                         [LHsType pass]  -- Element types (length gives arity)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'(' or '(#'@,
@@ -746,20 +746,20 @@ data HsType pass
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsSumTy             (XSumTy pass)
+  | HsSumTy             !(XSumTy pass)
                         [LHsType pass]  -- Element types (length gives arity)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'(#'@,
     --         'GHC.Parser.Annotation.AnnClose' '#)'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsOpTy              (XOpTy pass)
+  | HsOpTy              !(XOpTy pass)
                         (LHsType pass) (LIdP pass) (LHsType pass)
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsParTy             (XParTy pass)
+  | HsParTy             !(XParTy pass)
                         (LHsType pass)   -- See Note [Parens in HsSyn] in GHC.Hs.Expr
         -- Parenthesis preserved for the precedence re-arrangement in
         -- GHC.Rename.HsType
@@ -769,7 +769,7 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsIParamTy          (XIParamTy pass)
+  | HsIParamTy          !(XIParamTy pass)
                         (XRec pass HsIPName) -- (?x :: ty)
                         (LHsType pass)   -- Implicit parameters as they occur in
                                          -- contexts
@@ -780,12 +780,12 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsStarTy            (XStarTy pass)
+  | HsStarTy            !(XStarTy pass)
                         Bool             -- Is this the Unicode variant?
                                          -- Note [HsStarTy]
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
-  | HsKindSig           (XKindSig pass)
+  | HsKindSig           !(XKindSig pass)
                         (LHsType pass)  -- (ty :: kind)
                         (LHsKind pass)  -- A type with a kind signature
       -- ^
@@ -796,20 +796,20 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsSpliceTy          (XSpliceTy pass)
+  | HsSpliceTy          !(XSpliceTy pass)
                         (HsSplice pass)   -- Includes quasi-quotes
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'$('@,
       --         'GHC.Parser.Annotation.AnnClose' @')'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsDocTy             (XDocTy pass)
+  | HsDocTy             !(XDocTy pass)
                         (LHsType pass) LHsDocString -- A documented type
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsBangTy    (XBangTy pass)
+  | HsBangTy    !(XBangTy pass)
                 HsSrcBang (LHsType pass)   -- Bang-style type annotations
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' :
       --         'GHC.Parser.Annotation.AnnOpen' @'{-\# UNPACK' or '{-\# NOUNPACK'@,
@@ -818,7 +818,7 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsRecTy     (XRecTy pass)
+  | HsRecTy     !(XRecTy pass)
                 [LConDeclField pass]    -- Only in data type declarations
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{'@,
       --         'GHC.Parser.Annotation.AnnClose' @'}'@
@@ -832,7 +832,7 @@ data HsType pass
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsExplicitListTy       -- A promoted explicit list
-        (XExplicitListTy pass)
+        !(XExplicitListTy pass)
         PromotionFlag      -- whether explicitly promoted, for pretty printer
         [LHsType pass]
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @"'["@,
@@ -841,19 +841,19 @@ data HsType pass
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsExplicitTupleTy      -- A promoted explicit tuple
-        (XExplicitTupleTy pass)
+        !(XExplicitTupleTy pass)
         [LHsType pass]
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @"'("@,
       --         'GHC.Parser.Annotation.AnnClose' @')'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsTyLit (XTyLit pass) HsTyLit      -- A promoted numeric literal.
+  | HsTyLit !(XTyLit pass) HsTyLit      -- A promoted numeric literal.
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsWildCardTy (XWildCardTy pass)  -- A type wildcard
+  | HsWildCardTy !(XWildCardTy pass)  -- A type wildcard
       -- See Note [The wildcard story for types]
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
@@ -861,7 +861,7 @@ data HsType pass
 
   -- For adding new constructors via Trees that Grow
   | XHsType
-      (XXType pass)
+      !(XXType pass)
 
 data NewHsTypeX
   = NHsCoreTy Type -- An escape hatch for tunnelling a *closed*
@@ -1083,7 +1083,7 @@ type LConDeclField pass = XRec pass (ConDeclField pass)
 
 -- | Constructor Declaration Field
 data ConDeclField pass  -- Record fields have Haddock docs on them
-  = ConDeclField { cd_fld_ext  :: XConDeclField pass,
+  = ConDeclField { cd_fld_ext  :: !(XConDeclField pass),
                    cd_fld_names :: [LFieldOcc pass],
                                    -- ^ See Note [ConDeclField passs]
                    cd_fld_type :: LBangType pass,
@@ -1680,7 +1680,7 @@ type LFieldOcc pass = XRec pass (FieldOcc pass)
 -- Represents an *occurrence* of an unambiguous field.  We store
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
-data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
+data FieldOcc pass = FieldOcc { extFieldOcc     :: !(XCFieldOcc pass)
                               , rdrNameFieldOcc :: Located RdrName
                                  -- ^ See Note [Located RdrNames] in "GHC.Hs.Expr"
                               }
@@ -1715,8 +1715,8 @@ mkFieldOcc rdr = FieldOcc noExtField rdr
 -- Note [Disambiguating record fields] in "GHC.Tc.Gen.Head".
 -- See Note [Located RdrNames] in "GHC.Hs.Expr"
 data AmbiguousFieldOcc pass
-  = Unambiguous (XUnambiguous pass) (Located RdrName)
-  | Ambiguous   (XAmbiguous pass)   (Located RdrName)
+  = Unambiguous !(XUnambiguous pass) (Located RdrName)
+  | Ambiguous   !(XAmbiguous pass)   (Located RdrName)
   | XAmbiguousFieldOcc !(XXAmbiguousFieldOcc pass)
 
 type instance XUnambiguous GhcPs = NoExtField
