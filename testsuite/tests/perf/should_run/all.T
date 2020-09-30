@@ -88,15 +88,15 @@ test('T4321',
 test('T3736', [], makefile_test, ['T3736'])
 test('T3738',
      [extra_clean(['T3738a.hi', 'T3738a.o']),
-      collect_stats('peak_megabytes_allocated', 0),
+      collect_runtime_residency(1),
       collect_stats('bytes allocated',8),
-      only_ways(['normal'])
+      only_ways(['normal']),
       ],
      compile_and_run,
      ['-O'])
 
 test('MethSharing',
-     [collect_stats('peak_megabytes_allocated',  0),
+     [collect_runtime_residency(1),
       collect_stats('bytes allocated',5),
       only_ways(['normal'])
       ],
@@ -177,7 +177,7 @@ test('T5536',
 
 test('T7257',
      [collect_stats('bytes allocated',10),
-      collect_stats('peak_megabytes_allocated',5),
+      collect_runtime_residency(5),
       only_ways(['normal'])
      ],
     compile_and_run, ['-O'])
@@ -192,14 +192,14 @@ test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
 # For 7507, stack overflow is the bad case
 
 test('T7436',
-     [collect_stats('max_bytes_used',4),
+     [collect_runtime_residency(4),
       only_ways(['normal'])
       ],
      compile_and_run,
      ['-O'])
 
 test('T7436b',
-     [collect_stats('max_bytes_used',4),
+     [collect_runtime_residency(4),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -221,7 +221,7 @@ test('T7954',
      ['-O'])
 
 test('T7850',
-     [collect_stats('peak_megabytes_allocated',10),
+     [collect_runtime_residency(10),
       only_ways(['normal'])],
      compile_and_run,
      ['-O'])
@@ -308,7 +308,7 @@ test('T12990',
 
 test('T13218',
     [collect_stats('bytes allocated',5),
-     collect_stats('max_bytes_used',10),
+     collect_runtime_residency(10),
      only_ways(['normal'])],
     compile_and_run,
     ['-O'])
