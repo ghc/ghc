@@ -4,7 +4,7 @@ Field Selectors
 ------------
 
 .. extension:: FieldSelectors
-    :shortdesc: Generete field selector functions.
+    :shortdesc: Generate field selector functions.
         Implied by :extension:`Haskell98`
 
     :implied by: :extension:`Haskell98`
