@@ -1959,9 +1959,10 @@ type :: { LHsType GhcPs }
                                        >> ams (sLL $1 $> $ HsFunTy noExtField HsUnrestrictedArrow $1 $3)
                                               [mu AnnRarrow $2] }
 
-        | btype '#->' ctype             {% hintLinear (getLoc $2) >>
-                                         ams (sLL $1 $> $ HsFunTy noExtField HsLinearArrow $1 $3)
-                                             [mu AnnLolly $2] }
+        | btype '#->' ctype             {% hintLinear (getLoc $2)
+                                        >> ams $1 [mu AnnLolly $2] -- See note [GADT decl discards annotations]
+                                        >> ams (sLL $1 $> $ HsFunTy noExtField HsLinearArrow $1 $3)
+                                               [mu AnnLolly $2] }
 
 mult :: { LHsType GhcPs }
         : btype                  { $1 }
@@ -2173,9 +2174,9 @@ gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
         : optSemi con_list '::' sigtype
-                {% do { decl <- mkGadtDecl (unLoc $2) $4
+                {% do { (decl, anns) <- mkGadtDecl (unLoc $2) $4
                       ; ams (sLL $2 $> decl)
-                            [mu AnnDcolon $3] } }
+                            (mu AnnDcolon $3:anns) } }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

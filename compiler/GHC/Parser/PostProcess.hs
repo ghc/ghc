@@ -700,20 +700,20 @@ mkConDeclH98 name mb_forall mb_cxt args
 --   we faithfully record whether -> or #-> was used.
 mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs
-           -> P (ConDecl GhcPs)
+           -> P (ConDecl GhcPs, [AddAnn])
 mkGadtDecl names ty = do
   linearEnabled <- getBit LinearTypesBit
 
-  let (args, res_ty)
+  let (args, res_ty, anns)
         | L _ (HsFunTy _ _w (L loc (HsRecTy _ rf)) res_ty) <- body_ty
-        = (RecCon (L loc rf), res_ty)
+        = (RecCon (L loc rf), res_ty, [])
         | otherwise
-        = let (arg_types, res_type) = splitHsFunType body_ty
+        = let (arg_types, res_type, anns) = splitHsFunType body_ty
               arg_types' | linearEnabled = arg_types
                          | otherwise     = map (hsLinear . hsScaledThing) arg_types
-          in (PrefixCon arg_types', res_type)
+          in (PrefixCon arg_types', res_type, anns)
 
-  pure $ ConDeclGADT { con_g_ext  = noExtField
+  pure ( ConDeclGADT { con_g_ext  = noExtField
                      , con_names  = names
                      , con_forall = L (getLoc ty) $ isJust mtvs
                      , con_qvars  = fromMaybe [] mtvs
@@ -721,6 +721,7 @@ mkGadtDecl names ty = do
                      , con_args   = args
                      , con_res_ty = res_ty
                      , con_doc    = Nothing }
+       , anns )
   where
     (mtvs, mcxt, body_ty) = splitLHsGadtTy ty
 

@@ -107,6 +107,7 @@ import GHC.Utils.Misc ( count )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
+import GHC.Parser.Lexer
 
 {-
 ************************************************************************
@@ -1331,17 +1332,20 @@ mkHsAppKindTy ext ty k
 -- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
 -- Breaks up any parens in the result type:
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
+-- It returns API Annotations for any parens removed
 splitHsFunType ::
      LHsType (GhcPass p)
-  -> ([HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p))
-splitHsFunType (L _ (HsParTy _ ty))
-  = splitHsFunType ty
+  -> ([HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p), [AddAnn])
+splitHsFunType ty = go ty []
+  where
+    go (L l (HsParTy _ ty)) anns
+      = go ty (anns ++ mkParensApiAnn l)
 
-splitHsFunType (L _ (HsFunTy _ mult x y))
-  | (args, res) <- splitHsFunType y
-  = (HsScaled mult x:args, res)
+    go (L _ (HsFunTy _ mult x y)) anns
+      | (args, res, anns') <- go y anns
+      = (HsScaled mult x:args, res, anns')
 
-splitHsFunType other = ([], other)
+    go other anns = ([], other, anns)
 
 -- | Retrieve the name of the \"head\" of a nested type application.
 -- This is somewhat like @GHC.Tc.Gen.HsType.splitHsAppTys@, but a little more
