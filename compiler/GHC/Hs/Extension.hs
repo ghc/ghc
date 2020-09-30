@@ -331,11 +331,11 @@ type family XHsIPBinds       x x'
 type family XEmptyLocalBinds x x'
 type family XXHsLocalBindsLR x x'
 
--- ValBindsLR type families
+-- HsValBindsLR type families
 type family XValBinds    x x'
 type family XXValBindsLR x x'
 
--- HsBindsLR type families
+-- HsBindLR type families
 type family XFunBind    x x'
 type family XPatBind    x x'
 type family XVarBind    x x'
@@ -469,7 +469,7 @@ type family XCClsInstDecl      x
 type family XXClsInstDecl      x
 
 -- -------------------------------------
--- ClsInstDecl type families
+-- InstDecl type families
 type family XClsInstD      x
 type family XDataFamInstD  x
 type family XTyFamInstD    x
@@ -490,7 +490,7 @@ type family XCDefaultDecl      x
 type family XXDefaultDecl      x
 
 -- -------------------------------------
--- DefaultDecl type families
+-- ForeignDecl type families
 type family XForeignImport     x
 type family XForeignExport     x
 type family XXForeignDecl      x
@@ -517,7 +517,7 @@ type family XWarnings        x
 type family XXWarnDecls      x
 
 -- -------------------------------------
--- AnnDecl type families
+-- WarnDecl type families
 type family XWarning        x
 type family XXWarnDecl      x
 
@@ -574,32 +574,34 @@ type family XBinTick        x
 type family XPragE          x
 type family XXExpr          x
 
+-- -------------------------------------
+-- HsPragE type families
 type family XSCC            x
-type family XCoreAnn        x
-type family XTickPragma     x
 type family XXPragE         x
--- ---------------------------------------------------------------------
 
+
+-- -------------------------------------
+-- AmbiguousFieldOcc type families
 type family XUnambiguous        x
 type family XAmbiguous          x
 type family XXAmbiguousFieldOcc x
 
--- ----------------------------------------------------------------------
-
+-- -------------------------------------
+-- HsTupArg type families
 type family XPresent  x
 type family XMissing  x
 type family XXTupArg  x
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- HsSplice type families
 type family XTypedSplice   x
 type family XUntypedSplice x
 type family XQuasiQuote    x
 type family XSpliced       x
 type family XXSplice       x
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- HsBracket type families
 type family XExpBr      x
 type family XPatBr      x
 type family XDecBrL     x
@@ -609,33 +611,33 @@ type family XVarBr      x
 type family XTExpBr     x
 type family XXBracket   x
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- HsCmdTop type families
 type family XCmdTop  x
 type family XXCmdTop x
 
 -- -------------------------------------
-
+-- MatchGroup type families
 type family XMG           x b
 type family XXMatchGroup  x b
 
 -- -------------------------------------
-
+-- Match type families
 type family XCMatch  x b
 type family XXMatch  x b
 
 -- -------------------------------------
-
+-- GRHSs type families
 type family XCGRHSs  x b
 type family XXGRHSs  x b
 
 -- -------------------------------------
-
+-- GRHS type families
 type family XCGRHS  x b
 type family XXGRHS  x b
 
 -- -------------------------------------
-
+-- StmtLR type families
 type family XLastStmt        x x' b
 type family XBindStmt        x x' b
 type family XApplicativeStmt x x' b
@@ -646,8 +648,8 @@ type family XTransStmt       x x' b
 type family XRecStmt         x x' b
 type family XXStmtLR         x x' b
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- HsCmd type families
 type family XCmdArrApp  x
 type family XCmdArrForm x
 type family XCmdApp     x
@@ -661,13 +663,13 @@ type family XCmdDo      x
 type family XCmdWrap    x
 type family XXCmd       x
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- ParStmtBlock type families
 type family XParStmtBlock  x x'
 type family XXParStmtBlock x x'
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- ApplicativeArg type families
 type family XApplicativeArgOne   x
 type family XApplicativeArgMany  x
 type family XXApplicativeArg     x
@@ -697,6 +699,8 @@ type family XHsFloatPrim x
 type family XHsDoublePrim x
 type family XXLit x
 
+-- -------------------------------------
+-- HsOverLit type families
 type family XOverLit  x
 type family XXOverLit x
 
@@ -725,26 +729,29 @@ type family XXPat      x
 -- =====================================================================
 -- Type families for the HsTypes type families
 
+
+-- -------------------------------------
+-- LHsQTyVars type families
 type family XHsQTvs       x
 type family XXLHsQTyVars  x
 
 -- -------------------------------------
-
+-- HsImplicitBndrs type families
 type family XHsIB              x b
 type family XXHsImplicitBndrs  x b
 
 -- -------------------------------------
-
+-- HsWildCardBndrs type families
 type family XHsWC              x b
 type family XXHsWildCardBndrs  x b
 
 -- -------------------------------------
-
+-- HsPatSigType type families
 type family XHsPS x
 type family XXHsPatSigType x
 
 -- -------------------------------------
-
+-- HsType type families
 type family XForAllTy        x
 type family XQualTy          x
 type family XTyVar           x
@@ -770,35 +777,37 @@ type family XWildCardTy      x
 type family XXType           x
 
 -- ---------------------------------------------------------------------
-
+-- HsForAllTelescope type families
 type family XHsForAllVis        x
 type family XHsForAllInvis      x
 type family XXHsForAllTelescope x
 
 -- ---------------------------------------------------------------------
-
+-- HsTyVarBndr type families
 type family XUserTyVar   x
 type family XKindedTyVar x
 type family XXTyVarBndr  x
 
 -- ---------------------------------------------------------------------
-
+-- ConDeclField type families
 type family XConDeclField  x
 type family XXConDeclField x
 
 -- ---------------------------------------------------------------------
-
+-- FieldOcc type families
 type family XCFieldOcc x
 type family XXFieldOcc x
 
 -- =====================================================================
 -- Type families for the HsImpExp type families
 
+-- -------------------------------------
+-- ImportDecl type families
 type family XCImportDecl       x
 type family XXImportDecl       x
 
 -- -------------------------------------
-
+-- IE type families
 type family XIEVar             x
 type family XIEThingAbs        x
 type family XIEThingAll        x
