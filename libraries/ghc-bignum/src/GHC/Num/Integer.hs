@@ -486,6 +486,9 @@ integerNegate (IP b)
   | isTrue# (bigNatEqWord# b ABS_INT_MINBOUND##) = IS INT_MINBOUND#
   | True                                         = IN b
 
+{-# RULES
+"integerNegate/integerNegate" forall x. integerNegate (integerNegate x) = x
+#-}
 
 -- | Compute absolute value of an 'Integer'
 integerAbs :: Integer -> Integer
