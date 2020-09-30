@@ -610,8 +610,7 @@ gHC_OVER_LABELS = mkBaseModule (fsLit "GHC.OverloadedLabels")
 gHC_RECORDS :: Module
 gHC_RECORDS = mkBaseModule (fsLit "GHC.Records")
 
-mAIN, rOOT_MAIN :: Module
-mAIN            = mkMainModule_ mAIN_NAME
+rOOT_MAIN :: Module
 rOOT_MAIN       = mkMainModule (fsLit ":Main") -- Root module for initialisation
 
 mkInteractiveModule :: Int -> Module
