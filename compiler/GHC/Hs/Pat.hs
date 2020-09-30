@@ -87,42 +87,42 @@ type LPat p = XRec p (Pat p)
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data Pat p
   =     ------------ Simple patterns ---------------
-    WildPat     (XWildPat p)        -- ^ Wildcard Pattern
+    WildPat     !(XWildPat p)        -- ^ Wildcard Pattern
         -- The sole reason for a type on a WildPat is to
         -- support hsPatType :: Pat Id -> Type
 
        -- AZ:TODO above comment needs to be updated
-  | VarPat      (XVarPat p)
+  | VarPat      !(XVarPat p)
                 (LIdP p)     -- ^ Variable Pattern
 
                              -- See Note [Located RdrNames] in GHC.Hs.Expr
-  | LazyPat     (XLazyPat p)
+  | LazyPat     !(XLazyPat p)
                 (LPat p)                -- ^ Lazy Pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnTilde'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | AsPat       (XAsPat p)
+  | AsPat       !(XAsPat p)
                 (LIdP p) (LPat p)    -- ^ As pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnAt'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | ParPat      (XParPat p)
+  | ParPat      !(XParPat p)
                 (LPat p)                -- ^ Parenthesised pattern
                                         -- See Note [Parens in HsSyn] in GHC.Hs.Expr
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
     --                                    'GHC.Parser.Annotation.AnnClose' @')'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | BangPat     (XBangPat p)
+  | BangPat     !(XBangPat p)
                 (LPat p)                -- ^ Bang pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
         ------------ Lists, tuples, arrays ---------------
-  | ListPat     (XListPat p)
+  | ListPat     !(XListPat p)
                 [LPat p]
                    -- For OverloadedLists a Just (ty,fn) gives
                    -- overall type of the pattern, and the toList
@@ -135,7 +135,7 @@ data Pat p
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | TuplePat    (XTuplePat p)
+  | TuplePat    !(XTuplePat p)
                   -- after typechecking, holds the types of the tuple components
                 [LPat p]         -- Tuple sub-patterns
                 Boxity           -- UnitPat is TuplePat []
@@ -161,7 +161,7 @@ data Pat p
     --            'GHC.Parser.Annotation.AnnOpen' @'('@ or @'(#'@,
     --            'GHC.Parser.Annotation.AnnClose' @')'@ or  @'#)'@
 
-  | SumPat      (XSumPat p)        -- after typechecker, types of the alternative
+  | SumPat      !(XSumPat p)       -- after typechecker, types of the alternative
                 (LPat p)           -- Sum sub-pattern
                 ConTag             -- Alternative (one-based)
                 Arity              -- Arity (INVARIANT: ≥ 2)
@@ -175,7 +175,7 @@ data Pat p
 
         ------------ Constructor patterns ---------------
   | ConPat {
-        pat_con_ext :: XConPat p,
+        pat_con_ext :: !(XConPat p),
         pat_con     :: XRec p (ConLikeP p),
         pat_args    :: HsConPatDetails p
     }
@@ -185,7 +185,7 @@ data Pat p
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | ViewPat       (XViewPat p)     -- The overall type of the pattern
+  | ViewPat       !(XViewPat p)    -- The overall type of the pattern
                                    -- (= the argument type of the view function)
                                    -- for hsPatType.
                   (LHsExpr p)
@@ -197,11 +197,11 @@ data Pat p
   --        'GHC.Parser.Annotation.AnnClose' @')'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | SplicePat       (XSplicePat p)
+  | SplicePat       !(XSplicePat p)
                     (HsSplice p)    -- ^ Splice Pattern (Includes quasi-quotes)
 
         ------------ Literal and n+k patterns ---------------
-  | LitPat          (XLitPat p)
+  | LitPat          !(XLitPat p)
                     (HsLit p)           -- ^ Literal Pattern
                                         -- Used for *non-overloaded* literal patterns:
                                         -- Int#, Char#, Int, Char, String, etc.
@@ -209,7 +209,7 @@ data Pat p
   | NPat                -- Natural Pattern
                         -- Used for all overloaded literals,
                         -- including overloaded strings with -XOverloadedStrings
-                    (XNPat p)            -- Overall type of pattern. Might be
+                    !(XNPat p)           -- Overall type of pattern. Might be
                                          -- different than the literal's type
                                          -- if (==) or negate changes the type
                     (XRec p (HsOverLit p))     -- ALWAYS positive
@@ -223,7 +223,7 @@ data Pat p
   -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnVal' @'+'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
+  | NPlusKPat       !(XNPlusKPat p)          -- Type of overall pattern
                     (LIdP p)                 -- n+k pattern
                     (XRec p (HsOverLit p))   -- It'll always be an HsIntegral
                     (HsOverLit p)            -- See Note [NPlusK patterns] in GHC.Tc.Gen.Pat
@@ -238,7 +238,7 @@ data Pat p
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | SigPat          (XSigPat p)             -- After typechecker: Type
+  | SigPat          !(XSigPat p)            -- After typechecker: Type
                     (LPat p)                -- Pattern with a type signature
                     (HsPatSigType (NoGhcTc p)) --  Signature can bind both
                                                --  kind and type vars

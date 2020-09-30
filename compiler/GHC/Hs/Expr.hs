@@ -242,11 +242,11 @@ is Less Cool because
 
 -- | A Haskell expression.
 data HsExpr p
-  = HsVar     (XVar p)
+  = HsVar     !(XVar p)
               (LIdP p) -- ^ Variable
                        -- See Note [Located RdrNames]
 
-  | HsUnboundVar (XUnboundVar p)
+  | HsUnboundVar !(XUnboundVar p)
                  OccName     -- ^ Unbound variable; also used for "holes"
                              --   (_ or _x).
                              -- Turned from HsVar to HsUnboundVar by the
@@ -255,32 +255,32 @@ data HsExpr p
                              -- The (XUnboundVar p) field becomes Id
                              --   after typechecking
 
-  | HsConLikeOut (XConLikeOut p)
+  | HsConLikeOut !(XConLikeOut p)
                  ConLike     -- ^ After typechecker only; must be different
                              -- HsVar for pretty printing
 
-  | HsRecFld  (XRecFld p)
+  | HsRecFld  !(XRecFld p)
               (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
               -- The parser produces HsVars
               -- The renamer renames record-field selectors to HsRecFld
               -- The typechecker preserves HsRecFld
 
-  | HsOverLabel (XOverLabel p)
+  | HsOverLabel !(XOverLabel p)
                 (Maybe (IdP p)) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
      --   @Just id@ means @RebindableSyntax@ is in use, and gives the id of the
      --   in-scope 'fromLabel'.
      --   NB: Not in use after typechecking
 
-  | HsIPVar   (XIPVar p)
+  | HsIPVar   !(XIPVar p)
               HsIPName   -- ^ Implicit parameter (not in use after typechecking)
-  | HsOverLit (XOverLitE p)
+  | HsOverLit !(XOverLitE p)
               (HsOverLit p)  -- ^ Overloaded literals
 
-  | HsLit     (XLitE p)
+  | HsLit     !(XLitE p)
               (HsLit p)      -- ^ Simple (non-overloaded) literals
 
-  | HsLam     (XLam p)
+  | HsLam     !(XLam p)
               (MatchGroup p (LHsExpr p))
                        -- ^ Lambda abstraction. Currently always a single match
        --
@@ -289,7 +289,7 @@ data HsExpr p
 
        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsLamCase (XLamCase p) (MatchGroup p (LHsExpr p)) -- ^ Lambda-case
+  | HsLamCase !(XLamCase p) (MatchGroup p (LHsExpr p)) -- ^ Lambda-case
        --
        -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
        --           'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen',
@@ -297,9 +297,9 @@ data HsExpr p
 
        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsApp     (XApp p) (LHsExpr p) (LHsExpr p) -- ^ Application
+  | HsApp     !(XApp p) (LHsExpr p) (LHsExpr p) -- ^ Application
 
-  | HsAppType (XAppTypeE p) -- After typechecking: the type argument
+  | HsAppType !(XAppTypeE p) -- After typechecking: the type argument
               (LHsExpr p)
               (LHsWcType (NoGhcTc p))  -- ^ Visible type application
        --
@@ -314,7 +314,7 @@ data HsExpr p
   -- NB We need an expr for the operator in an OpApp/Section since
   -- the typechecker may need to apply the operator to a few types.
 
-  | OpApp       (XOpApp p)
+  | OpApp       !(XOpApp p)
                 (LHsExpr p)       -- left operand
                 (LHsExpr p)       -- operator
                 (LHsExpr p)       -- right operand
@@ -325,7 +325,7 @@ data HsExpr p
   --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnMinus'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | NegApp      (XNegApp p)
+  | NegApp      !(XNegApp p)
                 (LHsExpr p)
                 (SyntaxExpr p)
 
@@ -333,13 +333,13 @@ data HsExpr p
   --             'GHC.Parser.Annotation.AnnClose' @')'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsPar       (XPar p)
+  | HsPar       !(XPar p)
                 (LHsExpr p)  -- ^ Parenthesised expr; see Note [Parens in HsSyn]
 
-  | SectionL    (XSectionL p)
+  | SectionL    !(XSectionL p)
                 (LHsExpr p)    -- operand; see Note [Sections in HsSyn]
                 (LHsExpr p)    -- operator
-  | SectionR    (XSectionR p)
+  | SectionR    !(XSectionR p)
                 (LHsExpr p)    -- operator; see Note [Sections in HsSyn]
                 (LHsExpr p)    -- operand
 
@@ -351,7 +351,7 @@ data HsExpr p
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   -- Note [ExplicitTuple]
   | ExplicitTuple
-        (XExplicitTuple p)
+        !(XExplicitTuple p)
         [LHsTupArg p]
         Boxity
 
@@ -363,7 +363,7 @@ data HsExpr p
   --  There will be multiple 'GHC.Parser.Annotation.AnnVbar', (1 - alternative) before
   --  the expression, (arity - alternative) after it
   | ExplicitSum
-          (XExplicitSum p)
+          !(XExplicitSum p)
           ConTag --  Alternative (one-based)
           Arity  --  Sum arity
           (LHsExpr p)
@@ -373,7 +373,7 @@ data HsExpr p
   --       'GHC.Parser.Annotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsCase      (XCase p)
+  | HsCase      !(XCase p)
                 (LHsExpr p)
                 (MatchGroup p (LHsExpr p))
 
@@ -383,7 +383,7 @@ data HsExpr p
   --       'GHC.Parser.Annotation.AnnElse',
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsIf        (XIf p)        -- GhcPs: this is a Bool; False <=> do not use
+  | HsIf        !(XIf p)       -- GhcPs: this is a Bool; False <=> do not use
                                --  rebindable syntax
                 (LHsExpr p)    --  predicate
                 (LHsExpr p)    --  then part
@@ -395,7 +395,7 @@ data HsExpr p
   --       'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsMultiIf   (XMultiIf p) [LGRHS p (LHsExpr p)]
+  | HsMultiIf   !(XMultiIf p) [LGRHS p (LHsExpr p)]
 
   -- | let(rec)
   --
@@ -404,7 +404,7 @@ data HsExpr p
   --       'GHC.Parser.Annotation.AnnClose' @'}'@,'GHC.Parser.Annotation.AnnIn'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsLet       (XLet p)
+  | HsLet       !(XLet p)
                 (LHsLocalBinds p)
                 (LHsExpr  p)
 
@@ -414,7 +414,7 @@ data HsExpr p
   --             'GHC.Parser.Annotation.AnnClose'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsDo        (XDo p)                  -- Type of the whole expression
+  | HsDo        !(XDo p)                 -- Type of the whole expression
                 (HsStmtContext GhcRn)    -- The parameterisation is unimportant
                                          -- because in this context we never use
                                          -- the PatGuard or ParStmt variant
@@ -428,7 +428,7 @@ data HsExpr p
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   -- See Note [Empty lists]
   | ExplicitList
-                (XExplicitList p)  -- Gives type of components of list
+                !(XExplicitList p)  -- Gives type of components of list
                 (Maybe (SyntaxExpr p))
                                    -- For OverloadedLists, the fromListN witness
                 [LHsExpr p]
@@ -440,7 +440,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordCon
-      { rcon_ext      :: XRecordCon p
+      { rcon_ext      :: !(XRecordCon p)
       , rcon_con_name :: LIdP p             -- The constructor name;
                                             --  not used after type checking
       , rcon_flds     :: HsRecordBinds p }  -- The fields
@@ -452,7 +452,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordUpd
-      { rupd_ext  :: XRecordUpd p
+      { rupd_ext  :: !(XRecordUpd p)
       , rupd_expr :: LHsExpr p
       , rupd_flds :: [LHsRecUpdField p]
       }
@@ -465,7 +465,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | ExprWithTySig
-                (XExprWithTySig p)
+                !(XExprWithTySig p)
 
                 (LHsExpr p)
                 (LHsSigWcType (NoGhcTc p))
@@ -478,7 +478,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | ArithSeq
-                (XArithSeq p)
+                !(XArithSeq p)
                 (Maybe (SyntaxExpr p))
                                   -- For OverloadedLists, the fromList witness
                 (ArithSeqInfo p)
@@ -493,17 +493,17 @@ data HsExpr p
   --         'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnCloseQ'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsBracket    (XBracket p) (HsBracket p)
+  | HsBracket    !(XBracket p) (HsBracket p)
 
     -- See Note [Pending Splices]
   | HsRnBracketOut
-      (XRnBracketOut p)
+      !(XRnBracketOut p)
       (HsBracket GhcRn)    -- Output of the renamer is the *original* renamed
                            -- expression, plus
       [PendingRnSplice]    -- _renamed_ splices to be type checked
 
   | HsTcBracketOut
-      (XTcBracketOut p)
+      !(XTcBracketOut p)
       (Maybe QuoteWrapper) -- The wrapper to apply type and dictionary argument
                            -- to the quote.
       (HsBracket GhcRn)    -- Output of the type checker is the *original*
@@ -515,7 +515,7 @@ data HsExpr p
   --         'GHC.Parser.Annotation.AnnClose'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsSpliceE  (XSpliceE p) (HsSplice p)
+  | HsSpliceE  !(XSpliceE p) (HsSplice p)
 
   -----------------------------------------------------------
   -- Arrow notation extension
@@ -526,7 +526,7 @@ data HsExpr p
   --          'GHC.Parser.Annotation.AnnRarrow'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsProc      (XProc p)
+  | HsProc      !(XProc p)
                 (LPat p)               -- arrow abstraction, proc
                 (LHsCmdTop p)          -- body of the abstraction
                                        -- always has an empty stack
@@ -536,26 +536,26 @@ data HsExpr p
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnStatic',
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsStatic (XStatic p) -- Free variables of the body
+  | HsStatic !(XStatic p) -- Free variables of the body
              (LHsExpr p)        -- Body
 
   ---------------------------------------
   -- Haskell program coverage (Hpc) Support
 
   | HsTick
-     (XTick p)
+     !(XTick p)
      (Tickish (IdP p))
      (LHsExpr p)                       -- sub-expression
 
   | HsBinTick
-     (XBinTick p)
+     !(XBinTick p)
      Int                                -- module-local tick number for True
      Int                                -- module-local tick number for False
      (LHsExpr p)                        -- sub-expression
 
   ---------------------------------------
   -- Expressions annotated with pragmas, written as {-# ... #-}
-  | HsPragE (XPragE p) (HsPragE p) (LHsExpr p)
+  | HsPragE !(XPragE p) (HsPragE p) (LHsExpr p)
 
   | XExpr       !(XXExpr p)
   -- Note [Trees that Grow] extension constructor for the
@@ -831,7 +831,7 @@ instance (Outputable a, Outputable b) => Outputable (HsExpansion a b) where
 
 -- | A pragma, written as {-# ... #-}, that may appear within an expression.
 data HsPragE p
-  = HsPragSCC   (XSCC p)
+  = HsPragSCC   !(XSCC p)
                 SourceText            -- Note [Pragma source text] in GHC.Types.Basic
                 StringLiteral         -- "set cost centre" SCC pragma
 
@@ -847,7 +847,6 @@ data HsPragE p
   | XHsPragE !(XXPragE p)
 
 type instance XSCC           (GhcPass _) = NoExtField
-type instance XCoreAnn       (GhcPass _) = NoExtField
 type instance XXPragE        (GhcPass _) = NoExtCon
 
 -- | Located Haskell Tuple Argument
@@ -863,8 +862,8 @@ type LHsTupArg id = XRec id (HsTupArg id)
 
 -- | Haskell Tuple Argument
 data HsTupArg id
-  = Present (XPresent id) (LHsExpr id)     -- ^ The argument
-  | Missing (XMissing id)    -- ^ The argument is missing, but this is its type
+  = Present !(XPresent id) (LHsExpr id)     -- ^ The argument
+  | Missing !(XMissing id)    -- ^ The argument is missing, but this is its type
   | XTupArg !(XXTupArg id)   -- ^ Note [Trees that Grow] extension point
 
 type instance XPresent         (GhcPass _) = NoExtField
@@ -1419,9 +1418,9 @@ data HsCmd id
   --          'GHC.Parser.Annotation.AnnRarrowtail'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  = HsCmdArrApp          -- Arrow tail, or arrow application (f -< arg)
-        (XCmdArrApp id)  -- type of the arrow expressions f,
-                         -- of the form a t t', where arg :: t
+  = HsCmdArrApp           -- Arrow tail, or arrow application (f -< arg)
+        !(XCmdArrApp id)  -- type of the arrow expressions f,
+                          -- of the form a t t', where arg :: t
         (LHsExpr id)     -- arrow expression, f
         (LHsExpr id)     -- input expression, arg
         HsArrAppType     -- higher-order (-<<) or first-order (-<)
@@ -1433,7 +1432,7 @@ data HsCmd id
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsCmdArrForm         -- Command formation,  (| e cmd1 .. cmdn |)
-        (XCmdArrForm id)
+        !(XCmdArrForm id)
         (LHsExpr id)     -- The operator.
                          -- After type-checking, a type abstraction to be
                          -- applied to the type of the local environment tuple
@@ -1443,25 +1442,25 @@ data HsCmd id
                          -- were converted from OpApp's by the renamer
         [LHsCmdTop id]   -- argument commands
 
-  | HsCmdApp    (XCmdApp id)
+  | HsCmdApp    !(XCmdApp id)
                 (LHsCmd id)
                 (LHsExpr id)
 
-  | HsCmdLam    (XCmdLam id)
+  | HsCmdLam    !(XCmdLam id)
                 (MatchGroup id (LHsCmd id))     -- kappa
        -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
        --       'GHC.Parser.Annotation.AnnRarrow',
 
        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsCmdPar    (XCmdPar id)
+  | HsCmdPar    !(XCmdPar id)
                 (LHsCmd id)                     -- parenthesised command
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
     --             'GHC.Parser.Annotation.AnnClose' @')'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsCmdCase   (XCmdCase id)
+  | HsCmdCase   !(XCmdCase id)
                 (LHsExpr id)
                 (MatchGroup id (LHsCmd id))     -- bodies are HsCmd's
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnCase',
@@ -1470,7 +1469,7 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsCmdLamCase (XCmdLamCase id)
+  | HsCmdLamCase !(XCmdLamCase id)
                  (MatchGroup id (LHsCmd id))    -- bodies are HsCmd's
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
     --       'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen' @'{'@,
@@ -1478,7 +1477,7 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsCmdIf     (XCmdIf id)
+  | HsCmdIf     !(XCmdIf id)
                 (SyntaxExpr id)         -- cond function
                 (LHsExpr id)            -- predicate
                 (LHsCmd id)             -- then part
@@ -1490,7 +1489,7 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsCmdLet    (XCmdLet id)
+  | HsCmdLet    !(XCmdLet id)
                 (LHsLocalBinds id)      -- let(rec)
                 (LHsCmd  id)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLet',
@@ -1499,7 +1498,7 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  | HsCmdDo     (XCmdDo id)                     -- Type of the whole expression
+  | HsCmdDo     !(XCmdDo id)                     -- Type of the whole expression
                 (XRec id [CmdLStmt id])
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDo',
     --             'GHC.Parser.Annotation.AnnOpen', 'GHC.Parser.Annotation.AnnSemi',
@@ -1551,7 +1550,7 @@ type LHsCmdTop p = XRec p (HsCmdTop p)
 
 -- | Haskell Top-level Command
 data HsCmdTop p
-  = HsCmdTop (XCmdTop p)
+  = HsCmdTop !(XCmdTop p)
              (LHsCmd p)
   | XCmdTop !(XXCmdTop p)        -- Note [Trees that Grow] extension point
 
@@ -1702,7 +1701,7 @@ patterns in each equation.
 -}
 
 data MatchGroup p body
-  = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result
+  = MG { mg_ext     :: !(XMG p body) -- Post-typechecker, types of args and result
        , mg_alts    :: XRec p [LMatch p body]  -- The alternatives
        , mg_origin  :: Origin }
      -- The type is the type of the entire group
@@ -1730,7 +1729,7 @@ type LMatch id body = XRec id (Match id body)
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data Match p body
   = Match {
-        m_ext :: XCMatch p body,
+        m_ext :: !(XCMatch p body),
         m_ctxt :: HsMatchContext (NoGhcTc p),
           -- See note [m_ctxt in Match]
         m_pats :: [LPat p], -- The patterns
@@ -1821,7 +1820,7 @@ hsLMatchPats (L _ (Match { m_pats = pats })) = pats
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data GRHSs p body
   = GRHSs {
-      grhssExt :: XCGRHSs p body,
+      grhssExt :: !(XCGRHSs p body),
       grhssGRHSs :: [LGRHS p body],      -- ^ Guarded RHSs
       grhssLocalBinds :: LHsLocalBinds p -- ^ The where clause
     }
@@ -1834,7 +1833,7 @@ type instance XXGRHSs (GhcPass _) b = NoExtCon
 type LGRHS id body = XRec id (GRHS id body)
 
 -- | Guarded Right Hand Side.
-data GRHS p body = GRHS (XCGRHS p body)
+data GRHS p body = GRHS !(XCGRHS p body)
                         [GuardLStmt p] -- Guards
                         body           -- Right hand side
                   | XGRHS !(XXGRHS p body)
@@ -1973,7 +1972,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   = LastStmt  -- Always the last Stmt in ListComp, MonadComp,
               -- and (after the renamer, see GHC.Rename.Expr.checkLastStmt) DoExpr, MDoExpr
               -- Not used for GhciStmtCtxt, PatGuard, which scope over other stuff
-          (XLastStmt idL idR body)
+          !(XLastStmt idL idR body)
           body
           (Maybe Bool)  -- Whether return was stripped
             -- Just True <=> return with a dollar was stripped by ApplicativeDo
@@ -1987,7 +1986,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
             -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLarrow'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | BindStmt (XBindStmt idL idR body)
+  | BindStmt !(XBindStmt idL idR body)
              -- ^ Post renaming has optional fail and bind / (>>=) operator.
              -- Post typechecking, also has multiplicity of the argument
              -- and the result type of the function passed to bind;
@@ -2004,14 +2003,14 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   -- For full details, see Note [ApplicativeDo] in "GHC.Rename.Expr"
   --
   | ApplicativeStmt
-             (XApplicativeStmt idL idR body) -- Post typecheck, Type of the body
+             !(XApplicativeStmt idL idR body) -- Post typecheck, Type of the body
              [ ( SyntaxExpr idR
                , ApplicativeArg idL) ]
                       -- [(<$>, e1), (<*>, e2), ..., (<*>, en)]
              (Maybe (SyntaxExpr idR))  -- 'join', if necessary
 
-  | BodyStmt (XBodyStmt idL idR body) -- Post typecheck, element type
-                                      -- of the RHS (used for arrows)
+  | BodyStmt !(XBodyStmt idL idR body) -- Post typecheck, element type
+                                       -- of the RHS (used for arrows)
              body              -- See Note [BodyStmt]
              (SyntaxExpr idR)  -- The (>>) operator
              (SyntaxExpr idR)  -- The `guard` operator; used only in MonadComp
@@ -2021,11 +2020,11 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   --          'GHC.Parser.Annotation.AnnOpen' @'{'@,'GHC.Parser.Annotation.AnnClose' @'}'@,
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | LetStmt  (XLetStmt idL idR body) (LHsLocalBindsLR idL idR)
+  | LetStmt  !(XLetStmt idL idR body) (LHsLocalBindsLR idL idR)
 
   -- ParStmts only occur in a list/monad comprehension
-  | ParStmt  (XParStmt idL idR body)    -- Post typecheck,
-                                        -- S in (>>=) :: Q -> (R -> S) -> T
+  | ParStmt  !(XParStmt idL idR body)    -- Post typecheck,
+                                         -- S in (>>=) :: Q -> (R -> S) -> T
              [ParStmtBlock idL idR]
              (HsExpr idR)               -- Polymorphic `mzip` for monad comprehensions
              (SyntaxExpr idR)           -- The `>>=` operator
@@ -2034,8 +2033,8 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
             -- bound by the stmts and used after themp
 
   | TransStmt {
-      trS_ext   :: XTransStmt idL idR body, -- Post typecheck,
-                                            -- R in (>>=) :: Q -> (R -> S) -> T
+      trS_ext   :: !(XTransStmt idL idR body), -- Post typecheck,
+                                               -- R in (>>=) :: Q -> (R -> S) -> T
       trS_form  :: TransForm,
       trS_stmts :: [ExprLStmt idL],   -- Stmts to the *left* of the 'group'
                                       -- which generates the tuples to be grouped
@@ -2060,7 +2059,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecStmt
-     { recS_ext :: XRecStmt idL idR body
+     { recS_ext :: !(XRecStmt idL idR body)
      , recS_stmts :: [LStmtLR idL idR body]
 
         -- The next two fields are only valid after renaming
@@ -2154,7 +2153,7 @@ data TransForm   -- The 'f' below is the 'using' function, 'e' is the by functio
 -- | Parenthesised Statement Block
 data ParStmtBlock idL idR
   = ParStmtBlock
-        (XParStmtBlock idL idR)
+        !(XParStmtBlock idL idR)
         [ExprLStmt idL]
         [IdP idR]          -- The variables to be returned
         (SyntaxExpr idR)   -- The return operator
@@ -2182,7 +2181,7 @@ type FailOperator id = Maybe (SyntaxExpr id)
 -- | Applicative Argument
 data ApplicativeArg idL
   = ApplicativeArgOne      -- A single statement (BindStmt or BodyStmt)
-    { xarg_app_arg_one  :: XApplicativeArgOne idL
+    { xarg_app_arg_one  :: !(XApplicativeArgOne idL)
       -- ^ The fail operator, after renaming
       --
       -- The fail operator is needed if this is a BindStmt
@@ -2201,7 +2200,7 @@ data ApplicativeArg idL
       -- See Note [Applicative BodyStmt]
     }
   | ApplicativeArgMany     -- do { stmts; return vars }
-    { xarg_app_arg_many :: XApplicativeArgMany idL
+    { xarg_app_arg_many :: !(XApplicativeArgMany idL)
     , app_stmts         :: [ExprLStmt idL] -- stmts
     , final_expr        :: HsExpr idL    -- return (v1,..,vn), or just (v1,..,vn)
     , bv_pattern        :: LPat idL      -- (v1,...,vn)
@@ -2549,19 +2548,19 @@ pprQuals quals = interpp'SP quals
 -- | Haskell Splice
 data HsSplice id
    = HsTypedSplice       --  $$z  or $$(f 4)
-        (XTypedSplice id)
+        !(XTypedSplice id)
         SpliceDecoration -- Whether $$( ) variant found, for pretty printing
         (IdP id)         -- A unique name to identify this splice point
         (LHsExpr id)     -- See Note [Pending Splices]
 
    | HsUntypedSplice     --  $z  or $(f 4)
-        (XUntypedSplice id)
+        !(XUntypedSplice id)
         SpliceDecoration -- Whether $( ) variant found, for pretty printing
         (IdP id)         -- A unique name to identify this splice point
         (LHsExpr id)     -- See Note [Pending Splices]
 
    | HsQuasiQuote        -- See Note [Quasi-quote overview] in GHC.Tc.Gen.Splice
-        (XQuasiQuote id)
+        !(XQuasiQuote id)
         (IdP id)         -- Splice point
         (IdP id)         -- Quoter
         SrcSpan          -- The span of the enclosed string
@@ -2573,7 +2572,7 @@ data HsSplice id
                 -- This is the result of splicing a splice. It is produced by
                 -- the renamer and consumed by the typechecker. It lives only
                 -- between the two.
-        (XSpliced id)
+        !(XSpliced id)
         ThModFinalizers     -- TH finalizers produced by the splice.
         (HsSplicedThing id) -- The result of splicing
    | XSplice !(XXSplice id) -- Note [Trees that Grow] extension point
@@ -2779,14 +2778,14 @@ ppr_splice herald n e trail
 
 -- | Haskell Bracket
 data HsBracket p
-  = ExpBr  (XExpBr p)   (LHsExpr p)    -- [|  expr  |]
-  | PatBr  (XPatBr p)   (LPat p)      -- [p| pat   |]
-  | DecBrL (XDecBrL p)  [LHsDecl p]   -- [d| decls |]; result of parser
-  | DecBrG (XDecBrG p)  (HsGroup p)   -- [d| decls |]; result of renamer
-  | TypBr  (XTypBr p)   (LHsType p)   -- [t| type  |]
-  | VarBr  (XVarBr p)   Bool (IdP p)  -- True: 'x, False: ''T
+  = ExpBr  !(XExpBr p)   (LHsExpr p)    -- [|  expr  |]
+  | PatBr  !(XPatBr p)   (LPat p)      -- [p| pat   |]
+  | DecBrL !(XDecBrL p)  [LHsDecl p]   -- [d| decls |]; result of parser
+  | DecBrG !(XDecBrG p)  (HsGroup p)   -- [d| decls |]; result of renamer
+  | TypBr  !(XTypBr p)   (LHsType p)   -- [t| type  |]
+  | VarBr  !(XVarBr p)   Bool (IdP p)  -- True: 'x, False: ''T
                                 -- (The Bool flag is used only in pprHsBracket)
-  | TExpBr (XTExpBr p) (LHsExpr p)    -- [||  expr  ||]
+  | TExpBr !(XTExpBr p) (LHsExpr p)    -- [||  expr  ||]
   | XBracket !(XXBracket p)           -- Note [Trees that Grow] extension point
 
 type instance XExpBr      (GhcPass _) = NoExtField

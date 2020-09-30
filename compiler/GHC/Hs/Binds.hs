@@ -79,7 +79,7 @@ type LHsLocalBinds id = XRec id (HsLocalBinds id)
 -- or a 'where' clause
 data HsLocalBindsLR idL idR
   = HsValBinds
-        (XHsValBinds idL idR)
+        !(XHsValBinds idL idR)
         (HsValBindsLR idL idR)
       -- ^ Haskell Value Bindings
 
@@ -89,11 +89,11 @@ data HsLocalBindsLR idL idR
          -- renamer to report them
 
   | HsIPBinds
-        (XHsIPBinds idL idR)
+        !(XHsIPBinds idL idR)
         (HsIPBinds idR)
       -- ^ Haskell Implicit Parameter Bindings
 
-  | EmptyLocalBinds (XEmptyLocalBinds idL idR)
+  | EmptyLocalBinds !(XEmptyLocalBinds idL idR)
       -- ^ Empty Local Bindings
 
   | XHsLocalBindsLR
@@ -121,7 +121,7 @@ data HsValBindsLR idL idR
     -- Not dependency analysed
     -- Recursive by default
     ValBinds
-        (XValBinds idL idR)
+        !(XValBinds idL idR)
         (LHsBindsLR idL idR) [LSig idR]
 
     -- | Value Bindings Out
@@ -224,7 +224,7 @@ data HsBindLR idL idR
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     FunBind {
 
-        fun_ext :: XFunBind idL idR,
+        fun_ext :: !(XFunBind idL idR),
 
           -- ^ After the renamer (but before the type-checker), this contains the
           -- locally-bound free variables of this defn. See Note [Bind free vars]
@@ -264,7 +264,7 @@ data HsBindLR idL idR
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | PatBind {
-        pat_ext    :: XPatBind idL idR, -- ^ See Note [Bind free vars]
+        pat_ext    :: !(XPatBind idL idR), -- ^ See Note [Bind free vars]
         pat_lhs    :: LPat idL,
         pat_rhs    :: GRHSs idR (LHsExpr idR),
         pat_ticks  :: ([Tickish Id], [[Tickish Id]])
@@ -277,14 +277,14 @@ data HsBindLR idL idR
   -- Dictionary binding and suchlike.
   -- All VarBinds are introduced by the type checker
   | VarBind {
-        var_ext    :: XVarBind idL idR,
+        var_ext    :: !(XVarBind idL idR),
         var_id     :: IdP idL,
         var_rhs    :: LHsExpr idR    -- ^ Located only for consistency
     }
 
   -- | Abstraction Bindings
   | AbsBinds {                      -- Binds abstraction; TRANSLATION
-        abs_ext     :: XAbsBinds idL idR,
+        abs_ext     :: !(XAbsBinds idL idR),
         abs_tvs     :: [TyVar],
         abs_ev_vars :: [EvVar],  -- ^ Includes equality constraints
 
@@ -306,7 +306,7 @@ data HsBindLR idL idR
 
   -- | Patterns Synonym Binding
   | PatSynBind
-        (XPatSynBind idL idR)
+        !(XPatSynBind idL idR)
         (PatSynBind idL idR)
         -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnPattern',
         --          'GHC.Parser.Annotation.AnnLarrow','GHC.Parser.Annotation.AnnEqual',
@@ -345,7 +345,7 @@ type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
 
 -- | Abstraction Bindings Export
 data ABExport p
-  = ABE { abe_ext       :: XABE p
+  = ABE { abe_ext       :: !(XABE p)
         , abe_poly      :: IdP p -- ^ Any INLINE pragma is attached to this Id
         , abe_mono      :: IdP p
         , abe_wrap      :: HsWrapper    -- ^ See Note [ABExport wrapper]
@@ -367,7 +367,7 @@ type instance XXABExport (GhcPass p) = NoExtCon
 
 -- | Pattern Synonym binding
 data PatSynBind idL idR
-  = PSB { psb_ext  :: XPSB idL idR,            -- ^ Post renaming, FVs.
+  = PSB { psb_ext  :: !(XPSB idL idR),         -- ^ Post renaming, FVs.
                                                -- See Note [Bind free vars]
           psb_id   :: LIdP idL,                -- ^ Name of the pattern synonym
           psb_args :: HsPatSynDetails idR,     -- ^ Formal parameter names
@@ -798,7 +798,7 @@ pprTicks pp_no_debug pp_when_debug
 -- | Haskell Implicit Parameter Bindings
 data HsIPBinds id
   = IPBinds
-        (XIPBinds id)
+        !(XIPBinds id)
         [LIPBind id]
         -- TcEvBinds       -- Only in typechecker output; binds
         --                 -- uses of the implicit parameters
@@ -837,7 +837,7 @@ type LIPBind id = XRec id (IPBind id)
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data IPBind id
   = IPBind
-        (XCIPBind id)
+        !(XCIPBind id)
         (Either (XRec id HsIPName) (IdP id))
         (LHsExpr id)
   | XIPBind !(XXIPBind id)
@@ -891,7 +891,7 @@ data Sig pass
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     TypeSig
-       (XTypeSig pass)
+       !(XTypeSig pass)
        [LIdP pass]           -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 
@@ -904,7 +904,7 @@ data Sig pass
       --           'GHC.Parser.Annotation.AnnDot','GHC.Parser.Annotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | PatSynSig (XPatSynSig pass) [LIdP pass] (LHsSigType pass)
+  | PatSynSig !(XPatSynSig pass) [LIdP pass] (LHsSigType pass)
       -- P :: forall a b. Req => Prov => ty
 
       -- | A signature for a class method
@@ -917,14 +917,14 @@ data Sig pass
       --
       --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDefault',
       --           'GHC.Parser.Annotation.AnnDcolon'
-  | ClassOpSig (XClassOpSig pass) Bool [LIdP pass] (LHsSigType pass)
+  | ClassOpSig !(XClassOpSig pass) Bool [LIdP pass] (LHsSigType pass)
 
         -- | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
         -- the desired Id itself, replete with its name, type
         -- and IdDetails.  Otherwise it's just like a type
         -- signature: there should be an accompanying binding
-  | IdSig (XIdSig pass) Id
+  | IdSig !(XIdSig pass) Id
 
         -- | An ordinary fixity declaration
         --
@@ -935,7 +935,7 @@ data Sig pass
         --           'GHC.Parser.Annotation.AnnVal'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | FixSig (XFixSig pass) (FixitySig pass)
+  | FixSig !(XFixSig pass) (FixitySig pass)
 
         -- | An inline pragma
         --
@@ -948,7 +948,7 @@ data Sig pass
         --       'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | InlineSig   (XInlineSig pass)
+  | InlineSig   !(XInlineSig pass)
                 (LIdP pass)        -- Function name
                 InlinePragma       -- Never defaultInlinePragma
 
@@ -964,7 +964,7 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnDcolon'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | SpecSig     (XSpecSig pass)
+  | SpecSig     !(XSpecSig pass)
                 (LIdP pass)        -- Specialise a function or datatype  ...
                 [LHsSigType pass]  -- ... to these types
                 InlinePragma       -- The pragma on SPECIALISE_INLINE form.
@@ -982,7 +982,7 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnInstance','GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType pass)
+  | SpecInstSig !(XSpecInstSig pass) SourceText (LHsSigType pass)
                   -- Note [Pragma source text] in GHC.Types.Basic
 
         -- | A minimal complete definition pragma
@@ -994,7 +994,7 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | MinimalSig (XMinimalSig pass)
+  | MinimalSig !(XMinimalSig pass)
                SourceText (LBooleanFormula (LIdP pass))
                -- Note [Pragma source text] in GHC.Types.Basic
 
@@ -1006,7 +1006,7 @@ data Sig pass
         --
         -- > {-# SCC funName "cost_centre_name" #-}
 
-  | SCCFunSig  (XSCCFunSig pass)
+  | SCCFunSig  !(XSCCFunSig pass)
                SourceText     -- Note [Pragma source text] in GHC.Types.Basic
                (LIdP pass)    -- Function name
                (Maybe (XRec pass StringLiteral))
@@ -1017,7 +1017,7 @@ data Sig pass
        -- Used to inform the pattern match checker about additional
        -- complete matchings which, for example, arise from pattern
        -- synonym definitions.
-  | CompleteMatchSig (XCompleteMatchSig pass)
+  | CompleteMatchSig !(XCompleteMatchSig pass)
                      SourceText
                      (XRec pass [LIdP pass])
                      (Maybe (LIdP pass))
@@ -1040,7 +1040,7 @@ type instance XXSig             (GhcPass p) = NoExtCon
 type LFixitySig pass = XRec pass (FixitySig pass)
 
 -- | Fixity Signature
-data FixitySig pass = FixitySig (XFixitySig pass) [LIdP pass] Fixity
+data FixitySig pass = FixitySig !(XFixitySig pass) [LIdP pass] Fixity
                     | XFixitySig !(XXFixitySig pass)
 
 type instance XFixitySig  (GhcPass p) = NoExtField
