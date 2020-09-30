@@ -282,6 +282,9 @@ hadrian-ghc-in-ghci:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
   script:
+    - "echo $PATH"
+    - "echo $SHELL"
+    - which autoreconf
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_make
@@ -382,9 +385,10 @@ release-x86_64-freebsd:
 
 validate-x86_64-darwin:
   extends: .validate
-  stage: full-build
+  stage: lint
   tags:
     - x86_64-darwin
+    - testing
   variables:
     GHC_VERSION: 8.8.4
     CABAL_INSTALL_VERSION: 3.0.0.0
