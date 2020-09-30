@@ -385,6 +385,7 @@ validate-x86_64-darwin:
   stage: full-build
   tags:
     - x86_64-darwin
+    - testing
   variables:
     GHC_VERSION: 8.8.4
     CABAL_INSTALL_VERSION: 3.0.0.0
