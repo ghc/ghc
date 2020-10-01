@@ -28,6 +28,7 @@ import GHC.Types
 import GHC.Magic (runRW#)
 import {-# SOURCE #-} GHC.Num.Integer
 import {-# SOURCE #-} GHC.Num.BigNat
+import {-# SOURCE #-} GHC.Num.Natural
 
 default ()
 
@@ -354,8 +355,37 @@ bignat_powmod
    -> WordArray#
    -> State# RealWorld
    -> State# RealWorld
-bignat_powmod r b e m s =
-   case ioInt# (integer_gmp_powm# r b (wordArraySize# b) e (wordArraySize# e) m (wordArraySize# m)) s of
+bignat_powmod r b e m s = sbignat_powmod r (wordArraySize# b) b e m s
+
+integer_powmod
+   :: Integer
+   -> Natural
+   -> Natural
+   -> Natural
+integer_powmod b e m = naturalFromBigNat# (withNewWordArray# szm io)
+   where
+      !be = naturalToBigNat# e
+      !bm = naturalToBigNat# m
+      !(# sb, bb #) = integerToBigNatSign# b
+      !szb = bigNatSize# bb
+      !szm = bigNatSize# bm
+      !ssb = case sb of -- signed size of b
+               0# -> szb
+               _  -> negateInt# szb
+
+      io r s = sbignat_powmod r ssb bb be bm s
+
+
+sbignat_powmod
+   :: MutableWordArray# RealWorld
+   -> Int#
+   -> WordArray#
+   -> WordArray#
+   -> WordArray#
+   -> State# RealWorld
+   -> State# RealWorld
+sbignat_powmod r b_signed_size b e m s =
+   case ioInt# (integer_gmp_powm# r b b_signed_size e (wordArraySize# e) m (wordArraySize# m)) s of
       (# s', n #) -> mwaSetSize# r (narrowGmpSize# n) s'
 
 integer_gcde
@@ -425,16 +455,16 @@ integer_gcde a b = case runRW# io of (# _, a #) -> a
 
 integer_recip_mod
    :: Integer
-   -> Integer
-   -> (# Integer | () #)
+   -> Natural
+   -> (# Natural | () #)
 integer_recip_mod x m =
    let
       !(#  sign_x, bx #) = integerToBigNatSign# x
-      !(# _sign_m, bm #) = integerToBigNatSign# m
+      !bm = naturalToBigNat# m
       !br = sbignat_recip_mod sign_x bx bm
    in if isTrue# (bigNatIsZero# br)
          then (# | () #)
-         else (# integerFromBigNat# br | #)
+         else (# naturalFromBigNat# br | #)
 
 
 -- | Return 0 for invalid inputs
