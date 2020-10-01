@@ -22,7 +22,7 @@ The HTML view has an instruction lookup, the xml file is also good.
 
 ### Cmm
 
-@GHC.CmmToAsm@ contains the top-level netry point @nativeCodeGen@,
+@GHC.CmmToAsm@ contains the top-level entry point @nativeCodeGen@,
 which will be called from @GHC.Driver.CodeOutput.outputAsm@, which
 is triggert via the @-fasm@ flag.
 
