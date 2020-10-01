@@ -680,7 +680,7 @@ release-x86_64-linux-deb10:
 .build-x86_64-linux-ubuntu2004:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu2004:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-ubuntu2004"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-ubuntu2004-linux.tar.xz"
