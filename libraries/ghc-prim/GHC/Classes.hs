@@ -125,18 +125,13 @@ and @('>=')@ for the types in "GHC.Word" and "GHC.Int".
 -- and 'Eq' may be derived for any datatype whose constituents are also
 -- instances of 'Eq'.
 --
--- The Haskell Report defines no laws for 'Eq'. However, '==' is customarily
--- expected to implement an equivalence relationship where two values comparing
--- equal are indistinguishable by "public" functions, with a "public" function
--- being one not allowing to see implementation details. For example, for a
--- type representing non-normalised natural numbers modulo 100, a "public"
--- function doesn't make the difference between 1 and 201. It is expected to
--- have the following properties:
+-- The Haskell Report defines no laws for 'Eq'. However, instances are
+-- encouraged to follow these properties:
 --
 -- [__Reflexivity__]: @x == x@ = 'True'
 -- [__Symmetry__]: @x == y@ = @y == x@
 -- [__Transitivity__]: if @x == y && y == z@ = 'True', then @x == z@ = 'True'
--- [__Substitutivity__]: if @x == y@ = 'True' and @f@ is a "public" function
+-- [__Extensionality__]: if @x == y@ = 'True' and @f@ is a function
 -- whose return type is an instance of 'Eq', then @f x == f y@ = 'True'
 -- [__Negation__]: @x /= y@ = @not (x == y)@
 --
@@ -234,7 +229,7 @@ eqChar, neChar :: Char -> Char -> Bool
 -- >>> 0/0 == (0/0 :: Float)
 -- False
 --
--- Also note that `Float`'s 'Eq' instance does not satisfy substitutivity:
+-- Also note that `Float`'s 'Eq' instance does not satisfy extensionality:
 --
 -- >>> 0 == (-0 :: Float)
 -- True
