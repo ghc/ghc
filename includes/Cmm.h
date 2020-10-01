@@ -652,7 +652,7 @@
    -------------------------------------------------------------------------- */
 
 #if defined(TICKY_TICKY)
-#define TICK_BUMP_BY(ctr,n) CLong[ctr] = CLong[ctr] + n
+#define TICK_BUMP_BY(ctr,n) W_[ctr] = W_[ctr] + n
 #else
 #define TICK_BUMP_BY(ctr,n) /* nothing */
 #endif
