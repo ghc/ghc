@@ -2,22 +2,25 @@
 {-# LANGUAGE LambdaCase #-}
 module Main where
 
-import Control.Concurrent (forkIO, threadDelay)
-import Control.Concurrent.MVar (putMVar, takeMVar, newEmptyMVar)
 import Control.Monad
 import Control.Exception
-import Data.Maybe (isNothing)
 import System.Environment (getArgs)
 import System.Exit
-import System.IO (hPutStrLn, stderr)
+import Prelude hiding (pi)
 
 #if !defined(mingw32_HOST_OS)
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent.MVar (putMVar, takeMVar, newEmptyMVar)
+
+import Data.Maybe (isNothing)
+
 import System.Posix hiding (killProcess)
 import System.IO.Error hiding (try,catch)
+import System.IO (hPutStrLn, stderr)
 #endif
 
 #if defined(mingw32_HOST_OS)
-import System.Process
+-- import System.Process
 import WinCBindings
 import Foreign
 import System.Win32.DebugApi
@@ -114,8 +117,8 @@ run secs cmd =
        -- We're explicitly turning off handle inheritance to prevent misc handles
        -- from being inherited by the child. Notable we don't want the I/O Completion
        -- Ports and Job handles to be inherited. So we mark them as non-inheritable.
-       setHandleInformation job    cHANDLE_FLAG_INHERIT 0
-       setHandleInformation ioPort cHANDLE_FLAG_INHERIT 0
+       _ <- setHandleInformation job    cHANDLE_FLAG_INHERIT 0
+       _ <- setHandleInformation ioPort cHANDLE_FLAG_INHERIT 0
 
        -- Now create the process suspended so we can add it to the job and then resume.
        -- This is so we don't miss any events on the receiving end of the I/O port.
@@ -132,30 +135,30 @@ run secs cmd =
        let handleInterrupt action =
                action `onException` terminateJobObject job 99
            handleCtrl _ = do
-               terminateJobObject job 99
-               closeHandle ioPort
-               closeHandle job
-               exitWith (ExitFailure 99)
+               _ <- terminateJobObject job 99
+               _ <- closeHandle ioPort
+               _ <- closeHandle job
+               _ <- exitWith (ExitFailure 99)
                return True
 
        withConsoleCtrlHandler handleCtrl $
            handleInterrupt $ do
-              resumeThread (piThread pi)
+              _ <- resumeThread (piThread pi)
               -- The program is now running
-              let handle = piProcess pi
+              let p_handle = piProcess pi
               let millisecs = secs * 1000
               rc <- waitForJobCompletion job ioPort (fromIntegral millisecs)
-              closeHandle ioPort
+              _ <- closeHandle ioPort
 
               if not rc
-                then do terminateJobObject job 99
-                        closeHandle job
+                then do _ <- terminateJobObject job 99
+                        _ <- closeHandle job
                         exitWith (ExitFailure 99)
                 else alloca $ \p_exitCode ->
-                      do terminateJobObject job 0
+                      do _ <- terminateJobObject job 0
                          -- Ensured it's all really dead.
-                         closeHandle job
-                         r <- getExitCodeProcess handle p_exitCode
+                         _ <- closeHandle job
+                         r <- getExitCodeProcess p_handle p_exitCode
                          if r
                            then peek p_exitCode >>= \case
                                    0 -> exitWith ExitSuccess
