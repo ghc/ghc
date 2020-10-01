@@ -72,10 +72,10 @@ the value ``MkT1 x`` can be constructed and deconstructed in a linear context:
 
 ::
 
-    construct :: a %1 -> MkT1 a
+    construct :: a %1 -> T1 a
     construct x = MkT1 x
 
-    deconstruct :: MkT1 a %1 -> a
+    deconstruct :: T1 a %1 -> a
     deconstruct (MkT1 x) = x  -- must consume `x` exactly once
 
 When used as a value, ``MkT1`` is given a multiplicity-polymorphic
