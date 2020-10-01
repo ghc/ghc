@@ -869,7 +869,19 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
         IF_DEBUG(linker, debugBelch("lookupSymbol: symbol '%s' not found, trying dlsym\n", lbl));
 
 #       if defined(OBJFORMAT_ELF)
-        return internal_dlsym(lbl);
+        SymbolAddr *ret = internal_dlsym(lbl);
+
+        // Generally the dynamic linker would define _DYNAMIC, which is
+        // supposed to point to various bits of dynamic linker state (see
+        // [1]). However, if dynamic linking isn't supported (e.g. in the case
+        // of musl) then we can safely declare that it is NULL.
+        //
+        // [1] https://wiki.gentoo.org/wiki/Hardened/Introduction_to_Position_Independent_Code
+        if (ret == NULL && strcmp(lbl, "_DYNAMIC") == 0) {
+            static void *RTS_DYNAMIC = NULL;
+            ret = (SymbolAddr *) &RTS_DYNAMIC;
+        }
+        return ret;
 #       elif defined(OBJFORMAT_MACHO)
 
         /* HACK: On OS X, all symbols are prefixed with an underscore.
