@@ -24,7 +24,7 @@ The HTML view has an instruction lookup, the xml file is also good.
 
 @GHC.CmmToAsm@ contains the top-level entry point @nativeCodeGen@,
 which will be called from @GHC.Driver.CodeOutput.outputAsm@, which
-is triggert via the @-fasm@ flag.
+is triggered via the @-fasm@ flag.
 
 Thus, we'll not concern ourselves with anything in the pipeline
 before that point.
