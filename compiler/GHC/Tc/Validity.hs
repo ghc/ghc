@@ -542,6 +542,15 @@ allConstraintsAllowed ctxt = case typeOrKindCtxt ctxt of
   BothTypeAndKindCtxt -> True
 
 -- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
+-- context for a kind of a type, where all function arrows currently
+-- must be unrestricted.
+linearityAllowed :: UserTypeCtxt -> Bool
+linearityAllowed ctxt = case typeOrKindCtxt ctxt of
+  OnlyTypeCtxt        -> True
+  OnlyKindCtxt        -> False
+  BothTypeAndKindCtxt -> True
+
+-- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
 -- context for the type of a term, where visible, dependent quantification is
 -- currently disallowed. If the 'UserTypeCtxt' can refer to both types and
 -- kinds, this function conservatively returns 'True'.
@@ -744,8 +753,12 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
     (theta, tau)  = tcSplitPhiTy phi
     (env', tvbs') = tidyTyCoVarBinders env tvbs
 
-check_type (ve@ValidityEnv{ve_rank = rank}) (FunTy _ _ arg_ty res_ty)
-  = do  { check_type (ve{ve_rank = arg_rank}) arg_ty
+check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
+                          , ve_rank = rank })
+           ty@(FunTy _ mult arg_ty res_ty)
+  = do  { failIfTcM (not (linearityAllowed ctxt) && not (isManyDataConTy mult))
+                     (linearFunKindErr env ty)
+        ; check_type (ve{ve_rank = arg_rank}) arg_ty
         ; check_type (ve{ve_rank = res_rank}) res_ty }
   where
     (arg_rank, res_rank) = funArgResRank rank
@@ -992,6 +1005,11 @@ illegalVDQTyErr env ty =
           text "in the type of a term:")
        2 (ppr_tidy env ty)
   , text "(GHC does not yet support this)" ] )
+
+-- | Reject uses of linear function arrows in kinds.
+linearFunKindErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+linearFunKindErr env ty =
+  (env, text "Illegal linear function in a kind:" <+> ppr_tidy env ty)
 
 {-
 Note [Liberal type synonyms]
