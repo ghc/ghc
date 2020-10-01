@@ -11,7 +11,7 @@ test('T5373', [req_shared_libs], makefile_test, [])
 # It's not clear exactly what platforms we can expect this to succeed on.
 test('T13702',
      [when(have_thread_sanitizer(), expect_broken(18884)),
-      unless(opsys('linux'), skip)],
+      req_shared_libs, unless(opsys('linux'), skip)],
      makefile_test, [])
 
 # test that -shared and -flink-rts actually links the rts
