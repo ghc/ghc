@@ -1,5 +1,4 @@
 
-LinearKind.hs:4:11: error:
-    • Linear arrows disallowed in kinds: * %1 -> *
-    • In the kind ‘* %1 -> *’
-      In the data type declaration for ‘A’
+LinearKind.hs:4:1: error:
+    • Illegal linear function in a kind: * %1 -> *
+    • In the data type declaration for ‘A’
