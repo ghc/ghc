@@ -277,7 +277,7 @@ unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 --      are the same  -- but the proof of that relies on the complex, trusted
 --      implementation of @Typeable@.
 --
---   4. The "reflection trick", which takes advantanage of the fact that in
+--   4. The "reflection trick", which takes advantage of the fact that in
 --      @class C a where { op :: ty }@, we can safely coerce between @C a@ and @ty@
 --      (which have different kinds!) because it's really just a newtype.
 --      Note: there is /no guarantee, at all/ that this behavior will be supported

@@ -234,7 +234,7 @@ pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)
 
 instanceHead :: ClsInst -> ([TyVar], Class, [Type])
--- Returns the head, using the fresh tyavs from the ClsInst
+-- Returns the head, using the fresh tyvars from the ClsInst
 instanceHead (ClsInst { is_tvs = tvs, is_tys = tys, is_dfun = dfun })
    = (tvs, cls, tys)
    where

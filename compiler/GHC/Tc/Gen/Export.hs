@@ -579,7 +579,7 @@ lookupChildrenExport spec_parent rdr_items =
 --
 -- Note: [Types of TyCon]
 --
--- This check appears to be overlly complicated, Richard asked why it
+-- This check appears to be overly complicated, Richard asked why it
 -- is not simply just `isAlgTyCon`. The answer for this is that
 -- a classTyCon is also an `AlgTyCon` which we explicitly want to disallow.
 -- (It is either a newtype or data depending on the number of methods)

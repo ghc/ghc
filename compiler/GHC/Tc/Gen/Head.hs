@@ -326,7 +326,7 @@ tcInferAppHead :: HsExpr GhcRn
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- We get back a /SigmaType/ because we have special cases for
 --   * A bare identifier (just look it up)
---     This case also covers a record selectro HsRecFld
+--     This case also covers a record selector HsRecFld
 --   * An expression with a type signature (e :: ty)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 --

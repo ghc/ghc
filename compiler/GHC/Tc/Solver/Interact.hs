@@ -2606,7 +2606,7 @@ because many good things flow from [W] t1 ~# t2.
 
 The same reasoning applies to
 
-* (~~)        heqTyCOn
+* (~~)        heqTyCon
 * (~)         eqTyCon
 * Coercible   coercibleTyCon
 

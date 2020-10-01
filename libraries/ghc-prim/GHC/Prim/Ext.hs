@@ -10,7 +10,7 @@
 #include "MachDeps.h"
 
 -- See note [When do out-of-line primops go in primops.txt.pp]. More primops
--- there are elgible according to the description below, but cannot yet be moved
+-- there are eligible according to the description below, but cannot yet be moved
 -- here because of superficial restrictions to `foreign import prim`. Hopefully
 -- that is fixed soon.
 

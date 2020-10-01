@@ -625,7 +625,7 @@ schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
           --    match = /\(r::RuntimeRep) /\(a::TYPE r).
           --            \(k :: Int -> a) \(v::T).
           --            case v of MkV n -> k n
-          -- Here (k n) :: a :: Type r, so we don't know if it's lifted
+          -- Here (k n) :: a :: TYPE r, so we don't know if it's lifted
           -- or not; but that should be fine provided we add that void arg.
 
           id <- newId (mkVisFunTyMany realWorldStatePrimTy ty)

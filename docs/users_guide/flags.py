@@ -257,7 +257,7 @@ class LanguageExtension(GenericFlag):
     @staticmethod
     def _noname(name):
         # We check isupper() so that NondecreasingIndentation
-        # is not counted as "No-decreasingIndentation"
+        # is not counted as "No-ndecreasingIndentation"
         if name[:2] == "No" and name[2].isupper():
           return name[2:]
         else:

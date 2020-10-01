@@ -1689,7 +1689,7 @@ points so that the code is readable with its original meaning.
 
 So scattered through "GHC.ThToHs" are various points where parens are added.
 
-See (among other closed issued) https://gitlab.haskell.org/ghc/ghc/issues/14289
+See (among other closed issues) https://gitlab.haskell.org/ghc/ghc/issues/14289
 -}
 -- ---------------------------------------------------------------------
 

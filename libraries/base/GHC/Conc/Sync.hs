@@ -497,7 +497,7 @@ labelThread (ThreadId t) str =
      case labelThread# t p s of s1 -> (# s1, () #)
 
 --      Nota Bene: 'pseq' used to be 'seq'
---                 but 'seq' is now defined in PrelGHC
+--                 but 'seq' is now defined in GHC.Prim
 --
 -- "pseq" is defined a bit weirdly (see below)
 --

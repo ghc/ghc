@@ -604,7 +604,7 @@ which allows only (Coercion co) on the RHS.
 
 ************************************************************************
 *                                                                      *
-               Operations oer case alternatives
+               Operations over case alternatives
 *                                                                      *
 ************************************************************************
 

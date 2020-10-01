@@ -2032,7 +2032,7 @@ GHC.Core.Multiplicity above this module.
 -- | A shorthand for data with an attached 'Mult' element (the multiplicity).
 data Scaled a = Scaled Mult a
   deriving (Data.Data)
-  -- You might think that this would be a natural candiate for
+  -- You might think that this would be a natural candidate for
   -- Functor, Traversable but Krzysztof says (!3674) "it was too easy
   -- to accidentally lift functions (substitutions, zonking etc.) from
   -- Type -> Type to Scaled Type -> Scaled Type, ignoring

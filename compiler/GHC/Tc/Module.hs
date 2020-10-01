@@ -301,7 +301,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                         tcg_env <- return (tcg_env
                                            { tcg_doc_hdr = maybe_doc_hdr })
                       ; -- Report unused names
-                        -- Do this /after/ typeinference, so that when reporting
+                        -- Do this /after/ type inference, so that when reporting
                         -- a function with no type signature we can give the
                         -- inferred type
                         reportUnusedNames tcg_env hsc_src
