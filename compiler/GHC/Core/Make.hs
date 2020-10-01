@@ -940,7 +940,7 @@ We use aBSENT_ERROR_ID to build dummy values in workers.  E.g.
 
    f x = (case x of (a,b) -> b) + 1::Int
 
-The demand analyser figures ot that only the second component of x is
+The demand analyser figures out that only the second component of x is
 used, and does a w/w split thus
 
    f x = case x of (a,b) -> $wf b

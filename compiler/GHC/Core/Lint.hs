@@ -178,7 +178,7 @@ in GHC.Core.Opt.WorkWrap.Utils.  (Maybe there are other "clients" of this featur
   might reject a correct program.  So we carry a type substitution (in
   this example [a -> Bool]) and apply this substitution before
   comparing types. In effect, in Lint, type equality is always
-  equality-moduolo-le-subst.  This is in the le_subst field of
+  equality-modulo-le-subst.  This is in the le_subst field of
   LintEnv.  But nota bene:
 
   (SI1) The le_subst substitution is applied to types and coercions only

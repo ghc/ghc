@@ -1669,7 +1669,7 @@ datatypeClassKey    = mkPreludeClassUnique 39
 constructorClassKey = mkPreludeClassUnique 40
 selectorClassKey    = mkPreludeClassUnique 41
 
--- KnownNat: see Note [KnowNat & KnownSymbol and EvLit] in GHC.Tc.Types.Evidence
+-- KnownNat: see Note [KnownNat & KnownSymbol and EvLit] in GHC.Tc.Types.Evidence
 knownNatClassNameKey :: Unique
 knownNatClassNameKey = mkPreludeClassUnique 42
 

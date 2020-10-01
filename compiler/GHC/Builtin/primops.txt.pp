@@ -163,7 +163,7 @@ defaults
 --
 -- Unfortunately, for the time being most of the primops which should be
 -- moved according to the previous paragraph can't yet. There are some
--- superficial restrictions in `foreign import prim` which mus be fixed
+-- superficial restrictions in `foreign import prim` which must be fixed
 -- first. Specifically, `foreign import prim` always requires:
 --
 --   - No polymorphism in type

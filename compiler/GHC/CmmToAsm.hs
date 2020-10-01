@@ -1174,7 +1174,7 @@ initNCGConfig dflags = NCGConfig
                                  ArchX86    -> bmiVersion dflags
                                  _          -> Nothing
 
-     -- We Assume  SSE1 and SSE2 operations are available on both
+     -- We assume  SSE1 and SSE2 operations are available on both
      -- x86 and x86_64. Historically we didn't default to SSE2 and
      -- SSE1 on x86, which results in defacto nondeterminism for how
      -- rounding behaves in the associated x87 floating point instructions
