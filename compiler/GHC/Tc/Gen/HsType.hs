@@ -1041,11 +1041,8 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
   = failWithTc (text "Unexpected type splice:" <+> ppr ty)
 
 ---------- Functions and applications
-tc_hs_type mode ty@(HsFunTy _ mult ty1 ty2) exp_kind
-  | mode_tyki mode == KindLevel && not (isUnrestricted mult)
-    = failWithTc (text "Linear arrows disallowed in kinds:" <+> ppr ty)
-  | otherwise
-    = tc_fun_type mode mult ty1 ty2 exp_kind
+tc_hs_type mode (HsFunTy _ mult ty1 ty2) exp_kind
+  = tc_fun_type mode mult ty1 ty2 exp_kind
 
 tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
