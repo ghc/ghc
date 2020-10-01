@@ -1233,11 +1233,39 @@ integerGcde a b = case integerGcde# a b of
 --
 integerRecipMod#
    :: Integer
-   -> Integer
-   -> (# Integer | () #)
+   -> Natural
+   -> (# Natural | () #)
 integerRecipMod# x m
    | integerIsZero x = (# | () #)
-   | integerIsZero m = (# | () #)
-   | IS 1#    <- m   = (# | () #)
-   | IS (-1#) <- m   = (# | () #)
+   | naturalIsZero m = (# | () #)
+   | naturalIsOne  m = (# | () #)
    | True            = Backend.integer_recip_mod x m
+
+
+-- | Computes the modular exponentiation.
+--
+-- I.e. y = integer_powmod b e m
+--        = b^e `mod` m
+--
+-- with 0 <= y < abs m
+--
+-- If e is negative, we use `integerRecipMod#` to try to find a modular
+-- multiplicative inverse (which may not exist).
+integerPowMod# :: Integer -> Integer -> Natural -> (# Natural | () #)
+integerPowMod# !b !e !m
+   | naturalIsZero m     = (# | () #)
+   | naturalIsOne  m     = (# naturalZero | #)
+   | integerIsZero e     = (# naturalOne  | #)
+   | integerIsZero b     = (# naturalZero | #)
+   | integerIsOne  b     = (# naturalOne  | #)
+     -- when the exponent is negative, try to find the modular multiplicative
+     -- inverse and use it instead
+   | integerIsNegative e = case integerRecipMod# b m of
+      (#    | () #) -> (# | () #)
+      (# b' |    #) -> integerPowMod#
+                        (integerFromNatural b')
+                        (integerNegate e)
+                        m
+
+     -- e > 0 by cases above
+   | True = (# Backend.integer_powmod b (integerToNatural e) m | #)

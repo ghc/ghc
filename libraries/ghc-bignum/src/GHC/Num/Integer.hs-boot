@@ -7,6 +7,7 @@ module GHC.Num.Integer where
 import GHC.Types
 import GHC.Prim
 import {-# SOURCE #-} GHC.Num.BigNat
+import {-# SOURCE #-} GHC.Num.Natural
 
 data Integer
 
@@ -32,3 +33,5 @@ integerQuotRem# :: Integer -> Integer -> (# Integer, Integer #)
 integerToBigNatSign# :: Integer -> (# Int#, BigNat# #)
 integerFromBigNatSign# :: Int# -> BigNat# -> Integer
 integerFromBigNat# :: BigNat# -> Integer
+integerToNatural :: Integer -> Natural
+integerFromNatural :: Natural -> Integer

@@ -14,7 +14,7 @@ module GHC.Num.Backend.Native where
 #include "MachDeps.h"
 #include "WordSize.h"
 
-#if defined(BIGNUM_NATIVE) || defined(BIGNUM_CHECK)
+#if defined(BIGNUM_NATIVE) || defined(BIGNUM_CHECK) || defined(BIGNUM_FFI)
 import {-# SOURCE #-} GHC.Num.BigNat
 import {-# SOURCE #-} GHC.Num.Natural
 import {-# SOURCE #-} GHC.Num.Integer
@@ -740,14 +740,37 @@ integer_gcde a b = f (# a,integerOne,integerZero #) (# b,integerZero,integerOne 
 
 integer_recip_mod
    :: Integer
-   -> Integer
-   -> (# Integer | () #)
+   -> Natural
+   -> (# Natural | () #)
 integer_recip_mod x m =
-   let m' = integerAbs m
+   let m' = integerFromNatural m
    in case integer_gcde x m' of
       (# g, a, _b #)
          -- gcd(x,m) = ax+mb = 1
          -- ==> ax - 1 = -mb
          -- ==> ax     = 1 [m]
-         | g `integerEq` integerOne -> (# a `integerMod` m' | #)
+         | g `integerEq` integerOne -> (# integerToNatural (a `integerMod` m') | #)
+                                       -- a `mod` m > 0 because m > 0
          | True                     -> (# | () #)
+
+integer_powmod
+   :: Integer
+   -> Natural
+   -> Natural
+   -> Natural
+integer_powmod b0 e0 m = go b0 e0 integerOne
+   where
+      !m' = integerFromNatural m
+
+      go !b e !r
+        | isTrue# (e `naturalTestBit#` 0##)
+        = go b' e' ((r `integerMul` b) `integerMod` m')
+
+        | naturalIsZero e
+        = integerToNatural r -- r >= 0 by integerMod above
+
+        | True
+        = go b' e' r
+        where
+          b' = (b `integerMul` b) `integerRem` m'
+          e' = e `naturalShiftR#` 1##

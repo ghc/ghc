@@ -16,8 +16,12 @@ naturalToWord# :: Natural -> Word#
 naturalFromWord# :: Word# -> Natural
 naturalFromBigNat# :: BigNat# -> Natural
 naturalToBigNat# :: Natural -> BigNat#
+
+naturalZero :: Natural
 naturalMul :: Natural -> Natural -> Natural
 naturalRem :: Natural -> Natural -> Natural
-naturalIsZero :: Natural -> Bool
 naturalShiftR# :: Natural -> Word# -> Natural
+
+naturalIsZero :: Natural -> Bool
 naturalTestBit# :: Natural -> Word# -> Bool#
+naturalEq# :: Natural -> Natural -> Bool#
