@@ -987,7 +987,7 @@ mismatch between two skolems
 We certainly don't want to say "Can't match LiftedRep ~ LiftedRep"!
 
 But if we are printing the type
-    (forall (a :: Type r). blah
+    (forall (a :: TYPE r). blah
 we do want to turn that (free) r into LiftedRep, so it prints as
     (forall a. blah)
 

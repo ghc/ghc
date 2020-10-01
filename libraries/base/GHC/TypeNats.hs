@@ -82,7 +82,7 @@ someNatVal n = withSNat SomeNat (SNat n) Proxy
 {- Note [NOINLINE someNatVal]
 
 `someNatVal` converts a natural number to an existentially quantified
-dictionary for `KnowNat` (aka `SomeNat`).  The existential quantification
+dictionary for `KnownNat` (aka `SomeNat`).  The existential quantification
 is very important, as it captures the fact that we don't know the type
 statically, although we do know that it exists.   Because this type is
 fully opaque, we should never be able to prove that it matches anything else.

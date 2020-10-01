@@ -809,7 +809,7 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
   = ASSERT2( not (isCoVar old_id), ppr old_id )
     (env { seInScope = in_scope `extendInScopeSet` new_id,
            seIdSubst = new_subst }, new_id)
-    -- It's important that both seInScope and seIdSubt are updated with
+    -- It's important that both seInScope and seIdSubst are updated with
     -- the new_id, /after/ applying adjust_type. That's why adjust_type
     -- is done here.  If we did adjust_type in simplJoinBndr (the only
     -- place that gives a non-identity adjust_type) we'd have to fiddle

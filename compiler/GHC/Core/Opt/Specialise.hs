@@ -946,7 +946,7 @@ and we get a loop!
 Note [specImport call stack]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When specialising an imports function 'f', we may get new calls
-of an imported fuction 'g', which we want to specialise in turn,
+of an imported function 'g', which we want to specialise in turn,
 and similarly specialising 'g' might expose a new call to 'h'.
 
 We track the stack of enclosing functions. So when specialising 'h' we

@@ -196,7 +196,7 @@ tcApp works like this:
    The "list of arguments" is [HsExprArg], described in Note [HsExprArg].
    in GHC.Tc.Gen.Head
 
-2. Use tcInferAppHead to infer the type of the fuction,
+2. Use tcInferAppHead to infer the type of the function,
      as an (uninstantiated) TcSigmaType
    There are special cases for
      HsVar, HsRecFld, and ExprWithTySig
@@ -588,7 +588,7 @@ Consider (#15859)
 
   data A k :: k -> Type      -- A      :: forall k -> k -> Type
   type KindOf (a :: k) = k   -- KindOf :: forall k. k -> Type
-  a = (undefind :: KindOf A) @Int
+  a = (undefined :: KindOf A) @Int
 
 With ImpredicativeTypes (thin ice, I know), we instantiate
 KindOf at type (forall k -> k -> Type), so

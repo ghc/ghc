@@ -10,4 +10,4 @@ newtype T :: Type where
   MkT :: Int -> (T :: Star)
 
 -- The error message is pretty terrible
--- but it probably nevery happens in practice
+-- but it probably never happens in practice

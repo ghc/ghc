@@ -601,7 +601,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; traceTc "findingValidHoleFitsFor }" empty
      ; return (tidy_env, vMsg $$ refMsg) }
   where
-    -- We extract the type, the tcLevel and the types free variables
+    -- We extract the type, the TcLevel and the types free variables
     -- from the constraint.
     hole_fvs :: FV
     hole_fvs = tyCoFVsOfType hole_ty

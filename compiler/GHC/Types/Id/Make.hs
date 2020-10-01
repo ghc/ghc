@@ -1564,7 +1564,7 @@ Note [seqId magic]
 a) Its fixity is set in GHC.Iface.Load.ghcPrimIface
 
 b) It has quite a bit of desugaring magic.
-   See GHC.HsToCore.Utils Note [Desugaring seq (1)] and (2) and (3)
+   See GHC.HsToCore.Utils Note [Desugaring seq] (1) and (2) and (3)
 
 c) There is some special rule handing: Note [User-defined RULES for seq]
 
@@ -1748,7 +1748,7 @@ definition in Core.  The rewrite rule works as follows:
   f (x `cast` co a) y
 
 The `co` coercion is the newtype-coercion extracted from the type-class.
-The type class is obtain by looking at the type of wrap.
+The type class is obtained by looking at the type of wrap.
 
 
 -------------------------------------------------------------
