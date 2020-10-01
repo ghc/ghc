@@ -7,7 +7,8 @@ test('ghcilink001',
 
 test('ghcilink002', [extra_files(['TestLink.hs', 'f.c']),
                      when(unregisterised(), fragile(16085)),
-                     unless(doing_ghci, skip)],
+                     unless(doing_ghci, skip),
+                     req_shared_libs],
      makefile_test, ['ghcilink002'])
 
 test('ghcilink003',
@@ -30,7 +31,8 @@ test('ghcilink004',
 test('ghcilink005',
      [extra_files(['TestLink.hs', 'f.c']),
       when(unregisterised(), fragile(16085)),
-      unless(doing_ghci, skip)],
+      unless(doing_ghci, skip),
+      req_shared_libs],
      makefile_test, ['ghcilink005'])
 
 test('ghcilink006',
