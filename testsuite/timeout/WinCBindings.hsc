@@ -29,11 +29,11 @@ data PROCESS_INFORMATION = PROCESS_INFORMATION
 instance Storable PROCESS_INFORMATION where
     sizeOf = const #size PROCESS_INFORMATION
     alignment = sizeOf
-    poke buf pi = do
-        (#poke PROCESS_INFORMATION, hProcess)    buf (piProcess   pi)
-        (#poke PROCESS_INFORMATION, hThread)     buf (piThread    pi)
-        (#poke PROCESS_INFORMATION, dwProcessId) buf (piProcessId pi)
-        (#poke PROCESS_INFORMATION, dwThreadId)  buf (piThreadId  pi)
+    poke buf pinfo = do
+        (#poke PROCESS_INFORMATION, hProcess)    buf (piProcess   pinfo)
+        (#poke PROCESS_INFORMATION, hThread)     buf (piThread    pinfo)
+        (#poke PROCESS_INFORMATION, dwProcessId) buf (piProcessId pinfo)
+        (#poke PROCESS_INFORMATION, dwThreadId)  buf (piThreadId  pinfo)
 
     peek buf = do
         vhProcess    <- (#peek PROCESS_INFORMATION, hProcess)    buf
@@ -361,7 +361,7 @@ createCompletionPort hJob = do
                          return nullPtr
 
 waitForJobCompletion :: HANDLE -> HANDLE -> DWORD -> IO BOOL
-waitForJobCompletion hJob ioPort timeout
+waitForJobCompletion _hJob ioPort timeout
   = alloca $ \p_CompletionCode ->
     alloca $ \p_CompletionKey ->
     alloca $ \p_Overlapped -> do
