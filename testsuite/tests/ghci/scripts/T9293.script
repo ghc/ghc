@@ -1,23 +1,19 @@
 :set -XHaskell2010
-:set
 
 putStrLn "Should fail, GADTs is not enabled"
 data T a where C :: T Int
 
 :set -XGADTs
-:set
 
 putStrLn "Should work, GADTs is in force from :set"
 :load ghci057.hs
 
 :unset -XGADTs
-:set
 
 putStrLn "Should fail, GADTs is now disabled"
 :load ghci057.hs
 
 :seti -XGADTs
-:seti
 
 putStrLn "Should fail, GADTs is only enabled at the prompt"
 :load ghci057.hs
