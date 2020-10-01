@@ -11,9 +11,10 @@ import Control.Monad
 import GHC.Word
 import GHC.Base
 import GHC.Num.Integer
+import GHC.Num.Natural
 import qualified GHC.Num.Integer as I
 
-recipModInteger :: Integer -> Integer -> Maybe Integer
+recipModInteger :: Integer -> Natural -> Maybe Natural
 recipModInteger x m = case I.integerRecipMod# x m of
    (# y |    #) -> Just y
    (#   | () #) -> Nothing
@@ -24,16 +25,9 @@ main = do
       f x = case recipModInteger x (2*3*11*11*17*17) of
                y -> fmap (x,) y
 
-      g x = case recipModInteger x (-2*3*11*11*17*17) of
-               y -> fmap (x,) y
-
    -- positive modulo
    print $ mapMaybe f [-7..71]
 
-   -- negative modulo
-   print $ mapMaybe g [-7..71]
-
-   -- modulo == 1, -1 or 0
+   -- modulo == 1 or 0
    print (recipModInteger 77 1)
-   print (recipModInteger 77 (-1))
    print (recipModInteger 77 0)

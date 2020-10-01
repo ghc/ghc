@@ -32,6 +32,7 @@ module GHC.Integer.GMP.Internals
     , gcdExtInteger
     , lcmInteger
     , sqrInteger
+    , powModInteger
     , recipModInteger
 
       -- ** Additional conversion operations to 'Integer'
@@ -189,9 +190,15 @@ sqrInteger = I.integerSqr
 
 {-# DEPRECATED recipModInteger "Use integerRecipMod# instead" #-}
 recipModInteger :: Integer -> Integer -> Integer
-recipModInteger x m = case I.integerRecipMod# x m of
-   (# y |    #) -> y
+recipModInteger x m = case I.integerRecipMod# x (I.integerToNatural m) of
+   (# y |    #) -> I.integerFromNatural y
    (#   | () #) -> 0
+
+{-# DEPRECATED powModInteger "Use integerPowMod# instead" #-}
+powModInteger :: Integer -> Integer -> Integer -> Integer
+powModInteger b e m = case I.integerPowMod# b e (I.integerToNatural m) of
+   (# r  | #) -> I.integerFromNatural r
+   (# | () #) -> 0
 
 {-# DEPRECATED wordToNegInteger "Use integerFromWordNeg# instead" #-}
 wordToNegInteger :: Word# -> Integer
