@@ -7,7 +7,7 @@ test('T2410', [only_ways(['normal']), req_profiling], compile, ['-O2 -prof -fpro
 test('T5889', [only_ways(['normal']), req_profiling, extra_files(['T5889/A.hs', 'T5889/B.hs'])], multimod_compile, ['A B', '-O -prof -fno-prof-count-entries -v0'])
 test('T12790', [only_ways(['normal']), req_profiling], compile, ['-O -prof'])
 # -dynamic-too not supported on Windows
-test('T14931', [when(opsys('mingw32'), skip), only_ways(['normal']), req_profiling],
+test('T14931', [when(opsys('mingw32'), skip), only_ways(['normal']), req_profiling, req_shared_libs],
      makefile_test, ['T14931'])
 test('T15108', [only_ways(['normal']), req_profiling], compile, ['-O -prof -fprof-auto'])
 test('T19894', [only_ways(['normal']), req_profiling, extra_files(['T19894'])], multimod_compile, ['Main', '-v0 -O2 -prof -fprof-auto -iT19894'])
