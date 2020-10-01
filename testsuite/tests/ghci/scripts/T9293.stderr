@@ -1,5 +1,5 @@
 
-<interactive>:5:1: error:
+<interactive>:4:1: error:
     • Illegal generalised algebraic data declaration for ‘T’
         (Enable the GADTs extension to allow this)
     • In the data declaration for ‘T’
