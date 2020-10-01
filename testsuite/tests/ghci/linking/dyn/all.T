@@ -1,3 +1,5 @@
+setTestOpts(req_shared_libs)
+
 test('load_short_name', [extra_files(['A.c']),
                          unless(doing_ghci, skip)],
      makefile_test, ['load_short_name'])
