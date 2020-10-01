@@ -383,11 +383,11 @@ Projections of records can't be linear:
 
 If we had
 
-  a :: Foo #-> A
+  a :: Foo %1 -> A
 
 We could write
 
-  bad :: A #-> B #-> A
+  bad :: A %1 -> B %1 -> A
   bad x y = a (MkFoo { a=x, b=y })
 
 There is an exception: if `b` (more generally all the fields besides `a`) is
@@ -396,7 +396,7 @@ linear projection has as simple definition.
 
   data Bar = MkBar { c :: C, d # Many :: D }
 
-  c :: Bar #-> C
+  c :: Bar %1 -> C
   c MkBar{ c=x, d=_} = x
 
 The `# Many` syntax, for records, does not exist yet. But there is one important
