@@ -20,6 +20,8 @@ import GHC.Types
 import GHC.Num.WordArray
 import GHC.Num.Primitives
 import qualified GHC.Num.Backend.Native as Native
+import {-# SOURCE #-} GHC.Num.Natural
+import {-# SOURCE #-} GHC.Num.Integer
 
 default ()
 
@@ -606,9 +608,25 @@ integer_gcde = Native.integer_gcde
 -- with 0 < y < abs m
 integer_recip_mod
    :: Integer
-   -> Integer
-   -> (# Integer | () #)
+   -> Natural
+   -> (# Natural | () #)
 integer_recip_mod = Native.integer_recip_mod
+   -- for now we use Native's implementation. If some FFI backend user needs a
+   -- specific implementation, we'll need to determine a prototype to pass and
+   -- return BigNat signs and sizes via FFI.
+
+-- | Computes the modular exponentiation.
+--
+-- I.e. y = integer_powmod b e m
+--        = b^e `mod` m
+--
+-- with 0 <= y < abs m
+integer_powmod
+   :: Integer
+   -> Natural
+   -> Natural
+   -> Natural
+integer_powmod = Native.integer_powmod
    -- for now we use Native's implementation. If some FFI backend user needs a
    -- specific implementation, we'll need to determine a prototype to pass and
    -- return BigNat signs and sizes via FFI.
