@@ -1024,6 +1024,7 @@ llvmOptions dflags =
     ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu)
                                  , not (any (isInfixOf "-mcpu") (getOpts dflags opt_lc)) ]
     ++ [("", "-mattr=" ++ attrs) | not (null attrs) ]
+    ++ [("", "-target-abi=" ++ abi) | not (null abi) ]
 
   where target = platformMisc_llvmTarget $ platformMisc dflags
         Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets $ llvmConfig dflags)
@@ -1054,6 +1055,11 @@ llvmOptions dflags =
               ++ ["+avx512pf"| isAvx512pfEnabled dflags ]
               ++ ["+bmi"     | isBmiEnabled dflags      ]
               ++ ["+bmi2"    | isBmi2Enabled dflags     ]
+
+        abi :: String
+        abi = case platformArch (targetPlatform dflags) of
+                ArchRISCV64 -> "lp64d"
+                _           -> ""
 
 -- -----------------------------------------------------------------------------
 -- | Each phase in the pipeline returns the next phase to execute, and the
