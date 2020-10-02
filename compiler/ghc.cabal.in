@@ -473,6 +473,7 @@ Library
         GHC.Platform.Constants
         GHC.Platform.NoRegs
         GHC.Platform.PPC
+        GHC.Platform.RISCV64
         GHC.Platform.Profile
         GHC.Platform.Reg
         GHC.Platform.Reg.Class
