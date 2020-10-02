@@ -1613,7 +1613,6 @@ getParent rdr_env n
   = case lookupGRE_Name rdr_env n of
       Just gre -> case gre_par gre of
                     ParentIs  { par_is = p } -> p
-                    FldParent { par_is = p } -> p
                     _                        -> n
       Nothing -> n
 
@@ -2389,7 +2388,8 @@ extendPatSynEnv val_decls local_fix_env thing = do {
      names_with_fls <- new_ps val_decls
    ; let pat_syn_bndrs = concat [ name: map flSelector fields
                                 | (name, fields) <- names_with_fls ]
-   ; let avails = map avail pat_syn_bndrs
+   ; let avails = map avail (map fst names_with_fls)
+               ++ map availField (concatMap snd names_with_fls)
    ; (gbl_env, lcl_env) <- extendGlobalRdrEnvRn avails local_fix_env
 
    ; let field_env' = extendNameEnvList (tcg_field_env gbl_env) names_with_fls
@@ -2408,11 +2408,9 @@ extendPatSynEnv val_decls local_fix_env thing = do {
                                        , psb_args = RecCon as }))) <- bind
       = do
           bnd_name <- newTopSrcBinder (L bind_loc n)
-          let rnames = map recordPatSynSelectorId as
-              mkFieldOcc :: Located RdrName -> LFieldOcc GhcPs
-              mkFieldOcc (L l name) = L l (FieldOcc noExtField (L l name))
-              field_occs =  map mkFieldOcc rnames
-          flds     <- mapM (newRecordSelector False [bnd_name]) field_occs
+          let field_occs = map ((\ f -> L (getLoc (rdrNameFieldOcc f)) f) . recordPatSynField) as
+          overload_ok <- xoptM LangExt.DuplicateRecordFields
+          flds <- mapM (newRecordSelector overload_ok [bnd_name]) field_occs
           return ((bnd_name, flds): names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n})) <- bind
       = do

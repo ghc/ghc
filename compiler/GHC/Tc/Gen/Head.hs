@@ -493,11 +493,12 @@ tc_rec_sel_id lbl sel_name
   = do { thing <- tcLookup sel_name
        ; case thing of
              ATcId { tct_id = id }
-               -> do { check_local_id occ id
+               -> do { check_naughty occ id
+                     ; check_local_id id
                      ; return id }
 
              AGlobal (AnId id)
-               -> do { check_global_id occ id
+               -> do { check_naughty occ id
                      ; return id }
                     -- A global cannot possibly be ill-staged
                     -- nor does it need the 'lifting' treatment
@@ -545,7 +546,7 @@ finish_ambiguous_selector lr@(L _ rdr) parent_type
            Just gre ->
 
     do { addUsedGRE True gre
-       ; return (gre_name gre) } } } } }
+       ; return (greMangledName gre) } } } } }
 
 -- This field name really is ambiguous, so add a suitable "ambiguous
 -- occurrence" error, then give up.
@@ -596,10 +597,10 @@ lookupParents rdr
        ; mapM lookupParent gres }
   where
     lookupParent :: GlobalRdrElt -> RnM (RecSelParent, GlobalRdrElt)
-    lookupParent gre = do { id <- tcLookupId (gre_name gre)
+    lookupParent gre = do { id <- tcLookupId (greMangledName gre)
                           ; case recordSelectorTyCon_maybe id of
                               Just rstc -> return (rstc, gre)
-                              Nothing -> failWithTc (notSelector (gre_name gre)) }
+                              Nothing -> failWithTc (notSelector (greMangledName gre)) }
 
 
 fieldNotInType :: RecSelParent -> RdrName -> SDoc
@@ -758,12 +759,14 @@ tc_infer_id id_name
       ; global_env <- getGlobalRdrEnv
       ; case thing of
              ATcId { tct_id = id }
-               -> do { check_local_id occ id
+               -> do { check_local_id id
                      ; return_id id }
 
              AGlobal (AnId id)
-               -> do { check_global_id occ id
-                     ; return_id id }
+               -> return_id id
+               -- A global cannot possibly be ill-staged
+               -- nor does it need the 'lifting' treatment
+               -- Hence no checkTh stuff here
 
              AGlobal (AConLike cl) -> case cl of
                  RealDataCon con -> return_data_con con
@@ -797,8 +800,6 @@ tc_infer_id id_name
     term_level_tycons ty_con
       = text "Illegal term-level use of the type constructor"
           <+> quotes (ppr (tyConName ty_con))
-
-    occ = nameOccName id_name
 
     return_id id = return (HsVar noExtField (noLoc id), idType id)
 
@@ -845,18 +846,10 @@ tc_infer_id id_name
                                   , mkInvisForAllTys tvs $ mkInvisFunTysMany theta $ mkVisFunTys scaled_arg_tys res)
            }
 
-check_local_id :: OccName -> Id -> TcM ()
-check_local_id occ id
-  = do { check_naughty occ id  -- See Note [HsVar: naughty record selectors]
-       ; checkThLocalId id
+check_local_id :: Id -> TcM ()
+check_local_id id
+  = do { checkThLocalId id
        ; tcEmitBindingUsage $ unitUE (idName id) One }
-
-check_global_id :: OccName -> Id -> TcM ()
-check_global_id occ id
-  = check_naughty occ id  -- See Note [HsVar: naughty record selectors]
-  -- A global cannot possibly be ill-staged
-  -- nor does it need the 'lifting' treatment
-  -- Hence no checkTh stuff here
 
 check_naughty :: OccName -> TcId -> TcM ()
 check_naughty lbl id
@@ -868,15 +861,7 @@ nonBidirectionalErr name = failWithTc $
     text "non-bidirectional pattern synonym"
     <+> quotes (ppr name) <+> text "used in an expression"
 
-{- Note [HsVar: naughty record selectors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-All record selectors should really be HsRecFld (ambiguous or
-unambiguous), but currently not all of them are: see #18452.  So we
-need to check for naughty record selectors in tc_infer_id, as well as
-in tc_rec_sel_id.
-
-Remove this code when fixing #18452.
-
+{-
 Note [Linear fields generalization]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As per Note [Polymorphisation of linear fields], linear field of data

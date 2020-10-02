@@ -21,7 +21,7 @@ module GHC.Core.DataCon (
         substEqSpec, filterEqSpec,
 
         -- ** Field labels
-        FieldLbl(..), FieldLabel, FieldLabelString,
+        FieldLabel(..), FieldLabelString,
 
         -- ** Type construction
         mkDataCon, fIRST_TAG,

@@ -1,0 +1,24 @@
+[1 of 2] Compiling DRFHoleFits_A    ( DRFHoleFits_A.hs, DRFHoleFits_A.o )
+[2 of 2] Compiling DRFHoleFits      ( DRFHoleFits.hs, DRFHoleFits.o )
+
+DRFHoleFits.hs:7:7: error:
+    • Found hole: _ :: T -> Int
+    • In the expression: _ :: T -> Int
+      In an equation for ‘bar’: bar = _ :: T -> Int
+    • Relevant bindings include
+        bar :: T -> Int (bound at DRFHoleFits.hs:7:1)
+      Valid hole fits include
+        foo :: T -> Int (defined at DRFHoleFits.hs:5:16)
+        bar :: T -> Int (defined at DRFHoleFits.hs:7:1)
+
+DRFHoleFits.hs:8:7: error:
+    • Found hole: _ :: A.S -> Int
+    • In the expression: _ :: A.S -> Int
+      In an equation for ‘baz’: baz = _ :: A.S -> Int
+    • Relevant bindings include
+        baz :: A.S -> Int (bound at DRFHoleFits.hs:8:1)
+      Valid hole fits include
+        baz :: A.S -> Int (defined at DRFHoleFits.hs:8:1)
+        DRFHoleFits_A.foo :: A.S -> Int
+          (imported qualified from ‘DRFHoleFits_A’ at DRFHoleFits.hs:3:1-35
+           (and originally defined at DRFHoleFits_A.hs:5:16-18))

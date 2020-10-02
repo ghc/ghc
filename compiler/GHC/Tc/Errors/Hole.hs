@@ -22,7 +22,8 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.DataCon
 import GHC.Types.Name
-import GHC.Types.Name.Reader ( pprNameProvenance , GlobalRdrElt (..), globalRdrEnvElts )
+import GHC.Types.Name.Reader ( pprNameProvenance , GlobalRdrElt (..)
+                             , globalRdrEnvElts, greMangledName, grePrintableName )
 import GHC.Builtin.Names ( gHC_ERR )
 import GHC.Types.Id
 import GHC.Types.Var.Set
@@ -441,8 +442,7 @@ pprHoleFit :: HoleFitDispConfig -> HoleFit -> SDoc
 pprHoleFit _ (RawHoleFit sd) = sd
 pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
  hang display 2 provenance
- where name =  getName hfCand
-       tyApp = sep $ zipWithEqual "pprHoleFit" pprArg vars hfWrap
+ where tyApp = sep $ zipWithEqual "pprHoleFit" pprArg vars hfWrap
          where pprArg b arg = case binderArgFlag b of
                                 -- See Note [Explicit Case Statement for Specificity]
                                 (Invisible spec) -> case spec of
@@ -471,7 +471,10 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
        holeVs = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) hfMatches
        holeDisp = if sMs then holeVs
                   else sep $ replicate (length hfMatches) $ text "_"
-       occDisp = pprPrefixOcc name
+       occDisp = case hfCand of
+                   GreHFCand gre   -> pprPrefixOcc (grePrintableName gre)
+                   NameHFCand name -> pprPrefixOcc name
+                   IdHFCand id_    -> pprPrefixOcc id_
        tyDisp = ppWhen sTy $ dcolon <+> ppr hfType
        has = not . null
        wrapDisp = ppWhen (has hfWrap && (sWrp || sWrpVars))
@@ -490,7 +493,8 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
        provenance = ppWhen sProv $ parens $
              case hfCand of
                  GreHFCand gre -> pprNameProvenance gre
-                 _ -> text "bound at" <+> ppr (getSrcLoc name)
+                 NameHFCand name -> text "bound at" <+> ppr (getSrcLoc name)
+                 IdHFCand id_ -> text "bound at" <+> ppr (getSrcLoc id_)
 
 getLocalBindings :: TidyEnv -> CtLoc -> TcM [Id]
 getLocalBindings tidy_orig ct_loc
@@ -784,7 +788,7 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
 #if __GLASGOW_HASKELL__ <= 810
                            IdHFCand id -> idName id
 #endif
-                           GreHFCand gre -> gre_name gre
+                           GreHFCand gre -> greMangledName gre
                            NameHFCand name -> name
           discard_it = go subs seen maxleft ty elts
           keep_it eid eid_ty wrp ms = go (fit:subs) (extendVarSet seen eid)

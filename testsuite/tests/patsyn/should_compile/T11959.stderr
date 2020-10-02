@@ -1,0 +1,3 @@
+
+T11959Lib.hs:2:35: warning: [-Wduplicate-exports (in -Wdefault)]
+    ‘:>’ is exported by ‘pattern (:>)’ and ‘Vec2(Nil, (:>))’

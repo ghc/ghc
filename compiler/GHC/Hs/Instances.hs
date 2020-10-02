@@ -69,6 +69,11 @@ deriving instance Data (ABExport GhcPs)
 deriving instance Data (ABExport GhcRn)
 deriving instance Data (ABExport GhcTc)
 
+-- deriving instance DataId p => Data (RecordPatSynField p)
+deriving instance Data (RecordPatSynField GhcPs)
+deriving instance Data (RecordPatSynField GhcRn)
+deriving instance Data (RecordPatSynField GhcTc)
+
 -- deriving instance (DataIdLR pL pR) => Data (PatSynBind pL pR)
 deriving instance Data (PatSynBind GhcPs GhcPs)
 deriving instance Data (PatSynBind GhcPs GhcRn)

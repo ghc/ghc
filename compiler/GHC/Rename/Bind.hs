@@ -47,6 +47,7 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, extendTyVarEnvFVRn
                         , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Driver.Session
 import GHC.Unit.Module
+import GHC.Types.FieldLabel
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -692,13 +693,15 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                       ; return ( (pat', InfixCon name1 name2)
                                , mkFVs (map unLoc [name1, name2])) }
                RecCon vars ->
-                   do { checkDupRdrNames (map recordPatSynSelectorId vars)
+                   do { checkDupRdrNames (map (rdrNameFieldOcc . recordPatSynField) vars)
+                      ; fls <- lookupConstructorFields name
+                      ; let fld_env = mkFsEnv [ (flLabel fl, fl) | fl <- fls ]
                       ; let rnRecordPatSynField
-                              (RecordPatSynField { recordPatSynSelectorId = visible
+                              (RecordPatSynField { recordPatSynField  = visible
                                                  , recordPatSynPatVar = hidden })
-                              = do { visible' <- lookupLocatedTopBndrRn visible
+                              = do { let visible' = lookupField fld_env visible
                                    ; hidden'  <- lookupPatSynBndr hidden
-                                   ; return $ RecordPatSynField { recordPatSynSelectorId = visible'
+                                   ; return $ RecordPatSynField { recordPatSynField  = visible'
                                                                 , recordPatSynPatVar = hidden' } }
                       ; names <- mapM rnRecordPatSynField  vars
                       ; return ( (pat', RecCon names)
@@ -726,7 +729,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                           , psb_ext = fvs' }
               selector_names = case details' of
                                  RecCon names ->
-                                  map (unLoc . recordPatSynSelectorId) names
+                                  map (extFieldOcc . recordPatSynField) names
                                  _ -> []
 
         ; fvs' `seq` -- See Note [Free-variable space leak]

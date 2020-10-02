@@ -2335,7 +2335,7 @@ mkModuleImpExp (L l specname) subs =
     ImpExpAll          -> IEThingAll noExtField . L l <$> nameT
     ImpExpList xs      ->
       (\newName -> IEThingWith noExtField (L l newName)
-        NoIEWildcard (wrapped xs) []) <$> nameT
+        NoIEWildcard (wrapped xs)) <$> nameT
     ImpExpAllWith xs                       ->
       do allowed <- getBit PatternSynonymsBit
          if allowed
@@ -2345,7 +2345,7 @@ mkModuleImpExp (L l specname) subs =
                           (findIndex isImpExpQcWildcard withs)
                 ies   = wrapped $ filter (not . isImpExpQcWildcard . unLoc) xs
             in (\newName
-                        -> IEThingWith noExtField (L l newName) pos ies [])
+                        -> IEThingWith noExtField (L l newName) pos ies)
                <$> nameT
           else addFatalError $ PsError PsErrIllegalPatSynExport [] l
   where
@@ -2374,7 +2374,7 @@ mkTypeImpExp name =
 
 checkImportSpec :: Located [LIE GhcPs] -> P (Located [LIE GhcPs])
 checkImportSpec ie@(L _ specs) =
-    case [l | (L l (IEThingWith _ _ (IEWildcard _) _ _)) <- specs] of
+    case [l | (L l (IEThingWith _ _ (IEWildcard _) _)) <- specs] of
       [] -> return ie
       (l:_) -> importSpecError l
   where

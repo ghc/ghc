@@ -123,7 +123,11 @@
    [((,)
      ({ T14189.hs:3:3-15 }
       (IEThingWith
-       (NoExtField)
+       [({ T14189.hs:3:11 }
+         (FieldLabel
+          {FastString: "f"}
+          (False)
+          {Name: T14189.f}))]
        ({ T14189.hs:3:3-8 }
         (IEName
          ({ T14189.hs:3:3-8 }
@@ -132,20 +136,18 @@
        [({ T14189.hs:3:13-14 }
          (IEName
           ({ T14189.hs:3:13-14 }
-           {Name: T14189.NT})))]
-       [({ T14189.hs:3:11 }
+           {Name: T14189.NT})))]))
+     [(AvailTC
+       {Name: T14189.MyType}
+       [(NormalGreName
+         {Name: T14189.MyType})
+       ,(NormalGreName
+         {Name: T14189.NT})
+       ,(FieldGreName
          (FieldLabel
           {FastString: "f"}
           (False)
-          {Name: T14189.f}))]))
-     [(AvailTC
-       {Name: T14189.MyType}
-       [{Name: T14189.MyType}
-       ,{Name: T14189.NT}]
-       [(FieldLabel
-         {FastString: "f"}
-         (False)
-         {Name: T14189.f})])])])
+          {Name: T14189.f}))])])])
   (Nothing)))
 
 

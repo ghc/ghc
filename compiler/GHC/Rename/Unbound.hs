@@ -180,8 +180,7 @@ similarNameSuggestions where_look dflags global_env
       | tried_is_qual = [ (rdr_qual, (rdr_qual, how))
                         | gre <- globalRdrEnvElts global_env
                         , isGreOk where_look gre
-                        , let name = gre_name gre
-                              occ  = nameOccName name
+                        , let occ = greOccName gre
                         , correct_name_space occ
                         , (mod, how) <- qualsInScope gre
                         , let rdr_qual = mkRdrQual mod occ ]
@@ -189,8 +188,7 @@ similarNameSuggestions where_look dflags global_env
       | otherwise = [ (rdr_unqual, pair)
                     | gre <- globalRdrEnvElts global_env
                     , isGreOk where_look gre
-                    , let name = gre_name gre
-                          occ  = nameOccName name
+                    , let occ = greOccName gre
                           rdr_unqual = mkRdrUnqual occ
                     , correct_name_space occ
                     , pair <- case (unquals_in_scope gre, quals_only gre) of
@@ -210,8 +208,8 @@ similarNameSuggestions where_look dflags global_env
 
     --------------------
     unquals_in_scope :: GlobalRdrElt -> [HowInScope]
-    unquals_in_scope (GRE { gre_name = n, gre_lcl = lcl, gre_imp = is })
-      | lcl       = [ Left (nameSrcSpan n) ]
+    unquals_in_scope (gre@GRE { gre_lcl = lcl, gre_imp = is })
+      | lcl       = [ Left (greDefinitionSrcSpan gre) ]
       | otherwise = [ Right ispec
                     | i <- is, let ispec = is_decl i
                     , not (is_qual ispec) ]
@@ -220,8 +218,8 @@ similarNameSuggestions where_look dflags global_env
     --------------------
     quals_only :: GlobalRdrElt -> [(RdrName, HowInScope)]
     -- Ones for which *only* the qualified version is in scope
-    quals_only (GRE { gre_name = n, gre_imp = is })
-      = [ (mkRdrQual (is_as ispec) (nameOccName n), Right ispec)
+    quals_only (gre@GRE { gre_imp = is })
+      = [ (mkRdrQual (is_as ispec) (greOccName gre), Right ispec)
         | i <- is, let ispec = is_decl i, is_qual ispec ]
 
 -- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
@@ -366,10 +364,10 @@ extensionSuggestions rdrName
 
 qualsInScope :: GlobalRdrElt -> [(ModuleName, HowInScope)]
 -- Ones for which the qualified version is in scope
-qualsInScope GRE { gre_name = n, gre_lcl = lcl, gre_imp = is }
-      | lcl = case nameModule_maybe n of
+qualsInScope gre@GRE { gre_lcl = lcl, gre_imp = is }
+      | lcl = case greDefinitionModule gre of
                 Nothing -> []
-                Just m  -> [(moduleName m, Left (nameSrcSpan n))]
+                Just m  -> [(moduleName m, Left (greDefinitionSrcSpan gre))]
       | otherwise = [ (is_as ispec, Right ispec)
                     | i <- is, let ispec = is_decl i ]
 

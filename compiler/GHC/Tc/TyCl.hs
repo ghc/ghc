@@ -4152,9 +4152,8 @@ checkPartialRecordField all_cons fld
         (sep [text "Use of partial record field selector" <> colon,
               nest 2 $ quotes (ppr occ_name)])
   where
-    sel_name = flSelector fld
-    loc    = getSrcSpan sel_name
-    occ_name = getOccName sel_name
+    loc = getSrcSpan (flSelector fld)
+    occ_name = occName fld
 
     (cons_with_field, cons_without_field) = partition has_field all_cons
     has_field con = fld `elem` (dataConFieldLabels con)

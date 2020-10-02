@@ -92,7 +92,6 @@ import GHC.Types.TypeEnv
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.SrcLoc
-import GHC.Types.FieldLabel
 import GHC.Types.TyThing
 
 import GHC.Unit.External
@@ -1134,15 +1133,16 @@ When printing export lists, we print like this:
 -}
 
 pprExport :: IfaceExport -> SDoc
-pprExport (Avail n)         = ppr n
-pprExport (AvailTC _ [] []) = Outputable.empty
-pprExport (AvailTC n ns0 fs)
-  = case ns0 of
-      (n':ns) | n==n' -> ppr n <> pp_export ns fs
-      _               -> ppr n <> vbar <> pp_export ns0 fs
+pprExport (Avail n)      = ppr n
+pprExport (AvailTC _ []) = Outputable.empty
+pprExport avail@(AvailTC n _) =
+    ppr n <> mark <> pp_export (availSubordinateGreNames avail)
   where
-    pp_export []    [] = Outputable.empty
-    pp_export names fs = braces (hsep (map ppr names ++ map (ppr . flLabel) fs))
+    mark | availExportsDecl avail = Outputable.empty
+         | otherwise              = vbar
+
+    pp_export []    = Outputable.empty
+    pp_export names = braces (hsep (map ppr names))
 
 pprUsage :: Usage -> SDoc
 pprUsage usage@UsagePackageModule{}

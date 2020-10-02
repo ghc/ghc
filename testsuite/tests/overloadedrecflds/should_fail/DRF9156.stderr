@@ -1,0 +1,5 @@
+
+DRF9156.hs:4:19: error:
+    Multiple declarations of ‘f1’
+    Declared at: DRF9156.hs:3:15
+                 DRF9156.hs:4:19

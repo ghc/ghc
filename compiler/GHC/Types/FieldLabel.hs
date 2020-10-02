@@ -1,11 +1,16 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-
 %
 % (c) Adam Gundry 2013-2015
 %
+
+Note [FieldLabel]
+~~~~~~~~~~~~~~~~~
 
 This module defines the representation of FieldLabels as stored in
 TyCons.  As well as a selector name, these have some extra structure
@@ -63,9 +68,9 @@ Of course, datatypes with no constructors cannot have any fields.
 module GHC.Types.FieldLabel
    ( FieldLabelString
    , FieldLabelEnv
-   , FieldLbl(..)
-   , FieldLabel
-   , mkFieldLabelOccs
+   , FieldLabel(..)
+   , fieldSelectorOccName
+   , fieldLabelPrintableName
    )
 where
 
@@ -89,22 +94,26 @@ type FieldLabelString = FastString
 type FieldLabelEnv = DFastStringEnv FieldLabel
 
 
-type FieldLabel = FieldLbl Name
-
--- | Fields in an algebraic record type
-data FieldLbl a = FieldLabel {
+-- | Fields in an algebraic record type; see Note [FieldLabel].
+data FieldLabel = FieldLabel {
       flLabel        :: FieldLabelString, -- ^ User-visible label of the field
       flIsOverloaded :: Bool,             -- ^ Was DuplicateRecordFields on
                                           --   in the defining module for this datatype?
-      flSelector     :: a                 -- ^ Record selector function
+      flSelector     :: Name              -- ^ Record selector function
     }
-  deriving (Eq, Functor, Foldable, Traversable)
-deriving instance Data a => Data (FieldLbl a)
+  deriving (Data, Eq)
 
-instance Outputable a => Outputable (FieldLbl a) where
-    ppr fl = ppr (flLabel fl) <> braces (ppr (flSelector fl))
+instance HasOccName FieldLabel where
+  occName = mkVarOccFS . flLabel
 
-instance Binary a => Binary (FieldLbl a) where
+instance Outputable FieldLabel where
+    ppr fl = ppr (flLabel fl) <> whenPprDebug (braces (ppr (flSelector fl)))
+
+-- | We need the @Binary Name@ constraint here even though there is an instance
+-- defined in "GHC.Types.Name", because the we have a SOURCE import, so the
+-- instance is not in scope.  And the instance cannot be added to Name.hs-boot
+-- because "GHC.Utils.Binary" itself depends on "GHC.Types.Name".
+instance Binary Name => Binary FieldLabel where
     put_ bh (FieldLabel aa ab ac) = do
         put_ bh aa
         put_ bh ab
@@ -120,11 +129,18 @@ instance Binary a => Binary (FieldLbl a) where
 -- and the name of the first data constructor of the type, to support
 -- duplicate record field names.
 -- See Note [Why selector names include data constructors].
-mkFieldLabelOccs :: FieldLabelString -> OccName -> Bool -> FieldLbl OccName
-mkFieldLabelOccs lbl dc is_overloaded
-  = FieldLabel { flLabel = lbl, flIsOverloaded = is_overloaded
-               , flSelector = sel_occ }
+fieldSelectorOccName :: FieldLabelString -> OccName -> Bool -> OccName
+fieldSelectorOccName lbl dc is_overloaded
+  | is_overloaded = mkRecFldSelOcc str
+  | otherwise     = mkVarOccFS lbl
   where
     str     = ":" ++ unpackFS lbl ++ ":" ++ occNameString dc
-    sel_occ | is_overloaded = mkRecFldSelOcc str
-            | otherwise     = mkVarOccFS lbl
+
+-- | Undo the name mangling described in Note [FieldLabel] to produce a Name
+-- that has the user-visible OccName (but the selector's unique).  This should
+-- be used only when generating output, when we want to show the label, but may
+-- need to qualify it with a module prefix.
+fieldLabelPrintableName :: FieldLabel -> Name
+fieldLabelPrintableName fl
+  | flIsOverloaded fl = tidyNameOcc (flSelector fl) (mkVarOccFS (flLabel fl))
+  | otherwise         = flSelector fl

@@ -852,7 +852,7 @@ getInfo allInfo name
 -- | Returns all names in scope in the current interactive context
 getNamesInScope :: GhcMonad m => m [Name]
 getNamesInScope = withSession $ \hsc_env ->
-  return (map gre_name (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
+  return (map greMangledName (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
 
 -- | Returns all 'RdrName's in scope in the current interactive
 -- context, excluding any that are internally-generated.

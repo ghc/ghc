@@ -412,7 +412,7 @@ cvtDec (TH.PatSynD nm args dir pat)
     cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon noTypeArgs <$> mapM vNameL args
     cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameL a1 <*> vNameL a2
     cvtArgs (TH.RecordPatSyn sels)
-      = do { sels' <- mapM vNameL sels
+      = do { sels' <- mapM (fmap (\ (L li i) -> FieldOcc noExtField (L li i)) . vNameL) sels
            ; vars' <- mapM (vNameL . mkNameS . nameBase) sels
            ; return $ Hs.RecCon $ zipWith RecordPatSynField sels' vars' }
 

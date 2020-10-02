@@ -1,6 +1,8 @@
+{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module GHC.Hs.Extension
@@ -20,7 +22,7 @@ import GHC.Unit.Module        ( ModuleName, IsBootInterface(..) )
 import GHC.Hs.Doc             ( HsDocString )
 import GHC.Types.Name.Occurrence ( HasOccName(..), isTcOcc, isSymOcc )
 import GHC.Types.SourceText   ( SourceText(..), StringLiteral(..), pprWithSourceText )
-import GHC.Types.FieldLabel   ( FieldLbl(..) )
+import GHC.Types.FieldLabel   ( FieldLabel )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -229,7 +231,6 @@ data IE pass
                 (LIEWrappedName (IdP pass))
                 IEWildcard
                 [LIEWrappedName (IdP pass)]
-                [XRec pass (FieldLbl (IdP pass))]
         -- ^ Imported or exported Thing With given imported or exported
         --
         -- The thing is a Class/Type and the imported or exported things are
@@ -256,12 +257,17 @@ data IE pass
 type instance XIEVar             (GhcPass _) = NoExtField
 type instance XIEThingAbs        (GhcPass _) = NoExtField
 type instance XIEThingAll        (GhcPass _) = NoExtField
-type instance XIEThingWith       (GhcPass _) = NoExtField
 type instance XIEModuleContents  (GhcPass _) = NoExtField
 type instance XIEGroup           (GhcPass _) = NoExtField
 type instance XIEDoc             (GhcPass _) = NoExtField
 type instance XIEDocNamed        (GhcPass _) = NoExtField
 type instance XXIE               (GhcPass _) = NoExtCon
+
+-- See Note [IEThingWith]
+type instance XIEThingWith       (GhcPass 'Renamed)     = [Located FieldLabel]
+type instance XIEThingWith       (GhcPass 'Parsed)      = NoExtField
+type instance XIEThingWith       (GhcPass 'Typechecked) = NoExtField
+
 
 -- | Imported or Exported Wildcard
 data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data)
@@ -269,33 +275,43 @@ data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data)
 {-
 Note [IEThingWith]
 ~~~~~~~~~~~~~~~~~~
-
 A definition like
 
+    {-# LANGUAGE DuplicateRecordFields #-}
     module M ( T(MkT, x) ) where
       data T = MkT { x :: Int }
 
-gives rise to
+gives rise to this in the output of the parser:
 
-    IEThingWith T [MkT] [FieldLabel "x" False x)]           (without DuplicateRecordFields)
-    IEThingWith T [MkT] [FieldLabel "x" True $sel:x:MkT)]   (with    DuplicateRecordFields)
+    IEThingWith NoExtField T [MkT, x] NoIEWildcard
+
+But in the renamer we need to attach the correct field label,
+because the selector Name is mangled (see Note [FieldLabel] in
+GHC.Types.FieldLabel).  Hence we change this to:
+
+    IEThingWith [FieldLabel "x" True $sel:x:MkT)] T [MkT] NoIEWildcard
+
+using the TTG extension field to store the list of fields in renamed syntax
+only.  (Record fields always appear in this list, regardless of whether
+DuplicateRecordFields was in use at the definition site or not.)
 
 See Note [Representing fields in AvailInfo] in GHC.Types.Avail for more details.
 -}
 
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)
-ieName (IEVar _ (L _ n))              = ieWrappedName n
-ieName (IEThingAbs  _ (L _ n))        = ieWrappedName n
-ieName (IEThingWith _ (L _ n) _ _ _)  = ieWrappedName n
-ieName (IEThingAll  _ (L _ n))        = ieWrappedName n
+ieName (IEVar _ (L _ n))            = ieWrappedName n
+ieName (IEThingAbs  _ (L _ n))      = ieWrappedName n
+ieName (IEThingWith _ (L _ n) _ _)  = ieWrappedName n
+ieName (IEThingAll  _ (L _ n))      = ieWrappedName n
 ieName _ = panic "ieName failed pattern match!"
 
 ieNames :: IE (GhcPass p) -> [IdP (GhcPass p)]
-ieNames (IEVar       _ (L _ n)   )     = [ieWrappedName n]
-ieNames (IEThingAbs  _ (L _ n)   )     = [ieWrappedName n]
-ieNames (IEThingAll  _ (L _ n)   )     = [ieWrappedName n]
-ieNames (IEThingWith _ (L _ n) _ ns _) = ieWrappedName n
-                                       : map (ieWrappedName . unLoc) ns
+ieNames (IEVar       _ (L _ n)   )   = [ieWrappedName n]
+ieNames (IEThingAbs  _ (L _ n)   )   = [ieWrappedName n]
+ieNames (IEThingAll  _ (L _ n)   )   = [ieWrappedName n]
+ieNames (IEThingWith _ (L _ n) _ ns) = ieWrappedName n
+                                     : map (ieWrappedName . unLoc) ns
+-- NB the above case does not include names of field selectors
 ieNames (IEModuleContents {})     = []
 ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
@@ -321,10 +337,9 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
     ppr (IEVar       _     var) = ppr (unLoc var)
     ppr (IEThingAbs  _   thing) = ppr (unLoc thing)
     ppr (IEThingAll  _   thing) = hcat [ppr (unLoc thing), text "(..)"]
-    ppr (IEThingWith _ thing wc withs flds)
+    ppr (IEThingWith flds thing wc withs)
         = ppr (unLoc thing) <> parens (fsep (punctuate comma
-                                              (ppWiths ++
-                                              map (ppr . flLabel . unLoc) flds)))
+                                              (ppWiths ++ ppFields) ))
       where
         ppWiths =
           case wc of
@@ -333,6 +348,10 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
               IEWildcard pos ->
                 let (bs, as) = splitAt pos (map (ppr . unLoc) withs)
                 in bs ++ [text ".."] ++ as
+        ppFields =
+          case ghcPass @p of
+            GhcRn -> map ppr flds
+            _     -> []
     ppr (IEModuleContents _ mod')
         = text "module" <+> ppr mod'
     ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")

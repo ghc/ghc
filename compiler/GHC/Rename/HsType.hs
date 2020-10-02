@@ -17,6 +17,7 @@ module GHC.Rename.HsType (
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
         newTyVarNameRn,
         rnConDeclFields,
+        lookupField,
         rnLTyVar,
 
         rnScaledLHsType,
@@ -1247,17 +1248,17 @@ rnConDeclFields ctxt fls fields
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LConDeclField GhcPs
         -> RnM (LConDeclField GhcRn, FreeVars)
 rnField fl_env env (L l (ConDeclField _ names ty haddock_doc))
-  = do { let new_names = map (fmap lookupField) names
+  = do { let new_names = map (fmap (lookupField fl_env)) names
        ; (new_ty, fvs) <- rnLHsTyKi env ty
        ; return (L l (ConDeclField noExtField new_names new_ty haddock_doc)
                 , fvs) }
+
+lookupField :: FastStringEnv FieldLabel -> FieldOcc GhcPs -> FieldOcc GhcRn
+lookupField fl_env (FieldOcc _ (L lr rdr)) =
+    FieldOcc (flSelector fl) (L lr rdr)
   where
-    lookupField :: FieldOcc GhcPs -> FieldOcc GhcRn
-    lookupField (FieldOcc _ (L lr rdr)) =
-        FieldOcc (flSelector fl) (L lr rdr)
-      where
-        lbl = occNameFS $ rdrNameOcc rdr
-        fl  = expectJust "rnField" $ lookupFsEnv fl_env lbl
+    lbl = occNameFS $ rdrNameOcc rdr
+    fl  = expectJust "lookupField" $ lookupFsEnv fl_env lbl
 
 {-
 ************************************************************************

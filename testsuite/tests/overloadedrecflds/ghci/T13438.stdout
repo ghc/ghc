@@ -1,0 +1,10 @@
+-- defined locally
+type T :: *
+data T = ...
+MkT :: Int -> T
+foo :: T -> Int
+type T :: *
+data T = MkT {foo :: Int}
+foo	T13438.hs	3;"	v	file:
+MkT	T13438.hs	3;"	d
+T	T13438.hs	3;"	t

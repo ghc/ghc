@@ -1465,7 +1465,7 @@ can_eq_newtype_nc ev swapped ty1 ((gres, co), ty1') ty2 ps_ty2
        ; addUsedGREs gre_list
          -- If a newtype constructor was imported, don't warn about not
          -- importing it...
-       ; traverse_ keepAlive $ map gre_name gre_list
+       ; traverse_ keepAlive $ map greMangledName gre_list
          -- ...and similarly, if a newtype constructor was defined in the same
          -- module, don't warn about it being unused.
          -- See Note [Tracking unused binding and imports] in GHC.Tc.Utils.

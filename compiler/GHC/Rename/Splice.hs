@@ -433,7 +433,7 @@ rnSpliceExpr splice
              traceRn "rnSpliceExpr: typed expression splice" empty
            ; lcl_rdr <- getLocalRdrEnv
            ; gbl_rdr <- getGlobalRdrEnv
-           ; let gbl_names = mkNameSet [gre_name gre | gre <- globalRdrEnvElts gbl_rdr
+           ; let gbl_names = mkNameSet [greMangledName gre | gre <- globalRdrEnvElts gbl_rdr
                                                      , isLocalGRE gre]
                  lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
 
