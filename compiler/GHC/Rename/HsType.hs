@@ -32,6 +32,7 @@ module GHC.Rename.HsType (
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars, extractDataDefnKindVars,
         extractHsTvBndrs, extractHsTyArgRdrKiTyVars,
+        extractHsScaledTysRdrTyVars,
         forAllOrNothing, nubL
   ) where
 
@@ -1749,6 +1750,9 @@ extractHsTyArgRdrKiTyVars args
 extractHsTyRdrTyVars :: LHsType GhcPs -> FreeKiTyVars
 extractHsTyRdrTyVars ty = extract_lty ty []
 
+extractHsScaledTysRdrTyVars :: [HsScaled GhcPs (LHsType GhcPs)] -> FreeKiTyVars -> FreeKiTyVars
+extractHsScaledTysRdrTyVars args acc = foldr (\(HsScaled m ty) -> extract_hs_arrow m . extract_lty ty) acc args
+
 -- | Extracts the free type/kind variables from the kind signature of a HsType.
 --   This is used to implicitly quantify over @k@ in @type T = Nothing :: Maybe k@.
 -- The left-to-right order of variables is preserved.
@@ -1765,8 +1769,8 @@ extractHsTyRdrTyVarsKindVars (L _ ty) =
 -- | Extracts free type and kind variables from types in a list.
 -- When the same name occurs multiple times in the types, all occurrences
 -- are returned.
-extractHsTysRdrTyVars :: [LHsType GhcPs] -> FreeKiTyVars
-extractHsTysRdrTyVars tys = extract_ltys tys []
+extractHsTysRdrTyVars :: [LHsType GhcPs] -> FreeKiTyVars -> FreeKiTyVars
+extractHsTysRdrTyVars tys = extract_ltys tys
 
 -- Returns the free kind variables of any explicitly-kinded binders, returning
 -- variable occurrences in left-to-right order.
