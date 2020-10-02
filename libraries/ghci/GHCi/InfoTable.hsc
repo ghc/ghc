@@ -72,6 +72,7 @@ data Arch = ArchSPARC
           | ArchAArch64
           | ArchPPC64
           | ArchPPC64LE
+          | ArchRISCV64
           | ArchS390X
  deriving Show
 
@@ -107,6 +108,8 @@ mArch =
        Just ArchPPC64
 #elif defined(powerpc64le_HOST_ARCH)
        Just ArchPPC64LE
+#elif defined(riscv64_HOST_ARCH)
+       Just ArchRISCV64
 #elif defined(s390x_HOST_ARCH)
        Just ArchS390X
 #else
@@ -273,6 +276,26 @@ mkJumpToAddr' platform a = case platform of
         in Right [ 0x3D800000 .|. hi16 w32,
                    0x618C0000 .|. lo16 w32,
                    0x7D8903A6, 0x4E800420 ]
+
+    ArchRISCV64 ->
+        -- Generates:
+        -- .L0: auipc t0,%pcrel_hi(.L1)
+        --      ld    t0,%pcrel_lo(.L0)(a0)
+        --      jr    t0
+        -- .L1:
+        --      .dword <addr>
+        --
+        -- which looks like:
+        --    0:   00000297                auipc   t0,0x0
+        --    4:   00a2b283                ld      t0,10(t0) # a <f+0xa>
+        --    8:   8282                    jr      t0
+        -- with addr at a.
+
+        let w64 = fromIntegral (funPtrToInt a) :: Word64
+        in Left [ 0x97, 0x02, 0x00, 0x00, 0x83, 0xb2, 0xa2, 0x00,
+                  0x82, 0x82,
+                  byte0 w64, byte1 w64, byte2 w64, byte3 w64,
+                  byte4 w64, byte5 w64, byte6 w64, byte7 w64 ]
 
     ArchS390X ->
         -- Let 0xAABBCCDDEEFFGGHH be the address to jump to.
