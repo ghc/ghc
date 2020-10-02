@@ -35,8 +35,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>default<br></td>
-    <td>-O<br>-H64m<br></td>
-    <td>-O2<br>-H64m</td>
+    <td>-O<br>-H32m<br></td>
+    <td>-O2<br>-H32m</td>
     <td></td>
     <td>-haddock</td>
     <td></td>
@@ -54,6 +54,28 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O</td>
     <td>-O</td>
     <td></td>
+  </tr>
+  <tr>
+    <th>quick-validate</td>
+    <td>-O0<br>-H64m<br>-Werror</td>
+    <td>-O0<br>-H64m<br>-Werror</td>
+    <td></td>
+    <td>-O</td>
+    <td>-O2</td>
+    <td>-O</td>
+    <td>-O</td>
+    <td></td>
+  </tr>
+  <tr>
+    <th>quick-debug</td>
+    <td>-O0<br>-H64m</td>
+    <td>-O0<br>-H64m</td>
+    <td></td>
+    <td>-O</td>
+    <td>-O2</td>
+    <td>-O</td>
+    <td>-O</td>
+    <td>-debug (link)</td>
   </tr>
   <tr>
     <th>quickest</td>
@@ -190,7 +212,7 @@ information. The following table lists ways that are built in different flavours
     <td>Only in<br>prof<br>flavour</td>
 </tr>
 <tr>
-    <th>quick<br>quick-llvm</th>
+    <th>quick<br>quick-llvm<br>quick-validate<br>quick-debug</th>
     <td>vanilla</td>
     <td>vanilla<br>dynamic</td>
     <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
