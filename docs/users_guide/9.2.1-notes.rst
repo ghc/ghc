@@ -11,13 +11,13 @@ Language
   impredicative types, as described in in the paper
   `A quick look at impredicativity
   <https://www.microsoft.com/en-us/research/publication/a-quick-look-at-impredicativity/>`__
- (Serrano et al, ICFP 2020).  More information here: :ref:`impredicative-polymorphism`.
- This replaces the old (undefined, flaky) behaviour of the :extension:`ImpredicativeTypes` extension.
+  (Serrano et al, ICFP 2020).  More information here: :ref:`impredicative-polymorphism`.
+  This replaces the old (undefined, flaky) behaviour of the :extension:`ImpredicativeTypes` extension.
 
 Compiler
 ~~~~~~~~
 
-- New '-Wredundant-bang-patterns' flag that enables checks for "dead" bangs.
+- New ``-Wredundant-bang-patterns`` flag that enables checks for "dead" bangs.
   For instance, given this program: ::
 
       f :: Bool -> Bool
@@ -26,4 +26,10 @@ Compiler
 
   GHC would report that the bang on ``x`` is redundant and can be removed
   since the argument was already forced in the first equation. For more
-  details see :ghc-flag:`-Wredundant-bang-patterns`
+  details see :ghc-flag:`-Wredundant-bang-patterns`.
+
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+- ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
+  Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
