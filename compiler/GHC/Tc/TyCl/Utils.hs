@@ -993,13 +993,44 @@ mkRecordSelectorAndUpdater all_cons idDetails fl x_vars y_var =
         field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
         mk_expr   = L loc (HsVar noExtField (L loc field_var))
 
+    -- Make a binding for the updater.  We prefer to use upd_bind_fast, but
+    -- thanks to #2595 this does not work for some GADTs, so we fall back on
+    -- upd_bind_slow.
+    upd_bind
+      | null (conLikeExTyCoVars con1) = upd_bind_fast
+      | otherwise                     = upd_bind_slow
+
+    -- Make the binding:
+    --   upd x = (\ y -> x { fld = y }, fld x)
+    --
+    -- TODO: this implementation needs cleaning up
+    upd_bind_fast name = L loc (mkTopFunBind Generated lname [alt])
+      where
+        lname = L loc name
+        alt = mkSimpleMatch (mkPrefixFunRhs lname)
+                            [L loc (VarPat noExtField (L loc (x_var fl)))]
+                            (mkLHsTupleExpr
+                          [ mkHsLam [L loc (VarPat noExtField (L loc y_var))]
+                                    (L loc (RecordUpd noExtField
+                                               (L loc (HsVar noExtField (L loc (x_var fl))))
+                                               [L loc (HsRecField (L loc afo) (L loc (HsVar noExtField (L loc y_var))) False)]
+                                    ))
+                          , mkHsApp (L loc (HsRecFld noExtField afo))
+                                    (L loc (HsVar noExtField (L loc (x_var fl))))
+                          ])
+
+        afo = Unambiguous sel_name (L loc (mkVarUnqual (flLabel fl)))
+
     -- Make the binding:
     --   upd (C2 { fld1 = x1, .., fldN = xN })
     --       = (\ y -> C2 { fld1 = y, fld2 = x2, .., fldN = xN }, x1)
     --   upd (C7 { fld1 = x1, .., fldM = xM })
     --       = (\ y -> C7 { fld1 = y, fld3 = x3, .., fldM = xM }, x1)
     --    where cons_w_field = [C2,C7] and fld1 is being selected/updated
-    upd_bind = the_bind mk_rec_flds mk_expr
+    --
+    -- TODO: we should probably be more consistent with upd_bind_fast and generate
+    --    upd x = ((\ y -> case x of { c@C2 { fld1 = x1 } -> c { fld1 = y } ; ... }), fld1 x)
+    upd_bind_slow = the_bind mk_rec_flds mk_expr
       where
         -- Pattern that matches { fld1 = x1, .., fldN = xN }
         mk_rec_flds con = rec_flds (rec_fields con pat_var)
@@ -1041,10 +1072,10 @@ mkRecordSelectorAndUpdater all_cons idDetails fl x_vars y_var =
             field_occ fl' = FieldOcc (flSelector fl')
                                      (L loc (mkVarUnqual (flLabel fl')))
 
-        -- The x_vars NameEnv contains a fresh name for every selector name in the
-        -- TyCon, i.e. maps fldN to xN.
-        x_var :: FieldLbl upd Name -> Name
-        x_var fl' = lookupNameEnv_NF x_vars (flSelector fl')
+    -- The x_vars NameEnv contains a fresh name for every selector name in the
+    -- TyCon, i.e. maps fldN to xN.
+    x_var :: FieldLbl upd Name -> Name
+    x_var fl' = lookupNameEnv_NF x_vars (flSelector fl')
 
     -- Add catch-all default case unless the case is exhaustive
     -- We do this explicitly so that we get a nice error message that
