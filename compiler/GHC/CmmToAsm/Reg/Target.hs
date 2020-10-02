@@ -52,6 +52,7 @@ targetVirtualRegSqueeze platform
       ArchAlpha     -> panic "targetVirtualRegSqueeze ArchAlpha"
       ArchMipseb    -> panic "targetVirtualRegSqueeze ArchMipseb"
       ArchMipsel    -> panic "targetVirtualRegSqueeze ArchMipsel"
+      ArchRISCV64   -> panic "targetVirtualRegSqueeze ArchRISCV64"
       ArchJavaScript-> panic "targetVirtualRegSqueeze ArchJavaScript"
       ArchUnknown   -> panic "targetVirtualRegSqueeze ArchUnknown"
 
@@ -71,6 +72,7 @@ targetRealRegSqueeze platform
       ArchAlpha     -> panic "targetRealRegSqueeze ArchAlpha"
       ArchMipseb    -> panic "targetRealRegSqueeze ArchMipseb"
       ArchMipsel    -> panic "targetRealRegSqueeze ArchMipsel"
+      ArchRISCV64   -> panic "targetRealRegSqueeze ArchRISCV64"
       ArchJavaScript-> panic "targetRealRegSqueeze ArchJavaScript"
       ArchUnknown   -> panic "targetRealRegSqueeze ArchUnknown"
 
@@ -89,6 +91,7 @@ targetClassOfRealReg platform
       ArchAlpha     -> panic "targetClassOfRealReg ArchAlpha"
       ArchMipseb    -> panic "targetClassOfRealReg ArchMipseb"
       ArchMipsel    -> panic "targetClassOfRealReg ArchMipsel"
+      ArchRISCV64   -> panic "targetClassOfRealReg ArchRISCV64"
       ArchJavaScript-> panic "targetClassOfRealReg ArchJavaScript"
       ArchUnknown   -> panic "targetClassOfRealReg ArchUnknown"
 
@@ -107,6 +110,7 @@ targetMkVirtualReg platform
       ArchAlpha     -> panic "targetMkVirtualReg ArchAlpha"
       ArchMipseb    -> panic "targetMkVirtualReg ArchMipseb"
       ArchMipsel    -> panic "targetMkVirtualReg ArchMipsel"
+      ArchRISCV64   -> panic "targetMkVirtualReg ArchRISCV64"
       ArchJavaScript-> panic "targetMkVirtualReg ArchJavaScript"
       ArchUnknown   -> panic "targetMkVirtualReg ArchUnknown"
 
@@ -125,6 +129,7 @@ targetRegDotColor platform
       ArchAlpha     -> panic "targetRegDotColor ArchAlpha"
       ArchMipseb    -> panic "targetRegDotColor ArchMipseb"
       ArchMipsel    -> panic "targetRegDotColor ArchMipsel"
+      ArchRISCV64   -> panic "targetRegDotColor ArchRISCV64"
       ArchJavaScript-> panic "targetRegDotColor ArchJavaScript"
       ArchUnknown   -> panic "targetRegDotColor ArchUnknown"
 
