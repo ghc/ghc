@@ -2238,6 +2238,10 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; let theta         = hsConDeclTheta mcxt
               arg_tys       = hsConDeclArgTys args
 
+              multInArrow (HsExplicitMult m)  = [m]
+              multInArrow HsLinearArrow       = []
+              multInArrow HsUnrestrictedArrow = []
+
           -- We must ensure that we extract the free tkvs in left-to-right
           -- order of their appearance in the constructor type.
           -- That order governs the order the implicitly-quantified type
@@ -2245,7 +2249,9 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- See #14808.
         ; implicit_bndrs <- forAllOrNothing explicit_forall
             $ extractHsTvBndrs explicit_tkvs
-            $ extractHsTysRdrTyVars (theta ++ map hsScaledThing arg_tys ++ [res_ty])
+            $ extractHsTysRdrTyVars (theta ++ map hsScaledThing arg_tys ++
+                                     concatMap (multInArrow . hsMult) arg_tys ++
+                                     [res_ty])
 
         ; let ctxt = ConDeclCtx new_names
 
