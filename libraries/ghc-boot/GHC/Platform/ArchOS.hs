@@ -37,6 +37,7 @@ data Arch
    | ArchX86_64
    | ArchPPC
    | ArchPPC_64 PPC_64ABI
+   | ArchRISCV64
    | ArchS390X
    | ArchSPARC
    | ArchSPARC64
@@ -124,6 +125,7 @@ stringEncodeArch = \case
   ArchPPC           -> "powerpc"
   ArchPPC_64 ELF_V1 -> "powerpc64"
   ArchPPC_64 ELF_V2 -> "powerpc64le"
+  ArchRISCV64       -> "riscv64"
   ArchS390X         -> "s390x"
   ArchSPARC         -> "sparc"
   ArchSPARC64       -> "sparc64"
