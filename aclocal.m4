@@ -1976,7 +1976,7 @@ AC_MSG_CHECKING(for path to top of build tree)
 # `libraries/base/System/Info.hs`'s documentation.
 AC_DEFUN([GHC_CONVERT_CPU],[
 case "$1" in
-  aarch64*)
+  aarch64*|arm64*)
     $2="aarch64"
     ;;
   alpha*)
