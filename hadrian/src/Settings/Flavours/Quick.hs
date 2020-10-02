@@ -1,6 +1,7 @@
 module Settings.Flavours.Quick
    ( quickFlavour
    , quickValidateFlavour
+   , quickDebugFlavour
    )
 where
 
@@ -38,4 +39,10 @@ quickArgs = sourceArgs SourceArgs
 quickValidateFlavour :: Flavour
 quickValidateFlavour = werror $ quickFlavour
     { name = "quick-validate"
+    }
+
+quickDebugFlavour :: Flavour
+quickDebugFlavour = quickFlavour
+    { name = "quick-debug"
+    , ghcDebugged = True
     }
