@@ -234,7 +234,10 @@ copyWithHeader dflags purpose maybe_header from to = do
 linkDynLib :: DynFlags -> [String] -> [UnitId] -> IO ()
 linkDynLib dflags0 o_files dep_packages
  = do
-    let -- This is a rather ugly hack to fix dynamically linked
+    let platform = targetPlatform dflags0
+        os = platformOS platform
+
+        -- This is a rather ugly hack to fix dynamically linked
         -- GHC on Windows. If GHC is linked with -threaded, then
         -- it links against libHSrts_thr. But if base is linked
         -- against libHSrts, then both end up getting loaded,
@@ -243,20 +246,23 @@ linkDynLib dflags0 o_files dep_packages
         dflags1 = if platformMisc_ghcThreaded $ platformMisc dflags0
           then addWay' WayThreaded dflags0
           else                     dflags0
-        dflags = if platformMisc_ghcDebugged $ platformMisc dflags1
+        win_dflags = if platformMisc_ghcDebugged $ platformMisc dflags1
           then addWay' WayDebug dflags1
           else                  dflags1
+
+        dflags | OSMinGW32 <- os = win_dflags
+               | otherwise       = dflags0
 
         verbFlags = getVerbFlags dflags
         o_file = outputFile dflags
 
-    pkgs <- getPreloadUnitsAnd
+    pkgs_with_rts <- getPreloadUnitsAnd
                (initSDocContext dflags defaultUserStyle)
                (unitState dflags)
                (mkHomeUnitFromFlags dflags)
                dep_packages
 
-    let pkg_lib_paths = collectLibraryPaths (ways dflags) pkgs
+    let pkg_lib_paths = collectLibraryPaths (ways dflags) pkgs_with_rts
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | ( osElfTarget (platformOS (targetPlatform dflags)) ||
@@ -273,24 +279,26 @@ linkDynLib dflags0 o_files dep_packages
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
-    -- We don't want to link our dynamic libs against the RTS package,
-    -- because the RTS lib comes in several flavours and we want to be
+    -- In general we don't want to link our dynamic libs against the RTS
+    -- package, because the RTS lib comes in several flavours and we want to be
     -- able to pick the flavour when a binary is linked.
-    -- On Windows we need to link the RTS import lib as Windows does
-    -- not allow undefined symbols.
-    -- The RTS library path is still added to the library search path
-    -- above in case the RTS is being explicitly linked in (see #3807).
-    let platform = targetPlatform dflags
-        os = platformOS platform
-        pkgs_no_rts = case os of
-                      OSMinGW32 ->
-                          pkgs
-                      _ | gopt Opt_LinkRts dflags ->
-                          pkgs
-                        | otherwise ->
-                          filter ((/= rtsUnitId) . unitId) pkgs
-    let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs_no_rts
-                        in  package_hs_libs ++ extra_libs ++ other_flags
+    --
+    -- But:
+    --   * on Windows we need to link the RTS import lib as Windows does not
+    --   allow undefined symbols.
+    --
+    --   * the RTS library path is still added to the library search path above
+    --   in case the RTS is being explicitly linked in (see #3807).
+    --
+    --   * if -flink-rts is used, we link with the rts.
+    --
+    let pkgs_without_rts = filter ((/= rtsUnitId) . unitId) pkgs_with_rts
+        pkgs
+         | OSMinGW32 <- os         = pkgs_with_rts
+         | gopt Opt_LinkRts dflags = pkgs_with_rts
+         | otherwise               = pkgs_without_rts
+        (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs
+        pkg_link_opts = package_hs_libs ++ extra_libs ++ other_flags
 
         -- probably _stub.o files
         -- and last temporary shared object file
