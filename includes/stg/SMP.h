@@ -377,6 +377,8 @@ write_barrier(void) {
     __asm__ __volatile__ ("" : : : "memory");
 #elif defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
     __asm__ __volatile__ ("dmb  st" : : : "memory");
+#elif defined(riscv64_HOST_ARCH)
+    __asm__ __volatile__ ("fence w,w" : : : "memory");
 #else
 #error memory barriers unimplemented on this architecture
 #endif
@@ -401,6 +403,8 @@ store_load_barrier(void) {
     __asm__ __volatile__ ("dmb" : : : "memory");
 #elif defined(aarch64_HOST_ARCH)
     __asm__ __volatile__ ("dmb sy" : : : "memory");
+#elif defined(riscv64_HOST_ARCH)
+    __asm__ __volatile__ ("fence w,r" : : : "memory");
 #else
 #error memory barriers unimplemented on this architecture
 #endif
@@ -426,6 +430,8 @@ load_load_barrier(void) {
     __asm__ __volatile__ ("dmb" : : : "memory");
 #elif defined(aarch64_HOST_ARCH)
     __asm__ __volatile__ ("dmb sy" : : : "memory");
+#elif defined(riscv64_HOST_ARCH)
+    __asm__ __volatile__ ("fence w,r" : : : "memory");
 #else
 #error memory barriers unimplemented on this architecture
 #endif
