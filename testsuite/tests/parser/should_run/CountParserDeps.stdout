@@ -120,6 +120,7 @@ GHC.Platform.Constants
 GHC.Platform.NoRegs
 GHC.Platform.PPC
 GHC.Platform.Profile
+GHC.Platform.RISCV64
 GHC.Platform.Reg
 GHC.Platform.Reg.Class
 GHC.Platform.Regs
