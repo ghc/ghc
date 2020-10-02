@@ -190,6 +190,7 @@ T7360.$tc'Foo2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo9 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
 T7360.$tc'Foo9 = GHC.Types.KindRepFun $krep T7360.$tc'Foo4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -219,3 +220,6 @@ T7360.$tc'Foo3
       T7360.$tc'Foo10
       0#
       T7360.$tc'Foo9
+
+
+
