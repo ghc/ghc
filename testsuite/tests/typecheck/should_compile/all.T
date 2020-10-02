@@ -726,6 +726,7 @@ test('T15942', normal, compile, [''])
 
 test('TyAppPat_Existential', normal, compile, [''])
 test('TyAppPat_ExistentialMulti', normal, compile, [''])
+test('TyAppPat_KindDependency', normal, compile, [''])
 test('TyAppPat_Universal', normal, compile, [''])
 test('TyAppPat_Mixed', normal, compile, [''])
 test('TyAppPat_TH', normal, compile, [''])

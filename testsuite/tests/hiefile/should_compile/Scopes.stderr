@@ -1,2 +1,20 @@
-Got valid scopes
-Got no roundtrip errors
+Got invalid scopes
+Name ax Defined at Scopes.hs:45:17 at position Scopes.hs:45:32-33 doesn't occur in calculated scope [LocalScope Scopes.hs:45:17-18,
+                                                                                                     LocalScope Scopes.hs:45:37-59,
+                                                                                                     NoScope]
+Got roundtrip errors
+LocalName k{tv} Scopes.hs:41:13-18 and LocalName k{tv} Scopes.hs:41:1-27 do not match
+In Node:
+([(Right k{tv agq},
+   Details:  Nothing {type variable binding with scope: LocalScope Scopes.hs:41:13-18 , type variable scopes: NoScope,  LocalScope Scopes.hs:41:23-27})],
+ Scopes.hs:41:13-18)
+and
+([(Right k{tv rOn},
+   Details:  Nothing {type variable binding with scope: LocalScope Scopes.hs:41:13-18 , type variable scopes: NoScope,  LocalScope Scopes.hs:41:23-27})],
+ Scopes.hs:41:13-18)
+While comparing
+[(Right LocalName k{tv} Scopes.hs:41:13-18,
+  Details:  Nothing {type variable binding with scope: LocalScope Scopes.hs:41:13-18 , type variable scopes: NoScope,  LocalScope Scopes.hs:41:23-27})]
+and
+[(Right LocalName k{tv} Scopes.hs:41:1-27,
+  Details:  Nothing {type variable binding with scope: LocalScope Scopes.hs:41:13-18 , type variable scopes: NoScope,  LocalScope Scopes.hs:41:23-27})]
