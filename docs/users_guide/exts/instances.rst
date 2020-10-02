@@ -106,7 +106,9 @@ Formal syntax for instance declaration types
 
 The top of an instance declaration only permits very specific forms of types.
 To make more precise what forms of types are or are not permitted, we provide a
-BNF-style grammar for the tops of instance declarations below: ::
+BNF-style grammar for the tops of instance declarations below.
+
+.. code-block:: none
 
   inst_top ::= 'instance' opt_forall opt_ctxt inst_head opt_where
 

@@ -233,7 +233,7 @@ simply force the (bottom) value of the argument using
     data V a deriving Functor
     type role V nominal
 
-will produce
+will produce ::
 
     instance Functor V where
       fmap _ z = case z of
