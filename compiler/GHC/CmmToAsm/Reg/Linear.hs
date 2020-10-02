@@ -218,6 +218,7 @@ linearRegAlloc config entry_ids block_live sccs
  = case platformArch platform of
       ArchX86        -> go $ (frInitFreeRegs platform :: X86.FreeRegs)
       ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
+      ArchRISCV64    -> panic "linearRegAlloc ArchRISCV64"
       ArchS390X      -> panic "linearRegAlloc ArchS390X"
       ArchSPARC      -> go $ (frInitFreeRegs platform :: SPARC.FreeRegs)
       ArchSPARC64    -> panic "linearRegAlloc ArchSPARC64"
