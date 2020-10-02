@@ -165,6 +165,7 @@ nativeCodeGen dflags this_mod modLoc h us cmms
       ArchSPARC     -> nCG' (SPARC.ncgSPARC config)
       ArchSPARC64   -> panic "nativeCodeGen: No NCG for SPARC64"
       ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
+      ArchRISCV64   -> panic "nativeCodeGen: No NCG for RISCV64"
       ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
       ArchAArch64   -> panic "nativeCodeGen: No NCG for AArch64"
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"

@@ -391,6 +391,12 @@ ocVerifyImage_ELF ( ObjectCode* oc )
                      oc->fileName);
           return 0;
 #endif
+#if defined(EM_RISCV)
+      case EM_RISCV:  IF_DEBUG(linker,debugBelch( "riscv" ));
+          errorBelch("%s: RTS linker not implemented on riscv",
+                     oc->fileName);
+          return 0;
+#endif
 #if defined(EM_S390)
       case EM_S390:  IF_DEBUG(linker,debugBelch( "s390" ));
           errorBelch("%s: RTS linker not implemented on s390",
