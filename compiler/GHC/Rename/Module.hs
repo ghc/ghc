@@ -2213,7 +2213,9 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- See #14808.
         ; implicit_bndrs <- forAllOrNothing explicit_forall
             $ extractHsTvBndrs explicit_tkvs
-            $ extractHsTysRdrTyVars (theta ++ map hsScaledThing arg_tys ++ [res_ty])
+            $ extractHsTysRdrTyVars theta
+            $ extractHsScaledTysRdrTyVars arg_tys
+            $ extractHsTysRdrTyVars [res_ty] []
 
         ; let ctxt = ConDeclCtx new_names
 
