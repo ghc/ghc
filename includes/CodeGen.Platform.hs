@@ -380,6 +380,74 @@ import GHC.Platform.Reg
 # define f14 30
 # define f15 31
 
+#elif defined(MACHREGS_riscv64)
+
+# define zero 0
+# define ra   1
+# define sp   2
+# define gp   3
+# define tp   4
+# define t0   5
+# define t1   6
+# define t2   7
+# define s0   8
+# define s1   9
+# define a0  10
+# define a1  11
+# define a2  12
+# define a3  13
+# define a4  14
+# define a5  15
+# define a6  16
+# define a7  17
+# define s2  18
+# define s3  19
+# define s4  20
+# define s5  21
+# define s6  22
+# define s7  23
+# define s8  24
+# define s9  25
+# define s10 26
+# define s11 27
+# define t3  28
+# define t4  29
+# define t5  30
+# define t6  31
+
+# define ft0  32
+# define ft1  33
+# define ft2  34
+# define ft3  35
+# define ft4  36
+# define ft5  37
+# define ft6  38
+# define ft7  39
+# define fs0  40
+# define fs1  41
+# define fa0  42
+# define fa1  43
+# define fa2  44
+# define fa3  45
+# define fa4  46
+# define fa5  47
+# define fa6  48
+# define fa7  49
+# define fs2  50
+# define fs3  51
+# define fs4  52
+# define fs5  53
+# define fs6  54
+# define fs7  55
+# define fs8  56
+# define fs9  57
+# define fs10 58
+# define fs11 59
+# define ft8  60
+# define ft9  61
+# define ft10 62
+# define ft11 63
+
 #endif
 
 callerSaves :: GlobalReg -> Bool
@@ -667,7 +735,7 @@ globalRegMaybe :: GlobalReg -> Maybe RealReg
 #if defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
     || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc) \
     || defined(MACHREGS_arm) || defined(MACHREGS_aarch64) \
-    || defined(MACHREGS_s390x)
+    || defined(MACHREGS_s390x) || defined(MACHREGS_riscv64)
 # if defined(REG_Base)
 globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
 # endif
