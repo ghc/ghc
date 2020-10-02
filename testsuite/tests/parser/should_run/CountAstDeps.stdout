@@ -1,4 +1,4 @@
-Found 241 Language.Haskell.Syntax module dependencies
+Found 242 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -114,6 +114,7 @@ GHC.Platform.Constants
 GHC.Platform.NoRegs
 GHC.Platform.PPC
 GHC.Platform.Profile
+GHC.Platform.RISCV64
 GHC.Platform.Reg
 GHC.Platform.Reg.Class
 GHC.Platform.Regs

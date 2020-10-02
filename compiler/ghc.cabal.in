@@ -492,6 +492,7 @@ Library
         GHC.Platform.Reg
         GHC.Platform.Reg.Class
         GHC.Platform.Regs
+        GHC.Platform.RISCV64
         GHC.Platform.S390X
         GHC.Platform.SPARC
         GHC.Platform.Ways
