@@ -74,6 +74,7 @@ maxSpillSlots config = case platformArch (ncgPlatform config) of
    ArchX86       -> X86.Instr.maxSpillSlots config
    ArchX86_64    -> X86.Instr.maxSpillSlots config
    ArchPPC       -> PPC.Instr.maxSpillSlots config
+   ArchRISCV64   -> panic "maxSpillSlots ArchRISCV64"
    ArchS390X     -> panic "maxSpillSlots ArchS390X"
    ArchSPARC     -> SPARC.Instr.maxSpillSlots config
    ArchSPARC64   -> panic "maxSpillSlots ArchSPARC64"
