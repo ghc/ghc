@@ -105,11 +105,17 @@ type Closure = GenClosure Box
 -- | This is the representation of a Haskell value on the heap. It reflects
 -- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/storage/Closures.h>
 --
--- The data type is parametrized by the type to store references in. Usually
--- this is a 'Box' with the type synonym 'Closure'.
+-- The data type is parametrized by `b`: the type to store references in.
+-- Usually this is a 'Box' with the type synonym 'Closure'.
 --
--- All Heap objects have the same basic layout. A header containing a pointer
--- to the info table and a payload with various fields. The @info@ field below
+-- If you are observing closures from an external process, extra care must be
+-- taken when dealing with `b` references. The external process's GC may move or
+-- free the objects. If you plan on using the `b` references, you should pause
+-- the external process's GC for example with `rts_lock` or `rts_pause` form
+-- `RtsAPI.h`.
+--
+-- All Heap objects have the same basic layout. A header containing a pointer to
+-- the info table and a payload with various fields. The @info@ field below
 -- always refers to the info table pointed to by the header. The remaining
 -- fields are the payload.
 --
@@ -273,46 +279,50 @@ data GenClosure b
         , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
         }
 
-  -- | Representation of StgTSO: A Thread State Object.
-  -- The values for 'what_next', 'why_blocked' and 'flags' are defined in
-  -- @Constants.h@.
-  -- Fields marked as @unsafe@ are backed by dynamic pointers and should only
-  -- be accessed when the garbage collector is stopped. Otherwise segmentation
-  -- faults may happen when an invalidated pointer is accessed.
+  -- | Representation of StgTSO: A Thread State Object. The values for
+  -- 'what_next', 'why_blocked' and 'flags' are defined in @Constants.h@.
   | TSOClosure
-      { info :: !StgInfoTable
+      { info                :: !StgInfoTable
       -- pointers
-      , unsafe_link :: !b
-      , unsafe_global_link :: !b
-      , tsoStack :: !b -- ^ stackobj from StgTSO
-      , unsafe_trec :: !b
-      , unsafe_blocked_exceptions :: !b
-      , unsafe_bq :: !b
+      , link                :: !b
+      , global_link         :: !b
+      , tsoStack            :: !b -- ^ stackobj from StgTSO
+      , trec                :: !b
+      , blocked_exceptions  :: !b
+      , bq                  :: !b
       -- values
-      , what_next :: WhatNext
-      , why_blocked :: WhyBlocked
-      , flags :: [TsoFlags]
-      , threadId :: Word64
-      , saved_errno :: Word32
-      , tso_dirty:: Word32 -- ^ non-zero => dirty
-      , alloc_limit :: Int64
-      , tot_stack_size :: Word32
-      , prof :: Maybe StgTSOProfInfo
+      , what_next           :: !WhatNext
+      , why_blocked         :: !WhyBlocked
+      , flags               :: ![TsoFlags]
+      , threadId            :: !Word64
+      , saved_errno         :: !Word32
+      , tso_dirty           :: !Word32 -- ^ non-zero => dirty
+      , alloc_limit         :: !Int64
+      , tot_stack_size      :: !Word32
+      , prof                :: !(Maybe StgTSOProfInfo)
       }
-  -- | Representation of StgStack: The 'tsoStack' of a 'TSOClosure'.
-  -- Fields marked as @unsafe@ are backed by dynamic pointers and should only
-  -- be accessed when the garbage collector is stopped. Otherwise segmentation
-  -- faults may happen when an invalidated pointer is accessed.
+
+  -- | Representation of StgStack: The 'tsoStack ' of a 'TSOClosure'.
+  --
+  -- Fields marked as @unsafe@ contain pointers to data that might be moved by
+  -- the RTS at any point (e.g. by the garbage collector or the scheduler).
+  -- These unsafe fields should only be accessed when all haskell threads are
+  -- paused, typically via GHC's `rts_pause` fucntion in `RtsAPI.h`.
+  -- Unfortunately, you need a running haskell thread to observe these fields in
+  -- the first place! Still, you can safely make use of these fields if the
+  -- closure is from an external Haskell process with a paused RTS.
   | StackClosure
-     { info :: !StgInfoTable
-     , stack_size :: !Word32 -- ^ stack size in *words*
-     , stack_dirty :: !Word8 -- ^ non-zero => dirty
+      { info            :: !StgInfoTable
+      , stack_size      :: !Word32 -- ^ stack size in *words*
+      , stack_dirty     :: !Word8 -- ^ non-zero => dirty
 #if __GLASGOW_HASKELL__ >= 810
-     , stack_marking :: Word8
+      , stack_marking   :: !Word8
 #endif
-     , unsafeStackPointer :: !b -- ^ current stack pointer
-     , unsafeStack :: [Word]
-     }
+      -- | Offset of the `StgStack::sp` pointer in bytes
+      --    x->sp == ((byte*)x)+stack_spOffset
+      --  The type of `stack_spOffset` reflects the type of `stack_size`.
+      , stack_spOffset  :: !Int
+      }
 
     ------------------------------------------------------------
     -- Unboxed unlifted closures

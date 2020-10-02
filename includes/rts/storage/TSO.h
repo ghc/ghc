@@ -255,7 +255,6 @@ typedef struct StgStack_ {
     /* Pointer to the "top" of the stack i.e. the most recently written address.
      * The stack is filled downwards, so the "top" of the stack starts with `sp
      * = stack + stack_size` and is decremented as the stack fills with data.
-     * The memory in `stack` strictly less than `sp` is free stack space.
      * See comment on "Invariants" below.
      */
     StgPtr     sp;

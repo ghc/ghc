@@ -1,10 +1,13 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+
 module GHC.Exts.Heap.FFIClosures where
 
 #include "Rts.h"
 
 import Prelude
 import Foreign
+import GHC.Exts
 import GHC.Exts.Heap.ProfInfo.Types
 import GHC.Exts.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..))
 
@@ -100,7 +103,7 @@ data StackFields = StackFields {
 #if __GLASGOW_HASKELL__ >= 810
     stack_marking :: Word8,
 #endif
-    stack :: [Word]
+    stack_sp :: Addr##
 }
 
 -- | Get non-closure fields from @StgStack_@ (@TSO.h@)
@@ -111,9 +114,9 @@ peekStackFields ptr = do
 #if __GLASGOW_HASKELL__ >= 810
     marking' <- (#peek struct StgStack_, marking) ptr
 #endif
+    Ptr sp' <- (#peek struct StgStack_, sp) ptr
 
-    let stackPtr = (#ptr struct StgStack_, stack) ptr
-    stack' <- peekArray (fromIntegral stack_size') stackPtr
+    -- TODO decode the stack.
 
     return StackFields {
         stack_size = stack_size',
@@ -121,5 +124,5 @@ peekStackFields ptr = do
 #if __GLASGOW_HASKELL__ >= 810
         stack_marking = marking',
 #endif
-        stack = stack'
+        stack_sp = sp'
     }
