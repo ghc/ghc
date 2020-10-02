@@ -32,6 +32,7 @@ module GHC.Rename.HsType (
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars, extractDataDefnKindVars,
         extractHsTvBndrs, extractHsTyArgRdrKiTyVars,
+        extractHsScaledTysRdrTyVars,
         forAllOrNothing, nubL
   ) where
 
@@ -1748,6 +1749,9 @@ extractHsTyArgRdrKiTyVars args
 -- See Note [Kind and type-variable binders]
 extractHsTyRdrTyVars :: LHsType GhcPs -> FreeKiTyVars
 extractHsTyRdrTyVars ty = extract_lty ty []
+
+extractHsScaledTysRdrTyVars :: [HsScaled GhcPs (LHsType GhcPs)] -> FreeKiTyVars -> FreeKiTyVars
+extractHsScaledTysRdrTyVars args acc = foldr (\(HsScaled m ty) -> extract_hs_arrow m . extract_lty ty) acc args
 
 -- | Extracts the free type/kind variables from the kind signature of a HsType.
 --   This is used to implicitly quantify over @k@ in @type T = Nothing :: Maybe k@.
