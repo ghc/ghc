@@ -879,8 +879,7 @@ mkRecSelAndUpd (tycon, fl) = do
     -- value of the field being updated.
     x_vars <- fmap mkNameEnv $ forM (tyConFieldLabels tycon) $ \fl' ->
                   (,) (flSelector fl') <$> newSysName (mkVarOccFS (flLabel fl'))
-    y_var <- newSysName (mkVarOccFS (flLabel fl))
-    let (sel, upd) = mkRecordSelectorAndUpdater all_cons idDetails fl x_vars y_var
+    let (sel, upd) = mkRecordSelectorAndUpdater all_cons idDetails fl x_vars
     return [sel, upd]
   where
     all_cons = map RealDataCon (tyConDataCons tycon)
@@ -891,14 +890,14 @@ mkRecSelAndUpd (tycon, fl) = do
 mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabelNoUpdater
                     -> (Id, LHsBind GhcRn)
 mkOneRecordSelector all_cons idDetails fl
-  = fst $ mkRecordSelectorAndUpdater all_cons idDetails (fl { flUpdate = oops }) oops oops
+  = fst $ mkRecordSelectorAndUpdater all_cons idDetails (fl { flUpdate = oops }) oops
   where
     oops = error "mkOneRecordSelector: poked a field needed only for updaters"
 
 mkRecordSelectorAndUpdater :: [ConLike] -> RecSelParent -> FieldLabel
-                           -> NameEnv Name -> Name
+                           -> NameEnv Name
                            -> ((Id, LHsBind GhcRn), (Id, LHsBind GhcRn))
-mkRecordSelectorAndUpdater all_cons idDetails fl x_vars y_var =
+mkRecordSelectorAndUpdater all_cons idDetails fl x_vars =
     ( mk_binding rec_details sel_name sel_ty sel_bind is_naughty
     , mk_binding VanillaId   upd_name upd_ty upd_bind no_updater
     )
@@ -909,12 +908,12 @@ mkRecordSelectorAndUpdater all_cons idDetails fl x_vars y_var =
     upd_name = flUpdate fl
 
     mk_binding :: IdDetails -> Name -> Type  -- What is being bound
-               -> (Name -> LHsBind GhcRn)    -- The body of the binding
+               -> LHsBind GhcRn              -- The body of the binding
                -> Bool                       -- Should it be unit instead?
                -> (Id, Located (HsBindLR GhcRn GhcRn))
     mk_binding details name ty bind is_unit
       | is_unit   = (mkExportedLocalId details name unitTy, unit_bind name)
-      | otherwise = (mkExportedLocalId details name ty, bind name)
+      | otherwise = (mkExportedLocalId details name ty, bind)
 
     rec_details = RecSelId { sel_tycon = idDetails, sel_naughty = is_naughty }
 
@@ -957,102 +956,115 @@ mkRecordSelectorAndUpdater all_cons idDetails fl x_vars y_var =
                             -- fields in all the constructor have multiplicity Many.
                           result_ty
 
-    -- Make a selector or updater binding: one alternative per constructor that
-    -- includes the field, plus a default case if necessary.
-    the_bind :: (ConLike -> [LHsRecField GhcRn (LPat GhcRn)])
-                  -- Fields to match on for this constructor
-             -> (ConLike -> LHsExpr GhcRn) -- RHS for this constructor
-             -> Name  -- Name of the bound function
-             -> LHsBind GhcRn
-    the_bind mk_rec_flds mk_expr name
-        = L loc (mkTopFunBind Generated lname alts)
-      where
-        lname = L loc name
-        alts  = map mk_match cons_w_field ++ deflt
-
-        mk_match con = mkSimpleMatch (mkPrefixFunRhs lname)
-                                     [L loc pat]
-                                     (mk_expr con)
-          where
-            pat = ConPat NoExtField (L loc (getName con)) (RecCon rec_fields)
-            rec_fields = HsRecFields { rec_flds = mk_rec_flds con
-                                     , rec_dotdot = Nothing }
-
     -- Make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
     --    where cons_w_field = [C2,C7]
-    sel_bind = the_bind (const [rec_field]) (const mk_expr)
+    sel_bind = mkBind sel_name alts
       where
-        rec_field = noLoc (HsRecField
-                            { hsRecFieldLbl
-                               = L loc (FieldOcc sel_name
-                                         (L loc $ mkVarUnqual lbl))
-                            , hsRecFieldArg
-                               = L loc (VarPat noExtField (L loc field_var))
-                            , hsRecPun = False })
+        alts = map mk_match cons_w_field ++ deflt
+
+        mk_match con = ( [mkRecConPat con [rec_field]]
+                       , mkHsVar field_var
+                       )
+        rec_field = mkHsRecField (mkFieldOcc fl) (mkVarPat field_var)
         field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
-        mk_expr   = L loc (HsVar noExtField (L loc field_var))
 
-    -- Make the binding:
-    --   upd (C2 { fld1 = x1, .., fldN = xN })
-    --       = (\ y -> C2 { fld1 = y, fld2 = x2, .., fldN = xN }, x1)
-    --   upd (C7 { fld1 = x1, .., fldM = xM })
-    --       = (\ y -> C7 { fld1 = y, fld3 = x3, .., fldM = xM }, x1)
-    --    where cons_w_field = [C2,C7] and fld1 is being selected/updated
-    upd_bind = the_bind mk_rec_flds mk_expr
+    -- Make the updater binding:
+    --   upd z = (\ y -> z { fld = y }, fld z)
+    upd_bind = mkBind upd_name [([mkVarPat z_var], expr)]
       where
-        -- Pattern that matches { fld1 = x1, .., fldN = xN }
-        mk_rec_flds con = rec_flds (rec_fields con pat_var)
-        pat_var = VarPat noExtField . L loc . x_var
+        y_var = mkInternalName (mkBuiltinUnique 2) (mkVarOccFS lbl) loc
+        z_var = mkInternalName (mkBuiltinUnique 3) (mkVarOcc "z") loc
 
-        -- RHS expression in updater binding: (\y -> C{...}, x1)
-        mk_expr con = mkLHsTupleExpr
-                          [ mk_update_fun con
-                          , L loc (HsVar noExtField (L loc (x_var fl)))
-                          ]
+        expr = mkLHsTupleExpr
+                   [ mkHsLam [mkVarPat y_var] update_expr
+                   , mkHsApp (L loc (HsRecFld noExtField unambiguous_fld))
+                             (mkHsVar z_var)
+                   ]
 
-        -- Make the first component of the pair: a function that takes a new value
-        -- for the field being updated and constructs a record with that field
-        -- updated and the others unchanged: e.g. if updating fld1 we make
-        --     \y -> C { fld1 = y, fld2 = x2, .., fldN = xN }
-        mk_update_fun con = mkHsLam
-            [L loc (VarPat noExtField (L loc y_var))]
-                (L loc (RecordCon noExtField
-                           (L loc (getName con))
-                           (rec_fields con con_var)))
-        con_var fl' = HsVar noExtField (L loc (if flSelector fl' == sel_name
-                                               then y_var
-                                               else x_var fl'))
+        unambiguous_fld = Unambiguous sel_name (L loc (mkVarUnqual (flLabel fl)))
 
-        -- Used for both pattern and record construction, to create
-        --     { fld1 = k fld1, .., fldN = k fldN }
-        -- where k gives the hsRecFieldArg for each field
-        rec_fields :: ConLike
-                   -> (FieldLabelNoUpdater -> a)
-                   -> HsRecFields GhcRn (Located a)
-        rec_fields con k = HsRecFields { rec_flds = map rec_field
-                                                        (conLikeFieldLabels con)
-                                       , rec_dotdot = Nothing }
+        -- Either z { fld = y } or its desugaring as a case expression.
+        -- See Note [Updaters use record update syntax] for why we need the latter.
+        update_expr = L loc (if simple_update then rec_upd_expr else case_expr)
+        simple_update = null (conLikeExTyCoVars con1)
+
+        -- z { fld = y }
+        rec_upd_expr = RecordUpd
+            { rupd_ext  = Generated
+            , rupd_expr = mkHsVar z_var
+            , rupd_flds = [mkHsRecField (L loc unambiguous_fld) (mkHsVar y_var)] }
+
+        -- desugaring of z { fld1 = y }, i.e.
+        --     case z of
+        --         C2 { fld1 = x1, fld2 = x2, ..., fld = xN }
+        --              -> C2 { fld1 = y, fld2 = x2, ..., fldN = xN }
+        --         ...
+        case_expr = HsCase noExtField (mkHsVar z_var) (mkMatchGroup Generated alts)
+        alts = map mk_alt cons_w_field
+                   ++ map (uncurry (mkSimpleMatch CaseAlt)) deflt
+
+        -- C2 { fld1 = x1, ..., fld = xN } -> C2 { fld1 = y, fld2 = x2, ..., fldN = xN }
+        mk_alt con = mkHsCaseAlt pat expr
           where
-            rec_field fl' = L loc (HsRecField
-                                      { hsRecFieldLbl = L loc (field_occ fl')
-                                      , hsRecFieldArg = L loc (k fl')
-                                      , hsRecPun = False })
-            field_occ fl' = FieldOcc (flSelector fl')
-                                     (L loc (mkVarUnqual (flLabel fl')))
+            field_labels = conLikeFieldLabels con
+            pat  = mkRecConPat con (map (rec_field (mkVarPat . x_var)) field_labels)
+            expr = mkRecordCon con (map (rec_field (mkHsVar . con_var)) field_labels)
+            con_var fl' = if flSelector fl' == sel_name then y_var else x_var fl'
 
-        -- The x_vars NameEnv contains a fresh name for every selector name in the
-        -- TyCon, i.e. maps fldN to xN.
-        x_var :: FieldLbl upd Name -> Name
-        x_var fl' = lookupNameEnv_NF x_vars (flSelector fl')
+            -- Used for both pattern and record construction, to create
+            --     fldN = k fldN
+            -- where k gives the hsRecFieldArg for each field
+            rec_field :: (FieldLabelNoUpdater -> a)
+                      -> FieldLabelNoUpdater
+                      -> LHsRecField' (FieldOcc GhcRn) a
+            rec_field k fl' = mkHsRecField (mkFieldOcc fl') (k fl')
+
+            -- The x_vars NameEnv contains a fresh name for every selector name
+            -- in the TyCon, i.e. maps fldN to xN.
+            x_var :: FieldLabelNoUpdater -> Name
+            x_var fl' = lookupNameEnv_NF x_vars (flSelector fl')
+
+
+    -- These are just boring constructors for bits of syntax, using the SrcSpan
+    -- of the field (which is why they are not top-level).
+    mkBind :: Name -> [([LPat GhcRn], LHsExpr GhcRn)] -> LHsBind GhcRn
+    mkBind name alts = L loc (mkTopFunBind Generated lname alts')
+      where
+        lname = L loc name
+        alts' = map (uncurry (mkSimpleMatch (mkPrefixFunRhs lname))) alts
+
+    mkVarPat :: Name -> LPat GhcRn
+    mkVarPat var = L loc (VarPat noExtField (L loc var))
+
+    mkRecConPat :: ConLike -> [LHsRecField GhcRn (XRec GhcRn (Pat GhcRn))] -> LPat GhcRn
+    mkRecConPat con rflds = L loc (ConPat noExtField (L loc (getName con))
+                                        (RecCon (HsRecFields rflds Nothing)))
+
+    mkHsVar :: Name -> LHsExpr GhcRn
+    mkHsVar var = L loc (HsVar noExtField (L loc var))
+
+    mkRecordCon :: ConLike -> [LHsRecField GhcRn (XRec GhcRn (HsExpr GhcRn))] -> LHsExpr GhcRn
+    mkRecordCon con rflds = L loc (RecordCon noExtField
+                                      (L loc (getName con))
+                                      (HsRecFields rflds Nothing))
+
+    mkHsRecField :: Located lbl -> arg -> LHsRecField' lbl arg
+    mkHsRecField lbl arg = L loc (HsRecField { hsRecFieldLbl = lbl
+                                             , hsRecFieldArg = arg
+                                             , hsRecPun = False })
+
+    mkFieldOcc :: FieldLbl update_rep Name -> LFieldOcc GhcRn
+    mkFieldOcc fl' = L loc (FieldOcc (flSelector fl')
+                                     (L loc (mkVarUnqual (flLabel fl'))))
+
 
     -- Add catch-all default case unless the case is exhaustive
     -- We do this explicitly so that we get a nice error message that
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
-          | otherwise = [mkSimpleMatch CaseAlt
-                            [L loc (WildPat noExtField)]
-                            (mkHsApp (L loc (HsVar noExtField
+          | otherwise = [( [L loc (WildPat noExtField)]
+                         , mkHsApp (L loc (HsVar noExtField
                                          (L loc (getName rEC_SEL_ERROR_ID))))
                                      (L loc (HsLit noExtField msg_lit)))]
     msg_lit = HsStringPrim NoSourceText (bytesFS lbl)
@@ -1087,19 +1099,11 @@ mkRecordSelectorAndUpdater all_cons idDetails fl x_vars y_var =
     inst_tys = substTyVars eq_subst univ_tvs
 
 
--- | Make a binding of unit:
---
---   name :: ()
---   name = ()
---
--- used for naughty record selectors and missing updaters.
-unit_bind :: Name -> LHsBind GhcRn
-unit_bind name = L loc (mkTopFunBind Generated lname alts)
-  where
-    loc      = getSrcSpan name
-    lname    = L loc name
-    alts     = [mkSimpleMatch (mkPrefixFunRhs lname) [] unit_rhs]
-    unit_rhs = mkLHsTupleExpr []
+    -- Make a binding of unit, for naughty record selectors/updaters:
+    --     name :: ()
+    --     name = ()
+    unit_bind :: Name -> LHsBind GhcRn
+    unit_bind name = mkBind name [([], mkLHsTupleExpr [])]
 
 
 
@@ -1270,12 +1274,10 @@ returns the existing value.  For example, given the data declaration
 we generate the record updaters:
 
     $upd:foo:MkT :: T y -> ([y] -> T y, [y])
-    $upd:foo:MkT (MkT { foo = x1, bar = x2})
-        = (\y -> MkT { foo = y, bar = x2}, x1)
+    $upd:foo:MkT x = (\ y -> t { foo = y }, foo x)
 
     $upd:bar:MkT :: T y -> (Int -> T y, Int)
-    $upd:bar:MkT (MkT { foo = x1, bar = x2 })
-        = (\y -> MkT { foo = x1, bar = y}, x2)
+    $upd:bar:MkT x = (\ y -> t { bar = y }, foo x)
 
 These are used to produce instances of GHC.Records.HasField automatically as
 described in Note [HasField instances] in GHC.Tc.Instance.Class.
@@ -1316,11 +1318,45 @@ Note that:
    and an updater (see Note [GADT record selectors]).
 
 
+Note [Updaters use record update syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Most updaters are defined by generating a record update expression and a call to
+the selector function, like this:
+
+    $upd:foo:MkT x = (\ y -> x { foo = y }, foo x)
+
+Since we are generating renamed syntax, we can emit a call to the selector
+function, even if it is not technically in scope (due to NoFieldSelectors).
+When RecordDotSyntax is implemented, it will redefine the meaning of record
+update syntax, but here we really need the "traditional" version.
+
+We use a record update expression, rather than generating an explicit case
+statement, because type-checking the explicit case statement is expensive for
+datatypes with many constructors and/or many fields.
+
+An annoying wrinkle is #2595: we cannot use record update for some GADTs, even
+though the desugaring is in principle type-correct, because the type-checker
+rejects the update.  Thus we *do* generate an explicit case statement when the
+constructor has existential type variables.  For example, we generate:
+
+    data S a where
+      MkS :: { soo :: Either p q, f :: Int } -> S (p,q)
+
+    $sel:soo:MkS :: S (p,q) -> Either p q
+    $sel:soo:MkS MkS{soo=x} = x
+
+    $upd:soo:MkS :: S (p,q) -> (Either p q -> S (p,q), Either p q)
+    $upd:soo:MkS x = (\ y -> case x of { MkS{soo=x0,f=x1} -> MkS{soo=y,f=x1} }
+                     , $sel:soo:MkS x
+                     )
+
+
 Note [Naughty record updaters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are a few cases in which we cannot generate an updater for a field:
 
-1. The field has an existential tyvar, e.g.
+1. The field has an existential tyvar that would escape its scope, e.g.
      data T = forall a . MkT { foo :: a }
    This is the same as for selectors (see Note [Naughty record selectors]).
 
