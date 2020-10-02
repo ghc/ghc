@@ -860,8 +860,8 @@ of ``-W(no-)*``.
 
 
 .. ghc-flag:: -Wincomplete-uni-patterns
-    :shortdesc: warn when a pattern match in a lambda expression or
-        pattern binding could fail
+    :shortdesc: warn when a pattern match in a lambda expression,
+        pattern binding or a lazy pattern could fail
     :type: dynamic
     :reverse: -Wno-incomplete-uni-patterns
     :category:
@@ -873,6 +873,10 @@ of ``-W(no-)*``.
 
         h = \[] -> 2
         Just k = f y
+
+    Furthermore, this flag also applies to lazy patterns, since they are
+    syntactic sugar for pattern bindings. For example, ``f ~(Just x) = (x,x)``
+    is equivalent to ``f y = let Just x = y in (x,x)``.
 
 .. ghc-flag:: -fmax-pmcheck-models=⟨n⟩
     :shortdesc: soft limit on the number of parallel models the pattern match
