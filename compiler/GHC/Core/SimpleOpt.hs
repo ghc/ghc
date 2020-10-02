@@ -1257,13 +1257,24 @@ exprIsLiteral_maybe env@(_, id_unf) e
          -> Just l
       Var v
          | Just rhs <- expandUnfolding_maybe (id_unf v)
-         , Just (_env,_fb,dc,_tys,[arg]) <- exprIsConApp_maybe env rhs
+         , Just b <- matchBignum env rhs
+         -> Just b
+      e
+         | Just b <- matchBignum env e
+         -> Just b
+
+         | otherwise
+         -> Nothing
+  where
+    matchBignum env e
+         | Just (_env,_fb,dc,_tys,[arg]) <- exprIsConApp_maybe env e
          , Just (LitNumber _ i) <- exprIsLiteral_maybe env arg
-         -> if
+         = if
             | dc == naturalNSDataCon -> Just (mkLitNatural i)
             | dc == integerISDataCon -> Just (mkLitInteger i)
             | otherwise              -> Nothing
-      _         -> Nothing
+         | otherwise
+         = Nothing
 
 {-
 Note [exprIsLambda_maybe]
