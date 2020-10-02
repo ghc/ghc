@@ -8,24 +8,24 @@ def f( name, opts ):
 setTestOpts(f)
 
 # Tests that should compile fine as they should be inferred safe
-test('SafeInfered01', [], multimod_compile, ['SafeInfered01', ''])
-test('SafeInfered02', [], multimod_compile, ['SafeInfered02', ''])
-test('SafeInfered03', [], multimod_compile, ['SafeInfered03', ''])
-test('SafeInfered04', [], multimod_compile, ['SafeInfered04', ''])
-test('SafeInfered05', [], multimod_compile, ['SafeInfered05', ''])
+test('SafeInfered01', [], multimod_compile, ['SafeInfered01', '-v0'])
+test('SafeInfered02', [], multimod_compile, ['SafeInfered02', '-v0'])
+test('SafeInfered03', [], multimod_compile, ['SafeInfered03', '-v0'])
+test('SafeInfered04', [], multimod_compile, ['SafeInfered04', '-v0'])
+test('SafeInfered05', [], multimod_compile, ['SafeInfered05', '-v0'])
 
 # Tests that should fail to compile as they should be inferred unsafe
-test('UnsafeInfered01', [], multimod_compile_fail, ['UnsafeInfered01', ''])
-test('UnsafeInfered02', [], multimod_compile_fail, ['UnsafeInfered02', ''])
-test('UnsafeInfered03', [], multimod_compile_fail, ['UnsafeInfered03', ''])
-test('UnsafeInfered05', [], multimod_compile_fail, ['UnsafeInfered05', ''])
-test('UnsafeInfered06', [], multimod_compile_fail, ['UnsafeInfered06', ''])
-test('UnsafeInfered08', [], multimod_compile, ['UnsafeInfered08', ''])
-test('UnsafeInfered09', [], multimod_compile_fail, ['UnsafeInfered09', ''])
+test('UnsafeInfered01', [], multimod_compile_fail, ['UnsafeInfered01', '-v0'])
+test('UnsafeInfered02', [], multimod_compile_fail, ['UnsafeInfered02', '-v0'])
+test('UnsafeInfered03', [], multimod_compile_fail, ['UnsafeInfered03', '-v0'])
+test('UnsafeInfered05', [], multimod_compile_fail, ['UnsafeInfered05', '-v0'])
+test('UnsafeInfered06', [], multimod_compile_fail, ['UnsafeInfered06', '-v0'])
+test('UnsafeInfered08', [], multimod_compile, ['UnsafeInfered08', '-v0'])
+test('UnsafeInfered09', [], multimod_compile_fail, ['UnsafeInfered09', '-v0'])
 
 # Test that should fail as we disable safe inference
-test('UnsafeInfered10', [], multimod_compile_fail, ['UnsafeInfered10', ''])
-test('UnsafeInfered11', [], multimod_compile_fail, ['UnsafeInfered11', ''])
+test('UnsafeInfered10', [], multimod_compile_fail, ['UnsafeInfered10', '-v0'])
+test('UnsafeInfered11', [], multimod_compile_fail, ['UnsafeInfered11', '-v0'])
 
 # Test TH is unsafe
 test('UnsafeInfered12', normal, compile_fail, [''])
