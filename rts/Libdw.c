@@ -330,6 +330,49 @@ static bool set_initial_registers(Dwfl_Thread *thread,
         );
     return dwfl_thread_state_registers(thread, 0, 9, regs);
 }
+#elif defined(riscv64_HOST_ARCH)
+static bool set_initial_registers(Dwfl_Thread *thread,
+                                  void *arg STG_UNUSED) {
+    Dwarf_Word regs[32];
+    __asm__ ("sd x1,0x08(%0)\t\n"
+             "sd x2,0x10(%0)\t\n"
+             "sd x3,0x18(%0)\t\n"
+             "sd x4,0x20(%0)\t\n"
+             "sd x5,0x28(%0)\t\n"
+             "sd x6,0x30(%0)\t\n"
+             "sd x7,0x38(%0)\t\n"
+             "sd x8,0x40(%0)\t\n"
+             "sd x9,0x48(%0)\t\n"
+             "sd x10,0x50(%0)\t\n"
+             "sd x11,0x58(%0)\t\n"
+             "sd x12,0x60(%0)\t\n"
+             "sd x13,0x68(%0)\t\n"
+             "sd x14,0x70(%0)\t\n"
+             "sd x15,0x78(%0)\t\n"
+             "sd x16,0x80(%0)\t\n"
+             "sd x17,0x88(%0)\t\n"
+             "sd x18,0x90(%0)\t\n"
+             "sd x19,0x98(%0)\t\n"
+             "sd x20,0xa0(%0)\t\n"
+             "sd x21,0xa8(%0)\t\n"
+             "sd x22,0xb0(%0)\t\n"
+             "sd x23,0xb8(%0)\t\n"
+             "sd x24,0xc0(%0)\t\n"
+             "sd x25,0xc8(%0)\t\n"
+             "sd x26,0xd0(%0)\t\n"
+             "sd x27,0xd8(%0)\t\n"
+             "sd x28,0xe0(%0)\t\n"
+             "sd x29,0xe8(%0)\t\n"
+             "sd x30,0xf0(%0)\t\n"
+             "sd x31,0xf8(%0)\t\n"
+             "auipc t0,0\t\n"
+             "sd t0,0(%0)\t\n"
+             :                            /* no output */
+             :"r" (&regs[0])              /* input */
+             :"t0"                        /* clobbered */
+        );
+    return dwfl_thread_state_registers(thread, 0, 64, regs);
+}
 #elif defined(s390x_HOST_ARCH)
 static bool set_initial_registers(Dwfl_Thread *thread,
                                   void *arg STG_UNUSED) {
