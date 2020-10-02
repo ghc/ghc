@@ -1356,12 +1356,12 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
           Just gre -> do { unless (null (tail xs)) $ do
                              let L loc _ = hsRecFieldLbl (unLoc upd)
                              setSrcSpan loc $ addUsedGRE True gre
-                         ; lookupSelector (upd, gre_name gre) }
+                         ; lookupSelector (upd, greMangledName gre) }
                       -- The field doesn't belong to this parent, so report
                       -- an error but keep going through all the fields
           Nothing  -> do { addErrTc (fieldNotInType p
                                       (unLoc (hsRecUpdFieldRdr (unLoc upd))))
-                         ; lookupSelector (upd, gre_name (snd (head xs))) }
+                         ; lookupSelector (upd, greMangledName (snd (head xs))) }
 
     -- Given a (field update, selector name) pair, look up the
     -- selector to give a field update with an unambiguous Id

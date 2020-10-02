@@ -1,0 +1,14 @@
+[1 of 4] Compiling T16745C          ( T16745C.hs, T16745C.o )
+[2 of 4] Compiling T16745B          ( T16745B.hs, T16745B.o )
+[3 of 4] Compiling T16745D          ( T16745D.hs, T16745D.o )
+[4 of 4] Compiling T16745A          ( T16745A.hs, T16745A.o )
+
+T16745A.hs:3:24: error:
+    Ambiguous name ‘field’ in import item. It could refer to:
+      T16745C.field
+      T16745B.R(field)
+
+T16745A.hs:4:24: error:
+    Ambiguous name ‘foo’ in import item. It could refer to:
+      T16745D.T(foo)
+      T16745D.S(foo)

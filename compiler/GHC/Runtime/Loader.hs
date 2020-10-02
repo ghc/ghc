@@ -48,7 +48,7 @@ import GHC.Types.TyThing
 import GHC.Types.Name.Occurrence ( OccName, mkVarOcc )
 import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                                , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
-                               , gre_name, mkRdrQual )
+                               , greMangledName, mkRdrQual )
 
 import GHC.Unit.Finder         ( findPluginModule, FindResult(..) )
 import GHC.Unit.Module   ( Module, ModuleName )
@@ -268,7 +268,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                         imp_spec = ImpSpec decl_spec ImpAll
                         env = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) (mi_exports iface))
                     case lookupGRE_RdrName rdr_name env of
-                        [gre] -> return (Just (gre_name gre, iface))
+                        [gre] -> return (Just (greMangledName gre, iface))
                         []    -> return Nothing
                         _     -> panic "lookupRdrNameInModule"
 

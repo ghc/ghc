@@ -253,11 +253,10 @@ tyThingsTyCoVars tts =
 tyThingAvailInfo :: TyThing -> [AvailInfo]
 tyThingAvailInfo (ATyCon t)
    = case tyConClass_maybe t of
-        Just c  -> [AvailTC n (n : map getName (classMethods c)
-                                 ++ map getName (classATs c))
-                             [] ]
+        Just c  -> [availTC n ((n : map getName (classMethods c)
+                                 ++ map getName (classATs c))) [] ]
              where n = getName c
-        Nothing -> [AvailTC n (n : map getName dcs) flds]
+        Nothing -> [availTC n (n : map getName dcs) flds]
              where n    = getName t
                    dcs  = tyConDataCons t
                    flds = tyConFieldLabels t

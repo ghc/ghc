@@ -120,7 +120,7 @@ mkPrintUnqualified unit_env env
           map tyConName [ constraintKindTyCon, heqTyCon, coercibleTyCon ]
           ++ [ eqTyConName ]
 
-        right_name gre = nameModule_maybe (gre_name gre) == Just mod
+        right_name gre = greDefinitionModule gre == Just mod
 
         unqual_gres = lookupGRE_RdrName (mkRdrUnqual occ) env
         qual_gres   = filter right_name (lookupGlobalRdrEnv env occ)

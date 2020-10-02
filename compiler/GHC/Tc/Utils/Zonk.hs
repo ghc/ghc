@@ -625,7 +625,7 @@ zonk_bind env (PatSynBind x bind@(PSB { psb_id = L loc id
                                       , psb_dir = dir }))
   = do { id' <- zonkIdBndr env id
        ; (env1, lpat') <- zonkPat env lpat
-       ; let details' = zonkPatSynDetails env1 details
+       ; details' <- zonkPatSynDetails env1 details
        ; (_env2, dir') <- zonkPatSynDir env1 dir
        ; return $ PatSynBind x $
                   bind { psb_id = L loc id'
@@ -635,13 +635,17 @@ zonk_bind env (PatSynBind x bind@(PSB { psb_id = L loc id
 
 zonkPatSynDetails :: ZonkEnv
                   -> HsPatSynDetails GhcTc
-                  -> HsPatSynDetails GhcTc
+                  -> TcM (HsPatSynDetails GhcTc)
 zonkPatSynDetails env (PrefixCon _ as)
-  = PrefixCon noTypeArgs (map (zonkLIdOcc env) as)
+  = pure $ PrefixCon noTypeArgs (map (zonkLIdOcc env) as)
 zonkPatSynDetails env (InfixCon a1 a2)
-  = InfixCon (zonkLIdOcc env a1) (zonkLIdOcc env a2)
+  = pure $ InfixCon (zonkLIdOcc env a1) (zonkLIdOcc env a2)
 zonkPatSynDetails env (RecCon flds)
-  = RecCon (map (fmap (zonkLIdOcc env)) flds)
+  = RecCon <$> mapM (zonkPatSynField env) flds
+
+zonkPatSynField :: ZonkEnv -> RecordPatSynField GhcTc -> TcM (RecordPatSynField GhcTc)
+zonkPatSynField env (RecordPatSynField x y) =
+    RecordPatSynField <$> zonkFieldOcc env x <*> pure (zonkLIdOcc env y)
 
 zonkPatSynDir :: ZonkEnv -> HsPatSynDir GhcTc
               -> TcM (ZonkEnv, HsPatSynDir GhcTc)

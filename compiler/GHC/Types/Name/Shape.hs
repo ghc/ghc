@@ -183,12 +183,17 @@ substName env n | Just n' <- lookupNameEnv env n = n'
 -- for type constructors, where it is sufficient to substitute the 'availName'
 -- to induce a substitution on 'availNames'.
 substNameAvailInfo :: HscEnv -> ShNameSubst -> AvailInfo -> IO AvailInfo
-substNameAvailInfo _ env (Avail n) = return (Avail (substName env n))
-substNameAvailInfo hsc_env env (AvailTC n ns fs) =
+substNameAvailInfo _ env (Avail (NormalGreName n)) = return (Avail (NormalGreName (substName env n)))
+substNameAvailInfo _ env (Avail (FieldGreName fl)) =
+    return (Avail (FieldGreName fl { flSelector = substName env (flSelector fl) }))
+substNameAvailInfo hsc_env env (AvailTC n ns) =
     let mb_mod = fmap nameModule (lookupNameEnv env n)
-    in AvailTC (substName env n)
-        <$> mapM (initIfaceLoad hsc_env . setNameModule mb_mod) ns
-        <*> mapM (setNameFieldSelector hsc_env mb_mod) fs
+    in AvailTC (substName env n) <$> mapM (setNameGreName hsc_env mb_mod) ns
+
+setNameGreName :: HscEnv -> Maybe Module -> GreName -> IO GreName
+setNameGreName hsc_env mb_mod gname = case gname of
+    NormalGreName n -> NormalGreName <$> initIfaceLoad hsc_env (setNameModule mb_mod n)
+    FieldGreName fl -> FieldGreName  <$> setNameFieldSelector hsc_env mb_mod fl
 
 -- | Set the 'Module' of a 'FieldSelector'
 setNameFieldSelector :: HscEnv -> Maybe Module -> FieldLabel -> IO FieldLabel
@@ -235,8 +240,8 @@ uAvailInfos flexi as1 as2 = -- pprTrace "uAvailInfos" (ppr as1 $$ ppr as2) $
 -- with only name holes from @flexi@ unifiable (all other name holes rigid.)
 uAvailInfo :: ModuleName -> ShNameSubst -> AvailInfo -> AvailInfo
            -> Either SDoc ShNameSubst
-uAvailInfo flexi subst (Avail n1) (Avail n2) = uName flexi subst n1 n2
-uAvailInfo flexi subst (AvailTC n1 _ _) (AvailTC n2 _ _) = uName flexi subst n1 n2
+uAvailInfo flexi subst (Avail (NormalGreName n1)) (Avail (NormalGreName n2)) = uName flexi subst n1 n2
+uAvailInfo flexi subst (AvailTC n1 _) (AvailTC n2 _) = uName flexi subst n1 n2
 uAvailInfo _ _ a1 a2 = Left $ text "While merging export lists, could not combine"
                            <+> ppr a1 <+> text "with" <+> ppr a2
                            <+> parens (text "one is a type, the other is a plain identifier")

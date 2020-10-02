@@ -265,7 +265,7 @@ ghcPrimExports :: [IfaceExport]
 ghcPrimExports
  = map (avail . idName) ghcPrimIds ++
    map (avail . idName . primOpId) allThePrimOps ++
-   [ AvailTC n [n] []
+   [ availTC n [n] []
    | tc <- exposedPrimTyCons, let n = tyConName tc  ]
 
 ghcPrimDeclDocs :: DeclDocMap

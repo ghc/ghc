@@ -1,0 +1,5 @@
+:l T13438.hs
+:browse! T13438
+:browse T13438
+:ctags
+:!cat tags

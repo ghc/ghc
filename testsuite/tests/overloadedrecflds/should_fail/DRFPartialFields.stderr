@@ -1,0 +1,3 @@
+
+DRFPartialFields.hs:4:17: error: [-Wpartial-fields, -Werror=partial-fields]
+    Use of partial record field selector: ‘foo’

@@ -1898,9 +1898,13 @@ type LFieldOcc pass = XRec pass (FieldOcc pass)
 
 -- | Field Occurrence
 --
--- Represents an *occurrence* of an unambiguous field.  We store
--- both the 'RdrName' the user originally wrote, and after the
--- renamer, the selector function.
+-- Represents an *occurrence* of an unambiguous field.  This may or may not be a
+-- binding occurrence (e.g. this type is used in 'ConDeclField' and
+-- 'RecordPatSynField' which bind their fields, but also in 'HsRecField' for
+-- record construction and patterns, which do not).
+--
+-- We store both the 'RdrName' the user originally wrote, and after the renamer,
+-- the selector function.
 data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
                               , rdrNameFieldOcc :: Located RdrName
                                  -- ^ See Note [Located RdrNames] in "GHC.Hs.Expr"

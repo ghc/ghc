@@ -211,7 +211,7 @@ lookupFieldFixityRn (Ambiguous _ lrdr) = get_ambiguous_fixity (unLoc lrdr)
         ambigs -> addErr (ambiguous_fixity_err rdr_name ambigs)
                   >> return (Fixity NoSourceText minPrecedence InfixL)
 
-    lookup_gre_fixity gre = lookupFixityRn' (gre_name gre) (greOccName gre)
+    lookup_gre_fixity gre = lookupFixityRn' (greMangledName gre) (greOccName gre)
 
     ambiguous_fixity_err rn ambigs
       = vcat [ text "Ambiguous fixity for record field" <+> quotes (ppr rn)

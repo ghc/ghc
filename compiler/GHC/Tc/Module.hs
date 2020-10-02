@@ -1491,7 +1491,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                           foe_binds
 
             ; fo_gres = fi_gres `unionBags` foe_gres
-            ; fo_fvs = foldr (\gre fvs -> fvs `addOneFV` gre_name gre)
+            ; fo_fvs = foldr (\gre fvs -> fvs `addOneFV` greMangledName gre)
                                 emptyFVs fo_gres
 
             ; sig_names = mkNameSet (collectHsValBinders hs_val_binds)
@@ -1556,11 +1556,11 @@ tcPreludeClashWarn warnFlag name = do
             where
               isLocalDef = gre_lcl x == True
               -- Names are identical ...
-              nameClashes = nameOccName (gre_name x) == nameOccName name
+              nameClashes = nameOccName (greMangledName x) == nameOccName name
               -- ... but not the actual definitions, because we don't want to
               -- warn about a bad definition of e.g. <> in Data.Semigroup, which
               -- is the (only) proper place where this should be defined
-              isNotInProperModule = gre_name x /= name
+              isNotInProperModule = greMangledName x /= name
 
           -- List of all offending definitions
           clashingElts :: [GlobalRdrElt]
@@ -1569,9 +1569,9 @@ tcPreludeClashWarn warnFlag name = do
     ; traceTc "tcPreludeClashWarn/prelude_functions"
                 (hang (ppr name) 4 (sep [ppr clashingElts]))
 
-    ; let warn_msg x = addWarnAt (Reason warnFlag) (nameSrcSpan (gre_name x)) (hsep
+    ; let warn_msg x = addWarnAt (Reason warnFlag) (nameSrcSpan (greMangledName x)) (hsep
               [ text "Local definition of"
-              , (quotes . ppr . nameOccName . gre_name) x
+              , (quotes . ppr . nameOccName . greMangledName) x
               , text "clashes with a future Prelude name." ]
               $$
               text "This will become an error in a future release." )
@@ -2489,7 +2489,7 @@ isGHCiMonad hsc_env ty
         let occIO = lookupOccEnv rdrEnv (mkOccName tcName ty)
         case occIO of
             Just [n] -> do
-                let name = gre_name n
+                let name = greMangledName n
                 ghciClass <- tcLookupClass ghciIoClassName
                 userTyCon <- tcLookupTyCon name
                 let userTy = mkTyConApp userTyCon []
@@ -2857,7 +2857,7 @@ loadUnqualIfaces hsc_env ictxt
 
     unqual_mods = [ nameModule name
                   | gre <- globalRdrEnvElts (ic_rn_gbl_env ictxt)
-                  , let name = gre_name gre
+                  , let name = greMangledName gre
                   , nameIsFromExternalPackage home_unit name
                   , isTcOcc (nameOccName name)   -- Types and classes only
                   , unQualOK gre ]               -- In scope unqualified

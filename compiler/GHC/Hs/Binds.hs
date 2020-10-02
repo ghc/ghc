@@ -1230,57 +1230,48 @@ pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 -}
 
 -- | Haskell Pattern Synonym Details
-type HsPatSynDetails pass = HsConDetails Void (LIdP pass) [RecordPatSynField (LIdP pass)]
--- The Void argument to HsConDetails here is a reflection of the fact that
--- type applications are not allowed in declarations of pattern synonyms at present.
+type HsPatSynDetails pass = HsConDetails Void (LIdP pass) [RecordPatSynField pass]
 
 -- See Note [Record PatSyn Fields]
 -- | Record Pattern Synonym Field
-data RecordPatSynField fld
-  = RecordPatSynField {
-      recordPatSynSelectorId :: fld  -- Selector name visible in rest of the file
-      , recordPatSynPatVar   :: fld
-      -- Filled in by renamer, the name used internally
-      -- by the pattern
-      } deriving (Data, Functor)
-
+data RecordPatSynField pass
+  = RecordPatSynField
+      { recordPatSynField :: FieldOcc pass
+      -- ^ Field label visible in rest of the file
+      , recordPatSynPatVar :: LIdP pass
+      -- ^ Filled in by renamer, the name used internally by the pattern
+      }
 
 
 {-
 Note [Record PatSyn Fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Consider the following two pattern synonyms.
 
-pattern P x y = ([x,True], [y,'v'])
-pattern Q{ x, y } =([x,True], [y,'v'])
+  pattern P x y = ([x,True], [y,'v'])
+  pattern Q{ x, y } =([x,True], [y,'v'])
 
 In P, we just have two local binders, x and y.
 
 In Q, we have local binders but also top-level record selectors
-x :: ([Bool], [Char]) -> Bool and similarly for y.
+  x :: ([Bool], [Char]) -> Bool
+  y :: ([Bool], [Char]) -> Char
+
+Both are recorded in the `RecordPatSynField`s for `x` and `y`:
+* recordPatSynField: the top-level record selector
+* recordPatSynPatVar: the local `x`, bound only in the RHS of the pattern synonym.
 
 It would make sense to support record-like syntax
 
-pattern Q{ x=x1, y=y1 } = ([x1,True], [y1,'v'])
+  pattern Q{ x=x1, y=y1 } = ([x1,True], [y1,'v'])
 
-when we have a different name for the local and top-level binder
-the distinction between the two names clear
+when we have a different name for the local and top-level binder,
+making the distinction between the two names clear.
 
 -}
-instance Outputable a => Outputable (RecordPatSynField a) where
-    ppr (RecordPatSynField { recordPatSynSelectorId = v }) = ppr v
-
-instance Foldable RecordPatSynField  where
-    foldMap f (RecordPatSynField { recordPatSynSelectorId = visible
-                                 , recordPatSynPatVar = hidden })
-      = f visible `mappend` f hidden
-
-instance Traversable RecordPatSynField where
-    traverse f (RecordPatSynField { recordPatSynSelectorId =visible
-                                  , recordPatSynPatVar = hidden })
-      = (\ sel_id pat_var -> RecordPatSynField { recordPatSynSelectorId = sel_id
-                                               , recordPatSynPatVar = pat_var })
-          <$> f visible <*> f hidden
+instance Outputable (RecordPatSynField a) where
+    ppr (RecordPatSynField { recordPatSynField = v }) = ppr v
 
 
 -- | Haskell Pattern Synonym Direction

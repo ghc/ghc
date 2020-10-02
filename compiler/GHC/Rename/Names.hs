@@ -84,7 +84,7 @@ import GHC.Data.FastString
 import GHC.Data.FastString.Env
 
 import Control.Monad
-import Data.Either      ( partitionEithers, isRight, rights )
+import Data.Either      ( partitionEithers )
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
@@ -645,7 +645,7 @@ extendGlobalRdrEnvRn avails new_fixities
       | otherwise
       = fix_env
       where
-        name = gre_name gre
+        name = greMangledName gre
         occ  = greOccName gre
 
     new_gres :: [GlobalRdrElt]  -- New LocalDef GREs, derived from avails
@@ -663,12 +663,70 @@ extendGlobalRdrEnvRn avails new_fixities
       | otherwise
       = return (extendGlobalRdrEnv env gre)
       where
-        occ  = greOccName gre
-        dups = filter isDupGRE (lookupGlobalRdrEnv env occ)
-        -- Duplicate GREs are those defined locally with the same OccName,
-        -- except cases where *both* GREs are DuplicateRecordFields (#17965).
+        -- See Note [Reporting duplicate local declarations]
+        dups = filter isDupGRE (lookupGlobalRdrEnv env (greOccName gre))
         isDupGRE gre' = isLocalGRE gre'
-                && not (isOverloadedRecFldGRE gre && isOverloadedRecFldGRE gre')
+                && (not (isOverloadedRecFldGRE gre && isOverloadedRecFldGRE gre')
+                     || (gre_name gre == gre_name gre'))
+
+{-
+Note [Reporting duplicate local declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general, a single module may not define the same OccName multiple times. This
+is checked in extendGlobalRdrEnvRn: when adding a new locally-defined GRE to the
+GlobalRdrEnv we report an error if there are already duplicates in the
+environment.  This establishes INVARIANT 1 of the GlobalRdrEnv, which says that
+for a given OccName, all the GlobalRdrElts to which it maps must have distinct
+'gre_name's.
+
+For example, the following will be rejected:
+
+  f x = x
+  g x = x
+  f x = x  -- Duplicate!
+
+Under what conditions will a GRE that exists already count as a duplicate of the
+LocalDef GRE being added?
+
+* It must also be a LocalDef: the programmer is allowed to make a new local
+  definition that clashes with an imported one (although attempting to refer to
+  either may lead to ambiguity errors at use sites).  For example, the following
+  definition is allowed:
+
+    import M (f)
+    f x = x
+
+* When DuplicateRecordFields is enabled, the same field label may be defined in
+  multiple records. For example, this is allowed:
+
+    {-# LANGUAGE DuplicateRecordFields #-}
+    data S1 = MkS1 { f :: Int }
+    data S2 = MkS2 { f :: Int }
+
+  Even though both fields have the same OccName, this does not violate INVARIANT
+  1, because the fields have distinct selector names, which form part of the
+  gre_name (see Note [GreNames] in GHC.Types.Name.Reader).
+
+* However, we must be careful to reject the following (#9156):
+
+    {-# LANGUAGE DuplicateRecordFields #-}
+    data T = MkT { f :: Int, f :: Int }  -- Duplicate!
+
+  In this case, both 'gre_name's are the same (because the fields belong to the
+  same type), and adding them both to the environment would be a violation of
+  INVARIANT 1. Thus isDupGRE checks whether both GREs have the same gre_name.
+
+* We also reject attempts to define a field and a non-field with the same
+  OccName (#17965):
+
+    {-# LANGUAGE DuplicateRecordFields #-}
+    f x = x
+    data T = MkT { f :: Int}
+
+  In principle this could be supported, but the current "specification" of
+  DuplicateRecordFields does not allow it. Thus isDupGRE checks that *both* GREs
+  being compared are record fields.
+-}
 
 
 {- *********************************************************************
@@ -760,7 +818,7 @@ getLocalNonValBinders fixity_env
              ; let fld_env = case unLoc tc_decl of
                      DataDecl { tcdDataDefn = d } -> mk_fld_env d names flds'
                      _                            -> []
-             ; return (AvailTC main_name names flds', fld_env) }
+             ; return (availTC main_name names flds', fld_env) }
 
 
     -- Calculate the mapping from constructor names to fields, which
@@ -835,7 +893,7 @@ getLocalNonValBinders fixity_env
              ; let (bndrs, flds) = hsDataFamInstBinders dfid
              ; sub_names <- mapM newTopSrcBinder bndrs
              ; flds' <- mapM (newRecordSelector overload_ok sub_names) flds
-             ; let avail    = AvailTC (unLoc main_name) sub_names flds'
+             ; let avail    = availTC (unLoc main_name) sub_names flds'
                                   -- main_name is not bound here!
                    fld_env  = mk_fld_env (feqn_rhs ti_decl) sub_names flds'
              ; return (avail, fld_env) }
@@ -848,10 +906,12 @@ newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
 newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
   = do { selName <- newTopSrcBinder $ L loc $ field
-       ; return $ qualFieldLbl { flSelector = selName } }
+       ; return $ FieldLabel { flLabel = fieldLabelString
+                             , flIsOverloaded = overload_ok
+                             , flSelector = selName } }
   where
-    fieldOccName = occNameFS $ rdrNameOcc fld
-    qualFieldLbl = mkFieldLabelOccs fieldOccName (nameOccName dc) overload_ok
+    fieldLabelString = occNameFS $ rdrNameOcc fld
+    selOccName = fieldSelectorOccName fieldLabelString (nameOccName dc) overload_ok
     field | isExact fld = fld
               -- use an Exact RdrName as is to preserve the bindings
               -- of an already renamer-resolved field and its use
@@ -859,7 +919,7 @@ newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
               -- selectors in Template Haskell. See Note [Binders in
               -- Template Haskell] in "GHC.ThToHs" and Note [Looking up
               -- Exact RdrNames] in "GHC.Rename.Env".
-          | otherwise   = mkRdrUnqual (flSelector qualFieldLbl)
+          | otherwise   = mkRdrUnqual selOccName
 
 {-
 Note [Looking up family names in family instances]
@@ -892,9 +952,12 @@ available, and filters it through the import spec (if any).
 Note [Dealing with imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For import M( ies ), we take the mi_exports of M, and make
-   imp_occ_env :: OccEnv (Name, AvailInfo, Maybe Name)
-One entry for each Name that M exports; the AvailInfo is the
-AvailInfo exported from M that exports that Name.
+   imp_occ_env :: OccEnv (NameEnv (GreName, AvailInfo, Maybe Name))
+One entry for each OccName that M exports, mapping each corresponding Name to
+its GreName, the AvailInfo exported from M that exports that Name, and
+optionally a Name for an associated type's parent class. (Typically there will
+be a single Name in the NameEnv, but see Note [Importing DuplicateRecordFields]
+for why we may need more than one.)
 
 The situation is made more complicated by associated types. E.g.
    module M where
@@ -906,7 +969,7 @@ Then M's export_avails are (recall the AvailTC invariant from Avails.hs)
 Notice that T appears *twice*, once as a child and once as a parent. From
 this list we construct a raw list including
    T -> (T, T( T1, T2, T3 ), Nothing)
-   T -> (C, C( C, T ),       Nothing)
+   T -> (T, C( C, T ),       Nothing)
 and we combine these (in function 'combine' in 'imp_occ_env' in
 'filterImports') to get
    T  -> (T,  T(T,T1,T2,T3), Just C)
@@ -922,6 +985,57 @@ then we get *two* Avails:  C(T), T(T1,T2)
 
 Note that the imp_occ_env will have entries for data constructors too,
 although we never look up data constructors.
+
+Note [Importing PatternSynonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As described in Note [Dealing with imports], associated types can lead to the
+same Name appearing twice, both as a child and once as a parent, when
+constructing the imp_occ_env.  The same thing can happen with pattern synonyms
+if they are exported bundled with a type.
+
+A simplified example, based on #11959:
+
+  {-# LANGUAGE PatternSynonyms #-}
+  module M (T(P), pattern P) where  -- Duplicate export warning, but allowed
+    data T = MkT
+    pattern P = MkT
+
+Here we have T(P) and P in export_avails, and construct both
+  P -> (P, P, Nothing)
+  P -> (P, T(P), Nothing)
+which are 'combine'd to leave
+  P -> (P, T(P), Nothing)
+i.e. we simply discard the non-bundled Avail.
+
+Note [Importing DuplicateRecordFields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In filterImports, another complicating factor is DuplicateRecordFields.
+Suppose we have:
+
+  {-# LANGUAGE DuplicateRecordFields #-}
+  module M (S(foo), T(foo)) where
+    data S = MkS { foo :: Int }
+    data T = mkT { foo :: Int }
+
+  module N where
+    import M (foo)    -- this is an ambiguity error (A)
+    import M (S(foo)) -- this is allowed (B)
+
+Here M exports the OccName 'foo' twice, so we get an imp_occ_env where 'foo'
+maps to a NameEnv containing an entry for each of the two mangled field selector
+names (see Note [FieldLabel] in GHC.Types.FieldLabel).
+
+  foo -> [ $sel:foo:MkS -> (foo, S(foo), Nothing)
+         , $sel:foo:MKT -> (foo, T(foo), Nothing)
+         ]
+
+Then when we look up 'foo' in lookup_name for case (A) we get both entries and
+hence report an ambiguity error.  Whereas in case (B) we reach the lookup_ie
+case for IEThingWith, which looks up 'S' and then finds the unique 'foo' amongst
+its children.
+
+See T16745 for a test of this.
+
 -}
 
 filterImports
@@ -958,30 +1072,46 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
     all_avails = mi_exports iface
 
         -- See Note [Dealing with imports]
-    imp_occ_env :: OccEnv (Name,    -- the name
-                           AvailInfo,   -- the export item providing the name
-                           Maybe Name)  -- the parent of associated types
-    imp_occ_env = mkOccEnv_C combine [ (occ, (n, a, Nothing))
+    imp_occ_env :: OccEnv (NameEnv (GreName,    -- the name or field
+                           AvailInfo,   -- the export item providing it
+                           Maybe Name))   -- the parent of associated types
+    imp_occ_env = mkOccEnv_C (plusNameEnv_C combine)
+                             [ (occName c, mkNameEnv [(greNameMangledName c, (c, a, Nothing))])
                                      | a <- all_avails
-                                     , (n, occ) <- availNamesWithOccs a]
-      where
-        -- See Note [Dealing with imports]
-        -- 'combine' is only called for associated data types which appear
-        -- twice in the all_avails. In the example, we combine
-        --    T(T,T1,T2,T3) and C(C,T)  to give   (T, T(T,T1,T2,T3), Just C)
-        -- NB: the AvailTC can have fields as well as data constructors (#12127)
-        combine (name1, a1@(AvailTC p1 _ _), mp1)
-                (name2, a2@(AvailTC p2 _ _), mp2)
-          = ASSERT2( name1 == name2 && isNothing mp1 && isNothing mp2
-                   , ppr name1 <+> ppr name2 <+> ppr mp1 <+> ppr mp2 )
-            if p1 == name1 then (name1, a1, Just p2)
-                           else (name1, a2, Just p1)
-        combine x y = pprPanic "filterImports/combine" (ppr x $$ ppr y)
+                                     , c <- availGreNames a]
+    -- See Note [Dealing with imports]
+    -- 'combine' may be called for associated data types which appear
+    -- twice in the all_avails. In the example, we combine
+    --    T(T,T1,T2,T3) and C(C,T)  to give   (T, T(T,T1,T2,T3), Just C)
+    -- NB: the AvailTC can have fields as well as data constructors (#12127)
+    combine :: (GreName, AvailInfo, Maybe Name)
+            -> (GreName, AvailInfo, Maybe Name)
+            -> (GreName, AvailInfo, Maybe Name)
+    combine (NormalGreName name1, a1@(AvailTC p1 _), mb1)
+            (NormalGreName name2, a2@(AvailTC p2 _), mb2)
+      = ASSERT2( name1 == name2 && isNothing mb1 && isNothing mb2
+               , ppr name1 <+> ppr name2 <+> ppr mb1 <+> ppr mb2 )
+        if p1 == name1 then (NormalGreName name1, a1, Just p2)
+                       else (NormalGreName name1, a2, Just p1)
+    -- 'combine' may also be called for pattern synonyms which appear both
+    -- unassociated and associated (see Note [Importing PatternSynonyms]).
+    combine (c1, a1, mb1) (c2, a2, mb2)
+      = ASSERT2( c1 == c2 && isNothing mb1 && isNothing mb2
+                          && (isAvailTC a1 || isAvailTC a2)
+               , ppr c1 <+> ppr c2 <+> ppr a1 <+> ppr a2 <+> ppr mb1 <+> ppr mb2 )
+        if isAvailTC a1 then (c1, a1, Nothing)
+                        else (c1, a2, Nothing)
+
+    isAvailTC AvailTC{} = True
+    isAvailTC _ = False
 
     lookup_name :: IE GhcPs -> RdrName -> IELookupM (Name, AvailInfo, Maybe Name)
     lookup_name ie rdr
        | isQual rdr              = failLookupWith (QualImportError rdr)
-       | Just succ <- mb_success = return succ
+       | Just succ <- mb_success = case nameEnvElts succ of
+                                     -- See Note [Importing DuplicateRecordFields]
+                                     [(c,a,x)] -> return (greNameMangledName c, a, x)
+                                     xs -> failLookupWith (AmbiguousImport rdr (map sndOf3 xs))
        | otherwise               = failLookupWith (BadImport ie)
       where
         mb_success = lookupOccEnv imp_occ_env (rdrNameOcc rdr)
@@ -1011,6 +1141,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
               BadImport ie  -> badImportItemErr iface decl_spec ie all_avails
               IllegalImport -> illegalImportItemErr
               QualImportError rdr -> qualImportItemErr rdr
+              AmbiguousImport rdr xs -> ambiguousImportItemErr rdr xs
 
         -- For each import item, we convert its RdrNames to Names,
         -- and at the same time construct an AvailInfo corresponding
@@ -1037,8 +1168,8 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                           Avail {}                     -- e.g. f(..)
                             -> [DodgyImport $ ieWrappedName tc]
 
-                          AvailTC _ subs fs
-                            | null (drop 1 subs) && null fs -- e.g. T(..) where T is a synonym
+                          AvailTC _ subs
+                            | null (drop 1 subs) -- e.g. T(..) where T is a synonym
                             -> [DodgyImport $ ieWrappedName tc]
 
                             | not (is_qual decl_spec)  -- e.g. import M( T(..) )
@@ -1049,12 +1180,12 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
 
                 renamed_ie = IEThingAll noExtField (L l (replaceWrappedName tc name))
                 sub_avails = case avail of
-                               Avail {}              -> []
-                               AvailTC name2 subs fs -> [(renamed_ie, AvailTC name2 (subs \\ [name]) fs)]
+                               Avail {}           -> []
+                               AvailTC name2 subs -> [(renamed_ie, AvailTC name2 (subs \\ [NormalGreName name]))]
             case mb_parent of
               Nothing     -> return ([(renamed_ie, avail)], warns)
                              -- non-associated ty/cls
-              Just parent -> return ((renamed_ie, AvailTC parent [name] []) : sub_avails, warns)
+              Just parent -> return ((renamed_ie, AvailTC parent [NormalGreName name]) : sub_avails, warns)
                              -- associated type
 
         IEThingAbs _ (L l tc')
@@ -1073,25 +1204,16 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                   return ([mkIEThingAbs tc' l nameAvail]
                          , [])
 
-        IEThingWith xt ltc@(L l rdr_tc) wc rdr_ns rdr_fs ->
-          ASSERT2(null rdr_fs, ppr rdr_fs) do
+        IEThingWith xt ltc@(L l rdr_tc) wc rdr_ns -> do
            (name, avail, mb_parent)
                <- lookup_name (IEThingAbs noExtField ltc) (ieWrappedName rdr_tc)
 
-           let (ns,subflds) = case avail of
-                                AvailTC _ ns' subflds' -> (ns',subflds')
-                                Avail _                -> panic "filterImports"
-
            -- Look up the children in the sub-names of the parent
-           let subnames = case ns of   -- The tc is first in ns,
-                            [] -> []   -- if it is there at all
-                                       -- See the AvailTC Invariant in
-                                       -- GHC.Types.Avail
-                            (n1:ns1) | n1 == name -> ns1
-                                     | otherwise  -> ns
-           case lookupChildren (map Left subnames ++ map Right subflds) rdr_ns of
+           -- See Note [Importing DuplicateRecordFields]
+           let subnames = availSubordinateGreNames avail
+           case lookupChildren subnames rdr_ns of
 
-             Failed rdrs -> failLookupWith (BadImport (IEThingWith xt ltc wc rdrs []))
+             Failed rdrs -> failLookupWith (BadImport (IEThingWith xt ltc wc rdrs))
                                 -- We are trying to import T( a,b,c,d ), and failed
                                 -- to find 'b' and 'd'.  So we make up an import item
                                 -- to report as failing, namely T( b, d ).
@@ -1101,21 +1223,18 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                case mb_parent of
                  -- non-associated ty/cls
                  Nothing
-                   -> return ([(IEThingWith noExtField (L l name') wc childnames'
-                                                                 childflds,
-                               AvailTC name (name:map unLoc childnames) (map unLoc childflds))],
+                   -> return ([(IEThingWith childflds (L l name') wc childnames',
+                               availTC name (name:map unLoc childnames) (map unLoc childflds))],
                               [])
                    where name' = replaceWrappedName rdr_tc name
                          childnames' = map to_ie_post_rn childnames
                          -- childnames' = postrn_ies childnames
                  -- associated ty
                  Just parent
-                   -> return ([(IEThingWith noExtField (L l name') wc childnames'
-                                                           childflds,
-                                AvailTC name (map unLoc childnames) (map unLoc childflds)),
-                               (IEThingWith noExtField (L l name') wc childnames'
-                                                           childflds,
-                                AvailTC parent [name] [])],
+                   -> return ([(IEThingWith childflds (L l name') wc childnames',
+                                availTC name (map unLoc childnames) (map unLoc childflds)),
+                               (IEThingWith childflds (L l name') wc childnames',
+                                availTC parent [name] [])],
                               [])
                    where name' = replaceWrappedName rdr_tc name
                          childnames' = map to_ie_post_rn childnames
@@ -1129,7 +1248,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
           = (IEThingAbs noExtField (L l (replaceWrappedName tc n)), trimAvail av n)
         mkIEThingAbs tc l (n, _,  Just parent)
           = (IEThingAbs noExtField (L l (replaceWrappedName tc n))
-             , AvailTC parent [n] [])
+             , availTC parent [n] [])
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
           BadImport ie | want_hiding -> return ([], [BadImportW ie])
@@ -1147,6 +1266,7 @@ data IELookupError
   = QualImportError RdrName
   | BadImport (IE GhcPs)
   | IllegalImport
+  | AmbiguousImport RdrName [AvailInfo] -- e.g. a duplicated field name as a top-level import
 
 failLookupWith :: IELookupError -> IELookupM a
 failLookupWith err = Failed err
@@ -1201,14 +1321,13 @@ mkChildEnv :: [GlobalRdrElt] -> NameEnv [GlobalRdrElt]
 mkChildEnv gres = foldr add emptyNameEnv gres
   where
     add gre env = case gre_par gre of
-        FldParent p _  -> extendNameEnv_Acc (:) Utils.singleton env p gre
         ParentIs  p    -> extendNameEnv_Acc (:) Utils.singleton env p gre
         NoParent       -> env
 
 findChildren :: NameEnv [a] -> Name -> [a]
 findChildren env n = lookupNameEnv env n `orElse` []
 
-lookupChildren :: [Either Name FieldLabel] -> [LIEWrappedName RdrName]
+lookupChildren :: [GreName] -> [LIEWrappedName RdrName]
                -> MaybeErr [LIEWrappedName RdrName]   -- The ones for which the lookup failed
                            ([Located Name], [Located FieldLabel])
 -- (lookupChildren all_kids rdr_items) maps each rdr_item to its
@@ -1233,13 +1352,13 @@ lookupChildren all_kids rdr_items
 
     doOne item@(L l r)
        = case (lookupFsEnv kid_env . occNameFS . rdrNameOcc . ieWrappedName) r of
-           Just [Left n]            -> Succeeded (Left (L l n))
-           Just rs | all isRight rs -> Succeeded (Right (map (L l) (rights rs)))
-           _                        -> Failed    item
+           Just [NormalGreName n]                             -> Succeeded (Left (L l n))
+           Just rs | Just fs <- traverse greNameFieldLabel rs -> Succeeded (Right (map (L l) fs))
+           _                                                  -> Failed    item
 
     -- See Note [Children for duplicate record fields]
     kid_env = extendFsEnvList_C (++) emptyFsEnv
-              [(either (occNameFS . nameOccName) flLabel x, [x]) | x <- all_kids]
+              [(occNameFS (occName x), [x]) | x <- all_kids]
 
 
 
@@ -1274,11 +1393,13 @@ reportUnusedNames gbl_env hsc_src
     -- This is done in mkExports too; duplicated work
 
     gre_is_used :: NameSet -> GlobalRdrElt -> Bool
-    gre_is_used used_names (GRE {gre_name = name})
+    gre_is_used used_names gre0
         = name `elemNameSet` used_names
-          || any (\ gre -> gre_name gre `elemNameSet` used_names) (findChildren kids_env name)
+          || any (\ gre -> greMangledName gre `elemNameSet` used_names) (findChildren kids_env name)
                 -- A use of C implies a use of T,
                 -- if C was brought into scope by T(..) or T(C)
+      where
+        name = greMangledName gre0
 
     -- Filter out the ones that are
     --  (a) defined in this module, and
@@ -1295,7 +1416,7 @@ reportUnusedNames gbl_env hsc_src
 
       in filter is_unused_local defined_but_not_used
     is_unused_local :: GlobalRdrElt -> Bool
-    is_unused_local gre = isLocalGRE gre && isExternalName (gre_name gre)
+    is_unused_local gre = isLocalGRE gre && isExternalName (greMangledName gre)
 
 {- *********************************************************************
 *                                                                      *
@@ -1422,7 +1543,7 @@ findImportUsage imports used_gres
                                -- srcSpanEnd: see Note [The ImportMap]
                     `orElse` []
 
-        used_names   = mkNameSet (map      gre_name        used_gres)
+        used_names   = mkNameSet (map      greMangledName        used_gres)
         used_parents = mkNameSet (mapMaybe greParent_maybe used_gres)
 
         unused_imps   -- Not trivial; see eg #7454
@@ -1435,7 +1556,7 @@ findImportUsage imports used_gres
         add_unused (IEVar _ n)      acc = add_unused_name (lieWrappedName n) acc
         add_unused (IEThingAbs _ n) acc = add_unused_name (lieWrappedName n) acc
         add_unused (IEThingAll _ n) acc = add_unused_all  (lieWrappedName n) acc
-        add_unused (IEThingWith _ p wc ns fs) acc =
+        add_unused (IEThingWith fs p wc ns) acc =
           add_wc_all (add_unused_with pn xs acc)
           where pn = lieWrappedName p
                 xs = map lieWrappedName ns ++ map (flSelector . unLoc) fs
@@ -1501,7 +1622,7 @@ mkImportMap gres
           best_imp_spec = bestImport imp_specs
           add _ gres = gre : gres
 
-warnUnusedImport :: WarningFlag -> NameEnv (FieldLabelString, Name)
+warnUnusedImport :: WarningFlag -> NameEnv (FieldLabelString, Parent)
                  -> ImportDeclUsage -> RnM ()
 warnUnusedImport flag fld_env (L loc decl, used, unused)
 
@@ -1553,8 +1674,9 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
     -- to improve the consistent for ambiguous/unambiguous identifiers.
     -- See trac#14881.
     ppr_possible_field n = case lookupNameEnv fld_env n of
-                               Just (fld, p) -> pprNameUnqualified p <> parens (ppr fld)
-                               Nothing  -> pprNameUnqualified n
+                               Just (fld, ParentIs p) -> pprNameUnqualified p <> parens (ppr fld)
+                               Just (fld, NoParent)   -> ppr fld
+                               Nothing                -> pprNameUnqualified n
 
     -- Print unused names in a deterministic (lexicographic) order
     sort_unused :: SDoc
@@ -1606,35 +1728,30 @@ getMinimalImports = fmap combine . mapM mk_minimal
     -- The main trick here is that if we're importing all the constructors
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
-    to_ie _ (Avail n)
-       = [IEVar noExtField (to_ie_post_rn $ noLoc n)]
-    to_ie _ (AvailTC n [m] [])
-       | n==m = [IEThingAbs noExtField (to_ie_post_rn $ noLoc n)]
-    to_ie iface (AvailTC n ns fs)
-      = case [(xs,gs) |  AvailTC x xs gs <- mi_exports iface
+    to_ie _ (Avail c)  -- Note [Overloaded field import]
+       = [IEVar noExtField (to_ie_post_rn $ noLoc (greNamePrintableName c))]
+    to_ie _ avail@(AvailTC n [_])  -- Exporting the main decl and nothing else
+       | availExportsDecl avail = [IEThingAbs noExtField (to_ie_post_rn $ noLoc n)]
+    to_ie iface (AvailTC n cs)
+      = case [xs | avail@(AvailTC x xs) <- mi_exports iface
                  , x == n
-                 , x `elem` xs    -- Note [Partial export]
+                 , availExportsDecl avail  -- Note [Partial export]
                  ] of
            [xs] | all_used xs -> [IEThingAll noExtField (to_ie_post_rn $ noLoc n)]
                 | otherwise   ->
-                   [IEThingWith noExtField (to_ie_post_rn $ noLoc n) NoIEWildcard
-                                (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
-                                (map noLoc fs)]
+                   [IEThingWith (map noLoc fs) (to_ie_post_rn $ noLoc n) NoIEWildcard
+                                (map (to_ie_post_rn . noLoc) (filter (/= n) ns))]
                                           -- Note [Overloaded field import]
            _other | all_non_overloaded fs
                            -> map (IEVar noExtField . to_ie_post_rn_var . noLoc) $ ns
                                  ++ map flSelector fs
                   | otherwise ->
-                      [IEThingWith noExtField (to_ie_post_rn $ noLoc n) NoIEWildcard
-                                (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
-                                (map noLoc fs)]
+                      [IEThingWith (map noLoc fs) (to_ie_post_rn $ noLoc n) NoIEWildcard
+                                (map (to_ie_post_rn . noLoc) (filter (/= n) ns))]
         where
+          (ns, fs) = partitionGreNames cs
 
-          fld_lbls = map flLabel fs
-
-          all_used (avail_occs, avail_flds)
-              = all (`elem` ns) avail_occs
-                    && all (`elem` fld_lbls) (map flLabel avail_flds)
+          all_used avail_cs = all (`elem` cs) avail_cs
 
           all_non_overloaded = all (not . flIsOverloaded)
 
@@ -1713,7 +1830,7 @@ Then the minimal import for module B is
 not
    import A( C( op ) )
 which we would usually generate if C was exported from B.  Hence
-the (x `elem` xs) test when deciding what to generate.
+the availExportsDecl test when deciding what to generate.
 
 
 Note [Overloaded field import]
@@ -1733,6 +1850,23 @@ then the minimal import for module B must be
 because when DuplicateRecordFields is enabled, field selectors are
 not in scope without their enclosing datatype.
 
+On the third hand, if we have
+
+    {-# LANGUAGE DuplicateRecordFields #-}
+    module A where
+      pattern MkT { foo } = Just foo
+
+    module B where
+      import A
+      f = ...foo...
+
+then the minimal import for module B must be
+    import A ( foo )
+because foo doesn't have a parent.  This might actually be ambiguous if A
+exports another field called foo, but there is no good answer to return and this
+is a very obscure corner, so it seems to be the best we can do.  See
+DRFPatSynExport for a test of this.
+
 
 ************************************************************************
 *                                                                      *
@@ -1745,6 +1879,14 @@ qualImportItemErr :: RdrName -> SDoc
 qualImportItemErr rdr
   = hang (text "Illegal qualified name in import item:")
        2 (ppr rdr)
+
+ambiguousImportItemErr :: RdrName -> [AvailInfo] -> SDoc
+ambiguousImportItemErr rdr avails
+  = hang (text "Ambiguous name" <+> quotes (ppr rdr) <+> text "in import item. It could refer to:")
+       2 (vcat (map ppr_avail avails))
+  where
+    ppr_avail (AvailTC parent _) = ppr parent <> parens (ppr rdr)
+    ppr_avail (Avail name)       = ppr name
 
 pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
 pprImpDeclSpec iface decl_spec =
@@ -1787,13 +1929,12 @@ badImportItemErr iface decl_spec ie avails
       Just con -> badImportItemErrDataCon (availOccName con) iface decl_spec ie
       Nothing  -> badImportItemErrStd iface decl_spec ie
   where
-    checkIfDataCon (AvailTC _ ns _) =
-      case find (\n -> importedFS == nameOccNameFS n) ns of
-        Just n  -> isDataConName n
+    checkIfDataCon (AvailTC _ ns) =
+      case find (\n -> importedFS == occNameFS (occName n)) ns of
+        Just n  -> isDataConName (greNameMangledName n)
         Nothing -> False
     checkIfDataCon _ = False
-    availOccName = nameOccName . availName
-    nameOccNameFS = occNameFS . nameOccName
+    availOccName = occName . availGreName
     importedFS = occNameFS . rdrNameOcc $ ieName ie
 
 illegalImportItemErr :: SDoc
@@ -1834,7 +1975,7 @@ addDupDeclErr gres@(gre : _)
   where
     sorted_names =
       sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan)
-             (map gre_name gres)
+             (map greMangledName gres)
 
 
 

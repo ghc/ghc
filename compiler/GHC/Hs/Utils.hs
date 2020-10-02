@@ -1192,17 +1192,17 @@ hsForeignDeclsBinders foreign_decls
 
 
 -------------------
-hsPatSynSelectors :: IsPass p => HsValBinds (GhcPass p) -> [IdP (GhcPass p)]
+hsPatSynSelectors :: IsPass p => HsValBinds (GhcPass p) -> [FieldOcc (GhcPass p)]
 -- ^ Collects record pattern-synonym selectors only; the pattern synonym
 -- names are collected by 'collectHsValBinders'.
 hsPatSynSelectors (ValBinds _ _ _) = panic "hsPatSynSelectors"
 hsPatSynSelectors (XValBindsLR (NValBinds binds _))
   = foldr addPatSynSelector [] . unionManyBags $ map snd binds
 
-addPatSynSelector :: forall p. UnXRec p => LHsBind p -> [IdP p] -> [IdP p]
+addPatSynSelector :: forall p. UnXRec p => LHsBind p -> [FieldOcc p] -> [FieldOcc p]
 addPatSynSelector bind sels
   | PatSynBind _ (PSB { psb_args = RecCon as }) <- unXRec @p bind
-  = map (unXRec @p . recordPatSynSelectorId) as ++ sels
+  = map recordPatSynField as ++ sels
   | otherwise = sels
 
 getPatSynBinds :: forall id. UnXRec id
