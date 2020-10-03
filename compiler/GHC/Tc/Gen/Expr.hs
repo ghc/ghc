@@ -910,6 +910,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
         -- Step 2
         -- Check that at least one constructor has all the named fields
         -- i.e. has an empty set of bad fields returned by badFields
+        -- FIXME: record pattern synonym fails this check
         ; checkTc (not (null relevant_cons)) (badFieldsUpd rbinds con_likes)
 
         -- Take apart a representative constructor
@@ -2800,8 +2801,8 @@ badFieldsUpd rbinds data_cons
     -- all of them.  See Note [Finding the conflicting fields]
     conflictingFields = case nonMembers of
         -- nonMember belongs to a different type.
-        (nonMember, _) : _ -> [aMember, nonMember]
-        [] -> let
+        (nonMember, _) : _ | (aMember, _) : _ <- members -> [aMember, nonMember]
+        _ -> let
             -- All of rbinds belong to one type. In this case, repeatedly add
             -- a field to the set until no constructor contains the set.
 
@@ -2814,9 +2815,8 @@ badFieldsUpd rbinds data_cons
             in
             -- Fields that don't change the membership status of the set
             -- are redundant and can be dropped.
-            map (fst . head) $ groupBy ((==) `on` snd) growingSets
+            concatMap (fmap fst . take 1) $ groupBy ((==) `on` snd) growingSets
 
-    aMember = ASSERT( not (null members) ) fst (head members)
     (members, nonMembers) = partition (or . snd) membership
 
     -- For each field, which constructors contain the field?

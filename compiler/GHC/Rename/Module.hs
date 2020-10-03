@@ -2299,15 +2299,16 @@ extendPatSynEnv :: FieldSelectors -> HsValBinds GhcPs -> MiniFixityEnv
                 -> ([Name] -> TcRnIf TcGblEnv TcLclEnv a) -> TcM a
 extendPatSynEnv has_sel val_decls local_fix_env thing = do {
      names_with_fls <- new_ps val_decls
-   ; let pat_syn_bndrs = concat [ name: map flSelector fields
-                                | (name, fields) <- names_with_fls ]
-   ; let avails = map avail pat_syn_bndrs
+   ; let avails = [ AvailTC name [name] fields
+                  | (name, fields) <- names_with_fls ]
    ; (gbl_env, lcl_env) <- extendGlobalRdrEnvRn avails local_fix_env
 
    ; let field_env' = extendNameEnvList (tcg_field_env gbl_env) names_with_fls
          final_gbl_env = gbl_env { tcg_field_env = field_env' }
-   ; setEnvs (final_gbl_env, lcl_env) (thing pat_syn_bndrs) }
+   ; setEnvs (final_gbl_env, lcl_env) (thing $ concatMap unwrap avails) }
   where
+    unwrap (Avail x) = [x]
+    unwrap (AvailTC name xs ys) = name : xs ++ map flSelector ys
     new_ps :: HsValBinds GhcPs -> TcM [(Name, [FieldLabel])]
     new_ps (ValBinds _ binds _) = foldrM new_ps' [] binds
     new_ps _ = panic "new_ps"

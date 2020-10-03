@@ -1,5 +1,9 @@
 
-records-nofieldselectors.hs:5:16: Not in scope: ‘x’
+records-nofieldselectors.hs:5:16:
+     Variable not in scope: x :: [a0] -> Int
+     NB: x is Single's field selector that has been suppressed by NoFieldSelectors
 
-records-nofieldselectors.hs:12:23:
-    ‘x’ is not a (visible) constructor field name
+records-nofieldselectors.hs:12:10:
+     No constructor has all these fields: ‘x’
+     In the expression: ["String"] {x = "updated"}
+      In an equation for ‘update’: update = ["String"] {x = "updated"}
