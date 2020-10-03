@@ -46,6 +46,7 @@ import GHC.Hs
 import GHC.Core.Class
 import GHC.Core.FamInstEnv
 import GHC.Core.Type
+import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Core.TyCon
 import GHC.Core.ConLike
@@ -854,6 +855,8 @@ tcRecSelBinds sel_bind_prs
     do { (rec_sel_binds, tcg_env) <- discardWarnings $
                                      -- See Note [Impredicative record selectors]
                                      setXOptM LangExt.ImpredicativeTypes $
+                                     -- See Note [Updaters use record update syntax]
+                                     unsetWOptM Opt_WarnIncompletePatternsRecUpd $
                                      tcValBinds TopLevel binds sigs getGblEnv
        ; return (tcg_env `addTypecheckedBinds` map snd rec_sel_binds) }
   where
@@ -995,7 +998,7 @@ mkRecordSelectorAndUpdater all_cons idDetails fl x_vars y_var =
 
     -- Make a binding for the updater.  We prefer to use upd_bind_fast, but
     -- thanks to #2595 this does not work for some GADTs, so we fall back on
-    -- upd_bind_slow.
+    -- upd_bind_slow. See Note [Updaters use record update syntax].
     upd_bind
       | null (conLikeExTyCoVars con1) = upd_bind_fast
       | otherwise                     = upd_bind_slow
@@ -1301,12 +1304,10 @@ returns the existing value.  For example, given the data declaration
 we generate the record updaters:
 
     $upd:foo:MkT :: T y -> ([y] -> T y, [y])
-    $upd:foo:MkT (MkT { foo = x1, bar = x2})
-        = (\y -> MkT { foo = y, bar = x2}, x1)
+    $upd:foo:MkT x = (\ y -> t { foo = y }, foo x)
 
     $upd:bar:MkT :: T y -> (Int -> T y, Int)
-    $upd:bar:MkT (MkT { foo = x1, bar = x2 })
-        = (\y -> MkT { foo = x1, bar = y}, x2)
+    $upd:bar:MkT x = (\ y -> t { bar = y }, foo x)
 
 These are used to produce instances of GHC.Records.HasField automatically as
 described in Note [HasField instances] in GHC.Tc.Instance.Class.
@@ -1345,6 +1346,44 @@ Note that:
    type, and reject the definition entirely if not.  Thus if the field does not
    involve an existential (and hence is not naughty) we can make both a selector
    and an updater (see Note [GADT record selectors]).
+
+
+Note [Updaters use record update syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Most updaters are defined by generating a record update expression and a call to
+the selector function, like this:
+
+    $upd:foo:MkT x = (\ y -> x { foo = y }, foo x)
+
+Since we are generating renamed syntax, we can emit a call to the selector
+function, even if it is not technically in scope (due to NoFieldSelectors).
+When RecordDotSyntax is implemented, it will redefine the meaning of record
+update syntax, but here we really need the "traditional" version.
+
+We use a record update expression, rather than generating an explicit case
+statement, because type-checking the explicit case statement is expensive for
+datatypes with many constructors and/or many fields.
+
+When type-checking the updater bindings, we disable -Wincomplete-record-updates,
+otherwise it would emit a warning on the definition of a partial field, which is
+not intended (there is a separate warning -Wpartial-fields for this).
+
+An annoying wrinkle is #2595: we cannot use record update for some GADTs, even
+though the desugaring is in principle type-correct, because the type-checker
+rejects the update.  Thus we *do* generate an explicit case statement when the
+constructor has existential type variables.  For example, we generate:
+
+    data S a where
+      MkS :: { soo :: Either p q, f :: Int } -> S (p,q)
+
+    $sel:soo:MkS :: S (p,q) -> Either p q
+    $sel:soo:MkS MkS{soo=x} = x
+
+    $upd:soo:MkS :: S (p,q) -> (Either p q -> S (p,q), Either p q)
+    $upd:soo:MkS x = (\ y -> case x of { MkS{soo=x0,f=x1} -> MkS{soo=y,f=x1} }
+                     , $sel:soo:MkS x
+                     )
 
 
 Note [Naughty record updaters]
