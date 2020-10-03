@@ -23,6 +23,7 @@
 #include "Printer.h"
 #include "sm/Sanity.h"
 #include "sm/Storage.h"
+#include "Printer.h"
 
 #include <string.h>
 

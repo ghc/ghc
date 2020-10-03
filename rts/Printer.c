@@ -648,7 +648,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
     }
 }
 
-static void printStack( StgStack *stack )
+// TODO: Do not merge. Only exported for debugging.
+void printStack( StgStack *stack )
 {
     printStackChunk( stack->sp, stack->stack + stack->stack_size );
 }

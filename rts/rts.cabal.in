@@ -410,6 +410,7 @@ library
                Arena.c
                Capability.c
                CheckUnload.c
+               CloneStack.c
                ClosureFlags.c
                Disassembler.c
                FileLock.c

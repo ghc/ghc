@@ -418,3 +418,7 @@ test('T17088',
      compile_and_run, ['-rtsopts -O2'])
 
 test('T15427', normal, compile_and_run, [''])
+
+test('cloneMyStack', [extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -debug'])
+
+test('cloneThreadStack', [only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -debug -threaded'])
