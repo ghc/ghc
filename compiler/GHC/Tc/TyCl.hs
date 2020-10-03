@@ -43,7 +43,7 @@ import GHC.Tc.Deriv (DerivInfo(..))
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
-import GHC.Builtin.Types ( unitTy, makeRecoveryTyCon )
+import GHC.Builtin.Types (oneDataConTy,  unitTy, makeRecoveryTyCon )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
 import GHC.Rename.Env( lookupConstructorFields )
@@ -3411,8 +3411,12 @@ tcConArg exp_kind (HsScaled w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcCheckLHsType (getBangType bty) exp_kind
         ; w' <- tcMult w
+        ; linearEnabled <- xoptM LangExt.LinearTypes
+        ; let interp_w
+                | linearEnabled = w'
+                | otherwise     = oneDataConTy
         ; traceTc "tcConArg 2" (ppr bty)
-        ; return (Scaled w' arg_ty, getBangStrictness bty) }
+        ; return (Scaled interp_w arg_ty, getBangStrictness bty) }
 
 {-
 Note [Infix GADT constructors]
