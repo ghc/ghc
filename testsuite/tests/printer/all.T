@@ -58,3 +58,4 @@ test('T14343b', normal, compile_fail, [''])
 test('T15761', normal, compile_fail, [''])
 test('T18052a', normal, compile,
      ['-ddump-simpl -ddump-types -dno-typeable-binds -dsuppress-uniques'])
+test('T18791', normal, compile, ['-ddump-parsed-ast'])
