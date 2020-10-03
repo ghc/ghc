@@ -1,0 +1,63 @@
+
+==================== Parser AST ====================
+
+({ T18791.hs:1:1 }
+ (HsModule
+  (VirtualBraces
+   (1))
+  (Just
+   ({ T18791.hs:2:8-13 }
+    {ModuleName: T18791}))
+  (Nothing)
+  []
+  [({ T18791.hs:(4,1)-(5,17) }
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (NoExtField)
+      ({ T18791.hs:4:6 }
+       (Unqual
+        {OccName: T}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (DataType)
+       ({ <no location info> }
+        [])
+       (Nothing)
+       (Nothing)
+       [({ T18791.hs:5:3-17 }
+         (ConDeclGADT
+          (NoExtField)
+          [({ T18791.hs:5:3-5 }
+            (Unqual
+             {OccName: MkT}))]
+          ({ T18791.hs:5:10-17 }
+           (False))
+          []
+          (Nothing)
+          (PrefixCon
+           [(HsScaled
+             (HsUnrestrictedArrow)
+             ({ T18791.hs:5:10-12 }
+              (HsTyVar
+               (NoExtField)
+               (NotPromoted)
+               ({ T18791.hs:5:10-12 }
+                (Unqual
+                 {OccName: Int})))))])
+          ({ T18791.hs:5:17 }
+           (HsTyVar
+            (NoExtField)
+            (NotPromoted)
+            ({ T18791.hs:5:17 }
+             (Unqual
+              {OccName: T}))))
+          (Nothing)))]
+       ({ <no location info> }
+        [])))))]
+  (Nothing)
+  (Nothing)))

@@ -695,24 +695,16 @@ mkConDeclH98 name mb_forall mb_cxt args
 --   provided), context (if provided), argument types, and result type, and
 --   records whether this is a prefix or record GADT constructor. See
 --   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
---
--- * If -XLinearTypes is not enabled, the function arrows in a prefix GADT
---   constructor are always interpreted as linear. If -XLinearTypes is enabled,
---   we faithfully record whether -> or %1 -> was used.
 mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs
            -> P (ConDecl GhcPs)
 mkGadtDecl names ty = do
-  linearEnabled <- getBit LinearTypesBit
-
   let (args, res_ty)
         | L _ (HsFunTy _ _w (L loc (HsRecTy _ rf)) res_ty) <- body_ty
         = (RecCon (L loc rf), res_ty)
         | otherwise
         = let (arg_types, res_type) = splitHsFunType body_ty
-              arg_types' | linearEnabled = arg_types
-                         | otherwise     = map (hsLinear . hsScaledThing) arg_types
-          in (PrefixCon arg_types', res_type)
+          in (PrefixCon arg_types, res_type)
 
   pure $ ConDeclGADT { con_g_ext  = noExtField
                      , con_names  = names
