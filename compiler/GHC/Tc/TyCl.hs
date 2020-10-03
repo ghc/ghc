@@ -43,7 +43,7 @@ import GHC.Tc.Deriv (DerivInfo(..))
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
-import GHC.Builtin.Types ( unitTy, makeRecoveryTyCon )
+import GHC.Builtin.Types (oneDataConTy,  unitTy, makeRecoveryTyCon )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
 import GHC.Rename.Env( lookupConstructorFields )
@@ -3410,11 +3410,27 @@ tcConArg :: ContextKind  -- expected kind for args; always OpenKind for datatype
 tcConArg exp_kind (HsScaled w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcCheckLHsType (getBangType bty) exp_kind
-        ; w' <- tcMult w
+        ; w' <- tcDataConMult w
         ; traceTc "tcConArg 2" (ppr bty)
         ; return (Scaled w' arg_ty, getBangStrictness bty) }
 
+tcDataConMult :: HsArrow GhcRn -> TcM Mult
+tcDataConMult arr@HsUnrestrictedArrow = do
+  -- See Note [Function arrows in GADT constructors]
+  linearEnabled <- xoptM LangExt.LinearTypes
+  if linearEnabled then tcMult arr else return oneDataConTy
+tcDataConMult arr = tcMult arr
+
 {-
+Note [Function arrows in GADT constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the absence of -XLinearTypes, we always interpret function arrows
+in GADT constructor types as linear, even if the user wrote an
+unrestricted arrow. See the "Without -XLinearTypes" section of the
+linear types GHC proposal (#111). We opt to do this in the
+typechecker, and not in an earlier pass, to ensure that the AST
+matches what the user wrote (#18791).
+
 Note [Infix GADT constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We do not currently have syntax to declare an infix constructor in GADT syntax,
