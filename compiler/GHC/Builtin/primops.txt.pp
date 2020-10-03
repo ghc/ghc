@@ -2674,7 +2674,7 @@ primop  RaiseOp "raise#" GenPrimOp
    can_fail = True
 
 primop  RaiseIOOp "raiseIO#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, o #)
+   b -> State# RealWorld -> (# State# RealWorld, o #)
    with
    -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
    -- for why this is the *only* primop that has 'exnDiv'
