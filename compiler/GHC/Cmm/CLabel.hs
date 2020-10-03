@@ -1540,6 +1540,7 @@ pprDynamicLinkerAsmLabel platform dllInfo ppLbl =
             SymbolPtr       -> char 'L' <> ppLbl <> text "$non_lazy_ptr"
             GotSymbolPtr    -> ppLbl <> text "@GOTPCREL"
             GotSymbolOffset -> ppLbl
+        | platformArch platform == ArchAArch64 -> ppr lbl
         | otherwise ->
           case dllInfo of
             CodeStub  -> char 'L' <> ppLbl <> text "$stub"
