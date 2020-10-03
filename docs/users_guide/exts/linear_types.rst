@@ -90,7 +90,7 @@ therefore constructors appear to have regular function types.
 
 ::
 
-    mkList :: [a] -> [MkT1 a]
+    mkList :: [a] -> [T1 a]
     mkList xs = map MkT1 xs
 
 Hence the linearity of type constructors is invisible when

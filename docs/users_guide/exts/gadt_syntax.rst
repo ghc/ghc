@@ -110,7 +110,9 @@ Formal syntax for GADTs
 
 To make more precise what is and what is not permitted inside of a GADT-style
 constructor, we provide a BNF-style grammar for GADT below. Note that this
-grammar is subject to change in the future. ::
+grammar is subject to change in the future.
+
+.. code-block:: none
 
   gadt_con ::= conids '::' opt_forall opt_ctxt gadt_body
 
