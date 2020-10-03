@@ -501,8 +501,10 @@ wildcardDoc herald =
 addNameClashErrRn :: RdrName -> NE.NonEmpty GlobalRdrElt -> RnM ()
 addNameClashErrRn rdr_name gres
   | all isLocalGRE gres && not (any isRecFldGRE gres)
-               -- If there are two or more *local* defns, we'll have reported
-  = return ()  -- that already, and we don't want an error cascade
+  -- If there are two or more *local* defns, and *none* of them is
+  -- a record field, we'll have reported that already,
+  -- and we don't want an error cascade
+  = return ()
   | otherwise
   = addErr (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
                  , text "It could refer to"
