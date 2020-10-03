@@ -703,16 +703,12 @@ mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs
            -> P (ConDecl GhcPs)
 mkGadtDecl names ty = do
-  linearEnabled <- getBit LinearTypesBit
-
   let (args, res_ty)
         | L _ (HsFunTy _ _w (L loc (HsRecTy _ rf)) res_ty) <- body_ty
         = (RecCon (L loc rf), res_ty)
         | otherwise
         = let (arg_types, res_type) = splitHsFunType body_ty
-              arg_types' | linearEnabled = arg_types
-                         | otherwise     = map (hsLinear . hsScaledThing) arg_types
-          in (PrefixCon arg_types', res_type)
+          in (PrefixCon arg_types, res_type)
 
   pure $ ConDeclGADT { con_g_ext  = noExtField
                      , con_names  = names

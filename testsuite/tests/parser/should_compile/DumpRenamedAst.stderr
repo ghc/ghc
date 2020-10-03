@@ -370,7 +370,7 @@
                (Nothing)
                (PrefixCon
                 [(HsScaled
-                  (HsLinearArrow)
+                  (HsUnrestrictedArrow)
                   ({ DumpRenamedAst.hs:19:10-34 }
                    (HsParTy
                     (NoExtField)
