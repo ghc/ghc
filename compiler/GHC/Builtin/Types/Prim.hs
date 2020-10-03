@@ -1097,8 +1097,6 @@ compactPrimTy = mkTyConTy compactPrimTyCon
 ************************************************************************
 -}
 
--- TODO: choose the right PrimRep - This is relevant for garbage collection behaviour
--- https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/prim-ops#adding-a-new-primop
 stackSnapshotPrimTyCon :: TyCon
 stackSnapshotPrimTyCon = pcPrimTyCon0 stackSnapshotPrimTyConName UnliftedRep
 

@@ -442,7 +442,6 @@ wanteds os = concat
           ,closureField_ Both "StgTSO_cccs" "StgTSO" "prof.cccs"
           ,closureField  Both "StgTSO"      "stackobj"
 
-          ,closureSize        C    "StgStack"
           ,closureField       Both "StgStack" "sp"
           ,closureFieldOffset Both "StgStack" "stack"
           ,closureField       C    "StgStack" "stack_size"
