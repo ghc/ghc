@@ -20,6 +20,7 @@ import Settings.Flavours.Profiled
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
+import Settings.Flavours.QuickCrossNCG
 import Settings.Flavours.GhcInGhci
 import Settings.Flavours.Validate
 
@@ -55,7 +56,7 @@ hadrianFlavours =
     [ benchmarkFlavour, defaultFlavour, developmentFlavour Stage1
     , developmentFlavour Stage2, performanceFlavour, profiledFlavour
     , quickFlavour, quickValidateFlavour, quickestFlavour
-    , quickCrossFlavour, benchmarkLlvmFlavour
+    , quickCrossFlavour, quickCrossNCGFlavour, benchmarkLlvmFlavour
     , performanceLlvmFlavour, profiledLlvmFlavour, quickLlvmFlavour
     , ghcInGhciFlavour, validateFlavour, slowValidateFlavour ]
 
