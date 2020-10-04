@@ -361,9 +361,8 @@ get_scoped_tvs_from_sig :: LHsSigType GhcRn -> [Name]
   --     m = n @a
   --
   -- See also Note [Scoped type variables in quotes]
-get_scoped_tvs_from_sig (L _ (HsSig{sig_bndrs = outer_bndrs})) = case outer_bndrs of
-  OuterImplicit imp_tv_names -> imp_tv_names
-  OuterExplicit exp_tvs      -> hsLTyVarNames exp_tvs
+get_scoped_tvs_from_sig (L _ (HsSig{sig_bndrs = outer_bndrs})) =
+  hsOuterTyVarNames outer_bndrs
 
 {- Notes
 
@@ -1012,9 +1011,9 @@ rep_ty_sig_tvs explicit_tvs
 -- and Note [Don't quantify implicit type variables in quotes]
 rep_ty_sig_outer_tvs :: HsOuterSigTyVarBndrs GhcRn
                      -> MetaM (Core [M TH.TyVarBndrSpec])
-rep_ty_sig_outer_tvs (OuterImplicit{}) =
+rep_ty_sig_outer_tvs (HsOuterImplicit{}) =
   coreListM tyVarBndrSpecTyConName []
-rep_ty_sig_outer_tvs (OuterExplicit explicit_tvs) =
+rep_ty_sig_outer_tvs (HsOuterExplicit{hso_bndrs = explicit_tvs}) =
   rep_ty_sig_tvs explicit_tvs
 
 -- Desugar a top-level type signature. Unlike 'repHsSigType', this
@@ -1168,10 +1167,12 @@ addHsOuterFamEqnTyVarBinds ::
 addHsOuterFamEqnTyVarBinds outer_bndrs thing_inside = do
   elt_ty <- wrapName tyVarBndrUnitTyConName
   case outer_bndrs of
-    OuterImplicit imp_tvs   -> addTyClTyVarBinds (mk_qtvs imp_tvs []) $ \_th_exp_bndrs ->
-                               thing_inside $ coreNothingList elt_ty
-    OuterExplicit exp_bndrs -> addTyClTyVarBinds (mk_qtvs [] exp_bndrs) $ \th_exp_bndrs ->
-                               thing_inside $ coreJustList elt_ty th_exp_bndrs
+    HsOuterImplicit{hso_ximplicit = imp_tvs} ->
+      addTyClTyVarBinds (mk_qtvs imp_tvs []) $ \_th_exp_bndrs ->
+      thing_inside $ coreNothingList elt_ty
+    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+      addTyClTyVarBinds (mk_qtvs [] exp_bndrs) $ \th_exp_bndrs ->
+      thing_inside $ coreJustList elt_ty th_exp_bndrs
   where
     mk_qtvs imp_tvs exp_tvs = HsQTvs { hsq_ext = imp_tvs
                                      , hsq_explicit = exp_tvs }
@@ -1181,20 +1182,22 @@ addHsOuterSigTyVarBinds ::
   -> (Core [M TH.TyVarBndrSpec] -> MetaM (Core (M a)))
   -> MetaM (Core (M a))
 addHsOuterSigTyVarBinds outer_bndrs thing_inside = case outer_bndrs of
-  OuterImplicit imp_tvs   -> do th_nil <- coreListM tyVarBndrSpecTyConName []
-                                addSimpleTyVarBinds imp_tvs $ thing_inside th_nil
-  OuterExplicit exp_bndrs -> addHsTyVarBinds exp_bndrs thing_inside
+  HsOuterImplicit{hso_ximplicit = imp_tvs} ->
+    do th_nil <- coreListM tyVarBndrSpecTyConName []
+       addSimpleTyVarBinds imp_tvs $ thing_inside th_nil
+  HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+    addHsTyVarBinds exp_bndrs thing_inside
 
 -- TODO RGS: Docs
 nullOuterImplicit :: HsOuterSigTyVarBndrs GhcRn -> Bool
-nullOuterImplicit (OuterImplicit imp_bndrs) = null imp_bndrs
-nullOuterImplicit (OuterExplicit{})         = True
+nullOuterImplicit (HsOuterImplicit{hso_ximplicit = imp_tvs}) = null imp_tvs
+nullOuterImplicit (HsOuterExplicit{})                        = True
   -- Vacuously true, as there is no implicit quantification
 
 -- TODO RGS: Docs
 nullOuterExplicit :: HsOuterSigTyVarBndrs GhcRn -> Bool
-nullOuterExplicit (OuterExplicit exp_bndrs) = null exp_bndrs
-nullOuterExplicit (OuterImplicit {})        = True
+nullOuterExplicit (HsOuterExplicit{hso_bndrs = exp_bndrs}) = null exp_bndrs
+nullOuterExplicit (HsOuterImplicit{})                      = True
   -- Vacuously true, as there is no outermost explicit quantification
 
 addSimpleTyVarBinds :: [Name]             -- the binders to be added

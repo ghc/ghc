@@ -550,8 +550,10 @@ instance HasLoc a => HasLoc [a] where
 
 instance HasLoc a => HasLoc (FamEqn (GhcPass s) a) where
   loc (FamEqn _ a outer_bndrs b _ c) = case outer_bndrs of
-    OuterImplicit{}   -> foldl1' combineSrcSpans [loc a, loc b, loc c]
-    OuterExplicit tvs -> foldl1' combineSrcSpans [loc a, loc tvs, loc b, loc c]
+    HsOuterImplicit{} ->
+      foldl1' combineSrcSpans [loc a, loc b, loc c]
+    HsOuterExplicit{hso_bndrs = tvs} ->
+      foldl1' combineSrcSpans [loc a, loc tvs, loc b, loc c]
 instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg tm ty) where
   loc (HsValArg tm) = loc tm
   loc (HsTypeArg _ ty) = loc ty
@@ -1551,10 +1553,11 @@ instance ToHie (Located (ConDecl GhcRn)) where
                   , con_mb_cxt = ctx, con_args = args, con_res_ty = typ } ->
         [ toHie $ map (C (Decl ConDec $ getRealSpan span)) names
         , case outer_bndrs of
-            OuterImplicit imp_vars -> bindingsOnly $
-                                      map (C $ TyVarBind (mkScope outer_bndrs_loc) resScope)
-                                      imp_vars
-            OuterExplicit exp_bndrs -> toHie $ tvScopes resScope NoScope exp_bndrs
+            HsOuterImplicit{hso_ximplicit = imp_vars} ->
+              bindingsOnly $ map (C $ TyVarBind (mkScope outer_bndrs_loc) resScope)
+                             imp_vars
+            HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+              toHie $ tvScopes resScope NoScope exp_bndrs
         , toHie ctx
         , toHie args
         , toHie typ

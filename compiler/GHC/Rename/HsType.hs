@@ -1045,16 +1045,17 @@ bindHsOuterTyVarBndrs :: OutputableBndrFlag flag
                       -> RnM (a, FreeVars)
 bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
   case outer_bndrs of
-    OuterImplicit{} ->
+    HsOuterImplicit{} ->
       rnImplicitBndrs mb_cls implicit_vars $ \implicit_vars' ->
-        thing_inside $ OuterImplicit implicit_vars'
-    OuterExplicit exp_bndrs ->
+        thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
+    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
       -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
       -- will use class variables for any names the user meant to bring in
       -- scope here. This is an explicit forall, so we want fresh names, not
       -- class variables. Thus: always pass Nothing.
       bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
-        thing_inside $ OuterExplicit exp_bndrs'
+        thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
+                                       , hso_bndrs     = exp_bndrs' }
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs
@@ -1870,8 +1871,8 @@ extractHsOuterTvBndrs :: HsOuterTyVarBndrs flag GhcPs
                       -> FreeKiTyVars -- Free in result
 extractHsOuterTvBndrs outer_bndrs body_fvs =
   case outer_bndrs of
-    OuterImplicit{}     -> body_fvs
-    OuterExplicit bndrs -> extract_hs_tv_bndrs bndrs [] body_fvs
+    HsOuterImplicit{}                  -> body_fvs
+    HsOuterExplicit{hso_bndrs = bndrs} -> extract_hs_tv_bndrs bndrs [] body_fvs
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr flag GhcPs]
                     -> FreeKiTyVars  -- Accumulator

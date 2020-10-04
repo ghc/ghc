@@ -738,6 +738,8 @@ type family XXLHsQTyVars  x
 -- -------------------------------------
 -- HsOuterTyVarBndrs type families
 type family XHsOuterImplicit    x
+type family XHsOuterExplicit    x
+type family XXHsOuterTyVarBndrs x
 
 -- -------------------------------------
 -- HsSigType type families

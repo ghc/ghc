@@ -711,8 +711,8 @@ rnFamEqn doc atfi rhs_kvars
              -- -Wunused-type-patterns warnings. We can be a little more precise
              -- than that by pointing to the LHS of the instance instead, which
              -- is what lhs_loc corresponds to.
-             rn_outer_bndrs' = mapOuterImplicit (map (`setNameLoc` lhs_loc))
-                                                rn_outer_bndrs
+             rn_outer_bndrs' = mapHsOuterImplicit (map (`setNameLoc` lhs_loc))
+                                                  rn_outer_bndrs
 
              groups :: [NonEmpty (Located RdrName)]
              groups = equivClasses cmpLocated $
@@ -727,9 +727,7 @@ rnFamEqn doc atfi rhs_kvars
              --     Note [Unused type variables in family instances]
        ; let nms_used = extendNameSetList rhs_fvs $
                            inst_tvs ++ nms_dups
-             all_nms = case rn_outer_bndrs' of
-                         OuterImplicit imp_var_nms -> imp_var_nms
-                         OuterExplicit bndrs       -> hsLTyVarNames bndrs
+             all_nms = hsOuterTyVarNames rn_outer_bndrs'
        ; warnUnusedTypePatterns all_nms nms_used
 
        ; let eqn_fvs = rhs_fvs `plusFV` pat_fvs
@@ -1924,12 +1922,7 @@ rnLDerivStrategy doc mds thing_inside
              (via_ty', fvs1) <- rnHsSigType doc TypeLevel via_ty
              let HsSig { sig_bndrs = via_outer_bndrs
                        , sig_body  = via_body } = unLoc via_ty'
-                 -- TODO RGS: We also do something like this in splitLHsInstDeclTy.
-                 -- Consider factoring this out into its own function in the same
-                 -- vein as hsScopedTvs.
-                 via_tvs = case via_outer_bndrs of
-                             OuterImplicit imp_tvs   -> imp_tvs
-                             OuterExplicit exp_bndrs -> hsLTyVarNames exp_bndrs
+                 via_tvs = hsOuterTyVarNames via_outer_bndrs
              -- Check if there are any nested `forall`s, which are illegal in a
              -- `via` type.
              -- See Note [No nested foralls or contexts in instance types]
