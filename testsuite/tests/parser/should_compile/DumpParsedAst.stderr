@@ -66,6 +66,7 @@
           (Nothing)
           (PrefixCon
            [(HsScaled
+             (NormalSyntax)
              (HsLinearArrow)
              ({ DumpParsedAst.hs:7:26-30 }
               (HsTyVar
@@ -258,6 +259,7 @@
           (Nothing)
           (PrefixCon
            [(HsScaled
+             (NormalSyntax)
              (HsLinearArrow)
              ({ DumpParsedAst.hs:14:25-29 }
               (HsParTy
@@ -391,7 +393,7 @@
              {OccName: f}))
            ({ DumpParsedAst.hs:16:31-39 }
             (HsFunTy
-             (NoExtField)
+             (NormalSyntax)
              (HsUnrestrictedArrow)
              ({ DumpParsedAst.hs:16:31 }
               (HsTyVar

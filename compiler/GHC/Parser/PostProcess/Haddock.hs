@@ -784,10 +784,10 @@ getConDoc l =
 addHaddockConDeclFieldTy
   :: HsScaled GhcPs (LHsType GhcPs)
   -> ConHdkA (HsScaled GhcPs (LHsType GhcPs))
-addHaddockConDeclFieldTy (HsScaled mult (L l t)) =
+addHaddockConDeclFieldTy (HsScaled u mult (L l t)) =
   WriterT $ extendHdkA l $ liftHdkA $ do
     mDoc <- getPrevNextDoc l
-    return (HsScaled mult (mkLHsDocTy (L l t) mDoc),
+    return (HsScaled u mult (mkLHsDocTy (L l t) mDoc),
             HasInnerDocs (isJust mDoc))
 
 -- Add documentation comment to a data constructor field.
@@ -837,7 +837,7 @@ addConTrailingDoc l_sep =
             if has_inner_docs then do
               let mk_doc_ty ::       HsScaled GhcPs (LHsType GhcPs)
                             -> HdkM (HsScaled GhcPs (LHsType GhcPs))
-                  mk_doc_ty x@(HsScaled _ (L _ HsDocTy{})) =
+                  mk_doc_ty x@(HsScaled _ _ (L _ HsDocTy{})) =
                     -- Happens in the following case:
                     --
                     --    data T =
@@ -848,9 +848,9 @@ addConTrailingDoc l_sep =
                     --
                     -- See tests/.../haddockExtraDocs.hs
                     x <$ reportExtraDocs trailingDocs
-                  mk_doc_ty (HsScaled mult (L l' t)) = do
+                  mk_doc_ty (HsScaled u mult (L l' t)) = do
                     doc <- selectDocString trailingDocs
-                    return $ HsScaled mult (mkLHsDocTy (L l' t) doc)
+                    return $ HsScaled u mult (mkLHsDocTy (L l' t) doc)
               let mk_doc_fld ::       LConDeclField GhcPs
                              -> HdkM (LConDeclField GhcPs)
                   mk_doc_fld x@(L _ (ConDeclField { cd_fld_doc = Just _ })) =
@@ -928,7 +928,7 @@ We implement this in two steps:
 -}
 
 instance HasHaddock a => HasHaddock (HsScaled GhcPs a) where
-  addHaddock (HsScaled mult a) = HsScaled mult <$> addHaddock a
+  addHaddock (HsScaled u mult a) = HsScaled u mult <$> addHaddock a
 
 instance HasHaddock a => HasHaddock (HsWildCardBndrs GhcPs a) where
   addHaddock (HsWC _ t) = HsWC noExtField <$> addHaddock t
@@ -981,10 +981,10 @@ instance HasHaddock (Located (HsType GhcPs)) where
         pure $ L l (HsQualTy noExtField lhs rhs')
 
       -- arg -> res
-      HsFunTy _ mult lhs rhs -> do
+      HsFunTy u mult lhs rhs -> do
         lhs' <- addHaddock lhs
         rhs' <- addHaddock rhs
-        pure $ L l (HsFunTy noExtField mult lhs' rhs')
+        pure $ L l (HsFunTy u mult lhs' rhs')
 
       -- other types
       _ -> liftHdkA $ do

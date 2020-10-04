@@ -262,6 +262,7 @@ data AnnKeywordId
     | AnnMdo
     | AnnMinus -- ^ '-'
     | AnnModule
+    | AnnMult -- ^ '%1'
     | AnnNewtype
     | AnnName -- ^ where a name loses its location in the AST, this carries it
     | AnnOf

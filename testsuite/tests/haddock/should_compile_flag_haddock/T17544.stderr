@@ -43,7 +43,7 @@
           (NoExtField)
           ({ T17544.hs:6:9-16 }
            (HsFunTy
-            (NoExtField)
+            (NormalSyntax)
             (HsUnrestrictedArrow)
             ({ T17544.hs:6:9 }
              (HsTyVar
@@ -103,7 +103,7 @@
           (NoExtField)
           ({ T17544.hs:10:9-16 }
            (HsFunTy
-            (NoExtField)
+            (NormalSyntax)
             (HsUnrestrictedArrow)
             ({ T17544.hs:10:9 }
              (HsTyVar
@@ -160,7 +160,7 @@
           (NoExtField)
           ({ T17544.hs:14:9-16 }
            (HsFunTy
-            (NoExtField)
+            (NormalSyntax)
             (HsUnrestrictedArrow)
             ({ T17544.hs:14:9 }
              (HsTyVar
@@ -220,7 +220,7 @@
           (NoExtField)
           ({ T17544.hs:18:9-16 }
            (HsFunTy
-            (NoExtField)
+            (NormalSyntax)
             (HsUnrestrictedArrow)
             ({ T17544.hs:18:9 }
              (HsTyVar
@@ -247,7 +247,7 @@
           (NoExtField)
           ({ T17544.hs:20:9-16 }
            (HsFunTy
-            (NoExtField)
+            (NormalSyntax)
             (HsUnrestrictedArrow)
             ({ T17544.hs:20:9 }
              (HsTyVar
