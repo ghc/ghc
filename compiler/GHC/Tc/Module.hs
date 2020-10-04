@@ -148,6 +148,7 @@ import Control.DeepSeq
 import Control.Monad
 
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR (..) )
+import GHC.Parser.Annotation
 
 
 #include "HsVersions.h"
@@ -2455,7 +2456,7 @@ getGhciStepIO = do
                      { hst_tele = mkHsForAllInvisTele
                                   [noLoc $ UserTyVar noExtField SpecifiedSpec (noLoc a_tv)]
                      , hst_xforall = noExtField
-                     , hst_body  = nlHsFunTy HsUnrestrictedArrow ghciM ioM }
+                     , hst_body  = nlHsFunTy (HsUnrestrictedArrow NormalSyntax) ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)

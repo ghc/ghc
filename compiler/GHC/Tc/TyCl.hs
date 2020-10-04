@@ -3416,7 +3416,7 @@ tcConArg exp_kind (HsScaled w bty)
         ; return (Scaled w' arg_ty, getBangStrictness bty) }
 
 tcDataConMult :: HsArrow GhcRn -> TcM Mult
-tcDataConMult arr@HsUnrestrictedArrow = do
+tcDataConMult arr@(HsUnrestrictedArrow _) = do
   -- See Note [Function arrows in GADT constructors]
   linearEnabled <- xoptM LangExt.LinearTypes
   if linearEnabled then tcMult arr else return oneDataConTy
