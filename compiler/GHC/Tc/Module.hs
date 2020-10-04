@@ -2451,7 +2451,7 @@ getGhciStepIO = do
 
         step_ty :: LHsSigType GhcRn
         step_ty = noLoc $ HsSig
-                     { sig_bndrs = OuterImplicit [a_tv]
+                     { sig_bndrs = HsOuterImplicit{hso_ximplicit = [a_tv]}
                      , sig_ext = noExtField
                      , sig_body = nlHsFunTy HsUnrestrictedArrow ghciM ioM }
 

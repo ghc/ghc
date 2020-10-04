@@ -398,7 +398,12 @@ deriving instance Data (LHsQTyVars GhcPs)
 deriving instance Data (LHsQTyVars GhcRn)
 deriving instance Data (LHsQTyVars GhcTc)
 
--- deriving instance (DataIsLR p p) => Data (HsSigType p)
+-- deriving instance (Data flag, DataIdLR p p) => Data (HsOuterTyVarBndrs p)
+deriving instance Data flag => Data (HsOuterTyVarBndrs flag GhcPs)
+deriving instance Data flag => Data (HsOuterTyVarBndrs flag GhcRn)
+deriving instance Data flag => Data (HsOuterTyVarBndrs flag GhcTc)
+
+-- deriving instance (DataIdLR p p) => Data (HsSigType p)
 deriving instance Data (HsSigType GhcPs)
 deriving instance Data (HsSigType GhcRn)
 deriving instance Data (HsSigType GhcTc)
