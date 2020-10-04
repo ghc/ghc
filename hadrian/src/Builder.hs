@@ -319,6 +319,15 @@ systemBuilderPath builder = case builder of
     Happy           -> fromKey "happy"
     HsCpp           -> fromKey "hs-cpp"
     Ld _            -> fromKey "ld"
+    -- MergeObjects Stage0 is a special case in case of
+    -- cross-compiling. We're building stage1, e.g. code which will be
+    -- executed on the host and hence we need to use host's merge
+    -- objects tool and not the target merge object tool.
+    -- Note, merge object tool is usually platform linker with some
+    -- parameters. E.g. building a cross-compiler on and for x86_64
+    -- which will target ppc64 means that MergeObjects Stage0 will use
+    -- x86_64 linker and MergeObject _ will use ppc64 linker.
+    MergeObjects Stage0 -> fromKey "system-merge-objects"
     MergeObjects _  -> fromKey "merge-objects"
     Make _          -> fromKey "make"
     Makeinfo        -> fromKey "makeinfo"
