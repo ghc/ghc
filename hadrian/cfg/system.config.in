@@ -15,6 +15,7 @@ ld             = @LdCmd@
 make           = @MakeCmd@
 nm             = @NmCmd@
 merge-objects  = @MergeObjsCmd@
+system-merge-objects = @LD_STAGE0@
 objdump        = @ObjdumpCmd@
 ranlib         = @REAL_RANLIB_CMD@
 sphinx-build   = @SPHINXBUILD@
