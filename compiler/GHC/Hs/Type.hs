@@ -931,22 +931,23 @@ isUnrestricted _ = False
 
 -- | Denotes the type of arrows in the surface language
 data HsArrow pass
-  = HsUnrestrictedArrow
-    -- ^ a -> b
-  | HsLinearArrow
-    -- ^ a %1 -> b
-  | HsExplicitMult (LHsType pass)
-    -- ^ a %m -> b (very much including `a %Many -> b`! This is how the
-    -- programmer wrote it). It is stored as an `HsType` so as to preserve the
-    -- syntax as written in the program.
+  = HsUnrestrictedArrow IsUnicodeSyntax
+    -- ^ a -> b or a → b
+  | HsLinearArrow IsUnicodeSyntax
+    -- ^ a %1 -> b or a %1 → b, or a ⊸ b
+  | HsExplicitMult IsUnicodeSyntax (LHsType pass)
+    -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
+    -- This is how the programmer wrote it). It is stored as an
+    -- `HsType` so as to preserve the syntax as written in the
+    -- program.
 
 -- | Convert an arrow into its corresponding multiplicity. In essence this
 -- erases the information of whether the programmer wrote an explicit
 -- multiplicity or a shorthand.
 arrowToHsType :: HsArrow GhcRn -> LHsType GhcRn
-arrowToHsType HsUnrestrictedArrow = noLoc manyDataConHsTy
-arrowToHsType HsLinearArrow = noLoc oneDataConHsTy
-arrowToHsType (HsExplicitMult p) = p
+arrowToHsType (HsUnrestrictedArrow _) = noLoc manyDataConHsTy
+arrowToHsType (HsLinearArrow _) = noLoc oneDataConHsTy
+arrowToHsType (HsExplicitMult _ p) = p
 
 -- | This is used in the syntax. In constructor declaration. It must keep the
 -- arrow representation.
@@ -961,20 +962,23 @@ hsScaledThing (HsScaled _ t) = t
 -- | When creating syntax we use the shorthands. It's better for printing, also,
 -- the shorthands work trivially at each pass.
 hsUnrestricted, hsLinear :: a -> HsScaled pass a
-hsUnrestricted = HsScaled HsUnrestrictedArrow
-hsLinear = HsScaled HsLinearArrow
+hsUnrestricted = HsScaled (HsUnrestrictedArrow NormalSyntax)
+hsLinear = HsScaled (HsLinearArrow NormalSyntax)
 
 instance Outputable a => Outputable (HsScaled pass a) where
    ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
-                          ppr t
+                            ppr t
 
 instance
       (OutputableBndrId pass) =>
       Outputable (HsArrow (GhcPass pass)) where
-  ppr HsUnrestrictedArrow = parens arrow
-  ppr HsLinearArrow = parens lollipop
-  ppr (HsExplicitMult p) = parens (mulArrow (ppr p))
+  ppr arr = parens (pprHsArrow arr)
 
+-- See #18846
+pprHsArrow :: (OutputableBndrId pass) => HsArrow (GhcPass pass) -> SDoc
+pprHsArrow (HsUnrestrictedArrow _) = arrow
+pprHsArrow (HsLinearArrow _) = lollipop
+pprHsArrow (HsExplicitMult _ p) = (mulArrow (ppr p))
 
 {-
 Note [Unit tuples]
@@ -1959,10 +1963,7 @@ ppr_fun_ty :: (OutputableBndrId p)
 ppr_fun_ty mult ty1 ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
-        arr = case mult of
-          HsLinearArrow -> lollipop
-          HsUnrestrictedArrow -> arrow
-          HsExplicitMult p -> mulArrow (ppr p)
+        arr = pprHsArrow mult
     in
     sep [p1, arr <+> p2]
 

@@ -276,7 +276,8 @@
         ({ KindSigs.hs:22:8-44 }
          (HsFunTy
           (NoExtField)
-          (HsUnrestrictedArrow)
+          (HsUnrestrictedArrow
+           (NormalSyntax))
           ({ KindSigs.hs:22:8-20 }
            (HsParTy
             (NoExtField)
@@ -300,7 +301,8 @@
           ({ KindSigs.hs:22:25-44 }
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow)
+            (HsUnrestrictedArrow
+             (NormalSyntax))
             ({ KindSigs.hs:22:25-28 }
              (HsTyVar
               (NoExtField)

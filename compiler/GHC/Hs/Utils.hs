@@ -133,6 +133,7 @@ import GHC.Types.SrcLoc
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Settings.Constants
+import GHC.Parser.Annotation
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -538,12 +539,12 @@ nlList exprs          = noLoc (ExplicitList noExtField Nothing exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
-nlHsFunTy :: HsArrow (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+nlHsFunTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExtField f (parenthesizeHsType appPrec t))
 nlHsTyVar x   = noLoc (HsTyVar noExtField NotPromoted (noLoc x))
-nlHsFunTy mult a b = noLoc (HsFunTy noExtField mult (parenthesizeHsType funPrec a) b)
+nlHsFunTy a b = noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) (parenthesizeHsType funPrec a) b)
 nlHsParTy t   = noLoc (HsParTy noExtField t)
 
 nlHsTyConApp :: LexicalFixity -> IdP (GhcPass p)
