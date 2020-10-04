@@ -1570,8 +1570,8 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 kcConArgTys :: NewOrData -> Kind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
 kcConArgTys new_or_data res_kind arg_tys = do
   { let exp_kind = getArgExpKind new_or_data res_kind
-  ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsType (getBangType ty) exp_kind
-                                             tcMult mult)
+  ; forM_ arg_tys (\(HsScaled _ mult ty) -> do _ <- tcCheckLHsType (getBangType ty) exp_kind
+                                               tcMult mult)
 
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
   }
@@ -3408,7 +3408,7 @@ tcConArgs exp_kind (RecCon fields)
 tcConArg :: ContextKind  -- expected kind for args; always OpenKind for datatypes,
                          -- but might be an unlifted type with UnliftedNewtypes
          -> HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
-tcConArg exp_kind (HsScaled w bty)
+tcConArg exp_kind (HsScaled _ w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcCheckLHsType (getBangType bty) exp_kind
         ; w' <- tcDataConMult w

@@ -2051,18 +2051,18 @@ is connected to the first type too.
 type :: { LHsType GhcPs }
         -- See Note [%shift: type -> btype]
         : btype %shift                 { $1 }
-        | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExtField HsUnrestrictedArrow $1 $3)
+        | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See Note [GADT decl discards annotations]
+                                       >> ams (sLL $1 $> $ HsFunTy NormalSyntax HsUnrestrictedArrow $1 $3)
                                               [mu AnnRarrow $2] }
 
         | btype mult '->' ctype        {% hintLinear (getLoc $2)
-                                       >> ams $1 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExtField (unLoc $2) $1 $4)
-                                              [mu AnnRarrow $3] }
+                                       >> ams $1 [mj AnnMult $2,mu AnnRarrow $3] -- See Note [GADT decl discards annotations]
+                                       >> ams (sLL $1 $> $ HsFunTy NormalSyntax (unLoc $2) $1 $4)
+                                              [mj AnnMult $2,mu AnnRarrow $3] }
 
         | btype '->.' ctype            {% hintLinear (getLoc $2)
                                        >> ams $1 [mu AnnLollyU $2] -- See note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExtField HsLinearArrow $1 $3)
+                                       >> ams (sLL $1 $> $ HsFunTy UnicodeSyntax HsLinearArrow $1 $3)
                                               [mu AnnLollyU $2] }
 
 mult :: { Located (HsArrow GhcPs) }

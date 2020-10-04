@@ -512,10 +512,10 @@ rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
 rnScaledLHsType :: HsDocContext -> HsScaled GhcPs (LHsType GhcPs)
                                   -> RnM (HsScaled GhcRn (LHsType GhcRn), FreeVars)
-rnScaledLHsType doc (HsScaled w ty) = do
+rnScaledLHsType doc (HsScaled u w ty) = do
   (w' , fvs_w) <- rnHsArrow (mkTyKiEnv doc TypeLevel RnTypeBody) w
   (ty', fvs) <- rnLHsType doc ty
-  return (HsScaled w' ty', fvs `plusFV` fvs_w)
+  return (HsScaled u w' ty', fvs `plusFV` fvs_w)
 
 
 rnHsType  :: HsDocContext -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
@@ -622,11 +622,11 @@ rnHsTyKi env ty@(HsRecTy _ flds)
                                    2 (ppr ty))
            ; return [] }
 
-rnHsTyKi env (HsFunTy _ mult ty1 ty2)
+rnHsTyKi env (HsFunTy u mult ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
        ; (mult', w_fvs) <- rnHsArrow env mult
-       ; return (HsFunTy noExtField mult' ty1' ty2'
+       ; return (HsFunTy u mult' ty1' ty2'
                 , plusFVs [fvs1, fvs2, w_fvs]) }
 
 rnHsTyKi env listTy@(HsListTy _ ty)

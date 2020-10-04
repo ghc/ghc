@@ -116,6 +116,7 @@ import GHC.Data.FastString
 import GHC.Builtin.Names hiding ( wildCardName )
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Parser.Annotation
 
 import GHC.Data.Maybe
 import GHC.Data.Bag( unitBag )
@@ -1245,13 +1246,13 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
        ; mult' <- tc_mult mode mult
-       ; checkExpectedKind (HsFunTy noExtField mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
+       ; checkExpectedKind (HsFunTy NormalSyntax mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
        ; mult' <- tc_mult mode mult
-       ; checkExpectedKind (HsFunTy noExtField mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
+       ; checkExpectedKind (HsFunTy NormalSyntax mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
 
 {- Note [Skolem escape and forall-types]
