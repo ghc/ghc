@@ -41,7 +41,8 @@
           (Nothing)
           (PrefixCon
            [(HsScaled
-             (HsUnrestrictedArrow)
+             (HsUnrestrictedArrow
+              (NormalSyntax))
              ({ T18791.hs:5:10-12 }
               (HsTyVar
                (NoExtField)

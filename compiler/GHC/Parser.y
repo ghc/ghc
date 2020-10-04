@@ -1956,23 +1956,22 @@ is connected to the first type too.
 
 type :: { LHsType GhcPs }
         : btype                        { $1 }
-        | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExtField HsUnrestrictedArrow $1 $3)
+        | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See Note [GADT decl discards annotations]
+                                       >> ams (sLL $1 $> $ HsFunTy noExtField (HsUnrestrictedArrow (toUnicode $2)) $1 $3)
                                               [mu AnnRarrow $2] }
 
         | btype mult '->' ctype        {% hintLinear (getLoc $2)
-                                       >> ams $1 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExtField (unLoc $2) $1 $4)
-                                              [mu AnnRarrow $3] }
+                                       >> ams $1 [mj AnnMult $2,mu AnnRarrow $3] -- See Note [GADT decl discards annotations]
+                                       >> ams (sLL $1 $> $ HsFunTy noExtField ((unLoc $2) (toUnicode $3)) $1 $4)
+                                              [mj AnnMult $2,mu AnnRarrow $3] }
 
         | btype '->.' ctype            {% hintLinear (getLoc $2)
-                                       >> ams $1 [mu AnnLollyU $2] -- See note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExtField HsLinearArrow $1 $3)
+                                       >> ams $1 [mu AnnLollyU $2] -- See Note [GADT decl discards annotations]
+                                       >> ams (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow UnicodeSyntax) $1 $3)
                                               [mu AnnLollyU $2] }
 
-mult :: { Located (HsArrow GhcPs) }
-        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy $2) }
-
+mult :: { Located (IsUnicodeSyntax -> HsArrow GhcPs) }
+        : PREFIX_PERCENT atype          { sLL $1 $> (\u -> mkMultTy u $2) }
 
 btype :: { LHsType GhcPs }
         : tyapps                        {% mergeOps (unLoc $1) }
@@ -3910,6 +3909,9 @@ mu a lt@(L l t) = AddAnn (toUnicodeAnn a lt) l
 --   the annotation
 toUnicodeAnn :: AnnKeywordId -> Located Token -> AnnKeywordId
 toUnicodeAnn a t = if isUnicode t then unicodeAnn a else a
+
+toUnicode :: Located Token -> IsUnicodeSyntax
+toUnicode t = if isUnicode t then UnicodeSyntax else NormalSyntax
 
 gl :: Located a -> SrcSpan
 gl = getLoc

@@ -599,7 +599,7 @@ rnHsTyKi env ty@(HsRecTy _ flds)
                                    2 (ppr ty))
            ; return [] }
 
-rnHsTyKi env (HsFunTy _ mult ty1 ty2)
+rnHsTyKi env (HsFunTy u mult ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
         -- Might find a for-all as the arg of a function type
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
@@ -611,7 +611,7 @@ rnHsTyKi env (HsFunTy _ mult ty1 ty2)
        ; res_ty <- mkHsOpTyRn (hs_fun_ty mult') funTyConName funTyFixity ty1' ty2'
        ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
   where
-    hs_fun_ty w a b = HsFunTy noExtField w a b
+    hs_fun_ty w a b = HsFunTy u w a b
 
 rnHsTyKi env listTy@(HsListTy _ ty)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -708,10 +708,10 @@ rnHsTyKi env (HsWildCardTy _)
        ; return (HsWildCardTy noExtField, emptyFVs) }
 
 rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
-rnHsArrow _env HsUnrestrictedArrow = return (HsUnrestrictedArrow, emptyFVs)
-rnHsArrow _env HsLinearArrow = return (HsLinearArrow, emptyFVs)
-rnHsArrow env (HsExplicitMult p)
-  = (\(mult, fvs) -> (HsExplicitMult mult, fvs)) <$> rnLHsTyKi env p
+rnHsArrow _env (HsUnrestrictedArrow u) = return (HsUnrestrictedArrow u, emptyFVs)
+rnHsArrow _env (HsLinearArrow u) = return (HsLinearArrow u, emptyFVs)
+rnHsArrow env (HsExplicitMult u p)
+  = (\(mult, fvs) -> (HsExplicitMult u mult, fvs)) <$> rnLHsTyKi env p
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
@@ -1840,7 +1840,7 @@ extract_lty (L _ ty) acc
 
 extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars ->
                    FreeKiTyVars
-extract_hs_arrow (HsExplicitMult p) acc = extract_lty p acc
+extract_hs_arrow (HsExplicitMult _ p) acc = extract_lty p acc
 extract_hs_arrow _ acc = acc
 
 extract_hs_for_all_telescope :: HsForAllTelescope GhcPs
