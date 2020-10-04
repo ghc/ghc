@@ -1425,7 +1425,9 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
   where
     go dflags cur_lvl
       | canSolveByUnification cur_lvl tv1 ty2
-      , MTVU_OK ty2' <- metaTyVarUpdateOK dflags tv1 ty2
+           -- See Note [Prevent unification with type families] about the False:
+      , MTVU_OK ty2' <- metaTyVarUpdateOK dflags False
+                                          tv1 ty2
       = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
@@ -1728,8 +1730,8 @@ It would be lovely in the future to revisit this problem and remove this
 extra, unnecessary check. But we retain it for now as it seems to work
 better in practice.
 
-Note [Refactoring hazard: checkTauTvUpdate]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Refactoring hazard: metaTyVarUpdateOK]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 I (Richard E.) have a sad story about refactoring this code, retained here
 to prevent others (or a future me!) from falling into the same traps.
 
@@ -1961,6 +1963,7 @@ occCheckForErrors dflags tv ty
 
 ----------------
 metaTyVarUpdateOK :: DynFlags
+                  -> Bool                -- True <=> allow type families in RHS
                   -> TcTyVar             -- tv :: k1
                   -> TcType              -- ty :: k2
                   -> MetaTyVarUpdateResult TcType        -- possibly-expanded ty
@@ -1968,8 +1971,7 @@ metaTyVarUpdateOK :: DynFlags
 -- Checks that the equality tv~ty is OK to be used to rewrite
 -- other equalities.  Equivalently, checks the conditions for CTyEqCan
 --       (a) that tv doesn't occur in ty (occurs check)
---       (b) that ty does not have any foralls
---           (in the impredicative case), or type functions
+--       (b) that ty does not have any foralls or (perhaps) type functions
 --       (c) that ty does not have any blocking coercion holes
 --           See Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
 --
@@ -1994,12 +1996,10 @@ metaTyVarUpdateOK :: DynFlags
 -- we return Nothing, leaving it to the later constraint simplifier to
 -- sort matters out.
 --
--- See Note [Refactoring hazard: checkTauTvUpdate]
+-- See Note [Refactoring hazard: metaTyVarUpdateOK]
 
-metaTyVarUpdateOK dflags tv ty
-  = case mtvu_check dflags False tv ty of
-         -- False <=> type families not ok
-         -- See Note [Prevent unification with type families]
+metaTyVarUpdateOK dflags ty_fam_ok tv ty
+  = case mtvu_check dflags ty_fam_ok tv ty of
       MTVU_OK _        -> MTVU_OK ty
       MTVU_Bad         -> MTVU_Bad          -- forall, predicate, type function
       MTVU_HoleBlocker -> MTVU_HoleBlocker  -- coercion hole

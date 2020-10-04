@@ -25,6 +25,7 @@ module GHC.Tc.Types.Constraint (
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
 
+        CanEqLHS(..), canEqLHS_maybe, canEqLHSKind, canEqLHSType,
         Hole(..), HoleSort(..), isOutOfScopeHole,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
@@ -111,7 +112,12 @@ import Control.Monad ( msum )
 ************************************************************************
 -}
 
-type Xi = TcType  -- "RAE" Remove
+-- | A 'Xi'-type is one that has been fully rewritten with respect
+-- to the inert set; that is, it has been flattened by the algorithm
+-- in GHC.Tc.Solver.Flatten. (Historical note: 'Xi', for years and years,
+-- meant that a type was type-family-free. It does *not* mean this
+-- any more.)
+type Xi = TcType
 
 type Cts = Bag Ct
 
@@ -121,7 +127,7 @@ data Ct
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
 
       cc_class  :: Class,
-      cc_tyargs :: [TcType],
+      cc_tyargs :: [Xi],   -- cc_tyargs are rewritten w.r.t. inerts, so Xi
 
       cc_pend_sc :: Bool   -- See Note [The superclass story] in GHC.Tc.Solver.Canonical
                            -- True <=> (a) cc_class has superclasses
@@ -144,46 +150,27 @@ data Ct
         --    a ~ [a]         occurs check
     }
 
-  | CTyEqCan {  -- tv ~ rhs
+  | CEqCan {  -- tv ~ rhs
        -- Invariants:
        --   * See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.Monad
-       --   * (TyEq:OC) tv not in deep tvs(rhs)   (occurs check)
-       --   * (TyEq:F) If tv is a TauTv, then rhs has no foralls
+       --   * (TyEq:OC) if LHS is a variable tv, then tv not in deep tvs(rhs) (occurs check)
+       --   * (TyEq:F) rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
-       --   * (TyEq:K) tcTypeKind ty `tcEqKind` tcTypeKind tv; Note [Ct kind invariant]
-       --   * (TyEq:Fun) rhs is not headed (even after looking under a cast) by a
-       --                type function; use CFunEqCan for this instead
+       --   * (TyEq:K) tcTypeKind lhs `tcEqKind` tcTypeKind rhs; Note [Ct kind invariant]
        --   * (TyEq:N) If the equality is representational, rhs has no top-level newtype
        --     See Note [No top-level newtypes on RHS of representational
        --     equalities] in GHC.Tc.Solver.Canonical
-       --   * (TyEq:TV) If rhs (perhaps under the cast) is also a tv, then it is oriented
+       --   * (TyEq:TV) If rhs (perhaps under a cast) is also CanEqLHS, then it is oriented
        --     to give best chance of
        --     unification happening; eg if rhs is touchable then lhs is too
-       --     See "GHC.Tc.Solver.Canonical" Note [Canonical orientation for tyvar/tyvar equality constraints]
-       --   * (TyEq:H) The RHS has no blocking coercion holes. See "GHC.Tc.Solver.Canonical"
+       --     Note [TyVar/TyVar orientation] in GHC.Tc.Utils.Unify
+       --   * (TyEq:H) The RHS has no blocking coercion holes. See GHC.Tc.Solver.Canonical
        --     Note [Equalities with incompatible kinds], wrinkle (2)
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
-      cc_tyvar  :: TcTyVar,
-      cc_rhs    :: TcType,     -- See invariants above
+      cc_lhs    :: CanEqLHS,
+      cc_rhs    :: Xi,         -- See invariants above
 
       cc_eq_rel :: EqRel       -- INVARIANT: cc_eq_rel = ctEvEqRel cc_ev
-    }
-
-  | CFunEqCan {  -- F xis ~ fsk
-       -- Invariants:
-       --   * isTypeFamilyTyCon cc_fun
-       --   * tcTypeKind (F xis) = tyVarKind fsk; Note [Ct kind invariant]
-       --   * isTauTy cc_rhs; type family reducts are always tau-types
-      cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
-      cc_fun    :: TyCon,       -- A type function
-
-      cc_tyargs :: [TcType],
-        --    exactly saturated
-        --    *never* over-saturated (because if so
-        --    we should have decomposed)
-
-      cc_rhs    :: TcType,
-      cc_eq_rel :: EqRel
     }
 
   | CNonCanonical {        -- See Note [NonCanonical Semantics] in GHC.Tc.Solver.Monad
@@ -194,6 +181,18 @@ data Ct
       -- NB: I expect to make more of the cases in Ct
       --     look like this, with the payload in an
       --     auxiliary type
+
+------------
+-- | A 'CanEqLHS' is a type that can appear on the left of a canonical
+-- equality: a type variable or exactly-saturated type family application.
+data CanEqLHS
+  = TyVarCEL TcTyVar
+  | TyFamCEL TyCon  -- ^ of the family
+             [Xi]   -- ^ exactly saturating the family
+
+instance Outputable CanEqLHS where
+  ppr (TyVarCEL tv)              = ppr tv
+  ppr (TyFamCEL fam_tc fam_args) = ppr (mkTyConApp fam_tc fam_args)
 
 ------------
 data QCInst  -- A much simplified version of ClsInst
@@ -458,6 +457,102 @@ instance Outputable Ct where
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
             | otherwise -> text "CQuantCan"
+
+-----------------------------------
+-- | Is a type a canonical LHS? That is, is it a tyvar or an exactly-saturated
+-- type family application?
+-- Does not look through type synonyms.
+canEqLHS_maybe :: Xi -> Maybe CanEqLHS
+canEqLHS_maybe (TyVarTy tv) = Just $ TyVarCEL tv
+canEqLHS_maybe (TyConApp tc args)
+  | isTypeFamilyTyCon tc
+  , args `lengthIs` tyConArity tc
+  = Just $ TyFamCEL tc args
+canEqLHS_maybe _other = Nothing
+
+-- | Convert a 'CanEqLHS' back into a 'Type'
+canEqLHSType :: CanEqLHS -> TcType
+canEqLHSType (TyVarCEL tv) = mkTyVarTy tv
+canEqLHSType (TyFamCEL fam_tc fam_args) = mkTyConApp fam_tc fam_args
+
+-- | Retrieve the kind of a 'CanEqLHS'
+canEqLHSKind :: CanEqLHS -> TcKind
+canEqLHSKind (TyVarCEL tv) = tyVarKind tv
+canEqLHSKind (TyFamCEL fam_tc fam_args) = piResultTys (tyConKind fam_tc) fam_args
+
+-- | Are two 'CanEqLHS's equal?
+eqCanEqLHS :: CanEqLHS -> CanEqLHS -> Bool
+eqCanEqLHS (TyVarCEL tv1) (TyVarCEL tv2) = tv1 == tv2
+eqCanEqLHS (TyFamCEL fam_tc1 fam_args1) (TyFamCEL fam_tc2 fam_args2)
+  = fam_tc1 == fam_tc2 && and (zipWith tcEqTypeNoKindCheck fam_args1 fam_args2)
+  -- tcEqTypeNoKindCheck is sufficient; see reasoning in
+  -- Note [Use loose types in inert set] in GHC.Tc.Solver.Monad
+
+-- | Result of checking whether a RHS is suitable for pairing
+-- with a CanEqLHS in a CEqCan.
+data CanEqOK
+  = CanEqOK Xi     -- use this RHS; it may have been occCheckExpand'ed
+  | CanEqNotOK CtIrredStatus  -- don't proceed; explains why
+
+instance Outputable CanEqOK where
+  ppr (CanEqOK rhs)       = text "CanEqOK" <+> ppr rhs
+  ppr (CanEqNotOK status) = text "CanEqNotOK" <+> ppr status
+
+-- | This function establishes most of the invariants needed to make
+-- a CEqCan.
+--
+--   TyEq:OC: Checked here.
+--   TyEq:F:  Checked here.
+--   TyEq:K:  assumed; ASSERTed here (that is, kind(lhs) = kind(rhs))
+--   TyEq:N:  assumed; ASSERTed here (if eq_rel is R, rhs is not a newtype)
+--   TyEq:TV: not checked (this is hard to check)
+--   TyEq:H:  Checked here.
+canEqOK :: DynFlags -> EqRel -> CanEqLHS -> Xi -> CanEqOK
+canEqOK dflags eq_rel lhs rhs
+  | TyVarCEL tv <- ASSERT( good_rhs )
+                   lhs
+  = case metaTyVarUpdateOK True {- type families are OK here -} tv rhs of
+      MTVU_OK rhs'     -> CanEqOK rhs'
+      MTVU_Bad         -> CanEqNotOK OtherCIS
+                 -- Violation of TyEq:F
+
+      MTVU_HoleBlocker -> CanEqNotOK BlockedCIS
+                 -- This is the case detailed in
+                 -- Note [Equalities with incompatible kinds]
+                 -- Violation of TyEq:H
+
+                 -- These are both a violation of TyEq:OC, but we
+                 -- want to differentiate for better production of
+                 -- error messages
+      MTVU_Occurs | isInsolubleOccursCheck eq_rel tv rhs -> CanEqNotOK InsolubleCIS
+                 -- If we have a ~ [a], it is not canonical, and in particular
+                 -- we don't want to rewrite existing inerts with it, otherwise
+                 -- we'd risk divergence in the constraint solver
+
+                  | otherwise                            -> CanEqNotOK OtherCIS
+                 -- A representational equality with an occurs-check problem isn't
+                 -- insoluble! For example:
+                 --   a ~R b a
+                 -- We might learn that b is the newtype Id.
+                 -- But, the occurs-check certainly prevents the equality from being
+                 -- canonical, and we might loop if we were to use it in rewriting.
+
+  -- ToDo: These checks are very close to what's done in metaTyVarUpdateOK; combine?
+  | TyFamCEL fam_tc fam_args <- lhs
+  = if | not (isTauTy rhs)   -> CanEqNotOK OtherCIS   -- TyEq:F
+       | badCoercionHole rhs -> CanEqNotOK BlockedCIS -- TyEq:H
+       | otherwise           -> CanEqOK rhs
+         -- NB: TyEq:OC does not apply
+
+  where
+    good_rhs       = kinds_match && no_bad_newtype
+    kinds_match    = canEqLHSKind lhs `tcEqType` tcTypeKind rhs
+    no_bad_newtype | ReprEq <- eq_rel
+                   , Just tc <- tyConAppTyCon_maybe rhs
+                   , isNewTyCon tc
+                   = False
+                   | otherwise
+                   = True
 
 {-
 ************************************************************************

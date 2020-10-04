@@ -40,8 +40,8 @@ module GHC.Tc.Types.Evidence (
   mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo,
   mkTcTyConAppCo, mkTcAppCo, mkTcFunCo,
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos,
-  mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSubCo,
-  tcDowngradeRole,
+  mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSymCo,
+  maybeTcSubCo, tcDowngradeRole,
   mkTcAxiomRuleCo, mkTcGReflRightCo, mkTcGReflLeftCo, mkTcPhantomCo,
   mkTcCoherenceLeftCo,
   mkTcCoherenceRightCo,
@@ -186,6 +186,10 @@ maybeTcSubCo :: EqRel -> TcCoercion -> TcCoercion
 maybeTcSubCo NomEq  = id
 maybeTcSubCo ReprEq = mkTcSubCo
 
+-- | If a 'SwapFlag' is 'IsSwapped', flip the orientation of a coercion
+maybeTcSymCo :: SwapFlag -> TcCoercion -> TcCoercion
+maybeTcSymCo IsSwapped  co = mkTcSymCo co
+maybeTcSymCo NotSwapped co = co
 
 {-
 %************************************************************************
