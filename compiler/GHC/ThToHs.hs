@@ -50,6 +50,7 @@ import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable as Outputable
+import GHC.Parser.Annotation
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
@@ -1457,7 +1458,7 @@ cvtTypeKind ty_str ty
                           _            -> return $
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
-                 returnL (HsFunTy noExtField HsUnrestrictedArrow x'' y'')
+                 returnL (HsFunTy NormalSyntax HsUnrestrictedArrow x'' y'')
              | otherwise
              -> mk_apps
                 (HsTyVar noExtField NotPromoted (noLoc (getRdrName unrestrictedFunTyCon)))
@@ -1473,7 +1474,7 @@ cvtTypeKind ty_str ty
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
                      w'' = hsTypeToArrow w'
-                 returnL (HsFunTy noExtField w'' x'' y'')
+                 returnL (HsFunTy NormalSyntax w'' x'' y'')
              | otherwise
              -> mk_apps
                 (HsTyVar noExtField NotPromoted (noLoc (getRdrName funTyCon)))

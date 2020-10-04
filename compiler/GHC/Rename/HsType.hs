@@ -487,10 +487,10 @@ rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
 rnScaledLHsType :: HsDocContext -> HsScaled GhcPs (LHsType GhcPs)
                                   -> RnM (HsScaled GhcRn (LHsType GhcRn), FreeVars)
-rnScaledLHsType doc (HsScaled w ty) = do
+rnScaledLHsType doc (HsScaled u w ty) = do
   (w' , fvs_w) <- rnHsArrow (mkTyKiEnv doc TypeLevel RnTypeBody) w
   (ty', fvs) <- rnLHsType doc ty
-  return (HsScaled w' ty', fvs `plusFV` fvs_w)
+  return (HsScaled u w' ty', fvs `plusFV` fvs_w)
 
 
 rnHsType  :: HsDocContext -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
@@ -598,7 +598,7 @@ rnHsTyKi env ty@(HsRecTy _ flds)
                                    2 (ppr ty))
            ; return [] }
 
-rnHsTyKi env (HsFunTy _ mult ty1 ty2)
+rnHsTyKi env (HsFunTy u mult ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
         -- Might find a for-all as the arg of a function type
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
@@ -610,7 +610,7 @@ rnHsTyKi env (HsFunTy _ mult ty1 ty2)
        ; res_ty <- mkHsOpTyRn (hs_fun_ty mult') funTyConName funTyFixity ty1' ty2'
        ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
   where
-    hs_fun_ty w a b = HsFunTy noExtField w a b
+    hs_fun_ty w a b = HsFunTy u w a b
 
 rnHsTyKi env listTy@(HsListTy _ ty)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -1199,11 +1199,11 @@ mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy noExtField ty21 op2 ty22))
                       (\t1 t2 -> HsOpTy noExtField t1 op2 t2)
                       (unLoc op2) fix2 ty21 ty22 loc2 }
 
-mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy _ mult ty21 ty22))
+mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy u mult ty21 ty22))
   = mk_hs_op_ty mk1 pp_op1 fix1 ty1
                 hs_fun_ty funTyConName funTyFixity ty21 ty22 loc2
   where
-    hs_fun_ty a b = HsFunTy noExtField mult a b
+    hs_fun_ty a b = HsFunTy u mult a b
 
 mkHsOpTyRn mk1 _ _ ty1 ty2              -- Default case, no rearrangment
   = return (mk1 ty1 ty2)

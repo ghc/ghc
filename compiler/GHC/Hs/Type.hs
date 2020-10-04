@@ -104,6 +104,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc ( count )
+import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
@@ -879,7 +880,7 @@ type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
 type instance XTyVar           (GhcPass _) = NoExtField
 type instance XAppTy           (GhcPass _) = NoExtField
-type instance XFunTy           (GhcPass _) = NoExtField
+type instance XFunTy           (GhcPass _) = IsUnicodeSyntax
 type instance XListTy          (GhcPass _) = NoExtField
 type instance XTupleTy         (GhcPass _) = NoExtField
 type instance XSumTy           (GhcPass _) = NoExtField
@@ -953,23 +954,23 @@ arrowToHsType (HsExplicitMult p) = p
 
 -- | This is used in the syntax. In constructor declaration. It must keep the
 -- arrow representation.
-data HsScaled pass a = HsScaled (HsArrow pass) a
+data HsScaled pass a = HsScaled IsUnicodeSyntax (HsArrow pass) a
 
 hsMult :: HsScaled pass a -> HsArrow pass
-hsMult (HsScaled m _) = m
+hsMult (HsScaled _ m _) = m
 
 hsScaledThing :: HsScaled pass a -> a
-hsScaledThing (HsScaled _ t) = t
+hsScaledThing (HsScaled _ _ t) = t
 
 -- | When creating syntax we use the shorthands. It's better for printing, also,
 -- the shorthands work trivially at each pass.
 hsUnrestricted, hsLinear :: a -> HsScaled pass a
-hsUnrestricted = HsScaled HsUnrestrictedArrow
-hsLinear = HsScaled HsLinearArrow
+hsUnrestricted = HsScaled NormalSyntax HsUnrestrictedArrow
+hsLinear = HsScaled NormalSyntax HsLinearArrow
 
 instance Outputable a => Outputable (HsScaled pass a) where
-   ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
-                          ppr t
+   ppr (HsScaled _ _cnt t) = -- ppr cnt <> ppr t
+                            ppr t
 
 instance
       (OutputableBndrId pass) =>
@@ -1337,9 +1338,9 @@ splitHsFunType ::
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
 
-splitHsFunType (L _ (HsFunTy _ mult x y))
+splitHsFunType (L _ (HsFunTy u mult x y))
   | (args, res) <- splitHsFunType y
-  = (HsScaled mult x:args, res)
+  = (HsScaled u mult x:args, res)
 
 splitHsFunType other = ([], other)
 

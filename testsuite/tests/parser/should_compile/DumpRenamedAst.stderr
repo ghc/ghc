@@ -100,6 +100,7 @@
             (Nothing)
             (PrefixCon
              [(HsScaled
+               (NormalSyntax)
                (HsLinearArrow)
                ({ DumpRenamedAst.hs:9:26-30 }
                 (HsTyVar
@@ -253,7 +254,7 @@
            (NoExtField)
            ({ DumpRenamedAst.hs:15:20-33 }
             (HsFunTy
-             (NoExtField)
+             (NormalSyntax)
              (HsUnrestrictedArrow)
              ({ DumpRenamedAst.hs:15:20 }
               (HsTyVar
@@ -263,7 +264,7 @@
                 {Name: k})))
              ({ DumpRenamedAst.hs:15:25-33 }
               (HsFunTy
-               (NoExtField)
+               (NormalSyntax)
                (HsUnrestrictedArrow)
                ({ DumpRenamedAst.hs:15:25 }
                 (HsTyVar
@@ -307,7 +308,7 @@
                     {Name: a})))
                  ({ DumpRenamedAst.hs:18:28-36 }
                   (HsFunTy
-                   (NoExtField)
+                   (NormalSyntax)
                    (HsUnrestrictedArrow)
                    ({ DumpRenamedAst.hs:18:28 }
                     (HsTyVar
@@ -331,14 +332,14 @@
             (Just
              ({ DumpRenamedAst.hs:18:42-60 }
               (HsFunTy
-               (NoExtField)
+               (NormalSyntax)
                (HsUnrestrictedArrow)
                ({ DumpRenamedAst.hs:18:42-52 }
                 (HsParTy
                  (NoExtField)
                  ({ DumpRenamedAst.hs:18:43-51 }
                   (HsFunTy
-                   (NoExtField)
+                   (NormalSyntax)
                    (HsUnrestrictedArrow)
                    ({ DumpRenamedAst.hs:18:43 }
                     (HsTyVar
@@ -370,6 +371,7 @@
                (Nothing)
                (PrefixCon
                 [(HsScaled
+                  (NormalSyntax)
                   (HsUnrestrictedArrow)
                   ({ DumpRenamedAst.hs:19:10-34 }
                    (HsParTy
@@ -387,7 +389,7 @@
                            {Name: xx})))])
                       ({ DumpRenamedAst.hs:19:22-33 }
                        (HsFunTy
-                        (NoExtField)
+                        (NormalSyntax)
                         (HsUnrestrictedArrow)
                         ({ DumpRenamedAst.hs:19:22-25 }
                          (HsAppTy
@@ -496,6 +498,7 @@
             (Nothing)
             (PrefixCon
              [(HsScaled
+               (NormalSyntax)
                (HsLinearArrow)
                ({ DumpRenamedAst.hs:21:25-29 }
                 (HsParTy
@@ -619,7 +622,7 @@
               {Name: f})
              ({ DumpRenamedAst.hs:23:31-39 }
               (HsFunTy
-               (NoExtField)
+               (NormalSyntax)
                (HsUnrestrictedArrow)
                ({ DumpRenamedAst.hs:23:31 }
                 (HsTyVar
