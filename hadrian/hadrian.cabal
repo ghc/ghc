@@ -110,6 +110,7 @@ executable hadrian
                        , Settings.Flavours.Profiled
                        , Settings.Flavours.Quick
                        , Settings.Flavours.QuickCross
+                       , Settings.Flavours.QuickCrossNCG
                        , Settings.Flavours.Quickest
                        , Settings.Flavours.GhcInGhci
                        , Settings.Flavours.Validate
