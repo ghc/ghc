@@ -349,6 +349,25 @@ mkBindsRep gk tycon = (binds, sigs)
                     ]
                else []
          where
+           -- The heuristic was chosen by looking at how marking Generic methods
+           -- INLINE[1] helps with optimal code generation for several types of
+           -- generic algorithms (roundtrip, generation of NFData instances,
+           -- generation of field lenses).
+           --
+           -- The exerimentation was done by picking data types having N
+           -- constructors with M fields each and using their derived Generic
+           -- instances to generate code with the above algorithms.
+           --
+           -- The results are data type SOP values for which the inlining is
+           -- beneficial, i.e. it leads to GHC optimizing away generic
+           -- representation of a data type in the generated code.
+           --
+           -- The data types at threshold tested with the above algorithms can
+           -- be found in T11068.
+           --
+           -- Above the chosen threshold INLINE pragmas start to become at best
+           -- useless and at worst lead to code size blowup without runtime
+           -- performance improvements.
            inlining_potentially_useful
              | cons <= 1  = True
              | cons <= 4  = max_fields <= 5
