@@ -270,7 +270,7 @@ isCompleteHsSig (HsWC { hswc_ext = wcs, hswc_body = hs_sig_ty })
 
 no_anon_wc_sig_ty :: LHsSigType GhcRn -> Bool
 no_anon_wc_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body}))
-  =  all no_anon_wc_tvb (outerExplicitBndrs outer_bndrs)
+  =  all no_anon_wc_tvb (hsOuterExplicitBndrs outer_bndrs)
   && no_anon_wc_ty body
 
 no_anon_wc_ty :: LHsType GhcRn -> Bool
@@ -402,11 +402,11 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
                      -- e.g. pattern Zero <- 0#   (#12094)
                  ; return (req, prov, body_ty) }
 
-       ; let implicit_tvs  :: [TcTyVar]
+       ; let implicit_tvs :: [TcTyVar]
              univ_tvbndrs :: [TcInvisTVBinder]
              (implicit_tvs, univ_tvbndrs) = case outer_bndrs of
-               OuterImplicit implicit_tvs -> (implicit_tvs, [])
-               OuterExplicit univ_tvbndrs -> ([], univ_tvbndrs)
+               HsOuterImplicit{hso_ximplicit = implicit_tvs} -> (implicit_tvs, [])
+               HsOuterExplicit{hso_xexplicit = univ_tvbndrs} -> ([], univ_tvbndrs)
 
        ; implicit_tvs <- zonkAndScopedSort implicit_tvs
        ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvbndrs

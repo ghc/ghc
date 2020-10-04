@@ -2984,63 +2984,69 @@ tcTKTelescope mode tele thing_inside = case tele of
           ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
 
 --------------------------------------
---    OuterTyVarBndrs
+--    HsOuterTyVarBndrs
 --------------------------------------
 
-type OuterTVBs = OuterTyVarBndrs
-                     [TcTyVar]          -- Implicit
-                     [TcInvisTVBinder]  -- Explicit, with Specificity
-     -- OuterTVBs is what we get afeter typechecking HsOuterSigTyVarBndrs
-     -- with tcOuterSigTKBndrs
+bindOuterTKBndrsX ::
+     ([Name]                    -> TcM a -> TcM ([TcTyVar], a))
+       -- Deal with implicit binders
+  -> ([LHsTyVarBndr flag GhcRn] -> TcM a -> TcM ([TcInvisTVBinder], a))
+       -- Deal with explicit binders
+  -> HsOuterTyVarBndrs flag GhcRn
+  -> TcM a
+  -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
+bindOuterTKBndrsX do_implicit do_explicit outer_bndrs thing_inside
+  = case outer_bndrs of
+      HsOuterImplicit{hso_ximplicit = imp_tvs} ->
+        do { (imp_tvs', thing) <- do_implicit imp_tvs thing_inside
+           ; return (HsOuterImplicit{hso_ximplicit = imp_tvs'}, thing) }
+      HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+        do { (exp_tvs', thing) <- do_explicit exp_bndrs thing_inside
+           ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
+                                      , hso_bndrs     = exp_bndrs }
+                    , thing) }
+
+bindOuterTKBndrsX_Q ::
+     ([Name]                    -> TcM a -> TcM ([res], a))
+       -- Deal with implicit binders
+  -> ([LHsTyVarBndr flag GhcRn] -> TcM a -> TcM ([res], a))
+       -- Deal with explicit binders
+  -> HsOuterTyVarBndrs flag GhcRn
+  -> TcM a
+  -> TcM ([res], a)
+bindOuterTKBndrsX_Q do_implicit do_explicit outer_bndrs thing_inside
+  = case outer_bndrs of
+      HsOuterImplicit{hso_ximplicit = imp_tvs} ->
+        do_implicit imp_tvs thing_inside
+      HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+        do_explicit exp_bndrs thing_inside
 
 ---------------
-fmapOuterTVBs :: (hs_imp -> TcM a -> TcM (imp, a))     -- Deal with implicit binders
-              -> (hs_exp -> TcM a -> TcM (exp, a))     -- Deal with explicit binders
-              -> OuterTyVarBndrs hs_imp hs_exp
-              -> TcM a
-              -> TcM (OuterTyVarBndrs imp exp, a)
-fmapOuterTVBs do_implicit do_explicit outer_bndrs thing_inside
-  = case outer_bndrs of
-      OuterImplicit imp -> do { (imp, thing) <- do_implicit imp thing_inside
-                              ; return (OuterImplicit imp, thing) }
-      OuterExplicit exp -> do { (exp, thing) <- do_explicit exp thing_inside
-                              ; return (OuterExplicit exp, thing) }
-
-flatMapOuterTVBs :: (hs_imp -> TcM a -> TcM (res, a))     -- Deal with implicit binders
-                 -> (hs_exp -> TcM a -> TcM (res, a))     -- Deal with explicit binders
-                 -> OuterTyVarBndrs hs_imp hs_exp
-                 -> TcM a
-                 -> TcM (res, a)
-flatMapOuterTVBs do_implicit do_explicit outer_bndrs thing_inside
-  = case outer_bndrs of
-      OuterImplicit imp -> do_implicit imp thing_inside
-      OuterExplicit exp -> do_explicit exp thing_inside
-
----------------
-scopedSortOuter :: OuterTVBs -> TcM [TcInvisTVBinder]
+scopedSortOuter :: HsOuterTyVarBndrs flag GhcTc -> TcM [TcInvisTVBinder]
 -- Sort any /implicit/ binders into dependency order
 --     (zonking first so we can see the dependencies)
 -- /Explicit/ ones are already in the right order
-scopedSortOuter (OuterImplicit imp_tvs)
+scopedSortOuter (HsOuterImplicit{hso_ximplicit = imp_tvs})
   = do { imp_tvs <- zonkAndScopedSort imp_tvs
        ; return [Bndr tv SpecifiedSpec | tv <- imp_tvs] }
-scopedSortOuter (OuterExplicit exp_tvs)
+scopedSortOuter (HsOuterExplicit{hso_xexplicit = exp_tvs})
   = -- No need to dependency-sort (or zonk) explicit quantifiers
     return exp_tvs
 
 ---------------
-bindOuterSigTKBndrs_Tv :: HsOuterSigTyVarBndrs GhcRn -> TcM a -> TcM (OuterTVBs, a)
+bindOuterSigTKBndrs_Tv :: HsOuterSigTyVarBndrs GhcRn
+                       -> TcM a -> TcM (HsOuterSigTyVarBndrs GhcTc, a)
 bindOuterSigTKBndrs_Tv = bindOuterSigTKBndrs_Tv_M (mkMode TypeLevel)
 
 bindOuterSigTKBndrs_Tv_M :: TcTyMode
                          -> HsOuterSigTyVarBndrs GhcRn
-                         -> TcM a -> TcM (OuterTVBs, a)
+                         -> TcM a -> TcM (HsOuterSigTyVarBndrs GhcTc, a)
 -- Do not push level; do not make implication constraint; use Tvs
 -- Two major clients of this "bind-only" path are:
 --    Note [Kind-checking for GADTs] in TyCl
 --    Note [Checking partial type signatures]
 bindOuterSigTKBndrs_Tv_M mode
-  = fmapOuterTVBs bindImplicitTKBndrs_Tv (bindExplicitTKBndrs_Tv_M mode)
+  = bindOuterTKBndrsX bindImplicitTKBndrs_Tv (bindExplicitTKBndrs_Tv_M mode)
 
 -- TODO RGS: Which of these do we actually need?
 
@@ -3052,8 +3058,8 @@ bindOuterFamEqnTKBndrs_Q_Skol :: ContextKind
                               -> TcM a
                               -> TcM ([TcTyVar], a)
 bindOuterFamEqnTKBndrs_Q_Skol ctxt_kind
-   = flatMapOuterTVBs (bindImplicitTKBndrs_Q_Skol)
-                      (bindExplicitTKBndrs_Q_Skol ctxt_kind)
+   = bindOuterTKBndrsX_Q (bindImplicitTKBndrs_Q_Skol)
+                         (bindExplicitTKBndrs_Q_Skol ctxt_kind)
 
 -- TODO RGS: Docs(?)
 -- TODO RGS: Is the return type correct?
@@ -3063,17 +3069,17 @@ bindOuterFamEqnTKBndrs_Q_Tv :: ContextKind
                             -> TcM a
                             -> TcM ([TcTyVar], a)
 bindOuterFamEqnTKBndrs_Q_Tv ctxt_kind
-  = flatMapOuterTVBs bindImplicitTKBndrs_Q_Tv
-                     (bindExplicitTKBndrs_Q_Tv ctxt_kind)
+  = bindOuterTKBndrsX_Q bindImplicitTKBndrs_Q_Tv
+                        (bindExplicitTKBndrs_Q_Tv ctxt_kind)
 
 ---------------
 tcOuterSigTKBndrs :: TypeOrKind -> SkolemInfo
                   -> HsOuterSigTyVarBndrs GhcRn
-                  -> TcM a -> TcM (OuterTVBs, a)
+                  -> TcM a -> TcM (HsOuterSigTyVarBndrs GhcTc, a)
 -- Push level, capture constraints, make implication
 tcOuterSigTKBndrs tyki skol_info
-   = fmapOuterTVBs (tc_implicit_tk_bndrs skol_info bindImplicitTKBndrs_Skol)
-                   (tcExplicitTKBndrs tyki)
+   = bindOuterTKBndrsX (tc_implicit_tk_bndrs skol_info bindImplicitTKBndrs_Skol)
+                       (tcExplicitTKBndrs tyki)
 
 
 --------------------------------------
@@ -3770,9 +3776,7 @@ tcHsPartialSigType ctxt sig_ty
          -- we bring the right name into scope in the function body.
          -- Test case: partial-sigs/should_compile/LocalDefinitionBug
        ; let outer_bndr_names :: [Name]
-             outer_bndr_names = case hs_outer_bndrs of
-                                  OuterImplicit imp_tvs -> imp_tvs
-                                  OuterExplicit exp_tvs -> hsLTyVarNames exp_tvs
+             outer_bndr_names = hsOuterTyVarNames hs_outer_bndrs
              tv_prs :: [(Name,InvisTVBinder)]
              tv_prs = outer_bndr_names `zip` outer_tv_bndrs
 

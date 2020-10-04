@@ -1364,12 +1364,12 @@ ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
 ty_fam_inst_eqn :: { Located ([AddAnn],TyFamInstEqn GhcPs) }
         : 'forall' tv_bndrs '.' type '=' ktype
               {% do { hintExplicitForall $1
-                    ; tvb <- fromSpecTyVarBndrs $2
-                    ; (eqn,ann) <- mkTyFamInstEqn (OuterExplicit tvb) $4 $6
+                    ; tvbs <- fromSpecTyVarBndrs $2
+                    ; (eqn,ann) <- mkTyFamInstEqn (mkHsOuterExplicit tvbs) $4 $6
                     ; return (sLL $1 $>
                                (mu AnnForall $1:mj AnnDot $3:mj AnnEqual $5:ann,eqn)) } }
         | type '=' ktype
-              {% do { (eqn,ann) <- mkTyFamInstEqn (OuterImplicit noExtField) $1 $3
+              {% do { (eqn,ann) <- mkTyFamInstEqn mkHsOuterImplicit $1 $3
                     ; return (sLL $1 $> (mj AnnEqual $2:ann, eqn))  } }
               -- Note the use of type for the head; this allows
               -- infix type constructors and type patterns
@@ -1498,18 +1498,18 @@ datafam_inst_hdr :: { Located ([AddAnn],(Maybe (LHsContext GhcPs), HsOuterFamEqn
                                                        >> fromSpecTyVarBndrs $2
                                                          >>= \tvbs -> (addAnnotation (gl $4) (toUnicodeAnn AnnDarrow $5) (gl $5)
                                                              >> return (sLL $1 $> ([mu AnnForall $1, mj AnnDot $3]
-                                                                                  , (Just $4, OuterExplicit tvbs, $6)))
+                                                                                  , (Just $4, mkHsOuterExplicit tvbs, $6)))
                                                           )
                                                     }
         | 'forall' tv_bndrs '.' type   {% do { hintExplicitForall $1
                                              ; tvbs <- fromSpecTyVarBndrs $2
                                              ; return (sLL $1 $> ([mu AnnForall $1, mj AnnDot $3]
-                                                                 , (Nothing, OuterExplicit tvbs, $4)))
+                                                                 , (Nothing, mkHsOuterExplicit tvbs, $4)))
                                        } }
         | context '=>' type         {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
-                                       >> (return (sLL $1 $>([], (Just $1, OuterImplicit noExtField, $3))))
+                                       >> (return (sLL $1 $>([], (Just $1, mkHsOuterImplicit, $3))))
                                     }
-        | type                      { sL1 $1 ([], (Nothing, OuterImplicit noExtField, $1)) }
+        | type                      { sL1 $1 ([], (Nothing, mkHsOuterImplicit, $1)) }
 
 
 capi_ctype :: { Maybe (Located CType) }
