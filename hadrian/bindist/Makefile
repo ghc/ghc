@@ -125,6 +125,7 @@ lib/settings :
 	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
 	@echo ',("libtool command", "$(SettingsLibtoolCommand)")' >> $@
 	@echo ',("unlit command", "$$topdir/bin/unlit")' >> $@
+	@echo ',("hc-pkg command", "$(ActualBinsDir)/bin/ghc-pkg")' >> $@
 	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@
 	@echo ',("target platform string", "$(TARGETPLATFORM)")' >> $@
 	@echo ',("target os", "$(HaskellTargetOs)")' >> $@

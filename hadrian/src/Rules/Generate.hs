@@ -307,6 +307,7 @@ generateSettings = do
         , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)
         , ("libtool command", expr $ settingsFileSetting SettingsFileSetting_LibtoolCommand)
         , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
+        , ("hc-pkg path", expr ((</>) <$> topDirectory <*> programPath (ctx { Context.package = ghcPkg })))
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
         , ("target platform string", getSetting TargetPlatform)
         , ("target os", getSetting TargetOsHaskell)
