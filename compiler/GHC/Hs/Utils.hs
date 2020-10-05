@@ -69,7 +69,7 @@ module GHC.Hs.Utils(
 
   -- * Types
   mkHsAppTy, mkHsAppKindTy,
-  mkClassOpSigs, mkHsSigEnv,
+  hsTypeToHsSigType, hsTypeToHsSigWcType, mkClassOpSigs, mkHsSigEnv,
   nlHsAppTy, nlHsAppKindTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
 
   -- * Stmts
@@ -652,6 +652,18 @@ chunkify xs
         LHsSigType and LHsSigWcType
 *                                                                      *
 ********************************************************************* -}
+
+-- | Convert an 'LHsType' to an 'LHsSigType'.
+hsTypeToHsSigType :: LHsType GhcPs -> LHsSigType GhcPs
+hsTypeToHsSigType lty@(L loc ty) = L loc $ case ty of
+  HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndrs }
+             , hst_body = body }
+    -> mkHsExplicitSigType bndrs body
+  _ -> mkHsImplicitSigType lty
+
+-- | Convert an 'LHsType' to an 'LHsSigWcType'.
+hsTypeToHsSigWcType :: LHsType GhcPs -> LHsSigWcType GhcPs
+hsTypeToHsSigWcType = mkHsWildCardBndrs . hsTypeToHsSigType
 
 mkHsSigEnv :: forall a. (LSig GhcRn -> Maybe ([Located Name], a))
                      -> [LSig GhcRn]

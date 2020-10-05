@@ -3048,11 +3048,6 @@ bindOuterSigTKBndrs_Tv_M :: TcTyMode
 bindOuterSigTKBndrs_Tv_M mode
   = bindOuterTKBndrsX bindImplicitTKBndrs_Tv (bindExplicitTKBndrs_Tv_M mode)
 
--- TODO RGS: Which of these do we actually need?
-
--- TODO RGS: Docs(?)
--- TODO RGS: Is the return type correct?
--- TODO RGS: Consolidate with bindHsOuter*TKBndrs_Tv?
 bindOuterFamEqnTKBndrs_Q_Skol :: ContextKind
                               -> HsOuterFamEqnTyVarBndrs GhcRn
                               -> TcM a
@@ -3061,9 +3056,6 @@ bindOuterFamEqnTKBndrs_Q_Skol ctxt_kind
    = bindOuterTKBndrsX_Q (bindImplicitTKBndrs_Q_Skol)
                          (bindExplicitTKBndrs_Q_Skol ctxt_kind)
 
--- TODO RGS: Docs(?)
--- TODO RGS: Is the return type correct?
--- TODO RGS: Consolidate with bindHsOuter*TKBndrs_Tv?
 bindOuterFamEqnTKBndrs_Q_Tv :: ContextKind
                             -> HsOuterFamEqnTyVarBndrs GhcRn
                             -> TcM a

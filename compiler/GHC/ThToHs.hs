@@ -286,7 +286,7 @@ cvtDec (InstanceD o ctxt ty decs)
         ; unless (null fams') (failWith (mkBadDecMsg doc fams'))
         ; ctxt' <- cvtContext funPrec ctxt
         ; (L loc ty') <- cvtType ty
-        ; let inst_ty' = hsTypeToHsSigType $
+        ; let inst_ty' = L loc $ mkHsImplicitSigType $
                          mkHsQualTy ctxt loc ctxt' $ L loc ty'
         ; returnJustL $ InstD noExtField $ ClsInstD noExtField $
           ClsInstDecl { cid_ext = noExtField, cid_poly_ty = inst_ty'
@@ -384,7 +384,7 @@ cvtDec (TH.StandaloneDerivD ds cxt ty)
   = do { cxt' <- cvtContext funPrec cxt
        ; ds'  <- traverse cvtDerivStrategy ds
        ; (L loc ty') <- cvtType ty
-       ; let inst_ty' = hsTypeToHsSigType $
+       ; let inst_ty' = L loc $ mkHsImplicitSigType $
                         mkHsQualTy cxt loc cxt' $ L loc ty'
        ; returnJustL $ DerivD noExtField $
          DerivDecl { deriv_ext =noExtField
@@ -1436,7 +1436,9 @@ cvtType = cvtTypeKind "type"
 cvtSigType :: TH.Type -> CvtM (LHsSigType GhcPs)
 cvtSigType = cvtSigTypeKind "type"
 
--- TODO RGS: Docs
+-- | Convert a Template Haskell 'Type' to an 'LHsSigType'. To avoid duplicating
+-- the logic in 'cvtTypeKind' here, we simply reuse 'cvtTypeKind' and perform
+-- surgery on the 'LHsType' it returns to turn it into an 'LHsSigType'.
 cvtSigTypeKind :: String -> TH.Type -> CvtM (LHsSigType GhcPs)
 cvtSigTypeKind ty_str ty = do
   ty' <- cvtTypeKind ty_str ty

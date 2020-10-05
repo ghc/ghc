@@ -329,44 +329,6 @@ rnHsSigType ctx level
                                 , sig_bndrs = outer_bndrs', sig_body = body' }
                 , fvs ) } }
 
-{-
-Note [forall-or-nothing rule]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Free variables in signatures are usually bound in an implicit 'forall' at the
-beginning of user-written signatures. However, if the signature has an
-explicit, invisible forall at the beginning, this is disabled.
-
-The idea is nested foralls express something which is only expressible
-explicitly, while a top level forall could (usually) be replaced with an
-implicit binding. Top-level foralls alone ("forall.") are therefore an
-indication that the user is trying to be fastidious, so we don't implicitly
-bind any variables.
-
-Note that this rule only applies to outermost /in/visible 'forall's, and not
-outermost visible 'forall's. See #18660 for more on this point.
-
-Here are some concrete examples to demonstrate the forall-or-nothing rule in
-action:
-
-  type F1 :: a -> b -> b                    -- Legal; a,b are implicitly quantified.
-                                            -- Equivalently: forall a b. a -> b -> b
-
-  type F2 :: forall a b. a -> b -> b        -- Legal; explicitly quantified
-
-  type F3 :: forall a. a -> b -> b          -- Illegal; the forall-or-nothing rule says that
-                                            -- if you quantify a, you must also quantify b
-
-  type F4 :: forall a -> b -> b             -- Legal; the top quantifier (forall a) is a /visible/
-                                            -- quantifer, so the "nothing" part of the forall-or-nothing
-                                            -- rule applies, and b is therefore implicitly quantified.
-                                            -- Equivalently: forall b. forall a -> b -> b
-
-  type F5 :: forall b. forall a -> b -> c   -- Illegal; the forall-or-nothing rule says that
-                                            -- if you quantify b, you must also quantify c
-
-  type F6 :: forall a -> forall b. b -> c   -- Legal: just like F4.
--}
-
 rnImplicitBndrs :: Maybe assoc
                 -- ^ @'Just' _@ => an associated type decl
                 -> FreeKiTyVars

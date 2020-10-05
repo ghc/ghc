@@ -675,7 +675,7 @@ rnFamEqn doc atfi rhs_kvars
 
          -- all_imp_vars represent the implicitly bound type variables. This is
          -- empty if we have an explicit `forall` (see
-         -- Note [forall-or-nothing rule] in GHC.Rename.HsType), which means
+         -- Note [forall-or-nothing rule] in GHC.Hs.Type), which means
          -- ignoring:
          --
          -- - pat_kity_vars_with_dups, the variables mentioned in the LHS of
