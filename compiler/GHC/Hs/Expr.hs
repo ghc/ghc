@@ -580,6 +580,7 @@ data RecordUpdTc = RecordUpdTc
                                 -- The original type can be reconstructed
                                 -- with conLikeResTy
       , rupd_wrap :: HsWrapper  -- See note [Record Update HsWrapper]
+      , rupd_origin :: Origin   -- Did the update come from generated code?
       }
 
 -- | HsWrap appears only in typechecker output
@@ -650,7 +651,7 @@ type instance XRecordCon     GhcRn = NoExtField
 type instance XRecordCon     GhcTc = RecordConTc
 
 type instance XRecordUpd     GhcPs = NoExtField
-type instance XRecordUpd     GhcRn = NoExtField
+type instance XRecordUpd     GhcRn = Origin
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
 type instance XExprWithTySig (GhcPass _) = NoExtField

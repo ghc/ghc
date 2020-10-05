@@ -738,7 +738,7 @@ following.
 
 -}
 
-tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
+tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds, rupd_ext = origin }) res_ty
   = ASSERT( notNull rbnds )
     do  { -- STEP -2: typecheck the record_expr, the record to be updated
           (record_expr', record_rho) <- tcScalingUsage Many $ tcInferRho record_expr
@@ -902,7 +902,8 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
         ; let upd_tc = RecordUpdTc { rupd_cons = relevant_cons
                                    , rupd_in_tys = scrut_inst_tys
                                    , rupd_out_tys = result_inst_tys
-                                   , rupd_wrap = req_wrap }
+                                   , rupd_wrap = req_wrap
+                                   , rupd_origin = origin }
               expr' = RecordUpd { rupd_expr = mkLHsWrap fam_co $
                                               mkLHsWrapCo co_scrut record_expr'
                                 , rupd_flds = rbinds'

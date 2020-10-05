@@ -877,7 +877,8 @@ zonkExpr env (RecordUpd { rupd_flds = rbinds
                         , rupd_expr = expr
                         , rupd_ext = RecordUpdTc
                             { rupd_cons = cons, rupd_in_tys = in_tys
-                            , rupd_out_tys = out_tys, rupd_wrap = req_wrap }})
+                            , rupd_out_tys = out_tys, rupd_wrap = req_wrap
+                            , rupd_origin = origin }})
   = do  { new_expr    <- zonkLExpr env expr
         ; new_in_tys  <- mapM (zonkTcTypeToTypeX env) in_tys
         ; new_out_tys <- mapM (zonkTcTypeToTypeX env) out_tys
@@ -887,7 +888,8 @@ zonkExpr env (RecordUpd { rupd_flds = rbinds
                             , rupd_ext = RecordUpdTc
                                 { rupd_cons = cons, rupd_in_tys = new_in_tys
                                 , rupd_out_tys = new_out_tys
-                                , rupd_wrap = new_recwrap }}) }
+                                , rupd_wrap = new_recwrap
+                                , rupd_origin = origin }}) }
 
 zonkExpr env (ExprWithTySig _ e ty)
   = do { e' <- zonkLExpr env e

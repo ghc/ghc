@@ -633,7 +633,8 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                            { rupd_cons = cons_to_upd
                            , rupd_in_tys = in_inst_tys
                            , rupd_out_tys = out_inst_tys
-                           , rupd_wrap = dict_req_wrap }} )
+                           , rupd_wrap = dict_req_wrap
+                           , rupd_origin = origin }} )
   | null fields
   = dsLExpr record_expr
   | otherwise
@@ -653,10 +654,8 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                 <- matchWrapper RecUpd (Just record_expr) -- See Note [Scrutinee in Record updates]
                                       (MG { mg_alts = noLoc alts
                                           , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty
-                                          , mg_origin = FromSource
+                                          , mg_origin = origin
                                           })
-                                     -- FromSource is not strictly right, but we
-                                     -- want incomplete pattern-match warnings
 
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
