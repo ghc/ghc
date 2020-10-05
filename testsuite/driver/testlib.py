@@ -554,6 +554,9 @@ def integer_simple( ) -> bool:
 def llvm_build ( ) -> bool:
     return config.ghc_built_by_llvm
 
+def have_thread_sanitizer( ) -> bool:
+    return config.have_thread_sanitizer
+
 # ---
 
 # Note [Measuring residency]
