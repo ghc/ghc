@@ -174,13 +174,10 @@ exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
 -- and gives them a suitable strictness signatures.  It's used during
 -- float-out
 exprBotStrictness_maybe e
-  = case getBotArity (arityType env e) of
+  = case getBotArity (arityType botStrictnessArityEnv e) of
         Nothing -> Nothing
         Just ar -> Just (ar, sig ar)
   where
-    env    = AE { ae_ped_bot = True
-                , ae_cheap_fn = \ _ _ -> False
-                , ae_joins = emptyVarSet }
     sig ar = mkClosedStrictSig (replicate ar topDmd) botDiv
 
 {-
@@ -551,33 +548,17 @@ maxWithArity at@(ATop oss) ar
 vanillaArityType :: ArityType
 vanillaArityType = ATop []      -- Totally uninformative
 
--- ^ The Arity returned is the number of value args the
+-- | The Arity returned is the number of value args the
 -- expression can be applied to without doing much work
 exprEtaExpandArity :: DynFlags -> CoreExpr -> ArityType
 -- exprEtaExpandArity is used when eta expanding
 --      e  ==>  \xy -> e x y
-exprEtaExpandArity dflags e
-  = arityType env e
-  where
-    env = AE { ae_cheap_fn = mk_cheap_fn dflags isCheapApp
-             , ae_ped_bot  = gopt Opt_PedanticBottoms dflags
-             , ae_joins    = emptyVarSet }
+exprEtaExpandArity dflags e = arityType (initArityEnv dflags) e
 
 getBotArity :: ArityType -> Maybe Arity
 -- Arity of a divergent function
 getBotArity (ABot n) = Just n
 getBotArity _        = Nothing
-
-mk_cheap_fn :: DynFlags -> CheapAppFun -> CheapFun
-mk_cheap_fn dflags cheap_app
-  | not (gopt Opt_DictsCheap dflags)
-  = \e _     -> exprIsCheapX cheap_app e
-  | otherwise
-  = \e mb_ty -> exprIsCheapX cheap_app e
-             || case mb_ty of
-                  Nothing -> False
-                  Just ty -> isDictTy ty
-
 
 ----------------------
 findRhsArity :: DynFlags -> Id -> CoreExpr -> Arity -> ArityType
@@ -588,20 +569,16 @@ findRhsArity :: DynFlags -> Id -> CoreExpr -> Arity -> ArityType
 --      so it is safe to expand e  ==>  (\x1..xn. e x1 .. xn)
 --  (b) if is_bot=True, then e applied to n args is guaranteed bottom
 findRhsArity dflags bndr rhs old_arity
-  = go (get_arity init_cheap_app)
-       -- We always call exprEtaExpandArity once, but usually
-       -- that produces a result equal to old_arity, and then
-       -- we stop right away (since arities should not decrease)
-       -- Result: the common case is that there is just one iteration
+  = go (step botArityType)
+      -- We always do one step, but usually that produces a result equal to
+      -- old_arity, and then we stop right away (since arities should not
+      -- decrease)
+      -- Result: the common case is that there is just one iteration
   where
-    init_cheap_app :: CheapAppFun
-    init_cheap_app fn n_val_args
-      | fn == bndr = True   -- On the first pass, this binder gets infinite arity
-      | otherwise  = isCheapApp fn n_val_args
-
     go :: ArityType -> ArityType
+    go cur_atype@(ATop oss)
+      | length oss <= old_arity = cur_atype
     go cur_atype
-      | cur_arity <= old_arity = cur_atype
       | new_atype == cur_atype = cur_atype
       | otherwise =
 #if defined(DEBUG)
@@ -611,20 +588,12 @@ findRhsArity dflags bndr rhs old_arity
 #endif
                     go new_atype
       where
-        new_atype = get_arity cheap_app
+        new_atype = step cur_atype
 
-        cur_arity = arityTypeArity cur_atype
-        cheap_app :: CheapAppFun
-        cheap_app fn n_val_args
-          | fn == bndr = n_val_args < cur_arity
-          | otherwise  = isCheapApp fn n_val_args
-
-    get_arity :: CheapAppFun -> ArityType
-    get_arity cheap_app = arityType env rhs
+    step :: ArityType -> ArityType
+    step at = arityType env rhs
       where
-         env = AE { ae_cheap_fn = mk_cheap_fn dflags cheap_app
-                  , ae_ped_bot  = gopt Opt_PedanticBottoms dflags
-                  , ae_joins    = emptyVarSet }
+        env = extendSigEnv (initArityEnv dflags) bndr at
 
 {-
 Note [Arity analysis]
@@ -756,21 +725,79 @@ encountered a cast, but that is far too conservative: see #5475
 -}
 
 ---------------------------
-type CheapFun = CoreExpr -> Maybe Type -> Bool
-        -- How to decide if an expression is cheap
-        -- If the Maybe is Just, the type is the type
-        -- of the expression; Nothing means "don't know"
+
+data AnalysisMode
+  = BotStrictness
+  -- ^ Used during 'exprBotStrictness_maybe'.
+  | ArityAnalysis { aa_ped_bot :: !Bool
+                  , aa_dicts_cheap :: !Bool
+                  , aa_sigs :: !(IdEnv ArityType) }
+  -- ^ Used for regular arity analysis ('exprEtaExpandArity', 'findRhsArity').
 
 data ArityEnv
-  = AE { ae_cheap_fn :: CheapFun
-       , ae_ped_bot  :: Bool       -- True <=> be pedantic about bottoms
-       , ae_joins    :: IdSet      -- In-scope join points
-                                   -- See Note [Eta-expansion and join points]
+  = AE
+  { ae_mode   :: !AnalysisMode
+  -- ^ The analysis mode. Called during 'exprBotStrictness_maybe' or not?
+  , ae_joins  :: !IdSet
+  -- ^ In-scope join points. See Note [Eta-expansion and join points]
   }
+
+-- | A regular, initial @ArityEnv@ used in arity analysis.
+initArityEnv :: DynFlags -> ArityEnv
+initArityEnv dflags
+  = AE { ae_mode  = ArityAnalysis { aa_ped_bot = gopt Opt_PedanticBottoms dflags
+                                  , aa_dicts_cheap = gopt Opt_DictsCheap dflags
+                                  , aa_sigs = emptyVarEnv }
+       , ae_joins = emptyVarSet }
+
+-- | The @ArityEnv@ used by 'exprBotStrictness_maybe'. Pedantic about bottoms
+-- and no application is ever considered cheap.
+botStrictnessArityEnv :: ArityEnv
+botStrictnessArityEnv = AE { ae_mode = BotStrictness, ae_joins = emptyVarSet }
 
 extendJoinEnv :: ArityEnv -> [JoinId] -> ArityEnv
 extendJoinEnv env@(AE { ae_joins = joins }) join_ids
   = env { ae_joins = joins `extendVarSetList` join_ids }
+
+extendSigEnv :: ArityEnv -> Id -> ArityType -> ArityEnv
+extendSigEnv env id ar_ty = env { ae_mode = go (ae_mode env) }
+  where
+    go BotStrictness = BotStrictness
+    go aa            = aa { aa_sigs = extendVarEnv (aa_sigs aa) id ar_ty }
+
+lookupSigEnv :: ArityEnv -> Id -> Maybe ArityType
+lookupSigEnv AE{ ae_mode = mode } id = case mode of
+  BotStrictness                   -> Nothing
+  ArityAnalysis{ aa_sigs = sigs } -> lookupVarEnv sigs id
+
+-- | Whether the analysis should be pedantic about bottoms.
+-- 'exprBotStrictness_maybe' always is.
+pedanticBottoms :: ArityEnv -> Bool
+pedanticBottoms AE{ ae_mode = mode } = case mode of
+  BotStrictness                         -> True
+  ArityAnalysis{ aa_ped_bot = ped_bot } -> ped_bot
+
+-- | A version of 'exprIsCheap' that considers results from arity analysis
+-- and optionally the expression's type.
+-- Under 'exprBotStrictness_maybe', no expressions are cheap.
+myExprIsCheap :: ArityEnv -> CoreExpr -> Maybe Type -> Bool
+myExprIsCheap AE{ae_mode = mode} e mb_ty = case mode of
+  BotStrictness                                               -> False
+  ArityAnalysis{aa_dicts_cheap = dicts_cheap, aa_sigs = sigs} ->
+    cheap_dict || exprIsCheapX (myIsCheapApp sigs) e
+    where
+      cheap_dict = dicts_cheap && fmap isDictTy mb_ty == Just True
+
+-- | A version of 'isCheapApp' that considers results from arity analysis.
+myIsCheapApp :: IdEnv ArityType -> CheapAppFun
+myIsCheapApp sigs fn n_val_args = case lookupVarEnv sigs fn of
+  -- Nothing means not a local function, fall back to regular
+  -- 'GHC.Core.Utils.isCheapApp'
+  Nothing         -> isCheapApp fn n_val_args
+  -- @Just at@ means local function with @at@ as current ArityType.
+  -- Roughly approximate what 'isCheapApp' is doing.
+  Just (ABot _)   -> True -- See Note [isCheapApp: bottoming functions] in GHC.Core.Utils
+  Just (ATop oss) -> n_val_args < length oss -- Essentially isWorkFreeApp
 
 ----------------
 arityType :: ArityEnv -> CoreExpr -> ArityType
@@ -792,6 +819,8 @@ arityType env (Cast e co)
 arityType env (Var v)
   | v `elemVarSet` ae_joins env
   = botArityType  -- See Note [Eta-expansion and join points]
+  | Just at <- lookupSigEnv env v -- Local binding
+  = at
   | otherwise
   = idArityType v
 
@@ -804,7 +833,7 @@ arityType env (Lam x e)
 arityType env (App fun (Type _))
    = arityType env fun
 arityType env (App fun arg )
-   = arityApp (arityType env fun) (ae_cheap_fn env arg Nothing)
+   = arityApp (arityType env fun) (myExprIsCheap env arg Nothing)
 
         -- Case/Let; keep arity if either the expression is cheap
         -- or it's a 1-shot lambda
@@ -824,10 +853,10 @@ arityType env (Case scrut _ _ alts)
              | otherwise -> botArityType  -- if RHS is bottomming
                                           -- See Note [Dealing with bottom (2)]
 
-     ATop as | not (ae_ped_bot env)    -- See Note [Dealing with bottom (3)]
-             , ae_cheap_fn env scrut Nothing -> ATop as
-             | exprOkForSpeculation scrut    -> ATop as
-             | otherwise                     -> ATop (takeWhile isOneShotInfo as)
+     ATop as | not (pedanticBottoms env)  -- See Note [Dealing with bottom (3)]
+             , myExprIsCheap env scrut Nothing -> ATop as
+             | exprOkForSpeculation scrut      -> ATop as
+             | otherwise                       -> ATop (takeWhile isOneShotInfo as)
   where
     alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
 
@@ -854,11 +883,12 @@ arityType env (Let (Rec pairs) body)
       = pprPanic "arityType:joinrec" (ppr pairs)
 
 arityType env (Let b e)
-  = floatIn (cheap_bind b) (arityType env e)
+  = floatIn cheap_bind (arityType env e)
   where
-    cheap_bind (NonRec b e) = is_cheap (b,e)
-    cheap_bind (Rec prs)    = all is_cheap prs
-    is_cheap (b,e) = ae_cheap_fn env e (Just (idType b))
+    cheap_bind = case b of
+      NonRec b e -> is_cheap (b,e)
+      Rec prs    -> all is_cheap prs
+    is_cheap (b,e) = myExprIsCheap env e (Just (idType b))
 
 arityType env (Tick t e)
   | not (tickishIsCode t)     = arityType env e
@@ -1742,4 +1772,3 @@ freshEtaId n subst ty
                   -- "OrCoVar" since this can be used to eta-expand
                   -- coercion abstractions
         subst'  = extendTCvInScope subst eta_id'
-
