@@ -212,7 +212,7 @@ def parse_allowed_perf_changes(commitMsg: str
     innerQstrList = r"(?:"+qstr+r"(?:"+s+r"?,"+s+r"?"+qstr+r")*)?"     # Inside of a list of strings.gs.s..
     qstrList = r"(?:\["+s+r"?"+innerQstrList+s+r"?\])"      # A list of strings (using box brackets)..
 
-    exp = (r"^Metric"
+    exp = (r"^\s*Metric"
         +s+r"(Increase|Decrease)"
         +s+r"?("+qstr+r"|"+qstrList+r")?"                   # Metric or list of metrics.s..
         +s+r"?(\(" + r"(?:[^')]|"+qstr+r")*" + r"\))?"      # Options surrounded in parenthesis. (allow parenthases in quoted strings)
