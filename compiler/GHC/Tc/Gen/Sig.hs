@@ -104,21 +104,8 @@ especially on value bindings.  Here's an overview.
   unification variables is correct because we are in tcMonoBinds.
 
 
-Note [Scoped tyvars]
-~~~~~~~~~~~~~~~~~~~~
-The -XScopedTypeVariables flag brings lexically-scoped type variables
-into scope for any explicitly forall-quantified type variables:
-        f :: forall a. a -> a
-        f x = e
-Then 'a' is in scope inside 'e'.
-
-However, we do *not* support this
-  - For pattern bindings e.g
-        f :: forall a. a->a
-        (f,g) = e
-
 Note [Binding scoped type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The type variables *brought into lexical scope* by a type signature
 may be a subset of the *quantified type variables* of the signatures,
 for two reasons:

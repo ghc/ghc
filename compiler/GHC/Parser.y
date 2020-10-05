@@ -1962,14 +1962,18 @@ opt_tyconsig :: { ([AddAnn], Maybe (Located RdrName)) }
              : {- empty -}              { ([], Nothing) }
              | '::' gtycon              { ([mu AnnDcolon $1], Just $2) }
 
--- TODO RGS: Docs
+-- Like ktype, but for types that obey the forall-or-nothing rule.
+-- See Note [forall-or-nothing rule] in GHC.Hs.Type.
 sigktype :: { LHsSigType GhcPs }
         : sigtype              { $1 }
         | ctype '::' kind      {% ams (sLL $1 $> $ mkHsImplicitSigType $
                                        sLL $1 $> $ HsKindSig noExtField $1 $3)
                                       [mu AnnDcolon $2] }
 
--- TODO RGS: Docs
+-- Like ctype, but for types that obey the forall-or-nothing rule.
+-- See Note [forall-or-nothing rule] in GHC.Hs.Type. To avoid duplicating the
+-- logic in ctype here, we simply reuse the ctype production and perform
+-- surgery on the LHsType it returns to turn it into an LHsSigType.
 sigtype :: { LHsSigType GhcPs }
         : ctype                            { hsTypeToHsSigType $1 }
 

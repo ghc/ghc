@@ -424,9 +424,6 @@ So in repTopDs we bring the binders into scope with mkGenSyms and addBinds.
 And we use lookupOcc, rather than lookupBinder
 in repTyClD and repC.
 
-TODO RGS: lookupBinder is literally an alias for lookupOcc, making the comment
-above outdated.
-
 Note [Don't quantify implicit type variables in quotes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If you're not careful, it's surprisingly easy to take this quoted declaration:
@@ -1187,13 +1184,23 @@ addHsOuterSigTyVarBinds outer_bndrs thing_inside = case outer_bndrs of
   HsOuterExplicit{hso_bndrs = exp_bndrs} ->
     addHsTyVarBinds exp_bndrs thing_inside
 
--- TODO RGS: Docs
+-- | If a type implicitly quantifies its outermost type variables, return
+-- 'True' if the list of implicitly bound type variables is empty. If a type
+-- explicitly quantifies its outermost type variables, always return 'True'.
+--
+-- This is used in various places to determine if a Template Haskell 'Type'
+-- should be headed by a 'ForallT' or not.
 nullOuterImplicit :: HsOuterSigTyVarBndrs GhcRn -> Bool
 nullOuterImplicit (HsOuterImplicit{hso_ximplicit = imp_tvs}) = null imp_tvs
 nullOuterImplicit (HsOuterExplicit{})                        = True
   -- Vacuously true, as there is no implicit quantification
 
--- TODO RGS: Docs
+-- | If a type explicitly quantifies its outermost type variables, return
+-- 'True' if the list of explicitly bound type variables is empty. If a type
+-- implicitly quantifies its outermost type variables, always return 'True'.
+--
+-- This is used in various places to determine if a Template Haskell 'Type'
+-- should be headed by a 'ForallT' or not.
 nullOuterExplicit :: HsOuterSigTyVarBndrs GhcRn -> Bool
 nullOuterExplicit (HsOuterExplicit{hso_bndrs = exp_bndrs}) = null exp_bndrs
 nullOuterExplicit (HsOuterImplicit{})                      = True
@@ -1227,7 +1234,6 @@ addQTyVarBinds (HsQTvs { hsq_ext = imp_tvs
               thing_inside
   = addTyVarBinds exp_tvs imp_tvs thing_inside
 
--- TODO RGS: Consolidate with addQTyVarBind
 addTyVarBinds :: RepTV flag flag'
               => [LHsTyVarBndr flag GhcRn] -- the binders to be added
               -> [Name]

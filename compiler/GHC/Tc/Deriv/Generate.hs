@@ -594,7 +594,9 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
                         -- mean more tests (dynamically)
         nlHsIf (ascribeBool $ genPrimOpApp a_expr eq_op b_expr) eq gt
   where
-    ascribeBool e = nlExprWithTySig e $ nlHsTyVar boolTyCon_RDR
+    ascribeBool e = noLoc $ ExprWithTySig noExtField e
+                          $ mkHsWildCardBndrs $ noLoc $ mkHsImplicitSigType
+                          $ nlHsTyVar boolTyCon_RDR
 
 nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
@@ -1945,11 +1947,6 @@ nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
 nlHsAppType e s = noLoc (HsAppType noExtField e hs_ty)
   where
     hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec $ nlHsCoreTy s
-
-nlExprWithTySig :: LHsExpr GhcPs -> LHsType GhcPs -> LHsExpr GhcPs
-nlExprWithTySig e s = noLoc $ ExprWithTySig noExtField (parenthesizeHsExpr sigPrec e) hs_ty
-  where
-    hs_ty = hsTypeToHsSigWcType s
 
 nlHsCoreTy :: Type -> LHsType GhcPs
 nlHsCoreTy = noLoc . XHsType . NHsCoreTy

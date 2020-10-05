@@ -1775,26 +1775,23 @@ type HsTyPats pass = [LHsTypeArg pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The feqn_pats field of FamEqn (family instance equation) stores the LHS type
 (and kind) patterns. Any type (and kind) variables contained
-in these type patterns are bound in the hsib_vars field of the HsImplicitBndrs (TODO RGS: Not any more!)
-in FamInstEqn depending on whether or not an explicit forall is present. In
-the case of an explicit forall, the hsib_vars only includes kind variables not
-bound in the forall. Otherwise, all type (and kind) variables are bound in
-the hsib_vars. In the latter case, note that in particular
+in these type patterns are bound in the feqn_bndrs field.
+Note that in particular:
 
-* The hsib_vars *includes* any anonymous wildcards.  For example
+* The feqn_bndrs *include* any anonymous wildcards.  For example
      type instance F a _ = a
-  The hsib_vars will be {a, _}.  Remember that each separate wildcard
-  '_' gets its own unique.  In this context wildcards behave just like
+  The feqn_bndrs will be HsOuterImplicit {a, _}.  Remember that each separate
+  wildcard '_' gets its own unique.  In this context wildcards behave just like
   an ordinary type variable, only anonymous.
 
-* The hsib_vars *includes* type variables that are already in scope
+* The feqn_bndrs *include* type variables that are already in scope
 
    Eg   class C s t where
           type F t p :: *
         instance C w (a,b) where
           type F (a,b) x = x->a
-   The hsib_vars of the F decl are {a,b,x}, even though the F decl
-   is nested inside the 'instance' decl.
+   The feqn_bndrs of the F decl is HsOuterImplicit {a,b,x}, even though the
+   F decl is nested inside the 'instance' decl.
 
    However after the renamer, the uniques will match up:
         instance C w7 (a8,b9) where

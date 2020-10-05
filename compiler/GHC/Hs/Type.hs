@@ -58,7 +58,6 @@ module GHC.Hs.Type (
         hsOuterTyVarNames, hsOuterExplicitBndrs, mapHsOuterImplicit,
         mkHsOuterImplicit, mkHsOuterExplicit,
         mkHsImplicitSigType, mkHsExplicitSigType,
-        hsTypeToHsSigType, hsTypeToHsSigWcType,
         mkHsWildCardBndrs, mkHsPatSigType,
         mkEmptyWildCardBndrs,
         mkHsForAllVisTele, mkHsForAllInvisTele,
@@ -168,9 +167,14 @@ The system for recording type and kind-variable binders in HsTypes
 is a bit complicated.  Here's how it works.
 
 * In a HsType,
-     HsForAllTy   represents an /explicit, user-written/ 'forall'
+     HsForAllTy   represents an /explicit, user-written/ 'forall' that
+                  is nested within another HsType
                    e.g.   forall a b.   {...} or
                           forall a b -> {...}
+
+                  Note that top-level 'forall's are represented with a
+                  different AST form. See the description of HsOuterTyVarBndrs
+                  below.
      HsQualTy     represents an /explicit, user-written/ context
                    e.g.   (Eq a, Show a) => ...
                   The context can be empty if that's what the user wrote
@@ -187,29 +191,31 @@ is a bit complicated.  Here's how it works.
   here 'a' and '(b::*)' are each a HsTyVarBndr.  A HsForAllTy has
   a list of LHsTyVarBndrs.
 
-* TODO RGS: This section is out of date
+* HsOuterTyVarBndrs is used to represent the outermost quantified type
+  variables in a type that obeys the forall-or-nothing rule. An
+  HsOuterTyVarBndrs can be one of the following:
 
-  HsImplicitBndrs is a wrapper that gives the implicitly-quantified
-  kind and type variables of the wrapped thing.  It is filled in by
-  the renamer. For example, if the user writes
-     f :: a -> a
-  the HsImplicitBinders binds the 'a' (not a HsForAllTy!).
-  NB: this implicit quantification is purely lexical: we bind any
-      type or kind variables that are not in scope. The type checker
-      may subsequently quantify over further kind variables.
+    HsOuterImplicit (implicit quantification, added by renamer)
+          f :: a -> a     -- Desugars to f :: forall {a}. a -> a
+    HsOuterExplicit (explicit user quantifiation):
+          f :: forall a. a -> a
+
+  See Note [forall-or-nothing rule].
+
+* An HsSigType is an LHsType with an accompanying HsOuterTyVarBndrs that
+  represents the presence (or absence) of its outermost 'forall'.
+  See Note [Representing type signatures].
 
 * HsWildCardBndrs is a wrapper that binds the wildcard variables
   of the wrapped thing.  It is filled in by the renamer
      f :: _a -> _
   The enclosing HsWildCardBndrs binds the wildcards _a and _.
 
-* TODO RGS: This section is out of date
-
-  HsSigPatType describes types that appear in pattern signatures and
+* HsSigPatType describes types that appear in pattern signatures and
   the signatures of term-level binders in RULES. Like
-  HsWildCardBndrs/HsImplicitBndrs, they track the names of wildcard
+  HsWildCardBndrs/HsOuterTyVarBndrs, they track the names of wildcard
   variables and implicitly bound type variables. Unlike
-  HsImplicitBndrs, however, HsSigPatTypes do not obey the
+  HsOuterTyVarBndrs, however, HsSigPatTypes do not obey the
   forall-or-nothing rule. See Note [Pattern signature binders and scoping].
 
 * The explicit presence of these wrappers specifies, in the HsSyn,
@@ -412,41 +418,59 @@ emptyLHsQTvs :: LHsQTyVars GhcRn
 emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 
 ------------------------------------------------
---            OuterTyVarBndrs (TODO RGS: Update this)
--- Used to quantify the implicit binders of a type
---    * Implicit binders of a type signature (LHsSigType/LHsSigWcType)
+--            HsOuterTyVarBndrs
+-- Used to quantify the outermost type variable binders of a type that obeys
+-- the forall-or-nothing rule. These are used to represent the outermost
+-- quantification in:
+--    * Type signatures (LHsSigType/LHsSigWcType)
 --    * Patterns in a type/data family instance (HsTyPats)
 --
 -- We support two forms:
---   OuterImplicit (implicit quantification, added by renamer)
---         f :: a -> a     -- Short for f :: forall {a}. a->a
---   OuterExplicit (explicit user quantifiation):
---         f :: forall a. a->a
+--   HsOuterImplicit (implicit quantification, added by renamer)
+--         f :: a -> a     -- Desugars to f :: forall {a}. a -> a
+--   HsOuterExplicit (explicit user quantifiation):
+--         f :: forall a. a -> a
 --
 -- In constrast, when the user writes /visible/ quanitification
 --         T :: forall k -> k -> Type
--- we use use OuterImplicit, wrapped around a HsForAllTy
+-- we use use HsOuterImplicit, wrapped around a HsForAllTy
 -- for the visible quantification
+--
+-- See Note [forall-or-nothing] rule
 
--- | TODO RGS: Docs
+-- | The outermost type variables in a type that obeys the @forall@-or-nothing
+-- rule. See @Note [forall-or-nothing rule]@.
 data HsOuterTyVarBndrs flag pass
-  = HsOuterImplicit -- Implicit forall
-                    --    f :: a -> b -> b
+  = HsOuterImplicit -- ^ Implicit forall, e.g.,
+                    --    @f :: a -> b -> b@
     { hso_ximplicit :: XHsOuterImplicit pass
     }
-  | HsOuterExplicit -- Explicit forall
-                    --    f :: forall a b. a -> b-> b
+  | HsOuterExplicit -- ^ Explicit forall, e.g.,
+                    --    @f :: forall a b. a -> b -> b@
     { hso_xexplicit :: XHsOuterExplicit pass
     , hso_bndrs     :: [LHsTyVarBndr flag (NoGhcTc pass)]
     }
   | XHsOuterTyVarBndrs !(XXHsOuterTyVarBndrs pass)
 
--- HsOuterSigTyVarBndrs:    used for signatures
---                            f :: forall a {b}. blahg
--- HsOuterFamEqnTyVarBndrs: use for type-family inststance eqns
---                            type instance forall a. F [a] = Tree a
-type HsOuterSigTyVarBndrs    pass = HsOuterTyVarBndrs Specificity pass
-type HsOuterFamEqnTyVarBndrs pass = HsOuterTyVarBndrs ()          pass
+-- | Used for signatures, e.g.,
+--
+-- @
+-- f :: forall a {b}. blahg
+-- @
+--
+-- We use 'Specificity' for the 'HsOuterTyVarBndrs' @flag@ to allow
+-- distinguishing between specified and inferred type variables.
+type HsOuterSigTyVarBndrs = HsOuterTyVarBndrs Specificity
+
+-- | Used for type-family instance equations, e.g.,
+--
+-- @
+-- type instance forall a. F [a] = Tree a
+-- @
+--
+-- The notion of specificity is irrelevant in type family equations, so we use
+-- @()@ for the 'HsOuterTyVarBndrs' @flag@.
+type HsOuterFamEqnTyVarBndrs = HsOuterTyVarBndrs ()
 
 type instance XHsOuterImplicit GhcPs = NoExtField
 type instance XHsOuterImplicit GhcRn = [Name]
@@ -516,7 +540,10 @@ type LHsWcType    pass = HsWildCardBndrs pass (LHsType pass)    -- Wildcard only
 -- | Located Haskell Signature Wildcard Type
 type LHsSigWcType pass = HsWildCardBndrs pass (LHsSigType pass) -- Both
 
--- | TODO RGS: Docs
+-- | A type signature that obeys the @forall@-or-nothing rule. In other
+-- words, an 'LHsType' that uses an 'HsOuterSigTyVarBndrs' to represent its
+-- outermost type variable quantification.
+-- See @Note [Representing type signatures]@.
 data HsSigType pass
   = HsSig { sig_ext   :: XHsSig pass
           , sig_bndrs :: HsOuterSigTyVarBndrs pass
@@ -526,8 +553,6 @@ data HsSigType pass
 
 type instance XHsSig (GhcPass _) = NoExtField
 type instance XXHsSigType (GhcPass _) = NoExtCon
-
--- See Note [Representing type signatures]
 
 hsSigWcType :: LHsSigWcType pass -> LHsType pass
 hsSigWcType = sig_body . unLoc . hswc_body
@@ -539,26 +564,97 @@ dropWildCards :: LHsSigWcType pass -> LHsSigType pass
 -- Drop the wildcard part of a LHsSigWcType
 dropWildCards sig_ty = hswc_body sig_ty
 
-{- Note [Representing type signatures]
+{-
+Note [forall-or-nothing rule]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Free variables in signatures are usually bound in an implicit 'forall' at the
+beginning of user-written signatures. However, if the signature has an
+explicit, invisible forall at the beginning, this is disabled. This is referred
+to as the forall-or-nothing rule.
+
+The idea is nested foralls express something which is only expressible
+explicitly, while a top level forall could (usually) be replaced with an
+implicit binding. Top-level foralls alone ("forall.") are therefore an
+indication that the user is trying to be fastidious, so we don't implicitly
+bind any variables.
+
+Note that this rule only applies to outermost /in/visible 'forall's, and not
+outermost visible 'forall's. See #18660 for more on this point.
+
+Here are some concrete examples to demonstrate the forall-or-nothing rule in
+action:
+
+  type F1 :: a -> b -> b                    -- Legal; a,b are implicitly quantified.
+                                            -- Equivalently: forall a b. a -> b -> b
+
+  type F2 :: forall a b. a -> b -> b        -- Legal; explicitly quantified
+
+  type F3 :: forall a. a -> b -> b          -- Illegal; the forall-or-nothing rule says that
+                                            -- if you quantify a, you must also quantify b
+
+  type F4 :: forall a -> b -> b             -- Legal; the top quantifier (forall a) is a /visible/
+                                            -- quantifer, so the "nothing" part of the forall-or-nothing
+                                            -- rule applies, and b is therefore implicitly quantified.
+                                            -- Equivalently: forall b. forall a -> b -> b
+
+  type F5 :: forall b. forall a -> b -> c   -- Illegal; the forall-or-nothing rule says that
+                                            -- if you quantify b, you must also quantify c
+
+  type F6 :: forall a -> forall b. b -> c   -- Legal: just like F4.
+
+For a complete list of all places where the forall-or-nothing rule applies, see
+"The `forall`-or-nothing rule" section of the GHC User's Guide.
+
+Any type that obeys the forall-or-nothing rule is represented in the AST with
+an HsOuterTyVarBndrs:
+
+* If the type has an outermost, invisible 'forall', it uses HsOuterExplicit,
+  which contains a list of the explicitly quantified type variable binders in
+  `hso_bndrs`. After typechecking, HsOuterExplicit also stores a list of the
+  explicitly quantified `InvisTVBinder`s in
+  `hso_xexplicit :: XHsOuterExplicit GhcTc`.
+
+* Otherwise, it uses HsOuterImplicit. HsOuterImplicit is used for different
+  things depending on the phase:
+
+  * After parsing, it does not store anything in particular.
+  * After renaming, it stores the implicitly bound type variable `Name`s in
+    `hso_ximplicit :: XHsOuterImplicit GhcRn`.
+  * After typechecking, it stores the implicitly bound `TyVar`s in
+    `hso_ximplicit :: XHsOuterImplicit GhcTc`.
+
+  NB: this implicit quantification is purely lexical: we bind any
+      type or kind variables that are not in scope. The type checker
+      may subsequently quantify over further kind variables.
+      See Note [Binding scoped type variables] in GHC.Tc.Gen.Sig.
+
+HsOuterTyVarBndrs GhcTc is used in the typechecker as an intermediate data type
+for storing the outermost TyVars/InvisTVBinders in a type.
+See GHC.Tc.Gen.HsType.bindOuterTKBndrsX for an example of this.
+
+Note [Representing type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TODO RGS: Update this Note
+HsSigType is used to represent an explicit user type signature. These are
+used in a variety of places. Some examples include:
 
-HsSigType is used to represent an explicit user type signature
-such as   f :: a -> a
-     or   g (x :: a -> a) = x
+* Type signatures (e.g., f :: a -> a)
+* Standalone kind signatures (e.g., type G :: a -> a)
+* GADT constructor types (e.g., data T where MkT :: a -> T)
 
-A HsSigType is just a HsImplicitBndrs wrapping a LHsType.
- * The HsImplicitBndrs binds the /implicitly/ quantified tyvars
- * The LHsType binds the /explicitly/ quantified tyvars
+A HsSigType is the combination of an HsOuterSigTyVarBndrs and an LHsType:
+
+* The HsOuterSigTyVarBndrs binds the /explicitly/ quantified type variables
+  when the type signature has an outermost, user-written 'forall' (i.e,
+  the HsOuterExplicit constructor is used). If there is no outermost 'forall',
+  then it binds the /implicitly/ quantified type variables instead (i.e.,
+  the HsOuterImplicit constructor is used).
+* The LHsType represents the rest of the type.
 
 E.g. For a signature like
-   f :: forall (a::k). blah
+   f :: forall k (a::k). blah
 we get
-   HsIB { hsib_vars = [k]
-        , hsib_body = HsForAllTy { hst_tele = HsForAllInvis [(a::*)]
-                                 , hst_body = blah }
-The implicit kind variable 'k' is bound by the HsIB;
-the explicitly forall'd tyvar 'a' is bound by the HsForAllTy
+   HsSig { sig_bndrs = HsOuterExplicit { hso_bndrs = [k, (a :: k)] }
+         , sig_body  = blah }
 
 Note [Pattern signature binders and scoping]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -579,8 +675,7 @@ Consider the pattern signatures like those on `t` and `g` in:
   of the lambda.
 * There is no forall-or-nothing rule for pattern signatures, which is why the
   type `forall a. a -> b` is permitted in `g`'s pattern signature, even though
-  `b` is not explicitly bound.
-  See Note [forall-or-nothing rule] in GHC.Rename.HsType.
+  `b` is not explicitly bound. See Note [forall-or-nothing rule].
 
 Similar scoping rules apply to term variable binders in RULES, like in the
 following example:
@@ -624,6 +719,58 @@ in the AST by HsSigPatType. From the renamer onward, the hsps_ext field (of
 type HsPSRn) tracks the names of named wildcards and implicitly bound type
 variables so that they can be brought into scope during renaming and
 typechecking.
+
+Note [Lexically scoped type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ScopedTypeVariables extension does two things:
+
+* It allows the use of type signatures in patterns
+  (e.g., `f (x :: a -> a) = ...`). See
+  Note [Pattern signature binders and scoping] for more on this point.
+* It brings lexically scoped type variables into scope for certain type
+  signatures with outermost invisible 'forall's.
+
+This Note concerns the latter bullet point. Per the
+"Lexically scoped type variables" section of the GHC User's Guide, the
+following forms of type signatures can have lexically scoped type variables:
+
+* In declarations with type signatures, e.g.,
+
+    f :: forall a. a -> a
+    f x = e @a
+
+  Here, the 'forall a' brings 'a' into scope over the body of 'f'.
+
+  Note that ScopedTypeVariables does /not/ interact with standalone kind
+  signatures, only type signatures.
+
+* In explicit type annotations in expressions, e.g.,
+
+    id @a :: forall a. a -> a
+
+* In instance declarations, e.g.,
+
+    instance forall a. C [a] where
+      m = e @a
+
+  Note that unlike the examples above, the use of an outermost 'forall' isn't
+  required to bring 'a' into scope. That is, the following would also work:
+
+    instance forall a. C [a] where
+      m = e @a
+
+Note that all of the types above obey the forall-or-nothing rule. As a result,
+the places in the AST that can have lexically scoped type variables are a
+subset of the places that use HsOuterTyVarBndrs
+(See Note [forall-or-nothing rule].)
+
+Some other observations about lexically scoped type variables:
+
+* Only type variables bound by an /invisible/ forall can be lexically scoped.
+  See Note [hsScopedTvs and visible foralls].
+* The lexically scoped type variables may be a strict subset of the type
+  variables brought into scope by a type signature.
+  See Note [Binding scoped type variables] in GHC.Tc.Gen.Sig.
 -}
 
 hsOuterTyVarNames :: HsOuterTyVarBndrs flag GhcRn -> [Name]
@@ -660,26 +807,6 @@ mkHsExplicitSigType :: [LHsTyVarBndr Specificity GhcPs] -> LHsType GhcPs
 mkHsExplicitSigType bndrs body =
   HsSig { sig_ext = noExtField
         , sig_bndrs = mkHsOuterExplicit bndrs, sig_body = body }
-
--- TODO RGS: Docs
--- TODO RGS: Consider moving this to GHC.Hs.Utils instead, as it is somewhat analogous
--- to mkLHsSigType
--- TODO RGS: We should probably use this function less than we are currently using. Try
--- to replace uses of it with mkHsImplicitSigType if possible.
-hsTypeToHsSigType :: LHsType GhcPs -> LHsSigType GhcPs
-hsTypeToHsSigType lty@(L loc ty) = L loc $ case ty of
-  HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndrs }
-             , hst_body = body }
-    -> mkHsExplicitSigType bndrs body
-  _ -> mkHsImplicitSigType lty
-
--- TODO RGS: Docs
--- TODO RGS: Consider moving this to GHC.Hs.Utils instead, as it is somewhat analogous
--- to mkLHsSigWcType
--- TODO RGS: We should probably use this function less than we are currently using. Try
--- to replace uses of it with (mkHsWildCardBndrs . mkHsImplicitSigType) if possible.
-hsTypeToHsSigWcType :: LHsType GhcPs -> LHsSigWcType GhcPs
-hsTypeToHsSigWcType = mkHsWildCardBndrs . hsTypeToHsSigType
 
 mkHsWildCardBndrs :: thing -> HsWildCardBndrs GhcPs thing
 mkHsWildCardBndrs x = HsWC { hswc_body = x
@@ -1225,23 +1352,22 @@ gives
 
 ---------------------
 hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
--- Get the lexically-scoped type variables of a HsSigType
---  - the explicitly-given forall'd type variables
+-- Get the lexically-scoped type variables of an LHsSigWcType:
+--  - the explicitly-given forall'd type variables;
+--    see Note [Lexically scoped type variables]
 --  - the named wildcards; see Note [Scoping of named wildcards]
 -- because they scope in the same way
 hsWcScopedTvs sig_wc_ty
   | HsWC { hswc_ext = nwcs, hswc_body = sig_ty }  <- sig_wc_ty
   , L _ (HsSig{sig_bndrs = outer_bndrs}) <- sig_ty
-  = case outer_bndrs of
-      HsOuterImplicit{}                -> nwcs
-      HsOuterExplicit{hso_bndrs = tvs} -> nwcs ++ hsLTyVarNames tvs
-                           -- See Note [hsScopedTvs vis_flag]
+  = nwcs ++ hsLTyVarNames (hsOuterExplicitBndrs outer_bndrs)
+    -- See Note [hsScopedTvs and visible foralls]
 
 hsScopedTvs :: LHsSigType GhcRn -> [Name]
 -- Same as hsWcScopedTvs, but for a LHsSigType
 hsScopedTvs (L _ (HsSig{sig_bndrs = outer_bndrs}))
   = hsLTyVarNames (hsOuterExplicitBndrs outer_bndrs)
-    -- See Note [hsScopedTvs vis_flag]
+    -- See Note [hsScopedTvs and visible foralls]
 
 {- Note [Scoping of named wildcards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1256,10 +1382,8 @@ although there is no explicit forall, the "_a" scopes over the definition.
 I don't know if this is a good idea, but there it is.
 -}
 
-{- Note [hsScopedTvs vis_flag]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TODO RGS: Update this in light of the new LHsSigType
-
+{- Note [hsScopedTvs and visible foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -XScopedTypeVariables can be defined in terms of a desugaring to
 -XTypeAbstractions (GHC Proposal #50):
 
@@ -1287,10 +1411,22 @@ The conclusion of these discussions can be summarized as follows:
   >     vfn :: forall x y -> tau(x,y)
   >     vfn x y = \a b -> ...         -- bad!
 
-We cement this design by pattern-matching on HsForAllInvis in hsScopedTvs:
+This design choice is reflected in the design of HsOuterSigTyVarBndrs, which are
+used in every place that ScopedTypeVariables takes effect:
 
-    hsScopedTvs (HsForAllTy { hst_tele = HsForAllInvis { hst_bndrs = ... }
-                            , ... }) = ...
+  data HsOuterTyVarBndrs flag pass
+    = HsOuterImplicit { ... }
+    | HsOuterExplicit { ..., hso_bndrs :: [LHsTyVarBndr flag pass] }
+    | ...
+  type HsOuterSigTyVarBndrs = HsOuterTyVarBndrs Specificity
+
+The HsOuterExplicit constructor is only used in type signatures with outermost,
+/invisible/ 'forall's. Any other type—including those with outermost,
+/visible/ 'forall's—will use HsOuterImplicit. Therefore, when we determine
+which type variables to bring into scope over the body of a function
+(in hsScopedTvs), we /only/ bring the type variables bound by the hso_bndrs in
+an HsOuterExplicit into scope. If we have an HsOuterImplicit instead, then we
+do not bring any type variables into scope over the body of a function at all.
 
 At the moment, GHC does not support visible 'forall' in terms. Nevertheless,
 it is still possible to write erroneous programs that use visible 'forall's in
@@ -1299,12 +1435,13 @@ terms, such as this example:
     x :: forall a -> a -> a
     x = x
 
-If we do not pattern-match on HsForAllInvis in hsScopedTvs, then `a` would
-erroneously be brought into scope over the body of `x` when renaming it.
-Although the typechecker would later reject this (see `GHC.Tc.Validity.vdqAllowed`),
-it is still possible for this to wreak havoc in the renamer before it gets to
-that point (see #17687 for an example of this).
-Bottom line: nip problems in the bud by matching on HsForAllInvis from the start.
+Previous versions of GHC would bring `a` into scope over the body of `x` in the
+hopes that the typechecker would error out later
+(see `GHC.Tc.Validity.vdqAllowed`). However, this can wreak havoc in the
+renamer before GHC gets to that point (see #17687 for an example of this).
+Bottom line: nip problems in the bud by refraining from bringing any type
+variables in an HsOuterImplicit into scope over the body of a function, even
+if they correspond to a visible 'forall'.
 -}
 
 ---------------------
@@ -1491,8 +1628,9 @@ splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
       -> ([LHsTyVarBndr Specificity (NoGhcTc (GhcPass p))], LHsType (GhcPass p))
     split_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
       case outer_bndrs of
+        -- NB: Use ignoreParens here in order to be consistent with the use of
+        -- splitLHsForAllTyInvis below, which also looks through parentheses.
         HsOuterImplicit{}                      -> ([], ignoreParens body)
-          -- TODO RGS: Sigh. Explain why ignoreParens is necessary here.
         HsOuterExplicit{hso_bndrs = exp_bndrs} -> (exp_bndrs, body)
 
     (univs, ty1) = split_sig_ty ty
@@ -1669,8 +1807,8 @@ For example, GHC will accept the following:
     mempty = Identity (mempty @a)
 
 Moreover, the type in the top of an instance declaration must obey the
-forall-or-nothing rule (see Note [forall-or-nothing rule] in
-GHC.Rename.HsType). If instance types allowed nested `forall`s, this could
+forall-or-nothing rule (see Note [forall-or-nothing rule]).
+If instance types allowed nested `forall`s, this could
 result in some strange interactions. For example, consider the following:
 
   class C a where
@@ -1888,16 +2026,16 @@ instance OutputableBndrId p
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'
 
--- | Version of 'pprHsForAll' or 'pprHsForAllExtra' that will always print
--- @forall.@ when passed @Just []@. Prints nothing if passed 'Nothing'
--- TODO RGS: Update the Haddocks, as they're now out of date.
+-- | Prints the explicit @forall@ in a type family equation if one is written.
+-- If there is no explicit @forall@, nothing is printed.
 pprHsOuterFamEqnTyVarBndrs :: OutputableBndrId p
                            => HsOuterFamEqnTyVarBndrs (GhcPass p) -> SDoc
 pprHsOuterFamEqnTyVarBndrs (HsOuterImplicit{}) = empty
 pprHsOuterFamEqnTyVarBndrs (HsOuterExplicit{hso_bndrs = qtvs}) =
   forAllLit <+> interppSP qtvs <> dot
 
--- | TODO RGS: Docs
+-- | Prints the outermost @forall@ in a type signature if one is written.
+-- If there is no outermost @forall@, nothing is printed.
 pprHsOuterSigTyVarBndrs :: OutputableBndrId p
                         => HsOuterSigTyVarBndrs (GhcPass p) -> SDoc
 pprHsOuterSigTyVarBndrs (HsOuterImplicit{}) = empty
