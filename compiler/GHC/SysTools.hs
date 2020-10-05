@@ -297,8 +297,8 @@ linkDynLib dflags0 o_files dep_packages
          | OSMinGW32 <- os         = pkgs_with_rts
          | gopt Opt_LinkRts dflags = pkgs_with_rts
          | otherwise               = pkgs_without_rts
-        (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs
         pkg_link_opts = package_hs_libs ++ extra_libs ++ other_flags
+          where (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs
 
         -- probably _stub.o files
         -- and last temporary shared object file
