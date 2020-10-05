@@ -47,6 +47,7 @@ import GHC.Rename.Pat
 import GHC.Driver.Session
 import GHC.Builtin.Names
 
+import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -311,7 +312,7 @@ rnExpr (RecordCon { rcon_con_name = con_id
 rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
   = do  { (expr', fvExpr) <- rnLExpr expr
         ; (rbinds', fvRbinds) <- rnHsRecUpdFields rbinds
-        ; return (RecordUpd { rupd_ext = noExtField, rupd_expr = expr'
+        ; return (RecordUpd { rupd_ext = FromSource, rupd_expr = expr'
                             , rupd_flds = rbinds' }
                  , fvExpr `plusFV` fvRbinds) }
 
