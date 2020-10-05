@@ -46,6 +46,7 @@ module GHC.Types.Id (
         -- ** Taking an Id apart
         idName, idType, idMult, idScaledType, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
+        recordSelectorTyCon_maybe,
 
         -- ** Modifying an Id
         setIdName, setIdUnique, GHC.Types.Id.setIdType, setIdMult,
@@ -438,10 +439,15 @@ That is what is happening in, say tidy_insts in GHC.Iface.Tidy.
 -- | If the 'Id' is that for a record selector, extract the 'sel_tycon'. Panic otherwise.
 recordSelectorTyCon :: Id -> RecSelParent
 recordSelectorTyCon id
-  = case Var.idDetails id of
-        RecSelId { sel_tycon = parent } -> parent
+  = case recordSelectorTyCon_maybe id of
+        Just parent -> parent
         _ -> panic "recordSelectorTyCon"
 
+recordSelectorTyCon_maybe :: Id -> Maybe RecSelParent
+recordSelectorTyCon_maybe id
+  = case Var.idDetails id of
+        RecSelId { sel_tycon = parent } -> Just parent
+        _ -> Nothing
 
 isRecordSelector        :: Id -> Bool
 isNaughtyRecordSelector :: Id -> Bool

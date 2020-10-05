@@ -5,7 +5,7 @@ import Control.Concurrent.MVar
 import System.IO.Unsafe
 import Utilities
 import Converter
-import GHC.Data.Stream
+import Stream
 import Data.Ratio
 import Trit
 

@@ -3,7 +3,7 @@ module Thread (threadTesting1) where
 
 import Control.Concurrent
 import Control.Concurrent.MVar
-import GHC.Data.Stream
+import Stream
 import Converter
 
 threadTesting1 :: Gray -> Gray -> IO Int

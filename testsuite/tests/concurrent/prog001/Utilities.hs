@@ -1,6 +1,6 @@
 module Utilities (toBinary, fl) where
 
-import GHC.Data.Stream
+import Stream
 import Data.Ratio
 
 -- Convert from an Integer to its signed-digit representation
