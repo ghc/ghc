@@ -25,8 +25,8 @@ import GHC.Types
 
 main = do
    alloca $ \ptr_i -> do
-      poke ptr_i (1 :: Int)
-      w1 <- newEmptyMVar :: IO (MVar Int)
+      poke ptr_i (1 :: Word)
+      w1 <- newEmptyMVar :: IO (MVar Word)
       forkIO $ do
          v <- swapN 50000 2 ptr_i
          putMVar w1 v
@@ -37,15 +37,14 @@ main = do
       -- Should be [1,2,3]
       print $ sort [v0,v1,v2]
 
-swapN :: Int -> Int -> Ptr Int -> IO Int
+swapN :: Word -> Word -> Ptr Word -> IO Word
 swapN 0 val ptr = return val
 swapN n val ptr = do
    val' <- swap ptr val
    swapN (n-1) val' ptr
 
 
-swap :: Ptr Int -> Int -> IO Int
-swap (Ptr ptr) (I# val) = do
-   IO $ \s -> case (atomicExchangeInt# ptr val s) of
-            (# s2, old_val #) -> (# s2, I# old_val #)
-
+swap :: Ptr Word -> Word -> IO Word
+swap (Ptr ptr) (W# val) = do
+   IO $ \s -> case (atomicExchangeWordAddr# ptr val s) of
+            (# s2, old_val #) -> (# s2, W# old_val #)

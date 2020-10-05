@@ -26,16 +26,16 @@ import GHC.Ptr
 #include "MachDeps.h"
 
 main = do
-   alloca $ \(ptr_p :: Ptr (Ptr Int)) -> do
-   alloca $ \(ptr_i :: Ptr Int) -> do
-   alloca $ \(ptr_j :: Ptr Int) -> do
-      poke ptr_i (1 :: Int)
-      poke ptr_j (2 :: Int)
+   alloca $ \(ptr_p :: Ptr (Ptr Word)) -> do
+   alloca $ \(ptr_i :: Ptr Word) -> do
+   alloca $ \(ptr_j :: Ptr Word) -> do
+      poke ptr_i (1 :: Word)
+      poke ptr_j (2 :: Word)
 
       --expected to swap
-      res_i <- cas ptr_i 1 3 :: IO Int
+      res_i <- cas ptr_i 1 3 :: IO Word
       -- expected to fail
-      res_j <- cas ptr_j 1 4 :: IO Int
+      res_j <- cas ptr_j 1 4 :: IO Word
 
       putStrLn "Returned results:"
       --(1,2)
@@ -48,7 +48,7 @@ main = do
       --(3,2)
       print (i,j)
 
-cas :: Ptr Int -> Int -> Int -> IO Int
-cas (Ptr ptr) (I# expected) (I# desired)= do
-   IO $ \s -> case (atomicCasInt# ptr expected desired s) of
-            (# s2, old_val #) -> (# s2, I# old_val #)
+cas :: Ptr Word -> Word -> Word -> IO Word
+cas (Ptr ptr) (W# expected) (W# desired)= do
+   IO $ \s -> case (atomicCasWordAddr# ptr expected desired s) of
+            (# s2, old_val #) -> (# s2, W# old_val #)
