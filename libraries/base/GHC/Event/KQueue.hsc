@@ -2,8 +2,10 @@
 {-# LANGUAGE CApiFFI                    #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE Trustworthy                #-}
+
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Unused LANGUAGE pragma" #-}
 
 module GHC.Event.KQueue
     (
