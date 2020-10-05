@@ -145,6 +145,9 @@ class TestConfig:
         # Is the compiler dynamically linked?
         self.ghc_dynamic = False
 
+        # Are we running in a ThreadSanitizer-instrumented build?
+        self.have_thread_sanitizer = False
+
         # the timeout program
         self.timeout_prog = ''
         self.timeout = 300
