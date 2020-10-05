@@ -97,7 +97,6 @@ import GHC.Core.Multiplicity
 import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Builtin.Types.Prim
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps( minusList )
@@ -139,7 +138,7 @@ exprType e@(App _ _)
   = case collectArgs e of
         (fun, args) -> applyTypeToArgs e (exprType fun) args
 
-exprType other = pprTrace "exprType" (pprCoreExpr other) alphaTy
+exprType other = pprPanic "exprType" (pprCoreExpr other)
 
 coreAltType :: CoreAlt -> Type
 -- ^ Returns the type of the alternatives right hand side

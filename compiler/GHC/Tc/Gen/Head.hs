@@ -593,9 +593,9 @@ lookupParents rdr
   where
     lookupParent :: GlobalRdrElt -> RnM (RecSelParent, GlobalRdrElt)
     lookupParent gre = do { id <- tcLookupId (gre_name gre)
-                          ; if isRecordSelector id
-                              then return (recordSelectorTyCon id, gre)
-                              else failWithTc (notSelector (gre_name gre)) }
+                          ; case recordSelectorTyCon_maybe id of
+                              Just rstc -> return (rstc, gre)
+                              Nothing -> failWithTc (notSelector (gre_name gre)) }
 
 
 fieldNotInType :: RecSelParent -> RdrName -> SDoc
