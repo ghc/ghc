@@ -81,7 +81,6 @@ module GHC.Core.Type (
         filterOutInvisibleTypes, filterOutInferredTypes,
         partitionInvisibleTypes, partitionInvisibles,
         tyConArgFlags, appTyArgFlags,
-        synTyConResKind,
 
         -- ** Analyzing types
         TyCoMapper(..), mapTyCo, mapTyCoX,
@@ -2890,13 +2889,6 @@ tyConsOfType ty
 
      go_tc tc = unitUniqSet tc
      go_ax ax = go_tc $ coAxiomTyCon ax
-
--- | Find the result 'Kind' of a type synonym,
--- after applying it to its 'arity' number of type variables
--- Actually this function works fine on data types too,
--- but they'd always return '*', so we never need to ask
-synTyConResKind :: TyCon -> Kind
-synTyConResKind tycon = piResultTys (tyConKind tycon) (mkTyVarTys (tyConTyVars tycon))
 
 -- | Retrieve the free variables in this type, splitting them based
 -- on whether they are used visibly or invisibly. Invisible ones come

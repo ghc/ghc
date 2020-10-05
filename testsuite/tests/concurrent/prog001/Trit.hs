@@ -2,7 +2,7 @@ module Trit (Trit, rationalToTrit, getIntegral, getFraction, getFraction',
                 neg, addTrits, subTrits, shiftLeft, shiftRight, multiply
                 ) where
 
-import GHC.Data.Stream
+import Stream
 import Utilities
 import Data.Ratio
 
