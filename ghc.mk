@@ -1173,7 +1173,8 @@ SRC_DIST_TESTSUITE_TARBALL        = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).
 # Files to include in source distributions
 #
 SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
-    utils docs rts compiler ghc driver libraries libffi-tarballs
+    utils docs rts compiler ghc driver libraries libffi-tarballs \
+		hadrian
 SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
     aclocal.m4 README.md ANNOUNCE HACKING.md INSTALL.md LICENSE Makefile \
@@ -1214,6 +1215,7 @@ sdist-ghc-prep-tree :
 	cd $(SRC_DIST_GHC_DIR) && $(MAKE) distclean
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/tarballs/)
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/stamp/)
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/hadrian/_build/ (SRC_DIST_GHC_DIR)/hadrian/dist-newstyle/)
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/compiler/stage[123])
 	$(call removeFiles,$(SRC_DIST_GHC_DIR)/mk/build.mk)
 	$(call removeFiles,$(SRC_DIST_GHC_DIR)/rts/rts.cabal)
