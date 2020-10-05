@@ -632,8 +632,7 @@ integer_gmp_powm(mp_limb_t rp[], // result
   assert(!mp_limb_zero_p(mp,mn));
 
   if ((mn == 1 || mn == -1) && mp[0] == 1) {
-    rp[0] = 0;
-    return 1;
+    return 0;
   }
 
   if (mp_limb_zero_p(ep,en)) {
@@ -658,11 +657,6 @@ integer_gmp_powm(mp_limb_t rp[], // result
   }
 
   mpz_clear (r);
-
-  if (!rn) {
-    rp[0] = 0;
-    return 1;
-  }
 
   return rn;
 }
@@ -720,8 +714,7 @@ integer_gmp_powm_sec(mp_limb_t rp[], // result
   assert(mp[0] & 1);
 
   if ((mn == 1 || mn == -1) && mp[0] == 1) {
-    rp[0] = 0;
-    return 1;
+    return 0;
   }
 
   if (mp_limb_zero_p(ep,en)) {
@@ -753,11 +746,6 @@ integer_gmp_powm_sec(mp_limb_t rp[], // result
 
   mpz_clear (r);
 
-  if (!rn) {
-    rp[0] = 0;
-    return 1;
-  }
-
   return rn;
 }
 
@@ -779,8 +767,7 @@ integer_gmp_invert(mp_limb_t rp[], // result
   if (mp_limb_zero_p(xp,xn)
       || mp_limb_zero_p(mp,mn)
       || ((mn == 1 || mn == -1) && mp[0] == 1)) {
-    rp[0] = 0;
-    return 1;
+    return 0;
   }
 
   const mpz_t x = CONST_MPZ_INIT(xp, xn);
@@ -799,11 +786,6 @@ integer_gmp_invert(mp_limb_t rp[], // result
   }
 
   mpz_clear (r);
-
-  if (!rn) {
-    rp[0] = 0;
-    return 1;
-  }
 
   return rn;
 }

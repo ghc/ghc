@@ -17,6 +17,7 @@ import GHC.Types
 import GHC.Num.WordArray
 import GHC.Num.Primitives
 import {-# SOURCE #-} GHC.Num.Integer
+import {-# SOURCE #-} GHC.Num.Natural
 import qualified GHC.Num.Backend.Native   as Native
 import qualified GHC.Num.Backend.Selected as Other
 
@@ -469,3 +470,32 @@ integer_gcde a b =
          then (# g0, x0, y0 #)
          else case unexpectedValue of
             !_ -> (# integerZero, integerZero, integerZero #)
+
+integer_recip_mod
+   :: Integer
+   -> Natural
+   -> (# Natural | () #)
+integer_recip_mod x m =
+   let
+      !r0 = Other.integer_recip_mod x m
+      !r1 = Native.integer_recip_mod x m
+   in case (# r0, r1 #) of
+         (# (# | () #), (# | () #) #) -> r0
+         (# (# y0 | #), (# y1 | #) #)
+            | isTrue# (naturalEq# y0 y1) -> r0
+         _ -> case unexpectedValue of
+            !_ -> (# | () #)
+
+integer_powmod
+   :: Integer
+   -> Natural
+   -> Natural
+   -> Natural
+integer_powmod b e m =
+   let
+      !r0 = Other.integer_powmod b e m
+      !r1 = Native.integer_powmod b e m
+   in if isTrue# (naturalEq# r0 r1)
+         then r0
+         else case unexpectedValue of
+               !_ -> naturalZero

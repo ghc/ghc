@@ -5,11 +5,13 @@
 module GHC.Num.BigNat where
 
 import GHC.Num.WordArray
+import GHC.Num.Primitives
 import GHC.Prim
 
 type BigNat# = WordArray#
 data BigNat = BN# { unBigNat :: BigNat# }
 
+bigNatIsZero# :: BigNat# -> Bool#
 bigNatSize# :: BigNat# -> Int#
 bigNatSubUnsafe :: BigNat# -> BigNat# -> BigNat#
 bigNatMulWord# :: BigNat# -> Word# -> BigNat#

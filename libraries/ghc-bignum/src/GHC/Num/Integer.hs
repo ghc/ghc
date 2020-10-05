@@ -244,6 +244,11 @@ integerIsZero :: Integer -> Bool
 integerIsZero (IS 0#) = True
 integerIsZero _       = False
 
+-- | One predicate
+integerIsOne :: Integer -> Bool
+integerIsOne (IS 1#) = True
+integerIsOne _       = False
+
 -- | Not-equal predicate.
 integerNe :: Integer -> Integer -> Bool
 integerNe !x !y = isTrue# (integerNe# x y)
@@ -486,6 +491,9 @@ integerNegate (IP b)
   | isTrue# (bigNatEqWord# b ABS_INT_MINBOUND##) = IS INT_MINBOUND#
   | True                                         = IN b
 
+{-# RULES
+"integerNegate/integerNegate" forall x. integerNegate (integerNegate x) = x
+#-}
 
 -- | Compute absolute value of an 'Integer'
 integerAbs :: Integer -> Integer
@@ -1214,3 +1222,50 @@ integerGcde
    -> ( Integer, Integer, Integer)
 integerGcde a b = case integerGcde# a b of
    (# g,x,y #) -> (g,x,y)
+
+
+-- | Computes the modular inverse.
+--
+-- I.e. y = integerRecipMod# x m
+--        = x^(-1) `mod` m
+--
+-- with 0 < y < |m|
+--
+integerRecipMod#
+   :: Integer
+   -> Natural
+   -> (# Natural | () #)
+integerRecipMod# x m
+   | integerIsZero x = (# | () #)
+   | naturalIsZero m = (# | () #)
+   | naturalIsOne  m = (# | () #)
+   | True            = Backend.integer_recip_mod x m
+
+
+-- | Computes the modular exponentiation.
+--
+-- I.e. y = integer_powmod b e m
+--        = b^e `mod` m
+--
+-- with 0 <= y < abs m
+--
+-- If e is negative, we use `integerRecipMod#` to try to find a modular
+-- multiplicative inverse (which may not exist).
+integerPowMod# :: Integer -> Integer -> Natural -> (# Natural | () #)
+integerPowMod# !b !e !m
+   | naturalIsZero m     = (# | () #)
+   | naturalIsOne  m     = (# naturalZero | #)
+   | integerIsZero e     = (# naturalOne  | #)
+   | integerIsZero b     = (# naturalZero | #)
+   | integerIsOne  b     = (# naturalOne  | #)
+     -- when the exponent is negative, try to find the modular multiplicative
+     -- inverse and use it instead
+   | integerIsNegative e = case integerRecipMod# b m of
+      (#    | () #) -> (# | () #)
+      (# b' |    #) -> integerPowMod#
+                        (integerFromNatural b')
+                        (integerNegate e)
+                        m
+
+     -- e > 0 by cases above
+   | True = (# Backend.integer_powmod b (integerToNatural e) m | #)
