@@ -29,7 +29,7 @@ lvl = \ (x :: GHC.Prim.Int#) -> T18231.m1 (GHC.Types.I# (GHC.Prim.+# x 1#))
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
 T18231.m1 :: Int -> Data.Functor.Identity.Identity ((), Int)
-T18231.m1 = \ (s1 :: Int) -> case s1 of { GHC.Types.I# x -> lvl x }
+T18231.m1 = \ (eta2 :: Int) -> case eta2 of { GHC.Types.I# x -> lvl x }
 end Rec }
 
 -- RHS size: {terms: 1, types: 0, coercions: 5, joins: 0/0}
