@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns, MultiWayIf #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -745,14 +746,18 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
          let dflags = hsc_dflags hsc_env
          -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
          when (not $ platformOS (targetPlatform dflags) == OSMinGW32) $ do
-           when isHaskellishFile $ whenCannotGenerateDynamicToo dflags $ do
-               debugTraceMsg dflags 4
-                   (text "Running the pipeline again for -dynamic-too")
-               let dflags' = dynamicTooMkDynamicDynFlags dflags
-               hsc_env' <- newHscEnv dflags'
-               _ <- runPipeline' start_phase hsc_env' env input_fn'
-                                 maybe_loc foreign_os
-               return ()
+           when isHaskellishFile $ do
+             dynamicTooState dflags >>= \case
+               DT_Dont   -> return ()
+               DT_Dyn    -> return ()
+               DT_OK     -> return ()
+               DT_Failed -> do
+                 debugTraceMsg dflags 4
+                     (text "Running the pipeline again for -dynamic-too")
+                 hsc_env' <- newHscEnv (setDynamicNow dflags)
+                 _ <- runPipeline' start_phase hsc_env' env input_fn'
+                                   maybe_loc foreign_os
+                 return ()
          return r
 
 runPipeline'
@@ -827,7 +832,7 @@ pipeLoop phase input_fn = do
                           -- supports it, we first run the backend to generate
                           -- the dynamic objects and then re-run it to generate
                           -- the non-dynamic ones.
-                          let dflags' = dynamicTooMkDynamicDynFlags dflags -- set "dynamicNow"
+                          let dflags' = setDynamicNow dflags -- set "dynamicNow"
                           setDynFlags dflags'
                           (next_phase, output_fn) <- runHookedPhase phase input_fn dflags'
                           _ <- pipeLoop next_phase output_fn
@@ -835,7 +840,11 @@ pipeLoop phase input_fn = do
                           -- the dynamic compilation
                           setDynFlags dflags -- restore flags without "dynamicNow" set
                           noDynToo
-                   ifGeneratingDynamicToo dflags dynToo noDynToo
+                   dynamicTooState dflags >>= \case
+                     DT_Dont   -> noDynToo
+                     DT_Failed -> noDynToo
+                     DT_Dyn    -> error "Unexpected DT_Dyn state: pipeline already forked?!"
+                     DT_OK     -> dynToo
                _ -> do
                   (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
                   pipeLoop next_phase output_fn

@@ -8,6 +8,8 @@ Loading interface files
 
 {-# LANGUAGE CPP, BangPatterns, RecordWildCards, NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module GHC.Iface.Load (
         -- Importing one thing
@@ -86,7 +88,6 @@ import GHC.Unit.Home
 
 import Control.Monad
 import Control.Exception
-import Data.IORef
 import Data.Map ( toList )
 import System.FilePath
 import System.Directory
@@ -962,28 +963,34 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                 Succeeded iface -> return (Succeeded (iface, file_path))
                             -- Don't forget to fill in the package name...
 
+          -- Indefinite interfaces are ALWAYS non-dynamic.
+          checkBuildDynamicToo (Succeeded (iface, _filePath))
+            | not (moduleIsDefinite (mi_module iface)) = return ()
+
           checkBuildDynamicToo (Succeeded (iface, filePath)) = do
+              let load_dynamic = do
+                     dflags <- getDynFlags
+                     let dynFilePath = addBootSuffix_maybe hi_boot_file
+                                     $ replaceExtension filePath (hiSuf dflags)
+                     r <- read_file dynFilePath
+                     case r of
+                         Succeeded (dynIface, _)
+                          | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface) ->
+                             return ()
+                          | otherwise ->
+                             do traceIf (text "Dynamic hash doesn't match")
+                                setDynamicTooFailed dflags
+                         Failed err ->
+                             do traceIf (text "Failed to load dynamic interface file:" $$ err)
+                                setDynamicTooFailed dflags
+
               dflags <- getDynFlags
-              -- Indefinite interfaces are ALWAYS non-dynamic, and
-              -- that's OK.
-              let is_definite_iface = moduleIsDefinite (mi_module iface)
-              when is_definite_iface $
-                whenGeneratingDynamicToo dflags $ withDoDynamicToo $ do
-                  dflags <- getDynFlags
-                  let ref = canGenerateDynamicToo dflags
-                      dynFilePath = addBootSuffix_maybe hi_boot_file
-                                  $ replaceExtension filePath (hiSuf dflags)
-                  r <- read_file dynFilePath
-                  case r of
-                      Succeeded (dynIface, _)
-                       | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface) ->
-                          return ()
-                       | otherwise ->
-                          do traceIf (text "Dynamic hash doesn't match")
-                             liftIO $ writeIORef ref False
-                      Failed err ->
-                          do traceIf (text "Failed to load dynamic interface file:" $$ err)
-                             liftIO $ writeIORef ref False
+              dynamicTooState dflags >>= \case
+                DT_Dont   -> return ()
+                DT_Failed -> return ()
+                DT_Dyn    -> load_dynamic
+                DT_OK     -> withDynamicNow load_dynamic
+
           checkBuildDynamicToo _ = return ()
 
 -- | Write interface file

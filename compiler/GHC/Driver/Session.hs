@@ -36,9 +36,7 @@ module GHC.Driver.Session (
         xopt, xopt_set, xopt_unset,
         xopt_set_unlessExplSpec,
         lang_set,
-        whenGeneratingDynamicToo, ifGeneratingDynamicToo,
-        whenCannotGenerateDynamicToo,
-        dynamicTooMkDynamicDynFlags,
+        DynamicTooState(..), dynamicTooState, setDynamicNow, setDynamicTooFailed,
         dynamicOutputFile,
         sccProfilingEnabled,
         DynFlags(..), mainModIs,
@@ -545,7 +543,7 @@ data DynFlags = DynFlags {
   hiSuf_                :: String,
   hieSuf                :: String,
 
-  canGenerateDynamicToo :: IORef Bool,
+  dynamicTooFailed      :: IORef Bool,
   dynObjectSuf_         :: String,
   dynHiSuf_             :: String,
 
@@ -1064,34 +1062,57 @@ data RtsOptsEnabled
 positionIndependent :: DynFlags -> Bool
 positionIndependent dflags = gopt Opt_PIC dflags || gopt Opt_PIE dflags
 
-whenGeneratingDynamicToo :: MonadIO m => DynFlags -> m () -> m ()
-whenGeneratingDynamicToo dflags f = ifGeneratingDynamicToo dflags f (return ())
+-- Note [-dynamic-too business]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- With -dynamic-too flag, we try to build both the non-dynamic and dynamic
+-- objects in a single run of the compiler: the pipeline is the same down to
+-- Core optimisation, then the backend (from Core to object code) is executed
+-- twice.
+--
+-- The implementation is currently rather hacky: recompilation avoidance is
+-- broken, we don't clearly separate non-dynamic and dynamic loaded interfaces,
+-- etc.
+--
+-- To make matters worse, we automatically enable -dynamic-too when some modules
+-- need Template-Haskell and GHC is dynamically linked (cf
+-- GHC.Driver.Pipeline.compileOne').
+--
+-- This somewhat explains why we have "dynamicTooFailed :: IORef Bool" in
+-- DynFlags. My understanding is that when -dynamic-too is enabled, we try to
+-- build the dynamic objects, but we may fail and we shouldn't abort the whole
+-- compilation because the user may not even have asked for -dynamic-too in the
+-- first place. So instead we use this global variable to indicate that we can't
+-- build dynamic objects and compilation continues to build non-dynamic objects
+-- only.
 
-ifGeneratingDynamicToo :: MonadIO m => DynFlags -> m a -> m a -> m a
-ifGeneratingDynamicToo dflags f g = generateDynamicTooConditional dflags f g g
+data DynamicTooState
+   = DT_Dont    -- ^ Don't try to build dynamic objects too
+   | DT_Failed  -- ^ Won't try to generate dynamic objects for some reason
+   | DT_OK      -- ^ Will still try to generate dynamic objects
+   | DT_Dyn     -- ^ Currently generating dynamic objects (in the backend)
+   deriving (Eq,Show,Ord)
 
-whenCannotGenerateDynamicToo :: MonadIO m => DynFlags -> m () -> m ()
-whenCannotGenerateDynamicToo dflags f
-    = ifCannotGenerateDynamicToo dflags f (return ())
+dynamicTooState :: MonadIO m => DynFlags -> m DynamicTooState
+dynamicTooState dflags
+   | not (gopt Opt_BuildDynamicToo dflags) = return DT_Dont
+   | otherwise = do
+      failed <- liftIO $ readIORef (dynamicTooFailed dflags)
+      if failed
+         then return DT_Failed
+         else if dynamicNow dflags
+               then return DT_Dyn
+               else return DT_OK
 
-ifCannotGenerateDynamicToo :: MonadIO m => DynFlags -> m a -> m a -> m a
-ifCannotGenerateDynamicToo dflags f g
-    = generateDynamicTooConditional dflags g f g
-
-generateDynamicTooConditional :: MonadIO m
-                              => DynFlags -> m a -> m a -> m a -> m a
-generateDynamicTooConditional dflags canGen cannotGen notTryingToGen
-    = if gopt Opt_BuildDynamicToo dflags && not (dynamicNow dflags)
-      then do let ref = canGenerateDynamicToo dflags
-              b <- liftIO $ readIORef ref
-              if b then canGen else cannotGen
-      else notTryingToGen
-
-dynamicTooMkDynamicDynFlags :: DynFlags -> DynFlags
-dynamicTooMkDynamicDynFlags dflags0 =
+setDynamicNow :: DynFlags -> DynFlags
+setDynamicNow dflags0 =
    dflags0
       { dynamicNow = True
       }
+
+setDynamicTooFailed :: MonadIO m => DynFlags -> m ()
+setDynamicTooFailed dflags =
+   liftIO $ writeIORef (dynamicTooFailed dflags) True
 
 -- | Compute the path of the dynamic object corresponding to an object file.
 dynamicOutputFile :: DynFlags -> FilePath -> FilePath
@@ -1109,7 +1130,7 @@ initDynFlags dflags = do
      -- building dynamically or not.
      platformCanGenerateDynamicToo
          = platformOS (targetPlatform dflags) /= OSMinGW32
- refCanGenerateDynamicToo <- newIORef platformCanGenerateDynamicToo
+ refDynamicTooFailed <- newIORef (not platformCanGenerateDynamicToo)
  refNextTempSuffix <- newIORef 0
  refFilesToClean <- newIORef emptyFilesToClean
  refDirsToClean <- newIORef Map.empty
@@ -1133,7 +1154,7 @@ initDynFlags dflags = do
        (adjustCols maybeGhcColoursEnv . adjustCols maybeGhcColorsEnv)
        (useColor dflags, colScheme dflags)
  return dflags{
-        canGenerateDynamicToo = refCanGenerateDynamicToo,
+        dynamicTooFailed = refDynamicTooFailed,
         nextTempSuffix = refNextTempSuffix,
         filesToClean   = refFilesToClean,
         dirsToClean    = refDirsToClean,
@@ -1211,7 +1232,7 @@ defaultDynFlags mySettings llvmConfig =
         hiSuf_                  = "hi",
         hieSuf                  = "hie",
 
-        canGenerateDynamicToo   = panic "defaultDynFlags: No canGenerateDynamicToo",
+        dynamicTooFailed        = panic "defaultDynFlags: No dynamicTooFailed",
         dynObjectSuf_           = "dyn_" ++ phaseInputExt StopLn,
         dynHiSuf_               = "dyn_hi",
         dynamicNow              = False,
@@ -2007,14 +2028,12 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
       throwGhcExceptionIO (CmdLineError ("combination not supported: " ++
                                intercalate "/" (map wayDesc (Set.toAscList theWays))))
 
-  let chooseOutput
+  let dflags3
         | Just outFile <- outputFile_ dflags2   -- Only iff user specified -o ...
         , not (isJust (dynOutputFile_ dflags2)) -- but not -dyno
-        = return $ dflags2 { dynOutputFile_ = Just $ dynamicOutputFile dflags2 outFile }
+        = dflags2 { dynOutputFile_ = Just $ dynamicOutputFile dflags2 outFile }
         | otherwise
-        = return dflags2
-
-  dflags3 <- ifGeneratingDynamicToo dflags2 chooseOutput (return dflags2)
+        = dflags2
 
   let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
 

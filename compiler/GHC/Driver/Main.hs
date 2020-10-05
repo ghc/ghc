@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns, CPP, MagicHash, NondecreasingIndentation #-}
+{-# LANGUAGE LambdaCase #-}
+
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
 -------------------------------------------------------------------------------
@@ -931,14 +933,30 @@ hscMaybeWriteIface dflags is_simple iface old_iface mod_location = do
       --
       let no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
 
+      dt <- dynamicTooState dflags
+
+      when (dopt Opt_D_dump_if_trace dflags) $ putMsg dflags $
+        hang (text "Writing interface(s):") 2 $ vcat
+         [ text "Kind:" <+> if is_simple then text "simple" else text "full"
+         , text "Hash change:" <+> ppr (not no_change)
+         , text "DynamicToo state:" <+> text (show dt)
+         ]
+
       if is_simple
          then unless no_change $ do -- FIXME: see no_change' comment above
             write_iface dflags iface
-            whenGeneratingDynamicToo dflags $
-               write_iface (dynamicTooMkDynamicDynFlags dflags) iface
-         else do
-            -- FIXME: see no_change' comment above
-            when (dynamicNow dflags || not no_change) $ write_iface dflags iface
+            case dt of
+               DT_Dont   -> return ()
+               DT_Failed -> return ()
+               DT_Dyn    -> error "Unexpected DT_Dyn state when writing simple interface"
+               DT_OK     -> write_iface (setDynamicNow dflags) iface
+         else case dt of
+               DT_Dont | not no_change             -> write_iface dflags iface
+               DT_OK   | not no_change             -> write_iface dflags iface
+               -- FIXME: see no_change' comment above
+               DT_Dyn                              -> write_iface dflags iface
+               DT_Failed | not (dynamicNow dflags) -> write_iface dflags iface
+               _                                   -> return ()
 
 --------------------------------------------------------------
 -- NoRecomp handlers
