@@ -843,14 +843,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
                 appendToRunQueue(free_caps[i],t);
                 traceEventMigrateThread (cap, t, free_caps[i]->no);
 
+                // See Note [Benign data race due to work-pushing].
                 if (t->bound) {
-                    // N.B. we typically would need to hold 't->bound->task->lock' to change 'cap'
-                    // but this is safe because the Task lives on our run queue. See
-                    // Note [Ownership of Task].
-                    TSAN_ANNOTATE_HAPPENS_BEFORE(&t->bound->task->cap);
-                        // The happens-before matches the happens-after in
-                        // waitForWorkerCapability
-                    RELAXED_STORE(&t->bound->task->cap, free_caps[i]);
+                    t->bound->task->cap = free_caps[i];
                 }
                 t->cap = free_caps[i];
                 n--; // we have one fewer threads now
