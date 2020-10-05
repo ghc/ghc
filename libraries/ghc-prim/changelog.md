@@ -22,7 +22,12 @@
 - Add primops for atomic exchange:
 
         atomicExchangeAddr# :: Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
-        atomicExchangeInt# :: Addr# -> Int# -> State# s -> (# State# s, Int# #)
+        atomicExchangeWord# :: Addr# -> Word# -> State# s -> (# State# s, Word# #)
+
+- Add primops for atomic compare and swap at a given Addr#:
+
+        atomicCasAddrAddr# :: Addr# -> Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
+        atomicCasWordAddr# :: Addr# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
 
 - Add an explicit fixity for `(~)` and `(~~)`: 
 

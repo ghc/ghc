@@ -109,5 +109,5 @@ throwErrnoIfMinus1NoRetry loc f = do
 exchangePtr :: Ptr (Ptr a) -> Ptr a -> IO (Ptr a)
 exchangePtr (Ptr dst) (Ptr val) =
   IO $ \s ->
-      case (atomicExchangeAddr# dst val s) of
+      case (atomicExchangeAddrAddr# dst val s) of
         (# s2, old_val #) -> (# s2, Ptr old_val #)
