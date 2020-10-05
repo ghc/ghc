@@ -643,6 +643,36 @@ enqueueWorker (Capability* cap USED_IF_THREADS)
 
 #endif
 
+/*
+ * Note [Benign data race due to work-pushing]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * #17276 points out a tricky data race (noticed by ThreadSanitizer) between
+ * waitForWorkerCapability and schedulePushWork. In short, schedulePushWork
+ * works as follows:
+ *
+ *  1. collect the set of all idle capabilities, take cap->lock of each.
+ *
+ *  2. sort through each TSO on the calling capability's run queue and push
+ *     some to idle capabilities. This may (if the TSO is a bound thread)
+ *     involve setting tso->bound->task->cap despite not holding
+ *     tso->bound->task->lock.
+ *
+ *  3. release cap->lock of all idle capabilities.
+ *
+ * Now, step 2 is in principle safe since the capability of the caller of
+ * schedulePushWork *owns* the TSO and therefore the Task to which it is bound.
+ * Furthermore, step 3 ensures that the write in step (2) will be visible to
+ * any core which starts execution of the previously-idle capability.
+ *
+ * However, this argument doesn't quite work for waitForWorkerCapability, which
+ * reads task->cap *without* first owning the capability which owns `task`.
+ * For this reason, we check again whether the task has been migrated to
+ * another capability after taking task->cap->lock. See Note [migrated bound
+ * threads] above.
+ *
+ */
+
 /* ----------------------------------------------------------------------------
  * waitForWorkerCapability(task)
  *
@@ -664,6 +694,9 @@ static Capability * waitForWorkerCapability (Task *task)
         // schedulePushWork, which does owns 'task' when it sets 'task->cap'.
         TSAN_ANNOTATE_HAPPENS_AFTER(&task->cap);
         cap = task->cap;
+
+        // See Note [Benign data race due to work-pushing].
+        TSAN_ANNOTATE_BENIGN_RACE(&task->cap, "we will double-check this below");
         task->wakeup = false;
         RELEASE_LOCK(&task->lock);
 
@@ -977,33 +1010,41 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
 
 #endif /* THREADED_RTS */
 
-// Note [migrated bound threads]
-//
-// There's a tricky case where:
-//    - cap A is running an unbound thread T1
-//    - there is a bound thread T2 at the head of the run queue on cap A
-//    - T1 makes a safe foreign call, the task bound to T2 is woken up on cap A
-//    - T1 returns quickly grabbing A again (T2 is still waking up on A)
-//    - T1 blocks, the scheduler migrates T2 to cap B
-//    - the task bound to T2 wakes up on cap B
-//
-// We take advantage of the following invariant:
-//
-//  - A bound thread can only be migrated by the holder of the
-//    Capability on which the bound thread currently lives.  So, if we
-//    hold Capability C, and task->cap == C, then task cannot be
-//    migrated under our feet.
-
-// Note [migrated bound threads 2]
-//
-// Second tricky case;
-//   - A bound Task becomes a GC thread
-//   - scheduleDoGC() migrates the thread belonging to this Task,
-//     because the Capability it is on is disabled
-//   - after GC, gcWorkerThread() returns, but now we are
-//     holding a Capability that is not the same as task->cap
-//   - Hence we must check for this case and immediately give up the
-//     cap we hold.
+/*
+ * Note [migrated bound threads]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * There's a tricky case where:
+ *    - cap A is running an unbound thread T1
+ *    - there is a bound thread T2 at the head of the run queue on cap A
+ *    - T1 makes a safe foreign call, the task bound to T2 is woken up on cap A
+ *    - T1 returns quickly grabbing A again (T2 is still waking up on A)
+ *    - T1 blocks, the scheduler migrates T2 to cap B
+ *    - the task bound to T2 wakes up on cap B
+ *
+ * We take advantage of the following invariant:
+ *
+ *  - A bound thread can only be migrated by the holder of the
+ *    Capability on which the bound thread currently lives.  So, if we
+ *    hold Capability C, and task->cap == C, then task cannot be
+ *    migrated under our feet.
+ *
+ * See also Note [Benign data race due to work-pushing].
+ *
+ *
+ * Note [migrated bound threads 2]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Second tricky case;
+ *   - A bound Task becomes a GC thread
+ *   - scheduleDoGC() migrates the thread belonging to this Task,
+ *     because the Capability it is on is disabled
+ *   - after GC, gcWorkerThread() returns, but now we are
+ *     holding a Capability that is not the same as task->cap
+ *   - Hence we must check for this case and immediately give up the
+ *     cap we hold.
+ *
+ */
 
 /* ----------------------------------------------------------------------------
  * prodCapability
