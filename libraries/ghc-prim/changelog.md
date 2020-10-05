@@ -1,3 +1,19 @@
+## 0.7.1 (edit as necessary)
+
+- Rename `atomicCasInt#` to `atomicCasWordAddr#` and change its type signature
+  to use more natural `Word#` values (rather than `Int#`):
+
+    atomicCasWordAddr# :: Addr# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
+
+- Rename `atomicCasAddr#` to `atomicCasAddrAddr#`
+
+- Rename `atomicExchangeInt#` to `atomicExchangeWordAddr#` and change its type
+  signature to use more natural `Word#` values (rather than `Int#`):
+
+    atomicExchangeWord# :: Addr# -> Word# -> State# s -> (# State# s, Word# #)
+
+- Rename `atomicExchangeAddr#` to `atomicExchangeAddrAddr#`
+
 ## 0.7.0 (edit as necessary)
 
 - Shipped with GHC 8.12.1

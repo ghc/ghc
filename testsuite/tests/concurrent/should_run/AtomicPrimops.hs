@@ -6,6 +6,8 @@ module Main ( main ) where
 import Control.Concurrent
 import Control.Concurrent.MVar
 import Control.Monad (when)
+import Foreign.Marshal.Alloc
+import Foreign.Ptr
 import Foreign.Storable
 import GHC.Exts
 import GHC.IO
@@ -22,6 +24,7 @@ main = do
     fetchOrTest
     fetchXorTest
     casTest
+    casTestAddr
     readWriteTest
 
 -- | Test fetchAddIntArray# by having two threads concurrenctly
@@ -54,12 +57,14 @@ fetchXorTest = do
     work mba 0 val = return ()
     work mba n val = fetchXorIntArray mba 0 val >> work mba (n-1) val
 
-    -- Initial value is a large prime and the two patterns are 1010...
-    -- and 0101...
+    -- The two patterns are 1010...  and 0101...  The second pattern is larger
+    -- than maxBound, avoid warnings by initialising as a Word.
     (n0, t1pat, t2pat)
         | sizeOf (undefined :: Int) == 8 =
-            (0x00000000ffffffff, 0x5555555555555555, 0x9999999999999999)
-        | otherwise = (0x0000ffff, 0x55555555, 0x99999999)
+            ( 0x00000000ffffffff, 0x5555555555555555
+            , fromIntegral (0x9999999999999999 :: Word))
+        | otherwise = ( 0x0000ffff, 0x55555555
+                      , fromIntegral (0x99999999 :: Word))
     expected
         | sizeOf (undefined :: Int) == 8 = 4294967295
         | otherwise = 65535
@@ -90,13 +95,15 @@ fetchOpTest op expected name = do
 
 -- | Initial value and operation arguments for race test.
 --
--- Initial value is a large prime and the two patterns are 1010...
--- and 0101...
+-- The two patterns are 1010...  and 0101...  The second pattern is larger than
+-- maxBound, avoid warnings by initialising as a Word.
 n0, t1pat, t2pat :: Int
 (n0, t1pat, t2pat)
     | sizeOf (undefined :: Int) == 8 =
-        (0x00000000ffffffff, 0x5555555555555555, 0x9999999999999999)
-    | otherwise = (0x0000ffff, 0x55555555, 0x99999999)
+        ( 0x00000000ffffffff, 0x5555555555555555
+        , fromIntegral (0x9999999999999999 :: Word))
+    | otherwise = ( 0x0000ffff, 0x55555555
+                  , fromIntegral (0x99999999 :: Word))
 
 fetchAndTest :: IO ()
 fetchAndTest = fetchOpTest fetchAndIntArray expected "fetchAndTest"
@@ -120,8 +127,10 @@ fetchNandTest = do
 fetchOrTest :: IO ()
 fetchOrTest = fetchOpTest fetchOrIntArray expected "fetchOrTest"
   where expected
-            | sizeOf (undefined :: Int) == 8 = 15987178197787607039
-            | otherwise = 3722313727
+            | sizeOf (undefined :: Int) == 8
+            = fromIntegral (15987178197787607039 :: Word)
+            | otherwise
+            = fromIntegral (3722313727 :: Word)
 
 -- | Test casIntArray# by using it to emulate fetchAddIntArray# and
 -- then having two threads concurrenctly increment a counter,
@@ -131,7 +140,7 @@ casTest = do
     tot <- race 0
         (\ mba -> work mba iters 1)
         (\ mba -> work mba iters 2)
-    assertEq 3000000 tot "casTest"
+    assertEq (3 * iters) tot "casTest"
   where
     work :: MByteArray -> Int -> Int -> IO ()
     work mba 0 val = return ()
@@ -178,6 +187,45 @@ race n0 thread1 thread2 = do
     forkIO $ thread2 mba >> putMVar done2 ()
     mapM_ takeMVar [done1, done2]
     readIntArray mba 0
+
+-- | Test atomicCasWordAddr# by having two threads concurrenctly increment a
+-- counter, checking the sum at the end.
+casTestAddr :: IO ()
+casTestAddr = do
+    tot <- raceAddr 0
+        (\ addr -> work addr (fromIntegral iters) 1)
+        (\ addr -> work addr (fromIntegral iters) 2)
+    assertEq (3 * fromIntegral iters) tot "casTestAddr"
+  where
+    work :: Ptr Word -> Word -> Word -> IO ()
+    work ptr 0 val = return ()
+    work ptr n val = add ptr val >> work ptr (n-1) val
+
+    -- Fetch-and-add implemented using CAS.
+    add :: Ptr Word -> Word -> IO ()
+    add ptr n = peek ptr >>= go
+      where
+        go old = do
+            old' <- atomicCasWordPtr ptr old (old + n)
+            when (old /= old') $ go old'
+
+    -- | Create two threads that mutate the byte array passed to them
+    -- concurrently. The array is one word large.
+    raceAddr :: Word                -- ^ Initial value of array element
+            -> (Ptr Word -> IO ())  -- ^ Thread 1 action
+            -> (Ptr Word -> IO ())  -- ^ Thread 2 action
+            -> IO Word              -- ^ Final value of array element
+    raceAddr n0 thread1 thread2 = do
+        done1 <- newEmptyMVar
+        done2 <- newEmptyMVar
+        ptr <- asWordPtr <$> callocBytes (sizeOf (undefined :: Word))
+        forkIO $ thread1 ptr >> putMVar done1 ()
+        forkIO $ thread2 ptr >> putMVar done2 ()
+        mapM_ takeMVar [done1, done2]
+        peek ptr
+      where
+        asWordPtr :: Ptr a -> Ptr Word
+        asWordPtr = castPtr
 
 ------------------------------------------------------------------------
 -- Test helper
@@ -254,3 +302,13 @@ casIntArray :: MByteArray -> Int -> Int -> Int -> IO Int
 casIntArray (MBA mba#) (I# ix#) (I# old#) (I# new#) = IO $ \ s# ->
     case casIntArray# mba# ix# old# new# s# of
         (# s2#, old2# #) -> (# s2#, I# old2# #)
+
+------------------------------------------------------------------------
+-- Wrappers around Addr#
+
+-- Should this be added to Foreign.Storable?  Similar to poke, but does the
+-- update atomically.
+atomicCasWordPtr :: Ptr Word -> Word -> Word -> IO Word
+atomicCasWordPtr (Ptr addr#) (W# old#) (W# new#) = IO $ \ s# ->
+    case atomicCasWordAddr# addr# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, W# old2# #)
