@@ -580,8 +580,8 @@ irDataCon :: DataCon -> RoleM ()
 irDataCon datacon
   = setRoleInferenceVars univ_tvs $
     irExTyVars ex_tvs $ \ ex_var_set ->
-    mapM_ (irType ex_var_set)
-          (map tyVarKind ex_tvs ++ eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys))
+      do mapM_ (irType ex_var_set) (eqSpecPreds eq_spec ++ theta ++ map scaledThing arg_tys)
+         mapM_ (markNominal ex_var_set) (map tyVarKind ex_tvs ++ map scaledMult arg_tys)  -- Field multiplicities are nominal (#18799)
       -- See Note [Role-checking data constructor arguments]
   where
     (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
