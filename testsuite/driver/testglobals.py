@@ -151,6 +151,9 @@ class TestConfig:
         # Is the compiler dynamically linked?
         self.ghc_dynamic = False
 
+        # Are we running in a ThreadSanitizer-instrumented build?
+        self.have_thread_sanitizer = False
+
         # Do symbols use leading underscores?
         self.leading_underscore = False
 
