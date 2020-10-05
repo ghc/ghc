@@ -1,6 +1,6 @@
 ## 0.7.0 (edit as necessary)
 
-- Shipped with GHC 8.12.1
+- Shipped with GHC 9.0.1
 
 - Add known-key `cstringLength#` to `GHC.CString`. This is just the
   C function `strlen`, but a built-in rewrite rule allows GHC to
@@ -21,8 +21,13 @@
 
 - Add primops for atomic exchange:
 
-        atomicExchangeAddr# :: Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
-        atomicExchangeInt# :: Addr# -> Int# -> State# s -> (# State# s, Int# #)
+        atomicExchangeAddrAddr# :: Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
+        atomicExchangeWordAddr# :: Addr# -> Word# -> State# s -> (# State# s, Word# #)
+
+- Add primops for atomic compare and swap at a given Addr#:
+
+        atomicCasAddrAddr# :: Addr# -> Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
+        atomicCasWordAddr# :: Addr# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
 
 - Add an explicit fixity for `(~)` and `(~~)`: 
 
