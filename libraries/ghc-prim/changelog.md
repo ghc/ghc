@@ -1,3 +1,13 @@
+## 0.7.1 (edit as necessary)
+
+- Added to `GHC.Prim` a new primop for atomic update of a machine word
+  at a given index relative to a base address.  This is essentially
+  the same as the extant `casIntArray#`, except that here the offset
+  from the base address to the first element is always zero, also the
+  type written and returned is `Word#` rather than `Int#`:
+
+    casWordOffAddr# :: Addr# -> Int# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
+
 ## 0.7.0 (edit as necessary)
 
 - Shipped with GHC 8.12.1

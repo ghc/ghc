@@ -2527,6 +2527,15 @@ primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
    with has_side_effects = True
         can_fail         = True
 
+primop CasOffAddrOp_Word "casWordOffAddr#" GenPrimOp
+   Addr# -> Int# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given a word-aligned address, an offset in machine words, the
+    expected old value, and the new value, perform an atomic compare and
+    swap i.e. write the new value if the current value matches the
+    provided old value. Returns the value of the element before the
+    operation. Implies a full memory barrier.}
+   with has_side_effects = True
+
 primop  InterlockedExchange_Addr "atomicExchangeAddr#" GenPrimOp
    Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
    {The atomic exchange operation. Atomically exchanges the value at the first address
