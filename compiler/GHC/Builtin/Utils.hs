@@ -133,8 +133,7 @@ knownKeyNames
       -- See Note [One-tuples] (Wrinkle: Make boxed one-tuple names have known keys)
       -- in GHC.Builtin.Types.
       tupleTyConName BoxedTuple 1 : tupleDataConName Boxed 1 :
-      concat [ wired_tycon_kk_names funTyCon
-             , concatMap wired_tycon_kk_names primTyCons
+      concat [ concatMap wired_tycon_kk_names primTyCons
              , concatMap wired_tycon_kk_names wiredInTyCons
              , concatMap wired_tycon_kk_names typeNatTyCons
              , map idName wiredInIds
@@ -264,14 +263,14 @@ ghcPrimExports
  = map (avail . idName) ghcPrimIds ++
    map (avail . idName . primOpId) allThePrimOps ++
    [ AvailTC n [n] []
-   | tc <- funTyCon : exposedPrimTyCons, let n = tyConName tc  ]
+   | tc <- exposedPrimTyCons, let n = tyConName tc  ]
 
 ghcPrimDeclDocs :: DeclDocMap
 ghcPrimDeclDocs = DeclDocMap $ Map.fromList $ mapMaybe findName primOpDocs
   where
     names = map idName ghcPrimIds ++
             map (idName . primOpId) allThePrimOps ++
-            map tyConName (funTyCon : exposedPrimTyCons)
+            map tyConName exposedPrimTyCons
     findName (nameStr, doc)
       | Just name <- find ((nameStr ==) . getOccString) names
       = Just (name, mkHsDocString doc)

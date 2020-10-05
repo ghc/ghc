@@ -190,6 +190,7 @@ exposedPrimTyCons
     , word64PrimTyCon
 
     , tYPETyCon
+    , funTyCon
 
 #include "primop-vector-tycons.hs-incl"
     ]
