@@ -1,1 +1,21 @@
-test('T18793', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+# "Unit tests"
+test('Arity00', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity01', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity02', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity03', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity04', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity05', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity06', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity07', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity08', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity09', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity10', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity11', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity12', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity13', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity14', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity15', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity16', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+
+# Regression tests
+test('T18793', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
