@@ -1,0 +1,135 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 129, types: 104, coercions: 0, joins: 0/5}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F11.fib1 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F11.fib1 = 0
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F11.fib3 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F11.fib3 = 1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F11.fib2 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F11.fib2 = 2
+
+Rec {
+-- RHS size: {terms: 24, types: 3, coercions: 0, joins: 0/0}
+F11.f11_fib [Occ=LoopBreaker] :: Integer -> Integer
+[GblId, Arity=1, Str=<S,U>, Unf=OtherCon []]
+F11.f11_fib
+  = \ (ds :: Integer) ->
+      case GHC.Num.Integer.integerEq# ds F11.fib1 of {
+        __DEFAULT ->
+          case GHC.Num.Integer.integerEq# ds F11.fib3 of {
+            __DEFAULT -> GHC.Num.Integer.integerAdd (F11.f11_fib (GHC.Num.Integer.integerSub ds F11.fib3)) (F11.f11_fib (GHC.Num.Integer.integerSub ds F11.fib2));
+            1# -> F11.fib3
+          };
+        1# -> F11.fib3
+      }
+end Rec }
+
+-- RHS size: {terms: 52, types: 28, coercions: 0, joins: 0/5}
+F11.$wfib [InlPrag=NOUSERINLINE[2]] :: forall {a} {p}. (a -> a -> Bool) -> (Num a, Num p) => a -> p
+[GblId, Arity=4, Str=<C(C(S)),C(C1(U))><L,U(A,C(C1(U)),A,A,A,A,C(U))><L,U(C(C1(U)),A,A,A,A,A,1*C1(U))><L,U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 460 0}]
+F11.$wfib
+  = \ (@a) (@p) (ww :: a -> a -> Bool) (w :: Num a) (w1 :: Num p) (w2 :: a) ->
+      let {
+        lvl :: a
+        [LclId]
+        lvl = fromInteger @a w F11.fib3 } in
+      let {
+        lvl1 :: a
+        [LclId]
+        lvl1 = fromInteger @a w F11.fib2 } in
+      let {
+        lvl2 :: p
+        [LclId]
+        lvl2 = fromInteger @p w1 F11.fib3 } in
+      let {
+        lvl3 :: a
+        [LclId]
+        lvl3 = fromInteger @a w F11.fib1 } in
+      letrec {
+        fib4 [Occ=LoopBreaker] :: a -> p
+        [LclId, Arity=1, Str=<L,U>, Unf=OtherCon []]
+        fib4
+          = \ (ds :: a) ->
+              case ww ds lvl3 of {
+                False ->
+                  case ww ds lvl of {
+                    False -> + @p w1 (fib4 (- @a w ds lvl)) (fib4 (- @a w ds lvl1));
+                    True -> lvl2
+                  };
+                True -> lvl2
+              }; } in
+      fib4 w2
+
+-- RHS size: {terms: 14, types: 21, coercions: 0, joins: 0/0}
+fib [InlPrag=NOUSERINLINE[2]] :: forall {a} {p}. (Eq a, Num a, Num p) => a -> p
+[GblId,
+ Arity=4,
+ Str=<S(C(C(S))L),1*U(C(C1(U)),A)><L,U(A,C(C1(U)),A,A,A,A,C(U))><L,U(C(C1(U)),A,A,A,A,A,C(U))><L,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a) (@p) (w [Occ=Once1!] :: Eq a) (w1 [Occ=Once1] :: Num a) (w2 [Occ=Once1] :: Num p) (w3 [Occ=Once1] :: a) -> case w of { GHC.Classes.C:Eq ww1 [Occ=Once1] _ [Occ=Dead] -> F11.$wfib @a @p ww1 w1 w2 w3 }}]
+fib = \ (@a) (@p) (w :: Eq a) (w1 :: Num a) (w2 :: Num p) (w3 :: a) -> case w of { GHC.Classes.C:Eq ww1 ww2 -> F11.$wfib @a @p ww1 w1 w2 w3 }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F11.f3 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F11.f3 = 1000
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+F11.f11_x :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False, WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+F11.f11_x = F11.f11_fib F11.f3
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+F11.f11f1 :: Integer -> Integer
+[GblId,
+ Arity=1,
+ Str=<S,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (y [Occ=Once1] :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y}]
+F11.f11f1 = \ (y :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y
+
+-- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+f11f :: forall {p}. p -> Integer -> Integer
+[GblId,
+ Arity=2,
+ Str=<L,A><S,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@p) _ [Occ=Dead] (eta [Occ=Once1] :: Integer) -> F11.f11f1 eta}]
+f11f = \ (@p) _ [Occ=Dead] -> F11.f11f1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F11.f5 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F11.f5 = 6
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+F11.f4 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False, WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+F11.f4 = GHC.Num.Integer.integerAdd F11.f11_x F11.f5
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F11.f2 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F11.f2 = 8
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+F11.f1 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False, WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+F11.f1 = GHC.Num.Integer.integerAdd F11.f11_x F11.f2
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+f11 :: (Integer, Integer)
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+f11 = (F11.f4, F11.f1)
+
+
+

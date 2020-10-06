@@ -1,0 +1,47 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 35, types: 27, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F2.f1 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F2.f1 = 0
+
+-- RHS size: {terms: 7, types: 8, coercions: 0, joins: 0/0}
+f2f :: forall {t1} {t2}. (t1 -> Integer -> t2) -> t1 -> t2
+[GblId,
+ Arity=2,
+ Str=<C(C(S)),1*C1(C1(U))><L,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@t) (@t1) (h [Occ=Once1!] :: t -> Integer -> t1) (x [Occ=Once1] :: t) -> h x F2.f1}]
+f2f = \ (@t) (@t1) (h :: t -> Integer -> t1) (x :: t) -> h x F2.f1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl :: Integer
+[GblId, Unf=OtherCon []]
+lvl = 1
+
+Rec {
+-- RHS size: {terms: 16, types: 3, coercions: 0, joins: 0/0}
+F2.f2_g [Occ=LoopBreaker] :: Integer -> Integer -> Integer
+[GblId, Arity=2, Str=<S,U><S,U>, Unf=OtherCon []]
+F2.f2_g
+  = \ (x :: Integer) (y :: Integer) ->
+      case GHC.Num.Integer.integerCompare x F2.f1 of {
+        __DEFAULT -> y;
+        GT -> F2.f2_g (GHC.Num.Integer.integerSub x lvl) (GHC.Num.Integer.integerAdd x y)
+      }
+end Rec }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F2.f3 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F2.f3 = 5
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+f2 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False, WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+f2 = F2.f2_g F2.f3 F2.f1
+
+
+
