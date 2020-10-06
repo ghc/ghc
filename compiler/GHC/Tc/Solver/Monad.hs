@@ -79,9 +79,9 @@ module GHC.Tc.Solver.Monad (
     DictMap, emptyDictMap, lookupInertDict, findDictsByClass, addDict,
     addDictsByClass, delDict, foldDicts, filterDicts, findDict,
 
-    -- Inert CTyEqCans
+    -- Inert CEqCans
     EqualCtList, findTyEqs, foldTyEqs, isInInertEqs,
-    lookupInertTyVar,
+    lookupInertTyVar, findEq,
 
     -- Inert solved dictionaries
     addSolvedDict, lookupSolvedDict,
@@ -435,6 +435,9 @@ data InertSet
               -- (w:F ty ~ a) by setting w:=w!  We just use the flat-cache
               -- when allocating a new flatten-skolem.
               -- Not necessarily inert wrt top-level equations (or inert_cans)
+              --
+              -- Only nominal, Given equalities end up in here (along with
+              -- top-level instances)
 
        , inert_solved_dicts   :: DictMap CtEvidence
               -- All Wanteds, of form ev :: C t1 .. tn
@@ -709,8 +712,8 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- All CTyEqCans; index is the LHS tyvar
               -- Domain = skolems and untouchables; a touchable would be unified
 
-       , inert_funeqs :: FunEqMap Ct
-              -- All CFunEqCans; index is the whole family head type.
+       , inert_funeqs :: FunEqMap EqualCtList
+              -- All CEqCans; index is the whole family head type.
               -- All Nominal (that's an invariant of all CFunEqCans)
               -- LHS is fully rewritten (modulo eqCanRewrite constraints)
               --     wrt inert_eqs
@@ -1499,12 +1502,23 @@ addTyEq :: InertEqs -> TcTyVar -> Ct -> InertEqs
 addTyEq old_eqs tv ct
   = extendDVarEnv_C add_eq old_eqs tv [ct]
   where
-    add_eq old_eqs _
-      | isWantedCt ct
-      , (eq1 : eqs) <- old_eqs
-      = eq1 : ct : eqs
-      | otherwise
-      = ct : old_eqs
+    add_eq old_eqs _ = addToEqualCtList ct old_eqs
+
+addCanFunEq :: FunEqMap EqualCtList -> TyCon -> [TcType] -> Ct
+            -> FunEqMap EqualCtList
+addCanFunEq old_eqs fun_tc fun_args ct
+  = alterTcApp old_eqs (getUnique fun_tc) fun_args upd
+  where
+    upd (Just old_equal_ct_list) = addToEqualCtList ct old_equal_ct_list
+    upd Nothing                  = [ct]
+
+addToEqualCtList :: Ct -> EqualCtList -> EqualCtList
+addToEqualCtList ct old_eqs
+  | isWantedCt ct
+  , (eq1 : eqs) <- old_eqs
+  = eq1 : ct : eqs
+  | otherwise
+  = ct : old_eqs
 
 foldTyEqs :: (Ct -> b -> b) -> InertEqs -> b -> b
 foldTyEqs k eqs z
@@ -1523,6 +1537,11 @@ lookupInertTyVar ieqs tv
   = case lookupDVarEnv ieqs tv of
       Just (CTyEqCan { cc_rhs = rhs, cc_eq_rel = NomEq } : _ ) -> Just rhs
       _                                                        -> Nothing
+
+findEq :: InertCans -> CanEqLHS -> EqualCtList
+findEq icans (TyVarCEL tv) = findTyEqs icans tv
+findEq icans (TyFamCEL fun_tc fun_args)
+  = findFunEq (inert_funeqs icans) fun_tc fun_args `orElse` []
 
 {- *********************************************************************
 *                                                                      *
@@ -1627,17 +1646,17 @@ addInertCan ct
 maybeKickOut :: InertCans -> Ct -> TcS InertCans
 -- For a CTyEqCan, kick out any inert that can be rewritten by the CTyEqCan
 maybeKickOut ics ct
-  | CTyEqCan { cc_tyvar = tv, cc_ev = ev, cc_eq_rel = eq_rel } <- ct
-  = do { (_, ics') <- kickOutRewritable (ctEvFlavour ev, eq_rel) tv ics
+  | CEqCan { cc_lhs = lhs, cc_ev = ev, cc_eq_rel = eq_rel } <- ct
+  = do { (_, ics') <- kickOutRewritable (ctEvFlavour ev, eq_rel) lhs ics
        ; return ics' }
   | otherwise
   = return ics
 
 add_item :: InertCans -> Ct -> InertCans
-add_item ics item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys })
-  = ics { inert_funeqs = insertFunEq (inert_funeqs ics) tc tys item }
+add_item ics item@(CEqCan { cc_lhs = TyFamCEL tc tys })
+  = ics { inert_funeqs = addCanFunEq (inert_funeqs ics) tc tys item }
 
-add_item ics item@(CTyEqCan { cc_tyvar = tv, cc_ev = ev })
+add_item ics item@(CEqCan { cc_lhs = TyVarCEL tv, cc_ev = ev })
   = ics { inert_eqs   = addTyEq (inert_eqs ics) tv item
         , inert_count = bumpUnsolvedCount ev (inert_count ics) }
 
@@ -1666,11 +1685,11 @@ bumpUnsolvedCount ev n | isWanted ev = n+1
 -----------------------------------------
 kickOutRewritable  :: CtFlavourRole  -- Flavour/role of the equality that
                                       -- is being added to the inert set
-                    -> TcTyVar        -- The new equality is tv ~ ty
-                    -> InertCans
-                    -> TcS (Int, InertCans)
-kickOutRewritable new_fr new_tv ics
-  = do { let (kicked_out, ics') = kick_out_rewritable new_fr new_tv ics
+                   -> CanEqLHS        -- The new equality is lhs ~ ty
+                   -> InertCans
+                   -> TcS (Int, InertCans)
+kickOutRewritable new_fr new_lhs ics
+  = do { let (kicked_out, ics') = kick_out_rewritable new_fr new_lhs ics
              n_kicked = workListSize kicked_out
 
        ; unless (n_kicked == 0) $
@@ -1685,11 +1704,11 @@ kickOutRewritable new_fr new_tv ics
 
 kick_out_rewritable :: CtFlavourRole  -- Flavour/role of the equality that
                                       -- is being added to the inert set
-                    -> TcTyVar        -- The new equality is tv ~ ty
+                    -> CanEqLHS       -- The new equality is lhs ~ ty
                     -> InertCans
                     -> (WorkList, InertCans)
 -- See Note [kickOutRewritable]
-kick_out_rewritable new_fr new_tv
+kick_out_rewritable new_fr new_lhs
                     ics@(IC { inert_eqs      = tv_eqs
                             , inert_dicts    = dictmap
                             , inert_safehask = safehask
@@ -1719,7 +1738,7 @@ kick_out_rewritable new_fr new_tv
     -- NB: use extendWorkList to ensure that kicked-out equalities get priority
     -- See Note [Prioritise equalities] (Kick-out).
     -- The irreds may include non-canonical (hetero-kinded) equality
-    -- constraints, which perhaps may have become soluble after new_tv
+    -- constraints, which perhaps may have become soluble after new_lhs
     -- is substituted; ditto the dictionaries, which may include (a~b)
     -- or (a~~b) constraints.
     kicked_out = foldr extendWorkListCt
@@ -1755,46 +1774,65 @@ kick_out_rewritable new_fr new_tv
 
     (_, new_role) = new_fr
 
+    fr_tv_can_rewrite_ty :: TyVar -> EqRel -> Type -> Bool
+    fr_tv_can_rewrite_ty new_tv role ty
+      = anyRewritableTyVar True role can_rewrite ty
+                  -- True: ignore casts and coercions
+      where
+        can_rewrite :: EqRel -> TyVar -> Bool
+        can_rewrite old_role tv = new_role `eqCanRewrite` old_role && tv == new_tv
+
+    fr_tf_can_rewrite_ty :: TyCon -> [TcType] -> EqRel -> Type -> Bool
+    fr_tf_can_rewrite_ty new_tf new_tf_args role ty
+      = anyRewritableTyFamApp role can_rewrite ty
+      where
+        can_rewrite :: EqRel -> TyCon -> [TcType] -> Bool
+        can_rewrite old_role old_tf old_tf_args
+          = new_role `eqCanRewrite` old_role &&
+            tcEqTyConApps new_tf new_tf_args old_tf old_tf_args
+              -- it's possible for old_tf_args to have too many. This is fine;
+              -- we'll only check what we need to.
+
+    {-# INLINE fr_can_rewrite_ty #-}   -- perform the check here only once
     fr_can_rewrite_ty :: EqRel -> Type -> Bool
-    fr_can_rewrite_ty role ty = anyRewritableTyVar False role
-                                                   fr_can_rewrite_tv ty
-    fr_can_rewrite_tv :: EqRel -> TyVar -> Bool
-    fr_can_rewrite_tv role tv = new_role `eqCanRewrite` role
-                             && tv == new_tv
+    fr_can_rewrite_ty = case new_lhs of
+      TyVarCEL new_tv             -> fr_tv_can_rewrite_ty tv
+      TyFamCEL new_tf new_tf_args -> fr_tf_can_rewrite_ty new_tf new_tf_args
 
     fr_may_rewrite :: CtFlavourRole -> Bool
     fr_may_rewrite fs = new_fr `eqMayRewriteFR` fs
         -- Can the new item rewrite the inert item?
 
+    {-# INLINE kick_out_ct #-}   -- perform case on new_lhs here only once
     kick_out_ct :: Ct -> Bool
-    -- Kick it out if the new CTyEqCan can rewrite the inert one
+    -- Kick it out if the new CEqCan can rewrite the inert one
     -- See Note [kickOutRewritable]
-    kick_out_ct ct | let fs@(_,role) = ctFlavourRole ct
-                   = fr_may_rewrite fs
-                   && fr_can_rewrite_ty role (ctPred ct)
-                  -- False: ignore casts and coercions
-                  -- NB: this includes the fsk of a CFunEqCan.  It can't
-                  --     actually be rewritten, but we need to kick it out
-                  --     so we get to take advantage of injectivity
-                  -- See Note [Kicking out CFunEqCan for fundeps]
+    kick_out_ct = case new_lhs of
+      TyVarCEL new_tv -> \ct -> let fs@(_,role) = ctFlavourRole ct in
+                                fr_may_rewrite fs
+                             && fr_tv_can_rewrite_ty new_tv role (ctPred ct)
+      TyFamCEL new_tf new_tf_args
+        -> \ct -> let fs@(_, role) = ctFlavourRole ct in
+                  fr_may_rewrite fs
+               && fr_tf_can_rewrite_ty new_tf new_tf_args role (ctPred ct)
 
     kick_out_eqs :: EqualCtList -> ([Ct], DTyVarEnv EqualCtList)
                  -> ([Ct], DTyVarEnv EqualCtList)
     kick_out_eqs eqs (acc_out, acc_in)
-      = (eqs_out ++ acc_out, case eqs_in of
-                               []      -> acc_in
-                               (eq1:_) -> extendDVarEnv acc_in (cc_tyvar eq1) eqs_in)
+      = (eqs_out `chkAppend` acc_out, case eqs_in of
+            []      -> acc_in
+            (eq1:_) -> extendDVarEnv acc_in (cc_tyvar eq1) eqs_in)
       where
         (eqs_out, eqs_in) = partition kick_out_eq eqs
 
     -- Implements criteria K1-K3 in Note [Extending the inert equalities]
-    kick_out_eq (CTyEqCan { cc_tyvar = tv, cc_rhs = rhs_ty
-                          , cc_ev = ev, cc_eq_rel = eq_rel })
+    kick_out_eq (CEqCan { cc_lhs = lhs, cc_rhs = rhs_ty
+                        , cc_ev = ev, cc_eq_rel = eq_rel })
       | not (fr_may_rewrite fs)
       = False  -- Keep it in the inert set if the new thing can't rewrite it
 
       -- Below here (fr_may_rewrite fs) is True
-      | tv == new_tv              = True        -- (K1)
+      | lhs `eqCanEqLHS` new_lhs  = True        -- (K1)
       | kick_out_for_inertness    = True
       | kick_out_for_completeness = True
       | otherwise                 = False
@@ -1808,9 +1846,15 @@ kick_out_rewritable new_fr new_tv
             -- (K2c) is guaranteed by the first guard of keep_eq
 
         kick_out_for_completeness
-          = case eq_rel of
-              NomEq  -> rhs_ty `eqType` mkTyVarTy new_tv
-              ReprEq -> isTyVarHead new_tv rhs_ty
+          = case (eq_rel, new_lhs) of
+              (NomEq, _)  -> rhs_ty `eqType` canEqLHSType new_lhs
+              (ReprEq, TyVarCEL new_tv) -> isTyVarHead new_tv rhs_ty
+              (ReprEq, TyFamCEL new_tf new_tf_args)
+                | Just (rhs_tc, rhs_tc_args) <- tcSplitTyConApp_maybe rhs_ty
+                , tcEqTyConApps new_tf new_tf_args rhs_tc rhs_tc_args
+                  -> True
+                | otherwise
+                  -> False
 
     kick_out_eq ct = pprPanic "keep_eq" (ppr ct)
 
@@ -1818,7 +1862,7 @@ kickOutAfterUnification :: TcTyVar -> TcS Int
 kickOutAfterUnification new_tv
   = do { ics <- getInertCans
        ; (n_kicked, ics2) <- kickOutRewritable (Given,NomEq)
-                                                 new_tv ics
+                                                 (TyVarCEL new_tv) ics
                      -- Given because the tv := xi is given; NomEq because
                      -- only nominal equalities are solved by unification
 
@@ -1865,21 +1909,21 @@ kickOutAfterFillingCoercionHole hole
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [inert_eqs: the inert equalities].
 
-When we add a new inert equality (a ~N ty) to the inert set,
+When we add a new inert equality (lhs ~N ty) to the inert set,
 we must kick out any inert items that could be rewritten by the
 new equality, to maintain the inert-set invariants.
 
   - We want to kick out an existing inert constraint if
     a) the new constraint can rewrite the inert one
-    b) 'a' is free in the inert constraint (so that it *will*)
+    b) 'lhs' is free in the inert constraint (so that it *will*)
        rewrite it if we kick it out.
 
-    For (b) we use tyCoVarsOfCt, which returns the type variables /and
-    the kind variables/ that are directly visible in the type. Hence
+    For (b) we use anyRewritableCanLHS, which examines the types /and
+    kinds/ that are directly visible in the type. Hence
     we will have exposed all the rewriting we care about to make the
     most precise kinds visible for matching classes etc. No need to
     kick out constraints that mention type variables whose kinds
-    contain this variable!
+    contain this LHS!
 
   - A Derived equality can kick out [D] constraints in inert_eqs,
     inert_dicts, inert_irreds etc.
@@ -2456,6 +2500,12 @@ insertTcApp :: TcAppMap a -> Unique -> [Type] -> a -> TcAppMap a
 insertTcApp m cls tys ct = alterUDFM alter_tm m cls
   where
     alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
+
+alterTcApp :: TcAppMap a -> Unique -> [Type] -> (Maybe a -> a) -> TcAppMap a
+alterTcApp m cls tys upd = alterUDFM alter_tm m cls
+  where
+    alter_tm :: Maybe (ListMap LooseTypeMap a) -> Maybe (ListMap LooseTypeMap a)
+    alter_tm m_elt = Just (alterTM tys (Just . upd) (m_elt `orElse` emptyTM))
 
 -- mapTcApp :: (a->b) -> TcAppMap a -> TcAppMap b
 -- mapTcApp f = mapUDFM (mapTM f)
