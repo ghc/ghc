@@ -416,8 +416,8 @@ function test_make() {
 }
 
 function build_hadrian() {
-  if [ -z "$FLAVOUR" ]; then
-    fail "FLAVOUR not set"
+  if [ -z "$BUILD_FLAVOUR" ]; then
+    fail "BUILD_FLAVOUR not set"
   fi
 
   run_hadrian binary-dist
@@ -446,7 +446,7 @@ function clean() {
 function run_hadrian() {
   if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
   run hadrian/build-cabal \
-    --flavour="$FLAVOUR" \
+    --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
     --broken-test="$BROKEN_TESTS" \
     --bignum=$BIGNUM_BACKEND \
