@@ -349,14 +349,7 @@ this transformation.  So we try to limit it as much as possible:
        case undefined of { (a,b) -> \y -> e }
      This showed up in #5557
 
- (2) Do NOT move a lambda outside a case if all the branches of
-     the case are known to return bottom.
-        case x of { (a,b) -> \y -> error "urk" }
-     This case is less important, but the idea is that if the fn is
-     going to diverge eventually anyway then getting the best arity
-     isn't an issue, so we might as well play safe
-
- (3) Do NOT move a lambda outside a case unless
+ (2) Do NOT move a lambda outside a case unless
      (a) The scrutinee is ok-for-speculation, or
      (b) more liberally: the scrutinee is cheap (e.g. a variable), and
          -fpedantic-bottoms is not enforced (see #2915 for an example)
@@ -576,7 +569,7 @@ findRhsArity dflags bndr rhs old_arity
       -- Result: the common case is that there is just one iteration
   where
     -- See Note [Optimistic arity in fixed-point iteration]
-    optimistic_atype = ATop (OneShotLam <$ typeArity (idType bndr))
+    optimistic_atype = ATop (typeArity (idType bndr))
 
     go :: ArityType -> ArityType
     go cur_atype@(ATop oss)
@@ -594,7 +587,8 @@ findRhsArity dflags bndr rhs old_arity
         new_atype = step cur_atype
 
     step :: ArityType -> ArityType
-    step at = arityType env rhs
+    step at = -- pprTrace "step" (ppr bndr <+> ppr at <+> ppr (arityType env rhs)) $
+              arityType env rhs
       where
         env = extendSigEnv (initArityEnv dflags) bndr at
 
@@ -649,7 +643,7 @@ Note [Optimistic arity in fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Optimistic fixed-point iteration normally begins by giving the recursive binder
 the bottom element of the lattice. In case of arity analysis, that would be
-@ABot 0@ (aka 'botArityType'). We start with @ATop max_arity_one_shots@ instead.
+@ABot 0@ (aka 'botArityType'). We start with @ATop type_arity@ instead.
 Here's why:
 
 Starting from @ABot 0@ would give @f = \x. f (x+1)@ arity type @ABot 1@, which
@@ -863,20 +857,20 @@ arityType env (App fun arg )
         --      f x y = case x of { (a,b) -> e }
         -- The difference is observable using 'seq'
         --
-arityType env (Case scrut _ _ alts)
+arityType env (Case scrut bndr _ alts)
   | exprIsDeadEnd scrut || null alts
   = botArityType    -- Do not eta expand
                     -- See Note [Dealing with bottom (1)]
-  | otherwise
-  = case alts_type of
-     ABot n  | n>0       -> ATop []       -- Don't eta expand
-             | otherwise -> botArityType  -- if RHS is bottomming
-                                          -- See Note [Dealing with bottom (2)]
+  | not (pedanticBottoms env)  -- See Note [Dealing with bottom (2)]
+  , myExprIsCheap env scrut (Just (idType bndr))
+  = alts_type
+  | exprOkForSpeculation scrut
+  = alts_type
 
-     ATop as | not (pedanticBottoms env)  -- See Note [Dealing with bottom (3)]
-             , myExprIsCheap env scrut Nothing -> ATop as
-             | exprOkForSpeculation scrut      -> ATop as
-             | otherwise                       -> ATop (takeWhile isOneShotInfo as)
+  | otherwise               -- In the remaining cases we may not push
+  = case alts_type of       -- evaluation of the scrutinee in
+     ATop as -> ATop (takeWhile isOneShotInfo as)
+     ABot _  -> ATop []
   where
     alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
 
@@ -902,12 +896,15 @@ arityType env (Let (Rec pairs) body)
       | otherwise
       = pprPanic "arityType:joinrec" (ppr pairs)
 
-arityType env (Let b e)
-  = floatIn cheap_bind (arityType env e)
+arityType env (Let (NonRec b r) e)
+  = floatIn cheap_rhs (arityType env' e)
   where
-    cheap_bind = case b of
-      NonRec b e -> is_cheap (b,e)
-      Rec prs    -> all is_cheap prs
+    cheap_rhs = myExprIsCheap env r (Just (idType b))
+    env'      = extendSigEnv env b (arityType env r)
+
+arityType env (Let (Rec prs) e)
+  = floatIn (all is_cheap prs) (arityType env e)
+  where
     is_cheap (b,e) = myExprIsCheap env e (Just (idType b))
 
 arityType env (Tick t e)
