@@ -95,6 +95,8 @@
 -fspec-constr-recursive
 -fspecialize
 -fspecialize-aggressively
+-finline-generics
+-finline-generics-aggressively
 -fstg-lift-lams-non-rec-args-any
 -fstg-lift-lams-rec-args-any
 -fth
