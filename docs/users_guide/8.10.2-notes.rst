@@ -22,7 +22,7 @@ Highlights
   (:ghc-ticket:`18033`).
 
 - Fixes a few specialiser regressions (:ghc-ticket:`17810`,
-  :ghc-ticket:`18120`) as well introduces a variety of miscellaneous
+  :ghc-ticket:`18120`) and introduces a variety of miscellaneous
   specialiser improvements (:ghc-ticket:`16473`, :ghc-ticket:`17930`,
   :ghc-ticket:`17966`)
 
@@ -48,7 +48,7 @@ Runtime system
    effect of :rts-flag:`--nonmoving-gc`.
 
  - The RTS now allows the user to specify a minimum time between idle GCs with
-   the :rts-flag:`-Iw ⟨seconds⟩` flag. 8.10.1 contained a users guide reference
+   the :rts-flag:`-Iw ⟨seconds⟩` flag. 8.10.1 contained a user's guide reference
    to this flag but did not include the associated implementation.
 
  - A memory leak in the cost-center profiler has been fixed
@@ -57,10 +57,10 @@ Runtime system
  - A potential integer overflow in the compact normal form import logic has
    been fixed (:ghc-ticket:`16992`)
 
- - We now workaround a Linux kernel bug in the implementation of timerfd which
+ - We now work around a Linux kernel bug in the implementation of timerfd which
    could previously result in program crashes (:ghc-ticket:`18033`)
 
- - The cost center profiler's JSON output backend now escapes backslashes
+ - The cost-center profiler's JSON output backend now escapes backslashes
    correctly (:ghc-ticket:`18438`)
 
  - A variety of linker issues on ARM platforms have been fixed.
