@@ -626,6 +626,36 @@ But if x::T a b, then
    x { f1 = v } :: T a b   (not T a Int!)
 So we need to cast (T a Int) to (T a b).  Sigh.
 
+In order to construct such a cast (in the RecordUpd case of dsExpr), we first
+need a (Int ~# b) coercion. Since we have access to the T1 data constructor in
+dsExpr, this can easily be constructed from T1's dcEqSpec. Next, we need the
+type constructor used in the head of T1's return type. Since
+T1 :: a -> T a Int, the type constructor we are looking for is T, which we
+retrieve with dataConOrigTyCon. Putting that all together, this gives us a
+final coercion of T <a>_N (co :: Int ~ b) :: T a Int ~# T a b.
+
+Note that we use dataConOrigTyCon, not dataConTyCon, to retrieve the parent
+type constructor. This is important if we are dealing with a data family
+instance:
+
+    data family F s t
+    data instance F s t where
+      MkF :: { foo :: Int } -> F Int t
+
+Here, there are /two/ type constructors to contend with: F, the data family
+type constructor, and R:Fst, the representation type constructor for the data
+family instance. Importantly, the wrapper for the MkF data constructor is
+
+    $WMkF :: Int -> F Int t
+
+But if x :: F s t, then
+
+    x { foo v } :: F s t   (not F Int t!)
+
+So we need to cast (F Int t) to (F s t). We use dataConOrigTyCon on MkF to
+obtain the data family type constructor F. If we had used dataConTyCon, we
+would instead obtain the representation type constructor R:Fst, which would
+result in the wrong coercion (#18809).
 -}
 
 dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
@@ -727,7 +757,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                       let
                         wrap_co =
                           mkTcTyConAppCo Nominal
-                            (dataConTyCon data_con)
+                            (dataConOrigTyCon data_con)
                             [ lookup tv ty
                               | (tv,ty) <- univ_tvs `zip` out_inst_tys ]
                         lookup univ_tv ty =
