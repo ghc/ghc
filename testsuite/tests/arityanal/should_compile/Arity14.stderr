@@ -1,0 +1,54 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 56, types: 87, coercions: 0, joins: 0/3}
+
+-- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+F14.f1 :: forall {t}. t -> t
+[GblId,
+ Arity=1,
+ Str=<S,1*U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@t) (y [Occ=Once1] :: t) -> y}]
+F14.f1 = \ (@t) (y :: t) -> y
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F14.f2 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F14.f2 = 1
+
+-- RHS size: {terms: 35, types: 24, coercions: 0, joins: 0/3}
+F14.$wf14 [InlPrag=NOUSERINLINE[2]] :: forall {t}. (t -> t -> Bool) -> Num t => t -> t -> t -> t
+[GblId, Arity=4, Str=<C(C(S)),C(C1(U))><L,U(C(C1(U)),A,A,A,A,A,1*C1(U))><L,U><L,U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 90 0 0] 300 0}]
+F14.$wf14
+  = \ (@t) (ww :: t -> t -> Bool) (w :: Num t) (w1 :: t) (w2 :: t) ->
+      let {
+        lvl :: t
+        [LclId]
+        lvl = fromInteger @t w F14.f2 } in
+      letrec {
+        f3 [Occ=LoopBreaker] :: t -> t -> t -> t
+        [LclId, Arity=2, Str=<L,U><L,U>, Unf=OtherCon []]
+        f3
+          = \ (n :: t) (x :: t) ->
+              case ww x n of {
+                False -> F14.f1 @t;
+                True ->
+                  let {
+                    v [Dmd=<L,C(U)>] :: t -> t
+                    [LclId]
+                    v = f3 n (+ @t w x lvl) } in
+                  \ (y :: t) -> v (+ @t w x y)
+              }; } in
+      f3 w1 w2
+
+-- RHS size: {terms: 13, types: 34, coercions: 0, joins: 0/0}
+f14 [InlPrag=NOUSERINLINE[2]] :: forall {t}. (Ord t, Num t) => t -> t -> t -> t
+[GblId,
+ Arity=4,
+ Str=<S(LLC(C(S))LLLLL),1*U(A,A,C(C1(U)),A,A,A,A,A)><L,U(C(C1(U)),A,A,A,A,A,C(U))><L,U><L,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@t) (w [Occ=Once1!] :: Ord t) (w1 [Occ=Once1] :: Num t) (w2 [Occ=Once1] :: t) (w3 [Occ=Once1] :: t) -> case w of { GHC.Classes.C:Ord _ [Occ=Dead] _ [Occ=Dead] ww3 [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> F14.$wf14 @t ww3 w1 w2 w3 }}]
+f14 = \ (@t) (w :: Ord t) (w1 :: Num t) (w2 :: t) (w3 :: t) -> case w of { GHC.Classes.C:Ord ww1 ww2 ww3 ww4 ww5 ww6 ww7 ww8 -> F14.$wf14 @t ww3 w1 w2 w3 }
+
+
+

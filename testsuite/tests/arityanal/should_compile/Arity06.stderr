@@ -1,0 +1,34 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 14, types: 22, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F6.f6f1 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F6.f6f1 = 0
+
+-- RHS size: {terms: 7, types: 8, coercions: 0, joins: 0/0}
+f6f :: forall {t1} {t2}. (t1 -> Integer -> t2) -> t1 -> t2
+[GblId,
+ Arity=2,
+ Str=<C(C(S)),1*C1(C1(U))><L,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@t) (@t1) (h [Occ=Once1!] :: t -> Integer -> t1) (x [Occ=Once1] :: t) -> h x F6.f6f1}]
+f6f = \ (@t) (@t1) (h :: t -> Integer -> t1) (x :: t) -> h x F6.f6f1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+f6t :: Integer -> Integer -> Integer
+[GblId,
+ Arity=2,
+ Str=<S,1*U><S,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
+         Tmpl= GHC.Num.Integer.integerAdd}]
+f6t = GHC.Num.Integer.integerAdd
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+f6 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+f6 = 3
+
+
+
