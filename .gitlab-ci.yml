@@ -212,7 +212,7 @@ lint-release-changelogs:
       junit: junit.xml
     expire_in: 2 week
     paths:
-      - ghc.tar.xz
+      - "$BIN_DIST_NAME.tar.xz"
       - junit.xml
 
 .validate-linux-hadrian:
@@ -220,6 +220,7 @@ lint-release-changelogs:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9-hadrian"
+    BIN_DIST_NAME: "ghc-x86_64-deb9-linux"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -399,7 +400,7 @@ release-x86_64-freebsd:
     HADRIAN_ARGS: "--docs=no-sphinx"
     GHC_VERSION: 8.6.3
     CABAL_INSTALL_VERSION: 3.0.0.0
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-portbld-freebsd.tar.xz"
+    BIN_DIST_NAME: "ghc-x86_64-portbld-freebsd"
     TEST_ENV: "x86_64-freebsd-hadrian"
     FLAVOUR: "validate"
   after_script:
@@ -464,6 +465,7 @@ validate-x86_64-darwin:
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: --with-intree-gmp
     TEST_ENV: "x86_64-darwin-hadrian"
+    BIN_DIST_NAME: "ghc-x86_64-apple-darwin"
     FLAVOUR: "validate"
   script:
     - .gitlab/ci.sh setup
@@ -479,7 +481,7 @@ validate-x86_64-darwin:
     reports:
       junit: junit.xml
     paths:
-      - ghc.tar.xz
+      - "$BIN_DIST_NAME.tar.xz"
       - junit.xml
 
 .validate-linux:
@@ -785,7 +787,7 @@ release-x86_64-linux-deb8:
   allow_failure: true
   variables:
     TEST_ENV: "x86_64-linux-alpine"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
+    BIN_DIST_NAME: "ghc-x86_64-alpine-linux"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
     HADRIAN_ARGS: "--docs=no-sphinx"
@@ -901,7 +903,7 @@ validate-x86_64-linux-fedora27:
     expire_in: 2 week
     when: always
     paths:
-      - ghc.tar.xz
+      - "$BIN_DIST_NAME.tar.xz"
       - junit.xml
 
 .build-x86_64-windows-hadrian:
@@ -909,6 +911,7 @@ validate-x86_64-linux-fedora27:
   variables:
     MSYSTEM: MINGW64
     TEST_ENV: "x86_64-windows"
+    BIN_DIST_NAME: "ghc-x86_64-unknown-mingw32"
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
@@ -968,6 +971,7 @@ release-x86_64-windows-integer-simple:
   variables:
     BIGNUM_BACKEND: native
     BUILD_FLAVOUR: "perf"
+    BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
 
 
 ############################################################
@@ -985,7 +989,7 @@ doc-tarball:
     - validate-x86_64-windows-hadrian
   variables:
     LINUX_BINDIST: "ghc-x86_64-deb9-linux-debug.tar.xz"
-    WINDOWS_BINDIST: "ghc-x86_64-mingw32.tar.xz"
+    WINDOWS_BINDIST: "ghc-x86_64-unknown-mingw32.tar.xz"
   artifacts:
     paths:
       - haddock.html.tar.xz

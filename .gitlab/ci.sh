@@ -377,10 +377,13 @@ function build_hadrian() {
   if [ -z "$FLAVOUR" ]; then
     fail "FLAVOUR not set"
   fi
+  if [ -z "$BIN_DIST_NAME" ]; then
+    fail "BIN_DIST_NAME not set"
+  fi
 
   run_hadrian binary-dist
 
-  mv _build/bindist/ghc*.tar.xz ghc.tar.xz
+  mv _build/bindist/ghc*.tar.xz $BIN_DIST_NAME.tar.xz
 }
 
 function test_hadrian() {
