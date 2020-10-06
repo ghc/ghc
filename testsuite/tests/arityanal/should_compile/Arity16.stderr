@@ -1,0 +1,48 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 52, types: 87, coercions: 0, joins: 0/0}
+
+Rec {
+-- RHS size: {terms: 15, types: 17, coercions: 0, joins: 0/0}
+map2 [Occ=LoopBreaker] :: forall {t} {a}. (t -> a) -> [t] -> [a]
+[GblId, Arity=2, Str=<L,C(U)><S,1*U>, Unf=OtherCon []]
+map2
+  = \ (@t) (@a) (f :: t -> a) (ds :: [t]) ->
+      case ds of {
+        [] -> GHC.Types.[] @a;
+        : x xs -> GHC.Types.: @a (f x) (map2 @t @a f xs)
+      }
+end Rec }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+lvl = "Arity16.hs:(6,1)-(7,47)|function zipWith2"#
+
+-- RHS size: {terms: 3, types: 5, coercions: 0, joins: 0/0}
+lvl1 :: forall {a}. [a]
+[GblId, Str=b, Cpr=b]
+lvl1 = \ (@a) -> Control.Exception.Base.patError @'GHC.Types.LiftedRep @[a] lvl
+
+Rec {
+-- RHS size: {terms: 29, types: 35, coercions: 0, joins: 0/0}
+zipWith2 [Occ=LoopBreaker] :: forall {t1} {t2} {a}. (t1 -> t2 -> a) -> [t1] -> [t2] -> [a]
+[GblId, Arity=3, Str=<L,C(C1(U))><S,1*U><S,1*U>, Unf=OtherCon []]
+zipWith2
+  = \ (@t) (@t1) (@a) (f :: t -> t1 -> a) (ds :: [t]) (ds1 :: [t1]) ->
+      case ds of {
+        [] ->
+          case ds1 of {
+            [] -> GHC.Types.[] @a;
+            : ipv ipv1 -> lvl1 @a
+          };
+        : a1 x ->
+          case ds1 of {
+            [] -> lvl1 @a;
+            : b y -> GHC.Types.: @a (f a1 b) (zipWith2 @t @t1 @a f x y)
+          }
+      }
+end Rec }
+
+
+

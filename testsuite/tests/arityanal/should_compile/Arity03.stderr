@@ -1,0 +1,38 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 29, types: 13, coercions: 0, joins: 0/0}
+
+Rec {
+-- RHS size: {terms: 15, types: 3, coercions: 0, joins: 0/0}
+F3.$wfac [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int#
+[GblId, Arity=1, Str=<S,1*U>, Unf=OtherCon []]
+F3.$wfac
+  = \ (ww :: GHC.Prim.Int#) ->
+      case ww of wild {
+        __DEFAULT -> case F3.$wfac (GHC.Prim.-# wild 1#) of ww1 { __DEFAULT -> GHC.Prim.*# wild ww1 };
+        0# -> 1#
+      }
+end Rec }
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+fac [InlPrag=NOUSERINLINE[2]] :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<S(S),1*U(1*U)>,
+ Cpr=m1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once1!] :: Int) -> case w of { GHC.Types.I# ww1 [Occ=Once1] -> case F3.$wfac ww1 of ww2 [Occ=Once1] { __DEFAULT -> GHC.Types.I# ww2 } }}]
+fac = \ (w :: Int) -> case w of { GHC.Types.I# ww1 -> case F3.$wfac ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 } }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+f3 :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<S(S),1*U(1*U)>,
+ Cpr=m1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
+         Tmpl= fac}]
+f3 = fac
+
+
+
