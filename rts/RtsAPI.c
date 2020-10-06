@@ -461,6 +461,26 @@ void rts_evalIO (/* inout */ Capability **cap,
 }
 
 /*
+ * rts_inCall() is similar to rts_evalIO, but expects to be called as an incall,
+ * and is not expected to be called by user code directly.
+ */
+void rts_inCall (/* inout */ Capability **cap,
+                 /* in    */ HaskellObj p,
+                 /* out */   HaskellObj *ret)
+{
+    StgTSO* tso;
+
+    tso = createStrictIOThread(*cap, RtsFlags.GcFlags.initialStkSize, p);
+    if ((*cap)->running_task->preferred_capability != -1) {
+        // enabled_capabilities should not change between here and waitCapability()
+        ASSERT((*cap)->no == ((*cap)->running_task->preferred_capability % enabled_capabilities));
+        // we requested explicit affinity; don't move this thread from now on.
+        tso->flags |= TSO_LOCKED;
+    }
+    scheduleWaitThread(tso,ret,cap);
+}
+
+/*
  * rts_evalStableIOMain() is suitable for calling main Haskell thread
  * stored in (StablePtr (IO a)) it calls rts_evalStableIO but wraps
  * function in GHC.TopHandler.runMainIO that installs top_handlers.

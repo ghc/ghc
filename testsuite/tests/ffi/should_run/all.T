@@ -198,3 +198,5 @@ test('PrimFFIWord8', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord8_c.c'
 test('PrimFFIInt16', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt16_c.c'])
 
 test('PrimFFIWord16', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord16_c.c'])
+
+test('IncallAffinity', [req_smp, only_ways(['threaded1', 'threaded2'])], compile_and_run, ['IncallAffinity_c.c -no-hs-main'])

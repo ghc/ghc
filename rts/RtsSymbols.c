@@ -703,6 +703,7 @@
       SymI_HasProto(rts_evalStableIOMain)                               \
       SymI_HasProto(rts_evalStableIO)                                   \
       SymI_HasProto(rts_eval_)                                          \
+      SymI_HasProto(rts_inCall)                                         \
       SymI_HasProto(rts_getBool)                                        \
       SymI_HasProto(rts_getChar)                                        \
       SymI_HasProto(rts_getDouble)                                      \
