@@ -1017,10 +1017,13 @@ hGetBufSome h !ptr count
   | otherwise =
       wantReadableHandle_ "hGetBufSome" h $ \ h_@Handle__{..} -> do
          flushCharReadBuffer h_
-         buf@Buffer{ bufSize=sz } <- readIORef haByteBuffer
+         buf@Buffer{ bufSize=sz, bufOffset=offset } <- readIORef haByteBuffer
          if isEmptyBuffer buf
             then case count > sz of  -- large read? optimize it with a little special case:
-                    True -> RawIO.read haDevice (castPtr ptr) 0 count
+                    True -> do bytes <- RawIO.read haDevice (castPtr ptr) offset count
+                               -- Update buffer with actual bytes written.
+                               writeIORef haByteBuffer $! bufferAddOffset bytes buf
+                               return bytes
                     _ -> do (r,buf') <- Buffered.fillReadBuffer haDevice buf
                             if r == 0
                                then return 0
@@ -1074,7 +1077,9 @@ bufReadNBEmpty   h_@Handle__{..}
        m <- RawIO.readNonBlocking haDevice ptr offset count
        case m of
          Nothing -> return so_far
-         Just n  -> return (so_far + n)
+         Just n  -> do -- Update buffer with actual bytes written.
+                       writeIORef haByteBuffer $! bufferAddOffset n buf
+                       return (so_far + n)
 
  | otherwise = do
     --  buf <- readIORef haByteBuffer
