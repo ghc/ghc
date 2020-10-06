@@ -2049,6 +2049,8 @@ isTauTyCon :: TyCon -> Bool
 isTauTyCon (SynonymTyCon { synIsTau = is_tau }) = is_tau
 isTauTyCon _                                    = True
 
+-- | Is this tycon neither a type family nor a synonym that expands
+-- to a type family?
 isFamFreeTyCon :: TyCon -> Bool
 isFamFreeTyCon (SynonymTyCon { synIsFamFree = fam_free }) = fam_free
 isFamFreeTyCon (FamilyTyCon { famTcFlav = flav })         = isDataFamFlav flav

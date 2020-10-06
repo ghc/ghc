@@ -488,9 +488,10 @@ interactWithInertsStage :: WorkItem -> TcS (StopOrContinue Ct)
 
 interactWithInertsStage wi
   = do { inerts <- getTcSInerts
+       ; lvl  <- getTcLevel
        ; let ics = inert_cans inerts
        ; case wi of
-             CTyEqCan  {} -> interactTyVarEq ics wi
+             CEqCan    {} -> interactEq lvl  ics wi
              CFunEqCan {} -> interactFunEq   ics wi
              CIrredCan {} -> interactIrred   ics wi
              CDictCan  {} -> interactDict    ics wi
@@ -1339,71 +1340,64 @@ upgradeWanted ct = ct { cc_ev = upgrade_ev (cc_ev ct) }
     upgrade_ev ev = ASSERT2( isWanted ev, ppr ct )
                     ev { ctev_nosh = WDeriv }
 
-improveLocalFunEqs :: CtEvidence -> InertCans -> TyCon -> [TcType] -> TcTyVar
+improveLocalFunEqs :: CtEvidence -> InertCans -> TyCon -> [TcType] -> TcType
                    -> TcS ()
 -- Generate derived improvement equalities, by comparing
 -- the current work item with inert CFunEqs
 -- E.g.   x + y ~ z,   x + y' ~ z   =>   [D] y ~ y'
 --
 -- See Note [FunDep and implicit parameter reactions]
-improveLocalFunEqs work_ev inerts fam_tc args fsk
-  | isGiven work_ev -- See Note [No FunEq improvement for Givens]
-    || not (isImprovable work_ev)
-  = return ()
-
-  | otherwise
-  = do { eqns <- improvement_eqns
-       ; if not (null eqns)
-         then do { traceTcS "interactFunEq improvements: " $
+-- No Givens here: Note [No FunEq improvement for Givens]
+-- Precondition: isImprovable work_ev
+improveLocalFunEqs work_ev inerts fam_tc args rhs
+  = ASSERT( not (isGiven work_ev) )
+    ASSERT( isImprovable work_ev )
+    unless (null improvement_eqns) $
+    do { traceTcS "interactFunEq improvements: " $
                    vcat [ text "Eqns:" <+> ppr eqns
                         , text "Candidates:" <+> ppr funeqs_for_tc
                         , text "Inert eqs:" <+> ppr (inert_eqs inerts) ]
-                 ; emitFunDepDeriveds eqns }
-         else return () }
-
+       ; emitFunDepDeriveds eqns }
   where
     funeqs        = inert_funeqs inerts
-    funeqs_for_tc = findFunEqsByTyCon funeqs fam_tc
+    funeqs_for_tc = [ funeq_ct | funeq_ct : _ <- findFunEqsByTyCon funeqs fam_tc
+                               , NomEq <- ctEqRel funeq_ct ]
+                                  -- representational equalities don't interact
+                                  -- with type family dependencies
     work_loc      = ctEvLoc work_ev
     work_pred     = ctEvPred work_ev
     fam_inj_info  = tyConInjectivityInfo fam_tc
 
     --------------------
-    improvement_eqns :: TcS [FunDepEqn CtLoc]
+    improvement_eqns :: [FunDepEqn CtLoc]
     improvement_eqns
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
       =    -- Try built-in families, notably for arithmethic
-        do { rhs <- rewriteTyVar fsk
-           ; concatMapM (do_one_built_in ops rhs) funeqs_for_tc }
+        concatMap (do_one_built_in ops rhs) funeqs_for_tc
 
       | Injective injective_args <- fam_inj_info
       =    -- Try improvement from type families with injectivity annotations
-        do { rhs <- rewriteTyVar fsk
-           ; concatMapM (do_one_injective injective_args rhs) funeqs_for_tc }
+        concatMap (do_one_injective injective_args rhs) funeqs_for_tc
 
       | otherwise
       = return []
 
     --------------------
-    do_one_built_in ops rhs (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk, cc_ev = inert_ev })
-      = do { inert_rhs <- rewriteTyVar ifsk
-           ; return $ mk_fd_eqns inert_ev (sfInteractInert ops args rhs iargs inert_rhs) }
+    do_one_built_in ops rhs (CEqCan { cc_lhs = TyFamLHS _ iargs, cc_rhs = irhs, cc_ev = inert_ev })
+      = mk_fd_eqns inert_ev (sfInteractInert ops args rhs iargs irhs)
 
     do_one_built_in _ _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
 
     --------------------
     -- See Note [Type inference for type families with injectivity]
-    do_one_injective inj_args rhs (CFunEqCan { cc_tyargs = inert_args
-                                             , cc_fsk = ifsk, cc_ev = inert_ev })
+    do_one_injective inj_args rhs (CEqCan { cc_lhs = TyFamLHS _ inert_args
+                                          , cc_rhs = irhs, cc_ev = inert_ev })
       | isImprovable inert_ev
-      = do { inert_rhs <- rewriteTyVar ifsk
-           ; return $ if rhs `tcEqType` inert_rhs
-                      then mk_fd_eqns inert_ev $
-                             [ Pair arg iarg
-                             | (arg, iarg, True) <- zip3 args inert_args inj_args ]
-                      else [] }
+      , rhs `tcEqType` irhs
+      = mk_fd_eqns inert_ev $ [ Pair arg iarg
+                              | (arg, iarg, True) <- zip3 args inert_args inj_args ]
       | otherwise
-      = return []
+      = []
 
     do_one_injective _ _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
 
@@ -1433,6 +1427,8 @@ reactFunEq from_this fsk1 solve_this fsk2
 
 {- Note [Type inference for type families with injectivity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"RAE": Update this Note.
+
 Suppose we have a type family with an injectivity annotation:
     type family F a b = r | r -> b
 
@@ -1553,32 +1549,32 @@ test when solving pairwise CFunEqCan.
 
 **********************************************************************
 *                                                                    *
-                   interactTyVarEq
+                   interactEq
 *                                                                    *
 **********************************************************************
 -}
 
-inertsCanDischarge :: InertCans -> TcTyVar -> TcType -> CtFlavourRole
+inertsCanDischarge :: InertCans -> CanEqLHS -> TcType -> CtFlavourRole
                    -> Maybe ( CtEvidence  -- The evidence for the inert
                             , SwapFlag    -- Whether we need mkSymCo
                             , Bool)       -- True <=> keep a [D] version
                                           --          of the [WD] constraint
-inertsCanDischarge inerts tv rhs fr
-  | (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i
-                                    , cc_eq_rel = eq_rel }
-                             <- findTyEqs inerts tv
+inertsCanDischarge inerts lhs rhs fr
+  | (ev_i : _) <- [ ev_i | CEqCan { cc_ev = ev_i, cc_rhs = rhs_i
+                                  , cc_eq_rel = eq_rel }
+                             <- findEq inerts lhs
                          , (ctEvFlavour ev_i, eq_rel) `eqCanDischargeFR` fr
                          , rhs_i `tcEqType` rhs ]
   =  -- Inert:     a ~ ty
      -- Work item: a ~ ty
     Just (ev_i, NotSwapped, keep_deriv ev_i)
 
-  | Just tv_rhs <- getTyVar_maybe rhs
+  | Just rhs_lhs <- canEqLHS_maybe rhs
   , (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i
                                     , cc_eq_rel = eq_rel }
-                             <- findTyEqs inerts tv_rhs
+                             <- findEq inerts rhs_lhs
                          , (ctEvFlavour ev_i, eq_rel) `eqCanDischargeFR` fr
-                         , rhs_i `tcEqType` mkTyVarTy tv ]
+                         , rhs_i `tcEqType` canEqLHSType lhs ]
   =  -- Inert:     a ~ b
      -- Work item: b ~ a
      Just (ev_i, IsSwapped, keep_deriv ev_i)
@@ -1594,14 +1590,13 @@ inertsCanDischarge inerts tv rhs fr
       | otherwise
       = False  -- Work item is fully discharged
 
-interactTyVarEq :: InertCans -> Ct -> TcS (StopOrContinue Ct)
--- CTyEqCans are always consumed, so always returns Stop
-interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
-                                          , cc_rhs = rhs
-                                          , cc_ev = ev
-                                          , cc_eq_rel = eq_rel })
+interactEq :: TcLevel -> InertCans -> Ct -> TcS (StopOrContinue Ct)
+interactEq tclvl inerts workItem@(CEqCan { cc_lhs = lhs
+                                         , cc_rhs = rhs
+                                         , cc_ev = ev
+                                         , cc_eq_rel = eq_rel })
   | Just (ev_i, swapped, keep_deriv)
-       <- inertsCanDischarge inerts tv rhs (ctEvFlavour ev, eq_rel)
+       <- inertsCanDischarge inerts lhs rhs (ctEvFlavour ev, eq_rel)
   = do { setEvBindIfWanted ev $
          evCoercion (maybeTcSymCo swapped $
                      tcDowngradeRole (eqRelRole eq_rel)
@@ -1622,18 +1617,25 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
        ; continueWith workItem }
 
   | isGiven ev         -- See Note [Touchables and givens]
+                       -- See Note [No FunEq improvement for Givens]
   = continueWith workItem
 
+  | TyVarCEL tv <- lhs
+  , canSolveByUnification tclvl tv rhs
+  = do { solveByUnification ev tv rhs
+       ; n_kicked <- kickOutAfterUnification tv
+       ; return (Stop ev (text "Solved by unification" <+> pprKicked n_kicked)) }
+
+    -- try improvement, if possible
+  | TyFamCEL fam_tc fam_args <- lhs
+  , isImprovable ev
+  = do { improveLocalFunEqs ev inerts fam_tc fam_args rhs
+       ; continueWith workItem }
+
   | otherwise
-  = do { tclvl <- getTcLevel
-       ; if canSolveByUnification tclvl tv rhs
-         then do { solveByUnification ev tv rhs
-                 ; n_kicked <- kickOutAfterUnification tv
-                 ; return (Stop ev (text "Solved by unification" <+> pprKicked n_kicked)) }
+  = continueWith workItem
 
-         else continueWith workItem }
-
-interactTyVarEq _ wi = pprPanic "interactTyVarEq" (ppr wi)
+interactEq _ _ wi = pprPanic "interactEq" (ppr wi)
 
 solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
 -- Solve with the identity coercion
@@ -1948,27 +1950,15 @@ Test case: typecheck/should_fail/T16512a
 -}
 
 --------------------
-doTopReactFunEq :: Ct -> TcS (StopOrContinue Ct)
-doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
-                                     , cc_tyargs = args, cc_fsk = fsk })
-
-  | fsk `elemVarSet` tyCoVarsOfTypes args
-  = no_reduction    -- See Note [FunEq occurs-check principle]
-
-  | otherwise  -- Note [Reduction for Derived CFunEqCans]
-  = do { match_res <- matchFam fam_tc args
-                           -- Look up in top-level instances, or built-in axiom
-                           -- See Note [MATCHING-SYNONYMS]
-       ; case match_res of
-           Nothing         -> no_reduction
-           Just match_info -> reduce_top_fun_eq old_ev fsk match_info }
-  where
-    no_reduction
-      = do { improveTopFunEqs old_ev fam_tc args fsk
-           ; continueWith work_item }
+doTopReactEq :: Ct -> TcS (StopOrContinue Ct)
+doTopReactEq work_item@(CEqCan { cc_ev = old_ev, cc_lhs = TyFamCEL fam_tc args
+                               , cc_rhs = rhs })
+  = do { improveTopFunEqs old_ev fam_tc args rhs
+       ; doTopReactOther work_item }
+doTopReactEq other_work_item = doTopReactOther work_item
 
 doTopReactFunEq w = pprPanic "doTopReactFunEq" (ppr w)
-
+{- "RAE"
 reduce_top_fun_eq :: CtEvidence -> TcTyVar -> (TcCoercion, TcType)
                   -> TcS (StopOrContinue Ct)
 -- We have found an applicable top-level axiom: use it to reduce
@@ -1997,17 +1987,17 @@ reduce_top_fun_eq old_ev fsk (ax_co, rhs_ty)
          vcat [ text "old_ev:" <+> ppr old_ev
               , nest 2 (text ":=") <+> ppr ax_co ]
        ; stopWith old_ev "Fun/Top" }
+-}
 
-improveTopFunEqs :: CtEvidence -> TyCon -> [TcType] -> TcTyVar -> TcS ()
+improveTopFunEqs :: CtEvidence -> TyCon -> [TcType] -> TcType -> TcS ()
 -- See Note [FunDep and implicit parameter reactions]
-improveTopFunEqs ev fam_tc args fsk
+improveTopFunEqs ev fam_tc args rhs
   | isGiven ev            -- See Note [No FunEq improvement for Givens]
     || not (isImprovable ev)
   = return ()
 
   | otherwise
   = do { fam_envs <- getFamInstEnvs
-       ; rhs <- rewriteTyVar fsk
        ; eqns <- improve_top_fun_eqs fam_envs fam_tc args rhs
        ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs
                                           , ppr eqns ])
@@ -2089,13 +2079,13 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
                           _          -> True
                       , (ax_arg, arg, True) <- zip3 ax_args args inj_args ] }
 
-
+{- "RAE"
 shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
                   -> TyCon -> [TcType] -> TcS ()
 -- See Note [Top-level reductions for type functions]
 -- Previously, we flattened the tc_args here, but there's no need to do so.
 -- And, if we did, this function would have all the complication of
--- GHC.Tc.Solver.Canonical.canCFunEqCan. See Note [canCFunEqCan]
+-- GHC.Tc.Solver.Canonical.canCFunEqCan. See Note [canCFunEqCan] in that file.
 shortCutReduction old_ev fsk ax_co fam_tc tc_args
   = ASSERT( ctEvEqRel old_ev == NomEq)
                -- ax_co :: F args ~ G tc_args
@@ -2120,6 +2110,7 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
        ; updWorkListTcS (extendWorkListFunEq new_ct) }
   where
     deeper_loc = bumpCtLocDepth (ctEvLoc old_ev)
+-}
 
 {- Note [Top-level reductions for type functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

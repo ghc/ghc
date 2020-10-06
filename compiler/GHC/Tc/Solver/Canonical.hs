@@ -121,14 +121,12 @@ canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
   = {-# SCC "canClass" #-}
     canClass ev cls xis pend_sc
 
-canonicalize (CTyEqCan { cc_ev = ev
-                       , cc_tyvar  = tv
-                       , cc_rhs    = xi
-                       , cc_eq_rel = eq_rel })
+canonicalize (CEqCan { cc_ev     = ev
+                     , cc_lhs    = lhs
+                     , cc_rhs    = rhs
+                     , cc_eq_rel = eq_rel })
   = {-# SCC "canEqLeafTyVarEq" #-}
-    canEqNC ev eq_rel (mkTyVarTy tv) xi
-      -- NB: Don't use canEqTyVar because that expects flattened types,
-      -- and tv and xi may not be flat w.r.t. an updated inert set
+    canEqNC ev eq_rel (canEqLHSType lhs) rhs
 
 canonicalize (CFunEqCan { cc_ev = ev
                         , cc_fun    = fn
@@ -1627,6 +1625,8 @@ Data family            NO{3}       MAYBE{3}                canTyConApp(can_decom
 Type family            NO           NO                            canEqFun
 AppTy                  NO{4}        NO{4}                         can_eq_nc'
 
+"RAE" update all this; no more canEqFun
+
 {1}: Type families can be injective in some, but not all, of their arguments,
 so we want to do partial decomposition. This is quite different than the way
 other decomposition is done, where the decomposed equalities replace the original
@@ -1981,35 +1981,6 @@ whenever possible, but #15577 was an infinite loop because even
 though the coercion was homo-kinded, `kind_co` was not `Refl`, so we
 made a new (identical) CFunEqCan, and then the entire process repeated.
 -}
-
-canEqFun :: SwapFlag
-         -> CtEvidence
-         -> EqRel
-         -> TyCon      -- the type function
-         -> [TcType]   -- type function args; exactly saturated; flat
-         -> TcType     -- RHS; flat
-         -> TcType     -- pretty RHS; flat
-         -> TcS (StopOrContinue Ct)
--- The types have already been flattened, so we know that F tys cannot
--- reduce, w.r.t. both the top-level axioms (type instances) and any local
--- assumptions (the inert set)
-canEqFun swapped ev eq_rel fun_tc fun_args rhs ps_rhs
-  = do { ev' <- maybe_swap
-       ; continueWith (CFunEqCan { cc_ev = ev'
-                                 , cc_fun = fun_tc
-                                 , cc_tyargs = fun_args
-                                 , cc_rhs = ps_rhs
-                                 , cc_eq_rel = eq_rel }) }
-  where
-    role = eqRelRole eq_rel
-    maybe_swap
-      | IsSwapped <- swapped
-      = rewriteEqEvidence ev IsSwapped lhs rhs
-                             (mkReflCo role lhs) (mkReflCo role rhs)
-
-      | otherwise
-      = return ev
-
 
 canCFunEqCan :: CtEvidence
              -> TyCon -> [TcType]   -- LHS

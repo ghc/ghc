@@ -851,27 +851,37 @@ isTyFamFree :: Type -> Bool
 -- ^ Check that a type does not contain any type family applications.
 isTyFamFree = null . tcTyFamInsts
 
-anyRewritableTyVar :: Bool    -- Ignore casts and coercions
-                   -> EqRel   -- Ambient role
-                   -> (EqRel -> TcTyVar -> Bool)
-                   -> TcType -> Bool
--- (anyRewritableTyVar ignore_cos pred ty) returns True
---    if the 'pred' returns True of any free TyVar in 'ty'
+any_rewritable :: Bool    -- Ignore casts and coercions
+               -> EqRel   -- Ambient role
+               -> (EqRel -> TcTyVar -> Bool)           -- check tyvar
+               -> (EqRel -> TyCon -> [TcType] -> Bool) -- check type family
+               -> (TyCon -> Bool)                      -- expand type synonym?
+               -> TcType -> Bool
+-- Checks every tyvar and tyconapp (not including FunTys) within a type,
+-- ORing the results of the predicates above together
 -- Do not look inside casts and coercions if 'ignore_cos' is True
 -- See Note [anyRewritableTyVar must be role-aware]
-anyRewritableTyVar ignore_cos role pred ty
-  = go role emptyVarSet ty
+{-# INLINE any_rewritable #-} -- this allows specialization of predicates
+any_rewritable ignore_cos role tv_pred tc_pred should_expand
+  = go role emptyVarSet
   where
-    -- NB: No need to expand synonyms, because we can find
-    -- all free variables of a synonym by looking at its
-    -- arguments
-
     go_tv rl bvs tv | tv `elemVarSet` bvs = False
                     | otherwise           = pred rl tv
 
+    go rl bvs ty@(TyConApp tc tys)
+      | isTypeSynonymTyCon tc
+      , should_expand tc
+      , Just ty' <- tcView ty   -- should always match
+      = go rl bvs ty'
+
+      | tc_pred rl tc tys
+      = True
+
+      | otherwise
+      = go_tc rl bvs tc tys
+
     go rl bvs (TyVarTy tv)       = go_tv rl bvs tv
     go _ _     (LitTy {})        = False
-    go rl bvs (TyConApp tc tys)  = go_tc rl bvs tc tys
     go rl bvs (AppTy fun arg)    = go rl bvs fun || go NomEq bvs arg
     go rl bvs (FunTy _ w arg res)  = go NomEq bvs arg_rep || go NomEq bvs res_rep ||
                                      go rl bvs arg || go rl bvs res || go NomEq bvs w
@@ -894,6 +904,26 @@ anyRewritableTyVar ignore_cos role pred ty
       | otherwise  = anyVarSet (go_tv rl bvs) (tyCoVarsOfCo co)
       -- We don't have an equivalent of anyRewritableTyVar for coercions
       -- (at least not yet) so take the free vars and test them
+
+anyRewritableTyVar :: Bool     -- Ignore casts and coercions
+                   -> EqRel    -- Ambient role
+                   -> (EqRel -> TcTyVar -> Bool)  -- check tyvar
+                   -> TcType -> Bool
+anyRewritableTyVar ignore_cos role pred
+  = any_rewritable ignore_cos role pred
+      (\ _ _ _ -> False) -- don't check tyconapps
+      (\ _ -> False)     -- don't expand synonyms
+    -- NB: No need to expand synonyms, because we can find
+    -- all free variables of a synonym by looking at its
+    -- arguments
+
+anyRewritableTyFamApp :: EqRel   -- Ambient role
+                      -> (EqRel -> TyCon -> [TcType] -> Bool) -- check tyconapp
+                          -- should return True only for type family applications
+                      -> TcType -> Bool
+  -- always ignores casts & coercions
+anyRewritableTyFamApp role check_tyconapp
+  = any_rewritable True role (\ _ _ -> False) check_tyconapp isFamFreeTyCon
 
 {- Note [anyRewritableTyVar must be role-aware]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1531,7 +1561,15 @@ pickyEqType :: TcType -> TcType -> Bool
 -- This ignores kinds and coercions, because this is used only for printing.
 pickyEqType ty1 ty2 = tc_eq_type True False ty1 ty2
 
-
+-- | Check whether two TyConApps are the same; if the number of arguments
+-- are different, just checks the common prefix of arguments.
+tcEqTyConApps :: TyCon -> [Type] -> TyCon -> [Type] -> Bool
+tcEqTyConApps tc1 args1 tc2 args2
+  = tc1 == tc2 &&
+    and (zipWith tcEqTypeNoKindCheck args1 args2)
+    -- No kind check necessary: if both arguments are well typed, then
+    -- any difference in the kinds of later arguments would show up
+    -- as differences in earlier (dependent) arguments
 
 -- | Real worker for 'tcEqType'. No kind check!
 tc_eq_type :: Bool          -- ^ True <=> do not expand type synonyms

@@ -484,9 +484,7 @@ canEqLHSKind (TyFamCEL fam_tc fam_args) = piResultTys (tyConKind fam_tc) fam_arg
 eqCanEqLHS :: CanEqLHS -> CanEqLHS -> Bool
 eqCanEqLHS (TyVarCEL tv1) (TyVarCEL tv2) = tv1 == tv2
 eqCanEqLHS (TyFamCEL fam_tc1 fam_args1) (TyFamCEL fam_tc2 fam_args2)
-  = fam_tc1 == fam_tc2 && and (zipWith tcEqTypeNoKindCheck fam_args1 fam_args2)
-  -- tcEqTypeNoKindCheck is sufficient; see reasoning in
-  -- Note [Use loose types in inert set] in GHC.Tc.Solver.Monad
+  = tcEqTyConApps fam_tc1 fam_args1 fam_tc2 fam_args2
 
 -- | Result of checking whether a RHS is suitable for pairing
 -- with a CanEqLHS in a CEqCan.
@@ -1734,7 +1732,7 @@ funEqCanDischarge
   :: CtEvidence -> CtEvidence
   -> ( SwapFlag   -- NotSwapped => lhs can discharge rhs
                   -- Swapped    => rhs can discharge lhs
-     , Bool)      -- True <=> upgrade non-discharded one
+     , Bool)      -- True <=> upgrade non-discharged one
                   --          from [W] to [WD]
 -- See Note [funEqCanDischarge]
 funEqCanDischarge ev1 ev2
