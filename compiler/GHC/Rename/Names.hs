@@ -680,8 +680,7 @@ getLocalNonValBinders fixity_env
                 hs_fords  = foreign_decls })
   = do  { -- Process all type/class decls *except* family instances
         ; let inst_decls = tycl_decls >>= group_instds
-        ; overload_ok_flag <- xoptM LangExt.DuplicateRecordFields
-        ; let overload_ok = if overload_ok_flag then DuplicateRecordFields else NoDuplicateRecordFields
+        ; overload_ok <- xopt_DuplicateRecordFields <$> getDynFlags
         ; has_sel_flag <- xoptM LangExt.FieldSelectors
         ; let has_sel = if has_sel_flag then FieldSelectors else NoFieldSelectors
         ; (tc_avails, tc_fldss)

@@ -37,6 +37,7 @@ module GHC.Driver.Session (
         wopt_fatal, wopt_set_fatal, wopt_unset_fatal,
         xopt, xopt_set, xopt_unset,
         xopt_set_unlessExplSpec,
+        xopt_DuplicateRecordFields,
         lang_set,
         whenGeneratingDynamicToo, ifGeneratingDynamicToo,
         whenCannotGenerateDynamicToo,
@@ -264,6 +265,7 @@ import GHC.Utils.Monad
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Types.SrcLoc
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
+import qualified GHC.Types.FieldLabel as FieldLabel
 import GHC.Data.FastString
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
@@ -1755,6 +1757,11 @@ xopt_set_unlessExplSpec ext setUnset dflags =
         stripOnOff (Off x) = x
     in
         if ext `elem` referedExts then dflags else setUnset dflags ext
+
+xopt_DuplicateRecordFields :: DynFlags -> FieldLabel.DuplicateRecordFields
+xopt_DuplicateRecordFields dfs = if xopt LangExt.DuplicateRecordFields dfs
+  then FieldLabel.DuplicateRecordFields
+  else FieldLabel.NoDuplicateRecordFields
 
 lang_set :: DynFlags -> Maybe Language -> DynFlags
 lang_set dflags lang =

@@ -74,6 +74,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
 import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
+import GHC.Driver.Session ( getDynFlags, xopt_DuplicateRecordFields )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, ap, guard )
@@ -729,7 +730,7 @@ rnHsRecUpdFields
     -> RnM ([LHsRecUpdField GhcRn], FreeVars)
 rnHsRecUpdFields flds
   = do { pun_ok        <- xoptM LangExt.RecordPuns
-       ; overload_ok   <- (\x -> if x then DuplicateRecordFields else NoDuplicateRecordFields) <$> xoptM LangExt.DuplicateRecordFields
+       ; overload_ok <- xopt_DuplicateRecordFields <$> getDynFlags
        ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok) flds
        ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds
 
