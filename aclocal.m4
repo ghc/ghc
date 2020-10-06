@@ -2062,12 +2062,13 @@ case "$1" in
 # --------------------------------
 # converts the canonicalized target into something llvm can understand
 AC_DEFUN([GHC_LLVM_TARGET], [
-  case "$2-$3" in
+  llvm_target_cpu=$1
+  case "$1-$2-$3" in
     *-freebsd*-gnueabihf)
       llvm_target_vendor="unknown"
       llvm_target_os="freebsd-gnueabihf"
       ;;
-    hardfloat-*eabi)
+    *-hardfloat-*eabi)
       llvm_target_vendor="unknown"
       llvm_target_os="$3""hf"
       ;;
@@ -2083,12 +2084,22 @@ AC_DEFUN([GHC_LLVM_TARGET], [
       GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
       llvm_target_os="$3"
       ;;
+    # apple is a bit about their naming scheme for
+    # aarch64; and clang on macOS doesn't know that
+    # aarch64 would be arm64. So for LLVM we'll need
+    # to call it arm64; while we'll refer to it internally
+    # as aarch64 for consistency and sanity.
+    aarch64-apple-*)
+      llvm_target_cpu="arm64"
+      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
+      GHC_CONVERT_OS([$3],[$1],[llvm_target_os])
+      ;;
     *)
       GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
       GHC_CONVERT_OS([$3],[$1],[llvm_target_os])
       ;;
   esac
-  $4="$1-$llvm_target_vendor-$llvm_target_os"
+  $4="$llvm_target_cpu-$llvm_target_vendor-$llvm_target_os"
 ])
 
 
