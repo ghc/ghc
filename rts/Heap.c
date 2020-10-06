@@ -93,6 +93,7 @@ StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[siz
 
         // No pointers
         case ARR_WORDS:
+        case STACK:
             break;
 
         // Default layout
