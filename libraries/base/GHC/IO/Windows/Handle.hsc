@@ -437,7 +437,7 @@ hwndRead hwnd ptr offset bytes
       | err == #{const STATUS_END_OF_FILE}  = Mgr.ioSuccess 0
       | err == #{const ERROR_BROKEN_PIPE}   = Mgr.ioSuccess 0
       | err == #{const STATUS_PIPE_BROKEN}  = Mgr.ioSuccess 0
-      | err == #{const ERROR_NO_MORE_ITEMS} = Mgr.ioSuccess 0
+      | err == #{const ERROR_NO_MORE_ITEMS} = Mgr.ioSuccess $ fromIntegral dwBytes
       | err == #{const ERROR_MORE_DATA}     = Mgr.ioSuccess $ fromIntegral dwBytes
       | otherwise                           = Mgr.ioFailed err
 
