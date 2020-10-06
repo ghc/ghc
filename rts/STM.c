@@ -187,7 +187,7 @@ static StgClosure *lock_tvar(Capability *cap STG_UNUSED,
                              StgTVar *s STG_UNUSED) {
   StgClosure *result;
   TRACE("%p : lock_tvar(%p)", trec, s);
-  result = s -> current_value;
+  result = SEQ_CST_LOAD(&s->current_value);
   return result;
 }
 
@@ -198,8 +198,8 @@ static void unlock_tvar(Capability *cap,
                         StgBool force_update) {
   TRACE("%p : unlock_tvar(%p)", trec, s);
   if (force_update) {
-    StgClosure *old_value = s -> current_value;
-    s -> current_value = c;
+    StgClosure *old_value = SEQ_CST_LOAD(&s->current_value);
+    RELEASE_STORE(&s->current_value, c);
     dirty_TVAR(cap, s, old_value);
   }
 }
@@ -210,7 +210,7 @@ static StgBool cond_lock_tvar(Capability *cap STG_UNUSED,
                               StgClosure *expected) {
   StgClosure *result;
   TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
-  result = RELAXED_LOAD(&s->current_value);
+  result = SEQ_CST_LOAD(&s->current_value);
   TRACE("%p : %s", trec, (result == expected) ? "success" : "failure");
   return (result == expected);
 }
@@ -240,7 +240,7 @@ static StgClosure *lock_tvar(Capability *cap STG_UNUSED,
   StgClosure *result;
   TRACE("%p : lock_tvar(%p)", trec, s);
   ASSERT(smp_locked == trec);
-  result = RELAXED_LOAD(&s->current_value);
+  result = SEQ_CST_LOAD(&s->current_value);
   return result;
 }
 
@@ -252,8 +252,8 @@ static void *unlock_tvar(Capability *cap,
   TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
   ASSERT(smp_locked == trec);
   if (force_update) {
-    StgClosure *old_value = s -> current_value;
-    RELAXED_STORE(&s->current_value, c);
+    StgClosure *old_value = SEQ_CST_LOAD(&s->current_value);
+    RELEASE_STORE(&s->current_value, c);
     dirty_TVAR(cap, s, old_value);
   }
 }
@@ -265,7 +265,7 @@ static StgBool cond_lock_tvar(Capability *cap STG_UNUSED,
   StgClosure *result;
   TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
   ASSERT(smp_locked == trec);
-  result = RELAXED_LOAD(&s->current_value);
+  result = SEQ_CST_LOAD(&s->current_value);
   TRACE("%p : %d", result ? "success" : "failure");
   return (result == expected);
 }
@@ -292,9 +292,9 @@ static StgClosure *lock_tvar(Capability *cap,
   TRACE("%p : lock_tvar(%p)", trec, s);
   do {
     do {
-      result = RELAXED_LOAD(&s->current_value);
+      result = SEQ_CST_LOAD(&s->current_value);
     } while (GET_INFO(UNTAG_CLOSURE(result)) == &stg_TREC_HEADER_info);
-  } while (cas((void *)&(s -> current_value),
+  } while (cas((void *) &s->current_value,
                (StgWord)result, (StgWord)trec) != (StgWord)result);
 
 
@@ -311,7 +311,7 @@ static void unlock_tvar(Capability *cap,
                         StgClosure *c,
                         StgBool force_update STG_UNUSED) {
   TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
-  ASSERT(RELAXED_LOAD(&s->current_value) == (StgClosure *)trec);
+  ASSERT(SEQ_CST_LOAD(&s->current_value) == (StgClosure *)trec);
   RELEASE_STORE(&s->current_value, c);
   dirty_TVAR(cap, s, (StgClosure *) trec);
 }
@@ -375,7 +375,7 @@ static void unpark_waiters_on(Capability *cap, StgTVar *s) {
   StgTVarWatchQueue *trail;
   TRACE("unpark_waiters_on tvar=%p", s);
   // unblock TSOs in reverse order, to be a bit fairer (#2319)
-  for (q = s -> first_watch_queue_entry, trail = q;
+  for (q = SEQ_CST_LOAD(&s->first_watch_queue_entry), trail = q;
        q != END_STM_WATCH_QUEUE;
        q = q -> next_queue_entry) {
     trail = q;
@@ -532,16 +532,16 @@ static void build_watch_queue_entries_for_trec(Capability *cap,
     StgTVarWatchQueue *fq;
     s = e -> tvar;
     TRACE("%p : adding tso=%p to watch queue for tvar=%p", trec, tso, s);
-    ACQ_ASSERT(RELAXED_LOAD(&s->current_value) == (StgClosure *)trec);
-    NACQ_ASSERT(RELAXED_LOAD(&s->current_value) == e -> expected_value);
-    fq = s -> first_watch_queue_entry;
+    ACQ_ASSERT(SEQ_CST_LOAD(&s->current_value) == (StgClosure *)trec);
+    NACQ_ASSERT(SEQ_CST_LOAD(&s->current_value) == e -> expected_value);
+    fq = SEQ_CST_LOAD(&s->first_watch_queue_entry);
     q = alloc_stg_tvar_watch_queue(cap, (StgClosure*) tso);
     q -> next_queue_entry = fq;
     q -> prev_queue_entry = END_STM_WATCH_QUEUE;
     if (fq != END_STM_WATCH_QUEUE) {
       fq -> prev_queue_entry = q;
     }
-    s -> first_watch_queue_entry = q;
+    SEQ_CST_STORE(&s->first_watch_queue_entry, q);
     e -> new_value = (StgClosure *) q;
     dirty_TVAR(cap, s, (StgClosure *) fq); // we modified first_watch_queue_entry
   });
@@ -569,7 +569,7 @@ static void remove_watch_queue_entries_for_trec(Capability *cap,
           trec,
           q -> closure,
           s);
-    ACQ_ASSERT(RELAXED_LOAD(&s->current_value) == (StgClosure *)trec);
+    ACQ_ASSERT(SEQ_CST_LOAD(&s->current_value) == (StgClosure *)trec);
     nq = q -> next_queue_entry;
     pq = q -> prev_queue_entry;
     if (nq != END_STM_WATCH_QUEUE) {
@@ -578,8 +578,8 @@ static void remove_watch_queue_entries_for_trec(Capability *cap,
     if (pq != END_STM_WATCH_QUEUE) {
       pq -> next_queue_entry = nq;
     } else {
-      ASSERT(s -> first_watch_queue_entry == q);
-      s -> first_watch_queue_entry = nq;
+      ASSERT(SEQ_CST_LOAD(&s->first_watch_queue_entry) == q);
+      SEQ_CST_STORE(&s->first_watch_queue_entry, nq);
       dirty_TVAR(cap, s, (StgClosure *) q); // we modified first_watch_queue_entry
     }
     free_stg_tvar_watch_queue(cap, q);
@@ -727,7 +727,7 @@ static StgBool entry_is_read_only(TRecEntry *e) {
 static StgBool tvar_is_locked(StgTVar *s, StgTRecHeader *h) {
   StgClosure *c;
   StgBool result;
-  c = RELAXED_LOAD(&s->current_value);
+  c = SEQ_CST_LOAD(&s->current_value);
   result = (c == (StgClosure *) h);
   return result;
 }
