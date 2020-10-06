@@ -556,6 +556,16 @@ LD_STAGE1       = $(LD)
 LD_STAGE2       = $(LD)
 LD_STAGE3       = $(LD)
 
+MERGE_OBJS_STAGE0 = @MergeObjsCmd@
+MERGE_OBJS_STAGE1 = @MergeObjsCmd@
+MERGE_OBJS_STAGE2 = @MergeObjsCmd@
+MERGE_OBJS_STAGE3 = @MergeObjsCmd@
+
+MERGE_OBJS_STAGE0_FLAGS = @MergeObjsArgs@
+MERGE_OBJS_STAGE1_FLAGS = @MergeObjsArgs@
+MERGE_OBJS_STAGE2_FLAGS = @MergeObjsArgs@
+MERGE_OBJS_STAGE3_FLAGS = @MergeObjsArgs@
+
 # Cross-compiling options
 # See Note [CrossCompiling vs Stage1Only]
 CrossCompiling        = @CrossCompiling@

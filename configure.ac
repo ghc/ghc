@@ -429,6 +429,8 @@ then
     NM="${mingwbin}nm.exe"
     RANLIB="${mingwbin}ranlib.exe"
     OBJDUMP="${mingwbin}objdump.exe"
+    MergeObjsCmd="$LD"
+    MergeObjsArgs="-r --oformat=pe-bigobj-x86-64"
     fp_prog_ar="${mingwbin}ar.exe"
 
     AC_PATH_PROG([Genlib],[genlib])
