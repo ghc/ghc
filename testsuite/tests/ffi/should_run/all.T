@@ -213,3 +213,5 @@ test('PrimFFIWord16', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord16_c.
 test('T493', [omit_ways(['ghci'])], compile_and_run, ['T493_c.c'])
 
 test('UnliftedNewtypesByteArrayOffset', [omit_ways(['ghci'])], compile_and_run, ['UnliftedNewtypesByteArrayOffset_c.c'])
+
+test('IncallAffinity', [req_smp, only_ways(['threaded1', 'threaded2'])], compile_and_run, ['IncallAffinity_c.c -no-hs-main'])
