@@ -1032,11 +1032,10 @@ dataConSrcToImplBang dflags fam_envs arg_ty
   , case unpk_prag of
       NoSrcUnpack
         | rep_tys `lengthAtLeast` 2
-        -> False -- don't unpack sum types without explicit UNPACK
+        -> False -- don't unpack sum types automatically, but they can be unpacked with an explicit source UNPACK.
         | otherwise
         -> gopt Opt_UnboxStrictFields dflags
-               || (gopt Opt_UnboxSmallStrictFields dflags
-                   && rep_tys `lengthAtMost` 1) -- See Note [Unpack one-wide fields]
+           || gopt Opt_UnboxSmallStrictFields dflags -- See Note [Unpack one-wide fields]
       srcUnpack -> isSrcUnpacked srcUnpack
   = case mb_co of
       Nothing     -> HsUnpack Nothing
