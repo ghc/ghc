@@ -1,0 +1,48 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 54, types: 99, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F5.f5g1 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F5.f5g1 = 1
+
+-- RHS size: {terms: 12, types: 11, coercions: 0, joins: 0/0}
+f5g :: forall {a} {t}. Num a => (t -> a) -> t -> a
+[GblId,
+ Arity=3,
+ Str=<S(C(C(S))LLLLLL),U(1*C1(C1(U)),A,A,A,A,A,1*C1(U))><L,1*C1(U)><L,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a) (@t) ($dNum :: Num a) (h [Occ=Once1!] :: t -> a) (z [Occ=Once1] :: t) -> + @a $dNum (h z) (fromInteger @a $dNum F5.f5g1)}]
+f5g = \ (@a) (@t) ($dNum :: Num a) (h :: t -> a) (z :: t) -> + @a $dNum (h z) (fromInteger @a $dNum F5.f5g1)
+
+-- RHS size: {terms: 15, types: 14, coercions: 0, joins: 0/0}
+F5.$wf5h [InlPrag=NOUSERINLINE[2]] :: forall {a} {t}. (a -> a -> a) -> (Integer -> a) -> (t -> a) -> t -> (t -> a) -> a
+[GblId, Arity=5, Str=<C(C(S)),C(C1(U))><L,1*C1(U)><L,1*C1(U)><L,U><L,1*C1(U)>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 60 60 0 60] 120 0}]
+F5.$wf5h = \ (@a) (@t) (ww :: a -> a -> a) (ww1 :: Integer -> a) (w :: t -> a) (w1 :: t) (w2 :: t -> a) -> ww (w w1) (ww (w2 w1) (ww1 F5.f5g1))
+
+-- RHS size: {terms: 15, types: 32, coercions: 0, joins: 0/0}
+f5h [InlPrag=NOUSERINLINE[2]] :: forall {a} {t}. Num a => (t -> a) -> t -> (t -> a) -> a
+[GblId,
+ Arity=4,
+ Str=<S(C(C(S))LLLLLL),1*U(C(C1(U)),A,A,A,A,A,1*C1(U))><L,1*C1(U)><L,U><L,1*C1(U)>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a) (@t) (w [Occ=Once1!] :: Num a) (w1 [Occ=Once1] :: t -> a) (w2 [Occ=Once1] :: t) (w3 [Occ=Once1] :: t -> a) -> case w of { GHC.Num.C:Num ww1 [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ww7 [Occ=Once1] -> F5.$wf5h @a @t ww1 ww7 w1 w2 w3 }}]
+f5h = \ (@a) (@t) (w :: Num a) (w1 :: t -> a) (w2 :: t) (w3 :: t -> a) -> case w of { GHC.Num.C:Num ww1 ww2 ww3 ww4 ww5 ww6 ww7 -> F5.$wf5h @a @t ww1 ww7 w1 w2 w3 }
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+f5y :: Integer -> Integer
+[GblId,
+ Arity=1,
+ Str=<S,1*U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (y [Occ=Once1] :: Integer) -> GHC.Num.Integer.integerAdd y F5.f5g1}]
+f5y = \ (y :: Integer) -> GHC.Num.Integer.integerAdd y F5.f5g1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+f5 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+f5 = 3
+
+
+
