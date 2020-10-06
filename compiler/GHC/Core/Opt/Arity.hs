@@ -349,14 +349,7 @@ this transformation.  So we try to limit it as much as possible:
        case undefined of { (a,b) -> \y -> e }
      This showed up in #5557
 
- (2) Do NOT move a lambda outside a case if all the branches of
-     the case are known to return bottom.
-        case x of { (a,b) -> \y -> error "urk" }
-     This case is less important, but the idea is that if the fn is
-     going to diverge eventually anyway then getting the best arity
-     isn't an issue, so we might as well play safe
-
- (3) Do NOT move a lambda outside a case unless
+ (2) Do NOT move a lambda outside a case unless
      (a) The scrutinee is ok-for-speculation, or
      (b) more liberally: the scrutinee is cheap (e.g. a variable), and
          -fpedantic-bottoms is not enforced (see #2915 for an example)
@@ -591,7 +584,8 @@ findRhsArity dflags bndr rhs old_arity
         new_atype = step cur_atype
 
     step :: ArityType -> ArityType
-    step at = arityType env rhs
+    step at = -- pprTrace "step" (ppr bndr <+> ppr at <+> ppr (arityType env rhs)) $
+              arityType env rhs
       where
         env = extendSigEnv (initArityEnv dflags) bndr at
 
@@ -849,13 +843,10 @@ arityType env (Case scrut _ _ alts)
                     -- See Note [Dealing with bottom (1)]
   | otherwise
   = case alts_type of
-     ABot n  | n>0       -> ATop []       -- Don't eta expand
-             | otherwise -> botArityType  -- if RHS is bottomming
-                                          -- See Note [Dealing with bottom (2)]
-
-     ATop as | not (pedanticBottoms env)  -- See Note [Dealing with bottom (3)]
-             , myExprIsCheap env scrut Nothing -> ATop as
-             | exprOkForSpeculation scrut      -> ATop as
+     ABot _                                    -> alts_type
+     ATop as | not (pedanticBottoms env)  -- See Note [Dealing with bottom (2)]
+             , myExprIsCheap env scrut Nothing -> alts_type
+             | exprOkForSpeculation scrut      -> alts_type
              | otherwise                       -> ATop (takeWhile isOneShotInfo as)
   where
     alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
@@ -882,12 +873,15 @@ arityType env (Let (Rec pairs) body)
       | otherwise
       = pprPanic "arityType:joinrec" (ppr pairs)
 
-arityType env (Let b e)
-  = floatIn cheap_bind (arityType env e)
+arityType env (Let (NonRec b r) e)
+  = floatIn cheap_rhs (arityType env' e)
   where
-    cheap_bind = case b of
-      NonRec b e -> is_cheap (b,e)
-      Rec prs    -> all is_cheap prs
+    cheap_rhs = myExprIsCheap env r (Just (idType b))
+    env'      = extendSigEnv env b (arityType env r)
+
+arityType env (Let (Rec prs) e)
+  = floatIn (all is_cheap prs) (arityType env e)
+  where
     is_cheap (b,e) = myExprIsCheap env e (Just (idType b))
 
 arityType env (Tick t e)
