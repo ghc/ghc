@@ -45,6 +45,7 @@ import GHC.Tc.Gen.Bind
 import GHC.Types.Basic
 import GHC.Tc.Solver
 import GHC.Tc.Utils.Unify
+import GHC.Tc.Utils.Instantiate
 import GHC.Core.Predicate
 import GHC.Builtin.Types
 import GHC.Tc.Utils.TcType
@@ -345,8 +346,8 @@ tcCheckPatSynDecl :: PatSynBind GhcRn GhcRn
 tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                          , psb_def = lpat, psb_dir = dir }
                   TPSI{ patsig_implicit_bndrs = implicit_bndrs
-                      , patsig_univ_bndrs = explicit_univ_bndrs, patsig_prov = prov_theta
-                      , patsig_ex_bndrs   = explicit_ex_bndrs,   patsig_req  = req_theta
+                      , patsig_univ_bndrs = explicit_univ_bndrs, patsig_req  = req_theta
+                      , patsig_ex_bndrs   = explicit_ex_bndrs,   patsig_prov = prov_theta
                       , patsig_body_ty    = sig_body_ty }
   = addPatSynCtxt lname $
     do { let decl_arity = length arg_names
@@ -379,36 +380,52 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
              univ_tvs   = binderVars univ_bndrs
              ex_tvs     = binderVars ex_bndrs
 
+         -- Skolemise the universals. This is necessary in order to check the actual pattern
+         -- type against the expected type. Even though the tyvars in the type are already
+         -- skolems, this step changes their TcLevels, avoiding level-check errors when
+         -- unifying.
+       ; (skol_subst0, skol_univ_tvs) <- tcInstSkolTyVars univ_tvs
+       ; let skol_req_theta  = substTheta skol_subst0 req_theta
+       ; (skol_subst, skol_ex_tvs)    <- tcInstSkolTyVarsX skol_subst0 ex_tvs
+       ; let skol_prov_theta = substTheta skol_subst prov_theta
+             skol_arg_tys    = substTys skol_subst (map scaledThing arg_tys)
+             skol_pat_ty     = substTy skol_subst pat_ty
+
+             univ_tv_prs     = [ (getName orig_univ_tv, skol_univ_tv)
+                               | (orig_univ_tv, skol_univ_tv) <- univ_tvs `zip` skol_univ_tvs ]
+
        -- Right!  Let's check the pattern against the signature
        -- See Note [Checking against a pattern signature]
-       ; req_dicts <- newEvVars req_theta
+       ; req_dicts <- newEvVars skol_req_theta
        ; (tclvl, wanted, (lpat', (ex_tvs', prov_dicts, args'))) <-
            ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
            pushLevelAndCaptureConstraints   $
-           tcExtendTyVarEnv univ_tvs        $
-           tcCheckPat PatSyn lpat (unrestricted pat_ty)   $
-           do { let in_scope    = mkInScopeSet (mkVarSet univ_tvs)
+           tcExtendNameTyVarEnv univ_tv_prs $
+           tcCheckPat PatSyn lpat (unrestricted skol_pat_ty)   $
+           do { let in_scope    = mkInScopeSet (mkVarSet skol_univ_tvs)
                     empty_subst = mkEmptyTCvSubst in_scope
-              ; (subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst ex_tvs
+              ; (inst_subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst skol_ex_tvs
                     -- newMetaTyVarX: see the "Existential type variables"
                     -- part of Note [Checking against a pattern signature]
               ; traceTc "tcpatsyn1" (vcat [ ppr v <+> dcolon <+> ppr (tyVarKind v) | v <- ex_tvs])
               ; traceTc "tcpatsyn2" (vcat [ ppr v <+> dcolon <+> ppr (tyVarKind v) | v <- ex_tvs'])
-              ; let prov_theta' = substTheta subst prov_theta
+              ; let prov_theta' = substTheta inst_subst skol_prov_theta
                   -- Add univ_tvs to the in_scope set to
                   -- satisfy the substitution invariant. There's no need to
                   -- add 'ex_tvs' as they are already in the domain of the
                   -- substitution.
                   -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
               ; prov_dicts <- mapM (emitWanted (ProvCtxtOrigin psb)) prov_theta'
-              ; args'      <- zipWithM (tc_arg subst) arg_names (map scaledThing arg_tys)
+              ; args'      <- zipWithM (tc_arg inst_subst) arg_names
+                                       skol_arg_tys
               ; return (ex_tvs', prov_dicts, args') }
 
        ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
                          -- The type here is a bit bogus, but we do not print
                          -- the type for PatSynCtxt, so it doesn't matter
                          -- See Note [Skolem info for pattern synonyms] in "GHC.Tc.Types.Origin"
-       ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info univ_tvs req_dicts wanted
+       ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_univ_tvs
+                                                    req_dicts wanted
 
        -- Solve the constraints now, because we are about to make a PatSyn,
        -- which should not contain unification variables and the like (#10997)
@@ -418,12 +435,23 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        -- Otherwise we may get a type error when typechecking the builder,
        -- when that should be impossible
 
+       -- Need to get Specificities right for univ_bndrs
+       ; let skol_univ_bndrs = zipWithEqual "tcCheckPatSynDecl"
+                                 xfer_specificity univ_bndrs skol_univ_tvs
+             skol_ex_bndrs   = zipWithEqual "tcCheckPatSynDecl2"
+                                 xfer_specificity ex_bndrs skol_ex_tvs
+
+             xfer_specificity :: VarBndr var Specificity -> TyVar
+                              -> VarBndr TyVar Specificity
+             xfer_specificity bndr tv = mkTyVarBinder (binderArgFlag bndr) tv
+
        ; traceTc "tcCheckPatSynDecl }" $ ppr name
+
        ; tc_patsyn_finish lname dir is_infix lpat'
-                          (univ_bndrs, req_theta, ev_binds, req_dicts)
-                          (ex_bndrs, mkTyVarTys ex_tvs', prov_theta, prov_dicts)
-                          (args', (map scaledThing arg_tys))
-                          pat_ty rec_fields }
+                          (skol_univ_bndrs, skol_req_theta, ev_binds, req_dicts)
+                          (skol_ex_bndrs, mkTyVarTys ex_tvs', skol_prov_theta, prov_dicts)
+                          (args', skol_arg_tys)
+                          skol_pat_ty rec_fields }
   where
     tc_arg :: TCvSubst -> Name -> Type -> TcM (LHsExpr GhcTc)
     tc_arg subst arg_name arg_ty
@@ -432,7 +460,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
              arg_id <- tcLookupId arg_name
            ; wrap <- tcSubTypeSigma GenSigCtxt
                                     (idType arg_id)
-                                    (substTyUnchecked subst arg_ty)
+                                    (substTy subst arg_ty)
                 -- Why do we need tcSubType here?
                 -- See Note [Pattern synonyms and higher rank types]
            ; return (mkLHsWrap wrap $ nlHsVar arg_id) }

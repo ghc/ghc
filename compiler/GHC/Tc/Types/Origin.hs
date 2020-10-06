@@ -303,7 +303,7 @@ For pattern synonym SkolemInfo we have
 but the type 'ty' is not very helpful.  The full pattern-synonym type
 has the provided and required pieces, which it is inconvenient to
 record and display here. So we simply don't display the type at all,
-contenting outselves with just the name of the pattern synonym, which
+contenting ourselves with just the name of the pattern synonym, which
 is fine.  We could do more, but it doesn't seem worth it.
 
 Note [SigSkol SkolemInfo]
