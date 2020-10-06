@@ -44,7 +44,9 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.Core.Type
+import GHC.Core.TyCon
 import GHC.Core.Multiplicity
+import GHC.Core.Coercion( Coercion, liftCoSubstWith )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -53,6 +55,7 @@ import GHC.Driver.Session
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Make
+import GHC.Types.Var.Env
 import GHC.Unit.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -61,14 +64,12 @@ import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Data.Maybe
-import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Core.PatSyn
-
 import Control.Monad
 
 {-
@@ -626,6 +627,41 @@ But if x::T a b, then
    x { f1 = v } :: T a b   (not T a Int!)
 So we need to cast (T a Int) to (T a b).  Sigh.
 
+It gets more complicated when data families are involved (#18809).
+Consider
+    data family F s t
+    data instance F (a,b) where
+      MkF :: { foo :: Int } -> F (Int,b)
+
+    bar :: F (s,t) -> Int -> F (s,t)
+    bar z y = z { foo = y}
+
+We have
+    data R:FPair a b where
+      MkF :: { foo :: Int } -> R:FPair Int b
+
+    $WMkF :: Int -> F (Int,b)
+    MkF :: forall a b. (a ~# Int) => Int -> R:FPair a b
+
+    bar :: F (s,t) -> Int -> F (s,t)
+    bar = /\s t. \(z::F (s,t)) \(y::Int) ->
+         case z |> co1 of
+            MkF (co2::s ~# Int) _ -> $WMkF @t y |> co3
+
+The question is: what is co3, the cast for the RHS?
+      co3 :: F (Int,t) ~ F (s,t)
+We can construct it using co2, bound by the GADT match.
+To do that,
+
+* Start with the data instance type, res_ty:
+      F (a,b)
+  by applying tyConFamInst_maybe to the representation tycon R:FPair.
+
+* Now, do a liftCoSubst to turn this into a coercion, replacing
+     a  by  (Sym co2)   since 'a' is in the data-con's EqSpec
+     b  by  t           since 't' instantiates 'b'
+
+Gah!  That's absurdly hard work.
 -}
 
 dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
@@ -711,8 +747,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                         dict_req_wrap                                           <.>
                         mkWpTyApps    [ lookupTyVar out_subst tv
                                           `orElse` mkTyVarTy tv
-                                      | tv <- user_tvs
-                                      , not (tv `elemVarEnv` wrap_subst) ]
+                                      | tv <- user_tvs ]
                           -- Be sure to use user_tvs (which may be ordered
                           -- differently than `univ_tvs ++ ex_tvs) above.
                           -- See Note [DataCon user type variable binders]
@@ -723,27 +758,35 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                         -- Note [Update for GADTs]
                  wrapped_rhs =
                   case con of
-                    RealDataCon data_con ->
-                      let
-                        wrap_co =
-                          mkTcTyConAppCo Nominal
-                            (dataConTyCon data_con)
-                            [ lookup tv ty
-                              | (tv,ty) <- univ_tvs `zip` out_inst_tys ]
-                        lookup univ_tv ty =
-                          case lookupVarEnv wrap_subst univ_tv of
-                            Just co' -> co'
-                            Nothing  -> mkTcReflCo Nominal ty
-                        in if null eq_spec
-                             then rhs
-                             else mkLHsWrap (mkWpCastN wrap_co) rhs
+                    RealDataCon data_con
+                      | null eq_spec -> rhs
+                      | otherwise    -> mkLHsWrap (mkWpCastN wrap_co) rhs
+                                     -- This wrap is the punchline: Note [Update for GADTs]
+                      where
+                        rep_tc     = dataConTyCon data_con
+                        rep_tc_tvs = tyConTyVars rep_tc
+                        res_ty = case tyConFamInst_maybe rep_tc of
+                           Nothing                -> mkTyConApp rep_tc (mkTyVarTys rep_tc_tvs)
+                           Just (fam_tc, arg_tys) -> mkTyConApp fam_tc arg_tys
+
+                        wrap_co  = liftCoSubstWith Nominal rep_tc_tvs univ_cos res_ty
+                        univ_cos = zipWithEqual "dsExpr:upd1" mk_univ_co univ_tvs out_inst_tys
+
+                        mk_univ_co :: TyVar   -- Universal tyvar from the DataCon
+                                   -> Type    -- Corresponding instantiating type
+                                   -> Coercion
+                        mk_univ_co con_univ_tv inst_ty
+                          = case lookupVarEnv eq_spec_env con_univ_tv of
+                               Just co -> co
+                               Nothing -> mkTcNomReflCo inst_ty
+
+                        eq_spec_env :: VarEnv Coercion
+                        eq_spec_env = mkVarEnv [ (eqSpecTyVar spec, mkTcSymCo (mkTcCoVarCo eqs_var))
+                                               | (spec,eqs_var) <- zipEqual "dsExpr:upd2" eq_spec eqs_vars ]
+
                     -- eq_spec is always null for a PatSynCon
                     PatSynCon _ -> rhs
 
-                 wrap_subst =
-                  mkVarEnv [ (tv, mkTcSymCo (mkTcCoVarCo eq_var))
-                           | (spec, eq_var) <- eq_spec `zip` eqs_vars
-                           , let tv = eqSpecTyVar spec ]
 
                  req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
 
