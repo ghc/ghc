@@ -415,7 +415,7 @@ f_helper(StablePtr s, HsBool b, HsInt i)
 {
         Capability *cap;
         cap = rts_lock();
-        rts_evalIO(&cap,
+        rts_inCall(&cap,
                    rts_apply(rts_apply(deRefStablePtr(s),
                                        rts_mkBool(b)), rts_mkInt(i)));
         rts_unlock(cap);
@@ -674,7 +674,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ,   declareCResult
      ,   text "cap = rts_lock();"
           -- create the application + perform it.
-     ,   text "rts_evalIO" <> parens (
+     ,   text "rts_inCall" <> parens (
                 char '&' <> cap <>
                 text "rts_apply" <> parens (
                     cap <>
