@@ -86,7 +86,7 @@ head st
   | SBS.null $ contents st = error "head: Empty ShortText"
   | otherwise              = Prelude.head $ unpack st
 
--- | /O(n)/ The 'stripPrefix' function takes two ByteStrings and returns Just the remainder of
+-- | /O(n)/ The 'stripPrefix' function takes two 'ShortText's and returns 'Just' the remainder of
 -- the second iff the first is its prefix, and otherwise Nothing.
 stripPrefix :: ShortText -> ShortText -> Maybe ShortText
 stripPrefix prefix st = case B8.stripPrefix (SBS.fromShort $ contents prefix) (SBS.fromShort $ contents st) of

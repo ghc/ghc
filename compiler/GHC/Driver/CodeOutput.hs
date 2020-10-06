@@ -212,7 +212,7 @@ outputForeignStubs dflags mod location stubs
         let rts_includes =
                let rts_pkg = unsafeLookupUnitId (unitState dflags) rtsUnitId in
                concatMap mk_include (unitIncludes rts_pkg)
-            mk_include i = "#include \"" ++ (ST.unpack $ i) ++ "\"\n"
+            mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
