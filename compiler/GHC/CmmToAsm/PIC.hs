@@ -301,7 +301,7 @@ howToAccessLabel config arch OSDarwin JumpReference lbl
         -- dyld code stubs don't work for tailcalls because the
         -- stack alignment is only right for regular calls.
         -- Therefore, we have to go via a symbol pointer:
-        | arch == ArchX86 || arch == ArchX86_64
+        | arch == ArchX86 || arch == ArchX86_64 || arch == ArchAArch64
         , labelDynamic config lbl
         = AccessViaSymbolPtr
 
@@ -309,14 +309,14 @@ howToAccessLabel config arch OSDarwin JumpReference lbl
 howToAccessLabel config arch OSDarwin _kind lbl
         -- Code stubs are the usual method of choice for imported code;
         -- not needed on x86_64 because Apple's new linker, ld64, generates
-        -- them automatically.
+        -- them automatically, neither on Aarch64 (arm64).
         | arch /= ArchX86_64
+        , arch /= ArchAArch64
         , labelDynamic config lbl
         = AccessViaStub
 
         | otherwise
         = AccessDirectly
-
 
 ----------------------------------------------------------------------------
 -- AIX
@@ -635,14 +635,24 @@ pprImportedSymbol config importedLbl = case (arch,os) of
         | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
         -> vcat [
                 text ".non_lazy_symbol_pointer",
-                char 'L' <> ppr_lbl lbl <> text "$non_lazy_ptr:",
+                text "L" <> ppr_lbl lbl <> text "$non_lazy_ptr:",
                 text "\t.indirect_symbol" <+> ppr_lbl lbl,
                 text "\t.long\t0"]
 
         | otherwise
         -> empty
 
-   (_, OSDarwin) -> empty
+   (ArchAArch64, OSDarwin)
+        -- | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
+        -- -> vcat [
+        --         text ".non_lazy_symbol_pointer",
+        --         text "L" <> ppr_lbl lbl <> text "$non_lazy_ptr:",
+        --         text "\t.indirect_symbol" <+> ppr_lbl lbl,
+        --         text "\t.long\t0"]
+
+        -- | otherwise
+        -> empty
+
 
 
    -- XCOFF / AIX
