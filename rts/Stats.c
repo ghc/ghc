@@ -281,6 +281,10 @@ stat_endInit(void)
 void
 stat_startExit(void)
 {
+    // This can race with stat_endGC but I really don't think it's worth a lock
+    TSAN_ANNOTATE_BENIGN_RACE(&stats.gc_elapsed_ns, "stat_startExit(gc_elapsed_ns)");
+    TSAN_ANNOTATE_BENIGN_RACE(&stats.gc_cpu_ns, "stat_startExit(gc_cpu_ns)");
+
     getProcessTimes(&start_exit_cpu, &start_exit_elapsed);
     start_exit_gc_elapsed = stats.gc_elapsed_ns;
     start_exit_gc_cpu = stats.gc_cpu_ns;
