@@ -581,6 +581,7 @@ variables:
   purposes of TypeApplications, and as a consequence, they do not come equipped
   with visibilities (that is, they are TyVars/TyCoVars instead of
   TyCoVarBinders).
+
 * dcUserTyVarBinders, for the type variables binders in the order in which they
   originally arose in the user-written type signature. Their order *does* matter
   for TypeApplications, so they are full TyVarBinders, complete with
@@ -601,10 +602,10 @@ dcExTyCoVars. That is, the tyvars in dcUserTyVarBinders are a permutation of
 ordering, they in fact share the same type variables (with the same Uniques). We
 sometimes refer to this as "the dcUserTyVarBinders invariant".
 
-dcUserTyVarBinders, as the name suggests, is the one that users will see most of
-the time. It's used when computing the type signature of a data constructor (see
-dataConWrapperType), and as a result, it's what matters from a TypeApplications
-perspective.
+dcUserTyVarBinders, as the name suggests, is the one that users will
+see most of the time. It's used when computing the type signature of a
+data constructor wrapper (see dataConWrapperType), and as a result,
+it's what matters from a TypeApplications perspective.
 
 Note [The dcEqSpec domain invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

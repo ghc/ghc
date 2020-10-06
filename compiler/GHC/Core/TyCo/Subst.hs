@@ -436,8 +436,8 @@ mkTvSubstPrs prs =
 zipTyEnv :: HasDebugCallStack => [TyVar] -> [Type] -> TvSubstEnv
 zipTyEnv tyvars tys
   | debugIsOn
-  , not (all isTyVar tyvars)
-  = pprPanic "zipTyEnv" (ppr tyvars <+> ppr tys)
+  , not (all isTyVar tyvars && (tyvars `equalLength` tys))
+  = pprPanic "zipTyEnv" (ppr tyvars $$ ppr tys)
   | otherwise
   = ASSERT( all (not . isCoercionTy) tys )
     zipToUFM tyvars tys
