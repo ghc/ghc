@@ -1,7 +1,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE Strict #-}
+{-# LANGUAGE Strict                #-}
 
-import Control.Monad.State
+import           Control.Monad.State
 
 tester :: MonadState a m => m ()
 tester = modify' id
@@ -9,7 +9,7 @@ tester = modify' id
 -- manyState :: StateT () (StateT () IO) () -> IO ()
 -- manyState :: _ -> IO ()
 manyState x =
-  (flip evalStateT ()     -- 1
+  ( flip evalStateT ()    -- 1
   . flip evalStateT ()    -- 2
   . flip evalStateT ()    -- 3
   . flip evalStateT ()    -- 4
@@ -18,33 +18,8 @@ manyState x =
   . flip evalStateT ()    -- 7
   . flip evalStateT ()    -- 8
   . flip evalStateT ()    -- 9
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
+  . flip evalStateT ()    -- 10
 
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
-  . flip evalStateT ()
   . flip evalStateT ()
   . flip evalStateT ()
   . flip evalStateT ()
@@ -66,12 +41,41 @@ manyState x =
   . flip evalStateT ()
   . flip evalStateT ()
   . flip evalStateT ()
+
+  {-
   . flip evalStateT ()
   . flip evalStateT ()
   . flip evalStateT ()
   . flip evalStateT ()
   . flip evalStateT ()
   . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  . flip evalStateT ()
+  -}
   ) x :: IO ()
 
 main :: IO ()
