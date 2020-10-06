@@ -87,7 +87,6 @@ workflow:
 
 ghc-linters:
   stage: tool-lint
-  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
@@ -108,7 +107,6 @@ ghc-linters:
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
   stage: tool-lint
-  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - mypy .gitlab/linters/*.py
@@ -119,7 +117,6 @@ lint-linters:
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
   stage: tool-lint
-  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
@@ -130,7 +127,6 @@ lint-testsuite:
 # Run mypy Python typechecker on testsuite driver
 typecheck-testsuite:
   stage: tool-lint
-  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - mypy testsuite/driver/runtests.py
@@ -143,7 +139,6 @@ typecheck-testsuite:
 # Marge jobs.
 .lint-submods:
   stage: tool-lint
-  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
@@ -176,7 +171,6 @@ lint-submods-branch:
 
 .lint-changelogs:
   stage: tool-lint
-  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   dependencies: []
   tags:
