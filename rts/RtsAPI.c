@@ -670,7 +670,7 @@ rts_unlock (Capability *cap)
  * This is achieved almost entirely by the mechanism of acquiring and releasing
  * Capabilities, resulting in a sort of mutex / critical section pattern.
  * Correct usage of this API requires that you surround API calls in
- * rts_lock/rts_unlock or rts_pause/rts_resume. These ensure that the thread
+ * rts_lock/rts_unlock or rts_pause/rts_resume. This ensures that the thread
  * owns a capability while calling other RtsAPI functions (in the case of
  * rts_pause/rts_resume the thread owns *all* capabilities).
  *
@@ -678,7 +678,7 @@ rts_unlock (Capability *cap)
  * without objects unexpectedly moving, which is important for many of the
  * functions in RtsAPI.
  *
- * Another important consequence is:
+ * Other important consequences are:
  *
  *  * There are at most `n_capabilities` threads currently in a
  *    rts_lock/rts_unlock section.
@@ -686,11 +686,6 @@ rts_unlock (Capability *cap)
  *    there will be no threads in a rts_lock/rts_unlock section.
  *  * rts_pause and rts_lock may block in order to enforce the above 2
  *    invariants.
- *
- * In particular, by ensuring that that code does not block indefinitely in a
- * rts_lock/rts_unlock or rts_pause/rts_resume section, we can be confident that
- * the RtsAPI functions will not cause a deadlock even when many threads are
- * attempting to use the RtsAPI concurrently.
  */
 
 // See RtsAPI.h
