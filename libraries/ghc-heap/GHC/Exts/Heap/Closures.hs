@@ -318,9 +318,10 @@ data GenClosure b
 #if __GLASGOW_HASKELL__ >= 810
       , stack_marking   :: !Word8
 #endif
-      -- | Offset of the `StgStack::sp` pointer in bytes
-      --    x->sp == ((byte*)x)+stack_spOffset
-      --  The type of `stack_spOffset` reflects the type of `stack_size`.
+      -- | Offset of the `StgStack::sp` pointer in bytes:
+      --
+      --    stgStack->sp == ((byte*)stgStack)+stack_spOffset
+      --
       , stack_spOffset  :: !Int
       }
 

@@ -191,9 +191,10 @@ getClosureDataFromHeapObject x = do
 getClosureDataFromHeapRep
     :: Maybe (Ptr a)
     -- ^ Pointer to the closure in the heap. This is only used for STACK
-    -- closures to properly calculate the `stack_spOffset`. If this argument is
-    -- Nothing and the closure is a STACK, then `UnsupportedClosure` is
-    -- returned.
+    -- closures to properly calculate the `stack_spOffset`. This pointer will
+    -- not be dereferenced; the object need not exist at the give address. If
+    -- this argument is Nothing and the closure is a STACK, then
+    -- `UnsupportedClosure` is returned.
     -> ByteArray#
     -- ^ Heap representation of the closure as returned by `unpackClosure#`.
     -- This includes all of the object including the header, info table
@@ -205,16 +206,16 @@ getClosureDataFromHeapRep
     -- info table from this process's runtime or in pinned or off-heap memory.
     -> [b]
     -- ^ Pointers in the payload of the closure, extracted from the heap
-    -- representation. In the case of STACK objects, this does NOT contain
-    -- pointers in the stack space (i.e. in StgStack::stack). Note `b` is some
-    -- representation of a pointer. If for example `b ~ Any` then the referenced
-    -- objects will be managed by the runtime system and kept alive by the
-    -- garbage collector. That is not true if for example `b ~ Ptr Any`.
+    -- representation as defined by `collect_pointers()` in `Heap.c`. In the
+    -- case of STACK objects, this does NOT contain pointers in the stack space
+    -- (i.e. in StgStack::stack). Note `b` is some representation of a pointer.
+    -- If for example `b ~ Any` then the referenced objects will be managed by
+    -- the runtime system and kept alive by the garbage collector. That is not
+    -- true if for example `b ~ Ptr Any`.
     -> IO (GenClosure b)
     -- ^ Heap representation of the closure.
 getClosureDataFromHeapRep closureAddressMay heapRep infoTablePtr pts = do
     itbl <- peekItbl infoTablePtr
-    -- The remaining words after the header
     let -- heapRep as a list of words.
         rawHeapWords :: [Word]
         rawHeapWords = [W# (indexWordArray# heapRep i) | I# i <- [0.. end] ]
