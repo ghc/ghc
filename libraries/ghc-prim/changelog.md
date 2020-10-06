@@ -28,6 +28,26 @@
 
         infix 4 ~, ~~
 
+- Add a pair of new operations to `GHC.Magic` which supersede `touch#` in most cases:
+
+    keepAliveLifted#
+        :: forall (arg :: TYPE 'LiftedRep) r.
+           arg
+        -> (State# RealWorld -> (# State# RealWorld, r #))
+        -> State# RealWorld
+        -> (# State# RealWorld, r #)
+
+    keepAliveUnlifted# ::
+        :: forall (arg :: TYPE 'UnliftedRep) r.
+           arg
+        -> (State# RealWorld -> (# State# RealWorld, r #))
+        -> State# RealWorld
+        -> (# State# RealWorld, r #)
+
+  These have special treatment in the compiler to avoid the soundness issues
+  encountered by `touch#` in the presence of simplification (see GHC
+  [#17760](https://gitlab.haskell.org/ghc/ghc/-/issues/17760)).
+
 ## 0.6.1 (edit as necessary)
 
 - Shipped with GHC 8.10.1
