@@ -577,8 +577,9 @@ data RecordUpdTc = RecordUpdTc
 
       , rupd_in_tys  :: [Type]  -- Argument types of *input* record type
       , rupd_out_tys :: [Type]  --             and  *output* record type
-                                -- The original type can be reconstructed
-                                -- with conLikeResTy
+                -- For a data family, these are the type args of the
+                -- /representation/ type constructor
+
       , rupd_wrap :: HsWrapper  -- See note [Record Update HsWrapper]
       }
 
