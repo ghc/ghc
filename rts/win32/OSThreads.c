@@ -444,6 +444,15 @@ interruptOSThread (OSThreadId id)
     CloseHandle(hdl);
 }
 
+void
+joinOSThread (OSThreadId id)
+{
+    int ret = WaitForSingleObject(id, INFINITE);
+    if (ret != WAIT_OBJECT_0) {
+        sysErrorBelch("joinOSThread: error %d", ret);
+    }
+}
+
 void setThreadNode (uint32_t node)
 {
     if (osNumaAvailable())
