@@ -350,14 +350,7 @@ this transformation.  So we try to limit it as much as possible:
        case undefined of { (a,b) -> \y -> e }
      This showed up in #5557
 
- (2) Do NOT move a lambda outside a case if all the branches of
-     the case are known to return bottom.
-        case x of { (a,b) -> \y -> error "urk" }
-     This case is less important, but the idea is that if the fn is
-     going to diverge eventually anyway then getting the best arity
-     isn't an issue, so we might as well play safe
-
- (3) Do NOT move a lambda outside a case unless
+ (2) Do NOT move a lambda outside a case unless
      (a) The scrutinee is ok-for-speculation, or
      (b) more liberally: the scrutinee is cheap (e.g. a variable), and
          -fpedantic-bottoms is not enforced (see #2915 for an example)
@@ -554,7 +547,7 @@ vanillaArityType = ATop []      -- Totally uninformative
 exprEtaExpandArity :: DynFlags -> CoreExpr -> ArityType
 -- exprEtaExpandArity is used when eta expanding
 --      e  ==>  \xy -> e x y
-exprEtaExpandArity dflags e = arityType (initArityEnv dflags) e
+exprEtaExpandArity dflags e = arityType (etaExpandArityEnv dflags) e
 
 getBotArity :: ArityType -> Maybe Arity
 -- Arity of a divergent function
@@ -592,9 +585,10 @@ findRhsArity dflags bndr rhs old_arity
         new_atype = step cur_atype
 
     step :: ArityType -> ArityType
-    step at = arityType env rhs
+    step at = -- pprTrace "step" (ppr bndr <+> ppr at <+> ppr (arityType env rhs)) $
+              arityType env rhs
       where
-        env = extendSigEnv (initArityEnv dflags) bndr at
+        env = extendSigEnv (findRhsArityEnv dflags) bndr at
 
 {-
 Note [Arity analysis]
@@ -612,17 +606,29 @@ This example happens a lot; it first showed up in Andy Gill's thesis,
 fifteen years ago!  It also shows up in the code for 'rnf' on lists
 in #4138.
 
-The analysis is easy to achieve because exprEtaExpandArity takes an
-argument
-     type CheapFun = CoreExpr -> Maybe Type -> Bool
-used to decide if an expression is cheap enough to push inside a
-lambda.  And exprIsCheapX in turn takes an argument
-     type CheapAppFun = Id -> Int -> Bool
-which tells when an application is cheap. This makes it easy to
-write the analysis loop.
+We do the neccessary, quite simple fixed-point iteration in 'findRhsArity',
+which assumes for a single binding @botArityType@ on the first run and iterates
+until it finds a stable arity type. Two wrinkles
 
-The analysis is cheap-and-cheerful because it doesn't deal with
-mutual recursion.  But the self-recursive case is the important one.
+* We often have to ask (see the Case or Let case of 'arityType') whether some
+  expression is cheap. In the case of an application, that depends on the arity
+  of the application head! That's why we have our own version of 'exprIsCheap',
+  'myExprIsCheap', that will integrate the optimistic arity types we have on
+  f and g into the cheapness check.
+
+* Consider this (#18793)
+
+    go = \ds. case ds of
+           []     -> id
+           (x:ys) -> let acc = go ys in
+                     case blah of
+                       True  -> acc
+                       False -> \ x1 -> acc (negate x1)
+
+  We must propagate go's optimistically large arity to @acc@, so that the
+  tail call to @acc@ in the True branch has sufficient arity.  This is done
+  by the 'am_sigs' field in 'FindRhsArity', and 'lookupSigEnv' in the Var case
+  of 'arityType'.
 
 Note [Eta expanding through dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -727,69 +733,104 @@ encountered a cast, but that is far too conservative: see #5475
 
 ---------------------------
 
+-- | Each of the entry-points of the analyser ('arityType') has different
+-- requirements. The entry-points are
+--
+--   1. 'exprBotStrictness_maybe'
+--   2. 'exprEtaExpandArity'
+--   3. 'findRhsArity'
+--
+-- For each of the entry-points, there is a separate mode that governs
+--
+--   1. How pedantic we are wrt. ⊥, in 'pedanticBottoms'.
+--   2. Whether we store arity signatures for non-recursive let-bindings,
+--      accessed in 'extendSigEnv'/'lookupSigEnv'.
+--      See Note [Arity analysis] why that's important.
+--   3. Which expressions we consider cheap to float inside a lambda,
+--      in 'myExprIsCheap'.
 data AnalysisMode
   = BotStrictness
   -- ^ Used during 'exprBotStrictness_maybe'.
-  | ArityAnalysis { aa_ped_bot :: !Bool
-                  , aa_dicts_cheap :: !Bool
-                  , aa_sigs :: !(IdEnv ArityType) }
-  -- ^ Used for regular arity analysis ('exprEtaExpandArity', 'findRhsArity').
+  | EtaExpandArity { am_ped_bot :: !Bool
+                   , am_dicts_cheap :: !Bool }
+  -- ^ Used for finding an expression's eta-expanding arity quickly, without
+  -- fixed-point iteration ('exprEtaExpandArity').
+  | FindRhsArity { am_ped_bot :: !Bool
+                 , am_dicts_cheap :: !Bool
+                 , am_sigs :: !(IdEnv ArityType) }
+  -- ^ Used for regular, fixed-point arity analysis ('findRhsArity').
+  --   See Note [Arity analysis] for details about fixed-point iteration.
 
 data ArityEnv
   = AE
   { ae_mode   :: !AnalysisMode
-  -- ^ The analysis mode. Called during 'exprBotStrictness_maybe' or not?
+  -- ^ The analysis mode. See 'AnalysisMode'.
   , ae_joins  :: !IdSet
   -- ^ In-scope join points. See Note [Eta-expansion and join points]
   }
-
--- | A regular, initial @ArityEnv@ used in arity analysis.
-initArityEnv :: DynFlags -> ArityEnv
-initArityEnv dflags
-  = AE { ae_mode  = ArityAnalysis { aa_ped_bot = gopt Opt_PedanticBottoms dflags
-                                  , aa_dicts_cheap = gopt Opt_DictsCheap dflags
-                                  , aa_sigs = emptyVarEnv }
-       , ae_joins = emptyVarSet }
 
 -- | The @ArityEnv@ used by 'exprBotStrictness_maybe'. Pedantic about bottoms
 -- and no application is ever considered cheap.
 botStrictnessArityEnv :: ArityEnv
 botStrictnessArityEnv = AE { ae_mode = BotStrictness, ae_joins = emptyVarSet }
 
+-- | The @ArityEnv@ used by 'exprEtaExpandArity'.
+etaExpandArityEnv :: DynFlags -> ArityEnv
+etaExpandArityEnv dflags
+  = AE { ae_mode  = EtaExpandArity { am_ped_bot = gopt Opt_PedanticBottoms dflags
+                                   , am_dicts_cheap = gopt Opt_DictsCheap dflags }
+       , ae_joins = emptyVarSet }
+
+-- | The @ArityEnv@ used by 'findRhsArity'.
+findRhsArityEnv :: DynFlags -> ArityEnv
+findRhsArityEnv dflags
+  = AE { ae_mode  = FindRhsArity { am_ped_bot = gopt Opt_PedanticBottoms dflags
+                                 , am_dicts_cheap = gopt Opt_DictsCheap dflags
+                                 , am_sigs = emptyVarEnv }
+       , ae_joins = emptyVarSet }
+
 extendJoinEnv :: ArityEnv -> [JoinId] -> ArityEnv
 extendJoinEnv env@(AE { ae_joins = joins }) join_ids
   = env { ae_joins = joins `extendVarSetList` join_ids }
 
 extendSigEnv :: ArityEnv -> Id -> ArityType -> ArityEnv
-extendSigEnv env id ar_ty = env { ae_mode = go (ae_mode env) }
-  where
-    go BotStrictness = BotStrictness
-    go aa            = aa { aa_sigs = extendVarEnv (aa_sigs aa) id ar_ty }
+extendSigEnv env@AE { ae_mode = am@FindRhsArity{am_sigs = sigs} } id ar_ty =
+  env { ae_mode = am { am_sigs = extendVarEnv sigs id ar_ty } }
+extendSigEnv env _ _ = env
 
 lookupSigEnv :: ArityEnv -> Id -> Maybe ArityType
 lookupSigEnv AE{ ae_mode = mode } id = case mode of
-  BotStrictness                   -> Nothing
-  ArityAnalysis{ aa_sigs = sigs } -> lookupVarEnv sigs id
+  BotStrictness                  -> Nothing
+  EtaExpandArity{}               -> Nothing
+  FindRhsArity{ am_sigs = sigs } -> lookupVarEnv sigs id
 
 -- | Whether the analysis should be pedantic about bottoms.
 -- 'exprBotStrictness_maybe' always is.
 pedanticBottoms :: ArityEnv -> Bool
 pedanticBottoms AE{ ae_mode = mode } = case mode of
-  BotStrictness                         -> True
-  ArityAnalysis{ aa_ped_bot = ped_bot } -> ped_bot
+  BotStrictness                          -> True
+  EtaExpandArity{ am_ped_bot = ped_bot } -> ped_bot
+  FindRhsArity{ am_ped_bot = ped_bot }   -> ped_bot
 
 -- | A version of 'exprIsCheap' that considers results from arity analysis
 -- and optionally the expression's type.
 -- Under 'exprBotStrictness_maybe', no expressions are cheap.
 myExprIsCheap :: ArityEnv -> CoreExpr -> Maybe Type -> Bool
 myExprIsCheap AE{ae_mode = mode} e mb_ty = case mode of
-  BotStrictness                                               -> False
-  ArityAnalysis{aa_dicts_cheap = dicts_cheap, aa_sigs = sigs} ->
-    cheap_dict || exprIsCheapX (myIsCheapApp sigs) e
+  BotStrictness -> False
+  _             -> cheap_dict || cheap_fun e
     where
-      cheap_dict = dicts_cheap && fmap isDictTy mb_ty == Just True
+      cheap_dict = am_dicts_cheap mode && fmap isDictTy mb_ty == Just True
+      cheap_fun e = case mode of
+#if __GLASGOW_HASKELL__ <= 900
+        BotStrictness                -> panic "impossible"
+#endif
+        EtaExpandArity{}             -> exprIsCheap e
+        FindRhsArity{am_sigs = sigs} -> exprIsCheapX (myIsCheapApp sigs) e
 
 -- | A version of 'isCheapApp' that considers results from arity analysis.
+-- See Note [Arity analysis] for what's in the signature environment and why
+-- it's important.
 myIsCheapApp :: IdEnv ArityType -> CheapAppFun
 myIsCheapApp sigs fn n_val_args = case lookupVarEnv sigs fn of
   -- Nothing means not a local function, fall back to regular
@@ -844,20 +885,20 @@ arityType env (App fun arg )
         --      f x y = case x of { (a,b) -> e }
         -- The difference is observable using 'seq'
         --
-arityType env (Case scrut _ _ alts)
+arityType env (Case scrut bndr _ alts)
   | exprIsDeadEnd scrut || null alts
   = botArityType    -- Do not eta expand
                     -- See Note [Dealing with bottom (1)]
-  | otherwise
-  = case alts_type of
-     ABot n  | n>0       -> ATop []       -- Don't eta expand
-             | otherwise -> botArityType  -- if RHS is bottomming
-                                          -- See Note [Dealing with bottom (2)]
+  | not (pedanticBottoms env)  -- See Note [Dealing with bottom (2)]
+  , myExprIsCheap env scrut (Just (idType bndr))
+  = alts_type
+  | exprOkForSpeculation scrut
+  = alts_type
 
-     ATop as | not (pedanticBottoms env)  -- See Note [Dealing with bottom (3)]
-             , myExprIsCheap env scrut Nothing -> ATop as
-             | exprOkForSpeculation scrut      -> ATop as
-             | otherwise                       -> ATop (takeWhile isOneShotInfo as)
+  | otherwise               -- In the remaining cases we may not push
+  = case alts_type of       -- evaluation of the scrutinee in
+     ATop as -> ATop (takeWhile isOneShotInfo as)
+     ABot _  -> ATop []
   where
     alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
 
@@ -883,12 +924,15 @@ arityType env (Let (Rec pairs) body)
       | otherwise
       = pprPanic "arityType:joinrec" (ppr pairs)
 
-arityType env (Let b e)
-  = floatIn cheap_bind (arityType env e)
+arityType env (Let (NonRec b r) e)
+  = floatIn cheap_rhs (arityType env' e)
   where
-    cheap_bind = case b of
-      NonRec b e -> is_cheap (b,e)
-      Rec prs    -> all is_cheap prs
+    cheap_rhs = myExprIsCheap env r (Just (idType b))
+    env'      = extendSigEnv env b (arityType env r)
+
+arityType env (Let (Rec prs) e)
+  = floatIn (all is_cheap prs) (arityType env e)
+  where
     is_cheap (b,e) = myExprIsCheap env e (Just (idType b))
 
 arityType env (Tick t e)
