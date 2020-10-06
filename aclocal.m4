@@ -327,9 +327,14 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
     AC_LINK_IFELSE(
         [AC_LANG_PROGRAM([], [__asm__ (".subsections_via_symbols");])],
         [AC_MSG_RESULT(yes)
-         TargetHasSubsectionsViaSymbols=YES
-         AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
+         if test x"$TargetArch" = xaarch64; then
+            dnl subsections via symbols is busted on arm64
+            TargetHasSubsectionsViaSymbols=NO
+         else
+            TargetHasSubsectionsViaSymbols=YES
+            AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
                    [Define to 1 if Apple-style dead-stripping is supported.])
+         fi
         ],
         [TargetHasSubsectionsViaSymbols=NO
          AC_MSG_RESULT(no)])
