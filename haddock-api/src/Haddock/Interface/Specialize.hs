@@ -17,6 +17,7 @@ import GHC
 import GHC.Types.Name
 import GHC.Data.FastString
 import GHC.Builtin.Types ( listTyConName, unrestrictedFunTyConName )
+import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 
 import Control.Monad
 import Control.Monad.Trans.State
@@ -136,7 +137,7 @@ sugarTuples typ =
 sugarOperators :: NamedThing (IdP (GhcPass p)) => HsType (GhcPass p) -> HsType (GhcPass p)
 sugarOperators (HsAppTy _ (L _ (HsAppTy _ (L _ (HsTyVar _ _ (L l name))) la)) lb)
     | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
-    | unrestrictedFunTyConName == name' = HsFunTy noExtField HsUnrestrictedArrow la lb
+    | unrestrictedFunTyConName == name' = HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) la lb
   where
     name' = getName name
 sugarOperators typ = typ
@@ -290,7 +291,7 @@ renameType t@(HsTyLit _ _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 
 renameHsArrow :: HsArrow GhcRn -> Rename (IdP GhcRn) (HsArrow GhcRn)
-renameHsArrow (HsExplicitMult p) = HsExplicitMult <$> renameLType p
+renameHsArrow (HsExplicitMult u p) = HsExplicitMult u <$> renameLType p
 renameHsArrow mult = pure mult
 
 

@@ -29,6 +29,7 @@ import GHC
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 
 import Data.Char
 import Data.List
@@ -245,7 +246,7 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
                            [out dflags (map (extFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
 
-        funs = foldr1 (\x y -> reL $ HsFunTy noExtField HsUnrestrictedArrow x y)
+        funs = foldr1 (\x y -> reL $ HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) x y)
         apps = foldl1 (\x y -> reL $ HsAppTy noExtField x y)
 
         typeSig nm flds = operator nm ++ " :: " ++ outHsType dflags (unL $ funs flds)

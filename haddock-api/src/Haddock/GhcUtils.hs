@@ -44,6 +44,7 @@ import GHC.Types.Var.Env ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Core.Type     ( isRuntimeRepVar )
 import GHC.Builtin.Types( liftedRepDataConTyCon )
+import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 
 import           GHC.Data.StringBuffer ( StringBuffer )
 import qualified GHC.Data.StringBuffer             as S
@@ -156,13 +157,13 @@ getGADTConType (ConDeclGADT { con_forall = L _ has_forall
             | otherwise
             = tau_ty
 
---   tau_ty :: LHsType DocNameI
+--  tau_ty :: LHsType DocNameI
    tau_ty = case args of
               RecCon flds ->  mkFunTy (noLoc (HsRecTy noExtField (unLoc flds))) res_ty
               PrefixCon pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
               InfixCon arg1 arg2 -> (hsScaledThing arg1) `mkFunTy` ((hsScaledThing arg2) `mkFunTy` res_ty)
 
-   mkFunTy a b = noLoc (HsFunTy noExtField HsUnrestrictedArrow a b)
+   mkFunTy a b = noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) a b)
 
 getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
   -- Should only be called on ConDeclGADT
@@ -218,7 +219,7 @@ getGADTConTypeG (ConDeclGADT { con_forall = L _ has_forall
               InfixCon arg1 arg2 -> (hsScaledThing arg1) `mkFunTy` ((hsScaledThing arg2) `mkFunTy` res_ty)
 
    -- mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
-   mkFunTy a b = noLoc (HsFunTy noExtField HsUnrestrictedArrow a b)
+   mkFunTy a b = noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) a b)
 
 getGADTConTypeG (ConDeclH98 {}) = panic "getGADTConTypeG"
   -- Should only be called on ConDeclGADT

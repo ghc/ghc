@@ -51,6 +51,7 @@ import GHC.Utils.Panic ( assertPanic )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
+import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 
 import Haddock.Types
 import Haddock.Interface.Specialize
@@ -767,9 +768,9 @@ noKindTyVars _ _ = emptyVarSet
 
 synifyMult :: [TyVar] -> Mult -> HsArrow GhcRn
 synifyMult vs t = case t of
-                    One  -> HsLinearArrow
-                    Many -> HsUnrestrictedArrow
-                    ty -> HsExplicitMult (synifyType WithinType vs ty)
+                    One  -> HsLinearArrow NormalSyntax
+                    Many -> HsUnrestrictedArrow NormalSyntax
+                    ty -> HsExplicitMult NormalSyntax (synifyType WithinType vs ty)
 
 
 

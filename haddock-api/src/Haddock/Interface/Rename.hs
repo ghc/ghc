@@ -223,9 +223,9 @@ renameMaybeInjectivityAnn :: Maybe (LInjectivityAnn GhcRn)
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
 renameArrow :: HsArrow GhcRn -> RnM (HsArrow DocNameI)
-renameArrow HsUnrestrictedArrow = return HsUnrestrictedArrow
-renameArrow HsLinearArrow = return HsLinearArrow
-renameArrow (HsExplicitMult p) = HsExplicitMult <$> renameLType p
+renameArrow (HsUnrestrictedArrow u) = return (HsUnrestrictedArrow u)
+renameArrow (HsLinearArrow u) = return (HsLinearArrow u)
+renameArrow (HsExplicitMult u p) = HsExplicitMult u <$> renameLType p
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of

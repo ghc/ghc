@@ -56,6 +56,7 @@ import GHC.Types.Basic ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
 import qualified GHC.Utils.Outputable as O
 import GHC.Utils.Panic
 import GHC.HsToCore.Docs hiding (mkMaps)
+import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -957,7 +958,7 @@ extractPatternSyn nm t tvs cons =
     in PatSynSig noExtField [noLoc nm] (mkEmptyImplicitBndrs typ'')
 
   longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn
-  longArrow inputs output = foldr (\x y -> noLoc (HsFunTy noExtField HsUnrestrictedArrow x y)) output inputs
+  longArrow inputs output = foldr (\x y -> noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) x y)) output inputs
 
   data_ty con
     | ConDeclGADT{} <- con = con_res_ty con
@@ -974,7 +975,7 @@ extractRecSel _ _ _ [] = error "extractRecSel: selector not found"
 extractRecSel nm t tvs (L _ con : rest) =
   case getConArgs con of
     RecCon (L _ fields) | ((l,L _ (ConDeclField _ _nn ty _)) : _) <- matching_fields fields ->
-      L l (TypeSig noExtField [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy noExtField HsUnrestrictedArrow data_ty (getBangType ty)))))
+      L l (TypeSig noExtField [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) data_ty (getBangType ty)))))
     _ -> extractRecSel nm t tvs rest
  where
   matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]
