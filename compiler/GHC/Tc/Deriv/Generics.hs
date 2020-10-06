@@ -42,6 +42,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
+import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Utils.Error( Validity(..), andValid )
 import GHC.Types.SrcLoc
@@ -77,10 +78,10 @@ For the generic representation we need to generate:
 gen_Generic_binds :: GenericKind -> TyCon -> [Type]
                  -> TcM (LHsBinds GhcPs, [LSig GhcPs], FamInst)
 gen_Generic_binds gk tc inst_tys = do
+  dflags <- getDynFlags
   repTyInsts <- tc_mkRepFamInsts gk tc inst_tys
+  let (binds, sigs) = mkBindsRep dflags gk tc
   return (binds, sigs, repTyInsts)
-  where
-    (binds, sigs) = mkBindsRep gk tc
 
 {-
 ************************************************************************
@@ -333,8 +334,8 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
 
 -- Bindings for the Generic instance
-mkBindsRep :: GenericKind -> TyCon -> (LHsBinds GhcPs, [LSig GhcPs])
-mkBindsRep gk tycon = (binds, sigs)
+mkBindsRep :: DynFlags -> GenericKind -> TyCon -> (LHsBinds GhcPs, [LSig GhcPs])
+mkBindsRep dflags gk tycon = (binds, sigs)
       where
         binds = unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
               `unionBags`
@@ -343,10 +344,9 @@ mkBindsRep gk tycon = (binds, sigs)
         -- If the type is small enough mark both methods as INLINE[1] so that
         -- GHC is able to optimize away intermediate Generic representation in
         -- more cases (#11068).
-        sigs = if inlining_potentially_useful
-               then [ inline1 from01_RDR
-                    , inline1 to01_RDR
-                    ]
+        sigs = if     gopt Opt_InlineGenericsAggressively dflags
+                  || (gopt Opt_InlineGenerics dflags && inlining_useful)
+               then [inline1 from01_RDR, inline1 to01_RDR]
                else []
          where
            -- The heuristic was chosen by looking at how marking Generic methods
@@ -368,7 +368,7 @@ mkBindsRep gk tycon = (binds, sigs)
            -- Above the chosen thresholds INLINE pragmas start to become at best
            -- useless and at worst lead to code size blowup without runtime
            -- performance improvements.
-           inlining_potentially_useful
+           inlining_useful
              | cons <= 1  = True
              | cons <= 4  = max_fields <= 5
              | cons <= 8  = max_fields <= 2
