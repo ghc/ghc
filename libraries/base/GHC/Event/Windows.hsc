@@ -555,9 +555,24 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
       withRequest offset callbackData $ \hs_lpol cdData -> do
         let ptr_lpol = hs_lpol `plusPtr` cdOffset
         let lpol = castPtr hs_lpol
+        -- We need to add the payload before calling startCBResult, the reason being
+        -- that the I/O routine begins immediately then.  If we don't then the request
+        -- may end up lost as processCompletion will get called with a null payload.
+        poke ptr_lpol cdData
+
+        -- Since FILE_SKIP_COMPLETION_PORT_ON_SUCCESS can't be
+        -- relied on for non-file handles we need a way to prevent
+        -- us from handling a request inline and handle a completion
+        -- event handled without a queued I/O operation.  Which means we
+        -- can't solely rely on the number of oustanding requests but most
+        -- also check intermediate status.
+        reqs <- addRequest
+        debugIO $ "+1.. " ++ show reqs ++ " requests queued. | " ++ show lpol
+        cdDataCheck <- peek ptr_lpol :: IO (Ptr CompletionData)
         debugIO $ "hs_lpol:" ++ show hs_lpol
                 ++ " cdData:" ++ show cdData
                 ++ " ptr_lpol:" ++ show ptr_lpol
+                ++ " *ptr_lpol:" ++ show cdDataCheck
 
         startCBResult <- startCB lpol `onException`
                         (CbError `fmap` Win32.getLastError) >>= \result -> do
@@ -630,29 +645,14 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
 
               debugIO $ "== >*< " ++ show (finished, done_early, will_finish_sync, h, lpol, lasterr)
               case (finished, done_early, will_finish_sync) of
+                (Just _, _, _) -> do
+                  debugIO "request handled immediately (o/b), not queued."
+                  return $ CbDone finished
                 -- Still pending
-                (Nothing, False, False) -> do
-                    -- Since FILE_SKIP_COMPLETION_PORT_ON_SUCCESS can't be
-                    -- relied on for non-file handles we need a way to prevent
-                    -- us from handling a request inline and handle a completion
-                    -- event handled without a queued I/O operation.  We can do
-                    -- this by deferring the setting data pointer until we know
-                    -- the request will be handled async.
-                    poke ptr_lpol cdData
-                    reqs <- addRequest
-                    debugIO $ "+1.. " ++ show reqs ++ " requests queued. | " ++ show lpol
+                (Nothing, _, _) -> do
                     -- If we should add back support to suspend the IO Manager thread
                     -- then we will need to make sure it's running at this point.
                     return result'
-                -- In progress, we will wait for completion.
-                (Nothing, False, True) -> do
-                  debugIO $ "handling incomplete request synchronously " ++ show (h, lpol)
-                  res <- waitForCompletion h lpol
-                  debugIO $ "done blocking request 1: " ++ show (h, lpol) ++ " - " ++ show res
-                  return res
-                _                -> do
-                  debugIO "request handled immediately (o/b), not queued."
-                  return $ CbDone finished
             CbError err' -> signalThrow (Just err') >> return result'
             CbDone  _   -> do
               debugIO "request handled immediately (o), not queued." >> return result'
@@ -660,8 +660,9 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
         -- If an exception was received while waiting for IO to complete
         -- we try to cancel the request here.
         let cancel e = do
+                        nerr <- getLastError
                         debugIO $ "## Exception occurred. Cancelling request... "
-                        debugIO $ show (e :: SomeException)
+                        debugIO $ show (e :: SomeException) ++ " : " ++ show nerr
                         _ <- uninterruptibleMask_ $ FFI.cancelIoEx' h lpol
                         -- we need to wait for the cancellation before removing
                         -- the pointer.
@@ -669,10 +670,9 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                         _ <- FFI.getOverlappedResult h lpol True
                         oldDataPtr <- exchangePtr ptr_lpol nullReq
                         when (oldDataPtr == cdData) $
-                          do reqs <- removeRequest
-                             debugIO $ "-1.. " ++ show reqs ++ " requests queued after error."
-                             status <- fmap fromIntegral getLastError
-                             completionCB' status 0
+                          do reqs1 <- removeRequest
+                             debugIO $ "-1.. " ++ show reqs1 ++ " requests queued after error."
+                             completionCB' (fromIntegral nerr) 0
                         when (not threadedIOMgr) $
                           do -- Run timeouts. This way if we canceled the last
                              -- IO Request and have no timer events waiting we
@@ -692,22 +692,32 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
         case startCBResult of
           CbPending    -> runner
           CbDone rdata -> do
-            debugIO $ dbgMsg $ ":: done " ++ show lpol ++ " - " ++ show rdata
-            bytes <- if isJust rdata
-                        then return rdata
-                        -- Make sure it's safe to free the OVERLAPPED buffer
-                        else FFI.getOverlappedResult h lpol False
-            debugIO $ dbgMsg $ ":: done bytes: " ++ show bytes
-            case bytes of
-              Just res -> completionCB 0 res
-              Nothing  -> do err <- FFI.overlappedIOStatus lpol
-                             numBytes <- FFI.overlappedIONumBytes lpol
-                             -- TODO: Remap between STATUS_ and ERROR_ instead
-                             -- of re-interpret here. But for now, don't care.
-                             let err' = fromIntegral err
-                             debugIO $ dbgMsg $ ":: done callback: " ++ show err' ++ " - " ++ show numBytes
-                             completionCB err' (fromIntegral numBytes)
+            oldDataPtr <- I.exchangePtr ptr_lpol nullReq
+            if (oldDataPtr == cdData)
+              then
+                do reqs2 <- removeRequest
+                   debugIO $ "-1.. " ++ show reqs2 ++ " requests queued."
+                   debugIO $ dbgMsg $ ":: done " ++ show lpol ++ " - " ++ show rdata
+                   bytes <- if isJust rdata
+                               then return rdata
+                               -- Make sure it's safe to free the OVERLAPPED buffer
+                               else FFI.getOverlappedResult h lpol False
+                   cdDataCheck2 <- peek ptr_lpol :: IO (Ptr CompletionData)
+                   debugIO $ dbgMsg $ ":: exit *ptr_lpol: " ++ show cdDataCheck2
+                   debugIO $ dbgMsg $ ":: done bytes: " ++ show bytes
+                   case bytes of
+                     Just res -> completionCB 0 res
+                     Nothing  -> do err <- FFI.overlappedIOStatus lpol
+                                    numBytes <- FFI.overlappedIONumBytes lpol
+                                    -- TODO: Remap between STATUS_ and ERROR_ instead
+                                    -- of re-interpret here. But for now, don't care.
+                                    let err' = fromIntegral err
+                                    debugIO $ dbgMsg $ ":: done callback: " ++ show err' ++ " - " ++ show numBytes
+                                    completionCB err' (fromIntegral numBytes)
+              else readIOPort signal
           CbError err  -> do
+            reqs3 <- removeRequest
+            debugIO $ "-1.. " ++ show reqs3 ++ " requests queued."
             let err' = fromIntegral err
             completionCB err' 0
           _            -> do
@@ -1033,14 +1043,25 @@ processCompletion Manager{..} n delay = do
           let hs_lpol  = castPtr lpol :: Ptr FFI.HASKELL_OVERLAPPED
           let ptr_lpol = castPtr (hs_lpol `plusPtr` cdOffset) :: Ptr (Ptr CompletionData)
           cdDataCheck <- peek ptr_lpol
+          oldDataPtr <- I.exchangePtr ptr_lpol nullReq :: IO (Ptr CompletionData)
           debugIO $ " $ checking " ++ show lpol
                     ++ " -en ptr_lpol: " ++ show ptr_lpol
                     ++ " offset: " ++ show cdOffset
                     ++ " cdData: " ++ show cdDataCheck
                     ++ " at idx " ++ show idx
-          oldDataPtr <- exchangePtr ptr_lpol nullReq :: IO (Ptr CompletionData)
+          ptrd <- peek ptr_lpol
+          debugIO $ ":: nullReq " ++ show nullReq
           debugIO $ ":: oldDataPtr " ++ show oldDataPtr
-          when (oldDataPtr /= nullPtr) $
+          debugIO $ ":: oldDataPtr (ptr)" ++ show ptrd
+          -- A nullPtr indicates that we received a request which we shouldn't
+          -- have. Essentially the field is 0 initialized and a nullPtr means
+          -- it wasn't given a payload.
+          -- A nullReq means that something else already handled the request,
+          -- this can happen if for instance the request was cancelled.
+          -- The former is an error while the latter is OK.  For now we treat
+          -- them both as the same, but external tools such as API monitor are
+          -- used to distinguish between the two when doing API tracing.
+          when (oldDataPtr /= nullPtr && oldDataPtr /= castPtr nullReq) $
             do debugIO $ "exchanged: " ++ show oldDataPtr
                payload <- peek oldDataPtr :: IO CompletionData
                let !cb = cdCallback payload
@@ -1054,7 +1075,9 @@ processCompletion Manager{..} n delay = do
                -- now require the callback to free the memory since the
                -- callback allocated it.  This allows us to simplify memory
                -- management and reduce bugs.  See Note [Memory Management].
-               cb status' (dwNumberOfBytesTransferred oe)
+               let bytes = dwNumberOfBytesTransferred oe
+               debugIO $ "?: status " ++ show status' ++ " - " ++ show bytes ++ " bytes return."
+               cb status' bytes
 
       -- clear the array so we don't erroneously interpret the output, in
       -- certain circumstances like lockFileEx the code could return 1 entry
