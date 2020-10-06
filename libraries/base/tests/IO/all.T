@@ -149,3 +149,4 @@ test('T17414',
       high_memory_usage],
      compile_and_run, [''])
 test('T17510', expect_broken(17510), compile_and_run, [''])
+test('bytestringread001', extra_run_opts('test.data'), compile_and_run, [''])
