@@ -11,6 +11,7 @@ test('integerPowMod', [], compile_and_run, [''])
 test('integerGcdExt', [], compile_and_run, [''])
 test('integerRecipMod', [], compile_and_run, [''])
 test('bignumMatch', [], compile, [''])
+test('T18813', [], compile_and_run, [''])
 
 # skip ghci as it doesn't support unboxed tuples
 test('integerImportExport', [omit_ways(['ghci'])], compile_and_run, [''])
