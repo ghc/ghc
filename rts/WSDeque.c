@@ -11,7 +11,15 @@
  * SPAA'05, July 2005, Las Vegas, USA.
  * ACM 1-58113-986-1/05/0007
  *
+ * This implementation closely follows the C11 implementation presented in
+ *
+ * N.M. Lê, A. Pop, A.Cohen, and F.Z. Nardelli. "Correct and Efficient
+ * Work-Stealing for Weak Memory Models". PPoPP'13, February 2013,
+ * ACM 978-1-4503-1922/13/02.
+ *
  * Author: Jost Berthold MSRC 07-09/2008
+ * Rewritten by: Ben Gamari (Well-Typed)
+ *
  *
  * The DeQue is held as a circular array with known length. Positions
  * of top (read-end) and bottom (write-end) always increase, and the
@@ -44,7 +52,12 @@
 #include "RtsUtils.h"
 #include "WSDeque.h"
 
-#define CASTOP(addr,old,new) ((old) == cas(((StgPtr)addr),(old),(new)))
+static inline bool
+cas_top(WSDeque *q, StgInt old, StgInt new)
+{
+    return (StgWord) old == cas((StgPtr) &q->top, (StgWord) old, (StgWord) new);
+}
+
 
 /* -----------------------------------------------------------------------------
  * newWSDeque
@@ -80,12 +93,11 @@ newWSDeque (uint32_t size)
                                   "newWSDeque");
     q->elements = stgMallocBytes(realsize * sizeof(StgClosurePtr), /* dataspace */
                                  "newWSDeque:data space");
-    q->top=0;
-    q->bottom=0;
-    q->topBound=0; /* read by writer, updated each time top is read */
-
     q->size = realsize;  /* power of 2 */
     q->moduloSize = realsize - 1; /* n % size == n & moduloSize  */
+
+    q->top=0;
+    RELEASE_STORE(&q->bottom, 0); /* read by writer, updated each time top is read */
 
     ASSERT_WSDEQUE_INVARIANTS(q);
     return q;
@@ -118,56 +130,31 @@ freeWSDeque (WSDeque *q)
 void *
 popWSDeque (WSDeque *q)
 {
-    /* also a bit tricky, has to avoid concurrent steal() calls by
-       accessing top with cas, when there is only one element left */
-    StgWord t, b;
-    long  currSize;
-    void * removed;
+    StgInt b = RELAXED_LOAD(&q->bottom) - 1;
+    RELAXED_STORE(&q->bottom, b);
+    SEQ_CST_FENCE();
+    StgInt t = RELAXED_LOAD(&q->top);
 
-    ASSERT_WSDEQUE_INVARIANTS(q);
+    void *result;
+    if (t <= b) {
+        /* Non-empty */
+        result = RELAXED_LOAD(&q->elements[b & q->moduloSize]);
+        if (t == b) {
+            /* Single last element in queue */
+            if (!cas_top(q, t, t+1)) {
+                /* Failed race */
+                result = NULL;
+            }
 
-    b = q->bottom;
-
-    // "decrement b as a test, see what happens"
-    b--;
-    q->bottom = b;
-
-    // very important that the following read of q->top does not occur
-    // before the earlier write to q->bottom.
-    store_load_barrier();
-
-    t = q->top; /* using topBound would give an *upper* bound, we
-                   need a lower bound. We use the real top here, but
-                   can update the topBound value */
-    q->topBound = t;
-    currSize = (long)b - (long)t;
-    if (currSize < 0) { /* was empty before decrementing b, set b
-                           consistently and abort */
-        q->bottom = t;
-        return NULL;
+            RELAXED_STORE(&q->bottom, b+1);
+        }
+    } else {
+        /* Empty queue */
+        result = NULL;
+        RELAXED_STORE(&q->bottom, b+1);
     }
 
-    // read the element at b
-    removed = q->elements[b & q->moduloSize];
-
-    if (currSize > 0) { /* no danger, still elements in buffer after b-- */
-        // debugBelch("popWSDeque: t=%ld b=%ld = %ld\n", t, b, removed);
-        return removed;
-    }
-    /* otherwise, has someone meanwhile stolen the same (last) element?
-       Check and increment top value to know  */
-    if ( !(CASTOP(&(q->top),t,t+1)) ) {
-        removed = NULL; /* no success, but continue adjusting bottom */
-    }
-    q->bottom = t+1; /* anyway, empty now. Adjust bottom consistently. */
-    q->topBound = t+1; /* ...and cached top value as well */
-
-    ASSERT_WSDEQUE_INVARIANTS(q);
-    ASSERT(q->bottom >= q->top);
-
-    // debugBelch("popWSDeque: t=%ld b=%ld = %ld\n", t, b, removed);
-
-    return removed;
+    return result;
 }
 
 /* -----------------------------------------------------------------------------
@@ -177,43 +164,19 @@ popWSDeque (WSDeque *q)
 void *
 stealWSDeque_ (WSDeque *q)
 {
-    void * stolen;
-    StgWord b,t;
+    StgInt t = ACQUIRE_LOAD(&q->top);
+    SEQ_CST_FENCE();
+    StgInt b = ACQUIRE_LOAD(&q->bottom);
 
-// Can't do this on someone else's spark pool:
-// ASSERT_WSDEQUE_INVARIANTS(q);
-
-    // NB. these loads must be ordered, otherwise there is a race
-    // between steal and pop.
-    t = q->top;
-    load_load_barrier();
-    b = q->bottom;
-
-    // NB. b and t are unsigned; we need a signed value for the test
-    // below, because it is possible that t > b during a
-    // concurrent popWSQueue() operation.
-    if ((long)b - (long)t <= 0 ) {
-        return NULL; /* already looks empty, abort */
+    void *result = NULL;
+    if (t < b) {
+        /* Non-empty queue */
+        result = RELAXED_LOAD(&q->elements[t % q->size]);
+        if (!cas_top(q, t, t+1)) {
+            return NULL;
+        }
     }
-    // NB. the load of q->bottom must be ordered before the load of
-    // q->elements[t & q-> moduloSize]. See comment "KG:..." below
-    // and Ticket #13633.
-    load_load_barrier();
-    /* now access array, see pushBottom() */
-    stolen = q->elements[t & q->moduloSize];
-
-    /* now decide whether we have won */
-    if ( !(CASTOP(&(q->top),t,t+1)) ) {
-        /* lost the race, someone else has changed top in the meantime */
-        return NULL;
-    }  /* else: OK, top has been incremented by the cas call */
-
-    // debugBelch("stealWSDeque_: t=%d b=%d\n", t, b);
-
-// Can't do this on someone else's spark pool:
-// ASSERT_WSDEQUE_INVARIANTS(q);
-
-    return stolen;
+    return result;
 }
 
 void *
@@ -232,67 +195,30 @@ stealWSDeque (WSDeque *q)
  * pushWSQueue
  * -------------------------------------------------------------------------- */
 
-#define DISCARD_NEW
-
-/* enqueue an element. Should always succeed by resizing the array
-   (not implemented yet, silently fails in that case). */
+/* Enqueue an element. Must only be called by owner. Returns true if element was
+ * pushed, false if queue is full
+ */
 bool
 pushWSDeque (WSDeque* q, void * elem)
 {
-    StgWord t;
-    StgWord b;
-    StgWord sz = q->moduloSize;
+    StgInt b = ACQUIRE_LOAD(&q->bottom);
+    StgInt t = ACQUIRE_LOAD(&q->top);
 
-    ASSERT_WSDEQUE_INVARIANTS(q);
-
-    /* we try to avoid reading q->top (accessed by all) and use
-       q->topBound (accessed only by writer) instead.
-       This is why we do not just call empty(q) here.
-    */
-    b = q->bottom;
-    t = q->topBound;
-    if ( (StgInt)b - (StgInt)t >= (StgInt)sz ) {
-        /* NB. 1. sz == q->size - 1, thus ">="
-           2. signed comparison, it is possible that t > b
-        */
-        /* could be full, check the real top value in this case */
-        t = q->top;
-        q->topBound = t;
-        if (b - t >= sz) { /* really no space left :-( */
-            /* reallocate the array, copying the values. Concurrent steal()s
-               will in the meantime use the old one and modify only top.
-               This means: we cannot safely free the old space! Can keep it
-               on a free list internally here...
-
-               Potential bug in combination with steal(): if array is
-               replaced, it is unclear which one concurrent steal operations
-               use. Must read the array base address in advance in steal().
-            */
-#if defined(DISCARD_NEW)
-            ASSERT_WSDEQUE_INVARIANTS(q);
-            return false; // we didn't push anything
-#else
-            /* could make room by incrementing the top position here.  In
-             * this case, should use CASTOP. If this fails, someone else has
-             * removed something, and new room will be available.
-             */
-            ASSERT_WSDEQUE_INVARIANTS(q);
-#endif
-        }
+    if ( b - t > q->size - 1 ) {
+        /* Full queue */
+        /* We don't implement resizing, just say we didn't push anything. */
+        return false;
     }
 
-    q->elements[b & sz] = elem;
-    /*
-       KG: we need to put write barrier here since otherwise we might
-       end with elem not added to q->elements, but q->bottom already
-       modified (write reordering) and with stealWSDeque_ failing
-       later when invoked from another thread since it thinks elem is
-       there (in case there is just added element in the queue). This
-       issue concretely hit me on ARMv7 multi-core CPUs
-     */
-    write_barrier();
-    q->bottom = b + 1;
-
-    ASSERT_WSDEQUE_INVARIANTS(q);
+    RELAXED_STORE(&q->elements[b & q->moduloSize], elem);
+    RELEASE_FENCE();
+#if defined(TSAN_ENABLED)
+    // ThreadSanizer doesn't know about release fences, so we need to
+    // strengthen this to a release store lest we get spurious data race
+    // reports.
+    RELEASE_STORE(&q->bottom, b+1);
+#else
+    RELAXED_STORE(&q->bottom, b+1);
+#endif
     return true;
 }
