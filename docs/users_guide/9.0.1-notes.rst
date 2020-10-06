@@ -351,6 +351,13 @@ Haddock
 - ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
 
+- Add a pair of new operations, ``keepAliveLifted#`` and ``keepAliveUnlifted#``
+  to :ghc-prim:`GHC.Magic` which supersede the ``touch#`` primitive in most
+  cases. Unlike ``touch#`` these operations do not suffer from fragility in the
+  presence of simplification (see :ghc-ticket:`17760`). Users are strongly
+  encouraged to audit their code-bases for uses of ``touch#`` and replace them
+  with the appropriate ``keepAlive#`` function if possible.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
