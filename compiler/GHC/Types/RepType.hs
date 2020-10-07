@@ -30,6 +30,7 @@ import GHC.Core.DataCon
 import GHC.Builtin.Names
 import GHC.Core.Coercion
 import GHC.Core.TyCon
+import GHC.Core.TyCon.RecWalk
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim

@@ -50,12 +50,13 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Name.Set hiding (unitFV)
 import GHC.Types.Name.Reader ( mkVarUnqual )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Unique.Set
+import GHC.Core.TyCon.Set
 import GHC.Core.Coercion ( ltRole )
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
@@ -156,7 +157,11 @@ newtype SynCycleM a = SynCycleM {
     runSynCycleM :: SynCycleState -> Either (SrcSpan, SDoc) (a, SynCycleState) }
     deriving (Functor)
 
-type SynCycleState = NameSet
+-- TODO: TyConSet is implemented as IntMap over uniques.
+-- But we could get away with something based on IntSet
+-- since we only check membershib, but never extract the
+-- elements.
+type SynCycleState = TyConSet
 
 instance Applicative SynCycleM where
     pure x = SynCycleM $ \state -> Right (x, state)
@@ -174,12 +179,12 @@ failSynCycleM loc err = SynCycleM $ \_ -> Left (loc, err)
 
 -- | Test if a 'Name' is acyclic, short-circuiting if we've
 -- seen it already.
-checkNameIsAcyclic :: Name -> SynCycleM () -> SynCycleM ()
-checkNameIsAcyclic n m = SynCycleM $ \s ->
-    if n `elemNameSet` s
+checkTyConIsAcyclic :: TyCon -> SynCycleM () -> SynCycleM ()
+checkTyConIsAcyclic tc m = SynCycleM $ \s ->
+    if tc `elemTyConSet` s
         then Right ((), s) -- short circuit
         else case runSynCycleM m s of
-                Right ((), s') -> Right ((), extendNameSet s' n)
+                Right ((), s') -> Right ((), extendTyConSet s' tc)
                 Left err -> Left err
 
 -- | Checks if any of the passed in 'TyCon's have cycles.
@@ -189,7 +194,7 @@ checkNameIsAcyclic n m = SynCycleM $ \s ->
 -- can give better error messages.
 checkSynCycles :: Unit -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
 checkSynCycles this_uid tcs tyclds = do
-    case runSynCycleM (mapM_ (go emptyNameSet []) tcs) emptyNameSet of
+    case runSynCycleM (mapM_ (go emptyTyConSet []) tcs) emptyTyConSet of
         Left (loc, err) -> setSrcSpan loc $ failWithTc err
         Right _  -> return ()
   where
@@ -198,15 +203,15 @@ checkSynCycles this_uid tcs tyclds = do
 
     -- Short circuit if we've already seen this Name and concluded
     -- it was acyclic.
-    go :: NameSet -> [TyCon] -> TyCon -> SynCycleM ()
+    go :: TyConSet -> [TyCon] -> TyCon -> SynCycleM ()
     go so_far seen_tcs tc =
-        checkNameIsAcyclic (tyConName tc) $ go' so_far seen_tcs tc
+        checkTyConIsAcyclic tc $ go' so_far seen_tcs tc
 
     -- Expand type synonyms, complaining if you find the same
     -- type synonym a second time.
-    go' :: NameSet -> [TyCon] -> TyCon -> SynCycleM ()
+    go' :: TyConSet -> [TyCon] -> TyCon -> SynCycleM ()
     go' so_far seen_tcs tc
-        | n `elemNameSet` so_far
+        | tc `elemTyConSet` so_far
             = failSynCycleM (getSrcSpan (head seen_tcs)) $
                   sep [ text "Cycle in type synonym declarations:"
                       , nest 2 (vcat (map ppr_decl seen_tcs)) ]
@@ -221,7 +226,7 @@ checkSynCycles this_uid tcs tyclds = do
                isInteractiveModule mod)
             = return ()
         | Just ty <- synTyConRhs_maybe tc =
-            go_ty (extendNameSet so_far (tyConName tc)) (tc:seen_tcs) ty
+            go_ty (extendTyConSet so_far tc) (tc:seen_tcs) ty
         | otherwise = return ()
       where
         n = tyConName tc
@@ -234,7 +239,7 @@ checkSynCycles this_uid tcs tyclds = do
          where
           n = tyConName tc
 
-    go_ty :: NameSet -> [TyCon] -> Type -> SynCycleM ()
+    go_ty :: TyConSet -> [TyCon] -> Type -> SynCycleM ()
     go_ty so_far seen_tcs ty =
         mapM_ (go so_far seen_tcs) (synonymTyConsOfType ty)
 
@@ -284,11 +289,13 @@ and now expand superclasses for constraint (C Id):
 Each step expands superclasses one layer, and clearly does not terminate.
 -}
 
+type ClassSet = UniqSet Class
+
 checkClassCycles :: Class -> Maybe SDoc
 -- Nothing  <=> ok
 -- Just err <=> possible cycle error
 checkClassCycles cls
-  = do { (definite_cycle, err) <- go (unitNameSet (getName cls))
+  = do { (definite_cycle, err) <- go (unitUniqSet cls)
                                      cls (mkTyVarTys (classTyVars cls))
        ; let herald | definite_cycle = text "Superclass cycle for"
                     | otherwise      = text "Potential superclass cycle for"
@@ -304,12 +311,12 @@ checkClassCycles cls
     -- NB: this code duplicates TcType.transSuperClasses, but
     --     with more error message generation clobber
     -- Make sure the two stay in sync.
-    go :: NameSet -> Class -> [Type] -> Maybe (Bool, SDoc)
+    go :: ClassSet -> Class -> [Type] -> Maybe (Bool, SDoc)
     go so_far cls tys = firstJusts $
                         map (go_pred so_far) $
                         immSuperClasses cls tys
 
-    go_pred :: NameSet -> PredType -> Maybe (Bool, SDoc)
+    go_pred :: ClassSet -> PredType -> Maybe (Bool, SDoc)
        -- Nothing <=> ok
        -- Just (True, err)  <=> definite cycle
        -- Just (False, err) <=> possible cycle
@@ -322,7 +329,7 @@ checkClassCycles cls
        | otherwise
        = Nothing
 
-    go_tc :: NameSet -> PredType -> TyCon -> [Type] -> Maybe (Bool, SDoc)
+    go_tc :: ClassSet -> PredType -> TyCon -> [Type] -> Maybe (Bool, SDoc)
     go_tc so_far pred tc tys
       | isFamilyTyCon tc
       = Just (False, hang (text "one of whose superclass constraints is headed by a type family:")
@@ -332,18 +339,16 @@ checkClassCycles cls
       | otherwise   -- Equality predicate, for example
       = Nothing
 
-    go_cls :: NameSet -> Class -> [Type] -> Maybe (Bool, SDoc)
+    go_cls :: ClassSet -> Class -> [Type] -> Maybe (Bool, SDoc)
     go_cls so_far cls tys
-       | cls_nm `elemNameSet` so_far
+       | cls `elementOfUniqSet` so_far
        = Just (True, text "one of whose superclasses is" <+> quotes (ppr cls))
        | isCTupleClass cls
        = go so_far cls tys
        | otherwise
-       = do { (b,err) <- go  (so_far `extendNameSet` cls_nm) cls tys
+       = do { (b,err) <- go  (so_far `addOneToUniqSet` cls) cls tys
           ; return (b, text "one of whose superclasses is" <+> quotes (ppr cls)
                        $$ err) }
-       where
-         cls_nm = getName cls
 
 {-
 ************************************************************************
