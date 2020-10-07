@@ -210,8 +210,6 @@ report_unsolved type_errors expr_holes
        ; traceTc "reportUnsolved (before zonking and tidying)" (ppr wanted)
 
        ; wanted <- zonkWC wanted   -- Zonk to reveal all information
-            -- If we are deferring we are going to need /all/ evidence around,
-            -- including the evidence produced by unflattening (zonkWC)
        ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs
              free_tvs = filterOut isCoVar $
                         tyCoVarsOfWCList wanted
