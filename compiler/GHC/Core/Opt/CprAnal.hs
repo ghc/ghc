@@ -31,7 +31,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Utils.Misc
 import GHC.Utils.Error  ( dumpIfSet_dyn, DumpFormat (..) )
-import GHC.Data.Maybe   ( isJust, isNothing )
+import GHC.Data.Maybe   ( isJust )
 
 import Control.Monad ( guard )
 import Data.List
@@ -120,12 +120,12 @@ cprAnalTopBind :: AnalEnv
 cprAnalTopBind env (NonRec id rhs)
   = (env', NonRec id' rhs')
   where
-    (id', rhs', env') = cprAnalBind TopLevel env id rhs
+    (id', rhs', env') = cprAnalBind env id rhs
 
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
   where
-    (env', pairs') = cprFix TopLevel env pairs
+    (env', pairs') = cprFix env pairs
 
 --
 -- * Analysing expressions
@@ -194,13 +194,13 @@ cprAnal' env (Case scrut case_bndr ty alts)
 cprAnal' env (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
   where
-    (id', rhs', env') = cprAnalBind NotTopLevel env id rhs
+    (id', rhs', env') = cprAnalBind env id rhs
     (body_ty, body')  = cprAnal env' body
 
 cprAnal' env (Let (Rec pairs) body)
   = body_ty `seq` (body_ty, Let (Rec pairs') body')
   where
-    (env', pairs')   = cprFix NotTopLevel env pairs
+    (env', pairs')   = cprFix env pairs
     (body_ty, body') = cprAnal env' body
 
 cprAnalAlt
@@ -249,11 +249,10 @@ cprTransform env id
 --
 
 -- Recursive bindings
-cprFix :: TopLevelFlag
-       -> AnalEnv                    -- Does not include bindings for this binding
+cprFix :: AnalEnv                    -- Does not include bindings for this binding
        -> [(Id,CoreExpr)]
        -> (AnalEnv, [(Id,CoreExpr)]) -- Binders annotated with CPR info
-cprFix top_lvl orig_env orig_pairs
+cprFix orig_env orig_pairs
   = loop 1 init_env init_pairs
   where
     init_sig id rhs
@@ -286,17 +285,16 @@ cprFix top_lvl orig_env orig_pairs
       where
         go env (id, rhs) = (env', (id', rhs'))
           where
-            (id', rhs', env') = cprAnalBind top_lvl env id rhs
+            (id', rhs', env') = cprAnalBind env id rhs
 
 -- | Process the RHS of the binding for a sensible arity, add the CPR signature
 -- to the Id, and augment the environment with the signature as well.
 cprAnalBind
-  :: TopLevelFlag
-  -> AnalEnv
+  :: AnalEnv
   -> Id
   -> CoreExpr
   -> (Id, CoreExpr, AnalEnv)
-cprAnalBind top_lvl env id rhs
+cprAnalBind env id rhs
   -- See Note [CPR for data structures]
   | isDataStructure id rhs
   = (id,  rhs,  env) -- Data structure => no code => need to analyse rhs
@@ -308,8 +306,6 @@ cprAnalBind top_lvl env id rhs
     rhs_ty'
       -- See Note [CPR for thunks]
       | stays_thunk = trimCprTy rhs_ty
-      -- See Note [CPR for sum types]
-      | returns_sum = trimCprTy rhs_ty
       | otherwise   = rhs_ty
     -- See Note [Arity trimming for CPR signatures]
     sig  = mkCprSigForArity (idArity id) rhs_ty'
@@ -320,10 +316,6 @@ cprAnalBind top_lvl env id rhs
     stays_thunk = is_thunk && not_strict
     is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
     not_strict  = not (isStrictDmd (idDemandInfo id))
-    -- See Note [CPR for sum types]
-    (_, ret_ty) = splitPiTys (idType id)
-    not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
-    returns_sum = not (isTopLevel top_lvl) && not_a_prod
 
 isDataStructure :: Id -> CoreExpr -> Bool
 -- See Note [CPR for data structures]
@@ -565,32 +557,6 @@ Note that
     See Note [CPR in a DataAlt case alternative].
 
   * See Note [CPR examples]
-
-Note [CPR for sum types]
-~~~~~~~~~~~~~~~~~~~~~~~~
-At the moment we do not do CPR for let-bindings that
-   * non-top level
-   * bind a sum type
-Reason: I found that in some benchmarks we were losing let-no-escapes,
-which messed it all up.  Example
-   let j = \x. ....
-   in case y of
-        True  -> j False
-        False -> j True
-If we w/w this we get
-   let j' = \x. ....
-   in case y of
-        True  -> case j' False of { (# a #) -> Just a }
-        False -> case j' True of { (# a #) -> Just a }
-Notice that j' is not a let-no-escape any more.
-
-However this means in turn that the *enclosing* function
-may be CPR'd (via the returned Justs).  But in the case of
-sums, there may be Nothing alternatives; and that messes
-up the sum-type CPR.
-
-Conclusion: only do this for products.  It's still not
-guaranteed OK for products, but sums definitely lose sometimes.
 
 Note [CPR for thunks]
 ~~~~~~~~~~~~~~~~~~~~~
