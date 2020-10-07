@@ -649,7 +649,7 @@ nightly-x86_64-linux-deb9-tsan:
 
 validate-x86_64-linux-deb9-tsan:
   extends: .build-x86_64-linux-deb9-tsan
-  when: manual
+  stage: lint
 
 validate-x86_64-linux-deb9-dwarf:
   extends: .build-x86_64-linux-deb9
