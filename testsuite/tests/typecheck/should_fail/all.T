@@ -590,3 +590,5 @@ test('T18640b', normal, compile_fail, [''])
 test('T18640c', normal, compile_fail, [''])
 test('T10709', normal, compile_fail, [''])
 test('T10709b', normal, compile_fail, [''])
+test('T12178a', normal, compile_fail, [''])
+
