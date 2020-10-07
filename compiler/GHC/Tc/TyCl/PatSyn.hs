@@ -25,7 +25,7 @@ import GHC.Tc.Gen.Pat
 import GHC.Core.Multiplicity
 import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType )
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Gen.Sig( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv, addInlinePrags )
+import GHC.Tc.Gen.Sig ( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv, addInlinePrags )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Zonk
@@ -758,7 +758,7 @@ tcPatSynMatcher (L loc name) lpat prag_fn
              -- See Note [Pragmas for pattern synonyms]
 
        ; matcher_prag_id <- addInlinePrags matcher_id prags
-       ; let bind = FunBind{ fun_id = cL loc matcher_prag_id
+       ; let bind = FunBind{ fun_id = L loc matcher_prag_id
                            , fun_matches = mg
                            , fun_ext = idHsWrapper
                            , fun_tick = [] }
