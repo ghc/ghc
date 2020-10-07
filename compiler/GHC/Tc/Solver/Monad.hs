@@ -174,6 +174,7 @@ import GHC.Core.Predicate
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
+import GHC.Core.TyCon.Env
 import GHC.Data.Maybe
 
 import GHC.Core.Map
@@ -2640,7 +2641,7 @@ delFunEq :: FunEqMap a -> TyCon -> [Type] -> FunEqMap a
 delFunEq m tc tys = delTcApp m (getUnique tc) tys
 
 ------------------------------
-type ExactFunEqMap a = UniqFM TyCon (ListMap TypeMap a)
+type ExactFunEqMap a = TyConEnv (ListMap TypeMap a)
 
 emptyExactFunEqs :: ExactFunEqMap a
 emptyExactFunEqs = emptyUFM

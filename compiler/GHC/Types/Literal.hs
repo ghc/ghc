@@ -646,6 +646,7 @@ absentLiteralOf :: TyCon -> Maybe Literal
 --  2. This would need to return a type application to a literal
 absentLiteralOf tc = lookupUFM absent_lits tc
 
+-- We do not use TyConEnv here to avoid import cycles.
 absent_lits :: UniqFM TyCon Literal
 absent_lits = listToUFM_Directly
                         -- Explicitly construct the mape from the known

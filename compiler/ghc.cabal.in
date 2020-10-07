@@ -531,6 +531,9 @@ Library
         GHC.Core.Multiplicity
         GHC.Core.UsageEnv
         GHC.Core.TyCon
+        GHC.Core.TyCon.Env
+        GHC.Core.TyCon.Set
+        GHC.Core.TyCon.RecWalk
         GHC.Core.Coercion.Axiom
         GHC.Core.Type
         GHC.Core.TyCo.Rep

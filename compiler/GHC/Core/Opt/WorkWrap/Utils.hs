@@ -40,6 +40,7 @@ import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
 import GHC.Types.Basic       ( Boxity(..) )
 import GHC.Core.TyCon
+import GHC.Core.TyCon.RecWalk
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Data.Maybe

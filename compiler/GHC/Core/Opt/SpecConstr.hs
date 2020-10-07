@@ -31,7 +31,7 @@ import GHC.Core.DataCon
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
 import GHC.Core.Type     hiding ( substTy )
-import GHC.Core.TyCon   ( tyConName )
+import GHC.Core.TyCon   ( tyConUnique )
 import GHC.Core.Multiplicity
 import GHC.Types.Id
 import GHC.Core.Ppr     ( pprParendExpr )
@@ -56,7 +56,7 @@ import GHC.Types.Unique.FM
 import GHC.Utils.Monad
 import Control.Monad    ( zipWithM )
 import Data.List
-import GHC.Builtin.Names ( specTyConName )
+import GHC.Builtin.Names ( specTyConKey )
 import GHC.Unit.Module
 import Data.Ord( comparing )
 
@@ -983,7 +983,7 @@ forceSpecArgTy env ty
 forceSpecArgTy env ty
   | Just (tycon, tys) <- splitTyConApp_maybe ty
   , tycon /= funTyCon
-      = tyConName tycon == specTyConName
+      = tyConUnique tycon == specTyConKey
         || any (forceSpecArgTy env) tys
 
 forceSpecArgTy _ _ = False
