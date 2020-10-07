@@ -2179,18 +2179,15 @@ Why?, for example:
 
 - For CIrredCan we want to see if a constraint is insoluble with insolubleWC
 
-On the other hand, we change CTyEqCan to CNonCanonical, because of all of
-CTyEqCan's invariants, which can break during zonking. Besides, the constraint
+On the other hand, we change CEqCan to CNonCanonical, because of all of
+CEqCan's invariants, which can break during zonking. Besides, the constraint
 will be canonicalised again, so there is little benefit in keeping the
-CTyEqCan structure.
-
-NB: we do not expect to see any CFunEqCans, because zonkCt is only
-called on unflattened constraints.
+CEqCan structure.
 
 NB: Constraints are always re-flattened etc by the canonicaliser in
 @GHC.Tc.Solver.Canonical@ even if they come in as CDictCan. Only canonical constraints that
 are actually in the inert set carry all the guarantees. So it is okay if zonkCt
-creates e.g. a CDictCan where the cc_tyars are /not/ function free.
+creates e.g. a CDictCan where the cc_tyars are /not/ fully reduced.
 -}
 
 zonkCt :: Ct -> TcM Ct
@@ -2200,7 +2197,7 @@ zonkCt ct@(CDictCan { cc_ev = ev, cc_tyargs = args })
        ; args' <- mapM zonkTcType args
        ; return $ ct { cc_ev = ev', cc_tyargs = args' } }
 
-zonkCt (CTyEqCan { cc_ev = ev })
+zonkCt (CEqCan { cc_ev = ev })
   = mkNonCanonical <$> zonkCtEvidence ev
 
 zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_status flag
@@ -2208,10 +2205,7 @@ zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_status flag
        ; return (ct { cc_ev = ev' }) }
 
 zonkCt ct
-  = ASSERT( not (isCFunEqCan ct) )
-  -- We do not expect to see any CFunEqCans, because zonkCt is only called on
-  -- unflattened constraints.
-    do { fl' <- zonkCtEvidence (ctEvidence ct)
+  = do { fl' <- zonkCtEvidence (ctEvidence ct)
        ; return (mkNonCanonical fl') }
 
 zonkCtEvidence :: CtEvidence -> TcM CtEvidence
