@@ -1,18 +1,24 @@
 
 ==================== Strictness signatures ====================
 T5075.$trModule:
-T5075.loop: <SP(A,A,SCS(C1(L)),A,A,A,A,A)><LP(A,A,LCL(C1(L)),A,A,A,L)><L>
+T5075.f: <SP(A,A,SCS(C1(L)),A,A,A,A,A)><LP(A,A,LCL(C1(L)),A,A,A,L)><L>
+T5075.g: <1P(L)><SP(L)>
+T5075.h: <SP(L)>
 
 
 
 ==================== Cpr signatures ====================
 T5075.$trModule:
-T5075.loop:
+T5075.f: 1
+T5075.g: 2(1)
+T5075.h:
 
 
 
 ==================== Strictness signatures ====================
 T5075.$trModule:
-T5075.loop: <1P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(A,A,LCL(C1(L)),A,A,A,L)><L>
+T5075.f: <1P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(A,A,LCL(C1(L)),A,A,A,L)><L>
+T5075.g: <1P(L)><SP(L)>
+T5075.h: <1P(L)>
 
 
