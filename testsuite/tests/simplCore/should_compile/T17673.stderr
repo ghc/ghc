@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 56, types: 67, coercions: 5, joins: 0/0}
+Result size of Tidy Core = {terms: 55, types: 82, coercions: 6, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T17673.$trModule4 :: GHC.Prim.Addr#
@@ -9,7 +9,7 @@ T17673.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T17673.$trModule3 :: GHC.Types.TrName
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T17673.$trModule3 = GHC.Types.TrNameS T17673.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -19,48 +19,45 @@ T17673.$trModule2 = "T17673"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T17673.$trModule1 :: GHC.Types.TrName
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T17673.$trModule1 = GHC.Types.TrNameS T17673.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T17673.$trModule :: GHC.Types.Module
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T17673.$trModule = GHC.Types.Module T17673.$trModule3 T17673.$trModule1
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-lvl :: Int
-[GblId, Unf=OtherCon []]
-lvl = GHC.Types.I# 1#
-
 Rec {
--- RHS size: {terms: 27, types: 31, coercions: 0, joins: 0/0}
-T17673.$wfacIO [InlPrag=NOINLINE, Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)
+-- RHS size: {terms: 23, types: 29, coercions: 0, joins: 0/0}
+T17673.$wfacIO [InlPrag=NOINLINE, Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Prim.Int# #)
 [GblId, Arity=2, Str=<L,U><L,U>, Unf=OtherCon []]
 T17673.$wfacIO
   = \ (ww :: GHC.Prim.Int#) (w :: GHC.Prim.State# GHC.Prim.RealWorld) ->
       case GHC.Prim.<# ww 2# of {
-        __DEFAULT -> case T17673.$wfacIO (GHC.Prim.-# ww 1#) w of { (# ipv, ipv1 #) -> (# ipv, case ipv1 of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.*# ww y) } #) };
-        1# -> (# w, lvl #)
+        __DEFAULT -> case T17673.$wfacIO (GHC.Prim.-# ww 1#) w of { (# ww2, ww3 #) -> (# ww2, GHC.Prim.*# ww ww3 #) };
+        1# -> (# w, 1# #)
       }
 end Rec }
 
--- RHS size: {terms: 8, types: 5, coercions: 0, joins: 0/0}
-T17673.facIO1 [InlPrag=NOUSERINLINE[-1]] :: Int -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)
+-- RHS size: {terms: 14, types: 23, coercions: 0, joins: 0/0}
+T17673.facIO1 [InlPrag=NOUSERINLINE[final]] :: Int -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)
 [GblId,
  Arity=2,
  Str=<S,1*U(U)><L,U>,
+ Cpr=*c1(*, #c1(#)),
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once!] :: Int) (w1 [Occ=Once] :: GHC.Prim.State# GHC.Prim.RealWorld) -> case w of { GHC.Types.I# ww1 [Occ=Once] -> T17673.$wfacIO ww1 w1 }}]
-T17673.facIO1 = \ (w :: Int) (w1 :: GHC.Prim.State# GHC.Prim.RealWorld) -> case w of { GHC.Types.I# ww1 -> T17673.$wfacIO ww1 w1 }
+         Tmpl= \ (w [Occ=Once1!] :: Int) (w1 [Occ=Once1] :: GHC.Prim.State# GHC.Prim.RealWorld) -> case w of { GHC.Types.I# ww1 [Occ=Once1] -> case T17673.$wfacIO ww1 w1 of { (# ww3 [Occ=Once1], ww4 [Occ=Once1] #) -> (# ww3, GHC.Types.I# ww4 #) } }}]
+T17673.facIO1 = \ (w :: Int) (w1 :: GHC.Prim.State# GHC.Prim.RealWorld) -> case w of { GHC.Types.I# ww1 -> case T17673.$wfacIO ww1 w1 of { (# ww3, ww4 #) -> (# ww3, GHC.Types.I# ww4 #) } }
 
--- RHS size: {terms: 1, types: 0, coercions: 5, joins: 0/0}
-facIO [InlPrag=NOUSERINLINE[-1]] :: Int -> IO Int
+-- RHS size: {terms: 1, types: 0, coercions: 6, joins: 0/0}
+facIO [InlPrag=NOUSERINLINE[final]] :: Int -> IO Int
 [GblId,
  Arity=2,
  Str=<S,1*U(U)><L,U>,
+ Cpr=*c1(*, #c1(#)),
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
-         Tmpl= T17673.facIO1 `cast` (<Int>_R ->_R Sym (GHC.Types.N:IO[0] <Int>_R) :: (Int -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)) ~R# (Int -> IO Int))}]
-facIO = T17673.facIO1 `cast` (<Int>_R ->_R Sym (GHC.Types.N:IO[0] <Int>_R) :: (Int -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)) ~R# (Int -> IO Int))
+         Tmpl= T17673.facIO1 `cast` (<Int>_R %<'Many>_N ->_R Sym (GHC.Types.N:IO[0] <Int>_R) :: (Int -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)) ~R# (Int -> IO Int))}]
+facIO = T17673.facIO1 `cast` (<Int>_R %<'Many>_N ->_R Sym (GHC.Types.N:IO[0] <Int>_R) :: (Int -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)) ~R# (Int -> IO Int))
 
 
 
