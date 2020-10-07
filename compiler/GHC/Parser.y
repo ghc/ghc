@@ -476,6 +476,23 @@ Ambiguity:
     the -XTransformListComp extension.
 -}
 
+{- Note [%shift: activation -> {- empty -}]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    sigdecl -> '{-# INLINE' . activation qvarcon '#-}'
+    activation -> {- empty -}
+    activation -> explicit_activation
+
+Example:
+
+    {-# INLINE [0] Something #-}
+
+Ambiguity:
+    We don't know whether the '[' is the start of the activation or the beginning
+    of the [] data constructor.
+    We parse this as having '[0]' activation for inlining 'Something', rather than
+    empty activation and inlining '[0] Something'.
+-}
 
 {- Note [Parser API Annotations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1607,6 +1624,10 @@ pattern_synonym_sig :: { LSig GhcPs }
                    {% ams (sLL $1 $> $ PatSynSig noExtField (unLoc $2) $4)
                           [mj AnnPattern $1, mu AnnDcolon $3] }
 
+qvarcon :: { Located RdrName }
+        : qvar                          { $1 }
+        | qcon                          { $1 }
+
 -----------------------------------------------------------------------------
 -- Nested declarations
 
@@ -2506,7 +2527,7 @@ sigdecl :: { LHsDecl GhcPs }
                     ([ mo $1 ] ++ dcolon ++ [mc $4]) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
-        | '{-# INLINE' activation qvar '#-}'
+        | '{-# INLINE' activation qvarcon '#-}'
                 {% ams ((sLL $1 $> $ SigD noExtField (InlineSig noExtField $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2)))))
@@ -2546,7 +2567,8 @@ sigdecl :: { LHsDecl GhcPs }
                    [mo $1,mc $3] }
 
 activation :: { ([AddAnn],Maybe Activation) }
-        : {- empty -}                           { ([],Nothing) }
+        : -- See Note [%shift: activation -> {- empty -}]
+          {- empty -} %shift                    { ([],Nothing) }
         | explicit_activation                   { (fst $1,Just (snd $1)) }
 
 explicit_activation :: { ([AddAnn],Activation) }  -- In brackets
