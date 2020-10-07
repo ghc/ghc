@@ -540,5 +540,5 @@ Pragmas for pattern synonyms
         -- This wouldn't compile: {-# INLINE HeadC #-}
       {-# INLINE HeadC #-} -- But this works
   
-  When no pragma is provided for a pattern, the inlining decision might change
-  between different versions of GHC.
+  When no pragma is provided for a pattern, the inlining decision is made by
+  GHC's own inlining heuristics.
