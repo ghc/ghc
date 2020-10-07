@@ -2056,17 +2056,18 @@ type :: { LHsType GhcPs }
                                               [mu AnnRarrow $2] }
 
         | btype mult '->' ctype        {% hintLinear (getLoc $2)
-                                       >> ams $1 [mj AnnMult $2,mu AnnRarrow $3] -- See Note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExtField ((unLoc $2) (toUnicode $3)) $1 $4)
-                                              [mj AnnMult $2,mu AnnRarrow $3] }
+                                       >> return ((unLoc $2) (toUnicode $3))
+                                       >>= \(arr, anns) -> ams $1 (mj AnnMult $2:mu AnnRarrow $3:anns) -- See Note [GADT decl discards annotations]
+                                       >> ams (sLL $1 $> $ HsFunTy noExtField arr $1 $4)
+                                              (mj AnnMult $2:mu AnnRarrow $3:anns) }
 
         | btype '->.' ctype            {% hintLinear (getLoc $2)
                                        >> ams $1 [mu AnnLollyU $2] -- See Note [GADT decl discards annotations]
                                        >> ams (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow UnicodeSyntax) $1 $3)
                                               [mu AnnLollyU $2] }
 
-mult :: { Located (IsUnicodeSyntax -> HsArrow GhcPs) }
-        : PREFIX_PERCENT atype          { sLL $1 $> (\u -> mkMultTy u $2) }
+mult :: { Located (IsUnicodeSyntax -> (HsArrow GhcPs, [AddAnn])) }
+        : PREFIX_PERCENT atype          { sLL $1 $> (\u -> mkMultTy u $2 [mj AnnPercent $1]) }
 
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }
