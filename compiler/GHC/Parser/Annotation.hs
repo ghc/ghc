@@ -302,7 +302,7 @@ data AnnKeywordId
     | AnnMdo
     | AnnMinus -- ^ '-'
     | AnnModule
-    | AnnMult -- ^ '%1'
+    | AnnPercentOne -- ^ '%1' -- for HsLinearArrow
     | AnnNewtype
     | AnnName -- ^ where a name loses its location in the AST, this carries it
     | AnnOf
@@ -319,6 +319,7 @@ data AnnKeywordId
     | AnnDollarDollar    -- ^ prefix '$$'  -- TemplateHaskell
     | AnnPackageName
     | AnnPattern
+    | AnnPercent -- ^ '%' -- for HsExplicitMult
     | AnnProc
     | AnnQualified
     | AnnRarrow -- ^ '->'

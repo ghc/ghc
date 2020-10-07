@@ -3069,9 +3069,10 @@ mkLHsOpTy x op y =
   let loc = getLoc x `combineSrcSpans` getLoc op `combineSrcSpans` getLoc y
   in L loc (mkHsOpTy x op y)
 
-mkMultTy :: IsUnicodeSyntax -> LHsType GhcPs -> HsArrow GhcPs
-mkMultTy u (L _ (HsTyLit _ (HsNumTy _ 1))) = HsLinearArrow u
-mkMultTy u t = HsExplicitMult u t
+mkMultTy :: IsUnicodeSyntax -> Located Token -> LHsType GhcPs -> (HsArrow GhcPs, AddAnn)
+mkMultTy u tok t@(L _ (HsTyLit _ (HsNumTy _ 1)))
+  = (HsLinearArrow u, AddAnn AnnPercentOne (combineLocs tok t))
+mkMultTy u tok t = (HsExplicitMult u t, AddAnn AnnPercent (getLoc tok))
 
 -----------------------------------------------------------------------------
 -- Token symbols
