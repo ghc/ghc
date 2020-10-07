@@ -134,6 +134,7 @@ import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.Tidy
 import GHC.Core.Type
 import GHC.Core.TyCon
+import GHC.Core.TyCon.RecWalk
 import GHC.Core.Coercion.Axiom
 import {-# SOURCE #-} GHC.Core.Utils ( mkFunctionType )
 import GHC.Types.Var
