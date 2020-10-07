@@ -1608,6 +1608,10 @@ pattern_synonym_sig :: { LSig GhcPs }
                    {% ams (sLL $1 $> $ PatSynSig noExtField (unLoc $2) (mkLHsSigType $4))
                           [mj AnnPattern $1, mu AnnDcolon $3] }
 
+qvarcon :: { Located RdrName }
+        : qvar                          { $1 }
+        | qcon                          { $1 }
+
 -----------------------------------------------------------------------------
 -- Nested declarations
 
@@ -2494,7 +2498,7 @@ sigdecl :: { LHsDecl GhcPs }
                     ([ mo $1 ] ++ dcolon ++ [mc $4]) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
-        | '{-# INLINE' activation qvar '#-}'
+        | '{-# INLINE' activation qvarcon '#-}'
                 {% ams ((sLL $1 $> $ SigD noExtField (InlineSig noExtField $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2)))))
