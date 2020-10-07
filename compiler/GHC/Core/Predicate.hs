@@ -34,6 +34,7 @@ import GHC.Prelude
 import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Core.TyCon
+import GHC.Core.TyCon.RecWalk
 import GHC.Types.Var
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity ( scaledThing )
