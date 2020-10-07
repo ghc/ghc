@@ -2217,6 +2217,8 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lo  = (f,[]) }
   , make_ord_flag defFlag "pgmlc"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lc  = (f,[]) }
+  , make_ord_flag defFlag "pgmlm"
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lm  = (f,[]) }
   , make_ord_flag defFlag "pgmi"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_i   =  f }
   , make_ord_flag defFlag "pgmL"
@@ -2257,6 +2259,8 @@ dynamic_flags_deps = [
 
 
     -- need to appear before -optl/-opta to be parsed as LLVM flags.
+  , make_ord_flag defFlag "optlm"
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_lm  = f : toolSettings_opt_lm s }
   , make_ord_flag defFlag "optlo"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_lo  = f : toolSettings_opt_lo s }
   , make_ord_flag defFlag "optlc"
