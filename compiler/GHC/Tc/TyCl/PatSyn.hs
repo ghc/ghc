@@ -25,7 +25,7 @@ import GHC.Tc.Gen.Pat
 import GHC.Core.Multiplicity
 import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType )
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Gen.Sig( emptyPragEnv, completeSigFromId )
+import GHC.Tc.Gen.Sig( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv, addInlinePrags )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Zonk
@@ -75,12 +75,13 @@ import Data.List( partition )
 
 tcPatSynDecl :: PatSynBind GhcRn GhcRn
              -> Maybe TcSigInfo
+             -> TcPragEnv -- See Note [Pragmas for pattern synonyms]
              -> TcM (LHsBinds GhcTc, TcGblEnv)
-tcPatSynDecl psb mb_sig
+tcPatSynDecl psb mb_sig prag_fn
   = recoverM (recoverPSB psb) $
     case mb_sig of
-      Nothing                 -> tcInferPatSynDecl psb
-      Just (TcPatSynSig tpsi) -> tcCheckPatSynDecl psb tpsi
+      Nothing                 -> tcInferPatSynDecl psb prag_fn
+      Just (TcPatSynSig tpsi) -> tcCheckPatSynDecl psb tpsi prag_fn
       _                       -> panic "tcPatSynDecl"
 
 recoverPSB :: PatSynBind GhcRn GhcRn
@@ -137,9 +138,11 @@ pattern.) But it'll do for now.
 -}
 
 tcInferPatSynDecl :: PatSynBind GhcRn GhcRn
+                  -> TcPragEnv
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
 tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                        , psb_def = lpat, psb_dir = dir })
+                  prag_fn
   = addPatSynCtxt lname $
     do { traceTc "tcInferPatSynDecl {" $ ppr name
 
@@ -183,7 +186,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
        ; mapM_ dependentArgErr bad_args
 
        ; traceTc "tcInferPatSynDecl }" $ (ppr name $$ ppr ex_tvs)
-       ; tc_patsyn_finish lname dir is_infix lpat'
+       ; tc_patsyn_finish lname dir is_infix lpat' prag_fn
                           (mkTyVarBinders InferredSpec univ_tvs
                             , req_theta,  ev_binds, req_dicts)
                           (mkTyVarBinders InferredSpec ex_tvs
@@ -341,6 +344,7 @@ is not very helpful, but at least we don't get a Lint error.
 
 tcCheckPatSynDecl :: PatSynBind GhcRn GhcRn
                   -> TcPatSynInfo
+                  -> TcPragEnv
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
 tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                          , psb_def = lpat, psb_dir = dir }
@@ -348,6 +352,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                       , patsig_univ_bndrs = explicit_univ_bndrs, patsig_prov = prov_theta
                       , patsig_ex_bndrs   = explicit_ex_bndrs,   patsig_req  = req_theta
                       , patsig_body_ty    = sig_body_ty }
+                  prag_fn
   = addPatSynCtxt lname $
     do { let decl_arity = length arg_names
              (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
@@ -419,7 +424,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        -- when that should be impossible
 
        ; traceTc "tcCheckPatSynDecl }" $ ppr name
-       ; tc_patsyn_finish lname dir is_infix lpat'
+       ; tc_patsyn_finish lname dir is_infix lpat' prag_fn
                           (univ_bndrs, req_theta, ev_binds, req_dicts)
                           (ex_bndrs, mkTyVarTys ex_tvs', prov_theta, prov_dicts)
                           (args', map scaledThing arg_tys)
@@ -601,6 +606,7 @@ tc_patsyn_finish :: Located Name      -- ^ PatSyn Name
                  -> HsPatSynDir GhcRn -- ^ PatSyn type (Uni/Bidir/ExplicitBidir)
                  -> Bool              -- ^ Whether infix
                  -> LPat GhcTc        -- ^ Pattern of the PatSyn
+                 -> TcPragEnv
                  -> ([TcInvisTVBinder], [PredType], TcEvBinds, [EvVar])
                  -> ([TcInvisTVBinder], [TcType], [PredType], [EvTerm])
                  -> ([LHsExpr GhcTc], [TcType])  -- ^ Pattern arguments and types
@@ -608,7 +614,7 @@ tc_patsyn_finish :: Located Name      -- ^ PatSyn Name
                  -> [Name]            -- ^ Selector names
                  -- ^ Whether fields, empty if not record PatSyn
                  -> TcM (LHsBinds GhcTc, TcGblEnv)
-tc_patsyn_finish lname dir is_infix lpat'
+tc_patsyn_finish lname dir is_infix lpat' prag_fn
                  (univ_tvs, req_theta, req_ev_binds, req_dicts)
                  (ex_tvs,   ex_tys,    prov_theta,   prov_dicts)
                  (args, arg_tys)
@@ -639,7 +645,7 @@ tc_patsyn_finish lname dir is_infix lpat'
            ppr pat_ty
 
        -- Make the 'matcher'
-       ; (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat'
+       ; (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat' prag_fn
                                          (binderVars univ_tvs, req_theta, req_ev_binds, req_dicts)
                                          (binderVars ex_tvs, ex_tys, prov_theta, prov_dicts)
                                          (args, arg_tys)
@@ -649,7 +655,7 @@ tc_patsyn_finish lname dir is_infix lpat'
        ; builder_id <- mkPatSynBuilderId dir lname
                                          univ_tvs req_theta
                                          ex_tvs   prov_theta
-                                         arg_tys pat_ty
+                                         arg_tys pat_ty prag_fn
 
          -- TODO: Make this have the proper information
        ; let mkFieldLabel name = FieldLabel { flLabel = occNameFS (nameOccName name)
@@ -686,13 +692,14 @@ tc_patsyn_finish lname dir is_infix lpat'
 
 tcPatSynMatcher :: Located Name
                 -> LPat GhcTc
+                -> TcPragEnv
                 -> ([TcTyVar], ThetaType, TcEvBinds, [EvVar])
                 -> ([TcTyVar], [TcType], ThetaType, [EvTerm])
                 -> ([LHsExpr GhcTc], [TcType])
                 -> TcType
                 -> TcM ((Id, Bool), LHsBinds GhcTc)
 -- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
-tcPatSynMatcher (L loc name) lpat
+tcPatSynMatcher (L loc name) lpat prag_fn
                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
                 (ex_tvs, ex_tys, prov_theta, prov_dicts)
                 (args, arg_tys) pat_ty
@@ -755,17 +762,19 @@ tcPatSynMatcher (L loc name) lpat
                     , mg_ext = MatchGroupTc [] res_ty
                     , mg_origin = Generated
                     }
+             prags = lookupPragEnv prag_fn name
+             -- See Note [Pragmas for pattern synonyms]
 
-       ; let bind = FunBind{ fun_id = L loc matcher_id
+       ; matcher_prag_id <- addInlinePrags matcher_id prags
+       ; let bind = FunBind{ fun_id = cL loc matcher_prag_id
                            , fun_matches = mg
                            , fun_ext = idHsWrapper
                            , fun_tick = [] }
              matcher_bind = unitBag (noLoc bind)
-
        ; traceTc "tcPatSynMatcher" (ppr name $$ ppr (idType matcher_id))
        ; traceTc "tcPatSynMatcher" (ppr matcher_bind)
 
-       ; return ((matcher_id, is_unlifted), matcher_bind) }
+       ; return ((matcher_prag_id, is_unlifted), matcher_bind) }
 
 mkPatSynRecSelBinds :: PatSyn
                     -> [FieldLabel]  -- ^ Visible field labels
@@ -791,10 +800,11 @@ mkPatSynBuilderId :: HsPatSynDir a -> Located Name
                   -> [InvisTVBinder] -> ThetaType
                   -> [InvisTVBinder] -> ThetaType
                   -> [Type] -> Type
+                  -> TcPragEnv
                   -> TcM (Maybe (Id, Bool))
 mkPatSynBuilderId dir (L _ name)
                   univ_bndrs req_theta ex_bndrs prov_theta
-                  arg_tys pat_ty
+                  arg_tys pat_ty prag_fn
   | isUnidirectional dir
   = return Nothing
   | otherwise
@@ -811,8 +821,11 @@ mkPatSynBuilderId dir (L _ name)
               -- See Note [Exported LocalIds] in GHC.Types.Id
 
              builder_id'    = modifyIdInfo (`setLevityInfoWithType` pat_ty) builder_id
+             prags          = lookupPragEnv prag_fn name
+             -- See Note [Pragmas for pattern synonyms]
 
-       ; return (Just (builder_id', need_dummy_arg)) }
+       ; builder_prag_id <- addInlinePrags builder_id' prags
+       ; return (Just (builder_prag_id, need_dummy_arg)) }
 
 tcPatSynBuilderBind :: PatSynBind GhcRn GhcRn
                     -> TcM (LHsBinds GhcTc)
@@ -1083,12 +1096,34 @@ converting the pattern to an expression (for the builder RHS) we
 simply discard the signature.
 
 Note [Record PatSyn Desugaring]
--------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is important that prov_theta comes before req_theta as this ordering is used
 when desugaring record pattern synonym updates.
 
 Any change to this ordering should make sure to change GHC.HsToCore.Expr if you
 want to avoid difficult to decipher core lint errors!
+
+Note [Pragmas for pattern synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INLINE and NOINLINE pragmas are supported for pattern synonyms. They affect both
+the matcher and the builder.
+(See Note [Matchers and builders for pattern synonyms] in PatSyn)
+
+For example:
+    pattern InlinedPattern x = [x]
+    {-# INLINE InlinedPattern #-}
+    pattern NonInlinedPattern x = [x]
+    {-# NOINLINE NonInlinedPattern #-}
+
+For pattern synonyms with explicit builders, only pragma for the entire pattern
+synonym is supported. For example:
+    pattern HeadC x <- x:xs where
+      HeadC x = [x]
+      -- This wouldn't compile: {-# INLINE HeadC #-}
+    {-# INLINE HeadC #-} -- But this works
+
+When no pragma is provided for a pattern, the inlining decision might change
+between different versions of GHC.
  -}
 
 
