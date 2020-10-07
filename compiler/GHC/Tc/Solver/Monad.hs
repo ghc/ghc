@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor, TypeFamilies #-}
+{-# LANGUAGE CPP, DeriveFunctor, TypeFamilies, ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -94,14 +94,13 @@ module GHC.Tc.Solver.Monad (
     pprKicked,
 
     -- Inert function equalities
-    updInertFunEqs, findFunEq,
-    findFunEqsByTyCon,
+    findFunEq, findFunEqsByTyCon,
 
     instDFunType,                              -- Instantiation
 
     -- MetaTyVars
     newFlexiTcSTy, instFlexi, instFlexiX,
-    cloneMetaTyVar
+    cloneMetaTyVar,
     tcInstSkolTyVarsX,
 
     TcLevel,
@@ -173,7 +172,6 @@ import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 
 import GHC.Types.Unique
-import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Core.TyCon.Env
 import GHC.Data.Maybe
@@ -406,7 +404,7 @@ data InertSet
               -- fsk as we generate them.
 -}
 
-       , inert_flat_cache :: FunEqMap (TcCoercion, TcType, CtFlavour)
+       , inert_flat_cache :: FunEqMap (TcCoercion, TcType)
               -- See Note [Type family equations]
               -- If    F tys :-> (co, rhs, flav),
               -- then  co :: F tys ~ rhs
@@ -1067,9 +1065,9 @@ instance Outputable InertCans where
     = braces $ vcat
       [ ppUnless (isEmptyDVarEnv eqs) $
         text "Equalities:"
-          <+> pprCts (foldDVarEnv (\eqs rest -> listToBag eqs `andCts` rest) emptyCts eqs)
+          <+> pprCts (foldDVarEnv folder emptyCts eqs)
       , ppUnless (isEmptyTcAppMap funeqs) $
-        text "Type-function equalities =" <+> pprCts (funEqsToBag funeqs)
+        text "Type-function equalities =" <+> pprCts (foldFunEqs folder funeqs emptyCts)
       , ppUnless (isEmptyTcAppMap dicts) $
         text "Dictionaries =" <+> pprCts (dictsToBag dicts)
       , ppUnless (isEmptyTcAppMap safehask) $
@@ -1080,6 +1078,8 @@ instance Outputable InertCans where
         text "Given instances =" <+> vcat (map ppr insts)
       , text "Unsolved goals =" <+> int count
       ]
+    where
+      folder eqs rest = listToBag eqs `andCts` rest
 
 {- *********************************************************************
 *                                                                      *
@@ -1425,11 +1425,11 @@ shouldSplitWD :: InertEqs -> FunEqMap EqualCtList -> Ct -> Bool
 -- See Note [Splitting WD constraints]
 
 shouldSplitWD inert_eqs fun_eqs (CDictCan { cc_tyargs = tys })
-  = should_split_match_args inert_eqs tys
+  = should_split_match_args inert_eqs fun_eqs tys
     -- NB True: ignore coercions
     -- See Note [Splitting WD constraints]
 
-shouldSplitWD inert_eqs fun_eqs (CEqCan { cc_lhs = TyVarCEL tv, cc_rhs = ty
+shouldSplitWD inert_eqs fun_eqs (CEqCan { cc_lhs = TyVarLHS tv, cc_rhs = ty
                                         , cc_eq_rel = eq_rel })
   =  tv `elemDVarEnv` inert_eqs
   || anyRewritableCanEqLHS eq_rel (canRewriteTv inert_eqs) (canRewriteTyFam fun_eqs) ty
@@ -1511,10 +1511,10 @@ findTyEqs icans tv = lookupDVarEnv (inert_eqs icans) tv `orElse` []
 
 delEq :: InertCans -> CanEqLHS -> TcType -> InertCans
 delEq ic lhs rhs = case lhs of
-    TyVarCEL tv -> ic { inert_eqs = modifyDVarEnv
+    TyVarLHS tv -> ic { inert_eqs = modifyDVarEnv
                                       (filter (not . isThisOne))
                                       (inert_eqs ic) tv }
-    TyFamCEL tf args -> ic { inert_funeqs = alterTcApp
+    TyFamLHS tf args -> ic { inert_funeqs = alterTcApp
                                               (inert_funeqs ic)
                                               (getUnique tf)
                                               args
@@ -1526,12 +1526,12 @@ delEq ic lhs rhs = case lhs of
           where filtered = filter (not . isThisOne) eq_ct_list
         upd Nothing = Nothing
   where
-    isThisOne (CEqCan { cc_rhs = t1 }) = tcEqTypeNoKindCheck t t1
+    isThisOne (CEqCan { cc_rhs = t1 }) = tcEqTypeNoKindCheck rhs t1
     isThisOne other = pprPanic "delEq" (ppr lhs $$ ppr ic $$ ppr other)
 
 findEq :: InertCans -> CanEqLHS -> EqualCtList
-findEq icans (TyVarCEL tv) = findTyEqs icans tv
-findEq icans (TyFamCEL fun_tc fun_args)
+findEq icans (TyVarLHS tv) = findTyEqs icans tv
+findEq icans (TyFamLHS fun_tc fun_args)
   = findFunEq (inert_funeqs icans) fun_tc fun_args `orElse` []
 
 {- *********************************************************************
@@ -1644,10 +1644,10 @@ maybeKickOut ics ct
   = return ics
 
 add_item :: InertCans -> Ct -> InertCans
-add_item ics item@(CEqCan { cc_lhs = TyFamCEL tc tys })
+add_item ics item@(CEqCan { cc_lhs = TyFamLHS tc tys })
   = ics { inert_funeqs = addCanFunEq (inert_funeqs ics) tc tys item }
 
-add_item ics item@(CEqCan { cc_lhs = TyVarCEL tv, cc_ev = ev })
+add_item ics item@(CEqCan { cc_lhs = TyVarLHS tv, cc_ev = ev })
   = ics { inert_eqs   = addTyEq (inert_eqs ics) tv item
         , inert_count = bumpUnsolvedCount ev (inert_count ics) }
 
@@ -1686,7 +1686,7 @@ kickOutRewritable new_fr new_lhs ics
        ; unless (n_kicked == 0) $
          do { updWorkListTcS (appendWorkList kicked_out)
             ; csTraceTcS $
-              hang (text "Kick out, tv =" <+> ppr new_tv)
+              hang (text "Kick out, lhs =" <+> ppr new_lhs)
                  2 (vcat [ text "n-kicked =" <+> int n_kicked
                          , text "kicked_out =" <+> ppr kicked_out
                          , text "Residual inerts =" <+> ppr ics' ]) }
@@ -1788,8 +1788,8 @@ kick_out_rewritable new_fr new_lhs
     {-# INLINE fr_can_rewrite_ty #-}   -- perform the check here only once
     fr_can_rewrite_ty :: EqRel -> Type -> Bool
     fr_can_rewrite_ty = case new_lhs of
-      TyVarCEL new_tv             -> fr_tv_can_rewrite_ty tv
-      TyFamCEL new_tf new_tf_args -> fr_tf_can_rewrite_ty new_tf new_tf_args
+      TyVarLHS new_tv             -> fr_tv_can_rewrite_ty new_tv
+      TyFamLHS new_tf new_tf_args -> fr_tf_can_rewrite_ty new_tf new_tf_args
 
     fr_may_rewrite :: CtFlavourRole -> Bool
     fr_may_rewrite fs = new_fr `eqMayRewriteFR` fs
@@ -1800,21 +1800,21 @@ kick_out_rewritable new_fr new_lhs
     -- Kick it out if the new CEqCan can rewrite the inert one
     -- See Note [kickOutRewritable]
     kick_out_ct = case new_lhs of
-      TyVarCEL new_tv -> \ct -> let fs@(_,role) = ctFlavourRole ct in
+      TyVarLHS new_tv -> \ct -> let fs@(_,role) = ctFlavourRole ct in
                                 fr_may_rewrite fs
                              && fr_tv_can_rewrite_ty new_tv role (ctPred ct)
-      TyFamCEL new_tf new_tf_args
+      TyFamLHS new_tf new_tf_args
         -> \ct -> let fs@(_, role) = ctFlavourRole ct in
                   fr_may_rewrite fs
                && fr_tf_can_rewrite_ty new_tf new_tf_args role (ctPred ct)
 
     extend_tv_eqs :: InertEqs -> CanEqLHS -> EqualCtList -> InertEqs
-    extend_tv_eqs eqs (TyVarCEL tv) cts = extendDVarEnv eqs tv cts
+    extend_tv_eqs eqs (TyVarLHS tv) cts = extendDVarEnv eqs tv cts
     extend_tv_eqs eqs other _cts = pprPanic "extend_tv_eqs" (ppr eqs $$ ppr other)
 
     extend_fun_eqs :: FunEqMap EqualCtList -> CanEqLHS -> EqualCtList
                    -> FunEqMap EqualCtList
-    extend_fun_eqs eqs (TyFamCEL fam_tc fam_args) cts
+    extend_fun_eqs eqs (TyFamLHS fam_tc fam_args) cts
       = insertTcApp eqs (getUnique fam_tc) fam_args cts
     extend_fun_eqs eqs other _cts = pprPanic "extend_fun_eqs" (ppr eqs $$ ppr other)
 
@@ -1851,8 +1851,8 @@ kick_out_rewritable new_fr new_lhs
         kick_out_for_completeness
           = case (eq_rel, new_lhs) of
               (NomEq, _)  -> rhs_ty `eqType` canEqLHSType new_lhs
-              (ReprEq, TyVarCEL new_tv) -> isTyVarHead new_tv rhs_ty
-              (ReprEq, TyFamCEL new_tf new_tf_args)
+              (ReprEq, TyVarLHS new_tv) -> isTyVarHead new_tv rhs_ty
+              (ReprEq, TyFamLHS new_tf new_tf_args)
                 | Just (rhs_tc, rhs_tc_args) <- tcSplitTyConApp_maybe rhs_ty
                 , tcEqTyConApps new_tf new_tf_args rhs_tc rhs_tc_args
                   -> True
@@ -1865,7 +1865,7 @@ kickOutAfterUnification :: TcTyVar -> TcS Int
 kickOutAfterUnification new_tv
   = do { ics <- getInertCans
        ; (n_kicked, ics2) <- kickOutRewritable (Given,NomEq)
-                                                 (TyVarCEL new_tv) ics
+                                                 (TyVarLHS new_tv) ics
                      -- Given because the tv := xi is given; NomEq because
                      -- only nominal equalities are solved by unification
 
@@ -2044,11 +2044,6 @@ updInertSafehask :: (DictMap Ct -> DictMap Ct) -> TcS ()
 updInertSafehask upd_fn
   = updInertCans $ \ ics -> ics { inert_safehask = upd_fn (inert_safehask ics) }
 
-updInertFunEqs :: (FunEqMap Ct -> FunEqMap Ct) -> TcS ()
--- Modify the inert set with the supplied function
-updInertFunEqs upd_fn
-  = updInertCans $ \ ics -> ics { inert_funeqs = upd_fn (inert_funeqs ics) }
-
 updInertIrreds :: (Cts -> Cts) -> TcS ()
 -- Modify the inert set with the supplied function
 updInertIrreds upd_fn
@@ -2068,7 +2063,7 @@ getInertGivens :: TcS [Ct]
 getInertGivens
   = do { inerts <- getInertCans
        ; let all_cts = foldDicts (:) (inert_dicts inerts)
-                     $ foldFunEqs (:) (inert_funeqs inerts)
+                     $ foldFunEqs (++) (inert_funeqs inerts)
                      $ concat (dVarEnvElts (inert_eqs inerts))
        ; return (filter isGivenCt all_cts) }
 
@@ -2135,7 +2130,7 @@ getUnsolvedInerts
            } <- getInertCans
 
       ; let unsolved_tv_eqs  = foldTyEqs add_if_unsolved tv_eqs emptyCts
-            unsolved_fun_eqs = foldFunEqs add_if_unsolved fun_eqs emptyCts
+            unsolved_fun_eqs = foldFunEqs add_if_unsolveds fun_eqs emptyCts
             unsolved_irreds  = Bag.filterBag is_unsolved irreds
             unsolved_dicts   = foldDicts add_if_unsolved idicts emptyCts
             unsolved_others  = unsolved_irreds `unionBags` unsolved_dicts
@@ -2156,6 +2151,9 @@ getUnsolvedInerts
     add_if_unsolved ct cts | is_unsolved ct = ct `consCts` cts
                            | otherwise      = cts
 
+    add_if_unsolveds :: [Ct] -> Cts -> Cts
+    add_if_unsolveds new_cts old_cts = foldr add_if_unsolved old_cts new_cts
+
     is_unsolved ct = not (isGivenCt ct)   -- Wanted or Derived
 
 getNoGivenEqs :: TcLevel          -- TcLevel of this implication
@@ -2168,7 +2166,7 @@ getNoGivenEqs tclvl skol_tvs
               <- getInertCans
        ; let has_given_eqs = foldr ((||) . ct_given_here) False irreds
                           || anyDVarEnv tv_eqs_given_here ieqs
-                          || anyFunEqMap fun_eqs_given_here funeqs
+                          || anyFunEqMap funeqs fun_eqs_given_here
              insols = filterBag insolubleEqCt irreds
                       -- Specifically includes ones that originated in some
                       -- outer context but were refined to an insoluble by
@@ -2183,7 +2181,7 @@ getNoGivenEqs tclvl skol_tvs
        ; return (not has_given_eqs, insols) }
   where
     tv_eqs_given_here :: EqualCtList -> Bool
-    tv_eqs_given_here [ct@(CEqCan { cc_lhs = TyVarCEL tv })]
+    tv_eqs_given_here [ct@(CEqCan { cc_lhs = TyVarLHS tv })]
                               -- Givens are always a singleton
       = not (skolem_bound_here tv) && ct_given_here ct
     tv_eqs_given_here _ = False
@@ -2472,13 +2470,6 @@ isEmptyTcAppMap m = isNullUDFM m
 emptyTcAppMap :: TcAppMap a
 emptyTcAppMap = emptyUDFM
 
-isInTcAppMap :: TcAppMap a -> Unique -> [Type] -> Bool
-isInTcAppMap m u tys
-  | Just tys_map <- lookupUDFM m u
-  = isJust (lookupTM tys tys_map)
-  | otherwise
-  = False
-
 findTcApp :: TcAppMap a -> Unique -> [Type] -> Maybe a
 findTcApp m u tys = do { tys_map <- lookupUDFM m u
                        ; lookupTM tys tys_map }
@@ -2491,7 +2482,7 @@ insertTcApp m cls tys ct = alterUDFM alter_tm m cls
   where
     alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
 
-alterTcApp :: TcAppMap a -> Unique -> [Type] -> (Maybe a -> Maybe a) -> TcAppMap a
+alterTcApp :: forall a. TcAppMap a -> Unique -> [Type] -> (Maybe a -> Maybe a) -> TcAppMap a
 alterTcApp m cls tys upd = alterUDFM alter_tm m cls
   where
     alter_tm :: Maybe (ListMap LooseTypeMap a) -> Maybe (ListMap LooseTypeMap a)
@@ -2637,15 +2628,8 @@ type FunEqMap a = TcAppMap a  -- A map whose key is a (TyCon, [Type]) pair
 emptyFunEqs :: TcAppMap a
 emptyFunEqs = emptyTcAppMap
 
-isInFunEqMap :: FunEqMap a -> TyCon -> [Type] -> Bool
-isInFunEqMap m tc tys
-  = isInTcAppMap m (getUnique tc) tys
-
 findFunEq :: FunEqMap a -> TyCon -> [Type] -> Maybe a
 findFunEq m tc tys = findTcApp m (getUnique tc) tys
-
-funEqsToBag :: FunEqMap a -> Bag a
-funEqsToBag m = foldTcAppMap consBag m emptyBag
 
 findFunEqsByTyCon :: FunEqMap a -> TyCon -> [a]
 -- Get inert function equation constraints that have the given tycon
@@ -2670,9 +2654,6 @@ anyFunEqMap m test = foldFunEqs (\ a b -> b || test a) m False
 
 insertFunEq :: FunEqMap a -> TyCon -> [Type] -> a -> FunEqMap a
 insertFunEq m tc tys val = insertTcApp m (getUnique tc) tys val
-
-delFunEq :: FunEqMap a -> TyCon -> [Type] -> FunEqMap a
-delFunEq m tc tys = delTcApp m (getUnique tc) tys
 
 {-
 ************************************************************************
@@ -3296,19 +3277,15 @@ unflattenGivens inert_var
 -}
 
 ----------------------------
-extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcType, CtFlavour) -> TcS ()
-extendFlatCache tc xi_args stuff@(_, ty, fl)
-  | isGiven fl  -- Maintain the invariant that inert_flat_cache only has [G]
+extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
+extendFlatCache tc xi_args stuff@(_, ty)
   = do { dflags <- getDynFlags
        ; when (gopt Opt_FlatCache dflags) $
     do { traceTcS "extendFlatCache" (vcat [ ppr tc <+> ppr xi_args
-                                          , ppr fl, ppr ty ])
+                                          , ppr ty ])
             -- 'co' can be bottom, in the case of derived items
        ; updInertTcS $ \ is@(IS { inert_flat_cache = fc }) ->
             is { inert_flat_cache = insertFunEq fc tc xi_args stuff } } }
-
-  | otherwise
-  = return ()
 
 {- "RAE"
 ----------------------------
