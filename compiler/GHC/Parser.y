@@ -1961,17 +1961,17 @@ type :: { LHsType GhcPs }
                                               [mu AnnRarrow $2] }
 
         | btype mult '->' ctype        {% hintLinear (getLoc $2)
-                                       >> ams $1 [mj AnnMult $2,mu AnnRarrow $3] -- See Note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy NormalSyntax (unLoc $2) $1 $4)
-                                              [mj AnnMult $2,mu AnnRarrow $3] }
+                                       >> ams $1 (mj AnnMult $2:mu AnnRarrow $3:(snd $ unLoc $2)) -- See Note [GADT decl discards annotations]
+                                       >> ams (sLL $1 $> $ HsFunTy NormalSyntax (fst $ unLoc $2) $1 $4)
+                                              (mj AnnMult $2:mu AnnRarrow $3:(snd $ unLoc $2)) }
 
         | btype '->.' ctype            {% hintLinear (getLoc $2)
                                        >> ams $1 [mu AnnLollyU $2] -- See note [GADT decl discards annotations]
                                        >> ams (sLL $1 $> $ HsFunTy UnicodeSyntax HsLinearArrow $1 $3)
                                               [mu AnnLollyU $2] }
 
-mult :: { Located (HsArrow GhcPs) }
-        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy $2) }
+mult :: { Located (HsArrow GhcPs, [AddAnn]) }
+        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy $2 [mj AnnPercent $1]) }
 
 
 btype :: { LHsType GhcPs }

@@ -3073,9 +3073,9 @@ mkLHsOpTy x op y =
   let loc = getLoc x `combineSrcSpans` getLoc op `combineSrcSpans` getLoc y
   in L loc (mkHsOpTy x op y)
 
-mkMultTy :: LHsType GhcPs -> HsArrow GhcPs
-mkMultTy (L _ (HsTyLit _ (HsNumTy _ 1))) = HsLinearArrow
-mkMultTy t = HsExplicitMult t
+mkMultTy :: LHsType GhcPs -> [AddAnn] ->  (HsArrow GhcPs, [AddAnn])
+mkMultTy (L _ (HsTyLit _ (HsNumTy _ 1))) _ = (HsLinearArrow, [])
+mkMultTy t anns = (HsExplicitMult t, anns)
 
 -----------------------------------------------------------------------------
 -- Token symbols
