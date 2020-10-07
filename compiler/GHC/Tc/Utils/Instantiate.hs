@@ -531,16 +531,23 @@ tcInstSkolTyVarsPushLevel :: Bool -> TCvSubst -> [TyVar]
 tcInstSkolTyVarsPushLevel overlappable subst tvs
   = do { tc_lvl <- getTcLevel
        ; let pushed_lvl = pushTcLevel tc_lvl
-       ; tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs }
+       ; return (tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs) }
 
 tcInstSkolTyVarsAt :: TcLevel -> Bool
                    -> TCvSubst -> [TyVar]
-                   -> TcM (TCvSubst, [TcTyVar])
-tcInstSkolTyVarsAt lvl overlappable subst tvs
-  = freshenTyCoVarsX new_skol_tv subst tvs
+                   -> (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsAt lvl overlappable orig_subst tvs
+  = mapAccumL mk_skol_tv_x orig_subst tvs
   where
     details = SkolemTv lvl overlappable
-    new_skol_tv name kind = mkTcTyVar name kind details
+
+    mk_skol_tv_x :: TCvSubst -> TyCoVar -> (TCvSubst, TyCoVar)
+    mk_skol_tv_x subst tv
+      = (subst', new_tv)
+      where
+        new_kind = substTyUnchecked subst (tyVarKind tv)
+        new_tv   = mkTcTyVar (tyVarName tv) new_kind details
+        subst'   = extendTvSubstWithClone subst tv new_tv
 
 ------------------
 freshenTyVarBndrs :: [TyVar] -> TcM (TCvSubst, [TyVar])
@@ -593,8 +600,17 @@ a) Level allocation. We generally skolemise /before/ calling
 b) The [TyVar] should be ordered (kind vars first)
    See Note [Kind substitution when instantiating]
 
-c) It's a complete freshening operation: the skolems have a fresh
-   unique, and a location from the monad
+c) Variables are *not* freshened; the names and locations are retained.
+
+   Why retain names? To keep scoped type variables working in explicitly
+   bidirectional pattern synonyms. The scoped variables are found in the
+   builder Id's type; these must match up with the renamer-produced variables
+   in the MatchGroup, even though those variables have been skolemised.
+
+   Why retain locations? Because the location of the variable is the correct
+   location to report in errors (e.g. in the signature). We don't want the
+   location to change to the body of the function, which does *not* explicitly
+   bind the variable.
 
 d) The resulting skolems are
         non-overlappable for tcInstSkolTyVars,

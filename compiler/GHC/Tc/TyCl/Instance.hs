@@ -937,9 +937,9 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
     -- See Note [Result kind signature for a data family instance]
     tc_kind_sig (Just hs_kind)
       = do { sig_kind <- tcLHsKindSig data_ctxt hs_kind
-           ; let (tvs, inner_kind) = tcSplitForAllTys sig_kind
            ; lvl <- getTcLevel
-           ; (subst, _tvs') <- tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
+           ; let (tvs, inner_kind) = tcSplitForAllTys sig_kind
+                 (subst, _tvs')    = tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
            ; return (substTy subst inner_kind) }
 
