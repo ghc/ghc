@@ -78,9 +78,15 @@ class HasHeapRep (a :: TYPE rep) where
         -> IO Closure
         -- ^ Heap representation of the closure.
 
+#if __GLASGOW_HASKELL__ >= 901
+instance HasHeapRep (a :: TYPE ('BoxedRep 'Lifted)) where
+#else
 instance HasHeapRep (a :: TYPE 'LiftedRep) where
     getClosureData = getClosureDataFromHeapObject
 
+#if __GLASGOW_HASKELL__ >= 901
+instance HasHeapRep (a :: TYPE ('BoxedRep 'Unlifted)) where
+#else
 instance HasHeapRep (a :: TYPE 'UnliftedRep) where
     getClosureData x = getClosureDataFromHeapObject (unsafeCoerce# x)
 

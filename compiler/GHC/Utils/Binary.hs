@@ -94,6 +94,10 @@ import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 
+#if __GLASGOW_HASKELL__ >= 811
+import GHC.Exts (Levity(..))
+#endif
+
 type BinArray = ForeignPtr Word8
 
 
@@ -862,7 +866,6 @@ instance (Binary a) => Binary (Ratio a) where
 instance Binary (Bin a) where
   put_ bh (BinPtr i) = putWord32 bh (fromIntegral i :: Word32)
   get bh = do i <- getWord32 bh; return (BinPtr (fromIntegral (i :: Word32)))
-
 
 
 -- -----------------------------------------------------------------------------
