@@ -440,6 +440,7 @@ test('T13068', [extra_files(['T13068.hs', 'T13068a.hs', 'T13068.hs-boot', 'T1306
 test('T13075', normal, compile_fail, [''])
 test('T13105', normal, compile_fail, [''])
 test('LevPolyBounded', normal, compile_fail, [''])
+test('LevPolyLet', normal, compile_fail, [''])
 test('T13487', normal, compile, [''])
 test('T13292', normal, multimod_compile, ['T13292', '-v0 -fdefer-type-errors'])
 test('T13300', normal, compile_fail, [''])
