@@ -81,13 +81,31 @@ T17566:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T17566a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T17566.hs
 
-T12178:
-	$(RM) -f T12178.o T12178.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c T12178.hs  -O -dsuppress-all -ddump-simpl | grep -e '^test' -e 'Pattern' -e '^$$'
-	# There are three types of lines of interest in this test:
-	# '^test' - Beginning of a function definition
-	# 'Pattern' - Non-inlined occurrence of a pattern synonym
-	# empty line - End of a function definition (among other possible meanings)
-	#
-	# Grepping for those allows to recognize which pattern synonym builders or
-	# matchers are called (as opposed to being inlined) in which functions
+# In the InlinePatSyn tests, we're interested in whether the pattern synonym (whose name always contains the string 'Pattern').
+# is inlined or not. In order to check, we use sed to isolate lines between the start and end of the test definition. That is,
+# from a line starting with 'test', to a blank line. We then use grep to determine if 'Pattern' occurs anywhere in the definition
+# in the core. If it was inlined, it naturally won't occur, so grep -v will succeed, if it wasn't then plain grep will succeed.
+
+InlinePatSyn_InlineBuilder:
+	$(RM) -f InlinePatSyn_InlineBuilder.o InlinePatSyn_InlineBuilder.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c InlinePatSyn_InlineBuilder.hs  -O -dsuppress-all -ddump-simpl | sed -n '/^test/,/^$$/p' | grep -vq 'Pattern'
+
+InlinePatSyn_InlineMatcher:
+	$(RM) -f InlinePatSyn_InlineMatcher.o InlinePatSyn_InlineMatcher.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c InlinePatSyn_InlineMatcher.hs  -O -dsuppress-all -ddump-simpl | sed -n '/^test/,/^$$/p' | grep -vq 'Pattern'
+
+InlinePatSyn_NoInlineBuilder:
+	$(RM) -f InlinePatSyn_NoInlineBuilder.o InlinePatSyn_NoInlineBuilder.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c InlinePatSyn_NoInlineBuilder.hs  -O -dsuppress-all -ddump-simpl | sed -n '/^test/,/^$$/p' | grep -q 'Pattern'
+
+InlinePatSyn_NoInlineMatcher:
+	$(RM) -f InlinePatSyn_NoInlineMatcher.o InlinePatSyn_NoInlineMatcher.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c InlinePatSyn_NoInlineMatcher.hs  -O -dsuppress-all -ddump-simpl | sed -n '/^test/,/^$$/p' | grep -q 'Pattern'
+
+InlinePatSyn_ExplicitBidiBuilder:
+	$(RM) -f InlinePatSyn_ExplicitBidiBuilder.o InlinePatSyn_ExplicitBidiBuilder.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c InlinePatSyn_ExplicitBidiBuilder.hs  -O -dsuppress-all -ddump-simpl | sed -n '/^test/,/^$$/p' | grep -vq 'Pattern'
+
+InlinePatSyn_ExplicitBidiMatcher:
+	$(RM) -f InlinePatSyn_ExplicitBidiMatcher.o InlinePatSyn_ExplicitBidiMatcher.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c InlinePatSyn_ExplicitBidiMatcher.hs  -O -dsuppress-all -ddump-simpl | sed -n '/^test/,/^$$/p' | grep -vq 'Pattern'
