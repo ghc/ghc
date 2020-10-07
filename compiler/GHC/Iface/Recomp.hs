@@ -52,6 +52,7 @@ import Data.Function
 import Data.List (find, sortBy, sort)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Word (Word64)
 import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), pluginRecompile', plugins )
 
 --Qualified import so we can define a Semigroup instance
@@ -719,6 +720,77 @@ Names (e.g. the ifName field of a IfaceDecl) and non-binding (e.g. the ifInstCls
 field of a IfaceClsInst): only in the non-binding case should we include the
 fingerprint; in the binding case we shouldn't since it is merely the name of the
 thing that we are currently fingerprinting.
+
+
+Note [Fingerprinting recursive groups]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The fingerprinting of a single recursive group is a rather subtle affair, as
+seen in #18733.
+
+How not to fingerprint
+----------------------
+
+Prior to fixing #18733 we used the following (flawed) scheme to fingerprint a
+group in hash environment `hash_env0`:
+
+ 1. extend hash_env0, giving each declaration in the group the fingerprint 0
+ 2. use this environment to hash the declarations' ABIs, resulting in
+    group_fingerprint
+ 3. produce the final hash environment by extending hash_env0, mapping each
+    declaration of the group to group_fingerprint
+
+However, this is wrong. Consider, for instance, a program like:
+
+    data A = ARecu B | ABase String deriving (Show)
+    data B = BRecu A | BBase Int deriving (Show)
+
+    info :: B
+    info = BBase 1
+
+A consequence of (3) is that A and B will have the same fingerprint. This means
+that if the user changes `info` to:
+
+    info :: A
+    info = ABase "hello"
+
+The program's ABI fingerprint will not change despite `info`'s type, and
+therefore ABI, being clearly different.
+
+However, the incorrectness doesn't end there: (1) means that all recursive
+occurrences of names within the group will be given the same fingerprint. This
+means that the group's fingerprint won't change if we change an occurrence of A
+to B.
+
+Surprisingly, this bug (#18733) lurked for many years before being uncovered.
+
+How we now fingerprint
+----------------------
+
+As seen above, the fingerprinting function must ensure that a groups
+fingerprint captures the structure of within-group occurrences. The scheme that
+we use is:
+
+ 0. To ensure determinism, sort the declarations into a stable order by
+    declaration name
+
+ 1. Extend hash_env0, giving each declaration in the group a sequential
+    fingerprint (e.g. 0, 1, 2, ...).
+
+ 2. Use this environment to hash the declarations' ABIs, resulting in
+    group_fingerprint.
+
+    Since we included the sequence number in step (1) programs identical up to
+    transposition of recursive occurrences are distinguisable, avoiding the
+    second issue mentioned above.
+
+ 3. Produce the final environment by extending hash_env, mapping each
+    declaration of the group to the hash of (group_fingerprint, i), where
+    i is the position of the declaration in the stable ordering.
+
+    Including i in the hash ensures that the first issue noted above is
+    avoided.
+
 -}
 
 -- | Add fingerprints for top-level declarations to a 'ModIface'.
@@ -844,17 +916,26 @@ addFingerprints hsc_env iface0
                return (env', (hash,decl) : decls_w_hashes)
 
        fingerprint_group (local_env, decls_w_hashes) (CyclicSCC abis)
-          = do let decls = map abiDecl abis
+          = do let stable_decls = sortBy (stableNameCmp `on` ifName) $ map abiDecl abis
                local_env1 <- foldM extend_hash_env local_env
-                                   (zip (repeat fingerprint0) decls)
+                                   (zip (map mkRecFingerprint [0..]) stable_decls)
+                -- See Note [Fingerprinting recursive groups]
                let hash_fn = mk_put_name local_env1
                -- pprTrace "fingerprinting" (ppr (map ifName decls) ) $ do
                let stable_abis = sortBy cmp_abiNames abis
                 -- put the cycle in a canonical order
                hash <- computeFingerprint hash_fn stable_abis
-               let pairs = zip (repeat hash) decls
+               let pairs = zip (map (bumpFingerprint hash) [0..]) stable_decls
+                -- See Note [Fingerprinting recursive groups]
                local_env2 <- foldM extend_hash_env local_env pairs
                return (local_env2, pairs ++ decls_w_hashes)
+
+
+       mkRecFingerprint :: Word64 -> Fingerprint
+       mkRecFingerprint = Fingerprint 0
+
+       bumpFingerprint :: Fingerprint -> Word64 -> Fingerprint
+       bumpFingerprint fp n = fingerprintFingerprints [ fp, mkRecFingerprint n ]
 
        -- we have fingerprinted the whole declaration, but we now need
        -- to assign fingerprints to all the OccNames that it binds, to
@@ -874,7 +955,8 @@ addFingerprints hsc_env iface0
    -- when calculating fingerprints, we always need to use canonical
    -- ordering for lists of things.  In particular, the mi_deps has various
    -- lists of modules and suchlike, so put these all in canonical order:
-   let sorted_deps = sortDependencies (mi_deps iface0)
+   let sorted_deps :: Dependencies
+       sorted_deps = sortDependencies (mi_deps iface0)
 
    -- The export hash of a module depends on the orphan hashes of the
    -- orphan modules below us in the dependency tree.  This is the way
@@ -961,7 +1043,8 @@ addFingerprints hsc_env iface0
    --
 
    -- put the declarations in a canonical order, sorted by OccName
-   let sorted_decls = Map.elems $ Map.fromList $
+   let sorted_decls :: [(Fingerprint, IfaceDecl)]
+       sorted_decls = Map.elems $ Map.fromList $
                           [(getOccName d, e) | e@(_, d) <- decls_w_hashes]
 
    -- the flag hash depends on:
