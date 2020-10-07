@@ -22,7 +22,7 @@ import GHC.Prelude
 
 import GHC.Types.Unique.FM
 import GHC.Core.TyCon
-import GHC.Types.Name.Env
+import GHC.Core.TyCon.Env
 
 {-
 ************************************************************************
@@ -71,13 +71,13 @@ good to be able to unwrap multiple layers.
 The function that manages all this is checkRecTc.
 -}
 
-data RecTcChecker = RC !Int (NameEnv Int)
+data RecTcChecker = RC !Int (TyConEnv Int)
   -- The upper bound, and the number of times
   -- we have encountered each TyCon
 
 -- | Initialise a 'RecTcChecker' with 'defaultRecTcMaxBound'.
 initRecTc :: RecTcChecker
-initRecTc = RC defaultRecTcMaxBound emptyNameEnv
+initRecTc = RC defaultRecTcMaxBound emptyTyConEnv
 
 -- | The default upper bound (100) for the number of times a 'RecTcChecker' is
 -- allowed to encounter each 'TyCon'.
@@ -94,10 +94,8 @@ checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker
 -- Nothing      => Recursion detected
 -- Just rec_tcs => Keep going
 checkRecTc (RC bound rec_nts) tc
-  = case lookupNameEnv rec_nts tc_name of
+  = case lookupTyConEnv rec_nts tc of
       Just n | n >= bound -> Nothing
-             | otherwise  -> Just (RC bound (extendNameEnv rec_nts tc_name (n+1)))
-      Nothing             -> Just (RC bound (extendNameEnv rec_nts tc_name 1))
-  where
-    tc_name = tyConName tc
+             | otherwise  -> Just (RC bound (extendTyConEnv rec_nts tc (n+1)))
+      Nothing             -> Just (RC bound (extendTyConEnv rec_nts tc 1))
 
