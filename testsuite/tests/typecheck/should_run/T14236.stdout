@@ -1,3 +1,3 @@
-(FUN 'Many 'LiftedRep 'LiftedRep Int,Char)
-(FUN 'Many 'IntRep 'LiftedRep Int#,Char)
+(FUN 'Many ('BoxedRep 'Lifted) ('BoxedRep 'Lifted) Int,Char)
+(FUN 'Many 'IntRep ('BoxedRep 'Lifted) Int#,Char)
 Int# -> [Char]

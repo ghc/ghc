@@ -98,7 +98,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
-  , liftedRepDataConTy, unliftedRepDataConTy
+  , liftedRepTy, unliftedRepTy
   , intRepDataConTy
   , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
   , wordRepDataConTy
@@ -364,7 +364,7 @@ alphaTy, betaTy, gammaTy, deltaTy :: Type
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 
 alphaTyVarsUnliftedRep :: [TyVar]
-alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (tYPE unliftedRepDataConTy)
+alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (tYPE unliftedRepTy)
 
 alphaTyVarUnliftedRep :: TyVar
 (alphaTyVarUnliftedRep:_) = alphaTyVarsUnliftedRep
@@ -577,8 +577,8 @@ pcPrimTyCon name roles rep
 primRepToRuntimeRep :: PrimRep -> Type
 primRepToRuntimeRep rep = case rep of
   VoidRep       -> TyConApp tupleRepDataConTyCon [mkPromotedListTy runtimeRepTy []]
-  LiftedRep     -> liftedRepDataConTy
-  UnliftedRep   -> unliftedRepDataConTy
+  LiftedRep     -> liftedRepTy
+  UnliftedRep   -> unliftedRepTy
   IntRep        -> intRepDataConTy
   Int8Rep       -> int8RepDataConTy
   Int16Rep      -> int16RepDataConTy
