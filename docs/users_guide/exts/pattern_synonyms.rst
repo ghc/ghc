@@ -520,4 +520,38 @@ below:
     *Main> g (False:undefined)
     False
 
+Pragmas for pattern synonyms
+----------------------------
 
+The :ref:`inlinable-pragma`, :ref:`inline-pragma` and :ref:`noinline-pragma` are supported for pattern
+synonyms. For example: ::
+
+    patternInlinablePattern x = [x]
+    {-# INLINABLE InlinablePattern #-}
+    pattern InlinedPattern x = [x]
+    {-# INLINE InlinedPattern #-}
+    pattern NonInlinedPattern x = [x]
+    {-# NOINLINE NonInlinedPattern #-}
+
+As with other ``INLINABLE``, ``INLINE`` and ``NOINLINE`` pragmas, it's possible to specify
+to which phase the pragma applies: ::
+
+    pattern Q x = [x]
+    {-# NOINLINE[1] Q #-}
+
+The pragmas are applied both when the pattern is used as a matcher, and as a
+data constructor. For explicitly bidirectional pattern synonyms, the pragma
+must be at top level, not nested in the where clause. For example, this won't compile: ::
+
+    pattern HeadC x <- x:xs where
+      HeadC x = [x]
+      {-# INLINE HeadC #-}
+
+but this will: ::
+
+    pattern HeadC x <- x:xs where
+      HeadC x = [x]
+    {-# INLINE HeadC #-}
+
+When no pragma is provided for a pattern, the inlining decision is made by
+GHC's own inlining heuristics.

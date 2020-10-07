@@ -445,10 +445,10 @@ tc_single :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
           -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
           -> TcM (LHsBinds GhcTc, thing)
-tc_single _top_lvl sig_fn _prag_fn
+tc_single _top_lvl sig_fn prag_fn
           (L _ (PatSynBind _ psb@PSB{ psb_id = L _ name }))
           _ thing_inside
-  = do { (aux_binds, tcg_env) <- tcPatSynDecl psb (sig_fn name)
+  = do { (aux_binds, tcg_env) <- tcPatSynDecl psb (sig_fn name) prag_fn
        ; thing <- setGblEnv tcg_env thing_inside
        ; return (aux_binds, thing)
        }
