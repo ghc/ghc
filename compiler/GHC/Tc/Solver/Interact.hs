@@ -11,14 +11,12 @@ module GHC.Tc.Solver.Interact (
 #include "HsVersions.h"
 
 import GHC.Prelude
-import GHC.Types.Basic ( SwapFlag(..), isSwapped,
+import GHC.Types.Basic ( SwapFlag(..),
                          infinity, IntWithInf, intGtLimit )
 import GHC.Tc.Solver.Canonical
-import GHC.Tc.Solver.Flatten
 import GHC.Tc.Utils.Unify( canSolveByUnification )
 import GHC.Types.Var.Set
 import GHC.Core.Type as Type
-import GHC.Core.Coercion        ( BlockSubstFlag(..) )
 import GHC.Core.InstEnv         ( DFunInstType )
 import GHC.Core.Coercion.Axiom  ( sfInteractTop, sfInteractInert )
 
@@ -186,8 +184,7 @@ solveSimpleWanteds simples
              -- See Note [Running plugins on unflattened wanteds]
 
           ; if rerun_plugin
-            then do { traceTcS "solveSimple going round again:" $
-                      ppr unif_count $$ ppr rerun_plugin
+            then do { traceTcS "solveSimple going round again:" (ppr rerun_plugin)
                     ; go (n+1) limit wc2 }   -- Loop
             else return (n, wc2) }           -- Done
 
@@ -1346,14 +1343,14 @@ improveLocalFunEqs work_ev inerts fam_tc args rhs
     ASSERT( isImprovable work_ev )
     unless (null improvement_eqns) $
     do { traceTcS "interactFunEq improvements: " $
-                   vcat [ text "Eqns:" <+> ppr eqns
+                   vcat [ text "Eqns:" <+> ppr improvement_eqns
                         , text "Candidates:" <+> ppr funeqs_for_tc
                         , text "Inert eqs:" <+> ppr (inert_eqs inerts) ]
-       ; emitFunDepDeriveds eqns }
+       ; emitFunDepDeriveds improvement_eqns }
   where
     funeqs        = inert_funeqs inerts
     funeqs_for_tc = [ funeq_ct | funeq_ct : _ <- findFunEqsByTyCon funeqs fam_tc
-                               , NomEq <- ctEqRel funeq_ct ]
+                               , NomEq == ctEqRel funeq_ct ]
                                   -- representational equalities don't interact
                                   -- with type family dependencies
     work_loc      = ctEvLoc work_ev
@@ -1372,7 +1369,7 @@ improveLocalFunEqs work_ev inerts fam_tc args rhs
         concatMap (do_one_injective injective_args rhs) funeqs_for_tc
 
       | otherwise
-      = return []
+      = []
 
     --------------------
     do_one_built_in ops rhs (CEqCan { cc_lhs = TyFamLHS _ iargs, cc_rhs = irhs, cc_ev = inert_ev })
@@ -1614,14 +1611,14 @@ interactEq tclvl inerts workItem@(CEqCan { cc_lhs = lhs
                        -- See Note [No FunEq improvement for Givens]
   = continueWith workItem
 
-  | TyVarCEL tv <- lhs
+  | TyVarLHS tv <- lhs
   , canSolveByUnification tclvl tv rhs
   = do { solveByUnification ev tv rhs
        ; n_kicked <- kickOutAfterUnification tv
        ; return (Stop ev (text "Solved by unification" <+> pprKicked n_kicked)) }
 
     -- try improvement, if possible
-  | TyFamCEL fam_tc fam_args <- lhs
+  | TyFamLHS fam_tc fam_args <- lhs
   , isImprovable ev
   = do { improveLocalFunEqs ev inerts fam_tc fam_args rhs
        ; continueWith workItem }
@@ -1944,11 +1941,11 @@ Test case: typecheck/should_fail/T16512a
 
 --------------------
 doTopReactEq :: Ct -> TcS (StopOrContinue Ct)
-doTopReactEq work_item@(CEqCan { cc_ev = old_ev, cc_lhs = TyFamCEL fam_tc args
+doTopReactEq work_item@(CEqCan { cc_ev = old_ev, cc_lhs = TyFamLHS fam_tc args
                                , cc_rhs = rhs })
   = do { improveTopFunEqs old_ev fam_tc args rhs
        ; doTopReactOther work_item }
-doTopReactEq other_work_item = doTopReactOther work_item
+doTopReactEq work_item = doTopReactOther work_item
 
 {- "RAE"
 reduce_top_fun_eq :: CtEvidence -> TcTyVar -> (TcCoercion, TcType)

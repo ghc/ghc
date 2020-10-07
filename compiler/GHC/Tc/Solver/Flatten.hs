@@ -12,7 +12,6 @@ module GHC.Tc.Solver.Flatten(
 
 import GHC.Prelude
 
-import GHC.Tc.Types
 import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
@@ -28,13 +27,10 @@ import GHC.Types.Var.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
-import GHC.Types.Basic( SwapFlag(..) )
 
 import GHC.Utils.Misc
-import GHC.Data.Bag
 import Control.Monad
 import GHC.Utils.Monad ( zipWith3M )
-import Data.Foldable ( foldrM )
 
 import Control.Arrow ( first )
 
@@ -451,8 +447,6 @@ wanteds, we will
 ************************************************************************
 
 -}
-
-type FlatWorkListRef = TcRef [Ct]  -- See Note [The flattening work list]
 
 data FlattenEnv
   = FE { fe_mode    :: !FlattenMode
@@ -1466,10 +1460,9 @@ flatten_exact_fam_app_fully tc tys
                        ; let co = maybeTcSubCo eq_rel norm_co
                                    `mkTransCo` mkSymCo final_co
                        ; flavour <- getFlavour
-                           -- NB: only extend cache with nominal equalities
-                       ; when (eq_rel == NomEq) $
-                         liftTcS $
-                         extendFlatCache tc tys ( co, xi, flavour )
+                           -- NB: only extend cache with nominal, given equalities
+                       ; when (eq_rel == NomEq && flavour == Given) $
+                         liftTcS $ extendFlatCache tc tys (co, xi)
                        ; let role = eqRelRole eq_rel
                              xi' = xi `mkCastTy` kind_co
                              co' = update_co $
@@ -1597,7 +1590,7 @@ flatten_tyvar2 tv fr@(_, eq_rel)
        ; case lookupDVarEnv ieqs tv of
            Just (ct:_)   -- If the first doesn't work,
                          -- the subsequent ones won't either
-             | CEqCan { cc_ev = ctev, cc_lhs = TyVarCEL tv
+             | CEqCan { cc_ev = ctev, cc_lhs = TyVarLHS tv
                       , cc_rhs = rhs_ty, cc_eq_rel = ct_eq_rel } <- ct
              , let ct_fr = (ctEvFlavour ctev, ct_eq_rel)
              , ct_fr `eqCanRewriteFR` fr  -- This is THE key call of eqCanRewriteFR
@@ -1880,6 +1873,11 @@ unsolved constraints.  The flat form will be
 Flatten using the fun-eqs first.
 -}
 
+-}
+
+--------------------------------------
+-- Utilities
+
 -- | Like 'splitPiTys'' but comes with a 'Bool' which is 'True' iff there is at
 -- least one named binder.
 split_pi_tys' :: Type -> ([TyCoBinder], Type, Bool)
@@ -1896,6 +1894,8 @@ split_pi_tys' ty = split ty ty
   split orig_ty _                = ([], orig_ty, False)
 {-# INLINE split_pi_tys' #-}
 
+
+
 -- | Like 'tyConBindersTyCoBinders' but you also get a 'Bool' which is true iff
 -- there is at least one named binder.
 ty_con_binders_ty_binders' :: [TyConBinder] -> ([TyCoBinder], Bool)
@@ -1907,5 +1907,3 @@ ty_con_binders_ty_binders' = foldr go ([], False)
       = (Anon af (unrestricted (tyVarKind tv))   : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}
-
--}

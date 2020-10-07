@@ -35,14 +35,15 @@ module GHC.Tc.Types.Evidence (
 
   -- * TcCoercion
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
-  TcMCoercion,
+  TcMCoercion, TcMCoercionN, TcMCoercionR,
   Role(..), LeftOrRight(..), pickLR,
   mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo,
   mkTcTyConAppCo, mkTcAppCo, mkTcFunCo,
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos,
-  mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSymCo,
+  mkTcSymCo, mkTcSymMCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSymCo,
   maybeTcSubCo, tcDowngradeRole,
-  mkTcAxiomRuleCo, mkTcGReflRightCo, mkTcGReflLeftCo, mkTcPhantomCo,
+  mkTcAxiomRuleCo, mkTcGReflRightCo, mkTcGReflRightMCo, mkTcGReflLeftCo, mkTcGReflLeftMCo,
+  mkTcPhantomCo,
   mkTcCoherenceLeftCo,
   mkTcCoherenceRightCo,
   mkTcKindCo,
@@ -76,6 +77,7 @@ import GHC.Types.Var.Set
 import GHC.Core.Predicate
 import GHC.Types.Name
 import GHC.Data.Pair
+import GHC.Types.Basic
 
 import GHC.Core
 import GHC.Core.Class ( classSCSelId )
@@ -111,10 +113,13 @@ type TcCoercion  = Coercion
 type TcCoercionN = CoercionN    -- A Nominal          coercion ~N
 type TcCoercionR = CoercionR    -- A Representational coercion ~R
 type TcCoercionP = CoercionP    -- a phantom coercion
-type TcMCoercion = MCoercion
+type TcMCoercion  = MCoercion
+type TcMCoercionN = MCoercionN  -- nominal
+type TcMCoercionR = MCoercionR  -- representational
 
 mkTcReflCo             :: Role -> TcType -> TcCoercion
 mkTcSymCo              :: TcCoercion -> TcCoercion
+mkTcSymMCo             :: TcMCoercion -> TcMCoercion
 mkTcTransCo            :: TcCoercion -> TcCoercion -> TcCoercion
 mkTcNomReflCo          :: TcType -> TcCoercionN
 mkTcRepReflCo          :: TcType -> TcCoercionR
@@ -133,7 +138,9 @@ mkTcSubCo              :: TcCoercionN -> TcCoercionR
 tcDowngradeRole        :: Role -> Role -> TcCoercion -> TcCoercion
 mkTcAxiomRuleCo        :: CoAxiomRule -> [TcCoercion] -> TcCoercionR
 mkTcGReflRightCo       :: Role -> TcType -> TcCoercionN -> TcCoercion
+mkTcGReflRightMCo      :: Role -> TcType -> TcMCoercionN -> TcCoercion
 mkTcGReflLeftCo        :: Role -> TcType -> TcCoercionN -> TcCoercion
+mkTcGReflLeftMCo       :: Role -> TcType -> TcMCoercionN -> TcCoercion
 mkTcCoherenceLeftCo    :: Role -> TcType -> TcCoercionN
                        -> TcCoercion -> TcCoercion
 mkTcCoherenceRightCo   :: Role -> TcType -> TcCoercionN
@@ -152,6 +159,7 @@ isTcReflexiveCo        :: TcCoercion -> Bool
 
 mkTcReflCo             = mkReflCo
 mkTcSymCo              = mkSymCo
+mkTcSymMCo             = mkSymMCo
 mkTcTransCo            = mkTransCo
 mkTcNomReflCo          = mkNomReflCo
 mkTcRepReflCo          = mkRepReflCo
@@ -168,7 +176,9 @@ mkTcSubCo              = mkSubCo
 tcDowngradeRole        = downgradeRole
 mkTcAxiomRuleCo        = mkAxiomRuleCo
 mkTcGReflRightCo       = mkGReflRightCo
+mkTcGReflRightMCo      = mkGReflRightMCo
 mkTcGReflLeftCo        = mkGReflLeftCo
+mkTcGReflLeftMCo       = mkGReflLeftMCo
 mkTcCoherenceLeftCo    = mkCoherenceLeftCo
 mkTcCoherenceRightCo   = mkCoherenceRightCo
 mkTcPhantomCo          = mkPhantomCo

@@ -75,6 +75,7 @@ module GHC.Tc.Utils.TcType (
   -- Again, newtypes are opaque
   eqType, eqTypes, nonDetCmpType, nonDetCmpTypes, eqTypeX,
   pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
+  tcEqTyConApps,
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isNaturalTy,
@@ -104,7 +105,7 @@ module GHC.Tc.Utils.TcType (
 
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
-  anyRewritableTyVar,
+  anyRewritableTyVar, anyRewritableTyFamApp, anyRewritableCanEqLHS,
 
   ---------------------------------
   -- Foreign import and export
@@ -866,7 +867,7 @@ any_rewritable ignore_cos role tv_pred tc_pred should_expand
   = go role emptyVarSet
   where
     go_tv rl bvs tv | tv `elemVarSet` bvs = False
-                    | otherwise           = pred rl tv
+                    | otherwise           = tv_pred rl tv
 
     go rl bvs ty@(TyConApp tc tys)
       | isTypeSynonymTyCon tc

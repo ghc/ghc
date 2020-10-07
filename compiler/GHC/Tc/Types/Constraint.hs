@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -25,6 +25,8 @@ module GHC.Tc.Types.Constraint (
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
 
         CanEqLHS(..), canEqLHS_maybe, canEqLHSKind, canEqLHSType,
+        eqCanEqLHS,
+
         Hole(..), HoleSort(..), isOutOfScopeHole,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
@@ -183,13 +185,13 @@ data Ct
 -- | A 'CanEqLHS' is a type that can appear on the left of a canonical
 -- equality: a type variable or exactly-saturated type family application.
 data CanEqLHS
-  = TyVarCEL TcTyVar
-  | TyFamCEL TyCon  -- ^ of the family
+  = TyVarLHS TcTyVar
+  | TyFamLHS TyCon  -- ^ of the family
              [Xi]   -- ^ exactly saturating the family
 
 instance Outputable CanEqLHS where
-  ppr (TyVarCEL tv)              = ppr tv
-  ppr (TyFamCEL fam_tc fam_args) = ppr (mkTyConApp fam_tc fam_args)
+  ppr (TyVarLHS tv)              = ppr tv
+  ppr (TyFamLHS fam_tc fam_args) = ppr (mkTyConApp fam_tc fam_args)
 
 ------------
 data QCInst  -- A much simplified version of ClsInst
@@ -459,94 +461,34 @@ instance Outputable Ct where
 -- type family application?
 -- Does not look through type synonyms.
 canEqLHS_maybe :: Xi -> Maybe CanEqLHS
-canEqLHS_maybe (TyVarTy tv) = Just $ TyVarCEL tv
-canEqLHS_maybe (TyConApp tc args)
-  | isTypeFamilyTyCon tc
+canEqLHS_maybe xi
+  | Just tv <- tcGetTyVar_maybe xi
+  = Just $ TyVarLHS tv
+
+  | Just (tc, args) <- tcSplitTyConApp_maybe xi
+  , isTypeFamilyTyCon tc
   , args `lengthIs` tyConArity tc
-  = Just $ TyFamCEL tc args
-canEqLHS_maybe _other = Nothing
+  = Just $ TyFamLHS tc args
+
+  | otherwise
+  = Nothing
 
 -- | Convert a 'CanEqLHS' back into a 'Type'
 canEqLHSType :: CanEqLHS -> TcType
-canEqLHSType (TyVarCEL tv) = mkTyVarTy tv
-canEqLHSType (TyFamCEL fam_tc fam_args) = mkTyConApp fam_tc fam_args
+canEqLHSType (TyVarLHS tv) = mkTyVarTy tv
+canEqLHSType (TyFamLHS fam_tc fam_args) = mkTyConApp fam_tc fam_args
 
 -- | Retrieve the kind of a 'CanEqLHS'
 canEqLHSKind :: CanEqLHS -> TcKind
-canEqLHSKind (TyVarCEL tv) = tyVarKind tv
-canEqLHSKind (TyFamCEL fam_tc fam_args) = piResultTys (tyConKind fam_tc) fam_args
+canEqLHSKind (TyVarLHS tv) = tyVarKind tv
+canEqLHSKind (TyFamLHS fam_tc fam_args) = piResultTys (tyConKind fam_tc) fam_args
 
 -- | Are two 'CanEqLHS's equal?
 eqCanEqLHS :: CanEqLHS -> CanEqLHS -> Bool
-eqCanEqLHS (TyVarCEL tv1) (TyVarCEL tv2) = tv1 == tv2
-eqCanEqLHS (TyFamCEL fam_tc1 fam_args1) (TyFamCEL fam_tc2 fam_args2)
+eqCanEqLHS (TyVarLHS tv1) (TyVarLHS tv2) = tv1 == tv2
+eqCanEqLHS (TyFamLHS fam_tc1 fam_args1) (TyFamLHS fam_tc2 fam_args2)
   = tcEqTyConApps fam_tc1 fam_args1 fam_tc2 fam_args2
-
--- | Result of checking whether a RHS is suitable for pairing
--- with a CanEqLHS in a CEqCan.
-data CanEqOK
-  = CanEqOK Xi     -- use this RHS; it may have been occCheckExpand'ed
-  | CanEqNotOK CtIrredStatus  -- don't proceed; explains why
-
-instance Outputable CanEqOK where
-  ppr (CanEqOK rhs)       = text "CanEqOK" <+> ppr rhs
-  ppr (CanEqNotOK status) = text "CanEqNotOK" <+> ppr status
-
--- | This function establishes most of the invariants needed to make
--- a CEqCan.
---
---   TyEq:OC: Checked here.
---   TyEq:F:  Checked here.
---   TyEq:K:  assumed; ASSERTed here (that is, kind(lhs) = kind(rhs))
---   TyEq:N:  assumed; ASSERTed here (if eq_rel is R, rhs is not a newtype)
---   TyEq:TV: not checked (this is hard to check)
---   TyEq:H:  Checked here.
-canEqOK :: DynFlags -> EqRel -> CanEqLHS -> Xi -> CanEqOK
-canEqOK dflags eq_rel lhs rhs
-  | TyVarCEL tv <- ASSERT( good_rhs )
-                   lhs
-  = case metaTyVarUpdateOK True {- type families are OK here -} tv rhs of
-      MTVU_OK rhs'     -> CanEqOK rhs'
-      MTVU_Bad         -> CanEqNotOK OtherCIS
-                 -- Violation of TyEq:F
-
-      MTVU_HoleBlocker -> CanEqNotOK BlockedCIS
-                 -- This is the case detailed in
-                 -- Note [Equalities with incompatible kinds]
-                 -- Violation of TyEq:H
-
-                 -- These are both a violation of TyEq:OC, but we
-                 -- want to differentiate for better production of
-                 -- error messages
-      MTVU_Occurs | isInsolubleOccursCheck eq_rel tv rhs -> CanEqNotOK InsolubleCIS
-                 -- If we have a ~ [a], it is not canonical, and in particular
-                 -- we don't want to rewrite existing inerts with it, otherwise
-                 -- we'd risk divergence in the constraint solver
-
-                  | otherwise                            -> CanEqNotOK OtherCIS
-                 -- A representational equality with an occurs-check problem isn't
-                 -- insoluble! For example:
-                 --   a ~R b a
-                 -- We might learn that b is the newtype Id.
-                 -- But, the occurs-check certainly prevents the equality from being
-                 -- canonical, and we might loop if we were to use it in rewriting.
-
-  -- ToDo: These checks are very close to what's done in metaTyVarUpdateOK; combine?
-  | TyFamCEL fam_tc fam_args <- lhs
-  = if | not (isTauTy rhs)   -> CanEqNotOK OtherCIS   -- TyEq:F
-       | badCoercionHole rhs -> CanEqNotOK BlockedCIS -- TyEq:H
-       | otherwise           -> CanEqOK rhs
-         -- NB: TyEq:OC does not apply
-
-  where
-    good_rhs       = kinds_match && no_bad_newtype
-    kinds_match    = canEqLHSKind lhs `tcEqType` tcTypeKind rhs
-    no_bad_newtype | ReprEq <- eq_rel
-                   , Just tc <- tyConAppTyCon_maybe rhs
-                   , isNewTyCon tc
-                   = False
-                   | otherwise
-                   = True
+eqCanEqLHS _ _ = False
 
 {-
 ************************************************************************

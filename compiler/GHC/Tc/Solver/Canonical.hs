@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module GHC.Tc.Solver.Canonical(
      canonicalize,
@@ -2071,7 +2072,7 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
        ; type_ev <- rewriteEqEvidence ev swapped xi1 rhs' lhs_co rhs_co
 
           -- rewriteEqEvidence carries out the swap, so we're NotSwapped any more
-       ; canEqLHSHomo type_ev eq_rel NotSwapped lhs1 ps_xi1 rhs' ps_rhs' }
+       ; canEqCanLHSHomo type_ev eq_rel NotSwapped lhs1 ps_xi1 rhs' ps_rhs' }
   where
     emit_kind_co :: TcS CoercionN
     emit_kind_co
@@ -2104,8 +2105,8 @@ canEqCanLHSHomo :: CtEvidence
                 -> TcS (StopOrContinue Ct)
 canEqCanLHSHomo ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
   | (xi2', mco) <- split_cast_ty xi2
-  , lhs2 <- canEqLHS_maybe xi2'
-  = canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 (ps_xi2 `mkCastTyMCo` mkSymMCo mco) mco
+  , Just lhs2 <- canEqLHS_maybe xi2'
+  = canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 (ps_xi2 `mkCastTyMCo` mkTcSymMCo mco) mco
 
   | otherwise
   = canEqCanLHSFinish ev eq_rel swapped lhs1 ps_xi2
@@ -2128,22 +2129,22 @@ canEqCanLHS2 :: CtEvidence              -- lhs ~ (rhs |> mco)
 canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
   | lhs1 `eqCanEqLHS` lhs2
     -- It must be the case that mco is reflexive
-  = canEqReflexive ev eq_rel xi1
+  = canEqReflexive ev eq_rel (canEqLHSType lhs1)
 
-  | TyVarCEL tv1 <- lhs1
-  , TyVarCEL tv2 <- lhs2
+  | TyVarLHS tv1 <- lhs1
+  , TyVarLHS tv2 <- lhs2
   , swapOverTyVars (isGiven ev) tv1 tv2
   = do { traceTcS "canEqLHS2 swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
        ; new_ev <- rewriteCastedEquality ev eq_rel swapped (mkTyVarTy tv1) (mkTyVarTy tv2) mco
-       ; canEqLHSFinish new_ev eq_rel IsSwapped (TyVarCEL tv2)
-                                                (ps_xi1 `mkCastTyMCo` sym_mco) }
+       ; canEqCanLHSFinish new_ev eq_rel IsSwapped (TyVarLHS tv2)
+                                                   (ps_xi1 `mkCastTyMCo` sym_mco) }
 
-  | TyVarCEL tv1 <- lhs1
-  , TyFamCEL fun_tc2 fun_args2 <- lhs2
+  | TyVarLHS tv1 <- lhs1
+  , TyFamLHS fun_tc2 fun_args2 <- lhs2
   = canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
 
-  | TyFamCEL fun_tc1 fun_args1 <- lhs1
-  , TyVarCEL tv2 <- lhs2
+  | TyFamLHS fun_tc1 fun_args1 <- lhs1
+  , TyVarLHS tv2 <- lhs2
   = do { new_ev <- rewriteCastedEquality ev eq_rel swapped
                                          (mkTyConApp fun_tc1 fun_args1) (mkTyVarTy tv2) mco
        ; canEqTyVarFunEq new_ev eq_rel IsSwapped tv2 ps_xi2
@@ -2155,9 +2156,6 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
   = canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco)
 
   where
-    xi1 = canEqLHSType lhs1
-    xi2 = canEqLHSType lhs2
-
     sym_mco = mkTcSymMCo mco
 
 -- This function handles the case where one side is a tyvar and the other is
@@ -2178,14 +2176,14 @@ canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
 canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
   = do { tclvl <- getTcLevel
        ; if isTouchableMetaTyVar tclvl tv1
-         then canEqCanLHSFinish ev eq_rel swapped (TyVarCEL tv1)
+         then canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1)
                                 (ps_xi2 `mkCastTyMCo` mco)
          else do { new_ev <- rewriteCastedEquality ev eq_rel swapped
                                (mkTyVarTy tv1) (mkTyConApp fun_tc2 fun_args2)
                                mco
-                 ; canEqCanLHSFinish ev eq_rel IsSwapped
-                                (TyFamCEL fun_tc2 fun_args2)
-                                (ps_xi1 `mkCastTyMCo` sym_mco) }
+                 ; canEqCanLHSFinish new_ev eq_rel IsSwapped
+                                (TyFamLHS fun_tc2 fun_args2)
+                                (ps_xi1 `mkCastTyMCo` sym_mco) } }
   where
     sym_mco = mkTcSymMCo mco
 
@@ -2222,9 +2220,9 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
 
                -- We must not use it for further rewriting!
            CanEqNotOK status ->
-             do { traceTcS "canEqCanLHSFinish can't make a canonical" (ppr lhs $$ ppr ps_xi2)
+             do { traceTcS "canEqCanLHSFinish can't make a canonical" (ppr lhs $$ ppr rhs)
                 ; new_ev <- rewriteEqEvidence ev swapped lhs_ty rhs rewrite_co1 rewrite_co2
-                ; continueWith (mkIrredCt status new_ev) }
+                ; continueWith (mkIrredCt status new_ev) } }
   where
     role = eqRelRole eq_rel
 
@@ -2261,6 +2259,75 @@ rewriteCastedEquality ev eq_rel swapped lhs rhs mco
 
     sym_mco = mkTcSymMCo mco
     role    = eqRelRole eq_rel
+
+---------------------------------------------
+-- | Result of checking whether a RHS is suitable for pairing
+-- with a CanEqLHS in a CEqCan.
+data CanEqOK
+  = CanEqOK Xi     -- use this RHS; it may have been occCheckExpand'ed
+  | CanEqNotOK CtIrredStatus  -- don't proceed; explains why
+
+instance Outputable CanEqOK where
+  ppr (CanEqOK rhs)       = text "CanEqOK" <+> ppr rhs
+  ppr (CanEqNotOK status) = text "CanEqNotOK" <+> ppr status
+
+-- | This function establishes most of the invariants needed to make
+-- a CEqCan.
+--
+--   TyEq:OC: Checked here.
+--   TyEq:F:  Checked here.
+--   TyEq:K:  assumed; ASSERTed here (that is, kind(lhs) = kind(rhs))
+--   TyEq:N:  assumed; ASSERTed here (if eq_rel is R, rhs is not a newtype)
+--   TyEq:TV: not checked (this is hard to check)
+--   TyEq:H:  Checked here.
+canEqOK :: DynFlags -> EqRel -> CanEqLHS -> Xi -> CanEqOK
+canEqOK dflags eq_rel lhs rhs
+  | TyVarLHS tv <- lhs
+  = ASSERT( good_rhs )  -- I want to put this in the pattern guard, but
+                        -- that confuses the pattern-match completeness checker
+    case metaTyVarUpdateOK dflags True {- type families are OK here -} tv rhs of
+      MTVU_OK rhs'     -> CanEqOK rhs'
+      MTVU_Bad         -> CanEqNotOK OtherCIS
+                 -- Violation of TyEq:F
+
+      MTVU_HoleBlocker -> CanEqNotOK BlockedCIS
+                 -- This is the case detailed in
+                 -- Note [Equalities with incompatible kinds]
+                 -- Violation of TyEq:H
+
+                 -- These are both a violation of TyEq:OC, but we
+                 -- want to differentiate for better production of
+                 -- error messages
+      MTVU_Occurs | isInsolubleOccursCheck eq_rel tv rhs -> CanEqNotOK InsolubleCIS
+                 -- If we have a ~ [a], it is not canonical, and in particular
+                 -- we don't want to rewrite existing inerts with it, otherwise
+                 -- we'd risk divergence in the constraint solver
+
+                  | otherwise                            -> CanEqNotOK OtherCIS
+                 -- A representational equality with an occurs-check problem isn't
+                 -- insoluble! For example:
+                 --   a ~R b a
+                 -- We might learn that b is the newtype Id.
+                 -- But, the occurs-check certainly prevents the equality from being
+                 -- canonical, and we might loop if we were to use it in rewriting.
+
+  -- ToDo: These checks are very close to what's done in metaTyVarUpdateOK; combine?
+  | TyFamLHS _fam_tc _fam_args <- lhs
+  = ASSERT( good_rhs )
+    if | not (isTauTy rhs)   -> CanEqNotOK OtherCIS   -- TyEq:F
+       | badCoercionHole rhs -> CanEqNotOK BlockedCIS -- TyEq:H
+       | otherwise           -> CanEqOK rhs
+         -- NB: TyEq:OC does not apply
+
+  where
+    good_rhs       = kinds_match && no_bad_newtype
+    kinds_match    = canEqLHSKind lhs `tcEqType` tcTypeKind rhs
+    no_bad_newtype | ReprEq <- eq_rel
+                   , Just tc <- tyConAppTyCon_maybe rhs
+                   , isNewTyCon tc
+                   = False
+                   | otherwise
+                   = True
 
 {- Note [Equalities with incompatible kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

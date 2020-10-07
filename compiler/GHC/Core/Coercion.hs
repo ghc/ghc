@@ -11,7 +11,7 @@
 --
 module GHC.Core.Coercion (
         -- * Main data type
-        Coercion, CoercionN, CoercionR, CoercionP, MCoercion(..), MCoercionR,
+        Coercion, CoercionN, CoercionR, CoercionP, MCoercion(..), MCoercionN, MCoercionR,
         UnivCoProvenance, CoercionHole(..), BlockSubstFlag(..),
         coHoleCoVar, setCoHoleCoVar,
         LeftOrRight(..),
@@ -65,8 +65,9 @@ module GHC.Core.Coercion (
         pickLR,
 
         isGReflCo, isReflCo, isReflCo_maybe, isGReflCo_maybe, isReflexiveCo, isReflexiveCo_maybe,
-        isReflCoVar_maybe, isGReflMCo,
-        coToMCo, mkTransMCo, mkTransMCoL,
+        isReflCoVar_maybe, isGReflMCo, mkGReflLeftMCo, mkGReflRightMCo,
+
+        coToMCo, mkTransMCo, mkTransMCoL, mkCastTyMCo, mkSymMCo,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -326,6 +327,23 @@ mkTransMCoL :: MCoercion -> Coercion -> MCoercion
 mkTransMCoL MRefl     co2 = MCo co2
 mkTransMCoL (MCo co1) co2 = MCo (mkTransCo co1 co2)
 
+-- | Get the reverse of an 'MCoercion'
+mkSymMCo :: MCoercion -> MCoercion
+mkSymMCo MRefl    = MRefl
+mkSymMCo (MCo co) = MCo (mkSymCo co)
+
+-- | Cast a type by an 'MCoercion'
+mkCastTyMCo :: Type -> MCoercion -> Type
+mkCastTyMCo ty MRefl    = ty
+mkCastTyMCo ty (MCo co) = ty `mkCastTy` co
+
+mkGReflLeftMCo :: Role -> Type -> MCoercionN -> Coercion
+mkGReflLeftMCo r ty MRefl    = mkReflCo r ty
+mkGReflLeftMCo r ty (MCo co) = mkGReflLeftCo r ty co
+
+mkGReflRightMCo :: Role -> Type -> MCoercionN -> Coercion
+mkGReflRightMCo r ty MRefl    = mkReflCo r ty
+mkGReflRightMCo r ty (MCo co) = mkGReflRightCo r ty co
 
 {-
 %************************************************************************
