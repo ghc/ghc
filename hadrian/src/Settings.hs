@@ -54,7 +54,8 @@ hadrianFlavours :: [Flavour]
 hadrianFlavours =
     [ benchmarkFlavour, defaultFlavour, developmentFlavour Stage1
     , developmentFlavour Stage2, performanceFlavour, profiledFlavour
-    , quickFlavour, quickValidateFlavour, quickestFlavour
+    , quickFlavour, quickValidateFlavour, quickDebugFlavour
+    , quickestFlavour
     , quickCrossFlavour, benchmarkLlvmFlavour
     , performanceLlvmFlavour, profiledLlvmFlavour, quickLlvmFlavour
     , ghcInGhciFlavour, validateFlavour, slowValidateFlavour ]

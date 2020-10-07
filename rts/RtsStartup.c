@@ -71,7 +71,7 @@ static bool rts_shutdown = false;
 
 #if defined(mingw32_HOST_OS)
 /* Indicates CodePage to set program to after exit.  */
-static int64_t __codePage = 0;
+static int64_t __codePage = -1;
 #endif
 
 static void flushStdHandles(void);
