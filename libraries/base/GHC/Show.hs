@@ -594,6 +594,9 @@ instance Show KindRep where
       . showString " "
       . showsPrec 11 q
 
+-- | @since 4.15.0.0
+deriving instance Show Levity
+
 -- | @since 4.11.0.0
 deriving instance Show RuntimeRep
 

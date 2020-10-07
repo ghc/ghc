@@ -48,7 +48,7 @@ lvl = "spec-inline.hs:(19,5)-(29,25)|function go"#
 Roman.foo3 :: Int
 [GblId, Str=b, Cpr=b]
 Roman.foo3
-  = Control.Exception.Base.patError @'GHC.Types.LiftedRep @Int lvl
+  = Control.Exception.Base.patError @GHC.Types.LiftedRep @Int lvl
 
 Rec {
 -- RHS size: {terms: 40, types: 5, coercions: 0, joins: 0/0}
