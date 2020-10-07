@@ -479,6 +479,23 @@ Ambiguity:
     the -XTransformListComp extension.
 -}
 
+{- Note [%shift: activation -> {- empty -}]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    sigdecl -> '{-# INLINE' . activation qvarcon '#-}'
+    activation -> {- empty -}
+    activation -> explicit_activation
+
+Example:
+
+    {-# INLINE [0] Something #-}
+
+Ambiguity:
+    We don't know whether the '[' is the start of the activation or the beginning
+    of the [] data constructor.
+    We parse this as having '[0]' activation for inlining 'Something', rather than
+    empty activation and inlining '[0] Something'.
+-}
 
 {- Note [Parser API Annotations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2538,7 +2555,8 @@ sigdecl :: { LHsDecl GhcPs }
                    [mo $1,mc $3] }
 
 activation :: { ([AddAnn],Maybe Activation) }
-        : {- empty -}                           { ([],Nothing) }
+        : -- See Note [%shift: activation -> {- empty -}]
+          {- empty -} %shift                    { ([],Nothing) }
         | explicit_activation                   { (fst $1,Just (snd $1)) }
 
 explicit_activation :: { ([AddAnn],Activation) }  -- In brackets
