@@ -62,7 +62,6 @@ workflow:
 .release: &release
   variables:
     BUILD_FLAVOUR: "perf"
-    FLAVOUR: "perf"
   artifacts:
     when: always
     expire_in: 1 year
@@ -197,7 +196,7 @@ lint-release-changelogs:
 
 .validate-hadrian:
   variables:
-    FLAVOUR: "validate"
+    BUILD_FLAVOUR: "validate"
   script:
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
@@ -359,7 +358,7 @@ release-x86_64-freebsd:
     CABAL_INSTALL_VERSION: 3.0.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-portbld-freebsd.tar.xz"
     TEST_ENV: "x86_64-freebsd-hadrian"
-    FLAVOUR: "validate"
+    BUILD_FLAVOUR: "validate"
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
     - .gitlab/ci.sh clean
@@ -421,7 +420,7 @@ validate-x86_64-darwin:
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: --with-intree-gmp
     TEST_ENV: "x86_64-darwin-hadrian"
-    FLAVOUR: "validate"
+    BUILD_FLAVOUR: "validate"
   script:
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
@@ -636,6 +635,22 @@ nightly-x86_64-linux-deb9-integer-simple:
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
     TEST_TYPE: slowtest
 
+.build-x86_64-linux-deb9-tsan:
+  extends: .validate-linux-hadrian
+  stage: full-build
+  variables:
+    TEST_ENV: "x86_64-linux-deb9-tsan"
+    BUILD_FLAVOUR: "thread-sanitizer"
+    TSAN_OPTIONS: "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
+
+nightly-x86_64-linux-deb9-tsan:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb9-tsan
+
+validate-x86_64-linux-deb9-tsan:
+  extends: .build-x86_64-linux-deb9-tsan
+  when: manual
+
 validate-x86_64-linux-deb9-dwarf:
   extends: .build-x86_64-linux-deb9
   stage: full-build
@@ -837,7 +852,7 @@ validate-x86_64-linux-fedora27:
   extends: .build-windows
   stage: full-build
   variables:
-    FLAVOUR: "validate"
+    BUILD_FLAVOUR: "validate"
     # skipping perf tests for now since we build a quick-flavoured GHC,
     # which might result in some broken perf tests?
     HADRIAN_ARGS: "--docs=no-sphinx --skip-perf"

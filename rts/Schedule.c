@@ -438,7 +438,7 @@ run_thread:
     RELAXED_STORE(&cap->interrupt, false);
 
     cap->in_haskell = true;
-    cap->idle = 0;
+    RELAXED_STORE(&cap->idle, false);
 
     dirty_TSO(cap,t);
     dirty_STACK(cap,t->stackobj);
@@ -1805,7 +1805,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         debugTrace(DEBUG_sched, "%d idle caps", n_idle_caps);
 
         for (i=0; i < n_capabilities; i++) {
-            capabilities[i]->idle++;
+            NONATOMIC_ADD(&capabilities[i]->idle, 1);
         }
 
         // For all capabilities participating in this GC, wait until
@@ -2052,11 +2052,13 @@ forkProcess(HsStablePtr *entry
     ACQUIRE_LOCK(&sm_mutex);
     ACQUIRE_LOCK(&stable_ptr_mutex);
     ACQUIRE_LOCK(&stable_name_mutex);
-    ACQUIRE_LOCK(&task->lock);
 
     for (i=0; i < n_capabilities; i++) {
         ACQUIRE_LOCK(&capabilities[i]->lock);
     }
+
+    // Take task lock after capability lock to avoid order inversion (#17275).
+    ACQUIRE_LOCK(&task->lock);
 
 #if defined(THREADED_RTS)
     ACQUIRE_LOCK(&all_tasks_mutex);
@@ -2261,6 +2263,12 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
     cap = rts_lock();
     task = cap->running_task;
 
+
+    // N.B. We must stop the interval timer while we are changing the
+    // capabilities array lest handle_tick may try to context switch
+    // an old capability. See #17289.
+    stopTimer();
+
     stopAllCapabilities(&cap, task);
 
     if (new_n_capabilities < enabled_capabilities)
@@ -2342,6 +2350,8 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
 
     // Notify IO manager that the number of capabilities has changed.
     rts_evalIO(&cap, ioManagerCapabilitiesChanged_closure, NULL);
+
+    startTimer();
 
     rts_unlock(cap);
 
