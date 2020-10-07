@@ -6,7 +6,7 @@ import GHC.Tc.Utils.Monad ( TcGblEnv)
 import GHC.Utils.Outputable ( Outputable )
 import GHC.Hs.Extension ( GhcRn, GhcTc )
 import Data.Maybe  ( Maybe )
-import TcSigs ( TcPragEnv )
+import GHC.Tc.Gen.Sig ( TcPragEnv )
 
 tcPatSynDecl :: PatSynBind GhcRn GhcRn
              -> Maybe TcSigInfo
