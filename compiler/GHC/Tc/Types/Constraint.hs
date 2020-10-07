@@ -11,10 +11,9 @@ module GHC.Tc.Types.Constraint (
         -- Canonical constraints
         Xi, Ct(..), Cts, CtIrredStatus(..), emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
-        isEmptyCts, isCTyEqCan, isCFunEqCan,
+        isEmptyCts,
         isPendingScDict, superClassesMightHelp, getPendingWantedScs,
-        isCDictCan_Maybe, isCFunEqCan_maybe,
-        isCNonCanonical, isWantedCt, isDerivedCt, isGivenCt,
+        isWantedCt, isDerivedCt, isGivenCt,
         isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         ctEvId, mkTcEqPredLikeEv,
@@ -58,7 +57,6 @@ module GHC.Tc.Types.Constraint (
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
         eqCanRewrite, eqCanRewriteFR, eqMayRewriteFR,
         eqCanDischargeFR,
-        funEqCanDischarge, funEqCanDischargeF,
 
         -- Pretty printing
         pprEvVarTheta,
@@ -141,8 +139,7 @@ data Ct
 
         -- For the might-be-soluble case, the ctev_pred of the evidence is
         -- of form   (tv xi1 xi2 ... xin)   with a tyvar at the head
-        --      or   (tv1 ~ ty2)   where the CTyEqCan  kind invariant (TyEq:K) fails
-        --      or   (F tys ~ ty)  where the CFunEqCan kind invariant fails
+        --      or   (lhs1 ~ ty2)  where the CEqCan    kind invariant (TyEq:K) fails
         -- See Note [CIrredCan constraints]
 
         -- The definitely-insoluble case is for things like
@@ -296,8 +293,8 @@ during constraint solving. See Note [Evidence field of CtEvidence].
 
 Note [Ct kind invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-CTyEqCan and CFunEqCan both require that the kind of the lhs matches the kind
-of the rhs. This is necessary because both constraints are used for substitutions
+CEqCan requires that the kind of the lhs matches the kind
+of the rhs. This is necessary because these constraints are used for substitutions
 during solving. If the kinds differed, then the substitution would take a well-kinded
 type to an ill-kinded one.
 
@@ -447,8 +444,7 @@ instance Outputable Ct where
   ppr ct = ppr (ctEvidence ct) <+> parens pp_sort
     where
       pp_sort = case ct of
-         CTyEqCan {}      -> text "CTyEqCan"
-         CFunEqCan {}     -> text "CFunEqCan"
+         CEqCan {}        -> text "CEqCan"
          CNonCanonical {} -> text "CNonCanonical"
          CDictCan { cc_pend_sc = pend_sc }
             | pend_sc   -> text "CDictCan(psc)"
@@ -786,26 +782,6 @@ isGivenCt = isGiven . ctEvidence
 
 isDerivedCt :: Ct -> Bool
 isDerivedCt = isDerived . ctEvidence
-
-isCTyEqCan :: Ct -> Bool
-isCTyEqCan (CTyEqCan {})  = True
-isCTyEqCan _              = False
-
-isCDictCan_Maybe :: Ct -> Maybe Class
-isCDictCan_Maybe (CDictCan {cc_class = cls })  = Just cls
-isCDictCan_Maybe _              = Nothing
-
-isCFunEqCan_maybe :: Ct -> Maybe (TyCon, [Type])
-isCFunEqCan_maybe (CFunEqCan { cc_fun = tc, cc_tyargs = xis }) = Just (tc, xis)
-isCFunEqCan_maybe _ = Nothing
-
-isCFunEqCan :: Ct -> Bool
-isCFunEqCan (CFunEqCan {}) = True
-isCFunEqCan _ = False
-
-isCNonCanonical :: Ct -> Bool
-isCNonCanonical (CNonCanonical {}) = True
-isCNonCanonical _ = False
 
 {- Note [Custom type errors in constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1585,9 +1561,7 @@ Constraints come in four flavours:
 
 * [WD] Wanted WDeriv: a single constraint that represents
                       both [W] and [D]
-  We keep them paired as one both for efficiency, and because
-  when we have a finite map  F tys -> CFunEqCan, it's inconvenient
-  to have two CFunEqCans in the range
+  We keep them paired as one both for efficiency
 
 The ctev_nosh field of a Wanted distinguishes between [W] and [WD]
 
@@ -1640,17 +1614,15 @@ ctFlavourRole :: Ct -> CtFlavourRole
 -- Uses short-cuts to role for special cases
 ctFlavourRole (CDictCan { cc_ev = ev })
   = (ctEvFlavour ev, NomEq)
-ctFlavourRole (CTyEqCan { cc_ev = ev, cc_eq_rel = eq_rel })
+ctFlavourRole (CEqCan { cc_ev = ev, cc_eq_rel = eq_rel })
   = (ctEvFlavour ev, eq_rel)
-ctFlavourRole (CFunEqCan { cc_ev = ev })
-  = (ctEvFlavour ev, NomEq)
 ctFlavourRole ct
   = ctEvFlavourRole (ctEvidence ct)
 
 {- Note [eqCanRewrite]
 ~~~~~~~~~~~~~~~~~~~~~~
-(eqCanRewrite ct1 ct2) holds if the constraint ct1 (a CTyEqCan of form
-tv ~ ty) can be used to rewrite ct2.  It must satisfy the properties of
+(eqCanRewrite ct1 ct2) holds if the constraint ct1 (a CEqCan of form
+lhs ~ ty) can be used to rewrite ct2.  It must satisfy the properties of
 a can-rewrite relation, see Definition [Can-rewrite relation] in
 GHC.Tc.Solver.Monad.
 
@@ -1716,6 +1688,7 @@ eqMayRewriteFR (Wanted WDeriv, NomEq) (Wanted WDeriv, NomEq) = True
 eqMayRewriteFR (Derived,       NomEq) (Wanted WDeriv, NomEq) = True
 eqMayRewriteFR fr1 fr2 = eqCanRewriteFR fr1 fr2
 
+{- "RAE"
 -----------------
 {- Note [funEqCanDischarge]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1750,13 +1723,13 @@ funEqCanDischargeF (Wanted WOnly)  (Wanted WOnly)  = (NotSwapped, False)
 funEqCanDischargeF (Wanted WOnly)  Derived         = (NotSwapped, True)
 funEqCanDischargeF Derived         (Wanted WOnly)  = (IsSwapped,  True)
 funEqCanDischargeF Derived         Derived         = (NotSwapped, False)
-
+-}
 
 {- Note [eqCanDischarge]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have two identical CTyEqCan equality constraints
+Suppose we have two identical CEqCan equality constraints
 (i.e. both LHS and RHS are the same)
-      (x1:a~t) `eqCanDischarge` (xs:a~t)
+      (x1:lhs~t) `eqCanDischarge` (xs:lhs~t)
 Can we just drop x2 in favour of x1?
 
 Answer: yes if eqCanDischarge is true.

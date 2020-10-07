@@ -917,7 +917,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        ; psig_theta_vars <- mapM TcM.newEvVar psig_theta
        ; wanted_transformed_incl_derivs
             <- setTcLevel rhs_tclvl $
-               runTcSWithEvBinds ev_binds_var True $
+               runTcSWithEvBinds ev_binds_var $
                do { let loc         = mkGivenLoc rhs_tclvl UnkSkol $
                                       env_lcl tc_env
                         psig_givens = mkGivens loc psig_theta_vars
@@ -1620,7 +1620,7 @@ simplifyWantedsTcM :: [CtEvidence] -> TcM WantedConstraints
 -- Solve the specified Wanted constraints
 -- Discard the evidence binds
 -- Discards all Derived stuff in result
--- Postcondition: fully zonked and unflattened constraints
+-- Postcondition: fully zonked
 simplifyWantedsTcM wanted
   = do { traceTc "simplifyWantedsTcM {" (ppr wanted)
        ; (result, _) <- runTcS (solveWantedsAndDrop (mkSimpleWC wanted))
@@ -2481,12 +2481,7 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
 
   | otherwise
-  = do { -- First zonk: the inert set (from whence they came) is fully
-         -- zonked, but unflattening may have filled in unification
-         -- variables, and we /must/ see them.  Otherwise we may float
-         -- constraints that mention the skolems!
-         simples <- TcS.zonkSimples simples
-       ; binds   <- TcS.getTcEvBindsMap ev_binds_var
+  = do { binds   <- TcS.getTcEvBindsMap ev_binds_var
 
        -- Now we can pick the ones to float
        -- The constraints are un-flattened and de-canonicalised
@@ -2589,10 +2584,9 @@ happen.  In particular, float out equalities that are:
      of error messages.
 
   NB: generally we won't see (ty ~ alpha), with alpha on the right because
-  of Note [Unification variables on the left] in GHC.Tc.Utils.Unify.
-  But if we start with (F tys ~ alpha), it will orient as (fmv ~ alpha),
-  and unflatten back to (F tys ~ alpha). So we must look for alpha on
-  the right too.  Example T4494.
+  of Note [Unification variables on the left] in GHC.Tc.Utils.Unify,
+  but if we have (F tys ~ alpha) and alpha is untouchable, then it will
+  appear on the right.  Example T4494.
 
 * Nominal.  No point in floating (alpha ~R# ty), because we do not
   unify representational equalities even if alpha is touchable.

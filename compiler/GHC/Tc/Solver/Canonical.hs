@@ -128,13 +128,6 @@ canonicalize (CEqCan { cc_ev     = ev
   = {-# SCC "canEqLeafTyVarEq" #-}
     canEqNC ev eq_rel (canEqLHSType lhs) rhs
 
-canonicalize (CFunEqCan { cc_ev = ev
-                        , cc_fun    = fn
-                        , cc_tyargs = xis1
-                        , cc_fsk    = fsk })
-  = {-# SCC "canEqLeafFunEq" #-}
-    canCFunEqCan ev fn xis1 fsk
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1940,9 +1933,9 @@ Suppose we're in this situation:
 where
   newtype Id a = Id a
 
-We want to make sure canEqTyVar sees [W] a ~R a, after b is flattened
+We want to make sure canEqCanLHS sees [W] a ~R a, after b is flattened
 and the Id newtype is unwrapped. This is assured by requiring only flat
-types in canEqTyVar *and* having the newtype-unwrapping check above
+types in canEqCanLHS *and* having the newtype-unwrapping check above
 the tyvar check in can_eq_nc.
 
 Note [Occurs check error]
@@ -1982,6 +1975,7 @@ though the coercion was homo-kinded, `kind_co` was not `Refl`, so we
 made a new (identical) CFunEqCan, and then the entire process repeated.
 -}
 
+{- "RAE"
 canCFunEqCan :: CtEvidence
              -> TyCon -> [TcType]   -- LHS
              -> TcTyVar             -- RHS
@@ -2032,6 +2026,7 @@ canCFunEqCan ev fn tys fsk
        ; extendFlatCache fn tys' (ctEvCoercion ev', mkTyVarTy fsk', ctEvFlavour ev')
        ; continueWith (CFunEqCan { cc_ev = ev', cc_fun = fn
                                  , cc_tyargs = tys', cc_fsk = fsk' }) }
+-}
 
 ---------------------
 canEqCanLHS :: CtEvidence          -- ev :: lhs ~ rhs
@@ -2288,7 +2283,7 @@ where
   noDerived G = G
   noDerived _ = W
 
-For Wanted/Derived, the [X] constraint is "blocked" (not CTyEqCan, is CIrred)
+For Wanted/Derived, the [X] constraint is "blocked" (not CEqCan, is CIrred)
 until the k1~k2 constraint solved: Wrinkle (2).
 
 Wrinkles:
@@ -2307,7 +2302,7 @@ Wrinkles:
      in GHC.Tc.Types.Constraint. The problem is about poor error messages. See #11198 for
      tales of destruction.
 
-     So, we have an invariant on CTyEqCan (TyEq:H) that the RHS does not have
+     So, we have an invariant on CEqCan (TyEq:H) that the RHS does not have
      any coercion holes. This is checked in metaTyVarUpdateOK. We also
      must be sure to kick out any constraints that mention coercion holes
      when those holes get filled in.
@@ -2328,7 +2323,7 @@ Wrinkles:
      later, we solve co, and fill in co's coercion hole. This kicks out
      the irreducible as described in (2b).
      But now, during canonicalization, we see the cast
-     and remove it, in canEqCast. By the time we get into canEqTyVar, the equality
+     and remove it, in canEqCast. By the time we get into canEqCanLHS, the equality
      is heterogeneous again, and the process repeats.
 
      To avoid this, we don't strip casts off a type if the other type
@@ -2403,7 +2398,7 @@ However, if we encounter an equality constraint with a type synonym
 application on one side and a variable on the other side, we should
 NOT (necessarily) expand the type synonym, since for the purpose of
 good error messages we want to leave type synonyms unexpanded as much
-as possible.  Hence the ps_xi1, ps_xi2 argument passed to canEqTyVar.
+as possible.  Hence the ps_xi1, ps_xi2 argument passed to canEqCanLHS.
 
 -}
 

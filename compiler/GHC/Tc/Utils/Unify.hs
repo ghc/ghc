@@ -1502,7 +1502,7 @@ lhsPriority tv
 
 {- Note [TyVar/TyVar orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Given (a ~ b), should we orient the CTyEqCan as (a~b) or (b~a)?
+Given (a ~ b), should we orient the CEqCan as (a~b) or (b~a)?
 This is a surprisingly tricky question! This is invariant (TyEq:TV).
 
 The question is answered by swapOverTyVars, which is use
@@ -1969,7 +1969,7 @@ metaTyVarUpdateOK :: DynFlags
                   -> MetaTyVarUpdateResult TcType        -- possibly-expanded ty
 -- (metaTyVarUpdateOK tv ty)
 -- Checks that the equality tv~ty is OK to be used to rewrite
--- other equalities.  Equivalently, checks the conditions for CTyEqCan
+-- other equalities.  Equivalently, checks the conditions for CEqCan
 --       (a) that tv doesn't occur in ty (occurs check)
 --       (b) that ty does not have any foralls or (perhaps) type functions
 --       (c) that ty does not have any blocking coercion holes
@@ -2008,7 +2008,7 @@ metaTyVarUpdateOK dflags ty_fam_ok tv ty
                             Nothing          -> MTVU_Occurs
 
 mtvu_check :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
--- Checks the invariants for CTyEqCan.   In particular:
+-- Checks the invariants for CEqCan.   In particular:
 --   (a) a forall type (forall a. blah)
 --   (b) a predicate type (c => ty)
 --   (c) a type family; see Note [Prevent unification with type families]

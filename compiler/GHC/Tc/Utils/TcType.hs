@@ -923,7 +923,17 @@ anyRewritableTyFamApp :: EqRel   -- Ambient role
                       -> TcType -> Bool
   -- always ignores casts & coercions
 anyRewritableTyFamApp role check_tyconapp
-  = any_rewritable True role (\ _ _ -> False) check_tyconapp isFamFreeTyCon
+  = any_rewritable True role (\ _ _ -> False) check_tyconapp (not . isFamFreeTyCon)
+
+-- This version is used by shouldSplitWD. It *does* look in casts
+-- and coercions, and it always expands type synonyms whose RHSs mention
+-- type families.
+anyRewritableCanEqLHS :: EqRel   -- Ambient role
+                      -> (EqRel -> TcTyVar -> Bool)            -- check tyvar
+                      -> (EqRel -> TyCon -> [TcType] -> Bool)  -- check type family
+                      -> TcType -> Bool
+anyRewritableCanEqLHS role check_tyvar check_tyconapp
+  = any_rewritable False role check_tyvar check_tyconapp (not . isFamFreeTyCon)
 
 {- Note [anyRewritableTyVar must be role-aware]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -5,9 +5,7 @@
 module GHC.Tc.Solver.Flatten(
    FlattenMode(..),
    flatten, flattenKind, flattenArgsNom,
-   rewriteTyVar, flattenType,
-
-   unflattenWanteds
+   rewriteTyVar, flattenType
  ) where
 
 #include "HsVersions.h"
@@ -462,7 +460,7 @@ data FlattenEnv
                       -- unbanged because it's bogus in rewriteTyVar
        , fe_flavour :: !CtFlavour
        , fe_eq_rel  :: !EqRel             -- See Note [Flattener EqRels]
-       , fe_work    :: !FlatWorkListRef } -- See Note [The flattening work list]
+       }
 
 data FlattenMode  -- Postcondition for all three: inert wrt the type substitution
   = FM_FlattenAll          -- Postcondition: function-free
@@ -506,10 +504,6 @@ liftTcS :: TcS a -> FlatM a
 liftTcS thing_inside
   = FlatM $ const thing_inside
 
-emitFlatWork :: Ct -> FlatM ()
--- See Note [The flattening work list]
-emitFlatWork ct = FlatM $ \env -> updTcRef (fe_work env) (ct :)
-
 -- convenient wrapper when you have a CtEvidence describing
 -- the flattening operation
 runFlattenCtEv :: FlattenMode -> CtEvidence -> FlatM a -> TcS a
@@ -521,26 +515,12 @@ runFlattenCtEv mode ev
 -- See Note [The flattening work list]
 runFlatten :: FlattenMode -> CtLoc -> CtFlavour -> EqRel -> FlatM a -> TcS a
 runFlatten mode loc flav eq_rel thing_inside
-  = do { flat_ref <- newTcRef []
-       ; let fmode = FE { fe_mode = mode
+  = do { let fmode = FE { fe_mode = mode
                         , fe_loc  = bumpCtLocDepth loc
                             -- See Note [Flatten when discharging CFunEqCan]
                         , fe_flavour = flav
-                        , fe_eq_rel = eq_rel
-                        , fe_work = flat_ref }
-       ; res <- runFlatM thing_inside fmode
-       ; new_flats <- readTcRef flat_ref
-       ; updWorkListTcS (add_flats new_flats)
-       ; return res }
-  where
-    add_flats new_flats wl
-      = wl { wl_funeqs = add_funeqs new_flats (wl_funeqs wl) }
-
-    add_funeqs []     wl = wl
-    add_funeqs (f:fs) wl = add_funeqs fs (f:wl)
-      -- add_funeqs fs ws = reverse fs ++ ws
-      -- e.g. add_funeqs [f1,f2,f3] [w1,w2,w3,w4]
-      --        = [f3,f2,f1,w1,w2,w3,w4]
+                        , fe_eq_rel = eq_rel }
+       ; runFlatM thing_inside fmode }
 
 traceFlat :: String -> SDoc -> FlatM ()
 traceFlat herald doc = liftTcS $ traceTcS herald doc
@@ -728,8 +708,8 @@ is really irrelevant -- it will be ignored when solving for representational
 equality later on. So, we omit flattening `ty` entirely. This may
 violate the expectation of "xi"s for a bit, but the canonicaliser will
 soon throw out the phantoms when decomposing a TyConApp. (Or, the
-canonicaliser will emit an insoluble, in which case the unflattened version
-yields a better error message anyway.)
+canonicaliser will emit an insoluble, in which case we get
+a better error message anyway.)
 
 Note [No derived kind equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -850,6 +830,8 @@ flattenType loc ty
 
 {- Note [Flattening]
 ~~~~~~~~~~~~~~~~~~~~
+"RAE": update
+
   flatten ty  ==>   (xi, co)
     where
       xi has no type functions, unless they appear under ForAlls
@@ -888,7 +870,7 @@ case in flattenTyVar.
 
 Why have these invariants on flattening? Because we sometimes use tcTypeKind
 during canonicalisation, and we want this kind to be zonked (e.g., see
-GHC.Tc.Solver.Canonical.canEqTyVar).
+GHC.Tc.Solver.Canonical.canEqCanLHS).
 
 Flattening is always homogeneous. That is, the kind of the result of flattening is
 always the same as the kind of the input, modulo zonking. More formally:
@@ -911,10 +893,6 @@ Here
   * alpha and beta are 'flattening skolem variables'.
   * All the constraints in cc are 'given', and all their coercion terms
     are the identity.
-
-NB: Flattening Skolems only occur in canonical constraints, which
-are never zonked, so we don't need to worry about zonking doing
-accidental unflattening.
 
 Note that we prefer to leave type synonyms unexpanded when possible,
 so when the flattener encounters one, it first asks whether its
@@ -1407,7 +1385,7 @@ flatten_exact_fam_app_fully tc tys
                       flatten_args_tc tc (repeat Nominal) tys
                       -- kind_co :: tcTypeKind(F xis) ~N tcTypeKind(F tys)
                ; eq_rel   <- getEqRel
-               ; cur_flav <- getFlavour
+               ; cur_fr <- getFlavourRole
                ; let role   = eqRelRole eq_rel
                      ret_co = mkTyConAppCo role tc cos
                       -- ret_co :: F xis ~ F tys; might be heterogeneous
@@ -1415,10 +1393,9 @@ flatten_exact_fam_app_fully tc tys
                 -- Now, look in the cache
                ; mb_ct <- liftTcS $ lookupFlatCache tc xis
                ; case mb_ct of
-                   Just (co, rhs_ty, flav)  -- co :: F xis ~ fsk
-                        -- flav is [G] or [WD]
+                   Just (co, rhs_ty, inert_fr)  -- co :: F xis ~ fsk
                         -- See Note [Type family equations] in GHC.Tc.Solver.Monad
-                     | (NotSwapped, _) <- flav `funEqCanDischargeF` cur_flav
+                     | inert_fr `eqCanRewriteFR` cur_fr
                      ->  -- Usable hit in the flat-cache
                         do { traceFlat "flatten/flat-cache hit" $
                                (ppr tc <+> ppr xis $$ ppr rhs_ty)
@@ -1620,8 +1597,8 @@ flatten_tyvar2 tv fr@(_, eq_rel)
        ; case lookupDVarEnv ieqs tv of
            Just (ct:_)   -- If the first doesn't work,
                          -- the subsequent ones won't either
-             | CTyEqCan { cc_ev = ctev, cc_tyvar = tv
-                        , cc_rhs = rhs_ty, cc_eq_rel = ct_eq_rel } <- ct
+             | CEqCan { cc_ev = ctev, cc_lhs = TyVarCEL tv
+                      , cc_rhs = rhs_ty, cc_eq_rel = ct_eq_rel } <- ct
              , let ct_fr = (ctEvFlavour ctev, ct_eq_rel)
              , ct_fr `eqCanRewriteFR` fr  -- This is THE key call of eqCanRewriteFR
              -> do { traceFlat "Following inert tyvar"
@@ -1729,6 +1706,7 @@ flattens to
 We must solve both!
 -}
 
+{- "RAE"
 unflattenWanteds :: Cts -> Cts -> TcS Cts
 unflattenWanteds tv_eqs funeqs
  = do { tclvl    <- getTcLevel
@@ -1929,3 +1907,5 @@ ty_con_binders_ty_binders' = foldr go ([], False)
       = (Anon af (unrestricted (tyVarKind tv))   : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}
+
+-}

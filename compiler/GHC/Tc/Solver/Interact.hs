@@ -179,48 +179,38 @@ solveSimpleWanteds simples
 
      | otherwise
      = do { -- Solve
-            (unif_count, wc1) <- solve_simple_wanteds wc
+            wc1 <- solve_simple_wanteds wc
 
             -- Run plugins
           ; (rerun_plugin, wc2) <- runTcPluginsWanted wc1
              -- See Note [Running plugins on unflattened wanteds]
 
-          ; if unif_count == 0 && not rerun_plugin
-            then return (n, wc2)             -- Done
-            else do { traceTcS "solveSimple going round again:" $
+          ; if rerun_plugin
+            then do { traceTcS "solveSimple going round again:" $
                       ppr unif_count $$ ppr rerun_plugin
-                    ; go (n+1) limit wc2 } }      -- Loop
+                    ; go (n+1) limit wc2 }   -- Loop
+            else return (n, wc2) }           -- Done
 
 
-solve_simple_wanteds :: WantedConstraints -> TcS (Int, WantedConstraints)
+solve_simple_wanteds :: WantedConstraints -> TcS WantedConstraints
 -- Try solving these constraints
 -- Affects the unification state (of course) but not the inert set
 -- The result is not necessarily zonked
 solve_simple_wanteds (WC { wc_simple = simples1, wc_impl = implics1, wc_holes = holes })
   = nestTcS $
     do { solveSimples simples1
-       ; (implics2, tv_eqs, fun_eqs, others) <- getUnsolvedInerts
-       ; (unif_count, unflattened_eqs) <- reportUnifications $
-                                          unflattenWanteds tv_eqs fun_eqs
-            -- See Note [Unflatten after solving the simple wanteds]
-       ; return ( unif_count
-                , WC { wc_simple = others `andCts` unflattened_eqs
-                     , wc_impl   = implics1 `unionBags` implics2
-                     , wc_holes  = holes }) }
+       ; (implics2, unsolved) <- getUnsolvedInerts
+       ; return (WC { wc_simple = unsolved
+                    , wc_impl   = implics1 `unionBags` implics2
+                    , wc_holes  = holes }) }
 
 {- Note [The solveSimpleWanteds loop]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Solving a bunch of simple constraints is done in a loop,
 (the 'go' loop of 'solveSimpleWanteds'):
-  1. Try to solve them; unflattening may lead to improvement that
-     was not exploitable during solving
+  1. Try to solve them
   2. Try the plugin
-  3. If step 1 did improvement during unflattening; or if the plugin
-     wants to run again, go back to step 1
-
-Non-obviously, improvement can also take place during
-the unflattening that takes place in step (1). See GHC.Tc.Solver.Flatten,
-See Note [Unflattening can force the solver to iterate]
+  3. If the plugin wants to run again, go back to step 1
 -}
 
 -- The main solver loop implements Note [Basic Simplifier Plan]
@@ -483,8 +473,9 @@ or, equivalently,
 -- Interaction result of  WorkItem <~> Ct
 
 interactWithInertsStage :: WorkItem -> TcS (StopOrContinue Ct)
--- Precondition: if the workitem is a CTyEqCan then it will not be able to
--- react with anything at this stage.
+-- Precondition: if the workitem is a CEqCan then it will not be able to
+-- react with anything at this stage (except, maybe, via a type family
+-- dependency)
 
 interactWithInertsStage wi
   = do { inerts <- getTcSInerts
@@ -492,7 +483,6 @@ interactWithInertsStage wi
        ; let ics = inert_cans inerts
        ; case wi of
              CEqCan    {} -> interactEq lvl  ics wi
-             CFunEqCan {} -> interactFunEq   ics wi
              CIrredCan {} -> interactIrred   ics wi
              CDictCan  {} -> interactDict    ics wi
              _ -> pprPanic "interactWithInerts" (ppr wi) }
@@ -1298,6 +1288,7 @@ I can think of two ways to fix this:
 **********************************************************************
 -}
 
+{- "RAE"
 interactFunEq :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 -- Try interacting the work item with the inert set
 interactFunEq inerts work_item@(CFunEqCan { cc_ev = ev, cc_fun = tc
@@ -1339,6 +1330,7 @@ upgradeWanted ct = ct { cc_ev = upgrade_ev (cc_ev ct) }
   where
     upgrade_ev ev = ASSERT2( isWanted ev, ppr ct )
                     ev { ctev_nosh = WDeriv }
+-}
 
 improveLocalFunEqs :: CtEvidence -> InertCans -> TyCon -> [TcType] -> TcType
                    -> TcS ()
@@ -1414,6 +1406,7 @@ improveLocalFunEqs work_ev inerts fam_tc args rhs
         loc = inert_loc { ctl_depth = ctl_depth inert_loc `maxSubGoalDepth`
                                       ctl_depth work_loc }
 
+{- "RAE"
 -------------
 reactFunEq :: CtEvidence -> TcTyVar    -- From this  :: F args1 ~ fsk1
            -> CtEvidence -> TcTyVar    -- Solve this :: F args2 ~ fsk2
@@ -1424,6 +1417,7 @@ reactFunEq from_this fsk1 solve_this fsk2
        ; dischargeFunEq solve_this fsk2 (ctEvCoercion from_this) (mkTyVarTy fsk1)
        ; traceTcS "reactFunEq done" (ppr from_this $$ ppr fsk1 $$
                                      ppr solve_this $$ ppr fsk2) }
+-}
 
 {- Note [Type inference for type families with injectivity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1570,8 +1564,8 @@ inertsCanDischarge inerts lhs rhs fr
     Just (ev_i, NotSwapped, keep_deriv ev_i)
 
   | Just rhs_lhs <- canEqLHS_maybe rhs
-  , (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i
-                                    , cc_eq_rel = eq_rel }
+  , (ev_i : _) <- [ ev_i | CEqCan { cc_ev = ev_i, cc_rhs = rhs_i
+                                  , cc_eq_rel = eq_rel }
                              <- findEq inerts rhs_lhs
                          , (ctEvFlavour ev_i, eq_rel) `eqCanDischargeFR` fr
                          , rhs_i `tcEqType` canEqLHSType lhs ]
@@ -1646,7 +1640,7 @@ solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
 --        workItem = the new Given constraint
 --
 -- NB: No need for an occurs check here, because solveByUnification always
---     arises from a CTyEqCan, a *canonical* constraint.  Its invariant (TyEq:OC)
+--     arises from a CEqCan, a *canonical* constraint.  Its invariant (TyEq:OC)
 --     says that in (a ~ xi), the type variable a does not appear in xi.
 --     See GHC.Tc.Types.Constraint.Ct invariants.
 --
@@ -1695,7 +1689,7 @@ where
 and we want to get alpha := N b.
 
 See also #15144, which was caused by unifying a representational
-equality (in the unflattener).
+equality.
 
 
 ************************************************************************
@@ -1823,9 +1817,8 @@ topReactionsStage work_item
        ; case work_item of
            CDictCan {}  -> do { inerts <- getTcSInerts
                               ; doTopReactDict inerts work_item }
-           CFunEqCan {} -> doTopReactFunEq work_item
+           CEqCan {}    -> doTopReactEq    work_item
            CIrredCan {} -> doTopReactOther work_item
-           CTyEqCan {}  -> doTopReactOther work_item
            _  -> -- Any other work item does not react with any top-level equations
                  continueWith work_item  }
 
@@ -1833,7 +1826,7 @@ topReactionsStage work_item
 --------------------
 doTopReactOther :: Ct -> TcS (StopOrContinue Ct)
 -- Try local quantified constraints for
---     CTyEqCan  e.g.  (a ~# ty)
+--     CEqCan    e.g.  (lhs ~# ty)
 -- and CIrredCan e.g.  (c a)
 --
 -- Why equalities? See GHC.Tc.Solver.Canonical
@@ -1957,7 +1950,6 @@ doTopReactEq work_item@(CEqCan { cc_ev = old_ev, cc_lhs = TyFamCEL fam_tc args
        ; doTopReactOther work_item }
 doTopReactEq other_work_item = doTopReactOther work_item
 
-doTopReactFunEq w = pprPanic "doTopReactFunEq" (ppr w)
 {- "RAE"
 reduce_top_fun_eq :: CtEvidence -> TcTyVar -> (TcCoercion, TcType)
                   -> TcS (StopOrContinue Ct)
