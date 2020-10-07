@@ -26,12 +26,13 @@ module GHC.Data.ShortText (
 
 import Prelude
 
+import Control.Monad (guard)
 import Control.DeepSeq as DeepSeq
 import Data.Binary
 import qualified Data.ByteString.Char8 as B8
-import qualified Data.ByteString.Short as SBS
+import qualified Data.ByteString.Short.Internal as SBS
 import GHC.Exts
-import GHC.IO.Unsafe
+import GHC.IO
 import GHC.Utils.Encoding
 import System.FilePath (isPathSeparator)
 
@@ -89,6 +90,23 @@ head st
 -- | /O(n)/ The 'stripPrefix' function takes two 'ShortText's and returns 'Just' the remainder of
 -- the second iff the first is its prefix, and otherwise Nothing.
 stripPrefix :: ShortText -> ShortText -> Maybe ShortText
-stripPrefix prefix st = case B8.stripPrefix (SBS.fromShort $ contents prefix) (SBS.fromShort $ contents st) of
-  Nothing -> Nothing
-  Just rest -> Just $ ShortText $ SBS.toShort rest
+stripPrefix prefix st = do
+  let !(SBS.SBS prefixBA) = contents prefix
+  let !(SBS.SBS stBA)     = contents st
+  let prefixLength        = sizeofByteArray# prefixBA
+  let stLength            = sizeofByteArray# stBA
+  -- If the length of 'st' is not >= than the length of 'prefix', it is impossible for 'prefix'
+  -- to be the prefix of `st`.
+  guard $ (I# stLength) >= (I# prefixLength)
+  -- 'prefix' is a prefix of 'st' if the first <length of prefix> bytes of 'st'
+  -- are equal to 'prefix'
+  guard $ I# (compareByteArrays# prefixBA 0# stBA 0# prefixLength) == 0
+  -- Allocate a new ByteArray# and copy the remainder of the 'st' into it
+  unsafeDupablePerformIO $ do
+    let newBAsize = (stLength -# prefixLength)
+    newSBS <- IO $ \s0 ->
+      let !(# s1, ba #)  = newByteArray# newBAsize s0
+          s2             = copyByteArray# stBA prefixLength ba 0# newBAsize s1
+          !(# s3, fba #) = unsafeFreezeByteArray# ba s2
+      in  (# s3, SBS.SBS fba #)
+    return . Just . ShortText $ newSBS
