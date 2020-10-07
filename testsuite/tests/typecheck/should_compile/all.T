@@ -724,4 +724,4 @@ test('T18323', normal, compile, [''])
 test('T18585', normal, compile, [''])
 test('T18831', normal, compile, [''])
 test('T15942', normal, compile, [''])
-
+test('T12178', [], makefile_test, [])
