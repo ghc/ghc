@@ -101,6 +101,10 @@ import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import GHC.Serialized
 
+#if __GLASGOW_HASKELL__ >= 811
+import GHC.Exts (Levity(..))
+#endif
+
 type BinArray = ForeignPtr Word8
 
 
@@ -895,8 +899,13 @@ instance Binary RuntimeRep where
     put_ bh (VecRep a b)    = putByte bh 0 >> put_ bh a >> put_ bh b
     put_ bh (TupleRep reps) = putByte bh 1 >> put_ bh reps
     put_ bh (SumRep reps)   = putByte bh 2 >> put_ bh reps
+#if __GLASGOW_HASKELL__ >= 811
+    put_ bh (BoxedRep Lifted)   = putByte bh 3
+    put_ bh (BoxedRep Unlifted) = putByte bh 4
+#else
     put_ bh LiftedRep       = putByte bh 3
     put_ bh UnliftedRep     = putByte bh 4
+#endif
     put_ bh IntRep          = putByte bh 5
     put_ bh WordRep         = putByte bh 6
     put_ bh Int64Rep        = putByte bh 7
@@ -919,8 +928,13 @@ instance Binary RuntimeRep where
           0  -> VecRep <$> get bh <*> get bh
           1  -> TupleRep <$> get bh
           2  -> SumRep <$> get bh
+#if __GLASGOW_HASKELL__ >= 811
+          3  -> pure (BoxedRep Lifted)
+          4  -> pure (BoxedRep Unlifted)
+#else
           3  -> pure LiftedRep
           4  -> pure UnliftedRep
+#endif
           5  -> pure IntRep
           6  -> pure WordRep
           7  -> pure Int64Rep

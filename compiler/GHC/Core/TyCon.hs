@@ -142,7 +142,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.Rep
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
 import {-# SOURCE #-} GHC.Builtin.Types
-   ( runtimeRepTyCon, constraintKind
+   ( runtimeRepTyCon, constraintKind, levityTyCon
    , multiplicityTyCon
    , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} GHC.Core.DataCon
@@ -1071,6 +1071,8 @@ data RuntimeRepInfo
       -- be the list of arguments to the promoted datacon.
   | VecCount Int         -- ^ A constructor of @VecCount@
   | VecElem PrimElemRep  -- ^ A constructor of @VecElem@
+  | LiftedInfo
+  | UnliftedInfo
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in
@@ -2221,8 +2223,8 @@ isKindTyCon tc = getUnique tc `elementOfUniqSet` kindTyConKeys
 -- -XDataKinds.
 kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
-  ( mkUniqSet [ liftedTypeKindTyConKey, constraintKindTyConKey, tYPETyConKey ]
-  : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
+  ( mkUniqSet [ liftedTypeKindTyConKey, liftedRepTyConKey, constraintKindTyConKey, tYPETyConKey ]
+  : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon, levityTyCon
                                           , multiplicityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where
