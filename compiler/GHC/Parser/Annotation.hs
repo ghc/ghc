@@ -318,6 +318,7 @@ data AnnKeywordId
     | AnnDollarDollar    -- ^ prefix '$$'  -- TemplateHaskell
     | AnnPackageName
     | AnnPattern
+    | AnnPercent -- ^ '%' -- for HsExplicitMult
     | AnnProc
     | AnnQualified
     | AnnRarrow -- ^ '->'
