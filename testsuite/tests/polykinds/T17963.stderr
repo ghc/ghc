@@ -1,6 +1,6 @@
 
 T17963.hs:15:23: error:
-    • Couldn't match kind ‘rep’ with ‘'LiftedRep’
+    • Couldn't match kind ‘rep’ with ‘GHC.Types.LiftedRep’
       When matching kinds
         k0 :: *
         ob :: TYPE rep

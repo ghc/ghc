@@ -145,5 +145,6 @@ test('UnliftedNewtypesFamilyRun', normal, compile_and_run, [''])
 test('UnliftedNewtypesDependentFamilyRun', normal, compile_and_run, [''])
 test('UnliftedNewtypesIdentityRun', normal, compile_and_run, [''])
 test('UnliftedNewtypesCoerceRun', normal, compile_and_run, [''])
+test('LevPolyResultInst', normal, compile_and_run, [''])
 test('T17104', normal, compile_and_run, [''])
 test('T18627', normal, compile_and_run, ['-O'])  # Optimisation shows up the bug

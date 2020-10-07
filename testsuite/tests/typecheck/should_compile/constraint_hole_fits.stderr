@@ -36,12 +36,12 @@ constraint_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           where const :: forall a b. a -> b -> a
         ($) (_ :: [a] -> a)
           where ($) :: forall a b. (a -> b) -> a -> b
-        ($!) (_ :: [a] -> a)
-          where ($!) :: forall a b. (a -> b) -> a -> b
         return (_ :: a)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: a)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+        ($!) (_ :: [a] -> a)
+          where ($!) :: forall a b. (a -> b) -> a -> b
         id (_ :: [a] -> a)
           where id :: forall a. a -> a
         head (_ :: [[a] -> a])
