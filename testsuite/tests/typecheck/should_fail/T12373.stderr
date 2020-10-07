@@ -3,7 +3,7 @@ T12373.hs:10:19: error:
     • Couldn't match a lifted type with an unlifted type
       When matching types
         a0 :: *
-        MVar# RealWorld a1 :: TYPE 'UnliftedRep
+        MVar# RealWorld a1 :: TYPE ('BoxedRep 'Unlifted)
       Expected: (# State# RealWorld, a0 #)
         Actual: (# State# RealWorld, MVar# RealWorld a1 #)
     • In the expression: newMVar# rw

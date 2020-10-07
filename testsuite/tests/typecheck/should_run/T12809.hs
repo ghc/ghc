@@ -32,7 +32,7 @@ g (# b, x #) = show b ++ " " ++ show (I# x)
 h :: (# Double, Int# #) -> String
 h (# d, x #) = show d ++ " " ++ show (I# x)
 
-cond :: forall (a :: TYPE (TupleRep [LiftedRep, IntRep])). Bool -> a -> a -> a
+cond :: forall (a :: TYPE (TupleRep [BoxedRep Lifted, IntRep])). Bool -> a -> a -> a
 cond True x _ = x
 cond False _ x = x
 

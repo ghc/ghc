@@ -38,7 +38,8 @@ type (#,#) :: *
               -> *
               -> TYPE
                    ('GHC.Types.TupleRep
-                      '[ 'GHC.Types.LiftedRep, 'GHC.Types.LiftedRep])
+                      '[ 'GHC.Types.BoxedRep 'GHC.Types.Lifted,
+                         'GHC.Types.BoxedRep 'GHC.Types.Lifted])
 data (#,#) a b = (#,#) a b
   	-- Defined in ‘GHC.Prim’
 (,) :: a -> b -> (a, b)

@@ -1782,7 +1782,9 @@ headline_eq_msg :: Bool -> Ct -> Type -> Type -> SDoc
 headline_eq_msg add_ea ct ty1 ty2
 
   | (isLiftedRuntimeRep ty1 && isUnliftedRuntimeRep ty2) ||
-    (isLiftedRuntimeRep ty2 && isUnliftedRuntimeRep ty1)
+    (isLiftedRuntimeRep ty2 && isUnliftedRuntimeRep ty1) ||
+    (isLiftedLevity ty1 && isUnliftedLevity ty2) ||
+    (isLiftedLevity ty2 && isUnliftedLevity ty1)
   = text "Couldn't match a lifted type with an unlifted type"
 
   | isAtomicTy ty1 || isAtomicTy ty2

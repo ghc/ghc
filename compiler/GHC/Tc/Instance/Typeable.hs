@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
 
@@ -28,7 +29,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( primTyCons )
 import GHC.Builtin.Types
                   ( tupleTyCon, sumTyCon, runtimeRepTyCon
-                  , vecCountTyCon, vecElemTyCon
+                  , levityTyCon, vecCountTyCon, vecElemTyCon
                   , nilDataCon, consDataCon )
 import GHC.Types.Name
 import GHC.Types.Id
@@ -175,7 +176,7 @@ mkTypeableBinds
        } } }
   where
     needs_typeable_binds tc
-      | tc `elem` [runtimeRepTyCon, vecCountTyCon, vecElemTyCon]
+      | tc `elem` [runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon]
       = False
       | otherwise =
           isAlgTyCon tc
@@ -351,7 +352,7 @@ mkPrimTypeableTodos
 -- Note [Built-in syntax and the OrigNameCache] in "GHC.Iface.Env" for more.
 ghcPrimTypeableTyCons :: [TyCon]
 ghcPrimTypeableTyCons = concat
-    [ [ runtimeRepTyCon, vecCountTyCon, vecElemTyCon ]
+    [ [ runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon ]
     , map (tupleTyCon Unboxed) [0..mAX_TUPLE_SIZE]
     , map sumTyCon [2..mAX_SUM_SIZE]
     , primTyCons
@@ -555,9 +556,9 @@ mkKindRepRhs :: TypeableStuff
              -> CmEnv       -- ^ in-scope kind variables
              -> Kind        -- ^ the kind we want a 'KindRep' for
              -> KindRepM (LHsExpr GhcTc) -- ^ RHS expression
-mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
+mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
   where
-    new_kind_rep k
+    new_kind_rep_shortcut k
         -- We handle (TYPE LiftedRep) etc separately to make it
         -- clear to consumers (e.g. serializers) that there is
         -- a loop here (as TYPE :: RuntimeRep -> TYPE 'LiftedRep)
@@ -565,9 +566,19 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
               -- Typeable respects the Constraint/Type distinction
               -- so do not follow the special case here
       , Just arg <- kindRep_maybe k
-      , Just (tc, []) <- splitTyConApp_maybe arg
-      , Just dc <- isPromotedDataCon_maybe tc
-      = return $ nlHsDataCon kindRepTYPEDataCon `nlHsApp` nlHsDataCon dc
+      = if
+          | Just (tc, []) <- splitTyConApp_maybe arg
+          , Just dc <- isPromotedDataCon_maybe tc
+            -> return $ nlHsDataCon kindRepTYPEDataCon `nlHsApp` nlHsDataCon dc
+          | Just (rep,[levArg]) <- splitTyConApp_maybe arg
+          , Just dcRep <- isPromotedDataCon_maybe rep
+          , Just (lev, []) <- splitTyConApp_maybe levArg
+          , Just dcLev <- isPromotedDataCon_maybe lev
+            -> return $ nlHsDataCon kindRepTYPEDataCon `nlHsApp` (nlHsDataCon dcRep `nlHsApp` nlHsDataCon dcLev)
+          | otherwise
+            -> new_kind_rep k
+      | otherwise = new_kind_rep k
+
 
     new_kind_rep (TyVarTy v)
       | Just idx <- lookupCME in_scope v

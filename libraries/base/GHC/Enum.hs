@@ -1005,6 +1005,11 @@ enumNegDeltaToNatural x0 ndelta lim = go x0
 
 -- Instances from GHC.Types
 
+-- | @since 4.15.0.0
+deriving instance Bounded Levity
+-- | @since 4.15.0.0
+deriving instance Enum Levity
+
 -- | @since 4.10.0.0
 deriving instance Bounded VecCount
 -- | @since 4.10.0.0
