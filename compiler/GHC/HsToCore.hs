@@ -120,7 +120,7 @@ deSugar hsc_env
                             })
 
   = do { let dflags = hsc_dflags hsc_env
-             home_unit = mkHomeUnitFromFlags dflags
+             home_unit = hsc_home_unit hsc_env
              print_unqual = mkPrintUnqualified
                               (unitState dflags)
                               home_unit
@@ -183,7 +183,7 @@ deSugar hsc_env
 
         ; let used_names = mkUsedNames tcg_env
               pluginModules = map lpModule (cachedPlugins (hsc_dflags hsc_env))
-              home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+              home_unit = hsc_home_unit hsc_env
         ; deps <- mkDependencies (homeUnitId home_unit)
                                  (map mi_module pluginModules) tcg_env
 

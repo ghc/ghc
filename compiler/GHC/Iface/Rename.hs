@@ -300,7 +300,7 @@ rnIfaceGlobal :: Name -> ShIfM Name
 rnIfaceGlobal n = do
     hsc_env <- getTopEnv
     let dflags = hsc_dflags hsc_env
-        home_unit = mkHomeUnitFromFlags dflags
+        home_unit = hsc_home_unit hsc_env
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
     mb_nsubst <- fmap sh_if_shape getGblEnv
     hmap <- getHoleSubst

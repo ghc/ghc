@@ -78,6 +78,8 @@ import GHC.HsToCore.Types
 import GHC.HsToCore.Pmc.Solver.Types (Nablas, initNablas)
 import GHC.Types.Id
 import GHC.Unit.Module
+import GHC.Unit.Home
+import GHC.Unit.State
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Core.Type
@@ -213,6 +215,8 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
   = do { cc_st_var   <- liftIO $ newIORef newCostCentreState
        ; eps <- liftIO $ hscEPS hsc_env
        ; let dflags   = hsc_dflags hsc_env
+             home_unit = hsc_home_unit hsc_env
+             unit_state = unitState dflags
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
              rdr_env  = tcg_rdr_env tcg_env
@@ -220,7 +224,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              complete_matches = hptCompleteSigs hsc_env         -- from the home package
                                 ++ tcg_complete_matches tcg_env -- from the current module
                                 ++ eps_complete_matches eps     -- from imports
-       ; return $ mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
+       ; return $ mkDsEnvs unit_state home_unit this_mod rdr_env type_env fam_inst_env
                            msg_var cc_st_var complete_matches
        }
 
@@ -244,6 +248,8 @@ initDsWithModGuts hsc_env guts thing_inside
        ; msg_var <- newIORef emptyMessages
        ; eps <- liftIO $ hscEPS hsc_env
        ; let dflags   = hsc_dflags hsc_env
+             home_unit = hsc_home_unit hsc_env
+             unit_state = unitState dflags
              type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
              rdr_env  = mg_rdr_env guts
              fam_inst_env = mg_fam_inst_env guts
@@ -256,7 +262,7 @@ initDsWithModGuts hsc_env guts thing_inside
              bindsToIds (Rec    binds) = map fst binds
              ids = concatMap bindsToIds (mg_binds guts)
 
-             envs  = mkDsEnvs dflags this_mod rdr_env type_env
+             envs  = mkDsEnvs unit_state home_unit this_mod rdr_env type_env
                               fam_inst_env msg_var cc_st_var
                               complete_matches
        ; runDs hsc_env envs thing_inside
@@ -285,10 +291,10 @@ initTcDsForSolver thing_inside
          updGblEnv (\tc_gbl -> tc_gbl { tcg_fam_inst_env = fam_inst_env }) $
          thing_inside }
 
-mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
+mkDsEnvs :: UnitState -> HomeUnit -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> IORef Messages -> IORef CostCentreState -> CompleteMatches
          -> (DsGblEnv, DsLclEnv)
-mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
+mkDsEnvs unit_state home_unit mod rdr_env type_env fam_inst_env msg_var cc_st_var
          complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
                              if_rec_types = Just (mod, return type_env) }
@@ -298,10 +304,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
                            , ds_if_env  = (if_genv, if_lenv)
-                           , ds_unqual  = mkPrintUnqualified
-                                             (unitState dflags)
-                                             (mkHomeUnitFromFlags dflags)
-                                             rdr_env
+                           , ds_unqual  = mkPrintUnqualified unit_state home_unit rdr_env
                            , ds_msgs    = msg_var
                            , ds_complete_matches = complete_matches
                            , ds_cc_st   = cc_st_var

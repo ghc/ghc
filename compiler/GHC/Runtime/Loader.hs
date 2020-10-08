@@ -161,7 +161,7 @@ forceLoadTyCon :: HscEnv -> Name -> IO TyCon
 forceLoadTyCon hsc_env con_name = do
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of loadTyConTy") con_name
 
-    mb_con_thing <- lookupTypeHscEnv hsc_env con_name
+    mb_con_thing <- lookupType hsc_env con_name
     case mb_con_thing of
         Nothing -> throwCmdLineErrorS dflags $ missingTyThingError con_name
         Just (ATyCon tycon) -> return tycon
@@ -193,7 +193,7 @@ getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
 getHValueSafely hsc_env val_name expected_type = do
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment
-    mb_val_thing <- lookupTypeHscEnv hsc_env val_name
+    mb_val_thing <- lookupType hsc_env val_name
     case mb_val_thing of
         Nothing -> throwCmdLineErrorS dflags $ missingTyThingError val_name
         Just (AnId id) -> do

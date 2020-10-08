@@ -288,7 +288,7 @@ buildUnit session cid insts lunit = do
     conf <- withBkpSession cid insts deps_w_rns session $ do
 
         dflags <- getDynFlags
-        mod_graph <- hsunitModuleGraph dflags (unLoc lunit)
+        mod_graph <- hsunitModuleGraph (unLoc lunit)
 
         msg <- mkBackpackMsg
         ok <- load' LoadAllTargets (Just msg) mod_graph
@@ -312,7 +312,7 @@ buildUnit session cid insts lunit = do
 
         let compat_fs = unitIdFS (indefUnit cid)
             compat_pn = PackageName compat_fs
-            unit_id   = homeUnitId (mkHomeUnitFromFlags (hsc_dflags hsc_env))
+            unit_id   = homeUnitId (hsc_home_unit hsc_env)
 
         return GenericUnitInfo {
             -- Stub data
@@ -378,8 +378,7 @@ compileExe lunit = do
     forM_ (zip [1..] deps) $ \(i, dep) ->
         compileInclude (length deps) (i, dep)
     withBkpExeSession deps_w_rns $ do
-        dflags <- getDynFlags
-        mod_graph <- hsunitModuleGraph dflags (unLoc lunit)
+        mod_graph <- hsunitModuleGraph (unLoc lunit)
         msg <- mkBackpackMsg
         ok <- load' LoadAllTargets (Just msg) mod_graph
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
@@ -645,11 +644,12 @@ convertHsModuleId (HsModuleId (L _ hsuid) (L _ modname)) = mkModule (convertHsCo
 --
 -- We don't bother trying to support GHC.Driver.Make for now, it's more trouble
 -- than it's worth for inline modules.
-hsunitModuleGraph :: DynFlags -> HsUnit HsComponentId -> BkpM ModuleGraph
-hsunitModuleGraph dflags unit = do
+hsunitModuleGraph :: HsUnit HsComponentId -> BkpM ModuleGraph
+hsunitModuleGraph unit = do
+    hsc_env <- getSession
     let decls = hsunitBody unit
         pn = hsPackageName (unLoc (hsunitName unit))
-        home_unit = mkHomeUnitFromFlags dflags
+        home_unit = hsc_home_unit hsc_env
 
     --  1. Create a HsSrcFile/HsigFile summary for every
     --  explicitly mentioned module/signature.

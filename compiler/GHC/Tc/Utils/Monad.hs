@@ -242,7 +242,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         th_remote_state_var  <- newIORef Nothing ;
         let {
              dflags = hsc_dflags hsc_env ;
-             home_unit = mkHomeUnitFromFlags dflags ;
+             home_unit = hsc_home_unit hsc_env ;
 
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
@@ -774,8 +774,9 @@ wrapDocLoc doc = do
 getPrintUnqualified :: DynFlags -> TcRn PrintUnqualified
 getPrintUnqualified dflags
   = do { rdr_env <- getGlobalRdrEnv
+       ; hsc_env <- getTopEnv
        ; let unit_state = unitState dflags
-       ; let home_unit  = mkHomeUnitFromFlags dflags
+       ; let home_unit  = hsc_home_unit hsc_env
        ; return $ mkPrintUnqualified unit_state home_unit rdr_env }
 
 -- | Like logInfoTcRn, but for user consumption
@@ -1967,9 +1968,9 @@ mkIfLclEnv mod loc boot
 initIfaceTcRn :: IfG a -> TcRn a
 initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv
-        ; dflags <- getDynFlags
+        ; hsc_env <- getTopEnv
         ; let !mod = tcg_semantic_mod tcg_env
-              home_unit = mkHomeUnitFromFlags dflags
+              home_unit = hsc_home_unit hsc_env
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
               is_instantiate = isHomeUnitInstantiating home_unit
