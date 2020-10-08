@@ -7,13 +7,14 @@
 -- The parser for C-- requires access to a lot more of the 'DynFlags',
 -- so 'PD' provides access to 'DynFlags' via a 'HasDynFlags' instance.
 -----------------------------------------------------------------------------
-module GHC.Cmm.Monad (
+module GHC.Cmm.Parser.Monad (
     PD(..)
   , liftP
   , failMsgPD
   , getProfile
   , getPlatform
   , getPtrOpts
+  , getHomeUnitId
   ) where
 
 import GHC.Prelude
@@ -28,6 +29,8 @@ import GHC.Driver.Session
 import GHC.Parser.Lexer
 import GHC.Parser.Errors
 import GHC.Types.SrcLoc
+import GHC.Unit.Types
+import GHC.Unit.Home
 
 newtype PD a = PD { unPD :: DynFlags -> PState -> ParseResult a }
 
@@ -73,3 +76,9 @@ getPtrOpts = do
       { po_profile     = profile
       , po_align_check = gopt Opt_AlignmentSanitisation dflags
       }
+
+-- | Return the UnitId of the home-unit. This is used to create labels.
+getHomeUnitId :: PD UnitId
+getHomeUnitId = do
+   dflags <- getDynFlags
+   pure (homeUnitId (mkHomeUnitFromFlags dflags))
