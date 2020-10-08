@@ -339,6 +339,7 @@ splitConCprTy dc (CprType 0 (Cpr _ _ l))
   = Just (replicate (dataConRepArity dc) botCpr)
   | Levitate (Con t fields) <- l
   , dataConTag dc == t
+  , length fields == dataConRepArity dc -- See Note [CPR types and unsafeCoerce]
   = Just fields
 splitConCprTy _  _
   = Nothing
@@ -364,6 +365,23 @@ ensureCprTyArity n ty@(CprType m _)
 
 trimCprTy :: CprType -> CprType
 trimCprTy (CprType arty cpr) = CprType arty (trimCpr cpr)
+
+{- Note [CPR types and unsafeCoerce]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unsafe coercions may lead to looking into a CPR type analysed for a different
+type than the type of the expression a case scrutinises. Example (like T16893):
+
+  data T = T Int
+  data U = U Int Int
+  ... (case unsafeCoerce (U 1 2 :: U) of
+        T i -> ...) ...
+
+Although we can only derive bogus in these situations, we shouldn't try to
+unpack the 2 field CPR type from the scrutinee into a 1 field type matching
+the pattern. That led to a deliberate panic when calling @zipEqual@ in
+'CprAnal.extendEnvForDataAlt'. Nothing bad was happening, just a precautionary
+panic on T16893.
+-}
 
 zonkOptimisticCprTy :: Int -> CprType -> CprType
 zonkOptimisticCprTy max_depth _ty@(CprType arty cpr)
