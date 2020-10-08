@@ -256,7 +256,7 @@ checkVersions hsc_env mod_summary iface
        ; return (recomp, Just iface)
     }}}}}}}}}}
   where
-    home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+    home_unit = hsc_home_unit hsc_env
     -- This is a bit of a hack really
     mod_deps :: ModuleNameEnv ModuleNameWithIsBoot
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
@@ -335,8 +335,8 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
 -- implementing module has changed.
 checkHsig :: ModSummary -> ModIface -> IfG RecompileRequired
 checkHsig mod_summary iface = do
-    dflags <- getDynFlags
-    let home_unit = mkHomeUnitFromFlags dflags
+    hsc_env <- getTopEnv
+    let home_unit = hsc_home_unit hsc_env
         outer_mod = ms_mod mod_summary
         inner_mod = homeModuleNameInstantiation home_unit (moduleName outer_mod)
     MASSERT( isHomeModule home_unit outer_mod )
@@ -453,7 +453,7 @@ checkDependencies hsc_env summary iface
    prev_dep_mods = dep_mods (mi_deps iface)
    prev_dep_plgn = dep_plgins (mi_deps iface)
    prev_dep_pkgs = dep_pkgs (mi_deps iface)
-   home_unit     = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+   home_unit     = hsc_home_unit hsc_env
 
    dep_missing (mb_pkg, L _ mod) = do
      find_res <- liftIO $ findImportedModule hsc_env mod (mb_pkg)
@@ -486,7 +486,6 @@ checkDependencies hsc_env summary iface
    isOldHomeDeps = flip Set.member old_deps
    checkForNewHomeDependency (L _ mname) = do
      let
-       home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
        mod = mkHomeModule home_unit mname
        str_mname = moduleNameString mname
        reason = str_mname ++ " changed"
@@ -1359,8 +1358,7 @@ mkHashFun hsc_env eps name
   | otherwise
   = lookup orig_mod
   where
-      dflags = hsc_dflags hsc_env
-      home_unit = mkHomeUnitFromFlags dflags
+      home_unit = hsc_home_unit hsc_env
       hpt = hsc_HPT hsc_env
       pit = eps_PIT eps
       occ = nameOccName name

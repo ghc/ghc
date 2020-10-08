@@ -1669,7 +1669,7 @@ tcIfaceGlobal name
   where
     via_external =  do
         { hsc_env <- getTopEnv
-        ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
+        ; mb_thing <- liftIO (lookupType hsc_env name)
         ; case mb_thing of {
             Just thing -> return thing ;
             Nothing    -> do

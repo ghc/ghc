@@ -371,7 +371,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
               ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
               ; print_unqual = mkPrintUnqualified
                                  (unitState dflags)
-                                 (mkHomeUnitFromFlags dflags)
+                                 (hsc_home_unit hsc_env)
                                  rdr_env
               ; implicit_binds = concatMap getImplicitBinds tcs
               }
