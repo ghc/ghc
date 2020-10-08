@@ -60,7 +60,7 @@ instance Storable FLock where
         #{poke struct flock, l_start}  ptr (l_start x)
         #{poke struct flock, l_len}    ptr (l_len x)
         #{poke struct flock, l_pid}    ptr (l_pid x)
-    peek ptr = do
+    peek ptr =
         FLock <$> #{peek struct flock, l_type}   ptr
               <*> #{peek struct flock, l_whence} ptr
               <*> #{peek struct flock, l_start}  ptr
