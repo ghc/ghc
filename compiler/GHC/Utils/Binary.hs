@@ -1311,14 +1311,14 @@ instance Binary RuleMatchInfo where
                       else return FunLike
 
 instance Binary InlineSpec where
-    put_ bh NoUserInline    = putByte bh 0
-    put_ bh Inline          = putByte bh 1
-    put_ bh Inlinable       = putByte bh 2
-    put_ bh NoInline        = putByte bh 3
+    put_ bh NoUserInlinePrag = putByte bh 0
+    put_ bh Inline           = putByte bh 1
+    put_ bh Inlinable        = putByte bh 2
+    put_ bh NoInline         = putByte bh 3
 
     get bh = do h <- getByte bh
                 case h of
-                  0 -> return NoUserInline
+                  0 -> return NoUserInlinePrag
                   1 -> return Inline
                   2 -> return Inlinable
                   _ -> return NoInline
