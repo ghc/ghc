@@ -37,11 +37,13 @@ download_file() {
             return
         else
             echo "Downloading ${description} to ${dest_dir}..."
-            $curl_cmd || echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk || {
-                rm -f "${dest_file}"
-                fail "ERROR: Download failed."
-                exit 1
-            }
+            $curl_cmd || (
+                echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk || {
+                    rm -f "${dest_file}"
+                    fail "ERROR: Download failed."
+                    exit 1
+                }
+            )
         fi
     fi
 
@@ -55,11 +57,13 @@ download_file() {
         else
             local curl_cmd_bnk="true"
         fi
-        $curl_cmd || echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk || {
+        $curl_cmd || (
+            echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk || {
                 rm -f "${dest_file}.sig"
                 fail "ERROR: Download failed."
                 exit 1
             }
+        )
     fi
 
     if test "$verify" = "1"
