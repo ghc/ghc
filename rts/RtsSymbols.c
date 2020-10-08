@@ -135,7 +135,7 @@
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_HasProto(atexit)                              \
-      RTS_WIN32_ONLY(SymI_NeedsProto(__chkstk_ms))       \
+      RTS_WIN32_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___environ))      \
       RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
@@ -803,6 +803,9 @@
       SymI_HasProto(rtsSupportsBoundThreads)                            \
       SymI_HasProto(rts_isProfiled)                                     \
       SymI_HasProto(rts_isDynamic)                                      \
+      SymI_HasProto(rts_isThreaded)                                     \
+      SymI_HasProto(rts_isDebugged)                                     \
+      SymI_HasProto(rts_isTracing)                                      \
       SymI_HasProto(rts_setInCallCapability)                            \
       SymI_HasProto(rts_enableThreadAllocationLimit)                    \
       SymI_HasProto(rts_disableThreadAllocationLimit)                   \
