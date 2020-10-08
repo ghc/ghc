@@ -1690,14 +1690,16 @@ occAnalUnfolding :: OccEnv
 occAnalUnfolding env is_rec mb_join_arity unf
   = case unf of
       unf@(CoreUnfolding { uf_tmpl = rhs, uf_src = src })
-        | isStableSource src -> (usage,        unf')
-        | otherwise          -> (emptyDetails, unf)
-        where -- For non-Stable unfoldings we leave them undisturbed, but
+        | isStableSource src -> (markAllMany usage, unf')
+              -- markAllMany: see Note [Occurrences in stable unfoldings]
+        | otherwise          -> (emptyDetails,      unf)
+              -- For non-Stable unfoldings we leave them undisturbed, but
               -- don't count their usage because the simplifier will discard them.
               -- We leave them undisturbed because nodeScore uses their size info
               -- to guide its decisions.  It's ok to leave un-substituted
               -- expressions in the tree because all the variables that were in
               -- scope remain in scope; there is no cloning etc.
+        where
           (usage, rhs') = occAnalRhs env is_rec mb_join_arity rhs
 
           unf' | noBinderSwaps env = unf -- Note [Unfoldings and rules]
@@ -1755,6 +1757,28 @@ the join point a RhsCtxt (#14137).  It's not a huge deal, because
 the FloatIn pass knows to float into join point RHSs; and the simplifier
 does not float things out of join point RHSs.  But it's a simple, cheap
 thing to do.  See #14137.
+
+Note [Occurrences in stable unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    f p = BIG
+    {-# INLINE g #-}
+    g y = not (f y)
+where this is the /only/ occurrence of 'f'.  So 'g' will get a stable
+unfolding.  Now suppose that g's RHS gets optimised (perhaps by a rule
+or inlining f) so that it doesn't mention 'f' any more.  Now the last
+remaining call to f is in g's Stable unfolding. But, even though there
+is only one syntactic occurrence of f, we do /not/ want to do
+preinlineUnconditionally here!
+
+The INLINE pragma says "inline exactly this RHS"; perhaps the
+programmer wants to expose that 'not', say. If we inline f that will make
+the Stable unfoldign big, and that wasn't what the programmer wanted.
+
+Another way to think about it: if we inlined g as-is into multiple
+call sites, now there's be multiple calls to f.
+
+Bottom line: treat all occurrences in a stable unfolding as "Many".
 
 Note [Unfoldings and rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

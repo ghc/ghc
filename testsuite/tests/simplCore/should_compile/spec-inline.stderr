@@ -73,8 +73,7 @@ Roman.foo_$s$wgo
 end Rec }
 
 -- RHS size: {terms: 61, types: 18, coercions: 0, joins: 0/0}
-Roman.$wgo [InlPrag=NOUSERINLINE[2]]
-  :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
+Roman.$wgo [InlPrag=[2]] :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
 [GblId,
  Arity=2,
  Str=<S,1*U><S,1*U>,
@@ -109,8 +108,7 @@ Roman.$wgo
       }
 
 -- RHS size: {terms: 9, types: 5, coercions: 0, joins: 0/0}
-Roman.foo_go [InlPrag=NOUSERINLINE[2]]
-  :: Maybe Int -> Maybe Int -> Int
+Roman.foo_go [InlPrag=[2]] :: Maybe Int -> Maybe Int -> Int
 [GblId,
  Arity=2,
  Str=<S,1*U><S,1*U>,
