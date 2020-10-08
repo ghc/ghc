@@ -64,17 +64,8 @@ import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Constants
 import GHC.Exts.Heap.ProfInfo.Types
 #if defined(PROFILING)
-import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
 import GHC.Exts.Heap.InfoTableProf
 #else
--- This import makes PeekProfInfo_ProfilingEnabled available in make-based
--- builds. See #15197 for details (even though the related patch didn't
--- seem to fix the issue).
--- GHC.Exts.Heap.Closures uses the same trick to include
--- GHC.Exts.Heap.InfoTableProf into make-based builds.
-import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled ()
-
-import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled
 import GHC.Exts.Heap.InfoTable
 #endif
 import GHC.Exts.Heap.Utils
@@ -362,7 +353,7 @@ getClosureDataFromHeapRep closureAddressMay heapRep infoTablePtr pts = do
                 }
         TSO | [ u_lnk, u_gbl_lnk, tso_stack, u_trec, u_blk_ex, u_bq] <- pts
                 -> withArray rawHeapWords (\ptr -> do
-                    fields <- FFIClosures.peekTSOFields peekStgTSOProfInfo ptr
+                    fields <- FFIClosures.peekTSOFields ptr
                     pure $ TSOClosure
                         { info = itbl
                         , link = u_lnk

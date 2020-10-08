@@ -11,6 +11,18 @@ import GHC.Exts
 import GHC.Exts.Heap.ProfInfo.Types
 import GHC.Exts.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..))
 
+##if defined(PROFILING)
+import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
+##else
+-- This import makes PeekProfInfo_ProfilingEnabled available in make-based
+-- builds. See ##15197 for details (even though the related patch didn't
+-- seem to fix the issue).
+-- GHC.Exts.Heap.Closures uses the same trick to include
+-- GHC.Exts.Heap.InfoTableProf into make-based builds.
+import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled ()
+import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled
+##endif
+
 data TSOFields = TSOFields {
     tso_what_next :: WhatNext,
     tso_why_blocked :: WhyBlocked,
@@ -26,10 +38,8 @@ data TSOFields = TSOFields {
 }
 
 -- | Get non-pointer fields from @StgTSO_@ (@TSO.h@)
-peekTSOFields :: (Ptr tsoPtr -> IO (Maybe StgTSOProfInfo))
-                -> Ptr tsoPtr
-                -> IO TSOFields
-peekTSOFields peekProfInfo ptr = do
+peekTSOFields :: Ptr tsoPtr -> IO TSOFields
+peekTSOFields ptr = do
     what_next' <- (#peek struct StgTSO_, what_next) ptr
     why_blocked' <- (#peek struct StgTSO_, why_blocked) ptr
     flags' <- (#peek struct StgTSO_, flags) ptr
@@ -38,7 +48,7 @@ peekTSOFields peekProfInfo ptr = do
     dirty' <- (#peek struct StgTSO_, dirty) ptr
     alloc_limit' <- (#peek struct StgTSO_, alloc_limit) ptr
     tot_stack_size' <- (#peek struct StgTSO_, tot_stack_size) ptr
-    tso_prof' <- peekProfInfo ptr
+    tso_prof' <- peekStgTSOProfInfo ptr
 
     return TSOFields {
         tso_what_next = parseWhatNext what_next',
