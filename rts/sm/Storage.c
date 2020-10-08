@@ -1828,9 +1828,6 @@ AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
 {
     AdjustorWritable writ;
     ffi_closure* cl;
-    if (bytes != sizeof(ffi_closure)) {
-        barf("allocateExec: for ffi_closure only");
-    }
     ACQUIRE_SM_LOCK;
     cl = writ = ffi_closure_alloc((size_t)bytes, exec_ret);
     if (cl != NULL) {
