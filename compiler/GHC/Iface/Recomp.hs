@@ -845,14 +845,31 @@ addFingerprints hsc_env iface0
 
        fingerprint_group (local_env, decls_w_hashes) (CyclicSCC abis)
           = do let decls = map abiDecl abis
-               local_env1 <- foldM extend_hash_env local_env
-                                   (zip (repeat fingerprint0) decls)
-               let hash_fn = mk_put_name local_env1
                -- pprTrace "fingerprinting" (ppr (map ifName decls) ) $ do
+
+               -- temporarily extend the local environment with dummy
+               -- fingerprints for the members of the group.
+               --
+               -- Give each member a different temporary fingerprint, otherwise
+               -- we don't catch changes of occurrences within the group (cf
+               -- #18733).
+               let dummys = [Fingerprint 0 i | i <- [0..]]
+               local_env1 <- foldM extend_hash_env local_env (zip dummys decls)
+
+               -- put the cycle in a canonical order
                let stable_abis = sortBy cmp_abiNames abis
-                -- put the cycle in a canonical order
+
+               -- get a fignerprint for the whole group
+               let hash_fn = mk_put_name local_env1
                hash <- computeFingerprint hash_fn stable_abis
-               let pairs = zip (repeat hash) decls
+
+               -- compute final fingerprints for each member of the group.
+               -- Each member of the group must have its own fingerprint (cf
+               -- #18733) based on the group fingerprint.
+               let finals = [ fingerprintFingerprints [hash,Fingerprint 0 i]
+                            | i <- [0..]
+                            ]
+                   pairs  = zip finals decls
                local_env2 <- foldM extend_hash_env local_env pairs
                return (local_env2, pairs ++ decls_w_hashes)
 
