@@ -1526,7 +1526,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                         -- See Note [Specialising imported functions] in "GHC.Core.Opt.OccurAnal"
 
                   | InlinePragma { inl_inline = Inlinable } <- inl_prag
-                  = (inl_prag { inl_inline = NoUserInline }, noUnfolding)
+                  = (inl_prag { inl_inline = NoUserInlinePrag }, noUnfolding)
 
                   | otherwise
                   = (inl_prag, specUnfolding simpl_opts spec_bndrs (`mkApps` spec_args)
