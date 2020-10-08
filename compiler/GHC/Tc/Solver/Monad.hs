@@ -803,6 +803,8 @@ The CFunEqCan Ownership Invariant:
 
 Note [inert_eqs: the inert equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"RAE": update. Don't forget to update K1.
+
 Definition [Can-rewrite relation]
 A "can-rewrite" relation between flavours, written f1 >= f2, is a
 binary relation with the following properties
@@ -879,7 +881,7 @@ Main Theorem [Stability under extension]
                         The latter can't rewrite the former,
                         so the kick-out achieved nothing
 
-           OR { (K1) not (a = b)
+           OR { (K1) not (
                      Reason: if fw >= fs, WF1 says we can't have both
                              a -fw-> t  and  a -fs-> s
 
@@ -1835,7 +1837,10 @@ kick_out_rewritable new_fr new_lhs
       = False  -- Keep it in the inert set if the new thing can't rewrite it
 
       -- Below here (fr_may_rewrite fs) is True
-      | lhs `eqCanEqLHS` new_lhs  = True        -- (K1)
+      | fr_can_rewrite_ty eq_rel (canEqLHSType lhs) = True   -- (K1)
+         -- The above check redundantly checks the role & flavour,
+         -- but it's very convenient
+
       | kick_out_for_inertness    = True
       | kick_out_for_completeness = True
       | otherwise                 = False
