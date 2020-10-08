@@ -18,9 +18,9 @@
   [3 of 3] Compiling E                ( s/E.hs, nothing )
 [5 of 6] Processing t
   [1 of 4] Compiling H[sig]           ( t/H.hsig, nothing )
-  [2 of 4] Instantiating r
-  [3 of 4] Compiling F                ( t/F.hs, nothing )
-  [4 of 4] Instantiating s
+  [2 of 4] Instantiating s
+  [3 of 4] Instantiating r
+  [4 of 4] Compiling F                ( t/F.hs, nothing )
 [6 of 6] Processing u
   [1 of 3] Compiling H[sig]           ( u/H.hsig, nothing )
   [2 of 3] Instantiating q
