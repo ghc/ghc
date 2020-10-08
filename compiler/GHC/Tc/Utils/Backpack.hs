@@ -313,8 +313,7 @@ implicitRequirements' hsc_env normal_imports
             Found _ mod | not (isHomeModule home_unit mod) ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
-  where dflags = hsc_dflags hsc_env
-        home_unit = mkHomeUnitFromFlags dflags
+  where home_unit = hsc_home_unit hsc_env
 
 -- | Given a 'Unit', make sure it is well typed.  This is because
 -- unit IDs come from Cabal, which does not know if things are well-typed or
@@ -538,7 +537,7 @@ mergeSignatures
         inner_mod  = tcg_semantic_mod tcg_env
         mod_name   = moduleName (tcg_mod tcg_env)
         unit_state = unitState dflags
-        home_unit  = mkHomeUnitFromFlags dflags
+        home_unit  = hsc_home_unit hsc_env
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
@@ -830,6 +829,7 @@ mergeSignatures
         -- we hope that we get lucky / the overlapping instances never
         -- get used, but it is not a very good situation to be in.
         --
+        hsc_env <- getTopEnv
         let merge_inst (insts, inst_env) inst
                 | memberInstEnv inst_env inst -- test DFun Type equality
                 = (insts, inst_env)
@@ -844,8 +844,9 @@ mergeSignatures
             -- in the listing.  We don't want it because a module is NOT
             -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214
             iface' = iface { mi_final_exts = (mi_final_exts iface){ mi_orphan = False, mi_finsts = False } }
+            home_unit = hsc_home_unit hsc_env
             avails = plusImportAvails (tcg_imports tcg_env) $
-                        calculateAvails dflags iface' False NotBoot ImportedBySystem
+                        calculateAvails home_unit iface' False NotBoot ImportedBySystem
         return tcg_env {
             tcg_inst_env = inst_env,
             tcg_insts    = insts,
@@ -912,7 +913,9 @@ impl_msg unit_state impl_mod (Module req_uid req_mod_name)
 checkImplements :: Module -> InstantiatedModule -> TcRn TcGblEnv
 checkImplements impl_mod req_mod@(Module uid mod_name) = do
   dflags <- getDynFlags
+  hsc_env <- getTopEnv
   let unit_state = unitState dflags
+      home_unit  = hsc_home_unit hsc_env
   addErrCtxt (impl_msg unit_state impl_mod req_mod) $ do
     let insts = instUnitInsts uid
 
@@ -933,7 +936,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     loadModuleInterfaces (text "Loading orphan modules (from implementor of hsig)")
                          (dep_orphs (mi_deps impl_iface))
 
-    let avails = calculateAvails dflags
+    let avails = calculateAvails home_unit
                     impl_iface False{- safe -} NotBoot ImportedBySystem
         fix_env = mkNameEnv [ (gre_name rdr_elt, FixItem occ f)
                             | (occ, f) <- mi_fixities impl_iface
@@ -997,11 +1000,11 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
 -- checking that the implementation matches the signature.
 instantiateSignature :: TcRn TcGblEnv
 instantiateSignature = do
+    hsc_env <- getTopEnv
     tcg_env <- getGblEnv
-    dflags <- getDynFlags
     let outer_mod = tcg_mod tcg_env
         inner_mod = tcg_semantic_mod tcg_env
-        home_unit = mkHomeUnitFromFlags dflags
+        home_unit = hsc_home_unit hsc_env
     -- TODO: setup the local RdrEnv so the error messages look a little better.
     -- But this information isn't stored anywhere. Should we RETYPECHECK
     -- the local one just to get the information?  Hmm...

@@ -365,7 +365,9 @@ rnImportDecl this_mod
                     || (not implicit && safeDirectImpsReq dflags)
                     || (implicit && safeImplicitImpsReq dflags)
 
-    let imv = ImportedModsVal
+    hsc_env <- getTopEnv
+    let home_unit = hsc_home_unit hsc_env
+        imv = ImportedModsVal
             { imv_name        = qual_mod_name
             , imv_span        = loc
             , imv_is_safe     = mod_safe'
@@ -373,7 +375,7 @@ rnImportDecl this_mod
             , imv_all_exports = potential_gres
             , imv_qualified   = qual_only
             }
-        imports = calculateAvails dflags iface mod_safe' want_boot (ImportedByUser imv)
+        imports = calculateAvails home_unit iface mod_safe' want_boot (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
@@ -395,13 +397,13 @@ rnImportDecl this_mod
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
-calculateAvails :: DynFlags
+calculateAvails :: HomeUnit
                 -> ModIface
                 -> IsSafeImport
                 -> IsBootInterface
                 -> ImportedBy
                 -> ImportAvails
-calculateAvails dflags iface mod_safe' want_boot imported_by =
+calculateAvails home_unit iface mod_safe' want_boot imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
       orph_iface = mi_orphan (mi_final_exts iface)
@@ -450,8 +452,6 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]
       ptrust = trust == Sf_Trustworthy || trust_pkg
-
-      home_unit = mkHomeUnitFromFlags dflags
 
       (dependent_mods, dependent_pkgs, pkg_trust_req)
          | isHomeUnit home_unit pkg =

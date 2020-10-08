@@ -81,7 +81,7 @@ flushFinderCaches hsc_env =
   atomicModifyIORef' fc_ref $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
  where
         fc_ref       = hsc_FC hsc_env
-        home_unit    = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+        home_unit    = hsc_home_unit hsc_env
         is_ext mod _ = not (isHomeInstalledModule home_unit mod)
 
 addToFinderCache :: IORef FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
@@ -139,7 +139,7 @@ findPluginModule hsc_env mod_name =
 
 findExactModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findExactModule hsc_env mod =
-    let home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+    let home_unit = hsc_home_unit hsc_env
     in if isHomeInstalledModule home_unit mod
        then findInstalledHomeModule hsc_env (moduleName mod)
        else findPackageModule hsc_env mod
@@ -179,7 +179,7 @@ orIfNotFound this or_this = do
 -- was successful.)
 homeSearchCache :: HscEnv -> ModuleName -> IO InstalledFindResult -> IO InstalledFindResult
 homeSearchCache hsc_env mod_name do_this = do
-  let home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+  let home_unit = hsc_home_unit hsc_env
       mod = mkHomeInstalledModule home_unit mod_name
   modLocationCache hsc_env mod do_this
 
@@ -255,14 +255,14 @@ modLocationCache hsc_env mod do_this = do
 -- This returns a module because it's more convenient for users
 addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> IO Module
 addHomeModuleToFinder hsc_env mod_name loc = do
-  let home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+  let home_unit = hsc_home_unit hsc_env
       mod = mkHomeInstalledModule home_unit mod_name
   addToFinderCache (hsc_FC hsc_env) mod (InstalledFound loc mod)
   return (mkHomeModule home_unit mod_name)
 
 uncacheModule :: HscEnv -> ModuleName -> IO ()
 uncacheModule hsc_env mod_name = do
-  let home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+  let home_unit = hsc_home_unit hsc_env
       mod = mkHomeInstalledModule home_unit mod_name
   removeFromFinderCache (hsc_FC hsc_env) mod
 
@@ -284,9 +284,8 @@ findHomeModule hsc_env mod_name = do
         fr_suggestions = []
       }
  where
-  dflags    = hsc_dflags hsc_env
-  home_unit = mkHomeUnitFromFlags dflags
-  uid       = homeUnitAsUnit (mkHomeUnitFromFlags dflags)
+  home_unit = hsc_home_unit hsc_env
+  uid       = homeUnitAsUnit home_unit
 
 -- | Implements the search for a module name in the home package only.  Calling
 -- this function directly is usually *not* what you want; currently, it's used
@@ -309,7 +308,7 @@ findInstalledHomeModule hsc_env mod_name =
    homeSearchCache hsc_env mod_name $
    let
      dflags = hsc_dflags hsc_env
-     home_unit = mkHomeUnitFromFlags dflags
+     home_unit = hsc_home_unit hsc_env
      home_path = importPaths dflags
      hisuf = hiSuf dflags
      mod = mkHomeInstalledModule home_unit mod_name

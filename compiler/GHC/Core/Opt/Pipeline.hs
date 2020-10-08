@@ -103,7 +103,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     hpt_rule_base  = mkRuleBase home_pkg_rules
     print_unqual   = mkPrintUnqualified
                         (unitState dflags)
-                        (mkHomeUnitFromFlags dflags)
+                        (hsc_home_unit hsc_env)
                         rdr_env
     -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
     -- This is very convienent for the users of the monad (e.g. plugins do not have to
@@ -696,7 +696,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
     }
   where
     dflags       = hsc_dflags hsc_env
-    print_unqual = mkPrintUnqualified (unitState dflags) (mkHomeUnitFromFlags dflags) rdr_env
+    print_unqual = mkPrintUnqualified (unitState dflags) (hsc_home_unit hsc_env) rdr_env
     simpl_env    = mkSimplEnv mode
     active_rule  = activeRule mode
     active_unf   = activeUnfolding mode

@@ -121,7 +121,7 @@ tcLookupImported_maybe :: Name -> TcM (MaybeErr MsgDoc TyThing)
 -- Returns (Failed err) if we can't find the interface file for the thing
 tcLookupImported_maybe name
   = do  { hsc_env <- getTopEnv
-        ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
+        ; mb_thing <- liftIO (lookupType hsc_env name)
         ; case mb_thing of
             Just thing -> return (Succeeded thing)
             Nothing    -> tcImportDecl_maybe name }
@@ -402,8 +402,8 @@ loadInterface :: SDoc -> Module -> WhereFrom
 loadInterface doc_str mod from
   | isHoleModule mod
   -- Hole modules get special treatment
-  = do dflags <- getDynFlags
-       let home_unit = mkHomeUnitFromFlags dflags
+  = do hsc_env <- getTopEnv
+       let home_unit = hsc_home_unit hsc_env
        -- Redo search for our local hole module
        loadInterface doc_str (mkHomeModule home_unit (moduleName mod)) from
   | otherwise
@@ -416,7 +416,8 @@ loadInterface doc_str mod from
 
                 -- Check whether we have the interface already
         ; dflags <- getDynFlags
-        ; let home_unit = mkHomeUnitFromFlags dflags
+        ; hsc_env <- getTopEnv
+        ; let home_unit = hsc_home_unit hsc_env
         ; case lookupIfaceByModule hpt (eps_PIT eps) mod of {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
@@ -643,8 +644,8 @@ computeInterface ::
     -> TcRnIf gbl lcl (MaybeErr MsgDoc (ModIface, FilePath))
 computeInterface doc_str hi_boot_file mod0 = do
     MASSERT( not (isHoleModule mod0) )
-    dflags <- getDynFlags
-    let home_unit = mkHomeUnitFromFlags dflags
+    hsc_env <- getTopEnv
+    let home_unit = hsc_home_unit hsc_env
     case getModuleInstantiation mod0 of
         (imod, Just indef) | isHomeUnitIndefinite home_unit -> do
             r <- findAndReadIface doc_str imod mod0 hi_boot_file
@@ -925,7 +926,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                -- Look for the file
                hsc_env <- getTopEnv
                mb_found <- liftIO (findExactModule hsc_env mod)
-               let home_unit = mkHomeUnitFromFlags dflags
+               let home_unit = hsc_home_unit hsc_env
                case mb_found of
                    InstalledFound loc mod -> do
                        -- Found file, so read it

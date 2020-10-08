@@ -241,11 +241,11 @@ sptCreateStaticBinds hsc_env this_mod binds
         PW8 -> mkWordLit platform . toInteger
 
     lookupIdHscEnv :: Name -> IO Id
-    lookupIdHscEnv n = lookupTypeHscEnv hsc_env n >>=
+    lookupIdHscEnv n = lookupType hsc_env n >>=
                          maybe (getError n) (return . tyThingId)
 
     lookupDataConHscEnv :: Name -> IO DataCon
-    lookupDataConHscEnv n = lookupTypeHscEnv hsc_env n >>=
+    lookupDataConHscEnv n = lookupType hsc_env n >>=
                               maybe (getError n) (return . tyThingDataCon)
 
     getError n = pprPanic "sptCreateStaticBinds.get: not found" $

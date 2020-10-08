@@ -146,8 +146,7 @@ lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
 lookupGlobal_maybe hsc_env name
   = do  {    -- Try local envt
           let mod = icInteractiveModule (hsc_IC hsc_env)
-              dflags = hsc_dflags hsc_env
-              home_unit = mkHomeUnitFromFlags dflags
+              home_unit = hsc_home_unit hsc_env
               tcg_semantic_mod = homeModuleInstantiation home_unit mod
 
         ; if nameIsLocalOrFrom tcg_semantic_mod name
@@ -162,7 +161,7 @@ lookupGlobal_maybe hsc_env name
 lookupImported_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
 -- Returns (Failed err) if we can't find the interface file for the thing
 lookupImported_maybe hsc_env name
-  = do  { mb_thing <- lookupTypeHscEnv hsc_env name
+  = do  { mb_thing <- lookupType hsc_env name
         ; case mb_thing of
             Just thing -> return (Succeeded thing)
             Nothing    -> importDecl_maybe hsc_env name

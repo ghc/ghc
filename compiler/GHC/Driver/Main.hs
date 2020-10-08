@@ -214,6 +214,7 @@ newHscEnv dflags = do
                   ,  hsc_type_env_var = Nothing
                   ,  hsc_interp       = Nothing
                   ,  hsc_dynLinker    = emptyDynLinker
+                  ,  hsc_home_unit    = home_unit
                   }
 
 -- -----------------------------------------------------------------------------
@@ -477,7 +478,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
     hsc_env <- getHscEnv
     let hsc_src = ms_hsc_src mod_summary
         dflags = hsc_dflags hsc_env
-        home_unit = mkHomeUnitFromFlags dflags
+        home_unit = hsc_home_unit hsc_env
         outer_mod = ms_mod mod_summary
         mod_name = moduleName outer_mod
         outer_mod' = mkHomeModule home_unit mod_name
@@ -1123,9 +1124,9 @@ hscGetSafe hsc_env m l = runHsc hsc_env $ do
 hscCheckSafe' :: Module -> SrcSpan
   -> Hsc (Maybe UnitId, Set UnitId)
 hscCheckSafe' m l = do
-    dflags <- getDynFlags
-    let home_unit = mkHomeUnitFromFlags dflags
-    (tw, pkgs) <- isModSafe m l
+    hsc_env <- getHscEnv
+    let home_unit = hsc_home_unit hsc_env
+    (tw, pkgs) <- isModSafe home_unit m l
     case tw of
         False                           -> return (Nothing, pkgs)
         True | isHomeModule home_unit m -> return (Nothing, pkgs)
@@ -1133,8 +1134,8 @@ hscCheckSafe' m l = do
              -- Not necessary if that is reflected in dependencies
              | otherwise   -> return (Just $ toUnitId (moduleUnit m), pkgs)
   where
-    isModSafe :: Module -> SrcSpan -> Hsc (Bool, Set UnitId)
-    isModSafe m l = do
+    isModSafe :: HomeUnit -> Module -> SrcSpan -> Hsc (Bool, Set UnitId)
+    isModSafe home_unit m l = do
         dflags <- getDynFlags
         iface <- lookup' m
         case iface of
@@ -1150,7 +1151,7 @@ hscCheckSafe' m l = do
                     -- check module is trusted
                     safeM = trust `elem` [Sf_Safe, Sf_SafeInferred, Sf_Trustworthy]
                     -- check package is trusted
-                    safeP = packageTrusted dflags trust trust_own_pkg m
+                    safeP = packageTrusted dflags home_unit trust trust_own_pkg m
                     -- pkg trust reqs
                     pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
                     -- warn if Safe module imports Safe-Inferred module.
@@ -1195,16 +1196,16 @@ hscCheckSafe' m l = do
     -- modules are trusted without requiring that their package is trusted. For
     -- trustworthy modules, modules in the home package are trusted but
     -- otherwise we check the package trust flag.
-    packageTrusted :: DynFlags -> SafeHaskellMode -> Bool -> Module -> Bool
-    packageTrusted _ Sf_None      _ _ = False -- shouldn't hit these cases
-    packageTrusted _ Sf_Ignore    _ _ = False -- shouldn't hit these cases
-    packageTrusted _ Sf_Unsafe    _ _ = False -- prefer for completeness.
-    packageTrusted dflags _ _ _
+    packageTrusted :: DynFlags -> HomeUnit -> SafeHaskellMode -> Bool -> Module -> Bool
+    packageTrusted _ _ Sf_None      _ _ = False -- shouldn't hit these cases
+    packageTrusted _ _ Sf_Ignore    _ _ = False -- shouldn't hit these cases
+    packageTrusted _ _ Sf_Unsafe    _ _ = False -- prefer for completeness.
+    packageTrusted dflags _ _ _ _
         | not (packageTrustOn dflags) = True
-    packageTrusted _ Sf_Safe  False _ = True
-    packageTrusted _ Sf_SafeInferred False _ = True
-    packageTrusted dflags _ _ m
-        | isHomeModule (mkHomeUnitFromFlags dflags) m = True
+    packageTrusted _ _ Sf_Safe  False _ = True
+    packageTrusted _ _ Sf_SafeInferred False _ = True
+    packageTrusted dflags home_unit _ _ m
+        | isHomeModule home_unit m = True
         | otherwise = unitIsTrusted $ unsafeLookupUnit (unitState dflags) (moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
@@ -1500,7 +1501,7 @@ hscInteractive hsc_env cgguts location = do
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO ()
 hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags   = hsc_dflags hsc_env
-        home_unit = mkHomeUnitFromFlags dflags
+        home_unit = hsc_home_unit hsc_env
         platform  = targetPlatform dflags
     cmm <- ioMsgMaybe
                $ do

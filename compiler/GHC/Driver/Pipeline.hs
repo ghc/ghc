@@ -384,7 +384,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   -- https://gitlab.haskell.org/ghc/ghc/issues/12673
   -- and https://github.com/haskell/cabal/issues/2257
   empty_stub <- newTempName dflags TFL_CurrentModule "c"
-  let home_unit = mkHomeUnitFromFlags dflags
+  let home_unit = hsc_home_unit hsc_env
       src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
   writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
   _ <- runPipeline StopLn hsc_env
@@ -1297,7 +1297,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
         pkg_include_dirs <- liftIO $ getUnitIncludePath
                                        (initSDocContext dflags defaultUserStyle)
                                        (unitState dflags)
-                                       (mkHomeUnitFromFlags dflags)
+                                       home_unit
                                        pkgs
         let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
               (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
@@ -1329,7 +1329,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
              else getUnitExtraCcOpts
                      (initSDocContext dflags defaultUserStyle)
                      (unitState dflags)
-                     (mkHomeUnitFromFlags dflags)
+                     home_unit
                      pkgs
 
         framework_paths <-
@@ -1337,7 +1337,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
             then do pkgFrameworkPaths <- liftIO $ getUnitFrameworkPath
                                                    (initSDocContext dflags defaultUserStyle)
                                                    (unitState dflags)
-                                                   (mkHomeUnitFromFlags dflags)
+                                                   home_unit
                                                    pkgs
                     let cmdlineFrameworkPaths = frameworkPaths dflags
                     return $ map ("-F"++)
@@ -1732,6 +1732,7 @@ linkBinary' staticLink dflags o_files dep_units = do
         toolSettings' = toolSettings dflags
         verbFlags = getVerbFlags dflags
         output_fn = exeFileName staticLink dflags
+        home_unit = mkHomeUnitFromFlags dflags
 
     -- get the full list of packages to link with, by combining the
     -- explicit packages with the auto packages and all of their
@@ -1744,7 +1745,7 @@ linkBinary' staticLink dflags o_files dep_units = do
     pkg_lib_paths <- getUnitLibraryPath
                         (initSDocContext dflags defaultUserStyle)
                         (unitState dflags)
-                        (mkHomeUnitFromFlags dflags)
+                        home_unit
                         (ways dflags)
                         dep_units
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
@@ -2016,6 +2017,7 @@ linkStaticLib dflags o_files dep_units = do
   let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
       modules = o_files ++ extra_ld_inputs
       output_fn = exeFileName True dflags
+      home_unit = mkHomeUnitFromFlags dflags
 
   full_output_fn <- if isAbsolute output_fn
                     then return output_fn
@@ -2027,7 +2029,7 @@ linkStaticLib dflags o_files dep_units = do
   pkg_cfgs_init <- getPreloadUnitsAnd
                      (initSDocContext dflags defaultUserStyle)
                      (unitState dflags)
-                     (mkHomeUnitFromFlags dflags)
+                     home_unit
                      dep_units
 
   let pkg_cfgs
@@ -2056,11 +2058,12 @@ doCpp :: DynFlags -> Bool -> FilePath -> FilePath -> IO ()
 doCpp dflags raw input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
     let cmdline_include_paths = includePaths dflags
+    let home_unit = mkHomeUnitFromFlags dflags
 
     pkg_include_dirs <- getUnitIncludePath
                            (initSDocContext dflags defaultUserStyle)
                            (unitState dflags)
-                           (mkHomeUnitFromFlags dflags)
+                           home_unit
                            []
     let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
           (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)

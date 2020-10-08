@@ -102,7 +102,7 @@ module GHC.Driver.Types (
         implicitTyThings, implicitTyConThings, implicitClassThings,
         isImplicitTyThing,
 
-        TypeEnv, lookupType, lookupTypeHscEnv, mkTypeEnv, emptyTypeEnv,
+        TypeEnv, lookupType, mkTypeEnv, emptyTypeEnv,
         typeEnvFromEntities, mkTypeEnvWithImplicits,
         extendTypeEnv, extendTypeEnvList,
         extendTypeEnvWithIds, plusTypeEnv,
@@ -489,6 +489,9 @@ data HscEnv
 
         , hsc_dynLinker :: DynLinker
                 -- ^ dynamic linker.
+
+        , hsc_home_unit :: !HomeUnit
+                -- ^ Home-unit
 
  }
 
@@ -2286,34 +2289,24 @@ plusTypeEnv env1 env2 = plusNameEnv env1 env2
 -- compiled modules in other packages that live in 'PackageTypeEnv'. Note
 -- that this does NOT look up the 'TyThing' in the module being compiled: you
 -- have to do that yourself, if desired
-lookupType :: DynFlags
-           -> HomePackageTable
-           -> PackageTypeEnv
-           -> Name
-           -> Maybe TyThing
+lookupType :: HscEnv -> Name -> IO (Maybe TyThing)
+lookupType hsc_env name = do
+   eps <- liftIO $ readIORef (hsc_EPS hsc_env)
+   let pte = eps_PTE eps
+       hpt = hsc_HPT hsc_env
 
-lookupType dflags hpt pte name
-  | isOneShot (ghcMode dflags)  -- in one-shot, we don't use the HPT
-  = lookupNameEnv pte name
-  | otherwise
-  = case lookupHptByModule hpt mod of
-       Just hm -> lookupNameEnv (md_types (hm_details hm)) name
-       Nothing -> lookupNameEnv pte name
-  where
-    mod = ASSERT2( isExternalName name, ppr name )
-          if isHoleName name
-            then mkHomeModule (mkHomeUnitFromFlags dflags) (moduleName (nameModule name))
-            else nameModule name
+       mod = ASSERT2( isExternalName name, ppr name )
+             if isHoleName name
+               then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
+               else nameModule name
 
--- | As 'lookupType', but with a marginally easier-to-use interface
--- if you have a 'HscEnv'
-lookupTypeHscEnv :: HscEnv -> Name -> IO (Maybe TyThing)
-lookupTypeHscEnv hsc_env name = do
-    eps <- readIORef (hsc_EPS hsc_env)
-    return $! lookupType dflags hpt (eps_PTE eps) name
-  where
-    dflags = hsc_dflags hsc_env
-    hpt = hsc_HPT hsc_env
+       !ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
+               -- in one-shot, we don't use the HPT
+               then lookupNameEnv pte name
+               else case lookupHptByModule hpt mod of
+                Just hm -> lookupNameEnv (md_types (hm_details hm)) name
+                Nothing -> lookupNameEnv pte name
+   pure ty
 
 -- | Get the 'TyCon' from a 'TyThing' if it is a type constructor thing. Panics otherwise
 tyThingTyCon :: HasDebugCallStack => TyThing -> TyCon

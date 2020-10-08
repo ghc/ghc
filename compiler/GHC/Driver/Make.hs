@@ -661,7 +661,7 @@ discardIC hsc_env
     | nameIsFromExternalPackage home_unit old_name = old_name
     | otherwise = ic_name empty_ic
     where
-    home_unit = mkHomeUnitFromFlags dflags
+    home_unit = hsc_home_unit hsc_env
     old_name = ic_name old_ic
 
 -- | If there is no -o option, guess the name of target executable
@@ -1078,7 +1078,8 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
                 -- work to compile the module (see parUpsweep_one).
                 m_res <- MC.try $ unmask $ prettyPrintGhcErrors lcl_dflags $
                         parUpsweep_one mod home_mod_map comp_graph_loops
-                                       lcl_dflags mHscMessage cleanup
+                                       lcl_dflags (hsc_home_unit hsc_env)
+                                       mHscMessage cleanup
                                        par_sem hsc_env_var old_hpt_var
                                        stable_mods mod_idx (length sccs)
 
@@ -1180,6 +1181,8 @@ parUpsweep_one
     -- ^ The list of all module loops within the compilation graph.
     -> DynFlags
     -- ^ The thread-local DynFlags
+    -> HomeUnit
+    -- ^ The home-unit
     -> Maybe Messager
     -- ^ The messager
     -> (HscEnv -> IO ())
@@ -1198,14 +1201,13 @@ parUpsweep_one
     -- ^ The total number of modules
     -> IO SuccessFlag
     -- ^ The result of this compile
-parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup par_sem
+parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessage cleanup par_sem
                hsc_env_var old_hpt_var stable_mods mod_index num_mods = do
 
     let this_build_mod = mkBuildModule mod
 
     let home_imps     = map unLoc $ ms_home_imps mod
     let home_src_imps = map unLoc $ ms_home_srcimps mod
-    let home_unit     = mkHomeUnitFromFlags lcl_dflags
 
     -- All the textual imports of this module.
     let textual_deps = Set.fromList $
@@ -2117,8 +2119,9 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        -- otherwise those modules will fail to compile.
        -- See Note [-fno-code mode] #8025
        let default_backend = platformDefaultBackend (targetPlatform dflags)
+           home_unit       = hsc_home_unit hsc_env
        map1 <- case backend dflags of
-         NoBackend   -> enableCodeGenForTH default_backend map0
+         NoBackend   -> enableCodeGenForTH home_unit default_backend map0
          Interpreter -> enableCodeGenForUnboxedTuplesOrSums default_backend map0
          _           -> return map0
        if null errs
@@ -2203,10 +2206,10 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 -- the specified target, disable optimization and change the .hi
 -- and .o file locations to be temporary files.
 -- See Note [-fno-code mode]
-enableCodeGenForTH :: Backend
+enableCodeGenForTH :: HomeUnit -> Backend
   -> NodeMap [Either ErrorMessages ModSummary]
   -> IO (NodeMap [Either ErrorMessages ModSummary])
-enableCodeGenForTH =
+enableCodeGenForTH home_unit =
   enableCodeGenWhen condition should_modify TFL_CurrentModule TFL_GhcSession
   where
     condition = isTemplateHaskellOrQQNonBoot
@@ -2214,7 +2217,7 @@ enableCodeGenForTH =
       backend dflags == NoBackend &&
       -- Don't enable codegen for TH on indefinite packages; we
       -- can't compile anything anyway! See #16219.
-      isHomeUnitDefinite (mkHomeUnitFromFlags dflags)
+      isHomeUnitDefinite home_unit
 
 -- | Update the every ModSummary that is depended on
 -- by a module that needs unboxed tuples. We enable codegen to
@@ -2503,7 +2506,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
   | otherwise  = find_it
   where
     dflags = hsc_dflags hsc_env
-    home_unit = mkHomeUnitFromFlags dflags
+    home_unit = hsc_home_unit hsc_env
 
     check_timestamp old_summary location src_fn =
         checkSummaryTimestamp

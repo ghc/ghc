@@ -682,7 +682,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           let
             pkg = moduleUnit mod
             deps  = mi_deps iface
-            home_unit = mkHomeUnitFromFlags dflags
+            home_unit = hsc_home_unit hsc_env
 
             pkg_deps = dep_pkgs deps
             (boot_deps, mod_deps) = flip partitionWith (dep_mods deps) $
