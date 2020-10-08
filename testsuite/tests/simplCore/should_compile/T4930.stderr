@@ -41,7 +41,7 @@ T4930.$trModule
 
 Rec {
 -- RHS size: {terms: 17, types: 3, coercions: 0, joins: 0/0}
-T4930.$wfoo [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker]
+T4930.$wfoo [InlPrag=[2], Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId, Arity=1, Str=<L,U>, Unf=OtherCon []]
 T4930.$wfoo
@@ -53,7 +53,7 @@ T4930.$wfoo
 end Rec }
 
 -- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
-foo [InlPrag=NOUSERINLINE[2]] :: Int -> Int
+foo [InlPrag=[2]] :: Int -> Int
 [GblId,
  Arity=1,
  Str=<S,1*U(U)>,

@@ -446,13 +446,19 @@ Conclusion:
   - Otherwise inline wrapper in phase 2.  That allows the
     'gentle' simplification pass to apply specialisation rules
 
-
-Note [Wrapper NoUserInline]
+Note [Wrapper NoUserInlinePrag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The use an inl_inline of NoUserInline on the wrapper distinguishes
-this pragma from one that was given by the user. In particular, CSE
-will not happen if there is a user-specified pragma, but should happen
-for w/w’ed things (#14186).
+We use NoUserInlinePrag on the wrapper, to say that there is no
+user-specified inline pragma. (The worker inherits that; see Note
+[Worker-wrapper for INLINABLE functions].)  The wrapper has no pragma
+given by the user.
+
+(Historical note: we used to give the wrapper an INLINE pragma, but
+CSE will not happen if there is a user-specified pragma, but should
+happen for w/w’ed things (#14186).  We don't need a pragma, because
+everything we needs is expressed by (a) the stable unfolding and (b)
+the inl_act activation.)
+
 -}
 
 tryWW   :: DynFlags
@@ -678,7 +684,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma
 mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
-                 , inl_inline = NoUserInline -- See Note [Wrapper NoUserInline]
+                 , inl_inline = NoUserInlinePrag -- See Note [Wrapper NoUserInline]
                  , inl_sat    = Nothing
                  , inl_act    = wrap_act
                  , inl_rule   = rule_info }  -- RuleMatchInfo is (and must be) unaffected
