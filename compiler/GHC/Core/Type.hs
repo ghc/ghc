@@ -1359,7 +1359,7 @@ repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- have enough info to extract the runtime-rep arguments that
 -- the funTyCon requires.  This will usually be true;
 -- but may be temporarily false during canonicalization:
---     see Note [FunTy and decomposing tycon applications] in "GHC.Tc.Solver.Canonical"
+--     see Note [Decomposing FunTy] in GHC.Tc.Solver.Canonical
 --
 repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy _ w arg res)

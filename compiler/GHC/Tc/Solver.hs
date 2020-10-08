@@ -2481,7 +2481,13 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
 
   | otherwise
-  = do { binds   <- TcS.getTcEvBindsMap ev_binds_var
+  = do { -- First zonk: the inert set (from whence they came) is not
+         -- necessarily fully zonked; equalities are not kicked out
+         -- if a unification cannot make progress. See Note
+         -- [inert_eqs: the inert equalities] in GHC.Tc.Solver.Monad, which
+         -- describes how the inert set might not actually be inert.
+         simples <- TcS.zonkSimples simples
+       ; binds   <- TcS.getTcEvBindsMap ev_binds_var
 
        -- Now we can pick the ones to float
        -- The constraints are un-flattened and de-canonicalised

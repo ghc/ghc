@@ -999,23 +999,28 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Decompose FunTy: (s -> t) and (c => t)
 -- NB: don't decompose (Int -> blah) ~ (Show a => blah)
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
-           (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _
-           (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _
-  | af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
-  , Just ty1a_rep <- getRuntimeRep_maybe ty1a  -- getRutimeRep_maybe:
+           (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) ps_ty1
+           (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) ps_ty2
+  | Just ty1a_rep <- getRuntimeRep_maybe ty1a  -- getRutimeRep_maybe:
   , Just ty1b_rep <- getRuntimeRep_maybe ty1b  -- see Note [Decomposing FunTy]
   , Just ty2a_rep <- getRuntimeRep_maybe ty2a
   , Just ty2b_rep <- getRuntimeRep_maybe ty2b
-  = canDecomposableTyConAppOK ev eq_rel funTyCon
+  = if af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
+    then canDecomposableTyConAppOK ev eq_rel funTyCon
                               [am1, ty1a_rep, ty1b_rep, ty1a, ty1b]
                               [am2, ty2a_rep, ty2b_rep, ty2a, ty2b]
+    else canEqHardFailure ev ps_ty1 ps_ty2
+      -- in the "else" case, we don't want to fall through, because the TyConApp
+      -- case may trigger, giving a worse error
 
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already
-can_eq_nc' _flat _rdr_env _envs ev eq_rel
-           (TyConApp tc1 tys1) _
-           (TyConApp tc2 tys2) _
-  | not (isTypeFamilyTyCon tc1)
+-- We still have to handle the FunTy case separately, just to avoid decomposing
+-- (Int -> blah) and (Show a => blah).
+can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
+  | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
+  , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
+  , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
@@ -2313,21 +2318,27 @@ canEqOK dflags eq_rel lhs rhs
 
   -- ToDo: These checks are very close to what's done in metaTyVarUpdateOK; combine?
   | TyFamLHS _fam_tc _fam_args <- lhs
-  = ASSERT( good_rhs )
+  = ASSERT2( good_rhs, ppr lhs <+> dcolon <+> ppr lhs_kind $$
+                       ppr rhs <+> dcolon <+> ppr rhs_kind $$
+                       ppr eq_rel )
     if | not (isTauTy rhs)   -> CanEqNotOK OtherCIS   -- TyEq:F
        | badCoercionHole rhs -> CanEqNotOK BlockedCIS -- TyEq:H
        | otherwise           -> CanEqOK rhs
          -- NB: TyEq:OC does not apply
 
   where
-    good_rhs       = kinds_match && no_bad_newtype
-    kinds_match    = canEqLHSKind lhs `tcEqType` tcTypeKind rhs
-    no_bad_newtype | ReprEq <- eq_rel
+    good_rhs       = kinds_match && not bad_newtype
+
+    lhs_kind       = canEqLHSKind lhs
+    rhs_kind       = tcTypeKind rhs
+
+    kinds_match    = lhs_kind `tcEqType` rhs_kind
+
+    bad_newtype    | ReprEq <- eq_rel
                    , Just tc <- tyConAppTyCon_maybe rhs
-                   , isNewTyCon tc
-                   = False
+                   = isNewTyCon tc
                    | otherwise
-                   = True
+                   = False
 
 {- Note [Equalities with incompatible kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1624,6 +1624,11 @@ data NormaliseStepResult ev
                                     -- ^ ev is evidence;
                                     -- Usually a co :: old type ~ new type
 
+instance Outputable ev => Outputable (NormaliseStepResult ev) where
+  ppr NS_Done           = text "NS_Done"
+  ppr NS_Abort          = text "NS_Abort"
+  ppr (NS_Step _ ty ev) = sep [text "NS_Step", ppr ty, ppr ev]
+
 mapStepResult :: (ev1 -> ev2)
               -> NormaliseStepResult ev1 -> NormaliseStepResult ev2
 mapStepResult f (NS_Step rec_nts ty ev) = NS_Step rec_nts ty (f ev)

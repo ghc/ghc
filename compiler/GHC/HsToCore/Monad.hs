@@ -277,12 +277,15 @@ initTcDsForSolver thing_inside
        ; hsc_env    <- getTopEnv
 
        ; let DsGblEnv { ds_mod = mod
-                      , ds_fam_inst_env = fam_inst_env } = gbl
+                      , ds_fam_inst_env = fam_inst_env
+                      , ds_gbl_rdr_env  = rdr_env }      = gbl
+                          -- this is *the* use of ds_gbl_rdr_env
 
              DsLclEnv { dsl_loc = loc }                  = lcl
 
        ; liftIO $ initTc hsc_env HsSrcFile False mod loc $
-         updGblEnv (\tc_gbl -> tc_gbl { tcg_fam_inst_env = fam_inst_env }) $
+         updGblEnv (\tc_gbl -> tc_gbl { tcg_fam_inst_env = fam_inst_env
+                                      , tcg_rdr_env      = rdr_env }) $
          thing_inside }
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
@@ -297,6 +300,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
+                           , ds_gbl_rdr_env  = rdr_env
                            , ds_if_env  = (if_genv, if_lenv)
                            , ds_unqual  = mkPrintUnqualified
                                              (unitState dflags)

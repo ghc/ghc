@@ -157,8 +157,9 @@ data Ct
        --       (this avoids substituting a forall for the tyvar in other types)
        --   * (TyEq:K) tcTypeKind lhs `tcEqKind` tcTypeKind rhs; Note [Ct kind invariant]
        --   * (TyEq:N) If the equality is representational, rhs has no top-level newtype
-       --     See Note [No top-level newtypes on RHS of representational
-       --     equalities] in GHC.Tc.Solver.Canonical
+       --     See Note [No top-level newtypes on RHS of representational equalities]
+       --     in GHC.Tc.Solver.Canonical. (Applies only when constructor of newtype is
+       --     in scope.)
        --   * (TyEq:TV) If rhs (perhaps under a cast) is also CanEqLHS, then it is oriented
        --     to give best chance of
        --     unification happening; eg if rhs is touchable then lhs is too

@@ -12,6 +12,7 @@ import GHC.Types.CostCentre.State
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Var
+import GHC.Types.Name.Reader (GlobalRdrEnv)
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
 import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
 import GHC.HsToCore.PmCheck.Types (Nablas)
@@ -42,6 +43,9 @@ data DsGblEnv
   = DsGblEnv
   { ds_mod          :: Module             -- For SCC profiling
   , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
+  , ds_gbl_rdr_env  :: GlobalRdrEnv       -- needed *only* to know what newtype
+                                          -- constructors are in scope during
+                                          -- pattern-match satisfiability checking
   , ds_unqual  :: PrintUnqualified
   , ds_msgs    :: IORef Messages          -- Warning messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
