@@ -679,3 +679,12 @@ T14452:
 T17786:
 	# N.B. Check for the presence of caret diagnostics.
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v "$(shell cygpath -w -a T17786.hs)" 2>&1 | grep --quiet '3 |'
+
+.PHONY: T18733
+T18733:
+	"$(TEST_HC)" $(TEST_HC_OPTS) T18733.hs T18733_Lib.hs
+	./T18733
+	sed -i "s/if 1/if 0/" T18733_Lib.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) T18733.hs T18733_Lib.hs
+	./T18733
+	sed -i "s/if 0/if 1/" T18733_Lib.hs
