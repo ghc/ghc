@@ -239,7 +239,7 @@ Library
         GHC.Cmm.Lint
         GHC.Cmm.Liveness
         GHC.Cmm.MachOp
-        GHC.Cmm.Monad
+        GHC.Cmm.Parser.Monad
         GHC.Cmm.Switch
         GHC.Cmm.Node
         GHC.Cmm.Opt
