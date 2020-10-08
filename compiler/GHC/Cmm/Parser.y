@@ -234,8 +234,8 @@ import GHC.Cmm.Info
 import GHC.Cmm.BlockId
 import GHC.Cmm.Lexer
 import GHC.Cmm.CLabel
-import GHC.Cmm.Monad hiding (getPlatform, getProfile, getPtrOpts)
-import qualified GHC.Cmm.Monad as PD
+import GHC.Cmm.Parser.Monad hiding (getPlatform, getProfile, getPtrOpts)
+import qualified GHC.Cmm.Parser.Monad as PD
 import GHC.Cmm.CallConv
 import GHC.Runtime.Heap.Layout
 import GHC.Parser.Lexer
@@ -385,9 +385,11 @@ cmmtop  :: { CmmParse () }
         | cmmdata                       { $1 }
         | decl                          { $1 }
         | 'CLOSURE' '(' NAME ',' NAME lits ')' ';'
-                {% liftP . withHomeUnitId $ \pkg ->
-                   do lits <- sequence $6;
-                      staticClosure pkg $3 $5 (map getLit lits) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        lits <- sequence $6;
+                        staticClosure home_unit_id $3 $5 (map getLit lits) }
 
 -- The only static closures in the RTS are dummy closures like
 -- stg_END_TSO_QUEUE_closure and stg_dummy_ret.  We don't need
@@ -406,8 +408,10 @@ cmmdata :: { CmmParse () }
 
 data_label :: { CmmParse CLabel }
     : NAME ':'
-                {% liftP . withHomeUnitId $ \pkg ->
-                   return (mkCmmDataLabel pkg (NeedExternDecl False) $1) }
+                {% do
+                   home_unit_id <- getHomeUnitId
+                   liftP $ pure $ do
+                     pure (mkCmmDataLabel home_unit_id (NeedExternDecl False) $1) }
 
 statics :: { [CmmParse [CmmStatic]] }
         : {- empty -}                   { [] }
@@ -464,103 +468,117 @@ maybe_body :: { CmmParse () }
 
 info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
         : NAME
-                {% liftP . withHomeUnitId $ \pkg ->
-                   do   newFunctionName $1 pkg
-                        return (mkCmmCodeLabel pkg $1, Nothing, []) }
+                {% do
+                     home_unit_id <- getHomeUnitId
+                     liftP $ pure $ do
+                       newFunctionName $1 home_unit_id
+                       return (mkCmmCodeLabel home_unit_id $1, Nothing, []) }
 
 
         | 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, closure type, description, type
-                {% liftP . withHomeUnitId $ \pkg ->
-                   do profile <- getProfile
-                      let prof = profilingInfo profile $11 $13
-                          rep  = mkRTSRep (fromIntegral $9) $
-                                   mkHeapRep profile False (fromIntegral $5)
-                                                   (fromIntegral $7) Thunk
-                              -- not really Thunk, but that makes the info table
-                              -- we want.
-                      return (mkCmmEntryLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                              []) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        profile <- getProfile
+                        let prof = profilingInfo profile $11 $13
+                            rep  = mkRTSRep (fromIntegral $9) $
+                                     mkHeapRep profile False (fromIntegral $5)
+                                                     (fromIntegral $7) Thunk
+                                -- not really Thunk, but that makes the info table
+                                -- we want.
+                        return (mkCmmEntryLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
+                                []) }
 
         | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
                 -- ptrs, nptrs, closure type, description, type, fun type
-                {% liftP . withHomeUnitId $ \pkg ->
-                   do profile <- getProfile
-                      let prof = profilingInfo profile $11 $13
-                          ty   = Fun 0 (ArgSpec (fromIntegral $15))
-                                -- Arity zero, arg_type $15
-                          rep = mkRTSRep (fromIntegral $9) $
-                                    mkHeapRep profile False (fromIntegral $5)
-                                                    (fromIntegral $7) ty
-                      return (mkCmmEntryLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                              []) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        profile <- getProfile
+                        let prof = profilingInfo profile $11 $13
+                            ty   = Fun 0 (ArgSpec (fromIntegral $15))
+                                  -- Arity zero, arg_type $15
+                            rep = mkRTSRep (fromIntegral $9) $
+                                      mkHeapRep profile False (fromIntegral $5)
+                                                      (fromIntegral $7) ty
+                        return (mkCmmEntryLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
+                                []) }
                 -- we leave most of the fields zero here.  This is only used
                 -- to generate the BCO info table in the RTS at the moment.
 
         | 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, tag, closure type, description, type
-                {% liftP . withHomeUnitId $ \pkg ->
-                   do profile <- getProfile
-                      let prof = profilingInfo profile $13 $15
-                          ty  = Constr (fromIntegral $9)  -- Tag
-                                       (BS8.pack $13)
-                          rep = mkRTSRep (fromIntegral $11) $
-                                  mkHeapRep profile False (fromIntegral $5)
-                                                  (fromIntegral $7) ty
-                      return (mkCmmEntryLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing,cit_clo = Nothing },
-                              []) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        profile <- getProfile
+                        let prof = profilingInfo profile $13 $15
+                            ty  = Constr (fromIntegral $9)  -- Tag
+                                         (BS8.pack $13)
+                            rep = mkRTSRep (fromIntegral $11) $
+                                    mkHeapRep profile False (fromIntegral $5)
+                                                    (fromIntegral $7) ty
+                        return (mkCmmEntryLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing,cit_clo = Nothing },
+                                []) }
 
                      -- If profiling is on, this string gets duplicated,
                      -- but that's the way the old code did it we can fix it some other time.
 
         | 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- selector, closure type, description, type
-                {% liftP . withHomeUnitId $ \pkg ->
-                   do profile <- getProfile
-                      let prof = profilingInfo profile $9 $11
-                          ty  = ThunkSelector (fromIntegral $5)
-                          rep = mkRTSRep (fromIntegral $7) $
-                                   mkHeapRep profile False 0 0 ty
-                      return (mkCmmEntryLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                              []) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        profile <- getProfile
+                        let prof = profilingInfo profile $9 $11
+                            ty  = ThunkSelector (fromIntegral $5)
+                            rep = mkRTSRep (fromIntegral $7) $
+                                     mkHeapRep profile False 0 0 ty
+                        return (mkCmmEntryLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
+                                []) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ')'
                 -- closure type (no live regs)
-                {% liftP . withHomeUnitId $ \pkg ->
-                   do let prof = NoProfilingInfo
-                          rep  = mkRTSRep (fromIntegral $5) $ mkStackRep []
-                      return (mkCmmRetLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                              []) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        let prof = NoProfilingInfo
+                            rep  = mkRTSRep (fromIntegral $5) $ mkStackRep []
+                        return (mkCmmRetLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
+                                []) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals0 ')'
                 -- closure type, live regs
-                {% liftP . withHomeUnitId $ \pkg ->
-                   do platform <- getPlatform
-                      live <- sequence $7
-                      let prof = NoProfilingInfo
-                          -- drop one for the info pointer
-                          bitmap = mkLiveness platform (drop 1 live)
-                          rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
-                      return (mkCmmRetLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                              live) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        platform <- getPlatform
+                        live <- sequence $7
+                        let prof = NoProfilingInfo
+                            -- drop one for the info pointer
+                            bitmap = mkLiveness platform (drop 1 live)
+                            rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
+                        return (mkCmmRetLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
+                                live) }
 
 body    :: { CmmParse () }
         : {- empty -}                   { return () }

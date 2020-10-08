@@ -20,7 +20,7 @@ import GHC.Prelude
 import GHC.Cmm.Expr
 
 import GHC.Parser.Lexer
-import GHC.Cmm.Monad
+import GHC.Cmm.Parser.Monad
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 import GHC.Data.StringBuffer
