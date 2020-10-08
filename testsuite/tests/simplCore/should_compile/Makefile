@@ -2,6 +2,17 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+
+# T18815 should not have a non-recursive join-point for 'go'
+# Previously we ended up with
+#      join {go_sPI w_sQ3 = case w_sQ3 of { GHC.Types.I# ww1_sQ6 ->
+#                           jump $wgo_sQ8 ww1_sQ6 } } in
+#      jump go_sPI x_atE
+# With the bug fixed, go is inlined, so the 'join' vanishes
+T18815:
+	$(RM) -f T18815.o T18815.hi
+	- '$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T18815.hs 2> /dev/null | grep 'join '
+
 T17966:
 	$(RM) -f T17966.o T17966.hi
 	- '$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-spec T17966.hs 2> /dev/null | grep 'SPEC'

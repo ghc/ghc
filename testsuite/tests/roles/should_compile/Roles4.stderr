@@ -9,7 +9,7 @@ COERCION AXIOMS
   axiom Roles4.N:C1 :: C1 a = a -> a
   axiom Roles4.N:C3 :: C3 a = a -> Syn1 a
 Dependent modules: []
-Dependent packages: [base-4.14.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
+Dependent packages: [base-4.15.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
 
 ==================== Typechecker ====================
 Roles4.$tcC3
@@ -28,20 +28,19 @@ Roles4.$tc'C:C1
   = GHC.Types.TyCon
       3870707671502302648## 10631907186261837450## Roles4.$trModule
       (GHC.Types.TrNameS "'C:C1"#) 1 $krep
-$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=NOUSERINLINE[~]]
-  = GHC.Types.KindRepFun GHC.Types.krep$* $krep
-$krep [InlPrag=NOUSERINLINE[~]]
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp GHC.Types.$tc[] ((:) $krep [])
-$krep [InlPrag=NOUSERINLINE[~]]
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp GHC.Types.$tcConstraint []
-$krep [InlPrag=NOUSERINLINE[~]]
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp Roles4.$tcC3 ((:) $krep [])
-$krep [InlPrag=NOUSERINLINE[~]]
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp Roles4.$tcC1 ((:) $krep [])
 Roles4.$trModule
   = GHC.Types.Module
