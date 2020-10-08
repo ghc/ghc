@@ -172,7 +172,7 @@ mkIfaceTc hsc_env safe_mode mod_details
   = do
           let used_names = mkUsedNames tc_result
           let pluginModules = map lpModule (cachedPlugins (hsc_dflags hsc_env))
-          let home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+          let home_unit = hsc_home_unit hsc_env
           deps <- mkDependencies (homeUnitId home_unit)
                     (map mi_module pluginModules) tc_result
           let hpc_info = emptyHpcInfo other_hpc_info
@@ -228,7 +228,7 @@ mkIface_ hsc_env
 --      to expose in the interface
 
   = do
-    let home_unit    = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+    let home_unit    = hsc_home_unit hsc_env
         semantic_mod = homeModuleNameInstantiation home_unit (moduleName this_mod)
         entities = typeEnvElts type_env
         show_linear_types = xopt LangExt.LinearTypes (hsc_dflags hsc_env)

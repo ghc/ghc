@@ -7,6 +7,7 @@
 {-# LANGUAGE CPP, TupleSections, ScopedTypeVariables, MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -173,7 +174,7 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
 
            -- Step 1.5: Make sure we don't have any type synonym cycles
        ; traceTc "Starting synonym cycle check" (ppr tyclss)
-       ; home_unit <- mkHomeUnitFromFlags <$> getDynFlags
+       ; home_unit <- hsc_home_unit <$> getTopEnv
        ; checkSynCycles (homeUnitAsUnit home_unit) tyclss tyclds
        ; traceTc "Done synonym cycle check" (ppr tyclss)
 
@@ -4094,6 +4095,36 @@ checkValidDataCon dflags existential_ok tc con
           -- Check that UNPACK pragmas and bangs work out
           -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"
           --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
+        ; hsc_env <- getTopEnv
+        ; let check_bang :: HsSrcBang -> HsImplBang -> Int -> TcM ()
+              check_bang bang rep_bang n
+               | HsSrcBang _ _ SrcLazy <- bang
+               , not (xopt LangExt.StrictData dflags)
+               = addErrTc (bad_bang n (text "Lazy annotation (~) without StrictData"))
+
+               | HsSrcBang _ want_unpack strict_mark <- bang
+               , isSrcUnpacked want_unpack, not (is_strict strict_mark)
+               = addWarnTc NoReason (bad_bang n (text "UNPACK pragma lacks '!'"))
+
+               | HsSrcBang _ want_unpack _ <- bang
+               , isSrcUnpacked want_unpack
+               , case rep_bang of { HsUnpack {} -> False; _ -> True }
+               -- If not optimising, we don't unpack (rep_bang is never
+               -- HsUnpack), so don't complain!  This happens, e.g., in Haddock.
+               -- See dataConSrcToImplBang.
+               , not (gopt Opt_OmitInterfacePragmas dflags)
+               -- When typechecking an indefinite package in Backpack, we
+               -- may attempt to UNPACK an abstract type.  The test here will
+               -- conclude that this is unusable, but it might become usable
+               -- when we actually fill in the abstract type.  As such, don't
+               -- warn in this case (it gives users the wrong idea about whether
+               -- or not UNPACK on abstract types is supported; it is!)
+               , isHomeUnitDefinite (hsc_home_unit hsc_env)
+               = addWarnTc NoReason (bad_bang n (text "Ignoring unusable UNPACK pragma"))
+
+               | otherwise
+               = return ()
+
         ; zipWith3M_ check_bang (dataConSrcBangs con) (dataConImplBangs con) [1..]
 
           -- Check the dcUserTyVarBinders invariant
@@ -4125,36 +4156,9 @@ checkValidDataCon dflags existential_ok tc con
     }
   where
     ctxt = ConArgCtxt (dataConName con)
-
-    check_bang :: HsSrcBang -> HsImplBang -> Int -> TcM ()
-    check_bang (HsSrcBang _ _ SrcLazy) _ n
-      | not (xopt LangExt.StrictData dflags)
-      = addErrTc
-          (bad_bang n (text "Lazy annotation (~) without StrictData"))
-    check_bang (HsSrcBang _ want_unpack strict_mark) rep_bang n
-      | isSrcUnpacked want_unpack, not is_strict
-      = addWarnTc NoReason (bad_bang n (text "UNPACK pragma lacks '!'"))
-      | isSrcUnpacked want_unpack
-      , case rep_bang of { HsUnpack {} -> False; _ -> True }
-      -- If not optimising, we don't unpack (rep_bang is never
-      -- HsUnpack), so don't complain!  This happens, e.g., in Haddock.
-      -- See dataConSrcToImplBang.
-      , not (gopt Opt_OmitInterfacePragmas dflags)
-      -- When typechecking an indefinite package in Backpack, we
-      -- may attempt to UNPACK an abstract type.  The test here will
-      -- conclude that this is unusable, but it might become usable
-      -- when we actually fill in the abstract type.  As such, don't
-      -- warn in this case (it gives users the wrong idea about whether
-      -- or not UNPACK on abstract types is supported; it is!)
-      , isHomeUnitDefinite (mkHomeUnitFromFlags dflags)
-      = addWarnTc NoReason (bad_bang n (text "Ignoring unusable UNPACK pragma"))
-      where
-        is_strict = case strict_mark of
-                      NoSrcStrict -> xopt LangExt.StrictData dflags
-                      bang        -> isSrcStrict bang
-
-    check_bang _ _ _
-      = return ()
+    is_strict = \case
+      NoSrcStrict -> xopt LangExt.StrictData dflags
+      bang        -> isSrcStrict bang
 
     bad_bang n herald
       = hang herald 2 (text "on the" <+> speakNth n

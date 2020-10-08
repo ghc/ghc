@@ -600,9 +600,9 @@ checkBrokenTablesNextToCode' dflags
 -- can ignore the list of packages returned.
 --
 setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
-setSessionDynFlags dflags = do
-  dflags' <- checkNewDynFlags dflags
-  dflags''' <- liftIO $ initUnits dflags'
+setSessionDynFlags dflags0 = do
+  dflags1 <- checkNewDynFlags dflags0
+  dflags <- liftIO $ initUnits dflags1
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -637,11 +637,12 @@ setSessionDynFlags dflags = do
       return Nothing
 #endif
 
-  modifySession $ \h -> h{ hsc_dflags = dflags'''
-                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags''' }
+  modifySession $ \h -> h{ hsc_dflags = dflags
+                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags }
                          , hsc_interp = hsc_interp h <|> interp
                            -- we only update the interpreter if there wasn't
                            -- already one set up
+                         , hsc_home_unit = mkHomeUnitFromFlags dflags
                          }
   invalidateModSummaryCache
 
@@ -1171,7 +1172,7 @@ getPrintUnqual = withSession $ \hsc_env -> do
   let dflags = hsc_dflags hsc_env
   return $ icPrintUnqual
                (unitState dflags)
-               (mkHomeUnitFromFlags dflags)
+               (hsc_home_unit hsc_env)
                (hsc_IC hsc_env)
 
 -- | Container for information about a 'Module'.
@@ -1270,7 +1271,7 @@ mkPrintUnqualifiedForModule minf = withSession $ \hsc_env -> do
   let dflags          = hsc_dflags hsc_env
       mk_print_unqual = mkPrintUnqualified
                            (unitState dflags)
-                           (mkHomeUnitFromFlags dflags)
+                           (hsc_home_unit hsc_env)
   return (fmap mk_print_unqual (minf_rdr_env minf))
 
 modInfoLookupName :: GhcMonad m =>
@@ -1279,10 +1280,7 @@ modInfoLookupName :: GhcMonad m =>
 modInfoLookupName minf name = withSession $ \hsc_env -> do
    case lookupTypeEnv (minf_type_env minf) name of
      Just tyThing -> return (Just tyThing)
-     Nothing      -> do
-       eps <- liftIO $ readIORef (hsc_EPS hsc_env)
-       return $! lookupType (hsc_dflags hsc_env)
-                            (hsc_HPT hsc_env) (eps_PTE eps) name
+     Nothing      -> liftIO (lookupType hsc_env name)
 
 modInfoIface :: ModuleInfo -> Maybe ModIface
 modInfoIface = minf_iface
@@ -1308,7 +1306,7 @@ isDictonaryId id
 -- 'setContext'.
 lookupGlobalName :: GhcMonad m => Name -> m (Maybe TyThing)
 lookupGlobalName name = withSession $ \hsc_env -> do
-   liftIO $ lookupTypeHscEnv hsc_env name
+   liftIO $ lookupType hsc_env name
 
 findGlobalAnns :: (GhcMonad m, Typeable a) => ([Word8] -> a) -> AnnTarget Name -> m [a]
 findGlobalAnns deserialize target = withSession $ \hsc_env -> do
@@ -1501,7 +1499,7 @@ showRichTokenStream ts = go startLoc ts ""
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
   let dflags = hsc_dflags hsc_env
-      home_unit = mkHomeUnitFromFlags dflags
+      home_unit = hsc_home_unit hsc_env
   case maybe_pkg of
     Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg

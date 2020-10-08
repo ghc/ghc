@@ -811,7 +811,7 @@ getContext = withSession $ \HscEnv{ hsc_IC=ic } ->
 -- its full top-level scope available.
 moduleIsInterpreted :: GhcMonad m => Module -> m Bool
 moduleIsInterpreted modl = withSession $ \h ->
- if notHomeModule (mkHomeUnitFromFlags (hsc_dflags h)) modl
+ if notHomeModule (hsc_home_unit h) modl
         then return False
         else case lookupHpt (hsc_HPT h) (moduleName modl) of
                 Just details       -> return (isJust (mi_globals (hm_iface details)))

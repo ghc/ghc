@@ -1556,7 +1556,7 @@ mkConvertNumLiteral hsc_env = do
    let
       dflags   = hsc_dflags hsc_env
       platform = targetPlatform dflags
-      home_unit = mkHomeUnitFromFlags dflags
+      home_unit = hsc_home_unit hsc_env
       guardBignum act
          | isHomeUnitInstanceOf home_unit primUnitId
          = return $ panic "Bignum literals are not supported in ghc-prim"

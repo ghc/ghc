@@ -43,7 +43,6 @@ import GHC.Tc.Utils.Monad
 
 import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Unit
-import GHC.Driver.Types ( Warnings(..), plusWarns )
 import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
                         , semigroupClassName, sappendName
@@ -61,7 +60,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
 import GHC.Utils.Misc   ( debugIsOn, lengthExceeds, partitionWith )
 import GHC.Utils.Panic
-import GHC.Driver.Types ( HscEnv, hsc_dflags )
+import GHC.Driver.Types ( Warnings(..), plusWarns, HscEnv(..))
 import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
@@ -350,7 +349,7 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
 
         -- Mark any PackageTarget style imports as coming from the current package
-       ; let home_unit = mkHomeUnitFromFlags (hsc_dflags topEnv)
+       ; let home_unit = hsc_home_unit topEnv
              spec'  = patchForeignImport (homeUnitAsUnit home_unit) spec
 
        ; return (ForeignImport { fd_i_ext = noExtField
