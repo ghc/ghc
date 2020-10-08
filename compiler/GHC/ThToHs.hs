@@ -1926,7 +1926,7 @@ isTyConName :: TH.Name -> Bool
 isTyConName name
   = case nameSpace name of
       Just TcClsName -> True
-      Nothing        -> False
+      _              -> False
 
 badOcc :: OccName.NameSpace -> String -> SDoc
 badOcc ctxt_ns occ
