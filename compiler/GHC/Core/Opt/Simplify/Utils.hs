@@ -1190,7 +1190,7 @@ However, as usual for Gentle mode, do not inline things that are
 inactive in the initial stages.  See Note [Gentle mode].
 
 Note [Stable unfoldings and preInlineUnconditionally]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Surprisingly, do not pre-inline-unconditionally Ids with INLINE pragmas!
 Example
 
@@ -1210,10 +1210,18 @@ the application is saturated for exactly this reason; and we don't
 want PreInlineUnconditionally to second-guess it. A live example is #3736.
     c.f. Note [Stable unfoldings and postInlineUnconditionally]
 
-NB: if the pragma is INLINEABLE, then we don't want to behave in
-this special way -- an INLINEABLE pragma just says to GHC "inline this
-if you like".  But if there is a unique occurrence, we want to inline
-the stable unfolding, not the RHS.
+NB: this only applies for INLINE things. Do /not/ switch off
+preInlineUnconditionally for
+
+* INLINABLE. It just says to GHC "inline this if you like".  If there
+  is a unique occurrence, we want to inline the stable unfolding, not
+  the RHS.
+
+* NONLINE[n] just switches off inlining until phase n.  We should
+  respect that, but after phase n, just behave as usual.
+
+* NoUserInlinePrag.  There is no pragma at all. This ends up on wrappers.
+  (See #18815.)
 
 Note [Top-level bottoming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1247,7 +1255,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | not (isStableUnfolding unf)              = Just (extend_subst_with rhs)
 
   -- Note [Stable unfoldings and preInlineUnconditionally]
-  | isInlinablePragma inline_prag
+  | not (isInlinePragma inline_prag)
   , Just inl <- maybeUnfoldingTemplate unf   = Just (extend_subst_with inl)
   | otherwise                                = Nothing
   where
