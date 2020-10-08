@@ -1,8 +1,7 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving
-           , NoImplicitPrelude
-           , BangPatterns
-  #-}
+{-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE Trustworthy                #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -50,8 +49,7 @@ import GHC.Base
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral, div)
 import GHC.Show (Show)
-import System.Posix.Internals (c_close)
-import System.Posix.Internals (setCloseOnExec)
+import System.Posix.Internals (c_close, setCloseOnExec)
 import System.Posix.Types (Fd(..))
 
 import qualified GHC.Event.Array    as A

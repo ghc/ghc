@@ -423,6 +423,8 @@ test ('T13253-spj',
       ['-v0 -O'])
 test ('T18223',
       [ collect_compiler_stats('bytes allocated',2)
+      , compile_timeout_multiplier(2)
+        # needed for the unregistered build (#18795)
       ],
       compile,
       ['-v0 -O'])
