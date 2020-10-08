@@ -62,7 +62,7 @@ T3772.$wfoo
       }
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
-foo [InlPrag=NOUSERINLINE[final]] :: Int -> ()
+foo [InlPrag=[final]] :: Int -> ()
 [GblId,
  Arity=1,
  Str=<S,1*U(U)>,
