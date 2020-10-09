@@ -29,6 +29,8 @@ for l in linters:
     # Don't lint font files
     l.add_path_filter(lambda path: not path.parent == Path('docs','users_guide',
         'rtd-theme', 'static', 'fonts'))
+    # Don't lint files from external xxhash projects
+    l.add_path_filter(lambda path: not path.parent == Path('utils', 'xxhash')),
     # Don't lint image files
     l.add_path_filter(lambda path: not path.parent == Path('docs','users_guide',
         'images'))
