@@ -33,3 +33,12 @@ Compiler
 
 - ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
+
+
+Runtime system
+~~~~~~~~~~~~~~
+
+* Upgraded Hash function for faster linker operations.
+
+* Changed hashing function for interface files from MD5 to xxHash.
+
