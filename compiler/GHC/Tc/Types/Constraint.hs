@@ -1294,14 +1294,30 @@ worrying that 'b' might clash.
 
 Note [Skolems in an implication]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The skolems in an implication are not there to perform a skolem escape
-check.  That happens because all the environment variables are in the
-untouchables, and therefore cannot be unified with anything at all,
-let alone the skolems.
+The skolems in an implication are used:
 
-Instead, ic_skols is used only when considering floating a constraint
-outside the implication in GHC.Tc.Solver.floatEqualities or
-GHC.Tc.Solver.approximateImplications
+* When considering floating a constraint outside the implication in
+  GHC.Tc.Solver.floatEqualities or GHC.Tc.Solver.approximateImplications
+  For this, we can treat ic_skols as a set.
+
+* When checking that a /user-specified/ forall (ic_info = ForAllSkol tvs)
+  has its variables in the correct order; see Note [Checking telescopes].
+  Only for these implications does ic_skols need to be a list.
+
+Nota bene: Although ic_skols is a list, it is not necessarily
+in dependency order:
+- In the ic_info=ForAllSkol case, the user might have written them
+  in the wrong order
+- In the case of a type signature like
+      f :: [a] -> [b]
+  the renamer gathers the implicit "outer" forall'd variables {a,b}, but
+  does not know what order to put them in.  The type checker can sort them
+  into dependency order, but only after solving all the kind constraints;
+  and to do that it's convenient to create the Implication!
+
+So we accept that ic_skols may be out of order.  Think of it as a set or
+(in the case of ic_info=ForAllSkol, a list in user-specified, and possibly
+wrong, order.
 
 Note [Insoluble constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -79,6 +79,7 @@ module GHC.Types.Var (
         isTyVarBinder,
         tyVarSpecToBinder, tyVarSpecToBinders, tyVarReqToBinder, tyVarReqToBinders,
         mapVarBndr, mapVarBndrs, lookupVarBndr,
+        transferArgFlag, transferArgFlags,
 
         -- ** Constructing TyVar's
         mkTyVar, mkTcTyVar,
@@ -656,6 +657,12 @@ tyVarReqToBinders = map tyVarReqToBinder
 
 tyVarReqToBinder :: VarBndr a () -> VarBndr a ArgFlag
 tyVarReqToBinder (Bndr tv _) = Bndr tv Required
+
+transferArgFlag :: VarBndr var1 argf1 -> var2 -> VarBndr var2 argf1
+transferArgFlag (Bndr _ af) v2 = Bndr v2 af
+
+transferArgFlags :: [VarBndr var1 argf1] -> [var2] -> [VarBndr var2 argf1]
+transferArgFlags = zipWithEqual "transferArgFlags" transferArgFlag
 
 binderVar :: VarBndr tv argf -> tv
 binderVar (Bndr v _) = v

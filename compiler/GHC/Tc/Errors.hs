@@ -438,7 +438,12 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs
   where
     tcl_env      = ic_env implic
     insoluble    = isInsolubleStatus status
-    (env1, tvs') = mapAccumL tidyVarBndr (cec_tidy ctxt) tvs
+    (env1, tvs') = mapAccumL tidyVarBndr (cec_tidy ctxt) $
+                   scopedSort tvs
+        -- scopedSort: the ic_skols may not be in dependency order
+        -- (see Note [Skolems in an implication] in GHC.Tc.Types.Constraint)
+        -- but tidying goes wrong on out-of-order constraints;
+        -- so we sort them here before tidying
     info'        = tidySkolemInfo env1 info
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env1) given

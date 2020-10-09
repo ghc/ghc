@@ -380,16 +380,19 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
              univ_tvs   = binderVars univ_bndrs
              ex_tvs     = binderVars ex_bndrs
 
-         -- Skolemise the universals. This is necessary in order to check the actual pattern
-         -- type against the expected type. Even though the tyvars in the type are already
-         -- skolems, this step changes their TcLevels, avoiding level-check errors when
-         -- unifying.
+         -- Skolemise the quantified type variables. This is necessary
+         -- in order to check the actual pattern type against the
+         -- expected type. Even though the tyvars in the type are
+         -- already skolems, this step changes their TcLevels,
+         -- avoiding level-check errors when unifying.
        ; (skol_subst0, skol_univ_tvs) <- tcInstSkolTyVars univ_tvs
-       ; let skol_req_theta  = substTheta skol_subst0 req_theta
        ; (skol_subst, skol_ex_tvs)    <- tcInstSkolTyVarsX skol_subst0 ex_tvs
-       ; let skol_prov_theta = substTheta skol_subst prov_theta
-             skol_arg_tys    = substTys skol_subst (map scaledThing arg_tys)
-             skol_pat_ty     = substTy skol_subst pat_ty
+       ; let skol_univ_bndrs = transferArgFlags univ_bndrs skol_univ_tvs
+             skol_ex_bndrs   = transferArgFlags ex_bndrs   skol_ex_tvs
+             skol_req_theta  = substTheta skol_subst0 req_theta
+             skol_prov_theta = substTheta skol_subst  prov_theta
+             skol_arg_tys    = substTys   skol_subst  (map scaledThing arg_tys)
+             skol_pat_ty     = substTy    skol_subst  pat_ty
 
              univ_tv_prs     = [ (getName orig_univ_tv, skol_univ_tv)
                                | (orig_univ_tv, skol_univ_tv) <- univ_tvs `zip` skol_univ_tvs ]
@@ -434,16 +437,6 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        -- ToDo: in the bidirectional case, check that the ex_tvs' are all distinct
        -- Otherwise we may get a type error when typechecking the builder,
        -- when that should be impossible
-
-       -- Need to get Specificities right for univ_bndrs
-       ; let skol_univ_bndrs = zipWithEqual "tcCheckPatSynDecl"
-                                 xfer_specificity univ_bndrs skol_univ_tvs
-             skol_ex_bndrs   = zipWithEqual "tcCheckPatSynDecl2"
-                                 xfer_specificity ex_bndrs skol_ex_tvs
-
-             xfer_specificity :: VarBndr var Specificity -> TyVar
-                              -> VarBndr TyVar Specificity
-             xfer_specificity bndr tv = mkTyVarBinder (binderArgFlag bndr) tv
 
        ; traceTc "tcCheckPatSynDecl }" $ ppr name
 
