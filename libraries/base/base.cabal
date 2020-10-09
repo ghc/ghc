@@ -35,7 +35,8 @@ extra-source-files:
     include/EventConfig.h.in
     include/HsBaseConfig.h.in
     include/ieee-flpt.h
-    include/md5.h
+    include/HsHash.h
+    include/xxhash.h
     include/fs.h
     include/winio_structs.h
     install-sh
@@ -342,7 +343,8 @@ Library
         cbits/WCsubst.c
         cbits/iconv.c
         cbits/inputReady.c
-        cbits/md5.c
+        cbits/xxhash.c
+        cbits/HsHash.c
         cbits/primFloat.c
         cbits/sysconf.c
         cbits/fs.c
@@ -353,6 +355,7 @@ Library
     include-dirs: include
     includes:
         HsBase.h
+        HsHash.h
     install-includes:
         HsBase.h
         WCsubst.h

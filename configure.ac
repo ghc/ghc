@@ -753,6 +753,12 @@ ln -f utils/fs/fs.* utils/unlit/
 ln -f utils/fs/fs.* rts/
 ln -f utils/fs/fs.h libraries/base/include/
 ln -f utils/fs/fs.c libraries/base/cbits/
+dnl ** Copy the files from the "xxhash" library into the right folders.
+dnl --------------------------------------------------------------
+AC_MSG_NOTICE([Creating links for in-tree xxhash routines.])
+ln -f utils/xxhash/xxh*.* rts/
+ln -f utils/xxhash/xxhash.h libraries/base/include/
+ln -f utils/xxhash/xxh*.c libraries/base/cbits/
 AC_MSG_NOTICE([Routines in place. Packages can now be build normally.])
 
 dnl --------------------------------------------------------------
