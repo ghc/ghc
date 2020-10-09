@@ -1,14 +1,14 @@
 [1 of 3] Processing p
-  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
-  [2 of 2] Compiling B                ( p/B.hs, nothing )
+  [1 of 2] Compiling A[sig]           ( p\A.hsig, nothing )
+  [2 of 2] Compiling B                ( p\B.hs, nothing )
 [2 of 3] Processing a
   Instantiating a
-  [1 of 1] Compiling A                ( a/A.hs, bkpfail45.out/a/A.o )
+  [1 of 1] Compiling A                ( a\A.hs, bkpfail45.out\a\A.o )
 [3 of 3] Processing q
   Instantiating q
   [1 of 1] Including p[A=a:A]
     Instantiating p[A=a:A]
-    [1 of 2] Compiling A[sig]           ( p/A.hsig, bkpfail45.out/p/p-KvF5Y9pEVY39j64PHPNj9i/A.o )
+    [1 of 2] Compiling A[sig]           ( p\A.hsig, bkpfail45.out\p\p-CX29OZ3GML9H7Lv65JXWQ6\A.o )
 
 bkpfail45.bkp:13:9: error:
     • Type constructor ‘T’ has conflicting definitions in the module

@@ -195,6 +195,9 @@ utils/unlit/fs.*
 rts/fs.*
 libraries/base/include/fs.h
 libraries/base/cbits/fs.c
+rts/xxh*.*
+libraries/base/include/xxhash.h
+libraries/base/cbits/xxh*.c
 missing-win32-tarballs
 
 /extra-gcc-opts
