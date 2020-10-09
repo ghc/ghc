@@ -199,14 +199,15 @@ casTestAddr = do
   where
     work :: Ptr Word -> Word -> Word -> IO ()
     work ptr 0 val = return ()
-    work ptr n val = add ptr 0 val >> work ptr (n-1) val
+    work ptr n val = add ptr val >> work ptr (n-1) val
 
     -- Fetch-and-add implemented using CAS.
-    add :: Ptr Word -> Int -> Word -> IO ()
-    add ptr ix n = do
-        old <- peekElemOff ptr ix
-        old' <- casElemOffWord ptr ix old (old + n)
-        when (old /= old') $ add ptr ix n
+    add :: Ptr Word -> Word -> IO ()
+    add ptr n = peek ptr >>= go
+      where
+        go old = do
+            old' <- casWord ptr old (old + n)
+            when (old /= old') $ go old'
 
     -- | Create two threads that mutate the byte array passed to them
     -- concurrently. The array is one word large.
@@ -305,9 +306,9 @@ casIntArray (MBA mba#) (I# ix#) (I# old#) (I# new#) = IO $ \ s# ->
 ------------------------------------------------------------------------
 -- Wrappers around Addr#
 
--- Should this be added to Foreign.Storable?  Similar to pokeElemOff,
--- but does the update atomically.
-casElemOffWord :: Ptr Word -> Int -> Word -> Word -> IO Word
-casElemOffWord (Ptr addr#) (I# ix#) (W# old#) (W# new#) = IO $ \ s# ->
-    case casWordOffAddr# addr# ix# old# new# s# of
+-- Should this be added to Foreign.Storable?  Similar to poke, but does the
+-- update atomically.
+casWord :: Ptr Word -> Word -> Word -> IO Word
+casWord (Ptr addr#) (W# old#) (W# new#) = IO $ \ s# ->
+    case casWordAddr# addr# old# new# s# of
         (# s2#, old2# #) -> (# s2#, W# old2# #)

@@ -4,8 +4,8 @@
 
 module M where
 
-import GHC.Exts (atomicExchangeInt#, Int#, Addr#, State# )
+import GHC.Exts (atomicExchangeWord#, Word#, Addr#, State# )
 
-swap :: Addr# -> Int# -> State# s -> (# #)
-swap ptr val s = case (atomicExchangeInt# ptr val s) of
+swap :: Addr# -> Word# -> State# s -> (# #)
+swap ptr val s = case (atomicExchangeWord# ptr val s) of
             (# s2, old_val #) -> (# #)
