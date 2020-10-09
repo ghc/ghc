@@ -705,7 +705,7 @@ Note [Fingerprinting IfaceDecls]
 The general idea here is that we first examine the 'IfaceDecl's and determine
 the recursive groups of them. We then walk these groups in dependency order,
 serializing each contained 'IfaceDecl' to a "Binary" buffer which we then
-hash using MD5 to produce a fingerprint for the group.
+hash using Hash to produce a fingerprint for the group.
 
 However, the serialization that we use is a bit funny: we override the @putName@
 operation with our own which serializes the hash of a 'Name' instead of the

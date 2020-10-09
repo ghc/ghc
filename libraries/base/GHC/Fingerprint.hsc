@@ -31,8 +31,7 @@ import System.IO
 
 import GHC.Fingerprint.Type
 
--- for SIZEOF_STRUCT_MD5CONTEXT:
-#include "HsBaseConfig.h"
+#include "HsHash.h"
 
 -- XXX instance Storable Fingerprint
 -- defined in Foreign.Storable to avoid orphan instance
@@ -47,11 +46,11 @@ fingerprintFingerprints fs = unsafeDupablePerformIO $
 
 fingerprintData :: Ptr Word8 -> Int -> IO Fingerprint
 fingerprintData buf len =
-  allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do
-    c_MD5Init pctxt
-    c_MD5Update pctxt buf (fromIntegral len)
+  allocaBytes (#const sizeof(XXH3_state_t)) $ \pctxt -> do
+    c_HashInit pctxt
+    c_HashUpdate pctxt buf (fromIntegral len)
     allocaBytes 16 $ \pdigest -> do
-      c_MD5Final pdigest pctxt
+      c_HashFinal pctxt pdigest
       peek (castPtr pdigest :: Ptr Fingerprint)
 
 fingerprintString :: String -> Fingerprint
@@ -72,13 +71,13 @@ fingerprintString str = unsafeDupablePerformIO $
 -- @since 4.7.0.0
 getFileHash :: FilePath -> IO Fingerprint
 getFileHash path = withBinaryFile path ReadMode $ \h ->
-  allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do
-    c_MD5Init pctxt
+  allocaBytes  (#const sizeof(XXH3_state_t)) $ \pctxt -> do
+    c_HashInit pctxt
 
-    processChunks h (\buf size -> c_MD5Update pctxt buf (fromIntegral size))
+    processChunks h (\buf size -> c_HashUpdate pctxt buf (fromIntegral size))
 
     allocaBytes 16 $ \pdigest -> do
-      c_MD5Final pdigest pctxt
+      c_HashFinal pctxt pdigest
       peek (castPtr pdigest :: Ptr Fingerprint)
 
   where
@@ -101,11 +100,11 @@ getFileHash path = withBinaryFile path ReadMode $ \h ->
 
       in loop
 
-data MD5Context
+data HashContext
 
-foreign import ccall unsafe "__hsbase_MD5Init"
-   c_MD5Init   :: Ptr MD5Context -> IO ()
-foreign import ccall unsafe "__hsbase_MD5Update"
-   c_MD5Update :: Ptr MD5Context -> Ptr Word8 -> CInt -> IO ()
-foreign import ccall unsafe "__hsbase_MD5Final"
-   c_MD5Final  :: Ptr Word8 -> Ptr MD5Context -> IO ()
+foreign import ccall unsafe "__hsbase_hash_init"
+   c_HashInit   :: Ptr HashContext -> IO ()
+foreign import ccall unsafe "__hsbase_hash_update"
+   c_HashUpdate :: Ptr HashContext -> Ptr Word8 -> CInt -> IO ()
+foreign import ccall unsafe "__hsbase_hash_final"
+   c_HashFinal  :: Ptr HashContext -> Ptr Word64 -> IO ()
