@@ -2,18 +2,17 @@ TYPE CONSTRUCTORS
   data type T{2} :: forall k. k -> *
     roles nominal representational
 Dependent modules: []
-Dependent packages: [array-0.5.4.0, base-4.14.0.0, deepseq-1.4.4.0,
-                     ghc-bignum-1.0, ghc-boot-th-8.9.0.20191106, ghc-prim-0.7.0,
-                     pretty-1.1.3.6, template-haskell-2.16.0.0]
+Dependent packages: [array-0.5.4.0, base-4.15.0.0, deepseq-1.4.4.0,
+                     ghc-bignum-1.0, ghc-boot-th-9.1.0.20201005, ghc-prim-0.7.0,
+                     pretty-1.1.3.6, template-haskell-2.17.0.0]
 
 ==================== Typechecker ====================
 TH_Roles2.$tcT
   = GHC.Types.TyCon
       11651627537942629178## 11503899791410937231## TH_Roles2.$trModule
       (GHC.Types.TrNameS "T"#) 1 $krep
-$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=NOUSERINLINE[~]]
-  = GHC.Types.KindRepFun $krep GHC.Types.krep$*
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep GHC.Types.krep$*
 TH_Roles2.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "TH_Roles2"#)
