@@ -45,6 +45,13 @@ Highlights
   This improves runtime but causes increased memory usage on Windows versions
   older than Win 8.1/Server 2012.
 
+* Windows: New IO Manager.
+
+  A new I/O manager (WinIO) is now available as a community technical preview which is designed to allow experimentation and
+  bootstrapping of third-party packages such as Network.   The new I/O manager is off by default and can be enabled with the
+  RTS flag ``--io-manager=native``.  Currently the I/O manager is *unoptimized* and is focused more on correctness.  There is also
+  no support for pipes and sockets.  These will be added in the next release.  `*see more* <https://www.youtube.com/watch?v=kgNh5mdZ1xw>`__.
+
 * Big-number support
 
   - GHC now relies on a new ``ghc-bignum`` package to provide Integer/Natural
