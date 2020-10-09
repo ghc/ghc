@@ -22,8 +22,6 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE LinearTypes #-}
 
-{-# OPTIONS_GHC -fno-warn-unused-top-binds -ddump-to-file -ddump-simpl -dsuppress-all #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Typeable.Internal
