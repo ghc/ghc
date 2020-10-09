@@ -1092,7 +1092,16 @@ genCCall target dest_regs arg_regs bid = do
       -- this will give us the format information to match on.
       arg_regs' <- mapM getSomeReg arg_regs
 
-      (stackArgs, passRegs, passArgumentsCode) <- passArguments allGpArgRegs allFpArgRegs arg_regs' 0 [] nilOL
+      platform <- getPlatform
+      let packStack = platformOS platform == OSDarwin
+
+      (stackSpace', passRegs, passArgumentsCode) <- passArguments packStack allGpArgRegs allFpArgRegs arg_regs' 0 [] nilOL
+
+      -- if we pack the stack, we may need to adjust to multiple of 8byte.
+      -- if we don't pack the stack, it will always be multiple of 8.
+      let stackSpace = if stackSpace' `mod` 8 /= 0
+                       then 8 * (stackSpace' `div` 8 + 1)
+                       else stackSpace'
 
       (returnRegs, readResultsCode)   <- readResults allGpArgRegs allFpArgRegs dest_regs [] nilOL
 
@@ -1110,11 +1119,11 @@ genCCall target dest_regs arg_regs bid = do
                                , DELTA 0 ]
 
       let code =    call_target_code          -- compute the label (possibly into a register)
-            `appOL` moveStackDown stackArgs
+            `appOL` moveStackDown (stackSpace `div` 8)
             `appOL` passArgumentsCode         -- put the arguments into x0, ...
             `appOL` (unitOL $ BL call_target passRegs returnRegs) -- branch and link.
             `appOL` readResultsCode           -- parse the results into registers
-            `appOL` moveStackUp stackArgs
+            `appOL` moveStackUp (stackSpace `div` 8)
       return (code, Nothing)
 
     -- or a possibly side-effecting machine operation
@@ -1237,17 +1246,17 @@ genCCall target dest_regs arg_regs bid = do
       genCCall (ForeignTarget target cconv) dest_regs arg_regs bid
 
     -- XXX: Optimize using paired load LDP
-    passArguments :: [Reg] -> [Reg] -> [(Reg, Format, InstrBlock)] -> Int -> [Reg] -> InstrBlock -> NatM (Int, [Reg], InstrBlock)
-    passArguments _ _ [] stackArgs accumRegs accumCode = return (stackArgs, accumRegs, accumCode)
-    -- passArguments _ _ [] accumCode stackArgs | isEven stackArgs = return $ SUM (OpReg W64 x31) (OpReg W64 x31) OpImm (ImmInt (-8 * stackArgs))
-    -- passArguments _ _ [] accumCode stackArgs = return $ SUM (OpReg W64 x31) (OpReg W64 x31) OpImm (ImmInt (-8 * (stackArgs + 1)))
+    passArguments :: Bool -> [Reg] -> [Reg] -> [(Reg, Format, InstrBlock)] -> Int -> [Reg] -> InstrBlock -> NatM (Int, [Reg], InstrBlock)
+    passArguments _packStack _ _ [] stackSpace accumRegs accumCode = return (stackSpace, accumRegs, accumCode)
+    -- passArguments _ _ [] accumCode stackSpace | isEven stackSpace = return $ SUM (OpReg W64 x31) (OpReg W64 x31) OpImm (ImmInt (-8 * stackSpace))
+    -- passArguments _ _ [] accumCode stackSpace = return $ SUM (OpReg W64 x31) (OpReg W64 x31) OpImm (ImmInt (-8 * (stackSpace + 1)))
     -- passArguments [] fpRegs (arg0:arg1:args) stack accumCode = do
     --   -- allocate this on the stack
     --   (r0, format0, code_r0) <- getSomeReg arg0
     --   (r1, format1, code_r1) <- getSomeReg arg1
     --   let w0 = formatToWidth format0
     --       w1 = formatToWidth format1
-    --       stackCode = unitOL $ STP (OpReg w0 r0) (OpReg w1 R1), (OpAddr (AddrRegImm x31 (ImmInt (stackArgs * 8)))
+    --       stackCode = unitOL $ STP (OpReg w0 r0) (OpReg w1 R1), (OpAddr (AddrRegImm x31 (ImmInt (stackSpace * 8)))
     --   passArguments gpRegs (fpReg:fpRegs) args (stackCode `appOL` accumCode)
 
       -- float promotion.
@@ -1276,34 +1285,40 @@ genCCall target dest_regs arg_regs bid = do
       -- For AArch64 specificies see: https://developer.arm.com/docs/ihi0055/latest/procedure-call-standard-for-the-arm-64-bit-architecture
       --
     -- Still have GP regs, and we want to pass an GP argument.
-    passArguments (gpReg:gpRegs) fpRegs ((r, format, code_r):args) stackArgs accumRegs accumCode | isIntFormat format = do
+    passArguments pack (gpReg:gpRegs) fpRegs ((r, format, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
       let w = formatToWidth format
-      passArguments gpRegs fpRegs args stackArgs (gpReg:accumRegs) (accumCode `appOL` code_r `snocOL` (ANN (text $ "Pass gp argument: " ++ show r) $ MOV (OpReg w gpReg) (OpReg w r)))
+      passArguments pack gpRegs fpRegs args stackSpace (gpReg:accumRegs) (accumCode `appOL` code_r `snocOL` (ANN (text $ "Pass gp argument: " ++ show r) $ MOV (OpReg w gpReg) (OpReg w r)))
 
     -- Still have FP regs, and we want to pass an FP argument.
-    passArguments gpRegs (fpReg:fpRegs) ((r, format, code_r):args) stackArgs accumRegs accumCode | isFloatFormat format = do
+    passArguments pack gpRegs (fpReg:fpRegs) ((r, format, code_r):args) stackSpace accumRegs accumCode | isFloatFormat format = do
       let w = formatToWidth format
-      passArguments gpRegs fpRegs args stackArgs (fpReg:accumRegs) (accumCode `appOL` code_r `snocOL` (ANN (text $ "Pass fp argument: " ++ show r) $ MOV (OpReg w fpReg) (OpReg w r)))
+      passArguments pack gpRegs fpRegs args stackSpace (fpReg:accumRegs) (accumCode `appOL` code_r `snocOL` (ANN (text $ "Pass fp argument: " ++ show r) $ MOV (OpReg w fpReg) (OpReg w r)))
 
     -- No mor regs left to pass. Must pass on stack.
-    passArguments [] [] ((r, format, code_r):args) stackArgs accumRegs accumCode = do
+    passArguments pack [] [] ((r, format, code_r):args) stackSpace accumRegs accumCode = do
       let w = formatToWidth format
-          stackCode = code_r `snocOL` (ANN (text $ "Pass argument: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt (stackArgs * 8)))))
-      passArguments [] [] args (stackArgs+1) accumRegs (stackCode `appOL` accumCode)
+          bytes = widthInBits w `div` 8
+          space = if pack then bytes else 8
+          stackCode = code_r `snocOL` (ANN (text $ "Pass argument (size " ++ show w ++ ") on the stack: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
+      passArguments pack [] [] args (stackSpace+space) accumRegs (stackCode `appOL` accumCode)
 
     -- Still have fpRegs left, but want to pass a GP argument. Must be passed on the stack then.
-    passArguments [] fpRegs ((r, format, code_r):args) stackArgs accumRegs accumCode | isIntFormat format = do
+    passArguments pack [] fpRegs ((r, format, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
       let w = formatToWidth format
-          stackCode = code_r `snocOL` (ANN (text $ "Pass argument: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt (stackArgs * 8)))))
-      passArguments [] fpRegs args (stackArgs+1) accumRegs (stackCode `appOL` accumCode)
+          bytes = widthInBits w `div` 8
+          space = if pack then bytes else 8
+          stackCode = code_r `snocOL` (ANN (text $ "Pass argument (size " ++ show w ++ ") on the stack: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
+      passArguments pack [] fpRegs args (stackSpace+space) accumRegs (stackCode `appOL` accumCode)
 
     -- Still have gpRegs left, but want to pass a FP argument. Must be passed on the stack then.
-    passArguments gpRegs [] ((r, format, code_r):args) stackArgs accumRegs accumCode | isFloatFormat format = do
+    passArguments pack gpRegs [] ((r, format, code_r):args) stackSpace accumRegs accumCode | isFloatFormat format = do
       let w = formatToWidth format
-          stackCode = code_r `snocOL` (ANN (text $ "Pass argument: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt (stackArgs * 8)))))
-      passArguments gpRegs [] args (stackArgs+1) accumRegs (stackCode `appOL` accumCode)
+          bytes = widthInBits w `div` 8
+          space = if pack then bytes else 8
+          stackCode = code_r `snocOL` (ANN (text $ "Pass argument (size " ++ show w ++ ") on the stack: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
+      passArguments pack gpRegs [] args (stackSpace+space) accumRegs (stackCode `appOL` accumCode)
 
-    passArguments _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
+    passArguments _ _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
 
     readResults :: [Reg] -> [Reg] -> [LocalReg] -> [Reg]-> InstrBlock -> NatM ([Reg], InstrBlock)
     readResults _ _ [] accumRegs accumCode = return (accumRegs, accumCode)
