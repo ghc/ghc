@@ -16,7 +16,7 @@ module Main (main) where
 
 -- The official GHC API
 import qualified GHC
-import GHC              ( Ghc, GhcMonad(..), Backend (..),
+import GHC              (parseTargetFiles,  Ghc, GhcMonad(..), Backend (..),
                           LoadHowMuch(..) )
 import GHC.Driver.CmdLine
 
@@ -74,7 +74,6 @@ import GHC.Iface.Recomp.Binary ( fingerprintBinMem )
 import System.IO
 import System.Environment
 import System.Exit
-import System.FilePath
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
@@ -219,29 +218,7 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   liftIO $ showBanner postLoadMode dflags4
 
-  let
-     -- To simplify the handling of filepaths, we normalise all filepaths right
-     -- away. Note the asymmetry of FilePath.normalise:
-     --    Linux:   p/q -> p/q; p\q -> p\q
-     --    Windows: p/q -> p\q; p\q -> p\q
-     -- #12674: Filenames starting with a hypen get normalised from ./-foo.hs
-     -- to -foo.hs. We have to re-prepend the current directory.
-    normalise_hyp fp
-        | strt_dot_sl && "-" `isPrefixOf` nfp = cur_dir ++ nfp
-        | otherwise                           = nfp
-        where
-#if defined(mingw32_HOST_OS)
-          strt_dot_sl = "./" `isPrefixOf` fp || ".\\" `isPrefixOf` fp
-#else
-          strt_dot_sl = "./" `isPrefixOf` fp
-#endif
-          cur_dir = '.' : [pathSeparator]
-          nfp = normalise fp
-    normal_fileish_paths = map (normalise_hyp . unLoc) fileish_args
-    (srcs, objs)         = partition_args normal_fileish_paths [] []
-
-    dflags5 = dflags4 { ldInputs = map (FileOption "") objs
-                                   ++ ldInputs dflags4 }
+  let (dflags5, srcs, objs) = parseTargetFiles dflags4 (map unLoc fileish_args)
 
   -- we've finished manipulating the DynFlags, update the session
   _ <- GHC.setSessionDynFlags dflags5
@@ -289,51 +266,6 @@ ghciUI hsc_env dflags0 srcs maybe_expr = do
   interactiveUI defaultGhciSettings srcs maybe_expr
 #endif
 
--- -----------------------------------------------------------------------------
--- Splitting arguments into source files and object files.  This is where we
--- interpret the -x <suffix> option, and attach a (Maybe Phase) to each source
--- file indicating the phase specified by the -x option in force, if any.
-
-partition_args :: [String] -> [(String, Maybe Phase)] -> [String]
-               -> ([(String, Maybe Phase)], [String])
-partition_args [] srcs objs = (reverse srcs, reverse objs)
-partition_args ("-x":suff:args) srcs objs
-  | "none" <- suff      = partition_args args srcs objs
-  | StopLn <- phase     = partition_args args srcs (slurp ++ objs)
-  | otherwise           = partition_args rest (these_srcs ++ srcs) objs
-        where phase = startPhase suff
-              (slurp,rest) = break (== "-x") args
-              these_srcs = zip slurp (repeat (Just phase))
-partition_args (arg:args) srcs objs
-  | looks_like_an_input arg = partition_args args ((arg,Nothing):srcs) objs
-  | otherwise               = partition_args args srcs (arg:objs)
-
-    {-
-      We split out the object files (.o, .dll) and add them
-      to ldInputs for use by the linker.
-
-      The following things should be considered compilation manager inputs:
-
-       - haskell source files (strings ending in .hs, .lhs or other
-         haskellish extension),
-
-       - module names (not forgetting hierarchical module names),
-
-       - things beginning with '-' are flags that were not recognised by
-         the flag parser, and we want them to generate errors later in
-         checkOptions, so we class them as source files (#5921)
-
-       - and finally we consider everything without an extension to be
-         a comp manager input, as shorthand for a .hs or .lhs filename.
-
-      Everything else is considered to be a linker object, and passed
-      straight through to the linker.
-    -}
-looks_like_an_input :: String -> Bool
-looks_like_an_input m =  isSourceFilename m
-                      || looksLikeModuleName m
-                      || "-" `isPrefixOf` m
-                      || not (hasExtension m)
 
 -- -----------------------------------------------------------------------------
 -- Option sanity checks
