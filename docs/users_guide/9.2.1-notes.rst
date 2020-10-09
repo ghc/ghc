@@ -55,3 +55,11 @@ Compiler
   ``Natural``. As a consequence, one must enable ``TypeSynonymInstances``
   in order to define instances for ``Nat``.
 
+Runtime system
+~~~~~~~~~~~~~~
+
+* Upgraded Hash function for faster linker operations.
+
+* Changed hashing function for interface files from MD5 to xxHash.
+  xxHash is multiple factors faster than MD5.
+
