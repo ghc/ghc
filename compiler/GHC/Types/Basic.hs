@@ -1467,11 +1467,11 @@ data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
 
 -- | Inline Specification
 data InlineSpec   -- What the user's INLINE pragma looked like
-  = Inline       -- User wrote INLINE
-  | Inlinable    -- User wrote INLINABLE
-  | NoInline     -- User wrote NOINLINE
-  | NoUserInline -- User did not write any of INLINE/INLINABLE/NOINLINE
-                 -- e.g. in `defaultInlinePragma` or when created by CSE
+  = Inline           -- User wrote INLINE
+  | Inlinable        -- User wrote INLINABLE
+  | NoInline         -- User wrote NOINLINE
+  | NoUserInlinePrag -- User did not write any of INLINE/INLINABLE/NOINLINE
+                     -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
         -- Show needed for GHC.Parser.Lexer
 
@@ -1481,7 +1481,7 @@ This data type mirrors what you can write in an INLINE or NOINLINE pragma in
 the source program.
 
 If you write nothing at all, you get defaultInlinePragma:
-   inl_inline = NoUserInline
+   inl_inline = NoUserInlinePrag
    inl_act    = AlwaysActive
    inl_rule   = FunLike
 
@@ -1555,15 +1555,15 @@ isFunLike FunLike = True
 isFunLike _       = False
 
 noUserInlineSpec :: InlineSpec -> Bool
-noUserInlineSpec NoUserInline = True
-noUserInlineSpec _            = False
+noUserInlineSpec NoUserInlinePrag = True
+noUserInlineSpec _                = False
 
 defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
   :: InlinePragma
 defaultInlinePragma = InlinePragma { inl_src = SourceText "{-# INLINE"
                                    , inl_act = AlwaysActive
                                    , inl_rule = FunLike
-                                   , inl_inline = NoUserInline
+                                   , inl_inline = NoUserInlinePrag
                                    , inl_sat = Nothing }
 
 alwaysInlinePragma = defaultInlinePragma { inl_inline = Inline }
@@ -1629,10 +1629,10 @@ instance Outputable RuleMatchInfo where
    ppr FunLike = text "FUNLIKE"
 
 instance Outputable InlineSpec where
-   ppr Inline       = text "INLINE"
-   ppr NoInline     = text "NOINLINE"
-   ppr Inlinable    = text "INLINABLE"
-   ppr NoUserInline = text "NOUSERINLINE" -- what is better?
+   ppr Inline           = text "INLINE"
+   ppr NoInline         = text "NOINLINE"
+   ppr Inlinable        = text "INLINABLE"
+   ppr NoUserInlinePrag = empty
 
 instance Outputable InlinePragma where
   ppr = pprInline
