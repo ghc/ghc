@@ -2107,16 +2107,6 @@ AC_DEFUN([GHC_LLVM_TARGET], [
       GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
       GHC_CONVERT_OS([$4],[$2],[llvm_target_os])
       ;;
-    # apple is a bit about their naming scheme for
-    # aarch64; and clang on macOS doesn't know that
-    # aarch64 would be arm64. So for LLVM we'll need
-    # to call it arm64; while we'll refer to it internally
-    # as aarch64 for consistency and sanity.
-    aarch64-apple-*)
-      llvm_target_cpu="arm64"
-      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
-      GHC_CONVERT_OS([$3],[$1],[llvm_target_os])
-      ;;
     *)
       GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
       GHC_CONVERT_OS([$4],[$2],[llvm_target_os])
