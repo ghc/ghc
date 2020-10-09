@@ -486,7 +486,7 @@ tcInstTypeBndrs id
 
 tcSkolDFunType :: DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type signature with skolem constants.
--- We could give them fresh names, but no need to do so
+-- This freshens the names, but no need to do so
 tcSkolDFunType dfun
   = do { (tv_prs, theta, tau) <- tcInstType tcInstSuperSkolTyVars dfun
        ; return (map snd tv_prs, theta, tau) }
@@ -518,20 +518,34 @@ tcInstSkolTyVarsX = tcInstSkolTyVarsPushLevel False
 
 tcInstSuperSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- See Note [Skolemising type variables]
+-- This version freshens the names and creates "super skolems";
+-- see comments around superSkolemTv.
 tcInstSuperSkolTyVars = tcInstSuperSkolTyVarsX emptyTCvSubst
 
 tcInstSuperSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- See Note [Skolemising type variables]
+-- This version freshens the names and creates "super skolems";
+-- see comments around superSkolemTv.
 tcInstSuperSkolTyVarsX subst = tcInstSkolTyVarsPushLevel True subst
 
-tcInstSkolTyVarsPushLevel :: Bool -> TCvSubst -> [TyVar]
+tcInstSkolTyVarsPushLevel :: Bool  -- True <=> make "super skolem" AND
+                                   --          freshen names
+                          -> TCvSubst -> [TyVar]
                           -> TcM (TCvSubst, [TcTyVar])
 -- Skolemise one level deeper, hence pushTcLevel
 -- See Note [Skolemising type variables]
-tcInstSkolTyVarsPushLevel overlappable subst tvs
+tcInstSkolTyVarsPushLevel overlappable_and_freshen subst tvs
   = do { tc_lvl <- getTcLevel
        ; let pushed_lvl = pushTcLevel tc_lvl
-       ; return (tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs) }
+       ; if overlappable_and_freshen
+         then freshenTyCoVarsX (mk_skol pushed_lvl) subst tvs
+         else return (tcInstSkolTyVarsAt pushed_lvl overlappable_and_freshen
+                                         subst tvs) }
+  where
+    mk_skol :: TcLevel -> Name -> Kind -> TcTyVar
+    mk_skol lvl nm ki = mkTcTyVar nm ki details
+      where
+        details = SkolemTv lvl overlappable_and_freshen
 
 tcInstSkolTyVarsAt :: TcLevel -> Bool
                    -> TCvSubst -> [TyVar]
