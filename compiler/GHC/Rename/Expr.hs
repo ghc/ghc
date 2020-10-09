@@ -49,7 +49,6 @@ import GHC.Driver.Session
 import GHC.Builtin.Names
 
 import GHC.Types.Basic
-import GHC.Types.FieldLabel
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
