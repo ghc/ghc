@@ -18,6 +18,7 @@ cleanSourceTree = do
     forM_ [Stage0 ..] $ removeDirectory . (path -/-) . stageString
     removeDirectory "sdistprep"
     cleanFsUtils
+    cleanXxHash
 
 -- Clean all temporary fs files copied by configure into the source folder
 cleanFsUtils :: Action ()
@@ -29,6 +30,15 @@ cleanFsUtils = do
                , "libraries/base/cbits/"
                ]
     liftIO $ forM_ dirs (flip removeFiles ["fs.*"])
+
+-- Clean all temporary xxhash files copied by configure into the source folder
+cleanXxHash :: Action ()
+cleanXxHash = do
+    let dirs = [ "rts/"
+               , "libraries/base/include/"
+               , "libraries/base/cbits/"
+               ]
+    liftIO $ forM_ dirs (flip removeFiles ["xxhash.*"])
 
 cleanRules :: Rules ()
 cleanRules = "clean" ~> clean
