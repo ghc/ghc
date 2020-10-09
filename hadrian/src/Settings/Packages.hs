@@ -335,10 +335,8 @@ rtsPackageArgs = package rts ? do
 
           -- We're after pur performance here. So make sure fast math and
           -- vectorization is enabled.
-          , input "**/xxhash.c" ? pure
-            [ "-O3"
-            , "-ffast-math"
-            , "-ftree-vectorize" ]
+          , inputs [ "**/xxhash.c"
+                   , "**/Hash.c" ] ? pure [ "-O3" ]
 
             , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
 
