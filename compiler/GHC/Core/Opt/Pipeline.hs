@@ -24,7 +24,7 @@ import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Types.Id.Info
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
-import GHC.Core.Utils   ( mkTicks, stripTicksTop )
+import GHC.Core.Utils   ( mkTicks, stripTicksTop, dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
 import GHC.Core.Opt.Simplify       ( simplTopBinds, simplExpr, simplRules )
@@ -41,15 +41,17 @@ import GHC.Utils.Error  ( withTiming, withTimingD, DumpFormat (..) )
 import GHC.Types.Basic
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Demand
 import GHC.Core.Opt.LiberateCase ( liberateCase )
 import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
 import GHC.Core.Opt.Specialise   ( specProgram)
 import GHC.Core.Opt.SpecConstr   ( specConstrProgram)
-import GHC.Core.Opt.DmdAnal      ( dmdAnalProgram )
+import GHC.Core.Opt.DmdAnal
 import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
 import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
+import GHC.Core.Seq (seqBinds)
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Unit.Module.Env
@@ -484,7 +486,7 @@ doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
                                        doPass exitifyProgram
 
 doCorePass CoreDoDemand              = {-# SCC "DmdAnal" #-}
-                                       doPassDFM dmdAnalProgram
+                                       doPassDFM dmdAnal
 
 doCorePass CoreDoCpr                 = {-# SCC "CprAnal" #-}
                                        doPassDFM cprAnalProgram
@@ -1074,3 +1076,16 @@ transferIdInfo exported_id local_id
                                (ruleInfo local_info)
         -- Remember to set the function-name field of the
         -- rules as we transfer them from one function to another
+
+
+
+dmdAnal :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
+dmdAnal dflags fam_envs binds = do
+  let opts = DmdAnalOpts
+               { dmd_strict_dicts = gopt Opt_DictsStrict dflags
+               }
+      binds_plus_dmds = dmdAnalProgram opts fam_envs binds
+  Err.dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
+    dumpIdInfoOfProgram (pprIfaceStrictSig . strictnessInfo) binds_plus_dmds
+  -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
+  seqBinds binds_plus_dmds `seq` return binds_plus_dmds
