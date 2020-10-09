@@ -1,6 +1,6 @@
 #import <Foundation/Foundation.h>
 #import "HsFFI.h"
-#import "SymbolsViaSections_stub.h"
+#import "SubsectionsViaSymbols_stub.h"
 
 int
 main(int argc, char * argv[]) {
