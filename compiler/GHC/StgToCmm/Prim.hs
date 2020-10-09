@@ -846,15 +846,13 @@ emitPrimOp dflags primop = case primop of
     emitPrimCall [res] (MO_UF_Conv W64) [w]
 
 -- Atomic operations
-  CasOffAddrOp_Word -> \[addr, ix, old, new] -> opIntoRegs $ \[res] -> do
-    doCasAddr res addr ix (bWord platform) old new
   InterlockedExchange_Addr -> \[src, value] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
-  InterlockedExchange_Int -> \[src, value] -> opIntoRegs $ \[res] ->
+  InterlockedExchange_Word -> \[src, value] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
-  AtomicCompareExchange_Int -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+  CasAddrOp_Word -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Cmpxchg (wordWidth platform)) [dst, expected, new]
-  AtomicCompareExchange_Addr -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+  CasAddrOp_Addr -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Cmpxchg (wordWidth platform)) [dst, expected, new]
 
 -- SIMD primops
@@ -2925,24 +2923,6 @@ doCasByteArray res mba idx idx_ty old new = do
     let width = (typeWidth idx_ty)
         addr = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                width mba idx
-    emitPrimCall
-        [ res ]
-        (MO_Cmpxchg width)
-        [ addr, old, new ]
-
--- Just like doCasByteArray, but the offset to the first element is zero
-doCasAddr
-    :: LocalReg  -- ^ Result reg
-    -> CmmExpr   -- ^ Addr#
-    -> CmmExpr   -- ^ Index
-    -> CmmType   -- ^ Type of element by which we are indexing
-    -> CmmExpr   -- ^ Old value
-    -> CmmExpr   -- ^ New value
-    -> FCode ()
-doCasAddr res base idx idx_ty old new = do
-    platform <- getPlatform
-    let width = (typeWidth idx_ty)
-        addr = cmmIndexExpr platform width base idx
     emitPrimCall
         [ res ]
         (MO_Cmpxchg width)

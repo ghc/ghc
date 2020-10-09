@@ -2527,48 +2527,47 @@ primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
    with has_side_effects = True
         can_fail         = True
 
-primop CasOffAddrOp_Word "casWordOffAddr#" GenPrimOp
-   Addr# -> Int# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
-   {Given a word-aligned address, an offset in machine words, the
-    expected old value, and the new value, perform an atomic compare and
-    swap i.e. write the new value if the current value matches the
-    provided old value. Returns the value of the element before the
-    operation. Implies a full memory barrier.}
-   with has_side_effects = True
-
 primop  InterlockedExchange_Addr "atomicExchangeAddr#" GenPrimOp
    Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
    {The atomic exchange operation. Atomically exchanges the value at the first address
     with the Addr# given as second argument. Implies a read barrier.}
    with has_side_effects = True
+        can_fail         = True
 
-primop  InterlockedExchange_Int "atomicExchangeInt#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Int# #)
+primop  InterlockedExchange_Word "atomicExchangeWord#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
    {The atomic exchange operation. Atomically exchanges the value at the address
     with the given value. Returns the old value. Implies a read barrier.}
    with has_side_effects = True
+        can_fail         = True
 
-primop  AtomicCompareExchange_Int "atomicCasInt#" GenPrimOp
-   Addr# -> Int# -> Int# -> State# s -> (# State# s, Int# #)
-   { Compare and swap on a word-sized memory location.
+primop  CasAddrOp_Word "casWordAddr#" GenPrimOp
+   Addr# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
+   { Compare and swap on a word-sized and aligned memory location.
 
-     Use as atomicCasInt# location expected desired
+     Use as: \s -> casWordAddr# location expected desired s
 
-     This version always returns the old value read. This follows the normal protocol for CAS operations (and matches the underlying instruction on most architectures).
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
 
      Implies a full memory barrier.}
    with has_side_effects = True
+        can_fail         = True
 
-primop  AtomicCompareExchange_Addr "atomicCasAddr#" GenPrimOp
+primop  CasAddrOp_Addr "casAddrAddr#" GenPrimOp
    Addr# -> Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
    { Compare and swap on a word-sized memory location.
 
-     Use as atomicCasAddr# location expected desired
+     Use as: \s -> casAddrAddr# location expected desired s
 
-     This version always returns the old value read. This follows the normal protocol for CAS operations (and matches the underlying instruction on most architectures).
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
 
      Implies a full memory barrier.}
    with has_side_effects = True
+        can_fail         = True
 
 ------------------------------------------------------------------------
 section "Mutable variables"
