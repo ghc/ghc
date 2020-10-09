@@ -1005,7 +1005,7 @@ lookup_demoted rdr_name
            , text "instead of"
            , quotes (ppr name) <> dot ]
 
--- If the given RdrName can be promoted to the type level and is in scope,
+-- If the given RdrName can be promoted to the type level and its promoted variant is in scope,
 -- lookup_promoted returns the corresponding type-level Name.
 -- Otherwise, the function returns Nothing.
 -- See Note [Promotion] below.
