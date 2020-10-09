@@ -511,6 +511,7 @@ library
                sm/Storage.c
                sm/Sweep.c
                xxhash.c
+               xxhsum.c
                fs.c
                -- I wish we had wildcards..., this would be:
                -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
