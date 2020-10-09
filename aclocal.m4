@@ -118,7 +118,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
         GHC_CONVERT_OS([$target_os], [$TargetArch], [TargetOS])
     fi
 
-    GHC_LLVM_TARGET([$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
+    GHC_LLVM_TARGET([$target],[$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
 
     GHC_SELECT_FILE_EXTENSIONS([$host], [exeext_host], [soext_host])
     GHC_SELECT_FILE_EXTENSIONS([$target], [exeext_target], [soext_target])
@@ -2063,19 +2063,19 @@ case "$1" in
   esac
 ])
 
-# GHC_LLVM_TARGET(target_cpu, target_vendor, target_os, llvm_target_var)
+# GHC_LLVM_TARGET(target, target_cpu, target_vendor, target_os, llvm_target_var)
 # --------------------------------
 # converts the canonicalized target into something llvm can understand
 AC_DEFUN([GHC_LLVM_TARGET], [
-  llvm_target_cpu=$1
-  case "$1-$2-$3" in
+  llvm_target_cpu=$2
+  case "$1" in
     *-freebsd*-gnueabihf)
       llvm_target_vendor="unknown"
       llvm_target_os="freebsd-gnueabihf"
       ;;
     *-hardfloat-*eabi)
       llvm_target_vendor="unknown"
-      llvm_target_os="$3""hf"
+      llvm_target_os="$4""hf"
       ;;
     *-mingw32|*-mingw64|*-msys)
       llvm_target_vendor="unknown"
@@ -2086,25 +2086,25 @@ AC_DEFUN([GHC_LLVM_TARGET], [
     # turned into just `-linux` and fail to be found
     # in the `llvm-targets` file.
     *-android*|*-gnueabi*|*-musleabi*)
-      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
-      llvm_target_os="$3"
+      GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
+      llvm_target_os="$4"
       ;;
     # apple is a bit about their naming scheme for
     # aarch64; and clang on macOS doesn't know that
     # aarch64 would be arm64. So for LLVM we'll need
     # to call it arm64; while we'll refer to it internally
     # as aarch64 for consistency and sanity.
-    aarch64-apple-*)
+    aarch64-apple-*|arm64-apple-*)
       llvm_target_cpu="arm64"
-      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
-      GHC_CONVERT_OS([$3],[$1],[llvm_target_os])
+      GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
+      GHC_CONVERT_OS([$4],[$2],[llvm_target_os])
       ;;
     *)
-      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
-      GHC_CONVERT_OS([$3],[$1],[llvm_target_os])
+      GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
+      GHC_CONVERT_OS([$4],[$2],[llvm_target_os])
       ;;
   esac
-  $4="$llvm_target_cpu-$llvm_target_vendor-$llvm_target_os"
+  $5="$llvm_target_cpu-$llvm_target_vendor-$llvm_target_os"
 ])
 
 
