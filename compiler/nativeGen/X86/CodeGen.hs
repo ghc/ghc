@@ -2440,7 +2440,7 @@ genCCall' dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
-                                                           CmmMayReturn)
+                                                           CmmMayReturn undefined undefined)
             genCCall' dflags is32Bit target dest_regs args bid
   where
     format = intFormat width
@@ -2473,7 +2473,7 @@ genCCall' dflags is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
-                                                           CmmMayReturn)
+                                                           CmmMayReturn undefined undefined)
             genCCall' dflags is32Bit target dest_regs args bid
   where
     format = intFormat width
@@ -2506,7 +2506,7 @@ genCCall' dflags is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
-                                                           CmmMayReturn)
+                                                           CmmMayReturn undefined undefined)
             genCCall' dflags is32Bit target dest_regs args bid
   where
     format = intFormat width
@@ -2518,7 +2518,7 @@ genCCall' dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] 
     targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                            [NoHint] [NoHint]
-                                           CmmMayReturn)
+                                           CmmMayReturn undefined undefined)
     genCCall' dflags is32Bit target dest_regs args bid
 
   | otherwise = do
@@ -2561,7 +2561,7 @@ genCCall' dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
                   CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                            [NoHint] [NoHint]
-                                           CmmMayReturn)
+                                           CmmMayReturn undefined undefined)
     genCCall' dflags is32Bit target dest_regs args bid
   where
     lbl = mkCmmCodeLabel primUnitId (fsLit (word2FloatLabel width))
@@ -2900,7 +2900,7 @@ genCCall32' dflags target dest_regs args = do
               -- We have to pop any stack padding we added
               -- even if we are doing stdcall, though (#5052)
             pop_size
-               | ForeignConvention StdCallConv _ _ _ <- cconv = arg_pad_size
+               | ForeignConvention StdCallConv _ _ _ _ _ <- cconv = arg_pad_size
                | otherwise = tot_arg_size
 
             call = callinsns `appOL`
@@ -3274,7 +3274,7 @@ outOfLineCmmOp bid mop res args
       dflags <- getDynFlags
       targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
       let target = ForeignTarget targetExpr
-                           (ForeignConvention CCallConv [] [] CmmMayReturn)
+                           (ForeignConvention CCallConv [] [] CmmMayReturn undefined undefined)
 
       -- We know foreign calls results in no new basic blocks, so we can ignore
       -- the returned block id.

@@ -368,7 +368,7 @@ library
 
     if os(osx)
       ld-options: "-Wl,-search_paths_first"
-      if !arch(x86_64)
+      if !arch(x86_64) && !arch(aarch64)
          ld-options: -read_only_relocs warning
 
     cmm-sources: Apply.cmm
@@ -463,6 +463,8 @@ library
                linker/LoadArchive.c
                linker/M32Alloc.c
                linker/MachO.c
+               linker/macho/plt.c
+               linker/macho/plt_aarch64.c
                linker/PEi386.c
                linker/SymbolExtras.c
                linker/elf_got.c

@@ -18,7 +18,9 @@ module RepType
 
     -- * Unboxed sum representation type
     ubxSumRepType, layoutUbxSum, typeSlotTy, SlotTy (..),
-    slotPrimRep, primRepSlot
+    slotPrimRep, primRepSlot,
+
+    mkCCallSpec
   ) where
 
 #include "HsVersions.h"
@@ -35,10 +37,61 @@ import TyCoRep
 import Type
 import Util
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( anyTypeOfKind )
+import {-# SOURCE #-} TysWiredIn ( anyTypeOfKind, unitTyConKey )
+import PrelNames
+import {-# SOURCE #-} TcType (tcSplitIOType_maybe)
 
 import Data.List (sort)
 import qualified Data.IntSet as IS
+
+import ForeignCall (CCallSpec(..), CCallTarget(..), CCallConv(..), Safety(..), CCallTarget(..))
+
+import Debug.Trace
+
+mkCCallSpec :: CCallTarget -> CCallConv -> Safety -> Type -> [Type] -> CCallSpec
+mkCCallSpec t c s r as = CCallSpec t c s (myTypePrimRep1 r') (map myTypePrimRep1 as')
+        where ppr_target :: CCallTarget -> String
+              ppr_target (StaticTarget _ lbl _ fn) = "static " ++ (if fn then "function " else "value ") ++ show lbl
+              ppr_target DynamicTarget = "dynamic"
+
+              r'= case tcSplitIOType_maybe r of
+                Just (_ioTyCon, res_ty) -> res_ty
+                Nothing                 -> r
+
+              -- for dynamic targets, we want to drop the first
+              -- represetnation, as that is the stable pointer to
+              -- the fucntion we are invocing, which is irrelevant
+              -- for the argument repsenstation.
+              as' = case t of
+                DynamicTarget -> tail as
+                _             -> as
+
+              typeTyCon :: Type -> TyCon
+              typeTyCon ty
+                | Just (tc, _) <- tcSplitTyConApp_maybe (unwrapType ty)
+                = tc
+                | otherwise
+                = pprPanic "DsForeign.typeTyCon" (ppr ty)
+
+              myTypePrimRep1 :: Type -> PrimRep
+              myTypePrimRep1 t = case typePrimRep1 t of
+                LiftedRep -> case getUnique (typeTyCon t) of
+                  key | key == int8TyConKey   -> Int8Rep
+                      | key == int16TyConKey  -> Int16Rep
+                      | key == int32TyConKey  -> Int32Rep
+                      | key == int64TyConKey  -> Int64Rep
+                      | key == word8TyConKey  -> Word8Rep
+                      | key == word16TyConKey -> Word16Rep
+                      | key == word32TyConKey -> Word32Rep
+                      | key == word64TyConKey -> Word64Rep
+                      | key == intTyConKey    -> IntRep
+                      | key == wordTyConKey   -> WordRep
+                      | key == floatTyConKey  -> FloatRep
+                      | key == doubleTyConKey -> DoubleRep
+                      | key == unitTyConKey   -> VoidRep
+                  _                           -> LiftedRep
+                other     -> other
+
 
 {- **********************************************************************
 *                                                                       *

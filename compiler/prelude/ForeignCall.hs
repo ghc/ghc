@@ -28,6 +28,10 @@ import BasicTypes ( SourceText, pprWithSourceText )
 
 import Data.Char
 import Data.Data
+import {-# SOURCE #-} TyCon (PrimRep (..))
+
+import GHC.Stack( HasCallStack )
+import Debug.Trace (traceStack)
 
 {-
 ************************************************************************
@@ -41,7 +45,7 @@ newtype ForeignCall = CCall CCallSpec
   deriving Eq
 
 isSafeForeignCall :: ForeignCall -> Bool
-isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
+isSafeForeignCall (CCall (CCallSpec _ _ safe _ _)) = playSafe safe
 
 -- We may need more clues to distinguish foreign calls
 -- but this simple printer will do for now
@@ -100,6 +104,8 @@ data CCallSpec
   =  CCallSpec  CCallTarget     -- What to call
                 CCallConv       -- Calling convention to use.
                 Safety
+                PrimRep         -- result
+                [PrimRep]       -- args
   deriving( Eq )
 
 -- The call target:
@@ -197,7 +203,7 @@ instance Outputable CExportSpec where
   ppr (CExportStatic _ str _) = pprCLabelString str
 
 instance Outputable CCallSpec where
-  ppr (CCallSpec fun cconv safety)
+  ppr (CCallSpec fun cconv safety _ret_ty _arg_tys)
     = hcat [ whenPprDebug callconv, ppr_fun fun ]
     where
       callconv = text "{-" <> ppr cconv <> text "-}"
@@ -283,15 +289,19 @@ instance Binary CExportSpec where
           return (CExportStatic ss aa ab)
 
 instance Binary CCallSpec where
-    put_ bh (CCallSpec aa ab ac) = do
+    put_ bh (CCallSpec aa ab ac ad ae) = do
             put_ bh aa
             put_ bh ab
             put_ bh ac
+            put_ bh ad
+            put_ bh ae
     get bh = do
           aa <- get bh
           ab <- get bh
           ac <- get bh
-          return (CCallSpec aa ab ac)
+          ad <- get bh
+          ae <- get bh
+          return (CCallSpec aa ab ac ad ae)
 
 instance Binary CCallTarget where
     put_ bh (StaticTarget ss aa ab ac) = do

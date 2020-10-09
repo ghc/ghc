@@ -1856,7 +1856,7 @@ genCCall' dflags gcp target dest_regs args
                    | otherwise      = cmmTypeFormat rep
                 conv_op = case hint of
                             SignedHint -> MO_SS_Conv
-                            _          -> MO_UU_Conv
+                            _            -> MO_UU_Conv
 
                 stackOffset' = case gcp of
                                GCPAIX ->
