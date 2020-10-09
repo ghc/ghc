@@ -428,7 +428,9 @@ rts/RtsUtils_CC_OPTS += -DTargetVendor=\"$(TargetVendor_CPP)\"
 rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
 rts/RtsUtils_CC_OPTS += -DTablesNextToCode=\"$(TablesNextToCode)\"
 #
-rts/xxhash_CC_OPTS += -O3 -ffast-math -ftree-vectorize
+rts/xxhash_CC_OPTS += -O3
+rts/xxhsum_CC_OPTS += -O3
+rts/Hash_CC_OPTS += -O3
 
 # Compile various performance-critical pieces *without* -fPIC -dynamic
 # even when building a shared library.  If we don't do this, then the
