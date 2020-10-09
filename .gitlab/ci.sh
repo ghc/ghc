@@ -95,8 +95,8 @@ export TEMP="$TOP/tmp"
 function darwin_setup() {
   # It looks like we already have python2 here and just installing python3
   # does not work.
-  brew upgrade python
-  brew install ghc cabal-install ncurses gmp
+  #brew upgrade python
+  #brew install ghc cabal-install ncurses gmp
 
   pip3 install sphinx
   # PDF documentation disabled as MacTeX apparently doesn't include xelatex.
