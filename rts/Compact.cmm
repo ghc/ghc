@@ -88,7 +88,8 @@ eval:
         AP,
         AP_STACK,
         BLACKHOLE,
-        THUNK_SELECTOR : {
+        THUNK_SELECTOR,
+        THUNK_SELECTOR_N : {
         (P_ evald) = call %ENTRY_CODE(info) (p);
         p = evald;
         goto eval;
