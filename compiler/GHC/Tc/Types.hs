@@ -25,7 +25,8 @@ module GHC.Tc.Types(
 
         -- The environment types
         Env(..),
-        TcGblEnv(..), TcLclEnv(..),
+        TcGblEnv(..), TcLclEnv(..), tcl_in_gen_code, tcl_deriving, tclAddProvenance, tclDelProvenance,
+        CodeProvenance(..),
         setLclEnvTcLevel, getLclEnvTcLevel,
         setLclEnvLoc, getLclEnvLoc,
         IfGblEnv(..), IfLclEnv(..),
@@ -750,16 +751,20 @@ Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
         b) used in the ModDetails of this module
 -}
 
+-- | This data type indicates possible types of generated code. Code may have any set of these indicators, and code that the user wrote directly
+-- is expected to have none.
+data CodeProvenance
+  = DerivingCP
+  | TemplateHaskellCP
+  | RebindableSyntaxCP
+  deriving (Eq, Ord)
+
 data TcLclEnv           -- Changes as we move inside an expression
                         -- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {
         tcl_loc        :: RealSrcSpan,     -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_in_gen_code :: Bool,           -- Are we in code that was generated for rebindable syntax?
-                                           -- See Note [Rebindable syntax and HsExpansion]
-        tcl_deriving :: Bool,              -- Are we in code that was generated for a deriving clause?
-                                           -- We can't reuse tcl_in_gen_code for this, because it is reset by setSrcSpan, and
-                                           -- many parts of the deriving mechanism set helpful SrcSpans.
+        tcl_provenance :: Set CodeProvenance, -- Set of values indicating artificially generated sources of code.
         tcl_tclvl      :: TcLevel,
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
@@ -795,6 +800,20 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
         tcl_errs :: TcRef Messages              -- Place to accumulate errors
     }
+
+tclAddProvenance :: CodeProvenance -> TcLclEnv -> TcLclEnv
+tclAddProvenance p e = e { tcl_provenance = S.insert p (tcl_provenance e) }
+
+tclDelProvenance :: CodeProvenance -> TcLclEnv -> TcLclEnv
+tclDelProvenance p e = e { tcl_provenance = S.delete p (tcl_provenance e) }
+
+
+-- TODO: Rename this
+tcl_in_gen_code :: TcLclEnv -> Bool
+tcl_in_gen_code tcl = S.member RebindableSyntaxCP (tcl_provenance tcl)
+
+tcl_deriving :: TcLclEnv -> Bool
+tcl_deriving tcl = S.member DerivingCP (tcl_provenance tcl)
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv
 setLclEnvTcLevel env lvl = env { tcl_tclvl = lvl }
