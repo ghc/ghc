@@ -31,11 +31,11 @@
                 ({ <no location info> }
                  (HsLit
                   (NoExtField)
-                  {HsWord{64}Prim (1374752024144278257) (NoSourceText)}))))
+                  {HsWord{64}Prim (11495131215720360590) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
                 (NoExtField)
-                {HsWord{64}Prim (13654949607623281177) (NoSourceText)}))))
+                {HsWord{64}Prim (18004159716880113643) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
@@ -96,11 +96,11 @@
                 ({ <no location info> }
                  (HsLit
                   (NoExtField)
-                  {HsWord{64}Prim (10715337633704422415) (NoSourceText)}))))
+                  {HsWord{64}Prim (4115764498531086199) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
                 (NoExtField)
-                {HsWord{64}Prim (12411373583424111944) (NoSourceText)}))))
+                {HsWord{64}Prim (14411262740988290093) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
@@ -161,11 +161,11 @@
                 ({ <no location info> }
                  (HsLit
                   (NoExtField)
-                  {HsWord{64}Prim (14073232900889011755) (NoSourceText)}))))
+                  {HsWord{64}Prim (7181928264921648215) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
                 (NoExtField)
-                {HsWord{64}Prim (2739668351064589274) (NoSourceText)}))))
+                {HsWord{64}Prim (8771329799898411356) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
@@ -226,11 +226,11 @@
                 ({ <no location info> }
                  (HsLit
                   (NoExtField)
-                  {HsWord{64}Prim (13760111476013868540) (NoSourceText)}))))
+                  {HsWord{64}Prim (8351232746674251555) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
                 (NoExtField)
-                {HsWord{64}Prim (12314848029315386153) (NoSourceText)}))))
+                {HsWord{64}Prim (15841416826006611400) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
@@ -291,11 +291,11 @@
                 ({ <no location info> }
                  (HsLit
                   (NoExtField)
-                  {HsWord{64}Prim (1143980031331647856) (NoSourceText)}))))
+                  {HsWord{64}Prim (6016845882546961188) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
                 (NoExtField)
-                {HsWord{64}Prim (14802086722010293686) (NoSourceText)}))))
+                {HsWord{64}Prim (6240756973019282700) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
               (NoExtField)

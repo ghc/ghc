@@ -140,3 +140,11 @@ Compiler
   The ``Numeric`` module recieves ``showBin`` and ``readBin`` to show and
   read integer numbers in binary.
 
+Runtime system
+~~~~~~~~~~~~~~
+
+* Upgraded Hash function for faster linker operations.
+
+* Changed hashing function for interface files from MD5 to xxHash.
+  xxHash is multiple factors faster than MD5.
+

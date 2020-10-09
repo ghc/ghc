@@ -716,7 +716,7 @@ Note [Fingerprinting IfaceDecls]
 The general idea here is that we first examine the 'IfaceDecl's and determine
 the recursive groups of them. We then walk these groups in dependency order,
 serializing each contained 'IfaceDecl' to a "Binary" buffer which we then
-hash using MD5 to produce a fingerprint for the group.
+hash using Hash to produce a fingerprint for the group.
 
 However, the serialization that we use is a bit funny: we override the @putName@
 operation with our own which serializes the hash of a 'Name' instead of the
@@ -1398,17 +1398,17 @@ lookupOccEnvL :: OccEnv [v] -> OccName -> [v]
 lookupOccEnvL env k = lookupOccEnv env k `orElse` []
 
 {-
--- for testing: use the md5sum command to generate fingerprints and
+-- for testing: use the xxh128sum command to generate fingerprints and
 -- compare the results against our built-in version.
-  fp' <- oldMD5 dflags bh
+  fp' <- oldHash dflags bh
   if fp /= fp' then pprPanic "computeFingerprint" (ppr fp <+> ppr fp')
                else return fp
 
-oldMD5 dflags bh = do
+oldHash dflags bh = do
   tmp <- newTempName dflags CurrentModule "bin"
   writeBinMem bh tmp
   tmp2 <- newTempName dflags CurrentModule "md5"
-  let cmd = "md5sum " ++ tmp ++ " >" ++ tmp2
+  let cmd = "xxh128sum " ++ tmp ++ " >" ++ tmp2
   r <- system cmd
   case r of
     ExitFailure _ -> throwGhcExceptionIO (PhaseFailed cmd r)

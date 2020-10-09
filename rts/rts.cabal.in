@@ -523,7 +523,6 @@ library
                sm/Scav_thr.c
                sm/Storage.c
                sm/Sweep.c
-               xxhash.c
                fs.c
                -- I wish we had wildcards..., this would be:
                -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c

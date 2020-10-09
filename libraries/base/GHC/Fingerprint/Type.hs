@@ -19,7 +19,7 @@ import GHC.Show
 import GHC.Word
 import Numeric (showHex)
 
--- Using 128-bit MD5 fingerprints for now.
+-- Using 128-bit xxHash fingerprints for now.
 
 data Fingerprint = Fingerprint {-# UNPACK #-} !Word64 {-# UNPACK #-} !Word64
   deriving ( Eq  -- ^ @since 4.4.0.0

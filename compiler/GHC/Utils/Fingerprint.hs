@@ -35,7 +35,7 @@ import qualified Data.ByteString.Unsafe as BS
 
 import GHC.Fingerprint
 
--- useful for parsing the output of 'md5sum', should we want to do that.
+-- useful for parsing the output of 'xxh128sum', should we want to do that.
 readHexFingerprint :: String -> Fingerprint
 readHexFingerprint s = Fingerprint w1 w2
  where (s1,s2) = splitAt 16 s

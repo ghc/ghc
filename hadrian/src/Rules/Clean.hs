@@ -19,6 +19,7 @@ cleanSourceTree = do
     removeDirectory "sdistprep"
     cleanFsUtils
     cleanMingwTarballs
+    cleanXxHash
 
 cleanMingwTarballs :: Action ()
 cleanMingwTarballs = do
@@ -34,6 +35,15 @@ cleanFsUtils = do
                , "libraries/base/cbits/"
                ]
     liftIO $ forM_ dirs (flip removeFiles ["fs.*"])
+
+-- Clean all temporary xxhash files copied by configure into the source folder
+cleanXxHash :: Action ()
+cleanXxHash = do
+    let dirs = [ "rts/"
+               , "libraries/base/include/"
+               , "libraries/base/cbits/"
+               ]
+    liftIO $ forM_ dirs (flip removeFiles ["xxhash.*"])
 
 cleanRules :: Rules ()
 cleanRules = "clean" ~> clean
