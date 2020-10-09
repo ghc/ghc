@@ -9,18 +9,20 @@
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Opt.DmdAnal ( dmdAnalProgram ) where
+module GHC.Core.Opt.DmdAnal
+   ( DmdAnalOpts(..)
+   , dmdAnalProgram
+   )
+where
 
 #include "HsVersions.h"
 
 import GHC.Prelude
 
-import GHC.Driver.Session
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Types.Demand   -- All of it
 import GHC.Core
 import GHC.Core.Multiplicity ( scaledThing )
-import GHC.Core.Seq     ( seqBinds )
 import GHC.Utils.Outputable
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -29,7 +31,6 @@ import Data.List        ( mapAccumL )
 import GHC.Core.DataCon
 import GHC.Types.ForeignCall ( isSafeForeignCall )
 import GHC.Types.Id
-import GHC.Types.Id.Info
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -41,7 +42,6 @@ import GHC.Utils.Panic
 import GHC.Data.Maybe         ( isJust )
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
-import GHC.Utils.Error        ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Types.Unique.Set
 
 {-
@@ -52,14 +52,21 @@ import GHC.Types.Unique.Set
 ************************************************************************
 -}
 
-dmdAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
-dmdAnalProgram dflags fam_envs binds = do
-  let env             = emptyAnalEnv dflags fam_envs
-  let binds_plus_dmds = snd $ mapAccumL dmdAnalTopBind env binds
-  dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
-    dumpIdInfoOfProgram (pprIfaceStrictSig . strictnessInfo) binds_plus_dmds
-  -- See Note [Stamp out space leaks in demand analysis]
-  seqBinds binds_plus_dmds `seq` return binds_plus_dmds
+-- | Options for the demand analysis
+data DmdAnalOpts = DmdAnalOpts
+   { dmd_strict_dicts :: !Bool -- ^ Use strict dictionaries
+   }
+
+-- | Outputs a new copy of the Core program in which binders have been annotated
+-- with demand and strictness information.
+--
+-- Note: use `seqBinds` on the result to avoid leaks due to lazyness (cf Note
+-- [Stamp out space leaks in demand analysis])
+dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> CoreProgram -> CoreProgram
+dmdAnalProgram opts fam_envs binds = binds_plus_dmds
+   where
+      env             = emptyAnalEnv opts fam_envs
+      binds_plus_dmds = snd $ mapAccumL dmdAnalTopBind env binds
 
 -- Analyse a (group of) top-level binding(s)
 dmdAnalTopBind :: AnalEnv
@@ -1235,31 +1242,13 @@ type DFunFlag = Bool  -- indicates if the lambda being considered is in the
 notArgOfDfun :: DFunFlag
 notArgOfDfun = False
 
-{-  Note [dmdAnalEnv performance]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-It's tempting to think that removing the dynflags from AnalEnv would improve
-performance. After all when analysing recursive groups we end up allocating
-a lot of environments. However this is not the case.
-
-We do get some performance by making AnalEnv smaller. However very often we
-defer computation which means we have to capture the dynflags in the thunks
-we allocate. Doing this naively in practice causes more allocation than the
-removal of DynFlags saves us.
-
-In theory it should be possible to make this better if we are stricter in
-the analysis and therefore allocate fewer thunks. But I couldn't get there
-in a few hours and overall the impact on GHC here is small, and there are
-bigger fish to fry. So for new the env will keep a reference to the flags.
--}
-
-data AnalEnv
-  = AE { ae_dflags :: DynFlags -- See Note [dmdAnalEnv performance]
-       , ae_sigs   :: SigEnv
-       , ae_virgin :: Bool    -- True on first iteration only
+data AnalEnv = AE
+   { ae_strict_dicts :: !Bool -- ^ Enable strict dict
+   , ae_sigs         :: !SigEnv
+   , ae_virgin       :: !Bool -- ^ True on first iteration only
                               -- See Note [Initialising strictness]
-       , ae_fam_envs :: FamInstEnvs
- }
+   , ae_fam_envs     :: !FamInstEnvs
+   }
 
         -- We use the se_env to tell us whether to
         -- record info about a variable in the DmdEnv
@@ -1271,17 +1260,18 @@ data AnalEnv
 type SigEnv = VarEnv (StrictSig, TopLevelFlag)
 
 instance Outputable AnalEnv where
-  ppr (AE { ae_sigs = env, ae_virgin = virgin })
-    = text "AE" <+> braces (vcat
-         [ text "ae_virgin =" <+> ppr virgin
-         , text "ae_sigs =" <+> ppr env ])
+  ppr env = text "AE" <+> braces (vcat
+         [ text "ae_virgin =" <+> ppr (ae_virgin env)
+         , text "ae_strict_dicts =" <+> ppr (ae_strict_dicts env)
+         , text "ae_sigs =" <+> ppr (ae_sigs env)
+         ])
 
-emptyAnalEnv :: DynFlags -> FamInstEnvs -> AnalEnv
-emptyAnalEnv dflags fam_envs
-    = AE { ae_dflags = dflags
-         , ae_sigs = emptySigEnv
-         , ae_virgin = True
-         , ae_fam_envs = fam_envs
+emptyAnalEnv :: DmdAnalOpts -> FamInstEnvs -> AnalEnv
+emptyAnalEnv opts fam_envs
+    = AE { ae_strict_dicts = dmd_strict_dicts opts
+         , ae_sigs         = emptySigEnv
+         , ae_virgin       = True
+         , ae_fam_envs     = fam_envs
          }
 
 emptySigEnv :: SigEnv
@@ -1334,7 +1324,7 @@ findBndrDmd env arg_of_dfun dmd_ty id
     id_ty = idType id
 
     strictify dmd
-      | gopt Opt_DictsStrict (ae_dflags env)
+      | ae_strict_dicts env
              -- We never want to strictify a recursive let. At the moment
              -- annotateBndr is only call for non-recursive lets; if that
              -- changes, we need a RecFlag parameter and another guard here.
