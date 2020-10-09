@@ -2248,8 +2248,11 @@ repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
 
 --------------- Expressions -----------------
 repVarOrCon :: Name -> Core TH.Name -> MetaM (Core (M TH.Exp))
-repVarOrCon vc str | isDataOcc (nameOccName vc) = repCon str
-                   | otherwise                  = repVar str
+repVarOrCon vc str
+    | isVarNameSpace ns = repVar str  -- Both type and term variables (#18740)
+    | otherwise         = repCon str
+  where
+    ns = nameNameSpace vc
 
 repVar :: Core TH.Name -> MetaM (Core (M TH.Exp))
 repVar (MkC s) = rep2 varEName [s]
