@@ -29,7 +29,7 @@ module GHC (
         -- * Flags and settings
         DynFlags(..), GeneralFlag(..), Severity(..), Backend(..), gopt,
         GhcMode(..), GhcLink(..),
-        parseDynamicFlags,
+        parseDynamicFlags, parseTargetFiles,
         getSessionDynFlags, setSessionDynFlags,
         getProgramDynFlags, setProgramDynFlags, setLogAction,
         getInteractiveDynFlags, setInteractiveDynFlags,
@@ -334,7 +334,8 @@ import GHC.Types.Avail
 import GHC.Types.SrcLoc
 import GHC.Core
 import GHC.Iface.Tidy
-import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename )
+import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
+                           , isSourceFilename, startPhase )
 import GHC.Driver.Finder
 import GHC.Driver.Types
 import GHC.Driver.CmdLine
@@ -387,6 +388,7 @@ import GHC.Data.Maybe
 import System.IO.Error  ( isDoesNotExistError )
 import System.Environment ( getEnv )
 import System.Directory
+import Data.List (isPrefixOf)
 
 
 -- %************************************************************************
@@ -600,9 +602,9 @@ checkBrokenTablesNextToCode' dflags
 -- can ignore the list of packages returned.
 --
 setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
-setSessionDynFlags dflags = do
-  dflags' <- checkNewDynFlags dflags
-  dflags''' <- liftIO $ initUnits dflags'
+setSessionDynFlags dflags0 = do
+  dflags1 <- checkNewDynFlags dflags0
+  dflags <- liftIO $ initUnits dflags1
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -637,11 +639,12 @@ setSessionDynFlags dflags = do
       return Nothing
 #endif
 
-  modifySession $ \h -> h{ hsc_dflags = dflags'''
-                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags''' }
+  modifySession $ \h -> h{ hsc_dflags = dflags
+                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags }
                          , hsc_interp = hsc_interp h <|> interp
                            -- we only update the interpreter if there wasn't
                            -- already one set up
+                         , hsc_home_unit = mkHomeUnitFromFlags dflags
                          }
   invalidateModSummaryCache
 
@@ -728,6 +731,88 @@ parseDynamicFlags dflags cmdline = do
   dflags2 <- liftIO $ interpretPackageEnv dflags1
   return (dflags2, leftovers, warns)
 
+-- | Parse command line arguments that look like files.
+-- First normalises its arguments and then splits them into source files
+-- and object files.
+-- A source file can be turned into a 'Target' via 'guessTarget'
+parseTargetFiles :: DynFlags -> [String] -> (DynFlags, [(String, Maybe Phase)], [String])
+parseTargetFiles dflags0 fileish_args =
+  let
+    normal_fileish_paths = map normalise_hyp fileish_args
+    (srcs, objs)         = partition_args normal_fileish_paths [] []
+
+    dflags1 = dflags0 { ldInputs = map (FileOption "") objs
+                                   ++ ldInputs dflags0 }
+    {-
+      We split out the object files (.o, .dll) and add them
+      to ldInputs for use by the linker.
+
+      The following things should be considered compilation manager inputs:
+
+       - haskell source files (strings ending in .hs, .lhs or other
+         haskellish extension),
+
+       - module names (not forgetting hierarchical module names),
+
+       - things beginning with '-' are flags that were not recognised by
+         the flag parser, and we want them to generate errors later in
+         checkOptions, so we class them as source files (#5921)
+
+       - and finally we consider everything without an extension to be
+         a comp manager input, as shorthand for a .hs or .lhs filename.
+
+      Everything else is considered to be a linker object, and passed
+      straight through to the linker.
+    -}
+  in (dflags1, srcs, objs)
+
+-- -----------------------------------------------------------------------------
+
+-- | Splitting arguments into source files and object files.  This is where we
+-- interpret the -x <suffix> option, and attach a (Maybe Phase) to each source
+-- file indicating the phase specified by the -x option in force, if any.
+partition_args :: [String] -> [(String, Maybe Phase)] -> [String]
+               -> ([(String, Maybe Phase)], [String])
+partition_args [] srcs objs = (reverse srcs, reverse objs)
+partition_args ("-x":suff:args) srcs objs
+  | "none" <- suff      = partition_args args srcs objs
+  | StopLn <- phase     = partition_args args srcs (slurp ++ objs)
+  | otherwise           = partition_args rest (these_srcs ++ srcs) objs
+        where phase = startPhase suff
+              (slurp,rest) = break (== "-x") args
+              these_srcs = zip slurp (repeat (Just phase))
+partition_args (arg:args) srcs objs
+  | looks_like_an_input arg = partition_args args ((arg,Nothing):srcs) objs
+  | otherwise               = partition_args args srcs (arg:objs)
+
+
+looks_like_an_input :: String -> Bool
+looks_like_an_input m =  isSourceFilename m
+                      || looksLikeModuleName m
+                      || "-" `isPrefixOf` m
+                      || not (hasExtension m)
+
+
+-- | To simplify the handling of filepaths, we normalise all filepaths right
+-- away. Note the asymmetry of FilePath.normalise:
+--    Linux:   p\/q -> p\/q; p\\q -> p\\q
+--    Windows: p\/q -> p\\q; p\\q -> p\\q
+-- #12674: Filenames starting with a hypen get normalised from ./-foo.hs
+-- to -foo.hs. We have to re-prepend the current directory.
+normalise_hyp :: FilePath -> FilePath
+normalise_hyp fp
+  | strt_dot_sl && "-" `isPrefixOf` nfp = cur_dir ++ nfp
+  | otherwise                           = nfp
+  where
+#if defined(mingw32_HOST_OS)
+    strt_dot_sl = "./" `isPrefixOf` fp || ".\\" `isPrefixOf` fp
+#else
+    strt_dot_sl = "./" `isPrefixOf` fp
+#endif
+    cur_dir = '.' : [pathSeparator]
+    nfp = normalise fp
+
+-----------------------------------------------------------------------------
 
 -- | Checks the set of new DynFlags for possibly erroneous option
 -- combinations when invoking 'setSessionDynFlags' and friends, and if
@@ -1171,7 +1256,7 @@ getPrintUnqual = withSession $ \hsc_env -> do
   let dflags = hsc_dflags hsc_env
   return $ icPrintUnqual
                (unitState dflags)
-               (mkHomeUnitFromFlags dflags)
+               (hsc_home_unit hsc_env)
                (hsc_IC hsc_env)
 
 -- | Container for information about a 'Module'.
@@ -1270,7 +1355,7 @@ mkPrintUnqualifiedForModule minf = withSession $ \hsc_env -> do
   let dflags          = hsc_dflags hsc_env
       mk_print_unqual = mkPrintUnqualified
                            (unitState dflags)
-                           (mkHomeUnitFromFlags dflags)
+                           (hsc_home_unit hsc_env)
   return (fmap mk_print_unqual (minf_rdr_env minf))
 
 modInfoLookupName :: GhcMonad m =>
@@ -1279,10 +1364,7 @@ modInfoLookupName :: GhcMonad m =>
 modInfoLookupName minf name = withSession $ \hsc_env -> do
    case lookupTypeEnv (minf_type_env minf) name of
      Just tyThing -> return (Just tyThing)
-     Nothing      -> do
-       eps <- liftIO $ readIORef (hsc_EPS hsc_env)
-       return $! lookupType (hsc_dflags hsc_env)
-                            (hsc_HPT hsc_env) (eps_PTE eps) name
+     Nothing      -> liftIO (lookupType hsc_env name)
 
 modInfoIface :: ModuleInfo -> Maybe ModIface
 modInfoIface = minf_iface
@@ -1308,7 +1390,7 @@ isDictonaryId id
 -- 'setContext'.
 lookupGlobalName :: GhcMonad m => Name -> m (Maybe TyThing)
 lookupGlobalName name = withSession $ \hsc_env -> do
-   liftIO $ lookupTypeHscEnv hsc_env name
+   liftIO $ lookupType hsc_env name
 
 findGlobalAnns :: (GhcMonad m, Typeable a) => ([Word8] -> a) -> AnnTarget Name -> m [a]
 findGlobalAnns deserialize target = withSession $ \hsc_env -> do
@@ -1501,7 +1583,7 @@ showRichTokenStream ts = go startLoc ts ""
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
   let dflags = hsc_dflags hsc_env
-      home_unit = mkHomeUnitFromFlags dflags
+      home_unit = hsc_home_unit hsc_env
   case maybe_pkg of
     Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg

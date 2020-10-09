@@ -184,7 +184,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
   where
     hsc_src = ms_hsc_src mod_sum
     dflags = hsc_dflags hsc_env
-    home_unit = mkHomeUnitFromFlags dflags
+    home_unit = hsc_home_unit hsc_env
     err_msg = mkPlainErrMsg dflags loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
 
@@ -2832,7 +2832,7 @@ loadUnqualIfaces hsc_env ictxt
   = initIfaceTcRn $ do
     mapM_ (loadSysInterface doc) (moduleSetElts (mkModuleSet unqual_mods))
   where
-    home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+    home_unit = hsc_home_unit hsc_env
 
     unqual_mods = [ nameModule name
                   | gre <- globalRdrEnvElts (ic_rn_gbl_env ictxt)

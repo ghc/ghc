@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | This is the driver for the 'ghc --backpack' mode, which
 -- is a reimplementation of the "package manager" bits of
@@ -39,6 +40,7 @@ import GHC.Unit.State
 import GHC.Driver.Types
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
 import GHC.Utils.Error
 import GHC.Types.SrcLoc
 import GHC.Driver.Main
@@ -288,7 +290,7 @@ buildUnit session cid insts lunit = do
     conf <- withBkpSession cid insts deps_w_rns session $ do
 
         dflags <- getDynFlags
-        mod_graph <- hsunitModuleGraph dflags (unLoc lunit)
+        mod_graph <- hsunitModuleGraph (unLoc lunit)
 
         msg <- mkBackpackMsg
         ok <- load' LoadAllTargets (Just msg) mod_graph
@@ -312,7 +314,7 @@ buildUnit session cid insts lunit = do
 
         let compat_fs = unitIdFS (indefUnit cid)
             compat_pn = PackageName compat_fs
-            unit_id   = homeUnitId (mkHomeUnitFromFlags (hsc_dflags hsc_env))
+            unit_id   = homeUnitId (hsc_home_unit hsc_env)
 
         return GenericUnitInfo {
             -- Stub data
@@ -341,8 +343,8 @@ buildUnit session cid insts lunit = do
             unitAbiDepends = [],
             unitLinkerOptions = case session of
                                  TcSession -> []
-                                 _ -> obj_files,
-            unitImportDirs = [ hi_dir ],
+                                 _ -> map ST.pack $ obj_files,
+            unitImportDirs = [ ST.pack $ hi_dir ],
             unitIsExposed = False,
             unitIsIndefinite = case session of
                                  TcSession -> True
@@ -378,8 +380,7 @@ compileExe lunit = do
     forM_ (zip [1..] deps) $ \(i, dep) ->
         compileInclude (length deps) (i, dep)
     withBkpExeSession deps_w_rns $ do
-        dflags <- getDynFlags
-        mod_graph <- hsunitModuleGraph dflags (unLoc lunit)
+        mod_graph <- hsunitModuleGraph (unLoc lunit)
         msg <- mkBackpackMsg
         ok <- load' LoadAllTargets (Just msg) mod_graph
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
@@ -645,11 +646,12 @@ convertHsModuleId (HsModuleId (L _ hsuid) (L _ modname)) = mkModule (convertHsCo
 --
 -- We don't bother trying to support GHC.Driver.Make for now, it's more trouble
 -- than it's worth for inline modules.
-hsunitModuleGraph :: DynFlags -> HsUnit HsComponentId -> BkpM ModuleGraph
-hsunitModuleGraph dflags unit = do
+hsunitModuleGraph :: HsUnit HsComponentId -> BkpM ModuleGraph
+hsunitModuleGraph unit = do
+    hsc_env <- getSession
     let decls = hsunitBody unit
         pn = hsPackageName (unLoc (hsunitName unit))
-        home_unit = mkHomeUnitFromFlags dflags
+        home_unit = hsc_home_unit hsc_env
 
     --  1. Create a HsSrcFile/HsigFile summary for every
     --  explicitly mentioned module/signature.
