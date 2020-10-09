@@ -6,7 +6,7 @@
 The @TyCon@ datatype
 -}
 
-{-# LANGUAGE CPP, FlexibleInstances #-}
+{-# LANGUAGE CPP, FlexibleInstances, LambdaCase #-}
 
 module TyCon(
         -- * Main TyCon data types
@@ -1437,7 +1437,44 @@ data PrimRep
   | FloatRep
   | DoubleRep
   | VecRep Int PrimElemRep  -- ^ A vector
-  deriving( Show )
+  deriving( Eq, Show )
+
+instance Binary PrimRep where
+  put_ bh VoidRep     = putByte bh 0
+  put_ bh LiftedRep   = putByte bh 1
+  put_ bh UnliftedRep = putByte bh 2
+  put_ bh Int8Rep     = putByte bh 3
+  put_ bh Int16Rep    = putByte bh 4
+  put_ bh Int32Rep    = putByte bh 5
+  put_ bh Int64Rep    = putByte bh 6
+  put_ bh IntRep      = putByte bh 7
+  put_ bh Word8Rep    = putByte bh 8
+  put_ bh Word16Rep   = putByte bh 9
+  put_ bh Word32Rep   = putByte bh 10
+  put_ bh Word64Rep   = putByte bh 11
+  put_ bh WordRep     = putByte bh 12
+  put_ bh AddrRep     = putByte bh 13
+  put_ bh FloatRep    = putByte bh 14
+  put_ bh DoubleRep   = putByte bh 15
+  put_ bh (VecRep n el) = putByte bh 16 >> put_ bh n >> put_ bh el
+  get bh = getByte bh >>= \case
+    0 -> pure VoidRep
+    1 -> pure LiftedRep
+    2 -> pure UnliftedRep
+    3 -> pure Int8Rep
+    4 -> pure Int16Rep
+    5 -> pure Int32Rep
+    6 -> pure Int64Rep
+    7 -> pure IntRep
+    8 -> pure Word8Rep
+    9 -> pure Word16Rep
+    10 -> pure Word32Rep
+    11 -> pure Word64Rep
+    12 -> pure WordRep
+    13 -> pure AddrRep
+    14 -> pure FloatRep
+    15 -> pure DoubleRep
+    16 -> VecRep <$> get bh <*> get bh
 
 data PrimElemRep
   = Int8ElemRep
@@ -1451,6 +1488,30 @@ data PrimElemRep
   | FloatElemRep
   | DoubleElemRep
    deriving( Eq, Show )
+
+instance Binary PrimElemRep where
+  put_ bh Int8ElemRep   = putByte bh 0
+  put_ bh Int16ElemRep  = putByte bh 1
+  put_ bh Int32ElemRep  = putByte bh 2
+  put_ bh Int64ElemRep  = putByte bh 3
+  put_ bh Word8ElemRep  = putByte bh 4
+  put_ bh Word16ElemRep = putByte bh 5
+  put_ bh Word32ElemRep = putByte bh 6
+  put_ bh Word64ElemRep = putByte bh 7
+  put_ bh FloatElemRep  = putByte bh 8
+  put_ bh DoubleElemRep = putByte bh 9
+  get bh = getByte bh >>= \case
+    0 -> pure Int8ElemRep
+    1 -> pure Int16ElemRep
+    2 -> pure Int32ElemRep
+    3 -> pure Int64ElemRep
+    4 -> pure Word8ElemRep
+    5 -> pure Word16ElemRep
+    6 -> pure Word32ElemRep
+    7 -> pure Word64ElemRep
+    8 -> pure FloatElemRep
+    9 -> pure DoubleElemRep
+
 
 instance Outputable PrimRep where
   ppr r = text (show r)

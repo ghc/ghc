@@ -43,6 +43,9 @@ import qualified Data.Semigroup as Semigroup
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
 
+import TyCon (PrimRep(..))
+import StgSyn (isAddrRep)
+
 type Atomic = Bool
 type LlvmStatements = OrdList LlvmStatement
 
@@ -218,6 +221,7 @@ genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
                              CC_Ccc LMVoid FixedArgs (tysToParams argTy) Nothing
 
     let (_, arg_hints) = foreignTargetHints t
+    let (ret_rep, args_rep) = foreignTargetReps t
     let args_hints' = zip args arg_hints
     argVars <- arg_varsW args_hints' ([], nilOL, [])
     fptr    <- liftExprData $ getFunPtr funTy t
@@ -400,23 +404,34 @@ genCall t@(PrimTarget (MO_SubWordC w)) [dstV, dstO] [lhs, rhs] =
 -- Handle all other foreign calls and prim ops.
 genCall target res args = runStmtsDecls $ do
     dflags <- getDynFlags
+    platform <- lift $ getLlvmPlatform
 
-    -- parameter types
-    let arg_type (_, AddrHint) = i8Ptr
-        -- cast pointers to i8*. Llvm equivalent of void*
-        arg_type (expr, _) = cmmToLlvmType $ cmmExprType dflags expr
+
+    let primRepToLlvmTy VoidRep  = (Unsigned, LMVoid)
+        primRepToLlvmTy r | isAddrRep r = (Unsigned, i8Ptr)
+        primRepToLlvmTy IntRep   = (Signed, widthToLlvmInt (cIntWidth dflags))
+        primRepToLlvmTy Int8Rep  = (Signed, i8)
+        primRepToLlvmTy Int16Rep = (Signed, i16)
+        primRepToLlvmTy Int32Rep = (Signed, i32)
+        primRepToLlvmTy Int64Rep = (Signed, i64)
+        primRepToLlvmTy WordRep  = (Unsigned, widthToLlvmInt (wordWidth dflags))
+        primRepToLlvmTy Word8Rep = (Unsigned, i8)
+        primRepToLlvmTy Word16Rep = (Unsigned, i16)
+        primRepToLlvmTy Word32Rep = (Unsigned, i32)
+        primRepToLlvmTy Word64Rep = (Unsigned, i64)
+        primRepToLlvmTy FloatRep  = (Signed, LMFloat)
+        primRepToLlvmTy DoubleRep = (Signed, LMDouble)
 
     -- ret type
-    let ret_type [] = LMVoid
-        ret_type [(_, AddrHint)] = i8Ptr
-        ret_type [(reg, _)]      = cmmToLlvmType $ localRegType reg
-        ret_type t = panic $ "genCall: Too many return values! Can only handle"
-                        ++ " 0 or 1, given " ++ show (length t) ++ "."
+    let -- similarly to arg_type_cmm, we may need to widen/narrow the result.
+        -- most likely widen, as cmm regs will be 64bit wide.
+        ret_type_cmm []              = LMVoid
+        ret_type_cmm [(_, AddrHint)] = i8Ptr
+        ret_type_cmm [(reg, _)]      = cmmToLlvmType $ localRegType reg
 
     -- extract Cmm call convention, and translate to LLVM call convention
-    platform <- lift $ getLlvmPlatform
     let lmconv = case target of
-            ForeignTarget _ (ForeignConvention conv _ _ _) ->
+            ForeignTarget _ (ForeignConvention conv _ _ _ _ _) ->
               case conv of
                  StdCallConv  -> case platformArch platform of
                                  ArchX86    -> CC_X86_Stdcc
@@ -442,43 +457,60 @@ genCall target res args = runStmtsDecls $ do
                 | otherwise     = llvmStdFunAttrs
 
         never_returns = case target of
-             ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns) -> True
+             ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns _ _) -> True
              _ -> False
 
     -- fun type
     let (res_hints, arg_hints) = foreignTargetHints target
+    let (ret_rep, args_rep) = foreignTargetReps target
+
     let args_hints = zip args arg_hints
     let ress_hints = zip res  res_hints
     let ccTy  = StdCall -- tail calls should be done through CmmJump
-    let retTy = ret_type ress_hints
-    let argTy = tysToParams $ map arg_type args_hints
+
+    let retTyCmm = ret_type_cmm ress_hints
+
+    -- discard signage, we don't need that for the function signature.
+    -- the take length is such a hack. The issue is that we end up with
+    -- VoidRep's for the State Transition as additional function arguments
+    -- :-/
+    let argTy = tysToParams $ map (snd . primRepToLlvmTy) args_rep
+    let retTy = snd $ primRepToLlvmTy ret_rep
     let funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
                              lmconv retTy FixedArgs argTy (llvmFunAlign dflags)
 
 
-    argVars <- arg_varsW args_hints ([], nilOL, [])
-    fptr    <- getFunPtrW funTy target
+    let args_with_reps = zip args (map primRepToLlvmTy args_rep)
 
     let doReturn | ccTy == TailCall  = statement $ Return Nothing
                  | never_returns     = statement $ Unreachable
                  | otherwise         = return ()
 
+    let myPprTraceDebug :: String -> SDoc -> a -> a
+        myPprTraceDebug str doc x
+          | hasPprDebug dflags = pprTrace str doc x
+          | otherwise          = x
+
     doTrashStmts
 
     -- make the actual call
+    argVars <- arg_varsW2 args_with_reps ([], nilOL, [])
+    fptr    <- getFunPtrW funTy target
     case retTy of
         LMVoid -> do
             statement $ Expr $ Call ccTy fptr argVars fnAttrs
 
         _ -> do
-            v1 <- doExprW retTy $ Call ccTy fptr argVars fnAttrs
+            let (signage, retTy) = primRepToLlvmTy ret_rep
+            v0 <- doExprW retTy $ Call ccTy fptr argVars fnAttrs
+            v1 <- castVarW Signed v0 retTyCmm
             -- get the return register
             let ret_reg [reg] = reg
                 ret_reg t = panic $ "genCall: Bad number of registers! Can only handle"
                                 ++ " 1, given " ++ show (length t) ++ "."
             let creg = ret_reg res
             vreg <- getCmmRegW (CmmLocal creg)
-            if retTy == pLower (getVarType vreg)
+            if retTyCmm == pLower (getVarType vreg)
                 then do
                     statement $ Store v1 vreg
                     doReturn
@@ -580,8 +612,7 @@ genCallSimpleCast w t@(PrimTarget op) [dst] args = do
 
     dstV                        <- getCmmReg (CmmLocal dst)
 
-    let (_, arg_hints) = foreignTargetHints t
-    let args_hints = zip args arg_hints
+    let args_hints = zip args (snd (foreignTargetHints t))
     (argsV, stmts2, top2)       <- arg_vars args_hints ([], nilOL, [])
     (argsV', stmts4)            <- castVars Signed $ zip argsV [width]
     (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
@@ -668,6 +699,14 @@ arg_varsW xs ys = do
     tell $ LlvmAccum stmts decls
     return vars
 
+arg_varsW2 :: [(CmmActual, (Signage, LlvmType))]
+           -> ([LlvmVar], LlvmStatements, [LlvmCmmDecl])
+           -> WriterT LlvmAccum LlvmM [LlvmVar]
+arg_varsW2 xs ys = do
+  (vars, stmts, decls) <- lift $ arg_vars2 xs ys
+  tell $ LlvmAccum stmts decls
+  return vars
+
 -- | Conversion of call arguments.
 arg_vars :: [(CmmActual, ForeignHint)]
          -> ([LlvmVar], LlvmStatements, [LlvmCmmDecl])
@@ -690,10 +729,45 @@ arg_vars ((e, AddrHint):rest) (vars, stmts, tops)
        arg_vars rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1,
                                tops ++ top')
 
+-- arg_vars ((e, SignedHint w):rest) (vars, stmts, tops)
+--   = do (v1, stmts', top') <- exprToVar e
+--        dflags <- getDynFlags
+--        (v2, s1) <- castVar Signed v1 (signedType w)
+--        arg_vars rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1, tops ++ top')
+--   where signedType W8 = i8
+--         signedType W16 = i16
+--         signedType W32 = i32
+--         signedType W64 = i64
+
+
 arg_vars ((e, _):rest) (vars, stmts, tops)
   = do (v1, stmts', top') <- exprToVar e
        arg_vars rest (vars ++ [v1], stmts `appOL` stmts', tops ++ top')
 
+
+arg_vars2 :: [(CmmActual, (Signage, LlvmType))]
+          -> ([LlvmVar], LlvmStatements, [LlvmCmmDecl])
+          -> LlvmM ([LlvmVar], LlvmStatements, [LlvmCmmDecl])
+arg_vars2 [] x = return x
+arg_vars2 ((e, (s, ty0)):rest) (vars, stmts, tops)
+  | ty0 == i8Ptr
+  = do (v1, stmts', top') <- exprToVar e
+       dflags <- getDynFlags
+       let op = case getVarType v1 of
+             ty | isPointer ty -> LM_Bitcast
+             ty | isInt ty     -> LM_Inttoptr
+
+             a -> panic $ "genCall: Can't cast llvmType to i8*! ("
+                  ++ showSDoc dflags (ppr a) ++ ")"
+       (v2, s1) <- doExpr i8Ptr $ Cast op v1 i8Ptr
+       arg_vars2 rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1,
+                      tops ++ top')
+
+arg_vars2 ((e, (s, ty)):rest) (vars, stmts, tops)
+  = do (v1, stmts', top') <- exprToVar e
+       dflags <- getDynFlags
+       (v2, s1) <- castVar s v1 ty
+       arg_vars2 rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1, tops ++ top')
 
 -- | Cast a collection of LLVM variables to specific types.
 castVarsW :: Signage
@@ -738,6 +812,12 @@ castVar signage v t | getVarType v == t
     where extend = case signage of
             Signed      -> LM_Sext
             Unsigned    -> LM_Zext
+
+castVarW :: Signage -> LlvmVar -> LlvmType -> WriterT LlvmAccum LlvmM LlvmVar
+castVarW signage var ty = do
+  (var, stmt) <- lift $ castVar signage var ty
+  statement $ stmt
+  return var
 
 
 cmmPrimOpRetValSignage :: CallishMachOp -> Signage

@@ -15,7 +15,7 @@
 module CmmNode (
      CmmNode(..), CmmFormal, CmmActual, CmmTickish,
      UpdFrameOffset, Convention(..),
-     ForeignConvention(..), ForeignTarget(..), foreignTargetHints,
+     ForeignConvention(..), ForeignTarget(..), foreignTargetHints, foreignTargetReps,
      CmmReturnInfo(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
      mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors, mapCollectSuccessors,
@@ -45,7 +45,9 @@ import Data.Maybe
 import Data.List (tails,sortBy)
 import Unique (nonDetCmpUnique)
 import Util
+import PprCmmExpr
 
+import {-# SOURCE #-} TyCon (PrimRep)
 
 ------------------------
 -- CmmNode
@@ -287,6 +289,8 @@ data ForeignConvention
         [ForeignHint]           -- Extra info about the args
         [ForeignHint]           -- Extra info about the result
         CmmReturnInfo
+        PrimRep                 -- return prim rep
+        [PrimRep]               -- argument prim reps
   deriving Eq
 
 data CmmReturnInfo
@@ -302,7 +306,11 @@ data ForeignTarget        -- The target of a foreign call
         CallishMachOp            -- Which one
   deriving Eq
 
-foreignTargetHints :: ForeignTarget -> ([ForeignHint], [ForeignHint])
+foreignTargetReps :: HasCallStack => ForeignTarget -> (PrimRep, [PrimRep])
+foreignTargetReps (ForeignTarget _ (ForeignConvention _ _ _ _ rr ras)) = (rr, ras)
+foreignTargetReps (PrimTarget op) = callishMachOpReps op
+
+foreignTargetHints :: HasCallStack => ForeignTarget -> ([ForeignHint], [ForeignHint])
 foreignTargetHints target
   = ( res_hints ++ repeat NoHint
     , arg_hints ++ repeat NoHint )
@@ -310,7 +318,7 @@ foreignTargetHints target
     (res_hints, arg_hints) =
        case target of
           PrimTarget op -> callishMachOpHints op
-          ForeignTarget _ (ForeignConvention _ arg_hints res_hints _) ->
+          ForeignTarget _ (ForeignConvention _ arg_hints res_hints _ _ _) ->
              (res_hints, arg_hints)
 
 --------------------------------------------------
@@ -376,7 +384,7 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
           activeRegs = activeStgRegs platform
           activeCallerSavesRegs = filter (callerSaves platform) activeRegs
 
-          foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns)) = []
+          foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns _ _)) = []
           foreignTargetRegs _ = activeCallerSavesRegs
 
 -- Note [Safe foreign calls clobber STG registers]

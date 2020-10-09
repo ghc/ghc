@@ -118,7 +118,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
         GHC_CONVERT_OS([$target_os], [$TargetArch], [TargetOS])
     fi
 
-    GHC_LLVM_TARGET([$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
+    GHC_LLVM_TARGET([$target],[$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
 
     GHC_SELECT_FILE_EXTENSIONS([$host], [exeext_host], [soext_host])
     GHC_SELECT_FILE_EXTENSIONS([$target], [exeext_target], [soext_target])
@@ -218,7 +218,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             test -z "[$]2" || eval "[$]2=\"ArchARM {armISA = \$ARM_ISA, armISAExt = \$ARM_ISA_EXT, armABI = \$ARM_ABI}\""
             ;;
         aarch64)
-            test -z "[$]2" || eval "[$]2=ArchARM64"
+            test -z "[$]2" || eval "[$]2=ArchAArch64"
             ;;
         alpha)
             test -z "[$]2" || eval "[$]2=ArchAlpha"
@@ -327,9 +327,14 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
     AC_LINK_IFELSE(
         [AC_LANG_PROGRAM([], [__asm__ (".subsections_via_symbols");])],
         [AC_MSG_RESULT(yes)
-         TargetHasSubsectionsViaSymbols=YES
-         AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
+         if test x"$TargetArch" = xaarch64; then
+            dnl subsections via symbols is busted on arm64
+            TargetHasSubsectionsViaSymbols=NO
+         else
+            TargetHasSubsectionsViaSymbols=YES
+            AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
                    [Define to 1 if Apple-style dead-stripping is supported.])
+         fi
         ],
         [TargetHasSubsectionsViaSymbols=NO
          AC_MSG_RESULT(no)])
@@ -1956,7 +1961,7 @@ AC_MSG_CHECKING(for path to top of build tree)
 # converts cpu from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_CPU],[
 case "$1" in
-  aarch64*)
+  aarch64*|arm64*)
     $2="aarch64"
     ;;
   alpha*)
@@ -2038,18 +2043,19 @@ case "$1" in
   esac
 ])
 
-# GHC_LLVM_TARGET(target_cpu, target_vendor, target_os, llvm_target_var)
+# GHC_LLVM_TARGET(target, target_cpu, target_vendor, target_os, llvm_target_var)
 # --------------------------------
 # converts the canonicalized target into someting llvm can understand
 AC_DEFUN([GHC_LLVM_TARGET], [
-  case "$2-$3" in
+  llvm_target_cpu=$2
+  case "$1" in
     *-freebsd*-gnueabihf)
       llvm_target_vendor="unknown"
       llvm_target_os="freebsd-gnueabihf"
       ;;
-    hardfloat-*eabi)
+    *-hardfloat-*eabi)
       llvm_target_vendor="unknown"
-      llvm_target_os="$3""hf"
+      llvm_target_os="$4""hf"
       ;;
     *-mingw32|*-mingw64|*-msys)
       llvm_target_vendor="unknown"
@@ -2060,15 +2066,25 @@ AC_DEFUN([GHC_LLVM_TARGET], [
     # turned into just `-linux` and fail to be found
     # in the `llvm-targets` file.
     *-android*|*-gnueabi*|*-musleabi*)
-      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
-      llvm_target_os="$3"
+      GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
+      llvm_target_os="$4"
+      ;;
+    # apple is a bit about their naming scheme for
+    # aarch64; and clang on macOS doesn't know that
+    # aarch64 would be arm64. So for LLVM we'll need
+    # to call it arm64; while we'll refer to it internally
+    # as aarch64 for consistency and sanity.
+    aarch64-apple-*|arm64-apple-*)
+      llvm_target_cpu="arm64"
+      GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
+      GHC_CONVERT_OS([$4],[$2],[llvm_target_os])
       ;;
     *)
-      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
-      GHC_CONVERT_OS([$3],[$1],[llvm_target_os])
+      GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
+      GHC_CONVERT_OS([$4],[$2],[llvm_target_os])
       ;;
   esac
-  $4="$1-$llvm_target_vendor-$llvm_target_os"
+  $5="$llvm_target_cpu-$llvm_target_vendor-$llvm_target_os"
 ])
 
 

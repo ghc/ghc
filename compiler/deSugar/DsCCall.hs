@@ -47,6 +47,7 @@ import Util
 
 import Data.Maybe
 
+import RepType (typePrimRep1, mkCCallSpec)
 {-
 Desugaring of @ccall@s consists of adding some state manipulation,
 unboxing any boxed primitive arguments and boxing the result if
@@ -97,8 +98,20 @@ dsCCall lbl args may_gc result_ty
        uniq <- newUnique
        dflags <- getDynFlags
        let
+           arg_tys = map exprType args
+
+           raw_res_ty = case tcSplitIOType_maybe result_ty of
+             Just (_ioTyCon, res_ty) -> res_ty
+             Nothing                 -> result_ty
+
+           myPprTraceDebug :: String -> SDoc -> a -> a
+           myPprTraceDebug str doc x
+             | hasPprDebug dflags = pprTrace str doc x
+             | otherwise          = x
            target = StaticTarget NoSourceText lbl Nothing True
-           the_fcall    = CCall (CCallSpec target CCallConv may_gc)
+           the_fcall    = myPprTraceDebug "dsCCall" (text "result type:" <+> ppr result_ty
+                                                  $$ text "ccall result type" <+> ppr ccall_result_ty)
+             $ CCall (mkCCallSpec target CCallConv may_gc raw_res_ty arg_tys)
            the_prim_app = mkFCall dflags uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
 
@@ -349,31 +362,12 @@ resultWrapper result_ty
   , [unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
   = do { dflags <- getDynFlags
        ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
-       ; let narrow_wrapper = maybeNarrow dflags tycon
-             marshal_con e  = Var (dataConWrapId data_con)
+       ; let marshal_con e  = Var (dataConWrapId data_con)
                               `mkTyApps` tycon_arg_tys
-                              `App` wrapper (narrow_wrapper e)
+                              `App` wrapper e
        ; return (maybe_ty, marshal_con) }
 
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)
   where
     maybe_tc_app = splitTyConApp_maybe result_ty
-
--- When the result of a foreign call is smaller than the word size, we
--- need to sign- or zero-extend the result up to the word size.  The C
--- standard appears to say that this is the responsibility of the
--- caller, not the callee.
-
-maybeNarrow :: DynFlags -> TyCon -> (CoreExpr -> CoreExpr)
-maybeNarrow dflags tycon
-  | tycon `hasKey` int8TyConKey   = \e -> App (Var (mkPrimOpId Narrow8IntOp)) e
-  | tycon `hasKey` int16TyConKey  = \e -> App (Var (mkPrimOpId Narrow16IntOp)) e
-  | tycon `hasKey` int32TyConKey
-         && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32IntOp)) e
-
-  | tycon `hasKey` word8TyConKey  = \e -> App (Var (mkPrimOpId Narrow8WordOp)) e
-  | tycon `hasKey` word16TyConKey = \e -> App (Var (mkPrimOpId Narrow16WordOp)) e
-  | tycon `hasKey` word32TyConKey
-         && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
-  | otherwise                     = id

@@ -235,7 +235,7 @@ pprStmt stmt =
         hresults = zip results res_hints
         hargs    = zip args arg_hints
 
-        ForeignConvention cconv _ _ ret = conv
+        ForeignConvention cconv _ _ ret _ _ = conv
 
         cast_fn = parens (cCast (pprCFunType (char '*') cconv hresults hargs) fn)
 
@@ -1016,9 +1016,9 @@ pprCall ppr_fn cconv results args
      pprArg (expr, _other)
         = pprExpr expr
 
-     pprUnHint AddrHint   rep = parens (machRepCType rep)
-     pprUnHint SignedHint rep = parens (machRepCType rep)
-     pprUnHint _          _   = empty
+     pprUnHint AddrHint       rep = parens (machRepCType rep)
+     pprUnHint (SignedHint) rep = parens (machRepCType rep)
+     pprUnHint _              _   = empty
 
 -- Currently we only have these two calling conventions, but this might
 -- change in the future...
@@ -1164,7 +1164,7 @@ cLoad expr rep
           bewareLoadStoreAlignment ArchMipseb   = True
           bewareLoadStoreAlignment ArchMipsel   = True
           bewareLoadStoreAlignment (ArchARM {}) = True
-          bewareLoadStoreAlignment ArchARM64    = True
+          bewareLoadStoreAlignment ArchAArch64    = True
           bewareLoadStoreAlignment ArchSPARC    = True
           bewareLoadStoreAlignment ArchSPARC64  = True
           -- Pessimistically assume that they will also cause problems
@@ -1181,9 +1181,9 @@ isCmmWordType dflags ty = not (isFloatType ty)
 -- argument, we always cast the argument to (void *), to avoid warnings from
 -- the C compiler.
 machRepHintCType :: CmmType -> ForeignHint -> SDoc
-machRepHintCType _   AddrHint   = text "void *"
-machRepHintCType rep SignedHint = machRep_S_CType (typeWidth rep)
-machRepHintCType rep _other     = machRepCType rep
+machRepHintCType _   AddrHint       = text "void *"
+machRepHintCType rep (SignedHint) = machRep_S_CType (typeWidth rep)
+machRepHintCType rep _other         = machRepCType rep
 
 machRepPtrCType :: CmmType -> SDoc
 machRepPtrCType r

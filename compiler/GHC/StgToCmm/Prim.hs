@@ -290,15 +290,16 @@ emitPrimOp dflags = \case
       -> opAllDone $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
--- First we handle various awkward cases specially.
-
+  -- First we handle various awkward cases specially.
+  -- Note: StgInt newSpark (StgRegTable *reg, StgClosure *p)
+  --       StgInt is Int_64 on 64bit platforms, Int_32 on others
   ParOp -> \[arg] -> opAllDone $ \[res] -> do
     -- for now, just implement this in a C function
     -- later, we might want to inline it.
     emitCCall
-        [(res,NoHint)]
+        [(res, Int64Rep, SignedHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
-        [(baseExpr, AddrHint), (arg,AddrHint)]
+        [(baseExpr, AddrRep, AddrHint), (arg, AddrRep, AddrHint)]
 
   SparkOp -> \[arg] -> opAllDone $ \[res] -> do
     -- returns the value of arg in res.  We're going to therefore
@@ -307,9 +308,9 @@ emitPrimOp dflags = \case
     tmp <- assignTemp arg
     tmp2 <- newTemp (bWord dflags)
     emitCCall
-        [(tmp2,NoHint)]
+        [(tmp2, Int64Rep, SignedHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
-        [(baseExpr, AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
+        [(baseExpr, AddrRep, AddrHint), ((CmmReg (CmmLocal tmp)), AddrRep, AddrHint)]
     emitAssign (CmmLocal res) (CmmReg (CmmLocal tmp))
 
   GetCCSOfOp -> \[arg] -> opAllDone $ \[res] -> do
@@ -342,7 +343,7 @@ emitPrimOp dflags = \case
     emitCCall
             [{-no results-}]
             (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
-            [(baseExpr, AddrHint), (mutv, AddrHint), (CmmReg old_val, AddrHint)]
+            [(baseExpr, AddrRep, AddrHint), (mutv, AddrRep, AddrHint), (CmmReg old_val, AddrRep, AddrHint)]
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes

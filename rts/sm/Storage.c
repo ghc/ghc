@@ -30,8 +30,12 @@
 #include "GC.h"
 #include "Evac.h"
 #include "NonMoving.h"
-#if defined(ios_HOST_OS)
+#if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
 #include "Hash.h"
+#endif
+
+#if RTS_LINKER_USE_MMAP
+#include "LinkerInternals.h"
 #endif
 
 #include <string.h>
@@ -1543,7 +1547,7 @@ StgWord calcTotalCompactW (void)
          should be modified to use allocateExec instead of VirtualAlloc.
    ------------------------------------------------------------------------- */
 
-#if (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && defined(ios_HOST_OS)
+#if (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && (defined(ios_HOST_OS) || defined(darwin_HOST_OS))
 #include <libkern/OSCacheControl.h>
 #endif
 
@@ -1574,7 +1578,7 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
   /* x86 doesn't need to do anything, so just suppress some warnings. */
   (void)len;
   (void)exec_addr;
-#elif (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && defined(ios_HOST_OS)
+#elif (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && (defined(ios_HOST_OS) || defined(darwin_HOST_OS))
   /* On iOS we need to use the special 'sys_icache_invalidate' call. */
   sys_icache_invalidate(exec_addr, len);
 #elif defined(__clang__)
@@ -1628,7 +1632,7 @@ void freeExec (AdjustorExecutable addr)
     RELEASE_SM_LOCK
 }
 
-#elif defined(ios_HOST_OS)
+#elif (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && (defined(ios_HOST_OS) || defined(darwin_HOST_OS))
 
 static HashTable* allocatedExecs;
 
@@ -1636,6 +1640,11 @@ AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
 {
     AdjustorWritable writ;
     ffi_closure* cl;
+    // This check is necessary as we can't use allocateExec for anything *but*
+    // ffi_closures on ios/darwin on arm.  libffi does some heavy lifting to
+    // get around the X^W restrictions, and we can't just use this codepath
+    // to allocate generic executable space. For those cases we have to refer
+    // back to allocateWrite/markExec/freeWrite (see above.)
     if (bytes != sizeof(ffi_closure)) {
         barf("allocateExec: for ffi_closure only");
     }
@@ -1650,6 +1659,20 @@ AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
     RELEASE_SM_LOCK;
     return writ;
 }
+
+#if RTS_LINKER_USE_MMAP
+AdjustorWritable allocateWrite(W_ bytes) {
+    return mmapForLinker(bytes, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+}
+
+void markExec(W_ bytes, AdjustorWritable writ) {
+    mmapForLinkerMarkExecutable(writ, bytes);
+}
+
+void freeWrite(W_ bytes, AdjustorWritable writ) {
+    munmap(writ, bytes);
+}
+#endif
 
 AdjustorWritable execToWritable(AdjustorExecutable exec)
 {
