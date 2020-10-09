@@ -189,7 +189,7 @@ data ClosureTypeInfo
   = Constr        ConTagZ ConstrDescription
   | Fun           FunArity ArgDescr
   | Thunk
-  | ThunkSelector SelectorOffset
+  | ThunkSelector (Maybe SelectorOffset)
   | BlackHole
   | IndStatic
 

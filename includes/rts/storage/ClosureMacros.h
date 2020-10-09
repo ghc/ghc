@@ -277,7 +277,11 @@ EXTERN_INLINE StgOffset CONSTR_sizeW( uint32_t p, uint32_t np )
 
 EXTERN_INLINE StgOffset THUNK_SELECTOR_sizeW ( void );
 EXTERN_INLINE StgOffset THUNK_SELECTOR_sizeW ( void )
-{ return sizeofW(StgSelector); }
+{ return sizeofW(StgSelector) + 1; }
+
+EXTERN_INLINE StgOffset THUNK_SELECTOR_N_sizeW ( void );
+EXTERN_INLINE StgOffset THUNK_SELECTOR_N_sizeW ( void )
+{ return sizeofW(StgSelector) + 2; }
 
 EXTERN_INLINE StgOffset BLACKHOLE_sizeW ( void );
 EXTERN_INLINE StgOffset BLACKHOLE_sizeW ( void )
@@ -373,6 +377,8 @@ closure_sizeW_ (const StgClosure *p, const StgInfoTable *info)
         return thunk_sizeW_fromITBL(info);
     case THUNK_SELECTOR:
         return THUNK_SELECTOR_sizeW();
+    case THUNK_SELECTOR_N:
+        return THUNK_SELECTOR_N_sizeW();
     case AP_STACK:
         return ap_stack_sizeW((StgAP_STACK *)p);
     case AP:

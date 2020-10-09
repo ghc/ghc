@@ -863,6 +863,7 @@ loop:
       return;
 
   case THUNK_SELECTOR:
+  case THUNK_SELECTOR_N:
       eval_thunk_selector(p, (StgSelector *)q, true);
       return;
 
@@ -1121,7 +1122,7 @@ static void
 eval_thunk_selector (StgClosure **q, StgSelector *p, bool evac)
                  // NB. for legacy reasons, p & q are swapped around :(
 {
-    uint32_t field;
+    StgWord field;
     StgInfoTable *info;
     StgWord info_ptr;
     StgClosure *selectee;
@@ -1168,6 +1169,7 @@ selector_chain:
         }
     }
 
+    StgInfoTable* selector_info_tbl;
 
     // WHITEHOLE the selector thunk, since it is now under evaluation.
     // This is important to stop us going into an infinite loop if
@@ -1185,9 +1187,12 @@ selector_chain:
             busy_wait_nop();
         }
 
+        selector_info_tbl = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
+
         // make sure someone else didn't get here first...
         if (IS_FORWARDING_PTR(info_ptr) ||
-            INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr)->type != THUNK_SELECTOR) {
+            (selector_info_tbl->type != THUNK_SELECTOR &&
+             selector_info_tbl->type != THUNK_SELECTOR_N)) {
             // v. tricky now.  The THUNK_SELECTOR has been evacuated
             // by another thread, and is now either a forwarding ptr or IND.
             // We need to extract ourselves from the current situation
@@ -1208,14 +1213,20 @@ selector_chain:
 #else
     // Save the real info pointer (NOTE: not the same as get_itbl()).
     info_ptr = (StgWord)p->header.info;
+    selector_info_tbl = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
     SET_INFO((StgClosure *)p,&stg_WHITEHOLE_info);
 #endif /* THREADED_RTS */
 
-    field = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr)->layout.selector_offset;
+    // There are two types of selector closures
+    if (selector_info_tbl->type == THUNK_SELECTOR_N) {
+      field = (StgWord)(p->payload[1]);
+    } else {
+      field = selector_info_tbl->layout.selector_offset;
+    }
 
     // The selectee might be a constructor closure,
     // so we untag the pointer.
-    selectee = UNTAG_CLOSURE(p->selectee);
+    selectee = UNTAG_CLOSURE(p->payload[0]);
 
 selector_loop:
     // selectee now points to the closure that we're trying to select
@@ -1351,6 +1362,7 @@ selector_loop:
       }
 
       case THUNK_SELECTOR:
+      case THUNK_SELECTOR_N:
       {
           StgClosure *val;
 
@@ -1397,12 +1409,18 @@ bale_out:
     // We didn't manage to evaluate this thunk; restore the old info
     // pointer.  But don't forget: we still need to evacuate the thunk itself.
     SET_INFO((StgClosure *)p, (const StgInfoTable *)info_ptr);
+    selector_info_tbl = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
+
     // THREADED_RTS: we just unlocked the thunk, so another thread
     // might get in and update it.  copy() will lock it again and
     // check whether it was updated in the meantime.
     *q = (StgClosure *)p;
     if (evac) {
-        copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->dest_no);
+        if (selector_info_tbl->type == THUNK_SELECTOR_N) {
+          copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_N_sizeW(),bd->dest_no);
+        } else {
+          copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->dest_no);
+        }
     }
     unchain_thunk_selectors(prev_thunk_selector, *q);
 }

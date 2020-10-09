@@ -376,6 +376,9 @@ import qualified Data.ByteString.Char8 as BS8
 
 %%
 
+optional(p) : p           { Just $1 }
+            | {- empty -} { Nothing }
+
 cmm     :: { CmmParse () }
         : {- empty -}                   { return () }
         | cmmtop cmm                    { do $1; $2 }
@@ -522,12 +525,12 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                      -- If profiling is on, this string gets duplicated,
                      -- but that's the way the old code did it we can fix it some other time.
 
-        | 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
+        | 'INFO_TABLE_SELECTOR' '(' NAME ',' optional(INT) ',' INT ',' STRING ',' STRING ')'
                 -- selector, closure type, description, type
                 {% liftP . withHomeUnitId $ \pkg ->
                    do profile <- getProfile
                       let prof = profilingInfo profile $9 $11
-                          ty  = ThunkSelector (fromIntegral $5)
+                          ty  = ThunkSelector (fmap fromIntegral $5)
                           rep = mkRTSRep (fromIntegral $7) $
                                    mkHeapRep profile False 0 0 ty
                       return (mkCmmEntryLabel pkg $3,

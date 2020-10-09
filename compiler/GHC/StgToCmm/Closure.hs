@@ -366,7 +366,7 @@ lfClosureType (LFThunk _ _ _ is_sel _)     = thunkClosureType is_sel
 lfClosureType _                            = panic "lfClosureType"
 
 thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
-thunkClosureType (SelectorThunk off) = ThunkSelector off
+thunkClosureType (SelectorThunk off) = ThunkSelector (Just off)
 thunkClosureType _                   = Thunk
 
 -- We *do* get non-updatable top-level thunks sometimes.  eg. f = g

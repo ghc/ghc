@@ -362,8 +362,12 @@ checkClosure( const StgClosure* p )
       }
 
     case THUNK_SELECTOR:
-            ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->selectee));
+            ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->payload[0]));
             return THUNK_SELECTOR_sizeW();
+
+    case THUNK_SELECTOR_N:
+            ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->payload[0]));
+            return THUNK_SELECTOR_N_sizeW();
 
     case IND:
         {
