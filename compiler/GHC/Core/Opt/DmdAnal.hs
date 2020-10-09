@@ -481,7 +481,7 @@ We *need* to return False in those cases, because
      introduces a substantial regression in
      GHC.IO.Handle.Internals.wantReadableHandle.
   3. We would lose strictness for code like GHC.Fingerprint.fingerprintData,
-     where an intermittent FFI call to c_MD5Init would otherwise lose
+     where an intermittent FFI call to c_HashInit would otherwise lose
      strictness on the arguments len and buf, leading to regressions in T9203
      (2%) and i386's haddock.base (5%). Tested by T13380f.
 
