@@ -388,7 +388,7 @@ pmIsClosedType ty
 -- efficient.
 normaliseSourceTypeWHNF :: TyState -> Type -> DsM Type
 normaliseSourceTypeWHNF _     ty | isSourceTypeInWHNF ty = pure ty
-normaliseSourceTypeWHNF ty_st ty = do
+normaliseSourceTypeWHNF ty_st ty =
   pmTopNormaliseType ty_st ty >>= \case
     NoChange ty                -> pure ty
     NormalisedByConstraints ty -> pure ty
@@ -1223,7 +1223,7 @@ inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = do
   where
     nabla_not_dirty = nabla{ nabla_tm_st = ts{ts_dirty=emptyDVarSet} }
     test_one :: VarInfo -> MaybeT DsM VarInfo
-    test_one vi = do
+    test_one vi =
       lift (varNeedsTesting old_ty_st nabla vi) >>= \case
         True -> do
           -- tracPm "test_one" (ppr vi)

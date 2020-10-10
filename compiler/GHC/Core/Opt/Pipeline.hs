@@ -461,7 +461,7 @@ runCorePasses passes guts
   where
     do_pass guts CoreDoNothing = return guts
     do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
-    do_pass guts pass = do
+    do_pass guts pass =
        withTimingD (ppr pass <+> brackets (ppr mod))
                    (const ()) $ do
             { guts' <- lintAnnots (ppr pass) (doCorePass pass) guts

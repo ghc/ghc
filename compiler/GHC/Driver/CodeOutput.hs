@@ -131,17 +131,15 @@ outputC :: DynFlags
         -> Stream IO RawCmmGroup a
         -> [UnitId]
         -> IO a
-
-outputC dflags filenm cmm_stream packages
-  = do
-       withTiming dflags (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
-         let pkg_names = map unitIdString packages
-         doOutput filenm $ \ h -> do
-            hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
-            hPutStr h "#include \"Stg.h\"\n"
-            let platform = targetPlatform dflags
-                writeC = printForC dflags h . cmmToC platform
-            Stream.consume cmm_stream writeC
+outputC dflags filenm cmm_stream packages =
+  withTiming dflags (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
+    let pkg_names = map unitIdString packages
+    doOutput filenm $ \ h -> do
+      hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
+      hPutStr h "#include \"Stg.h\"\n"
+      let platform = targetPlatform dflags
+          writeC = printForC dflags h . cmmToC platform
+      Stream.consume cmm_stream writeC
 
 {-
 ************************************************************************
@@ -151,17 +149,18 @@ outputC dflags filenm cmm_stream packages
 ************************************************************************
 -}
 
-outputAsm :: DynFlags -> Module -> ModLocation -> FilePath
+outputAsm :: DynFlags
+          -> Module
+          -> ModLocation
+          -> FilePath
           -> Stream IO RawCmmGroup a
           -> IO a
-outputAsm dflags this_mod location filenm cmm_stream
-  = do ncg_uniqs <- mkSplitUniqSupply 'n'
-
-       debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
-
-       {-# SCC "OutputAsm" #-} doOutput filenm $
-           \h -> {-# SCC "NativeCodeGen" #-}
-                 nativeCodeGen dflags this_mod location h ncg_uniqs cmm_stream
+outputAsm dflags this_mod location filenm cmm_stream = do
+  ncg_uniqs <- mkSplitUniqSupply 'n'
+  debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
+  {-# SCC "OutputAsm" #-} doOutput filenm $
+    \h -> {-# SCC "NativeCodeGen" #-}
+      nativeCodeGen dflags this_mod location h ncg_uniqs cmm_stream
 
 {-
 ************************************************************************
@@ -172,10 +171,10 @@ outputAsm dflags this_mod location filenm cmm_stream
 -}
 
 outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
-outputLlvm dflags filenm cmm_stream
-  = do {-# SCC "llvm_output" #-} doOutput filenm $
-           \f -> {-# SCC "llvm_CodeGen" #-}
-                 llvmCodeGen dflags f cmm_stream
+outputLlvm dflags filenm cmm_stream =
+  {-# SCC "llvm_output" #-} doOutput filenm $
+    \f -> {-# SCC "llvm_CodeGen" #-}
+      llvmCodeGen dflags f cmm_stream
 
 {-
 ************************************************************************

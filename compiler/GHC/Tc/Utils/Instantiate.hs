@@ -11,31 +11,31 @@
 -}
 
 module GHC.Tc.Utils.Instantiate (
-       topSkolemise,
-       topInstantiate, instantiateSigma,
-       instCall, instDFunType, instStupidTheta, instTyVarsWith,
-       newWanted, newWanteds,
+     topSkolemise,
+     topInstantiate, instantiateSigma,
+     instCall, instDFunType, instStupidTheta, instTyVarsWith,
+     newWanted, newWanteds,
 
-       tcInstType, tcInstTypeBndrs,
-       tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
-       tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
+     tcInstType, tcInstTypeBndrs,
+     tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
+     tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
 
-       freshenTyVarBndrs, freshenCoVarBndrsX,
+     freshenTyVarBndrs, freshenCoVarBndrsX,
 
-       tcInstInvisibleTyBindersN, tcInstInvisibleTyBinders, tcInstInvisibleTyBinder,
+     tcInstInvisibleTyBindersN, tcInstInvisibleTyBinders, tcInstInvisibleTyBinder,
 
-       newOverloadedLit, mkOverLit,
+     newOverloadedLit, mkOverLit,
 
-       newClsInst,
-       tcGetInsts, tcGetInstEnvs, getOverlapFlag,
-       tcExtendLocalInstEnv,
-       instCallConstraints, newMethodFromName,
-       tcSyntaxName,
+     newClsInst,
+     tcGetInsts, tcGetInstEnvs, getOverlapFlag,
+     tcExtendLocalInstEnv,
+     instCallConstraints, newMethodFromName,
+     tcSyntaxName,
 
-       -- Simple functions over evidence variables
-       tyCoVarsOfWC,
-       tyCoVarsOfCt, tyCoVarsOfCts,
-    ) where
+     -- Simple functions over evidence variables
+     tyCoVarsOfWC,
+     tyCoVarsOfCt, tyCoVarsOfCts,
+  ) where
 
 #include "HsVersions.h"
 
@@ -50,13 +50,12 @@ import GHC.Hs
 
 import GHC.Core.InstEnv
 import GHC.Core.Predicate
-import GHC.Core    ( isOrphan )
+import GHC.Core ( Expr(..), isOrphan ) -- For the Coercion constructor
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Core.Class( Class )
-import GHC.Core( Expr(..) )  -- For the Coercion constructor
 import GHC.Core.DataCon
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )

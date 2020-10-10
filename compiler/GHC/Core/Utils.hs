@@ -74,7 +74,7 @@ import GHC.Platform
 import GHC.Driver.Ppr
 
 import GHC.Core
-import GHC.Builtin.Names ( makeStaticName, unsafeEqualityProofName )
+import GHC.Builtin.Names (absentErrorIdKey, makeStaticName, unsafeEqualityProofName)
 import GHC.Core.Ppr
 import GHC.Core.FVs( exprFreeVars )
 import GHC.Types.Var
@@ -87,7 +87,6 @@ import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Builtin.Names( absentErrorIdKey )
 import GHC.Core.Type as Type
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
