@@ -10,7 +10,6 @@ module GHC.Utils.Exception
 
 import GHC.Prelude
 
-import Control.Exception
 import Control.Exception as CE
 import Control.Monad.IO.Class
 import Control.Monad.Catch

@@ -5,9 +5,7 @@
 \section[TyConEnv]{@TyConEnv@: tyCon environments}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
-
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 
