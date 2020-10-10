@@ -56,7 +56,6 @@ import GHC.Core.Coercion
 import GHC.Core.Multiplicity
 import GHC.Builtin.Types ( typeNatKind, typeSymbolKind )
 import GHC.Types.Id
-import GHC.Types.Id.Make(proxyHashId)
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Core.Rules
@@ -1220,7 +1219,7 @@ dsEvTerm (EvFun { et_tvs = tvs, et_given = given
 dsEvTypeable :: Type -> EvTypeable -> DsM CoreExpr
 -- Return a CoreExpr :: Typeable ty
 -- This code is tightly coupled to the representation
--- of TypeRep, in base library Data.Typeable.Internals
+-- of TypeRep, in base library Data.Typeable.Internal
 dsEvTypeable ty ev
   = do { tyCl <- dsLookupTyCon typeableClassName    -- Typeable
        ; let kind = typeKind ty
@@ -1299,14 +1298,13 @@ ds_ev_typeable ty (EvTypeableTyLit ev)
   = -- See Note [Typeable for Nat and Symbol] in GHC.Tc.Solver.Interact
     do { fun  <- dsLookupGlobalId tr_fun
        ; dict <- dsEvTerm ev       -- Of type KnownNat/KnownSymbol
-       ; let proxy = mkTyApps (Var proxyHashId) [ty_kind, ty]
-       ; return (mkApps (mkTyApps (Var fun) [ty]) [ dict, proxy ]) }
+       ; return (mkApps (mkTyApps (Var fun) [ty]) [ dict ]) }
   where
     ty_kind = typeKind ty
 
     -- tr_fun is the Name of
-    --       typeNatTypeRep    :: KnownNat    a => Proxy# a -> TypeRep a
-    -- of    typeSymbolTypeRep :: KnownSymbol a => Proxy# a -> TypeRep a
+    --       typeNatTypeRep    :: KnownNat    a => TypeRep a
+    -- of    typeSymbolTypeRep :: KnownSymbol a => TypeRep a
     tr_fun | ty_kind `eqType` typeNatKind    = typeNatTypeRepName
            | ty_kind `eqType` typeSymbolKind = typeSymbolTypeRepName
            | otherwise = panic "dsEvTypeable: unknown type lit kind"

@@ -14,7 +14,7 @@ More dramatically
 
          GHC.Exception
 imports  Data.Typeable
-imports  Data.Typeable.Internals
+imports  Data.Typeable.Internal
 imports  GHC.Arr (fingerprint representation etc)
 imports  GHC.Real
 imports  {-# SOURCE #-} GHC.Exception
