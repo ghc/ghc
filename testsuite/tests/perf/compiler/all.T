@@ -409,7 +409,7 @@ test('T10421',
     ['T10421', '-v0 -O'])
 test('T10421a',
     [ only_ways(['normal']),
-      collect_compiler_stats('bytes allocated', 1)
+      collect_compiler_stats('bytes allocated', 10)
     ],
     multimod_compile,
     ['T10421a', '-v0 -O'])
