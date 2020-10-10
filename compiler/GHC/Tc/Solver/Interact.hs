@@ -15,23 +15,21 @@ import GHC.Types.Basic ( SwapFlag(..), isSwapped,
                          infinity, IntWithInf, intGtLimit )
 import GHC.Tc.Solver.Canonical
 import GHC.Tc.Solver.Flatten
-import GHC.Tc.Utils.Unify( canSolveByUnification )
+import GHC.Tc.Utils.Unify ( canSolveByUnification )
 import GHC.Types.Var.Set
 import GHC.Core.Type as Type
 import GHC.Core.Coercion        ( BlockSubstFlag(..) )
 import GHC.Core.InstEnv         ( DFunInstType )
-import GHC.Core.Coercion.Axiom  ( sfInteractTop, sfInteractInert )
 
 import GHC.Types.Var
 import GHC.Tc.Utils.TcType
-import GHC.Builtin.Names ( coercibleTyConKey,
-                   heqTyConKey, eqTyConKey, ipClassKey )
-import GHC.Core.Coercion.Axiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
+import GHC.Builtin.Names ( coercibleTyConKey, heqTyConKey, eqTyConKey, ipClassKey )
+import GHC.Core.Coercion.Axiom ( CoAxBranch (..), CoAxiom (..), TypeEqn, fromBranches, sfInteractInert, sfInteractTop )
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
-import GHC.Tc.Instance.Class( InstanceWhat(..), safeOverlap )
+import GHC.Tc.Instance.Class ( InstanceWhat(..), safeOverlap )
 import GHC.Core.FamInstEnv
 import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 

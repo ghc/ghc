@@ -189,7 +189,7 @@ lazyGetToks popts filename handle = do
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
   lazyLexBuf :: Handle -> PState -> Bool -> Int -> IO [Located Token]
-  lazyLexBuf handle state eof size = do
+  lazyLexBuf handle state eof size =
     case unP (lexer False return) state of
       POk state' t -> do
         -- pprTrace "lazyLexBuf" (text (show (buffer state'))) (return ())

@@ -525,15 +525,15 @@ instance Outputable RecFlag where
   ppr NonRecursive = text "NonRecursive"
 
 instance Binary RecFlag where
-    put_ bh Recursive = do
+    put_ bh Recursive =
             putByte bh 0
-    put_ bh NonRecursive = do
+    put_ bh NonRecursive =
             putByte bh 1
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return Recursive
-              _ -> do return NonRecursive
+              0 -> return Recursive
+              _ -> return NonRecursive
 
 {-
 ************************************************************************
@@ -819,9 +819,9 @@ instance Binary TupleSort where
     get bh = do
       h <- getByte bh
       case h of
-        0 -> do return BoxedTuple
-        1 -> do return UnboxedTuple
-        _ -> do return ConstraintTuple
+        0 -> return BoxedTuple
+        1 -> return UnboxedTuple
+        _ -> return ConstraintTuple
 
 
 tupleSortBoxity :: TupleSort -> Boxity
@@ -1483,11 +1483,11 @@ instance Outputable Activation where
    ppr FinalActive        = text "[final]"
 
 instance Binary Activation where
-    put_ bh NeverActive = do
+    put_ bh NeverActive =
             putByte bh 0
-    put_ bh FinalActive = do
+    put_ bh FinalActive =
             putByte bh 1
-    put_ bh AlwaysActive = do
+    put_ bh AlwaysActive =
             putByte bh 2
     put_ bh (ActiveBefore src aa) = do
             putByte bh 3
@@ -1500,9 +1500,9 @@ instance Binary Activation where
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return NeverActive
-              1 -> do return FinalActive
-              2 -> do return AlwaysActive
+              0 -> return NeverActive
+              1 -> return FinalActive
+              2 -> return AlwaysActive
               3 -> do src <- get bh
                       aa <- get bh
                       return (ActiveBefore src aa)

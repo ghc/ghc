@@ -17,13 +17,11 @@ import GHC.Platform
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Config
-import GHC.Core.SimpleOpt   ( exprIsConApp_maybe )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Utils
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
-import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
 import GHC.Types.SourceText
 import GHC.Types.Id
@@ -34,7 +32,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Name           ( mkSystemVarName, isExternalName, getOccFS )
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
 import GHC.Core.Coercion.Opt    ( optCoercion )
-import GHC.Core.FamInstEnv      ( topNormaliseType_maybe )
+import GHC.Core.FamInstEnv      ( FamInstEnv, topNormaliseType_maybe )
 import GHC.Core.DataCon
    ( DataCon, dataConWorkId, dataConRepStrictness
    , dataConRepArgTys, isUnboxedTupleDataCon
@@ -54,7 +52,7 @@ import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType(..), arityTypeArity, isBotArityType
                           , pushCoTyArg, pushCoValArg
                           , idArityType, etaExpandAT )
-import GHC.Core.SimpleOpt ( joinPointBinding_maybe, joinPointBindings_maybe )
+import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Types.Basic
@@ -2197,21 +2195,21 @@ tryRules env rules fn args call_cont
 
     nodump
       | dopt Opt_D_dump_rule_rewrites dflags
-      = liftIO $ do
-         touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_rewrites)
+      = liftIO $
+          touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_rewrites)
 
       | dopt Opt_D_dump_rule_firings dflags
-      = liftIO $ do
-         touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_firings)
+      = liftIO $
+          touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_firings)
 
       | otherwise
       = return ()
 
     log_rule dflags flag hdr details
       = liftIO $ do
-         let sty = mkDumpStyle alwaysQualify
-         dumpAction dflags sty (dumpOptionsFromFlag flag) "" FormatText $
-           sep [text hdr, nest 4 details]
+          let sty = mkDumpStyle alwaysQualify
+          dumpAction dflags sty (dumpOptionsFromFlag flag) "" FormatText $
+              sep [text hdr, nest 4 details]
 
 trySeqRules :: SimplEnv
             -> OutExpr -> InExpr   -- Scrutinee and RHS

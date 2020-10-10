@@ -810,7 +810,7 @@ mkRuleTyVarBndrs = fmap (fmap cvt_one)
 -- See note [Parsing explicit foralls in Rules] in Parser.y
 checkRuleTyVarBndrNames :: [LHsTyVarBndr flag GhcPs] -> P ()
 checkRuleTyVarBndrNames = mapM_ (check . fmap hsTyVarName)
-  where check (L loc (Unqual occ)) = do
+  where check (L loc (Unqual occ)) =
           -- TODO: don't use string here, OccName has a Unique/FastString
           when ((occNameString occ ==) `any` ["forall","family","role"])
             (addFatalError $ Error (ErrParseErrorOnInput occ) [] loc)
@@ -878,8 +878,7 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
 (checkExpBlockArguments, checkCmdBlockArguments) = (checkExpr, checkCmd)
   where
     checkExpr :: LHsExpr GhcPs -> PV ()
-    checkExpr expr = do
-     case unLoc expr of
+    checkExpr expr = case unLoc expr of
       HsDo _ (DoExpr m) _  -> check (ErrDoInFunAppExpr m)     expr
       HsDo _ (MDoExpr m) _ -> check (ErrMDoInFunAppExpr m)    expr
       HsLam {}             -> check ErrLambdaInFunAppExpr     expr
@@ -1458,7 +1457,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsLetPV l bs c = return $ L l (HsLet noExtField bs c)
   type InfixOp (HsExpr GhcPs) = HsExpr GhcPs
   superInfixOp m = m
-  mkHsOpAppPV l e1 op e2 = do
+  mkHsOpAppPV l e1 op e2 =
     return $ L l $ OpApp noExtField e1 op e2
   mkHsCasePV l e mg = return $ L l (HsCase noExtField e mg)
   mkHsLamCasePV l mg = return $ L l (HsLamCase noExtField mg)

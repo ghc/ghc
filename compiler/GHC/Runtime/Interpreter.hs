@@ -191,7 +191,7 @@ iservCmd hsc_env msg = withInterp hsc_env $ \case
   InternalInterp     -> run msg -- Just run it directly
 #endif
   (ExternalInterp c i) -> withIServ_ c i $ \iserv ->
-    uninterruptibleMask_ $ do -- Note [uninterruptibleMask_]
+    uninterruptibleMask_ $ -- Note [uninterruptibleMask_]
       iservCall iserv msg
 
 
@@ -223,7 +223,7 @@ hscInterp hsc_env = case hsc_interp hsc_env of
 withIServ
   :: (ExceptionMonad m)
   => IServConfig -> IServ -> (IServInstance -> m (IServInstance, a)) -> m a
-withIServ conf (IServ mIServState) action = do
+withIServ conf (IServ mIServState) action =
   MC.mask $ \restore -> do
     state <- liftIO $ takeMVar mIServState
 
@@ -286,7 +286,7 @@ resumeStmt hsc_env step resume_ctxt = do
   handleEvalStatus hsc_env status
 
 abandonStmt :: HscEnv -> ForeignRef (ResumeContext [HValueRef]) -> IO ()
-abandonStmt hsc_env resume_ctxt = do
+abandonStmt hsc_env resume_ctxt =
   withForeignRef resume_ctxt $ \rhv ->
     iservCmd hsc_env (AbandonStmt rhv)
 
@@ -300,24 +300,24 @@ handleEvalStatus hsc_env status =
       EvalComplete alloc <$> addFinalizer res
  where
   addFinalizer (EvalException e) = return (EvalException e)
-  addFinalizer (EvalSuccess rs) = do
+  addFinalizer (EvalSuccess rs)  =
     EvalSuccess <$> mapM (mkFinalizedHValue hsc_env) rs
 
 -- | Execute an action of type @IO ()@
 evalIO :: HscEnv -> ForeignHValue -> IO ()
-evalIO hsc_env fhv = do
+evalIO hsc_env fhv =
   liftIO $ withForeignRef fhv $ \fhv ->
     iservCmd hsc_env (EvalIO fhv) >>= fromEvalResult
 
 -- | Execute an action of type @IO String@
 evalString :: HscEnv -> ForeignHValue -> IO String
-evalString hsc_env fhv = do
+evalString hsc_env fhv =
   liftIO $ withForeignRef fhv $ \fhv ->
     iservCmd hsc_env (EvalString fhv) >>= fromEvalResult
 
 -- | Execute an action of type @String -> IO String@
 evalStringToIOString :: HscEnv -> ForeignHValue -> String -> IO String
-evalStringToIOString hsc_env fhv str = do
+evalStringToIOString hsc_env fhv str =
   liftIO $ withForeignRef fhv $ \fhv ->
     iservCmd hsc_env (EvalStringToString fhv str) >>= fromEvalResult
 
@@ -379,12 +379,12 @@ newBreakArray hsc_env size = do
   mkFinalizedHValue hsc_env breakArray
 
 enableBreakpoint :: HscEnv -> ForeignRef BreakArray -> Int -> Bool -> IO ()
-enableBreakpoint hsc_env ref ix b = do
+enableBreakpoint hsc_env ref ix b =
   withForeignRef ref $ \breakarray ->
     iservCmd hsc_env (EnableBreakpoint breakarray ix b)
 
 breakpointStatus :: HscEnv -> ForeignRef BreakArray -> Int -> IO Bool
-breakpointStatus hsc_env ref ix = do
+breakpointStatus hsc_env ref ix =
   withForeignRef ref $ \breakarray ->
     iservCmd hsc_env (BreakpointStatus breakarray ix)
 
@@ -408,7 +408,7 @@ seqHValue hsc_env ref =
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
 handleSeqHValueStatus :: HscEnv -> EvalStatus () -> IO (EvalResult ())
-handleSeqHValueStatus hsc_env eval_status = do
+handleSeqHValueStatus hsc_env eval_status =
   case eval_status of
     (EvalBreak is_exception _ ix mod_uniq resume_ctxt _) -> do
       -- A breakpoint was hit; inform the user and tell them

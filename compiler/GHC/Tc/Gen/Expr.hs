@@ -513,8 +513,7 @@ tcExpr (HsMultiIf _ alts) res_ty
   where match_ctxt = MC { mc_what = IfAlt, mc_body = tcBody }
 
 tcExpr (HsDo _ do_or_lc stmts) res_ty
-  = do { expr' <- tcDoStmts do_or_lc stmts res_ty
-       ; return expr' }
+  = tcDoStmts do_or_lc stmts res_ty
 
 tcExpr (HsProc x pat cmd) res_ty
   = do  { (pat', cmd', coi) <- tcProc pat cmd res_ty
@@ -1691,7 +1690,7 @@ checkClosedInStaticForm name = do
     checkClosed type_env n = checkLoop type_env (unitNameSet n) n
 
     checkLoop :: TcTypeEnv -> NameSet -> Name -> Maybe NotClosedReason
-    checkLoop type_env visited n = do
+    checkLoop type_env visited n =
       -- The @visited@ set is an accumulating parameter that contains the set of
       -- visited nodes, so we avoid repeating cycles in the traversal.
       case lookupNameEnv type_env n of

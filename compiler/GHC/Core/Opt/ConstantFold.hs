@@ -43,7 +43,7 @@ import GHC.Core
 import GHC.Core.Make
 import GHC.Types.Id
 import GHC.Types.Literal
-import GHC.Core.SimpleOpt ( exprIsLiteral_maybe )
+import GHC.Core.SimpleOpt (  exprIsConApp_maybe, exprIsLiteral_maybe )
 import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
@@ -54,7 +54,6 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
                        , stripTicksTop, stripTicksTopT, mkTicks )
-import GHC.Core.SimpleOpt ( exprIsConApp_maybe )
 import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -447,7 +446,7 @@ intOp2' _ _ _ _ = Nothing
 intOpC2 :: (Integral a, Integral b)
         => (a -> b -> Integer)
         -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
-intOpC2 op env (LitNumber LitNumInt i1) (LitNumber LitNumInt i2) = do
+intOpC2 op env (LitNumber LitNumInt i1) (LitNumber LitNumInt i2) =
   intCResult (roPlatform env) (fromInteger i1 `op` fromInteger i2)
 intOpC2 _ _ _ _ = Nothing
 

@@ -189,7 +189,7 @@ satExpr var@(Var v) interesting_ids = do
                    else Nothing
     return (var, emptyIdSATInfo, app_info)
 
-satExpr lit@(Lit _) _ = do
+satExpr lit@(Lit _) _ =
     return (lit, emptyIdSATInfo, Nothing)
 
 satExpr (Lam binders body) interesting_ids = do
@@ -238,10 +238,10 @@ satExpr (Tick tickish expr) interesting_ids = do
     (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids
     return (Tick tickish expr', sat_info_expr, expr_app)
 
-satExpr ty@(Type _) _ = do
+satExpr ty@(Type _) _ =
     return (ty, emptyIdSATInfo, Nothing)
 
-satExpr co@(Coercion _) _ = do
+satExpr co@(Coercion _) _ =
     return (co, emptyIdSATInfo, Nothing)
 
 satExpr (Cast expr coercion) interesting_ids = do

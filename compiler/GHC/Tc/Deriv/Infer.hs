@@ -368,8 +368,7 @@ inferConstraintsAnyclass
                     ; return (mkThetaOrigin (mkDerivOrigin wildcard) TypeLevel
                                 meth_tvs dm_tvs meth_theta (tau_eq:dm_theta)) }
 
-       ; theta_origins <- lift $ mapM do_one_meth gen_dms
-       ; return theta_origins }
+       ; lift $ mapM do_one_meth gen_dms }
 
 -- Like 'inferConstraints', but used only for @GeneralizedNewtypeDeriving@ and
 -- @DerivingVia@. Since both strategies generate code involving 'coerce', the
