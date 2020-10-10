@@ -349,7 +349,7 @@ instance Binary Unit where
   put_ bh (VirtUnit indef_uid) = do
     putByte bh 1
     put_ bh indef_uid
-  put_ bh HoleUnit = do
+  put_ bh HoleUnit =
     putByte bh 2
   get bh = do b <- getByte bh
               case b of

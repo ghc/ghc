@@ -608,7 +608,7 @@ whenUpdRemSetEnabled code = do
 -- remembered set.
 emitUpdRemSetPush :: CmmExpr   -- ^ value of pointer which was overwritten
                   -> FCode ()
-emitUpdRemSetPush ptr = do
+emitUpdRemSetPush ptr =
     emitRtsCall
       rtsUnitId
       (fsLit "updateRemembSetPushClosure_")
@@ -618,7 +618,7 @@ emitUpdRemSetPush ptr = do
 
 emitUpdRemSetPushThunk :: CmmExpr -- ^ the thunk
                        -> FCode ()
-emitUpdRemSetPushThunk ptr = do
+emitUpdRemSetPushThunk ptr =
     emitRtsCall
       rtsUnitId
       (fsLit "updateRemembSetPushThunk_")
