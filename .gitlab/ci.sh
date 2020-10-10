@@ -92,17 +92,6 @@ mkdir -p "$TOP/tmp"
 export TMP="$TOP/tmp"
 export TEMP="$TOP/tmp"
 
-function darwin_setup() {
-  # It looks like we already have python2 here and just installing python3
-  # does not work.
-  #brew upgrade python
-  #brew install ghc cabal-install ncurses gmp
-
-  pip3 install sphinx
-  # PDF documentation disabled as MacTeX apparently doesn't include xelatex.
-  #brew cask install mactex
-}
-
 function show_tool() {
   local tool="$1"
   info "$tool = ${!tool}"
@@ -127,9 +116,9 @@ function set_toolchain_paths() {
       # we provide these handy fallbacks in case the
       # script isn't run from within a GHC CI docker image.
       if [ -z "$GHC" ]; then GHC="$(which ghc)"; fi
-      if [ -z "$CABAL" ]; then GHC="$(which cabal)"; fi
-      if [ -z "$HAPPY" ]; then GHC="$(which happy)"; fi
-      if [ -z "$ALEX" ]; then GHC="$(which alex)"; fi
+      if [ -z "$CABAL" ]; then CABAL="$(which cabal)"; fi
+      if [ -z "$HAPPY" ]; then HAPPY="$(which happy)"; fi
+      if [ -z "$ALEX" ]; then ALEX="$(which alex)"; fi
   fi
 
   export GHC
@@ -149,10 +138,6 @@ function setup() {
   if [[ -n "$needs_toolchain" ]]; then
     setup_toolchain
   fi
-  case "$(uname)" in
-    Darwin) darwin_setup ;;
-    *) ;;
-  esac
 
   # Make sure that git works
   git config user.email "ghc-ci@gitlab-haskell.org"
