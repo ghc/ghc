@@ -409,7 +409,7 @@ tidyEqnInfo _ (EqnInfo { eqn_pats = [] })
 
 tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats, eqn_orig = orig })
   = do { (wrap, pat') <- tidy1 v orig pat
-       ; return (wrap, eqn { eqn_pats = do pat' : pats }) }
+       ; return (wrap, eqn { eqn_pats = pat' : pats }) }
 
 tidy1 :: Id                  -- The Id being scrutinised
       -> Origin              -- Was this a pattern the user wrote?

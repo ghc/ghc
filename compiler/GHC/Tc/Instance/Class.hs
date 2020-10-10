@@ -15,6 +15,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 
+
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType

@@ -11,31 +11,31 @@
 -}
 
 module GHC.Tc.Utils.Instantiate (
-       topSkolemise,
-       topInstantiate, instantiateSigma,
-       instCall, instDFunType, instStupidTheta, instTyVarsWith,
-       newWanted, newWanteds,
+     topSkolemise,
+     topInstantiate, instantiateSigma,
+     instCall, instDFunType, instStupidTheta, instTyVarsWith,
+     newWanted, newWanteds,
 
-       tcInstType, tcInstTypeBndrs,
-       tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
-       tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
+     tcInstType, tcInstTypeBndrs,
+     tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
+     tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
 
-       freshenTyVarBndrs, freshenCoVarBndrsX,
+     freshenTyVarBndrs, freshenCoVarBndrsX,
 
-       tcInstInvisibleTyBindersN, tcInstInvisibleTyBinders, tcInstInvisibleTyBinder,
+     tcInstInvisibleTyBindersN, tcInstInvisibleTyBinders, tcInstInvisibleTyBinder,
 
-       newOverloadedLit, mkOverLit,
+     newOverloadedLit, mkOverLit,
 
-       newClsInst,
-       tcGetInsts, tcGetInstEnvs, getOverlapFlag,
-       tcExtendLocalInstEnv,
-       instCallConstraints, newMethodFromName,
-       tcSyntaxName,
+     newClsInst,
+     tcGetInsts, tcGetInstEnvs, getOverlapFlag,
+     tcExtendLocalInstEnv,
+     instCallConstraints, newMethodFromName,
+     tcSyntaxName,
 
-       -- Simple functions over evidence variables
-       tyCoVarsOfWC,
-       tyCoVarsOfCt, tyCoVarsOfCts,
-    ) where
+     -- Simple functions over evidence variables
+     tyCoVarsOfWC,
+     tyCoVarsOfCt, tyCoVarsOfCts,
+  ) where
 
 #include "HsVersions.h"
 

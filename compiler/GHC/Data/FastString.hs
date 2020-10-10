@@ -1,8 +1,12 @@
 -- (c) The University of Glasgow, 1997-2006
 
-{-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples,
-    GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
+
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
@@ -501,7 +505,7 @@ mkFastStringBytes !ptr !len =
         mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
 
 newSBSFromPtr :: Ptr a -> Int -> IO ShortByteString
-newSBSFromPtr (Ptr src#) (I# len#) = do
+newSBSFromPtr (Ptr src#) (I# len#) =
   IO $ \s ->
     case newByteArray# len# s of { (# s, dst# #) ->
     case copyAddrToByteArray# src# dst# 0# len# s of { s ->
