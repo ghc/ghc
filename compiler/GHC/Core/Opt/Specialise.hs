@@ -1,15 +1,13 @@
+{-# LANGUAGE CPP #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
 \section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
 -}
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
@@ -1526,7 +1524,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                         -- See Note [Specialising imported functions] in "GHC.Core.Opt.OccurAnal"
 
                   | InlinePragma { inl_inline = Inlinable } <- inl_prag
-                  = (inl_prag { inl_inline = NoUserInline }, noUnfolding)
+                  = (inl_prag { inl_inline = NoUserInlinePrag }, noUnfolding)
 
                   | otherwise
                   = (inl_prag, specUnfolding simpl_opts spec_bndrs (`mkApps` spec_args)

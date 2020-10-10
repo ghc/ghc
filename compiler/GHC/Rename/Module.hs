@@ -1,17 +1,16 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 Main pass of renamer
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Rename.Module (
         rnSrcDecls, addTcgDUs, findSplice
@@ -2214,7 +2213,9 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- See #14808.
         ; implicit_bndrs <- forAllOrNothing explicit_forall
             $ extractHsTvBndrs explicit_tkvs
-            $ extractHsTysRdrTyVars (theta ++ map hsScaledThing arg_tys ++ [res_ty])
+            $ extractHsTysRdrTyVars theta
+            $ extractHsScaledTysRdrTyVars arg_tys
+            $ extractHsTysRdrTyVars [res_ty] []
 
         ; let ctxt = ConDeclCtx new_names
 

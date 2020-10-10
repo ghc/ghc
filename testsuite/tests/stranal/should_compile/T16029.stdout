@@ -3,9 +3,9 @@
   = \ (dt [Occ=Once1!] :: Int) (dt [Occ=Once1!] :: Int) ->
   :: GHC.Prim.Int# -> GHC.Prim.Int#
   = \ (ww :: GHC.Prim.Int#) ->
-g2 [InlPrag=NOUSERINLINE[2]] :: T -> Int -> Int
+g2 [InlPrag=[2]] :: T -> Int -> Int
          Tmpl= \ (w [Occ=Once1!] :: T) (w1 [Occ=Once1!] :: Int) ->
   = \ (w :: T) (w1 :: Int) ->
-g1 [InlPrag=NOUSERINLINE[2]] :: S -> Int -> Int
+g1 [InlPrag=[2]] :: S -> Int -> Int
          Tmpl= \ (w [Occ=Once1!] :: S) (w1 [Occ=Once1!] :: Int) ->
   = \ (w :: S) (w1 :: Int) ->
