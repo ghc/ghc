@@ -63,14 +63,13 @@ import qualified GHC.Data.IOEnv  as IOEnv
 import GHC.Types.Var
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
-import GHC.Utils.Error( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
+import GHC.Utils.Error (DumpFormat (..), Severity (..), dumpAction, dumpOptionsFromFlag)
 import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
 import GHC.Utils.Monad
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import Data.Bifunctor ( bimap )
-import GHC.Utils.Error (dumpAction)
 import Data.List (intersperse, groupBy, sortBy)
 import Data.Ord
 import Data.Dynamic

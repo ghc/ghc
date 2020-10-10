@@ -39,12 +39,11 @@ import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
-import GHC.HsToCore.Utils (selectMatchVar)
+import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar)
 import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
 import GHC.HsToCore.Monad
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.HsToCore.Utils       (isTrueLHsExpr)
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.Monad (concatMapM)
@@ -188,7 +187,7 @@ desugarPat x pat = case pat of
            , cpt_tvs     = ex_tvs
            , cpt_dicts   = dicts
            }
-         } -> do
+         } ->
     desugarConPatOut x con arg_tys ex_tvs dicts ps
 
   NPat ty (L _ olit) mb_neg _ -> do
@@ -363,7 +362,7 @@ desugarGuard guard = case guard of
 -- recursion, pattern bindings etc.
 -- See Note [Long-distance information for HsLocalBinds].
 desugarLocalBinds :: LHsLocalBinds GhcTc -> DsM [PmGrd]
-desugarLocalBinds (L _ (HsValBinds _ (XValBindsLR (NValBinds binds _)))) = do
+desugarLocalBinds (L _ (HsValBinds _ (XValBindsLR (NValBinds binds _)))) =
   concatMapM (concatMapM go . bagToList) (map snd binds)
   where
     go :: LHsBind GhcTc -> DsM [PmGrd]

@@ -69,8 +69,7 @@ import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.TyCon
-import GHC.Core.DataCon( DataCon, dataConWrapId )
-import GHC.Core.Class( Class )
+import GHC.Core.DataCon ( DataCon, dataConWrapId )
 import GHC.Builtin.Names
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -79,7 +78,7 @@ import GHC.Types.Name
 import GHC.Data.Pair
 
 import GHC.Core
-import GHC.Core.Class ( classSCSelId )
+import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
 
 import GHC.Utils.Misc
