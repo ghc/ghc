@@ -1066,14 +1066,6 @@ nullUsage = SCU { scu_calls = emptyVarEnv, scu_occs = emptyVarEnv }
 
 combineCalls :: CallEnv -> CallEnv -> CallEnv
 combineCalls = plusVarEnv_C (++)
-  where
---    plus cs ds | length res > 1
---               = pprTrace "combineCalls" (vcat [ text "cs:" <+> ppr cs
---                                               , text "ds:" <+> ppr ds])
---                 res
---               | otherwise = res
---       where
---          res = cs ++ ds
 
 combineUsage :: ScUsage -> ScUsage -> ScUsage
 combineUsage u1 u2 = SCU { scu_calls = combineCalls (scu_calls u1) (scu_calls u2),

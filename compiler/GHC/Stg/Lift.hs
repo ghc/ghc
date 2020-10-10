@@ -202,11 +202,11 @@ liftRhs
 liftRhs mb_former_fvs rhs@(StgRhsCon ccs con args)
   = ASSERT2(isNothing mb_former_fvs, text "Should never lift a constructor" $$ pprStgRhs panicStgPprOpts rhs)
     StgRhsCon ccs con <$> traverse liftArgs args
-liftRhs Nothing (StgRhsClosure _ ccs upd infos body) = do
+liftRhs Nothing (StgRhsClosure _ ccs upd infos body) =
   -- This RHS wasn't lifted.
   withSubstBndrs (map binderInfoBndr infos) $ \bndrs' ->
     StgRhsClosure noExtFieldSilent ccs upd bndrs' <$> liftExpr body
-liftRhs (Just former_fvs) (StgRhsClosure _ ccs upd infos body) = do
+liftRhs (Just former_fvs) (StgRhsClosure _ ccs upd infos body) =
   -- This RHS was lifted. Insert extra binders for @former_fvs@.
   withSubstBndrs (map binderInfoBndr infos) $ \bndrs' -> do
     let bndrs'' = dVarSetElems former_fvs ++ bndrs'

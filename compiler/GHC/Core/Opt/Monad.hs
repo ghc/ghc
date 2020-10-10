@@ -65,9 +65,8 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Error( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
+import GHC.Utils.Error ( Severity(..), DumpFormat (..), dumpAction, dumpOptionsFromFlag )
 import GHC.Utils.Monad
-import GHC.Utils.Error (dumpAction)
 
 import GHC.Data.FastString
 import GHC.Data.IOEnv hiding     ( liftIO, failM, failWithM )

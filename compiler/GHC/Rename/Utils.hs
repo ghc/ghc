@@ -366,8 +366,8 @@ checkUnusedRecordWildcard :: SrcSpan
                           -> FreeVars
                           -> Maybe [Name]
                           -> RnM ()
-checkUnusedRecordWildcard _ _ Nothing    = return ()
-checkUnusedRecordWildcard loc _ (Just [])  = do
+checkUnusedRecordWildcard _ _ Nothing     = return ()
+checkUnusedRecordWildcard loc _ (Just []) =
   -- Add a new warning if the .. pattern binds no variables
   setSrcSpan loc $ warnRedundantRecordWildcard
 checkUnusedRecordWildcard loc fvs (Just dotdot_names) =

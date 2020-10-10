@@ -51,9 +51,10 @@ import GHC.Builtin.PrimOps ( PrimCall(..) )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 import GHC.Builtin.Names   ( unsafeEqualityProofName )
 
-import Data.List.NonEmpty (nonEmpty, toList)
-import Data.Maybe    (fromMaybe)
 import Control.Monad (ap)
+import Data.List.NonEmpty (nonEmpty, toList)
+import Data.Maybe (fromMaybe)
+import Data.Tuple (swap)
 import qualified Data.Set as Set
 
 -- Note [Live vs free]
@@ -309,14 +310,10 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
 
         -- generate StgTopBindings and CAF cost centres created for CAFs
         (ccs', stg_rhss)
-          = initCts dflags env' $ do
-               mapAccumLM (\ccs rhs -> do
-                            (rhs', ccs') <-
-                              coreToTopStgRhs dflags ccs this_mod rhs
-                            return (ccs', rhs'))
-                          ccs
-                          pairs
-
+          = initCts dflags env' $
+              mapAccumLM (\ccs rhs -> swap <$> coreToTopStgRhs dflags ccs this_mod rhs)
+                         ccs
+                         pairs
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
     (env', ccs', bind)
@@ -467,10 +464,8 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
         rhs2 <- coreToStgExpr rhs
         return (con, binders', rhs2)
 
-coreToStgExpr (Let bind body) = do
-    coreToStgLet bind body
-
-coreToStgExpr e = pprPanic "coreToStgExpr" (ppr e)
+coreToStgExpr (Let bind body) = coreToStgLet bind body
+coreToStgExpr e               = pprPanic "coreToStgExpr" (ppr e)
 
 mkStgAltType :: Id -> [CoreAlt] -> AltType
 mkStgAltType bndr alts

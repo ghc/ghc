@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
 
 -----------------------------------------------------------------------------
 --
@@ -117,7 +118,7 @@ cmmTopCodeGen (CmmProc info lab live graph) = do
         return (CmmProc info lab live (ListGraph (b':blocks)) : statics)
       fixup_entry _ = panic "cmmTopCodegen: Broken CmmProc"
 
-cmmTopCodeGen (CmmData sec dat) = do
+cmmTopCodeGen (CmmData sec dat) =
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
 basicBlockCodeGen
@@ -787,7 +788,7 @@ getAmode DS (CmmMachOp (MO_Sub W64) [x, CmmLit (CmmInt i _)])
         (reg, code) <- getSomeReg x
         (reg', off', code')  <-
                      if i `mod` 4 == 0
-                      then do return (reg, off, code)
+                      then return (reg, off, code)
                       else do
                            tmp <- getNewRegNat II64
                            return (tmp, ImmInt 0,
@@ -800,7 +801,7 @@ getAmode DS (CmmMachOp (MO_Add W64) [x, CmmLit (CmmInt i _)])
         (reg, code) <- getSomeReg x
         (reg', off', code')  <-
                      if i `mod` 4 == 0
-                      then do return (reg, off, code)
+                      then return (reg, off, code)
                       else do
                            tmp <- getNewRegNat II64
                            return (tmp, ImmInt 0,
@@ -882,8 +883,7 @@ getCondCode :: CmmExpr -> NatM CondCode
 -- extend small integers to 32 bit or 64 bit first
 
 getCondCode (CmmMachOp mop [x, y])
-  = do
-    case mop of
+  = case mop of
       MO_F_Eq W32 -> condFltCode EQQ x y
       MO_F_Ne W32 -> condFltCode NE  x y
       MO_F_Gt W32 -> condFltCode GTT x y
@@ -1670,7 +1670,7 @@ genCCall' config gcp target dest_regs args
             codeAfter = move_sp_up finalStack `appOL` moveResult reduceToFF32
 
         case labelOrExpr of
-            Left lbl -> do -- the linker does all the work for us
+            Left lbl -> -- the linker does all the work for us
                 return (         codeBefore
                         `snocOL` BL lbl usedRegs
                         `appOL`  maybeNOP -- some ABI require a NOP after BL
@@ -1716,7 +1716,7 @@ genCCall' config gcp target dest_regs args
     where
         platform = ncgPlatform config
 
-        uses_pic_base_implicitly = do
+        uses_pic_base_implicitly =
             -- See Note [implicit register in PPC PIC code]
             -- on why we claim to use PIC register here
             when (ncgPIC config && target32Bit platform) $ do

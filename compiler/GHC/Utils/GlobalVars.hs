@@ -95,7 +95,7 @@ global :: a -> IORef a
 global a = unsafePerformIO (newIORef a)
 
 consIORef :: IORef [a] -> a -> IO ()
-consIORef var x = do
+consIORef var x =
   atomicModifyIORef' var (\xs -> (x:xs,()))
 
 globalM :: IO a -> IORef a

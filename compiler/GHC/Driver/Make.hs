@@ -1168,7 +1168,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
     -- The log_action callback that is used to synchronize messages from a
     -- worker thread.
     parLogAction :: LogQueue -> LogAction
-    parLogAction log_queue _dflags !reason !severity !srcSpan !msg = do
+    parLogAction log_queue _dflags !reason !severity !srcSpan !msg =
         writeLogQueue log_queue (Just (reason,severity,srcSpan,msg))
 
     -- Print each message from the log_queue using the log_action from the
