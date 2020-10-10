@@ -116,7 +116,7 @@ exitifyRec in_scope pairs
     -- Which are the recursive calls?
     recursive_calls = mkVarSet $ map fst pairs
 
-    (pairs',exits) = (`runState` []) $ do
+    (pairs',exits) = (`runState` []) $
         forM ann_pairs $ \(x,rhs) -> do
             -- go past the lambdas of the join point
             let (args, body) = collectNAnnBndrs (idJoinArity x) rhs

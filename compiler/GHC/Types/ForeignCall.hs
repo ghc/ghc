@@ -266,18 +266,18 @@ instance Binary ForeignCall where
     get bh = do aa <- get bh; return (CCall aa)
 
 instance Binary Safety where
-    put_ bh PlaySafe = do
+    put_ bh PlaySafe =
             putByte bh 0
-    put_ bh PlayInterruptible = do
+    put_ bh PlayInterruptible =
             putByte bh 1
-    put_ bh PlayRisky = do
+    put_ bh PlayRisky =
             putByte bh 2
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return PlaySafe
-              1 -> do return PlayInterruptible
-              _ -> do return PlayRisky
+              0 -> return PlaySafe
+              1 -> return PlayInterruptible
+              _ -> return PlayRisky
 
 instance Binary CExportSpec where
     put_ bh (CExportStatic ss aa ab) = do
@@ -308,7 +308,7 @@ instance Binary CCallTarget where
             put_ bh aa
             put_ bh ab
             put_ bh ac
-    put_ bh DynamicTarget = do
+    put_ bh DynamicTarget =
             putByte bh 1
     get bh = do
             h <- getByte bh
@@ -318,27 +318,27 @@ instance Binary CCallTarget where
                       ab <- get bh
                       ac <- get bh
                       return (StaticTarget ss aa ab ac)
-              _ -> do return DynamicTarget
+              _ -> return DynamicTarget
 
 instance Binary CCallConv where
-    put_ bh CCallConv = do
+    put_ bh CCallConv =
             putByte bh 0
-    put_ bh StdCallConv = do
+    put_ bh StdCallConv =
             putByte bh 1
-    put_ bh PrimCallConv = do
+    put_ bh PrimCallConv =
             putByte bh 2
-    put_ bh CApiConv = do
+    put_ bh CApiConv =
             putByte bh 3
-    put_ bh JavaScriptCallConv = do
+    put_ bh JavaScriptCallConv =
             putByte bh 4
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return CCallConv
-              1 -> do return StdCallConv
-              2 -> do return PrimCallConv
-              3 -> do return CApiConv
-              _ -> do return JavaScriptCallConv
+              0 -> return CCallConv
+              1 -> return StdCallConv
+              2 -> return PrimCallConv
+              3 -> return CApiConv
+              _ -> return JavaScriptCallConv
 
 instance Binary CType where
     put_ bh (CType s mh fs) = do put_ bh s

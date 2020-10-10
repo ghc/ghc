@@ -5,3 +5,14 @@
 - ignore: {}
 - warn: {name: Unused LANGUAGE pragma}
 - warn: {name: Use fewer LANGUAGE pragmas}
+- warn: {name: Redundant return}
+- warn: {name: Redundant True guards}
+- warn: {name: Redundant do}
+- warn: {name: Redundant variable capture}
+- warn: {name: Redundant void}
+- warn: {name: Redundant as}
+- warn: {name: Use fewer imports}
+- warn: {name: Redundant as-pattern}
+- warn: {name: Redundant where}
+
+- ignore: {name: Redundant do, within: [GHC.SysTools.Terminal]}

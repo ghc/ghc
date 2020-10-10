@@ -1,4 +1,3 @@
-
 -- | When there aren't enough registers to hold all the vregs we have to spill
 --   some of those vregs to slots on the stack. This module is used modify the
 --   code to use those slots.
@@ -7,6 +6,7 @@ module GHC.CmmToAsm.Reg.Graph.Spill (
         SpillStats(..),
         accSpillSL
 ) where
+
 import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Liveness
@@ -182,46 +182,41 @@ regSpill_instr
         -> UniqFM Reg Int -- ^ map of vregs to slots they're being spilled to.
         -> LiveInstr instr
         -> SpillM [LiveInstr instr]
+regSpill_instr _ _ li@(LiveInstr _ Nothing) = return [li]
+regSpill_instr platform regSlotMap (LiveInstr instr (Just _)) = do
+  -- work out which regs are read and written in this instr
+  let RU rlRead rlWritten = regUsageOfInstr platform instr
 
-regSpill_instr _ _ li@(LiveInstr _ Nothing)
- = do   return [li]
+  -- sometimes a register is listed as being read more than once,
+  --      nub this so we don't end up inserting two lots of spill code.
+  let rsRead_             = nub rlRead
+  let rsWritten_          = nub rlWritten
 
-regSpill_instr platform regSlotMap
-        (LiveInstr instr (Just _))
- = do
-        -- work out which regs are read and written in this instr
-        let RU rlRead rlWritten = regUsageOfInstr platform instr
+  -- if a reg is modified, it appears in both lists, want to undo this..
+  let rsRead              = rsRead_    \\ rsWritten_
+  let rsWritten           = rsWritten_ \\ rsRead_
+  let rsModify            = intersect rsRead_ rsWritten_
 
-        -- sometimes a register is listed as being read more than once,
-        --      nub this so we don't end up inserting two lots of spill code.
-        let rsRead_             = nub rlRead
-        let rsWritten_          = nub rlWritten
+  -- work out if any of the regs being used are currently being spilled.
+  let rsSpillRead         = filter (\r -> elemUFM r regSlotMap) rsRead
+  let rsSpillWritten      = filter (\r -> elemUFM r regSlotMap) rsWritten
+  let rsSpillModify       = filter (\r -> elemUFM r regSlotMap) rsModify
 
-        -- if a reg is modified, it appears in both lists, want to undo this..
-        let rsRead              = rsRead_    \\ rsWritten_
-        let rsWritten           = rsWritten_ \\ rsRead_
-        let rsModify            = intersect rsRead_ rsWritten_
+  -- rewrite the instr and work out spill code.
+  (instr1, prepost1)      <- mapAccumLM (spillRead   regSlotMap) instr  rsSpillRead
+  (instr2, prepost2)      <- mapAccumLM (spillWrite  regSlotMap) instr1 rsSpillWritten
+  (instr3, prepost3)      <- mapAccumLM (spillModify regSlotMap) instr2 rsSpillModify
 
-        -- work out if any of the regs being used are currently being spilled.
-        let rsSpillRead         = filter (\r -> elemUFM r regSlotMap) rsRead
-        let rsSpillWritten      = filter (\r -> elemUFM r regSlotMap) rsWritten
-        let rsSpillModify       = filter (\r -> elemUFM r regSlotMap) rsModify
+  let (mPrefixes, mPostfixes) = unzip (prepost1 ++ prepost2 ++ prepost3)
+  let prefixes                = concat mPrefixes
+  let postfixes               = concat mPostfixes
 
-        -- rewrite the instr and work out spill code.
-        (instr1, prepost1)      <- mapAccumLM (spillRead   regSlotMap) instr  rsSpillRead
-        (instr2, prepost2)      <- mapAccumLM (spillWrite  regSlotMap) instr1 rsSpillWritten
-        (instr3, prepost3)      <- mapAccumLM (spillModify regSlotMap) instr2 rsSpillModify
+  -- final code
+  let instrs' =  prefixes
+              ++ [LiveInstr instr3 Nothing]
+              ++ postfixes
 
-        let (mPrefixes, mPostfixes)     = unzip (prepost1 ++ prepost2 ++ prepost3)
-        let prefixes                    = concat mPrefixes
-        let postfixes                   = concat mPostfixes
-
-        -- final code
-        let instrs'     =  prefixes
-                        ++ [LiveInstr instr3 Nothing]
-                        ++ postfixes
-
-        return $ instrs'
+  return instrs'
 
 
 -- | Add a RELOAD met a instruction to load a value for an instruction that

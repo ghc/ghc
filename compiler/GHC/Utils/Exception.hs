@@ -3,14 +3,13 @@
 
 module GHC.Utils.Exception
     (
-    module Control.Exception,
+    module CE,
     module GHC.Utils.Exception
     )
     where
 
 import GHC.Prelude
 
-import Control.Exception
 import Control.Exception as CE
 import Control.Monad.IO.Class
 import Control.Monad.Catch
