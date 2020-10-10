@@ -548,7 +548,7 @@ have this instance, implemented here by doTyLit:
       instance KnownNat n => Typeable (n :: Nat) where
          typeRep = typeNatTypeRep @n
 where
-   Data.Typeable.Internals.typeNatTypeRep :: KnownNat a => TypeRep a
+   Data.Typeable.Internal.typeNatTypeRep :: KnownNat a => TypeRep a
 
 Ultimately typeNatTypeRep uses 'natSing' from KnownNat to get a
 runtime value 'n'; it turns it into a string with 'show' and uses
