@@ -1160,8 +1160,8 @@ ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
                                              (interpp'SP ty) inl)
     where
       pragmaSrc = case spec of
-        NoUserInline -> "{-# SPECIALISE"
-        _            -> "{-# SPECIALISE_INLINE"
+        NoUserInlinePrag -> "{-# SPECIALISE"
+        _                -> "{-# SPECIALISE_INLINE"
 ppr_sig (InlineSig _ var inl)
   = pragSrcBrackets (inl_src inl) "{-# INLINE"  (pprInline inl
                                    <+> pprPrefixOcc (unLoc var))
