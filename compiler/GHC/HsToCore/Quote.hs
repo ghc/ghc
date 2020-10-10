@@ -1,15 +1,14 @@
-{-# LANGUAGE CPP, TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE AllowAmbiguousTypes    #-}
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE PatternSynonyms        #-}
+{-# LANGUAGE RankNTypes             #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -1109,10 +1108,10 @@ rep_specialiseInst ty loc
        ; return [(loc, pragma)] }
 
 repInline :: InlineSpec -> MetaM (Core TH.Inline)
-repInline NoInline     = dataCon noInlineDataConName
-repInline Inline       = dataCon inlineDataConName
-repInline Inlinable    = dataCon inlinableDataConName
-repInline NoUserInline = notHandled "NOUSERINLINE" empty
+repInline NoInline         = dataCon noInlineDataConName
+repInline Inline           = dataCon inlineDataConName
+repInline Inlinable        = dataCon inlinableDataConName
+repInline NoUserInlinePrag = notHandled "NOUSERINLINE" empty
 
 repRuleMatch :: RuleMatchInfo -> MetaM (Core TH.RuleMatch)
 repRuleMatch ConLike = dataCon conLikeDataConName

@@ -2513,7 +2513,7 @@ sigdecl :: { LHsDecl GhcPs }
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% ams (
                  let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
-                                             (NoUserInline, FunLike) (snd $2)
+                                             (NoUserInlinePrag, FunLike) (snd $2)
                   in sLL $1 $> $ SigD noExtField (SpecSig noExtField $3 (fromOL $5) inl_prag))
                     (mo $1:mu AnnDcolon $4:mc $6:(fst $2)) }
 

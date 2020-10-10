@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -9,13 +15,6 @@ Handles @HsBinds@; those at the top level require different handling,
 in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
 lower levels it is preserved with @let@/@letrec@s).
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE FlexibleContexts #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.HsToCore.Binds
    ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec
@@ -385,10 +384,10 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
 
   | otherwise
   = case inlinePragmaSpec inline_prag of
-          NoUserInline -> (gbl_id, rhs)
-          NoInline     -> (gbl_id, rhs)
-          Inlinable    -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
-          Inline       -> inline_pair
+          NoUserInlinePrag -> (gbl_id, rhs)
+          NoInline         -> (gbl_id, rhs)
+          Inlinable        -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
+          Inline           -> inline_pair
 
   where
     simpl_opts    = initSimpleOpts dflags

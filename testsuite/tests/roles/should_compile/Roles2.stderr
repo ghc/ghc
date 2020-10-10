@@ -6,7 +6,7 @@ DATA CONSTRUCTORS
   K2 :: forall a. FunPtr a -> T2 a
   K1 :: forall a. IO a -> T1 a
 Dependent modules: []
-Dependent packages: [base-4.14.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
+Dependent packages: [base-4.15.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
 
 ==================== Typechecker ====================
 Roles2.$tcT2
@@ -25,16 +25,16 @@ Roles2.$tc'K1
   = GHC.Types.TyCon
       16530009231990968394## 11761390951471299534## Roles2.$trModule
       (GHC.Types.TrNameS "'K1"#) 1 $krep
-$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=NOUSERINLINE[~]]
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp GHC.Ptr.$tcFunPtr ((:) $krep [])
-$krep [InlPrag=NOUSERINLINE[~]]
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp Roles2.$tcT2 ((:) $krep [])
-$krep [InlPrag=NOUSERINLINE[~]]
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp GHC.Types.$tcIO ((:) $krep [])
-$krep [InlPrag=NOUSERINLINE[~]]
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp Roles2.$tcT1 ((:) $krep [])
 Roles2.$trModule
   = GHC.Types.Module

@@ -1,4 +1,6 @@
-{-# LANGUAGE CPP, DeriveFunctor, ViewPatterns, BangPatterns #-}
+{-# LANGUAGE BangPatterns  #-}
+{-# LANGUAGE CPP           #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
