@@ -1025,7 +1025,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         -- different parents).  See Note [Dealing with imports]
     lookup_ie :: IE GhcPs
               -> IELookupM ([(IE GhcRn, AvailInfo)], [IELookupWarning])
-    lookup_ie ie = handle_bad_import $ do
+    lookup_ie ie = handle_bad_import $
       case ie of
         IEVar _ (L l n) -> do
             (name, avail, _) <- lookup_name ie $ ieWrappedName n

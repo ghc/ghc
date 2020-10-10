@@ -194,9 +194,8 @@ compressTypes
 compressTypes asts = (a, arr)
   where
     (a, (HTS _ m i)) = flip runState initialHTS $
-      for asts $ \typ -> do
-        i <- getTypeIndex typ
-        return i
+      for asts $ \typ ->
+        getTypeIndex typ
     arr = A.array (0,i-1) (IM.toList m)
 
 recoverFullType :: TypeIndex -> A.Array TypeIndex HieTypeFlat -> HieTypeFix

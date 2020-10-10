@@ -1101,30 +1101,28 @@ cmmExprNative referenceKind expr = do
          arch = platformArch platform
      case expr of
         CmmLoad addr rep
-           -> do addr' <- cmmExprNative DataReference addr
-                 return $ CmmLoad addr' rep
+          -> do addr' <- cmmExprNative DataReference addr
+                return $ CmmLoad addr' rep
 
         CmmMachOp mop args
-           -> do args' <- mapM (cmmExprNative DataReference) args
-                 return $ CmmMachOp mop args'
+          -> do args' <- mapM (cmmExprNative DataReference) args
+                return $ CmmMachOp mop args'
 
         CmmLit (CmmBlock id)
-           -> cmmExprNative referenceKind (CmmLit (CmmLabel (infoTblLbl id)))
-           -- we must convert block Ids to CLabels here, because we
-           -- might have to do the PIC transformation.  Hence we must
-           -- not modify BlockIds beyond this point.
+          -> cmmExprNative referenceKind (CmmLit (CmmLabel (infoTblLbl id)))
+          -- we must convert block Ids to CLabels here, because we
+          -- might have to do the PIC transformation.  Hence we must
+          -- not modify BlockIds beyond this point.
 
         CmmLit (CmmLabel lbl)
-           -> do
-                cmmMakeDynamicReference config referenceKind lbl
+          -> cmmMakeDynamicReference config referenceKind lbl
         CmmLit (CmmLabelOff lbl off)
-           -> do
-                 dynRef <- cmmMakeDynamicReference config referenceKind lbl
-                 -- need to optimize here, since it's late
-                 return $ cmmMachOpFold platform (MO_Add (wordWidth platform)) [
-                     dynRef,
-                     (CmmLit $ CmmInt (fromIntegral off) (wordWidth platform))
-                   ]
+          -> do dynRef <- cmmMakeDynamicReference config referenceKind lbl
+                -- need to optimize here, since it's late
+                return $ cmmMachOpFold platform (MO_Add (wordWidth platform)) [
+                    dynRef,
+                    (CmmLit $ CmmInt (fromIntegral off) (wordWidth platform))
+                  ]
 
         -- On powerpc (non-PIC), it's easier to jump directly to a label than
         -- to use the register table, so we replace these registers

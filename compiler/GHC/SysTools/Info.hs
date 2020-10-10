@@ -119,9 +119,9 @@ getLinkerInfo' dflags = do
   let platform = targetPlatform dflags
       os = platformOS platform
       (pgm,args0) = pgm_l dflags
-      args1     = map Option (getOpts dflags opt_l)
-      args2     = args0 ++ args1
-      args3     = filter notNull (map showOpt args2)
+      args1       = map Option (getOpts dflags opt_l)
+      args2       = args0 ++ args1
+      args3       = filter notNull (map showOpt args2)
 
       -- Try to grab the info from the process output.
       parseLinkerInfo stdo _stde _exitc
@@ -142,68 +142,67 @@ getLinkerInfo' dflags = do
           return (GnuGold [Option "-Wl,--no-as-needed"])
 
         | any ("LLD" `isPrefixOf`) stdo =
-          return (LlvmLLD $ map Option [
-                                      -- see Note [ELF needed shared libs]
-                                      "-Wl,--no-as-needed"])
+          return (LlvmLLD $ map Option [ --see Note [ELF needed shared libs]
+                                        "-Wl,--no-as-needed"])
 
          -- Unknown linker.
         | otherwise = fail "invalid --version output, or linker is unsupported"
 
   -- Process the executable call
-  info <- catchIO (do
-             case os of
-               OSSolaris2 ->
-                 -- Solaris uses its own Solaris linker. Even all
-                 -- GNU C are recommended to configure with Solaris
-                 -- linker instead of using GNU binutils linker. Also
-                 -- all GCC distributed with Solaris follows this rule
-                 -- precisely so we assume here, the Solaris linker is
-                 -- used.
-                 return $ SolarisLD []
-               OSAIX ->
-                 -- IBM AIX uses its own non-binutils linker as well
-                 return $ AixLD []
-               OSDarwin ->
-                 -- Darwin has neither GNU Gold or GNU LD, but a strange linker
-                 -- that doesn't support --version. We can just assume that's
-                 -- what we're using.
-                 return $ DarwinLD []
-               OSMinGW32 ->
-                 -- GHC doesn't support anything but GNU ld on Windows anyway.
-                 -- Process creation is also fairly expensive on win32, so
-                 -- we short-circuit here.
-                 return $ GnuLD $ map Option
-                   [ -- Reduce ld memory usage
-                     "-Wl,--hash-size=31"
-                   , "-Wl,--reduce-memory-overheads"
-                     -- Emit gcc stack checks
-                     -- Note [Windows stack usage]
-                   , "-fstack-check"
-                     -- Force static linking of libGCC
-                     -- Note [Windows static libGCC]
-                   , "-static-libgcc" ]
-               _ -> do
-                 -- In practice, we use the compiler as the linker here. Pass
-                 -- -Wl,--version to get linker version info.
-                 (exitc, stdo, stde) <- readProcessEnvWithExitCode pgm
-                                        (["-Wl,--version"] ++ args3)
-                                        c_locale_env
-                 -- Split the output by lines to make certain kinds
-                 -- of processing easier. In particular, 'clang' and 'gcc'
-                 -- have slightly different outputs for '-Wl,--version', but
-                 -- it's still easy to figure out.
-                 parseLinkerInfo (lines stdo) (lines stde) exitc
-            )
-            (\err -> do
-                debugTraceMsg dflags 2
-                    (text "Error (figuring out linker information):" <+>
-                     text (show err))
-                errorMsg dflags $ hang (text "Warning:") 9 $
-                  text "Couldn't figure out linker information!" $$
-                  text "Make sure you're using GNU ld, GNU gold" <+>
-                  text "or the built in OS X linker, etc."
-                return UnknownLD)
-  return info
+  catchIO (
+    case os of
+      OSSolaris2 ->
+        -- Solaris uses its own Solaris linker. Even all
+        -- GNU C are recommended to configure with Solaris
+        -- linker instead of using GNU binutils linker. Also
+        -- all GCC distributed with Solaris follows this rule
+        -- precisely so we assume here, the Solaris linker is
+        -- used.
+        return $ SolarisLD []
+      OSAIX ->
+        -- IBM AIX uses its own non-binutils linker as well
+        return $ AixLD []
+      OSDarwin ->
+        -- Darwin has neither GNU Gold or GNU LD, but a strange linker
+        -- that doesn't support --version. We can just assume that's
+        -- what we're using.
+        return $ DarwinLD []
+      OSMinGW32 ->
+        -- GHC doesn't support anything but GNU ld on Windows anyway.
+        -- Process creation is also fairly expensive on win32, so
+        -- we short-circuit here.
+        return $ GnuLD $ map Option
+          [ -- Reduce ld memory usage
+            "-Wl,--hash-size=31"
+          , "-Wl,--reduce-memory-overheads"
+            -- Emit gcc stack checks
+            -- Note [Windows stack usage]
+          , "-fstack-check"
+            -- Force static linking of libGCC
+            -- Note [Windows static libGCC]
+          , "-static-libgcc" ]
+      _ -> do
+        -- In practice, we use the compiler as the linker here. Pass
+        -- -Wl,--version to get linker version info.
+        (exitc, stdo, stde) <- readProcessEnvWithExitCode pgm
+                               (["-Wl,--version"] ++ args3)
+                               c_locale_env
+        -- Split the output by lines to make certain kinds
+        -- of processing easier. In particular, 'clang' and 'gcc'
+        -- have slightly different outputs for '-Wl,--version', but
+        -- it's still easy to figure out.
+        parseLinkerInfo (lines stdo) (lines stde) exitc
+    )
+    (\err -> do
+        debugTraceMsg dflags 2
+            (text "Error (figuring out linker information):" <+>
+             text (show err))
+        errorMsg dflags $ hang (text "Warning:") 9 $
+          text "Couldn't figure out linker information!" $$
+          text "Make sure you're using GNU ld, GNU gold" <+>
+          text "or the built in OS X linker, etc."
+        return UnknownLD
+    )
 
 -- Grab compiler info and cache it in DynFlags.
 getCompilerInfo :: DynFlags -> IO CompilerInfo
@@ -244,19 +243,19 @@ getCompilerInfo' dflags = do
         | otherwise = fail $ "invalid -v output, or compiler is unsupported: " ++ unlines stde
 
   -- Process the executable call
-  info <- catchIO (do
-                (exitc, stdo, stde) <-
-                    readProcessEnvWithExitCode pgm ["-v"] c_locale_env
-                -- Split the output by lines to make certain kinds
-                -- of processing easier.
-                parseCompilerInfo (lines stdo) (lines stde) exitc
-            )
-            (\err -> do
-                debugTraceMsg dflags 2
-                    (text "Error (figuring out C compiler information):" <+>
-                     text (show err))
-                errorMsg dflags $ hang (text "Warning:") 9 $
-                  text "Couldn't figure out C compiler information!" $$
-                  text "Make sure you're using GNU gcc, or clang"
-                return UnknownCC)
-  return info
+  catchIO (do
+      (exitc, stdo, stde) <-
+          readProcessEnvWithExitCode pgm ["-v"] c_locale_env
+      -- Split the output by lines to make certain kinds
+      -- of processing easier.
+      parseCompilerInfo (lines stdo) (lines stde) exitc
+      )
+      (\err -> do
+          debugTraceMsg dflags 2
+              (text "Error (figuring out C compiler information):" <+>
+               text (show err))
+          errorMsg dflags $ hang (text "Warning:") 9 $
+            text "Couldn't figure out C compiler information!" $$
+            text "Make sure you're using GNU gcc, or clang"
+          return UnknownCC
+      )

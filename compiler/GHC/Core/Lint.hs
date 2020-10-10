@@ -51,7 +51,6 @@ import GHC.Types.Name.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.Ppr
-import GHC.Utils.Error
 import GHC.Core.Coercion
 import GHC.Types.SrcLoc
 import GHC.Core.Type as Type
@@ -402,7 +401,6 @@ displayLintResults dflags pass warns errs binds
         (lint_banner "warnings" (ppr pass) $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
 
   | otherwise = return ()
-  where
 
 lint_banner :: String -> SDoc -> SDoc
 lint_banner string pass = text "*** Core Lint"      <+> text string
@@ -925,7 +923,7 @@ lintCoreExpr e@(App _ _)
        ; (fun_ty2, ue2) <- lintCoreArg fun_pair1      arg_ty2
          -- See Note [Linting of runRW#]
        ; let lintRunRWCont :: CoreArg -> LintM (LintedType, UsageEnv)
-             lintRunRWCont expr@(Lam _ _) = do
+             lintRunRWCont expr@(Lam _ _) =
                 lintJoinLams 1 (Just fun) expr
              lintRunRWCont other = markAllJoinsBad $ lintCoreExpr other
              -- TODO: Look through ticks?

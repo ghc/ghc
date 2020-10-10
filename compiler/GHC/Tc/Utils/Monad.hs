@@ -746,14 +746,14 @@ formatTraceMsg :: String -> SDoc -> SDoc
 formatTraceMsg herald doc = hang (text herald) 2 doc
 
 traceOptTcRn :: DumpFlag -> SDoc -> TcRn ()
-traceOptTcRn flag doc = do
+traceOptTcRn flag doc =
   whenDOptM flag $
     dumpTcRn False (dumpOptionsFromFlag flag) "" FormatText doc
 {-# INLINE traceOptTcRn #-} -- see Note [INLINE conditional tracing utilities]
 
 -- | Dump if the given 'DumpFlag' is set.
 dumpOptTcRn :: DumpFlag -> String -> DumpFormat -> SDoc -> TcRn ()
-dumpOptTcRn flag title fmt doc = do
+dumpOptTcRn flag title fmt doc =
   whenDOptM flag $
     dumpTcRn False (dumpOptionsFromFlag flag) title fmt doc
 {-# INLINE dumpOptTcRn #-} -- see Note [INLINE conditional tracing utilities]
@@ -2053,43 +2053,43 @@ failIfM msg
         ; failM }
 
 --------------------
-forkM_maybe :: SDoc -> IfL a -> IfL (Maybe a)
--- Run thing_inside in an interleaved thread.
+
+-- | Run thing_inside in an interleaved thread.
 -- It shares everything with the parent thread, so this is DANGEROUS.
 --
 -- It returns Nothing if the computation fails
 --
 -- It's used for lazily type-checking interface
--- signatures, which is pretty benign
-
+-- signatures, which is pretty benign.
+--
+-- See Note [Masking exceptions in forkM_maybe]
+forkM_maybe :: SDoc -> IfL a -> IfL (Maybe a)
 forkM_maybe doc thing_inside
- = do { -- see Note [Masking exceptions in forkM_maybe]
-      ; unsafeInterleaveM $ uninterruptibleMaskM_ $
-        do { traceIf (text "Starting fork {" <+> doc)
-           ; mb_res <- tryM $
-                       updLclEnv (\env -> env { if_loc = if_loc env $$ doc }) $
-                       thing_inside
-           ; case mb_res of
-                Right r  -> do  { traceIf (text "} ending fork" <+> doc)
-                                ; return (Just r) }
-                Left exn -> do {
+ = unsafeInterleaveM $ uninterruptibleMaskM_ $
+    do { traceIf (text "Starting fork {" <+> doc)
+       ; mb_res <- tryM $
+                   updLclEnv (\env -> env { if_loc = if_loc env $$ doc }) $
+                   thing_inside
+       ; case mb_res of
+            Right r  -> do  { traceIf (text "} ending fork" <+> doc)
+                            ; return (Just r) }
+            Left exn -> do {
+                -- Bleat about errors in the forked thread, if -ddump-if-trace is on
+                -- Otherwise we silently discard errors. Errors can legitimately
+                -- happen when compiling interface signatures (see tcInterfaceSigs)
+                  whenDOptM Opt_D_dump_if_trace $ do
+                      dflags <- getDynFlags
+                      let msg = hang (text "forkM failed:" <+> doc)
+                                   2 (text (show exn))
+                      liftIO $ putLogMsg dflags
+                                         NoReason
+                                         SevFatal
+                                         noSrcSpan
+                                         $ withPprStyle defaultErrStyle msg
 
-                    -- Bleat about errors in the forked thread, if -ddump-if-trace is on
-                    -- Otherwise we silently discard errors. Errors can legitimately
-                    -- happen when compiling interface signatures (see tcInterfaceSigs)
-                      whenDOptM Opt_D_dump_if_trace $ do
-                          dflags <- getDynFlags
-                          let msg = hang (text "forkM failed:" <+> doc)
-                                       2 (text (show exn))
-                          liftIO $ putLogMsg dflags
-                                             NoReason
-                                             SevFatal
-                                             noSrcSpan
-                                             $ withPprStyle defaultErrStyle msg
-
-                    ; traceIf (text "} ending fork (badly)" <+> doc)
-                    ; return Nothing }
-        }}
+                ; traceIf (text "} ending fork (badly)" <+> doc)
+                ; return Nothing }
+    }
 
 forkM :: SDoc -> IfL a -> IfL a
 forkM doc thing_inside

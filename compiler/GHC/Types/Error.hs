@@ -159,9 +159,8 @@ getSeverityColour _          = const mempty
 
 getCaretDiagnostic :: Severity -> SrcSpan -> IO MsgDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
-getCaretDiagnostic severity (RealSrcSpan span _) = do
+getCaretDiagnostic severity (RealSrcSpan span _) =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
-
   where
     getSrcLine fn i =
       getLine i (unpackFS fn)
