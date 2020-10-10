@@ -55,6 +55,7 @@ and Xelatex (only for PDF output).
 
 **Quick start**: the following gives you a default build:
 
+    $ git submodule update --init
     $ ./boot
     $ ./configure
     $ make         # can also say 'make -jX' for X number of jobs
