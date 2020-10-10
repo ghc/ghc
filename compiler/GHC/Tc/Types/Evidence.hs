@@ -1022,7 +1022,7 @@ instance Outputable EvTypeable where
 -- overloaded-label dictionary to expose the underlying value. We
 -- expect the 'Type' to have the form `IP sym ty` or `IsLabel sym ty`,
 -- and return a 'Coercion' `co :: IP sym ty ~ ty` or
--- `co :: IsLabel sym ty ~ Proxy# sym -> ty`.  See also
+-- `co :: IsLabel sym ty ~ ty`.  See also
 -- Note [Type-checking overloaded labels] in "GHC.Tc.Gen.Expr".
 unwrapIP :: Type -> CoercionR
 unwrapIP ty =
