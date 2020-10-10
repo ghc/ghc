@@ -979,12 +979,12 @@ mkTypeLitTyCon name kind_tycon
   where kind = KindRepTyConApp kind_tycon []
 
 -- | Used to make `'Typeable' instance for things of kind Nat
-typeNatTypeRep :: KnownNat a => Proxy# a -> TypeRep a
-typeNatTypeRep p = typeLitTypeRep (show (natVal' p)) tcNat
+typeNatTypeRep :: forall a. KnownNat a => TypeRep a
+typeNatTypeRep = typeLitTypeRep (show (natVal' (proxy# @a))) tcNat
 
 -- | Used to make `'Typeable' instance for things of kind Symbol
-typeSymbolTypeRep :: KnownSymbol a => Proxy# a -> TypeRep a
-typeSymbolTypeRep p = typeLitTypeRep (show (symbolVal' p)) tcSymbol
+typeSymbolTypeRep :: forall a. KnownSymbol a => TypeRep a
+typeSymbolTypeRep = typeLitTypeRep (show (symbolVal' (proxy# @a))) tcSymbol
 
 mkTypeLitFromString :: TypeLitSort -> String -> SomeTypeRep
 mkTypeLitFromString TypeLitSymbol s =
