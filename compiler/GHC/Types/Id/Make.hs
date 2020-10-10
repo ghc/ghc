@@ -1030,12 +1030,13 @@ dataConSrcToImplBang dflags fam_envs arg_ty
   , isUnpackableType dflags fam_envs (scaledThing arg_ty')
   , (rep_tys, _) <- dataConArgUnpack arg_ty'
   , case unpk_prag of
-      NoSrcUnpack
-        | rep_tys `lengthAtLeast` 2
+      NoSrcUnpack -- No explicit unpack pragma, so use heuristics
+        | Just (_:_:_) <- unpackable_type_datacons (scaledThing arg_ty')
         -> False -- don't unpack sum types automatically, but they can be unpacked with an explicit source UNPACK.
         | otherwise
         -> gopt Opt_UnboxStrictFields dflags
-           || gopt Opt_UnboxSmallStrictFields dflags -- See Note [Unpack one-wide fields]
+           || (gopt Opt_UnboxSmallStrictFields dflags
+               && rep_tys `lengthAtMost` 1)  -- See Note [Unpack one-wide fields]
       srcUnpack -> isSrcUnpacked srcUnpack
   = case mb_co of
       Nothing     -> HsUnpack Nothing
@@ -1100,15 +1101,32 @@ unitBoxer = UnitBox
 {-
 Note [UNPACK for sum types]
 
-'Unboxer' for a sum argument 'x' looks like this:
+Given a data type D, for example:
+
+    data D = D1 T1 ... Tn
+           | D2
+           | ...
+
+and another data type which unpacks a field of type D:
+
+    data U = MkU {-# UNPACK #-} !D
+
+when constructing a value of type U with an expression such as:
+
+    MkU x
+
+we will need to apply a function to the argument x to convert it
+to an unboxed sum.
+
+This 'Unboxer' function for a sum argument 'x' then looks like this:
 
     case (case x of
-            D1 x1 ... xn -> (# (# x1, ..., xn #) | | ... | #)
-            D2           -> (# | (# #) | ... | #)
+            D1 x1 ... xn -> (# (# x1, ..., xn #) | ... #)
+            D2 -> (# | (# #) | ... #)
             ...) of
       x_ubx -> <rhs uses x_ubx>
 
-This is different than unboxer expressions for tuples to avoid code explosion.
+This is different than the unboxer expressions for tuples to avoid code explosion.
 To demonstrate why we need this, suppose we have these data types
 
     data D = D {-# UNPACK #-} !S
@@ -1116,7 +1134,11 @@ To demonstrate why we need this, suppose we have these data types
 
     data S = S1 Int | S2 Bool
 
-If we generate code similar to code we generate for tuples, we generate this:
+If we generate code similar to code we generate for tuples, when desugaring the expression:
+
+    D arg1 arg2
+
+we generate this:
 
     case arg1 of
       S1 i1 -> case arg2 of
@@ -1190,26 +1212,26 @@ dataConArgUnpack (Scaled arg_mult arg_ty)
         ubx_sum_bndr <- newLocal sum_ty
 
         let
-          mkUbxSumAlt :: Int -> DataCon -> [Var] -> CoreAlt
-          mkUbxSumAlt alt con [] =
+          mk_ubx_sum_alt :: Int -> DataCon -> [Var] -> CoreAlt
+          mk_ubx_sum_alt alt con [] =
             ( DataAlt con, [],
               mkCoreUbxSum sum_alt_tys alt (Var (dataConWorkId (tupleDataCon Unboxed 0))) )
 
-          mkUbxSumAlt alt con [bndr] =
+          mk_ubx_sum_alt alt con [bndr] =
             ( DataAlt con, [bndr], mkCoreUbxSum sum_alt_tys alt (Var bndr) )
 
-          mkUbxSumAlt alt con bndrs =
+          mk_ubx_sum_alt alt con bndrs =
             let tuple = mkCoreUbxTup (map idType bndrs) (map Var bndrs)
              in ( DataAlt con, bndrs, mkCoreUbxSum sum_alt_tys alt tuple )
 
-          ubxSum :: CoreExpr
-          ubxSum =
-            let alts = zipWith3 mkUbxSumAlt [ 1 .. ] cons con_arg_binders
+          ubx_sum :: CoreExpr
+          ubx_sum =
+            let alts = zipWith3 mk_ubx_sum_alt [ 1 .. ] cons con_arg_binders
              in Case (Var arg_id) arg_id (coreAltsType alts) alts
 
           unbox_fn :: CoreExpr -> CoreExpr
           unbox_fn body =
-            mkSingleAltCase ubxSum ubx_sum_bndr DEFAULT [] body
+            mkSingleAltCase ubx_sum ubx_sum_bndr DEFAULT [] body
 
         return ([ubx_sum_bndr], unbox_fn)
 
@@ -1224,17 +1246,17 @@ dataConArgUnpack (Scaled arg_mult arg_ty)
                 con_arg_binders <-
                   mapM (mapM newLocal' . map (TcType.substTy subst)) src_tys
 
-                let mkSumAlt :: Int -> DataCon -> Var -> [Var] -> CoreAlt
-                    mkSumAlt alt con tuple_bndr [] =
+                let mk_sum_alt :: Int -> DataCon -> Var -> [Var] -> CoreAlt
+                    mk_sum_alt alt con tuple_bndr [] =
                       ( DataAlt (sumDataCon alt ubx_sum_arity), [tuple_bndr],
                         Var (dataConWorkId con) `mkTyApps` tc_args' )
 
-                    mkSumAlt alt con _ [datacon_bndr] =
+                    mk_sum_alt alt con _ [datacon_bndr] =
                       ( DataAlt (sumDataCon alt ubx_sum_arity), [datacon_bndr],
                         Var (dataConWorkId con) `mkTyApps`  tc_args'
                                                 `mkVarApps` [datacon_bndr] )
 
-                    mkSumAlt alt con tuple_bndr datacon_bndrs =
+                    mk_sum_alt alt con tuple_bndr datacon_bndrs =
                       ( DataAlt (sumDataCon alt ubx_sum_arity), [tuple_bndr],
                         Case (Var tuple_bndr) tuple_bndr arg_ty'
                           [ ( DataAlt (tupleDataCon Unboxed (length datacon_bndrs)), datacon_bndrs,
@@ -1243,7 +1265,7 @@ dataConArgUnpack (Scaled arg_mult arg_ty)
 
                 return ( [unboxed_field_id],
                          Case (Var unboxed_field_id) unboxed_field_id arg_ty'
-                              (zipWith4 mkSumAlt [ 1 .. ] cons tuple_bndrs con_arg_binders) )
+                              (zipWith4 mk_sum_alt [ 1 .. ] cons tuple_bndrs con_arg_binders) )
     in
       ( [ (sum_ty, MarkedStrict) ] -- NOTE(osa): I don't completely understand
                                    -- this part. The idea: Unpacked variant will
@@ -1263,7 +1285,7 @@ isUnpackableType :: DynFlags -> FamInstEnvs -> Type -> Bool
 -- we encounter on the way, because otherwise we might well
 -- end up relying on ourselves!
 isUnpackableType dflags fam_envs ty
-  | Just data_cons <- unpackable_type ty
+  | Just data_cons <- unpackable_type_datacons ty
   = all (ok_con_args emptyNameSet) data_cons
   | otherwise
   = False
@@ -1289,7 +1311,7 @@ isUnpackableType dflags fam_envs ty
 
     ok_ty :: NameSet -> Type -> Bool
     ok_ty dcs ty
-      | Just data_cons <- unpackable_type ty
+      | Just data_cons <- unpackable_type_datacons ty
       = all (ok_con_args  dcs) data_cons
       | otherwise
       = True        -- NB True here, in contrast to False at top level
@@ -1305,26 +1327,20 @@ isUnpackableType dflags fam_envs ty
       = xopt LangExt.StrictData dflags -- Be conservative
     attempt_unpack _ = False
 
-    unpackable_type :: Type -> Maybe [DataCon]
-    -- Works just on a single level
-    unpackable_type ty
-      | Just (tc, _) <- splitTyConApp_maybe ty
-      , let cons = tyConDataCons tc
-      , -- either a single non-newtype constructor, or more than one constructors
-        case cons of
-          []  -> False
-          [_] -> not (isNewTyCon tc)
-          _   -> True
-      , all (null . dataConExTyCoVars) cons
-      = Just cons
-      {-
-      , Just data_con <- tyConSingleAlgDataCon_maybe tc
-      , null (dataConExTyCoVars data_con)
-          -- See Note [Unpacking GADTs and existentials]
-      = Just data_con
-      -}
-      | otherwise
-      = Nothing
+-- Works just on a single level to determine if a type looks unpackable, and obtains its list of data constructors.
+unpackable_type_datacons :: Type -> Maybe [DataCon]
+unpackable_type_datacons ty
+  | Just (tc, _) <- splitTyConApp_maybe ty
+  , let cons = tyConDataCons tc
+  , -- either a single non-newtype constructor, or more than one constructor
+    case cons of
+      []  -> False
+      [_] -> not (isNewTyCon tc)
+      _   -> True
+  , all (null . dataConExTyCoVars) cons
+  = Just cons -- See Note [Unpacking GADTs and existentials]
+  | otherwise
+  = Nothing
 
 {-
 Note [Unpacking GADTs and existentials]
