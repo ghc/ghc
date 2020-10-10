@@ -239,16 +239,18 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 ************************************************************************
 -}
 
-dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 
-dsLExpr (L loc e)
-  = putSrcSpanDs loc $
-    do { core_expr <- dsExpr e
-   -- uncomment this check to test the hsExprType function in GHC.Tc.Utils.Zonk
-   --    ; MASSERT2( exprType core_expr `eqType` hsExprType e
-   --              , ppr e <+> dcolon <+> ppr (hsExprType e) $$
-   --                ppr core_expr <+> dcolon <+> ppr (exprType core_expr) )
-       ; return core_expr }
+-- | Replace the body of the fucntion with this block to test the hsExprType
+-- function in GHC.Tc.Utils.Zonk:
+-- putSrcSpanDs loc $ do
+--   { core_expr <- dsExpr e
+--   ; MASSERT2( exprType core_expr `eqType` hsExprType e
+--             , ppr e <+> dcolon <+> ppr (hsExprType e) $$
+--                 ppr core_expr <+> dcolon <+> ppr (exprType core_expr) )
+--   ; return core_expr }
+dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
+dsLExpr (L loc e) =
+  putSrcSpanDs loc $ dsExpr e
 
 -- | Variant of 'dsLExpr' that ensures that the result is not levity
 -- polymorphic. This should be used when the resulting expression will
@@ -416,7 +418,7 @@ dsExpr e@(SectionL _ expr op) = do
     x_core <- dsLExpr expr
     case splitFunTys (exprType core_op) of
       -- Binary operator section
-      (x_ty:y_ty:_, _) -> do
+      (x_ty:y_ty:_, _) ->
         dsWhenNoErrs
           (newSysLocalsDsNoLP [x_ty, y_ty])
           (\[x_id, y_id] ->
@@ -425,7 +427,7 @@ dsExpr e@(SectionL _ expr op) = do
                                      core_op [Var x_id, Var y_id]))
 
       -- Postfix operator section
-      (_:_, _) -> do
+      (_:_, _) ->
         return $ mkCoreAppDs (text "sectionl" <+> ppr e) core_op x_core
 
       _ -> pprPanic "dsExpr(SectionL)" (ppr e)
@@ -462,11 +464,11 @@ dsExpr (ExplicitTuple _ tup_args boxity)
                         -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 
 dsExpr (ExplicitSum types alt arity expr)
-  = do { dsWhenNoErrs (dsLExprNoLP expr)
-                      (\core_expr -> mkCoreConApps (sumDataCon alt arity)
-                                     (map (Type . getRuntimeRep) types ++
-                                      map Type types ++
-                                      [core_expr]) ) }
+  = dsWhenNoErrs (dsLExprNoLP expr)
+                 (\core_expr -> mkCoreConApps (sumDataCon alt arity)
+                                (map (Type . getRuntimeRep) types ++
+                                 map Type types ++
+                                 [core_expr]) )
 
 dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
@@ -1189,12 +1191,12 @@ warnDiscardedDoBindings rhs rhs_ty
            -- Warn about discarding m a things in 'monadic' binding of the same type,
            -- but only if we didn't already warn due to Opt_WarnUnusedDoBind
            when warn_wrong $
-                do { case tcSplitAppTy_maybe norm_elt_ty of
-                         Just (elt_m_ty, _)
-                            | m_ty `eqType` topNormaliseType fam_inst_envs elt_m_ty
-                            -> warnDs (Reason Opt_WarnWrongDoBind)
-                                      (badMonadBind rhs elt_ty)
-                         _ -> return () } } }
+                case tcSplitAppTy_maybe norm_elt_ty of
+                      Just (elt_m_ty, _)
+                         | m_ty `eqType` topNormaliseType fam_inst_envs elt_m_ty
+                         -> warnDs (Reason Opt_WarnWrongDoBind)
+                                   (badMonadBind rhs elt_ty)
+                      _ -> return () } }
 
   | otherwise   -- RHS does have type of form (m ty), which is weird
   = return ()   -- but at least this warning is irrelevant

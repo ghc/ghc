@@ -724,8 +724,7 @@ spec_import top_env callers rb dict_binds cis@(CIS fn _)
                         -- call to the original function
 
   | null good_calls
-  = do { -- debugTraceMsg (text "specImport:no valid calls")
-       ; return ([], []) }
+  = return ([], [])
 
   | Just rhs <- canSpecImport dflags fn
   = do {     -- Get rules from the external package state
@@ -738,9 +737,8 @@ spec_import top_env callers rb dict_binds cis@(CIS fn _)
              rules_for_fn = getRules (RuleEnv full_rb vis_orphs) fn
 
        ; (rules1, spec_pairs, MkUD { ud_binds = dict_binds1, ud_calls = new_calls })
-             <- do { -- debugTraceMsg (text "specImport1" <+> vcat [ppr fn, ppr good_calls, ppr rhs])
-                   ; runSpecM $
-                     specCalls True top_env rules_for_fn good_calls fn rhs }
+            <- -- debugTraceMsg (text "specImport1" <+> vcat [ppr fn, ppr good_calls, ppr rhs]) >>
+                (runSpecM $ specCalls True top_env rules_for_fn good_calls fn rhs)
        ; let spec_binds1 = [NonRec b r | (b,r) <- spec_pairs]
              -- After the rules kick in we may get recursion, but
              -- we rely on a global GlomBinds to sort that out later

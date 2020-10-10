@@ -734,7 +734,7 @@ emitTick = emitCgStmt . CgStmt . CmmTick
 emitUnwind :: [(GlobalReg, Maybe CmmExpr)] -> FCode ()
 emitUnwind regs = do
   dflags <- getDynFlags
-  when (debugLevel dflags > 0) $ do
+  when (debugLevel dflags > 0) $
      emitCgStmt $ CgStmt $ CmmUnwind regs
 
 emitAssign :: CmmReg  -> CmmExpr -> FCode ()

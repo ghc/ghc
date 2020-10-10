@@ -593,9 +593,9 @@ repFamilyResultSig (TyVarSig _ bndr) = do { bndr' <- repTyVarBndr bndr
 repFamilyResultSigToMaybeKind :: FamilyResultSig GhcRn
                               -> MetaM (Core (Maybe (M TH.Kind)))
 repFamilyResultSigToMaybeKind (NoSig _) =
-    do { coreNothingM kindTyConName }
+    coreNothingM kindTyConName
 repFamilyResultSigToMaybeKind (KindSig _ ki) =
-    do { coreJustM kindTyConName =<< repLTy ki }
+    coreJustM kindTyConName =<< repLTy ki
 repFamilyResultSigToMaybeKind TyVarSig{} =
     panic "repFamilyResultSigToMaybeKind: unexpected TyVarSig"
 
@@ -603,7 +603,7 @@ repFamilyResultSigToMaybeKind TyVarSig{} =
 repInjectivityAnn :: Maybe (LInjectivityAnn GhcRn)
                   -> MetaM (Core (Maybe TH.InjectivityAnn))
 repInjectivityAnn Nothing =
-    do { coreNothing injAnnTyConName }
+    coreNothing injAnnTyConName
 repInjectivityAnn (Just (L _ (InjectivityAnn lhs rhs))) =
     do { lhs'   <- lookupBinder (unLoc lhs)
        ; rhs1   <- mapM (lookupBinder . unLoc) rhs
@@ -884,14 +884,13 @@ repC (L _ (ConDeclH98 { con_name = con
                       , con_ex_tvs = con_tvs
                       , con_mb_cxt = mcxt
                       , con_args = args }))
-  = do { addHsTyVarBinds con_tvs $ \ ex_bndrs ->
+  = addHsTyVarBinds con_tvs $ \ ex_bndrs ->
          do { c'    <- repH98DataCon con args
             ; ctxt' <- repMbContext mcxt
             ; if not is_existential && isNothing mcxt
               then return c'
               else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c'])
             }
-       }
 
 repC (L _ (ConDeclGADT { con_g_ext  = imp_tvs
                        , con_names  = cons

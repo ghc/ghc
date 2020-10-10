@@ -1595,8 +1595,8 @@ getLHsInstDeclClass_maybe :: LHsSigType (GhcPass p)
 -- Works on (LHsSigType GhcPs)
 getLHsInstDeclClass_maybe inst_ty
   = do { let head_ty = getLHsInstDeclHead inst_ty
-       ; cls <- hsTyGetAppHead_maybe head_ty
-       ; return cls }
+       ; hsTyGetAppHead_maybe head_ty
+       }
 
 {-
 Note [No nested foralls or contexts in instance types]

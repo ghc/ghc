@@ -224,7 +224,7 @@ withBkpSession cid insts deps session_type do_this = do
         do_this
 
 withBkpExeSession :: [(Unit, ModRenaming)] -> BkpM a -> BkpM a
-withBkpExeSession deps do_this = do
+withBkpExeSession deps do_this =
     withBkpSession (Indefinite (UnitId (fsLit "main"))) [] deps ExeSession do_this
 
 getSource :: IndefUnitId -> BkpM (LHsUnit HsComponentId)
@@ -472,7 +472,7 @@ overHscDynFlags f hsc_env = hsc_env { hsc_dflags = f (hsc_dflags hsc_env) }
 
 -- | Run a 'BkpM' computation, with the nesting level bumped one.
 innerBkpM :: BkpM a -> BkpM a
-innerBkpM do_this = do
+innerBkpM do_this =
     -- NB: withTempSession mutates, so we don't have to worry
     -- about bkp_session being stale.
     updEnv (\env -> env { bkp_level = bkp_level env + 1 }) do_this
@@ -491,14 +491,14 @@ getEpsGhc = do
 
 -- | Run 'BkpM' in 'Ghc'.
 initBkpM :: FilePath -> [LHsUnit HsComponentId] -> BkpM a -> Ghc a
-initBkpM file bkp m = do
-    reifyGhc $ \session -> do
+initBkpM file bkp m =
+  reifyGhc $ \session -> do
     let env = BkpEnv {
-                    bkp_session = session,
-                    bkp_table = Map.fromList [(hsComponentId (unLoc (hsunitName (unLoc u))), u) | u <- bkp],
-                    bkp_filename = file,
-                    bkp_level = 0
-                }
+        bkp_session = session,
+        bkp_table = Map.fromList [(hsComponentId (unLoc (hsunitName (unLoc u))), u) | u <- bkp],
+        bkp_filename = file,
+        bkp_level = 0
+      }
     runIOEnv env m
 
 -- ----------------------------------------------------------------------------
@@ -666,7 +666,7 @@ hsunitModuleGraph unit = do
 
     --  1. Create a HsSrcFile/HsigFile summary for every
     --  explicitly mentioned module/signature.
-    let get_decl (L _ (DeclD hsc_src lmodname mb_hsmod)) = do
+    let get_decl (L _ (DeclD hsc_src lmodname mb_hsmod)) =
           Just `fmap` summariseDecl pn hsc_src lmodname mb_hsmod
         get_decl _ = return Nothing
     nodes <- catMaybes `fmap` mapM get_decl decls

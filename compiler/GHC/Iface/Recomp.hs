@@ -283,7 +283,7 @@ checkPlugins hsc iface = liftIO $ do
     pluginRecompileToRecompileRequired old_fingerprint new_fingerprint pr
 
 fingerprintPlugins :: HscEnv -> IO Fingerprint
-fingerprintPlugins hsc_env = do
+fingerprintPlugins hsc_env =
   fingerprintPlugins' $ plugins (hsc_dflags hsc_env)
 
 fingerprintPlugins' :: [PluginWithArgs] -> IO Fingerprint
@@ -448,7 +448,7 @@ checkMergedSignatures mod_summary iface = do
 -- Returns (RecompBecause <textual reason>) if recompilation is required.
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
- = do
+ =
    checkList $
      [ checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
      , do
@@ -618,8 +618,7 @@ checkModUsage this_pkg UsageHomeModule{
        recompile <- checkModuleFingerprint reason old_mod_hash new_mod_hash
        if not (recompileRequired recompile)
          then return UpToDate
-         else do
-
+         else
            -- CHECK EXPORT LIST
            checkMaybeHash reason maybe_old_export_hash new_export_hash
                (text "  Export list changed") $ do
@@ -874,7 +873,7 @@ addFingerprints hsc_env iface0
        extend_hash_env :: OccEnv (OccName,Fingerprint)
                        -> (Fingerprint,IfaceDecl)
                        -> IO (OccEnv (OccName,Fingerprint))
-       extend_hash_env env0 (hash,d) = do
+       extend_hash_env env0 (hash,d) =
           return (foldr (\(b,fp) env -> extendOccEnv env b (b,fp)) env0
                  (ifaceDeclFingerprints hash d))
 
@@ -1379,14 +1378,13 @@ mkHashFun hsc_env eps name
         MASSERT2( isExternalName name, ppr name )
         iface <- case lookupIfaceByModule hpt pit mod of
                   Just iface -> return iface
-                  Nothing -> do
+                  Nothing ->
                       -- This can occur when we're writing out ifaces for
                       -- requirements; we didn't do any /real/ typechecking
                       -- so there's no guarantee everything is loaded.
                       -- Kind of a heinous hack.
-                      iface <- initIfaceLoad hsc_env . withException
-                            $ loadInterface (text "lookupVers2") mod ImportBySystem
-                      return iface
+                      initIfaceLoad hsc_env . withException
+                        $ loadInterface (text "lookupVers2") mod ImportBySystem
         return $ snd (mi_hash_fn (mi_final_exts iface) occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
 
