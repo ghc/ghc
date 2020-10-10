@@ -163,7 +163,7 @@ mkModBreaks hsc_env mod count entries
 mkCCSArray
   :: HscEnv -> Module -> Int -> [MixEntry_]
   -> IO (Array BreakIndex (RemotePtr GHC.Stack.CCS.CostCentre))
-mkCCSArray hsc_env modul count entries = do
+mkCCSArray hsc_env modul count entries =
   case hsc_interp hsc_env of
     Just interp | GHCi.interpreterProfiled interp -> do
       let module_str = moduleNameString (moduleName modul)
@@ -198,7 +198,7 @@ writeMixEntries dflags mod count entries filename
         modTime <- getModificationUTCTime filename
         let entries' = [ (hpcPos, box)
                        | (span,_,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
-        when (entries' `lengthIsNot` count) $ do
+        when (entries' `lengthIsNot` count) $
           panic "the number of .mix entries are inconsistent"
         let hashNo = mixHash filename modTime tabStop entries'
         mixCreate hpc_mod_dir mod_name
@@ -268,12 +268,12 @@ addTickLHsBinds = mapBagM addTickLHsBind
 
 addTickLHsBind :: LHsBind GhcTc -> TM (LHsBind GhcTc)
 addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
-                                       abs_exports = abs_exports })) = do
-  withEnv add_exports $ do
-  withEnv add_inlines $ do
-  binds' <- addTickLHsBinds binds
-  return $ L pos $ bind { abs_binds = binds' }
- where
+                                       abs_exports = abs_exports })) =
+  withEnv add_exports $
+    withEnv add_inlines $ do
+      binds' <- addTickLHsBinds binds
+      return $ L pos $ bind { abs_binds = binds' }
+  where
    -- in AbsBinds, the Id on each binding is not the actual top-level
    -- Id that we are defining, they are related by the abs_exports
    -- field of AbsBinds.  So if we're doing TickExportedFunctions we need
@@ -668,7 +668,7 @@ addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats
 
 addTickGRHSs :: Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
              -> TM (GRHSs GhcTc (LHsExpr GhcTc))
-addTickGRHSs isOneOfMany isLambda (GRHSs x guarded (L l local_binds)) = do
+addTickGRHSs isOneOfMany isLambda (GRHSs x guarded (L l local_binds)) =
   bindLocals binders $ do
     local_binds' <- addTickHsLocalBinds local_binds
     guarded' <- mapM (liftL (addTickGRHS isOneOfMany isLambda)) guarded
@@ -711,12 +711,12 @@ addTickLStmts' isGuard lstmts res
 
 addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt GhcTc (LHsExpr GhcTc)
             -> TM (Stmt GhcTc (LHsExpr GhcTc))
-addTickStmt _isGuard (LastStmt x e noret ret) = do
+addTickStmt _isGuard (LastStmt x e noret ret) =
         liftM3 (LastStmt x)
                 (addTickLHsExpr e)
                 (pure noret)
                 (addTickSyntaxExpr hpcSrcSpan ret)
-addTickStmt _isGuard (BindStmt xbs pat e) = do
+addTickStmt _isGuard (BindStmt xbs pat e) =
         liftM4 (\b f -> BindStmt $ XBindStmtTc
                     { xbstc_bindOp = b
                     , xbstc_boundResultType = xbstc_boundResultType xbs
@@ -727,15 +727,15 @@ addTickStmt _isGuard (BindStmt xbs pat e) = do
                 (mapM (addTickSyntaxExpr hpcSrcSpan) (xbstc_failOp xbs))
                 (addTickLPat pat)
                 (addTickLHsExprRHS e)
-addTickStmt isGuard (BodyStmt x e bind' guard') = do
+addTickStmt isGuard (BodyStmt x e bind' guard') =
         liftM3 (BodyStmt x)
                 (addTick isGuard e)
                 (addTickSyntaxExpr hpcSrcSpan bind')
                 (addTickSyntaxExpr hpcSrcSpan guard')
-addTickStmt _isGuard (LetStmt x (L l binds)) = do
+addTickStmt _isGuard (LetStmt x (L l binds)) =
         liftM (LetStmt x . L l)
                 (addTickHsLocalBinds binds)
-addTickStmt isGuard (ParStmt x pairs mzipExpr bindExpr) = do
+addTickStmt isGuard (ParStmt x pairs mzipExpr bindExpr) =
     liftM3 (ParStmt x)
         (mapM (addTickStmtAndBinders isGuard) pairs)
         (unLoc <$> addTickLHsExpr (L hpcSrcSpan mzipExpr))
@@ -920,7 +920,7 @@ addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
     return $ match { m_grhss = gRHSs' }
 
 addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
-addTickCmdGRHSs (GRHSs x guarded (L l local_binds)) = do
+addTickCmdGRHSs (GRHSs x guarded (L l local_binds)) =
   bindLocals binders $ do
     local_binds' <- addTickHsLocalBinds local_binds
     guarded' <- mapM (liftL addTickCmdGRHS) guarded
@@ -953,21 +953,21 @@ addTickLCmdStmts' lstmts res
         binders = collectLStmtsBinders lstmts
 
 addTickCmdStmt :: Stmt GhcTc (LHsCmd GhcTc) -> TM (Stmt GhcTc (LHsCmd GhcTc))
-addTickCmdStmt (BindStmt x pat c) = do
+addTickCmdStmt (BindStmt x pat c) =
         liftM2 (BindStmt x)
                 (addTickLPat pat)
                 (addTickLHsCmd c)
-addTickCmdStmt (LastStmt x c noret ret) = do
+addTickCmdStmt (LastStmt x c noret ret) =
         liftM3 (LastStmt x)
                 (addTickLHsCmd c)
                 (pure noret)
                 (addTickSyntaxExpr hpcSrcSpan ret)
-addTickCmdStmt (BodyStmt x c bind' guard') = do
+addTickCmdStmt (BodyStmt x c bind' guard') =
         liftM3 (BodyStmt x)
                 (addTickLHsCmd c)
                 (addTickSyntaxExpr hpcSrcSpan bind')
                 (addTickSyntaxExpr hpcSrcSpan guard')
-addTickCmdStmt (LetStmt x (L l binds)) = do
+addTickCmdStmt (LetStmt x (L l binds)) =
         liftM (LetStmt x . L l)
                 (addTickHsLocalBinds binds)
 addTickCmdStmt stmt@(RecStmt {})

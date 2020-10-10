@@ -77,7 +77,6 @@ import GHC.Tc.Types.Origin
 import GHC.Core.Predicate
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Instantiate( tcInstInvisibleTyBinders )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Utils.Unify
@@ -87,7 +86,8 @@ import GHC.Tc.Utils.Zonk
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBindersN, tcInstInvisibleTyBinder )
+import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBindersN,
+                                  tcInstInvisibleTyBinder )
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
 import GHC.Types.Name.Env

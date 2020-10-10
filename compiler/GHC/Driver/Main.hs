@@ -575,7 +575,7 @@ tcRnModule' sum save_rn_syntax mod = do
       else do
           tcg_res' <- hscCheckSafeImports tcg_res
           safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
-          when safe $ do
+          when safe $
             case wopt Opt_WarnSafe dflags of
               True
                 | safeHaskell dflags == Sf_Safe -> return ()
@@ -801,8 +801,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 -- in one-shot mode, since we're not going to do
                 -- any further typechecking.  It's much more useful
                 -- in make mode, since this HMI will go into the HPT.
-                details <- genModDetails hsc_env' iface
-                return details
+                genModDetails hsc_env' iface
             return (HscUpToDate iface details, dflags)
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
@@ -1012,7 +1011,7 @@ hscCheckSafeImports tcg_env = do
     checkRULES dflags tcg_env'
 
   where
-    checkRULES dflags tcg_env' = do
+    checkRULES dflags tcg_env' =
       case safeLanguageOn dflags of
           True -> do
               -- XSafe: we nuke user written RULES
@@ -1254,10 +1253,9 @@ hscCheckSafe' m l = do
         -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
         -- as the compiler hasn't filled in the various module tables
         -- so we need to call 'getModuleInterface' to load from disk
-        iface' <- case iface of
+        case iface of
             Just _  -> return iface
             Nothing -> snd `fmap` (liftIO $ getModuleInterface hsc_env m)
-        return iface'
 
 
 -- | Check the list of packages are trusted.
@@ -1924,9 +1922,8 @@ hscParseThingWithLocation source linenumber parser str
         loc = mkRealSrcLoc (fsLit source) linenumber 1
 
     case unP parser (initParserState (initParserOpts dflags) buf loc) of
-        PFailed pst -> do
+        PFailed pst ->
             handleWarningsThrowErrors (getMessages pst)
-
         POk pst thing -> do
             logWarningsReportErrors (getMessages pst)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
@@ -1965,9 +1962,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                      (icInteractiveModule (hsc_IC hsc_env)) prepd_expr
 
            {- link it -}
-         ; hval <- linkExpr hsc_env srcspan bcos
-
-         ; return hval }
+         ; linkExpr hsc_env srcspan bcos }
 
 
 {- **********************************************************************

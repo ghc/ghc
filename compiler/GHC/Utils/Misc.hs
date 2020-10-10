@@ -1281,7 +1281,7 @@ getModificationUTCTime = getModificationTime
 -- check existence & modification time at the same time
 
 modificationTimeIfExists :: FilePath -> IO (Maybe UTCTime)
-modificationTimeIfExists f = do
+modificationTimeIfExists f =
   (do t <- getModificationUTCTime f; return (Just t))
         `catchIO` \e -> if isDoesNotExistError e
                         then return Nothing

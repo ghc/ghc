@@ -2852,7 +2852,7 @@ loadUnqualIfaces :: HscEnv -> InteractiveContext -> TcM ()
 -- This is so that we can accurately report the instances for
 -- something
 loadUnqualIfaces hsc_env ictxt
-  = initIfaceTcRn $ do
+  = initIfaceTcRn $
     mapM_ (loadSysInterface doc) (moduleSetElts (mkModuleSet unqual_mods))
   where
     home_unit = hsc_home_unit hsc_env
@@ -3044,7 +3044,7 @@ withTcPlugins hsc_env m =
                 (solvers,stops) <- unzip `fmap` mapM (startPlugin ev_binds_var) plugins
                 -- This ensures that tcPluginStop is called even if a type
                 -- error occurs during compilation (Fix of #10078)
-                eitherRes <- tryM $ do
+                eitherRes <- tryM $
                   updGblEnv (\e -> e { tcg_tc_plugins = solvers }) m
                 mapM_ (flip runTcPluginM ev_binds_var) stops
                 case eitherRes of
@@ -3066,7 +3066,7 @@ withHoleFitPlugins hsc_env m =
     plugins -> do (plugins,stops) <- unzip `fmap` mapM startPlugin plugins
                   -- This ensures that hfPluginStop is called even if a type
                   -- error occurs during compilation.
-                  eitherRes <- tryM $ do
+                  eitherRes <- tryM $
                     updGblEnv (\e -> e { tcg_hf_plugins = plugins }) m
                   sequence_ stops
                   case eitherRes of

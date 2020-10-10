@@ -1,4 +1,7 @@
-{-# LANGUAGE RankNTypes, BangPatterns, FlexibleContexts, Strict #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Strict #-}
 
 {- |
   Module      :  GHC.CmmToAsm.CFG.Dominators
@@ -250,7 +253,7 @@ link v w = do
   zw  <- sizeM w
   store labelE s lw
   store sizeE v . (+zw) =<< sizeM v
-  let follow s = do
+  let follow s =
         when (s /= n0) (do
           store ancestorE s v
           follow =<< childM s)

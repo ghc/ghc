@@ -400,7 +400,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
     -- OK, now typecheck each ModIface using this environment
     details <- forM ifaces $ \iface -> do
         -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
-        type_env <- fixM $ \type_env -> do
+        type_env <- fixM $ \type_env ->
             setImplicitEnvM type_env $ do
                 decls <- tcIfaceDecls ignore_prags (mi_decls iface)
                 return (mkNameEnv decls)
@@ -440,7 +440,7 @@ typecheckIfaceForInstantiate nsubst iface =
                         (mi_boot iface) nsubst $ do
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
     -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
-    type_env <- fixM $ \type_env -> do
+    type_env <- fixM $ \type_env ->
         setImplicitEnvM type_env $ do
             decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
             return (mkNameEnv decls)
@@ -1256,10 +1256,9 @@ tcIfaceAnnotation (IfaceAnnotation target serialized) = do
     }
 
 tcIfaceAnnTarget :: IfaceAnnTarget -> IfL (AnnTarget Name)
-tcIfaceAnnTarget (NamedTarget occ) = do
-    name <- lookupIfaceTop occ
-    return $ NamedTarget name
-tcIfaceAnnTarget (ModuleTarget mod) = do
+tcIfaceAnnTarget (NamedTarget occ) =
+    NamedTarget <$> lookupIfaceTop occ
+tcIfaceAnnTarget (ModuleTarget mod) =
     return $ ModuleTarget mod
 
 {-

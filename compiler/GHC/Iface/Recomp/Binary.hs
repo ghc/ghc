@@ -35,8 +35,7 @@ computeFingerprint :: (Binary a)
 computeFingerprint put_nonbinding_name a = do
     bh <- fmap set_user_data $ openBinMem (3*1024) -- just less than a block
     put_ bh a
-    fp <- fingerprintBinMem bh
-    return fp
+    fingerprintBinMem bh
   where
     set_user_data bh =
       setUserData bh $ newWriteState put_nonbinding_name putNameLiterally putFS

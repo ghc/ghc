@@ -471,7 +471,7 @@ loadInterface doc_str mod from
         let
             loc_doc = text loc
         in
-        initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $ do
+        initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $
 
         dontLeakTheHPT $ do
 

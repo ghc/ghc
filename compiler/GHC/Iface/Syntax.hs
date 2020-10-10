@@ -2140,10 +2140,10 @@ instance Binary IfaceBang where
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return IfNoBang
-              1 -> do return IfStrict
-              2 -> do return IfUnpack
-              _ -> do { a <- get bh; return (IfUnpackCo a) }
+              0 -> return IfNoBang
+              1 -> return IfStrict
+              2 -> return IfUnpack
+              _ -> IfUnpackCo <$> get bh
 
 instance Binary IfaceSrcBang where
     put_ bh (IfSrcBang a1 a2) =

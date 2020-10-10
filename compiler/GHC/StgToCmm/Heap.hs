@@ -650,7 +650,7 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
      tickyHeapCheck
      emitAssign hpReg bump_hp
      emit =<< mkCmmIfThen' hp_oflo (alloc_n <*> mkBranch gc_id) (Just False)
-    else do
+    else
       when (checkYield && not (gopt Opt_OmitYields dflags)) $ do
          -- Yielding if HpLim == 0
          let yielding = CmmMachOp (mo_wordEq platform)

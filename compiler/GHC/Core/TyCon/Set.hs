@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
 
 module GHC.Core.TyCon.Set (
         -- * TyCons set type

@@ -222,9 +222,7 @@ readHieFileHeader file bh0 = do
 
 readHieFileContents :: BinHandle -> NameCacheUpdater -> IO HieFile
 readHieFileContents bh0 ncu = do
-
-  dict  <- get_dictionary bh0
-
+  dict <- get_dictionary bh0
   -- read the symbol table so we are capable of reading the actual data
   bh1 <- do
       let bh1 = setUserData bh0 $ newReadState (error "getSymtabName")
@@ -236,8 +234,7 @@ readHieFileContents bh0 ncu = do
       return bh1'
 
   -- load the actual data
-  hiefile <- get bh1
-  return hiefile
+  get bh1
   where
     get_dictionary bin_handle = do
       dict_p <- get bin_handle

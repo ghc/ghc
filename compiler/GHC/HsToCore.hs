@@ -767,5 +767,3 @@ mkUnsafeCoercePrimPair _old_id old_expr
 
              id   = mkExportedVanillaId unsafeCoercePrimName ty `setIdInfo` info
        ; return (id, old_expr) }
-
-  where

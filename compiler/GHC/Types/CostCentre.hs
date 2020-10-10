@@ -317,7 +317,7 @@ costCentreSrcSpan :: CostCentre -> SrcSpan
 costCentreSrcSpan = cc_loc
 
 instance Binary CCFlavour where
-    put_ bh CafCC = do
+    put_ bh CafCC =
             putByte bh 0
     put_ bh (ExprCC i) = do
             putByte bh 1
@@ -331,10 +331,10 @@ instance Binary CCFlavour where
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return CafCC
+              0 -> return CafCC
               1 -> ExprCC <$> get bh
               2 -> DeclCC <$> get bh
-              _ -> HpcCC <$> get bh
+              _ -> HpcCC  <$> get bh
 
 instance Binary CostCentre where
     put_ bh (NormalCC aa ab ac _ad) = do

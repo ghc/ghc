@@ -1019,7 +1019,7 @@ cvtl e = wrapL (cvt e)
                               -- constructor names - see #14627.
                               { s' <- vcName s
                               ; return $ HsVar noExtField (noLoc s') }
-    cvt (LabelE s)       = do { return $ HsOverLabel noExtField Nothing (fsLit s) }
+    cvt (LabelE s)       = return $ HsOverLabel noExtField Nothing (fsLit s)
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExtField n' }
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
@@ -1497,7 +1497,7 @@ cvtTypeKind ty_str ty
                 tys'
            ListT
              | Just normals <- m_normals
-             , [x'] <- normals -> do
+             , [x'] <- normals ->
                 returnL (HsListTy noExtField x')
              | otherwise
              -> mk_apps
@@ -1584,8 +1584,7 @@ cvtTypeKind ty_str ty
                           -- in Language.Haskell.TH.Syntax
               | Just normals <- m_normals
               , [ty1, L _ (HsExplicitListTy _ ip tys2)] <- normals
-              -> do
-                  returnL (HsExplicitListTy noExtField ip (ty1:tys2))
+              -> returnL (HsExplicitListTy noExtField ip (ty1:tys2))
               | otherwise
               -> mk_apps
                  (HsTyVar noExtField IsPromoted (noLoc (getRdrName consDataCon)))

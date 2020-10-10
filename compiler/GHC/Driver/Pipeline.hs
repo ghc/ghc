@@ -1,4 +1,8 @@
-{-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns, MultiWayIf #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -222,7 +226,7 @@ compileOne' m_tc_result mHscMessage
             in return $! HomeModInfo iface hmi_details mb_linkable
         (HscNotGeneratingCode _ _, _) -> panic "compileOne HscNotGeneratingCode"
         (_, NoBackend) -> panic "compileOne NoBackend"
-        (HscUpdateBoot iface hmi_details, Interpreter) -> do
+        (HscUpdateBoot iface hmi_details, Interpreter) ->
             return $! HomeModInfo iface hmi_details Nothing
         (HscUpdateBoot iface hmi_details, _) -> do
             touchObjectFile dflags object_filename
@@ -773,7 +777,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
          -- path, then rerun the pipeline for the dyn way
          let dflags = hsc_dflags hsc_env
          -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
-         when (not $ platformOS (targetPlatform dflags) == OSMinGW32) $ do
+         when (not $ platformOS (targetPlatform dflags) == OSMinGW32) $
            when isHaskellishFile $ whenCannotGenerateDynamicToo dflags $ do
                debugTraceMsg dflags 4
                    (text "Running the pipeline again for -dynamic-too")
@@ -1094,31 +1098,30 @@ runPhase (RealPhase (Cpp sf)) input_fn dflags0
 -- HsPp phase
 
 runPhase (RealPhase (HsPp sf)) input_fn dflags
-  = do
-       if not (gopt Opt_Pp dflags) then
-           -- no need to preprocess, just pass input file along
-           -- to the next phase of the pipeline.
-          return (RealPhase (Hsc sf), input_fn)
-        else do
-            PipeEnv{src_basename, src_suffix} <- getPipeEnv
-            let orig_fn = src_basename <.> src_suffix
-            output_fn <- phaseOutputFilename (Hsc sf)
-            liftIO $ GHC.SysTools.runPp dflags
-                           ( [ GHC.SysTools.Option     orig_fn
-                             , GHC.SysTools.Option     input_fn
-                             , GHC.SysTools.FileOption "" output_fn
-                             ]
-                           )
+  = if not (gopt Opt_Pp dflags) then
+      -- no need to preprocess, just pass input file along
+      -- to the next phase of the pipeline.
+       return (RealPhase (Hsc sf), input_fn)
+    else do
+        PipeEnv{src_basename, src_suffix} <- getPipeEnv
+        let orig_fn = src_basename <.> src_suffix
+        output_fn <- phaseOutputFilename (Hsc sf)
+        liftIO $ GHC.SysTools.runPp dflags
+                       ( [ GHC.SysTools.Option     orig_fn
+                         , GHC.SysTools.Option     input_fn
+                         , GHC.SysTools.FileOption "" output_fn
+                         ]
+                       )
 
-            -- re-read pragmas now that we've parsed the file (see #3674)
-            src_opts <- liftIO $ getOptionsFromFile dflags output_fn
-            (dflags1, unhandled_flags, warns)
-                <- liftIO $ parseDynamicFilePragma dflags src_opts
-            setDynFlags dflags1
-            liftIO $ checkProcessArgsResult dflags1 unhandled_flags
-            liftIO $ handleFlagWarnings dflags1 warns
+        -- re-read pragmas now that we've parsed the file (see #3674)
+        src_opts <- liftIO $ getOptionsFromFile dflags output_fn
+        (dflags1, unhandled_flags, warns)
+            <- liftIO $ parseDynamicFilePragma dflags src_opts
+        setDynFlags dflags1
+        liftIO $ checkProcessArgsResult dflags1 unhandled_flags
+        liftIO $ handleFlagWarnings dflags1 warns
 
-            return (RealPhase (Hsc sf), output_fn)
+        return (RealPhase (Hsc sf), output_fn)
 
 -----------------------------------------------------------------------------
 -- Hsc phase
@@ -1144,7 +1147,6 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- gather the imports and module name
         (hspp_buf,mod_name,imps,src_imps) <- liftIO $ do
-          do
             buf <- hGetStringBuffer input_fn
             let imp_prelude = xopt LangExt.ImplicitPrelude dflags
                 popts = initParserOpts dflags
@@ -1478,8 +1480,8 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         let local_includes = [ GHC.SysTools.Option ("-iquote" ++ p)
                              | p <- includePathsQuote cmdline_include_paths ]
         let runAssembler inputFilename outputFilename
-              = liftIO $ do
-                  withAtomicRename outputFilename $ \temp_outputFilename -> do
+              = liftIO $
+                  withAtomicRename outputFilename $ \temp_outputFilename ->
                     as_prog
                        dflags
                        (local_includes ++ global_includes
@@ -2028,15 +2030,13 @@ maybeCreateManifest dflags exe_filename
 
 
 linkDynLibCheck :: DynFlags -> [String] -> [UnitId] -> IO ()
-linkDynLibCheck dflags o_files dep_units
- = do
-    when (haveRtsOptsFlags dflags) $ do
-      putLogMsg dflags NoReason SevInfo noSrcSpan
-          $ withPprStyle defaultUserStyle
-          (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
-           text "    Call hs_init_ghc() from your main() function to set these options.")
-
-    linkDynLib dflags o_files dep_units
+linkDynLibCheck dflags o_files dep_units = do
+  when (haveRtsOptsFlags dflags) $
+    putLogMsg dflags NoReason SevInfo noSrcSpan
+      $ withPprStyle defaultUserStyle
+      (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
+      text "    Call hs_init_ghc() from your main() function to set these options.")
+  linkDynLib dflags o_files dep_units
 
 -- | Linking a static lib will not really link anything. It will merely produce
 -- a static archive of all dependent static libraries. The resulting library
@@ -2313,7 +2313,7 @@ joinObjectFiles dflags o_files output_fn = do
           writeFile filelist $ unlines o_files
           ld_r [GHC.SysTools.Option "-filelist",
                 GHC.SysTools.FileOption "" filelist]
-     else do
+     else
           ld_r (map (GHC.SysTools.FileOption "") o_files)
 
 -- -----------------------------------------------------------------------------

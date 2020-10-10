@@ -520,13 +520,14 @@ tcExtendNameTyVarEnv :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendNameTyVarEnv binds thing_inside
   -- this should be used only for explicitly mentioned scoped variables.
   -- thus, no coercion variables
-  = do { tc_extend_local_env NotTopLevel
-                    [(name, ATyVar name tv) | (name, tv) <- binds] $
-         tcExtendBinderStack tv_binds $
-         thing_inside }
+  = tc_extend_local_env NotTopLevel names $
+        tcExtendBinderStack tv_binds $
+        thing_inside
   where
     tv_binds :: [TcBinder]
     tv_binds = [TcTvBndr name tv | (name,tv) <- binds]
+
+    names = [(name, ATyVar name tv) | (name, tv) <- binds]
 
 isTypeClosedLetBndr :: Id -> Bool
 -- See Note [Bindings with closed types] in GHC.Tc.Types

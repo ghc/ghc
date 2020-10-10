@@ -201,7 +201,7 @@ checkTyConIsAcyclic tc m = SynCycleM $ \s ->
 -- the corresponding @LTyClDecl Name@ for each 'TyCon', so we
 -- can give better error messages.
 checkSynCycles :: Unit -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
-checkSynCycles this_uid tcs tyclds = do
+checkSynCycles this_uid tcs tyclds =
     case runSynCycleM (mapM_ (go emptyTyConSet []) tcs) emptyTyConSet of
         Left (loc, err) -> setSrcSpan loc $ failWithTc err
         Right _  -> return ()
@@ -775,8 +775,7 @@ addTyConsToGblEnv tyclss
     do { traceTc "tcAddTyCons" $ vcat
             [ text "tycons" <+> ppr tyclss
             , text "implicits" <+> ppr implicit_things ]
-       ; gbl_env <- tcRecSelBinds (mkRecSelBinds tyclss)
-       ; return gbl_env }
+       ; tcRecSelBinds (mkRecSelBinds tyclss) }
  where
    implicit_things = concatMap implicitTyConThings tyclss
    def_meth_ids    = mkDefaultMethodIds tyclss

@@ -6,7 +6,11 @@
 Buffers for scanning string input stored in external arrays.
 -}
 
-{-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
+
 {-# OPTIONS_GHC -O2 #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
@@ -124,8 +128,8 @@ hGetStringBufferBlock handle wanted
 
 hPutStringBuffer :: Handle -> StringBuffer -> IO ()
 hPutStringBuffer hdl (StringBuffer buf len cur)
-    = do withForeignPtr (plusForeignPtr buf cur) $ \ptr ->
-             hPutBuf hdl ptr len
+    = withForeignPtr (plusForeignPtr buf cur) $ \ptr ->
+          hPutBuf hdl ptr len
 
 -- | Skip the byte-order mark if there is one (see #1744 and #6016),
 -- and return the new position of the handle in bytes.
@@ -198,8 +202,8 @@ stringToStringBuffer str =
 nextChar :: StringBuffer -> (Char,StringBuffer)
 nextChar (StringBuffer buf len (I# cur#)) =
   -- Getting our fingers dirty a little here, but this is performance-critical
-  inlinePerformIO $ do
-    withForeignPtr buf $ \(Ptr a#) -> do
+  inlinePerformIO $
+    withForeignPtr buf $ \(Ptr a#) ->
         case utf8DecodeCharAddr# (a# `plusAddr#` cur#) 0# of
           (# c#, nBytes# #) ->
              let cur' = I# (cur# +# nBytes#) in
@@ -215,7 +219,7 @@ currentChar = fst . nextChar
 prevChar :: StringBuffer -> Char -> Char
 prevChar (StringBuffer _   _   0)   deflt = deflt
 prevChar (StringBuffer buf _   cur) _     =
-  inlinePerformIO $ do
+  inlinePerformIO $
     withForeignPtr buf $ \p -> do
       p' <- utf8PrevChar (p `plusPtr` cur)
       return (fst (utf8DecodeChar p'))

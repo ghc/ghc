@@ -243,7 +243,7 @@ withExtendedLinkEnv dl new_env action
         -- lose those changes (we might have linked a new module or
         -- package), so the reset action only removes the names we
         -- added earlier.
-          reset_old_env = liftIO $ do
+          reset_old_env = liftIO $
             modifyPLS_ dl $ \pls ->
                 let cur = closure_env pls
                     new = delListFromNameEnv cur (map fst new_env)
@@ -313,7 +313,7 @@ linkCmdLineLibs :: HscEnv -> IO ()
 linkCmdLineLibs hsc_env = do
   let dl = hsc_dynLinker hsc_env
   initDynLinker hsc_env
-  modifyPLS_ dl $ \pls -> do
+  modifyPLS_ dl $ \pls ->
     linkCmdLineLibs' hsc_env pls
 
 linkCmdLineLibs' :: HscEnv -> PersistentLinkerState -> IO PersistentLinkerState
@@ -915,7 +915,7 @@ dynLinkObjs hsc_env pls objs = do
 
                     -- If resolving failed, unload all our
                     -- object modules and carry on
-                    if succeeded ok then do
+                    if succeeded ok then
                             return (pls1, Succeeded)
                       else do
                             pls2 <- unload_wkr hsc_env [] pls1
@@ -1259,7 +1259,7 @@ linkPackages hsc_env new_pkgs = do
   -- a lock.
   initDynLinker hsc_env
   let dl = hsc_dynLinker hsc_env
-  modifyPLS_ dl $ \pls -> do
+  modifyPLS_ dl $ \pls ->
     linkPackages' hsc_env new_pkgs pls
 
 linkPackages' :: HscEnv -> [UnitId] -> PersistentLinkerState

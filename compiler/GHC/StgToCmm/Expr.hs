@@ -178,12 +178,10 @@ cgLetNoEscapeClosure
 
 cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
   = do platform <- getPlatform
-       return ( lneIdInfo platform bndr args
-              , code )
+       return ( lneIdInfo platform bndr args, code )
   where
-   code = forkLneBody $ do {
-            ; withNewTickyCounterLNE (idName bndr) args $ do
-            ; restoreCurrentCostCentre cc_slot
+   code = forkLneBody $ withNewTickyCounterLNE (idName bndr) args $ do
+            { restoreCurrentCostCentre cc_slot
             ; arg_regs <- bindArgsToRegs args
             ; void $ noEscapeHeapCheck arg_regs (tickyEnterLNE >> cgExpr body) }
 

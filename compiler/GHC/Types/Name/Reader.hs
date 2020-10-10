@@ -959,18 +959,17 @@ pickGREsModExp :: ModuleName -> [GlobalRdrElt] -> [(GlobalRdrElt,GlobalRdrElt)]
 --   see 'GHC.Tc.Gen.Export.exports_from_avail'
 pickGREsModExp mod gres = mapMaybe (pickBothGRE mod) gres
 
+-- | isBuiltInSyntax filter out names for built-in syntax They
+-- just clutter up the environment (esp tuples), and the
+-- parser will generate Exact RdrNames for them, so the
+-- cluttered envt is no use.  Really, it's only useful for
+-- GHC.Base and GHC.Tuple.
 pickBothGRE :: ModuleName -> GlobalRdrElt -> Maybe (GlobalRdrElt, GlobalRdrElt)
 pickBothGRE mod gre@(GRE { gre_name = n })
   | isBuiltInSyntax n                = Nothing
   | Just gre1 <- pickQualGRE mod gre
   , Just gre2 <- pickUnqualGRE   gre = Just (gre1, gre2)
   | otherwise                        = Nothing
-  where
-        -- isBuiltInSyntax filter out names for built-in syntax They
-        -- just clutter up the environment (esp tuples), and the
-        -- parser will generate Exact RdrNames for them, so the
-        -- cluttered envt is no use.  Really, it's only useful for
-        -- GHC.Base and GHC.Tuple.
 
 -- Building GlobalRdrEnvs
 

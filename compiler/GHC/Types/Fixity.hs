@@ -57,18 +57,18 @@ instance Outputable FixityDirection where
     ppr InfixN = text "infix"
 
 instance Binary FixityDirection where
-    put_ bh InfixL = do
+    put_ bh InfixL =
             putByte bh 0
-    put_ bh InfixR = do
+    put_ bh InfixR =
             putByte bh 1
-    put_ bh InfixN = do
+    put_ bh InfixN =
             putByte bh 2
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return InfixL
-              1 -> do return InfixR
-              _ -> do return InfixN
+              0 -> return InfixL
+              1 -> return InfixR
+              _ -> return InfixN
 
 ------------------------
 maxPrecedence, minPrecedence :: Int

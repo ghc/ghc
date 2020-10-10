@@ -451,26 +451,25 @@ handleLastNode
 
 handleLastNode dflags procpoints liveness cont_info stackmaps
                stack0@StackMap { sm_sp = sp0 } tscp middle last
- = case last of
-    --  At each return / tail call,
-    --  adjust Sp to point to the last argument pushed, which
-    --  is cml_args, after popping any other junk from the stack.
-    CmmCall{ cml_cont = Nothing, .. } -> do
-      let sp_off = sp0 - cml_args
-      return ([], sp_off, last, [], mapEmpty)
+  = case last of
+      --  At each return / tail call,
+      --  adjust Sp to point to the last argument pushed, which
+      --  is cml_args, after popping any other junk from the stack.
+      CmmCall{ cml_cont = Nothing, .. } -> do
+        let sp_off = sp0 - cml_args
+        return ([], sp_off, last, [], mapEmpty)
 
-    --  At each CmmCall with a continuation:
-    CmmCall{ cml_cont = Just cont_lbl, .. } ->
-       return $ lastCall cont_lbl cml_args cml_ret_args cml_ret_off
+      --  At each CmmCall with a continuation:
+      CmmCall{ cml_cont = Just cont_lbl, .. } ->
+        return $ lastCall cont_lbl cml_args cml_ret_args cml_ret_off
 
-    CmmForeignCall{ succ = cont_lbl, .. } -> do
-       return $ lastCall cont_lbl (platformWordSizeInBytes platform) ret_args ret_off
-            -- one word of args: the return address
+      CmmForeignCall{ succ = cont_lbl, .. } ->
+        return $ lastCall cont_lbl (platformWordSizeInBytes platform) ret_args ret_off
+              -- one word of args: the return address
 
-    CmmBranch {}     ->  handleBranches
-    CmmCondBranch {} ->  handleBranches
-    CmmSwitch {}     ->  handleBranches
-
+      CmmBranch {}     ->  handleBranches
+      CmmCondBranch {} ->  handleBranches
+      CmmSwitch {}     ->  handleBranches
   where
      platform = targetPlatform dflags
      -- Calls and ForeignCalls are handled the same way:
@@ -1051,7 +1050,7 @@ insertReloadsAsNeeded
     -> BlockId
     -> [CmmBlock]
     -> UniqSM [CmmBlock]
-insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks = do
+insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks =
     toBlockList . fst <$>
         rewriteCmmBwd liveLattice rewriteCC (ofBlockList entry blocks) mapEmpty
   where

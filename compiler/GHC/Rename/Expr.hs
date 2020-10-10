@@ -108,16 +108,16 @@ finishHsVar (L l name)
       ; return (HsVar noExtField (L l name), unitFV name) }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
-rnUnboundVar v
- = do { if isUnqual v
-        then -- Treat this as a "hole"
-             -- Do not fail right now; instead, return HsUnboundVar
-             -- and let the type checker report the error
-             return (HsUnboundVar noExtField (rdrNameOcc v), emptyFVs)
+rnUnboundVar v =
+  if isUnqual v
+  then -- Treat this as a "hole"
+       -- Do not fail right now; instead, return HsUnboundVar
+       -- and let the type checker report the error
+       return (HsUnboundVar noExtField (rdrNameOcc v), emptyFVs)
 
-        else -- Fail immediately (qualified name)
-             do { n <- reportUnboundName v
-                ; return (HsVar noExtField (noLoc n), emptyFVs) } }
+  else -- Fail immediately (qualified name)
+       do { n <- reportUnboundName v
+          ; return (HsVar noExtField (noLoc n), emptyFVs) }
 
 rnExpr (HsVar _ (L l v))
   = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
@@ -847,10 +847,10 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat body)) thing_inside
         -- but it does not matter because the names are unique
 
 rnStmt _ _ (L loc (LetStmt _ (L l binds))) thing_inside
-  = do  { rnLocalBindsAndThen binds $ \binds' bind_fvs -> do
+  =     rnLocalBindsAndThen binds $ \binds' bind_fvs -> do
         { (thing, fvs) <- thing_inside (collectLocalBinders binds')
         ; return ( ([(L loc (LetStmt noExtField (L l binds')), bind_fvs)], thing)
-                 , fvs) }  }
+                 , fvs) }
 
 rnStmt ctxt rnBody (L loc (RecStmt { recS_stmts = rec_stmts })) thing_inside
   = do  { (return_op, fvs1)  <- lookupQualifiedDoStmtName ctxt returnMName

@@ -79,7 +79,7 @@ mkExtraObj dflags extn xs
 --
 mkExtraObjToLinkIntoBinary :: DynFlags -> IO FilePath
 mkExtraObjToLinkIntoBinary dflags = do
-  when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $ do
+  when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $
      putLogMsg dflags NoReason SevInfo noSrcSpan
          $ withPprStyle defaultUserStyle
          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$

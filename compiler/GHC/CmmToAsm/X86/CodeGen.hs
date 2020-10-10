@@ -1,6 +1,8 @@
-{-# LANGUAGE CPP, GADTs, NondecreasingIndentation #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE TupleSections #-}
 
 #if __GLASGOW_HASKELL__ <= 808
 -- GHC 8.10 deprecates this flag, but GHC 8.8 needs it
@@ -131,7 +133,7 @@ cmmTopCodeGen (CmmProc info lab live graph) = do
       Just picBase -> initializePicBase_x86 ArchX86 os picBase tops
       Nothing -> return tops
 
-cmmTopCodeGen (CmmData sec dat) = do
+cmmTopCodeGen (CmmData sec dat) =
   return [CmmData sec (mkAlignment 1, dat)]  -- no translation, we just use CmmStatic
 
 {- Note [Verifying basic blocks]
@@ -750,11 +752,11 @@ getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad addr _])
 
 getRegister' _ is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
                                      CmmLit displacement])
- | not is32Bit = do
+ | not is32Bit =
       return $ Any II64 (\dst -> unitOL $
         LEA II64 (OpAddr (ripRel (litToImm displacement))) (OpReg dst))
 
-getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
+getRegister' platform is32Bit (CmmMachOp mop [x]) = -- unary MachOps
     case mop of
       MO_F_Neg w  -> sse2NegCode w x
 
@@ -886,7 +888,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                  return (swizzleRegisterRep e_code new_format)
 
 
-getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
+getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
   case mop of
       MO_F_Eq _ -> condFltReg is32Bit EQQ x y
       MO_F_Ne _ -> condFltReg is32Bit NE  x y
@@ -1371,17 +1373,16 @@ x86_complex_amode base index shift offset
 -- (see trivialCode where this function is used for an example).
 
 getNonClobberedOperand :: CmmExpr -> NatM (Operand, InstrBlock)
-getNonClobberedOperand (CmmLit lit) = do
+getNonClobberedOperand (CmmLit lit) =
   if isSuitableFloatingPointLit lit
-    then do
-      let CmmFloat _ w = lit
-      Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
-      return (OpAddr addr, code)
-     else do
-
-  is32Bit <- is32BitPlatform
-  platform <- getPlatform
-  if is32BitLit is32Bit lit && not (isFloatType (cmmLitType platform lit))
+  then do
+    let CmmFloat _ w = lit
+    Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
+    return (OpAddr addr, code)
+  else do
+    is32Bit <- is32BitPlatform
+    platform <- getPlatform
+    if is32BitLit is32Bit lit && not (isFloatType (cmmLitType platform lit))
     then return (OpImm (litToImm lit), nilOL)
     else getNonClobberedOperand_generic (CmmLit lit)
 
@@ -1407,7 +1408,7 @@ getNonClobberedOperand (CmmLoad mem pk) = do
                 else
                    return (src, nilOL)
       return (OpAddr src', mem_code `appOL` save_code)
-    else do
+    else
       -- if its a word or gcptr on 32bit?
       getNonClobberedOperand_generic (CmmLoad mem pk)
 
@@ -1415,8 +1416,8 @@ getNonClobberedOperand e = getNonClobberedOperand_generic e
 
 getNonClobberedOperand_generic :: CmmExpr -> NatM (Operand, InstrBlock)
 getNonClobberedOperand_generic e = do
-    (reg, code) <- getNonClobberedReg e
-    return (OpReg reg, code)
+  (reg, code) <- getNonClobberedReg e
+  return (OpReg reg, code)
 
 amodeCouldBeClobbered :: Platform -> AddrMode -> Bool
 amodeCouldBeClobbered platform amode = any (regClobbered platform) (addrModeRegs amode)
@@ -1795,7 +1796,7 @@ genJump (CmmLoad mem _) regs = do
   Amode target code <- getAmode mem
   return (code `snocOL` JMP (OpAddr target) regs)
 
-genJump (CmmLit lit) regs = do
+genJump (CmmLit lit) regs =
   return (unitOL (JMP (OpImm (litToImm lit)) regs))
 
 genJump expr regs = do

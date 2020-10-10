@@ -1831,7 +1831,6 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
 
        ; return (floated_eqs, res_implic) }
 
-  where
     -- TcLevels must be strictly increasing (see (ImplicInv) in
     -- Note [TcLevel and untouchable type variables] in GHC.Tc.Utils.TcType),
     -- and in fact I think they should always increase one level at a time.
@@ -2245,8 +2244,6 @@ approximateWC float_past_equalities wc
     float_wc trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
       = filterBag (is_floatable trapping_tvs) simples `unionBags`
         concatMapBag (float_implic trapping_tvs) implics
-      where
-
     float_implic :: TcTyCoVarSet -> Implication -> Cts
     float_implic trapping_tvs imp
       | float_past_equalities || ic_no_eqs imp

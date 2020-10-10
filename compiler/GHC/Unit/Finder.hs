@@ -407,28 +407,16 @@ findPackageModule_ hsc_env mod pkg_conf =
 -- -----------------------------------------------------------------------------
 -- General path searching
 
-searchPathExts
-  :: [FilePath]         -- paths to search
-  -> InstalledModule             -- module name
-  -> [ (
-        FileExt,                                -- suffix
-        FilePath -> BaseName -> IO ModLocation  -- action
-       )
-     ]
-  -> IO InstalledFindResult
+searchPathExts :: [FilePath]      -- paths to search
+               -> InstalledModule -- module name
+               -> [ (
+                     FileExt,                                -- suffix
+                     FilePath -> BaseName -> IO ModLocation  -- action
+                    )
+                  ]
+               -> IO InstalledFindResult
 
-searchPathExts paths mod exts
-   = do result <- search to_search
-{-
-        hPutStrLn stderr (showSDoc $
-                vcat [text "Search" <+> ppr mod <+> sep (map (text. fst) exts)
-                    , nest 2 (vcat (map text paths))
-                    , case result of
-                        Succeeded (loc, p) -> text "Found" <+> ppr loc
-                        Failed fs          -> text "not found"])
--}
-        return result
-
+searchPathExts paths mod exts = search to_search
   where
     basename = moduleNameSlashes (moduleName mod)
 
@@ -451,8 +439,8 @@ searchPathExts paths mod exts
 
 mkHomeModLocationSearched :: DynFlags -> ModuleName -> FileExt
                           -> FilePath -> BaseName -> IO ModLocation
-mkHomeModLocationSearched dflags mod suff path basename = do
-   mkHomeModLocation2 dflags mod (path </> basename) suff
+mkHomeModLocationSearched dflags mod suff path basename =
+  mkHomeModLocation2 dflags mod (path </> basename) suff
 
 -- -----------------------------------------------------------------------------
 -- Constructing a home module location

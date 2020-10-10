@@ -1019,7 +1019,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
         traceTR (text "Constr1" <+> ppr dcname)
         (mb_dc, _) <- tryTc (tcLookupDataCon dcname)
         case mb_dc of
-          Nothing-> do
+          Nothing->
             forM pArgs $ \x -> do
               tv <- newVar liftedTypeKind
               return (tv, x)

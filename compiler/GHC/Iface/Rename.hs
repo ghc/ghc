@@ -103,7 +103,7 @@ failWithRn doc = do
 -- when loading an interface to merge it into a requirement.)
 rnModIface :: HscEnv -> [(ModuleName, Module)] -> Maybe NameShape
            -> ModIface -> IO (Either ErrorMessages ModIface)
-rnModIface hsc_env insts nsubst iface = do
+rnModIface hsc_env insts nsubst iface =
     initRnIface hsc_env iface insts nsubst $ do
         mod <- rnModule (mi_module iface)
         sig_of <- case mi_sig_of iface of

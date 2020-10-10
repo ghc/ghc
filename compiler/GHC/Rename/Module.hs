@@ -449,8 +449,8 @@ checkCanonicalInstances cls poly_ty mbinds = do
     --  * Warn if '(*>)' is defined backwards (i.e. @(*>) = (>>)@).
     --
     checkCanonicalMonadInstances refURL
-      | cls == applicativeClassName  = do
-          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
+      | cls == applicativeClassName =
+          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
@@ -464,8 +464,8 @@ checkCanonicalInstances cls poly_ty mbinds = do
 
                   _ -> return ()
 
-      | cls == monadClassName  = do
-          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
+      | cls == monadClassName =
+          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
@@ -495,8 +495,8 @@ checkCanonicalInstances cls poly_ty mbinds = do
     --  * Warn if '(<>)' is defined backwards (i.e. @(<>) = mappend@).
     --
     checkCanonicalMonoidInstances refURL
-      | cls == semigroupClassName  = do
-          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
+      | cls == semigroupClassName =
+          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $
               case mbind of
                   FunBind { fun_id      = L _ name
                           , fun_matches = mg }
@@ -506,8 +506,8 @@ checkCanonicalInstances cls poly_ty mbinds = do
 
                   _ -> return ()
 
-      | cls == monoidClassName  = do
-          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
+      | cls == monoidClassName =
+          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
@@ -531,7 +531,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG _ = Nothing
 
     -- got "lhs = rhs" but expected something different
-    addWarnNonCanonicalMethod1 refURL flag lhs rhs = do
+    addWarnNonCanonicalMethod1 refURL flag lhs rhs =
         addWarn (Reason flag) $ vcat
                        [ text "Noncanonical" <+>
                          quotes (text (lhs ++ " = " ++ rhs)) <+>
@@ -545,7 +545,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
                        ]
 
     -- expected "lhs = rhs" but got something else
-    addWarnNonCanonicalMethod2 refURL flag lhs rhs = do
+    addWarnNonCanonicalMethod2 refURL flag lhs rhs =
         addWarn (Reason flag) $ vcat
                        [ text "Noncanonical" <+>
                          quotes (text lhs) <+>

@@ -27,7 +27,7 @@ import GHC.Platform
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsLExpr, dsSyntaxExpr)
 
-import GHC.Types.Basic ( Origin(..) )
+import GHC.Types.Basic ( Origin(..), isGenerated, Boxity(..) )
 import GHC.Types.SourceText
 import GHC.Driver.Session
 import GHC.Hs
@@ -61,7 +61,6 @@ import GHC.Utils.Misc
 import GHC.Types.Name
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.Basic ( isGenerated, Boxity(..) )
 import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
@@ -409,7 +408,7 @@ tidyEqnInfo _ (EqnInfo { eqn_pats = [] })
 
 tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats, eqn_orig = orig })
   = do { (wrap, pat') <- tidy1 v orig pat
-       ; return (wrap, eqn { eqn_pats = do pat' : pats }) }
+       ; return (wrap, eqn { eqn_pats = pat' : pats }) }
 
 tidy1 :: Id                  -- The Id being scrutinised
       -> Origin              -- Was this a pattern the user wrote?

@@ -49,7 +49,7 @@ instance Binary ExtensibleFields where
     n <- get bh :: IO Int
 
     -- Get the names and field pointers:
-    header_entries <- replicateM n $ do
+    header_entries <- replicateM n $
       (,) <$> get bh <*> get bh
 
     -- Seek to and get each field's payload:

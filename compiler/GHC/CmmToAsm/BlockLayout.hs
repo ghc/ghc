@@ -475,7 +475,6 @@ combineNeighbourhood edges chains
                  applyEdges edges newEnds newFronts (Set.insert (from,to) combined)
             | otherwise
             = applyEdges edges chainEnds chainFronts combined
-         where
 
         getFronts chain = takeL neighbourOverlapp chain
         getEnds chain = takeR neighbourOverlapp chain
@@ -588,19 +587,14 @@ buildChains edges blocks
         , Just predChain <- mapLookup from chainEnds
         , Just succChain <- mapLookup to chainStarts
         , predChain /= succChain -- Otherwise we try to create a cycle.
-        = do
-            -- pprTraceM "Fusing edge" (ppr edge)
-            fuseChain predChain succChain
+          = fuseChain predChain succChain
 
         | (alreadyPlaced from) &&
           (alreadyPlaced to)
-        =   --pprTraceM "Skipping:" (ppr edge) >>
-            buildNext placed chainStarts chainEnds todo linked
+          = buildNext placed chainStarts chainEnds todo linked
 
         | otherwise
-        = do -- pprTraceM "Finding chain for:" (ppr edge $$
-             --         text "placed" <+> ppr placed)
-             findChain
+          = findChain
       where
         from = edgeFrom edge
         to   = edgeTo   edge

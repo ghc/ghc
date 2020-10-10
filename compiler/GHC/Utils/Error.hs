@@ -1,6 +1,5 @@
 {-# LANGUAGE BangPatterns    #-}
 {-# LANGUAGE CPP             #-}
-{-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE RankNTypes      #-}
 
 {-
@@ -122,10 +121,6 @@ getInvalids vs = [d | NotValid d <- vs]
 orValid :: Validity -> Validity -> Validity
 orValid IsValid _ = IsValid
 orValid _       v = v
-
--- -----------------------------------------------------------------------------
--- Basic error messages: just render a message with a source location.
-
 
 -- -----------------------------------------------------------------------------
 -- Collecting up messages for later ordering and printing.
@@ -536,42 +531,42 @@ withTiming' :: MonadIO m
             -> m a          -- ^ The body of the phase to be timed
             -> m a
 withTiming' dflags what force_result prtimings action
-  = do if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
-          then do whenPrintTimings $
-                    logInfo dflags $ withPprStyle defaultUserStyle $
-                      text "***" <+> what <> colon
-                  let ctx = initDefaultSDocContext dflags
-                  eventBegins ctx what
-                  alloc0 <- liftIO getAllocationCounter
-                  start <- liftIO getCPUTime
-                  !r <- action
-                  () <- pure $ force_result r
-                  eventEnds ctx what
-                  end <- liftIO getCPUTime
-                  alloc1 <- liftIO getAllocationCounter
-                  -- recall that allocation counter counts down
-                  let alloc = alloc0 - alloc1
-                      time = realToFrac (end - start) * 1e-9
+  = if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
+    then do whenPrintTimings $
+              logInfo dflags $ withPprStyle defaultUserStyle $
+                text "***" <+> what <> colon
+            let ctx = initDefaultSDocContext dflags
+            eventBegins ctx what
+            alloc0 <- liftIO getAllocationCounter
+            start <- liftIO getCPUTime
+            !r <- action
+            () <- pure $ force_result r
+            eventEnds ctx what
+            end <- liftIO getCPUTime
+            alloc1 <- liftIO getAllocationCounter
+            -- recall that allocation counter counts down
+            let alloc = alloc0 - alloc1
+                time = realToFrac (end - start) * 1e-9
 
-                  when (verbosity dflags >= 2 && prtimings == PrintTimings)
-                      $ liftIO $ logInfo dflags $ withPprStyle defaultUserStyle
-                          (text "!!!" <+> what <> colon <+> text "finished in"
-                           <+> doublePrec 2 time
-                           <+> text "milliseconds"
-                           <> comma
-                           <+> text "allocated"
-                           <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
-                           <+> text "megabytes")
+            when (verbosity dflags >= 2 && prtimings == PrintTimings)
+                $ liftIO $ logInfo dflags $ withPprStyle defaultUserStyle
+                    (text "!!!" <+> what <> colon <+> text "finished in"
+                     <+> doublePrec 2 time
+                     <+> text "milliseconds"
+                     <> comma
+                     <+> text "allocated"
+                     <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
+                     <+> text "megabytes")
 
-                  whenPrintTimings $
-                      dumpIfSet_dyn dflags Opt_D_dump_timings "" FormatText
-                          $ text $ showSDocOneLine ctx
-                          $ hsep [ what <> colon
-                                 , text "alloc=" <> ppr alloc
-                                 , text "time=" <> doublePrec 3 time
-                                 ]
-                  pure r
-           else action
+            whenPrintTimings $
+                dumpIfSet_dyn dflags Opt_D_dump_timings "" FormatText
+                    $ text $ showSDocOneLine ctx
+                    $ hsep [ what <> colon
+                           , text "alloc=" <> ppr alloc
+                           , text "time=" <> doublePrec 3 time
+                           ]
+            pure r
+     else action
 
     where whenPrintTimings = liftIO . when (prtimings == PrintTimings)
           eventBegins ctx w = do
@@ -776,8 +771,8 @@ type TraceAction = forall a. DynFlags -> String -> SDoc -> a -> a
 
 -- | Default action for 'dumpAction' hook
 defaultDumpAction :: DumpAction
-defaultDumpAction dflags sty dumpOpt title _fmt doc = do
-   dumpSDocWithStyle sty dflags dumpOpt title doc
+defaultDumpAction dflags sty dumpOpt title _fmt doc =
+  dumpSDocWithStyle sty dflags dumpOpt title doc
 
 -- | Default action for 'traceAction' hook
 defaultTraceAction :: TraceAction

@@ -73,7 +73,7 @@ cmmTopCodeGen (CmmProc info lab live graph)
 
       return tops
 
-cmmTopCodeGen (CmmData sec dat) = do
+cmmTopCodeGen (CmmData sec dat) =
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
 
@@ -430,8 +430,8 @@ genCCall target dest_regs args
 
                 PrimTarget mop
                  -> do  res     <- outOfLineMachOp mop
-                        lblOrMopExpr <- case res of
-                                Left lbl -> do
+                        case res of
+                                Left lbl ->
                                         return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
 
                                 Right mopExpr -> do
@@ -440,8 +440,6 @@ genCCall target dest_regs args
                                                       [dyn_r'] -> dyn_r'
                                                       _ -> panic "SPARC.CodeGen.genCCall: arg_to_int"
                                         return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
-
-                        return lblOrMopExpr
 
         let argcode = concatOL argcodes
 

@@ -267,7 +267,7 @@ testRedSets :: RedSets -> DsM (Bool, Bool, OrdList SrcInfo)
 testRedSets RedSets { rs_cov = cov, rs_div = div, rs_bangs = bangs } = do
   is_covered  <- isInhabited cov
   may_diverge <- isInhabited div
-  red_bangs   <- flip mapMaybeM (fromOL bangs) $ \(nablas, bang) -> do
+  red_bangs   <- flip mapMaybeM (fromOL bangs) $ \(nablas, bang) ->
     isInhabited nablas >>= \case
       True  -> pure Nothing
       False -> pure (Just bang)
@@ -351,14 +351,14 @@ reportWarnings dflags ctx@(DsMatchContext kind loc) vars
       when (approx && (exists_u || exists_i)) $
         putSrcSpanDs loc (warnDs NoReason approx_msg)
 
-      when exists_b $ forM_ redundant_bangs $ \(SrcInfo (L l q)) -> do
+      when exists_b $ forM_ redundant_bangs $ \(SrcInfo (L l q)) ->
         putSrcSpanDs l (warnDs (Reason Opt_WarnRedundantBangPatterns)
                                (pprEqn q "has redundant bang"))
 
-      when exists_r $ forM_ redundant_rhss $ \(SrcInfo (L l q)) -> do
+      when exists_r $ forM_ redundant_rhss $ \(SrcInfo (L l q)) ->
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "is redundant"))
-      when exists_i $ forM_ inaccessible_rhss $ \(SrcInfo (L l q)) -> do
+      when exists_i $ forM_ inaccessible_rhss $ \(SrcInfo (L l q)) ->
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
 

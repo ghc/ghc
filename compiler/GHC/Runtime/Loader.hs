@@ -80,8 +80,7 @@ initializePlugins hsc_env df
   | otherwise
   = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
        let df' = df { cachedPlugins = loadedPlugins }
-       df'' <- withPlugins df' runDflagsPlugin df'
-       return df''
+       withPlugins df' runDflagsPlugin df'
 
   where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
         runDflagsPlugin p opts dynflags = dynflagsPlugin p opts dynflags

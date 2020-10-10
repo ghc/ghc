@@ -188,18 +188,18 @@ barrierUnless exs = do
         else barrier
 
 -- | Foreign Calls
-genCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
-              -> LlvmM StmtData
+genCall :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> LlvmM StmtData
 
 -- Barriers need to be handled specially as they are implemented as LLVM
 -- intrinsic functions.
 genCall (PrimTarget MO_ReadBarrier) _ _ =
     barrierUnless [ArchX86, ArchX86_64, ArchSPARC]
-genCall (PrimTarget MO_WriteBarrier) _ _ = do
+
+genCall (PrimTarget MO_WriteBarrier) _ _ =
     barrierUnless [ArchX86, ArchX86_64, ArchSPARC]
 
-genCall (PrimTarget MO_Touch) _ _
- = return (nilOL, [])
+genCall (PrimTarget MO_Touch) _ _ =
+    return (nilOL, [])
 
 genCall (PrimTarget (MO_UF_Conv w)) [dst] [e] = runStmtsDecls $ do
     dstV <- getCmmRegW (CmmLocal dst)
@@ -514,9 +514,8 @@ genCall target res args = do
 
     -- make the actual call
     case retTy of
-        LMVoid -> do
+        LMVoid ->
             statement $ Expr $ Call ccTy fptr argVars fnAttrs
-
         _ -> do
             v1 <- doExprW retTy $ Call ccTy fptr argVars fnAttrs
             -- get the return register
@@ -1559,9 +1558,8 @@ genMachOp_slow opt op [x, y] = case op of
             vx <- exprToVarW x
             vy <- exprToVarW y
             if getVarType vx == getVarType vy
-                then do
+                then
                     doExprW (ty vx) $ binOp vx vy
-
                 else do
                     -- Error. Continue anyway so we can debug the generated ll file.
                     dflags <- getDynFlags
@@ -1717,19 +1715,19 @@ genLoad_slow atomic e ty meta = do
   runExprData $ do
     iptr <- exprToVarW e
     case getVarType iptr of
-         LMPointer _ -> do
+        LMPointer _ ->
                     doExprW (cmmToLlvmType ty) (MExpr meta $ loadInstr iptr)
 
-         i@(LMInt _) | i == llvmWord platform -> do
+        i@(LMInt _) | i == llvmWord platform -> do
                     let pty = LMPointer $ cmmToLlvmType ty
                     ptr <- doExprW pty $ Cast LM_Inttoptr iptr pty
                     doExprW (cmmToLlvmType ty) (MExpr meta $ loadInstr ptr)
 
-         other -> do pprPanic "exprToVar: CmmLoad expression is not right type!"
-                        (PprCmm.pprExpr platform e <+> text (
-                            "Size of Ptr: " ++ show (llvmPtrBits platform) ++
-                            ", Size of var: " ++ show (llvmWidthInBits platform other) ++
-                            ", Var: " ++ showSDoc dflags (ppVar opts iptr)))
+        other -> pprPanic "exprToVar: CmmLoad expression is not right type!"
+                     (PprCmm.pprExpr platform e <+> text (
+                         "Size of Ptr: " ++ show (llvmPtrBits platform) ++
+                         ", Size of var: " ++ show (llvmWidthInBits platform other) ++
+                         ", Var: " ++ showSDoc dflags (ppVar opts iptr)))
   where
     loadInstr ptr | atomic    = ALoad SyncSeqCst False ptr
                   | otherwise = Load ptr

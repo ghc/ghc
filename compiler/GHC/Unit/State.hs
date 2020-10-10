@@ -715,7 +715,7 @@ readUnitDatabase printer cfg conf_file = do
                           <+> text conf_dir <> text ", treating"
                           <+> text "package database as empty"
               return []
-            else do
+            else
               throwGhcExceptionIO $ InstallationError $
                 "there is no package.cache in " ++ conf_dir ++
                 " even though package database is not empty"

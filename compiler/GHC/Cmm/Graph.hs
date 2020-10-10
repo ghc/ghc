@@ -250,10 +250,10 @@ mkCallReturnsTo :: Profile -> CmmExpr -> Convention -> [CmmExpr]
                 -> UpdFrameOffset
                 -> [CmmExpr]
                 -> CmmAGraph
-mkCallReturnsTo profile f callConv actuals ret_lbl ret_off updfr_off extra_stack = do
+mkCallReturnsTo profile f callConv actuals ret_lbl ret_off updfr_off extra_stack =
   lastWithArgsAndExtraStack profile Call (Young ret_lbl) callConv actuals
-     updfr_off extra_stack $
-       toCall f (Just ret_lbl) updfr_off ret_off
+    updfr_off extra_stack $
+      toCall f (Just ret_lbl) updfr_off ret_off
 
 -- Like mkCallReturnsTo, but does not push the return address (it is assumed to be
 -- already on the stack).
@@ -262,9 +262,9 @@ mkJumpReturnsTo :: Profile -> CmmExpr -> Convention -> [CmmExpr]
                 -> ByteOff
                 -> UpdFrameOffset
                 -> CmmAGraph
-mkJumpReturnsTo profile f callConv actuals ret_lbl ret_off updfr_off  = do
+mkJumpReturnsTo profile f callConv actuals ret_lbl ret_off updfr_off =
   lastWithArgs profile JumpRet (Young ret_lbl) callConv actuals updfr_off $
-       toCall f (Just ret_lbl) updfr_off ret_off
+    toCall f (Just ret_lbl) updfr_off ret_off
 
 mkUnsafeCall  :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> CmmAGraph
 mkUnsafeCall t fs as = mkMiddle $ CmmUnsafeForeignCall t fs as

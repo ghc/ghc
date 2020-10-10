@@ -203,7 +203,7 @@ runSomethingFiltered
   :: DynFlags -> (String->String) -> String -> String -> [Option]
   -> Maybe FilePath -> Maybe [(String,String)] -> IO ()
 
-runSomethingFiltered dflags filter_fn phase_name pgm args mb_cwd mb_env = do
+runSomethingFiltered dflags filter_fn phase_name pgm args mb_cwd mb_env =
     runSomethingWith dflags phase_name pgm args $ \real_args -> do
         r <- builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env
         return (r,())
@@ -325,12 +325,12 @@ readerProc chan hdl filter_fn =
         loop (l:ls) in_err     =
                 case in_err of
                   Just err@(BuildError srcLoc msg)
-                    | leading_whitespace l -> do
+                    | leading_whitespace l ->
                         loop ls (Just (BuildError srcLoc (msg $$ text l)))
                     | otherwise -> do
                         writeChan chan err
                         checkError l ls
-                  Nothing -> do
+                  Nothing ->
                         checkError l ls
                   _ -> panic "readerProc/loop"
 

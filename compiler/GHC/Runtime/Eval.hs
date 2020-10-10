@@ -1,5 +1,7 @@
-{-# LANGUAGE CPP, MagicHash, RecordWildCards, BangPatterns #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -436,7 +438,7 @@ resumeExec canLogSpan step
                  , resumeBindings = bindings, resumeFinalIds = final_ids
                  , resumeApStack = apStack, resumeBreakInfo = mb_brkpt
                  , resumeSpan = span
-                 , resumeHistory = hist } -> do
+                 , resumeHistory = hist } ->
                withVirtualCWD $ do
                 status <- liftIO $ GHCi.resumeStmt hsc_env (isStep step) fhv
                 let prevHistoryLst = fromListBL 50 hist
@@ -630,8 +632,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
            [id | id <- tmp_ids
                , not $ noSkolems id
                , (occNameFS.nameOccName.idName) id /= result_fs]
-   hsc_env' <- foldM improveTypes hsc_env (map idName incompletelyTypedIds)
-   return hsc_env'
+   foldM improveTypes hsc_env (map idName incompletelyTypedIds)
     where
      noSkolems = noFreeVarsOfType . idType
      improveTypes hsc_env@HscEnv{hsc_IC=ic} name = do
@@ -870,7 +871,7 @@ getInfo allInfo name
 
 -- | Returns all names in scope in the current interactive context
 getNamesInScope :: GhcMonad m => m [Name]
-getNamesInScope = withSession $ \hsc_env -> do
+getNamesInScope = withSession $ \hsc_env ->
   return (map gre_name (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
 
 -- | Returns all 'RdrName's in scope in the current interactive
@@ -917,7 +918,7 @@ isImport pflags stmt =
 
 -- | Returns @True@ if passed string is a declaration but __/not a splice/__.
 isDecl :: ParserOpts -> String -> Bool
-isDecl pflags stmt = do
+isDecl pflags stmt =
   case parseThing Parser.parseDeclaration pflags stmt of
     Lexer.POk _ thing ->
       case unLoc thing of
@@ -1011,7 +1012,7 @@ exprType mode expr = withSession $ \hsc_env -> do
 
 -- | Get the kind of a  type
 typeKind  :: GhcMonad m => Bool -> String -> m (Type, Kind)
-typeKind normalise str = withSession $ \hsc_env -> do
+typeKind normalise str = withSession $ \hsc_env ->
    liftIO $ hscKcType hsc_env normalise str
 
 -- ----------------------------------------------------------------------------
@@ -1062,8 +1063,8 @@ typeKind normalise str = withSession $ \hsc_env -> do
 
 -- Find all instances that match a provided type
 getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
-getInstancesForType ty = withSession $ \hsc_env -> do
-  liftIO $ runInteractiveHsc hsc_env $ do
+getInstancesForType ty = withSession $ \hsc_env ->
+  liftIO $ runInteractiveHsc hsc_env $
     ioMsgMaybe $ runTcInteractive hsc_env $ do
       -- Bring class and instances from unqualified modules into scope, this fixes #16793.
       loadUnqualIfaces hsc_env (hsc_IC hsc_env)
@@ -1204,7 +1205,7 @@ checkForExistence clsInst mb_inst_tys = do
 -- | Parse an expression, the parsed expression can be further processed and
 -- passed to compileParsedExpr.
 parseExpr :: GhcMonad m => String -> m (LHsExpr GhcPs)
-parseExpr expr = withSession $ \hsc_env -> do
+parseExpr expr = withSession $ \hsc_env ->
   liftIO $ runInteractiveHsc hsc_env $ hscParseExpr expr
 
 -- | Compile an expression, run it, and deliver the resulting HValue.
