@@ -8,6 +8,7 @@
 module GHC.Stack.CloneStack (
   cloneThreadStack,
   cloneMyStack,
+  printStack,
   StackSnapshot(..)
   ) where
 
@@ -18,6 +19,8 @@ import GHC.Stable
 import GHC.IO (IO(..))
 
 foreign import ccall "sendCloneStackMessage" sendCloneStackMessage :: ThreadId# -> StablePtr PrimMVar -> IO ()
+
+foreign import ccall "PrinterAPI.h printStack" printStack_c :: StackSnapshot# -> IO ()
 
 data StackSnapshot = StackSnapshot StackSnapshot#
 
@@ -50,3 +53,7 @@ cloneThreadStack (ThreadId tid#) = do
 cloneMyStack :: IO StackSnapshot
 cloneMyStack = IO $ \s ->
    case (cloneMyStack# s) of (# s1, stack #) -> (# s1, StackSnapshot stack #)
+
+-- | Print the stack
+printStack :: StackSnapshot -> IO ()
+printStack (StackSnapshot stack) = printStack_c stack

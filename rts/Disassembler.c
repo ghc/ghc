@@ -8,8 +8,6 @@
  * $Date: 2004/09/03 15:28:19 $
  * ---------------------------------------------------------------------------*/
 
-#if defined(DEBUG)
-
 #include "PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
@@ -358,5 +356,3 @@ void disassemble( StgBCO *bco )
 
    debugBelch("\n");
 }
-
-#endif /* DEBUG */
