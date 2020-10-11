@@ -41,7 +41,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs   ( tyCoVarsOfCoList, tyCoFVsOfTypes )
 import GHC.Core.TyCo.Subst ( mkTvSubst )
-import GHC.Core.Map
+import GHC.Core.Map.Type
 import GHC.Utils.FV( FV, fvVarSet, fvVarList )
 import GHC.Utils.Misc
 import GHC.Data.Pair

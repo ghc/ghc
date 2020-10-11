@@ -103,6 +103,7 @@ import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
 import Data.Maybe (fromMaybe)
 import GHC.Core.Map
+import GHC.Data.TrieMap
 import GHC.Types.Name.Env
 import Control.Monad( (>=>) )
 
