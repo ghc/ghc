@@ -45,7 +45,7 @@ import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Builtin.Types ( eqTyConName, listTyConName, liftedTypeKindTyConName
                   , unitTy, promotedNilDataCon, promotedConsDataCon )
 import GHC.Builtin.Names ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
-                 , liftedRepDataConKey )
+                 , liftedDataConKey, boxedRepDataConKey )
 import GHC.Types.Unique ( getUnique )
 import GHC.Utils.Misc ( chkAppend, debugIsOn, dropList, equalLength
                       , filterByList, filterOut )
@@ -575,8 +575,9 @@ synifyType _ vs (TyConApp tc tys)
     res_ty
       -- Use */# instead of TYPE 'Lifted/TYPE 'Unlifted (#473)
       | tc `hasKey` tYPETyConKey
-      , [TyConApp lev []] <- tys
-      , lev `hasKey` liftedRepDataConKey
+      , [TyConApp rep [TyConApp lev []]] <- tys
+      , rep `hasKey` boxedRepDataConKey
+      , lev `hasKey` liftedDataConKey
       = noLoc (HsTyVar noExtField NotPromoted (noLoc liftedTypeKindTyConName))
       -- Use non-prefix tuple syntax where possible, because it looks nicer.
       | Just sort <- tyConTuple_maybe tc
