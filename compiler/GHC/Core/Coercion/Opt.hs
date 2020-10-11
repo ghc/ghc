@@ -27,7 +27,6 @@ import GHC.Types.Var.Env
 import GHC.Data.Pair
 import GHC.Data.List.SetOps ( getNth )
 import GHC.Core.Unify
-import GHC.Core.InstEnv
 import Control.Monad   ( zipWithM )
 
 import GHC.Utils.Outputable
@@ -1006,7 +1005,7 @@ checkAxInstCo (AxiomInstCo ax ind cos)
     check_no_conflict _    [] = Nothing
     check_no_conflict flat (b@CoAxBranch { cab_lhs = lhs_incomp } : rest)
          -- See Note [Apartness] in GHC.Core.FamInstEnv
-      | SurelyApart <- tcUnifyTysFG instanceBindFun flat lhs_incomp
+      | SurelyApart <- tcUnifyTysFG (const BindMe) flat lhs_incomp
       = check_no_conflict flat rest
       | otherwise
       = Just b
