@@ -1128,8 +1128,8 @@ flatten_one (AppTy ty1 ty2)
 flatten_one ty@(TyConApp tc tys)
   -- Expand type synonyms that mention type families
   -- on the RHS; see Note [Flattening synonyms]
-  | isForgetfulSynTyCon tc
-  , Just expanded_ty <- tcView ty  -- should always succeed
+  | isForgetfulSynTyCon tc || not (isFamFreeTyCon tc)
+  , Just expanded_ty <- tcView ty
   = flatten_one expanded_ty
 
   -- Otherwise, it's a type function application, and we have to
@@ -1312,6 +1312,9 @@ synonyms, but not others.
 
 One nice consequence is that we never have to occCheckExpand flattened
 types, as any forgetful synonyms are already expanded.
+
+We also, of course, must expand type synonyms that mention type families,
+so those families can get reduced.
 
 Note [Flattening under a forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
