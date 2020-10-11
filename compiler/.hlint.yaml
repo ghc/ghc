@@ -14,3 +14,5 @@
 - warn: {name: Use fewer imports}
 - warn: {name: Redundant as-pattern}
 - warn: {name: Redundant where}
+
+- ignore: {name: Redundant do, within: [GHC.SysTools.Terminal]}

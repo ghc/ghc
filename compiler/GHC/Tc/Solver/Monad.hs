@@ -3615,8 +3615,7 @@ emitNewDerivedEq loc role ty1 ty2
 
 newDerivedNC :: CtLoc -> TcPredType -> TcS CtEvidence
 newDerivedNC loc pred
-  = do { -- checkReductionDepth loc pred
-       ; return (CtDerived { ctev_pred = pred, ctev_loc = loc }) }
+  = CtDerived { ctev_pred = pred, ctev_loc = loc }
 
 -- --------- Check done in GHC.Tc.Solver.Interact.selectNewWorkItem???? ---------
 -- | Checks if the depth of the given location is too much. Fails if

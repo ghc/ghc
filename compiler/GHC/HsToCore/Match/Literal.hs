@@ -105,7 +105,7 @@ dsLit l = do
     HsString _ str   -> mkStringExprFS str
     HsInteger _ i _  -> return (mkIntegerExpr i)
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
-    HsRat _ (FL _ _ val) ty -> do
+    HsRat _ (FL _ _ val) ty ->
       return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
       where
         num   = mkIntegerExpr (numerator val)
@@ -223,7 +223,7 @@ warnAboutOverflowedLiterals dflags lit
 
     checkPositive :: Integer -> Name -> DsM ()
     checkPositive i tc
-      = when (i < 0) $ do
+      = when (i < 0) $
         warnDs (Reason Opt_WarnOverflowedLiterals)
                (vcat [ text "Literal" <+> integer i
                        <+> text "is negative but" <+> ppr tc
@@ -232,7 +232,7 @@ warnAboutOverflowedLiterals dflags lit
 
     check :: forall a. (Bounded a, Integral a) => Integer -> Name -> Proxy a -> DsM ()
     check i tc _proxy
-      = when (i < minB || i > maxB) $ do
+      = when (i < minB || i > maxB) $
         warnDs (Reason Opt_WarnOverflowedLiterals)
                (vcat [ text "Literal" <+> integer i
                        <+> text "is out of the" <+> ppr tc <+> ptext (sLit "range")

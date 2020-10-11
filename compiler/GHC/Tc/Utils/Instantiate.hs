@@ -44,7 +44,7 @@ import GHC.Prelude
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType, unifyKind )
 
-import GHC.Types.Basic ( IntegralLit(..), SourceText(..) )
+import GHC.Types.Basic ( IntegralLit (..), SourceText (..), TypeOrKind (..) )
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
@@ -79,7 +79,6 @@ import GHC.Driver.Session
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
-import GHC.Types.Basic ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.State
 
