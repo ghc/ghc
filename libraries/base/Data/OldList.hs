@@ -547,19 +547,57 @@ intercalate xs xss = concat (intersperse xs xss)
 --
 -- >>> transpose [[10,11],[20],[],[30,31,32]]
 -- [[10,20,30],[11,31],[32]]
-transpose               :: [[a]] -> [[a]]
-transpose []             = []
-transpose ([]   : xss)   = transpose xss
-transpose ((x:xs) : xss) = (x : hds) : transpose (xs : tls)
+transpose :: [[a]] -> [[a]]
+transpose [] = []
+transpose ([] : xss) = transpose xss
+transpose ((x : xs) : xss) = combine x hds xs tls
   where
     -- We tie the calculations of heads and tails together
     -- to prevent heads from leaking into tails and vice versa.
     -- unzip makes the selector thunk arrangements we need to
     -- ensure everything gets cleaned up properly.
-    (hds, tls) = unzip [(hd, tl) | (hd:tl) <- xss]
+    (hds, tls) = unzip [(hd, tl) | hd : tl <- xss]
+    combine y h ys t = (y:h) : transpose (ys:t)
+    {-# NOINLINE combine #-}
+  {- Implementation note:
+  If the bottom part of the function was written as such:
+
+  ```
+  transpose ((x : xs) : xss) = (x:hds) : transpose (xs:tls)
+  where
+    (hds,tls) = hdstls
+    hdstls = unzip [(hd, tl) | hd : tl <- xss]
+    {-# NOINLINE hdstls #-}
+  ```
+  Here are the steps that would take place:
+
+  1. We allocate a thunk, `hdstls`, representing the result of unzipping.
+  2. We allocate selector thunks, `hds` and `tls`, that deconstruct `hdstls`.
+  3. Install `hds` as the tail of the result head and pass `xs:tls` to
+     the recursive call in the result tail.
+
+  Once optimised, this code would amount to:
+
+  ```
+  transpose ((x : xs) : xss) = (x:hds) : (let tls = snd hdstls in transpose (xs:tls))
+  where
+    hds = fst hdstls
+    hdstls = unzip [(hd, tl) | hd : tl <- xss]
+    {-# NOINLINE hdstls #-}
+  ```
+
+  In particular, GHC does not produce the `tls` selector thunk immediately;
+  rather, it waits to do so until the tail of the result is actually demanded.
+  So when `hds` is demanded, that does not resolve `snd hdstls`; the tail of the
+  result keeps `hdstls` alive.
+
+  By writing `combine` and making it NOINLINE, we prevent GHC from delaying
+  the selector thunk allocation, requiring that `hds` and `tls` are actually
+  allocated to be passed to `combine`.
+  -}
 
 
--- | The 'partition' function takes a predicate a list and returns
+-- | The 'partition' function takes a predicate and a list, and returns
 -- the pair of lists of elements which do and do not satisfy the
 -- predicate, respectively; i.e.,
 --
