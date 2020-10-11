@@ -3,7 +3,7 @@
 #include "rts/Messages.h"
 
 
-void checkClonedStack(StgStack *clonedStack, StgTSO *tso) {
+void expectStacksToBeEqual(StgStack *clonedStack, StgTSO *tso) {
     StgStack *liveStack = tso->stackobj;
 
     if(liveStack->header.info != clonedStack->header.info){

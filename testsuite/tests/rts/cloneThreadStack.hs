@@ -8,7 +8,7 @@ import GHC.Stack.CloneStack
 import Control.Concurrent
 import GHC.Conc
 
-foreign import ccall "checkClonedStack" checkClonedStack:: StackSnapshot# -> ThreadId# -> IO ()
+foreign import ccall "expectStacksToBeEqual" expectStacksToBeEqual:: StackSnapshot# -> ThreadId# -> IO ()
 
 main :: IO ()
 main = do
@@ -21,7 +21,7 @@ main = do
 
     let (StackSnapshot stack) = stackSnapshot
     let (ThreadId tid#) = threadId
-    checkClonedStack stack tid#
+    expectStacksToBeEqual stack tid#
 
 immediatelyBlocking :: MVar Int -> IO ()
 immediatelyBlocking mVarToBeBlockedOn = do
