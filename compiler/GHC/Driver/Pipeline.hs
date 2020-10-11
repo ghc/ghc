@@ -1,4 +1,8 @@
-{-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns, MultiWayIf #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -201,7 +205,7 @@ compileOne' m_tc_result mHscMessage
             in return $! HomeModInfo iface hmi_details mb_linkable
         (HscNotGeneratingCode _ _, _) -> panic "compileOne HscNotGeneratingCode"
         (_, NoBackend) -> panic "compileOne NoBackend"
-        (HscUpdateBoot iface hmi_details, Interpreter) -> do
+        (HscUpdateBoot iface hmi_details, Interpreter) ->
             return $! HomeModInfo iface hmi_details Nothing
         (HscUpdateBoot iface hmi_details, _) -> do
             touchObjectFile dflags object_filename
@@ -1065,31 +1069,30 @@ runPhase (RealPhase (Cpp sf)) input_fn dflags0
 -- HsPp phase
 
 runPhase (RealPhase (HsPp sf)) input_fn dflags
-  = do
-       if not (gopt Opt_Pp dflags) then
-           -- no need to preprocess, just pass input file along
-           -- to the next phase of the pipeline.
-          return (RealPhase (Hsc sf), input_fn)
-        else do
-            PipeEnv{src_basename, src_suffix} <- getPipeEnv
-            let orig_fn = src_basename <.> src_suffix
-            output_fn <- phaseOutputFilename (Hsc sf)
-            liftIO $ GHC.SysTools.runPp dflags
-                           ( [ GHC.SysTools.Option     orig_fn
-                             , GHC.SysTools.Option     input_fn
-                             , GHC.SysTools.FileOption "" output_fn
-                             ]
-                           )
+  = if not (gopt Opt_Pp dflags) then
+      -- no need to preprocess, just pass input file along
+      -- to the next phase of the pipeline.
+       return (RealPhase (Hsc sf), input_fn)
+    else do
+        PipeEnv{src_basename, src_suffix} <- getPipeEnv
+        let orig_fn = src_basename <.> src_suffix
+        output_fn <- phaseOutputFilename (Hsc sf)
+        liftIO $ GHC.SysTools.runPp dflags
+                       ( [ GHC.SysTools.Option     orig_fn
+                         , GHC.SysTools.Option     input_fn
+                         , GHC.SysTools.FileOption "" output_fn
+                         ]
+                       )
 
-            -- re-read pragmas now that we've parsed the file (see #3674)
-            src_opts <- liftIO $ getOptionsFromFile dflags output_fn
-            (dflags1, unhandled_flags, warns)
-                <- liftIO $ parseDynamicFilePragma dflags src_opts
-            setDynFlags dflags1
-            liftIO $ checkProcessArgsResult dflags1 unhandled_flags
-            liftIO $ handleFlagWarnings dflags1 warns
+        -- re-read pragmas now that we've parsed the file (see #3674)
+        src_opts <- liftIO $ getOptionsFromFile dflags output_fn
+        (dflags1, unhandled_flags, warns)
+            <- liftIO $ parseDynamicFilePragma dflags src_opts
+        setDynFlags dflags1
+        liftIO $ checkProcessArgsResult dflags1 unhandled_flags
+        liftIO $ handleFlagWarnings dflags1 warns
 
-            return (RealPhase (Hsc sf), output_fn)
+        return (RealPhase (Hsc sf), output_fn)
 
 -----------------------------------------------------------------------------
 -- Hsc phase
