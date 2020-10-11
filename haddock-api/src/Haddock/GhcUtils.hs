@@ -43,8 +43,8 @@ import GHC.Types.Var.Set ( VarSet, emptyVarSet )
 import GHC.Types.Var.Env ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Core.Type     ( isRuntimeRepVar )
-import GHC.Builtin.Types( liftedRepDataConTyCon )
 import GHC.Parser.Annotation (IsUnicodeSyntax(..))
+import GHC.Builtin.Types( liftedRepTy )
 
 import           GHC.Data.StringBuffer ( StringBuffer )
 import qualified GHC.Data.StringBuffer             as S
@@ -656,7 +656,7 @@ defaultRuntimeRepVars = go emptyVarEnv
 
     go subs (TyVarTy tv)
       | tv `elemVarEnv` subs
-      = TyConApp liftedRepDataConTyCon []
+      = liftedRepTy
       | otherwise
       = TyVarTy (updateTyVarKind (go subs) tv)
 
