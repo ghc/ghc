@@ -858,9 +858,9 @@ instance Binary IfaceBndr where
                       return (IfaceTvBndr ab)
 
 instance Binary IfaceOneShot where
-    put_ bh IfaceNoOneShot = do
+    put_ bh IfaceNoOneShot =
             putByte bh 0
-    put_ bh IfaceOneShot = do
+    put_ bh IfaceOneShot =
             putByte bh 1
     get bh = do
             h <- getByte bh
