@@ -1108,10 +1108,10 @@ rep_specialiseInst ty loc
        ; return [(loc, pragma)] }
 
 repInline :: InlineSpec -> MetaM (Core TH.Inline)
-repInline NoInline     = dataCon noInlineDataConName
-repInline Inline       = dataCon inlineDataConName
-repInline Inlinable    = dataCon inlinableDataConName
-repInline NoUserInline = notHandled "NOUSERINLINE" empty
+repInline NoInline         = dataCon noInlineDataConName
+repInline Inline           = dataCon inlineDataConName
+repInline Inlinable        = dataCon inlinableDataConName
+repInline NoUserInlinePrag = notHandled "NOUSERINLINE" empty
 
 repRuleMatch :: RuleMatchInfo -> MetaM (Core TH.RuleMatch)
 repRuleMatch ConLike = dataCon conLikeDataConName
@@ -2247,8 +2247,11 @@ repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
 
 --------------- Expressions -----------------
 repVarOrCon :: Name -> Core TH.Name -> MetaM (Core (M TH.Exp))
-repVarOrCon vc str | isDataOcc (nameOccName vc) = repCon str
-                   | otherwise                  = repVar str
+repVarOrCon vc str
+    | isVarNameSpace ns = repVar str  -- Both type and term variables (#18740)
+    | otherwise         = repCon str
+  where
+    ns = nameNameSpace vc
 
 repVar :: Core TH.Name -> MetaM (Core (M TH.Exp))
 repVar (MkC s) = rep2 varEName [s]

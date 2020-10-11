@@ -52,6 +52,7 @@ module GHC.Types.Name.Occurrence (
         mkDFunOcc,
         setOccNameSpace,
         demoteOccName,
+        promoteOccName,
         HasOccName(..),
 
         -- ** Derived 'OccName's
@@ -208,12 +209,20 @@ pprNameSpaceBrief TcClsName = text "tc"
 
 -- demoteNameSpace lowers the NameSpace if possible.  We can not know
 -- in advance, since a TvName can appear in an HsTyVar.
--- See Note [Demotion] in GHC.Rename.Env
+-- See Note [Demotion] in GHC.Rename.Env.
 demoteNameSpace :: NameSpace -> Maybe NameSpace
 demoteNameSpace VarName = Nothing
 demoteNameSpace DataName = Nothing
 demoteNameSpace TvName = Nothing
 demoteNameSpace TcClsName = Just DataName
+
+-- promoteNameSpace promotes the NameSpace as follows.
+-- See Note [Promotion] in GHC.Rename.Env.
+promoteNameSpace :: NameSpace -> Maybe NameSpace
+promoteNameSpace DataName = Just TcClsName
+promoteNameSpace VarName = Just TvName
+promoteNameSpace TcClsName = Nothing
+promoteNameSpace TvName = Nothing
 
 {-
 ************************************************************************
@@ -336,10 +345,17 @@ mkClsOccFS :: FastString -> OccName
 mkClsOccFS = mkOccNameFS clsName
 
 -- demoteOccName lowers the Namespace of OccName.
--- see Note [Demotion]
+-- See Note [Demotion] in GHC.Rename.Env.
 demoteOccName :: OccName -> Maybe OccName
 demoteOccName (OccName space name) = do
   space' <- demoteNameSpace space
+  return $ OccName space' name
+
+-- promoteOccName promotes the NameSpace of OccName.
+-- See Note [Promotion] in GHC.Rename.Env.
+promoteOccName :: OccName -> Maybe OccName
+promoteOccName (OccName space name) = do
+  space' <- promoteNameSpace space
   return $ OccName space' name
 
 -- Name spaces are related if there is a chance to mean the one when one writes
