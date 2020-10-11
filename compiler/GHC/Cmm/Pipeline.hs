@@ -132,7 +132,7 @@ cpsTop dflags proc =
                                       (CmmProc h l v g)
                dumps Opt_D_dump_cmm_split "Post splitting" g
                return g
-             else do
+             else
                -- attach info tables to return points
                return $ [attachContInfoTables call_pps (CmmProc h l v g)]
 

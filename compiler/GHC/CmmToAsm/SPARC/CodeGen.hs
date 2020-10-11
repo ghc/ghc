@@ -73,7 +73,7 @@ cmmTopCodeGen (CmmProc info lab live graph)
 
       return tops
 
-cmmTopCodeGen (CmmData sec dat) = do
+cmmTopCodeGen (CmmData sec dat) =
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
 
@@ -431,7 +431,7 @@ genCCall target dest_regs args
                 PrimTarget mop
                  -> do  res     <- outOfLineMachOp mop
                         lblOrMopExpr <- case res of
-                                Left lbl -> do
+                                Left lbl ->
                                         return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
 
                                 Right mopExpr -> do

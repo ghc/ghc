@@ -383,10 +383,8 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap
          sort_fn (bid, _) (bid', _) =
            compare (expectJust "block_order" $ mapLookup bid  block_order)
                    (expectJust "block_order" $ mapLookup bid' block_order)
-     procs <- return $ map to_proc $ sortBy sort_fn $ mapToList graphEnv
-     return -- pprTrace "procLabels" (ppr procLabels)
-            -- pprTrace "splitting graphs" (ppr procs)
-            procs
+    return $ map to_proc $ sortBy sort_fn $ mapToList graphEnv
+
 splitAtProcPoints _ _ _ _ _ t@(CmmData _ _) = return [t]
 
 -- Only called from GHC.Cmm.ProcPoint.splitAtProcPoints. NB. does a
