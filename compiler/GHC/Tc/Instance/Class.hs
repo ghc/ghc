@@ -16,7 +16,6 @@ import GHC.Prelude
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Instantiate( tcInstType )
 import GHC.Tc.Instance.Typeable
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
@@ -24,7 +23,7 @@ import GHC.Core.Predicate
 import GHC.Rename.Env( addUsedGRE )
 import GHC.Types.Name.Reader( lookupGRE_FieldLabel )
 import GHC.Core.InstEnv
-import GHC.Tc.Utils.Instantiate( instDFunType )
+import GHC.Tc.Utils.Instantiate( instDFunType, tcInstType  )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
 
 import GHC.Builtin.Types

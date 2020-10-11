@@ -44,7 +44,7 @@ import GHC.Prelude
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType, unifyKind )
 
-import GHC.Types.Basic ( IntegralLit(..), SourceText(..) )
+import GHC.Types.Basic ( IntegralLit (..), SourceText (..), TypeOrKind (..) )
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
@@ -54,8 +54,8 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence
 import GHC.Core.InstEnv
-import GHC.Builtin.Types  ( heqDataCon, eqDataCon, integerTyConName )
-import GHC.Core    ( isOrphan )
+import GHC.Builtin.Types ( heqDataCon, eqDataCon, integerTyConName )
+import GHC.Core ( Expr (..), isOrphan ) -- For the Coercion constructor
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Utils.TcMType
 import GHC.Core.Type
@@ -65,8 +65,7 @@ import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Tc.Utils.TcType
 import GHC.Driver.Types
 import GHC.Core.Class( Class )
-import GHC.Types.Id.Make( mkDictFunId )
-import GHC.Core( Expr(..) )  -- For the Coercion constructor
+import GHC.Types.Id.Make ( mkDictFunId )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var
@@ -79,7 +78,6 @@ import GHC.Driver.Session
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
-import GHC.Types.Basic ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.State
 
