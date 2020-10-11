@@ -27,7 +27,12 @@ void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar) {
 void handleCloneStackMessage(MessageCloneStack *msg){
   StgStack* newStackClosure = cloneStack(msg->tso->cap, msg->tso->stackobj);
 
-  bool putMVarWasSuccessful = performTryPutMVar(msg->tso->cap, msg->result, newStackClosure);
+  // Lift StackSnapshot# to StackSnapshot by applying it's constructor.
+  // This is necessary because performTryPutMVar() puts the closure onto the
+  // stack for evaluation and stacks can not be evaluated (entered).
+  HaskellObj result = rts_apply(msg->tso->cap, StackSnapshot_constructor_closure, (HaskellObj) newStackClosure);
+
+  bool putMVarWasSuccessful = performTryPutMVar(msg->tso->cap, msg->result, result);
 
   if(!putMVarWasSuccessful) {
     barf("Can't put stack cloning result into MVar.");
@@ -43,11 +48,6 @@ void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar) {
 #endif // end !defined(THREADED_RTS)
 
 StgStack* cloneStack(Capability* capability, StgStack* stack){
-#if defined(DEBUG)
-  debugBelch("Stack to clone\n");
-  printStack(stack);
-#endif
-
   StgWord spOffset = stack->sp - stack->stack;
   StgWord closureSizeBytes = sizeof(StgStack) + (stack->stack_size * sizeof(StgWord));
 
@@ -58,9 +58,7 @@ StgStack* cloneStack(Capability* capability, StgStack* stack){
   newStackClosure->sp = newStackClosure->stack + spOffset;
 
 #if defined(DEBUG)
-  debugBelch("Cloned stack\n");
-  printStack(newStackClosure);
-  // TODO: Check sanity
+  checkClosure(newStackClosure);
 #endif
 
   return newStackClosure;

@@ -4,11 +4,17 @@
 
 import GHC.Prim (StackSnapshot#)
 import GHC.Stack.CloneStack
+import Foreign
+import Foreign.C.Types (CUInt)
 
-foreign import ccall "printy" printStack:: StackSnapshot# -> IO ()
+foreign import ccall "expectClosureTypes" expectClosureTypes:: StackSnapshot# -> Ptr CUInt -> Int -> IO ()
 
 main :: IO ()
 main = do
     stackSnapshot <- cloneMyStack
+
     let (StackSnapshot stack) = stackSnapshot
-    printStack stack
+    let expectedClosureTypes = [34 -- CATCH_FRAME
+                               ,36 -- STOP_FRAME
+                               ]
+    withArray expectedClosureTypes (\ptr -> expectClosureTypes stack ptr (length expectedClosureTypes))
