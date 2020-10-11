@@ -1,4 +1,6 @@
-{-# LANGUAGE GADTs, DisambiguateRecordFields, BangPatterns #-}
+{-# LANGUAGE BangPatterns             #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE GADTs                    #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Cmm.ProcPoint
