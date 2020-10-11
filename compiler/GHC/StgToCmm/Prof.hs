@@ -186,7 +186,7 @@ enterCostCentreThunk closure =
 
 enterCostCentreFun :: CostCentreStack -> CmmExpr -> FCode ()
 enterCostCentreFun ccs closure =
-  ifProfiling $ do
+  ifProfiling $
     if isCurrentCCS ccs
        then do platform <- getPlatform
                emitRtsCall rtsUnitId (fsLit "enterFunCCS")
