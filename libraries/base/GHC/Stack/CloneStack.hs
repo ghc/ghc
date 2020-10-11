@@ -21,6 +21,19 @@ foreign import ccall "sendCloneStackMessage" sendCloneStackMessage :: ThreadId# 
 
 data StackSnapshot = StackSnapshot StackSnapshot#
 
+{- Note [Stack Cloning]
+"Cloning" a stack means that it's StgStack closure is copied including the
+stack memory (stack[]). The stack pointer (sp) of the clone is adjusted to be
+valid.
+The clone is "offline"/"cold", i.e. it won't be evaluated any further. This is
+useful for further analyses like stack unwinding or traversal.
+
+There are two different ways to clone a stack:
+1. By the corresponding thread via a primop call (cloneMyStack#).
+2. By sending a RTS message (Messages.c) with a MVar to the corresponding
+   thread and receiving the stack by taking it out of this MVar.
+-}
+
 -- | Clone the stack of a thread identified by it's 'ThreadId'
 cloneThreadStack :: ThreadId -> IO StackSnapshot
 cloneThreadStack (ThreadId tid#) = do
@@ -31,7 +44,6 @@ cloneThreadStack (ThreadId tid#) = do
   -- into resultVar.
   sendCloneStackMessage tid# ptr
   freeStablePtr ptr
-  print "takeMVar"
   takeMVar resultVar
 
 -- | Clone the stack of the executing thread
