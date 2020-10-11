@@ -547,16 +547,18 @@ intercalate xs xss = concat (intersperse xs xss)
 --
 -- >>> transpose [[10,11],[20],[],[30,31,32]]
 -- [[10,20,30],[11,31],[32]]
-transpose               :: [[a]] -> [[a]]
-transpose []             = []
-transpose ([]   : xss)   = transpose xss
-transpose ((x:xs) : xss) = (x : hds) : transpose (xs : tls)
+transpose :: [[a]] -> [[a]]
+transpose [] = []
+transpose ([] : xss) = transpose xss
+transpose ((x : xs) : xss) = combine x hds xs tls
   where
-    -- We tie the calculations of heads and tails together
-    -- to prevent heads from leaking into tails and vice versa.
-    -- unzip makes the selector thunk arrangements we need to
-    -- ensure everything gets cleaned up properly.
-    (hds, tls) = unzip [(hd, tl) | (hd:tl) <- xss]
+    (hds,tls) = unzip [(hd, tl) | hd : tl <- xss]
+    combine x h xs t = (x:h) : transpose (xs:t)
+    {-# NOINLINE combine #-}
+    {- The combine function ensures that we allocate the tls selector thunk
+       before we reach the tail of the result. Otherwise, GHC wants to do something
+       like (x:h) : let tls = ... in ... which is no good at all.
+    -}
 
 
 -- | The 'partition' function takes a predicate a list and returns
