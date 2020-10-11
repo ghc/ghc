@@ -457,7 +457,16 @@ else:
     if config.baseline_commit:
         print('Performance baseline: %s\n' % config.baseline_commit)
     if any(t.metrics):
-        tabulate_metrics(t.metrics)
+        print("\nMissing baseline:\n")
+        tabulate_metrics([ m for m in t.metrics if m.baseline is None)
+        print("\nIncreased:\n")
+        tabulate_metrics([ m for m in t.metrics
+                           if m.baseline is not None
+                           if m.baseline.perfStat.value < m.stat.value)
+        print("\nDecreased:\n")
+        tabulate_metrics([ m for m in t.metrics
+                           if m.baseline is not None
+                           if m.baseline.perfStat.value > m.stat.value)
     else:
         print("\nNone collected.")
     print("")
