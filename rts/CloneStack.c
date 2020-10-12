@@ -41,7 +41,8 @@ void handleCloneStackMessage(MessageCloneStack *msg){
 
 #else // !defined(THREADED_RTS)
 
-void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar) {
+GNU_ATTRIBUTE(__noreturn__)
+void  sendCloneStackMessage(StgTSO *tso STG_UNUSED, HsStablePtr mvar STG_UNUSED) {
   barf("Sending CloneStackMessages is only available in threaded RTS!");
 }
 
