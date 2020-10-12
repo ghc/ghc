@@ -1,6 +1,6 @@
 [submodule "libraries/binary"]
 	path = libraries/binary
-	url = https://gitlab.haskell.org/ghc/packages/binary.git
+	url = https://github.com/andrewthad/binary.git
 	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
@@ -89,9 +89,8 @@
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = https://gitlab.haskell.org/ghc/haddock.git
+	url = https://github.com/andrewthad/haddock.git
 	ignore = untracked
-	branch = ghc-head
 [submodule "nofib"]
 	path = nofib
 	url = https://gitlab.haskell.org/ghc/nofib.git

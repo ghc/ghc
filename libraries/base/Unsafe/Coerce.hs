@@ -285,7 +285,7 @@ unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 unsafeCoerce :: forall (a :: Type) (b :: Type) . a -> b
 unsafeCoerce x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
-unsafeCoerceUnlifted :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'UnliftedRep) . a -> b
+unsafeCoerceUnlifted :: forall (a :: TYPE ('BoxedRep 'Unlifted)) (b :: TYPE ('BoxedRep 'Unlifted)) . a -> b
 -- Kind-homogeneous, but levity monomorphic (TYPE UnliftedRep)
 unsafeCoerceUnlifted x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
