@@ -15,6 +15,7 @@ module Builder (
     ) where
 
 import Control.Exception.Extra (Partial)
+import qualified Data.ByteString.Lazy.Char8 as BSL
 import Development.Shake.Classes
 import Development.Shake.Command
 import GHC.Generics
@@ -26,6 +27,8 @@ import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
+import System.Exit
+import System.IO (stderr)
 
 import Base
 import Context
@@ -286,7 +289,18 @@ instance H.Builder Builder where
                 Makeinfo -> do
                   cmd' echo [path] "--no-split" [ "-o", output] [input]
 
-                Xelatex   -> unit $ cmd' [Cwd output] [path] buildArgs
+                Xelatex   ->
+                  -- xelatex produces an incredible amount of output, almost
+                  -- all of which is useless. Suppress it unless user
+                  -- requests a loud build.
+                  if verbosity >= Loud
+                    then cmd' [Cwd output] [path] buildArgs
+                    else do (Stdouterr out, Exit code) <- cmd' [Cwd output] [path] buildArgs
+                            when (code /= ExitSuccess) $ do
+                              liftIO $ BSL.hPutStrLn stderr out
+                              putFailure "xelatex failed!"
+                              fail "xelatex failed"
+
                 Makeindex -> unit $ cmd' [Cwd output] [path] (buildArgs ++ [input])
 
                 Tar _ -> cmd' buildOptions echo [path] buildArgs
