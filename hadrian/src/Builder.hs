@@ -27,6 +27,8 @@ import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
 
+import qualified Data.ByteString.Lazy.Char8 as BSL
+
 import Base
 import Context
 import Oracles.Flag
@@ -286,7 +288,18 @@ instance H.Builder Builder where
                 Makeinfo -> do
                   cmd' echo [path] "--no-split" [ "-o", output] [input]
 
-                Xelatex   -> unit $ cmd' [Cwd output] [path] buildArgs
+                Xelatex   ->
+                  -- xelatex produces an incredible amount of output, almost
+                  -- all of which is useless. Suppress it unless user
+                  -- requests a loud build.
+                  if verbosity >= Loud
+                    then cmd' [Cwd output] [path] buildArgs
+                    else do (Stdouterr out, Exit code) <- cmd' [Cwd output] [path] buildArgs
+                            when (code /= ExitSuccess) $
+                              BSL.hPutStrLn stderr out
+                            putFailure "xelatex failed!"
+                            fail "xelatex failed"
+
                 Makeindex -> unit $ cmd' [Cwd output] [path] (buildArgs ++ [input])
 
                 Tar _ -> cmd' buildOptions echo [path] buildArgs
