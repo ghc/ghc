@@ -463,8 +463,14 @@ assembleI platform i = case i of
        -- LitString requires a zero-terminator when emitted
     literal (LitNumber nt i) = case nt of
       LitNumInt     -> int (fromIntegral i)
-      LitNumWord    -> int (fromIntegral i)
+      LitNumInt8    -> int (fromIntegral i)
+      LitNumInt16   -> int (fromIntegral i)
+      LitNumInt32   -> int (fromIntegral i)
       LitNumInt64   -> int64 (fromIntegral i)
+      LitNumWord    -> int (fromIntegral i)
+      LitNumWord8   -> int (fromIntegral i)
+      LitNumWord16  -> int (fromIntegral i)
+      LitNumWord32  -> int (fromIntegral i)
       LitNumWord64  -> int64 (fromIntegral i)
       LitNumInteger -> panic "GHC.ByteCode.Asm.literal: LitNumInteger"
       LitNumNatural -> panic "GHC.ByteCode.Asm.literal: LitNumNatural"
