@@ -48,7 +48,11 @@ peekStgTSOProfInfo tsoPtr = do
 cccsOffset :: Int
 cccsOffset = (#const OFFSET_StgTSO_cccs) + (#size StgHeader)
 
-peekCostCentreStack :: AddressSet -> IORef (AddressMap CostCentre) -> Ptr costCentreStack -> IO (Maybe CostCentreStack)
+peekCostCentreStack
+    :: AddressSet
+    -> IORef (AddressMap CostCentre)
+    -> Ptr costCentreStack
+    -> IO (Maybe CostCentreStack)
 peekCostCentreStack _ _ ptr | ptr == nullPtr = return Nothing
 peekCostCentreStack loopBreakers _ ptr | IntSet.member (ptrToInt ptr) loopBreakers = return Nothing
 peekCostCentreStack loopBreakers costCenterCacheRef ptr = do

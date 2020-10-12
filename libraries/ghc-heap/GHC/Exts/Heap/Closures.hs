@@ -318,7 +318,7 @@ data GenClosure b
 #if __GLASGOW_HASKELL__ >= 810
       , stack_marking   :: !Word8
 #endif
-      -- | Offset of the `StgStack::sp` pointer in bytes:
+      -- | Offset of the `StgStack::sp` pointer in *bytes*:
       --
       --    stgStack->sp == ((byte*)stgStack)+stack_spOffset
       --
@@ -394,7 +394,7 @@ data WhatNext
   | ThreadInterpret
   | ThreadKilled
   | ThreadComplete
-  | WhatNextUnknownValue -- ^ Please report this as a bug
+  | WhatNextUnknownValue Word16 -- ^ Please report this as a bug
   deriving (Eq, Show, Generic)
 
 data WhyBlocked
@@ -412,7 +412,7 @@ data WhyBlocked
   | BlockedOnMsgThrowTo
   | ThreadMigrating
   | BlockedOnIOCompletion
-  | WhyBlockedUnknownValue -- ^ Please report this as a bug
+  | WhyBlockedUnknownValue Word16 -- ^ Please report this as a bug
   deriving (Eq, Show, Generic)
 
 data TsoFlags
@@ -423,7 +423,7 @@ data TsoFlags
   | TsoMarked
   | TsoSqueezed
   | TsoAllocLimit
-  | TsoFlagsUnknownValue -- ^ Please report this as a bug
+  | TsoFlagsUnknownValue Word32 -- ^ Please report this as a bug
   deriving (Eq, Show, Generic)
 
 -- | For generic code, this function returns all referenced closures.

@@ -1,61 +1,159 @@
-{-# LANGUAGE ForeignFunctionInterface, MagicHash, BangPatterns #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
 
+import Control.Monad (forM_, unless)
+import Data.List (find)
+import Data.Word
 import Foreign
 import Foreign.C.Types
-import GHC.Exts.Heap
+import GHC.IO ( IO(..) )
 import GHC.Exts
-
+import GHC.Exts.Heap
+import qualified  GHC.Exts.Heap.FFIClosures as FFIClosures
 import GHC.Word
 
 import TestUtils
 
-foreign import ccall unsafe "create_tso.h create_tso"
-    c_create_tso:: IO (Ptr ())
-
--- We can make some assumptions about the - otherwise dynamic - properties of
--- StgTSO and StgStack, because a new, non-running TSO is created with
--- create_tso() (create_tso.c).create_tso
 main :: IO ()
 main = do
-    tso <- createTSOClosure
+    (tso, stack) <- {-# SCC "MyCostCentre" #-} createAndUnpackTSOAndSTACKClosure
+    assertEqual (getClosureType tso) TSO
+    assertEqual (getClosureType stack) STACK
     assertEqual (what_next tso) ThreadRunGHC
     assertEqual (why_blocked tso) NotBlocked
     assertEqual (saved_errno tso) 0
 
-    -- The newly created TSO should be on the end of the run queue.
-    let !_linkBox = unsafe_link tso
-    _linkClosure <- getBoxedClosureData _linkBox
-    assertEqual (name _linkClosure) "END_TSO_QUEUE"
-    assertEqual (getClosureType _linkClosure) CONSTR_NOCAF
+#if defined(PROFILING)
+    let costCentre = ccs_cc <$> (cccs =<< prof tso)
+    case costCentre of
+        Nothing -> error $ "No CostCentre found in TSO: " ++ show tso
+        Just _ -> case findMyCostCentre (linkedCostCentres costCentre) of
+                    Just myCostCentre -> do
+                        assertEqual (cc_label myCostCentre) "MyCostCentre"
+                        assertEqual (cc_module myCostCentre) "Main"
+                        assertEqual (cc_srcloc myCostCentre) (Just "tso_and_stack_closures.hs:23:48-80")
+                        assertEqual (cc_is_caf myCostCentre) False
+                    Nothing -> error $ "MyCostCentre not found in:\n" ++ unlines (cc_label <$> linkedCostCentres costCentre)
+#endif
 
-    let !global_linkBox = unsafe_global_link tso
-    globalLinkClosure <- getBoxedClosureData global_linkBox
-    assertEqual (getClosureType globalLinkClosure) TSO
+linkedCostCentres :: Maybe CostCentre -> [CostCentre]
+linkedCostCentres Nothing = []
+linkedCostCentres (Just cc) = cc : linkedCostCentres (cc_link cc)
 
-    let !stackBox = tsoStack tso
-    stackClosure <- getBoxedClosureData stackBox
-    assertEqual (getClosureType stackClosure) STACK
-
-    let !stackPointerBox = unsafeStackPointer stackClosure
-    stackPointerClosure <- getBoxedClosureData stackPointerBox
-    assertEqual (getClosureType stackPointerClosure) RET_SMALL
-
-    let !trecBox = unsafe_trec tso
-    trecClosure <- getBoxedClosureData trecBox
-    assertEqual (name trecClosure) "NO_TREC"
-
-    let !blockedExceptionsBox = unsafe_blocked_exceptions tso
-    blockedExceptionsClosure <- getBoxedClosureData blockedExceptionsBox
-    assertEqual (name blockedExceptionsClosure) "END_TSO_QUEUE"
-
-    let !bqBox = unsafe_bq tso
-    bqClosure <- getBoxedClosureData bqBox
-    assertEqual (name bqClosure) "END_TSO_QUEUE"
-
-createTSOClosure :: IO (GenClosure Box)
-createTSOClosure = do
-    ptr <- c_create_tso
-    createClosure ptr
+findMyCostCentre:: [CostCentre] -> Maybe CostCentre
+findMyCostCentre ccs = find (\cc -> cc_label cc == "MyCostCentre") ccs
 
 getClosureType :: GenClosure b -> ClosureType
 getClosureType = tipe . info
+
+type StgTso = Any
+type StgStack = Any
+data MBA a = MBA (MutableByteArray# a)
+data BA = BA ByteArray#
+
+foreign import ccall safe "create_tso.h create_and_unpack_tso_and_stack"
+    c_create_and_unpack_tso_and_stack
+        :: Ptr (Ptr StgTso)
+        -> Ptr (Ptr StgInfoTable)
+        -> Ptr CInt
+        -> Ptr (Ptr Word8)
+        -> Ptr CInt
+        -> Ptr (Ptr (Ptr Any))
+        -> Ptr (Ptr StgStack)
+        -> Ptr (Ptr StgInfoTable)
+        -> Ptr CInt
+        -> Ptr (Ptr Word8)
+        -> Ptr CInt
+        -> Ptr (Ptr (Ptr Any))
+        -> IO ()
+
+createAndUnpackTSOAndSTACKClosure :: IO (GenClosure (Ptr Any), GenClosure (Ptr Any))
+createAndUnpackTSOAndSTACKClosure = do
+
+    alloca $ \ptrPtrTso -> do
+    alloca $ \ptrPtrTsoInfoTable -> do
+    alloca $ \ptrTsoHeapRepSize -> do
+    alloca $ \ptrPtrTsoHeapRep -> do
+    alloca $ \ptrTsoPointersSize -> do
+    alloca $ \ptrPtrPtrTsoPointers -> do
+
+    alloca $ \ptrPtrStack -> do
+    alloca $ \ptrPtrStackInfoTable -> do
+    alloca $ \ptrStackHeapRepSize -> do
+    alloca $ \ptrPtrStackHeapRep -> do
+    alloca $ \ptrStackPointersSize -> do
+    alloca $ \ptrPtrPtrStackPointers -> do
+
+    c_create_and_unpack_tso_and_stack
+
+        ptrPtrTso
+        ptrPtrTsoInfoTable
+        ptrTsoHeapRepSize
+        ptrPtrTsoHeapRep
+        ptrTsoPointersSize
+        ptrPtrPtrTsoPointers
+
+        ptrPtrStack
+        ptrPtrStackInfoTable
+        ptrStackHeapRepSize
+        ptrPtrStackHeapRep
+        ptrStackPointersSize
+        ptrPtrPtrStackPointers
+
+    let fromHeapRep
+          ptrPtrClosure
+          ptrPtrClosureInfoTable
+          ptrClosureHeapRepSize
+          ptrPtrClosureHeapRep
+          ptrClosurePointersSize
+          ptrPtrPtrClosurePointers = do
+            ptrClosure :: Ptr Any <- peek ptrPtrClosure
+            ptrInfoTable :: Ptr StgInfoTable <- peek ptrPtrClosureInfoTable
+
+            heapRepSize :: Int <- fromIntegral <$> peek ptrClosureHeapRepSize
+            let I# heapRepSize# = heapRepSize
+            ptrHeapRep :: Ptr Word8 <- peek ptrPtrClosureHeapRep
+            MBA mutHeapRepBA <- IO $ \s -> let
+                (# s', mba# #) = newByteArray# heapRepSize# s
+                in (# s', MBA mba# #)
+            forM_ [0..heapRepSize-1] $ \i@(I# i#) -> do
+                W8# w <- peekElemOff ptrHeapRep i
+                IO (\s -> (# writeWord8Array# mutHeapRepBA i# w s, () #))
+            BA heapRep <- IO $ \s -> let
+                (# s', ba# #) = unsafeFreezeByteArray# mutHeapRepBA s
+                in (# s', BA ba# #)
+
+            pointersSize :: Int <- fromIntegral <$> peek ptrClosurePointersSize
+            ptrPtrPointers :: Ptr (Ptr Any) <- peek ptrPtrPtrClosurePointers
+            ptrPtrPointers :: [Ptr Any] <- sequence
+                [ peekElemOff ptrPtrPointers i
+                | i <- [0..pointersSize-1]
+                ]
+
+            getClosureDataFromHeapRep
+                (Just ptrClosure)
+                heapRep
+                ptrInfoTable
+                ptrPtrPointers
+
+    tso <- fromHeapRep
+        ptrPtrTso
+        ptrPtrTsoInfoTable
+        ptrTsoHeapRepSize
+        ptrPtrTsoHeapRep
+        ptrTsoPointersSize
+        ptrPtrPtrTsoPointers
+
+    stack <- fromHeapRep
+        ptrPtrStack
+        ptrPtrStackInfoTable
+        ptrStackHeapRepSize
+        ptrPtrStackHeapRep
+        ptrStackPointersSize
+        ptrPtrPtrStackPointers
+
+    return (tso, stack)

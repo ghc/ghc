@@ -37,11 +37,22 @@ test('closure_size_noopt',
      compile_and_run, [''])
 
 test('tso_and_stack_closures',
-     [extra_files(['create_tso.c','create_tso.h', 'TestUtils.hs']),
+     [extra_files(['create_tso.c','create_tso.h','TestUtils.hs']),
+      only_ways(['profthreaded']),
+      extra_ways(['profthreaded']),
       ignore_stdout,
       ignore_stderr
      ],
      multi_compile_and_run, ['tso_and_stack_closures', [('create_tso.c','')], ''])
+
+# test('tso_and_stack_closures (prof)',
+#      [extra_files(['create_tso.c','create_tso.h','TestUtils.hs']),
+#       only_ways(prof_ways),
+#       extra_ways(prof_ways),
+#       ignore_stdout,
+#       ignore_stderr,
+#      ],
+#      multi_compile_and_run, ['tso_and_stack_closures', [('create_tso.c','')], '-prof'])
 
 test('list_threads_and_misc_roots',
      [extra_files(['list_threads_and_misc_roots_c.c','list_threads_and_misc_roots_c.h','TestUtils.hs']),
@@ -49,15 +60,6 @@ test('list_threads_and_misc_roots',
       ignore_stderr
      ],
      multi_compile_and_run, ['list_threads_and_misc_roots', [('list_threads_and_misc_roots_c.c','')], '-threaded'])
-
-test('prof_info',
-     [extra_files(['create_tso.c','create_tso.h','TestUtils.hs']),
-      ignore_stdout,
-      ignore_stderr,
-      when(have_profiling(), extra_ways(['prof'])),
-      only_ways(prof_ways)
-     ],
-     multi_compile_and_run, ['prof_info', [('create_tso.c','')], '-prof'])
 
 test('parse_tso_flags',
      [extra_files(['TestUtils.hs']),

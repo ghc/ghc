@@ -31,14 +31,14 @@ main = do
     tsoCount <- getTSOCount_c
     tsos <- getTSOs_c
     tsoList <- peekArray tsoCount tsos
-    tsoClosures <- mapM createClosure tsoList
+    tsoClosures <- mapM createAndUnpackTSOClosure tsoList
     assertEqual tsoCount $ length tsoClosures
     mapM (assertEqual TSO) $ map (tipe . info) tsoClosures
 
     miscRootsCount <- getMiscRootsCount_c
     miscRoots <- getMiscRoots_c
     miscRootsList <- peekArray miscRootsCount miscRoots
-    heapClosures <- mapM createClosure miscRootsList
+    heapClosures <- mapM _ miscRootsList
     assertEqual miscRootsCount $ length heapClosures
     -- Regarding the type system, this always has to be True, but we want to
     -- force evaluation / de-serialization with a simple check.
