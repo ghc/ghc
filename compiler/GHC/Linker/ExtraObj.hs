@@ -6,12 +6,19 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.SysTools.ExtraObj (
-  mkExtraObj, mkExtraObjToLinkIntoBinary, mkNoteObjsToLinkIntoBinary,
-  checkLinkInfo, getLinkInfo, getCompilerInfo,
-  ghcLinkInfoSectionName, ghcLinkInfoNoteName, platformSupportsSavingLinkOpts,
-  haveRtsOptsFlags
-) where
+module GHC.Linker.ExtraObj
+   ( mkExtraObj
+   , mkExtraObjToLinkIntoBinary
+   , mkNoteObjsToLinkIntoBinary
+   , checkLinkInfo
+   , getLinkInfo
+   , getCompilerInfo
+   , ghcLinkInfoSectionName
+   , ghcLinkInfoNoteName
+   , platformSupportsSavingLinkOpts
+   , haveRtsOptsFlags
+   )
+where
 
 import GHC.Utils.Asm
 import GHC.Utils.Error
@@ -35,6 +42,8 @@ import Control.Monad.IO.Class
 import GHC.SysTools.FileCleanup
 import GHC.SysTools.Tasks
 import GHC.SysTools.Info
+import GHC.Linker.Unit
+import GHC.Linker.MacOS
 
 mkExtraObj :: DynFlags -> Suffix -> String -> IO FilePath
 mkExtraObj dflags extn xs
