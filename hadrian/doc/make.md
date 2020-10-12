@@ -203,10 +203,17 @@ time you fire up a build. This is not possible with the Make build system.
 
   ``` sh
   # Make
-  cd nofib; make clean; make boot; make 2>&1 | tee nofib-log
+  cd nofib; make clean; make boot; make 2>&1 | tee nofib-log                                  # (1)
+  cd nofib; make clean; make boot; mode=fast; make mode=fast NoFibRuns=3 2>&1 | tee nofib-log # (2)
+  cd nofib; make clean; make boot; make EXTRA_RUNTEST_OPTS="-cachegrind" 2>&1 | tee new-log   # (3)
 
   # Hadrian
-  build nofib # builds the compiler and everything we need if necessary, too
+  # builds the compiler and everything we need if necessary, too
+  build nofib                                  # (1)
+  build nofib --nofib-mode=fast --nofib-runs=3 # (2)
+  build nofib --cachegrind --nofib-log=new-log # (3)
+
+  # Note that if with --cachegrind is passed, --nofib-runs will be set to 1.
   ```
 
 - `make FAST=YES`
