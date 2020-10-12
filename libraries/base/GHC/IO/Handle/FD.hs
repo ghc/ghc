@@ -179,16 +179,17 @@ openBinaryFile fp m =
     (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
 
 openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
-openFile' filepath iomode binary non_blocking = do
+openFile' filepath iomode binary non_blocking =
   -- first open the file to get an FD
-  (fd, fd_type) <- FD.openFile filepath iomode non_blocking
+  mask_ $ do
+    (fd, fd_type) <- FD.openFile filepath iomode non_blocking
 
-  mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
+    mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
 
-  -- then use it to make a Handle
-  mkHandleFromFD fd fd_type filepath iomode
-                   False {- do not *set* non-blocking mode -}
-                   mb_codec
+    -- then use it to make a Handle
+    mkHandleFromFD fd fd_type filepath iomode
+                    False {- do not *set* non-blocking mode -}
+                    mb_codec
             `onException` IODevice.close fd
         -- NB. don't forget to close the FD if mkHandleFromFD fails, otherwise
         -- this FD leaks.
