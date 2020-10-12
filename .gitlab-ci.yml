@@ -287,6 +287,8 @@ hadrian-ghc-in-ghci:
     - which autoreconf
     - pwd
     - ls
+    - sleep 5
+    - ls
     - "ls toolchain"
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
