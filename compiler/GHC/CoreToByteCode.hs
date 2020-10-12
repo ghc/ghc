@@ -1636,8 +1636,14 @@ pushAtom _ _ (AnnLit lit) = do
         LitRubbish      -> code N
         LitNumber nt _  -> case nt of
           LitNumInt     -> code N
-          LitNumWord    -> code N
+          LitNumInt8    -> code N
+          LitNumInt16   -> code N
+          LitNumInt32   -> code N
           LitNumInt64   -> code L
+          LitNumWord    -> code N
+          LitNumWord8   -> code N
+          LitNumWord16  -> code N
+          LitNumWord32  -> code N
           LitNumWord64  -> code L
           -- No LitInteger's or LitNatural's should be left by the time this is
           -- called. CorePrep should have converted them all to a real core

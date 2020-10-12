@@ -59,10 +59,18 @@ module GHC.Utils.Outputable (
         pprInfixVar, pprPrefixVar,
         pprHsChar, pprHsString, pprHsBytes,
 
-        primFloatSuffix, primCharSuffix, primWordSuffix, primDoubleSuffix,
-        primInt64Suffix, primWord64Suffix, primIntSuffix,
+        primFloatSuffix, primCharSuffix, primDoubleSuffix,
+        primInt8Suffix, primWord8Suffix,
+        primInt16Suffix, primWord16Suffix,
+        primInt32Suffix, primWord32Suffix,
+        primInt64Suffix, primWord64Suffix,
+        primIntSuffix, primWordSuffix,
 
-        pprPrimChar, pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64,
+        pprPrimChar, pprPrimInt, pprPrimWord,
+        pprPrimInt8, pprPrimWord8,
+        pprPrimInt16, pprPrimWord16,
+        pprPrimInt32, pprPrimWord32,
+        pprPrimInt64, pprPrimWord64,
 
         pprFastFilePath, pprFilePathString,
 
@@ -1148,22 +1156,44 @@ pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
 
 -- Postfix modifiers for unboxed literals.
 -- See Note [Printing of literals in Core] in "GHC.Types.Literal".
-primCharSuffix, primFloatSuffix, primIntSuffix :: SDoc
-primDoubleSuffix, primWordSuffix, primInt64Suffix, primWord64Suffix :: SDoc
+primCharSuffix, primFloatSuffix, primDoubleSuffix,
+  primIntSuffix, primWordSuffix,
+  primInt8Suffix, primWord8Suffix,
+  primInt16Suffix, primWord16Suffix,
+  primInt32Suffix, primWord32Suffix,
+  primInt64Suffix, primWord64Suffix
+  :: SDoc
 primCharSuffix   = char '#'
 primFloatSuffix  = char '#'
 primIntSuffix    = char '#'
 primDoubleSuffix = text "##"
 primWordSuffix   = text "##"
-primInt64Suffix  = text "L#"
-primWord64Suffix = text "L##"
+primInt8Suffix   = text "#8"
+primWord8Suffix  = text "##8"
+primInt16Suffix  = text "#16"
+primWord16Suffix = text "##16"
+primInt32Suffix  = text "#32"
+primWord32Suffix = text "##32"
+primInt64Suffix  = text "#64"
+primWord64Suffix = text "##64"
 
 -- | Special combinator for showing unboxed literals.
 pprPrimChar :: Char -> SDoc
-pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64 :: Integer -> SDoc
+pprPrimInt, pprPrimWord,
+  pprPrimInt8, pprPrimWord8,
+  pprPrimInt16, pprPrimWord16,
+  pprPrimInt32, pprPrimWord32,
+  pprPrimInt64, pprPrimWord64
+  :: Integer -> SDoc
 pprPrimChar c   = pprHsChar c <> primCharSuffix
 pprPrimInt i    = integer i   <> primIntSuffix
 pprPrimWord w   = word    w   <> primWordSuffix
+pprPrimInt8 i   = integer i   <> primInt8Suffix
+pprPrimWord8 w  = word    w   <> primWord8Suffix
+pprPrimInt16 i  = integer i   <> primInt16Suffix
+pprPrimWord16 w = word    w   <> primWord16Suffix
+pprPrimInt32 i  = integer i   <> primInt32Suffix
+pprPrimWord32 w = word    w   <> primWord32Suffix
 pprPrimInt64 i  = integer i   <> primInt64Suffix
 pprPrimWord64 w = word    w   <> primWord64Suffix
 
