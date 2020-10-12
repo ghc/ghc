@@ -62,7 +62,7 @@ import GHC.Unit.Finder
 import GHC.Unit.Module.ModSummary (showModMsg)
 import GHC.Unit.Home.ModInfo
 
-import GHC.Runtime.Linker.Types
+import GHC.Linker.Types
 
 import qualified GHC.LanguageExtensions as LangExt
 
