@@ -83,7 +83,7 @@ import GHC.Settings.Config
 import GHC.Data.Graph.Directed
 import GHC.Utils.Encoding
 import GHC.Data.FastString
-import GHC.Runtime.Linker
+import GHC.Linker.Runtime
 import GHC.Data.Maybe ( orElse, expectJust )
 import GHC.Types.Name.Set
 import GHC.Utils.Panic hiding ( showException, try )

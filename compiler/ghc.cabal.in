@@ -388,10 +388,16 @@ Library
         GHC.Core.Ppr.TyThing
         GHC.Settings
         GHC.Iface.Tidy.StaticPtrTable
+        GHC.Linker
+        GHC.Linker.External
+        GHC.Linker.MacOS
+        GHC.Linker.Windows
+        GHC.Linker.Unit
+        GHC.Linker.Static
         GHC.SysTools
         GHC.SysTools.BaseDir
         GHC.SysTools.Terminal
-        GHC.SysTools.ExtraObj
+        GHC.Linker.ExtraObj
         GHC.SysTools.Info
         GHC.SysTools.Process
         GHC.SysTools.Tasks
@@ -671,8 +677,8 @@ Library
             GHC.ByteCode.Linker
             GHC.CoreToByteCode
             GHC.Runtime.Debugger
-            GHC.Runtime.Linker.Types
-            GHC.Runtime.Linker
+            GHC.Linker.Types
+            GHC.Linker.Runtime
             GHC.Runtime.Heap.Inspect
             GHC.Runtime.Interpreter
             GHC.Runtime.Interpreter.Types

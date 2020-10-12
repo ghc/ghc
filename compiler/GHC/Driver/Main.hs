@@ -94,7 +94,7 @@ import GHC.Types.Id
 import GHC.Runtime.Interpreter ( addSptEntry )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
-import GHC.Runtime.Linker
+import GHC.Linker.Runtime
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Lint           ( lintInteractiveExpr )
