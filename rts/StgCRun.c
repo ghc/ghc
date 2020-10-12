@@ -970,7 +970,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 #endif
 
-#ifdef riscv64_HOST_ARCH
+#if defined(riscv64_HOST_ARCH)
 
 StgRegTable *
 StgRun(StgFunPtr f, StgRegTable *basereg) {
