@@ -71,6 +71,10 @@
 #define MACHREGS_s390x    1
 #endif
 
+#if defined(riscv64_TARGET_ARCH)
+#define MACHREGS_riscv64  1
+#endif
+
 #endif
 
 #include "MachRegs.h"

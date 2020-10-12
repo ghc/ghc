@@ -73,6 +73,7 @@ data Arch = ArchSPARC
           | ArchPPC64
           | ArchPPC64LE
           | ArchS390X
+          | ArchRiscV64
  deriving Show
 
 mkJumpToAddr :: MonadFail m => EntryFunPtr-> m ItblCodes
@@ -109,6 +110,8 @@ mArch =
        Just ArchPPC64LE
 #elif defined(s390x_HOST_ARCH)
        Just ArchS390X
+#elif defined(riscv64_HOST_ARCH)
+       Just ArchRiscV64
 #else
        Nothing
 #endif
@@ -287,6 +290,23 @@ mkJumpToAddr' platform a = case platform of
         in Left [ 0xC0, 0x1E, byte7 w64, byte6 w64, byte5 w64, byte4 w64,
                   0xC0, 0x19, byte3 w64, byte2 w64, byte1 w64, byte0 w64,
                   0x07, 0xF1 ]
+
+    ArchRiscV64 ->
+        -- We place the entry address in x28 (also known as t3).
+        -- This looks like (where 0xdeadbeef is the address of the function
+        -- pointer),
+        --      auipc   t3, 0
+        --      ld      t3, 0(t3)
+        --      jr      t3
+        -- label:
+        --      .quad <addr>
+        let w64 :: Word64
+            w64 = fromIntegral (funPtrToInt a)
+        in Right [ 0x00000e17    -- auipc t3, 0x0
+                 , 0x000e3e03    -- ld t3, 0(t3)
+                 , 0x000e0067    -- jr t3
+                 , fromIntegral w64
+                 , fromIntegral (w64 `shiftR` 32) ]
 
 byte0 :: (Integral w) => w -> Word8
 byte0 w = fromIntegral w
