@@ -134,6 +134,12 @@ promotion quote and the data constructor: ::
   type S = 'A'   -- ERROR: looks like a character
   type R = ' A'  -- OK: promoted `A'`
 
+Type-level literals
+-------------------
+
+:extension:`DataKinds` enables the use of numeric and string literals at the
+type level. For more information, see :ref:`type-level-literals`.
+
 .. _promoted-lists-and-tuples:
 
 Promoted list and tuple types
@@ -207,4 +213,8 @@ above code is valid.
 
 See also :ghc-ticket:`7347`.
 
+Constraints in kinds
+--------------------
 
+:extension:`DataKinds` enables the use of equality constraints in kinds. For
+more information, see :ref:`constraints-in-kinds`.

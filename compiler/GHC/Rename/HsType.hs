@@ -441,9 +441,9 @@ sites. This is less precise, but more accurate.
 rnHsType is here because we call it from loadInstDecl, and I didn't
 want a gratuitous knot.
 
-Note [QualTy in kinds]
+Note [HsQualTy in kinds]
 ~~~~~~~~~~~~~~~~~~~~~~
-I was wondering whether QualTy could occur only at TypeLevel.  But no,
+I was wondering whether HsQualTy could occur only at TypeLevel.  But no,
 we can have a qualified type in a kind too. Here is an example:
 
   type family F a where
@@ -466,9 +466,9 @@ suitable message:
       Expected kind: G Bool
         Actual kind: F Bool
 
-However: in a kind, the constraints in the QualTy must all be
+However: in a kind, the constraints in the HsQualTy must all be
 equalities; or at least, any kinds with a class constraint are
-uninhabited.
+uninhabited. See Note [Constraints in kinds] in GHC.Core.TyCo.Rep.
 -}
 
 data RnTyKiEnv
@@ -574,7 +574,9 @@ rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
                 , fvs) } }
 
 rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
-  = do { checkPolyKinds env ty  -- See Note [QualTy in kinds]
+  = do { data_kinds <- xoptM LangExt.DataKinds -- See Note [HsQualTy in kinds]
+       ; when (not data_kinds && isRnKindLevel env)
+              (addErr (dataKindsErr env ty))
        ; (ctxt', fvs1) <- rnTyKiContext env lctxt
        ; (tau',  fvs2) <- rnLHsTyKi env tau
        ; return (HsQualTy { hst_xqual = noExtField, hst_ctxt = ctxt'
@@ -636,9 +638,8 @@ rnHsTyKi env listTy@(HsListTy _ ty)
        ; (ty', fvs) <- rnLHsTyKi env ty
        ; return (HsListTy noExtField ty', fvs) }
 
-rnHsTyKi env t@(HsKindSig _ ty k)
-  = do { checkPolyKinds env t
-       ; kind_sigs_ok <- xoptM LangExt.KindSignatures
+rnHsTyKi env (HsKindSig _ ty k)
+  = do { kind_sigs_ok <- xoptM LangExt.KindSignatures
        ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) ty)
        ; (ty', lhs_fvs) <- rnLHsTyKi env ty
        ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
@@ -665,7 +666,6 @@ rnHsTyKi env tyLit@(HsTyLit _ t)
   = do { data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr env tyLit))
        ; when (negLit t) (addErr negLitErr)
-       ; checkPolyKinds env tyLit
        ; return (HsTyLit noExtField t, emptyFVs) }
   where
     negLit (HsStrTy _ _) = False
@@ -705,15 +705,13 @@ rnHsTyKi _ (XHsType (NHsCoreTy ty))
     -- but I don't think it matters
 
 rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
-  = do { checkPolyKinds env ty
-       ; data_kinds <- xoptM LangExt.DataKinds
+  = do { data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr env ty))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsExplicitListTy noExtField ip tys', fvs) }
 
 rnHsTyKi env ty@(HsExplicitTupleTy _ tys)
-  = do { checkPolyKinds env ty
-       ; data_kinds <- xoptM LangExt.DataKinds
+  = do { data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr env ty))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsExplicitTupleTy noExtField tys', fvs) }
