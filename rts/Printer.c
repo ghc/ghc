@@ -17,6 +17,7 @@
 #include "sm/GCThread.h"
 #include "Hash.h"
 #include "Printer.h"
+#include "rts/PrinterAPI.h"
 #include "RtsUtils.h"
 
 #if defined(PROFILING)
