@@ -423,7 +423,7 @@ funTyConName = mkPrimTyConName (fsLit "FUN") funTyConKey funTyCon
 -- @
 -- type Arr :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
 --             TYPE rep1 -> TYPE rep2 -> Type
--- type Arr = FUN
+-- type Arr = FUN 'Many
 -- @
 --
 funTyCon :: TyCon
