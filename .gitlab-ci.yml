@@ -285,6 +285,8 @@ hadrian-ghc-in-ghci:
     - "echo $PATH"
     - "echo $SHELL"
     - which autoreconf
+    - pwd
+    - ls
     - "ls toolchain"
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
