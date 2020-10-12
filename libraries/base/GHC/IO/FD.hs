@@ -199,21 +199,28 @@ openFile filepath iomode non_blocking =
     -- NB. always use a safe open(), because we don't know whether open()
     -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
     -- for example.
-    fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666
+    mask_ $ do
+      fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666
 
-    (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
-                            False{-not a socket-}
-                            non_blocking
-            `catchAny` \e -> do _ <- c_close fd
-                                throwIO e
+      (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
+                              False{-not a socket-}
+                              non_blocking
+              `catchAny` \e -> do _ <- c_close fd
+                                  -- ASSERT the fd is not locked:
+                                  -- There are no interruptible operations
+                                  -- after locking the file inside mkFD, therefore,
+                                  -- given the mask, the fd is not locked.
+                                  throwIO e
 
-    -- we want to truncate() if this is an open in WriteMode, but only
-    -- if the target is a RegularFile.  ftruncate() fails on special files
-    -- like /dev/null.
-    when (iomode == WriteMode && fd_type == RegularFile) $
-      setSize fD 0
+      -- we want to truncate() if this is an open in WriteMode, but only
+      -- if the target is a RegularFile.  ftruncate() fails on special files
+      -- like /dev/null.
+      when (iomode == WriteMode && fd_type == RegularFile) $
+        setSize fD 0
+              `catchAny` \e -> do _ <- close fD
+                                  throwIO e
 
-    return (fD,fd_type)
+      return (fD,fd_type)
 
 std_flags, output_flags, read_flags, write_flags, rw_flags,
     append_flags, nonblock_flags :: CInt
