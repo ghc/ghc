@@ -2163,7 +2163,7 @@ def normalise_callstacks(s: str) -> str:
         s = re.sub(r'CallStack \(from -prof\):(\n  .*)*\n?', '', s)
     return s
 
-tyCon_re = re.compile(r'TyCon\s*\d+L?\#\#(64)?\s*\d+L?\#\#(64)?\s*', flags=re.MULTILINE)
+tyCon_re = re.compile(r'TyCon\s*\d+\#\#\d?\d?\s*\d+\#\#\d?\d?\s*', flags=re.MULTILINE)
 
 def normalise_type_reps(s: str) -> str:
     """ Normalise out fingerprints from Typeable TyCon representations """

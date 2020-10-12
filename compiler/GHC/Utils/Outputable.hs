@@ -59,12 +59,18 @@ module GHC.Utils.Outputable (
         pprInfixVar, pprPrefixVar,
         pprHsChar, pprHsString, pprHsBytes,
 
-        primFloatSuffix, primCharSuffix, primWordSuffix, primDoubleSuffix,
-        primInt64Suffix, primWord64Suffix, primIntSuffix,
+        primFloatSuffix, primCharSuffix, primDoubleSuffix,
+        primInt8Suffix, primWord8Suffix,
+        primInt16Suffix, primWord16Suffix,
+        primInt32Suffix, primWord32Suffix,
+        primInt64Suffix, primWord64Suffix,
+        primIntSuffix, primWordSuffix,
 
         pprPrimChar, pprPrimInt, pprPrimWord,
-        pprPrimInt8, pprPrimInt16, pprPrimInt32, pprPrimInt64,
-        pprPrimWord8, pprPrimWord16, pprPrimWord32, pprPrimWord64,
+        pprPrimInt8, pprPrimWord8,
+        pprPrimInt16, pprPrimWord16,
+        pprPrimInt32, pprPrimWord32,
+        pprPrimInt64, pprPrimWord64,
 
         pprFastFilePath, pprFilePathString,
 
@@ -1150,12 +1156,13 @@ pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
 
 -- Postfix modifiers for unboxed literals.
 -- See Note [Printing of literals in Core] in "GHC.Types.Literal".
-primCharSuffix, primFloatSuffix, primIntSuffix :: SDoc
-primDoubleSuffix, primWordSuffix :: SDoc
-primInt8Suffix,  primWord8Suffix :: SDoc
-primInt16Suffix, primWord16Suffix :: SDoc
-primInt32Suffix, primWord32Suffix :: SDoc
-primInt64Suffix, primWord64Suffix :: SDoc
+primCharSuffix, primFloatSuffix, primDoubleSuffix,
+  primIntSuffix, primWordSuffix,
+  primInt8Suffix, primWord8Suffix,
+  primInt16Suffix, primWord16Suffix,
+  primInt32Suffix, primWord32Suffix,
+  primInt64Suffix, primWord64Suffix
+  :: SDoc
 primCharSuffix   = char '#'
 primFloatSuffix  = char '#'
 primIntSuffix    = char '#'
@@ -1172,9 +1179,12 @@ primWord64Suffix = text "##64"
 
 -- | Special combinator for showing unboxed literals.
 pprPrimChar :: Char -> SDoc
-pprPrimInt, pprPrimWord :: Integer -> SDoc
-pprPrimInt8, pprPrimInt16, pprPrimInt32, pprPrimInt64 :: Integer -> SDoc
-pprPrimWord8, pprPrimWord16, pprPrimWord32, pprPrimWord64 :: Integer -> SDoc
+pprPrimInt, pprPrimWord,
+  pprPrimInt8, pprPrimWord8,
+  pprPrimInt16, pprPrimWord16,
+  pprPrimInt32, pprPrimWord32,
+  pprPrimInt64, pprPrimWord64
+  :: Integer -> SDoc
 pprPrimChar c   = pprHsChar c <> primCharSuffix
 pprPrimInt i    = integer i   <> primIntSuffix
 pprPrimWord w   = word    w   <> primWordSuffix
