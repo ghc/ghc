@@ -1066,17 +1066,17 @@ coercions to an O(1) amount.
 
 Note [Generics performance tricks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Generic based algorithms tend to rely on GHC optimizing away the intermediate
-representation for optimal performance. However, default unfolding threshold is
-usually too small for GHC to do that.
+Generics-based algorithms tend to rely on GHC optimizing away the intermediate
+representation for optimal performance. However, the default unfolding threshold
+is usually too small for GHC to do that.
 
 The recommended approach thus far was to increase unfolding threshold, but this
 makes GHC inline more aggressively in general, whereas it should only be more
-aggresive with Generic based code.
+aggresive with generics-based code.
 
 The solution is to use a heuristic that'll annotate Generic class methods with
-INLINE[1] pragmas (explicit phase is used to give user phase control as they can
-annotate their functions with INLINE[2] or INLINE[0] if appropriate).
+INLINE[1] pragmas (the explicit phase is used to give users phase control as
+they can annotate their functions with INLINE[2] or INLINE[0] if appropriate).
 
 The current heuristic was chosen by looking at how annotating Generic methods
 INLINE[1] helps with optimal code generation for several types of generic
@@ -1092,14 +1092,17 @@ The experimentation was done by picking data types having N constructors with M
 fields each and using their derived Generic instances to generate code with the
 above algorithms.
 
-The results are threshold values for N and M for which the inlining is
-beneficial, i.e. it leads to GHC optimizing away generic representation of a
-data type in the generated core.
+The results are threshold values for N and M (contained in
+`mkBindsRep.inlining_useful`) for which inlining is beneficial, i.e. it leads to
+GHC optimizing away the generic representation of a data type in the generated
+core.
 
-The data types at thresholds tested with the above algorithms can be found in
-T11068.
+The T11068 test case, which includes the algorithms mentioned above, tests that
+the generic representations of several data types optimize away using the
+threshold values in `mkBindsRep.inlining_useful`.
 
-Above the chosen thresholds annotating Generic class methods with INLINE pragmas
-tends to be at best useless and at worst lead to code size blowup without
-runtime performance improvements.
+If one uses threshold values higher what is found in
+`mkBindsRep.inlining_useful`, then annotating Generic class methods with INLINE
+pragmas tends to be at best useless and at worst lead to code size blowup
+without runtime performance improvements.
 -}

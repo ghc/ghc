@@ -987,6 +987,7 @@ by saying ``-fno-wombat``.
     :category:
 
     :default: on
+    :since: 9.2.1
 
     .. index::
        single: inlining, controlling
@@ -1005,6 +1006,7 @@ by saying ``-fno-wombat``.
     :category:
 
     :default: off
+    :since: 9.2.1
 
     .. index::
        single: inlining, controlling
