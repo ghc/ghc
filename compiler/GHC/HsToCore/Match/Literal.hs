@@ -97,8 +97,8 @@ dsLit l = do
     HsCharPrim   _ c -> return (Lit (LitChar c))
     HsIntPrim    _ i -> return (Lit (mkLitIntWrap platform i))
     HsWordPrim   _ w -> return (Lit (mkLitWordWrap platform w))
-    HsInt64Prim  _ i -> return (Lit (mkLitInt64Wrap platform i))
-    HsWord64Prim _ w -> return (Lit (mkLitWord64Wrap platform w))
+    HsInt64Prim  _ i -> return (Lit (mkLitInt64Wrap i))
+    HsWord64Prim _ w -> return (Lit (mkLitWord64Wrap w))
     HsFloatPrim  _ f -> return (Lit (LitFloat (fl_value f)))
     HsDoublePrim _ d -> return (Lit (LitDouble (fl_value d)))
     HsChar _ c       -> return (mkCharExpr c)
@@ -514,8 +514,8 @@ hsLitKey :: Platform -> HsLit GhcTc -> Literal
 -- HsLit does not.
 hsLitKey platform (HsIntPrim    _ i) = mkLitIntWrap  platform i
 hsLitKey platform (HsWordPrim   _ w) = mkLitWordWrap platform w
-hsLitKey platform (HsInt64Prim  _ i) = mkLitInt64Wrap  platform i
-hsLitKey platform (HsWord64Prim _ w) = mkLitWord64Wrap platform w
+hsLitKey _        (HsInt64Prim  _ i) = mkLitInt64Wrap  i
+hsLitKey _        (HsWord64Prim _ w) = mkLitWord64Wrap w
 hsLitKey _        (HsCharPrim   _ c) = mkLitChar            c
 hsLitKey _        (HsFloatPrim  _ f) = mkLitFloat           (fl_value f)
 hsLitKey _        (HsDoublePrim _ d) = mkLitDouble          (fl_value d)

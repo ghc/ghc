@@ -76,7 +76,6 @@ import Control.Applicative ( Alternative(..) )
 import Control.Monad
 import Data.Bits as Bits
 import qualified Data.ByteString as BS
-import Data.Int
 import Data.Ratio
 import Data.Word
 import Data.Maybe (fromMaybe)
@@ -238,37 +237,38 @@ primOpRules nm = \case
                                        , narrowSubsumesAnd WordAndOp Word32NarrowOp 32 ]
 
 
-   WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform wordToIntLit
+   WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt)
                                        , inversePrimOp IntToWordOp ]
-   IntToWordOp    -> mkPrimOpRule nm 1 [ liftLitPlatform intToWordLit
+   IntToWordOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord)
                                        , inversePrimOp WordToIntOp ]
-   Narrow8IntOp   -> mkPrimOpRule nm 1 [ liftLit narrow8IntLit
+
+   Narrow8IntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumInt8)
                                        , subsumedByPrimOp Narrow8IntOp
                                        , Narrow8IntOp `subsumesPrimOp` Narrow16IntOp
                                        , Narrow8IntOp `subsumesPrimOp` Narrow32IntOp
                                        , narrowSubsumesAnd IntAndOp Narrow8IntOp 8 ]
-   Narrow16IntOp  -> mkPrimOpRule nm 1 [ liftLit narrow16IntLit
+   Narrow16IntOp  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumInt16)
                                        , subsumedByPrimOp Narrow8IntOp
                                        , subsumedByPrimOp Narrow16IntOp
                                        , Narrow16IntOp `subsumesPrimOp` Narrow32IntOp
                                        , narrowSubsumesAnd IntAndOp Narrow16IntOp 16 ]
-   Narrow32IntOp  -> mkPrimOpRule nm 1 [ liftLit narrow32IntLit
+   Narrow32IntOp  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumInt32)
                                        , subsumedByPrimOp Narrow8IntOp
                                        , subsumedByPrimOp Narrow16IntOp
                                        , subsumedByPrimOp Narrow32IntOp
                                        , removeOp32
                                        , narrowSubsumesAnd IntAndOp Narrow32IntOp 32 ]
-   Narrow8WordOp  -> mkPrimOpRule nm 1 [ liftLit narrow8WordLit
+   Narrow8WordOp  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumWord8)
                                        , subsumedByPrimOp Narrow8WordOp
                                        , Narrow8WordOp `subsumesPrimOp` Narrow16WordOp
                                        , Narrow8WordOp `subsumesPrimOp` Narrow32WordOp
                                        , narrowSubsumesAnd WordAndOp Narrow8WordOp 8 ]
-   Narrow16WordOp -> mkPrimOpRule nm 1 [ liftLit narrow16WordLit
+   Narrow16WordOp -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumWord16)
                                        , subsumedByPrimOp Narrow8WordOp
                                        , subsumedByPrimOp Narrow16WordOp
                                        , Narrow16WordOp `subsumesPrimOp` Narrow32WordOp
                                        , narrowSubsumesAnd WordAndOp Narrow16WordOp 16 ]
-   Narrow32WordOp -> mkPrimOpRule nm 1 [ liftLit narrow32WordLit
+   Narrow32WordOp -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumWord32)
                                        , subsumedByPrimOp Narrow8WordOp
                                        , subsumedByPrimOp Narrow16WordOp
                                        , subsumedByPrimOp Narrow32WordOp
@@ -582,7 +582,7 @@ doubleOp2 _ _ _ _ = Nothing
 doubleDecodeOp :: RuleOpts -> Literal -> Maybe CoreExpr
 doubleDecodeOp env (LitDouble ((decodeFloat . fromRational @Double) -> (m, e)))
   = Just $ mkCoreUbxTup [iNT64Ty, intPrimTy]
-                        [ Lit (mkLitINT64 (roPlatform env) (toInteger m))
+                        [ Lit (mkLitINT64 (toInteger m))
                         , mkIntVal platform (toInteger e) ]
   where
     platform = roPlatform env
@@ -590,7 +590,7 @@ doubleDecodeOp env (LitDouble ((decodeFloat . fromRational @Double) -> (m, e)))
       | platformWordSizeInBits platform < 64
       = (int64PrimTy, mkLitInt64Wrap)
       | otherwise
-      = (intPrimTy  , mkLitIntWrap)
+      = (intPrimTy  , mkLitIntWrap platform)
 doubleDecodeOp _   _
   = Nothing
 
@@ -660,40 +660,6 @@ mkRuleFn platform Lt (Lit lit) _ | isMaxBound platform lit = Just $ falseValInt 
 mkRuleFn platform Gt _ (Lit lit) | isMaxBound platform lit = Just $ falseValInt platform
 mkRuleFn platform Le _ (Lit lit) | isMaxBound platform lit = Just $ trueValInt  platform
 mkRuleFn _ _ _ _                                           = Nothing
-
-isMinBound :: Platform -> Literal -> Bool
-isMinBound _        (LitChar c)        = c == minBound
-isMinBound platform (LitNumber nt i)   = case nt of
-   LitNumInt     -> i == platformMinInt platform
-   LitNumInt8    -> i == toInteger (minBound :: Int8)
-   LitNumInt16   -> i == toInteger (minBound :: Int16)
-   LitNumInt32   -> i == toInteger (minBound :: Int32)
-   LitNumInt64   -> i == toInteger (minBound :: Int64)
-   LitNumWord    -> i == 0
-   LitNumWord8   -> i == 0
-   LitNumWord16  -> i == 0
-   LitNumWord32  -> i == 0
-   LitNumWord64  -> i == 0
-   LitNumNatural -> i == 0
-   LitNumInteger -> False
-isMinBound _        _                  = False
-
-isMaxBound :: Platform -> Literal -> Bool
-isMaxBound _        (LitChar c)        = c == maxBound
-isMaxBound platform (LitNumber nt i)   = case nt of
-   LitNumInt     -> i == platformMaxInt platform
-   LitNumInt8    -> i == toInteger (maxBound :: Int8)
-   LitNumInt16   -> i == toInteger (maxBound :: Int16)
-   LitNumInt32   -> i == toInteger (maxBound :: Int32)
-   LitNumInt64   -> i == toInteger (maxBound :: Int64)
-   LitNumWord    -> i == platformMaxWord platform
-   LitNumWord8   -> i == toInteger (maxBound :: Word8)
-   LitNumWord16  -> i == toInteger (maxBound :: Word16)
-   LitNumWord32  -> i == toInteger (maxBound :: Word32)
-   LitNumWord64  -> i == toInteger (maxBound :: Word64)
-   LitNumNatural -> False
-   LitNumInteger -> False
-isMaxBound _        _                  = False
 
 -- | Create an Int literal expression while ensuring the given Integer is in the
 -- target Int range
