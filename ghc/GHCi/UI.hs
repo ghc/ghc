@@ -89,7 +89,7 @@ import GHC.Settings.Config
 import GHC.Data.Graph.Directed
 import GHC.Utils.Encoding
 import GHC.Data.FastString
-import GHC.Runtime.Linker
+import qualified GHC.Linker.Loader as Loader
 import GHC.Data.Maybe ( orElse, expectJust )
 import GHC.Types.Name.Set
 import GHC.Utils.Panic hiding ( showException, try )
@@ -2965,7 +2965,7 @@ newDynFlags interactive_only minus_opts = do
           clearAllTargets
           when must_reload $ do
             let units = preloadUnits (unitState dflags2)
-            liftIO $ linkPackages hsc_env units
+            liftIO $ Loader.loadPackages hsc_env units
           -- package flags changed, we can't re-use any of the old context
           setContextAfterLoad False []
           -- and copy the package state to the interactive DynFlags
@@ -2986,7 +2986,7 @@ newDynFlags interactive_only minus_opts = do
                                  , cmdlineFrameworks = newCLFrameworks } }
 
         when (not (null newLdInputs && null newCLFrameworks)) $
-          liftIO $ linkCmdLineLibs hsc_env'
+          liftIO $ Loader.loadCmdLineLibs hsc_env'
 
       return ()
 
@@ -3088,7 +3088,7 @@ showCmd str = do
             , action "modules"    $ showModules
             , action "bindings"   $ showBindings
             , action "linker"     $ do
-               msg <- liftIO $ showLinkerState (hsc_dynLinker hsc_env)
+               msg <- liftIO $ Loader.showLoaderState (hsc_loader hsc_env)
                dflags <- getDynFlags
                liftIO $ putLogMsg dflags NoReason SevDump noSrcSpan msg
             , action "breaks"     $ showBkptTable

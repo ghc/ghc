@@ -27,7 +27,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
-import GHC.Runtime.Linker      ( linkModule, getHValue )
+import GHC.Linker.Loader       ( loadModule, loadName )
 import GHC.Runtime.Interpreter ( wormhole, withInterp )
 import GHC.Runtime.Interpreter.Types
 
@@ -209,11 +209,11 @@ getHValueSafely hsc_env val_name expected_type = do
              then do
                 -- Link in the module that contains the value, if it has such a module
                 case nameModule_maybe val_name of
-                    Just mod -> do linkModule hsc_env mod
+                    Just mod -> do loadModule hsc_env mod
                                    return ()
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
-                hval <- withInterp hsc_env $ \interp -> getHValue hsc_env val_name >>= wormhole interp
+                hval <- withInterp hsc_env $ \interp -> loadName hsc_env val_name >>= wormhole interp
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing

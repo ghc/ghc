@@ -1,14 +1,15 @@
 -----------------------------------------------------------------------------
 --
--- Types for the Dynamic Linker
+-- Types for the linkers and the loader
 --
 -- (c) The University of Glasgow 2019
 --
 -----------------------------------------------------------------------------
 
-module GHC.Runtime.Linker.Types
-   ( DynLinker(..)
-   , PersistentLinkerState(..)
+module GHC.Linker.Types
+   ( Loader (..)
+   , LoaderState (..)
+   , uninitializedLoader
    , Linkable(..)
    , Unlinked(..)
    , SptEntry(..)
@@ -22,8 +23,6 @@ module GHC.Runtime.Linker.Types
 where
 
 import GHC.Prelude
-import Data.Time               ( UTCTime )
-import Control.Concurrent.MVar ( MVar )
 import GHC.Unit                ( UnitId, Module )
 import GHC.ByteCode.Types      ( ItblEnv, CompiledByteCode )
 import GHC.Fingerprint.Type    ( Fingerprint )
@@ -36,13 +35,34 @@ import GHC.Types.Name          ( Name )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-type ClosureEnv = NameEnv (Name, ForeignHValue)
+import Control.Concurrent.MVar
+import Data.Time               ( UTCTime )
 
-newtype DynLinker =
-  DynLinker { dl_mpls :: MVar (Maybe PersistentLinkerState) }
 
-data PersistentLinkerState
-  = PersistentLinkerState {
+{- **********************************************************************
+
+                        The Loader's state
+
+  ********************************************************************* -}
+
+{-
+The loader state *must* match the actual state of the C dynamic linker at all
+times.
+
+The MVar used to hold the LoaderState contains a Maybe LoaderState. The MVar
+serves to ensure mutual exclusion between multiple loaded copies of the GHC
+library. The Maybe may be Nothing to indicate that the linker has not yet been
+initialised.
+
+The LoaderState maps Names to actual closures (for interpreted code only), for
+use during linking.
+-}
+
+newtype Loader =
+  Loader { dl_mpls :: MVar (Maybe LoaderState) }
+
+data LoaderState
+  = LoaderState {
 
        -- Current global mapping from Names to their true values
        closure_env :: ClosureEnv,
@@ -68,6 +88,12 @@ data PersistentLinkerState
        -- we need to remember the name of previous temporary DLL/.so
        -- libraries so we can link them (see #10322)
        temp_sos :: ![(FilePath, String)] }
+
+uninitializedLoader :: IO Loader
+uninitializedLoader =
+  newMVar Nothing >>= (pure . Loader)
+
+type ClosureEnv = NameEnv (Name, ForeignHValue)
 
 -- | Information we can use to dynamically link modules into the compiler
 data Linkable = LM {
