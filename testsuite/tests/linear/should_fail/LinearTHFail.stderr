@@ -1,0 +1,13 @@
+
+LinearTHFail.hs:8:3: error:
+    • Couldn't match type ‘'Many’ with ‘'One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘f’:
+          f x
+            = [| Just $x |]
+              pending(rn) [<splice, x>]
+
+LinearTHFail.hs:11:3: error:
+    • Couldn't match type ‘'Many’ with ‘'One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘g’: g x = [|| Just $$x ||]

@@ -162,6 +162,20 @@ the following flags:
 
     Pass ⟨option⟩ to the C compiler.
 
+.. ghc-flag:: -pgmc-supports-no-pie
+    :shortdesc: Indicate that the C compiler supports ``-no-pie``
+    :type: dynamic
+    :category: phase-options
+
+    When ``-pgmc`` is used, GHC by default will never pass the ``-no-pie``
+    command line flag. The rationale is that it is not known whether the
+    specified compiler will support it. This flag can be used to indicate
+    that ``-no-pie`` is supported. It has to be passed after ``-pgmc``.
+
+    This flag is not neccessary when ``-pgmc`` is not used, since GHC
+    remembers whether the default C compiler supports ``-no-pie`` in
+    an internal settings file.
+
 .. ghc-flag:: -optcxx ⟨option⟩
     :shortdesc: pass ⟨option⟩ to the C++ compiler
     :type: dynamic

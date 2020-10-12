@@ -339,7 +339,7 @@ bigNatCompareWord# a b
    | bigNatIsZero a                   = cmpW# 0## b
    | isTrue# (wordArraySize# a ># 1#) = GT
    | True
-   = cmpW# (indexWordArray# a 1#) b
+   = cmpW# (indexWordArray# a 0#) b
 
 -- | Compare a BigNat and a Word
 bigNatCompareWord :: BigNat# -> Word -> Ordering
