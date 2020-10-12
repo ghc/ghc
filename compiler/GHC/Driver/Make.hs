@@ -35,7 +35,7 @@ module GHC.Driver.Make (
 
 import GHC.Prelude
 
-import qualified GHC.Runtime.Linker as Linker
+import qualified GHC.Linker.Runtime as Linker
 
 import GHC.Driver.Config
 import GHC.Driver.Phases

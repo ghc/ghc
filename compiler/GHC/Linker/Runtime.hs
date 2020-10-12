@@ -3,13 +3,13 @@
 
 --
 --  (c) The University of Glasgow 2002-2006
---
+
 -- | The dynamic linker for GHCi.
 --
 -- This module deals with the top-level issues of dynamic linking,
 -- calling the object-code linker and the byte-code linker where
 -- necessary.
-module GHC.Runtime.Linker
+module GHC.Linker.Runtime
    ( getHValue
    , showLinkerState
    , linkExpr
@@ -49,7 +49,7 @@ import GHC.Types.Name.Env
 import GHC.Unit.Module
 import GHC.Unit.Home
 import GHC.Data.List.SetOps
-import GHC.Runtime.Linker.Types (DynLinker(..), PersistentLinkerState(..))
+import GHC.Linker.Types (DynLinker(..), PersistentLinkerState(..))
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Types.Basic
@@ -64,6 +64,9 @@ import GHC.Data.FastString
 import GHC.Platform
 import GHC.SysTools
 import GHC.SysTools.FileCleanup
+
+import GHC.Linker.MacOS
+import GHC.Linker.External
 
 -- Standard libraries
 import Control.Monad
@@ -191,7 +194,7 @@ getHValue hsc_env name = do
               m <- lookupClosure hsc_env (unpackFS sym_to_find)
               case m of
                 Just hvref -> mkFinalizedHValue hsc_env hvref
-                Nothing -> linkFail "GHC.Runtime.Linker.getHValue"
+                Nothing -> linkFail "GHC.Linker.Runtime.getHValue"
                              (unpackFS sym_to_find)
 
 linkDependencies :: HscEnv -> PersistentLinkerState
@@ -972,7 +975,7 @@ dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
         Nothing -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
         Just err -> linkFail msg err
   where
-    msg = "GHC.Runtime.Linker.dynLoadObjs: Loading temp shared object failed"
+    msg = "GHC.Linker.Runtime.dynLoadObjs: Loading temp shared object failed"
 
 rmDupLinkables :: [Linkable]    -- Already loaded
                -> [Linkable]    -- New linkables
@@ -1287,7 +1290,7 @@ linkPackage hsc_env pkg
 
         let hs_libs   =  Packages.unitLibraries pkg
             -- The FFI GHCi import lib isn't needed as
-            -- GHC.Runtime.Linker + rts/Linker.c link the
+            -- GHC.Linker.Runtime + rts/Linker.c link the
             -- interpreted references to FFI to the compiled FFI.
             -- We therefore filter it out so that we don't get
             -- duplicate symbol errors.
@@ -1700,70 +1703,6 @@ addEnvPaths name list
 -- ----------------------------------------------------------------------------
 -- Loading a dynamic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
 
-{-
-Note [macOS Big Sur dynamic libraries]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-macOS Big Sur makes the following change to how frameworks are shipped
-with the OS:
-
-> New in macOS Big Sur 11 beta, the system ships with a built-in
-> dynamic linker cache of all system-provided libraries.  As part of
-> this change, copies of dynamic libraries are no longer present on
-> the filesystem.  Code that attempts to check for dynamic library
-> presence by looking for a file at a path or enumerating a directory
-> will fail.  Instead, check for library presence by attempting to
-> dlopen() the path, which will correctly check for the library in the
-> cache. (62986286)
-
-(https://developer.apple.com/documentation/macos-release-notes/macos-big-sur-11-beta-release-notes/)
-
-Therefore, the previous method of checking whether a library exists
-before attempting to load it makes GHC.Runtime.Linker.loadFramework
-fail to find frameworks installed at /System/Library/Frameworks.
-Instead, any attempt to load a framework at runtime, such as by
-passing -framework OpenGL to runghc or running code loading such a
-framework with GHCi, fails with a 'not found' message.
-
-GHC.Runtime.Linker.loadFramework now opportunistically loads the
-framework libraries without checking for their existence first,
-failing only if all attempts to load a given framework from any of the
-various possible locations fail.  See also #18446, which this change
-addresses.
--}
-
--- Darwin / MacOS X only: load a framework
--- a framework is a dynamic library packaged inside a directory of the same
--- name. They are searched for in different paths than normal libraries.
-loadFramework :: HscEnv -> [FilePath] -> FilePath -> IO (Maybe String)
-loadFramework hsc_env extraPaths rootname
-   = do { either_dir <- tryIO getHomeDirectory
-        ; let homeFrameworkPath = case either_dir of
-                                  Left _ -> []
-                                  Right dir -> [dir </> "Library/Frameworks"]
-              ps = extraPaths ++ homeFrameworkPath ++ defaultFrameworkPaths
-        ; errs <- findLoadDLL ps []
-        ; return $ fmap (intercalate ", ") errs
-        }
-   where
-     fwk_file = rootname <.> "framework" </> rootname
-
-     -- sorry for the hardcoded paths, I hope they won't change anytime soon:
-     defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
-
-     -- Try to call loadDLL for each candidate path.
-     --
-     -- See Note [macOS Big Sur dynamic libraries]
-     findLoadDLL [] errs =
-       -- Tried all our known library paths, but dlopen()
-       -- has no built-in paths for frameworks: give up
-       return $ Just errs
-     findLoadDLL (p:ps) errs =
-       do { dll <- loadDLL hsc_env (p </> fwk_file)
-          ; case dll of
-              Nothing  -> return Nothing
-              Just err -> findLoadDLL ps ((p ++ ": " ++ err):errs)
-          }
 
 {- **********************************************************************
 

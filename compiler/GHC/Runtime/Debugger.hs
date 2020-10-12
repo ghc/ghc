@@ -14,7 +14,7 @@ module GHC.Runtime.Debugger (pprintClosureCommand, showTerm, pprTypeAndContents)
 
 import GHC.Prelude
 
-import GHC.Runtime.Linker
+import GHC.Linker.Runtime
 import GHC.Runtime.Heap.Inspect
 
 import GHC.Runtime.Interpreter
