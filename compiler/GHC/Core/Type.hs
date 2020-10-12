@@ -1119,14 +1119,14 @@ In the compiler we maintain the invariant that all saturated applications of
 See #11714.
 -}
 
-splitFunTy :: Type -> (Type, Type, Type)
--- ^ Attempts to extract the argument and result types from a type, and
--- panics if that is not possible. See also 'splitFunTy_maybe'
+splitFunTy :: Type -> (Mult, Type, Type)
+-- ^ Attempts to extract the multiplicity, argument and result types from a type,
+-- and panics if that is not possible. See also 'splitFunTy_maybe'
 splitFunTy = expectJust "splitFunTy" . splitFunTy_maybe
 
 {-# INLINE splitFunTy_maybe #-}
-splitFunTy_maybe :: Type -> Maybe (Type, Type, Type)
--- ^ Attempts to extract the argument and result types from a type
+splitFunTy_maybe :: Type -> Maybe (Mult, Type, Type)
+-- ^ Attempts to extract the multiplicity, argument and result types from a type
 splitFunTy_maybe ty
   | FunTy _ w arg res <- coreFullView ty = Just (w, arg, res)
   | otherwise                            = Nothing

@@ -101,12 +101,22 @@ Whether a data constructor field is linear or not can be customized using the GA
 ::
 
     data T2 a b c where
-        MkT2 :: a -> b %1 -> c %1 -> T2 a b  -- Note unrestricted arrow in the first argument
+        MkT2 :: a -> b %1 -> c %1 -> T2 a b c -- Note unrestricted arrow in the first argument
 
 the value ``MkT2 x y z`` can be constructed only if ``x`` is
 unrestricted. On the other hand, a linear function which is matching
 on ``MkT2 x y z`` must consume ``y`` and ``z`` exactly once, but there
 is no restriction on ``x``.
+
+It is also possible to define a multiplicity-polymorphic field:
+
+::
+    data T3 a m where
+        MkT3 :: a %m -> T3 a m
+
+While linear fields are generalized (``MkT1 :: forall {m} a. a %m -> T1 a``
+in the previous example), multiplicity-polymorphic fields are not;
+it is not possible to directly use ``MkT3`` as a function ``a -> T3 a 'One``.
 
 If :extension:`LinearTypes` is disabled, all fields are considered to be linear
 fields, including GADT fields defined with the ``->`` arrow.
@@ -143,9 +153,9 @@ missing pieces.
   have success using it, or you may not. Expect it to be really unreliable.
 - There is currently no support for multiplicity annotations such as
   ``x :: a %p``, ``\(x :: a %p) -> ...``.
-- All ``case``, ``let`` and ``where`` statements consume their
-  right-hand side, or scrutiny, ``Many`` times. That is, the following
-  will not type check:
+- All ``case`` expressions consume their scrutinee ``Many`` times.
+  All ``let`` and ``where`` statements consume their right hand side
+  ``Many`` times. That is, the following will not type check:
 
   ::
 

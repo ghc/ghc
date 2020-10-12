@@ -351,9 +351,10 @@ mkPsBindStmt pat body = BindStmt noExtField pat body
 mkRnBindStmt pat body = BindStmt (XBindStmtRn { xbsrn_bindOp = noSyntaxExpr, xbsrn_failOp = Nothing }) pat body
 mkTcBindStmt pat body = BindStmt (XBindStmtTc { xbstc_bindOp = noSyntaxExpr,
                                                 xbstc_boundResultType = unitTy,
+                                                   -- unitTy is a dummy value
+                                                   -- can't panic here: it's forced during zonking
                                                 xbstc_boundResultMult = Many,
                                                 xbstc_failOp = Nothing }) pat body
-  -- don't use placeHolderTypeTc above, because that panics during zonking
 
 emptyRecStmt' :: forall idL idR body. IsPass idR
               => XRecStmt (GhcPass idL) (GhcPass idR) body
