@@ -102,6 +102,34 @@ pprWarning = \case
              <+> text "after the module name instead."
          $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
 
+   WarnOperatorWhitespaceExtConflict loc sym
+      -> mkParserWarn Opt_WarnOperatorWhitespaceExtConflict loc $
+         let mk_prefix_msg operator_symbol extension_name syntax_meaning =
+                  text "The prefix use of a" <+> quotes (text operator_symbol)
+                    <+> text "would denote" <+> text syntax_meaning
+               $$ nest 2 (text "were the" <+> text extension_name <+> text "extension enabled.")
+               $$ text "Suggested fix: add whitespace after the"
+                    <+> quotes (text operator_symbol) <> char '.'
+         in
+         case sym of
+           OperatorWhitespaceSymbol_PrefixPercent -> mk_prefix_msg "%" "LinearTypes" "a multiplicity annotation"
+           OperatorWhitespaceSymbol_PrefixDollar -> mk_prefix_msg "$" "TemplateHaskell" "an untyped splice"
+           OperatorWhitespaceSymbol_PrefixDollarDollar -> mk_prefix_msg "$$" "TemplateHaskell" "a typed splice"
+
+
+   WarnOperatorWhitespace loc sym occ_type
+      -> mkParserWarn Opt_WarnOperatorWhitespace loc $
+         let mk_msg occ_type_str =
+                  text "The" <+> text occ_type_str <+> text "use of a" <+> quotes (ftext sym)
+                    <+> text "might be repurposed as special syntax"
+               $$ nest 2 (text "by a future language extension.")
+               $$ text "Suggested fix: add whitespace around it."
+         in
+         case occ_type of
+           OperatorWhitespaceOccurrence_Prefix -> mk_msg "prefix"
+           OperatorWhitespaceOccurrence_Suffix -> mk_msg "suffix"
+           OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
+
 pprError :: Error -> ErrMsg
 pprError err = mkParserErr (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))

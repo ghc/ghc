@@ -427,7 +427,7 @@ resumeExec canLogSpan step
                     hist' = case mb_brkpt of
                        Nothing -> prevHistoryLst
                        Just bi
-                         | not $canLogSpan span -> prevHistoryLst
+                         | not $ canLogSpan span -> prevHistoryLst
                          | otherwise -> mkHistory hsc_env apStack bi `consBL`
                                                         fromListBL 50 hist
                 handleRunStatus step expr bindings final_ids status hist'

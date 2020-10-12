@@ -1572,42 +1572,65 @@ qconsym buf len = ITqconsym $! splitQualName buf len False
 
 -- See Note [Whitespace-sensitive operator parsing]
 varsym_prefix :: Action
-varsym_prefix = sym $ \exts s ->
-  if | s == fsLit "@"  -- regardless of TypeApplications for better error messages
-     -> return ITtypeApp
-     | LinearTypesBit `xtest` exts, s == fsLit "%"
-     -> return ITpercent
-     | ThQuotesBit `xtest` exts, s == fsLit "$"
-     -> return ITdollar
-     | ThQuotesBit `xtest` exts, s == fsLit "$$"
-     -> return ITdollardollar
-     | s == fsLit "-"   -- Only when LexicalNegation is on, otherwise we get ITminus and
-                        -- don't hit this code path. See Note [Minus tokens]
-     -> return ITprefixminus
+varsym_prefix = sym $ \span exts s ->
+  let warnExtConflict errtok =
+        do { addWarning Opt_WarnOperatorWhitespaceExtConflict $
+               WarnOperatorWhitespaceExtConflict (mkSrcSpanPs span) errtok
+           ; return (ITvarsym s) }
+  in
+  if | s == fsLit "@" ->
+         return ITtypeApp  -- regardless of TypeApplications for better error messages
+     | s == fsLit "%" ->
+         if xtest LinearTypesBit exts
+         then return ITpercent
+         else warnExtConflict OperatorWhitespaceSymbol_PrefixPercent
+     | s == fsLit "$" ->
+         if xtest ThQuotesBit exts
+         then return ITdollar
+         else warnExtConflict OperatorWhitespaceSymbol_PrefixDollar
+     | s == fsLit "$$" ->
+         if xtest ThQuotesBit exts
+         then return ITdollardollar
+         else warnExtConflict OperatorWhitespaceSymbol_PrefixDollarDollar
+     | s == fsLit "-" ->
+         return ITprefixminus -- Only when LexicalNegation is on, otherwise we get ITminus
+                              -- and don't hit this code path. See Note [Minus tokens]
      | s == fsLit "!" -> return ITbang
      | s == fsLit "~" -> return ITtilde
-     | otherwise -> return (ITvarsym s)
+     | otherwise ->
+         do { addWarning Opt_WarnOperatorWhitespace $
+                WarnOperatorWhitespace (mkSrcSpanPs span) s
+                  OperatorWhitespaceOccurrence_Prefix
+            ; return (ITvarsym s) }
 
 -- See Note [Whitespace-sensitive operator parsing]
 varsym_suffix :: Action
-varsym_suffix = sym $ \_ s ->
+varsym_suffix = sym $ \span _ s ->
   if | s == fsLit "@" -> failMsgP (Error ErrSuffixAT [])
-     | otherwise      -> return (ITvarsym s)
+     | otherwise ->
+         do { addWarning Opt_WarnOperatorWhitespace $
+                WarnOperatorWhitespace (mkSrcSpanPs span) s
+                  OperatorWhitespaceOccurrence_Suffix
+            ; return (ITvarsym s) }
 
 -- See Note [Whitespace-sensitive operator parsing]
 varsym_tight_infix :: Action
-varsym_tight_infix = sym $ \_ s ->
+varsym_tight_infix = sym $ \span _ s ->
   if | s == fsLit "@" -> return ITat
-     | otherwise -> return (ITvarsym s)
+     | otherwise ->
+         do { addWarning Opt_WarnOperatorWhitespace $
+                WarnOperatorWhitespace (mkSrcSpanPs span) s
+                  OperatorWhitespaceOccurrence_TightInfix
+            ;  return (ITvarsym s) }
 
 -- See Note [Whitespace-sensitive operator parsing]
 varsym_loose_infix :: Action
-varsym_loose_infix = sym (\_ s -> return $ ITvarsym s)
+varsym_loose_infix = sym (\_ _ s -> return $ ITvarsym s)
 
 consym :: Action
-consym = sym (\_exts s -> return $ ITconsym s)
+consym = sym (\_span _exts s -> return $ ITconsym s)
 
-sym :: (ExtsBitmap -> FastString -> P Token) -> Action
+sym :: (PsSpan -> ExtsBitmap -> FastString -> P Token) -> Action
 sym con span buf len =
   case lookupUFM reservedSymsFM fs of
     Just (keyword, NormalSyntax, 0) ->
@@ -1616,20 +1639,20 @@ sym con span buf len =
       exts <- getExts
       if exts .&. i /= 0
         then return $ L span keyword
-        else L span <$!> con exts fs
+        else L span <$!> con span exts fs
     Just (keyword, UnicodeSyntax, 0) -> do
       exts <- getExts
       if xtest UnicodeSyntaxBit exts
         then return $ L span keyword
-        else L span <$!> con exts fs
+        else L span <$!> con span exts fs
     Just (keyword, UnicodeSyntax, i) -> do
       exts <- getExts
       if exts .&. i /= 0 && xtest UnicodeSyntaxBit exts
         then return $ L span keyword
-        else L span <$!> con exts fs
+        else L span <$!> con span exts fs
     Nothing -> do
       exts <- getExts
-      L span <$!> con exts fs
+      L span <$!> con span exts fs
   where
     !fs = lexemeToFastString buf len
 

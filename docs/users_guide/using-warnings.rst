@@ -51,6 +51,7 @@ To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
         * :ghc-flag:`-Wunrecognised-warning-flags`
         * :ghc-flag:`-Winaccessible-code`
         * :ghc-flag:`-Wstar-binder`
+        * :ghc-flag:`-Woperator-whitespace-ext-conflict`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -1853,6 +1854,7 @@ of ``-W(no-)*``.
 .. ghc-flag:: -Winvalid-haddock
     :shortdesc: warn when a Haddock comment occurs in an invalid position
     :type: dynamic
+    :reverse: -Wno-invalid-haddock
     :category:
 
     :since: 9.0
@@ -1868,6 +1870,56 @@ of ``-W(no-)*``.
 
     This warning informs you about discarded documentation comments.
     It has no effect when :ghc-flag:`-haddock` is disabled.
+
+.. ghc-flag:: -Woperator-whitespace-ext-conflict
+    :shortdesc: warn on uses of infix operators that would be parsed differently
+                were a particular GHC extension enabled
+    :type: dynamic
+    :reverse: -Wno-operator-whitespace-ext-conflict
+    :category:
+
+    :since: 9.2
+
+    When :extension:`TemplateHaskell` is enabled, ``f $x`` is parsed as ``f``
+    applied to an untyped splice. But when the extension is disabled, the
+    expression is parsed as a use of the ``$`` infix operator.
+
+    To make it easy to read ``f $x`` without checking the enabled extensions,
+    one could rewrite it as ``f $ x``, which is what this warning suggests.
+
+    Currently, it detects the following cases:
+
+    * ``$x`` could mean an untyped splice under :extension:`TemplateHaskell`
+    * ``$$x`` could mean a typed splice under :extension:`TemplateHaskell`
+    * ``%m`` could mean a multiplicity annotation under :extension:`LinearTypes`
+
+    It only covers extensions that currently exist. If you want to enforce a
+    stricter policy and always require whitespace around all infix operators,
+    use :ghc-flag:`-Woperator-whitespace`.
+
+.. ghc-flag:: -Woperator-whitespace
+    :shortdesc: warn on prefix, suffix, and tight infix uses of infix operators
+    :type: dynamic
+    :reverse: -Wno-operator-whitespace
+    :category:
+
+    :since: 9.2
+
+    There are four types of infix operator occurrences, as defined by
+    `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__::
+
+      a ! b   -- a loose infix occurrence
+      a!b     -- a tight infix occurrence
+      a !b    -- a prefix occurrence
+      a! b    -- a suffix occurrence
+
+    A loose infix occurrence of any operator is always parsed as an infix
+    operator, but other occurrence types may be assigned a special meaning.
+    For example, a prefix ``!`` denotes a bang pattern, and a prefix ``$``
+    denotes a :extension:`TemplateHaskell` splice.
+
+    This warning encourages the use of loose infix occurrences of all infix
+    operators, to prevent possible conflicts with future language extensions.
 
 .. ghc-flag:: -Wauto-orphans
     :shortdesc: *(deprecated)* Does nothing

@@ -207,14 +207,14 @@ nodeOnly = ([VanillaReg 1], [], [], [], [])
 realArgRegsCover :: Platform -> [GlobalReg]
 realArgRegsCover platform
     | passFloatArgsInXmm platform
-    = map ($VGcPtr) (realVanillaRegs platform) ++
+    = map ($ VGcPtr) (realVanillaRegs platform) ++
       realLongRegs platform ++
       realDoubleRegs platform -- we only need to save the low Double part of XMM registers.
                               -- Moreover, the NCG can't load/store full XMM
                               -- registers for now...
 
     | otherwise
-    = map ($VGcPtr) (realVanillaRegs platform) ++
+    = map ($ VGcPtr) (realVanillaRegs platform) ++
       realFloatRegs  platform ++
       realDoubleRegs platform ++
       realLongRegs   platform
