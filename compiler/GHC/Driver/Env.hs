@@ -30,7 +30,7 @@ import GHC.Unit.Finder.Types
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
-import GHC.Runtime.Linker.Types ( DynLinker )
+import GHC.Linker.Types ( Loader )
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
@@ -172,8 +172,8 @@ data HscEnv
                 -- ^ target code interpreter (if any) to use for TH and GHCi.
                 -- See Note [Target code interpreter]
 
-        , hsc_dynLinker :: DynLinker
-                -- ^ dynamic linker.
+        , hsc_loader :: Loader
+                -- ^ Loader (dynamic linker)
 
         , hsc_home_unit :: !HomeUnit
                 -- ^ Home-unit

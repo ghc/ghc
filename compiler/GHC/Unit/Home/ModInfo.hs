@@ -24,7 +24,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module
 
-import GHC.Runtime.Linker.Types ( Linkable(..) )
+import GHC.Linker.Types ( Linkable(..) )
 
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM

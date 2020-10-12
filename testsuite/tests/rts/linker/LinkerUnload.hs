@@ -4,7 +4,7 @@ import GHC
 import GHC.Unit.State
 import GHC.Driver.Session
 import GHC.Driver.Backend
-import GHC.Runtime.Linker as Linker
+import qualified GHC.Linker.Loader as Loader
 import System.Environment
 import GHC.Utils.Monad ( MonadIO(..) )
 
@@ -19,4 +19,4 @@ loadPackages = do
                          , ghcLink = LinkInMemory }
     setSessionDynFlags dflags'
     hsc_env <- getSession
-    liftIO $ Linker.linkPackages hsc_env (preloadUnits (unitState dflags'))
+    liftIO $ Loader.loadPackages hsc_env (preloadUnits (unitState dflags'))
