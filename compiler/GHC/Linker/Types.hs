@@ -6,7 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Runtime.Linker.Types (
+module GHC.Linker.Types (
       DynLinker(..),
       PersistentLinkerState(..),
       Linkable(..),
