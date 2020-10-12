@@ -285,6 +285,7 @@ hadrian-ghc-in-ghci:
     - "echo $PATH"
     - "echo $SHELL"
     - which autoreconf
+    - "ls toolchain"
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_make
