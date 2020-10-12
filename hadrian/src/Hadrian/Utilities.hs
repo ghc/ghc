@@ -10,7 +10,7 @@ module Hadrian.Utilities (
     unifyPath, (-/-), makeRelativeNoSysLink,
 
     -- * Accessing Shake's type-indexed map
-    insertExtra, lookupExtra, userSetting,
+    insertExtra, lookupExtra, userSetting, userSettingRules,
 
     -- * Paths
     BuildRoot (..), buildRoot, buildRootRules, isGeneratedSource,
