@@ -27,6 +27,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 import GHC.Data.Maybe
 import GHC.Driver.Finder
+import GHC.Linker.Unit
 
 import Control.Monad (filterM)
 import Data.List
@@ -186,7 +187,7 @@ mkPluginUsage hsc_env pluginModule
             if useDyn
               then libLocs
               else
-                let dflags'  = addWay' WayDyn dflags
+                let dflags'  = addWay' WayDyn dflags -- FIXME: we should use GHC.Platform.Ways.hostFullWays
                     dlibLocs = [ searchPath </> mkHsSOName platform dlibLoc
                                | searchPath <- searchPaths
                                , dlibLoc    <- packageHsLibs dflags' pkg

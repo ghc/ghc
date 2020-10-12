@@ -196,7 +196,7 @@ import GHC.Core.PatSyn
 import GHC.Builtin.Names ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import GHC.Builtin.Types
 import GHC.Driver.Backend
-import GHC.Runtime.Linker.Types ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
+import GHC.Linker.Types ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
 import GHC.Driver.Phases
    ( Phase, HscSource(..), hscSourceString
    , isHsBootOrSig, isHsigFile )
@@ -3152,7 +3152,7 @@ data HsParsedModule = HsParsedModule {
 *                                                                      *
 ************************************************************************
 
-This stuff is in here, rather than (say) in "GHC.Runtime.Linker", because the "GHC.Runtime.Linker"
+This stuff is in here, rather than (say) in "GHC.Linker.Runtime", because the "GHC.Linker.Runtime"
 stuff is the *dynamic* linker, and isn't present in a stage-1 compiler
 -}
 
