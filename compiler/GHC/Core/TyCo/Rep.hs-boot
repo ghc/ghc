@@ -23,6 +23,7 @@ type MCoercionN = MCoercion
 
 mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
 mkForAllTy :: Var -> ArgFlag -> Type -> Type
+liftedTypeKindTyConApp :: Type
 
 instance Data Type  -- To support Data instances in GHC.Core.Coercion.Axiom
 instance Outputable Type

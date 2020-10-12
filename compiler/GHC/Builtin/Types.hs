@@ -173,6 +173,7 @@ import GHC.Core.DataCon
 import {-# SOURCE #-} GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Class     ( Class, mkClass )
+import GHC.Core.TyCo.Rep (liftedTypeKindTyConApp)
 import GHC.Types.Name.Reader
 import GHC.Types.Name as Name
 import GHC.Types.Name.Env ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
@@ -694,7 +695,7 @@ constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
-liftedTypeKind   = tYPE liftedRepTy
+liftedTypeKind   = liftedTypeKindTyConApp
 typeToTypeKind   = liftedTypeKind `mkVisFunTyMany` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
