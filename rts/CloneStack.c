@@ -16,7 +16,7 @@ void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar) {
   msg = (MessageCloneStack *)allocate(srcCapability, sizeofW(MessageCloneStack));
   msg->tso = tso;
   msg->result = (StgMVar*)deRefStablePtr(mvar);
-  // TODO: Free? See RtsAPI.c: hs_try_putmvar()
+  freeStablePtr(mvar);
   SET_HDR(msg, &stg_MSG_CLONE_STACK_info, CCS_SYSTEM);
   // Ensure that writes constructing Message are committed before sending.
   write_barrier();
