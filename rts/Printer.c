@@ -921,6 +921,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
             printLargeBitmap(spBottom,
                             (StgPtr)((StgClosure *) sp)->payload,
                             bitmap,
+                            bitmap->size);
             continue;
         case RET_FUN:
         {
