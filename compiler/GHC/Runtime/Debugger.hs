@@ -21,7 +21,8 @@ import GHC.Driver.Ppr
 import GHC.Driver.Monad
 import GHC.Driver.Env
 
-import GHC.Runtime.Linker
+import GHC.Linker.Loader
+
 import GHC.Runtime.Heap.Inspect
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
@@ -131,8 +132,8 @@ bindSuspensions t = do
       let ids = [ mkVanillaGlobal name ty
                 | (name,ty) <- zip names tys]
           new_ic = extendInteractiveContextWithIds ictxt ids
-          dl = hsc_dynLinker hsc_env
-      liftIO $ extendLinkEnv dl (zip names fhvs)
+          dl = hsc_loader hsc_env
+      liftIO $ extendLoadedEnv dl (zip names fhvs)
       setSession hsc_env {hsc_IC = new_ic }
       return t'
      where
@@ -186,9 +187,9 @@ showTerm term = do
                expr = "Prelude.return (Prelude.show " ++
                          showPpr dflags bname ++
                       ") :: Prelude.IO Prelude.String"
-               dl   = hsc_dynLinker hsc_env
+               dl   = hsc_loader hsc_env
            GHC.setSessionDynFlags dflags{log_action=noop_log}
-           txt_ <- withExtendedLinkEnv dl
+           txt_ <- withExtendedLoadedEnv dl
                                        [(bname, fhv)]
                                        (GHC.compileExprRemote expr)
            let myprec = 10 -- application precedence. TODO Infix constructors
