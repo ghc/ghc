@@ -787,6 +787,8 @@ distinction). GHC does not consider ``forall k. k -> Type`` and
 ``forall {k}. k -> Type`` to be equal at the kind level, and thus rejects
 ``Foo Proxy`` as ill-kinded.
 
+.. _constraints_in_kinds:
+
 Constraints in kinds
 --------------------
 
