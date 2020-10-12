@@ -57,13 +57,15 @@ import GHC.Driver.Ppr
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter as GHCi
 import GHC.Runtime.Interpreter.Types
-import GHC.Runtime.Linker as Linker
-import GHC.Runtime.Linker.Types
 import GHC.Runtime.Heap.Inspect
 import GHC.Runtime.Context
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.ByteCode.Types
+
+import GHC.Linker.Types
+
+import GHC.Linker.Runtime as Linker
 
 import GHC.Hs
 

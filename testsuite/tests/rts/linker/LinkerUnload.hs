@@ -4,7 +4,7 @@ import GHC
 import GHC.Unit.State
 import GHC.Driver.Session
 import GHC.Driver.Backend
-import GHC.Runtime.Linker as Linker
+import GHC.Linker.Runtime as Linker
 import System.Environment
 import GHC.Utils.Monad ( MonadIO(..) )
 

@@ -21,7 +21,8 @@ import GHC.Driver.Ppr
 import GHC.Driver.Monad
 import GHC.Driver.Env
 
-import GHC.Runtime.Linker
+import GHC.Linker.Runtime
+
 import GHC.Runtime.Heap.Inspect
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context

@@ -37,6 +37,8 @@ import GHC.Unit.Module.Imported
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
+import GHC.Linker.Unit
+
 import GHC.Data.Maybe
 
 import Control.Monad (filterM)
@@ -197,7 +199,7 @@ mkPluginUsage hsc_env pluginModule
             if useDyn
               then libLocs
               else
-                let dflags'  = addWay' WayDyn dflags
+                let dflags'  = addWay' WayDyn dflags -- FIXME: we should use GHC.Platform.Ways.hostFullWays
                     dlibLocs = [ searchPath </> platformHsSOName platform dlibLoc
                                | searchPath <- searchPaths
                                , dlibLoc    <- packageHsLibs dflags' pkg

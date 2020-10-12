@@ -30,7 +30,7 @@ import GHC.Unit.Finder.Types
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
-import GHC.Runtime.Linker.Types ( DynLinker )
+import GHC.Linker.Types ( DynLinker )
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts

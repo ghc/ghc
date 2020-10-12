@@ -96,13 +96,14 @@ import GHC.Driver.CodeOutput
 import GHC.Driver.Config
 import GHC.Driver.Hooks
 
+import GHC.Linker.Runtime
 import GHC.Runtime.Context
-import GHC.Runtime.Linker
-import GHC.Runtime.Linker.Types
 import GHC.Runtime.Interpreter ( addSptEntry )
 import GHC.Runtime.Loader      ( initializePlugins )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.ByteCode.Types
+
+import GHC.Linker.Types
 
 import GHC.Hs
 import GHC.Hs.Dump

@@ -21,7 +21,7 @@ import GHC.Core         ( CoreProgram, CoreRule )
 import GHC.Core.TyCon
 import GHC.Core.PatSyn
 
-import GHC.Runtime.Linker.Types ( SptEntry(..) )
+import GHC.Linker.Types ( SptEntry(..) )
 
 import GHC.Types.Annotations ( Annotation )
 import GHC.Types.Avail
