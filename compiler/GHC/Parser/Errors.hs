@@ -1,6 +1,8 @@
 module GHC.Parser.Errors
    ( Warning(..)
    , TransLayoutReason(..)
+   , OperatorWhitespaceSymbol(..)
+   , OperatorWhitespaceOccurrence(..)
    , NumUnderscoreReason(..)
    , Error(..)
    , ErrorDesc(..)
@@ -57,6 +59,20 @@ data Warning
    | WarnImportPreQualified !SrcSpan
       -- ^ Pre qualified import with 'WarnPrepositiveQualifiedModule' enabled
 
+   | WarnOperatorWhitespaceExtConflict !SrcSpan !OperatorWhitespaceSymbol
+   | WarnOperatorWhitespace !SrcSpan !FastString !OperatorWhitespaceOccurrence
+
+-- | The operator symbol in the 'WarnOperatorWhitespaceExtConflict' warning.
+data OperatorWhitespaceSymbol
+   = OperatorWhitespaceSymbol_PrefixPercent
+   | OperatorWhitespaceSymbol_PrefixDollar
+   | OperatorWhitespaceSymbol_PrefixDollarDollar
+
+-- | The operator occurrence type in the 'WarnOperatorWhitespace' warning.
+data OperatorWhitespaceOccurrence
+   = OperatorWhitespaceOccurrence_Prefix
+   | OperatorWhitespaceOccurrence_Suffix
+   | OperatorWhitespaceOccurrence_TightInfix
 
 data TransLayoutReason
    = TransLayout_Where -- ^ "`where' clause at the same depth as implicit layout block"
