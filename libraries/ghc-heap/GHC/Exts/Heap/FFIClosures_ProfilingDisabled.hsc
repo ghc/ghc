@@ -1,27 +1,21 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 
-module GHC.Exts.Heap.FFIClosures where
+module GHC.Exts.Heap.FFIClosures_ProfilingDisabled where
 
+-- Manually undefining PROFILING gives the #peek and #poke macros an accurate
+-- representation of the C structures when hsc2hs runs. This is valid because
+-- a non-profiling build would use
+-- GHC.Exts.Heap.FFIClosures_ProfilingEnabled.
+#undef PROFILING
 #include "Rts.h"
 
 import Prelude
 import Foreign
 import GHC.Exts
+import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
 import GHC.Exts.Heap.ProfInfo.Types
 import GHC.Exts.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..))
-
-##if defined(PROFILING)
-import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
-##else
--- This import makes PeekProfInfo_ProfilingEnabled available in make-based
--- builds. See ##15197 for details (even though the related patch didn't
--- seem to fix the issue).
--- GHC.Exts.Heap.Closures uses the same trick to include
--- GHC.Exts.Heap.InfoTableProf into make-based builds.
-import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled ()
-import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled
-##endif
 
 data TSOFields = TSOFields {
     tso_what_next :: WhatNext,
@@ -68,7 +62,7 @@ parseWhatNext w = case w of
                     (#const ThreadInterpret) -> ThreadInterpret
                     (#const ThreadKilled) -> ThreadKilled
                     (#const ThreadComplete) -> ThreadComplete
-                    _ -> WhatNextUnknownValue
+                    _ -> WhatNextUnknownValue w
 
 parseWhyBlocked :: Word16 -> WhyBlocked
 parseWhyBlocked w = case w of
@@ -88,7 +82,7 @@ parseWhyBlocked w = case w of
 #if __GLASGOW_HASKELL__ >= 810
                         (#const BlockedOnIOCompletion) -> BlockedOnIOCompletion
 #endif
-                        _ -> WhyBlockedUnknownValue
+                        _ -> WhyBlockedUnknownValue w
 
 parseTsoFlags :: Word32 -> [TsoFlags]
 parseTsoFlags w | isSet (#const TSO_LOCKED) w = TsoLocked : parseTsoFlags (unset (#const TSO_LOCKED) w)
@@ -99,7 +93,7 @@ parseTsoFlags w | isSet (#const TSO_LOCKED) w = TsoLocked : parseTsoFlags (unset
                 | isSet (#const TSO_SQUEEZED) w = TsoSqueezed : parseTsoFlags (unset (#const TSO_SQUEEZED) w)
                 | isSet (#const TSO_ALLOC_LIMIT) w = TsoAllocLimit : parseTsoFlags (unset (#const TSO_ALLOC_LIMIT) w)
 parseTsoFlags 0 = []
-parseTsoFlags _ = [TsoFlagsUnknownValue]
+parseTsoFlags w = [TsoFlagsUnknownValue w]
 
 isSet :: Word32 -> Word32 -> Bool
 isSet bitMask w = w .&. bitMask /= 0
@@ -136,3 +130,4 @@ peekStackFields ptr = do
 #endif
         stack_sp = sp'
     }
+

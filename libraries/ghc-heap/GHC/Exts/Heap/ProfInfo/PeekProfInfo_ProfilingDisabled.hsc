@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP, DeriveGeneric #-}
 module GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled(
     peekStgTSOProfInfo
 ) where
