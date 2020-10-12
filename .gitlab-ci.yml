@@ -286,11 +286,14 @@ hadrian-ghc-in-ghci:
     - "echo $SHELL"
     - which autoreconf
     - whoami
+    - env
     - pwd
     - /bin/ls
     - sleep 5
     - /bin/ls
+    - date
     - "ls toolchain"
+    - date
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_make
