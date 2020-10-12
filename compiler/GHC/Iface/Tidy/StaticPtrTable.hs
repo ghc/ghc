@@ -142,7 +142,8 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Builtin.Names
 import GHC.Tc.Utils.Env (lookupGlobal)
-import GHC.Runtime.Linker.Types
+
+import GHC.Linker.Types
 
 import GHC.Types.Name
 import GHC.Types.Id

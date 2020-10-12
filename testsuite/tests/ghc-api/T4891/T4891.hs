@@ -8,7 +8,7 @@ import GHC.Core.DataCon
 import GHC
 import GHC.Exts.Heap
 import GHC.Driver.Ppr
-import GHC.Runtime.Linker
+import GHC.Linker.Loader
 import GHC.Runtime.Heap.Inspect
 import GHC.Tc.Utils.Env
 import GHC.Core.Type

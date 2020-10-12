@@ -65,8 +65,9 @@ import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
 import GHC.Runtime.Eval.Types(BreakInfo(..))
-import GHC.Runtime.Linker.Types
 import GHC.ByteCode.Types
+
+import GHC.Linker.Types
 
 import GHC.Data.Maybe
 import GHC.Data.FastString

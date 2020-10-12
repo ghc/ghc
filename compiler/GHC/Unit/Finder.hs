@@ -59,7 +59,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
-import GHC.Runtime.Linker.Types
+import GHC.Linker.Types
 
 import Data.IORef       ( IORef, readIORef, atomicModifyIORef' )
 import System.Directory

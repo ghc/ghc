@@ -26,11 +26,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 
 import Data.List
-import Control.Monad (join, forM, filterM)
 import System.IO
 import System.Process
-import System.Directory (doesFileExist)
-import System.FilePath ((</>))
 
 {-
 ************************************************************************
@@ -239,40 +236,6 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
                                 llvmVersionStr supportedLlvmVersion) ]
                 return Nothing)
 
-
--- | On macOS we rely on the linkers @-dead_strip_dylibs@ flag to remove unused
--- libraries from the dynamic library.  We do this to reduce the number of load
--- commands that end up in the dylib, and has been limited to 32K (32768) since
--- macOS Sierra (10.14).
---
--- @-dead_strip_dylibs@ does not dead strip @-rpath@ entries, as such passing
--- @-l@ and @-rpath@ to the linker will result in the unnecesasry libraries not
--- being included in the load commands, however the @-rpath@ entries are all
--- forced to be included.  This can lead to 100s of @-rpath@ entries being
--- included when only a handful of libraries end up being truely linked.
---
--- Thus after building the library, we run a fixup phase where we inject the
--- @-rpath@ for each found library (in the given library search paths) into the
--- dynamic library through @-add_rpath@.
---
--- See Note [Dynamic linking on macOS]
-runInjectRPaths :: DynFlags -> [FilePath] -> FilePath -> IO ()
-runInjectRPaths dflags lib_paths dylib = do
-  info <- lines <$> askOtool dflags Nothing [Option "-L", Option dylib]
-  -- filter the output for only the libraries. And then drop the @rpath prefix.
-  let libs = fmap (drop 7) $ filter (isPrefixOf "@rpath") $ fmap (head.words) $ info
-  -- find any pre-existing LC_PATH items
-  info <- fmap words.lines <$> askOtool dflags Nothing [Option "-l", Option dylib]
-  let paths = concatMap f info
-        where f ("path":p:_) = [p]
-              f _            = []
-      lib_paths' = [ p | p <- lib_paths, not (p `elem` paths) ]
-  -- only find those rpaths, that aren't already in the library.
-  rpaths <- nub.sort.join <$> forM libs (\f -> filterM (\l -> doesFileExist (l </> f)) lib_paths')
-  -- inject the rpaths
-  case rpaths of
-    [] -> return ()
-    _  -> runInstallNameTool dflags $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
 
 
 runLink :: DynFlags -> [Option] -> IO ()

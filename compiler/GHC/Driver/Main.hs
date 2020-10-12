@@ -97,12 +97,13 @@ import GHC.Driver.Config
 import GHC.Driver.Hooks
 
 import GHC.Runtime.Context
-import GHC.Runtime.Linker
-import GHC.Runtime.Linker.Types
 import GHC.Runtime.Interpreter ( addSptEntry )
 import GHC.Runtime.Loader      ( initializePlugins )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.ByteCode.Types
+
+import GHC.Linker.Loader
+import GHC.Linker.Types
 
 import GHC.Hs
 import GHC.Hs.Dump
@@ -238,7 +239,7 @@ newHscEnv dflags = do
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
-    emptyDynLinker <- uninitializedLinker
+    emptyLoader <- uninitializedLoader
     return HscEnv {  hsc_dflags       = dflags
                   ,  hsc_targets      = []
                   ,  hsc_mod_graph    = emptyMG
@@ -249,7 +250,7 @@ newHscEnv dflags = do
                   ,  hsc_FC           = fc_var
                   ,  hsc_type_env_var = Nothing
                   ,  hsc_interp       = Nothing
-                  ,  hsc_dynLinker    = emptyDynLinker
+                  ,  hsc_loader       = emptyLoader
                   ,  hsc_home_unit    = home_unit
                   }
 
@@ -1799,7 +1800,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                                 prepd_binds data_tycons mod_breaks
 
     let src_span = srcLocSpan interactiveSrcLoc
-    liftIO $ linkDecls hsc_env src_span cbc
+    liftIO $ loadDecls hsc_env src_span cbc
 
     {- Load static pointer table entries -}
     liftIO $ hscAddSptEntries hsc_env (cg_spt_entries tidy_cg)
@@ -1831,7 +1832,7 @@ hscAddSptEntries :: HscEnv -> [SptEntry] -> IO ()
 hscAddSptEntries hsc_env entries = do
     let add_spt_entry :: SptEntry -> IO ()
         add_spt_entry (SptEntry i fpr) = do
-            val <- getHValue hsc_env (idName i)
+            val <- loadName hsc_env (idName i)
             addSptEntry hsc_env fpr val
     mapM_ add_spt_entry entries
 
@@ -1961,8 +1962,8 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
          ; bcos <- coreExprToBCOs hsc_env
                      (icInteractiveModule (hsc_IC hsc_env)) prepd_expr
 
-           {- link it -}
-         ; linkExpr hsc_env srcspan bcos }
+           {- load it -}
+         ; loadExpr hsc_env srcspan bcos }
 
 
 {- **********************************************************************

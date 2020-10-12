@@ -59,13 +59,14 @@ import GHC.Driver.Ppr
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter as GHCi
 import GHC.Runtime.Interpreter.Types
-import GHC.Runtime.Linker as Linker
-import GHC.Runtime.Linker.Types
 import GHC.Runtime.Heap.Inspect
 import GHC.Runtime.Context
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.ByteCode.Types
+
+import GHC.Linker.Types
+import GHC.Linker.Loader as Loader
 
 import GHC.Hs
 
@@ -388,8 +389,8 @@ handleRunStatus step expr bindings final_ids status history
     = do hsc_env <- getSession
          let final_ic = extendInteractiveContextWithIds (hsc_IC hsc_env) final_ids
              final_names = map getName final_ids
-             dl = hsc_dynLinker hsc_env
-         liftIO $ Linker.extendLinkEnv dl (zip final_names hvals)
+             dl = hsc_loader hsc_env
+         liftIO $ Loader.extendLoadedEnv dl (zip final_names hvals)
          hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
          setSession hsc_env'
          return (ExecComplete (Right final_names) allocs)
@@ -430,8 +431,8 @@ resumeExec canLogSpan step
             new_names = [ n | thing <- ic_tythings ic
                             , let n = getName thing
                             , not (n `elem` old_names) ]
-            dl        = hsc_dynLinker hsc_env
-        liftIO $ Linker.deleteFromLinkEnv dl new_names
+            dl        = hsc_loader hsc_env
+        liftIO $ Loader.deleteFromLoadedEnv dl new_names
 
         case r of
           Resume { resumeStmt = expr, resumeContext = fhv
@@ -525,9 +526,9 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
 
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 [exn_id]
-       dl     = hsc_dynLinker hsc_env
+       dl     = hsc_loader hsc_env
    --
-   Linker.extendLinkEnv dl [(exn_name, apStack)]
+   Loader.extendLoadedEnv dl [(exn_name, apStack)]
    return (hsc_env{ hsc_IC = ictxt1 }, [exn_name], span, "<exception thrown>")
 
 -- Just case: we stopped at a breakpoint, we have information about the location
@@ -582,11 +583,11 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 final_ids
        names  = map idName new_ids
-       dl     = hsc_dynLinker hsc_env
+       dl     = hsc_loader hsc_env
 
    let fhvs = catMaybes mb_hValues
-   Linker.extendLinkEnv dl (zip names fhvs)
-   when result_ok $ Linker.extendLinkEnv dl [(result_name, apStack_fhv)]
+   Loader.extendLoadedEnv dl (zip names fhvs)
+   when result_ok $ Loader.extendLoadedEnv dl [(result_name, apStack_fhv)]
    hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
    return (hsc_env1, if result_ok then result_name:names else names, span, decl)
   where
@@ -1298,13 +1299,13 @@ obtainTermFromVal hsc_env _bound _force _ty _x = withInterp hsc_env $ \case
 
 obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
 obtainTermFromId hsc_env bound force id =  do
-  hv <- Linker.getHValue hsc_env (varName id)
+  hv <- Loader.loadName hsc_env (varName id)
   cvObtainTerm hsc_env bound force (idType id) hv
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
 reconstructType :: HscEnv -> Int -> Id -> IO (Maybe Type)
 reconstructType hsc_env bound id = do
-  hv <- Linker.getHValue hsc_env (varName id)
+  hv <- Loader.loadName hsc_env (varName id)
   cvReconstructType hsc_env bound (idType id) hv
 
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
