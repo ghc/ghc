@@ -59,9 +59,9 @@ import Data.Array.Unsafe( castSTUArray )
 import Foreign
 import Data.Char        ( ord )
 import Data.List        ( genericLength )
-import Data.Map (Map)
+import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 
 -- -----------------------------------------------------------------------------
 -- Unlinked BCOs
