@@ -430,7 +430,7 @@ genCCall target dest_regs args
 
                 PrimTarget mop
                  -> do  res     <- outOfLineMachOp mop
-                        lblOrMopExpr <- case res of
+                        case res of
                                 Left lbl -> do
                                         return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
 
@@ -440,8 +440,6 @@ genCCall target dest_regs args
                                                       [dyn_r'] -> dyn_r'
                                                       _ -> panic "SPARC.CodeGen.genCCall: arg_to_int"
                                         return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
-
-                        return lblOrMopExpr
 
         let argcode = concatOL argcodes
 

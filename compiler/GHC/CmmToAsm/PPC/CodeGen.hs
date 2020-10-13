@@ -801,7 +801,7 @@ getAmode DS (CmmMachOp (MO_Add W64) [x, CmmLit (CmmInt i _)])
         (reg, code) <- getSomeReg x
         (reg', off', code')  <-
                      if i `mod` 4 == 0
-                      then do return (reg, off, code)
+                      then return (reg, off, code)
                       else do
                            tmp <- getNewRegNat II64
                            return (tmp, ImmInt 0,
