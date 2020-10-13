@@ -2371,11 +2371,11 @@ stg_unpackClosurezh ( P_ closure )
     clos = UNTAG(closure);
 
     W_ len;
-    // The array returned is the raw data for the entire closure.
+    // The array returned, dat_arr, is the raw data for the entire closure.
     // The length is variable based upon the closure type, ptrs, and non-ptrs
     (len) = foreign "C" heap_view_closureSize(clos "ptr");
 
-    W_ ptrs_arr_sz, ptrs_arr_cards, dat_arr_sz;
+    W_ dat_arr_sz;
 
     dat_arr_sz = SIZEOF_StgArrBytes + WDS(len);
     ("ptr" dat_arr) = ccall allocateMightFail(MyCapability() "ptr", BYTES_TO_WDS(dat_arr_sz));
@@ -2396,7 +2396,7 @@ for:
 
     W_ ptrArray;
 
-    // Follow the pointers
+    // Collect pointers.
     ("ptr" ptrArray) = foreign "C" heap_view_closurePtrs(MyCapability() "ptr", clos "ptr");
 
     return (info, dat_arr, ptrArray);

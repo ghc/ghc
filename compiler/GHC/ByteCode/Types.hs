@@ -36,7 +36,7 @@ import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Maybe (catMaybes)
-import GHC.Exts.Heap
+import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS
 
 -- -----------------------------------------------------------------------------
@@ -71,7 +71,7 @@ type ItblEnv = NameEnv (Name, ItblPtr)
         -- We need the Name in the range so we know which
         -- elements to filter out when unloading a module
 
-newtype ItblPtr = ItblPtr (RemotePtr StgInfoTable)
+newtype ItblPtr = ItblPtr (RemotePtr Heap.StgInfoTable)
   deriving (Show, NFData)
 
 data UnlinkedBCO

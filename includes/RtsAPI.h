@@ -16,7 +16,9 @@ extern "C" {
 #endif
 
 #include "HsFFI.h"
+#include "rts/Types.h"
 #include "rts/Time.h"
+#include "rts/Task.h"
 #include "rts/EventLogWriter.h"
 
 /*
@@ -333,11 +335,13 @@ extern void (*exitFn)(int);
 /* ----------------------------------------------------------------------------
    Locking.
 
-   You have to surround all access to the RtsAPI with these calls.
+   You have to surround all access to the RtsAPI with rts_lock and rts_unlock
+   or with rts_pause and rts_resume.
    ------------------------------------------------------------------------- */
 
-// acquires a token which may be used to create new objects and
-// evaluate them.
+// acquires a token which may be used to create new objects and evaluate them.
+// Calling rts_lock in between rts_pause/rts_resume on the same thread will
+// cause an error.
 Capability *rts_lock (void);
 
 // releases the token acquired with rts_lock().
@@ -482,6 +486,39 @@ void rts_evalLazyIO_ (/* inout */ Capability **,
 void rts_checkSchedStatus (char* site, Capability *);
 
 SchedulerStatus rts_getSchedStatus (Capability *cap);
+
+// Halt execution of all Haskell threads by acquiring all capabilities.
+// rts_resume must later be called on the same thread to resume the RTS. Returns
+// a token which may be used to create new objects and evaluate them (like
+// rts_lock).
+//
+// rts_pause does not pause threads running safe FFI calls. Only one thread at a
+// time can keep the rts paused. The rts_pause function will block until the
+// current thread is given exclusive permission to pause the RTS. It is an error
+// if the RTS is already paused by the current OS thread. rts_pause is different
+// to rts_lock which only pauses a single capability. Calling rts_pause in
+// between rts_lock/rts_unlock on the same thread will cause an error. Calling
+// rts_pause from an unsafe FFI call will also cause an error (safe FFI calls
+// are ok).
+Capability * rts_pause (void);
+
+// Counterpart of rts_pause: Continue from a pause. All capabilities are
+// released. Must be called on the same thread as rts_pause().
+// [in] cap: the token returned by rts_pause.
+void rts_resume (Capability * cap);
+
+// Returns true if the rts is paused. See rts_pause() and rts_resume().
+bool rts_isPaused(void);
+
+// List all live threads. The RTS must be paused and this must be called on the
+// same thread that called rts_pause().
+typedef void (*ListThreadsCb)(void *user, StgTSO *);
+void rts_listThreads(ListThreadsCb cb, void *user);
+
+// List all non-thread GC roots. The RTS must be paused and this must be called
+// on the same thread that called rts_pause().
+typedef void (*ListRootsCb)(void *user, StgClosure *);
+void rts_listMiscRoots(ListRootsCb cb, void *user);
 
 /*
  * The RTS allocates some thread-local data when you make a call into

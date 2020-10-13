@@ -223,6 +223,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/Globals.h"
 #include "rts/IOManager.h"
 #include "rts/Linker.h"
+#include "rts/Task.h"
 #include "rts/Ticky.h"
 #include "rts/Timer.h"
 #include "rts/StablePtr.h"
