@@ -1394,7 +1394,15 @@ scheduleNeedHeapProfile( bool ready_to_gc )
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-void stopAllCapabilities (Capability **pCap, Task *task)
+void stopAllCapabilities
+    ( Capability **pCap     // [in/out] This thread's task's owned capability.
+                            //          pCap may be NULL if no capability is owned.
+                            //          Else *pCap != NULL
+                            // On return, set to the task's newly owned
+                            // capability (task->cap). Though, the Task will
+                            // technically own all capabilities.
+    , Task *task            // [in] This thread's task.
+    )
 {
     stopAllCapabilitiesWith(pCap, task, SYNC_OTHER);
 }
@@ -1446,9 +1454,15 @@ void stopAllCapabilitiesWith (Capability **pCap, Task *task, SyncType sync_type)
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-static bool requestSync (
-    Capability **pcap, Task *task, PendingSync *new_sync,
-    SyncType *prev_sync_type)
+static bool requestSync
+    ( Capability **pcap         // [in/out] This thread's task's owned capability.
+                                // May change if there is an existing sync (true is returned).
+                                //      pcap may be NULL
+                                //      *pcap != NULL
+    , Task *task                // [in] This thread's task.
+    , PendingSync *new_sync     // [in] The new requested sync.
+    , SyncType *prev_sync_type  // [out] Only set if there is an existing sync (true is returned).
+    )
 {
     PendingSync *sync;
 
@@ -1542,7 +1556,7 @@ static void acquireAllCapabilities(Capability *cap, Task *task)
 void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task)
 {
     uint32_t i;
-
+    ASSERT( task != NULL);
     for (i = 0; i < n; i++) {
         Capability *tmpcap = capabilities[i];
         if (keep_cap != tmpcap) {
@@ -2065,7 +2079,7 @@ forkProcess(HsStablePtr *entry
             RELEASE_LOCK(&capabilities[i]->lock);
         }
 
-        boundTaskExiting(task);
+        exitMyTask();
 
         // just return the pid
         return pid;
@@ -2745,7 +2759,7 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
     // debugBelch("n_failed_trygrab_idles = %d, n_idle_caps = %d\n",
     //            n_failed_trygrab_idles, n_idle_caps);
 
-    boundTaskExiting(task);
+    exitMyTask();
 }
 
 void
@@ -2804,7 +2818,7 @@ performGC_(bool force_major)
     waitForCapability(&cap,task);
     scheduleDoGC(&cap,task,force_major,false);
     releaseCapability(cap);
-    boundTaskExiting(task);
+    exitMyTask();
 }
 
 void

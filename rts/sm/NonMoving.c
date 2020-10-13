@@ -1215,7 +1215,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 
 #if defined(THREADED_RTS)
 finish:
-    boundTaskExiting(task);
+    exitMyTask();
 
     // We are done...
     mark_thread = 0;
