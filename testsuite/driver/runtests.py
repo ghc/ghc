@@ -457,7 +457,20 @@ else:
     if config.baseline_commit:
         print('Performance baseline: %s\n' % config.baseline_commit)
     if any(t.metrics):
-        tabulate_metrics(t.metrics)
+        # Group metrics by metric type
+        groups = {}
+        for stat in t.metrics:
+            if stat.metric not in groups:
+                groups[stat.metric] = []
+
+            groups[stat.metric].append(stat)
+
+        for metric_name, stats in groups.items():
+            heading = 'Metrics: %s' % metric_name
+            print(heading)
+            print('-' * len(heading))
+            print()
+            tabulate_metrics(stats)
     else:
         print("\nNone collected.")
     print("")
