@@ -74,6 +74,7 @@ import GHC.Unit.Module
 
 import Control.Exception
 import Data.Array
+import Data.Coerce (coerce)
 import Data.ByteString (ByteString)
 import Data.Map (Map)
 import Data.IntMap (IntMap)
@@ -2032,17 +2033,17 @@ recordFFIBc :: RemotePtr C_ffi_cif -> BcM ()
 recordFFIBc a
   = BcM $ \st -> return (st{ffis = FFIInfo a : ffis st}, ())
 
-getLabelBc :: BcM Word16
+getLabelBc :: BcM LocalLabel
 getLabelBc
   = BcM $ \st -> do let nl = nextlabel st
                     when (nl == maxBound) $
                         panic "getLabelBc: Ran out of labels"
-                    return (st{nextlabel = nl + 1}, nl)
+                    return (st{nextlabel = nl + 1}, LocalLabel nl)
 
-getLabelsBc :: Word16 -> BcM [Word16]
+getLabelsBc :: Word16 -> BcM [LocalLabel]
 getLabelsBc n
   = BcM $ \st -> let ctr = nextlabel st
-                 in return (st{nextlabel = ctr+n}, [ctr .. ctr+n-1])
+                 in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])
 
 getCCArray :: BcM (Array BreakIndex (RemotePtr CostCentre))
 getCCArray = BcM $ \st ->
