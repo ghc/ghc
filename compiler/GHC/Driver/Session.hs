@@ -3053,7 +3053,7 @@ package_flags_deps = [
       (HasArg $ addPkgDbRef . PkgDbPath) "Use -package-db instead"
   , make_dep_flag defFlag "no-user-package-conf"
       (NoArg removeUserPkgDb)              "Use -no-user-package-db instead"
-  , make_ord_flag defGhcFlag "package-name"       (HasArg $ \name -> do
+  , make_ord_flag defGhcFlag "package-name"       (HasArg $ \name ->
                                       upd (setUnitId name))
   , make_ord_flag defGhcFlag "this-unit-id"       (hasArg setUnitId)
   , make_ord_flag defFlag "package"               (HasArg exposePackage)

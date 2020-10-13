@@ -748,7 +748,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
          -- path, then rerun the pipeline for the dyn way
          let dflags = hsc_dflags hsc_env
          -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
-         when (not $ platformOS (targetPlatform dflags) == OSMinGW32) $ do
+         when (not $ platformOS (targetPlatform dflags) == OSMinGW32) $
            when isHaskellishFile $ whenCannotGenerateDynamicToo dflags $ do
                debugTraceMsg dflags 4
                    (text "Running the pipeline again for -dynamic-too")
@@ -1118,7 +1118,6 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- gather the imports and module name
         (hspp_buf,mod_name,imps,src_imps) <- liftIO $ do
-          do
             buf <- hGetStringBuffer input_fn
             let imp_prelude = xopt LangExt.ImplicitPrelude dflags
                 popts = initParserOpts dflags
@@ -1452,8 +1451,8 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         let local_includes = [ GHC.SysTools.Option ("-iquote" ++ p)
                              | p <- includePathsQuote cmdline_include_paths ]
         let runAssembler inputFilename outputFilename
-              = liftIO $ do
-                  withAtomicRename outputFilename $ \temp_outputFilename -> do
+              = liftIO $
+                  withAtomicRename outputFilename $ \temp_outputFilename ->
                     as_prog
                        dflags
                        (local_includes ++ global_includes
@@ -2002,15 +2001,13 @@ maybeCreateManifest dflags exe_filename
 
 
 linkDynLibCheck :: DynFlags -> [String] -> [UnitId] -> IO ()
-linkDynLibCheck dflags o_files dep_units
- = do
-    when (haveRtsOptsFlags dflags) $ do
-      putLogMsg dflags NoReason SevInfo noSrcSpan
-          $ withPprStyle defaultUserStyle
-          (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
-           text "    Call hs_init_ghc() from your main() function to set these options.")
-
-    linkDynLib dflags o_files dep_units
+linkDynLibCheck dflags o_files dep_units = do
+  when (haveRtsOptsFlags dflags) $
+    putLogMsg dflags NoReason SevInfo noSrcSpan
+      $ withPprStyle defaultUserStyle
+      (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
+      text "    Call hs_init_ghc() from your main() function to set these options.")
+  linkDynLib dflags o_files dep_units
 
 -- | Linking a static lib will not really link anything. It will merely produce
 -- a static archive of all dependent static libraries. The resulting library
@@ -2287,7 +2284,7 @@ joinObjectFiles dflags o_files output_fn = do
           writeFile filelist $ unlines o_files
           ld_r [GHC.SysTools.Option "-filelist",
                 GHC.SysTools.FileOption "" filelist]
-     else do
+     else
           ld_r (map (GHC.SysTools.FileOption "") o_files)
 
 -- -----------------------------------------------------------------------------
