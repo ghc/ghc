@@ -850,8 +850,8 @@ for example).
 
     This flag tells GHC to link against shared Haskell libraries. This
     flag only affects the selection of dependent libraries, not the form
-    of the current target (see -shared). See :ref:`using-shared-libs` on
-    how to create them.
+    of the current target (see :ghc-flag:`-shared`).
+    See :ref:`using-shared-libs` on how to create them.
 
     Note that this option also has an effect on code generation (see
     above).
