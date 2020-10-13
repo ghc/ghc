@@ -479,8 +479,7 @@ getEpsGhc = do
 initBkpM :: FilePath -> [LHsUnit HsComponentId] -> BkpM a -> Ghc a
 initBkpM file bkp m =
   reifyGhc $ \session -> do
-    let env =
-      BkpEnv {
+    let env = BkpEnv {
         bkp_session = session,
         bkp_table = Map.fromList [(hsComponentId (unLoc (hsunitName (unLoc u))), u) | u <- bkp],
         bkp_filename = file,

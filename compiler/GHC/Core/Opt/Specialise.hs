@@ -746,8 +746,7 @@ spec_import top_env callers rb dict_binds cis@(CIS fn _)
        ; let final_binds = wrapDictBinds dict_binds1 $
                            spec_binds2 ++ spec_binds1
 
-       ; return (rules2 ++ rules1, final_binds)
-       }
+       ; return (rules2 ++ rules1, final_binds) }
 
   | otherwise
   = do { tryWarnMissingSpecs dflags callers fn good_calls
