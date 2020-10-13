@@ -22,10 +22,20 @@ main :: IO ()
 main = do
     (tso, stack) <- {-# SCC "MyCostCentre" #-} createAndUnpackTSOAndSTACKClosure
     assertEqual (getClosureType tso) TSO
-    assertEqual (getClosureType stack) STACK
     assertEqual (what_next tso) ThreadRunGHC
     assertEqual (why_blocked tso) NotBlocked
     assertEqual (saved_errno tso) 0
+    forM_ (flags tso) $ \flag -> case flag of
+        TsoFlagsUnknownValue _ -> error $ "Unknown flag: " ++ show flag
+        _ | flag `elem`
+            [ TsoLocked
+            , TsoBlockx
+            , TsoStoppedOnBreakpoint
+            , TsoSqueezed
+            ] -> error $ "Unexpected flag: " ++ show flag
+        _ -> return ()
+
+    assertEqual (getClosureType stack) STACK
 
 #if defined(PROFILING)
     let costCentre = ccs_cc <$> (cccs =<< prof tso)
@@ -71,7 +81,10 @@ foreign import ccall safe "create_tso.h create_and_unpack_tso_and_stack"
         -> Ptr (Ptr (Ptr Any))
         -> IO ()
 
-createAndUnpackTSOAndSTACKClosure :: IO (GenClosure (Ptr Any), GenClosure (Ptr Any))
+createAndUnpackTSOAndSTACKClosure
+    :: IO ( GenClosure (Ptr Any)
+          , GenClosure (Ptr Any)
+          )
 createAndUnpackTSOAndSTACKClosure = do
 
     alloca $ \ptrPtrTso -> do
