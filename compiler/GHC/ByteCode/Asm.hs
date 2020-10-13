@@ -179,7 +179,9 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
       -- this BCO to be long.
       (n_insns0, lbl_map0) = inspectAsm platform False initial_offset asm
       ((n_insns, lbl_map), long_jumps)
-        | isLarge n_insns0 = (inspectAsm platform True initial_offset asm, True)
+        | isLarge (fromIntegral $ Map.size lbl_map0)
+          || isLarge n_insns0
+                    = (inspectAsm platform True initial_offset asm, True)
         | otherwise = ((n_insns0, lbl_map0), False)
 
       env :: LocalLabel -> Word
