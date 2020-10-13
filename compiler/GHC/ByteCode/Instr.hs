@@ -50,7 +50,7 @@ data ProtoBCO a
         protoBCOFFIs       :: [FFIInfo]
    }
 
-newtype LocalLabel = LocalLabel { getLocalLabel :: Word16 }
+newtype LocalLabel = LocalLabel { getLocalLabel :: Word32 }
   deriving (Eq, Ord)
 
 instance Outputable LocalLabel where
