@@ -94,7 +94,7 @@ import GHC.Hs.Extension
 import GHC.Types.Id ( Id )
 import GHC.Types.Name( Name, NamedThing(getName) )
 import GHC.Types.Name.Reader ( RdrName )
-import GHC.Types.Var ( InvisTVBinder )
+import GHC.Types.Var ( VarBndr )
 import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),
                          SrcStrictness(..), SrcUnpackedness(..) )
 import GHC.Core.TyCo.Rep ( Type(..) )
@@ -447,7 +447,7 @@ data HsOuterTyVarBndrs flag pass
     }
   | HsOuterExplicit -- ^ Explicit forall, e.g.,
                     --    @f :: forall a b. a -> b -> b@
-    { hso_xexplicit :: XHsOuterExplicit pass
+    { hso_xexplicit :: XHsOuterExplicit pass flag
     , hso_bndrs     :: [LHsTyVarBndr flag (NoGhcTc pass)]
     }
   | XHsOuterTyVarBndrs !(XXHsOuterTyVarBndrs pass)
@@ -476,9 +476,9 @@ type instance XHsOuterImplicit GhcPs = NoExtField
 type instance XHsOuterImplicit GhcRn = [Name]
 type instance XHsOuterImplicit GhcTc = [TyVar]
 
-type instance XHsOuterExplicit GhcPs = NoExtField
-type instance XHsOuterExplicit GhcRn = NoExtField
-type instance XHsOuterExplicit GhcTc = [InvisTVBinder]
+type instance XHsOuterExplicit GhcPs _    = NoExtField
+type instance XHsOuterExplicit GhcRn _    = NoExtField
+type instance XHsOuterExplicit GhcTc flag = [VarBndr TyVar flag]
 
 type instance XXHsOuterTyVarBndrs (GhcPass _) = NoExtCon
 

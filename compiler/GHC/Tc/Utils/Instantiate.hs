@@ -528,40 +528,24 @@ tcInstSuperSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- see comments around superSkolemTv.
 tcInstSuperSkolTyVarsX subst = tcInstSkolTyVarsPushLevel True subst
 
-tcInstSkolTyVarsPushLevel :: Bool  -- True <=> make "super skolem" AND
-                                   --          freshen names
+tcInstSkolTyVarsPushLevel :: Bool  -- True <=> make "super skolem"
                           -> TCvSubst -> [TyVar]
                           -> TcM (TCvSubst, [TcTyVar])
 -- Skolemise one level deeper, hence pushTcLevel
 -- See Note [Skolemising type variables]
-tcInstSkolTyVarsPushLevel overlappable_and_freshen subst tvs
+tcInstSkolTyVarsPushLevel overlappable subst tvs
   = do { tc_lvl <- getTcLevel
        ; let pushed_lvl = pushTcLevel tc_lvl
-       ; if overlappable_and_freshen
-         then freshenTyCoVarsX (mk_skol pushed_lvl) subst tvs
-         else return (tcInstSkolTyVarsAt pushed_lvl overlappable_and_freshen
-                                         subst tvs) }
-  where
-    mk_skol :: TcLevel -> Name -> Kind -> TcTyVar
-    mk_skol lvl nm ki = mkTcTyVar nm ki details
-      where
-        details = SkolemTv lvl overlappable_and_freshen
+       ; tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs }
 
 tcInstSkolTyVarsAt :: TcLevel -> Bool
                    -> TCvSubst -> [TyVar]
-                   -> (TCvSubst, [TcTyVar])
-tcInstSkolTyVarsAt lvl overlappable orig_subst tvs
-  = mapAccumL mk_skol_tv_x orig_subst tvs
+                   -> TcM (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsAt lvl overlappable subst tvs
+  = freshenTyCoVarsX new_skol_tv subst tvs
   where
     details = SkolemTv lvl overlappable
-
-    mk_skol_tv_x :: TCvSubst -> TyCoVar -> (TCvSubst, TyCoVar)
-    mk_skol_tv_x subst tv
-      = (subst', new_tv)
-      where
-        new_kind = substTyUnchecked subst (tyVarKind tv)
-        new_tv   = mkTcTyVar (tyVarName tv) new_kind details
-        subst'   = extendTvSubstWithClone subst tv new_tv
+    new_skol_tv name kind = mkTcTyVar name kind details
 
 ------------------
 freshenTyVarBndrs :: [TyVar] -> TcM (TCvSubst, [TyVar])
@@ -614,19 +598,22 @@ a) Level allocation. We generally skolemise /before/ calling
 b) The [TyVar] should be ordered (kind vars first)
    See Note [Kind substitution when instantiating]
 
-c) Variables are *not* freshened; the names and locations are retained.
+c) Clone the variable to give a fresh unique.  This is essential.
+   Consider (tc160)
+       type Foo x = forall a. a -> x
+   And typecheck the expression
+       (e :: Foo (Foo ())
+   We will skolemise the signature, but after expanding synonyms it
+   looks like
+        forall a. a -> forall a. a -> x
+   We don't want to make two big-lambdas with the same unique!
 
-   Why retain names? To keep scoped type variables working in explicitly
-   bidirectional pattern synonyms. The scoped variables are found in the
-   builder Id's type; these must match up with the renamer-produced variables
-   in the MatchGroup, even though those variables have been skolemised.
-
-   Why retain locations? Because the location of the variable is the correct
+d) We retain locations. Because the location of the variable is the correct
    location to report in errors (e.g. in the signature). We don't want the
    location to change to the body of the function, which does *not* explicitly
    bind the variable.
 
-d) The resulting skolems are
+e) The resulting skolems are
         non-overlappable for tcInstSkolTyVars,
    but overlappable for tcInstSuperSkolTyVars
    See GHC.Tc.Deriv.Infer Note [Overlap and deriving] for an example

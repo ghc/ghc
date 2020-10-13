@@ -2987,42 +2987,32 @@ tcTKTelescope mode tele thing_inside = case tele of
 --    HsOuterTyVarBndrs
 --------------------------------------
 
-bindOuterTKBndrsX ::
-     ([Name]                    -> TcM a -> TcM ([TcTyVar], a))
-       -- Deal with implicit binders
-  -> ([LHsTyVarBndr flag GhcRn] -> TcM a -> TcM ([TcInvisTVBinder], a))
-       -- Deal with explicit binders
-  -> HsOuterTyVarBndrs flag GhcRn
-  -> TcM a
-  -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
-bindOuterTKBndrsX do_implicit do_explicit outer_bndrs thing_inside
+bindOuterTKBndrsX :: OutputableBndrFlag flag
+                  => SkolemMode -> TcTyMode
+                  -> HsOuterTyVarBndrs flag GhcRn
+                  -> TcM a
+                  -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
+bindOuterTKBndrsX skol_mode tc_ty_mode outer_bndrs thing_inside
   = case outer_bndrs of
       HsOuterImplicit{hso_ximplicit = imp_tvs} ->
-        do { (imp_tvs', thing) <- do_implicit imp_tvs thing_inside
-           ; return (HsOuterImplicit{hso_ximplicit = imp_tvs'}, thing) }
+        do { (imp_tvs', thing) <- bindImplicitTKBndrsX skol_mode imp_tvs thing_inside
+           ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
+                    , thing) }
       HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-        do { (exp_tvs', thing) <- do_explicit exp_bndrs thing_inside
+        do { (exp_tvs', thing) <- bindExplicitTKBndrsX skol_mode tc_ty_mode exp_bndrs thing_inside
            ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
                                       , hso_bndrs     = exp_bndrs }
                     , thing) }
 
-bindOuterTKBndrsX_Q ::
-     ([Name]                    -> TcM a -> TcM ([res], a))
-       -- Deal with implicit binders
-  -> ([LHsTyVarBndr flag GhcRn] -> TcM a -> TcM ([res], a))
-       -- Deal with explicit binders
-  -> HsOuterTyVarBndrs flag GhcRn
-  -> TcM a
-  -> TcM ([res], a)
-bindOuterTKBndrsX_Q do_implicit do_explicit outer_bndrs thing_inside
-  = case outer_bndrs of
-      HsOuterImplicit{hso_ximplicit = imp_tvs} ->
-        do_implicit imp_tvs thing_inside
-      HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-        do_explicit exp_bndrs thing_inside
+getOuterTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
+getOuterTyVars (HsOuterImplicit { hso_ximplicit = tvs })  = tvs
+getOuterTyVars (HsOuterExplicit { hso_xexplicit = tvbs }) = binderVars tvbs
+
+applyToFstM :: (a -> b) -> TcM (a, r) -> TcM (b, r)
+applyToFstM f thing = do { (a,r) <- thing; return (f a, r) }
 
 ---------------
-scopedSortOuter :: HsOuterTyVarBndrs flag GhcTc -> TcM [TcInvisTVBinder]
+scopedSortOuter :: HsOuterTyVarBndrs Specificity GhcTc -> TcM [InvisTVBinder]
 -- Sort any /implicit/ binders into dependency order
 --     (zonking first so we can see the dependencies)
 -- /Explicit/ ones are already in the right order
@@ -3036,7 +3026,8 @@ scopedSortOuter (HsOuterExplicit{hso_xexplicit = exp_tvs})
 ---------------
 bindOuterSigTKBndrs_Tv :: HsOuterSigTyVarBndrs GhcRn
                        -> TcM a -> TcM (HsOuterSigTyVarBndrs GhcTc, a)
-bindOuterSigTKBndrs_Tv = bindOuterSigTKBndrs_Tv_M (mkMode TypeLevel)
+bindOuterSigTKBndrs_Tv
+  = bindOuterTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = True }) (mkMode TypeLevel)
 
 bindOuterSigTKBndrs_Tv_M :: TcTyMode
                          -> HsOuterSigTyVarBndrs GhcRn
@@ -3046,33 +3037,40 @@ bindOuterSigTKBndrs_Tv_M :: TcTyMode
 --    Note [Kind-checking for GADTs] in TyCl
 --    Note [Checking partial type signatures]
 bindOuterSigTKBndrs_Tv_M mode
-  = bindOuterTKBndrsX bindImplicitTKBndrs_Tv (bindExplicitTKBndrs_Tv_M mode)
+  = bindOuterTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = True }) mode
 
-bindOuterFamEqnTKBndrs_Q_Skol :: ContextKind
-                              -> HsOuterFamEqnTyVarBndrs GhcRn
+bindOuterFamEqnTKBndrs_Q_Skol :: HsOuterFamEqnTyVarBndrs GhcRn
                               -> TcM a
                               -> TcM ([TcTyVar], a)
-bindOuterFamEqnTKBndrs_Q_Skol ctxt_kind
-   = bindOuterTKBndrsX_Q (bindImplicitTKBndrs_Q_Skol)
-                         (bindExplicitTKBndrs_Q_Skol ctxt_kind)
+bindOuterFamEqnTKBndrs_Q_Skol hs_bndrs thing_inside
+  = applyToFstM getOuterTyVars $
+    bindOuterTKBndrsX (smVanilla { sm_parent = True }) (mkMode KindLevel)
+                      hs_bndrs thing_inside
 
-bindOuterFamEqnTKBndrs_Q_Tv :: ContextKind
-                            -> HsOuterFamEqnTyVarBndrs GhcRn
+bindOuterFamEqnTKBndrs_Q_Tv :: HsOuterFamEqnTyVarBndrs GhcRn
                             -> TcM a
                             -> TcM ([TcTyVar], a)
-bindOuterFamEqnTKBndrs_Q_Tv ctxt_kind
-  = bindOuterTKBndrsX_Q bindImplicitTKBndrs_Q_Tv
-                        (bindExplicitTKBndrs_Q_Tv ctxt_kind)
+bindOuterFamEqnTKBndrs_Q_Tv hs_bndrs thing_inside
+  = applyToFstM getOuterTyVars $
+    bindOuterTKBndrsX (smVanilla { sm_parent = True, sm_tvtv = True }) (mkMode KindLevel)
+                      hs_bndrs thing_inside
 
 ---------------
 tcOuterSigTKBndrs :: TypeOrKind -> SkolemInfo
                   -> HsOuterSigTyVarBndrs GhcRn
                   -> TcM a -> TcM (HsOuterSigTyVarBndrs GhcTc, a)
 -- Push level, capture constraints, make implication
-tcOuterSigTKBndrs tyki skol_info
-   = bindOuterTKBndrsX (tc_implicit_tk_bndrs skol_info bindImplicitTKBndrs_Skol)
-                       (tcExplicitTKBndrs tyki)
-
+tcOuterSigTKBndrs tyki skol_info outer_bndrs thing_inside
+  = case outer_bndrs of
+      HsOuterImplicit{hso_ximplicit = imp_tvs} ->
+        do { (imp_tvs', thing) <- tcImplicitTKBndrs skol_info imp_tvs thing_inside
+           ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
+                    , thing) }
+      HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+        do { (exp_tvs', thing) <- tcExplicitTKBndrs tyki exp_bndrs thing_inside
+           ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
+                                      , hso_bndrs     = exp_bndrs }
+                    , thing) }
 
 --------------------------------------
 --    Explicit tyvar binders
@@ -3083,31 +3081,20 @@ tcExplicitTKBndrs :: OutputableBndrFlag flag
                   -> [LHsTyVarBndr flag GhcRn]
                   -> TcM a
                   -> TcM ([VarBndr TyVar flag], a)
-tcExplicitTKBndrs tyki
-  = tcExplicitTKBndrs_M (mkMode tyki)
+tcExplicitTKBndrs tyki = tcExplicitTKBndrs_M (mkMode tyki)
 
 tcExplicitTKBndrs_M :: OutputableBndrFlag flag
                     => TcTyMode
                     -> [LHsTyVarBndr flag GhcRn]
                     -> TcM a
                     -> TcM ([VarBndr TyVar flag], a)
-tcExplicitTKBndrs_M mode
-  = tc_explicit_tk_bndrs (bindExplicitTKBndrs_Skol_M mode)
-
-tc_explicit_tk_bndrs
-    :: OutputableBndrFlag flag
-    => ([LHsTyVarBndr flag GhcRn] -> TcM a -> TcM ([VarBndr TyVar flag], a))
-    -> [LHsTyVarBndr flag GhcRn]
-    -> TcM a
-    -> TcM ([VarBndr TyVar flag], a)
--- The workhorse:
---    push level, capture constraints,
---    and emit an implication constraint with a ForAllSkol ic_info,
---    so that it is subject to a telescope test.
-tc_explicit_tk_bndrs bind_them bndrs thing_inside
+-- Push level, capture constraints,
+-- and emit an implication constraint with a ForAllSkol ic_info,
+-- so that it is subject to a telescope test.
+tcExplicitTKBndrs_M mode bndrs thing_inside
   = do { (tclvl, wanted, (skol_tvs, res))
              <- pushLevelAndCaptureConstraints $
-                bind_them bndrs                $
+                bindExplicitTKBndrs_Skol_M mode bndrs $
                 thing_inside
 
        ; let skol_info = ForAllSkol (fsep (map ppr bndrs))
@@ -3127,54 +3114,49 @@ bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
     -> TcM a
     -> TcM ([VarBndr TyVar flag], a)
 
-bindExplicitTKBndrs_Skol_M, bindExplicitTKBndrs_Tv_M
-    :: (OutputableBndrFlag flag)
-    => TcTyMode
-    -> [LHsTyVarBndr flag GhcRn]
-    -> TcM a
-    -> TcM ([VarBndr TyVar flag], a)
+bindExplicitTKBndrs_Skol_M :: (OutputableBndrFlag flag)
+                           => TcTyMode
+                           -> [LHsTyVarBndr flag GhcRn]
+                           -> TcM a
+                           -> TcM ([VarBndr TyVar flag], a)
 
-bindExplicitTKBndrs_Skol        = bindExplicitTKBndrsX (tcHsTyVarBndr (mkMode KindLevel) newSkolemTyVar)
-bindExplicitTKBndrs_Skol_M mode = bindExplicitTKBndrsX (tcHsTyVarBndr (kindLevel mode)   newSkolemTyVar)
-bindExplicitTKBndrs_Tv          = bindExplicitTKBndrsX (tcHsTyVarBndr (mkMode KindLevel) cloneTyVarTyVar)
-bindExplicitTKBndrs_Tv_M mode   = bindExplicitTKBndrsX (tcHsTyVarBndr (kindLevel mode)   cloneTyVarTyVar)
-  -- newSkolemTyVar:  see Note [Non-cloning for tyvar binders]
-  -- cloneTyVarTyVar: see Note [Cloning for tyvar binders]
+bindExplicitTKBndrs_Skol        = bindExplicitTKBndrsX smVanilla (mkMode KindLevel)
+bindExplicitTKBndrs_Skol_M mode = bindExplicitTKBndrsX smVanilla (kindLevel mode)
+bindExplicitTKBndrs_Tv          = bindExplicitTKBndrsX (smVanilla { sm_clone = True,  sm_tvtv = True }) (mkMode KindLevel)
+  -- sm_clone = False: see Note [Non-cloning for tyvar binders]
+  -- sm_clone = True:  see Note [Cloning for tyvar binders]
 
 bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
     :: ContextKind
     -> [LHsTyVarBndr () GhcRn]
     -> TcM a
     -> TcM ([TcTyVar], a)
-
-bindExplicitTKBndrs_Q_Skol ctxt_kind = bindExplicitTKBndrsX_Q (tcHsQTyVarBndr ctxt_kind newSkolemTyVar)
-bindExplicitTKBndrs_Q_Tv   ctxt_kind = bindExplicitTKBndrsX_Q (tcHsQTyVarBndr ctxt_kind newTyVarTyVar)
-  -- See Note [Non-cloning for tyvar binders]
-
-bindExplicitTKBndrsX_Q
-    :: (HsTyVarBndr () GhcRn -> TcM TcTyVar)
-    -> [LHsTyVarBndr () GhcRn]
-    -> TcM a
-    -> TcM ([TcTyVar], a)  -- Returned [TcTyVar] are in 1-1 correspondence
-                           -- with the passed-in [LHsTyVarBndr]
-bindExplicitTKBndrsX_Q tc_tv hs_tvs thing_inside
-  = do { (tv_bndrs,res) <- bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
-       ; return (binderVars tv_bndrs,res) }
+-- These do not cloen: see Note [Non-cloning for tyvar binders]
+bindExplicitTKBndrs_Q_Skol ctxt_kind hs_bndrs thing_inside
+  = applyToFstM binderVars $
+    bindExplicitTKBndrsX (smVanilla { sm_parent = True, sm_kind = ctxt_kind })
+                         (mkMode KindLevel) hs_bndrs thing_inside
+bindExplicitTKBndrs_Q_Tv ctxt_kind hs_bndrs thing_inside
+  = applyToFstM binderVars $
+    bindExplicitTKBndrsX (smVanilla { sm_parent = True, sm_tvtv = True, sm_kind = ctxt_kind })
+                         (mkMode KindLevel) hs_bndrs thing_inside
 
 bindExplicitTKBndrsX :: (OutputableBndrFlag flag)
-    => (HsTyVarBndr flag GhcRn -> TcM TyVar)
+    => SkolemMode -> TcTyMode
     -> [LHsTyVarBndr flag GhcRn]
     -> TcM a
     -> TcM ([VarBndr TyVar flag], a)  -- Returned [TcTyVar] are in 1-1 correspondence
                                       -- with the passed-in [LHsTyVarBndr]
-bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
+bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_kind })
+                     tc_ty_mode hs_tvs thing_inside
   = do { traceTc "bindExplicTKBndrs" (ppr hs_tvs)
        ; go hs_tvs }
   where
     go [] = do { res <- thing_inside
                ; return ([], res) }
     go (L _ hs_tv : hs_tvs)
-       = do { tv <- tc_tv hs_tv
+       = do { lcl_env <- getLclTypeEnv
+            ; tv <- tc_hs_bndr lcl_env hs_tv
             -- Extend the environment as we go, in case a binder
             -- is mentioned in the kind of a later binder
             --   e.g. forall k (a::k). blah
@@ -3184,61 +3166,58 @@ bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
                            go hs_tvs
             ; return (Bndr tv (hsTyVarBndrFlag hs_tv):tvs, res) }
 
------------------
-tcHsTyVarBndr :: TcTyMode -> (Name -> Kind -> TcM TyVar)
-              -> HsTyVarBndr flag GhcRn -> TcM TcTyVar
-tcHsTyVarBndr _ new_tv (UserTyVar _ _ (L _ tv_nm))
-  = do { kind <- newMetaKindVar
-       ; new_tv tv_nm kind }
-tcHsTyVarBndr mode new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
-  = do { kind <- tc_lhs_kind_sig mode (TyVarBndrKindCtxt tv_nm) lhs_kind
-       ; new_tv tv_nm kind }
 
------------------
-tcHsQTyVarBndr :: ContextKind
-               -> (Name -> Kind -> TcM TyVar)
-               -> HsTyVarBndr () GhcRn -> TcM TcTyVar
--- Just like tcHsTyVarBndr, but also
---   - uses the in-scope TyVar from class, if it exists
---   - takes a ContextKind to use for the no-sig case
-tcHsQTyVarBndr ctxt_kind new_tv (UserTyVar _ _ (L _ tv_nm))
-  = do { mb_tv <- tcLookupLcl_maybe tv_nm
-       ; case mb_tv of
-           Just (ATyVar _ tv) -> return tv
-           _ -> do { kind <- newExpectedKind ctxt_kind
-                   ; new_tv tv_nm kind } }
+    tc_hs_bndr lcl_env (UserTyVar _ _ (L _ name))
+      | check_parent
+      , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
+      = return tv
+      | otherwise
+      = do { kind <- newExpectedKind ctxt_kind
+           ; newTyVarBndr skol_mode name kind }
 
-tcHsQTyVarBndr _ new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
-  = do { kind <- tcLHsKindSig (TyVarBndrKindCtxt tv_nm) lhs_kind
-       ; mb_tv <- tcLookupLcl_maybe tv_nm
-       ; case mb_tv of
-           Just (ATyVar _ tv)
-             -> do { discardResult $ unifyKind (Just (ppr tv_nm))
-                                        kind (tyVarKind tv)
-                       -- This unify rejects:
-                       --    class C (m :: * -> *) where
-                       --      type F (m :: *) = ...
-                   ; return tv }
+    tc_hs_bndr lcl_env (KindedTyVar _ _ (L _ name) lhs_kind)
+      | check_parent
+      , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
+      = do { kind <- tc_lhs_kind_sig tc_ty_mode (TyVarBndrKindCtxt name) lhs_kind
+           ; discardResult $
+             unifyKind (Just (ppr name)) kind (tyVarKind tv)
+                          -- This unify rejects:
+                          --    class C (m :: * -> *) where
+                          --      type F (m :: *) = ...
+           ; return tv }
 
-           _ -> new_tv tv_nm kind }
+      | otherwise
+      = do { kind <- tc_lhs_kind_sig tc_ty_mode (TyVarBndrKindCtxt name) lhs_kind
+           ; newTyVarBndr skol_mode name kind }
+
+newTyVarBndr :: SkolemMode -> Name -> Kind -> TcM TcTyVar
+newTyVarBndr (SM { sm_clone = clone, sm_tvtv = tvtv }) name kind
+  = do { name <- case clone of
+              True -> do { uniq <- newUnique
+                         ; return (setNameUnique name uniq) }
+              False -> return name
+       ; details <- case tvtv of
+                 True  -> newMetaDetails TyVarTv
+                 False -> do { lvl <- getTcLevel
+                             ; return (SkolemTv lvl False) }
+       ; return (mkTcTyVar name kind details) }
 
 --------------------------------------
 --    Implicit tyvar binders
 --------------------------------------
 
-tc_implicit_tk_bndrs :: SkolemInfo
-                     -> ([Name] -> TcM a -> TcM ([TcTyVar], a))
-                     -> [Name]
-                     -> TcM a
-                     -> TcM ([TcTyVar], a)
+tcImplicitTKBndrs :: SkolemInfo
+                  -> [Name]
+                  -> TcM a
+                  -> TcM ([TcTyVar], a)
 -- The workhorse:
 --    push level, capture constraints,
 --    and emit an implication constraint with a ForAllSkol ic_info,
 --    so that it is subject to a telescope test.
-tc_implicit_tk_bndrs skol_info bind_them bndrs thing_inside
+tcImplicitTKBndrs skol_info bndrs thing_inside
   = do { (tclvl, wanted, (skol_tvs, res))
              <- pushLevelAndCaptureConstraints $
-                bind_them bndrs                $
+                bindImplicitTKBndrs_Skol bndrs $
                 thing_inside
 
        ; emitResidualTvConstraint skol_info skol_tvs tclvl wanted
@@ -3249,49 +3228,57 @@ tc_implicit_tk_bndrs skol_info bind_them bndrs thing_inside
 bindImplicitTKBndrs_Skol, bindImplicitTKBndrs_Tv,
   bindImplicitTKBndrs_Q_Skol, bindImplicitTKBndrs_Q_Tv
   :: [Name] -> TcM a -> TcM ([TcTyVar], a)
-bindImplicitTKBndrs_Q_Skol = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedSkolemTyVar)
-bindImplicitTKBndrs_Q_Tv   = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedTyVarTyVar)
-bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX newFlexiKindedSkolemTyVar
-bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX cloneFlexiKindedTyVarTyVar
-  -- newFlexiKinded...           see Note [Non-cloning for tyvar binders]
-  -- cloneFlexiKindedTyVarTyVar: see Note [Cloning for tyvar binders]
+bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX smVanilla
+bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = True })
+bindImplicitTKBndrs_Q_Skol = bindImplicitTKBndrsX (smVanilla { sm_parent = True })
+bindImplicitTKBndrs_Q_Tv   = bindImplicitTKBndrsX (smVanilla { sm_parent = True, sm_tvtv = True })
+  -- sm_clone = False: see Note [Non-cloning for tyvar binders]
+  -- sm_clone = True:  see Note [Cloning for tyvar binders]
+
+data SkolemMode
+  = SM { sm_parent :: Bool    -- True <=> check the in-scope parent type variable
+       , sm_clone  :: Bool    -- True <=> fresh unique
+       , sm_tvtv   :: Bool    -- True <=> use a TyVarTv, rather than SkolemTv
+       , sm_kind   :: ContextKind  -- Use this for the kind of any new binders
+       }
+
+smVanilla :: SkolemMode
+smVanilla = SM { sm_parent = False
+               , sm_clone  = False
+               , sm_tvtv   = False
+               , sm_kind   = AnyKind }
 
 bindImplicitTKBndrsX
-   :: (Name -> TcM TcTyVar) -- new_tv function
+   :: SkolemMode
    -> [Name]
    -> TcM a
    -> TcM ([TcTyVar], a)   -- Returned [TcTyVar] are in 1-1 correspondence
                            -- with the passed in [Name]
-bindImplicitTKBndrsX new_tv tv_names thing_inside
-  = do { tkvs <- mapM new_tv tv_names
-       ; traceTc "bindImplicitTKBndrs" (ppr tv_names $$ ppr tkvs)
+bindImplicitTKBndrsX (SM { sm_parent = check_parent, sm_clone = clone
+                         , sm_tvtv = tvtv, sm_kind = ctxt_kind })
+                     tv_names thing_inside
+  = do { lcl_env <- getLclTypeEnv
+       ; tkvs <- mapM (new_tv lcl_env) tv_names
+       ; traceTc "bindImplicitTKBndrsX" (ppr tv_names $$ ppr tkvs)
        ; res <- tcExtendNameTyVarEnv (tv_names `zip` tkvs)
                 thing_inside
        ; return (tkvs, res) }
-
-newImplicitTyVarQ :: (Name -> TcM TcTyVar) ->  Name -> TcM TcTyVar
--- Behave like new_tv, except that if the tyvar is in scope, use it
-newImplicitTyVarQ new_tv name
-  = do { mb_tv <- tcLookupLcl_maybe name
-       ; case mb_tv of
-           Just (ATyVar _ tv) -> return tv
-           _ -> new_tv name }
-
-newFlexiKindedTyVar :: (Name -> Kind -> TcM TyVar) -> Name -> TcM TyVar
-newFlexiKindedTyVar new_tv name
-  = do { kind <- newMetaKindVar
-       ; new_tv name kind }
-
-newFlexiKindedSkolemTyVar :: Name -> TcM TyVar
-newFlexiKindedSkolemTyVar = newFlexiKindedTyVar newSkolemTyVar
-
-newFlexiKindedTyVarTyVar :: Name -> TcM TyVar
-newFlexiKindedTyVarTyVar = newFlexiKindedTyVar newTyVarTyVar
-
-cloneFlexiKindedTyVarTyVar :: Name -> TcM TyVar
-cloneFlexiKindedTyVarTyVar = newFlexiKindedTyVar cloneTyVarTyVar
-   -- See Note [Cloning for tyvar binders]
-
+  where
+    new_tv lcl_env name
+      | check_parent
+      , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
+      = return tv
+      | otherwise
+      = do { name <- case clone of
+                  True -> do { uniq <- newUnique
+                             ; return (setNameUnique name uniq) }
+                  False -> return name
+           ; kind <- newExpectedKind ctxt_kind
+           ; details <- case tvtv of
+                     True  -> newMetaDetails TyVarTv
+                     False -> do { lvl <- getTcLevel
+                                 ; return (SkolemTv lvl False) }
+           ; return (mkTcTyVar name kind details) }
 
 --------------------------------------
 -- Binding type/class variables in the

@@ -857,7 +857,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
        ; (tclvl, wanted, (scoped_tvs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
-               bindOuterFamEqnTKBndrs_Q_Skol AnyKind outer_bndrs $
+               bindOuterFamEqnTKBndrs_Q_Skol outer_bndrs $
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
                   ; (lhs_applied_ty, lhs_applied_kind)
@@ -939,7 +939,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
       = do { sig_kind <- tcLHsKindSig data_ctxt hs_kind
            ; lvl <- getTcLevel
            ; let (tvs, inner_kind) = tcSplitForAllTys sig_kind
-                 (subst, _tvs')    = tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
+           ; (subst, _tvs') <- tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
            ; return (substTy subst inner_kind) }
 

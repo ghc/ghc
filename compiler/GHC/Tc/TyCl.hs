@@ -2840,7 +2840,7 @@ kcTyFamInstEqn tc_fam_tc
                   wrongNumberOfParmsErr vis_arity
 
        ; discardResult $
-         bindOuterFamEqnTKBndrs_Q_Tv AnyKind outer_bndrs $
+         bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
          do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty (TheKind res_kind) }
              -- Why "_Tv" here?  Consider (#14066
@@ -2963,7 +2963,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_bndrs hs_pats hs_rhs_ty
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
        ; (tclvl, wanted, (scoped_tvs, (lhs_ty, rhs_ty)))
                <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
-                  bindOuterFamEqnTKBndrs_Q_Skol AnyKind outer_bndrs $
+                  bindOuterFamEqnTKBndrs_Q_Skol outer_bndrs $
                   do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)

@@ -734,7 +734,7 @@ type family XXLHsQTyVars  x
 -- -------------------------------------
 -- HsOuterTyVarBndrs type families
 type family XHsOuterImplicit    x
-type family XHsOuterExplicit    x
+type family XHsOuterExplicit    x flag
 type family XXHsOuterTyVarBndrs x
 
 -- -------------------------------------
