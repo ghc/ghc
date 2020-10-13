@@ -314,7 +314,6 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
               mapAccumLM (\ccs rhs -> swap <$> coreToTopStgRhs dflags ccs this_mod rhs
                          ccs
                          pairs
-
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
     (env', ccs', bind)
