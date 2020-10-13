@@ -367,40 +367,14 @@
               (Nothing)
               (PrefixCon
                [(HsScaled
-                 (HsLinearArrow)
+                 (HsUnrestrictedArrow)
                  ({ DumpRenamedAst.hs:19:10-34 }
                   (HsParTy
                    (NoExtField)
                    ({ DumpRenamedAst.hs:19:11-33 }
                     (HsForAllTy
                      (NoExtField)
-                     (NotPromoted)
-                     ({ DumpRenamedAst.hs:18:48-51 }
-                      {Name: GHC.Types.Type})))))))
-               ({ DumpRenamedAst.hs:18:57-60 }
-                (HsTyVar
-                 (NoExtField)
-                 (NotPromoted)
-                 ({ DumpRenamedAst.hs:18:57-60 }
-                  {Name: GHC.Types.Type}))))))
-            [({ DumpRenamedAst.hs:19:3-45 }
-              (ConDeclGADT
-               [{Name: f}
-               ,{Name: g}]
-               [({ DumpRenamedAst.hs:19:3-5 }
-                 {Name: DumpRenamedAst.Nat})]
-               ({ DumpRenamedAst.hs:19:10-45 }
-                (False))
-               []
-               (Nothing)
-               (PrefixCon
-                [(HsScaled
-                  (HsUnrestrictedArrow)
-                  ({ DumpRenamedAst.hs:19:10-34 }
-                   (HsParTy
-                    (NoExtField)
-                    ({ DumpRenamedAst.hs:19:11-33 }
-                     (HsForAllTy
+                     (HsForAllInvis
                       (NoExtField)
                       [({ DumpRenamedAst.hs:19:18-19 }
                         (UserTyVar
