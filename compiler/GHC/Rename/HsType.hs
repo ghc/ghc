@@ -320,13 +320,16 @@ rnHsSigType ctx level
     (L loc sig_ty@(HsSig { sig_bndrs = outer_bndrs, sig_body = body }))
   = setSrcSpan loc $
     do { traceRn "rnHsSigType" (ppr sig_ty)
+       ; checkPolyKinds env sig_ty
        ; imp_vars <- filterInScopeM $ extractHsTyRdrTyVars body
        ; bindHsOuterTyVarBndrs ctx Nothing imp_vars outer_bndrs $ \outer_bndrs' ->
-    do { (body', fvs) <- rnLHsTyKi (mkTyKiEnv ctx level RnTypeBody) body
+    do { (body', fvs) <- rnLHsTyKi env body
 
        ; return ( L loc $ HsSig { sig_ext = noExtField
                                 , sig_bndrs = outer_bndrs', sig_body = body' }
                 , fvs ) } }
+  where
+    env = mkTyKiEnv ctx level RnTypeBody
 
 rnImplicitBndrs :: Maybe assoc
                 -- ^ @'Just' _@ => an associated type decl
