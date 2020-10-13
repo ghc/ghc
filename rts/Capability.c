@@ -858,7 +858,14 @@ void waitForCapability (Capability **pCap, Task *task)
 /* See Note [GC livelock] in Schedule.c for why we have gcAllowed
    and return the bool */
 bool /* Did we GC? */
-yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
+yieldCapability
+    ( Capability** pCap     // [in/out] Task's owned capability. Set to the
+                            //          newly owned capability on return.
+                            //              pCap != NULL
+                            //              && *pCap != NULL
+    , Task *task            // [in] This thread's task.
+    , bool gcAllowed
+    )
 {
     Capability *cap = *pCap;
 
