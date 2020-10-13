@@ -381,8 +381,6 @@ getClosureDataFromHeapRep closureAddressMay heapRep infoTablePtr pts = do
                 Nothing -> pure $ UnsupportedClosure itbl
                 Just (Ptr closureAddress) ->  withArray rawHeapWords (\ptr -> do
                             fields <- FFIClosures.peekStackFields ptr
-                            let sp = FFIClosures.stack_sp fields
-                                spOffset = I# (minusAddr# sp closureAddress)
                             pure $ StackClosure
                                 { info = itbl
                                 , stack_size = FFIClosures.stack_size fields
@@ -390,7 +388,6 @@ getClosureDataFromHeapRep closureAddressMay heapRep infoTablePtr pts = do
 #if __GLASGOW_HASKELL__ >= 811
                                 , stack_marking = FFIClosures.stack_marking fields
 #endif
-                                , stack_spOffset = spOffset
                                 })
             | otherwise
                 -> fail $ "Expected 0 ptr argument to STACK, found "
