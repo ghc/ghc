@@ -1,7 +1,7 @@
-{-# LANGUAGE BangPatterns     #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes       #-}
-{-# LANGUAGE Strict           #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Strict #-}
 
 {- |
   Module      :  GHC.CmmToAsm.CFG.Dominators
