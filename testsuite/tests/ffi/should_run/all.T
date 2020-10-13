@@ -219,4 +219,9 @@ test('UnliftedNewtypesByteArrayOffset', [omit_ways(['ghci'])], compile_and_run, 
 test('T17471', [omit_ways(['ghci'])], compile_and_run,
      ['T17471_c.c -optc-D -optcFOO'])
 
-test('IncallAffinity', [req_smp, only_ways(['threaded1', 'threaded2'])], compile_and_run, ['IncallAffinity_c.c -no-hs-main'])
+test('IncallAffinity',
+     [req_smp, only_ways(['threaded1', 'threaded2']),
+      # Unregisterised build doesn't support 
+      when(unregisterised(), skip)],
+     compile_and_run,
+     ['IncallAffinity_c.c -no-hs-main'])
