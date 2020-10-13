@@ -6,7 +6,7 @@
 
 -- | Bytecode instruction definitions
 module GHC.ByteCode.Instr (
-        BCInstr(..), ProtoBCO(..), bciStackUse,
+        BCInstr(..), ProtoBCO(..), bciStackUse, LocalLabel(..)
   ) where
 
 #include "HsVersions.h"
@@ -50,7 +50,11 @@ data ProtoBCO a
         protoBCOFFIs       :: [FFIInfo]
    }
 
-type LocalLabel = Word16
+newtype LocalLabel = LocalLabel { getLocalLabel :: Word16 }
+  deriving (Eq, Ord)
+
+instance Outputable LocalLabel where
+  ppr (LocalLabel lbl) = text "lbl:" <> ppr lbl
 
 data BCInstr
    -- Messing with the stack
