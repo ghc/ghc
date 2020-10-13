@@ -40,7 +40,7 @@ module GHC.Event.PSQ
     , atMost
     ) where
 
-import GHC.Base hiding (Nat, empty)
+import GHC.Base hiding (empty)
 import GHC.Event.Unique
 import GHC.Word (Word64)
 import GHC.Num (Num(..))
