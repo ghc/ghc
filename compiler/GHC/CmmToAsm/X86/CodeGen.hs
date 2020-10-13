@@ -1403,7 +1403,7 @@ getNonClobberedOperand (CmmLoad mem pk) = do
                 else
                    return (src, nilOL)
       return (OpAddr src', mem_code `appOL` save_code)
-    else do
+    else
       -- if its a word or gcptr on 32bit?
       getNonClobberedOperand_generic (CmmLoad mem pk)
 
@@ -1791,7 +1791,7 @@ genJump (CmmLoad mem _) regs = do
   Amode target code <- getAmode mem
   return (code `snocOL` JMP (OpAddr target) regs)
 
-genJump (CmmLit lit) regs = do
+genJump (CmmLit lit) regs =
   return (unitOL (JMP (OpImm (litToImm lit)) regs))
 
 genJump expr regs = do
