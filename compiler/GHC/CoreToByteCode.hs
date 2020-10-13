@@ -1968,7 +1968,7 @@ data BcM_State
         { bcm_hsc_env :: HscEnv
         , uniqSupply  :: UniqSupply      -- for generating fresh variable names
         , thisModule  :: Module          -- current module (for breakpoints)
-        , nextlabel   :: Word16          -- for generating local labels
+        , nextlabel   :: Word32          -- for generating local labels
         , ffis        :: [FFIInfo]       -- ffi info blocks, to free later
                                          -- Should be free()d when it is GCd
         , modBreaks   :: Maybe ModBreaks -- info about breakpoints
@@ -2040,7 +2040,7 @@ getLabelBc
                         panic "getLabelBc: Ran out of labels"
                     return (st{nextlabel = nl + 1}, LocalLabel nl)
 
-getLabelsBc :: Word16 -> BcM [LocalLabel]
+getLabelsBc :: Word32 -> BcM [LocalLabel]
 getLabelsBc n
   = BcM $ \st -> let ctr = nextlabel st
                  in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])

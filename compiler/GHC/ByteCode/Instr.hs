@@ -50,7 +50,8 @@ data ProtoBCO a
         protoBCOFFIs       :: [FFIInfo]
    }
 
-newtype LocalLabel = LocalLabel { getLocalLabel :: Word16 }
+-- | A local block label (e.g. identifying a case alternative).
+newtype LocalLabel = LocalLabel { getLocalLabel :: Word32 }
   deriving (Eq, Ord)
 
 instance Outputable LocalLabel where
