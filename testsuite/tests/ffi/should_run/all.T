@@ -199,4 +199,9 @@ test('PrimFFIInt16', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt16_c.c'
 
 test('PrimFFIWord16', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord16_c.c'])
 
-test('IncallAffinity', [req_smp, only_ways(['threaded1', 'threaded2'])], compile_and_run, ['IncallAffinity_c.c -no-hs-main'])
+test('IncallAffinity',
+     [req_smp, only_ways(['threaded1', 'threaded2']),
+      # Unregisterised build doesn't support
+      when(unregisterised(), skip)],
+     compile_and_run,
+     ['IncallAffinity_c.c -no-hs-main'])
