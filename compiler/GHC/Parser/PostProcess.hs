@@ -975,6 +975,9 @@ checkPat loc (L l e@(PatBuilderVar (L _ c))) tyargs args
       , pat_con = L l c
       , pat_args = PrefixCon tyargs args
       }
+  | not (null tyargs) =
+      add_hint TypeApplicationsInPatternsOnlyDataCons $
+      patFail l (ppr e <+> hsep [text "@" <> ppr t | t <- tyargs])
   | not (null args) && patIsRec c =
       add_hint SuggestRecursiveDo $
       patFail l (ppr e)
