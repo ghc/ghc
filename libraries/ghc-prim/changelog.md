@@ -5,7 +5,7 @@
 - Add known-key `cstringLength#` to `GHC.CString`. This is just the
   C function `strlen`, but a built-in rewrite rule allows GHC to
   compute the result at compile time when the argument is known.
-  
+
 - In order to support unicode better the following functions in `GHC.CString`
   gained UTF8 counterparts:
 
