@@ -438,31 +438,6 @@ The Foreign Function Interface
         single: hs_init
         single: hs_exit
 
-.. _infelicities-operator-sections:
-
-Operator sections
-^^^^^^^^^^^^^^^^^
-
-The Haskell Report demands that, for infix operators ``%``, the following
-identities hold:
-
-::
-
-    (% expr) = \x -> x % expr
-    (expr %) = \x -> expr % x
-
-However, the second law is violated in the presence of undefined operators,
-
-::
-
-    (%) = error "urk"
-    (() %)         `seq` () -- urk
-    (\x -> () % x) `seq` () -- OK, result ()
-
-The operator section is treated like function application of an undefined
-function, while the lambda form is in WHNF that contains an application of an
-undefined function.
-
 .. _haskell-98-2010-undefined:
 
 GHC's interpretation of undefined behaviour in Haskell 98 and Haskell 2010
