@@ -70,6 +70,8 @@ import GHC.Utils.Panic
 import GHC.Core.PatSyn
 import Control.Monad
 
+import qualified GHC.LanguageExtensions as LangExt
+
 {-
 ************************************************************************
 *                                                                      *
@@ -347,7 +349,11 @@ converting to core it must become a CO.
 
 Note [Desugaring operator sections]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-At first it looks as if we can convert
+Desugaring left sections with -XPostfixOperators is straightforward: convert
+(expr `op`) to (op expr).
+
+Without -XPostfixOperators it's a bit more tricky. At first it looks as if we
+can convert
 
     (expr `op`)
 
@@ -398,6 +404,13 @@ dsExpr e@(OpApp _ e1 op e2)
 -- See Note [Desugaring operator sections].
 -- N.B. this also must handle postfix operator sections due to -XPostfixOperators.
 dsExpr e@(SectionL _ expr op) = do
+  postfix_operators <- xoptM LangExt.PostfixOperators
+  if postfix_operators then
+    -- Desugar (e !) to ((!) e)
+    do { op' <- dsLExpr op
+       ; dsWhenNoErrs (dsLExprNoLP expr) $ \expr' ->
+         mkCoreAppDs (text "sectionl" <+> ppr expr) op' expr' }
+  else do
     core_op <- dsLExpr op
     x_core <- dsLExpr expr
     case splitFunTys (exprType core_op) of
