@@ -34,6 +34,10 @@
 #include "Hash.h"
 #endif
 
+#if RTS_LINKER_USE_MMAP
+#include "LinkerInternals.h"
+#endif
+
 #include <string.h>
 
 #include "ffi.h"
@@ -1655,6 +1659,20 @@ AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
     RELEASE_SM_LOCK;
     return writ;
 }
+
+#if RTS_LINKER_USE_MMAP
+AdjustorWritable allocateWrite(W_ bytes) {
+    return mmapForLinker(bytes, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+}
+
+void markExec(W_ bytes, AdjustorWritable writ) {
+    mmapForLinkerMarkExecutable(writ, bytes);
+}
+
+void freeWrite(W_ bytes, AdjustorWritable writ) {
+    munmap(writ, bytes);
+}
+#endif
 
 AdjustorWritable execToWritable(AdjustorExecutable exec)
 {
