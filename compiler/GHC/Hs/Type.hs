@@ -1104,15 +1104,19 @@ instance OutputableBndrId p
 
 -- HsConDetails is used for patterns/expressions *and* for data type
 -- declarations
--- | Haskell Constructor Details
-data HsConDetails arg rec
+-- | Haskell Constructor Details.
+--
+-- The @arg@ and @inf@ type parameters are kept separate so that GADT
+-- constructors (which cannot be declared with infix syntax) can instantiate
+-- @inf@ to @Void@. See @Note [GADT syntax can't be infix]@ in "GHC.Hs.Decls".
+data HsConDetails arg rec inf
   = PrefixCon [arg]             -- C p1 p2 p3
   | RecCon    rec               -- C { x = p1, y = p2 }
-  | InfixCon  arg arg           -- p1 `C` p2
+  | InfixCon  inf inf           -- p1 `C` p2
   deriving Data
 
-instance (Outputable arg, Outputable rec)
-         => Outputable (HsConDetails arg rec) where
+instance (Outputable arg, Outputable rec, Outputable inf)
+         => Outputable (HsConDetails arg rec inf) where
   ppr (PrefixCon args) = text "PrefixCon" <+> ppr args
   ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]

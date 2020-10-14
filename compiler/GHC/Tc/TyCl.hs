@@ -81,12 +81,14 @@ import GHC.Types.Basic
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Data.Foldable
 import Data.Function ( on )
 import Data.Functor.Identity
 import Data.List
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
 import Data.Tuple( swap )
+import Data.Void
 
 {-
 ************************************************************************
@@ -1563,18 +1565,33 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 
 -------------------
 
--- Type check the types of the arguments to a data constructor.
+-- Kind-check the type of an argument to a data constructor.
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
--- the first two arguments.
-kcConArgTys :: NewOrData -> Kind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
-kcConArgTys new_or_data res_kind arg_tys = do
-  { let exp_kind = getArgExpKind new_or_data res_kind
-  ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsType (getBangType ty) exp_kind
-                                             tcMult mult)
-
+-- the ContextKind argument.
+kcConArg :: ContextKind -> HsScaled GhcRn (LHsType GhcRn) -> TcM ()
+kcConArg exp_kind (HsScaled mult ty) = do
+  _ <- tcCheckLHsType (getBangType ty) exp_kind
+  _ <- tcMult mult
+  pure ()
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
-  }
+
+-- Kind-check the types of arguments to a Haskell98 data constructor.
+kcConH98Args :: ContextKind -> HsConDeclH98Details GhcRn -> TcM ()
+kcConH98Args = kcConArgs kcConArg
+
+-- Kind-check the types of arguments to a GADT data constructor.
+kcConGADTArgs :: ContextKind -> HsConDeclGADTDetails GhcRn -> TcM ()
+kcConGADTArgs = kcConArgs (\_ -> absurd)
+
+-- Kind-check the types of argument to a data constructor.
+kcConArgs :: (ContextKind -> infRn -> TcM ())
+          -> ContextKind -> HsConDeclDetails GhcRn infRn -> TcM ()
+kcConArgs kc_inf exp_kind con_args = case con_args of
+  PrefixCon tys     -> traverse_ (kcConArg exp_kind) tys
+  InfixCon ty1 ty2  -> traverse_ (kc_inf exp_kind) [ty1, ty2]
+  RecCon (L _ flds) -> traverse_ (kcConArg exp_kind) $
+                       map (hsLinear . cd_fld_type . unLoc) flds
 
 kcConDecls :: NewOrData
            -> Kind             -- The result kind signature
@@ -1604,14 +1621,14 @@ kcConDecl new_or_data res_kind (ConDeclH98
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
-       ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
+       ; kcConH98Args (getArgExpKind new_or_data res_kind) args
          -- We don't need to check the telescope here,
          -- because that's done in tcConDecl
        }
 
 kcConDecl new_or_data res_kind (ConDeclGADT
     { con_names = names, con_qvars = explicit_tkv_nms, con_mb_cxt = cxt
-    , con_args = args, con_res_ty = res_ty, con_g_ext = implicit_tkv_nms })
+    , con_g_args = args, con_res_ty = res_ty, con_g_ext = implicit_tkv_nms })
   = -- Even though the GADT-style data constructor's type is closed,
     -- we must still kind-check the type, because that may influence
     -- the inferred kind of the /type/ constructor.  Example:
@@ -1625,7 +1642,7 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     bindExplicitTKBndrs_Tv explicit_tkv_nms $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
     do { _ <- tcHsMbContext cxt
-       ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
+       ; kcConGADTArgs (getArgExpKind new_or_data res_kind) args
        ; _ <- tcHsOpenType res_ty
        ; return () }
 
@@ -3196,7 +3213,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
               bindExplicitTKBndrs_Skol explicit_tkv_nms    $
               do { ctxt <- tcHsMbContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
-                 ; btys <- tcConArgs exp_kind hs_args
+                 ; btys <- tcConH98Args exp_kind hs_args
                  ; field_lbls <- lookupConstructorFields name
                  ; let (arg_tys, stricts) = unzip btys
                  ; return (ctxt, arg_tys, field_lbls, stricts)
@@ -3266,7 +3283,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
           (ConDeclGADT { con_g_ext = implicit_tkv_nms
                        , con_names = names
                        , con_qvars = explicit_tkv_nms
-                       , con_mb_cxt = cxt, con_args = hs_args
+                       , con_mb_cxt = cxt, con_g_args = hs_args
                        , con_res_ty = hs_res_ty })
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
@@ -3283,7 +3300,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                    -- See Note [Datatype return kinds]
                  ; let exp_kind = getArgExpKind new_or_data res_kind
 
-                 ; btys <- tcConArgs exp_kind hs_args
+                 ; btys <- tcConGADTArgs exp_kind hs_args
                  ; let (arg_tys, stricts) = unzip btys
                  ; field_lbls <- lookupConstructorFields name
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
@@ -3362,19 +3379,20 @@ getArgExpKind NewType res_ki = TheKind res_ki
 getArgExpKind DataType _     = OpenKind
 
 tcConIsInfixH98 :: Name
-             -> HsConDetails a b
+             -> HsConDeclH98Details GhcRn
              -> TcM Bool
 tcConIsInfixH98 _   details
   = case details of
            InfixCon {}  -> return True
-           _            -> return False
+           RecCon{}     -> return False
+           PrefixCon{}  -> return False
 
 tcConIsInfixGADT :: Name
-             -> HsConDetails (HsScaled GhcRn (LHsType GhcRn)) r
+             -> HsConDeclGADTDetails GhcRn
              -> TcM Bool
 tcConIsInfixGADT con details
   = case details of
-           InfixCon {}  -> return True
+           InfixCon v _ -> absurd v
            RecCon {}    -> return False
            PrefixCon arg_tys           -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
@@ -3383,18 +3401,31 @@ tcConIsInfixGADT con details
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
 
-tcConArgs :: ContextKind  -- expected kind of arguments
+tcConH98Args :: ContextKind  -- expected kind of arguments
+                             -- always OpenKind for datatypes, but unlifted newtypes
+                             -- might have a specific kind
+             -> HsConDeclH98Details GhcRn
+             -> TcM [(Scaled TcType, HsSrcBang)]
+tcConH98Args = tcConArgs tcConArg
+
+tcConGADTArgs :: ContextKind  -- expected kind of arguments
+                              -- always OpenKind for datatypes, but unlifted newtypes
+                              -- might have a specific kind
+              -> HsConDeclGADTDetails GhcRn
+              -> TcM [(Scaled TcType, HsSrcBang)]
+tcConGADTArgs = tcConArgs (\_ -> absurd)
+
+tcConArgs :: (ContextKind -> infRn -> TcM (Scaled TcType, HsSrcBang))
+          -> ContextKind  -- expected kind of arguments
                           -- always OpenKind for datatypes, but unlifted newtypes
                           -- might have a specific kind
-          -> HsConDeclDetails GhcRn
+          -> HsConDeclDetails GhcRn infRn
           -> TcM [(Scaled TcType, HsSrcBang)]
-tcConArgs exp_kind (PrefixCon btys)
+tcConArgs _ exp_kind (PrefixCon btys)
   = mapM (tcConArg exp_kind) btys
-tcConArgs exp_kind (InfixCon bty1 bty2)
-  = do { bty1' <- tcConArg exp_kind bty1
-       ; bty2' <- tcConArg exp_kind bty2
-       ; return [bty1', bty2'] }
-tcConArgs exp_kind (RecCon fields)
+tcConArgs tc_inf exp_kind (InfixCon bty1 bty2)
+  = mapM (tc_inf exp_kind) [bty1, bty2]
+tcConArgs _ exp_kind (RecCon fields)
   = mapM (tcConArg exp_kind) btys
   where
     -- We need a one-to-one mapping from field_names to btys
@@ -3434,7 +3465,8 @@ matches what the user wrote (#18791).
 
 Note [Infix GADT constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We do not currently have syntax to declare an infix constructor in GADT syntax,
+We do not currently have syntax to declare an infix constructor in GADT syntax
+(see Note [GADT syntax can't be infix] in GHC.Hs.Decls),
 but it makes a (small) difference to the Show instance.  So as a slightly
 ad-hoc solution, we regard a GADT data constructor as infix if
   a) it is an operator symbol
