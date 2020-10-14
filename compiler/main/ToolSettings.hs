@@ -31,6 +31,8 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_windres :: String
   , toolSettings_pgm_libtool :: String
   , toolSettings_pgm_ar      :: String
+  , toolSettings_pgm_otool   :: String
+  , toolSettings_pgm_install_name_tool :: String
   , toolSettings_pgm_ranlib  :: String
   , -- | LLVM: opt llvm optimiser
     toolSettings_pgm_lo      :: (String, [Option])

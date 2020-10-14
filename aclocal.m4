@@ -586,6 +586,18 @@ AC_DEFUN([FP_SETTINGS],
     else
       SettingsOptCommand="$OptCmd"
     fi
+    if test -z "$OtoolCmd"
+    then
+      SettingsOtoolCommand="otool"
+    else
+      SettingsOtoolCommand="$OtoolCmd"
+    fi
+    if test -z "$InstallNameToolCmd"
+    then
+      SettingsInstallNameToolCommand="install_name_tool"
+    else
+      SettingsInstallNameToolCommand="$InstallNameToolCmd"
+    fi
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
     SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
@@ -604,6 +616,8 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsMergeObjectsFlags)
     AC_SUBST(SettingsArCommand)
     AC_SUBST(SettingsRanlibCommand)
+    AC_SUBST(SettingsOtoolCommand)
+    AC_SUBST(SettingsInstallNameToolCommand)
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsLibtoolCommand)
