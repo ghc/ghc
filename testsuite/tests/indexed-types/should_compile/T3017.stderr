@@ -4,7 +4,7 @@ TYPE SIGNATURES
   insert :: forall c. Coll c => Elem c -> c -> c
   test2 ::
     forall {c} {a} {b}.
-    (Coll c, Num a, Num b, Elem c ~ (a, b)) =>
+    (Elem c ~ (a, b), Coll c, Num a, Num b) =>
     c -> c
 TYPE CONSTRUCTORS
   class Coll{1} :: * -> Constraint
@@ -20,4 +20,4 @@ CLASS INSTANCES
 FAMILY INSTANCES
   type instance Elem (ListColl a) = a -- Defined at T3017.hs:13:9
 Dependent modules: []
-Dependent packages: [base-4.13.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
+Dependent packages: [base-4.15.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]

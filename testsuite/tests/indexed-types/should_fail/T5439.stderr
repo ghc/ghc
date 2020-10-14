@@ -30,3 +30,28 @@ T5439.hs:82:39: error:
         ‘inj $ Failure (e :: SomeException)’
       In a stmt of a 'do' block:
         c <- complete ev $ inj $ Failure (e :: SomeException)
+
+T5439.hs:245:15: error:
+    • Could not deduce: HDrop (PSucc PZero) l ~ HTail l
+        arising from a use of ‘HTailDropComm’
+      from the context: (HDropClass n l, HNonEmpty (HDrop n l))
+        bound by the type signature for:
+                   hTailDropComm :: forall n l.
+                                    (HDropClass n l, HNonEmpty (HDrop n l)) =>
+                                    HTailDropComm n l
+        at T5439.hs:(242,1)-(243,34)
+      or from: (n ~ PZero, HListClass l)
+        bound by a pattern with constructor:
+                   HDropZero :: forall l. HListClass l => HDropWitness PZero l,
+                 in a case alternative
+        at T5439.hs:245:3-11
+    • In the expression: HTailDropComm
+      In a case alternative: HDropZero -> HTailDropComm
+      In the expression:
+        case hDropWitness :: HDropWitness n l of
+          HDropZero -> HTailDropComm
+          HDropSucc
+            -> case hTailDropComm :: HTailDropComm (PPred n) (HTail l) of {
+                 HTailDropComm -> HTailDropComm }
+    • Relevant bindings include
+        hTailDropComm :: HTailDropComm n l (bound at T5439.hs:244:1)
