@@ -74,8 +74,9 @@ module GHC.Hs.Decls (
   CImportSpec(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl,
-  HsConDeclDetails, hsConDeclArgTys, hsConDeclTheta,
-  getConNames, getConArgs,
+  HsConDeclDetails, HsConDeclH98Details, HsConDeclGADTDetails,
+  hsConDeclTheta,
+  getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
@@ -126,6 +127,7 @@ import GHC.Core.Type
 import GHC.Data.Bag
 import GHC.Data.Maybe
 import Data.Data        hiding (TyCon,Fixity, Infix)
+import Data.Void
 
 {-
 ************************************************************************
@@ -1473,9 +1475,9 @@ data ConDecl pass
                        -- Whether or not there is an /explicit/ forall, we still
                        -- need to capture the implicitly-bound type/kind variables
 
-      , con_mb_cxt  :: Maybe (LHsContext pass) -- ^ User-written context (if any)
-      , con_args    :: HsConDeclDetails pass   -- ^ Arguments; never InfixCon
-      , con_res_ty  :: LHsType pass            -- ^ Result type
+      , con_mb_cxt  :: Maybe (LHsContext pass)   -- ^ User-written context (if any)
+      , con_g_args  :: HsConDeclGADTDetails pass -- ^ Arguments; never InfixCon
+      , con_res_ty  :: LHsType pass              -- ^ Result type
 
       , con_doc     :: Maybe LHsDocString
           -- ^ A possible Haddock comment.
@@ -1492,7 +1494,7 @@ data ConDecl pass
                               -- False => con_ex_tvs is empty
       , con_ex_tvs :: [LHsTyVarBndr Specificity pass] -- ^ Existentials only
       , con_mb_cxt :: Maybe (LHsContext pass)         -- ^ User-written context (if any)
-      , con_args   :: HsConDeclDetails pass           -- ^ Arguments; can be InfixCon
+      , con_args   :: HsConDeclH98Details pass        -- ^ Arguments; can be InfixCon
 
       , con_doc       :: Maybe LHsDocString
           -- ^ A possible Haddock comment.
@@ -1623,27 +1625,39 @@ or contexts in two parts:
    quantification occurs after a visible argument type.
 -}
 
--- | Haskell data Constructor Declaration Details
-type HsConDeclDetails pass
-   = HsConDetails (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
+-- | The arguments in a data constructor declaration. The @inf@ type parameter
+-- represents the representation for infix data constructors, which is
+-- different depending on whether the data constructor is Haskell98-style or
+-- GADT-style.
+type HsConDeclDetails pass inf
+  = HsConDetails (HsScaled pass (LBangType pass))
+                 (XRec pass [LConDeclField pass])
+                 inf
+
+-- | The arguments in a Haskell98 data constructor, which can be infix.
+type HsConDeclH98Details pass
+   = HsConDeclDetails pass (HsScaled pass (LBangType pass))
+
+-- | The arguments in a GADT constructor, which cannot be infix.
+type HsConDeclGADTDetails pass
+   = HsConDeclDetails pass Void
 
 getConNames :: ConDecl GhcRn -> [Located Name]
 getConNames ConDeclH98  {con_name  = name}  = [name]
 getConNames ConDeclGADT {con_names = names} = names
 
-getConArgs :: ConDecl GhcRn -> HsConDeclDetails GhcRn
-getConArgs d = con_args d
-
-hsConDeclArgTys :: HsConDeclDetails (GhcPass p) -> [HsScaled (GhcPass p) (LBangType (GhcPass p))]
-hsConDeclArgTys (PrefixCon tys)    = tys
-hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
-hsConDeclArgTys (RecCon flds)      = map (hsLinear . cd_fld_type . unLoc) (unLoc flds)
-  -- Remark: with the record syntax, constructors have all their argument
-  -- linear, despite the fact that projections do not make sense on linear
-  -- constructors. The design here is that the record projection themselves are
-  -- typed to take an unrestricted argument (that is the record itself is
-  -- unrestricted). By the transfer property, projections are then correct in
-  -- that all the non-projected fields have multiplicity Many, and can be dropped.
+-- | Return @'Just' fields@ if a data constructor declaration uses record
+-- syntax (i.e., 'RecCon'), where @fields@ are the field selectors.
+-- Otherwise, return 'Nothing'.
+getRecConArgs_maybe :: ConDecl GhcRn -> Maybe (Located [LConDeclField GhcRn])
+getRecConArgs_maybe (ConDeclH98{con_args = args}) = case args of
+  PrefixCon{} -> Nothing
+  RecCon flds -> Just flds
+  InfixCon{}  -> Nothing
+getRecConArgs_maybe (ConDeclGADT{con_g_args = args}) = case args of
+  PrefixCon{}  -> Nothing
+  RecCon flds  -> Just flds
+  InfixCon v _ -> absurd v
 
 hsConDeclTheta :: Maybe (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
 hsConDeclTheta Nothing            = []
@@ -1723,7 +1737,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
     cxt = fromMaybe noLHsContext mcxt
 
 pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
-                        , con_mb_cxt = mcxt, con_args = args
+                        , con_mb_cxt = mcxt, con_g_args = args
                         , con_res_ty = res_ty, con_doc = doc })
   = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
     <+> (sep [pprHsForAll (mkHsForAllInvisTele qvars) cxt,
