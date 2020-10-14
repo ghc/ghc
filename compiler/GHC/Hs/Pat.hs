@@ -316,7 +316,7 @@ type instance ConLikeP GhcTc = ConLike
 
 
 -- | Haskell Constructor Pattern Details
-type HsConPatDetails p = HsConDetails (LPat p) (HsRecFields p (LPat p))
+type HsConPatDetails p = HsConDetails (LPat p) (HsRecFields p (LPat p)) (LPat p)
 
 hsConPatArgs :: HsConPatDetails p -> [LPat p]
 hsConPatArgs (PrefixCon ps)   = ps
@@ -866,7 +866,7 @@ patNeedsParens p = go
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@
 -- needs parentheses under precedence @p@.
-conPatNeedsParens :: PprPrec -> HsConDetails a b -> Bool
+conPatNeedsParens :: PprPrec -> HsConDetails a b c -> Bool
 conPatNeedsParens p = go
   where
     go (PrefixCon args) = p >= appPrec && not (null args)

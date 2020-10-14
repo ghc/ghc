@@ -68,6 +68,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
 import Data.List                  ( foldl1' )
+import Data.Void
 import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
@@ -578,6 +579,9 @@ class ToHie a where
 class HasType a where
   getTypeNode :: a -> HieM [HieAST Type]
 
+instance ToHie Void where
+  toHie = absurd
+
 instance (ToHie a) => ToHie [a] where
   toHie = concatMapM toHie
 
@@ -996,8 +1000,10 @@ instance HiePass p => ToHie (PScoped (Located (Pat (GhcPass p)))) where
           HieRn -> []
 #endif
     where
-      contextify :: a ~ LPat (GhcPass p) => HsConDetails a (HsRecFields (GhcPass p) a)
-                 -> HsConDetails (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
+      contextify :: a ~ LPat (GhcPass p) => HsConDetails a (HsRecFields (GhcPass p) a) a
+                 -> HsConDetails (PScoped a)
+                                 (RContext (HsRecFields (GhcPass p) (PScoped a)))
+                                 (PScoped a)
       contextify (PrefixCon args) = PrefixCon $ patScopes rsp scope pscope args
       contextify (InfixCon a b) = InfixCon a' b'
         where [a', b'] = patScopes rsp scope pscope [a,b]
@@ -1314,7 +1320,7 @@ instance HiePass p => ToHie (RScoped (ApplicativeArg (GhcPass p))) where
     , toHie $ PS Nothing sc NoScope pat
     ]
 
-instance (ToHie arg, ToHie rec) => ToHie (HsConDetails arg rec) where
+instance (ToHie arg, ToHie rec, ToHie inf) => ToHie (HsConDetails arg rec inf) where
   toHie (PrefixCon args) = toHie args
   toHie (RecCon rec) = toHie rec
   toHie (InfixCon a b) = concatM [ toHie a, toHie b]
@@ -1530,7 +1536,7 @@ instance ToHie a => ToHie (HsScaled GhcRn a) where
 instance ToHie (Located (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
       ConDeclGADT { con_names = names, con_qvars = exp_vars, con_g_ext = imp_vars
-                  , con_mb_cxt = ctx, con_args = args, con_res_ty = typ } ->
+                  , con_mb_cxt = ctx, con_g_args = args, con_res_ty = typ } ->
         [ toHie $ map (C (Decl ConDec $ getRealSpan span)) names
         , concatM $ [ bindingsOnly bindings
                     , toHie $ tvScopes resScope NoScope exp_vars ]
@@ -1541,7 +1547,10 @@ instance ToHie (Located (ConDecl GhcRn)) where
         where
           rhsScope = combineScopes argsScope tyScope
           ctxScope = maybe NoScope mkLScope ctx
-          argsScope = condecl_scope args
+          argsScope = case args of
+            PrefixCon xs -> scaled_args_scope xs
+            InfixCon v _ -> noGadtInfix v
+            RecCon x     -> mkLScope x
           tyScope = mkLScope typ
           resScope = ResolvedScopes [ctxScope, rhsScope]
           bindings = map (C $ TyVarBind (mkScope (loc exp_vars)) resScope) imp_vars
@@ -1555,13 +1564,12 @@ instance ToHie (Located (ConDecl GhcRn)) where
         where
           rhsScope = combineScopes ctxScope argsScope
           ctxScope = maybe NoScope mkLScope ctx
-          argsScope = condecl_scope dets
-    where condecl_scope :: HsConDeclDetails (GhcPass p) -> Scope
-          condecl_scope args = case args of
-            PrefixCon xs -> foldr combineScopes NoScope $ map (mkLScope . hsScaledThing) xs
-            InfixCon a b -> combineScopes (mkLScope (hsScaledThing a))
-                                          (mkLScope (hsScaledThing b))
-            RecCon x -> mkLScope x
+          argsScope = case dets of
+            PrefixCon xs -> scaled_args_scope xs
+            InfixCon a b -> scaled_args_scope [a, b]
+            RecCon x     -> mkLScope x
+    where scaled_args_scope :: [HsScaled GhcRn (LHsType GhcRn)] -> Scope
+          scaled_args_scope = foldr combineScopes NoScope . map (mkLScope . hsScaledThing)
 
 instance ToHie (Located [Located (ConDeclField GhcRn)]) where
   toHie (L span decls) = concatM $
