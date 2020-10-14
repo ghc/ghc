@@ -1226,7 +1226,7 @@ mkKindCo co
   | otherwise
   = KindCo co
 
-mkSubCo :: Coercion -> Coercion
+mkSubCo :: HasDebugCallStack => Coercion -> Coercion
 -- Input coercion is Nominal, result is Representational
 -- see also Note [Role twiddling functions]
 mkSubCo (Refl ty) = GRefl Representational ty MRefl

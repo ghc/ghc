@@ -17,7 +17,7 @@ import GHC.Prelude
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
-import GHC.Tc.Utils.Unify( swapOverTyVars, metaTyVarUpdateOK, MetaTyVarUpdateResult(..) )
+import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Tc.Solver.Flatten
@@ -2155,6 +2155,16 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
        ; canEqTyVarFunEq new_ev eq_rel IsSwapped tv2 ps_xi2
                                                  fun_tc1 fun_args1 ps_xi1 sym_mco }
 
+  | NomEq <- eq_rel
+  , TyFamLHS fun_tc1 fun_args1 <- lhs1
+  , TyFamLHS fun_tc2 fun_args2 <- lhs2
+  , fun_tc1 == fun_tc2
+  , Injective inj <- tyConInjectivityInfo fun_tc1
+  = do { traceTcS "CanEqCanLHS2 injective type family" (ppr lhs1 $$ ppr lhs2)
+       ; sequence_ [ unifyDerived (ctEvLoc ev) Nominal (Pair arg1 arg2)
+                   | (arg1, arg2, True) <- zip3 fun_args1 fun_args2 inj ]
+       ; canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco) }
+
   -- that's all the special cases. Now we just figure out which non-special case
   -- to continue to.
   | otherwise
@@ -2213,11 +2223,11 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
      -- #12593
      -- guarantees (TyEq:OC), (TyEq:F), and (TyEq:H)
        ; case canEqOK dflags eq_rel lhs rhs of
-           CanEqOK rhs' ->
-             do { traceTcS "canEqOK" (ppr lhs $$ ppr rhs')
-                ; new_ev <- rewriteEqEvidence ev swapped lhs_ty rhs' rewrite_co1 rewrite_co2
+           CanEqOK ->
+             do { traceTcS "canEqOK" (ppr lhs $$ ppr rhs)
+                ; new_ev <- rewriteEqEvidence ev swapped lhs_ty rhs rewrite_co1 rewrite_co2
                 ; continueWith (CEqCan { cc_ev = new_ev, cc_lhs = lhs
-                                       , cc_rhs = rhs', cc_eq_rel = eq_rel }) }
+                                       , cc_rhs = rhs, cc_eq_rel = eq_rel }) }
        -- it is possible that cc_rhs mentions the LHS if the LHS is a type
        -- family. This will cause later flattening to potentially loop, but
        -- that will be caught by the depth counter. The other option is an
@@ -2269,11 +2279,11 @@ rewriteCastedEquality ev eq_rel swapped lhs rhs mco
 -- | Result of checking whether a RHS is suitable for pairing
 -- with a CanEqLHS in a CEqCan.
 data CanEqOK
-  = CanEqOK Xi     -- use this RHS; it may have been occCheckExpand'ed
+  = CanEqOK                   -- RHS is good
   | CanEqNotOK CtIrredStatus  -- don't proceed; explains why
 
 instance Outputable CanEqOK where
-  ppr (CanEqOK rhs)       = text "CanEqOK" <+> ppr rhs
+  ppr CanEqOK             = text "CanEqOK"
   ppr (CanEqNotOK status) = text "CanEqNotOK" <+> ppr status
 
 -- | This function establishes most of the invariants needed to make
@@ -2287,11 +2297,9 @@ instance Outputable CanEqOK where
 --   TyEq:H:  Checked here.
 canEqOK :: DynFlags -> EqRel -> CanEqLHS -> Xi -> CanEqOK
 canEqOK dflags eq_rel lhs rhs
-  | TyVarLHS tv <- lhs
-  = ASSERT( good_rhs )  -- I want to put this in the pattern guard, but
-                        -- that confuses the pattern-match completeness checker
-    case metaTyVarUpdateOK dflags True {- type families are OK here -} tv rhs of
-      MTVU_OK rhs'     -> CanEqOK rhs'
+  = ASSERT( good_rhs )
+    case checkTypeEq dflags True {- type families are OK here -} lhs rhs of
+      MTVU_OK ()       -> CanEqOK
       MTVU_Bad         -> CanEqNotOK OtherCIS
                  -- Violation of TyEq:F
 
@@ -2303,10 +2311,14 @@ canEqOK dflags eq_rel lhs rhs
                  -- These are both a violation of TyEq:OC, but we
                  -- want to differentiate for better production of
                  -- error messages
-      MTVU_Occurs | isInsolubleOccursCheck eq_rel tv rhs -> CanEqNotOK InsolubleCIS
+      MTVU_Occurs | TyVarLHS tv <- lhs
+                  , isInsolubleOccursCheck eq_rel tv rhs -> CanEqNotOK InsolubleCIS
                  -- If we have a ~ [a], it is not canonical, and in particular
                  -- we don't want to rewrite existing inerts with it, otherwise
                  -- we'd risk divergence in the constraint solver
+
+                 -- NB: no occCheckExpand here; see Note [Flattening synonyms]
+                 -- in GHC.Tc.Solver.Flatten
 
                   | otherwise                            -> CanEqNotOK OtherCIS
                  -- A representational equality with an occurs-check problem isn't
@@ -2316,15 +2328,8 @@ canEqOK dflags eq_rel lhs rhs
                  -- But, the occurs-check certainly prevents the equality from being
                  -- canonical, and we might loop if we were to use it in rewriting.
 
-  -- ToDo: These checks are very close to what's done in metaTyVarUpdateOK; combine?
-  | TyFamLHS _fam_tc _fam_args <- lhs
-  = ASSERT2( good_rhs, ppr lhs <+> dcolon <+> ppr lhs_kind $$
-                       ppr rhs <+> dcolon <+> ppr rhs_kind $$
-                       ppr eq_rel )
-    if | not (isTauTy rhs)   -> CanEqNotOK OtherCIS   -- TyEq:F
-       | badCoercionHole rhs -> CanEqNotOK BlockedCIS -- TyEq:H
-       | otherwise           -> CanEqOK rhs
-         -- NB: TyEq:OC does not apply
+                 -- This case also include type family occurs-check errors, which
+                 -- are not generally insoluble
 
   where
     good_rhs       = kinds_match && not bad_newtype

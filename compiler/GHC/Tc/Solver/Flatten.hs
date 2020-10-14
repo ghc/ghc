@@ -1123,16 +1123,12 @@ flatten_one (TyVarTy tv)
 flatten_one (AppTy ty1 ty2)
   = flatten_app_tys ty1 [ty2]
 
-flatten_one (TyConApp tc tys)
+flatten_one ty@(TyConApp tc tys)
   -- Expand type synonyms that mention type families
   -- on the RHS; see Note [Flattening synonyms]
-  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  , let expanded_ty = mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
-  = do { mode <- getMode
-       ; case mode of
-           FM_FlattenAll | not (isFamFreeTyCon tc)
-                         -> flatten_one expanded_ty
-           _             -> flatten_ty_con_app tc tys }
+  | isForgetfulSynTyCon tc
+  , Just expanded_ty <- tcView ty  -- should always succeed
+  = flatten_one expanded_ty
 
   -- Otherwise, it's a type function application, and we have to
   -- flatten it away as well, and generate a new given equality constraint
@@ -1301,17 +1297,17 @@ Not expanding synonyms aggressively improves error messages, and
 keeps types smaller. But we need to take care.
 
 Suppose
-   type T a = a -> a
-and we want to flatten the type (T (F a)).  Then we can safely flatten
-the (F a) to a skolem, and return (T fsk).  We don't need to expand the
-synonym.  This works because TcTyConAppCo can deal with synonyms
-(unlike TyConAppCo), see Note [TcCoercions] in GHC.Tc.Types.Evidence.
+   type Syn a = Int
+   type instance F Bool = Syn (F Bool)
 
-But (#8979) for
-   type T a = (F a, a)    where F is a type function
-we must expand the synonym in (say) T Int, to expose the type function
-to the flattener.
+If we don't expand the synonym, we'll fall into an unnecessary loop.
 
+In addition, expanding the forgetful synonym like this
+will generally yield a *smaller* type. We thus expand forgetful
+synonyms, but not others.
+
+One nice consequence is that we never have to occCheckExpand flattened
+types, as any forgetful synonyms are already expanded.
 
 Note [Flattening under a forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1387,20 +1383,21 @@ flatten_exact_fam_app_fully tc tys
                 -- Now, look in the cache
                ; mb_ct <- liftTcS $ lookupFlatCache tc xis
                ; case mb_ct of
-                   Just (co, rhs_ty, inert_fr)  -- co :: F xis ~ fsk
+                   Just (co, rhs_ty, inert_fr@(_, inert_eq_rel))  -- co :: F xis ~ fsk
                         -- See Note [Type family equations] in GHC.Tc.Solver.Monad
                      | inert_fr `eqCanRewriteFR` cur_fr
                      ->  -- Usable hit in the flat-cache
                         do { traceFlat "flatten/flat-cache hit" $
                                (ppr tc <+> ppr xis $$ ppr rhs_ty)
-                           ; (fsk_xi, fsk_co) <- flatten_one rhs_ty
-                                  -- The fsk may already have been unified, so
+                           ; (rhs_xi, rhs_co) <- flatten_one rhs_ty
+                                  -- There may be more work to do on the rhs:
                                   -- flatten it
-                                  -- fsk_co :: fsk_xi ~ fsk
-                           ; let xi  = fsk_xi `mkCastTy` kind_co
-                                 co' = mkTcCoherenceLeftCo role fsk_xi kind_co fsk_co
+                                  -- rhs_co :: rhs_xi ~ rhs_ty
+                           ; let xi  = rhs_xi `mkCastTy` kind_co
+                                 co' = mkTcCoherenceLeftCo role rhs_xi kind_co rhs_co
                                        `mkTransCo`
-                                       maybeTcSubCo eq_rel (mkSymCo co)
+                                       tcDowngradeRole role (eqRelRole inert_eq_rel)
+                                                            (mkTcSymCo co)
                                        `mkTransCo` ret_co
                            ; return (xi, co')
                            }

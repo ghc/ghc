@@ -55,7 +55,7 @@ module GHC.Core.TyCon(
         mustBeSaturated,
         isPromotedDataCon, isPromotedDataCon_maybe,
         isKindTyCon, isLiftedTypeKindTyConName,
-        isTauTyCon, isFamFreeTyCon,
+        isTauTyCon, isFamFreeTyCon, isForgetfulSynTyCon,
 
         isDataTyCon, isProductTyCon, isDataProductTyCon_maybe,
         isDataSumTyCon_maybe,
@@ -820,10 +820,12 @@ data TyCon
         synIsTau     :: Bool,   -- True <=> the RHS of this synonym does not
                                  --          have any foralls, after expanding any
                                  --          nested synonyms
-        synIsFamFree  :: Bool    -- True <=> the RHS of this synonym does not mention
+        synIsFamFree  :: Bool,   -- True <=> the RHS of this synonym does not mention
                                  --          any type synonym families (data families
                                  --          are fine), again after expanding any
                                  --          nested synonyms
+        synIsForgetful :: Bool   -- True <=> at least one argument is not mentioned
+                                 --          in the RHS
     }
 
   -- | Represents families (both type and data)
@@ -1782,20 +1784,21 @@ mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
 
 -- | Create a type synonym 'TyCon'
 mkSynonymTyCon :: Name -> [TyConBinder] -> Kind   -- ^ /result/ kind
-               -> [Role] -> Type -> Bool -> Bool -> TyCon
-mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free
+               -> [Role] -> Type -> Bool -> Bool -> Bool -> TyCon
+mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free is_forgetful
   = SynonymTyCon {
-        tyConName    = name,
-        tyConUnique  = nameUnique name,
-        tyConBinders = binders,
-        tyConResKind = res_kind,
-        tyConKind    = mkTyConKind binders res_kind,
-        tyConArity   = length binders,
-        tyConTyVars  = binderVars binders,
-        tcRoles      = roles,
-        synTcRhs     = rhs,
-        synIsTau     = is_tau,
-        synIsFamFree = is_fam_free
+        tyConName      = name,
+        tyConUnique    = nameUnique name,
+        tyConBinders   = binders,
+        tyConResKind   = res_kind,
+        tyConKind      = mkTyConKind binders res_kind,
+        tyConArity     = length binders,
+        tyConTyVars    = binderVars binders,
+        tcRoles        = roles,
+        synTcRhs       = rhs,
+        synIsTau       = is_tau,
+        synIsFamFree   = is_fam_free,
+        synIsForgetful = is_forgetful
     }
 
 -- | Create a type family 'TyCon'
@@ -2055,6 +2058,11 @@ isFamFreeTyCon :: TyCon -> Bool
 isFamFreeTyCon (SynonymTyCon { synIsFamFree = fam_free }) = fam_free
 isFamFreeTyCon (FamilyTyCon { famTcFlav = flav })         = isDataFamFlav flav
 isFamFreeTyCon _                                          = True
+
+-- | Is this a forgetful type synonym?
+isForgetfulSynTyCon :: TyCon -> Bool
+isForgetfulSynTyCon (SynonymTyCon { synIsForgetful = forget }) = forget
+isForgetfulSynTyCon _                                          = False
 
 -- As for newtypes, it is in some contexts important to distinguish between
 -- closed synonyms and synonym families, as synonym families have no unique

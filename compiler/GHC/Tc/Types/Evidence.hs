@@ -134,7 +134,7 @@ mkTcForAllCo           :: TyVar -> TcCoercionN -> TcCoercion -> TcCoercion
 mkTcForAllCos          :: [(TyVar, TcCoercionN)] -> TcCoercion -> TcCoercion
 mkTcNthCo              :: Role -> Int -> TcCoercion -> TcCoercion
 mkTcLRCo               :: LeftOrRight -> TcCoercion -> TcCoercion
-mkTcSubCo              :: TcCoercionN -> TcCoercionR
+mkTcSubCo              :: HasDebugCallStack => TcCoercionN -> TcCoercionR
 tcDowngradeRole        :: Role -> Role -> TcCoercion -> TcCoercion
 mkTcAxiomRuleCo        :: CoAxiomRule -> [TcCoercion] -> TcCoercionR
 mkTcGReflRightCo       :: Role -> TcType -> TcCoercionN -> TcCoercion
@@ -192,7 +192,7 @@ isTcReflexiveCo        = isReflexiveCo
 
 -- | If the EqRel is ReprEq, makes a SubCo; otherwise, does nothing.
 -- Note that the input coercion should always be nominal.
-maybeTcSubCo :: EqRel -> TcCoercion -> TcCoercion
+maybeTcSubCo :: HasDebugCallStack => EqRel -> TcCoercionN -> TcCoercion
 maybeTcSubCo NomEq  = id
 maybeTcSubCo ReprEq = mkTcSubCo
 

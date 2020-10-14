@@ -1,9 +1,9 @@
 
 T4174.hs:44:12: error:
-    • Couldn't match type ‘b’ with ‘RtsSpinLock’
+    • Couldn't match type ‘a’ with ‘SmStep’
       Expected: m (Field (Way (GHC6'8 minor) n t p) a b)
         Actual: m (Field (WayOf m) SmStep RtsSpinLock)
-      ‘b’ is a rigid type variable bound by
+      ‘a’ is a rigid type variable bound by
         the type signature for:
           testcase :: forall (m :: * -> *) minor n t p a b.
                       Monad m =>

@@ -1967,13 +1967,14 @@ isCoVarType ty
 
 buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
               -> [Role] -> KnotTied Type -> TyCon
--- This function is here beucase here is where we have
+-- This function is here because here is where we have
 --   isFamFree and isTauTy
 buildSynTyCon name binders res_kind roles rhs
-  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free
+  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free is_forgetful
   where
-    is_tau      = isTauTy rhs
-    is_fam_free = isFamFreeTy rhs
+    is_tau       = isTauTy rhs
+    is_fam_free  = isFamFreeTy rhs
+    is_forgetful = any (not . (`elemVarSet` tyCoVarsOfType rhs) . binderVar) binders
 
 {-
 ************************************************************************

@@ -40,6 +40,7 @@ import GHC.Unit
 import GHC.Core.Class
 import GHC.Types.Var
 import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Unique (getUnique)
@@ -827,18 +828,23 @@ lookupInstEnv' ie vis_mods cls tys
       = find ms us rest
 
       | otherwise
-      = ASSERT2( tyCoVarsOfTypes tys `disjointVarSet` tpl_tv_set,
+      = ASSERT2( tys_tv_set `disjointVarSet` tpl_tv_set,
                  (ppr cls <+> ppr tys <+> ppr all_tvs) $$
                  (ppr tpl_tvs <+> ppr tpl_tys)
                 )
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
                 -- See Note [Template tyvars are fresh]
-        case tcUnifyTys instanceBindFun tpl_tys tys of
-            Just _   -> find ms (item:us) rest
-            Nothing  -> find ms us        rest
+        let in_scope      = mkInScopeSet (tpl_tv_set `unionVarSet` tys_tv_set)
+            flattened_tys = flattenTys in_scope tys in
+              -- NB: important to flatten here. Otherwise, it looks like
+              -- instance C Int cannot match a target [W] C (F Bool).
+        case tcUnifyTysFG instanceBindFun tpl_tys flattened_tys of
+            SurelyApart -> find ms us        rest
+            _           -> find ms (item:us) rest
       where
         tpl_tv_set = mkVarSet tpl_tvs
+        tys_tv_set = tyCoVarsOfTypes tys
 
 ---------------
 -- This is the common way to call this function.

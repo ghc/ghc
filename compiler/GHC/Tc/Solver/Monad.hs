@@ -409,11 +409,6 @@ data InertSet
               --       flav is [G]
               --
               -- Just a hash-cons cache for use when flattening only
-              -- These include entirely un-processed goals, so don't use
-              -- them to solve a top-level goal, else you may end up solving
-              -- (w:F ty ~ a) by setting w:=w!  We just use the flat-cache
-              -- when allocating a new flatten-skolem.
-              -- Not necessarily inert wrt top-level equations (or inert_cans)
               --
               -- Only nominal, Given equalities end up in here (along with
               -- top-level instances)
@@ -685,11 +680,11 @@ Result
 data InertCans   -- See Note [Detailed InertCans Invariants] for more
   = IC { inert_eqs :: InertEqs
               -- See Note [inert_eqs: the inert equalities]
-              -- All CEqCans; index is the LHS tyvar
+              -- All CEqCans with a TyVarLHS; index is the LHS tyvar
               -- Domain = skolems and untouchables; a touchable would be unified
 
        , inert_funeqs :: FunEqMap EqualCtList
-              -- All CEqCans; index is the whole family head type.
+              -- All CEqCans with a TyFamLHS; index is the whole family head type.
               -- LHS is fully rewritten (modulo eqCanRewrite constraints)
               --     wrt inert_eqs
               -- Can include all flavours, [G], [W], [WD], [D]
@@ -3244,7 +3239,7 @@ newFlattenSkolem flav loc tc xis
       = do { fmv <- wrapTcS (TcM.newFmvTyVar fam_ty)
               -- See (2a) in "GHC.Tc.Solver.Canonical"
               -- Note [Equalities with incompatible kinds]
-           ; (ev, hole_co) <- newWantedEq_SI NoBlockSubst WDeriv loc Nominal
+           ; (ev, hole_co) <- newWantedEq_SI tcNoBlockSubst WDeriv loc Nominal
                                              fam_ty (mkTyVarTy fmv)
            ; return (ev, hole_co, fmv) }
 

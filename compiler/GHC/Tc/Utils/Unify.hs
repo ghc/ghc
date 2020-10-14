@@ -35,7 +35,8 @@ module GHC.Tc.Utils.Unify (
   matchExpectedFunKind,
   matchActualFunTySigma, matchActualFunTysRho,
 
-  metaTyVarUpdateOK, occCheckForErrors, MetaTyVarUpdateResult(..)
+  metaTyVarUpdateOK, occCheckForErrors, MetaTyVarUpdateResult(..),
+  checkTypeEq
 
   ) where
 
@@ -72,6 +73,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
+import GHC.Exts      ( inline )
 import Control.Monad
 import Control.Arrow ( second )
 
@@ -1953,7 +1955,7 @@ occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
 --   a) the given variable occurs in the given type.
 --   b) there is a forall in the type (unless we have -XImpredicativeTypes)
 occCheckForErrors dflags tv ty
-  = case mtvu_check dflags True tv ty of
+  = case checkTyVarEq dflags True tv ty of
       MTVU_OK _        -> MTVU_OK ()
       MTVU_Bad         -> MTVU_Bad
       MTVU_HoleBlocker -> MTVU_HoleBlocker
@@ -1999,7 +2001,7 @@ metaTyVarUpdateOK :: DynFlags
 -- See Note [Refactoring hazard: metaTyVarUpdateOK]
 
 metaTyVarUpdateOK dflags ty_fam_ok tv ty
-  = case mtvu_check dflags ty_fam_ok tv ty of
+  = case checkTyVarEq dflags ty_fam_ok tv ty of
       MTVU_OK _        -> MTVU_OK ty
       MTVU_Bad         -> MTVU_Bad          -- forall, predicate, type function
       MTVU_HoleBlocker -> MTVU_HoleBlocker  -- coercion hole
@@ -2007,20 +2009,31 @@ metaTyVarUpdateOK dflags ty_fam_ok tv ty
                             Just expanded_ty -> MTVU_OK expanded_ty
                             Nothing          -> MTVU_Occurs
 
-mtvu_check :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
+checkTyVarEq :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
+checkTyVarEq dflags ty_fam_ok tv ty
+  = inline checkTypeEq dflags ty_fam_ok (TyVarLHS tv) ty
+    -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
+
+checkTypeEq :: DynFlags -> Bool -> CanEqLHS -> TcType -> MetaTyVarUpdateResult ()
 -- Checks the invariants for CEqCan.   In particular:
 --   (a) a forall type (forall a. blah)
 --   (b) a predicate type (c => ty)
 --   (c) a type family; see Note [Prevent unification with type families]
 --   (d) a blocking coercion hole
---   (e) an occurrence of the type variable (occurs check)
+--   (e) an occurrence of the LHS (occurs check)
 --
 -- For (a), (b), and (c) we check only the top level of the type, NOT
 -- inside the kinds of variables it mentions.  For (d) we look deeply
--- in coercions, and for (e) we do look in the kinds of course.
+-- in coercions when the LHS is a tyvar (but skip coercions for type family
+-- LHSs), and for (e) we do look in the kinds of course.
+--
+-- Why skip coercions for type families? Because we don't rewrite type family
+-- applications in coercions, so there's no point in looking there. On the
+-- other hand, we must check for type variables, lest we mutably create an
+-- infinite structure during unification.
 
-mtvu_check dflags ty_fam_ok tv ty
-  = fast_check ty
+checkTypeEq dflags ty_fam_ok lhs ty
+  = go ty
   where
     ok :: MetaTyVarUpdateResult ()
     ok = MTVU_OK ()
@@ -2029,53 +2042,75 @@ mtvu_check dflags ty_fam_ok tv ty
     -- unification variables that can unify with a polytype
     -- or a TyCon that would usually be disallowed by bad_tc
     -- See Note [RuntimeUnkTv] in GHC.Runtime.Heap.Inspect
-    ghci_tv = case tcTyVarDetails tv of
-                MetaTv { mtv_info = RuntimeUnkTv } -> True
-                _                                  -> False
+    ghci_tv
+      | TyVarLHS tv <- lhs
+      , MetaTv { mtv_info = RuntimeUnkTv } <- tcTyVarDetails tv
+      = True
 
-    fast_check :: TcType -> MetaTyVarUpdateResult ()
-    fast_check (TyVarTy tv')
-      | tv == tv' = MTVU_Occurs
-      | otherwise = fast_check_occ (tyVarKind tv')
-           -- See Note [Occurrence checking: look inside kinds]
-           -- in GHC.Core.Type
+      | otherwise
+      = False
 
-    fast_check (TyConApp tc tys)
-      | bad_tc tc, not ghci_tv = MTVU_Bad
-      | otherwise              = mapM fast_check tys >> ok
-    fast_check (LitTy {})      = ok
-    fast_check (FunTy{ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
+    go :: TcType -> MetaTyVarUpdateResult ()
+    go (TyVarTy tv')           = go_tv tv'
+    go (TyConApp tc tys)       = go_tc tc tys
+    go (LitTy {})              = ok
+    go (FunTy{ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
       | InvisArg <- af
       , not ghci_tv            = MTVU_Bad
-      | otherwise              = fast_check w   >> fast_check a >> fast_check r
-    fast_check (AppTy fun arg) = fast_check fun >> fast_check arg
-    fast_check (CastTy ty co)  = fast_check ty  >> fast_check_co co
-    fast_check (CoercionTy co) = fast_check_co co
-    fast_check (ForAllTy (Bndr tv' _) ty)
+      | otherwise              = go w   >> go a >> go r
+    go (AppTy fun arg) = go fun >> go arg
+    go (CastTy ty co)  = go ty  >> go_co co
+    go (CoercionTy co) = go_co co
+    go (ForAllTy (Bndr tv' _) ty)
        | not ghci_tv = MTVU_Bad
-       | tv == tv'   = ok
-       | otherwise = do { fast_check_occ (tyVarKind tv')
-                        ; fast_check_occ ty }
-       -- Under a forall we look only for occurrences of
-       -- the type variable
+       | otherwise   = case lhs of
+           TyVarLHS tv | tv == tv' -> ok
+                       | otherwise -> do { go_occ tv (tyVarKind tv')
+                                         ; go ty }
+           _                       -> go ty
+
+    go_tv :: TcTyVar -> MetaTyVarUpdateResult ()
+      -- this slightly peculiar way of defining this means
+      -- we don't have to evaluate this `case` at every variable
+      -- occurrence
+    go_tv = case lhs of
+      TyVarLHS tv -> \ tv' -> if tv == tv'
+                              then MTVU_Occurs
+                              else go_occ tv (tyVarKind tv')
+      TyFamLHS {} -> \ _tv' -> ok
+           -- See Note [Occurrence checking: look inside kinds] in GHC.Core.Type
 
      -- For kinds, we only do an occurs check; we do not worry
      -- about type families or foralls
      -- See Note [Checking for foralls]
-    fast_check_occ k | tv `elemVarSet` tyCoVarsOfType k = MTVU_Occurs
-                     | otherwise                        = ok
+    go_occ tv k | tv `elemVarSet` tyCoVarsOfType k = MTVU_Occurs
+                | otherwise                        = ok
+
+    go_tc :: TyCon -> [TcType] -> MetaTyVarUpdateResult ()
+      -- this slightly peculiar way of defining this means
+      -- we don't have to evaluate this `case` at every tyconapp
+    go_tc = case lhs of
+      TyVarLHS {} -> \ tc tys -> if good_tc tc
+                                 then mapM go tys >> ok
+                                 else MTVU_Bad
+      TyFamLHS fam_tc fam_args -> \ tc tys ->
+        if | tcEqTyConApps fam_tc fam_args tc tys -> MTVU_Occurs
+           | good_tc tc                           -> mapM go tys >> ok
+           | otherwise                            -> MTVU_Bad
 
      -- no bother about impredicativity in coercions, as they're
      -- inferred
-    fast_check_co co | not (gopt Opt_DeferTypeErrors dflags)
-                     , badCoercionHoleCo co            = MTVU_HoleBlocker
+    go_co co | not (gopt Opt_DeferTypeErrors dflags)
+             , badCoercionHoleCo co            = MTVU_HoleBlocker
         -- Wrinkle (4b) in "GHC.Tc.Solver.Canonical" Note [Equalities with incompatible kinds]
 
-                     | tv `elemVarSet` tyCoVarsOfCo co = MTVU_Occurs
-                     | otherwise                       = ok
+             | TyVarLHS tv <- lhs
+             , tv `elemVarSet` tyCoVarsOfCo co = MTVU_Occurs
+        -- Don't check coercions for type families; see commentary at top of function
+             | otherwise                       = ok
 
-    bad_tc :: TyCon -> Bool
-    bad_tc tc
-      | not (isTauTyCon tc)                  = True
-      | not (ty_fam_ok || isFamFreeTyCon tc) = True
-      | otherwise                            = False
+    good_tc :: TyCon -> Bool
+    good_tc
+      | ghci_tv   = \ _tc -> True
+      | otherwise = \ tc  -> isTauTyCon tc &&
+                             (ty_fam_ok || isFamFreeTyCon tc)
