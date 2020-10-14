@@ -796,7 +796,7 @@ The CFunEqCan Ownership Invariant:
 
 Note [inert_eqs: the inert equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-"RAE": update. Don't forget to update K1.
+"RAE": update. Don't forget to update (K1). See kick_out_rewritable
 
 Definition [Can-rewrite relation]
 A "can-rewrite" relation between flavours, written f1 >= f2, is a
