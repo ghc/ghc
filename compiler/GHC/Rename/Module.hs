@@ -75,6 +75,7 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Maybe ( isNothing, isJust, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import Data.Function ( on )
+import Data.Void
 
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.
@@ -2180,7 +2181,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
         ; bindLHsTyVarBndrs ctxt WarnUnusedForalls
                             Nothing ex_tvs $ \ new_ex_tvs ->
     do  { (new_context, fvs1) <- rnMbContext ctxt mcxt
-        ; (new_args,    fvs2) <- rnConDeclDetails (unLoc new_name) ctxt args
+        ; (new_args,    fvs2) <- rnConDeclH98Details (unLoc new_name) ctxt args
         ; let all_fvs  = fvs1 `plusFV` fvs2
         ; traceRn "rnConDecl (ConDeclH98)" (ppr name <+> vcat
              [ text "ex_tvs:" <+> ppr ex_tvs
@@ -2197,14 +2198,11 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                             , con_forall  = forall@(L _ explicit_forall)
                             , con_qvars   = explicit_tkvs
                             , con_mb_cxt  = mcxt
-                            , con_args    = args
+                            , con_g_args  = args
                             , con_res_ty  = res_ty
                             , con_doc = mb_doc })
   = do  { mapM_ (addLocM checkConName) names
         ; new_names <- mapM lookupLocatedTopBndrRn names
-
-        ; let theta         = hsConDeclTheta mcxt
-              arg_tys       = hsConDeclArgTys args
 
           -- We must ensure that we extract the free tkvs in left-to-right
           -- order of their appearance in the constructor type.
@@ -2213,9 +2211,9 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- See #14808.
         ; implicit_bndrs <- forAllOrNothing explicit_forall
             $ extractHsTvBndrs explicit_tkvs
-            $ extractHsTysRdrTyVars theta
-            $ extractHsScaledTysRdrTyVars arg_tys
-            $ extractHsTysRdrTyVars [res_ty] []
+            $ extractHsTysRdrTyVars (hsConDeclTheta mcxt)
+            $ extractConDeclGADTDetailsTyVars args
+            $ extractHsTyRdrTyVars res_ty
 
         ; let ctxt = ConDeclCtx new_names
 
@@ -2223,7 +2221,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           bindLHsTyVarBndrs ctxt WarnUnusedForalls
                             Nothing explicit_tkvs $ \ explicit_tkvs ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
-        ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
+        ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
 
          -- Ensure that there are no nested `forall`s or contexts, per
@@ -2238,7 +2236,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
             (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
         ; return (decl { con_g_ext = implicit_tkvs, con_names = new_names
                        , con_qvars = explicit_tkvs, con_mb_cxt = new_cxt
-                       , con_args = new_args, con_res_ty = new_res_ty
+                       , con_g_args = new_args, con_res_ty = new_res_ty
                        , con_doc = mb_doc
                        , con_forall = forall }, -- Remove when #18311 is fixed
                   all_fvs) } }
@@ -2249,22 +2247,36 @@ rnMbContext _    Nothing    = return (Nothing, emptyFVs)
 rnMbContext doc (Just cxt) = do { (ctx',fvs) <- rnContext doc cxt
                                 ; return (Just ctx',fvs) }
 
-rnConDeclDetails
-   :: Name
+rnConDeclH98Details ::
+      Name
    -> HsDocContext
-   -> HsConDetails (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
-   -> RnM ((HsConDetails (HsScaled GhcRn (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
-           FreeVars)
-rnConDeclDetails _ doc (PrefixCon tys)
+   -> HsConDeclH98Details GhcPs
+   -> RnM (HsConDeclH98Details GhcRn, FreeVars)
+rnConDeclH98Details = rnConDeclDetails rnScaledLHsType
+
+rnConDeclGADTDetails ::
+      Name
+   -> HsDocContext
+   -> HsConDeclGADTDetails GhcPs
+   -> RnM (HsConDeclGADTDetails GhcRn, FreeVars)
+rnConDeclGADTDetails = rnConDeclDetails (\_ -> absurd)
+
+rnConDeclDetails ::
+      (HsDocContext -> infPs -> RnM (infRn, FreeVars))
+   -> Name
+   -> HsDocContext
+   -> HsConDeclDetails GhcPs infPs
+   -> RnM (HsConDeclDetails GhcRn infRn, FreeVars)
+rnConDeclDetails _ _ doc (PrefixCon tys)
   = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
        ; return (PrefixCon new_tys, fvs) }
 
-rnConDeclDetails _ doc (InfixCon ty1 ty2)
-  = do { (new_ty1, fvs1) <- rnScaledLHsType doc ty1
-       ; (new_ty2, fvs2) <- rnScaledLHsType doc ty2
+rnConDeclDetails rnInf _ doc (InfixCon ty1 ty2)
+  = do { (new_ty1, fvs1) <- rnInf doc ty1
+       ; (new_ty2, fvs2) <- rnInf doc ty2
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 
-rnConDeclDetails con doc (RecCon (L l fields))
+rnConDeclDetails _ con doc (RecCon (L l fields))
   = do  { fls <- lookupConstructorFields con
         ; (new_fields, fvs) <- rnConDeclFields doc fls fields
                 -- No need to check for duplicate fields

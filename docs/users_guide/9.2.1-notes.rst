@@ -37,14 +37,19 @@ Compiler
 - ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
 
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+- TODO RGS: ``con_args``/``con_g_args`` split
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
-- It's possible now to promote the ``Natural`` type: :: 
-    
+- It's possible now to promote the ``Natural`` type: ::
+
     data Coordinate = Mk2D Natural Natural
     type MyCoordinate = Mk2D 1 10
-    
+
   The separate kind ``Nat`` is removed and now it is just a type synonym for
   ``Natural``. As a consequence, one must enable ``TypeSynonymInstances``
   in order to define instances for ``Nat``.
