@@ -48,6 +48,7 @@ module GHC.Tc.Types.Evidence (
   mkTcKindCo,
   tcCoercionKind,
   mkTcCoVarCo,
+  mkTcFamilyTyConAppCo,
   isTcReflCo, isTcReflexiveCo,
   tcCoercionRole,
   unwrapIP, wrapIP,
@@ -139,6 +140,7 @@ mkTcCoherenceRightCo   :: Role -> TcType -> TcCoercionN
 mkTcPhantomCo          :: TcCoercionN -> TcType -> TcType -> TcCoercionP
 mkTcKindCo             :: TcCoercion -> TcCoercionN
 mkTcCoVarCo            :: CoVar -> TcCoercion
+mkTcFamilyTyConAppCo   :: TyCon -> [TcCoercionN] -> TcCoercionN
 
 tcCoercionKind         :: TcCoercion -> Pair TcType
 tcCoercionRole         :: TcCoercion -> Role
@@ -172,6 +174,7 @@ mkTcCoherenceRightCo   = mkCoherenceRightCo
 mkTcPhantomCo          = mkPhantomCo
 mkTcKindCo             = mkKindCo
 mkTcCoVarCo            = mkCoVarCo
+mkTcFamilyTyConAppCo   = mkFamilyTyConAppCo
 
 tcCoercionKind         = coercionKind
 tcCoercionRole         = coercionRole

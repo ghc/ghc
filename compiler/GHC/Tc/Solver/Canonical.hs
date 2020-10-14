@@ -29,7 +29,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
 import GHC.Core.Coercion
 import GHC.Core
-import GHC.Types.Id( idType, mkTemplateLocals )
+import GHC.Types.Id( mkTemplateLocals )
 import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Tc.Instance.Family ( tcTopNormaliseNewTypeTF_maybe )
 import GHC.Types.Var
@@ -541,7 +541,7 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
                          mk_given_desc sel_id sc_pred
            ; mk_superclasses rec_clss given_ev tvs theta sc_pred }
       where
-        sc_pred  = funResultTy (piResultTys (idType sel_id) tys)
+        sc_pred = classMethodInstTy sel_id tys
 
       -- See Note [Nested quantified constraint superclasses]
     mk_given_desc :: Id -> PredType -> (PredType, EvTerm)
