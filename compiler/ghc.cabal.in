@@ -298,7 +298,8 @@ Library
         GHC.Core.InstEnv
         GHC.Core.Lint
         GHC.Core.Make
-        GHC.Core.Map
+        GHC.Core.Map.Expr
+        GHC.Core.Map.Type
         GHC.Core.Multiplicity
         GHC.Core.Opt.Arity
         GHC.Core.Opt.CallArity
