@@ -1374,7 +1374,7 @@ defaultFatalMessager = hPutStrLn stderr
 --
 jsonLogAction :: LogAction
 jsonLogAction dflags reason severity srcSpan msg
-  = do
+  =
     defaultLogActionHPutStrDoc dflags stdout
       (withPprStyle (PprCode CStyle) (doc $$ text ""))
     where
