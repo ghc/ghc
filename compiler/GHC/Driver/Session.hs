@@ -1616,13 +1616,18 @@ dopt_unset :: DynFlags -> DumpFlag -> DynFlags
 dopt_unset dfs f = dfs{ dumpFlags = EnumSet.delete f (dumpFlags dfs) }
 
 -- | Test whether a 'GeneralFlag' is set
+--
+-- Note that `dynamicNow` (i.e., dynamic objects built with `-dynamic-too`)
+-- always implicitly enables Opt_PIC, Opt_ExternalDynamicRefs, and disables
+-- Opt_SplitSections.
+--
 gopt :: GeneralFlag -> DynFlags -> Bool
 gopt Opt_PIC dflags
-   | ways dflags `hasWay` WayDyn = True
+   | dynamicNow dflags = True
 gopt Opt_ExternalDynamicRefs dflags
-   | ways dflags `hasWay` WayDyn = True
+   | dynamicNow dflags = True
 gopt Opt_SplitSections dflags
-   | ways dflags `hasWay` WayDyn = False
+   | dynamicNow dflags = False
 gopt f dflags = f `EnumSet.member` generalFlags dflags
 
 -- | Set a 'GeneralFlag'
@@ -4303,7 +4308,14 @@ setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 
 --------------------------
 addWay' :: Way -> DynP ()
-addWay' w = upd (\dflags -> dflags { ways_ = addWay w (ways_ dflags)})
+addWay' w = upd $ \dflags0 ->
+           let platform = targetPlatform dflags0
+               dflags1 = dflags0 { ways_ = addWay w (ways_ dflags0) }
+               dflags2 = foldr setGeneralFlag' dflags1
+                               (wayGeneralFlags platform w)
+               dflags3 = foldr unSetGeneralFlag' dflags2
+                               (wayUnsetGeneralFlags platform w)
+           in dflags3
 
 removeWayDyn :: DynP ()
 removeWayDyn = upd (\dfs -> dfs { ways_ = Set.filter (WayDyn /=) (ways_ dfs) })
