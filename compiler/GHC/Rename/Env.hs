@@ -1454,13 +1454,19 @@ lookupQualifiedNameGHCi rdr_name
        ; go_for_it dflags is_ghci }
 
   where
+    -- Generate candidates of LookupOccRnOverloadedResult
+    availNames' :: AvailInfo -> [LookupOccRnOverloadedResult]
     availNames' (Avail n) = [LookupOccRnUnique n]
     availNames' (AvailTC _ ns fs) = map LookupOccRnUnique ns
       ++ map (LookupOccRnSelectors . pure . flSelector) fs
+
+    -- obtain a list of LookupOccRnOverloadedResult matching the given OccName
+    check :: OccName -> LookupOccRnOverloadedResult -> [LookupOccRnOverloadedResult]
     check occ (LookupOccRnUnique n) = [ LookupOccRnUnique n | nameOccName n == occ]
     check occ (LookupOccRnSelectors xs) = case NE.filter ((==occ) . nameOccName) xs of
       [] -> []
       x : xs -> [LookupOccRnSelectors $ x NE.:| xs]
+
     go_for_it dflags is_ghci
       | Just (mod,occ) <- isQual_maybe rdr_name
       , is_ghci
