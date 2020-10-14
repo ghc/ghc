@@ -1,6 +1,7 @@
 #include "HsFFI.h"
 #include "conc059_stub.h"
 #include <unistd.h>
+#include <stdlib.h>
 #include <stdio.h>
 #if mingw32_HOST_OS
 #include <windows.h>
