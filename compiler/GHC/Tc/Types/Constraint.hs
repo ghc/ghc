@@ -152,7 +152,10 @@ data Ct
   | CEqCan {  -- tv ~ rhs
        -- Invariants:
        --   * See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.Monad
-       --   * (TyEq:OC) if LHS is a variable tv, then tv not in deep tvs(rhs) (occurs check)
+       --   * Many are checked in checkTypeEq in GHC.Tc.Utils.Unify
+       --   * (TyEq:OC) lhs does not occur in rhs (occurs check)
+       --       (skips coercions if the lhs is a type family application, because
+       --        we don't rewrite type families in coercions)
        --   * (TyEq:F) rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
        --   * (TyEq:K) tcTypeKind lhs `tcEqKind` tcTypeKind rhs; Note [Ct kind invariant]

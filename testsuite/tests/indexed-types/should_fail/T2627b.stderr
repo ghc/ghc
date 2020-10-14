@@ -1,6 +1,6 @@
 
 T2627b.hs:20:24: error:
-    • Could not deduce: Dual (Dual b0) ~ b0
+    • Could not deduce: a0 ~ Dual (Dual a0)
         arising from a use of ‘conn’
       from the context: (Dual a ~ b, Dual b ~ a)
         bound by the type signature for:
@@ -13,7 +13,12 @@ T2627b.hs:20:24: error:
                    Rd :: forall c d. (c -> Comm d) -> Comm (R c d),
                  in an equation for ‘conn’
         at T2627b.hs:20:7-10
-      The type variable ‘b0’ is ambiguous
+      or from: b ~ W e f
+        bound by a pattern with constructor:
+                   Wr :: forall e f. e -> Comm f -> Comm (W e f),
+                 in an equation for ‘conn’
+        at T2627b.hs:20:14-19
+      The type variable ‘a0’ is ambiguous
     • In the expression: conn undefined undefined
       In an equation for ‘conn’:
           conn (Rd k) (Wr a r) = conn undefined undefined
