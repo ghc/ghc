@@ -631,7 +631,7 @@ cvtConstr (RecGadtC c varstrtys ty)
         ; rec_flds <- mapM cvt_id_arg varstrtys
         ; returnL $ mk_gadt_decl c' (RecCon $ noLoc rec_flds) ty' }
 
-mk_gadt_decl :: [Located RdrName] -> HsConDeclDetails GhcPs -> LHsType GhcPs
+mk_gadt_decl :: [Located RdrName] -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
              -> ConDecl GhcPs
 mk_gadt_decl names args res_ty
   = ConDeclGADT { con_g_ext  = noExtField
@@ -639,7 +639,7 @@ mk_gadt_decl names args res_ty
                 , con_forall = noLoc False
                 , con_qvars  = []
                 , con_mb_cxt = Nothing
-                , con_args   = args
+                , con_g_args = args
                 , con_res_ty = res_ty
                 , con_doc    = Nothing }
 

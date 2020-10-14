@@ -43,14 +43,63 @@ Compiler
 - ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
 
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+- The ``con_args`` field of ``ConDeclGADT`` has been renamed to ``con_g_args``.
+  This is because the type of ``con_g_args`` is now different from the type of
+  the ``con_args`` field in ``ConDeclH98``: ::
+
+    data ConDecl pass
+      = ConDeclGADT
+          { ...
+          , con_g_args :: HsConDeclGADTDetails pass -- ^ Arguments; never InfixCon
+          , ...
+          }
+
+      | ConDeclH98
+          { ...
+          , con_args :: HsConDeclH98Details pass -- ^ Arguments; can be InfixCon
+          , ...
+          }
+
+  Where: ::
+
+    -- New type synonym introduced in GHC 9.2; equivalent to `HsConDeclDetails`
+    -- in previous versions of GHC
+    type HsConDeclH98Details pass
+       = HsConDeclDetails pass (HsScaled pass (LBangType pass))
+
+    -- New type synonym introduced in GHC 9.2
+    type HsConDeclGADTDetails pass
+       = HsConDeclDetails pass Void
+
+    -- The `inf` type parameter is new in GHC 9.2
+    type HsConDeclDetails pass inf
+      = HsConDetails (HsScaled pass (LBangType pass))
+                     (XRec pass [LConDeclField pass])
+                     inf
+
+    -- The `inf` type parameter is new in GHC 9.2
+    data HsConDetails arg rec inf
+      = PrefixCon [arg]             -- C p1 p2 p3
+      | RecCon    rec               -- C { x = p1, y = p2 }
+      | InfixCon  inf inf           -- p1 `C` p2
+
+  The use of ``Void`` in ``HsConDeclGADTDetails`` reflects the fact that GADT
+  constructors cannot use infix syntax like Haskell98-style constructors can.
+
+  As a result of all this, the ``con_args`` field is now partial, so using
+  ``con_args`` as a top-level field selector is discouraged.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
-- It's possible now to promote the ``Natural`` type: :: 
-    
+- It's possible now to promote the ``Natural`` type: ::
+
     data Coordinate = Mk2D Natural Natural
     type MyCoordinate = Mk2D 1 10
-    
+
   The separate kind ``Nat`` is removed and now it is just a type synonym for
   ``Natural``. As a consequence, one must enable ``TypeSynonymInstances``
   in order to define instances for ``Nat``.

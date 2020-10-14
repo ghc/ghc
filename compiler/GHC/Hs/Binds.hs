@@ -1227,7 +1227,10 @@ pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 -}
 
 -- | Haskell Pattern Synonym Details
-type HsPatSynDetails pass = HsConDetails (LIdP pass) [RecordPatSynField (LIdP pass)]
+type HsPatSynDetails pass
+   = HsConDetails (LIdP pass)
+                  [RecordPatSynField (LIdP pass)]
+                  (LIdP pass)
 
 -- See Note [Record PatSyn Fields]
 -- | Record Pattern Synonym Field
