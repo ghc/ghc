@@ -178,7 +178,9 @@ import GHC.Types.Unique.DFM
 import GHC.Core.TyCon.Env
 import GHC.Data.Maybe
 
-import GHC.Core.Map
+import GHC.Core.Map.Type
+import GHC.Data.TrieMap
+
 import Control.Monad
 import GHC.Utils.Monad
 import Data.IORef
