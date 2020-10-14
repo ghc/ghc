@@ -979,7 +979,7 @@ run_BCO:
         bcoSize = bco->instrs->bytes / sizeof(StgWord16);
 #endif
         IF_DEBUG(interpreter,debugBelch("bcoSize = %d\n", bcoSize));
-
+        IF_DEBUG(interpreter,disassemble( bco ));
 #if defined(INTERP_STATS)
         it_lastopc = 0; /* no opcode */
 #endif

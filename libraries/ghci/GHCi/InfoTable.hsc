@@ -359,7 +359,8 @@ sizeOfEntryCode tables_next_to_code
 -- Note: Must return proper pointer for use in a closure
 newExecConItbl :: Bool -> StgInfoTable -> ByteString -> IO (FunPtr ())
 newExecConItbl tables_next_to_code obj con_desc
-   = alloca $ \pcode -> do
+   = -- alloca $ \pcode ->
+     do
         sz0 <- sizeOfEntryCode tables_next_to_code
         let lcon_desc = BS.length con_desc + 1{- null terminator -}
             -- SCARY
@@ -369,8 +370,10 @@ newExecConItbl tables_next_to_code obj con_desc
                -- table, because on a 64-bit platform we reference this string
                -- with a 32-bit offset relative to the info table, so if we
                -- allocated the string separately it might be out of range.
-        wr_ptr <- _allocateExec (sz + fromIntegral lcon_desc) pcode
-        ex_ptr <- peek pcode
+        wr_ptr <- _allocateWrite (sz + fromIntegral lcon_desc)
+        let ex_ptr = wr_ptr
+        -- wr_ptr <- _allocateExec (sz + fromIntegral lcon_desc) pcode
+        -- ex_ptr <- peek pcode
         let cinfo = StgConInfoTable { conDesc = ex_ptr `plusPtr` fromIntegral sz
                                     , infoTable = obj }
         pokeConItbl tables_next_to_code wr_ptr ex_ptr cinfo
@@ -379,6 +382,7 @@ newExecConItbl tables_next_to_code obj con_desc
         let null_off = fromIntegral sz + fromIntegral (BS.length con_desc)
         poke (castPtr wr_ptr `plusPtr` null_off) (0 :: Word8)
         _flushExec sz ex_ptr -- Cache flush (if needed)
+        _markExec (sz + fromIntegral lcon_desc) ex_ptr
         pure $ if tables_next_to_code
           then castPtrToFunPtr $ ex_ptr `plusPtr` conInfoTableSizeB
           else castPtrToFunPtr ex_ptr
@@ -388,6 +392,15 @@ foreign import ccall unsafe "allocateExec"
 
 foreign import ccall unsafe "flushExec"
   _flushExec :: CUInt -> Ptr a -> IO ()
+
+foreign import ccall unsafe "allocateWrite"
+  _allocateWrite :: CUInt -> IO (Ptr a)
+
+foreign import ccall unsafe "markExec"
+  _markExec :: CUInt -> Ptr a -> IO ()
+
+foreign import ccall unsafe "freeWrite"
+  _freeWrite :: CUInt -> Ptr a -> IO ()
 
 -- -----------------------------------------------------------------------------
 -- Constants and config
