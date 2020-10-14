@@ -31,10 +31,9 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
-import GHC.Core.Unify     ( tcMatchTys )
+import GHC.Core.Unify     ( tcMatchTys, flattenTys )
 import GHC.Unit.Module
 import GHC.Tc.Instance.Family
-import GHC.Core.FamInstEnv ( flattenTys )
 import GHC.Tc.Utils.Instantiate
 import GHC.Core.InstEnv
 import GHC.Core.TyCon

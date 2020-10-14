@@ -176,7 +176,9 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Data.Maybe
 
-import GHC.Core.Map
+import GHC.Core.Map.Type
+import GHC.Data.TrieMap
+
 import Control.Monad
 import GHC.Utils.Monad
 import Data.IORef

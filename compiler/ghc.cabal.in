@@ -303,6 +303,7 @@ Library
         GHC.Core.Unfold.Make
         GHC.Core.Utils
         GHC.Core.Map
+        GHC.Core.Map.Type
         GHC.Core.Seq
         GHC.Core.Stats
         GHC.Core.Make
