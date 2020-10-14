@@ -54,7 +54,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Types.Literal
 import GHC.Core
-import GHC.Core.Map
+import GHC.Core.Map.Expr
 import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names
 import GHC.Builtin.Types

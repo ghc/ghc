@@ -24,7 +24,6 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Core.FamInstEnv ( flattenTys )
 import GHC.Data.Pair
 import GHC.Data.List.SetOps ( getNth )
 import GHC.Core.Unify
