@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #if mingw32_HOST_OS
 #include <windows.h>
 #else
