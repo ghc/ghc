@@ -18,10 +18,6 @@
 Main functions for .hie file generation
 -}
 
--- TODO RGS: This is a horrible hack that I put in place to get the test suite
--- to run on GitLab CI. Please remove this hack before landing!
-{-# OPTIONS_GHC -Wno-unused-matches -Wno-unused-local-binds #-}
-
 module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts, enrichHie) where
 
 import GHC.Utils.Outputable(ppr)
@@ -514,31 +510,11 @@ This case in handled in the instance for HsPatSigType
 -}
 
 class HasLoc a where
-  -- ^ defined so that HsImplicitBndrs and HsWildCardBndrs can
-  -- know what their implicit bindings are scoping over
-  -- TODO RGS: Remove the HsImplicitBndrs reference above
+  -- ^ conveniently calculate locations for things without locations attached
   loc :: a -> SrcSpan
-
-instance HasLoc thing => HasLoc (TScoped thing) where
-  loc (TS _ a) = loc a
 
 instance HasLoc thing => HasLoc (PScoped thing) where
   loc (PS _ _ _ a) = loc a
-
-instance HasLoc (LHsQTyVars GhcRn) where
-  loc (HsQTvs _ vs) = loc vs
-
-{-
-TODO RGS: Delete this once we've learned what we can from this code
-
-instance HasLoc thing => HasLoc (HsImplicitBndrs a thing) where
-  loc (HsIB _ a) = loc a
-  loc _ = noSrcSpan
--}
-
-instance HasLoc thing => HasLoc (HsWildCardBndrs a thing) where
-  loc (HsWC _ a) = loc a
-  loc _ = noSrcSpan
 
 instance HasLoc (Located a) where
   loc (L l _) = l
@@ -553,6 +529,7 @@ instance HasLoc a => HasLoc (FamEqn (GhcPass s) a) where
       foldl1' combineSrcSpans [loc a, loc b, loc c]
     HsOuterExplicit{hso_bndrs = tvs} ->
       foldl1' combineSrcSpans [loc a, loc tvs, loc b, loc c]
+
 instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg tm ty) where
   loc (HsValArg tm) = loc tm
   loc (HsTypeArg _ ty) = loc ty
@@ -798,8 +775,7 @@ class ( IsPass p
       , ToHie (RFContext (Located (AmbiguousFieldOcc (GhcPass p))))
       , ToHie (RFContext (Located (FieldOcc (GhcPass p))))
       , ToHie (TScoped (LHsWcType (GhcPass (NoGhcTcPass p))))
-      -- TODO RGS: Should I replace this with something?
-      -- , ToHie (TScoped (LHsSigWcType (GhcPass (NoGhcTcPass p))))
+      , ToHie (TScoped (LHsSigWcType (GhcPass (NoGhcTcPass p))))
       , HasRealDataConName (GhcPass p)
       )
       => HiePass p where
@@ -1141,8 +1117,7 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
         ]
       ExprWithTySig _ expr sig ->
         [ toHie expr
-        -- TODO RGS: Figure out how to do this correctly
-        -- , toHie $ TS (ResolvedScopes [mkLScope expr]) sig
+        , toHie $ TS (ResolvedScopes [mkLScope expr]) sig
         ]
       ArithSeq _ _ info ->
         [ toHie info
@@ -1485,10 +1460,7 @@ instance (ToHie rhs, HasLoc rhs)
     => ToHie (FamEqn GhcRn rhs) where
   toHie fe@(FamEqn _ var outer_bndrs pats _ rhs) = concatM $
     [ toHie $ C (Decl InstDec $ getRealSpan $ loc fe) var
-    {-
-    TODO RGS: Figure out how to do this correctly
-    , toHie $ fmap (tvScopes (ResolvedScopes []) scope) tybndrs
-    -}
+    , toHie $ TVS (ResolvedScopes []) scope outer_bndrs
     , toHie pats
     , toHie rhs
     ]
@@ -1526,19 +1498,15 @@ instance ToHie (Located (HsDerivingClause GhcRn)) where
 
 instance ToHie (Located (DerivClauseTys GhcRn)) where
   toHie (L span dct) = concatM $ makeNode dct span : case dct of
-      -- TODO RGS: Figure out how to do this properly
-      DctSingle _ ty -> [] -- [ toHie $ TS (ResolvedScopes[]) ty ]
-      DctMulti _ tys -> [] -- [ toHie $ map (TS (ResolvedScopes [])) tys ]
+      DctSingle _ ty -> [ toHie $ TS (ResolvedScopes []) ty ]
+      DctMulti _ tys -> [ toHie $ map (TS (ResolvedScopes [])) tys ]
 
 instance ToHie (Located (DerivStrategy GhcRn)) where
   toHie (L span strat) = concatM $ makeNode strat span : case strat of
       StockStrategy -> []
       AnyclassStrategy -> []
       NewtypeStrategy -> []
-      ViaStrategy s -> [ {-
-                         TODO RGS: Figure out how to do this properly
-
-                         toHie $ TS (ResolvedScopes []) s -} ]
+      ViaStrategy s -> [ toHie (TS (ResolvedScopes []) s) ]
 
 instance ToHie (Located OverlapMode) where
   toHie (L span _) = locOnly span
@@ -1591,25 +1559,17 @@ instance ToHie (Located [Located (ConDeclField GhcRn)]) where
     , toHie decls
     ]
 
-{-
-TODO RGS: Delete this once we've learned what we can from this code
-
-instance ( HasLoc thing
-         , ToHie (TScoped thing)
-         ) => ToHie (TScoped (HsImplicitBndrs GhcRn thing)) where
-  toHie (TS sc (HsIB ibrn a)) = concatM $
-      [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) ibrn
-      , toHie $ TS sc a
-      ]
-    where span = loc a
--}
-
-instance ( HasLoc thing
-         , ToHie (TScoped thing)
-         ) => ToHie (TScoped (HsWildCardBndrs GhcRn thing)) where
+instance ToHie (TScoped (HsWildCardBndrs GhcRn (Located (HsSigType GhcRn)))) where
   toHie (TS sc (HsWC names a)) = concatM $
       [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) names
       , toHie $ TS sc a
+      ]
+    where span = loc a
+
+instance ToHie (TScoped (HsWildCardBndrs GhcRn (Located (HsType GhcRn)))) where
+  toHie (TS sc (HsWC names a)) = concatM $
+      [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) names
+      , toHie a
       ]
     where span = loc a
 
@@ -1620,8 +1580,7 @@ instance ToHie (StandaloneKindSig GhcRn) where
   toHie sig = concatM $ case sig of
     StandaloneKindSig _ name typ ->
       [ toHie $ C TyDecl name
-      -- TODO RGS: Figure out how to do this correctly
-      -- , toHie $ TS (ResolvedScopes []) typ
+      , toHie $ TS (ResolvedScopes []) typ
       ]
 
 instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where
@@ -1631,20 +1590,17 @@ instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where
       HieRn -> concatM $ makeNode sig sp : case sig of
         TypeSig _ names typ ->
           [ toHie $ map (C TyDecl) names
-          -- TODO RGS: Figure out how to do this correctly
-          -- , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
+          , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
           ]
         PatSynSig _ names typ ->
           [ toHie $ map (C TyDecl) names
-          -- TODO RGS: Figure out how to do this correctly
-          -- , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
+          , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
           ]
         ClassOpSig _ _ names typ ->
           [ case styp of
               ClassSig -> toHie $ map (C $ ClassTyDecl $ getRealSpan sp) names
               _  -> toHie $ map (C $ TyDecl) names
-          -- TODO RGS: Figure out how to do this correctly
-          -- , toHie $ TS (UnresolvedScope (map unLoc names) msp) typ
+          , toHie $ TS (UnresolvedScope (map unLoc names) msp) typ
           ]
         IdSig _ _ -> []
         FixSig _ fsig ->
@@ -1655,16 +1611,11 @@ instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where
           ]
         SpecSig _ name typs _ ->
           [ toHie $ (C Use) name
-          -- TODO RGS: Figure out how to do this correctly
-          -- , toHie $ map (TS (ResolvedScopes [])) typs
+          , toHie $ map (TS (ResolvedScopes [])) typs
           ]
         SpecInstSig _ _ typ ->
-          {-
-          -- TODO RGS: Figure out how to do this correctly
           [ toHie $ TS (ResolvedScopes []) typ
           ]
-          -}
-          []
         MinimalSig _ _ form ->
           [ toHie form
           ]
@@ -1678,18 +1629,26 @@ instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where
           , toHie $ fmap (C Use) typ
           ]
 
-instance ToHie (Located (HsType GhcRn)) where
-  toHie x = toHie $ TS (ResolvedScopes []) x
+instance ToHie (TScoped (Located (HsSigType GhcRn))) where
+  toHie (TS tsc (L span t@HsSig{sig_bndrs=bndrs,sig_body=body})) = concatM $ makeNode t span :
+      [ toHie (TVS tsc (mkScope span) bndrs)
+      , toHie body
+      ]
 
-instance ToHie (TScoped (Located (HsType GhcRn))) where
-  toHie (TS tsc (L span t)) = concatM $ makeNode t span : case t of
+instance Data flag => ToHie (TVScoped (HsOuterTyVarBndrs flag GhcRn)) where
+  toHie (TVS tsc sc bndrs) = case bndrs of
+    HsOuterImplicit xs -> bindingsOnly $ map (C $ TyVarBind sc tsc) xs
+    HsOuterExplicit _ xs -> toHie $ tvScopes tsc sc xs
+
+instance ToHie (Located (HsType GhcRn)) where
+  toHie (L span t) = concatM $ makeNode t span : case t of
       HsForAllTy _ tele body ->
         let scope = mkScope $ getLoc body in
         [ case tele of
             HsForAllVis { hsf_vis_bndrs = bndrs } ->
-              toHie $ tvScopes tsc scope bndrs
+              toHie $ tvScopes (ResolvedScopes []) scope bndrs
             HsForAllInvis { hsf_invis_bndrs = bndrs } ->
-              toHie $ tvScopes tsc scope bndrs
+              toHie $ tvScopes (ResolvedScopes []) scope bndrs
         , toHie body
         ]
       HsQualTy _ ctx body ->
@@ -1705,7 +1664,7 @@ instance ToHie (TScoped (Located (HsType GhcRn))) where
         ]
       HsAppKindTy _ ty ki ->
         [ toHie ty
-        , toHie $ TS (ResolvedScopes []) ki
+        , toHie ki
         ]
       HsFunTy _ w a b ->
         [ toHie (arrowToHsType w)
@@ -1888,11 +1847,8 @@ instance ToHie (Located (InstDecl GhcRn)) where
 
 instance ToHie (Located (ClsInstDecl GhcRn)) where
   toHie (L span decl) = concatM
-    [ {-
-      TODO RGS: Figure out what to do here
-
-      toHie $ TS (ResolvedScopes [mkScope span]) $ cid_poly_ty decl
-    , -} toHie $ fmap (BC InstanceBind ModuleScope) $ cid_binds decl
+    [ toHie $ TS (ResolvedScopes [mkScope span]) $ cid_poly_ty decl
+    , toHie $ fmap (BC InstanceBind ModuleScope) $ cid_binds decl
     , toHie $ map (SC $ SI InstSig $ getRealSpan span) $ cid_sigs decl
     , concatMapM (locOnly . getLoc) $ cid_tyfam_insts decl
     , toHie $ cid_tyfam_insts decl
@@ -1917,11 +1873,8 @@ instance ToHie (Context a)
 instance ToHie (Located (DerivDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
       DerivDecl _ typ strat overlap ->
-        [ {-
-          TODO RGS: Figure out what to do here
-
-          toHie $ TS (ResolvedScopes []) typ
-        , -} toHie strat
+        [ toHie $ TS (ResolvedScopes []) typ
+        , toHie strat
         , toHie overlap
         ]
 
@@ -1941,18 +1894,12 @@ instance ToHie (Located (ForeignDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
       ForeignImport {fd_name = name, fd_sig_ty = sig, fd_fi = fi} ->
         [ toHie $ C (ValBind RegularBind ModuleScope $ getRealSpan span) name
-        {-
-        TODO RGS: Figure out how to do this properly
         , toHie $ TS (ResolvedScopes []) sig
-        -}
         , toHie fi
         ]
       ForeignExport {fd_name = name, fd_sig_ty = sig, fd_fe = fe} ->
         [ toHie $ C Use name
-        {-
-        TODO RGS: Figure out how to do this properly
         , toHie $ TS (ResolvedScopes []) sig
-        -}
         , toHie fe
         ]
 
