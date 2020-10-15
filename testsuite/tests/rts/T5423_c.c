@@ -1,6 +1,24 @@
 #include <stdio.h>
+#include "Stg.h"
 
 void flush_stdout(void)
 {
     fflush(stdout);
+}
+
+void print_it(
+    StgWord r1,
+    StgWord r2,
+    StgWord r3,
+    StgWord r4,
+    StgWord r5,
+    StgWord r5,
+    StgWord r7,
+    StgWord r8,
+    StgWord r9,
+    StgWord r10
+    )
+{
+  printf("%d  %d  %d  %d  %d  %d  %d  %d  %d  %d\n",
+         r1, r2, r3, r4, r5, r6, r7, r8, r9, r10);
 }
