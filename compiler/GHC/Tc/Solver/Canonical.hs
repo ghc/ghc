@@ -35,7 +35,7 @@ import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Tc.Instance.Family ( tcTopNormaliseNewTypeTF_maybe )
 import GHC.Types.Var
 import GHC.Types.Var.Env( mkInScopeSet )
-import GHC.Types.Var.Set( delVarSetList )
+import GHC.Types.Var.Set( delVarSetList, anyVarSet )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Driver.Session( DynFlags )
@@ -2038,6 +2038,56 @@ if we really need to.  Of course `flattenArgsNom` should return `Refl`
 whenever possible, but #15577 was an infinite loop because even
 though the coercion was homo-kinded, `kind_co` was not `Refl`, so we
 made a new (identical) CFunEqCan, and then the entire process repeated.
+
+Note [Put touchable variables on the left]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#10009, a very nasty example:
+
+    f :: (UnF (F b) ~ b) => F b -> ()
+
+    g :: forall a. (UnF (F a) ~ a) => a -> ()
+    g _ = f (undefined :: F a)
+
+For g we get [G]  g1 : UnF (F a) ~ a
+             [WD] w1 : UnF (F beta) ~ beta
+             [WD] w2 : F a ~ F beta
+
+g1 is canonical (CEqCan). It is oriented as above because a is not touchable.
+See canEqTyVarFunEq.
+
+w1 is similarly canonical, though the occurs-check in canEqTyVarFunEq is key
+here.
+
+w2 is canonical. But which way should it be oriented? As written, we'll be
+stuck. When w2 is added to the inert set, nothing gets kicked out: g1 is
+a Given (and Wanteds don't rewrite Givens), and w2 doesn't mention the LHS
+of w2. We'll thus lose.
+
+But if w2 is swapped around, to
+
+    [D] w3 : F beta ~ F a
+
+then (after emitting shadow Deriveds, etc. See GHC.Tc.Solver.Monad
+Note [The improvement story and derived shadows]) we'll kick w1 out of the inert
+set (it mentions the LHS of w3). We then rewrite w1 to
+
+    [D] w4 : UnF (F a) ~ beta
+
+and then, using g1, to
+
+    [D] w5 : a ~ beta
+
+at which point we can unify and go on to glory. (This rewriting actually
+happens all at once, in the call to flatten during canonicalisation.)
+
+But what about the new LHS makes it better? It mentions a variable (beta)
+that can appear in a Wanted -- a touchable metavariable never appears
+in a Given. On the other hand, the original LHS mentioned only variables
+that appear in Givens. We thus choose to put variables that can appear
+in Wanteds on the left.
+
+#12526 is another good example of this in action.
+
 -}
 
 {- "RAE"
@@ -2199,7 +2249,7 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
   , TyVarLHS tv2 <- lhs2
   , swapOverTyVars (isGiven ev) tv1 tv2
   = do { traceTcS "canEqLHS2 swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
-       ; new_ev <- rewriteCastedEquality ev eq_rel swapped (mkTyVarTy tv1) (mkTyVarTy tv2) mco
+       ; new_ev <- do_swap
        ; canEqCanLHSFinish new_ev eq_rel IsSwapped (TyVarLHS tv2)
                                                    (ps_xi1 `mkCastTyMCo` sym_mco) }
 
@@ -2209,35 +2259,53 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 
   | TyFamLHS fun_tc1 fun_args1 <- lhs1
   , TyVarLHS tv2 <- lhs2
-  = do { new_ev <- rewriteCastedEquality ev eq_rel swapped
-                                         (mkTyConApp fun_tc1 fun_args1) (mkTyVarTy tv2) mco
+  = do { new_ev <- do_swap
        ; canEqTyVarFunEq new_ev eq_rel IsSwapped tv2 ps_xi2
                                                  fun_tc1 fun_args1 ps_xi1 sym_mco }
 
-  | NomEq <- eq_rel
-  , TyFamLHS fun_tc1 fun_args1 <- lhs1
+  | TyFamLHS fun_tc1 fun_args1 <- lhs1
   , TyFamLHS fun_tc2 fun_args2 <- lhs2
-  , fun_tc1 == fun_tc2
-  , Injective inj <- tyConInjectivityInfo fun_tc1
-  = do { traceTcS "CanEqCanLHS2 injective type family" (ppr lhs1 $$ ppr lhs2)
-       ; sequence_ [ unifyDerived (ctEvLoc ev) Nominal (Pair arg1 arg2)
-                   | (arg1, arg2, True) <- zip3 fun_args1 fun_args2 inj ]
-       ; canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco) }
+  = do { traceTcS "canEqCanLHS2 two type families" (ppr lhs1 $$ ppr lhs2)
+
+         -- emit derived equalities for injective type families
+       ; if | NomEq <- eq_rel
+              , fun_tc1 == fun_tc2
+              , Injective inj <- tyConInjectivityInfo fun_tc1
+              ->  sequence_ [ unifyDerived (ctEvLoc ev) Nominal (Pair arg1 arg2)
+                            | (arg1, arg2, True) <- zip3 fun_args1 fun_args2 inj ]
+            | otherwise -> return ()
+
+       ; let tvs2 = tyCoVarsOfTypes fun_args2
+       ; tclvl <- getTcLevel
+       ; if anyVarSet (isTouchableMetaTyVar tclvl) tvs2
+            -- swap 'em: Note [Put touchable variables on the left]
+         then do { new_ev <- do_swap
+                 ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
+         else finish_without_swapping }
 
   -- that's all the special cases. Now we just figure out which non-special case
   -- to continue to.
   | otherwise
-  = canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco)
+  = finish_without_swapping
 
   where
     sym_mco = mkTcSymMCo mco
+
+    do_swap = rewriteCastedEquality ev eq_rel swapped (canEqLHSType lhs1) (canEqLHSType lhs2) mco
+    finish_without_swapping = canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco)
+
 
 -- This function handles the case where one side is a tyvar and the other is
 -- a type family application. Which to put on the left?
 --   If we can unify the variable, put it on the left, as this may be our only
 --   shot to unify.
 --   Otherwise, put the function on the left, because it's generally better to
---   rewrite away function calls. This makes types smaller.
+--   rewrite away function calls. This makes types smaller. And it seems necessary:
+--     [W] F alpha ~ alpha
+--     [W] F alpha ~ beta
+--     [W] G alpha beta ~ Int   ( where we have type instance G a a = a )
+--   If we end up with a stuck alpha ~ F alpha, we won't be able to solve this.
+--   Test case: indexed-types/should_compile/CEqCanOccursCheck
 -- It would probably work to always put the variable on the left, but we think
 -- it would be less efficient.
 canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
@@ -2249,15 +2317,18 @@ canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
                 -> TcS (StopOrContinue Ct)
 canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
   = do { tclvl <- getTcLevel
-       ; if isTouchableMetaTyVar tclvl tv1
-         then canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1)
-                                (ps_xi2 `mkCastTyMCo` mco)
-         else do { new_ev <- rewriteCastedEquality ev eq_rel swapped
-                               (mkTyVarTy tv1) (mkTyConApp fun_tc2 fun_args2)
-                               mco
-                 ; canEqCanLHSFinish new_ev eq_rel IsSwapped
-                                (TyFamLHS fun_tc2 fun_args2)
-                                (ps_xi1 `mkCastTyMCo` sym_mco) } }
+       ; dflags <- getDynFlags
+       ; if | isTouchableMetaTyVar tclvl tv1
+              , MTVU_OK _ <- checkTyVarEq dflags YesTypeFamilies tv1 (ps_xi2 `mkCastTyMCo` mco)
+              -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1)
+                                                     (ps_xi2 `mkCastTyMCo` mco)
+            | otherwise
+              -> do { new_ev <- rewriteCastedEquality ev eq_rel swapped
+                                  (mkTyVarTy tv1) (mkTyConApp fun_tc2 fun_args2)
+                                  mco
+                    ; canEqCanLHSFinish new_ev eq_rel IsSwapped
+                                  (TyFamLHS fun_tc2 fun_args2)
+                                  (ps_xi1 `mkCastTyMCo` sym_mco) } }
   where
     sym_mco = mkTcSymMCo mco
 
@@ -2357,7 +2428,7 @@ instance Outputable CanEqOK where
 canEqOK :: DynFlags -> EqRel -> CanEqLHS -> Xi -> CanEqOK
 canEqOK dflags eq_rel lhs rhs
   = ASSERT( good_rhs )
-    case checkTypeEq dflags True {- type families are OK here -} lhs rhs of
+    case checkTypeEq dflags YesTypeFamilies lhs rhs of
       MTVU_OK ()       -> CanEqOK
       MTVU_Bad         -> CanEqNotOK OtherCIS
                  -- Violation of TyEq:F

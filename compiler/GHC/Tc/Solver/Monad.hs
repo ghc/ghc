@@ -1274,35 +1274,6 @@ If we don't split the Irreds, we loop. This is all dangerously subtle.
 
 This is triggered by test case typecheck/should_compile/SplitWD.
 
-Note [Examples of how Derived shadows helps completeness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Ticket #10009, a very nasty example:
-
-    f :: (UnF (F b) ~ b) => F b -> ()
-
-    g :: forall a. (UnF (F a) ~ a) => a -> ()
-    g _ = f (undefined :: F a)
-
-  For g we get [G] UnF (F a) ~ a
-               [WD] UnF (F beta) ~ beta
-               [WD] F a ~ F beta
-  Flatten:
-      [G] g1: F a ~ fsk1         fsk1 := F a
-      [G] g2: UnF fsk1 ~ fsk2    fsk2 := UnF fsk1
-      [G] g3: fsk2 ~ a
-
-      [WD] w1: F beta ~ fmv1
-      [WD] w2: UnF fmv1 ~ fmv2
-      [WD] w3: fmv2 ~ beta
-      [WD] w4: fmv1 ~ fsk1   -- From F a ~ F beta using flat-cache
-                             -- and re-orient to put meta-var on left
-
-Rewrite w2 with w4: [D] d1: UnF fsk1 ~ fmv2
-React that with g2: [D] d2: fmv2 ~ fsk2
-React that with w3: [D] beta ~ fsk2
-            and g3: [D] beta ~ a -- Hooray beta := a
-And that is enough to solve everything
-
 Note [Add derived shadows only for Wanteds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We only add shadows for Wanted constraints. That is, we have
