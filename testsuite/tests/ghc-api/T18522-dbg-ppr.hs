@@ -11,8 +11,8 @@ import GHC.Utils.Outputable
 import GHC.Tc.Module
 import GHC.Tc.Utils.Zonk
 import GHC.Utils.Error
-import GHC.Driver.Types
 import GHC.Driver.Ppr
+import GHC.Driver.Env
 import GHC
 import qualified GHC.LanguageExtensions as LangExt
 

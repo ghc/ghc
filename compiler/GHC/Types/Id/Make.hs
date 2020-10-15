@@ -57,6 +57,7 @@ import GHC.Core.Utils   ( mkCast, mkDefaultCase )
 import GHC.Core.Unfold.Make
 import GHC.Core.SimpleOpt
 import GHC.Types.Literal
+import GHC.Types.SourceText
 import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Types.Name.Set
@@ -68,6 +69,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.TyThing
 import GHC.Core
 import GHC.Types.Unique
 import GHC.Builtin.Uniques

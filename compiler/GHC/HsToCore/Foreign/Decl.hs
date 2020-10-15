@@ -29,6 +29,8 @@ import GHC.Core.DataCon
 import GHC.Core.Unfold.Make
 import GHC.Types.Id
 import GHC.Types.Literal
+import GHC.Types.ForeignStubs
+import GHC.Types.SourceText
 import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Core.Type
@@ -41,7 +43,6 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils
-import GHC.Driver.Types
 import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Builtin.Types

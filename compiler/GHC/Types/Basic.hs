@@ -33,14 +33,6 @@ module GHC.Types.Basic (
         PromotionFlag(..), isPromoted,
         FunctionOrData(..),
 
-        WarningTxt(..), pprWarningTxtForMsg, StringLiteral(..),
-
-        Fixity(..), FixityDirection(..),
-        defaultFixity, maxPrecedence, minPrecedence,
-        negateFixity, funTyFixity,
-        compareFixity,
-        LexicalFixity(..),
-
         RecFlag(..), isRec, isNonRec, boolToRecFlag,
         Origin(..), isGenerated,
 
@@ -100,28 +92,24 @@ module GHC.Types.Basic (
 
         SuccessFlag(..), succeeded, failed, successIf,
 
-        IntegralLit(..), FractionalLit(..),
-        negateIntegralLit, negateFractionalLit,
-        mkIntegralLit, mkFractionalLit,
-        integralFractionalLit,
-
-        SourceText(..), pprWithSourceText,
-
         IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit,
 
         SpliceExplicitFlag(..),
 
-        TypeOrKind(..), isTypeLevel, isKindLevel
+        TypeOrKind(..), isTypeLevel, isKindLevel,
+
+        ForeignSrcLang (..)
    ) where
 
 import GHC.Prelude
 
+import GHC.ForeignSrcLang
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc ( Located,unLoc )
-import Data.Data hiding (Fixity, Prefix, Infix)
-import Data.Function (on)
+import GHC.Utils.Binary
+import GHC.Types.SourceText
+import Data.Data
 import Data.Bits
 import qualified Data.Semigroup as Semi
 
@@ -143,6 +131,16 @@ pickLR CRight (_,r) = r
 instance Outputable LeftOrRight where
   ppr CLeft    = text "Left"
   ppr CRight   = text "Right"
+
+instance Binary LeftOrRight where
+   put_ bh CLeft  = putByte bh 0
+   put_ bh CRight = putByte bh 1
+
+   get bh = do { h <- getByte bh
+               ; case h of
+                   0 -> return CLeft
+                   _ -> return CRight }
+
 
 {-
 ************************************************************************
@@ -402,6 +400,17 @@ instance Outputable PromotionFlag where
   ppr NotPromoted = text "NotPromoted"
   ppr IsPromoted  = text "IsPromoted"
 
+instance Binary PromotionFlag where
+   put_ bh NotPromoted = putByte bh 0
+   put_ bh IsPromoted  = putByte bh 1
+
+   get bh = do
+       n <- getByte bh
+       case n of
+         0 -> return NotPromoted
+         1 -> return IsPromoted
+         _ -> fail "Binary(IsPromoted): fail)"
+
 {-
 ************************************************************************
 *                                                                      *
@@ -417,62 +426,15 @@ instance Outputable FunctionOrData where
     ppr IsFunction = text "(function)"
     ppr IsData     = text "(data)"
 
-{-
-************************************************************************
-*                                                                      *
-                Deprecations
-*                                                                      *
-************************************************************************
--}
-
--- | A String Literal in the source, including its original raw format for use by
--- source to source manipulation tools.
-data StringLiteral = StringLiteral
-                       { sl_st :: SourceText, -- literal raw source.
-                                              -- See not [Literal source text]
-                         sl_fs :: FastString  -- literal string value
-                       } deriving Data
-
-instance Eq StringLiteral where
-  (StringLiteral _ a) == (StringLiteral _ b) = a == b
-
-instance Outputable StringLiteral where
-  ppr sl = pprWithSourceText (sl_st sl) (ftext $ sl_fs sl)
-
--- | Warning Text
---
--- reason/explanation from a WARNING or DEPRECATED pragma
-data WarningTxt = WarningTxt (Located SourceText)
-                             [Located StringLiteral]
-                | DeprecatedTxt (Located SourceText)
-                                [Located StringLiteral]
-    deriving (Eq, Data)
-
-instance Outputable WarningTxt where
-    ppr (WarningTxt    lsrc ws)
-      = case unLoc lsrc of
-          NoSourceText   -> pp_ws ws
-          SourceText src -> text src <+> pp_ws ws <+> text "#-}"
-
-    ppr (DeprecatedTxt lsrc  ds)
-      = case unLoc lsrc of
-          NoSourceText   -> pp_ws ds
-          SourceText src -> text src <+> pp_ws ds <+> text "#-}"
-
-pp_ws :: [Located StringLiteral] -> SDoc
-pp_ws [l] = ppr $ unLoc l
-pp_ws ws
-  = text "["
-    <+> vcat (punctuate comma (map (ppr . unLoc) ws))
-    <+> text "]"
-
-
-pprWarningTxtForMsg :: WarningTxt -> SDoc
-pprWarningTxtForMsg (WarningTxt    _ ws)
-                     = doubleQuotes (vcat (map (ftext . sl_fs . unLoc) ws))
-pprWarningTxtForMsg (DeprecatedTxt _ ds)
-                     = text "Deprecated:" <+>
-                       doubleQuotes (vcat (map (ftext . sl_fs . unLoc) ds))
+instance Binary FunctionOrData where
+    put_ bh IsFunction = putByte bh 0
+    put_ bh IsData     = putByte bh 1
+    get bh = do
+        h <- getByte bh
+        case h of
+          0 -> return IsFunction
+          1 -> return IsData
+          _ -> panic "Binary FunctionOrData"
 
 {-
 ************************************************************************
@@ -487,81 +449,6 @@ type RuleName = FastString
 pprRuleName :: RuleName -> SDoc
 pprRuleName rn = doubleQuotes (ftext rn)
 
-{-
-************************************************************************
-*                                                                      *
-\subsection[Fixity]{Fixity info}
-*                                                                      *
-************************************************************************
--}
-
-------------------------
-data Fixity = Fixity SourceText Int FixityDirection
-  -- Note [Pragma source text]
-  deriving Data
-
-instance Outputable Fixity where
-    ppr (Fixity _ prec dir) = hcat [ppr dir, space, int prec]
-
-instance Eq Fixity where -- Used to determine if two fixities conflict
-  (Fixity _ p1 dir1) == (Fixity _ p2 dir2) = p1==p2 && dir1 == dir2
-
-------------------------
-data FixityDirection = InfixL | InfixR | InfixN
-                     deriving (Eq, Data)
-
-instance Outputable FixityDirection where
-    ppr InfixL = text "infixl"
-    ppr InfixR = text "infixr"
-    ppr InfixN = text "infix"
-
-------------------------
-maxPrecedence, minPrecedence :: Int
-maxPrecedence = 9
-minPrecedence = 0
-
-defaultFixity :: Fixity
-defaultFixity = Fixity NoSourceText maxPrecedence InfixL
-
-negateFixity, funTyFixity :: Fixity
--- Wired-in fixities
-negateFixity = Fixity NoSourceText 6 InfixL  -- Fixity of unary negate
-funTyFixity  = Fixity NoSourceText (-1) InfixR  -- Fixity of '->', see #15235
-
-{-
-Consider
-
-\begin{verbatim}
-        a `op1` b `op2` c
-\end{verbatim}
-@(compareFixity op1 op2)@ tells which way to arrange application, or
-whether there's an error.
--}
-
-compareFixity :: Fixity -> Fixity
-              -> (Bool,         -- Error please
-                  Bool)         -- Associate to the right: a op1 (b op2 c)
-compareFixity (Fixity _ prec1 dir1) (Fixity _ prec2 dir2)
-  = case prec1 `compare` prec2 of
-        GT -> left
-        LT -> right
-        EQ -> case (dir1, dir2) of
-                        (InfixR, InfixR) -> right
-                        (InfixL, InfixL) -> left
-                        _                -> error_please
-  where
-    right        = (False, True)
-    left         = (False, False)
-    error_please = (True,  False)
-
--- |Captures the fixity of declarations as they are parsed. This is not
--- necessarily the same as the fixity declaration, as the normal fixity may be
--- overridden using parens or backticks.
-data LexicalFixity = Prefix | Infix deriving (Data,Eq)
-
-instance Outputable LexicalFixity where
-  ppr Prefix = text "Prefix"
-  ppr Infix  = text "Infix"
 
 {-
 ************************************************************************
@@ -636,6 +523,17 @@ boolToRecFlag False = NonRecursive
 instance Outputable RecFlag where
   ppr Recursive    = text "Recursive"
   ppr NonRecursive = text "NonRecursive"
+
+instance Binary RecFlag where
+    put_ bh Recursive = do
+            putByte bh 0
+    put_ bh NonRecursive = do
+            putByte bh 1
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do return Recursive
+              _ -> do return NonRecursive
 
 {-
 ************************************************************************
@@ -775,6 +673,31 @@ instance Outputable OverlapMode where
    ppr (Overlaps     _) = text "[overlap ok]"
    ppr (Incoherent   _) = text "[incoherent]"
 
+instance Binary OverlapMode where
+    put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
+    put_ bh (Overlaps     s) = putByte bh 1 >> put_ bh s
+    put_ bh (Incoherent   s) = putByte bh 2 >> put_ bh s
+    put_ bh (Overlapping  s) = putByte bh 3 >> put_ bh s
+    put_ bh (Overlappable s) = putByte bh 4 >> put_ bh s
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> (get bh) >>= \s -> return $ NoOverlap s
+            1 -> (get bh) >>= \s -> return $ Overlaps s
+            2 -> (get bh) >>= \s -> return $ Incoherent s
+            3 -> (get bh) >>= \s -> return $ Overlapping s
+            4 -> (get bh) >>= \s -> return $ Overlappable s
+            _ -> panic ("get OverlapMode" ++ show h)
+
+
+instance Binary OverlapFlag where
+    put_ bh flag = do put_ bh (overlapMode flag)
+                      put_ bh (isSafeOverlap flag)
+    get bh = do
+        h <- get bh
+        b <- get bh
+        return OverlapFlag { overlapMode = h, isSafeOverlap = b }
+
 pprSafeOverlap :: Bool -> SDoc
 pprSafeOverlap True  = text "[safe]"
 pprSafeOverlap False = empty
@@ -888,6 +811,18 @@ instance Outputable TupleSort where
       BoxedTuple      -> "BoxedTuple"
       UnboxedTuple    -> "UnboxedTuple"
       ConstraintTuple -> "ConstraintTuple"
+
+instance Binary TupleSort where
+    put_ bh BoxedTuple      = putByte bh 0
+    put_ bh UnboxedTuple    = putByte bh 1
+    put_ bh ConstraintTuple = putByte bh 2
+    get bh = do
+      h <- getByte bh
+      case h of
+        0 -> do return BoxedTuple
+        1 -> do return UnboxedTuple
+        _ -> do return ConstraintTuple
+
 
 tupleSortBoxity :: TupleSort -> Boxity
 tupleSortBoxity BoxedTuple      = Boxed
@@ -1226,83 +1161,6 @@ failed Failed    = True
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Source Text}
-*                                                                      *
-************************************************************************
-Keeping Source Text for source to source conversions
-
-Note [Pragma source text]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-The lexer does a case-insensitive match for pragmas, as well as
-accepting both UK and US spelling variants.
-
-So
-
-  {-# SPECIALISE #-}
-  {-# SPECIALIZE #-}
-  {-# Specialize #-}
-
-will all generate ITspec_prag token for the start of the pragma.
-
-In order to be able to do source to source conversions, the original
-source text for the token needs to be preserved, hence the
-`SourceText` field.
-
-So the lexer will then generate
-
-  ITspec_prag "{ -# SPECIALISE"
-  ITspec_prag "{ -# SPECIALIZE"
-  ITspec_prag "{ -# Specialize"
-
-for the cases above.
- [without the space between '{' and '-', otherwise this comment won't parse]
-
-
-Note [Literal source text]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-The lexer/parser converts literals from their original source text
-versions to an appropriate internal representation. This is a problem
-for tools doing source to source conversions, so the original source
-text is stored in literals where this can occur.
-
-Motivating examples for HsLit
-
-  HsChar          '\n'       == '\x20`
-  HsCharPrim      '\x41`#    == `A`
-  HsString        "\x20\x41" == " A"
-  HsStringPrim    "\x20"#    == " "#
-  HsInt           001        == 1
-  HsIntPrim       002#       == 2#
-  HsWordPrim      003##      == 3##
-  HsInt64Prim     004##      == 4##
-  HsWord64Prim    005##      == 5##
-  HsInteger       006        == 6
-
-For OverLitVal
-
-  HsIntegral      003      == 0x003
-  HsIsString      "\x41nd" == "And"
--}
-
- -- Note [Literal source text],[Pragma source text]
-data SourceText = SourceText String
-                | NoSourceText -- ^ For when code is generated, e.g. TH,
-                               -- deriving. The pretty printer will then make
-                               -- its own representation of the item.
-                deriving (Data, Show, Eq )
-
-instance Outputable SourceText where
-  ppr (SourceText s) = text "SourceText" <+> text s
-  ppr NoSourceText   = text "NoSourceText"
-
--- | Special combinator for showing string literals.
-pprWithSourceText :: SourceText -> SDoc -> SDoc
-pprWithSourceText NoSourceText     d = d
-pprWithSourceText (SourceText src) _ = text src
-
-{-
-************************************************************************
-*                                                                      *
 \subsection{Activation}
 *                                                                      *
 ************************************************************************
@@ -1624,9 +1482,46 @@ instance Outputable Activation where
    ppr (ActiveAfter  _ n) = brackets (int n)
    ppr FinalActive        = text "[final]"
 
+instance Binary Activation where
+    put_ bh NeverActive = do
+            putByte bh 0
+    put_ bh FinalActive = do
+            putByte bh 1
+    put_ bh AlwaysActive = do
+            putByte bh 2
+    put_ bh (ActiveBefore src aa) = do
+            putByte bh 3
+            put_ bh src
+            put_ bh aa
+    put_ bh (ActiveAfter src ab) = do
+            putByte bh 4
+            put_ bh src
+            put_ bh ab
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do return NeverActive
+              1 -> do return FinalActive
+              2 -> do return AlwaysActive
+              3 -> do src <- get bh
+                      aa <- get bh
+                      return (ActiveBefore src aa)
+              _ -> do src <- get bh
+                      ab <- get bh
+                      return (ActiveAfter src ab)
+
+
 instance Outputable RuleMatchInfo where
    ppr ConLike = text "CONLIKE"
    ppr FunLike = text "FUNLIKE"
+
+instance Binary RuleMatchInfo where
+    put_ bh FunLike = putByte bh 0
+    put_ bh ConLike = putByte bh 1
+    get bh = do
+            h <- getByte bh
+            if h == 1 then return ConLike
+                      else return FunLike
 
 instance Outputable InlineSpec where
    ppr Inline           = text "INLINE"
@@ -1634,8 +1529,39 @@ instance Outputable InlineSpec where
    ppr Inlinable        = text "INLINABLE"
    ppr NoUserInlinePrag = empty
 
+instance Binary InlineSpec where
+    put_ bh NoUserInlinePrag = putByte bh 0
+    put_ bh Inline           = putByte bh 1
+    put_ bh Inlinable        = putByte bh 2
+    put_ bh NoInline         = putByte bh 3
+
+    get bh = do h <- getByte bh
+                case h of
+                  0 -> return NoUserInlinePrag
+                  1 -> return Inline
+                  2 -> return Inlinable
+                  _ -> return NoInline
+
+
 instance Outputable InlinePragma where
   ppr = pprInline
+
+instance Binary InlinePragma where
+    put_ bh (InlinePragma s a b c d) = do
+            put_ bh s
+            put_ bh a
+            put_ bh b
+            put_ bh c
+            put_ bh d
+
+    get bh = do
+           s <- get bh
+           a <- get bh
+           b <- get bh
+           c <- get bh
+           d <- get bh
+           return (InlinePragma s a b c d)
+
 
 pprInline :: InlinePragma -> SDoc
 pprInline = pprInline' True
@@ -1662,99 +1588,6 @@ pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
               | otherwise      = ppr info
 
 
-
-{- *********************************************************************
-*                                                                      *
-                 Integer literals
-*                                                                      *
-********************************************************************* -}
-
--- | Integral Literal
---
--- Used (instead of Integer) to represent negative zegative zero which is
--- required for NegativeLiterals extension to correctly parse `-0::Double`
--- as negative zero. See also #13211.
-data IntegralLit
-  = IL { il_text :: SourceText
-       , il_neg :: Bool -- See Note [Negative zero]
-       , il_value :: Integer
-       }
-  deriving (Data, Show)
-
-mkIntegralLit :: Integral a => a -> IntegralLit
-mkIntegralLit i = IL { il_text = SourceText (show i_integer)
-                     , il_neg = i < 0
-                     , il_value = i_integer }
-  where
-    i_integer :: Integer
-    i_integer = toInteger i
-
-negateIntegralLit :: IntegralLit -> IntegralLit
-negateIntegralLit (IL text neg value)
-  = case text of
-      SourceText ('-':src) -> IL (SourceText src)       False    (negate value)
-      SourceText      src  -> IL (SourceText ('-':src)) True     (negate value)
-      NoSourceText         -> IL NoSourceText          (not neg) (negate value)
-
--- | Fractional Literal
---
--- Used (instead of Rational) to represent exactly the floating point literal that we
--- encountered in the user's source program. This allows us to pretty-print exactly what
--- the user wrote, which is important e.g. for floating point numbers that can't represented
--- as Doubles (we used to via Double for pretty-printing). See also #2245.
-data FractionalLit
-  = FL { fl_text :: SourceText     -- How the value was written in the source
-       , fl_neg :: Bool            -- See Note [Negative zero]
-       , fl_value :: Rational      -- Numeric value of the literal
-       }
-  deriving (Data, Show)
-  -- The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on
-
-mkFractionalLit :: Real a => a -> FractionalLit
-mkFractionalLit r = FL { fl_text = SourceText (show (realToFrac r::Double))
-                           -- Converting to a Double here may technically lose
-                           -- precision (see #15502). We could alternatively
-                           -- convert to a Rational for the most accuracy, but
-                           -- it would cause Floats and Doubles to be displayed
-                           -- strangely, so we opt not to do this. (In contrast
-                           -- to mkIntegralLit, where we always convert to an
-                           -- Integer for the highest accuracy.)
-                       , fl_neg = r < 0
-                       , fl_value = toRational r }
-
-negateFractionalLit :: FractionalLit -> FractionalLit
-negateFractionalLit (FL text neg value)
-  = case text of
-      SourceText ('-':src) -> FL (SourceText src)     False value
-      SourceText      src  -> FL (SourceText ('-':src)) True  value
-      NoSourceText         -> FL NoSourceText (not neg) (negate value)
-
-integralFractionalLit :: Bool -> Integer -> FractionalLit
-integralFractionalLit neg i = FL { fl_text = SourceText (show i),
-                                   fl_neg = neg,
-                                   fl_value = fromInteger i }
-
--- Comparison operations are needed when grouping literals
--- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
-
-instance Eq IntegralLit where
-  (==) = (==) `on` il_value
-
-instance Ord IntegralLit where
-  compare = compare `on` il_value
-
-instance Outputable IntegralLit where
-  ppr (IL (SourceText src) _ _) = text src
-  ppr (IL NoSourceText _ value) = text (show value)
-
-instance Eq FractionalLit where
-  (==) = (==) `on` fl_value
-
-instance Ord FractionalLit where
-  compare = compare `on` fl_value
-
-instance Outputable FractionalLit where
-  ppr f = pprWithSourceText (fl_text f) (rational (fl_value f))
 
 {-
 ************************************************************************
