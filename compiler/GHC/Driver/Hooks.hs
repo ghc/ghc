@@ -31,34 +31,46 @@ where
 
 import GHC.Prelude
 
+import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Pipeline.Monad
-import GHC.Driver.Types
+
 import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr
-import GHC.Tc.Types
-import GHC.Data.Bag
+import GHC.Hs.Extension
+
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Id
-import GHC.Core
-import GHCi.RemoteTypes
 import GHC.Types.SrcLoc
-import GHC.Core.Type
-import System.Process
 import GHC.Types.Basic
-import GHC.Unit.Module
-import GHC.Core.TyCon
 import GHC.Types.CostCentre
+import GHC.Types.Meta
+import GHC.Types.HpcInfo
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Home.ModInfo
+
+import GHC.Core
+import GHC.Core.TyCon
+import GHC.Core.Type
+
+import GHC.Tc.Types
 import GHC.Stg.Syntax
-import GHC.Data.Stream
-import GHC.Cmm
-import GHC.Hs.Extension
 import GHC.StgToCmm.Types (ModuleLFInfos)
+import GHC.Cmm
+
+import GHCi.RemoteTypes
+
+import GHC.Data.Stream
+import GHC.Data.Bag
 
 import Data.Maybe
 import qualified Data.Kind
+import System.Process
 
 {-
 ************************************************************************

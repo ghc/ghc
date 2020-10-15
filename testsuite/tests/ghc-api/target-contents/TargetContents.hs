@@ -14,7 +14,8 @@ import Data.Time.Calendar
 import Data.Time.Clock
 import GHC.Utils.Exception
 import GHC.Parser.Header
-import GHC.Driver.Types
+import GHC.Types.Target
+import GHC.Types.SourceError
 import GHC.Utils.Outputable
 import GHC.Data.StringBuffer
 import System.Directory

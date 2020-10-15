@@ -26,7 +26,8 @@ import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
 import GHC.Rename.Unbound ( isUnboundName )
 import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
-import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, SourceText(..) )
+import GHC.Types.Basic    ( TopLevelFlag, isTopLevel )
+import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Utils.Outputable
 import GHC.Unit.Module
 import GHC.Types.SrcLoc

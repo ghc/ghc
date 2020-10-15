@@ -56,7 +56,6 @@ import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
 import GHC.Iface.Env
 import GHC.Hs
 import GHC.Types.Name.Reader
-import GHC.Driver.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Parser.PostProcess ( setRdrNameSpace )
@@ -67,12 +66,14 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
 import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Warnings  ( WarningTxt, pprWarningTxtForMsg )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Error  ( MsgDoc )
 import GHC.Builtin.Names( rOOT_MAIN )
-import GHC.Types.Basic  ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )
+import GHC.Types.Basic  ( TopLevelFlag(..), TupleSort(..) )
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique.Set ( uniqSetAny )

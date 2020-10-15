@@ -17,10 +17,13 @@ module GHC.Iface.Tidy (
 
 import GHC.Prelude
 
-import GHC.Tc.Types
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Ppr
+import GHC.Driver.Env
+
+import GHC.Tc.Types
+
 import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
@@ -34,36 +37,47 @@ import GHC.Core.Rules
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Core.Opt.Arity   ( exprArity, exprBotStrictness_maybe )
+import GHC.Core.InstEnv
+import GHC.Core.Type     ( tidyTopType )
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.Class
+
 import GHC.Iface.Tidy.StaticPtrTable
+import GHC.Iface.Env
+
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Monad
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc( filterOut )
+import GHC.Utils.Panic
+import qualified GHC.Utils.Error as Err
+
+import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Make ( mkDictSelRhs )
 import GHC.Types.Id.Info
-import GHC.Core.InstEnv
-import GHC.Core.Type     ( tidyTopType )
 import GHC.Types.Demand  ( appIsDeadEnd, isTopSig, isDeadEndSig )
 import GHC.Types.Cpr     ( mkCprSig, botCpr )
 import GHC.Types.Basic
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Name.Set
 import GHC.Types.Name.Cache
+import GHC.Types.Name.Ppr
 import GHC.Types.Avail
-import GHC.Iface.Env
-import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Monad
-import GHC.Core.DataCon
-import GHC.Core.TyCon
-import GHC.Core.Class
-import GHC.Unit.Module
-import GHC.Driver.Types
-import GHC.Data.Maybe
 import GHC.Types.Unique.Supply
-import GHC.Utils.Outputable
-import GHC.Utils.Misc( filterOut )
-import GHC.Utils.Panic
-import qualified GHC.Utils.Error as Err
+import GHC.Types.TypeEnv
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.Deps
+
+import GHC.Data.Maybe
 
 import Control.Monad
 import Data.Function
