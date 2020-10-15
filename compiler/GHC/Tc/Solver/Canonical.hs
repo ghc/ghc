@@ -2275,10 +2275,14 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
                             | (arg1, arg2, True) <- zip3 fun_args1 fun_args2 inj ]
             | otherwise -> return ()
 
-       ; let tvs2 = tyCoVarsOfTypes fun_args2
+       ; let tvs1 = tyCoVarsOfTypes fun_args1
+             tvs2 = tyCoVarsOfTypes fun_args2
        ; tclvl <- getTcLevel
-       ; if anyVarSet (isTouchableMetaTyVar tclvl) tvs2
+       ; if anyVarSet (isTouchableMetaTyVar tclvl) tvs2 &&
             -- swap 'em: Note [Put touchable variables on the left]
+            not (anyVarSet (isTouchableMetaTyVar tclvl) tvs1)
+              -- this check is just to avoid unfruitful swapping
+
          then do { new_ev <- do_swap
                  ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
          else finish_without_swapping }
