@@ -3,8 +3,8 @@
 module InlinePatSyn_InlineMatcher where
 
 -- Pattern with "INLINE" pragma, both builder and matcher should be inlined
-pattern InlineablePattern a = [[[[a]]]]
-{-# INLINE InlineablePattern #-}
+pattern InlinePattern a = [[[[a]]]]
+{-# INLINE InlinePattern #-}
 
-testInMatcher (InlineablePattern x) = 1
+testInMatcher (InlinePattern x) = 1
 testInMatcher _ = 2
