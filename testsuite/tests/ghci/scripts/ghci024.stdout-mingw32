@@ -14,7 +14,6 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
 warning settings:
   -Wsemigroup
-  -Wnoncanonical-monoid-instances
   -Wstar-is-type
   -Wcompat-unqualified-imports
 ~~~~~~~~~~ Testing :set -a
