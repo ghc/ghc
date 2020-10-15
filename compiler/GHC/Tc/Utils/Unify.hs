@@ -37,7 +37,7 @@ module GHC.Tc.Utils.Unify (
   matchActualFunTySigma, matchActualFunTysRho,
 
   metaTyVarUpdateOK, occCheckForErrors, MetaTyVarUpdateResult(..),
-  checkTypeEq
+  checkTyVarEq, checkTypeEq, AreTypeFamiliesOK(..)
 
   ) where
 
@@ -1434,8 +1434,7 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
     go dflags cur_lvl
       | canSolveByUnification cur_lvl tv1 ty2
            -- See Note [Prevent unification with type families] about the False:
-      , MTVU_OK ty2' <- metaTyVarUpdateOK dflags False
-                                          tv1 ty2
+      , MTVU_OK ty2' <- metaTyVarUpdateOK dflags NoTypeFamilies tv1 ty2
       = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
@@ -1961,7 +1960,7 @@ occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
 --   a) the given variable occurs in the given type.
 --   b) there is a forall in the type (unless we have -XImpredicativeTypes)
 occCheckForErrors dflags tv ty
-  = case checkTyVarEq dflags True tv ty of
+  = case checkTyVarEq dflags YesTypeFamilies tv ty of
       MTVU_OK _        -> MTVU_OK ()
       MTVU_Bad         -> MTVU_Bad
       MTVU_HoleBlocker -> MTVU_HoleBlocker
@@ -1970,8 +1969,16 @@ occCheckForErrors dflags tv ty
                             Just _  -> MTVU_OK ()
 
 ----------------
+data AreTypeFamiliesOK = YesTypeFamilies
+                       | NoTypeFamilies
+                       deriving Eq
+
+instance Outputable AreTypeFamiliesOK where
+  ppr YesTypeFamilies = text "YesTypeFamilies"
+  ppr NoTypeFamilies  = text "NoTypeFamilies"
+
 metaTyVarUpdateOK :: DynFlags
-                  -> Bool                -- True <=> allow type families in RHS
+                  -> AreTypeFamiliesOK   -- allow type families in RHS?
                   -> TcTyVar             -- tv :: k1
                   -> TcType              -- ty :: k2
                   -> MetaTyVarUpdateResult TcType        -- possibly-expanded ty
@@ -2015,12 +2022,12 @@ metaTyVarUpdateOK dflags ty_fam_ok tv ty
                             Just expanded_ty -> MTVU_OK expanded_ty
                             Nothing          -> MTVU_Occurs
 
-checkTyVarEq :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
+checkTyVarEq :: DynFlags -> AreTypeFamiliesOK -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 checkTyVarEq dflags ty_fam_ok tv ty
   = inline checkTypeEq dflags ty_fam_ok (TyVarLHS tv) ty
     -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
 
-checkTypeEq :: DynFlags -> Bool -> CanEqLHS -> TcType -> MetaTyVarUpdateResult ()
+checkTypeEq :: DynFlags -> AreTypeFamiliesOK -> CanEqLHS -> TcType -> MetaTyVarUpdateResult ()
 -- Checks the invariants for CEqCan.   In particular:
 --   (a) a forall type (forall a. blah)
 --   (b) a predicate type (c => ty)
@@ -2119,4 +2126,4 @@ checkTypeEq dflags ty_fam_ok lhs ty
     good_tc
       | ghci_tv   = \ _tc -> True
       | otherwise = \ tc  -> isTauTyCon tc &&
-                             (ty_fam_ok || isFamFreeTyCon tc)
+                             (ty_fam_ok == YesTypeFamilies || isFamFreeTyCon tc)
