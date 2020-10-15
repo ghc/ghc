@@ -61,8 +61,6 @@ module GHC.Settings
   , sGhcWithSMP
   , sGhcRTSWays
   , sLibFFI
-  , sGhcThreaded
-  , sGhcDebugged
   , sGhcRtsWithLibdw
   ) where
 
@@ -276,9 +274,5 @@ sGhcRTSWays :: Settings -> String
 sGhcRTSWays = platformMisc_ghcRTSWays . sPlatformMisc
 sLibFFI :: Settings -> Bool
 sLibFFI = platformMisc_libFFI . sPlatformMisc
-sGhcThreaded :: Settings -> Bool
-sGhcThreaded = platformMisc_ghcThreaded . sPlatformMisc
-sGhcDebugged :: Settings -> Bool
-sGhcDebugged = platformMisc_ghcDebugged . sPlatformMisc
 sGhcRtsWithLibdw :: Settings -> Bool
 sGhcRtsWithLibdw = platformMisc_ghcRtsWithLibdw . sPlatformMisc

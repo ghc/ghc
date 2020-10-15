@@ -209,8 +209,6 @@ data PlatformMisc = PlatformMisc
   , platformMisc_ghcWithSMP           :: Bool
   , platformMisc_ghcRTSWays           :: String
   , platformMisc_libFFI               :: Bool
-  , platformMisc_ghcThreaded          :: Bool
-  , platformMisc_ghcDebugged          :: Bool
   , platformMisc_ghcRtsWithLibdw      :: Bool
   , platformMisc_llvmTarget           :: String
   }
