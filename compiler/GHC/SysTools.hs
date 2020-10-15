@@ -244,14 +244,7 @@ linkDynLib dflags0 o_files dep_packages
         -- against libHSrts, then both end up getting loaded,
         -- and things go wrong. We therefore link the libraries
         -- with the same RTS flags that we link GHC with.
-        dflags1 = if platformMisc_ghcThreaded $ platformMisc dflags0
-          then addWay' WayThreaded dflags0
-          else                     dflags0
-        win_dflags = if platformMisc_ghcDebugged $ platformMisc dflags1
-          then addWay' WayDebug dflags1
-          else                  dflags1
-
-        dflags | OSMinGW32 <- os = win_dflags
+        dflags | OSMinGW32 <- os = dflags0 { ways = hostWays }
                | otherwise       = dflags0
 
         verbFlags = getVerbFlags dflags
