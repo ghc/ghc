@@ -49,6 +49,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types( mkBoxedTupleTy )
+import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set

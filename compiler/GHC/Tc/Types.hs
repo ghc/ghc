@@ -87,23 +87,30 @@ module GHC.Tc.Types(
 import GHC.Prelude
 import GHC.Platform
 
+import GHC.Driver.Env
+import GHC.Driver.Session
+
 import GHC.Hs
-import GHC.Driver.Types
+
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
+import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
+
 import GHC.Core.Type
 import GHC.Core.TyCon  ( TyCon, tyConKind )
 import GHC.Core.PatSyn ( PatSyn )
 import GHC.Core.Lint   ( lintAxioms )
-import GHC.Types.Id         ( idType, idName )
-import GHC.Types.FieldLabel ( FieldLabel )
 import GHC.Core.UsageEnv
-import GHC.Tc.Utils.TcType
-import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Origin
-import GHC.Types.Annotations
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Data.IOEnv
+
+import GHC.Types.Id         ( idType, idName )
+import GHC.Types.FieldLabel ( FieldLabel )
+import GHC.Types.Fixity.Env
+import GHC.Types.Annotations
+import GHC.Types.CompleteMatch
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -111,26 +118,36 @@ import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Unit
+import GHC.Types.TypeEnv
+import GHC.Types.TyThing
+import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
-import GHC.Utils.Error
 import GHC.Types.Unique.FM
 import GHC.Types.Basic
+import GHC.Types.CostCentre.State
+import GHC.Types.HpcInfo
+
+import GHC.Data.IOEnv
 import GHC.Data.Bag
-import GHC.Driver.Session
-import GHC.Utils.Outputable
 import GHC.Data.List.SetOps
+
+import GHC.Unit
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.Imported
+import GHC.Unit.Module.ModDetails
+
+import GHC.Utils.Error
+import GHC.Utils.Outputable
 import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+
 import GHC.Builtin.Names ( isUnboundName )
-import GHC.Types.CostCentre.State
 
 import Control.Monad (ap)
 import Data.Set      ( Set )
 import qualified Data.Set as S
-
 import Data.List ( sort )
 import Data.Map ( Map )
 import Data.Dynamic  ( Dynamic )
@@ -138,8 +155,6 @@ import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
-
-import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
 
 import qualified Language.Haskell.TH as TH
 
@@ -297,7 +312,7 @@ data IfLclEnv
 -- module. Currently one always gets a 'FrontendTypecheck', since running the
 -- frontend involves typechecking a program. hs-sig merges are not handled here.
 --
--- This data type really should be in GHC.Driver.Types, but it needs
+-- This data type really should be in GHC.Driver.Env, but it needs
 -- to have a TcGblEnv which is only defined here.
 data FrontendResult
         = FrontendTypecheck TcGblEnv
@@ -367,7 +382,7 @@ data TcGblEnv
 
         tcg_fix_env   :: FixityEnv,     -- ^ Just for things in this module
         tcg_field_env :: RecFieldEnv,   -- ^ Just for things in this module
-                                        -- See Note [The interactive package] in "GHC.Driver.Types"
+                                        -- See Note [The interactive package] in "GHC.Runtime.Context"
 
         tcg_type_env :: TypeEnv,
           -- ^ Global type env for the module we are compiling now.  All
@@ -378,7 +393,7 @@ data TcGblEnv
           --  move to the global envt during zonking)
           --
           -- NB: for what "things in this module" means, see
-          -- Note [The interactive package] in "GHC.Driver.Types"
+          -- Note [The interactive package] in "GHC.Runtime.Context"
 
         tcg_type_env_var :: TcRef TypeEnv,
                 -- Used only to initialise the interface-file
@@ -501,7 +516,8 @@ data TcGblEnv
 
         -- Things defined in this module, or (in GHCi)
         -- in the declarations for a single GHCi command.
-        -- For the latter, see Note [The interactive package] in GHC.Driver.Types
+        -- For the latter, see Note [The interactive package] in
+        -- GHC.Runtime.Context
         tcg_tr_module :: Maybe Id,   -- Id for $trModule :: GHC.Unit.Module
                                              -- for which every module has a top-level defn
                                              -- except in GHCi in which case we have Nothing
@@ -1285,8 +1301,8 @@ data ImportAvails
           --      = ModuleEnv [ImportedModsVal],
           -- ^ Domain is all directly-imported modules
           --
-          -- See the documentation on ImportedModsVal in "GHC.Driver.Types" for the
-          -- meaning of the fields.
+          -- See the documentation on ImportedModsVal in
+          -- "GHC.Unit.Module.Imported" for the meaning of the fields.
           --
           -- We need a full ModuleEnv rather than a ModuleNameEnv here,
           -- because we might be importing modules of the same name from

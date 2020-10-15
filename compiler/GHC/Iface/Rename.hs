@@ -18,35 +18,40 @@ module GHC.Iface.Rename (
 
 import GHC.Prelude
 
-import GHC.Types.SrcLoc
-import GHC.Utils.Outputable
-import GHC.Driver.Types
+import GHC.Driver.Session
+import GHC.Driver.Env
+
+import GHC.Tc.Utils.Monad
+
+import GHC.Iface.Syntax
+import GHC.Iface.Env
+import {-# SOURCE #-} GHC.Iface.Load -- a bit vexing
+
 import GHC.Unit
 import GHC.Unit.State
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Deps
+
+import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 import GHC.Types.Avail
-import GHC.Iface.Syntax
 import GHC.Types.FieldLabel
 import GHC.Types.Var
-import GHC.Utils.Error
-
+import GHC.Types.Basic
 import GHC.Types.Name
-import GHC.Tc.Utils.Monad
+import GHC.Types.Name.Shape
+
+import GHC.Utils.Error
+import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
-import GHC.Types.Basic
 
--- a bit vexing
-import {-# SOURCE #-} GHC.Iface.Load
-import GHC.Driver.Session
+import GHC.Data.Bag
 
 import qualified Data.Traversable as T
 
-import GHC.Data.Bag
 import Data.IORef
-import GHC.Types.Name.Shape
-import GHC.Iface.Env
 
 tcRnMsgMaybe :: IO (Either ErrorMessages a) -> TcM a
 tcRnMsgMaybe do_this = do

@@ -28,8 +28,11 @@ module GHC.Tc.TyCl (
 
 import GHC.Prelude
 
+import GHC.Driver.Env
+import GHC.Driver.Session
+
 import GHC.Hs
-import GHC.Driver.Types
+
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
                     , reportUnsolvedEqualities )
@@ -44,14 +47,17 @@ import GHC.Tc.Deriv (DerivInfo(..))
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
-import GHC.Builtin.Types (oneDataConTy,  unitTy, makeRecoveryTyCon )
 import GHC.Tc.Utils.TcType
-import GHC.Core.Multiplicity
-import GHC.Rename.Env( lookupConstructorFields )
 import GHC.Tc.Instance.Family
+import GHC.Tc.Types.Origin
+
+import GHC.Builtin.Types (oneDataConTy,  unitTy, makeRecoveryTyCon )
+
+import GHC.Rename.Env( lookupConstructorFields )
+
+import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
-import GHC.Tc.Types.Origin
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep   -- for checkValidRoles
 import GHC.Core.TyCo.Ppr( pprTyVars )
@@ -59,26 +65,30 @@ import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCon
 import GHC.Core.DataCon
+import GHC.Core.Unify
+
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Data.FastString
-import GHC.Unit
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Data.Maybe
-import GHC.Core.Unify
-import GHC.Utils.Misc
 import GHC.Types.SrcLoc
-import GHC.Data.List.SetOps
-import GHC.Driver.Session
+import GHC.Types.SourceFile
 import GHC.Types.Unique
 import GHC.Types.Basic
 import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Data.FastString
+import GHC.Data.Maybe
+import GHC.Data.List.SetOps
+
+import GHC.Unit
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
 
 import Control.Monad
 import Data.Function ( on )
