@@ -3,7 +3,7 @@
 module InlinePatSyn_NoInlineBuilder where
 
 -- Pattern with "NOINLINE" pragma, neither builder nor matcher should be inlined
-pattern NonInlineablePattern a = Left a
-{-# NOINLINE NonInlineablePattern #-}
+pattern NonInlinablePattern a = Left a
+{-# NOINLINE NonInlinablePattern #-}
 
-testNonBuilder x = NonInlineablePattern (x+1)
+testNonBuilder x = NonInlinablePattern (x+1)
