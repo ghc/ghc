@@ -1973,7 +1973,8 @@ buildSynTyCon name binders res_kind roles rhs
   where
     is_tau       = isTauTy rhs
     is_fam_free  = isFamFreeTy rhs
-    is_forgetful = any (not . (`elemVarSet` tyCoVarsOfType rhs) . binderVar) binders
+    is_forgetful = any (not . (`elemVarSet` tyCoVarsOfType rhs) . binderVar) binders ||
+                   uniqSetAny isForgetfulSynTyCon (tyConsOfType rhs)
 
 {-
 ************************************************************************

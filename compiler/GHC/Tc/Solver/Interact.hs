@@ -2440,7 +2440,7 @@ matchClassInst dflags inerts clas tys loc
 -- First check whether there is an in-scope Given that could
 -- match this constraint.  In that case, do not use any instance
 -- whether top level, or local quantified constraints.
--- ee Note [Instance and Given overlap]
+-- See Note [Instance and Given overlap]
   | not (xopt LangExt.IncoherentInstances dflags)
   , not (naturallyCoherentClass clas)
   , let matchable_givens = matchableGivens loc pred inerts
