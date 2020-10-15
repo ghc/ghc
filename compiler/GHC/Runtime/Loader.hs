@@ -21,38 +21,45 @@ module GHC.Runtime.Loader (
     ) where
 
 import GHC.Prelude
+
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Hooks
+import GHC.Driver.Plugins
 
 import GHC.Runtime.Linker      ( linkModule, getHValue )
 import GHC.Runtime.Interpreter ( wormhole, withInterp )
 import GHC.Runtime.Interpreter.Types
-import GHC.Types.SrcLoc        ( noSrcSpan )
-import GHC.Driver.Finder       ( findPluginModule, cannotFindModule )
+
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
 import GHC.Iface.Load          ( loadPluginInterface )
+import GHC.Rename.Names ( gresFromAvails )
+import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
+
+import GHC.Driver.Env
+import GHCi.RemoteTypes  ( HValue )
+import GHC.Core.Type     ( Type, eqType, mkTyConTy )
+import GHC.Core.TyCon    ( TyCon )
+
+import GHC.Types.SrcLoc        ( noSrcSpan )
+import GHC.Types.Name    ( Name, nameModule_maybe )
+import GHC.Types.Id      ( idType )
+import GHC.Types.TyThing
+import GHC.Types.Name.Occurrence ( OccName, mkVarOcc )
 import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                                , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
                                , gre_name, mkRdrQual )
-import GHC.Types.Name.Occurrence ( OccName, mkVarOcc )
-import GHC.Rename.Names ( gresFromAvails )
-import GHC.Driver.Plugins
-import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
 
-import GHC.Driver.Types
-import GHCi.RemoteTypes  ( HValue )
-import GHC.Core.Type     ( Type, eqType, mkTyConTy )
-import GHC.Core.TyCo.Ppr ( pprTyThingCategory )
-import GHC.Core.TyCon    ( TyCon )
-import GHC.Types.Name    ( Name, nameModule_maybe )
-import GHC.Types.Id      ( idType )
+import GHC.Unit.Finder         ( findPluginModule, cannotFindModule, FindResult(..) )
 import GHC.Unit.Module   ( Module, ModuleName )
+import GHC.Unit.Module.ModIface
+
 import GHC.Utils.Panic
-import GHC.Data.FastString
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Exception
-import GHC.Driver.Hooks
+
+import GHC.Data.FastString
 
 import Control.Monad     ( unless )
 import Data.Maybe        ( mapMaybe )

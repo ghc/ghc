@@ -33,7 +33,7 @@ module GHC.Plugins
    , module GHC.Core.TyCon
    , module GHC.Core.Coercion
    , module GHC.Builtin.Types
-   , module GHC.Driver.Types
+   , module GHC.Driver.Env
    , module GHC.Types.Basic
    , module GHC.Types.Var.Set
    , module GHC.Types.Var.Env
@@ -51,6 +51,11 @@ module GHC.Plugins
    , module GHC.Types.Unique.Supply
    , module GHC.Data.FastString
    , module GHC.Tc.Errors.Hole.FitTypes   -- for hole-fit plugins
+   , module GHC.Unit.Module.ModGuts
+   , module GHC.Unit.Module.ModSummary
+   , module GHC.Unit.Module.ModIface
+   , module GHC.Types.Meta
+   , module GHC.Types.SourceError
    , -- * Getting 'Name's
      thNameToGhcName
    )
@@ -60,6 +65,8 @@ where
 import GHC.Driver.Plugins
 
 -- Variable naming
+import GHC.Types.TyThing
+import GHC.Types.SourceError
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence  hiding  ( varName {- conflicts with Var.varName -} )
 import GHC.Types.Name     hiding  ( varName {- reexport from OccName, conflicts with Var.varName -} )
@@ -78,23 +85,24 @@ import GHC.Core.FVs
 import GHC.Core.Subst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst )
        -- These names are also exported by Type
 
--- Core "extras"
 import GHC.Core.Rules
 import GHC.Types.Annotations
+import GHC.Types.Meta
 
--- Pipeline-related stuff
 import GHC.Driver.Session
 import GHC.Unit.State
 
--- Important GHC types
 import GHC.Unit.Module
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.ModIface
 import GHC.Core.Type hiding {- conflict with GHC.Core.Subst -}
                 ( substTy, extendTvSubst, extendTvSubstList, isInScope )
 import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
                 ( substCo )
 import GHC.Core.TyCon
 import GHC.Builtin.Types
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHC.Types.Basic
 
 -- Collections and maps

@@ -15,19 +15,22 @@ where
 
 import GHC.Prelude
 
-import GHC.Utils.Outputable
-import GHC.Driver.Types
+import GHC.Driver.Env
+
 import GHC.Unit.Module
+
 import GHC.Types.Unique.FM
 import GHC.Types.Avail
 import GHC.Types.FieldLabel
-
 import GHC.Types.Name
 import GHC.Types.Name.Env
+
 import GHC.Tc.Utils.Monad
+import GHC.Iface.Env
+
+import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Iface.Env
 
 import Control.Monad
 

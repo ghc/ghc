@@ -226,7 +226,7 @@ instance Outputable FamInst where
 pprFamInst :: FamInst -> SDoc
 -- Prints the FamInst as a family instance declaration
 -- NB: This function, FamInstEnv.pprFamInst, is used only for internal,
---     debug printing. See GHC.Core.Ppr.TyThing.pprFamInst for printing for the user
+--     debug printing. See GHC.Types.TyThing.Ppr.pprFamInst for printing for the user
 pprFamInst (FamInst { fi_flavor = flavor, fi_axiom = ax
                     , fi_tvs = tvs, fi_tys = tys, fi_rhs = rhs })
   = hang (ppr_tc_sort <+> text "instance"

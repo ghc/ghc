@@ -54,7 +54,7 @@ import GHC.HsToCore.Pmc.Ppr
 import GHC.Types.Basic (Origin(..))
 import GHC.Core (CoreExpr)
 import GHC.Driver.Session
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHC.Hs
 import GHC.Types.Id
 import GHC.Types.SrcLoc

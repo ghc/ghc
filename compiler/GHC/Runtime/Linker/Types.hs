@@ -6,26 +6,35 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Runtime.Linker.Types (
-      DynLinker(..),
-      PersistentLinkerState(..),
-      Linkable(..),
-      Unlinked(..),
-      SptEntry(..)
-    ) where
+module GHC.Runtime.Linker.Types
+   ( DynLinker(..)
+   , PersistentLinkerState(..)
+   , Linkable(..)
+   , Unlinked(..)
+   , SptEntry(..)
+   , isObjectLinkable
+   , linkableObjs
+   , isObject
+   , nameOfObject
+   , isInterpretable
+   , byteCodeOfObject
+   )
+where
 
-import GHC.Prelude             ( FilePath, String, show )
+import GHC.Prelude
 import Data.Time               ( UTCTime )
-import Data.Maybe              ( Maybe )
 import Control.Concurrent.MVar ( MVar )
 import GHC.Unit                ( UnitId, Module )
 import GHC.ByteCode.Types      ( ItblEnv, CompiledByteCode )
-import GHC.Utils.Outputable
-import GHC.Types.Var           ( Id )
 import GHC.Fingerprint.Type    ( Fingerprint )
+import GHCi.RemoteTypes        ( ForeignHValue )
+
+import GHC.Types.Var           ( Id )
 import GHC.Types.Name.Env      ( NameEnv )
 import GHC.Types.Name          ( Name )
-import GHCi.RemoteTypes        ( ForeignHValue )
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 type ClosureEnv = NameEnv (Name, ForeignHValue)
 
@@ -106,3 +115,39 @@ data SptEntry = SptEntry Id Fingerprint
 instance Outputable SptEntry where
   ppr (SptEntry id fpr) = ppr id <> colon <+> ppr fpr
 
+
+isObjectLinkable :: Linkable -> Bool
+isObjectLinkable l = not (null unlinked) && all isObject unlinked
+  where unlinked = linkableUnlinked l
+        -- A linkable with no Unlinked's is treated as a BCO.  We can
+        -- generate a linkable with no Unlinked's as a result of
+        -- compiling a module in NoBackend mode, and this choice
+        -- happens to work well with checkStability in module GHC.
+
+linkableObjs :: Linkable -> [FilePath]
+linkableObjs l = [ f | DotO f <- linkableUnlinked l ]
+
+-------------------------------------------
+
+-- | Is this an actual file on disk we can link in somehow?
+isObject :: Unlinked -> Bool
+isObject (DotO _)   = True
+isObject (DotA _)   = True
+isObject (DotDLL _) = True
+isObject _          = False
+
+-- | Is this a bytecode linkable with no file on disk?
+isInterpretable :: Unlinked -> Bool
+isInterpretable = not . isObject
+
+-- | Retrieve the filename of the linkable if possible. Panic if it is a byte-code object
+nameOfObject :: Unlinked -> FilePath
+nameOfObject (DotO fn)   = fn
+nameOfObject (DotA fn)   = fn
+nameOfObject (DotDLL fn) = fn
+nameOfObject other       = pprPanic "nameOfObject" (ppr other)
+
+-- | Retrieve the compiled byte-code if possible. Panic if it is a file-based linkable
+byteCodeOfObject :: Unlinked -> CompiledByteCode
+byteCodeOfObject (BCOs bc _) = bc
+byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)

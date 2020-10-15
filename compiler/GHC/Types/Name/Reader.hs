@@ -1061,7 +1061,7 @@ There are two reasons for shadowing:
     So when we add `x = True` we must not delete the `M.x` from the
     `GlobalRdrEnv`; rather we just want to make it "qualified only";
     hence the `mk_fake-imp_spec` in `shadowName`.  See also Note
-    [Interactively-bound Ids in GHCi] in GHC.Driver.Types
+    [Interactively-bound Ids in GHCi] in GHC.Runtime.Context
 
   - Data types also have External Names, like Ghci4.T; but we still want
     'T' to mean the newly-declared 'T', not an old one.
