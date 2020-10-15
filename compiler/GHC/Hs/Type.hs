@@ -87,6 +87,7 @@ import {-# SOURCE #-} GHC.Hs.Expr ( HsSplice, pprSplice )
 import GHC.Hs.Extension
 
 import GHC.Types.Id ( Id )
+import GHC.Types.SourceText
 import GHC.Types.Name( Name, NamedThing(getName) )
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),

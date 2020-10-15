@@ -6,19 +6,25 @@ where
 
 import GHC.Prelude
 
-import GHC.Data.FastString
+import GHC.Driver.Session
+
+import GHC.Tc.Types.Evidence
+
+import GHC.Unit
+
+import GHC.Builtin.Names
+
 import GHC.Core.Type
 import GHC.Core
 import GHC.Core.Make
-import GHC.Types.Literal ( Literal(..) )
-import GHC.Tc.Types.Evidence
-import GHC.Driver.Types
-import GHC.Driver.Session
-import GHC.Types.Name
-import GHC.Unit
 import GHC.Core.Utils
-import GHC.Builtin.Names
+
+import GHC.Types.Literal ( Literal(..) )
 import GHC.Types.SrcLoc
+import GHC.Types.Name
+import GHC.Types.TyThing
+
+import GHC.Data.FastString
 
 -- Used with Opt_DeferTypeErrors
 -- See Note [Deferring coercion errors to runtime]

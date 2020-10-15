@@ -11,7 +11,6 @@ import GHC.Hs.Doc
 import GHC.Hs.Expr
 import GHC.Hs.Extension
 import GHC.Hs.ImpExp
-import GHC.Driver.Types
 import GHC.Utils.Outputable
 import GHC.Driver.Plugins
 import System.Environment

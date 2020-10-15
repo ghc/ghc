@@ -42,6 +42,7 @@ import GHC.Tc.Utils.Monad
 
 import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Unit
+import GHC.Unit.Module.Warnings
 import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
                         , semigroupClassName, sappendName
@@ -59,7 +60,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
 import GHC.Utils.Misc   ( debugIsOn, lengthExceeds, partitionWith )
 import GHC.Utils.Panic
-import GHC.Driver.Types ( Warnings(..), plusWarns, HscEnv(..))
+import GHC.Driver.Env ( HscEnv(..))
 import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )

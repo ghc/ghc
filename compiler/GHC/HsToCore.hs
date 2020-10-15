@@ -20,55 +20,71 @@ module GHC.HsToCore (
 
 import GHC.Prelude
 
-import GHC.HsToCore.Usage
 import GHC.Driver.Session
 import GHC.Driver.Config
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHC.Driver.Backend
+
 import GHC.Hs
+
+import GHC.HsToCore.Usage
+import GHC.HsToCore.Monad
+import GHC.HsToCore.Expr
+import GHC.HsToCore.Binds
+import GHC.HsToCore.Foreign.Decl
+import GHC.HsToCore.Coverage
+import GHC.HsToCore.Docs
+
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances )
 import GHC.Tc.Module ( runTcInteractive )
-import GHC.Types.Id
-import GHC.Types.Id.Info
-import GHC.Types.Name
+
 import GHC.Core.Type
 import GHC.Core.TyCon     ( tyConDataCons )
-import GHC.Types.Avail
 import GHC.Core
 import GHC.Core.FVs       ( exprsSomeFreeVarsList )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
 import GHC.Core.Ppr
-import GHC.HsToCore.Monad
-import GHC.HsToCore.Expr
-import GHC.HsToCore.Binds
-import GHC.HsToCore.Foreign.Decl
-import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim
 import GHC.Core.Coercion
-import GHC.Builtin.Types
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
-import GHC.Unit
-import GHC.Types.Name.Set
-import GHC.Types.Name.Env
 import GHC.Core.Rules
-import GHC.Types.Basic
 import GHC.Core.Opt.Monad ( CoreToDo(..) )
 import GHC.Core.Lint     ( endPassIO )
-import GHC.Types.Var.Set
+
+import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types
+
 import GHC.Data.FastString
+import GHC.Data.OrdList
+
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc
-import GHC.HsToCore.Coverage
 import GHC.Utils.Misc
 import GHC.Utils.Monad
-import GHC.Data.OrdList
-import GHC.HsToCore.Docs
+
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.ForeignStubs
+import GHC.Types.Avail
+import GHC.Types.Basic
+import GHC.Types.Var.Set
+import GHC.Types.SrcLoc
+import GHC.Types.SourceFile
+import GHC.Types.TypeEnv
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Name.Env
+import GHC.Types.Name.Ppr
+import GHC.Types.HpcInfo
+
+import GHC.Unit
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModIface
 
 import Data.List
 import Data.IORef

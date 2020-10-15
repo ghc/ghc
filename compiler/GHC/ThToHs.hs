@@ -42,8 +42,10 @@ import GHC.Core.Type as Hs
 import qualified GHC.Core.Coercion as Coercion ( Role(..) )
 import GHC.Builtin.Types
 import GHC.Types.Basic as Hs
+import GHC.Types.Fixity as Hs
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
+import GHC.Types.SourceText
 import GHC.Utils.Error
 import GHC.Data.Bag
 import GHC.Utils.Lexeme

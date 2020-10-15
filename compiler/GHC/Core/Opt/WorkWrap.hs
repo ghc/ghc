@@ -26,6 +26,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Config
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.SourceText
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Utils.Misc
 import GHC.Utils.Outputable

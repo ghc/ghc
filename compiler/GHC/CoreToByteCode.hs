@@ -17,6 +17,9 @@ module GHC.CoreToByteCode ( UnlinkedBCO, byteCodeGen, coreExprToBCOs ) where
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+import GHC.Driver.Env
+
 import GHC.ByteCode.Instr
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
@@ -28,13 +31,11 @@ import GHC.Runtime.Interpreter
 import GHCi.FFI
 import GHCi.RemoteTypes
 import GHC.Types.Basic
-import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Id.Make
 import GHC.Types.Id
 import GHC.Types.ForeignCall
-import GHC.Driver.Types
 import GHC.Core.Utils
 import GHC.Core
 import GHC.Core.Ppr

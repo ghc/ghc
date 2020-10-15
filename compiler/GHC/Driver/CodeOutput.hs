@@ -17,33 +17,38 @@ where
 
 import GHC.Prelude
 import GHC.Platform
+import GHC.ForeignSrcLang
 
 import GHC.CmmToAsm     ( nativeCodeGen )
 import GHC.CmmToLlvm    ( llvmCodeGen )
 
-import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
-
-import GHC.Driver.Finder    ( mkStubPaths )
-import GHC.Driver.Backend
 import GHC.CmmToC           ( cmmToC )
 import GHC.Cmm.Lint         ( cmmLint )
 import GHC.Cmm              ( RawCmmGroup )
 import GHC.Cmm.CLabel
-import GHC.Driver.Types
+
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Backend
+
 import qualified GHC.Data.ShortText as ST
 import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
+
 import GHC.SysTools.FileCleanup
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
 import GHC.Unit
 import GHC.Unit.State
+import GHC.Unit.Finder      ( mkStubPaths )
+
 import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
+import GHC.Types.ForeignStubs
+import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 
 import Control.Exception
 import System.Directory

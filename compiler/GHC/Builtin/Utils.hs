@@ -50,31 +50,34 @@ module GHC.Builtin.Utils (
 import GHC.Prelude
 
 import GHC.Builtin.Uniques
-import GHC.Types.Unique ( isValidKnownKeyUnique )
-
-import GHC.Core.ConLike ( ConLike(..) )
+import GHC.Builtin.PrimOps
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Literals ( typeNatTyCons )
+import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names.TH ( templateHaskellNames )
 import GHC.Builtin.Names
+
+import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.Opt.ConstantFold
-import GHC.Types.Avail
-import GHC.Builtin.PrimOps
 import GHC.Core.DataCon
+import GHC.Core.Class
+import GHC.Core.TyCon
+
+import GHC.Types.Avail
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id.Make
-import GHC.Utils.Outputable
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
-import GHC.Driver.Types
-import GHC.Core.Class
-import GHC.Core.TyCon
 import GHC.Types.Unique.FM
+import GHC.Types.TyThing
+import GHC.Types.Unique ( isValidKnownKeyUnique )
+
+import GHC.Utils.Outputable
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Panic
-import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Hs.Doc
+import GHC.Unit.Module.ModIface (IfaceExport)
 
 import Control.Applicative ((<|>))
 import Data.List        ( intercalate , find )

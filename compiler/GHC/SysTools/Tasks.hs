@@ -9,26 +9,26 @@
 -----------------------------------------------------------------------------
 module GHC.SysTools.Tasks where
 
-import GHC.Utils.Exception as Exception
-import GHC.Utils.Error
-import GHC.Driver.Types
-import GHC.Driver.Session
-import GHC.Utils.Outputable
-import GHC.Platform
-import GHC.Utils.Misc
-
-import Data.List
-
-import System.IO
-import System.Process
 import GHC.Prelude
+import GHC.Platform
+import GHC.ForeignSrcLang
 
 import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersion, parseLlvmVersion)
 
 import GHC.SysTools.Process
 import GHC.SysTools.Info
 
+import GHC.Driver.Session
+
+import GHC.Utils.Exception as Exception
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+
+import Data.List
 import Control.Monad (join, forM, filterM)
+import System.IO
+import System.Process
 import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 

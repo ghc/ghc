@@ -19,7 +19,7 @@ import GHC.Prelude
 import GHC.Unit.Module        ( ModuleName, IsBootInterface(..) )
 import GHC.Hs.Doc             ( HsDocString )
 import GHC.Types.Name.Occurrence ( HasOccName(..), isTcOcc, isSymOcc )
-import GHC.Types.Basic        ( SourceText(..), StringLiteral(..), pprWithSourceText )
+import GHC.Types.SourceText   ( SourceText(..), StringLiteral(..), pprWithSourceText )
 import GHC.Types.FieldLabel   ( FieldLbl(..) )
 
 import GHC.Utils.Outputable
@@ -79,7 +79,7 @@ data ImportDecl pass
   = ImportDecl {
       ideclExt       :: XCImportDecl pass,
       ideclSourceSrc :: SourceText,
-                                 -- Note [Pragma source text] in GHC.Types.Basic
+                                 -- Note [Pragma source text] in GHC.Types.SourceText
       ideclName      :: XRec pass ModuleName, -- ^ Module name.
       ideclPkgQual   :: Maybe StringLiteral,  -- ^ Package qualifier.
       ideclSource    :: IsBootInterface,      -- ^ IsBoot <=> {-\# SOURCE \#-} import

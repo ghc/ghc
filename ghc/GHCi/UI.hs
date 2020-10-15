@@ -44,33 +44,39 @@ import GHC.Runtime.Interpreter
 import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 import GHCi.BreakArray
-import GHC.Unit.State
+import GHC.ByteCode.Types
+import GHC.Driver.Phases
 import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
-import GHC.Driver.Finder as Finder
 import GHC.Driver.Monad ( modifySession )
 import GHC.Driver.Config
 import qualified GHC
-import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
-             TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
+import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
+             Resume, SingleStep, Ghc,
              GetDocsFailure(..),
              getModuleGraph, handleSourceError, ms_mod )
 import GHC.Driver.Main (hscParseDeclsWithLocation, hscParseStmtWithLocation)
 import GHC.Hs.ImpExp
 import GHC.Hs
-import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
-                  setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
-                  hsc_dynLinker, hsc_interp, emptyModBreaks )
-import GHC.Unit
+import GHC.Driver.Env
+import GHC.Runtime.Context
+import GHC.Types.TyThing
+import GHC.Types.TyThing.Ppr
+import GHC.Types.SafeHaskell ( getSafeMode )
 import GHC.Types.Name
+import GHC.Types.SourceText
 import GHC.Iface.Syntax ( showToHeader )
-import GHC.Core.Ppr.TyThing
 import GHC.Builtin.Names
 import GHC.Builtin.Types( stringTyCon_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName )
 import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
+
+import GHC.Unit
+import GHC.Unit.State
+import GHC.Unit.Finder as Finder
+import GHC.Unit.Module.ModSummary
 
 import GHC.Data.StringBuffer
 import GHC.Utils.Outputable

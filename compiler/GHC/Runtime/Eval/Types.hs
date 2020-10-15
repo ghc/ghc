@@ -18,9 +18,9 @@ import GHCi.RemoteTypes
 import GHCi.Message (EvalExpr, ResumeContext)
 import GHC.Types.Id
 import GHC.Types.Name
+import GHC.Types.TyThing
 import GHC.Unit.Module
 import GHC.Types.Name.Reader
-import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHC.Utils.Exception
 

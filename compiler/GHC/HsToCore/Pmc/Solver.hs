@@ -121,13 +121,13 @@ isInhabited (MkNablas ds) = pure (not (null ds))
 -- See Note [Implementation of COMPLETE pragmas]
 
 -- | Update the COMPLETE sets of 'ResidualCompleteMatches'.
-updRcm :: (ConLikeSet -> ConLikeSet) -> ResidualCompleteMatches -> ResidualCompleteMatches
+updRcm :: (CompleteMatch -> CompleteMatch) -> ResidualCompleteMatches -> ResidualCompleteMatches
 updRcm f (RCM vanilla pragmas) = RCM (f <$> vanilla) (fmap f <$> pragmas)
 
 -- | A pseudo-'CompleteMatch' for the vanilla complete set of the given data
 -- 'TyCon'.
 -- Ex.: @vanillaCompleteMatchTC 'Maybe' ==> Just ("Maybe", {'Just','Nothing'})@
-vanillaCompleteMatchTC :: TyCon -> Maybe ConLikeSet
+vanillaCompleteMatchTC :: TyCon -> Maybe CompleteMatch
 vanillaCompleteMatchTC tc =
   let -- | TYPE acts like an empty data type on the term-level (#14086), but
       -- it is a PrimTyCon, so tyConDataCons_maybe returns Nothing. Hence a
@@ -1260,9 +1260,9 @@ varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi = do
 -- | Returns (Just vi) if at least one member of each ConLike in the COMPLETE
 -- set satisfies the oracle
 --
--- Internally uses and updates the ConLikeSets in vi_rcm.
+-- Internally uses and updates the CompleteMatchs in vi_rcm.
 --
--- NB: Does /not/ filter each ConLikeSet with the oracle; members may
+-- NB: Does /not/ filter each CompleteMatch with the oracle; members may
 --     remain that do not statisfy it.  This lazy approach just
 --     avoids doing unnecessary work.
 instantiate :: Int -> Nabla -> VarInfo -> MaybeT DsM VarInfo
@@ -1326,7 +1326,7 @@ anyConLikeSolution p = any (go . paca_con)
 -- original Nabla, not a proper refinement! No positive information will be
 -- added, only negative information from failed instantiation attempts,
 -- entirely as an optimisation.
-instCompleteSet :: Int -> Nabla -> Id -> ConLikeSet -> MaybeT DsM Nabla
+instCompleteSet :: Int -> Nabla -> Id -> CompleteMatch -> MaybeT DsM Nabla
 instCompleteSet fuel nabla x cs
   | anyConLikeSolution (`elementOfUniqDSet` cs) (vi_pos vi)
   -- No need to instantiate a constructor of this COMPLETE set if we already
@@ -1337,7 +1337,7 @@ instCompleteSet fuel nabla x cs
   where
     vi = lookupVarInfo (nabla_tm_st nabla) x
 
-    sorted_candidates :: ConLikeSet -> [ConLike]
+    sorted_candidates :: CompleteMatch -> [ConLike]
     sorted_candidates cs
       -- If there aren't many candidates, we can try to sort them by number of
       -- strict fields, type constraints, etc., so that we are fast in the
@@ -1705,7 +1705,7 @@ generateInhabitingPatterns (x:xs) n nabla = do
       other_cons_nablas <- instantiate_cons x ty xs (n - length con_nablas) nabla cls
       pure (con_nablas ++ other_cons_nablas)
 
-pickApplicableCompleteSets :: Type -> ResidualCompleteMatches -> DsM [ConLikeSet]
+pickApplicableCompleteSets :: Type -> ResidualCompleteMatches -> DsM [CompleteMatch]
 pickApplicableCompleteSets ty rcm = do
   env <- dsGetFamInstEnvs
   pure $ filter (all (is_valid env) . uniqDSetToList) (getRcm rcm)

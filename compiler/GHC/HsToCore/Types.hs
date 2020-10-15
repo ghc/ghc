@@ -22,7 +22,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Unit.Module
 import GHC.Driver.Hooks (DsForeignsHook)
 import GHC.Data.OrdList (OrdList)
-import GHC.Driver.Types (ForeignStubs)
+import GHC.Types.ForeignStubs (ForeignStubs)
 
 {-
 ************************************************************************

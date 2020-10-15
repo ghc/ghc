@@ -22,17 +22,21 @@ import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Misc
-import GHC.Driver.Types
+import GHC.Driver.Env
 import qualified GHC.SysTools as SysTools
-import GHC.Unit.Module
 import GHC.Data.Graph.Directed ( SCC(..) )
-import GHC.Driver.Finder
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import Data.List
 import GHC.Data.FastString
 import GHC.SysTools.FileCleanup
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.Graph
+import GHC.Unit.Finder
 
 import GHC.Utils.Exception
 import GHC.Utils.Error

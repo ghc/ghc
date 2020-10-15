@@ -4,6 +4,7 @@
 module Main where
 
 import GHC.Types.Basic
+import GHC.Types.SourceText
 import Data.Data
 import Data.List (intercalate)
 import System.IO

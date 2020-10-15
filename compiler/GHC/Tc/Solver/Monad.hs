@@ -129,7 +129,7 @@ module GHC.Tc.Solver.Monad (
 
 import GHC.Prelude
 
-import GHC.Driver.Types
+import GHC.Driver.Env
 
 import qualified GHC.Tc.Utils.Instantiate as TcM
 import GHC.Core.InstEnv
@@ -155,6 +155,7 @@ import GHC.Core.TyCon
 import GHC.Tc.Errors   ( solverDepthErrorTcS )
 
 import GHC.Types.Name
+import GHC.Types.TyThing
 import GHC.Unit.Module ( HasModule, getModule )
 import GHC.Types.Name.Reader ( GlobalRdrEnv, GlobalRdrElt )
 import qualified GHC.Rename.Env as TcM

@@ -14,45 +14,57 @@ where
 
 import GHC.Prelude
 
+import GHC.Driver.Backend
+import GHC.Driver.Env
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), pluginRecompile', plugins )
+
 import GHC.Iface.Syntax
 import GHC.Iface.Recomp.Binary
 import GHC.Iface.Load
 import GHC.Iface.Recomp.Flags
 
-import GHC.Types.Annotations
 import GHC.Core
 import GHC.Tc.Utils.Monad
 import GHC.Hs
-import GHC.Driver.Backend
-import GHC.Driver.Types
-import GHC.Driver.Finder
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Types.Name
-import GHC.Types.Name.Set
-import GHC.Unit.Module
-import GHC.Utils.Error
-import GHC.Utils.Panic
+
 import GHC.Data.Graph.Directed
-import GHC.Types.SrcLoc
-import GHC.Utils.Outputable as Outputable
-import GHC.Types.Unique
-import GHC.Utils.Misc as Utils hiding ( eqListBy )
 import GHC.Data.Maybe
 import GHC.Data.FastString
+
+import GHC.Utils.Error
+import GHC.Utils.Panic
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Misc as Utils hiding ( eqListBy )
 import GHC.Utils.Binary
 import GHC.Utils.Fingerprint
 import GHC.Utils.Exception
+
+import GHC.Types.Annotations
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.SrcLoc
+import GHC.Types.Unique
 import GHC.Types.Unique.Set
+import GHC.Types.Fixity.Env
+import GHC.Types.SourceFile
+
+import GHC.Unit.External
+import GHC.Unit.Finder
 import GHC.Unit.State
 import GHC.Unit.Home
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.Deps
 
 import Control.Monad
 import Data.Function
 import Data.List (find, sortBy, sort)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), pluginRecompile', plugins )
 
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>

@@ -27,22 +27,28 @@ module GHC.IfaceToCore (
 
 import GHC.Prelude
 
+import GHC.Driver.Env
+import GHC.Driver.Session
+
 import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
+import GHC.Builtin.Types
+
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
+
 import GHC.StgToCmm.Types
+
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
+
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FVs
 import GHC.Core.TyCo.Rep    -- needs to build types & coercions in a knot
 import GHC.Core.TyCo.Subst ( substTyCoVars )
-import GHC.Driver.Types
-import GHC.Types.Annotations
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core
@@ -50,34 +56,46 @@ import GHC.Core.Utils
 import GHC.Core.Unfold.Make
 import GHC.Core.Lint
 import GHC.Core.Make
-import GHC.Types.Id
-import GHC.Types.Id.Make
-import GHC.Types.Id.Info
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Builtin.Types
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
+
+import GHC.Unit.External
+import GHC.Unit.Module
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Home.ModInfo
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+
+import GHC.Data.Maybe
+import GHC.Data.FastString
+import GHC.Data.List.SetOps
+
+import GHC.Types.Annotations
+import GHC.Types.SourceFile
+import GHC.Types.SourceText
+import GHC.Types.Basic hiding ( SuccessFlag(..) )
+import GHC.Types.SrcLoc
+import GHC.Types.TypeEnv
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSet ( mkUniqDSet )
+import GHC.Types.Unique.Supply
 import GHC.Types.Literal
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
-import GHC.Unit.Module
-import GHC.Types.Unique.FM
-import GHC.Types.Unique.DSet ( mkUniqDSet )
-import GHC.Types.Unique.Supply
-import GHC.Utils.Outputable
-import GHC.Data.Maybe
-import GHC.Types.SrcLoc
-import GHC.Driver.Session
-import GHC.Utils.Misc
-import GHC.Utils.Panic
-import GHC.Data.FastString
-import GHC.Types.Basic hiding ( SuccessFlag(..) )
-import GHC.Data.List.SetOps
+import GHC.Types.Id
+import GHC.Types.Id.Make
+import GHC.Types.Id.Info
+import GHC.Types.TyThing
+
 import GHC.Fingerprint
 import qualified GHC.Data.BooleanFormula as BF
 

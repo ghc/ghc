@@ -31,18 +31,23 @@ module GHC.Platform
    , PlatformMisc(..)
    , SseVersion (..)
    , BmiVersion (..)
+   -- * Shared libraries
+   , platformSOName
+   , platformHsSOName
+   , platformSOExt
    )
 where
 
 import Prelude -- See Note [Why do we import Prelude here?]
 
-import Data.Word
-import Data.Int
-
 import GHC.Read
 import GHC.ByteOrder (ByteOrder(..))
 import GHC.Platform.Constants
 import GHC.Platform.ArchOS
+
+import Data.Word
+import Data.Int
+import System.FilePath
 
 -- | Platform description
 --
@@ -212,3 +217,19 @@ data PlatformMisc = PlatformMisc
   , platformMisc_ghcRtsWithLibdw      :: Bool
   , platformMisc_llvmTarget           :: String
   }
+
+platformSOName :: Platform -> FilePath -> FilePath
+platformSOName platform root = case platformOS platform of
+   OSMinGW32 ->           root  <.> platformSOExt platform
+   _         -> ("lib" ++ root) <.> platformSOExt platform
+
+platformHsSOName :: Platform -> FilePath -> FilePath
+platformHsSOName platform root = ("lib" ++ root) <.> platformSOExt platform
+
+platformSOExt :: Platform -> FilePath
+platformSOExt platform
+    = case platformOS platform of
+      OSDarwin  -> "dylib"
+      OSMinGW32 -> "dll"
+      _         -> "so"
+

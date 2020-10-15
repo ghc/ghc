@@ -34,49 +34,55 @@ module GHC.HsToCore.Quote( dsBracket ) where
 import GHC.Prelude
 import GHC.Platform
 
-import {-# SOURCE #-}   GHC.HsToCore.Expr ( dsExpr )
+import GHC.Driver.Session
 
+import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr )
 import GHC.HsToCore.Match.Literal
 import GHC.HsToCore.Monad
+import GHC.HsToCore.Binds
 
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Syntax as TH
 
 import GHC.Hs
-import GHC.Builtin.Names
 
-import GHC.Unit.Module
-import GHC.Types.Id
-import GHC.Types.Name hiding( varName, tcName )
-import GHC.Builtin.Names.TH
-import GHC.Types.Name.Env
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.Evidence
+
+import GHC.Core.Class
+import GHC.Core.DataCon
 import GHC.Core.TyCon
-import GHC.Builtin.Types
 import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Utils
+
+import GHC.Builtin.Names
+import GHC.Builtin.Names.TH
+import GHC.Builtin.Types
+
+import GHC.Unit.Module
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+import GHC.Utils.Monad
+
+import GHC.Data.Bag
+import GHC.Data.FastString
+import GHC.Data.Maybe
+
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Basic
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Data.Bag
-import GHC.Driver.Session
-import GHC.Data.FastString
 import GHC.Types.ForeignCall
-import GHC.Utils.Misc
-import GHC.Data.Maybe
-import GHC.Utils.Monad
-import GHC.Tc.Types.Evidence
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Class
-import GHC.Core.Class
-import GHC.Driver.Types ( MonadThings )
-import GHC.Core.DataCon
 import GHC.Types.Var
-import GHC.HsToCore.Binds
+import GHC.Types.Id
+import GHC.Types.SourceText
+import GHC.Types.Fixity
+import GHC.Types.TyThing
+import GHC.Types.Name hiding( varName, tcName )
+import GHC.Types.Name.Env
 
 import GHC.TypeLits
 import Data.Kind (Constraint)
@@ -85,6 +91,8 @@ import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List
 import Data.Function
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Class
 
 data MetaWrappers = MetaWrappers {
       -- Applies its argument to a type argument `m` and dictionary `Quote m`

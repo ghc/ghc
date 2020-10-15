@@ -20,22 +20,28 @@ where
 
 import GHC.Prelude
 
-import GHC.Types.Name.Reader
-import GHC.Driver.Types
-import GHC.Tc.Utils.Monad
-import GHC.Types.Name
-import GHC.Unit.Module
-import GHC.Types.SrcLoc as SrcLoc
-import GHC.Utils.Outputable as Outputable
-import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
-import GHC.Utils.Misc
-import GHC.Data.Maybe
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+
+import GHC.Tc.Utils.Monad
+import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Misc
+
+import GHC.Data.Maybe
 import GHC.Data.FastString
+
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.Unique.DFM (udfmToList)
+
+import GHC.Unit.Module
+import GHC.Unit.Module.Imported
+import GHC.Unit.Home.ModInfo
+
 import Data.List
 import Data.Function ( on )
-import GHC.Types.Unique.DFM (udfmToList)
 
 {-
 ************************************************************************

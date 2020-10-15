@@ -55,28 +55,36 @@ module GHC.Runtime.Interpreter
 
 import GHC.Prelude
 
+import GHC.Driver.Ppr (showSDoc)
+import GHC.Driver.Env
+import GHC.Driver.Session
+
 import GHC.Runtime.Interpreter.Types
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
-import GHC.Utils.Fingerprint
-import GHC.Driver.Types
-import GHC.Types.Unique.FM
-import GHC.Utils.Panic
-import GHC.Driver.Session
-import GHC.Utils.Exception as Ex
-import GHC.Types.Basic
-import GHC.Data.FastString
-import GHC.Utils.Misc
 import GHC.Runtime.Eval.Types(BreakInfo(..))
-import GHC.Utils.Outputable(brackets, ppr)
-import GHC.Driver.Ppr (showSDoc)
-import GHC.Types.SrcLoc
-import GHC.Data.Maybe
-import GHC.Unit.Module
+import GHC.Runtime.Linker.Types
 import GHC.ByteCode.Types
+
+import GHC.Data.Maybe
+import GHC.Data.FastString
+
 import GHC.Types.Unique
+import GHC.Types.SrcLoc
+import GHC.Types.Unique.FM
+import GHC.Types.Basic
+
+import GHC.Utils.Panic
+import GHC.Utils.Exception as Ex
+import GHC.Utils.Outputable(brackets, ppr)
+import GHC.Utils.Fingerprint
+import GHC.Utils.Misc
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Home.ModInfo
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run

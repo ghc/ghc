@@ -14,11 +14,19 @@ import GHC.Prelude
 
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
+
 import GHC.Driver.Session
 import GHC.Driver.Phases
-import GHC.Driver.Types
-import GHC.Unit.Module
+import GHC.Driver.Env
+
 import GHC.SysTools.FileCleanup (TempFileLifetime)
+
+import GHC.Types.SourceFile
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Status
 
 import Control.Monad
 

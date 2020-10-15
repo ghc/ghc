@@ -23,20 +23,24 @@ module GHC.Core.Opt.FloatIn ( floatInwards ) where
 import GHC.Prelude
 import GHC.Platform
 
+import GHC.Driver.Session
+
 import GHC.Core
 import GHC.Core.Make hiding ( wrapFloats )
-import GHC.Driver.Types     ( ModGuts(..) )
 import GHC.Core.Utils
 import GHC.Core.FVs
-import GHC.Core.Opt.Monad    ( CoreM )
+import GHC.Core.Opt.Monad   ( CoreM )
+import GHC.Core.Type
+
+import GHC.Types.Basic      ( RecFlag(..), isRec )
 import GHC.Types.Id         ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
 import GHC.Types.Var
-import GHC.Core.Type
 import GHC.Types.Var.Set
+
+import GHC.Unit.Module.ModGuts
+
 import GHC.Utils.Misc
-import GHC.Driver.Session
 import GHC.Utils.Panic
-import GHC.Types.Basic      ( RecFlag(..), isRec )
 
 {-
 Top-level interface function, @floatInwards@.  Note that we do not

@@ -11,10 +11,13 @@ import Foreign.Ptr (ptrToIntPtr, intPtrToPtr)
 import GHC
 import GHC.Ptr (Ptr (..))
 import GHCi.Util
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Home.ModInfo
 import GHC.Platform (target32Bit)
+import GHC.Runtime.Linker.Types
 import Prelude
 import System.Mem
 import System.Mem.Weak

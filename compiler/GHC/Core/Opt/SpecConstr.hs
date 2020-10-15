@@ -25,7 +25,7 @@ import GHC.Core.Unfold
 import GHC.Core.FVs     ( exprsFreeVarsList )
 import GHC.Core.Opt.Monad
 import GHC.Types.Literal ( litIsLifted )
-import GHC.Driver.Types ( ModGuts(..) )
+import GHC.Unit.Module.ModGuts
 import GHC.Core.Opt.WorkWrap.Utils ( isWorkerSmallEnough, mkWorkerArgs )
 import GHC.Core.DataCon
 import GHC.Core.Coercion hiding( substCo )

@@ -39,46 +39,67 @@ module GHC.Driver.Pipeline (
 
 import GHC.Prelude
 
-import GHC.Driver.Pipeline.Monad
-import GHC.Unit
-import GHC.Unit.State
-import GHC.Platform.Ways
-import GHC.Platform.ArchOS
-import GHC.Driver.Config
-import GHC.Parser.Header
-import GHC.Parser.Errors.Ppr
-import GHC.Driver.Phases
-import GHC.SysTools
-import GHC.SysTools.ExtraObj
+import GHC.Platform
+
+import GHC.Tc.Types
+
 import GHC.Driver.Main
-import GHC.Driver.Finder
-import GHC.Driver.Types hiding ( Hsc )
-import GHC.Utils.Outputable
-import GHC.Utils.Error
+import GHC.Driver.Env hiding ( Hsc )
+import GHC.Driver.Pipeline.Monad
+import GHC.Driver.Config
+import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Ppr
-import GHC.Utils.Panic
-import GHC.Utils.Misc
-import GHC.Data.StringBuffer ( hGetStringBuffer, hPutStringBuffer )
-import GHC.Types.Basic       ( SuccessFlag(..) )
-import GHC.Data.Maybe        ( expectJust )
-import GHC.Types.SrcLoc
-import GHC.CmmToLlvm         ( llvmFixupAsm, llvmVersionList )
-import GHC.Utils.Monad
-import GHC.Platform
-import GHC.Tc.Types
 import GHC.Driver.Hooks
-import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Platform.Ways
+import GHC.Platform.ArchOS
+
+import GHC.Parser.Header
+import GHC.Parser.Errors.Ppr
+
+import GHC.SysTools
+import GHC.SysTools.ExtraObj
 import GHC.SysTools.FileCleanup
 import GHC.SysTools.Ar
-import GHC.Settings
-import GHC.Data.Bag             ( unitBag )
-import GHC.Data.FastString      ( mkFastString )
-import GHC.Iface.Make           ( mkFullIface )
-import GHC.Iface.UpdateIdInfos  ( updateModDetailsIdInfos )
 
+import GHC.Utils.Outputable
+import GHC.Utils.Error
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+import GHC.Utils.Monad
 import GHC.Utils.Exception as Exception
+
+import GHC.CmmToLlvm         ( llvmFixupAsm, llvmVersionList )
+import qualified GHC.LanguageExtensions as LangExt
+import GHC.Settings
+import GHC.Runtime.Linker.Types
+
+import GHC.Data.Bag            ( unitBag )
+import GHC.Data.FastString     ( mkFastString )
+import GHC.Data.StringBuffer   ( hGetStringBuffer, hPutStringBuffer )
+import GHC.Data.Maybe          ( expectJust )
+
+import GHC.Iface.Make          ( mkFullIface )
+import GHC.Iface.UpdateIdInfos ( updateModDetailsIdInfos )
+
+import GHC.Types.Basic       ( SuccessFlag(..) )
+import GHC.Types.Target
+import GHC.Types.SrcLoc
+import GHC.Types.SourceFile
+import GHC.Types.SourceError
+
+import GHC.Unit
+import GHC.Unit.State
+import GHC.Unit.Finder
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Graph (needsTemplateHaskellOrQQ)
+import GHC.Unit.Module.Deps
+import GHC.Unit.Home.ModInfo
+
 import System.Directory
 import System.FilePath
 import System.IO
@@ -594,7 +615,7 @@ findHSLib :: DynFlags -> [String] -> String -> IO (Maybe FilePath)
 findHSLib dflags dirs lib = do
   let batch_lib_file = if WayDyn `notElem` ways dflags
                       then "lib" ++ lib <.> "a"
-                      else mkSOName (targetPlatform dflags) lib
+                      else platformSOName (targetPlatform dflags) lib
   found <- filterM doesFileExist (map (</> batch_lib_file) dirs)
   case found of
     [] -> return Nothing

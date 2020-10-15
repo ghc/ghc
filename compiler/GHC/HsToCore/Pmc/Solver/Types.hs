@@ -13,7 +13,7 @@ module GHC.HsToCore.Pmc.Solver.Types (
         Nabla(..), Nablas(..), initNablas,
 
         -- ** Caching residual COMPLETE sets
-        ConLikeSet, ResidualCompleteMatches(..), getRcm, isRcmInitialised,
+        CompleteMatch, ResidualCompleteMatches(..), getRcm, isRcmInitialised,
 
         -- ** Representations for Literals and AltCons
         PmLit(..), PmLitValue(..), PmAltCon(..), pmLitType, pmAltConType,
@@ -61,7 +61,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.Monad (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
-import GHC.Driver.Types (ConLikeSet)
+import GHC.Types.CompleteMatch (CompleteMatch)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
@@ -249,19 +249,19 @@ initTmState = TmSt emptyUSDFM emptyCoreMap emptyDVarSet
 -- See also Note [Implementation of COMPLETE pragmas]
 data ResidualCompleteMatches
   = RCM
-  { rcm_vanilla :: !(Maybe ConLikeSet)
+  { rcm_vanilla :: !(Maybe CompleteMatch)
   -- ^ The residual set for the vanilla COMPLETE set from the data defn.
   -- Tracked separately from 'rcm_pragmas', because it might only be
   -- known much later (when we have enough type information to see the 'TyCon'
   -- of the match), or not at all even. Until that happens, it is 'Nothing'.
-  , rcm_pragmas :: !(Maybe [ConLikeSet])
+  , rcm_pragmas :: !(Maybe [CompleteMatch])
   -- ^ The residual sets for /all/ COMPLETE sets from pragmas that are
   -- visible when compiling this module. Querying that set with
   -- 'dsGetCompleteMatches' requires 'DsM', so we initialise it with 'Nothing'
   -- until first needed in a 'DsM' context.
   }
 
-getRcm :: ResidualCompleteMatches -> [ConLikeSet]
+getRcm :: ResidualCompleteMatches -> [CompleteMatch]
 getRcm (RCM vanilla pragmas) = maybeToList vanilla ++ fromMaybe [] pragmas
 
 isRcmInitialised :: ResidualCompleteMatches -> Bool
@@ -363,7 +363,7 @@ eqConLike _                 _                 = PossiblyOverlap
 data PmAltCon = PmAltConLike ConLike
               | PmAltLit     PmLit
 
-data PmAltConSet = PACS !ConLikeSet ![PmLit]
+data PmAltConSet = PACS !CompleteMatch ![PmLit]
 
 emptyPmAltConSet :: PmAltConSet
 emptyPmAltConSet = PACS emptyUniqDSet []

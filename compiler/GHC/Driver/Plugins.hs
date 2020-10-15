@@ -49,19 +49,25 @@ module GHC.Driver.Plugins (
 
 import GHC.Prelude
 
-import GHC.Core.Opt.Monad ( CoreToDo, CoreM )
+import GHC.Driver.Env
+import GHC.Driver.Session
+import GHC.Driver.Monad
+import GHC.Driver.Phases
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModSummary
+
 import qualified GHC.Tc.Types
 import GHC.Tc.Types ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR )
+
+import GHC.Core.Opt.Monad ( CoreToDo, CoreM )
 import GHC.Hs
-import GHC.Driver.Session
-import GHC.Driver.Types
-import GHC.Driver.Monad
-import GHC.Driver.Phases
-import GHC.Unit.Module
 import GHC.Utils.Fingerprint
-import Data.List (sort)
 import GHC.Utils.Outputable (Outputable(..), text, (<+>))
+
+import Data.List (sort)
 
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>

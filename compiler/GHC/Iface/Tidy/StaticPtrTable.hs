@@ -124,23 +124,29 @@ Here is a running example:
 -}
 
 import GHC.Prelude
+import GHC.Platform
 
-import GHC.Cmm.CLabel
+import GHC.Driver.Session
+import GHC.Driver.Env
+
 import GHC.Core
 import GHC.Core.Utils (collectMakeStaticArgs)
 import GHC.Core.DataCon
-import GHC.Driver.Session
-import GHC.Driver.Types
-import GHC.Types.Id
 import GHC.Core.Make (mkStringExprFSWith)
+import GHC.Core.Type
+
+import GHC.Cmm.CLabel
+
 import GHC.Unit.Module
-import GHC.Types.Name
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Platform
 import GHC.Builtin.Names
 import GHC.Tc.Utils.Env (lookupGlobal)
-import GHC.Core.Type
+import GHC.Runtime.Linker.Types
+
+import GHC.Types.Name
+import GHC.Types.Id
+import GHC.Types.TyThing
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State

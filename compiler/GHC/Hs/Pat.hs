@@ -57,6 +57,7 @@ import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Tc.Types.Evidence
 import GHC.Types.Basic
+import GHC.Types.SourceText
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Builtin.Types

@@ -34,6 +34,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Types.Id
+import GHC.Types.SourceText
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
 

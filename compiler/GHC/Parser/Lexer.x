@@ -104,9 +104,8 @@ import GHC.Data.OrdList
 import GHC.Utils.Misc ( readRational, readHexRational )
 
 import GHC.Types.SrcLoc
-import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
-                         IntegralLit(..), FractionalLit(..),
-                         SourceText(..) )
+import GHC.Types.SourceText
+import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..))
 import GHC.Hs.Doc
 
 import GHC.Parser.CharClass

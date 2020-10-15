@@ -24,7 +24,6 @@ Note [The Type-related module hierarchy]
 
 -- We expose the relevant stuff from this module via the Type module
 module GHC.Core.TyCo.Rep (
-        TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
 
         -- * Types
         Type(..),
@@ -83,13 +82,10 @@ import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
-import {-# SOURCE #-} GHC.Core.ConLike ( ConLike(..), conLikeName )
-
 -- friends:
 import GHC.Iface.Type
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Types.Name hiding ( varName )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
@@ -106,66 +102,6 @@ import GHC.Utils.Panic
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.IORef ( IORef )   -- for CoercionHole
-
-{-
-%************************************************************************
-%*                                                                      *
-                        TyThing
-%*                                                                      *
-%************************************************************************
-
-Despite the fact that DataCon has to be imported via a hi-boot route,
-this module seems the right place for TyThing, because it's needed for
-funTyCon and all the types in GHC.Builtin.Types.Prim.
-
-It is also SOURCE-imported into "GHC.Types.Name"
-
-
-Note [ATyCon for classes]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Both classes and type constructors are represented in the type environment
-as ATyCon.  You can tell the difference, and get to the class, with
-   isClassTyCon :: TyCon -> Bool
-   tyConClass_maybe :: TyCon -> Maybe Class
-The Class and its associated TyCon have the same Name.
--}
-
--- | A global typecheckable-thing, essentially anything that has a name.
--- Not to be confused with a 'TcTyThing', which is also a typecheckable
--- thing but in the *local* context.  See "GHC.Tc.Utils.Env" for how to retrieve
--- a 'TyThing' given a 'Name'.
-data TyThing
-  = AnId     Id
-  | AConLike ConLike
-  | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
-  | ACoAxiom (CoAxiom Branched)
-
-instance Outputable TyThing where
-  ppr = pprShortTyThing
-
-instance NamedThing TyThing where       -- Can't put this with the type
-  getName (AnId id)     = getName id    -- decl, because the DataCon instance
-  getName (ATyCon tc)   = getName tc    -- isn't visible there
-  getName (ACoAxiom cc) = getName cc
-  getName (AConLike cl) = conLikeName cl
-
-pprShortTyThing :: TyThing -> SDoc
--- c.f. GHC.Core.Ppr.TyThing.pprTyThing, which prints all the details
-pprShortTyThing thing
-  = pprTyThingCategory thing <+> quotes (ppr (getName thing))
-
-pprTyThingCategory :: TyThing -> SDoc
-pprTyThingCategory = text . capitalise . tyThingCategory
-
-tyThingCategory :: TyThing -> String
-tyThingCategory (ATyCon tc)
-  | isClassTyCon tc = "class"
-  | otherwise       = "type constructor"
-tyThingCategory (ACoAxiom _) = "coercion axiom"
-tyThingCategory (AnId   _)   = "identifier"
-tyThingCategory (AConLike (RealDataCon _)) = "data constructor"
-tyThingCategory (AConLike (PatSynCon _))  = "pattern synonym"
-
 
 {- **********************************************************************
 *                                                                       *

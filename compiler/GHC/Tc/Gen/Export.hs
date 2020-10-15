@@ -9,7 +9,6 @@ import GHC.Prelude
 
 import GHC.Hs
 import GHC.Builtin.Names
-import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
@@ -17,25 +16,29 @@ import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Utils.Error
-import GHC.Types.Id
-import GHC.Types.Id.Info
 import GHC.Unit.Module
-import GHC.Types.Name
-import GHC.Types.Name.Env
-import GHC.Types.Name.Set
-import GHC.Types.Avail
+import GHC.Unit.Module.Imported
 import GHC.Core.TyCon
-import GHC.Types.SrcLoc as SrcLoc
-import GHC.Driver.Types
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Data.Maybe
-import GHC.Types.Unique.Set
 import GHC.Utils.Misc (capitalise)
 import GHC.Data.FastString (fsLit)
+
+import GHC.Types.Unique.Set
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Avail
+import GHC.Types.SourceFile
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.TyThing
+import GHC.Types.Name.Reader
 
 import Control.Monad
 import GHC.Driver.Session

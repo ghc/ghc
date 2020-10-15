@@ -13,41 +13,47 @@ module GHC.HsToCore.Coverage (addTicksToBinds, hpcInitCode) where
 
 import GHC.Prelude as Prelude
 
-import qualified GHC.Runtime.Interpreter as GHCi
-import GHCi.RemoteTypes
-import Data.Array
-import GHC.ByteCode.Types
-import GHC.Stack.CCS
-import GHC.Core.Type
-import GHC.Hs
-import GHC.Unit
-import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Panic
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Ppr
+import GHC.Driver.Env
+
+import qualified GHC.Runtime.Interpreter as GHCi
+import GHCi.RemoteTypes
+import GHC.ByteCode.Types
+import GHC.Stack.CCS
+import GHC.Hs
+import GHC.Unit
+import GHC.Cmm.CLabel
+
+import GHC.Core.Type
 import GHC.Core.ConLike
-import Control.Monad
-import GHC.Types.SrcLoc
-import GHC.Utils.Error
-import GHC.Types.Name.Set hiding (FreeVars)
-import GHC.Types.Name
-import GHC.Data.Bag
-import GHC.Types.CostCentre
-import GHC.Types.CostCentre.State
 import GHC.Core
+import GHC.Core.TyCon
+
+import GHC.Data.Maybe
+import GHC.Data.FastString
+import GHC.Data.Bag
+
+import GHC.Utils.Misc
+import GHC.Utils.Error
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Monad
+
+import GHC.Types.SrcLoc
+import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Var.Set
-import Data.List
-import GHC.Data.FastString
-import GHC.Driver.Types
-import GHC.Core.TyCon
-import GHC.Types.Basic
-import GHC.Utils.Monad
-import GHC.Data.Maybe
-import GHC.Cmm.CLabel
-import GHC.Utils.Misc
+import GHC.Types.Name.Set hiding (FreeVars)
+import GHC.Types.Name
+import GHC.Types.HpcInfo
+import GHC.Types.CostCentre
+import GHC.Types.CostCentre.State
 
+import Control.Monad
+import Data.List
+import Data.Array
 import Data.Time
 import System.Directory
 

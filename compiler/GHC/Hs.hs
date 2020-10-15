@@ -32,6 +32,7 @@ module GHC.Hs (
         Fixity,
 
         HsModule(..),
+        HsParsedModule(..)
 ) where
 
 -- friends:
@@ -45,15 +46,17 @@ import GHC.Hs.Lit
 import GHC.Hs.Extension
 import GHC.Hs.Pat
 import GHC.Hs.Type
-import GHC.Types.Basic ( Fixity, WarningTxt )
 import GHC.Hs.Utils
 import GHC.Hs.Doc
 import GHC.Hs.Instances () -- For Data instances
 
 -- others:
+import GHC.Parser.Annotation    ( ApiAnns )
 import GHC.Utils.Outputable
+import GHC.Types.Fixity         ( Fixity )
 import GHC.Types.SrcLoc
-import GHC.Unit.Module ( ModuleName )
+import GHC.Unit.Module          ( ModuleName )
+import GHC.Unit.Module.Warnings ( WarningTxt )
 
 -- libraries:
 import Data.Data hiding ( Fixity )
@@ -150,3 +153,16 @@ pp_mb Nothing  = empty
 pp_nonnull :: Outputable t => [t] -> SDoc
 pp_nonnull [] = empty
 pp_nonnull xs = vcat (map ppr xs)
+
+data HsParsedModule = HsParsedModule {
+    hpm_module    :: Located HsModule,
+    hpm_src_files :: [FilePath],
+       -- ^ extra source files (e.g. from #includes).  The lexer collects
+       -- these from '# <file> <line>' pragmas, which the C preprocessor
+       -- leaves behind.  These files and their timestamps are stored in
+       -- the .hi file, so that we can force recompilation if any of
+       -- them change (#3589)
+    hpm_annotations :: ApiAnns
+    -- See note [Api annotations] in GHC.Parser.Annotation
+  }
+

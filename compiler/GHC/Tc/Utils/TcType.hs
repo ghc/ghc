@@ -182,7 +182,7 @@ module GHC.Tc.Utils.TcType (
 
   --------------------------------
   pprKind, pprParendKind, pprSigmaType,
-  pprType, pprParendType, pprTypeApp, pprTyThingCategory, tyThingCategory,
+  pprType, pprParendType, pprTypeApp,
   pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
   pprTCvBndr, pprTCvBndrs,
 

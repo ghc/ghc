@@ -18,57 +18,75 @@ module GHC.Tc.Utils.Backpack (
 
 import GHC.Prelude
 
-import GHC.Types.Basic (defaultFixity, TypeOrKind(..))
-import GHC.Unit
-import GHC.Tc.Gen.Export
+import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Hs
+
+import GHC.Types.Basic (TypeOrKind(..))
+import GHC.Types.Fixity (defaultFixity)
+import GHC.Types.Fixity.Env
+import GHC.Types.TypeEnv
 import GHC.Types.Name.Reader
-import GHC.Tc.Utils.Monad
-import GHC.Tc.TyCl.Utils
-import GHC.Core.InstEnv
-import GHC.Core.FamInstEnv
-import GHC.Tc.Utils.Instantiate
-import GHC.IfaceToCore
-import GHC.Tc.Utils.TcMType
-import GHC.Tc.Utils.TcType
-import GHC.Tc.Solver
-import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Origin
-import GHC.Iface.Load
-import GHC.Rename.Names
-import GHC.Utils.Error
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.SrcLoc
-import GHC.Driver.Types
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Core.Type
-import GHC.Core.Multiplicity
-import GHC.Data.FastString
-import GHC.Rename.Fixity ( lookupFixityRn )
-import GHC.Data.Maybe
-import GHC.Tc.Utils.Env
+import GHC.Types.SourceFile
 import GHC.Types.Var
-import GHC.Iface.Syntax
-import qualified Data.Map as Map
-
-import GHC.Driver.Finder
 import GHC.Types.Unique.DSet
 import GHC.Types.Name.Shape
+
+import GHC.Unit
+import GHC.Unit.State
+import GHC.Unit.Finder
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.Imported
+import GHC.Unit.Module.Deps
+
+import GHC.Tc.Gen.Export
+import GHC.Tc.TyCl.Utils
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Utils.TcMType
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Solver
+import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Origin
+
+import GHC.Hs
+
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
+import GHC.Core.Type
+import GHC.Core.Multiplicity
+
+import GHC.IfaceToCore
+import GHC.Iface.Load
+import GHC.Iface.Rename
+import GHC.Iface.Syntax
+
+import GHC.Rename.Names
+import GHC.Rename.Fixity ( lookupFixityRn )
+
+import GHC.Tc.Utils.Env
 import GHC.Tc.Errors
 import GHC.Tc.Utils.Unify
-import GHC.Iface.Rename
+
 import GHC.Utils.Misc
-import GHC.Unit.State
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+
+import GHC.Data.FastString
+import GHC.Data.Maybe
 
 import Control.Monad
 import Data.List (find)
+import qualified Data.Map as Map
 
 import {-# SOURCE #-} GHC.Tc.Module
 

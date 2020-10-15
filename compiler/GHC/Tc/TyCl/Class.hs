@@ -45,7 +45,6 @@ import GHC.Core.Multiplicity
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
-import GHC.Driver.Phases (HscSource(..))
 import GHC.Tc.TyCl.Build( TcMethInfo )
 import GHC.Core.Class
 import GHC.Core.Coercion ( pprCoAxiom )
@@ -58,6 +57,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.SourceFile (HscSource(..))
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc

@@ -34,89 +34,98 @@ module GHC.Tc.Gen.Splice(
 
 import GHC.Prelude
 
+import GHC.Driver.Plugins
+import GHC.Driver.Main
+import GHC.Driver.Session
+import GHC.Driver.Env
+import GHC.Driver.Hooks
+
 import GHC.Hs
-import GHC.Types.Annotations
-import GHC.Driver.Finder
-import GHC.Types.Name
+
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import GHC.Core.Multiplicity
-
-import GHC.Utils.Outputable
 import GHC.Tc.Gen.Expr
-import GHC.Types.SrcLoc
-import GHC.Builtin.Names.TH
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
-import GHC.Core.Coercion( etaExpandCoAxBranch )
-import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.Zonk
+import GHC.Tc.Solver
+import GHC.Tc.Utils.TcMType
+import GHC.Tc.Gen.HsType
+import GHC.Tc.Instance.Family
+import GHC.Tc.Utils.Instantiate
 
-import Control.Monad
+import GHC.Core.Multiplicity
+import GHC.Core.Coercion( etaExpandCoAxBranch )
+import GHC.Core.Type as Type
+import GHC.Core.TyCo.Rep as TyCoRep
+import GHC.Core.FamInstEnv
+import GHC.Core.InstEnv as InstEnv
+
+import GHC.Builtin.Names.TH
+import GHC.Builtin.Names
+import GHC.Builtin.Types
+
+import GHC.ThToHs
+import GHC.HsToCore.Expr
+import GHC.HsToCore.Monad
+import GHC.IfaceToCore
+import GHC.Iface.Load
 
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Interpreter.Types
-import GHC.Driver.Main
-        -- These imports are the reason that GHC.Tc.Gen.Splice
-        -- is very high up the module hierarchy
+
 import GHC.Rename.Splice( traceSplice, SpliceInfo(..))
-import GHC.Types.Name.Reader
-import GHC.Driver.Types
-import GHC.ThToHs
 import GHC.Rename.Expr
 import GHC.Rename.Env
 import GHC.Rename.Utils  ( HsDocContext(..) )
 import GHC.Rename.Fixity ( lookupFixityRn_help )
 import GHC.Rename.HsType
-import GHC.Tc.Utils.Zonk
-import GHC.Tc.Solver
-import GHC.Core.Type as Type
-import GHC.Types.Name.Set
-import GHC.Tc.Utils.TcMType
-import GHC.Tc.Gen.HsType
-import GHC.IfaceToCore
-import GHC.Core.TyCo.Rep as TyCoRep
-import GHC.Tc.Instance.Family
-import GHC.Core.FamInstEnv
-import GHC.Core.InstEnv as InstEnv
-import GHC.Tc.Utils.Instantiate
-import GHC.Types.Name.Env
-import GHC.Builtin.Names
-import GHC.Builtin.Types
-import GHC.Types.Name.Occurrence as OccName
-import GHC.Driver.Hooks
-import GHC.Types.Var
-import GHC.Unit.Module
-import GHC.Iface.Load
+
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Core.DataCon as DataCon
-import GHC.Tc.Types.Evidence
+
+import GHC.Types.SrcLoc
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Name.Reader
+import GHC.Types.Name.Occurrence as OccName
+import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.HsToCore.Expr
-import GHC.HsToCore.Monad
-import GHC.Serialized
-import GHC.Utils.Error
-import GHC.Utils.Misc
 import GHC.Types.Unique
 import GHC.Types.Var.Set
-import Data.List        ( find )
-import Data.Maybe
-import GHC.Data.FastString
-import GHC.Types.Basic as BasicTypes hiding( SuccessFlag(..) )
-import GHC.Data.Maybe( MaybeErr(..) )
-import GHC.Driver.Session
+import GHC.Types.Meta
+import GHC.Types.Basic hiding( SuccessFlag(..) )
+import GHC.Types.Fixity as Hs
+import GHC.Types.Annotations
+import GHC.Types.Name
+import GHC.Serialized
+
+import GHC.Unit.Finder
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Deps
+
+import GHC.Utils.Error
+import GHC.Utils.Misc
 import GHC.Utils.Panic as Panic
 import GHC.Utils.Lexeme
-import qualified GHC.Data.EnumSet as EnumSet
-import GHC.Driver.Plugins
+import GHC.Utils.Outputable
+
+import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
+
 import GHC.Data.Bag
+import GHC.Data.FastString
+import GHC.Data.Maybe( MaybeErr(..) )
+import qualified GHC.Data.EnumSet as EnumSet
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
@@ -128,9 +137,12 @@ import GHC.Desugar      ( AnnotationWrapper(..) )
 import Unsafe.Coerce    ( unsafeCoerce )
 #endif
 
+import Control.Monad
 import Control.Exception
 import Data.Binary
 import Data.Binary.Get
+import Data.List        ( find )
+import Data.Maybe
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic  ( fromDynamic, toDyn )
@@ -2295,10 +2307,10 @@ reifyFixity name
   = do { (found, fix) <- lookupFixityRn_help name
        ; return (if found then Just (conv_fix fix) else Nothing) }
     where
-      conv_fix (BasicTypes.Fixity _ i d) = TH.Fixity i (conv_dir d)
-      conv_dir BasicTypes.InfixR = TH.InfixR
-      conv_dir BasicTypes.InfixL = TH.InfixL
-      conv_dir BasicTypes.InfixN = TH.InfixN
+      conv_fix (Hs.Fixity _ i d) = TH.Fixity i (conv_dir d)
+      conv_dir Hs.InfixR = TH.InfixR
+      conv_dir Hs.InfixL = TH.InfixL
+      conv_dir Hs.InfixN = TH.InfixN
 
 reifyUnpackedness :: DataCon.SrcUnpackedness -> TH.SourceUnpackedness
 reifyUnpackedness NoSrcUnpack = TH.NoSourceUnpackedness

@@ -27,6 +27,10 @@ module GHC.Core.Lint (
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Env
+
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
@@ -73,10 +77,10 @@ import GHC.Core.InstEnv      ( instanceDFunId )
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity )
 import GHC.Types.Demand      ( splitStrictSig, isDeadEndDiv )
+import GHC.Types.TypeEnv
+import GHC.Unit.Module.ModGuts
+import GHC.Runtime.Context
 
-import GHC.Driver.Types hiding (Usage)
-import GHC.Driver.Session
-import GHC.Driver.Ppr
 import Control.Monad
 import GHC.Utils.Monad
 import Data.Foldable      ( toList )
@@ -437,7 +441,7 @@ lintInteractiveExpr what hsc_env expr
 interactiveInScope :: HscEnv -> [Var]
 -- In GHCi we may lint expressions, or bindings arising from 'deriving'
 -- clauses, that mention variables bound in the interactive context.
--- These are Local things (see Note [Interactively-bound Ids in GHCi] in GHC.Driver.Types).
+-- These are Local things (see Note [Interactively-bound Ids in GHCi] in GHC.Runtime.Context).
 -- So we have to tell Lint about them, lest it reports them as out of scope.
 --
 -- We do this by find local-named things that may appear free in interactive

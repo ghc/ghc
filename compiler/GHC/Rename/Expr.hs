@@ -47,11 +47,12 @@ import GHC.Rename.Pat
 import GHC.Driver.Session
 import GHC.Builtin.Names
 
-import GHC.Types.Basic
+import GHC.Types.Fixity
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
+import GHC.Types.SourceText
 import Data.List
 import Data.Maybe (isJust, isNothing)
 import GHC.Utils.Misc

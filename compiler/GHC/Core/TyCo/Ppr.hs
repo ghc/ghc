@@ -22,9 +22,6 @@ module GHC.Core.TyCo.Ppr
         pprCo, pprParendCo,
 
         debugPprType,
-
-        -- * Pretty-printing 'TyThing's
-        pprTyThingCategory, pprShortTyThing,
   ) where
 
 import GHC.Prelude
@@ -79,7 +76,7 @@ See Note [Precedence in types] in GHC.Types.Basic.
 --------------------------------------------------------
 -- When pretty-printing types, we convert to IfaceType,
 --   and pretty-print that.
--- See Note [Pretty printing via Iface syntax] in GHC.Core.Ppr.TyThing
+-- See Note [Pretty printing via Iface syntax] in GHC.Types.TyThing.Ppr
 --------------------------------------------------------
 
 pprType, pprParendType, pprTidiedType :: Type -> SDoc

@@ -44,12 +44,14 @@ import qualified GHC.Driver.Ppr as Ppr
 import GHC.Types.Name.Occurrence
 import GHC.Driver.Session
 import GHC.Data.FastString
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHC.Types.SrcLoc
+import GHC.Types.SafeHaskell
 import GHC.Unit
 import GHC.Types.Name.Reader as RdrName (mkOrig)
 import GHC.Builtin.Names (gHC_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Context
 import GHCi.RemoteTypes
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils

@@ -47,43 +47,52 @@ module GHC.Tc.Utils.Zonk (
 
 import GHC.Prelude
 
-import GHC.Hs
-import GHC.Types.Id
-import GHC.Types.Id.Info
-import GHC.Core.Predicate
-import GHC.Tc.Utils.Monad
+import GHC.Platform
+
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
+
+import GHC.Hs
+
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (runTopSplice)
+import GHC.Tc.Utils.Monad
 import GHC.Tc.TyCl.Build ( TcMethInfo, MethInfo )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env   ( tcLookupGlobalOnly )
 import GHC.Tc.Types.Evidence
+
 import GHC.Core.TyCo.Ppr ( pprTyVar )
-import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
-import GHC.Builtin.Types
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Driver.Types
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+
+import GHC.Core.Multiplicity
+import GHC.Core
+import GHC.Core.Predicate
+
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Platform
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.TypeEnv
+import GHC.Types.SourceText
 import GHC.Types.Basic
-import GHC.Data.Maybe
 import GHC.Types.SrcLoc
-import GHC.Data.Bag
-import GHC.Utils.Outputable
-import GHC.Utils.Misc
-import GHC.Utils.Panic
 import GHC.Types.Unique.FM
-import GHC.Core.Multiplicity
-import GHC.Core
+import GHC.Types.TyThing
 
-import {-# SOURCE #-} GHC.Tc.Gen.Splice (runTopSplice)
+import GHC.Data.Maybe
+import GHC.Data.Bag
 
 import Control.Monad
 import Data.List  ( partition )

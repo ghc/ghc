@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE CPP #-}
-module GHC.Core.Ppr.TyThing (
+module GHC.Types.TyThing.Ppr (
         pprTyThing,
         pprTyThingInContext,
         pprTyThingLoc,
@@ -21,17 +21,21 @@ module GHC.Core.Ppr.TyThing (
 
 import GHC.Prelude
 
-import GHC.Core.Type    ( Type, ArgFlag(..), TyThing(..), mkTyVarBinders, tidyOpenType )
-import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
-  , showToHeader, pprIfaceDecl )
-import GHC.Core.Coercion.Axiom ( coAxiomTyCon )
-import GHC.Driver.Types( tyThingParent_maybe )
-import GHC.Driver.Ppr
-import GHC.Iface.Make ( tyThingToIfaceDecl )
-import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
-import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp, pprSigmaType )
+import GHC.Driver.Ppr (warnPprTrace)
+
+import GHC.Types.TyThing ( TyThing(..), tyThingParent_maybe )
 import GHC.Types.Name
 import GHC.Types.Var.Env( emptyTidyEnv )
+
+import GHC.Core.Type    ( Type, ArgFlag(..), mkTyVarBinders, tidyOpenType )
+import GHC.Core.Coercion.Axiom ( coAxiomTyCon )
+import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
+import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp, pprSigmaType )
+
+import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
+  , showToHeader, pprIfaceDecl )
+import GHC.Iface.Make ( tyThingToIfaceDecl )
+
 import GHC.Utils.Outputable
 
 -- -----------------------------------------------------------------------------

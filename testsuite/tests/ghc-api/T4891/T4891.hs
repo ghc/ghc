@@ -7,7 +7,6 @@ import Data.Array
 import GHC.Core.DataCon
 import GHC
 import GHC.Exts.Heap
-import GHC.Driver.Types
 import GHC.Driver.Ppr
 import GHC.Runtime.Linker
 import GHC.Runtime.Heap.Inspect

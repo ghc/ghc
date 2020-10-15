@@ -23,15 +23,21 @@ where
 
 import GHC.Prelude
 
+import GHC.Hs
+
+import GHC.StgToCmm.Types (CgInfos (..))
+
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Monad
+
 import GHC.Iface.Syntax
 import GHC.Iface.Recomp
 import GHC.Iface.Load
+import GHC.Iface.Ext.Fields
+
 import GHC.CoreToIface
 
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames, mkDependencies )
-import GHC.Types.Id
-import GHC.Types.Annotations
 import GHC.Core
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -40,16 +46,19 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
-import GHC.StgToCmm.Types (CgInfos (..))
-import GHC.Tc.Utils.TcType
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Tc.Utils.Monad
-import GHC.Hs
-import GHC.Driver.Types
+
+import GHC.Driver.Env
 import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Plugins (LoadedPlugin(..))
+
+import GHC.Types.Id
+import GHC.Types.Fixity.Env
+import GHC.Types.SafeHaskell
+import GHC.Types.Annotations
 import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Name
@@ -58,21 +67,34 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Unique.DSet
-import GHC.Unit
+import GHC.Types.Basic hiding ( SuccessFlag(..) )
+import GHC.Types.TypeEnv
+import GHC.Types.SourceFile
+import GHC.Types.TyThing
+import GHC.Types.HpcInfo
+
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.Basic hiding ( SuccessFlag(..) )
 import GHC.Utils.Misc  hiding ( eqListBy )
+
 import GHC.Data.FastString
 import GHC.Data.Maybe
+
 import GHC.HsToCore.Docs
+import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames, mkDependencies )
+
+import GHC.Unit
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.Deps
 
 import Data.Function
 import Data.List ( findIndex, mapAccumL, sortBy )
 import Data.Ord
 import Data.IORef
-import GHC.Driver.Plugins (LoadedPlugin(..))
 
 {-
 ************************************************************************

@@ -13,6 +13,8 @@ module GHC.Tc.Instance.Class (
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
@@ -20,30 +22,32 @@ import GHC.Tc.Utils.Instantiate( tcInstType )
 import GHC.Tc.Instance.Typeable
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
-import GHC.Core.Predicate
-import GHC.Rename.Env( addUsedGRE )
-import GHC.Types.Name.Reader( lookupGRE_FieldLabel )
-import GHC.Core.InstEnv
 import GHC.Tc.Utils.Instantiate( instDFunType )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
+import GHC.Rename.Env( addUsedGRE )
 
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.Names
 
-import GHC.Types.Id
-import GHC.Core.Type
-import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
-
+import GHC.Types.Name.Reader( lookupGRE_FieldLabel )
+import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name, pprDefinedAt )
 import GHC.Types.Var.Env ( VarEnv )
+import GHC.Types.Id
+
+import GHC.Core.Predicate
+import GHC.Core.InstEnv
+import GHC.Core.Type
+import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
-import GHC.Driver.Session
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( splitAtList, fstOf3 )
+
 import Data.Maybe
 
 {- *******************************************************************

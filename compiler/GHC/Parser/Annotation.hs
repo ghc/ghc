@@ -237,7 +237,7 @@ getAndRemoveAnnotationComments anns span =
 -- AST.
 --
 -- The annotations, together with original source comments are made available in
--- the @'pm_annotations'@ field of @'GHC.Driver.Types.HsParsedModule'@.
+-- the @'pm_annotations'@ field of @'GHC.Driver.Env.HsParsedModule'@.
 -- Comments are only retained if @'Opt_KeepRawTokenStream'@ is set.
 --
 -- The wiki page describing this feature is

@@ -5,11 +5,11 @@ import Data.List (intercalate)
 import Data.Maybe (isJust)
 import GHC.Driver.Plugins
 import GHC.Driver.Session
-import GHC.Driver.Types
-import GHC.Driver.Ppr
+import GHC.Plugins
 import GHC.Tc.Types
 import GHC.Hs.Extension
 import GHC.Types.Avail
+import GHC.Hs
 import GHC.Hs.Expr
 import GHC.Utils.Outputable
 import GHC.Hs.ImpExp

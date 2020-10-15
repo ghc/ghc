@@ -164,13 +164,15 @@ import GHC.Builtin.Uniques
 -- others:
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Id
+import GHC.Types.TyThing
+import GHC.Types.SourceText
 import GHC.Types.Var (VarBndr (Bndr))
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.DataCon
-import {-# SOURCE #-} GHC.Core.ConLike
+import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Class     ( Class, mkClass )
 import GHC.Types.Name.Reader

@@ -55,37 +55,39 @@ module GHC.Core.Make (
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.Types.Id
 import GHC.Types.Var  ( EvVar, setTyVarUnique )
-
-import GHC.Core
-import GHC.Core.Utils ( exprType, needsCaseBinding, mkSingleAltCase, bindNonRec )
-import GHC.Types.Literal
-import GHC.Driver.Types
-import GHC.Platform
-
-import GHC.Builtin.Types
-import GHC.Builtin.Names
-
-import GHC.Hs.Utils      ( mkChunkified, chunkify )
-import GHC.Core.Type
-import GHC.Core.Coercion ( isCoVar )
-import GHC.Core.DataCon  ( DataCon, dataConWorkId )
-import GHC.Core.Multiplicity
-import GHC.Builtin.Types.Prim
+import GHC.Types.TyThing
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Name      hiding ( varName )
-import GHC.Utils.Outputable
-import GHC.Data.FastString
+import GHC.Types.Literal
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
+
+import GHC.Core
+import GHC.Core.Utils ( exprType, needsCaseBinding, mkSingleAltCase, bindNonRec )
+import GHC.Core.Type
+import GHC.Core.Coercion ( isCoVar )
+import GHC.Core.DataCon  ( DataCon, dataConWorkId )
+import GHC.Core.Multiplicity
+
+import GHC.Hs.Utils      ( mkChunkified, chunkify )
+
+import GHC.Builtin.Types
+import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim
+
+import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import Data.List
 
+import GHC.Data.FastString
+
+import Data.List
 import Data.Char        ( ord )
 
 infixl 4 `mkCoreApp`, `mkCoreApps`

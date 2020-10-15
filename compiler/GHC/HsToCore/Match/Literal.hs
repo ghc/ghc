@@ -35,6 +35,7 @@ import GHC.HsToCore.Utils
 import GHC.Hs
 
 import GHC.Types.Id
+import GHC.Types.SourceText
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.TyCon
@@ -50,7 +51,6 @@ import GHC.Types.Literal
 import GHC.Types.SrcLoc
 import Data.Ratio
 import GHC.Utils.Outputable as Outputable
-import GHC.Types.Basic
 import GHC.Driver.Session
 import GHC.Utils.Misc
 import GHC.Utils.Panic

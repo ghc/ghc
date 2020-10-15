@@ -15,14 +15,15 @@ module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Types.Basic ( Boxity(..), neverInlinePragma, SourceText(..) )
+import GHC.Types.Basic ( Boxity(..), neverInlinePragma )
+import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Iface.Env( newGlobalBinder )
 import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence ( mkWpTyApps )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import GHC.Driver.Types ( lookupId )
+import GHC.Types.TyThing ( lookupId )
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( primTyCons )
 import GHC.Builtin.Types

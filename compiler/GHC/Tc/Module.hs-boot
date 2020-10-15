@@ -1,7 +1,7 @@
 module GHC.Tc.Module where
 
 import GHC.Prelude
-import GHC.Core.Type(TyThing)
+import GHC.Types.TyThing(TyThing)
 import GHC.Tc.Types (TcM)
 import GHC.Utils.Outputable (SDoc)
 import GHC.Types.Name (Name)

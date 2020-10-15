@@ -12,6 +12,8 @@ import Data.List (intercalate)
 import System.IO
 import GHC
 import GHC.Types.Basic
+import GHC.Types.SourceText
+import GHC.Types.Fixity
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString

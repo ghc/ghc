@@ -16,6 +16,9 @@ module GHC.StgToCmm ( codeGen ) where
 
 import GHC.Prelude as Prelude
 
+import GHC.Driver.Backend
+import GHC.Driver.Session
+
 import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
@@ -31,32 +34,34 @@ import GHC.StgToCmm.Types (ModuleLFInfos)
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
+import GHC.Cmm.Graph
 
 import GHC.Stg.Syntax
-import GHC.Driver.Session
-import GHC.Utils.Error
 
-import GHC.Driver.Types
-import GHC.Driver.Backend
 import GHC.Types.CostCentre
+import GHC.Types.HpcInfo
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.RepType
-import GHC.Core.DataCon
-import GHC.Core.TyCon
-import GHC.Core.Multiplicity
-import GHC.Unit.Module
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Data.Stream
 import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )
-import GHC.SysTools.FileCleanup
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Env
 
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.Multiplicity
+
+import GHC.Unit.Module
+
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+
+import GHC.SysTools.FileCleanup
+
+import GHC.Data.Stream
 import GHC.Data.OrdList
-import GHC.Cmm.Graph
 
 import Data.IORef
 import Control.Monad (when,void)

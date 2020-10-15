@@ -69,7 +69,6 @@ module GHC.Driver.Session (
         putLogMsg,
 
         -- ** Safe Haskell
-        SafeHaskellMode(..),
         safeHaskellOn, safeHaskellModeEnabled,
         safeImportsOn, safeLanguageOn, safeInferOn,
         packageTrustOn,
@@ -257,6 +256,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Monad
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Types.SrcLoc
+import GHC.Types.SafeHaskell
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
 import GHC.Data.FastString
 import GHC.Utils.Fingerprint
@@ -264,9 +264,9 @@ import GHC.Utils.Outputable
 import GHC.Settings
 import GHC.CmmToAsm.CFG.Weight
 
+import GHC.Types.Error
 import {-# SOURCE #-} GHC.Utils.Error
-                               ( Severity(..), MsgDoc, mkLocMessageAnn
-                               , getCaretDiagnostic, DumpAction, TraceAction
+                               ( DumpAction, TraceAction
                                , defaultDumpAction, defaultTraceAction )
 import GHC.Utils.Json
 import GHC.SysTools.Terminal ( stderrSupportsAnsiColors )
@@ -403,27 +403,6 @@ addQuoteInclude spec paths  = let f = includePathsQuote spec
 -- just a flat list of paths.
 flattenIncludes :: IncludeSpecs -> [String]
 flattenIncludes specs = includePathsQuote specs ++ includePathsGlobal specs
-
--- | The various Safe Haskell modes
-data SafeHaskellMode
-   = Sf_None          -- ^ inferred unsafe
-   | Sf_Unsafe        -- ^ declared and checked
-   | Sf_Trustworthy   -- ^ declared and checked
-   | Sf_Safe          -- ^ declared and checked
-   | Sf_SafeInferred  -- ^ inferred as safe
-   | Sf_Ignore        -- ^ @-fno-safe-haskell@ state
-   deriving (Eq)
-
-instance Show SafeHaskellMode where
-    show Sf_None         = "None"
-    show Sf_Unsafe       = "Unsafe"
-    show Sf_Trustworthy  = "Trustworthy"
-    show Sf_Safe         = "Safe"
-    show Sf_SafeInferred = "Safe-Inferred"
-    show Sf_Ignore       = "Ignore"
-
-instance Outputable SafeHaskellMode where
-    ppr = text . show
 
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
@@ -937,13 +916,13 @@ versionedFilePath platform = uniqueSubdir platform
 -- | The 'GhcMode' tells us whether we're doing multi-module
 -- compilation (controlled via the "GHC" API) or one-shot
 -- (single-module) compilation.  This makes a difference primarily to
--- the "GHC.Driver.Finder": in one-shot mode we look for interface files for
+-- the "GHC.Unit.Finder": in one-shot mode we look for interface files for
 -- imported modules, but in multi-module mode we look for source files
 -- in order to check whether they need to be recompiled.
 data GhcMode
   = CompManager         -- ^ @\-\-make@, GHCi, etc.
   | OneShot             -- ^ @ghc -c Foo.hs@
-  | MkDepend            -- ^ @ghc -M@, see "GHC.Driver.Finder" for why we need this
+  | MkDepend            -- ^ @ghc -M@, see "GHC.Unit.Finder" for why we need this
   deriving Eq
 
 instance Outputable GhcMode where
@@ -5080,4 +5059,3 @@ initSDocContext dflags style = SDC
 -- | Initialize the pretty-printing options using the default user style
 initDefaultSDocContext :: DynFlags -> SDocContext
 initDefaultSDocContext dflags = initSDocContext dflags defaultUserStyle
-

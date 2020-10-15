@@ -30,6 +30,7 @@ import GHC.Core
 import GHC.HsToCore.Monad
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Types.SourceText
 import GHC.Types.Id.Make
 import GHC.Types.ForeignCall
 import GHC.Core.DataCon

@@ -26,28 +26,34 @@ where
 import GHC.Prelude
 
 import GHC.Platform
+
+import GHC.Driver.Session
+import GHC.Driver.Config
+
 import GHC.Parser.Errors.Ppr
 import GHC.Parser.Errors
-import GHC.Driver.Types
 import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer
-import GHC.Data.FastString
+
 import GHC.Hs
 import GHC.Unit.Module
 import GHC.Builtin.Names
-import GHC.Data.StringBuffer
+
 import GHC.Types.SrcLoc
-import GHC.Driver.Session
-import GHC.Driver.Config
+import GHC.Types.SourceError
+import GHC.Types.SourceText
+
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Data.Maybe
-import GHC.Data.Bag         ( Bag, emptyBag, listToBag, unitBag, isEmptyBag )
 import GHC.Utils.Monad
 import GHC.Utils.Exception as Exception
-import GHC.Types.Basic
+
+import GHC.Data.StringBuffer
+import GHC.Data.Maybe
+import GHC.Data.Bag         ( Bag, emptyBag, listToBag, unitBag, isEmptyBag )
+import GHC.Data.FastString
 
 import Control.Monad
 import System.IO

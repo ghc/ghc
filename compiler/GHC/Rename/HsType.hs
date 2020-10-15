@@ -57,9 +57,9 @@ import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
 
 import GHC.Utils.Misc
-import GHC.Types.Basic  ( compareFixity, negateFixity
-                        , Fixity(..), FixityDirection(..), LexicalFixity(..)
-                        , TypeOrKind(..) )
+import GHC.Types.Fixity ( compareFixity, negateFixity
+                        , Fixity(..), FixityDirection(..), LexicalFixity(..) )
+import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString

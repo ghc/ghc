@@ -40,49 +40,69 @@ import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecl, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
    , tcIfaceAnnotations, tcIfaceCompleteMatches )
 
+import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Ppr
+import GHC.Driver.Hooks
+import GHC.Driver.Plugins
+
 import GHC.Iface.Syntax
 import GHC.Iface.Env
-import GHC.Driver.Types
+import GHC.Iface.Ext.Fields
+import GHC.Iface.Binary
+import GHC.Iface.Rename
 
-import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Tc.Utils.Monad
 
 import GHC.Utils.Binary   ( BinData(..) )
+import GHC.Utils.Error
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+import GHC.Utils.Fingerprint
+
 import GHC.Settings.Constants
+
 import GHC.Builtin.Names
 import GHC.Builtin.Utils
 import GHC.Builtin.PrimOps    ( allThePrimOps, primOpFixity, primOpOcc )
-import GHC.Types.Id.Make      ( seqId, EnableBignumRules(..) )
+
 import GHC.Core.Rules
 import GHC.Core.TyCon
-import GHC.Types.Annotations
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
+
+import GHC.Types.Id.Make      ( seqId, EnableBignumRules(..) )
+import GHC.Types.Annotations
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Avail
-import GHC.Unit.Module
-import GHC.Unit.State
-import GHC.Data.Maybe
-import GHC.Utils.Error
-import GHC.Driver.Finder
+import GHC.Types.Fixity
+import GHC.Types.Fixity.Env
+import GHC.Types.SourceError
+import GHC.Types.SourceText
+import GHC.Types.SourceFile
+import GHC.Types.SafeHaskell
+import GHC.Types.TypeEnv
 import GHC.Types.Unique.FM
-import GHC.Types.SrcLoc
-import GHC.Utils.Outputable as Outputable
-import GHC.Iface.Binary
-import GHC.Utils.Panic
-import GHC.Utils.Misc
-import GHC.Data.FastString
-import GHC.Utils.Fingerprint
-import GHC.Driver.Hooks
-import GHC.Types.FieldLabel
-import GHC.Iface.Rename
 import GHC.Types.Unique.DSet
-import GHC.Driver.Plugins
+import GHC.Types.SrcLoc
+import GHC.Types.FieldLabel
+import GHC.Types.TyThing
+
+import GHC.Unit.External
+import GHC.Unit.Module
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Deps
+import GHC.Unit.State
 import GHC.Unit.Home
+import GHC.Unit.Home.ModInfo
+import GHC.Unit.Finder
+
+import GHC.Data.Maybe
+import GHC.Data.FastString
 
 import Control.Monad
 import Control.Exception
@@ -873,7 +893,7 @@ Note [Home module load error]
 If the sought-for interface is in the current package (as determined
 by -package-name flag) then it jolly well should already be in the HPT
 because we process home-package modules in dependency order.  (Except
-in one-shot mode; see notes with hsc_HPT decl in GHC.Driver.Types).
+in one-shot mode; see notes with hsc_HPT decl in GHC.Driver.Env).
 
 It is possible (though hard) to get this error through user behaviour.
   * Suppose package P (modules P1, P2) depends on package Q (modules Q1,

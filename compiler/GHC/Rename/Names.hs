@@ -34,38 +34,54 @@ module GHC.Rename.Names (
 
 import GHC.Prelude
 
+import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Core.TyCo.Ppr
-import GHC.Hs
-import GHC.Tc.Utils.Env
+
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
-import GHC.Iface.Load   ( loadSrcInterface )
+
+import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
+
+import GHC.Hs
+import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Builtin.Names
-import GHC.Unit
+import GHC.Parser.PostProcess ( setRdrNameSpace )
+import GHC.Core.Type
+import GHC.Core.PatSyn
+import GHC.Core.TyCo.Ppr
+import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Misc as Utils
+import GHC.Utils.Panic
+
+import GHC.Types.Fixity.Env
+import GHC.Types.SafeHaskell
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.Name.Reader
 import GHC.Types.Avail
 import GHC.Types.FieldLabel
-import GHC.Driver.Types
-import GHC.Types.Name.Reader
-import GHC.Parser.PostProcess ( setRdrNameSpace )
-import GHC.Utils.Outputable as Outputable
-import GHC.Data.Maybe
+import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Basic  ( TopLevelFlag(..), StringLiteral(..) )
-import GHC.Utils.Misc as Utils
-import GHC.Utils.Panic
+import GHC.Types.Basic  ( TopLevelFlag(..) )
+import GHC.Types.SourceText
+import GHC.Types.Id
+import GHC.Types.HpcInfo
+
+import GHC.Unit
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Imported
+import GHC.Unit.Module.Deps
+
+import GHC.Data.Maybe
 import GHC.Data.FastString
 import GHC.Data.FastString.Env
-import GHC.Types.Id
-import GHC.Core.Type
-import GHC.Core.PatSyn
-import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Either      ( partitionEithers, isRight, rights )
@@ -552,7 +568,7 @@ created by its bindings.
 
 Note [Top-level Names in Template Haskell decl quotes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also: Note [Interactively-bound Ids in GHCi] in GHC.Driver.Types
+See also: Note [Interactively-bound Ids in GHCi] in GHC.Driver.Env
           Note [Looking up Exact RdrNames] in GHC.Rename.Env
 
 Consider a Template Haskell declaration quotation like this:

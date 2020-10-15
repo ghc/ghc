@@ -11,22 +11,33 @@ module GHC.HsToCore.Usage (
 
 import GHC.Prelude
 
+import GHC.Driver.Env
 import GHC.Driver.Session
+
+import GHC.Platform
 import GHC.Platform.Ways
-import GHC.Driver.Types
+
 import GHC.Tc.Types
-import GHC.Types.Name
-import GHC.Types.Name.Set
-import GHC.Unit
-import GHC.Unit.State
+
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
-import GHC.Types.Unique.Set
-import GHC.Types.Unique.FM
 import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
+
+import GHC.Types.Name
+import GHC.Types.Name.Set
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM
+
+import GHC.Unit
+import GHC.Unit.External
+import GHC.Unit.State
+import GHC.Unit.Finder
+import GHC.Unit.Module.Imported
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Deps
+
 import GHC.Data.Maybe
-import GHC.Driver.Finder
 
 import Control.Monad (filterM)
 import Data.List
@@ -175,7 +186,7 @@ mkPluginUsage hsc_env pluginModule
     -- search for the library files containing the plugin.
       let searchPaths = collectLibraryPaths (ways dflags) [pkg]
           useDyn = WayDyn `elem` ways dflags
-          suffix = if useDyn then soExt platform else "a"
+          suffix = if useDyn then platformSOExt platform else "a"
           libLocs = [ searchPath </> "lib" ++ libLoc <.> suffix
                     | searchPath <- searchPaths
                     , libLoc     <- packageHsLibs dflags pkg
@@ -187,7 +198,7 @@ mkPluginUsage hsc_env pluginModule
               then libLocs
               else
                 let dflags'  = addWay' WayDyn dflags
-                    dlibLocs = [ searchPath </> mkHsSOName platform dlibLoc
+                    dlibLocs = [ searchPath </> platformHsSOName platform dlibLoc
                                | searchPath <- searchPaths
                                , dlibLoc    <- packageHsLibs dflags' pkg
                                ]

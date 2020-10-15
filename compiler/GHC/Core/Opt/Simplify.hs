@@ -25,6 +25,7 @@ import GHC.Core.Opt.Simplify.Utils
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
+import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Id.Make   ( seqId )
 import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )

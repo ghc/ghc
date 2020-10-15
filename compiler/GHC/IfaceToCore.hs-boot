@@ -3,12 +3,12 @@ module GHC.IfaceToCore where
 import GHC.Prelude
 import GHC.Iface.Syntax ( IfaceDecl, IfaceClsInst, IfaceFamInst, IfaceRule
                         , IfaceAnnotation, IfaceCompleteMatch )
-import GHC.Core.TyCo.Rep   ( TyThing )
+import GHC.Types.TyThing   ( TyThing )
 import GHC.Tc.Types        ( IfL )
 import GHC.Core.InstEnv    ( ClsInst )
 import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core         ( CoreRule )
-import GHC.Driver.Types ( CompleteMatch )
+import GHC.Types.CompleteMatch ( CompleteMatch )
 import GHC.Types.Annotations ( Annotation )
 
 tcIfaceDecl            :: Bool -> IfaceDecl -> IfL TyThing

@@ -30,12 +30,13 @@ import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Driver.Session
 import GHC.Utils.Error
-import GHC.Driver.Types (lookupFixity, mi_fix)
+import GHC.Types.Fixity.Env (lookupFixity)
 import GHC.Hs
 import GHC.Tc.Utils.Instantiate
 import GHC.Core.InstEnv
 import GHC.Iface.Load   (loadInterfaceForName)
 import GHC.Unit.Module (getModule)
+import GHC.Unit.Module.ModIface (mi_fix)
 import GHC.Types.Name
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

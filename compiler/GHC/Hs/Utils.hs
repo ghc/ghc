@@ -116,8 +116,6 @@ import GHC.Hs.Lit
 import GHC.Hs.Extension
 
 import GHC.Tc.Types.Evidence
-import GHC.Types.Name.Reader
-import GHC.Types.Var
 import GHC.Core.TyCo.Rep
 import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Builtin.Types ( unitTy )
@@ -128,8 +126,12 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Set hiding ( unitFV )
 import GHC.Types.Name.Env
+import GHC.Types.Name.Reader
+import GHC.Types.Var
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
+import GHC.Types.Fixity
+import GHC.Types.SourceText
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Settings.Constants
