@@ -63,11 +63,18 @@ import GHC.List (repeat, zipWith, drop)
 import GHC.Read (Read)
 import GHC.Show (Show)
 
+-- | Recover an 'Applicative' instance from a 'Monad' instance.
+--
+-- Since the Applicative-Monad-Proposal landed in GHC 7.10, this
+-- type is no longer useful. All types with a 'Monad' instance
+-- /must/ have an 'Applicative' instance. This type is deprecated
+-- and will be removed in GHC 8.8.
 newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
                          deriving ( Generic  -- ^ @since 4.7.0.0
                                   , Generic1 -- ^ @since 4.7.0.0
                                   , Monad    -- ^ @since 4.7.0.0
                                   )
+{-# DEPRECATED WrappedMonad #-}
 
 -- | @since 2.01
 instance Monad m => Functor (WrappedMonad m) where
