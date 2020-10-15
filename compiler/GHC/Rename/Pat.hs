@@ -66,6 +66,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
+import GHC.Types.SourceText
 import GHC.Utils.Misc
 import GHC.Data.List.SetOps( removeDups )
 import GHC.Utils.Outputable

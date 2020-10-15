@@ -48,28 +48,57 @@ module GHC.Runtime.Eval (
 
 import GHC.Prelude
 
-import GHC.Runtime.Eval.Types
-
-import GHC.Runtime.Interpreter as GHCi
-import GHC.Runtime.Interpreter.Types
-import GHCi.Message
-import GHCi.RemoteTypes
 import GHC.Driver.Monad
 import GHC.Driver.Main
+import GHC.Driver.Env
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+
+import GHC.Runtime.Eval.Types
+import GHC.Runtime.Interpreter as GHCi
+import GHC.Runtime.Interpreter.Types
+import GHC.Runtime.Linker as Linker
+import GHC.Runtime.Linker.Types
+import GHC.Runtime.Heap.Inspect
+import GHC.Runtime.Context
+import GHCi.Message
+import GHCi.RemoteTypes
+import GHC.ByteCode.Types
+
 import GHC.Hs
-import GHC.Driver.Types
+
+import GHC.Core.Predicate
 import GHC.Core.InstEnv
-import GHC.Iface.Env       ( newInteractiveBinder )
 import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core.FVs        ( orphNamesOfFamInst )
 import GHC.Core.TyCon
 import GHC.Core.Type       hiding( typeKind )
 import qualified GHC.Core.Type as Type
-import GHC.Types.RepType
+
+import GHC.Iface.Env       ( newInteractiveBinder )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
-import GHC.Core.Predicate
+
+import GHC.Builtin.Names ( toDynName, pretendNameIsInScope )
+import GHC.Builtin.Types ( isCTupleTyConName )
+
+import GHC.Data.Maybe
+import GHC.Data.FastString
+import GHC.Data.Bag
+
+import GHC.Utils.Monad
+import GHC.Utils.Panic
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+
+import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, initParserState)
+import GHC.Parser.Lexer (ParserOpts)
+import qualified GHC.Parser       as Parser (parseStmt, parseModule, parseDeclaration, parseImport)
+
+import GHC.Types.RepType
+import GHC.Types.Fixity.Env
 import GHC.Types.Var
 import GHC.Types.Id as Id
 import GHC.Types.Name      hiding ( varName )
@@ -77,28 +106,15 @@ import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Var.Env
-import GHC.ByteCode.Types
-import GHC.Runtime.Linker as Linker
-import GHC.Driver.Session
-import GHC.Driver.Ppr
+import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
-import GHC.Utils.Monad
+import GHC.Types.TyThing
+
 import GHC.Unit
-import GHC.Builtin.Names ( toDynName, pretendNameIsInScope )
-import GHC.Builtin.Types ( isCTupleTyConName )
-import GHC.Utils.Panic
-import GHC.Data.Maybe
-import GHC.Utils.Error
-import GHC.Types.SrcLoc
-import GHC.Runtime.Heap.Inspect
-import GHC.Utils.Outputable
-import GHC.Data.FastString
-import GHC.Data.Bag
-import GHC.Utils.Misc
-import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, initParserState)
-import GHC.Parser.Lexer (ParserOpts)
-import qualified GHC.Parser       as Parser (parseStmt, parseModule, parseDeclaration, parseImport)
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Home.ModInfo
 
 import System.Directory
 import Data.Dynamic

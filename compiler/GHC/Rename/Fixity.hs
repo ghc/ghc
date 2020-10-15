@@ -16,21 +16,28 @@ import GHC.Prelude
 
 import GHC.Iface.Load
 import GHC.Hs
-import GHC.Types.Name.Reader
-import GHC.Driver.Types
 import GHC.Tc.Utils.Monad
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+
+import GHC.Types.Fixity.Env
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Unit.Module
-import GHC.Types.Basic  ( Fixity(..), FixityDirection(..), minPrecedence,
-                          defaultFixity, SourceText(..) )
+import GHC.Types.Name.Reader
+import GHC.Types.Fixity
+import GHC.Types.SourceText
 import GHC.Types.SrcLoc
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
 import GHC.Data.Maybe
+
+import GHC.Rename.Unbound
+
 import Data.List
 import Data.Function    ( on )
-import GHC.Rename.Unbound
 
 {-
 *********************************************************

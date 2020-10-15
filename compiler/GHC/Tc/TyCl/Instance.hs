@@ -67,11 +67,13 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Data.Bag
 import GHC.Types.Basic
+import GHC.Types.Fixity
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Error
 import GHC.Data.FastString
 import GHC.Types.Id
+import GHC.Types.SourceText
 import GHC.Data.List.SetOps
 import GHC.Types.Name
 import GHC.Types.Name.Set

@@ -115,6 +115,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
 
 import GHC.Types.Var    ( TyVar, mkTyVar )
 import GHC.Types.Name
+import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Core.TyCon
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
@@ -199,14 +200,14 @@ mkPrimTc :: FastString -> Unique -> TyCon -> Name
 mkPrimTc fs unique tycon
   = mkWiredInName gHC_PRIM (mkTcOccFS fs)
                   unique
-                  (ATyCon tycon)        -- Relevant TyCon
+                  (mkATyCon tycon)        -- Relevant TyCon
                   UserSyntax
 
 mkBuiltInPrimTc :: FastString -> Unique -> TyCon -> Name
 mkBuiltInPrimTc fs unique tycon
   = mkWiredInName gHC_PRIM (mkTcOccFS fs)
                   unique
-                  (ATyCon tycon)        -- Relevant TyCon
+                  (mkATyCon tycon)        -- Relevant TyCon
                   BuiltInSyntax
 
 
@@ -547,7 +548,7 @@ mkPrimTyConName = mkPrimTcName BuiltInSyntax
 
 mkPrimTcName :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
 mkPrimTcName built_in_syntax occ key tycon
-  = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (ATyCon tycon) built_in_syntax
+  = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (mkATyCon tycon) built_in_syntax
 
 -----------------------------
 -- | Given a RuntimeRep, applies TYPE to it.

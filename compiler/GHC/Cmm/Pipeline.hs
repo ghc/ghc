@@ -24,7 +24,7 @@ import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Utils.Error
-import GHC.Driver.Types
+import GHC.Driver.Env
 import Control.Monad
 import GHC.Utils.Outputable
 import GHC.Platform

@@ -8,13 +8,19 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.InstEnv
-import GHC.Driver.Types
+
 import GHC.StgToCmm.Types (CgInfos (..))
+
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Var
+import GHC.Types.TypeEnv
+import GHC.Types.TyThing
+
+import GHC.Unit.Module.ModDetails
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

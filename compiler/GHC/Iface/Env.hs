@@ -16,7 +16,7 @@ module GHC.Iface.Env (
         ifaceExportNames,
 
         -- Name-cache stuff
-        allocateGlobalBinder, updNameCacheTc,
+        allocateGlobalBinder, updNameCacheTc, updNameCache,
         mkNameCacheUpdater, NameCacheUpdater(..),
    ) where
 
@@ -24,22 +24,29 @@ module GHC.Iface.Env (
 
 import GHC.Prelude
 
+import GHC.Driver.Env
+
 import GHC.Tc.Utils.Monad
-import GHC.Driver.Types
 import GHC.Core.Type
+import GHC.Iface.Type
+import GHC.Runtime.Context
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
+
 import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Avail
-import GHC.Unit.Module
-import GHC.Data.FastString
-import GHC.Data.FastString.Env
-import GHC.Iface.Type
 import GHC.Types.Name.Cache
 import GHC.Types.Unique.Supply
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
 import Data.List     ( partition )
+import Data.IORef
 
 {-
 *********************************************************
@@ -296,3 +303,20 @@ newIfaceNames occs
   = do  { uniqs <- newUniqueSupply
         ; return [ mkInternalName uniq occ noSrcSpan
                  | (occ,uniq) <- occs `zip` uniqsFromSupply uniqs] }
+
+{-
+Names in a NameCache are always stored as a Global, and have the SrcLoc
+of their binding locations.
+
+Actually that's not quite right.  When we first encounter the original
+name, we might not be at its binding site (e.g. we are reading an
+interface file); so we give it 'noSrcLoc' then.  Later, when we find
+its binding site, we fix it up.
+-}
+
+updNameCache :: IORef NameCache
+             -> (NameCache -> (NameCache, c))  -- The updating function
+             -> IO c
+updNameCache ncRef upd_fn
+  = atomicModifyIORef' ncRef upd_fn
+
