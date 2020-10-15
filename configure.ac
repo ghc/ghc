@@ -417,7 +417,8 @@ set_up_tarballs() {
         rm -rf inplace/mingw
         local base_dir="../ghc-tarballs/${tarball_dest_dir}"
         ( cd inplace &&
-        find "${base_dir}" -name "*.tar.xz" -exec tar xfJ {} \; &&
+        find "${base_dir}" -name "*.tar.xz" -exec tar --xz -xf {} \; &&
+        find "${base_dir}" -name "*.tar.zst" -exec tar --zstd -xf {} \; &&
         rm ".MTREE" &&
         rm ".PKGINFO" &&
         cd .. ) || AC_MSG_ERROR([Could not extract Windows toolchains.])
