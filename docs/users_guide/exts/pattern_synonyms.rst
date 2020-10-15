@@ -523,15 +523,17 @@ below:
 Pragmas for pattern synonyms
 ----------------------------
 
-The :ref:`inline-pragma` and :ref:`noinline-pragma` are supported for pattern
+The :ref:`inlinable-pragma`, :ref:`inline-pragma` and :ref:`noinline-pragma` are supported for pattern
 synonyms. For example: ::
 
+    patternInlinablePattern x = [x]
+    {-# INLINABLE InlinablePattern #-}
     pattern InlinedPattern x = [x]
     {-# INLINE InlinedPattern #-}
     pattern NonInlinedPattern x = [x]
     {-# NOINLINE NonInlinedPattern #-}
 
-As with other ``INLINE`` and ``NOINLINE`` pragmas, it's possible to specify
+As with other ``INLINABLE``, ``INLINE`` and ``NOINLINE`` pragmas, it's possible to specify
 to which phase the pragma applies: ::
 
     pattern Q x = [x]
@@ -550,6 +552,6 @@ but this will: ::
     pattern HeadC x <- x:xs where
       HeadC x = [x]
     {-# INLINE HeadC #-}
-  
+
 When no pragma is provided for a pattern, the inlining decision is made by
 GHC's own inlining heuristics.
