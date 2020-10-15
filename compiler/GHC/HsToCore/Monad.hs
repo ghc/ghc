@@ -57,42 +57,58 @@ module GHC.HsToCore.Monad (
 
 import GHC.Prelude
 
-import GHC.Tc.Utils.Monad
+import GHC.Driver.Env
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+
+import GHC.Hs
+
+import GHC.HsToCore.Types
+import GHC.HsToCore.Pmc.Solver.Types (Nablas, initNablas)
+
 import GHC.Core.FamInstEnv
 import GHC.Core
 import GHC.Core.Make  ( unitExpr )
 import GHC.Core.Utils ( exprType, isExprLevPoly )
-import GHC.Hs
-import GHC.IfaceToCore
-import GHC.Tc.Utils.TcMType ( checkForLevPolyX, formatLevPolyErr )
-import GHC.Builtin.Names
-import GHC.Types.Name.Reader
-import GHC.Driver.Types
-import GHC.Data.Bag
-import GHC.Types.Basic ( Origin )
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
-import GHC.HsToCore.Types
-import GHC.HsToCore.Pmc.Solver.Types (Nablas, initNablas)
-import GHC.Types.Id
-import GHC.Unit.Module
-import GHC.Unit.Home
-import GHC.Unit.State
-import GHC.Utils.Outputable
-import GHC.Types.SrcLoc
 import GHC.Core.Type
 import GHC.Core.Multiplicity
+
+import GHC.IfaceToCore
+
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcMType ( checkForLevPolyX, formatLevPolyErr )
+
+import GHC.Builtin.Names
+
+import GHC.Data.Bag
+import GHC.Data.FastString
+
+import GHC.Unit.External
+import GHC.Unit.Module
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Home
+import GHC.Unit.State
+
+import GHC.Types.Name.Reader
+import GHC.Types.Basic ( Origin )
+import GHC.Types.SourceFile
+import GHC.Types.Id
+import GHC.Types.SrcLoc
+import GHC.Types.TypeEnv
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Utils.Error
-import GHC.Utils.Panic
-import GHC.Data.FastString
+import GHC.Types.Name.Ppr
 import GHC.Types.Literal ( mkLitString )
 import GHC.Types.CostCentre.State
+import GHC.Types.TyThing
+
+import GHC.Utils.Outputable
+import GHC.Utils.Error
+import GHC.Utils.Panic
 
 import Data.IORef
 

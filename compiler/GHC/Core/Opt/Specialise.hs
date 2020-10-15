@@ -14,44 +14,53 @@ module GHC.Core.Opt.Specialise ( specProgram, specUnfolding ) where
 
 import GHC.Prelude
 
-import GHC.Types.Id
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Config
+import GHC.Driver.Env
+
 import GHC.Tc.Utils.TcType hiding( substTy )
+
 import GHC.Core.Type  hiding( substTy, extendTvSubstList )
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate
-import GHC.Unit.Module( Module )
 import GHC.Core.Coercion( Coercion )
 import GHC.Core.Opt.Monad
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
-import GHC.Types.Var      ( isLocalVar )
-import GHC.Types.Var.Set
-import GHC.Types.Var.Env
 import GHC.Core
 import GHC.Core.Rules
 import GHC.Core.Utils     ( exprIsTrivial, getIdFromTrivialExpr_maybe
                           , mkCast, exprType )
 import GHC.Core.FVs
+import GHC.Core.TyCo.Rep (TyCoBinder (..))
 import GHC.Core.Opt.Arity     ( collectBindersPushingCo
                               , etaExpandToJoinPointRule )
+
+import GHC.Builtin.Types  ( unboxedUnitTy )
+
+import GHC.Data.Maybe     ( mapMaybe, maybeToList, isJust )
+import GHC.Data.Bag
+import GHC.Data.FastString
+
+import GHC.Types.Basic
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DFM
 import GHC.Types.Name
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
-import GHC.Builtin.Types  ( unboxedUnitTy )
-import GHC.Data.Maybe     ( mapMaybe, maybeToList, isJust )
+import GHC.Types.Var      ( isLocalVar )
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
+import GHC.Types.Id
+
 import GHC.Utils.Monad    ( foldlM )
-import GHC.Types.Basic
-import GHC.Driver.Types
-import GHC.Data.Bag
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Driver.Config
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
-import GHC.Types.Unique.DFM
-import GHC.Core.TyCo.Rep (TyCoBinder (..))
+
+import GHC.Unit.Module( Module )
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.External
 
 {-
 ************************************************************************

@@ -35,45 +35,62 @@ module GHC.Driver.Make (
 
 import GHC.Prelude
 
+import GHC.Tc.Utils.Backpack
+
 import qualified GHC.Runtime.Linker as Linker
+import GHC.Runtime.Linker.Types
+import GHC.Runtime.Context
 
 import GHC.Driver.Config
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
 import GHC.Driver.Backend
-import GHC.Utils.Error
-import GHC.Driver.Finder
 import GHC.Driver.Monad
-import GHC.Parser.Header
-import GHC.Parser.Errors.Ppr
-import GHC.Driver.Types
-import GHC.Unit
-import GHC.Unit.State
-import GHC.IfaceToCore     ( typecheckIface )
-import GHC.Tc.Utils.Monad  ( initIfaceCheck )
+import GHC.Driver.Env
 import GHC.Driver.Main
 
+import GHC.Parser.Header
+import GHC.Parser.Errors.Ppr
+
+import GHC.Utils.Error
+import GHC.IfaceToCore     ( typecheckIface )
+import GHC.Tc.Utils.Monad  ( initIfaceCheck )
+
 import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
-import GHC.Types.Basic
 import GHC.Data.Graph.Directed
-import GHC.Utils.Exception ( tryIO )
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
-import GHC.Types.Name
+import GHC.Data.StringBuffer
+import qualified GHC.LanguageExtensions as LangExt
+import GHC.SysTools.FileCleanup
+
+import GHC.Utils.Exception ( tryIO )
 import GHC.Utils.Monad     ( allM )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Misc
+
+import GHC.Types.Basic
+import GHC.Types.Target
+import GHC.Types.SourceFile
+import GHC.Types.SourceError
 import GHC.Types.SrcLoc
-import GHC.Data.StringBuffer
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
-import GHC.Tc.Utils.Backpack
 import GHC.Types.Unique.Set
-import GHC.Utils.Misc
-import qualified GHC.LanguageExtensions as LangExt
+import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.SysTools.FileCleanup
+
+import GHC.Unit
+import GHC.Unit.External
+import GHC.Unit.State
+import GHC.Unit.Finder
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.Graph
+import GHC.Unit.Home.ModInfo
 
 import Data.Either ( rights, partitionEithers )
 import qualified Data.Map as Map

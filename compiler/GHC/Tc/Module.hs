@@ -48,28 +48,16 @@ module GHC.Tc.Module (
 
 import GHC.Prelude
 
+import GHC.Driver.Env
+import GHC.Driver.Plugins
+import GHC.Driver.Session
+
+import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR (..) )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice ( finishTH, runRemoteModFinalizers )
-import GHC.Rename.Splice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
-import GHC.Iface.Env     ( externaliseName )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Validity( checkValidType )
 import GHC.Tc.Gen.Match
 import GHC.Tc.Utils.Unify( checkConstraints )
-import GHC.Rename.HsType
-import GHC.Rename.Expr
-import GHC.Rename.Utils  ( HsDocContext(..) )
-import GHC.Rename.Fixity ( lookupFixityRn )
-import GHC.Builtin.Types ( unitTy, mkListTy )
-import GHC.Driver.Plugins
-import GHC.Driver.Session
-import GHC.Hs
-import GHC.Iface.Syntax   ( ShowSub(..), showToHeader )
-import GHC.Iface.Type     ( ShowForAllFlag(..) )
-import GHC.Core.PatSyn    ( pprPatSynType )
-import GHC.Core.Predicate ( classMethodTy )
-import GHC.Builtin.Names
-import GHC.Builtin.Utils
-import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Expr
 import GHC.Tc.Errors( reportAllUnsolved )
@@ -79,24 +67,14 @@ import GHC.Tc.Gen.Export
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
-import qualified GHC.Data.BooleanFormula as BF
-import GHC.Core.Ppr.TyThing ( pprTyThingInContext )
-import GHC.Core.FVs         ( orphNamesOfFamInst )
 import GHC.Tc.Instance.Family
-import GHC.Core.InstEnv
-import GHC.Core.FamInstEnv
-   ( FamInst, pprFamInst, famInstsRepTyCons
-   , famInstEnvElts, extendFamInstEnvList, normaliseType )
 import GHC.Tc.Gen.Annotation
 import GHC.Tc.Gen.Bind
-import GHC.Iface.Make   ( coAxiomToIfaceDecl )
-import GHC.Parser.Header       ( mkPrelImports )
 import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Rule
 import GHC.Tc.Gen.Foreign
 import GHC.Tc.TyCl.Instance
-import GHC.IfaceToCore
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate (tcGetInsts)
@@ -104,49 +82,96 @@ import GHC.Tc.Solver
 import GHC.Tc.TyCl
 import GHC.Tc.Instance.Typeable ( mkTypeableBinds )
 import GHC.Tc.Utils.Backpack
-import GHC.Iface.Load
+
+import GHC.Rename.Splice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
+import GHC.Rename.HsType
+import GHC.Rename.Expr
+import GHC.Rename.Utils  ( HsDocContext(..) )
+import GHC.Rename.Fixity ( lookupFixityRn )
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Module
+
+import GHC.Iface.Syntax   ( ShowSub(..), showToHeader )
+import GHC.Iface.Type     ( ShowForAllFlag(..) )
+import GHC.Iface.Env     ( externaliseName )
+import GHC.Iface.Make   ( coAxiomToIfaceDecl )
+import GHC.Iface.Load
+
+import GHC.Builtin.Types ( unitTy, mkListTy )
+import GHC.Builtin.Names
+import GHC.Builtin.Utils
+
+import GHC.Hs
+import GHC.Hs.Dump
+
+import GHC.Core.PatSyn    ( pprPatSynType )
+import GHC.Core.Predicate ( classMethodTy )
+import GHC.Core.FVs         ( orphNamesOfFamInst )
+import GHC.Core.InstEnv
+import GHC.Core.TyCon
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.Type
+import GHC.Core.Class
+import GHC.Core.Coercion.Axiom
+import GHC.Core.FamInstEnv
+   ( FamInst, pprFamInst, famInstsRepTyCons
+   , famInstEnvElts, extendFamInstEnvList, normaliseType )
+
+import GHC.Parser.Header       ( mkPrelImports )
+
+import GHC.IfaceToCore
+
+import GHC.Runtime.Context
+
 import GHC.Utils.Error
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+
+import GHC.Types.Name.Reader
+import GHC.Types.Fixity.Env
 import GHC.Types.Id as Id
 import GHC.Types.Id.Info( IdDetails(..) )
 import GHC.Types.Var.Env
-import GHC.Unit
+import GHC.Types.TypeEnv
 import GHC.Types.Unique.FM
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Avail
-import GHC.Core.TyCon
-import GHC.Types.SrcLoc
-import GHC.Driver.Types
-import GHC.Data.List.SetOps
-import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Panic
-import GHC.Core.ConLike
-import GHC.Core.DataCon
-import GHC.Core.Type
-import GHC.Core.Class
 import GHC.Types.Basic hiding( SuccessFlag(..) )
-import GHC.Core.Coercion.Axiom
 import GHC.Types.Annotations
-import Data.List ( find, sortBy, sort )
-import Data.Ord
+import GHC.Types.SrcLoc
+import GHC.Types.SourceText
+import GHC.Types.SourceFile
+import GHC.Types.TyThing.Ppr ( pprTyThingInContext )
+import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Unit.External
+import GHC.Unit.Types
+import GHC.Unit.State
+import GHC.Unit.Home
+import GHC.Unit.Module
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.Deps
+
 import GHC.Data.FastString
 import GHC.Data.Maybe
-import GHC.Utils.Misc
+import GHC.Data.List.SetOps
 import GHC.Data.Bag
-import qualified GHC.LanguageExtensions as LangExt
-import Data.Data ( Data )
-import GHC.Hs.Dump
-import qualified Data.Set as S
+import qualified GHC.Data.BooleanFormula as BF
 
+import Data.List ( find, sortBy, sort )
+import Data.Ord
+import Data.Data ( Data )
+import qualified Data.Set as S
 import Control.DeepSeq
 import Control.Monad
-
-import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR (..) )
-
 
 #include "HsVersions.h"
 
@@ -2099,7 +2124,7 @@ tcRnStmt hsc_env rdr_stmt
     traceTc "tcs 1" empty ;
     this_mod <- getModule ;
     global_ids <- mapM (externaliseAndTidyId this_mod) zonked_ids ;
-        -- Note [Interactively-bound Ids in GHCi] in GHC.Driver.Types
+        -- Note [Interactively-bound Ids in GHCi] in GHC.Driver.Env
 
 {- ---------------------------------------------
    At one stage I removed any shadowed bindings from the type_env;
@@ -2170,7 +2195,7 @@ runPlans (p:ps) = tryTcDiscardingErrs (runPlans ps) p
 --
 -- By 'lift' and 'environment we mean that the code is changed to
 -- execute properly in an IO monad. See Note [Interactively-bound Ids
--- in GHCi] in GHC.Driver.Types for more details. We do this lifting by trying
+-- in GHCi] in GHC.Driver.Env for more details. We do this lifting by trying
 -- different ways ('plans') of lifting the code into the IO monad and
 -- type checking each plan until one succeeds.
 tcUserStmt :: GhciLStmt GhcPs -> TcM (PlanResult, FixityEnv)
