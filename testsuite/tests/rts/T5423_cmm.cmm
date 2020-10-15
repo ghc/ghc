@@ -10,7 +10,6 @@ test (W_ r1,
       W_ r9,
       W_ r10)
  {
-    foreign "C" printf("%d  %d  %d  %d  %d  %d  %d  %d  %d  %d\n",
-                        r1, r2, r3, r4, r5, r6, r7, r8, r9, r10);
+    foreign "C" print_it(r1, r2, r3, r4, r5, r6, r7, r8, r9, r10);
     return (r10);
  }
