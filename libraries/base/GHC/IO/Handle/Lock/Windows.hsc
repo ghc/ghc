@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE InterruptibleFFI #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | File locking for Windows.
 module GHC.IO.Handle.Lock.Windows where
