@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE InterruptibleFFI #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
