@@ -5,8 +5,8 @@ variables:
   DOCKER_REV: 6ceb0cecaeefd4927b26c054e4897724986078c8
 
   # Sequential version number capturing the versions of all tools fetched by
-  # .gitlab/ci.sh.
-  WINDOWS_TOOLCHAIN_VERSION: 3
+  # .gitlab/ci.sh. Used for invalidation of GitLab CI cache.
+  WINDOWS_TOOLCHAIN_VERSION: 4
 
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
