@@ -151,7 +151,9 @@
          __imp___acrt_iob_func, __rts_iob_func, true))   \
       RTS_WIN32_ONLY(SymI_HasProto_redirect(             \
          __imp____acrt_iob_func, __rts_iob_func, true))  \
-      SymI_HasProto(__mingw_vsnwprintf)
+      SymI_HasProto(__mingw_vsnwprintf)                  \
+      /* ^^ Need to figure out why this is needed.  */   \
+      SymI_HasProto(__mingw_vfprintf)                    \
       /* ^^ Need to figure out why this is needed.  */
 
 #define RTS_MINGW_COMPAT_SYMBOLS                         \
