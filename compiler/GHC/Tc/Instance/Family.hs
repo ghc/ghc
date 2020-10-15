@@ -14,33 +14,46 @@ module GHC.Tc.Instance.Family (
 
 import GHC.Prelude
 
-import GHC.Driver.Types
+import GHC.Driver.Session
+import GHC.Driver.Env
+
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv( roughMatchTcs )
 import GHC.Core.Coercion
-import GHC.Tc.Types.Evidence
-import GHC.Iface.Load
-import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.Instantiate( freshenTyVarBndrs, freshenCoVarBndrsX )
-import GHC.Types.SrcLoc as SrcLoc
 import GHC.Core.TyCon
-import GHC.Tc.Utils.TcType
 import GHC.Core.Coercion.Axiom
-import GHC.Driver.Session
-import GHC.Unit.Module
-import GHC.Utils.Outputable
-import GHC.Utils.Misc
-import GHC.Types.Name.Reader
 import GHC.Core.DataCon ( dataConName )
-import GHC.Data.Maybe
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr ( pprWithExplicitKindsWhen )
+
+import GHC.Iface.Load
+
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Instantiate( freshenTyVarBndrs, freshenCoVarBndrsX )
+import GHC.Tc.Utils.TcType
+
+import GHC.Unit.External
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.Deps
+import GHC.Unit.Home.ModInfo
+
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Name.Reader
 import GHC.Types.Name
-import GHC.Utils.Panic
 import GHC.Types.Var.Set
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Utils.FV
+
 import GHC.Data.Bag( Bag, unionBags, unitBag )
+import GHC.Data.Maybe
+
 import Control.Monad
 import Data.List ( sortBy )
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -215,7 +228,7 @@ two modules are consistent--because we checked that when we compiled M.
 
 For every other pair of family instance modules we import (directly or
 indirectly), we check that they are consistent now. (So that we can be
-certain that the modules in our `GHC.Driver.Types.dep_finsts' are consistent.)
+certain that the modules in our `GHC.Driver.Env.dep_finsts' are consistent.)
 
 There is some fancy footwork regarding hs-boot module loops, see
 Note [Don't check hs-boot type family instances too early]

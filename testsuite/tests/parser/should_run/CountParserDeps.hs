@@ -10,7 +10,7 @@ module Main(main) where
 -- provided with as small a number of modules as possible for when the
 -- need exists to produce ASTs and nothing more.
 
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHC.Unit.Module
 import GHC.Driver.Session
 import GHC.Driver.Main
@@ -22,13 +22,14 @@ import Control.Monad.IO.Class
 import System.Environment
 import System.Exit
 import GHC.Types.Unique.Set
+import GHC.Unit.Module.Deps
 
 main :: IO ()
 main = do
   [libdir] <- getArgs
   modules <- parserDeps libdir
   let num = sizeUniqSet modules
-      max_num = 205
+      max_num = 234
       min_num = max_num - 10 -- so that we don't forget to change the number
                              -- when the number of dependencies decreases
   -- putStrLn $ "Found " ++ show num ++ " parser module dependencies"

@@ -151,47 +151,61 @@ module GHC.Tc.Utils.Monad(
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
+
+import GHC.Builtin.Names
 
 import GHC.Tc.Types     -- Re-export all
-import GHC.Data.IOEnv -- Re-export all
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
+import GHC.Tc.Utils.TcType
 
 import GHC.Hs hiding (LIE)
-import GHC.Driver.Types
+
 import GHC.Unit
-import GHC.Types.Name.Reader
-import GHC.Types.Name
+import GHC.Unit.External
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Home.ModInfo
+
 import GHC.Core.UsageEnv
 import GHC.Core.Multiplicity
-import GHC.Core.Type
-
-import GHC.Tc.Utils.TcType
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Builtin.Names
 
+import GHC.Driver.Env
+import GHC.Driver.Ppr
+import GHC.Driver.Session
+
+import GHC.Runtime.Context
+
+import GHC.Data.IOEnv -- Re-export all
+import GHC.Data.Bag
+import GHC.Data.FastString
+import GHC.Data.Maybe
+
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Error
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+
+import GHC.Types.Fixity.Env
+import GHC.Types.Name.Reader
+import GHC.Types.Name
+import GHC.Types.SafeHaskell
 import GHC.Types.Id
+import GHC.Types.TypeEnv
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Utils.Error
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Data.Bag
-import GHC.Utils.Outputable as Outputable
+import GHC.Types.Name.Ppr
 import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
-import GHC.Driver.Session
-import GHC.Data.FastString
-import GHC.Utils.Panic
-import GHC.Utils.Misc
 import GHC.Types.Annotations
 import GHC.Types.Basic( TopLevelFlag, TypeOrKind(..) )
-import GHC.Data.Maybe
 import GHC.Types.CostCentre.State
+import GHC.Types.SourceFile
 
 import qualified GHC.LanguageExtensions as LangExt
 

@@ -1,15 +1,17 @@
 {-
 (c) The University of Glasgow, 2000-2006
 
-\section[Finder]{Module Finder}
 -}
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module GHC.Driver.Finder (
-    flushFinderCaches,
+-- | Module finder
+module GHC.Unit.Finder (
     FindResult(..),
+    InstalledFindResult(..),
+    FinderCache,
+    flushFinderCaches,
     findImportedModule,
     findPluginModule,
     findExactModule,
@@ -36,21 +38,28 @@ module GHC.Driver.Finder (
 
 import GHC.Prelude
 
+import GHC.Driver.Env
+import GHC.Driver.Session
+
+import GHC.Platform.Ways
+
+import GHC.Builtin.Names ( gHC_PRIM )
+
 import GHC.Unit.Types
 import GHC.Unit.Module
 import GHC.Unit.Home
 import GHC.Unit.State
+import GHC.Unit.Finder.Types
 
-import GHC.Driver.Types
 import GHC.Data.FastString
+import GHC.Data.Maybe    ( expectJust )
 import qualified GHC.Data.ShortText as ST
+
 import GHC.Utils.Misc
-import GHC.Builtin.Names ( gHC_PRIM )
-import GHC.Driver.Session
-import GHC.Platform.Ways
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Data.Maybe    ( expectJust )
+
+import GHC.Runtime.Linker.Types
 
 import Data.IORef       ( IORef, readIORef, atomicModifyIORef' )
 import System.Directory

@@ -50,27 +50,34 @@ module GHC.Core.Opt.Monad (
 
 import GHC.Prelude hiding ( read )
 
+import GHC.Driver.Session
+import GHC.Driver.Env
+
 import GHC.Core
 import GHC.Core.Unfold
-import GHC.Driver.Types
-import GHC.Unit.Module
-import GHC.Driver.Session
+
 import GHC.Types.Basic  ( CompilerPhase(..) )
 import GHC.Types.Annotations
-
-import GHC.Data.IOEnv hiding     ( liftIO, failM, failWithM )
-import qualified GHC.Data.IOEnv  as IOEnv
 import GHC.Types.Var
-import GHC.Utils.Outputable as Outputable
-import GHC.Data.FastString
-import GHC.Utils.Error( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
 import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
-import GHC.Utils.Monad
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
-import Data.Bifunctor ( bimap )
+
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Error( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
+import GHC.Utils.Monad
 import GHC.Utils.Error (dumpAction)
+
+import GHC.Data.FastString
+import GHC.Data.IOEnv hiding     ( liftIO, failM, failWithM )
+import qualified GHC.Data.IOEnv  as IOEnv
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.External
+
+import Data.Bifunctor ( bimap )
 import Data.List (intersperse, groupBy, sortBy)
 import Data.Ord
 import Data.Dynamic

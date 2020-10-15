@@ -385,7 +385,7 @@ giving rise to the FamInstBranch.
 
 Note [Implicit axioms]
 ~~~~~~~~~~~~~~~~~~~~~~
-See also Note [Implicit TyThings] in GHC.Driver.Types
+See also Note [Implicit TyThings] in GHC.Types.TyThing
 * A CoAxiom arising from data/type family instances is not "implicit".
   That is, it has its own IfaceAxiom declaration in an interface file
 
