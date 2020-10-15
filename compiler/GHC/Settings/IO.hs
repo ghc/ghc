@@ -155,8 +155,6 @@ initSettings top_dir = do
   ghcWithSMP <- getBooleanSetting "Support SMP"
   ghcRTSWays <- getSetting "RTS ways"
   useLibFFI <- getBooleanSetting "Use LibFFI"
-  ghcThreaded <- getBooleanSetting "Use Threads"
-  ghcDebugged <- getBooleanSetting "Use Debugging"
   ghcRtsWithLibdw <- getBooleanSetting "RTS expects libdw"
 
   return $ Settings
@@ -225,8 +223,6 @@ initSettings top_dir = do
       , platformMisc_ghcWithSMP = ghcWithSMP
       , platformMisc_ghcRTSWays = ghcRTSWays
       , platformMisc_libFFI = useLibFFI
-      , platformMisc_ghcThreaded = ghcThreaded
-      , platformMisc_ghcDebugged = ghcDebugged
       , platformMisc_ghcRtsWithLibdw = ghcRtsWithLibdw
       , platformMisc_llvmTarget = llvmTarget
       }

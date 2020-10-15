@@ -9,7 +9,6 @@ import Data.Foldable (for_)
 import Base
 import qualified Context
 import Expression
-import Flavour
 import Hadrian.Oracles.TextFile (lookupValueOrError)
 import Oracles.Flag
 import Oracles.ModuleFiles
@@ -338,8 +337,6 @@ generateSettings = do
         , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
         , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
         , ("Use LibFFI", expr $ yesNo <$> useLibFFIForAdjustors)
-        , ("Use Threads", expr $ yesNo . ghcThreaded <$> flavour)
-        , ("Use Debugging", expr $ yesNo . ghcDebugged <$> flavour)
         , ("RTS expects libdw", yesNo <$> getFlag WithLibdw)
         ]
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
