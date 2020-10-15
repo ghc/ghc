@@ -979,6 +979,50 @@ by saying ``-fno-wombat``.
     which returns a constrained type. For example, a type class where one
     of the methods implements a traversal.
 
+.. ghc-flag:: -finline-generics
+    :shortdesc: Annotate methods of derived Generic and Generic1 instances with
+        INLINE[1] pragmas based on heuristics. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-inline-generics
+    :category:
+
+    :default: on
+    :since: 9.2.1
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    Annotate methods of derived Generic and Generic1 instances with INLINE[1]
+    pragmas based on heuristics dependent on the size of the data type in
+    question. Improves performance of generics-based algorithms as GHC is able
+    to optimize away intermediate representation more often.
+
+.. ghc-flag:: -finline-generics-aggressively
+    :shortdesc: Annotate methods of all derived Generic and Generic1 instances
+        with INLINE[1] pragmas.
+    :type: dynamic
+    :reverse: -fno-inline-generics-aggressively
+    :category:
+
+    :default: off
+    :since: 9.2.1
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    Annotate methods of all derived Generic and Generic1 instances with
+    INLINE[1] pragmas.
+
+    This flag should only be used in modules deriving Generic instances that
+    weren't considered appropriate for INLINE[1] annotations by heuristics of
+    :ghc-flag:`-finline-generics`, yet you know that doing so would be
+    beneficial.
+
+    When enabled globally it will most likely lead to worse compile times and
+    code size blowup without runtime performance gains.
+
 .. ghc-flag:: -fsolve-constant-dicts
     :shortdesc: When solving constraints, try to eagerly solve
         super classes using available dictionaries.

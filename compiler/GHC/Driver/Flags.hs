@@ -158,6 +158,8 @@ data GeneralFlag
    | Opt_Specialise
    | Opt_SpecialiseAggressively
    | Opt_CrossModuleSpecialise
+   | Opt_InlineGenerics
+   | Opt_InlineGenericsAggressively
    | Opt_StaticArgumentTransformation
    | Opt_CSE
    | Opt_StgCSE
