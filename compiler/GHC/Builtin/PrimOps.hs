@@ -39,10 +39,11 @@ import GHC.Builtin.Names ( gHC_PRIMOPWRAPPERS )
 import GHC.Core.TyCon    ( TyCon, isPrimTyCon, PrimRep(..) )
 import GHC.Core.Type
 import GHC.Types.RepType ( tyConPrimRep1 )
-import GHC.Types.Basic   ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
-                           SourceText(..) )
+import GHC.Types.Basic   ( Arity, Boxity(..) )
+import GHC.Types.Fixity  ( Fixity(..), FixityDirection(..) )
 import GHC.Types.SrcLoc  ( wiredInSrcSpan )
 import GHC.Types.ForeignCall ( CLabelString )
+import GHC.Types.SourceText  ( SourceText(..) )
 import GHC.Types.Unique  ( Unique)
 import GHC.Builtin.Uniques (mkPrimOpIdUnique, mkPrimOpWrapperUnique )
 import GHC.Unit.Types    ( Unit )

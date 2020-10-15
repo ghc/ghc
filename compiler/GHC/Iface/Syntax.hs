@@ -73,6 +73,7 @@ import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
+import GHC.Utils.Binary.Typeable ()
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith, debugIsOn,
@@ -194,7 +195,7 @@ data IfaceTyConParent
   | IfDataInstance
        IfExtName     -- Axiom name
        IfaceTyCon    -- Family TyCon (pretty-printing only, not used in GHC.IfaceToCore)
-                     -- see Note [Pretty printing via Iface syntax] in GHC.Core.Ppr.TyThing
+                     -- see Note [Pretty printing via Iface syntax] in GHC.Types.TyThing.Ppr
        IfaceAppArgs  -- Arguments of the family TyCon
 
 data IfaceFamTyConFlav
@@ -203,7 +204,7 @@ data IfaceFamTyConFlav
   | IfaceClosedSynFamilyTyCon (Maybe (IfExtName, [IfaceAxBranch]))
     -- ^ Name of associated axiom and branches for pretty printing purposes,
     -- or 'Nothing' for an empty closed family without an axiom
-    -- See Note [Pretty printing via Iface syntax] in "GHC.Core.Ppr.TyThing"
+    -- See Note [Pretty printing via Iface syntax] in "GHC.Types.TyThing.Ppr"
   | IfaceAbstractClosedSynFamilyTyCon
   | IfaceBuiltInSynFamTyCon -- for pretty printing purposes only
 
@@ -463,10 +464,10 @@ ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
 -- Deeply revolting, because it has to predict what gets bound,
 -- especially the question of whether there's a wrapper for a datacon
--- See Note [Implicit TyThings] in GHC.Driver.Types
+-- See Note [Implicit TyThings] in GHC.Driver.Env
 
 -- N.B. the set of names returned here *must* match the set of
--- TyThings returned by GHC.Driver.Types.implicitTyThings, in the sense that
+-- TyThings returned by GHC.Driver.Env.implicitTyThings, in the sense that
 -- TyThing.getOccName should define a bijection between the two lists.
 -- This invariant is used in GHC.Iface.Load.loadDecl (see note [Tricky iface loop])
 -- The order of the list does not matter.
@@ -736,7 +737,7 @@ Note [Printing IfaceDecl binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The binders in an IfaceDecl are just OccNames, so we don't know what module they
 come from.  But when we pretty-print a TyThing by converting to an IfaceDecl
-(see GHC.Core.Ppr.TyThing), the TyThing may come from some other module so we really need
+(see GHC.Types.TyThing.Ppr), the TyThing may come from some other module so we really need
 the module qualifier.  We solve this by passing in a pretty-printer for the
 binders.
 
@@ -806,7 +807,7 @@ constraintIfaceKind =
 
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
---     See Note [Pretty-printing TyThings] in GHC.Core.Ppr.TyThing
+--     See Note [Pretty-printing TyThings] in GHC.Types.TyThing.Ppr
 pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifCtxt = context, ifResKind = kind,
                              ifRoles = roles, ifCons = condecls,

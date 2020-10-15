@@ -46,8 +46,10 @@ import GHC.Tc.Utils.Monad
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
+import GHC.Types.Fixity
 import GHC.Core.DataCon
 import GHC.Types.Name
+import GHC.Types.SourceText
 
 import GHC.Driver.Session
 import GHC.Builtin.Utils

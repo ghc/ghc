@@ -37,8 +37,7 @@ import GHC.Core.DataCon           ( dataConNonlinearType )
 import GHC.HsToCore               ( deSugarExpr )
 import GHC.Types.FieldLabel
 import GHC.Hs
-import GHC.Driver.Types
-import GHC.Unit.Module            ( ModuleName, ml_hs_file )
+import GHC.Driver.Env
 import GHC.Utils.Monad            ( concatMapM, liftIO )
 import GHC.Types.Id               ( isDataConId_maybe )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique )
@@ -61,6 +60,9 @@ import GHC.Data.FastString
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
+
+import GHC.Unit.Module            ( ModuleName, ml_hs_file )
+import GHC.Unit.Module.ModSummary
 
 import qualified Data.Array as A
 import qualified Data.ByteString as BS

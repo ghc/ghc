@@ -19,27 +19,30 @@ module GHC.ByteCode.Asm (
 
 import GHC.Prelude
 
+import GHC.Driver.Env
+import GHC.Driver.Session
+
 import GHC.ByteCode.Instr
 import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Heap.Layout
 
-import GHC.Driver.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Literal
+import GHC.Types.Unique
+import GHC.Types.Unique.DSet
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+
 import GHC.Core.TyCon
 import GHC.Data.FastString
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
-import GHC.Runtime.Heap.Layout
-import GHC.Driver.Session
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Utils.Misc
-import GHC.Types.Unique
-import GHC.Types.Unique.DSet
 
 -- From iserv
 import SizedSeq

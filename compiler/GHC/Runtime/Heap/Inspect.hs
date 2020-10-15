@@ -30,7 +30,7 @@ import GHC.Platform
 
 import GHC.Runtime.Interpreter as GHCi
 import GHCi.RemoteTypes
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHCi.Message ( fromSerializableException )
 
 import GHC.Core.DataCon

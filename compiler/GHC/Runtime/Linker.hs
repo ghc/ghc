@@ -31,40 +31,53 @@ where
 
 import GHC.Prelude
 
+import GHC.Platform
+import GHC.Platform.Ways
+
+import GHC.Driver.Phases
+import GHC.Driver.Env
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+
+import GHC.Tc.Utils.Monad
+
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Interpreter.Types
+import GHC.Runtime.Linker.Types
 import GHCi.RemoteTypes
+
 import GHC.Iface.Load
+
 import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
-import GHC.Tc.Utils.Monad
-import GHC.Unit.State as Packages
-import GHC.Driver.Phases
-import GHC.Driver.Finder
-import GHC.Driver.Types
-import GHC.Platform.Ways
+
+import GHC.SysTools
+import GHC.SysTools.FileCleanup
+
+import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Unit.Module
-import GHC.Unit.Home
-import GHC.Data.List.SetOps
-import GHC.Runtime.Linker.Types (DynLinker(..), PersistentLinkerState(..))
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Types.Basic
+import GHC.Types.SrcLoc
+import GHC.Types.Unique.DSet
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Error
-import GHC.Types.SrcLoc
-import qualified GHC.Data.Maybe as Maybes
-import GHC.Types.Unique.DSet
-import GHC.Data.FastString
+
+import GHC.Unit.Finder
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Deps
+import GHC.Unit.Home
+import GHC.Unit.Home.ModInfo
+import GHC.Unit.State as Packages
+
 import qualified GHC.Data.ShortText as ST
-import GHC.Platform
-import GHC.SysTools
-import GHC.SysTools.FileCleanup
+import qualified GHC.Data.Maybe as Maybes
+import GHC.Data.FastString
+import GHC.Data.List.SetOps
 
 -- Standard libraries
 import Control.Monad
@@ -446,7 +459,7 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
       return pls
 
     DLL dll_unadorned -> do
-      maybe_errstr <- loadDLL hsc_env (mkSOName platform dll_unadorned)
+      maybe_errstr <- loadDLL hsc_env (platformSOName platform dll_unadorned)
       case maybe_errstr of
          Nothing -> maybePutStrLn dflags "done"
          Just mm | platformOS platform /= OSDarwin ->
@@ -918,7 +931,7 @@ dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
     let minus_big_ls = [ lib | Option ('-':'L':lib) <- ldInputs dflags ]
     (soFile, libPath , libName) <-
-      newTempLibName dflags TFL_CurrentModule (soExt platform)
+      newTempLibName dflags TFL_CurrentModule (platformSOExt platform)
     let
         dflags2 = dflags {
                       -- We don't want the original ldInputs in
@@ -1342,7 +1355,7 @@ linkPackage hsc_env pkg
             mapM_ (load_dyn hsc_env True) known_dlls
             -- For remaining `dlls` crash early only when there is surely
             -- no package's DLL around ... (not is_dyn)
-            mapM_ (load_dyn hsc_env (not is_dyn) . mkSOName platform) dlls
+            mapM_ (load_dyn hsc_env (not is_dyn) . platformSOName platform) dlls
 #endif
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link
@@ -1528,9 +1541,9 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
                     ]
 
      hs_dyn_lib_name = lib ++ '-':programName dflags ++ projectVersion dflags
-     hs_dyn_lib_file = mkHsSOName platform hs_dyn_lib_name
+     hs_dyn_lib_file = platformHsSOName platform hs_dyn_lib_name
 
-     so_name     = mkSOName platform lib
+     so_name     = platformSOName platform lib
      lib_so_name = "lib" ++ so_name
      dyn_lib_file = case (arch, os) of
                              (ArchX86_64, OSSolaris2) -> "64" </> so_name
