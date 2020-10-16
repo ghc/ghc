@@ -19,7 +19,7 @@ module GHC.Driver.Types (
         -- * compilation state
         HscEnv(..), hscEPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
-        Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
+        Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId, findTarget,
         HscStatus(..),
 
         -- * ModuleGraph
@@ -605,7 +605,7 @@ type InputFileBuffer = StringBuffer
 
 pprTarget :: Target -> SDoc
 pprTarget (Target id obj _) =
-    (if obj then char '*' else empty) <> pprTargetId id
+    (if obj then empty else char '*') <> pprTargetId id
 
 instance Outputable Target where
     ppr = pprTarget
@@ -616,6 +616,20 @@ pprTargetId (TargetFile f _) = text f
 
 instance Outputable TargetId where
     ppr = pprTargetId
+
+findTarget :: ModSummary -> [Target] -> Maybe Target
+findTarget ms ts =
+  case filter (matches ms) ts of
+        []    -> Nothing
+        (t:_) -> Just t
+  where
+    summary `matches` Target (TargetModule m) _ _
+        = ms_mod_name summary == m
+    summary `matches` Target (TargetFile f _) _ _
+        | Just f' <- ml_hs_file (ms_location summary)
+        = f == f'
+    _ `matches` _
+        = False
 
 {-
 ************************************************************************
