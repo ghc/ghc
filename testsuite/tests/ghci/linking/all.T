@@ -10,7 +10,16 @@ test('ghcilink002', [extra_files(['TestLink.hs', 'f.c']),
                      unless(doing_ghci, skip)],
      makefile_test, ['ghcilink002'])
 
-test('ghcilink003', [unless(doing_ghci, skip)], makefile_test, ['ghcilink003'])
+test('ghcilink003',
+     [unless(doing_ghci, skip),
+      # libstdc++ is named differently on FreeBSD
+      when(opsys('freebsd'), expect_broken(17739)),
+      # from Big Sur onwards, we can't dlopen libstdc++.dylib
+      # anymore. Will produce:
+      #   dlopen(libstdc++.dylib, 5): image not found
+      when(opsys('darwin'), expect_broken(17739))],
+     makefile_test,
+     ['ghcilink003'])
 
 test('ghcilink004',
      [extra_files(['TestLink.hs', 'f.c']),
@@ -24,7 +33,16 @@ test('ghcilink005',
       unless(doing_ghci, skip)],
      makefile_test, ['ghcilink005'])
 
-test('ghcilink006', [unless(doing_ghci, skip)], makefile_test, ['ghcilink006'])
+test('ghcilink006',
+     [unless(doing_ghci, skip),
+      # libstdc++ is named differently on FreeBSD
+      when(opsys('freebsd'), expect_broken(17739)),
+      # from Big Sur onwards, we can't dlopen libstdc++.dylib
+      # anymore. Will produce:
+      #   dlopen(libstdc++.dylib, 5): image not found
+      when(opsys('darwin'), expect_broken(17739))],
+     makefile_test,
+     ['ghcilink006'])
 
 test('T3333',
      [unless(doing_ghci, skip),
