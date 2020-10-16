@@ -40,6 +40,7 @@
           []
           (Nothing)
           (PrefixCon
+           []
            [(HsScaled
              (HsUnrestrictedArrow)
              ({ T18791.hs:5:10-12 }
@@ -61,3 +62,5 @@
         [])))))]
   (Nothing)
   (Nothing)))
+
+
