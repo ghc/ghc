@@ -700,6 +700,7 @@
       SymI_HasProto(stg_copySmallArrayzh)                               \
       SymI_HasProto(stg_copySmallMutableArrayzh)                        \
       SymI_HasProto(stg_casSmallArrayzh)                                \
+      SymI_HasProto(stg_copyArray_barrier)                              \
       SymI_HasProto(stg_newBCOzh)                                       \
       SymI_HasProto(stg_newByteArrayzh)                                 \
       SymI_HasProto(stg_casIntArrayzh)                                  \
