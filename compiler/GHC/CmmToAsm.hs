@@ -1184,7 +1184,7 @@ initNCGConfig dflags = NCGConfig
             ArchX86    -> v
             _          -> Nothing
 
-   , ncgDwarfEnabled        = debugLevel dflags > 0
-   , ncgDwarfUnwindings     = debugLevel dflags >= 1
-   , ncgDwarfStripBlockInfo = debugLevel dflags < 2 -- We strip out block information when running with -g0 or -g1.
+   , ncgDwarfEnabled        = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0
+   , ncgDwarfUnwindings     = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags >= 1
+   , ncgDwarfStripBlockInfo = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags < 2 -- We strip out block information when running with -g0 or -g1.
    }
