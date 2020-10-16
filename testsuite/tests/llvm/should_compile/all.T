@@ -12,10 +12,10 @@ def ignore_llvm_and_vortex( msg ):
                          re.sub(r".* is not a recognized processor for this target.*\n",r"",msg))))
 
 # test('T5486', normal, compile, [''])
-test('T5681', normal, compile, [''])
+test('T5681', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile, [''])
 test('T6158', [reqlib('vector'), reqlib('primitive')], compile, ['-package vector -package primitive'])
-test('T7571', cmm_src, compile, ['-no-hs-main'])
+test('T7571', [cmm_src, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile, ['-no-hs-main'])
 test('T7575', unless(wordsize(32), skip), compile, [''])
-test('T8131b', normal, compile, [''])
+test('T8131b', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile, [''])
 test('T11649', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile, [''])
 test('T17920fail', cmm_src, compile_fail, ['-no-hs-main'])
