@@ -174,6 +174,7 @@ test('T7872', normal, ghci_script, ['T7872.script'])
 test('T7873', normal, ghci_script, ['T7873.script'])
 test('T7939', normal, ghci_script, ['T7939.script'])
 test('T7894', normal, ghci_script, ['T7894.script'])
+test('T8042', normal, ghci_script, ['T8042.script'])
 test('T8116', normal, ghci_script, ['T8116.script'])
 test('T8113', normal, ghci_script, ['T8113.script'])
 test('T8172', when(opsys('mingw32'), normalise_drive_letter),

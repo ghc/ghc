@@ -316,17 +316,25 @@ compileOne' m_tc_result mHscMessage
        current_dir = takeDirectory basename
        old_paths   = includePaths dflags2
        !prevailing_dflags = hsc_dflags hsc_env0
+       -- Figure out which backend we're using
+       (bcknd, dflags3)
+         -- #8042: When module was loaded with `*` prefix in ghci, but DynFlags
+         -- suggest to generate object code (which may happen in case -fobject-code
+         -- was set), force it to generate byte-code. This is NOT transitive and
+         -- only applies to direct targets.
+         | Just (Target _ obj _) <- findTarget summary (hsc_targets hsc_env0)
+         , not obj
+         = (Interpreter, dflags2 { backend = Interpreter })
+         | otherwise
+         = (backend dflags, dflags2)
        dflags =
-          dflags2 { includePaths = addQuoteInclude old_paths [current_dir]
+          dflags3 { includePaths = addQuoteInclude old_paths [current_dir]
                   , log_action = log_action prevailing_dflags }
                   -- use the prevailing log_action / log_finaliser,
                   -- not the one cached in the summary.  This is so
                   -- that we can change the log_action without having
                   -- to re-summarize all the source files.
        hsc_env     = hsc_env0 {hsc_dflags = dflags}
-
-       -- Figure out which backend we're using
-       bcknd = backend dflags
 
        -- -fforce-recomp should also work with --make
        force_recomp = gopt Opt_ForceRecomp dflags
