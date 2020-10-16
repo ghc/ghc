@@ -561,8 +561,8 @@ synifyType _ vs (TyConApp tc tys)
       , tyConArity tc == tys_len
       = noLoc $ HsTupleTy noExtField
                           (case sort of
-                              BoxedTuple      -> HsBoxedTuple
-                              ConstraintTuple -> HsConstraintTuple
+                              BoxedTuple      -> HsBoxedOrConstraintTuple
+                              ConstraintTuple -> HsBoxedOrConstraintTuple
                               UnboxedTuple    -> HsUnboxedTuple)
                            (map (synifyType WithinType vs) vis_tys)
       | isUnboxedSumTyCon tc = noLoc $ HsSumTy noExtField (map (synifyType WithinType vs) vis_tys)

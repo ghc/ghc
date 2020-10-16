@@ -124,7 +124,7 @@ sugarTuples typ =
     aux apps (HsAppTy _ (L _ ftyp) atyp) = aux (atyp:apps) ftyp
     aux apps (HsParTy _ (L _ typ')) = aux apps typ'
     aux apps (HsTyVar _ _ (L _ name))
-        | isBuiltInSyntax name' && suitable = HsTupleTy noExtField HsBoxedTuple apps
+        | isBuiltInSyntax name' && suitable = HsTupleTy noExtField HsBoxedOrConstraintTuple apps
       where
         name' = getName name
         strName = getOccString name
