@@ -1494,8 +1494,10 @@ ocResolve_MachO(ObjectCode* oc)
                  */
                 if(NULL == symbol->addr) {
                     symbol->addr = lookupDependentSymbol((char*)symbol->name, oc);
-                    if(NULL == symbol->addr)
-                        barf("Failed to lookup symbol: %s", symbol->name);
+                    if(NULL == symbol->addr) {
+                        errorBelch("Failed to lookup symbol: %s", symbol->name);
+                        return 0;
+                    }
                 } else {
                     // we already have the address.
                 }
@@ -1504,10 +1506,12 @@ ocResolve_MachO(ObjectCode* oc)
                * the address as well already
                */
             if(NULL == symbol->addr) {
-                barf("Something went wrong!");
+                errorBelch("Something went wrong!");
+                return 0;
             }
             if(NULL == symbol->got_addr) {
-                barf("Not good either!");
+                errorBelch("Not good either!");
+                return 0;
             }
             *(uint64_t*)symbol->got_addr = (uint64_t)symbol->addr;
         }
