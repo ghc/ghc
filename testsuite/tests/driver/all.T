@@ -259,7 +259,7 @@ test('T12752pass', normal, compile, ['-DSHOULD_PASS=1 -Wcpp-undef'])
 
 test('T12955', normal, makefile_test, [])
 
-test('T12971', ignore_stdout, makefile_test, [])
+test('T12971', [when(opsys('mingw32'), fragile(17945)), ignore_stdout], makefile_test, [])
 test('json', normal, compile_fail, ['-ddump-json'])
 test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddump-json -Wno-unsupported-llvm-version'])
 test('T13604', [], makefile_test, [])
