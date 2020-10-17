@@ -374,10 +374,6 @@ Capability *rts_unsafeGetMyCapability (void);
 // into Haskell.  The actual capability will be calculated as the supplied
 // value modulo the number of enabled Capabilities.
 //
-// Note that the thread may still be migrated by the RTS scheduler, but that
-// will only happen if there are multiple threads running on one Capability and
-// another Capability is free.
-//
 // If affinity is non-zero, the current thread will be bound to
 // specific CPUs according to the prevailing affinity policy for the
 // specified capability, set by either +RTS -qa or +RTS --numa.
@@ -478,6 +474,10 @@ void rts_evalLazyIO_ (/* inout */ Capability **,
                       /* in    */ HaskellObj p,
                       /* in    */ unsigned int stack_size,
                       /* out   */ HaskellObj *ret);
+
+void rts_inCall (/* inout */ Capability **,
+                 /* in    */ HaskellObj p,
+                 /* out */   HaskellObj *ret);
 
 void rts_checkSchedStatus (char* site, Capability *);
 
