@@ -1424,6 +1424,13 @@ distclean : clean
 # Don't delete 'inplace' itself, it contains source files.
 	$(call removeTrees,inplace/mingw)
 
+# Remove the download tarballs.  This is because updating
+# the tarballs doesn't remove old ones.  After a tarbal is updated
+# you end up with both in your tree and get a franken build.
+# The downside here is that a maintainer clean will trigger more
+# bandwidth usage from haskell.org
+	$(call removeTrees,ghc-tarballs)
+
 # Remove the fs utilities.
 	$(call removeFiles,utils/lndir/fs.h)
 	$(call removeFiles,utils/lndir/fs.c)
