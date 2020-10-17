@@ -940,7 +940,7 @@ ocGetNames_ELF ( ObjectCode* oc )
                    symbol->addr = (SymbolAddr*)(
                            (intptr_t) oc->sections[secno].start +
                            (intptr_t) symbol->elf_sym->st_value);
-
+                   ASSERT(symbol->addr != 0x0);
                    if (ELF_ST_BIND(symbol->elf_sym->st_info) == STB_LOCAL) {
                        isLocal = true;
                        isWeak = false;
@@ -1867,6 +1867,7 @@ ocResolve_ELF ( ObjectCode* oc )
 #endif
                 ASSERT(symbol->elf_sym->st_name == 0);
                 ASSERT(symbol->elf_sym->st_value == 0);
+                ASSERT(0x0 != oc->sections[ secno ].start);
                 symbol->addr = oc->sections[ secno ].start;
             }
         }
@@ -1940,6 +1941,7 @@ int ocRunInit_ELF( ObjectCode *oc )
          init_start = (init_t*)init_startC;
          init_end = (init_t*)(init_startC + shdr[i].sh_size);
          for (init = init_start; init < init_end; init++) {
+            ASSERT(0x0 != *init);
             (*init)(argc, argv, envv);
          }
       }
