@@ -277,6 +277,10 @@ validate-x86_64-linux-deb9-unreg-hadrian:
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
+    HADRIAN_ARGS: -V
+  before_script:
+    mkdir -p _build
+    echo  ".genapply.cabal.configure.opts += --flag=unregisterised" > _build/hadrian.settings
 
 .build-x86_64-linux-deb10-hadrian-cross-aarch64:
   extends: .validate-linux-hadrian
