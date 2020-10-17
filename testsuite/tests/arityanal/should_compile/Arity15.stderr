@@ -1,0 +1,34 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 14, types: 14, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+F15.f15f1 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+F15.f15f1 = 1
+
+-- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
+f15f :: forall {t}. (Integer -> t) -> t
+[GblId,
+ Arity=1,
+ Str=<C(S),1*C1(U)>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@t) (h [Occ=Once1!] :: Integer -> t) -> h F15.f15f1}]
+f15f = \ (@t) (h :: Integer -> t) -> h F15.f15f1
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+f15g :: Integer -> Integer
+[GblId,
+ Arity=1,
+ Str=<S,1*U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x [Occ=Once1] :: Integer) -> GHC.Num.Integer.integerAdd x F15.f15f1}]
+f15g = \ (x :: Integer) -> GHC.Num.Integer.integerAdd x F15.f15f1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+f15 :: Integer
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+f15 = 2
+
+
+
