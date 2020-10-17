@@ -476,6 +476,7 @@ ghcInternalFunctions :: LlvmM ()
 ghcInternalFunctions = do
     platform <- getPlatform
     let w = llvmWord platform
+    mk "memcmp" w [i8Ptr, i8Ptr, w]
     mk "memcpy" i8Ptr [i8Ptr, i8Ptr, w]
     mk "memmove" i8Ptr [i8Ptr, i8Ptr, w]
     mk "memset" i8Ptr [i8Ptr, w, w]
