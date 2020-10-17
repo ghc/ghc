@@ -17,6 +17,11 @@ module Main(main) where
 -- We improperly include *HOST* macros for our target...
 #include "../../includes/ghcconfig.h"
 
+-- If the bootstrap compiler is unregisterised it defines
+-- UnregisterisedCompiler, which implies NO_REGS.  But we only want to
+-- define NO_REGS if the *target* is unregisterised.
+#undef UnregisterisedCompiler
+
 -- ...so that this header defines the right stuff.  It is the RTS's host, but
 -- our target, as we are generating code that uses that RTS.
 #include "../../includes/stg/MachRegsForHost.h"
