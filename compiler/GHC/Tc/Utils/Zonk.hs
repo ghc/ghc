@@ -82,6 +82,7 @@ import GHC.Utils.Panic
 import GHC.Types.Unique.FM
 import GHC.Core.Multiplicity
 import GHC.Core
+import GHC.Core.TyCo.Rep (ArgType(..), normalArgTys)
 
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (runTopSplice)
 
@@ -671,10 +672,10 @@ zonkMatchGroup env zBody (MG { mg_alts = L l ms
                              , mg_ext = MatchGroupTc arg_tys res_ty
                              , mg_origin = origin })
   = do  { ms' <- mapM (zonkMatch env zBody) ms
-        ; arg_tys' <- zonkScaledTcTypesToTypesX env arg_tys
+        ; arg_tys' <- zonkScaledTcTypesToTypesX env (normalArgTys arg_tys)
         ; res_ty'  <- zonkTcTypeToTypeX env res_ty
         ; return (MG { mg_alts = L l ms'
-                     , mg_ext = MatchGroupTc arg_tys' res_ty'
+                     , mg_ext = MatchGroupTc (NormalArgType <$> arg_tys') res_ty'
                      , mg_origin = origin }) }
 
 zonkMatch :: ZonkEnv

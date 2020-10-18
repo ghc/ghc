@@ -39,6 +39,7 @@ import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst (substTyWithInScope)
 import GHC.Core.TyCo.FVs( shallowTyCoVarsOfType )
 import GHC.Core.Type
+import GHC.Types.Basic ( PromotionFlag (..) )
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
 import GHC.Builtin.PrimOps( tagToEnumKey )
@@ -442,6 +443,9 @@ tcInstFun do_ql inst_final rn_fun fun_sigma rn_args
            ; case cts of
                 Indirect fun_ty' -> go  delta acc so_far fun_ty' args
                 Flexi            -> go1 delta acc so_far fun_ty  args }
+     | (bndrs, _) <- splitForAllTysReq fun_ty
+     , not (null bndrs)
+     = go1 delta acc so_far fun_ty args
      | otherwise
      = go1 delta acc so_far fun_ty args
 
@@ -556,6 +560,25 @@ tcVTA :: TcType            -- Function type
 -- Deal with a visible type application
 -- The function type has already had its Inferred binders instantiated
 tcVTA fun_ty hs_ty
+  | (bndr : _, ty) <- splitForAllTysReq fun_ty
+  = do { let tv   = binderVar bndr
+             kind = tyVarKind tv
+       ; ty_arg <- tcHsTypeApp hs_ty kind
+       ; traceTc "ty_arg is" (ppr ty_arg)
+
+       ; inner_ty <- zonkTcType ty
+                -- See Note [Visible type application zonk]
+
+       ; let in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])
+             insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
+                            -- NB: tv and ty_arg have the same kind, so this
+                            --     substitution is kind-respecting
+       ; traceTc "VTA" (vcat [ppr tv, debugPprType kind
+                             , debugPprType ty_arg
+                             , debugPprType (tcTypeKind ty_arg)
+                             , debugPprType inner_ty
+                             , debugPprType insted_ty ])
+       ; return (ty_arg, insted_ty) }
   | Just (tvb, inner_ty) <- tcSplitForAllTy_maybe fun_ty
   , binderArgFlag tvb == Specified
     -- It really can't be Inferred, because we've just
@@ -1087,5 +1110,3 @@ tcTagToEnum expr fun args app_res_ty res_ty
 
 tcExprPrag :: HsPragE GhcRn -> HsPragE GhcTc
 tcExprPrag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
-
-

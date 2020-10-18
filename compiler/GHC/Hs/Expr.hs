@@ -50,6 +50,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep (ArgType)
 import GHC.Builtin.Types (mkTupleStr)
 import GHC.Tc.Utils.TcType (TcType)
 import {-# SOURCE #-} GHC.Tc.Types (TcLclEnv)
@@ -1710,7 +1711,7 @@ data MatchGroup p body
 
 data MatchGroupTc
   = MatchGroupTc
-       { mg_arg_tys :: [Scaled Type]  -- Types of the arguments, t1..tn
+       { mg_arg_tys :: [ArgType]  -- Types of the arguments, t1..tn
        , mg_res_ty  :: Type    -- Type of the result, tr
        } deriving Data
 

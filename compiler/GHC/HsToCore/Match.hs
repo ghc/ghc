@@ -36,6 +36,7 @@ import GHC.Tc.Utils.Monad
 import GHC.HsToCore.Pmc
 import GHC.HsToCore.Pmc.Types ( Nablas, initNablas )
 import GHC.Core
+import GHC.Core.TyCo.Rep (normalArgTys)
 import GHC.Types.Literal
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -757,11 +758,11 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; locn   <- getSrcSpanDs
 
         ; new_vars    <- case matches of
-                           []    -> newSysLocalsDsNoLP arg_tys
+                           []    -> newSysLocalsDsNoLP (normalArgTys arg_tys)
                            (m:_) ->
                             selectMatchVars (zipWithEqual "matchWrapper"
                                               (\a b -> (scaledMult a, unLoc b))
-                                                arg_tys
+                                                (normalArgTys arg_tys)
                                                 (hsLMatchPats m))
 
         -- Pattern match check warnings for /this match-group/.

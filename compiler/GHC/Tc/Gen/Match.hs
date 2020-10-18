@@ -57,6 +57,7 @@ import GHC.Types.Name
 import GHC.Builtin.Types
 import GHC.Types.Id
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep ( ArgType(..) )
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
@@ -141,7 +142,7 @@ tcMatchesCase :: (Outputable (body GhcRn)) =>
                 -- wrapper goes from MatchGroup's ty to expected ty
 
 tcMatchesCase ctxt (Scaled scrut_mult scrut_ty) matches res_ty
-  = tcMatches ctxt [Scaled scrut_mult (mkCheckExpType scrut_ty)] res_ty matches
+  = tcMatches ctxt [NormalArgTy (Scaled scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
 
 tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
               -> TcMatchCtxt HsExpr
@@ -187,7 +188,7 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
 
 -- | Type-check a MatchGroup.
 tcMatches :: (Outputable (body GhcRn)) => TcMatchCtxt body
-          -> [Scaled ExpSigmaType]      -- Expected pattern types
+          -> [ArgTy]      -- Expected pattern types
           -> ExpRhoType                 -- Expected result-type of the Match.
           -> MatchGroup GhcRn (Located (body GhcRn))
           -> TcM (MatchGroup GhcTc (Located (body GhcTc)))
@@ -199,7 +200,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
     -- when in inference mode, so we must do it ourselves,
     -- here, using expTypeToType
   = do { tcEmitBindingUsage bottomUE
-       ; pat_tys <- mapM scaledExpTypeToType pat_tys
+       ; pat_tys <- mapM argTyToArgType pat_tys
        ; rhs_ty  <- expTypeToType rhs_ty
        ; return (MG { mg_alts = L l []
                     , mg_ext = MatchGroupTc pat_tys rhs_ty
@@ -209,15 +210,20 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
   = do { umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
        ; let (usages,matches') = unzip umatches
        ; tcEmitBindingUsage $ supUEs usages
-       ; pat_tys  <- mapM readScaledExpType pat_tys
+       ; pat_tys  <- mapM argTyToArgType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
        ; return (MG { mg_alts   = L l matches'
                     , mg_ext    = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
 
+  where
+    argTyToArgType (NormalArgTy (Scaled m t)) = fmap (NormalArgType . Scaled m) (readExpType t)
+    argTyToArgType (ForallArgTy p)            = return (ForallArgType p)
+
+
 -------------
 tcMatch :: (Outputable (body GhcRn)) => TcMatchCtxt body
-        -> [Scaled ExpSigmaType]        -- Expected pattern types
+        -> [ArgTy]        -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
         -> LMatch GhcRn (Located (body GhcRn))
         -> TcM (LMatch GhcTc (Located (body GhcTc)))
@@ -228,7 +234,7 @@ tcMatch ctxt pat_tys rhs_ty match
     tc_match ctxt pat_tys rhs_ty
              match@(Match { m_pats = pats, m_grhss = grhss })
       = add_match_ctxt match $
-        do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
+        do { (pats', grhss') <- tcPats (mc_what ctxt) pats (scaledExpTypes pat_tys) $
                                 tcGRHSs ctxt grhss rhs_ty
            ; return (Match { m_ext = noExtField
                            , m_ctxt = mc_what ctxt, m_pats = pats'

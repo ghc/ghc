@@ -46,6 +46,7 @@ import GHC.Types.Basic
 import GHC.Tc.Solver
 import GHC.Tc.Utils.Unify
 import GHC.Core.Predicate
+import GHC.Core.TyCo.Rep ( ArgType(..) )
 import GHC.Builtin.Types
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
@@ -728,14 +729,14 @@ tcPatSynMatcher (L loc name) lpat
                     L (getLoc lpat) $
                     HsCase noExtField (nlHsVar scrutinee) $
                     MG{ mg_alts = L (getLoc lpat) cases
-                      , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty
+                      , mg_ext = MatchGroupTc [NormalArgType (unrestricted pat_ty)] res_ty
                       , mg_origin = Generated
                       }
              body' = noLoc $
                      HsLam noExtField $
                      MG{ mg_alts = noLoc [mkSimpleMatch LambdaExpr
                                                         args body]
-                       , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
+                       , mg_ext = MatchGroupTc (map (NormalArgType . unrestricted) [pat_ty, cont_ty, fail_ty]) res_ty
                        , mg_origin = Generated
                        }
              match = mkMatch (mkPrefixFunRhs (L loc name)) []
