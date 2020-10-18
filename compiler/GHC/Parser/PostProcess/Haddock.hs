@@ -980,10 +980,10 @@ instance HasHaddock (Located (HsType GhcPs)) where
         pure $ L l (HsQualTy noExtField lhs rhs')
 
       -- arg -> res
-      HsFunTy _ mult lhs rhs -> do
+      HsFunTy u mult lhs rhs -> do
         lhs' <- addHaddock lhs
         rhs' <- addHaddock rhs
-        pure $ L l (HsFunTy noExtField mult lhs' rhs')
+        pure $ L l (HsFunTy u mult lhs' rhs')
 
       -- other types
       _ -> liftHdkA $ do
