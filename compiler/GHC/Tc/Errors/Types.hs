@@ -1581,6 +1581,35 @@ data TcRnMessage where
   -}
   TcRnForallIdentifier :: RdrName -> TcRnMessage
 
+  {-| TcRnTypeEqualityOutOfScope is a warning (controlled by -Wtype-equality-out-of-scope)
+      that occurs when the type equality (a ~ b) is not in scope.
+
+      Test case: T18862b
+  -}
+  TcRnTypeEqualityOutOfScope :: TcRnMessage
+
+  {-| TcRnTypeEqualityRequiresOperators is a warning (controlled by -Wtype-equality-requires-operators)
+      that occurs when the type equality (a ~ b) is used without the TypeOperators extension.
+
+      Example:
+        {-# LANGUAGE NoTypeOperators #-}
+        f :: (a ~ b) => a -> b
+
+      Test case: T18862a
+  -}
+  TcRnTypeEqualityRequiresOperators :: TcRnMessage
+
+  {-| TcRnIllegalTypeOperator is an error that occurs when a type operator
+      is used without the TypeOperators extension.
+
+      Example:
+        {-# LANGUAGE NoTypeOperators #-}
+        f :: Vec a n -> Vec a m -> Vec a (n + m)
+
+      Test case: T12811
+  -}
+  TcRnIllegalTypeOperator :: !SDoc -> !RdrName -> TcRnMessage
+
   {-| TcRnGADTMonoLocalBinds is a warning controlled by -Wgadt-mono-local-binds
       that occurs when pattern matching on a GADT when -XMonoLocalBinds is off.
 

@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module T21010A ( WrapMono, Constrained(..), withMonoCoercible ) where
 import T21010B ( WrapMono(..), withMonoCoercible )

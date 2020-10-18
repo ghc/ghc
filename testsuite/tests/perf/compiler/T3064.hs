@@ -2,6 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE Rank2Types, TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeOperators #-}
 
 module T3064 where
 import Control.Applicative

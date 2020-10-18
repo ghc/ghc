@@ -553,6 +553,8 @@ data WarningFlag =
    | Opt_WarnForallIdentifier                        -- Since 9.4
    | Opt_WarnUnicodeBidirectionalFormatCharacters    -- Since 9.0.2
    | Opt_WarnGADTMonoLocalBinds                      -- Since 9.4
+   | Opt_WarnTypeEqualityOutOfScope                  -- Since 9.4
+   | Opt_WarnTypeEqualityRequiresOperators           -- Since 9.4
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -655,6 +657,8 @@ warnFlagNames wflag = case wflag of
   Opt_WarnForallIdentifier                        -> "forall-identifier" :| []
   Opt_WarnUnicodeBidirectionalFormatCharacters    -> "unicode-bidirectional-format-characters" :| []
   Opt_WarnGADTMonoLocalBinds                      -> "gadt-mono-local-binds" :| []
+  Opt_WarnTypeEqualityOutOfScope                  -> "type-equality-out-of-scope" :| []
+  Opt_WarnTypeEqualityRequiresOperators           -> "type-equality-requires-operators" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -748,7 +752,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnOperatorWhitespaceExtConflict,
         Opt_WarnForallIdentifier,
         Opt_WarnUnicodeBidirectionalFormatCharacters,
-        Opt_WarnGADTMonoLocalBinds
+        Opt_WarnGADTMonoLocalBinds,
+        Opt_WarnTypeEqualityRequiresOperators
       ]
 
 -- | Things you get with -W
@@ -801,6 +806,7 @@ minusWcompatOpts
       , Opt_WarnNonCanonicalMonoidInstances
       , Opt_WarnStarIsType
       , Opt_WarnCompatUnqualifiedImports
+      , Opt_WarnTypeEqualityOutOfScope
       ]
 
 -- | Things you get with -Wunused-binds

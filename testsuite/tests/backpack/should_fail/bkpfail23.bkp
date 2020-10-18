@@ -1,5 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
-{-# LANGUAGE GADTs, RoleAnnotations #-}
+{-# LANGUAGE GADTs, TypeOperators, RoleAnnotations #-}
 unit p where
     signature H where
         type role F phantom

@@ -31,7 +31,9 @@
 
 module Data.Type.Equality (
   -- * The equality types
-  (:~:)(..), type (~~),
+  type (~),
+  type (~~),
+  (:~:)(..),
   (:~~:)(..),
 
   -- * Working with equality

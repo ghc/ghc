@@ -343,27 +343,6 @@ eqTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "~")   eqTyConK
 eqDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Eq#") eqDataConKey eqDataCon
 eqSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "eq_sel") eqSCSelIdKey eqSCSelId
 
-{- Note [eqTyCon (~) is built-in syntax]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The (~) type operator used in equality constraints (a~b) is considered built-in
-syntax. This has a few consequences:
-
-* The user is not allowed to define their own type constructors with this name:
-
-    ghci> class a ~ b
-    <interactive>:1:1: error: Illegal binding of built-in syntax: ~
-
-* Writing (a ~ b) does not require enabling -XTypeOperators. It does, however,
-  require -XGADTs or -XTypeFamilies.
-
-* The (~) type operator is always in scope. It doesn't need to be imported,
-  and it cannot be hidden.
-
-* We have a bunch of special cases in the compiler to arrange all of the above.
-
-There's no particular reason for (~) to be special, but fixing this would be a
-breaking change.
--}
 eqTyCon_RDR :: RdrName
 eqTyCon_RDR = nameRdrName eqTyConName
 
@@ -892,9 +871,6 @@ isBuiltInOcc_maybe occ =
     case name of
       "[]" -> Just $ choose_ns listTyConName nilDataConName
       ":"    -> Just consDataConName
-
-      -- equality tycon
-      "~"    -> Just eqTyConName
 
       -- function tycon
       "FUN"  -> Just funTyConName

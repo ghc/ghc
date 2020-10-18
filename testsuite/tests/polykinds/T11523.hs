@@ -19,7 +19,8 @@
 
 module T11523 where
 
-import GHC.Types (Constraint, Type)
+import Data.Kind (Constraint, Type)
+import Data.Type.Equality (type (~))
 import qualified Prelude
 
 type Cat i = i -> i -> Type

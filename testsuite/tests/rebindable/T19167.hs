@@ -6,6 +6,7 @@ module Bug where
 import qualified Prelude as P
 import qualified GHC.Exts as P
 import Data.List.NonEmpty ( NonEmpty )
+import Data.Type.Equality ( type (~) )
 
 fromInteger :: P.Integer -> forall a. P.Num a => a
 fromInteger n = P.fromInteger n

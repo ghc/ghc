@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -159,6 +160,8 @@ module Prelude (
     -- ** Exception handling in the I\/O monad
     IOError, ioError, userError,
 
+    -- ** The equality types
+    type (~)
   ) where
 
 import Control.Monad

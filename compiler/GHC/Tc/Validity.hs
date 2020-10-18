@@ -1137,7 +1137,9 @@ check_class_pred env dflags ctxt pred cls tys
                          -- but here we want to treat them as equalities
   = -- Equational constraints are valid in all contexts, and
     -- we do not need to check e.g. for FlexibleContexts here, so just do nothing
-    return ()
+    -- We used to require TypeFamilies/GADTs for equality constraints,
+    -- but not anymore (GHC Proposal #371)
+   return ()
 
   | isIPClass cls
   = do { check_arity

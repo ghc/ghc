@@ -16,6 +16,7 @@ warning settings:
   -Wsemigroup
   -Wstar-is-type
   -Wcompat-unqualified-imports
+  -Wtype-equality-out-of-scope
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
 base language is: GHC2021

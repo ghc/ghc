@@ -1,5 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
   -- this is needed because |FamHelper a x| /< |Fam a x|
   -- This file compiled with -dunique-increment=-1 made GHC crash before

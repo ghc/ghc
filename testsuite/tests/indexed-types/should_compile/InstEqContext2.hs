@@ -1,6 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE TypeFamilies, EmptyDataDecls #-}
+{-# LANGUAGE TypeFamilies, TypeOperators, EmptyDataDecls #-}
 
 module InstEqContext2  where 
 

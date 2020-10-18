@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeInType #-} -- or PolyKinds
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module T15352 where
 

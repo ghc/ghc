@@ -2,9 +2,12 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE TypeOperators     #-}
+
 module T14933 where
 
 import Data.Kind (Type)
+import Data.Type.Equality (type (~))
 
 class Wrapped s where
   type Unwrapped s :: Type

@@ -25,6 +25,7 @@ module T14584 where
 
 import Data.Monoid
 import Data.Kind
+import Data.Type.Equality
 
 data family Sing (a::k)
 

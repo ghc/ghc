@@ -1,5 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
-{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies, GADTs, ConstraintKinds #-}
+{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies, GADTs, ConstraintKinds, TypeOperators #-}
 
 module T12919 where
 

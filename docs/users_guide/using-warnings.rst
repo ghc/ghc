@@ -65,6 +65,7 @@ To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
         * :ghc-flag:`-Wunicode-bidirectional-format-characters`
         * :ghc-flag:`-Wforall-identifier`
         * :ghc-flag:`-Wgadt-mono-local-binds`
+        * :ghc-flag:`-Wtype-equality-requires-operators`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -161,6 +162,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wstar-is-type`
         * :ghc-flag:`-Wcompat-unqualified-imports`
+        * :ghc-flag:`-Wtype-equality-out-of-scope`
 
 .. ghc-flag:: -Wno-compat
     :shortdesc: Disables all warnings enabled by :ghc-flag:`-Wcompat`.
@@ -2285,6 +2287,48 @@ of ``-W(no-)*``.
     In previous versions of GHC (9.2 and below), it was an error
     to pattern match on a GADT if neither :extension:`GADTs`
     nor :extension:`TypeFamilies` were enabled.
+
+.. ghc-flag:: -Wtype-equality-out-of-scope
+    :shortdesc: warn when type equality ``a ~ b`` is used despite being out of scope
+    :type: dynamic
+    :reverse: -Wno-type-equality-out-of-scope
+
+    :since: 9.4.1
+
+    In accordance with `GHC Proposal #371
+    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0371-non-magical-eq.md>`__,
+    the type equality syntax ``a ~ b`` is no longer built-in. Instead, ``~`` is
+    a regular type operator that can be imported from ``Data.Type.Equality`` or
+    ``Prelude``.
+
+    To minimize breakage, a compatibility fallback is provided: whenever ``~``
+    is used but is not in scope, the compiler assumes that it stands for a type
+    equality constraint. The warning is triggered by any code that relies on
+    this fallback. It can be addressed by bringing ``~`` into scope explicitly.
+
+    The likely culprit is that you use :extension:`NoImplicitPrelude` and a
+    custom Prelude. In this case, consider updating your custom Prelude to
+    re-export ``~`` from ``Data.Type.Equality``.
+
+    Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
+    default, but will be switched on in a future GHC release.
+
+.. ghc-flag:: -Wtype-equality-requires-operators
+    :shortdesc: warn when type equality ``a ~ b`` is used despite being out of scope
+    :type: dynamic
+    :reverse: -Wno-type-equality-requires-operators
+
+    :since: 9.4.1
+
+    In accordance with `GHC Proposal #371
+    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0371-non-magical-eq.md>`__,
+    the type equality syntax ``a ~ b`` is no longer built-in. Instead, ``~`` is
+    a regular type operator that requires the :extension:`TypeOperators` extension.
+
+    To minimize breakage, ``~`` specifically (unlike other type operators) can
+    be used even when :extension:`TypeOperators` is disabled. The warning is
+    triggered whenever this happens, and can be addressed by enabling the
+    extension.
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's

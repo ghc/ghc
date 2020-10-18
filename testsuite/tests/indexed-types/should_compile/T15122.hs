@@ -1,6 +1,7 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeInType #-}
 module T15122 where
 

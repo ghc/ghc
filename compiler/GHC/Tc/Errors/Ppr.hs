@@ -651,6 +651,23 @@ instance Diagnostic TcRnMessage where
             fsep [ text "The use of" <+> quotes (ppr rdr_name)
                                      <+> text "as an identifier",
                    text "will become an error in a future GHC release." ]
+    TcRnTypeEqualityOutOfScope
+      -> mkDecorated
+           [ text "The" <+> quotes (text "~") <+> text "operator is out of scope." $$
+             text "Assuming it to stand for an equality constraint."
+           , text "NB:" <+> (quotes (text "~") <+> text "used to be built-in syntax but now is a regular type operator" $$
+                             text "exported from Data.Type.Equality and Prelude.") $$
+             text "If you are using a custom Prelude, consider re-exporting it."
+           , text "This will become an error in a future GHC release." ]
+    TcRnTypeEqualityRequiresOperators
+      -> mkSimpleDecorated $
+            fsep [ text "The use of" <+> quotes (text "~")
+                                     <+> text "without TypeOperators",
+                   text "will become an error in a future GHC release." ]
+    TcRnIllegalTypeOperator overall_ty op
+      -> mkSimpleDecorated $
+           text "Illegal operator" <+> quotes (ppr op) <+>
+           text "in type" <+> quotes (ppr overall_ty)
     TcRnGADTMonoLocalBinds
       -> mkSimpleDecorated $
             fsep [ text "Pattern matching on GADTs without MonoLocalBinds"
@@ -920,6 +937,12 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnForallIdentifier {}
       -> WarningWithFlag Opt_WarnForallIdentifier
+    TcRnTypeEqualityOutOfScope
+      -> WarningWithFlag Opt_WarnTypeEqualityOutOfScope
+    TcRnTypeEqualityRequiresOperators
+      -> WarningWithFlag Opt_WarnTypeEqualityRequiresOperators
+    TcRnIllegalTypeOperator {}
+      -> ErrorWithoutFlag
     TcRnGADTMonoLocalBinds {}
       -> WarningWithFlag Opt_WarnGADTMonoLocalBinds
     TcRnIncorrectNameSpace {}
@@ -1152,6 +1175,12 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnForallIdentifier {}
       -> [SuggestRenameForall]
+    TcRnTypeEqualityOutOfScope
+      -> noHints
+    TcRnTypeEqualityRequiresOperators
+      -> [suggestExtension LangExt.TypeOperators]
+    TcRnIllegalTypeOperator {}
+      -> [suggestExtension LangExt.TypeOperators]
     TcRnGADTMonoLocalBinds {}
       -> [suggestAnyExtension [LangExt.GADTs, LangExt.TypeFamilies]]
     TcRnIncorrectNameSpace nm is_th_use

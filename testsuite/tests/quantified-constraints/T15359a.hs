@@ -1,6 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE MultiParamTypeClasses, GADTs, RankNTypes,
-             ConstraintKinds, QuantifiedConstraints,
+             ConstraintKinds, QuantifiedConstraints, TypeOperators,
              UndecidableInstances #-}
 
 module T15359a where

@@ -154,6 +154,7 @@ Library
        ,BangPatterns
        ,ScopedTypeVariables
        ,MonoLocalBinds
+       ,TypeOperators
 
     Exposed-Modules:
         GHC

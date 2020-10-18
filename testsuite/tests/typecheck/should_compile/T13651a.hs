@@ -1,5 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
-{-# LANGUAGE TypeFamilies, TypeFamilyDependencies #-}
+{-# LANGUAGE TypeFamilies, TypeFamilyDependencies, TypeOperators #-}
 module T13651 where
 
 type family F r s = f | f -> r s

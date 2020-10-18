@@ -90,7 +90,7 @@ import GHC.Parser.Errors.Ppr ()
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            tupleTyCon, tupleDataCon, nilDataCon,
                            unboxedUnitTyCon, unboxedUnitDataCon,
-                           listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR)
+                           listTyCon_RDR, consDataCon_RDR)
 
 import qualified Data.Semigroup as Semi
 }
@@ -3641,11 +3641,7 @@ qtyconsym :: { LocatedN RdrName }
 
 tyconsym :: { LocatedN RdrName }
         : CONSYM                { sL1n $1 $! mkUnqual tcClsName (getCONSYM $1) }
-        | VARSYM                { sL1n $1 $!
-                                    -- See Note [eqTyCon (~) is built-in syntax] in GHC.Builtin.Types
-                                    if getVARSYM $1 == fsLit "~"
-                                      then eqTyCon_RDR
-                                      else mkUnqual tcClsName (getVARSYM $1) }
+        | VARSYM                { sL1n $1 $! mkUnqual tcClsName (getVARSYM $1) }
         | ':'                   { sL1n $1 $! consDataCon_RDR }
         | '-'                   { sL1n $1 $! mkUnqual tcClsName (fsLit "-") }
         | '.'                   { sL1n $1 $! mkUnqual tcClsName (fsLit ".") }

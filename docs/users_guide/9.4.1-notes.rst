@@ -22,9 +22,24 @@ Language
   If you want to retain the old behavior, add a (backward-compatible) type signature,
   explicitly requesting this unusual quantification.
 
-- GHC no longer checks for ``-XGADTs`` or ``-XTypeFamilies`` in order to use
-  an equality constraint in a type. This is part of accepted proposal
-  `#371 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0371-non-magical-eq.md>`_.
+- GHC Proposal `#371 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0371-non-magical-eq.md>`_ has been implemented. This means:
+
+  * The use of equality constraints no longer requires ``-XGADTs`` or ``-XTypeFamilies``.
+
+  * The use of equality constraint syntax ``a ~ b`` requires ``-XTypeOperators``,
+    otherwise results in a warning (:ghc-flag:`-Wtype-equality-requires-operators`).
+
+  * ``(~)`` is now a legal name for a user-defined type operator:
+    ::
+
+      class a ~ b where
+        ...
+
+    This used to be rejected with "Illegal binding of built-in syntax".
+
+  * The built-in type equality is now exported from ``Data.Type.Equality`` and
+    re-exported from ``Prelude``. When ``(~)`` is not in scope, its use results
+    in a warning (:ghc-flag:`-Wtype-equality-out-of-scope`).
 
 - There were previously cases around functional dependencies and injective
   type families where the result of type inference would depend on the order

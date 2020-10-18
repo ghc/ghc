@@ -1,5 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
-{-# LANGUAGE QuantifiedConstraints, DatatypeContexts, TypeFamilies #-}
+{-# LANGUAGE QuantifiedConstraints, DatatypeContexts, TypeFamilies, TypeOperators #-}
 -- NB: -XNoPolyKinds, to get defaulting.
 
 module T17567StupidThetaB where

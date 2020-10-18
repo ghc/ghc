@@ -1,5 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 module ShouldCompile where
 
 import Tc251_Help

@@ -37,7 +37,7 @@ module GHC.Types (
         Any,
 
         -- * Type equality
-        type (~~), Coercible,
+        type (~), type (~~), Coercible,
 
         -- * Representation polymorphism
         TYPE, Levity(..), RuntimeRep(..),
@@ -254,7 +254,6 @@ newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
 *                                                                      *
                     (~) and Coercible
 
-   NB: (~) is built-in syntax, and hence not explicitly exported
 *                                                                      *
 ********************************************************************* -}
 

@@ -629,7 +629,7 @@ rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
 
 rnHsTyKi env ty@(HsOpTy _ ty1 l_op ty2)
   = setSrcSpan (getLocA l_op) $
-    do  { (l_op', fvs1) <- rnHsTyOp env ty l_op
+    do  { (l_op', fvs1) <- rnHsTyOp env (ppr ty) l_op
         ; fix   <- lookupTyFixityRn l_op'
         ; (ty1', fvs2) <- rnLHsTyKi env ty1
         ; (ty2', fvs3) <- rnLHsTyKi env ty2
@@ -822,16 +822,15 @@ rnLTyVar (L loc rdr_name)
        ; return (L loc tyvar) }
 
 --------------
-rnHsTyOp :: Outputable a
-         => RnTyKiEnv -> a -> LocatedN RdrName
+rnHsTyOp :: RnTyKiEnv -> SDoc -> LocatedN RdrName
          -> RnM (LocatedN Name, FreeVars)
 rnHsTyOp env overall_ty (L loc op)
-  = do { ops_ok <- xoptM LangExt.TypeOperators
-       ; op' <- rnTyVar env op
-       ; unless (ops_ok || op' `hasKey` eqTyConKey) $
-           addErr $ TcRnUnknownMessage $ mkPlainError noHints (opTyErr op overall_ty)
-       ; let l_op' = L loc op'
-       ; return (l_op', unitFV op') }
+  = do { op' <- rnTyVar env op
+       ; unlessXOptM LangExt.TypeOperators $
+           if (op' `hasKey` eqTyConKey) -- See [eqTyCon (~) compatibility fallback] in GHC.Rename.Env
+           then addDiagnostic TcRnTypeEqualityRequiresOperators
+           else addErr $ TcRnIllegalTypeOperator overall_ty op
+       ; return (L loc op', unitFV op') }
 
 --------------
 checkWildCard :: RnTyKiEnv
@@ -1659,11 +1658,6 @@ warnUnusedForAll doc (L loc tv) used_names
               vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
                    , inHsDocContext doc ]
       addDiagnosticAt (locA loc) msg
-
-opTyErr :: Outputable a => RdrName -> a -> SDoc
-opTyErr op overall_ty
-  = hang (text "Illegal operator" <+> quotes (ppr op) <+> text "in type" <+> quotes (ppr overall_ty))
-         2 (text "Use TypeOperators to allow operators in types")
 
 {-
 ************************************************************************

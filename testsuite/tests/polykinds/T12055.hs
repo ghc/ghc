@@ -17,8 +17,8 @@
 
 module T12055 where
 
-import GHC.Base ( Constraint, Type )
-import GHC.Exts ( type (~~) )
+import Data.Kind (Constraint, Type)
+import Data.Type.Equality (type (~), type (~~))
 
 type Cat k = k -> k -> Type
 
