@@ -121,7 +121,7 @@ import GHC.Utils.Lexeme ( isLexCon )
 import GHC.Core.Type    ( TyThing(..), unrestrictedFunTyCon, Specificity(..) )
 import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
-                          listTyConName, listTyConKey, eqTyCon_RDR )
+                          listTyConName, listTyConKey )
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
@@ -2128,8 +2128,7 @@ checkPrecP (L l (_,i)) (L _ ol)
  | otherwise = addFatalError $ Error (ErrPrecedenceOutOfRange i) [] l
   where
     -- If you change this, consider updating Note [Fixity of (->)] in GHC/Types.hs
-    specialOp op = unLoc op `elem` [ eqTyCon_RDR
-                                   , getRdrName unrestrictedFunTyCon ]
+    specialOp op = unLoc op `elem` [ getRdrName unrestrictedFunTyCon ]
 
 mkRecConstrOrUpdate
         :: LHsExpr GhcPs
