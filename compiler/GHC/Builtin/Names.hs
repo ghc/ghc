@@ -2600,4 +2600,5 @@ pretendNameIsInScope :: Name -> Bool
 pretendNameIsInScope n
   = any (n `hasKey`)
     [ liftedTypeKindTyConKey, tYPETyConKey
-    , runtimeRepTyConKey, liftedRepDataConKey ]
+    , runtimeRepTyConKey, liftedRepDataConKey
+    , eqTyConKey ]

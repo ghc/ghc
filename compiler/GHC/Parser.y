@@ -87,7 +87,7 @@ import GHC.Parser.Errors
 
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                            unboxedUnitTyCon, unboxedUnitDataCon,
-                           listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR)
+                           listTyCon_RDR, consDataCon_RDR )
 }
 
 %expect 0 -- shift/reduce conflicts
@@ -3517,11 +3517,7 @@ qtyconsym :: { Located RdrName }
 
 tyconsym :: { Located RdrName }
         : CONSYM                { sL1 $1 $! mkUnqual tcClsName (getCONSYM $1) }
-        | VARSYM                { sL1 $1 $!
-                                    -- See Note [eqTyCon (~) is built-in syntax] in GHC.Builtin.Types
-                                    if getVARSYM $1 == fsLit "~"
-                                      then eqTyCon_RDR
-                                      else mkUnqual tcClsName (getVARSYM $1) }
+        | VARSYM                { sL1 $1 $! mkUnqual tcClsName (getVARSYM $1) }
         | ':'                   { sL1 $1 $! consDataCon_RDR }
         | '-'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "-") }
         | '.'                   { sL1 $1 $! mkUnqual tcClsName (fsLit ".") }
