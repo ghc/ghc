@@ -156,7 +156,7 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
 
     ------------
     mk_ctxt :: TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
-    mk_ctxt res_ty env = mkFunTysMsg env herald (reverse arg_tys_so_far)
+    mk_ctxt res_ty env = mkFunTysMsg env herald (reverse (NormalArgType <$> arg_tys_so_far))
                                      res_ty n_val_args_in_call
     (n_val_args_in_call, arg_tys_so_far) = err_info
 
@@ -290,7 +290,7 @@ matchExpectedFunTys :: forall a.
                     -> UserTypeCtxt
                     -> Arity
                     -> ExpRhoType      -- Skolemised
-                    -> ([Scaled ExpSigmaType] -> ExpRhoType -> TcM a)
+                    -> ([ArgTy] -> ExpRhoType -> TcM a)
                     -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (_, wrap)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
@@ -320,13 +320,23 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
 
     go acc_arg_tys n (FunTy { ft_mult = mult, ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
-        do { (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
+        do { (wrap_res, result) <- go ((NormalArgTy . Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
            ; let fun_wrap = mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty doc
            ; return ( fun_wrap, result ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
+
+    go acc_arg_tys n ty
+      | (bndrs, ty') <- tcSplitForAllTysReq ty
+      , not (null bndrs)
+      = do { let forall_args = ForallArgTy <$> bndrs
+           ; let req_arg_tys = forall_args ++ acc_arg_tys
+           ; let arg_num = n - (length forall_args)
+           ; (wrap_gen, (wrap_res, result)) <- tcSkolemise ctx ty' $ \ty' ->
+                                                         go req_arg_tys arg_num ty'
+           ; return (wrap_gen <.> wrap_res, result) }
 
     go acc_arg_tys n ty@(TyVarTy tv)
       | isMetaTyVar tv
@@ -354,11 +364,11 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
                           defer acc_arg_tys n (mkCheckExpType ty)
 
     ------------
-    defer :: [Scaled ExpSigmaType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
+    defer :: [ArgTy] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
     defer acc_arg_tys n fun_ty
       = do { more_arg_tys <- replicateM n newInferExpType
            ; res_ty       <- newInferExpType
-           ; result       <- thing_inside (reverse acc_arg_tys ++ (map unrestricted more_arg_tys)) res_ty
+           ; result       <- thing_inside (reverse acc_arg_tys ++ (map (NormalArgTy . unrestricted) more_arg_tys)) res_ty
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
            ; let unif_fun_ty = mkVisFunTysMany more_arg_tys res_ty
@@ -367,19 +377,24 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
            ; return (wrap, result) }
 
     ------------
-    mk_ctxt :: [Scaled ExpSigmaType] -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt :: [ArgTy] -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
     mk_ctxt arg_tys res_ty env
       = mkFunTysMsg env herald arg_tys' res_ty arity
       where
-        arg_tys' = map (\(Scaled u v) -> Scaled u (checkingExpType "matchExpectedFunTys" v)) $
-                   reverse arg_tys
+        arg_tys' = map toArgType (reverse arg_tys)
+
+        toArgType (NormalArgTy (Scaled u v))
+          = NormalArgType (Scaled u (checkingExpType "matchExpectedFunTys" v))
+        toArgType (ForallArgTy bndr)
+          = ForallArgType bndr
+
             -- this is safe b/c we're called from "go"
 
-mkFunTysMsg :: TidyEnv -> SDoc -> [Scaled TcType] -> TcType -> Arity
+mkFunTysMsg :: TidyEnv -> SDoc -> [ArgType] -> TcType -> Arity
             -> TcM (TidyEnv, MsgDoc)
 mkFunTysMsg env herald arg_tys res_ty n_val_args_in_call
   = do { (env', fun_rho) <- zonkTidyTcType env $
-                            mkVisFunTys arg_tys res_ty
+                            mkVisFunForallTys arg_tys res_ty
 
        ; let (all_arg_tys, _) = splitFunTys fun_rho
              n_fun_args = length all_arg_tys

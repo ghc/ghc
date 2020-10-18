@@ -72,7 +72,10 @@ module GHC.Core.TyCo.Rep (
         typeSize, coercionSize, provSize,
 
         -- * Multiplicities
-        Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
+        Scaled(..), scaledMult, scaledThing, mapScaledType, Mult,
+
+        -- * visible foralls related definitions
+        ArgType(..), mkVisFunForallTys, normalArgTys
     ) where
 
 #include "HsVersions.h"
@@ -2071,3 +2074,22 @@ So that Mult feels a bit more structured, we provide pattern synonyms and smart
 constructors for these.
 -}
 type Mult = Type
+
+data ArgType
+  = NormalArgType (Scaled Type)
+  | ForallArgType ReqTVBinder
+  deriving Data.Data
+
+mkVisFunForallTy :: ArgType -> Type -> Type
+mkVisFunForallTy (NormalArgType m) ty            = mkScaledFunTy VisArg m ty
+mkVisFunForallTy (ForallArgType (Bndr var _)) ty = ForAllTy (Bndr var Required) ty
+
+mkVisFunForallTys :: [ArgType] -> Type -> Type
+mkVisFunForallTys tys ty = foldr mkVisFunForallTy ty tys
+
+normalArgTys :: [ArgType] -> [Scaled Type]
+normalArgTys [] = []
+normalArgTys (arg_ty : arg_tys)
+  = case arg_ty of
+      NormalArgType ty -> ty : normalArgTys arg_tys
+      _                -> normalArgTys arg_tys

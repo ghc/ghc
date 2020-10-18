@@ -1124,7 +1124,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
                  , res_wrapper )                     -- :: res_ty_out "->" res_ty
                , arg_wrapper1, [], arg_wrapper2 ) )  -- :: arg_ty "->" arg_ty_out
                <- matchExpectedFunTys herald GenSigCtxt 1 (mkCheckExpType rho_ty) $
-                  \ [arg_ty] res_ty ->
+                  \ [NormalArgTy arg_ty] res_ty ->
                   do { arg_tc_ty <- expTypeToType (scaledThing arg_ty)
                      ; res_tc_ty <- expTypeToType res_ty
 

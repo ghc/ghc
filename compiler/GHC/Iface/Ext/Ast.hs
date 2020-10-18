@@ -34,6 +34,7 @@ import GHC.Core.ConLike           ( conLikeName, ConLike(RealDataCon) )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.FVs
 import GHC.Core.DataCon           ( dataConNonlinearType )
+import GHC.Core.TyCo.Rep          ( mkVisFunForallTys )
 import GHC.HsToCore               ( deSugarExpr )
 import GHC.Types.FieldLabel
 import GHC.Hs
@@ -45,7 +46,7 @@ import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.SrcLoc
 import GHC.Tc.Utils.Zonk          ( hsLitType, hsPatType )
-import GHC.Core.Type              ( mkVisFunTys, Type )
+import GHC.Core.Type              ( Type )
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
 import GHC.Builtin.Types          ( mkListTy, mkSumTy )
@@ -747,7 +748,7 @@ instance HiePass p => HasType (Located (HsExpr (GhcPass p))) where
           fallback = makeNode e' spn
 
           matchGroupType :: MatchGroupTc -> Type
-          matchGroupType (MatchGroupTc args res) = mkVisFunTys args res
+          matchGroupType (MatchGroupTc args res) = mkVisFunForallTys args res
 
           -- | Skip desugaring of these expressions for performance reasons.
           --

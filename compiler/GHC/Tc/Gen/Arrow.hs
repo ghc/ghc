@@ -31,6 +31,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Core.Multiplicity
+import GHC.Core.TyCo.Rep ( ArgType(..) )
 import GHC.Types.Id( mkLocalId )
 import GHC.Tc.Utils.Instantiate
 import GHC.Builtin.Types
@@ -265,7 +266,7 @@ tc_cmd env
                                          , m_grhss = grhss' })
               arg_tys = map (unrestricted . hsLPatType) pats'
               cmd' = HsCmdLam x (MG { mg_alts = L l [match']
-                                    , mg_ext = MatchGroupTc arg_tys res_ty
+                                    , mg_ext = MatchGroupTc (NormalArgType <$> arg_tys) res_ty
                                     , mg_origin = origin })
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
   where
