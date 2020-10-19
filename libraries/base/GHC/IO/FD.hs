@@ -54,6 +54,8 @@ import qualified System.Posix.Internals
 import System.Posix.Internals hiding (FD, setEcho, getEcho)
 import System.Posix.Types
 
+import Control.Exception
+
 #if defined(mingw32_HOST_OS)
 # if defined(i386_HOST_ARCH)
 #  define WINDOWS_CCONV stdcall
@@ -196,11 +198,17 @@ openFile filepath iomode non_blocking =
              | otherwise    = oflags2
     in do
 
-    -- NB. always use a safe open(), because we don't know whether open()
+    -- NB. always use a interruptible open(), because we don't know whether open()
     -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
     -- for example.
     mask_ $ do
-      fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666
+      fd <- throwErrnoIfMinus1Retry "openFile" $ do
+              allowInterrupt -- Check for async exceptions before retrying.
+                             -- This in combination with `c_safe_open` being
+                             -- interruptible and `throwErrnoIfMinus1Retry`
+                             -- retrying on EINT, allows to interrupt open
+                             -- without leaking the FD (#17912 & #18832)
+              c_safe_open f oflags 0o666
 
       (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
                               False{-not a socket-}
