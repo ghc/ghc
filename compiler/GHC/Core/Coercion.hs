@@ -42,7 +42,8 @@ module GHC.Core.Coercion (
         mkAxiomInstCo, mkProofIrrelCo,
         downgradeRole, mkAxiomRuleCo,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
-        mkKindCo, castCoercionKind, castCoercionKindI,
+        mkKindCo,
+        castCoercionKind, castCoercionKindI, castCoercionKind1,
         mkFamilyTyConAppCo,
 
         mkHeteroCoercionType,
@@ -1521,6 +1522,24 @@ castCoercionKind :: Coercion -> Role -> Type -> Type
 castCoercionKind g r t1 t2 h1 h2
   = mkCoherenceRightCo r t2 h2 (mkCoherenceLeftCo r t1 h1 g)
 
+-- | @castCoercionKind1 g r t1 t2 h@ = @coercionKind g r t1 t2 h h@
+-- That is, it's a specialised form of castCoercionKind, where the two
+--          kind coercions are identical
+-- @castCoercionKind1 g r t1 t2 h@, where @g :: t1 ~r t2@,
+-- has type @(t1 |> h) ~r (t2 |> h)@.
+-- @h@ must be nominal.
+-- See Note [castCoercionKind1]
+castCoercionKind1 :: Coercion -> Role -> Type -> Type
+                 -> CoercionN -> Coercion
+castCoercionKind1 g r t1 t2 h
+  = case g of
+      Refl {}         -> mkReflCo r (mkCastTy t1 h)
+      GRefl _ _ MRefl -> mkReflCo r (mkCastTy t1 h)
+      GRefl _ _ (MCo kind_co)
+          -> GRefl r (mkCastTy t1 h)
+                   (MCo (mkSymCo h `mkTransCo` kind_co `mkTransCo` h))
+      _ -> castCoercionKind g r t1 t2 h h
+
 -- | Creates a new coercion with both of its types casted by different casts
 -- @castCoercionKind g h1 h2@, where @g :: t1 ~r t2@,
 -- has type @(t1 |> h1) ~r (t2 |> h2)@.
@@ -1529,7 +1548,7 @@ castCoercionKind g r t1 t2 h1 h2
 -- Use @castCoercionKind@ instead if @t1@, @t2@, and @r@ are known beforehand.
 castCoercionKindI :: Coercion -> CoercionN -> CoercionN -> Coercion
 castCoercionKindI g h1 h2
-  = mkCoherenceRightCo r t2 h2 (mkCoherenceLeftCo r t1 h1 g)
+  = castCoercionKind g r t1 t2 h1 h2
   where (Pair t1 t2, r) = coercionKindRole g
 
 mkFamilyTyConAppCo :: TyCon -> [CoercionN] -> CoercionN
@@ -1591,6 +1610,23 @@ mkCoCast c g
     -- g2 :: t1 ~# t2
     (tc, _) = splitTyConApp (coercionLKind g)
     co_list = decomposeCo (tyConArity tc) g (tyConRolesRepresentational tc)
+
+{- Note [castCoercionKind1]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+castCoercionKind1 deals with the very important special case of castCoercionKind
+where the two kind coercions are identical.  In that case we can exploit the
+situation where the main coercion is reflexive, via the special cases for Refl
+and GRefl.
+
+This is important when flattening  (ty |> co). We flatten ty, yielding
+   fco :: ty ~ ty'
+and now we want a coercion xco between
+   xco :: (ty |> co) ~ (ty' |> co)
+That's exactly what castCoercionKind1 does.  And it's very very common for
+fco to be Refl.  In that case we do NOT want to get some terrible composition
+of mkLeftCoherenceCo and mkRightCoherenceCo, which is what castCoercionKind
+has to do in its full generality.  See #18413 and #18855.
+-}
 
 {-
 %************************************************************************
