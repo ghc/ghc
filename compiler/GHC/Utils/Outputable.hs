@@ -1045,12 +1045,6 @@ instance Outputable Extension where
 -- See Note [The OutputableP class]
 class OutputableP env a where
    pdoc :: env -> a -> SDoc
-   pdocPrec :: Rational -> env -> a -> SDoc
-                -- 0 binds least tightly
-                -- We use Rational because there is always a
-                -- Rational between any other two Rationals
-   pdoc       = pdocPrec 0
-   pdocPrec _ = pdoc
 
 -- | Wrapper for types having a Outputable instance when an OutputableP instance
 -- is required.
