@@ -647,23 +647,6 @@ validate-x86_64-linux-deb9-debug:
     when: always
     expire_in: 2 week
 
-validate-x86_64-linux-deb9-llvm:
-  extends: .build-x86_64-linux-deb9
-  stage: full-build
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/'
-  variables:
-    BUILD_FLAVOUR: perf-llvm
-    TEST_ENV: "x86_64-linux-deb9-llvm"
-
-nightly-x86_64-linux-deb9-llvm:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb9
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: perf-llvm
-    TEST_ENV: "x86_64-linux-deb9-llvm"
-
 validate-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
   stage: full-build
@@ -719,6 +702,23 @@ nightly-x86_64-linux-deb10:
 release-x86_64-linux-deb10:
   <<: *release
   extends: .build-x86_64-linux-deb10
+
+validate-x86_64-linux-deb10-llvm:
+  extends: .build-x86_64-linux-deb10
+  stage: full-build
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/'
+  variables:
+    BUILD_FLAVOUR: perf-llvm
+    TEST_ENV: "x86_64-linux-deb10-llvm"
+
+nightly-x86_64-linux-deb10-llvm:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb10
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: perf-llvm
+    TEST_ENV: "x86_64-linux-deb10-llvm"
 
 #################################
 # x86_64-linux-ubuntu 20.04
