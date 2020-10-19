@@ -330,14 +330,49 @@ extern void freeFullProgArgv       ( void ) ;
 /* exit() override */
 extern void (*exitFn)(int);
 
-/* ----------------------------------------------------------------------------
-   Locking.
+/* Note [Locking and Pausing the RTS]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   You have to surround all access to the RtsAPI with these calls.
-   ------------------------------------------------------------------------- */
+You have to surround all access to the RtsAPI with rts_lock/rts_unlock
+or with rts_pause/rts_resume.
 
-// acquires a token which may be used to create new objects and
-// evaluate them.
+# rts_pause / rts_resume
+
+Halt execution of all Haskell threads by acquiring all capabilities.
+rts_resume must later be called on the same thread to resume the RTS. Returns
+a token which may be used to create new objects and evaluate them (like
+rts_lock).
+
+rts_pause does not pause threads running safe FFI calls. Only one thread at a
+time can keep the rts paused. The rts_pause function will block until the
+current thread is given exclusive permission to pause the RTS. It is an error
+if the RTS is already paused by the current OS thread. rts_pause is different
+to rts_lock which only pauses a single capability. Calling rts_pause in
+between rts_lock/rts_unlock on the same thread will cause an error. Calling
+rts_pause from an unsafe FFI call will also cause an error (safe FFI calls
+are ok).
+
+
+
+
+
+TODO
+  * This note should give a good overview of the whole pause/lock mechanism. It
+    should first explain correct usage, then explaing implementation details
+  * Do we want to say why we chose to track rts_pausing_task
+    * If we just check that we own all caps then ??? Ugg I just tried this and gave up.
+      Why? I think somehow the error messages are nicer with rts_pausing_task
+  * explain that both lock/pause is implemented by acquiring a capability
+
+
+
+
+
+*/
+
+// acquires a token which may be used to create new objects and evaluate them.
+// Calling rts_lock in between rts_pause/rts_resume on the same thread will
+// cause an error.
 Capability *rts_lock (void);
 
 // releases the token acquired with rts_lock().
@@ -482,6 +517,29 @@ void rts_evalLazyIO_ (/* inout */ Capability **,
 void rts_checkSchedStatus (char* site, Capability *);
 
 SchedulerStatus rts_getSchedStatus (Capability *cap);
+
+// Halt execution of all Haskell threads by acquiring all capabilities.
+// rts_resume must later be called on the same thread to resume the RTS. Returns
+// a token which may be used to create new objects and evaluate them (like
+// rts_lock).
+//
+// rts_pause does not pause threads running safe FFI calls. Only one thread at a
+// time can keep the rts paused. The rts_pause function will block until the
+// current thread is given exclusive permission to pause the RTS. It is an error
+// if the RTS is already paused by the current OS thread. rts_pause is different
+// to rts_lock which only pauses a single capability. Calling rts_pause in
+// between rts_lock/rts_unlock on the same thread will cause an error. Calling
+// rts_pause from an unsafe FFI call will also cause an error (safe FFI calls
+// are ok).
+Capability * rts_pause (void);
+
+// Counterpart of rts_pause: Continue from a pause. All capabilities are
+// released. Must be called on the same thread as rts_pause().
+// [in] cap: the token returned by rts_pause.
+void rts_resume (Capability * cap);
+
+// Returns true if the rts is paused. See rts_pause() and rts_resume().
+bool rts_isPaused(void);
 
 /*
  * The RTS allocates some thread-local data when you make a call into
