@@ -118,7 +118,7 @@ freeTaskManager (void)
     return tasksRunning;
 }
 
-Task* getTask (void)
+Task* getMyTask (void)
 {
     Task *task;
 
@@ -306,7 +306,7 @@ newBoundTask (void)
         stg_exit(EXIT_FAILURE);
     }
 
-    task = getTask();
+    task = getMyTask();
 
     task->stopped = false;
 
@@ -317,13 +317,12 @@ newBoundTask (void)
 }
 
 void
-boundTaskExiting (Task *task)
+exitMyTask (void)
 {
+    Task* task = myTask();
 #if defined(THREADED_RTS)
     ASSERT(osThreadId() == task->id);
 #endif
-    ASSERT(myTask() == task);
-
     endInCall(task);
 
     // Set task->stopped, but only if this is the last call (#4850).
@@ -524,7 +523,7 @@ void rts_setInCallCapability (
     int preferred_capability,
     int affinity USED_IF_THREADS)
 {
-    Task *task = getTask();
+    Task *task = getMyTask();
     task->preferred_capability = preferred_capability;
 
 #if defined(THREADED_RTS)
@@ -541,7 +540,7 @@ void rts_pinThreadToNumaNode (
 {
 #if defined(THREADED_RTS)
     if (RtsFlags.GcFlags.numa) {
-        Task *task = getTask();
+        Task *task = getMyTask();
         task->node = capNoToNumaNode(node);
         if (!DEBUG_IS_ON || !RtsFlags.DebugFlags.numa) { // faking NUMA
             setThreadNode(numa_map[task->node]);
