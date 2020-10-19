@@ -423,6 +423,10 @@ createStrictIOThread(Capability *cap, W_ stack_size,  StgClosure *closure)
 
 /* ----------------------------------------------------------------------------
    Evaluating Haskell expressions
+
+   The running task (capability->running_task) must be bounded i.e. you must
+   call newBoundTask() before calling these functions. Note that rts_lock() and
+   rts_pause() both call newBoundTask().
    ------------------------------------------------------------------------- */
 
 void rts_eval (/* inout */ Capability **cap,
@@ -597,12 +601,23 @@ rts_getSchedStatus (Capability *cap)
     return cap->running_task->incall->rstat;
 }
 
+#if defined(THREADED_RTS)
+// The task that paused the RTS. The rts_pausing_task variable is owned by the
+// task that owns all capabilities (there is at most one such task).
+//
+// It's possible to remove this and instead define the pausing task as whichever
+// task owns all capabilities, but using `rts_pausing_task` leads to marginally
+// cleaner code/API and better error messages.
+Task * rts_pausing_task = NULL;
+#endif
+
 Capability *
 rts_lock (void)
 {
     Capability *cap;
     Task *task;
 
+    // Bound the current task. This is necessary to support rts_eval* functions.
     task = newBoundTask();
 
     if (task->running_finalizers) {
@@ -612,6 +627,14 @@ rts_lock (void)
                    "   Foreign.Concurrent.newForeignPtr instead of Foreign.newForeignPtr.");
         stg_exit(EXIT_FAILURE);
     }
+
+#if defined(THREADED_RTS)
+    if (rts_pausing_task == task) {
+        errorBelch("error: rts_lock: The RTS is already paused by this thread.\n"
+                   "   There is no need to call rts_lock if you have already called rts_pause.");
+        stg_exit(EXIT_FAILURE);
+    }
+#endif
 
     cap = NULL;
     waitForCapability(&cap, task);
@@ -640,21 +663,21 @@ rts_unlock (Capability *cap)
     task = cap->running_task;
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    // Now release the Capability.  With the capability released, GC
-    // may happen.  NB. does not try to put the current Task on the
+    // Now release the Capability. With the capability released, GC
+    // may happen. NB. does not try to put the current Task on the
     // worker queue.
-    // NB. keep cap->lock held while we call boundTaskExiting().  This
+    // NB. keep cap->lock held while we call exitMyTask(). This
     // is necessary during shutdown, where we want the invariant that
     // after shutdownCapability(), all the Tasks associated with the
-    // Capability have completed their shutdown too.  Otherwise we
-    // could have boundTaskExiting()/workerTaskStop() running at some
+    // Capability have completed their shutdown too. Otherwise we
+    // could have exitMyTask()/workerTaskStop() running at some
     // random point in the future, which causes problems for
     // freeTaskManager().
     ACQUIRE_LOCK(&cap->lock);
     releaseCapability_(cap,false);
 
     // Finally, we can release the Task to the free list.
-    boundTaskExiting(task);
+    exitMyTask();
     RELEASE_LOCK(&cap->lock);
 
     if (task->incall == NULL) {
@@ -664,6 +687,153 @@ rts_unlock (Capability *cap)
       traceTaskDelete(task);
     }
 }
+
+struct PauseToken_ {
+    Capability *capability;
+};
+
+Capability *pauseTokenCapability(PauseToken *pauseToken) {
+    return pauseToken->capability;
+}
+
+#if defined(THREADED_RTS)
+
+// See Note [Locking and Pausing the RTS]
+PauseToken *rts_pause (void)
+{
+    // It is an error if this thread already paused the RTS. If another
+    // thread has paused the RTS, then rts_pause will block until rts_resume is
+    // called (and compete with other threads calling rts_pause). The blocking
+    // behavior is implied by the use of `stopAllCapabilities`.
+    Task * task = getMyTask();
+    if (rts_pausing_task == task)
+    {
+        // This task already pased the RTS.
+        errorBelch("error: rts_pause: This thread has already paused the RTS.");
+        stg_exit(EXIT_FAILURE);
+    }
+
+    // The current task must not own a capability. This is true for non-worker
+    // threads e.g. when making a safe FFI call. We allow pausing when
+    // `task->cap->running_task != task` because the capability can be taken by
+    // other capabilities. Doing this check is justified because rts_pause is a
+    // user facing function and we want good error reporting. We also don't
+    // expect rts_pause to be performance critical.
+    if (task->cap && task->cap->running_task == task)
+    {
+        // This task owns a capability (and it can't be taken by other capabilities).
+        errorBelch(task->cap->in_haskell
+            ? ("error: rts_pause: attempting to pause via an unsafe FFI call.\n"
+               "   Perhaps a 'foreign import unsafe' should be 'safe'?")
+            : ("error: rts_pause: attempting to pause from a Task that owns a capability.\n"
+               "   Have you already acquired a capability e.g. with rts_lock?"));
+        stg_exit(EXIT_FAILURE);
+    }
+
+    // Bound the current task. This is necessary to support rts_eval* functions.
+    task = newBoundTask();
+    stopAllCapabilities(NULL, task);
+
+    // Now we own all capabilities so we own rts_pausing_task and may set it.
+    rts_pausing_task = task;
+
+    PauseToken *token = malloc(sizeof(PauseToken));
+    token->capability = task->cap;
+    return token;
+}
+
+static void assert_isPausedOnMyTask(const char *functionName);
+
+// See Note [Locking and Pausing the RTS]. The pauseToken argument is here just
+// for symmetry with rts_pause and to match the pattern of rts_lock/rts_unlock.
+void rts_resume (PauseToken *pauseToken)
+{
+    assert_isPausedOnMyTask("rts_resume");
+    Task * task = getMyTask();
+
+    // Now we own all capabilities so we own rts_pausing_task and may write to
+    // it.
+    rts_pausing_task = NULL;
+
+    // releaseAllCapabilities will not block because the current task owns all
+    // capabilities.
+    releaseAllCapabilities(n_capabilities, NULL, task);
+    exitMyTask();
+    free(pauseToken);
+}
+
+// See RtsAPI.h
+bool rts_isPaused(void)
+{
+    return rts_pausing_task != NULL;
+}
+
+// Check that the rts_pause was called on this thread/task and this thread owns
+// all capabilities. If not, outputs an error and exits with EXIT_FAILURE.
+static void assert_isPausedOnMyTask(const char *functionName)
+{
+    Task * task = getMyTask();
+    if (rts_pausing_task == NULL)
+    {
+        errorBelch (
+            "error: %s: the rts is not paused. Did you forget to call rts_pause?",
+            functionName);
+        stg_exit(EXIT_FAILURE);
+    }
+
+    if (task != rts_pausing_task)
+    {
+        // We don't have ownership of rts_pausing_task, so it may have changed
+        // just after the above read. Still, we are garanteed that
+        // rts_pausing_task won't be set to the current task (because the
+        // current task is here now!), so the error messages are still correct.
+        errorBelch (
+            "error: %s: called from a different OS thread than rts_pause.",
+            functionName);
+
+        stg_exit(EXIT_FAILURE);
+    }
+
+    // Check that we own all capabilities.
+    for (unsigned int i = 0; i < n_capabilities; i++)
+    {
+        Capability *cap = capabilities[i];
+        if (cap->running_task != task)
+        {
+            errorBelch (
+                "error: %s: the pausing thread does not own all capabilities.\n"
+                "   Have you manually released a capability after calling rts_pause?",
+                functionName);
+            stg_exit(EXIT_FAILURE);
+        }
+    }
+}
+
+
+#else
+PauseToken GNU_ATTRIBUTE(__noreturn__)
+*rts_pause (void)
+{
+    errorBelch("Warning: Pausing the RTS is only possible for "
+               "multithreaded RTS.");
+    stg_exit(EXIT_FAILURE);
+}
+
+void GNU_ATTRIBUTE(__noreturn__)
+rts_resume (PauseToken *pauseToken STG_UNUSED)
+{
+    errorBelch("Warning: Resuming the RTS is only possible for "
+               "multithreaded RTS.");
+    stg_exit(EXIT_FAILURE);
+}
+
+bool rts_isPaused()
+{
+    errorBelch("Warning: Pausing/Resuming the RTS is only possible for "
+               "multithreaded RTS.");
+    return false;
+}
+#endif
 
 void rts_done (void)
 {
@@ -700,7 +870,7 @@ void rts_done (void)
 void hs_try_putmvar (/* in */ int capability,
                      /* in */ HsStablePtr mvar)
 {
-    Task *task = getTask();
+    Task *task = getMyTask();
     Capability *cap;
     Capability *task_old_cap USED_IF_THREADS;
 
