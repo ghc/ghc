@@ -1,0 +1,2 @@
+unsafe_rts_pause: error: rts_pause: attempting to pause via an unsafe FFI call.
+   Perhaps a 'foreign import unsafe' should be 'safe'?
