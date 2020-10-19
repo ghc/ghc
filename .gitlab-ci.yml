@@ -469,7 +469,7 @@ validate-x86_64-darwin:
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: "--with-intree-gmp"
     TEST_ENV: "x86_64-darwin"
-    BUILD_FLAVOUR: "perf"
+    BUILD_FLAVOUR: "validate"
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
     - .gitlab/ci.sh clean
@@ -520,7 +520,7 @@ validate-x86_64-darwin:
   tags:
     - x86_64-linux
   variables:
-    BUILD_FLAVOUR: "perf"
+    BUILD_FLAVOUR: "validate"
   before_script:
       # Build hyperlinked sources for documentation when building releases
     - |
