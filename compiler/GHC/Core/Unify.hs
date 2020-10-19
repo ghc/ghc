@@ -1522,7 +1522,7 @@ ty_co_match menv subst (TyVarTy tv1) co lkco rkco
   = if any (inRnEnvR rn_env) (tyCoVarsOfCoList co)
     then Nothing      -- occurs check failed
     else Just $ extendVarEnv subst tv1' $
-                castCoercionKindI co (mkSymCo lkco) (mkSymCo rkco)
+                castCoercionKind co (mkSymCo lkco) (mkSymCo rkco)
 
   | otherwise
   = Nothing

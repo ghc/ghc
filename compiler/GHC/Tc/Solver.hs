@@ -2541,6 +2541,9 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
     is_float_eq_candidate ct
       | pred <- ctPred ct
       , EqPred NomEq ty1 ty2 <- classifyPredType pred
+      , case ct of
+           CIrredCan {} -> False   -- See Note [Do not float blocked constraints]
+           _            -> True    --   See #18855
       = float_eq ty1 ty2 || float_eq ty2 ty1
       | otherwise
       = False
@@ -2551,7 +2554,26 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
                    && (not (isTyVarTyVar tv1) || isTyVarTy ty2)
           Nothing  -> False
 
-{- Note [Float equalities from under a skolem binding]
+{- Note [Do not float blocked constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As #18855 showed, we must not float an equality that is blocked.
+Consider
+     forall a[4]. [W] co1: alpha[4] ~ Maybe (a[4] |> bco)
+                  [W] co2: alpha[4] ~ Maybe (beta[4] |> bco])
+                  [W] bco: kappa[2] ~ Type
+
+Now co1, co2 are blocked by bco.  We will eventually float out bco
+and solve it at level 2.  But the danger is that we will *also*
+float out co2, and that is bad bad bad.  Because we'll promote alpha
+and beta to level 2, and then fail to unify the promoted beta
+with the skolem a[4].
+
+Solution: don't float out blocked equalities. Remember: we only want
+to float out if we can solve; see Note [Which equalities to float].
+
+(Future plan: kill floating altogether.)
+
+Note [Float equalities from under a skolem binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Which of the simple equalities can we float out?  Obviously, only
 ones that don't mention the skolem-bound variables.  But that is

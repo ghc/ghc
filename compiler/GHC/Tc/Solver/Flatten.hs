@@ -1203,9 +1203,11 @@ flatten_one ty@(ForAllTy {})
 flatten_one (CastTy ty g)
   = do { (xi, co) <- flatten_one ty
        ; (g', _)   <- flatten_co g
-
        ; role <- getRole
-       ; return (mkCastTy xi g', castCoercionKind co role xi ty g' g) }
+       ; return (mkCastTy xi g', castCoercionKind1 co role xi ty g') }
+         -- It makes a /big/ difference to call castCoercionKind1 not
+         -- the more general castCoercionKind2.
+         -- See Note [castCoercionKind1] in GHC.Core.Coercion
 
 flatten_one (CoercionTy co) = first mkCoercionTy <$> flatten_co co
 
