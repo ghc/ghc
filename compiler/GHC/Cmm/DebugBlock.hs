@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE LambdaCase #-}
 
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -520,18 +521,22 @@ data UnwindExpr = UwConst !Int                  -- ^ literal value
                 deriving (Eq)
 
 instance OutputableP env CLabel => OutputableP env UnwindExpr where
-  pdocPrec _ _   (UwConst i)     = ppr i
-  pdocPrec _ _   (UwReg g 0)     = ppr g
-  pdocPrec p env (UwReg g x)     = pdocPrec p env (UwPlus (UwReg g 0) (UwConst x))
-  pdocPrec _ env (UwDeref e)     = char '*' <> pdocPrec 3 env e
-  pdocPrec _ env (UwLabel l)     = pdocPrec 3 env l
-  pdocPrec p env (UwPlus e0 e1)  | p <= 0
-                                      = pdocPrec 0 env e0 <> char '+' <> pdocPrec 0 env e1
-  pdocPrec p env (UwMinus e0 e1) | p <= 0
-                                      = pdocPrec 1 env e0 <> char '-' <> pdocPrec 1 env e1
-  pdocPrec p env (UwTimes e0 e1) | p <= 1
-                                      = pdocPrec 2 env e0 <> char '*' <> pdocPrec 2 env e1
-  pdocPrec _ env other           = parens (pdocPrec 0 env other)
+  pdoc = pprUnwindExpr 0
+
+pprUnwindExpr :: OutputableP env CLabel => Rational -> env -> UnwindExpr -> SDoc
+pprUnwindExpr p env = \case
+  UwConst i     -> ppr i
+  UwReg g 0     -> ppr g
+  UwReg g x     -> pprUnwindExpr p env (UwPlus (UwReg g 0) (UwConst x))
+  UwDeref e     -> char '*' <> pprUnwindExpr 3 env e
+  UwLabel l     -> pdoc env l
+  UwPlus e0 e1
+   | p <= 0     -> pprUnwindExpr 0 env e0 <> char '+' <> pprUnwindExpr 0 env e1
+  UwMinus e0 e1
+   | p <= 0     -> pprUnwindExpr 1 env e0 <> char '-' <> pprUnwindExpr 1 env e1
+  UwTimes e0 e1
+   | p <= 1     -> pprUnwindExpr 2 env e0 <> char '*' <> pprUnwindExpr 2 env e1
+  other         -> parens (pprUnwindExpr 0 env other)
 
 -- | Conversion of Cmm expressions to unwind expressions. We check for
 -- unsupported operator usages and simplify the expression as far as
