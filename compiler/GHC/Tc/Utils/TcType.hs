@@ -28,6 +28,7 @@ module GHC.Tc.Utils.TcType (
   TcTyCon, KnotTied,
 
   ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
+  ArgTy(..), scaledExpTypes,
 
   SyntaxOpType(..), synKnownType, mkSynFunTys,
 
@@ -398,6 +399,16 @@ instance Outputable InferResult where
 mkCheckExpType :: TcType -> ExpType
 mkCheckExpType = Check
 
+data ArgTy
+  = NormalArgTy (Scaled ExpSigmaType)
+  | ForallArgTy ReqTVBinder
+
+scaledExpTypes :: [ArgTy] -> [Scaled ExpSigmaType]
+scaledExpTypes [] = []
+scaledExpTypes (arg_ty : arg_tys)
+  = case arg_ty of
+      NormalArgTy ty -> ty : scaledExpTypes arg_tys
+      _              -> scaledExpTypes arg_tys
 
 {- *********************************************************************
 *                                                                      *
@@ -1286,9 +1297,9 @@ tcSplitPhiTy ty
 
 -- | Split a sigma type into its parts.
 tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
-tcSplitSigmaTy ty = case tcSplitForAllTys ty of
+tcSplitSigmaTy ty = case tcSplitForAllTysInvis ty of
                         (tvs, rho) -> case tcSplitPhiTy rho of
-                                        (theta, tau) -> (tvs, theta, tau)
+                                        (theta, tau) -> (binderVar <$> tvs, theta, tau)
 
 -- | Split a sigma type into its parts, going underneath as many @ForAllTy@s
 -- as possible. For example, given this type synonym:

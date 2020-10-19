@@ -48,6 +48,7 @@ import GHC.Core.Coercion( Coercion )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Core.TyCo.Rep( ArgType (..) )
 
 import GHC.Driver.Session
 import GHC.Types.CostCentre
@@ -721,7 +722,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         ; ([discrim_var], matching_code)
                 <- matchWrapper RecUpd (Just record_expr) -- See Note [Scrutinee in Record updates]
                                       (MG { mg_alts = noLoc alts
-                                          , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty
+                                          , mg_ext = MatchGroupTc [NormalArgType (unrestricted in_ty)] out_ty
                                           , mg_origin = FromSource
                                           })
                                      -- FromSource is not strictly right, but we
@@ -1119,7 +1120,7 @@ dsDo ctx stmts
                            (MG { mg_alts = noLoc [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
-                               , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty
+                               , mg_ext = MatchGroupTc [NormalArgType (unrestricted tup_ty)] body_ty
                                , mg_origin = Generated })
         mfix_pat     = noLoc $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo body_ty

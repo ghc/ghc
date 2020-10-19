@@ -39,6 +39,7 @@ import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst (substTyWithInScope)
 import GHC.Core.TyCo.FVs( shallowTyCoVarsOfType )
 import GHC.Core.Type
+import GHC.Types.Basic ( PromotionFlag (..) )
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
 import GHC.Builtin.PrimOps( tagToEnumKey )
@@ -312,6 +313,16 @@ tcValArgs quick_look fun args
     tc_arg n (EWrap wrap)          = return (n,   EWrap wrap)
     tc_arg n (ETypeArg l hs_ty ty) = return (n+1, ETypeArg l hs_ty ty)
 
+    tc_arg n (EValArg { eva_loc = loc
+                      , eva_arg = ValArg (L l (HsVar noExtField tvname@(L l' name)))
+                      , eva_arg_ty = ty })
+      = return (n + 1, (ETypeArg loc arg' (irrelevantMult ty)))
+      where
+        arg' = HsWC { hswc_body = (L l ty_arg)
+                    , hswc_ext  = [name]
+                    }
+        ty_arg = HsTyVar NoExtField IsPromoted tvname
+
     tc_arg n eva@(EValArg { eva_arg = arg, eva_arg_ty = Scaled mult arg_ty })
       = do { -- Crucial step: expose QL results before checking arg_ty
              -- So far as the paper is concerned, this step applies
@@ -572,6 +583,26 @@ tcVTA fun_ty hs_ty
              insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
                          -- NB: tv and ty_arg have the same kind, so this
                          --     substitution is kind-respecting
+       ; traceTc "VTA" (vcat [ppr tv, debugPprType kind
+                             , debugPprType ty_arg
+                             , debugPprType (tcTypeKind ty_arg)
+                             , debugPprType inner_ty
+                             , debugPprType insted_ty ])
+       ; return (ty_arg, insted_ty) }
+
+  | (bndr : _, ty) <- splitForAllTysReq fun_ty
+  = do { let tv   = binderVar bndr
+             kind = tyVarKind tv
+       ; ty_arg <- tcHsTypeApp hs_ty kind
+       ; traceTc "ty_arg is" (ppr ty_arg)
+
+       ; inner_ty <- zonkTcType ty
+                  -- See Note [Visible type application zonk]
+
+       ; let in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])
+             insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
+                              -- NB: tv and ty_arg have the same kind, so this
+                              --     substitution is kind-respecting
        ; traceTc "VTA" (vcat [ppr tv, debugPprType kind
                              , debugPprType ty_arg
                              , debugPprType (tcTypeKind ty_arg)
@@ -1087,5 +1118,3 @@ tcTagToEnum expr fun args app_res_ty res_ty
 
 tcExprPrag :: HsPragE GhcRn -> HsPragE GhcTc
 tcExprPrag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
-
-

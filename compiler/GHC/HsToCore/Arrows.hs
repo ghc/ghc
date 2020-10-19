@@ -43,6 +43,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Core.TyCo.Rep
 import GHC.HsToCore.Binds (dsHsWrapper)
 
 import GHC.Types.Id
@@ -595,7 +596,7 @@ dsCmd ids local_vars stack_ty res_ty
             exprFreeIdsDSet core_body `uniqDSetIntersectUniqSet` local_vars)
 
 dsCmd ids local_vars stack_ty res_ty
-      (HsCmdLamCase _ mg@MG { mg_ext = MatchGroupTc [Scaled arg_mult arg_ty] _ }) env_ids = do
+      (HsCmdLamCase _ mg@MG { mg_ext = MatchGroupTc [NormalArgType (Scaled arg_mult arg_ty)] _ }) env_ids = do
   arg_id <- newSysLocalDs arg_mult arg_ty
   let case_cmd  = noLoc $ HsCmdCase noExtField (nlHsVar arg_id) mg
   dsCmdLam ids local_vars stack_ty res_ty [nlVarPat arg_id] case_cmd env_ids

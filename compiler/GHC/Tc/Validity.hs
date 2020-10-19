@@ -567,11 +567,6 @@ linearityAllowed = typeLevelUserTypeCtxt
 -- where VDQ is permitted) and
 -- @testsuite/tests/dependent/should_fail/T16326_Fail*.hs@ (for places where
 -- VDQ is disallowed).
-vdqAllowed :: UserTypeCtxt -> Bool
-vdqAllowed ctxt = case typeOrKindCtxt ctxt of
-  OnlyTypeCtxt        -> False
-  OnlyKindCtxt        -> True
-  BothTypeAndKindCtxt -> True
 
 {-
 Note [Correctness and performance of type synonym validity checking]
@@ -724,7 +719,7 @@ check_type ve (CastTy ty _) = check_type ve ty
 --
 -- Critically, this case must come *after* the case for TyConApp.
 -- See Note [Liberal type synonyms].
-check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
+check_type ve@(ValidityEnv{ ve_tidy_env = env
                           , ve_rank = rank, ve_expand = expand }) ty
   | not (null tvbs && null theta)
   = do  { traceTc "check_type" (ppr ty $$ ppr rank)
@@ -735,12 +730,6 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
         ; checkConstraintsOK ve theta ty
                 -- Reject forall (a :: Eq b => b). blah
                 -- In a kind signature we don't allow constraints
-
-        ; checkTcM (all (isInvisibleArgFlag . binderArgFlag) tvbs
-                         || vdqAllowed ctxt)
-                   (illegalVDQTyErr env ty)
-                -- Reject visible, dependent quantification in the type of a
-                -- term (e.g., `f :: forall a -> a -> Maybe a`)
 
         ; check_valid_theta env' SigmaCtxt expand theta
                 -- Allow     type T = ?x::Int => Int -> Int
@@ -998,15 +987,6 @@ checkConstraintsOK ve theta ty
 constraintTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
 constraintTyErr env ty
   = (env, text "Illegal constraint in a kind:" <+> ppr_tidy env ty)
-
--- | Reject a use of visible, dependent quantification in the type of a term.
-illegalVDQTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
-illegalVDQTyErr env ty =
-  (env, vcat
-  [ hang (text "Illegal visible, dependent quantification" <+>
-          text "in the type of a term:")
-       2 (ppr_tidy env ty)
-  , text "(GHC does not yet support this)" ] )
 
 -- | Reject uses of linear function arrows in kinds.
 linearFunKindErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
