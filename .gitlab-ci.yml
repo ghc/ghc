@@ -659,10 +659,11 @@ validate-x86_64-linux-deb9-debug:
     when: always
     expire_in: 2 week
 
-# Disabled to alleviate CI load
-.validate-x86_64-linux-deb9-llvm:
+validate-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
   stage: full-build
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/'
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
