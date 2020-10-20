@@ -12,7 +12,7 @@ test('unsigned_reloc_macho_x64',
 test('section_alignment',
      [
          extra_files(['runner.c', 'section_alignment.c']),
-         unless(opsys('darwin') and arch('x86_64'), expect_broken(13624))
+         unless(opsys('darwin') and have_ncg(), expect_broken(13624))
      ],
      run_command, ['$MAKE -s --no-print-directory section_alignment'])
 
@@ -109,8 +109,8 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
      compile_and_run, ['-rdynamic -package ghc'])
 
 
-test('T7072', 
-	[extra_files(['T7072-main.c', 'T7072-obj.c']), 
-		unless(opsys('linux'), skip), 
-		req_rts_linker], 
+test('T7072',
+	[extra_files(['T7072-main.c', 'T7072-obj.c']),
+		unless(opsys('linux'), skip),
+		req_rts_linker],
 	makefile_test, ['T7072'])
