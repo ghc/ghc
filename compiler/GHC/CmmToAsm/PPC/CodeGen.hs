@@ -1863,8 +1863,8 @@ genCCall' config gcp target dest_regs args
                    | isBitsType rep = intFormat (wordWidth platform)
                    | otherwise      = cmmTypeFormat rep
                 conv_op = case hint of
-                            SignedHint -> MO_SS_Conv
-                            _          -> MO_UU_Conv
+                            SignedHint _ -> MO_SS_Conv
+                            _            -> MO_UU_Conv
 
                 stackOffset' = case gcp of
                                GCPAIX ->
