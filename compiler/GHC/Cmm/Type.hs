@@ -18,6 +18,7 @@ module GHC.Cmm.Type
     , rEP_StgEntCounter_allocd
 
     , ForeignHint(..)
+    , hintToWidth
 
     , Length
     , vec, vec2, vec4, vec8, vec16
@@ -321,6 +322,10 @@ data ForeignHint
         -- Used to give extra per-argument or per-result
         -- information needed by foreign calling conventions
 
+hintToWidth :: ForeignHint -> Width
+hintToWidth (NoHint w)     = w
+hintToWidth AddrHint       = W64 -- XXX: this should be ptr size.
+hintToWidth (SignedHint w) = w
 -------------------------------------------------------------------------
 
 -- These don't really belong here, but I don't know where is best to
