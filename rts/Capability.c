@@ -410,36 +410,44 @@ void
 moreCapabilities (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
-    uint32_t i;
-    Capability **old_capabilities = capabilities;
+    Capability **new_capabilities = stgMallocBytes(to * sizeof(Capability*), "moreCapabilities");
 
-    capabilities = stgMallocBytes(to * sizeof(Capability*), "moreCapabilities");
+    // We must disable the timer while we do this since the tick handler may
+    // call contextSwitchAllCapabilities, which may see the capabilities array
+    // as we free it. The alternative would be to protect the capabilities
+    // array with a lock but this seems more expensive than necessary.
+    // See #17289.
+    stopTimer();
 
     if (to == 1) {
         // THREADED_RTS must work on builds that don't have a mutable
         // BaseReg (eg. unregisterised), so in this case
         // capabilities[0] must coincide with &MainCapability.
-        capabilities[0] = &MainCapability;
+        new_capabilities[0] = &MainCapability;
         initCapability(&MainCapability, 0);
     }
     else
     {
-        for (i = 0; i < to; i++) {
+        for (uint32_t i = 0; i < to; i++) {
             if (i < from) {
-                capabilities[i] = old_capabilities[i];
+                new_capabilities[i] = capabilities[i];
             } else {
-                capabilities[i] = stgMallocBytes(sizeof(Capability),
-                                                 "moreCapabilities");
-                initCapability(capabilities[i], i);
+                new_capabilities[i] = stgMallocBytes(sizeof(Capability),
+                                                     "moreCapabilities");
+                initCapability(new_capabilities[i], i);
             }
         }
     }
 
     debugTrace(DEBUG_sched, "allocated %d more capabilities", to - from);
 
+    Capability **old_capabilities = ACQUIRE_LOAD(&capabilities);
+    RELEASE_STORE(&capabilities, new_capabilities);
     if (old_capabilities != NULL) {
         stgFree(old_capabilities);
     }
+
+    startTimer();
 #endif
 }
 
@@ -1341,7 +1349,7 @@ void
 setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
 #if defined(THREADED_RTS)
     if (cap_no < n_capabilities) {
-        capabilities[cap_no]->io_manager_control_wr_fd = fd;
+        RELAXED_STORE(&capabilities[cap_no]->io_manager_control_wr_fd, fd);
     } else {
         errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
     }
