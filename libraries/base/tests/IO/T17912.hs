@@ -15,17 +15,17 @@ main = do
     ExitSuccess -> do
       passed <- newEmptyMVar
       opener <- forkIO $
-        openFileBlocking "fifo" WriteMode >> return ()
+        (openFileBlocking "fifo" WriteMode >> return ())
           `catch` \(e:: AsyncException) -> do
              if e == ThreadKilled then do
                 putStrLn "openFileBlocking successfully interrupted"
                 putMVar passed True
              else print e
              throwIO e
-      threadDelay 10
+      threadDelay 1000
       forkIO $ killThread opener
       forkIO $ do
-        threadDelay (10^5)
+        threadDelay (10^6)
         putStrLn "timeout!"
         putMVar passed False
       res <- readMVar passed
