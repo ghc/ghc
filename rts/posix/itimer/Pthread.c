@@ -189,7 +189,7 @@ void
 startTicker(void)
 {
     OS_ACQUIRE_LOCK(&mutex);
-    stopped = 0;
+    RELAXED_STORE(&stopped, false);
     signalCondition(&start_cond);
     OS_RELEASE_LOCK(&mutex);
 }
@@ -199,7 +199,7 @@ void
 stopTicker(void)
 {
     OS_ACQUIRE_LOCK(&mutex);
-    stopped = 1;
+    RELAXED_STORE(&stopped, true):
     OS_RELEASE_LOCK(&mutex);
 }
 
