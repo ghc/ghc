@@ -3455,6 +3455,7 @@ fFlagsDeps = [
   flagSpec "print-typechecker-elaboration"    Opt_PrintTypecheckerElaboration,
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
+  flagSpec "read-codegen-pragmas"             Opt_ReadCodeGenPragmas,
   flagSpec "regs-graph"                       Opt_RegsGraph,
   flagSpec "regs-iterative"                   Opt_RegsIterative,
   depFlagSpec' "rewrite-rules"                Opt_EnableRewriteRules
@@ -3473,6 +3474,7 @@ fFlagsDeps = [
   flagSpec "static-argument-transformation"   Opt_StaticArgumentTransformation,
   flagSpec "strictness"                       Opt_Strictness,
   flagSpec "use-rpaths"                       Opt_RPath,
+  flagSpec "write-codegen-pragmas"            Opt_WriteCodeGenPragmas,
   flagSpec "write-interface"                  Opt_WriteInterface,
   flagSpec "write-ide-info"                   Opt_WriteHie,
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,

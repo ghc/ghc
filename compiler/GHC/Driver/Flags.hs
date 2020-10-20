@@ -209,6 +209,8 @@ data GeneralFlag
    -- Interface files
    | Opt_IgnoreInterfacePragmas
    | Opt_OmitInterfacePragmas
+   | Opt_ReadCodeGenPragmas -- forces reading codegen pragmas even with -fingore-interface-pragmas
+   | Opt_WriteCodeGenPragmas -- forces writing codegen pragmas even with -fomit-interface-pragmas
    | Opt_ExposeAllUnfoldings
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
    | Opt_WriteHie -- generate .hie files

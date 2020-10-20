@@ -115,6 +115,7 @@ mkFullIface :: HscEnv -> PartialModIface -> Maybe CgInfos -> IO ModIface
 mkFullIface hsc_env partial_iface mb_cg_infos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
+          , not $ gopt Opt_WriteCodeGenPragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
           = updateDecl (mi_decls partial_iface) mb_cg_infos

@@ -745,6 +745,19 @@ by saying ``-fno-wombat``.
     a case expression, which is good for performance, but bad if you are
     using ``seq`` on partial applications.
 
+.. ghc-flag:: -fread-codegen-pragmas
+    :shortdesc: Read in code generation pragmas from interface files even with
+        -fignore-interface-pragmas enabled.
+    :type: dynamic
+    :category:
+
+    :default: off
+
+    Always read code generation pragmas (such as CAF and lambda form
+    unfoldings) from interface files. With -fignore-interface-pragmas
+    or -O0, where we would normally not do this, it has been shown to
+    generate slightly less code but also necessitates more recompilations.
+
 .. ghc-flag:: -fregs-graph
     :shortdesc: Use the graph colouring register allocator for register
         allocation in the native code generator. Implied by :ghc-flag:`-O2`.
@@ -1306,6 +1319,19 @@ by saying ``-fno-wombat``.
     if a function definition will be inlined *at a call site*. The other option
     determines if a function definition will be kept around at all for
     potential inlining.
+
+.. ghc-flag:: -fwrite-codegen-pragmas
+    :shortdesc: Write code generation pragmas to interface files even with
+        -fomit-interface-pragmas enabled.
+    :type: dynamic
+    :category:
+
+    :default: off
+
+    Always write code generation pragmas (such as CAF and lambda form
+    unfoldings) to interface files. With -fomit-interface-pragmas or -O0,
+    where we would normally not do this, it has been shown to generate slightly
+    less code but also necessitates more recompilations.
 
 .. ghc-flag:: -fworker-wrapper
     :shortdesc: Enable the worker-wrapper transformation.

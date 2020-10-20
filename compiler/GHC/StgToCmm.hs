@@ -125,6 +125,7 @@ codeGen dflags this_mod data_tycons
 
               !generatedInfo
                 | gopt Opt_OmitInterfacePragmas dflags
+                , not $ gopt Opt_WriteCodeGenPragmas dflags
                 = emptyNameEnv
                 | otherwise
                 = mkNameEnv (Prelude.map extractInfo (eltsUFM cg_id_infos))

@@ -1252,6 +1252,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                     final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface (Just cg_infos))
                     let final_mod_details
                            | gopt Opt_OmitInterfacePragmas iface_dflags
+                           , not $ gopt Opt_WriteCodeGenPragmas iface_dflags
                            = mod_details
                            | otherwise = {-# SCC updateModDetailsIdInfos #-}
                                          updateModDetailsIdInfos cg_infos mod_details

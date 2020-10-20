@@ -64,8 +64,10 @@ moving parts are:
 * For ModIface we generate the final ModIface with CgInfo in
   GHC.Iface.Make.mkFullIface.
 
-* We don't absolutely guarantee to serialise the CgInfo: we won't if you have
-  -fomit-interface-pragmas or -fno-code; and we won't read it in if you have
+* if -fwrite-codegen-pragmas is enabled then CgInfo is always serialized,
+  otherwise, it is not absolutely guaranteed to be serialised: we won't if you
+  have -fomit-interface-pragmas or -fno-code. It will always be read in if you
+  have -fread-codegen-pragmas, but it won't be read if you have
   -fignore-interface-pragmas.  (We could revisit this decision.)
 -}
 

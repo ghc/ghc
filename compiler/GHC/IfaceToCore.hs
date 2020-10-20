@@ -1478,14 +1478,27 @@ tcIdInfo ignore_prags toplvl name ty info = do
                       then vanillaIdInfo `setUnfoldingInfo` BootUnfolding
                       else vanillaIdInfo
 
-    foldlM tcPrag init_info (needed_prags info)
-  where
-    needed_prags :: [IfaceInfoItem] -> [IfaceInfoItem]
-    needed_prags items
-      | not ignore_prags = items
-      | otherwise        = filter need_prag items
+    read_cg_prags <- goptM Opt_ReadCodeGenPragmas
+    let needed_prags =
+          filter (should_read_prag read_cg_prags ignore_prags) info
 
-    need_prag :: IfaceInfoItem -> Bool
+    foldlM tcPrag init_info needed_prags
+  where
+    should_read_prag :: Bool -- True <=> Always read codegen pragmas
+                     -> Bool -- True <=> Ignore non-compulsory unfoldings
+                     -> IfaceInfoItem
+                     -> Bool
+    should_read_prag read_cg_prags ignore_prags item
+      | read_cg_prags && is_codegen_prag item = True
+      | ignore_prags = need_prag item
+      | otherwise = True
+
+    -- Always read in Code-generated Id info if --fread-codegen-pragmas is set
+    -- See Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types
+    is_codegen_prag HsNoCafRefs  = True
+    is_codegen_prag (HsLFInfo _) = True
+    is_codegen_prag _            = False
+
       -- Always read in compulsory unfoldings
       -- See Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
     need_prag (HsUnfold _ (IfCompulsory {})) = True
