@@ -198,9 +198,9 @@ openFile filepath iomode non_blocking =
              | otherwise    = oflags2
     in do
 
-    -- NB. always use a interruptible open(), because we don't know whether open()
-    -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
-    -- for example.
+    -- NB. always use an interruptible open(), because we don't know whether
+    -- open() will be fast or not.  It can be slow on NFS and FUSE
+    -- filesystems, for example.
     mask_ $ do
       fd <- throwErrnoIfMinus1Retry "openFile" $ do
               allowInterrupt -- Check for async exceptions before retrying.
@@ -213,12 +213,13 @@ openFile filepath iomode non_blocking =
       (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
                               False{-not a socket-}
                               non_blocking
-              `catchAny` \e -> do _ <- c_close fd
-                                  -- ASSERT the fd is not locked:
-                                  -- There are no interruptible operations
-                                  -- after locking the file inside mkFD, therefore,
-                                  -- given the mask, the fd is not locked.
-                                  throwIO e
+              `catchAny` \e -> do
+                  _ <- c_close fd
+                  -- ASSERT the fd is not locked:
+                  -- There are no interruptible operations after locking the
+                  -- file inside mkFD, therefore, given the mask, the fd is
+                  -- not locked.
+                  throwIO e
 
       -- we want to truncate() if this is an open in WriteMode, but only
       -- if the target is a RegularFile.  ftruncate() fails on special files
