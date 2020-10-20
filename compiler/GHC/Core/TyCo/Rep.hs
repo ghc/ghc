@@ -93,7 +93,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Builtin.Names ( liftedTypeKindTyConKey, manyDataConKey )
 import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, manyDataConTy )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
-import GHC.Types.Unique ( hasKey )
+import GHC.Types.Unique ( hasKey, Uniquable(..) )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
@@ -1611,6 +1611,9 @@ instance Data.Data CoercionHole where
 
 instance Outputable CoercionHole where
   ppr (CoercionHole { ch_co_var = cv }) = braces (ppr cv)
+
+instance Uniquable CoercionHole where
+  getUnique (CoercionHole { ch_co_var = cv }) = getUnique cv
 
 instance Outputable BlockSubstFlag where
   ppr YesBlockSubst = text "YesBlockSubst"

@@ -9,7 +9,8 @@ module GHC.Tc.Types.Constraint (
         QCInst(..), isPendingScInst,
 
         -- Canonical constraints
-        Xi, Ct(..), Cts, CtIrredStatus(..), emptyCts, andCts, andManyCts, pprCts,
+        Xi, Ct(..), Cts, CtIrredStatus(..), HoleSet,
+        emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts,
         isPendingScDict, superClassesMightHelp, getPendingWantedScs,
@@ -257,16 +258,19 @@ instance Outputable HoleSort where
 -- | Used to indicate extra information about why a CIrredCan is irreducible
 data CtIrredStatus
   = InsolubleCIS   -- this constraint will never be solved
-  | BlockedCIS     -- this constraint is blocked on a coercion hole
-                   -- The hole will appear in the ctEvPred of the constraint with this status
-                   -- See Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
-                   -- Wrinkle (4a)
+  | BlockedCIS HoleSet
+                   -- this constraint is blocked on the coercion hole(s) listed
+                   -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+                   -- Wrinkle (4a). Why store the HoleSet? See Wrinkle (2b) of that
+                   -- same Note.
+                   -- INVARIANT: A BlockedCIS is a homogeneous equality whose
+                   --   left hand side can fit in a CanEqLHS.
   | OtherCIS
 
 instance Outputable CtIrredStatus where
-  ppr InsolubleCIS = text "(insoluble)"
-  ppr BlockedCIS   = text "(blocked)"
-  ppr OtherCIS     = text "(soluble)"
+  ppr InsolubleCIS       = text "(insoluble)"
+  ppr (BlockedCIS holes) = parens (text "blocked on" <+> ppr holes)
+  ppr OtherCIS           = text "(soluble)"
 
 {- Note [CIrredCan constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
