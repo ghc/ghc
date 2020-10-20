@@ -246,8 +246,7 @@ The braces are *not* allowed in the following places:
   explicitly applied. Making them inferred (and thus not appliable) would be
   conflicting.
 
-- In default type signatures for class methods, in SPECIALISE pragmas or in
-  instance declaration heads, e.g.::
+- In SPECIALISE pragmas or in instance declaration heads, e.g.::
 
     instance forall {a}. Eq (Maybe a) where ...
 
@@ -256,3 +255,22 @@ The braces are *not* allowed in the following places:
   could play a role.
 
 - On the left-hand sides of type declarations, such as classes, data types, etc.
+
+Note that while specified and inferred type variables have different properties
+vis-à-vis visible type application, they do not otherwise affect GHC's notion
+of equality over types. For example, given the following definitions: ::
+
+  id1 :: forall a. a -> a
+  id1 x = x
+
+  id2 :: forall {a}. a -> a
+  id2 x = x
+
+  app1 :: (forall a. a -> a) -> b -> b
+  app1 g x = g x
+
+  app2 :: (forall {a}. a -> a) -> b -> b
+  app2 g x = g x
+
+GHC will deem all of ``app1 id1``, ``app1 id2``, ``app2 id1``, and ``app2 id2``
+to be well typed.

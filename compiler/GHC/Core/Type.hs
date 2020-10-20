@@ -2236,7 +2236,7 @@ eqVarBndrs _ _ _= Nothing
 
 {-
 Note [nonDetCmpType nondeterminism]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 nonDetCmpType is implemented in terms of nonDetCmpTypeX. nonDetCmpTypeX
 uses nonDetCmpTc which compares TyCons by their Unique value. Using Uniques for
 ordering leads to nondeterminism. We hit the same problem in the TyVarTy case,
@@ -2926,7 +2926,7 @@ splitVisVarsOfTypes = foldMap splitVisVarsOfType
 ************************************************************************
 
 Note [Kind Constraint and kind Type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The kind Constraint is the kind of classes and other type constraints.
 The special thing about types of kind Constraint is that
  * They are displayed with double arrow:

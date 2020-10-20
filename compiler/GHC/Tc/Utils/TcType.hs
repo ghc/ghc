@@ -1506,9 +1506,19 @@ tcEqKind :: HasDebugCallStack => TcKind -> TcKind -> Bool
 tcEqKind = tcEqType
 
 tcEqType :: HasDebugCallStack => TcType -> TcType -> Bool
--- tcEqType is a proper implements the same Note [Non-trivial definitional
--- equality] (in GHC.Core.TyCo.Rep) as `eqType`, but Type.eqType believes (* ==
--- Constraint), and that is NOT what we want in the type checker!
+-- ^ tcEqType implements \"typechecker equality\", which is like
+-- 'eqType' (see @Note [Non-trivial definitional equality]@ in
+-- "GHC.Core.TyCo.Rep"), but with the following differences:
+--
+-- * Unlike 'eqType', which equates @Type@ and @Constraint@, 'tcEqType' treats
+--   them as distinct types.
+--   See @Note [Kind Constraint and kind Type]@ in "GHC.Core.Type".
+--
+-- * Unlike 'eqType', which does not care about the 'ArgFlag' of a 'ForAllTy',
+--   'tcEqType' treats 'Required' type variable binders as distinct from
+--   'Invisible' type variable binders.
+--   See @Note [ForAllTy and typechecker equality]@ in
+--   "GHC.Tc.Solver.Canonical".
 tcEqType ty1 ty2
   =  tc_eq_type False False ki1 ki2
   && tc_eq_type False False ty1 ty2
@@ -1557,7 +1567,9 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
 
     go env (ForAllTy (Bndr tv1 vis1) ty1)
            (ForAllTy (Bndr tv2 vis2) ty2)
-      =  vis1 == vis2
+      =  vis1 `sameVis` vis2
+           -- See Note [ForAllTy and typechecker equality] in
+           -- GHC.Tc.Solver.Canonical for why we use `sameVis` here
       && (vis_only || go env (varType tv1) (varType tv2))
       && go (rnBndr2 env tv1 tv2) ty1 ty2
 
