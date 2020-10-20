@@ -314,8 +314,8 @@ isVecType _                       = False
 -- needed by the ABI to make the correct kind of call.
 
 data ForeignHint
-  = NoHint | AddrHint | SignedHint
-  deriving( Eq )
+  = NoHint Width | AddrHint | SignedHint Width
+  deriving( Eq, Show )
         -- Used to give extra per-argument or per-result
         -- information needed by foreign calling conventions
 

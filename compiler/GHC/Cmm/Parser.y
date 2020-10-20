@@ -1101,14 +1101,14 @@ parseSafety str      = failMsgPD ("unrecognised safety: " ++ str)
 
 parseCmmHint :: String -> PD ForeignHint
 parseCmmHint "ptr"    = return AddrHint
-parseCmmHint "signed" = return SignedHint
+parseCmmHint "signed" = return $ SignedHint W64
 parseCmmHint str      = failMsgPD ("unrecognised hint: " ++ str)
 
 -- labels are always pointers, so we might as well infer the hint
 inferCmmHint :: CmmExpr -> ForeignHint
 inferCmmHint (CmmLit (CmmLabel _)) = AddrHint
 inferCmmHint (CmmReg (CmmGlobal g)) | isPtrGlobalReg g = AddrHint
-inferCmmHint _ = NoHint
+inferCmmHint _ = NoHint W64
 
 isPtrGlobalReg Sp                    = True
 isPtrGlobalReg SpLim                 = True

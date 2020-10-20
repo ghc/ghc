@@ -2389,7 +2389,7 @@ genCCall' config is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
             targetExpr <- cmmMakeDynamicReference config
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
-                                                           [NoHint] [NoHint]
+                                                           [NoHint W64] [NoHint W64]
                                                            CmmMayReturn)
             genCCall' config is32Bit target dest_regs args bid
   where
@@ -2422,7 +2422,7 @@ genCCall' config is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
             targetExpr <- cmmMakeDynamicReference config
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
-                                                           [NoHint] [NoHint]
+                                                           [NoHint W64] [NoHint W64]
                                                            CmmMayReturn)
             genCCall' config is32Bit target dest_regs args bid
   where
@@ -2455,7 +2455,7 @@ genCCall' config is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
             targetExpr <- cmmMakeDynamicReference config
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
-                                                           [NoHint] [NoHint]
+                                                           [NoHint W64] [NoHint W64]
                                                            CmmMayReturn)
             genCCall' config is32Bit target dest_regs args bid
   where
@@ -2467,7 +2467,7 @@ genCCall' config is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] 
     -- Fallback to `hs_clz64` on i386
     targetExpr <- cmmMakeDynamicReference config CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
-                                           [NoHint] [NoHint]
+                                           [NoHint W64] [NoHint W64]
                                            CmmMayReturn)
     genCCall' config is32Bit target dest_regs args bid
 
@@ -2511,7 +2511,7 @@ genCCall' config is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
     targetExpr <- cmmMakeDynamicReference config
                   CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
-                                           [NoHint] [NoHint]
+                                           [NoHint W64] [NoHint W64]
                                            CmmMayReturn)
     genCCall' config is32Bit target dest_regs args bid
   where
