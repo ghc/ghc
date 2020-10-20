@@ -1842,8 +1842,8 @@ kickOutAfterUnification new_tv
        ; return n_kicked }
 
 -- See Wrinkle (2b) in Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
-kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
-kickOutAfterFillingCoercionHole hole
+kickOutAfterFillingCoercionHole :: CoercionHole -> Coercion -> TcS ()
+kickOutAfterFillingCoercionHole hole filled_co
   = do { ics <- getInertCans
        ; let (kicked_out, ics') = kick_out ics
              n_kicked           = workListSize kicked_out
@@ -1860,22 +1860,26 @@ kickOutAfterFillingCoercionHole hole
   where
     kick_out :: InertCans -> (WorkList, InertCans)
     kick_out ics@(IC { inert_irreds = irreds })
-      = let (to_kick, to_keep) = partitionBag kick_ct irreds
+      = let (to_kick, to_keep) = partitionBagWith kick_ct irreds
 
             kicked_out = extendWorkListCts (bagToList to_kick) emptyWorkList
             ics'       = ics { inert_irreds = to_keep }
         in
         (kicked_out, ics')
 
-    kick_ct :: Ct -> Bool
-    -- This is not particularly efficient. Ways to do better:
-    --  1) Have a custom function that looks for a coercion hole and returns a Bool
-    --  2) Keep co-hole-blocked constraints in a separate part of the inert set,
-    --     keyed by their co-hole. (Is it possible for more than one co-hole to be
-    --     in a constraint? I doubt it.)
-    kick_ct (CIrredCan { cc_ev = ev, cc_status = BlockedCIS })
-      = coHoleCoVar hole `elemVarSet` tyCoVarsOfType (ctEvPred ev)
-    kick_ct _other = False
+    kick_ct :: Ct -> Either Ct Ct
+         -- Left: kick out; Right: keep. But even if we keep, we may need
+         -- to update the set of blocking holes
+    kick_ct ct@(CIrredCan { cc_status = BlockedCIS holes })
+      | hole `elementOfUniqSet` holes
+      = let new_holes = holes `delOneFromUniqSet` hole
+                              `unionUniqSets` coercionHolesOfCo filled_co
+            updated_ct = ct { cc_status = BlockedCIS new_holes }
+        in
+        if isEmptyUniqSet new_holes
+        then Left updated_ct
+        else Right updated_ct
+    kick_ct other = Right other
 
 {- Note [kickOutRewritable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3436,7 +3440,7 @@ Yuk!
 fillCoercionHole :: CoercionHole -> Coercion -> TcS ()
 fillCoercionHole hole co
   = do { wrapTcS $ TcM.fillCoercionHole hole co
-       ; kickOutAfterFillingCoercionHole hole }
+       ; kickOutAfterFillingCoercionHole hole co }
 
 setEvBindIfWanted :: CtEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev tm

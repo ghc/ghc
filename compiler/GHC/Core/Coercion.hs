@@ -118,7 +118,8 @@ module GHC.Core.Coercion (
 
         simplifyArgsWorker,
 
-        badCoercionHole, badCoercionHoleCo
+        badCoercionHole, badCoercionHoleCo,
+        HoleSet, coercionHolesOfType, coercionHolesOfCo
        ) where
 
 #include "HsVersions.h"
@@ -150,6 +151,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -3006,3 +3008,22 @@ badCoercionHole = Monoid.getAny . bad_co_hole_ty
 -- GHC.Tc.Solver.Canonical Note [Equalities with incompatible kinds]
 badCoercionHoleCo :: Coercion -> Bool
 badCoercionHoleCo = Monoid.getAny . bad_co_hole_co
+
+-- | A set of 'CoercionHole's
+type HoleSet = UniqSet CoercionHole
+
+-- | Extract out all the coercion holes from a given type
+coercionHolesOfType :: Type -> UniqSet CoercionHole
+coercionHolesOfCo   :: Coercion -> UniqSet CoercionHole
+(coercionHolesOfType, _, coercionHolesOfCo, _) = foldTyCo folder ()
+  where
+    folder = TyCoFolder { tcf_view  = const Nothing  -- don't look through synonyms
+                        , tcf_tyvar = \ _ _ -> mempty
+                        , tcf_covar = \ _ _ -> mempty
+                        , tcf_hole  = const hole
+                        , tcf_tycobinder = \ _ _ _ -> ()
+                        }
+
+    hole :: CoercionHole -> HoleSet
+    hole h@(CoercionHole { ch_blocker = YesBlockSubst }) = unitUniqSet h
+    hole _non_block_subst                                = mempty

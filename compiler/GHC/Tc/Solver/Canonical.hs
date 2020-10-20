@@ -43,6 +43,7 @@ import GHC.Builtin.Types ( anyTypeOfKind )
 import GHC.Driver.Session( DynFlags )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
+import GHC.Types.Unique.Set
 import GHC.Hs.Type( HsIPName(..) )
 
 import GHC.Data.Pair
@@ -108,8 +109,20 @@ canonicalize (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
   = canForAll ev pend_sc
 
 canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
-  | EqPred eq_rel ty1 ty2 <- classifyPredType (ctEvPred ev)
-  = -- For insolubles (all of which are equalities, do /not/ flatten the arguments
+  | BlockedCIS holes <- status
+  , isEmptyUniqSet holes
+    -- this would be a CEqCan if it weren't for the blocking hole, but that
+    -- block has been removed. Warp straight to canEqCanLHSFinish.
+    -- See Wrinkle (2c) of Note [Equalities with incompatible kinds]
+  = let (eq_rel, lhs, rhs) = case pred of EqPred er ty1 ty2
+                                            | Just l <- canEqLHS_maybe ty1
+                                            -> (er, l, ty2)
+                                          _ -> pprPanic "can CIrredCan" (ppr ev)
+    in
+    canEqCanLHSFinish ev eq_rel NotSwapped lhs rhs
+
+  | EqPred eq_rel ty1 ty2 <- pred
+  = -- For insolubles (all of which are equalities), do /not/ flatten the arguments
     -- In #14350 doing so led entire-unnecessary and ridiculously large
     -- type function expansion.  Instead, canEqNC just applies
     -- the substitution to the predicate, and may do decomposition;
@@ -118,6 +131,8 @@ canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
 
   | otherwise
   = canIrred status ev
+  where
+    pred = classifyPredType (ctEvPred ev)
 
 canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
                        , cc_tyargs = xis, cc_pend_sc = pend_sc })
@@ -2407,7 +2422,8 @@ canEqOK dflags eq_rel lhs rhs
       MTVU_Bad         -> CanEqNotOK OtherCIS
                  -- Violation of TyEq:F
 
-      MTVU_HoleBlocker -> CanEqNotOK BlockedCIS
+      MTVU_HoleBlocker -> CanEqNotOK (BlockedCIS holes)
+        where holes = coercionHolesOfType rhs
                  -- This is the case detailed in
                  -- Note [Equalities with incompatible kinds]
                  -- Violation of TyEq:H
@@ -2502,7 +2518,43 @@ Wrinkles:
 
      (2b) We must now absolutely make sure to kick out any constraints that
           mention a newly-filled-in coercion hole. This is done in
-          kickOutAfterFillingCoercionHole.
+          kickOutAfterFillingCoercionHole. But we only kick out when the
+          filling coercion contains no coercion holes. This extra check
+          avoids needless work when rewriting evidence (which fills coercion
+          holes) and aids efficiency. It also can avoid a loop in the solver
+          that would otherwise arise in this case:
+               [W] w1 :: (ty1 :: F a) ~ (ty2 :: s)
+          After canonicalisation, we discover that this equality is heterogeneous.
+          So we emit
+               [W] co_abc :: F a ~ s
+          and preserve the original as
+               [W] w2 :: (ty1 |> co_abc) ~ ty2
+          Then, co_abc comes becomes the work item. It gets swapped back
+          and forth, as it goes through canEqTyVarFunEq. We thus get
+          co_abc := sym co_abd, and then co_abd := sym co_abe, with
+               [W] co_abe :: F a ~ s
+          right back where we started. But all this filling in would,
+          naively, cause kicking w2 out. Which, when it got processed,
+          would get this whole chain going again. The solution is to
+          kick out a blocked constraint only when the result of filling
+          in the blocking coercion involves no further blocking coercions.
+
+     (2c) Consider this case:
+             [G] co_given :: k1 ~ k2
+             [W] w :: (alpha :: k1) ~ (T a b c :: k2)
+          Processing the Wanted, we will eventually get to canEqCanLHSHetero,
+          which will produce
+             [W] co_abc :: k2 ~ k1
+          leaving the Wanted to become
+             [W] w2 :: alpha ~ (T a b c |> co_abc)
+          When co_abc gets picked off the work list, it will get solved,
+          kicking out w2. But canonicalising w2 strips off the cast (toward the
+          top of can_eq_nc') and then the process repeats.
+
+          Instead, when we're canonicalising something that was made into
+          an Irred only because of a blocking coercion (that is, with BlockedCIS),
+          we just jump straight to canEqCanLHSFinish, which is essentially where
+          the last canonicalisation left off.
 
  (3) Suppose we have [W] (a :: k1) ~ (rhs :: k2). We duly follow the
      algorithm detailed here, producing [W] co :: k2 ~ k1, and adding
