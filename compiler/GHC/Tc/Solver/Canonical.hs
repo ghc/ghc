@@ -29,6 +29,7 @@ import GHC.Core.TyCon
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
 import GHC.Core.Coercion
+import GHC.Core.Coercion.Axiom
 import GHC.Core
 import GHC.Types.Id( mkTemplateLocals )
 import GHC.Core.FamInstEnv ( FamInstEnvs )
@@ -38,6 +39,7 @@ import GHC.Types.Var.Env( mkInScopeSet )
 import GHC.Types.Var.Set( delVarSetList, anyVarSet )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Builtin.Types ( anyTypeOfKind )
 import GHC.Driver.Session( DynFlags )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -2268,12 +2270,39 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
   = do { traceTcS "canEqCanLHS2 two type families" (ppr lhs1 $$ ppr lhs2)
 
          -- emit derived equalities for injective type families
-       ; if | NomEq <- eq_rel
-              , fun_tc1 == fun_tc2
-              , Injective inj <- tyConInjectivityInfo fun_tc1
-              ->  sequence_ [ unifyDerived (ctEvLoc ev) Nominal (Pair arg1 arg2)
-                            | (arg1, arg2, True) <- zip3 fun_args1 fun_args2 inj ]
-            | otherwise -> return ()
+       ; let inj_eqns :: [TypeEqn]  -- TypeEqn = Pair Type
+             inj_eqns
+               | ReprEq <- eq_rel   = []   -- injectivity applies only for nom. eqs.
+               | fun_tc1 /= fun_tc2 = []   -- if the families don't match, stop.
+
+               | Injective inj <- tyConInjectivityInfo fun_tc1
+               = [ Pair arg1 arg2
+                 | (arg1, arg2, True) <- zip3 fun_args1 fun_args2 inj ]
+
+                 -- built-in synonym families don't have an entry point
+                 -- for this use case. So, we just use sfInteractInert
+                 -- and pass two equal RHSs. We *could* add another entry
+                 -- point, but then there would be a burden to make
+                 -- sure the new entry point and existing ones were
+                 -- internally consistent. This is slightly distasteful,
+                 -- but it works well in practice and localises the
+                 -- problem.
+               | Just ops <- isBuiltInSynFamTyCon_maybe fun_tc1
+               = let ki1 = canEqLHSKind lhs1
+                     ki2 | MRefl <- mco
+                         = ki1   -- just a small optimisation
+                         | otherwise
+                         = canEqLHSKind lhs2
+
+                     fake_rhs1 = anyTypeOfKind ki1
+                     fake_rhs2 = anyTypeOfKind ki2
+                 in
+                 sfInteractInert ops fun_args1 fake_rhs1 fun_args2 fake_rhs2
+
+               | otherwise  -- ordinary, non-injective type family
+               = []
+
+       ; mapM_ (unifyDerived (ctEvLoc ev) Nominal) inj_eqns
 
        ; let tvs1 = tyCoVarsOfTypes fun_args1
              tvs2 = tyCoVarsOfTypes fun_args2

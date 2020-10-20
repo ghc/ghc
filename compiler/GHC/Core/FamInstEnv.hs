@@ -1141,6 +1141,7 @@ reduceTyFamApp_maybe envs role tc tys
 
   | Just ax           <- isBuiltInSynFamTyCon_maybe tc
   , Just (coax,ts,ty) <- sfMatchFam ax tys
+  , role == coaxrRole coax
   = let co = mkAxiomRuleCo coax (zipWith mkReflCo (coaxrAsmpRoles coax) ts)
     in Just (co, ty)
 
