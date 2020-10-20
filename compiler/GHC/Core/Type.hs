@@ -2236,7 +2236,7 @@ eqVarBndrs _ _ _= Nothing
 
 {-
 Note [nonDetCmpType nondeterminism]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 nonDetCmpType is implemented in terms of nonDetCmpTypeX. nonDetCmpTypeX
 uses nonDetCmpTc which compares TyCons by their Unique value. Using Uniques for
 ordering leads to nondeterminism. We hit the same problem in the TyVarTy case,
@@ -2926,7 +2926,7 @@ splitVisVarsOfTypes = foldMap splitVisVarsOfType
 ************************************************************************
 
 Note [Kind Constraint and kind Type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The kind Constraint is the kind of classes and other type constraints.
 The special thing about types of kind Constraint is that
  * They are displayed with double arrow:
@@ -2944,6 +2944,18 @@ generates an axiom witnessing
     C a ~ (a -> a)
 so on the left we have Constraint, and on the right we have Type.
 See #7451.
+
+Because we treat Constraint/Type differently during and after type inference,
+GHC has two notions of equality that differ in whether they equate
+Constraint/Type or not:
+
+* GHC.Tc.Utils.TcType.tcEqType implements typechecker equality (see
+  Note [Typechecker equality vs definitional equality] in GHC.Tc.Utils.TcType),
+  which treats Constraint and Type as distinct. This is used during type
+  inference. See #11715 for issues that arise from this.
+* GHC.Core.TyCo.Rep.eqType implements definitional equality (see
+  Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep), which treats
+  Constraint and Type as equal. This is used after type inference.
 
 Bottom line: although 'Type' and 'Constraint' are distinct TyCons, with
 distinct uniques, they are treated as equal at all times except

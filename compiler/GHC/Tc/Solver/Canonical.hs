@@ -1035,7 +1035,9 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
-           s1@(ForAllTy {}) _ s2@(ForAllTy {}) _
+           s1@(ForAllTy (Bndr _ vis1) _) _
+           s2@(ForAllTy (Bndr _ vis2) _) _
+  | vis1 `sameVis` vis2 -- Note [ForAllTy and typechecker equality]
   = can_eq_nc_forall ev eq_rel s1 s2
 
 -- See Note [Canonicalising type applications] about why we require flat types
@@ -1071,6 +1073,63 @@ If we have an unsolved equality like
 that is not necessarily insoluble!  Maybe 'a' will turn out to be a newtype.
 So we want to make it a potentially-soluble Irred not an insoluble one.
 Missing this point is what caused #15431
+
+Note [ForAllTy and typechecker equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Should GHC type-check the following program (adapted from #15740)?
+
+  {-# LANGUAGE PolyKinds, ... #-}
+  data D a
+  type family F :: forall k. k -> Type
+  type instance F = D
+
+Due to the way F is declared, any instance of F must have a right-hand side
+whose kind is equal to `forall k. k -> Type`. The kind of D is
+`forall {k}. k -> Type`, which is very close, but technically uses distinct
+Core:
+
+  -----------------------------------------------------------
+  | Source Haskell    | Core                                |
+  -----------------------------------------------------------
+  | forall  k.  <...> | ForAllTy (Bndr k Specified) (<...>) |
+  | forall {k}. <...> | ForAllTy (Bndr k Inferred)  (<...>) |
+  -----------------------------------------------------------
+
+We could deem these kinds to be unequal, but that would imply rejecting
+programs like the one above. Whether a kind variable binder ends up being
+specified or inferred can be somewhat subtle, however, especially for kinds
+that aren't explicitly written out in the source code (like in D above).
+For now, we decide to not make the specified/inferred status of an invisible
+type variable binder affect GHC's notion of typechecker equality
+(see Note [Typechecker equality vs definitional equality] in
+GHC.Tc.Utils.TcType). That is, we have the following:
+
+  --------------------------------------------------
+  | Type 1            | Type 2            | Equal? |
+  --------------------|-----------------------------
+  | forall k. <...>   | forall k. <...>   | Yes    |
+  |                   | forall {k}. <...> | Yes    |
+  |                   | forall k -> <...> | No     |
+  --------------------------------------------------
+  | forall {k}. <...> | forall k. <...>   | Yes    |
+  |                   | forall {k}. <...> | Yes    |
+  |                   | forall k -> <...> | No     |
+  --------------------------------------------------
+  | forall k -> <...> | forall k. <...>   | No     |
+  |                   | forall {k}. <...> | No     |
+  |                   | forall k -> <...> | Yes    |
+  --------------------------------------------------
+
+We implement this nuance by using the GHC.Types.Var.sameVis function in
+GHC.Tc.Solver.Canonical.canEqNC and GHC.Tc.Utils.TcType.tcEqType, which
+respect typechecker equality. sameVis puts both forms of invisible type
+variable binders into the same equivalence class.
+
+Note that we do /not/ use sameVis in GHC.Core.Type.eqType, which implements
+/definitional/ equality, a slighty more coarse-grained notion of equality
+(see Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep) that does
+not consider the ArgFlag of ForAllTys at all. That is, eqType would equate all
+of forall k. <...>, forall {k}. <...>, and forall k -> <...>.
 -}
 
 ---------------------------------
