@@ -24,6 +24,7 @@ import GHC.Core.Coercion
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
@@ -493,6 +494,9 @@ instance Monad FlatM where
 instance Applicative FlatM where
   pure x = FlatM $ const (pure x)
   (<*>) = ap
+
+instance HasDynFlags FlatM where
+  getDynFlags = liftTcS getDynFlags
 
 liftTcS :: TcS a -> FlatM a
 liftTcS thing_inside
@@ -1385,10 +1389,19 @@ flatten_exact_fam_app_fully tc tys
 
                 -- Now, look in the cache
                ; mb_ct <- liftTcS $ lookupFlatCache tc xis
+               ; dflags <- getDynFlags
+               ; loc <- getLoc
                ; case mb_ct of
                    Just (co, rhs_ty, inert_fr@(_, inert_eq_rel))  -- co :: F xis ~ fsk
                         -- See Note [Type family equations] in GHC.Tc.Solver.Monad
                      | inert_fr `eqCanRewriteFR` cur_fr
+                        -- See Note [Runaway Derived rewriting]
+                     , let reduction_ok | (Derived, _) <- cur_fr
+                                        = not (subGoalDepthExceeded dflags
+                                                 (bumpSubGoalDepth (ctLocDepth loc)))
+                                        | otherwise
+                                        = True
+                     , reduction_ok
                      ->  -- Usable hit in the flat-cache
                         do { traceFlat "flatten/flat-cache hit" $
                                (ppr tc <+> ppr xis $$ ppr rhs_ty)
@@ -1527,6 +1540,25 @@ flat-cache for the first reduction resulted in an increase in allocations
 of about 3% for the four T9872x tests. However, using the flat-cache in
 the later reduction is a similar gain. I (Richard E) don't currently (Dec '14)
 have any knowledge as to *why* these facts are true.
+
+Note [Runaway Derived rewriting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  [WD] F a ~ T (F a)
+We *don't* want to fall into a hole using that to rewrite a Derived
+  [D] F a ~ Int
+because that produces an unhelpful error about a reduction stack overflow.
+Instead, when we've reached the reduction stack limit on a Derived, just stop.
+Either the program will be accepted if all the Wanteds are solved (good),
+or a Wanted will not be solved, and will be reported (also good).
+
+There is a tiny chance that continuing to try to reduce the Derived would
+yield fruit, and there is no way for the user to know this is the case
+(or to increase the reduction stack limit). But I see no easy way of
+communicating this. Since Deriveds are likely going to be short-lived
+at this point, it's not worth thinking about further.
+
+This arose in typecheck/should_fail/T13320.
 
 ************************************************************************
 *                                                                      *
