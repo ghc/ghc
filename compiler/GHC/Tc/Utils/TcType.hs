@@ -1557,7 +1557,9 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
 
     go env (ForAllTy (Bndr tv1 vis1) ty1)
            (ForAllTy (Bndr tv2 vis2) ty2)
-      =  vis1 == vis2
+      =  vis1 `sameVis` vis2
+           -- See Note [ForAllTy and definitional equality] in
+           -- GHC.Tc.Solver.Canonical for why we use `sameVis` here
       && (vis_only || go env (varType tv1) (varType tv2))
       && go (rnBndr2 env tv1 tv2) ty1 ty2
 
