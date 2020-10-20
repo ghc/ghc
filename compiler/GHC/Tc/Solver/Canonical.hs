@@ -112,16 +112,19 @@ canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
   | BlockedCIS holes <- status
   , isEmptyUniqSet holes
     -- this would be a CEqCan if it weren't for the blocking hole, but that
-    -- block has been removed. Warp straight to canEqCanLHSFinish.
+    -- block has been removed. Warp straight to canEqCanLHSHomo.
     -- See Wrinkle (2c) of Note [Equalities with incompatible kinds]
-  = let (eq_rel, lhs, rhs) = case pred of EqPred er ty1 ty2
-                                            | Just l <- canEqLHS_maybe ty1
-                                            -> (er, l, ty2)
-                                          _ -> pprPanic "can CIrredCan" (ppr ev)
-    in
-    canEqCanLHSFinish ev eq_rel NotSwapped lhs rhs
+  = do { pred_ty <- zonkTcType (ctEvPred ev) -- zonk to remove the filled-in coercion
+                                             -- hole. Could flatten, but why bother?
+       ; let (eq_rel, ty1, lhs, rhs) =
+               case classifyPredType pred_ty of
+                 EqPred er ty1 ty2
+                   | Just l <- canEqLHS_maybe ty1
+                   -> (er, ty1, l, ty2)
+                 _ -> pprPanic "can CIrredCan" (ppr ev)
+       ; canEqCanLHSHomo ev eq_rel NotSwapped lhs ty1 rhs rhs }
 
-  | EqPred eq_rel ty1 ty2 <- pred
+  | EqPred eq_rel ty1 ty2 <- classifyPredType (ctEvPred ev)
   = -- For insolubles (all of which are equalities), do /not/ flatten the arguments
     -- In #14350 doing so led entire-unnecessary and ridiculously large
     -- type function expansion.  Instead, canEqNC just applies
@@ -131,8 +134,6 @@ canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
 
   | otherwise
   = canIrred status ev
-  where
-    pred = classifyPredType (ctEvPred ev)
 
 canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
                        , cc_tyargs = xis, cc_pend_sc = pend_sc })
@@ -2612,8 +2613,10 @@ Wrinkles:
 
           Instead, when we're canonicalising something that was made into
           an Irred only because of a blocking coercion (that is, with BlockedCIS),
-          we just jump straight to canEqCanLHSFinish, which is essentially where
-          the last canonicalisation left off.
+          we just jump straight to canEqCanLHSHomo. You might think we can go
+          straight to canEqCanLHSFinish, but there's a chance that a blocking
+          coercion hole interfered with the checkTyVarEq call in canEqTyVarFunEq,
+          so we have to start above that call.
 
  (3) Suppose we have [W] (a :: k1) ~ (rhs :: k2). We duly follow the
      algorithm detailed here, producing [W] co :: k2 ~ k1, and adding
