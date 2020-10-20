@@ -1129,7 +1129,7 @@ parseCmmHint str      = failMsgPD $ PsError (PsErrCmmParser (CmmUnrecognisedHint
 inferCmmHint :: CmmExpr -> ForeignHint
 inferCmmHint (CmmLit (CmmLabel _)) = AddrHint
 inferCmmHint (CmmReg (CmmGlobal g)) | isPtrGlobalReg g = AddrHint
-inferCmmHint _ = NoHint
+inferCmmHint _ = NoHint W64
 
 isPtrGlobalReg Sp                    = True
 isPtrGlobalReg SpLim                 = True

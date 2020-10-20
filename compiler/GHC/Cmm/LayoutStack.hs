@@ -1193,13 +1193,15 @@ lowerSafeForeignCall profile block
 foreignLbl :: FastString -> CmmExpr
 foreignLbl name = CmmLit (CmmLabel (mkForeignLabel name Nothing ForeignLabelInExternalPackage IsFunction))
 
+-- void *        suspendThread (StgRegTable *, bool interruptible);
 callSuspendThread :: Platform -> LocalReg -> Bool -> CmmNode O O
 callSuspendThread platform id intrbl =
   CmmUnsafeForeignCall
        (ForeignTarget (foreignLbl (fsLit "suspendThread"))
-        (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint] CmmMayReturn))
+        (ForeignConvention CCallConv [AddrHint, NoHint W32] [AddrHint] CmmMayReturn))
        [id] [baseExpr, mkIntExpr platform (fromEnum intrbl)]
 
+-- StgRegTable * resumeThread  (void *);
 callResumeThread :: LocalReg -> LocalReg -> CmmNode O O
 callResumeThread new_base id =
   CmmUnsafeForeignCall

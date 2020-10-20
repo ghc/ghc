@@ -305,8 +305,8 @@ data ForeignTarget        -- The target of a foreign call
 
 foreignTargetHints :: ForeignTarget -> ([ForeignHint], [ForeignHint])
 foreignTargetHints target
-  = ( res_hints ++ repeat NoHint
-    , arg_hints ++ repeat NoHint )
+  = ( res_hints ++ repeat undefined
+    , arg_hints ++ repeat undefined )
   where
     (res_hints, arg_hints) =
        case target of
