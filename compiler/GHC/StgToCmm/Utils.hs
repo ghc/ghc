@@ -339,7 +339,7 @@ newUnboxedTupleRegs res_ty
         ; sequel <- getSequel
         ; regs <- choose_regs platform sequel
         ; ASSERT( regs `equalLength` reps )
-          return (regs, map primRepForeignHint reps) }
+          return (regs, map (primRepForeignHint platform) reps) }
   where
     reps = typePrimRep res_ty
     choose_regs _ (AssignTo regs _) = return regs

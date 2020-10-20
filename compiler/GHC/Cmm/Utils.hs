@@ -14,7 +14,7 @@
 
 module GHC.Cmm.Utils(
         -- CmmType
-        primRepCmmType, slotCmmType, slotForeignHint,
+        primRepCmmType, slotCmmType, 
         typeCmmType, typeForeignHint, primRepForeignHint,
 
         -- CmmLit
@@ -140,34 +140,27 @@ primElemRepCmmType DoubleElemRep = f64
 typeCmmType :: Platform -> UnaryType -> CmmType
 typeCmmType platform ty = primRepCmmType platform (typePrimRep1 ty)
 
-primRepForeignHint :: PrimRep -> ForeignHint
-primRepForeignHint VoidRep      = panic "primRepForeignHint:VoidRep"
-primRepForeignHint LiftedRep    = AddrHint
-primRepForeignHint UnliftedRep  = AddrHint
-primRepForeignHint IntRep       = SignedHint
-primRepForeignHint Int8Rep      = SignedHint
-primRepForeignHint Int16Rep     = SignedHint
-primRepForeignHint Int32Rep     = SignedHint
-primRepForeignHint Int64Rep     = SignedHint
-primRepForeignHint WordRep      = NoHint
-primRepForeignHint Word8Rep     = NoHint
-primRepForeignHint Word16Rep    = NoHint
-primRepForeignHint Word32Rep    = NoHint
-primRepForeignHint Word64Rep    = NoHint
-primRepForeignHint AddrRep      = AddrHint -- NB! AddrHint, but NonPtrArg
-primRepForeignHint FloatRep     = NoHint
-primRepForeignHint DoubleRep    = NoHint
-primRepForeignHint (VecRep {})  = NoHint
+primRepForeignHint :: Platform -> PrimRep -> ForeignHint
+primRepForeignHint _platform VoidRep     = panic "primRepForeignHint:VoidRep"
+primRepForeignHint _platform LiftedRep   = AddrHint
+primRepForeignHint _platform UnliftedRep = AddrHint
+primRepForeignHint platform IntRep       = SignedHint (cIntWidth platform)
+primRepForeignHint _platform Int8Rep     = SignedHint W8
+primRepForeignHint _platform Int16Rep    = SignedHint W16
+primRepForeignHint _platform Int32Rep    = SignedHint W32
+primRepForeignHint _platform Int64Rep    = SignedHint W64
+primRepForeignHint platform WordRep      = NoHint (wordWidth platform)
+primRepForeignHint _platform Word8Rep    = NoHint W8
+primRepForeignHint _platform Word16Rep   = NoHint W16
+primRepForeignHint _platform Word32Rep   = NoHint W32
+primRepForeignHint _platform Word64Rep   = NoHint W64
+primRepForeignHint _platform AddrRep     = AddrHint -- NB! AddrHint, but NonPtrArg
+primRepForeignHint _platform FloatRep    = NoHint W32
+primRepForeignHint _platform DoubleRep   = NoHint W64
+primRepForeignHint _platform (VecRep {}) = NoHint W64
 
-slotForeignHint :: SlotTy -> ForeignHint
-slotForeignHint PtrSlot       = AddrHint
-slotForeignHint WordSlot      = NoHint
-slotForeignHint Word64Slot    = NoHint
-slotForeignHint FloatSlot     = NoHint
-slotForeignHint DoubleSlot    = NoHint
-
-typeForeignHint :: UnaryType -> ForeignHint
-typeForeignHint = primRepForeignHint . typePrimRep1
+typeForeignHint :: Platform -> UnaryType -> ForeignHint
+typeForeignHint platform = primRepForeignHint platform . typePrimRep1
 
 ---------------------------------------------------
 --
