@@ -834,7 +834,7 @@ flattenType loc ty
       co :: xi ~ ty
 
 Key invariants:
-  (F0) co :: xi ~ zonk(ty)
+  (F0) co :: xi ~ zonk(ty')    where zonk(ty') ~ zonk(ty)
   (F1) tcTypeKind(xi) succeeds and returns a fully zonked kind
   (F2) tcTypeKind(xi) `eqType` zonk(tcTypeKind(ty))
 
@@ -852,11 +852,11 @@ Because flattening zonks and the returned coercion ("co" above) is also
 zonked, it's possible that (co :: xi ~ ty) isn't quite true. So, instead,
 we can rely on this fact:
 
-  (F0) co :: xi ~ zonk(ty)
+  (F0) co :: xi ~ zonk(ty'), where zonk(ty') ~ zonk(ty)
 
 Note that the left-hand type of co is *always* precisely xi. The right-hand
 type may or may not be ty, however: if ty has unzonked filled-in metavariables,
-then the right-hand type of co will be the zonked version of ty.
+then the right-hand type of co will be the zonk-equal to ty.
 It is for this reason that we
 occasionally have to explicitly zonk, when (co :: xi ~ ty) is important
 even before we zonk the whole program. For example, see the FTRNotFollowed
@@ -1171,7 +1171,7 @@ flatten_one ty@(ForAllTy {})
 
 flatten_one (CastTy ty g)
   = do { (xi, co) <- flatten_one ty
-       ; (g', _)   <- flatten_co g
+       ; (g', _)  <- flatten_co g
 
        ; role <- getRole
        ; return (mkCastTy xi g', castCoercionKind co role xi ty g' g) }
