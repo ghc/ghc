@@ -1321,7 +1321,7 @@ We expand synonyms during unification, but:
    This is particularly helpful when checking (* ~ *), because * is
    now a type synonym.
 
-Note [Deferred Unification]
+Note [Deferred unification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We may encounter a unification ty1 ~ ty2 that cannot be performed syntactically,
 and yet its consistency is undetermined. Previously, there was no way to still

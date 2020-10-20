@@ -769,24 +769,6 @@ In this redefinition, we give an explicit kind for ``(:~~:)``, deferring the cho
 of ``k2`` until after the first argument (``a``) has been given. With this declaration
 for ``(:~~:)``, the instance for ``HTestEquality`` is accepted.
 
-Another difference between higher-rank kinds and types can be found in their
-treatment of inferred and user-specified type variables. Consider the following
-program: ::
-
-  newtype Foo (f :: forall k. k -> Type) = MkFoo (f Int)
-  data Proxy a = Proxy
-
-  foo :: Foo Proxy
-  foo = MkFoo Proxy
-
-The kind of ``Foo``'s parameter is ``forall k. k -> Type``, but the kind of
-``Proxy`` is ``forall {k}. k -> Type``, where ``{k}`` denotes that the kind
-variable ``k`` is to be inferred, not specified by the user. (See
-:ref:`visible-type-application` for more discussion on the inferred-specified
-distinction). GHC does not consider ``forall k. k -> Type`` and
-``forall {k}. k -> Type`` to be equal at the kind level, and thus rejects
-``Foo Proxy`` as ill-kinded.
-
 The kind ``Type``
 -----------------
 

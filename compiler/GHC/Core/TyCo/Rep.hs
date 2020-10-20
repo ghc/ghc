@@ -485,6 +485,12 @@ Another helpful principle with eqType is this:
 This principle also tells us that eqType must relate only types with the
 same kinds.
 
+Besides eqType, another equality relation that upholds the (EQ) property above
+is /typechecker equality/, which is implemented as
+GHC.Tc.Utils.TcType.tcEqType. See
+Note [Typechecker equality vs definitional equality] in GHC.Tc.Utils.TcType for
+what the difference between eqType and tcEqType is.
+
 Note [Respecting definitional equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Note [Non-trivial definitional equality] introduces the property (EQ).
