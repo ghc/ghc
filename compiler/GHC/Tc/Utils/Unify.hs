@@ -2027,6 +2027,8 @@ checkTyVarEq dflags ty_fam_ok tv ty
   = inline checkTypeEq dflags ty_fam_ok (TyVarLHS tv) ty
     -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
 
+checkTyFamEq :: DynFlags
+
 checkTypeEq :: DynFlags -> AreTypeFamiliesOK -> CanEqLHS -> TcType -> MetaTyVarUpdateResult ()
 -- Checks the invariants for CEqCan.   In particular:
 --   (a) a forall type (forall a. blah)
