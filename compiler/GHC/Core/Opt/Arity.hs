@@ -17,14 +17,14 @@ module GHC.Core.Opt.Arity
    , etaExpand, etaExpandAT
    , exprBotStrictness_maybe
 
-        -- ** ArityType
-   , ArityType(..), expandableArityType, arityTypeArity
-   , maxWithArity, isBotArityType, idArityType
+   -- ** ArityType
+   , ArityType(..), mkBotArityType, mkTopArityType, expandableArityType
+   , arityTypeArity, maxWithArity, idArityType
 
-        -- ** Join points
+   -- ** Join points
    , etaExpandToJoinPoint, etaExpandToJoinPointRule
 
-        -- ** Coercions and casts
+   -- ** Coercions and casts
    , pushCoArg, pushCoArgs, pushCoValArg, pushCoTyArg
    , pushCoercionIntoLambda, pushCoDataCon, collectBindersPushingCo
    )
@@ -455,27 +455,36 @@ ArityType is the result of a compositional analysis on expressions,
 from which we can decide the real arity of the expression (extracted
 with function exprEtaExpandArity).
 
+We use the following notation:
+  at  ::= \o1..on.div
+  div ::= T | x | ⊥
+  o   ::= ? | 1
+And omit the \. if n = 0. Examples:
+  \?11.T stands for @AT [NoOneShotInfo,OneShotLam,OneShotLam] topDiv@
+  ⊥      stands for @AT [] botDiv@
+See the 'Outputable' instance for more information. It's pretty simple.
+
 Here is what the fields mean. If an arbitrary expression 'f' has
 ArityType 'at', then
 
- * If at = ABot n, then (f x1..xn) definitely diverges. Partial
-   applications to fewer than n args may *or may not* diverge.
+ * If @at = AT [o1,..,on] botDiv@ (notation: \o1..on.⊥), then @f x1..xn@
+   definitely diverges. Partial applications to fewer than n args may *or
+   may not* diverge.
 
    We allow ourselves to eta-expand bottoming functions, even
    if doing so may lose some `seq` sharing,
        let x = <expensive> in \y. error (g x y)
        ==> \y. let x = <expensive> in error (g x y)
 
- * If at = ATop as, and n=length as,
-   then expanding 'f' to (\x1..xn. f x1 .. xn) loses no sharing,
-   assuming the calls of f respect the one-shot-ness of
-   its definition.
+ * If @at = AT [o1,..,on] topDiv@ (notation: \o1..on.T), then expanding 'f'
+   to @\x1..xn. f x1..xn@ loses no sharing, assuming the calls of f respect
+   the one-shot-ness o1..on of its definition.
 
-   NB 'f' is an arbitrary expression, eg (f = g e1 e2).  This 'f'
-   can have ArityType as ATop, with length as > 0, only if e1 e2 are
-   themselves.
+   NB 'f' is an arbitrary expression, eg @f = g e1 e2@.  This 'f' can have
+   arity type @AT oss _@, with @length oss > 0@, only if e1 e2 are themselves
+   cheap.
 
- * In both cases, f, (f x1), ... (f x1 ... f(n-1)) are definitely
+ * In both cases, @f@, @f x1@, ... @f x1 ... x(n-1)@ are definitely
    really functions, or bottom, but *not* casts from a data type, in
    at least one case branch.  (If it's a function in one case branch but
    an unsafe cast from a data type in another, the program is bogus.)
@@ -485,62 +494,128 @@ ArityType 'at', then
 Example:
       f = \x\y. let v = <expensive> in
           \s(one-shot) \t(one-shot). blah
-      'f' has ArityType [ManyShot,ManyShot,OneShot,OneShot]
+      'f' has arity type \??11.T
       The one-shot-ness means we can, in effect, push that
       'let' inside the \st.
 
 
 Suppose f = \xy. x+y
-Then  f             :: AT [False,False] ATop
-      f v           :: AT [False]       ATop
-      f <expensive> :: AT []            ATop
-
--------------------- Main arity code ----------------------------
+Then  f             :: \??.T
+      f v           :: \?.T
+      f <expensive> :: T
 -}
 
 
-data ArityType   -- See Note [ArityType]
-  = ATop [OneShotInfo]
-  | ABot Arity
-  deriving( Eq )
-     -- There is always an explicit lambda
-     -- to justify the [OneShot], or the Arity
+-- | The analysis lattice of arity analysis. It is isomorphic to
+--
+-- @
+--    data ArityType'
+--      = AEnd Divergence
+--      | ALam OneShotInfo ArityType'
+-- @
+--
+-- Which is easier to display the Hasse diagram for:
+--
+-- @
+--  ALam OneShotLam at
+--          |
+--      AEnd topDiv
+--          |
+--  ALam NoOneShotInfo at
+--          |
+--      AEnd exnDiv
+--          |
+--      AEnd botDiv
+-- @
+--
+-- where the @at@ fields of @ALam@ are inductively subject to the same order.
+-- That is, @ALam os at1 < ALam os at2@ iff @at1 < at2@.
+--
+-- Why the strange Top element? See Note [Combining case branches].
+--
+-- We rely on this lattice structure for fixed-point iteration in
+-- 'findRhsArity'. For the semantics of 'ArityType', see Note [ArityType].
+data ArityType
+  = AT ![OneShotInfo] !Divergence
+  -- ^ @AT oss div@ means this value can safely be eta-expanded @length oss@
+  -- times, provided use sites respect the 'OneShotInfo's in @oss@.
+  -- A 'OneShotLam' annotation can come from two sources:
+  --     * The user annotated a lambda as one-shot with 'GHC.Exts.oneShot'
+  --     * It's from a lambda binder of a type affected by `-fstate-hack`.
+  --       See 'idStateHackOneShotInfo'.
+  -- In both cases, 'OneShotLam' should win over 'NoOneShotInfo', see
+  -- Note [Combining case branches].
+  --
+  -- If @div@ is dead-ending ('isDeadEndDiv'), then application to
+  -- @length os@ arguments will surely diverge, similar to the situation
+  -- with 'DmdType'.
+  deriving Eq
 
+-- | This is the BNF of the generated output:
+--
+-- @
+-- @
+--
+-- We format
+-- @AT [o1,..,on] topDiv@ as @\o1..on.T@ and
+-- @AT [o1,..,on] botDiv@ as @\o1..on.⊥@, respectively.
+-- More concretely, @AT [NOI,OS,OS] topDiv@ is formatted as @\?11.T@.
+-- If the one-shot info is empty, we omit the leading @\.@.
 instance Outputable ArityType where
-  ppr (ATop os) = text "ATop" <> parens (ppr (length os))
-  ppr (ABot n)  = text "ABot" <> parens (ppr n)
+  ppr (AT oss div)
+    | null oss  = pp_div div
+    | otherwise = char '\\' <> hcat (map pp_os oss) <> dot <> pp_div div
+    where
+      pp_div Diverges = char '⊥'
+      pp_div ExnOrDiv = char 'x'
+      pp_div Dunno    = char 'T'
+      pp_os OneShotLam    = char '1'
+      pp_os NoOneShotInfo = char '?'
 
-arityTypeArity :: ArityType -> Arity
--- The number of value args for the arity type
-arityTypeArity (ATop oss) = length oss
-arityTypeArity (ABot ar)  = ar
-
-expandableArityType :: ArityType -> Bool
--- True <=> eta-expansion will add at least one lambda
-expandableArityType (ATop oss) = not (null oss)
-expandableArityType (ABot ar)  = ar /= 0
-
-isBotArityType :: ArityType -> Bool
-isBotArityType (ABot {}) = True
-isBotArityType (ATop {}) = False
-
-arityTypeOneShots :: ArityType -> [OneShotInfo]
-arityTypeOneShots (ATop oss) = oss
-arityTypeOneShots (ABot ar)  = replicate ar OneShotLam
-   -- If we are diveging or throwing an exception anyway
-   -- it's fine to push redexes inside the lambdas
+mkBotArityType :: [OneShotInfo] -> ArityType
+mkBotArityType oss = AT oss botDiv
 
 botArityType :: ArityType
-botArityType = ABot 0   -- Unit for andArityType
+botArityType = mkBotArityType []
 
+mkTopArityType :: [OneShotInfo] -> ArityType
+mkTopArityType oss = AT oss topDiv
+
+topArityType :: ArityType
+topArityType = mkTopArityType []
+
+-- | The number of value args for the arity type
+arityTypeArity :: ArityType -> Arity
+arityTypeArity (AT oss _) = length oss
+
+-- | True <=> eta-expansion will add at least one lambda
+expandableArityType :: ArityType -> Bool
+expandableArityType at = arityTypeArity at /= 0
+
+-- | See Note [Dead ends] in "GHC.Types.Demand".
+-- Bottom implies a dead end.
+isDeadEndArityType :: ArityType -> Bool
+isDeadEndArityType (AT _ div) = isDeadEndDiv div
+
+-- | Expand a non-bottoming arity type so that it has at least the given arity.
 maxWithArity :: ArityType -> Arity -> ArityType
-maxWithArity at@(ABot {}) _   = at
-maxWithArity at@(ATop oss) ar
-     | oss `lengthAtLeast` ar = at
-     | otherwise              = ATop (take ar (oss ++ repeat NoOneShotInfo))
+maxWithArity at@(AT oss div) !ar
+  | isDeadEndArityType at    = at
+  | oss `lengthAtLeast` ar   = at
+  | otherwise                = AT (take ar $ oss ++ repeat NoOneShotInfo) div
 
-vanillaArityType :: ArityType
-vanillaArityType = ATop []      -- Totally uninformative
+-- | Trim an arity type so that it has at most the given arity.
+-- Any excess 'OneShotInfo's are truncated to 'topDiv', even if they end in
+-- 'ABot'.
+minWithArity :: ArityType -> Arity -> ArityType
+minWithArity at@(AT oss _) ar
+  | oss `lengthAtMost` ar = at
+  | otherwise             = AT (take ar oss) topDiv
+
+takeWhileOneShot :: ArityType -> ArityType
+takeWhileOneShot (AT oss div)
+  | isDeadEndDiv div = AT (takeWhile isOneShotInfo oss) topDiv
+  | otherwise        = AT (takeWhile isOneShotInfo oss) div
 
 -- | The Arity returned is the number of value args the
 -- expression can be applied to without doing much work
@@ -551,8 +626,9 @@ exprEtaExpandArity dflags e = arityType (etaExpandArityEnv dflags) e
 
 getBotArity :: ArityType -> Maybe Arity
 -- Arity of a divergent function
-getBotArity (ABot n) = Just n
-getBotArity _        = Nothing
+getBotArity (AT oss div)
+  | isDeadEndDiv div = Just $ length oss
+  | otherwise        = Nothing
 
 ----------------------
 findRhsArity :: DynFlags -> Id -> CoreExpr -> Arity -> ArityType
@@ -565,15 +641,15 @@ findRhsArity :: DynFlags -> Id -> CoreExpr -> Arity -> ArityType
 findRhsArity dflags bndr rhs old_arity
   = go (step botArityType)
       -- We always do one step, but usually that produces a result equal to
-      -- old_arity, and then we stop right away (since arities should not
-      -- decrease)
+      -- old_arity, and then we stop right away, because old_arity is assumed
+      -- to be sound. In other words, arities should never decrease.
       -- Result: the common case is that there is just one iteration
   where
     go :: ArityType -> ArityType
-    go cur_atype@(ATop oss)
-      | length oss <= old_arity = cur_atype
-    go cur_atype
-      | new_atype == cur_atype = cur_atype
+    go cur_atype@(AT oss div)
+      | not (isDeadEndDiv div)              -- the "stop right away" case
+      , length oss <= old_arity = cur_atype -- from above
+      | new_atype == cur_atype  = cur_atype
       | otherwise =
 #if defined(DEBUG)
                     pprTrace "Exciting arity"
@@ -607,7 +683,7 @@ fifteen years ago!  It also shows up in the code for 'rnf' on lists
 in #4138.
 
 We do the neccessary, quite simple fixed-point iteration in 'findRhsArity',
-which assumes for a single binding @botArityType@ on the first run and iterates
+which assumes for a single binding 'ABot' on the first run and iterates
 until it finds a stable arity type. Two wrinkles
 
 * We often have to ask (see the Case or Let case of 'arityType') whether some
@@ -651,44 +727,45 @@ dictionary-typed expression, but that's more work.
 -}
 
 arityLam :: Id -> ArityType -> ArityType
-arityLam id (ATop as) = ATop (idStateHackOneShotInfo id : as)
-arityLam _  (ABot n)  = ABot (n+1)
+arityLam id (AT oss div) = AT (idStateHackOneShotInfo id : oss) div
 
 floatIn :: Bool -> ArityType -> ArityType
 -- We have something like (let x = E in b),
 -- where b has the given arity type.
-floatIn _     (ABot n)  = ABot n
-floatIn True  (ATop as) = ATop as
-floatIn False (ATop as) = ATop (takeWhile isOneShotInfo as)
-   -- If E is not cheap, keep arity only for one-shots
+floatIn cheap at
+  | isDeadEndArityType at || cheap = at
+  -- If E is not cheap, keep arity only for one-shots
+  | otherwise                      = takeWhileOneShot at
 
 arityApp :: ArityType -> Bool -> ArityType
 -- Processing (fun arg) where at is the ArityType of fun,
 -- Knock off an argument and behave like 'let'
-arityApp (ABot 0)      _     = ABot 0
-arityApp (ABot n)      _     = ABot (n-1)
-arityApp (ATop [])     _     = ATop []
-arityApp (ATop (_:as)) cheap = floatIn cheap (ATop as)
+arityApp (AT (_:oss) div) cheap = floatIn cheap (AT oss div)
+arityApp at               _     = at
 
-andArityType :: ArityType -> ArityType -> ArityType   -- Used for branches of a 'case'
--- This is least upper bound in the ArityType lattice
-andArityType (ABot n1) (ABot n2)  = ABot (n1 `max` n2) -- Note [ABot branches: use max]
-andArityType (ATop as)  (ABot _)  = ATop as
-andArityType (ABot _)   (ATop bs) = ATop bs
-andArityType (ATop as)  (ATop bs) = ATop (as `combine` bs)
-  where      -- See Note [Combining case branches]
-    combine (a:as) (b:bs) = (a `bestOneShot` b) : combine as bs
-    combine []     bs     = takeWhile isOneShotInfo bs
-    combine as     []     = takeWhile isOneShotInfo as
+-- | Least upper bound in the 'ArityType' lattice.
+-- See the haddocks on 'ArityType' for the lattice.
+--
+-- Used for branches of a @case@.
+andArityType :: ArityType -> ArityType -> ArityType
+andArityType (AT (os1:oss1) div1) (AT (os2:oss2) div2)
+  | AT oss' div' <- andArityType (AT oss1 div1) (AT oss2 div2)
+  = AT ((os1 `bestOneShot` os2) : oss') div' -- See Note [Combining case branches]
+andArityType (AT []         div1) at2
+  | isDeadEndDiv div1 = at2                  -- Note [ABot branches: max arity wins]
+  | otherwise         = takeWhileOneShot at2 -- See Note [Combining case branches]
+andArityType at1                  (AT []         div2)
+  | isDeadEndDiv div2 = at1                  -- Note [ABot branches: max arity wins]
+  | otherwise         = takeWhileOneShot at1 -- See Note [Combining case branches]
 
-{- Note [ABot branches: use max]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [ABot branches: max arity wins]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider   case x of
              True  -> \x.  error "urk"
              False -> \xy. error "urk2"
 
-Remember: ABot n means "if you apply to n args, it'll definitely diverge".
-So we need (ABot 2) for the whole thing, the /max/ of the ABot arities.
+Remember: \o1..on.⊥ means "if you apply to n args, it'll definitely diverge".
+So we need \??.⊥ for the whole thing, the /max/ of both arities.
 
 Note [Combining case branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -698,15 +775,18 @@ Consider
                            True  -> z
                            False -> \s(one-shot). e1
            in go2 x
-We *really* want to eta-expand go and go2.
+We *really* want to respect the one-shot annotation provided by the
+user and eta-expand go and go2.
 When combining the branches of the case we have
-     ATop [] `andAT` ATop [OneShotLam]
-and we want to get ATop [OneShotLam].  But if the inner
-lambda wasn't one-shot we don't want to do this.
-(We need a proper arity analysis to justify that.)
+     T `andAT` \1.T
+and we want to get \1.T.
+But if the inner lambda wasn't one-shot (\?.T) we don't want to do this.
+(We need a usage analysis to justify that.)
 
 So we combine the best of the two branches, on the (slightly dodgy)
 basis that if we know one branch is one-shot, then they all must be.
+Surprisingly, this means that the one-shot arity type is effectively the top
+element of the lattice.
 
 Note [Arity trimming]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -718,16 +798,17 @@ most 1, because typeArity (Int -> F a) = 1.  So we have to trim the result of
 calling arityType on (\x y. blah).  Failing to do so, and hence breaking the
 exprArity invariant, led to #5441.
 
-How to trim?  For ATop, it's easy.  But we must take great care with ABot.
-Suppose the expression was (\x y. error "urk"), we'll get (ABot 2).  We
-absolutely must not trim that to (ABot 1), because that claims that
-((\x y. error "urk") |> co) diverges when given one argument, which it
-absolutely does not. And Bad Things happen if we think something returns bottom
-when it doesn't (#16066).
+How to trim?  If we end in topDiv, it's easy.  But we must take great care with
+dead ends (i.e. botDiv). Suppose the expression was (\x y. error "urk"),
+we'll get \??.⊥.  We absolutely must not trim that to \?.⊥, because that
+claims that ((\x y. error "urk") |> co) diverges when given one argument,
+which it absolutely does not. And Bad Things happen if we think something
+returns bottom when it doesn't (#16066).
 
-So, do not reduce the 'n' in (ABot n); rather, switch (conservatively) to ATop.
+So, if we need to trim a dead-ending arity type, switch (conservatively) to
+topDiv.
 
-Historical note: long ago, we unconditionally switched to ATop when we
+Historical note: long ago, we unconditionally switched to topDiv when we
 encountered a cast, but that is far too conservative: see #5475
 -}
 
@@ -838,25 +919,22 @@ myIsCheapApp sigs fn n_val_args = case lookupVarEnv sigs fn of
   Nothing         -> isCheapApp fn n_val_args
   -- @Just at@ means local function with @at@ as current ArityType.
   -- Roughly approximate what 'isCheapApp' is doing.
-  Just (ABot _)   -> True -- See Note [isCheapApp: bottoming functions] in GHC.Core.Utils
-  Just (ATop oss) -> n_val_args < length oss -- Essentially isWorkFreeApp
+  Just (AT oss div)
+    | isDeadEndDiv div -> True -- See Note [isCheapApp: bottoming functions] in GHC.Core.Utils
+    | n_val_args < length oss -> True -- Essentially isWorkFreeApp
+    | otherwise -> False
 
 ----------------
 arityType :: ArityEnv -> CoreExpr -> ArityType
 
 arityType env (Cast e co)
-  = case arityType env e of
-      ATop os -> ATop (take co_arity os)  -- See Note [Arity trimming]
-      ABot n | co_arity < n -> ATop (replicate co_arity noOneShotInfo)
-             | otherwise    -> ABot n
+  = minWithArity (arityType env e) co_arity -- See Note [Arity trimming]
   where
     co_arity = length (typeArity (coercionRKind co))
     -- See Note [exprArity invariant] (2); must be true of
     -- arityType too, since that is how we compute the arity
     -- of variables, and they in turn affect result of exprArity
     -- #5441 is a nice demo
-    -- However, do make sure that ATop -> ATop and ABot -> ABot!
-    --   Casts don't affect that part. Getting this wrong provoked #5475
 
 arityType env (Var v)
   | v `elemVarSet` ae_joins env
@@ -887,18 +965,15 @@ arityType env (App fun arg )
         --
 arityType env (Case scrut bndr _ alts)
   | exprIsDeadEnd scrut || null alts
-  = botArityType    -- Do not eta expand
-                    -- See Note [Dealing with bottom (1)]
+  = botArityType    -- Do not eta expand. See Note [Dealing with bottom (1)]
   | not (pedanticBottoms env)  -- See Note [Dealing with bottom (2)]
   , myExprIsCheap env scrut (Just (idType bndr))
   = alts_type
   | exprOkForSpeculation scrut
   = alts_type
 
-  | otherwise               -- In the remaining cases we may not push
-  = case alts_type of       -- evaluation of the scrutinee in
-     ATop as -> ATop (takeWhile isOneShotInfo as)
-     ABot _  -> ATop []
+  | otherwise                  -- In the remaining cases we may not push
+  = takeWhileOneShot alts_type -- evaluation of the scrutinee in
   where
     alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
 
@@ -938,7 +1013,7 @@ arityType env (Let (Rec prs) e)
 arityType env (Tick t e)
   | not (tickishIsCode t)     = arityType env e
 
-arityType _ _ = vanillaArityType
+arityType _ _ = topArityType
 
 {- Note [Eta-expansion and join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -973,12 +1048,12 @@ So we do this:
   body of the let.
 
 * Dually, when we come to a /call/ of a join point, just no-op
-  by returning botArityType, the bottom element of ArityType,
+  by returning ABot, the bottom element of ArityType,
   which so that: bot `andArityType` x = x
 
 * This works if the join point is bound in the expression we are
   taking the arityType of.  But if it's bound further out, it makes
-  no sense to say that (say) the arityType of (j False) is ABot 0.
+  no sense to say that (say) the arityType of (j False) is ABot.
   Bad things happen.  So we keep track of the in-scope join-point Ids
   in ae_join.
 
@@ -997,12 +1072,12 @@ idArityType :: Id -> ArityType
 idArityType v
   | strict_sig <- idStrictness v
   , not $ isTopSig strict_sig
-  , (ds, res) <- splitStrictSig strict_sig
+  , (ds, div) <- splitStrictSig strict_sig
   , let arity = length ds
-  = if isDeadEndDiv res then ABot arity
-                        else ATop (take arity one_shots)
+  -- Every strictness signature admits an arity signature!
+  = AT (take arity one_shots) div
   | otherwise
-  = ATop (take (idArity v) one_shots)
+  = AT (take (idArity v) one_shots) topDiv
   where
     one_shots :: [OneShotInfo]  -- One-shot-ness derived from the type
     one_shots = typeArity (idType v)
@@ -1111,13 +1186,13 @@ Consider
   foo = \x. case x of
               True  -> (\s{os}. blah) |> co
               False -> wubble
-We'll get an ArityType for foo of (ATop [NoOneShot,OneShot]).
+We'll get an ArityType for foo of \?1.T.
 
 Then we want to eta-expand to
   foo = \x. (\eta{os}. (case x of ...as before...) eta) |> some_co
 
 That 'eta' binder is fresh, and we really want it to have the
-one-shot flag from the inner \s{osf}.  By expanding with the
+one-shot flag from the inner \s{os}.  By expanding with the
 ArityType gotten from analysing the RHS, we achieve this neatly.
 
 This makes a big difference to the one-shot monad trick;
@@ -1137,8 +1212,8 @@ see Note [The one-shot state monad trick] in GHC.Utils.Monad.
 etaExpand   :: Arity     -> CoreExpr -> CoreExpr
 etaExpandAT :: ArityType -> CoreExpr -> CoreExpr
 
-etaExpand   n  orig_expr = eta_expand (replicate n NoOneShotInfo) orig_expr
-etaExpandAT at orig_expr = eta_expand (arityTypeOneShots at)      orig_expr
+etaExpand   n          orig_expr = eta_expand (replicate n NoOneShotInfo) orig_expr
+etaExpandAT (AT oss _) orig_expr = eta_expand oss                         orig_expr
                            -- See Note [Eta expansion with ArityType]
 
 -- etaExpand arity e = res
