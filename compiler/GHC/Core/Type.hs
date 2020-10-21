@@ -1347,7 +1347,12 @@ splitTyConApp_maybe = repSplitTyConApp_maybe . coreFullView
 tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.
 tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
-tcSplitTyConApp_maybe ty                         = repSplitTyConApp_maybe ty
+tcSplitTyConApp_maybe (TyConApp tc tys)          = Just (tc, tys)
+tcSplitTyConApp_maybe (FunTy VisArg w arg res)
+  | Just arg_rep <- getRuntimeRep_maybe arg
+  , Just res_rep <- getRuntimeRep_maybe res
+  = Just (funTyCon, [w, arg_rep, res_rep, arg, res])
+tcSplitTyConApp_maybe _ = Nothing
 
 -------------------
 repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
