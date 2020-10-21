@@ -50,7 +50,7 @@ import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
-import GHC.Core.Opt.Arity ( ArityType(..), arityTypeArity, isBotArityType
+import GHC.Core.Opt.Arity ( ArityType, arityTypeArity, isBotArityType
                           , pushCoTyArg, pushCoValArg
                           , idArityType, etaExpandAT )
 import GHC.Core.SimpleOpt ( joinPointBinding_maybe, joinPointBindings_maybe )
