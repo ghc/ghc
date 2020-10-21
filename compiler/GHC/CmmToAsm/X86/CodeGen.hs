@@ -2512,6 +2512,14 @@ genCCall' config is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] 
     bw = widthInBits width
     lbl = mkCmmCodeLabel primUnitId (fsLit (clzLabel width))
 
+genCCall' config _ (PrimTarget (MO_UF_Conv width)) [dst] [CmmLit arg_lit] _
+  | CmmFloat n _ <- arg_lit = do
+    let fmt = floatFormat width
+    Amode amode amode_code <- memConstant (mkAlignment $ widthInBytes width) (CmmFloat (realToFrac n) width)
+    let platform = ncgPlatform config
+    let dst_r = getRegisterReg platform (CmmLocal dst)
+    return $ amode_code `appOL` unitOL (MOV fmt (OpAddr amode) (OpReg dst_r))
+
 genCCall' config is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
     targetExpr <- cmmMakeDynamicReference config
                   CallReference lbl
