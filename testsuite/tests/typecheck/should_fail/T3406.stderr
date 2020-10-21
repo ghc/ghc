@@ -1,6 +1,6 @@
 
 T3406.hs:11:28: error:
-    • Couldn't match type ‘Int’ with ‘a -> ItemColID a b’
+    • Couldn't match type ‘Int’ with ‘a -> Int’
       Expected: a -> ItemColID a b
         Actual: ItemColID a1 b1
     • In the expression: x :: ItemColID a b

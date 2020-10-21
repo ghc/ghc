@@ -1036,8 +1036,9 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel
 -- We still have to handle the FunTy case separately, just to avoid decomposing
 -- (Int -> blah) and (Show a => blah).
 can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
-  | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
-  , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
+    -- use tcSplit to avoid splitting (Eq a => Bool)
+  | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
+  , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
   , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
