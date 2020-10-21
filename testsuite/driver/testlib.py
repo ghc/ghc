@@ -946,7 +946,7 @@ def test_common_work(watcher: testutil.Watcher,
         # All the ways we might run this test
         if func == compile or func == multimod_compile:
             all_ways = config.compile_ways
-        elif func == compile_and_run or func == multimod_compile_and_run:
+        elif func in [compile_and_run, multi_compile_and_run, multimod_compile_and_run]:
             all_ways = config.run_ways
         elif func == ghci_script:
             if WayName('ghci') in config.run_ways:
