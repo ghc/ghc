@@ -1,5 +1,5 @@
 
-T11010.hs:9:36: error:
+T11010.hs:9:34: error:
     • Couldn't match type ‘a1’ with ‘Int’
       Expected: a -> b
         Actual: a1 -> b
@@ -12,3 +12,6 @@ T11010.hs:9:36: error:
     • Relevant bindings include
         x :: Expr a1 (bound at T11010.hs:9:36)
         f :: a1 -> b (bound at T11010.hs:9:34)
+  |
+9 | pattern IntFun str f x = Fun str f x
+  |                                  ^
