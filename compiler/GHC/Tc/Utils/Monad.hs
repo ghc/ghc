@@ -60,6 +60,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Error management
   getSrcSpanM, setSrcSpan, addLocM, inGeneratedCode,
+  withProvenance,
   wrapLocM, wrapLocFstM, wrapLocSndM,wrapLocM_,
   getErrsVar, setErrsVar,
   addErr,
@@ -195,7 +196,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Control.Monad
-import qualified Data.Set as S
 
 import {-# SOURCE #-} GHC.Tc.Utils.Env    ( tcInitTidyEnv )
 
@@ -347,7 +347,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_errs       = errs_var,
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
-                tcl_provenance = S.empty,
+                tcl_provenance = [],
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,
@@ -876,14 +876,16 @@ getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) 
 inGeneratedCode :: TcRn Bool
 inGeneratedCode = tcl_in_gen_code <$> getLclEnv
 
+withProvenance :: CodeProvenance -> TcRn a -> TcRn a
+withProvenance p = updLclEnv (\env -> tclPushProvenance p env)
+
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 setSrcSpan (RealSrcSpan loc _) thing_inside =
-  updLclEnv (\env -> tclDelProvenance RebindableSyntaxCP (env { tcl_loc = loc }))
-            thing_inside
+  updLclEnv (\env -> env { tcl_loc = loc }) $ withProvenance UserSourceCP thing_inside
 setSrcSpan loc@(UnhelpfulSpan _) thing_inside
   -- See Note [Rebindable syntax and HsExpansion].
   | isGeneratedSrcSpan loc =
-      updLclEnv (\env -> tclAddProvenance RebindableSyntaxCP env) thing_inside
+      withProvenance RebindableSyntaxCP thing_inside
   | otherwise = thing_inside
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
@@ -1133,7 +1135,7 @@ setCtLocM (CtLoc { ctl_env = lcl }) thing_inside
               thing_inside
 
 setDeriving :: TcM a -> TcM a
-setDeriving = updLclEnv (\e -> tclAddProvenance DerivingCP e)
+setDeriving = updLclEnv (\e -> tclPushProvenance DerivingCP e)
 
 inDeriving :: TcM Bool
 inDeriving = fmap tcl_deriving getLclEnv

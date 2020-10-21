@@ -25,7 +25,7 @@ module GHC.Tc.Types(
 
         -- The environment types
         Env(..),
-        TcGblEnv(..), TcLclEnv(..), tcl_in_gen_code, tcl_deriving, tclAddProvenance, tclDelProvenance,
+        TcGblEnv(..), TcLclEnv(..), tcl_in_gen_code, tcl_deriving, tclPushProvenance,
         CodeProvenance(..),
         setLclEnvTcLevel, getLclEnvTcLevel,
         setLclEnvLoc, getLclEnvLoc,
@@ -754,7 +754,8 @@ Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
 -- | This data type indicates possible types of generated code. Code may have any set of these indicators, and code that the user wrote directly
 -- is expected to have none.
 data CodeProvenance
-  = DerivingCP
+  = UserSourceCP
+  | DerivingCP
   | TemplateHaskellCP
   | RebindableSyntaxCP
   deriving (Eq, Ord)
@@ -764,7 +765,7 @@ data TcLclEnv           -- Changes as we move inside an expression
   = TcLclEnv {
         tcl_loc        :: RealSrcSpan,     -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_provenance :: Set CodeProvenance, -- Set of values indicating artificially generated sources of code.
+        tcl_provenance :: [CodeProvenance], -- Stack of values indicating artificially generated sources of code.
         tcl_tclvl      :: TcLevel,
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
@@ -801,19 +802,21 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_errs :: TcRef Messages              -- Place to accumulate errors
     }
 
-tclAddProvenance :: CodeProvenance -> TcLclEnv -> TcLclEnv
-tclAddProvenance p e = e { tcl_provenance = S.insert p (tcl_provenance e) }
-
-tclDelProvenance :: CodeProvenance -> TcLclEnv -> TcLclEnv
-tclDelProvenance p e = e { tcl_provenance = S.delete p (tcl_provenance e) }
-
+tclPushProvenance :: CodeProvenance -> TcLclEnv -> TcLclEnv
+tclPushProvenance p e =
+  let prov = tcl_provenance e
+  in case prov of
+       (p':_) | p == p' -> e -- don't push the same provenance onto the stack repeatedly
+       _ -> e { tcl_provenance = p : prov }
 
 -- TODO: Rename this
 tcl_in_gen_code :: TcLclEnv -> Bool
-tcl_in_gen_code tcl = S.member RebindableSyntaxCP (tcl_provenance tcl)
+tcl_in_gen_code tcl = case tcl_provenance tcl of
+  RebindableSyntaxCP : _ -> True
+  _ -> False
 
 tcl_deriving :: TcLclEnv -> Bool
-tcl_deriving tcl = S.member DerivingCP (tcl_provenance tcl)
+tcl_deriving tcl = DerivingCP `elem` tcl_provenance tcl
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv
 setLclEnvTcLevel env lvl = env { tcl_tclvl = lvl }
