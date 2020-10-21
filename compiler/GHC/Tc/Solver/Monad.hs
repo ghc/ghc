@@ -172,6 +172,7 @@ import GHC.Core.Predicate
 
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
+import GHC.Types.Unique.Set
 import GHC.Data.Maybe
 
 import GHC.Core.Map.Type
@@ -184,7 +185,6 @@ import Data.List ( partition, mapAccumL )
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
-import GHC.Types.Unique.Set
 #endif
 
 {-
