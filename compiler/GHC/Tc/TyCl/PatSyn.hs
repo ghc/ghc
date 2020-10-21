@@ -31,9 +31,9 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Zonk
 import GHC.Builtin.Types.Prim
 import GHC.Types.Name
+import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Core.PatSyn
-import GHC.Types.Name.Set
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -422,14 +422,22 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; tc_patsyn_finish lname dir is_infix lpat'
                           (univ_bndrs, req_theta, ev_binds, req_dicts)
                           (ex_bndrs, mkTyVarTys ex_tvs', prov_theta, prov_dicts)
-                          (args', (map scaledThing arg_tys))
+                          (args', map scaledThing arg_tys)
                           pat_ty rec_fields }
   where
     tc_arg :: TCvSubst -> Name -> Type -> TcM (LHsExpr GhcTc)
+     -- Look up the variable actually bound by lpat
+     -- and check that it has the expected type
     tc_arg subst arg_name arg_ty
-      = do {   -- Look up the variable actually bound by lpat
-               -- and check that it has the expected type
-             arg_id <- tcLookupId arg_name
+      = setSrcSpan (nameSrcSpan arg_name) $
+           -- Set the SrcSpan to be the binding site of the Id (#18856)
+           -- e.g.  pattern P :: Int -> Maybe (Int,Bool)
+           --       pattern P x = Just (x,True)
+           -- Before unifying x's actual type with its expected type, in tc_arg, set
+           -- location to x's binding site in lpat, namely the 'x' in Just (x,True).
+           -- Else the error message location is wherever tcCheckPat finished,
+           -- namely the right-hand corner of the pattern
+        do { arg_id <- tcLookupId arg_name
            ; wrap <- tcSubTypeSigma GenSigCtxt
                                     (idType arg_id)
                                     (substTyUnchecked subst arg_ty)
