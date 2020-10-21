@@ -36,7 +36,7 @@ module GHC.Tc.Utils.Unify (
   matchActualFunTySigma, matchActualFunTysRho,
 
   metaTyVarUpdateOK, occCheckForErrors, MetaTyVarUpdateResult(..),
-  checkTyVarEq, checkTypeEq, AreTypeFamiliesOK(..)
+  checkTyVarEq, checkTyFamEq, checkTypeEq, AreTypeFamiliesOK(..)
 
   ) where
 
@@ -2022,6 +2022,13 @@ checkTyVarEq dflags ty_fam_ok tv ty
     -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
 
 checkTyFamEq :: DynFlags
+             -> TyCon     -- type function
+             -> [TcType]  -- args, exactly saturated
+             -> TcType    -- RHS
+             -> MetaTyVarUpdateResult ()
+checkTyFamEq dflags fun_tc fun_args ty
+  = inline checkTypeEq dflags YesTypeFamilies (TyFamLHS fun_tc fun_args) ty
+    -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
 
 checkTypeEq :: DynFlags -> AreTypeFamiliesOK -> CanEqLHS -> TcType -> MetaTyVarUpdateResult ()
 -- Checks the invariants for CEqCan.   In particular:

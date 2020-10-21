@@ -2262,14 +2262,28 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 
        ; mapM_ (unifyDerived (ctEvLoc ev) Nominal) inj_eqns
 
+       ; tclvl <- getTcLevel
+       ; dflags <- getDynFlags
        ; let tvs1 = tyCoVarsOfTypes fun_args1
              tvs2 = tyCoVarsOfTypes fun_args2
-       ; tclvl <- getTcLevel
-       ; if anyVarSet (isTouchableMetaTyVar tclvl) tvs2 &&
-            -- swap 'em: Note [Put touchable variables on the left]
-            not (anyVarSet (isTouchableMetaTyVar tclvl) tvs1)
-              -- this check is just to avoid unfruitful swapping
 
+             swap_for_rewriting = anyVarSet (isTouchableMetaTyVar tclvl) tvs2 &&
+                          -- swap 'em: Note [Put touchable variables on the left]
+                                  not (anyVarSet (isTouchableMetaTyVar tclvl) tvs1)
+                          -- this check is just to avoid unfruitful swapping
+
+               -- If we have F a ~ F (F a), we want to swap.
+             swap_for_occurs
+               | MTVU_OK ()  <- checkTyFamEq dflags fun_tc2 fun_args2
+                                             (mkTyConApp fun_tc1 fun_args1)
+               , MTVU_Occurs <- checkTyFamEq dflags fun_tc1 fun_args1
+                                             (mkTyConApp fun_tc2 fun_args2)
+               = True
+
+               | otherwise
+               = False
+
+       ; if swap_for_rewriting || swap_for_occurs
          then do { new_ev <- do_swap
                  ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
          else finish_without_swapping }
