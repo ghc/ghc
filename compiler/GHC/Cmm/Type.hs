@@ -311,6 +311,8 @@ isVecType _                       = False
 -- Hints are extra type information we attach to the arguments and
 -- results of a foreign call, where more type information is sometimes
 -- needed by the ABI to make the correct kind of call.
+--
+-- See Note [Signed vs unsigned] for one case where this is used.
 
 data ForeignHint
   = NoHint | AddrHint | SignedHint
