@@ -113,7 +113,7 @@ canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
   , isEmptyUniqSet holes
     -- this would be a CEqCan if it weren't for the blocking hole, but that
     -- block has been removed. Warp straight to canEqCanLHSHomo.
-    -- See Wrinkle (2c) of Note [Equalities with incompatible kinds]
+    -- See Wrinkle (2b) of Note [Equalities with incompatible kinds]
   = do { pred_ty <- zonkTcType (ctEvPred ev) -- zonk to remove the filled-in coercion
                                              -- hole. Could flatten, but why bother?
        ; case classifyPredType pred_ty of
@@ -123,7 +123,7 @@ canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
 
             -- the work item was indeed kicked out because the blocking coercion
             -- hole got filled in. But perhaps an intervening work item unified
-            -- a variable in the LHS. We're not in the looping case of Wrinkle (2c),
+            -- a variable in the LHS. We're not in the looping case of Wrinkle (2b),
             -- so just go via the general path
            _ -> canIrred status ev }
             -- NB: The Irred is /not/ insoluble, so the special case below
@@ -2531,13 +2531,7 @@ Wrinkles:
      must be sure to kick out any constraints that mention coercion holes
      when those holes get filled in.
 
-     (2a) We don't want to do this for CoercionHoles that witness
-          CFunEqCans (that are produced by the flattener), as these will disappear
-          once we unflatten. So we remember in the CoercionHole structure
-          whether the presence of the hole should block substitution or not.
-          A bit gross, this.
-
-     (2b) We must now absolutely make sure to kick out any constraints that
+     (2a) We must now absolutely make sure to kick out any constraints that
           mention a newly-filled-in coercion hole. This is done in
           kickOutAfterFillingCoercionHole. But we only kick out when the
           filling coercion contains no coercion holes. This extra check
@@ -2560,7 +2554,7 @@ Wrinkles:
           kick out a blocked constraint only when the result of filling
           in the blocking coercion involves no further blocking coercions.
 
-     (2c) Consider this case:
+     (2b) Consider this case:
              [G] co_given :: k1 ~ k2
              [W] w :: (alpha :: k1) ~ (T a b c :: k2)
           Processing the Wanted, we will eventually get to canEqCanLHSHetero,
@@ -2583,7 +2577,7 @@ Wrinkles:
      algorithm detailed here, producing [W] co :: k2 ~ k1, and adding
      [W] (a :: k1) ~ ((rhs |> co) :: k1) to the irreducibles. Some time
      later, we solve co, and fill in co's coercion hole. This kicks out
-     the irreducible as described in (2b).
+     the irreducible as described in (2a).
      But now, during canonicalization, we see the cast
      and remove it, in canEqCast. By the time we get into canEqCanLHS, the equality
      is heterogeneous again, and the process repeats.

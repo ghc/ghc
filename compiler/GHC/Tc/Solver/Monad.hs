@@ -756,42 +756,6 @@ From the fourth invariant it follows that the list is
 
 The Wanteds can't rewrite anything which is why we put them last
 
-Note [Type family equations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Type-family equations, CFunEqCans, of form (ev : F tys ~ ty),
-live in three places
-
-  * The work-list, of course
-
-  * The inert_funeqs are un-solved but fully processed, and in
-    the InertCans. They can be [G], [W], [WD], or [D].
-
-  * The inert_flat_cache.  This is used when flattening, to get maximal
-    sharing. Everything in the inert_flat_cache is [G] or [WD]
-
-    It contains lots of things that are still in the work-list.
-    E.g Suppose we have (w1: F (G a) ~ Int), and (w2: H (G a) ~ Int) in the
-        work list.  Then we flatten w1, dumping (w3: G a ~ f1) in the work
-        list.  Now if we flatten w2 before we get to w3, we still want to
-        share that (G a).
-    Because it contains work-list things, DO NOT use the flat cache to solve
-    a top-level goal.  Eg in the above example we don't want to solve w3
-    using w3 itself!
-
-The CFunEqCan Ownership Invariant:
-
-  * Each [G/W/WD] CFunEqCan has a distinct fsk or fmv
-    It "owns" that fsk/fmv, in the sense that:
-      - reducing a [W/WD] CFunEqCan fills in the fmv
-      - unflattening a [W/WD] CFunEqCan fills in the fmv
-      (in both cases unless an occurs-check would result)
-
-  * In contrast a [D] CFunEqCan does not "own" its fmv:
-      - reducing a [D] CFunEqCan does not fill in the fmv;
-        it just generates an equality
-      - unflattening ignores [D] CFunEqCans altogether
-
-
 Note [inert_eqs: the inert equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 "RAE": update. Don't forget to update (K1). See kick_out_rewritable
@@ -1088,21 +1052,13 @@ solving.  Here's a classic example (indexed-types/should_fail/T4093a)
 
     Ambiguity check for f: (Foo e ~ Maybe e) => Foo e
 
-    We get [G] Foo e ~ Maybe e
-           [W] Foo e ~ Foo ee      -- ee is a unification variable
-           [W] Foo ee ~ Maybe ee
+    We get [G] Foo e ~ Maybe e    (CEqCan)
+           [W] Foo ee ~ Foo e     (CEqCan)       -- ee is a unification variable
+           [W] Foo ee ~ Maybe ee  (CEqCan)
 
-    Flatten: [G] Foo e ~ fsk
-             [G] fsk ~ Maybe e   -- (A)
+    The first Wanted gets rewritten to
 
-             [W] Foo ee ~ fmv
-             [W] fmv ~ fsk       -- (B) From Foo e ~ Foo ee
-             [W] fmv ~ Maybe ee
-
-    --> rewrite (B) with (A)
-             [W] Foo ee ~ fmv
-             [W] fmv ~ Maybe e
-             [W] fmv ~ Maybe ee
+           [W] Foo ee ~ Maybe e
 
     But now we appear to be stuck, since we don't rewrite Wanteds with
     Wanteds.  This is silly because we can see that ee := e is the
@@ -1135,20 +1091,18 @@ More specifically, here's how it works (Oct 16):
   putting the latter into the work list (see maybeEmitShadow).
 
 In the example above, we get to the point where we are stuck:
-    [WD] Foo ee ~ fmv
-    [WD] fmv ~ Maybe e
-    [WD] fmv ~ Maybe ee
+    [WD] Foo ee ~ Foo e
+    [WD] Foo ee ~ Maybe ee
 
-But now when [WD] fmv ~ Maybe ee is about to be added, we'll
-split it into [W] and [D], since the inert [WD] fmv ~ Maybe e
+But now when [WD] Foo ee ~ Maybe ee is about to be added, we'll
+split it into [W] and [D], since the inert [WD] Foo ee ~ Foo e
 can rewrite it.  Then:
-    work item: [D] fmv ~ Maybe ee
-    inert:     [W] fmv ~ Maybe ee
-               [WD] fmv ~ Maybe e   -- (C)
-               [WD] Foo ee ~ fmv
+    work item: [D] Foo ee ~ Maybe ee
+    inert:     [W] Foo ee ~ Maybe ee
+               [WD] Foo ee ~ Maybe e
 
 See Note [Splitting WD constraints].  Now the work item is rewritten
-by (C) and we soon get ee := e.
+by the [WD] and we soon get ee := e.
 
 Additional notes:
 
@@ -1164,7 +1118,7 @@ Additional notes:
 
   * It's worth having [WD] rather than just [W] and [D] because
     * efficiency: silly to process the same thing twice
-    * inert_funeqs, inert_dicts is a finite map keyed by
+    * inert_dicts is a finite map keyed by
       the type; it's inconvenient for it to map to TWO constraints
 
 Note [Splitting WD constraints]
@@ -1214,22 +1168,17 @@ scenario:
 
   work item: [WD] a ~ beta
 
-This is heterogeneous, so we try flattening the kinds.
-
-  co :: F v ~ fmv
-  [WD] (a |> co) ~ beta
-
-This is still hetero, so we emit a kind equality and make the work item an
+This is heterogeneous, so we emit a kind equality and make the work item an
 inert Irred.
 
-  work item: [D] fmv ~ alpha
+  work item: [D] F v ~ alpha
   inert: [WD] (a |> co) ~ beta (CIrredCan)
 
 Can't make progress on the work item. Add to inert set. This kicks out the
 old inert, because a [D] can rewrite a [WD].
 
   work item: [WD] (a |> co) ~ beta
-  inert: [D] fmv ~ alpha (CTyEqCan)
+  inert: [D] F v ~ alpha (CEqCan)
 
 Can't make progress on this work item either (although GHC tries by
 decomposing the cast and reflattening... but that doesn't make a difference),
@@ -1237,25 +1186,24 @@ which is still hetero. Emit a new kind equality and add to inert set. But,
 critically, we split the Irred.
 
   work list:
-   [D] fmv ~ alpha (CTyEqCan)
+   [D] F v ~ alpha (CEqCan)
    [D] (a |> co) ~ beta (CIrred) -- this one was split off
   inert:
    [W] (a |> co) ~ beta
-   [D] fmv ~ alpha
+   [D] F v ~ alpha
 
 We quickly solve the first work item, as it's the same as an inert.
 
   work item: [D] (a |> co) ~ beta
   inert:
    [W] (a |> co) ~ beta
-   [D] fmv ~ alpha
+   [D] F v ~ alpha
 
 We decompose the cast, yielding
 
   [D] a ~ beta
 
-We then flatten the kinds. The lhs kind is F v, which flattens to fmv which
-then rewrites to alpha.
+We then flatten the kinds. The lhs kind is F v, which flattens to alpha.
 
   co' :: F v ~ alpha
   [D] (a |> co') ~ beta
@@ -1562,26 +1510,6 @@ When adding an equality to the inerts:
 
 * Note that unifying a:=ty, is like adding [G] a~ty; just use
   kickOutRewritable with Nominal, Given.  See kickOutAfterUnification.
-
-Note [Kicking out CFunEqCan for fundeps]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider:
-   New:    [D] fmv1 ~ fmv2
-   Inert:  [W] F alpha ~ fmv1
-           [W] F beta  ~ fmv2
-
-where F is injective. The new (derived) equality certainly can't
-rewrite the inerts. But we *must* kick out the first one, to get:
-
-   New:   [W] F alpha ~ fmv1
-   Inert: [W] F beta ~ fmv2
-          [D] fmv1 ~ fmv2
-
-and now improvement will discover [D] alpha ~ beta. This is important;
-eg in #9587.
-
-So in kickOutRewritable we look at all the tyvars of the
-CFunEqCan, including the fsk.
 -}
 
 addInertCan :: Ct -> TcS ()  -- Constraints *other than* equalities
@@ -1839,7 +1767,7 @@ kickOutAfterUnification new_tv
        ; setInertCans ics2
        ; return n_kicked }
 
--- See Wrinkle (2b) in Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
+-- See Wrinkle (2a) in Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
 kickOutAfterFillingCoercionHole :: CoercionHole -> Coercion -> TcS ()
 kickOutAfterFillingCoercionHole hole filled_co
   = do { ics <- getInertCans
