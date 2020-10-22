@@ -2,9 +2,12 @@
 
 #include "Rts.h"
 #include "rts/Messages.h"
+#include "Messages.h"
 #include "rts/storage/TSO.h"
 #include "stg/Types.h"
 #include "CloneStack.h"
+#include "StablePtr.h"
+#include "Threads.h"
 
 #if defined(DEBUG)
 #include "sm/Sanity.h"
@@ -63,7 +66,7 @@ StgStack* cloneStack(Capability* capability, StgStack* stack){
   newStackClosure->sp = newStackClosure->stack + spOffset;
 
 #if defined(DEBUG)
-  checkClosure(newStackClosure);
+  checkClosure((StgClosure*) newStackClosure);
 #endif
 
   return newStackClosure;
