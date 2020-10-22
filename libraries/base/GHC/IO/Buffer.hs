@@ -72,6 +72,7 @@ import GHC.Word
 import GHC.Show
 import GHC.Real
 import GHC.List
+import GHC.ForeignPtr.Ops
 import Foreign.C.Types
 import Foreign.ForeignPtr
 import Foreign.Storable
@@ -103,10 +104,10 @@ import Foreign.Storable
 type RawBuffer e = ForeignPtr e
 
 readWord8Buf :: RawBuffer Word8 -> Int -> IO Word8
-readWord8Buf arr ix = withForeignPtr arr $ \p -> peekByteOff p ix
+readWord8Buf p ix = peekWord8ForeignPtr p ix
 
 writeWord8Buf :: RawBuffer Word8 -> Int -> Word8 -> IO ()
-writeWord8Buf arr ix w = withForeignPtr arr $ \p -> pokeByteOff p ix w
+writeWord8Buf p ix w = pokeWord8ForeignPtr p ix w
 
 #if defined(CHARBUF_UTF16)
 type CharBufElem = Word16
