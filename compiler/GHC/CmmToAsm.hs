@@ -84,6 +84,7 @@ import GHC.Prelude
 import qualified GHC.CmmToAsm.X86   as X86
 import qualified GHC.CmmToAsm.PPC   as PPC
 import qualified GHC.CmmToAsm.SPARC as SPARC
+import qualified GHC.CmmToAsm.AArch64 as AArch64
 
 import GHC.CmmToAsm.Reg.Liveness
 import qualified GHC.CmmToAsm.Reg.Linear                as Linear
@@ -164,14 +165,13 @@ nativeCodeGen logger dflags this_mod modLoc h us cmms
       ArchSPARC64   -> panic "nativeCodeGen: No NCG for SPARC64"
       ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
       ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
-      ArchAArch64   -> panic "nativeCodeGen: No NCG for AArch64"
+      ArchAArch64   -> nCG' (AArch64.ncgAArch64 config)
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
       ArchRISCV64   -> panic "nativeCodeGen: No NCG for RISCV64"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
-
 
 -- | Data accumulated during code generation. Mostly about statistics,
 -- but also collects debug data for DWARF generation.
@@ -1190,9 +1190,9 @@ initNCGConfig dflags this_mod = NCGConfig
             ArchX86    -> v
             _          -> Nothing
 
-   , ncgDwarfEnabled        = debugLevel dflags >  0
-   , ncgDwarfUnwindings     = debugLevel dflags >= 1
+   , ncgDwarfEnabled        = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0
+   , ncgDwarfUnwindings     = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0
+   , ncgDwarfStripBlockInfo = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags < 2 -- We strip out block information when running with -g0 or -g1.
+   , ncgDwarfSourceNotes    = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 2 -- We produce GHC-specific source-note DIEs only with -g3
    , ncgExposeInternalSymbols = gopt Opt_ExposeInternalSymbols dflags
-   , ncgDwarfStripBlockInfo = debugLevel dflags <  2 -- We strip out block information when running with -g0 or -g1.
-   , ncgDwarfSourceNotes    = debugLevel dflags >= 3 -- We produce GHC-specific source-note DIEs only with -g3
    }
