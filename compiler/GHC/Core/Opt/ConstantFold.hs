@@ -237,7 +237,6 @@ primOpRules nm = \case
                                        , subsumedByPrimOp Word32NarrowOp
                                        , narrowSubsumesAnd AndOp Word32NarrowOp 32 ]
 
-
    WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform wordToIntLit
                                        , inversePrimOp IntToWordOp ]
    IntToWordOp    -> mkPrimOpRule nm 1 [ liftLitPlatform intToWordLit
