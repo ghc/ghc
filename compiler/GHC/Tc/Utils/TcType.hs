@@ -39,7 +39,6 @@ module GHC.Tc.Utils.TcType (
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
-  isFskTyVar, isFmvTyVar, isFlattenTyVar,
   isAmbiguousTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
@@ -83,7 +82,7 @@ module GHC.Tc.Utils.TcType (
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
-  isRigidTy, isAlmostFunctionFree,
+  isRigidTy,
 
   ---------------------------------
   -- Misc type manipulators
@@ -552,16 +551,6 @@ data MetaInfo
                    --   unified with a type, only with a type variable
                    -- See Note [Signature skolems]
 
-   | FlatMetaTv    -- A flatten meta-tyvar
-                   -- It is a meta-tyvar, but it is always untouchable, with level 0
-                   -- See Note [The flattening story] in GHC.Tc.Solver.Flatten
-
-   | FlatSkolTv    -- A flatten skolem tyvar
-                   -- Just like FlatMetaTv, but is completely "owned" by
-                   --   its Given CFunEqCan.
-                   -- It is filled in /only/ by unflattenGivens
-                   -- See Note [The flattening story] in GHC.Tc.Solver.Flatten
-
    | RuntimeUnkTv  -- A unification variable used in the GHCi debugger.
                    -- It /is/ allowed to unify with a polytype, unlike TauTv
 
@@ -576,8 +565,6 @@ instance Outputable MetaDetails where
 instance Outputable MetaInfo where
   ppr TauTv          = text "tau"
   ppr TyVarTv        = text "tyv"
-  ppr FlatMetaTv     = text "fmv"
-  ppr FlatSkolTv     = text "fsk"
   ppr RuntimeUnkTv   = text "rutv"
   ppr CycleBreakerTv = text "cbv"
 
@@ -618,7 +605,7 @@ Note [TcLevel and untouchable type variables]
 
 * A unification variable is *touchable* if its level number
   is EQUAL TO that of its immediate parent implication,
-  and it is a TauTv or TyVarTv (but /not/ FlatMetaTv or FlatSkolTv)
+  and it is a TauTv or TyVarTv (but /not/ CycleBreakerTv)
 
 Note [WantedInv]
 ~~~~~~~~~~~~~~~~
@@ -1032,8 +1019,7 @@ isImmutableTyVar :: TyVar -> Bool
 isImmutableTyVar tv = isSkolemTyVar tv
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
-  isMetaTyVar, isAmbiguousTyVar,
-  isFmvTyVar, isFskTyVar, isFlattenTyVar :: TcTyVar -> Bool
+  isMetaTyVar, isAmbiguousTyVar :: TcTyVar -> Bool
 
 isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
@@ -1044,25 +1030,6 @@ isTyConableTyVar tv
         MetaTv { mtv_info = TyVarTv } -> False
         _                             -> True
   | otherwise = True
-
-isFmvTyVar tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
-        MetaTv { mtv_info = FlatMetaTv } -> True
-        _                                -> False
-
-isFskTyVar tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
-        MetaTv { mtv_info = FlatSkolTv } -> True
-        _                                -> False
-
--- | True of both given and wanted flatten-skolems (fmv and fsk)
-isFlattenTyVar tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
-        MetaTv { mtv_info = info } -> isFlattenInfo info
-        _                          -> False
 
 isSkolemTyVar tv
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
@@ -1109,14 +1076,8 @@ metaTyVarInfo tv
 
 isTouchableInfo :: MetaInfo -> Bool
 isTouchableInfo info
-  | isFlattenInfo info     = False
   | CycleBreakerTv <- info = False
   | otherwise              = True
-
-isFlattenInfo :: MetaInfo -> Bool
-isFlattenInfo FlatMetaTv = True
-isFlattenInfo FlatSkolTv = True
-isFlattenInfo _          = False
 
 metaTyVarTcLevel :: TcTyVar -> TcLevel
 metaTyVarTcLevel tv
@@ -2172,24 +2133,6 @@ isRigidTy ty
   | isForAllTy ty                           = True
   | otherwise                               = False
 
-
--- | Is this type *almost function-free*? See Note [Almost function-free]
--- in "GHC.Tc.Types"
-isAlmostFunctionFree :: TcType -> Bool
-isAlmostFunctionFree ty | Just ty' <- tcView ty = isAlmostFunctionFree ty'
-isAlmostFunctionFree (TyVarTy {})    = True
-isAlmostFunctionFree (AppTy ty1 ty2) = isAlmostFunctionFree ty1 &&
-                                       isAlmostFunctionFree ty2
-isAlmostFunctionFree (TyConApp tc args)
-  | isTypeFamilyTyCon tc = False
-  | otherwise            = all isAlmostFunctionFree args
-isAlmostFunctionFree (ForAllTy bndr _) = isAlmostFunctionFree (binderType bndr)
-isAlmostFunctionFree (FunTy _ w ty1 ty2) = isAlmostFunctionFree w &&
-                                           isAlmostFunctionFree ty1 &&
-                                           isAlmostFunctionFree ty2
-isAlmostFunctionFree (LitTy {})        = True
-isAlmostFunctionFree (CastTy ty _)     = isAlmostFunctionFree ty
-isAlmostFunctionFree (CoercionTy {})   = True
 
 {-
 ************************************************************************
