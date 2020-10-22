@@ -261,7 +261,7 @@ data CtIrredStatus
   | BlockedCIS HoleSet
                    -- this constraint is blocked on the coercion hole(s) listed
                    -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
-                   -- Wrinkle (4a). Why store the HoleSet? See Wrinkle (2b) of that
+                   -- Wrinkle (4a). Why store the HoleSet? See Wrinkle (2a) of that
                    -- same Note.
                    -- INVARIANT: A BlockedCIS is a homogeneous equality whose
                    --   left hand side can fit in a CanEqLHS.
