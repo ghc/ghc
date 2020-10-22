@@ -217,6 +217,7 @@ dwarfRegNo p r = case platformArch p of
     | r == xmm14 -> 31
     | r == xmm15 -> 32
   ArchPPC_64 _ -> fromIntegral $ toRegNo r
+  ArchAArch64  -> fromIntegral $ toRegNo r
   _other -> error "dwarfRegNo: Unsupported platform or unknown register!"
 
 -- | Virtual register number to use for return address.
@@ -229,4 +230,5 @@ dwarfReturnRegNo p
     ArchX86    -> 8  -- eip
     ArchX86_64 -> 16 -- rip
     ArchPPC_64 ELF_V2 -> 65 -- lr (link register)
+    ArchAArch64-> 30
     _other     -> error "dwarfReturnRegNo: Unsupported platform!"

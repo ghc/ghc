@@ -122,6 +122,14 @@ cmmMakeDynamicReference config referenceKind lbl
               addImport stub
               return $ CmmLit $ CmmLabel stub
 
+        -- GOT relative loads work differently on AArch64.  We don't
+        -- the got symbol is loaded directly, and not through an additional
+        -- load.
+        AccessViaSymbolPtr | ArchAArch64 <- platformArch platform -> do
+              let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
+              addImport symbolPtr
+              return $ cmmMakePicReference config symbolPtr
+
         AccessViaSymbolPtr -> do
               let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
               addImport symbolPtr
@@ -135,7 +143,6 @@ cmmMakeDynamicReference config referenceKind lbl
                 -- so just jump there if it's a call or a jump
               _ -> return $ CmmLit $ CmmLabel lbl
 
-
 -- -----------------------------------------------------------------------------
 -- Create a position independent reference to a label.
 -- (but do not bother with dynamic linking).
@@ -148,6 +155,11 @@ cmmMakePicReference config lbl
   -- Windows doesn't need PIC,
   -- everything gets relocated at runtime
   | OSMinGW32 <- platformOS platform
+  = CmmLit $ CmmLabel lbl
+
+  -- no pic base reg on AArch64, however indicate this symbol should go through
+  -- the global offset table (GOT).
+  | ArchAArch64 <- platformArch platform
   = CmmLit $ CmmLabel lbl
 
   | OSAIX <- platformOS platform
@@ -241,6 +253,20 @@ howToAccessLabel config _arch OSMinGW32 _kind lbl
         | otherwise
         = AccessDirectly
 
+-- On AArch64, relocations for JUMP and CALL will be emitted with 26bits, this
+-- is enough for ~64MB of range. Anything else will need to go through a veneer,
+-- which is the job of the linker to build.  We might only want to lookup
+-- Data References through the GOT.
+howToAccessLabel config ArchAArch64 _os _kind lbl
+        | not (ncgExternalDynamicRefs config)
+        = AccessDirectly
+
+        | labelDynamic config lbl
+        = AccessViaSymbolPtr
+
+        | otherwise
+        = AccessDirectly
+
 
 -- Mach-O (Darwin, Mac OS X)
 --
@@ -275,7 +301,7 @@ howToAccessLabel config arch OSDarwin JumpReference lbl
         -- dyld code stubs don't work for tailcalls because the
         -- stack alignment is only right for regular calls.
         -- Therefore, we have to go via a symbol pointer:
-        | arch == ArchX86 || arch == ArchX86_64
+        | arch == ArchX86 || arch == ArchX86_64 || arch == ArchAArch64
         , labelDynamic config lbl
         = AccessViaSymbolPtr
 
@@ -283,14 +309,14 @@ howToAccessLabel config arch OSDarwin JumpReference lbl
 howToAccessLabel config arch OSDarwin _kind lbl
         -- Code stubs are the usual method of choice for imported code;
         -- not needed on x86_64 because Apple's new linker, ld64, generates
-        -- them automatically.
+        -- them automatically, neither on Aarch64 (arm64).
         | arch /= ArchX86_64
+        , arch /= ArchAArch64
         , labelDynamic config lbl
         = AccessViaStub
 
         | otherwise
         = AccessDirectly
-
 
 ----------------------------------------------------------------------------
 -- AIX
@@ -609,14 +635,24 @@ pprImportedSymbol config importedLbl = case (arch,os) of
         | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
         -> vcat [
                 text ".non_lazy_symbol_pointer",
-                char 'L' <> ppr_lbl lbl <> text "$non_lazy_ptr:",
+                text "L" <> ppr_lbl lbl <> text "$non_lazy_ptr:",
                 text "\t.indirect_symbol" <+> ppr_lbl lbl,
                 text "\t.long\t0"]
 
         | otherwise
         -> empty
 
-   (_, OSDarwin) -> empty
+   (ArchAArch64, OSDarwin)
+        -- | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
+        -- -> vcat [
+        --         text ".non_lazy_symbol_pointer",
+        --         text "L" <> ppr_lbl lbl <> text "$non_lazy_ptr:",
+        --         text "\t.indirect_symbol" <+> ppr_lbl lbl,
+        --         text "\t.long\t0"]
+
+        -- | otherwise
+        -> empty
+
 
 
    -- XCOFF / AIX
