@@ -36,7 +36,7 @@ module GHC.Core.TyCo.Rep (
         -- * Coercions
         Coercion(..),
         UnivCoProvenance(..),
-        CoercionHole(..), BlockSubstFlag(..), coHoleCoVar, setCoHoleCoVar,
+        CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
         MCoercion(..), MCoercionR, MCoercionN,
 
@@ -1648,14 +1648,8 @@ data CoercionHole
   = CoercionHole { ch_co_var  :: CoVar
                        -- See Note [CoercionHoles and coercion free variables]
 
-                 , ch_blocker :: BlockSubstFlag  -- should this hole block substitution?
-                                                 -- See (2a) in TcCanonical
-                                                 -- Note [Equalities with incompatible kinds]
                  , ch_ref     :: IORef (Maybe Coercion)
                  }
-
-data BlockSubstFlag = YesBlockSubst
-                    | NoBlockSubst
 
 coHoleCoVar :: CoercionHole -> CoVar
 coHoleCoVar = ch_co_var
@@ -1674,10 +1668,6 @@ instance Outputable CoercionHole where
 
 instance Uniquable CoercionHole where
   getUnique (CoercionHole { ch_co_var = cv }) = getUnique cv
-
-instance Outputable BlockSubstFlag where
-  ppr YesBlockSubst = text "YesBlockSubst"
-  ppr NoBlockSubst  = text "NoBlockSubst"
 
 {- Note [Phantom coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

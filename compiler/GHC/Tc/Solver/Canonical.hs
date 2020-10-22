@@ -1984,26 +1984,6 @@ isInsolubleOccursCheck does.
 
 See also #10715, which induced this addition.
 
-Note [canCFunEqCan]
-~~~~~~~~~~~~~~~~~~~
-Flattening the arguments to a type family can change the kind of the type
-family application. As an easy example, consider (Any k) where (k ~ Type)
-is in the inert set. The original (Any k :: k) becomes (Any Type :: Type).
-The problem here is that the fsk in the CFunEqCan will have the old kind.
-
-The solution is to come up with a new fsk/fmv of the right kind. For
-givens, this is easy: just introduce a new fsk and update the flat-cache
-with the new one. For wanteds, we want to solve the old one if favor of
-the new one, so we use dischargeFmv. This also kicks out constraints
-from the inert set; this behavior is correct, as the kind-change may
-allow more constraints to be solved.
-
-We use `isTcReflexiveCo`, to ensure that we only use the hetero-kinded case
-if we really need to.  Of course `flattenArgsNom` should return `Refl`
-whenever possible, but #15577 was an infinite loop because even
-though the coercion was homo-kinded, `kind_co` was not `Refl`, so we
-made a new (identical) CFunEqCan, and then the entire process repeated.
-
 Note [Put touchable variables on the left]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #10009, a very nasty example:
@@ -2053,59 +2033,6 @@ in Wanteds on the left.
 
 #12526 is another good example of this in action.
 
--}
-
-{- "RAE"
-canCFunEqCan :: CtEvidence
-             -> TyCon -> [TcType]   -- LHS
-             -> TcTyVar             -- RHS
-             -> TcS (StopOrContinue Ct)
--- ^ Canonicalise a CFunEqCan.  We know that
---     the arg types are already flat,
--- and the RHS is a fsk, which we must *not* substitute.
--- So just substitute in the LHS
-canCFunEqCan ev fn tys fsk
-  = do { (tys', cos, kind_co) <- flattenArgsNom ev fn tys
-                        -- cos :: tys' ~ tys
-
-       ; let lhs_co  = mkTcTyConAppCo Nominal fn cos
-                        -- :: F tys' ~ F tys
-             new_lhs = mkTyConApp fn tys'
-
-             flav    = ctEvFlavour ev
-       ; (ev', fsk')
-           <- if isTcReflexiveCo kind_co   -- See Note [canCFunEqCan]
-              then do { traceTcS "canCFunEqCan: refl" (ppr new_lhs)
-                      ; let fsk_ty = mkTyVarTy fsk
-                      ; ev' <- rewriteEqEvidence ev NotSwapped new_lhs fsk_ty
-                                                 lhs_co (mkTcNomReflCo fsk_ty)
-                      ; return (ev', fsk) }
-              else do { traceTcS "canCFunEqCan: non-refl" $
-                        vcat [ text "Kind co:" <+> ppr kind_co
-                             , text "RHS:" <+> ppr fsk <+> dcolon <+> ppr (tyVarKind fsk)
-                             , text "LHS:" <+> hang (ppr (mkTyConApp fn tys))
-                                                  2 (dcolon <+> ppr (tcTypeKind (mkTyConApp fn tys)))
-                             , text "New LHS" <+> hang (ppr new_lhs)
-                                                     2 (dcolon <+> ppr (tcTypeKind new_lhs)) ]
-                      ; (ev', new_co, new_fsk)
-                          <- newFlattenSkolem flav (ctEvLoc ev) fn tys'
-                      ; let xi = mkTyVarTy new_fsk `mkCastTy` kind_co
-                               -- sym lhs_co :: F tys ~ F tys'
-                               -- new_co     :: F tys' ~ new_fsk
-                               -- co         :: F tys ~ (new_fsk |> kind_co)
-                            co = mkTcSymCo lhs_co `mkTcTransCo`
-                                 mkTcCoherenceRightCo Nominal
-                                                      (mkTyVarTy new_fsk)
-                                                      kind_co
-                                                      new_co
-
-                      ; traceTcS "Discharging fmv/fsk due to hetero flattening" (ppr ev)
-                      ; dischargeFunEq ev fsk co xi
-                      ; return (ev', new_fsk) }
-
-       ; extendFlatCache fn tys' (ctEvCoercion ev', mkTyVarTy fsk', ctEvFlavour ev')
-       ; continueWith (CFunEqCan { cc_ev = ev', cc_fun = fn
-                                 , cc_tyargs = tys', cc_fsk = fsk' }) }
 -}
 
 ---------------------
@@ -2897,21 +2824,17 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
        ; newGivenEvVar loc' (new_pred, new_tm) }
 
   | CtWanted { ctev_dest = dest, ctev_nosh = si } <- old_ev
-  = case dest of
-      HoleDest hole ->
-        do { (new_ev, hole_co) <- newWantedEq_SI (ch_blocker hole) si loc'
-                                                 (ctEvRole old_ev) nlhs nrhs
-                   -- The "_SI" variant ensures that we make a new Wanted
-                   -- with the same shadow-info as the existing one (#16735)
-           ; let co = maybeTcSymCo swapped $
-                      mkSymCo lhs_co
-                      `mkTransCo` hole_co
-                      `mkTransCo` rhs_co
-           ; setWantedEq dest co
-           ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
-           ; return new_ev }
-
-      _ -> panic "rewriteEqEvidence"
+  = do { (new_ev, hole_co) <- newWantedEq_SI si loc'
+                                             (ctEvRole old_ev) nlhs nrhs
+               -- The "_SI" variant ensures that we make a new Wanted
+               -- with the same shadow-info as the existing one (#16735)
+       ; let co = maybeTcSymCo swapped $
+                  mkSymCo lhs_co
+                  `mkTransCo` hole_co
+                  `mkTransCo` rhs_co
+       ; setWantedEq dest co
+       ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
+       ; return new_ev }
 
 #if __GLASGOW_HASKELL__ <= 810
   | otherwise
