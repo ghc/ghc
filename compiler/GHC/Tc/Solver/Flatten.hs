@@ -83,8 +83,7 @@ runFlatten :: CtLoc -> CtFlavour -> EqRel -> FlatM a -> TcS a
 runFlatten loc flav eq_rel thing_inside
   = runFlatM thing_inside fmode
   where
-    fmode = FE { fe_loc  = bumpCtLocDepth loc
-                           -- See Note [Flatten when discharging CFunEqCan]
+    fmode = FE { fe_loc  = loc
                , fe_flavour = flav
                , fe_eq_rel = eq_rel }
 
@@ -810,7 +809,7 @@ flatten_exact_fam_app_fully tc tys
                ; dflags <- getDynFlags
                ; loc <- getLoc
                ; case mb_ct of
-                   Just (co, rhs_ty, inert_fr@(_, inert_eq_rel))  -- co :: F xis ~ fsk
+                   Just (co, rhs_ty, inert_fr@(_, inert_eq_rel))  -- co :: F xis ~ rhs_ty
                         -- See Note [Type family equations] in GHC.Tc.Solver.Monad
                      | inert_fr `eqCanRewriteFR` cur_fr
                         -- See Note [Runaway Derived rewriting]
@@ -835,7 +834,7 @@ flatten_exact_fam_app_fully tc tys
                                        `mkTransCo` ret_co
                            ; return (xi, co')
                            }
-                                            -- :: fsk_xi ~ F xis
+
 
                    -- Try to reduce the family application right now
                    -- See Note [Reduce type family applications eagerly]
