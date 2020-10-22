@@ -106,10 +106,7 @@ eqFlattenMode FM_SubstOnly  FM_SubstOnly  = True
 --  FM_Avoid tv1 b1 `eq` FM_Avoid tv2 b2 = tv1 == tv2 && b1 == b2
 eqFlattenMode _  _ = False
 
--- | The 'FlatM' monad is a wrapper around 'TcS' with the following
--- extra capabilities: (1) it offers access to a 'FlattenEnv';
--- and (2) it maintains the flattening worklist.
--- See Note [The flattening work list].
+-- | The 'FlatM' monad is a wrapper around 'TcS' with a 'FlattenEnv'
 newtype FlatM a
   = FlatM { runFlatM :: FlattenEnv -> TcS a }
   deriving (Functor)
@@ -136,17 +133,16 @@ runFlattenCtEv :: FlattenMode -> CtEvidence -> FlatM a -> TcS a
 runFlattenCtEv mode ev
   = runFlatten mode (ctEvLoc ev) (ctEvFlavour ev) (ctEvEqRel ev)
 
--- Run thing_inside (which does flattening), and put all
--- the work it generates onto the main work list
--- See Note [The flattening work list]
+-- Run thing_inside (which does the flattening)
 runFlatten :: FlattenMode -> CtLoc -> CtFlavour -> EqRel -> FlatM a -> TcS a
 runFlatten mode loc flav eq_rel thing_inside
-  = do { let fmode = FE { fe_mode = mode
-                        , fe_loc  = bumpCtLocDepth loc
-                            -- See Note [Flatten when discharging CFunEqCan]
-                        , fe_flavour = flav
-                        , fe_eq_rel = eq_rel }
-       ; runFlatM thing_inside fmode }
+  = runFlatM thing_inside fmode
+  where
+    fmode = FE { fe_mode = mode
+               , fe_loc  = bumpCtLocDepth loc
+                           -- See Note [Flatten when discharging CFunEqCan]
+               , fe_flavour = flav
+               , fe_eq_rel = eq_rel }
 
 traceFlat :: String -> SDoc -> FlatM ()
 traceFlat herald doc = liftTcS $ traceTcS herald doc
@@ -220,55 +216,6 @@ bumpDepth (FlatM thing_inside)
       ; thing_inside env' }
 
 {-
-Note [The flattening work list]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The "flattening work list", held in the fe_work field of FlattenEnv,
-is a list of CFunEqCans generated during flattening.  The key idea
-is this.  Consider flattening (Eq (F (G Int) (H Bool)):
-  * The flattener recursively calls itself on sub-terms before building
-    the main term, so it will encounter the terms in order
-              G Int
-              H Bool
-              F (G Int) (H Bool)
-    flattening to sub-goals
-              w1: G Int ~ fuv0
-              w2: H Bool ~ fuv1
-              w3: F fuv0 fuv1 ~ fuv2
-
-  * Processing w3 first is BAD, because we can't reduce i t,so it'll
-    get put into the inert set, and later kicked out when w1, w2 are
-    solved.  In #9872 this led to inert sets containing hundreds
-    of suspended calls.
-
-  * So we want to process w1, w2 first.
-
-  * So you might think that we should just use a FIFO deque for the work-list,
-    so that putting adding goals in order w1,w2,w3 would mean we processed
-    w1 first.
-
-  * BUT suppose we have 'type instance G Int = H Char'.  Then processing
-    w1 leads to a new goal
-                w4: H Char ~ fuv0
-    We do NOT want to put that on the far end of a deque!  Instead we want
-    to put it at the *front* of the work-list so that we continue to work
-    on it.
-
-So the work-list structure is this:
-
-  * The wl_funeqs (in TcS) is a LIFO stack; we push new goals (such as w4) on
-    top (extendWorkListFunEq), and take new work from the top
-    (selectWorkItem).
-
-  * When flattening, emitFlatWork pushes new flattening goals (like
-    w1,w2,w3) onto the flattening work list, fe_work, another
-    push-down stack.
-
-  * When we finish flattening, we *reverse* the fe_work stack
-    onto the wl_funeqs stack (which brings w1 to the top).
-
-The function runFlatten initialises the fe_work stack, and reverses
-it onto wl_fun_eqs at the end.
-
 Note [Flattener EqRels]
 ~~~~~~~~~~~~~~~~~~~~~~~
 When flattening, we need to know which equality relation -- nominal
