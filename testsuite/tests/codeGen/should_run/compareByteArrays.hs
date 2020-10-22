@@ -39,7 +39,7 @@ copyByteArray (BA# src#) (I# srcOfs#) (MBA# dest#) (I# destOfs#) (I# n#)
 
 indexWord8Array :: BA -> Int -> Word8
 indexWord8Array (BA# ba#) (I# i#)
-  = W8# (indexWord8Array# ba# i#)
+  = W8# (narrowWord8# (indexWord8Array# ba# i#))
 
 sizeofByteArray :: BA -> Int
 sizeofByteArray (BA# ba#) = I# (sizeofByteArray# ba#)
@@ -54,7 +54,7 @@ newByteArray (I# n#)
 
 writeWord8Array :: MBA s -> Int -> Word8 -> ST s ()
 writeWord8Array (MBA# mba#) (I# i#) (W8# j#)
-  = ST $ \s -> case writeWord8Array# mba# i# j# s of
+  = ST $ \s -> case writeWord8Array# mba# i# (extendWord8# j#) s of
                  s' -> (# s', () #)
 
 unsafeFreezeByteArray :: MBA s -> ST s BA

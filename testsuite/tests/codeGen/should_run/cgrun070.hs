@@ -196,11 +196,11 @@ touch a = unsafeIOToST $ IO $ \s# ->
 
 indexWord8Array :: ByteArray -> Int -> Word8
 indexWord8Array arr (I# i#) = case indexWord8Array# (unBA arr) i# of
-    a -> W8# a
+    a -> W8# (narrowWord8# a)
 
 writeWord8Array :: MByteArray s -> Int -> Word8 -> ST s ()
 writeWord8Array marr (I# i#) (W8# a) = ST $ \ s# ->
-    case writeWord8Array# (unMBA marr) i# a s# of
+    case writeWord8Array# (unMBA marr) i# (extendWord8# a) s# of
         s2# -> (# s2#, () #)
 
 unsafeFreezeByteArray :: MByteArray s -> ST s (ByteArray)
