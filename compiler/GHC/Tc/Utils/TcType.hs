@@ -565,16 +565,21 @@ data MetaInfo
    | RuntimeUnkTv  -- A unification variable used in the GHCi debugger.
                    -- It /is/ allowed to unify with a polytype, unlike TauTv
 
+   | CycleBreakerTv  -- Used to fix occurs-check problems in Givens
+                     -- See Note [Type variable cycles in Givens] in
+                     -- GHC.Tc.Solver.Canonical
+
 instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
 
 instance Outputable MetaInfo where
-  ppr TauTv         = text "tau"
-  ppr TyVarTv       = text "tyv"
-  ppr FlatMetaTv    = text "fmv"
-  ppr FlatSkolTv    = text "fsk"
-  ppr RuntimeUnkTv  = text "rutv"
+  ppr TauTv          = text "tau"
+  ppr TyVarTv        = text "tyv"
+  ppr FlatMetaTv     = text "fmv"
+  ppr FlatSkolTv     = text "fsk"
+  ppr RuntimeUnkTv   = text "rutv"
+  ppr CycleBreakerTv = text "cbv"
 
 {- *********************************************************************
 *                                                                      *
@@ -1007,7 +1012,7 @@ isTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
 isTouchableMetaTyVar ctxt_tclvl tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   , MetaTv { mtv_tclvl = tv_tclvl, mtv_info = info } <- tcTyVarDetails tv
-  , not (isFlattenInfo info)
+  , isTouchableInfo info
   = ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
              ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl )
     tv_tclvl `sameDepthAs` ctxt_tclvl
@@ -1018,7 +1023,7 @@ isFloatedTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
 isFloatedTouchableMetaTyVar ctxt_tclvl tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   , MetaTv { mtv_tclvl = tv_tclvl, mtv_info = info } <- tcTyVarDetails tv
-  , not (isFlattenInfo info)
+  , isTouchableInfo info
   = tv_tclvl `strictlyDeeperThan` ctxt_tclvl
 
   | otherwise = False
@@ -1101,6 +1106,12 @@ metaTyVarInfo tv
   = case tcTyVarDetails tv of
       MetaTv { mtv_info = info } -> info
       _ -> pprPanic "metaTyVarInfo" (ppr tv)
+
+isTouchableInfo :: MetaInfo -> Bool
+isTouchableInfo info
+  | isFlattenInfo info     = False
+  | CycleBreakerTv <- info = False
+  | otherwise              = True
 
 isFlattenInfo :: MetaInfo -> Bool
 isFlattenInfo FlatMetaTv = True

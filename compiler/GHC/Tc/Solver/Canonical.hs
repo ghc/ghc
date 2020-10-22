@@ -2353,6 +2353,8 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
     -- this next line checks also for coercion holes; see
     -- Note [Equalities with incompatible kinds]
   = do { dflags <- getDynFlags
+       ; new_ev <- rewriteEqEvidence ev swapped lhs_ty rhs rewrite_co1 rewrite_co2
+
      -- Must do the occurs check even on tyvar/tyvar
      -- equalities, in case have  x ~ (y :: ..x...)
      -- #12593
@@ -2360,7 +2362,6 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
        ; case canEqOK dflags eq_rel lhs rhs of
            CanEqOK ->
              do { traceTcS "canEqOK" (ppr lhs $$ ppr rhs)
-                ; new_ev <- rewriteEqEvidence ev swapped lhs_ty rhs rewrite_co1 rewrite_co2
                 ; continueWith (CEqCan { cc_ev = new_ev, cc_lhs = lhs
                                        , cc_rhs = rhs, cc_eq_rel = eq_rel }) }
        -- it is possible that cc_rhs mentions the LHS if the LHS is a type
@@ -2368,11 +2369,24 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
        -- that will be caught by the depth counter. The other option is an
        -- occurs-check for a function application, which seems awkward.
 
+           CanEqNotOK status
+                -- See Note [Type variable cycles in Givens]
+             | OtherCIS <- status
+             , Given <- ctEvFlavour ev
+             , TyVarLHS lhs_tv <- lhs
+             , NomEq <- eq_rel
+             -> do { traceTcS "canEqCanLHSFinish breaking a cycle" (ppr lhs $$ ppr rhs)
+                   ; new_rhs <- breakTyVarCycle lhs_tv rhs
+                   ; traceTcS "new RHS:" (ppr new_rhs)
+                   ; let new_pred   = mkPrimEqPred (mkTyVarTy lhs_tv) new_rhs
+                         new_new_ev = new_ev { ctev_pred = new_pred }
+                   ; continueWith (CEqCan { cc_ev = new_new_ev, cc_lhs = lhs
+                                          , cc_rhs = new_rhs, cc_eq_rel = eq_rel }) }
+
                -- We must not use it for further rewriting!
-           CanEqNotOK status ->
-             do { traceTcS "canEqCanLHSFinish can't make a canonical" (ppr lhs $$ ppr rhs)
-                ; new_ev <- rewriteEqEvidence ev swapped lhs_ty rhs rewrite_co1 rewrite_co2
-                ; continueWith (mkIrredCt status new_ev) } }
+             | otherwise
+             -> do { traceTcS "canEqCanLHSFinish can't make a canonical" (ppr lhs $$ ppr rhs)
+                   ; continueWith (mkIrredCt status new_ev) } }
   where
     role = eqRelRole eq_rel
 
@@ -2657,6 +2671,73 @@ NOT (necessarily) expand the type synonym, since for the purpose of
 good error messages we want to leave type synonyms unexpanded as much
 as possible.  Hence the ps_xi1, ps_xi2 argument passed to canEqCanLHS.
 
+Note [Type variable cycles in Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this situation (from indexed-types/should_compile/GivenLoop):
+
+  instance C (Maybe b)
+  [G] a ~ Maybe (F a)
+  [W] C a
+
+In order to solve the Wanted, we must use the Given to rewrite `a` to
+Maybe (F a). But note that the Given has an occurs-check failure, and
+so we can't straightforwardly add the Given to the inert set.
+
+Instead, we detect this scenario by the following characteristics:
+ - a Given CEqCan constraint
+ - with a tyvar on its LHS
+ - with a soluble occurs-check failure
+
+Having identified the scenario, we create a fresh untouchable metavariable a'
+(with MetaInfo CycleBreakerTv), and replace all occurrences of `a` in the RHS
+with a'. This is done by breakTyVarCycle. We have now disrupted the
+occurs-check problem and can make the CEqCan.
+
+Of course, we don't want a' leaking into e.g. error messages. So we
+restore the cycles by setting a' := a after we're done running the
+solver (in nestImplicTcS and runTcSWithEvBinds). This is done by
+restoreTyVarCycles, which uses the inert_tv_cycles field in InertSet,
+which contains the pairings invented in breakTyVarCycle.
+
+Note that we don't have to think about evidence here, because the
+loop-breaker variable just gets zonked right back to the original
+one. By the time we examine the evidence, all traces of this trick
+are very long gone.
+
+There are drawbacks of this approach:
+
+ 1. This trick allows us to use a loopy Given once, but not twice.
+    And it's possible for twice to be necessary. #18875:
+
+      type family G a b where
+        G (Maybe c) d = d
+
+      h :: (e ~ Maybe (G e f)) => e -> f
+      h (Just x) = x
+
+    In order to accept this, we have to use the Given twice, in order
+    for G e f to reduce to show that e ~ Maybe f.
+
+ 2. We apply this trick only for Givens, never for Wanted or Derived.
+    It wouldn't make sense for Wanted, because Wanted never rewrite.
+    But it's conceivable that a Derived would benefit from this all.
+    I doubt it would ever happen, though, so I'm holding off.
+
+ 3. We don't use this trick for representational equalities, as there
+    is no concrete use case where it is helpful (unlike for nominal
+    equalities). Furthermore, because function applications can be
+    CanEqLHSs, but newtype applications cannot, the disparities between
+    the cases are enough that it would be effortful to expand the idea
+    to representational equalities. A quick attempt, with
+
+      data family N a b
+
+      f :: (Coercible a (N a b), Coercible (N a b) b) => a -> b
+      f = coerce
+
+    failed with "Could not match 'b' with 'b'." Further work is saved
+    for when we have a concrete incentive to explore this dark corner.
+
 -}
 
 {-
@@ -2840,7 +2921,14 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
     loc      = ctEvLoc old_ev
     loc'     = bumpCtLocDepth loc
 
-{- Note [unifyWanted and unifyDerived]
+{-
+************************************************************************
+*                                                                      *
+              Unification
+*                                                                      *
+************************************************************************
+
+Note [unifyWanted and unifyDerived]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When decomposing equalities we often create new wanted constraints for
 (s ~ t).  But what if s=t?  Then it'd be faster to return Refl right away.
