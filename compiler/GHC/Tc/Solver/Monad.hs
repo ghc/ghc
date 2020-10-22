@@ -398,7 +398,6 @@ data InertSet
               -- Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical
 
        , inert_flat_cache :: FunEqMap (TcCoercion, TcType)
-              -- See Note [Type family equations]
               -- If    F tys :-> (co, rhs, flav),
               -- then  co :: F tys ~ rhs
               --       flav is [G]
@@ -684,7 +683,6 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- LHS is fully rewritten (modulo eqCanRewrite constraints)
               --     wrt inert_eqs
               -- Can include all flavours, [G], [W], [WD], [D]
-              -- See Note [Type family equations]
 
        , inert_dicts :: DictMap Ct
               -- Dictionaries only

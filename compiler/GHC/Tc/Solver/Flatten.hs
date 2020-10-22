@@ -806,7 +806,6 @@ flatten_exact_fam_app_fully tc tys
                ; loc <- getLoc
                ; case mb_ct of
                    Just (co, rhs_ty, inert_fr@(_, inert_eq_rel))  -- co :: F xis ~ rhs_ty
-                        -- See Note [Type family equations] in GHC.Tc.Solver.Monad
                      | inert_fr `eqCanRewriteFR` cur_fr
                         -- See Note [Runaway Derived rewriting]
                      , let reduction_ok | (Derived, _) <- cur_fr

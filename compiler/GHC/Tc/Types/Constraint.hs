@@ -51,7 +51,7 @@ module GHC.Tc.Types.Constraint (
         -- CtEvidence
         CtEvidence(..), TcEvDest(..),
         mkKindLoc, toKindLoc, mkGivenLoc,
-        isWanted, isGiven, isDerived, isGivenOrWDeriv,
+        isWanted, isGiven, isDerived,
         ctEvRole,
 
         wrapType,
@@ -1481,11 +1481,6 @@ data ShadowInfo
              -- See Note [The improvement story and derived shadows] in GHC.Tc.Solver.Monad
   deriving( Eq )
 
-isGivenOrWDeriv :: CtFlavour -> Bool
-isGivenOrWDeriv Given           = True
-isGivenOrWDeriv (Wanted WDeriv) = True
-isGivenOrWDeriv _               = False
-
 instance Outputable CtFlavour where
   ppr Given           = text "[G]"
   ppr (Wanted WDeriv) = text "[WD]"
@@ -1584,43 +1579,6 @@ eqMayRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
 eqMayRewriteFR (Wanted WDeriv, NomEq) (Wanted WDeriv, NomEq) = True
 eqMayRewriteFR (Derived,       NomEq) (Wanted WDeriv, NomEq) = True
 eqMayRewriteFR fr1 fr2 = eqCanRewriteFR fr1 fr2
-
-{- "RAE"
------------------
-{- Note [funEqCanDischarge]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have two CFunEqCans with the same LHS:
-    (x1:F ts ~ f1) `funEqCanDischarge` (x2:F ts ~ f2)
-Can we drop x2 in favour of x1, either unifying
-f2 (if it's a flatten meta-var) or adding a new Given
-(f1 ~ f2), if x2 is a Given?
-
-Answer: yes if funEqCanDischarge is true.
--}
-
-funEqCanDischarge
-  :: CtEvidence -> CtEvidence
-  -> ( SwapFlag   -- NotSwapped => lhs can discharge rhs
-                  -- Swapped    => rhs can discharge lhs
-     , Bool)      -- True <=> upgrade non-discharged one
-                  --          from [W] to [WD]
--- See Note [funEqCanDischarge]
-funEqCanDischarge ev1 ev2
-  = ASSERT2( ctEvEqRel ev1 == NomEq, ppr ev1 )
-    ASSERT2( ctEvEqRel ev2 == NomEq, ppr ev2 )
-    -- CFunEqCans are all Nominal, hence asserts
-    funEqCanDischargeF (ctEvFlavour ev1) (ctEvFlavour ev2)
-
-funEqCanDischargeF :: CtFlavour -> CtFlavour -> (SwapFlag, Bool)
-funEqCanDischargeF Given           _               = (NotSwapped, False)
-funEqCanDischargeF _               Given           = (IsSwapped,  False)
-funEqCanDischargeF (Wanted WDeriv) _               = (NotSwapped, False)
-funEqCanDischargeF _               (Wanted WDeriv) = (IsSwapped,  True)
-funEqCanDischargeF (Wanted WOnly)  (Wanted WOnly)  = (NotSwapped, False)
-funEqCanDischargeF (Wanted WOnly)  Derived         = (NotSwapped, True)
-funEqCanDischargeF Derived         (Wanted WOnly)  = (IsSwapped,  True)
-funEqCanDischargeF Derived         Derived         = (NotSwapped, False)
--}
 
 {- Note [eqCanDischarge]
 ~~~~~~~~~~~~~~~~~~~~~~~~
