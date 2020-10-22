@@ -721,7 +721,7 @@ canIrred :: CtIrredStatus -> CtEvidence -> TcS (StopOrContinue Ct)
 canIrred status ev
   = do { let pred = ctEvPred ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr pred)
-       ; (xi,co) <- flatten FM_FlattenAll ev pred -- co :: xi ~ pred
+       ; (xi,co) <- flatten ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
 
     do { -- Re-classify, in case flattening has improved its shape
@@ -832,11 +832,8 @@ canForAll :: CtEvidence -> Bool -> TcS (StopOrContinue Ct)
 -- We have a constraint (forall as. blah => C tys)
 canForAll ev pend_sc
   = do { -- First rewrite it to apply the current substitution
-         -- Do not bother with type-family reductions; we can't
-         -- do them under a forall anyway (c.f. Flatten.flatten_one
-         -- on a forall type)
          let pred = ctEvPred ev
-       ; (xi,co) <- flatten FM_SubstOnly ev pred -- co :: xi ~ pred
+       ; (xi,co) <- flatten ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
 
     do { -- Now decompose into its pieces and solve it
@@ -1068,8 +1065,8 @@ can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ ty2 _
 
 -- No similarity in type structure detected. Flatten and try again.
 can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
-  = do { (xi1, co1) <- flatten FM_FlattenAll ev ps_ty1
-       ; (xi2, co2) <- flatten FM_FlattenAll ev ps_ty2
+  = do { (xi1, co1) <- flatten ev ps_ty1
+       ; (xi2, co2) <- flatten ev ps_ty2
        ; new_ev <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
        ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
 
@@ -1924,8 +1921,8 @@ canEqFailure :: CtEvidence -> EqRel
 canEqFailure ev NomEq ty1 ty2
   = canEqHardFailure ev ty1 ty2
 canEqFailure ev ReprEq ty1 ty2
-  = do { (xi1, co1) <- flatten FM_FlattenAll ev ty1
-       ; (xi2, co2) <- flatten FM_FlattenAll ev ty2
+  = do { (xi1, co1) <- flatten ev ty1
+       ; (xi2, co2) <- flatten ev ty2
             -- We must flatten the types before putting them in the
             -- inert set, so that we are sure to kick them out when
             -- new equalities become available
@@ -1940,8 +1937,8 @@ canEqHardFailure :: CtEvidence
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqHardFailure ev ty1 ty2
   = do { traceTcS "canEqHardFailure" (ppr ty1 $$ ppr ty2)
-       ; (s1, co1) <- flatten FM_SubstOnly ev ty1
-       ; (s2, co2) <- flatten FM_SubstOnly ev ty2
+       ; (s1, co1) <- flatten ev ty1
+       ; (s2, co2) <- flatten ev ty2
        ; new_ev <- rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
        ; continueWith (mkIrredCt InsolubleCIS new_ev) }
 
