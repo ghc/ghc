@@ -198,6 +198,46 @@ primOpRules nm = \case
    SrlOp       -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogical ]
 
    -- coercions
+
+   Int8ExtendOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   Int16ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   Int32ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   Int8NarrowOp   -> mkPrimOpRule nm 1 [ liftLit narrowInt8Lit
+                                       , subsumedByPrimOp Int8NarrowOp
+                                       , narrowSubsumesAnd AndIOp Int8NarrowOp 8 ]
+   Int16NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowInt16Lit
+                                       , subsumedByPrimOp Int8NarrowOp
+                                       , subsumedByPrimOp Int16NarrowOp
+                                       , narrowSubsumesAnd AndIOp Int16NarrowOp 16 ]
+   Int32NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowInt32Lit
+                                       , subsumedByPrimOp Int8NarrowOp
+                                       , subsumedByPrimOp Int16NarrowOp
+                                       , subsumedByPrimOp Int32NarrowOp
+                                       , narrowSubsumesAnd AndIOp Int32NarrowOp 32 ]
+
+   Word8ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
+                                       , extendNarrowPassthrough Word8NarrowOp 0xFF
+                                       ]
+   Word16ExtendOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
+                                       , extendNarrowPassthrough Word16NarrowOp 0xFFFF
+                                       ]
+   Word32ExtendOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
+                                       , extendNarrowPassthrough Word32NarrowOp 0xFFFFFFFF
+                                       ]
+   Word8NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowWord8Lit
+                                       , subsumedByPrimOp Word8NarrowOp
+                                       , narrowSubsumesAnd AndOp Word8NarrowOp 8 ]
+   Word16NarrowOp -> mkPrimOpRule nm 1 [ liftLit narrowWord16Lit
+                                       , subsumedByPrimOp Word8NarrowOp
+                                       , subsumedByPrimOp Word16NarrowOp
+                                       , narrowSubsumesAnd AndOp Word16NarrowOp 16 ]
+   Word32NarrowOp -> mkPrimOpRule nm 1 [ liftLit narrowWord32Lit
+                                       , subsumedByPrimOp Word8NarrowOp
+                                       , subsumedByPrimOp Word16NarrowOp
+                                       , subsumedByPrimOp Word32NarrowOp
+                                       , narrowSubsumesAnd AndOp Word32NarrowOp 32 ]
+
+
    WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform wordToIntLit
                                        , inversePrimOp IntToWordOp ]
    IntToWordOp    -> mkPrimOpRule nm 1 [ liftLitPlatform intToWordLit
@@ -625,8 +665,14 @@ isMinBound :: Platform -> Literal -> Bool
 isMinBound _        (LitChar c)        = c == minBound
 isMinBound platform (LitNumber nt i)   = case nt of
    LitNumInt     -> i == platformMinInt platform
+   LitNumInt8    -> i == toInteger (minBound :: Int8)
+   LitNumInt16   -> i == toInteger (minBound :: Int16)
+   LitNumInt32   -> i == toInteger (minBound :: Int32)
    LitNumInt64   -> i == toInteger (minBound :: Int64)
    LitNumWord    -> i == 0
+   LitNumWord8   -> i == 0
+   LitNumWord16  -> i == 0
+   LitNumWord32  -> i == 0
    LitNumWord64  -> i == 0
    LitNumNatural -> i == 0
    LitNumInteger -> False
@@ -636,8 +682,14 @@ isMaxBound :: Platform -> Literal -> Bool
 isMaxBound _        (LitChar c)        = c == maxBound
 isMaxBound platform (LitNumber nt i)   = case nt of
    LitNumInt     -> i == platformMaxInt platform
+   LitNumInt8    -> i == toInteger (maxBound :: Int8)
+   LitNumInt16   -> i == toInteger (maxBound :: Int16)
+   LitNumInt32   -> i == toInteger (maxBound :: Int32)
    LitNumInt64   -> i == toInteger (maxBound :: Int64)
    LitNumWord    -> i == platformMaxWord platform
+   LitNumWord8   -> i == toInteger (maxBound :: Word8)
+   LitNumWord16  -> i == toInteger (maxBound :: Word16)
+   LitNumWord32  -> i == toInteger (maxBound :: Word32)
    LitNumWord64  -> i == toInteger (maxBound :: Word64)
    LitNumNatural -> False
    LitNumInteger -> False
@@ -696,6 +748,13 @@ subsumedByPrimOp primop = do
   [e@(Var primop_id `App` _)] <- getArgs
   matchPrimOpId primop primop_id
   return e
+
+-- | Transform `extendWordN (narrowWordN x)` into `x .&. 0xFF..FF`
+extendNarrowPassthrough :: PrimOp -> Integer -> RuleM CoreExpr
+extendNarrowPassthrough narrow_primop n = do
+  [Var primop_id `App` x] <- getArgs
+  matchPrimOpId narrow_primop primop_id
+  return (Var (mkPrimOpId AndOp) `App` x `App` Lit (LitNumber LitNumWord n))
 
 -- | narrow subsumes bitwise `and` with full mask (cf #16402):
 --

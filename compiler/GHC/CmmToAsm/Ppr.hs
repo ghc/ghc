@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE CPP, MagicHash #-}
 
 -----------------------------------------------------------------------------
 --
@@ -38,8 +38,15 @@ import Data.Word
 import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import GHC.Exts
+import GHC.Exts hiding (extendWord8#)
 import GHC.Word
+
+#if MIN_VERSION_base(4,16,0)
+import GHC.Base (extendWord8#)
+#else
+extendWord8# :: Word# -> Word#
+extendWord8# w = w
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Converting floating-point literals to integrals for printing
@@ -103,7 +110,7 @@ pprASCII str
        -- we know that the Chars we create are in the ASCII range
        -- so we bypass the check in "chr"
        chr' :: Word8 -> Char
-       chr' (W8# w#) = C# (chr# (word2Int# w#))
+       chr' (W8# w#) = C# (chr# (word2Int# (extendWord8# w#)))
 
        octal :: Word8 -> String
        octal w = [ chr' (ord0 + (w `unsafeShiftR` 6) .&. 0x07)
