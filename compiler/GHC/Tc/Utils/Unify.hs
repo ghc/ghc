@@ -1501,11 +1501,12 @@ lhsPriority tv
       RuntimeUnk  -> 0
       SkolemTv {} -> 0
       MetaTv { mtv_info = info } -> case info of
-                                     FlatSkolTv   -> 1
-                                     TyVarTv      -> 2
-                                     TauTv        -> 3
-                                     FlatMetaTv   -> 4
-                                     RuntimeUnkTv -> 5
+                                     CycleBreakerTv -> 0
+                                     FlatSkolTv     -> 1
+                                     TyVarTv        -> 2
+                                     TauTv          -> 3
+                                     FlatMetaTv     -> 4
+                                     RuntimeUnkTv   -> 5
 
 {- Note [TyVar/TyVar orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

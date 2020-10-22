@@ -1,4 +1,17 @@
 
+T8227.hs:17:27: error:
+    • Couldn't match expected type: Scalar (V a)
+                  with actual type: Scalar (V (Scalar (V a)))
+                                    -> Scalar (V (Scalar (V a)))
+    • In the expression: arcLengthToParam eps eps
+      In an equation for ‘absoluteToParam’:
+          absoluteToParam eps seg = arcLengthToParam eps eps
+    • Relevant bindings include
+        seg :: a (bound at T8227.hs:17:21)
+        eps :: Scalar (V a) (bound at T8227.hs:17:17)
+        absoluteToParam :: Scalar (V a) -> a -> Scalar (V a)
+          (bound at T8227.hs:17:1)
+
 T8227.hs:17:44: error:
     • Couldn't match expected type: Scalar (V (Scalar (V a)))
                   with actual type: Scalar (V a)
