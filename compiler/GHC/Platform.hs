@@ -40,6 +40,7 @@ module GHC.Platform
    , platformSOName
    , platformHsSOName
    , platformSOExt
+   , genericPlatform
    )
 where
 
@@ -82,6 +83,21 @@ platformConstants :: Platform -> PlatformConstants
 platformConstants platform = case platform_constants platform of
   Nothing -> panic "Platform constants not available!"
   Just c  -> c
+
+genericPlatform :: Platform
+genericPlatform = Platform
+   { platformArchOS                  = ArchOS ArchX86_64 OSLinux
+   , platformWordSize                = PW8
+   , platformByteOrder               = LittleEndian
+   , platformUnregisterised          = False
+   , platformHasGnuNonexecStack      = False
+   , platformHasIdentDirective       = False
+   , platformHasSubsectionsViaSymbols= False
+   , platformIsCrossCompiling        = False
+   , platformLeadingUnderscore       = False
+   , platformTablesNextToCode        = True
+   , platform_constants               = Nothing
+   }
 
 data PlatformWordSize
   = PW4 -- ^ A 32-bit platform
@@ -222,7 +238,6 @@ data BmiVersion
    = BMI1
    | BMI2
    deriving (Eq, Ord)
-
 
 -- | Platform-specific settings formerly hard-coded in Config.hs.
 --
