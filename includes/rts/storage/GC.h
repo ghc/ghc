@@ -230,6 +230,10 @@ void revertCAFs (void);
 // (preferably use RtsConfig.keep_cafs instead)
 void setKeepCAFs (void);
 
+// Let the runtime know that all the CAFs in high mem are not
+// to be retained. Useful in conjunction with loadNativeObj
+void setHighMemDynamic (void);
+
 /* -----------------------------------------------------------------------------
    This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
    MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
