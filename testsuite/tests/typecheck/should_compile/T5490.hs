@@ -8,8 +8,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE QuantifiedConstraints #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module Bug (await, bug) where
 
@@ -18,7 +16,7 @@ import Data.Functor
 import Control.Exception
 
 data Attempt α = Success α
-               | ∀ e . Exception e ⇒ Failure e
+               | ∀ e . Exception e ⇒ Failure e 
 
 fromAttempt ∷ Attempt α → IO α
 fromAttempt (Success a) = return a
@@ -138,7 +136,7 @@ instance IsPeano PZero where
   peano = PZero
 
 instance IsPeano p ⇒ IsPeano (PSucc p) where
-  peano = PSucc peano
+  peano = PSucc peano 
 
 class (n ~ PSucc (PPred n)) ⇒ PHasPred n where
   type PPred n
@@ -194,9 +192,7 @@ hListInst ∷ HList l → HListInst l
 hListInst HNil     = HListInst
 hListInst (_ :* _) = HListInst
 
-class ( forall h t. (h ~ HHead l, t ~ HTail l) => l ~ (h :* t)
-      , HListClass (HTail l)
-      ) ⇒ HNonEmpty l where
+class (l ~ (HHead l :* HTail l), HListClass (HTail l)) ⇒ HNonEmpty l where
   type HHead l
   type HTail l
 
@@ -301,3 +297,4 @@ hGetIfNth _        _                  = Nothing
 
 elem0 ∷ HNonEmpty l ⇒ HElemOf l → Maybe (HHead l)
 elem0 = hGetIfNth PZero
+
