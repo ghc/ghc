@@ -308,56 +308,6 @@ of the rhs. This is necessary because these constraints are used for substitutio
 during solving. If the kinds differed, then the substitution would take a well-kinded
 type to an ill-kinded one.
 
-Note [Almost function-free]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A type is *almost function-free* if it has no type functions (something that
-responds True to isTypeFamilyTyCon), except (possibly)
- * under a forall, or
- * in a coercion (either in a CastTy or a CercionTy)
-
-The RHS of a CTyEqCan must be almost function-free, invariant (TyEq:AFF).
-This is for two reasons:
-
-1. There cannot be a top-level function. If there were, the equality should
-   really be a CFunEqCan, not a CTyEqCan.
-
-2. Nested functions aren't too bad, on the other hand. However, consider this
-   scenario:
-
-     type family F a = r | r -> a
-
-     [D] F ty1 ~ fsk1
-     [D] F ty2 ~ fsk2
-     [D] fsk1 ~ [G Int]
-     [D] fsk2 ~ [G Bool]
-
-     type instance G Int = Char
-     type instance G Bool = Char
-
-   If it was the case that fsk1 = fsk2, then we could unifty ty1 and ty2 --
-   good! They don't look equal -- but if we aggressively reduce that G Int and
-   G Bool they would become equal. The "almost function free" makes sure that
-   these redexes are exposed.
-
-   Note that this equality does *not* depend on casts or coercions, and so
-   skipping these forms is OK. In addition, the result of a type family cannot
-   be a polytype, so skipping foralls is OK, too. We skip foralls because we
-   want the output of the flattener to be almost function-free. See Note
-   [Flattening under a forall] in GHC.Tc.Solver.Flatten.
-
-   As I (Richard E) write this, it is unclear if the scenario pictured above
-   can happen -- I would expect the G Int and G Bool to be reduced. But
-   perhaps it can arise somehow, and maintaining almost function-free is cheap.
-
-Historical note: CTyEqCans used to require only condition (1) above: that no
-type family was at the top of an RHS. But work on #16512 suggested that the
-injectivity checks were not complete, and adding the requirement that functions
-do not appear even in a nested fashion was easy (it was already true, but
-unenforced).
-
-The almost-function-free property is checked by isAlmostFunctionFree in GHC.Tc.Utils.TcType.
-The flattener (in GHC.Tc.Solver.Flatten) produces types that are almost function-free.
-
 Note [Holes]
 ~~~~~~~~~~~~
 This Note explains how GHC tracks *holes*.

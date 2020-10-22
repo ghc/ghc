@@ -25,7 +25,7 @@ module GHC.Tc.Utils.TcMType (
   newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
   newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
   newAnonMetaTyVar, cloneMetaTyVar,
-  newFmvTyVar, newFskTyVar, newCycleBreakerTyVar,
+  newCycleBreakerTyVar,
 
   newMultiplicityVar,
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
@@ -806,8 +806,6 @@ metaInfoToTyVarName :: MetaInfo -> FastString
 metaInfoToTyVarName  meta_info =
   case meta_info of
        TauTv          -> fsLit "t"
-       FlatMetaTv     -> fsLit "fmv"
-       FlatSkolTv     -> fsLit "fsk"
        TyVarTv        -> fsLit "a"
        RuntimeUnkTv   -> fsLit "r"
        CycleBreakerTv -> fsLit "b"
@@ -883,20 +881,6 @@ newCycleBreakerTyVar old_tv
   = do { details <- newMetaDetails CycleBreakerTv
        ; name <- cloneMetaTyVarName (tyVarName old_tv)
        ; return (mkTcTyVar name (tyVarKind old_tv) details) }
-
-newFskTyVar :: TcType -> TcM TcTyVar
-newFskTyVar fam_ty
-  = do { details <- newMetaDetails FlatSkolTv
-       ; name <- newMetaTyVarName (fsLit "fsk")
-       ; return (mkTcTyVar name (tcTypeKind fam_ty) details) }
-
-newFmvTyVar :: TcType -> TcM TcTyVar
--- Very like newMetaTyVar, except sets mtv_tclvl to one less
--- so that the fmv is untouchable.
-newFmvTyVar fam_ty
-  = do { details <- newMetaDetails FlatMetaTv
-       ; name <- newMetaTyVarName (fsLit "s")
-       ; return (mkTcTyVar name (tcTypeKind fam_ty) details) }
 
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info
