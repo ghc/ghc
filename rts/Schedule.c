@@ -654,9 +654,14 @@ shouldYieldCapability (Capability *cap, Task *task, bool didGcLast)
     // Capability keeps forcing a GC and the other Capabilities make no
     // progress at all.
 
+    // Note [Data race in shouldYieldCapability]
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // We would usually need to hold cap->lock to look at n_returning_tasks but
-    // we don't here since this is just an approximate predicate.
-    TSAN_ANNOTATE_BENIGN_RACE(&cap->n_returning_tasks, "shouldYieldCapability");
+    // we don't here since this is just an approximate predicate. We
+    // consequently need to use atomic accesses whenever touching
+    // n_returning_tasks. However, since this is an approximate predicate we can
+    // use a RELAXED ordering.
+
     return ((RELAXED_LOAD(&pending_sync) && !didGcLast) ||
             RELAXED_LOAD(&cap->n_returning_tasks) != 0 ||
             (!emptyRunQueue(cap) && (task->incall->tso == NULL
