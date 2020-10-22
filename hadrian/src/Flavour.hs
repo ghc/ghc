@@ -124,4 +124,5 @@ enableThreadSanitizer = addArgs $ mconcat
     , builder (Ghc LinkHs) ? arg "-optl-fsanitize=thread"
     , builder (Cc  CompileC) ? arg "-fsanitize=thread"
     , builder (Cabal Flags) ? arg "thread-sanitizer"
+    , builder  RunTest ? arg "--config=have_thread_sanitizer=True"
     ]
