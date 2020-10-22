@@ -1,7 +1,7 @@
 
 T4179.hs:26:16: error:
-    • Couldn't match type: A3 (FCon x)
-                     with: A3 (x (A2 (FCon x) -> A3 (FCon x)))
+    • Couldn't match type: A3 (x (A2 (FCon x) -> A3 (FCon x)))
+                     with: A3 (FCon x)
       Expected: x (A2 (FCon x) -> A3 (FCon x))
                 -> A2 (FCon x) -> A3 (FCon x)
         Actual: x (A2 (FCon x) -> A3 (FCon x))

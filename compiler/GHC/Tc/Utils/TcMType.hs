@@ -24,7 +24,7 @@ module GHC.Tc.Utils.TcMType (
   newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
   newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
   newAnonMetaTyVar, cloneMetaTyVar,
-  newFmvTyVar, newFskTyVar,
+  newFmvTyVar, newFskTyVar, newCycleBreakerTyVar,
 
   newMultiplicityVar,
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
@@ -804,11 +804,12 @@ influences the way it is tidied; see TypeRep.tidyTyVarBndr.
 metaInfoToTyVarName :: MetaInfo -> FastString
 metaInfoToTyVarName  meta_info =
   case meta_info of
-       TauTv        -> fsLit "t"
-       FlatMetaTv   -> fsLit "fmv"
-       FlatSkolTv   -> fsLit "fsk"
-       TyVarTv      -> fsLit "a"
-       RuntimeUnkTv -> fsLit "r"
+       TauTv          -> fsLit "t"
+       FlatMetaTv     -> fsLit "fmv"
+       FlatSkolTv     -> fsLit "fsk"
+       TyVarTv        -> fsLit "a"
+       RuntimeUnkTv   -> fsLit "r"
+       CycleBreakerTv -> fsLit "b"
 
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 newAnonMetaTyVar mi = newNamedAnonMetaTyVar (metaInfoToTyVarName mi) mi
@@ -873,6 +874,14 @@ cloneAnonMetaTyVar info tv kind
         ; let tyvar = mkTcTyVar name kind details
         ; traceTc "cloneAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar))
         ; return tyvar }
+
+-- Make a new CycleBreakerTv. See Note [Type variable cycles in Givens]
+-- in GHC.Tc.Solver.Canonical.
+newCycleBreakerTyVar :: TyVar -> TcM TcTyVar
+newCycleBreakerTyVar old_tv
+  = do { details <- newMetaDetails CycleBreakerTv
+       ; name <- cloneMetaTyVarName (tyVarName old_tv)
+       ; return (mkTcTyVar name (tyVarKind old_tv) details) }
 
 newFskTyVar :: TcType -> TcM TcTyVar
 newFskTyVar fam_ty
