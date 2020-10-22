@@ -1496,14 +1496,14 @@ lhsPriority tv
       SkolemTv {} -> 0
       MetaTv { mtv_info = info } -> case info of
                                      CycleBreakerTv -> 0
-                                     FlatSkolTv     -> 1
-                                     TyVarTv        -> 2
-                                     TauTv          -> 3
-                                     FlatMetaTv     -> 4
-                                     RuntimeUnkTv   -> 5
+                                     TyVarTv        -> 1
+                                     TauTv          -> 2
+                                     RuntimeUnkTv   -> 3
 
 {- Note [TyVar/TyVar orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"RAE": Update
+
 Given (a ~ b), should we orient the CEqCan as (a~b) or (b~a)?
 This is a surprisingly tricky question! This is invariant (TyEq:TV).
 
@@ -1529,12 +1529,6 @@ So we look for a positive reason to swap, using a three-step test:
         looks for meta tyvars on the left
 
   Tie-breaking rules for MetaTvs:
-  - FlatMetaTv = 4: always put on the left.
-        See Note [Fmv Orientation Invariant]
-
-        NB: FlatMetaTvs always have the current level, never an
-        outer one.  So nothing can be deeper than a FlatMetaTv.
-
   - TauTv = 3: if we have  tyv_tv ~ tau_tv,
        put tau_tv on the left because there are fewer
        restrictions on updating TauTvs.  Or to say it another
@@ -1542,9 +1536,6 @@ So we look for a positive reason to swap, using a three-step test:
 
   - TyVarTv = 2: remember, flat-skols are *only* updated by
        the unflattener, never unified, so TyVarTvs come next
-
-  - FlatSkolTv = 1: put on the left in preference to a SkolemTv.
-       See Note [Eliminate flat-skols]
 
 * Names. If the level and priority comparisons are all
   equal, try to eliminate a TyVars with a System Name in
@@ -1639,24 +1630,6 @@ left, giving
       [WD] fmv ~ alpha, [WD] F alpha ~ fmv, [WD] alpha ~ a
 
     Now we get alpha:=a, and everything works out
-
-Note [Eliminate flat-skols]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have  [G] Num (F [a])
-then we flatten to
-     [G] Num fsk
-     [G] F [a] ~ fsk
-where fsk is a flatten-skolem (FlatSkolTv). Suppose we have
-      type instance F [a] = a
-then we'll reduce the second constraint to
-     [G] a ~ fsk
-and then replace all uses of 'a' with fsk.  That's bad because
-in error messages instead of saying 'a' we'll say (F [a]).  In all
-places, including those where the programmer wrote 'a' in the first
-place.  Very confusing!  See #7862.
-
-Solution: re-orient a~fsk to fsk~a, so that we preferentially eliminate
-the fsk.
 
 Note [Avoid unnecessary swaps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
