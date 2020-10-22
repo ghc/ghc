@@ -408,6 +408,14 @@ primop Int16LtOp "ltInt16#" Compare Int16# -> Int16# -> Int#
 primop Int16NeOp "neInt16#" Compare Int16# -> Int16# -> Int#
 
 ------------------------------------------------------------------------
+section "Int32#"
+        {Operations on 32-bit integers.}
+------------------------------------------------------------------------
+
+primop Int32Extend "extendInt32#" GenPrimOp Int32# -> Int#
+primop Int32Narrow "narrowInt32#" GenPrimOp Int# -> Int32#
+
+------------------------------------------------------------------------
 section "Word16#"
         {Operations on 16-bit unsigned integers.}
 ------------------------------------------------------------------------
