@@ -1534,8 +1534,7 @@ So we look for a positive reason to swap, using a three-step test:
        restrictions on updating TauTvs.  Or to say it another
        way, then we won't lose the TyVarTv flag
 
-  - TyVarTv = 2: remember, flat-skols are *only* updated by
-       the unflattener, never unified, so TyVarTvs come next
+  - TyVarTv = 2: TyVarTvs come next
 
 * Names. If the level and priority comparisons are all
   equal, try to eliminate a TyVars with a System Name in
