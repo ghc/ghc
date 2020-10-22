@@ -14,7 +14,7 @@
 
 module GHC.Cmm.Utils(
         -- CmmType
-        primRepCmmType, slotCmmType, slotForeignHint,
+        primRepCmmType, slotCmmType,
         typeCmmType, typeForeignHint, primRepForeignHint,
 
         -- CmmLit

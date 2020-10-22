@@ -58,6 +58,7 @@ Library
     Exposed: False
 
     Build-Depends: base       >= 4.11 && < 4.17,
+                   ghc-prim   >= 0.5.0 && < 0.9,
                    deepseq    >= 1.4 && < 1.5,
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
@@ -205,6 +206,13 @@ Library
         GHC.Cmm.Switch.Implement
         GHC.CmmToAsm
         GHC.Cmm.LRegSet
+        GHC.CmmToAsm.AArch64
+        GHC.CmmToAsm.AArch64.CodeGen
+        GHC.CmmToAsm.AArch64.Cond
+        GHC.CmmToAsm.AArch64.Instr
+        GHC.CmmToAsm.AArch64.Ppr
+        GHC.CmmToAsm.AArch64.RegInfo
+        GHC.CmmToAsm.AArch64.Regs
         GHC.CmmToAsm.BlockLayout
         GHC.CmmToAsm.CFG
         GHC.CmmToAsm.CFG.Dominators
@@ -236,6 +244,7 @@ Library
         GHC.CmmToAsm.Reg.Graph.TrivColorable
         GHC.CmmToAsm.Reg.Graph.X86
         GHC.CmmToAsm.Reg.Linear
+        GHC.CmmToAsm.Reg.Linear.AArch64
         GHC.CmmToAsm.Reg.Linear.Base
         GHC.CmmToAsm.Reg.Linear.FreeRegs
         GHC.CmmToAsm.Reg.Linear.JoinToTargets
