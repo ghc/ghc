@@ -27,13 +27,13 @@ instance Pext Word where
   pext (W#   src#) (W#   mask#) = W#   (pext#   src# mask#)
 
 instance Pext Word8 where
-  pext (W8#  src#) (W8#  mask#) = W8#  (pext8#  src# mask#)
+  pext (W8#  src#) (W8#  mask#) = W8#  (narrowWord8# (pext8#  (extendWord8# src#) (extendWord8# mask#)))
 
 instance Pext Word16 where
-  pext (W16# src#) (W16# mask#) = W16# (pext16# src# mask#)
+  pext (W16# src#) (W16# mask#) = W16# (narrowWord16# (pext16# (extendWord16# src#) (extendWord16# mask#)))
 
 instance Pext Word32 where
-  pext (W32# src#) (W32# mask#) = W32# (pext32# src# mask#)
+  pext (W32# src#) (W32# mask#) = W32# (narrowWord32# (pext32# (extendWord32# src#) (extendWord32# mask#)))
 
 instance Pext Word64 where
   pext (W64# src#) (W64# mask#) = W64# (pext64# src# mask#)
