@@ -6,6 +6,10 @@
 #include "stg/Types.h"
 #include "CloneStack.h"
 
+#if defined(DEBUG)
+#include "sm/Sanity.h"
+#endif
+
 #if defined(THREADED_RTS)
 
 // ThreadId# in Haskell is a StgTSO* in RTS.
