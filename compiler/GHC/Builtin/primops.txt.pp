@@ -291,8 +291,8 @@ section "Int8#"
 
 primtype Int8#
 
-primop Int8Extend "extendInt8#" GenPrimOp Int8# -> Int#
-primop Int8Narrow "narrowInt8#" GenPrimOp Int# -> Int8#
+primop Int8ExtendOp "extendInt8#" GenPrimOp Int8# -> Int#
+primop Int8NarrowOp "narrowInt8#" GenPrimOp Int# -> Int8#
 
 primop Int8NegOp "negateInt8#" GenPrimOp Int8# -> Int8#
 
@@ -332,8 +332,8 @@ section "Word8#"
 
 primtype Word8#
 
-primop Word8Extend "extendWord8#" GenPrimOp Word8# -> Word#
-primop Word8Narrow "narrowWord8#" GenPrimOp Word# -> Word8#
+primop Word8ExtendOp "extendWord8#" GenPrimOp Word8# -> Word#
+primop Word8NarrowOp "narrowWord8#" GenPrimOp Word# -> Word8#
 
 primop Word8NotOp "notWord8#" GenPrimOp Word8# -> Word8#
 
@@ -373,8 +373,8 @@ section "Int16#"
 
 primtype Int16#
 
-primop Int16Extend "extendInt16#" GenPrimOp Int16# -> Int#
-primop Int16Narrow "narrowInt16#" GenPrimOp Int# -> Int16#
+primop Int16ExtendOp "extendInt16#" GenPrimOp Int16# -> Int#
+primop Int16NarrowOp "narrowInt16#" GenPrimOp Int# -> Int16#
 
 primop Int16NegOp "negateInt16#" GenPrimOp Int16# -> Int16#
 
@@ -414,8 +414,8 @@ section "Word16#"
 
 primtype Word16#
 
-primop Word16Extend "extendWord16#" GenPrimOp Word16# -> Word#
-primop Word16Narrow "narrowWord16#" GenPrimOp Word# -> Word16#
+primop Word16ExtendOp "extendWord16#" GenPrimOp Word16# -> Word#
+primop Word16NarrowOp "narrowWord16#" GenPrimOp Word# -> Word16#
 
 primop Word16NotOp "notWord16#" GenPrimOp Word16# -> Word16#
 
@@ -447,6 +447,26 @@ primop Word16GtOp "gtWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> Int#
+
+------------------------------------------------------------------------
+section "Int32#"
+        {Operations on 32-bit integers.}
+------------------------------------------------------------------------
+
+primtype Int32#
+
+primop Int32ExtendOp "extendInt32#" GenPrimOp Int32# -> Int#
+primop Int32NarrowOp "narrowInt32#" GenPrimOp Int# -> Int32#
+
+------------------------------------------------------------------------
+section "Word32#"
+        {Operations on 32-bit unsigned integers.}
+------------------------------------------------------------------------
+
+primtype Word32#
+
+primop Word32ExtendOp "extendWord32#" GenPrimOp Word32# -> Word#
+primop Word32NarrowOp "narrowWord32#" GenPrimOp Word# -> Word32#
 
 #if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------

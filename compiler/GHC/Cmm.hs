@@ -228,6 +228,12 @@ data CmmStatic
   | CmmFileEmbed FilePath
         -- ^ an embedded binary file
 
+instance Outputable CmmStatic where
+  ppr (CmmStaticLit lit) = text "CmmStaticLit" <+> ppr lit
+  ppr (CmmUninitialised n) = text "CmmUninitialised" <+> ppr n
+  ppr (CmmString _) = text "CmmString"
+  ppr (CmmFileEmbed fp) = text "CmmFileEmbed" <+> text fp
+
 -- Static data before SRT generation
 data GenCmmStatics (rawOnly :: Bool) where
     CmmStatics

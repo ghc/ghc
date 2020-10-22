@@ -55,7 +55,7 @@ module GHC.Builtin.Types (
         wordTyCon, wordDataCon, wordTyConName, wordTy,
 
         -- * Word8
-        word8TyCon, word8DataCon, word8TyConName, word8Ty,
+        word8TyCon, word8DataCon, word8Ty,
 
         -- * List
         listTyCon, listTyCon_RDR, listTyConName, listTyConKey,
@@ -251,7 +251,6 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , floatTyCon
                 , intTyCon
                 , wordTyCon
-                , word8TyCon
                 , listTyCon
                 , orderingTyCon
                 , maybeTyCon
@@ -354,10 +353,9 @@ nothingDataConName = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Nothing")
 justDataConName    = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Just")
                                           justDataConKey justDataCon
 
-wordTyConName, wordDataConName, word8TyConName, word8DataConName :: Name
+wordTyConName, wordDataConName, word8DataConName :: Name
 wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
 wordDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "W#")     wordDataConKey   wordDataCon
-word8TyConName     = mkWiredInTyConName   UserSyntax gHC_WORD  (fsLit "Word8")  word8TyConKey    word8TyCon
 word8DataConName   = mkWiredInDataConName UserSyntax gHC_WORD  (fsLit "W8#")    word8DataConKey  word8DataCon
 
 floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
@@ -1641,7 +1639,7 @@ word8TyCon = pcTyCon word8TyConName
                             (NoSourceText, fsLit "HsWord8"))) []
                      [word8DataCon]
 word8DataCon :: DataCon
-word8DataCon = pcDataCon word8DataConName [] [wordPrimTy] word8TyCon
+word8DataCon = pcDataCon word8DataConName [] [word8PrimTy] word8TyCon
 
 floatTy :: Type
 floatTy = mkTyConTy floatTyCon

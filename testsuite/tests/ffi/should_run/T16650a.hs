@@ -44,4 +44,4 @@ luckySingleton = IO $ \s0 -> case newByteArray# 1# s0 of
 readByteArray :: MutableByteArray -> Int -> IO Word8
 readByteArray (MutableByteArray b#) (I# i#) = IO $ \s0 ->
   case readWord8Array# b# i# s0 of
-    (# s1, w #) -> (# s1, W8# w #)
+    (# s1, w #) -> (# s1, W8# (narrowWord8# w) #)
