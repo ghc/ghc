@@ -33,13 +33,13 @@ newByteArray :: Word# -> IO MBA
 newByteArray sz = IO $ \s -> case newPinnedByteArray# (word2Int# sz) s of (# s, arr #) -> (# s, MBA arr #)
 
 indexByteArray :: ByteArray# -> Word# -> Word8
-indexByteArray a# n# = W8# (indexWord8Array# a# (word2Int# n#))
+indexByteArray a# n# = W8# (narrowWord8# (indexWord8Array# a# (word2Int# n#)))
 
 -- indexMutableByteArray :: MutableByteArray# RealWorld -> Word# -> IO Word8
 -- indexMutableByteArray a# n# = IO $ \s -> case readWord8Array# a# (word2Int# n#) s of (# s', v #) -> (# s', W# v #)
 
 writeByteArray :: MutableByteArray# RealWorld -> Int# -> Word8 -> IO ()
-writeByteArray arr i (W8# w) = IO $ \s -> case writeWord8Array# arr i w s of s -> (# s, () #)
+writeByteArray arr i (W8# w) = IO $ \s -> case writeWord8Array# arr i (extendWord8# w) s of s -> (# s, () #)
 
 lengthByteArray :: ByteArray# -> Word
 lengthByteArray ba = W# (int2Word# (sizeofByteArray# ba))
