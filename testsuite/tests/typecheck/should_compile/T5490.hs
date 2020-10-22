@@ -8,8 +8,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE QuantifiedConstraints #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module Bug (await, bug) where
 
@@ -194,9 +192,7 @@ hListInst ∷ HList l → HListInst l
 hListInst HNil     = HListInst
 hListInst (_ :* _) = HListInst
 
-class ( forall h t. (h ~ HHead l, t ~ HTail l) => l ~ (h :* t)
-      , HListClass (HTail l)
-      ) ⇒ HNonEmpty l where
+class (l ~ (HHead l :* HTail l), HListClass (HTail l)) ⇒ HNonEmpty l where
   type HHead l
   type HTail l
 
