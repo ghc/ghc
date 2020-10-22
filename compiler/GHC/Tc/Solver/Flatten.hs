@@ -5,7 +5,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Tc.Solver.Flatten(
-   FlattenMode(..),
    flatten, flattenKind, flattenArgsNom,
    flattenType
  ) where
@@ -47,32 +46,10 @@ import Control.Arrow ( first )
 -}
 
 data FlattenEnv
-  = FE { fe_mode    :: !FlattenMode
-       , fe_loc     :: !CtLoc             -- See Note [Flattener CtLoc]
+  = FE { fe_loc     :: !CtLoc             -- See Note [Flattener CtLoc]
        , fe_flavour :: !CtFlavour
        , fe_eq_rel  :: !EqRel             -- See Note [Flattener EqRels]
        }
-
-data FlattenMode  -- Postcondition for all three: inert wrt the type substitution
-  = FM_FlattenAll          -- Postcondition: function-free
-  | FM_SubstOnly           -- See Note [Flattening under a forall]
-
---  | FM_Avoid TcTyVar Bool  -- See Note [Lazy flattening]
---                           -- Postcondition:
---                           --  * tyvar is only mentioned in result under a rigid path
---                           --    e.g.   [a] is ok, but F a won't happen
---                           --  * If flat_top is True, top level is not a function application
---                           --   (but under type constructors is ok e.g. [F a])
-
-instance Outputable FlattenMode where
-  ppr FM_FlattenAll = text "FM_FlattenAll"
-  ppr FM_SubstOnly  = text "FM_SubstOnly"
-
-eqFlattenMode :: FlattenMode -> FlattenMode -> Bool
-eqFlattenMode FM_FlattenAll FM_FlattenAll = True
-eqFlattenMode FM_SubstOnly  FM_SubstOnly  = True
---  FM_Avoid tv1 b1 `eq` FM_Avoid tv2 b2 = tv1 == tv2 && b1 == b2
-eqFlattenMode _  _ = False
 
 -- | The 'FlatM' monad is a wrapper around 'TcS' with a 'FlattenEnv'
 newtype FlatM a
@@ -97,17 +74,16 @@ liftTcS thing_inside
 
 -- convenient wrapper when you have a CtEvidence describing
 -- the flattening operation
-runFlattenCtEv :: FlattenMode -> CtEvidence -> FlatM a -> TcS a
-runFlattenCtEv mode ev
-  = runFlatten mode (ctEvLoc ev) (ctEvFlavour ev) (ctEvEqRel ev)
+runFlattenCtEv :: CtEvidence -> FlatM a -> TcS a
+runFlattenCtEv ev
+  = runFlatten (ctEvLoc ev) (ctEvFlavour ev) (ctEvEqRel ev)
 
 -- Run thing_inside (which does the flattening)
-runFlatten :: FlattenMode -> CtLoc -> CtFlavour -> EqRel -> FlatM a -> TcS a
-runFlatten mode loc flav eq_rel thing_inside
+runFlatten :: CtLoc -> CtFlavour -> EqRel -> FlatM a -> TcS a
+runFlatten loc flav eq_rel thing_inside
   = runFlatM thing_inside fmode
   where
-    fmode = FE { fe_mode = mode
-               , fe_loc  = bumpCtLocDepth loc
+    fmode = FE { fe_loc  = bumpCtLocDepth loc
                            -- See Note [Flatten when discharging CFunEqCan]
                , fe_flavour = flav
                , fe_eq_rel = eq_rel }
@@ -135,9 +111,6 @@ getFlavourRole
        ; eq_rel <- getEqRel
        ; return (flavour, eq_rel) }
 
-getMode :: FlatM FlattenMode
-getMode = getFlatEnvField fe_mode
-
 getLoc :: FlatM CtLoc
 getLoc = getFlatEnvField fe_loc
 
@@ -153,14 +126,6 @@ setEqRel new_eq_rel thing_inside
     if new_eq_rel == fe_eq_rel env
     then runFlatM thing_inside env
     else runFlatM thing_inside (env { fe_eq_rel = new_eq_rel })
-
--- | Change the 'FlattenMode' in a 'FlattenEnv'.
-setMode :: FlattenMode -> FlatM a -> FlatM a
-setMode new_mode thing_inside
-  = FlatM $ \env ->
-    if new_mode `eqFlattenMode` fe_mode env
-    then runFlatM thing_inside env
-    else runFlatM thing_inside (env { fe_mode = new_mode })
 
 -- | Make sure that flattening actually produces a coercion (in other
 -- words, make sure our flavour is not Derived)
@@ -212,32 +177,6 @@ will be essentially impossible. So, the official recommendation if a
 stack limit is hit is to disable the check entirely. Otherwise, there
 will be baffling, unpredictable errors.
 
-Note [Lazy flattening]
-~~~~~~~~~~~~~~~~~~~~~~
-The idea of FM_Avoid mode is to flatten less aggressively.  If we have
-       a ~ [F Int]
-there seems to be no great merit in lifting out (F Int).  But if it was
-       a ~ [G a Int]
-then we *do* want to lift it out, in case (G a Int) reduces to Bool, say,
-which gets rid of the occurs-check problem.  (For the flat_top Bool, see
-comments above and at call sites.)
-
-HOWEVER, the lazy flattening actually seems to make type inference go
-*slower*, not faster.  perf/compiler/T3064 is a case in point; it gets
-*dramatically* worse with FM_Avoid.  I think it may be because
-floating the types out means we normalise them, and that often makes
-them smaller and perhaps allows more re-use of previously solved
-goals.  But to be honest I'm not absolutely certain, so I am leaving
-FM_Avoid in the code base.  What I'm removing is the unique place
-where it is *used*, namely in GHC.Tc.Solver.Canonical.canEqTyVar.
-
-See also Note [Conservative unification check] in GHC.Tc.Utils.Unify, which gives
-other examples where lazy flattening caused problems.
-
-Bottom line: FM_Avoid is unused for now (Nov 14).
-Note: T5321Fun got faster when I disabled FM_Avoid
-      T5837 did too, but it's pathological anyway
-
 Note [Phantoms in the flattener]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
@@ -275,11 +214,11 @@ changes the flavour from Derived just for this purpose.
 -- | See Note [Flattening].
 -- If (xi, co) <- flatten mode ev ty, then co :: xi ~r ty
 -- where r is the role in @ev@.
-flatten :: FlattenMode -> CtEvidence -> TcType
+flatten :: CtEvidence -> TcType
         -> TcS (Xi, TcCoercion)
-flatten mode ev ty
-  = do { traceTcS "flatten {" (ppr mode <+> ppr ty)
-       ; (ty', co) <- runFlattenCtEv mode ev (flatten_one ty)
+flatten ev ty
+  = do { traceTcS "flatten {" (ppr ty)
+       ; (ty', co) <- runFlattenCtEv ev (flatten_one ty)
        ; traceTcS "flatten }" (ppr ty')
        ; return (ty', co) }
 
@@ -292,7 +231,7 @@ flattenKind loc flav ty
        ; let flav' = case flav of
                        Derived -> Wanted WDeriv  -- the WDeriv/WOnly choice matters not
                        _       -> flav
-       ; (ty', co) <- runFlatten FM_FlattenAll loc flav' NomEq (flatten_one ty)
+       ; (ty', co) <- runFlatten loc flav' NomEq (flatten_one ty)
        ; traceTcS "flattenKind }" (ppr ty' $$ ppr co) -- co is never a panic
        ; return (ty', co) }
 
@@ -311,7 +250,7 @@ flattenArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion], Tc
 flattenArgsNom ev tc tys
   = do { traceTcS "flatten_args {" (vcat (map ppr tys))
        ; (tys', cos, kind_co)
-           <- runFlattenCtEv FM_FlattenAll ev (flatten_args_tc tc (repeat Nominal) tys)
+           <- runFlattenCtEv ev (flatten_args_tc tc (repeat Nominal) tys)
        ; traceTcS "flatten }" (vcat (map ppr tys'))
        ; return (tys', cos, kind_co) }
 
@@ -321,8 +260,7 @@ flattenArgsNom ev tc tys
 -- only givens.
 flattenType :: CtLoc -> TcType -> TcS TcType
 flattenType loc ty
-          -- More info about FM_SubstOnly in Note [Holes] in GHC.Tc.Types.Constraint
-  = do { (xi, _) <- runFlatten FM_SubstOnly loc Given NomEq $
+  = do { (xi, _) <- runFlatten loc Given NomEq $
                     flatten_one ty
                      -- use Given flavor so that it is rewritten
                      -- only w.r.t. Givens, never Wanteds/Deriveds
@@ -651,11 +589,6 @@ flatten_one ty@(TyConApp tc tys)
   --     * data family application
   -- we just recursively flatten the arguments.
   | otherwise
--- FM_Avoid stuff commented out; see Note [Lazy flattening]
---  , let fmode' = case fmode of  -- Switch off the flat_top bit in FM_Avoid
---                   FE { fe_mode = FM_Avoid tv _ }
---                     -> fmode { fe_mode = FM_Avoid tv False }
---                   _ -> fmode
   = flatten_ty_con_app tc tys
 
 flatten_one ty@(FunTy { ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
@@ -675,9 +608,7 @@ flatten_one ty@(ForAllTy {})
 -- applications inside the forall involve the bound type variables.
   = do { let (bndrs, rho) = tcSplitForAllVarBndrs ty
              tvs           = binderVars bndrs
-       ; (rho', co) <- setMode FM_SubstOnly $ flatten_one rho
-                         -- Substitute only under a forall
-                         -- See Note [Flattening under a forall]
+       ; (rho', co) <- flatten_one rho
        ; return (mkForAllTys bndrs rho', mkHomoForAllCos tvs co) }
 
 flatten_one (CastTy ty g)
@@ -825,23 +756,6 @@ types, as any forgetful synonyms are already expanded.
 We also, of course, must expand type synonyms that mention type families,
 so those families can get reduced.
 
-Note [Flattening under a forall]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Under a forall, we
-  (a) MUST apply the inert substitution
-  (b) MUST NOT flatten type family applications
-Hence FMSubstOnly.
-
-For (a) consider   c ~ a, a ~ T (forall b. (b, [c]))
-If we don't apply the c~a substitution to the second constraint
-we won't see the occurs-check error.
-
-For (b) consider  (a ~ forall b. F a b), we don't want to flatten
-to     (a ~ forall b.fsk, F a b ~ fsk)
-because now the 'b' has escaped its scope.  We'd have to flatten to
-       (a ~ forall b. fsk b, forall b. F a b ~ fsk b)
-and we have not begun to think about how to make that work!
-
 ************************************************************************
 *                                                                      *
              Flattening a type-family application
@@ -858,11 +772,6 @@ flatten_fam_app tc tys  -- Can be over-saturated
     = ASSERT2( tys `lengthAtLeast` tyConArity tc
              , ppr tc $$ ppr (tyConArity tc) $$ ppr tys)
 
-      do { mode <- getMode
-         ; case mode of
-             { FM_SubstOnly  -> flatten_ty_con_app tc tys
-             ; FM_FlattenAll ->
-
                  -- Type functions are saturated
                  -- The type function might be *over* saturated
                  -- in which case the remaining arguments should
@@ -871,7 +780,7 @@ flatten_fam_app tc tys  -- Can be over-saturated
          ; (xi1, co1) <- flatten_exact_fam_app_fully tc tys1
                -- co1 :: xi1 ~ F tys1
 
-         ; flatten_app_ty_args xi1 co1 tys_rest } } }
+         ; flatten_app_ty_args xi1 co1 tys_rest }
 
 -- the [TcType] exactly saturate the TyCon
 -- See note [flatten_exact_fam_app_fully performance]
@@ -1127,7 +1036,6 @@ flatten_tyvar2 :: TcTyVar -> CtFlavourRole -> FlatM FlattenTvResult
 
 flatten_tyvar2 tv fr@(_, eq_rel)
   = do { ieqs <- liftTcS $ getInertEqs
-       ; mode <- getMode
        ; case lookupDVarEnv ieqs tv of
            Just (ct:_)   -- If the first doesn't work,
                          -- the subsequent ones won't either
@@ -1136,8 +1044,7 @@ flatten_tyvar2 tv fr@(_, eq_rel)
              , let ct_fr = (ctEvFlavour ctev, ct_eq_rel)
              , ct_fr `eqCanRewriteFR` fr  -- This is THE key call of eqCanRewriteFR
              -> do { traceFlat "Following inert tyvar"
-                        (ppr mode <+>
-                         ppr tv <+>
+                        (ppr tv <+>
                          equals <+>
                          ppr rhs_ty $$ ppr ctev)
                     ; let rewrite_co1 = mkSymCo (ctEvCoercion ctev)
