@@ -580,9 +580,10 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
        ; checkTc (isOpenTypeFamilyTyCon fam_tc) (notOpenFamily fam_tc)
 
          -- (1) do the work of verifying the synonym group
+         -- For some reason we don't have a location for the equation
+         -- itself, so we make do with the location of family name
        ; co_ax_branch <- tcTyFamInstEqn fam_tc mb_clsinfo
                                         (L (getLoc fam_lname) eqn)
-
 
          -- (2) check for validity
        ; checkConsistentFamInst mb_clsinfo fam_tc co_ax_branch
@@ -857,7 +858,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
        ; (tclvl, wanted, (scoped_tvs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
-               tcOuterFamEqnTKBndrs outer_bndrs                   $
+               bindOuterFamEqnTKBndrs outer_bndrs                 $
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
                   ; (lhs_applied_ty, lhs_applied_kind)

@@ -30,7 +30,7 @@ module GHC.Tc.Gen.HsType (
         bindExplicitTKBndrs_Tv, bindExplicitTKBndrs_Skol,
             bindExplicitTKBndrs_Q_Tv, bindExplicitTKBndrs_Q_Skol,
 
-        tcOuterFamEqnTKBndrs, bindOuterFamEqnTKBndrs_Q_Tv,
+        bindOuterFamEqnTKBndrs, bindOuterFamEqnTKBndrs_Q_Tv,
         tcOuterTKBndrs, scopedSortOuter,
         bindOuterSigTKBndrs_Tv,
         tcExplicitTKBndrs,
@@ -382,14 +382,14 @@ kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
 kcClassSigType _skol_info names
     sig_ty@(L _ (HsSig { sig_bndrs = hs_outer_bndrs, sig_body = hs_ty }))
   = addSigCtxt (funsSigCtxt names) sig_ty $
-    do { _ <- bindOuterTKBndrsX smVanilla hs_outer_bndrs $
+    do { _ <- bindOuterSigTKBndrs_Tv hs_outer_bndrs    $
               tcLHsType hs_ty liftedTypeKind
        ; return () }
 
-tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
+tcClassSigType :: [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
-tcClassSigType skol_info names sig_ty
-  = addSigCtxt (funsSigCtxt names) sig_ty $
+tcClassSigType names sig_ty
+  = addSigCtxt sig_ctxt sig_ty $
     do { (implic, ty) <- tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
        ; emitImplication implic
        ; return ty }
@@ -409,6 +409,9 @@ tcClassSigType skol_info names sig_ty
        -- It should be that f has kind `k2 -> *`, but we never get a chance
        -- to run the solver where the kind of f is touchable. This is
        -- painfully delicate.
+  where
+    sig_ctxt = funsSigCtxt names
+    skol_info = SigTypeSkol sig_ctxt
 
 tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Does validity checking
@@ -2355,7 +2358,7 @@ kcInferDeclHeader name flav
              all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
                -- NB: bindExplicitTKBndrs_Q_Tv does not clone;
                --     ditto Implicit
-               -- See Note [Non-cloning for tyvar binders]
+               -- See Note [Cloning for type variable binders]
 
              tycon = mkTcTyCon name tc_binders res_kind all_tv_prs
                                False -- not yet generalised
@@ -2914,56 +2917,6 @@ expectedKindInCtxt _                   = OpenKind
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [Non-cloning for tyvar binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bindExplictTKBndrs_Q_Skol, bindExplictTKBndrs_Skol, do not clone;
-and nor do the Implicit versions.  There is no need.
-
-bindExplictTKBndrs_Q_Tv does not clone; and similarly Implicit.
-We take advantage of this in kcInferDeclHeader:
-     all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
-If we cloned, we'd need to take a bit more care here; not hard.
-
-The main payoff is that avoidng gratuitious cloning means that we can
-almost always take the fast path in swizzleTcTyConBndrs.  "Almost
-always" means not the case of mutual recursion with polymorphic kinds.
-
-
-Note [Cloning for tyvar binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bindExplicitTKBndrs_Tv does cloning, making up a Name with a fresh Unique,
-unlike bindExplicitTKBndrs_Q_Tv.  (Nor do the Skol variants clone.)
-And similarly for bindImplicit...
-
-This for a narrow and tricky reason which, alas, I couldn't find a
-simpler way round.  #16221 is the poster child:
-
-   data SameKind :: k -> k -> *
-   data T a = forall k2 (b :: k2). MkT (SameKind a b) !Int
-
-When kind-checking T, we give (a :: kappa1). Then:
-
-- In kcConDecl we make a TyVarTv unification variable kappa2 for k2
-  (as described in Note [Kind-checking for GADTs], even though this
-  example is an existential)
-- So we get (b :: kappa2) via bindExplicitTKBndrs_Tv
-- We end up unifying kappa1 := kappa2, because of the (SameKind a b)
-
-Now we generalise over kappa2. But if kappa2's Name is precisely k2
-(i.e. we did not clone) we'll end up giving T the utterlly final kind
-  T :: forall k2. k2 -> *
-Nothing directly wrong with that but when we typecheck the data constructor
-we have k2 in scope; but then it's brought into scope /again/ when we find
-the forall k2.  This is chaotic, and we end up giving it the type
-  MkT :: forall k2 (a :: k2) k2 (b :: k2).
-         SameKind @k2 a b -> Int -> T @{k2} a
-which is bogus -- because of the shadowing of k2, we can't
-apply T to the kind or a!
-
-And there no reason /not/ to clone the Name when making a unification
-variable.  So that's what we do.
--}
-
 --------------------------------------
 --    HsForAllTelescope
 --------------------------------------
@@ -2985,7 +2938,7 @@ tcTKTelescope mode tele thing_inside = case tele of
             -- but we want [VarBndr TyVar ArgFlag]
           ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
   where
-    skol_mode = smVanilla { sm_holes = mode_holes mode }
+    skol_mode = smVanilla { sm_clone = False, sm_holes = mode_holes mode }
 
 --------------------------------------
 --    HsOuterTyVarBndrs
@@ -3049,23 +3002,28 @@ bindOuterFamEqnTKBndrs_Q_Tv :: HsOuterFamEqnTyVarBndrs GhcRn
                             -> TcM ([TcTyVar], a)
 bindOuterFamEqnTKBndrs_Q_Tv hs_bndrs thing_inside
   = applyToFstM getOuterTyVars $
-    bindOuterTKBndrsX (smVanilla { sm_parent = True, sm_tvtv = True })
+    bindOuterTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
+                                 , sm_tvtv = True })
                       hs_bndrs thing_inside
+    -- sm_clone=False: see Note [Cloning for type variable binders]
 
-tcOuterFamEqnTKBndrs :: HsOuterFamEqnTyVarBndrs GhcRn
-                     -> TcM a
-                     -> TcM ([TcTyVar], a)
-tcOuterFamEqnTKBndrs hs_bndrs thing_inside
+bindOuterFamEqnTKBndrs :: HsOuterFamEqnTyVarBndrs GhcRn
+                       -> TcM a
+                       -> TcM ([TcTyVar], a)
+bindOuterFamEqnTKBndrs hs_bndrs thing_inside
   = applyToFstM getOuterTyVars $
-    tcOuterTKBndrsX (smVanilla { sm_parent = True }) FamInstSkol
-                    hs_bndrs thing_inside
+    bindOuterTKBndrsX (smVanilla { sm_clone = False, sm_parent = True })
+                      hs_bndrs thing_inside
+    -- sm_clone=False: see Note [Cloning for type variable binders]
 
 ---------------
 tcOuterTKBndrs :: OutputableBndrFlag flag
                => SkolemInfo
                -> HsOuterTyVarBndrs flag GhcRn
                -> TcM a -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
-tcOuterTKBndrs = tcOuterTKBndrsX smVanilla
+tcOuterTKBndrs = tcOuterTKBndrsX (smVanilla { sm_clone = False })
+  -- Do not clone the outer binders
+  -- See Note [Cloning for type variable binder] under "must not"
 
 tcOuterTKBndrsX :: OutputableBndrFlag flag
                 => SkolemMode -> SkolemInfo
@@ -3092,7 +3050,7 @@ tcExplicitTKBndrs :: OutputableBndrFlag flag
                   => [LHsTyVarBndr flag GhcRn]
                   -> TcM a
                   -> TcM ([VarBndr TyVar flag], a)
-tcExplicitTKBndrs = tcExplicitTKBndrsX smVanilla
+tcExplicitTKBndrs = tcExplicitTKBndrsX (smVanilla { sm_clone = True })
 
 tcExplicitTKBndrsX :: OutputableBndrFlag flag
                    => SkolemMode
@@ -3125,25 +3083,27 @@ bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
     -> TcM a
     -> TcM ([VarBndr TyVar flag], a)
 
-bindExplicitTKBndrs_Skol = bindExplicitTKBndrsX smVanilla
-bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (smVanilla { sm_clone = True,  sm_tvtv = True })
-  -- sm_clone = False: see Note [Non-cloning for tyvar binders]
-  -- sm_clone = True:  see Note [Cloning for tyvar binders]
+bindExplicitTKBndrs_Skol = bindExplicitTKBndrsX (smVanilla { sm_clone = False })
+bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = True })
 
 bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
     :: ContextKind
     -> [LHsTyVarBndr () GhcRn]
     -> TcM a
     -> TcM ([TcTyVar], a)
--- These do not cloen: see Note [Non-cloning for tyvar binders]
+-- These do not clone: see Note [Cloning for type variable binders]
 bindExplicitTKBndrs_Q_Skol ctxt_kind hs_bndrs thing_inside
   = applyToFstM binderVars $
-    bindExplicitTKBndrsX (smVanilla { sm_parent = True, sm_kind = ctxt_kind })
+    bindExplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
+                                    , sm_kind = ctxt_kind })
                          hs_bndrs thing_inside
+
 bindExplicitTKBndrs_Q_Tv ctxt_kind hs_bndrs thing_inside
   = applyToFstM binderVars $
-    bindExplicitTKBndrsX (smVanilla { sm_parent = True, sm_tvtv = True, sm_kind = ctxt_kind })
+    bindExplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
+                                    , sm_tvtv = True, sm_kind = ctxt_kind })
                          hs_bndrs thing_inside
+    -- sm_clone=False: see Note [Cloning for type variable binders]
 
 bindExplicitTKBndrsX :: (OutputableBndrFlag flag)
     => SkolemMode
@@ -3169,7 +3129,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
             -- is mentioned in the kind of a later binder
             --   e.g. forall k (a::k). blah
             -- NB: tv's Name may differ from hs_tv's
-            -- See GHC.Tc.Utils.TcMType Note [Cloning for tyvar binders]
+            -- See Note [Cloning for type variable binders]
             ; (tvs,res) <- tcExtendNameTyVarEnv [(hsTyVarName hs_tv, tv)] $
                            go hs_tvs
             ; return (Bndr tv (hsTyVarBndrFlag hs_tv):tvs, res) }
@@ -3236,12 +3196,10 @@ tcImplicitTKBndrsX skol_mode skol_info bndrs thing_inside
 bindImplicitTKBndrs_Skol, bindImplicitTKBndrs_Tv,
   bindImplicitTKBndrs_Q_Skol, bindImplicitTKBndrs_Q_Tv
   :: [Name] -> TcM a -> TcM ([TcTyVar], a)
-bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX smVanilla
+bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX (smVanilla { sm_clone = True })
 bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = True })
-bindImplicitTKBndrs_Q_Skol = bindImplicitTKBndrsX (smVanilla { sm_parent = True })
-bindImplicitTKBndrs_Q_Tv   = bindImplicitTKBndrsX (smVanilla { sm_parent = True, sm_tvtv = True })
-  -- sm_clone = False: see Note [Non-cloning for tyvar binders]
-  -- sm_clone = True:  see Note [Cloning for tyvar binders]
+bindImplicitTKBndrs_Q_Skol = bindImplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True })
+bindImplicitTKBndrs_Q_Tv   = bindImplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True, sm_tvtv = True })
 
 bindImplicitTKBndrsX
    :: SkolemMode
@@ -3279,8 +3237,12 @@ bindImplicitTKBndrsX (SM { sm_parent = check_parent, sm_clone = clone
 --           SkolemMode
 --------------------------------------
 
--- SkolemMode decribes how to typecheck an explict (HsTyVarBndr) or implicit (Name)
--- binder in a type
+{- Note [SkolemMode]
+~~~~~~~~~~~~~~~~~~~~
+SkolemMode decribes how to typecheck an explict (HsTyVarBndr) or
+implicit (Name) binder in a type. It is just a record of flags
+that describe what sort of TcTyVar to create.
+-}
 
 data SkolemMode
   = SM { sm_parent :: Bool    -- True <=> check the in-scope parent type variable
@@ -3292,11 +3254,75 @@ data SkolemMode
 
 smVanilla :: SkolemMode
 smVanilla = SM { sm_parent = False
-               , sm_clone  = False
+               , sm_clone  = True
                , sm_tvtv   = False
                , sm_kind   = AnyKind
                , sm_holes  = Nothing }
 
+{- Note [Cloning for type variable binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sometimes we must clone the Name of a type variable binder (written in
+the source program); and sometimes we must not. This is controlled by
+the sm_clone field of SkolemMode
+
+When we /must not/ clone
+* In the binders of a type signature (tcOuterTKBndrs)
+      f :: forall a{27}. blah
+      f = rhs
+  Then 'a' scopes over 'rhs'. When we kind-check the signature (tcHsSigType),
+  we must get the type (forall a{27}. blah) for the Id f, because
+  we bring that type variable into scope when we typecheck 'rhs'.
+
+* In the binders of a data family instance (bindOuterFamEqnTKBndrs)
+     data instance
+       forall p q. D (p,q) = D1 p | D2 q
+  We kind-check the LHS in tcDataFamInstHeader, and then separately
+  (in tcDataFamInstDecl) bring p,q into scope before looking at the
+  the constructor decls.
+
+* bindExplictTKBndrs_Q_Tv/bindImplicitTKBndrs_Q_Tv do not clone
+  We take advantage of this in kcInferDeclHeader:
+     all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
+  If we cloned, we'd need to take a bit more care here; not hard.
+
+* bindExplictTKBndrs_Q_Skol, bindExplictTKBndrs_Skol, do not clone.
+  There is no need, I think.
+
+  The payoff here is that avoidng gratuitious cloning means that we can
+  lmost always take the fast path in swizzleTcTyConBndrs.  "Almost
+  always" means not the case of mutual recursion with polymorphic kinds.
+
+When we /must/ clone.
+* bindOuterSigTKBndrs_Tv, bindExplicitTKBndrs_Tv do cloning
+
+  This for a narrow and tricky reason which, alas, I couldn't find a
+  simpler way round.  #16221 is the poster child:
+
+     data SameKind :: k -> k -> *
+     data T a = forall k2 (b :: k2). MkT (SameKind a b) !Int
+
+  When kind-checking T, we give (a :: kappa1). Then:
+
+  - In kcConDecl we make a TyVarTv unification variable kappa2 for k2
+    (as described in Note [Kind-checking for GADTs], even though this
+    example is an existential)
+  - So we get (b :: kappa2) via bindExplicitTKBndrs_Tv
+  - We end up unifying kappa1 := kappa2, because of the (SameKind a b)
+
+  Now we generalise over kappa2. But if kappa2's Name is precisely k2
+  (i.e. we did not clone) we'll end up giving T the utterly final kind
+    T :: forall k2. k2 -> *
+  Nothing directly wrong with that but when we typecheck the data constructor
+  we have k2 in scope; but then it's brought into scope /again/ when we find
+  the forall k2.  This is chaotic, and we end up giving it the type
+    MkT :: forall k2 (a :: k2) k2 (b :: k2).
+           SameKind @k2 a b -> Int -> T @{k2} a
+  which is bogus -- because of the shadowing of k2, we can't
+  apply T to the kind or a!
+
+  And there no reason /not/ to clone the Name when making a unification
+  variable.  So that's what we do.
+-}
 
 --------------------------------------
 -- Binding type/class variables in the
@@ -3821,7 +3847,7 @@ we do the following
   They are typechecked as a recursive group, with monomorphic types,
   so 'a' and 'b' will get unified together.  Very like kind inference
   for mutually recursive data types (sans CUSKs or SAKS); see
-  Note [Cloning for tyvar binders] in GHC.Tc.Gen.HsType
+  Note [Cloning for type variable binders]
 
 * In GHC.Tc.Gen.Sig.tcUserSigType we return a PartialSig, which (unlike
   the companion CompleteSig) contains the original, as-yet-unchecked

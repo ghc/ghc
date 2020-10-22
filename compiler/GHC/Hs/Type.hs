@@ -428,8 +428,10 @@ emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 -- We support two forms:
 --   HsOuterImplicit (implicit quantification, added by renamer)
 --         f :: a -> a     -- Desugars to f :: forall {a}. a -> a
+--         type instance F (a,b) = a->b
 --   HsOuterExplicit (explicit user quantifiation):
 --         f :: forall a. a -> a
+--         type instance forall a b. F (a,b) = a->b
 --
 -- In constrast, when the user writes /visible/ quanitification
 --         T :: forall k -> k -> Type

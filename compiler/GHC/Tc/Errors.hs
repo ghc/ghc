@@ -444,7 +444,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs
         -- (see Note [Skolems in an implication] in GHC.Tc.Types.Constraint)
         -- but tidying goes wrong on out-of-order constraints;
         -- so we sort them here before tidying
-    info'        = tidySkolemInfo env1 info
+    info'   = tidySkolemInfo env1 info
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env1) given
                      , ic_info  = info' }
