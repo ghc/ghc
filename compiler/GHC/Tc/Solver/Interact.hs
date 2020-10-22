@@ -1385,57 +1385,6 @@ which did not really made a 'step' towards proving some goal. Solved's are
 just an optimization so we don't lose anything in terms of completeness of
 solving.
 
-
-Note [Efficient Orientation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we are interacting two FunEqCans with the same LHS:
-          (inert)  ci :: (F ty ~ xi_i)
-          (work)   cw :: (F ty ~ xi_w)
-We prefer to keep the inert (else we pass the work item on down
-the pipeline, which is a bit silly).  If we keep the inert, we
-will (a) discharge 'cw'
-     (b) produce a new equality work-item (xi_w ~ xi_i)
-Notice the orientation (xi_w ~ xi_i) NOT (xi_i ~ xi_w):
-    new_work :: xi_w ~ xi_i
-    cw := ci ; sym new_work
-Why?  Consider the simplest case when xi1 is a type variable.  If
-we generate xi1~xi2, processing that constraint will kick out 'ci'.
-If we generate xi2~xi1, there is less chance of that happening.
-Of course it can and should still happen if xi1=a, xi1=Int, say.
-But we want to avoid it happening needlessly.
-
-Similarly, if we *can't* keep the inert item (because inert is Wanted,
-and work is Given, say), we prefer to orient the new equality (xi_i ~
-xi_w).
-
-Note [Carefully solve the right CFunEqCan]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   ---- OLD COMMENT, NOW NOT NEEDED
-   ---- because we now allow multiple
-   ---- wanted FunEqs with the same head
-Consider the constraints
-  c1 :: F Int ~ a      -- Arising from an application line 5
-  c2 :: F Int ~ Bool   -- Arising from an application line 10
-Suppose that 'a' is a unification variable, arising only from
-flattening.  So there is no error on line 5; it's just a flattening
-variable.  But there is (or might be) an error on line 10.
-
-Two ways to combine them, leaving either (Plan A)
-  c1 :: F Int ~ a      -- Arising from an application line 5
-  c3 :: a ~ Bool       -- Arising from an application line 10
-or (Plan B)
-  c2 :: F Int ~ Bool   -- Arising from an application line 10
-  c4 :: a ~ Bool       -- Arising from an application line 5
-
-Plan A will unify c3, leaving c1 :: F Int ~ Bool as an error
-on the *totally innocent* line 5.  An example is test SimpleFail16
-where the expected/actual message comes out backwards if we use
-the wrong plan.
-
-The second is the right thing to do.  Hence the isMetaTyVarTy
-test when solving pairwise CFunEqCan.
-
-
 **********************************************************************
 *                                                                    *
                    interactEq
@@ -1940,50 +1889,6 @@ We don't do improvements (injectivity etc) for Givens. Why?
      indexed-types/should_compile/T10806
      indexed-types/should_compile/T10507
      polykinds/T10742
-
-Note [Reduction for Derived CFunEqCans]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-You may wonder if it's important to use top-level instances to
-simplify [D] CFunEqCan's.  But it is.  Here's an example (T10226).
-
-   type instance F    Int = Int
-   type instance FInv Int = Int
-
-Suppose we have to solve
-    [WD] FInv (F alpha) ~ alpha
-    [WD] F alpha ~ Int
-
-  --> flatten
-    [WD] F alpha ~ fuv0
-    [WD] FInv fuv0 ~ fuv1  -- (A)
-    [WD] fuv1 ~ alpha
-    [WD] fuv0 ~ Int        -- (B)
-
-  --> Rewwrite (A) with (B), splitting it
-    [WD] F alpha ~ fuv0
-    [W] FInv fuv0 ~ fuv1
-    [D] FInv Int ~ fuv1    -- (C)
-    [WD] fuv1 ~ alpha
-    [WD] fuv0 ~ Int
-
-  --> Reduce (C) with top-level instance
-      **** This is the key step ***
-    [WD] F alpha ~ fuv0
-    [W] FInv fuv0 ~ fuv1
-    [D] fuv1 ~ Int        -- (D)
-    [WD] fuv1 ~ alpha     -- (E)
-    [WD] fuv0 ~ Int
-
-  --> Rewrite (D) with (E)
-    [WD] F alpha ~ fuv0
-    [W] FInv fuv0 ~ fuv1
-    [D] alpha ~ Int       -- (F)
-    [WD] fuv1 ~ alpha
-    [WD] fuv0 ~ Int
-
-  --> unify (F)  alpha := Int, and that solves it
-
-Another example is indexed-types/should_compile/T10634
 -}
 
 {- *******************************************************************
