@@ -82,7 +82,7 @@ unsafeFreeze (MArray maBA) = ST $ \s# -> (# s#, Array (unsafeCoerce# maBA) #)
 
 unsafeIndex :: Array -> Int -> Word16
 unsafeIndex (Array aBA) (I# i#) =
-    case indexWord16Array# aBA i# of r# -> (W16# r#)
+    case indexWord16Array# aBA i# of r# -> (W16# (narrowWord16# r#))
 {-# INLINE unsafeIndex #-}
 
 empty :: Array
