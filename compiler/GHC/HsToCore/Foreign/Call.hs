@@ -21,9 +21,7 @@ where
 
 #include "HsVersions.h"
 
-
 import GHC.Prelude
-import GHC.Platform
 
 import GHC.Core
 
@@ -41,7 +39,6 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Types.Id   ( Id )
 import GHC.Core.Coercion
-import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
 import GHC.Builtin.Types
@@ -355,36 +352,13 @@ resultWrapper result_ty
   | Just (tycon, tycon_arg_tys) <- maybe_tc_app
   , Just data_con <- isDataProductTyCon_maybe tycon  -- One constructor, no existentials
   , [Scaled _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
-  = do { dflags <- getDynFlags
-       ; let platform = targetPlatform dflags
-       ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
-       ; let narrow_wrapper = maybeNarrow platform tycon
-             marshal_con e  = Var (dataConWrapId data_con)
+  = do { (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
+       ; let marshal_con e  = Var (dataConWrapId data_con)
                               `mkTyApps` tycon_arg_tys
-                              `App` wrapper (narrow_wrapper e)
+                              `App` wrapper e
        ; return (maybe_ty, marshal_con) }
 
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)
   where
     maybe_tc_app = splitTyConApp_maybe result_ty
-
--- When the result of a foreign call is smaller than the word size, we
--- need to sign- or zero-extend the result up to the word size.  The C
--- standard appears to say that this is the responsibility of the
--- caller, not the callee.
-
-maybeNarrow :: Platform -> TyCon -> (CoreExpr -> CoreExpr)
-maybeNarrow platform tycon
-  | tycon `hasKey` int8TyConKey   = \e -> App (Var (mkPrimOpId Narrow8IntOp)) e
-  | tycon `hasKey` int16TyConKey  = \e -> App (Var (mkPrimOpId Narrow16IntOp)) e
-  | tycon `hasKey` int32TyConKey
-  , platformWordSizeInBytes platform > 4
-  = \e -> App (Var (mkPrimOpId Narrow32IntOp)) e
-
-  | tycon `hasKey` word8TyConKey  = \e -> App (Var (mkPrimOpId Narrow8WordOp)) e
-  | tycon `hasKey` word16TyConKey = \e -> App (Var (mkPrimOpId Narrow16WordOp)) e
-  | tycon `hasKey` word32TyConKey
-  , platformWordSizeInBytes platform > 4
-  = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
-  | otherwise                     = id
