@@ -85,6 +85,11 @@ test('linker_unload',
      [extra_files(['LinkerUnload.hs', 'Test.hs']), req_rts_linker],
      makefile_test, ['linker_unload'])
 
+test('linker_unload_native',
+     [extra_files(['LinkerUnload.hs', 'Test.hs']), req_rts_linker,
+      when(opsys('darwin') or opsys('mingw32'), skip)],
+     makefile_test, ['linker_unload_native'])
+
 ######################################
 test('linker_error1', [extra_files(['linker_error.c']),
                        ignore_stderr], makefile_test, ['linker_error1'])
