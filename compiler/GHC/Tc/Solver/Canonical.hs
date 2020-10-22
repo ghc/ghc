@@ -116,13 +116,18 @@ canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
     -- See Wrinkle (2c) of Note [Equalities with incompatible kinds]
   = do { pred_ty <- zonkTcType (ctEvPred ev) -- zonk to remove the filled-in coercion
                                              -- hole. Could flatten, but why bother?
-       ; let (eq_rel, ty1, lhs, rhs) =
-               case classifyPredType pred_ty of
-                 EqPred er ty1 ty2
-                   | Just l <- canEqLHS_maybe ty1
-                   -> (er, ty1, l, ty2)
-                 _ -> pprPanic "can CIrredCan" (ppr ev)
-       ; canEqCanLHSHomo ev eq_rel NotSwapped lhs ty1 rhs rhs }
+       ; case classifyPredType pred_ty of
+           EqPred eq_rel ty1 ty2
+             | Just lhs <- canEqLHS_maybe ty1
+             -> canEqCanLHSHomo ev eq_rel NotSwapped lhs ty1 ty2 ty2
+
+            -- the work item was indeed kicked out because the blocking coercion
+            -- hole got filled in. But perhaps an intervening work item unified
+            -- a variable in the LHS. We're not in the looping case of Wrinkle (2c),
+            -- so just go via the general path
+           _ -> canIrred status ev }
+            -- NB: The Irred is /not/ insoluble, so the special case below
+            -- for insolubles (the direct call to canEqNC) does not apply.
 
   | EqPred eq_rel ty1 ty2 <- classifyPredType (ctEvPred ev)
   = -- For insolubles (all of which are equalities), do /not/ flatten the arguments
