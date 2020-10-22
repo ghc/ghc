@@ -72,6 +72,7 @@ import GHC.Word
 import GHC.Show
 import GHC.Real
 import GHC.List
+import GHC.ForeignPtr  (unsafeWithForeignPtr)
 import Foreign.C.Types
 import Foreign.ForeignPtr
 import Foreign.Storable
@@ -103,10 +104,10 @@ import Foreign.Storable
 type RawBuffer e = ForeignPtr e
 
 readWord8Buf :: RawBuffer Word8 -> Int -> IO Word8
-readWord8Buf arr ix = withForeignPtr arr $ \p -> peekByteOff p ix
+readWord8Buf fp ix = unsafeWithForeignPtr fp $ \p -> peekByteOff p ix
 
 writeWord8Buf :: RawBuffer Word8 -> Int -> Word8 -> IO ()
-writeWord8Buf arr ix w = withForeignPtr arr $ \p -> pokeByteOff p ix w
+writeWord8Buf fp ix w = unsafeWithForeignPtr fp $ \p -> pokeByteOff p ix w
 
 #if defined(CHARBUF_UTF16)
 type CharBufElem = Word16
@@ -117,17 +118,17 @@ type CharBufElem = Char
 type RawCharBuffer = RawBuffer CharBufElem
 
 peekCharBuf :: RawCharBuffer -> Int -> IO Char
-peekCharBuf arr ix = withForeignPtr arr $ \p -> do
+peekCharBuf arr ix = unsafeWithForeignPtr arr $ \p -> do
                         (c,_) <- readCharBufPtr p ix
                         return c
 
 {-# INLINE readCharBuf #-}
 readCharBuf :: RawCharBuffer -> Int -> IO (Char, Int)
-readCharBuf arr ix = withForeignPtr arr $ \p -> readCharBufPtr p ix
+readCharBuf arr ix = unsafeWithForeignPtr arr $ \p -> readCharBufPtr p ix
 
 {-# INLINE writeCharBuf #-}
 writeCharBuf :: RawCharBuffer -> Int -> Char -> IO Int
-writeCharBuf arr ix c = withForeignPtr arr $ \p -> writeCharBufPtr p ix c
+writeCharBuf arr ix c = unsafeWithForeignPtr arr $ \p -> writeCharBufPtr p ix c
 
 {-# INLINE readCharBufPtr #-}
 readCharBufPtr :: Ptr CharBufElem -> Int -> IO (Char, Int)
