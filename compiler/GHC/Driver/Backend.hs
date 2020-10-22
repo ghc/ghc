@@ -104,6 +104,7 @@ platformNcgSupported platform = if
          ArchPPC       -> True
          ArchPPC_64 {} -> True
          ArchSPARC     -> True
+         ArchAArch64   -> True
          _             -> False
 
 -- | Will this backend produce an object file on the disk?
