@@ -1054,6 +1054,16 @@ unify_ty env ty1 (AppTy ty2a ty2b) _kco
   | Just (ty1a, ty1b) <- tcRepSplitAppTy_maybe ty1
   = unify_ty_app env ty1a [ty1b] ty2a [ty2b]
 
+  -- tcSplitTyConApp won't split a (=>), so we handle this separately.
+unify_ty env (FunTy InvisArg _w1 arg1 res1) (FunTy InvisArg _w2 arg2 res2) _kco
+   -- Look at result representations, but arg representations would be redundant
+   -- as anything that can appear to the left of => is lifted.
+   -- And anything that can appear to the left of => is unrestricted, so skip the
+   -- multiplicities.
+  | Just res_rep1 <- getRuntimeRep_maybe res1
+  , Just res_rep2 <- getRuntimeRep_maybe res2
+  = unify_tys env [res_rep1, arg1, res1] [res_rep2, arg2, res2]
+
 unify_ty _ (LitTy x) (LitTy y) _kco | x == y = return ()
 
 unify_ty env (ForAllTy (Bndr tv1 _) ty1) (ForAllTy (Bndr tv2 _) ty2) kco
