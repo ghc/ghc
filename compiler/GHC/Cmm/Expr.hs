@@ -39,6 +39,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.MachOp
 import GHC.Cmm.Type
 import GHC.Utils.Panic (panic)
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 
 import Data.Set (Set)
@@ -209,6 +210,16 @@ data CmmLit
                      -- is replaced by a CmmInt for the actual number
                      -- of bytes used
   deriving Eq
+
+instance Outputable CmmLit where
+  ppr (CmmInt n w) = text "CmmInt" <+> ppr n <+> ppr w
+  ppr (CmmFloat n w) = text "CmmFloat" <+> text (show n) <+> ppr w
+  ppr (CmmVec xs) = text "CmmVec" <+> ppr xs
+  ppr (CmmLabel _) = text "CmmLabel"
+  ppr (CmmLabelOff _ _) = text "CmmLabelOff"
+  ppr (CmmLabelDiffOff _ _ _ _) = text "CmmLabelDiffOff"
+  ppr (CmmBlock blk) = text "CmmBlock" <+> ppr blk
+  ppr CmmHighStackMark = text "CmmHighStackMark"
 
 cmmExprType :: Platform -> CmmExpr -> CmmType
 cmmExprType platform = \case

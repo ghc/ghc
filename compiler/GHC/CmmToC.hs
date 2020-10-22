@@ -159,8 +159,14 @@ pprWordArray platform is_ro lbl ds
          -- See Note [StgWord alignment]
          , pprAlignment (wordWidth platform)
          , text "= {" ]
-    $$ nest 8 (commafy (pprStatics platform ds))
+    $$ nest 8 (commafy (staticLitsToWords platform $ toLits ds))
     $$ text "};"
+  where
+    toLits :: [CmmStatic] -> [CmmLit]
+    toLits = map f
+      where
+        f (CmmStaticLit lit) = lit
+        f static             = pprPanic "pprWordArray: Unexpected literal"  (pprStatic platform static)
 
 pprAlignment :: Width -> SDoc
 pprAlignment words =
@@ -501,59 +507,69 @@ pprLit1 platform lit = case lit of
 -- ---------------------------------------------------------------------------
 -- Static data
 
-pprStatics :: Platform -> [CmmStatic] -> [SDoc]
-pprStatics platform = pprStatics'
+-- | Produce a list of word sized literals encoding the given list of 'CmmLit's.
+staticLitsToWords :: Platform -> [CmmLit] -> [SDoc]
+staticLitsToWords platform = go . foldMap decomposeMultiWord
   where
-    pprStatics' = \case
-      [] -> []
-      (CmmStaticLit (CmmFloat f W32) : rest)
-        -- odd numbers of floats are padded to a word by mkVirtHeapOffsetsWithPadding
-        | wordWidth platform == W64, CmmStaticLit (CmmInt 0 W32) : rest' <- rest
-        -> pprLit1 platform (floatToWord platform f) : pprStatics' rest'
-        -- adjacent floats aren't padded but combined into a single word
-        | wordWidth platform == W64, CmmStaticLit (CmmFloat g W32) : rest' <- rest
-        -> pprLit1 platform (floatPairToWord platform f g) : pprStatics' rest'
-        | wordWidth platform == W32
-        -> pprLit1 platform (floatToWord platform f) : pprStatics' rest
-        | otherwise
-        -> pprPanic "pprStatics: float" (vcat (map ppr' rest))
-          where ppr' (CmmStaticLit l) = ppr (cmmLitType platform l)
-                ppr' _other           = text "bad static!"
+    -- rem_bytes is how many bytes remain in the word we are currently filling.
+    -- accum is the word we are filling.
+    go :: [CmmLit] -> [SDoc]
+    go [] = []
+    go lits@(lit : _)
+      | Just _ <- isSubWordLit lit
+      = goSubWord wordWidthBytes 0 lits
+    go (lit : rest)
+      = pprLit1 platform lit : go rest
 
-      (CmmStaticLit (CmmFloat f W64) : rest)
-        -> map (pprLit1 platform) (doubleToWords platform f) ++ pprStatics' rest
+    goSubWord :: Int -> Integer -> [CmmLit] -> [SDoc]
+    goSubWord rem_bytes accum (lit : rest)
+      | Just (bytes, w) <- isSubWordLit lit
+      , rem_bytes >= widthInBytes w
+      = let accum' =
+              case platformByteOrder platform of
+                BigEndian    -> (accum `shiftL` widthInBits w) .|. bytes
+                LittleEndian -> (accum `shiftL` widthInBits w) .|. byteSwap w bytes
+        in goSubWord (rem_bytes - widthInBytes w) accum' rest
+    goSubWord rem_bytes accum rest
+      = pprWord (byteSwap (wordWidth platform) $ accum `shiftL` (8*rem_bytes)) : go rest
 
-      (CmmStaticLit (CmmInt i W64) : rest)
-        | wordWidth platform == W32
-        -> case platformByteOrder platform of
-            BigEndian    -> pprStatics' (CmmStaticLit (CmmInt q W32) :
-                                         CmmStaticLit (CmmInt r W32) : rest)
-            LittleEndian -> pprStatics' (CmmStaticLit (CmmInt r W32) :
-                                         CmmStaticLit (CmmInt q W32) : rest)
-           where r = i .&. 0xffffffff
-                 q = i `shiftR` 32
+    -- Decompose multi-word or floating-point literals into multiple
+    -- single-word (or smaller) literals.
+    decomposeMultiWord :: CmmLit -> [CmmLit]
+    decomposeMultiWord (CmmFloat n W64)
+      -- This will produce a W64 integer, which will then be broken up further
+      -- on the next iteration on 32-bit platforms.
+      = [doubleToWord64 n]
+    decomposeMultiWord (CmmFloat n W32)
+      = [floatToWord32 n]
+    decomposeMultiWord (CmmInt n W64)
+      | W32 <- wordWidth platform
+      = [CmmInt hi W32, CmmInt lo W32]
+      where
+        hi = n `shiftR` 32
+        lo = n .&. 0xffffffff
+    decomposeMultiWord lit = [lit]
 
-      (CmmStaticLit (CmmInt a W32) : CmmStaticLit (CmmInt b W32) : rest)
-        | wordWidth platform == W64
-        -> case platformByteOrder platform of
-             BigEndian    -> pprStatics' (CmmStaticLit (CmmInt ((shiftL a 32) .|. b) W64) : rest)
-             LittleEndian -> pprStatics' (CmmStaticLit (CmmInt ((shiftL b 32) .|. a) W64) : rest)
+    -- Decompose a sub-word-sized literal into the integer value and its
+    -- (sub-word-sized) width.
+    isSubWordLit :: CmmLit -> Maybe (Integer, Width)
+    isSubWordLit lit =
+      case lit of
+        CmmInt n w
+          | w < wordWidth platform   -> Just (n, w)
+        _                            -> Nothing
 
-      (CmmStaticLit (CmmInt a W16) : CmmStaticLit (CmmInt b W16) : rest)
-        | wordWidth platform == W32
-        -> case platformByteOrder platform of
-             BigEndian    -> pprStatics' (CmmStaticLit (CmmInt ((shiftL a 16) .|. b) W32) : rest)
-             LittleEndian -> pprStatics' (CmmStaticLit (CmmInt ((shiftL b 16) .|. a) W32) : rest)
+    wordWidthBytes = widthInBytes $ wordWidth platform
 
-      (CmmStaticLit (CmmInt _ w) : _)
-        | w /= wordWidth platform
-        -> pprPanic "pprStatics: cannot emit a non-word-sized static literal" (ppr w)
+    pprWord :: Integer -> SDoc
+    pprWord n = pprHexVal platform n (wordWidth platform)
 
-      (CmmStaticLit lit : rest)
-        -> pprLit1 platform lit : pprStatics' rest
-
-      (other : _)
-        -> pprPanic "pprStatics: other" (pprStatic platform other)
+byteSwap :: Width -> Integer -> Integer
+byteSwap width n = foldl' f 0 bytes
+  where
+    f acc m = (acc `shiftL` 8) .|. m
+    bytes = [ byte i | i <- [0..widthInBytes width - 1] ]
+    byte i = (n `shiftR` (i*8)) .&. 0xff
 
 pprStatic :: Platform -> CmmStatic -> SDoc
 pprStatic platform s = case s of
@@ -1252,69 +1268,30 @@ pprStringInCStyle s = doubleQuotes (text (concatMap charToC (BS.unpack s)))
 -- This is a hack to turn the floating point numbers into ints that we
 -- can safely initialise to static locations.
 
-castFloatToWord32Array :: STUArray s Int Float -> ST s (STUArray s Int Word32)
-castFloatToWord32Array = U.castSTUArray
-
-castDoubleToWord64Array :: STUArray s Int Double -> ST s (STUArray s Int Word64)
-castDoubleToWord64Array = U.castSTUArray
-
-floatToWord :: Platform -> Rational -> CmmLit
-floatToWord platform r
-  = runST (do
+floatToWord32 :: Rational -> CmmLit
+floatToWord32 r
+  = runST $ do
         arr <- newArray_ ((0::Int),0)
         writeArray arr 0 (fromRational r)
         arr' <- castFloatToWord32Array arr
         w32 <- readArray arr' 0
-        return (CmmInt (toInteger w32 `shiftL` wo) (wordWidth platform))
-    )
-    where wo | wordWidth platform == W64
-             , BigEndian <- platformByteOrder platform
-             = 32
-             | otherwise
-             = 0
+        return (CmmInt (toInteger w32) W32)
+  where
+    castFloatToWord32Array :: STUArray s Int Float -> ST s (STUArray s Int Word32)
+    castFloatToWord32Array = U.castSTUArray
 
-floatPairToWord :: Platform -> Rational -> Rational -> CmmLit
-floatPairToWord platform r1 r2
-  = runST (do
-        arr <- newArray_ ((0::Int),1)
-        writeArray arr 0 (fromRational r1)
-        writeArray arr 1 (fromRational r2)
-        arr' <- castFloatToWord32Array arr
-        w32_1 <- readArray arr' 0
-        w32_2 <- readArray arr' 1
-        return (pprWord32Pair w32_1 w32_2)
-    )
-    where pprWord32Pair w32_1 w32_2
-              | BigEndian <- platformByteOrder platform =
-                  CmmInt ((shiftL i1 32) .|. i2) W64
-              | otherwise =
-                  CmmInt ((shiftL i2 32) .|. i1) W64
-              where i1 = toInteger w32_1
-                    i2 = toInteger w32_2
-
-doubleToWords :: Platform -> Rational -> [CmmLit]
-doubleToWords platform r
-  = runST (do
+doubleToWord64 :: Rational -> CmmLit
+doubleToWord64 r
+  = runST $ do
         arr <- newArray_ ((0::Int),1)
         writeArray arr 0 (fromRational r)
         arr' <- castDoubleToWord64Array arr
         w64 <- readArray arr' 0
-        return (pprWord64 w64)
-    )
-    where targetWidth = wordWidth platform
-          pprWord64 w64
-              | targetWidth == W64 =
-                  [ CmmInt (toInteger w64) targetWidth ]
-              | targetWidth == W32 =
-                  [ CmmInt (toInteger targetW1) targetWidth
-                  , CmmInt (toInteger targetW2) targetWidth
-                  ]
-              | otherwise = panic "doubleToWords.pprWord64"
-              where (targetW1, targetW2) = case platformByteOrder platform of
-                        BigEndian    -> (wHi, wLo)
-                        LittleEndian -> (wLo, wHi)
-                    wHi = w64 `shiftR` 32
-                    wLo = w64 .&. 0xFFFFffff
+        return $ CmmInt (toInteger w64) W64
+  where
+    castDoubleToWord64Array :: STUArray s Int Double -> ST s (STUArray s Int Word64)
+    castDoubleToWord64Array = U.castSTUArray
+
 
 -- ---------------------------------------------------------------------------
 -- Utils

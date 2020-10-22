@@ -309,10 +309,10 @@ chr4 :: Word8 -> Word8 -> Word8 -> Word8 -> Char
 chr4 (W8# x1#) (W8# x2#) (W8# x3#) (W8# x4#) =
     C# (chr# (z1# +# z2# +# z3# +# z4#))
     where
-      !y1# = word2Int# x1#
-      !y2# = word2Int# x2#
-      !y3# = word2Int# x3#
-      !y4# = word2Int# x4#
+      !y1# = word2Int# (extendWord8# x1#)
+      !y2# = word2Int# (extendWord8# x2#)
+      !y3# = word2Int# (extendWord8# x3#)
+      !y4# = word2Int# (extendWord8# x4#)
       !z1# = uncheckedIShiftL# y1# 24#
       !z2# = uncheckedIShiftL# y2# 16#
       !z3# = uncheckedIShiftL# y3# 8#
@@ -333,4 +333,3 @@ validate    :: Char -> Bool
 validate c = (x1 >= 0x0 && x1 < 0xD800) || (x1 > 0xDFFF && x1 <= 0x10FFFF)
    where x1 = ord c
 {-# INLINE validate #-}
-

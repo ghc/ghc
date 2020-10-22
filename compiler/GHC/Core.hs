@@ -29,6 +29,7 @@ module GHC.Core (
 
         mkIntLit, mkIntLitWrap,
         mkWordLit, mkWordLitWrap,
+        mkWord8Lit,
         mkWord64LitWord64, mkInt64LitInt64,
         mkCharLit, mkStringLit,
         mkFloatLit, mkFloatLitFloat,
@@ -1996,6 +1997,9 @@ mkWordLit platform w = Lit (mkLitWord platform w)
 -- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
 mkWordLitWrap :: Platform -> Integer -> Expr b
 mkWordLitWrap platform w = Lit (mkLitWordWrap platform w)
+
+mkWord8Lit :: Integer -> Expr b
+mkWord8Lit    w = Lit (mkLitWord8 w)
 
 mkWord64LitWord64 :: Word64 -> Expr b
 mkWord64LitWord64 w = Lit (mkLitWord64 (toInteger w))

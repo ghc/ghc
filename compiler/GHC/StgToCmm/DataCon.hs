@@ -102,6 +102,21 @@ cgTopRhsCon dflags id con args
              nv_args_w_offsets) =
                  mkVirtHeapOffsetsWithPadding profile StdHeader (addArgReps args)
 
+        ; let
+            -- Decompose padding into units of length 8, 4, 2, or 1 bytes to
+            -- allow the implementation of mk_payload to use widthFromBytes,
+            -- which only handles these cases.
+            fix_padding (x@(Padding n off) : rest)
+              | n == 0                 = fix_padding rest
+              | n `elem` [1,2,4,8]     = x : fix_padding rest
+              | n > 8                  = add_pad 8
+              | n > 4                  = add_pad 4
+              | n > 2                  = add_pad 2
+              | otherwise              = add_pad 1
+              where add_pad m = Padding m off : fix_padding (Padding (n-m) (off+m) : rest)
+            fix_padding (x : rest)     = x : fix_padding rest
+            fix_padding []             = []
+
             mk_payload (Padding len _) = return (CmmInt 0 (widthFromBytes len))
             mk_payload (FieldOff arg _) = do
                 amode <- getArgAmode arg
@@ -117,7 +132,7 @@ cgTopRhsCon dflags id con args
             info_tbl = mkDataConInfoTable profile con True ptr_wds nonptr_wds
 
 
-        ; payload <- mapM mk_payload nv_args_w_offsets
+        ; payload <- mapM mk_payload (fix_padding nv_args_w_offsets)
                 -- NB1: nv_args_w_offsets is sorted into ptrs then non-ptrs
                 -- NB2: all the amodes should be Lits!
                 --      TODO (osa): Why?

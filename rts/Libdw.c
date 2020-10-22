@@ -133,6 +133,11 @@ int libdwLookupLocation(LibdwSession *session, Location *frame,
     Dwfl_Module *mod = dwfl_addrmodule(session->dwfl, addr);
     if (mod == NULL)
         return 1;
+    // avoid unaligned pointer value
+    // Using &frame->object_file as argument to dwfl_module_info leads to
+    //
+    //   error: taking address of packed member of ‘struct Location_’ may result in an unaligned pointer value [-Werror=address-of-packed-member]
+    //
     void *object_file = &frame->object_file;
     dwfl_module_info(mod, NULL, NULL, NULL, NULL, NULL,
                      object_file, NULL);
