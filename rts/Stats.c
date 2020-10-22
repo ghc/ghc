@@ -26,6 +26,11 @@
 
 #include <string.h> // for memset
 
+#if defined(THREADED_RTS)
+// Protects all statistics below
+Mutex stats_mutex;
+#endif
+
 static Time
     start_init_cpu, start_init_elapsed,
     end_init_cpu,   end_init_elapsed,
@@ -101,6 +106,10 @@ mut_user_time_during_RP( void )
 void
 initStats0(void)
 {
+#if defined(THREADED_RTS)
+    initMutex(&stats_mutex);
+#endif
+
     start_init_cpu    = 0;
     start_init_elapsed = 0;
     end_init_cpu     = 0;
@@ -262,9 +271,11 @@ stat_endInit(void)
 void
 stat_startExit(void)
 {
+    ACQUIRE_LOCK(&stats_mutex);
     getProcessTimes(&start_exit_cpu, &start_exit_elapsed);
     start_exit_gc_elapsed = stats.gc_elapsed_ns;
     start_exit_gc_cpu = stats.gc_cpu_ns;
+    RELEASE_LOCK(&stats_mutex);
 }
 
 /* -----------------------------------------------------------------------------
@@ -275,7 +286,9 @@ stat_startExit(void)
 void
 stat_endExit(void)
 {
+    ACQUIRE_LOCK(&stats_mutex);
     getProcessTimes(&end_exit_cpu, &end_exit_elapsed);
+    RELEASE_LOCK(&stats_mutex);
 }
 
 void
@@ -287,8 +300,10 @@ stat_startGCSync (gc_thread *gct)
 void
 stat_startNonmovingGc ()
 {
+    ACQUIRE_LOCK(&stats_mutex);
     start_nonmoving_gc_cpu = getCurrentThreadCPUTime();
     start_nonmoving_gc_elapsed = getProcessCPUTime();
+    RELEASE_LOCK(&stats_mutex);
 }
 
 void
@@ -296,6 +311,8 @@ stat_endNonmovingGc ()
 {
     Time cpu = getCurrentThreadCPUTime();
     Time elapsed = getProcessCPUTime();
+
+    ACQUIRE_LOCK(&stats_mutex);
     stats.gc.nonmoving_gc_elapsed_ns = elapsed - start_nonmoving_gc_elapsed;
     stats.nonmoving_gc_elapsed_ns += stats.gc.nonmoving_gc_elapsed_ns;
 
@@ -305,12 +322,15 @@ stat_endNonmovingGc ()
     stats.nonmoving_gc_max_elapsed_ns =
       stg_max(stats.gc.nonmoving_gc_elapsed_ns,
               stats.nonmoving_gc_max_elapsed_ns);
+    RELEASE_LOCK(&stats_mutex);
 }
 
 void
 stat_startNonmovingGcSync ()
 {
+    ACQUIRE_LOCK(&stats_mutex);
     start_nonmoving_gc_sync_elapsed = getProcessElapsedTime();
+    RELEASE_LOCK(&stats_mutex);
     traceConcSyncBegin();
 }
 
@@ -318,13 +338,17 @@ void
 stat_endNonmovingGcSync ()
 {
     Time end_elapsed = getProcessElapsedTime();
+    ACQUIRE_LOCK(&stats_mutex);
     stats.gc.nonmoving_gc_sync_elapsed_ns = end_elapsed - start_nonmoving_gc_sync_elapsed;
     stats.nonmoving_gc_sync_elapsed_ns +=  stats.gc.nonmoving_gc_sync_elapsed_ns;
     stats.nonmoving_gc_sync_max_elapsed_ns =
       stg_max(stats.gc.nonmoving_gc_sync_elapsed_ns,
               stats.nonmoving_gc_sync_max_elapsed_ns);
+    Time sync_elapsed = stats.gc.nonmoving_gc_sync_elapsed_ns;
+    RELEASE_LOCK(&stats_mutex);
+
     if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
-      statsPrintf("# sync %6.3f\n", TimeToSecondsDbl(stats.gc.nonmoving_gc_sync_elapsed_ns));
+      statsPrintf("# sync %6.3f\n", TimeToSecondsDbl(sync_elapsed));
     }
     traceConcSyncEnd();
 }
@@ -440,6 +464,8 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
             W_ mut_spin_spin, W_ mut_spin_yield, W_ any_work, W_ no_work,
             W_ scav_find_work)
 {
+    ACQUIRE_LOCK(&stats_mutex);
+
     // -------------------------------------------------
     // Collect all the stats about this GC in stats.gc. We always do this since
     // it's relatively cheap and we need allocated_bytes to catch heap
@@ -609,6 +635,7 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
                            CAPSET_HEAP_DEFAULT,
                            mblocks_allocated * MBLOCK_SIZE);
     }
+    RELEASE_LOCK(&stats_mutex);
 }
 
 /* -----------------------------------------------------------------------------
@@ -621,8 +648,10 @@ stat_startRP(void)
     Time user, elapsed;
     getProcessTimes( &user, &elapsed );
 
+    ACQUIRE_LOCK(&stats_mutex);
     RP_start_time = user;
     RPe_start_time = elapsed;
+    RELEASE_LOCK(&stats_mutex);
 }
 #endif /* PROFILING */
 
@@ -640,11 +669,14 @@ stat_endRP(
     Time user, elapsed;
     getProcessTimes( &user, &elapsed );
 
+    ACQUIRE_LOCK(&stats_mutex);
     RP_tot_time += user - RP_start_time;
     RPe_tot_time += elapsed - RPe_start_time;
+    double mut_time_during_RP = mut_user_time_during_RP();
+    RELEASE_LOCK(&stats_mutex);
 
     fprintf(prof_file, "Retainer Profiling: %d, at %f seconds\n",
-      retainerGeneration, mut_user_time_during_RP());
+            retainerGeneration, mut_time_during_RP);
     fprintf(prof_file, "\tMax auxiliary stack size = %u\n", maxStackSize);
     fprintf(prof_file, "\tAverage number of visits per object = %f\n",
             averageNumVisit);
@@ -661,8 +693,10 @@ stat_startHeapCensus(void)
     Time user, elapsed;
     getProcessTimes( &user, &elapsed );
 
+    ACQUIRE_LOCK(&stats_mutex);
     HC_start_time = user;
     HCe_start_time = elapsed;
+    RELEASE_LOCK(&stats_mutex);
 }
 #endif /* PROFILING */
 
@@ -676,8 +710,10 @@ stat_endHeapCensus(void)
     Time user, elapsed;
     getProcessTimes( &user, &elapsed );
 
+    ACQUIRE_LOCK(&stats_mutex);
     HC_tot_time += user - HC_start_time;
     HCe_tot_time += elapsed - HCe_start_time;
+    RELEASE_LOCK(&stats_mutex);
 }
 #endif /* PROFILING */
 
@@ -774,6 +810,7 @@ static void free_RTSSummaryStats(RTSSummaryStats * sum)
     sum->gc_summary_stats = NULL;
 }
 
+// Must hold stats_mutex.
 static void report_summary(const RTSSummaryStats* sum)
 {
     // We should do no calculation, other than unit changes and formatting, and
@@ -1176,6 +1213,7 @@ static void report_machine_readable (const RTSSummaryStats * sum)
     statsPrintf(" ]\n");
 }
 
+// Must hold stats_mutex.
 static void report_one_line(const RTSSummaryStats * sum)
 {
     // We should do no calculation, other than unit changes and formatting, and
@@ -1222,6 +1260,7 @@ stat_exit (void)
             Time now_cpu_ns, now_elapsed_ns;
             getProcessTimes(&now_cpu_ns, &now_elapsed_ns);
 
+            ACQUIRE_LOCK(&stats_mutex);
             stats.cpu_ns = now_cpu_ns - start_init_cpu;
             stats.elapsed_ns = now_elapsed_ns - start_init_elapsed;
             /* avoid divide by zero if stats.total_cpu_ns is measured as 0.00
@@ -1410,6 +1449,10 @@ stat_exit (void)
                 report_one_line(&sum);
             }
         }
+        RELEASE_LOCK(&stats_mutex);
+#if defined(THREADED_RTS)
+        closeMutex(&stats_mutex);
+#endif
 
         statsFlush();
         statsClose();
@@ -1650,7 +1693,10 @@ statDescribeGens(void)
 
 uint64_t getAllocations( void )
 {
-    return stats.allocated_bytes;
+    ACQUIRE_LOCK(&stats_mutex);
+    StgWord64 n = stats.allocated_bytes;
+    RELEASE_LOCK(&stats_mutex);
+    return n;
 }
 
 int getRTSStatsEnabled( void )
@@ -1663,7 +1709,9 @@ void getRTSStats( RTSStats *s )
     Time current_elapsed = 0;
     Time current_cpu = 0;
 
+    ACQUIRE_LOCK(&stats_mutex);
     *s = stats;
+    RELEASE_LOCK(&stats_mutex);
 
     getProcessTimes(&current_cpu, &current_elapsed);
     s->cpu_ns = current_cpu - end_init_cpu;
