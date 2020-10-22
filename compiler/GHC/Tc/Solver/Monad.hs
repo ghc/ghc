@@ -117,11 +117,13 @@ module GHC.Tc.Solver.Monad (
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
     matchFam, matchFamTcM,
     checkWellStagedDFun,
-    pprEq                                    -- Smaller utils, re-exported from TcM
+    pprEq,                                   -- Smaller utils, re-exported from TcM
                                              -- TODO (DV): these are only really used in the
                                              -- instance matcher in GHC.Tc.Solver. I am wondering
                                              -- if the whole instance matcher simply belongs
                                              -- here
+
+    breakTyVarCycle
 ) where
 
 #include "HsVersions.h"
@@ -392,6 +394,11 @@ data InertSet
               -- Canonical Given, Wanted, Derived
               -- Sometimes called "the inert set"
 
+       , inert_tv_cycles :: [(TcTyVar, TcTyVar)]
+              -- a list of CycleBreakerTv / original tv pairs (in that order)
+              -- used to undo the cycle-breaking needed to handle
+              -- Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical
+
        {- "RAE"
        , inert_fsks :: [(TcTyVar, TcType)]
               -- A list of (fsk, ty) pairs; we add one element when we flatten
@@ -443,6 +450,7 @@ emptyInertCans
 emptyInert :: InertSet
 emptyInert
   = IS { inert_cans         = emptyInertCans
+       , inert_tv_cycles    = []
        , inert_flat_cache   = emptyFunEqs
        , inert_solved_dicts = emptyDictMap }
 
@@ -2791,7 +2799,7 @@ runTcSEqualities thing_inside
 runTcSInerts :: InertSet -> TcS a -> TcM (a, InertSet)
 runTcSInerts inerts tcs = do
   ev_binds_var <- TcM.newTcEvBinds
-  runTcSWithEvBinds ev_binds_var $ do
+  runTcSWithEvBinds' False ev_binds_var $ do
     setTcSInerts inerts
     a <- tcs
     new_inerts <- getTcSInerts
@@ -2800,7 +2808,16 @@ runTcSInerts inerts tcs = do
 runTcSWithEvBinds :: EvBindsVar
                   -> TcS a
                   -> TcM a
-runTcSWithEvBinds ev_binds_var tcs
+runTcSWithEvBinds = runTcSWithEvBinds' True
+
+runTcSWithEvBinds' :: Bool -- ^ Restore type variable cycles afterwards?
+                           -- Don't if you want to reuse the InertSet.
+                           -- See also Note [Type variable cycles in Givens]
+                           -- in GHC.Tc.Solver.Canonical
+                   -> EvBindsVar
+                   -> TcS a
+                   -> TcM a
+runTcSWithEvBinds' restore_cycles ev_binds_var tcs
   = do { unified_var <- TcM.newTcRef 0
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef emptyInert
@@ -2817,6 +2834,10 @@ runTcSWithEvBinds ev_binds_var tcs
        ; count <- TcM.readTcRef step_count
        ; when (count > 0) $
          csTraceTcM $ return (text "Constraint solver steps =" <+> int count)
+
+       ; when restore_cycles $
+         do { inert_set <- TcM.readTcRef inert_var
+            ; restoreTyVarCycles inert_set }
 
 #if defined(DEBUG)
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
@@ -2880,6 +2901,9 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
                                , tcs_worklist      = new_wl_var }
        ; res <- TcM.setTcLevel inner_tclvl $
                 thing_inside nest_env
+
+       ; out_inert_set <- TcM.readTcRef new_inert_var
+       ; restoreTyVarCycles out_inert_set
 
 #if defined(DEBUG)
        -- Perform a check that the thing_inside did not cause cycles
@@ -3628,3 +3652,33 @@ from which we get the implication
    (forall a. t1 ~ t2)
 See GHC.Tc.Solver.Monad.deferTcSForAllEq
 -}
+
+{-
+************************************************************************
+*                                                                      *
+              Breaking type variable cycles
+*                                                                      *
+************************************************************************
+-}
+
+-- | Replace all occurrences of the LHS tyvar in an RHS with a fresh
+-- variable, recording the pairing in the TcS monad.
+-- See Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical.
+breakTyVarCycle :: TyVar       -- the LHS tyvar
+                -> TcType      -- the RHS
+                -> TcS TcType  -- new RHS that doesn't mention TyVar
+breakTyVarCycle lhs_tv rhs
+  = do { new_tv <- wrapTcS (TcM.newCycleBreakerTyVar lhs_tv)
+       ; updInertTcS $ \is ->
+           is { inert_tv_cycles = (new_tv, lhs_tv) : inert_tv_cycles is }
+       ; let in_scope = mkInScopeSet (tyCoVarsOfType rhs)
+             subst0   = mkEmptyTCvSubst in_scope
+             subst    = extendTvSubstWithClone subst0 lhs_tv new_tv
+       ; return (substTy subst rhs) }
+
+-- | Filli in CycleBreakerTvs with the variables they stand for.
+-- See Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical.
+restoreTyVarCycles :: InertSet -> TcM ()
+restoreTyVarCycles is
+  = forM_ (inert_tv_cycles is) $ \ (cycle_breaker_tv, orig_tv) ->
+    TcM.writeMetaTyVar cycle_breaker_tv (mkTyVarTy orig_tv)
