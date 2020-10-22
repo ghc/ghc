@@ -2227,9 +2227,8 @@ mightMatchLater given_pred given_loc wanted_pred wanted_loc
     -- something that matches the 'given', until demonstrated
     -- otherwise.  More info in Note [Instance and Given overlap]
     -- in GHC.Tc.Solver.Interact
-    bind_meta_tv tv | isMetaTyVar tv
-                    , not (isFskTyVar tv) = BindMe
-                    | otherwise           = Skolem
+    bind_meta_tv tv | isMetaTyVar tv = BindMe
+                    | otherwise      = Skolem
 
 prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
 -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
@@ -3214,67 +3213,6 @@ zonkWC wc = wrapTcS (TcM.zonkWC wc)
 zonkTyCoVarKind :: TcTyCoVar -> TcS TcTyCoVar
 zonkTyCoVarKind tv = wrapTcS (TcM.zonkTyCoVarKind tv)
 
-{- "RAE"
-{- *********************************************************************
-*                                                                      *
-*                Flatten skolems                                       *
-*                                                                      *
-********************************************************************* -}
-
-newFlattenSkolem :: CtFlavour -> CtLoc
-                 -> TyCon -> [TcType]                    -- F xis
-                 -> TcS (CtEvidence, Coercion, TcTyVar)  -- [G/WD] x:: F xis ~ fsk
-newFlattenSkolem flav loc tc xis
-  = do { stuff@(ev, co, fsk) <- new_skolem
-       ; let fsk_ty = mkTyVarTy fsk
-       ; extendFlatCache tc xis (co, fsk_ty, ctEvFlavour ev)
-       ; return stuff }
-  where
-    fam_ty = mkTyConApp tc xis
-
-    new_skolem
-      | Given <- flav
-      = do { fsk <- wrapTcS (TcM.newFskTyVar fam_ty)
-
-           -- Extend the inert_fsks list, for use by unflattenGivens
-           ; updInertTcS $ \is -> is { inert_fsks = (fsk, fam_ty) : inert_fsks is }
-
-           -- Construct the Refl evidence
-           ; let pred = mkPrimEqPred fam_ty (mkTyVarTy fsk)
-                 co   = mkNomReflCo fam_ty
-           ; ev  <- newGivenEvVar loc (pred, evCoercion co)
-           ; return (ev, co, fsk) }
-
-      | otherwise  -- Generate a [WD] for both Wanted and Derived
-                   -- See Note [No Derived CFunEqCans]
-      = do { fmv <- wrapTcS (TcM.newFmvTyVar fam_ty)
-              -- See (2a) in "GHC.Tc.Solver.Canonical"
-              -- Note [Equalities with incompatible kinds]
-           ; (ev, hole_co) <- newWantedEq_SI tcNoBlockSubst WDeriv loc Nominal
-                                             fam_ty (mkTyVarTy fmv)
-           ; return (ev, hole_co, fmv) }
-
-
-----------------------------
-unflattenGivens :: IORef InertSet -> TcM ()
--- Unflatten all the fsks created by flattening types in Given
--- constraints. We must be sure to do this, else we end up with
--- flatten-skolems buried in any residual Wanteds
---
--- NB: this is the /only/ way that a fsk (MetaDetails = FlatSkolTv)
---     is filled in. Nothing else does so.
---
--- It's here (rather than in GHC.Tc.Solver.Flatten) because the Right Places
--- to call it are in runTcSWithEvBinds/nestImplicTcS, where it
--- is nicely paired with the creation an empty inert_fsks list.
-unflattenGivens inert_var
- = do { inerts <- TcM.readTcRef inert_var
-       ; TcM.traceTc "unflattenGivens" (ppr (inert_fsks inerts))
-       ; mapM_ flatten_one (inert_fsks inerts) }
-  where
-    flatten_one (fsk, ty) = TcM.writeMetaTyVar fsk ty
--}
-
 ----------------------------
 extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
 extendFlatCache tc xi_args stuff@(_, ty)
@@ -3285,71 +3223,6 @@ extendFlatCache tc xi_args stuff@(_, ty)
             -- 'co' can be bottom, in the case of derived items
        ; updInertTcS $ \ is@(IS { inert_flat_cache = fc }) ->
             is { inert_flat_cache = insertFunEq fc tc xi_args stuff } } }
-
-{- "RAE"
-----------------------------
-unflattenFmv :: TcTyVar -> TcType -> TcS ()
--- Fill a flatten-meta-var, simply by unifying it.
--- This does NOT count as a unification in tcs_unified.
-unflattenFmv tv ty
-  = ASSERT2( isMetaTyVar tv, ppr tv )
-    TcS $ \ _ ->
-    do { TcM.traceTc "unflattenFmv" (ppr tv <+> text ":=" <+> ppr ty)
-       ; TcM.writeMetaTyVar tv ty }
-
-----------------------------
-demoteUnfilledFmv :: TcTyVar -> TcS ()
--- If a flatten-meta-var is still un-filled,
--- turn it into an ordinary meta-var
-demoteUnfilledFmv fmv
-  = wrapTcS $ do { is_filled <- TcM.isFilledMetaTyVar fmv
-                 ; unless is_filled $
-                   do { tv_ty <- TcM.newFlexiTyVarTy (tyVarKind fmv)
-                      ; TcM.writeMetaTyVar fmv tv_ty } }
-
------------------------------
-dischargeFunEq :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
--- (dischargeFunEq tv co ty)
---     Preconditions
---       - ev :: F tys ~ tv   is a CFunEqCan
---       - tv is a FlatMetaTv of FlatSkolTv
---       - co :: F tys ~ xi
---       - fmv/fsk `notElem` xi
---       - fmv not filled (for Wanteds)
---       - xi is flattened (and obeys Note [Almost function-free] in GHC.Tc.Types)
---
--- Then for [W] or [WD], we actually fill in the fmv:
---      set fmv := xi,
---      set ev  := co
---      kick out any inert things that are now rewritable
---
--- For [D], we instead emit an equality that must ultimately hold
---      [D] xi ~ fmv
---      Does not evaluate 'co' if 'ev' is Derived
---
--- For [G], emit this equality
---     [G] (sym ev; co) :: fsk ~ xi
-
--- See GHC.Tc.Solver.Flatten Note [The flattening story],
--- especially "Ownership of fsk/fmv"
-dischargeFunEq (CtGiven { ctev_evar = old_evar, ctev_loc = loc }) fsk co xi
-  = do { new_ev <- newGivenEvVar loc ( new_pred, evCoercion new_co  )
-       ; emitWorkNC [new_ev] }
-  where
-    new_pred = mkPrimEqPred (mkTyVarTy fsk) xi
-    new_co   = mkTcSymCo (mkTcCoVarCo old_evar) `mkTcTransCo` co
-
-dischargeFunEq ev@(CtWanted { ctev_dest = dest }) fmv co xi
-  = ASSERT2( not (fmv `elemVarSet` tyCoVarsOfType xi), ppr ev $$ ppr fmv $$ ppr xi )
-    do { setWantedEvTerm dest (evCoercion co)
-       ; unflattenFmv fmv xi
-       ; n_kicked <- kickOutAfterUnification fmv
-       ; traceTcS "dischargeFmv" (ppr fmv <+> equals <+> ppr xi $$ pprKicked n_kicked) }
-
-dischargeFunEq (CtDerived { ctev_loc = loc }) fmv _co xi
-  = emitNewDerivedEq loc Nominal xi (mkTyVarTy fmv)
-              -- FunEqs are always at Nominal role
--}
 
 pprKicked :: Int -> SDoc
 pprKicked 0 = empty
