@@ -1228,6 +1228,11 @@ emitPrimOp dflags primop = case primop of
   Int16LtOp       -> \args -> opTranslate args (MO_S_Lt W16)
   Int16NeOp       -> \args -> opTranslate args (MO_Ne W16)
 
+-- Int32# signed ops
+
+  Int32Extend     -> \args -> opTranslate args (MO_SS_Conv W32 (wordWidth platform))
+  Int32Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W32)
+
 -- Word16# unsigned ops
 
   Word16Extend     -> \args -> opTranslate args (MO_UU_Conv W16 (wordWidth platform))
