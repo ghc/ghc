@@ -62,4 +62,4 @@ instance Instruction X86.Instr where
    mkStackAllocInstr       = X86.mkStackAllocInstr
    mkStackDeallocInstr     = X86.mkStackDeallocInstr
    pprInstr                = X86.pprInstr
-
+   mkComment               = const []

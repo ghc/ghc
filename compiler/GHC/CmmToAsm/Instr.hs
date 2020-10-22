@@ -16,6 +16,8 @@ import GHC.Cmm.BlockId
 
 import GHC.CmmToAsm.Config
 
+import GHC.Stack
+
 -- | Holds a list of source and destination registers used by a
 --      particular instruction.
 --
@@ -31,6 +33,7 @@ data RegUsage
                 reads :: [Reg],
                 writes :: [Reg]
                 }
+        deriving Show
 
 -- | No regs read or written to.
 noUsage :: RegUsage
@@ -86,20 +89,22 @@ class Instruction instr where
 
         -- | An instruction to spill a register into a spill slot.
         mkSpillInstr
-                :: NCGConfig
+                :: HasCallStack
+                => NCGConfig
                 -> Reg          -- ^ the reg to spill
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ spill slot to use
-                -> instr
+                -> [instr]        -- ^ instructions
 
 
         -- | An instruction to reload a register from a spill slot.
         mkLoadInstr
-                :: NCGConfig
+                :: HasCallStack
+                => NCGConfig
                 -> Reg          -- ^ the reg to reload.
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ the spill slot to use
-                -> instr
+                -> [instr]        -- ^ instructions
 
         -- | See if this instruction is telling us the current C stack delta
         takeDeltaInstr
@@ -157,3 +162,6 @@ class Instruction instr where
 
         -- | Pretty-print an instruction
         pprInstr :: Platform -> instr -> SDoc
+
+        -- Create a comment instruction
+        mkComment :: SDoc -> [instr]
