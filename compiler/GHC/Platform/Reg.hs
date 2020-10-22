@@ -181,7 +181,7 @@ realRegsAlias rr1 rr2
 data Reg
         = RegVirtual !VirtualReg
         | RegReal    !RealReg
-        deriving (Eq, Ord)
+        deriving (Eq, Ord, Show)
 
 regSingle :: RegNo -> Reg
 regSingle regNo = RegReal (realRegSingle regNo)
