@@ -118,6 +118,7 @@ import GHC.Data.FastString
 import GHC.Builtin.Names hiding ( wildCardName )
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Parser.Annotation
 
 import GHC.Data.Maybe
 import GHC.Data.Bag( unitBag )
@@ -979,7 +980,7 @@ tc_hs_type mode ty@(HsFunTy _ mult ty1 ty2) exp_kind
 
 tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
-  = tc_fun_type mode HsUnrestrictedArrow ty1 ty2 exp_kind
+  = tc_fun_type mode (HsUnrestrictedArrow NormalSyntax) ty1 ty2 exp_kind
 
 --------- Foralls
 tc_hs_type mode forall@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind

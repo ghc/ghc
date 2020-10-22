@@ -50,6 +50,7 @@ import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable as Outputable
+import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
@@ -1457,7 +1458,7 @@ cvtTypeKind ty_str ty
                           _            -> return $
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
-                 returnL (HsFunTy noExtField HsUnrestrictedArrow x'' y'')
+                 returnL (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) x'' y'')
              | otherwise
              -> mk_apps
                 (HsTyVar noExtField NotPromoted (noLoc (getRdrName unrestrictedFunTyCon)))
@@ -1609,9 +1610,9 @@ cvtTypeKind ty_str ty
 hsTypeToArrow :: LHsType GhcPs -> HsArrow GhcPs
 hsTypeToArrow w = case unLoc w of
                      HsTyVar _ _ (L _ (isExact_maybe -> Just n))
-                        | n == oneDataConName -> HsLinearArrow
-                        | n == manyDataConName -> HsUnrestrictedArrow
-                     _ -> HsExplicitMult w
+                        | n == oneDataConName -> HsLinearArrow NormalSyntax
+                        | n == manyDataConName -> HsUnrestrictedArrow NormalSyntax
+                     _ -> HsExplicitMult NormalSyntax w
 
 -- ConT/InfixT can contain both data constructor (i.e., promoted) names and
 -- other (i.e, unpromoted) names, as opposed to PromotedT, which can only
