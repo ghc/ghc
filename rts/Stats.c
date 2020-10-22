@@ -81,25 +81,6 @@ Time stat_getElapsedTime(void)
    Measure the current MUT time, for profiling
    ------------------------------------------------------------------------ */
 
-double
-mut_user_time_until( Time t )
-{
-    return TimeToSecondsDbl(t - stats.gc_cpu_ns - stats.nonmoving_gc_cpu_ns);
-    // heapCensus() time is included in GC_tot_cpu, so we don't need
-    // to subtract it here.
-
-    // TODO: This seems wrong to me. Surely we should be subtracting
-    // (at least) start_init_cpu?
-}
-
-double
-mut_user_time( void )
-{
-    Time cpu;
-    cpu = getProcessCPUTime();
-    return mut_user_time_until(cpu);
-}
-
 #if defined(PROFILING)
 /*
   mut_user_time_during_RP() returns the MUT time during retainer profiling.
