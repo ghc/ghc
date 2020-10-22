@@ -1306,8 +1306,8 @@ genCCall target dest_regs arg_regs bid = do
 
     -- No mor regs left to pass. Must pass on stack.
     passArguments pack [] [] ((r, format, hint, code_r):args) stackSpace accumRegs accumCode = do
-      let -- w = formatToWidth format
-          w = hintToWidth hint
+      let w = formatToWidth format
+          -- w = hintToWidth hint
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
           stackCode = code_r `snocOL` (ANN (text $ "Pass argument (size " ++ show w ++ ") on the stack: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
@@ -1315,8 +1315,8 @@ genCCall target dest_regs arg_regs bid = do
 
     -- Still have fpRegs left, but want to pass a GP argument. Must be passed on the stack then.
     passArguments pack [] fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
-      let -- w = formatToWidth format
-          w = hintToWidth hint
+      let w = formatToWidth format
+          -- w = hintToWidth hint
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
           stackCode = code_r `snocOL` (ANN (text $ "Pass argument (size " ++ show w ++ ") on the stack: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
@@ -1324,8 +1324,8 @@ genCCall target dest_regs arg_regs bid = do
 
     -- Still have gpRegs left, but want to pass a FP argument. Must be passed on the stack then.
     passArguments pack gpRegs [] ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isFloatFormat format = do
-      let -- w = formatToWidth format
-          w = hintToWidth hint
+      let w = formatToWidth format
+          -- w = hintToWidth hint
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
           stackCode = code_r `snocOL` (ANN (text $ "Pass argument (size " ++ show w ++ ") on the stack: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
