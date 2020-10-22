@@ -1387,6 +1387,12 @@ primRepToFFIType platform r
      VoidRep     -> FFIVoid
      IntRep      -> signed_word
      WordRep     -> unsigned_word
+     Int8Rep     -> FFISInt8
+     Word8Rep    -> FFIUInt8
+     Int16Rep    -> FFISInt16
+     Word16Rep   -> FFIUInt16
+     Int32Rep    -> FFISInt32
+     Word32Rep   -> FFIUInt32
      Int64Rep    -> FFISInt64
      Word64Rep   -> FFIUInt64
      AddrRep     -> FFIPointer
@@ -1405,6 +1411,12 @@ mkDummyLiteral platform pr
    = case pr of
         IntRep    -> mkLitInt  platform 0
         WordRep   -> mkLitWord platform 0
+        Int8Rep   -> mkLitInt8 0
+        Word8Rep  -> mkLitWord8 0
+        Int16Rep  -> mkLitInt16 0
+        Word16Rep -> mkLitWord16 0
+        Int32Rep  -> mkLitInt32 0
+        Word32Rep -> mkLitWord32 0
         Int64Rep  -> mkLitInt64 0
         Word64Rep -> mkLitWord64 0
         AddrRep   -> LitNullAddr
@@ -1621,24 +1633,39 @@ pushAtom d p (AnnVar var)
 
 pushAtom _ _ (AnnLit lit) = do
      platform <- targetPlatform <$> getDynFlags
-     let code rep
-             = let size_words = WordOff (argRepSizeW platform rep)
-               in  return (unitOL (PUSH_UBX lit (trunc16W size_words)),
-                           wordsToBytes platform size_words)
+     let code :: PrimRep -> BcM (BCInstrList, ByteOff)
+         code rep =
+            return (unitOL instr, size_bytes)
+          where
+            size_bytes = ByteOff $ primRepSizeB platform rep
+            -- Here we handle the non-word-width cases specifically since we
+            -- must emit different bytecode for them.
+            instr =
+              case size_bytes of
+                1  -> PUSH_UBX8 lit
+                2  -> PUSH_UBX16 lit
+                4  -> PUSH_UBX32 lit
+                _  -> PUSH_UBX lit (trunc16W $ bytesToWords platform size_bytes)
 
      case lit of
-        LitLabel _ _ _  -> code N
-        LitFloat _      -> code F
-        LitDouble _     -> code D
-        LitChar _       -> code N
-        LitNullAddr     -> code N
-        LitString _     -> code N
-        LitRubbish      -> code N
+        LitLabel _ _ _  -> code AddrRep
+        LitFloat _      -> code FloatRep
+        LitDouble _     -> code DoubleRep
+        LitChar _       -> code WordRep
+        LitNullAddr     -> code AddrRep
+        LitString _     -> code AddrRep
+        LitRubbish      -> code WordRep
         LitNumber nt _  -> case nt of
-          LitNumInt     -> code N
-          LitNumWord    -> code N
-          LitNumInt64   -> code L
-          LitNumWord64  -> code L
+          LitNumInt     -> code IntRep
+          LitNumWord    -> code WordRep
+          LitNumInt8    -> code Int8Rep
+          LitNumWord8   -> code Word8Rep
+          LitNumInt16   -> code Int16Rep
+          LitNumWord16  -> code Word16Rep
+          LitNumInt32   -> code Int32Rep
+          LitNumWord32  -> code Word32Rep
+          LitNumInt64   -> code Int64Rep
+          LitNumWord64  -> code Word64Rep
           -- No LitInteger's or LitNatural's should be left by the time this is
           -- called. CorePrep should have converted them all to a real core
           -- representation.
