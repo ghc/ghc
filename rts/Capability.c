@@ -211,7 +211,10 @@ newReturningTask (Capability *cap, Task *task)
         cap->returning_tasks_hd = task;
     }
     cap->returning_tasks_tl = task;
-    cap->n_returning_tasks++;
+
+    // See Note [Data race in shouldYieldCapability] in Schedule.c.
+    RELAXED_ADD(&cap->n_returning_tasks, 1);
+
     ASSERT_RETURNING_TASKS(cap,task);
 }
 
@@ -227,7 +230,10 @@ popReturningTask (Capability *cap)
         cap->returning_tasks_tl = NULL;
     }
     task->next = NULL;
-    cap->n_returning_tasks--;
+
+    // See Note [Data race in shouldYieldCapability] in Schedule.c.
+    RELAXED_ADD(&cap->n_returning_tasks, -1);
+
     ASSERT_RETURNING_TASKS(cap,task);
     return task;
 }
