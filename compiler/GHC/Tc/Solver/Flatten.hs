@@ -5,7 +5,7 @@
 module GHC.Tc.Solver.Flatten(
    FlattenMode(..),
    flatten, flattenKind, flattenArgsNom,
-   rewriteTyVar, flattenType
+   flattenType
  ) where
 
 #include "HsVersions.h"
@@ -36,49 +36,17 @@ import GHC.Utils.Monad ( zipWith3M )
 import Control.Arrow ( first )
 
 {-
-Note [Unflattening can force the solver to iterate]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Look at #10340:
-   type family Any :: *   -- No instances
-   get :: MonadState s m => m s
-   instance MonadState s (State s) where ...
-
-   foo :: State Any Any
-   foo = get
-
-For 'foo' we instantiate 'get' at types mm ss
-   [WD] MonadState ss mm, [WD] mm ss ~ State Any Any
-Flatten, and decompose
-   [WD] MonadState ss mm, [WD] Any ~ fmv
-   [WD] mm ~ State fmv, [WD] fmv ~ ss
-Unify mm := State fmv:
-   [WD] MonadState ss (State fmv)
-   [WD] Any ~ fmv, [WD] fmv ~ ss
-Now we are stuck; the instance does not match!!  So unflatten:
-   fmv := Any
-   ss := Any    (*)
-   [WD] MonadState Any (State Any)
-
-The unification (*) represents progress, so we must do a second
-round of solving; this time it succeeds. This is done by the 'go'
-loop in solveSimpleWanteds.
-
-This story does not feel right but it's the best I can do; and the
-iteration only happens in pretty obscure circumstances.
-
 ************************************************************************
 *                                                                      *
 *                FlattenEnv & FlatM
 *             The flattening environment & monad
 *                                                                      *
 ************************************************************************
-
 -}
 
 data FlattenEnv
   = FE { fe_mode    :: !FlattenMode
-       , fe_loc     :: CtLoc              -- See Note [Flattener CtLoc]
-                      -- unbanged because it's bogus in rewriteTyVar
+       , fe_loc     :: !CtLoc             -- See Note [Flattener CtLoc]
        , fe_flavour :: !CtFlavour
        , fe_eq_rel  :: !EqRel             -- See Note [Flattener EqRels]
        }
@@ -300,19 +268,6 @@ changes the flavour from Derived just for this purpose.
 *  flattening work gets put into the work list                         *
 *                                                                      *
 *********************************************************************
-
-Note [rewriteTyVar]
-~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have an injective function F and
-  inert_funeqs:   F t1 ~ fsk1
-                  F t2 ~ fsk2
-  inert_eqs:      fsk1 ~ [a]
-                  a ~ Int
-                  fsk2 ~ [Int]
-
-We never rewrite the RHS (cc_fsk) of a CFunEqCan. But we /do/ want to get the
-[D] t1 ~ t2 from the injectiveness of F. So we flatten cc_fsk of CFunEqCans
-when trying to find derived equalities arising from injectivity.
 -}
 
 -- | See Note [Flattening].
@@ -325,24 +280,6 @@ flatten mode ev ty
        ; (ty', co) <- runFlattenCtEv mode ev (flatten_one ty)
        ; traceTcS "flatten }" (ppr ty')
        ; return (ty', co) }
-
--- Apply the inert set as an *inert generalised substitution* to
--- a variable, zonking along the way.
--- See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.Monad.
--- Equivalently, this flattens the variable with respect to NomEq
--- in a Derived constraint. (Why Derived? Because Derived allows the
--- most about of rewriting.) Returns no coercion, because we're
--- using Derived constraints.
--- See Note [rewriteTyVar]
-rewriteTyVar :: TcTyVar -> TcS TcType
-rewriteTyVar tv
-  = do { traceTcS "rewriteTyVar {" (ppr tv)
-       ; (ty, _) <- runFlatten FM_SubstOnly fake_loc Derived NomEq $
-                    flattenTyVar tv
-       ; traceTcS "rewriteTyVar }" (ppr ty)
-       ; return ty }
-  where
-    fake_loc = pprPanic "rewriteTyVar used a CtLoc" (ppr tv)
 
 -- specialized to flattening kinds: never Derived, always Nominal
 -- See Note [No derived kind equalities]
