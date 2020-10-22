@@ -174,6 +174,8 @@ instance Instruction instr => Instruction (InstrSR instr) where
 
         pprInstr platform i = ppr (fmap (pprInstr platform) i)
 
+        mkComment               = fmap Instr . mkComment
+
 
 -- | An instruction with liveness information.
 data LiveInstr instr
@@ -565,16 +567,20 @@ stripLiveBlock config (BasicBlock i lis)
  where  (instrs', _)
                 = runState (spillNat [] lis) 0
 
+        -- spillNat :: [instr] -> [LiveInstr instr] -> State Int [instr]
+        spillNat :: Instruction instr => [instr] -> [LiveInstr instr] -> State Int [instr]
         spillNat acc []
          =      return (reverse acc)
 
+        -- The SPILL/RELOAD cases do not appear to be exercised by our codegens
+        --
         spillNat acc (LiveInstr (SPILL reg slot) _ : instrs)
          = do   delta   <- get
-                spillNat (mkSpillInstr config reg delta slot : acc) instrs
+                spillNat (mkSpillInstr config reg delta slot ++ acc) instrs
 
         spillNat acc (LiveInstr (RELOAD slot reg) _ : instrs)
          = do   delta   <- get
-                spillNat (mkLoadInstr config reg delta slot : acc) instrs
+                spillNat (mkLoadInstr config reg delta slot ++ acc) instrs
 
         spillNat acc (LiveInstr (Instr instr) _ : instrs)
          | Just i <- takeDeltaInstr instr

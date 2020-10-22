@@ -12,6 +12,7 @@ module GHC.CmmToAsm.Format (
     Format(..),
     intFormat,
     floatFormat,
+    isIntFormat,
     isFloatFormat,
     cmmTypeFormat,
     formatToWidth,
@@ -73,6 +74,9 @@ floatFormat width
 
         other   -> pprPanic "Format.floatFormat" (ppr other)
 
+-- | Check if a format represent an integer value.
+isIntFormat :: Format -> Bool
+isIntFormat = not . isFloatFormat
 
 -- | Check if a format represents a floating point value.
 isFloatFormat :: Format -> Bool
