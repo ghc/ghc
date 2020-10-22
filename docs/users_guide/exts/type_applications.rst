@@ -4,7 +4,7 @@ Visible type application
 ========================
 
 .. extension:: TypeApplications
-    :shortdesc: Enable type application syntax in terms and types.
+    :shortdesc: Enable type application syntax in terms, patterns and types.
 
     :since: 8.0.1
 
@@ -28,6 +28,10 @@ not have a type signature, visible type application cannot be used.
 GHC also permits visible kind application, where users can declare the kind
 arguments to be instantiated in kind-polymorphic cases. Its usage parallels
 visible type application in the term level, as specified above.
+
+In addition to visible type application in terms and types, the type application
+syntax can be used in patterns matching a data constructor to bind type variables
+in that constructor's type.
 
 .. _inferred-vs-specified:
 
@@ -256,3 +260,32 @@ The braces are *not* allowed in the following places:
   could play a role.
 
 - On the left-hand sides of type declarations, such as classes, data types, etc.
+
+.. _type-applications-in-patterns:
+
+Type Applications in Patterns
+-----------------------------
+
+The type application syntax can be used in patterns that match a data
+constructor. The syntax can't be used with record patterns or infix patterns.
+This is useful in particular to bind existential type variables associated with
+a GADT data constructor as in the following example::
+
+    {-# LANGUAGE AllowAmbiguousTypes #-}
+    {-# LANGUAGE GADTs #-}
+    {-# LANGUAGE RankNTypes #-}
+    {-# LANGUAGE TypeApplications #-}
+    import Data.Proxy
+
+    data Foo where
+      Foo :: forall a. (Show a, Num a) => Foo
+
+    test :: Foo -> String
+    test x = case x of
+      Foo @t -> show @t 0
+
+    main :: IO ()
+    main = print $ test (Foo @Float)
+
+In this example, the case in ``test``` is binding an existential variable introduced
+by ``Foo`` that otherwise could not be named and used.
