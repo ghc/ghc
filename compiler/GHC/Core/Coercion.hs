@@ -14,7 +14,7 @@
 module GHC.Core.Coercion (
         -- * Main data type
         Coercion, CoercionN, CoercionR, CoercionP, MCoercion(..), MCoercionN, MCoercionR,
-        UnivCoProvenance, CoercionHole(..), BlockSubstFlag(..),
+        UnivCoProvenance, CoercionHole(..),
         coHoleCoVar, setCoHoleCoVar,
         LeftOrRight(..),
         Var, CoVar, TyCoVar,
@@ -3057,16 +3057,12 @@ bad_co_hole_co :: Coercion -> Monoid.Any
     folder = TyCoFolder { tcf_view  = const Nothing
                         , tcf_tyvar = const2 (Monoid.Any False)
                         , tcf_covar = const2 (Monoid.Any False)
-                        , tcf_hole  = const hole
+                        , tcf_hole  = const2 (Monoid.Any True)
                         , tcf_tycobinder = const2
                         }
 
     const2 :: a -> b -> c -> a
     const2 x _ _ = x
-
-    hole :: CoercionHole -> Monoid.Any
-    hole (CoercionHole { ch_blocker = YesBlockSubst }) = Monoid.Any True
-    hole _                                             = Monoid.Any False
 
 -- | Is there a blocking coercion hole in this type? See
 -- "GHC.Tc.Solver.Canonical" Note [Equalities with incompatible kinds]
@@ -3089,10 +3085,6 @@ coercionHolesOfCo   :: Coercion -> UniqSet CoercionHole
     folder = TyCoFolder { tcf_view  = const Nothing  -- don't look through synonyms
                         , tcf_tyvar = \ _ _ -> mempty
                         , tcf_covar = \ _ _ -> mempty
-                        , tcf_hole  = const hole
+                        , tcf_hole  = const unitUniqSet
                         , tcf_tycobinder = \ _ _ _ -> ()
                         }
-
-    hole :: CoercionHole -> HoleSet
-    hole h@(CoercionHole { ch_blocker = YesBlockSubst }) = unitUniqSet h
-    hole _non_block_subst                                = mempty
