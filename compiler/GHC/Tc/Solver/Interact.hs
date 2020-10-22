@@ -90,50 +90,6 @@ Note [Basic Simplifier Plan]
 
 If in Step 1 no such element exists, we have exceeded our context-stack
 depth and will simply fail.
-
-Note [Unflatten after solving the simple wanteds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We unflatten after solving the wc_simples of an implication, and before attempting
-to float. This means that
-
- * The fsk/fmv flatten-skolems only survive during solveSimples.  We don't
-   need to worry about them across successive passes over the constraint tree.
-   (E.g. we don't need the old ic_fsk field of an implication.
-
- * When floating an equality outwards, we don't need to worry about floating its
-   associated flattening constraints.
-
- * Another tricky case becomes easy: #4935
-       type instance F True a b = a
-       type instance F False a b = b
-
-       [w] F c a b ~ gamma
-       (c ~ True) => a ~ gamma
-       (c ~ False) => b ~ gamma
-
-   Obviously this is soluble with gamma := F c a b, and unflattening
-   will do exactly that after solving the simple constraints and before
-   attempting the implications.  Before, when we were not unflattening,
-   we had to push Wanted funeqs in as new givens.  Yuk!
-
-   Another example that becomes easy: indexed_types/should_fail/T7786
-      [W] BuriedUnder sub k Empty ~ fsk
-      [W] Intersect fsk inv ~ s
-      [w] xxx[1] ~ s
-      [W] forall[2] . (xxx[1] ~ Empty)
-                   => Intersect (BuriedUnder sub k Empty) inv ~ Empty
-
-Note [Running plugins on unflattened wanteds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There is an annoying mismatch between solveSimpleGivens and
-solveSimpleWanteds, because the latter needs to fiddle with the inert
-set, unflatten and zonk the wanteds.  It passes the zonked wanteds
-to runTcPluginsWanteds, which produces a replacement set of wanteds,
-some additional insolubles and a flag indicating whether to go round
-the loop again.  If so, prepareInertsForImplications is used to remove
-the previous wanteds (which will still be in the inert set).  Note
-that prepareInertsForImplications will discard the insolubles, so we
-must keep track of them separately.
 -}
 
 solveSimpleGivens :: [Ct] -> TcS ()
@@ -181,7 +137,6 @@ solveSimpleWanteds simples
 
             -- Run plugins
           ; (rerun_plugin, wc2) <- runTcPluginsWanted wc1
-             -- See Note [Running plugins on unflattened wanteds]
 
           ; if rerun_plugin
             then do { traceTcS "solveSimple going round again:" (ppr rerun_plugin)
@@ -1285,50 +1240,6 @@ I can think of two ways to fix this:
 **********************************************************************
 -}
 
-{- "RAE"
-interactFunEq :: InertCans -> Ct -> TcS (StopOrContinue Ct)
--- Try interacting the work item with the inert set
-interactFunEq inerts work_item@(CFunEqCan { cc_ev = ev, cc_fun = tc
-                                          , cc_tyargs = args, cc_fsk = fsk })
-  | Just inert_ct@(CFunEqCan { cc_ev = ev_i
-                             , cc_fsk = fsk_i })
-         <- findFunEq (inert_funeqs inerts) tc args
-  , pr@(swap_flag, upgrade_flag) <- ev_i `funEqCanDischarge` ev
-  = do { traceTcS "reactFunEq (rewrite inert item):" $
-         vcat [ text "work_item =" <+> ppr work_item
-              , text "inertItem=" <+> ppr ev_i
-              , text "(swap_flag, upgrade)" <+> ppr pr ]
-       ; if isSwapped swap_flag
-         then do {   -- Rewrite inert using work-item
-                   let work_item' | upgrade_flag = upgradeWanted work_item
-                                  | otherwise    = work_item
-                 ; updInertFunEqs $ \ feqs -> insertFunEq feqs tc args work_item'
-                      -- Do the updInertFunEqs before the reactFunEq, so that
-                      -- we don't kick out the inertItem as well as consuming it!
-                 ; reactFunEq ev fsk ev_i fsk_i
-                 ; stopWith ev "Work item rewrites inert" }
-         else do {   -- Rewrite work-item using inert
-                 ; when upgrade_flag $
-                   updInertFunEqs $ \ feqs -> insertFunEq feqs tc args
-                                                 (upgradeWanted inert_ct)
-                 ; reactFunEq ev_i fsk_i ev fsk
-                 ; stopWith ev "Inert rewrites work item" } }
-
-  | otherwise   -- Try improvement
-  = do { improveLocalFunEqs ev inerts tc args fsk
-       ; continueWith work_item }
-
-interactFunEq _ work_item = pprPanic "interactFunEq" (ppr work_item)
-
-upgradeWanted :: Ct -> Ct
--- We are combining a [W] F tys ~ fmv1 and [D] F tys ~ fmv2
--- so upgrade the [W] to [WD] before putting it in the inert set
-upgradeWanted ct = ct { cc_ev = upgrade_ev (cc_ev ct) }
-  where
-    upgrade_ev ev = ASSERT2( isWanted ev, ppr ct )
-                    ev { ctev_nosh = WDeriv }
--}
-
 improveLocalFunEqs :: CtEvidence -> InertCans -> TyCon -> [TcType] -> TcType
                    -> TcS ()
 -- Generate derived improvement equalities, by comparing
@@ -1402,19 +1313,6 @@ improveLocalFunEqs work_ev inerts fam_tc args rhs
         inert_loc = ctEvLoc inert_ev
         loc = inert_loc { ctl_depth = ctl_depth inert_loc `maxSubGoalDepth`
                                       ctl_depth work_loc }
-
-{- "RAE"
--------------
-reactFunEq :: CtEvidence -> TcTyVar    -- From this  :: F args1 ~ fsk1
-           -> CtEvidence -> TcTyVar    -- Solve this :: F args2 ~ fsk2
-           -> TcS ()
-reactFunEq from_this fsk1 solve_this fsk2
-  = do { traceTcS "reactFunEq"
-            (vcat [ppr from_this, ppr fsk1, ppr solve_this, ppr fsk2])
-       ; dischargeFunEq solve_this fsk2 (ctEvCoercion from_this) (mkTyVarTy fsk1)
-       ; traceTcS "reactFunEq done" (ppr from_this $$ ppr fsk1 $$
-                                     ppr solve_this $$ ppr fsk2) }
--}
 
 {- Note [Type inference for type families with injectivity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1880,63 +1778,6 @@ See
  * Note [Evidence for quantified constraints] in GHC.Core.Predicate
  * Note [Equality superclasses in quantified constraints]
    in GHC.Tc.Solver.Canonical
-
-Note [Flatten when discharging CFunEqCan]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have the following scenario (#16512):
-
-type family LV (as :: [Type]) (b :: Type) = (r :: Type) | r -> as b where
-  LV (a ': as) b = a -> LV as b
-
-[WD] w1 :: LV as0 (a -> b) ~ fmv1 (CFunEqCan)
-[WD] w2 :: fmv1 ~ (a -> fmv2) (CTyEqCan)
-[WD] w3 :: LV as0 b ~ fmv2 (CFunEqCan)
-
-We start with w1. Because LV is injective, we wish to see if the RHS of the
-equation matches the RHS of the CFunEqCan. The RHS of a CFunEqCan is always an
-fmv, so we "look through" to get (a -> fmv2). Then we run tcUnifyTyWithTFs.
-That performs the match, but it allows a type family application (such as the
-LV in the RHS of the equation) to match with anything. (See "Injective type
-families" by Stolarek et al., HS'15, Fig. 2) The matching succeeds, which
-means we can improve as0 (and b, but that's not interesting here). However,
-because the RHS of w1 can't see through fmv2 (we have no way of looking up a
-LHS of a CFunEqCan from its RHS, and this use case isn't compelling enough),
-we invent a new unification variable here. We thus get (as0 := a : as1).
-Rewriting:
-
-[WD] w1 :: LV (a : as1) (a -> b) ~ fmv1
-[WD] w2 :: fmv1 ~ (a -> fmv2)
-[WD] w3 :: LV (a : as1) b ~ fmv2
-
-We can now reduce both CFunEqCans, using the equation for LV. We get
-
-[WD] w2 :: (a -> LV as1 (a -> b)) ~ (a -> a -> LV as1 b)
-
-Now we decompose (and flatten) to
-
-[WD] w4 :: LV as1 (a -> b) ~ fmv3
-[WD] w5 :: fmv3 ~ (a -> fmv1)
-[WD] w6 :: LV as1 b ~ fmv4
-
-which is exactly where we started. These goals really are insoluble, but
-we would prefer not to loop. We thus need to find a way to bump the reduction
-depth, so that we can detect the loop and abort.
-
-The key observation is that we are performing a reduction. We thus wish
-to bump the level when discharging a CFunEqCan. Where does this bumped
-level go, though? It can't just go on the reduct, as that's a type. Instead,
-it must go on any CFunEqCans produced after flattening. We thus flatten
-when discharging, making sure that the level is bumped in the new
-fun-eqs. The flattening happens in reduce_top_fun_eq and the level
-is bumped when setting up the FlatM monad in GHC.Tc.Solver.Flatten.runFlatten.
-(This bumping will happen for call sites other than this one, but that
-makes sense -- any constraints emitted by the flattener are offshoots
-the work item and should have a higher level. We don't have any test
-cases that require the bumping in this other cases, but it's convenient
-and causes no harm to bump at every flatten.)
-
-Test case: typecheck/should_fail/T16512a
-
 -}
 
 --------------------
@@ -1946,37 +1787,6 @@ doTopReactEq work_item@(CEqCan { cc_ev = old_ev, cc_lhs = TyFamLHS fam_tc args
   = do { improveTopFunEqs old_ev fam_tc args rhs
        ; doTopReactOther work_item }
 doTopReactEq work_item = doTopReactOther work_item
-
-{- "RAE"
-reduce_top_fun_eq :: CtEvidence -> TcTyVar -> (TcCoercion, TcType)
-                  -> TcS (StopOrContinue Ct)
--- We have found an applicable top-level axiom: use it to reduce
--- Precondition: fsk is not free in rhs_ty
--- ax_co :: F tys ~ rhs_ty, where F tys is the LHS of the old_ev
-reduce_top_fun_eq old_ev fsk (ax_co, rhs_ty)
-  | not (isDerived old_ev)  -- Precondition of shortCutReduction
-  , Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
-  , isTypeFamilyTyCon tc
-  , tc_args `lengthIs` tyConArity tc    -- Short-cut
-  = -- RHS is another type-family application
-    -- Try shortcut; see Note [Top-level reductions for type functions]
-    do { shortCutReduction old_ev fsk ax_co tc tc_args
-       ; stopWith old_ev "Fun/Top (shortcut)" }
-
-  | otherwise
-  = ASSERT2( not (fsk `elemVarSet` tyCoVarsOfType rhs_ty)
-           , ppr old_ev $$ ppr rhs_ty )
-           -- Guaranteed by Note [FunEq occurs-check principle]
-    do { (rhs_xi, flatten_co) <- flatten FM_FlattenAll old_ev rhs_ty
-             -- flatten_co :: rhs_xi ~ rhs_ty
-             -- See Note [Flatten when discharging CFunEqCan]
-       ; let total_co = ax_co `mkTcTransCo` mkTcSymCo flatten_co
-       ; dischargeFunEq old_ev fsk total_co rhs_xi
-       ; traceTcS "doTopReactFunEq" $
-         vcat [ text "old_ev:" <+> ppr old_ev
-              , nest 2 (text ":=") <+> ppr ax_co ]
-       ; stopWith old_ev "Fun/Top" }
--}
 
 improveTopFunEqs :: CtEvidence -> TyCon -> [TcType] -> TcType -> TcS ()
 -- See Note [FunDep and implicit parameter reactions]
