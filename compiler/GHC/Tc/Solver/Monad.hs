@@ -1631,7 +1631,6 @@ kick_out_rewritable new_fr new_lhs
                                           ([], emptyDVarEnv) tv_eqs
     (feqs_out,   feqs_in)   = foldFunEqs  (kick_out_eqs extend_fun_eqs)
                                           funeqmap ([], emptyFunEqs)
-           -- See Note [Kicking out CFunEqCan for fundeps]
     (dicts_out,  dicts_in)  = partitionDicts   kick_out_ct dictmap
     (irs_out,    irs_in)    = partitionBag     kick_out_ct irreds
       -- Kick out even insolubles: See Note [Rewrite insolubles]
@@ -2217,8 +2216,7 @@ a) The Given is pretty much a let-binding, like
    and hence can be ignored by has_given_eqs
 
 b) 'a' will have been completely substituted out in the inert set,
-   so we can safely discard it.  Notably, it doesn't need to be
-   returned as part of 'fsks'
+   so we can safely discard it.
 
 For an example, see #9211.
 
