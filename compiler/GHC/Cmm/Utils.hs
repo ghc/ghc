@@ -14,7 +14,7 @@
 
 module GHC.Cmm.Utils(
         -- CmmType
-        primRepCmmType, slotCmmType, 
+        primRepCmmType, slotCmmType,
         typeCmmType, typeForeignHint, primRepForeignHint,
 
         -- CmmLit
@@ -144,7 +144,7 @@ primRepForeignHint :: Platform -> PrimRep -> ForeignHint
 primRepForeignHint _platform VoidRep     = panic "primRepForeignHint:VoidRep"
 primRepForeignHint _platform LiftedRep   = AddrHint
 primRepForeignHint _platform UnliftedRep = AddrHint
-primRepForeignHint platform IntRep       = SignedHint (cIntWidth platform)
+primRepForeignHint platform IntRep       = SignedHint (wordWidth platform)
 primRepForeignHint _platform Int8Rep     = SignedHint W8
 primRepForeignHint _platform Int16Rep    = SignedHint W16
 primRepForeignHint _platform Int32Rep    = SignedHint W32
