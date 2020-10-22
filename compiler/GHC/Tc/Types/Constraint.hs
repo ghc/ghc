@@ -322,10 +322,7 @@ user describing the bit that is left out.
 When a hole is encountered, a new entry of type Hole is added to the ambient
 WantedConstraints. The type (hole_ty) of the hole is then simplified during
 solving (with respect to any Givens in surrounding implications). It is
-reported with all the other errors in GHC.Tc.Errors. No type family reduction
-is done on hole types; this is purely because we think it will produce
-better error messages not to reduce type families. This is why the
-GHC.Tc.Solver.Flatten.flattenType function uses FM_SubstOnly.
+reported with all the other errors in GHC.Tc.Errors.
 
 For expression holes, the user has the option of deferring errors until runtime
 with -fdefer-type-errors. In this case, the hole actually has evidence: this
