@@ -849,6 +849,12 @@ primTyDescChar platform ty
  = case typePrimRep1 (getPrimTyOf ty) of
      IntRep      -> signed_word
      WordRep     -> unsigned_word
+     Int8Rep     -> 'B'
+     Word8Rep    -> 'b'
+     Int16Rep    -> 'S'
+     Word16Rep   -> 's'
+     Int32Rep    -> 'W'
+     Word32Rep   -> 'w'
      Int64Rep    -> 'L'
      Word64Rep   -> 'l'
      AddrRep     -> 'p'
