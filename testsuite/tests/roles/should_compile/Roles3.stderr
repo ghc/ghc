@@ -48,18 +48,20 @@ Roles3.$tc'C:C1
   = GHC.Types.TyCon
       4508088879886988796## 13962145553903222779## Roles3.$trModule
       (GHC.Types.TrNameS "'C:C1"#) 1 $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 1
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp GHC.Types.$tcConstraint []
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp
       GHC.Types.$tc~ ((:) GHC.Types.krep$* ((:) $krep ((:) $krep [])))
 $krep [InlPrag=[~]]
