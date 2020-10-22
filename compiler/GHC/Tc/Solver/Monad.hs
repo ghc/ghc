@@ -399,18 +399,6 @@ data InertSet
               -- used to undo the cycle-breaking needed to handle
               -- Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical
 
-       {- "RAE"
-       , inert_fsks :: [(TcTyVar, TcType)]
-              -- A list of (fsk, ty) pairs; we add one element when we flatten
-              -- a function application in a Given constraint, creating
-              -- a new fsk in newFlattenSkolem.  When leaving a nested scope,
-              -- unflattenGivens unifies fsk := ty
-              --
-              -- We could also get this info from inert_funeqs, filtered by
-              -- level, but it seems simpler and more direct to capture the
-              -- fsk as we generate them.
--}
-
        , inert_flat_cache :: FunEqMap (TcCoercion, TcType)
               -- See Note [Type family equations]
               -- If    F tys :-> (co, rhs, flav),
@@ -3396,13 +3384,13 @@ emitNewWantedEq loc role ty1 ty2
 -- | Make a new equality CtEvidence
 newWantedEq :: CtLoc -> Role -> TcType -> TcType
             -> TcS (CtEvidence, Coercion)
-newWantedEq = newWantedEq_SI YesBlockSubst WDeriv
+newWantedEq = newWantedEq_SI WDeriv
 
-newWantedEq_SI :: BlockSubstFlag -> ShadowInfo -> CtLoc -> Role
+newWantedEq_SI :: ShadowInfo -> CtLoc -> Role
                -> TcType -> TcType
                -> TcS (CtEvidence, Coercion)
-newWantedEq_SI blocker si loc role ty1 ty2
-  = do { hole <- wrapTcS $ TcM.newCoercionHole blocker pty
+newWantedEq_SI si loc role ty1 ty2
+  = do { hole <- wrapTcS $ TcM.newCoercionHole pty
        ; traceTcS "Emitting new coercion hole" (ppr hole <+> dcolon <+> ppr pty)
        ; return ( CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
                            , ctev_nosh = si
@@ -3448,7 +3436,7 @@ newWanted = newWanted_SI WDeriv
 newWanted_SI :: ShadowInfo -> CtLoc -> PredType -> TcS MaybeNew
 newWanted_SI si loc pty
   | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
-  = Fresh . fst <$> newWantedEq_SI YesBlockSubst si loc role ty1 ty2
+  = Fresh . fst <$> newWantedEq_SI si loc role ty1 ty2
   | otherwise
   = newWantedEvVar_SI si loc pty
 
