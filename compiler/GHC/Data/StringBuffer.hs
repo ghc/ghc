@@ -17,7 +17,7 @@ Buffers for scanning string input stored in external arrays.
 
 module GHC.Data.StringBuffer
        (
-        StringBuffer(..),
+        StringBuffer, len, cur,
         -- non-abstract for vs\/HaskellService
 
          -- * Creation\/destruction
@@ -26,6 +26,7 @@ module GHC.Data.StringBuffer
         hPutStringBuffer,
         appendStringBuffers,
         stringToStringBuffer,
+        byteStringToStringBuffer,
 
         -- * Inspection
         nextChar,
@@ -54,10 +55,13 @@ import GHC.Prelude
 
 import GHC.Utils.Encoding
 import GHC.Data.FastString
+import GHC.Data.ByteArray
 import GHC.Utils.IO.Unsafe
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Unsafe as BS
 import Data.Maybe
 import Control.Exception
 import System.IO
@@ -65,6 +69,7 @@ import System.IO.Unsafe         ( unsafePerformIO )
 import GHC.IO.Encoding.UTF8     ( mkUTF8 )
 import GHC.IO.Encoding.Failure  ( CodingFailureMode(IgnoreCodingFailure) )
 
+import GHC.Word
 import GHC.Exts
 
 import Foreign
@@ -81,7 +86,7 @@ import Foreign
 --
 data StringBuffer
  = StringBuffer {
-     buf :: {-# UNPACK #-} !(ForeignPtr Word8),
+     buf :: {-# UNPACK #-} !ByteArray,
      len :: {-# UNPACK #-} !Int,        -- length
      cur :: {-# UNPACK #-} !Int         -- current pos
   }
@@ -102,34 +107,35 @@ instance Show StringBuffer where
 -- managed by the garbage collector.
 hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname = do
-   h <- openBinaryFile fname ReadMode
-   size_i <- hFileSize h
-   offset_i <- skipBOM h size_i 0  -- offset is 0 initially
-   let size = fromIntegral $ size_i - offset_i
-   buf <- mallocForeignPtrArray (size+3)
-   withForeignPtr buf $ \ptr -> do
-     r <- if size == 0 then return 0 else hGetBuf h ptr size
-     hClose h
-     if (r /= size)
-        then ioError (userError "short read of file")
-        else newUTF8StringBuffer buf ptr size
+  h <- openBinaryFile fname ReadMode
+  size_i <- hFileSize h
+  offset_i <- skipBOM h size_i 0  -- offset is 0 initially
+  let size = fromIntegral $ size_i - offset_i
+  buf <- newPinnedMutableByteArray (size+3)
+  r <- if size == 0
+          then return 0
+          else hGetBuf h (unsafeMutableByteArrayContents buf) size
+  hClose h
+  if r /= size
+    then ioError (userError "short read of file")
+    else newUTF8StringBuffer buf size
 
 hGetStringBufferBlock :: Handle -> Int -> IO StringBuffer
-hGetStringBufferBlock handle wanted
-    = do size_i <- hFileSize handle
-         offset_i <- hTell handle >>= skipBOM handle size_i
-         let size = min wanted (fromIntegral $ size_i-offset_i)
-         buf <- mallocForeignPtrArray (size+3)
-         withForeignPtr buf $ \ptr ->
-             do r <- if size == 0 then return 0 else hGetBuf handle ptr size
-                if r /= size
-                   then ioError (userError $ "short read of file: "++show(r,size,size_i,handle))
-                   else newUTF8StringBuffer buf ptr size
+hGetStringBufferBlock handle wanted = do
+  size_i <- hFileSize handle
+  offset_i <- hTell handle >>= skipBOM handle size_i
+  let size = min wanted (fromIntegral $ size_i-offset_i)
+  buf <- newPinnedMutableByteArray (size+3)
+  r <- if size == 0
+          then return 0
+          else hGetBuf handle (unsafeMutableByteArrayContents buf) size
+  if r /= size
+    then ioError (userError $ "short read of file: "++show(r,size,size_i,handle))
+    else newUTF8StringBuffer buf size
 
 hPutStringBuffer :: Handle -> StringBuffer -> IO ()
-hPutStringBuffer hdl (StringBuffer buf len cur)
-    = withForeignPtr (plusForeignPtr buf cur) $ \ptr ->
-          hPutBuf hdl ptr len
+hPutStringBuffer hdl (StringBuffer buf len cur) = do
+  withByteArrayContents buf $ \ptr -> hPutBuf hdl (ptr `plusPtr` cur) len
 
 -- | Skip the byte-order mark if there is one (see #1744 and #6016),
 -- and return the new position of the handle in bytes.
@@ -156,39 +162,45 @@ skipBOM h size offset =
   where
     safeEncoding = mkUTF8 IgnoreCodingFailure
 
-newUTF8StringBuffer :: ForeignPtr Word8 -> Ptr Word8 -> Int -> IO StringBuffer
-newUTF8StringBuffer buf ptr size = do
-  pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
+-- | @newUTF8StringBuffer buf size@ creates a 'StringBuffer' from a
+-- 'MutableByteArray' of length @size+3@ containing UTF-8 encoded text. A three
+-- byte sentinel will be added to the end of the buffer.
+newUTF8StringBuffer :: MutableByteArray -> Int -> IO StringBuffer
+newUTF8StringBuffer buf size = do
   -- sentinels for UTF-8 decoding
-  return $ StringBuffer buf size 0
+  writeWord8Array buf (size+0) 0
+  writeWord8Array buf (size+1) 0
+  writeWord8Array buf (size+3) 0
+  buf' <- unsafeFreezeByteArray buf
+  return $ StringBuffer buf' size 0
 
 appendStringBuffers :: StringBuffer -> StringBuffer -> IO StringBuffer
-appendStringBuffers sb1 sb2
-    = do newBuf <- mallocForeignPtrArray (size+3)
-         withForeignPtr newBuf $ \ptr ->
-          withForeignPtr (buf sb1) $ \sb1Ptr ->
-           withForeignPtr (buf sb2) $ \sb2Ptr ->
-             do copyArray ptr (sb1Ptr `advancePtr` cur sb1) sb1_len
-                copyArray (ptr `advancePtr` sb1_len) (sb2Ptr `advancePtr` cur sb2) sb2_len
-                pokeArray (ptr `advancePtr` size) [0,0,0]
-                return (StringBuffer newBuf size 0)
-    where sb1_len = calcLen sb1
-          sb2_len = calcLen sb2
-          calcLen sb = len sb - cur sb
-          size =  sb1_len + sb2_len
+appendStringBuffers sb1 sb2 = do
+  dst <- newPinnedMutableByteArray (size+3)
+  copyByteArray (buf sb1) (cur sb1) dst 0 sb1_len
+  copyByteArray (buf sb2) (cur sb2) dst sb1_len sb2_len
+  newUTF8StringBuffer dst size
+  where
+    sb1_len = calcLen sb1
+    sb2_len = calcLen sb2
+    calcLen sb = len sb - cur sb
+    size =  sb1_len + sb2_len
+
+byteStringToStringBuffer :: BS.ByteString -> StringBuffer
+byteStringToStringBuffer bs = unsafePerformIO $ do
+  let size = BS.length bs
+  buf <- newPinnedMutableByteArray (size+3)
+  BS.unsafeUseAsCString bs (\p -> copyAddrToMutableByteArray p buf 0 size)
+  newUTF8StringBuffer buf size
 
 -- | Encode a 'String' into a 'StringBuffer' as UTF-8.  The resulting buffer
 -- is automatically managed by the garbage collector.
 stringToStringBuffer :: String -> StringBuffer
-stringToStringBuffer str =
- unsafePerformIO $ do
+stringToStringBuffer str = unsafePerformIO $ do
   let size = utf8EncodedLength str
-  buf <- mallocForeignPtrArray (size+3)
-  withForeignPtr buf $ \ptr -> do
-    utf8EncodeString ptr str
-    pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
-    -- sentinels for UTF-8 decoding
-  return (StringBuffer buf size 0)
+  buf <- newPinnedMutableByteArray (size+3)
+  utf8EncodeString (unsafeMutableByteArrayContents buf) str
+  newUTF8StringBuffer buf size
 
 -- -----------------------------------------------------------------------------
 -- Grab a character
@@ -202,12 +214,10 @@ stringToStringBuffer str =
 nextChar :: StringBuffer -> (Char,StringBuffer)
 nextChar (StringBuffer buf len (I# cur#)) =
   -- Getting our fingers dirty a little here, but this is performance-critical
-  inlinePerformIO $
-    withForeignPtr buf $ \(Ptr a#) ->
-        case utf8DecodeCharAddr# (a# `plusAddr#` cur#) 0# of
-          (# c#, nBytes# #) ->
-             let cur' = I# (cur# +# nBytes#) in
-             return (C# c#, StringBuffer buf len cur')
+    case utf8DecodeCharByteArray# (getByteArray buf) cur# of
+      (# c#, nBytes# #) ->
+        let cur' = I# (cur# +# nBytes#)
+        in (C# c#, StringBuffer buf len cur')
 
 -- | Return the first UTF-8 character of a nonempty 'StringBuffer' (analogous
 -- to 'Data.List.head').  __Warning:__ The behavior is undefined if the
@@ -219,10 +229,9 @@ currentChar = fst . nextChar
 prevChar :: StringBuffer -> Char -> Char
 prevChar (StringBuffer _   _   0)   deflt = deflt
 prevChar (StringBuffer buf _   cur) _     =
-  inlinePerformIO $
-    withForeignPtr buf $ \p -> do
-      p' <- utf8PrevChar (p `plusPtr` cur)
-      return (fst (utf8DecodeChar p'))
+    let !(I# p') = utf8PrevChar (getByteArray buf) cur
+        !(# c, _ #) = utf8DecodeCharByteArray# (getByteArray buf) p'
+    in C# c
 
 -- -----------------------------------------------------------------------------
 -- Moving
@@ -257,18 +266,18 @@ atEnd (StringBuffer _ l c) = l == c
 -- wanted line. Lines begin at 1.
 atLine :: Int -> StringBuffer -> Maybe StringBuffer
 atLine line sb@(StringBuffer buf len _) =
-  inlinePerformIO $
-    withForeignPtr buf $ \p -> do
-      p' <- skipToLine line len p
-      if p' == nullPtr
-        then return Nothing
-        else
-          let
-            delta = p' `minusPtr` p
-          in return $ Just (sb { cur = delta
-                               , len = len - delta
-                               })
+  inlinePerformIO $ withByteArrayContents buf $ \p -> do
+    p' <- skipToLine line len p
+    if p' == nullPtr
+      then return Nothing
+      else
+        let !delta = p' `minusPtr` p
+        in return $ Just (sb { cur = delta
+                             , len = len - delta
+                             })
 
+-- | @skipToLine line len op0@ finds the byte offset to the beginning of
+-- the given line number.
 skipToLine :: Int -> Int -> Ptr Word8 -> IO (Ptr Word8)
 skipToLine !line !len !op0 = go 1 op0
   where
@@ -300,39 +309,42 @@ lexemeToString :: StringBuffer
                -> Int                   -- ^ @n@, the number of bytes
                -> String
 lexemeToString _ 0 = ""
-lexemeToString (StringBuffer buf _ cur) bytes =
-  utf8DecodeStringLazy buf cur bytes
+lexemeToString (StringBuffer buf _ (I# cur#)) (I# bytes#) =
+  utf8DecodeByteArrayLazy# (getByteArray buf) cur# bytes#
 
 lexemeToFastString :: StringBuffer
                    -> Int               -- ^ @n@, the number of bytes
                    -> FastString
 lexemeToFastString _ 0 = nilFS
 lexemeToFastString (StringBuffer buf _ cur) len =
-   inlinePerformIO $
-     withForeignPtr buf $ \ptr ->
-       return $! mkFastStringBytes (ptr `plusPtr` cur) len
+  inlinePerformIO $
+    withByteArrayContents buf $ \ptr ->
+      return $! mkFastStringBytes (ptr `plusPtr` cur) len
 
 -- | Return the previous @n@ characters (or fewer if we are less than @n@
 -- characters into the buffer.
 decodePrevNChars :: Int -> StringBuffer -> String
-decodePrevNChars n (StringBuffer buf _ cur) =
-    inlinePerformIO $ withForeignPtr buf $ \p0 ->
-      go p0 n "" (p0 `plusPtr` (cur - 1))
+decodePrevNChars n (StringBuffer buf0 _ cur) =
+    go (getByteArray buf0) (min n (cur - 1)) "" (cur - 1)
   where
-    go :: Ptr Word8 -> Int -> String -> Ptr Word8 -> IO String
-    go buf0 n acc p | n == 0 || buf0 >= p = return acc
-    go buf0 n acc p = do
-        p' <- utf8PrevChar p
-        let (c,_) = utf8DecodeChar p'
-        go buf0 (n - 1) (c:acc) p'
+    go :: ByteArray# -> Int -> String -> Int -> String
+    go buf n acc ofs
+      | n == 0 = acc
+      | otherwise =
+          let !ofs'@(I# ofs'#) = utf8PrevChar buf ofs
+              !(# c,_ #) = utf8DecodeCharByteArray# buf ofs'#
+          in go buf (n - 1) (C# c:acc) ofs'
 
 -- -----------------------------------------------------------------------------
 -- Parsing integer strings in various bases
 parseUnsignedInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
-parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int
-  = inlinePerformIO $ withForeignPtr buf $ \ptr -> return $! let
-    go i x | i == len  = x
-           | otherwise = case fst (utf8DecodeChar (ptr `plusPtr` (cur + i))) of
-               '_'  -> go (i + 1) x    -- skip "_" (#14473)
-               char -> go (i + 1) (x * radix + toInteger (char_to_int char))
-  in go 0 0
+parseUnsignedInteger (StringBuffer buf _ (I# cur)) (I# len) radix char_to_int
+  = go (len +# cur) cur 0
+  where
+    go :: Int# -> Int# -> Integer -> Integer
+    go end i !acc
+      | isTrue# (i ==# end) = acc
+      | otherwise =
+        case utf8DecodeCharByteArray# (getByteArray buf) i of
+          (# '_'#, _ #) -> go end (i +# 1#) acc    -- skip "_" (#14473)
+          (# char, _ #) -> go end (i +# 1#) (acc * radix + toInteger (char_to_int (C# char)))
