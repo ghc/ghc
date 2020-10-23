@@ -73,6 +73,7 @@ import GHC.Show
 import GHC.Real
 import GHC.List
 import GHC.ForeignPtr.Ops
+import GHC.ForeignPtr  (unsafeWithForeignPtr)
 import Foreign.C.Types
 import Foreign.ForeignPtr
 import Foreign.Storable
@@ -118,17 +119,17 @@ type CharBufElem = Char
 type RawCharBuffer = RawBuffer CharBufElem
 
 peekCharBuf :: RawCharBuffer -> Int -> IO Char
-peekCharBuf arr ix = withForeignPtr arr $ \p -> do
+peekCharBuf arr ix = unsafeWithForeignPtr arr $ \p -> do
                         (c,_) <- readCharBufPtr p ix
                         return c
 
 {-# INLINE readCharBuf #-}
 readCharBuf :: RawCharBuffer -> Int -> IO (Char, Int)
-readCharBuf arr ix = withForeignPtr arr $ \p -> readCharBufPtr p ix
+readCharBuf arr ix = unsafeWithForeignPtr arr $ \p -> readCharBufPtr p ix
 
 {-# INLINE writeCharBuf #-}
 writeCharBuf :: RawCharBuffer -> Int -> Char -> IO Int
-writeCharBuf arr ix c = withForeignPtr arr $ \p -> writeCharBufPtr p ix c
+writeCharBuf arr ix c = unsafeWithForeignPtr arr $ \p -> writeCharBufPtr p ix c
 
 {-# INLINE readCharBufPtr #-}
 readCharBufPtr :: Ptr CharBufElem -> Int -> IO (Char, Int)
