@@ -1,7 +1,7 @@
 i = GHC.Types.I# 0#
-i8 = GHC.Int.I8# 0#
-i16 = GHC.Int.I16# 0#
-i32 = GHC.Int.I32# 0#
+i8 = GHC.Int.I8# (GHC.Prim.narrowInt8# 0#)
+i16 = GHC.Int.I16# (GHC.Prim.narrowInt16# 0#)
+i32 = GHC.Int.I32# (GHC.Prim.narrowInt32# 0#)
 i64 = GHC.Int.I64# 0#
 w = GHC.Types.W# 0##
 w8 = GHC.Word.W8# 0##
