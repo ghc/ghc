@@ -338,7 +338,7 @@ So here's the plan (see tcHsSigType):
 * buildTvImplication: build an implication for the residual, unsolved
   constraint
 
-* simplifyAndEmitFlatConstraints: try to float out every unsolved equalities
+* simplifyAndEmitFlatConstraints: try to float out every unsolved equality
   inside that implication, in the hope that it constrains only global
   type variables, not the locally-quantified ones.
 

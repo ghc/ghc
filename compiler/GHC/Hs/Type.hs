@@ -457,7 +457,7 @@ data HsOuterTyVarBndrs flag pass
 -- | Used for signatures, e.g.,
 --
 -- @
--- f :: forall a {b}. blahg
+-- f :: forall a {b}. blah
 -- @
 --
 -- We use 'Specificity' for the 'HsOuterTyVarBndrs' @flag@ to allow
@@ -1664,8 +1664,8 @@ splitLHsSigmaTyInvis ty
 -- | Decompose a GADT type into its constituent parts.
 -- Returns @(outer_bndrs, mb_ctxt, body)@, where:
 --
--- * @outer_bndrs@ are 'OuterExplicit' if the type has explicit, outermost
---   type variable binders. Otherwise, they are 'OuterImplicit'.
+-- * @outer_bndrs@ are 'HsOuterExplicit' if the type has explicit, outermost
+--   type variable binders. Otherwise, they are 'HsOuterImplicit'.
 --
 -- * @mb_ctxt@ is @Just@ the context, if it is provided.
 --   Otherwise, it is @Nothing@.
@@ -1684,7 +1684,7 @@ splitLHsGadtTy (L _ sig_ty)
   = (outer_bndrs, mb_ctxt, tau_ty)
   where
     split_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
-    split_bndrs (HsSig { sig_bndrs = outer_bndrs, sig_body = body_ty}) =
+    split_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
       (outer_bndrs, body_ty)
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent

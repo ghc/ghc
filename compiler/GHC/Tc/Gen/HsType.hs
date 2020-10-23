@@ -3289,7 +3289,7 @@ When we /must not/ clone
   There is no need, I think.
 
   The payoff here is that avoidng gratuitious cloning means that we can
-  lmost always take the fast path in swizzleTcTyConBndrs.  "Almost
+  almost always take the fast path in swizzleTcTyConBndrs.  "Almost
   always" means not the case of mutual recursion with polymorphic kinds.
 
 When we /must/ clone.
@@ -4118,8 +4118,11 @@ promotionErr name err
                NoDataKindsTC  -> text "perhaps you intended to use DataKinds"
                NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
                PatSynPE       -> text "pattern synonyms cannot be promoted"
-               _ -> text "it is defined and used in the same recursive group"
-                    -- RecDataConPE, ClassPE, TyConPE
+               RecDataConPE   -> same_rec_group_msg
+               ClassPE        -> same_rec_group_msg
+               TyConPE        -> same_rec_group_msg
+
+    same_rec_group_msg = text "it is defined and used in the same recursive group"
 
 {-
 ************************************************************************

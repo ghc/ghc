@@ -933,8 +933,6 @@ instance HasHaddock a => HasHaddock (HsWildCardBndrs GhcPs a) where
 
 instance HasHaddock (Located (HsSigType GhcPs)) where
   addHaddock (L l (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
-    -- TODO RGS: I cargo-culted this code from the HsForAllTy case of the
-    -- HasHaddock instance for HsType. Is this right? Need Vlad to check.
     extendHdkA l $ do
       case outer_bndrs of
         HsOuterImplicit{} -> pure ()
