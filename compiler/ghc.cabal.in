@@ -354,6 +354,7 @@ Library
         GHC.Data.Bag
         GHC.Data.Bitmap
         GHC.Data.BooleanFormula
+        GHC.Data.ByteArray
         GHC.Data.EnumSet
         GHC.Data.FastMutInt
         GHC.Data.FastString
