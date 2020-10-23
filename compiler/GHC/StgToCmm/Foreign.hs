@@ -113,6 +113,8 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
             (CmmLit _, AddrHint) -> pure ()
             (CmmReg _, AddrHint) -> pure ()
             (CmmRegOff _ _, AddrHint) -> pure ()
+            (CmmLit (CmmFloat _ w), SignedHint w')            | w == w' -> pure ()
+            (CmmLit (CmmFloat _ w), NoHint w')                | w == w' -> pure ()
             (CmmLit (CmmInt _ w), SignedHint w')              | w == w' -> pure ()
             (CmmLit (CmmInt _ w), NoHint w')                  | w == w' -> pure ()
             (CmmReg (CmmLocal (LocalReg _ ty)), _)            | isFloatType ty -> pure ()
