@@ -1018,7 +1018,8 @@ instance HiePass p => ToHie (PScoped (Located (Pat (GhcPass p)))) where
     where
       contextify :: a ~ LPat (GhcPass p) => HsConDetails (HsPatSigType (NoGhcTc (GhcPass p))) a (HsRecFields (GhcPass p) a)
                  -> HsConDetails (TScoped (HsPatSigType (NoGhcTc (GhcPass p)))) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
-      contextify (PrefixCon tyargs args) = PrefixCon (tScopes scope pscope tyargs) (patScopes rsp scope pscope args)
+      contextify (PrefixCon tyargs args) = PrefixCon (tScopes scope argscope tyargs) (patScopes rsp scope pscope args)
+        where argscope = foldr combineScopes NoScope $ map mkLScope args
       contextify (InfixCon a b) = InfixCon a' b'
         where [a', b'] = patScopes rsp scope pscope [a,b]
       contextify (RecCon r) = RecCon $ RC RecFieldMatch $ contextify_rec r
