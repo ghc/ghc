@@ -546,21 +546,21 @@ pprInstr platform instr = case instr of
     text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl <> text "@page" $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> ppr lbl <> text "@pageoff" $$
+    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl $$
+    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> test ":lo12:" <> ppr lbl $$
     text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl <> text "@gotpage" $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> ppr lbl <> text "@gotpageoff" <> text "]"
+    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" ppr lbl $$
+    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text ":got_lo12:" <> ppr lbl <> text "]"
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) | isForeignLabel lbl ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl <> text "@gotpage" $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> ppr lbl <> text "@gotpageoff" <> text "]"
+    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" ppr lbl $$
+    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text ":got_lo12:" <> ppr lbl <> text "]"
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl <> text "@page" $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> ppr lbl <> text "@pageoff"
+    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl $$
+    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> text ":lo12:" <> ppr lbl
 #endif
 
   LDR _f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
