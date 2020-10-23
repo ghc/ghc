@@ -6,6 +6,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -84,6 +85,7 @@ import Data.Array
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
+import GHC.ForeignPtr
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Time
@@ -96,7 +98,10 @@ import GHC.Real                 ( Ratio(..) )
 
 type BinArray = ForeignPtr Word8
 
-
+#if !MIN_VERSION_base(4,15,0)
+unsafeWithForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
+unsafeWithForeignPtr = withForeignPtr
+#endif
 
 ---------------------------------------------------------------
 -- BinData
@@ -111,14 +116,14 @@ instance Binary BinData where
   put_ bh (BinData sz dat) = do
     put_ bh sz
     putPrim bh sz $ \dest ->
-      withForeignPtr dat $ \orig ->
+      unsafeWithForeignPtr dat $ \orig ->
         copyBytes dest orig sz
   --
   get bh = do
     sz <- get bh
     dat <- mallocForeignPtrBytes sz
     getPrim bh sz $ \orig ->
-      withForeignPtr dat $ \dest ->
+      unsafeWithForeignPtr dat $ \dest ->
         copyBytes dest orig sz
     return (BinData sz dat)
 
@@ -226,7 +231,7 @@ writeBinMem (BinMem _ ix_r _ arr_r) fn = do
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
-  withForeignPtr arr $ \p -> hPutBuf h p ix
+  unsafeWithForeignPtr arr $ \p -> hPutBuf h p ix
   hClose h
 
 readBinMem :: FilePath -> IO BinHandle
@@ -236,7 +241,7 @@ readBinMem filename = do
   filesize' <- hFileSize h
   let filesize = fromIntegral filesize'
   arr <- mallocForeignPtrBytes filesize
-  count <- withForeignPtr arr $ \p -> hGetBuf h p filesize
+  count <- unsafeWithForeignPtr arr $ \p -> hGetBuf h p filesize
   when (count /= filesize) $
        error ("Binary.readBinMem: only read " ++ show count ++ " bytes")
   hClose h
@@ -280,7 +285,7 @@ putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
   when (ix + size > sz) $
     expandBin h (ix + size)
   arr <- readIORef arr_r
-  withForeignPtr arr $ \op -> f (op `plusPtr` ix)
+  unsafeWithForeignPtr arr $ \op -> f (op `plusPtr` ix)
   writeFastMutInt ix_r (ix + size)
 
 -- -- | Similar to putPrim but advances the index by the actual number of
@@ -302,7 +307,10 @@ getPrim (BinMem _ ix_r sz_r arr_r) size f = do
   when (ix + size > sz) $
       ioError (mkIOError eofErrorType "Data.Binary.getPrim" Nothing Nothing)
   arr <- readIORef arr_r
-  w <- withForeignPtr arr $ \op -> f (op `plusPtr` ix)
+  w <- f (unsafeForeignPtrToPtr arr `plusPtr` ix)
+  touchForeignPtr arr
+    -- This is safe WRT #17760 as we we guarantee that the above line doesn't
+    -- diverge
   writeFastMutInt ix_r (ix + size)
   return w
 
