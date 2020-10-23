@@ -1387,6 +1387,12 @@ primRepToFFIType platform r
      VoidRep     -> FFIVoid
      IntRep      -> signed_word
      WordRep     -> unsigned_word
+     Int8Rep     -> FFISInt8
+     Word8Rep    -> FFIUInt8
+     Int16Rep    -> FFISInt16
+     Word16Rep   -> FFIUInt16
+     Int32Rep    -> FFISInt32
+     Word32Rep   -> FFIUInt32
      Int64Rep    -> FFISInt64
      Word64Rep   -> FFIUInt64
      AddrRep     -> FFIPointer
@@ -1405,6 +1411,12 @@ mkDummyLiteral platform pr
    = case pr of
         IntRep    -> mkLitInt  platform 0
         WordRep   -> mkLitWord platform 0
+        Int8Rep   -> mkLitInt8 0
+        Word8Rep  -> mkLitWord8 0
+        Int16Rep  -> mkLitInt16 0
+        Word16Rep -> mkLitWord16 0
+        Int32Rep  -> mkLitInt32 0
+        Word32Rep -> mkLitWord32 0
         Int64Rep  -> mkLitInt64 0
         Word64Rep -> mkLitWord64 0
         AddrRep   -> LitNullAddr
@@ -1637,6 +1649,12 @@ pushAtom _ _ (AnnLit lit) = do
         LitNumber nt _  -> case nt of
           LitNumInt     -> code N
           LitNumWord    -> code N
+          LitNumInt8    -> code (toArgRep Int8Rep)
+          LitNumWord8   -> code (toArgRep Word8Rep)
+          LitNumInt16   -> code (toArgRep Int16Rep)
+          LitNumWord16  -> code (toArgRep Word16Rep)
+          LitNumInt32   -> code (toArgRep Int32Rep)
+          LitNumWord32  -> code (toArgRep Word32Rep)
           LitNumInt64   -> code L
           LitNumWord64  -> code L
           -- No LitInteger's or LitNatural's should be left by the time this is

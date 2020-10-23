@@ -106,8 +106,14 @@ mkSimpleLit platform = \case
                                           (wordWidth platform)
    LitNullAddr                  -> zeroCLit platform
    (LitNumber LitNumInt i)      -> CmmInt i (wordWidth platform)
+   (LitNumber LitNumInt8 i)     -> CmmInt i W8
+   (LitNumber LitNumInt16 i)    -> CmmInt i W16
+   (LitNumber LitNumInt32 i)    -> CmmInt i W32
    (LitNumber LitNumInt64 i)    -> CmmInt i W64
    (LitNumber LitNumWord i)     -> CmmInt i (wordWidth platform)
+   (LitNumber LitNumWord8 i)    -> CmmInt i W8
+   (LitNumber LitNumWord16 i)   -> CmmInt i W16
+   (LitNumber LitNumWord32 i)   -> CmmInt i W32
    (LitNumber LitNumWord64 i)   -> CmmInt i W64
    (LitFloat r)                 -> CmmFloat r W32
    (LitDouble r)                -> CmmFloat r W64

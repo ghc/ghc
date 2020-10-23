@@ -61,7 +61,9 @@ module GHC.Utils.Outputable (
         primFloatSuffix, primCharSuffix, primWordSuffix, primDoubleSuffix,
         primInt64Suffix, primWord64Suffix, primIntSuffix,
 
-        pprPrimChar, pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64,
+        pprPrimChar, pprPrimInt, pprPrimWord,
+        pprPrimInt8, pprPrimInt16, pprPrimInt32, pprPrimInt64,
+        pprPrimWord8, pprPrimWord16, pprPrimWord32, pprPrimWord64,
 
         pprFastFilePath, pprFilePathString,
 
@@ -1158,11 +1160,19 @@ primWord64Suffix = text "L##"
 
 -- | Special combinator for showing unboxed literals.
 pprPrimChar :: Char -> SDoc
-pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64 :: Integer -> SDoc
+pprPrimInt, pprPrimWord :: Integer -> SDoc
+pprPrimInt8, pprPrimInt16, pprPrimInt32, pprPrimInt64 :: Integer -> SDoc
+pprPrimWord8, pprPrimWord16, pprPrimWord32, pprPrimWord64 :: Integer -> SDoc
 pprPrimChar c   = pprHsChar c <> primCharSuffix
 pprPrimInt i    = integer i   <> primIntSuffix
 pprPrimWord w   = word    w   <> primWordSuffix
+pprPrimInt8 i   = integer i   <> primInt64Suffix
+pprPrimInt16 i  = integer i   <> primInt64Suffix
+pprPrimInt32 i  = integer i   <> primInt64Suffix
 pprPrimInt64 i  = integer i   <> primInt64Suffix
+pprPrimWord8 w  = word    w   <> primWord64Suffix
+pprPrimWord16 w = word    w   <> primWord64Suffix
+pprPrimWord32 w = word    w   <> primWord64Suffix
 pprPrimWord64 w = word    w   <> primWord64Suffix
 
 ---------------------
