@@ -33,6 +33,7 @@ import GHC.Driver.Ppr
 import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, magicDictId )
 
 import GHC.Core
+import GHC.Core.Num
 import GHC.Core.Make
 import GHC.Types.Id
 import GHC.Types.Literal
@@ -66,6 +67,7 @@ import GHC.Utils.Panic
 import GHC.Core.Coercion   (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 
 import Control.Applicative ( Alternative(..) )
+import qualified Control.Applicative as App
 
 import Control.Monad
 import Data.Bits as Bits
@@ -100,12 +102,12 @@ primOpRules nm = \case
    -- Int operations
    IntAddOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (+))
                                     , identityPlatform zeroi
-                                    , numFoldingRules IntAddOp intPrimOps
+                                    , numFoldingRules IntAddOp intOps
                                     ]
    IntSubOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (-))
                                     , rightIdentityPlatform zeroi
                                     , equalArgs >> retLit zeroi
-                                    , numFoldingRules IntSubOp intPrimOps
+                                    , numFoldingRules IntSubOp intOps
                                     ]
    IntAddCOp   -> mkPrimOpRule nm 2 [ binaryLit (intOpC2 (+))
                                     , identityCPlatform zeroi ]
@@ -115,7 +117,7 @@ primOpRules nm = \case
    IntMulOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (*))
                                     , zeroElem zeroi
                                     , identityPlatform onei
-                                    , numFoldingRules IntMulOp intPrimOps
+                                    , numFoldingRules IntMulOp intOps
                                     ]
    IntQuotOp   -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intOp2 quot)
                                     , leftZero zeroi
@@ -152,12 +154,12 @@ primOpRules nm = \case
    -- Word operations
    WordAddOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (+))
                                     , identityPlatform zerow
-                                    , numFoldingRules WordAddOp wordPrimOps
+                                    , numFoldingRules WordAddOp wordOps
                                     ]
    WordSubOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (-))
                                     , rightIdentityPlatform zerow
                                     , equalArgs >> retLit zerow
-                                    , numFoldingRules WordSubOp wordPrimOps
+                                    , numFoldingRules WordSubOp wordOps
                                     ]
    WordAddCOp  -> mkPrimOpRule nm 2 [ binaryLit (wordOpC2 (+))
                                     , identityCPlatform zerow ]
@@ -166,7 +168,7 @@ primOpRules nm = \case
                                     , equalArgs >> retLitNoC zerow ]
    WordMulOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (*))
                                     , identityPlatform onew
-                                    , numFoldingRules WordMulOp wordPrimOps
+                                    , numFoldingRules WordMulOp wordOps
                                     ]
    WordQuotOp  -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 quot)
                                     , rightIdentityPlatform onew ]
@@ -1881,178 +1883,309 @@ match_smallIntegerTo _ _ _ _ _ = Nothing
 -- | Rules to perform constant folding into nested expressions
 --
 --See Note [Constant folding through nested expressions]
-numFoldingRules :: PrimOp -> (Platform -> PrimOps) -> RuleM CoreExpr
-numFoldingRules op dict = do
+numFoldingRules :: PrimOp -> NumOps -> RuleM CoreExpr
+numFoldingRules op num_ops = do
   env <- getEnv
   if not (roNumConstantFolding env)
    then mzero
    else do
     [e1,e2] <- getArgs
     platform <- getPlatform
-    let PrimOps{..} = dict platform
-    case BinOpApp e1 op e2 of
-     -- R1) +/- simplification
-     x    :++: (y :++: v)          -> return $ mkL (x+y)   `add` v
-     x    :++: (L y :-: v)         -> return $ mkL (x+y)   `sub` v
-     x    :++: (v   :-: L y)       -> return $ mkL (x-y)   `add` v
-     L x  :-:  (y :++: v)          -> return $ mkL (x-y)   `sub` v
-     L x  :-:  (L y :-: v)         -> return $ mkL (x-y)   `add` v
-     L x  :-:  (v   :-: L y)       -> return $ mkL (x+y)   `sub` v
+    let mkL = Lit . mkNumLiteral platform num_ops
+        add x y = BinOpApp x (numAdd num_ops) y
+        sub x y = BinOpApp x (numSub num_ops) y
+        mul x y = BinOpApp x (numMul num_ops) y
 
-     (y :++: v)    :-: L x         -> return $ mkL (y-x)   `add` v
-     (L y :-: v)   :-: L x         -> return $ mkL (y-x)   `sub` v
-     (v   :-: L y) :-: L x         -> return $ mkL (0-y-x) `add` v
+        is_op op e = case e of
+         BinOpApp x op' y | op == op' -> pure (x,y)
+         _                            -> App.empty
 
-     (x :++: w)  :+: (y :++: v)    -> return $ mkL (x+y)   `add` (w `add` v)
-     (w :-: L x) :+: (L y :-: v)   -> return $ mkL (y-x)   `add` (w `sub` v)
-     (w :-: L x) :+: (v   :-: L y) -> return $ mkL (0-x-y) `add` (w `add` v)
-     (L x :-: w) :+: (L y :-: v)   -> return $ mkL (x+y)   `sub` (w `add` v)
-     (L x :-: w) :+: (v   :-: L y) -> return $ mkL (x-y)   `add` (v `sub` w)
-     (w :-: L x) :+: (y :++: v)    -> return $ mkL (y-x)   `add` (w `add` v)
-     (L x :-: w) :+: (y :++: v)    -> return $ mkL (x+y)   `add` (v `sub` w)
-     (y :++: v)  :+: (w :-: L x)   -> return $ mkL (y-x)   `add` (w `add` v)
-     (y :++: v)  :+: (L x :-: w)   -> return $ mkL (x+y)   `add` (v `sub` w)
+        is_add = is_op (numAdd num_ops)
+        is_sub = is_op (numSub num_ops)
+        is_mul = is_op (numMul num_ops)
 
-     (v   :-: L y) :-: (w :-: L x) -> return $ mkL (x-y)   `add` (v `sub` w)
-     (v   :-: L y) :-: (L x :-: w) -> return $ mkL (0-x-y) `add` (v `add` w)
-     (L y :-:   v) :-: (w :-: L x) -> return $ mkL (x+y)   `sub` (v `add` w)
-     (L y :-:   v) :-: (L x :-: w) -> return $ mkL (y-x)   `add` (w `sub` v)
-     (x :++: w)    :-: (y :++: v)  -> return $ mkL (x-y)   `add` (w `sub` v)
-     (w :-: L x)   :-: (y :++: v)  -> return $ mkL (0-y-x) `add` (w `sub` v)
-     (L x :-: w)   :-: (y :++: v)  -> return $ mkL (x-y)   `sub` (v `add` w)
-     (y :++: v)    :-: (w :-: L x) -> return $ mkL (y+x)   `add` (v `sub` w)
-     (y :++: v)    :-: (L x :-: w) -> return $ mkL (y-x)   `add` (v `add` w)
+        -- match addition with a literal (handles commutativity)
+        is_lit_add e = is_add e >>= \case
+           (L l, x  ) -> pure (l,x)
+           (x  , L l) -> pure (l,x)
+           _          -> App.empty
 
-     -- R2) * simplification
-     x :**: (y :**: v)             -> return $ mkL (x*y)   `mul` v
-     (x :**: w) :*: (y :**: v)     -> return $ mkL (x*y)   `mul` (w `mul` v)
+        -- match an addition and handles commutativity by performing the given
+        -- action twice (the second time with arguments reversed).
+        with_add e f = do
+           (e1,e2) <- is_add e
+           msum [ f e1 e2, f e2 e1 ]
 
-     -- R3) * distribution over +/-
-     x :**: (y :++: v)             -> return $ mkL (x*y)   `add` (mkL x `mul` v)
-     x :**: (L y :-: v)            -> return $ mkL (x*y)   `sub` (mkL x `mul` v)
-     x :**: (v   :-: L y)          -> return $ (mkL x `mul` v) `sub` mkL (x*y)
+        -- match multiplication with a literal (handles commutativity)
+        is_lit_mul e = is_mul e >>= \case
+           (L l, x  ) -> pure (l,x)
+           (x  , L l) -> pure (l,x)
+           _          -> App.empty
 
-     -- R4) Simple factorization
-     v :+: w
-      | w `cheapEqExpr` v          -> return $ mkL 2       `mul` v
-     w :+: (y :**: v)
-      | w `cheapEqExpr` v          -> return $ mkL (1+y)   `mul` v
-     w :-: (y :**: v)
-      | w `cheapEqExpr` v          -> return $ mkL (1-y)   `mul` v
-     (y :**: v) :+: w
-      | w `cheapEqExpr` v          -> return $ mkL (y+1)   `mul` v
-     (y :**: v) :-: w
-      | w `cheapEqExpr` v          -> return $ mkL (y-1)   `mul` v
-     (x :**: w) :+: (y :**: v)
-      | w `cheapEqExpr` v          -> return $ mkL (x+y)   `mul` v
-     (x :**: w) :-: (y :**: v)
-      | w `cheapEqExpr` v          -> return $ mkL (x-y)   `mul` v
+        -- match given "x": return 1
+        -- match "lit * x": return lit value (handles commutativity)
+        is_expr_mul x e = msum
+          [ do guard (x `cheapEqExpr` e)
+               pure 1
+          , do (k,x') <- is_lit_mul e
+               guard (x `cheapEqExpr` x')
+               pure k
+          ]
 
-     -- R5) +/- propagation
-     w  :+: (y :++: v)             -> return $ mkL y `add` (w `add` v)
-     (y :++: v) :+: w              -> return $ mkL y       `add` (w `add` v)
-     w  :-: (y :++: v)             -> return $ (w `sub` v) `sub` mkL y
-     (y :++: v) :-: w              -> return $ mkL y       `add` (v `sub` w)
-     w    :-: (L y :-: v)          -> return $ (w `add` v) `sub` mkL y
-     (L y :-: v) :-: w             -> return $ mkL y       `sub` (w `add` v)
-     w    :+: (L y :-: v)          -> return $ mkL y       `add` (w `sub` v)
-     w    :+: (v :-: L y)          -> return $ (w `add` v) `sub` mkL y
-     (L y :-: v) :+: w             -> return $ mkL y       `add` (w `sub` v)
-     (v :-: L y) :+: w             -> return $ (w `add` v) `sub` mkL y
+        e = BinOpApp e1 op e2
 
-     _                             -> mzero
-
+    msum
+      -- R1) +/- simplification
+      [ do -- l1 + (l2 + x) ==> (l1+l2) + x
+           (l1,e') <- is_lit_add e
+           (l2,x)  <- is_lit_add e'
+           return (mkL (l1+l2) `add` x)
+      
+      , do -- l1 + (l2 - x) ==> (l1+l2) - x
+           (l1,e')  <- is_lit_add e
+           (L l2,x) <- is_sub e'
+           return (mkL (l1+l2) `sub` x)
+      
+      , do -- l1 + (x - l2) ==> (l1-l2) + x
+           (l1,e')  <- is_lit_add e
+           (x,L l2) <- is_sub e'
+           return (mkL (l1-l2) `add` x)
+      
+      , do -- l1 - (l2 + x) ==> (l1-l2) - x
+           (L l1,e') <- is_sub e
+           (l2,x)    <- is_lit_add e'
+           return (mkL (l1-l2) `sub` x)
+      
+      , do -- l1 - (l2 - x) ==> (l1-l2) + x
+           (L l1,e') <- is_sub e
+           (L l2,x)  <- is_sub e'
+           return (mkL (l1-l2) `add` x)
+      
+      , do -- l1 - (x - l2) ==> (l1+l2) - x
+           (L l1,e') <- is_sub e
+           (x,L l2)  <- is_sub e'
+           return (mkL (l1+l2) `sub` x)
+      
+      , do -- (l1 + x) - l2 ==> (l1-l2) + x
+           (e',L l2) <- is_sub e
+           (l1,x)    <- is_lit_add e'
+           return (mkL (l1-l2) `add` x)
+      
+      , do -- (l1 - x) - l2 ==> (l1-l2) - x
+           (e',L l2) <- is_sub e
+           (L l1,x)  <- is_sub e'
+           return (mkL (l1-l2) `sub` x)
+      
+      , do -- (x - l1) - l2 ==> (0-l1-l2) + x
+           (e',L l2) <- is_sub e
+           (x,L l1)  <- is_sub e'
+           return (mkL (0-l1-l2) `add` x)
+      
+      , do -- e1 + e2 ==> ...
+           with_add e $ \e1 e2 -> msum -- with_add handles commutativity
+            [ do -- (l1 + x) + (l2 + y) ==> (l1+l2) + (x+y)
+                 (l1,x) <- is_lit_add e1
+                 (l2,y) <- is_lit_add e2
+                 return (mkL (l1+l2) `add` (x `add` y))
+      
+            , do -- (l1 + x) + (l2 - y) ==> (l1+l2) + (x-y)
+                 (l1,x)   <- is_lit_add e1
+                 (L l2,y) <- is_sub e2
+                 return (mkL (l1+l2) `add` (x `sub` y))
+      
+            , do -- (l1 + x) + (y - l2) ==> (l1-l2) + (x+y)
+                 (l1,x)   <- is_lit_add e1
+                 (y,L l2) <- is_sub e2
+                 return (mkL (l1-l2) `add` (x `add` y))
+      
+            , do -- (l1 - x) + (l2 - y) ==> (l1+l2) - (x+y)
+                 (L l1,x) <- is_sub e1
+                 (L l2,y) <- is_sub e2
+                 return (mkL (l1+l2) `sub` (x `add` y))
+      
+            , do -- (l1 - x) + (y - l2) ==> (l1-l2) + (y-x)
+                 (L l1,x) <- is_sub e1
+                 (y,L l2) <- is_sub e2
+                 return (mkL (l1-l2) `add` (y `sub` x))
+      
+            , do -- (x - l1) + (y - l2) ==> (0-l1-l2) + (x+y)
+                 (x,L l1) <- is_sub e1
+                 (y,L l2) <- is_sub e2
+                 return (mkL (0-l1-l2) `add` (x `add` y))
+            ]
+      
+      , do -- e1 - e2 ==> ...
+           (e1,e2) <- is_sub e
+           msum
+            [ do -- (l1 + x) - (l2 + y) ==> (l1-l2) + (x-y)
+                 (l1,x) <- is_lit_add e1
+                 (l2,y) <- is_lit_add e2
+                 return (mkL (l1-l2) `add` (x `sub` y))
+      
+            , do -- (l1 + x) - (l2 - y) ==> (l1-l2) + (x+y)
+                 (l1,x)   <- is_lit_add e1
+                 (L l2,y) <- is_sub e2
+                 return (mkL (l1-l2) `add` (x `add` y))
+      
+            , do -- (l1 + x) - (y - l2) ==> (l1+l2) + (x-y)
+                 (l1,x)   <- is_lit_add e1
+                 (y,L l2) <- is_sub e2
+                 return (mkL (l1+l2) `add` (x `sub` y))
+      
+            , do -- (l1 - x) - (l2 + y) ==> (l1-l2) - (x+y)
+                 (L l1,x) <- is_sub e1
+                 (l2,y)   <- is_lit_add e2
+                 return (mkL (l1-l2) `sub` (x `add` y))
+      
+            , do -- (x - l1) - (l2 + y) ==> (0-l1-l2) + (x-y)
+                 (x,L l1) <- is_sub e1
+                 (l2,y)   <- is_lit_add e2
+                 return (mkL (0-l1-l2) `add` (x `sub` y))
+      
+            , do -- (l1 - x) - (l2 - y) ==> (l1-l2) + (y-x)
+                 (L l1,x) <- is_sub e1
+                 (L l2,y) <- is_sub e2
+                 return (mkL (l1-l2) `add` (y `sub` x))
+      
+            , do -- (l1 - x) - (y - l2) ==> (l1+l2) - (x+y)
+                 (L l1,x) <- is_sub e1
+                 (y,L l2) <- is_sub e2
+                 return (mkL (l1+l2) `sub` (x `add` y))
+      
+            , do -- (x - l1) - (l2 - y) ==> (0-l1-l2) + (x+y)
+                 (x,L l1) <- is_sub e1
+                 (L l2,y) <- is_sub e2
+                 return (mkL (0-l1-l2) `add` (x `add` y))
+      
+            , do -- (x - l1) - (y - l2) ==> (l2-l1) + (x-y)
+                 (x,L l1) <- is_sub e1
+                 (y,L l2) <- is_sub e2
+                 return (mkL (l2-l1) `add` (x `sub` y))
+            ]
+      
+      -- R2) * simplification
+      
+      , do -- l1 * (l2 * x) ==> (l1*l2) * x
+           (l1,e') <- is_lit_mul e
+           (l2,x)  <- is_lit_mul e'
+           return (mkL (l1*l2) `mul` x)
+      
+      , do -- (l1 * x) * (l2 * y) ==> (l1*l2) * (x * y)
+           (e1,e2) <- is_mul e
+           (l1,x)  <- is_lit_mul e1
+           (l2,y)  <- is_lit_mul e2
+           return (mkL (l1*l2) `mul` (x `mul` y))
+      
+      -- R3) * distribution over +/-
+      
+      , do -- l1 * (l2 + x) ==> (l1*l2) + (l1 * x)
+           (l1,e') <- is_lit_mul e
+           (l2,x)  <- is_lit_add e'
+           return (mkL (l1*l2) `add` (mkL l1 `mul` x))
+      
+      , do -- l1 * (l2 - x) ==> (l1*l2) - (l1 * x)
+           (l1,e')  <- is_lit_mul e
+           (L l2,x) <- is_sub e'
+           return (mkL (l1*l2) `sub` (mkL l1 `mul` x))
+      
+      , do -- l1 * (x - l2) ==> (l1 * x) - (l1*l2)
+           (l1,e')  <- is_lit_mul e
+           (x,L l2) <- is_sub e'
+           return ((mkL l1 `mul` x) `sub` mkL (l1*l2))
+      
+      -- R4) Simple factorization
+      
+      , do -- x        + x        ==> 2 * x
+           -- (l1 * x) + x        ==> (l1+1) * x
+           -- (l1 * x) + (l2 * x) ==> (l1+l2) * x
+           (e1,e2) <- is_add e
+           msum
+            [ do l1 <- is_expr_mul e1 e2
+                 return (mkL (l1+1) `mul` e1)
+            , do l1 <- is_expr_mul e2 e1
+                 return (mkL (l1+1) `mul` e2)
+            , do (l1,x) <- is_lit_mul e1
+                 l2 <- is_expr_mul x e2
+                 return (mkL (l1+l2) `mul` x)
+            ]
+      
+      , do -- x        - (l1 * x) ==> (1-l1) * x
+           -- (l1 * x) - x        ==> (l1-1) * x
+           -- (l1 * x) - (l2 * x) ==> (l1-l2) * x
+           msum
+            [ do l1 <- is_expr_mul e1 e2
+                 return (mkL (1-l1) `mul` e1)
+            , do l1 <- is_expr_mul e2 e1
+                 return (mkL (l1-1) `mul` e2)
+            , do (l1,x) <- is_lit_mul e1
+                 l2 <- is_expr_mul x e2
+                 return (mkL (l1-l2) `mul` x)
+            ]
+      
+      -- R5) +/- propagation: these transformations pushes literals outwards
+      -- with the hope that other rules can then be applied.
+      
+      , with_add e $ \x e2 -> msum
+         -- In the following rules, x can't be a literal otherwise another
+         -- rule would have combined it with the other literal in e2. So we
+         -- don't have to check this to avoid loops here.
+         [ do -- x + (l1 + y) ==> l1 + (x + y)
+              (l1,y) <- is_lit_add e2
+              return (mkL l1 `add` (x `add` y))
+      
+         , do -- x + (l1 - y) ==> l1 + (x - y)
+              (L l1,y) <- is_sub e2
+              return (mkL l1 `add` (x `sub` y))
+      
+         , do -- x + (y - l1) ==> (x + y) - l1
+              (y,L l1) <- is_sub e2
+              return ((x `add` y) `sub` mkL l1)
+         ]
+      
+      , do -- x - (l1 + y) ==> (x - y) - l1
+           (x,e') <- is_sub e
+           (l1,y) <- is_lit_add e'
+           return ((x `sub` y) `sub` mkL l1)
+      
+      , do -- (l1 + x) - y ==> l1 + (x - y)
+           (e',y) <- is_sub e
+           (l1,x) <- is_lit_add e'
+           return (mkL l1 `add` (x `sub` y))
+      
+      , do -- x - (l1 - y) ==> (x + y) - l1
+           (x,e')   <- is_sub e
+           (L l1,y) <- is_sub e'
+           return ((x `add` y) `sub` mkL l1)
+      
+      , do -- x - (y - l1) ==> l1 + (x - y)
+           (x,e')   <- is_sub e
+           (y,L l1) <- is_sub e'
+           return (mkL l1 `add` (x `sub` y))
+      
+      , do -- (l1 - x) - y ==> l1 - (x + y)
+           (e',y)   <- is_sub e
+           (L l1,x) <- is_sub e'
+           return (mkL l1 `sub` (x `add` y))
+      
+      , do -- (x - l1) - y ==> (x - y) - l1
+           (e',y)   <- is_sub e
+           (x,L l1) <- is_sub e'
+           return ((x `sub` y) `sub` mkL l1)
+      ]
 
 
 -- | Match the application of a binary primop
-pattern BinOpApp  :: Arg CoreBndr -> PrimOp -> Arg CoreBndr -> CoreExpr
-pattern BinOpApp  x op y =  OpVal op `App` x `App` y
+pattern BinOpApp :: Arg CoreBndr -> PrimOp -> Arg CoreBndr -> CoreExpr
+pattern BinOpApp x op y = OpVal op `App` x `App` y
 
 -- | Match a primop
-pattern OpVal   :: PrimOp  -> Arg CoreBndr
-pattern OpVal   op     <- Var (isPrimOpId_maybe -> Just op) where
+pattern OpVal:: PrimOp  -> Arg CoreBndr
+pattern OpVal op <- Var (isPrimOpId_maybe -> Just op) where
    OpVal op = Var (mkPrimOpId op)
-
-
 
 -- | Match a literal
 pattern L :: Integer -> Arg CoreBndr
 pattern L l <- Lit (isLitValue_maybe -> Just l)
-
--- | Match an addition
-pattern (:+:) :: Arg CoreBndr -> Arg CoreBndr -> CoreExpr
-pattern x :+: y <- BinOpApp x (isAddOp -> True) y
-
--- | Match an addition with a literal (handle commutativity)
-pattern (:++:) :: Integer -> Arg CoreBndr -> CoreExpr
-pattern l :++: x <- (isAdd -> Just (l,x))
-
-isAdd :: CoreExpr -> Maybe (Integer,CoreExpr)
-isAdd e = case e of
-   L l :+: x   -> Just (l,x)
-   x   :+: L l -> Just (l,x)
-   _           -> Nothing
-
--- | Match a multiplication
-pattern (:*:) :: Arg CoreBndr -> Arg CoreBndr -> CoreExpr
-pattern x :*: y <- BinOpApp x (isMulOp -> True) y
-
--- | Match a multiplication with a literal (handle commutativity)
-pattern (:**:) :: Integer -> Arg CoreBndr -> CoreExpr
-pattern l :**: x <- (isMul -> Just (l,x))
-
-isMul :: CoreExpr -> Maybe (Integer,CoreExpr)
-isMul e = case e of
-   L l :*: x   -> Just (l,x)
-   x   :*: L l -> Just (l,x)
-   _           -> Nothing
-
-
--- | Match a subtraction
-pattern (:-:) :: Arg CoreBndr -> Arg CoreBndr -> CoreExpr
-pattern x :-: y <- BinOpApp x (isSubOp -> True) y
-
-isSubOp :: PrimOp -> Bool
-isSubOp IntSubOp  = True
-isSubOp WordSubOp = True
-isSubOp _         = False
-
-isAddOp :: PrimOp -> Bool
-isAddOp IntAddOp  = True
-isAddOp WordAddOp = True
-isAddOp _         = False
-
-isMulOp :: PrimOp -> Bool
-isMulOp IntMulOp  = True
-isMulOp WordMulOp = True
-isMulOp _         = False
-
--- | Explicit "type-class"-like dictionary for numeric primops
---
--- Depends on Platform because creating a literal value depends on Platform
-data PrimOps = PrimOps
-   { add :: CoreExpr -> CoreExpr -> CoreExpr -- ^ Add two numbers
-   , sub :: CoreExpr -> CoreExpr -> CoreExpr -- ^ Sub two numbers
-   , mul :: CoreExpr -> CoreExpr -> CoreExpr -- ^ Multiply two numbers
-   , mkL :: Integer -> CoreExpr              -- ^ Create a literal value
-   }
-
-intPrimOps :: Platform -> PrimOps
-intPrimOps platform = PrimOps
-   { add = \x y -> BinOpApp x IntAddOp y
-   , sub = \x y -> BinOpApp x IntSubOp y
-   , mul = \x y -> BinOpApp x IntMulOp y
-   , mkL = intResult' platform
-   }
-
-wordPrimOps :: Platform -> PrimOps
-wordPrimOps platform = PrimOps
-   { add = \x y -> BinOpApp x WordAddOp y
-   , sub = \x y -> BinOpApp x WordSubOp y
-   , mul = \x y -> BinOpApp x WordMulOp y
-   , mkL = wordResult' platform
-   }
-
 
 --------------------------------------------------------
 -- Constant folding through case-expressions

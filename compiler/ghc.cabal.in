@@ -171,6 +171,7 @@ Library
         GHC.Utils.Asm
         GHC.Types.Basic
         GHC.Core.ConLike
+        GHC.Core.Num
         GHC.Core.DataCon
         GHC.Core.PatSyn
         GHC.Types.Demand
