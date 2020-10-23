@@ -1172,8 +1172,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Int8# signed ops
 
-  Int8Extend     -> \args -> opTranslate args (MO_SS_Conv W8 (wordWidth platform))
-  Int8Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W8)
+  Int8ExtendOp     -> \args -> opTranslate args (MO_SS_Conv W8 (wordWidth platform))
+  Int8NarrowOp     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W8)
   Int8NegOp      -> \args -> opTranslate args (MO_S_Neg W8)
   Int8AddOp      -> \args -> opTranslate args (MO_Add W8)
   Int8SubOp      -> \args -> opTranslate args (MO_Sub W8)
@@ -1208,8 +1208,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Int16# signed ops
 
-  Int16Extend     -> \args -> opTranslate args (MO_SS_Conv W16 (wordWidth platform))
-  Int16Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W16)
+  Int16ExtendOp     -> \args -> opTranslate args (MO_SS_Conv W16 (wordWidth platform))
+  Int16NarrowOp     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W16)
   Int16NegOp      -> \args -> opTranslate args (MO_S_Neg W16)
   Int16AddOp      -> \args -> opTranslate args (MO_Add W16)
   Int16SubOp      -> \args -> opTranslate args (MO_Sub W16)
@@ -1226,8 +1226,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Int32# signed ops
 
-  Int32Extend     -> \args -> opTranslate args (MO_SS_Conv W32 (wordWidth platform))
-  Int32Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W32)
+  Int32ExtendOp     -> \args -> opTranslate args (MO_SS_Conv W32 (wordWidth platform))
+  Int32NarrowOp     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W32)
 
 -- Word16# unsigned ops
 

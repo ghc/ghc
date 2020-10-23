@@ -193,6 +193,32 @@ primOpRules nm = \case
    SrlOp       -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogical ]
 
    -- coercions
+
+   Int8ExtendOp   -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
+                                            matchPrimOpId Int8NarrowOp primop_id
+                                            return (Var (mkPrimOpId Narrow8IntOp) `App` e) ]
+   Int16ExtendOp  -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
+                                            matchPrimOpId Int16NarrowOp primop_id
+                                            return (Var (mkPrimOpId Narrow16IntOp) `App` e) ]
+   Int32ExtendOp  -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
+                                            matchPrimOpId Int32NarrowOp primop_id
+                                            return (Var (mkPrimOpId Narrow32IntOp) `App` e) ]
+   Int8NarrowOp   -> mkPrimOpRule nm 1 [ subsumedByPrimOp Int8NarrowOp
+                                       , narrowSubsumesAnd AndIOp Int8NarrowOp 8 ]
+   Int16NarrowOp  -> mkPrimOpRule nm 1 [ subsumedByPrimOp Int8NarrowOp
+                                       , subsumedByPrimOp Int16NarrowOp
+                                       , narrowSubsumesAnd AndIOp Int16NarrowOp 16 ]
+   Int32NarrowOp  -> mkPrimOpRule nm 1 [ subsumedByPrimOp Int8NarrowOp
+                                       , subsumedByPrimOp Int16NarrowOp
+                                       , subsumedByPrimOp Int32NarrowOp
+                                       , narrowSubsumesAnd AndIOp Int32NarrowOp 32 ]
+  --  Int64NarrowOp  -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndIOp Int64NarrowOp 64 ]
+
+  --  Word8Narrow  -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word8Narrow 8 ]
+  --  Word16Narrow -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word16Narrow 16 ]
+  --  Word32Narrow -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word32Narrow 32 ]
+  --  Word64Narrow -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word64Narrow 64 ]
+
    WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform wordToIntLit
                                        , inversePrimOp IntToWordOp ]
    IntToWordOp    -> mkPrimOpRule nm 1 [ liftLitPlatform intToWordLit
