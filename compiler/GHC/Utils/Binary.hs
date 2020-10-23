@@ -6,6 +6,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -84,6 +85,7 @@ import Data.Array
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
+import GHC.ForeignPtr
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Time
@@ -302,7 +304,10 @@ getPrim (BinMem _ ix_r sz_r arr_r) size f = do
   when (ix + size > sz) $
       ioError (mkIOError eofErrorType "Data.Binary.getPrim" Nothing Nothing)
   arr <- readIORef arr_r
-  w <- withForeignPtr arr $ \op -> f (op `plusPtr` ix)
+  w <- f (unsafeForeignPtrToPtr arr `plusPtr` ix)
+  touchForeignPtr arr
+    -- This is safe WRT #17760 as we we guarantee that the above line doesn't
+    -- diverge
   writeFastMutInt ix_r (ix + size)
   return w
 
