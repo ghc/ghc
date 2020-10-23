@@ -330,9 +330,10 @@ be annotated with ``interruptible`` instead of ``safe`` or ``unsafe``: ::
        "sleep" sleepBlock :: CUint -> IO CUint
 
 ``interruptible`` behaves exactly as ``safe``, except that when a
-``throwTo`` is directed at a thread in an interruptible foreign call, an
-OS-specific mechanism will be used to attempt to cause the foreign call
-to return:
+``throwTo`` is directed at a thread in an interruptible foreign call,
+irrespective of the masking state, the exception is added to the blocked
+exceptions queue of the target thread and an OS-specific mechanism will be
+used to attempt to cause the foreign call to return:
 
 Unix systems
     The thread making the foreign call is sent a ``SIGPIPE`` signal
@@ -348,7 +349,9 @@ Windows systems
 
 Once the system call is successfully interrupted, the surrounding
 code must return control out of the ``foreign import``, back into Haskell code,
-so that the ``throwTo`` Haskell exception can be raised there.
+so that any blocked exception can be raised if the masking state
+of the thread allows it. Being under mask gives the Haskell code an opportunity
+to detect and react to the interrupt error code from the c call.
 
 If the foreign code simply retries the system call directly without returning
 back to Haskell, then the intended effect of `interruptible` disappears
