@@ -21,9 +21,7 @@ where
 
 #include "HsVersions.h"
 
-
 import GHC.Prelude
-import GHC.Platform
 
 import GHC.Core
 
@@ -41,7 +39,6 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Types.Id   ( Id )
 import GHC.Core.Coercion
-import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
 import GHC.Builtin.Types
@@ -355,8 +352,7 @@ resultWrapper result_ty
   | Just (tycon, tycon_arg_tys) <- maybe_tc_app
   , Just data_con <- isDataProductTyCon_maybe tycon  -- One constructor, no existentials
   , [Scaled _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
-  = do { dflags <- getDynFlags
-       ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
+  = do { (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        ; let marshal_con e  = Var (dataConWrapId data_con)
                               `mkTyApps` tycon_arg_tys
                               `App` wrapper e
