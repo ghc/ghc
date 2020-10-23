@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE ViewPatterns         #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -662,9 +663,6 @@ f g = (snd (g 3), True)
 should be: <L,C(U(AU))>m
 -}
 
-type CleanDemand = JointDmd StrDmd UseDmd
-     -- A demand that is at least head-strict
-
 bothCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
 bothCleanDmd (JD { sd = s1, ud = a1}) (JD { sd = s2, ud = a2})
   = JD { sd = s1 `bothStr` s2, ud = a1 `bothUse` a2 }
@@ -715,17 +713,168 @@ cleanEvalProdDmd n = JD { sd = HeadStr, ud = UProd (replicate n useTop) }
 ************************************************************************
 -}
 
-type Demand = JointDmd ArgStr ArgUse
+data Card
+  = C_00 -- ^ {0}
+  | C_01 -- ^ {0,1}
+  | C_0N -- ^ {0,1,n} Every possible cardinality; the top element.
+  | C_11 -- ^ {1,1}
+  | C_1N -- ^ {1,n}
+  | C_10 -- ^ {}      The empty interval; the bottom element of the powerset lattice.
+  deriving ( Eq )
+
+instance Show Card where
+  show C_00 = "0"
+  show C_01 = "01"
+  show C_0N = "_"
+  show C_11 = "1"
+  show C_1N = "1_"
+  show C_10 = "⊥"
+
+botCard, topCard :: Card
+botCard = C_10
+topCard = C_0N
+
+-- | Denotes '∪' on 'Card'.
+lubCard :: Card -> Card -> Card
+-- Handle C_10 (bot)
+lubCard C_10 n    = n    -- bot
+lubCard n    C_10 = n    -- bot
+-- Handle C_0N (top)
+lubCard C_0N _    = C_0N -- top
+lubCard _    C_0N = C_0N -- top
+-- Handle C_11
+lubCard C_00 C_11 = C_01 -- {0} ∪ {1} = {0,1}
+lubCard C_11 C_00 = C_01 -- {0} ∪ {1} = {0,1}
+lubCard C_11 n    = n    -- {1} is a subset of all other intervals
+lubCard n    C_11 = n    -- {1} is a subset of all other intervals
+-- Handle C_1N
+lubCard _    C_1N = C_0N -- {0} ∪ {1,n} = top
+lubCard C_1N _    = C_0N -- {0} ∪ {1,n} = top
+-- Handle C_01
+lubCard C_01 _    = C_01 -- {0} ∪ {0,1} = {0,1}
+lubCard _    C_01 = C_01 -- {0} ∪ {0,1} = {0,1}
+-- Handle C_00
+lubCard C_00 C_00 = C_00 -- reflexivity
+
+-- It's similar to @'Scaled' 'CleanDemand'@, but it's scaled by 'Card', which
+-- is an interval on 'Multiplicity'.
+data Demand = !Card :* !CleanDemand
+  deriving ( Eq, Show )
+
+data CleanDemand
+  = Poly !Card     -- ^ Polymorphic head demand with nested evaluation
+                   -- cardinalities.
+
+  | Call !Card !CleanDemand -- ^ Call demand
+                          -- Used only for values of function type
+
+  | Prod ![Demand]       -- ^ Product
+                        -- Used only for values of product type
+                        -- Invariant: not all components are HyperDmd (use HyperDmd)
+                        --            not all components are Lazy     (use HeadStr)
+
+  deriving ( Eq, Show )
+
+poly00, poly01, poly0N, poly11, poly1N, poly10, topCleanDmd, botCleanDmd :: CleanDemand
+poly00 = Poly C_00
+poly01 = Poly C_01
+poly0N = Poly C_0N
+poly11 = Poly C_11
+poly1N = Poly C_1N
+poly10 = Poly C_10
+topCleanDmd = poly0N
+botCleanDmd = poly10
+
+polyDmd :: Card -> Demand
+polyDmd C_00 = C_00 :* poly00
+polyDmd C_01 = C_01 :* poly01
+polyDmd C_0N = C_0N :* poly0N
+polyDmd C_11 = C_11 :* poly11
+polyDmd C_1N = C_1N :* poly1N
+polyDmd C_10 = C_10 :* poly10
+
+polyCleanDmd :: Card -> CleanDemand
+polyCleanDmd C_00 = poly00
+polyCleanDmd C_01 = poly01
+polyCleanDmd C_0N = poly0N
+polyCleanDmd C_11 = poly11
+polyCleanDmd C_1N = poly1N
+polyCleanDmd C_10 = poly10
+
+
+topDmd, absDmd, botDmd :: Demand
+topDmd = polyDmd C_0N
+absDmd = polyDmd C_00
+botDmd = polyDmd C_10
+
+viewProd :: Arity -> CleanDemand -> Maybe [Demand]
+viewProd n (Prod ds)     | ds `lengthIs` n = Just ds
+viewProd n (Poly card)                     = Just (replicate n (polyDmd card))
+viewProd _ _                               = Nothing
+
+viewCall :: CleanDemand -> Maybe (Card, CleanDemand)
+viewCall (Call n cd)    = Just (n, cd)
+viewCall cd@(Poly card) = Just (card, cd)
+viewCall _              = Nothing
+
+lubCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
+-- Handle Prod
+lubCleanDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
+  Prod $ zipWith lubDmd ds1 ds2
+-- Handle Call
+lubCleanDmd (Call n1 d1) (viewCall -> Just (n2, d2)) =
+  Call (lubCard n1 n2) (lubCleanDmd d1 d2)
+-- Handle Poly
+lubCleanDmd (Poly n1)  (Poly n2) = Poly (lubCard n1 n2)
+-- Make use of reflexivity (so we'll match the Prod or Call cases again).
+lubCleanDmd cd1@Poly{} cd2       = lubCleanDmd cd2 cd1
+-- Otherwise (Call `lub` Prod) return Top
+lubCleanDmd _          _         = topCleanDmd
 
 lubDmd :: Demand -> Demand -> Demand
-lubDmd (JD {sd = s1, ud = a1}) (JD {sd = s2, ud = a2})
- = JD { sd = s1 `lubArgStr` s2
-      , ud = a1 `lubArgUse` a2 }
+lubDmd (n1 :* cd1) (n2 :* cd2) = lubCard n1 n2 :* lubCleanDmd cd1 cd2
+
+-- | Denotes '+' on 'Card'.
+bothCard :: Card -> Card -> Card
+-- Handle C_00
+bothCard C_00 n    = n    -- {0}+n = n
+bothCard n    C_00 = n    -- {0}+n = n
+-- Handle C_10
+bothCard C_10 C_01 = C_11 -- These follow by applying + to lower and upper bounds individually
+bothCard C_10 C_0N = C_1N
+bothCard C_10 n    = n
+bothCard C_01 C_10 = C_11
+bothCard C_0N C_10 = C_1N
+bothCard n    C_10 = n
+-- Handle the rest (C_01, C_0N, C_11, C_1N)
+bothCard C_01 C_01 = C_0N -- The upper bound is at least 1, so upper bound of
+bothCard C_01 C_0N = C_0N -- the result must be 1+1 ~= N.
+bothCard C_0N C_01 = C_0N -- But for the lower bound we have 4 cases where
+bothCard C_0N C_0N = C_0N -- 0+0 ~= 0 (as opposed to 1), so we match on these.
+bothCard _    _    = C_1N -- Otherwise we return topCard
+
+bothCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
+-- Handle HeadDmd
+bothCleanDmd HeadDmd cd      = cd
+bothCleanDmd cd      HeadDmd = cd
+-- Handle Prod
+bothCleanDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
+  Prod $ zipWith bothDmd ds1 ds2
+-- Handle Call
+bothCleanDmd (Call n1 d1) (viewCall -> Just (n2, d2)) =
+  Call (bothCard n1 n2) (bothCleanDmd d1 d2)
+-- Handle TopDmd. Do not move before Prod, because we want to handle TopDmd through viewProd.
+bothCleanDmd BotDmd  BotDmd  = BotDmd
+bothCleanDmd TopDmd  BotDmd  = BotDmd
+bothCleanDmd TopDmd  _       = TopDmd
+bothCleanDmd _       TopDmd  = TopDmd
+-- A dead catch-all
+bothCleanDmd cd1     cd2     = pprPanic "bothCleanDmd: impossible" (ppr cd1 <+> ppr cd2)
 
 bothDmd :: Demand -> Demand -> Demand
-bothDmd (JD {sd = s1, ud = a1}) (JD {sd = s2, ud = a2})
- = JD { sd = s1 `bothArgStr` s2
-      , ud = a1 `bothArgUse` a2 }
+bothDmd Absent      dmd         = dmd
+bothDmd dmd         Absent      = dmd
+bothDmd (n1 :* cd1) (n2 :* cd2) = bothCard n1 n2 :* bothCleanDmd cd1 cd2
 
 lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd :: Demand
 
@@ -800,7 +949,7 @@ splitFVs :: Bool   -- Thunk
          -> DmdEnv -> (DmdEnv, DmdEnv)
 splitFVs is_thunk rhs_fvs
   | is_thunk  = strictPairToTuple $
-                nonDetStrictFoldUFM_Directly add (emptyVarEnv :*: emptyVarEnv) rhs_fvs
+                nonDetStrictFoC_dFM_Directly add (emptyVarEnv :*: emptyVarEnv) rhs_fvs
                 -- It's OK to use a non-deterministic fold because we
                 -- immediately forget the ordering by putting the elements
                 -- in the envs again
@@ -1362,7 +1511,7 @@ postProcessDmdEnv ds@(JD { sd = ss, ud = us }) env
   | Str _ <- ss
   , Use One _ <- us = env
   | otherwise       = mapVarEnv (postProcessDmd ds) env
-  -- For the Absent case just discard all usage information
+  -- For the Absent case just discard alC_ sage information
   -- We only processed the thing at all to analyse the body
   -- See Note [Always analyse in virgin pass]
 
@@ -1520,7 +1669,7 @@ one. Therefore (\x -> \y -> x (y ++ z)) should be analyzed with a
 demand <C(C(..), C(C1(U))>.
 
 This is achieved by, first, converting the lazy demand L into the
-strict S by the second clause of the analysis.
+strict S by the second cC_ase of the analysis.
 
 Note [Analysing with absent demand]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1595,13 +1744,13 @@ demand on all arguments. Otherwise, the demand is specified by Id's
 signature.
 
 For example, the demand transformer described by the demand signature
-        StrictSig (DmdType {x -> <S,1*U>} <L,A><L,U(U,U)>m)
+        StrictSig (DmdType {x -> <S,1*U>} <L,A><C_,(U,U)>m)
 says that when the function is applied to two arguments, it
 unleashes demand <S,1*U> on the free var x, <L,A> on the first arg,
-and <L,U(U,U)> on the second, then returning a constructor.
+and <C_,(U,U)> on the second, then returning a constructor.
 
 If this same function is applied to one arg, all we can say is that it
-uses x with <L,U>, and its arg with demand <L,U>.
+uses x with <C_,>, and its arg with demand <C_,>.
 
 Note [Understanding DmdType and StrictSig]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1617,8 +1766,8 @@ yields a more precise demand type:
 
     incoming demand                  |  demand type
     ----------------------------------------------------
-    <S           ,HU              >  |  <L,U><L,U>{}
-    <C(C(S     )),C1(C1(U       ))>  |  <S,U><L,U>{}
+    <S           ,HU              >  |  <C_,><C_,>{}
+    <C(C(S     )),C1(C1(U       ))>  |  <S,U><C_,>{}
     <C(C(S(S,L))),C1(C1(U(1*U,A)))>  |  <S,1*HU><L,A>{}
 
 Note that in the first example, the depth of the demand type was *higher* than
@@ -1871,7 +2020,7 @@ zapUsageEnvSig (StrictSig (DmdType _ ds r)) = mkClosedStrictSig ds r
 
 zapUsageDemand :: Demand -> Demand
 -- Remove the usage info, but not the strictness info, from the demand
-zapUsageDemand = kill_usage $ KillFlags
+zapUsageDemand = kilC__sage $ KillFlags
     { kf_abs         = True
     , kf_used_once   = True
     , kf_called_once = True
@@ -1879,7 +2028,7 @@ zapUsageDemand = kill_usage $ KillFlags
 
 -- | Remove all 1* information (but not C1 information) from the demand
 zapUsedOnceDemand :: Demand -> Demand
-zapUsedOnceDemand = kill_usage $ KillFlags
+zapUsedOnceDemand = kilC__sage $ KillFlags
     { kf_abs         = False
     , kf_used_once   = True
     , kf_called_once = False
@@ -1897,8 +2046,8 @@ data KillFlags = KillFlags
     , kf_called_once :: Bool
     }
 
-kill_usage :: KillFlags -> Demand -> Demand
-kill_usage kfs (JD {sd = s, ud = u}) = JD {sd = s, ud = zap_musg kfs u}
+kilC__sage :: KillFlags -> Demand -> Demand
+kilC__sage kfs (JD {sd = s, ud = u}) = JD {sd = s, ud = zap_musg kfs u}
 
 zap_musg :: KillFlags -> ArgUse -> ArgUse
 zap_musg kfs Abs
