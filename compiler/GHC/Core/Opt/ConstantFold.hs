@@ -2198,7 +2198,7 @@ pattern OpVal op <- Var (isPrimOpId_maybe -> Just op) where
 
 -- | Match a literal
 pattern L :: Integer -> Arg CoreBndr
-pattern L l <- Lit (isLitValue_maybe -> Just l)
+pattern L i <- Lit (LitNumber _ i)
 
 -- | Explicit "type-class"-like dictionary for numeric primops
 data NumOps = NumOps
@@ -2256,14 +2256,14 @@ caseRules :: Platform
 
 caseRules platform (App (App (Var f) v) (Lit l))   -- v `op` x#
   | Just op <- isPrimOpId_maybe f
-  , Just x  <- isLitValue_maybe l
+  , LitNumber _ x <- l
   , Just adjust_lit <- adjustDyadicRight op x
   = Just (v, tx_lit_con platform adjust_lit
            , \v -> (App (App (Var f) (Var v)) (Lit l)))
 
 caseRules platform (App (App (Var f) (Lit l)) v)   -- x# `op` v
   | Just op <- isPrimOpId_maybe f
-  , Just x  <- isLitValue_maybe l
+  , LitNumber _ x <- l
   , Just adjust_lit <- adjustDyadicLeft x op
   = Just (v, tx_lit_con platform adjust_lit
            , \v -> (App (App (Var f) (Lit l)) (Var v)))

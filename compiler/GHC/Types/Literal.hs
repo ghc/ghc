@@ -36,7 +36,7 @@ module GHC.Types.Literal
         , inCharRange
         , isZeroLit
         , litFitsInChar
-        , litValue, isLitValue, isLitValue_maybe, mapLitValue
+        , litValue, mapLitValue
 
         -- ** Coercions
         , wordToIntLit, intToWordLit
@@ -71,7 +71,6 @@ import Data.ByteString (ByteString)
 import Data.Int
 import Data.Word
 import Data.Char
-import Data.Maybe ( isJust )
 import Data.Data ( Data )
 import Data.Proxy
 import Numeric ( fromRat )
@@ -461,11 +460,6 @@ mapLitValue _        f (LitChar   c)      = mkLitChar (fchar c)
    where fchar = chr . fromInteger . f . toInteger . ord
 mapLitValue platform f (LitNumber nt i)   = wrapLitNumber platform (LitNumber nt (f i))
 mapLitValue _        _ l                  = pprPanic "mapLitValue" (ppr l)
-
--- | Indicate if the `Literal` contains an 'Integer' value, e.g. 'Char',
--- 'Int', 'Word', 'LitInteger' and 'LitNatural'.
-isLitValue  :: Literal -> Bool
-isLitValue = isJust . isLitValue_maybe
 
 {-
         Coercions
