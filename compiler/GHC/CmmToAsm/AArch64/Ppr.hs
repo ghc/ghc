@@ -551,11 +551,11 @@ pprInstr platform instr = case instr of
     text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" ppr lbl $$
+    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
     text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text ":got_lo12:" <> ppr lbl <> text "]"
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) | isForeignLabel lbl ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" ppr lbl $$
+    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
     text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text ":got_lo12:" <> ppr lbl <> text "]"
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) ->
