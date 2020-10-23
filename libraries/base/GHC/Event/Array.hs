@@ -33,7 +33,7 @@ import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import Foreign.Ptr (Ptr, nullPtr, plusPtr)
 import Foreign.Storable (Storable(..))
 import GHC.Base hiding (empty)
-import GHC.ForeignPtr (mallocPlainForeignPtrBytes, newForeignPtr_)
+import GHC.ForeignPtr (mallocPlainForeignPtrBytes, newForeignPtr_, unsafeForeignPtrToPtr, touchForeignPtr)
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)
 import GHC.Show (show)
@@ -118,9 +118,11 @@ capacity (Array ref) = do
 unsafeRead :: Storable a => Array a -> Int -> IO a
 unsafeRead (Array ref) ix = do
     AC es _ cap <- readIORef ref
-    CHECK_BOUNDS("unsafeRead",cap,ix)
-      withForeignPtr es $ \p ->
-        peekElemOff p ix
+    CHECK_BOUNDS("unsafeRead",cap,ix) do
+      r <- peekElemOff (unsafeForeignPtrToPtr es) ix
+      touchForeignPtr es
+        -- this is safe WRT #17760 as we assume that peekElemOff doesn't diverge
+      return r
 
 unsafeWrite :: Storable a => Array a -> Int -> a -> IO ()
 unsafeWrite (Array ref) ix a = do
@@ -129,9 +131,10 @@ unsafeWrite (Array ref) ix a = do
 
 unsafeWrite' :: Storable a => AC a -> Int -> a -> IO ()
 unsafeWrite' (AC es _ cap) ix a =
-    CHECK_BOUNDS("unsafeWrite'",cap,ix)
-      withForeignPtr es $ \p ->
-        pokeElemOff p ix a
+    CHECK_BOUNDS("unsafeWrite'",cap,ix) do
+      pokeElemOff (unsafeForeignPtrToPtr es) ix a
+      touchForeignPtr es
+        -- this is safe WRT #17760 as we assume that peekElemOff doesn't diverge
 
 unsafeLoad :: Array a -> (Ptr a -> Int -> IO Int) -> IO Int
 unsafeLoad (Array ref) load = do
