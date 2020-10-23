@@ -291,8 +291,8 @@ section "Int8#"
 
 primtype Int8#
 
-primop Int8Extend "extendInt8#" GenPrimOp Int8# -> Int#
-primop Int8Narrow "narrowInt8#" GenPrimOp Int# -> Int8#
+primop Int8ExtendOp "extendInt8#" GenPrimOp Int8# -> Int#
+primop Int8NarrowOp "narrowInt8#" GenPrimOp Int# -> Int8#
 
 primop Int8NegOp "negateInt8#" GenPrimOp Int8# -> Int8#
 
@@ -373,8 +373,8 @@ section "Int16#"
 
 primtype Int16#
 
-primop Int16Extend "extendInt16#" GenPrimOp Int16# -> Int#
-primop Int16Narrow "narrowInt16#" GenPrimOp Int# -> Int16#
+primop Int16ExtendOp "extendInt16#" GenPrimOp Int16# -> Int#
+primop Int16NarrowOp "narrowInt16#" GenPrimOp Int# -> Int16#
 
 primop Int16NegOp "negateInt16#" GenPrimOp Int16# -> Int16#
 
@@ -412,8 +412,8 @@ section "Int32#"
         {Operations on 32-bit integers.}
 ------------------------------------------------------------------------
 
-primop Int32Extend "extendInt32#" GenPrimOp Int32# -> Int#
-primop Int32Narrow "narrowInt32#" GenPrimOp Int# -> Int32#
+primop Int32ExtendOp "extendInt32#" GenPrimOp Int32# -> Int#
+primop Int32NarrowOp "narrowInt32#" GenPrimOp Int# -> Int32#
 
 ------------------------------------------------------------------------
 section "Word16#"

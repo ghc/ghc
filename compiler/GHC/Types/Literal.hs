@@ -49,6 +49,8 @@ module GHC.Types.Literal
         , narrowLit
         , narrow8IntLit, narrow16IntLit, narrow32IntLit
         , narrow8WordLit, narrow16WordLit, narrow32WordLit
+        , int8Lit, int16Lit, int32Lit
+        , word8Lit, word16Lit, word32Lit
         , charToIntLit, intToCharLit
         , floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit
         , nullAddrLit, rubbishLit, floatToDoubleLit, doubleToFloatLit
@@ -587,6 +589,8 @@ mapLitValue _        _ l                  = pprPanic "mapLitValue" (ppr l)
 
 narrow8IntLit, narrow16IntLit, narrow32IntLit,
   narrow8WordLit, narrow16WordLit, narrow32WordLit,
+  int8Lit, int16Lit, int32Lit,
+  word8Lit, word16Lit, word32Lit,
   charToIntLit, intToCharLit,
   floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit,
   floatToDoubleLit, doubleToFloatLit
@@ -620,6 +624,19 @@ narrow32IntLit  = narrowLit (Proxy :: Proxy Int32)
 narrow8WordLit  = narrowLit (Proxy :: Proxy Word8)
 narrow16WordLit = narrowLit (Proxy :: Proxy Word16)
 narrow32WordLit = narrowLit (Proxy :: Proxy Word32)
+
+int8Lit (LitNumber _ i)   = mkLitInt8 i
+int8Lit l                 = pprPanic "int8Lit" (ppr l)
+int16Lit (LitNumber _ i)  = mkLitInt16 i
+int16Lit l                = pprPanic "int16Lit" (ppr l)
+int32Lit (LitNumber _ i)  = mkLitInt32 i
+int32Lit l                = pprPanic "int32Lit" (ppr l)
+word8Lit (LitNumber _ i)  = mkLitWord8 i
+word8Lit l                = pprPanic "word8Lit" (ppr l)
+word16Lit (LitNumber _ i) = mkLitWord16 i
+word16Lit l               = pprPanic "word16Lit" (ppr l)
+word32Lit (LitNumber _ i) = mkLitWord32 i
+word32Lit l               = pprPanic "word32Lit" (ppr l)
 
 charToIntLit (LitChar c)       = mkLitIntUnchecked (toInteger (ord c))
 charToIntLit l                 = pprPanic "charToIntLit" (ppr l)
