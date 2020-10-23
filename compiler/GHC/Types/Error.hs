@@ -30,7 +30,7 @@ import GHC.Utils.Outputable as Outputable
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.FastString (unpackFS)
-import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
+import GHC.Data.StringBuffer (atLine, hGetStringBuffer, lengthStringBuffer, lexemeToString)
 import GHC.Utils.Json
 
 import System.IO.Error  ( catchIOError )
@@ -175,7 +175,7 @@ getCaretDiagnostic severity (RealSrcSpan span _) =
       content <- hGetStringBuffer fn
       case atLine i content of
         Just at_line -> pure $
-          case lines (fix <$> lexemeToString at_line (len at_line)) of
+          case lines (fix <$> lexemeToString at_line (lengthStringBuffer at_line)) of
             srcLine : _ -> Just srcLine
             _           -> Nothing
         _ -> pure Nothing

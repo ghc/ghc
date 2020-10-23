@@ -214,7 +214,7 @@ lazyGetToks popts filename handle = do
        -- counteracts the quadratic slowdown we otherwise get for very
        -- large module names (#5981)
      nextbuf <- hGetStringBufferBlock handle new_size
-     if (len nextbuf == 0) then lazyLexBuf handle state True new_size else do
+     if lengthStringBuffer nextbuf == 0 then lazyLexBuf handle state True new_size else do
        newbuf <- appendStringBuffers (buffer state) nextbuf
        unsafeInterleaveIO $ lazyLexBuf handle state{buffer=newbuf} False new_size
 

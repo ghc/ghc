@@ -1894,7 +1894,7 @@ lex_string_tok span buf _len = do
             ITprimstring _ bs -> ITprimstring (SourceText src) bs
             ITstring _ s -> ITstring (SourceText src) s
             _ -> panic "lex_string_tok"
-    src = lexemeToString buf (cur bufEnd - cur buf)
+    src = lexemeToString buf (lengthStringBuffer buf - lengthStringBuffer bufEnd)
   return (L (mkPsSpan (psSpanStart span) end) tok')
 
 lex_string :: String -> P Token
@@ -1994,7 +1994,7 @@ finish_char_tok buf loc ch  -- We've already seen the closing quote
                         -- Just need to check for trailing #
   = do  magicHash <- getBit MagicHashBit
         i@(AI end bufEnd) <- getInput
-        let src = lexemeToString buf (cur bufEnd - cur buf)
+        let src = lexemeToString buf (lengthStringBuffer buf - lengthStringBuffer bufEnd)
         if magicHash then do
             case alexGetChar' i of
               Just ('#',i@(AI end _)) -> do
