@@ -259,6 +259,7 @@ Library
         GHC.Cmm.Ppr.Decl
         GHC.Cmm.Ppr.Expr
         GHC.Data.Bitmap
+        GHC.Data.ByteArray
         GHC.Platform
         GHC.Platform.Constants
         GHC.Platform.Ways
