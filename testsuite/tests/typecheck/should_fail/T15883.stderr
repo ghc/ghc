@@ -1,5 +1,6 @@
 
-T15883.hs:9:1: error:
-    • Newtype has non-* return kind ‘TYPE rep’
+T15883.hs:9:19: error:
+    • A newtype must have an argument of kind *
       Perhaps you intended to use UnliftedNewtypes
-    • In the newtype declaration for ‘Foo’
+    • In the definition of data constructor ‘MkFoo’
+      In the newtype declaration for ‘Foo’

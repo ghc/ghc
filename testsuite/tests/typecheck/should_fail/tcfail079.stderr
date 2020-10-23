@@ -1,5 +1,6 @@
 
-tcfail079.hs:9:1: error:
-    • Newtype has non-* return kind ‘TYPE 'GHC.Types.IntRep’
+tcfail079.hs:9:19: error:
+    • A newtype must have an argument of kind *
       Perhaps you intended to use UnliftedNewtypes
-    • In the newtype declaration for ‘Unboxed’
+    • In the definition of data constructor ‘Unboxed’
+      In the newtype declaration for ‘Unboxed’

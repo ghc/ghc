@@ -1,6 +1,5 @@
 
-UnliftedNewtypesMismatchedKind.hs:12:10: error:
+UnliftedNewtypesMismatchedKind.hs:12:3: error:
     • Expecting a lifted type, but ‘Int#’ is unlifted
-    • In the type ‘Int#’
-      In the definition of data constructor ‘MkT’
+    • In the definition of data constructor ‘MkT’
       In the newtype declaration for ‘T’

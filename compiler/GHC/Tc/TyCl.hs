@@ -39,7 +39,7 @@ import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
                     , reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Unify( unifyType, emitResidualTvConstraint )
+import GHC.Tc.Utils.Unify( emitResidualTvConstraint, unifyKind, unifyType )
 import GHC.Tc.Types.Constraint( emptyWC )
 import GHC.Tc.Validity
 import GHC.Tc.Utils.Zonk
@@ -1566,16 +1566,74 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 
 -------------------
 
+unifyH98NewtypeKind ::
+     NewOrData
+  -> HsConDeclH98Details GhcRn
+  -> [Scaled TcType]
+  -> TcKind
+  -> TcM [Scaled TcType]
+unifyH98NewtypeKind new_or_data hs_args arg_tys res_kind =
+  do dflags <- getDynFlags
+     unifyNewtypeKind dflags new_or_data hs_vis_args arg_tys res_kind
+  where
+    hs_vis_args = case hs_args of
+      PrefixCon args      -> args
+      InfixCon arg1 arg2  -> [arg1, arg2]
+      RecCon (L _ fields) -> map (hsLinear . cd_fld_type . unLoc) fields
+
+unifyGADTNewtypeKind ::
+     NewOrData
+  -> HsConDeclGADTDetails GhcRn
+  -> [Scaled TcType]
+  -> TcKind
+  -> TcM [Scaled TcType]
+unifyGADTNewtypeKind new_or_data hs_args arg_tys res_kind =
+  do dflags <- getDynFlags
+     unifyNewtypeKind dflags new_or_data hs_vis_args arg_tys res_kind
+  where
+    hs_vis_args = case hs_args of
+      PrefixConGADT args      -> args
+      RecConGADT (L _ fields) -> map (hsLinear . cd_fld_type . unLoc) fields
+
+-- | Unify the kind of the first type provided with the newtype's kind, if
+-- -XUnliftedNewtypes is enabled and the NewOrData indicates Newtype. If there
+-- is more than one type provided, do nothing: the newtype is in error, and this
+-- will be caught in validity checking (which will give a better error than we can
+-- here.)
+unifyNewtypeKind ::
+     DynFlags
+  -> NewOrData
+  -> [HsScaled GhcRn (LBangType GhcRn)]
+                         -- user-written argument types, should be just 1
+  -> [Scaled TcType]     -- type-checked argument types, should be just 1
+  -> TcKind              -- expected kind of newtype
+  -> TcM [Scaled TcType] -- casted argument types (should be just 1)
+                         --  result = orig_arg |> kind_co
+                         -- where kind_co :: orig_arg_ki ~N expected_ki
+unifyNewtypeKind dflags NewType [hs_ty] [Scaled mult tc_ty] ki
+  | xopt LangExt.UnliftedNewtypes dflags
+  = do { traceTc "unifyNewtypeKind" (ppr hs_ty $$ ppr tc_ty $$ ppr ki)
+       ; co <- unifyKind (Just (ppr hs_ty)) (typeKind tc_ty) ki
+       ; return [Scaled mult $ tc_ty `mkCastTy` co] }
+  -- See comments above: just do nothing here
+unifyNewtypeKind _ _ _ arg_tys _ = return arg_tys
+
 -- Kind-check the types of the arguments to a data constructor.
+-- Type check the types of the arguments to a data constructor.
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
 -- the first two arguments.
 kcConArgTys :: NewOrData -> Kind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
 kcConArgTys new_or_data res_kind arg_tys = do
-  { let exp_kind = getArgExpKind new_or_data res_kind
-  ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsType (getBangType ty) exp_kind
-                                             tcMult mult)
+  { arg_tc_tys <- forM arg_tys $ \(HsScaled mult ty) ->
+      do arg_tc_ty <- tcHsOpenType (getBangType ty)
+         tc_mult <- tcMult mult
+         pure $ Scaled tc_mult arg_tc_ty
+
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
+  ; dflags <- getDynFlags
+  ; discardResult $
+      unifyNewtypeKind dflags new_or_data arg_tys arg_tc_tys res_kind
   }
 
 -- Kind-check the types of arguments to a Haskell98 data constructor.
@@ -2116,7 +2174,8 @@ STEP 2: Kind-checking, as done by kcTyClDecl. This step is skipped for CUSKs.
 The key function here is kcConDecl, which looks at an individual constructor
 declaration. When we are processing a newtype (but whether or not -XUnliftedNewtypes
 is enabled; see <Error Messages>, below), we generate a correct ContextKind
-for the checking argument types: see getArgExpKind.
+for the checking argument types: see getArgExpKind
+(TODO RGS: getArgExpKind no longer exists; update the sentence above).
 
 Examples of newtypes affected by STEP 2, assuming -XUnliftedNewtypes is
 enabled (we use r0 to denote a unification variable):
@@ -2141,6 +2200,7 @@ in kcTyClDecl.
 STEP 3: Type-checking (desugaring), as done by tcTyClDecl. The key function
 here is tcConDecl. Once again, we must use getArgExpKind to ensure that the
 representation type's kind matches that of the newtype, for two reasons:
+(TODO RGS: getArgExpKind no longer exists; update the sentence above).
 
   A. It is possible that a GADT has a CUSK. (Note that this is *not*
      possible for H98 types.) Recall that CUSK types don't go through
@@ -3246,11 +3306,12 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
            <- pushLevelAndSolveEqualitiesX "tcConDecl:H98"  $
               tcExplicitTKBndrs explicit_tkv_nms            $
               do { ctxt <- tcHsMbContext hs_ctxt
-                 ; let exp_kind = getArgExpKind new_or_data res_kind
-                 ; btys <- tcConH98Args exp_kind hs_args
+                 ; btys <- tcConH98Args hs_args
                  ; field_lbls <- lookupConstructorFields name
                  ; let (arg_tys, stricts) = unzip btys
-                 ; return (ctxt, arg_tys, field_lbls, stricts)
+                 ; final_arg_tys <- unifyH98NewtypeKind new_or_data
+                                      hs_args arg_tys res_kind
+                 ; return (ctxt, final_arg_tys, field_lbls, stricts)
                  }
 
 
@@ -3331,6 +3392,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
               tcOuterTKBndrs skol_info outer_hs_bndrs       $
               do { ctxt <- tcHsMbContext cxt
+                 ; btys <- tcConGADTArgs hs_args
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
 
@@ -3347,13 +3409,11 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                              addErrCtxt (dataConResCtxt names) $
                              unifyType Nothing res_ty head_shape }
 
-                   -- See Note [Datatype return kinds]
-                 ; let exp_kind = getArgExpKind new_or_data res_kind
-                 ; btys <- tcConGADTArgs exp_kind hs_args
-
                  ; let (arg_tys, stricts) = unzip btys
+                 ; final_arg_tys <- unifyGADTNewtypeKind new_or_data
+                                      hs_args arg_tys res_kind
                  ; field_lbls <- lookupConstructorFields name
-                 ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
+                 ; return (ctxt, final_arg_tys, res_ty, field_lbls, stricts)
                  }
 
        ; outer_tv_bndrs <- scopedSortOuter outer_bndrs
@@ -3482,16 +3542,6 @@ nothing wrong with it).  We are implicitly requiring tha
 tcInferLHsTypeKind doesn't any gratuitous top-level casts.
 -}
 
--- | Produce an "expected kind" for the arguments of a data/newtype.
--- If the declaration is indeed for a newtype,
--- then this expected kind will be the kind provided. Otherwise,
--- it is OpenKind for datatypes and liftedTypeKind.
--- Why do we not check for -XUnliftedNewtypes? See point <Error Messages>
--- in Note [Implementation of UnliftedNewtypes]
-getArgExpKind :: NewOrData -> Kind -> ContextKind
-getArgExpKind NewType res_ki = TheKind res_ki
-getArgExpKind DataType _     = OpenKind
-
 tcConIsInfixH98 :: Name
              -> HsConDeclH98Details GhcRn
              -> TcM Bool
@@ -3514,52 +3564,50 @@ tcConIsInfixGADT con details
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
 
-tcConH98Args :: ContextKind  -- expected kind of arguments
-                             -- always OpenKind for datatypes, but unlifted newtypes
-                             -- might have a specific kind
-             -> HsConDeclH98Details GhcRn
+tcConH98Args :: HsConDeclH98Details GhcRn
              -> TcM [(Scaled TcType, HsSrcBang)]
-tcConH98Args exp_kind (PrefixCon btys)
-  = mapM (tcConArg exp_kind) btys
-tcConH98Args exp_kind (InfixCon bty1 bty2)
-  = do { bty1' <- tcConArg exp_kind bty1
-       ; bty2' <- tcConArg exp_kind bty2
+tcConH98Args (PrefixCon btys)
+  = mapM tcConArg btys
+tcConH98Args (InfixCon bty1 bty2)
+  = do { bty1' <- tcConArg bty1
+       ; bty2' <- tcConArg bty2
        ; return [bty1', bty2'] }
-tcConH98Args exp_kind (RecCon fields)
-  = tcRecConDeclFields exp_kind fields
+tcConH98Args (RecCon fields)
+  = tcRecConDeclFields fields
 
-tcConGADTArgs :: ContextKind  -- expected kind of arguments
-                              -- always OpenKind for datatypes, but unlifted newtypes
-                              -- might have a specific kind
-              -> HsConDeclGADTDetails GhcRn
+tcConGADTArgs :: HsConDeclGADTDetails GhcRn
               -> TcM [(Scaled TcType, HsSrcBang)]
-tcConGADTArgs exp_kind (PrefixConGADT btys)
-  = mapM (tcConArg exp_kind) btys
-tcConGADTArgs exp_kind (RecConGADT fields)
-  = tcRecConDeclFields exp_kind fields
+tcConGADTArgs (PrefixConGADT btys)
+  = mapM tcConArg btys
+tcConGADTArgs (RecConGADT fields)
+  = tcRecConDeclFields fields
 
-tcConArg :: ContextKind  -- expected kind for args; always OpenKind for datatypes,
-                         -- but might be an unlifted type with UnliftedNewtypes
-         -> HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
-tcConArg exp_kind (HsScaled w bty)
+tcConArg :: HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
+tcConArg (HsScaled w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
-        ; arg_ty <- tcCheckLHsType (getBangType bty) exp_kind
+        ; arg_ty <- tcHsOpenType (getBangType bty)
         ; w' <- tcDataConMult w
         ; traceTc "tcConArg 2" (ppr bty)
         ; return (Scaled w' arg_ty, getBangStrictness bty) }
 
-tcRecConDeclFields :: ContextKind
-                   -> Located [LConDeclField GhcRn]
+tcRecConDeclFields :: Located [LConDeclField GhcRn]
                    -> TcM [(Scaled TcType, HsSrcBang)]
-tcRecConDeclFields exp_kind fields
-  = mapM (tcConArg exp_kind) btys
+tcRecConDeclFields (L _ fields)
+  = concatMapM tc_field fields
   where
-    -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f)))
-                   (unLoc fields)
-    explode (ns,ty) = zip ns (repeat ty)
-    exploded = concatMap explode combined
-    (_,btys) = unzip exploded
+    -- We need to ensure that each distinct field name gets its own type.
+    -- For example, if we have:
+    --
+    --   data T = MkT { a,b,c :: Int }
+    --
+    -- Then we should return /three/ Int types, not just one! At the same
+    -- time, we don't want to kind-check Int three separate times, as that
+    -- would be redundant. Therefore, we kind-check Int once and 'replicate'
+    -- it so that we return three occurrences of it.
+    tc_field :: LConDeclField GhcRn -> TcM [(Scaled TcType, HsSrcBang)]
+    tc_field (L _ f) = do
+      bty' <- tcConArg $ hsLinear $ cd_fld_type f
+      pure $ replicate (length (cd_fld_names f)) bty'
 
 tcDataConMult :: HsArrow GhcRn -> TcM Mult
 tcDataConMult arr@(HsUnrestrictedArrow _) = do
@@ -4332,7 +4380,7 @@ checkNewDataCon con
         ; let allowedArgType =
                 unlifted_newtypes || isLiftedType_maybe (scaledThing arg_ty1) == Just True
         ; checkTc allowedArgType $ vcat
-          [ text "A newtype cannot have an unlifted argument type"
+          [ text "A newtype must have an argument of kind" <+> ppr liftedTypeKind
           , text "Perhaps you intended to use UnliftedNewtypes"
           ]
         ; show_linear_types <- xopt LangExt.LinearTypes <$> getDynFlags

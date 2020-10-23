@@ -3,8 +3,8 @@ T15685.hs:13:24: error:
     • Could not deduce: k ~ [k0]
       from the context: as ~ (a : as1)
         bound by a pattern with constructor:
-                   Here :: forall {k} (f :: k -> *) (a :: k) (as :: [k]).
-                           f a -> NS f (a : as),
+                   Here :: forall {a1} (f :: a1 -> *) (a2 :: a1) (as :: [a1]).
+                           f a2 -> NS f (a2 : as),
                  in a pattern synonym declaration
         at T15685.hs:13:19-26
       ‘k’ is a rigid type variable bound by

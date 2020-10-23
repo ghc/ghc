@@ -1,5 +1,6 @@
 
-UnliftedNewtypesNotEnabled.hs:9:1: error:
-    • Newtype has non-* return kind ‘TYPE 'GHC.Types.IntRep’
+UnliftedNewtypesNotEnabled.hs:9:15: error:
+    • A newtype must have an argument of kind *
       Perhaps you intended to use UnliftedNewtypes
-    • In the newtype declaration for ‘Baz’
+    • In the definition of data constructor ‘Baz’
+      In the newtype declaration for ‘Baz’
