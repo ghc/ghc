@@ -625,8 +625,14 @@ isMinBound :: Platform -> Literal -> Bool
 isMinBound _        (LitChar c)        = c == minBound
 isMinBound platform (LitNumber nt i)   = case nt of
    LitNumInt     -> i == platformMinInt platform
+   LitNumInt8    -> i == toInteger (minBound :: Int8)
+   LitNumInt16   -> i == toInteger (minBound :: Int16)
+   LitNumInt32   -> i == toInteger (minBound :: Int32)
    LitNumInt64   -> i == toInteger (minBound :: Int64)
    LitNumWord    -> i == 0
+   LitNumWord8   -> i == 0
+   LitNumWord16  -> i == 0
+   LitNumWord32  -> i == 0
    LitNumWord64  -> i == 0
    LitNumNatural -> i == 0
    LitNumInteger -> False
@@ -636,8 +642,14 @@ isMaxBound :: Platform -> Literal -> Bool
 isMaxBound _        (LitChar c)        = c == maxBound
 isMaxBound platform (LitNumber nt i)   = case nt of
    LitNumInt     -> i == platformMaxInt platform
+   LitNumInt8    -> i == toInteger (maxBound :: Int8)
+   LitNumInt16   -> i == toInteger (maxBound :: Int16)
+   LitNumInt32   -> i == toInteger (maxBound :: Int32)
    LitNumInt64   -> i == toInteger (maxBound :: Int64)
    LitNumWord    -> i == platformMaxWord platform
+   LitNumWord8   -> i == toInteger (maxBound :: Word8)
+   LitNumWord16  -> i == toInteger (maxBound :: Word16)
+   LitNumWord32  -> i == toInteger (maxBound :: Word32)
    LitNumWord64  -> i == toInteger (maxBound :: Word64)
    LitNumNatural -> False
    LitNumInteger -> False
