@@ -1,4 +1,4 @@
-Found 235 parser module dependencies
+Found 236 parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -62,6 +62,7 @@ GHC.Core.Utils
 GHC.CoreToIface
 GHC.Data.Bag
 GHC.Data.BooleanFormula
+GHC.Data.ByteArray
 GHC.Data.EnumSet
 GHC.Data.FastMutInt
 GHC.Data.FastString

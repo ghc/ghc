@@ -14,6 +14,7 @@ module GHC.Data.ByteArray
   , MutableByteArray
   , getMutableByteArray
   , unsafeMutableByteArrayContents
+  , sizeofMutableByteArray
   , newMutableByteArray
   , newPinnedMutableByteArray
   , copyByteArray
@@ -91,6 +92,10 @@ newPinnedMutableByteArray :: Int -> IO MutableByteArray
 newPinnedMutableByteArray (I# size) = IO $ \s ->
   case newPinnedByteArray# size s of
     (# s', mba #) -> (# s', MutableByteArray mba #)
+
+sizeofMutableByteArray :: MutableByteArray -> Int
+sizeofMutableByteArray (MutableByteArray mba) =
+  I# (sizeofMutableByteArray# mba)
 
 copyByteArray
   :: ByteArray          -- ^ source

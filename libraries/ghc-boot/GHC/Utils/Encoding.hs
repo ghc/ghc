@@ -17,12 +17,15 @@
 module GHC.Utils.Encoding (
         -- * UTF-8
         utf8DecodeCharAddr#,
+        utf8DecodeCharByteArray#,
         utf8PrevChar,
         utf8CharStart,
         utf8DecodeChar,
         utf8DecodeByteString,
+        utf8DecodeByteArray,
         utf8DecodeShortByteString,
         utf8CompareShortByteString,
+        utf8DecodeByteArrayLazy#,
         utf8DecodeStringLazy,
         utf8EncodeChar,
         utf8EncodeString,
@@ -53,6 +56,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import Data.ByteString.Short.Internal (ShortByteString(..))
 
+import GHC.Word
 import GHC.Exts
 
 -- -----------------------------------------------------------------------------
@@ -131,15 +135,20 @@ utf8DecodeChar !(Ptr a#) =
 -- the start of the current character is, given any position in a
 -- stream.  This function finds the start of the previous character,
 -- assuming there *is* a previous character.
-utf8PrevChar :: Ptr Word8 -> IO (Ptr Word8)
-utf8PrevChar p = utf8CharStart (p `plusPtr` (-1))
+utf8PrevChar :: ByteArray# -> Int -> Int
+utf8PrevChar arr ofs = utf8CharStart arr (ofs - 1)
 
-utf8CharStart :: Ptr Word8 -> IO (Ptr Word8)
-utf8CharStart p = go p
- where go p = do w <- peek p
-                 if w >= 0x80 && w < 0xC0
-                        then go (p `plusPtr` (-1))
-                        else return p
+utf8CharStart :: ByteArray# -> Int -> Int
+utf8CharStart = go
+  where
+    go arr ofs@(I# ofs#)
+      | True
+      , ofs < 0 || ofs > I# (sizeofByteArray# arr)
+      = error "utf8CharStart: overflow"
+      | w >= 0x80 && w < 0xC0 = go arr (ofs - 1)
+      | otherwise             = ofs
+      where
+        w = W8# (indexWord8Array# arr ofs#)
 
 {-# INLINE utf8DecodeLazy# #-}
 utf8DecodeLazy# :: (IO ()) -> (Int# -> (# Char#, Int# #)) -> Int# -> IO [Char]
@@ -157,6 +166,12 @@ utf8DecodeLazy# retain decodeChar# len#
 utf8DecodeByteString :: ByteString -> [Char]
 utf8DecodeByteString (BS.PS fptr offset len)
   = utf8DecodeStringLazy fptr offset len
+
+utf8DecodeByteArrayLazy# :: ByteArray# -> Int# -> Int# -> [Char]
+utf8DecodeByteArrayLazy# a# offset# len#
+  = unsafeDupablePerformIO $
+      let decodeChar i = utf8DecodeCharByteArray# a# (i +# offset#)
+      in utf8DecodeLazy# (return ()) decodeChar len#
 
 utf8DecodeStringLazy :: ForeignPtr Word8 -> Int -> Int -> [Char]
 utf8DecodeStringLazy fp offset (I# len#)
@@ -200,11 +215,14 @@ utf8CompareShortByteString (SBS a1) (SBS a2) = go 0# 0#
                          | isTrue# (b1_1 `ltWord#` b2_1) -> LT
                          | otherwise                     -> go (off1 +# 1#) (off2 +# 1#)
 
-utf8DecodeShortByteString :: ShortByteString -> [Char]
-utf8DecodeShortByteString (SBS ba#)
+utf8DecodeByteArray :: ByteArray# -> [Char]
+utf8DecodeByteArray ba#
   = unsafeDupablePerformIO $
       let len# = sizeofByteArray# ba# in
       utf8DecodeLazy# (return ()) (utf8DecodeCharByteArray# ba#) len#
+
+utf8DecodeShortByteString :: ShortByteString -> [Char]
+utf8DecodeShortByteString (SBS ba#) = utf8DecodeByteArray ba#
 
 countUTF8Chars :: ShortByteString -> IO Int
 countUTF8Chars (SBS ba) = go 0# 0#
