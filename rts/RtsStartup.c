@@ -518,6 +518,9 @@ hs_exit_(bool wait_foreign)
     shutdownAsyncIO(wait_foreign);
 #endif
 
+    /* tear down statistics subsystem */
+    stat_exit();
+
     /* free hash table storage */
     exitHashTable();
 
