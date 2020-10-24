@@ -302,7 +302,7 @@ exitStorage (void)
 {
     nonmovingExit();
     updateNurseriesStats();
-    stat_exit();
+    stat_exitReport();
 }
 
 void
