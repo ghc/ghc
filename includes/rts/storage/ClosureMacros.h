@@ -140,13 +140,19 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
 
 #define SET_HDR(c,_info,ccs)                            \
    {                                                    \
-        RELAXED_STORE(&(c)->header.info, _info);        \
         SET_PROF_HDR((StgClosure *)(c),ccs);            \
+        RELAXED_STORE(&(c)->header.info, _info);        \
+   }
+
+#define SET_HDR_RELEASE(c,_info,ccs)                    \
+   {                                                    \
+        SET_PROF_HDR((StgClosure *)(c),ccs);            \
+        RELEASE_STORE(&(c)->header.info, _info);        \
    }
 
 #define SET_ARR_HDR(c,info,costCentreStack,n_bytes)     \
-   SET_HDR(c,info,costCentreStack);                     \
-   (c)->bytes = n_bytes;
+   (c)->bytes = n_bytes;                                \
+   SET_HDR(c,info,costCentreStack);
 
 // Use when changing a closure from one kind to another
 #define OVERWRITE_INFO(c, new_info)                             \
