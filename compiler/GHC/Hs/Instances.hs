@@ -173,6 +173,11 @@ deriving instance Data (ConDecl GhcPs)
 deriving instance Data (ConDecl GhcRn)
 deriving instance Data (ConDecl GhcTc)
 
+-- deriving instance DataIdLR p p => Data (HsConDeclGADTDetails p)
+deriving instance Data (HsConDeclGADTDetails GhcPs)
+deriving instance Data (HsConDeclGADTDetails GhcRn)
+deriving instance Data (HsConDeclGADTDetails GhcTc)
+
 -- deriving instance DataIdLR p p   => Data (TyFamInstDecl p)
 deriving instance Data (TyFamInstDecl GhcPs)
 deriving instance Data (TyFamInstDecl GhcRn)

@@ -39,7 +39,7 @@
            (False))
           []
           (Nothing)
-          (PrefixCon
+          (PrefixConGADT
            [])
           ({ T17544_kw.hs:16:18-20 }
            (HsTyVar
@@ -83,7 +83,7 @@
            (False))
           []
           (Nothing)
-          (PrefixCon
+          (PrefixConGADT
            [(HsScaled
              (HsUnrestrictedArrow
               (NormalSyntax))
