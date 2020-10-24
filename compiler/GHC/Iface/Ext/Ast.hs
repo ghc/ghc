@@ -1319,6 +1319,10 @@ instance (ToHie arg, ToHie rec) => ToHie (HsConDetails arg rec) where
   toHie (RecCon rec) = toHie rec
   toHie (InfixCon a b) = concatM [ toHie a, toHie b]
 
+instance ToHie (HsConDeclGADTDetails GhcRn) where
+  toHie (PrefixConGADT args) = toHie args
+  toHie (RecConGADT rec) = toHie rec
+
 instance HiePass p => ToHie (Located (HsCmdTop (GhcPass p))) where
   toHie (L span top) = concatM $ makeNode top span : case top of
     HsCmdTop _ cmd ->
@@ -1530,7 +1534,7 @@ instance ToHie a => ToHie (HsScaled GhcRn a) where
 instance ToHie (Located (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
       ConDeclGADT { con_names = names, con_qvars = exp_vars, con_g_ext = imp_vars
-                  , con_mb_cxt = ctx, con_args = args, con_res_ty = typ } ->
+                  , con_mb_cxt = ctx, con_g_args = args, con_res_ty = typ } ->
         [ toHie $ map (C (Decl ConDec $ getRealSpan span)) names
         , concatM $ [ bindingsOnly bindings
                     , toHie $ tvScopes resScope NoScope exp_vars ]
@@ -1541,7 +1545,9 @@ instance ToHie (Located (ConDecl GhcRn)) where
         where
           rhsScope = combineScopes argsScope tyScope
           ctxScope = maybe NoScope mkLScope ctx
-          argsScope = condecl_scope args
+          argsScope = case args of
+            PrefixConGADT xs -> scaled_args_scope xs
+            RecConGADT x     -> mkLScope x
           tyScope = mkLScope typ
           resScope = ResolvedScopes [ctxScope, rhsScope]
           bindings = map (C $ TyVarBind (mkScope (loc exp_vars)) resScope) imp_vars
@@ -1555,13 +1561,12 @@ instance ToHie (Located (ConDecl GhcRn)) where
         where
           rhsScope = combineScopes ctxScope argsScope
           ctxScope = maybe NoScope mkLScope ctx
-          argsScope = condecl_scope dets
-    where condecl_scope :: HsConDeclDetails (GhcPass p) -> Scope
-          condecl_scope args = case args of
-            PrefixCon xs -> foldr combineScopes NoScope $ map (mkLScope . hsScaledThing) xs
-            InfixCon a b -> combineScopes (mkLScope (hsScaledThing a))
-                                          (mkLScope (hsScaledThing b))
-            RecCon x -> mkLScope x
+          argsScope = case dets of
+            PrefixCon xs -> scaled_args_scope xs
+            InfixCon a b -> scaled_args_scope [a, b]
+            RecCon x     -> mkLScope x
+    where scaled_args_scope :: [HsScaled GhcRn (LHsType GhcRn)] -> Scope
+          scaled_args_scope = foldr combineScopes NoScope . map (mkLScope . hsScaledThing)
 
 instance ToHie (Located [Located (ConDeclField GhcRn)]) where
   toHie (L span decls) = concatM $

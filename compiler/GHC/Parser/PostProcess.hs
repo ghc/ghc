@@ -608,7 +608,7 @@ recordPatSynErr loc pat =
     addFatalError $ Error (ErrRecordSyntaxInPatSynDecl pat) [] loc
 
 mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
-                -> Maybe (LHsContext GhcPs) -> HsConDeclDetails GhcPs
+                -> Maybe (LHsContext GhcPs) -> HsConDeclH98Details GhcPs
                 -> ConDecl GhcPs
 
 mkConDeclH98 name mb_forall mb_cxt args
@@ -633,17 +633,17 @@ mkGadtDecl :: [Located RdrName]
 mkGadtDecl names ty = do
   let (args, res_ty, anns)
         | L _ (HsFunTy _ _w (L loc (HsRecTy _ rf)) res_ty) <- body_ty
-        = (RecCon (L loc rf), res_ty, [])
+        = (RecConGADT (L loc rf), res_ty, [])
         | otherwise
         = let (arg_types, res_type, anns) = splitHsFunType body_ty
-          in (PrefixCon arg_types, res_type, anns)
+          in (PrefixConGADT arg_types, res_type, anns)
 
   pure ( ConDeclGADT { con_g_ext  = noExtField
                      , con_names  = names
                      , con_forall = L (getLoc ty) $ isJust mtvs
                      , con_qvars  = fromMaybe [] mtvs
                      , con_mb_cxt = mcxt
-                     , con_args   = args
+                     , con_g_args = args
                      , con_res_ty = res_ty
                      , con_doc    = Nothing }
        , anns )
@@ -1615,7 +1615,7 @@ dataConBuilderCon :: DataConBuilder -> Located RdrName
 dataConBuilderCon (PrefixDataConBuilder _ dc) = dc
 dataConBuilderCon (InfixDataConBuilder _ dc _) = dc
 
-dataConBuilderDetails :: DataConBuilder -> HsConDeclDetails GhcPs
+dataConBuilderDetails :: DataConBuilder -> HsConDeclH98Details GhcPs
 
 -- Detect when the record syntax is used:
 --   data T = MkT { ... }

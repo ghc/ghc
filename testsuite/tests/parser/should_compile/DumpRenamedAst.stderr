@@ -374,7 +374,7 @@
                 (False))
                []
                (Nothing)
-               (PrefixCon
+               (PrefixConGADT
                 [(HsScaled
                   (HsUnrestrictedArrow
                    (NormalSyntax))

@@ -2332,7 +2332,7 @@ forall :: { Located ([AddAnn], Maybe [LHsTyVarBndr Specificity GhcPs]) }
         : 'forall' tv_bndrs '.'       { sLL $1 $> ([mu AnnForall $1,mj AnnDot $3], Just $2) }
         | {- empty -}                 { noLoc ([], Nothing) }
 
-constr_stuff :: { Located (Located RdrName, HsConDeclDetails GhcPs) }
+constr_stuff :: { Located (Located RdrName, HsConDeclH98Details GhcPs) }
         : infixtype       {% fmap (mapLoc (\b -> (dataConBuilderCon b,
                                                   dataConBuilderDetails b)))
                                   (runPV $1) }
