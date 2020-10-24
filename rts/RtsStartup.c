@@ -574,6 +574,10 @@ hs_exit_(bool wait_foreign)
    if (is_io_mng_native_p())
       hs_restoreConsoleCP();
 #endif
+
+    /* Print the final runtime stats */
+    stat_exit();
+
     /* free hash table storage */
     exitHashTable();
 
