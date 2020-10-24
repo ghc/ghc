@@ -43,14 +43,52 @@ Compiler
 - ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
 
+``ghc`` library
+~~~~~~~~~~~~~
+
+- The ``con_args`` field of ``ConDeclGADT`` has been renamed to ``con_g_args``.
+  This is because the type of ``con_g_args`` is now different from the type of
+  the ``con_args`` field in ``ConDeclH98``: ::
+
+    data ConDecl pass
+      = ConDeclGADT
+          { ...
+          , con_g_args :: HsConDeclGADTDetails pass -- ^ Arguments; never infix
+          , ...
+          }
+
+      | ConDeclH98
+          { ...
+          , con_args :: HsConDeclH98Details pass -- ^ Arguments; can be infix
+          , ...
+          }
+
+  Where: ::
+
+    -- Introduced in GHC 9.2; was called `HsConDeclDetails` in previous versions of GHC
+    type HsConDeclH98Details pass
+       = HsConDetails (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
+
+    -- Introduced in GHC 9.2
+    data HsConDeclGADTDetails pass
+       = PrefixConGADT [HsScaled pass (LBangType pass)]
+       | RecConGADT (XRec pass [LConDeclField pass])
+
+  Unlike Haskell98-style constructors, GADT constructors cannot be declared
+  using infix syntax, which is why ``HsConDeclGADTDetails`` lacks an
+  ``InfixConGADT`` constructor.
+
+  As a result of all this, the ``con_args`` field is now partial, so using
+  ``con_args`` as a top-level field selector is discouraged.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
-- It's possible now to promote the ``Natural`` type: :: 
-    
+- It's possible now to promote the ``Natural`` type: ::
+
     data Coordinate = Mk2D Natural Natural
     type MyCoordinate = Mk2D 1 10
-    
+
   The separate kind ``Nat`` is removed and now it is just a type synonym for
   ``Natural``. As a consequence, one must enable ``TypeSynonymInstances``
   in order to define instances for ``Nat``.

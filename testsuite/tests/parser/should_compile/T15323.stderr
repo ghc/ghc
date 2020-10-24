@@ -72,7 +72,7 @@
                    ({ T15323.hs:6:35 }
                     (Unqual
                      {OccName: v}))))))))]))
-          (PrefixCon
+          (PrefixConGADT
            [])
           ({ T15323.hs:6:41-54 }
            (HsAppTy

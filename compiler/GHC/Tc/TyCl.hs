@@ -1574,7 +1574,7 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 
 -------------------
 
--- Type check the types of the arguments to a data constructor.
+-- Kind-check the types of the arguments to a data constructor.
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
 -- the first two arguments.
@@ -1586,6 +1586,21 @@ kcConArgTys new_or_data res_kind arg_tys = do
 
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
   }
+
+-- Kind-check the types of arguments to a Haskell98 data constructor.
+kcConH98Args :: NewOrData -> Kind -> HsConDeclH98Details GhcRn -> TcM ()
+kcConH98Args new_or_data res_kind con_args = case con_args of
+  PrefixCon tys     -> kcConArgTys new_or_data res_kind tys
+  InfixCon ty1 ty2  -> kcConArgTys new_or_data res_kind [ty1, ty2]
+  RecCon (L _ flds) -> kcConArgTys new_or_data res_kind $
+                       map (hsLinear . cd_fld_type . unLoc) flds
+
+-- Kind-check the types of arguments to a GADT data constructor.
+kcConGADTArgs :: NewOrData -> Kind -> HsConDeclGADTDetails GhcRn -> TcM ()
+kcConGADTArgs new_or_data res_kind con_args = case con_args of
+  PrefixConGADT tys     -> kcConArgTys new_or_data res_kind tys
+  RecConGADT (L _ flds) -> kcConArgTys new_or_data res_kind $
+                           map (hsLinear . cd_fld_type . unLoc) flds
 
 kcConDecls :: NewOrData
            -> Kind             -- The result kind signature
@@ -1615,14 +1630,14 @@ kcConDecl new_or_data res_kind (ConDeclH98
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
-       ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
+       ; kcConH98Args new_or_data res_kind args
          -- We don't need to check the telescope here,
          -- because that's done in tcConDecl
        }
 
 kcConDecl new_or_data res_kind (ConDeclGADT
     { con_names = names, con_qvars = explicit_tkv_nms, con_mb_cxt = cxt
-    , con_args = args, con_res_ty = res_ty, con_g_ext = implicit_tkv_nms })
+    , con_g_args = args, con_res_ty = res_ty, con_g_ext = implicit_tkv_nms })
   = -- Even though the GADT-style data constructor's type is closed,
     -- we must still kind-check the type, because that may influence
     -- the inferred kind of the /type/ constructor.  Example:
@@ -1636,7 +1651,7 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     bindExplicitTKBndrs_Tv explicit_tkv_nms $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
     do { _ <- tcHsMbContext cxt
-       ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
+       ; kcConGADTArgs new_or_data res_kind args
        ; _ <- tcHsOpenType res_ty
        ; return () }
 
@@ -3207,7 +3222,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
               bindExplicitTKBndrs_Skol explicit_tkv_nms    $
               do { ctxt <- tcHsMbContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
-                 ; btys <- tcConArgs exp_kind hs_args
+                 ; btys <- tcConH98Args exp_kind hs_args
                  ; field_lbls <- lookupConstructorFields name
                  ; let (arg_tys, stricts) = unzip btys
                  ; return (ctxt, arg_tys, field_lbls, stricts)
@@ -3277,7 +3292,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
           (ConDeclGADT { con_g_ext = implicit_tkv_nms
                        , con_names = names
                        , con_qvars = explicit_tkv_nms
-                       , con_mb_cxt = cxt, con_args = hs_args
+                       , con_mb_cxt = cxt, con_g_args = hs_args
                        , con_res_ty = hs_res_ty })
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
@@ -3294,7 +3309,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                    -- See Note [Datatype return kinds]
                  ; let exp_kind = getArgExpKind new_or_data res_kind
 
-                 ; btys <- tcConArgs exp_kind hs_args
+                 ; btys <- tcConGADTArgs exp_kind hs_args
                  ; let (arg_tys, stricts) = unzip btys
                  ; field_lbls <- lookupConstructorFields name
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
@@ -3373,48 +3388,50 @@ getArgExpKind NewType res_ki = TheKind res_ki
 getArgExpKind DataType _     = OpenKind
 
 tcConIsInfixH98 :: Name
-             -> HsConDetails a b
+             -> HsConDeclH98Details GhcRn
              -> TcM Bool
 tcConIsInfixH98 _   details
   = case details of
-           InfixCon {}  -> return True
-           _            -> return False
+           InfixCon{}  -> return True
+           RecCon{}    -> return False
+           PrefixCon{} -> return False
 
 tcConIsInfixGADT :: Name
-             -> HsConDetails (HsScaled GhcRn (LHsType GhcRn)) r
+             -> HsConDeclGADTDetails GhcRn
              -> TcM Bool
 tcConIsInfixGADT con details
   = case details of
-           InfixCon {}  -> return True
-           RecCon {}    -> return False
-           PrefixCon arg_tys           -- See Note [Infix GADT constructors]
+           RecConGADT{} -> return False
+           PrefixConGADT arg_tys       -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
                , [_ty1,_ty2] <- map hsScaledThing arg_tys
                   -> do { fix_env <- getFixityEnv
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
 
-tcConArgs :: ContextKind  -- expected kind of arguments
-                          -- always OpenKind for datatypes, but unlifted newtypes
-                          -- might have a specific kind
-          -> HsConDeclDetails GhcRn
-          -> TcM [(Scaled TcType, HsSrcBang)]
-tcConArgs exp_kind (PrefixCon btys)
+tcConH98Args :: ContextKind  -- expected kind of arguments
+                             -- always OpenKind for datatypes, but unlifted newtypes
+                             -- might have a specific kind
+             -> HsConDeclH98Details GhcRn
+             -> TcM [(Scaled TcType, HsSrcBang)]
+tcConH98Args exp_kind (PrefixCon btys)
   = mapM (tcConArg exp_kind) btys
-tcConArgs exp_kind (InfixCon bty1 bty2)
+tcConH98Args exp_kind (InfixCon bty1 bty2)
   = do { bty1' <- tcConArg exp_kind bty1
        ; bty2' <- tcConArg exp_kind bty2
        ; return [bty1', bty2'] }
-tcConArgs exp_kind (RecCon fields)
-  = mapM (tcConArg exp_kind) btys
-  where
-    -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f)))
-                   (unLoc fields)
-    explode (ns,ty) = zip ns (repeat ty)
-    exploded = concatMap explode combined
-    (_,btys) = unzip exploded
+tcConH98Args exp_kind (RecCon fields)
+  = tcRecConDeclFields exp_kind fields
 
+tcConGADTArgs :: ContextKind  -- expected kind of arguments
+                              -- always OpenKind for datatypes, but unlifted newtypes
+                              -- might have a specific kind
+              -> HsConDeclGADTDetails GhcRn
+              -> TcM [(Scaled TcType, HsSrcBang)]
+tcConGADTArgs exp_kind (PrefixConGADT btys)
+  = mapM (tcConArg exp_kind) btys
+tcConGADTArgs exp_kind (RecConGADT fields)
+  = tcRecConDeclFields exp_kind fields
 
 tcConArg :: ContextKind  -- expected kind for args; always OpenKind for datatypes,
                          -- but might be an unlifted type with UnliftedNewtypes
@@ -3425,6 +3442,19 @@ tcConArg exp_kind (HsScaled w bty)
         ; w' <- tcDataConMult w
         ; traceTc "tcConArg 2" (ppr bty)
         ; return (Scaled w' arg_ty, getBangStrictness bty) }
+
+tcRecConDeclFields :: ContextKind
+                   -> Located [LConDeclField GhcRn]
+                   -> TcM [(Scaled TcType, HsSrcBang)]
+tcRecConDeclFields exp_kind fields
+  = mapM (tcConArg exp_kind) btys
+  where
+    -- We need a one-to-one mapping from field_names to btys
+    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f)))
+                   (unLoc fields)
+    explode (ns,ty) = zip ns (repeat ty)
+    exploded = concatMap explode combined
+    (_,btys) = unzip exploded
 
 tcDataConMult :: HsArrow GhcRn -> TcM Mult
 tcDataConMult arr@(HsUnrestrictedArrow _) = do
