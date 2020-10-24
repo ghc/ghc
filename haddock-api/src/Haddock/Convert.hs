@@ -387,34 +387,44 @@ synifyDataCon use_gadt_syntax dc =
   con_decl_field fl synTy = noLoc $
     ConDeclField noExtField [noLoc $ FieldOcc (flSelector fl) (noLoc $ mkVarUnqual $ flLabel fl)] synTy
                  Nothing
-  hs_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
-          (True,True) -> Left "synifyDataCon: contradiction!"
-          (True,False) -> return $ RecCon (noLoc field_tys)
-          (False,False) -> return $ PrefixCon (map hsUnrestricted linear_tys)
-          (False,True) -> case linear_tys of
-                           [a,b] -> return $ InfixCon (hsUnrestricted a) (hsUnrestricted b)
-                           _ -> Left "synifyDataCon: infix with non-2 args?"
+
+  mk_h98_arg_tys :: Either ErrMsg (HsConDeclH98Details GhcRn)
+  mk_h98_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
+    (True,True) -> Left "synifyDataCon: contradiction!"
+    (True,False) -> return $ RecCon (noLoc field_tys)
+    (False,False) -> return $ PrefixCon (map hsUnrestricted linear_tys)
+    (False,True) -> case linear_tys of
+                     [a,b] -> return $ InfixCon (hsUnrestricted a) (hsUnrestricted b)
+                     _ -> Left "synifyDataCon: infix with non-2 args?"
+
+  mk_gadt_arg_tys :: HsConDeclGADTDetails GhcRn
+  mk_gadt_arg_tys
+    | use_named_field_syntax = RecConGADT (noLoc field_tys)
+    | otherwise              = PrefixConGADT (map hsUnrestricted linear_tys)
+
  -- finally we get synifyDataCon's result!
- in hs_arg_tys >>=
-      \hat ->
-        if use_gadt_syntax
-           then return $ noLoc $
-              ConDeclGADT { con_g_ext  = []
-                          , con_names  = [name]
-                          , con_forall = noLoc $ not $ null user_tvbndrs
-                          , con_qvars  = map synifyTyVarBndr user_tvbndrs
-                          , con_mb_cxt = ctx
-                          , con_args   = hat
-                          , con_res_ty = synifyType WithinType [] res_ty
-                          , con_doc    = Nothing }
-           else return $ noLoc $
-              ConDeclH98 { con_ext    = noExtField
-                         , con_name   = name
-                         , con_forall = noLoc False
-                         , con_ex_tvs = map (synifyTyVarBndr . (mkTyCoVarBinder InferredSpec)) ex_tvs
-                         , con_mb_cxt = ctx
-                         , con_args   = hat
-                         , con_doc    = Nothing }
+ in if use_gadt_syntax
+       then do
+         let hat = mk_gadt_arg_tys
+         return $ noLoc $ ConDeclGADT
+           { con_g_ext  = []
+           , con_names  = [name]
+           , con_forall = noLoc $ not $ null user_tvbndrs
+           , con_qvars  = map synifyTyVarBndr user_tvbndrs
+           , con_mb_cxt = ctx
+           , con_g_args = hat
+           , con_res_ty = synifyType WithinType [] res_ty
+           , con_doc    = Nothing }
+       else do
+         hat <- mk_h98_arg_tys
+         return $ noLoc $ ConDeclH98
+           { con_ext    = noExtField
+           , con_name   = name
+           , con_forall = noLoc False
+           , con_ex_tvs = map (synifyTyVarBndr . (mkTyCoVarBinder InferredSpec)) ex_tvs
+           , con_mb_cxt = ctx
+           , con_args   = hat
+           , con_doc    = Nothing }
 
 synifyName :: NamedThing n => n -> Located Name
 synifyName n = L (srcLocSpan (getSrcLoc n)) (getName n)

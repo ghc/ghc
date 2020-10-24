@@ -937,20 +937,22 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
                               , fixity
                               ]
 
-    fieldPart = case (con, getConArgsI con) of
-        -- Record style GADTs
-        (ConDeclGADT{}, RecCon _)            -> [ doConstrArgsWithDocs [] ]
+    fieldPart = case con of
+        ConDeclGADT{con_g_args = con_args'} -> case con_args' of
+          -- GADT record declarations
+          RecConGADT _                    -> [ doConstrArgsWithDocs [] ]
+          -- GADT prefix data constructors
+          PrefixConGADT args | hasArgDocs -> [ doConstrArgsWithDocs args ]
+          _                               -> []
 
-        -- Regular record declarations
-        (_, RecCon (L _ fields))             -> [ doRecordFields fields ]
-
-        -- Any GADT or a regular H98 prefix data constructor
-        (_, PrefixCon args)     | hasArgDocs -> [ doConstrArgsWithDocs args ]
-
-        -- An infix H98 data constructor
-        (_, InfixCon arg1 arg2) | hasArgDocs -> [ doConstrArgsWithDocs [arg1,arg2] ]
-
-        _ -> []
+        ConDeclH98{con_args = con_args'} -> case con_args' of
+          -- H98 record declarations
+          RecCon (L _ fields)             -> [ doRecordFields fields ]
+          -- H98 prefix data constructors
+          PrefixCon args | hasArgDocs     -> [ doConstrArgsWithDocs args ]
+          -- H98 infix data constructor
+          InfixCon arg1 arg2 | hasArgDocs -> [ doConstrArgsWithDocs [arg1,arg2] ]
+          _                               -> []
 
     doRecordFields fields = subFields pkg qual
       (map (ppSideBySideField subdocs unicode qual) (map unLoc fields))

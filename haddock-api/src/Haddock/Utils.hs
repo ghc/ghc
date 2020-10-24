@@ -187,21 +187,33 @@ restrictCons :: [Name] -> [LConDecl GhcRn] -> [LConDecl GhcRn]
 restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
   where
     keep d | any (\n -> n `elem` names) (map unLoc $ getConNames d) =
-      case con_args d of
-        PrefixCon _ -> Just d
-        RecCon fields
-          | all field_avail (unL fields) -> Just d
-          | otherwise -> Just (d { con_args = PrefixCon (field_types (map unL (unL fields))) })
+      case d of
+        ConDeclH98 { con_args = args }    -> restrict_h98_args args
+        ConDeclGADT { con_g_args = args } -> restrict_gadt_args args
+      where
+        restrict_h98_args :: HsConDeclH98Details GhcRn -> Maybe (ConDecl GhcRn)
+        restrict_h98_args (PrefixCon _) = Just d
+        restrict_h98_args (RecCon (L _ fields))
+          | all field_avail fields = Just d
+          | otherwise = Just (d { con_args = PrefixCon (field_types fields) })
           -- if we have *all* the field names available, then
           -- keep the record declaration.  Otherwise degrade to
           -- a constructor declaration.  This isn't quite right, but
           -- it's the best we can do.
-        InfixCon _ _ -> Just d
-      where
+
+        restrict_h98_args (InfixCon _ _) = Just d
+
+        restrict_gadt_args :: HsConDeclGADTDetails GhcRn -> Maybe (ConDecl GhcRn)
+        restrict_gadt_args (PrefixConGADT _) = Just d
+        restrict_gadt_args (RecConGADT (L _ fields))
+          | all field_avail fields = Just d
+          | otherwise = Just (d { con_g_args = PrefixConGADT (field_types fields) })
+          -- see the comments for the RecCon case of `restrict_h98_args` above
+
         field_avail :: LConDeclField GhcRn -> Bool
         field_avail (L _ (ConDeclField _ fs _ _))
             = all (\f -> extFieldOcc (unLoc f) `elem` names) fs
-        field_types flds = [ hsUnrestricted t | ConDeclField _ _ t _ <- flds ]
+        field_types flds = [ hsUnrestricted t | L _ (ConDeclField _ _ t _) <- flds ]
 
     keep _ = Nothing
 

@@ -236,9 +236,9 @@ lookupCon dflags subdocs (L _ name) = case lookup name subdocs of
   _ -> []
 
 ppCtor :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> ConDecl GhcRn -> [String]
-ppCtor dflags dat subdocs con@ConDeclH98 {}
+ppCtor dflags dat subdocs con@ConDeclH98 { con_args = con_args' }
   -- AZ:TODO get rid of the concatMap
-   = concatMap (lookupCon dflags subdocs) [con_name con] ++ f (getConArgs con)
+   = concatMap (lookupCon dflags subdocs) [con_name con] ++ f con_args'
     where
         f (PrefixCon args) = [typeSig name $ (map hsScaledThing args) ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [a1,a2]

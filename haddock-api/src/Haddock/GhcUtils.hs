@@ -134,9 +134,6 @@ mkHsForAllInvisTeleI ::
 mkHsForAllInvisTeleI invis_bndrs =
   HsForAllInvis { hsf_xinvis = noExtField, hsf_invis_bndrs = invis_bndrs }
 
-getConArgsI :: ConDecl DocNameI -> HsConDeclDetails DocNameI
-getConArgsI d = con_args d
-
 getGADTConType :: ConDecl DocNameI -> LHsType DocNameI
 -- The full type of a GADT data constructor We really only get this in
 -- order to pretty-print it, and currently only in Haddock's code.  So
@@ -144,7 +141,7 @@ getGADTConType :: ConDecl DocNameI -> LHsType DocNameI
 -- 'undefined's
 getGADTConType (ConDeclGADT { con_forall = L _ has_forall
                             , con_qvars = qtvs
-                            , con_mb_cxt = mcxt, con_args = args
+                            , con_mb_cxt = mcxt, con_g_args = args
                             , con_res_ty = res_ty })
  | has_forall = noLoc (HsForAllTy { hst_xforall = noExtField
                                   , hst_tele = mkHsForAllInvisTeleI qtvs
@@ -158,9 +155,8 @@ getGADTConType (ConDeclGADT { con_forall = L _ has_forall
 
 --  tau_ty :: LHsType DocNameI
    tau_ty = case args of
-              RecCon flds ->  mkFunTy (noLoc (HsRecTy noExtField (unLoc flds))) res_ty
-              PrefixCon pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
-              InfixCon arg1 arg2 -> (hsScaledThing arg1) `mkFunTy` ((hsScaledThing arg2) `mkFunTy` res_ty)
+              RecConGADT flds -> mkFunTy (noLoc (HsRecTy noExtField (unLoc flds))) res_ty
+              PrefixConGADT pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
 
    mkFunTy a b = noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) a b)
 
@@ -199,7 +195,7 @@ getGADTConTypeG :: ConDecl GhcRn -> LHsType GhcRn
 -- 'undefined's
 getGADTConTypeG (ConDeclGADT { con_forall = L _ has_forall
                             , con_qvars = qtvs
-                            , con_mb_cxt = mcxt, con_args = args
+                            , con_mb_cxt = mcxt, con_g_args = args
                             , con_res_ty = res_ty })
  | has_forall = noLoc (HsForAllTy { hst_xforall = noExtField
                                   , hst_tele = mkHsForAllInvisTele qtvs
@@ -213,9 +209,8 @@ getGADTConTypeG (ConDeclGADT { con_forall = L _ has_forall
 
 --   tau_ty :: LHsType DocNameI
    tau_ty = case args of
-              RecCon flds ->  mkFunTy (noLoc (HsRecTy noExtField (unLoc flds))) res_ty
-              PrefixCon pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
-              InfixCon arg1 arg2 -> (hsScaledThing arg1) `mkFunTy` ((hsScaledThing arg2) `mkFunTy` res_ty)
+              RecConGADT flds -> mkFunTy (noLoc (HsRecTy noExtField (unLoc flds))) res_ty
+              PrefixConGADT pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
 
    -- mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
    mkFunTy a b = noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) a b)

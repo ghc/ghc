@@ -926,7 +926,7 @@ extractDecl declMap name decl
             let matches = [ d' | L _ d'@(DataFamInstDecl (HsIB { hsib_body = d }))
                                    <- insts
                                  -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (feqn_rhs d)
-                               , RecCon rec <- map (getConArgs . unLoc) (dd_cons (feqn_rhs d))
+                               , Just rec <- map (getRecConArgs_maybe . unLoc) (dd_cons (feqn_rhs d))
                                , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
                                , L _ n <- ns
                                , extFieldOcc n == name
@@ -949,10 +949,14 @@ extractPatternSyn nm t tvs cons =
   extract :: ConDecl GhcRn -> Sig GhcRn
   extract con =
     let args =
-          case getConArgs con of
-            PrefixCon args' -> (map hsScaledThing args')
-            RecCon (L _ fields) -> cd_fld_type . unLoc <$> fields
-            InfixCon arg1 arg2 -> map hsScaledThing [arg1, arg2]
+          case con of
+            ConDeclH98 { con_args = con_args' } -> case con_args' of
+              PrefixCon args' -> map hsScaledThing args'
+              RecCon (L _ fields) -> cd_fld_type . unLoc <$> fields
+              InfixCon arg1 arg2 -> map hsScaledThing [arg1, arg2]
+            ConDeclGADT { con_g_args = con_args' } -> case con_args' of
+              PrefixConGADT args' -> map hsScaledThing args'
+              RecConGADT (L _ fields) -> cd_fld_type . unLoc <$> fields
         typ = longArrow args (data_ty con)
         typ' =
           case con of
@@ -977,8 +981,8 @@ extractRecSel :: Name -> Name -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn]
 extractRecSel _ _ _ [] = error "extractRecSel: selector not found"
 
 extractRecSel nm t tvs (L _ con : rest) =
-  case getConArgs con of
-    RecCon (L _ fields) | ((l,L _ (ConDeclField _ _nn ty _)) : _) <- matching_fields fields ->
+  case getRecConArgs_maybe con of
+    Just (L _ fields) | ((l,L _ (ConDeclField _ _nn ty _)) : _) <- matching_fields fields ->
       L l (TypeSig noExtField [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) data_ty (getBangType ty)))))
     _ -> extractRecSel nm t tvs rest
  where

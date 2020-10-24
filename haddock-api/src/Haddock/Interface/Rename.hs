@@ -479,7 +479,7 @@ renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
       lname'    <- renameL lname
       ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- traverse renameLContext lcontext
-      details'  <- renameDetails details
+      details'  <- renameH98Details details
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
       return (decl { con_ext = noExtField, con_name = lname', con_ex_tvs = ltyvars'
                    , con_mb_cxt = lcontext'
@@ -487,18 +487,18 @@ renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
                    , con_args = details', con_doc = mbldoc' })
 
 renameCon ConDeclGADT { con_names = lnames, con_qvars = ltyvars
-                            , con_mb_cxt = lcontext, con_args = details
+                            , con_mb_cxt = lcontext, con_g_args = details
                             , con_res_ty = res_ty, con_forall = forall
                             , con_doc = mbldoc } = do
       lnames'   <- mapM renameL lnames
       ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- traverse renameLContext lcontext
-      details'  <- renameDetails details
+      details'  <- renameGADTDetails details
       res_ty'   <- renameLType res_ty
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
       return (ConDeclGADT
                    { con_g_ext = noExtField, con_names = lnames', con_qvars = ltyvars'
-                   , con_mb_cxt = lcontext', con_args = details'
+                   , con_mb_cxt = lcontext', con_g_args = details'
                    , con_res_ty = res_ty', con_doc = mbldoc'
                    , con_forall = forall}) -- Remove when #18311 is fixed
 
@@ -506,17 +506,23 @@ renameHsScaled :: HsScaled GhcRn (LHsType GhcRn)
                -> RnM (HsScaled DocNameI (LHsType DocNameI))
 renameHsScaled (HsScaled w ty) = HsScaled <$> renameArrow w <*> renameLType ty
 
-renameDetails :: HsConDeclDetails GhcRn -> RnM (HsConDeclDetails DocNameI)
-renameDetails (RecCon (L l fields)) = do
+renameH98Details :: HsConDeclH98Details GhcRn
+                 -> RnM (HsConDeclH98Details DocNameI)
+renameH98Details (RecCon (L l fields)) = do
   fields' <- mapM renameConDeclFieldField fields
   return (RecCon (L l fields'))
-                               -- This causes an assertion failure
---renameDetails (PrefixCon ps) = -- return . PrefixCon =<< mapM (_renameLType) ps
-renameDetails (PrefixCon ps) = PrefixCon <$> mapM renameHsScaled ps
-renameDetails (InfixCon a b) = do
+renameH98Details (PrefixCon ps) = PrefixCon <$> mapM renameHsScaled ps
+renameH98Details (InfixCon a b) = do
   a' <- renameHsScaled a
   b' <- renameHsScaled b
   return (InfixCon a' b')
+
+renameGADTDetails :: HsConDeclGADTDetails GhcRn
+                  -> RnM (HsConDeclGADTDetails DocNameI)
+renameGADTDetails (RecConGADT (L l fields)) = do
+  fields' <- mapM renameConDeclFieldField fields
+  return (RecConGADT (L l fields'))
+renameGADTDetails (PrefixConGADT ps) = PrefixConGADT <$> mapM renameHsScaled ps
 
 renameConDeclFieldField :: LConDeclField GhcRn -> RnM (LConDeclField DocNameI)
 renameConDeclFieldField (L l (ConDeclField _ names t doc)) = do
