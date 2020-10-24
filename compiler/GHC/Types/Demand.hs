@@ -42,7 +42,7 @@ module GHC.Types.Demand (
         seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd,
-        splitDmdTy, splitFVs, deferAfterPreciseException,
+        splitDmdTy, isWeakDmd, deferAfterPreciseException,
         postProcessUnsat, postProcessDmdType,
 
         splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
@@ -796,22 +796,6 @@ cleanUseDmd_maybe :: Demand -> Maybe UseDmd
 cleanUseDmd_maybe (JD { ud = Use _ u }) = Just u
 cleanUseDmd_maybe _                     = Nothing
 
-splitFVs :: Bool   -- Thunk
-         -> DmdEnv -> (DmdEnv, DmdEnv)
-splitFVs is_thunk rhs_fvs
-  | is_thunk  = strictPairToTuple $
-                nonDetStrictFoldUFM_Directly add (emptyVarEnv :*: emptyVarEnv) rhs_fvs
-                -- It's OK to use a non-deterministic fold because we
-                -- immediately forget the ordering by putting the elements
-                -- in the envs again
-  | otherwise = partitionVarEnv isWeakDmd rhs_fvs
-  where
-    add uniq dmd@(JD { sd = s, ud = u }) (lazy_fv :*: sig_fv)
-      | Lazy <- s = addToUFM_Directly lazy_fv uniq dmd :*: sig_fv
-      | otherwise = addToUFM_Directly lazy_fv uniq (JD { sd = Lazy, ud = u })
-                    :*:
-                    addToUFM_Directly sig_fv  uniq (JD { sd = s,    ud = Abs })
-
 keepAliveDmdEnv :: DmdEnv -> IdSet -> DmdEnv
 -- (keepAliveDmdType dt vs) makes sure that the Ids in vs have
 -- /some/ usage in the returned demand types -- they are not Absent
@@ -841,11 +825,6 @@ splitProdDmd_maybe (JD { sd = s, ud = u })
                                 -> Just (mkJointDmds sx ux)
       (Lazy,  Use _ (UProd ux)) -> Just (mkJointDmds (replicate (length ux) Lazy) ux)
       _ -> Nothing
-
-data StrictPair a b = !a :*: !b
-
-strictPairToTuple :: StrictPair a b -> (a, b)
-strictPairToTuple (x :*: y) = (x, y)
 
 {- *********************************************************************
 *                                                                      *

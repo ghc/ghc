@@ -574,8 +574,7 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` extra_fvs
 
     -- See Note [Lazy and unleashable free variables]
-    (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv2
-    is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
+    (lazy_fv, sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
 
     -- Find the RHS free vars of the unfoldings and RULES
     -- See Note [Absence analysis for stable unfoldings and RULES]
@@ -595,8 +594,9 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
 mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
 mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity cleanEvalDmd
 
--- | If given the let-bound 'Id', 'useLetUp' determines whether we should
--- process the binding up (body before rhs) or down (rhs before body).
+-- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
+-- whether we should process the binding up (body before rhs) or down (rhs
+-- before body).
 --
 -- We use LetDown if there is a chance to get a useful strictness signature to
 -- unleash at call sites. LetDown is generally more precise than LetUp if we can
