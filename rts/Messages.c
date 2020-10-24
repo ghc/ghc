@@ -39,7 +39,7 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
 #endif
 
     msg->link = to_cap->inbox;
-    to_cap->inbox = msg;
+    RELAXED_STORE(&to_cap->inbox, msg);
 
     recordClosureMutated(from_cap,(StgClosure*)msg);
 
