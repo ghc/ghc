@@ -485,7 +485,6 @@ INLINE_HEADER bool emptyInbox(Capability *cap)
     // This may race with writes to putMVars and inbox but this harmless for the
     // intended uses of this function.
     TSAN_ANNOTATE_BENIGN_RACE(&cap->putMVars, "emptyInbox(cap->putMVars)");
-    TSAN_ANNOTATE_BENIGN_RACE(&cap->inbox, "emptyInbox(cap->inbox)");
     return (RELAXED_LOAD(&cap->inbox) == (Message*)END_TSO_QUEUE &&
             RELAXED_LOAD(&cap->putMVars) == NULL);
 }
