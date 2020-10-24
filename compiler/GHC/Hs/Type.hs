@@ -1102,9 +1102,22 @@ instance OutputableBndrId p
        => Outputable (ConDeclField (GhcPass p)) where
   ppr (ConDeclField _ fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
 
--- HsConDetails is used for patterns/expressions *and* for data type
--- declarations
--- | Haskell Constructor Details
+-- | Describes the arguments to a data constructor. This is a common
+-- representation for several constructor-related concepts, including:
+--
+-- * The arguments in a Haskell98-style constructor declaration
+--   (see 'HsConDeclH98Details' in "GHC.Hs.Decls").
+--
+-- * The arguments in constructor patterns in @case@/function definitions
+--   (see 'HsConPatDetails' in "GHC.Hs.Pat").
+--
+-- * The left-hand side arguments in a pattern synonym binding
+--   (see 'HsPatSynDetails' in "GHC.Hs.Binds").
+--
+-- One notable exception is the arguments in a GADT constructor, which uses
+-- a separate data type entirely (see 'HsConDeclGADTDetails' in
+-- "GHC.Hs.Decls"). This is because GADT constructors cannot be declared with
+-- infix syntax, unlike the concepts above (#18844).
 data HsConDetails arg rec
   = PrefixCon [arg]             -- C p1 p2 p3
   | RecCon    rec               -- C { x = p1, y = p2 }
