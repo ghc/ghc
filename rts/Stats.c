@@ -1220,7 +1220,7 @@ static void report_one_line(const RTSSummaryStats * sum)
 }
 
 void
-stat_exit (void)
+stat_exitReport (void)
 {
     RTSSummaryStats sum;
     init_RTSSummaryStats(&sum);
@@ -1425,9 +1425,6 @@ stat_exit (void)
             }
         }
         RELEASE_LOCK(&stats_mutex);
-#if defined(THREADED_RTS)
-        closeMutex(&stats_mutex);
-#endif
 
         statsFlush();
         statsClose();
@@ -1449,6 +1446,13 @@ stat_exit (void)
     }
 
     RELEASE_LOCK(&all_tasks_mutex);
+}
+
+void stat_exit()
+{
+#if defined(THREADED_RTS)
+        closeMutex(&stats_mutex);
+#endif
 }
 
 /* Note [Work Balance]
