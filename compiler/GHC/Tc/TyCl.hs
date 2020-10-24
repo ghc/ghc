@@ -4180,7 +4180,7 @@ checkNewDataCon con
         ; let allowedArgType =
                 unlifted_newtypes || isLiftedType_maybe (scaledThing arg_ty1) == Just True
         ; checkTc allowedArgType $ vcat
-          [ text "A newtype cannot have an unlifted argument type"
+          [ text "A newtype must have an argument of kind" <+> ppr liftedTypeKind
           , text "Perhaps you intended to use UnliftedNewtypes"
           ]
         ; show_linear_types <- xopt LangExt.LinearTypes <$> getDynFlags
