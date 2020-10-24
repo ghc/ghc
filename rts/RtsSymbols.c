@@ -12,6 +12,8 @@
 #include "Rts.h"
 #include "TopHandler.h"
 #include "HsFFI.h"
+#include "CloneStack.h"
+#include "rts/PrinterAPI.h"
 
 #include "sm/Storage.h"
 #include "sm/NonMovingMark.h"
@@ -999,6 +1001,8 @@
       SymI_HasProto(cas)                                                \
       SymI_HasProto(_assertFail)                                        \
       SymI_HasProto(keepCAFs)                                           \
+      SymI_HasProto(sendCloneStackMessage)                              \
+      SymI_HasProto(printStack)                                         \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
