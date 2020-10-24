@@ -808,9 +808,7 @@ splitFVs is_thunk rhs_fvs
   where
     add uniq dmd@(JD { sd = s, ud = u }) (lazy_fv :*: sig_fv)
       | Lazy <- s = addToUFM_Directly lazy_fv uniq dmd :*: sig_fv
-      | otherwise = addToUFM_Directly lazy_fv uniq (JD { sd = Lazy, ud = u })
-                    :*:
-                    addToUFM_Directly sig_fv  uniq (JD { sd = s,    ud = Abs })
+      | otherwise = lazy_fv :*: addToUFM_Directly sig_fv  uniq dmd
 
 keepAliveDmdEnv :: DmdEnv -> IdSet -> DmdEnv
 -- (keepAliveDmdType dt vs) makes sure that the Ids in vs have
