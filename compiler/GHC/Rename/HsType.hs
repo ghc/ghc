@@ -29,9 +29,9 @@ module GHC.Rename.HsType (
         rnImplicitBndrs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
-        extractHsTysRdrTyVars, extractRdrKindSigVars, extractDataDefnKindVars,
+        extractHsTysRdrTyVars, extractRdrKindSigVars,
+        extractConDeclGADTDetailsTyVars, extractDataDefnKindVars,
         extractHsTvBndrs, extractHsTyArgRdrKiTyVars,
-        extractHsScaledTysRdrTyVars,
         forAllOrNothing, nubL
   ) where
 
@@ -1747,9 +1747,6 @@ extractHsTyArgRdrKiTyVars args
 extractHsTyRdrTyVars :: LHsType GhcPs -> FreeKiTyVars
 extractHsTyRdrTyVars ty = extract_lty ty []
 
-extractHsScaledTysRdrTyVars :: [HsScaled GhcPs (LHsType GhcPs)] -> FreeKiTyVars -> FreeKiTyVars
-extractHsScaledTysRdrTyVars args acc = foldr (\(HsScaled m ty) -> extract_lty ty . extract_hs_arrow m) acc args
-
 -- | Extracts the free type/kind variables from the kind signature of a HsType.
 --   This is used to implicitly quantify over @k@ in @type T = Nothing :: Maybe k@.
 -- The left-to-right order of variables is preserved.
@@ -1787,6 +1784,15 @@ extractRdrKindSigVars (L _ resultSig) = case resultSig of
   TyVarSig _ (L _ (KindedTyVar _ _ _ k)) -> extractHsTyRdrTyVars k
   _ -> []
 
+-- | Extracts free type and kind variables from an argument in a GADT
+-- constructor, returning variable occurrences in left-to-right order.
+-- See @Note [Ordering of implicit variables]@.
+extractConDeclGADTDetailsTyVars ::
+  HsConDeclGADTDetails GhcPs -> FreeKiTyVars -> FreeKiTyVars
+extractConDeclGADTDetailsTyVars con_args = case con_args of
+  PrefixConGADT args    -> extract_scaled_ltys args
+  RecConGADT (L _ flds) -> extract_ltys $ map (cd_fld_type . unLoc) $ flds
+
 -- | Get type/kind variables mentioned in the kind signature, preserving
 -- left-to-right order:
 --
@@ -1800,6 +1806,14 @@ extractDataDefnKindVars (HsDataDefn { dd_kindSig = ksig })
 
 extract_lctxt :: LHsContext GhcPs -> FreeKiTyVars -> FreeKiTyVars
 extract_lctxt ctxt = extract_ltys (unLoc ctxt)
+
+extract_scaled_ltys :: [HsScaled GhcPs (LHsType GhcPs)]
+                    -> FreeKiTyVars -> FreeKiTyVars
+extract_scaled_ltys args acc = foldr extract_scaled_lty acc args
+
+extract_scaled_lty :: HsScaled GhcPs (LHsType GhcPs)
+                   -> FreeKiTyVars -> FreeKiTyVars
+extract_scaled_lty (HsScaled m ty) acc = extract_lty ty $ extract_hs_arrow m acc
 
 extract_ltys :: [LHsType GhcPs] -> FreeKiTyVars -> FreeKiTyVars
 extract_ltys tys acc = foldr extract_lty acc tys

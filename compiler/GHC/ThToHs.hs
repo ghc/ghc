@@ -622,7 +622,7 @@ cvtConstr (GadtC c strtys ty)
   = do  { c'      <- mapM cNameL c
         ; args    <- mapM cvt_arg strtys
         ; ty'     <- cvtType ty
-        ; returnL $ mk_gadt_decl c' (PrefixCon $ map hsLinear args) ty'}
+        ; returnL $ mk_gadt_decl c' (PrefixConGADT $ map hsLinear args) ty'}
 
 cvtConstr (RecGadtC [] _varstrtys _ty)
   = failWith (text "RecGadtC must have at least one constructor name")
@@ -631,9 +631,9 @@ cvtConstr (RecGadtC c varstrtys ty)
   = do  { c'       <- mapM cNameL c
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
-        ; returnL $ mk_gadt_decl c' (RecCon $ noLoc rec_flds) ty' }
+        ; returnL $ mk_gadt_decl c' (RecConGADT $ noLoc rec_flds) ty' }
 
-mk_gadt_decl :: [Located RdrName] -> HsConDeclDetails GhcPs -> LHsType GhcPs
+mk_gadt_decl :: [Located RdrName] -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
              -> ConDecl GhcPs
 mk_gadt_decl names args res_ty
   = ConDeclGADT { con_g_ext  = noExtField
@@ -641,7 +641,7 @@ mk_gadt_decl names args res_ty
                 , con_forall = noLoc False
                 , con_qvars  = []
                 , con_mb_cxt = Nothing
-                , con_args   = args
+                , con_g_args = args
                 , con_res_ty = res_ty
                 , con_doc    = Nothing }
 

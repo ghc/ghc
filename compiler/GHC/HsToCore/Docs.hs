@@ -189,7 +189,7 @@ subordinates instMap decl = case decl of
                     , conArgDocs c)
                   | c <- cons, cname <- getConNames c ]
         fields  = [ (extFieldOcc n, maybeToList $ fmap unLoc doc, M.empty)
-                  | RecCon flds <- map getConArgs cons
+                  | Just flds <- map getRecConArgs_maybe cons
                   , (L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
                   , (L _ n) <- ns ]
         derivs  = [ (instName, [unLoc doc], M.empty)
@@ -216,22 +216,30 @@ subordinates instMap decl = case decl of
             _               -> Nothing
 
 -- | Extract constructor argument docs from inside constructor decls.
-conArgDocs :: ConDecl GhcRn -> Map Int (HsDocString)
-conArgDocs con = case getConArgs con of
-                   PrefixCon args -> go 0 (map (unLoc . hsScaledThing) args ++ ret)
-                   InfixCon arg1 arg2 -> go 0 ([unLoc (hsScaledThing arg1),
-                                                unLoc (hsScaledThing arg2)] ++ ret)
-                   RecCon _ -> go 1 ret
-  where
-    go n = M.fromList . catMaybes . zipWith f [n..]
-      where
-        f n (HsDocTy _ _ lds) = Just (n, unLoc lds)
-        f n (HsBangTy _ _ (L _ (HsDocTy _ _ lds))) = Just (n, unLoc lds)
-        f _ _ = Nothing
+conArgDocs :: ConDecl GhcRn -> Map Int HsDocString
+conArgDocs (ConDeclH98{con_args = args}) =
+  h98ConArgDocs args
+conArgDocs (ConDeclGADT{con_g_args = args, con_res_ty = res_ty}) =
+  gadtConArgDocs args (unLoc res_ty)
 
-    ret = case con of
-            ConDeclGADT { con_res_ty = res_ty } -> [ unLoc res_ty ]
-            _ -> []
+h98ConArgDocs :: HsConDeclH98Details GhcRn -> Map Int HsDocString
+h98ConArgDocs con_args = case con_args of
+  PrefixCon args     -> con_arg_docs 0 $ map (unLoc . hsScaledThing) args
+  InfixCon arg1 arg2 -> con_arg_docs 0 [ unLoc (hsScaledThing arg1)
+                                       , unLoc (hsScaledThing arg2) ]
+  RecCon _           -> M.empty
+
+gadtConArgDocs :: HsConDeclGADTDetails GhcRn -> HsType GhcRn -> Map Int HsDocString
+gadtConArgDocs con_args res_ty = case con_args of
+  PrefixConGADT args -> con_arg_docs 0 $ map (unLoc . hsScaledThing) args ++ [res_ty]
+  RecConGADT _       -> con_arg_docs 1 [res_ty]
+
+con_arg_docs :: Int -> [HsType GhcRn] -> Map Int HsDocString
+con_arg_docs n = M.fromList . catMaybes . zipWith f [n..]
+  where
+    f n (HsDocTy _ _ lds) = Just (n, unLoc lds)
+    f n (HsBangTy _ _ (L _ (HsDocTy _ _ lds))) = Just (n, unLoc lds)
+    f _ _ = Nothing
 
 isValD :: HsDecl a -> Bool
 isValD (ValD _ _) = True

@@ -877,7 +877,7 @@ repC (L _ (ConDeclH98 { con_name   = con
                       , con_forall = (L _ False)
                       , con_mb_cxt = Nothing
                       , con_args   = args }))
-  = repDataCon con args
+  = repH98DataCon con args
 
 repC (L _ (ConDeclH98 { con_name = con
                       , con_forall = L _ is_existential
@@ -885,7 +885,7 @@ repC (L _ (ConDeclH98 { con_name = con
                       , con_mb_cxt = mcxt
                       , con_args = args }))
   = do { addHsTyVarBinds con_tvs $ \ ex_bndrs ->
-         do { c'    <- repDataCon con args
+         do { c'    <- repH98DataCon con args
             ; ctxt' <- repMbContext mcxt
             ; if not is_existential && isNothing mcxt
               then return c'
@@ -897,7 +897,7 @@ repC (L _ (ConDeclGADT { con_g_ext  = imp_tvs
                        , con_names  = cons
                        , con_qvars  = exp_tvs
                        , con_mb_cxt = mcxt
-                       , con_args   = args
+                       , con_g_args = args
                        , con_res_ty = res_ty }))
   | null imp_tvs && null exp_tvs -- No implicit or explicit variables
   , Nothing <- mcxt              -- No context
@@ -2589,49 +2589,51 @@ repImplicitParamBind (MkC n) (MkC e) = rep2 implicitParamBindDName [n, e]
 repCtxt :: Core [(M TH.Pred)] -> MetaM (Core (M TH.Cxt))
 repCtxt (MkC tys) = rep2 cxtName [tys]
 
-repDataCon :: Located Name
-           -> HsConDeclDetails GhcRn
-           -> MetaM (Core (M TH.Con))
-repDataCon con details
+repH98DataCon :: Located Name
+              -> HsConDeclH98Details GhcRn
+              -> MetaM (Core (M TH.Con))
+repH98DataCon con details
     = do con' <- lookupLOcc con -- See Note [Binders and occurrences]
-         repConstr details Nothing [con']
+         case details of
+           PrefixCon ps -> do
+             arg_tys <- repPrefixConArgs ps
+             rep2 normalCName [unC con', unC arg_tys]
+           InfixCon st1 st2 -> do
+             arg1 <- repBangTy (hsScaledThing st1)
+             arg2 <- repBangTy (hsScaledThing st2)
+             rep2 infixCName [unC arg1, unC con', unC arg2]
+           RecCon ips -> do
+             arg_vtys <- repRecConArgs ips
+             rep2 recCName [unC con', unC arg_vtys]
 
 repGadtDataCons :: [Located Name]
-                -> HsConDeclDetails GhcRn
+                -> HsConDeclGADTDetails GhcRn
                 -> LHsType GhcRn
                 -> MetaM (Core (M TH.Con))
 repGadtDataCons cons details res_ty
     = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
-         repConstr details (Just res_ty) cons'
-
--- Invariant:
---   * for plain H98 data constructors second argument is Nothing and third
---     argument is a singleton list
---   * for GADTs data constructors second argument is (Just return_type) and
---     third argument is a non-empty list
-repConstr :: HsConDeclDetails GhcRn
-          -> Maybe (LHsType GhcRn)
-          -> [Core TH.Name]
-          -> MetaM (Core (M TH.Con))
-repConstr (PrefixCon ps) Nothing [con]
-    = do arg_tys  <- repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
-         rep2 normalCName [unC con, unC arg_tys]
-
-repConstr (PrefixCon ps) (Just res_ty) cons
-    = do arg_tys     <- repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
-         res_ty' <- repLTy res_ty
-         rep2 gadtCName [ unC (nonEmptyCoreList cons), unC arg_tys, unC res_ty']
-
-repConstr (RecCon ips) resTy cons
-    = do args     <- concatMapM rep_ip (unLoc ips)
-         arg_vtys <- coreListM varBangTypeTyConName args
-         case resTy of
-           Nothing -> rep2 recCName [unC (head cons), unC arg_vtys]
-           Just res_ty -> do
+         case details of
+           PrefixConGADT ps -> do
+             arg_tys <- repPrefixConArgs ps
              res_ty' <- repLTy res_ty
-             rep2 recGadtCName [unC (nonEmptyCoreList cons), unC arg_vtys,
+             rep2 gadtCName [ unC (nonEmptyCoreList cons'), unC arg_tys, unC res_ty']
+           RecConGADT ips -> do
+             arg_vtys <- repRecConArgs ips
+             res_ty'  <- repLTy res_ty
+             rep2 recGadtCName [unC (nonEmptyCoreList cons'), unC arg_vtys,
                                 unC res_ty']
 
+-- Desugar the arguments in a data constructor declared with prefix syntax.
+repPrefixConArgs :: [HsScaled GhcRn (LHsType GhcRn)]
+                 -> MetaM (Core [M TH.BangType])
+repPrefixConArgs ps = repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
+
+-- Desugar the arguments in a data constructor declared with record syntax.
+repRecConArgs :: Located [LConDeclField GhcRn]
+              -> MetaM (Core [M TH.VarBangType])
+repRecConArgs ips = do
+  args     <- concatMapM rep_ip (unLoc ips)
+  coreListM varBangTypeTyConName args
     where
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
 
@@ -2639,16 +2641,6 @@ repConstr (RecCon ips) resTy cons
       rep_one_ip t n = do { MkC v  <- lookupOcc (extFieldOcc $ unLoc n)
                           ; MkC ty <- repBangTy  t
                           ; rep2 varBangTypeName [v,ty] }
-
-repConstr (InfixCon st1 st2) Nothing [con]
-    = do arg1 <- repBangTy (hsScaledThing st1)
-         arg2 <- repBangTy (hsScaledThing st2)
-         rep2 infixCName [unC arg1, unC con, unC arg2]
-
-repConstr (InfixCon {}) (Just _) _ =
-    panic "repConstr: infix GADT constructor should be in a PrefixCon"
-repConstr _ _ _ =
-    panic "repConstr: invariant violated"
 
 ------------ Types -------------------
 
