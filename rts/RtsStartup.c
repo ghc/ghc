@@ -518,6 +518,9 @@ hs_exit_(bool wait_foreign)
     shutdownAsyncIO(wait_foreign);
 #endif
 
+    /* tear down statistics subsystem */
+    stat_exit();
+
     // Finally, free all our storage.  However, we only free the heap
     // memory if we have waited for foreign calls to complete;
     // otherwise a foreign call in progress may still be referencing
