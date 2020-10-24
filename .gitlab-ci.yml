@@ -642,6 +642,9 @@ nightly-x86_64-linux-deb9-integer-simple:
     TEST_ENV: "x86_64-linux-deb9-tsan"
     BUILD_FLAVOUR: "thread-sanitizer"
     TSAN_OPTIONS: "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
+    # Haddock is large enough to make TSAN choke without massive quantities of
+    # memory.
+    HADRIAN_ARGS: "--docs=none"
 
 nightly-x86_64-linux-deb9-tsan:
   <<: *nightly
