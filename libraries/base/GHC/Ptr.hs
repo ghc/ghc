@@ -171,7 +171,7 @@ castPtrToFunPtr (Ptr addr) = FunPtr addr
 exchangePtr :: Ptr (Ptr a) -> Ptr b -> IO (Ptr c)
 exchangePtr (Ptr dst) (Ptr val) =
   IO $ \s ->
-      case (interlockedExchangeAddr# dst val s) of
+      case (atomicExchangeAddrAddr# dst val s) of
         (# s2, old_val #) -> (# s2, Ptr old_val #)
 
 ------------------------------------------------------------------------
