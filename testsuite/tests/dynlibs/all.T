@@ -1,5 +1,8 @@
-
-test('T3807', [req_shared_libs, when(opsys('mingw32'), skip)], makefile_test, [])
+test('T3807',
+    [req_shared_libs,
+     when(have_thread_sanitizer(), expect_broken(18883)),
+     when(opsys('mingw32'),
+     skip)], makefile_test, [])
 
 test('T4464', [req_shared_libs, unless(opsys('mingw32'), skip)], makefile_test, [])
 
