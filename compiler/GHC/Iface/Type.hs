@@ -865,8 +865,8 @@ instance Binary IfaceOneShot where
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return IfaceNoOneShot
-              _ -> do return IfaceOneShot
+              0 -> return IfaceNoOneShot
+              _ -> return IfaceOneShot
 
 -- ----------------------------- Printing IfaceType ------------------------------------
 
@@ -1905,7 +1905,7 @@ instance Binary IfaceType where
                        return (IfaceLitTy n)
 
 instance Binary IfaceMCoercion where
-  put_ bh IfaceMRefl = do
+  put_ bh IfaceMRefl =
           putByte bh 1
   put_ bh (IfaceMCo co) = do
           putByte bh 2

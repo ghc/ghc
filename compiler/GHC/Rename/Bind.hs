@@ -885,7 +885,7 @@ rnMethodBindLHS :: Bool -> Name
                 -> LHsBindsLR GhcRn GhcPs
                 -> RnM (LHsBindsLR GhcRn GhcPs)
 rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
-  = setSrcSpan loc $ do
+  = setSrcSpan loc $
     do { sel_name <- wrapLocM (lookupInstDeclBndr cls (text "method")) name
                      -- We use the selector name as the binder
        ; let bind' = bind { fun_id = sel_name, fun_ext = noExtField }
@@ -1034,7 +1034,7 @@ renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
        new_mty  <- traverse lookupLocatedOccRn mty
 
        this_mod <- fmap tcg_mod getGblEnv
-       unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $ do
+       unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $
          -- Why 'any'? See Note [Orphan COMPLETE pragmas]
          addErrCtxt (text "In" <+> ppr sig) $ failWithTc orphanError
 
@@ -1178,7 +1178,7 @@ rnMatch' :: Outputable (body GhcPs) => HsMatchContext GhcRn
          -> Match GhcPs (Located (body GhcPs))
          -> RnM (Match GhcRn (Located (body GhcRn)), FreeVars)
 rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
-  = do  { -- Note that there are no local fixity decls for matches
+  =     { -- Note that there are no local fixity decls for matches
         ; rnPats ctxt pats      $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt, mf) of
