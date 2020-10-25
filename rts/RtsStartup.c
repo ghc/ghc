@@ -575,7 +575,7 @@ hs_exit_(bool wait_foreign)
       hs_restoreConsoleCP();
 #endif
 
-    /* Print the final runtime stats */
+    /* tear down statistics subsystem */
     stat_exit();
 
     /* free hash table storage */
