@@ -455,7 +455,7 @@ getULEB128 bh =
         let !hasMore = testBit b 7
         let !val = w .|. ((clearBit (fromIntegral b) 7) `unsafeShiftL` shift) :: a
         if hasMore
-            then do
+            then
                 go (shift+7) val
             else
                 return $! val
@@ -1193,7 +1193,7 @@ putBS bh bs =
 getBS :: BinHandle -> IO ByteString
 getBS bh = do
   l <- get bh :: IO Int
-  BS.create l $ \dest -> do
+  BS.create l $ \dest ->
     getPrim bh l (\src -> BS.memcpy dest src l)
 
 instance Binary ByteString where
@@ -1254,16 +1254,16 @@ instance Binary TupleSort where
     get bh = do
       h <- getByte bh
       case h of
-        0 -> do return BoxedTuple
-        1 -> do return UnboxedTuple
-        _ -> do return ConstraintTuple
+        0 -> return BoxedTuple
+        1 -> return UnboxedTuple
+        _ -> return ConstraintTuple
 
 instance Binary Activation where
-    put_ bh NeverActive = do
+    put_ bh NeverActive =
             putByte bh 0
-    put_ bh FinalActive = do
+    put_ bh FinalActive =
             putByte bh 1
-    put_ bh AlwaysActive = do
+    put_ bh AlwaysActive =
             putByte bh 2
     put_ bh (ActiveBefore src aa) = do
             putByte bh 3
@@ -1276,9 +1276,9 @@ instance Binary Activation where
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return NeverActive
-              1 -> do return FinalActive
-              2 -> do return AlwaysActive
+              0 -> return NeverActive
+              1 -> return FinalActive
+              2 -> return AlwaysActive
               3 -> do src <- get bh
                       aa <- get bh
                       return (ActiveBefore src aa)
@@ -1324,15 +1324,15 @@ instance Binary InlineSpec where
                   _ -> return NoInline
 
 instance Binary RecFlag where
-    put_ bh Recursive = do
+    put_ bh Recursive =
             putByte bh 0
-    put_ bh NonRecursive = do
+    put_ bh NonRecursive =
             putByte bh 1
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return Recursive
-              _ -> do return NonRecursive
+              0 -> return Recursive
+              _ -> return NonRecursive
 
 instance Binary OverlapMode where
     put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
@@ -1360,18 +1360,18 @@ instance Binary OverlapFlag where
         return OverlapFlag { overlapMode = h, isSafeOverlap = b }
 
 instance Binary FixityDirection where
-    put_ bh InfixL = do
+    put_ bh InfixL =
             putByte bh 0
-    put_ bh InfixR = do
+    put_ bh InfixR =
             putByte bh 1
-    put_ bh InfixN = do
+    put_ bh InfixN =
             putByte bh 2
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return InfixL
-              1 -> do return InfixR
-              _ -> do return InfixN
+              0 -> return InfixL
+              1 -> return InfixR
+              _ -> return InfixN
 
 instance Binary Fixity where
     put_ bh (Fixity src aa ab) = do

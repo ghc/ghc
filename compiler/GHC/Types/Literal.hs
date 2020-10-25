@@ -208,7 +208,7 @@ instance Binary LitNumType where
 instance Binary Literal where
     put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
     put_ bh (LitString ab)   = do putByte bh 1; put_ bh ab
-    put_ bh (LitNullAddr)    = do putByte bh 2
+    put_ bh (LitNullAddr)    = putByte bh 2
     put_ bh (LitFloat ah)    = do putByte bh 3; put_ bh ah
     put_ bh (LitDouble ai)   = do putByte bh 4; put_ bh ai
     put_ bh (LitLabel aj mb fod)
@@ -220,7 +220,7 @@ instance Binary Literal where
         = do putByte bh 6
              put_ bh nt
              put_ bh i
-    put_ bh (LitRubbish)     = do putByte bh 7
+    put_ bh (LitRubbish) = putByte bh 7
     get bh = do
             h <- getByte bh
             case h of
@@ -247,8 +247,7 @@ instance Binary Literal where
                     nt <- get bh
                     i  <- get bh
                     return (LitNumber nt i)
-              _ -> do
-                    return (LitRubbish)
+              _ -> return (LitRubbish)
 
 instance Outputable Literal where
     ppr = pprLiteral id

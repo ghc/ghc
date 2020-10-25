@@ -250,9 +250,8 @@ getSeverityColour _          = const mempty
 
 getCaretDiagnostic :: Severity -> SrcSpan -> IO MsgDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
-getCaretDiagnostic severity (RealSrcSpan span _) = do
+getCaretDiagnostic severity (RealSrcSpan span _) =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
-
   where
     getSrcLine fn i =
       getLine i (unpackFS fn)
@@ -979,8 +978,8 @@ type TraceAction = forall a. DynFlags -> String -> SDoc -> a -> a
 
 -- | Default action for 'dumpAction' hook
 defaultDumpAction :: DumpAction
-defaultDumpAction dflags sty dumpOpt title _fmt doc = do
-   dumpSDocWithStyle sty dflags dumpOpt title doc
+defaultDumpAction dflags sty dumpOpt title _fmt doc =
+  dumpSDocWithStyle sty dflags dumpOpt title doc
 
 -- | Default action for 'traceAction' hook
 defaultTraceAction :: TraceAction
