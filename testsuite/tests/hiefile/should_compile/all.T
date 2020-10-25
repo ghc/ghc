@@ -4,6 +4,7 @@ test('hie002',
       when(wordsize(32), skip),
       # No linting in perf tests:
       no_lint,
+      high_memory_usage,
       collect_compiler_stats('bytes allocated',10)],
      compile,
      ['-fno-code -fwrite-ide-info'])

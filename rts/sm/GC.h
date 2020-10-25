@@ -42,19 +42,31 @@ extern StgPtr mark_sp;
 
 extern bool work_stealing;
 
-#if defined(DEBUG)
-extern uint32_t mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS,
-    mutlist_TVAR,
-    mutlist_TVAR_WATCH_QUEUE,
-    mutlist_TREC_CHUNK,
-    mutlist_TREC_HEADER;
-#endif
-
 #if defined(PROF_SPIN) && defined(THREADED_RTS)
 extern volatile StgWord64 whitehole_gc_spin;
 extern volatile StgWord64 waitForGcThreads_spin;
 extern volatile StgWord64 waitForGcThreads_yield;
 #endif
+
+// mutable list scavenging statistics
+#if defined(DEBUG)
+typedef struct {
+    StgWord n_MUTVAR;
+    StgWord n_MUTARR;
+    StgWord n_MVAR;
+    StgWord n_TVAR;
+    StgWord n_TREC_CHUNK;
+    StgWord n_TVAR_WATCH_QUEUE;
+    StgWord n_TREC_HEADER;
+    StgWord n_OTHERS;
+} MutListScavStats;
+
+extern MutListScavStats mutlist_scav_stats;
+
+void zeroMutListScavStats(MutListScavStats *src);
+void addMutListScavStats(const MutListScavStats *src,
+                         MutListScavStats *dest);
+#endif /* DEBUG */
 
 void gcWorkerThread (Capability *cap);
 void initGcThreads (uint32_t from, uint32_t to);
