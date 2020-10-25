@@ -1971,8 +1971,8 @@ out how deeply we can unpack x, or that we do not have to pass y.
 -}
 
 instance Binary StrDmd where
-  put_ bh HyperStr     = do putByte bh 0
-  put_ bh HeadStr      = do putByte bh 1
+  put_ bh HyperStr     = putByte bh 0
+  put_ bh HeadStr      = putByte bh 1
   put_ bh (SCall s)    = do putByte bh 2
                             put_ bh s
   put_ bh (SProd sx)   = do putByte bh 3
@@ -1980,17 +1980,17 @@ instance Binary StrDmd where
   get bh = do
          h <- getByte bh
          case h of
-           0 -> do return HyperStr
-           1 -> do return HeadStr
+           0 -> return HyperStr
+           1 -> return HeadStr
            2 -> do s  <- get bh
                    return (SCall s)
            _ -> do sx <- get bh
                    return (SProd sx)
 
 instance Binary ArgStr where
-    put_ bh Lazy         = do
+    put_ bh Lazy =
             putByte bh 0
-    put_ bh (Str s)    = do
+    put_ bh (Str s) = do
             putByte bh 1
             put_ bh s
 
@@ -2002,8 +2002,8 @@ instance Binary ArgStr where
                       return $ Str s
 
 instance Binary Count where
-    put_ bh One  = do putByte bh 0
-    put_ bh Many = do putByte bh 1
+    put_ bh One  = putByte bh 0
+    put_ bh Many = putByte bh 1
 
     get  bh = do h <- getByte bh
                  case h of
@@ -2011,9 +2011,9 @@ instance Binary Count where
                    _ -> return Many
 
 instance Binary ArgUse where
-    put_ bh Abs          = do
+    put_ bh Abs =
             putByte bh 0
-    put_ bh (Use c u)    = do
+    put_ bh (Use c u) = do
             putByte bh 1
             put_ bh c
             put_ bh u
@@ -2022,16 +2022,14 @@ instance Binary ArgUse where
             h <- getByte bh
             case h of
               0 -> return Abs
-              _ -> do c  <- get bh
-                      u  <- get bh
-                      return $ Use c u
+              _ -> return $ Use <$> get bh <*> get bh
 
 instance Binary UseDmd where
-    put_ bh Used         = do
+    put_ bh Used =
             putByte bh 0
-    put_ bh UHead        = do
+    put_ bh UHead =
             putByte bh 1
-    put_ bh (UCall c u)    = do
+    put_ bh (UCall c u) = do
             putByte bh 2
             put_ bh c
             put_ bh u
@@ -2052,17 +2050,11 @@ instance Binary UseDmd where
 
 instance (Binary s, Binary u) => Binary (JointDmd s u) where
     put_ bh (JD { sd = x, ud = y }) = do put_ bh x; put_ bh y
-    get  bh = do
-              x <- get bh
-              y <- get bh
-              return $ JD { sd = x, ud = y }
+    get  bh = return $ JD <$> get bh <*> get bh
 
 instance Binary StrictSig where
-    put_ bh (StrictSig aa) = do
-            put_ bh aa
-    get bh = do
-          aa <- get bh
-          return (StrictSig aa)
+    put_ bh (StrictSig aa) = put_ bh aa
+    get bh = return $ StrictSig <$> get bh
 
 instance Binary DmdType where
   -- Ignore DmdEnv when spitting out the DmdType

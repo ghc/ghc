@@ -54,8 +54,8 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence
 import GHC.Core.InstEnv
-import GHC.Builtin.Types  ( heqDataCon, eqDataCon, integerTyConName )
-import GHC.Core    ( isOrphan )
+import GHC.Builtin.Types ( heqDataCon, eqDataCon, integerTyConName )
+import GHC.Core ( Expr (..), isOrphan ) -- For the Coercion constructor
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Utils.TcMType
 import GHC.Core.Type
@@ -65,8 +65,7 @@ import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Tc.Utils.TcType
 import GHC.Driver.Types
 import GHC.Core.Class( Class )
-import GHC.Types.Id.Make( mkDictFunId )
-import GHC.Core( Expr(..) )  -- For the Coercion constructor
+import GHC.Types.Id.Make ( mkDictFunId )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var
