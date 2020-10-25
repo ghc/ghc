@@ -120,9 +120,9 @@ splitSections = splitSectionsIf (/=ghc)
 enableThreadSanitizer :: Flavour -> Flavour
 enableThreadSanitizer = addArgs $ mconcat
     [ builder (Ghc CompileHs) ? arg "-optc-fsanitize=thread"
-    , builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=thread"
+    , builder (Ghc CompileCWithGhc) ? (arg "-optc-fsanitize=thread" <> arg "-DTSAN_ENABLED")
     , builder (Ghc LinkHs) ? arg "-optl-fsanitize=thread"
-    , builder (Cc  CompileC) ? arg "-fsanitize=thread"
+    , builder (Cc  CompileC) ? (arg "-fsanitize=thread" <> arg "-DTSAN_ENABLED")
     , builder (Cabal Flags) ? arg "thread-sanitizer"
     , builder  RunTest ? arg "--config=have_thread_sanitizer=True"
     ]
