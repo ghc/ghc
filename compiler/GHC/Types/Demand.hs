@@ -228,70 +228,6 @@ strBot, strTop :: ArgStr
 strBot = Str HyperStr
 strTop = Lazy
 
-mkSCall :: StrDmd -> StrDmd
-mkSCall HyperStr = HyperStr
-mkSCall s        = SCall s
-
-mkSProd :: [ArgStr] -> StrDmd
-mkSProd sx
-  | any isHyperStr sx = HyperStr -- ??? Why any?
-  | all isLazy     sx = HeadStr
-  | otherwise         = SProd sx
-
-isHyperStr :: ArgStr -> Bool
-isHyperStr (Str HyperStr) = True
-isHyperStr _              = False
-
--- Pretty-printing
-instance Outputable StrDmd where
-  ppr HyperStr      = char 'B'
-  ppr (SCall s)     = char 'C' <> parens (ppr s)
-  ppr HeadStr       = char 'S'
-  ppr (SProd sx)    = char 'S' <> parens (hcat (map ppr sx))
-
-instance Outputable ArgStr where
-  ppr (Str s) = ppr s
-  ppr Lazy    = char 'L'
-
-lubArgStr :: ArgStr -> ArgStr -> ArgStr
-lubArgStr Lazy     _        = Lazy
-lubArgStr _        Lazy     = Lazy
-lubArgStr (Str s1) (Str s2) = Str (s1 `lubStr` s2)
-
-lubStr :: StrDmd -> StrDmd -> StrDmd
-lubStr HyperStr s              = s
-lubStr (SCall s1) HyperStr     = SCall s1
-lubStr (SCall _)  HeadStr      = HeadStr
-lubStr (SCall s1) (SCall s2)   = SCall (s1 `lubStr` s2)
-lubStr (SCall _)  (SProd _)    = HeadStr
-lubStr (SProd sx) HyperStr     = SProd sx
-lubStr (SProd _)  HeadStr      = HeadStr
-lubStr (SProd s1) (SProd s2)
-    | s1 `equalLength` s2      = mkSProd (zipWith lubArgStr s1 s2)
-    | otherwise                = HeadStr
-lubStr (SProd _) (SCall _)     = HeadStr
-lubStr HeadStr   _             = HeadStr
-
-bothArgStr :: ArgStr -> ArgStr -> ArgStr
-bothArgStr Lazy     s        = s
-bothArgStr s        Lazy     = s
-bothArgStr (Str s1) (Str s2) = Str (s1 `bothStr` s2)
-
-bothStr :: StrDmd -> StrDmd -> StrDmd
-bothStr HyperStr _             = HyperStr
-bothStr HeadStr s              = s
-bothStr (SCall _)  HyperStr    = HyperStr
-bothStr (SCall s1) HeadStr     = SCall s1
-bothStr (SCall s1) (SCall s2)  = SCall (s1 `bothStr` s2)
-bothStr (SCall _)  (SProd _)   = HyperStr  -- Weird
-
-bothStr (SProd _)  HyperStr    = HyperStr
-bothStr (SProd s1) HeadStr     = SProd s1
-bothStr (SProd s1) (SProd s2)
-    | s1 `equalLength` s2      = mkSProd (zipWith bothArgStr s1 s2)
-    | otherwise                = HyperStr  -- Weird
-bothStr (SProd _) (SCall _)    = HyperStr
-
 -- utility functions to deal with memory leaks
 seqStrDmd :: StrDmd -> ()
 seqStrDmd (SProd ds)   = seqStrDmdList ds
@@ -474,9 +410,9 @@ addCaseBndrDmd :: Demand    -- On the case binder
                -> [Demand]  -- On the components of the constructor
                -> [Demand]  -- Final demands for the components of the constructor
 -- See Note [Demand on case-alternative binders]
-addCaseBndrDmd dmd@(_ :* cd) alt_dmds
-  | isAbsDmd dmd = alt_dmds
-  | otherwise    = zipWith bothDmd alt_dmds ds
+addCaseBndrDmd (n :* cd) alt_dmds
+  | isAbs n   = alt_dmds
+  | otherwise = zipWith bothDmd alt_dmds ds
   where
     Just ds = viewProd (length alt_dmds) cd -- Guaranteed not to be a call
 
@@ -811,7 +747,7 @@ bothCleanDmd cd1@Poly{} cd2       = bothCleanDmd cd2 cd1
 -- Otherwise (Call `lub` Prod) return Top
 bothCleanDmd _          _         = topCleanDmd
 
-bothDmd :: Demand -> Demand
+bothDmd :: Demand -> Demand -> Demand
 bothDmd (n1 :* cd1) (n2 :* cd2) = bothCard n1 n2 :* bothCleanDmd cd1 cd2
 
 oneifyDmd :: Demand -> Demand
@@ -824,9 +760,7 @@ isTopDmd :: Demand -> Bool
 isTopDmd dmd = dmd == topDmd
 
 isAbsDmd :: Demand -> Bool
-isAbsDmd (C_00 :* _) = True
-isAbsDmd (C_10 :* _) = True  -- Bottom demand is also absent
-isAbsDmd _           = False
+isAbsDmd (n :* _) = isAbs n
 
 isSeqDmd :: Demand -> Bool
 isSeqDmd (C_11 :* cd) = cd == seqCleanDmd
@@ -854,10 +788,17 @@ isStrictDmd (C_11 :* _) = True
 isStrictDmd (C_1N :* _) = True
 isStrictDmd _           = False
 
+-- | True <=> lower bound is 0.
 isLazy :: Card -> Bool
 isLazy C_01 = False
 isLazy C_0N = False
 isLazy _    = True
+
+-- | True <=> upper bound is 0.
+isAbs :: Card -> Bool
+isAbs C_00 = True
+isAbs C_10 = True -- Bottom cardinality is also absent
+isAbs _    = False
 
 {- Note [Scaling demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1015,37 +956,19 @@ data TypeShape -- See Note [Trimming a demand to a type]
 
 trimToType :: Demand -> TypeShape -> Demand
 -- See Note [Trimming a demand to a type] in GHC.Core.Opt.DmdAnal
-trimToType (JD { sd = ms, ud = mu }) ts
-  = JD (go_ms ms ts) (go_mu mu ts)
+trimToType (n :* cd) ts
+  = n :* go cd ts
   where
-    go_ms :: ArgStr -> TypeShape -> ArgStr
-    go_ms Lazy    _  = Lazy
-    go_ms (Str s) ts = Str (go_s s ts)
-
-    go_s :: StrDmd -> TypeShape -> StrDmd
-    go_s HyperStr    _            = HyperStr
-    go_s (SCall s)   (TsFun ts)   = SCall (go_s s ts)
-    go_s (SProd mss) (TsProd tss)
-      | equalLength mss tss       = SProd (zipWith go_ms mss tss)
-    go_s _           _            = HeadStr
-
-    go_mu :: ArgUse -> TypeShape -> ArgUse
-    go_mu Abs _ = Abs
-    go_mu (Use c u) ts = Use c (go_u u ts)
-
-    go_u :: UseDmd -> TypeShape -> UseDmd
-    go_u UHead       _          = UHead
-    go_u (UCall c u) (TsFun ts) = UCall c (go_u u ts)
-    go_u (UProd mus) (TsProd tss)
-      | equalLength mus tss      = UProd (zipWith go_mu mus tss)
-    go_u _           _           = Used
+    go (Prod ds)   (TsProd tss)
+      | equalLength ds tss    = Prod (zipWith trimToType ds tss)
+    go (Call n cd) (TsFun ts) = Call n (go cd ts)
+    go cd@Poly{}   _          = cd
+    go _           _          = topCleanDmd
 
 instance Outputable TypeShape where
   ppr TsUnk        = text "TsUnk"
   ppr (TsFun ts)   = text "TsFun" <> parens (ppr ts)
   ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr tss)
-
-
 
 {- *********************************************************************
 *                                                                      *
@@ -1463,74 +1386,63 @@ deferAfterPreciseException :: DmdType -> DmdType
 deferAfterPreciseException = lubDmdType exnDmdType
 
 strictenDmd :: Demand -> Demand
-strictenDmd (JD { sd = s, ud = u})
-  = JD { sd = poke_s s, ud = poke_u u }
-  where
-    poke_s Lazy      = Str HeadStr
-    poke_s s         = s
-    poke_u Abs       = useTop
-    poke_u u         = u
+strictenDmd (n :* cd) = bothCard C_10 n :* cd
 
 -- Deferring and peeling
 
 type DmdShell   -- Describes the "outer shell"
                 -- of a Demand
-   = JointDmd (Str ()) (Use ())
+   = Card
 
 toCleanDmd :: Demand -> (DmdShell, CleanDemand)
 -- Splits a Demand into its "shell" and the inner "clean demand"
-toCleanDmd (JD { sd = s, ud = u })
-  = (JD { sd = ss, ud = us }, JD { sd = s', ud = u' })
+toCleanDmd (n :* cd) = (n, cd)
     -- See Note [Analyzing with lazy demand and lambdas]
     -- See Note [Analysing with absent demand]
-  where
-    (ss, s') = case s of
-                Str s' -> (Str (), s')
-                Lazy   -> (Lazy,   HeadStr)
-
-    (us, u') = case u of
-                 Use c u' -> (Use c (), u')
-                 Abs      -> (Abs,      Used)
 
 -- This is used in dmdAnalStar when post-processing
 -- a function's argument demand. So we only care about what
 -- does to free variables, and whether it terminates.
 -- see Note [Asymmetry of 'both*']
 postProcessDmdType :: DmdShell -> DmdType -> BothDmdArg
-postProcessDmdType du@(JD { sd = ss }) (DmdType fv _ res_ty)
-    = (postProcessDmdEnv du fv, postProcessDivergence ss res_ty)
+postProcessDmdType n (DmdType fv _ res_ty)
+    = (postProcessDmdEnv n fv, postProcessDivergence n res_ty)
 
-postProcessDivergence :: Str () -> Divergence -> Divergence
+postProcessDivergence :: DmdShell -> Divergence -> Divergence
 -- In a Lazy scenario, we might not force the Divergence, in which case we
 -- converge, hence Dunno.
-postProcessDivergence Lazy _ = Dunno
-postProcessDivergence _    d = d
+postProcessDivergence n _ | isLazy n = Dunno
+postProcessDivergence _ d = d
 
 postProcessDmdEnv :: DmdShell -> DmdEnv -> DmdEnv
-postProcessDmdEnv ds@(JD { sd = ss, ud = us }) env
-  | Abs <- us       = emptyDmdEnv
+postProcessDmdEnv n env
+  | isAbs n   = emptyDmdEnv
     -- In this case (postProcessDmd ds) == id; avoid a redundant rebuild
     -- of the environment. Be careful, bad things will happen if this doesn't
     -- match postProcessDmd (see #13977).
-  | Str _ <- ss
-  , Use One _ <- us = env
-  | otherwise       = mapVarEnv (postProcessDmd ds) env
+  | n == C_11 = env
+  | otherwise = mapVarEnv (postProcessDmd n) env
   -- For the Absent case just discard alC_ sage information
   -- We only processed the thing at all to analyse the body
   -- See Note [Always analyse in virgin pass]
 
+-- | See Note [Scaling demands]
 reuseEnv :: DmdEnv -> DmdEnv
-reuseEnv = mapVarEnv (postProcessDmd
-                        (JD { sd = Str (), ud = Use Many () }))
+reuseEnv = mapVarEnv (postProcessDmd C_1N)
 
 postProcessUnsat :: DmdShell -> DmdType -> DmdType
-postProcessUnsat ds@(JD { sd = ss }) (DmdType fv args res_ty)
-  = DmdType (postProcessDmdEnv ds fv)
-            (map (postProcessDmd ds) args)
-            (postProcessDivergence ss res_ty)
+postProcessUnsat n (DmdType fv args res_ty)
+  = DmdType (postProcessDmdEnv n fv)
+            (map (postProcessDmd n) args)
+            (postProcessDivergence n res_ty)
 
 postProcessDmd :: DmdShell -> Demand -> Demand
-postProcessDmd (JD { sd = ss, ud = us }) (JD { sd = s, ud = a})
+postProcessDmd C_11 dmd = dmd
+postProcessDmd n    _
+  | isAbs n             = absDmd
+postProcessDmd C_01 (n :* dmd) = lubCard C_01 n :* dmd
+postProcessDmd C_10 _ = Dmd
+postProcessDmd n (JD { sd = s, ud = a})
   = JD { sd = s', ud = a' }
   where
     s' = case ss of
@@ -1912,10 +1824,10 @@ dmdTransformDictSelSig :: StrictSig -> CleanDemand -> DmdType
 -- for dictionary selectors.  If the selector is saturated (ie has one
 -- argument: the dictionary), we feed the demand on the result into
 -- the indicated dictionary component.
-dmdTransformDictSelSig (StrictSig (DmdType _ [Prod jds] _)) cd
+dmdTransformDictSelSig (StrictSig (DmdType _ [Prod ds] _)) cd
    | (cd',defer_use) <- peelCallDmd cd
    = postProcessUnsat defer_use $
-     DmdType emptyDmdEnv [mkOnceUsedDmd $ mkProdDmd $ map (enhance cd') jds] topDiv
+     DmdType emptyDmdEnv [mkOnceUsedDmd $ Prod $ map (enhance cd') ds] topDiv
    | otherwise
    = nopDmdType -- See Note [Demand transformer for a dictionary selector]
   where
@@ -2072,8 +1984,8 @@ zap_usg _   u            = u
 -- strictify the argument's contained used non-newtype superclass dictionaries.
 -- We use the demand as our recursive measure to guarantee termination.
 strictifyDictDmd :: Type -> Demand -> Demand
-strictifyDictDmd ty dmd@(n :* Prod ds)
-  | not (isAbsDmd dmd)
+strictifyDictDmd ty (n :* Prod ds)
+  | not (isAbs n)
   , Just (tycon, field_tys) <- as_non_newtype_dict ty
   = C_1N :* -- main idea: ensure it's strict
       if all (not . isAbsDmd) ds
