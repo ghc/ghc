@@ -3310,6 +3310,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
               do { ctxt <- tcHsMbContext cxt
                  ; btys <- tcConArgs hs_args
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
+                         -- See Note [GADT return kinds]
                  ; let (arg_tys, stricts) = unzip btys
                  ; dflags <- getDynFlags
                  ; final_arg_tys <- unifyNewtypeKind dflags new_or_data
@@ -3367,6 +3368,20 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; mapM buildOneDataCon names }
   where
     skol_info = DataConSkol (unLoc (head names))
+
+{- Note [GADT return kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   type family Star where Star = Type
+   data T :: Type where
+      MkT :: Int -> T
+
+If, for some stupid reason, tcInferLHsTypeKind on the return type of
+MkT returned (T |> ax, Star), then the return-type check in
+checkValidDataCon would reject the decl (although of course there is
+nothing wrong with it).  We are implicitly requiring tha
+tcInferLHsTypeKind doesn't any gratuitous top-level casts.
+-}
 
 tcConIsInfixH98 :: Name
              -> HsConDetails a b
