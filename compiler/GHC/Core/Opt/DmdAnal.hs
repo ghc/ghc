@@ -574,8 +574,7 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` extra_fvs
 
     -- See Note [Lazy and unleashable free variables]
-    (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv2
-    is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
+    (lazy_fv, sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
 
     -- Find the RHS free vars of the unfoldings and RULES
     -- See Note [Absence analysis for stable unfoldings and RULES]
