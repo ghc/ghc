@@ -619,6 +619,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# OVERLAPPABLE'       { L _ (IToverlappable_prag _) }
  '{-# OVERLAPS'           { L _ (IToverlaps_prag _) }
  '{-# INCOHERENT'         { L _ (ITincoherent_prag _) }
+ '{-# COVERED'            { L _ (ITcovered_prag _) }
  '{-# COMPLETE'           { L _ (ITcomplete_prag _)   }
  '#-}'                    { L _ ITclose_prag }
 
@@ -1246,16 +1247,17 @@ sks_vars :: { Located [Located RdrName] }  -- Returned in reverse order
   | oqtycon { sL1 $1 [$1] }
 
 inst_decl :: { LInstDecl GhcPs }
-        : 'instance' overlap_pragma inst_type where_inst
-       {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $4)
+        : 'instance' overlap_pragma covered_pragma inst_type where_inst
+       {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $5)
              ; let cid = ClsInstDecl { cid_ext = noExtField
-                                     , cid_poly_ty = $3, cid_binds = binds
+                                     , cid_poly_ty = $4, cid_binds = binds
                                      , cid_sigs = mkClassOpSigs sigs
                                      , cid_tyfam_insts = ats
                                      , cid_overlap_mode = $2
+                                     , cid_covered_vars = $3
                                      , cid_datafam_insts = adts }
-             ; ams (L (comb3 $1 (hsSigType $3) $4) (ClsInstD { cid_d_ext = noExtField, cid_inst = cid }))
-                   (mj AnnInstance $1 : (fst $ unLoc $4)) } }
+             ; ams (L (comb3 $1 (hsSigType $4) $5) (ClsInstD { cid_d_ext = noExtField, cid_inst = cid }))
+                   (mj AnnInstance $1 : (fst $ unLoc $5)) } }
 
            -- type instance declarations
         | 'type' 'instance' ty_fam_inst_eqn
@@ -1291,6 +1293,10 @@ overlap_pragma :: { Maybe (Located OverlapMode) }
   | '{-# INCOHERENT'      '#-}' {% ajs (sLL $1 $> (Incoherent (getINCOHERENT_PRAGs $1)))
                                        [mo $1,mc $2] }
   | {- empty -}                 { Nothing }
+
+covered_pragma :: { Located [Located RdrName] }
+  : '{-# COVERED' varids0 '#-}' {% ams $2 [mo $1, mc $3] }
+  | {- empty -}                 { noLoc [] }
 
 deriv_strategy_no_via :: { LDerivStrategy GhcPs }
   : 'stock'                     {% ams (sL1 $1 StockStrategy)

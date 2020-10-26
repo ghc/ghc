@@ -46,7 +46,7 @@ import GHC.Utils.Error( Validity(..), allValid )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
-import GHC.Data.Pair             ( Pair(..) )
+import GHC.Data.Pair    ( Pair(..), pLiftSnd )
 import Data.List        ( nubBy )
 import Data.Maybe
 import Data.Foldable    ( fold )
@@ -372,7 +372,8 @@ makes instance inference go into a loop, because it requires the constraint
         Mul a [b] b
 -}
 
-checkInstCoverage :: Bool   -- Be liberal
+checkInstCoverage :: [Name]
+                  -> Bool   -- Be liberal
                   -> Class -> [PredType] -> [Type]
                   -> Validity
 -- "be_liberal" flag says whether to use "liberal" coverage of
@@ -382,7 +383,7 @@ checkInstCoverage :: Bool   -- Be liberal
 --    Nothing  => no problems
 --    Just msg => coverage problem described by msg
 
-checkInstCoverage be_liberal clas theta inst_taus
+checkInstCoverage covered_vars be_liberal clas theta inst_taus
   = allValid (map fundep_ok fds)
   where
     (tyvars, fds) = classTvsFds clas
@@ -392,10 +393,17 @@ checkInstCoverage be_liberal clas theta inst_taus
        where
          (ls,rs) = instFD fd tyvars inst_taus
          ls_tvs = tyCoVarsOfTypes ls
-         rs_tvs = splitVisVarsOfTypes rs
+         rs_tvs = filter_covered <$> splitVisVarsOfTypes rs
 
-         undetermined_tvs | be_liberal = liberal_undet_tvs
-                          | otherwise  = conserv_undet_tvs
+         filter_covered vs = foldr go vs covered_vars
+           where
+             go cov_name acc = case lookupVarSetByName acc cov_name of
+               Just var -> acc `delVarSet` var
+               Nothing  -> acc
+
+         undetermined_tvs
+           | be_liberal = liberal_undet_tvs
+           | otherwise  = conserv_undet_tvs
 
          closed_ls_tvs = oclose theta ls_tvs
          liberal_undet_tvs = (`minusVarSet` closed_ls_tvs) <$> rs_tvs
