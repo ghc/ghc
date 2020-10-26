@@ -65,7 +65,6 @@ import GHC.Cmm
 import GHC.Cmm.CLabel
 
 import GHC.Types.Basic
-import GHC.Unit.Module
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -95,11 +94,9 @@ data ReferenceKind
 
 class Monad m => CmmMakeDynamicReferenceM m where
     addImport :: CLabel -> m ()
-    getThisModule :: m Module
 
 instance CmmMakeDynamicReferenceM NatM where
     addImport = addImportNat
-    getThisModule = getThisModuleNat
 
 cmmMakeDynamicReference
   :: CmmMakeDynamicReferenceM m
@@ -113,13 +110,11 @@ cmmMakeDynamicReference config referenceKind lbl
   = return $ CmmLit $ CmmLabel lbl   -- already processed it, pass through
 
   | otherwise
-  = do this_mod <- getThisModule
-       let platform = ncgPlatform config
+  = do let platform = ncgPlatform config
        case howToAccessLabel
                 config
                 (platformArch platform)
                 (platformOS   platform)
-                this_mod
                 referenceKind lbl of
 
         AccessViaStub -> do
@@ -208,7 +203,7 @@ data LabelAccessStyle
         | AccessViaSymbolPtr
         | AccessDirectly
 
-howToAccessLabel :: NCGConfig -> Arch -> OS -> Module -> ReferenceKind -> CLabel -> LabelAccessStyle
+howToAccessLabel :: NCGConfig -> Arch -> OS -> ReferenceKind -> CLabel -> LabelAccessStyle
 
 -- Windows
 -- In Windows speak, a "module" is a set of objects linked into the
@@ -231,7 +226,7 @@ howToAccessLabel :: NCGConfig -> Arch -> OS -> Module -> ReferenceKind -> CLabel
 -- into the same .exe file. In this case we always access symbols directly,
 -- and never use __imp_SYMBOL.
 --
-howToAccessLabel config _ OSMinGW32 this_mod _ lbl
+howToAccessLabel config _arch OSMinGW32 _kind lbl
 
         -- Assume all symbols will be in the same PE, so just access them directly.
         | not (ncgExternalDynamicRefs config)
@@ -239,7 +234,7 @@ howToAccessLabel config _ OSMinGW32 this_mod _ lbl
 
         -- If the target symbol is in another PE we need to access it via the
         --      appropriate __imp_SYMBOL pointer.
-        | labelDynamic config this_mod lbl
+        | labelDynamic config lbl
         = AccessViaSymbolPtr
 
         -- Target symbol is in the same PE as the caller, so just access it directly.
@@ -255,9 +250,9 @@ howToAccessLabel config _ OSMinGW32 this_mod _ lbl
 -- It is always possible to access something indirectly,
 -- even when it's not necessary.
 --
-howToAccessLabel config arch OSDarwin this_mod DataReference lbl
+howToAccessLabel config arch OSDarwin DataReference lbl
         -- data access to a dynamic library goes via a symbol pointer
-        | labelDynamic config this_mod lbl
+        | labelDynamic config lbl
         = AccessViaSymbolPtr
 
         -- when generating PIC code, all cross-module data references must
@@ -276,21 +271,21 @@ howToAccessLabel config arch OSDarwin this_mod DataReference lbl
         | otherwise
         = AccessDirectly
 
-howToAccessLabel config arch OSDarwin this_mod JumpReference lbl
+howToAccessLabel config arch OSDarwin JumpReference lbl
         -- dyld code stubs don't work for tailcalls because the
         -- stack alignment is only right for regular calls.
         -- Therefore, we have to go via a symbol pointer:
         | arch == ArchX86 || arch == ArchX86_64
-        , labelDynamic config this_mod lbl
+        , labelDynamic config lbl
         = AccessViaSymbolPtr
 
 
-howToAccessLabel config arch OSDarwin this_mod _ lbl
+howToAccessLabel config arch OSDarwin _kind lbl
         -- Code stubs are the usual method of choice for imported code;
         -- not needed on x86_64 because Apple's new linker, ld64, generates
         -- them automatically.
         | arch /= ArchX86_64
-        , labelDynamic config this_mod lbl
+        , labelDynamic config lbl
         = AccessViaStub
 
         | otherwise
@@ -301,7 +296,7 @@ howToAccessLabel config arch OSDarwin this_mod _ lbl
 -- AIX
 
 -- quite simple (for now)
-howToAccessLabel _config _arch OSAIX _this_mod kind _lbl
+howToAccessLabel _config _arch OSAIX kind _lbl
         = case kind of
             DataReference -> AccessViaSymbolPtr
             CallReference -> AccessDirectly
@@ -318,7 +313,7 @@ howToAccessLabel _config _arch OSAIX _this_mod kind _lbl
 -- from position independent code. It is also required from the main program
 -- when dynamic libraries containing Haskell code are used.
 
-howToAccessLabel _ (ArchPPC_64 _) os _ kind _
+howToAccessLabel _config (ArchPPC_64 _) os kind _lbl
         | osElfTarget os
         = case kind of
           -- ELF PPC64 (powerpc64-linux), AIX, MacOS 9, BeOS/PPC
@@ -330,7 +325,7 @@ howToAccessLabel _ (ArchPPC_64 _) os _ kind _
           -- regular calls are handled by the runtime linker
           _             -> AccessDirectly
 
-howToAccessLabel config _ os _ _ _
+howToAccessLabel config _arch os _kind _lbl
         -- no PIC -> the dynamic linker does everything for us;
         --           if we don't dynamically link to Haskell code,
         --           it actually manages to do so without messing things up.
@@ -339,11 +334,11 @@ howToAccessLabel config _ os _ _ _
           not (ncgExternalDynamicRefs config)
         = AccessDirectly
 
-howToAccessLabel config arch os this_mod DataReference lbl
+howToAccessLabel config arch os DataReference lbl
         | osElfTarget os
         = case () of
             -- A dynamic label needs to be accessed via a symbol pointer.
-          _ | labelDynamic config this_mod lbl
+          _ | labelDynamic config lbl
             -> AccessViaSymbolPtr
 
             -- For PowerPC32 -fPIC, we have to access even static data
@@ -369,25 +364,25 @@ howToAccessLabel config arch os this_mod DataReference lbl
         -- (AccessDirectly, because we get an implicit symbol stub)
         -- and calling functions from PIC code on non-i386 platforms (via a symbol stub)
 
-howToAccessLabel config arch os this_mod CallReference lbl
+howToAccessLabel config arch os CallReference lbl
         | osElfTarget os
-        , labelDynamic config this_mod lbl && not (ncgPIC config)
+        , labelDynamic config lbl && not (ncgPIC config)
         = AccessDirectly
 
         | osElfTarget os
         , arch /= ArchX86
-        , labelDynamic config this_mod lbl
+        , labelDynamic config lbl
         , ncgPIC config
         = AccessViaStub
 
-howToAccessLabel config _ os this_mod _ lbl
+howToAccessLabel config _arch os _kind lbl
         | osElfTarget os
-        = if labelDynamic config this_mod lbl
+        = if labelDynamic config lbl
             then AccessViaSymbolPtr
             else AccessDirectly
 
 -- all other platforms
-howToAccessLabel config _ _ _ _ _
+howToAccessLabel config _arch _os _kind _lbl
         | not (ncgPIC config)
         = AccessDirectly
 
