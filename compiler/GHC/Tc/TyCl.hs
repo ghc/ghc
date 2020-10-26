@@ -3413,18 +3413,22 @@ tcConArgs (InfixCon bty1 bty2)
   = do { bty1' <- tcConArg bty1
        ; bty2' <- tcConArg bty2
        ; return [bty1', bty2'] }
-tcConArgs (RecCon fields)
-  = mapM tcConArg btys
+tcConArgs (RecCon (L _ fields))
+  = concatMapM tc_field fields
   where
     -- We need to ensure that each distinct field name gets its own type.
     -- For example, if we have:
     --
     --   data T = MkT { a,b,c :: Int }
     --
-    -- Then we should return /three/ Int types, not just one!
-    btys = [ hsLinear (cd_fld_type f)
-           | L _ f <- unLoc fields
-           , _fld_name <- cd_fld_names f ]
+    -- Then we should return /three/ Int types, not just one! At the same
+    -- time, we don't want to kind-check Int three separate times, as that
+    -- would be redundant. Therefore, we kind-check Int once and 'replicate'
+    -- it so that we return three occurrences of it.
+    tc_field :: LConDeclField GhcRn -> TcM [(Scaled TcType, HsSrcBang)]
+    tc_field (L _ f) = do
+      bty' <- tcConArg $ hsLinear $ cd_fld_type f
+      pure $ replicate (length (cd_fld_names f)) bty'
 
 tcConArg :: HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
 tcConArg (HsScaled w bty)
