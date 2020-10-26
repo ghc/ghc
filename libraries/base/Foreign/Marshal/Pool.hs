@@ -57,7 +57,7 @@ import GHC.Real              ( fromIntegral )
 
 import Foreign.Marshal.Array ( pokeArray, pokeArray0 )
 import Foreign.Marshal.Utils ( copyBytes )
-import Foreign.Ptr           ( Ptr, castPtr, plusPtr, nullPtr )
+import Foreign.Ptr           ( Ptr, castPtr, plusPtr )
 import Foreign.Storable      ( Storable(sizeOf, poke, pokeByteOff, peekByteOff) )
 import Foreign.C.Types       ( CSize(..) )
 
