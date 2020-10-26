@@ -220,6 +220,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/Signals.h"
 #include "rts/BlockSignals.h"
 #include "rts/Hpc.h"
+#include "rts/Arena.h"
 #include "rts/Adjustor.h"
 #include "rts/FileLock.h"
 #include "rts/GetTime.h"

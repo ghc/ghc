@@ -44,22 +44,22 @@ module Foreign.Marshal.Pool (
    pooledNew,
    pooledNewArray,
    pooledNewArray0
+
 ) where
 
-import GHC.Base              ( Int, Monad(..), (.), liftM, not )
-import GHC.Err               ( undefined )
+import GHC.Base
 import GHC.Exception         ( throw )
-import GHC.IO                ( IO, mask, catchAny )
-import GHC.IORef             ( IORef, newIORef, readIORef, writeIORef )
-import GHC.List              ( elem, length )
-import GHC.Num               ( Num(..) )
+import GHC.IO                ( mask, catchAny )
+import GHC.Num
+import GHC.List              ( length )
+import GHC.IO.Exception      ( ioError, userError )
+import GHC.Real              ( fromIntegral )
 
-import Data.OldList          ( delete )
-import Foreign.Marshal.Alloc ( mallocBytes, reallocBytes, free )
 import Foreign.Marshal.Array ( pokeArray, pokeArray0 )
-import Foreign.Marshal.Error ( throwIf )
-import Foreign.Ptr           ( Ptr, castPtr )
-import Foreign.Storable      ( Storable(sizeOf, poke) )
+import Foreign.Marshal.Utils ( copyBytes )
+import Foreign.Ptr           ( Ptr, castPtr, plusPtr, nullPtr )
+import Foreign.Storable      ( Storable(sizeOf, poke, pokeByteOff, peekByteOff) )
+import Foreign.C.Types       ( CSize(..) )
 
 --------------------------------------------------------------------------------
 
@@ -68,20 +68,18 @@ import Foreign.Storable      ( Storable(sizeOf, poke) )
 
 -- | A memory pool.
 
-newtype Pool = Pool (IORef [Ptr ()])
+newtype Pool = Pool (Ptr Arena)
 
 -- | Allocate a fresh memory pool.
 
 newPool :: IO Pool
-newPool = liftM Pool (newIORef [])
+newPool = liftM Pool _newArena
 
 -- | Deallocate a memory pool and everything which has been allocated in the
 -- pool itself.
 
 freePool :: Pool -> IO ()
-freePool (Pool pool) = readIORef pool >>= freeAll
-   where freeAll []     = return ()
-         freeAll (p:ps) = free p >> freeAll ps
+freePool (Pool arena) = _arenaFree arena
 
 -- | Execute an action with a fresh memory pool, which gets automatically
 -- deallocated (including its contents) after the action has finished.
@@ -108,11 +106,10 @@ pooledMalloc pool = pooledMallocBytes pool (sizeOf (undefined :: a))
 -- | Allocate the given number of bytes of storage in the pool.
 
 pooledMallocBytes :: Pool -> Int -> IO (Ptr a)
-pooledMallocBytes (Pool pool) size = do
-   ptr <- mallocBytes size
-   ptrs <- readIORef pool
-   writeIORef pool (ptr:ptrs)
-   return (castPtr ptr)
+pooledMallocBytes (Pool arena) size = do
+    ptr <- _arenaAlloc arena (fromIntegral (size + headerSize))
+    poke (castPtr ptr :: Ptr Int) size
+    return (plusPtr ptr headerSize)
 
 -- | Adjust the storage area for an element in the pool to the given size of
 -- the required type.
@@ -123,13 +120,21 @@ pooledRealloc pool ptr = pooledReallocBytes pool ptr (sizeOf (undefined :: a))
 -- | Adjust the storage area for an element in the pool to the given size.
 
 pooledReallocBytes :: Pool -> Ptr a -> Int -> IO (Ptr a)
-pooledReallocBytes (Pool pool) ptr size = do
-   let cPtr = castPtr ptr
-   _ <- throwIf (not . (cPtr `elem`)) (\_ -> "pointer not in pool") (readIORef pool)
-   newPtr <- reallocBytes cPtr size
-   ptrs <- readIORef pool
-   writeIORef pool (newPtr : delete cPtr ptrs)
-   return (castPtr newPtr)
+pooledReallocBytes (Pool arena) ptr size =
+    let reallocate prevSize | prevSize == size = return ptr
+        reallocate prevSize | prevSize >  size = do
+            pokeByteOff ptr (-1*headerSize) size
+            return ptr
+        -- Note that a possible optimization when ptr was added last: only do a
+        -- copy if there is not enough space on the arena block
+        reallocate prevSize = do -- prevSize <  size
+            newPtr <- pooledMallocBytes (Pool arena) size
+            copyBytes newPtr ptr prevSize
+            return newPtr
+     in do isInArena <- _inArena arena (castPtr ptr)
+           if isInArena
+              then peekByteOff ptr (-1*headerSize) >>= reallocate
+              else ioError $ userError "pointer not in pool"
 
 -- | Allocate storage for the given number of elements of a storable type in the
 -- pool.
@@ -185,3 +190,16 @@ pooledNewArray0 pool marker vals = do
    ptr <- pooledMallocArray0 pool (length vals)
    pokeArray0 marker ptr vals
    return ptr
+
+------------------------------------------------------
+
+type Arena = ()
+
+headerSize :: Int
+headerSize = sizeOf (undefined :: Int)
+
+foreign import ccall unsafe "newArena" _newArena :: IO  (Ptr Arena)
+foreign import ccall unsafe "arenaAlloc" _arenaAlloc :: Ptr Arena -> CSize -> IO (Ptr ())
+foreign import ccall unsafe "arenaFree" _arenaFree :: Ptr Arena -> IO ()
+foreign import ccall unsafe "inArena" _inArena :: Ptr Arena -> Ptr () -> IO Bool
+
