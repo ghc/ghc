@@ -293,7 +293,8 @@ cvtDec (InstanceD o ctxt ty decs)
                       , cid_binds = binds'
                       , cid_sigs = Hs.mkClassOpSigs sigs'
                       , cid_tyfam_insts = ats', cid_datafam_insts = adts'
-                      , cid_overlap_mode = fmap (L loc . overlap) o } }
+                      , cid_overlap_mode = fmap (L loc . overlap) o
+                      , cid_covered_vars = noLoc [] } }
   where
   overlap pragma =
     case pragma of
