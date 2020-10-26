@@ -968,6 +968,9 @@
       SymI_HasProto(allocateExec)                                       \
       SymI_HasProto(flushExec)                                          \
       SymI_HasProto(freeExec)                                           \
+      SymI_HasProto(allocateWrite)                                      \
+      SymI_HasProto(markExec)                                           \
+      SymI_HasProto(freeWrite)                                          \
       SymI_HasProto(getAllocations)                                     \
       SymI_HasProto(revertCAFs)                                         \
       SymI_HasProto(RtsFlags)                                           \
