@@ -946,7 +946,8 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
   topSRT <- get
 
   let
-    config = initNCGConfig dflags
+    this_mod = thisModule topSRT
+    config = initNCGConfig dflags this_mod
     profile = targetProfile dflags
     platform = profilePlatform profile
     srtMap = moduleSRTMap topSRT
@@ -1019,8 +1020,6 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
            in
                state{ moduleSRTMap = srt_map }
 
-    this_mod = thisModule topSRT
-
     allStaticData =
       all (\(CAFLabel clbl) -> Set.member clbl static_data) caf_lbls
 
@@ -1048,7 +1047,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
           -- when dynamic linking is used we cannot guarantee that the offset
           -- between the SRT and the info table will fit in the offset field.
           -- Consequently we build a singleton SRT in this case.
-          not (labelDynamic config this_mod lbl)
+          not (labelDynamic config lbl)
 
           -- MachO relocations can't express offsets between compilation units at
           -- all, so we are always forced to build a singleton SRT in this case.

@@ -1082,8 +1082,8 @@ isLocalCLabel this_mod lbl =
 -- that data resides in a DLL or not. [Win32 only.]
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
-labelDynamic :: NCGConfig -> Module -> CLabel -> Bool
-labelDynamic config this_mod lbl =
+labelDynamic :: NCGConfig -> CLabel -> Bool
+labelDynamic config lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _ ->
@@ -1136,6 +1136,7 @@ labelDynamic config this_mod lbl =
     externalDynamicRefs = ncgExternalDynamicRefs config
     platform = ncgPlatform config
     os = platformOS platform
+    this_mod = ncgThisModule config
     this_unit = toUnitId (moduleUnit this_mod)
 
 
