@@ -152,7 +152,7 @@ nativeCodeGen :: forall a . DynFlags -> Module -> ModLocation -> Handle -> UniqS
               -> Stream IO RawCmmGroup a
               -> IO a
 nativeCodeGen dflags this_mod modLoc h us cmms
- = let config   = initNCGConfig dflags
+ = let config   = initNCGConfig dflags this_mod
        platform = ncgPlatform config
        nCG' :: ( OutputableP Platform statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
@@ -479,7 +479,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         -- generate native code from cmm
         let ((native, lastMinuteImports, fileIds', nativeCfgWeights), usGen) =
                 {-# SCC "genMachCode" #-}
-                initUs us $ genMachCode config this_mod modLoc
+                initUs us $ genMachCode config modLoc
                                         (cmmTopCodeGen ncgImpl)
                                         fileIds dbgMap opt_cmm cmmCfg
 
@@ -914,7 +914,7 @@ apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
 
 genMachCode
         :: NCGConfig
-        -> Module -> ModLocation
+        -> ModLocation
         -> (RawCmmDecl -> NatM [NatCmmDecl statics instr])
         -> DwarfFiles
         -> LabelMap DebugBlock
@@ -927,9 +927,9 @@ genMachCode
                 , CFG
                 )
 
-genMachCode config this_mod modLoc cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
+genMachCode config modLoc cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
   = do  { initial_us <- getUniqueSupplyM
-        ; let initial_st           = mkNatM_State initial_us 0 config this_mod
+        ; let initial_st           = mkNatM_State initial_us 0 config
                                                   modLoc fileIds dbgMap cmm_cfg
               (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
               final_delta          = natm_delta final_st
@@ -1003,7 +1003,6 @@ instance Monad CmmOptM where
 
 instance CmmMakeDynamicReferenceM CmmOptM where
     addImport = addImportCmmOpt
-    getThisModule = CmmOptM $ \_ this_mod imports -> OptMResult this_mod imports
 
 addImportCmmOpt :: CLabel -> CmmOptM ()
 addImportCmmOpt lbl = CmmOptM $ \_ _ imports -> OptMResult () (lbl:imports)
@@ -1145,9 +1144,10 @@ cmmExprNative referenceKind expr = do
            -> return other
 
 -- | Initialize the native code generator configuration from the DynFlags
-initNCGConfig :: DynFlags -> NCGConfig
-initNCGConfig dflags = NCGConfig
+initNCGConfig :: DynFlags -> Module -> NCGConfig
+initNCGConfig dflags this_mod = NCGConfig
    { ncgPlatform              = targetPlatform dflags
+   , ncgThisModule            = this_mod
    , ncgAsmContext            = initSDocContext dflags (PprCode AsmStyle)
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
