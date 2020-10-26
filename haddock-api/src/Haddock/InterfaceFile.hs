@@ -38,7 +38,7 @@ import GHC.Data.FastMutInt
 import GHC.Data.FastString
 import GHC hiding (NoLink)
 import GHC.Driver.Monad (withSession)
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHC.Types.Name.Cache
 import GHC.Iface.Env
 import GHC.Types.Name

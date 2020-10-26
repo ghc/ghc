@@ -40,10 +40,12 @@ import Data.Traversable
 import GHC.Types.Avail hiding (avail)
 import qualified GHC.Types.Avail  as Avail
 import qualified GHC.Unit.Module as Module
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModSummary
 import qualified GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.SourceFile
 import GHC.Core.ConLike (ConLike(..))
 import GHC
-import GHC.Driver.Types
 import GHC.Driver.Ppr
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -52,11 +54,13 @@ import GHC.Unit.State
 import GHC.Types.Name.Reader
 import GHC.Tc.Types
 import GHC.Data.FastString ( unpackFS, bytesFS )
-import GHC.Types.Basic ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
+import GHC.Types.Basic ( PromotionFlag(..) )
+import GHC.Types.SourceText
 import qualified GHC.Utils.Outputable as O
 import GHC.Utils.Panic
 import GHC.HsToCore.Docs hiding (mkMaps)
 import GHC.Parser.Annotation (IsUnicodeSyntax(..))
+import GHC.Unit.Module.Warnings
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.

@@ -32,7 +32,6 @@ import GHC.Utils.Panic ( panic )
 import GHC.Driver.Ppr (showPpr )
 import GHC.Types.Name
 import GHC.Unit.Module
-import GHC.Driver.Types
 import GHC
 import GHC.Core.Class
 import GHC.Driver.Session

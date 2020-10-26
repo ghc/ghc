@@ -9,7 +9,7 @@ import Data.List           ( isPrefixOf, isSuffixOf )
 
 import qualified Data.ByteString as BS
 
-import GHC.Types.Basic     ( IntegralLit(..) )
+import GHC.Types.SourceText
 import GHC.Driver.Session
 import GHC.Utils.Error     ( pprLocErrMsg )
 import GHC.Data.FastString ( mkFastString )

@@ -36,7 +36,8 @@ import Data.Typeable (Typeable)
 import Data.Map (Map)
 import Data.Data (Data)
 import Documentation.Haddock.Types
-import GHC.Types.Basic (Fixity(..), PromotionFlag(..))
+import GHC.Types.Basic (PromotionFlag(..))
+import GHC.Types.Fixity (Fixity(..))
 
 import GHC
 import GHC.Driver.Session (Language)

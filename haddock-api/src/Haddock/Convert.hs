@@ -22,8 +22,9 @@ module Haddock.Convert (
 #include "HsVersions.h"
 
 import GHC.Data.Bag ( emptyBag )
-import GHC.Types.Basic ( TupleSort(..), SourceText(..), LexicalFixity(..)
-                  , PromotionFlag(..), DefMethSpec(..) )
+import GHC.Types.Basic ( TupleSort(..), PromotionFlag(..), DefMethSpec(..) )
+import GHC.Types.SourceText (SourceText(..))
+import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike
@@ -31,6 +32,7 @@ import Data.Either (lefts, rights)
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv
 import GHC.Hs
+import GHC.Types.TyThing
 import GHC.Types.Name
 import GHC.Types.Name.Set    ( emptyNameSet )
 import GHC.Types.Name.Reader ( mkVarUnqual )

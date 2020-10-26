@@ -51,11 +51,12 @@ import Distribution.Verbosity
 import Text.Printf
 
 import GHC.Unit.Module.Env (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
+import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
 import GHC.Data.Graph.Directed
 import GHC.Driver.Session hiding (verbosity)
 import GHC hiding (verbosity)
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHC.Data.FastString (unpackFS)
 import GHC.Tc.Types (tcg_rdr_env)
 import GHC.Types.Name (nameIsFromExternalPackage, nameOccName)
