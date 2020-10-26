@@ -607,10 +607,22 @@ primop   IntToWordOp "int2Word#" GenPrimOp Int# -> Word#
    with code_size = 0
 
 primop   IntToFloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
+   {Convert an {\tt Int#} to the corresponding {\tt Float#} with the same
+    integral value (up to truncation due to floating-point precision). e.g.
+    {\tt int2Float# 1# == 1.0#}}
 primop   IntToDoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
+   {Convert an {\tt Int#} to the corresponding {\tt Double#} with the same
+    integral value (up to truncation due to floating-point precision). e.g.
+    {\tt int2Double# 1# == 1.0##}}
 
 primop   WordToFloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
+   {Convert an {\tt Word#} to the corresponding {\tt Float#} with the same
+    integral value (up to truncation due to floating-point precision). e.g.
+    {\tt word2Float# 1## == 1.0#}}
 primop   WordToDoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
+   {Convert an {\tt Word#} to the corresponding {\tt Double#} with the same
+    integral value (up to truncation due to floating-point precision). e.g.
+    {\tt word2Double# 1## == 1.0##}}
 
 primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
          {Shift left.  Result undefined if shift amount is not
