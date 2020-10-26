@@ -1636,6 +1636,11 @@ AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
 {
     AdjustorWritable writ;
     ffi_closure* cl;
+    // This check is necessary as we can't use allocateExec for anything *but*
+    // ffi_closures on ios/darwin on arm.  libffi does some heavy lifting to
+    // get around the X^W restrictions, and we can't just use this codepath
+    // to allocate generic executable space. For those cases we have to refer
+    // back to allocateWrite/markExec/freeWrite (see above.)
     if (bytes != sizeof(ffi_closure)) {
         barf("allocateExec: for ffi_closure only");
     }
