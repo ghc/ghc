@@ -152,11 +152,11 @@ nativeCodeGen :: forall a . DynFlags -> Module -> ModLocation -> Handle -> UniqS
               -> Stream IO RawCmmGroup a
               -> IO a
 nativeCodeGen dflags this_mod modLoc h us cmms
- = let config   = initNCGConfig dflags
+ = let config   = initNCGConfig dflags this_mod
        platform = ncgPlatform config
        nCG' :: ( OutputableP Platform statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
-       nCG' ncgImpl = nativeCodeGen' dflags config this_mod modLoc ncgImpl h us cmms
+       nCG' ncgImpl = nativeCodeGen' dflags config modLoc ncgImpl h us cmms
    in case platformArch platform of
       ArchX86       -> nCG' (X86.ncgX86     config)
       ArchX86_64    -> nCG' (X86.ncgX86_64  config)
@@ -221,20 +221,20 @@ See also Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
 nativeCodeGen' :: (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
                => DynFlags
                -> NCGConfig
-               -> Module -> ModLocation
+               -> ModLocation
                -> NcgImpl statics instr jumpDest
                -> Handle
                -> UniqSupply
                -> Stream IO RawCmmGroup a
                -> IO a
-nativeCodeGen' dflags config this_mod modLoc ncgImpl h us cmms
+nativeCodeGen' dflags config modLoc ncgImpl h us cmms
  = do
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
         let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
-        (ngs, us', a) <- cmmNativeGenStream dflags config this_mod modLoc ncgImpl bufh us
+        (ngs, us', a) <- cmmNativeGenStream dflags config modLoc ncgImpl bufh us
                                          cmms ngs0
         _ <- finishNativeGen dflags config modLoc bufh us' ngs
         return a
@@ -300,7 +300,7 @@ finishNativeGen dflags config modLoc bufh@(BufHandle _ _ h) us ngs
 cmmNativeGenStream :: (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
               => DynFlags
               -> NCGConfig
-              -> Module -> ModLocation
+              -> ModLocation
               -> NcgImpl statics instr jumpDest
               -> BufHandle
               -> UniqSupply
@@ -308,7 +308,7 @@ cmmNativeGenStream :: (OutputableP Platform statics, Outputable jumpDest, Instru
               -> NativeGenAcc statics instr
               -> IO (NativeGenAcc statics instr, UniqSupply, a)
 
-cmmNativeGenStream dflags config this_mod modLoc ncgImpl h us cmm_stream ngs
+cmmNativeGenStream dflags config modLoc ncgImpl h us cmm_stream ngs
  = do r <- Stream.runStream cmm_stream
       case r of
         Left a ->
@@ -330,7 +330,7 @@ cmmNativeGenStream dflags config this_mod modLoc ncgImpl h us cmm_stream ngs
                   dbgMap = debugToMap ndbgs
 
               -- Generate native code
-              (ngs',us') <- cmmNativeGens dflags config this_mod modLoc ncgImpl h
+              (ngs',us') <- cmmNativeGens dflags config modLoc ncgImpl h
                                                dbgMap us cmms ngs 0
 
               -- Link native code information into debug blocks
@@ -345,7 +345,7 @@ cmmNativeGenStream dflags config this_mod modLoc ncgImpl h us cmm_stream ngs
               let ngs'' = ngs' { ngs_debug = ngs_debug ngs' ++ ldbgs, ngs_labels = [] }
               return (us', ngs'')
 
-          cmmNativeGenStream dflags config this_mod modLoc ncgImpl h us'
+          cmmNativeGenStream dflags config modLoc ncgImpl h us'
               cmm_stream' ngs''
 
     where ncglabel = text "NCG"
@@ -356,7 +356,7 @@ cmmNativeGens :: forall statics instr jumpDest.
                  (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
               => DynFlags
               -> NCGConfig
-              -> Module -> ModLocation
+              -> ModLocation
               -> NcgImpl statics instr jumpDest
               -> BufHandle
               -> LabelMap DebugBlock
@@ -366,7 +366,7 @@ cmmNativeGens :: forall statics instr jumpDest.
               -> Int
               -> IO (NativeGenAcc statics instr, UniqSupply)
 
-cmmNativeGens dflags config this_mod modLoc ncgImpl h dbgMap = go
+cmmNativeGens dflags config modLoc ncgImpl h dbgMap = go
   where
     go :: UniqSupply -> [RawCmmDecl]
        -> NativeGenAcc statics instr -> Int
@@ -379,7 +379,7 @@ cmmNativeGens dflags config this_mod modLoc ncgImpl h dbgMap = go
         let fileIds = ngs_dwarfFiles ngs
         (us', fileIds', native, imports, colorStats, linearStats, unwinds)
           <- {-# SCC "cmmNativeGen" #-}
-             cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap
+             cmmNativeGen dflags modLoc ncgImpl us fileIds dbgMap
                           cmm count
 
         -- Generate .file directives for every new file that has been
@@ -433,7 +433,7 @@ emitNativeCode dflags config h sdoc = do
 cmmNativeGen
     :: forall statics instr jumpDest. (Instruction instr, OutputableP Platform statics, Outputable jumpDest)
     => DynFlags
-    -> Module -> ModLocation
+    -> ModLocation
     -> NcgImpl statics instr jumpDest
         -> UniqSupply
         -> DwarfFiles
@@ -449,7 +449,7 @@ cmmNativeGen
                 , LabelMap [UnwindPoint]                    -- unwinding information for blocks
                 )
 
-cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
+cmmNativeGen dflags modLoc ncgImpl us fileIds dbgMap cmm count
  = do
         let config   = ncgConfig ncgImpl
         let platform = ncgPlatform config
@@ -467,7 +467,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         -- cmm to cmm optimisations
         let (opt_cmm, imports) =
                 {-# SCC "cmmToCmm" #-}
-                cmmToCmm config this_mod fixed_cmm
+                cmmToCmm config fixed_cmm
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_opt_cmm "Optimised Cmm" FormatCMM
@@ -479,7 +479,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         -- generate native code from cmm
         let ((native, lastMinuteImports, fileIds', nativeCfgWeights), usGen) =
                 {-# SCC "genMachCode" #-}
-                initUs us $ genMachCode config this_mod modLoc
+                initUs us $ genMachCode config modLoc
                                         (cmmTopCodeGen ncgImpl)
                                         fileIds dbgMap opt_cmm cmmCfg
 
@@ -914,7 +914,7 @@ apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
 
 genMachCode
         :: NCGConfig
-        -> Module -> ModLocation
+        -> ModLocation
         -> (RawCmmDecl -> NatM [NatCmmDecl statics instr])
         -> DwarfFiles
         -> LabelMap DebugBlock
@@ -927,9 +927,9 @@ genMachCode
                 , CFG
                 )
 
-genMachCode config this_mod modLoc cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
+genMachCode config modLoc cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
   = do  { initial_us <- getUniqueSupplyM
-        ; let initial_st           = mkNatM_State initial_us 0 config this_mod
+        ; let initial_st           = mkNatM_State initial_us 0 config
                                                   modLoc fileIds dbgMap cmm_cfg
               (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
               final_delta          = natm_delta final_st
@@ -966,10 +966,10 @@ Ideas for other things we could do (put these in Hoopl please!):
     temp assignments, and certain assigns to mem...)
 -}
 
-cmmToCmm :: NCGConfig -> Module -> RawCmmDecl -> (RawCmmDecl, [CLabel])
-cmmToCmm _ _ top@(CmmData _ _) = (top, [])
-cmmToCmm config this_mod (CmmProc info lbl live graph)
-    = runCmmOpt config this_mod $
+cmmToCmm :: NCGConfig -> RawCmmDecl -> (RawCmmDecl, [CLabel])
+cmmToCmm _ top@(CmmData _ _) = (top, [])
+cmmToCmm config (CmmProc info lbl live graph)
+    = runCmmOpt config $
       do blocks' <- mapM cmmBlockConFold (toBlockList graph)
          return $ CmmProc info lbl live (ofBlockList (g_entry graph) blocks')
 
@@ -986,34 +986,33 @@ pattern OptMResult x y = (# x, y #)
 data OptMResult a = OptMResult !a ![CLabel] deriving (Functor)
 #endif
 
-newtype CmmOptM a = CmmOptM (NCGConfig -> Module -> [CLabel] -> OptMResult a)
+newtype CmmOptM a = CmmOptM (NCGConfig -> [CLabel] -> OptMResult a)
     deriving (Functor)
 
 instance Applicative CmmOptM where
-    pure x = CmmOptM $ \_ _ imports -> OptMResult x imports
+    pure x = CmmOptM $ \_ imports -> OptMResult x imports
     (<*>) = ap
 
 instance Monad CmmOptM where
   (CmmOptM f) >>= g =
-    CmmOptM $ \config this_mod imports0 ->
-                case f config this_mod imports0 of
+    CmmOptM $ \config imports0 ->
+                case f config imports0 of
                   OptMResult x imports1 ->
                     case g x of
-                      CmmOptM g' -> g' config this_mod imports1
+                      CmmOptM g' -> g' config imports1
 
 instance CmmMakeDynamicReferenceM CmmOptM where
     addImport = addImportCmmOpt
-    getThisModule = CmmOptM $ \_ this_mod imports -> OptMResult this_mod imports
 
 addImportCmmOpt :: CLabel -> CmmOptM ()
-addImportCmmOpt lbl = CmmOptM $ \_ _ imports -> OptMResult () (lbl:imports)
+addImportCmmOpt lbl = CmmOptM $ \_ imports -> OptMResult () (lbl:imports)
 
 getCmmOptConfig :: CmmOptM NCGConfig
-getCmmOptConfig = CmmOptM $ \config _ imports -> OptMResult config imports
+getCmmOptConfig = CmmOptM $ \config imports -> OptMResult config imports
 
-runCmmOpt :: NCGConfig -> Module -> CmmOptM a -> (a, [CLabel])
-runCmmOpt config this_mod (CmmOptM f) =
-  case f config this_mod [] of
+runCmmOpt :: NCGConfig -> CmmOptM a -> (a, [CLabel])
+runCmmOpt config (CmmOptM f) =
+  case f config [] of
     OptMResult result imports -> (result, imports)
 
 cmmBlockConFold :: CmmBlock -> CmmOptM CmmBlock
@@ -1143,9 +1142,10 @@ cmmExprNative referenceKind expr = do
            -> return other
 
 -- | Initialize the native code generator configuration from the DynFlags
-initNCGConfig :: DynFlags -> NCGConfig
-initNCGConfig dflags = NCGConfig
+initNCGConfig :: DynFlags -> Module -> NCGConfig
+initNCGConfig dflags this_mod = NCGConfig
    { ncgPlatform              = targetPlatform dflags
+   , ncgThisModule            = this_mod
    , ncgAsmContext            = initSDocContext dflags (PprCode AsmStyle)
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
