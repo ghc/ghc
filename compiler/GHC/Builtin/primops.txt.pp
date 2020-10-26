@@ -412,6 +412,8 @@ section "Int32#"
         {Operations on 32-bit integers.}
 ------------------------------------------------------------------------
 
+primtype Int32#
+
 primop Int32ExtendOp "extendInt32#" GenPrimOp Int32# -> Int#
 primop Int32NarrowOp "narrowInt32#" GenPrimOp Int# -> Int32#
 
