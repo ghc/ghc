@@ -51,9 +51,7 @@ module GHC.ForeignPtr.Ops
 import GHC.Word
 import GHC.Int
 import GHC.Base
-import GHC.Prim
 import GHC.ForeignPtr
-import GHC.Magic
 
 peekWord8ForeignPtr :: ForeignPtr ty -> Int -> IO Word8
 peekWord8ForeignPtr (ForeignPtr addr c) (I# d) = IO $ \s0 ->
