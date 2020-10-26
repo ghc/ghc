@@ -3416,13 +3416,15 @@ tcConArgs (InfixCon bty1 bty2)
 tcConArgs (RecCon fields)
   = mapM tcConArg btys
   where
-    -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f)))
-                   (unLoc fields)
-    explode (ns,ty) = zip ns (repeat ty)
-    exploded = concatMap explode combined
-    (_,btys) = unzip exploded
-
+    -- We need to ensure that each distinct field name gets its own type.
+    -- For example, if we have:
+    --
+    --   data T = MkT { a,b,c :: Int }
+    --
+    -- Then we should return /three/ Int types, not just one!
+    btys = [ hsLinear (cd_fld_type f)
+           | L _ f <- unLoc fields
+           , _fld_name <- cd_fld_names f ]
 
 tcConArg :: HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
 tcConArg (HsScaled w bty)
