@@ -1700,6 +1700,20 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
 #endif
 }
 
+#if RTS_LINKER_USE_MMAP
+AdjustorWritable allocateWrite(W_ bytes) {
+    return mmapForLinker(bytes, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+}
+
+void markExec(W_ bytes, AdjustorWritable writ) {
+    mmapForLinkerMarkExecutable(writ, bytes);
+}
+
+void freeWrite(W_ bytes, AdjustorWritable writ) {
+    munmap(writ, bytes);
+}
+#endif
+
 #if defined(linux_HOST_OS) || defined(netbsd_HOST_OS)
 
 // On Linux we need to use libffi for allocating executable memory,
@@ -1748,20 +1762,6 @@ AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
     RELEASE_SM_LOCK;
     return writ;
 }
-
-#if RTS_LINKER_USE_MMAP
-AdjustorWritable allocateWrite(W_ bytes) {
-    return mmapForLinker(bytes, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
-}
-
-void markExec(W_ bytes, AdjustorWritable writ) {
-    mmapForLinkerMarkExecutable(writ, bytes);
-}
-
-void freeWrite(W_ bytes, AdjustorWritable writ) {
-    munmap(writ, bytes);
-}
-#endif
 
 AdjustorWritable execToWritable(AdjustorExecutable exec)
 {
