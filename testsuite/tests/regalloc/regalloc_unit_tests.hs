@@ -106,7 +106,7 @@ compileCmmForRegAllocStats ::
     IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
 compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
-    let ncgImpl = ncgImplF (initNCGConfig dflags)
+    let ncgImpl = ncgImplF (initNCGConfig dflags thisMod)
     hscEnv <- newHscEnv dflags
 
     -- parse the cmm file and output any warnings or errors
@@ -126,7 +126,7 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
 
     -- compile and discard the generated code, returning regalloc stats
     mapM (\ (count, thisCmm) ->
-        cmmNativeGen dflags thisMod thisModLoc ncgImpl
+        cmmNativeGen dflags thisModLoc ncgImpl
             usb dwarfFileIds dbgMap thisCmm count >>=
                 (\(_, _, _, _, colorStats, linearStats, _) ->
                 -- scrub unneeded output from cmmNativeGen
