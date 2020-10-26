@@ -724,7 +724,7 @@ tcStandaloneDerivInstType ctxt
   | (tvs, theta, rho) <- splitLHsSigmaTyInvis deriv_ty_body
   , L _ [wc_pred] <- theta
   , L wc_span (HsWildCardTy _) <- ignoreParens wc_pred
-  = do dfun_ty <- tcHsClsInstType ctxt $
+  = do dfun_ty <- tcHsClsInstType [] ctxt $
                   HsIB { hsib_ext = vars
                        , hsib_body
                            = L (getLoc deriv_ty_body) $
@@ -734,7 +734,7 @@ tcStandaloneDerivInstType ctxt
        let (tvs, _theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
        pure (tvs, InferContext (Just wc_span), cls, inst_tys)
   | otherwise
-  = do dfun_ty <- tcHsClsInstType ctxt deriv_ty
+  = do dfun_ty <- tcHsClsInstType [] ctxt deriv_ty
        let (tvs, theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
        pure (tvs, SupplyContext theta, cls, inst_tys)
 
