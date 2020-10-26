@@ -290,7 +290,7 @@ finishNativeGen dflags config modLoc bufh@(BufHandle _ _ h) us ngs
         -- write out the imports
         let ctx = ncgAsmContext config
         printSDocLn ctx Pretty.LeftMode h
-                $ makeImportsDoc dflags (concat (ngs_imports ngs))
+                $ makeImportsDoc config (concat (ngs_imports ngs))
         return us'
   where
     dump_stats = dumpAction dflags (mkDumpStyle alwaysQualify)
@@ -750,8 +750,8 @@ computeUnwinding _ ncgImpl (CmmProc _ _ _ (ListGraph blks)) =
 
 -- | Build a doc for all the imports.
 --
-makeImportsDoc :: DynFlags -> [CLabel] -> SDoc
-makeImportsDoc dflags imports
+makeImportsDoc :: NCGConfig -> [CLabel] -> SDoc
+makeImportsDoc config imports
  = dyld_stubs imports
             $$
             -- On recent versions of Darwin, the linker supports
@@ -779,7 +779,6 @@ makeImportsDoc dflags imports
              else Outputable.empty)
 
  where
-        config   = initNCGConfig dflags
         platform = ncgPlatform config
 
         -- Generate "symbol stubs" for all external symbols that might
