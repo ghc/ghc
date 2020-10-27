@@ -121,7 +121,8 @@ else:
   only_darwin = skip
 
 test('static001', [extra_files(['Static001.hs']),
-                   only_darwin, expect_broken(8127)],
+                   only_darwin,
+                   when(arch('x86_64'), expect_broken(8127))],
      makefile_test, ['static001'])
 
 test('dynHelloWorld',
