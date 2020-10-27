@@ -1909,6 +1909,7 @@ data ClsInstDecl pass
       , cid_tyfam_insts   :: [LTyFamInstDecl pass]   -- Type family instances
       , cid_datafam_insts :: [LDataFamInstDecl pass] -- Data family instances
       , cid_overlap_mode  :: Maybe (XRec pass OverlapMode)
+      , cid_covered_vars  :: XRec pass [LIdP pass]
          -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
          --                                    'GHC.Parser.Annotation.AnnClose',
 

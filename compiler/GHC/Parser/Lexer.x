@@ -754,6 +754,7 @@ data Token
   | IToverlapping_prag  SourceText  -- instance overlap mode
   | IToverlaps_prag     SourceText  -- instance overlap mode
   | ITincoherent_prag   SourceText  -- instance overlap mode
+  | ITcovered_prag      SourceText
   | ITctype             SourceText
   | ITcomment_line_prag         -- See Note [Nested comment line pragmas]
 
@@ -3261,6 +3262,7 @@ oneWordPrags = Map.fromList [
      ("overlappable", strtoken (\s -> IToverlappable_prag (SourceText s))),
      ("overlapping", strtoken (\s -> IToverlapping_prag (SourceText s))),
      ("incoherent", strtoken (\s -> ITincoherent_prag (SourceText s))),
+     ("covered", strtoken (\s -> ITcovered_prag (SourceText s))),
      ("ctype", strtoken (\s -> ITctype (SourceText s))),
      ("complete", strtoken (\s -> ITcomplete_prag (SourceText s))),
      ("column", columnPrag)
