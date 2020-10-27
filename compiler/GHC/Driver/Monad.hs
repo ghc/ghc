@@ -25,11 +25,14 @@ module GHC.Driver.Monad (
 
 import GHC.Prelude
 
-import GHC.Utils.Monad
-import GHC.Driver.Types
 import GHC.Driver.Session
+import GHC.Driver.Env
+
+import GHC.Utils.Monad
 import GHC.Utils.Exception
 import GHC.Utils.Error
+
+import GHC.Types.SourceError
 
 import Control.Monad
 import Control.Monad.Catch as MC

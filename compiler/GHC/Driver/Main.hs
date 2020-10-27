@@ -88,88 +88,127 @@ module GHC.Driver.Main
 
 import GHC.Prelude
 
-import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( fromJust )
-import GHC.Types.Id
-import GHC.Runtime.Interpreter ( addSptEntry )
-import GHCi.RemoteTypes        ( ForeignHValue )
-import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
-import GHC.Runtime.Linker
-import GHC.Core.Tidy           ( tidyExpr )
-import GHC.Core.Type           ( Type, Kind )
-import GHC.Core.Lint           ( lintInteractiveExpr )
-import GHC.Types.Var.Env       ( emptyTidyEnv )
-import GHC.Utils.Panic
-import GHC.Core.ConLike
+import GHC.Driver.Plugins
+import GHC.Driver.Session
+import GHC.Driver.Backend
+import GHC.Driver.Env
+import GHC.Driver.CodeOutput
+import GHC.Driver.Config
+import GHC.Driver.Hooks
 
-import GHC.Parser.Annotation
-import GHC.Parser.Errors
-import GHC.Parser.Errors.Ppr
-import GHC.Unit
-import GHC.Unit.State
-import GHC.Types.Name.Reader
+import GHC.Runtime.Context
+import GHC.Runtime.Linker
+import GHC.Runtime.Linker.Types
+import GHC.Runtime.Interpreter ( addSptEntry )
+import GHC.Runtime.Loader      ( initializePlugins )
+import GHCi.RemoteTypes        ( ForeignHValue )
+import GHC.ByteCode.Types
+
 import GHC.Hs
 import GHC.Hs.Dump
-import GHC.Core
-import GHC.Data.StringBuffer
-import GHC.Parser
-import GHC.Parser.Lexer as Lexer
-import GHC.Types.SrcLoc
-import GHC.Tc.Module
-import GHC.IfaceToCore  ( typecheckIface )
-import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
-import GHC.Types.Name.Cache ( initNameCache )
-import GHC.Builtin.Utils
-import GHC.Core.Opt.Pipeline
+import GHC.Hs.Stats         ( ppSourceStats )
+
 import GHC.HsToCore
+
+import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
+
+import GHC.IfaceToCore  ( typecheckIface )
+
 import GHC.Iface.Load   ( ifaceStats, initExternalPackageState, writeIface )
 import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
+import GHC.Iface.Ext.Ast    ( mkHieFile )
+import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
+import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result, NameCacheUpdater(..))
+import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
+import GHC.Iface.Env        ( updNameCache )
+
+import GHC.Core
+import GHC.Core.Tidy           ( tidyExpr )
+import GHC.Core.Type           ( Type, Kind )
+import GHC.Core.Lint           ( lintInteractiveExpr )
+import GHC.Core.ConLike
+import GHC.Core.Opt.Pipeline
+import GHC.Core.TyCon
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
+
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
+
+import GHC.Parser.Annotation
+import GHC.Parser.Errors
+import GHC.Parser.Errors.Ppr
+import GHC.Parser
+import GHC.Parser.Lexer as Lexer
+
+import GHC.Tc.Module
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
+
 import GHC.Stg.Syntax
 import GHC.Stg.FVs      ( annTopBindingsFreeVars )
 import GHC.Stg.Pipeline ( stg2stg )
+
+import GHC.Builtin.Utils
+import GHC.Builtin.Names
+
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
-import GHC.Types.CostCentre
-import GHC.Core.TyCon
-import GHC.Types.Name
+import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
+
 import GHC.Cmm
 import GHC.Cmm.Parser       ( parseCmmFile )
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
-import GHC.Driver.CodeOutput
-import GHC.Driver.Config
-import GHC.Core.InstEnv
-import GHC.Core.FamInstEnv
-import GHC.Utils.Fingerprint ( Fingerprint )
-import GHC.Driver.Hooks
-import GHC.Tc.Utils.Env
-import GHC.Builtin.Names
-import GHC.Driver.Plugins
-import GHC.Runtime.Loader   ( initializePlugins )
-import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
 
-import GHC.Driver.Session
-import GHC.Driver.Backend
-import GHC.Utils.Error
+import GHC.Unit
+import GHC.Unit.External
+import GHC.Unit.State
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.Graph
+import GHC.Unit.Module.Imported
+import GHC.Unit.Module.Deps
+import GHC.Unit.Module.Status
+import GHC.Unit.Home.ModInfo
 
-import GHC.Utils.Outputable
-import GHC.Types.Name.Env
-import GHC.Hs.Stats         ( ppSourceStats )
-import GHC.Driver.Types
-import GHC.Data.FastString
+import GHC.Types.Id
+import GHC.Types.SourceError
+import GHC.Types.SafeHaskell
+import GHC.Types.ForeignStubs
+import GHC.Types.Var.Env       ( emptyTidyEnv )
+import GHC.Types.Fixity.Env
+import GHC.Types.CostCentre
 import GHC.Types.Unique.Supply
-import GHC.Data.Bag
+import GHC.Types.SourceFile
+import GHC.Types.SrcLoc
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Cache ( initNameCache )
+import GHC.Types.Name.Reader
+import GHC.Types.Name.Ppr
+import GHC.Types.TyThing
+import GHC.Types.HpcInfo
+
+import GHC.Utils.Fingerprint ( Fingerprint )
+import GHC.Utils.Panic
+import GHC.Utils.Error
+import GHC.Utils.Outputable
 import GHC.Utils.Exception
+import GHC.Utils.Misc
+
+import GHC.Data.FastString
+import GHC.Data.Bag
+import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
 
-import GHC.Utils.Misc
-
+import Data.Data hiding (Fixity, TyCon)
+import Data.Maybe       ( fromJust )
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
@@ -182,11 +221,6 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
-
-import GHC.Iface.Ext.Ast    ( mkHieFile )
-import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
-import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result, NameCacheUpdater(..))
-import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 #include "HsVersions.h"
 
@@ -1639,7 +1673,7 @@ you run it you get a list of HValues that should be the same length as the list
 of names; add them to the ClosureEnv.
 
 A naked expression returns a singleton Name [it]. The stmt is lifted into the
-IO monad as explained in Note [Interactively-bound Ids in GHCi] in GHC.Driver.Types
+IO monad as explained in Note [Interactively-bound Ids in GHCi] in GHC.Runtime.Context
 -}
 
 -- | Compile a stmt all the way to an HValue, but don't run it
@@ -1781,7 +1815,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
             -- We only need to keep around the external bindings
             -- (as decided by GHC.Iface.Tidy), since those are the only ones
             -- that might later be looked up by name.  But we can exclude
-            --    - DFunIds, which are in 'cls_insts' (see Note [ic_tythings] in GHC.Driver.Types
+            --    - DFunIds, which are in 'cls_insts' (see Note [ic_tythings] in GHC.Runtime.Context
             --    - Implicit Ids, which are implicit in tcs
             -- c.f. GHC.Tc.Module.runTcInteractive, which reconstructs the TypeEnv
 

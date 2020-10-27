@@ -42,42 +42,39 @@ where
 -- base
 import Control.Monad    ( unless, liftM, when, (<=<) )
 import GHC.Exts
-import Data.Char
 import Data.Maybe       ( maybeToList )
-import Control.Monad    ( mplus )
-import Control.Applicative ((<$))
 import qualified Prelude -- for happy-generated code
 
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Hs.Doc
 
-import GHC.Driver.Phases  ( HscSource(..) )
 import GHC.Driver.Backpack.Syntax
 
-import GHC.Unit.Types     ( IsBootInterface(..) )
 import GHC.Unit.Info
 import GHC.Unit.Module
+import GHC.Unit.Module.Warnings
 
 import GHC.Data.OrdList
-import GHC.Data.BooleanFormula ( BooleanFormula(..), LBooleanFormula(..), mkTrue )
+import GHC.Data.BooleanFormula ( BooleanFormula(..), LBooleanFormula, mkTrue )
 import GHC.Data.FastString
-import GHC.Data.Maybe          ( isJust, orElse )
+import GHC.Data.Maybe          ( orElse )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName,
-                                   occNameFS, startsWithUnderscore )
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
+import GHC.Types.Fixity
 import GHC.Types.ForeignCall
+import GHC.Types.SourceFile
+import GHC.Types.SourceText
 
-import GHC.Core.Type    ( unrestrictedFunTyCon, Mult(..), Specificity(..) )
+import GHC.Core.Type    ( unrestrictedFunTyCon, Specificity(..) )
 import GHC.Core.Class   ( FunDep )
-import GHC.Core.DataCon          ( DataCon, dataConName )
+import GHC.Core.DataCon ( DataCon, dataConName )
 
 import GHC.Parser.PostProcess
 import GHC.Parser.PostProcess.Haddock
@@ -2056,17 +2053,18 @@ type :: { LHsType GhcPs }
                                               [mu AnnRarrow $2] }
 
         | btype mult '->' ctype        {% hintLinear (getLoc $2)
-                                       >> ams $1 [mj AnnMult $2,mu AnnRarrow $3] -- See Note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExtField ((unLoc $2) (toUnicode $3)) $1 $4)
-                                              [mj AnnMult $2,mu AnnRarrow $3] }
+                                       >> let (arr, ann) = (unLoc $2) (toUnicode $3)
+                                          in (ams $1 [ann,mu AnnRarrow $3] -- See Note [GADT decl discards annotations]
+                                             >> ams (sLL $1 $> $ HsFunTy noExtField arr $1 $4)
+                                                  [ann,mu AnnRarrow $3]) }
 
         | btype '->.' ctype            {% hintLinear (getLoc $2)
                                        >> ams $1 [mu AnnLollyU $2] -- See Note [GADT decl discards annotations]
                                        >> ams (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow UnicodeSyntax) $1 $3)
                                               [mu AnnLollyU $2] }
 
-mult :: { Located (IsUnicodeSyntax -> HsArrow GhcPs) }
-        : PREFIX_PERCENT atype          { sLL $1 $> (\u -> mkMultTy u $2) }
+mult :: { Located (IsUnicodeSyntax -> (HsArrow GhcPs, AddAnn)) }
+        : PREFIX_PERCENT atype          { sLL $1 $> (\u -> mkMultTy u $1 $2) }
 
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }

@@ -27,6 +27,7 @@ import GHC.Builtin.Names ( gHC_ERR )
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.TyThing
 import GHC.Data.Bag
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Utils.Misc
@@ -50,7 +51,7 @@ import GHC.Tc.Utils.Unify ( tcSubTypeSigma )
 import GHC.HsToCore.Docs ( extractDocs )
 import qualified Data.Map as Map
 import GHC.Hs.Doc      ( unpackHDS, DeclDocMap(..) )
-import GHC.Driver.Types        ( ModIface_(..) )
+import GHC.Unit.Module.ModIface ( ModIface_(..) )
 import GHC.Iface.Load  ( loadInterfaceForNameMaybe )
 
 import GHC.Builtin.Utils (knownKeyNames)

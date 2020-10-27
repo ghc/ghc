@@ -1215,7 +1215,8 @@ sdist-ghc-prep-tree :
 	cd $(SRC_DIST_GHC_DIR) && $(MAKE) distclean
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/tarballs/)
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/stamp/)
-	$(call removeTrees,$(SRC_DIST_GHC_DIR)/hadrian/_build/ (SRC_DIST_GHC_DIR)/hadrian/dist-newstyle/)
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/hadrian/_build/)
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/hadrian/dist-newstyle/)
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/compiler/stage[123])
 	$(call removeFiles,$(SRC_DIST_GHC_DIR)/mk/build.mk)
 	$(call removeFiles,$(SRC_DIST_GHC_DIR)/rts/rts.cabal)
@@ -1423,6 +1424,13 @@ distclean : clean
 # Also clean Windows-only inplace directories.
 # Don't delete 'inplace' itself, it contains source files.
 	$(call removeTrees,inplace/mingw)
+
+# Remove the download tarballs.  This is because updating
+# the tarballs doesn't remove old ones.  After a tarbal is updated
+# you end up with both in your tree and get a franken build.
+# The downside here is that a maintainer clean will trigger more
+# bandwidth usage from haskell.org
+	$(call removeTrees,ghc-tarballs)
 
 # Remove the fs utilities.
 	$(call removeFiles,utils/lndir/fs.h)

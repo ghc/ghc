@@ -73,7 +73,9 @@ import GHC.Core.Coercion
 import GHC.Core.Unify
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
+import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Types.FieldLabel
+import GHC.Types.SourceText
 import GHC.Core.Class
 import GHC.Types.Name
 import GHC.Builtin.Names
@@ -674,7 +676,7 @@ data DataConRep
 -- emit a warning (in checkValidDataCon) and treat it like
 -- @(HsSrcBang _ NoSrcUnpack SrcLazy)@
 data HsSrcBang =
-  HsSrcBang SourceText -- Note [Pragma source text] in GHC.Types.Basic
+  HsSrcBang SourceText -- Note [Pragma source text] in GHC.Types.SourceText
             SrcUnpackedness
             SrcStrictness
   deriving Data.Data
@@ -1194,11 +1196,11 @@ dataConWrapId dc = case dcRep dc of
 -- the union of the 'dataConWorkId' and the 'dataConWrapId'
 dataConImplicitTyThings :: DataCon -> [TyThing]
 dataConImplicitTyThings (MkData { dcWorkId = work, dcRep = rep })
-  = [AnId work] ++ wrap_ids
+  = [mkAnId work] ++ wrap_ids
   where
     wrap_ids = case rep of
                  NoDataConRep               -> []
-                 DCR { dcr_wrap_id = wrap } -> [AnId wrap]
+                 DCR { dcr_wrap_id = wrap } -> [mkAnId wrap]
 
 -- | The labels for the fields of this particular 'DataCon'
 dataConFieldLabels :: DataCon -> [FieldLabel]

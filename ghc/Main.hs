@@ -18,57 +18,60 @@ module Main (main) where
 import qualified GHC
 import GHC              (parseTargetFiles,  Ghc, GhcMonad(..), Backend (..),
                           LoadHowMuch(..) )
-import GHC.Driver.CmdLine
 
--- Implementations of the various modes (--show-iface, mkdependHS. etc.)
-import GHC.Iface.Load       ( showIface )
+import GHC.Driver.CmdLine
+import GHC.Driver.Env
+import GHC.Driver.Phases
+import GHC.Driver.Session hiding (WarnReason(..))
+import GHC.Driver.Ppr
 import GHC.Driver.Main      ( newHscEnv )
 import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
-import GHC.Platform.Ways
-#if defined(HAVE_INTERNAL_INTERPRETER)
-import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
-#endif
-
--- Frontend plugins
-import GHC.Runtime.Loader   ( loadFrontendPlugin )
 import GHC.Driver.Plugins
+
+import GHC.Platform
+import GHC.Platform.Ways
+import GHC.Platform.Host
+
 #if defined(HAVE_INTERNAL_INTERPRETER)
+import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 import GHC.Runtime.Loader   ( initializePlugins )
 #endif
-import GHC.Unit.Module     ( ModuleName, mkModuleName )
 
+import GHC.Runtime.Loader   ( loadFrontendPlugin )
 
--- Various other random stuff that we need
-import GHC.HandleEncoding
-import GHC.Platform
-import GHC.Platform.Host
-import GHC.Settings.Config
-import GHC.Settings.Constants
-import GHC.Driver.Types
-import GHC.Unit.State ( pprUnits, pprUnitsSimple )
-import GHC.Driver.Phases
+import GHC.Unit.Module ( ModuleName, mkModuleName )
+import GHC.Unit.Module.ModIface
+import GHC.Unit.State  ( pprUnits, pprUnitsSimple )
+import GHC.Unit.Finder ( findImportedModule, cannotFindModule, FindResult(..) )
+import GHC.Unit.Types  ( IsBootInterface(..) )
+
 import GHC.Types.Basic     ( failed )
-import GHC.Driver.Session hiding (WarnReason(..))
-import GHC.Driver.Ppr
-import GHC.Utils.Error
-import GHC.Data.FastString
-import GHC.Utils.Outputable as Outputable
-import GHC.SysTools.BaseDir
-import GHC.Settings.IO
 import GHC.Types.SrcLoc
+import GHC.Types.SourceError
+import GHC.Types.Unique.Supply
+
+import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Types.Unique.Supply
+import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Monad       ( liftIO )
-
--- Imports for --abi-hash
-import GHC.Iface.Load          ( loadUserInterface )
-import GHC.Driver.Finder       ( findImportedModule, cannotFindModule )
-import GHC.Tc.Utils.Monad      ( initIfaceCheck )
 import GHC.Utils.Binary        ( openBinMem, put_ )
+
+import GHC.Settings.Config
+import GHC.Settings.Constants
+import GHC.Settings.IO
+
+import GHC.HandleEncoding
+import GHC.Data.FastString
+import GHC.SysTools.BaseDir
+
+import GHC.Iface.Load       ( showIface )
+import GHC.Iface.Load          ( loadUserInterface )
 import GHC.Iface.Recomp.Binary ( fingerprintBinMem )
+
+import GHC.Tc.Utils.Monad      ( initIfaceCheck )
 
 -- Standard Haskell libraries
 import System.IO

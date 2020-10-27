@@ -23,43 +23,54 @@ import GHC.Prelude
 
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
-
-import GHC.Parser.Annotation
-import GHC.Parser.Errors.Ppr
-import GHC hiding (Failed, Succeeded)
-import GHC.Parser
-import GHC.Parser.Lexer
 import GHC.Driver.Config
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Tc.Utils.Monad
-import GHC.Tc.Module
-import GHC.Unit
-import GHC.Unit.State
-import GHC.Driver.Types
-import GHC.Data.StringBuffer
-import GHC.Data.FastString
-import qualified GHC.Data.ShortText as ST
-import GHC.Utils.Error
-import GHC.Types.SrcLoc
 import GHC.Driver.Main
+import GHC.Driver.Make
+import GHC.Driver.Env
+
+import GHC.Parser
+import GHC.Parser.Header
+import GHC.Parser.Lexer
+import GHC.Parser.Annotation
+import GHC.Parser.Errors.Ppr
+
+import GHC hiding (Failed, Succeeded)
+import GHC.Tc.Utils.Monad
+import GHC.Iface.Recomp
+import GHC.Builtin.Names
+
+import GHC.Types.SrcLoc
+import GHC.Types.SourceError
+import GHC.Types.SourceText
+import GHC.Types.SourceFile
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
-import GHC.Utils.Outputable
-import GHC.Data.Maybe
-import GHC.Parser.Header
-import GHC.Iface.Recomp
-import GHC.Driver.Make
 import GHC.Types.Unique.DSet
-import GHC.Builtin.Names
-import GHC.Types.Basic hiding (SuccessFlag(..))
-import GHC.Driver.Finder
+
+import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Utils.Error
+
+import GHC.Unit
+import GHC.Unit.External
+import GHC.Unit.State
+import GHC.Unit.Finder
+import GHC.Unit.Module.ModSummary (showModMsg)
+import GHC.Unit.Home.ModInfo
+
+import GHC.Runtime.Linker.Types
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Utils.Panic
+import GHC.Data.Maybe
+import GHC.Data.StringBuffer
+import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
+
 import Data.List ( partition )
 import System.Exit
 import Control.Monad

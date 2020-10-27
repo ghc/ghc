@@ -18,6 +18,11 @@ cleanSourceTree = do
     forM_ [Stage0 ..] $ removeDirectory . (path -/-) . stageString
     removeDirectory "sdistprep"
     cleanFsUtils
+    cleanMingwTarballs
+
+cleanMingwTarballs :: Action ()
+cleanMingwTarballs = do
+    liftIO $ IO.removeDirectoryRecursive "ghc-tarballs"
 
 -- Clean all temporary fs files copied by configure into the source folder
 cleanFsUtils :: Action ()

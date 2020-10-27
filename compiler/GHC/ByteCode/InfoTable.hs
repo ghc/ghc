@@ -12,21 +12,26 @@ module GHC.ByteCode.InfoTable ( mkITbls ) where
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+import GHC.Driver.Env
+
 import GHC.Platform
 import GHC.Platform.Profile
 
 import GHC.ByteCode.Types
 import GHC.Runtime.Interpreter
-import GHC.Driver.Session
-import GHC.Driver.Types
+
 import GHC.Types.Name       ( Name, getName )
 import GHC.Types.Name.Env
+import GHC.Types.RepType
+
 import GHC.Core.DataCon     ( DataCon, dataConRepArgTys, dataConIdentity )
 import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import GHC.Core.Multiplicity     ( scaledThing )
-import GHC.Types.RepType
+
 import GHC.StgToCmm.Layout  ( mkVirtConstrSizes )
 import GHC.StgToCmm.Closure ( tagForCon, NonVoid (..) )
+
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
