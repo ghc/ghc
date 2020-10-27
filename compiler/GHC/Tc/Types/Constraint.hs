@@ -150,7 +150,7 @@ data Ct
         --    a ~ [a]         occurs check
     }
 
-  | CEqCan {  -- tv ~ rhs
+  | CEqCan {  -- CanEqLHS ~ rhs
        -- Invariants:
        --   * See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.Monad
        --   * Many are checked in checkTypeEq in GHC.Tc.Utils.Unify
