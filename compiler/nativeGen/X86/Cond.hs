@@ -13,22 +13,22 @@ import GhcPrelude
 
 data Cond
         = ALWAYS        -- What's really used? ToDo
-        | EQQ
-        | GE
-        | GEU
-        | GTT
-        | GU
-        | LE
-        | LEU
-        | LTT
-        | LU
-        | NE
-        | NEG
-        | POS
-        | CARRY
-        | OFLO
-        | PARITY
-        | NOTPARITY
+        | EQQ           -- je/jz -> zf = 1
+        | GE            -- jge
+        | GEU           -- ae
+        | GTT           -- jg
+        | GU            -- ja
+        | LE            -- jle
+        | LEU           -- jbe
+        | LTT           -- jl
+        | LU            -- jb
+        | NE            -- jne
+        | NEG           -- js
+        | POS           -- jns
+        | CARRY         -- jc
+        | OFLO          -- jo
+        | PARITY        -- jp
+        | NOTPARITY     -- jnp
         deriving Eq
 
 condUnsigned :: Cond -> Bool
