@@ -482,10 +482,12 @@ tcClsInstDecl :: LClsInstDecl GhcRn
 tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                                   , cid_sigs = uprags, cid_tyfam_insts = ats
                                   , cid_overlap_mode = overlap_mode
+                                  , cid_dysfunctional = dysfunctional
                                   , cid_datafam_insts = adts }))
   = setSrcSpan loc                      $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
-    do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
+    do  { dfun_ty <- tcHsClsInstType (isJust dysfunctional)
+                                     (InstDeclCtxt False) hs_ty
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
              -- NB: tcHsClsInstType does checkValidInstance
 
@@ -2206,7 +2208,7 @@ tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
 tcSpecInst :: Id -> Sig GhcRn -> TcM TcSpecPrag
 tcSpecInst dfun_id prag@(SpecInstSig _ _ hs_ty)
   = addErrCtxt (spec_ctxt prag) $
-    do  { spec_dfun_ty <- tcHsClsInstType SpecInstCtxt hs_ty
+    do  { spec_dfun_ty <- tcHsClsInstType False SpecInstCtxt hs_ty
         ; co_fn <- tcSpecWrapper SpecInstCtxt (idType dfun_id) spec_dfun_ty
         ; return (SpecPrag dfun_id co_fn defaultInlinePragma) }
   where
