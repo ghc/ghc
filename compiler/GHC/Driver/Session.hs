@@ -3954,6 +3954,11 @@ validHoleFitsImpliedGFlags
 default_PIC :: Platform -> [GeneralFlag]
 default_PIC platform =
   case (platformOS platform, platformArch platform) of
+    -- Darwin always requires PIC.  Especially on more recent macOS releases
+    -- there will be a 4GB __ZEROPAGE that prevents us from using 32bit addresses
+    -- while we could work around this on x86_64 (like WINE does), we won't be
+    -- able on aarch64, where this is enforced.
+    (OSDarwin,  ArchX86_64)  -> [Opt_PIC]
     -- For AArch64, we need to always have PIC enabled.  The relocation model
     -- on AArch64 does not permit arbitrary relocations.  Under ASLR, we can't
     -- control much how far apart symbols are in memory for our in-memory static

@@ -324,8 +324,10 @@ Miscellaneous RTS options
     an object, the linker will probably fail with an error message when the
     problem is detected.
 
-    On some platforms where PIC is always the case, e.g. x86_64 MacOS X, this
-    flag is enabled by default.
+    On some platforms where PIC is always the case, e.g. macOS and OpenBSD on
+    x86_64, and macOS and Linux on aarch64 this flag is enabled by default.
+    One repercussion of this is that referenced system libraries also need to be
+    compiled with ``-fPIC`` if we need to load them in the runtime linker.
 
 .. rts-flag:: -xm ⟨address⟩
 
