@@ -2596,6 +2596,8 @@ as possible.  Hence the ps_xi1, ps_xi2 argument passed to canEqCanLHS.
 
 Note [Type variable cycles in Givens]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"RAE": update
+
 Consider this situation (from indexed-types/should_compile/GivenLoop):
 
   instance C (Maybe b)
@@ -2660,6 +2662,10 @@ There are drawbacks of this approach:
 
     failed with "Could not match 'b' with 'b'." Further work is saved
     for when we have a concrete incentive to explore this dark corner.
+
+Wrinkles:
+
+ (1) Can't go under foralls.
 
 -}
 

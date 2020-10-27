@@ -1508,11 +1508,11 @@ When adding an equality to the inerts:
   kickOutRewritable with Nominal, Given.  See kickOutAfterUnification.
 -}
 
-addInertCan :: Ct -> TcS ()  -- Constraints *other than* equalities
+addInertCan :: Ct -> TcS ()
 -- Precondition: item /is/ canonical
 -- See Note [Adding an equality to the InertCans]
 addInertCan ct
-  = do { traceTcS "insertInertCan {" $
+  = do { traceTcS "addInertCan {" $
          text "Trying to insert new inert item:" <+> ppr ct
 
        ; ics <- getInertCans
@@ -2352,19 +2352,20 @@ isEmptyTcAppMap m = isNullUDFM m
 emptyTcAppMap :: TcAppMap a
 emptyTcAppMap = emptyUDFM
 
-findTcApp :: TcAppMap a -> Unique -> [Type] -> Maybe a
+findTcApp :: Uniquable k => TcAppMap a -> k -> [Type] -> Maybe a
 findTcApp m u tys = do { tys_map <- lookupUDFM m u
                        ; lookupTM tys tys_map }
 
-delTcApp :: TcAppMap a -> Unique -> [Type] -> TcAppMap a
+delTcApp :: Uniquable k => TcAppMap a -> k -> [Type] -> TcAppMap a
 delTcApp m cls tys = adjustUDFM (deleteTM tys) m cls
 
-insertTcApp :: TcAppMap a -> Unique -> [Type] -> a -> TcAppMap a
+insertTcApp :: Uniquable k => TcAppMap a -> k -> [Type] -> a -> TcAppMap a
 insertTcApp m cls tys ct = alterUDFM alter_tm m cls
   where
     alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
 
-alterTcApp :: forall a. TcAppMap a -> Unique -> [Type] -> (Maybe a -> Maybe a) -> TcAppMap a
+alterTcApp :: forall a k. Uniquable k
+           => TcAppMap a -> k -> [Type] -> (Maybe a -> Maybe a) -> TcAppMap a
 alterTcApp m cls tys upd = alterUDFM alter_tm m cls
   where
     alter_tm :: Maybe (ListMap LooseTypeMap a) -> Maybe (ListMap LooseTypeMap a)
