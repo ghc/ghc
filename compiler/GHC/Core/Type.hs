@@ -29,7 +29,7 @@ module GHC.Core.Type (
         mkAppTy, mkAppTys, splitAppTy, splitAppTys, repSplitAppTys,
         splitAppTy_maybe, repSplitAppTy_maybe, tcRepSplitAppTy_maybe,
 
-        mkVisFunTy, mkInvisFunTy,
+        mkFunTy, mkVisFunTy, mkInvisFunTy,
         mkVisFunTys,
         mkVisFunTyMany, mkInvisFunTyMany,
         mkVisFunTysMany, mkInvisFunTysMany,

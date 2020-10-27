@@ -575,7 +575,7 @@ flatten_one (TyVarTy tv)
 flatten_one (AppTy ty1 ty2)
   = flatten_app_tys ty1 [ty2]
 
-flatten_one ty@(TyConApp tc tys)
+flatten_one (TyConApp tc tys)
   -- If it's a type family application, try to reduce it
   | isTypeFamilyTyCon tc
   = flatten_fam_app tc tys
