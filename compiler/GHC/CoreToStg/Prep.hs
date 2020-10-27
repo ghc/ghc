@@ -20,14 +20,20 @@ where
 #include "HsVersions.h"
 
 import GHC.Prelude
+
 import GHC.Platform
+import GHC.Platform.Ways
 
-import GHC.Core.Opt.OccurAnal
-
-import GHC.Driver.Types
+import GHC.Driver.Session
+import GHC.Driver.Env
 import GHC.Driver.Ppr
+
+import GHC.Tc.Utils.Env
+import GHC.Unit
+
 import GHC.Builtin.Names
-import GHC.Types.Id.Make ( realWorldPrimId )
+import GHC.Builtin.Types
+
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
 import GHC.Core.FVs
@@ -36,37 +42,39 @@ import GHC.Core.Lint    ( endPassIO )
 import GHC.Core
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
-import GHC.Types.Literal
 import GHC.Core.Coercion
-import GHC.Tc.Utils.Env
 import GHC.Core.TyCon
+import GHC.Core.DataCon
+import GHC.Core.Opt.OccurAnal
+
+import GHC.Data.Maybe
+import GHC.Data.OrdList
+import GHC.Data.FastString
+
+import GHC.Utils.Error
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+import GHC.Utils.Monad  ( mapAccumLM )
+
 import GHC.Types.Demand
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Builtin.Types
-import GHC.Core.DataCon
+import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Types.Basic
-import GHC.Unit
-import GHC.Types.Unique.Supply
-import GHC.Data.Maybe
-import GHC.Data.OrdList
-import GHC.Utils.Error
-import GHC.Driver.Session
-import GHC.Platform.Ways
-import GHC.Utils.Misc
-import GHC.Utils.Panic
-import GHC.Utils.Outputable
-import GHC.Data.FastString
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
+import GHC.Types.Literal
+import GHC.Types.TyThing
+import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
+import GHC.Types.Unique.Supply
+
 import Data.Bits
-import GHC.Utils.Monad  ( mapAccumLM )
 import Data.List        ( unfoldr )
 import Control.Monad
-import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import qualified Data.Set as S
 
 {-

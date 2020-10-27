@@ -5,7 +5,6 @@ import Data.Data  ( Data )
 import {-# SOURCE #-} GHC.Types.Var( Var, ArgFlag, AnonArgFlag )
 
 data Type
-data TyThing
 data Coercion
 data UnivCoProvenance
 data TyLit

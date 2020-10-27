@@ -237,7 +237,7 @@ getAndRemoveAnnotationComments anns span =
 -- AST.
 --
 -- The annotations, together with original source comments are made available in
--- the @'pm_annotations'@ field of @'GHC.Driver.Types.HsParsedModule'@.
+-- the @'pm_annotations'@ field of @'GHC.Driver.Env.HsParsedModule'@.
 -- Comments are only retained if @'Opt_KeepRawTokenStream'@ is set.
 --
 -- The wiki page describing this feature is
@@ -301,7 +301,7 @@ data AnnKeywordId
     | AnnMdo
     | AnnMinus -- ^ '-'
     | AnnModule
-    | AnnMult -- ^ '%1'
+    | AnnPercentOne -- ^ '%1' -- for HsLinearArrow
     | AnnNewtype
     | AnnName -- ^ where a name loses its location in the AST, this carries it
     | AnnOf
@@ -318,6 +318,7 @@ data AnnKeywordId
     | AnnDollarDollar    -- ^ prefix '$$'  -- TemplateHaskell
     | AnnPackageName
     | AnnPattern
+    | AnnPercent -- ^ '%' -- for HsExplicitMult
     | AnnProc
     | AnnQualified
     | AnnRarrow -- ^ '->'

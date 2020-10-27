@@ -29,7 +29,7 @@
     `ConcFlags`, `DebugFlags`, `CCFlags`, `DoHeapProfile`, `ProfFlags`,
     `DoTrace`, `TraceFlags`, `TickyFlags`, `ParFlags`, `RTSFlags`, `RTSStats`,
     `GCStats`, `ByteOrder`, `GeneralCategory`, `SrcLoc`
-    
+
   * Add rules `unpackUtf8`, `unpack-listUtf8` and `unpack-appendUtf8` to `GHC.Base`.
     They correspond to their ascii versions and hopefully make it easier
     for libraries to handle utf8 encoded strings efficiently.
@@ -43,6 +43,9 @@
 
   * `catMaybes` is now implemented using `mapMaybe`, so that it is both a "good
     consumer" and "good producer" for list-fusion (#18574)
+
+  * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
+    `Data.Ord.Down`.
 
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1

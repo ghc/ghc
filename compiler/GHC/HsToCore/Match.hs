@@ -28,6 +28,7 @@ import GHC.Platform
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsLExpr, dsSyntaxExpr)
 
 import GHC.Types.Basic ( Origin(..) )
+import GHC.Types.SourceText
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
@@ -60,7 +61,7 @@ import GHC.Utils.Misc
 import GHC.Types.Name
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.Basic ( isGenerated, il_value, fl_value, Boxity(..) )
+import GHC.Types.Basic ( isGenerated, Boxity(..) )
 import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM

@@ -14,15 +14,16 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
+import GHC.Driver.Env
+
 import GHC.Core
-import GHC.Driver.Types
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( mkRuleBase, unionRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addRuleInfo,
                           getRules, initRuleOpts )
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
-import GHC.Types.Id.Info
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop, dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( endPass, lintPassResult, dumpPassResult,
@@ -32,16 +33,8 @@ import GHC.Core.Opt.Simplify.Utils ( simplEnvForGHCi, activeRule, activeUnfoldin
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad
-import qualified GHC.Utils.Error as Err
-import GHC.Core.Opt.FloatIn  ( floatInwards )
-import GHC.Core.Opt.FloatOut ( floatOutwards )
-import GHC.Core.FamInstEnv
-import GHC.Types.Id
-import GHC.Utils.Error  ( withTiming, withTimingD, DumpFormat (..) )
-import GHC.Types.Basic
-import GHC.Types.Var.Set
-import GHC.Types.Var.Env
-import GHC.Types.Demand
+import GHC.Core.Opt.FloatIn      ( floatInwards )
+import GHC.Core.Opt.FloatOut     ( floatOutwards )
 import GHC.Core.Opt.LiberateCase ( liberateCase )
 import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
 import GHC.Core.Opt.Specialise   ( specProgram)
@@ -52,16 +45,33 @@ import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.Seq (seqBinds)
-import GHC.Types.SrcLoc
-import GHC.Utils.Misc
-import GHC.Unit.Module.Env
-import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
-import GHC.Runtime.Loader -- ( initializePlugins )
+import GHC.Core.FamInstEnv
 
-import GHC.Types.Unique.Supply ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
-import GHC.Types.Unique.FM
+import qualified GHC.Utils.Error as Err
+import GHC.Utils.Error  ( withTiming, withTimingD, DumpFormat (..) )
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+import GHC.Unit.External
+import GHC.Unit.Module.Env
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.Deps
+
+import GHC.Runtime.Loader -- ( initializePlugins )
+import GHC.Runtime.Context
+
+import GHC.Types.SrcLoc
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Basic
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
+import GHC.Types.Demand
+import GHC.Types.Unique.Supply ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
+import GHC.Types.Unique.FM
+import GHC.Types.Name.Ppr
+
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
 {-

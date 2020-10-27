@@ -14,29 +14,34 @@ module GHC.Runtime.Debugger (pprintClosureCommand, showTerm, pprTypeAndContents)
 
 import GHC.Prelude
 
+import GHC
+
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Monad
+import GHC.Driver.Env
+
 import GHC.Runtime.Linker
 import GHC.Runtime.Heap.Inspect
-
 import GHC.Runtime.Interpreter
-import GHCi.RemoteTypes
-import GHC.Driver.Monad
-import GHC.Driver.Types
-import GHC.Types.Id
+import GHC.Runtime.Context
+
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Iface.Env    ( newInteractiveBinder )
+import GHC.Core.Type
+
+import GHC.Utils.Outputable
+import GHC.Utils.Error
+import GHC.Utils.Monad
+import GHC.Utils.Exception
+
+import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var hiding ( varName )
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
-import GHC.Core.Type
-import GHC
-import GHC.Utils.Outputable
-import GHC.Core.Ppr.TyThing
-import GHC.Utils.Error
-import GHC.Utils.Monad
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Utils.Exception
+import GHC.Types.TyThing.Ppr
+import GHC.Types.TyThing
 
 import Control.Monad
 import Control.Monad.Catch as MC
