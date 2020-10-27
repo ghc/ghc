@@ -12,7 +12,7 @@ module GHC.Rename.HsType (
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType,
-        HsSigWcTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
+        HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
         newTyVarNameRn,
         rnConDeclFields,
         rnLTyVar,
@@ -81,7 +81,7 @@ to break several loops.
 *********************************************************
 -}
 
-data HsSigWcTypeScoping
+data HsPatSigTypeScoping
   = AlwaysBind
     -- ^ Always bind any free tyvars of the given type, regardless of whether we
     -- have a forall at the top.
@@ -131,7 +131,7 @@ rnHsSigWcType doc (HsWC { hswc_body =
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
               , fvs) } }
 
-rnHsPatSigType :: HsSigWcTypeScoping
+rnHsPatSigType :: HsPatSigTypeScoping
                -> HsDocContext
                -> HsPatSigType GhcPs
                -> (HsPatSigType GhcRn -> RnM (a, FreeVars))
@@ -146,32 +146,20 @@ rnHsPatSigType :: HsSigWcTypeScoping
 rnHsPatSigType scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
-       ; rn_hs_sig_wc_type scoping ctx (hsPatSigType sig_ty) $
-         \nwcs imp_tvs body ->
-    do { let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
-             sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = body }
-       ; thing_inside sig_ty'
-       } }
-
--- The workhorse for rnHsSigWcType and rnHsPatSigType.
-rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext
-                  -> LHsType GhcPs
-                  -> ([Name]    -- Wildcard names
-                      -> [Name] -- Implicitly bound type variable names
-                      -> LHsType GhcRn
-                      -> RnM (a, FreeVars))
-                  -> RnM (a, FreeVars)
-rn_hs_sig_wc_type scoping ctxt hs_ty thing_inside
-  = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
+       ; free_vars <- filterInScopeM (extractHsTyRdrTyVars pat_sig_ty)
        ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
-       ; implicit_bndrs <- case scoping of
-           AlwaysBind       -> pure tv_rdrs
-           NeverBind        -> pure []
-       ; rnImplicitBndrs Nothing implicit_bndrs $ \ vars ->
-    do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
-       ; (res, fvs2) <- thing_inside wcs vars hs_ty'
+             implicit_bndrs = case scoping of
+               AlwaysBind -> tv_rdrs
+               NeverBind  -> []
+       ; rnImplicitBndrs Nothing implicit_bndrs $ \ imp_tvs ->
+    do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx nwc_rdrs pat_sig_ty
+       ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
+             sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
+       ; (res, fvs2) <- thing_inside sig_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
+  where
+    pat_sig_ty = hsPatSigType sig_ty
 
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
 rnHsWcType ctxt (HsWC { hswc_body = hs_ty })

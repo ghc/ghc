@@ -4120,8 +4120,11 @@ promotionErr name err
                NoDataKindsTC  -> text "perhaps you intended to use DataKinds"
                NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
                PatSynPE       -> text "pattern synonyms cannot be promoted"
-               _ -> text "it is defined and used in the same recursive group"
-                    -- RecDataConPE, ClassPE, TyConPE
+               RecDataConPE   -> same_rec_group_msg
+               ClassPE        -> same_rec_group_msg
+               TyConPE        -> same_rec_group_msg
+
+    same_rec_group_msg = text "it is defined and used in the same recursive group"
 
 {-
 ************************************************************************
