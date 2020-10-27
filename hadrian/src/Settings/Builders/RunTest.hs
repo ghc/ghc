@@ -140,7 +140,7 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "--config", arg $ "stats_files_dir=" ++ statsFilesDir
             , arg $ "--threads=" ++ show threads
             , case perfBaseline of
-                Just commit | not (null commit) -> arg ("--perf-baseline=" ++ show commit)
+                Just commit | not (null commit) -> arg ("--perf-baseline=" ++ commit)
                 _ -> mempty
             , emitWhenSet testEnv $ \env -> arg ("--test-env=" ++ env)
             , emitWhenSet testMetricsFile $ \file -> arg ("--metrics-file=" ++ file)
