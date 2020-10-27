@@ -433,7 +433,7 @@ generate directory distdir config_args
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ fromShortText $ synopsis pd),
-                variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
+                variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (map getSymbolicPath $ hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
                 variablePrefix ++ "_DEP_IPIDS = " ++ unwords dep_ipids,
                 variablePrefix ++ "_DEP_NAMES = " ++ unwords depNames,
