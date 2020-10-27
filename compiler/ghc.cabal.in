@@ -621,6 +621,7 @@ Library
         GHC.Types.Fixity.Env
         GHC.Types.ForeignCall
         GHC.Types.ForeignStubs
+        GHC.Types.Hook
         GHC.Types.HpcInfo
         GHC.Types.Id
         GHC.Types.Id.Info

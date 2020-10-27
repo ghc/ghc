@@ -7,6 +7,7 @@ module GHC.Runtime.Interpreter.Types
    , IServInstance(..)
    , IServConfig(..)
    , IServState(..)
+   , CreateIservHook (..)
    )
 where
 
@@ -15,6 +16,7 @@ import GHC.Prelude
 import GHCi.RemoteTypes
 import GHCi.Message         ( Pipe )
 import GHC.Types.Unique.FM
+import GHC.Types.Hook
 import GHC.Data.FastString ( FastString )
 import Foreign
 
@@ -46,9 +48,13 @@ data IServConfig = IServConfig
   , iservConfOpts     :: ![String] -- ^ Command-line options
   , iservConfProfiled :: !Bool     -- ^ Use Profiling way
   , iservConfDynamic  :: !Bool     -- ^ Use Dynamic way
-  , iservConfHook     :: !(Maybe (CreateProcess -> IO ProcessHandle)) -- ^ Hook
+  , iservConfHook     :: !(Maybe CreateIservHook) -- ^ Hook
   , iservConfTrace    :: IO ()     -- ^ Trace action executed after spawn
   }
+
+newtype CreateIservHook = CreateIservHook (CreateProcess -> IO ProcessHandle)
+instance IsHook CreateIservHook
+
 
 -- | External interpreter instance
 data IServInstance = IServInstance

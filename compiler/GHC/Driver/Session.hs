@@ -236,7 +236,7 @@ import GHC.Unit.Types
 import GHC.Unit.Parser
 import GHC.Unit.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
-import {-# SOURCE #-} GHC.Driver.Hooks
+import GHC.Types.Hook
 import GHC.Builtin.Names ( mAIN_NAME )
 import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )

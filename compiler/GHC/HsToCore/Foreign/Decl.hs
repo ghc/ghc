@@ -12,7 +12,12 @@
 Desugaring foreign declarations (see also GHC.HsToCore.Foreign.Call).
 -}
 
-module GHC.HsToCore.Foreign.Decl ( dsForeigns ) where
+module GHC.HsToCore.Foreign.Decl
+   ( dsForeigns
+   -- * Hook
+   , DsForeignsHook (..)
+   )
+where
 
 #include "HsVersions.h"
 import GHC.Prelude
@@ -33,6 +38,7 @@ import GHC.Types.ForeignStubs
 import GHC.Types.SourceText
 import GHC.Unit.Module
 import GHC.Types.Name
+import GHC.Types.Hook
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.TyCon
@@ -84,7 +90,9 @@ type Binding = (Id, CoreExpr) -- No rec/nonrec structure;
 
 dsForeigns :: [LForeignDecl GhcTc]
            -> DsM (ForeignStubs, OrdList Binding)
-dsForeigns fos = getHooked dsForeignsHook dsForeigns' >>= ($ fos)
+dsForeigns fos = do
+   (DsForeignsHook ds_foreign) <- getHooked (DsForeignsHook dsForeigns')
+   ds_foreign fos
 
 dsForeigns' :: [LForeignDecl GhcTc]
             -> DsM (ForeignStubs, OrdList Binding)
@@ -859,3 +867,7 @@ primTyDescChar platform ty
     (signed_word, unsigned_word) = case platformWordSize platform of
       PW4 -> ('W','w')
       PW8 -> ('L','l')
+
+newtype DsForeignsHook = DsForeignsHook ([LForeignDecl GhcTc] -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))
+
+instance IsHook DsForeignsHook

@@ -27,7 +27,7 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQuasi,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice
+     finishTH, runTopSplice, RunMetaHook (..)
       ) where
 
 #include "HsVersions.h"
@@ -870,8 +870,11 @@ runMeta :: (MetaHook TcM -> LHsExpr GhcTc -> TcM hs_syn)
         -> LHsExpr GhcTc
         -> TcM hs_syn
 runMeta unwrap e
-  = do { h <- getHooked runMetaHook defaultRunMeta
+  = do { RunMetaHook h <- getHooked (RunMetaHook defaultRunMeta)
        ; unwrap h e }
+
+newtype RunMetaHook = RunMetaHook (MetaHook TcM)
+instance IsHook RunMetaHook
 
 defaultRunMeta :: MetaHook TcM
 defaultRunMeta (MetaE r)

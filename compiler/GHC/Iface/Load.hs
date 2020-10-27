@@ -8,6 +8,8 @@ Loading interface files
 
 {-# LANGUAGE CPP, BangPatterns, RecordWildCards, NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module GHC.Iface.Load (
         -- Importing one thing
@@ -29,7 +31,10 @@ module GHC.Iface.Load (
         needWiredInHomeIface, loadWiredInHomeIface,
 
         pprModIfaceSimple,
-        ifaceStats, pprModIface, showIface
+        ifaceStats, pprModIface, showIface,
+
+        -- * Hook
+        PrimIfaceHook (..)
    ) where
 
 #include "HsVersions.h"
@@ -938,7 +943,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
        -- TODO: make this check a function
        if mod `installedModuleEq` gHC_PRIM
            then do
-               iface <- getHooked ghcPrimIfaceHook ghcPrimIface
+               PrimIfaceHook iface <- getHooked (PrimIfaceHook ghcPrimIface)
                return (Succeeded (iface,
                                    "<built in interface for GHC.Prim>"))
            else do
@@ -1341,3 +1346,7 @@ homeModError mod location
            Just file -> space <> parens (text file)
            Nothing   -> Outputable.empty)
     <+> text "which is not loaded"
+
+
+newtype PrimIfaceHook = PrimIfaceHook ModIface
+instance IsHook PrimIfaceHook
