@@ -14,7 +14,6 @@
 
 #if RTS_LINKER_USE_MMAP
 #include <sys/mman.h>
-void* mmap_next(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 #endif
 
 void printLoadedObjects(void);
