@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns    #-}
 
@@ -28,6 +29,7 @@ import Distribution.Verbosity
 import qualified Distribution.InstalledPackageInfo as Installed
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import Distribution.Utils.ShortText (fromShortText)
+import Distribution.Utils.Path (getSymbolicPath)
 
 import Control.Exception (bracket)
 import Control.Monad
@@ -433,7 +435,7 @@ generate directory distdir config_args
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ fromShortText $ synopsis pd),
-                variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
+                variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (map getSymbolicPath $ hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
                 variablePrefix ++ "_DEP_IPIDS = " ++ unwords dep_ipids,
                 variablePrefix ++ "_DEP_NAMES = " ++ unwords depNames,
