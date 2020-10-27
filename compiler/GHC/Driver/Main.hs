@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                      #-}
 {-# LANGUAGE BangPatterns             #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE RankNTypes               #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
 -------------------------------------------------------------------------------
@@ -84,6 +85,11 @@ module GHC.Driver.Main
     , ioMsgMaybe
     , showModuleIndex
     , hscAddSptEntries
+
+    -- * Hooks
+    , CompileCoreExprHook (..)
+    , StgToCmmHook (..)
+    , CmmToRawCmmHook (..)
     ) where
 
 import GHC.Prelude
@@ -1450,9 +1456,9 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                                 stg_binds hpc_info
 
             ------------------  Code output -----------------------
+            let CmmToRawCmmHook cmm_to_raw_cmm = lookupHook (CmmToRawCmmHook (\dflg _ -> cmmToRawCmm dflg)) dflags
             rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
-                      lookupHook (\x -> cmmToRawCmmHook x)
-                        (\dflg _ -> cmmToRawCmm dflg) dflags dflags (Just this_mod) cmms
+                        cmm_to_raw_cmm dflags (Just this_mod) cmms
 
             let dump a = do
                   unless (null a) $
@@ -1529,16 +1535,20 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
         unless (null cmmgroup) $
           dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm"
             FormatCMM (pdoc platform cmmgroup)
-        rawCmms <- lookupHook (\x -> cmmToRawCmmHook x)
-                     (\dflgs _ -> cmmToRawCmm dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
-        _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
-             rawCmms
+
+        let CmmToRawCmmHook cmm_to_raw_cmm = lookupHook (CmmToRawCmmHook (\dflgs _ -> cmmToRawCmm dflgs)) dflags
+        rawCmms <- cmm_to_raw_cmm dflags Nothing (Stream.yield cmmgroup)
+
+        _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] [] rawCmms
         return ()
   where
     no_loc = ModLocation{ ml_hs_file  = Just filename,
                           ml_hi_file  = panic "hscCompileCmmFile: no hi file",
                           ml_obj_file = panic "hscCompileCmmFile: no obj file",
                           ml_hie_file = panic "hscCompileCmmFile: no hie file"}
+
+data CmmToRawCmmHook = CmmToRawCmmHook (forall a. (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a -> IO (Stream IO RawCmmGroup a)))
+instance IsHook CmmToRawCmmHook
 
 -------------------- Stuff for new code gen ---------------------
 
@@ -1577,11 +1587,12 @@ doCodeGen hsc_env this_mod data_tycons
 
     dumpIfSet_dyn dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
 
-    let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
+    let StgToCmmHook stg_to_cmm = lookupHook (StgToCmmHook StgToCmm.codeGen) dflags
+
+        cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
-            lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod data_tycons
-                           cost_centre_info stg_binds_w_fvs hpc_info
+            stg_to_cmm dflags this_mod data_tycons cost_centre_info stg_binds_w_fvs hpc_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one
@@ -1611,6 +1622,10 @@ doCodeGen hsc_env this_mod data_tycons
           return a
 
     return (Stream.mapM dump2 pipeline_stream)
+
+newtype StgToCmmHook = StgToCmmHook (DynFlags -> Module -> [TyCon] -> CollectedCCs -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos)
+
+instance IsHook StgToCmmHook
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
@@ -1909,8 +1924,13 @@ hscParseThingWithLocation source linenumber parser str
 %********************************************************************* -}
 
 hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue
-hscCompileCoreExpr hsc_env =
-  lookupHook hscCompileCoreExprHook hscCompileCoreExpr' (hsc_dflags hsc_env) hsc_env
+hscCompileCoreExpr hsc_env loc expr = do
+  let CompileCoreExprHook compile_expr = lookupHook (CompileCoreExprHook hscCompileCoreExpr')
+                                                    (hsc_dflags hsc_env)
+  compile_expr hsc_env loc expr
+
+newtype CompileCoreExprHook = CompileCoreExprHook (HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue)
+instance IsHook CompileCoreExprHook
 
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue
 hscCompileCoreExpr' hsc_env srcspan ds_expr

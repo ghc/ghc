@@ -24,7 +24,11 @@ module GHC.Driver.Pipeline (
    compileOne, compileOne',
    link,
 
-        -- Exports for hooks to override runPhase and link
+   -- * Hooks
+   RunPhaseHook (..),
+   LinkHook (..),
+
+   -- * Exports for hooks to override runPhase and link
    PhasePlus(..), CompPipeline(..), PipeEnv(..), PipeState(..),
    phaseOutputFilename, getOutputFilename, getPipeState, getPipeEnv,
    hscPostBackendPhase, getLocation, setModLocation, setDynFlags,
@@ -468,26 +472,30 @@ link :: GhcLink                 -- interactive or batch
 -- exports main, i.e., we have good reason to believe that linking
 -- will succeed.
 
-link ghcLink dflags
-  = lookupHook linkHook l dflags ghcLink dflags
-  where
-    l LinkInMemory _ _ _
-      = if platformMisc_ghcWithInterpreter $ platformMisc dflags
-        then -- Not Linking...(demand linker will do the job)
-             return Succeeded
-        else panicBadLink LinkInMemory
+link ghcLink dflags batch_attempt_linking hpt = do
+   let LinkHook l = lookupHook (LinkHook defaultLink) dflags
+   l ghcLink dflags batch_attempt_linking hpt
 
-    l NoLink _ _ _
-      = return Succeeded
+newtype LinkHook = LinkHook (GhcLink -> DynFlags -> Bool -> HomePackageTable -> IO SuccessFlag)
+instance IsHook LinkHook
 
-    l LinkBinary dflags batch_attempt_linking hpt
-      = link' dflags batch_attempt_linking hpt
+defaultLink
+     :: GhcLink                 -- interactive or batch
+     -> DynFlags                -- dynamic flags
+     -> Bool                    -- attempt linking in batch mode?
+     -> HomePackageTable        -- what to link
+     -> IO SuccessFlag
+defaultLink k dflags batch_attempt_linking hpt = case k of
+   LinkInMemory ->
+      if platformMisc_ghcWithInterpreter $ platformMisc dflags
+      then -- Not Linking...(demand linker will do the job)
+           return Succeeded
+      else panicBadLink LinkInMemory
+   NoLink        -> return Succeeded
+   LinkBinary    -> link' dflags batch_attempt_linking hpt
+   LinkStaticLib -> link' dflags batch_attempt_linking hpt
+   LinkDynLib    -> link' dflags batch_attempt_linking hpt
 
-    l LinkStaticLib dflags batch_attempt_linking hpt
-      = link' dflags batch_attempt_linking hpt
-
-    l LinkDynLib dflags batch_attempt_linking hpt
-      = link' dflags batch_attempt_linking hpt
 
 panicBadLink :: GhcLink -> a
 panicBadLink other = panic ("link: GHC not built to link this way: " ++
@@ -844,8 +852,12 @@ pipeLoop phase input_fn = do
 
 runHookedPhase :: PhasePlus -> FilePath -> DynFlags
                -> CompPipeline (PhasePlus, FilePath)
-runHookedPhase pp input dflags =
-  lookupHook runPhaseHook runPhase dflags pp input dflags
+runHookedPhase pp input dflags = do
+   let RunPhaseHook run_phase = lookupHook (RunPhaseHook runPhase) dflags
+   run_phase pp input dflags
+
+newtype RunPhaseHook = RunPhaseHook (PhasePlus -> FilePath -> DynFlags -> CompPipeline (PhasePlus, FilePath))
+instance IsHook RunPhaseHook
 
 -- -----------------------------------------------------------------------------
 -- In each phase, we need to know into what filename to generate the

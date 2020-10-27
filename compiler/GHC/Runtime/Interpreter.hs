@@ -565,10 +565,11 @@ handleIServFailure iserv e = do
 spawnIServ :: IServConfig -> IO IServInstance
 spawnIServ conf = do
   iservConfTrace conf
-  let createProc = fromMaybe (\cp -> do { (_,_,_,ph) <- createProcess cp
-                                        ; return ph })
-                             (iservConfHook conf)
-  (ph, rh, wh) <- runWithPipes createProc (iservConfProgram conf)
+  let default_create_proc cp = do (_,_,_,ph) <- createProcess cp
+                                  return ph
+  let CreateIservHook create_proc = fromMaybe (CreateIservHook default_create_proc)
+                                              (iservConfHook conf)
+  (ph, rh, wh) <- runWithPipes create_proc (iservConfProgram conf)
                                           (iservConfOpts    conf)
   lo_ref <- newIORef Nothing
   return $ IServInstance
