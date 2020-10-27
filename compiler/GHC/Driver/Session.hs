@@ -3819,7 +3819,7 @@ default_PIC platform =
   case (platformOS platform, platformArch platform) of
     (OSDarwin,  ArchX86_64)  -> [Opt_PIC]
     (OSDarwin,  ArchAArch64) -> [Opt_PIC]
-    (OSLinux,   ArchAArch64) -> [Opt_PIC, Opt_ExternalDynamicRefs]
+    (OSLinux,   ArchAArch64) -> [Opt_PIC] --, Opt_ExternalDynamicRefs]
     (OSOpenBSD, ArchX86_64)  -> [Opt_PIC] -- Due to PIE support in
                                          -- OpenBSD since 5.3 release
                                          -- (1 May 2013) we need to
