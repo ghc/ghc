@@ -578,11 +578,12 @@ tcDerivStrategy mb_lds
     boring_case :: ds -> TcM (ds, [TyVar])
     boring_case ds = pure (ds, [])
 
-tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
+tcHsClsInstType :: [Name]
+                -> UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
                 -> LHsSigType GhcRn
                 -> TcM Type
 -- Like tcHsSigType, but for a class instance declaration
-tcHsClsInstType user_ctxt hs_inst_ty
+tcHsClsInstType covered_vars user_ctxt hs_inst_ty
   = setSrcSpan (getLoc (hsSigType hs_inst_ty)) $
     do { -- Fail eagerly if tcTopLHsType fails.  We are at top level so
          -- these constraints will never be solved later. And failing
@@ -590,7 +591,7 @@ tcHsClsInstType user_ctxt hs_inst_ty
          -- sees an unsolved coercion hole
          inst_ty <- checkNoErrs $
                     tcTopLHsType hs_inst_ty (TheKind constraintKind)
-       ; checkValidInstance user_ctxt hs_inst_ty inst_ty
+       ; checkValidInstance covered_vars user_ctxt hs_inst_ty inst_ty
        ; return inst_ty }
 
 ----------------------------------------------
