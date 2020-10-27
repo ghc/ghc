@@ -746,7 +746,9 @@ swizzleTcTyConBndrs :: [(TcTyCon, ScopedPairs, TcKind)]
 swizzleTcTyConBndrs tc_infos
   | all no_swizzle swizzle_prs
     -- This fast path happens almost all the time
-    -- See Note [Non-cloning for tyvar binders] in GHC.Tc.Gen.HsType
+    -- See Note [Cloning for type variable binders] in GHC.Tc.Gen.HsType
+    -- "Almost all the time" means not the case of mutual recursion with
+    -- polymorphic kinds.
   = do { traceTc "Skipping swizzleTcTyConBndrs for" (ppr (map fstOf3 tc_infos))
        ; return tc_infos }
 
@@ -1551,10 +1553,8 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM_ kc_sig) sigs }
   where
-    kc_sig (ClassOpSig _ _ nms op_ty) = kcClassSigType skol_info nms op_ty
+    kc_sig (ClassOpSig _ _ nms op_ty) = kcClassSigType nms op_ty
     kc_sig _                          = return ()
-
-    skol_info = TyConSkol ClassFlavour name
 
 kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- closed type families look at their equations, but other families don't
@@ -3306,6 +3306,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                                     mkPhiTy ctxt $
                                     mkVisFunTys arg_tys $
                                     res_ty)
+       ; traceTc "tcConDecl:GADT" (ppr names $$ ppr res_ty $$ ppr tkvs)
        ; reportUnsolvedEqualities skol_info tkvs tclvl wanted
 
        ; let tvbndrs =  mkTyVarBinders InferredSpec tkvs ++ outer_tv_bndrs

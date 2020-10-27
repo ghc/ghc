@@ -366,9 +366,9 @@ tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- already checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
-kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
+kcClassSigType :: [Located Name] -> LHsSigType GhcRn -> TcM ()
 -- This is a special form of tcClassSigType that is used during the
--- kind-checking phase to infer the kind of class variables. Cf. tc_hs_sig_type.
+-- kind-checking phase to infer the kind of class variables. Cf. tc_lhs_sig_type.
 -- Importantly, this does *not* kind-generalize. Consider
 --   class SC f where
 --     meth :: forall a (x :: f a). Proxy x -> ()
@@ -379,7 +379,7 @@ kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
 -- end up promoting kappa to the top level (because kind-generalization is
 -- normally done right before adding a binding to the context), and then we
 -- can't set kappa := f a, because a is local.
-kcClassSigType _skol_info names
+kcClassSigType names
     sig_ty@(L _ (HsSig { sig_bndrs = hs_outer_bndrs, sig_body = hs_ty }))
   = addSigCtxt (funsSigCtxt names) sig_ty $
     do { _ <- bindOuterSigTKBndrs_Tv hs_outer_bndrs    $
@@ -390,7 +390,7 @@ tcClassSigType :: [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType names sig_ty
   = addSigCtxt sig_ctxt sig_ty $
-    do { (implic, ty) <- tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+    do { (implic, ty) <- tc_lhs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
        ; emitImplication implic
        ; return ty }
        -- Do not zonk-to-Type, nor perform a validity check
@@ -421,9 +421,9 @@ tcHsSigType ctxt sig_ty
     do { traceTc "tcHsSigType {" (ppr sig_ty)
 
           -- Generalise here: see Note [Kind generalisation]
-       ; (implic, ty) <- tc_hs_sig_type skol_info sig_ty  (expectedKindInCtxt ctxt)
+       ; (implic, ty) <- tc_lhs_sig_type skol_info sig_ty  (expectedKindInCtxt ctxt)
 
-       -- Spit out the implication (and perhaps fail fast)
+       -- Float out constraints, failing fast if not possible
        -- See Note [Failure in local type signatures] in GHC.Tc.Solver
        ; traceTc "tcHsSigType 2" (ppr implic)
        ; simplifyAndEmitFlatConstraints (mkImplicWC (unitBag implic))
@@ -435,7 +435,7 @@ tcHsSigType ctxt sig_ty
   where
     skol_info = SigTypeSkol ctxt
 
-tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
+tc_lhs_sig_type :: SkolemInfo -> LHsSigType GhcRn
                -> ContextKind -> TcM (Implication, TcType)
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
@@ -443,11 +443,11 @@ tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- This will never emit constraints, as it uses solveEqualities internally.
 -- No validity checking or zonking
 -- Returns also an implication for the unsolved constraints
-tc_hs_sig_type skol_info (L loc (HsSig { sig_bndrs = hs_outer_bndrs
+tc_lhs_sig_type skol_info (L loc (HsSig { sig_bndrs = hs_outer_bndrs
                                        , sig_body = hs_ty })) ctxt_kind
   = setSrcSpan loc $
     do { (tc_lvl, wanted, (outer_bndrs, ty))
-              <- pushLevelAndSolveEqualitiesX "tc_hs_sig_type" $
+              <- pushLevelAndSolveEqualitiesX "tc_lhs_sig_type" $
                  -- See Note [Failure in local type signatures]
                  tcOuterTKBndrs skol_info hs_outer_bndrs $
                  do { kind <- newExpectedKind ctxt_kind
@@ -455,7 +455,7 @@ tc_hs_sig_type skol_info (L loc (HsSig { sig_bndrs = hs_outer_bndrs
        -- Any remaining variables (unsolved in the solveEqualities)
        -- should be in the global tyvars, and therefore won't be quantified
 
-       ; traceTc "tc_hs_sig_type" (ppr hs_outer_bndrs $$ ppr outer_bndrs)
+       ; traceTc "tc_lhs_sig_type" (ppr hs_outer_bndrs $$ ppr outer_bndrs)
        ; (outer_tv_bndrs :: [InvisTVBinder]) <- scopedSortOuter outer_bndrs
 
        ; let ty1 = mkInvisForAllTys outer_tv_bndrs ty
@@ -475,7 +475,7 @@ tcHsSigType is tricky.  Consider (T11142)
 This is ill-kinded becuase of a nested skolem-escape.
 
 That will show up as an un-solvable constraint in the implication
-returned by buildTvImplication in tc_hs_sig_type.  See Note [Skolem
+returned by buildTvImplication in tc_lhs_sig_type.  See Note [Skolem
 escape prevention] in GHC.Tc.Utils.TcType for why it is unsolvable
 (the unification variable for b's kind is untouchable).
 
@@ -484,7 +484,7 @@ we'll try to float out the constraint, be unable to do so, and fail.
 See GHC.Tc.Solver Note [Failure in local type signatures] for more
 detail on this.
 
-The separation between tcHsSigType and tc_hs_sig_type is because
+The separation between tcHsSigType and tc_lhs_sig_type is because
 tcClassSigType wants to use the latter, but *not* fail fast, because
 there are skolems from the class decl which are in scope; but it's fine
 not to because tcClassDecl1 has a solveEqualities wrapped around all
@@ -503,32 +503,31 @@ top level of a signature.
 tcStandaloneKindSig :: LStandaloneKindSig GhcRn -> TcM (Name, Kind)
 tcStandaloneKindSig (L _ (StandaloneKindSig _ (L _ name) ksig))
   = addSigCtxt ctxt ksig $
-    do { kind <- tc_top_lhs_type KindLevel ksig (expectedKindInCtxt ctxt)
+    do { kind <- tc_top_lhs_type KindLevel ctxt ksig
        ; checkValidType ctxt kind
        ; return (name, kind) }
   where
    ctxt = StandaloneKindSigCtxt name
 
-tcTopLHsType :: LHsSigType GhcRn -> ContextKind -> TcM Type
-tcTopLHsType lsig_ty ctxt_kind
-  = tc_top_lhs_type TypeLevel lsig_ty ctxt_kind
+tcTopLHsType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
+tcTopLHsType ctxt lsig_ty
+  = tc_top_lhs_type TypeLevel ctxt lsig_ty
 
-tc_top_lhs_type :: TypeOrKind -> LHsSigType GhcRn -> ContextKind -> TcM Type
+tc_top_lhs_type :: TypeOrKind -> UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- tc_top_lhs_type is used for kind-checking top-level LHsSigTypes where
 --   we want to fully solve /all/ equalities, and report errors
 -- Does zonking, but not validity checking because it's used
 --   for things (like deriving and instances) that aren't
 --   ordinary types
 -- Used for both types and kinds
-tc_top_lhs_type tyki (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
-                                          , sig_body = body })) ctxt_kind
+tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
+                                               , sig_body = body }))
   = setSrcSpan loc $
     do { traceTc "tc_top_lhs_type {" (ppr sig_ty)
-       ; let skol_info = InstSkol    -- Why?
        ; (tclvl, wanted, (outer_bndrs, ty))
               <- pushLevelAndSolveEqualitiesX "tc_top_lhs_type"    $
                  tcOuterTKBndrs skol_info hs_outer_bndrs $
-                 do { kind <- newExpectedKind ctxt_kind
+                 do { kind <- newExpectedKind (expectedKindInCtxt ctxt)
                     ; tc_lhs_type (mkMode tyki) body kind }
 
        ; outer_tv_bndrs <- scopedSortOuter outer_bndrs
@@ -540,6 +539,8 @@ tc_top_lhs_type tyki (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
        ; final_ty <- zonkTcTypeToType (mkInfForAllTys kvs ty1)
        ; traceTc "tc_top_lhs_type }" (vcat [ppr sig_ty, ppr final_ty])
        ; return final_ty }
+  where
+    skol_info = SigTypeSkol ctxt
 
 -----------------
 tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
@@ -552,7 +553,7 @@ tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
 tcHsDeriv hs_ty
   = do { ty <- checkNoErrs $  -- Avoid redundant error report
                               -- with "illegal deriving", below
-               tcTopLHsType hs_ty AnyKind
+               tcTopLHsType DerivClauseCtxt hs_ty
        ; let (tvs, pred)    = splitForAllTys ty
              (kind_args, _) = splitFunTys (tcTypeKind pred)
        ; case getClassPredTys_maybe pred of
@@ -581,7 +582,7 @@ tcDerivStrategy mb_lds
     tc_deriv_strategy AnyclassStrategy = boring_case AnyclassStrategy
     tc_deriv_strategy NewtypeStrategy  = boring_case NewtypeStrategy
     tc_deriv_strategy (ViaStrategy ty) = do
-      ty' <- checkNoErrs $ tcTopLHsType ty AnyKind
+      ty' <- checkNoErrs $ tcTopLHsType DerivClauseCtxt ty
       let (via_tvs, via_pred) = splitForAllTys ty'
       pure (ViaStrategy via_pred, via_tvs)
 
@@ -599,7 +600,7 @@ tcHsClsInstType user_ctxt hs_inst_ty
          -- eagerly avoids follow-on errors when checkValidInstance
          -- sees an unsolved coercion hole
          inst_ty <- checkNoErrs $
-                    tcTopLHsType hs_inst_ty (TheKind constraintKind)
+                    tcTopLHsType user_ctxt hs_inst_ty
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty
        ; return inst_ty }
 
@@ -823,6 +824,7 @@ mkMode :: TypeOrKind -> TcTyMode
 mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing }
 
 typeLevelMode, kindLevelMode :: TcTyMode
+-- These modes expect no wildcards (holes) in the type
 kindLevelMode = mkMode KindLevel
 typeLevelMode = mkMode TypeLevel
 
@@ -2904,6 +2906,7 @@ expectedKindInCtxt (GhciCtxt {})   = AnyKind
 -- The types in a 'default' decl can have varying kinds
 -- See Note [Extended defaults]" in GHC.Tc.Utils.Env
 expectedKindInCtxt DefaultDeclCtxt     = AnyKind
+expectedKindInCtxt DerivClauseCtxt     = AnyKind
 expectedKindInCtxt TypeAppCtxt         = AnyKind
 expectedKindInCtxt (ForSigCtxt _)      = TheKind liftedTypeKind
 expectedKindInCtxt (InstDeclCtxt {})   = TheKind constraintKind
@@ -2962,11 +2965,10 @@ bindOuterTKBndrsX skol_mode outer_bndrs thing_inside
                     , thing) }
 
 getOuterTyVars :: HsOuterTyVarBndrs flag GhcTc -> [TcTyVar]
+-- The returned [TcTyVar] is not necessarily in dependency order
+-- at least for the HsOuterImplicit case
 getOuterTyVars (HsOuterImplicit { hso_ximplicit = tvs })  = tvs
 getOuterTyVars (HsOuterExplicit { hso_xexplicit = tvbs }) = binderVars tvbs
-
-applyToFstM :: (a -> b) -> TcM (a, r) -> TcM (b, r)
-applyToFstM f thing = do { (a,r) <- thing; return (f a, r) }
 
 ---------------
 scopedSortOuter :: HsOuterTyVarBndrs Specificity GhcTc -> TcM [InvisTVBinder]
@@ -3085,6 +3087,7 @@ bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
 
 bindExplicitTKBndrs_Skol = bindExplicitTKBndrsX (smVanilla { sm_clone = False })
 bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = True })
+   -- sm_clone: see Note [Cloning for type variable binders]
 
 bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
     :: ContextKind
@@ -3097,6 +3100,7 @@ bindExplicitTKBndrs_Q_Skol ctxt_kind hs_bndrs thing_inside
     bindExplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
                                     , sm_kind = ctxt_kind })
                          hs_bndrs thing_inside
+    -- sm_clone=False: see Note [Cloning for type variable binders]
 
 bindExplicitTKBndrs_Q_Tv ctxt_kind hs_bndrs thing_inside
   = applyToFstM binderVars $
@@ -3207,8 +3211,7 @@ bindImplicitTKBndrsX
    -> TcM a
    -> TcM ([TcTyVar], a)   -- Returned [TcTyVar] are in 1-1 correspondence
                            -- with the passed in [Name]
-bindImplicitTKBndrsX (SM { sm_parent = check_parent, sm_clone = clone
-                         , sm_tvtv = tvtv, sm_kind = ctxt_kind })
+bindImplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_kind })
                      tv_names thing_inside
   = do { lcl_env <- getLclTypeEnv
        ; tkvs <- mapM (new_tv lcl_env) tv_names
@@ -3222,39 +3225,36 @@ bindImplicitTKBndrsX (SM { sm_parent = check_parent, sm_clone = clone
       , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
       = return tv
       | otherwise
-      = do { name <- case clone of
-                  True -> do { uniq <- newUnique
-                             ; return (setNameUnique name uniq) }
-                  False -> return name
-           ; kind <- newExpectedKind ctxt_kind
-           ; details <- case tvtv of
-                     True  -> newMetaDetails TyVarTv
-                     False -> do { lvl <- getTcLevel
-                                 ; return (SkolemTv lvl False) }
-           ; return (mkTcTyVar name kind details) }
+      = do { kind <- newExpectedKind ctxt_kind
+           ; newTyVarBndr skol_mode name kind }
 
 --------------------------------------
 --           SkolemMode
 --------------------------------------
 
-{- Note [SkolemMode]
-~~~~~~~~~~~~~~~~~~~~
-SkolemMode decribes how to typecheck an explict (HsTyVarBndr) or
-implicit (Name) binder in a type. It is just a record of flags
-that describe what sort of TcTyVar to create.
--}
-
+-- | 'SkolemMode' decribes how to typecheck an explict ('HsTyVarBndr') or
+-- implicit ('Name') binder in a type. It is just a record of flags
+-- that describe what sort of 'TcTyVar' to create.
 data SkolemMode
   = SM { sm_parent :: Bool    -- True <=> check the in-scope parent type variable
+                              -- Used only for asssociated types
+
        , sm_clone  :: Bool    -- True <=> fresh unique
+                              -- See Note [Cloning for type variable binders]
+
        , sm_tvtv   :: Bool    -- True <=> use a TyVarTv, rather than SkolemTv
+                              -- Why?  See Note [Inferring kinds for type declarations]
+                              -- in GHC.Tc.TyCl, and (in this module)
+                              -- Note [Checking partial type signatures]
+
        , sm_kind   :: ContextKind  -- Use this for the kind of any new binders
+
        , sm_holes  :: HoleInfo     -- What to do for wildcards in the kind
        }
 
 smVanilla :: SkolemMode
-smVanilla = SM { sm_parent = False
-               , sm_clone  = True
+smVanilla = SM { sm_clone  = panic "sm_clone"  -- We always override this
+               , sm_parent = False
                , sm_tvtv   = False
                , sm_kind   = AnyKind
                , sm_holes  = Nothing }
@@ -3263,7 +3263,10 @@ smVanilla = SM { sm_parent = False
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Sometimes we must clone the Name of a type variable binder (written in
 the source program); and sometimes we must not. This is controlled by
-the sm_clone field of SkolemMode
+the sm_clone field of SkolemMode.
+
+In some cases it doesn't matter whether or not we clone. Perhaps
+it'd be better to use MustClone/MayClone/MustNotClone.
 
 When we /must not/ clone
 * In the binders of a type signature (tcOuterTKBndrs)
@@ -3288,9 +3291,8 @@ When we /must not/ clone
 * bindExplictTKBndrs_Q_Skol, bindExplictTKBndrs_Skol, do not clone.
   There is no need, I think.
 
-  The payoff here is that avoidng gratuitious cloning means that we can
-  lmost always take the fast path in swizzleTcTyConBndrs.  "Almost
-  always" means not the case of mutual recursion with polymorphic kinds.
+  The payoff here is that avoiding gratuitious cloning means that we can
+  almost always take the fast path in swizzleTcTyConBndrs.
 
 When we /must/ clone.
 * bindOuterSigTKBndrs_Tv, bindExplicitTKBndrs_Tv do cloning

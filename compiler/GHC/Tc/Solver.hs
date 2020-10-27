@@ -238,6 +238,7 @@ floatKindEqualities :: WantedConstraints -> Maybe (Bag Ct, Bag Hole)
 --    more floatable.
 -- Precondition 2: the 'wanteds' are zonked, since floatKindEqualities
 --    is not monadic
+-- See Note [floatKindEqualities vs approximateWC]
 floatKindEqualities wc = float_wc emptyVarSet wc
   where
     float_wc :: TcTyCoVarSet -> WantedConstraints -> Maybe (Bag Ct, Bag Hole)
@@ -374,6 +375,16 @@ All this is done:
   reporting errors, we avoid that happening.
 
 See also #18062, #11506
+
+Note [floatKindEqualities vs approximateWC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+floatKindEqualities and approximateWC are strikingly similar to each
+other, but
+
+* floatKindEqualites tries to float /all/ equalities, and fails if
+  it can't, or if any implication is insoluble.
+* approximateWC just floats out any constraints
+  (not just equalities) that can float; it never fails.
 -}
 
 
@@ -2248,6 +2259,7 @@ defaultTyVarTcS the_tv
 approximateWC :: Bool -> WantedConstraints -> Cts
 -- Postcondition: Wanted or Derived Cts
 -- See Note [ApproximateWC]
+-- See Note [floatKindEqualities vs approximateWC]
 approximateWC float_past_equalities wc
   = float_wc emptyVarSet wc
   where
