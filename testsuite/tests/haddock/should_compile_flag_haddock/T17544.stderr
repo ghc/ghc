@@ -419,6 +419,7 @@
                (Nothing)))]
             ({ <no location info> }
              [])))))]
+                (Nothing)
        (Nothing)))))
   ,({ T17544.hs:28:1-30 }
     (TyClD
@@ -555,6 +556,7 @@
                (Nothing)))]
             ({ <no location info> }
              [])))))]
+       (Nothing)
        (Nothing)))))
   ,({ T17544.hs:34:1-30 }
     (TyClD
@@ -691,6 +693,7 @@
                (Nothing)))]
             ({ <no location info> }
              [])))))]
+             (Nothing)
        (Nothing)))))
   ,({ T17544.hs:40:1-30 }
     (TyClD
@@ -827,6 +830,7 @@
                (Nothing)))]
             ({ <no location info> }
              [])))))]
+                (Nothing)
        (Nothing)))))
   ,({ T17544.hs:46:1-30 }
     (TyClD
@@ -963,6 +967,7 @@
                (Nothing)))]
             ({ <no location info> }
              [])))))]
+             (Nothing)
        (Nothing)))))
   ,({ T17544.hs:52:1-32 }
     (TyClD
@@ -1099,6 +1104,7 @@
                (Nothing)))]
             ({ <no location info> }
              [])))))]
+                (Nothing)
        (Nothing)))))
   ,({ T17544.hs:56:1-38 }
     (DocD
