@@ -15,6 +15,9 @@ ToDo:
 
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE -Wno-incomplete-uni-patterns #-}
 
+-- necessary for stage0 (GHC 8.8.4)
+{-# OPTIONS_GHC -fmax-pmcheck-iterations=20000000 #-}
+
 -- | Constant Folder
 module GHC.Core.Opt.ConstantFold
    ( primOpRules
