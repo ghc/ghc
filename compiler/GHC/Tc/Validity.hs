@@ -1881,8 +1881,8 @@ and we /really/ don't want that.  So we carefully do /not/ expand
 synonyms, by matching on TyConApp directly.
 -}
 
-checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
-checkValidInstance ctxt hs_type ty
+checkValidInstance :: Bool -> UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
+checkValidInstance is_dysfunctional ctxt hs_type ty
   | not is_tc_app
   = failWithTc (hang (text "Instance head is not headed by a class:")
                    2 ( ppr tau))
@@ -1921,9 +1921,10 @@ checkValidInstance ctxt hs_type ty
 
         ; traceTc "cvi 2" (ppr ty)
 
-        ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
-            IsValid      -> return ()   -- Check succeeded
-            NotValid msg -> addErrTc (instTypeErr clas inst_tys msg)
+        ; unless is_dysfunctional $
+            case (checkInstCoverage undecidable_ok clas theta inst_tys) of
+              IsValid      -> return ()   -- Check succeeded
+              NotValid msg -> addErrTc (instTypeErr clas inst_tys msg)
 
         ; traceTc "End checkValidInstance }" empty
 
