@@ -121,7 +121,7 @@ else:
   only_darwin = skip
 
 test('static001', [extra_files(['Static001.hs']),
-                   only_darwin, expect_broken(8127)],
+                   only_darwin],
      makefile_test, ['static001'])
 
 test('dynHelloWorld',
@@ -261,7 +261,7 @@ test('T12955', normal, makefile_test, [])
 test('T12971', [when(opsys('mingw32'), fragile(17945)), ignore_stdout], makefile_test, [])
 test('json', normal, compile_fail, ['-ddump-json'])
 test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddump-json'])
-test('T16167', exit_code(1), run_command, 
+test('T16167', exit_code(1), run_command,
      ['{compiler} -x hs -e ":set prog T16167.hs" -ddump-json T16167.hs'])
 test('T13604', [], makefile_test, [])
 test('T13604a', [], makefile_test, [])
