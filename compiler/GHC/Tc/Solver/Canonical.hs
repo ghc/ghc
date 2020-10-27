@@ -2303,6 +2303,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
              | OtherCIS <- status
              , Given <- ctEvFlavour ev
              , TyVarLHS lhs_tv <- lhs
+             , not (isCycleBreakerTyVar lhs_tv) -- See Detail (7) of Note
              , NomEq <- eq_rel
              -> do { traceTcS "canEqCanLHSFinish breaking a cycle" (ppr lhs $$ ppr rhs)
                    ; new_rhs <- breakTyVarCycle (ctEvLoc ev) rhs
@@ -2710,6 +2711,41 @@ Details:
      evidence term (as in e.g. rewriteEqEvidence) because the cycle
      breaker variables are all zonked away by the time we examine the
      evidence.
+
+ (7) We don't wish to apply this magic to CycleBreakerTvs themselves.
+     Consider this, from typecheck/should_compile/ContextStack2:
+
+       type instance TF (a, b) = (TF a, TF b)
+       t :: (a ~ TF (a, Int)) => ...
+
+       [G] a ~ TF (a, Int)
+
+     The RHS reduces, so we get
+
+       [G] a ~ (TF a, TF Int)
+
+     We then break cycles, to get
+
+       [G] g1 :: a ~ (cbv1, cbv2)
+       [G] g2 :: TF a ~ cbv1
+       [G] g3 :: TF Int ~ cbv2
+
+     g1 gets added to the inert set, as written. But then g2 becomes
+     the work item. g1 rewrites g2 to become
+
+       [G] TF (cbv1, cbv2) ~ cbv1
+
+     which then uses the type instance to become
+
+       [G] (TF cbv1, TF cbv2) ~ cbv1
+
+     which looks remarkably like the Given we started with. If left
+     unchecked, this will end up breaking cycles again, looping ad
+     infinitum (and resulting in a context-stack reduction error,
+     not an outright loop). The solution is easy: don't break cycles
+     if the var is already a CycleBreakerTv. This makes sense, because
+     we only want to break cycles for user-written loopy Givens, and
+     a CycleBreakerTv certainly isn't user-written.
 
 -}
 

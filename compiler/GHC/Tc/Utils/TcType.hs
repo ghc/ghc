@@ -39,7 +39,7 @@ module GHC.Tc.Utils.TcType (
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
-  isAmbiguousTyVar, metaTyVarRef, metaTyVarInfo,
+  isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar,
@@ -1019,7 +1019,7 @@ isImmutableTyVar :: TyVar -> Bool
 isImmutableTyVar tv = isSkolemTyVar tv
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
-  isMetaTyVar, isAmbiguousTyVar :: TcTyVar -> Bool
+  isMetaTyVar, isAmbiguousTyVar, isCycleBreakerTyVar :: TcTyVar -> Bool
 
 isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
@@ -1063,6 +1063,14 @@ isAmbiguousTyVar tv
         RuntimeUnk {} -> True
         _             -> False
   | otherwise = False
+
+isCycleBreakerTyVar tv
+  | isTyVar tv -- See Note [Coercion variables in free variable lists]
+  , MetaTv { mtv_info = CycleBreakerTv } <- tcTyVarDetails tv
+  = True
+
+  | otherwise
+  = False
 
 isMetaTyVarTy :: TcType -> Bool
 isMetaTyVarTy (TyVarTy tv) = isMetaTyVar tv
