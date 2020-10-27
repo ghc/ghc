@@ -561,6 +561,10 @@ flatten_one :: TcType -> FlatM (Xi, Coercion)
 -- Postcondition: Coercion :: Xi ~ TcType
 -- The role on the result coercion matches the EqRel in the FlattenEnv
 
+flatten_one ty
+  | Just ty' <- flattenView ty  -- See Note [Flattening synonyms]
+  = flatten_one ty'
+
 flatten_one xi@(LitTy {})
   = do { role <- getRole
        ; return (xi, mkReflCo role xi) }
@@ -572,15 +576,7 @@ flatten_one (AppTy ty1 ty2)
   = flatten_app_tys ty1 [ty2]
 
 flatten_one ty@(TyConApp tc tys)
-  -- Expand type synonyms that mention type families
-  -- on the RHS; see Note [Flattening synonyms]
-  | isForgetfulSynTyCon tc || not (isFamFreeTyCon tc)
-  , Just expanded_ty <- tcView ty
-  = flatten_one expanded_ty
-
-  -- Otherwise, it's a type function application, and we have to
-  -- flatten it away as well, and generate a new given equality constraint
-  -- between the application and a newly generated flattening skolem variable.
+  -- If it's a type family application, try to reduce it
   | isTypeFamilyTyCon tc
   = flatten_fam_app tc tys
 
