@@ -576,6 +576,7 @@ rnClsInstDecl :: ClsInstDecl GhcPs -> RnM (ClsInstDecl GhcRn, FreeVars)
 rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
                            , cid_overlap_mode = oflag
+                           , cid_dysfunctional = dysfunctional
                            , cid_datafam_insts = adts })
   = do { checkInferredVars ctxt inf_err inst_ty
        ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
@@ -625,7 +626,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
              <- extendTyVarEnvFVRn ktv_names $
                 do { (ats',  at_fvs)  <- rnATInstDecls rnTyFamInstDecl cls ktv_names ats
                    ; (adts', adt_fvs) <- rnATInstDecls rnDataFamInstDecl cls ktv_names adts
-                   ; return ( (ats', adts'), at_fvs `plusFV` adt_fvs) }
+                   ; return ((ats', adts'), at_fvs `plusFV` adt_fvs) }
 
        ; let all_fvs = meth_fvs `plusFV` more_fvs
                                 `plusFV` inst_fvs
@@ -633,6 +634,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
                              , cid_overlap_mode = oflag
+                             , cid_dysfunctional = dysfunctional
                              , cid_datafam_insts = adts' },
                  all_fvs) }
              -- We return the renamed associated data type declarations so
