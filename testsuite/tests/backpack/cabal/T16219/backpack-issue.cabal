@@ -1,8 +1,9 @@
+cabal-version:       2.2
 name:                backpack-issue
 version:             0.1.0.0
 -- synopsis:
 -- description:
-license:             BSD3
+license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Isaac Elliott
 maintainer:          isaace71295@gmail.com
@@ -10,7 +11,6 @@ maintainer:          isaace71295@gmail.com
 -- category:
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
-cabal-version:       >=2
 
 library library-a
   signatures:          A.Sig

@@ -1,4 +1,4 @@
-cabal-version:  2.1
+cabal-version:  2.2
 name:           ghc-prim
 version:        0.6.1
 -- NOTE: Don't forget to update ./changelog.md
