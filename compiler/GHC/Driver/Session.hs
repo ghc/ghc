@@ -3817,8 +3817,10 @@ validHoleFitsImpliedGFlags
 default_PIC :: Platform -> [GeneralFlag]
 default_PIC platform =
   case (platformOS platform, platformArch platform) of
-    (OSDarwin, ArchX86_64) -> [Opt_PIC]
-    (OSOpenBSD, ArchX86_64) -> [Opt_PIC] -- Due to PIE support in
+    (OSDarwin,  ArchX86_64)  -> [Opt_PIC]
+    (OSDarwin,  ArchAarch64) -> [Opt_PIC]
+    (OSLinux,   ArchAarch64) -> [Opt_PIC, Opt_ExternalDynamicRefs]
+    (OSOpenBSD, ArchX86_64)  -> [Opt_PIC] -- Due to PIE support in
                                          -- OpenBSD since 5.3 release
                                          -- (1 May 2013) we need to
                                          -- always generate PIC. See
@@ -5111,4 +5113,3 @@ initSDocContext dflags style = SDC
 -- | Initialize the pretty-printing options using the default user style
 initDefaultSDocContext :: DynFlags -> SDocContext
 initDefaultSDocContext dflags = initSDocContext dflags defaultUserStyle
-
