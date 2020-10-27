@@ -2364,12 +2364,18 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
              , TyVarLHS lhs_tv <- lhs
              , NomEq <- eq_rel
              -> do { traceTcS "canEqCanLHSFinish breaking a cycle" (ppr lhs $$ ppr rhs)
-                   ; new_rhs <- breakTyVarCycle lhs_tv rhs
+                   ; new_rhs <- breakTyVarCycle (ctEvLoc ev) rhs
                    ; traceTcS "new RHS:" (ppr new_rhs)
                    ; let new_pred   = mkPrimEqPred (mkTyVarTy lhs_tv) new_rhs
                          new_new_ev = new_ev { ctev_pred = new_pred }
-                   ; continueWith (CEqCan { cc_ev = new_new_ev, cc_lhs = lhs
-                                          , cc_rhs = new_rhs, cc_eq_rel = eq_rel }) }
+                           -- See Detail (6) of Note [Type variable cycles in Givens]
+
+                   ; if anyRewritableTyVar True NomEq (\ _ tv -> tv == lhs_tv) new_rhs
+                     then do { traceTcS "Note [Type variable cycles in Givens] Detail (1)"
+                                        (ppr new_new_ev)
+                             ; continueWith (mkIrredCt status new_ev) }
+                     else continueWith (CEqCan { cc_ev = new_new_ev, cc_lhs = lhs
+                                               , cc_rhs = new_rhs, cc_eq_rel = eq_rel }) }
 
                -- We must not use it for further rewriting!
              | otherwise
@@ -2655,8 +2661,6 @@ as possible.  Hence the ps_xi1, ps_xi2 argument passed to canEqCanLHS.
 
 Note [Type variable cycles in Givens]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-"RAE": update
-
 Consider this situation (from indexed-types/should_compile/GivenLoop):
 
   instance C (Maybe b)
@@ -2671,43 +2675,39 @@ Instead, we detect this scenario by the following characteristics:
  - a Given CEqCan constraint
  - with a tyvar on its LHS
  - with a soluble occurs-check failure
+ - and a nominal equality
 
-Having identified the scenario, we create a fresh untouchable metavariable a'
-(with MetaInfo CycleBreakerTv), and replace all occurrences of `a` in the RHS
-with a'. This is done by breakTyVarCycle. We have now disrupted the
-occurs-check problem and can make the CEqCan.
+Having identified the scenario, we wish to replace all type family
+applications on the RHS with fresh metavariables (with MetaInfo
+CycleBreakerTv). This is done in breakTyVarCycle. These metavariables are
+untouchable, but we also emit Givens relating the fresh variables to the type
+family applications they replace.
 
-Of course, we don't want a' leaking into e.g. error messages. So we
-restore the cycles by setting a' := a after we're done running the
-solver (in nestImplicTcS and runTcSWithEvBinds). This is done by
-restoreTyVarCycles, which uses the inert_tv_cycles field in InertSet,
-which contains the pairings invented in breakTyVarCycle.
+Of course, we don't want our fresh variables leaking into e.g. error messages.
+So we fill in the metavariables with their original type family applications
+after we're done running the solver (in nestImplicTcS and runTcSWithEvBinds).
+This is done by restoreTyVarCycles, which uses the inert_cycle_breakers field in
+InertSet, which contains the pairings invented in breakTyVarCycle.
 
-Note that we don't have to think about evidence here, because the
-loop-breaker variable just gets zonked right back to the original
-one. By the time we examine the evidence, all traces of this trick
-are very long gone.
+In our example, we start with
+
+  [G] a ~ Maybe (F a)
+
+We then change this to become
+
+  [G] a ~ Maybe cbv
+  [G] F a ~ cbv
+
+and set cbv := F a after we're done solving.
 
 There are drawbacks of this approach:
 
- 1. This trick allows us to use a loopy Given once, but not twice.
-    And it's possible for twice to be necessary. #18875:
-
-      type family G a b where
-        G (Maybe c) d = d
-
-      h :: (e ~ Maybe (G e f)) => e -> f
-      h (Just x) = x
-
-    In order to accept this, we have to use the Given twice, in order
-    for G e f to reduce to show that e ~ Maybe f.
-
- 2. We apply this trick only for Givens, never for Wanted or Derived.
+ 1. We apply this trick only for Givens, never for Wanted or Derived.
     It wouldn't make sense for Wanted, because Wanted never rewrite.
     But it's conceivable that a Derived would benefit from this all.
     I doubt it would ever happen, though, so I'm holding off.
 
- 3. We don't use this trick for representational equalities, as there
+ 2. We don't use this trick for representational equalities, as there
     is no concrete use case where it is helpful (unlike for nominal
     equalities). Furthermore, because function applications can be
     CanEqLHSs, but newtype applications cannot, the disparities between
@@ -2719,12 +2719,56 @@ There are drawbacks of this approach:
       f :: (Coercible a (N a b), Coercible (N a b) b) => a -> b
       f = coerce
 
-    failed with "Could not match 'b' with 'b'." Further work is saved
-    for when we have a concrete incentive to explore this dark corner.
+    failed with "Could not match 'b' with 'b'." Further work is held off
+    until when we have a concrete incentive to explore this dark corner.
 
-Wrinkles:
+Details:
 
- (1) Can't go under foralls.
+ (1) We don't look under foralls, at all, when substituting away type family
+     applications, because doing so can never be fruitful. Recall that we
+     are in a case like [G] a ~ forall b. ... a ....   Until we have a type
+     family that can pull the body out from a forall, this will always be
+     insoluble. Note also that the forall cannot be in an argument to a
+     type family, or that outer type family application would already have
+     been substituted away.
+
+     However, we still must check to make sure that breakTyVarCycle actually
+     succeeds in getting rid of all occurrences of the offending variable.
+     If one is hidden under a forall, this won't be true. So we perform
+     an additional check after performing the substitution.
+
+     Skipping this check causes typecheck/should_fail/GivenForallLoop to loop.
+
+ (2) Our goal here is to avoid loops in rewriting. We can thus skip looking
+     in coercions, as we don't rewrite in coercions.
+
+ (3) As we're substituting, we can build ill-kinded
+     types. For example, if we have Proxy (F a) b, where (b :: F a), then
+     replacing this with Proxy cbv b is ill-kinded. However, we will later
+     set cbv := F a, and so the zonked type will be well-kinded again.
+     The temporary ill-kinded type hurts no one, and avoiding this would
+     be quite painfully difficult.
+
+ (4) The evidence for the produced Givens is all just reflexive, because
+     we will eventually set the cycle-breaker variable to be the type family,
+     and then, after the zonk, all will be well.
+
+ (5) The approach here is inefficient. For instance, we could choose to
+     affect only type family applications that mention the offending variable.
+     We could try to detect cases like a ~ (F a, F a) and use the same
+     tyvar to replace F a. (Cf. Note [Flattening] in GHC.Core.Unify, which
+     goes to this extra effort.) There may be other opportunities for
+     improvement. However, this is really a very small corner case, always
+     tickled by a user-written Given. The investment to craft a clever,
+     performant solution seems unworthwhile.
+
+ (6) We often get the predicate associated with a constraint from its
+     evidence. We thus must not only make sure the generated CEqCan's
+     fields have the updated RHS type, but we must also update the
+     evidence itself. As in Detail (4), we don't need to change the
+     evidence term (as in e.g. rewriteEqEvidence) because the cycle
+     breaker variables are all zonked away by the time we examine the
+     evidence.
 
 -}
 
