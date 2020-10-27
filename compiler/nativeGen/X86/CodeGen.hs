@@ -1804,6 +1804,35 @@ I386: First, we have to ensure that the condition
 codes are set according to the supplied comparison operation.
 -}
 
+{-  Note [64-bit integer comparisons on 32-bit]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    When doing these comparisons there are 2 kinds of
+    comparisons.
+
+    * Comparison for equality (or lack thereof)
+
+    We use xor to check if high/low bits are
+    equal. Then combine the results using or and
+    perform a single conditional jump based on the
+    result.
+
+    * Other comparisons:
+
+    We map all other comparisons to the >= operation.
+    Why? Because it's easy to encode it with a single
+    conditional jump.
+
+    We do this by first computing [r1_lo - r2_lo]
+    and use the carry flag to compute
+    [r1_high - r2_high - CF].
+
+    At which point if r1 >= r2 then the result will be
+    positive. Otherwise negative so we can branch on this
+    condition.
+
+-}
+
 
 genCondBranch
     :: BlockId      -- the source of the jump
@@ -1821,22 +1850,63 @@ genCondBranch' :: Bool -> BlockId -> BlockId -> BlockId -> CmmExpr
                -> NatM InstrBlock
 
 -- 64-bit integer comparisons on 32-bit
+-- See Note [64-bit integer comparisons on 32-bit]
 genCondBranch' is32Bit _bid true false (CmmMachOp mop [e1,e2])
   | is32Bit, Just W64 <- maybeIntComparison mop = do
-  ChildCode64 code1 r1_lo <- iselExpr64 e1
-  ChildCode64 code2 r2_lo <- iselExpr64 e2
-  let r1_hi = getHiVRegFromLo r1_lo
-      r2_hi = getHiVRegFromLo r2_lo
-      cond = machOpToCond mop
-      Just cond' = maybeFlipCond cond
-  --TODO: Update CFG for x86
-  let code = code1 `appOL` code2 `appOL` toOL [
-        CMP II32 (OpReg r2_hi) (OpReg r1_hi),
-        JXX cond true,
-        JXX cond' false,
-        CMP II32 (OpReg r2_lo) (OpReg r1_lo),
-        JXX cond true] `appOL` genBranch false
-  return code
+
+  -- The resulting registers here are both the lower part of
+  -- the register as well as a way to get at the higher part.
+  ChildCode64 code1 r1 <- iselExpr64 e1
+  ChildCode64 code2 r2 <- iselExpr64 e2
+  let cond = machOpToCond mop :: Cond
+
+  let cmpCode = intComparison cond true false r1 r2
+  return $ code1 `appOL` code2 `appOL` cmpCode
+
+  where
+    intComparison :: Cond -> BlockId -> BlockId -> Reg -> Reg -> InstrBlock
+    intComparison cond true false r1_lo r2_lo =
+      case cond of
+        -- Impossible results of machOpToCond
+        ALWAYS  -> panic "impossible"
+        NEG     -> panic "impossible"
+        POS     -> panic "impossible"
+        CARRY   -> panic "impossible"
+        OFLO    -> panic "impossible"
+        PARITY  -> panic "impossible"
+        NOTPARITY -> panic "impossible"
+        -- Special case #1 x == y and x != y
+        EQQ -> cmpExact
+        NE  -> cmpExact
+        -- [x >= y]
+        GE  -> cmpGE
+        GEU -> cmpGE
+        -- [x >  y] <==> ![y >= x]
+        GTT -> intComparison GE  false true r2_lo r1_lo
+        GU  -> intComparison GEU false true r2_lo r1_lo
+        -- [x <= y] <==> [y >= x]
+        LE  -> intComparison GE  true false r2_lo r1_lo
+        LEU -> intComparison GEU true false r2_lo r1_lo
+        -- [x <  y] <==> ![x >= x]
+        LTT -> intComparison GE  false true r1_lo r2_lo
+        LU  -> intComparison GEU false true r1_lo r2_lo
+      where
+        r1_hi = getHiVRegFromLo r1_lo
+        r2_hi = getHiVRegFromLo r2_lo
+        cmpExact :: OrdList Instr
+        cmpExact =
+          toOL
+            [ XOR II32 (OpReg r2_hi) (OpReg r1_hi)
+            , XOR II32 (OpReg r2_lo) (OpReg r1_lo)
+            , OR  II32 (OpReg r1_hi)  (OpReg r1_lo)
+            , JXX cond true
+            , JXX ALWAYS false
+            ]
+        cmpGE = toOL
+            [ CMP II32 (OpReg r2_lo) (OpReg r1_lo)
+            , SBB II32 (OpReg r2_hi) (OpReg r1_hi)
+            , JXX cond true
+            , JXX ALWAYS false ]
 
 genCondBranch' _ bid id false bool = do
   CondCode is_float cond cond_code <- getCondCode bool

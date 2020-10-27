@@ -1821,7 +1821,9 @@ loop:
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
 
-    ASSERT(StgTSO_block_info(tso) == mvar);
+    if(StgTSO_block_info(tso) != mvar) {
+      ccall putMVarError(mvar "ptr", tso "ptr");
+    }
     // save why_blocked here, because waking up the thread destroys
     // this information
     W_ why_blocked;

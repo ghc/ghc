@@ -41,6 +41,16 @@ RtsMsgFunction *errorMsgFn           = rtsErrorMsgFn;
 RtsMsgFunction *sysErrorMsgFn        = rtsSysErrorMsgFn;
 
 void
+putMVarError(StgMVar *mvar, StgTSO *tso)
+{
+  errorBelch("putMVarzh: uh oh, blocked mismatch\n");
+  errorBelch("  tso->why_blocked=%d\n", tso->why_blocked);
+  errorBelch("  tso->block_info=%p\n", tso->block_info);
+  errorBelch("  mvar=%p\n", mvar);
+  barf("he's dead, jim.\n");
+}
+
+void
 barf(const char*s, ...)
 {
   va_list ap;
