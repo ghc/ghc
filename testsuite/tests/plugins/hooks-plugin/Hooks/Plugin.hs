@@ -8,14 +8,15 @@ import GHC.Hs.Extension
 import GHC.Hs.Lit
 import GHC.Driver.Hooks
 import GHC.Tc.Utils.Monad
+import GHC.Types.Hook
+import GHC.Tc.Gen.Splice (RunMetaHook (..))
 
 plugin :: Plugin
 plugin = defaultPlugin { dynflagsPlugin = hooksP }
 
 hooksP :: [CommandLineOption] -> DynFlags -> IO DynFlags
 hooksP opts dflags = return $ dflags
-  { hooks = (hooks dflags)
-    { runMetaHook = Just (fakeRunMeta opts) }
+  { hooks = setHook (hooks dflags) (RunMetaHook (fakeRunMeta opts))
   }
 
 -- This meta hook doesn't actually care running code in splices,

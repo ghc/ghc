@@ -3,12 +3,19 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module GHC.Rename.Splice (
-        rnTopSpliceDecls,
-        rnSpliceType, rnSpliceExpr, rnSplicePat, rnSpliceDecl,
-        rnBracket,
-        checkThLocalName
-        , traceSplice, SpliceInfo(..)
+module GHC.Rename.Splice
+   ( rnTopSpliceDecls
+   , rnSpliceType
+   , rnSpliceExpr
+   , rnSplicePat
+   , rnSpliceDecl
+   , rnBracket
+   , checkThLocalName
+   , traceSplice
+   , SpliceInfo(..)
+
+   -- * Hook
+   , RenameSpliceHook (..)
   ) where
 
 #include "HsVersions.h"
@@ -314,7 +321,8 @@ runRnSplice :: UntypedSpliceFlavour
             -> HsSplice GhcRn   -- Always untyped
             -> TcRn (res, [ForeignRef (TH.Q ())])
 runRnSplice flavour run_meta ppr_res splice
-  = do { splice' <- getHooked runRnSpliceHook return >>= ($ splice)
+  = do { RenameSpliceHook rn_splice <- getHooked (RenameSpliceHook return)
+       ; splice' <- rn_splice splice
 
        ; let the_expr = case splice' of
                 HsUntypedSplice _ _ _ e   ->  e
@@ -354,6 +362,10 @@ runRnSplice flavour run_meta ppr_res splice
     is_decl = case flavour of
                  UntypedDeclSplice -> True
                  _                 -> False
+
+newtype RenameSpliceHook = RenameSpliceHook (HsSplice GhcRn -> RnM (HsSplice GhcRn))
+
+instance IsHook RenameSpliceHook
 
 ------------------
 makePending :: UntypedSpliceFlavour

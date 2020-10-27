@@ -20,20 +20,25 @@
 -- is restricted to what the outside world understands (read C), and this
 -- module checks to see if a foreign declaration has got a legal type.
 module GHC.Tc.Gen.Foreign
-        ( tcForeignImports
-        , tcForeignExports
+   ( tcForeignImports
+   , tcForeignExports
 
-        -- Low-level exports for hooks
-        , isForeignImport, isForeignExport
-        , tcFImport, tcFExport
-        , tcForeignImports'
-        , tcCheckFIType, checkCTarget, checkForeignArgs, checkForeignRes
-        , normaliseFfiType
-        , nonIOok, mustBeIO
-        , checkSafe, noCheckSafe
-        , tcForeignExports'
-        , tcCheckFEType
-        ) where
+   -- Low-level exports for hooks
+   , isForeignImport, isForeignExport
+   , tcFImport, tcFExport
+   , tcForeignImports'
+   , tcCheckFIType, checkCTarget, checkForeignArgs, checkForeignRes
+   , normaliseFfiType
+   , nonIOok, mustBeIO
+   , checkSafe, noCheckSafe
+   , tcForeignExports'
+   , tcCheckFEType
+
+   -- * Hooks
+   , TcForeignImportsHook (..)
+   , TcForeignExportsHook (..)
+   )
+where
 
 #include "HsVersions.h"
 
@@ -216,8 +221,9 @@ to the module's usages.
 
 tcForeignImports :: [LForeignDecl GhcRn]
                  -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt)
-tcForeignImports decls
-  = getHooked tcForeignImportsHook tcForeignImports' >>= ($ decls)
+tcForeignImports decls = do
+   TcForeignImportsHook tc_imports <- getHooked (TcForeignImportsHook tcForeignImports')
+   tc_imports decls
 
 tcForeignImports' :: [LForeignDecl GhcRn]
                   -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt)
@@ -359,8 +365,9 @@ checkMissingAmpersand dflags arg_tys res_ty
 
 tcForeignExports :: [LForeignDecl GhcRn]
              -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)
-tcForeignExports decls =
-  getHooked tcForeignExportsHook tcForeignExports' >>= ($ decls)
+tcForeignExports decls = do
+  (TcForeignExportsHook tc_exports) <- getHooked (TcForeignExportsHook tcForeignExports')
+  tc_exports decls
 
 tcForeignExports' :: [LForeignDecl GhcRn]
              -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)
@@ -566,3 +573,10 @@ foreignDeclCtxt :: ForeignDecl GhcRn -> SDoc
 foreignDeclCtxt fo
   = hang (text "When checking declaration:")
        2 (ppr fo)
+
+
+newtype TcForeignImportsHook = TcForeignImportsHook ([LForeignDecl GhcRn] -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt))
+newtype TcForeignExportsHook = TcForeignExportsHook ([LForeignDecl GhcRn] -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt))
+
+instance IsHook TcForeignImportsHook
+instance IsHook TcForeignExportsHook

@@ -165,6 +165,7 @@ Library
         GHC.Driver.Backend
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
+        GHC.Types.Hook
         GHC.Types.Name.Shape
         GHC.Iface.Rename
         GHC.Types.Avail
