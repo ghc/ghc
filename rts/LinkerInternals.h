@@ -19,7 +19,6 @@
 #define _DARWIN_C_SOURCE 1
 #endif
 #include <sys/mman.h>
-void* mmap_next(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 #endif
 
 void printLoadedObjects(void);

@@ -1051,41 +1051,6 @@ mmapForLinkerMarkExecutable(void *start, size_t len)
 
 #elif RTS_LINKER_USE_MMAP
 
-/* -----------------------------------------------------------------------------
-   Occationally we depend on mmap'd region being close to already mmap'd regions.
-
-   Our static in-memory linker may be restricted by the architectures relocation
-   range. E.g. aarch64 has a +-4GB range for PIC code, thus we'd preferrably
-   get memory for the linker close to existing mappings.  mmap on it's own is
-   free to return any memory location, independent of what the preferred
-   location argument indicates.
-
-   For example mmap (via qemu) might give you addresses all over the available
-   memory range if the requested location is already occupied.
-
-   mmap_next will do a linear search from the start page upwards to find a
-   suitable location that is as close as possible to the locations (proivded
-   via the first argument).
-   -------------------------------------------------------------------------- */
-
-void*
-mmap_next(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
-  if(addr == NULL) return mmap(addr, length, prot, flags, fd, offset);
-  // we are going to look for up to pageSize * 1024 * 1024 (4GB) from the
-  // address.
-  size_t pageSize = getPageSize();
-  for(int i = (uintptr_t)addr & (pageSize-1) ? 1 : 0; i < 1024*1024; i++) {
-    void *target = (void*)(((uintptr_t)addr & ~(pageSize-1))+(i*pageSize));
-    void *mem = mmap(target, length, prot, flags, fd, offset);
-    if(mem == NULL) return mem;
-    if(mem == target) return mem;
-    munmap(mem, length);
-    IF_DEBUG(linker && (i % 1024 == 0),
-      debugBelch("mmap_next failed to find suitable space in %p - %p\n", addr, target));
-  }
-  return NULL;
-}
-
 //
 // Returns NULL on failure.
 //
@@ -1117,8 +1082,8 @@ mmap_again:
             debugBelch("mmapForLinker: \tflags      %#0x\n",
                        MAP_PRIVATE | tryMap32Bit | fixed | flags));
 
-   result = mmap_next(map_addr, size, prot,
-                      MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
+   result = mmap(map_addr, size, prot,
+                 MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
 
    if (result == MAP_FAILED) {
        sysErrorBelch("mmap %" FMT_Word " bytes at %p",(W_)size,map_addr);
