@@ -871,11 +871,11 @@ cloneAnonMetaTyVar info tv kind
 
 -- Make a new CycleBreakerTv. See Note [Type variable cycles in Givens]
 -- in GHC.Tc.Solver.Canonical.
-newCycleBreakerTyVar :: TyVar -> TcM TcTyVar
-newCycleBreakerTyVar old_tv
+newCycleBreakerTyVar :: TcKind -> TcM TcTyVar
+newCycleBreakerTyVar kind
   = do { details <- newMetaDetails CycleBreakerTv
-       ; name <- cloneMetaTyVarName (tyVarName old_tv)
-       ; return (mkTcTyVar name (tyVarKind old_tv) details) }
+       ; name <- newMetaTyVarName (fsLit "cbv")
+       ; return (mkTcTyVar name kind details) }
 
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info

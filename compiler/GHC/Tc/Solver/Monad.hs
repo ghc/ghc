@@ -123,7 +123,7 @@ module GHC.Tc.Solver.Monad (
                                              -- if the whole instance matcher simply belongs
                                              -- here
 
-    breakTyVarCycle
+    breakTyVarCycle, flattenView
 ) where
 
 #include "HsVersions.h"
@@ -146,6 +146,7 @@ import GHC.Tc.Instance.Class( InstanceWhat(..), safeOverlap, instanceReturnsDict
 import GHC.Tc.Utils.TcType
 import GHC.Driver.Session
 import GHC.Core.Type
+import qualified GHC.Core.TyCo.Rep as Rep  -- this needs to be used only very locally
 import GHC.Core.Coercion
 import GHC.Core.Unify
 
@@ -392,8 +393,8 @@ data InertSet
               -- Canonical Given, Wanted, Derived
               -- Sometimes called "the inert set"
 
-       , inert_tv_cycles :: [(TcTyVar, TcTyVar)]
-              -- a list of CycleBreakerTv / original tv pairs (in that order)
+       , inert_cycle_breakers :: [(TcTyVar, TcType)]
+              -- a list of CycleBreakerTv / original family applications
               -- used to undo the cycle-breaking needed to handle
               -- Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical
 
@@ -434,10 +435,10 @@ emptyInertCans
 
 emptyInert :: InertSet
 emptyInert
-  = IS { inert_cans         = emptyInertCans
-       , inert_tv_cycles    = []
-       , inert_flat_cache   = emptyFunEqs
-       , inert_solved_dicts = emptyDictMap }
+  = IS { inert_cans           = emptyInertCans
+       , inert_cycle_breakers = []
+       , inert_flat_cache     = emptyFunEqs
+       , inert_solved_dicts   = emptyDictMap }
 
 
 {- Note [Solved dictionaries]
@@ -1397,7 +1398,7 @@ addTyEq old_eqs tv ct
 addCanFunEq :: FunEqMap EqualCtList -> TyCon -> [TcType] -> Ct
             -> FunEqMap EqualCtList
 addCanFunEq old_eqs fun_tc fun_args ct
-  = alterTcApp old_eqs (getUnique fun_tc) fun_args upd
+  = alterTcApp old_eqs fun_tc fun_args upd
   where
     upd (Just old_equal_ct_list) = Just $ addToEqualCtList ct old_equal_ct_list
     upd Nothing                  = Just $ [ct]
@@ -1419,14 +1420,10 @@ findTyEqs icans tv = lookupDVarEnv (inert_eqs icans) tv `orElse` []
 
 delEq :: InertCans -> CanEqLHS -> TcType -> InertCans
 delEq ic lhs rhs = case lhs of
-    TyVarLHS tv -> ic { inert_eqs = modifyDVarEnv
-                                      (filter (not . isThisOne))
-                                      (inert_eqs ic) tv }
-    TyFamLHS tf args -> ic { inert_funeqs = alterTcApp
-                                              (inert_funeqs ic)
-                                              (getUnique tf)
-                                              args
-                                              upd }
+    TyVarLHS tv
+      -> ic { inert_eqs = modifyDVarEnv (filter (not . isThisOne)) (inert_eqs ic) tv }
+    TyFamLHS tf args
+      -> ic { inert_funeqs = alterTcApp (inert_funeqs ic) tf args upd }
       where
         upd (Just eq_ct_list)
           | null filtered = Nothing
@@ -1702,7 +1699,7 @@ kick_out_rewritable new_fr new_lhs
     extend_fun_eqs :: FunEqMap EqualCtList -> CanEqLHS -> EqualCtList
                    -> FunEqMap EqualCtList
     extend_fun_eqs eqs (TyFamLHS fam_tc fam_args) cts
-      = insertTcApp eqs (getUnique fam_tc) fam_args cts
+      = insertTcApp eqs fam_tc fam_args cts
     extend_fun_eqs eqs other _cts = pprPanic "extend_fun_eqs" (ppr eqs $$ ppr other)
 
     kick_out_eqs :: (container -> CanEqLHS -> EqualCtList -> container)
@@ -2338,7 +2335,7 @@ not match the requested info exactly!
 
 -}
 
-type TcAppMap a = UniqDFM Unique (ListMap LooseTypeMap a)
+type TcAppMap a = UniqDFM TyCon (ListMap LooseTypeMap a)
     -- Indexed by tycon then the arg types, using "loose" matching, where
     -- we don't require kind equality. This allows, for example, (a |> co)
     -- to match (a).
@@ -2352,27 +2349,23 @@ isEmptyTcAppMap m = isNullUDFM m
 emptyTcAppMap :: TcAppMap a
 emptyTcAppMap = emptyUDFM
 
-findTcApp :: Uniquable k => TcAppMap a -> k -> [Type] -> Maybe a
-findTcApp m u tys = do { tys_map <- lookupUDFM m u
-                       ; lookupTM tys tys_map }
+findTcApp :: TcAppMap a -> TyCon -> [Type] -> Maybe a
+findTcApp m tc tys = do { tys_map <- lookupUDFM m tc
+                        ; lookupTM tys tys_map }
 
-delTcApp :: Uniquable k => TcAppMap a -> k -> [Type] -> TcAppMap a
-delTcApp m cls tys = adjustUDFM (deleteTM tys) m cls
+delTcApp :: TcAppMap a -> TyCon -> [Type] -> TcAppMap a
+delTcApp m tc tys = adjustUDFM (deleteTM tys) m tc
 
-insertTcApp :: Uniquable k => TcAppMap a -> k -> [Type] -> a -> TcAppMap a
-insertTcApp m cls tys ct = alterUDFM alter_tm m cls
+insertTcApp :: TcAppMap a -> TyCon -> [Type] -> a -> TcAppMap a
+insertTcApp m tc tys ct = alterUDFM alter_tm m tc
   where
     alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
 
-alterTcApp :: forall a k. Uniquable k
-           => TcAppMap a -> k -> [Type] -> (Maybe a -> Maybe a) -> TcAppMap a
-alterTcApp m cls tys upd = alterUDFM alter_tm m cls
+alterTcApp :: forall a. TcAppMap a -> TyCon -> [Type] -> (Maybe a -> Maybe a) -> TcAppMap a
+alterTcApp m tc tys upd = alterUDFM alter_tm m tc
   where
     alter_tm :: Maybe (ListMap LooseTypeMap a) -> Maybe (ListMap LooseTypeMap a)
     alter_tm m_elt = Just (alterTM tys upd (m_elt `orElse` emptyTM))
-
--- mapTcApp :: (a->b) -> TcAppMap a -> TcAppMap b
--- mapTcApp f = mapUDFM (mapTM f)
 
 filterTcAppMap :: (Ct -> Bool) -> TcAppMap Ct -> TcAppMap Ct
 filterTcAppMap f m
@@ -2458,7 +2451,7 @@ findDict m loc cls tys
   = Nothing             -- See Note [Solving CallStack constraints]
 
   | otherwise
-  = findTcApp m (getUnique cls) tys
+  = findTcApp m (classTyCon cls) tys
 
 findDictsByClass :: DictMap a -> Class -> Bag a
 findDictsByClass m cls
@@ -2466,10 +2459,10 @@ findDictsByClass m cls
   | otherwise                  = emptyBag
 
 delDict :: DictMap a -> Class -> [Type] -> DictMap a
-delDict m cls tys = delTcApp m (getUnique cls) tys
+delDict m cls tys = delTcApp m (classTyCon cls) tys
 
 addDict :: DictMap a -> Class -> [Type] -> a -> DictMap a
-addDict m cls tys item = insertTcApp m (getUnique cls) tys item
+addDict m cls tys item = insertTcApp m (classTyCon cls) tys item
 
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
@@ -2512,7 +2505,7 @@ emptyFunEqs :: TcAppMap a
 emptyFunEqs = emptyTcAppMap
 
 findFunEq :: FunEqMap a -> TyCon -> [Type] -> Maybe a
-findFunEq m tc tys = findTcApp m (getUnique tc) tys
+findFunEq m tc tys = findTcApp m tc tys
 
 findFunEqsByTyCon :: FunEqMap a -> TyCon -> [a]
 -- Get inert function equation constraints that have the given tycon
@@ -2520,8 +2513,8 @@ findFunEqsByTyCon :: FunEqMap a -> TyCon -> [a]
 -- We use this to check for derived interactions with built-in type-function
 -- constructors.
 findFunEqsByTyCon m tc
-  | Just tm <- lookupUDFM m (getUnique tc) = foldTM (:) tm []
-  | otherwise                              = []
+  | Just tm <- lookupUDFM m tc = foldTM (:) tm []
+  | otherwise                  = []
 
 foldFunEqs :: (a -> b -> b) -> FunEqMap a -> b -> b
 foldFunEqs = foldTcAppMap
@@ -2536,7 +2529,7 @@ anyFunEqMap m test = foldFunEqs (\ a b -> b || test a) m False
 -- filterFunEqs = filterTcAppMap
 
 insertFunEq :: FunEqMap a -> TyCon -> [Type] -> a -> FunEqMap a
-insertFunEq m tc tys val = insertTcApp m (getUnique tc) tys val
+insertFunEq m tc tys val = insertTcApp m tc tys val
 
 {-
 ************************************************************************
@@ -3436,24 +3429,61 @@ See GHC.Tc.Solver.Monad.deferTcSForAllEq
 ************************************************************************
 -}
 
--- | Replace all occurrences of the LHS tyvar in an RHS with a fresh
--- variable, recording the pairing in the TcS monad.
+-- | Replace all type family applications in the RHS with fresh variables,
+-- emitting givens that relate the type family application to the variable.
 -- See Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical.
-breakTyVarCycle :: TyVar       -- the LHS tyvar
+breakTyVarCycle :: CtLoc
                 -> TcType      -- the RHS
-                -> TcS TcType  -- new RHS that doesn't mention TyVar
-breakTyVarCycle lhs_tv rhs
-  = do { new_tv <- wrapTcS (TcM.newCycleBreakerTyVar lhs_tv)
-       ; updInertTcS $ \is ->
-           is { inert_tv_cycles = (new_tv, lhs_tv) : inert_tv_cycles is }
-       ; let in_scope = mkInScopeSet (tyCoVarsOfType rhs)
-             subst0   = mkEmptyTCvSubst in_scope
-             subst    = extendTvSubstWithClone subst0 lhs_tv new_tv
-       ; return (substTy subst rhs) }
+                -> TcS TcType  -- new RHS that doesn't have any type families
+-- This could be considerably more efficient. See Detail (5) of Note.
+breakTyVarCycle loc = go
+  where
+    go ty | Just ty' <- flattenView ty = go ty'
+    go (Rep.TyConApp tc tys)
+      | isTypeFamilyTyCon tc
+      = do { let (fun_args, extra_args) = splitAt (tyConArity tc) tys
+                 fun_app                = mkTyConApp tc fun_args
+                 fun_app_kind           = tcTypeKind fun_app
+           ; new_tv <- wrapTcS (TcM.newCycleBreakerTyVar fun_app_kind)
+           ; let new_ty     = mkTyVarTy new_tv
+                 given_pred = mkHeteroPrimEqPred fun_app_kind fun_app_kind
+                                                 fun_app new_ty
+                 given_term = evCoercion $ mkNomReflCo new_ty  -- See Detail (4) of Note
+           ; new_given <- newGivenEvVar loc (given_pred, given_term)
+           ; traceTcS "breakTyVarCycle replacing type family" (ppr new_given)
+           ; emitWorkNC [new_given]
+           ; updInertTcS $ \is ->
+               is { inert_cycle_breakers = (new_tv, fun_app) :
+                                           inert_cycle_breakers is }
+           ; extra_args' <- mapM go extra_args
+           ; return (mkAppTys new_ty extra_args') }
+              -- Worried that this substitution will change kinds?
+              -- See Detail (3) of Note
+
+      | otherwise
+      = mkTyConApp tc <$> mapM go tys
+
+    go (Rep.AppTy ty1 ty2)       = mkAppTy <$> go ty1 <*> go ty2
+    go (Rep.FunTy vis w arg res) = mkFunTy vis <$> go w <*> go arg <*> go res
+    go (Rep.CastTy ty co)        = mkCastTy <$> go ty <*> pure co
+
+    go ty@(Rep.TyVarTy {})    = return ty
+    go ty@(Rep.LitTy {})      = return ty
+    go ty@(Rep.ForAllTy {})   = return ty  -- See Detail (1) of Note
+    go ty@(Rep.CoercionTy {}) = return ty  -- See Detail (2) of Note
 
 -- | Filli in CycleBreakerTvs with the variables they stand for.
 -- See Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical.
 restoreTyVarCycles :: InertSet -> TcM ()
 restoreTyVarCycles is
-  = forM_ (inert_tv_cycles is) $ \ (cycle_breaker_tv, orig_tv) ->
-    TcM.writeMetaTyVar cycle_breaker_tv (mkTyVarTy orig_tv)
+  = forM_ (inert_cycle_breakers is) $ \ (cycle_breaker_tv, orig_ty) ->
+    TcM.writeMetaTyVar cycle_breaker_tv orig_ty
+
+-- Unwrap a type synonym only when either:
+--   The type synonym is forgetful, or
+--   the type synonym mentions a type family in its expansion
+flattenView :: TcType -> Maybe TcType
+flattenView ty@(Rep.TyConApp tc _)
+  | isForgetfulSynTyCon tc || (isTypeSynonymTyCon tc && not (isFamFreeTyCon tc))
+  = tcView ty
+flattenView _other = Nothing
