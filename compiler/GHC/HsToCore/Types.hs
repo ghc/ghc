@@ -12,17 +12,13 @@ import GHC.Types.CostCentre.State
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Var
-import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
+import GHC.Hs (HsExpr, GhcTc)
 import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
 import GHC.HsToCore.Pmc.Types (Nablas)
-import GHC.Core (CoreExpr)
 import GHC.Core.FamInstEnv
 import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Unit.Module
-import GHC.Driver.Hooks (DsForeignsHook)
-import GHC.Data.OrdList (OrdList)
-import GHC.Driver.Types (ForeignStubs)
 
 {-
 ************************************************************************
@@ -80,6 +76,3 @@ data DsMetaVal
 
 -- | Desugaring monad. See also 'TcM'.
 type DsM = TcRnIf DsGblEnv DsLclEnv
-
--- See Note [The Decoupling Abstract Data Hack]
-type instance DsForeignsHook = [LForeignDecl GhcTc] -> DsM (ForeignStubs, OrdList (Id, CoreExpr))

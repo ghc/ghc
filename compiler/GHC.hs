@@ -627,7 +627,7 @@ setSessionDynFlags dflags0 = do
             , iservConfOpts     = getOpts dflags opt_i
             , iservConfProfiled = profiled
             , iservConfDynamic  = dynamic
-            , iservConfHook     = createIservProcessHook (hooks dflags)
+            , iservConfHook     = getHook (hooks dflags)
             , iservConfTrace    = tr
             }
          s <- liftIO $ newMVar IServPending

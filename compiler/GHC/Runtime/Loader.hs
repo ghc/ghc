@@ -17,7 +17,10 @@ module GHC.Runtime.Loader (
         -- * Loading values
         getValueSafely,
         getHValueSafely,
-        lessUnsafeCoerce
+        lessUnsafeCoerce,
+
+        -- * Hook
+        GetValueSafelyHook (..)
     ) where
 
 import GHC.Prelude
@@ -180,7 +183,8 @@ forceLoadTyCon hsc_env con_name = do
 
 getValueSafely :: HscEnv -> Name -> Type -> IO (Maybe a)
 getValueSafely hsc_env val_name expected_type = do
-  mb_hval <- lookupHook getValueSafelyHook getHValueSafely dflags hsc_env val_name expected_type
+  let GetValueSafelyHook get_hval = lookupHook (GetValueSafelyHook getHValueSafely) dflags
+  mb_hval <- get_hval hsc_env val_name expected_type
   case mb_hval of
     Nothing   -> return Nothing
     Just hval -> do
@@ -188,6 +192,10 @@ getValueSafely hsc_env val_name expected_type = do
       return (Just value)
   where
     dflags = hsc_dflags hsc_env
+
+newtype GetValueSafelyHook = GetValueSafelyHook (HscEnv -> Name -> Type -> IO (Maybe HValue))
+
+instance IsHook GetValueSafelyHook
 
 getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
 getHValueSafely hsc_env val_name expected_type = do
