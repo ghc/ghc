@@ -1164,6 +1164,60 @@ To avoid this, we use nested `case` expressions and generate code like this:
               s2 -> D s1 s2
 -}
 
+{- Note [Why sums and products are treated differently by the unpacker]
+
+We could in principle handle products in dataConArgUnpack in the same way
+we handle sums, by producing a single representation type which was an
+unboxed product rather than an unboxed sum. However, the strictness
+analyser currently is able to make use of the information about the
+strictness of each of the components of a product (which are passed back
+here in the list of StrictnessMarks), whereas it is unable to consume or
+make use of information about potential strictness of the fields of sum
+constructors (which would require some new sort of representation for the
+strictness information).
+
+Presently, if we have a situation like:
+
+  data T = MkT {-# UNPACK #-} S Char
+  data S = MkS !Int Bool !Int
+
+The worker for MkT has four arguments, and the strictness information
+might be rendered as:
+
+  mkT :: Int -> Bool -> Int -> Char -> T
+  mkT :str: SLSL -> .
+
+The strictness of the arguments of mkT is essentially a bit-vector,
+represented by the type [StrictnessMark] here.
+
+When the strictness analyser is faced with a case expression on the
+unpacked representation data constructor for MkT:
+
+  case x of MkTRep a b c d -> expr
+
+it can know from the strictness marks associated with MkTRep that a is
+evaluated.
+
+If we were to change it so that there was a single representation type
+for the unpacked field, the worker would then have a type something like:
+
+  mkT :: (# Int, Bool, Int #) -> Char -> T
+  mkT :str: S(SLS)L -> .
+
+and in the new story, we would need a way with something like:
+
+  case x of MkTRep abc d ->
+    case abc of (# a, b, c #) -> expr
+
+for the strictness analyser to know that a is evaluated in expr.
+
+This would require the information about strictness of worker
+arguments (or perhaps variables in general) to become more detailed,
+such that we could drill down into the parts of the unboxed product
+to determine if they are evaluated or not. This may eventually be
+something to consider, but it's a larger project.
+
+-}
 
 dataConArgUnpack
    :: Scaled Type
