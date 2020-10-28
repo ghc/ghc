@@ -144,13 +144,12 @@ dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
             -> CoreExpr -- Should obey the let/app invariant
             -> (BothDmdArg, CoreExpr)
-dmdAnalStar env dmd e
-  | (dmd_shell, cd) <- toCleanDmd dmd
-  , (dmd_ty, e')    <- dmdAnal env cd e
+dmdAnalStar env (n :* cd) e
+  | (dmd_ty, e')    <- dmdAnal env cd e
   = ASSERT2( not (isUnliftedType (exprType e)) || exprOkForSpeculation e, ppr e )
     -- The argument 'e' should satisfy the let/app invariant
     -- See Note [Analysing with absent demand] in GHC.Types.Demand
-    (postProcessDmdType dmd_shell dmd_ty, e')
+    (multDmdType n dmd_ty, e')
 
 -- Main Demand Analsysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
@@ -172,7 +171,7 @@ dmdAnal' env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
 
 dmdAnal' env dmd (Cast e co)
-  = (dmd_ty `bothDmdType` mkBothDmdArg (coercionDmdEnv co), Cast e' co)
+  = (dmd_ty `plusDmdType` mkBothDmdArg (coercionDmdEnv co), Cast e' co)
   where
     (dmd_ty, e') = dmdAnal env dmd e
 
@@ -206,7 +205,7 @@ dmdAnal' env dmd (App fun arg)
 --         , text "arg dmd_ty =" <+> ppr arg_ty
 --         , text "res dmd_ty =" <+> ppr res_ty
 --         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
-    (res_ty `bothDmdType` arg_ty, App fun' arg')
+    (res_ty `plusDmdType` arg_ty, App fun' arg')
 
 dmdAnal' env dmd (Lam var body)
   | isTyVar var
@@ -216,13 +215,13 @@ dmdAnal' env dmd (Lam var body)
     (body_ty, Lam var body')
 
   | otherwise
-  = let (body_dmd, defer_and_use) = peelCallDmd dmd
+  = let (n, body_dmd) = peelCallDmd dmd
           -- body_dmd: a demand to analyze the body
 
         (body_ty, body') = dmdAnal env body_dmd body
         (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty var
     in
-    (postProcessUnsat defer_and_use lam_ty, Lam var' body')
+    (multUnsat n lam_ty, Lam var' body')
 
 dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
@@ -243,9 +242,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
-        scrut_dmd          = mkProdDmd id_dmds
+        scrut_dmd          = Prod id_dmds
         (scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
-        res_ty             = alt_ty3 `bothDmdType` toBothDmdArg scrut_ty
+        res_ty             = alt_ty3 `plusDmdType` toBothDmdArg scrut_ty
         case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
         bndrs'             = setBndrsDemandInfo bndrs id_dmds
     in
@@ -274,7 +273,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
           = deferAfterPreciseException alt_ty
           | otherwise
           = alt_ty
-        res_ty               = alt_ty2 `bothDmdType` toBothDmdArg scrut_ty
+        res_ty               = alt_ty2 `plusDmdType` toBothDmdArg scrut_ty
 
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
@@ -304,7 +303,7 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
     id'                = setIdDemandInfo id id_dmd
 
     (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
-    final_ty           = body_ty' `bothDmdType` rhs_ty
+    final_ty           = body_ty' `plusDmdType` rhs_ty
 
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 rhs') body')
@@ -957,7 +956,7 @@ dmdFix top_lvl env let_dmd orig_pairs
           = ((env', lazy_fv'), (id', rhs'))
           where
             (lazy_fv1, sig, rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
-            lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
+            lazy_fv'              = plusVarEnv_C plusDmd lazy_fv lazy_fv1
             env'                  = extendAnalEnv top_lvl env id sig
             id'                   = setIdStrictness id sig
 
@@ -1043,11 +1042,11 @@ coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)
 
 addVarDmd :: DmdType -> Var -> Demand -> DmdType
 addVarDmd (DmdType fv ds res) var dmd
-  = DmdType (extendVarEnv_C bothDmd fv var dmd) ds res
+  = DmdType (extendVarEnv_C plusDmd fv var dmd) ds res
 
 addLazyFVs :: DmdType -> DmdEnv -> DmdType
 addLazyFVs dmd_ty lazy_fvs
-  = dmd_ty `bothDmdType` mkBothDmdArg lazy_fvs
+  = dmd_ty `plusDmdType` mkBothDmdArg lazy_fvs
         -- Using bothDmdType (rather than just both'ing the envs)
         -- is vital.  Consider
         --      let f = \x -> (x,y)
@@ -1115,7 +1114,7 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
       -- Watch out!  See note [Lambda-bound unfoldings]
     final_ty = case maybeUnfoldingTemplate (idUnfolding id) of
                  Nothing  -> main_ty
-                 Just unf -> main_ty `bothDmdType` unf_ty
+                 Just unf -> main_ty `plusDmdType` unf_ty
                           where
                              (unf_ty, _) = dmdAnalStar env dmd unf
 

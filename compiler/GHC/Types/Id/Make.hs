@@ -516,8 +516,8 @@ mkDictSelId name clas
     strict_sig = mkClosedStrictSig [arg_dmd] topDiv
     arg_dmd | new_tycon = evalDmd
             | otherwise = mkManyUsedDmd $
-                          mkProdDmd [ if name == sel_name then evalDmd else absDmd
-                                    | sel_name <- sel_names ]
+                          Prod [ if name == sel_name then evalDmd else absDmd
+                               | sel_name <- sel_names ]
 
 mkDictSelRhs :: Class
              -> Int         -- 0-indexed selector among (superclasses ++ methods)
