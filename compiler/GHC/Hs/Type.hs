@@ -1982,8 +1982,8 @@ ppr_fun_ty mult ty1 ty2
 
 --------------------------
 ppr_tylit :: HsTyLit -> SDoc
-ppr_tylit (HsNumTy _ i) = integer i
-ppr_tylit (HsStrTy _ s) = text (show s)
+ppr_tylit (HsNumTy source i) = pprWithSourceText source (integer i)
+ppr_tylit (HsStrTy source s) = pprWithSourceText source (text (show s))
 
 
 -- | @'hsTypeNeedsParens' p t@ returns 'True' if the type @t@ needs parentheses

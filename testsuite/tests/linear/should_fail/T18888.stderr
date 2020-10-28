@@ -1,0 +1,3 @@
+
+T18888.hs:4:9:
+    Illegal type: ‘001’ Perhaps you intended to use DataKinds
