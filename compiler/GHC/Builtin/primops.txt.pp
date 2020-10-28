@@ -458,6 +458,16 @@ primtype Int32#
 primop Int32ExtendOp "extendInt32#" GenPrimOp Int32# -> Int#
 primop Int32NarrowOp "narrowInt32#" GenPrimOp Int# -> Int32#
 
+------------------------------------------------------------------------
+section "Word32#"
+        {Operations on 32-bit unsigned integers.}
+------------------------------------------------------------------------
+
+primtype Word32#
+
+primop Word32ExtendOp "extendWord32#" GenPrimOp Word32# -> Int#
+primop Word32NarrowOp "narrowWord32#" GenPrimOp Int# -> Word32#
+
 #if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------
 section "Int64#"
