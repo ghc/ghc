@@ -895,7 +895,7 @@ Old "solution":
         of iterateList in the first place
 
 But in principle the user *might* want rules that only apply to the Id
-he says.  And inline pragmas are similar
+they say.  And inline pragmas are similar
    {-# NOINLINE f #-}
    f = local
    local = <stuff>

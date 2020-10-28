@@ -1287,8 +1287,8 @@ speakNth n = hcat [ int n, text suffix ]
 -- > speakN 5 = text "five"
 -- > speakN 10 = text "10"
 speakN :: Int -> SDoc
-speakN 0 = text "none"  -- E.g.  "he has none"
-speakN 1 = text "one"   -- E.g.  "he has one"
+speakN 0 = text "none"  -- E.g.  "they have none"
+speakN 1 = text "one"   -- E.g.  "they have one"
 speakN 2 = text "two"
 speakN 3 = text "three"
 speakN 4 = text "four"
