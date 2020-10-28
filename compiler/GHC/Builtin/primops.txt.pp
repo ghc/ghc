@@ -465,8 +465,8 @@ section "Word32#"
 
 primtype Word32#
 
-primop Word32ExtendOp "extendWord32#" GenPrimOp Word32# -> Int#
-primop Word32NarrowOp "narrowWord32#" GenPrimOp Int# -> Word32#
+primop Word32ExtendOp "extendWord32#" GenPrimOp Word32# -> Word#
+primop Word32NarrowOp "narrowWord32#" GenPrimOp Word# -> Word32#
 
 #if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------
