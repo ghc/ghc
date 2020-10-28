@@ -2620,7 +2620,8 @@ mkLHsOpTy x op y =
   in L loc (mkHsOpTy x op y)
 
 mkMultTy :: IsUnicodeSyntax -> Located Token -> LHsType GhcPs -> (HsArrow GhcPs, AddAnn)
-mkMultTy u tok t@(L _ (HsTyLit _ (HsNumTy _ 1)))
+mkMultTy u tok t@(L _ (HsTyLit _ (HsNumTy (SourceText "1") 1)))
+  -- See #18888 for the use of (SourceText "1") above
   = (HsLinearArrow u, AddAnn AnnPercentOne (combineLocs tok t))
 mkMultTy u tok t = (HsExplicitMult u t, AddAnn AnnPercent (getLoc tok))
 
