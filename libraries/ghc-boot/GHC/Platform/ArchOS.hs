@@ -45,6 +45,7 @@ data Arch
    | ArchAlpha
    | ArchMipseb
    | ArchMipsel
+   | ArchRiscV64
    | ArchJavaScript
    deriving (Read, Show, Eq)
 

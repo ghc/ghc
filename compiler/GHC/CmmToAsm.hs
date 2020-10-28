@@ -170,6 +170,7 @@ nativeCodeGen dflags this_mod modLoc h us cmms
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
+      ArchRiscV64   -> panic "nativeCodeGen: No NCG for RiscV64"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
 
@@ -1194,4 +1195,3 @@ initNCGConfig dflags = NCGConfig
    , ncgDwarfUnwindings     = debugLevel dflags >= 1
    , ncgDwarfStripBlockInfo = debugLevel dflags < 2 -- We strip out block information when running with -g0 or -g1.
    }
-

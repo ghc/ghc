@@ -272,6 +272,7 @@ Library
         GHC.Platform.SPARC
         GHC.Platform.X86
         GHC.Platform.X86_64
+        GHC.Platform.RiscV64
         GHC.StgToCmm.CgUtils
         GHC.StgToCmm
         GHC.StgToCmm.Bind
