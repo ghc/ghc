@@ -953,7 +953,7 @@ The question for this Note is this:
 Much of the debate is memorialized in #15743.
 
 Here is our design choice. When inferring the ordering of variables
-for a TyCl declaration (that is, for those variables that he user
+for a TyCl declaration (that is, for those variables that the user
 has not specified the order with an explicit `forall`), we use the
 following order:
 

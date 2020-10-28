@@ -411,7 +411,7 @@ handleSeqHValueStatus :: HscEnv -> EvalStatus () -> IO (EvalResult ())
 handleSeqHValueStatus hsc_env eval_status = do
   case eval_status of
     (EvalBreak is_exception _ ix mod_uniq resume_ctxt _) -> do
-      -- A breakpoint was hit, inform the user and tell him
+      -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue hsc_env resume_ctxt
       let hmi = expectJust "handleRunStatus" $

@@ -454,7 +454,7 @@ There are a few subtleties in the desugaring of `seq`:
           I# _ -> ...case b of {True -> fst x; False -> 0}...
 
     We can try to avoid doing this by ensuring that the binder-swap in the
-    case happens, so we get his at an early stage:
+    case happens, so we get this at an early stage:
        case chp of chp2 { I# -> ...chp2... }
     But this is fragile.  The real culprit is the source program.  Perhaps we
     should have said explicitly

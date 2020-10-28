@@ -1511,7 +1511,7 @@ Note [Expandable overloadings]
 Suppose the user wrote this
    {-# RULE  forall x. foo (negate x) = h x #-}
    f x = ....(foo (negate x))....
-He'd expect the rule to fire. But since negate is overloaded, we might
+They'd expect the rule to fire. But since negate is overloaded, we might
 get this:
     f = \d -> let n = negate d in \x -> ...foo (n x)...
 So we treat the application of a function (negate in this case) to a
@@ -2621,4 +2621,3 @@ isUnsafeEqualityProof e
   = idName v == unsafeEqualityProofName
   | otherwise
   = False
-

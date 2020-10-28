@@ -224,7 +224,7 @@ extra-constraints wildcard is used to infer three extra constraints.
           arbitCs :: _ => a -> String
 
 An extra-constraints wildcard shouldn't prevent the programmer from
-already listing the constraints he knows or wants to annotate, e.g.
+already listing the constraints they know or want to annotate, e.g.
 
 ::
 
