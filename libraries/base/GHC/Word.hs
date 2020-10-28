@@ -108,11 +108,11 @@ instance Num Word8 where
     (W8# x#) + (W8# y#)    = W8# (narrowWord8# ((extendWord8# x#) `plusWord#` (extendWord8# y#)))
     (W8# x#) - (W8# y#)    = W8# (narrowWord8# ((extendWord8# x#) `minusWord#` (extendWord8# y#)))
     (W8# x#) * (W8# y#)    = W8# (narrowWord8# ((extendWord8# x#) `timesWord#` (extendWord8# y#)))
-    negate (W8# x#)        = W8# (narrowWord8# (int2Word# (negateInt# (word2Int# ((extendWord8# x#)))))
+    negate (W8# x#)        = W8# (narrowWord8# (int2Word# (negateInt# (word2Int# ((extendWord8# x#))))))
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = W8# (narrowWord8# (integerToWord# ((extendWord8# i)))
+    fromInteger i          = W8# (narrowWord8# (integerToWord# ((extendWord8# i))))
 
 -- | @since 2.01
 instance Real Word8 where
@@ -383,9 +383,9 @@ instance Bits Word16 where
     (W16# x#) `unsafeShiftL` (I# i#) =
         W16# (narrowWord16# ((extendWord16# x#) `uncheckedShiftL#` i#))
     (W16# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W16# ((extendWord16# x#) `shiftRL#` i#)
+        | isTrue# (i# >=# 0#)  = W16# (narrowWord16# ((extendWord16# x#) `shiftRL#` i#))
         | otherwise            = overflowError
-    (W16# x#) `unsafeShiftR` (I# i#) = W16# ((extendWord16# x#) `uncheckedShiftRL#` i#)
+    (W16# x#) `unsafeShiftR` (I# i#) = W16# (narrowWord16# ((extendWord16# x#) `uncheckedShiftRL#` i#))
     (W16# x#) `rotate`       (I# i#)
         | isTrue# (i'# ==# 0#) = W16# x#
         | otherwise  = W16# (narrowWord16# (((extendWord16# x#) `uncheckedShiftL#` i'#) `or#`
@@ -411,7 +411,7 @@ instance FiniteBits Word16 where
 --
 -- @since 4.7.0.0
 byteSwap16 :: Word16 -> Word16
-byteSwap16 (W16# w#) = W16# (narrow16Word# (byteSwap16# w#))
+byteSwap16 (W16# w#) = W16# (narrowWord16# (byteSwap16# (extendWord16# w#)))
 
 {-# RULES
 "fromIntegral/Word8->Word16"   fromIntegral = \(W8# x#) -> W16# (narrowWord16# (extendWord8# x#))
@@ -570,16 +570,16 @@ instance Enum Word32 where
 -- | @since 2.01
 instance Integral Word32 where
     quot    (W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `quotWord#` (extendWord32# y#))
+        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `quotWord#` (extendWord32# y#)))
         | otherwise                 = divZeroError
     rem     (W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `remWord#` (extendWord32# y#))
+        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `remWord#` (extendWord32# y#)))
         | otherwise                 = divZeroError
     div     (W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `quotWord#` (extendWord32# y#))
+        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `quotWord#` (extendWord32# y#)))
         | otherwise                 = divZeroError
     mod     (W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `remWord#` (extendWord32# y#))
+        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `remWord#` (extendWord32# y#)))
         | otherwise                 = divZeroError
     quotRem (W32# x#) y@(W32# y#)
         | y /= 0                  = case (extendWord32# x#) `quotRemWord#` (extendWord32# y#) of
@@ -682,7 +682,7 @@ instance Ix Word32 where
 --
 -- @since 4.7.0.0
 byteSwap32 :: Word32 -> Word32
-byteSwap32 (W32# w#) = W32# (narrow32Word# (byteSwap32# w#))
+byteSwap32 (W32# w#) = W32# (narrowWord32# (byteSwap32# (extendWord32# w#)))
 
 ------------------------------------------------------------------------
 -- type Word64
@@ -1053,19 +1053,19 @@ byteSwap64 (W64# w#) = W64# (byteSwap# w#)
 --
 -- @since 4.12.0.0
 bitReverse8 :: Word8 -> Word8
-bitReverse8 (W8# w#) = W8# (narrow8Word# (bitReverse8# w#))
+bitReverse8 (W8# w#) = W8# (narrowWord8# (bitReverse8# (extendWord8# w#)))
 
 -- | Reverse the order of the bits in a 'Word16'.
 --
 -- @since 4.12.0.0
 bitReverse16 :: Word16 -> Word16
-bitReverse16 (W16# w#) = W16# (narrow16Word# (bitReverse16# w#))
+bitReverse16 (W16# w#) = W16# (narrowWord16# (bitReverse16# (extendWord16# w#)))
 
 -- | Reverse the order of the bits in a 'Word32'.
 --
 -- @since 4.12.0.0
 bitReverse32 :: Word32 -> Word32
-bitReverse32 (W32# w#) = W32# (narrow32Word# (bitReverse32# w#))
+bitReverse32 (W32# w#) = W32# (narrowWord32# (bitReverse32# (extendWord32# w#)))
 
 -- | Reverse the order of the bits in a 'Word64'.
 --
