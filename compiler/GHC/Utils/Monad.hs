@@ -11,7 +11,7 @@ module GHC.Utils.Monad
         , zipWith3M, zipWith3M_, zipWith4M, zipWithAndUnzipM
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M, mapAndUnzip5M
         , mapAccumLM
-        , applyToFstM, applyToSndM
+        , liftFstM, liftSndM
         , mapSndM
         , concatMapM
         , mapMaybeM
@@ -165,11 +165,11 @@ mapSndM f xs = go xs
     go []         = return []
     go ((a,b):xs) = do { c <- f b; rs <- go xs; return ((a,c):rs) }
 
-applyToFstM :: Monad m => (a -> b) -> m (a, r) -> m (b, r)
-applyToFstM f thing = do { (a,r) <- thing; return (f a, r) }
+liftFstM :: Monad m => (a -> b) -> m (a, r) -> m (b, r)
+liftFstM f thing = do { (a,r) <- thing; return (f a, r) }
 
-applyToSndM :: Monad m => (a -> b) -> m (r, a) -> m (r, b)
-applyToSndM f thing = do { (r,a) <- thing; return (r, f a) }
+liftSndM :: Monad m => (a -> b) -> m (r, a) -> m (r, b)
+liftSndM f thing = do { (r,a) <- thing; return (r, f a) }
 
 -- | Monadic version of concatMap
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]

@@ -3003,7 +3003,7 @@ bindOuterFamEqnTKBndrs_Q_Tv :: HsOuterFamEqnTyVarBndrs GhcRn
                             -> TcM a
                             -> TcM ([TcTyVar], a)
 bindOuterFamEqnTKBndrs_Q_Tv hs_bndrs thing_inside
-  = applyToFstM getOuterTyVars $
+  = liftFstM getOuterTyVars $
     bindOuterTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
                                  , sm_tvtv = True })
                       hs_bndrs thing_inside
@@ -3013,7 +3013,7 @@ bindOuterFamEqnTKBndrs :: HsOuterFamEqnTyVarBndrs GhcRn
                        -> TcM a
                        -> TcM ([TcTyVar], a)
 bindOuterFamEqnTKBndrs hs_bndrs thing_inside
-  = applyToFstM getOuterTyVars $
+  = liftFstM getOuterTyVars $
     bindOuterTKBndrsX (smVanilla { sm_clone = False, sm_parent = True })
                       hs_bndrs thing_inside
     -- sm_clone=False: see Note [Cloning for type variable binders]
@@ -3096,14 +3096,14 @@ bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
     -> TcM ([TcTyVar], a)
 -- These do not clone: see Note [Cloning for type variable binders]
 bindExplicitTKBndrs_Q_Skol ctxt_kind hs_bndrs thing_inside
-  = applyToFstM binderVars $
+  = liftFstM binderVars $
     bindExplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
                                     , sm_kind = ctxt_kind })
                          hs_bndrs thing_inside
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
 bindExplicitTKBndrs_Q_Tv ctxt_kind hs_bndrs thing_inside
-  = applyToFstM binderVars $
+  = liftFstM binderVars $
     bindExplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
                                     , sm_tvtv = True, sm_kind = ctxt_kind })
                          hs_bndrs thing_inside
@@ -3118,7 +3118,7 @@ bindExplicitTKBndrsX :: (OutputableBndrFlag flag)
 bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_kind
                                    , sm_holes = hole_info })
                      hs_tvs thing_inside
-  = do { traceTc "bindExplicTKBndrs" (ppr hs_tvs)
+  = do { traceTc "bindExplicitTKBndrs" (ppr hs_tvs)
        ; go hs_tvs }
   where
     tc_ki_mode = TcTyMode { mode_tyki = KindLevel, mode_holes = hole_info }
@@ -3232,7 +3232,7 @@ bindImplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
 --           SkolemMode
 --------------------------------------
 
--- | 'SkolemMode' decribes how to typecheck an explict ('HsTyVarBndr') or
+-- | 'SkolemMode' decribes how to typecheck an explicit ('HsTyVarBndr') or
 -- implicit ('Name') binder in a type. It is just a record of flags
 -- that describe what sort of 'TcTyVar' to create.
 data SkolemMode
@@ -3283,15 +3283,15 @@ When we /must not/ clone
   (in tcDataFamInstDecl) bring p,q into scope before looking at the
   the constructor decls.
 
-* bindExplictTKBndrs_Q_Tv/bindImplicitTKBndrs_Q_Tv do not clone
+* bindExplicitTKBndrs_Q_Tv/bindImplicitTKBndrs_Q_Tv do not clone
   We take advantage of this in kcInferDeclHeader:
      all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
   If we cloned, we'd need to take a bit more care here; not hard.
 
-* bindExplictTKBndrs_Q_Skol, bindExplictTKBndrs_Skol, do not clone.
+* bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Skol, do not clone.
   There is no need, I think.
 
-  The payoff here is that avoiding gratuitious cloning means that we can
+  The payoff here is that avoiding gratuitous cloning means that we can
   almost always take the fast path in swizzleTcTyConBndrs.
 
 When we /must/ clone.
