@@ -1744,8 +1744,8 @@ Note [spec_usg includes rhs_usg]
 In calls to 'specialise', the returned ScUsage must include the rhs_usg in
 the passed-in SpecInfo, unless there are no calls at all to the function.
 
-The caller can, indeed must, assume this.  He should not combine in rhs_usg
-himself, or he'll get rhs_usg twice -- and that can lead to an exponential
+The caller can, indeed must, assume this.  They should not combine in rhs_usg
+themselves, or they'll get rhs_usg twice -- and that can lead to an exponential
 blowup of duplicates in the CallEnv.  This is what gave rise to the massive
 performance loss in #8852.
 

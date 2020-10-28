@@ -90,7 +90,7 @@ initNabla = MkNabla initTyState initTmState
 instance Outputable Nabla where
   ppr nabla = hang (text "Nabla") 2 $ vcat [
       -- intentionally formatted this way enable the dev to comment in only
-      -- the info she needs
+      -- the info they need
       ppr (nabla_tm_st nabla),
       ppr (nabla_ty_st nabla)
     ]

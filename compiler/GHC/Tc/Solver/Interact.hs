@@ -88,7 +88,7 @@ Note [Basic Simplifier Plan]
       - If (ContinueWith ct) is returned by a stage, we feed 'ct' on to
         the next stage in the pipeline.
 4. If the element has survived (i.e. ContinueWith x) the last stage
-   then we add him in the inerts and jump back to Step 1.
+   then we add it in the inerts and jump back to Step 1.
 
 If in Step 1 no such element exists, we have exceeded our context-stack
 depth and will simply fail.
@@ -1671,7 +1671,7 @@ variable *on the left* of the equality. Here is what happens if not:
   Original wanted:  (a ~ alpha),  (alpha ~ Int)
 We spontaneously solve the first wanted, without changing the order!
       given : a ~ alpha      [having unified alpha := a]
-Now the second wanted comes along, but he cannot rewrite the given, so we simply continue.
+Now the second wanted comes along, but it cannot rewrite the given, so we simply continue.
 At the end we spontaneously solve that guy, *reunifying*  [alpha := Int]
 
 We avoid this problem by orienting the resulting given so that the unification

@@ -335,8 +335,8 @@ mkSpliceDecl :: LHsExpr GhcPs -> HsDecl GhcPs
 -- If the user wrote
 --      [pads| ... ]   then return a QuasiQuoteD
 --      $(e)           then return a SpliceD
--- but if she wrote, say,
---      f x            then behave as if she'd written $(f x)
+-- but if they wrote, say,
+--      f x            then behave as if they'd written $(f x)
 --                     ie a SpliceD
 --
 -- Typed splices are not allowed at the top level, thus we do not represent them

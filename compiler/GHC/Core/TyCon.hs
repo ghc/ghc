@@ -224,8 +224,8 @@ See also Note [Wrappers for data instance tycons] in GHC.Types.Id.Make
 
 * Reply "yes" to isDataFamilyTyCon, and isFamilyTyCon
 
-* The user does not see any "equivalent types" as he did with type
-  synonym families.  He just sees constructors with types
+* The user does not see any "equivalent types" as they did with type
+  synonym families.  They just see constructors with types
         T1 :: T Int
         T2 :: Bool -> T Int
 

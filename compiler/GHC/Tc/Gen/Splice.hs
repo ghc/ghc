@@ -553,7 +553,7 @@ We only produce warnings for TH splices when the user requests so
 (-fenable-th-splice-warnings). There are multiple reasons:
 
   * It's not clear that the user that compiles a splice is the author of the code
-    that produces the warning. Think of the situation where she just splices in
+    that produces the warning. Think of the situation where they just splice in
     code from a third-party library that produces incomplete pattern matches.
     In this scenario, the user isn't even able to fix that warning.
   * Gathering information for producing the warnings (pattern-match check

@@ -1345,7 +1345,7 @@ pprLoc (UnhelpfulSpan {}) = empty
 --   (b) it is always in scope
 --   (c) it is a synonym for Data.Kind.Type
 --
--- However, the user might not know that he's working on a module with
+-- However, the user might not know that they are working on a module with
 -- NoStarIsType and write code that still assumes (a), (b), and (c), which
 -- actually do not hold in that module.
 --

@@ -101,7 +101,7 @@ tcCheckPolyExpr, tcCheckPolyExprNC
 -- tcCheckPolyExpr is a convenient place (frequent but not too frequent)
 -- place to add context information.
 -- The NC version does not do so, usually because the caller wants
--- to do so himself.
+-- to do so themselves.
 
 tcCheckPolyExpr   expr res_ty = tcPolyExpr   expr (mkCheckExpType res_ty)
 tcCheckPolyExprNC expr res_ty = tcPolyExprNC expr (mkCheckExpType res_ty)

@@ -1494,7 +1494,7 @@ If you want to know where InlinePragmas take effect: Look in GHC.HsToCore.Binds.
 
 Note [inl_inline and inl_act]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* inl_inline says what the user wrote: did she say INLINE, NOINLINE,
+* inl_inline says what the user wrote: did they say INLINE, NOINLINE,
   INLINABLE, or nothing at all
 
 * inl_act says in what phases the unfolding is active or inactive
