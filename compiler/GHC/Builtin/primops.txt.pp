@@ -408,16 +408,6 @@ primop Int16LtOp "ltInt16#" Compare Int16# -> Int16# -> Int#
 primop Int16NeOp "neInt16#" Compare Int16# -> Int16# -> Int#
 
 ------------------------------------------------------------------------
-section "Int32#"
-        {Operations on 32-bit integers.}
-------------------------------------------------------------------------
-
-primtype Int32#
-
-primop Int32ExtendOp "extendInt32#" GenPrimOp Int32# -> Int#
-primop Int32NarrowOp "narrowInt32#" GenPrimOp Int# -> Int32#
-
-------------------------------------------------------------------------
 section "Word16#"
         {Operations on 16-bit unsigned integers.}
 ------------------------------------------------------------------------
@@ -457,6 +447,16 @@ primop Word16GtOp "gtWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> Int#
+
+------------------------------------------------------------------------
+section "Int32#"
+        {Operations on 32-bit integers.}
+------------------------------------------------------------------------
+
+primtype Int32#
+
+primop Int32ExtendOp "extendInt32#" GenPrimOp Int32# -> Int#
+primop Int32NarrowOp "narrowInt32#" GenPrimOp Int# -> Int32#
 
 #if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------
