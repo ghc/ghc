@@ -2,7 +2,7 @@
 T11520.hs:15:77: error:
     • Expected kind ‘k2 -> k1’, but ‘g’ has kind ‘k4’
       ‘k4’ is a rigid type variable bound by
-        the instance declaration
+        an instance declaration
         at T11520.hs:15:10-78
     • In the second argument of ‘Compose’, namely ‘g’
       In the first argument of ‘Typeable’, namely ‘(Compose f g)’
