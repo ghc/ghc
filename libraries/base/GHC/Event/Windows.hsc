@@ -290,8 +290,8 @@ foreign import ccall safe "registerIOCPHandle"
   registerIOCPHandle :: FFI.IOCP -> IO ()
 
 foreign import ccall safe "registerAlertableWait"
--- (bool has_timeout, DWORD mssec, uint64_t num_req, bool pending_service);
-  c_registerAlertableWait :: Bool -> DWORD -> Word64 -> Bool -> IO ()
+-- (bool has_timeout, DWORD mssec);
+  c_registerAlertableWait :: Bool -> DWORD  -> IO ()
 
 foreign import ccall safe "getOverlappedEntries"
   getOverlappedEntries :: Ptr DWORD -> IO (Ptr OVERLAPPED_ENTRY)
@@ -674,12 +674,11 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                              status <- fmap fromIntegral getLastError
                              completionCB' status 0
                         when (not threadedIOMgr) $
-                          do num_remaining <- outstandingRequests
-                             -- Run timeouts. This way if we canceled the last
+                          do -- Run timeouts. This way if we canceled the last
                              -- IO Request and have no timer events waiting we
                              -- can go into an unbounded alertable wait.
                              delay <- runExpiredTimeouts mgr
-                             registerAlertableWait delay num_remaining True
+                             registerAlertableWait delay
                         return $ IOFailed Nothing
         let runner = do debugIO $ (dbgMsg ":: waiting ") ++ " | "  ++ show lpol
                         res <- readIOPort signal `catch` cancel
@@ -1104,23 +1103,20 @@ processRemoteCompletion = do
     -- Process available completions
     _ <- processCompletion mngr n delay
 
-    num_left <- outstandingRequests
-
     -- Update and potentially wake up IO Manager
     -- This call will unblock the non-threaded I/O manager.  After this it is no
     -- longer safe to use `entries` nor `completed` as they can now be modified
     -- by the C thread.
-    registerAlertableWait delay num_left False
+    registerAlertableWait delay
 
     debugIO "processRemoteCompletion :: done ()"
     return ()
 
-registerAlertableWait :: Maybe Seconds -> Word64 -> Bool -> IO ()
-registerAlertableWait Nothing num_reqs pending_service =
-  c_registerAlertableWait False 0 num_reqs pending_service
-registerAlertableWait (Just delay) num_reqs pending_service =
+registerAlertableWait :: Maybe Seconds  -> IO ()
+registerAlertableWait Nothing =
+  c_registerAlertableWait False 0
+registerAlertableWait (Just delay) =
   c_registerAlertableWait True (secondsToMilliSeconds delay)
-                          num_reqs pending_service
 
 -- | Event loop for the Threaded I/O manager.  The one for the non-threaded
 -- I/O manager is in AsyncWinIO.c in the rts.

@@ -325,17 +325,10 @@ void completeSynchronousRequest (void)
    * MSSEC is the maximum amount of time in milliseconds that an alertable wait
       should be done for before the haskell side requested to be notified of progress.
    * NUM_REQ is the total overall number of outstanding I/O requests.
-   * pending_service indicates that there might be still a outstanding service
-     request queued and therefore we shouldn't unblock the runner quite yet.
-
-   `pending_service` is needed in case we cancel an IO operation. We don't want this
-   to result in two processRemoteCompletion threads being queued. As this is both harder
-   to reason about and bad for performance. So we only reset outstanding_service_requests
-   if no service is pending.
 
    */
 
-void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_req, bool pending_service)
+void registerAlertableWait (bool has_timeout, DWORD mssec)
 {
   ASSERT(completionPortHandle != INVALID_HANDLE_VALUE);
   AcquireSRWLockExclusive (&wio_runner_lock);
