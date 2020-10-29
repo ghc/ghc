@@ -231,6 +231,9 @@ AS_IF([test "x$with_libcharset" != xno],
 
 fi
 
+# workaround for building the library with cabal, which doesn't run the
+# configure script in the top level directory
+CFLAGS="-I../.. -I../../../../includes $CFLAGS"
 dnl Calling AC_CHECK_TYPE(T) makes AC_CHECK_SIZEOF(T) abort on failure
 dnl instead of considering sizeof(T) as 0.
 AC_CHECK_TYPE([struct MD5Context], [], [AC_MSG_ERROR([internal error])], [#include "include/md5.h"])
