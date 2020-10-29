@@ -54,7 +54,7 @@ Rec {
 -- RHS size: {terms: 40, types: 5, coercions: 0, joins: 0/0}
 Roman.foo_$s$wgo [Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Str=<U><U>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<A><U>, Unf=OtherCon []]
 Roman.foo_$s$wgo
   = \ (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#) ->
       case GHC.Prim.<=# sc1 0# of {
