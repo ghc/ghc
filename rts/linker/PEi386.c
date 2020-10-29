@@ -1952,13 +1952,15 @@ ocResolve_PEi386 ( ObjectCode* oc )
                {
                    uint64_t v;
                    v = S + A;
-                   if (v >> 32) {
+                   // N.B. in the case of the sign-extended relocations we must ensure that v is
+                   // fits in a signed 32-bit value. See #15808.
+                   if (((intptr_t) v > (intptr_t) INT32_MAX) || ((intptr_t) v < (intptr_t) INT32_MIN)) {
                        copyName (getSymShortName (info, sym), oc,
                                  symbol, sizeof(symbol)-1);
                        S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol);
                        /* And retry */
                        v = S + A;
-                       if (v >> 32) {
+                       if (((intptr_t) v > (intptr_t) INT32_MAX) || ((intptr_t) v < (intptr_t) INT32_MIN)) {
                            barf("IMAGE_REL_AMD64_ADDR32[NB]: High bits are set in %zx for %s",
                                 v, (char *)symbol);
                        }
