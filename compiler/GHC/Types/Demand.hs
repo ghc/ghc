@@ -12,8 +12,8 @@
 -}
 
 module GHC.Types.Demand (
-        Card, Demand(..), CleanDemand(Prod), viewProd,
-        mkOnceUsedDmd, mkManyUsedDmd, oneifyDmd, oneifyCard,
+        Card(..), Demand(..), CleanDemand(Prod), viewProd,
+        oneifyDmd, oneifyCard,
         absDmd, topDmd, botDmd, seqDmd,
         lubCard, lubDmd, lubCleanDmd,
         plusCard, plusDmd, plusCleanDmd,
@@ -319,13 +319,9 @@ f g = (snd (g 3), True)
 should be: <L,C(U(AU))>m
 -}
 
-mkOnceUsedDmd, mkManyUsedDmd :: CleanDemand -> Demand
-mkOnceUsedDmd cd = C_11 :* cd
-mkManyUsedDmd cd = C_1N :* cd
-
+-- | Evaluated strictly, and used arbitrarily deeply
 evalDmd :: Demand
--- Evaluated strictly, and used arbitrarily deeply
-evalDmd = C_1N :* topCleanDmd
+evalDmd = C_1N :* cleanEvalDmd
 
 -- | Wraps the 'CleanDemand' with a one-shot call demand: @d@ -> @C1(d)@.
 mkCallDmd :: CleanDemand -> CleanDemand
@@ -360,17 +356,21 @@ data Card
   | C_01 -- ^ {0,1}
   | C_0N -- ^ {0,1,n} Every possible cardinality; the top element.
   | C_11 -- ^ {1,1}
-  | C_1N -- ^ {1,n}
+  | C_1N -- ^ {1,n}   TODO: Think about whether this cardinality is of any
+         --                 practical relevance. If we are strict, we can
+         --                 assume that it is used at most once because of
+         --                 call-by-value. Ah yes, it's relevant for call
+         --                 demands.
   | C_10 -- ^ {}      The empty interval; the bottom element of the powerset lattice.
   deriving ( Eq )
 
 instance Show Card where
-  show C_00 = "0"
-  show C_01 = "01"
-  show C_0N = "_"
-  show C_11 = "1"
-  show C_1N = "1_"
-  show C_10 = "⊥"
+  show C_00 = "A"
+  show C_01 = "1"
+  show C_0N = "U"
+  show C_11 = "S"
+  show C_1N = "S"
+  show C_10 = "B"
 
 _botCard, topCard :: Card
 _botCard = C_10
@@ -463,17 +463,6 @@ multCard _    _    = C_0N
 -- is an interval on 'Multiplicity'.
 data Demand = !Card :* !CleanDemand
   deriving ( Eq, Show )
-
-instance Outputable Card where
-  ppr = text . show
-
-instance Outputable Demand where
-  ppr (n :* cd) = ppr n <> char '*' <> ppr cd
-
-instance Outputable CleanDemand where
-  ppr (Poly cd)   = ppr cd
-  ppr (Call n cd) = char 'C' <> ppr n <> parens (ppr cd)
-  ppr (Prod ds)   = parens (interpp'SP (map ppr ds))
 
 data CleanDemand
   = Poly !Card     -- ^ Polymorphic head demand with nested evaluation
@@ -1041,7 +1030,7 @@ plusDmdType (DmdType fv1 ds1 r1) (fv2, t2)
 
 instance Outputable DmdType where
   ppr (DmdType fv ds res)
-    = hsep [hcat (map ppr ds) <> ppr res,
+    = hsep [hcat (map (angleBrackets . ppr) ds) <> ppr res,
             if null fv_elts then empty
             else braces (fsep (map pp_elt fv_elts))]
     where
@@ -1157,7 +1146,7 @@ multDmdEnv n env
 
 -- | See Note [Scaling demands]
 reuseEnv :: DmdEnv -> DmdEnv
-reuseEnv = mapVarEnv (multDmd C_1N)
+reuseEnv = multDmdEnv C_1N
 
 -- | The trivial cases of the @mult*@ functions.
 -- If @multTrivial n abs a = ma@, we have the following outcomes
@@ -1527,17 +1516,20 @@ dmdTransformDictSelSig :: StrictSig -> CleanDemand -> DmdType
 -- for dictionary selectors.  If the selector is saturated (ie has one
 -- argument: the dictionary), we feed the demand on the result into
 -- the indicated dictionary component.
-dmdTransformDictSelSig (StrictSig (DmdType _ [_ :* Prod ds] _)) cd
-   | (n, cd') <- peelCallDmd cd
+-- NB: This currently doesn't handle newtype dictionaries and it's unclear how
+-- it could without additional parameters.
+dmdTransformDictSelSig (StrictSig (DmdType _ [(_ :* sig_cd)] _)) call_cd
+   | (n, cd') <- peelCallDmd call_cd
+   , Prod sig_ds  <- sig_cd
    = multUnsat n $
-     DmdType emptyDmdEnv [mkOnceUsedDmd $ Prod $ map (enhance cd') ds] topDiv
+     DmdType emptyDmdEnv [C_11 :* Prod (map (enhance cd') sig_ds)] topDiv
    | otherwise
    = nopDmdType -- See Note [Demand transformer for a dictionary selector]
   where
     enhance cd old | isAbsDmd old = old
-                   | otherwise    = mkOnceUsedDmd cd  -- This is the one!
+                   | otherwise    = C_11 :* cd  -- This is the one!
 
-dmdTransformDictSelSig _ _ = panic "dmdTransformDictSelSig: no args"
+dmdTransformDictSelSig sig cd = pprPanic "dmdTransformDictSelSig: no args" (ppr sig $$ ppr cd)
 
 {-
 Note [Demand transformer for a dictionary selector]
@@ -1718,8 +1710,27 @@ the demand signature, because we still want to know about the demand on things. 
 The signature of f should be <S(SL),1*U(1*U(U),A)><S,1*U>m. If we were not
 distinguishing the uses on x and y in the True case, we could either not figure
 out how deeply we can unpack x, or that we do not have to pass y.
+-}
 
+instance Outputable Card where
+  ppr = text . show
 
+instance Outputable Demand where
+  ppr dmd@(n :* cd)
+    | isAbs n          = ppr n
+    | dmd == polyDmd n = ppr n
+    | otherwise        = ppr n <> ppr cd
+
+instance Outputable CleanDemand where
+  ppr (Poly cd)   = ppr cd
+  ppr (Call n cd) = char 'C' <> ppr n <> parens (ppr cd)
+  ppr (Prod ds)   = parens (fields ds)
+    where
+      fields []     = empty
+      fields [x]    = ppr x
+      fields (x:xs) = ppr x <> char ',' <> fields xs
+
+{-
 ************************************************************************
 *                                                                      *
                      Serialisation
@@ -1762,29 +1773,22 @@ instance Binary CleanDemand where
       _ -> pprPanic "Binary:CleanDemand" (ppr (fromIntegral h :: Int))
 
 instance Binary StrictSig where
-    put_ bh (StrictSig aa) = do
-            put_ bh aa
-    get bh = do
-          aa <- get bh
-          return (StrictSig aa)
+  put_ bh (StrictSig aa) = put_ bh aa
+  get bh = StrictSig <$> get bh
 
 instance Binary DmdType where
   -- Ignore DmdEnv when spitting out the DmdType
-  put_ bh (DmdType _ ds dr)
-       = do put_ bh ds
-            put_ bh dr
-  get bh
-      = do ds <- get bh
-           dr <- get bh
-           return (DmdType emptyDmdEnv ds dr)
+  put_ bh (DmdType _ ds dr) = put_ bh ds *> put_ bh dr
+  get bh = DmdType emptyDmdEnv <$> get bh <*> get bh
 
 instance Binary Divergence where
   put_ bh Dunno    = putByte bh 0
   put_ bh ExnOrDiv = putByte bh 1
   put_ bh Diverges = putByte bh 2
-
-  get bh = do { h <- getByte bh
-              ; case h of
-                  0 -> return Dunno
-                  1 -> return ExnOrDiv
-                  _ -> return Diverges }
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return Dunno
+      1 -> return ExnOrDiv
+      2 -> return Diverges
+      _ -> pprPanic "Binary:Divergence" (ppr (fromIntegral h :: Int))

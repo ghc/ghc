@@ -513,7 +513,7 @@ mkDictSelId name clas
 
     strict_sig = mkClosedStrictSig [arg_dmd] topDiv
     arg_dmd | new_tycon = evalDmd
-            | otherwise = mkManyUsedDmd $
+            | otherwise = C_1N :*
                           Prod [ if name == sel_name then evalDmd else absDmd
                                | sel_name <- sel_names ]
 
