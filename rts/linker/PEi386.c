@@ -1952,13 +1952,15 @@ ocResolve_PEi386 ( ObjectCode* oc )
                {
                    uint64_t v;
                    v = S + A;
-                   if (v >> 32) {
+                   // N.B. in the case of the sign-extended relocations we must ensure that v
+                   // fits in a signed 32-bit value. See #15808.
+                   if (((int64_t) v > (int64_t) INT32_MAX) || ((int64_t) v < (int64_t) INT32_MIN)) {
                        copyName (getSymShortName (info, sym), oc,
                                  symbol, sizeof(symbol)-1);
                        S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol);
                        /* And retry */
                        v = S + A;
-                       if (v >> 32) {
+                       if (((int64_t) v > (int64_t) INT32_MAX) || ((int64_t) v < (int64_t) INT32_MIN)) {
                            barf("IMAGE_REL_AMD64_ADDR32[NB]: High bits are set in %zx for %s",
                                 v, (char *)symbol);
                        }
@@ -1970,14 +1972,14 @@ ocResolve_PEi386 ( ObjectCode* oc )
                {
                    intptr_t v;
                    v = S + (int32_t)A - ((intptr_t)pP) - 4;
-                   if ((v > (intptr_t) INT32_MAX) || (v < (intptr_t) INT32_MIN)) {
+                   if ((v > (int64_t) INT32_MAX) || (v < (int64_t) INT32_MIN)) {
                        /* Make the trampoline then */
                        copyName (getSymShortName (info, sym),
                                  oc, symbol, sizeof(symbol)-1);
                        S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol);
                        /* And retry */
                        v = S + (int32_t)A - ((intptr_t)pP) - 4;
-                       if ((v > (intptr_t) INT32_MAX) || (v < (intptr_t) INT32_MIN)) {
+                       if ((v > (int64_t) INT32_MAX) || (v < (int64_t) INT32_MIN)) {
                            barf("IMAGE_REL_AMD64_REL32: High bits are set in %zx for %s",
                                 v, (char *)symbol);
                        }
