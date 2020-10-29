@@ -44,6 +44,8 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 
+-- import GHC.Driver.Ppr
+
 {-
 ************************************************************************
 *                                                                      *
@@ -435,7 +437,7 @@ worker, so the worker will rebuild
      x = (a, absent-error)
 and that'll crash.
 
-Note [Aggregated demand for cardinality]
+Note [Aggregated demand for cardinality] -- TODO: This Note should be named [LetUp vs. LetDown] and probably predates said separation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use different strategies for strictness and usage/cardinality to
 "unleash" demands captured on free variables by bindings. Let us
@@ -498,7 +500,8 @@ dmdTransform env var dmd
   -- Used to be controlled by a flag.
   -- See #18429 for some perf measurements.
   | Just _ <- isClassOpId_maybe var
-  = dmdTransformDictSelSig (idStrictness var) dmd
+  = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr dmd) $
+    dmdTransformDictSelSig (idStrictness var) dmd
   -- Imported functions
   | isGlobalId var
   , let res = dmdTransformSig (idStrictness var) dmd
@@ -511,14 +514,14 @@ dmdTransform env var dmd
   = -- pprTrace "dmdTransform:LetDown" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
     if isTopLevel top_lvl
     then fn_ty   -- Don't record demand on top-level things
-    else addVarDmd fn_ty var (mkOnceUsedDmd dmd)
+    else addVarDmd fn_ty var (C_11 :* dmd)
   -- Everything else:
   --   * Local let binders for which we use LetUp (cf. 'useLetUp')
   --   * Lambda binders
   --   * Case and constructor field binders
   | otherwise
   = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr sig, ppr dmd, ppr res]) $
-    unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
+    unitDmdType (unitVarEnv var (C_11 :* dmd))
 
 {- *********************************************************************
 *                                                                      *
@@ -566,6 +569,16 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
 
     -- See Note [Aggregated demand for cardinality]
+    -- TODO: That Note doesn't explain the following lines at all. The reason
+    --       is really much different: When we have a recursive function, we'd
+    --       have to also consider the free vars of the strictness signature
+    --       when checking whether we found a fixed-point. That is expensive; we
+    --       only want to check whether argument demands of the sig changed.
+    --       reuseEnv makes it so that the FV results are stable as long as the
+    --       last argument demands were. Strictness won't change. But used-once
+    --       might turn into used-many even if the signature was stable and we'd
+    --       have to do an additional iteration. reuseEnv makes sure that we
+    --       never get used-once info for FVs of recursive fucntions.
     rhs_fv1 = case rec_flag of
                 Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
                 Nothing -> rhs_fv

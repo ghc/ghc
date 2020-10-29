@@ -607,18 +607,25 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
     dmd    = idDemandInfo arg
 
 wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> Maybe ([Demand], DataConAppContext)
-wantToUnbox fam_envs has_inlineable_prag ty dmd@(_ :* cd) =
+wantToUnbox fam_envs has_inlineable_prag ty dmd =
   case deepSplitProductType_maybe fam_envs ty of
     Just dcac@DataConAppContext{ dcac_arg_tys = con_arg_tys }
       | isStrictDmd dmd
       -- See Note [Unpacking arguments with product and polymorphic demands]
-      , Just cs <- viewProd (length con_arg_tys) cd
+      , Just cs <- split_prod_dmd_arity dmd (length con_arg_tys)
       -- See Note [Do not unpack class dictionaries]
       , not (has_inlineable_prag && isClassPred ty)
       -- See Note [mkWWstr and unsafeCoerce]
       , cs `equalLength` con_arg_tys
       -> Just (cs, dcac)
     _ -> Nothing
+  where
+    split_prod_dmd_arity dmd arty
+      -- For seqDmd, it should behave like <S(AAAA)>, for some
+      -- suitable arity
+      | isSeqDmd dmd        = Just (replicate arty absDmd)
+      | _ :* Prod ds <- dmd = Just ds
+      | otherwise           = Nothing
 
 unbox_one :: DynFlags -> FamInstEnvs -> Var
           -> [Demand]
