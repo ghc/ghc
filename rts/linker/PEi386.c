@@ -1948,39 +1948,23 @@ ocResolve_PEi386 ( ObjectCode* oc )
                }
             case 2: /* R_X86_64_32 (ELF constant 10) - IMAGE_REL_AMD64_ADDR32 (PE constant 2) */
             case 3: /* R_X86_64_32S (ELF constant 11) - IMAGE_REL_AMD64_ADDR32NB (PE constant 3) */
+            case 4: /* R_X86_64_PC32 (ELF constant 2) - IMAGE_REL_AMD64_REL32 (PE constant 4) */
             case 17: /* R_X86_64_32S ELF constant, no PE mapping. See note [ELF constant in PE file] */
                {
-                   uint64_t v;
-                   v = S + A;
-                   // N.B. in the case of the sign-extended relocations we must ensure that v
+                   // Account for PC offset in the case of IMAGE_REL_AMD64_REL32.
+                   int64_t offset = (- (intptr_t) pP - 4) ? (reloc->Type == 4) : 0;
+                   int64_t v = S + A + offset;
+
+                   // N.B. in the case of the sign-extended relocations we must ensure that v is
                    // fits in a signed 32-bit value. See #15808.
-                   if (((intptr_t) v > (intptr_t) INT32_MAX) || ((intptr_t) v < (intptr_t) INT32_MIN)) {
+                   if ((v > (int64_t) INT32_MAX) || (v < (int64_t) INT32_MIN)) {
                        copyName (getSymShortName (info, sym), oc,
                                  symbol, sizeof(symbol)-1);
                        S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol);
                        /* And retry */
-                       v = S + A;
-                       if (((intptr_t) v > (intptr_t) INT32_MAX) || ((intptr_t) v < (intptr_t) INT32_MIN)) {
-                           barf("IMAGE_REL_AMD64_ADDR32[NB]: High bits are set in %zx for %s",
-                                v, (char *)symbol);
-                       }
-                   }
-                   *(uint32_t *)pP = (uint32_t)v;
-                   break;
-               }
-            case 4: /* R_X86_64_PC32 (ELF constant 2) - IMAGE_REL_AMD64_REL32 (PE constant 4) */
-               {
-                   intptr_t v;
-                   v = S + (int32_t)A - ((intptr_t)pP) - 4;
-                   if ((v > (intptr_t) INT32_MAX) || (v < (intptr_t) INT32_MIN)) {
-                       /* Make the trampoline then */
-                       copyName (getSymShortName (info, sym),
-                                 oc, symbol, sizeof(symbol)-1);
-                       S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol);
-                       /* And retry */
-                       v = S + (int32_t)A - ((intptr_t)pP) - 4;
-                       if ((v > (intptr_t) INT32_MAX) || (v < (intptr_t) INT32_MIN)) {
-                           barf("IMAGE_REL_AMD64_REL32: High bits are set in %zx for %s",
+                       v = S + A + offset;
+                       if (((int64_t) v > (int64_t) INT32_MAX) || ((int64_t) v < (int64_t) INT32_MIN)) {
+                           barf("IMAGE_REL_AMD64_{ADDR32[NB],REL32}: High bits are set in %zx for %s",
                                 v, (char *)symbol);
                        }
                    }
