@@ -38,21 +38,14 @@ typedef StgWord SpinLock;
 
 // PROF_SPIN enables counting the number of times we spin on a lock
 
+void acquire_spin_lock_slow_path(SpinLock * p);
+
 // acquire spin lock
 INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 {
-    StgWord32 r = 0;
-    uint32_t i;
-    do {
-        for (i = 0; i < SPIN_COUNT; i++) {
-            r = cas((StgVolatilePtr)&(p->lock), 1, 0);
-            if (r != 0) return;
-            __atomic_fetch_add(&p->spin, 1, __ATOMIC_RELAXED);
-            busy_wait_nop();
-        }
-        __atomic_fetch_add(&p->yield, 1, __ATOMIC_RELAXED);
-        yieldThread();
-    } while (1);
+    StgWord32 r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+    if (RTS_UNLIKELY(r == 0))
+        acquire_spin_lock_slow_path(p);
 }
 
 // release spin lock
