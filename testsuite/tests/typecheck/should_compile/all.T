@@ -266,6 +266,7 @@ test('FD3', normal, compile_fail, [''])
 test('FD4', normal, compile, [''])
 
 test('faxen', normal, compile, [''])
+test('T816', normal, compile, [''])
 test('T1495', normal, compile, [''])
 test('T2045', normal, compile, [''])   # Needs -fhpc
 test('T2478', normal, compile, [''])
