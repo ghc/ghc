@@ -501,7 +501,7 @@ polyDmd C_10 = C_10 :* poly10
 topDmd, absDmd, botDmd, seqDmd :: Demand
 strictApply1Dmd, lazyApply1Dmd, lazyApply2Dmd :: Demand
 topDmd = polyDmd C_0N
-absDmd = polyDmd C_01
+absDmd = polyDmd C_00
 botDmd = polyDmd C_10
 seqDmd = C_11 :* seqCleanDmd
 strictApply1Dmd = C_1N :* Call C_1N topCleanDmd
@@ -1124,7 +1124,8 @@ strictenDmd (n :* cd) = plusCard C_10 n :* cd
 -- see Note [Asymmetry of 'plus*']
 multDmdType :: Card -> DmdType -> BothDmdArg
 multDmdType n (DmdType fv _ res_ty)
-    = (multDmdEnv n fv, multDivergence n res_ty)
+    = -- pprTrace "multDmdType" (ppr n $$ ppr fv $$ ppr (multDmdEnv n fv)) $
+      (multDmdEnv n fv, multDivergence n res_ty)
 
 -- | In a non-strict scenario, we might not force the Divergence, in which case
 -- we might converge, hence Dunno.
@@ -1163,7 +1164,8 @@ multTrivial _    _   _           = Nothing
 
 multUnsat :: Card -> DmdType -> DmdType
 multUnsat n (DmdType fv args res_ty)
-  = DmdType (multDmdEnv n fv)
+  = -- pprTrace "multUnsat" (ppr n $$ ppr fv $$ ppr (multDmdEnv n fv)) $
+    DmdType (multDmdEnv n fv)
             (map (multDmd n) args)
             (multDivergence n res_ty)
 
@@ -1423,8 +1425,7 @@ instance Outputable StrictSig where
 
 -- Used for printing top-level strictness pragmas in interface files
 pprIfaceStrictSig :: StrictSig -> SDoc
-pprIfaceStrictSig (StrictSig (DmdType _ dmds res))
-  = hcat (map ppr dmds) <> ppr res
+pprIfaceStrictSig = ppr
 
 -- | Turns a 'DmdType' computed for the particular 'Arity' into a 'StrictSig'
 -- unleashable at that arity. See Note [Understanding DmdType and StrictSig]

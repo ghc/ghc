@@ -217,7 +217,7 @@ dmdAnal' env dmd (Lam var body)
     (body_ty, Lam var body')
 
   | otherwise
-  = let (n, body_dmd) = peelCallDmd dmd
+  = let (n, body_dmd)    = peelCallDmd dmd
           -- body_dmd: a demand to analyze the body
 
         (body_ty, body') = dmdAnal env body_dmd body
@@ -965,7 +965,8 @@ dmdFix top_lvl env let_dmd orig_pairs
                 -- so this can significantly reduce the number of iterations needed
 
         my_downRhs (env, lazy_fv) (id,rhs)
-          = ((env', lazy_fv'), (id', rhs'))
+          = -- pprTrace "my_downRhs" (ppr id $$ ppr (idStrictness id) $$ ppr sig) $
+            ((env', lazy_fv'), (id', rhs'))
           where
             (lazy_fv1, sig, rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
             lazy_fv'              = plusVarEnv_C plusDmd lazy_fv lazy_fv1
@@ -1120,7 +1121,7 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
-    -- pprTrace "annLamBndr" (vcat [ppr id, ppr _dmd_ty]) $
+    -- pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty, ppr final_ty]) $
     (final_ty, setIdDemandInfo id dmd)
   where
       -- Watch out!  See note [Lambda-bound unfoldings]
@@ -1325,7 +1326,8 @@ findBndrsDmds env dmd_ty bndrs
 findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
 -- See Note [Trimming a demand to a type]
 findBndrDmd env arg_of_dfun dmd_ty id
-  = (dmd_ty', dmd')
+  = -- pprTrace "findBndrDmd" (ppr id $$ ppr dmd_ty $$ ppr starting_dmd $$ ppr dmd') $
+    (dmd_ty', dmd')
   where
     dmd' = strictify $
            trimToType starting_dmd (findTypeShape fam_envs id_ty)
