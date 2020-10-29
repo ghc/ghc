@@ -678,7 +678,8 @@ kcTyClGroup kisig_env decls
                     -- NB: the environment extension overrides the tycon
                     --     promotion-errors bindings
                     --     See Note [Type environment evolution]
-                  ; tcExtendKindEnvWithTyCons mono_tcs $
+                  ; checkNoErrs $
+                    tcExtendKindEnvWithTyCons mono_tcs $
                     mapM_ kcLTyClDecl kindless_decls
 
                   ; return mono_tcs }
