@@ -886,7 +886,10 @@ maybeReportHoleError ctxt hole err
 
 -- Unlike maybeReportError, these "hole" errors are
 -- /not/ suppressed by cec_suppress.  We want to see them!
-maybeReportHoleError ctxt (Hole { hole_sort = TypeHole }) err
+maybeReportHoleError ctxt (Hole { hole_sort = hole_sort }) err
+  | case hole_sort of TypeHole       -> True
+                      ConstraintHole -> True
+                      _              -> False
   -- When -XPartialTypeSignatures is on, warnings (instead of errors) are
   -- generated for holes in partial type signatures.
   -- Unless -fwarn-partial-type-signatures is not on,
@@ -898,7 +901,7 @@ maybeReportHoleError ctxt (Hole { hole_sort = TypeHole }) err
        HoleWarn  -> reportWarning (Reason Opt_WarnPartialTypeSignatures) err
        HoleDefer -> return ()
 
-maybeReportHoleError ctxt hole@(Hole { hole_sort = ExprHole _ }) err
+maybeReportHoleError ctxt hole err
   -- Otherwise this is a typed hole in an expression,
   -- but not for an out-of-scope variable (because that goes through a
   -- different function)
@@ -964,6 +967,8 @@ maybeAddDeferredHoleBinding ctxt err (Hole { hole_sort = ExprHole ev_id })
   | otherwise
   = return ()
 maybeAddDeferredHoleBinding _ _ (Hole { hole_sort = TypeHole })
+  = return ()
+maybeAddDeferredHoleBinding _ _ (Hole { hole_sort = ConstraintHole })
   = return ()
 
 tryReporters :: ReportErrCtxt -> [ReporterSpec] -> [Ct] -> TcM (ReportErrCtxt, [Ct])
@@ -1213,6 +1218,9 @@ mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
       TypeHole -> vcat [ hang (text "Found type wildcard" <+> quotes (ppr occ))
                             2 (text "standing for" <+> quotes pp_hole_type_with_kind)
                        , tyvars_msg, type_hole_hint ]
+      ConstraintHole -> vcat [ hang (text "Found extra-constraints wildcard standing for")
+                                  2 (quotes $ pprType hole_ty)  -- always kind constraint
+                             , tyvars_msg, type_hole_hint ]
 
     pp_hole_type_with_kind
       | isLiftedTypeKind hole_kind

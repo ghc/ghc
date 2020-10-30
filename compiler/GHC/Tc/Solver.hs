@@ -2049,6 +2049,15 @@ simplifyHoles :: Bag Hole -> TcS (Bag Hole)
 simplifyHoles = mapBagM simpl_hole
   where
     simpl_hole :: Hole -> TcS Hole
+
+     -- do not simplify an extra-constraints wildcard. These holes
+     -- are filled with already-simplified constraints in
+     -- chooseInferredQuantifiers (choose_psig_context)
+    simpl_hole h@(Hole { hole_sort = ConstraintHole }) = return h
+
+     -- other wildcards should be simplified for printing
+     -- we must do so here, and not in the error-message generation
+     -- code, because we have all the givens already set up
     simpl_hole h@(Hole { hole_ty = ty, hole_loc = loc })
       = do { ty' <- flattenType loc ty
            ; return (h { hole_ty = ty' }) }
