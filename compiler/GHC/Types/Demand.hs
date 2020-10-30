@@ -12,7 +12,7 @@
 -}
 
 module GHC.Types.Demand (
-        Card(..), Demand(..), CleanDemand(Prod), viewProd,
+        Card(..), Demand(..), CleanDemand(Prod), mkProd, viewProd,
         oneifyDmd, oneifyCard,
         absDmd, topDmd, botDmd, seqDmd,
         lubCard, lubDmd, lubCleanDmd,
@@ -480,7 +480,7 @@ data CleanDemand
   deriving ( Eq, Show )
 
 poly00, poly01, poly0N, poly11, poly1N, poly10 :: CleanDemand
-topCleanDmd, _botCleanDmd, seqCleanDmd :: CleanDemand
+topCleanDmd, botCleanDmd, seqCleanDmd :: CleanDemand
 poly00 = Poly C_00
 poly01 = Poly C_01
 poly0N = Poly C_0N
@@ -488,7 +488,7 @@ poly11 = Poly C_11
 poly1N = Poly C_1N
 poly10 = Poly C_10
 topCleanDmd = poly0N
-_botCleanDmd = poly10
+botCleanDmd = poly10
 seqCleanDmd = poly00
 
 polyDmd :: Card -> Demand
@@ -511,6 +511,21 @@ lazyApply1Dmd   = C_01 :* Call C_01 topCleanDmd
 --    uses its arg at most once, applies it once
 --    but is lazy (might not be called at all)
 lazyApply2Dmd = C_01 :* Call C_01 (Call C_01 topCleanDmd)
+
+-- | A smart constructor for 'Prod', applying rewrite rules along the semantic
+-- equalities @Prod [polyDmd n, ...] === polyDmd n@, simplifying to polymorphic
+-- demands when possible. Note that this degrades boxity information! E.g. a
+-- polymorphic demand will never unbox.
+mkProd :: [Demand] -> CleanDemand
+mkProd [] = botCleanDmd
+mkProd ds@(n:*cd : _)
+  | want_to_simplify n, all (== polyDmd n) ds = cd
+  | otherwise                                 = Prod ds
+  where
+    -- we only want to simplify absent and bottom demands
+    want_to_simplify C_00 = True
+    want_to_simplify C_10 = True
+    want_to_simplify _    = False
 
 viewProd :: Arity -> CleanDemand -> Maybe [Demand]
 viewProd n (Prod ds)     | ds `lengthIs` n = Just ds

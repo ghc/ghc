@@ -244,7 +244,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
-        scrut_dmd          = Prod id_dmds
+        scrut_dmd          = mkProd id_dmds
         (scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
         res_ty             = alt_ty3 `plusDmdType` toBothDmdArg scrut_ty
         case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
