@@ -67,7 +67,6 @@ import GHC.Types.Id.Info
 import GHC.Types.Basic
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Demand
 import GHC.Types.Unique.Supply ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Ppr
@@ -1096,6 +1095,6 @@ dmdAnal dflags fam_envs binds = do
                }
       binds_plus_dmds = dmdAnalProgram opts fam_envs binds
   Err.dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
-    dumpIdInfoOfProgram (pprIfaceStrictSig . strictnessInfo) binds_plus_dmds
+    dumpIdInfoOfProgram (ppr . strictnessInfo) binds_plus_dmds
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_dmds `seq` return binds_plus_dmds
