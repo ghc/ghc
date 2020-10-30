@@ -236,7 +236,7 @@ typedef struct _ObjectCode {
        require extra information.*/
     StrHashTable *extraInfos;
 
-#if RTS_LINKER_USE_MMAP == 1
+#if defined(USE_M32)
     /* The m32 allocators used for allocating small sections and symbol extras
      * during loading. We have two: one for (writeable) data and one for
      * (read-only/executable) code. */
@@ -335,6 +335,12 @@ resolveSymbolAddr (pathchar* buffer, int size,
 #else
 #define USE_CONTIGUOUS_MMAP 0
 #endif
+
+// We use the m32 allocator on Windows and Unix platforms using mmap
+#if (RTS_LINKER_USE_MMAP == 1) || defined(PE_OBJFORMAT)
+#define USE_M32
+#endif
+
 
 HsInt isAlreadyLoaded( pathchar *path );
 HsInt loadOc( ObjectCode* oc );
