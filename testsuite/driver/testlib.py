@@ -1682,7 +1682,7 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
         stats_args = ''
 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
-    cmd = ' '.join([prog, stats_args, my_rts_flags, extra_run_opts])
+    cmd = ' '.join(["catchsegv " + prog, stats_args, my_rts_flags, extra_run_opts])
 
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd)
