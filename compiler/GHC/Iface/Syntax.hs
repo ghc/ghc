@@ -1465,7 +1465,7 @@ instance Outputable IfaceInfoItem where
                               <> colon <+> ppr unf
   ppr (HsInline prag)       = text "Inline:" <+> ppr prag
   ppr (HsArity arity)       = text "Arity:" <+> int arity
-  ppr (HsStrictness str)    = text "Strictness:" <+> pprIfaceStrictSig str
+  ppr (HsStrictness str)    = text "Strictness:" <+> ppr str
   ppr (HsCpr cpr)           = text "CPR:" <+> ppr cpr
   ppr HsNoCafRefs           = text "HasNoCafRefs"
   ppr HsLevity              = text "Never levity-polymorphic"

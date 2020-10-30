@@ -3,8 +3,8 @@
 Test.$tc'MkT:
 Test.$tcT:
 Test.$trModule:
-Test.t: <S,1*U(U)><S,1*U(U)>
-Test.t2: <S,1*U(U)><S,1*U(U)>
+Test.t: <SP(U)><SP(U)>
+Test.t2: <SP(U)><SP(U)>
 
 
 
@@ -21,7 +21,7 @@ Test.t2: m1
 Test.$tc'MkT:
 Test.$tcT:
 Test.$trModule:
-Test.t: <S,1*U(U)><S,1*U(U)>
-Test.t2: <S,1*U(U)><S,1*U(U)>
+Test.t: <SP(U)><SP(U)>
+Test.t2: <SP(U)><SP(U)>
 
 
