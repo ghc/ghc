@@ -9,7 +9,7 @@ T11670.hs:10:42: warning: [-Wpartial-type-signatures (in -Wdefault)]
         peek :: Ptr a -> IO CLong (bound at T11670.hs:10:1)
 
 T11670.hs:13:40: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Storable w’
+    • Found extra-constraints wildcard standing for ‘Storable w’
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of <expression> :: Storable w => IO w
                at T11670.hs:13:40-48
