@@ -467,6 +467,7 @@ EXTERN_INLINE void load_load_barrier () {} /* nothing */
 // Relaxed atomic operations
 #define RELAXED_LOAD(ptr) *ptr
 #define RELAXED_STORE(ptr,val) *ptr = val
+#define RELAXED_ADD(ptr,val) *ptr += val
 
 // Acquire/release atomic operations
 #define ACQUIRE_LOAD(ptr) *ptr
