@@ -239,20 +239,23 @@ data HoleSort = ExprHole Id
                  -- will be an erroring expression for -fdefer-type-errors.
               | TypeHole
                  -- ^ A hole in a type (PartialTypeSignatures)
+              | ConstraintHole
+                 -- ^ A hole in a constraint, like @f :: (_, Eq a) => ...
 
 instance Outputable Hole where
   ppr (Hole { hole_sort = ExprHole id
             , hole_occ  = occ
             , hole_ty   = ty })
     = parens $ (braces $ ppr occ <> colon <> ppr id) <+> dcolon <+> ppr ty
-  ppr (Hole { hole_sort = TypeHole
+  ppr (Hole { hole_sort = _other
             , hole_occ  = occ
             , hole_ty   = ty })
     = braces $ ppr occ <> colon <> ppr ty
 
 instance Outputable HoleSort where
-  ppr (ExprHole id) = text "ExprHole:" <> ppr id
-  ppr TypeHole      = text "TypeHole"
+  ppr (ExprHole id)  = text "ExprHole:" <> ppr id
+  ppr TypeHole       = text "TypeHole"
+  ppr ConstraintHole = text "CosntraintHole"
 
 ------------
 -- | Used to indicate extra information about why a CIrredCan is irreducible
