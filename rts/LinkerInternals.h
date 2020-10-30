@@ -21,6 +21,36 @@ void printLoadedObjects(void);
 
 #include "BeginPrivate.h"
 
+/*************************************************
+ * Various bits of configuration
+ *************************************************/
+
+/* PowerPC and ARM have relative branch instructions with only 24 bit
+ * displacements and therefore need jump islands contiguous with each object
+ * code module.
+ */
+#if defined(powerpc_HOST_ARCH)
+#define SHORT_REL_BRANCH 1
+#endif
+#if defined(arm_HOST_ARCH)
+#define SHORT_REL_BRANCH 1
+#endif
+
+#if (RTS_LINKER_USE_MMAP && defined(SHORT_REL_BRANCH) && defined(linux_HOST_OS))
+#define USE_CONTIGUOUS_MMAP 1
+#else
+#define USE_CONTIGUOUS_MMAP 0
+#endif
+
+// We use the m32 allocator on Windows and Unix platforms using mmap
+#if (RTS_LINKER_USE_MMAP == 1) || defined(PE_OBJFORMAT) || 1
+#define USE_M32
+#endif
+
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#define NEED_SYMBOL_EXTRAS 1
+#endif
+
 typedef void SymbolAddr;
 typedef char SymbolName;
 
@@ -135,10 +165,6 @@ typedef struct _Segment {
     int n_sections;
 } Segment;
 
-#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
-#define NEED_SYMBOL_EXTRAS 1
-#endif
-
 /* Jump Islands are sniplets of machine code required for relative
  * address relocations on the PowerPC, x86_64 and ARM.
  */
@@ -236,7 +262,7 @@ typedef struct _ObjectCode {
        require extra information.*/
     StrHashTable *extraInfos;
 
-#if RTS_LINKER_USE_MMAP == 1
+#if defined(USE_M32)
     /* The m32 allocators used for allocating small sections and symbol extras
      * during loading. We have two: one for (writeable) data and one for
      * (read-only/executable) code. */
@@ -314,27 +340,6 @@ extern StrHashTable *symhash;
 pathchar*
 resolveSymbolAddr (pathchar* buffer, int size,
                    SymbolAddr* symbol, uintptr_t* top);
-
-/*************************************************
- * Various bits of configuration
- *************************************************/
-
-/* PowerPC and ARM have relative branch instructions with only 24 bit
- * displacements and therefore need jump islands contiguous with each object
- * code module.
- */
-#if defined(powerpc_HOST_ARCH)
-#define SHORT_REL_BRANCH 1
-#endif
-#if defined(arm_HOST_ARCH)
-#define SHORT_REL_BRANCH 1
-#endif
-
-#if (RTS_LINKER_USE_MMAP && defined(SHORT_REL_BRANCH) && defined(linux_HOST_OS))
-#define USE_CONTIGUOUS_MMAP 1
-#else
-#define USE_CONTIGUOUS_MMAP 0
-#endif
 
 HsInt isAlreadyLoaded( pathchar *path );
 HsInt loadOc( ObjectCode* oc );

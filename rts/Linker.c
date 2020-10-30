@@ -1351,7 +1351,7 @@ void freeObjectCode (ObjectCode *oc)
     ocDeinit_ELF(oc);
 #endif
 
-#if RTS_LINKER_USE_MMAP == 1
+#if defined(USE_M32)
     m32_allocator_free(oc->rx_m32);
     m32_allocator_free(oc->rw_m32);
 #endif
@@ -1422,7 +1422,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    /* chain it onto the list of objects */
    oc->next              = NULL;
 
-#if RTS_LINKER_USE_MMAP
+#if defined(USE_M32)
    oc->rw_m32 = m32_allocator_new(false);
    oc->rx_m32 = m32_allocator_new(true);
 #endif

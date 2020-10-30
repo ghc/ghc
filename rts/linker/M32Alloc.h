@@ -8,7 +8,7 @@
 
 #pragma once
 
-#if RTS_LINKER_USE_MMAP == 1
+#if defined(USE_M32)
 #include <fcntl.h>
 #include <sys/mman.h>
 
@@ -20,7 +20,7 @@
 
 #include "BeginPrivate.h"
 
-#if RTS_LINKER_USE_MMAP
+#if defined(USE_M32)
 #define M32_NO_RETURN    /* Nothing */
 #else
 #define M32_NO_RETURN    GNUC3_ATTRIBUTE(__noreturn__)

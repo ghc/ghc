@@ -42,7 +42,7 @@ still check the call for syntax and correct function parameter types.
 
 */
 
-#if RTS_LINKER_USE_MMAP == 1
+#if defined(USE_M32)
 
 /*
 

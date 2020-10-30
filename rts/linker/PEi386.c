@@ -1294,7 +1294,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       = (PEi386_IMAGE_OFFSET + 2 * default_alignment
          + oc->info->secBytesTotal) & ~0x7;
     oc->info->secBytesTotal
-      = oc->info->trampoline + info->numberOfSymbols * sizeof(SymbolExtra);
+      = oc->info->trampoline;
 
    /* No further verification after this point; only debug printing.  */
    i = 0;
@@ -1792,12 +1792,15 @@ ocAllocateExtras_PEi386 ( ObjectCode* oc )
    if (!oc->info)
      return false;
 
-   const int mask = default_alignment - 1;
-   size_t origin  = oc->info->trampoline;
-   oc->symbol_extras
-     = (SymbolExtra*)((uintptr_t)(oc->info->image + origin + mask) & ~mask);
-   oc->first_symbol_extra = 0;
    COFF_HEADER_INFO *info = oc->info->ch_info;
+   size_t extras_size = info->numberOfSymbols * sizeof(SymbolExtra);
+
+   oc->symbol_extras
+     = (SymbolExtra*) m32_alloc(oc->rx_m32, extras_size, 8);
+   if (oc->symbol_extras == NULL)
+     return false;
+
+   oc->first_symbol_extra = 0;
    oc->n_symbol_extras    = info->numberOfSymbols;
 
    return true;
