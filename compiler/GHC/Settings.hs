@@ -36,6 +36,8 @@ module GHC.Settings
   , sPgm_windres
   , sPgm_libtool
   , sPgm_ar
+  , sPgm_otool
+  , sPgm_install_name_tool
   , sPgm_ranlib
   , sPgm_lo
   , sPgm_lc
@@ -109,6 +111,8 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_windres :: String
   , toolSettings_pgm_libtool :: String
   , toolSettings_pgm_ar      :: String
+  , toolSettings_pgm_otool   :: String
+  , toolSettings_pgm_install_name_tool :: String
   , toolSettings_pgm_ranlib  :: String
   , -- | LLVM: opt llvm optimiser
     toolSettings_pgm_lo      :: (String, [Option])
@@ -222,6 +226,10 @@ sPgm_libtool :: Settings -> String
 sPgm_libtool = toolSettings_pgm_libtool . sToolSettings
 sPgm_ar :: Settings -> String
 sPgm_ar = toolSettings_pgm_ar . sToolSettings
+sPgm_otool :: Settings -> String
+sPgm_otool = toolSettings_pgm_otool . sToolSettings
+sPgm_install_name_tool :: Settings -> String
+sPgm_install_name_tool = toolSettings_pgm_install_name_tool . sToolSettings
 sPgm_ranlib :: Settings -> String
 sPgm_ranlib = toolSettings_pgm_ranlib . sToolSettings
 sPgm_lo :: Settings -> (String, [Option])

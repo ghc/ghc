@@ -391,7 +391,56 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
 
 -- ---------------------------------------------------------------------------
 -- Link
-
+--
+-- Note [Dynamic linking on macOS]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Since macOS Sierra (10.14), the dynamic system linker enforces
+-- a limit on the Load Commands.  Specifically the Load Command Size
+-- Limit is at 32K (32768).  The Load Commands contain the install
+-- name, dependencies, runpaths, and a few other commands.  We however
+-- only have control over the install name, dependencies and runpaths.
+--
+-- The install name is the name by which this library will be
+-- referenced.  This is such that we do not need to bake in the full
+-- absolute location of the library, and can move the library around.
+--
+-- The dependency commands contain the install names from of referenced
+-- libraries.  Thus if a libraries install name is @rpath/libHS...dylib,
+-- that will end up as the dependency.
+--
+-- Finally we have the runpaths, which informs the linker about the
+-- directories to search for the referenced dependencies.
+--
+-- The system linker can do recursive linking, however using only the
+-- direct dependencies conflicts with ghc's ability to inline across
+-- packages, and as such would end up with unresolved symbols.
+--
+-- Thus we will pass the full dependency closure to the linker, and then
+-- ask the linker to remove any unused dynamic libraries (-dead_strip_dylibs).
+--
+-- We still need to add the relevant runpaths, for the dynamic linker to
+-- lookup the referenced libraries though.  The linker (ld64) does not
+-- have any option to dead strip runpaths; which makes sense as runpaths
+-- can be used for dependencies of dependencies as well.
+--
+-- The solution we then take in GHC is to not pass any runpaths to the
+-- linker at link time, but inject them after the linking.  For this to
+-- work we'll need to ask the linker to create enough space in the header
+-- to add more runpaths after the linking (-headerpad 8000).
+--
+-- After the library has been linked by $LD (usually ld64), we will use
+-- otool to inspect the libraries left over after dead stripping, compute
+-- the relevant runpaths, and inject them into the linked product using
+-- the install_name_tool command.
+--
+-- This strategy should produce the smallest possible set of load commands
+-- while still retaining some form of relocatability via runpaths.
+--
+-- The only way I can see to reduce the load command size further would be
+-- by shortening the library names, or start putting libraries into the same
+-- folders, such that one runpath would be sufficient for multiple/all
+-- libraries.
 link :: GhcLink                 -- interactive or batch
      -> DynFlags                -- dynamic flags
      -> Bool                    -- attempt linking in batch mode?
@@ -1766,9 +1815,12 @@ linkBinary' staticLink dflags o_files dep_units = do
 
     rc_objs <- maybeCreateManifest dflags output_fn
 
-    let link = if staticLink
-                   then GHC.SysTools.runLibtool
-                   else GHC.SysTools.runLink
+    let link dflags args | staticLink = GHC.SysTools.runLibtool dflags args
+                         | platformOS platform == OSDarwin
+                            = GHC.SysTools.runLink dflags args >> GHC.SysTools.runInjectRPaths dflags pkg_lib_paths output_fn
+                         | otherwise
+                            = GHC.SysTools.runLink dflags args
+
     link dflags (
                        map GHC.SysTools.Option verbFlags
                       ++ [ GHC.SysTools.Option "-o"
@@ -1835,7 +1887,13 @@ linkBinary' staticLink dflags o_files dep_units = do
                       ++ pkg_link_opts
                       ++ pkg_framework_opts
                       ++ (if platformOS platform == OSDarwin
-                          then [ "-Wl,-dead_strip_dylibs" ]
+                          --  dead_strip_dylibs, will remove unused dylibs, and thus save
+                          --  space in the load commands. The -headerpad is necessary so
+                          --  that we can inject more @rpath's later for the left over
+                          --  libraries during runInjectRpaths phase.
+                          --
+                          --  See Note [Dynamic linking on macOS].
+                          then [ "-Wl,-dead_strip_dylibs", "-Wl,-headerpad,8000" ]
                           else [])
                     ))
 
