@@ -440,6 +440,7 @@ load_load_barrier(void) {
 // Relaxed atomic operations.
 #define RELAXED_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_RELAXED)
 #define RELAXED_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELAXED)
+#define RELAXED_ADD(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_RELAXED)
 
 // Acquire/release atomic operations
 #define ACQUIRE_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_ACQUIRE)
@@ -466,6 +467,7 @@ EXTERN_INLINE void load_load_barrier () {} /* nothing */
 // Relaxed atomic operations
 #define RELAXED_LOAD(ptr) *ptr
 #define RELAXED_STORE(ptr,val) *ptr = val
+#define RELAXED_ADD(ptr,val) *ptr += val
 
 // Acquire/release atomic operations
 #define ACQUIRE_LOAD(ptr) *ptr
