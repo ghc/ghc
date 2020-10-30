@@ -30,10 +30,10 @@ void acquire_spin_lock_slow_path(SpinLock * p)
         for (uint32_t i = 0; i < SPIN_COUNT; i++) {
             StgWord32 r = cas((StgVolatilePtr)&(p->lock), 1, 0);
             if (r != 0) return;
-            IF_PROF_SPIN(__atomic_fetch_add(&p->spin, 1, __ATOMIC_RELAXED));
+            IF_PROF_SPIN(RELAXED_ADD(&p->spin, 1));
             busy_wait_nop();
         }
-        IF_PROF_SPIN(__atomic_fetch_add(&p->yield, 1, __ATOMIC_RELAXED));
+        IF_PROF_SPIN(RELAXED_ADD(&p->yield, 1));
         yieldThread();
     } while (1);
 }
