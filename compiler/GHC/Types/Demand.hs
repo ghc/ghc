@@ -415,6 +415,7 @@ lubCard C_11 C_00 = C_01 -- {0} ∪ {1} = {0,1}
 lubCard C_11 n    = n    -- {1} is a subset of all other intervals
 lubCard n    C_11 = n    -- {1} is a subset of all other intervals
 -- Handle C_1N
+lubCard C_1N C_1N = C_1N -- reflexivity
 lubCard _    C_1N = C_0N -- {0} ∪ {1,n} = top
 lubCard C_1N _    = C_0N -- {0} ∪ {1,n} = top
 -- Handle C_01
