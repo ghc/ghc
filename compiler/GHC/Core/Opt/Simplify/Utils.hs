@@ -329,7 +329,7 @@ addCastTo ai co = ai { ai_args = CastBy co : ai_args ai }
 isStrictArgInfo :: ArgInfo -> Bool
 -- True if the function is strict in the next argument
 isStrictArgInfo (ArgInfo { ai_dmds = dmds })
-  | dmd:_ <- dmds = isStrictDmd dmd
+  | dmd:_ <- dmds = isStrUsedDmd dmd
   | otherwise     = False
 
 argInfoAppArgs :: [ArgSpec] -> [OutExpr]
@@ -582,7 +582,7 @@ mkArgInfo env fun rules n_val_args call_cont
       | Just (_, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
       , dmd : rest_dmds <- dmds
       , let dmd' = case isLiftedType_maybe arg_ty of
-                       Just False -> strictenDmd dmd
+                       Just False -> strictifyDmd dmd
                        _          -> dmd
       = dmd' : add_type_strictness fun_ty' rest_dmds
           -- If the type is levity-polymorphic, we can't know whether it's
