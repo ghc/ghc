@@ -319,7 +319,7 @@ cprAnalBind top_lvl env id rhs
     -- See Note [CPR for thunks]
     stays_thunk = is_thunk && not_strict
     is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
-    not_strict  = not (isStrictDmd (idDemandInfo id))
+    not_strict  = not (isStrUsedDmd (idDemandInfo id))
     -- See Note [CPR for sum types]
     (_, ret_ty) = splitPiTys (idType id)
     not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)

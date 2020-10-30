@@ -5,11 +5,11 @@ DmdAnalGADTs.$tc'B:
 DmdAnalGADTs.$tcD:
 DmdAnalGADTs.$trModule:
 DmdAnalGADTs.diverges: b
-DmdAnalGADTs.f: <S,1*U>
-DmdAnalGADTs.f': <S,1*U>
-DmdAnalGADTs.g: <S,1*U>
+DmdAnalGADTs.f: <SU>
+DmdAnalGADTs.f': <SU>
+DmdAnalGADTs.g: <SU>
 DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: <S,1*U(U)>
+DmdAnalGADTs.hasStrSig: <SP(U)>
 
 
 
@@ -33,10 +33,10 @@ DmdAnalGADTs.$tc'B:
 DmdAnalGADTs.$tcD:
 DmdAnalGADTs.$trModule:
 DmdAnalGADTs.diverges: b
-DmdAnalGADTs.f: <S,1*U>
-DmdAnalGADTs.f': <S,1*U>
-DmdAnalGADTs.g: <S,1*U>
+DmdAnalGADTs.f: <SU>
+DmdAnalGADTs.f': <SU>
+DmdAnalGADTs.g: <SU>
 DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: <S,1*U(U)>
+DmdAnalGADTs.hasStrSig: <SP(U)>
 
 
