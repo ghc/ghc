@@ -16,7 +16,8 @@ module GHC.IfaceToCore (
         importDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface,
         typecheckIfacesForMerging,
         typecheckIfaceForInstantiate,
-        tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
+        tcIfaceDecl, tcIfaceDecls,
+        tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceAnnotations, tcIfaceCompleteMatches,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
         tcIfaceGlobal,
@@ -185,7 +186,7 @@ typecheckIface iface
                 -- Typecheck the decls.  This is done lazily, so that the knot-tying
                 -- within this single module works out right.  It's the callers
                 -- job to make sure the knot is tied.
-        ; names_w_things <- loadDecls ignore_prags (mi_decls iface)
+        ; names_w_things <- tcIfaceDecls ignore_prags (mi_decls iface)
         ; let type_env = mkNameEnv names_w_things
 
                 -- Now do those rules, instances and annotations
@@ -390,8 +391,8 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
                         :: [OccEnv IfaceDecl]
         decl_env = foldl' mergeIfaceDecls emptyOccEnv decl_envs
                         ::  OccEnv IfaceDecl
-    -- TODO: change loadDecls to accept w/o Fingerprint
-    names_w_things <- loadDecls ignore_prags (map (\x -> (fingerprint0, x))
+    -- TODO: change tcIfaceDecls to accept w/o Fingerprint
+    names_w_things <- tcIfaceDecls ignore_prags (map (\x -> (fingerprint0, x))
                                                   (occEnvElts decl_env))
     let global_type_env = mkNameEnv names_w_things
     writeMutVar tc_env_var global_type_env
@@ -401,7 +402,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
         type_env <- fixM $ \type_env -> do
             setImplicitEnvM type_env $ do
-                decls <- loadDecls ignore_prags (mi_decls iface)
+                decls <- tcIfaceDecls ignore_prags (mi_decls iface)
                 return (mkNameEnv decls)
         -- But note that we use this type_env to typecheck references to DFun
         -- in 'IfaceInst'
@@ -441,7 +442,7 @@ typecheckIfaceForInstantiate nsubst iface =
     -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
     type_env <- fixM $ \type_env -> do
         setImplicitEnvM type_env $ do
-            decls     <- loadDecls ignore_prags (mi_decls iface)
+            decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
             return (mkNameEnv decls)
     -- See Note [rnIfaceNeverExported]
     setImplicitEnvM type_env $ do
@@ -870,6 +871,110 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = name
      tc_pr :: (IfExtName, Bool) -> IfL (Id, Bool)
      tc_pr (nm, b) = do { id <- forkM (ppr nm) (tcIfaceExtId nm)
                         ; return (id, b) }
+
+tcIfaceDecls :: Bool
+          -> [(Fingerprint, IfaceDecl)]
+          -> IfL [(Name,TyThing)]
+tcIfaceDecls ignore_prags ver_decls
+   = concatMapM (tc_iface_decl_fingerprint ignore_prags) ver_decls
+
+tc_iface_decl_fingerprint :: Bool                    -- Don't load pragmas into the decl pool
+          -> (Fingerprint, IfaceDecl)
+          -> IfL [(Name,TyThing)]   -- The list can be poked eagerly, but the
+                                    -- TyThings are forkM'd thunks
+tc_iface_decl_fingerprint ignore_prags (_version, decl)
+  = do  {       -- Populate the name cache with final versions of all
+                -- the names associated with the decl
+          let main_name = ifName decl
+
+        -- Typecheck the thing, lazily
+        -- NB. Firstly, the laziness is there in case we never need the
+        -- declaration (in one-shot mode), and secondly it is there so that
+        -- we don't look up the occurrence of a name before calling mk_new_bndr
+        -- on the binder.  This is important because we must get the right name
+        -- which includes its nameParent.
+
+        ; thing <- forkM doc $ do { bumpDeclStats main_name
+                                  ; tcIfaceDecl ignore_prags decl }
+
+        -- Populate the type environment with the implicitTyThings too.
+        --
+        -- Note [Tricky iface loop]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~
+        -- Summary: The delicate point here is that 'mini-env' must be
+        -- buildable from 'thing' without demanding any of the things
+        -- 'forkM'd by tcIfaceDecl.
+        --
+        -- In more detail: Consider the example
+        --      data T a = MkT { x :: T a }
+        -- The implicitTyThings of T are:  [ <datacon MkT>, <selector x>]
+        -- (plus their workers, wrappers, coercions etc etc)
+        --
+        -- We want to return an environment
+        --      [ "MkT" -> <datacon MkT>, "x" -> <selector x>, ... ]
+        -- (where the "MkT" is the *Name* associated with MkT, etc.)
+        --
+        -- We do this by mapping the implicit_names to the associated
+        -- TyThings.  By the invariant on ifaceDeclImplicitBndrs and
+        -- implicitTyThings, we can use getOccName on the implicit
+        -- TyThings to make this association: each Name's OccName should
+        -- be the OccName of exactly one implicitTyThing.  So the key is
+        -- to define a "mini-env"
+        --
+        -- [ 'MkT' -> <datacon MkT>, 'x' -> <selector x>, ... ]
+        -- where the 'MkT' here is the *OccName* associated with MkT.
+        --
+        -- However, there is a subtlety: due to how type checking needs
+        -- to be staged, we can't poke on the forkM'd thunks inside the
+        -- implicitTyThings while building this mini-env.
+        -- If we poke these thunks too early, two problems could happen:
+        --    (1) When processing mutually recursive modules across
+        --        hs-boot boundaries, poking too early will do the
+        --        type-checking before the recursive knot has been tied,
+        --        so things will be type-checked in the wrong
+        --        environment, and necessary variables won't be in
+        --        scope.
+        --
+        --    (2) Looking up one OccName in the mini_env will cause
+        --        others to be looked up, which might cause that
+        --        original one to be looked up again, and hence loop.
+        --
+        -- The code below works because of the following invariant:
+        -- getOccName on a TyThing does not force the suspended type
+        -- checks in order to extract the name. For example, we don't
+        -- poke on the "T a" type of <selector x> on the way to
+        -- extracting <selector x>'s OccName. Of course, there is no
+        -- reason in principle why getting the OccName should force the
+        -- thunks, but this means we need to be careful in
+        -- implicitTyThings and its helper functions.
+        --
+        -- All a bit too finely-balanced for my liking.
+
+        -- This mini-env and lookup function mediates between the
+        --'Name's n and the map from 'OccName's to the implicit TyThings
+        ; let mini_env = mkOccEnv [(getOccName t, t) | t <- implicitTyThings thing]
+              lookup n = case lookupOccEnv mini_env (getOccName n) of
+                           Just thing -> thing
+                           Nothing    ->
+                             pprPanic "tc_iface_decl_fingerprint" (ppr main_name <+> ppr n $$ ppr (decl))
+
+        ; implicit_names <- mapM lookupIfaceTop (ifaceDeclImplicitBndrs decl)
+
+--         ; traceIf (text "Loading decl for " <> ppr main_name $$ ppr implicit_names)
+        ; return $ (main_name, thing) :
+                      -- uses the invariant that implicit_names and
+                      -- implicitTyThings are bijective
+                      [(n, lookup n) | n <- implicit_names]
+        }
+  where
+    doc = text "Declaration for" <+> ppr (ifName decl)
+
+bumpDeclStats :: Name -> IfL ()         -- Record that one more declaration has actually been used
+bumpDeclStats name
+  = do  { traceIf (text "Loading decl for" <+> ppr name)
+        ; updateEps_ (\eps -> let stats = eps_stats eps
+                              in eps { eps_stats = stats { n_decls_out = n_decls_out stats + 1 } })
+        }
 
 tc_fd :: FunDep IfLclName -> IfL (FunDep TyVar)
 tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
