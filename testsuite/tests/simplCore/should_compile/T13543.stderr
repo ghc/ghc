@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
 Foo.$trModule:
-Foo.f: <S(SU)><U(U)><U(U)>
+Foo.f: <S(SU)><S(U)><S(U)>
 Foo.g: <S(S(U),S(U))>
 
 
