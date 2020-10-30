@@ -610,7 +610,7 @@ wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> Maybe ([Demand], DataCon
 wantToUnbox fam_envs has_inlineable_prag ty dmd =
   case deepSplitProductType_maybe fam_envs ty of
     Just dcac@DataConAppContext{ dcac_arg_tys = con_arg_tys }
-      | isStrictDmd dmd
+      | isStrUsedDmd dmd
       -- See Note [Unpacking arguments with product and polymorphic demands]
       , Just cs <- split_prod_dmd_arity dmd (length con_arg_tys)
       -- See Note [Do not unpack class dictionaries]
@@ -621,12 +621,11 @@ wantToUnbox fam_envs has_inlineable_prag ty dmd =
     _ -> Nothing
   where
     split_prod_dmd_arity dmd arty
-      -- For seqDmd, splitProdDmd_maybe will return Nothing (because how would
-      -- it know the arity?), but it should behave like <S, U(AAAA)>, for some
+      -- For seqDmd, it should behave like <S(AAAA)>, for some
       -- suitable arity
-      | isSeqDmd dmd = Just (replicate arty absDmd)
-      -- Otherwise splitProdDmd_maybe does the job
-      | otherwise    = splitProdDmd_maybe dmd
+      | isSeqDmd dmd        = Just (replicate arty absDmd)
+      | _ :* Prod ds <- dmd = Just ds
+      | otherwise           = Nothing
 
 unbox_one :: DynFlags -> FamInstEnvs -> Var
           -> [Demand]

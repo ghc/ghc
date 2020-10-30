@@ -2283,7 +2283,7 @@ section "Exceptions"
 --          DEFAULT -> case ma of MVar a -> ...
 --          0#      -> maskAsyncExceptions# (\st -> case ma of MVar a -> ...)
 -- The outer case just decides whether to mask exceptions, but we don't want
--- thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd
+-- thereby to hide the strictness in 'ma'!  Hence the use of strictOnceApply1Dmd
 -- in mask and unmask. But catch really is lazy in its first argument, see
 -- #11555. So for IO actions 'ma' we often use a wrapper around it that is
 -- head-strict in 'ma': GHC.IO.catchException.
@@ -2329,7 +2329,7 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2338,7 +2338,7 @@ primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
    out_of_line = True
    has_side_effects = True
 
@@ -2346,7 +2346,7 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2367,7 +2367,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictManyApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True

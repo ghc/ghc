@@ -35,6 +35,7 @@ h3 f = f 2 `seq` 3
 
 
 -- And here we check that the depth of the strictness
--- of h is applied correctly.
+-- of h is applied correctly. The lambda is unsaturated
+-- and thus x is absent.
 g3 :: Int -> Int
 g3 x = h3 (\_ _ -> error (show x))
