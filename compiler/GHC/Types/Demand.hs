@@ -369,7 +369,7 @@ instance Show Card where
   show C_01 = "1"
   show C_0N = "U"
   show C_11 = "S"
-  show C_1N = "S"
+  show C_1N = "S*"
   show C_10 = "B"
 
 _botCard, topCard :: Card
