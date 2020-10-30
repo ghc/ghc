@@ -578,7 +578,7 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     --       last argument demands were. Strictness won't change. But used-once
     --       might turn into used-many even if the signature was stable and we'd
     --       have to do an additional iteration. reuseEnv makes sure that we
-    --       never get used-once info for FVs of recursive fucntions.
+    --       never get used-once info for FVs of recursive functions.
     rhs_fv1 = case rec_flag of
                 Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
                 Nothing -> rhs_fv
