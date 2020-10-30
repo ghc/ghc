@@ -42,7 +42,7 @@ T4908.$trModule
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0, joins: 0/0}
 T4908.f_$s$wf [Occ=LoopBreaker] :: Int -> Int# -> Int# -> Bool
-[GblId, Arity=3, Str=<L,A><L,1*U><S,1*U>, Unf=OtherCon []]
+[GblId, Arity=3, Str=<A><1U><SU>, Unf=OtherCon []]
 T4908.f_$s$wf
   = \ (sc :: Int) (sc1 :: Int#) (sc2 :: Int#) ->
       case sc2 of ds {
@@ -59,7 +59,7 @@ end Rec }
 T4908.$wf [InlPrag=[2]] :: Int# -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
- Str=<S,1*U><L,1*U(A,1*U(1*U))>,
+ Str=<SU><1P(A,1P(1U))>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 20] 101 20}]
 T4908.$wf
@@ -81,7 +81,7 @@ T4908.$wf
 f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
- Str=<S(S),1*U(1*U)><L,1*U(A,1*U(1*U))>,
+ Str=<SP(SU)><1P(A,1P(1U))>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)

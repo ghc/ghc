@@ -1,0 +1,30 @@
+
+==================== Strictness signatures ====================
+T18957.$trModule:
+T18957.g: <1C1(U)><SP(U)>
+T18957.h1: <MC1(U)><SP(U)>
+T18957.h2: <SC1(U)><SP(U)>
+T18957.h3: <UCU(P(U))><SP(U)>
+T18957.seq': <SA><SU>
+
+
+
+==================== Cpr signatures ====================
+T18957.$trModule:
+T18957.g:
+T18957.h1:
+T18957.h2:
+T18957.h3: m1
+T18957.seq':
+
+
+
+==================== Strictness signatures ====================
+T18957.$trModule:
+T18957.g: <1C1(U)><SP(U)>
+T18957.h1: <MC1(U)><SP(U)>
+T18957.h2: <SC1(U)><SP(U)>
+T18957.h3: <UCU(P(U))><SP(U)>
+T18957.seq': <SA><SU>
+
+
