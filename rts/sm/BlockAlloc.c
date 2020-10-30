@@ -796,7 +796,7 @@ freeGroup(bdescr *p)
   // not true in multithreaded GC:
   // ASSERT_SM_LOCK();
 
-  ASSERT(p->free != (P_)-1);
+  ASSERT(RELAXED_LOAD(&p->free) != (P_)-1);
 
 #if defined(DEBUG)
   for (uint32_t i=0; i < p->blocks; i++) {
@@ -806,9 +806,9 @@ freeGroup(bdescr *p)
 
   node = p->node;
 
-  p->free = (void *)-1;  /* indicates that this block is free */
-  p->gen = NULL;
-  p->gen_no = 0;
+  RELAXED_STORE(&p->free, (void *) -1);  /* indicates that this block is free */
+  RELAXED_STORE(&p->gen, NULL);
+  RELAXED_STORE(&p->gen_no, 0);
   /* fill the block group with garbage if sanity checking is on */
   IF_DEBUG(zero_on_gc, memset(p->start, 0xaa, (W_)p->blocks * BLOCK_SIZE));
 
@@ -834,7 +834,8 @@ freeGroup(bdescr *p)
   {
       bdescr *next;
       next = p + p->blocks;
-      if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(p)) && next->free == (P_)-1)
+      if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(p))
+          && RELAXED_LOAD(&next->free) == (P_)-1)
       {
           p->blocks += next->blocks;
           ln = log_2(next->blocks);
@@ -855,7 +856,7 @@ freeGroup(bdescr *p)
       prev = p - 1;
       if (prev->blocks == 0) prev = prev->link; // find the head
 
-      if (prev->free == (P_)-1)
+      if (RELAXED_LOAD(&prev->free) == (P_)-1)
       {
           ln = log_2(prev->blocks);
           dbl_link_remove(prev, &free_list[node][ln]);
