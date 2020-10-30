@@ -31,12 +31,12 @@ void acquire_spin_lock_slow_path(SpinLock * p)
             StgWord32 r = cas((StgVolatilePtr)&(p->lock), 1, 0);
             if (r != 0) return;
 #if defined(PROF_SPIN)
-            __atomic_fetch_add(&p->spin, 1, __ATOMIC_RELAXED);
+            RELAXED_ADD(&p->spin, 1);
 #endif
             busy_wait_nop();
         }
 #if defined(PROF_SPIN)
-        __atomic_fetch_add(&p->yield, 1, __ATOMIC_RELAXED);
+        RELAXED_ADD(&p->yield, 1);
 #endif
         yieldThread();
     } while (1);
