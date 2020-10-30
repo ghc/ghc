@@ -2,13 +2,13 @@
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-
-Loading interface files
 -}
 
 {-# LANGUAGE CPP, BangPatterns, RecordWildCards, NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
+-- | Loading interface files
 module GHC.Iface.Load (
         -- Importing one thing
         tcLookupImported_maybe, importDecl,
@@ -23,7 +23,6 @@ module GHC.Iface.Load (
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
         findAndReadIface, readIface, writeIface,
-        loadDecls,      -- Should move to GHC.IfaceToCore and be renamed
         initExternalPackageState,
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
@@ -37,7 +36,7 @@ module GHC.Iface.Load (
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.IfaceToCore
-   ( tcIfaceDecl, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
+   ( tcIfaceDecls, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
    , tcIfaceAnnotations, tcIfaceCompleteMatches )
 
 import GHC.Driver.Env
@@ -48,7 +47,6 @@ import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
 import GHC.Iface.Syntax
-import GHC.Iface.Env
 import GHC.Iface.Ext.Fields
 import GHC.Iface.Binary
 import GHC.Iface.Rename
@@ -60,7 +58,6 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Utils.Fingerprint
 
 import GHC.Settings.Constants
 
@@ -489,13 +486,13 @@ loadInterface doc_str mod from
         --      IfaceDecls, IfaceClsInst, IfaceFamInst, IfaceRules,
         -- out of the ModIface and put them into the big EPS pools
 
-        -- NB: *first* we do loadDecl, so that the provenance of all the locally-defined
+        -- NB: *first* we do tcIfaceDecls, so that the provenance of all the locally-defined
         ---    names is done correctly (notably, whether this is an .hi file or .hi-boot file).
         --     If we do loadExport first the wrong info gets into the cache (unless we
         --      explicitly tag each export which seems a bit of a bore)
 
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
-        ; new_eps_decls     <- loadDecls ignore_prags (mi_decls iface)
+        ; new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
@@ -776,110 +773,6 @@ badSourceImport mod
 
 addDeclsToPTE :: PackageTypeEnv -> [(Name,TyThing)] -> PackageTypeEnv
 addDeclsToPTE pte things = extendNameEnvList pte things
-
-loadDecls :: Bool
-          -> [(Fingerprint, IfaceDecl)]
-          -> IfL [(Name,TyThing)]
-loadDecls ignore_prags ver_decls
-   = concatMapM (loadDecl ignore_prags) ver_decls
-
-loadDecl :: Bool                    -- Don't load pragmas into the decl pool
-          -> (Fingerprint, IfaceDecl)
-          -> IfL [(Name,TyThing)]   -- The list can be poked eagerly, but the
-                                    -- TyThings are forkM'd thunks
-loadDecl ignore_prags (_version, decl)
-  = do  {       -- Populate the name cache with final versions of all
-                -- the names associated with the decl
-          let main_name = ifName decl
-
-        -- Typecheck the thing, lazily
-        -- NB. Firstly, the laziness is there in case we never need the
-        -- declaration (in one-shot mode), and secondly it is there so that
-        -- we don't look up the occurrence of a name before calling mk_new_bndr
-        -- on the binder.  This is important because we must get the right name
-        -- which includes its nameParent.
-
-        ; thing <- forkM doc $ do { bumpDeclStats main_name
-                                  ; tcIfaceDecl ignore_prags decl }
-
-        -- Populate the type environment with the implicitTyThings too.
-        --
-        -- Note [Tricky iface loop]
-        -- ~~~~~~~~~~~~~~~~~~~~~~~~
-        -- Summary: The delicate point here is that 'mini-env' must be
-        -- buildable from 'thing' without demanding any of the things
-        -- 'forkM'd by tcIfaceDecl.
-        --
-        -- In more detail: Consider the example
-        --      data T a = MkT { x :: T a }
-        -- The implicitTyThings of T are:  [ <datacon MkT>, <selector x>]
-        -- (plus their workers, wrappers, coercions etc etc)
-        --
-        -- We want to return an environment
-        --      [ "MkT" -> <datacon MkT>, "x" -> <selector x>, ... ]
-        -- (where the "MkT" is the *Name* associated with MkT, etc.)
-        --
-        -- We do this by mapping the implicit_names to the associated
-        -- TyThings.  By the invariant on ifaceDeclImplicitBndrs and
-        -- implicitTyThings, we can use getOccName on the implicit
-        -- TyThings to make this association: each Name's OccName should
-        -- be the OccName of exactly one implicitTyThing.  So the key is
-        -- to define a "mini-env"
-        --
-        -- [ 'MkT' -> <datacon MkT>, 'x' -> <selector x>, ... ]
-        -- where the 'MkT' here is the *OccName* associated with MkT.
-        --
-        -- However, there is a subtlety: due to how type checking needs
-        -- to be staged, we can't poke on the forkM'd thunks inside the
-        -- implicitTyThings while building this mini-env.
-        -- If we poke these thunks too early, two problems could happen:
-        --    (1) When processing mutually recursive modules across
-        --        hs-boot boundaries, poking too early will do the
-        --        type-checking before the recursive knot has been tied,
-        --        so things will be type-checked in the wrong
-        --        environment, and necessary variables won't be in
-        --        scope.
-        --
-        --    (2) Looking up one OccName in the mini_env will cause
-        --        others to be looked up, which might cause that
-        --        original one to be looked up again, and hence loop.
-        --
-        -- The code below works because of the following invariant:
-        -- getOccName on a TyThing does not force the suspended type
-        -- checks in order to extract the name. For example, we don't
-        -- poke on the "T a" type of <selector x> on the way to
-        -- extracting <selector x>'s OccName. Of course, there is no
-        -- reason in principle why getting the OccName should force the
-        -- thunks, but this means we need to be careful in
-        -- implicitTyThings and its helper functions.
-        --
-        -- All a bit too finely-balanced for my liking.
-
-        -- This mini-env and lookup function mediates between the
-        --'Name's n and the map from 'OccName's to the implicit TyThings
-        ; let mini_env = mkOccEnv [(getOccName t, t) | t <- implicitTyThings thing]
-              lookup n = case lookupOccEnv mini_env (getOccName n) of
-                           Just thing -> thing
-                           Nothing    ->
-                             pprPanic "loadDecl" (ppr main_name <+> ppr n $$ ppr (decl))
-
-        ; implicit_names <- mapM lookupIfaceTop (ifaceDeclImplicitBndrs decl)
-
---         ; traceIf (text "Loading decl for " <> ppr main_name $$ ppr implicit_names)
-        ; return $ (main_name, thing) :
-                      -- uses the invariant that implicit_names and
-                      -- implicitTyThings are bijective
-                      [(n, lookup n) | n <- implicit_names]
-        }
-  where
-    doc = text "Declaration for" <+> ppr (ifName decl)
-
-bumpDeclStats :: Name -> IfL ()         -- Record that one more declaration has actually been used
-bumpDeclStats name
-  = do  { traceIf (text "Loading decl for" <+> ppr name)
-        ; updateEps_ (\eps -> let stats = eps_stats eps
-                              in eps { eps_stats = stats { n_decls_out = n_decls_out stats + 1 } })
-        }
 
 {-
 *********************************************************
