@@ -95,7 +95,7 @@ import Data.Maybe ( mapMaybe )
 --
 --   * 'ClosureSk', representing closure allocation.
 --   * 'RhsSk', representing a RHS of a binding and how many times it's called
---     by an appropriate 'DmdShell'.
+--     by an appropriate 'Card'.
 --   * 'AltSk', 'BothSk' and 'NilSk' for choice, sequence and empty element.
 --
 -- This abstraction is mostly so that the main analysis function 'closureGrowth'
@@ -124,7 +124,7 @@ freeVarsOfRhs (StgRhsClosure fvs _ _ _ _) = fvs
 -- closures, multi-shot lambdas and case expressions.
 data Skeleton
   = ClosureSk !Id !DIdSet {- ^ free vars -} !Skeleton
-  | RhsSk !DmdShell {- ^ how often the RHS was entered -} !Skeleton
+  | RhsSk !Card {- ^ how often the RHS was entered -} !Skeleton
   | AltSk !Skeleton !Skeleton
   | BothSk !Skeleton !Skeleton
   | NilSk
@@ -139,7 +139,7 @@ altSk NilSk b = b
 altSk a NilSk = a
 altSk a b     = AltSk a b
 
-rhsSk :: DmdShell -> Skeleton -> Skeleton
+rhsSk :: Card -> Skeleton -> Skeleton
 rhsSk _        NilSk = NilSk
 rhsSk body_dmd skel  = RhsSk body_dmd skel
 
@@ -172,22 +172,12 @@ instance Outputable Skeleton where
     ]
   ppr (BothSk l r) = ppr l $$ ppr r
   ppr (ClosureSk f fvs body) = ppr f <+> ppr fvs $$ nest 2 (ppr body)
-  ppr (RhsSk body_dmd body) = hcat
-    [ text "λ["
-    , ppr str
-    , text ", "
-    , ppr use
-    , text "]. "
+  ppr (RhsSk card body) = hcat
+    [ lambda
+    , ppr card
+    , dot
     , ppr body
     ]
-    where
-      str
-        | isStrictDmd body_dmd = '1'
-        | otherwise = '0'
-      use
-        | isAbsDmd body_dmd = '0'
-        | isUsedOnce body_dmd = '1'
-        | otherwise = 'ω'
 
 instance Outputable BinderInfo where
   ppr = ppr . binderInfoBndr
@@ -333,19 +323,19 @@ tagSkeletonRhs bndr (StgRhsClosure fvs ccs upd bndrs body)
   where
     bndrs' = map BoringBinder bndrs
     (body_skel, body_arg_occs, body') = tagSkeletonExpr body
-    rhs_skel = rhsSk (rhsDmdShell bndr) body_skel
+    rhs_skel = rhsSk (rhsCard bndr) body_skel
 
 -- | How many times will the lambda body of the RHS bound to the given
 -- identifier be evaluated, relative to its defining context? This function
--- computes the answer in form of a 'DmdShell'.
-rhsDmdShell :: Id -> DmdShell
-rhsDmdShell bndr
-  | is_thunk = oneifyDmd ds
+-- computes the answer in form of a 'Card'.
+rhsCard :: Id -> Card
+rhsCard bndr
+  | is_thunk  = oneifyCard n
   | otherwise = peelManyCalls (idArity bndr) cd
   where
     is_thunk = idArity bndr == 0
     -- Let's pray idDemandInfo is still OK after unarise...
-    (ds, cd) = toCleanDmd (idDemandInfo bndr)
+    n :* cd = idDemandInfo bndr
 
 tagSkeletonAlt :: CgStgAlt -> (Skeleton, IdSet, LlStgAlt)
 tagSkeletonAlt (con, bndrs, rhs)
@@ -550,7 +540,7 @@ closureGrowth expander sizer group abs_ids = go
         -- Lifting @f@ removes @f@ from the closure but adds all @newbies@
         cost = nonDetStrictFoldDVarSet (\id size -> sizer id + size) 0 newbies - n_occs
         -- Using a non-deterministic fold is OK here because addition is commutative.
-    go (RhsSk body_dmd body)
+    go (RhsSk n body)
       -- The conservative assumption would be that
       --   1. Every RHS with positive growth would be called multiple times,
       --      modulo thunks.
@@ -561,11 +551,11 @@ closureGrowth expander sizer group abs_ids = go
       -- considering information from the demand analyser, which provides us
       -- with conservative estimates on minimum and maximum evaluation
       -- cardinality. The @body_dmd@ part of 'RhsSk' is the result of
-      -- 'rhsDmdShell' and accurately captures the cardinality of the RHSs body
+      -- 'rhsCard' and accurately captures the cardinality of the RHSs body
       -- relative to its defining context.
-      | isAbsDmd body_dmd   = 0
-      | cg <= 0             = if isStrictDmd body_dmd then cg else 0
-      | isUsedOnce body_dmd = cg
-      | otherwise           = infinity
+      | isAbs n      = 0
+      | cg <= 0      = if isStrict n then cg else 0
+      | isUsedOnce n = cg
+      | otherwise    = infinity
       where
         cg = go body

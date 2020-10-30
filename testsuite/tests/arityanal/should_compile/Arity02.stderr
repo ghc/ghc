@@ -11,7 +11,7 @@ F2.f1 = 0
 f2f :: forall {t1} {t2}. (t1 -> Integer -> t2) -> t1 -> t2
 [GblId,
  Arity=2,
- Str=<C(C(S)),1*C1(C1(U))><L,U>,
+ Str=<SCS(CS(U))><U>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)
          Tmpl= \ (@t) (@t1) (h [Occ=Once1!] :: t -> Integer -> t1) (x [Occ=Once1] :: t) -> h x F2.f1}]
 f2f = \ (@t) (@t1) (h :: t -> Integer -> t1) (x :: t) -> h x F2.f1
@@ -24,7 +24,7 @@ lvl = 1
 Rec {
 -- RHS size: {terms: 16, types: 3, coercions: 0, joins: 0/0}
 F2.f2_g [Occ=LoopBreaker] :: Integer -> Integer -> Integer
-[GblId, Arity=2, Str=<S,U><S,U>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<MU><MU>, Unf=OtherCon []]
 F2.f2_g
   = \ (x :: Integer) (y :: Integer) ->
       case GHC.Num.Integer.integerCompare x F2.f1 of {
