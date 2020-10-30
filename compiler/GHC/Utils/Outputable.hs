@@ -35,6 +35,7 @@ module GHC.Utils.Outputable (
         doubleQuotes, angleBrackets,
         semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
+        lambda,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore, mulArrow,
         blankLine, forAllLit, bullet,
         (<>), (<+>), hcat, hsep,
@@ -648,7 +649,7 @@ quotes d = sdocOption sdocCanUseUnicode $ \case
            | otherwise        -> Pretty.quotes pp_d
 
 semi, comma, colon, equals, space, dcolon, underscore, dot, vbar :: SDoc
-arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
+arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt, lambda :: SDoc
 lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
 blankLine  = docToSDoc $ Pretty.text ""
@@ -661,6 +662,7 @@ arrowt     = unicodeSyntax (char '⤚') (docToSDoc $ Pretty.text ">-")
 larrowt    = unicodeSyntax (char '⤙') (docToSDoc $ Pretty.text "-<")
 arrowtt    = unicodeSyntax (char '⤜') (docToSDoc $ Pretty.text ">>-")
 larrowtt   = unicodeSyntax (char '⤛') (docToSDoc $ Pretty.text "-<<")
+lambda     = unicodeSyntax (char 'λ') (char '\\')
 semi       = docToSDoc $ Pretty.semi
 comma      = docToSDoc $ Pretty.comma
 colon      = docToSDoc $ Pretty.colon

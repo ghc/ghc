@@ -173,9 +173,9 @@ instance Outputable Skeleton where
   ppr (BothSk l r) = ppr l $$ ppr r
   ppr (ClosureSk f fvs body) = ppr f <+> ppr fvs $$ nest 2 (ppr body)
   ppr (RhsSk card body) = hcat
-    [ char 'λ'
+    [ lambda
     , ppr card
-    , text ". "
+    , dot
     , ppr body
     ]
 
