@@ -25,5 +25,5 @@ mkLlvmFlavour :: Flavour -> Flavour
 mkLlvmFlavour flav = flav
     { name = name flav ++ "-llvm"
     , args = mconcat [ args flav
-                     , builder Ghc ? arg "-fllvm" ]
+                     , notStage0 ? builder Ghc ? arg "-fllvm" ]
     }
