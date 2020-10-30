@@ -233,9 +233,10 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(alt, bndrs, rhs)])
         (rhs_ty, rhs')           = dmdAnal env dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
-        -- Evaluation cardinality on the case binder is irrelevant and a no-op.
-        -- What matters is its nested sub-demand!
-        (_ :* case_bndr_sd)      = case_bndr_dmd
+        -- The peelDmd below will lazify the relative sub-demands if the
+        -- case_bndr_dmd had lazy evaluation cardinality.
+        -- See Note [Absent sub-demand] in GHC.Types.Demand
+        case_bndr_sd             = peelDmd case_bndr_dmd
         -- Compute demand on the scrutinee
         (bndrs', scrut_sd)
           | DataAlt _ <- alt
@@ -388,9 +389,10 @@ dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> (DmdType, Alt Var)
 dmdAnalSumAlt env dmd case_bndr (con,bndrs,rhs)
   | (rhs_ty, rhs') <- dmdAnal env dmd rhs
   , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
-  , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
+  , let case_bndr_dmd = findIdDemand alt_ty case_bndr
         -- See Note [Demand on scrutinee of a product case]
-        id_dmds             = addCaseBndrDmd case_bndr_sd dmds
+        -- See Note [Absent sub-demand] in GHC.Types.Demand
+        id_dmds       = addCaseBndrDmd (peelDmd case_bndr_dmd) dmds
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
 {-

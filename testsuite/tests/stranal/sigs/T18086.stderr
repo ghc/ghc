@@ -2,7 +2,7 @@
 ==================== Strictness signatures ====================
 T18086.$trModule:
 T18086.m: <U>x
-T18086.panic: <U>x
+T18086.panic: <UM>x
 
 
 
@@ -16,6 +16,6 @@ T18086.panic:
 ==================== Strictness signatures ====================
 T18086.$trModule:
 T18086.m: <U>x
-T18086.panic: <U>x
+T18086.panic: <UM>x
 
 

@@ -1,10 +1,10 @@
 
 ==================== Strictness signatures ====================
 T18957.$trModule:
-T18957.g: <1C1(U)><SP(U)>
-T18957.h1: <MC1(U)><SP(U)>
+T18957.g: <1CS(U)><SP(U)>
+T18957.h1: <MCS(U)><SP(U)>
 T18957.h2: <SC1(U)><SP(U)>
-T18957.h3: <UCU(P(U))><SP(U)>
+T18957.h3: <UCM(P(U))><SP(U)>
 T18957.seq': <SA><SU>
 
 
@@ -21,10 +21,10 @@ T18957.seq':
 
 ==================== Strictness signatures ====================
 T18957.$trModule:
-T18957.g: <1C1(U)><SP(U)>
+T18957.g: <1CS(U)><SP(U)>
 T18957.h1: <MC1(U)><SP(U)>
 T18957.h2: <SC1(U)><SP(U)>
-T18957.h3: <UCU(P(U))><SP(U)>
+T18957.h3: <UCM(P(U))><SP(U)>
 T18957.seq': <SA><SU>
 
 

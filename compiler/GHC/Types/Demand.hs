@@ -35,7 +35,7 @@ module GHC.Types.Demand (
     -- ** Other @Demand@ operations
     oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, mkWorkerDemand,
     peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
-    addCaseBndrDmd,
+    peelDmd, addCaseBndrDmd,
     -- ** Extracting one-shot information
     argOneShots, argsOneShots, saturatedByOneShots,
 
@@ -231,8 +231,9 @@ multCard _    _    = C_0N
 --   * '$' puts demand @SCS(U)@ on its first argument: It calls (@C@) the
 --     argument function with one argument, exactly once (@S@). No info
 --     on how the result of that call is evaluated (@U@).
---   * 'maybe' puts demand @1C1(U)@ on its second argument: It evaluates
---     the argument function lazily and calls it once when it is evaluated.
+--   * 'maybe' puts demand @1CS(U)@ on its second argument: It evaluates
+--     the argument function lazily, but calls it exactly once when it is
+--     evaluated.
 --   * @fst p + fst p@ puts demand @MP(MU,A)@ on @p@: It's @SP(SU,A)@
 --     multiplied by two, so we get @M@ (used at least once, possibly multiple
 --     times).
@@ -252,6 +253,7 @@ data Demand
 -- @f@ is called exactly twice (@M@), each time exactly once (@S@) with an
 -- additional argument.
 --
+-- TODO: update following paragraph with intuition from #18885.
 -- The nested 'Demand's @dn@ of a 'Prod' @P(d1,d2,...)@ apply /absolutely/:
 -- If @dn@ is a used once demand (cf. 'isUsedOnce'), then that means that
 -- the denoted sub-expression is used once in the entire evaluation context
@@ -367,6 +369,9 @@ lubSubDmd _          _         = topSubDmd
 
 -- | Denotes '∪' on 'Demand'.
 lubDmd :: Demand -> Demand -> Demand
+-- See Note [Absent sub-demand] for the first two special cases
+lubDmd (C_00 :* _) (n2 :* sd2) = lubCard C_00 n2   :* lubSubDmd botSubDmd sd2
+lubDmd (n1 :* sd1) (C_00 :* _) = lubCard n1   C_00 :* lubSubDmd sd1       botSubDmd
 lubDmd (n1 :* sd1) (n2 :* sd2) = lubCard n1   n2   :* lubSubDmd sd1       sd2
 
 -- | Denotes '+' on 'SubDemand'.
@@ -459,20 +464,20 @@ evalDmd = C_1N :* topSubDmd
 strictOnceApply1Dmd :: Demand
 strictOnceApply1Dmd = C_11 :* Call C_11 topSubDmd
 
--- | First argument of 'GHC.Exts.atomically#': @MCM(U)@.
+-- | First argument of 'GHC.Exts.atomically#': @CM(U)@.
 -- Called at least once, possibly many times.
 strictManyApply1Dmd :: Demand
 strictManyApply1Dmd = C_1N :* Call C_1N topSubDmd
 
--- | First argument of catch#: @1C1(U)@.
+-- | First argument of catch#: @1CS(U)@.
 -- Evaluates its arg lazily, but then applies it exactly once to one argument.
 lazyApply1Dmd :: Demand
 lazyApply1Dmd = C_01 :* Call C_01 topSubDmd
 
--- | Second argument of catch#: @1C1(CS(U))@.
--- Calls its arg lazily, but then applies it exactly once to an additional argument.
+-- | Second argument of catch#: @1CS(CS(U))@.
+-- Evaluates its arg lazily, but then applies it exactly once to two arguments.
 lazyApply2Dmd :: Demand
-lazyApply2Dmd = C_01 :* Call C_01 (Call C_11 topSubDmd)
+lazyApply2Dmd = C_01 :* Call C_11 (Call C_11 topSubDmd)
 
 -- | Make a 'Demand' evaluated at-most-once.
 oneifyDmd :: Demand -> Demand
@@ -510,6 +515,14 @@ strictifyDictDmd ty (n :* Prod ds)
       | otherwise
       = Nothing
 strictifyDictDmd _  dmd = dmd
+
+-- | Peels the evaluation cardinality of a 'Demand' and multiplies it with
+-- the relative parts of the 'SubDemand'. See Note [Absent sub-demand].
+peelDmd :: Demand -> SubDemand
+peelDmd (n :* sd)
+  | isAbs n    = seqSubDmd
+  | isStrict n = sd
+  | otherwise  = C_01 `multSubDmd` sd
 
 -- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @CS(d)@.
 mkCallDmd :: SubDemand -> SubDemand
@@ -568,7 +581,7 @@ argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
 argOneShots :: Demand          -- ^ depending on saturation
             -> [OneShotInfo]
 -- ^ See Note [Computing one-shot info]
-argOneShots (_ :* sd) = go sd -- See Note [Call demands are relative]
+argOneShots (n :* sd) = go (multSubDmd n sd) -- See Note [Call demands are relative]
   where
     go (Call n sd)
       | isUsedOnce n = OneShotLam    : go sd
@@ -605,9 +618,9 @@ In #7319 we get
 Note [Call demands are relative]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The expression @if b then 0 else f 1 2 + f 3 4@ uses @f@ according to the demand
-@UCU(CS(P(U)))@, meaning
+@UCM(CS(P(U)))@, meaning
 
-  "f is called multiple times or not at all (CU), but each time it
+  "f is called multiple times (CM) or not at all (U), but each time it
    is called, it's called with *exactly one* (CS) more argument.
    Whenever it is called with two arguments, we have no info on how often
    the field of the product result is used (U)."
@@ -627,7 +640,7 @@ call site. Consider (#18903)
       2 -> snd (g m)
       _ -> uncurry (+) (g m)
 
-We want to give @g@ the demand @1C1(P(1P(U),SP(U)))@, so we see that in each call
+We want to give @g@ the demand @1CS(P(1P(U),SP(U)))@, so we see that in each call
 site of @g@, we are strict in the second component of the returned pair.
 
 This relative cardinality leads to an otherwise unexpected call to 'lubSubDmd'
@@ -638,6 +651,67 @@ call, in the case where we have *at most zero calls* (e.g. CA(...)), the premise
 is hurt and we can assume that the nested demand is 'botSubDmd'. That ensures
 that @g@ above actually gets the @SP(U)@ demand on its second pair component,
 rather than the lazy @1P(U)@ if we 'lub'bed with an absent demand.
+
+Note [Absent sub-demand]
+~~~~~~~~~~~~~~~~~~~~~~~~
+What is does the sub-demand of an absent demand tell us? There's no sense in
+telling *how deep* something was evaluated if it was not evaluated *at all*!
+Since the upper bound on evaluation cardinality is 0, we are free to choose
+whatever sub-demand we want.
+
+In case of 'lubDmd', we want that sub-demand to be 'botSubDmd', for similar
+reasons as we want 'botSubDmd' in Note [Call demands are relative]. Here's
+an example (T18885):
+
+  f :: Int -> Int
+  f y =
+    let x
+         | expensive y == 1 = (expensive (y+1), expensive (y+2))
+         | otherwise        = (expensive (y+3), expensive (y+4))
+    in case () of
+         _ | expensive (y+5) == 42 -> fst x
+         _ | expensive (y+6) == 41 -> fst x + snd x
+         _ | otherwise             -> 0
+
+Without the 'botSubDmd' special case, the demand on @x@ is 1P(1P(U),1P(U)).
+The outer evaluation cardinality is lazy and recursively makes all field
+demands lazy, too, so there's plenty of syntactic structure in our product
+demand language we leave unused.
+But note how everytime we evaluate @x@ to WHNF, we also evaluate its first
+pair component! We could say @1P(SP(U),1P(U))@ to encode that and the
+'botSubDmd' special case gives us exactly the means to infer that!
+
+We could then go on to exploit the nested strictness by transforming @x@ to
+
+    let x
+         | expensive y == 1 = case expensive (y+1) of !n -> (n, expensive (y+2))
+         | otherwise        = case expensive (y+3) of !n -> (n, expensive (y+4))
+
+which would save allocation of a thunk. Unfortunately, we haven't written that
+transformation yet.
+
+But now we say (T18885b) that @test@ in
+
+  force :: (Int, Int) -> (Int, Int)
+  force p@(!x, !y) = p
+  {-# NOINLINE force #-}
+
+  test :: (Int, Int) -> Int -> (Int, Int)
+  test p z = case p of p'
+    (x, y) | odd z     -> force p
+           | otherwise -> (1, 2)
+
+has strictness signature <SP(SP(U),SP(U))><SP(U)>, which is wrong! @test@
+is not strict in the fields of @p@. The problem is that the case binder @p'@
+has demand 1P(SP(U),SP(U)) from the call to @force@. When we apply the field
+demands to the alt binders ('addCaseBndrDmd'), we get strict demands on @x@
+and @y@, which is wrong.
+The solution is that we have to multiply the vase binders evaluation
+cardinality onto its field demands when we unwrap it! The field demands are
+relative to one evaluation, so similarly to dmdAnalStar the field demands
+have to lazified if the evaluation cardinality wasn't strict.
+(But we have to leave the usage alone, because it's already absolute.)
+Hence we do 'peelDmd' before calling 'addCaseBndrDmd'.
 
 Demand on case-alternative binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

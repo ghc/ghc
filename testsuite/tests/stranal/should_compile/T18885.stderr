@@ -1,0 +1,151 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 143, types: 59, coercions: 0, joins: 1/2}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18885.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T18885.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18885.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18885.$trModule3 = GHC.Types.TrNameS T18885.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18885.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T18885.$trModule2 = "T18885"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18885.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18885.$trModule1 = GHC.Types.TrNameS T18885.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18885.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18885.$trModule
+  = GHC.Types.Module T18885.$trModule3 T18885.$trModule1
+
+-- RHS size: {terms: 30, types: 8, coercions: 0, joins: 1/1}
+T18885.$wexpensive [InlPrag=NOINLINE]
+  :: GHC.Prim.Int# -> GHC.Prim.Int#
+[GblId, Arity=1, Str=<U>, Unf=OtherCon []]
+T18885.$wexpensive
+  = \ (ww :: GHC.Prim.Int#) ->
+      case GHC.Prim.># 0# ww of {
+        __DEFAULT ->
+          joinrec {
+            $wgo9 [InlPrag=[2], Occ=LoopBreaker]
+              :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
+            [LclId[JoinId(2)], Arity=2, Str=<U><U>, Unf=OtherCon []]
+            $wgo9 (w :: GHC.Prim.Int#) (ww1 :: GHC.Prim.Int#)
+              = case GHC.Prim.==# w ww of {
+                  __DEFAULT -> jump $wgo9 (GHC.Prim.+# w 1#) (GHC.Prim.+# ww1 w);
+                  1# -> GHC.Prim.+# ww1 w
+                }; } in
+          jump $wgo9 0# 0#;
+        1# -> 0#
+      }
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+expensive [InlPrag=[final]] :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<SP(U)>,
+ Cpr=m1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once1!] :: Int) ->
+                 case w of { GHC.Types.I# ww1 [Occ=Once1] ->
+                 case T18885.$wexpensive ww1 of ww2 [Occ=Once1] { __DEFAULT ->
+                 GHC.Types.I# ww2
+                 }
+                 }}]
+expensive
+  = \ (w :: Int) ->
+      case w of { GHC.Types.I# ww1 ->
+      case T18885.$wexpensive ww1 of ww2 { __DEFAULT ->
+      GHC.Types.I# ww2
+      }
+      }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18885.f1 :: Int
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18885.f1 = GHC.Types.I# 0#
+
+-- RHS size: {terms: 76, types: 30, coercions: 0, joins: 0/1}
+T18885.$wf [InlPrag=[2]] :: GHC.Prim.Int# -> Int
+[GblId,
+ Arity=1,
+ Str=<U>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 377 10}]
+T18885.$wf
+  = \ (ww :: GHC.Prim.Int#) ->
+      case T18885.$wexpensive (GHC.Prim.+# ww 5#) of ww1 { __DEFAULT ->
+      let {
+        x [Dmd=1P(SP(U),1P(U))] :: (Int, Int)
+        [LclId]
+        x = case T18885.$wexpensive ww of {
+              __DEFAULT ->
+                (case T18885.$wexpensive (GHC.Prim.+# ww 3#) of ww3 { __DEFAULT ->
+                 GHC.Types.I# ww3
+                 },
+                 case T18885.$wexpensive (GHC.Prim.+# ww 4#) of ww3 { __DEFAULT ->
+                 GHC.Types.I# ww3
+                 });
+              1# ->
+                (case T18885.$wexpensive (GHC.Prim.+# ww 1#) of ww3 { __DEFAULT ->
+                 GHC.Types.I# ww3
+                 },
+                 case T18885.$wexpensive (GHC.Prim.+# ww 2#) of ww3 { __DEFAULT ->
+                 GHC.Types.I# ww3
+                 })
+            } } in
+      case ww1 of {
+        __DEFAULT ->
+          case T18885.$wexpensive (GHC.Prim.+# ww 6#) of {
+            __DEFAULT -> T18885.f1;
+            41# ->
+              case x of { (x1, ds1) ->
+              case x1 of { GHC.Types.I# x2 ->
+              case ds1 of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.+# x2 y) }
+              }
+              }
+          };
+        42# -> case x of { (x1, ds1) -> x1 }
+      }
+      }
+
+-- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+f [InlPrag=[2]] :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<SP(U)>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once1!] :: Int) ->
+                 case w of { GHC.Types.I# ww1 [Occ=Once1] -> T18885.$wf ww1 }}]
+f = \ (w :: Int) ->
+      case w of { GHC.Types.I# ww1 -> T18885.$wf ww1 }
+
+
+

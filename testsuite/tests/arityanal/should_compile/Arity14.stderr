@@ -18,7 +18,7 @@ F14.f2 = 1
 
 -- RHS size: {terms: 35, types: 24, coercions: 0, joins: 0/3}
 F14.$wf14 [InlPrag=[2]] :: forall {t}. (t -> t -> Bool) -> Num t => t -> t -> t -> t
-[GblId, Arity=4, Str=<MCM(CS(U))><UP(UCU(CS(U)),A,A,A,A,A,1C1(U))><U><U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 90 0 0] 300 0}]
+[GblId, Arity=4, Str=<MCM(CS(U))><UP(UCU(CS(U)),A,A,A,A,A,1CS(U))><U><U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 90 0 0] 300 0}]
 F14.$wf14
   = \ (@t) (ww :: t -> t -> Bool) (w :: Num t) (w1 :: t) (w2 :: t) ->
       let {

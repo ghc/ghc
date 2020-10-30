@@ -63,7 +63,7 @@ T18903.$wh [InlPrag=[2]] :: GHC.Prim.Int# -> Int
 T18903.$wh
   = \ (ww :: GHC.Prim.Int#) ->
       let {
-        $wg [InlPrag=NOINLINE, Dmd=1C1(P(1P(U),SP(U)))]
+        $wg [InlPrag=NOINLINE, Dmd=1CS(P(1P(U),SP(U)))]
           :: GHC.Prim.Int# -> (# Int, Int #)
         [LclId, Arity=1, Str=<SU>, Unf=OtherCon []]
         $wg

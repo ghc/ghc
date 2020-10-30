@@ -59,7 +59,7 @@ end Rec }
 T4908.$wf [InlPrag=[2]] :: Int# -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
- Str=<SU><1P(A,1P(1U))>,
+ Str=<SU><1P(A,SP(SU))>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 20] 101 20}]
 T4908.$wf

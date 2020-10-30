@@ -35,7 +35,7 @@ end Rec }
 
 -- RHS size: {terms: 52, types: 28, coercions: 0, joins: 0/5}
 F11.$wfib [InlPrag=[2]] :: forall {a} {p}. (a -> a -> Bool) -> (Num a, Num p) => a -> p
-[GblId, Arity=4, Str=<MCM(CS(U))><UP(A,UCU(CS(U)),A,A,A,A,UCU(U))><UP(UCU(CS(U)),A,A,A,A,A,1C1(U))><U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 460 0}]
+[GblId, Arity=4, Str=<MCM(CS(U))><UP(A,UCU(CS(U)),A,A,A,A,UCM(U))><UP(MCM(CS(U)),A,A,A,A,A,1CS(U))><U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 460 0}]
 F11.$wfib
   = \ (@a) (@p) (ww :: a -> a -> Bool) (w :: Num a) (w1 :: Num p) (w2 :: a) ->
       let {

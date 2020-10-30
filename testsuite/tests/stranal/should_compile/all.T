@@ -58,3 +58,5 @@ test('T18122',  [ grep_errmsg(r'wfoo =') ], compile, ['-ddump-simpl'])
 
 # We care about the call demand on $wg
 test('T18903',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-simpl -dsuppress-uniques'])
+# We care about the nested strict product demand on x
+test('T18885',  [ grep_errmsg(r'Dmd=1P\(SP\(\S+') ], compile, ['-ddump-simpl -dsuppress-uniques'])

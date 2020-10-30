@@ -1268,11 +1268,13 @@ by saying ``-fno-wombat``.
      maybe n _ Nothing  = n
      maybe _ s (Just a) = s a
 
-    We give it demand signature ``<U><1C1(U)><SU>``.  The ``C1(U)`` is a *call
-    sub-demand* that says "Called at most once, where the result is used
-    according to ``U``". The expression ``f `seq` f 1 2`` puts ``f`` under
-    demand ``MCS(U)`` and serves as an example where the upper bound on
-    evaluation cardinality doesn't conincide with that of the call cardinality.
+    We give it demand signature ``<U><1CS(U)><SU>``.  The ``CS(U)`` is a
+    *call sub-demand* that applies when the surrounding demand is evaluated
+    at all. It says "If evaluated, the thing is called exactly once, where
+    the result is used according to ``U``". The expression ``f `seq` f 1 2``
+    puts ``f`` under demand ``MCS(U)`` and serves as an example where the
+    upper bound on evaluation cardinality doesn't conincide with that of
+    the call cardinality.
 
     Cardinality is always relative to the enclosing call cardinality, so
     ``g 1 2 + g 3 4`` puts ``g`` under demand ``MCM(CS(U))``, which says

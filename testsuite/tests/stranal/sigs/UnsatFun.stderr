@@ -6,7 +6,7 @@ UnsatFun.g: <SP(M)>b
 UnsatFun.g': <1P(U)>
 UnsatFun.g3: <A>
 UnsatFun.h: <SCS(U)>
-UnsatFun.h2: <SU><1C1(U)>
+UnsatFun.h2: <SU><1CS(U)>
 UnsatFun.h3: <SCS(A)>
 
 
@@ -30,7 +30,7 @@ UnsatFun.g: <SP(M)>b
 UnsatFun.g': <1P(U)>
 UnsatFun.g3: <A>
 UnsatFun.h: <SCS(U)>
-UnsatFun.h2: <SU><1C1(U)>
+UnsatFun.h2: <SU><1CS(U)>
 UnsatFun.h3: <SCS(A)>
 
 

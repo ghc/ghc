@@ -1,0 +1,21 @@
+
+==================== Strictness signatures ====================
+T18885b.$trModule:
+T18885b.force: <SP(MU,MU)>
+T18885b.test: <SP(U,U)><SP(U)>
+
+
+
+==================== Cpr signatures ====================
+T18885b.$trModule:
+T18885b.force: m1
+T18885b.test: m1
+
+
+
+==================== Strictness signatures ====================
+T18885b.$trModule:
+T18885b.force: <SP(SP(U),SP(U))>
+T18885b.test: <SP(1P(U),1P(U))><SP(U)>
+
+
