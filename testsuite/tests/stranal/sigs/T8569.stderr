@@ -4,7 +4,7 @@ T8569.$tc'Rdata:
 T8569.$tc'Rint:
 T8569.$tcRep:
 T8569.$trModule:
-T8569.addUp: <S,1*U><L,U>
+T8569.addUp: <SU><U>
 
 
 
@@ -22,6 +22,6 @@ T8569.$tc'Rdata:
 T8569.$tc'Rint:
 T8569.$tcRep:
 T8569.$trModule:
-T8569.addUp: <S,1*U><L,U>
+T8569.addUp: <SU><U>
 
 

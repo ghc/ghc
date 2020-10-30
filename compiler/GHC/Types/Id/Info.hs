@@ -636,7 +636,7 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
                           -> occ { occ_tail   = NoTailCallInfo }
                  _other   -> occ
 
-    is_safe_dmd dmd = not (isStrictDmd dmd)
+    is_safe_dmd dmd = not (isStrUsedDmd dmd)
 
 -- | Remove all demand info on the 'IdInfo'
 zapDemandInfo :: IdInfo -> Maybe IdInfo

@@ -5,7 +5,7 @@ Result size of Tidy Core = {terms: 52, types: 87, coercions: 0, joins: 0/0}
 Rec {
 -- RHS size: {terms: 15, types: 17, coercions: 0, joins: 0/0}
 map2 [Occ=LoopBreaker] :: forall {t} {a}. (t -> a) -> [t] -> [a]
-[GblId, Arity=2, Str=<L,C(U)><S,1*U>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<UCU(U)><SU>, Unf=OtherCon []]
 map2
   = \ (@t) (@a) (f :: t -> a) (ds :: [t]) ->
       case ds of {
@@ -27,7 +27,7 @@ lvl1 = \ (@a) -> Control.Exception.Base.patError @'GHC.Types.LiftedRep @[a] lvl
 Rec {
 -- RHS size: {terms: 29, types: 35, coercions: 0, joins: 0/0}
 zipWith2 [Occ=LoopBreaker] :: forall {t1} {t2} {a}. (t1 -> t2 -> a) -> [t1] -> [t2] -> [a]
-[GblId, Arity=3, Str=<L,C(C1(U))><S,1*U><S,1*U>, Unf=OtherCon []]
+[GblId, Arity=3, Str=<UCU(CS(U))><SU><SU>, Unf=OtherCon []]
 zipWith2
   = \ (@t) (@t1) (@a) (f :: t -> t1 -> a) (ds :: [t]) (ds1 :: [t1]) ->
       case ds of {

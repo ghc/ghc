@@ -41,7 +41,7 @@ import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
-import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrictDmd
+import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrUsedDmd
                         , mkClosedStrictSig, topDmd, seqDmd, isDeadEndDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
@@ -2481,7 +2481,7 @@ There have been various earlier versions of this patch:
 
     scrut_is_demanded_var :: CoreExpr -> Bool
     scrut_is_demanded_var (Cast s _) = scrut_is_demanded_var s
-    scrut_is_demanded_var (Var _)    = isStrictDmd (idDemandInfo case_bndr)
+    scrut_is_demanded_var (Var _)    = isStrUsedDmd (idDemandInfo case_bndr)
     scrut_is_demanded_var _          = False
 
   This only fired if the scrutinee was a /variable/, which seems
@@ -2709,7 +2709,7 @@ doCaseToLet scrut case_bndr
 
   | otherwise  -- Scrut has a lifted type
   = exprIsHNF scrut
-    || isStrictDmd (idDemandInfo case_bndr)
+    || isStrUsedDmd (idDemandInfo case_bndr)
     -- See Note [Case-to-let for strictly-used binders]
 
 --------------------------------------------------

@@ -44,6 +44,8 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 
+-- import GHC.Driver.Ppr
+
 {-
 ************************************************************************
 *                                                                      *
@@ -76,12 +78,12 @@ dmdAnalTopBind env (NonRec id rhs)
   = ( extendAnalEnv TopLevel env id sig
     , NonRec (setIdStrictness id sig) rhs')
   where
-    ( _, sig, rhs') = dmdAnalRhsLetDown Nothing env cleanEvalDmd id rhs
+    ( _, sig, rhs') = dmdAnalRhsLetDown Nothing env topSubDmd id rhs
 
 dmdAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
   where
-    (env', _, pairs')  = dmdFix TopLevel env cleanEvalDmd pairs
+    (env', _, pairs')  = dmdFix TopLevel env topSubDmd pairs
                 -- We get two iterations automatically
                 -- c.f. the NonRec case above
 
@@ -143,21 +145,20 @@ dmdTransformThunkDmd e
 dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
             -> CoreExpr -- Should obey the let/app invariant
-            -> (BothDmdArg, CoreExpr)
-dmdAnalStar env dmd e
-  | (dmd_shell, cd) <- toCleanDmd dmd
-  , (dmd_ty, e')    <- dmdAnal env cd e
+            -> (PlusDmdArg, CoreExpr)
+dmdAnalStar env (n :* cd) e
+  | (dmd_ty, e')    <- dmdAnal env cd e
   = ASSERT2( not (isUnliftedType (exprType e)) || exprOkForSpeculation e, ppr e )
     -- The argument 'e' should satisfy the let/app invariant
     -- See Note [Analysing with absent demand] in GHC.Types.Demand
-    (postProcessDmdType dmd_shell dmd_ty, e')
+    (toPlusDmdArg $ multDmdType n dmd_ty, e')
 
 -- Main Demand Analsysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
-        -> CleanDemand         -- The main one takes a *CleanDemand*
+        -> SubDemand         -- The main one takes a *SubDemand*
         -> CoreExpr -> (DmdType, CoreExpr)
 
--- The CleanDemand is always strict and not absent
+-- The SubDemand is always strict and not absent
 --    See Note [Ensure demand is strict]
 
 dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
@@ -172,7 +173,7 @@ dmdAnal' env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
 
 dmdAnal' env dmd (Cast e co)
-  = (dmd_ty `bothDmdType` mkBothDmdArg (coercionDmdEnv co), Cast e' co)
+  = (dmd_ty `plusDmdType` mkPlusDmdArg (coercionDmdEnv co), Cast e' co)
   where
     (dmd_ty, e') = dmdAnal env dmd e
 
@@ -206,7 +207,7 @@ dmdAnal' env dmd (App fun arg)
 --         , text "arg dmd_ty =" <+> ppr arg_ty
 --         , text "res dmd_ty =" <+> ppr res_ty
 --         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
-    (res_ty `bothDmdType` arg_ty, App fun' arg')
+    (res_ty `plusDmdType` arg_ty, App fun' arg')
 
 dmdAnal' env dmd (Lam var body)
   | isTyVar var
@@ -216,23 +217,35 @@ dmdAnal' env dmd (Lam var body)
     (body_ty, Lam var body')
 
   | otherwise
-  = let (body_dmd, defer_and_use) = peelCallDmd dmd
+  = let (n, body_dmd)    = peelCallDmd dmd
           -- body_dmd: a demand to analyze the body
 
         (body_ty, body') = dmdAnal env body_dmd body
         (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty var
     in
-    (postProcessUnsat defer_and_use lam_ty, Lam var' body')
+    (multDmdType n lam_ty, Lam var' body')
 
-dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
-  -- Only one alternative with a product constructor
-  | let tycon = dataConTyCon dc
-  , isJust (isDataProductTyCon_maybe tycon)
+dmdAnal' env dmd (Case scrut case_bndr ty [(alt, bndrs, rhs)])
+  -- Only one alternative.
+  -- If it's a DataAlt, it should be a product constructor.
+  | is_non_sum_alt alt
   = let
         (rhs_ty, rhs')           = dmdAnal env dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
-        id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
+        -- Evaluation cardinality on the case binder is irrelevant and a no-op.
+        -- What matters is its nested sub-demand!
+        (_ :* case_bndr_sd)      = case_bndr_dmd
+        -- Compute demand on the scrutinee
+        (bndrs', scrut_sd)
+          | DataAlt _ <- alt
+          , id_dmds <- addCaseBndrDmd case_bndr_sd dmds
+          -- See Note [Demand on scrutinee of a product case]
+          = (setBndrsDemandInfo bndrs id_dmds, mkProd id_dmds)
+          | otherwise
+          -- __DEFAULT and literal alts. Simply add demands and discard the
+          -- evaluation cardinality, as we evaluate the scrutinee exactly once.
+          = ASSERT( null bndrs ) (bndrs, case_bndr_sd)
         fam_envs                 = ae_fam_envs env
         alt_ty3
           -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
@@ -241,28 +254,26 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
           | otherwise
           = alt_ty2
 
-        -- Compute demand on the scrutinee
-        -- See Note [Demand on scrutinee of a product case]
-        scrut_dmd          = mkProdDmd id_dmds
-        (scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
-        res_ty             = alt_ty3 `bothDmdType` toBothDmdArg scrut_ty
+        (scrut_ty, scrut') = dmdAnal env scrut_sd scrut
+        res_ty             = alt_ty3 `plusDmdType` toPlusDmdArg scrut_ty
         case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
-        bndrs'             = setBndrsDemandInfo bndrs id_dmds
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
 --                                   , text "case_bndr_dmd" <+> ppr (idDemandInfo case_bndr')
---                                   , text "id_dmds" <+> ppr id_dmds
---                                   , text "scrut_dmd" <+> ppr scrut_dmd
+--                                   , text "scrut_sd" <+> ppr scrut_sd
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_ty" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
-    (res_ty, Case scrut' case_bndr' ty [(DataAlt dc, bndrs', rhs')])
+    (res_ty, Case scrut' case_bndr' ty [(alt, bndrs', rhs')])
+    where
+      is_non_sum_alt (DataAlt dc) = isJust $ isDataProductTyCon_maybe $ dataConTyCon dc
+      is_non_sum_alt _            = True
 
 dmdAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
-        (alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd case_bndr) alts
-        (scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
+        (alt_tys, alts')     = mapAndUnzip (dmdAnalSumAlt env dmd case_bndr) alts
+        (scrut_ty, scrut')   = dmdAnal env topSubDmd scrut
         (alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
                                -- NB: Base case is botDmdType, for empty case alternatives
                                --     This is a unit for lubDmdType, and the right result
@@ -274,7 +285,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
           = deferAfterPreciseException alt_ty
           | otherwise
           = alt_ty
-        res_ty               = alt_ty2 `bothDmdType` toBothDmdArg scrut_ty
+        res_ty               = alt_ty2 `plusDmdType` toPlusDmdArg scrut_ty
 
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
@@ -304,7 +315,7 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
     id'                = setIdDemandInfo id id_dmd
 
     (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
-    final_ty           = body_ty' `bothDmdType` rhs_ty
+    final_ty           = body_ty' `plusDmdType` rhs_ty
 
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 rhs') body')
@@ -373,21 +384,77 @@ forcesRealWorld fam_envs ty
   | otherwise
   = False
 
-dmdAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, Alt Var)
-dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
-  | null bndrs    -- Literals, DEFAULT, and nullary constructors
-  , (rhs_ty, rhs') <- dmdAnal env dmd rhs
-  = (rhs_ty, (con, [], rhs'))
-
-  | otherwise     -- Non-nullary data constructors
-  , (rhs_ty, rhs') <- dmdAnal env dmd rhs
+dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> (DmdType, Alt Var)
+dmdAnalSumAlt env dmd case_bndr (con,bndrs,rhs)
+  | (rhs_ty, rhs') <- dmdAnal env dmd rhs
   , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
-  , let case_bndr_dmd = findIdDemand alt_ty case_bndr
-        id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
+  , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
+        -- See Note [Demand on scrutinee of a product case]
+        id_dmds             = addCaseBndrDmd case_bndr_sd dmds
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
-{- Note [Which scrutinees may throw precise exceptions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [Analysing with absent demand]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we analyse an expression with demand A.  The "A" means
+"absent", so this expression will never be needed.  What should happen?
+There are several wrinkles:
+
+* We *do* want to analyse the expression regardless.
+  Reason: Note [Always analyse in virgin pass]
+
+  But we can post-process the results to ignore all the usage
+  demands coming back. This is done by multDmdType.
+
+* In a previous incarnation of GHC we needed to be extra careful in the
+  case of an *unlifted type*, because unlifted values are evaluated
+  even if they are not used.  Example (see #9254):
+     f :: (() -> (# Int#, () #)) -> ()
+          -- Strictness signature is
+          --    <CS(S(A,SU))>
+          -- I.e. calls k, but discards first component of result
+     f k = case k () of (# _, r #) -> r
+
+     g :: Int -> ()
+     g y = f (\n -> (# case y of I# y2 -> y2, n #))
+
+  Here f's strictness signature says (correctly) that it calls its
+  argument function and ignores the first component of its result.
+  This is correct in the sense that it'd be fine to (say) modify the
+  function so that always returned 0# in the first component.
+
+  But in function g, we *will* evaluate the 'case y of ...', because
+  it has type Int#.  So 'y' will be evaluated.  So we must record this
+  usage of 'y', else 'g' will say 'y' is absent, and will w/w so that
+  'y' is bound to an aBSENT_ERROR thunk.
+
+  However, the argument of toSubDmd always satisfies the let/app
+  invariant; so if it is unlifted it is also okForSpeculation, and so
+  can be evaluated in a short finite time -- and that rules out nasty
+  cases like the one above.  (I'm not quite sure why this was a
+  problem in an earlier version of GHC, but it isn't now.)
+
+Note [Always analyse in virgin pass]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Tricky point: make sure that we analyse in the 'virgin' pass. Consider
+   rec { f acc x True  = f (...rec { g y = ...g... }...)
+         f acc x False = acc }
+In the virgin pass for 'f' we'll give 'f' a very strict (bottom) type.
+That might mean that we analyse the sub-expression containing the
+E = "...rec g..." stuff in a bottom demand.  Suppose we *didn't analyse*
+E, but just returned botType.
+
+Then in the *next* (non-virgin) iteration for 'f', we might analyse E
+in a weaker demand, and that will trigger doing a fixpoint iteration
+for g.  But *because it's not the virgin pass* we won't start g's
+iteration at bottom.  Disaster.  (This happened in $sfibToList' of
+nofib/spectral/fibheaps.)
+
+So in the virgin pass we make sure that we do analyse the expression
+at least once, to initialise its signatures.
+
+Note [Which scrutinees may throw precise exceptions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This is the specification of 'exprMayThrowPreciseExceptions',
 which is important for Scenario 2 of
 Note [Precise exceptions and strictness analysis] in GHC.Types.Demand.
@@ -438,6 +505,9 @@ and that'll crash.
 
 Note [Aggregated demand for cardinality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+FIXME: This Note should be named [LetUp vs. LetDown] and probably predates
+said separation. SG
+
 We use different strategies for strictness and usage/cardinality to
 "unleash" demands captured on free variables by bindings. Let us
 consider the example:
@@ -484,13 +554,14 @@ strict in |y|.
 ************************************************************************
 -}
 
-dmdTransform :: AnalEnv         -- The strictness environment
-             -> Id              -- The function
-             -> CleanDemand     -- The demand on the function
-             -> DmdType         -- The demand type of the function in this context
-        -- Returned DmdEnv includes the demand on
-        -- this function plus demand on its free variables
+dmdTransform :: AnalEnv         -- ^ The strictness environment
+             -> Id              -- ^ The function
+             -> SubDemand       -- ^ The demand on the function
+             -> DmdType         -- ^ The demand type of the function in this context
+                                -- Returned DmdEnv includes the demand on
+                                -- this function plus demand on its free variables
 
+-- See Note [What are demand signatures?] in "GHC.Types.Demand"
 dmdTransform env var dmd
   -- Data constructors
   | isDataConWorkId var
@@ -499,7 +570,8 @@ dmdTransform env var dmd
   -- Used to be controlled by a flag.
   -- See #18429 for some perf measurements.
   | Just _ <- isClassOpId_maybe var
-  = dmdTransformDictSelSig (idStrictness var) dmd
+  = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr dmd) $
+    dmdTransformDictSelSig (idStrictness var) dmd
   -- Imported functions
   | isGlobalId var
   , let res = dmdTransformSig (idStrictness var) dmd
@@ -512,14 +584,14 @@ dmdTransform env var dmd
   = -- pprTrace "dmdTransform:LetDown" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
     if isTopLevel top_lvl
     then fn_ty   -- Don't record demand on top-level things
-    else addVarDmd fn_ty var (mkOnceUsedDmd dmd)
+    else addVarDmd fn_ty var (C_11 :* dmd)
   -- Everything else:
   --   * Local let binders for which we use LetUp (cf. 'useLetUp')
   --   * Lambda binders
   --   * Case and constructor field binders
   | otherwise
   = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr sig, ppr dmd, ppr res]) $
-    unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
+    unitDmdType (unitVarEnv var (C_11 :* dmd))
 
 {- *********************************************************************
 *                                                                      *
@@ -541,14 +613,15 @@ dmdTransform env var dmd
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
 dmdAnalRhsLetDown
   :: Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
-  -> AnalEnv -> CleanDemand
+  -> AnalEnv -> SubDemand
   -> Id -> CoreExpr
   -> (DmdEnv, StrictSig, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
 dmdAnalRhsLetDown rec_flag env let_dmd id rhs
-  = (lazy_fv, sig, rhs')
+  = -- pprTrace "dmdAnalRhsLetDown" (ppr id $$ ppr let_dmd $$ ppr sig $$ ppr lazy_fv) $
+    (lazy_fv, sig, rhs')
   where
     rhs_arity = idArity id
     rhs_dmd -- See Note [Demand analysis for join points]
@@ -567,19 +640,28 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
 
     -- See Note [Aggregated demand for cardinality]
+    -- FIXME: That Note doesn't explain the following lines at all. The reason
+    --        is really much different: When we have a recursive function, we'd
+    --        have to also consider the free vars of the strictness signature
+    --        when checking whether we found a fixed-point. That is expensive;
+    --        we only want to check whether argument demands of the sig changed.
+    --        reuseEnv makes it so that the FV results are stable as long as the
+    --        last argument demands were. Strictness won't change. But used-once
+    --        might turn into used-many even if the signature was stable and
+    --        we'd have to do an additional iteration. reuseEnv makes sure that
+    --        we never get used-once info for FVs of recursive functions.
     rhs_fv1 = case rec_flag of
                 Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
                 Nothing -> rhs_fv
 
     rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` extra_fvs
-
-    -- See Note [Lazy and unleashable free variables]
-    (lazy_fv, sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
-
     -- Find the RHS free vars of the unfoldings and RULES
     -- See Note [Absence analysis for stable unfoldings and RULES]
     extra_fvs = foldr (unionVarSet . ruleRhsFreeIds) unf_fvs $
                 idCoreRules id
+
+    -- See Note [Lazy and unleashable free variables]
+    (lazy_fv, sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
 
     unf = realIdUnfolding id
     unf_fvs | isStableUnfolding unf
@@ -587,12 +669,12 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
             = exprFreeIds unf_body
             | otherwise = emptyVarSet
 
--- | @mkRhsDmd env rhs_arity rhs@ creates a 'CleanDemand' for
+-- | @mkRhsDmd env rhs_arity rhs@ creates a 'SubDemand' for
 -- unleashing on the given function's @rhs@, by creating
 -- a call demand of @rhs_arity@
 -- See Historical Note [Product demands for function body]
-mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
-mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity cleanEvalDmd
+mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> SubDemand
+mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity topSubDmd
 
 -- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
 -- whether we should process the binding up (body before rhs) or down (rhs
@@ -694,12 +776,14 @@ behavior for when we have a call site with at least that many arguments. idArity
 is /at least/ the number of manifest lambdas, but might be higher for PAPs and
 trivial RHS (see Note [Demand analysis for trivial right-hand sides]).
 
-Because idArity of a function varies independently of its cardinality properties
-(cf. Note [idArity varies independently of dmdTypeDepth]), we implicitly encode
-the arity for when a demand signature is sound to unleash in its 'dmdTypeDepth'
-(cf. Note [Understanding DmdType and StrictSig] in GHC.Types.Demand). It is unsound to
-unleash a demand signature when the incoming number of arguments is less than
-that. See Note [What are demand signatures?] for more details on soundness.
+Because idArity of a function varies independently of its cardinality
+properties (cf. Note [idArity varies independently of dmdTypeDepth]), we
+implicitly encode the arity for when a demand signature is sound to unleash
+in its 'dmdTypeDepth' (cf. Note [Understanding DmdType and StrictSig] in
+GHC.Types.Demand). It is unsound to unleash a demand signature when the
+incoming number of arguments is less than that.
+See Note [What are demand signatures?] in GHC.Types.Demand for more details
+on soundness.
 
 Why idArity arguments? Because that's a conservative estimate of how many
 arguments we must feed a function before it does anything interesting with them.
@@ -758,57 +842,6 @@ coercion into the binding, leading to an arity decrease:
 
 With the CoreLint check, we would have to zap `go`'s perfectly viable strictness
 signature.
-
-Note [What are demand signatures?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Demand analysis interprets expressions in the abstract domain of demand
-transformers. Given an incoming demand we put an expression under, its abstract
-transformer gives us back a demand type denoting how other things (like
-arguments and free vars) were used when the expression was evaluated.
-Here's an example:
-
-  f x y =
-    if x + expensive
-      then \z -> z + y * ...
-      else \z -> z * ...
-
-The abstract transformer (let's call it F_e) of the if expression (let's call it
-e) would transform an incoming head demand <S,HU> into a demand type like
-{x-><S,1*U>,y-><L,U>}<L,U>. In pictures:
-
-     Demand ---F_e---> DmdType
-     <S,HU>            {x-><S,1*U>,y-><L,U>}<L,U>
-
-Let's assume that the demand transformers we compute for an expression are
-correct wrt. to some concrete semantics for Core. How do demand signatures fit
-in? They are strange beasts, given that they come with strict rules when to
-it's sound to unleash them.
-
-Fortunately, we can formalise the rules with Galois connections. Consider
-f's strictness signature, {}<S,1*U><L,U>. It's a single-point approximation of
-the actual abstract transformer of f's RHS for arity 2. So, what happens is that
-we abstract *once more* from the abstract domain we already are in, replacing
-the incoming Demand by a simple lattice with two elements denoting incoming
-arity: A_2 = {<2, >=2} (where '<2' is the top element and >=2 the bottom
-element). Here's the diagram:
-
-     A_2 -----f_f----> DmdType
-      ^                   |
-      | α               γ |
-      |                   v
-     Demand ---F_f---> DmdType
-
-With
-  α(C1(C1(_))) = >=2 -- example for usage demands, but similar for strictness
-  α(_)         =  <2
-  γ(ty)        =  ty
-and F_f being the abstract transformer of f's RHS and f_f being the abstracted
-abstract transformer computable from our demand signature simply by
-
-  f_f(>=2) = {}<S,1*U><L,U>
-  f_f(<2)  = postProcessUnsat {}<S,1*U><L,U>
-
-where postProcessUnsat makes a proper top element out of the given demand type.
 
 Note [Demand analysis for trivial right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -899,7 +932,7 @@ deleted the special case.
 -- Recursive bindings
 dmdFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
-       -> CleanDemand
+       -> SubDemand
        -> [(Id,CoreExpr)]
        -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
 
@@ -954,10 +987,11 @@ dmdFix top_lvl env let_dmd orig_pairs
                 -- so this can significantly reduce the number of iterations needed
 
         my_downRhs (env, lazy_fv) (id,rhs)
-          = ((env', lazy_fv'), (id', rhs'))
+          = -- pprTrace "my_downRhs" (ppr id $$ ppr (idStrictness id) $$ ppr sig) $
+            ((env', lazy_fv'), (id', rhs'))
           where
             (lazy_fv1, sig, rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
-            lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
+            lazy_fv'              = plusVarEnv_C plusDmd lazy_fv lazy_fv1
             env'                  = extendAnalEnv top_lvl env id sig
             id'                   = setIdStrictness id sig
 
@@ -1043,11 +1077,11 @@ coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)
 
 addVarDmd :: DmdType -> Var -> Demand -> DmdType
 addVarDmd (DmdType fv ds res) var dmd
-  = DmdType (extendVarEnv_C bothDmd fv var dmd) ds res
+  = DmdType (extendVarEnv_C plusDmd fv var dmd) ds res
 
 addLazyFVs :: DmdType -> DmdEnv -> DmdType
 addLazyFVs dmd_ty lazy_fvs
-  = dmd_ty `bothDmdType` mkBothDmdArg lazy_fvs
+  = dmd_ty `plusDmdType` mkPlusDmdArg lazy_fvs
         -- Using bothDmdType (rather than just both'ing the envs)
         -- is vital.  Consider
         --      let f = \x -> (x,y)
@@ -1109,13 +1143,13 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
-    -- pprTrace "annLamBndr" (vcat [ppr id, ppr _dmd_ty]) $
+    -- pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty, ppr final_ty]) $
     (final_ty, setIdDemandInfo id dmd)
   where
       -- Watch out!  See note [Lambda-bound unfoldings]
     final_ty = case maybeUnfoldingTemplate (idUnfolding id) of
                  Nothing  -> main_ty
-                 Just unf -> main_ty `bothDmdType` unf_ty
+                 Just unf -> main_ty `plusDmdType` unf_ty
                           where
                              (unf_ty, _) = dmdAnalStar env dmd unf
 
@@ -1314,7 +1348,8 @@ findBndrsDmds env dmd_ty bndrs
 findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
 -- See Note [Trimming a demand to a type]
 findBndrDmd env arg_of_dfun dmd_ty id
-  = (dmd_ty', dmd')
+  = -- pprTrace "findBndrDmd" (ppr id $$ ppr dmd_ty $$ ppr starting_dmd $$ ppr dmd') $
+    (dmd_ty', dmd')
   where
     dmd' = strictify $
            trimToType starting_dmd (findTypeShape fam_envs id_ty)

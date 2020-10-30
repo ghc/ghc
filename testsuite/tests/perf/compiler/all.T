@@ -341,6 +341,7 @@ test('Naperian',
 
 test ('T9630',
       [ collect_compiler_residency(15),
+        collect_compiler_stats('bytes allocated', 2),
         extra_clean(['T9630a.hi', 'T9630a.o']),
       ],
       multimod_compile,

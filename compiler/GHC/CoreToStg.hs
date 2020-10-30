@@ -46,7 +46,7 @@ import GHC.Driver.Session
 import GHC.Platform.Ways
 import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
-import GHC.Types.Demand    ( isUsedOnce )
+import GHC.Types.Demand    ( isUsedOnceDmd )
 import GHC.Builtin.PrimOps ( PrimCall(..) )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 import GHC.Builtin.Names   ( unsafeEqualityProofName )
@@ -714,8 +714,8 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
   where
     unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
 
-    upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
-             | otherwise                      = Updatable
+    upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry
+             | otherwise                         = Updatable
 
     -- CAF cost centres generated for -fcaf-all
     caf_cc = mkAutoCC bndr modl
@@ -756,8 +756,8 @@ mkStgRhs bndr rhs
   where
     unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
 
-    upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
-             | otherwise                      = Updatable
+    upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry
+             | otherwise                         = Updatable
 
   {-
     SDM: disabled.  Eval/Apply can't handle functions with arity zero very

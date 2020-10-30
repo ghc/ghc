@@ -1359,7 +1359,7 @@ mkFloat dmd is_unlifted bndr rhs
                    -- See Note [Pin demand info on floats]
   where
     is_hnf    = exprIsHNF rhs
-    is_strict = isStrictDmd dmd
+    is_strict = isStrUsedDmd dmd
 
 emptyFloats :: Floats
 emptyFloats = Floats OkToSpec nilOL
@@ -1446,7 +1446,7 @@ canFloat (Floats ok_to_spec fs) rhs
 wantFloatNested :: RecFlag -> Demand -> Bool -> Floats -> CpeRhs -> Bool
 wantFloatNested is_rec dmd is_unlifted floats rhs
   =  isEmptyFloats floats
-  || isStrictDmd dmd
+  || isStrUsedDmd dmd
   || is_unlifted
   || (allLazyNested is_rec floats && exprIsHNF rhs)
         -- Why the test for allLazyNested?

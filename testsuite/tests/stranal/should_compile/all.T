@@ -55,3 +55,6 @@ test('T13380b',  [ grep_errmsg('bigDeadAction') ], compile, ['-dppr-cols=200 -dd
 
 # We just want to find the worker of foo in there:
 test('T18122',  [ grep_errmsg(r'wfoo =') ], compile, ['-ddump-simpl'])
+
+# We care about the call demand on $wg
+test('T18903',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-simpl -dsuppress-uniques'])

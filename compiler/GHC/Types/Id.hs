@@ -704,7 +704,7 @@ isStrictId id
          not (isJoinId id) && (
            (isStrictType (idType id)) ||
            -- Take the best of both strictnesses - old and new
-           (isStrictDmd (idDemandInfo id))
+           (isStrUsedDmd (idDemandInfo id))
          )
 
         ---------------------------------

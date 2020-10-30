@@ -103,7 +103,7 @@ import GHC.Types.Unique.Set   ( nonDetStrictFoldUniqSet )
 import GHC.Types.Unique.DSet  ( getUniqDSet )
 import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
-import GHC.Types.Demand       ( StrictSig, Demand, isStrictDmd, splitStrictSig, prependArgsStrictSig )
+import GHC.Types.Demand       ( StrictSig, Demand, isStrUsedDmd, splitStrictSig, prependArgsStrictSig )
 import GHC.Types.Cpr          ( mkCprSig, botCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
@@ -469,7 +469,7 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
     lvl_arg :: [Demand] -> CoreExprWithFVs -> LvlM ([Demand], LevelledExpr)
     lvl_arg strs arg | (str1 : strs') <- strs
                      , is_val_arg arg
-                     = do { arg' <- lvlMFE env (isStrictDmd str1) arg
+                     = do { arg' <- lvlMFE env (isStrUsedDmd str1) arg
                           ; return (strs', arg') }
                      | otherwise
                      = do { arg' <- lvlMFE env False arg
