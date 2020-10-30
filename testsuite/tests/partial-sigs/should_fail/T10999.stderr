@@ -1,6 +1,6 @@
 
 T10999.hs:5:6: error:
-    • Found type wildcard ‘_’ standing for ‘Ord a’
+    • Found extra-constraints wildcard standing for ‘Ord a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of f :: Ord a => () -> Set.Set a
                at T10999.hs:6:1-28
