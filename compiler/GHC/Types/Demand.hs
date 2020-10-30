@@ -542,8 +542,10 @@ lubCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
 lubCleanDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
   Prod $ zipWith lubDmd ds1 ds2 -- TODO: What about Note [Used should win]?
 -- Handle Call
-lubCleanDmd (Call n1 d1) (viewCall -> Just (n2, d2)) =
-  Call (lubCard n1 n2) (lubCleanDmd d1 d2)
+lubCleanDmd (Call n1 d1) (viewCall -> Just (n2, d2))
+  -- See Note [Call demands are relative]
+  | isAbs n2  = Call (lubCard n1 n2) (lubCleanDmd d1 botCleanDmd)
+  | otherwise = Call (lubCard n1 n2) (lubCleanDmd d1          d2)
 -- Handle Poly
 lubCleanDmd (Poly n1)  (Poly n2) = Poly (lubCard n1 n2)
 -- Make use of reflexivity (so we'll match the Prod or Call cases again).
@@ -559,10 +561,10 @@ plusCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
 plusCleanDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
   Prod $ zipWith plusDmd ds1 ds2
 -- Handle Call
--- TODO: Exciting special treatment of inner demand for call demands:
---    use `lubUse` instead of `plusUse`!
-plusCleanDmd (Call n1 d1) (viewCall -> Just (n2, d2)) =
-  Call (plusCard n1 n2) (lubCleanDmd d1 d2)
+plusCleanDmd (Call n1 d1) (viewCall -> Just (n2, d2))
+  -- See Note [Call demands are relative]
+  | isAbs n2  = Call (plusCard n1 n2) (lubCleanDmd d1 botCleanDmd)
+  | otherwise = Call (plusCard n1 n2) (lubCleanDmd d1          d2)
 -- Handle Poly
 plusCleanDmd (Poly n1)  (Poly n2) = Poly (plusCard n1 n2)
 -- Make use of reflexivity (so we'll match the Prod or Call cases again).
@@ -603,6 +605,44 @@ seqDemand _              = ()
 
 seqDemandList :: [Demand] -> ()
 seqDemandList = foldr (seq . seqDemand) ()
+
+{- Note [Call demands are relative]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The expression @if b then 0 else f 1 2 + f 3 4@ uses @f@ according to the demand
+@UCU(CS(S(U)))@, meaning
+
+  "f is called multiple times (CU) or not at all, but each time it is called,
+   it's called with *exactly one* (CS) more argument.
+   Whenever it is called with two arguments, the result is used exactly once
+   (S(..)), but we have no info on how often the field is used (U)."
+
+So the 'CleanDemand' nested in a 'Call' demand is relative to exactly one call.
+And that extends to the information we have how its results are used in each
+call site. Consider (#18903)
+
+  h :: Int -> Int
+  h m =
+    let g :: Int -> (Int,Int)
+        g 1 = (m, 0)
+        g n = (2 * n, 2 `div` n)
+        {-# NOINLINE g #-}
+    in case m of
+      1 -> 0
+      2 -> snd (g m)
+      _ -> uncurry (+) (g m)
+
+We want to give @g@ the demand @1C1((1(U),S(U)))@, so we see that in each call
+site of @g@, we are strict in the second component of the returned pair.
+
+This relative cardinality leads to an otherwise unexpected call to 'lubCleanDmd'
+in 'plusCleanDmd', but if you do the math it's just the right thing.
+
+There's one more subtlety: Since the nested demand is relative to exactly one
+call, in the case where we have *at most zero calls* (e.g. CA(...)), the premise
+is hurt and we can assume that the nested demand is 'botCleanDmd'. That ensures
+that @g@ above actually gets the @S(U)@ demand on its second pair component,
+rather than the lazy @1(U)@ if we 'lub'bed with an absent demand.
+-}
 
 {- Note [Scaling demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1189,7 +1229,7 @@ multCleanDmd :: Card -> CleanDemand -> CleanDemand
 multCleanDmd n cd
   | Just cd' <- multTrivial n seqCleanDmd cd = cd'
 multCleanDmd n (Poly n')    = Poly (multCard n n')
-multCleanDmd n (Call n' cd) = Call (multCard n n') cd -- TODO Note
+multCleanDmd n (Call n' cd) = Call (multCard n n') cd -- See Note [Call demands are relative]
 multCleanDmd n (Prod ds)    = Prod (map (multDmd n) ds)
 
 multDmd :: Card -> Demand -> Demand

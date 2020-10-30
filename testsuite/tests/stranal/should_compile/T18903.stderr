@@ -1,0 +1,113 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 84, types: 55, coercions: 0, joins: 0/1}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18903.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T18903.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18903.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18903.$trModule3 = GHC.Types.TrNameS T18903.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18903.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T18903.$trModule2 = "T18903"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18903.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18903.$trModule1 = GHC.Types.TrNameS T18903.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18903.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18903.$trModule
+  = GHC.Types.Module T18903.$trModule3 T18903.$trModule1
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18903.h1 :: Int
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18903.h1 = GHC.Types.I# 0#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18903.h2 :: Int
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18903.h2 = GHC.Types.I# -2#
+
+-- RHS size: {terms: 56, types: 41, coercions: 0, joins: 0/1}
+T18903.$wh [InlPrag=[2]] :: GHC.Prim.Int# -> Int
+[GblId,
+ Arity=1,
+ Str=<S*U>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [70] 262 10}]
+T18903.$wh
+  = \ (ww_s11L :: GHC.Prim.Int#) ->
+      let {
+        $wg_s11H [InlPrag=NOINLINE, Dmd=1C1((1(U),S(U)))]
+          :: GHC.Prim.Int# -> (# Int, Int #)
+        [LclId, Arity=1, Str=<SU>, Unf=OtherCon []]
+        $wg_s11H
+          = \ (ww1_s11C [OS=OneShot] :: GHC.Prim.Int#) ->
+              case ww1_s11C of ds_X3 {
+                __DEFAULT ->
+                  (# GHC.Types.I# (GHC.Prim.*# 2# ds_X3),
+                     case ds_X3 of {
+                       __DEFAULT ->
+                         case GHC.Classes.divInt# 2# ds_X3 of ww4_aZI { __DEFAULT ->
+                         GHC.Types.I# ww4_aZI
+                         };
+                       -1# -> T18903.h2;
+                       0# -> case GHC.Real.divZeroError of wild1_00 { }
+                     } #);
+                1# -> (# GHC.Types.I# ww_s11L, T18903.h1 #)
+              } } in
+      case ww_s11L of ds_X2 {
+        __DEFAULT ->
+          case $wg_s11H ds_X2 of { (# ww2_s11O, ww3_s11P #) ->
+          case ww2_s11O of { GHC.Types.I# x_aZS ->
+          case ww3_s11P of { GHC.Types.I# y_aZV ->
+          GHC.Types.I# (GHC.Prim.+# x_aZS y_aZV)
+          }
+          }
+          };
+        1# -> T18903.h1;
+        2# -> case $wg_s11H 2# of { (# ww2_s11O, ww3_s11P #) -> ww3_s11P }
+      }
+
+-- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+h [InlPrag=[2]] :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<S(S*U)>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w_s11I [Occ=Once1!] :: Int) ->
+                 case w_s11I of { GHC.Types.I# ww1_s11L [Occ=Once1] ->
+                 T18903.$wh ww1_s11L
+                 }}]
+h = \ (w_s11I :: Int) ->
+      case w_s11I of { GHC.Types.I# ww1_s11L -> T18903.$wh ww1_s11L }
+
+
+
