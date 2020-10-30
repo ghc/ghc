@@ -462,6 +462,7 @@ library
                STM.c
                Schedule.c
                Sparks.c
+               SpinLock.c
                StableName.c
                StablePtr.c
                StaticPtrTable.c
