@@ -99,7 +99,7 @@ calloc = callocBytes (sizeOf (undefined :: a))
 mallocBytes      :: Int -> IO (Ptr a)
 mallocBytes size  = failWhenNULL "malloc" (_malloc (fromIntegral size))
 
--- |Llike 'mallocBytes' but memory is filled with bytes of value zero.
+-- |Like 'mallocBytes', but memory is filled with bytes of value zero.
 --
 callocBytes :: Int -> IO (Ptr a)
 callocBytes size = failWhenNULL "calloc" $ _calloc 1 (fromIntegral size)
