@@ -264,6 +264,7 @@ Library
         GHC.ResponseFile
         GHC.RTS.Flags
         GHC.ST
+        GHC.Stack.CloneStack
         GHC.StaticPtr
         GHC.STRef
         GHC.Show

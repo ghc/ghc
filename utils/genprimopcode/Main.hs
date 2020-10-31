@@ -878,6 +878,7 @@ ppType (TyApp (TyCon "ThreadId#")   []) = "threadIdPrimTy"
 ppType (TyApp (TyCon "ForeignObj#") []) = "foreignObjPrimTy"
 ppType (TyApp (TyCon "BCO")         []) = "bcoPrimTy"
 ppType (TyApp (TyCon "Compact#")    []) = "compactPrimTy"
+ppType (TyApp (TyCon "StackSnapshot#") []) = "stackSnapshotPrimTy"
 ppType (TyApp (TyCon "()")          []) = "unitTy"      -- unitTy is GHC.Builtin.Types's name for ()
 
 ppType (TyVar "a")                      = "alphaTy"

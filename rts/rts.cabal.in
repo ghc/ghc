@@ -286,6 +286,7 @@ library
          "-Wl,-u,_hs_atomicwrite8"
          "-Wl,-u,_hs_atomicwrite16"
          "-Wl,-u,_hs_atomicwrite32"
+         "-Wl,-u,_base_GHCziStackziCloneStack_StackSnapshot_closure"
 
       if flag(find-ptr)
         -- This symbol is useful in gdb, but not referred to anywhere,
@@ -367,6 +368,7 @@ library
          "-Wl,-u,hs_atomicwrite8"
          "-Wl,-u,hs_atomicwrite16"
          "-Wl,-u,hs_atomicwrite32"
+         "-Wl,-u,base_GHCziStackziCloneStack_StackSnapshot_closure"
 
       if flag(find-ptr)
         -- This symbol is useful in gdb, but not referred to anywhere,
@@ -410,6 +412,7 @@ library
                Arena.c
                Capability.c
                CheckUnload.c
+               CloneStack.c
                ClosureFlags.c
                Disassembler.c
                FileLock.c
