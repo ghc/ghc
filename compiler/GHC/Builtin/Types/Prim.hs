@@ -69,6 +69,7 @@ module GHC.Builtin.Types.Prim(
         bcoPrimTyCon,                   bcoPrimTy,
         weakPrimTyCon,                  mkWeakPrimTy,
         threadIdPrimTyCon,              threadIdPrimTy,
+        stackSnapshotPrimTyCon,         stackSnapshotPrimTy,
 
         int8PrimTyCon,          int8PrimTy, int8PrimTyConName,
         word8PrimTyCon,         word8PrimTy, word8PrimTyConName,
@@ -189,6 +190,7 @@ exposedPrimTyCons
     , word16PrimTyCon
     , word32PrimTyCon
     , word64PrimTyCon
+    , stackSnapshotPrimTyCon
 
     , tYPETyCon
     , funTyCon
@@ -211,7 +213,7 @@ mkBuiltInPrimTc fs unique tycon
                   BuiltInSyntax
 
 
-charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, ioPortPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName :: Name
+charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, ioPortPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, stackSnapshotPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
@@ -247,6 +249,7 @@ tVarPrimTyConName             = mkPrimTc (fsLit "TVar#") tVarPrimTyConKey tVarPr
 stablePtrPrimTyConName        = mkPrimTc (fsLit "StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
 stableNamePrimTyConName       = mkPrimTc (fsLit "StableName#") stableNamePrimTyConKey stableNamePrimTyCon
 compactPrimTyConName          = mkPrimTc (fsLit "Compact#") compactPrimTyConKey compactPrimTyCon
+stackSnapshotPrimTyConName    = mkPrimTc (fsLit "StackSnapshot#") stackSnapshotPrimTyConKey stackSnapshotPrimTyCon
 bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
@@ -1086,6 +1089,21 @@ compactPrimTyCon = pcPrimTyCon0 compactPrimTyConName UnliftedRep
 
 compactPrimTy :: Type
 compactPrimTy = mkTyConTy compactPrimTyCon
+
+{-
+************************************************************************
+*                                                                      *
+   The @StackSnapshot#@ type
+*                                                                      *
+************************************************************************
+-}
+
+stackSnapshotPrimTyCon :: TyCon
+stackSnapshotPrimTyCon = pcPrimTyCon0 stackSnapshotPrimTyConName UnliftedRep
+
+stackSnapshotPrimTy :: Type
+stackSnapshotPrimTy = mkTyConTy stackSnapshotPrimTyCon
+
 
 {-
 ************************************************************************
