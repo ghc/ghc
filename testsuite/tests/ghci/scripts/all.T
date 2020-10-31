@@ -279,6 +279,7 @@ test('T13591', expect_broken(13591), ghci_script, ['T13591.script'])
 test('T13699', normal, ghci_script, ['T13699.script'])
 test('T13988', normal, ghci_script, ['T13988.script'])
 test('T13407', normal, ghci_script, ['T13407.script'])
+test('T13795', normal, ghci_script, ['T13795.script'])
 test('T13963', normal, ghci_script, ['T13963.script'])
 test('T14342', [extra_hc_opts("-XOverloadedStrings -XRebindableSyntax")],
                ghci_script, ['T14342.script'])
@@ -322,3 +323,4 @@ test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code'), expect_b
 test('T18501', normal, ghci_script, ['T18501.script'])
 test('T18644', normal, ghci_script, ['T18644.script'])
 test('T18755', normal, ghci_script, ['T18755.script'])
+test('T18828', normal, ghci_script, ['T18828.script'])

@@ -37,6 +37,9 @@ Compiler
 - Type checker plugins which work with the natural numbers now
   should use ``naturalTy`` kind instead of ``typeNatKind``, which has been removed.
 
+- GHCi's ``:kind!`` command now expands through type synonyms in addition to type
+  families. See :ghci-cmd:`:kind`.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
