@@ -438,3 +438,4 @@ test('T15427', normal, compile_and_run, [''])
 
 test('T19481', extra_run_opts('+RTS -T  -RTS'), compile_and_run, [''])
 test('T19381', extra_run_opts('+RTS -T -RTS'), compile_and_run, [''])
+test('cloneMyStack', [extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c'])
