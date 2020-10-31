@@ -296,11 +296,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                  tcRnSrcDecls explicit_mod_hdr local_decls export_ies
 
                ; whenM (goptM Opt_DoCoreLinting) $
-                 do { let (warns, errs) = lintGblEnv (hsc_dflags hsc_env) tcg_env
-                    ; mapBagM_ (addWarn NoReason) warns
-                    ; mapBagM_ addErr errs
-                    ; failIfErrsM }  -- if we have a lint error, we're only
-                                     -- going to get in deeper trouble by proceeding
+                 lintGblEnv (hsc_dflags hsc_env) tcg_env
 
                ; setGblEnv tcg_env
                  $ do { -- Process the export list

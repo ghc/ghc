@@ -1712,7 +1712,8 @@ getRoleAnnots bndrs role_env
 
 -- | Check the 'TcGblEnv' for consistency. Currently, only checks
 -- axioms, but should check other aspects, too.
-lintGblEnv :: DynFlags -> TcGblEnv -> (Bag SDoc, Bag SDoc)
-lintGblEnv dflags tcg_env = lintAxioms dflags axioms
+lintGblEnv :: DynFlags -> TcGblEnv -> TcM ()
+lintGblEnv dflags tcg_env =
+  liftIO $ lintAxioms dflags (text "TcGblEnv axioms") axioms
   where
     axioms = typeEnvCoAxioms (tcg_type_env tcg_env)
