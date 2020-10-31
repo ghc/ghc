@@ -20,9 +20,10 @@ const char  *      info_type       ( const StgClosure *closure );
 const char  *      info_type_by_ip ( const StgInfoTable *ip );
 const char  *      info_update_frame ( const StgClosure *closure );
 
-#if defined(DEBUG)
 extern void        printClosure    ( const StgClosure *obj );
 extern void        printStackChunk ( StgPtr sp, StgPtr spLim );
+
+#if defined(DEBUG)
 extern void        printTSO        ( StgTSO *tso );
 extern void        printMutableList( bdescr *bd );
 extern void        printStaticObjects ( StgClosure *obj );
