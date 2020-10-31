@@ -573,6 +573,9 @@ INFO_TABLE_CONSTR(stg_MSG_BLACKHOLE,3,0,0,PRIM,"MSG_BLACKHOLE","MSG_BLACKHOLE")
 INFO_TABLE_CONSTR(stg_MSG_NULL,1,0,0,PRIM,"MSG_NULL","MSG_NULL")
 { foreign "C" barf("MSG_NULL object (%p) entered!", R1) never returns; }
 
+INFO_TABLE_CONSTR(stg_MSG_CLONE_STACK,3,0,0,PRIM,"MSG_CLONE_STACK","MSG_CLONE_STACK")
+{ foreign "C" barf("stg_MSG_CLONE_STACK object (%p) entered!", R1) never returns; }
+
 /* ----------------------------------------------------------------------------
    END_TSO_QUEUE
 

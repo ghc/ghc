@@ -11,3 +11,13 @@ extern StgClosure DLL_IMPORT_DATA_VARNAME(base_GHCziStackziCloneStack_StackSnaps
 #define StackSnapshot_constructor_closure DLL_IMPORT_DATA_REF(base_GHCziStackziCloneStack_StackSnapshot_closure)
 
 StgStack* cloneStack(Capability* capability, const StgStack* stack);
+
+#include "BeginPrivate.h"
+
+#if defined(THREADED_RTS)
+void handleCloneStackMessage(MessageCloneStack *msg);
+#endif
+
+void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar);
+
+#include "EndPrivate.h"

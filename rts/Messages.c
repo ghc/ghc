@@ -14,6 +14,7 @@
 #include "Threads.h"
 #include "RaiseAsync.h"
 #include "sm/Storage.h"
+#include "CloneStack.h"
 
 /* ----------------------------------------------------------------------------
    Send a message to another Capability
@@ -32,7 +33,8 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
             i != &stg_MSG_BLACKHOLE_info &&
             i != &stg_MSG_TRY_WAKEUP_info &&
             i != &stg_IND_info && // can happen if a MSG_BLACKHOLE is revoked
-            i != &stg_WHITEHOLE_info) {
+            i != &stg_WHITEHOLE_info &&
+            i != &stg_MSG_CLONE_STACK_info) {
             barf("sendMessage: %p", i);
         }
     }
@@ -130,6 +132,10 @@ loop:
         ++whitehole_executeMessage_spin;
 #endif
         goto loop;
+    }
+    else if(i == &stg_MSG_CLONE_STACK_info){
+        MessageCloneStack *cloneStackMessage = (MessageCloneStack*) m;
+        handleCloneStackMessage(cloneStackMessage);
     }
     else
     {
