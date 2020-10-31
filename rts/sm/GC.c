@@ -1416,10 +1416,10 @@ releaseGCThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
     uint32_t i;
     for (i=0; i < n_threads; i++) {
         if (i == me || idle_cap[i]) continue;
-        if (RELAXED_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_WAITING_TO_CONTINUE)
+        if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_WAITING_TO_CONTINUE)
             barf("releaseGCThreads");
 
-        RELAXED_STORE(&gc_threads[i]->wakeup, GC_THREAD_INACTIVE);
+        SEQ_CST_STORE(&gc_threads[i]->wakeup, GC_THREAD_INACTIVE);
         ACQUIRE_SPIN_LOCK(&gc_threads[i]->gc_spin);
         RELEASE_SPIN_LOCK(&gc_threads[i]->mut_spin);
     }
