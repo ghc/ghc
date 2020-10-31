@@ -12,7 +12,8 @@
 module GHC.Stack.CloneStack (
   StackSnapshot(..),
   cloneMyStack,
-  cloneThreadStack
+  cloneThreadStack,
+  printStack
   ) where
 
 import GHC.Prim (StackSnapshot#, cloneMyStack#, ThreadId#)
@@ -64,3 +65,8 @@ cloneThreadStack (ThreadId tid#) = do
   freeStablePtr ptr
   takeMVar resultVar
 
+foreign import ccall "PrinterAPI.h printStack" printStack_c :: StackSnapshot# -> IO ()
+
+-- | Print the stack
+printStack :: StackSnapshot -> IO ()
+printStack (StackSnapshot stack) = printStack_c stack
