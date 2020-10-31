@@ -1009,6 +1009,7 @@
       SymI_HasProto(keepCAFs)                                           \
       SymI_HasProto(registerInfoProvList)                               \
       SymI_HasProto(lookupIPE)                                          \
+      SymI_HasProto(sendCloneStackMessage)                              \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
