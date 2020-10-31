@@ -192,6 +192,7 @@ ld-options:
            * so we need to force it to be included in the binary. */
          , "-Wl,-u,_findPtr"
 #endif
+         , "-Wl,-u,_base_GHCziStackziCloneStack_StackSnapshot_closure"
 #else
            "-Wl,-u,base_GHCziTopHandler_runIO_closure"
          , "-Wl,-u,base_GHCziTopHandler_runNonIO_closure"
@@ -304,6 +305,7 @@ ld-options:
            * so we need to force it to be included in the binary. */
          , "-Wl,-u,findPtr"
 #endif
+         , "-Wl,-u,base_GHCziStackziCloneStack_StackSnapshot_closure"
 #endif
 
 /*  Pick up static libraries in preference over dynamic if in earlier search

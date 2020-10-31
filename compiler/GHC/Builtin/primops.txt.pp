@@ -3647,6 +3647,16 @@ primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
+primtype StackSnapshot#
+
+primop  CloneMyStack "cloneMyStack#" GenPrimOp
+   State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
+   { Clones the stack of the current Haskell thread. }
+   with
+   has_side_effects = True
+   out_of_line      = True
+
+
 ------------------------------------------------------------------------
 section "Safe coercions"
 ------------------------------------------------------------------------
