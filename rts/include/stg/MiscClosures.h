@@ -200,6 +200,7 @@ RTS_ENTRY(stg_STM_AWOKEN);
 RTS_ENTRY(stg_MSG_TRY_WAKEUP);
 RTS_ENTRY(stg_MSG_THROWTO);
 RTS_ENTRY(stg_MSG_BLACKHOLE);
+RTS_ENTRY(stg_MSG_CLONE_STACK);
 RTS_ENTRY(stg_MSG_NULL);
 RTS_ENTRY(stg_MVAR_TSO_QUEUE);
 RTS_ENTRY(stg_catch);
@@ -570,6 +571,7 @@ RTS_FUN_DECL(stg_traceBinaryEventzh);
 RTS_FUN_DECL(stg_traceMarkerzh);
 RTS_FUN_DECL(stg_getThreadAllocationCounterzh);
 RTS_FUN_DECL(stg_setThreadAllocationCounterzh);
+RTS_FUN_DECL(stg_cloneMyStackzh);
 
 
 /* Other misc stuff */
