@@ -2629,12 +2629,13 @@ tcRnType hsc_env flexi normalise rdr_type
        -- Do validity checking on type
        ; checkValidType (GhciCtxt True) ty
 
-       ; ty' <- if normalise
-                then do { fam_envs <- tcGetFamInstEnvs
-                        ; let (_, ty')
-                                = normaliseType fam_envs Nominal ty
-                        ; return ty' }
-                else return ty ;
+       -- Optionally (:k vs :k!) normalise the type. Does two things:
+       --   normaliseType: expand type-family applications
+       --   expandTypeSynonyms: expand type synonyms (#18828)
+       ; fam_envs <- tcGetFamInstEnvs
+       ; let ty' | normalise = expandTypeSynonyms $ snd $
+                               normaliseType fam_envs Nominal ty
+                 | otherwise = ty
 
        ; return (ty', mkInfForAllTys kvs (tcTypeKind ty')) }
 
