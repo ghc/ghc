@@ -304,6 +304,11 @@ instance H.Builder Builder where
                 Makeindex -> unit $ cmd' [Cwd output] [path] (buildArgs ++ [input])
 
                 Tar _ -> cmd' buildOptions echo [path] buildArgs
+
+                -- RunTest produces a very large amount of (colorised) output;
+                -- Don't attempt to capture it.
+                RunTest -> cmd echo [path] buildArgs
+
                 _  -> cmd' echo [path] buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
