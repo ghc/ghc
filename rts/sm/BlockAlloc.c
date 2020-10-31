@@ -856,6 +856,12 @@ freeGroup(bdescr *p)
       prev = p - 1;
       if (prev->blocks == 0) prev = prev->link; // find the head
 
+      // This is a bit hairy... we are looking at bd->free of a block that we
+      // do not own and yet have not synchronized with the thread that *does*
+      // own the block. We currently assume we won't see torn values and
+      // consequently this will work, although this is strictly speaking not
+      // guaranteed under the memory model.
+      TSAN_ANNOTATE_BENIGN_RACE(&prev->free, "freeGroup");
       if (RELAXED_LOAD(&prev->free) == (P_)-1)
       {
           ln = log_2(prev->blocks);
