@@ -431,6 +431,14 @@ typedef struct MessageBlackHole_ {
     StgClosure *bh;
 } MessageBlackHole;
 
+typedef struct MessageCloneStack_ {
+    StgHeader header;
+    Message   *link;
+    StgMVar   *result;
+    StgTSO    *tso;
+} MessageCloneStack;
+
+
 /* ----------------------------------------------------------------------------
    Compact Regions
    ------------------------------------------------------------------------- */
