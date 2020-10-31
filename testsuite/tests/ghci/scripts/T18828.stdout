@@ -1,0 +1,12 @@
+ObjectSyn (->) :: *
+= *
+forall ob. ObjectSyn ((:~:) :: Cat ob) :: *
+= ob
+ObjectSyn (:-) :: *
+= Constraint
+ObjectFam (->) :: *
+= *
+forall ob. ObjectFam ((:~:) :: Cat ob) :: *
+= ob
+ObjectFam (:-) :: *
+= Constraint
