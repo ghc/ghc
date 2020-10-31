@@ -1198,14 +1198,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                                         (nonDetEltsUFM $ if_id_env lcl_env) ++
                                         bndrs' ++
                                         exprsFreeIdsList args')
-                      ; case lintExpr dflags in_scope rhs' of
-                          Nothing       -> return ()
-                          Just fail_msg -> do { mod <- getIfModule
-                                              ; pprPanic "Iface Lint failure"
-                                                  (vcat [ text "In interface for" <+> ppr mod
-                                                        , hang doc 2 fail_msg
-                                                        , ppr name <+> equals <+> ppr rhs'
-                                                        , text "Iface expr =" <+> ppr rhs ]) } }
+                      ; liftIO $ lintExpr dflags doc in_scope rhs' }
                    ; return (bndrs', args', rhs') }
         ; let mb_tcs = map ifTopFreeName args
         ; this_mod <- getIfModule
@@ -1234,7 +1227,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
     ifTopFreeName (IfaceExt n)                      = Just n
     ifTopFreeName _                                 = Nothing
 
-    doc = text "Unfolding of" <+> ppr name
+    doc = text "tcIfaceRule" <+> parens (text "Unfolding of" <+> ppr name)
 
 {-
 ************************************************************************

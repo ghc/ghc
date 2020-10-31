@@ -373,33 +373,38 @@ lintPassResult hsc_env pass binds
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
   | otherwise
-  = do { let (warns, errs) = lintCoreBindings dflags pass (interactiveInScope hsc_env) binds
+  = do { let warns_and_errs = lintCoreBindings dflags pass (interactiveInScope hsc_env) binds
        ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
-       ; displayLintResults dflags pass warns errs binds  }
+       ; displayLintResults dflags (showLintWarnings pass) (ppr pass)
+                            (pprCoreBindings binds) warns_and_errs }
   where
     dflags = hsc_dflags hsc_env
 
-displayLintResults :: DynFlags -> CoreToDo
-                   -> Bag Err.MsgDoc -> Bag Err.MsgDoc -> CoreProgram
+displayLintResults :: DynFlags
+                   -> Bool -- ^ If 'True', display linter warnings.
+                           --   If 'False', ignore linter warnings.
+                   -> SDoc -- ^ The source of the linted program
+                   -> SDoc -- ^ The linted program, pretty-printed
+                   -> WarnsAndErrs
                    -> IO ()
-displayLintResults dflags pass warns errs binds
+displayLintResults dflags display_warnings pp_what pp_pgm (warns, errs)
   | not (isEmptyBag errs)
   = do { putLogMsg dflags NoReason Err.SevDump noSrcSpan
            $ withPprStyle defaultDumpStyle
-           (vcat [ lint_banner "errors" (ppr pass), Err.pprMessageBag errs
+           (vcat [ lint_banner "errors" pp_what, Err.pprMessageBag errs
                  , text "*** Offending Program ***"
-                 , pprCoreBindings binds
+                 , pp_pgm
                  , text "*** End of Offense ***" ])
        ; Err.ghcExit dflags 1 }
 
   | not (isEmptyBag warns)
   , not (hasNoDebugOutput dflags)
-  , showLintWarnings pass
+  , display_warnings
   -- If the Core linter encounters an error, output to stderr instead of
   -- stdout (#13342)
   = putLogMsg dflags NoReason Err.SevInfo noSrcSpan
       $ withPprStyle defaultDumpStyle
-        (lint_banner "warnings" (ppr pass) $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
+        (lint_banner "warnings" pp_what $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
 
   | otherwise = return ()
   where
@@ -415,28 +420,15 @@ showLintWarnings :: CoreToDo -> Bool
 showLintWarnings (CoreDoSimplify _ (SimplMode { sm_phase = InitialPhase })) = False
 showLintWarnings _ = True
 
-lintInteractiveExpr :: String -> HscEnv -> CoreExpr -> IO ()
+lintInteractiveExpr :: SDoc -- ^ The source of the linted expression
+                    -> HscEnv -> CoreExpr -> IO ()
 lintInteractiveExpr what hsc_env expr
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
-  | Just err <- lintExpr dflags (interactiveInScope hsc_env) expr
-  = do { display_lint_err err
-       ; Err.ghcExit dflags 1 }
   | otherwise
-  = return ()
+  = lintExpr dflags what (interactiveInScope hsc_env) expr
   where
     dflags = hsc_dflags hsc_env
-
-    display_lint_err err
-      = do { putLogMsg dflags NoReason Err.SevDump
-               noSrcSpan
-               $ withPprStyle defaultDumpStyle
-               (vcat [ lint_banner "errors" (text what)
-                     , err
-                     , text "*** Offending Program ***"
-                     , pprCoreExpr expr
-                     , text "*** End of Offense ***" ])
-           ; Err.ghcExit dflags 1 }
 
 interactiveInScope :: HscEnv -> [Var]
 -- In GHCi we may lint expressions, or bindings arising from 'deriving'
@@ -466,7 +458,7 @@ interactiveInScope hsc_env
               -- where t is a RuntimeUnk (see TcType)
 
 -- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
-lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> (Bag MsgDoc, Bag MsgDoc)
+lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> WarnsAndErrs
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -563,15 +555,15 @@ lintUnfolding is_compulsory dflags locn var_set expr
              lintCoreExpr expr
 
 lintExpr :: DynFlags
-         -> [Var]               -- Treat these as in scope
+         -> SDoc                -- ^ The source of the linted expression
+         -> [Var]               -- ^ Treat these as in scope
          -> CoreExpr
-         -> Maybe MsgDoc        -- Nothing => OK
+         -> IO ()
 
-lintExpr dflags vars expr
-  | isEmptyBag errs = Nothing
-  | otherwise       = Just (pprMessageBag errs)
+lintExpr dflags what vars expr =
+  displayLintResults dflags False what (pprCoreExpr expr) warns_and_errs
   where
-    (_warns, errs) = initL dflags (defaultLintFlags dflags) vars linter
+    warns_and_errs = initL dflags (defaultLintFlags dflags) vars linter
     linter = addLoc TopLevelBindings $
              lintCoreExpr expr
 
@@ -2328,13 +2320,15 @@ lintCoercion (HoleCo h)
 -}
 
 lintAxioms :: DynFlags
+           -> SDoc -- ^ The source of the linted axioms
            -> [CoAxiom Branched]
-           -> WarnsAndErrs
-lintAxioms dflags axioms
-  = initL dflags (defaultLintFlags dflags) [] $
-    do { mapM_ lint_axiom axioms
-       ; let axiom_groups = groupWith coAxiomTyCon axioms
-       ; mapM_ lint_axiom_group axiom_groups }
+           -> IO ()
+lintAxioms dflags what axioms =
+  displayLintResults dflags True what (vcat $ map pprCoAxiom axioms) $
+  initL dflags (defaultLintFlags dflags) [] $
+  do { mapM_ lint_axiom axioms
+     ; let axiom_groups = groupWith coAxiomTyCon axioms
+     ; mapM_ lint_axiom_group axiom_groups }
 
 lint_axiom :: CoAxiom Branched -> LintM ()
 lint_axiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches
