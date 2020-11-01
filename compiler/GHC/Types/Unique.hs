@@ -68,8 +68,11 @@ import Data.Bits
 *                                                                      *
 ************************************************************************
 
-The @Chars@ are ``tag letters'' that identify the @UniqueSupply@.
-Fast comparison is everything on @Uniques@:
+The @Chars@ are ``tag letters'' that identify the @UniqueSupply@. The
+allocation of these is documented in Note [Unique tag allocation] in
+GHC.Builtin.Uniques.
+
+Fast comparison is everything on @Uniques@.
 -}
 
 -- | Unique identifier.
