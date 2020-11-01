@@ -12,12 +12,12 @@ extern StgClosure DLL_IMPORT_DATA_VARNAME(base_GHCziStackziCloneStack_StackSnaps
 
 StgStack* cloneStack(Capability* capability, const StgStack* stack);
 
+void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar);
+
 #include "BeginPrivate.h"
 
 #if defined(THREADED_RTS)
 void handleCloneStackMessage(MessageCloneStack *msg);
 #endif
-
-void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar);
 
 #include "EndPrivate.h"

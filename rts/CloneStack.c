@@ -44,12 +44,13 @@ static StgStack* cloneStackChunk(Capability* capability, const StgStack* stack)
 StgStack* cloneStack(Capability* capability, const StgStack* stack)
 {
   StgStack *top_stack = cloneStackChunk(capability, stack);
-  StgStack last_stack = top_stack;
+  StgStack *last_stack = top_stack;
   while (true) {
     // check whether the stack ends in an underflow frame
-    StgPtr top = last_stack->stack + last_stack->stack_size
-    StgUnderflowFrame *frame = ((StgUnderflowFrame *)top)[-1];
-    if (frame->header.info == &stg_UNDERFLOW_FRAME_info) {
+    StgPtr top = last_stack->stack + last_stack->stack_size;
+    StgUnderflowFrame *underFlowFrame = ((StgUnderflowFrame *) top);
+    StgUnderflowFrame *frame = underFlowFrame--;
+    if (frame->info == &stg_stack_underflow_frame_info) {
       StgStack *s = cloneStackChunk(capability, frame->next_chunk);
       frame->next_chunk = s;
       last_stack = s;
@@ -96,9 +97,8 @@ void handleCloneStackMessage(MessageCloneStack *msg){
 #else // !defined(THREADED_RTS)
 
 GNU_ATTRIBUTE(__noreturn__)
-void  sendCloneStackMessage(StgTSO *tso STG_UNUSED, HsStablePtr mvar STG_UNUSED) {
+void sendCloneStackMessage(StgTSO *tso STG_UNUSED, HsStablePtr mvar STG_UNUSED) {
   barf("Sending CloneStackMessages is only available in threaded RTS!");
 }
 
 #endif // end !defined(THREADED_RTS)
-
