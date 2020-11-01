@@ -85,11 +85,11 @@ static Time itimer_interval = DEFAULT_TICK_INTERVAL;
 
 // Should we be firing ticks?
 // Writers to this must hold the mutex below.
-static volatile bool stopped = false;
+static bool stopped = false;
 
 // should the ticker thread exit?
 // This can be set without holding the mutex.
-static volatile bool exited = true;
+static bool exited = true;
 
 // Signaled when we want to (re)start the timer
 static Condition start_cond;
@@ -120,7 +120,9 @@ static void *itimer_thread_func(void *_handle_tick)
     }
 #endif
 
-    while (!exited) {
+    // Relaxed is sufficient: If we don't see that exited was set in one iteration we will
+    // see it next time.
+    while (!RELAXED_LOAD(&exited)) {
         if (USE_TIMERFD_FOR_ITIMER) {
             ssize_t r = read(timerfd, &nticks, sizeof(nticks));
             if ((r == 0) && (errno == 0)) {
@@ -142,7 +144,8 @@ static void *itimer_thread_func(void *_handle_tick)
         }
 
         // first try a cheap test
-        if (stopped) {
+        TSAN_ANNOTATE_BENIGN_RACE(&stopped, "itimer_thread_func");
+        if (RELAXED_LOAD(&stopped)) {
             OS_ACQUIRE_LOCK(&mutex);
             // should we really stop?
             if (stopped) {
@@ -186,7 +189,7 @@ void
 startTicker(void)
 {
     OS_ACQUIRE_LOCK(&mutex);
-    stopped = 0;
+    RELAXED_STORE(&stopped, false);
     signalCondition(&start_cond);
     OS_RELEASE_LOCK(&mutex);
 }
@@ -196,7 +199,7 @@ void
 stopTicker(void)
 {
     OS_ACQUIRE_LOCK(&mutex);
-    stopped = 1;
+    RELAXED_STORE(&stopped, true);
     OS_RELEASE_LOCK(&mutex);
 }
 
@@ -204,8 +207,8 @@ stopTicker(void)
 void
 exitTicker (bool wait)
 {
-    ASSERT(!exited);
-    exited = true;
+    ASSERT(!SEQ_CST_LOAD(&exited));
+    SEQ_CST_STORE(&exited, true);
     // ensure that ticker wakes up if stopped
     startTicker();
 
