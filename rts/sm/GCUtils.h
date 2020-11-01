@@ -67,7 +67,9 @@ recordMutableGen_GC (StgClosure *p, uint32_t gen_no)
         bd = new_bd;
         gct->mut_lists[gen_no] = bd;
     }
-    *bd->free++ = (StgWord)p;
+    *bd->free++ = (StgWord) p;
+    // N.B. we are allocating into our Capability-local mut_list, therefore
+    // we don't need an atomic increment.
 }
 
 #include "EndPrivate.h"
