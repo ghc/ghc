@@ -1190,8 +1190,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Word8# unsigned ops
 
-  Word8Extend     -> \args -> opTranslate args (MO_UU_Conv W8 (wordWidth platform))
-  Word8Narrow     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W8)
+  Word8ExtendOp     -> \args -> opTranslate args (MO_UU_Conv W8 (wordWidth platform))
+  Word8NarrowOp     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W8)
   Word8NotOp      -> \args -> opTranslate args (MO_Not W8)
   Word8AddOp      -> \args -> opTranslate args (MO_Add W8)
   Word8SubOp      -> \args -> opTranslate args (MO_Sub W8)
@@ -1226,8 +1226,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Word16# unsigned ops
 
-  Word16Extend     -> \args -> opTranslate args (MO_UU_Conv W16 (wordWidth platform))
-  Word16Narrow     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W16)
+  Word16ExtendOp     -> \args -> opTranslate args (MO_UU_Conv W16 (wordWidth platform))
+  Word16NarrowOp     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W16)
   Word16NotOp      -> \args -> opTranslate args (MO_Not W16)
   Word16AddOp      -> \args -> opTranslate args (MO_Add W16)
   Word16SubOp      -> \args -> opTranslate args (MO_Sub W16)

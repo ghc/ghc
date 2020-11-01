@@ -214,10 +214,10 @@ primOpRules nm = \case
                                        , narrowSubsumesAnd AndIOp Int32NarrowOp 32 ]
   --  Int64NarrowOp  -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndIOp Int64NarrowOp 64 ]
 
-  --  Word8Narrow  -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word8Narrow 8 ]
-  --  Word16Narrow -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word16Narrow 16 ]
-  --  Word32Narrow -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word32Narrow 32 ]
-  --  Word64Narrow -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word64Narrow 64 ]
+  --  Word8NarrowOp  -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word8NarrowOp 8 ]
+  --  Word16NarrowOp -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word16NarrowOp 16 ]
+  --  Word32NarrowOp -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word32NarrowOp 32 ]
+  --  Word64NarrowOp -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word64NarrowOp 64 ]
 
    WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform wordToIntLit
                                        , inversePrimOp IntToWordOp ]

@@ -1235,7 +1235,7 @@ inhabitationCandidates MkDelta{ delta_ty_st = ty_st } ty = do
 -- | All these types are trivially inhabited
 triviallyInhabitedTyCons :: UniqSet TyCon
 triviallyInhabitedTyCons = mkUniqSet [
-    charTyCon, doubleTyCon, floatTyCon, intTyCon, wordTyCon, word8TyCon
+    charTyCon, doubleTyCon, floatTyCon, intTyCon, wordTyCon
   ]
 
 isTyConTriviallyInhabited :: TyCon -> Bool
