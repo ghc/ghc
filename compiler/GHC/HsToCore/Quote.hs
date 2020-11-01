@@ -2756,13 +2756,14 @@ repTyVarSig (MkC bndr) = rep2 tyVarSigName [bndr]
 --              Literals
 
 repLiteral :: HsLit GhcRn -> MetaM (Core TH.Lit)
-repLiteral (HsStringPrim _ bs)
-  = do platform <- getPlatform
-       word8_ty <- lookupType word8TyConName
-       let w8s = unpack bs
-           w8s_expr = map (\w8 -> mkCoreConApps word8DataCon
-                                  [mkWordLit platform (toInteger w8)]) w8s
-       rep2_nw stringPrimLName [mkListExpr word8_ty w8s_expr]
+-- XXX this needs fixing.
+-- repLiteral (HsStringPrim _ bs)
+--   = do platform <- getPlatform
+--        word8_ty <- lookupType word8TyConName
+--        let w8s = unpack bs
+--            w8s_expr = map (\w8 -> mkCoreConApps word8DataCon
+--                                   [mkWordLit platform (toInteger w8)]) w8s
+--        rep2_nw stringPrimLName [mkListExpr word8_ty w8s_expr]
 repLiteral lit
   = do lit' <- case lit of
                    HsIntPrim _ i    -> mk_integer i

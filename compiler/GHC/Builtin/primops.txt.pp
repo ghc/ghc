@@ -332,8 +332,8 @@ section "Word8#"
 
 primtype Word8#
 
-primop Word8Extend "extendWord8#" GenPrimOp Word8# -> Word#
-primop Word8Narrow "narrowWord8#" GenPrimOp Word# -> Word8#
+primop Word8ExtendOp "extendWord8#" GenPrimOp Word8# -> Word#
+primop Word8NarrowOp "narrowWord8#" GenPrimOp Word# -> Word8#
 
 primop Word8NotOp "notWord8#" GenPrimOp Word8# -> Word8#
 
@@ -414,8 +414,8 @@ section "Word16#"
 
 primtype Word16#
 
-primop Word16Extend "extendWord16#" GenPrimOp Word16# -> Word#
-primop Word16Narrow "narrowWord16#" GenPrimOp Word# -> Word16#
+primop Word16ExtendOp "extendWord16#" GenPrimOp Word16# -> Word#
+primop Word16NarrowOp "narrowWord16#" GenPrimOp Word# -> Word16#
 
 primop Word16NotOp "notWord16#" GenPrimOp Word16# -> Word16#
 

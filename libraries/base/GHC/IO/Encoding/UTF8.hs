@@ -11,7 +11,7 @@
 -- Module      :  GHC.IO.Encoding.UTF8
 -- Copyright   :  (c) The University of Glasgow, 2009
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -144,17 +144,17 @@ bom1 = 0xbb
 bom2 = 0xbf
 
 utf8_decode :: DecodeBuffer
-utf8_decode 
+utf8_decode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
- = let 
+ = let
        loop !ir !ow
          | ow >= os = done OutputUnderflow ir ow
          | ir >= iw = done InputUnderflow ir ow
          | otherwise = do
               c0 <- readWord8Buf iraw ir
               case c0 of
-                _ | c0 <= 0x7f -> do 
+                _ | c0 <= 0x7f -> do
                            ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
                            loop (ir+1) ow'
                   | c0 >= 0xc0 && c0 <= 0xc1 -> invalid -- Overlong forms
@@ -170,7 +170,7 @@ utf8_decode
                         2 -> do -- check for an error even when we don't have
                                 -- the full sequence yet (#3341)
                            c1 <- readWord8Buf iraw (ir+1)
-                           if not (validate3 c0 c1 0x80) 
+                           if not (validate3 c0 c1 0x80)
                               then invalid else done InputUnderflow ir ow
                         _ -> do
                            c1 <- readWord8Buf iraw (ir+1)
@@ -215,7 +215,7 @@ utf8_encode :: EncodeBuffer
 utf8_encode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
- = let 
+ = let
       done why !ir !ow = return (why,
                                  if ir == iw then input{ bufL=0, bufR=0 }
                                              else input{ bufL=ir },
@@ -255,7 +255,7 @@ utf8_encode
 
 -- -----------------------------------------------------------------------------
 -- UTF-8 primitives, lifted from Data.Text.Fusion.Utf8
-  
+
 ord2   :: Char -> (Word8,Word8)
 ord2 c = assert (n >= 0x80 && n <= 0x07ff) (x1,x2)
     where
@@ -283,8 +283,8 @@ ord4 c = assert (n >= 0x10000) (x1,x2,x3,x4)
 chr2       :: Word8 -> Word8 -> Char
 chr2 (W8# x1#) (W8# x2#) = C# (chr# (z1# +# z2#))
     where
-      !y1# = word2Int# x1#
-      !y2# = word2Int# x2#
+      !y1# = word2Int# (extendWord8# x1#)
+      !y2# = word2Int# (extendWord8# x2#)
       !z1# = uncheckedIShiftL# (y1# -# 0xC0#) 6#
       !z2# = y2# -# 0x80#
 {-# INLINE chr2 #-}
@@ -292,9 +292,9 @@ chr2 (W8# x1#) (W8# x2#) = C# (chr# (z1# +# z2#))
 chr3          :: Word8 -> Word8 -> Word8 -> Char
 chr3 (W8# x1#) (W8# x2#) (W8# x3#) = C# (chr# (z1# +# z2# +# z3#))
     where
-      !y1# = word2Int# x1#
-      !y2# = word2Int# x2#
-      !y3# = word2Int# x3#
+      !y1# = word2Int# (extendWord8# x1#)
+      !y2# = word2Int# (extendWord8# x2#)
+      !y3# = word2Int# (extendWord8# x3#)
       !z1# = uncheckedIShiftL# (y1# -# 0xE0#) 12#
       !z2# = uncheckedIShiftL# (y2# -# 0x80#) 6#
       !z3# = y3# -# 0x80#
@@ -304,10 +304,10 @@ chr4             :: Word8 -> Word8 -> Word8 -> Word8 -> Char
 chr4 (W8# x1#) (W8# x2#) (W8# x3#) (W8# x4#) =
     C# (chr# (z1# +# z2# +# z3# +# z4#))
     where
-      !y1# = word2Int# x1#
-      !y2# = word2Int# x2#
-      !y3# = word2Int# x3#
-      !y4# = word2Int# x4#
+      !y1# = word2Int# (extendWord8# x1#)
+      !y2# = word2Int# (extendWord8# x2#)
+      !y3# = word2Int# (extendWord8# x3#)
+      !y4# = word2Int# (extendWord8# x4#)
       !z1# = uncheckedIShiftL# (y1# -# 0xF0#) 18#
       !z2# = uncheckedIShiftL# (y2# -# 0x80#) 12#
       !z3# = uncheckedIShiftL# (y3# -# 0x80#) 6#
@@ -346,7 +346,7 @@ validate4             :: Word8 -> Word8 -> Word8 -> Word8 -> Bool
 validate4 x1 x2 x3 x4 = validate4_1 ||
                         validate4_2 ||
                         validate4_3
-  where 
+  where
     validate4_1 = x1 == 0xF0 &&
                   between x2 0x90 0xBF &&
                   between x3 0x80 0xBF &&
@@ -359,4 +359,3 @@ validate4 x1 x2 x3 x4 = validate4_1 ||
                   between x2 0x80 0x8F &&
                   between x3 0x80 0xBF &&
                   between x4 0x80 0xBF
-

@@ -67,7 +67,10 @@ import GHC.Show
 -- Word8 is represented in the same way as Word. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsWord8" #-} Word8 = W8# Word8#
+data {-# CTYPE "HsWord8" #-} Word8
+    = W8# Word8#
+
+
 -- ^ 8-bit unsigned integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
@@ -112,7 +115,7 @@ instance Num Word8 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = W8# (narrowWord8# (integerToWord# ((extendWord8# i))))
+    fromInteger i          = W8# (narrowWord8# (integerToWord# i))
 
 -- | @since 2.01
 instance Real Word8 where
@@ -128,7 +131,7 @@ instance Enum Word8 where
         | otherwise     = predError "Word8"
     toEnum i@(I# i#)
         | i >= 0 && i <= fromIntegral (maxBound::Word8)
-                        = W8# (int2Word# (extendWord8# i#))
+                        = W8# (narrowWord8# (int2Word# i#))
         | otherwise     = toEnumError "Word8" i (minBound::Word8, maxBound::Word8)
     fromEnum (W8# x#)   = I# (word2Int# (extendWord8# x#))
     enumFrom            = boundedEnumFrom
@@ -320,7 +323,7 @@ instance Enum Word16 where
         | otherwise     = predError "Word16"
     toEnum i@(I# i#)
         | i >= 0 && i <= fromIntegral (maxBound::Word16)
-                        = W16# (int2Word# (extendWord16# i#))
+                        = W16# (narrowWord16# (int2Word# i#))
         | otherwise     = toEnumError "Word16" i (minBound::Word16, maxBound::Word16)
     fromEnum (W16# x#)  = I# (word2Int# (extendWord16# x#))
     enumFrom            = boundedEnumFrom
