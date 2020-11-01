@@ -10,6 +10,8 @@ import GHC.Conc
 
 foreign import ccall "expectStacksToBeEqual" expectStacksToBeEqual:: StackSnapshot# -> ThreadId# -> IO ()
 
+foreign import ccall "expectStackToBeNotDirty" expectStackToBeNotDirty:: StackSnapshot# -> IO ()
+
 main :: IO ()
 main = do
     mVarToBeBlockedOn <- newEmptyMVar
@@ -22,6 +24,7 @@ main = do
     let (StackSnapshot stack) = stackSnapshot
     let (ThreadId tid#) = threadId
     expectStacksToBeEqual stack tid#
+    expectStackToBeNotDirty stack
 
 immediatelyBlocking :: MVar Int -> IO ()
 immediatelyBlocking mVarToBeBlockedOn = do

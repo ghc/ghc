@@ -20,10 +20,6 @@ void expectStacksToBeEqual(StgStack *clonedStack, StgTSO *tso) {
         barf("Expected same stack_size!");
     }
 
-    if(liveStack->dirty != clonedStack->dirty){
-        barf("Expected same dirty flags!");
-    }
-
     if(liveStack->marking != clonedStack->marking){
         barf("Expected same marking flags!");
     }
@@ -32,6 +28,12 @@ void expectStacksToBeEqual(StgStack *clonedStack, StgTSO *tso) {
         if(liveStack->stack[i] != clonedStack->stack[i]){
             barf("Expected stack word %lu to be equal on both stacks.", i);
         }
+    }
+}
+
+void expectStackToBeNotDirty(StgStack *stack) {
+    if(stack->dirty != 0) {
+        barf("Expected stack to be not dirty. But dirty flag was set to %u", stack->dirty);
     }
 }
 
