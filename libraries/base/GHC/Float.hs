@@ -1394,7 +1394,7 @@ castWord32ToFloat :: Word32 -> Float
 castWord32ToFloat (W32# w#) = F# (stgWord32ToFloat w#)
 
 foreign import prim "stg_word32ToFloatzh"
-    stgWord32ToFloat :: Word# -> Float#
+    stgWord32ToFloat :: Word32# -> Float#
 
 
 -- | @'castFloatToWord32' f@ does a bit-for-bit copy from a floating-point value
@@ -1407,7 +1407,7 @@ castFloatToWord32 :: Float -> Word32
 castFloatToWord32 (F# f#) = W32# (stgFloatToWord32 f#)
 
 foreign import prim "stg_floatToWord32zh"
-    stgFloatToWord32 :: Float# -> Word#
+    stgFloatToWord32 :: Float# -> Word32#
 
 
 

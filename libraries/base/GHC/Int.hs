@@ -431,7 +431,7 @@ instance FiniteBits Int16 where
     countTrailingZeros (I16# x#) = I# (word2Int# (ctz16# (int2Word# (extendInt16# x#))))
 
 {-# RULES
-"fromIntegral/Word8->Int16"  fromIntegral = \(W8# x#) -> I16# (narrowInt16# (word2Int# x#))
+"fromIntegral/Word8->Int16"  fromIntegral = \(W8# x#) -> I16# (narrowInt16# (word2Int# (extendWord8# x#)))
 "fromIntegral/Int8->Int16"   fromIntegral = \(I8# x#) -> I16# (narrowInt16# (extendInt8# x#))
 "fromIntegral/Int16->Int16"  fromIntegral = id :: Int16 -> Int16
 "fromIntegral/a->Int16"      fromIntegral = \x -> case fromIntegral x of I# x# -> I16# (narrowInt16# x#)
@@ -641,8 +641,8 @@ instance FiniteBits Int32 where
     countTrailingZeros (I32# x#) = I# (word2Int# (ctz32# (int2Word# (extendInt32# x#))))
 
 {-# RULES
-"fromIntegral/Word8->Int32"  fromIntegral = \(W8# x#) -> I32# (narrowInt32# (word2Int# x#))
-"fromIntegral/Word16->Int32" fromIntegral = \(W16# x#) -> I32# (narrowInt32# (word2Int# x#))
+"fromIntegral/Word8->Int32"  fromIntegral = \(W8# x#) -> I32# (narrowInt32# (word2Int# (extendWord8# x#)))
+"fromIntegral/Word16->Int32" fromIntegral = \(W16# x#) -> I32# (narrowInt32# (word2Int# (extendWord16# x#)))
 "fromIntegral/Int8->Int32"   fromIntegral = \(I8# x#) -> I32# (narrowInt32# (extendInt8# x#))
 "fromIntegral/Int16->Int32"  fromIntegral = \(I16# x#) -> I32# (narrowInt32# (extendInt16# x#))
 "fromIntegral/Int32->Int32"  fromIntegral = id :: Int32 -> Int32
