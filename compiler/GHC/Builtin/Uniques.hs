@@ -296,6 +296,9 @@ getTupleDataConName boxity n =
 *                                                                      *
 ************************************************************************
 
+Note [Unique tag allocation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Allocation of unique supply characters:
         v,t,u : for renumbering value-, type- and usage- vars.
         B:   builtin
