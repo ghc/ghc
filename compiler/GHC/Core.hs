@@ -27,8 +27,8 @@ module GHC.Core (
         mkLet, mkLets, mkLetNonRec, mkLetRec, mkLams,
         mkApps, mkTyApps, mkCoApps, mkVarApps, mkTyArg,
 
-        mkIntLit, mkIntLitInt,
-        mkWordLit, mkWordLitWord,
+        mkIntLit, mkIntLitWrap,
+        mkWordLit, mkWordLitWrap,
         mkWord64LitWord64, mkInt64LitInt64,
         mkCharLit, mkStringLit,
         mkFloatLit, mkFloatLitFloat,
@@ -1973,23 +1973,25 @@ mkTyArg ty
 
 -- | Create a machine integer literal expression of type @Int#@ from an @Integer@.
 -- If you want an expression of type @Int@ use 'GHC.Core.Make.mkIntExpr'
-mkIntLit      :: Platform -> Integer -> Expr b
--- | Create a machine integer literal expression of type @Int#@ from an @Int@.
--- If you want an expression of type @Int@ use 'GHC.Core.Make.mkIntExpr'
-mkIntLitInt   :: Platform -> Int     -> Expr b
+mkIntLit :: Platform -> Integer -> Expr b
+mkIntLit platform n = Lit (mkLitInt platform n)
 
-mkIntLit    platform n = Lit (mkLitInt platform n)
-mkIntLitInt platform n = Lit (mkLitInt platform (toInteger n))
+-- | Create a machine integer literal expression of type @Int#@ from an
+-- @Integer@, wrapping if necessary.
+-- If you want an expression of type @Int@ use 'GHC.Core.Make.mkIntExpr'
+mkIntLitWrap :: Platform -> Integer -> Expr b
+mkIntLitWrap platform n = Lit (mkLitIntWrap platform n)
 
 -- | Create a machine word literal expression of type  @Word#@ from an @Integer@.
 -- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
-mkWordLit     :: Platform -> Integer -> Expr b
--- | Create a machine word literal expression of type  @Word#@ from a @Word@.
--- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
-mkWordLitWord :: Platform -> Word -> Expr b
+mkWordLit :: Platform -> Integer -> Expr b
+mkWordLit platform w = Lit (mkLitWord platform w)
 
-mkWordLit     platform w = Lit (mkLitWord platform w)
-mkWordLitWord platform w = Lit (mkLitWord platform (toInteger w))
+-- | Create a machine word literal expression of type  @Word#@ from an
+-- @Integer@, wrapping if necessary.
+-- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
+mkWordLitWrap :: Platform -> Integer -> Expr b
+mkWordLitWrap platform w = Lit (mkLitWordWrap platform w)
 
 mkWord64LitWord64 :: Word64 -> Expr b
 mkWord64LitWord64 w = Lit (mkLitWord64 (toInteger w))
