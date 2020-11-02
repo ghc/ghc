@@ -8,6 +8,9 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module GHC.Core.Map.Type (
+     -- * Re-export generic interface
+   TrieMap(..),
+
      -- * Maps over 'Type's
    TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap, foldTypeMap,
    LooseTypeMap,
