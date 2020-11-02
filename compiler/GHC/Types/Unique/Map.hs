@@ -10,7 +10,7 @@
 --
 -- Key preservation is right-biased.
 module GHC.Types.Unique.Map (
-    UniqMap,
+    UniqMap(..),
     emptyUniqMap,
     isNullUniqMap,
     unitUniqMap,
@@ -44,12 +44,12 @@ module GHC.Types.Unique.Map (
     -- Non-deterministic functions omitted
 ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Unique.FM
 
 import GHC.Types.Unique
-import Outputable
+import GHC.Utils.Outputable
 
 import Data.Semigroup as Semi ( Semigroup(..) )
 import Data.Coerce
@@ -57,7 +57,7 @@ import Data.Maybe
 import Data.Data
 
 -- | Maps indexed by 'Uniquable' keys
-newtype UniqMap k a = UniqMap (UniqFM (k, a))
+newtype UniqMap k a = UniqMap (UniqFM k (k, a))
     deriving (Data, Eq, Functor)
 type role UniqMap nominal representational
 

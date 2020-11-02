@@ -57,6 +57,8 @@ CostCentre      *CC_LIST  = NULL;
 // parent of all cost centres stacks (done in initProfiling2()).
 static CostCentreStack *CCS_LIST = NULL;
 
+InfoProvEnt *IPE_LIST = NULL;
+
 #if defined(THREADED_RTS)
 static Mutex ccs_mutex;
 #endif
@@ -145,6 +147,19 @@ dumpCostCentresToEventLog(void)
 #endif
 }
 
+static void
+dumpIPEToEventLog(void)
+{
+#if defined(PROFILING)
+    InfoProvEnt *ip, *next;
+    for (ip = IPE_LIST; ip != NULL; ip = next) {
+        next = ip->link;
+        traceIPE(ip->info, ip->prov.table_name, ip->prov.closure_desc, ip->prov.label,
+                ip->prov.module, ip->prov.srcloc);
+    }
+#endif
+}
+
 void initProfiling (void)
 {
     // initialise our arena
@@ -202,6 +217,7 @@ void initProfiling (void)
     }
 
     dumpCostCentresToEventLog();
+    dumpIPEToEventLog();
 }
 
 
@@ -338,6 +354,16 @@ static void registerCCS(CostCentreStack *ccs)
     }
 }
 
+static void
+registerInfoProvEnt(InfoProvEnt *ipe)
+{
+    //if (ipe->link == NULL) {
+    //
+        ipe->link = IPE_LIST;
+        IPE_LIST = ipe;
+    //}
+}
+
 void registerCcList(CostCentre **cc_list)
 {
     for (CostCentre **i = cc_list; *i != NULL; i++) {
@@ -349,6 +375,13 @@ void registerCcsList(CostCentreStack **cc_list)
 {
     for (CostCentreStack **i = cc_list; *i != NULL; i++) {
         registerCCS(*i);
+    }
+}
+
+void registerInfoProvList(InfoProvEnt **ent_list)
+{
+    for (InfoProvEnt **i = ent_list; *i != NULL; i++) {
+        registerInfoProvEnt(*i);
     }
 }
 

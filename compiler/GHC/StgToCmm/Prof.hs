@@ -10,6 +10,9 @@ module GHC.StgToCmm.Prof (
         initCostCentres, ccType, ccsType,
         mkCCostCentre, mkCCostCentreStack,
 
+        -- infoTablePRov
+        initInfoTableProv,
+
         -- Cost-centre Profiling
         dynProfHdr, profDynAlloc, profAlloc, staticProfHdr, initUpdFrameProf,
         enterCostCentreThunk, enterCostCentreFun,
@@ -269,6 +272,48 @@ sizeof_ccs_words platform
   where
    (ws,ms) = pc_SIZEOF_CostCentreStack (platformConstants platform) `divMod` platformWordSizeInBytes platform
 
+
+initInfoTableProv ::  InfoTableProvMap -> Module -> FCode ()
+-- Emit the declarations
+initInfoTableProv (InfoTableProvMap dcmap clmap) this_mod
+  = do
+       infos <- getUsedInfo
+       let ents = (((convertDCMap this_mod dcmap))
+                   ++ (convertClosureMap infos this_mod clmap))
+       --pprTraceM "UsedInfo" (ppr (length infos))
+       --pprTraceM "initInfoTable" (ppr (length ents))
+       mapM_ emitInfoTableProv ents
+
+--- Info Table Prov stuff
+emitInfoTableProv :: InfoTableEnt  -> FCode ()
+emitInfoTableProv ip = do
+  { dflags <- getDynFlags
+  ; let (mod, src, label) = infoTableProv ip
+  ; platform <- getPlatform
+                        -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
+  ; label <- newByteStringCLit (bytesFS $ mkFastString label)
+  ; modl  <- newByteStringCLit (bytesFS $ moduleNameFS
+                                        $ moduleName
+                                        $ mod)
+  ; loc <- newByteStringCLit $ bytesFS $ mkFastString $
+                   showPpr dflags src
+           -- XXX going via FastString to get UTF-8 encoding is silly
+  ; table_name <- newByteStringCLit $ bytesFS $ mkFastString $
+                    showPpr dflags (pprCLabel platform CStyle (infoTablePtr ip))
+
+  ; closure_type <- newByteStringCLit $ bytesFS $ mkFastString $
+                    showPpr dflags (text $ show $ infoTableEntClosureType ip)
+  ; let
+     lits = [ CmmLabel (infoTablePtr ip), -- Info table pointer
+              table_name,     -- char *table_name
+              closure_type,   -- char *closure_desc -- Filled in from the InfoTable
+              label,          -- char *label,
+              modl,           -- char *module,
+              loc,            -- char *srcloc,
+              zero platform   -- struct _InfoProvEnt *link
+            ]
+  ; emitDataLits (mkIPELabel ip) lits
+  }
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack
 
@@ -295,6 +340,7 @@ bumpSccCount :: Platform -> CmmExpr -> CmmAGraph
 bumpSccCount platform ccs
   = addToMem (rEP_CostCentreStack_scc_count platform)
          (cmmOffsetB platform ccs (pc_OFFSET_CostCentreStack_scc_count (platformConstants platform))) 1
+
 
 -----------------------------------------------------------------------------
 --

@@ -141,6 +141,7 @@ typedef struct _PROFILING_FLAGS {
 # define HEAP_BY_LDV            7
 
 # define HEAP_BY_CLOSURE_TYPE   8
+# define HEAP_BY_INFO_TABLE 9
 
     Time        heapProfileInterval; /* time between samples */
     uint32_t    heapProfileIntervalTicks; /* ticks between samples (derived) */

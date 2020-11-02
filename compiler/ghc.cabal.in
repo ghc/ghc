@@ -693,26 +693,13 @@ Library
         GHC.Utils.Lexeme
         GHC.Utils.Misc
         GHC.Utils.Monad
-        GHC.Utils.Monad.State
         GHC.Utils.Outputable
         GHC.Utils.Panic
         GHC.Utils.Panic.Plain
         GHC.Utils.Ppr
         GHC.Utils.Ppr.Colour
         GHC.Utils.Monad.State
-        GHC.Data.Stream
-        GHC.Data.StringBuffer
-        GHC.Types.Unique.DFM
-        GHC.Types.Unique.DSet
-        GHC.Types.Unique.FM
         GHC.Types.Unique.Map
-        GHC.Types.Unique.Set
-        GHC.Utils.Misc
-        GHC.Cmm.Dataflow
-        GHC.Cmm.Dataflow.Block
-        GHC.Cmm.Dataflow.Collections
-        GHC.Cmm.Dataflow.Graph
-        GHC.Cmm.Dataflow.Label
 
     reexported-modules:
           GHC.Platform.ArchOS

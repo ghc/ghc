@@ -30,7 +30,7 @@ import Text.ParserCombinators.ReadP (ReadP)
 import Data.Char (isAlphaNum)
 
 -- | A ModuleName is essentially a simple string, e.g. @Data.List@.
-newtype ModuleName = ModuleName FastString
+newtype ModuleName = ModuleName FastString deriving Show
 
 instance Uniquable ModuleName where
   getUnique (ModuleName nm) = getUnique nm

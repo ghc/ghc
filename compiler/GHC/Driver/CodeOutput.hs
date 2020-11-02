@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
@@ -10,6 +11,7 @@ module GHC.Driver.CodeOutput
    ( codeOutput
    , outputForeignStubs
    , profilingInitCode
+   , ipInitCode
    )
 where
 
@@ -24,7 +26,7 @@ import GHC.CmmToLlvm    ( llvmCodeGen )
 
 import GHC.CmmToC           ( cmmToC )
 import GHC.Cmm.Lint         ( cmmLint )
-import GHC.Cmm              ( RawCmmGroup )
+import GHC.Cmm              ( RawCmmGroup , CmmInfoTable )
 import GHC.Cmm.CLabel
 
 import GHC.Driver.Session
@@ -36,6 +38,8 @@ import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
 
 import GHC.SysTools.FileCleanup
+import GHC.StgToCmm.Utils
+
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -67,17 +71,17 @@ codeOutput :: DynFlags
            -> Module
            -> FilePath
            -> ModLocation
-           -> ForeignStubs
            -> [(ForeignSrcLang, FilePath)]
            -- ^ additional files to be compiled with the C compiler
            -> [UnitId]
+           -> IO ForeignStubs
            -> Stream IO RawCmmGroup a                       -- Compiled C--
            -> IO (FilePath,
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
                   [(ForeignSrcLang, FilePath)]{-foreign_fps-},
                   a)
 
-codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
+codeOutput dflags this_mod filenm location foreign_fps pkg_deps genForeignStubs
   cmm_stream
   =
     do  {
@@ -104,14 +108,15 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                 ; return cmm
                 }
 
-        ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
         ; a <- case backend dflags of
                  NCG         -> outputAsm dflags this_mod location filenm
-                                          linted_cmm_stream
-                 ViaC        -> outputC dflags filenm linted_cmm_stream pkg_deps
+                                             linted_cmm_stream
+                 ViaC           -> outputC dflags filenm linted_cmm_stream pkg_deps
                  LLVM        -> outputLlvm dflags filenm linted_cmm_stream
-                 Interpreter -> panic "codeOutput: Interpreter"
-                 NoBackend   -> panic "codeOutput: NoBackend"
+                 Interpreter -> panic "codeOutput: HscInterpreted"
+                 NoBackend     -> panic "codeOutput: HscNothing"
+        ; stubs <- genForeignStubs
+        ; stubs_exist <- outputForeignStubs dflags this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
@@ -303,3 +308,38 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
                          | cc <- ccs
                          ] ++ [text "NULL"])
       <> semi
+
+
+-- | Generate code to initialise info pointer origin
+ipInitCode :: [CmmInfoTable] -> DynFlags -> Module -> InfoTableProvMap -> SDoc
+ipInitCode used_info dflags this_mod (InfoTableProvMap dcmap closure_map)
+ = if not (sccProfilingEnabled dflags)
+    then empty
+    else withPprStyle (PprCode CStyle) $ pprTraceIt "ipInitCode" $ vcat
+    $  map emit_ipe_decl ents
+    ++ [emit_ipe_list ents]
+    ++ [ text "static void ip_init_" <> ppr this_mod
+            <> text "(void) __attribute__((constructor));"
+       , text "static void ip_init_" <> ppr this_mod <> text "(void)"
+       , braces (vcat
+                 [ text "registerInfoProvList" <> parens local_ipe_list_label <> semi
+                 ])
+       ]
+ where
+   dc_ents = convertDCMap this_mod dcmap
+   closure_ents = convertClosureMap used_info this_mod closure_map
+   platform = targetPlatform dflags
+   ents = closure_ents ++ dc_ents
+   emit_ipe_decl ipe =
+       text "extern InfoProvEnt" <+> ipe_lbl <> text "[];"
+     where ipe_lbl = pprCLabel platform CStyle (mkIPELabel ipe)
+   local_ipe_list_label = text "local_ipe_" <> ppr this_mod
+   emit_ipe_list ipes =
+      text "static InfoProvEnt *" <> local_ipe_list_label <> text "[] ="
+      <+> braces (vcat $ [ pprCLabel platform CStyle (mkIPELabel ipe) <> comma
+                         | ipe <- ipes
+                         ] ++ [text "NULL"])
+      <> semi
+
+
+

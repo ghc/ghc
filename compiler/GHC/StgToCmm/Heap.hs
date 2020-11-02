@@ -49,10 +49,11 @@ import GHC.Driver.Session
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.Data.FastString( mkFastString, fsLit )
-import GHC.Utils.Panic( sorry )
 
 import Control.Monad (when)
 import Data.Maybe (isJust)
+import GHC.Utils.Outputable
+import GHC.Utils.Panic( sorry )
 
 -----------------------------------------------------------
 --              Initialise dynamic heap objects

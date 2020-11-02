@@ -19,7 +19,7 @@ import GHC.Prelude as Prelude
 import GHC.Driver.Backend
 import GHC.Driver.Session
 
-import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
+import GHC.StgToCmm.Prof (initInfoTableProv, initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Bind
@@ -59,28 +59,32 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.SysTools.FileCleanup
+import GHC.Types.Unique.FM
 
 import GHC.Data.Stream
 import GHC.Data.OrdList
 
 import Data.IORef
-import Control.Monad (when,void)
+import Control.Monad (forM_, when,void)
 import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
+import GHC.Types.Unique.Map
+
 
 codeGen :: DynFlags
         -> Module
+        -> InfoTableProvMap
         -> [TyCon]
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ModuleLFInfos
-                                       -- Output as a stream, so codegen can
+        -> IORef [CmmInfoTable]
+        -> Stream IO CmmGroup ModuleLFInfos       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen dflags this_mod data_tycons
-        cost_centre_info stg_binds hpc_info
+codeGen dflags this_mod ip_map@(InfoTableProvMap ((UniqMap denv)) _) data_tycons
+        cost_centre_info stg_binds hpc_info lref
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer.
@@ -105,7 +109,9 @@ codeGen dflags this_mod data_tycons
         ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
 
         ; mapM_ (cg . cgTopBinding dflags) stg_binds
-
+        ; cgs <- liftIO (readIORef  cgref)
+        ; liftIO $ writeIORef lref (cgs_used_info cgs)
+        ; cg (initInfoTableProv ip_map this_mod)
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
                 -- (say) PrelBase_True_closure, which is defined in
@@ -115,11 +121,15 @@ codeGen dflags this_mod data_tycons
                 -- enumeration type Note that the closure pointers are
                 -- tagged.
                  when (isEnumerationTyCon tycon) $ cg (cgEnumerationTyCon tycon)
-                 mapM_ (cg . cgDataCon) (tyConDataCons tycon)
+                 -- Emit normal info_tables, just in case
+                 mapM_ (cg . cgDataCon Nothing) (tyConDataCons tycon)
+                 -- Emit special info tables for everything used in this module
 
         ; mapM_ do_tycon data_tycons
 
         ; cg_id_infos <- cgs_binds <$> liftIO (readIORef cgref)
+
+        ; mapM_ (\(dc, ns) -> forM_ ns $ \(k, _ss) -> cg (cgDataCon (Just (this_mod, k)) dc)) (nonDetEltsUFM denv)
 
           -- See Note [Conveying CAF-info and LFInfo between modules] in
           -- GHC.StgToCmm.Types
@@ -189,8 +199,8 @@ cgTopBinding dflags (StgTopStringLit id str) = do
 cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...
 
-cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
-  = cgTopRhsCon dflags bndr con (assertNonVoidStgArgs args)
+cgTopRhs dflags _rec bndr (StgRhsCon _cc con mn args)
+  = cgTopRhsCon dflags bndr con mn (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
@@ -229,11 +239,13 @@ cgEnumerationTyCon tycon
              | con <- tyConDataCons tycon]
 
 
--- | Generate the entry code, info tables, and (for niladic constructor)
+cgDataCon :: Maybe (Module, Int) -> DataCon -> FCode ()
+-- Generate the entry code, info tables, and (for niladic constructor)
 -- the static closure, for a constructor.
-cgDataCon :: DataCon -> FCode ()
-cgDataCon data_con
-  = do  { profile <- getProfile
+cgDataCon _ data_con | isUnboxedTupleDataCon data_con = return ()
+cgDataCon mn data_con
+  = do  { dflags <- getDynFlags
+        ; profile <- getProfile
         ; platform <- getPlatform
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
@@ -243,7 +255,7 @@ cgDataCon data_con
             nonptr_wds   = tot_wds - ptr_wds
 
             dyn_info_tbl =
-              mkDataConInfoTable profile data_con False ptr_wds nonptr_wds
+              mkDataConInfoTable profile data_con mn False ptr_wds nonptr_wds
 
             -- We're generating info tables, so we don't know and care about
             -- what the actual arguments are. Using () here as the place holder.
@@ -252,7 +264,6 @@ cgDataCon data_con
                        | ty <- dataConRepArgTys data_con
                        , rep_ty <- typePrimRep (scaledThing ty)
                        , not (isVoidRep rep_ty) ]
-
         ; emitClosureAndInfoTable platform dyn_info_tbl NativeDirectCall [] $
             -- NB: the closure pointer is assumed *untagged* on
             -- entry to a constructor.  If the pointer is tagged,

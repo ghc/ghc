@@ -81,8 +81,8 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   emitReturn [getConstrTag ptr_opts (cmmUntag platform (CmmReg (CmmLocal tmp)))]
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
-cgExpr (StgConApp con args _)= cgConApp con args
-cgExpr (StgTick t e)         = cgTick t >> cgExpr e
+cgExpr (StgConApp con mn args _)= cgConApp con mn args
+cgExpr (StgTick t e)         = cgTick t (cgExpr e)
 cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
                                emitReturn [CmmLit cmm_lit]
 
@@ -158,9 +158,9 @@ cgLetNoEscapeRhsBody
     -> FCode (CgIdInfo, FCode ())
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure _ cc _upd args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
-cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
+cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con mn args)
   = cgLetNoEscapeClosure bndr local_cc cc []
-      (StgConApp con args (pprPanic "cgLetNoEscapeRhsBody" $
+      (StgConApp con mn args (pprPanic "cgLetNoEscapeRhsBody" $
                            text "StgRhsCon doesn't have type args"))
         -- For a constructor RHS we want to generate a single chunk of
         -- code which can be jumped to from many places, which will
@@ -833,8 +833,8 @@ maybeAltHeapCheck (GcInAlts regs, ReturnedTo lret off) code =
 --      Tail calls
 -----------------------------------------------------------------------------
 
-cgConApp :: DataCon -> [StgArg] -> FCode ReturnKind
-cgConApp con stg_args
+cgConApp :: DataCon -> Maybe Int -> [StgArg] -> FCode ReturnKind
+cgConApp con mn stg_args
   | isUnboxedTupleDataCon con       -- Unboxed tuple: assign and return
   = do { arg_exprs <- getNonVoidArgAmodes stg_args
        ; tickyUnboxedTupleReturn (length arg_exprs)
@@ -842,7 +842,7 @@ cgConApp con stg_args
 
   | otherwise   --  Boxed constructors; allocate and return
   = ASSERT2( stg_args `lengthIs` countConRepArgs con, ppr con <> parens (ppr (countConRepArgs con)) <+> ppr stg_args )
-    do  { (idinfo, fcode_init) <- buildDynCon (dataConWorkId con) False
+    do  { (idinfo, fcode_init) <- buildDynCon (dataConWorkId con) mn False
                                      currentCCS con (assertNonVoidStgArgs stg_args)
                                      -- con args are always non-void,
                                      -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
@@ -1084,12 +1084,12 @@ emitEnter fun = do
 -- | Generate Cmm code for a tick. Depending on the type of Tickish,
 -- this will either generate actual Cmm instrumentation code, or
 -- simply pass on the annotation as a @CmmTickish@.
-cgTick :: Tickish Id -> FCode ()
-cgTick tick
+cgTick :: Tickish Id -> FCode a -> FCode a
+cgTick tick k
   = do { platform <- getPlatform
        ; case tick of
-           ProfNote   cc t p -> emitSetCCC cc t p
-           HpcTick    m n    -> emit (mkTickBox platform m n)
-           SourceNote s n    -> emitTick $ SourceNote s n
-           _other            -> return () -- ignore
+           ProfNote   cc t p -> emitSetCCC cc t p >> k
+           HpcTick    m n    -> emit (mkTickBox platform m n) >> k
+           SourceNote s n    -> emitTick (SourceNote s n) >> k
+           _other            -> k
        }

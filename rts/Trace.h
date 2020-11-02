@@ -302,6 +302,12 @@ void traceHeapProfCostCentre(StgWord32 ccID,
                              const char *module,
                              const char *srcloc,
                              StgBool is_caf);
+void traceIPE(StgInfoTable *info,
+               const char *table_name,
+               const char *closure_desc,
+               const char *label,
+               const char *module,
+               const char *srcloc );
 void traceHeapProfSampleCostCentre(StgWord8 profile_id,
                                    CostCentreStack *stack, StgWord residency);
 
@@ -354,6 +360,7 @@ void flushTrace(void);
 #define traceTaskDelete_(taskID) /* nothing */
 #define traceHeapProfBegin(profile_id) /* nothing */
 #define traceHeapProfCostCentre(ccID, label, module, srcloc, is_caf) /* nothing */
+#define traceIPE(info, table_name, closure_desc, label, module, srcloc) /* nothing */
 #define traceHeapProfSampleBegin(era) /* nothing */
 #define traceHeapBioProfSampleBegin(era, time) /* nothing */
 #define traceHeapProfSampleEnd(era) /* nothing */

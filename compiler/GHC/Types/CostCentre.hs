@@ -2,7 +2,7 @@
 module GHC.Types.CostCentre (
         CostCentre(..), CcName, CCFlavour(..),
                 -- All abstract except to friend: ParseIface.y
-
+        DCMap, ClosureMap, InfoTableProvMap(..), emptyInfoTableProvMap,
         CostCentreStack,
         CollectedCCs, emptyCollectedCCs, collectCC,
         currentCCS, dontCareCCS,
@@ -31,6 +31,8 @@ import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Data.FastString
 import GHC.Types.CostCentre.State
+import GHC.Core.DataCon
+import GHC.Types.Unique.Map
 
 import Data.Data
 
@@ -188,6 +190,16 @@ data CostCentreStack
 
   deriving (Eq, Ord)    -- needed for Ord on CLabel
 
+type DCMap = UniqMap DataCon [(Int, Maybe (RealSrcSpan, String))]
+
+type ClosureMap = UniqMap Name (RealSrcSpan, String)
+
+data InfoTableProvMap = InfoTableProvMap
+                          { provDC  :: DCMap
+                          , provClosure :: ClosureMap }
+
+emptyInfoTableProvMap :: InfoTableProvMap
+emptyInfoTableProvMap = InfoTableProvMap emptyUniqMap emptyUniqMap
 
 -- synonym for triple which describes the cost centre info in the generated
 -- code for a module.
@@ -208,6 +220,7 @@ currentCCS              = CurrentCCS
 dontCareCCS             = DontCareCCS
 
 -----------------------------------------------------------------------------
+
 -- Predicates on Cost-Centre Stacks
 
 isCurrentCCS :: CostCentreStack -> Bool
