@@ -29,6 +29,7 @@ module GHC.Core (
 
         mkIntLit, mkIntLitInt,
         mkWordLit, mkWordLitWord,
+        mkWord8Lit, mkWord8LitWord,
         mkWord64LitWord64, mkInt64LitInt64,
         mkCharLit, mkStringLit,
         mkFloatLit, mkFloatLitFloat,
@@ -1994,6 +1995,12 @@ mkWordLitWord :: Platform -> Word -> Expr b
 
 mkWordLit     platform w = Lit (mkLitWord platform w)
 mkWordLitWord platform w = Lit (mkLitWord platform (toInteger w))
+
+mkWord8Lit :: Platform -> Integer -> Expr b
+mkWord8Lit     _platform w = Lit (mkLitWord8 w)
+
+mkWord8LitWord :: Platform -> Integer -> Expr b
+mkWord8LitWord _platform w = Lit (mkLitWord8 (toInteger w))
 
 mkWord64LitWord64 :: Word64 -> Expr b
 mkWord64LitWord64 w = Lit (mkLitWord64 (toInteger w))
