@@ -169,6 +169,9 @@ class TestConfig:
         # Baseline commit for performane metric comparisons.
         self.baseline_commit = None # type: Optional[GitRef]
 
+        # Additional package dbs to inspect for test dependencies.
+        self.test_package_db = [] # type: [PathToPackageDb]
+
         # Should we skip performance tests
         self.skip_perf_tests = False
 

@@ -73,6 +73,7 @@ parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsu
 parser.add_argument("--broken-test", action="append", default=[], help="a test name to mark as broken for this run")
 parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
 parser.add_argument("--perf-baseline", type=GitRef, metavar='COMMIT', help="Baseline commit for performance comparsons.")
+parser.add_argument("--test-package-db", dest="test_package_db", action="append", help="Package db providing optional packages used by the testsuite.")
 perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
 
@@ -108,6 +109,9 @@ config.baseline_commit = args.perf_baseline
 
 if args.top:
     config.top = args.top
+
+if args.test_package_db:
+    config.test_package_db = args.test_package_db
 
 if args.only:
     config.only = args.only
