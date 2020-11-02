@@ -44,7 +44,6 @@ import GHC.Word
 #if MIN_VERSION_ghc_prim(0,8,0)
 import GHC.Base (extendWord8#)
 #else
-import GHC.Prim (Word#)
 extendWord8# :: Word# -> Word#
 extendWord8# w = w
 #endif
