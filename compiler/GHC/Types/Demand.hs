@@ -441,7 +441,7 @@ plusCard C_01 C_01 = C_0N -- The upper bound is at least 1, so upper bound of
 plusCard C_01 C_0N = C_0N -- the result must be 1+1 ~= N.
 plusCard C_0N C_01 = C_0N -- But for the lower bound we have 4 cases where
 plusCard C_0N C_0N = C_0N -- 0+0 ~= 0 (as opposed to 1), so we match on these.
-plusCard _    _    = C_1N -- Otherwise we return topCard
+plusCard _    _    = C_1N -- Otherwise we return {1,n}
 
 -- | Denotes '*' on 'Card'.
 multCard :: Card -> Card -> Card
@@ -600,8 +600,12 @@ isUsedOnceDmd (n :* _) = isUsedOnce n
 
 -- More utility functions for strictness
 seqDemand :: Demand -> ()
-seqDemand (_ :* Prod ds) = seqDemandList ds
-seqDemand _              = ()
+seqDemand (_ :* cd) = seqCleanDemand cd
+
+seqCleanDemand :: CleanDemand -> ()
+seqCleanDemand (Prod ds)   = seqDemandList ds
+seqCleanDemand (Call _ cd) = seqCleanDemand cd
+seqCleanDemand (Poly _)    = () 
 
 seqDemandList :: [Demand] -> ()
 seqDemandList = foldr (seq . seqDemand) ()
@@ -710,11 +714,11 @@ isScaleInvariantCleanDmd (Call n _) = isScaleInvariantCard n -- See Note [Scalin
 isWeakDmd :: Demand -> Bool
 isWeakDmd (n :* cd) = not (isStrict n) && isScaleInvariantCleanDmd cd
 
-keepAliveDmdEnv :: DmdEnv -> IdSet -> DmdEnv
--- (keepAliveDmdType dt vs) makes sure that the Ids in vs have
--- /some/ usage in the returned demand types -- they are not Absent
+-- | @keepAliveDmdType dt vs@ makes sure that the Ids in @vs@ have
+-- /some/ usage in the returned demand types -- they are not Absent.
 -- See Note [Absence analysis for stable unfoldings and RULES]
---     in GHC.Core.Opt.DmdAnal
+--     in "GHC.Core.Opt.DmdAnal".
+keepAliveDmdEnv :: DmdEnv -> IdSet -> DmdEnv
 keepAliveDmdEnv env vs
   = nonDetStrictFoldVarSet add env vs
   where
@@ -802,14 +806,14 @@ lubDivergence _        _        = Dunno
 -- defaultFvDmd (r1 `lubDivergence` r2) = defaultFvDmd r1 `lubDmd` defaultFvDmd r2
 -- (See Note [Default demand on free variables and arguments] for why)
 
-plusDivergence :: Divergence -> Divergence -> Divergence
--- See Note [Asymmetry of 'plus*'], which concludes that 'plusDivergence' needs
--- to be symmetric.
+-- | See Note [Asymmetry of 'plus*'], which concludes that 'plusDivergence'
+-- needs to be symmetric.
 -- Strictly speaking, we should have @plusDivergence Dunno Diverges = ExnOrDiv@.
 -- But that regresses in too many places (every infinite loop, basically) to be
 -- worth it and is only relevant in higher-order scenarios
 -- (e.g. Divergence of @f (throwIO blah)@).
 -- So 'plusDivergence' currently is 'glbDivergence', really.
+plusDivergence :: Divergence -> Divergence -> Divergence
 plusDivergence Dunno    Dunno    = Dunno
 plusDivergence Diverges _        = Diverges
 plusDivergence _        Diverges = Diverges
