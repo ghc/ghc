@@ -13,7 +13,7 @@ module GHC.Core.Make (
         sortQuantVars, castBottomExpr,
 
         -- * Constructing boxed literals
-        mkWordExpr, mkWordExprWord,
+        mkWordExpr,
         mkIntExpr, mkIntExprInt, mkUncheckedIntExpr,
         mkIntegerExpr, mkNaturalExpr,
         mkFloatExpr, mkDoubleExpr,
@@ -263,15 +263,11 @@ mkUncheckedIntExpr i = mkCoreConApps intDataCon  [Lit (mkLitIntUnchecked i)]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
 mkIntExprInt :: Platform -> Int -> CoreExpr         -- Result = I# i :: Int
-mkIntExprInt platform i = mkCoreConApps intDataCon  [mkIntLitInt platform i]
+mkIntExprInt platform i = mkCoreConApps intDataCon  [mkIntLit platform (fromIntegral i)]
 
 -- | Create a 'CoreExpr' which will evaluate to the a @Word@ with the given value
 mkWordExpr :: Platform -> Integer -> CoreExpr
 mkWordExpr platform w = mkCoreConApps wordDataCon [mkWordLit platform w]
-
--- | Create a 'CoreExpr' which will evaluate to the given @Word@
-mkWordExprWord :: Platform -> Word -> CoreExpr
-mkWordExprWord platform w = mkCoreConApps wordDataCon [mkWordLitWord platform w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
 mkIntegerExpr  :: Integer -> CoreExpr  -- Result :: Integer
