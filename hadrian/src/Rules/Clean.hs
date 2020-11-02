@@ -22,7 +22,7 @@ cleanSourceTree = do
 
 cleanMingwTarballs :: Action ()
 cleanMingwTarballs = do
-    liftIO $ IO.removeDirectoryRecursive "ghc-tarballs"
+    removeDirectory "ghc-tarballs"
 
 -- Clean all temporary fs files copied by configure into the source folder
 cleanFsUtils :: Action ()
