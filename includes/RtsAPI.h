@@ -17,7 +17,9 @@ extern "C" {
 
 #include "HsFFI.h"
 #include "rts/Time.h"
+#include "rts/Types.h"
 #include "rts/EventLogWriter.h"
+
 
 /*
  * Running the scheduler
@@ -565,6 +567,16 @@ void rts_resume (PauseToken *pauseToken);
 
 // Returns true if the rts is paused. See rts_pause() and rts_resume().
 bool rts_isPaused(void);
+
+// List all live threads. The RTS must be paused and this must be called on the
+// same thread that called rts_pause().
+typedef void (*ListThreadsCb)(void *user, StgTSO *);
+void rts_listThreads(ListThreadsCb cb, void *user);
+
+// List all non-thread GC roots. The RTS must be paused and this must be called
+// on the same thread that called rts_pause().
+typedef void (*ListRootsCb)(void *user, StgClosure *);
+void rts_listMiscRoots(ListRootsCb cb, void *user);
 
 /*
  * The RTS allocates some thread-local data when you make a call into

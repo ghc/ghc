@@ -15,6 +15,7 @@
 #include "Prelude.h"
 #include "Schedule.h"
 #include "Capability.h"
+#include "StableName.h"
 #include "StablePtr.h"
 #include "Threads.h"
 #include "Weak.h"
@@ -809,6 +810,46 @@ static void assert_isPausedOnMyTask(const char *functionName)
     }
 }
 
+// See RtsAPI.h
+void rts_listThreads(ListThreadsCb cb, void *user)
+{
+    assert_isPausedOnMyTask("rts_listThreads");
+
+    // The rts is paused and can only be resumed by the current thread. Hence it
+    // is safe to read global thread data.
+
+    for (uint32_t g=0; g < RtsFlags.GcFlags.generations; g++) {
+        StgTSO *tso = generations[g].threads;
+        while (tso != END_TSO_QUEUE) {
+            cb(user, tso);
+            tso = tso->global_link;
+        }
+    }
+}
+
+struct list_roots_ctx {
+    ListRootsCb cb;
+    void *user;
+};
+
+// This is an evac_fn.
+static void list_roots_helper(void *user, StgClosure **p) {
+    struct list_roots_ctx *ctx = (struct list_roots_ctx *) user;
+    ctx->cb(ctx->user, *p);
+}
+
+// See RtsAPI.h
+void rts_listMiscRoots (ListRootsCb cb, void *user)
+{
+    assert_isPausedOnMyTask("rts_listMiscRoots");
+
+    struct list_roots_ctx ctx;
+    ctx.cb = cb;
+    ctx.user = user;
+
+    threadStableNameTable(&list_roots_helper, (void *)&ctx);
+    threadStablePtrTable(&list_roots_helper, (void *)&ctx);
+}
 
 #else
 PauseToken GNU_ATTRIBUTE(__noreturn__)
@@ -832,6 +873,18 @@ bool rts_isPaused()
     errorBelch("Warning: Pausing/Resuming the RTS is only possible for "
                "multithreaded RTS.");
     return false;
+}
+
+// See RtsAPI.h
+void rts_listThreads(ListThreadsCb cb STG_UNUSED, void *user STG_UNUSED)
+{
+    errorBelch("Warning: rts_listThreads is only possible for multithreaded RTS.");
+}
+
+// See RtsAPI.h
+void rts_listMiscRoots (ListRootsCb cb STG_UNUSED, void *user STG_UNUSED)
+{
+    errorBelch("Warning: rts_listMiscRoots is only possible for multithreaded RTS.");
 }
 #endif
 
