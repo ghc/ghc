@@ -1466,7 +1466,9 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         let cost_centre_info =
               (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
             platform = targetPlatform dflags
-            prof_init = profilingInitCode platform this_mod cost_centre_info
+            prof_init
+              | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info
+              | otherwise = empty
 
         ------------------  Code generation ------------------
         lref <- newIORef []

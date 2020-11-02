@@ -70,6 +70,7 @@ import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import GHC.Types.Unique.Map
+import GHC.Driver.Ppr
 
 
 codeGen :: DynFlags
@@ -243,6 +244,7 @@ cgDataCon :: Maybe (Module, Int) -> DataCon -> FCode ()
 -- Generate the entry code, info tables, and (for niladic constructor)
 -- the static closure, for a constructor.
 cgDataCon _ data_con | isUnboxedTupleDataCon data_con = return ()
+cgDataCon _ data_con | isUnboxedSumDataCon data_con = return ()
 cgDataCon mn data_con
   = do  { dflags <- getDynFlags
         ; profile <- getProfile
