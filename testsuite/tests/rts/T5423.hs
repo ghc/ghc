@@ -1,3 +1,5 @@
+-- | Verify that @foreign import prim@ calls with more than 10 arguments
+-- are lowered correctly.
 
 {-# LANGUAGE MagicHash, GHCForeignImportPrim, UnliftedFFITypes #-}
 

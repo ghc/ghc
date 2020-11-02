@@ -296,11 +296,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                  tcRnSrcDecls explicit_mod_hdr local_decls export_ies
 
                ; whenM (goptM Opt_DoCoreLinting) $
-                 do { let (warns, errs) = lintGblEnv (hsc_dflags hsc_env) tcg_env
-                    ; mapBagM_ (addWarn NoReason) warns
-                    ; mapBagM_ addErr errs
-                    ; failIfErrsM }  -- if we have a lint error, we're only
-                                     -- going to get in deeper trouble by proceeding
+                 lintGblEnv (hsc_dflags hsc_env) tcg_env
 
                ; setGblEnv tcg_env
                  $ do { -- Process the export list
@@ -2629,12 +2625,13 @@ tcRnType hsc_env flexi normalise rdr_type
        -- Do validity checking on type
        ; checkValidType (GhciCtxt True) ty
 
-       ; ty' <- if normalise
-                then do { fam_envs <- tcGetFamInstEnvs
-                        ; let (_, ty')
-                                = normaliseType fam_envs Nominal ty
-                        ; return ty' }
-                else return ty ;
+       -- Optionally (:k vs :k!) normalise the type. Does two things:
+       --   normaliseType: expand type-family applications
+       --   expandTypeSynonyms: expand type synonyms (#18828)
+       ; fam_envs <- tcGetFamInstEnvs
+       ; let ty' | normalise = expandTypeSynonyms $ snd $
+                               normaliseType fam_envs Nominal ty
+                 | otherwise = ty
 
        ; return (ty', mkInfForAllTys kvs (tcTypeKind ty')) }
 

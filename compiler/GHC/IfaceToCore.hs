@@ -62,6 +62,7 @@ import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.Ppr
 
 import GHC.Unit.External
 import GHC.Unit.Module
@@ -73,6 +74,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
+import GHC.Data.Bag
 import GHC.Data.Maybe
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
@@ -1199,13 +1201,11 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                                         bndrs' ++
                                         exprsFreeIdsList args')
                       ; case lintExpr dflags in_scope rhs' of
-                          Nothing       -> return ()
-                          Just fail_msg -> do { mod <- getIfModule
-                                              ; pprPanic "Iface Lint failure"
-                                                  (vcat [ text "In interface for" <+> ppr mod
-                                                        , hang doc 2 fail_msg
-                                                        , ppr name <+> equals <+> ppr rhs'
-                                                        , text "Iface expr =" <+> ppr rhs ]) } }
+                          Nothing   -> return ()
+                          Just errs -> liftIO $
+                            displayLintResults dflags False doc
+                                               (pprCoreExpr rhs')
+                                               (emptyBag, errs) }
                    ; return (bndrs', args', rhs') }
         ; let mb_tcs = map ifTopFreeName args
         ; this_mod <- getIfModule
@@ -1724,13 +1724,10 @@ tcPragExpr is_compulsory toplvl name expr
         in_scope <- get_in_scope
         dflags   <- getDynFlags
         case lintUnfolding is_compulsory dflags noSrcLoc in_scope core_expr' of
-          Nothing       -> return ()
-          Just fail_msg -> do { mod <- getIfModule
-                              ; pprPanic "Iface Lint failure"
-                                  (vcat [ text "In interface for" <+> ppr mod
-                                        , hang doc 2 fail_msg
-                                        , ppr name <+> equals <+> ppr core_expr'
-                                        , text "Iface expr =" <+> ppr expr ]) }
+          Nothing   -> return ()
+          Just errs -> liftIO $
+            displayLintResults dflags False doc
+                               (pprCoreExpr core_expr') (emptyBag, errs)
     return core_expr'
   where
     doc = ppWhen is_compulsory (text "Compulsory") <+>
