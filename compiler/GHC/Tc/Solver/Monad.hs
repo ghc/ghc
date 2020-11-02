@@ -2126,10 +2126,31 @@ matchableGivens loc_w pred_w (IS { inert_cans = inert_cans })
       = False
 
 mightMatchLater :: TcPredType -> CtLoc -> TcPredType -> CtLoc -> Bool
+-- See Note [What might match later?]
 mightMatchLater given_pred given_loc wanted_pred wanted_loc
-  =  not (prohibitedSuperClassSolve given_loc wanted_loc)
-  && isJust (tcUnifyTys bind_meta_tv [given_pred] [wanted_pred])
+  | prohibitedSuperClassSolve given_loc wanted_loc
+  = False
+
+  | SurelyApart <- tcUnifyTysFG bind_meta_tv flattened_given flattened_wanted
+  = False
+
+  | otherwise
+  = True   -- safe answer
   where
+    given_in_scope  = mkInScopeSet $ tyCoVarsOfType given_pred
+    wanted_in_scope = mkInScopeSet $ tyCoVarsOfType wanted_pred
+
+    (flattened_given, given_vars)
+      | anyFreeVarsOfType isMetaTyVar given_pred
+      = flattenTysX given_in_scope [given_pred]
+      | otherwise
+      = ([given_pred], emptyVarSet)
+
+    (flattened_wanted, wanted_vars)
+      = flattenTysX wanted_in_scope [wanted_pred]
+
+    all_flat_vars = given_vars `unionVarSet` wanted_vars
+
     bind_meta_tv :: TcTyVar -> BindFlag
     -- Any meta tyvar may be unified later, so we treat it as
     -- bindable when unifying with givens. That ensures that we
@@ -2137,8 +2158,12 @@ mightMatchLater given_pred given_loc wanted_pred wanted_loc
     -- something that matches the 'given', until demonstrated
     -- otherwise.  More info in Note [Instance and Given overlap]
     -- in GHC.Tc.Solver.Interact
-    bind_meta_tv tv | isMetaTyVar tv = BindMe
-                    | otherwise      = Skolem
+    bind_meta_tv tv | isMetaTyVar tv
+                    , not (isCycleBreakerTyVar tv)  = BindMe
+                       -- a cycle-breaker var really stands for a type family
+                       -- application where all variables are skolems
+                    | tv `elemVarSet` all_flat_vars = BindMe
+                    | otherwise                     = Skolem
 
 prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
 -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
@@ -2155,6 +2180,39 @@ In getUnsolvedInerts, we return a derived equality from the inert_eqs
 because it is a candidate for floating out of this implication.  We
 only float equalities with a meta-tyvar on the left, so we only pull
 those out here.
+
+Note [What might match later?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must determine whether a Given might later match a Wanted. We
+definitely need to account for the possibility that any metavariable
+in the Wanted might be arbitrarily instantiated. We do *not* want
+to allow skolems in the Given to be instantiated. But what about
+type family applications?
+
+We break this down into two cases: a type family application in the
+Given, and a type family application in the Wanted.
+
+* Given: Before ever looking at Wanteds, we process and simplify all
+the Givens. So any type family applications in a Given have already
+been fully reduced. Furthermore, future Wanteds won't rewrite Givens,
+so information we learn later can't come to bear. So we worry about
+reduction of a type family application in a Given only when it has
+an metavariable in it (necessarily unfilled, because these types
+have been zonked before getting here). A Given with a metavariable
+is rare, but it can happen. See typecheck/should_compile/InstanceGivenOverlap2,
+which uses partial type signatures and polykinds to pull it off.
+
+* Wanted: Unlike the Given case, a type family application in a
+Wanted is always a cause for concern. Further information might allow
+it to reduce, so we want to say that a type family application could
+unify with any type.
+
+How we do this: we use the *core* flattener, as defined in the
+flattenTys function. See Note [Flattening] in GHC.Core.Unify. This
+function takes any type family application and turns it into a fresh
+variable. These fresh variables must be flagged with BindMe in the
+bind_meta_tv function, so that the unifier will match them. This
+is the only reason we need to collect them here.
 
 Note [When does an implication have given equalities?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

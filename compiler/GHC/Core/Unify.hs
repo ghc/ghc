@@ -24,7 +24,7 @@ module GHC.Core.Unify (
         liftCoMatch,
 
         -- The core flattening algorithm
-        flattenTys
+        flattenTys, flattenTysX
    ) where
 
 #include "HsVersions.h"
@@ -1806,12 +1806,17 @@ updateInScopeSet env upd = env { fe_in_scope = upd (fe_in_scope env) }
 
 flattenTys :: InScopeSet -> [Type] -> [Type]
 -- See Note [Flattening]
--- NB: the returned types may mention fresh type variables,
---     arising from the flattening.  We don't return the
+flattenTys in_scope tys = fst (flattenTysX in_scope tys)
+
+flattenTysX :: InScopeSet -> [Type] -> ([Type], TyVarSet)
+-- See Note [Flattening]
+-- NB: the returned types mention the fresh type variables
+--     in the returned set. We don't return the
 --     mapping from those fresh vars to the ty-fam
 --     applications they stand for (we could, but no need)
-flattenTys in_scope tys
-  = snd $ coreFlattenTys emptyTvSubstEnv (emptyFlattenEnv in_scope) tys
+flattenTysX in_scope tys
+  = let (env, result) = coreFlattenTys emptyTvSubstEnv (emptyFlattenEnv in_scope) tys in
+    (result, foldTM (flip extendVarSet) (fe_type_map env) emptyVarSet)
 
 coreFlattenTys :: TvSubstEnv -> FlattenEnv
                -> [Type] -> (FlattenEnv, [Type])

@@ -2117,12 +2117,7 @@ Other notes:
      - natural numbers
      - Typeable
 
-* Flatten-skolems: we do not treat a flatten-skolem as unifiable
-  for this purpose.
-  E.g.   f :: Eq (F a) => [a] -> [a]
-         f xs = ....(xs==xs).....
-  Here we get [W] Eq [a], and we don't want to refrain from solving
-  it because of the given (Eq (F a)) constraint!
+* See also Note [What might match later?] in GHC.Tc.Solver.Monad.
 
 * The given-overlap problem is arguably not easy to appear in practice
   due to our aggressive prioritization of equality solving over other
