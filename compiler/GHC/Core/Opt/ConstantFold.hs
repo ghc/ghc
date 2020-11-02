@@ -1348,10 +1348,10 @@ builtinBignumRules _ =
       , rule_IntegerFromLitNum  "Int64# -> Integer"   integerFromInt64Name
       , rule_IntegerFromLitNum  "Word64# -> Integer"  integerFromWord64Name
       , rule_IntegerFromLitNum  "Natural -> Integer"  integerFromNaturalName
-      , rule_convert            "Integer -> Word#"    integerToWordName       mkWordLitWord
-      , rule_convert            "Integer -> Int#"     integerToIntName        mkIntLitInt
-      , rule_convert            "Integer -> Word64#"  integerToWord64Name     (\_ -> mkWord64LitWord64)
-      , rule_convert            "Integer -> Int64#"   integerToInt64Name      (\_ -> mkInt64LitInt64)
+      , rule_convert            "Integer -> Word#"    integerToWordName       mkWordLitWrap
+      , rule_convert            "Integer -> Int#"     integerToIntName        mkIntLitWrap
+      , rule_convert            "Integer -> Word64#"  integerToWord64Name     (\_ -> mkWord64LitWord64 . fromInteger)
+      , rule_convert            "Integer -> Int64#"   integerToInt64Name      (\_ -> mkInt64LitInt64 . fromInteger)
       , rule_binopi             "integerAdd"          integerAddName          (+)
       , rule_binopi             "integerSub"          integerSubName          (-)
       , rule_binopi             "integerMul"          integerMulName          (*)
@@ -1366,9 +1366,9 @@ builtinBignumRules _ =
       , rule_unop               "integerSignum"       integerSignumName       signum
       , rule_binop_Ordering     "integerCompare"      integerCompareName      compare
       , rule_encodeFloat        "integerEncodeFloat"  integerEncodeFloatName  mkFloatLitFloat
-      , rule_convert            "integerToFloat"      integerToFloatName      (\_ -> mkFloatLitFloat)
+      , rule_convert            "integerToFloat"      integerToFloatName      (\_ -> mkFloatLitFloat . fromInteger)
       , rule_encodeFloat        "integerEncodeDouble" integerEncodeDoubleName mkDoubleLitDouble
-      , rule_convert            "integerToDouble"     integerToDoubleName     (\_ -> mkDoubleLitDouble)
+      , rule_convert            "integerToDouble"     integerToDoubleName     (\_ -> mkDoubleLitDouble . fromInteger)
       , rule_binopi             "integerGcd"          integerGcdName          gcd
       , rule_binopi             "integerLcm"          integerLcmName          lcm
       , rule_binopi             "integerAnd"          integerAndName          (.&.)
@@ -1659,12 +1659,11 @@ match_integerBit _ _ _ _ = Nothing
 
 
 -------------------------------------------------
-match_Integer_convert :: Num a
-                      => (Platform -> a -> Expr CoreBndr)
+match_Integer_convert :: (Platform -> Integer -> Expr CoreBndr)
                       -> RuleFun
 match_Integer_convert convert env id_unf _ [xl]
   | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
-  = Just (convert (roPlatform env) (fromInteger x))
+  = Just (convert (roPlatform env) x)
 match_Integer_convert _ _ _ _ _ = Nothing
 
 match_Integer_unop :: (Integer -> Integer) -> RuleFun
