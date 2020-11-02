@@ -217,6 +217,23 @@ primOpRules nm = \case
                                        , subsumedByPrimOp Int16NarrowOp
                                        , subsumedByPrimOp Int32NarrowOp
                                        , narrowSubsumesAnd AndIOp Int32NarrowOp 32 ]
+
+   Word8ExtendOp  -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
+                                            matchPrimOpId Word8NarrowOp primop_id
+                                            return (Var (mkPrimOpId Narrow8WordOp) `App` e) ]
+   Word16ExtendOp -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
+                                            matchPrimOpId Word16NarrowOp primop_id
+                                            return (Var (mkPrimOpId Narrow16WordOp) `App` e) ]
+   Word32ExtendOp -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
+                                            matchPrimOpId Word32NarrowOp primop_id
+                                            return (Var (mkPrimOpId Narrow32WordOp) `App` e) ]
+   Word8NarrowOp  -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word8NarrowOp
+                                       , narrowSubsumesAnd AndIOp Word8NarrowOp 8 ]
+   Word16NarrowOp -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word16NarrowOp
+                                       , narrowSubsumesAnd AndIOp Word16NarrowOp 8 ]
+   Word32NarrowOp -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word32NarrowOp
+                                       , narrowSubsumesAnd AndIOp Word32NarrowOp 8 ]
+
   --  Int64NarrowOp  -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndIOp Int64NarrowOp 64 ]
 
   --  Word8NarrowOp  -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndOp Word8NarrowOp 8 ]
