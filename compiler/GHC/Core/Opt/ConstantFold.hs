@@ -228,11 +228,14 @@ primOpRules nm = \case
                                             matchPrimOpId Word32NarrowOp primop_id
                                             return (Var (mkPrimOpId Narrow32WordOp) `App` e) ]
    Word8NarrowOp  -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word8NarrowOp
-                                       , narrowSubsumesAnd AndIOp Word8NarrowOp 8 ]
-   Word16NarrowOp -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word16NarrowOp
-                                       , narrowSubsumesAnd AndIOp Word16NarrowOp 8 ]
-   Word32NarrowOp -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word32NarrowOp
-                                       , narrowSubsumesAnd AndIOp Word32NarrowOp 8 ]
+                                       , narrowSubsumesAnd AndOp Word8NarrowOp 8 ]
+   Word16NarrowOp -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word8NarrowOp
+                                       , subsumedByPrimOp Word16NarrowOp
+                                       , narrowSubsumesAnd AndOp Word16NarrowOp 16 ]
+   Word32NarrowOp -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word8NarrowOp
+                                       , subsumedByPrimOp Word16NarrowOp
+                                       , subsumedByPrimOp Word32NarrowOp
+                                       , narrowSubsumesAnd AndOp Word32NarrowOp 32 ]
 
   --  Int64NarrowOp  -> mkPrimOpRule nm 1 [ narrowSubsumesAnd AndIOp Int64NarrowOp 64 ]
 
