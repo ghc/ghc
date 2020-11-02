@@ -728,4 +728,6 @@ test('T18831', normal, compile, [''])
 test('T18920', normal, compile, [''])
 test('T15942', normal, compile, [''])
 test('ClassDefaultInHsBoot', [extra_files(['ClassDefaultInHsBootA1.hs','ClassDefaultInHsBootA2.hs','ClassDefaultInHsBootA2.hs-boot','ClassDefaultInHsBootA3.hs'])], multimod_compile, ['ClassDefaultInHsBoot', '-v0'])
-
+test('CbvOverlap', normal, compile, [''])
+test('InstanceGivenOverlap', normal, compile, [''])
+test('InstanceGivenOverlap2', normal, compile, [''])
