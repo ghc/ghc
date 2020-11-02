@@ -76,7 +76,6 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Maybe ( isNothing, isJust, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import Data.Function ( on )
-import Data.Void
 
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.

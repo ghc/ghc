@@ -307,3 +307,51 @@ a GADT data constructor as in the following example::
 
 In this example, the case in ``test``` is binding an existential variable introduced
 by ``Foo`` that otherwise could not be named and used.
+
+It's possible to bind variables to any part of the type arguments to a constructor though,
+there is no need for them to be existential. In addition, it's possible to "match" against
+part of the type argument using type constructors.
+
+For a somewhat-contrived example::
+
+    foo :: (Num a) => Maybe [a] -> String
+    foo (Nothing @[t]) = show (0 :: t)
+    foo (Just @[t] xs) = show (sum xs :: t)
+
+Here, we're binding the type variable t to be the type of the elements of the list type
+which is itself the argument to Maybe.
+
+The order of the type arguments specified by the type applications in a pattern is the same
+as that for an expression: either the order as given by the user in an explicit forall in the
+definition of the data constructor, or if that is not present, the order in which the type
+variables appear in its type signature from left to right.
+
+For example if we have the following declaration in GADT syntax::
+
+    data Foo :: * -> * where
+      A :: forall s t. [(t,s)] -> Foo (t,s)
+      B :: (t,s) -> Foo (t,s)
+
+Then the type arguments to ``A`` will match first ``s`` and then ``t``, while the type arguments
+to ``B`` will match first ``t`` and then ``s``.
+
+Type arguments appearing in patterns can influence the inferred type of a definition::
+
+    foo (Nothing @Int) = 0
+    foo (Just x) = x
+
+will have inferred type:: 
+
+    foo :: Maybe Int -> Int
+
+which is more restricted than what it would be without the application::
+
+    foo :: Num a => Maybe a -> a
+
+For more information and detail regarding type applications in patterns, see the paper
+`Type variables in patterns <https://arxiv.org/pdf/1806.03476>`__ by Eisenberg, Breitner
+and Jones. Relative to that paper, the implementation in GHC for now at least makes one
+additional conservative restriction, that type variables occurring in patterns must not
+already be in scope, and so are always new variables that only bind whatever type is
+matched, rather than ever referring to a variable from an outer scope. Type wildcards
+``_`` may be used in any place where no new variable needs binding.
