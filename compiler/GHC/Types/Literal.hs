@@ -46,9 +46,11 @@ module GHC.Types.Literal
 
         -- ** Coercions
         , wordToIntLit, intToWordLit
-        , narrowLit
         , narrow8IntLit, narrow16IntLit, narrow32IntLit
         , narrow8WordLit, narrow16WordLit, narrow32WordLit
+        , narrowInt8Lit, narrowInt16Lit, narrowInt32Lit
+        , narrowWord8Lit, narrowWord16Lit, narrowWord32Lit
+        , extendIntLit, extendWordLit
         , int8Lit, int16Lit, int32Lit
         , word8Lit, word16Lit, word32Lit
         , charToIntLit, intToCharLit
@@ -614,16 +616,33 @@ intToWordLit platform (LitNumber LitNumInt i)
 intToWordLit _ l = pprPanic "intToWordLit" (ppr l)
 
 -- | Narrow a literal number (unchecked result range)
-narrowLit :: forall a. Integral a => Proxy a -> Literal -> Literal
-narrowLit _ (LitNumber nt i) = LitNumber nt (toInteger (fromInteger i :: a))
-narrowLit _ l                = pprPanic "narrowLit" (ppr l)
+narrowLit' :: forall a. Integral a => Proxy a -> LitNumType -> Literal -> Literal
+narrowLit' _ nt' (LitNumber _ i)  = LitNumber nt' (toInteger (fromInteger i :: a))
+narrowLit' _ _   l                = pprPanic "narrowLit" (ppr l)
 
-narrow8IntLit   = narrowLit (Proxy :: Proxy Int8)
-narrow16IntLit  = narrowLit (Proxy :: Proxy Int16)
-narrow32IntLit  = narrowLit (Proxy :: Proxy Int32)
-narrow8WordLit  = narrowLit (Proxy :: Proxy Word8)
-narrow16WordLit = narrowLit (Proxy :: Proxy Word16)
-narrow32WordLit = narrowLit (Proxy :: Proxy Word32)
+narrow8IntLit   = narrowLit' (Proxy :: Proxy Int8)   LitNumInt
+narrow16IntLit  = narrowLit' (Proxy :: Proxy Int16)  LitNumInt
+narrow32IntLit  = narrowLit' (Proxy :: Proxy Int32)  LitNumInt
+narrow8WordLit  = narrowLit' (Proxy :: Proxy Word8)  LitNumWord
+narrow16WordLit = narrowLit' (Proxy :: Proxy Word16) LitNumWord
+narrow32WordLit = narrowLit' (Proxy :: Proxy Word32) LitNumWord
+
+narrowInt8Lit, narrowInt16Lit, narrowInt32Lit,
+  narrowWord8Lit, narrowWord16Lit, narrowWord32Lit :: Literal -> Literal
+narrowInt8Lit   = narrowLit' (Proxy :: Proxy Int8)   LitNumInt8
+narrowInt16Lit  = narrowLit' (Proxy :: Proxy Int16)  LitNumInt16
+narrowInt32Lit  = narrowLit' (Proxy :: Proxy Int32)  LitNumInt32
+narrowWord8Lit  = narrowLit' (Proxy :: Proxy Word8)  LitNumWord8
+narrowWord16Lit = narrowLit' (Proxy :: Proxy Word16) LitNumWord16
+narrowWord32Lit = narrowLit' (Proxy :: Proxy Word32) LitNumWord32
+
+-- | Extend a fixed-width literal (e.g. 'Int16#') to a word-sized literal (e.g.
+-- 'Int#').
+extendWordLit, extendIntLit :: Platform -> Literal -> Literal
+extendWordLit platform (LitNumber _nt i)  = mkLitWord platform i
+extendWordLit _platform l                 = pprPanic "extendWordLit" (ppr l)
+extendIntLit  platform (LitNumber _nt i)  = mkLitInt platform i
+extendIntLit  _platform l                 = pprPanic "extendIntLit" (ppr l)
 
 int8Lit (LitNumber _ i)   = mkLitInt8 i
 int8Lit l                 = pprPanic "int8Lit" (ppr l)
