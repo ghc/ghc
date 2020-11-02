@@ -70,13 +70,13 @@ bignat_add
    -> State# RealWorld
 {-# INLINE bignat_add #-}
 bignat_add mwa wa wb s
-   -- weird GMP requirement
+   -- weird GMP requirement: the biggest comes first
    | isTrue# (wordArraySize# wb ># wordArraySize# wa)
-   = bignat_add mwa wb wa s
+   = case ioWord# (c_mpn_add mwa wb (wordArraySize# wb) wa (wordArraySize# wa)) s of
+      (# s', c #) -> mwaWriteMostSignificant mwa c s'
 
    | True
-   = do
-   case ioWord# (c_mpn_add mwa wa (wordArraySize# wa) wb (wordArraySize# wb)) s of
+   = case ioWord# (c_mpn_add mwa wa (wordArraySize# wa) wb (wordArraySize# wb)) s of
       (# s', c #) -> mwaWriteMostSignificant mwa c s'
 
 bignat_add_word
