@@ -20,12 +20,12 @@ newByteArray (I# n#)
 
 writeByteArray :: MutableByteArray s -> Int -> Word32 -> ST s ()
 writeByteArray (MutableByteArray mba#) (I# i#) (W32# w#)
-  = ST $ \s# -> case writeWord32Array# mba# i# w# s# of
+  = ST $ \s# -> case writeWord32Array# mba# i# (extendWord32# w#) s# of
            s'# -> (# s'#, () #)
 
 indexArray :: ByteArray Word32 -> Int -> Word32
 indexArray (ByteArray arr#) (I# i#)
-  = W32# (indexWord32Array# arr# i#)
+  = W32# (narrowWord32# (indexWord32Array# arr# i#))
 
 unsafeFreezeByteArray :: MutableByteArray s -> ST s (ByteArray e)
 unsafeFreezeByteArray (MutableByteArray mba#)
@@ -68,7 +68,7 @@ unsafeFreezeArrayArray (MutableArrayArray marrs#)
            (# s'#, arrs# #)  -> (# s'#, ArrayArray arrs# #)
 
 unsafeDeepFreezeArrayArray :: forall s e
-                           .  MutableArrayArray s (MutableByteArray s) 
+                           .  MutableArrayArray s (MutableByteArray s)
                            -> ST s (ArrayArray (ByteArray e))
 unsafeDeepFreezeArrayArray marrs@(MutableArrayArray marrs#)
   = do { let n = I# (sizeofMutableArrayArray# marrs#)
@@ -112,7 +112,7 @@ newUnboxedArray2D values
            }
 
 unboxedArray2D :: UnboxedArray2D Word32
-unboxedArray2D 
+unboxedArray2D
   = newUnboxedArray2D
     [ [1..10]
     , [11..200]
@@ -125,7 +125,7 @@ indexUnboxedArray2D :: UnboxedArray2D Word32 -> (Int, Int) -> Word32
 indexUnboxedArray2D arr (i, j)
   = indexArrayArray arr i `indexArray` j
 
-main 
+main
   = do { print $ unboxedArray2D `indexUnboxedArray2D` (3, 1000)
        ; performGC
        ; print $ unboxedArray2D `indexUnboxedArray2D` (3, 1000)
