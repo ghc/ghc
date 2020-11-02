@@ -183,8 +183,7 @@ instance Bits Word8 where
     (W8# x#) .&.   (W8# y#)   = W8# (narrowWord8# ((extendWord8# x#) `and#` (extendWord8# y#)))
     (W8# x#) .|.   (W8# y#)   = W8# (narrowWord8# ((extendWord8# x#) `or#`  (extendWord8# y#)))
     (W8# x#) `xor` (W8# y#)   = W8# (narrowWord8# ((extendWord8# x#) `xor#` (extendWord8# y#)))
-    complement (W8# x#)       = W8# (narrowWord8# ((extendWord8# x#) `xor#` (extendWord8# mb#)))
-        where !(W8# mb#) = maxBound
+    complement (W8# x#)       = W8# (narrowWord8# (not# (extendWord8# x#)))
     (W8# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#) = W8# (narrowWord8# ((extendWord8# x#) `shiftL#` i#))
         | otherwise           = W8# (narrowWord8# ((extendWord8# x#) `shiftRL#` negateInt# i#))
@@ -375,8 +374,7 @@ instance Bits Word16 where
     (W16# x#) .&.   (W16# y#)  = W16# (narrowWord16# ((extendWord16# x#) `and#` (extendWord16# y#)))
     (W16# x#) .|.   (W16# y#)  = W16# (narrowWord16# ((extendWord16# x#) `or#`  (extendWord16# y#)))
     (W16# x#) `xor` (W16# y#)  = W16# (narrowWord16# ((extendWord16# x#) `xor#` (extendWord16# y#)))
-    complement (W16# x#)       = W16# (narrowWord16# ((extendWord16# x#) `xor#` (extendWord16# mb#)))
-        where !(W16# mb#) = maxBound
+    complement (W16# x#)       = W16# (narrowWord16# (not# (extendWord16# x#)))
     (W16# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W16# (narrowWord16# ((extendWord16# x#) `shiftL#` i#))
         | otherwise            = W16# (narrowWord16# ((extendWord16# x#) `shiftRL#` negateInt# i#))
@@ -613,8 +611,7 @@ instance Bits Word32 where
     (W32# x#) .&.   (W32# y#)  = W32# (narrowWord32# ((extendWord32# x#) `and#` (extendWord32# y#)))
     (W32# x#) .|.   (W32# y#)  = W32# (narrowWord32# ((extendWord32# x#) `or#`  (extendWord32# y#)))
     (W32# x#) `xor` (W32# y#)  = W32# (narrowWord32# ((extendWord32# x#) `xor#` (extendWord32# y#)))
-    complement (W32# x#)       = W32# (narrowWord32# ((extendWord32# x#) `xor#` (extendWord32# mb#)))
-        where !(W32# mb#) = maxBound
+    complement (W32# x#)       = W32# (narrowWord32# (not# (extendWord32# x#)))
     (W32# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W32# (narrowWord32# ((extendWord32# x#) `shiftL#` i#))
         | otherwise            = W32# (narrowWord32# ((extendWord32# x#) `shiftRL#` negateInt# i#))
@@ -975,8 +972,7 @@ instance Bits Word64 where
     (W64# x#) .&.   (W64# y#)  = W64# (x# `and#` y#)
     (W64# x#) .|.   (W64# y#)  = W64# (x# `or#`  y#)
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor#` y#)
-    complement (W64# x#)       = W64# (x# `xor#` mb#)
-        where !(W64# mb#) = maxBound
+    complement (W64# x#)       = W64# (not# x#)
     (W64# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W64# (x# `shiftL#` i#)
         | otherwise            = W64# (x# `shiftRL#` negateInt# i#)
