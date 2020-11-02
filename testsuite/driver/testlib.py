@@ -165,7 +165,16 @@ def have_library(lib: str) -> bool:
         got_it = have_lib_cache[lib]
     else:
         cmd = strip_quotes(config.ghc_pkg)
-        p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
+        cmd_line = [cmd, '--no-user-package-db']
+
+        for db in config.test_package_db:
+            cmd_line.append("--package-db="+db)
+
+        cmd_line.extend(['describe', lib])
+
+        print(cmd_line)
+
+        p = subprocess.Popen(cmd_line,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
                              env=ghc_env)
@@ -181,6 +190,10 @@ def have_library(lib: str) -> bool:
 def _reqlib( name, opts, lib ):
     if not have_library(lib):
         opts.expect = 'missing-lib'
+    else:
+        opts.extra_hc_opts = opts.extra_hc_opts + ' -package ' + lib + ' '
+        for db in config.test_package_db:
+            opts.extra_hc_opts = opts.extra_hc_opts + ' -package-db=' + db + ' '
 
 def req_haddock( name, opts ):
     if not config.haddock:

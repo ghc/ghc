@@ -216,6 +216,10 @@ ifneq "$(THREADS)" ""
 RUNTEST_OPTS += --threads=$(THREADS)
 endif
 
+ifneq "$(PACKAGE_DB)" ""
+RUNTEST_OPTS += --test-package-db=$(PACKAGE_DB)
+endif
+
 ifneq "$(VERBOSE)" ""
 RUNTEST_OPTS += --verbose=$(VERBOSE)
 endif
