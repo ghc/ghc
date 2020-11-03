@@ -550,7 +550,8 @@ dmdAnalRhsLetDown
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
 dmdAnalRhsLetDown rec_flag env let_dmd id rhs
-  = (lazy_fv, sig, rhs')
+  = -- pprTrace "dmdAnalRhsLetDown" (ppr id $$ ppr let_dmd $$ ppr sig $$ ppr lazy_fv) $
+    (lazy_fv, sig, rhs')
   where
     rhs_arity = idArity id
     rhs_dmd -- See Note [Demand analysis for join points]
