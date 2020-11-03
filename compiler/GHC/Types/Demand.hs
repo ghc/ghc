@@ -712,7 +712,7 @@ isScaleInvariantCleanDmd (Call n _) = isScaleInvariantCard n -- See Note [Scalin
 -- was incomplete.
 -- See Note [Lazy and unleashable free variables] in "GHC.Core.Opt.DmdAnal".
 isWeakDmd :: Demand -> Bool
-isWeakDmd (n :* cd) = not (isStrict n) && isScaleInvariantCleanDmd cd
+isWeakDmd dmd@(n :* _) = not (isStrict n) && isScaleInvariantDmd dmd
 
 -- | @keepAliveDmdType dt vs@ makes sure that the Ids in @vs@ have
 -- /some/ usage in the returned demand types -- they are not Absent.
@@ -1201,9 +1201,6 @@ multDmdEnv n env
     -- match multDmd (see #13977).
   | n == C_11 = env
   | otherwise = mapVarEnv (multDmd n) env
-  -- For the Absent case just discard alC_ sage information
-  -- We only processed the thing at all to analyse the body
-  -- See Note [Always analyse in virgin pass]
 
 -- | See Note [Scaling demands]
 reuseEnv :: DmdEnv -> DmdEnv
