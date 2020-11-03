@@ -806,6 +806,19 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
            ; return (ParStmtBlock x stmts' ids return_op' : pairs', thing) }
     loop _ _ _ _ = panic "tcMcStmt.loop"
 
+tcMcStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
+  = do  { let tc_app_stmts ty = tcApplicativeStmts ctxt pairs ty $
+                                thing_inside . mkCheckExpType
+        ; ((pairs', body_ty, thing), mb_join') <- case mb_join of
+            Nothing -> (, Nothing) <$> tc_app_stmts res_ty
+            Just join_op ->
+              second Just <$>
+              (tcSyntaxOp MCompOrigin join_op [SynRho] res_ty $
+               \ [rhs_ty] _mults -> tc_app_stmts (mkCheckExpType rhs_ty))
+
+        ; let stmt = ApplicativeStmt body_ty pairs' mb_join'
+        ; return (stmt, thing) }
+
 tcMcStmt _ stmt _ _
   = pprPanic "tcMcStmt: unexpected Stmt" (ppr stmt)
 

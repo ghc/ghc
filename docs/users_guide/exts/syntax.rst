@@ -13,6 +13,7 @@ Syntax
     qualified_do
     parallel_list_comprehensions
     generalised_list_comprehensions
+    applicative_comprehensions
     monad_comprehensions
     monadfail_desugaring
     overloaded_lists
