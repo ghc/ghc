@@ -45,7 +45,6 @@ import GHC.Ptr
 import GHC.Foreign as GHC
 import GHC.IO.Encoding
 import GHC.List ( concatMap, reverse )
-import Prelude (putStrLn, print)
 
 #define PROFILING
 #include "Rts.h"
@@ -161,12 +160,12 @@ ipModule p =  (# peek InfoProv, module) p
 ipSrcLoc p =  (# peek InfoProv, srcloc) p
 
 infoProvToStrings :: Ptr InfoProv -> IO [String]
-infoProvToStrings ip = do
-  name <- GHC.peekCString utf8 =<< ipName ip
-  desc <- GHC.peekCString utf8 =<< ipDesc ip
-  label <- GHC.peekCString utf8 =<< ipLabel ip
-  mod <- GHC.peekCString utf8 =<< ipModule ip
-  loc <- GHC.peekCString utf8 =<< ipSrcLoc ip
+infoProvToStrings infop = do
+  name <- GHC.peekCString utf8 =<< ipName infop
+  desc <- GHC.peekCString utf8 =<< ipDesc infop
+  label <- GHC.peekCString utf8 =<< ipLabel infop
+  mod <- GHC.peekCString utf8 =<< ipModule infop
+  loc <- GHC.peekCString utf8 =<< ipSrcLoc infop
   return [name, desc, label, mod, loc]
 
 -- TODO: Add structured output of whereFrom

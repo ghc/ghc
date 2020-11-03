@@ -32,6 +32,7 @@
 #include "StaticPtrTable.h"
 #include "Hash.h"
 #include "Profiling.h"
+#include "IPE.h"
 #include "ProfHeap.h"
 #include "Timer.h"
 #include "Globals.h"

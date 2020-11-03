@@ -131,6 +131,7 @@ data GeneralFlag
    | Opt_NoTypeableBinds
 
    | Opt_DistinctConstructorTables
+   | Opt_InfoTableMap
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
    | Opt_ShowWarnGroups                 -- Show the group a warning belongs to

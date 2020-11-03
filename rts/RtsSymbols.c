@@ -544,9 +544,7 @@
       SymI_HasProto(pushCostCentre)             \
       SymI_HasProto(mkCostCentre)               \
       SymI_HasProto(registerCcList)             \
-      SymI_HasProto(registerInfoProvList)             \
       SymI_HasProto(registerCcsList)            \
-      SymI_HasProto(lookupIPE)            \
       SymI_HasProto(era)
 #else
 #define RTS_PROF_SYMBOLS /* empty */
@@ -1002,6 +1000,8 @@
       SymI_HasProto(cas)                                                \
       SymI_HasProto(_assertFail)                                        \
       SymI_HasProto(keepCAFs)                                           \
+      SymI_HasProto(registerInfoProvList)                               \
+      SymI_HasProto(lookupIPE)                                          \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 

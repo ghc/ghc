@@ -14,6 +14,4 @@
 #pragma once
 
 void registerCcList(CostCentre **cc_list);
-void registerInfoProvList(InfoProvEnt **cc_list);
 void registerCcsList(CostCentreStack **cc_list);
-InfoProvEnt * lookupIPE(StgClosure *info);

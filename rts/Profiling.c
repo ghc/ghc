@@ -7,6 +7,7 @@
  * ---------------------------------------------------------------------------*/
 
 
+#if defined(PROFILING)
 #include "PosixSource.h"
 #include "Rts.h"
 
@@ -23,9 +24,6 @@
 
 #include <fs_rts.h>
 #include <string.h>
-// TODO: These above includes are only used for lookupIPE when profiling is
-// not enabled.
-#if defined(PROFILING)
 
 #if defined(DEBUG) || defined(PROFILING)
 #include "Trace.h"
@@ -59,7 +57,6 @@ CostCentre      *CC_LIST  = NULL;
 // parent of all cost centres stacks (done in initProfiling2()).
 static CostCentreStack *CCS_LIST = NULL;
 
-InfoProvEnt *IPE_LIST = NULL;
 
 #if defined(THREADED_RTS)
 static Mutex ccs_mutex;
@@ -149,18 +146,6 @@ dumpCostCentresToEventLog(void)
 #endif
 }
 
-static void
-dumpIPEToEventLog(void)
-{
-#if defined(PROFILING)
-    InfoProvEnt *ip, *next;
-    for (ip = IPE_LIST; ip != NULL; ip = next) {
-        next = ip->link;
-        traceIPE(ip->info, ip->prov.table_name, ip->prov.closure_desc, ip->prov.label,
-                ip->prov.module, ip->prov.srcloc);
-    }
-#endif
-}
 
 void initProfiling (void)
 {
@@ -219,7 +204,6 @@ void initProfiling (void)
     }
 
     dumpCostCentresToEventLog();
-    dumpIPEToEventLog();
 }
 
 
@@ -356,16 +340,6 @@ static void registerCCS(CostCentreStack *ccs)
     }
 }
 
-static void
-registerInfoProvEnt(InfoProvEnt *ipe)
-{
-    //if (ipe->link == NULL) {
-    //
-        ipe->link = IPE_LIST;
-        IPE_LIST = ipe;
-    //}
-}
-
 void registerCcList(CostCentre **cc_list)
 {
     for (CostCentre **i = cc_list; *i != NULL; i++) {
@@ -377,13 +351,6 @@ void registerCcsList(CostCentreStack **cc_list)
 {
     for (CostCentreStack **i = cc_list; *i != NULL; i++) {
         registerCCS(*i);
-    }
-}
-
-void registerInfoProvList(InfoProvEnt **ent_list)
-{
-    for (InfoProvEnt **i = ent_list; *i != NULL; i++) {
-        registerInfoProvEnt(*i);
     }
 }
 
@@ -1056,28 +1023,3 @@ debugCCS( CostCentreStack *ccs )
 #endif /* DEBUG */
 
 #endif /* PROFILING */
-
-// MP: TODO: This should not be a linear search, need to improve
-// the IPE_LIST structure
-#if defined(PROFILING)
-InfoProvEnt * lookupIPE(StgClosure *clos)
-{
-    StgInfoTable * info;
-    info = GET_INFO(clos);
-    InfoProvEnt *ip, *next;
-    //printf("%p\n", info);
-    //printf("%p\n\n", clos);
-    for (ip = IPE_LIST; ip != NULL; ip = next) {
-        if (ip->info == info) {
-            //printf("Found %p\n", ip->info);
-            return ip;
-        }
-        next = ip->link;
-    }
-}
-#else
-InfoProvEnt * lookupIPE(StgClosure *info STG_UNUSED)
-{
-    return ;
-}
-#endif

@@ -314,7 +314,7 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
 -- See note [Mapping Info Tables to Source Positions]
 ipInitCode :: [CmmInfoTable] -> DynFlags -> Module -> InfoTableProvMap -> SDoc
 ipInitCode used_info dflags this_mod (InfoTableProvMap dcmap closure_map)
- = if not (sccProfilingEnabled dflags)
+ = if not (gopt Opt_InfoTableMap dflags)
     then empty
     else withPprStyle (PprCode CStyle) $ pprTraceIt "ipInitCode" $ vcat
     $  map emit_ipe_decl ents
