@@ -10,3 +10,4 @@
 
 #include <stdio.h>
 
+void dumpIPEToEventlog(void);

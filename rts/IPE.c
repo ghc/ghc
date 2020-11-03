@@ -15,17 +15,15 @@
 #include "Arena.h"
 #include "Printer.h"
 #include "Capability.h"
+#include "Trace.h"
 
 #include <fs_rts.h>
 #include <string.h>
 
-#if defined(DEBUG) || defined(PROFILING)
-#include "Trace.h"
-#endif
 
 InfoProvEnt *IPE_LIST = NULL;
 
-static void
+void
 dumpIPEToEventLog(void)
 {
     InfoProvEnt *ip, *next;

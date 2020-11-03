@@ -364,6 +364,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #if defined(PROFILING)
     initProfiling();
 #endif
+    //dumpIPEToEventlog();
     initHeapProfiling();
 
     /* start the virtual timer 'subsystem'. */
