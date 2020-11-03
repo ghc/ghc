@@ -311,6 +311,7 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
 
 
 -- | Generate code to initialise info pointer origin
+-- See note [Mapping Info Tables to Source Positions]
 ipInitCode :: [CmmInfoTable] -> DynFlags -> Module -> InfoTableProvMap -> SDoc
 ipInitCode used_info dflags this_mod (InfoTableProvMap dcmap closure_map)
  = if not (sccProfilingEnabled dflags)
@@ -342,4 +343,50 @@ ipInitCode used_info dflags this_mod (InfoTableProvMap dcmap closure_map)
       <> semi
 
 
+{-
+Note [Mapping Info Tables to Source Positions]
 
+When debugging memory issues it is very useful to be able to map a specific closure
+to a position in the source. The prime example is being able to map a THUNK to
+a specific place in the source program, the mapping is usually quite precise because
+a fresh info table is created for each distinct THUNK.
+
+There are two parts to the implementation
+
+1. The SourceNote information is used in order to give a source location to
+some specific closures.
+2. During code generation, a mapping from the info table to the statically
+determined location is emitted which can then be queried at runtime by
+various tools.
+
+-- Giving Source Locations to Closures
+
+### Thunks
+### Constructors
+
+
+
+
+-- Code Generation
+
+After the mapping has been collected during compilation, a C stub is generated which
+creates the static map from info table pointer to the information about where that
+info table was created from.
+
+This information can be consumed in two ways.
+
+1. The complete mapping is emitted into the eventlog so that external tools such
+as eventlog2html can use the information with the heap profile by info table mode.
+2. The `lookupIPE` function can be used via the `whereFrom#` primop to introspect
+information about a closure in a running Haskell program.
+
+Note [Distinct Info Tables for Constructors]
+
+In the old times, each usage of a data constructor used the same info table.
+This made it impossible to distinguish which actual usuage of a data constructor was
+contributing primarily to the allocation in a program. Using the TODO flag you
+can cause code generation to generate a distinct info table for each usage of
+a constructor. Then, when inspecting the heap you can see precisely which usage of a constructor
+was responsible for each allocation.
+
+-}
