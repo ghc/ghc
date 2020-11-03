@@ -67,7 +67,7 @@ import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.ByteCode.Types
 
-import GHC.Driver.Error
+import GHC.Driver.Errors.Types
 import GHC.Driver.Monad
 import GHC.Driver.Main
 import GHC.Hs

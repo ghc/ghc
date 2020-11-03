@@ -18,7 +18,7 @@ where
 import GHC.Prelude
 
 import qualified GHC
-import GHC.Driver.Error
+import GHC.Driver.Errors.Types
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -279,8 +279,8 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
 
             fail ->
                 let dflags = hsc_dflags hsc_env
-                    e = mkErr dflags srcloc alwaysQualify $
-                      (GhcErrorDriver $ DriverCannotFindModule imp fail)
+                    e = mkErr srcloc alwaysQualify $
+                      (GhcErrorDriver $ DriverCannotFindModule dflags imp fail)
                 in throwOneError e
         }
 

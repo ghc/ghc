@@ -5,14 +5,17 @@ import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Prelude
 import GHC.Tc.Utils.TcType
+import GHC.Types.Error
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Unit.Module.Name
 import GHC.Unit.Types
-import GHC.Utils.Error
 import GHC.Utils.Outputable
+
+-- NOTE(adn) Investigate this.
+type DsError = TcRnError
 
 data TcRnError
   = TcRnErrorDoc ErrDoc
@@ -63,7 +66,7 @@ tcRnErrorDoc (TcRnOutOfScopeHole occ ty suggs) =
         suggestions = pprOutOfScopeSuggestions occ suggs
 
 instance RenderableError TcRnError where
-  renderError _ = tcRnErrorDoc
+  renderError = tcRnErrorDoc
 
 type HowInScope = Either SrcSpan ImpDeclSpec
      -- Left loc    =>  locally bound at loc

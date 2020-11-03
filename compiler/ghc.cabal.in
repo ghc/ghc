@@ -380,6 +380,8 @@ Library
         GHC.Driver.CodeOutput
         GHC.Driver.Config
         GHC.Driver.Env
+        GHC.Driver.Errors
+        GHC.Driver.Errors.Types
         GHC.Driver.Flags
         GHC.Driver.Hooks
         GHC.Driver.Main
@@ -560,6 +562,7 @@ Library
         GHC.Tc.Errors
         GHC.Tc.Errors.Hole
         GHC.Tc.Errors.Hole.FitTypes
+        GHC.Tc.Errors.Types
         GHC.Tc.Gen.Annotation
         GHC.Tc.Gen.App
         GHC.Tc.Gen.Arrow

@@ -109,11 +109,10 @@ import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..))
 import GHC.Hs.Doc
 
 import GHC.Parser.CharClass
-import GHC.Parser.Error
 
 import GHC.Parser.Annotation
 import GHC.Driver.Flags
-import GHC.Parser.Errors
+import GHC.Parser.Errors as Parser
 }
 
 -- -----------------------------------------------------------------------------
@@ -2841,12 +2840,12 @@ addTabWarning srcspan
 
 -- | Get a bag of the errors that have been accumulated so far.
 --   Does not take -Werror into account.
-getErrorMessages :: PState -> Bag Error
+getErrorMessages :: PState -> Bag Parser.Error
 getErrorMessages p = errors p
 
 -- | Get the warnings and errors accumulated so far.
 --   Does not take -Werror into account.
-getMessages :: PState -> (Bag Warning, Bag Error)
+getMessages :: PState -> (Bag Parser.Warning, Bag Parser.Error)
 getMessages p =
   let ws = warnings p
       -- we add the tabulation warning on the fly because

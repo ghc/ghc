@@ -154,6 +154,7 @@ import GHC.Prelude
 
 import GHC.Builtin.Names
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Types     -- Re-export all
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
@@ -393,12 +394,11 @@ initTcWithGbl hsc_env gbl_env loc do_this
         -- Collect any error messages
       ; msgs <- readIORef (tcl_errs lcl_env)
 
-      ; let { final_res | errorsFound dflags msgs = Nothing
-                        | otherwise               = maybe_res }
+      ; let { final_res | errorsFound msgs = Nothing
+                        | otherwise        = maybe_res }
 
       ; return (msgs, final_res)
       }
-  where dflags = hsc_dflags hsc_env
 
 initTcInteractive :: HscEnv -> TcM a -> IO (Messages TcRnError, Maybe a)
 -- Initialise the type checker monad for use in GHCi
@@ -949,7 +949,7 @@ addTcRnErr loc err = do { ctxt <- getErrCtxt
                         ; err_info <- mkErrInfo tidy_env ctxt
                         ; dflags <- getDynFlags
                         ; printer <- getPrintUnqualified dflags
-                        ; reportError $ mkErr dflags loc printer (err err_info) }
+                        ; reportError $ mkErr loc printer (err err_info) }
 
 addErrAt :: SrcSpan -> MsgDoc -> TcRn ()
 -- addErrAt is mainly (exclusively?) used by the renamer, where
@@ -1004,13 +1004,13 @@ mkLongErrAt loc msg extra
          printer <- getPrintUnqualified dflags ;
          unit_state <- unitState <$> getDynFlags ;
          let msg' = pprWithUnitState unit_state msg in
-         return $ mkLongErrMsg dflags loc printer msg' extra }
+         return $ mkLongErrMsg loc printer msg' extra }
 
 mkErrDocAt :: SrcSpan -> TcRnError -> TcRn (ErrMsg TcRnError)
 mkErrDocAt loc err
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
-         return $ mkErr dflags loc printer err }
+         return $ mkErr loc printer err }
 
 addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError . fmap TcRnErrorDoc
@@ -1062,8 +1062,7 @@ ifErrsM :: TcRn r -> TcRn r -> TcRn r
 ifErrsM bale_out normal
  = do { errs_var <- getErrsVar ;
         msgs <- readTcRef errs_var ;
-        dflags <- getDynFlags ;
-        if errorsFound dflags msgs then
+        if errorsFound msgs then
            bale_out
         else
            normal }
@@ -1232,8 +1231,7 @@ askNoErrs thing_inside
                           ; failM }
 
            Just res -> do { emitConstraints lie
-                          ; dflags <- getDynFlags
-                          ; let errs_found = errorsFound dflags msgs
+                          ; let errs_found = errorsFound msgs
                                           || insolubleWC lie
                           ; return (res, not errs_found) } }
 
@@ -1395,9 +1393,8 @@ tryTcDiscardingErrs recover thing_inside
   = do { ((mb_res, lie), msgs) <- capture_messages    $
                                   capture_constraints $
                                   tcTryM thing_inside
-        ; dflags <- getDynFlags
         ; case mb_res of
-            Just res | not (errorsFound dflags msgs)
+            Just res | not (errorsFound msgs)
                      , not (insolubleWC lie)
               -> -- 'main' succeeded with no errors
                  do { addMessages msgs  -- msgs might still have warnings
@@ -1519,7 +1516,7 @@ add_warn_at :: WarnReason -> SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 add_warn_at reason loc msg extra_info
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
-         let { warn = mkLongWarnMsg dflags loc printer
+         let { warn = mkLongWarnMsg loc printer
                                     msg extra_info } ;
          reportWarning reason warn }
 

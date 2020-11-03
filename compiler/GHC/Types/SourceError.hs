@@ -11,6 +11,7 @@ where
 
 import GHC.Prelude
 import GHC.Data.Bag
+import {-# SOURCE #-} GHC.Driver.Errors.Types (GhcError)
 import GHC.Types.Error
 import GHC.Utils.Monad
 import GHC.Utils.Panic
@@ -18,16 +19,16 @@ import GHC.Utils.Exception
 
 import Control.Monad.Catch as MC (MonadCatch, catch)
 
-mkSrcErr :: ErrorMessages -> SourceError
+mkSrcErr :: ErrorMessages GhcError -> SourceError
 mkSrcErr = SourceError
 
-srcErrorMessages :: SourceError -> ErrorMessages
+srcErrorMessages :: SourceError -> ErrorMessages GhcError
 srcErrorMessages (SourceError msgs) = msgs
 
-throwErrors :: MonadIO io => ErrorMessages -> io a
+throwErrors :: MonadIO io => ErrorMessages GhcError -> io a
 throwErrors = liftIO . throwIO . mkSrcErr
 
-throwOneError :: MonadIO io => ErrMsg -> io a
+throwOneError :: MonadIO io => ErrMsg GhcError -> io a
 throwOneError = throwErrors . unitBag
 
 -- | A source error is an error that is caused by one or more errors in the
@@ -46,10 +47,10 @@ throwOneError = throwErrors . unitBag
 --
 -- See 'printExceptionAndWarnings' for more information on what to take care
 -- of when writing a custom error handler.
-newtype SourceError = SourceError ErrorMessages
+newtype SourceError = SourceError (ErrorMessages GhcError)
 
 instance Show SourceError where
-  show (SourceError msgs) = unlines . map show . bagToList $ msgs
+  show (SourceError msgs) = unlines . map showErrMsg . bagToList $ msgs
 
 instance Exception SourceError
 

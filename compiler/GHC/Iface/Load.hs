@@ -40,7 +40,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
    , tcIfaceAnnotations, tcIfaceCompleteMatches )
 
 import GHC.Driver.Env
-import GHC.Driver.Error
+import GHC.Driver.Errors.Types
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Ppr
@@ -99,6 +99,7 @@ import GHC.Unit.Home
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Finder
 
+import GHC.Data.Bag
 import GHC.Data.Maybe
 import GHC.Data.FastString
 

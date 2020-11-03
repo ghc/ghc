@@ -1062,9 +1062,15 @@ tc_hs_type mode forall@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
 
        -- Do not kind-generalise here!  See Note [Kind generalisation]
 
-       ; let skol_info = ForAllSkol forall $ sep $ case tele of
+       ; let skol_info = ForAllSkol forall $ case tele of
+                           -- NOTE(adn) This is almost surely wrong and arise
+                           -- from the fact that now 'ForAllSkol' doesn't store
+                           -- anymore opaque 'SDoc's, but proper types, and there
+                           -- a mismatch between the input 'LHsTyVarBndr Specificity pass'
+                           -- and 'LHsTyVarBndr () pass' we get from one or the other case.
+                           -- Maybe we need to split the type of 'ForAllSkol'?
                            HsForAllVis { hsf_vis_bndrs = hs_tvs } ->
-                             hs_tvs
+                             map (mapLoc (setHsTyVarBndrFlag InferredSpec)) hs_tvs
                            HsForAllInvis { hsf_invis_bndrs = hs_tvs } ->
                              hs_tvs
              skol_tvs  = binderVars tv_bndrs

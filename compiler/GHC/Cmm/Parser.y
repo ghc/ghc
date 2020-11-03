@@ -238,9 +238,8 @@ import GHC.Cmm.Parser.Monad hiding (getPlatform, getProfile, getPtrOpts)
 import qualified GHC.Cmm.Parser.Monad as PD
 import GHC.Cmm.CallConv
 import GHC.Runtime.Heap.Layout
-import GHC.Parser.Error
 import GHC.Parser.Lexer
-import GHC.Parser.Errors
+import GHC.Parser.Errors as Parser
 
 import GHC.Types.CostCentre
 import GHC.Types.ForeignCall
@@ -1448,7 +1447,7 @@ initEnv profile = listToUFM [
   ]
   where platform = profilePlatform profile
 
-parseCmmFile :: DynFlags -> FilePath -> IO (Messages PsError, Maybe CmmGroup)
+parseCmmFile :: DynFlags -> FilePath -> IO (Bag Parser.Warning, Bag Parser.Error, Maybe CmmGroup)
 parseCmmFile dflags filename = do
   buf <- hGetStringBuffer filename
   let

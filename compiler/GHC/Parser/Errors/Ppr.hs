@@ -9,13 +9,13 @@ where
 
 import GHC.Prelude
 import GHC.Driver.Flags
-import GHC.Parser.Errors
+import GHC.Parser.Errors as Parser
 import GHC.Parser.Types
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Reader (starInfo, rdrNameOcc, opIsAt, mkUnqual)
 import GHC.Types.Name.Occurrence (isSymOcc, occNameFS, varName)
-import GHC.Utils.Error
+import GHC.Types.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Data.FastString
@@ -24,27 +24,28 @@ import GHC.Hs.Type (pprLHsContext)
 import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
 
-mkParserErr :: SrcSpan -> SDoc -> ErrMsg
+instance RenderableError Parser.Error where
+  renderError = errMsgDoc . pprError
+
+mkParserErr :: SrcSpan -> SDoc -> ErrMsg ErrDoc
 mkParserErr span doc = ErrMsg
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
    , errMsgDoc         = ErrDoc [doc] [] []
-   , errMsgShortString = renderWithContext defaultSDocContext doc
    , errMsgSeverity    = SevError
    , errMsgReason      = NoReason
    }
 
-mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> ErrMsg
+mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> ErrMsg ErrDoc
 mkParserWarn flag span doc = ErrMsg
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
    , errMsgDoc         = ErrDoc [doc] [] []
-   , errMsgShortString = renderWithContext defaultSDocContext doc
    , errMsgSeverity    = SevWarning
    , errMsgReason      = Reason flag
    }
 
-pprWarning :: Warning -> ErrMsg
+pprWarning :: Warning -> ErrMsg ErrDoc
 pprWarning = \case
    WarnTab loc tc
       -> mkParserWarn Opt_WarnTabs loc $
@@ -130,7 +131,7 @@ pprWarning = \case
            OperatorWhitespaceOccurrence_Suffix -> mk_msg "suffix"
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
-pprError :: Error -> ErrMsg
+pprError :: Parser.Error -> ErrMsg ErrDoc
 pprError err = mkParserErr (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))
 
@@ -582,6 +583,29 @@ pp_err = \case
          [ text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
          , text "Perhaps you intended to use QualifiedDo"
          ]
+
+   ErrUnsupportedExtension ext sug
+       -> text "Unsupported extension: " <> text ext $$ suggestions
+          where
+            suggestions
+              | null sug  = GHC.Utils.Outputable.empty
+              | otherwise = text "Perhaps you meant" <+>
+                  quotedListWithOr (map text sug)
+
+   ErrUnknownOptionsFlag flag
+       -> text "unknown flag in {-# OPTIONS_GHC #-} pragma:" <+> text flag
+
+   ErrLanguagePragmaParseError
+       -> vcat [ text "Cannot parse LANGUAGE pragma"
+               , text "Expecting comma-separated list of language options,"
+               , text "each starting with a capital letter"
+               , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}") ]
+
+   ErrOptionsGhcParseError inp
+       -> vcat [ text "Error while parsing OPTIONS_GHC pragma."
+               , text "Expecting whitespace-separated list of GHC options."
+               , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
+               , text ("Input was: " ++ show inp) ]
 
 pp_unexpected_fun_app :: Outputable a => SDoc -> a -> SDoc
 pp_unexpected_fun_app e a =

@@ -21,6 +21,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 
 import GHC.Iface.Syntax
@@ -75,10 +76,9 @@ tcRnModExports x y = do
 failWithRn :: SDoc -> ShIfM a
 failWithRn doc = do
     errs_var <- fmap sh_if_errs getGblEnv
-    dflags <- getDynFlags
     errs <- readTcRef errs_var
     -- TODO: maybe associate this with a source location?
-    writeTcRef errs_var (errs `snocBag` (fmap TcRnErrorDoc $ mkPlainErrMsg dflags noSrcSpan doc))
+    writeTcRef errs_var (errs `snocBag` (fmap TcRnErrorDoc $ mkPlainErrMsg noSrcSpan doc))
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to

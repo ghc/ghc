@@ -80,6 +80,7 @@ import GHC.IfaceToCore
 
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType ( checkForLevPolyX, formatLevPolyErr )
+import GHC.Tc.Errors.Types  (DsError, TcRnError(..))
 
 import GHC.Builtin.Names
 
@@ -249,12 +250,11 @@ runDs hsc_env (ds_gbl, ds_lcl) thing_inside
                               (tryM thing_inside)
        ; msgs   <- readIORef (ds_msgs ds_gbl)
        ; let final_res
-               | errorsFound dflags msgs = Nothing
-               | Right r <- res          = Just r
-               | otherwise               = panic "initDs"
+               | errorsFound msgs = Nothing
+               | Right r <- res   = Just r
+               | otherwise        = panic "initDs"
        ; return (msgs, final_res)
        }
-  where dflags = hsc_dflags hsc_env
 
 -- | Run a 'DsM' action in the context of an existing 'ModGuts'
 initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages DsError, Maybe a)
@@ -450,9 +450,8 @@ warnDs :: WarnReason -> SDoc -> DsM ()
 warnDs reason warn
   = do { env <- getGblEnv
        ; loc <- getSrcSpanDs
-       ; dflags <- getDynFlags
        ; let msg = makeIntoWarning reason $
-                   mkWarnMsg dflags loc (ds_unqual env) warn
+                   mkWarnMsg loc (ds_unqual env) warn
        ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
 
 -- | Emit a warning only if the correct WarnReason is set in the DynFlags
@@ -465,8 +464,7 @@ errDs :: SDoc -> DsM ()
 errDs err
   = do  { env <- getGblEnv
         ; loc <- getSrcSpanDs
-        ; dflags <- getDynFlags
-        ; let msg = fmap TcRnErrorDoc $ mkErrMsg dflags loc (ds_unqual env) err
+        ; let msg = fmap TcRnErrorDoc $ mkErrMsg loc (ds_unqual env) err
         ; updMutVar (ds_msgs env) (\ (w,e) -> (w, e `snocBag` msg)) }
 
 -- | Issue an error, but return the expression for (), so that we can continue
@@ -511,8 +509,7 @@ askNoErrsDs thing_inside
       -- And return
       ; case mb_res of
            Left _    -> failM
-           Right res -> do { dflags <- getDynFlags
-                           ; let errs_found = errorsFound dflags msgs
+           Right res -> do { let errs_found = errorsFound msgs
                            ; return (res, not errs_found) } }
 
 mkPrintUnqualifiedDs :: DsM PrintUnqualified

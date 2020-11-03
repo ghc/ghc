@@ -20,6 +20,9 @@ module GHC.Utils.Error (
         Validity(..), andValid, allValid, isValid, getInvalids, orValid,
         Severity(..),
 
+        -- * Rendering errors
+        RenderableError(..),
+
         -- * Messages
         ErrMsg(..),
         ErrDoc(..), errDoc,
@@ -27,12 +30,6 @@ module GHC.Utils.Error (
         WarnMsg, MsgDoc,
         Messages, ErrorMessages, WarningMessages,
         unionMessages,
-        ErrMsg, errMsgDoc, errMsgSeverity, errMsgReason,
-        ErrDoc, errDoc, errDocImportant, errDocContext, errDocSupplementary,
-        WarnMsg, MsgDoc, RenderableError(..),
-        Messages, ErrorMessages, WarningMessages,
-        mapMessages, unionMessages,
-        errMsgSpan, errMsgContext,
         errorsFound, isEmptyMessages,
         isWarnMsgFatal,
         warningsToMessages,
@@ -82,6 +79,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import {-# SOURCE #-} GHC.Driver.Errors.Types (ghcErrorRawErrDoc)
 import qualified GHC.Driver.CmdLine as CmdLine
 
 import GHC.Data.Bag
@@ -140,31 +138,30 @@ orValid _       v = v
 
 mk_err_msg
   :: RenderableError e
-  => DynFlags -> Severity -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
-mk_err_msg dflags sev locn print_unqual err
+  => Severity -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+mk_err_msg sev locn print_unqual err
  = ErrMsg { errMsgSpan = locn
           , errMsgContext = print_unqual
           , errMsgDoc = err
-          , errMsgShortString = showSDoc dflags (vcat (errDocImportant $ renderError dflags err))
           , errMsgSeverity = sev
           , errMsgReason = NoReason }
 
-mkErr :: RenderableError e => DynFlags -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
-mkErr dflags = mk_err_msg dflags SevError
+mkErr :: RenderableError e => SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+mkErr = mk_err_msg SevError
 
-mkLongErrMsg, mkLongWarnMsg   :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg ErrDoc
+mkLongErrMsg, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg ErrDoc
 -- ^ A long (multi-line) error message
-mkErrMsg, mkWarnMsg           :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc            -> ErrMsg ErrDoc
+mkErrMsg, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> MsgDoc            -> ErrMsg ErrDoc
 -- ^ A short (one-line) error message
-mkPlainErrMsg, mkPlainWarnMsg :: DynFlags -> SrcSpan ->                     MsgDoc            -> ErrMsg ErrDoc
+mkPlainErrMsg, mkPlainWarnMsg :: SrcSpan ->                     MsgDoc            -> ErrMsg ErrDoc
 -- ^ Variant that doesn't care about qualified/unqualified names
 
-mkLongErrMsg   dflags locn unqual msg extra = mk_err_msg dflags SevError   locn unqual        (ErrDoc [msg] [] [extra])
-mkErrMsg       dflags locn unqual msg       = mk_err_msg dflags SevError   locn unqual        (ErrDoc [msg] [] [])
-mkPlainErrMsg  dflags locn        msg       = mk_err_msg dflags SevError   locn alwaysQualify (ErrDoc [msg] [] [])
-mkLongWarnMsg  dflags locn unqual msg extra = mk_err_msg dflags SevWarning locn unqual        (ErrDoc [msg] [] [extra])
-mkWarnMsg      dflags locn unqual msg       = mk_err_msg dflags SevWarning locn unqual        (ErrDoc [msg] [] [])
-mkPlainWarnMsg dflags locn        msg       = mk_err_msg dflags SevWarning locn alwaysQualify (ErrDoc [msg] [] [])
+mkLongErrMsg   locn unqual msg extra = mk_err_msg SevError   locn unqual        (ErrDoc [msg] [] [extra])
+mkErrMsg       locn unqual msg       = mk_err_msg SevError   locn unqual        (ErrDoc [msg] [] [])
+mkPlainErrMsg  locn        msg       = mk_err_msg SevError   locn alwaysQualify (ErrDoc [msg] [] [])
+mkLongWarnMsg  locn unqual msg extra = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [extra])
+mkWarnMsg      locn unqual msg       = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [])
+mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify (ErrDoc [msg] [] [])
 
 ----------------
 emptyMessages :: Messages e
@@ -173,8 +170,9 @@ emptyMessages = (emptyBag, emptyBag)
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (warns, errs) = isEmptyBag warns && isEmptyBag errs
 
-errorsFound :: DynFlags -> Messages e -> Bool
-errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
+-- | Returns 'True' if the messages contain at least one error.
+errorsFound :: (Bag warns, Bag errs) -> Bool
+errorsFound (_warns, errs) = not (isEmptyBag errs)
 
 warningsToMessages :: DynFlags -> WarningMessages -> Messages ErrDoc
 warningsToMessages dflags =
@@ -215,8 +213,8 @@ pprLocErrMsg (ErrMsg { errMsgSpan      = s
                      , errMsgDoc       = e
                      , errMsgSeverity  = sev
                      , errMsgContext   = unqual })
-  = sdocWithContext $ \ctx -> sdocWithDynFlags $ \dflags ->
-    withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx $ renderError dflags e)
+  = sdocWithContext $ \ctx ->
+    withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx $ renderError e)
 
 sortMsgBag :: Maybe DynFlags -> Bag (ErrMsg e) -> [ErrMsg e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
@@ -807,7 +805,7 @@ handleFlagWarnings dflags warns = do
 
       -- It would be nicer if warns :: [Located MsgDoc], but that
       -- has circular import problems.
-      bag = listToBag [ mkPlainWarnMsg dflags loc (text warn)
+      bag = listToBag [ mkPlainWarnMsg loc (text warn)
                       | CmdLine.Warn _ (L loc warn) <- warns' ]
 
   printOrThrowWarnings dflags bag
@@ -838,6 +836,6 @@ printOrThrowWarnings dflags warns = do
                            }))
           False warns
   if make_error
-    then throwIO (mkSrcErr warns')
+    then throwIO (mkSrcErr $ mapBag (fmap ghcErrorRawErrDoc) warns')
     else printBagOfErrors dflags warns
 

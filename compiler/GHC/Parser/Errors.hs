@@ -10,6 +10,7 @@ module GHC.Parser.Errors
    , CmmParserError(..)
    , LexErrKind(..)
    , Hint(..)
+   , noHints
    , StarIsType (..)
    )
 where
@@ -83,6 +84,9 @@ data Error = Error
    , errHints :: ![Hint]      -- ^ Hints
    , errLoc   :: !SrcSpan     -- ^ Error position
    }
+
+noHints :: [Hint]
+noHints = mempty
 
 data ErrorDesc
    = ErrLambdaCase
@@ -376,6 +380,14 @@ data ErrorDesc
       -- ^ Parse error in pattern
       --
       -- TODO: distinguish errors without using SDoc
+  | ErrUnsupportedExtension String [String]
+      -- ^ The given extension is not supported
+  | ErrUnknownOptionsFlag String
+      -- ^ Unknown GHC_OPTIONS flag
+  | ErrLanguagePragmaParseError
+      -- ^ Cannot parse LANGUAGE pragma
+  | ErrOptionsGhcParseError String
+      -- ^ Error while parsing GHC_OPTIONS
 
 
 newtype StarIsType = StarIsType Bool

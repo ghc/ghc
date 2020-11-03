@@ -1,4 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module GHC.Types.Error
    ( Messages
@@ -9,6 +11,9 @@ module GHC.Types.Error
    , ErrDoc (..)
    , MsgDoc
    , Severity (..)
+   , RenderableError (..)
+   , showErrMsg
+   , mapMessages
    , unionMessages
    , errDoc
    , mapErrDoc
@@ -35,23 +40,26 @@ import GHC.Utils.Json
 
 import System.IO.Error  ( catchIOError )
 
-type Messages        = (WarningMessages, ErrorMessages)
-type WarningMessages = Bag WarnMsg
-type ErrorMessages   = Bag ErrMsg
-type MsgDoc          = SDoc
-type WarnMsg         = ErrMsg
+type Messages        e = (WarningMessages, ErrorMessages e)
+type WarningMessages   = Bag WarnMsg
+type ErrorMessages   e = Bag (ErrMsg e)
+type MsgDoc            = SDoc
+type WarnMsg           = ErrMsg ErrDoc
 
+-- | A class for types which can be \"rendered\" into a opaque 'ErrDoc'.
+class RenderableError e where
+  renderError :: e -> ErrDoc
 
-data ErrMsg = ErrMsg
+-- | The main 'GHC' error type, parameterised over the /domain-specific/ error 'e'.
+-- There is deliberately no 'Show' instance for an 'ErrMsg', see Note [Showing ErrMsg].
+data ErrMsg e = ErrMsg
    { errMsgSpan        :: SrcSpan
       -- ^ The SrcSpan is used for sorting errors into line-number order
    , errMsgContext     :: PrintUnqualified
-   , errMsgDoc         :: ErrDoc
-   , errMsgShortString :: String
-      -- ^ This has the same text as errDocImportant . errMsgDoc.
+   , errMsgDoc         :: e
    , errMsgSeverity    :: Severity
    , errMsgReason      :: WarnReason
-   }
+   } deriving Functor
 
 -- | Categorise error msgs by their importance.  This is so each section can
 -- be rendered visually distinct.  See Note [Error report] for where these come
@@ -65,7 +73,13 @@ data ErrDoc = ErrDoc {
         errDocSupplementary :: [MsgDoc]
         }
 
-unionMessages :: Messages -> Messages -> Messages
+instance RenderableError ErrDoc where
+  renderError = id
+
+mapMessages :: (e -> e') -> Messages e -> Messages e'
+mapMessages f (ws, es) = (ws, mapBag (fmap f) es)
+
+unionMessages :: Messages e -> Messages e -> Messages e
 unionMessages (warns1, errs1) (warns2, errs2) =
   (warns1 `unionBags` warns2, errs1 `unionBags` errs2)
 
@@ -101,8 +115,27 @@ data Severity
 instance ToJson Severity where
   json s = JSString (show s)
 
-instance Show ErrMsg where
-    show em = errMsgShortString em
+-- NOTE [Showing ErrMsg]
+-- Showing an 'ErrMsg' via its 'Show' instance is something that doesn't make much sense.
+-- To begin with, we can't write a meaningful 'Show' instance such that 'read . show === id', but
+-- /properly/ showing an 'ErrMsg' is done via the 'RenderableError' machinery and all the pretty-printing,
+-- so having a 'Show' instance feels like duplicating efforts.
+-- Furthermore, the 'errMsgShortString' function was added to an 'ErrMsg' with the sole purpose of
+-- writing the instance below:
+--
+-- instance Show (ErrMsg e) where
+--   show em = errMsgShortString em
+--
+-- However, errMsgShortString required 'DynFlags' to be passed as input for rendering correctly the 'SDoc'
+-- making things even more coupled.
+-- For all these reasons we remove the 'Show' instance for 'ErrMsg' and we offer a top-level function for
+-- convenience, i.e. 'showErrMsg'.
+
+-- | Shows an 'ErrMsg'. See NOTE [Showing ErrMsg]. Use this function only for debugging and testing
+-- purposes.
+showErrMsg :: RenderableError e => ErrMsg e -> String
+showErrMsg err =
+  renderWithContext defaultSDocContext (vcat (errDocImportant $ renderError $ errMsgDoc err))
 
 pprMessageBag :: Bag MsgDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
@@ -233,7 +266,7 @@ getCaretDiagnostic severity (RealSrcSpan span _) =
                       | otherwise = ""
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
 
-makeIntoWarning :: WarnReason -> ErrMsg -> ErrMsg
+makeIntoWarning :: WarnReason -> ErrMsg e -> ErrMsg e
 makeIntoWarning reason err = err
     { errMsgSeverity = SevWarning
     , errMsgReason = reason }

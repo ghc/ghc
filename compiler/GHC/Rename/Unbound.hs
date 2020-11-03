@@ -23,6 +23,13 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 
+import GHC.Tc.Errors.Types ( OutOfScopeSuggestions(..)
+                           , NameSuggestions(..)
+                           , ImportSuggestion(..)
+                           , ExtensionSuggestion(..)
+                           , TcRnError(..)
+                           , noOutOfScopeSuggestions
+                           )
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
 import GHC.Utils.Outputable as Outputable

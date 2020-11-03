@@ -49,11 +49,6 @@ module GHC.Tc.Types(
         SelfBootInfo(..),
         pprTcTyThingCategory, pprPECategory, CompleteMatch, CompleteMatches,
 
-        -- Desugaring types
-        DsM, DsLclEnv(..), DsGblEnv(..), DsError,
-        DsMetaEnv, DsMetaVal(..), CompleteMatchMap,
-        mkCompleteMatchMap, extendCompleteMatchMap,
-
         -- Template Haskell
         ThStage(..), SpliceType(..), PendingStuff(..),
         topStage, topAnnStage, topSpliceStage,
@@ -312,7 +307,6 @@ data IfLclEnv
 {-
 ************************************************************************
 *                                                                      *
-type DsError = TcRnError
                 Global typechecker environment
 *                                                                      *
 ************************************************************************

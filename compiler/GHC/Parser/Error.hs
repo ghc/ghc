@@ -45,4 +45,4 @@ psErrorDoc (PsOptionsGhcParseError inp) =
                  , text ("Input was: " ++ show inp) ]
 
 instance RenderableError PsError where
-  renderError _ = psErrorDoc
+  renderError = psErrorDoc

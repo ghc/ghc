@@ -29,11 +29,10 @@ import GHC.Platform
 
 import GHC.Driver.Session
 import GHC.Driver.Config
+import GHC.Driver.Errors.Types
 
-import GHC.Parser.Errors.Ppr
-import GHC.Parser.Errors
+import GHC.Parser.Errors    as Parser
 import GHC.Parser           ( parseHeader )
-import GHC.Parser.Error
 import GHC.Parser.Lexer
 
 import GHC.Hs
@@ -53,7 +52,7 @@ import GHC.Utils.Exception as Exception
 
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
-import GHC.Data.Bag         ( Bag, emptyBag, listToBag, unitBag, isEmptyBag )
+import GHC.Data.Bag         ( Bag, emptyBag, listToBag, unitBag, mapBag )
 import GHC.Data.FastString
 
 import Control.Monad
@@ -74,7 +73,7 @@ getImports :: ParserOpts   -- ^ Parser options
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
            -> IO (Either
-               (ErrorMessages PsError)
+               (Bag Parser.Error)
                ([(Maybe FastString, Located ModuleName)],
                 [(Maybe FastString, Located ModuleName)],
                 Located ModuleName))
@@ -92,8 +91,8 @@ getImports popts implicit_prelude buf filename source_filename = do
       -- for real.  See #2500.
           ms = (emptyBag, errs)
       -- logWarnings warns
-      if errorsFound dflags ms
-        then throwIO $ mkSrcErr (mapBag (fmap GhcErrorPs) errs)
+      if errorsFound ms
+        then throwIO $ mkSrcErr (mapBag toGhcErrorMsg errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -258,7 +257,7 @@ getOptions' dflags toks
               | IToptions_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
               = case toArgs str of
-                  Left _err -> optionsParseError str dflags $   -- #15053
+                  Left _err -> optionsParseError str $   -- #15053
                                  combineSrcSpans (getLoc open) (getLoc close)
                   Right args -> map (L (getLoc open)) args ++ parseToks xs
           parseToks (open:close:xs)
@@ -283,10 +282,10 @@ getOptions' dflags toks
                 case rest of
                   (L _loc ITcomma):more -> parseLanguage more
                   (L _loc ITclose_prag):more -> parseToks more
-                  (L loc _):_ -> languagePragParseError dflags loc
+                  (L loc _):_ -> languagePragParseError loc
                   [] -> panic "getOptions'.parseLanguage(1) went past eof token"
           parseLanguage (tok:_)
-              = languagePragParseError dflags (getLoc tok)
+              = languagePragParseError (getLoc tok)
           parseLanguage []
               = panic "getOptions'.parseLanguage(2) went past eof token"
 
@@ -307,12 +306,12 @@ getOptions' dflags toks
 --
 -- Throws a 'SourceError' if the input list is non-empty claiming that the
 -- input flags are unknown.
-checkProcessArgsResult :: MonadIO m => DynFlags -> [Located String] -> m ()
-checkProcessArgsResult dflags flags
+checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
+checkProcessArgsResult flags
   = when (notNull flags) $
       liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
-    where mkMsg (L loc flag) = fmap GhcErrorPs $
-            mkErr dflags loc alwaysQualify (PsUnknownOptionsFlag flag)
+    where mkMsg (L loc flag) = toGhcErrorMsg
+                             $ Parser.Error (ErrUnknownOptionsFlag flag) noHints loc
 
 -----------------------------------------------------------------------------
 
@@ -327,20 +326,20 @@ checkExtension dflags (L l ext)
     ext' = unpackFS ext
     supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
 
-languagePragParseError :: DynFlags -> SrcSpan -> a
-languagePragParseError dflags loc =
-  throwPsError dflags loc PsLanguagePragmaParseError
+languagePragParseError :: SrcSpan -> a
+languagePragParseError loc =
+  throwPsError $ Parser.Error ErrLanguagePragmaParseError noHints loc
 
 unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
 unsupportedExtnError dflags loc unsup =
-    throwPsError dflags loc (PsUnsupportedExtension unsup suggestions)
+    throwPsError $ Parser.Error (ErrUnsupportedExtension unsup suggestions) noHints loc
   where
      supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
      suggestions = fuzzyMatch unsup supported
 
 
-optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages PsError
-optionsErrorMsgs dflags unhandled_flags flags_lines _filename
+optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages Parser.Error
+optionsErrorMsgs unhandled_flags flags_lines _filename
   = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
   where unhandled_flags_lines :: [Located String]
         unhandled_flags_lines = [ L l f
@@ -348,13 +347,15 @@ optionsErrorMsgs dflags unhandled_flags flags_lines _filename
                                 , L l f' <- flags_lines
                                 , f == f' ]
         mkMsg (L flagSpan flag) =
-            GHC.Utils.Error.mkErr dflags flagSpan alwaysQualify
-                                  (PsUnknownOptionsFlag flag)
+            GHC.Utils.Error.mkErr flagSpan alwaysQualify
+                                  $ Parser.Error (ErrUnknownOptionsFlag flag) noHints flagSpan
 
-optionsParseError :: String -> DynFlags -> SrcSpan -> a     -- #15053
-optionsParseError str dflags loc =
-  throwPsError dflags loc (PsOptionsGhcParseError str)
+optionsParseError :: String -> SrcSpan -> a     -- #15053
+optionsParseError str loc =
+  throwPsError $ Parser.Error (ErrOptionsGhcParseError str) noHints loc
 
-throwPsError :: DynFlags -> SrcSpan -> PsError -> a                -- #15053
-throwPsError dflags loc e =
-  throw $ mkSrcErr $ unitBag . fmap GhcErrorPs $ mkErr dflags loc alwaysQualify e
+toGhcErrorMsg :: Parser.Error -> ErrMsg GhcError
+toGhcErrorMsg e = GhcErrorPs <$> mkErr (errLoc e) alwaysQualify e
+
+throwPsError :: Parser.Error -> a                -- #15053
+throwPsError = throw . mkSrcErr . unitBag . toGhcErrorMsg

@@ -43,7 +43,7 @@ import GHC.Driver.Hooks
 import GHC.Hs
 
 import GHC.Types.Annotations
-import GHC.Driver.Finder
+import GHC.Unit.Finder
 import GHC.Types.Name
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad

@@ -49,6 +49,7 @@ import GHC.Unit.Module.Deps
 
 import GHC.Tc.Gen.Export
 import GHC.Tc.TyCl.Utils
+import GHC.Tc.Errors.Types (TcRnError(..))
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.TcMType

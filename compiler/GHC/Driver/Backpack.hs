@@ -21,6 +21,8 @@ module GHC.Driver.Backpack (doBackpack) where
 
 import GHC.Prelude
 
+import GHC.Data.Bag (mapBag)
+
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
 import GHC.Driver.Config
@@ -30,6 +32,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Env
+import GHC.Driver.Errors.Types (GhcError(..), ghcErrorRawErrDoc)
 
 import GHC.Parser
 import GHC.Parser.Header
@@ -92,14 +95,14 @@ doBackpack [src_filename] = do
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
     modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
-    liftIO $ checkProcessArgsResult dflags unhandled_flags
+    liftIO $ checkProcessArgsResult unhandled_flags
     liftIO $ handleFlagWarnings dflags warns
     -- TODO: Preprocessing not implemented
 
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (initParserState (initParserOpts dflags) buf loc) of
-        PFailed pst -> throwErrors $ mapBag (fmap GhcErrorPs) (getErrorMessages pst dflags)
+        PFailed pst -> throwErrors (error "adinapoli") -- $ mapBag (fmap GhcErrorPs) (getErrorMessages pst)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
@@ -751,7 +754,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          [] -- No exclusions
          case r of
             Nothing -> throwOneError . fmap ghcErrorRawErrDoc $
-              mkPlainErrMsg dflags loc (text "module" <+> ppr modname <+> text "was not found")
+              mkPlainErrMsg loc (text "module" <+> ppr modname <+> text "was not found")
             Just (Left err) -> throwErrors err
             Just (Right summary) -> return summary
 

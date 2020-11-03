@@ -93,6 +93,7 @@ import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Env
+import GHC.Driver.Errors (GhcError(..), DriverError(..), ghcErrorRawErrDoc)
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config
 import GHC.Driver.Hooks
@@ -139,8 +140,8 @@ import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
 
 import GHC.Parser.Annotation
-import GHC.Parser.Errors
-import GHC.Parser.Errors.Ppr
+import GHC.Parser.Errors     as Parser
+import GHC.Parser.Errors.Ppr as Parser
 import GHC.Parser
 import GHC.Parser.Lexer as Lexer
 
@@ -180,6 +181,7 @@ import GHC.Unit.Home.ModInfo
 import GHC.Types.Id
 import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
+import GHC.Types.Error (mapMessages)
 import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env       ( emptyTidyEnv )
 import GHC.Types.Fixity.Env
@@ -277,20 +279,42 @@ handleWarnings = do
 
 -- | log warning in the monad, and if there are errors then
 -- throw a SourceError exception.
-logWarningsReportErrors :: Messages GhcError -> Hsc ()
-logWarningsReportErrors (warns,errs) = do
+-- logWarningsReportErrors :: Messages GhcError -> Hsc ()
+-- logWarningsReportErrors (warns,errs) = do
+--     logWarnings warns
+--     when (not $ isEmptyBag errs) $ throwErrors errs
+
+-- | log warning in the monad, and if there are errors then
+-- throw a SourceError exception.
+-- FIXME(adn) Provisional.
+logWarningsReportErrors :: (Bag Parser.Warning, Bag GhcError) -> Hsc ()
+logWarningsReportErrors (warnings,errs) = do
+    let warns = fmap pprWarning warnings
     logWarnings warns
-    when (not $ isEmptyBag errs) $ throwErrors errs
+    when (not $ isEmptyBag errs) $ throwErrors (error "adinapoli") -- errs
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
-handleWarningsThrowErrors :: Messages GhcError -> Hsc a
-handleWarningsThrowErrors (warns, errs) = do
+-- handleWarningsThrowErrors :: Messages GhcError -> Hsc a
+-- handleWarningsThrowErrors (warns, errs) = do
+--     logWarnings warns
+--     dflags <- getDynFlags
+--     (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
+--     liftIO $ printBagOfErrors dflags wWarns
+--     throwErrors (unionBags errs $ mapBag (fmap ghcErrorRawErrDoc) wErrs)
+
+-- FIXME(adn) Provisional.
+-- | Log warnings and throw errors, assuming the messages
+-- contain at least one error (e.g. coming from PFailed)
+handleWarningsThrowErrors :: (Bag Parser.Warning, Bag GhcError) -> Hsc a
+handleWarningsThrowErrors (warnings, errs) = do
+    let warns = fmap pprWarning warnings
     logWarnings warns
     dflags <- getDynFlags
     (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
     liftIO $ printBagOfErrors dflags wWarns
-    throwErrors (unionBags errs $ mapBag (fmap ghcErrorRawErrDoc) wErrs)
+    throwErrors (error "adinapoli") -- (unionBags errs wErrs)
+
 
 -- | Deal with errors and warnings returned by a compilation step
 --
@@ -313,7 +337,7 @@ ioMsgMaybe ioA = do
     ((warns,errs), mb_r) <- liftIO ioA
     logWarnings warns
     case mb_r of
-        Nothing -> throwErrors errs
+        Nothing -> throwErrors (error "adinapoli") -- errs
         Just r  -> ASSERT( isEmptyBag errs ) return r
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
@@ -405,9 +429,9 @@ hscParse' mod_summary
     case unP parseMod (initParserState (initParserOpts dflags) buf loc) of
         PFailed pst ->
             handleWarningsThrowErrors $
-                mapMessages GhcErrorPs (getMessages pst dflags)
+                fmap GhcErrorPs <$> getMessages pst
         POk pst rdr_module -> do
-            let (warns, errs) = bimap (fmap pprWarning) (fmap pprError) (getMessages pst)
+            let (warns, errs) = bimap (fmap pprWarning) (fmap GhcErrorPs) (getMessages pst)
             logWarnings warns
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr rdr_module)
@@ -416,7 +440,7 @@ hscParse' mod_summary
             liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
             when (not $ isEmptyBag errs) $
-                throwErrors (mapBag (fmap GhcErrorPs) errs)
+                throwErrors (error "adinapoli") -- errs
 
             -- To get the list of extra source files, we take the list
             -- that the parser gave us,
@@ -560,7 +584,7 @@ tcRnModule' sum save_rn_syntax mod = do
           && wopt Opt_WarnMissingSafeHaskellMode dflags) $
         logWarnings $ unitBag $
         makeIntoWarning (Reason Opt_WarnMissingSafeHaskellMode) $
-        mkPlainWarnMsg dflags (getLoc (hpm_module mod)) $
+        mkPlainWarnMsg (getLoc (hpm_module mod)) $
         warnMissingSafeHaskellMode
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
@@ -589,13 +613,13 @@ tcRnModule' sum save_rn_syntax mod = do
                 | safeHaskell dflags == Sf_Safe -> return ()
                 | otherwise -> (logWarnings $ unitBag $
                        makeIntoWarning (Reason Opt_WarnSafe) $
-                       mkPlainWarnMsg dflags (warnSafeOnLoc dflags) $
+                       mkPlainWarnMsg (warnSafeOnLoc dflags) $
                        errSafe tcg_res')
               False | safeHaskell dflags == Sf_Trustworthy &&
                       wopt Opt_WarnTrustworthySafe dflags ->
                       (logWarnings $ unitBag $
                        makeIntoWarning (Reason Opt_WarnTrustworthySafe) $
-                       mkPlainWarnMsg dflags (trustworthyOnLoc dflags) $
+                       mkPlainWarnMsg (trustworthyOnLoc dflags) $
                        errTwthySafe tcg_res')
               False -> return ()
           return tcg_res'
@@ -1038,7 +1062,7 @@ hscCheckSafeImports tcg_env = do
 
     warnRules :: DynFlags -> GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg ErrDoc
     warnRules dflags (L loc (HsRule { rd_name = n })) =
-        mkPlainWarnMsg dflags loc $
+        mkPlainWarnMsg loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
 
@@ -1117,7 +1141,7 @@ checkSafeImports tcg_env
         | imv_is_safe v1 /= imv_is_safe v2
         = do
             dflags <- getDynFlags
-            throwOneError . fmap ghcErrorRawErrDoc $ mkPlainErrMsg dflags (imv_span v1)
+            throwOneError . fmap ghcErrorRawErrDoc $ mkPlainErrMsg (imv_span v1)
               (text "Module" <+> ppr (imv_name v1) <+>
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
@@ -1185,7 +1209,7 @@ hscCheckSafe' m l = do
         case iface of
             -- can't load iface to check trust!
             Nothing -> throwOneError $
-              mkErr dflags l alwaysQualify
+              mkErr l alwaysQualify
                     (GhcErrorDriver $ DriverCantLoadIfaceForSafe m)
 
             -- got iface, check trust
@@ -1218,20 +1242,20 @@ hscCheckSafe' m l = do
                     state = unitState dflags
                     inferredImportWarn = unitBag
                         $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
-                        $ mkWarnMsg dflags l (pkgQual state)
+                        $ mkWarnMsg l (pkgQual state)
                         $ sep
                             [ text "Importing Safe-Inferred module "
                                 <> ppr (moduleName m)
                                 <> text " from explicitly Safe module"
                             ]
-                    pkgTrustErr = unitBag $ mkErrMsg dflags l (pkgQual state) $
+                    pkgTrustErr = unitBag $ mkErrMsg l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package ("
                                 <> (pprWithUnitState state $ ppr (moduleUnit m))
                                 <> text ") the module resides in isn't trusted."
                             ]
-                    modTrustErr = unitBag $ mkErrMsg dflags l (pkgQual state) $
+                    modTrustErr = unitBag $ mkErrMsg l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
@@ -1267,11 +1291,6 @@ hscCheckSafe' m l = do
             Nothing -> snd `fmap` (liftIO $ getModuleInterface hsc_env m)
 
 
-    isHomePkg :: DynFlags -> Module -> Bool
-    isHomePkg dflags m
-        | thisPackage dflags == moduleUnit m = True
-        | otherwise                          = False
-
 -- | Check the list of packages are trusted.
 checkPkgTrust :: Set UnitId -> Hsc ()
 checkPkgTrust pkgs = do
@@ -1283,7 +1302,7 @@ checkPkgTrust pkgs = do
             = acc
             | otherwise
             = (:acc)
-              $ mkErr dflags noSrcSpan (pkgQual dflags)
+              $ mkErr noSrcSpan (pkgQual state)
                       (GhcErrorDriver $ DriverPkgRequiredTrusted pkg)
     case errors of
         [] -> return ()
@@ -1305,7 +1324,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
 
     when (wopt Opt_WarnUnsafe dflags)
          (logWarnings $ unitBag $ makeIntoWarning (Reason Opt_WarnUnsafe) $
-             mkPlainWarnMsg dflags (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
+             mkPlainWarnMsg (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
     -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other
@@ -1549,11 +1568,10 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags   = hsc_dflags hsc_env
         home_unit = hsc_home_unit hsc_env
         platform  = targetPlatform dflags
-    cmm <- ioMsgMaybe . wrappingErrors GhcErrorPs $
-               $ do
+    cmm <- ioMsgMaybe . wrappingErrors GhcErrorPs $ do
                   (warns,errs,cmm) <- withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
                                        $ parseCmmFile dflags filename
-                  return ((fmap pprWarning warns, fmap pprError errs), cmm)
+                  return (error "adinapoli") -- ((fmap pprWarning warns, fmap pprError errs), cmm)
     liftIO $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
         let -- Make up a module name to give the NCG. We can't pass bottom here
@@ -1872,7 +1890,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
     case is of
         [L _ i] -> return i
         _ -> liftIO $ throwOneError $
-                 mkErr (hsc_dflags hsc_env) noSrcSpan alwaysQualify $
+                 mkErr noSrcSpan alwaysQualify $
                        (GhcErrorDriver DriverParseErrorImport)
 
 -- | Typecheck an expression (but don't run it)
@@ -1904,7 +1922,7 @@ hscParseExpr expr = do
   case maybe_stmt of
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
     _ -> throwOneError $
-      mkErr (hsc_dflags hsc_env) noSrcSpan alwaysQualify
+      mkErr noSrcSpan alwaysQualify
             (GhcErrorDriver $ DriverNotAnExpression expr)
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))
@@ -1940,10 +1958,10 @@ hscParseThingWithLocation source linenumber parser str
     case unP parser (initParserState (initParserOpts dflags) buf loc) of
         PFailed pst ->
             handleWarningsThrowErrors $
-              mapMessages GhcErrorPs (getMessages pst dflags)
+              fmap GhcErrorPs <$> getMessages pst
         POk pst thing -> do
             logWarningsReportErrors $
-              mapMessages GhcErrorPs (getMessages pst dflags)
+              fmap GhcErrorPs <$> getMessages pst
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr thing)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST"
