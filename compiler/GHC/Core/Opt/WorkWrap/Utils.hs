@@ -610,7 +610,7 @@ wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> Maybe ([Demand], DataCon
 wantToUnbox fam_envs has_inlineable_prag ty dmd =
   case deepSplitProductType_maybe fam_envs ty of
     Just dcac@DataConAppContext{ dcac_arg_tys = con_arg_tys }
-      | isStrictDmd dmd
+      | isStrUsedDmd dmd
       -- See Note [Unpacking arguments with product and polymorphic demands]
       , Just cs <- split_prod_dmd_arity dmd (length con_arg_tys)
       -- See Note [Do not unpack class dictionaries]

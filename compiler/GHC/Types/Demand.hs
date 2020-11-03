@@ -19,7 +19,7 @@ module GHC.Types.Demand (
         plusCard, plusDmd, plusCleanDmd,
         multCard, multDmd, multCleanDmd,
         lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd,
-        isAbs, isUsedOnce, isStrict, isAbsDmd, isUsedOnceDmd, isStrictDmd,
+        isAbs, isUsedOnce, isStrict, isAbsDmd, isUsedOnceDmd, isStrUsedDmd,
         isTopDmd, isSeqDmd,
         strictenDmd,
         addCaseBndrDmd,
@@ -80,28 +80,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 {-
-************************************************************************
-*                                                                      *
-        Joint domain for Strictness and Absence
-*                                                                      *
-************************************************************************
--}
-
-{-
-************************************************************************
-*                                                                      *
-            Strictness domain
-*                                                                      *
-************************************************************************
-
-          Lazy
-           |
-        HeadStr
-        /     \
-    SCall      SProd
-        \     /
-        HyperStr
-
 Note [Exceptions and strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to smart about catching exceptions, but we aren't anymore.
@@ -171,24 +149,6 @@ only used by `raiseIO#` in order to preserve precise exceptions by strictness
 analysis, while not impacting the ability to eliminate dead code.
 See Note [Precise exceptions and strictness analysis].
 
--}
-
-{-
-************************************************************************
-*                                                                      *
-            Absence domain
-*                                                                      *
-************************************************************************
-
-         Used
-         /   \
-     UCall   UProd
-         \   /
-         UHead
-          |
-  Count x -
-        |
-       Abs
 -}
 
 addCaseBndrDmd :: Demand    -- On the case binder
@@ -284,28 +244,6 @@ Compare with: (C) making Used win for plus, but UProd win for lub
          Clean demand for Strictness and Usage
 *                                                                      *
 ************************************************************************
-
-This domain differst from JointDemand in the sense that pure absence
-is taken away, i.e., we deal *only* with non-absent demands.
-
-Note [Strict demands]
-~~~~~~~~~~~~~~~~~~~~~
-isStrictDmd returns true only of demands that are
-   both strict
-   and  used
-In particular, it is False for <HyperStr, Abs>, which can and does
-arise in, say (#7319)
-   f x = raise# <some exception>
-Then 'x' is not used, so f gets strictness <HyperStr,Abs> -> .
-Now the w/w generates
-   fx = let x <HyperStr,Abs> = absentError "unused"
-        in raise <some exception>
-At this point we really don't want to convert to
-   fx = case absentError "unused" of x -> raise <some exception>
-Since the program is going to diverge, this swaps one error for another,
-but it's really a bad idea to *ever* evaluate an absent argument.
-In #7319 we get
-   T7319.exe: Oops!  Entered absent arg w_s1Hd{v} [lid] [base:GHC.Base.String{tc 36u}]
 
 Note [Dealing with call demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -585,9 +523,9 @@ isTopDmd dmd = dmd == topDmd
 isAbsDmd :: Demand -> Bool
 isAbsDmd (n :* _) = isAbs n
 
-isStrictDmd :: Demand -> Bool
--- See Note [Strict demands]
-isStrictDmd (n :* _) = isStrict n
+-- | Not absent and used strictly. See Note [Strict demands]
+isStrUsedDmd :: Demand -> Bool
+isStrUsedDmd (n :* _) = isStrict n && not (isAbs n)
 
 isSeqDmd :: Demand -> Bool
 isSeqDmd (C_11 :* cd) = cd == seqCleanDmd
@@ -610,8 +548,27 @@ seqCleanDemand (Poly _)    = ()
 seqDemandList :: [Demand] -> ()
 seqDemandList = foldr (seq . seqDemand) ()
 
-{- Note [Call demands are relative]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Strict demands]
+~~~~~~~~~~~~~~~~~~~~~~~~
+'isStrUsedDmd' returns true only of demands that are
+   both strict
+   and  used
+In particular, it is False for <B>, which can and does
+arise in, say (#7319)
+   f x = raise# <some exception>
+Then 'x' is not used, so f gets strictness <B> -> .
+Now the w/w generates
+   fx = let x <B> = absentError "unused"
+        in raise <some exception>
+At this point we really don't want to convert to
+   fx = case absentError "unused" of x -> raise <some exception>
+Since the program is going to diverge, this swaps one error for another,
+but it's really a bad idea to *ever* evaluate an absent argument.
+In #7319 we get
+   T7319.exe: Oops!  Entered absent arg w_s1Hd{v} [lid] [base:GHC.Base.String{tc 36u}]
+
+Note [Call demands are relative]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The expression @if b then 0 else f 1 2 + f 3 4@ uses @f@ according to the demand
 @UCU(CS(S(U)))@, meaning
 

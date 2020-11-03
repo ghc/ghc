@@ -329,7 +329,7 @@ addCastTo ai co = ai { ai_args = CastBy co : ai_args ai }
 isStrictArgInfo :: ArgInfo -> Bool
 -- True if the function is strict in the next argument
 isStrictArgInfo (ArgInfo { ai_dmds = dmds })
-  | dmd:_ <- dmds = isStrictDmd dmd
+  | dmd:_ <- dmds = isStrUsedDmd dmd
   | otherwise     = False
 
 argInfoAppArgs :: [ArgSpec] -> [OutExpr]
