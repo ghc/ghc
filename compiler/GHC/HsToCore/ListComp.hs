@@ -9,6 +9,7 @@ Desugaring list comprehensions, monad comprehensions and array comprehensions
 {-# LANGUAGE CPP, NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.HsToCore.ListComp ( dsListComp, dsMonadComp ) where
 
@@ -35,6 +36,7 @@ import GHC.HsToCore.Match
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.TcType
 import GHC.Data.List.SetOps( getNth )
 import GHC.Utils.Misc
@@ -498,6 +500,30 @@ dsMcStmt (LetStmt _ binds) stmts
 dsMcStmt (BindStmt xbs pat rhs) stmts
   = do { rhs' <- dsLExpr rhs
        ; dsMcBindStmt pat rhs' (xbstc_bindOp xbs) (xbstc_failOp xbs) (xbstc_boundResultType xbs) stmts }
+
+dsMcStmt (ApplicativeStmt body_ty args mb_join) stmts = do
+    let (pats, rhss') = unzip (do_arg . snd <$> args)
+        do_arg = \ case
+            ApplicativeArgOne _ pat expr _ -> (pat, dsLExpr expr)
+            ApplicativeArgMany _ stmts ret pat _ ->
+                (pat, dsMonadComp (stmts ++ [noLoc $ LastStmt noExtField (noLoc ret) (Just False) (SyntaxExprTc
+                  { syn_expr = ret
+                  , syn_arg_wraps = []
+                  , syn_res_wrap = WpHole })]))
+    rhss <- sequenceA rhss'
+    body' <- dsLExpr $ noLoc $ HsDo body_ty MonadComp (noLoc stmts)
+    let match_args pat (vs, body) = do
+            var <- selectSimpleMatchVarL Many pat
+            match <- matchSinglePatVar var (StmtCtxt MonadComp) pat body_ty (cantFailMatchResult body)
+            match_code <- dsHandleMonadicFailure pat match Nothing
+            pure (var:vs, match_code)
+    (vars, body) <- foldrM match_args ([], body') pats
+    let fun' = mkLams vars body
+        mk_ap_call l (op, r) = dsSyntaxExpr op [l, r]
+    expr <- foldlM mk_ap_call fun' (fmap fst args `zip` rhss)
+    case mb_join of
+        Nothing -> pure expr
+        Just join_op -> dsSyntaxExpr join_op [expr]
 
 -- Apply `guard` to the `exp` expression
 --
