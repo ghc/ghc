@@ -2942,9 +2942,10 @@ newDynFlags interactive_only minus_opts = do
       when (interactive_only && packageFlagsChanged idflags1 idflags0) $ do
           liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
       -- Load any new plugins
+      GHC.setInteractiveDynFlags idflags1
       hsc_env0 <- GHC.getSession
-      idflags2 <- liftIO (initializePlugins hsc_env0 idflags1)
-      GHC.setInteractiveDynFlags idflags2
+      hsc_env1 <- liftIO (initializePlugins hsc_env0)
+      GHC.setSession hsc_env1
       installInteractivePrint (interactivePrint idflags1) False
 
       dflags0 <- getDynFlags

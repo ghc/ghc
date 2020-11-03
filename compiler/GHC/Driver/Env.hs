@@ -26,7 +26,7 @@ import GHC.Prelude
 
 import GHC.Driver.Ppr
 import GHC.Driver.Session
-import GHC.Unit.Finder.Types
+import {-# SOURCE #-} GHC.Driver.Plugins
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
@@ -39,6 +39,7 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Deps
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.External
+import GHC.Unit.Finder.Types
 
 import GHC.Core         ( CoreRule )
 import GHC.Core.FamInstEnv
@@ -178,6 +179,19 @@ data HscEnv
         , hsc_home_unit :: !HomeUnit
                 -- ^ Home-unit
 
+        , hsc_plugins :: ![LoadedPlugin]
+                -- ^ plugins dynamically loaded after processing arguments. What will be
+                -- loaded here is directed by pluginModNames. Arguments are loaded from
+                -- pluginModNameOpts. The purpose of this field is to cache the plugins so
+                -- they don't have to be loaded each time they are needed.  See
+                -- 'GHC.Runtime.Loader.initializePlugins'.
+
+        , hsc_static_plugins :: ![StaticPlugin]
+                -- ^ static plugins which do not need dynamic loading. These plugins are
+                -- intended to be added by GHC API users directly to this list.
+                --
+                -- To add dynamically loaded plugins through the GHC API see
+                -- 'addPluginModuleName' instead.
  }
 
 {-

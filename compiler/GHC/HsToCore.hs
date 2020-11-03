@@ -198,7 +198,7 @@ deSugar hsc_env
         ; endPassIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
-              pluginModules = map lpModule (cachedPlugins (hsc_dflags hsc_env))
+              pluginModules = map lpModule (hsc_plugins hsc_env)
               home_unit = hsc_home_unit hsc_env
         ; deps <- mkDependencies (homeUnitId home_unit)
                                  (map mi_module pluginModules) tcg_env

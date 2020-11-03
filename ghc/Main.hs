@@ -247,9 +247,8 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
-       DoInteractive          -> ghciUI hsc_env dflags6 srcs Nothing
-       DoEval exprs           -> ghciUI hsc_env dflags6 srcs $ Just $
-                                   reverse exprs
+       DoInteractive          -> ghciUI srcs Nothing
+       DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showUnits dflags6
        DoFrontend f           -> doFrontend f srcs
@@ -257,15 +256,15 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   liftIO $ dumpFinalStats dflags6
 
-ghciUI :: HscEnv -> DynFlags -> [(FilePath, Maybe Phase)] -> Maybe [String]
-       -> Ghc ()
+ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #if !defined(HAVE_INTERNAL_INTERPRETER)
-ghciUI _ _ _ _ =
+ghciUI _ _ =
   throwGhcException (CmdLineError "not built for interactive use")
 #else
-ghciUI hsc_env dflags0 srcs maybe_expr = do
-  dflags1 <- liftIO (initializePlugins hsc_env dflags0)
-  _ <- GHC.setSessionDynFlags dflags1
+ghciUI srcs maybe_expr = do
+  hsc_env <- GHC.getSession
+  hsc_env' <- liftIO (initializePlugins hsc_env)
+  GHC.setSession hsc_env'
   interactiveUI defaultGhciSettings srcs maybe_expr
 #endif
 
