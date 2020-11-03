@@ -546,6 +546,7 @@
       SymI_HasProto(registerCcList)             \
       SymI_HasProto(registerInfoProvList)             \
       SymI_HasProto(registerCcsList)            \
+      SymI_HasProto(lookupIPE)            \
       SymI_HasProto(era)
 #else
 #define RTS_PROF_SYMBOLS /* empty */
@@ -680,6 +681,7 @@
       SymI_HasProto(initLinker_)                                        \
       SymI_HasProto(stg_unpackClosurezh)                                \
       SymI_HasProto(stg_closureSizzezh)                                 \
+      SymI_HasProto(stg_whereFromzh)                                 \
       SymI_HasProto(stg_getApStackValzh)                                \
       SymI_HasProto(stg_getSparkzh)                                     \
       SymI_HasProto(stg_numSparkszh)                                    \

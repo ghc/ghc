@@ -2409,6 +2409,13 @@ stg_closureSizzezh (P_ clos)
     return (len);
 }
 
+stg_whereFromzh (P_ clos)
+{
+    P_ ipe;
+    (ipe) = foreign "C" lookupIPE(UNTAG(clos) "ptr");
+    return (ipe);
+}
+
 /* -----------------------------------------------------------------------------
    Thread I/O blocking primitives
    -------------------------------------------------------------------------- */

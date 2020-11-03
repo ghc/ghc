@@ -20,6 +20,7 @@ module GHC.Stack.CCS (
     -- * Call stacks
     currentCallStack,
     whoCreated,
+    whereFrom,
 
     -- * Internals
     CostCentreStack,
@@ -44,6 +45,7 @@ import GHC.Ptr
 import GHC.Foreign as GHC
 import GHC.IO.Encoding
 import GHC.List ( concatMap, reverse )
+import Prelude (putStrLn, print)
 
 #define PROFILING
 #include "Rts.h"
@@ -135,3 +137,47 @@ whoCreated obj = do
 renderStack :: [String] -> String
 renderStack strs =
   "CallStack (from -prof):" ++ concatMap ("\n  "++) (reverse strs)
+
+-- Static Closure Information
+
+data InfoProv
+data InfoProvEnt
+
+-- | Get the 'InfoProvEnv' associated with the given value.
+getIPE :: a -> IO (Ptr InfoProvEnt)
+getIPE obj = IO $ \s ->
+   case whereFrom## obj s of
+     (## s', addr ##) -> (## s', Ptr addr ##)
+
+ipeProv :: Ptr InfoProvEnt -> Ptr InfoProv
+ipeProv p = p `plusPtr` 8 -- TODO, offset is to the "prov" field  but not sure how to express this
+                          -- (# sizeOf * StgInfoTable)
+
+ipName, ipDesc, ipLabel, ipModule, ipSrcLoc :: Ptr InfoProv -> IO CString
+ipName p   =  (# peek InfoProv, table_name) p
+ipDesc p   =  (# peek InfoProv, closure_desc) p
+ipLabel p  =  (# peek InfoProv, label) p
+ipModule p =  (# peek InfoProv, module) p
+ipSrcLoc p =  (# peek InfoProv, srcloc) p
+
+infoProvToStrings :: Ptr InfoProv -> IO [String]
+infoProvToStrings ip = do
+  name <- GHC.peekCString utf8 =<< ipName ip
+  desc <- GHC.peekCString utf8 =<< ipDesc ip
+  label <- GHC.peekCString utf8 =<< ipLabel ip
+  mod <- GHC.peekCString utf8 =<< ipModule ip
+  loc <- GHC.peekCString utf8 =<< ipSrcLoc ip
+  return [name, desc, label, mod, loc]
+
+-- TODO: Add structured output of whereFrom
+
+whereFrom :: a -> IO [String]
+whereFrom obj = do
+  ipe <- getIPE obj
+  -- The primop returns the null pointer in two situations at the moment
+  -- 1. The lookup fails for whatever reason
+  -- 2. Profiling is not enabled.
+  -- It would be good to distinguish between these two cases somehow.
+  if ipe == nullPtr
+    then return []
+    else infoProvToStrings (ipeProv ipe)

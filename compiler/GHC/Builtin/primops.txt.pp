@@ -3005,6 +3005,15 @@ primop  ClearCCSOp "clearCCS#" GenPrimOp
    out_of_line = True
 
 ------------------------------------------------------------------------
+section "Info Table Origin"
+------------------------------------------------------------------------
+primop WhereFromOp "whereFrom#" GenPrimOp
+   a -> State# s -> (# State# s, Addr# #)
+   { TODO }
+   with
+   out_of_line = True
+
+------------------------------------------------------------------------
 section "Etc"
         {Miscellaneous built-ins}
 ------------------------------------------------------------------------

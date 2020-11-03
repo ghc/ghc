@@ -6,7 +6,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#if defined(PROFILING)
 
 #include "PosixSource.h"
 #include "Rts.h"
@@ -24,6 +23,9 @@
 
 #include <fs_rts.h>
 #include <string.h>
+// TODO: These above includes are only used for lookupIPE when profiling is
+// not enabled.
+#if defined(PROFILING)
 
 #if defined(DEBUG) || defined(PROFILING)
 #include "Trace.h"
@@ -1054,3 +1056,28 @@ debugCCS( CostCentreStack *ccs )
 #endif /* DEBUG */
 
 #endif /* PROFILING */
+
+// MP: TODO: This should not be a linear search, need to improve
+// the IPE_LIST structure
+#if defined(PROFILING)
+InfoProvEnt * lookupIPE(StgClosure *clos)
+{
+    StgInfoTable * info;
+    info = GET_INFO(clos);
+    InfoProvEnt *ip, *next;
+    printf("%p\n", info);
+    printf("%p\n\n", clos);
+    for (ip = IPE_LIST; ip != NULL; ip = next) {
+        if (ip->info == info) {
+            printf("Found %p\n", ip->info);
+            return ip;
+        }
+        next = ip->link;
+    }
+}
+#else
+InfoProvEnt * lookupIPE(StgClosure *info STG_UNUSED)
+{
+    return ;
+}
+#endif
