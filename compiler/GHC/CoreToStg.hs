@@ -925,7 +925,7 @@ lookupBinding env v = case lookupVarEnv env v of
 
 incDc :: DataCon -> CtsM (Maybe Int)
 incDc dc | isUnboxedTupleDataCon dc = return Nothing
-incDc dc = CtsM $ \_ _ -> do
+incDc dc = CtsM $ \dflags _ -> if not (gopt Opt_DistinctConstructorTables dflags) then return Nothing else do
           env <- get
           cc <- ask
           let dcMap' = alterUniqMap (maybe (Just [(0, cc)]) (\xs@((k, _):_) -> Just ((k + 1, cc) : xs))) (provDC env) dc
