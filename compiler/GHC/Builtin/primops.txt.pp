@@ -3458,8 +3458,7 @@ primop PrefetchAddrOp3 "prefetchAddr3#" GenPrimOp
 
 primop PrefetchValueOp3 "prefetchValue3#" GenPrimOp
    a -> State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        has_side_effects =  True
+   with has_side_effects =  True
 ----
 
 primop PrefetchByteArrayOp2 "prefetchByteArray2#" GenPrimOp
@@ -3476,8 +3475,7 @@ primop PrefetchAddrOp2 "prefetchAddr2#" GenPrimOp
 
 primop PrefetchValueOp2 "prefetchValue2#" GenPrimOp
    a ->  State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        has_side_effects =  True
+   with has_side_effects =  True
 ----
 
 primop PrefetchByteArrayOp1 "prefetchByteArray1#" GenPrimOp
@@ -3494,8 +3492,7 @@ primop PrefetchAddrOp1 "prefetchAddr1#" GenPrimOp
 
 primop PrefetchValueOp1 "prefetchValue1#" GenPrimOp
    a -> State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        has_side_effects =  True
+   with has_side_effects =  True
 ----
 
 primop PrefetchByteArrayOp0 "prefetchByteArray0#" GenPrimOp
@@ -3512,8 +3509,7 @@ primop PrefetchAddrOp0 "prefetchAddr0#" GenPrimOp
 
 primop PrefetchValueOp0 "prefetchValue0#" GenPrimOp
    a -> State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        has_side_effects =  True
+   with has_side_effects =  True
 
 ------------------------------------------------------------------------
 ---                                                                  ---
