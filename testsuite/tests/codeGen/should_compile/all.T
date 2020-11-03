@@ -101,3 +101,5 @@ test('T15570',
    compile, ['-Wno-overflowed-literals'])
    # skipped with CmmToC because it generates a warning:
    #   warning: integer constant is so large that it is unsigned
+
+test('T18614', normal, compile, [''])

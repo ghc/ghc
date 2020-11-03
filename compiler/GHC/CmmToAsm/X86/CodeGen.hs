@@ -1052,7 +1052,9 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
     --------------------
     add_code :: Width -> CmmExpr -> CmmExpr -> NatM Register
     add_code rep x (CmmLit (CmmInt y _))
-        | is32BitInteger y = add_int rep x y
+        | is32BitInteger y
+        , rep /= W8 -- LEA doesn't support byte size (#18614)
+        = add_int rep x y
     add_code rep x y = trivialCode rep (ADD format) (Just (ADD format)) x y
       where format = intFormat rep
     -- TODO: There are other interesting patterns we want to replace
@@ -1061,7 +1063,9 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
     --------------------
     sub_code :: Width -> CmmExpr -> CmmExpr -> NatM Register
     sub_code rep x (CmmLit (CmmInt y _))
-        | is32BitInteger (-y) = add_int rep x (-y)
+        | is32BitInteger (-y)
+        , rep /= W8 -- LEA doesn't support byte size (#18614)
+        = add_int rep x (-y)
     sub_code rep x y = trivialCode rep (SUB (intFormat rep)) Nothing x y
 
     -- our three-operand add instruction:
