@@ -218,7 +218,6 @@ import GHC.Unit.Module.Status
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
-import GHC.Types.Name.Set
 import GHC.Unit.Home
 import GHC.Unit.State
 import GHC.Unit.Module.Deps
@@ -1643,7 +1642,7 @@ doCodeGen hsc_env this_mod denv data_tycons
             Stream.mapAccumL_ (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
               <&> first (srtMapNonCAFs . moduleSRTMap)
 
-          return CgInfos{ cgNonCafs = non_cafs, cgLFInfos = lf_infos, cgNameSet = emptyNameSet }
+          return CgInfos{ cgNonCafs = non_cafs, cgLFInfos = lf_infos }
 
         dump2 a = do
           unless (null a) $

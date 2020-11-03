@@ -86,7 +86,6 @@ data CgInfos = CgInfos
       -- either not exported of CAFFY.
   , cgLFInfos :: !ModuleLFInfos
       -- ^ LambdaFormInfos of exported closures in the current module.
-  , cgNameSet :: !NameSet
   }
 
 --------------------------------------------------------------------------------
