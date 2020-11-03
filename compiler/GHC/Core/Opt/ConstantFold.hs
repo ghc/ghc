@@ -199,40 +199,34 @@ primOpRules nm = \case
 
    -- coercions
 
-   Int8ExtendOp   -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
-                                            matchPrimOpId Int8NarrowOp primop_id
-                                            return (Var (mkPrimOpId Narrow8IntOp) `App` e) ]
-   Int16ExtendOp  -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
-                                            matchPrimOpId Int16NarrowOp primop_id
-                                            return (Var (mkPrimOpId Narrow16IntOp) `App` e) ]
-   Int32ExtendOp  -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
-                                            matchPrimOpId Int32NarrowOp primop_id
-                                            return (Var (mkPrimOpId Narrow32IntOp) `App` e) ]
-   Int8NarrowOp   -> mkPrimOpRule nm 1 [ subsumedByPrimOp Int8NarrowOp
+   Int8ExtendOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   Int16ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   Int32ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   Int8NarrowOp   -> mkPrimOpRule nm 1 [ liftLit narrowInt8Lit
+                                       , subsumedByPrimOp Int8NarrowOp
                                        , narrowSubsumesAnd AndIOp Int8NarrowOp 8 ]
-   Int16NarrowOp  -> mkPrimOpRule nm 1 [ subsumedByPrimOp Int8NarrowOp
+   Int16NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowInt16Lit
+                                       , subsumedByPrimOp Int8NarrowOp
                                        , subsumedByPrimOp Int16NarrowOp
                                        , narrowSubsumesAnd AndIOp Int16NarrowOp 16 ]
-   Int32NarrowOp  -> mkPrimOpRule nm 1 [ subsumedByPrimOp Int8NarrowOp
+   Int32NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowInt32Lit
+                                       , subsumedByPrimOp Int8NarrowOp
                                        , subsumedByPrimOp Int16NarrowOp
                                        , subsumedByPrimOp Int32NarrowOp
                                        , narrowSubsumesAnd AndIOp Int32NarrowOp 32 ]
 
-   Word8ExtendOp  -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
-                                            matchPrimOpId Word8NarrowOp primop_id
-                                            return (Var (mkPrimOpId Narrow8WordOp) `App` e) ]
-   Word16ExtendOp -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
-                                            matchPrimOpId Word16NarrowOp primop_id
-                                            return (Var (mkPrimOpId Narrow16WordOp) `App` e) ]
-   Word32ExtendOp -> mkPrimOpRule nm 1 [ do [Var primop_id `App` e] <- getArgs
-                                            matchPrimOpId Word32NarrowOp primop_id
-                                            return (Var (mkPrimOpId Narrow32WordOp) `App` e) ]
-   Word8NarrowOp  -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word8NarrowOp
+   Word8ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit ]
+   Word16ExtendOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit ]
+   Word32ExtendOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit ]
+   Word8NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowWord8Lit
+                                       , subsumedByPrimOp Word8NarrowOp
                                        , narrowSubsumesAnd AndOp Word8NarrowOp 8 ]
-   Word16NarrowOp -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word8NarrowOp
+   Word16NarrowOp -> mkPrimOpRule nm 1 [ liftLit narrowWord16Lit
+                                       , subsumedByPrimOp Word8NarrowOp
                                        , subsumedByPrimOp Word16NarrowOp
                                        , narrowSubsumesAnd AndOp Word16NarrowOp 16 ]
-   Word32NarrowOp -> mkPrimOpRule nm 1 [ subsumedByPrimOp Word8NarrowOp
+   Word32NarrowOp -> mkPrimOpRule nm 1 [ liftLit narrowWord32Lit
+                                       , subsumedByPrimOp Word8NarrowOp
                                        , subsumedByPrimOp Word16NarrowOp
                                        , subsumedByPrimOp Word32NarrowOp
                                        , narrowSubsumesAnd AndOp Word32NarrowOp 32 ]
