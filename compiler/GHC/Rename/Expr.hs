@@ -1,8 +1,10 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -704,12 +706,18 @@ postProcessStmtsForApplicativeDo ctxt stmts
        -- -XApplicativeDo is on.  Also strip out the FreeVars attached
        -- to each Stmt body.
          ado_is_on <- xoptM LangExt.ApplicativeDo
+       ; acomp_is_on <- xoptM LangExt.ApplicativeComprehensions
        ; let is_do_expr | DoExpr{} <- ctxt = True
                         | otherwise = False
+             is_comp = case ctxt of
+                 ListComp -> True
+                 MonadComp -> True
+                 _ -> False
        -- don't apply the transformation inside TH brackets, because
        -- GHC.HsToCore.Quote does not handle ApplicativeDo.
        ; in_th_bracket <- isBrackStage <$> getStage
-       ; if ado_is_on && is_do_expr && not in_th_bracket
+       ; if (ado_is_on && is_do_expr ||
+             acomp_is_on && is_comp) && not in_th_bracket
             then do { traceRn "ppsfa" (ppr stmts)
                     ; rearrangeForApplicativeDo ctxt stmts }
             else noPostProcessStmts ctxt stmts }
@@ -1677,7 +1685,7 @@ stmtTreeToStmts
 -- the bind form, which would give rise to a Monad constraint.
 stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt xbs pat rhs), _))
                 tail _tail_fvs
-  | not (isStrictPattern pat), (False,tail') <- needJoin monad_names tail
+  | not (isStrictPattern pat), (False,tail') <- needJoin ctxt monad_names tail
   -- See Note [ApplicativeDo and strict patterns]
   = mkApplicativeStmt ctxt [ApplicativeArgOne
                             { xarg_app_arg_one = xbsrn_failOp xbs
@@ -1688,7 +1696,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt xbs pat rhs), _))
                       False tail'
 stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ _),_))
                 tail _tail_fvs
-  | (False,tail') <- needJoin monad_names tail
+  | (False,tail') <- needJoin ctxt monad_names tail
   = mkApplicativeStmt ctxt
       [ApplicativeArgOne
        { xarg_app_arg_one = Nothing
@@ -1713,7 +1721,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
      -- See Note [ApplicativeDo and refutable patterns]
          if any hasRefutablePattern stmts'
          then (True, tail)
-         else needJoin monad_names tail
+         else needJoin ctxt monad_names tail
 
    (stmts, fvs) <- mkApplicativeStmt ctxt stmts' need_join tail'
    return (stmts, unionNameSets (fvs:fvss))
@@ -1961,14 +1969,20 @@ mkApplicativeStmt ctxt args need_join body_stmts
 
 -- | Given the statements following an ApplicativeStmt, determine whether
 -- we need a @join@ or not, and remove the @return@ if necessary.
-needJoin :: MonadNames
+needJoin :: HsStmtContext GhcRn
+         -> MonadNames
          -> [ExprLStmt GhcRn]
          -> (Bool, [ExprLStmt GhcRn])
-needJoin _monad_names [] = (False, [])  -- we're in an ApplicativeArg
-needJoin monad_names  [L loc (LastStmt _ e _ t)]
- | Just (arg, wasDollar) <- isReturnApp monad_names e =
-       (False, [L loc (LastStmt noExtField arg (Just wasDollar) t)])
-needJoin _monad_names stmts = (True, stmts)
+needJoin ctxt monad_names = \ case
+    [] -> (False, [])  -- we're in an ApplicativeArg
+    [L loc (LastStmt _ e _ t)]
+      | Just (arg, wasDollar) <- isReturnApp monad_names e ->
+            (False, [L loc (LastStmt noExtField arg (Just wasDollar) t)])
+      | MonadComp <- ctxt ->
+            (False, [L loc (LastStmt noExtField e Nothing $ mkSyntaxExpr $ unLoc $
+                     let name = mkSystemName (getUnique (0 :: Int)) (mkVarOcc "x")
+                     in mkHsLam [nlVarPat name] $ nlHsVar name)])
+    stmts -> (True, stmts)
 
 -- | @(Just e, False)@, if the expression is @return e@
 --   @(Just e, True)@ if the expression is @return $ e@,
