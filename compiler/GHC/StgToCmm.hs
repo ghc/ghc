@@ -263,6 +263,7 @@ cgDataCon mn data_con
                        | ty <- dataConRepArgTys data_con
                        , rep_ty <- typePrimRep (scaledThing ty)
                        , not (isVoidRep rep_ty) ]
+
         ; emitClosureAndInfoTable platform dyn_info_tbl NativeDirectCall [] $
             -- NB: the closure pointer is assumed *untagged* on
             -- entry to a constructor.  If the pointer is tagged,

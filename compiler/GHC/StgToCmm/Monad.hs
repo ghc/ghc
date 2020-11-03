@@ -472,6 +472,7 @@ newUnique = do
         setState $ state { cgs_uniqs = us' }
         return u
 
+------------------
 getInfoDown :: FCode CgInfoDownwards
 getInfoDown = FCode $ \info_down state -> (info_down,state)
 

@@ -95,8 +95,8 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
   gen_code _ closure_label
     | StgApp f [] <- body, null args, isNonRec rec
     = do
-        cg_info <- getCgIdInfo f
-        emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
+         cg_info <- getCgIdInfo f
+         emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
 
   gen_code lf_info _closure_label
    = do { profile <- getProfile
@@ -136,7 +136,7 @@ cgBind (StgNonRec name rhs)
         -- init cannot be used in body, so slightly better to sink it eagerly
 
 cgBind (StgRec pairs)
-  = do  { r <- sequence $ unzipWith cgRhs pairs
+  = do  {  r <- sequence $ unzipWith cgRhs pairs
         ;  let (id_infos, fcodes) = unzip r
         ;  addBindsC id_infos
         ;  (inits, body) <- getCodeR $ sequence fcodes

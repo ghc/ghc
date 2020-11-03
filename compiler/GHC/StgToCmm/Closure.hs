@@ -924,7 +924,7 @@ mkDataConInfoTable profile data_con mn is_static ptr_wds nonptr_wds
         | otherwise                        = ProfilingInfo ty_descr val_descr
 
    ty_descr  = BS8.pack $ occNameString $ getOccName $ dataConTyCon data_con
-   val_descr = BS8.pack $ (occNameString $ getOccName data_con)
+   val_descr = BS8.pack $ occNameString $ getOccName data_con
 
 -- We need a black-hole closure info to pass to @allocDynClosure@ when we
 -- want to allocate the black hole on entry to a CAF.

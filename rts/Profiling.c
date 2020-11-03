@@ -6,8 +6,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
-
 #if defined(PROFILING)
+
 #include "PosixSource.h"
 #include "Rts.h"
 
@@ -56,7 +56,6 @@ CostCentre      *CC_LIST  = NULL;
 // All cost centre stacks temporarily appear here, to be able to make CCS_MAIN a
 // parent of all cost centres stacks (done in initProfiling2()).
 static CostCentreStack *CCS_LIST = NULL;
-
 
 #if defined(THREADED_RTS)
 static Mutex ccs_mutex;
@@ -145,7 +144,6 @@ dumpCostCentresToEventLog(void)
     }
 #endif
 }
-
 
 void initProfiling (void)
 {
