@@ -1270,19 +1270,6 @@ by saying ``-fno-wombat``.
 
     How eager should the compiler be to inline functions?
 
-.. ghc-flag:: -funfolding-keeness-factor=⟨n⟩
-    :shortdesc: *default: 1.5.* Tweak unfolding settings.
-    :type: dynamic
-    :category:
-
-    :default: 1.5
-
-    .. index::
-       single: inlining, controlling
-       single: unfolding, controlling
-
-    How eager should the compiler be to inline functions?
-
 .. ghc-flag:: -funfolding-use-threshold=⟨n⟩
     :shortdesc: *default: 80.* Tweak unfolding settings.
     :type: dynamic
