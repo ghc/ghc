@@ -1,9 +1,12 @@
 module Main where
 
-import GHC.Types.Avail
-import Control.Monad.IO.Class
+import GHC.Driver.Env
 import GHC.Driver.Session
   (getDynFlags, parseDynamicFlagsCmdLine, defaultFatalMessager, defaultFlushOut)
+import GHC.Driver.Plugins
+
+import GHC.Types.Avail
+import Control.Monad.IO.Class
 import GHC
 import GHC.Fingerprint.Type
 import GHC.Hs.Decls
@@ -12,7 +15,6 @@ import GHC.Hs.Expr
 import GHC.Hs.Extension
 import GHC.Hs.ImpExp
 import GHC.Utils.Outputable
-import GHC.Driver.Plugins
 import System.Environment
 import GHC.Tc.Types
 
@@ -65,9 +67,10 @@ main = do
       target <- guessTarget "static-plugins-module.hs" Nothing
       setTargets [target]
 
+      modifySession (\hsc_env -> hsc_env { hsc_static_plugins = the_plugins})
+
       dflags <- getSessionDynFlags
-      setSessionDynFlags dflags { staticPlugins = the_plugins
-                                , outputFile = Nothing }
+      setSessionDynFlags dflags { outputFile = Nothing }
       load LoadAllTargets
 
 
