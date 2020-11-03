@@ -605,7 +605,7 @@ seqDemand (_ :* cd) = seqCleanDemand cd
 seqCleanDemand :: CleanDemand -> ()
 seqCleanDemand (Prod ds)   = seqDemandList ds
 seqCleanDemand (Call _ cd) = seqCleanDemand cd
-seqCleanDemand (Poly _)    = () 
+seqCleanDemand (Poly _)    = ()
 
 seqDemandList :: [Demand] -> ()
 seqDemandList = foldr (seq . seqDemand) ()
