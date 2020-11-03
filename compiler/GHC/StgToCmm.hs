@@ -59,7 +59,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.SysTools.FileCleanup
-import GHC.Types.Unique.FM
 
 import GHC.Data.Stream
 import GHC.Data.OrdList
@@ -70,7 +69,6 @@ import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import GHC.Types.Unique.Map
-import GHC.Driver.Ppr
 
 
 codeGen :: DynFlags
@@ -246,8 +244,7 @@ cgDataCon :: Maybe (Module, Int) -> DataCon -> FCode ()
 cgDataCon _ data_con | isUnboxedTupleDataCon data_con = return ()
 cgDataCon _ data_con | isUnboxedSumDataCon data_con = return ()
 cgDataCon mn data_con
-  = do  { dflags <- getDynFlags
-        ; profile <- getProfile
+  = do  { profile <- getProfile
         ; platform <- getPlatform
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds

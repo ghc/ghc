@@ -52,7 +52,6 @@ import GHC.Data.FastString( mkFastString, fsLit )
 
 import Control.Monad (when)
 import Data.Maybe (isJust)
-import GHC.Utils.Outputable
 import GHC.Utils.Panic( sorry )
 
 -----------------------------------------------------------

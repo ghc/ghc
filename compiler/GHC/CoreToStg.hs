@@ -47,16 +47,12 @@ import GHC.Platform.Ways
 import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Types.Demand    ( isUsedOnce )
-import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
-import GHC.Builtin.PrimOps ( PrimCall(..), primOpWrapperId )
+import GHC.Builtin.PrimOps ( PrimCall(..) )
 import GHC.Builtin.Names   ( unsafeEqualityProofName )
 import GHC.Data.Maybe
 
 import Data.List.NonEmpty (nonEmpty, toList)
 import Control.Monad (ap)
-import Data.List.NonEmpty (nonEmpty, toList)
-import Data.Maybe (fromMaybe)
-import Data.Tuple (swap)
 import qualified Data.Set as Set
 import Control.Monad.Trans.RWS
 import GHC.Types.Unique.Map

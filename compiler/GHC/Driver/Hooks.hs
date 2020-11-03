@@ -67,7 +67,6 @@ import GHCi.RemoteTypes
 
 import GHC.Data.Stream
 import GHC.Data.Bag
-import GHC.Hs.Extension
 import Data.IORef
 
 import Data.Maybe

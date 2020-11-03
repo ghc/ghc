@@ -163,7 +163,6 @@ import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 
-import GHC.Driver.Session
 import GHC.Utils.Error
 import Data.IORef
 
@@ -187,7 +186,6 @@ import GHC.Types.HpcInfo
 
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
-import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Exception
 import GHC.Utils.Misc
