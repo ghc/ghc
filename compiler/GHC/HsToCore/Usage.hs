@@ -37,6 +37,8 @@ import GHC.Unit.Module.Imported
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
+import GHC.Linker.Unit
+
 import GHC.Data.Maybe
 
 import Control.Monad (filterM)

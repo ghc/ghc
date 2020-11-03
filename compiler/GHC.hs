@@ -621,12 +621,6 @@ checkBrokenTablesNextToCode' dflags
 -- read), and prepares the compilers knowledge about packages.  It can
 -- be called again to load new packages: just add new package flags to
 -- (packageFlags dflags).
---
--- Returns a list of new packages that may need to be linked in using
--- the dynamic linker (see 'linkPackages') as a result of new package
--- flags.  If you are not doing linking or doing static linking, you
--- can ignore the list of packages returned.
---
 setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setSessionDynFlags dflags0 = do
   dflags1 <- checkNewDynFlags dflags0
