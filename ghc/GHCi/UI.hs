@@ -81,8 +81,6 @@ import GHC.Unit.Module.ModSummary
 import GHC.Data.StringBuffer
 import GHC.Utils.Outputable
 
-import GHC.Runtime.Loader ( initializePlugins )
-
 -- Other random utilities
 import GHC.Types.Basic hiding ( isTopLevel )
 import GHC.Settings.Config
@@ -2943,10 +2941,7 @@ newDynFlags interactive_only minus_opts = do
 
       when (interactive_only && packageFlagsChanged idflags1 idflags0) $ do
           liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
-      -- Load any new plugins
-      hsc_env0 <- GHC.getSession
-      idflags2 <- liftIO (initializePlugins hsc_env0 idflags1)
-      GHC.setInteractiveDynFlags idflags2
+      GHC.setInteractiveDynFlags idflags1
       installInteractivePrint (interactivePrint idflags1) False
 
       dflags0 <- getDynFlags

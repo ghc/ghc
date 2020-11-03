@@ -69,21 +69,22 @@ import Unsafe.Coerce     ( unsafeCoerce )
 -- flags. Should be called after command line arguments are parsed, but before
 -- actual compilation starts. Idempotent operation. Should be re-called if
 -- pluginModNames or pluginModNameOpts changes.
-initializePlugins :: HscEnv -> DynFlags -> IO DynFlags
-initializePlugins hsc_env df
-  | map lpModuleName (cachedPlugins df)
-         == pluginModNames df -- plugins not changed
-     && all (\p -> paArguments (lpPlugin p)
-                       == argumentsForPlugin p (pluginModNameOpts df))
-            (cachedPlugins df) -- arguments not changed
-  = return df -- no need to reload plugins
+initializePlugins :: HscEnv -> IO HscEnv
+initializePlugins hsc_env
+    -- plugins not changed
+  | map lpModuleName (hsc_plugins hsc_env) == pluginModNames dflags
+   -- arguments not changed
+  , all same_args (hsc_plugins hsc_env)
+  = return hsc_env -- no need to reload plugins
   | otherwise
-  = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
-       let df' = df { cachedPlugins = loadedPlugins }
-       withPlugins df' runDflagsPlugin df'
-
-  where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
-        runDflagsPlugin p opts dynflags = dynflagsPlugin p opts dynflags
+  = do loaded_plugins <- loadPlugins hsc_env
+       let hsc_env' = hsc_env { hsc_plugins = loaded_plugins }
+       withPlugins hsc_env' driverPlugin hsc_env'
+  where
+    plugin_args = pluginModNameOpts dflags
+    same_args p = paArguments (lpPlugin p) == argumentsForPlugin p plugin_args
+    argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
+    dflags = hsc_dflags hsc_env
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env

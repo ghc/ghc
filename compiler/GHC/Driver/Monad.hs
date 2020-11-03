@@ -16,7 +16,8 @@ module GHC.Driver.Monad (
         reflectGhc, reifyGhc,
         getSessionDynFlags,
         liftIO,
-        Session(..), withSession, modifySession, withTempSession,
+        Session(..), withSession, modifySession, modifySessionM,
+        withTempSession,
 
         -- ** Warnings
         logWarnings, printException,
@@ -72,6 +73,13 @@ getSessionDynFlags = withSession (return . hsc_dflags)
 modifySession :: GhcMonad m => (HscEnv -> HscEnv) -> m ()
 modifySession f = do h <- getSession
                      setSession $! f h
+
+-- | Set the current session to the result of applying the current session to
+-- the argument.
+modifySessionM :: GhcMonad m => (HscEnv -> m HscEnv) -> m ()
+modifySessionM f = do h <- getSession
+                      h' <- f h
+                      setSession $! h'
 
 withSavedSession :: GhcMonad m => m a -> m a
 withSavedSession m = do

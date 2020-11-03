@@ -7,7 +7,7 @@ module GHC.Driver.Pipeline.Monad (
   , PhasePlus(..)
   , PipeEnv(..), PipeState(..), PipelineOutput(..)
   , getPipeEnv, getPipeState, setDynFlags, setModLocation, setForeignOs, setIface
-  , pipeStateDynFlags, pipeStateModIface
+  , pipeStateDynFlags, pipeStateModIface, setPlugins
   ) where
 
 import GHC.Prelude
@@ -18,6 +18,7 @@ import GHC.Utils.Outputable
 import GHC.Driver.Session
 import GHC.Driver.Phases
 import GHC.Driver.Env
+import GHC.Driver.Plugins
 
 import GHC.SysTools.FileCleanup (TempFileLifetime)
 
@@ -69,9 +70,9 @@ data PipeEnv = PipeEnv {
 -- PipeState: information that might change during a pipeline run
 data PipeState = PipeState {
        hsc_env   :: HscEnv,
-          -- ^ only the DynFlags change in the HscEnv.  The DynFlags change
-          -- at various points, for example when we read the OPTIONS_GHC
-          -- pragmas in the Cpp phase.
+          -- ^ only the DynFlags and the Plugins change in the HscEnv.  The
+          -- DynFlags change at various points, for example when we read the
+          -- OPTIONS_GHC pragmas in the Cpp phase.
        maybe_loc :: Maybe ModLocation,
           -- ^ the ModLocation.  This is discovered during compilation,
           -- in the Hsc phase where we read the module header.
@@ -116,6 +117,11 @@ instance HasDynFlags CompPipeline where
 setDynFlags :: DynFlags -> CompPipeline ()
 setDynFlags dflags = P $ \_env state ->
   return (state{hsc_env= (hsc_env state){ hsc_dflags = dflags }}, ())
+
+setPlugins :: [LoadedPlugin] -> [StaticPlugin] -> CompPipeline ()
+setPlugins dyn static = P $ \_env state ->
+  let hsc_env' = (hsc_env state){ hsc_plugins = dyn, hsc_static_plugins = static }
+  in return (state{hsc_env = hsc_env'}, ())
 
 setModLocation :: ModLocation -> CompPipeline ()
 setModLocation loc = P $ \_env state ->

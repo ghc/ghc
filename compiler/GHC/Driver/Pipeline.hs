@@ -197,10 +197,12 @@ compileOne' m_tc_result mHscMessage
    debugTraceMsg dflags1 2 (text "compile: input file" <+> text input_fnpp)
 
    -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
-   (status, plugin_dflags) <- hscIncrementalCompile
+   (status, plugin_hsc_env) <- hscIncrementalCompile
                         always_do_basic_recompilation_check
                         m_tc_result mHscMessage
                         hsc_env summary source_modified mb_old_iface (mod_index, nmods)
+   -- Use an HscEnv updated with the plugin info
+   let hsc_env' = plugin_hsc_env
 
    let flags = hsc_dflags hsc_env0
      in do unless (gopt Opt_KeepHiFiles flags) $
@@ -209,10 +211,6 @@ compileOne' m_tc_result mHscMessage
            unless (gopt Opt_KeepOFiles flags) $
                addFilesToClean flags TFL_GhcSession $
                    [ml_obj_file $ ms_location summary]
-
-   -- Use an HscEnv with DynFlags updated with the plugin info (returned from
-   -- hscIncrementalCompile)
-   let hsc_env' = hsc_env{ hsc_dflags = plugin_dflags }
 
    case (status, bcknd) of
         (HscUpToDate iface hmi_details, _) ->
@@ -1259,12 +1257,15 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
-        (result, plugin_dflags) <-
+        (result, plugin_hsc_env) <-
           liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
                             mod_summary source_unchanged Nothing (1,1)
 
-        -- In the rest of the pipeline use the dflags with plugin info
-        setDynFlags plugin_dflags
+        -- In the rest of the pipeline use the loaded plugins
+        setPlugins (hsc_plugins        plugin_hsc_env)
+                   (hsc_static_plugins plugin_hsc_env)
+        -- "driver" plugins may have modified the DynFlags so we update them
+        setDynFlags (hsc_dflags plugin_hsc_env)
 
         return (HscOut src_flavour mod_name result,
                 panic "HscOut doesn't have an input filename")

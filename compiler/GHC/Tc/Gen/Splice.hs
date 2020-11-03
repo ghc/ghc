@@ -932,7 +932,7 @@ runMeta' show_code ppr_hs run_and_convert expr
 
         -- run plugins
         ; hsc_env <- getTopEnv
-        ; expr' <- withPlugins (hsc_dflags hsc_env) spliceRunAction expr
+        ; expr' <- withPlugins hsc_env spliceRunAction expr
 
         -- Desugar
         ; ds_expr <- initDsTc (dsLExpr expr')

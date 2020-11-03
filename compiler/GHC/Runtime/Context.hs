@@ -18,6 +18,7 @@ import GHC.Prelude
 import GHC.Hs
 
 import GHC.Driver.Session
+import {-# SOURCE #-} GHC.Driver.Plugins
 
 import GHC.Runtime.Eval.Types ( Resume )
 
@@ -240,8 +241,12 @@ data InteractiveContext
              -- ^ The function that is used for printing results
              -- of expressions in ghci and -e mode.
 
-         ic_cwd :: Maybe FilePath
-             -- virtual CWD of the program
+         ic_cwd :: Maybe FilePath,
+             -- ^ virtual CWD of the program
+
+         ic_plugins :: ![LoadedPlugin]
+             -- ^ Cache of loaded plugins. We store them here to avoid having to
+             -- load them everytime we switch to the interctive context.
     }
 
 data InteractiveImport
@@ -270,7 +275,9 @@ emptyInteractiveContext dflags
        ic_int_print  = printName,    -- System.IO.print by default
        ic_default    = Nothing,
        ic_resume     = [],
-       ic_cwd        = Nothing }
+       ic_cwd        = Nothing,
+       ic_plugins    = []
+       }
 
 icInteractiveModule :: InteractiveContext -> Module
 icInteractiveModule (InteractiveContext { ic_mod_index = index })

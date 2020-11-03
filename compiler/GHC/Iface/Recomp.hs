@@ -276,16 +276,16 @@ checkVersions hsc_env mod_summary iface
 
 -- | Check if any plugins are requesting recompilation
 checkPlugins :: HscEnv -> ModIface -> IfG RecompileRequired
-checkPlugins hsc iface = liftIO $ do
-  new_fingerprint <- fingerprintPlugins hsc
+checkPlugins hsc_env iface = liftIO $ do
+  new_fingerprint <- fingerprintPlugins hsc_env
   let old_fingerprint = mi_plugin_hash (mi_final_exts iface)
-  pr <- mconcat <$> mapM pluginRecompile' (plugins (hsc_dflags hsc))
+  pr <- mconcat <$> mapM pluginRecompile' (plugins hsc_env)
   return $
     pluginRecompileToRecompileRequired old_fingerprint new_fingerprint pr
 
 fingerprintPlugins :: HscEnv -> IO Fingerprint
 fingerprintPlugins hsc_env =
-  fingerprintPlugins' $ plugins (hsc_dflags hsc_env)
+  fingerprintPlugins' $ plugins hsc_env
 
 fingerprintPlugins' :: [PluginWithArgs] -> IO Fingerprint
 fingerprintPlugins' plugins = do

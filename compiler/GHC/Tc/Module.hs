@@ -326,7 +326,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                         reportUnusedNames tcg_env hsc_src
                       ; -- add extra source files to tcg_dependent_files
                         addDependentFiles src_files
-                      ; tcg_env <- runTypecheckerPlugin mod_sum hsc_env tcg_env
+                      ; tcg_env <- runTypecheckerPlugin mod_sum tcg_env
                       ; -- Dump output and return
                         tcDump tcg_env
                       ; return tcg_env }
@@ -3034,10 +3034,10 @@ Type Checker Plugins
 
 withTcPlugins :: HscEnv -> TcM a -> TcM a
 withTcPlugins hsc_env m =
-  do let plugins = getTcPlugins (hsc_dflags hsc_env)
-     case plugins of
-       [] -> m  -- Common fast case
-       _  -> do ev_binds_var <- newTcEvBinds
+    case getTcPlugins hsc_env of
+       []      -> m  -- Common fast case
+       plugins -> do
+                ev_binds_var <- newTcEvBinds
                 (solvers,stops) <- unzip `fmap` mapM (startPlugin ev_binds_var) plugins
                 -- This ensures that tcPluginStop is called even if a type
                 -- error occurs during compilation (Fix of #10078)
@@ -3052,13 +3052,13 @@ withTcPlugins hsc_env m =
     do s <- runTcPluginM start ev_binds_var
        return (solve s, stop s)
 
-getTcPlugins :: DynFlags -> [GHC.Tc.Utils.Monad.TcPlugin]
-getTcPlugins dflags = catMaybes $ mapPlugins dflags (\p args -> tcPlugin p args)
+getTcPlugins :: HscEnv -> [GHC.Tc.Utils.Monad.TcPlugin]
+getTcPlugins hsc_env = catMaybes $ mapPlugins hsc_env (\p args -> tcPlugin p args)
 
 
 withHoleFitPlugins :: HscEnv -> TcM a -> TcM a
 withHoleFitPlugins hsc_env m =
-  case (getHfPlugins (hsc_dflags hsc_env)) of
+  case getHfPlugins hsc_env of
     [] -> m  -- Common fast case
     plugins -> do (plugins,stops) <- unzip `fmap` mapM startPlugin plugins
                   -- This ensures that hfPluginStop is called even if a type
@@ -3074,18 +3074,19 @@ withHoleFitPlugins hsc_env m =
       do ref <- init
          return (plugin ref, stop ref)
 
-getHfPlugins :: DynFlags -> [HoleFitPluginR]
-getHfPlugins dflags =
-  catMaybes $ mapPlugins dflags (\p args -> holeFitPlugin p args)
+getHfPlugins :: HscEnv -> [HoleFitPluginR]
+getHfPlugins hsc_env =
+  catMaybes $ mapPlugins hsc_env (\p args -> holeFitPlugin p args)
 
 
 runRenamerPlugin :: TcGblEnv
                  -> HsGroup GhcRn
                  -> TcM (TcGblEnv, HsGroup GhcRn)
 runRenamerPlugin gbl_env hs_group = do
-    dflags <- getDynFlags
-    withPlugins dflags
-      (\p opts (e, g) -> ( mark_plugin_unsafe dflags >> renamedResultAction p opts e g))
+    hsc_env <- getTopEnv
+    withPlugins hsc_env
+      (\p opts (e, g) -> ( mark_plugin_unsafe (hsc_dflags hsc_env)
+                            >> renamedResultAction p opts e g))
       (gbl_env, hs_group)
 
 
@@ -3103,11 +3104,11 @@ getRenamedStuff tc_result
                     , tcg_rn_exports tc_result, tcg_doc_hdr tc_result ) )
          (tcg_rn_decls tc_result)
 
-runTypecheckerPlugin :: ModSummary -> HscEnv -> TcGblEnv -> TcM TcGblEnv
-runTypecheckerPlugin sum hsc_env gbl_env = do
-    let dflags = hsc_dflags hsc_env
-    withPlugins dflags
-      (\p opts env -> mark_plugin_unsafe dflags
+runTypecheckerPlugin :: ModSummary -> TcGblEnv -> TcM TcGblEnv
+runTypecheckerPlugin sum gbl_env = do
+    hsc_env <- getTopEnv
+    withPlugins hsc_env
+      (\p opts env -> mark_plugin_unsafe (hsc_dflags hsc_env)
                         >> typeCheckResultAction p opts sum env)
       gbl_env
 

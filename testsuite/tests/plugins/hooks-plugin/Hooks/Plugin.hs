@@ -10,13 +10,17 @@ import GHC.Driver.Hooks
 import GHC.Tc.Utils.Monad
 
 plugin :: Plugin
-plugin = defaultPlugin { dynflagsPlugin = hooksP }
+plugin = defaultPlugin { driverPlugin = hooksP }
 
-hooksP :: [CommandLineOption] -> DynFlags -> IO DynFlags
-hooksP opts dflags = return $ dflags
-  { hooks = (hooks dflags)
-    { runMetaHook = Just (fakeRunMeta opts) }
-  }
+hooksP :: [CommandLineOption] -> HscEnv -> IO HscEnv
+hooksP opts hsc_env = do
+    let dflags  = hsc_dflags hsc_env
+        dflags' = dflags
+            { hooks = (hooks dflags)
+                { runMetaHook = Just (fakeRunMeta opts) }
+            }
+        hsc_env' = hsc_env { hsc_dflags = dflags' }
+    return hsc_env'
 
 -- This meta hook doesn't actually care running code in splices,
 -- it just replaces any expression splice with the "0"

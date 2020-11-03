@@ -433,7 +433,6 @@ loadInterface doc_str mod from
         ; traceIf (text "Considering whether to load" <+> ppr mod <+> ppr from)
 
                 -- Check whether we have the interface already
-        ; dflags <- getDynFlags
         ; hsc_env <- getTopEnv
         ; let home_unit = hsc_home_unit hsc_env
         ; case lookupIfaceByModule hpt (eps_PIT eps) mod of {
@@ -551,7 +550,7 @@ loadInterface doc_str mod from
 
         ; -- invoke plugins with *full* interface, not final_iface, to ensure
           -- that plugins have access to declarations, etc.
-          res <- withPlugins dflags (\p -> interfaceLoadAction p) iface
+          res <- withPlugins hsc_env (\p -> interfaceLoadAction p) iface
         ; return (Succeeded res)
     }}}}
 

@@ -241,18 +241,20 @@ newHscEnv dflags = do
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
     emptyLoader <- uninitializedLoader
-    return HscEnv {  hsc_dflags       = dflags
-                  ,  hsc_targets      = []
-                  ,  hsc_mod_graph    = emptyMG
-                  ,  hsc_IC           = emptyInteractiveContext dflags
-                  ,  hsc_HPT          = emptyHomePackageTable
-                  ,  hsc_EPS          = eps_var
-                  ,  hsc_NC           = nc_var
-                  ,  hsc_FC           = fc_var
-                  ,  hsc_type_env_var = Nothing
-                  ,  hsc_interp       = Nothing
-                  ,  hsc_loader       = emptyLoader
-                  ,  hsc_home_unit    = home_unit
+    return HscEnv {  hsc_dflags         = dflags
+                  ,  hsc_targets        = []
+                  ,  hsc_mod_graph      = emptyMG
+                  ,  hsc_IC             = emptyInteractiveContext dflags
+                  ,  hsc_HPT            = emptyHomePackageTable
+                  ,  hsc_EPS            = eps_var
+                  ,  hsc_NC             = nc_var
+                  ,  hsc_FC             = fc_var
+                  ,  hsc_type_env_var   = Nothing
+                  ,  hsc_interp         = Nothing
+                  ,  hsc_loader         = emptyLoader
+                  ,  hsc_home_unit      = home_unit
+                  ,  hsc_plugins        = []
+                  ,  hsc_static_plugins = []
                   }
 
 -- -----------------------------------------------------------------------------
@@ -454,7 +456,8 @@ hscParse' mod_summary
             -- apply parse transformation of plugins
             let applyPluginAction p opts
                   = parsedResultAction p opts mod_summary
-            withPlugins dflags applyPluginAction res
+            hsc_env <- getHscEnv
+            withPlugins hsc_env applyPluginAction res
 
 
 -- -----------------------------------------------------------------------------
@@ -764,12 +767,11 @@ hscIncrementalCompile :: Bool
                       -> SourceModified
                       -> Maybe ModIface
                       -> (Int,Int)
-                      -> IO (HscStatus, DynFlags)
+                      -> IO (HscStatus, HscEnv)
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
-    dflags <- initializePlugins hsc_env' (hsc_dflags hsc_env')
-    let hsc_env'' = hsc_env' { hsc_dflags = dflags }
+    hsc_env'' <- initializePlugins hsc_env'
 
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
@@ -804,14 +806,14 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 -- any further typechecking.  It's much more useful
                 -- in make mode, since this HMI will go into the HPT.
                 genModDetails hsc_env' iface
-            return (HscUpToDate iface details, dflags)
+            return (HscUpToDate iface details, hsc_env')
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
         -- the same.)
         Right (FrontendTypecheck tc_result, mb_old_hash) -> do
             status <- finish mod_summary tc_result mb_old_hash
-            return (status, dflags)
+            return (status, hsc_env)
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
 -- generate most of the interface as late as possible. This gets us up-to-date

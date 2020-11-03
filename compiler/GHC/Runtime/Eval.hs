@@ -218,11 +218,9 @@ execStmt' stmt stmt_text ExecOptions{..} = do
 
     -- Turn off -fwarn-unused-local-binds when running a statement, to hide
     -- warnings about the implicit bindings we introduce.
-    -- (This is basically `mkInteractiveHscEnv hsc_env`, except we unset
-    -- -wwarn-unused-local-binds)
     let ic       = hsc_IC hsc_env -- use the interactive dflags
         idflags' = ic_dflags ic `wopt_unset` Opt_WarnUnusedLocalBinds
-        hsc_env' = mkInteractiveHscEnv (hsc_env{ hsc_IC = ic{ ic_dflags = idflags' } })
+        hsc_env' = mkInteractiveHscEnv (hsc_env{ hsc_IC = ic{ ic_dflags = idflags' }})
 
     r <- liftIO $ hscParsedStmt hsc_env' stmt
 
