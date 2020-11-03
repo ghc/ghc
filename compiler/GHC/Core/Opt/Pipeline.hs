@@ -97,9 +97,8 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_mask mod
                                     orph_mods print_unqual loc $
                            do { hsc_env' <- getHscEnv
-                              ; dflags' <- liftIO $ initializePlugins hsc_env'
-                                                      (hsc_dflags hsc_env')
-                              ; all_passes <- withPlugins dflags'
+                              ; hsc_env'' <- liftIO $ initializePlugins hsc_env'
+                              ; all_passes <- withPlugins hsc_env''
                                                 installCoreToDos
                                                 builtin_passes
                               ; runCorePasses all_passes guts }
