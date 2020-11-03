@@ -50,7 +50,6 @@ module GHC.Driver.Plugins (
 import GHC.Prelude
 
 import GHC.Driver.Env
-import GHC.Driver.Session
 import GHC.Driver.Monad
 import GHC.Driver.Phases
 
@@ -98,13 +97,14 @@ data Plugin = Plugin {
   , holeFitPlugin :: HoleFitPlugin
     -- ^ An optional plugin to handle hole fits, which may re-order
     --   or change the list of valid hole fits and refinement hole fits.
-  , dynflagsPlugin :: [CommandLineOption] -> DynFlags -> IO DynFlags
-    -- ^ An optional plugin to update 'DynFlags', right after
-    --   plugin loading. This can be used to register hooks
-    --   or tweak any field of 'DynFlags' before doing
-    --   actual work on a module.
+
+  , driverPlugin :: [CommandLineOption] -> HscEnv -> IO HscEnv
+    -- ^ An optional plugin to update 'HscEnv', right after plugin loading. This
+    -- can be used to register hooks or tweak any field of 'DynFlags' before
+    -- doing actual work on a module.
     --
     --   @since 8.10.1
+
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
   , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
@@ -214,7 +214,7 @@ defaultPlugin = Plugin {
         installCoreToDos      = const return
       , tcPlugin              = const Nothing
       , holeFitPlugin         = const Nothing
-      , dynflagsPlugin        = const return
+      , driverPlugin          = const return
       , pluginRecompile       = impurePlugin
       , renamedResultAction   = \_ env grp -> return (env, grp)
       , parsedResultAction    = \_ _ -> return
@@ -242,25 +242,25 @@ keepRenamedSource _ gbl_env group =
 type PluginOperation m a = Plugin -> [CommandLineOption] -> a -> m a
 type ConstPluginOperation m a = Plugin -> [CommandLineOption] -> a -> m ()
 
-plugins :: DynFlags -> [PluginWithArgs]
-plugins df =
-  map lpPlugin (cachedPlugins df) ++
-  map spPlugin (staticPlugins df)
+plugins :: HscEnv -> [PluginWithArgs]
+plugins hsc_env =
+  map lpPlugin (hsc_plugins hsc_env) ++
+  map spPlugin (hsc_static_plugins hsc_env)
 
 -- | Perform an operation by using all of the plugins in turn.
-withPlugins :: Monad m => DynFlags -> PluginOperation m a -> a -> m a
-withPlugins df transformation input = foldM go input (plugins df)
+withPlugins :: Monad m => HscEnv -> PluginOperation m a -> a -> m a
+withPlugins hsc_env transformation input = foldM go input (plugins hsc_env)
   where
     go arg (PluginWithArgs p opts) = transformation p opts arg
 
-mapPlugins :: DynFlags -> (Plugin -> [CommandLineOption] -> a) -> [a]
-mapPlugins df f = map (\(PluginWithArgs p opts) -> f p opts) (plugins df)
+mapPlugins :: HscEnv -> (Plugin -> [CommandLineOption] -> a) -> [a]
+mapPlugins hsc_env f = map (\(PluginWithArgs p opts) -> f p opts) (plugins hsc_env)
 
 -- | Perform a constant operation by using all of the plugins in turn.
-withPlugins_ :: Monad m => DynFlags -> ConstPluginOperation m a -> a -> m ()
-withPlugins_ df transformation input
+withPlugins_ :: Monad m => HscEnv -> ConstPluginOperation m a -> a -> m ()
+withPlugins_ hsc_env transformation input
   = mapM_ (\(PluginWithArgs p opts) -> transformation p opts input)
-          (plugins df)
+          (plugins hsc_env)
 
 type FrontendPluginAction = [String] -> [(String, Maybe Phase)] -> Ghc ()
 data FrontendPlugin = FrontendPlugin {
