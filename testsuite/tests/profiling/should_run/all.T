@@ -150,3 +150,9 @@ test('T15897',
      makefile_test, ['T15897'])
 
 test('T17572', [], compile_and_run, [''])
+
+test('staticcallstack001',
+     # unoptimised results are different w.r.t. CAF attribution
+     [ omit_ways(['ghci-ext-prof']), # produces a different stack
+     ], compile_and_run,
+     ['-O0 -g3'])

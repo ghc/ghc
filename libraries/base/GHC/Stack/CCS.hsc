@@ -150,7 +150,7 @@ getIPE obj = IO $ \s ->
      (## s', addr ##) -> (## s', Ptr addr ##)
 
 ipeProv :: Ptr InfoProvEnt -> Ptr InfoProv
-ipeProv p = p `plusPtr` 8 -- TODO, offset is to the "prov" field  but not sure how to express this
+ipeProv p = p `plusPtr` 8 --(#offsetof InfoProvEnt, prov) -- TODO, offset is to the "prov" field  but not sure how to express this
                           -- (# sizeOf * StgInfoTable)
 
 ipName, ipDesc, ipLabel, ipModule, ipSrcLoc :: Ptr InfoProv -> IO CString

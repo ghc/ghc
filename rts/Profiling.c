@@ -1065,11 +1065,11 @@ InfoProvEnt * lookupIPE(StgClosure *clos)
     StgInfoTable * info;
     info = GET_INFO(clos);
     InfoProvEnt *ip, *next;
-    printf("%p\n", info);
-    printf("%p\n\n", clos);
+    //printf("%p\n", info);
+    //printf("%p\n\n", clos);
     for (ip = IPE_LIST; ip != NULL; ip = next) {
         if (ip->info == info) {
-            printf("Found %p\n", ip->info);
+            //printf("Found %p\n", ip->info);
             return ip;
         }
         next = ip->link;
