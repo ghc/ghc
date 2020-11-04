@@ -1,6 +1,7 @@
 
 T5334.hs:7:5: warning: [-Wmissing-fields (in -Wdefault)]
-    • Fields of ‘T’ not initialised: b
+    • Fields of ‘T’ not initialised:
+        b :: Int
     • In the expression: T {..}
       In an equation for ‘t’:
           t = T {..}
@@ -8,6 +9,7 @@ T5334.hs:7:5: warning: [-Wmissing-fields (in -Wdefault)]
                 a = 1
 
 T5334.hs:14:5: warning: [-Wmissing-fields (in -Wdefault)]
-    • Fields of ‘S’ not initialised: y
+    • Fields of ‘S’ not initialised:
+        y :: Int
     • In the expression: S {x = 1}
       In an equation for ‘s’: s = S {x = 1}
