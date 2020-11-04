@@ -15,24 +15,30 @@
 #include "Arena.h"
 #include "Printer.h"
 #include "Capability.h"
-#include "Trace.h"
 
 #include <fs_rts.h>
 #include <string.h>
 
+
+#if defined(TRACING)
+#include "Trace.h"
+#endif
 
 InfoProvEnt *IPE_LIST = NULL;
 
 void
 dumpIPEToEventLog(void)
 {
+#if defined(TRACING)
     InfoProvEnt *ip, *next;
     for (ip = IPE_LIST; ip != NULL; ip = next) {
         next = ip->link;
         traceIPE(ip->info, ip->prov.table_name, ip->prov.closure_desc, ip->prov.label,
                 ip->prov.module, ip->prov.srcloc);
     }
+#endif
 }
+
 
 /* -----------------------------------------------------------------------------
    Registering IPEs
