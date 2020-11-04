@@ -1629,23 +1629,27 @@ mixedSelectors _ _ = panic "GHC.Tc.Gen.Expr: mixedSelectors emptylists"
 
 missingStrictFields :: ConLike -> [FieldLabelString] -> SDoc
 missingStrictFields con fields
-  = header <> rest
+  = vcat [header, nest 2 rest]
   where
+    pprField f = ppr f <+> text "::" <+> ppr (conLikeFieldType con f)
     rest | null fields = Outputable.empty  -- Happens for non-record constructors
                                            -- with strict fields
-         | otherwise   = colon <+> pprWithCommas ppr fields
+         | otherwise   = vcat (fmap pprField fields)
 
     header = text "Constructor" <+> quotes (ppr con) <+>
-             text "does not have the required strict field(s)"
+             text "does not have the required strict field(s)" <>
+             if null fields then Outputable.empty else colon
 
 missingFields :: ConLike -> [FieldLabelString] -> SDoc
 missingFields con fields
-  = header <> rest
+  = vcat [header, nest 2 rest]
   where
+    pprField f = ppr f <+> text "::" <+> ppr (conLikeFieldType con f)
     rest | null fields = Outputable.empty
-         | otherwise = colon <+> pprWithCommas ppr fields
+         | otherwise   = vcat (fmap pprField fields)
     header = text "Fields of" <+> quotes (ppr con) <+>
-             text "not initialised"
+             text "not initialised" <>
+             if null fields then Outputable.empty else colon
 
 -- callCtxt fun args = text "In the call" <+> parens (ppr (foldl' mkHsApp fun args))
 
