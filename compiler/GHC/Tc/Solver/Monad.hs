@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, DeriveFunctor, TypeFamilies, ScopedTypeVariables #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 
 -- | Type definitions for the constraint solver
 module GHC.Tc.Solver.Monad (
@@ -2131,25 +2131,20 @@ mightMatchLater given_pred given_loc wanted_pred wanted_loc
   | prohibitedSuperClassSolve given_loc wanted_loc
   = False
 
-  | SurelyApart <- tcUnifyTysFG bind_meta_tv flattened_given flattened_wanted
+  | SurelyApart <- tcUnifyTysFG bind_meta_tv [flattened_given] [flattened_wanted]
   = False
 
   | otherwise
   = True   -- safe answer
   where
-    given_in_scope  = mkInScopeSet $ tyCoVarsOfType given_pred
-    wanted_in_scope = mkInScopeSet $ tyCoVarsOfType wanted_pred
+    in_scope  = mkInScopeSet $ tyCoVarsOfTypes [given_pred, wanted_pred]
 
-    (flattened_given, given_vars)
-      | anyFreeVarsOfType isMetaTyVar given_pred
-      = flattenTysX given_in_scope [given_pred]
-      | otherwise
-      = ([given_pred], emptyVarSet)
-
-    (flattened_wanted, wanted_vars)
-      = flattenTysX wanted_in_scope [wanted_pred]
-
-    all_flat_vars = given_vars `unionVarSet` wanted_vars
+    -- NB: flatten both at the same time, so that we can share mappings
+    -- from type family applications to variables, and also to guarantee
+    -- that the fresh variables are really fresh between the given and
+    -- the wanted.
+    ([flattened_given, flattened_wanted], var_mapping)
+      = flattenTysX in_scope [given_pred, wanted_pred]
 
     bind_meta_tv :: TcTyVar -> BindFlag
     -- Any meta tyvar may be unified later, so we treat it as
@@ -2158,12 +2153,17 @@ mightMatchLater given_pred given_loc wanted_pred wanted_loc
     -- something that matches the 'given', until demonstrated
     -- otherwise.  More info in Note [Instance and Given overlap]
     -- in GHC.Tc.Solver.Interact
-    bind_meta_tv tv | isMetaTyVar tv
-                    , not (isCycleBreakerTyVar tv)  = BindMe
-                       -- a cycle-breaker var really stands for a type family
-                       -- application where all variables are skolems
-                    | tv `elemVarSet` all_flat_vars = BindMe
-                    | otherwise                     = Skolem
+    bind_meta_tv tv | is_meta_tv tv = BindMe
+
+                    | Just (_fam_tc, fam_args) <- lookupVarEnv var_mapping tv
+                    , anyFreeVarsOfTypes is_meta_tv fam_args
+                    = BindMe
+
+                    | otherwise     = Skolem
+
+     -- CycleBreakerTvs really stands for a type family application in
+     -- a given; these won't contain touchable meta-variables
+    is_meta_tv = isMetaTyVar <&&> not . isCycleBreakerTyVar
 
 prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
 -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
@@ -2189,30 +2189,21 @@ in the Wanted might be arbitrarily instantiated. We do *not* want
 to allow skolems in the Given to be instantiated. But what about
 type family applications?
 
-We break this down into two cases: a type family application in the
-Given, and a type family application in the Wanted.
+To allow flexibility in how type family applications unify we use
+the Core flattener. See Note [Flattening] in GHC.Core.Unify.
+This is *distinct* from the flattener in GHC.Tc.Solver.Flatten.
+The Core flattener replaces all type family applications with
+fresh variables. The next question: should we allow these fresh
+variables in the domian of a unifying substitution?
 
-* Given: Before ever looking at Wanteds, we process and simplify all
-the Givens. So any type family applications in a Given have already
-been fully reduced. Furthermore, future Wanteds won't rewrite Givens,
-so information we learn later can't come to bear. So we worry about
-reduction of a type family application in a Given only when it has
-an metavariable in it (necessarily unfilled, because these types
-have been zonked before getting here). A Given with a metavariable
-is rare, but it can happen. See typecheck/should_compile/InstanceGivenOverlap2,
-which uses partial type signatures and polykinds to pull it off.
-
-* Wanted: Unlike the Given case, a type family application in a
-Wanted is always a cause for concern. Further information might allow
-it to reduce, so we want to say that a type family application could
-unify with any type.
-
-How we do this: we use the *core* flattener, as defined in the
-flattenTys function. See Note [Flattening] in GHC.Core.Unify. This
-function takes any type family application and turns it into a fresh
-variable. These fresh variables must be flagged with BindMe in the
-bind_meta_tv function, so that the unifier will match them. This
-is the only reason we need to collect them here.
+A type family application that mentions only skolems is settled: any
+skolems would have been rewritten w.r.t. Givens by now. These type
+family applications match only themselves. A type family application
+that mentions metavariables, on the other hand, can match anything.
+So, if the original type family application contains a metavariable,
+we use BindMe to tell the unifier to allow it in the substitution.
+On the other hand, a type family application with only skolems is
+considered rigid.
 
 Note [When does an implication have given equalities?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
