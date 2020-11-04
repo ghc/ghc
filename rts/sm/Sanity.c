@@ -233,6 +233,111 @@ checkClosureProfSanity(const StgClosure *p)
 }
 #endif
 
+/* Note [Racing weak pointer evacuation]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * While debugging a GC crash (#18919) I noticed a spurious crash due to the
+ * end-of-GC sanity check stumbling across a weak pointer with unevacuated key.
+ * This can happen when two GC threads race to evacuate a weak pointer.
+ * Specifically, we start out with a heap with a weak pointer reachable
+ * from both a generation's weak pointer list and some other root-reachable
+ * closure (e.g. a Just constructor):
+ *
+ *            O                      W
+ *            ┌──────────┐           ┌──────────┐
+ * Root ────→ │ Just     │     ╭───→ │ Weak#    │ ←─────── weak_ptr_list
+ * Set        ├──────────┤     │     ├──────────┤
+ *            │          │ ────╯     │ value    │ ─→ ...
+ *            └──────────┘           │ key      │ ───╮    K
+ *                                   │ ...      │    │    ┌──────────┐
+ *                                   └──────────┘    ╰──→ │ ...      │
+ *                                                        ├──────────┤
+ *
+ * The situation proceeds as follows:
+ *
+ * 1. Thread A initiates a GC, wakes up the GC worker threads, and starts
+ *    evacuating roots.
+ * 2. Thread A evacuates a weak pointer object O to location O'.
+ * 3. Thread A fills the block where O' lives and pushes it to its
+ *    work-stealing queue.
+ * 4. Thread B steals the O' block and starts scavenging it.
+ * 5. Thread A enters markWeakPtrList.
+ * 6. Thread A starts evacuating W, resulting in Wb'.
+ * 7. Thread B scavenges O', evacuating W', resulting in Wa'.
+ * 8. Thread A and B are now racing to evacuate W. Only one will win the race
+ *    (due to the CAS in copy_tag). Let the winning copy be called W'.
+ * 9. W will be replaced by a forwarding pointer to the winning copy, W'.
+ * 10. Whichever thread loses the race will retry evacuation, see
+ *     that W has already been evacuated, and proceed as usual.
+ * 10. W' will get added to weak_ptr_list by markWeakPtrList.
+ * 11. Eventually W' will be scavenged.
+ * 12. traverseWeakPtrList will see that W' has been scavenged and evacuate the
+ *     its key.
+ * 13. However, the copy that lost the race is not on `weak_ptr_list`
+ *     and will therefore never get its `key` field scavenged (since
+ *     `traverseWeakPtrList` will never see it).
+ *
+ * Now the heap looks like:
+ *
+ *            O'                     W (from-space)
+ *            ┌──────────┐           ┌──────────┐
+ * Root ────→ │ Just     │           │ Fwd-ptr  │ ───────────╮
+ * Set        ├──────────┤           ├──────────┤            │
+ *            │          │ ────╮     │ value    │ ─→ ...     │
+ *            └──────────┘     │     │ key      │ ────────────────────────╮
+ *                             │     │ ...      │            │            │
+ *                             │     └──────────┘            │            │
+ *                             │                             │            │
+ *                             │     Wa'                     │            │
+ *                             │     ┌──────────┐       ╭────╯            │
+ *                             ╰───→ │ Weak#    │ ←─────┤                 │
+ *                                   ├──────────┤       ╰─ weak_ptr_list  │
+ *                                   │ value    │ ─→ ...                  │
+ *                                   │ key      │ ───╮    K'              │
+ *                                   │ ...      │    │    ┌──────────┐    │
+ *                                   └──────────┘    ╰──→ │ ...      │    │
+ *                                                        ├──────────┤    │
+ *                                   Wb'                                  │
+ *                                   ┌──────────┐                         │
+ *                                   │ Weak#    │                         │
+ *                                   ├──────────┤                         │
+ *                                   │ value    │ ─→ ...                  │
+ *                                   │ key      │ ───╮    K (from-space)  │
+ *                                   │ ...      │    │    ┌──────────┐    │
+ *                                   └──────────┘    ╰──→ │ 0xaaaaa  │ ←──╯
+ *                                                        ├──────────┤
+ *
+ *
+ * Without sanity checking this is fine; we have introduced a spurious copy of
+ * W, Wb' into the heap but it is unreachable and therefore won't cause any
+ * trouble. However, with sanity checking we may encounter this spurious copy
+ * when walking the heap. Moreover, this copy was never added to weak_ptr_list,
+ * meaning that its key field (along with the other fields mark as
+ * non-pointers) will not get scavenged and will therefore point into
+ * from-space.
+ *
+ * To avoid this checkClosure skips over the key field when it sees a weak
+ * pointer. Note that all fields of Wb' *other* than the key field should be
+ * valid, so we don't skip the closure entirely.
+ *
+ * We then do additional checking of all closures on the weak_ptr_lists, where
+ * we *do* check `key`.
+ */
+
+// Check validity of objects on weak_ptr_list.
+// See Note [Racing weak pointer evacuation].
+static void
+checkGenWeakPtrList( uint32_t g )
+{
+  for (StgWeak *w = generations[g].weak_ptr_list; w != NULL; w = w->link) {
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(w));
+    ASSERT(w->header.info == &stg_WEAK_info);
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->key));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->value));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->finalizer));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->cfinalizers));
+  }
+}
+
 // Returns closure size in words
 StgOffset
 checkClosure( const StgClosure* p )
@@ -352,12 +457,9 @@ checkClosure( const StgClosure* p )
        * representative of the actual layout.
        */
       { StgWeak *w = (StgWeak *)p;
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->key));
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->value));
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->finalizer));
-        if (w->link) {
-          ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->link));
-        }
+        // N.B. Checking most of the fields here is not safe.
+        // See Note [Racing weak pointer evacuation] for why.
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->cfinalizers));
         return sizeW_fromITBL(info);
       }
 
@@ -850,6 +952,12 @@ static void checkGeneration (generation *gen,
         checkHeapChain(ws->todo_bd);
         checkHeapChain(ws->part_list);
         checkHeapChain(ws->scavd_list);
+    }
+
+    // Check weak pointer lists
+    // See Note [Racing weak pointer evacuation].
+    for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      checkGenWeakPtrList(g);
     }
 
     checkLargeObjects(gen->large_objects);
