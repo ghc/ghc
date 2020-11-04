@@ -74,6 +74,10 @@
 #  include <mach-o/fat.h>
 #endif
 
+#if defined(x86_64_HOST_ARCH) && defined(darwin_HOST_OS)
+#define ALWAYS_PIC
+#endif
+
 #if defined(dragonfly_HOST_OS)
 #include <sys/tls.h>
 #endif
@@ -199,7 +203,9 @@ static void freeNativeCode_ELF (ObjectCode *nc);
  * We pick a default address based on the OS, but also make this
  * configurable via an RTS flag (+RTS -xm)
  */
-#if defined(MAP_32BIT) || DEFAULT_LINKER_ALWAYS_PIC
+#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
+
+#if defined(MAP_32BIT)
 // Try to use MAP_32BIT
 #define MMAP_32BIT_BASE_DEFAULT 0
 #else
@@ -208,6 +214,7 @@ static void freeNativeCode_ELF (ObjectCode *nc);
 #endif
 
 static void *mmap_32bit_base = (void *)MMAP_32BIT_BASE_DEFAULT;
+#endif
 
 static void ghciRemoveSymbolTable(HashTable *table, const SymbolName* key,
     ObjectCode *owner)
@@ -478,10 +485,12 @@ initLinker_ (int retain_cafs)
     }
 #   endif
 
+#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
     if (RtsFlags.MiscFlags.linkerMemBase != 0) {
         // User-override for mmap_32bit_base
         mmap_32bit_base = (void*)RtsFlags.MiscFlags.linkerMemBase;
     }
+#endif
 
     if (RTS_LINKER_USE_MMAP)
         m32_allocator_init();
@@ -1009,30 +1018,29 @@ mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset)
    void *map_addr = NULL;
    void *result;
    size_t size;
-   uint32_t tryMap32Bit = RtsFlags.MiscFlags.linkerAlwaysPic
-     ? 0
-     : TRY_MAP_32BIT;
    static uint32_t fixed = 0;
 
    IF_DEBUG(linker, debugBelch("mmapForLinker: start\n"));
    size = roundUpToPage(bytes);
 
+#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
 mmap_again:
 
    if (mmap_32bit_base != 0) {
        map_addr = mmap_32bit_base;
    }
+#endif
 
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tprotection %#0x\n",
                        PROT_EXEC | PROT_READ | PROT_WRITE));
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tflags      %#0x\n",
-                       MAP_PRIVATE | tryMap32Bit | fixed | flags));
+                       MAP_PRIVATE | TRY_MAP_32BIT | fixed | flags));
 
    result = mmap(map_addr, size,
                  PROT_EXEC|PROT_READ|PROT_WRITE,
-                 MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
+                 MAP_PRIVATE|TRY_MAP_32BIT|fixed|flags, fd, offset);
 
    if (result == MAP_FAILED) {
        sysErrorBelch("mmap %" FMT_Word " bytes at %p",(W_)size,map_addr);
@@ -1040,9 +1048,8 @@ mmap_again:
        return NULL;
    }
 
-#if defined(x86_64_HOST_ARCH)
-   if (RtsFlags.MiscFlags.linkerAlwaysPic) {
-   } else if (mmap_32bit_base != 0) {
+#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
+   if (mmap_32bit_base != 0) {
        if (result == map_addr) {
            mmap_32bit_base = (StgWord8*)map_addr + size;
        } else {
@@ -1222,10 +1229,10 @@ void freeObjectCode (ObjectCode *oc)
 #if defined(NEED_SYMBOL_EXTRAS) && (!defined(x86_64_HOST_ARCH) \
                                     || !defined(mingw32_HOST_OS))
     if (RTS_LINKER_USE_MMAP) {
-      if (!USE_CONTIGUOUS_MMAP && !RtsFlags.MiscFlags.linkerAlwaysPic &&
-          oc->symbol_extras != NULL) {
-        m32_free(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
-      }
+        if (!USE_CONTIGUOUS_MMAP && oc->symbol_extras != NULL) {
+            m32_free(oc->symbol_extras,
+                    sizeof(SymbolExtra) * oc->n_symbol_extras);
+        }
     }
     else {
         stgFree(oc->symbol_extras);
