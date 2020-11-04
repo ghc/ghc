@@ -152,6 +152,11 @@ Runtime system
 - The output filename used for :ref:`eventlog output <rts-eventlog>` can now be
   specified with the :rts-flag:`-ol` flag.
 
+- A new flag ``-xp`` is added on x86_64. When it is passed, the runtime linker
+  can load object files compiled with ``-fPIC -fexternal-dynamic-refs``
+  anywhere in the address space. This used to be restricted to the low 2Gb.
+
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 

@@ -236,6 +236,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.generate_dump_file      = false;
     RtsFlags.MiscFlags.machineReadable         = false;
     RtsFlags.MiscFlags.internalCounters        = false;
+    RtsFlags.MiscFlags.linkerAlwaysPic         = DEFAULT_LINKER_ALWAYS_PIC;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
 
 #if defined(THREADED_RTS)
@@ -457,6 +458,11 @@ usage_text[] = {
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
 #endif
 #if defined(x86_64_HOST_ARCH)
+#if !DEFAULT_LINKER_ALWAYS_PIC
+"  -xp       Assume that all object files were compiled with -fPIC",
+"            -fexternal-dynamic-refs and load them anywhere in the address",
+"            space",
+#endif
 "  -xm       Base address to mmap memory in the GHCi linker",
 "            (hex; must be <80000000)",
 #endif
@@ -1502,6 +1508,11 @@ error = true;
                     break;
 
 #if defined(x86_64_HOST_ARCH)
+                case 'p': /* linkerAlwaysPic */
+                    OPTION_UNSAFE;
+                    RtsFlags.MiscFlags.linkerAlwaysPic = true;
+                    break;
+
                 case 'm': /* linkerMemBase */
                     OPTION_UNSAFE;
                     if (rts_argv[arg][3] != '\0') {
