@@ -155,7 +155,7 @@ module GHC.Core.Type (
         coVarsOfType,
         coVarsOfTypes,
 
-        anyFreeVarsOfType,
+        anyFreeVarsOfType, anyFreeVarsOfTypes,
         noFreeVarsOfType,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
