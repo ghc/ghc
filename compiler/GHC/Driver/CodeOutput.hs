@@ -346,6 +346,8 @@ ipInitCode used_info dflags this_mod (InfoTableProvMap dcmap closure_map)
 {-
 Note [Mapping Info Tables to Source Positions]
 
+This note describes what the `-finfo-table-map` flag achieves.
+
 When debugging memory issues it is very useful to be able to map a specific closure
 to a position in the source. The prime example is being able to map a THUNK to
 a specific place in the source program, the mapping is usually quite precise because
@@ -361,17 +363,32 @@ various tools.
 
 -- Giving Source Locations to Closures
 
-### Thunks
-### Constructors
+At the moment thunk and constructor closures are added to the map. This information
+is collected in the `InfoTableProvMap` which provides a mapping from:
 
+1. Data constructors to a list of where they are used.
+2. `Name`s and where they originate from.
 
+During the CoreToStg phase, this map is populated whenever something is turned into
+a StgRhsClosure or an StgConApp. The current source position is recorded
+depending on the location indicated by the surrounding SourceNote.
 
+When the -fdistinct-constructor-tables` flag is turned on then every
+usage of a data constructor gets its own distinct info table. This is orchestrated
+in `coreToStgExpr` where an incrementing number is used to distinguish each
+occurrence of a data constructor.
+
+-- StgToCmm
+
+The info tables which are actually used in the generated program are recorded during the
+conversion from STG to Cmm. The used info tables are recorded in the `emitProc` function.
 
 -- Code Generation
 
 After the mapping has been collected during compilation, a C stub is generated which
 creates the static map from info table pointer to the information about where that
-info table was created from.
+info table was created from. This is created by `ipInitCode` in the same manner as a
+C stub is generated for cost centres.
 
 This information can be consumed in two ways.
 
@@ -384,7 +401,7 @@ Note [Distinct Info Tables for Constructors]
 
 In the old times, each usage of a data constructor used the same info table.
 This made it impossible to distinguish which actual usuage of a data constructor was
-contributing primarily to the allocation in a program. Using the TODO flag you
+contributing primarily to the allocation in a program. Using the `-fdistinct-info-tables` flag you
 can cause code generation to generate a distinct info table for each usage of
 a constructor. Then, when inspecting the heap you can see precisely which usage of a constructor
 was responsible for each allocation.
