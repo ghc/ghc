@@ -26,6 +26,7 @@ import GHC.Stg.Lift     ( stgLiftLams )
 import GHC.Unit.Module ( Module )
 
 import GHC.Driver.Session
+import GHC.Driver.Env   ( HscEnv(..) )
 import GHC.Utils.Error
 import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
@@ -47,12 +48,12 @@ instance MonadUnique StgM where
 runStgM :: Char -> StgM a -> IO a
 runStgM mask (StgM m) = evalStateT m mask
 
-stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes to do
+stg2stg :: HscEnv                    -- includes spec of what stg-to-stg passes to do
         -> Module                    -- module being compiled
         -> [StgTopBinding]           -- input program
         -> IO [StgTopBinding]        -- output program
 
-stg2stg dflags this_mod binds
+stg2stg hsc_env this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass dflags "Stg2Stg"
         -- Do the main business!
@@ -72,9 +73,10 @@ stg2stg dflags this_mod binds
    }
 
   where
+    dflags = hsc_dflags hsc_env
     stg_linter unarised
       | gopt Opt_DoStgLinting dflags
-      = lintStgTopBindings dflags this_mod unarised
+      = lintStgTopBindings hsc_env this_mod unarised
       | otherwise
       = \ _whodunnit _binds -> return ()
 
