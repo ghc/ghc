@@ -302,12 +302,6 @@ void traceHeapProfCostCentre(StgWord32 ccID,
                              const char *module,
                              const char *srcloc,
                              StgBool is_caf);
-void traceIPE(StgInfoTable *info,
-               const char *table_name,
-               const char *closure_desc,
-               const char *label,
-               const char *module,
-               const char *srcloc );
 void traceHeapProfSampleCostCentre(StgWord8 profile_id,
                                    CostCentreStack *stack, StgWord residency);
 
@@ -326,6 +320,12 @@ void traceConcUpdRemSetFlush(Capability *cap);
 void traceNonmovingHeapCensus(uint32_t log_blk_size,
                               const struct NonmovingAllocCensus *census);
 
+void traceIPE(StgInfoTable *info,
+               const char *table_name,
+               const char *closure_desc,
+               const char *label,
+               const char *module,
+               const char *srcloc );
 void flushTrace(void);
 
 #else /* !TRACING */
