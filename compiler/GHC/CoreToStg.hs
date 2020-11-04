@@ -925,6 +925,7 @@ lookupBinding env v = case lookupVarEnv env v of
 
 incDc :: DataCon -> CtsM (Maybe Int)
 incDc dc | isUnboxedTupleDataCon dc = return Nothing
+incDc dc | isUnboxedSumDataCon dc = return Nothing
 incDc dc = CtsM $ \dflags _ -> if not (gopt Opt_DistinctConstructorTables dflags) then return Nothing else do
           env <- get
           cc <- ask
