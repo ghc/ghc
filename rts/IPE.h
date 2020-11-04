@@ -9,5 +9,10 @@
 #pragma once
 
 #include <stdio.h>
+#include "Rts.h"
 
-void dumpIPEToEventlog(void);
+#include "BeginPrivate.h"
+
+void dumpIPEToEventLog (void);
+
+#include "EndPrivate.h"
