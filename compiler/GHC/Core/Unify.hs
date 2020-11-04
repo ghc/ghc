@@ -1790,9 +1790,9 @@ flattenTys is defined here because of module dependencies.
 -}
 
 data FlattenEnv
-  = FlattenEnv { fe_type_map :: TypeMap TyVar
+  = FlattenEnv { fe_type_map :: TypeMap (TyVar, TyCon, [Type])
                  -- domain: exactly-saturated type family applications
-                 -- range: fresh variables
+                 -- range: (fresh variable, type family tycon, args)
                , fe_in_scope :: InScopeSet }
                  -- See Note [Flattening]
 
@@ -1808,15 +1808,26 @@ flattenTys :: InScopeSet -> [Type] -> [Type]
 -- See Note [Flattening]
 flattenTys in_scope tys = fst (flattenTysX in_scope tys)
 
-flattenTysX :: InScopeSet -> [Type] -> ([Type], TyVarSet)
+flattenTysX :: InScopeSet -> [Type] -> ([Type], TyVarEnv (TyCon, [Type]))
 -- See Note [Flattening]
 -- NB: the returned types mention the fresh type variables
---     in the returned set. We don't return the
---     mapping from those fresh vars to the ty-fam
---     applications they stand for (we could, but no need)
+--     in the domain of the returned env, whose range includes
+--     the original type family applications. Building a substitution
+--     from this information and applying it would yield the original
+--     types -- almost. The problem is that the original type might
+--     have something like (forall b. F a b); the returned environment
+--     can't really sensibly refer to that b. So it may include a locally-
+--     bound tyvar in its range. Currently, the only usage of this env't
+--     checks whether there are any meta-variables in it
+--     (in GHC.Tc.Solver.Monad.mightMatchLater), so this is all OK.
 flattenTysX in_scope tys
   = let (env, result) = coreFlattenTys emptyTvSubstEnv (emptyFlattenEnv in_scope) tys in
-    (result, foldTM (flip extendVarSet) (fe_type_map env) emptyVarSet)
+    (result, build_env (fe_type_map env))
+  where
+    build_env :: TypeMap (TyVar, TyCon, [Type]) -> TyVarEnv (TyCon, [Type])
+    build_env env_in
+      = foldTM (\(tv, tc, tys) env_out -> extendVarEnv env_out tv (tc, tys))
+               env_in emptyVarEnv
 
 coreFlattenTys :: TvSubstEnv -> FlattenEnv
                -> [Type] -> (FlattenEnv, [Type])
@@ -1899,15 +1910,17 @@ coreFlattenTyFamApp :: TvSubstEnv -> FlattenEnv
                     -> (FlattenEnv, Type)
 coreFlattenTyFamApp tv_subst env fam_tc fam_args
   = case lookupTypeMap type_map fam_ty of
-      Just tv -> (env', mkAppTys (mkTyVarTy tv) leftover_args')
-      Nothing -> let tyvar_name = mkFlattenFreshTyName fam_tc
-                     tv         = uniqAway in_scope $
-                                  mkTyVar tyvar_name (typeKind fam_ty)
+      Just (tv, _, _) -> (env', mkAppTys (mkTyVarTy tv) leftover_args')
+      Nothing ->
+        let tyvar_name = mkFlattenFreshTyName fam_tc
+            tv         = uniqAway in_scope $
+                         mkTyVar tyvar_name (typeKind fam_ty)
 
-                     ty'   = mkAppTys (mkTyVarTy tv) leftover_args'
-                     env'' = env' { fe_type_map = extendTypeMap type_map fam_ty tv
-                                  , fe_in_scope = extendInScopeSet in_scope tv }
-                 in (env'', ty')
+            ty'   = mkAppTys (mkTyVarTy tv) leftover_args'
+            env'' = env' { fe_type_map = extendTypeMap type_map fam_ty
+                                                       (tv, fam_tc, sat_fam_args)
+                         , fe_in_scope = extendInScopeSet in_scope tv }
+        in (env'', ty')
   where
     arity = tyConArity fam_tc
     tcv_subst = TCvSubst (fe_in_scope env) tv_subst emptyVarEnv
