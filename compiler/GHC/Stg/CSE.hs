@@ -310,9 +310,9 @@ stgCseExpr env (StgOpApp op args tys)
   where args' = substArgs env args
 stgCseExpr _ (StgLam _ _)
     = pprPanic "stgCseExp" (text "StgLam")
-stgCseExpr env (StgTick tick body)
+stgCseExpr env (StgTick ty tick body)
     = let body' = stgCseExpr env body
-      in StgTick tick body'
+      in StgTick ty tick body'
 stgCseExpr env (StgCase scrut bndr ty alts)
     = mkStgCase scrut' bndr' ty alts'
   where

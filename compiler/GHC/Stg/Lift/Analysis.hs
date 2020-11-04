@@ -242,8 +242,8 @@ tagSkeletonExpr (StgCase scrut bndr ty alts)
     skel = bothSk scrut_skel (foldr altSk NilSk alt_skels)
     arg_occs = unionVarSets (scrut_arg_occs:alt_arg_occss) `delVarSet` bndr
     bndr' = BoringBinder bndr
-tagSkeletonExpr (StgTick t e)
-  = (skel, arg_occs, StgTick t e')
+tagSkeletonExpr (StgTick ty t e)
+  = (skel, arg_occs, StgTick ty t e')
   where
     (skel, arg_occs, e') = tagSkeletonExpr e
 tagSkeletonExpr (StgLet _ bind body) = tagSkeletonLet False body bind

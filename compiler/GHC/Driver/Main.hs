@@ -1563,8 +1563,12 @@ hscInteractive hsc_env cgguts location = do
     -- Do saturation and convert to A-normal form
     (prepd_binds, _) <- {-# SCC "CorePrep" #-}
                    corePrepPgm hsc_env this_mod location core_binds data_tycons
+
+    (stg_binds, _caf_ccs__caf_cc_stacks)
+      <- {-# SCC "CoreToStg" #-}
+          myCoreToStg dflags this_mod prepd_binds
     -----------------  Generate byte code ------------------
-    comp_bc <- byteCodeGen hsc_env this_mod prepd_binds data_tycons mod_breaks
+    comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
         <- outputForeignStubs dflags this_mod location foreign_stubs
@@ -1834,9 +1838,13 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     (prepd_binds, _) <- {-# SCC "CorePrep" #-}
       liftIO $ corePrepPgm hsc_env this_mod iNTERACTIVELoc core_binds data_tycons
 
+    (stg_binds, _caf_ccs__caf_cc_stacks)
+        <- {-# SCC "CoreToStg" #-}
+           liftIO $ myCoreToStg (hsc_dflags hsc_env) this_mod prepd_binds
+
     {- Generate byte code -}
     cbc <- liftIO $ byteCodeGen hsc_env this_mod
-                                prepd_binds data_tycons mod_breaks
+                                stg_binds data_tycons mod_breaks
 
     let src_span = srcLocSpan interactiveSrcLoc
     liftIO $ loadDecls hsc_env src_span cbc
@@ -1997,9 +2005,14 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
            {- Lint if necessary -}
          ; lintInteractiveExpr (text "hscCompileExpr") hsc_env prepd_expr
 
+         ; ([StgTopLifted (StgNonRec _ stg_expr)], _) <-
+             myCoreToStg (hsc_dflags hsc_env)
+                         (icInteractiveModule (hsc_IC hsc_env))
+                         [NonRec unitDataConId prepd_expr]
+
            {- Convert to BCOs -}
          ; bcos <- coreExprToBCOs hsc_env
-                     (icInteractiveModule (hsc_IC hsc_env)) prepd_expr
+                     (icInteractiveModule (hsc_IC hsc_env)) stg_expr
 
            {- load it -}
          ; loadExpr hsc_env srcspan bcos }

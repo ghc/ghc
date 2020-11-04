@@ -82,7 +82,7 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args _)= cgConApp con args
-cgExpr (StgTick t e)         = cgTick t >> cgExpr e
+cgExpr (StgTick _ t e)       = cgTick t >> cgExpr e
 cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
                                emitReturn [CmmLit cmm_lit]
 

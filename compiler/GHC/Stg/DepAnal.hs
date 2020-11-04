@@ -103,7 +103,7 @@ annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
       binding bounds bs `unionVarSet`
         expr (extendVarSetList bounds (bindersOf bs)) e
 
-    expr bounds (StgTick _ e) =
+    expr bounds (StgTick _ _ e) =
       expr bounds e
 
     alts :: BVs -> [StgAlt] -> FVs

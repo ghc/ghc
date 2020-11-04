@@ -138,7 +138,7 @@ expr env = go
         fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
     go (StgLet ext bind body) = go_bind (StgLet ext) bind body
     go (StgLetNoEscape ext bind body) = go_bind (StgLetNoEscape ext) bind body
-    go (StgTick tick e) = (StgTick tick e', fvs')
+    go (StgTick ty tick e) = (StgTick ty tick e', fvs')
       where
         (e', fvs) = go e
         fvs' = unionDVarSet (tickish tick) fvs
