@@ -1413,31 +1413,6 @@ void postHeapProfCostCentre(StgWord32 ccID,
     postWord8(&eventBuf, is_caf);
     RELEASE_LOCK(&eventBufMutex);
 }
-void postIPE(StgWord64 info,
-             const char *table_name,
-             const char *closure_desc,
-             const char *label,
-             const char *module,
-             const char *srcloc)
-{
-    ACQUIRE_LOCK(&eventBufMutex);
-    StgWord table_name_len = strlen(table_name);
-    StgWord closure_desc_len = strlen(closure_desc);
-    StgWord label_len = strlen(label);
-    StgWord module_len = strlen(module);
-    StgWord srcloc_len = strlen(srcloc);
-    StgWord len = 8+table_name_len+closure_desc_len+label_len+module_len+srcloc_len+3;
-    ensureRoomForVariableEvent(&eventBuf, len);
-    postEventHeader(&eventBuf, EVENT_IPE);
-    postPayloadSize(&eventBuf, len);
-    postWord64(&eventBuf, info);
-    postString(&eventBuf, table_name);
-    postString(&eventBuf, closure_desc);
-    postString(&eventBuf, label);
-    postString(&eventBuf, module);
-    postString(&eventBuf, srcloc);
-    RELEASE_LOCK(&eventBufMutex);
-}
 
 void postHeapProfSampleCostCentre(StgWord8 profile_id,
                                   CostCentreStack *stack,
@@ -1502,6 +1477,32 @@ void postProfBegin(void)
     RELEASE_LOCK(&eventBufMutex);
 }
 #endif /* PROFILING */
+
+void postIPE(StgWord64 info,
+             const char *table_name,
+             const char *closure_desc,
+             const char *label,
+             const char *module,
+             const char *srcloc)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    StgWord table_name_len = strlen(table_name);
+    StgWord closure_desc_len = strlen(closure_desc);
+    StgWord label_len = strlen(label);
+    StgWord module_len = strlen(module);
+    StgWord srcloc_len = strlen(srcloc);
+    StgWord len = 8+table_name_len+closure_desc_len+label_len+module_len+srcloc_len+3;
+    ensureRoomForVariableEvent(&eventBuf, len);
+    postEventHeader(&eventBuf, EVENT_IPE);
+    postPayloadSize(&eventBuf, len);
+    postWord64(&eventBuf, info);
+    postString(&eventBuf, table_name);
+    postString(&eventBuf, closure_desc);
+    postString(&eventBuf, label);
+    postString(&eventBuf, module);
+    postString(&eventBuf, srcloc);
+    RELEASE_LOCK(&eventBufMutex);
+}
 
 void printAndClearEventBuf (EventsBuf *ebuf)
 {
