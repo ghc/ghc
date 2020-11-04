@@ -366,8 +366,8 @@ unariseExpr rho (StgLet ext bind e)
 unariseExpr rho (StgLetNoEscape ext bind e)
   = StgLetNoEscape ext <$> unariseBinding rho bind <*> unariseExpr rho e
 
-unariseExpr rho (StgTick tick e)
-  = StgTick tick <$> unariseExpr rho e
+unariseExpr rho (StgTick ty tick e)
+  = StgTick ty tick <$> unariseExpr rho e
 
 -- Doesn't return void args.
 unariseMulti_maybe :: UnariseEnv -> DataCon -> [InStgArg] -> [Type] -> Maybe [OutStgArg]

@@ -17,21 +17,18 @@ import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHCi.FFI (C_ffi_cif)
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
-import GHC.Core.Ppr
 import GHC.Utils.Outputable
-import GHC.Data.FastString
 import GHC.Types.Name
 import GHC.Types.Unique
-import GHC.Types.Id
-import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.DataCon
-import GHC.Types.Var.Set
 import GHC.Builtin.PrimOps
 import GHC.Runtime.Heap.Layout
 
 import Data.Word
 import GHC.Stack.CCS (CostCentre)
+
+import GHC.Stg.Syntax
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
@@ -45,7 +42,7 @@ data ProtoBCO a
         protoBCOBitmapSize :: Word16,
         protoBCOArity      :: Int,
         -- what the BCO came from, for debugging only
-        protoBCOExpr       :: Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet),
+        protoBCOExpr       :: Either [CgStgAlt] CgStgRhs,
         -- malloc'd pointers
         protoBCOFFIs       :: [FFIInfo]
    }
@@ -192,16 +189,29 @@ instance Outputable a => Outputable (ProtoBCO a) where
                  , protoBCOFFIs       = ffis })
       = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity
                 <+> text (show ffis) <> colon)
+        -- XXX complete this
         $$ nest 3 (case origin of
-                      Left alts -> vcat (zipWith (<+>) (char '{' : repeat (char ';'))
-                                                       (map (pprCoreAltShort.deAnnAlt) alts)) <+> char '}'
-                      Right rhs -> pprCoreExprShort (deAnnotate rhs))
+                      Left _alts -> text "alts" -- vcat (zipWith (<+>) (char '{' : repeat (char ';'))
+                                    --                   (map (ppr{-CoreAltShort.deAnnAlt-}) alts)) <+> char '}'
+                      Right _rhs -> text "rhs" -- ppr{-CoreExprShort-} ({-deAnnotate-} rhs)
+                      )
         $$ nest 3 (text "bitmap: " <+> text (show bsize) <+> ppr bitmap)
         $$ nest 3 (vcat (map ppr instrs))
 
 -- Print enough of the Core expression to enable the reader to find
 -- the expression in the -ddump-prep output.  That is, we need to
 -- include at least a binder.
+
+{-
+XXX complete this
+pprCgStgExprShort :: CgStgExpr -> SDoc
+
+pprCgStgExprShort (StgCase _expr var _ty _alts)
+  = text "case of" <+> ppr var
+pprCgStgExprShort (StgLet _xlet (StgNonRec x _) _)
+  = text "let" <+> ppr x <+> ptext (sLit ("= ... in ..."))
+pprCgStgExprShort (StgLet _xlet (StgRec bs) _)
+  = text "let {" <+> ppr (fst (head bs)) <+> ptext (sLit ("= ...; ... } in ..."))
 
 pprCoreExprShort :: CoreExpr -> SDoc
 pprCoreExprShort expr@(Lam _ _)
@@ -223,6 +233,7 @@ pprCoreExprShort e = pprCoreExpr e
 
 pprCoreAltShort :: CoreAlt -> SDoc
 pprCoreAltShort (con, args, expr) = ppr con <+> sep (map ppr args) <+> text "->" <+> pprCoreExprShort expr
+-}
 
 instance Outputable BCInstr where
    ppr (STKCHECK n)          = text "STKCHECK" <+> ppr n

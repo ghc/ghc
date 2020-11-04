@@ -220,7 +220,7 @@ liftArgs (StgVarArg occ) = do
 
 liftExpr :: LlStgExpr -> LiftM OutStgExpr
 liftExpr (StgLit lit) = pure (StgLit lit)
-liftExpr (StgTick t e) = StgTick t <$> liftExpr e
+liftExpr (StgTick ty t e) = StgTick ty t <$> liftExpr e
 liftExpr (StgApp f args) = do
   f' <- substOcc f
   args' <- traverse liftArgs args

@@ -412,7 +412,7 @@ coreToStgExpr (Tick tick expr)
          SourceNote{} -> return ()
          Breakpoint{} -> panic "coreToStgExpr: breakpoint should not happen"
        expr2 <- coreToStgExpr expr
-       return (StgTick tick expr2)
+       return (StgTick (exprType expr) tick expr2)
 
 coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
@@ -562,8 +562,9 @@ coreToStgApp f args ticks = do
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
 
-        tapp = foldr StgTick app (ticks ++ ticks')
+        tapp = foldr (StgTick res_ty) app (ticks ++ ticks')
 
+    -- XXX check that this doesn't leak
     -- Forcing these fixes a leak in the code generator, noticed while
     -- profiling for trac #4367
     app `seq` return tapp

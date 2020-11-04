@@ -208,7 +208,7 @@ lintStgExpr (StgLetNoEscape _ binds body) = do
       addInScopeVars binders $
         lintStgExpr body
 
-lintStgExpr (StgTick _ expr) = lintStgExpr expr
+lintStgExpr (StgTick _ _ expr) = lintStgExpr expr
 
 lintStgExpr (StgCase scrut bndr alts_type alts) = do
     lintStgExpr scrut
