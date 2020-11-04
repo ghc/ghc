@@ -1502,14 +1502,12 @@ lhsPriority tv
 
 {- Note [TyVar/TyVar orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-"RAE": Update
-
 Given (a ~ b), should we orient the CEqCan as (a~b) or (b~a)?
 This is a surprisingly tricky question! This is invariant (TyEq:TV).
 
-The question is answered by swapOverTyVars, which is use
+The question is answered by swapOverTyVars, which is used
   - in the eager unifier, in GHC.Tc.Utils.Unify.uUnfilledVar1
-  - in the constraint solver, in GHC.Tc.Solver.Canonical.canEqTyVarHomo
+  - in the constraint solver, in GHC.Tc.Solver.Canonical.canEqCanLHS2
 
 First note: only swap if you have to!
    See Note [Avoid unnecessary swaps]
@@ -1529,15 +1527,23 @@ So we look for a positive reason to swap, using a three-step test:
         looks for meta tyvars on the left
 
   Tie-breaking rules for MetaTvs:
-  - TauTv = 3: if we have  tyv_tv ~ tau_tv,
-       put tau_tv on the left because there are fewer
-       restrictions on updating TauTvs.  Or to say it another
-       way, then we won't lose the TyVarTv flag
+  - CycleBreakerTv: This is essentially a stand-in for another type;
+       it's untouchable and should have the same priority as a skolem: 0.
 
-  - TyVarTv = 2: TyVarTvs come next
+  - TyVarTv: These can unify only with another tyvar, but we can't unify
+       a TyVarTv with a TauTv, because then the TyVarTv could (transitively)
+       get a non-tyvar type. So give these a low priority: 1.
+
+  - TauTv: This is the common case; we want these on the left so that they
+       can be written to: 2.
+
+  - RuntimeUnkTv: These aren't really meta-variables used in type inference,
+       but just a convenience in the implementation of the GHCi debugger.
+       Eagerly write to these: 3. See Note [RuntimeUnkTv] in
+       GHC.Runtime.Heap.Inspect.
 
 * Names. If the level and priority comparisons are all
-  equal, try to eliminate a TyVars with a System Name in
+  equal, try to eliminate a TyVar with a System Name in
   favour of ones with a Name derived from a user type signature
 
 * Age.  At one point in the past we tried to break any remaining
