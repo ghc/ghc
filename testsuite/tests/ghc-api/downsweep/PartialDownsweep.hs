@@ -6,7 +6,7 @@
 import GHC
 import GHC.Driver.Make
 import GHC.Driver.Session
-import GHC.Driver.Types
+import GHC.Unit.Module.ModSummary (ExtendedModSummary(..))
 import GHC.Utils.Outputable
 import GHC.Utils.Exception (ExceptionMonad)
 import GHC.Data.Bag
