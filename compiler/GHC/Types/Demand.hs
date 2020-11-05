@@ -157,7 +157,7 @@ addCaseBndrDmd :: Demand    -- On the case binder
 -- See Note [Demand on case-alternative binders]
 addCaseBndrDmd (n :* cd) alt_dmds
   | isAbs n   = alt_dmds
-  | otherwise = zipWith plusDmd alt_dmds ds
+  | otherwise = zipWith plusDmd ds alt_dmds -- fuse ds!
   where
     Just ds = viewProd (length alt_dmds) cd -- Guaranteed not to be a call
 
@@ -466,9 +466,16 @@ mkProd ds@(n:*cd : _)
     want_to_simplify _    = False
 
 viewProd :: Arity -> CleanDemand -> Maybe [Demand]
-viewProd n (Prod ds)     | ds `lengthIs` n = Just ds
-viewProd n (Poly card)                     = Just (replicate n (polyDmd card))
-viewProd _ _                               = Nothing
+-- It's quite important that this function is optimised well;
+-- it is used by lubCleanDmd and plusCleanDmd. Note the strict
+-- application to 'polyDmd':
+viewProd n (Prod ds)   | ds `lengthIs` n = Just ds
+-- Note the strict application to replicate: This makes sure we don't allocate
+-- a thunk for it, inlines it and lets case-of-case fire at call sites.
+viewProd n (Poly card)                   = Just (replicate n $! polyDmd card)
+viewProd _ _                             = Nothing
+{-# INLINE viewProd #-} -- we want to fuse away the replicate and the allocation
+                        -- for Arity. Otherwise, #18304 bites us.
 
 viewCall :: CleanDemand -> Maybe (Card, CleanDemand)
 viewCall (Call n cd)    = Just (n, cd)
@@ -478,7 +485,7 @@ viewCall _              = Nothing
 lubCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
 -- Handle Prod
 lubCleanDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
-  Prod $ zipWith lubDmd ds1 ds2 -- TODO: What about Note [Used should win]?
+  Prod $ zipWith lubDmd ds2 ds2 -- try to fuse with ds2
 -- Handle Call
 lubCleanDmd (Call n1 d1) (viewCall -> Just (n2, d2))
   -- See Note [Call demands are relative]
@@ -497,7 +504,7 @@ lubDmd (n1 :* cd1) (n2 :* cd2) = lubCard n1 n2 :* lubCleanDmd cd1 cd2
 plusCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
 -- Handle Prod
 plusCleanDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
-  Prod $ zipWith plusDmd ds1 ds2
+  Prod $ zipWith plusDmd ds2 ds1 -- try to fuse with ds2
 -- Handle Call
 plusCleanDmd (Call n1 d1) (viewCall -> Just (n2, d2))
   -- See Note [Call demands are relative]
