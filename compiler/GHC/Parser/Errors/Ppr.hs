@@ -263,9 +263,6 @@ pp_err = \case
    ErrIfTheElseInPat
       -> text "(if ... then ... else ...)-syntax in pattern"
 
-   ErrTypeAppInPat
-      -> text "Type applications in patterns are not yet supported"
-
    ErrLambdaCaseInPat
       -> text "(\\case ...)-syntax in pattern"
 

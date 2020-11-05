@@ -175,9 +175,6 @@ data ErrorDesc
    | ErrIfTheElseInPat
       -- ^ If-then-else syntax in pattern
 
-   | ErrTypeAppInPat
-      -- ^ Type-application in pattern
-
    | ErrLambdaCaseInPat
       -- ^ Lambda-case in pattern
 
