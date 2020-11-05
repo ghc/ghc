@@ -16,7 +16,7 @@ module GHC.Data.TrieMap(
    -- * Maps over 'Literal's
    LiteralMap,
    -- * 'TrieMap' class
-   TrieMap(..), insertTM, deleteTM,
+   TrieMap(..), insertTM, deleteTM, foldMapTM,
 
    -- * Things helpful for adding additional Instances.
    (>.>), (|>), (|>>), XT,
@@ -39,6 +39,8 @@ import qualified Data.IntMap as IntMap
 import GHC.Utils.Outputable
 import Control.Monad( (>=>) )
 import Data.Kind( Type )
+
+import qualified Data.Semigroup as S
 
 {-
 This module implements TrieMaps, which are finite mappings
@@ -81,6 +83,9 @@ insertTM k v m = alterTM k (\_ -> Just v) m
 
 deleteTM :: TrieMap m => Key m -> m a -> m a
 deleteTM k m = alterTM k (\_ -> Nothing) m
+
+foldMapTM :: (TrieMap m, Monoid r) => (a -> r) -> m a -> r
+foldMapTM f m = foldTM (\ x r -> f x S.<> r) m mempty
 
 ----------------------
 -- Recall that
@@ -230,6 +235,9 @@ instance TrieMap m => TrieMap (MaybeMap m) where
    foldTM   = fdMaybe
    mapTM    = mapMb
 
+instance TrieMap m => Foldable (MaybeMap m) where
+  foldMap = foldMapTM
+
 mapMb :: TrieMap m => (a->b) -> MaybeMap m a -> MaybeMap m b
 mapMb f (MM { mm_nothing = mn, mm_just = mj })
   = MM { mm_nothing = fmap f mn, mm_just = mapTM f mj }
@@ -267,6 +275,9 @@ instance TrieMap m => TrieMap (ListMap m) where
    alterTM  = xtList alterTM
    foldTM   = fdList
    mapTM    = mapList
+
+instance TrieMap m => Foldable (ListMap m) where
+  foldMap = foldMapTM
 
 instance (TrieMap m, Outputable a) => Outputable (ListMap m a) where
   ppr m = text "List elts" <+> ppr (foldTM (:) m [])
@@ -354,6 +365,9 @@ instance (Eq (Key m), TrieMap m) => TrieMap (GenMap m) where
    alterTM  = xtG
    foldTM   = fdG
    mapTM    = mapG
+
+instance (Eq (Key m), TrieMap m) => Foldable (GenMap m) where
+  foldMap = foldMapTM
 
 --We want to be able to specialize these functions when defining eg
 --tries over (GenMap CoreExpr) which requires INLINEABLE

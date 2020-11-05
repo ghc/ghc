@@ -57,7 +57,7 @@ module GHC.Tc.Solver.Monad (
     -- Inerts
     InertSet(..), InertCans(..), emptyInert,
     updInertTcS, updInertCans, updInertDicts, updInertIrreds,
-    getNoGivenEqs, setInertCans,
+    getHasGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertGivens,
     getInertInsols,
     getTcSInerts, setTcSInerts,
@@ -187,6 +187,7 @@ import Control.Monad
 import GHC.Utils.Monad
 import Data.IORef
 import Data.List ( partition, mapAccumL )
+import qualified Data.Semigroup as S
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
@@ -2049,37 +2050,48 @@ getUnsolvedInerts
 
     is_unsolved ct = not (isGivenCt ct)   -- Wanted or Derived
 
-getNoGivenEqs :: TcLevel          -- TcLevel of this implication
-               -> [TcTyVar]       -- Skolems of this implication
-               -> TcS ( Bool      -- True <=> definitely no residual given equalities
-                      , Cts )     -- Insoluble equalities arising from givens
+getHasGivenEqs :: TcLevel           -- TcLevel of this implication
+               -> TcS ( HasGivenEqs -- are there Given equalities?
+                      , Cts )       -- Insoluble equalities arising from givens
 -- See Note [When does an implication have given equalities?]
-getNoGivenEqs tclvl skol_tvs
+getHasGivenEqs tclvl
   = do { inerts@(IC { inert_eqs = ieqs, inert_funeqs = funeqs, inert_irreds = irreds })
               <- getInertCans
-       ; let has_given_eqs = anyBag is_local_given_ct irreds
-                          || anyDVarEnv is_local_given_equal_ct_list ieqs
-                          || anyFunEqMap funeqs is_local_given_equal_ct_list
+       ; let has_given_eqs = foldMap check_local_given_ct irreds
+                        S.<> foldMap (lift_equal_ct_list check_local_given_tv_eq) ieqs
+                        S.<> foldMapFunEqs (lift_equal_ct_list check_local_given_ct) funeqs
              insols = filterBag insolubleEqCt irreds
                       -- Specifically includes ones that originated in some
                       -- outer context but were refined to an insoluble by
                       -- a local equality; so do /not/ add ct_given_here.
 
-       ; traceTcS "getNoGivenEqs" $
-         vcat [ if has_given_eqs then text "May have given equalities"
-                                 else text "No given equalities"
-              , text "Skols:" <+> ppr skol_tvs
+       ; traceTcS "getHasGivenEqs" $
+         vcat [ text "has_given_eqs:" <+> ppr has_given_eqs
               , text "Inerts:" <+> ppr inerts
               , text "Insols:" <+> ppr insols]
-       ; return (not has_given_eqs, insols) }
+       ; return (has_given_eqs, insols) }
   where
-    is_local_given_ct :: Ct -> Bool
-    is_local_given_ct = (given_here <&&> mentions_outer_var) . ctEvidence
+    check_local_given_ct :: Ct -> HasGivenEqs
+    check_local_given_ct ct
+      | given_here ev = if mentions_outer_var ev then MaybeGivenEqs else LocalGivenEqs
+      | otherwise     = NoGivenEqs
+      where
+        ev = ctEvidence ct
 
-    is_local_given_equal_ct_list :: EqualCtList -> Bool
-    is_local_given_equal_ct_list [ct] = is_local_given_ct ct
-      -- Givens are always singletons in an EqualCtList
-    is_local_given_equal_ct_list _    = False
+    lift_equal_ct_list :: (Ct -> HasGivenEqs) -> EqualCtList -> HasGivenEqs
+    -- returns NoGivenEqs for non-singleton lists, as Given lists are always
+    -- singletons
+    lift_equal_ct_list check [ct] = check ct
+    lift_equal_ct_list _     _    = NoGivenEqs
+
+    check_local_given_tv_eq :: Ct -> HasGivenEqs
+    check_local_given_tv_eq (CEqCan { cc_lhs = TyVarLHS tv, cc_ev = ev})
+      | given_here ev
+      = if is_outer_var tv then MaybeGivenEqs else LocalGivenEqs
+        -- See Note [Let-bound skolems]
+      | otherwise
+      = NoGivenEqs
+    check_local_given_tv_eq other_ct = check_local_given_ct other_ct
 
     given_here :: CtEvidence -> Bool
     -- True for a Given bound by the current implication,
@@ -2205,6 +2217,8 @@ considered rigid.
 
 Note [When does an implication have given equalities?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"RAE": update note
+
 Consider an implication
    beta => alpha ~ Int
 where beta is a unification variable that has already been unified
@@ -2447,6 +2461,9 @@ tcAppMapToBag m = foldTcAppMap consBag m emptyBag
 foldTcAppMap :: (a -> b -> b) -> TcAppMap a -> b -> b
 foldTcAppMap k m z = foldUDFM (foldTM k) z m
 
+foldMapTcAppMap :: Monoid m => (a -> m) -> TcAppMap a -> m
+foldMapTcAppMap f = foldMap (foldMap f)
+
 
 {- *********************************************************************
 *                                                                      *
@@ -2580,14 +2597,8 @@ findFunEqsByTyCon m tc
 foldFunEqs :: (a -> b -> b) -> FunEqMap a -> b -> b
 foldFunEqs = foldTcAppMap
 
-anyFunEqMap :: FunEqMap a -> (a -> Bool) -> Bool
-anyFunEqMap m test = foldFunEqs (\ a b -> b || test a) m False
-
--- mapFunEqs :: (a -> b) -> FunEqMap a -> FunEqMap b
--- mapFunEqs = mapTcApp
-
--- filterFunEqs :: (Ct -> Bool) -> FunEqMap Ct -> FunEqMap Ct
--- filterFunEqs = filterTcAppMap
+foldMapFunEqs :: Monoid m => (a -> m) -> FunEqMap a -> m
+foldMapFunEqs = foldMapTcAppMap
 
 insertFunEq :: FunEqMap a -> TyCon -> [Type] -> a -> FunEqMap a
 insertFunEq m tc tys val = insertTcApp m tc tys val
