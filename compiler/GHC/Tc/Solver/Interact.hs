@@ -1316,16 +1316,12 @@ improveLocalFunEqs work_ev inerts fam_tc args rhs
                                       ctl_depth work_loc }
 
 {- Note [Type inference for type families with injectivity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-"RAE": Update this Note.
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have a type family with an injectivity annotation:
     type family F a b = r | r -> b
 
-Then if we have two CFunEqCan constraints for F with the same RHS
-   F s1 t1 ~ rhs
-   F s2 t2 ~ rhs
-then we can use the injectivity to get a new Derived constraint on
+Then if we have an equality like F s1 t1 ~ F s2 t2,
+we can use the injectivity to get a new Derived constraint on
 the injective argument
   [D] t1 ~ t2
 
@@ -1352,8 +1348,20 @@ We could go further and offer evidence from decomposing injective type-function
 applications, but that would require new evidence forms, and an extension to
 FC, so we don't do that right now (Dec 14).
 
-See also Note [Injective type families] in GHC.Core.TyCon
+We generate these Deriveds in three places, depending on how we notice the
+injectivity.
 
+1. When we have a [W/D] F tys1 ~ F tys2. This is handled in canEqCanLHS2, and
+described in Note [Decomposing equality] in GHC.Tc.Solver.Canonical.
+
+2. When we have [W] F tys1 ~ T and [W] F tys2 ~ T. Note that neither of these
+constraints rewrites the other, as they have different LHSs. This is done
+in improveLocalFunEqs, called during the interactWithInertsStage.
+
+3. When we have [W] F tys ~ T and an equation for F that looks like F tys' = T.
+This is done in improve_top_fun_eqs, called from the top-level reactions stage.
+
+See also Note [Injective type families] in GHC.Core.TyCon
 
 Note [Cache-caused loops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
