@@ -4,5 +4,11 @@ fetchNandTest: OK
 fetchOrTest: OK
 fetchXorTest: OK
 casTest: OK
-casTestAddr: OK
 readWriteTest: OK
+fetchAddSubAddrTest: OK
+fetchAndAddrTest: OK
+fetchNandAddrTest: OK
+fetchOrAddrTest: OK
+fetchXorAddrTest: OK
+casAddrTest: OK
+readWriteAddrTest: OK
