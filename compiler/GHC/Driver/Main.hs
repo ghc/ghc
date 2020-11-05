@@ -1458,7 +1458,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -----------------  Convert to STG ------------------
         (stg_binds, denv, (caf_ccs, caf_cc_stacks))
             <- {-# SCC "CoreToStg" #-}
-               myCoreToStg dflags this_mod prepd_binds
+               myCoreToStg dflags this_mod location prepd_binds
 
         let cost_centre_info =
               (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
@@ -1651,14 +1651,14 @@ doCodeGen hsc_env this_mod denv data_tycons
 
     return (Stream.mapM dump2 pipeline_stream)
 
-myCoreToStg :: DynFlags -> Module -> CoreProgram
+myCoreToStg :: DynFlags -> Module -> ModLocation -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
                   , InfoTableProvMap
                   , CollectedCCs )  -- CAF cost centre info (declared and used)
-myCoreToStg dflags this_mod prepd_binds = do
+myCoreToStg dflags this_mod ml prepd_binds = do
     let (stg_binds, denv, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
-           coreToStg dflags this_mod prepd_binds
+           coreToStg dflags this_mod ml prepd_binds
 
     stg_binds2
         <- {-# SCC "Stg2Stg" #-}

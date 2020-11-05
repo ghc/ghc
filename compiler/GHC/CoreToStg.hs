@@ -57,6 +57,7 @@ import qualified Data.Set as Set
 import Control.Monad.Trans.RWS
 import GHC.Types.Unique.Map
 import GHC.Types.SrcLoc
+import Control.Applicative
 
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -229,13 +230,13 @@ import GHC.Types.SrcLoc
 -- --------------------------------------------------------------
 
 
-coreToStg :: DynFlags -> Module -> CoreProgram
+coreToStg :: DynFlags -> Module -> ModLocation -> CoreProgram
           -> ([StgTopBinding], InfoTableProvMap, CollectedCCs)
-coreToStg dflags this_mod pgm
+coreToStg dflags this_mod ml pgm
   = (pgm', denv, final_ccs)
   where
     (_, denv, (local_ccs, local_cc_stacks), pgm')
-      = coreTopBindsToStg dflags this_mod emptyVarEnv emptyInfoTableProvMap emptyCollectedCCs pgm
+      = coreTopBindsToStg dflags this_mod ml emptyVarEnv emptyInfoTableProvMap emptyCollectedCCs pgm
 
     prof = WayProf `Set.member` ways dflags
 
@@ -252,32 +253,34 @@ coreToStg dflags this_mod pgm
 coreTopBindsToStg
     :: DynFlags
     -> Module
+    -> ModLocation
     -> IdEnv HowBound           -- environment for the bindings
     -> InfoTableProvMap
     -> CollectedCCs
     -> CoreProgram
     -> (IdEnv HowBound, InfoTableProvMap,CollectedCCs, [StgTopBinding])
 
-coreTopBindsToStg _      _        env denv ccs []
+coreTopBindsToStg _      _  _    env denv ccs []
   = (env, denv, ccs, [])
-coreTopBindsToStg dflags this_mod env denv ccs (b:bs)
+coreTopBindsToStg dflags this_mod ml env denv ccs (b:bs)
   = (env2, denv2, ccs2, b':bs')
   where
         (env1, denv1, ccs1, b' ) =
-          coreTopBindToStg dflags this_mod env denv ccs b
+          coreTopBindToStg dflags this_mod ml env denv ccs b
         (env2, denv2, ccs2, bs') =
-          coreTopBindsToStg dflags this_mod env1 denv1 ccs1 bs
+          coreTopBindsToStg dflags this_mod ml env1 denv1 ccs1 bs
 
 coreTopBindToStg
         :: DynFlags
         -> Module
+        -> ModLocation
         -> IdEnv HowBound
         -> InfoTableProvMap
         -> CollectedCCs
         -> CoreBind
         -> (IdEnv HowBound, InfoTableProvMap, CollectedCCs, StgTopBinding)
 
-coreTopBindToStg _ _ env dcenv ccs (NonRec id e)
+coreTopBindToStg _ _ _ env dcenv ccs (NonRec id e)
   | Just str <- exprIsTickedString_maybe e
   -- top-level string literal
   -- See Note [Core top-level string literals] in GHC.Core
@@ -286,13 +289,13 @@ coreTopBindToStg _ _ env dcenv ccs (NonRec id e)
         how_bound = LetBound TopLet 0
     in (env', dcenv, ccs, StgTopStringLit id str)
 
-coreTopBindToStg dflags this_mod env dcenv ccs (NonRec id rhs)
+coreTopBindToStg dflags this_mod ml env dcenv ccs (NonRec id rhs)
   = let
         env'      = extendVarEnv env id how_bound
         how_bound = LetBound TopLet $! manifestArity rhs
 
         ((stg_rhs, ccs'), denv) =
-            initCts dflags env dcenv $
+            initCts dflags ml env dcenv $
               coreToTopStgRhs dflags ccs this_mod (id,rhs)
 
         bind = StgTopLifted $ StgNonRec id stg_rhs
@@ -303,7 +306,7 @@ coreTopBindToStg dflags this_mod env dcenv ccs (NonRec id rhs)
       --     assertion again!
     (env', denv, ccs', bind)
 
-coreTopBindToStg dflags this_mod env dcenv ccs (Rec pairs)
+coreTopBindToStg dflags this_mod ml env dcenv ccs (Rec pairs)
   = ASSERT( not (null pairs) )
     let
         binders = map fst pairs
@@ -314,7 +317,7 @@ coreTopBindToStg dflags this_mod env dcenv ccs (Rec pairs)
 
         -- generate StgTopBindings and CAF cost centres created for CAFs
         ((ccs', stg_rhss), dcenv')
-          = initCts dflags env' dcenv $ do
+          = initCts dflags ml env' dcenv $ do
                mapAccumLM (\ccs rhs -> do
                             (rhs', ccs') <-
                               coreToTopStgRhs dflags ccs this_mod rhs
@@ -340,8 +343,14 @@ coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
                mkTopStgRhs dflags this_mod ccs bndr new_rhs
              stg_arity =
                stgRhsArity stg_rhs
+
+       ; modLoc <- ctsModLocation
+       ; let
+            thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
+            best_span = quickSourcePos thisFile new_rhs
        ; case stg_rhs of
-            StgRhsClosure {} -> recordStgIdPosition bndr (((, occNameString (getOccName bndr))) <$> (srcSpanToRealSrcSpan (nameSrcSpan (getName bndr))))
+            StgRhsClosure {} ->
+              recordStgIdPosition bndr best_span (((, occNameString (getOccName bndr))) <$> (srcSpanToRealSrcSpan (nameSrcSpan (getName bndr))))
             _ -> return ()
        ; return (ASSERT2( arity_ok stg_arity, mk_arity_msg stg_arity) stg_rhs,
                  ccs') }
@@ -686,16 +695,23 @@ coreToStgRhs :: (Id,CoreExpr)
 
 coreToStgRhs (bndr, rhs) = do
     new_rhs <- coreToStgExpr rhs
+    modLoc <- ctsModLocation
+    let
+        thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
+        best_span = quickSourcePos thisFile new_rhs
     let new_stg_rhs = (mkStgRhs bndr new_rhs)
     case new_stg_rhs of
-      StgRhsClosure {} -> recordStgIdPosition bndr (((, occNameString (getOccName bndr))) <$> (srcSpanToRealSrcSpan (nameSrcSpan (getName bndr))))
+      StgRhsClosure {} ->
+        recordStgIdPosition bndr best_span (((, occNameString (getOccName bndr))) <$> (srcSpanToRealSrcSpan (nameSrcSpan (getName bndr))))
       _ -> return ()
     return new_stg_rhs
 
 
-_quickSourcePos :: Expr b -> Maybe (RealSrcSpan, String)
-_quickSourcePos (Tick (SourceNote ss m) _) =  Just (ss, m)
-_quickSourcePos _ = Nothing
+quickSourcePos :: FastString -> StgExpr -> Maybe (RealSrcSpan, String)
+quickSourcePos cur_mod (StgTick (SourceNote ss m) e)
+  | srcSpanFile ss == cur_mod = Just (ss, m)
+  | otherwise = quickSourcePos cur_mod e
+quickSourcePos _ _ = Nothing
 
 -- Generate a top-level RHS. Any new cost centres generated for CAFs will be
 -- appended to `CollectedCCs` argument.
@@ -841,6 +857,7 @@ isPAP env _               = False
 
 newtype CtsM a = CtsM
     { unCtsM :: DynFlags -- Needed for checking for bad coercions in coreToStgArgs
+             -> ModLocation
              -> IdEnv HowBound
              -> RWS (Maybe (RealSrcSpan, String)) () InfoTableProvMap a
     }
@@ -878,9 +895,9 @@ data LetInfo
 
 -- The std monad functions:
 
-initCts :: DynFlags -> IdEnv HowBound -> InfoTableProvMap -> CtsM a -> (a, InfoTableProvMap)
-initCts dflags env u m =
-  let (a, d, ()) = runRWS (unCtsM m dflags env) Nothing u
+initCts :: DynFlags -> ModLocation -> IdEnv HowBound -> InfoTableProvMap -> CtsM a -> (a, InfoTableProvMap)
+initCts dflags ml env u m =
+  let (a, d, ()) = runRWS (unCtsM m dflags ml env) Nothing u
   in (a, d)
 
 
@@ -889,13 +906,13 @@ initCts dflags env u m =
 {-# INLINE returnCts #-}
 
 returnCts :: a -> CtsM a
-returnCts e = CtsM $ \_ _ -> return  e
+returnCts e = CtsM $ \_ _ _ -> return  e
 
 thenCts :: CtsM a -> (a -> CtsM b) -> CtsM b
-thenCts m k = CtsM $ \dflags env
+thenCts m k = CtsM $ \dflags ml env
   -> do
-    a <- (unCtsM m dflags env)
-    unCtsM (k a) dflags env
+    a <- (unCtsM m dflags ml env)
+    unCtsM (k a) dflags ml env
 
 
 instance Applicative CtsM where
@@ -906,17 +923,17 @@ instance Monad CtsM where
     (>>=)  = thenCts
 
 instance HasDynFlags CtsM where
-    getDynFlags = CtsM $ \dflags _ -> return dflags
+    getDynFlags = CtsM $ \dflags _ _ -> return dflags
 
 -- Functions specific to this monad:
 
 extendVarEnvCts :: [(Id, HowBound)] -> CtsM a -> CtsM a
 extendVarEnvCts ids_w_howbound expr
-   =    CtsM $   \dflags env
-   -> unCtsM expr dflags (extendVarEnvList env ids_w_howbound)
+   =    CtsM $   \dflags ml env
+   -> unCtsM expr dflags ml (extendVarEnvList env ids_w_howbound)
 
 lookupVarCts :: Id -> CtsM HowBound
-lookupVarCts v = CtsM $ \_ env -> return $ lookupBinding env v
+lookupVarCts v = CtsM $ \_ _ env -> return $ lookupBinding env v
 
 lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
@@ -926,7 +943,7 @@ lookupBinding env v = case lookupVarEnv env v of
 incDc :: DataCon -> CtsM (Maybe Int)
 incDc dc | isUnboxedTupleDataCon dc = return Nothing
 incDc dc | isUnboxedSumDataCon dc = return Nothing
-incDc dc = CtsM $ \dflags _ -> if not (gopt Opt_DistinctConstructorTables dflags) then return Nothing else do
+incDc dc = CtsM $ \dflags _ _ -> if not (gopt Opt_DistinctConstructorTables dflags) then return Nothing else do
           env <- get
           cc <- ask
           let dcMap' = alterUniqMap (maybe (Just [(0, cc)]) (\xs@((k, _):_) -> Just ((k + 1, cc) : xs))) (provDC env) dc
@@ -934,16 +951,19 @@ incDc dc = CtsM $ \dflags _ -> if not (gopt Opt_DistinctConstructorTables dflags
           let r = lookupUniqMap dcMap' dc
           return (fst . head <$> r)
 
-recordStgIdPosition :: Id -> Maybe (RealSrcSpan, String) -> CtsM ()
-recordStgIdPosition id ss = CtsM $ \_ _ -> do
+recordStgIdPosition :: Id -> Maybe (RealSrcSpan, String) -> Maybe (RealSrcSpan, String) -> CtsM ()
+recordStgIdPosition id best_span ss = CtsM $ \_ _ _ -> do
   cc <- ask
   --pprTraceM "recordStgIdPosition" (ppr id $$ ppr cc $$ ppr ss)
-  case firstJust ss cc of
+  case best_span <|> ss <|> cc of
     Nothing -> return ()
     Just r -> modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) r})
 
 withSpan :: (RealSrcSpan, String) -> CtsM a -> CtsM a
-withSpan s (CtsM act) = CtsM (\a b -> local (const $ Just s) (act a b))
+withSpan s (CtsM act) = CtsM (\a b c -> local (const $ Just s) (act a b c))
+
+ctsModLocation :: CtsM ModLocation
+ctsModLocation = CtsM (\_ ml _ -> return ml)
 
 getAllCAFsCC :: Module -> (CostCentre, CostCentreStack)
 getAllCAFsCC this_mod =
