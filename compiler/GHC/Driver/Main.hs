@@ -1342,14 +1342,18 @@ hscGetSafeMode tcg_env = do
 -- Simplifiers
 --------------------------------------------------------------
 
+-- | Run Core2Core simplifier. The list of String is a list of (Core) plugin
+-- module names added via TH (cf 'addCorePlugin').
 hscSimplify :: HscEnv -> [String] -> ModGuts -> IO ModGuts
 hscSimplify hsc_env plugins modguts =
     runHsc hsc_env $ hscSimplify' plugins modguts
 
+-- | Run Core2Core simplifier. The list of String is a list of (Core) plugin
+-- module names added via TH (cf 'addCorePlugin').
 hscSimplify' :: [String] -> ModGuts -> Hsc ModGuts
 hscSimplify' plugins ds_result = do
     hsc_env <- getHscEnv
-    let hsc_env_with_plugins = hsc_env
+    hsc_env_with_plugins <- liftIO $ initializePlugins $ hsc_env
           { hsc_dflags = foldr addPluginModuleName (hsc_dflags hsc_env) plugins
           }
     {-# SCC "Core2Core" #-}
