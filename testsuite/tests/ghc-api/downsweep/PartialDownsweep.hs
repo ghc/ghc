@@ -6,7 +6,6 @@
 import GHC
 import GHC.Driver.Make
 import GHC.Driver.Session
-import GHC.Driver.Types
 import GHC.Utils.Outputable
 import GHC.Utils.Exception (ExceptionMonad)
 import GHC.Data.Bag
@@ -170,7 +169,7 @@ go label mods cnd =
     -- liftIO $ hPutStrLn stderr $ showSDoc (hsc_dflags hsc_env) $ ppr $ rights emss
     -- liftIO $ hPrint stderr $ bagToList $ unionManyBags $ lefts emss
 
-    it label $ cnd (map emsModSummary (rights emss))
+    it label $ cnd (rights emss)
 
 
 writeMod :: [String] -> IO ()

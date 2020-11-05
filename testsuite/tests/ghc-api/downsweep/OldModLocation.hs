@@ -3,7 +3,7 @@
 import GHC
 import GHC.Driver.Make
 import GHC.Driver.Session
-import GHC.Driver.Finder
+import GHC.Unit.Finder
 
 import Control.Monad.IO.Class (liftIO)
 import Data.List (sort, stripPrefix)
@@ -54,7 +54,7 @@ main = do
     -- using the 'location' parameter we'd end up using the old location of
     -- the "B" module in this test. Make sure that doesn't happen.
 
-    hPrint stderr $ sort (map (ml_hs_file . ms_location) (map emsModSummary (rights emss)))
+    hPrint stderr $ sort (map (ml_hs_file . ms_location) (rights emss))
 
 writeMod :: [String] -> IO ()
 writeMod src@(head -> stripPrefix "module " -> Just (takeWhile (/=' ') -> mod))
