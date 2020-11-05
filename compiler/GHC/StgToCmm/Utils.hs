@@ -638,8 +638,8 @@ convertClosureMap defns this_mod denv =
     let cl = cit_lbl cmit
         cn  = rtsClosureType (cit_rep cmit)
     n <- hasHaskellName cl
-    (ss, l) <- lookupUniqMap denv n
-    return (InfoTableEnt cl cn (this_mod, ss, l))) defns
+    (ty, ss, l) <- lookupUniqMap denv n
+    return (InfoTableEnt cl cn ty (this_mod, ss, l))) defns
 
 convertDCMap :: Module -> DCMap -> [InfoTableEnt]
 convertDCMap this_mod (UniqMap denv) =
@@ -648,4 +648,4 @@ convertDCMap this_mod (UniqMap denv) =
         Nothing -> Nothing
         Just (ss, l) -> Just $
           InfoTableEnt (mkConInfoTableLabel (dataConName dc) (Just (this_mod, k)))
-                       0 (this_mod, ss, l)) ns) (nonDetEltsUFM denv)
+                       0 "" (this_mod, ss, l)) ns) (nonDetEltsUFM denv)

@@ -641,12 +641,13 @@ void traceHeapProfSampleString(StgWord8 profile_id,
 void traceIPE(StgInfoTable * info,
               const char *table_name,
               const char *closure_desc,
+              const char *ty_desc,
               const char *label,
               const char *module,
               const char *srcloc )
 {
     if (eventlog_enabled) {
-        postIPE(INFO_PTR_TO_STRUCT(info), table_name, closure_desc, label, module, srcloc);
+        postIPE(INFO_PTR_TO_STRUCT(info), table_name, closure_desc, ty_desc, label, module, srcloc);
     }
 }
 

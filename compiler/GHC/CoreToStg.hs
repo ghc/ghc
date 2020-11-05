@@ -952,12 +952,13 @@ incDc dc = CtsM $ \dflags _ _ -> if not (gopt Opt_DistinctConstructorTables dfla
           return (fst . head <$> r)
 
 recordStgIdPosition :: Id -> Maybe (RealSrcSpan, String) -> Maybe (RealSrcSpan, String) -> CtsM ()
-recordStgIdPosition id best_span ss = CtsM $ \_ _ _ -> do
+recordStgIdPosition id best_span ss = CtsM $ \dflags _ _ -> do
   cc <- ask
+  let tyString = showPpr dflags (idType id)
   --pprTraceM "recordStgIdPosition" (ppr id $$ ppr cc $$ ppr ss)
   case best_span <|> ss <|> cc of
     Nothing -> return ()
-    Just r -> modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) r})
+    Just (rss, d) -> modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (tyString, rss, d)})
 
 withSpan :: (RealSrcSpan, String) -> CtsM a -> CtsM a
 withSpan s (CtsM act) = CtsM (\a b c -> local (const $ Just s) (act a b c))

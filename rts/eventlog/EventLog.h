@@ -171,6 +171,7 @@ void postProfBegin(void);
 void postIPE(StgWord64 info,
              const char *table_name,
              const char *closure_desc,
+             const char *ty_desc,
              const char *label,
              const char *module,
              const char *srcloc);

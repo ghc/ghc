@@ -295,6 +295,8 @@ emitInfoTableProv ip = do
   ; modl  <- newByteStringCLit (bytesFS $ moduleNameFS
                                         $ moduleName
                                         $ mod)
+
+  ; ty_string  <- newByteStringCLit (bytesFS (mkFastString (infoTableType ip)))
   ; loc <- newByteStringCLit $ bytesFS $ mkFastString $
                    showPpr dflags src
            -- XXX going via FastString to get UTF-8 encoding is silly
@@ -307,6 +309,7 @@ emitInfoTableProv ip = do
      lits = [ CmmLabel (infoTablePtr ip), -- Info table pointer
               table_name,     -- char *table_name
               closure_type,   -- char *closure_desc -- Filled in from the InfoTable
+              ty_string,      -- char *ty_string
               label,          -- char *label,
               modl,           -- char *module,
               loc,            -- char *srcloc,

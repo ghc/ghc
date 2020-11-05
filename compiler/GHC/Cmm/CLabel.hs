@@ -735,13 +735,14 @@ mkBitmapLabel   :: Unique -> CLabel
 mkBitmapLabel   uniq            = LargeBitmapLabel uniq
 
 
-data InfoTableEnt = InfoTableEnt { infoTablePtr :: CLabel
-                                 , infoTableEntClosureType :: Int
-                                 , infoTableProv :: (Module, RealSrcSpan, String) }
+data InfoTableEnt = InfoTableEnt { infoTablePtr :: !CLabel
+                                 , infoTableEntClosureType :: !Int
+                                 , infoTableType :: !String
+                                 , infoTableProv :: !(Module, RealSrcSpan, String) }
                                  deriving (Eq, Ord)
 
-instance Outputable InfoTableEnt where
-  ppr (InfoTableEnt l ct p) = pdoc (undefined :: Platform) l <> colon <> ppr ct <> colon <> ppr p
+--instance Outputable InfoTableEnt where
+--  ppr (InfoTableEnt l ct p) = pdoc (undefined :: Platform) l <> colon <> ppr ct <> colon <> ppr p
 
 -- Constructing Cost Center Labels
 mkCCLabel  :: CostCentre      -> CLabel
@@ -1392,7 +1393,7 @@ pprCLabel platform sty lbl =
 
    CC_Label cc   -> maybe_underscore $ ppr cc
    CCS_Label ccs -> maybe_underscore $ ppr ccs
-   (IPE_Label (InfoTableEnt l _ (m, _, _))) -> pprCode CStyle (pdoc platform l) <> text "_" <> ppr m <> text "_ipe"
+   (IPE_Label (InfoTableEnt l _ _ (m, _, _))) -> pprCode CStyle (pdoc platform l) <> text "_" <> ppr m <> text "_ipe"
 
 
    CmmLabel _ _ fs CmmCode     -> maybe_underscore $ ftext fs
