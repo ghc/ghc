@@ -1692,7 +1692,10 @@ When reporting that GHC can't solve (a ~ c), there are two givens in scope:
 redundant), so it's not terribly useful to report it in an error message.
 To accomplish this, we discard any Implications that do not bind any
 equalities by filtering the `givens` selected in `misMatchOrCND` (based on
-the `ic_given_eqs` field of the Implication).
+the `ic_given_eqs` field of the Implication). Note that we discard givens
+that have no equalities whatsoever, but we want to keep ones with only *local*
+equalities, as these may be helpful to the user in understanding what went
+wrong.
 
 But this is not enough to avoid all redundant givens! Consider this example,
 from #15361:

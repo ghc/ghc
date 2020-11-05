@@ -1,6 +1,11 @@
 
 T13784.hs:29:28: error:
-    • Couldn't match type ‘as’ with ‘a : Divide a as’
+    • Could not deduce: as ~ (a : Divide a as)
+      from the context: (a : as) ~ (a1 : as1)
+        bound by a pattern with constructor:
+                   :* :: forall a (as :: [*]). a -> Product as -> Product (a : as),
+                 in an equation for ‘divide’
+        at T13784.hs:29:13-19
       Expected: Product (Divide a (a : as))
         Actual: Product as1
       ‘as’ is a rigid type variable bound by
