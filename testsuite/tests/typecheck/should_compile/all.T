@@ -731,3 +731,4 @@ test('ClassDefaultInHsBoot', [extra_files(['ClassDefaultInHsBootA1.hs','ClassDef
 test('CbvOverlap', normal, compile, [''])
 test('InstanceGivenOverlap', normal, compile, [''])
 test('InstanceGivenOverlap2', normal, compile, [''])
+test('LocalGivenEqs', normal, compile, [''])
