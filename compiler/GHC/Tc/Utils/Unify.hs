@@ -951,7 +951,7 @@ buildTvImplication skol_info skol_tvs tclvl wanted
 
        ; return (implic { ic_tclvl     = tclvl
                         , ic_skols     = skol_tvs
-                        , ic_no_eqs    = True
+                        , ic_given_eqs = NoGivenEqs
                         , ic_wanted    = wanted
                         , ic_binds     = ev_binds
                         , ic_info      = skol_info }) }
