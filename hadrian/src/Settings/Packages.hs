@@ -11,7 +11,6 @@ import Settings
 packageArgs :: Args
 packageArgs = do
     stage        <- getStage
-    rtsWays      <- getRtsWays
     path         <- getBuildPath
     compilerPath <- expr $ buildPath (vanillaContext stage compiler)
     let -- Do not bind the result to a Boolean: this forces the configure rule
@@ -59,13 +58,6 @@ packageArgs = do
             , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
             , notM targetSupportsSMP ? arg "--ghc-option=-DNOSMP"
             , notM targetSupportsSMP ? arg "--ghc-option=-optc-DNOSMP"
-            -- When building stage 1 or later, use thread-safe RTS functions if
-            -- the configuration calls for a threaded GHC.
-            , (any (wayUnit Threaded) rtsWays) ?
-              notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
-            -- When building stage 1, use thread-safe RTS functions if the
-            -- bootstrapping (stage 0) compiler provides a threaded RTS way.
-            , stage0 ? threadedBootstrapper ? arg "--ghc-option=-optc-DTHREADED_RTS"
             , ghcWithInterpreter ?
               ghciWithDebugger <$> flavour ?
               notStage0 ? arg "--ghc-option=-DDEBUGGER"
@@ -86,14 +78,6 @@ packageArgs = do
           , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "internal-interpreter"
             , cross ? arg "-terminfo"
-            -- Note [Linking ghc-bin against threaded stage0 RTS]
-            -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            -- We must maintain the invariant that GHCs linked with '-threaded'
-            -- are built with '-optc=-DTHREADED_RTS', otherwise we'll end up
-            -- with a GHC that can use the threaded runtime, but contains some
-            -- non-thread-safe functions. See
-            -- https://gitlab.haskell.org/ghc/ghc/issues/18024 for an example of
-            -- the sort of issues this can cause.
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.
