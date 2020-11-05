@@ -325,20 +325,20 @@ implicitRequirements' hsc_env normal_imports
 implicitRequirementsShallow
   :: HscEnv
   -> [(Maybe FastString, Located ModuleName)]
-  -> IO [Either ModuleName InstantiatedUnit]
-implicitRequirementsShallow hsc_env normal_imports
-  = fmap concat $
-    forM normal_imports $ \(mb_pkg, L _ imp) -> do
-        found <- findImportedModule hsc_env imp mb_pkg
-        pure $ case found of
-            Found _ mod | not (isHomeModule home_unit mod) ->
-                case moduleUnit mod of
-                    HoleUnit -> [Left $ moduleName mod]
-                    RealUnit _ -> []
-                    VirtUnit u -> [Right u]
-            _ -> []
-  where dflags = hsc_dflags hsc_env
-        home_unit = mkHomeUnitFromFlags dflags
+  -> IO ([ModuleName], [InstantiatedUnit])
+implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
+ where
+  go acc [] = pure acc
+  go (accL, accR) ((mb_pkg, L _ imp):imports) = do
+    found <- findImportedModule hsc_env imp mb_pkg
+    let acc' = case found of
+          Found _ mod | not (isHomeModule (hsc_home_unit hsc_env) mod) ->
+              case moduleUnit mod of
+                  HoleUnit -> (moduleName mod : accL, accR)
+                  RealUnit _ -> (accL, accR)
+                  VirtUnit u -> (accL, u:accR)
+          _ -> (accL, accR)
+    go acc' imports
 
 -- | Given a 'Unit', make sure it is well typed.  This is because
 -- unit IDs come from Cabal, which does not know if things are well-typed or
