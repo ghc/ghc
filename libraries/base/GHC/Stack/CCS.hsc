@@ -152,21 +152,23 @@ ipeProv :: Ptr InfoProvEnt -> Ptr InfoProv
 ipeProv p = p `plusPtr` 8 --(#offsetof InfoProvEnt, prov) -- TODO, offset is to the "prov" field  but not sure how to express this
                           -- (# sizeOf * StgInfoTable)
 
-ipName, ipDesc, ipLabel, ipModule, ipSrcLoc :: Ptr InfoProv -> IO CString
+ipName, ipDesc, ipLabel, ipModule, ipSrcLoc, ipTyDesc :: Ptr InfoProv -> IO CString
 ipName p   =  (# peek InfoProv, table_name) p
 ipDesc p   =  (# peek InfoProv, closure_desc) p
 ipLabel p  =  (# peek InfoProv, label) p
 ipModule p =  (# peek InfoProv, module) p
 ipSrcLoc p =  (# peek InfoProv, srcloc) p
+ipTyDesc p =  (# peek InfoProv, ty_desc) p
 
 infoProvToStrings :: Ptr InfoProv -> IO [String]
 infoProvToStrings infop = do
   name <- GHC.peekCString utf8 =<< ipName infop
   desc <- GHC.peekCString utf8 =<< ipDesc infop
+  ty_desc <- GHC.peekCString utf8 =<< ipTyDesc infop
   label <- GHC.peekCString utf8 =<< ipLabel infop
   mod <- GHC.peekCString utf8 =<< ipModule infop
   loc <- GHC.peekCString utf8 =<< ipSrcLoc infop
-  return [name, desc, label, mod, loc]
+  return [name, desc, ty_desc, label, mod, loc]
 
 -- TODO: Add structured output of whereFrom
 

@@ -33,8 +33,8 @@ dumpIPEToEventLog(void)
     InfoProvEnt *ip, *next;
     for (ip = IPE_LIST; ip != NULL; ip = next) {
         next = ip->link;
-        traceIPE(ip->info, ip->prov.table_name, ip->prov.closure_desc, ip->prov.label,
-                ip->prov.module, ip->prov.srcloc);
+        traceIPE(ip->info, ip->prov.table_name, ip->prov.closure_desc, ip->prov.ty_desc
+                , ip->prov.label, ip->prov.module, ip->prov.srcloc);
     }
 #endif
 }
