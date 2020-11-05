@@ -60,7 +60,6 @@ import GHC.Unit.Module.Env
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.Deps
 
-import GHC.Runtime.Loader -- ( initializePlugins )
 import GHC.Runtime.Context
 
 import GHC.Types.SrcLoc
@@ -88,17 +87,14 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_deps    = deps
                                 , mg_rdr_env = rdr_env })
-  = do { -- make sure all plugins are loaded
-
-       ; let builtin_passes = getCoreToDo dflags
+  = do { let builtin_passes = getCoreToDo dflags
              orph_mods = mkModuleSet (mod : dep_orphs deps)
              uniq_mask = 's'
        ;
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_mask mod
                                     orph_mods print_unqual loc $
                            do { hsc_env' <- getHscEnv
-                              ; hsc_env'' <- liftIO $ initializePlugins hsc_env'
-                              ; all_passes <- withPlugins hsc_env''
+                              ; all_passes <- withPlugins hsc_env'
                                                 installCoreToDos
                                                 builtin_passes
                               ; runCorePasses all_passes guts }
