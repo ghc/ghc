@@ -347,7 +347,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_errs       = errs_var,
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
-                tcl_provenance = [],
+                tcl_provenance = UserSourceCP,
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,
@@ -877,7 +877,7 @@ inGeneratedCode :: TcRn Bool
 inGeneratedCode = tcl_in_gen_code <$> getLclEnv
 
 withProvenance :: CodeProvenance -> TcRn a -> TcRn a
-withProvenance p = updLclEnv (\env -> tclPushProvenance p env)
+withProvenance p = updLclEnv (\env -> tclSetProvenance p env)
 
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 setSrcSpan (RealSrcSpan loc _) thing_inside =
@@ -1135,7 +1135,7 @@ setCtLocM (CtLoc { ctl_env = lcl }) thing_inside
               thing_inside
 
 setDeriving :: TcM a -> TcM a
-setDeriving = updLclEnv (\e -> tclPushProvenance DerivingCP e)
+setDeriving = updLclEnv (\e -> tclSetProvenance DerivingCP e)
 
 inDeriving :: TcM Bool
 inDeriving = fmap tcl_deriving getLclEnv
