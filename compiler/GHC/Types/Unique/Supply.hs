@@ -3,11 +3,12 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# OPTIONS_GHC -fno-state-hack #-}
+{-# OPTIONS_GHC -fno-state-hack -ddump-simpl -ddump-to-file #-}
     -- This -fno-state-hack is important
     -- See Note [Optimising the unique supply]
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE BangPatterns #-}
@@ -22,7 +23,7 @@ module GHC.Types.Unique.Supply (
 
         -- ** Operations on supplies
         uniqFromSupply, uniqsFromSupply, -- basic ops
-        takeUniqFromSupply,
+        takeUniqFromSupply, uniqFromMask,
 
         mkSplitUniqSupply,
         splitUniqSupply, listSplitUniqSupply,
@@ -48,9 +49,18 @@ import GHC.Utils.Monad
 import Control.Monad
 import Data.Bits
 import Data.Char
-import GHC.Exts( inline )
+import GHC.Exts( inline, Ptr(..) )
+#if MIN_VERSION_GLASGOW_HASKELL(9,0,0,0)
+import GHC.Exts( Int(..), word2Int#, fetchAddWordAddr# )
+#if defined(DEBUG)
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+#endif
+#endif
+import Foreign.Storable
 
 #include "Unique.h"
+#include "HsVersions.h"
 
 {-
 ************************************************************************
@@ -228,8 +238,33 @@ multiShotIO :: IO a -> IO a
 -- See Note [multiShotIO]
 multiShotIO (IO m) = IO (\s -> inline m s)
 
+#if !MIN_VERSION_GLASGOW_HASKELL(9,0,0,0)
 foreign import ccall unsafe "genSym" genSym :: IO Int
-foreign import ccall unsafe "initGenSym" initUniqSupply :: Int -> Int -> IO ()
+#else
+genSym :: IO Int
+genSym = do
+    let !(Ptr counter) = ghc_unique_counter
+    v <- IO $ \s -> case fetchAddWordAddr# counter 1## s of
+                (# s', val #) -> (# s', I# (word2Int# val) #)
+    let !mask = (1 `unsafeShiftL` uNIQUE_BITS) - 1
+        !u    = (v + 1) .&. mask
+#if defined(DEBUG)
+    -- Uh oh! We will overflow next time a unique is requested.
+    ASSERT(u /= mask)
+#endif
+    return u
+#endif
+
+foreign import ccall unsafe "&ghc_unique_counter" ghc_unique_counter :: Ptr Int
+
+initUniqSupply :: Int -> IO ()
+initUniqSupply counter = poke ghc_unique_counter counter
+
+uniqFromMask :: Char -> IO Unique
+uniqFromMask mask
+  = do { uqNum <- genSym
+       ; return $! mkUnique mask uqNum }
+
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
 -- ^ Build two 'UniqSupply' from a single one, each of which

@@ -739,10 +739,6 @@ data DynFlags = DynFlags {
   -- | Limit the maximum number of errors to show
   maxErrors             :: Maybe Int,
 
-  -- | Unique supply configuration for testing build determinism
-  initialUnique         :: Int,
-  uniqueIncrement       :: Int,
-
   -- | Temporary: CFG Edge weights for fast iterations
   cfgWeights            :: Weights
 }
@@ -1329,9 +1325,6 @@ defaultDynFlags mySettings llvmConfig =
         maxInlineAllocSize = 128,
         maxInlineMemcpyInsns = 32,
         maxInlineMemsetInsns = 32,
-
-        initialUnique = 0,
-        uniqueIncrement = 1,
 
         reverseErrors = False,
         maxErrors     = Nothing,
@@ -2908,10 +2901,6 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { maxInlineMemcpyInsns = n }))
   , make_ord_flag defGhcFlag "fmax-inline-memset-insns"
       (intSuffix (\n d -> d { maxInlineMemsetInsns = n }))
-  , make_ord_flag defGhcFlag "dinitial-unique"
-      (intSuffix (\n d -> d { initialUnique = n }))
-  , make_ord_flag defGhcFlag "dunique-increment"
-      (intSuffix (\n d -> d { uniqueIncrement = n }))
 
         ------ Profiling ----------------------------------------------------
 

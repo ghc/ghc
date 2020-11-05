@@ -234,7 +234,7 @@ main' postLoadMode dflags0 args flagWarnings = do
       | v >= 5 -> liftIO $ dumpUnits dflags6
       | otherwise -> return ()
 
-  liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
+  liftIO $ initUniqSupply 0
         ---------------- Final sanity checking -----------
   liftIO $ checkOptions postLoadMode dflags6 srcs objs
 
