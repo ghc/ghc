@@ -729,8 +729,9 @@ data DynFlags = DynFlags {
   maxErrors             :: Maybe Int,
 
   -- | Unique supply configuration for testing build determinism
-  initialUnique         :: Int,
+  initialUnique         :: Word,
   uniqueIncrement       :: Int,
+    -- 'Int' because it can be used to test uniques in decreasing order.
 
   -- | Temporary: CFG Edge weights for fast iterations
   cfgWeights            :: Weights
@@ -2135,6 +2136,8 @@ add_dep_message (OptIntSuffix f) message =
                                OptIntSuffix $ \oi -> f oi >> deprecate message
 add_dep_message (IntSuffix f) message =
                                   IntSuffix $ \i -> f i >> deprecate message
+add_dep_message (WordSuffix f) message =
+                                  WordSuffix $ \i -> f i >> deprecate message
 add_dep_message (FloatSuffix f) message =
                                 FloatSuffix $ \fl -> f fl >> deprecate message
 add_dep_message (PassFlag f) message =
@@ -2899,7 +2902,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "fmax-inline-memset-insns"
       (intSuffix (\n d -> d { maxInlineMemsetInsns = n }))
   , make_ord_flag defGhcFlag "dinitial-unique"
-      (intSuffix (\n d -> d { initialUnique = n }))
+      (wordSuffix (\n d -> d { initialUnique = n }))
   , make_ord_flag defGhcFlag "dunique-increment"
       (intSuffix (\n d -> d { uniqueIncrement = n }))
 
@@ -4287,6 +4290,9 @@ intSuffix fn = IntSuffix (\n -> upd (fn n))
 
 intSuffixM :: (Int -> DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffixM fn = IntSuffix (\n -> updM (fn n))
+
+wordSuffix :: (Word -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
+wordSuffix fn = WordSuffix (\n -> upd (fn n))
 
 floatSuffix :: (Float -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 floatSuffix fn = FloatSuffix (\n -> upd (fn n))
