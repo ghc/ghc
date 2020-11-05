@@ -2121,6 +2121,67 @@ primop  CasAddrOp_Word "atomicCasWordAddr#" GenPrimOp
    with has_side_effects = True
         can_fail         = True
 
+primop FetchAddAddrOp_Word "fetchAddWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to add,
+    atomically add the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchSubAddrOp_Word "fetchSubWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to subtract,
+    atomically subtract the value to the element. Returns the value of
+    the element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchAndAddrOp_Word "fetchAndWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to AND,
+    atomically AND the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchNandAddrOp_Word "fetchNandWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to NAND,
+    atomically NAND the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchOrAddrOp_Word "fetchOrWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to OR,
+    atomically OR the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchXorAddrOp_Word "fetchXorWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to XOR,
+    atomically XOR the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop  AtomicReadAddrOp_Word "atomicReadWordAddr#" GenPrimOp
+   Addr# -> State# s -> (# State# s, Word# #)
+   {Given an address, read a machine word.  Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop  AtomicWriteAddrOp_Word "atomicWriteWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> State# s
+   {Given an address, write a machine word. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+
 ------------------------------------------------------------------------
 section "Mutable variables"
         {Operations on MutVar\#s.}
