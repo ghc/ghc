@@ -947,8 +947,8 @@ tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)))
 
 tc_infer_hs_type mode (HsDocTy _ ty _) = tc_infer_lhs_type mode ty
 
--- See Note [Typechecking NHsCoreTys]
-tc_infer_hs_type _ (XHsType (NHsCoreTy ty))
+-- See Note [Typechecking HsCoreTys]
+tc_infer_hs_type _ (XHsType ty)
   = do env <- getLclEnv
        -- Raw uniques since we go from NameEnv to TvSubstEnv.
        let subst_prs :: [(Unique, TcTyVar)]
@@ -972,21 +972,21 @@ tc_infer_hs_type mode other_ty
        ; return (ty', kv) }
 
 {-
-Note [Typechecking NHsCoreTys]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-NHsCoreTy is an escape hatch that allows embedding Core Types in HsTypes.
-As such, there's not much to be done in order to typecheck an NHsCoreTy,
+Note [Typechecking HsCoreTys]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+HsCoreTy is an escape hatch that allows embedding Core Types in HsTypes.
+As such, there's not much to be done in order to typecheck an HsCoreTy,
 since it's already been typechecked to some extent. There is one thing that
 we must do, however: we must substitute the type variables from the tcl_env.
 To see why, consider GeneralizedNewtypeDeriving, which is one of the main
-clients of NHsCoreTy (example adapted from #14579):
+clients of HsCoreTy (example adapted from #14579):
 
   newtype T a = MkT a deriving newtype Eq
 
 This will produce an InstInfo GhcPs that looks roughly like this:
 
   instance forall a_1. Eq a_1 => Eq (T a_1) where
-    (==) = coerce @(  a_1 ->   a_1 -> Bool) -- The type within @(...) is an NHsCoreTy
+    (==) = coerce @(  a_1 ->   a_1 -> Bool) -- The type within @(...) is an HsCoreTy
                   @(T a_1 -> T a_1 -> Bool) -- So is this
                   (==)
 
@@ -1002,9 +1002,9 @@ environment (tcl_env) with [a_1 :-> a_2]. This gives us:
 
 To ensure that the body of this instance is well scoped, every occurrence of
 the `a` type variable should refer to a_2, the new skolem. However, the
-NHsCoreTys mention a_1, not a_2. Luckily, the tcl_env provides exactly the
+HsCoreTys mention a_1, not a_2. Luckily, the tcl_env provides exactly the
 substitution we need ([a_1 :-> a_2]) to fix up the scoping. We apply this
-substitution to each NHsCoreTy and all is well:
+substitution to each HsCoreTy and all is well:
 
   instance forall a_2. Eq a_2 => Eq (T a_2) where
     (==) = coerce @(  a_2 ->   a_2 -> Bool)
@@ -1206,7 +1206,7 @@ tc_hs_type mode ty@(HsAppTy {})            ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsAppKindTy{})         ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsOpTy {})             ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsKindSig {})          ek = tc_infer_hs_type_ek mode ty ek
-tc_hs_type mode ty@(XHsType (NHsCoreTy{})) ek = tc_infer_hs_type_ek mode ty ek
+tc_hs_type mode ty@(XHsType {})            ek = tc_infer_hs_type_ek mode ty ek
 
 {-
 Note [Variable Specificity and Forall Visibility]

@@ -41,6 +41,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType )
 
+import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Rename.Env
@@ -50,6 +51,7 @@ import GHC.Rename.Utils  ( HsDocContext(..), inHsDocContext, withHsDocContext
                          , checkShadowedRdrNames )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
+import GHC.Rename.Unbound ( notInScopeErr )
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
@@ -717,10 +719,20 @@ rnHsTyKi env (HsDocTy _ ty haddock_doc)
   = do { (ty', fvs) <- rnLHsTyKi env ty
        ; return (HsDocTy noExtField ty' haddock_doc, fvs) }
 
-rnHsTyKi _ (XHsType (NHsCoreTy ty))
-  = return (XHsType (NHsCoreTy ty), emptyFVs)
-    -- The emptyFVs probably isn't quite right
-    -- but I don't think it matters
+-- See Note [Renaming HsCoreTys]
+rnHsTyKi env (XHsType ty)
+  = do mapM_ (check_in_scope . nameRdrName) fvs_list
+       return (XHsType ty, fvs)
+  where
+    fvs_list = map getName $ tyCoVarsOfTypeList ty
+    fvs = mkFVs fvs_list
+
+    check_in_scope :: RdrName -> RnM ()
+    check_in_scope rdr_name = do
+      mb_name <- lookupLocalOccRn_maybe rdr_name
+      when (isNothing mb_name) $
+        addErr $ withHsDocContext (rtke_ctxt env) $
+        notInScopeErr rdr_name
 
 rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -743,6 +755,39 @@ rnHsArrow _env (HsUnrestrictedArrow u) = return (HsUnrestrictedArrow u, emptyFVs
 rnHsArrow _env (HsLinearArrow u) = return (HsLinearArrow u, emptyFVs)
 rnHsArrow env (HsExplicitMult u p)
   = (\(mult, fvs) -> (HsExplicitMult u mult, fvs)) <$> rnLHsTyKi env p
+
+{-
+Note [Renaming HsCoreTys]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+HsCoreTy is an escape hatch that allows embedding Core Types in HsTypes.
+As such, there's not much to be done in order to rename an HsCoreTy,
+since it's already been renamed to some extent. However, in an attempt to
+detect ill-formed HsCoreTys, the renamer checks to see if all free type
+variables in an HsCoreTy are in scope. To see why this can matter, consider
+this example from #18914:
+
+  type T f = forall a. f a
+
+  class C f where
+    m :: T f
+
+  newtype N f a = MkN (f a)
+    deriving C
+
+Because of #18914, a previous GHC would generate the following code:
+
+  instance C f => C (N f) where
+    m :: T (N f)
+    m = coerce @(f a)   -- The type within @(...) is an HsCoreTy
+               @(N f a) -- So is this
+               (m @f)
+
+There are two HsCoreTys in play—(f a) and (N f a)—both of which have
+`f` and `a` as free type variables. The `f` is in scope from the instance head,
+but `a` is completely unbound, which is what led to #18914. To avoid this sort
+of mistake going forward, the renamer will now detect that `a` is unbound and
+throw an error accordingly.
+-}
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
