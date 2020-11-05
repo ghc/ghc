@@ -1,6 +1,9 @@
 
 T11010.hs:9:36: error:
-    • Couldn't match type ‘a1’ with ‘Int’
+    • Could not deduce: a1 ~ Int
+      from the context: a ~ Int
+        bound by the signature for pattern synonym ‘IntFun’
+        at T11010.hs:9:9-14
       Expected: a -> b
         Actual: a1 -> b
       ‘a1’ is a rigid type variable bound by

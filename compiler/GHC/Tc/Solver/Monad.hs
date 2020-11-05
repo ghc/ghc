@@ -2215,8 +2215,6 @@ considered rigid.
 
 Note [When does an implication have given equalities?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-"RAE": update note
-
 Consider an implication
    beta => alpha ~ Int
 where beta is a unification variable that has already been unified
@@ -2245,23 +2243,27 @@ are some wrinkles:
       beta => ...blah...
    If we still don't know what beta is, we conservatively treat it as potentially
    becoming an equality. Hence including 'irreds' in the calculation or has_given_eqs.
+   Note that we can't really know what's in an irred, so any irred is considered
+   a potential equality.
 
- * When flattening givens, we generate Given equalities like
-     <F [a]> : F [a] ~ f,
-   with Refl evidence, and we *don't* want those to count as an equality
-   in the givens!  After all, the entire flattening business is just an
-   internal matter, and the evidence does not mention any of the 'givens'
-   of this implication.  So we do not treat inert_funeqs as a 'given equality'.
+ * What about something like forall a b. a ~ F b => [W] c ~ X y z? That Given
+   cannot affect the Wanted, because the Given is entirely *local*: it mentions
+   only skolems bound in the very same implication. Such equalities need not
+   prevent floating. (Test case: typecheck/should_compile/LocalGivenEqs) These
+   equalities are noted with LocalGivenEqs: they do not prevent floating, but
+   they also are allowed to show up in error messages. See
+   Note [Suppress redundant givens during error reporting] in GHC.Tc.Errors.
+   The difference between what stops floating and what is suppressed from
+   error messages is why we need three options for HasGivenEqs.
 
  * See Note [Let-bound skolems] for another wrinkle
 
- * We do *not* need to worry about representational equalities, because
-   these do not affect the ability to float constraints.
+ * We need not look at the equality relation involved (nominal vs representational),
+   because representational equalities can still imply nominal ones. For example,
+   if (G a ~R G b) and G's argument's role is nominal, then we can deduce a ~N b.
 
 Note [Let-bound skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-"RAE": Update note.
-
 If   * the inert set contains a canonical Given CEqCan (a ~ ty)
 and  * 'a' is a skolem bound in this very implication,
 
