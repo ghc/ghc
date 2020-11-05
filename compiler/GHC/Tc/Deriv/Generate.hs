@@ -1819,6 +1819,94 @@ a truly higher-rank type like so:
 Then the same situation will arise again. But at least it won't arise for the
 common case of methods with ordinary, prenex-quantified types.
 
+-----
+-- Wrinkle: Use HsOuterExplicit
+-----
+
+One minor complication with the plan above is that we need to ensure that the
+type variables from a method's instance signature properly scope over the body
+of the method. For example, recall:
+
+  instance (C m, forall p q. Coercible p q => Coercible (m p) (m q)) =>
+      C (T m) where
+    join :: forall a. T m (T m a) -> T m a
+    join = coerce @(  m   (m a) ->   m a)
+                  @(T m (T m a) -> T m a)
+                  join
+
+In the example above, it is imperative that the `a` in the instance signature
+for `join` scope over the body of `join` by way of ScopedTypeVariables.
+This might sound obvious, but note that in gen_Newtype_binds, which is
+responsible for generating the code above, the type in `join`'s instance
+signature is given as a Core type, whereas gen_Newtype_binds will eventually
+produce HsBinds (i.e., source Haskell) that is renamed and typechecked. We
+must ensure that `a` is in scope over the body of `join` during renaming
+or else the generated code will be rejected.
+
+In short, we need to convert the instance signature from a Core type to an
+HsType (i.e., a source Haskell type). Two possible options are:
+
+1. Convert the Core type entirely to an HsType (i.e., a source Haskell type).
+2. Embed the entire Core type using HsCoreTy.
+
+Neither option is quite satisfactory:
+
+1. Converting a Core type to an HsType in full generality is surprisingly
+   complicated. Previous versions of GHCs did this, but it was the source of
+   numerous bugs (see #14579 and #16518, for instance).
+2. While HsCoreTy is much less complicated that option (1), it's not quite
+   what we want. In order for `a` to be in scope over the body of `join` during
+   renaming, the `forall` must be contained in an HsOuterExplicit.
+   (See Note [Lexically scoped type variables] in GHC.Hs.Type.) HsCoreTy
+   bypasses HsOuterExplicit, so this won't work either.
+
+As a compromise, we adopt a combination of the two options above:
+
+* Split apart the top-level ForAllTys in the instance signature's Core type,
+* Convert the top-level ForAllTys to an HsOuterExplicit, and
+* Embed the remainder of the Core type in an HsCoreTy.
+
+This retains most of the simplicity of option (2) while still ensuring that
+the type variables are correctly scoped.
+
+Note that splitting apart top-level ForAllTys will expand any type synonyms
+in the Core type itself. This ends up being important to fix a corner case
+observed in #18914. Consider this example:
+
+  type T f = forall a. f a
+
+  class C f where
+    m :: T f
+
+  newtype N f a = MkN (f a)
+    deriving C
+
+What code should `deriving C` generate? It will have roughly the following
+shape:
+
+  instance C f => C (N f) where
+    m :: T (N f)
+    m = coerce @(...) (...) (m @f)
+
+At a minimum, we must instantiate `coerce` with `@(T f)` and `@(T (N f))`, but
+with the `forall`s removed in order to make them monotypes. However, the
+`forall` is hidden underneath the `T` type synonym, so we must first expand `T`
+before we can strip of the `forall`. Expanding `T`, we get
+`coerce @(forall a. f a) @(forall a. N f a)`, and after omitting the `forall`s,
+we get `coerce @(f a) @(N f a)`.
+
+We can't stop there, however, or else we would end up with this code:
+
+  instance C f => C (N f) where
+    m :: T (N f)
+    m = coerce @(f a) @(N f a) (m @f)
+
+Notice that the type variable `a` is completely unbound. In order to make sure
+that `a` is in scope, we must /also/ expand the `T` in `m :: T (N f)` to get
+`m :: forall a. N f a`. Fortunately, we will do just that in the plan outlined
+above, since when we split off the top-level ForAllTys in the instance
+signature, we must first expand the T type synonym.
+
 Note [GND and ambiguity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 We make an effort to make the code generated through GND be robust w.r.t.
@@ -1891,13 +1979,30 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         , -- The derived instance signature, e.g.,
           --
           --   op :: forall c. a -> [T x] -> c -> Int
+          --
+          -- Make sure that `forall c` is in an HsOuterExplicit so that it
+          -- scopes over the body of `op`. See "Wrinkle: Use HsOuterExplicit" in
+          -- Note [GND and QuantifiedConstraints].
           L loc $ ClassOpSig noExtField False [loc_meth_RDR]
-                $ L loc $ mkHsImplicitSigType $ nlHsCoreTy to_ty
+                $ L loc $ mkHsExplicitSigType
+                            (map mk_hs_tvb to_tvbs)
+                            (nlHsCoreTy to_rho)
         )
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
-        (_, _, from_tau) = tcSplitSigmaTy from_ty
-        (_, _, to_tau)   = tcSplitSigmaTy to_ty
+        (_, _, from_tau)  = tcSplitSigmaTy from_ty
+        (to_tvbs, to_rho) = tcSplitForAllInvisTVBinders to_ty
+        (_, to_tau)       = tcSplitPhiTy to_rho
+        -- The use of tcSplitForAllInvisTVBinders above expands type synonyms,
+        -- which is important to ensure correct type variable scoping.
+        -- See "Wrinkle: Use HsOuterExplicit" in
+        -- Note [GND and QuantifiedConstraints].
+
+        mk_hs_tvb :: VarBndr TyVar flag -> LHsTyVarBndr flag GhcPs
+        mk_hs_tvb (Bndr tv flag) = noLoc $ KindedTyVar noExtField
+                                                       flag
+                                                       (noLoc (getRdrName tv))
+                                                       (nlHsCoreTy (tyVarKind tv))
 
         meth_RDR = getRdrName meth_id
         loc_meth_RDR = L loc meth_RDR
@@ -1950,8 +2055,8 @@ nlHsAppType e s = noLoc (HsAppType noExtField e hs_ty)
   where
     hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec $ nlHsCoreTy s
 
-nlHsCoreTy :: Type -> LHsType GhcPs
-nlHsCoreTy = noLoc . XHsType . NHsCoreTy
+nlHsCoreTy :: HsCoreTy -> LHsType GhcPs
+nlHsCoreTy = noLoc . XHsType
 
 mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> [TyVar] -- the tvs in the instance head (this includes
@@ -2079,15 +2184,15 @@ genAuxBindSpecDup loc original_rdr_name dup_spec
 genAuxBindSpecSig :: SrcSpan -> AuxBindSpec -> LHsSigWcType GhcPs
 genAuxBindSpecSig loc spec = case spec of
   DerivCon2Tag tycon _
-    -> mk_sig $ L loc $ XHsType $ NHsCoreTy $
+    -> mk_sig $ L loc $ XHsType $
        mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
        mkParentType tycon `mkVisFunTyMany` intPrimTy
   DerivTag2Con tycon _
     -> mk_sig $ L loc $
-       XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
+       XHsType $ mkSpecForAllTys (tyConTyVars tycon) $
        intTy `mkVisFunTyMany` mkParentType tycon
   DerivMaxTag _ _
-    -> mk_sig (L loc (XHsType (NHsCoreTy intTy)))
+    -> mk_sig (L loc (XHsType intTy))
   DerivDataDataType _ _ _
     -> mk_sig (nlHsTyVar dataType_RDR)
   DerivDataConstr _ _ _
