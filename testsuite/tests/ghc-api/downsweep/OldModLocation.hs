@@ -3,7 +3,8 @@
 import GHC
 import GHC.Driver.Make
 import GHC.Driver.Session
-import GHC.Driver.Finder
+import GHC.Unit.Module.ModSummary (ExtendedModSummary(..))
+import GHC.Unit.Finder
 
 import Control.Monad.IO.Class (liftIO)
 import Data.List (sort, stripPrefix)
