@@ -2055,9 +2055,34 @@ getNoGivenEqs :: TcLevel          -- TcLevel of this implication
 getNoGivenEqs tclvl skol_tvs
   = do { inerts@(IC { inert_eqs = ieqs, inert_funeqs = funeqs, inert_irreds = irreds })
               <- getInertCans
-       ; let has_given_eqs = foldr ((||) . ct_given_here) False irreds
-                          || anyDVarEnv tv_eqs_given_here ieqs
-                          || anyFunEqMap funeqs fun_eqs_given_here
+       ; tc_lvl <- getTcLevel
+       ; let is_local_given_ct :: Ct -> Bool
+             is_local_given_ct = ct_given_here <&&> ct_mentions_outer_var
+
+             is_local_given_equal_ct_list :: EqualCtList -> Bool
+             is_local_given_equal_ct_list [ct] = is_local_given_ct ct
+               -- Givens are always singletons in an EqualCtList
+             is_local_given_equal_ct_list _    = False
+
+             ct_given_here :: Ct -> Bool
+             -- True for a Given bound by the current implication,
+             -- i.e. the current level
+             ct_given_here ct =  isGiven ev
+                              && tclvl == ctLocLevel (ctEvLoc ev)
+                 where
+                   ev = ctEvidence ct
+
+             ct_mentions_outer_var :: Ct -> Bool
+             ct_mentions_outer_var = anyFreeVarsOfType is_outer_var . ctPred
+
+             is_outer_var :: TyCoVar -> Bool
+             is_outer_var tv
+               | isTyVar tv = tc_lvl `strictlyDeeperThan` tcTyVarLevel tv
+               | otherwise  = False
+
+             has_given_eqs = anyBag is_local_given_ct irreds
+                          || anyDVarEnv is_local_given_equal_ct_list ieqs
+                          || anyFunEqMap funeqs is_local_given_equal_ct_list
              insols = filterBag insolubleEqCt irreds
                       -- Specifically includes ones that originated in some
                       -- outer context but were refined to an insoluble by
@@ -2070,30 +2095,6 @@ getNoGivenEqs tclvl skol_tvs
               , text "Inerts:" <+> ppr inerts
               , text "Insols:" <+> ppr insols]
        ; return (not has_given_eqs, insols) }
-  where
-    tv_eqs_given_here :: EqualCtList -> Bool
-    tv_eqs_given_here [ct@(CEqCan { cc_lhs = TyVarLHS tv })]
-                              -- Givens are always a singleton
-      = not (skolem_bound_here tv) && ct_given_here ct
-    tv_eqs_given_here _ = False
-
-    fun_eqs_given_here :: EqualCtList -> Bool
-    fun_eqs_given_here [ct] = ct_given_here ct
-    fun_eqs_given_here _ = False
-
-    ct_given_here :: Ct -> Bool
-    -- True for a Given bound by the current implication,
-    -- i.e. the current level
-    ct_given_here ct =  isGiven ev
-                     && tclvl == ctLocLevel (ctEvLoc ev)
-        where
-          ev = ctEvidence ct
-
-    skol_tv_set = mkVarSet skol_tvs
-    skolem_bound_here tv -- See Note [Let-bound skolems]
-      = case tcTyVarDetails tv of
-          SkolemTv {} -> tv `elemVarSet` skol_tv_set
-          _           -> False
 
 -- | Returns Given constraints that might,
 -- potentially, match the given pred. This is used when checking to see if a
@@ -2248,6 +2249,8 @@ are some wrinkles:
 
 Note [Let-bound skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
+"RAE": Update note.
+
 If   * the inert set contains a canonical Given CEqCan (a ~ ty)
 and  * 'a' is a skolem bound in this very implication,
 
