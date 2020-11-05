@@ -1819,6 +1819,49 @@ a truly higher-rank type like so:
 Then the same situation will arise again. But at least it won't arise for the
 common case of methods with ordinary, prenex-quantified types.
 
+-----
+-- Wrinkle: higher-rank type synonyms
+-----
+
+One consequence of omitting `forall`s in the type arguments to `coerce` is that
+we must take extra care when a method type uses a higher-rank type synonym.
+Consider the following example from #18914:
+
+  type T f = forall a. f a
+
+  class C f where
+    m :: T f
+
+  newtype N f a = MkN (f a)
+    deriving C
+
+What code should `deriving C` generate? It will have roughly the following
+shape:
+
+  instance C f => C (N f) where
+    m :: T (N f)
+    m = coerce @(...) (...) (m @f)
+
+At a minimum, we must instantiate `coerce` with `@(T f)` and `@(T (N f))`, but
+with the `forall`s removed in order to make them monotypes. However, the
+`forall` is hidden underneath the `T` type synonym, so we must first expand `T`
+before we can strip of the `forall`. Expanding `T`, we get
+`coerce @(forall a. f a) @(forall a. N f a)`, and after omitting the `forall`s,
+we get `coerce @(f a) @(N f a)`.
+
+We can't stop there, however, or else we would end up with this code:
+
+  instance C f => C (N f) where
+    m :: T (N f)
+    m = coerce @(f a) @(N f a) (m @f)
+
+Notice that the type variable `a` is completely unbound. In order to make sure
+that `a` is in scope, we must /also/ expand the `T` in `m :: T (N f)` to get
+`m :: forall a. N f a`. Moreover, we must also make sure to put the `a` in an
+HsOuterExplicit to make sure that `a` is brought into scope over the body of
+`m` via `ScopedTypeVariables`. See Note [Lexically scoped type variables]
+in GHC.Hs.Type.
+
 Note [GND and ambiguity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 We make an effort to make the code generated through GND be robust w.r.t.
@@ -1891,13 +1934,33 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         , -- The derived instance signature, e.g.,
           --
           --   op :: forall c. a -> [T x] -> c -> Int
+          --
+          -- Make sure that:
+          --
+          -- - Type synonyms in the type of `op` are expanded. The use of
+          --   tcSplitForAllTysInvis below accomplishes this as a side effect.
+          --
+          -- - `forall c` is in an HsOuterExplicit so that it scopes over the
+          --   body of `op`.
+          --
+          -- See "Wrinkle: higher-rank type synonyms" in
+          -- Note [GND and QuantifiedConstraints].
           L loc $ ClassOpSig noExtField False [loc_meth_RDR]
-                $ L loc $ mkHsImplicitSigType $ nlHsCoreTy to_ty
+                $ L loc $ mkHsExplicitSigType
+                            (map mk_hs_tvb to_tvbs)
+                            (nlHsCoreTy to_rho)
         )
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
-        (_, _, from_tau) = tcSplitSigmaTy from_ty
-        (_, _, to_tau)   = tcSplitSigmaTy to_ty
+        (_, _, from_tau)  = tcSplitSigmaTy from_ty
+        (to_tvbs, to_rho) = tcSplitForAllTysInvis to_ty
+        (_, to_tau)       = tcSplitPhiTy to_rho
+
+        mk_hs_tvb :: VarBndr TyVar flag -> LHsTyVarBndr flag GhcPs
+        mk_hs_tvb (Bndr tv flag) = noLoc $ KindedTyVar noExtField
+                                                       flag
+                                                       (noLoc (getRdrName tv))
+                                                       (nlHsCoreTy (tyVarKind tv))
 
         meth_RDR = getRdrName meth_id
         loc_meth_RDR = L loc meth_RDR
@@ -1951,7 +2014,7 @@ nlHsAppType e s = noLoc (HsAppType noExtField e hs_ty)
     hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec $ nlHsCoreTy s
 
 nlHsCoreTy :: Type -> LHsType GhcPs
-nlHsCoreTy = noLoc . XHsType . NHsCoreTy
+nlHsCoreTy = noLoc . XHsType . HsCoreTy
 
 mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> [TyVar] -- the tvs in the instance head (this includes
@@ -2079,15 +2142,15 @@ genAuxBindSpecDup loc original_rdr_name dup_spec
 genAuxBindSpecSig :: SrcSpan -> AuxBindSpec -> LHsSigWcType GhcPs
 genAuxBindSpecSig loc spec = case spec of
   DerivCon2Tag tycon _
-    -> mk_sig $ L loc $ XHsType $ NHsCoreTy $
+    -> mk_sig $ L loc $ XHsType $ HsCoreTy $
        mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
        mkParentType tycon `mkVisFunTyMany` intPrimTy
   DerivTag2Con tycon _
     -> mk_sig $ L loc $
-       XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
+       XHsType $ HsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
        intTy `mkVisFunTyMany` mkParentType tycon
   DerivMaxTag _ _
-    -> mk_sig (L loc (XHsType (NHsCoreTy intTy)))
+    -> mk_sig (L loc (XHsType (HsCoreTy intTy)))
   DerivDataDataType _ _ _
     -> mk_sig (nlHsTyVar dataType_RDR)
   DerivDataConstr _ _ _

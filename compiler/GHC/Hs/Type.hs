@@ -24,7 +24,7 @@ module GHC.Hs.Type (
         HsArrow(..), arrowToHsType,
         hsLinear, hsUnrestricted, isUnrestricted,
 
-        HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
+        HsType(..), HsCoreTy(..), LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
@@ -1077,16 +1077,19 @@ data HsType pass
   | XHsType
       (XXType pass)
 
-data NewHsTypeX
-  = NHsCoreTy Type -- An escape hatch for tunnelling a *closed*
-                   -- Core Type through HsSyn.
-                   -- See also Note [Typechecking NHsCoreTys] in
-                   -- GHC.Tc.Gen.HsType.
-    deriving Data
+-- An escape hatch for tunnelling a Core 'Type' through 'HsType'.
+-- For more details on how this works, see:
+--
+-- * @Note [Renaming HsCoreTys]@ in "GHC.Rename.HsType"
+--
+-- * @Note [Typechecking HsCoreTys]@ in "GHC.Tc.Gen.HsType"
+newtype HsCoreTy
+  = HsCoreTy Type
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
+    deriving Data
 
-instance Outputable NewHsTypeX where
-  ppr (NHsCoreTy ty) = ppr ty
+instance Outputable HsCoreTy where
+  ppr (HsCoreTy ty) = ppr ty
 
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
@@ -1124,7 +1127,7 @@ type instance XTyLit           (GhcPass _) = NoExtField
 
 type instance XWildCardTy      (GhcPass _) = NoExtField
 
-type instance XXType         (GhcPass _) = NewHsTypeX
+type instance XXType         (GhcPass _) = HsCoreTy
 
 
 -- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
@@ -2250,7 +2253,7 @@ hsTypeNeedsParens p = go_hs_ty
     go_hs_ty (HsOpTy{})               = p >= opPrec
     go_hs_ty (HsParTy{})              = False
     go_hs_ty (HsDocTy _ (L _ t) _)    = go_hs_ty t
-    go_hs_ty (XHsType (NHsCoreTy ty)) = go_core_ty ty
+    go_hs_ty (XHsType (HsCoreTy ty))  = go_core_ty ty
 
     go_core_ty (TyVarTy{})    = False
     go_core_ty (AppTy{})      = p >= appPrec
