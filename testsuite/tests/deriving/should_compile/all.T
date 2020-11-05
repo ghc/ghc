@@ -127,3 +127,4 @@ test('T17339', normal, compile,
 test('T17880', normal, compile, [''])
 test('T18055', normal, compile, [''])
 test('T18321', normal, compile, [''])
+test('T18914', normal, compile, [''])

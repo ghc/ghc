@@ -291,7 +291,7 @@ no_anon_wc_ty lty = go lty
       HsTyLit{} -> True
       HsTyVar{} -> True
       HsStarTy{} -> True
-      XHsType (NHsCoreTy{}) -> True      -- Core type, which does not have any wildcard
+      XHsType{} -> True       -- HsCoreTy, which does not have any wildcard
 
     gos = all go
 

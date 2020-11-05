@@ -2082,7 +2082,7 @@ mkDefMethBind dfun_id clas sel_id dm_name
 
     mk_vta :: LHsExpr GhcRn -> Type -> LHsExpr GhcRn
     mk_vta fun ty = noLoc (HsAppType noExtField fun (mkEmptyWildCardBndrs $ nlHsParTy
-                                                $ noLoc $ XHsType $ NHsCoreTy ty))
+                                                $ noLoc $ XHsType ty))
        -- NB: use visible type application
        -- See Note [Default methods in instances]
 

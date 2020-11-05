@@ -24,7 +24,7 @@ module GHC.Hs.Type (
         HsArrow(..), arrowToHsType,
         hsLinear, hsUnrestricted, isUnrestricted,
 
-        HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
+        HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
@@ -1040,12 +1040,6 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-  -- | HsCoreTy (XCoreTy pass) Type -- An escape hatch for tunnelling a *closed*
-  --                                -- Core Type through HsSyn.
-  --     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
-
-      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-
   | HsExplicitListTy       -- A promoted explicit list
         (XExplicitListTy pass)
         PromotionFlag      -- whether explicitly promoted, for pretty printer
@@ -1078,16 +1072,13 @@ data HsType pass
   | XHsType
       (XXType pass)
 
-data NewHsTypeX
-  = NHsCoreTy Type -- An escape hatch for tunnelling a *closed*
-                   -- Core Type through HsSyn.
-                   -- See also Note [Typechecking NHsCoreTys] in
-                   -- GHC.Tc.Gen.HsType.
-    deriving Data
-      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
-
-instance Outputable NewHsTypeX where
-  ppr (NHsCoreTy ty) = ppr ty
+-- An escape hatch for tunnelling a Core 'Type' through 'HsType'.
+-- For more details on how this works, see:
+--
+-- * @Note [Renaming HsCoreTys]@ in "GHC.Rename.HsType"
+--
+-- * @Note [Typechecking HsCoreTys]@ in "GHC.Tc.Gen.HsType"
+type HsCoreTy = Type
 
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
@@ -1125,7 +1116,7 @@ type instance XTyLit           (GhcPass _) = NoExtField
 
 type instance XWildCardTy      (GhcPass _) = NoExtField
 
-type instance XXType         (GhcPass _) = NewHsTypeX
+type instance XXType         (GhcPass _) = HsCoreTy
 
 
 -- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
@@ -2256,7 +2247,7 @@ hsTypeNeedsParens p = go_hs_ty
     go_hs_ty (HsOpTy{})               = p >= opPrec
     go_hs_ty (HsParTy{})              = False
     go_hs_ty (HsDocTy _ (L _ t) _)    = go_hs_ty t
-    go_hs_ty (XHsType (NHsCoreTy ty)) = go_core_ty ty
+    go_hs_ty (XHsType ty)             = go_core_ty ty
 
     go_core_ty (TyVarTy{})    = False
     go_core_ty (AppTy{})      = p >= appPrec
