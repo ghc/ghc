@@ -2057,32 +2057,7 @@ getNoGivenEqs :: TcLevel          -- TcLevel of this implication
 getNoGivenEqs tclvl skol_tvs
   = do { inerts@(IC { inert_eqs = ieqs, inert_funeqs = funeqs, inert_irreds = irreds })
               <- getInertCans
-       ; tc_lvl <- getTcLevel
-       ; let is_local_given_ct :: Ct -> Bool
-             is_local_given_ct = ct_given_here <&&> ct_mentions_outer_var
-
-             is_local_given_equal_ct_list :: EqualCtList -> Bool
-             is_local_given_equal_ct_list [ct] = is_local_given_ct ct
-               -- Givens are always singletons in an EqualCtList
-             is_local_given_equal_ct_list _    = False
-
-             ct_given_here :: Ct -> Bool
-             -- True for a Given bound by the current implication,
-             -- i.e. the current level
-             ct_given_here ct =  isGiven ev
-                              && tclvl == ctLocLevel (ctEvLoc ev)
-                 where
-                   ev = ctEvidence ct
-
-             ct_mentions_outer_var :: Ct -> Bool
-             ct_mentions_outer_var = anyFreeVarsOfType is_outer_var . ctPred
-
-             is_outer_var :: TyCoVar -> Bool
-             is_outer_var tv
-               | isTyVar tv = tc_lvl `strictlyDeeperThan` tcTyVarLevel tv
-               | otherwise  = False
-
-             has_given_eqs = anyBag is_local_given_ct irreds
+       ; let has_given_eqs = anyBag is_local_given_ct irreds
                           || anyDVarEnv is_local_given_equal_ct_list ieqs
                           || anyFunEqMap funeqs is_local_given_equal_ct_list
              insols = filterBag insolubleEqCt irreds
@@ -2097,6 +2072,28 @@ getNoGivenEqs tclvl skol_tvs
               , text "Inerts:" <+> ppr inerts
               , text "Insols:" <+> ppr insols]
        ; return (not has_given_eqs, insols) }
+  where
+    is_local_given_ct :: Ct -> Bool
+    is_local_given_ct = (given_here <&&> mentions_outer_var) . ctEvidence
+
+    is_local_given_equal_ct_list :: EqualCtList -> Bool
+    is_local_given_equal_ct_list [ct] = is_local_given_ct ct
+      -- Givens are always singletons in an EqualCtList
+    is_local_given_equal_ct_list _    = False
+
+    given_here :: CtEvidence -> Bool
+    -- True for a Given bound by the current implication,
+    -- i.e. the current level
+    given_here ev =  isGiven ev
+                  && tclvl == ctLocLevel (ctEvLoc ev)
+
+    mentions_outer_var :: CtEvidence -> Bool
+    mentions_outer_var = anyFreeVarsOfType is_outer_var . ctEvPred
+
+    is_outer_var :: TyCoVar -> Bool
+    is_outer_var tv
+      | isTyVar tv = tclvl `strictlyDeeperThan` tcTyVarLevel tv
+      | otherwise  = False
 
 -- | Returns Given constraints that might,
 -- potentially, match the given pred. This is used when checking to see if a
