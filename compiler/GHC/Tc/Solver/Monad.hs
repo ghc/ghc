@@ -756,8 +756,6 @@ The Wanteds can't rewrite anything which is why we put them last
 
 Note [inert_eqs: the inert equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-"RAE": update. Don't forget to update (K1). See kick_out_rewritable
-
 Definition [Can-rewrite relation]
 A "can-rewrite" relation between flavours, written f1 >= f2, is a
 binary relation with the following properties
@@ -770,25 +768,24 @@ Lemma.  If f1 >= f then f1 >= f1
 Proof.  By property (R2), with f1=f2
 
 Definition [Generalised substitution]
-A "generalised substitution" S is a set of triples (a -f-> t), where
-  a is a type variable
+A "generalised substitution" S is a set of triples (t0 -f-> t), where
+  t0 is a type variable or an exactly-saturated type family application
   t is a type
   f is a flavour
 such that
-  (WF1) if (a -f1-> t1) in S
-           (a -f2-> t2) in S
-        then neither (f1 >= f2) nor (f2 >= f1) hold
-  (WF2) if (a -f-> t) is in S, then t /= a
+  (WF1) if (t0 -f1-> t1) in S
+           (t0' -f2-> t2) in S
+        then either not (f1 >= f2) or t0 does not appear within t0'
+  (WF2) if (t0 -f-> t) is in S, then t /= t0
 
 Definition [Applying a generalised substitution]
 If S is a generalised substitution
-   S(f,a) = t,  if (a -fs-> t) in S, and fs >= f
-          = a,  otherwise
-Application extends naturally to types S(f,t), modulo roles.
-See Note [Flavours with roles].
+   S(f,t0) = t,  if (t0 -fs-> t) in S, and fs >= f
+           = apply S to components of t0, otherwise
+See also Note [Flavours with roles].
 
-Theorem: S(f,a) is well defined as a function.
-Proof: Suppose (a -f1-> t1) and (a -f2-> t2) are both in S,
+Theorem: S(f,t0) is well defined as a function.
+Proof: Suppose (t0 -f1-> t1) and (t0 -f2-> t2) are both in S,
                and  f1 >= f and f2 >= f
        Then by (R2) f1 >= f2 or f2 >= f1, which contradicts (WF1)
 
@@ -811,40 +808,41 @@ Our main invariant:
 ----------------------------------------------------------------
 
 Note that inertness is not the same as idempotence.  To apply S to a
-type, you may have to apply it recursive.  But inertness does
+type, you may have to apply it recursively.  But inertness does
 guarantee that this recursive use will terminate.
 
 Note [Extending the inert equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Main Theorem [Stability under extension]
    Suppose we have a "work item"
-       a -fw-> t
+       t0 -fw-> t
    and an inert generalised substitution S,
-   THEN the extended substitution T = S+(a -fw-> t)
+   THEN the extended substitution T = S+(t0 -fw-> t)
         is an inert generalised substitution
    PROVIDED
-      (T1) S(fw,a) = a     -- LHS of work-item is a fixpoint of S(fw,_)
-      (T2) S(fw,t) = t     -- RHS of work-item is a fixpoint of S(fw,_)
-      (T3) a not in t      -- No occurs check in the work item
+      (T1) S(fw,t0) = t0     -- LHS of work-item is a fixpoint of S(fw,_)
+      (T2) S(fw,t)  = t      -- RHS of work-item is a fixpoint of S(fw,_)
+      (T3) t0 not in t       -- No occurs check in the work item
 
-      AND, for every (b -fs-> s) in S:
+      AND, for every (t0' -fs-> s) in S:
            (K0) not (fw >= fs)
                 Reason: suppose we kick out (a -fs-> s),
-                        and add (a -fw-> t) to the inert set.
+                        and add (t0 -fw-> t) to the inert set.
                         The latter can't rewrite the former,
                         so the kick-out achieved nothing
 
-           OR { (K1) not (
+           OR { (K1) t0 is not rewritable in t0'. That is, t0 does not occur
+                     in t0' (except perhaps in a cast or coercion).
                      Reason: if fw >= fs, WF1 says we can't have both
-                             a -fw-> t  and  a -fs-> s
+                             t0 -fw-> t  and  F t0 -fs-> s
 
                 AND (K2): guarantees inertness of the new substitution
                     {  (K2a) not (fs >= fs)
                     OR (K2b) fs >= fw
-                    OR (K2d) a not in s }
+                    OR (K2d) t0 not in s }
 
                 AND (K3) See Note [K3: completeness of solving]
-                    { (K3a) If the role of fs is nominal: s /= a
+                    { (K3a) If the role of fs is nominal: s /= t0
                       (K3b) If the role of fs is representational:
                             s is not of form (a t1 .. tn) } }
 
@@ -883,10 +881,10 @@ The idea is that
   It's used to avoid even looking for constraint to kick out.
 
 * Lemma (L1): The conditions of the Main Theorem imply that there is no
-              (a -fs-> t) in S, s.t.  (fs >= fw).
+              (t0 -fs-> t) in S, s.t.  (fs >= fw).
   Proof. Suppose the contrary (fs >= fw).  Then because of (T1),
-  S(fw,a)=a.  But since fs>=fw, S(fw,a) = s, hence s=a.  But now we
-  have (a -fs-> a) in S, which contradicts (WF2).
+  S(fw,t0)=t0.  But since fs>=fw, S(fw,t0) = s, hence s=t0.  But now we
+  have (t0 -fs-> t0) in S, which contradicts (WF2).
 
 * The extended substitution satisfies (WF1) and (WF2)
   - (K1) plus (L1) guarantee that the extended substitution satisfies (WF1).

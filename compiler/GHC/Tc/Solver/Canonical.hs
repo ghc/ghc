@@ -1596,7 +1596,7 @@ In this Note, "decomposition" refers to taking the constraint
 where that notation indicates a list of new constraints, where the
 new constraints may have different flavours and different roles.
 
-The key property to consider is injectivity. When decomposing a Given the
+The key property to consider is injectivity. When decomposing a Given, the
 decomposition is sound if and only if T is injective in all of its type
 arguments. When decomposing a Wanted, the decomposition is sound (assuming the
 correct roles in the produced equality constraints), but it may be a guess --
@@ -1614,13 +1614,13 @@ Pursuing the details requires exploring three axes:
 * Role: Nominal vs. Representational
 * TyCon species: datatype vs. newtype vs. data family vs. type family vs. type variable
 
-(So a type variable isn't a TyCon, but it's convenient to put the AppTy case
+(A type variable isn't a TyCon, of course, but it's convenient to put the AppTy case
 in the same table.)
 
 Right away, we can say that Derived behaves just as Wanted for the purposes
 of decomposition. The difference between Derived and Wanted is the handling of
 evidence. Since decomposition in these cases isn't a matter of soundness but of
-guessing, we want the same behavior regardless of evidence.
+guessing, we want the same behaviour regardless of evidence.
 
 Here is a table (discussion following) detailing where decomposition of
    (T s1 ... sn) ~r (T t1 .. tn)
@@ -1634,7 +1634,7 @@ NOMINAL               GIVEN        WANTED                         WHERE
 Datatype               YES          YES                           canTyConApp
 Newtype                YES          YES                           canTyConApp
 Data family            YES          YES                           canTyConApp
-Type family            NO{1}        YES, in injective args{1}     canEqFun
+Type family            NO{1}        YES, in injective args{1}     canEqCanLHS2
 AppTy                  YES          YES                           can_eq_app
 
 REPRESENTATIONAL      GIVEN        WANTED
@@ -1642,10 +1642,8 @@ REPRESENTATIONAL      GIVEN        WANTED
 Datatype               YES          YES                           canTyConApp
 Newtype                NO{2}       MAYBE{2}                canTyConApp(can_decompose)
 Data family            NO{3}       MAYBE{3}                canTyConApp(can_decompose)
-Type family            NO           NO                            canEqFun
+Type family            NO           NO                            canEqCanLHS2
 AppTy                  NO{4}        NO{4}                         can_eq_nc'
-
-"RAE" update all this; no more canEqFun
 
 {1}: Type families can be injective in some, but not all, of their arguments,
 so we want to do partial decomposition. This is quite different than the way
@@ -1658,9 +1656,9 @@ decompose an injective-type-family Given.
 {2}: See Note [Decomposing newtypes at representational role]
 
 {3}: Because of the possibility of newtype instances, we must treat
-data families like newtypes. See also Note [Decomposing newtypes at
-representational role]. See #10534 and test case
-typecheck/should_fail/T10534.
+data families like newtypes. See also
+Note [Decomposing newtypes at representational role]. See #10534 and
+test case typecheck/should_fail/T10534.
 
 {4}: See Note [Decomposing AppTy at representational role]
 
@@ -2189,7 +2187,8 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
                | otherwise  -- ordinary, non-injective type family
                = []
 
-       ; mapM_ (unifyDerived (ctEvLoc ev) Nominal) inj_eqns
+       ; unless (isGiven ev) $
+         mapM_ (unifyDerived (ctEvLoc ev) Nominal) inj_eqns
 
        ; tclvl <- getTcLevel
        ; dflags <- getDynFlags

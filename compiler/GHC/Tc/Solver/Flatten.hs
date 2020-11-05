@@ -273,11 +273,9 @@ flattenType loc ty
 
 {- Note [Flattening]
 ~~~~~~~~~~~~~~~~~~~~
-"RAE": update
-
   flatten ty  ==>   (xi, co)
     where
-      xi has no type functions, unless they appear under ForAlls
+      xi has no reducible type functions
          has no skolems that are mapped in the inert set
          has no filled-in metavariables
       co :: xi ~ ty
@@ -287,8 +285,7 @@ Key invariants:
   (F1) tcTypeKind(xi) succeeds and returns a fully zonked kind
   (F2) tcTypeKind(xi) `eqType` zonk(tcTypeKind(ty))
 
-Note that it is flatten's job to flatten *every type function it sees*.
-flatten is only called on *arguments* to type functions, by canEqGiven.
+Note that it is flatten's job to try to reduce *every type function it sees*.
 
 Flattening also:
   * zonks, removing any metavariables, and
@@ -323,22 +320,12 @@ Recall that in comments we use alpha[flat = ty] to represent a
 flattening skolem variable alpha which has been generated to stand in
 for ty.
 
------ Example of flattening a constraint: ------
-  flatten (List (F (G Int)))  ==>  (xi, cc)
-    where
-      xi  = List alpha
-      cc  = { G Int ~ beta[flat = G Int],
-              F beta ~ alpha[flat = F beta] }
-Here
-  * alpha and beta are 'flattening skolem variables'.
-  * All the constraints in cc are 'given', and all their coercion terms
-    are the identity.
-
 Note that we prefer to leave type synonyms unexpanded when possible,
 so when the flattener encounters one, it first asks whether its
-transitive expansion contains any type function applications.  If so,
+transitive expansion contains any type function applications or is
+forgetful -- that is, omits one or more type variables in its RHS.  If so,
 it expands the synonym and proceeds; if not, it simply returns the
-unexpanded synonym.
+unexpanded synonym. See also Note [Flattening synonyms].
 
 Note [flatten_args performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
