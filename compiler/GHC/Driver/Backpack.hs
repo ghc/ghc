@@ -531,18 +531,18 @@ mkBackpackMsg = do
       in case node of
            InstantiationNode _ ->
              case recomp of
-                 MustCompile -> showMsg (text "Instantiating ") empty
+                 MustCompile -> showMsg (ftext $ fsLit "Instantiating ") empty
                  UpToDate
-                     | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+                     | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (ftext $ fsLit "Skipping  ") empty
                      | otherwise -> return ()
-                 RecompBecause reason -> showMsg (text "Instantiating ") (text " [" <> text reason <> text "]")
+                 RecompBecause reason -> showMsg (ftext $ fsLit "Instantiating ") (text " [" <> ftext (fsLit reason) <> text "]")
            ModuleNode _ ->
              case recomp of
-               MustCompile -> showMsg (text "Compiling ") empty
+               MustCompile -> showMsg (ftext (fsLit "Compiling ")) empty
                UpToDate
-                 | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+                 | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (ftext (fsLit "Skipping  ")) empty
                  | otherwise -> return ()
-               RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
+               RecompBecause reason -> showMsg (ftext (fsLit "Compiling ")) (text " [" <> ftext (fsLit  reason) <> text "]")
 
 -- | 'PprStyle' for Backpack messages; here we usually want the module to
 -- be qualified (so we can tell how it was instantiated.) But we try not
@@ -830,9 +830,7 @@ hsModuleToModSummary pn hsc_src modname
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
 
     let normal_imports = map convImport (implicit_imports ++ ordinary_imps)
-    res <- liftIO $ implicitRequirementsShallow hsc_env normal_imports
-
-    let (implicit_sigs, inst_deps) = partitionEithers res
+    (implicit_sigs, inst_deps) <- liftIO $ implicitRequirementsShallow hsc_env normal_imports
 
     -- So that Finder can find it, even though it doesn't exist...
     this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location

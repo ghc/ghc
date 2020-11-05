@@ -2778,9 +2778,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
   hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
 
   extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
-  res <- implicitRequirementsShallow hsc_env pi_theimps
-
-  let (implicit_sigs, inst_deps) = partitionEithers res
+  (implicit_sigs, inst_deps) <- implicitRequirementsShallow hsc_env pi_theimps
 
   return $ ExtendedModSummary
     { emsModSummary =
