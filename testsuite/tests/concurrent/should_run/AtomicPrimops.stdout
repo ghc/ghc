@@ -6,3 +6,4 @@ fetchXorTest: OK
 casTest: OK
 casTestAddr: OK
 readWriteTest: OK
+fetchAddSubAddrTest: OK

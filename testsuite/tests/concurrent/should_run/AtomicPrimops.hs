@@ -26,8 +26,9 @@ main = do
     casTest
     casTestAddr
     readWriteTest
+    fetchAddSubAddrTest
 
--- | Test fetchAddIntArray# by having two threads concurrenctly
+-- | Test fetchAddIntArray# by having two threads concurrently
 -- increment a counter and then checking the sum at the end.
 fetchAddSubTest :: IO ()
 fetchAddSubTest = do
@@ -41,7 +42,21 @@ fetchAddSubTest = do
     work op mba 0 val = return ()
     work op mba n val = op mba 0 val >> work op mba (n-1) val
 
--- | Test fetchXorIntArray# by having two threads concurrenctly XORing
+-- | Test fetchAddWordAddr# by having two threads concurrently
+-- increment a counter and then checking the sum at the end.
+fetchAddSubAddrTest :: IO ()
+fetchAddSubAddrTest = do
+    tot <- raceAddr 0
+        (\ addr -> work fetchAddWordPtr addr iters 2)
+        (\ addr -> work fetchSubWordPtr addr iters 1)
+    assertEq 1000000 tot "fetchAddSubAddrTest"
+  where
+    work :: (Ptr Word -> Word -> IO ()) -> Ptr Word -> Int -> Word
+         -> IO ()
+    work op addr 0 val = return ()
+    work op addr n val = op addr val >> work op addr (n-1) val
+
+-- | Test fetchXorIntArray# by having two threads concurrently XORing
 -- and then checking the result at the end. Works since XOR is
 -- commutative.
 --
@@ -133,7 +148,7 @@ fetchOrTest = fetchOpTest fetchOrIntArray expected "fetchOrTest"
             = fromIntegral (3722313727 :: Word)
 
 -- | Test casIntArray# by using it to emulate fetchAddIntArray# and
--- then having two threads concurrenctly increment a counter,
+-- then having two threads concurrently increment a counter,
 -- checking the sum at the end.
 casTest :: IO ()
 casTest = do
@@ -188,7 +203,7 @@ race n0 thread1 thread2 = do
     mapM_ takeMVar [done1, done2]
     readIntArray mba 0
 
--- | Test atomicCasWordAddr# by having two threads concurrenctly increment a
+-- | Test atomicCasWordAddr# by having two threads concurrently increment a
 -- counter, checking the sum at the end.
 casTestAddr :: IO ()
 casTestAddr = do
@@ -209,23 +224,23 @@ casTestAddr = do
             old' <- atomicCasWordPtr ptr old (old + n)
             when (old /= old') $ go old'
 
-    -- | Create two threads that mutate the byte array passed to them
-    -- concurrently. The array is one word large.
-    raceAddr :: Word                -- ^ Initial value of array element
-            -> (Ptr Word -> IO ())  -- ^ Thread 1 action
-            -> (Ptr Word -> IO ())  -- ^ Thread 2 action
-            -> IO Word              -- ^ Final value of array element
-    raceAddr n0 thread1 thread2 = do
-        done1 <- newEmptyMVar
-        done2 <- newEmptyMVar
-        ptr <- asWordPtr <$> callocBytes (sizeOf (undefined :: Word))
-        forkIO $ thread1 ptr >> putMVar done1 ()
-        forkIO $ thread2 ptr >> putMVar done2 ()
-        mapM_ takeMVar [done1, done2]
-        peek ptr
-      where
-        asWordPtr :: Ptr a -> Ptr Word
-        asWordPtr = castPtr
+-- | Create two threads that mutate the byte array passed to them
+-- concurrently. The array is one word large.
+raceAddr :: Word                -- ^ Initial value of array element
+        -> (Ptr Word -> IO ())  -- ^ Thread 1 action
+        -> (Ptr Word -> IO ())  -- ^ Thread 2 action
+        -> IO Word              -- ^ Final value of array element
+raceAddr n0 thread1 thread2 = do
+    done1 <- newEmptyMVar
+    done2 <- newEmptyMVar
+    ptr <- asWordPtr <$> callocBytes (sizeOf (undefined :: Word))
+    forkIO $ thread1 ptr >> putMVar done1 ()
+    forkIO $ thread2 ptr >> putMVar done2 ()
+    mapM_ takeMVar [done1, done2]
+    peek ptr
+  where
+    asWordPtr :: Ptr a -> Ptr Word
+    asWordPtr = castPtr
 
 ------------------------------------------------------------------------
 -- Test helper
@@ -312,3 +327,13 @@ atomicCasWordPtr :: Ptr Word -> Word -> Word -> IO Word
 atomicCasWordPtr (Ptr addr#) (W# old#) (W# new#) = IO $ \ s# ->
     case atomicCasWordAddr# addr# old# new# s# of
         (# s2#, old2# #) -> (# s2#, W# old2# #)
+
+fetchAddWordPtr :: Ptr Word -> Word -> IO ()
+fetchAddWordPtr (Ptr addr#) (W# n#) = IO $ \ s# ->
+    case fetchAddWordAddr# addr# n# s# of
+        (# s2#, _ #) -> (# s2#, () #)
+
+fetchSubWordPtr :: Ptr Word -> Word -> IO ()
+fetchSubWordPtr (Ptr addr#) (W# n#) = IO $ \ s# ->
+    case fetchSubWordAddr# addr# n# s# of
+        (# s2#, _ #) -> (# s2#, () #)
