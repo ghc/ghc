@@ -247,13 +247,13 @@ floatKindEqualities wc = float_wc emptyVarSet wc
            | otherwise        = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
 
     float_implic :: TcTyCoVarSet -> Implication -> Maybe (Bag Ct, Bag Hole)
-    float_implic trapping_tvs (Implic { ic_wanted = wanted, ic_no_eqs = no_eqs
+    float_implic trapping_tvs (Implic { ic_wanted = wanted, ic_given_eqs = given_eqs
                                       , ic_skols = skols, ic_status = status })
       | isInsolubleStatus status
       = Nothing   -- A short cut /plus/ we must keep track of IC_BadTelescope
       | otherwise
       = do { (simples, holes) <- float_wc new_trapping_tvs wanted
-           ; when (not (isEmptyBag simples) && not no_eqs) $
+           ; when (not (isEmptyBag simples) && given_eqs /= NoGivenEqs) $
              Nothing
                  -- If there are some constraints to float out, but we can't
                  -- because we don't float out past local equalities
@@ -1004,13 +1004,13 @@ mkResidualConstraints rhs_tclvl ev_binds_var
                      then return emptyBag
                      else do implic1 <- newImplication
                              return $ unitBag $
-                                      implic1  { ic_tclvl  = rhs_tclvl
-                                               , ic_skols  = qtvs
-                                               , ic_given  = full_theta_vars
-                                               , ic_wanted = inner_wanted
-                                               , ic_binds  = ev_binds_var
-                                               , ic_no_eqs = False
-                                               , ic_info   = skol_info }
+                                      implic1  { ic_tclvl     = rhs_tclvl
+                                               , ic_skols     = qtvs
+                                               , ic_given     = full_theta_vars
+                                               , ic_wanted    = inner_wanted
+                                               , ic_binds     = ev_binds_var
+                                               , ic_given_eqs = MaybeGivenEqs
+                                               , ic_info      = skol_info }
 
         ; return (emptyWC { wc_simple = outer_simple
                           , wc_impl   = implics })}
@@ -1789,7 +1789,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
        -- ; when debugIsOn check_tc_level
 
          -- Solve the nested constraints
-       ; (no_given_eqs, given_insols, residual_wanted)
+       ; (has_given_eqs, given_insols, residual_wanted)
             <- nestImplicTcS ev_binds_var tclvl $
                do { let loc    = mkGivenLoc tclvl info (ic_env imp)
                         givens = mkGivens loc given_ids
@@ -1800,16 +1800,16 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                         -- we want to retain derived equalities so we can float
                         -- them out in floatEqualities
 
-                  ; (no_eqs, given_insols) <- getNoGivenEqs tclvl skols
-                        -- Call getNoGivenEqs /after/ solveWanteds, because
+                  ; (has_eqs, given_insols) <- getHasGivenEqs tclvl
+                        -- Call getHasGivenEqs /after/ solveWanteds, because
                         -- solveWanteds can augment the givens, via expandSuperClasses,
                         -- to reveal given superclass equalities
 
-                  ; return (no_eqs, given_insols, residual_wanted) }
+                  ; return (has_eqs, given_insols, residual_wanted) }
 
        ; (floated_eqs, residual_wanted)
              <- floatEqualities skols given_ids ev_binds_var
-                                no_given_eqs residual_wanted
+                                has_given_eqs residual_wanted
 
        ; traceTcS "solveImplication 2"
            (ppr given_insols $$ ppr residual_wanted)
@@ -1817,13 +1817,13 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
              -- Don't lose track of the insoluble givens,
              -- which signal unreachable code; put them in ic_wanted
 
-       ; res_implic <- setImplicationStatus (imp { ic_no_eqs = no_given_eqs
+       ; res_implic <- setImplicationStatus (imp { ic_given_eqs = has_given_eqs
                                                  , ic_wanted = final_wanted })
 
        ; evbinds <- TcS.getTcEvBindsMap ev_binds_var
        ; tcvs    <- TcS.getTcEvTyCoVars ev_binds_var
        ; traceTcS "solveImplication end }" $ vcat
-             [ text "no_given_eqs =" <+> ppr no_given_eqs
+             [ text "has_given_eqs =" <+> ppr has_given_eqs
              , text "floated_eqs =" <+> ppr floated_eqs
              , text "res_implic =" <+> ppr res_implic
              , text "implication evbinds =" <+> ppr (evBindMapBinds evbinds)
@@ -2258,7 +2258,7 @@ approximateWC float_past_equalities wc
 
     float_implic :: TcTyCoVarSet -> Implication -> Cts
     float_implic trapping_tvs imp
-      | float_past_equalities || ic_no_eqs imp
+      | float_past_equalities || ic_given_eqs imp == NoGivenEqs
       = float_wc new_trapping_tvs (ic_wanted imp)
       | otherwise   -- Take care with equalities
       = emptyCts    -- See (1) under Note [ApproximateWC]
@@ -2466,7 +2466,7 @@ no evidence for a fundep equality), but equality superclasses do matter (since
 they carry evidence).
 -}
 
-floatEqualities :: [TcTyVar] -> [EvId] -> EvBindsVar -> Bool
+floatEqualities :: [TcTyVar] -> [EvId] -> EvBindsVar -> HasGivenEqs
                 -> WantedConstraints
                 -> TcS (Cts, WantedConstraints)
 -- Main idea: see Note [Float Equalities out of Implications]
@@ -2484,9 +2484,9 @@ floatEqualities :: [TcTyVar] -> [EvId] -> EvBindsVar -> Bool
 -- Subtleties: Note [Float equalities from under a skolem binding]
 --             Note [Skolem escape]
 --             Note [What prevents a constraint from floating]
-floatEqualities skols given_ids ev_binds_var no_given_eqs
+floatEqualities skols given_ids ev_binds_var has_given_eqs
                 wanteds@(WC { wc_simple = simples })
-  | not no_given_eqs  -- There are some given equalities, so don't float
+  | MaybeGivenEqs <- has_given_eqs  -- There are some given equalities, so don't float
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
 
   | otherwise

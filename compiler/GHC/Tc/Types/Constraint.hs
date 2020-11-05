@@ -40,6 +40,7 @@ module GHC.Tc.Types.Constraint (
 
         Implication(..), implicationPrototype,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
+        HasGivenEqs(..),
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
@@ -102,6 +103,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 
 import Control.Monad ( msum )
+import qualified Data.Semigroup ( (<>) )
 
 {-
 ************************************************************************
@@ -1074,8 +1076,7 @@ data Implication
                                  --   (order does not matter)
                                  -- See Invariant (GivenInv) in GHC.Tc.Utils.TcType
 
-      ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
-                                 -- False <=> ic_givens might have equalities
+      ic_given_eqs :: HasGivenEqs,  -- Are there Given equalities here?
 
       ic_warn_inaccessible :: Bool,
                                  -- True  <=> -Winaccessible-code is enabled
@@ -1122,7 +1123,7 @@ implicationPrototype
             , ic_skols      = []
             , ic_given      = []
             , ic_wanted     = emptyWC
-            , ic_no_eqs     = False
+            , ic_given_eqs  = MaybeGivenEqs
             , ic_status     = IC_Unsolved
             , ic_need_inner = emptyVarSet
             , ic_need_outer = emptyVarSet }
@@ -1139,9 +1140,20 @@ data ImplicStatus
 
   | IC_Unsolved   -- Neither of the above; might go either way
 
+-- | Does this implication have Given equalities?
+-- See Note [When does an implication have given equalities?] in GHC.Tc.Solver.Monad
+-- and Note [Suppress redundant givens during error reporting] in GHC.Tc.Errors
+data HasGivenEqs
+  = NoGivenEqs      -- definitely no given equalities
+  | LocalGivenEqs   -- might have Given equalities that affect only local skolems
+                    -- e.g. forall a b. (a ~ F b) => ...; definitely no others
+  | MaybeGivenEqs   -- might have any kind of Given equalities; no floating out
+                    -- is possible.
+  deriving Eq
+
 instance Outputable Implication where
   ppr (Implic { ic_tclvl = tclvl, ic_skols = skols
-              , ic_given = given, ic_no_eqs = no_eqs
+              , ic_given = given, ic_given_eqs = given_eqs
               , ic_wanted = wanted, ic_status = status
               , ic_binds = binds
               , ic_need_inner = need_in, ic_need_outer = need_out
@@ -1149,7 +1161,7 @@ instance Outputable Implication where
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
                , text "Skolems =" <+> pprTyVars skols
-               , text "No-eqs =" <+> ppr no_eqs
+               , text "Given-eqs =" <+> ppr given_eqs
                , text "Status =" <+> ppr status
                , hang (text "Given =")  2 (pprEvVars given)
                , hang (text "Wanted =") 2 (ppr wanted)
@@ -1164,6 +1176,25 @@ instance Outputable ImplicStatus where
   ppr IC_Unsolved     = text "Unsolved"
   ppr (IC_Solved { ics_dead = dead })
     = text "Solved" <+> (braces (text "Dead givens =" <+> ppr dead))
+
+instance Outputable HasGivenEqs where
+  ppr NoGivenEqs    = text "NoGivenEqs"
+  ppr LocalGivenEqs = text "LocalGivenEqs"
+  ppr MaybeGivenEqs = text "MaybeGivenEqs"
+
+-- Used in GHC.Tc.Solver.Monad.getHasGivenEqs
+instance Semigroup HasGivenEqs where
+  NoGivenEqs <> other = other
+  other <> NoGivenEqs = other
+
+  MaybeGivenEqs <> _other = MaybeGivenEqs
+  _other <> MaybeGivenEqs = MaybeGivenEqs
+
+  LocalGivenEqs <> LocalGivenEqs = LocalGivenEqs
+
+-- Used in GHC.Tc.Solver.Monad.getHasGivenEqs
+instance Monoid HasGivenEqs where
+  mempty = NoGivenEqs
 
 {- Note [Checking telescopes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

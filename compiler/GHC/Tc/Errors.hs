@@ -672,7 +672,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
     has_gadt_match [] = False
     has_gadt_match (implic : implics)
       | PatSkol {} <- ic_info implic
-      , not (ic_no_eqs implic)
+      , ic_given_eqs implic /= NoGivenEqs
       , ic_warn_inaccessible implic
           -- Don't bother doing this if -Winaccessible-code isn't enabled.
           -- See Note [Avoid -Winaccessible-code when deriving] in GHC.Tc.TyCl.Instance.
@@ -1630,7 +1630,7 @@ misMatchOrCND insoluble_occurs_check ctxt ct ty1 ty2
     eq_pred = ctEvPred ev
     orig    = ctEvOrigin ev
     level   = ctLocTypeOrKind_maybe (ctEvLoc ev) `orElse` TypeLevel
-    givens  = [ given | given <- getUserGivens ctxt, not (ic_no_eqs given)]
+    givens  = [ given | given <- getUserGivens ctxt, ic_given_eqs given /= NoGivenEqs ]
               -- Keep only UserGivens that have some equalities.
               -- See Note [Suppress redundant givens during error reporting]
 
@@ -1688,7 +1688,7 @@ When reporting that GHC can't solve (a ~ c), there are two givens in scope:
 redundant), so it's not terribly useful to report it in an error message.
 To accomplish this, we discard any Implications that do not bind any
 equalities by filtering the `givens` selected in `misMatchOrCND` (based on
-the `ic_no_eqs` field of the Implication).
+the `ic_given_eqs` field of the Implication).
 
 But this is not enough to avoid all redundant givens! Consider this example,
 from #15361:
@@ -1701,7 +1701,7 @@ Matching on HRefl brings the /single/ given (* ~ *, a ~ b) into scope.
 The (* ~ *) part arises due the kinds of (:~~:) being unified. More
 importantly, (* ~ *) is redundant, so we'd like not to report it. However,
 the Implication (* ~ *, a ~ b) /does/ bind an equality (as reported by its
-ic_no_eqs field), so the test above will keep it wholesale.
+ic_given_eqs field), so the test above will keep it wholesale.
 
 To refine this given, we apply mkMinimalBySCs on it to extract just the (a ~ b)
 part. This works because mkMinimalBySCs eliminates reflexive equalities in
@@ -1743,7 +1743,7 @@ suggestAddSig ctxt ty1 _ty2
 
     -- 'find' returns the binders of an InferSkol for 'tv',
     -- provided there is an intervening implication with
-    -- ic_no_eqs = False (i.e. a GADT match)
+    -- ic_given_eqs /= NoGivenEqs (i.e. a GADT match)
     find [] _ _ = []
     find (implic:implics) seen_eqs tv
        | tv `elem` ic_skols implic
@@ -1751,7 +1751,7 @@ suggestAddSig ctxt ty1 _ty2
        , seen_eqs
        = map fst prs
        | otherwise
-       = find implics (seen_eqs || not (ic_no_eqs implic)) tv
+       = find implics (seen_eqs || ic_given_eqs implic /= NoGivenEqs) tv
 
 --------------------
 misMatchMsg :: ReportErrCtxt -> Ct -> TcType -> TcType -> Report
