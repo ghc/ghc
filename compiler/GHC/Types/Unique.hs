@@ -31,7 +31,7 @@ module GHC.Types.Unique (
 
         mkUniqueGrimily,
         getKey,
-        mkUnique, unpkUnique, uniqFromMask,
+        mkUnique, unpkUnique,
         eqUnique, ltUnique,
         incrUnique, stepUnique,
 
@@ -146,13 +146,6 @@ unpkUnique (MkUnique u)
         i   = u .&. uniqueMask
     in
     (tag, i)
-
-foreign import ccall unsafe "genSym" genSym :: IO Int
-
-uniqFromMask :: Char -> IO Unique
-uniqFromMask mask
-  = do { uqNum <- genSym
-       ; return $! mkUnique mask uqNum }
 
 -- | The interface file symbol-table encoding assumes that known-key uniques fit
 -- in 30-bits; verify this.
