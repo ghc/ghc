@@ -3,11 +3,12 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# OPTIONS_GHC -fno-state-hack #-}
+{-# OPTIONS_GHC -fno-state-hack -ddump-simpl -ddump-to-file #-}
     -- This -fno-state-hack is important
     -- See Note [Optimising the unique supply]
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE BangPatterns #-}
@@ -22,7 +23,7 @@ module GHC.Types.Unique.Supply (
 
         -- ** Operations on supplies
         uniqFromSupply, uniqsFromSupply, -- basic ops
-        takeUniqFromSupply,
+        takeUniqFromSupply, uniqFromMask,
 
         mkSplitUniqSupply,
         splitUniqSupply, listSplitUniqSupply,
@@ -48,9 +49,18 @@ import GHC.Utils.Monad
 import Control.Monad
 import Data.Bits
 import Data.Char
-import GHC.Exts( inline )
+import GHC.Exts( inline, Ptr(..) )
+#if MIN_VERSION_GLASGOW_HASKELL(9,0,0,0)
+import GHC.Exts( Int(..), word2Int#, fetchAddWordAddr# )
+#if defined(DEBUG)
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+#endif
+#endif
+import Foreign.Storable
 
 #include "Unique.h"
+#include "HsVersions.h"
 
 {-
 ************************************************************************
@@ -228,8 +238,40 @@ multiShotIO :: IO a -> IO a
 -- See Note [multiShotIO]
 multiShotIO (IO m) = IO (\s -> inline m s)
 
+#if !MIN_VERSION_GLASGOW_HASKELL(9,0,0,0)
 foreign import ccall unsafe "genSym" genSym :: IO Int
-foreign import ccall unsafe "initGenSym" initUniqSupply :: Int -> Int -> IO ()
+#else
+genSym :: IO Int
+genSym = do
+    let !mask = (1 `unsafeShiftL` uNIQUE_BITS) - 1
+    let !(Ptr counter) = ghc_unique_counter
+    let !(Ptr inc_ptr) = ghc_unique_inc
+    v <- IO $ \s0 -> case readWordOffAddr# inc_ptr 0# s0 of
+        (# s1, inc #) -> case fetchAddWordAddr# counter inc s1 of
+            (# s2, val #) ->
+                let !u = I# (word2Int# (val `plusWord#` inc)) .&. mask
+                in (# s2, u #)
+#if defined(DEBUG)
+    -- Uh oh! We will overflow next time a unique is requested.
+    -- (Note that if the increment isn't 1 we may miss this check)
+    ASSERT(u /= mask)
+#endif
+    return u
+#endif
+
+foreign import ccall unsafe "&ghc_unique_counter" ghc_unique_counter :: Ptr Word
+foreign import ccall unsafe "&ghc_unique_inc"     ghc_unique_inc     :: Ptr Word
+
+initUniqSupply :: Word -> Word -> IO ()
+initUniqSupply counter inc = do
+    poke ghc_unique_counter counter
+    poke ghc_unique_inc     inc
+
+uniqFromMask :: Char -> IO Unique
+uniqFromMask mask
+  = do { uqNum <- genSym
+       ; return $! mkUnique mask uqNum }
+
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
 -- ^ Build two 'UniqSupply' from a single one, each of which
