@@ -869,8 +869,8 @@ updateIdTypeAndMultM f id@(Id { varType = ty
 updateIdTypeAndMultM _ other = pprPanic "updateIdTypeAndMultM" (ppr other)
 
 setIdMult :: Id -> Mult -> Id
-setIdMult id r | isId id = id { varMult = r }
-               | otherwise = pprPanic "setIdMult" (ppr id <+> ppr r)
+setIdMult id !r | isId id = id { varMult = r }
+                | otherwise = pprPanic "setIdMult" (ppr id <+> ppr r)
 
 {-
 ************************************************************************
