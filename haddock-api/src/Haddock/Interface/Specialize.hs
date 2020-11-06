@@ -305,7 +305,7 @@ renameType t@(HsSpliceTy _ _) = pure t
 renameType (HsDocTy x lt doc) = HsDocTy x <$> renameLType lt <*> pure doc
 renameType (HsBangTy x bang lt) = HsBangTy x bang <$> renameLType lt
 renameType t@(HsRecTy _ _) = pure t
-renameType t@(XHsType (NHsCoreTy _)) = pure t
+renameType t@(XHsType _) = pure t
 renameType (HsExplicitListTy x ip ltys) =
     HsExplicitListTy x ip <$> renameLTypes ltys
 renameType (HsExplicitTupleTy x ltys) =

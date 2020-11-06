@@ -700,7 +700,7 @@ type instance XExplicitListTy  DocNameI = NoExtField
 type instance XExplicitTupleTy DocNameI = NoExtField
 type instance XTyLit           DocNameI = NoExtField
 type instance XWildCardTy      DocNameI = NoExtField
-type instance XXType           DocNameI = NewHsTypeX
+type instance XXType           DocNameI = HsCoreTy
 
 type instance XHsForAllVis        DocNameI = NoExtField
 type instance XHsForAllInvis      DocNameI = NoExtField
