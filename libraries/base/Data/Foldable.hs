@@ -1118,7 +1118,7 @@ maximumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
 maximumBy cmp = fromMaybe (errorWithoutStackTrace "maximumBy: empty structure")
   . foldl' max' Nothing
   where
-    max' mx y = Just $ case mx of
+    max' mx y = Just $! case mx of
       Nothing -> y
       Just x -> case cmp x y of
         GT -> x
