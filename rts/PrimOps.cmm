@@ -2412,7 +2412,9 @@ stg_closureSizzezh (P_ clos)
 stg_whereFromzh (P_ clos)
 {
     P_ ipe;
-    (ipe) = foreign "C" lookupIPE(UNTAG(clos) "ptr");
+    W_ info;
+    info = GET_INFO(UNTAG(clos));
+    (ipe) = foreign "C" lookupIPE(info "ptr");
     return (ipe);
 }
 
