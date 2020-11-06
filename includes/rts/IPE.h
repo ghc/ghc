@@ -14,4 +14,4 @@
 #pragma once
 
 void registerInfoProvList(InfoProvEnt **cc_list);
-InfoProvEnt * lookupIPE(StgClosure *info);
+InfoProvEnt * lookupIPE(StgInfoTable *info);

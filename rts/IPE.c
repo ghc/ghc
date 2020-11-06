@@ -69,14 +69,13 @@ void registerInfoProvList(InfoProvEnt **ent_list)
 
 // MP: TODO: This should not be a linear search, need to improve
 // the IPE_LIST structure
-InfoProvEnt * lookupIPE(StgClosure *clos)
+InfoProvEnt * lookupIPE(StgInfoTable *info)
 {
-    StgInfoTable * info;
-    info = GET_INFO(clos);
     InfoProvEnt *ip, *next;
-    //printf("%p\n", info);
+//    printf("%p\n", info);
     //printf("%p\n\n", clos);
     for (ip = IPE_LIST; ip != NULL; ip = next) {
+//        printf("%p\n", ip->info);
         if (ip->info == info) {
             //printf("Found %p\n", ip->info);
             return ip;
