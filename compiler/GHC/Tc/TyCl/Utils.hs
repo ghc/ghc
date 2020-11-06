@@ -985,6 +985,31 @@ mkRecordSelectorAndUpdater all_cons idDetails fl x_vars =
         field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
 
     -- Make the updater binding:
+    --   upd z@(C2 {fld = x}) = (\ y -> z { fld = y }, x)
+    -- ...
+    upd_bind = mkBind upd_name alts
+      where
+        alts = map mk_match cons_w_field ++ deflt
+
+        mk_match con = ( [mkAsPat z_var (mkRecConPat con [rec_field])]
+                       , expr con
+                       )
+        rec_field = mkHsRecField (mkFieldOcc fl) (mkVarPat field_var)
+        field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
+        y_var = mkInternalName (mkBuiltinUnique 2) (mkVarOccFS lbl) loc
+        z_var = mkInternalName (mkBuiltinUnique 3) (mkVarOcc "z") loc
+        expr con = mkLHsTupleExpr
+                   [ mkHsLam [mkVarPat y_var] update_expr
+                   , mkHsVar field_var
+                   ]
+        update_expr = L loc (RecordUpd
+            { rupd_ext  = Generated
+            , rupd_expr = mkHsVar z_var
+            , rupd_flds = [mkHsRecField (L loc unambiguous_fld) (mkHsVar y_var)] })
+        unambiguous_fld = Unambiguous sel_name (L loc (mkVarUnqual (flLabel fl)))
+
+{-
+    -- Make the updater binding:
     --   upd z = (\ y -> z { fld = y }, fld z)
     upd_bind = mkBind upd_name [([mkVarPat z_var], expr)]
       where
@@ -1039,7 +1064,7 @@ mkRecordSelectorAndUpdater all_cons idDetails fl x_vars =
             -- in the TyCon, i.e. maps fldN to xN.
             x_var :: FieldLabelNoUpdater -> Name
             x_var fl' = lookupNameEnv_NF x_vars (flSelector fl')
-
+-}
 
     -- These are just boring constructors for bits of syntax, using the SrcSpan
     -- of the field (which is why they are not top-level).
@@ -1051,6 +1076,9 @@ mkRecordSelectorAndUpdater all_cons idDetails fl x_vars =
 
     mkVarPat :: Name -> LPat GhcRn
     mkVarPat var = L loc (VarPat noExtField (L loc var))
+
+    mkAsPat :: Name -> LPat GhcRn -> LPat GhcRn
+    mkAsPat var pat = L loc (AsPat noExtField (L loc var) pat)
 
     mkRecConPat :: ConLike -> [LHsRecField GhcRn (XRec GhcRn (Pat GhcRn))] -> LPat GhcRn
     mkRecConPat con rflds = L loc (ConPat noExtField (L loc (getName con))
