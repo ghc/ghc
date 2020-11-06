@@ -306,6 +306,7 @@ initCapability (Capability *cap, uint32_t i)
     cap->free_trec_headers = NO_TREC;
     cap->transaction_tokens = 0;
     cap->context_switch = 0;
+    cap->interrupt = 0;
     cap->pinned_object_block = NULL;
     cap->pinned_object_blocks = NULL;
 

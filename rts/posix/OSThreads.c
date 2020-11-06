@@ -240,13 +240,14 @@ forkOS_createThread ( HsStablePtr entry )
 
 void freeThreadingResources (void) { /* nothing */ }
 
+static uint32_t nproc_cache = 0;
+
 // Get the number of logical CPU cores available to us. Note that this is
 // different from the number of physical cores (see #14781).
 uint32_t
 getNumberOfProcessors (void)
 {
-    static uint32_t nproc = 0;
-
+    uint32_t nproc = RELAXED_LOAD(&nproc_cache);
     if (nproc == 0) {
 #if defined(HAVE_SCHED_GETAFFINITY)
         cpu_set_t mask;
@@ -287,6 +288,7 @@ getNumberOfProcessors (void)
 #else
         nproc = 1;
 #endif
+        RELAXED_STORE(&nproc_cache, nproc);
     }
 
     return nproc;
