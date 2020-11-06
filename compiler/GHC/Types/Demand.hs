@@ -12,51 +12,70 @@
 -}
 
 module GHC.Types.Demand (
-        Card(..), Demand(..), CleanDemand(Prod), mkProd, viewProd,
-        oneifyDmd, oneifyCard,
-        absDmd, topDmd, botDmd, seqDmd,
-        lubCard, lubDmd, lubCleanDmd,
-        plusCard, plusDmd, plusCleanDmd,
-        multCard, multDmd, multCleanDmd,
-        lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd,
-        isAbs, isUsedOnce, isStrict, isAbsDmd, isUsedOnceDmd, isStrUsedDmd,
-        isTopDmd, isSeqDmd,
-        strictenDmd,
-        addCaseBndrDmd,
+    -- * Demands
+    Card(..), Demand(..), SubDemand(Prod), mkProd, viewProd,
+    -- ** Algebra
+    absDmd, topDmd, botDmd, seqDmd,
+    -- *** Least upper bound
+    lubCard, lubDmd, lubSubDmd,
+    -- *** Plus
+    plusCard, plusDmd, plusSubDmd,
+    -- *** Multiply
+    multCard, multDmd, multSubDmd,
+    -- ** Special demands
+    evalDmd, cleanEvalDmd, cleanEvalProdDmd,
+    -- *** Demands used in PrimOp signatures
+    lazyApply1Dmd, lazyApply2Dmd, strictOnceApply1Dmd, strictManyApply1Dmd,
+    -- ** Predicates on @Card@inalities and @Demand@s
+    isAbs, isUsedOnce, isStrict,
+    isAbsDmd, isUsedOnceDmd, isStrUsedDmd,
+    isTopDmd, isSeqDmd, isWeakDmd,
+    -- ** Other @Demand@ operations
+    oneifyCard, oneifyDmd, strictifyDmd, addCaseBndrDmd,
+    peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
+    mkWorkerDemand,
+    argOneShots, argsOneShots, saturatedByOneShots,
+    strictifyDictDmd,
 
-        DmdType(..), dmdTypeDepth, lubDmdType, plusDmdType,
-        BothDmdArg, mkBothDmdArg, toBothDmdArg,
-        nopDmdType, botDmdType, addDemand,
+    -- * Demand environments
+    DmdEnv, emptyDmdEnv,
+    keepAliveDmdEnv, peelFV, findIdDemand, reuseEnv,
 
-        DmdEnv, emptyDmdEnv, keepAliveDmdEnv,
-        peelFV, findIdDemand,
+    -- * Divergence
+    Divergence(..), lubDivergence, isDeadEndDiv,
+    topDiv, botDiv, exnDiv,
+    appIsDeadEnd, isDeadEndSig, pprIfaceStrictSig,
 
-        Divergence(..), lubDivergence, isDeadEndDiv,
-        topDiv, botDiv, exnDiv,
-        appIsDeadEnd, isDeadEndSig, pprIfaceStrictSig,
-        StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
-        nopSig, botSig,
-        isTopSig, hasDemandEnvSig,
-        splitStrictSig, strictSigDmdEnv,
-        prependArgsStrictSig, etaConvertStrictSig,
+    -- * Demand types
+    DmdType(..), dmdTypeDepth,
+    -- ** Algebra
+    nopDmdType, botDmdType,
+    lubDmdType, plusDmdType, multDmdType,
+    -- *** PlusDmdArg
+    PlusDmdArg, mkPlusDmdArg, toPlusDmdArg,
+    -- ** Other operations
+    addDemand, splitDmdTy, deferAfterPreciseException,
 
-        seqDemand, seqDemandList, seqDmdType, seqStrictSig,
+    -- * Demand signatures
+    StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
+    nopSig, botSig,
+    isTopSig, hasDemandEnvSig,
+    splitStrictSig, strictSigDmdEnv,
+    prependArgsStrictSig, etaConvertStrictSig,
 
-        evalDmd, cleanEvalDmd, cleanEvalProdDmd,
-        splitDmdTy, isWeakDmd, deferAfterPreciseException,
-        multUnsat, multDmdType,
+    -- * Demand transformers
+    dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
 
-        peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
-        mkWorkerDemand, dmdTransformSig, dmdTransformDataConSig,
-        dmdTransformDictSelSig, argOneShots, argsOneShots, saturatedByOneShots,
-        TypeShape(..), trimToType,
+    -- * Trim to a type shape
+    TypeShape(..), trimToType,
 
-        reuseEnv,
-        zapUsageDemand, zapUsageEnvSig,
-        zapUsedOnceDemand, zapUsedOnceSig,
-        strictifyDictDmd, strictifyDmd
+    -- * @seq@ing stuff
+    seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
-     ) where
+    -- * Zapping usage information
+    zapUsageDemand, zapUsageEnvSig,
+    zapUsedOnceDemand, zapUsedOnceSig
+  ) where
 
 #include "HsVersions.h"
 
@@ -78,6 +97,400 @@ import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+{-
+************************************************************************
+*                                                                      *
+           Card: Combining Strictness and Usage
+*                                                                      *
+************************************************************************
+-}
+
+-- | Describes an interval of /evaluation cardinalities/.
+-- @C_lu@ means "evaluated /at least/ @l@ and /at most/ @u@ times".
+-- The lower bound corresponds to /strictness/ (hence @l@ is either @0@ or @1@),
+-- the upper bound corresponds to /usage/      (@u@ is one of @0@, @1@, @n@).
+--
+-- Intervals describe sets, so the underlying lattice is the powerset lattice.
+data Card
+  = C_00 -- ^ {0}     Absent.
+  | C_01 -- ^ {0,1}   Used at most once.
+  | C_0N -- ^ {0,1,n} Every possible cardinality; the top element.
+  | C_11 -- ^ {1}     Strict and used once.
+  | C_1N -- ^ {1,n}   Strict and used (possibly) many times.
+  | C_10 -- ^ {}      The empty interval; the bottom element of the lattice.
+  deriving Eq
+
+_botCard, topCard :: Card
+_botCard = C_10
+topCard = C_0N
+
+-- | True <=> lower bound is 1.
+isStrict :: Card -> Bool
+isStrict C_10 = True
+isStrict C_11 = True
+isStrict C_1N = True
+isStrict _    = False
+
+-- | True <=> upper bound is 0.
+isAbs :: Card -> Bool
+isAbs C_00 = True
+isAbs C_10 = True -- Bottom cardinality is also absent
+isAbs _    = False
+
+-- | True <=> upper bound is 1.
+isUsedOnce :: Card -> Bool
+isUsedOnce C_0N = False
+isUsedOnce C_1N = False
+isUsedOnce _    = True
+
+-- | Intersect with [0,1].
+oneifyCard :: Card -> Card
+oneifyCard C_0N = C_01
+oneifyCard C_1N = C_11
+oneifyCard c    = c
+
+-- | Denotes '∪' on 'Card'.
+lubCard :: Card -> Card -> Card
+-- Handle C_10 (bot)
+lubCard C_10 n    = n    -- bot
+lubCard n    C_10 = n    -- bot
+-- Handle C_0N (top)
+lubCard C_0N _    = C_0N -- top
+lubCard _    C_0N = C_0N -- top
+-- Handle C_11
+lubCard C_00 C_11 = C_01 -- {0} ∪ {1} = {0,1}
+lubCard C_11 C_00 = C_01 -- {0} ∪ {1} = {0,1}
+lubCard C_11 n    = n    -- {1} is a subset of all other intervals
+lubCard n    C_11 = n    -- {1} is a subset of all other intervals
+-- Handle C_1N
+lubCard C_1N C_1N = C_1N -- reflexivity
+lubCard _    C_1N = C_0N -- {0} ∪ {1,n} = top
+lubCard C_1N _    = C_0N -- {0} ∪ {1,n} = top
+-- Handle C_01
+lubCard C_01 _    = C_01 -- {0} ∪ {0,1} = {0,1}
+lubCard _    C_01 = C_01 -- {0} ∪ {0,1} = {0,1}
+-- Handle C_00
+lubCard C_00 C_00 = C_00 -- reflexivity
+
+-- | Denotes '+' on 'Card'.
+plusCard :: Card -> Card -> Card
+-- Handle C_00
+plusCard C_00 n    = n    -- {0}+n = n
+plusCard n    C_00 = n    -- {0}+n = n
+-- Handle C_10
+plusCard C_10 C_01 = C_11 -- These follow by applying + to lower and upper
+plusCard C_10 C_0N = C_1N -- bounds individually
+plusCard C_10 n    = n
+plusCard C_01 C_10 = C_11
+plusCard C_0N C_10 = C_1N
+plusCard n    C_10 = n
+-- Handle the rest (C_01, C_0N, C_11, C_1N)
+plusCard C_01 C_01 = C_0N -- The upper bound is at least 1, so upper bound of
+plusCard C_01 C_0N = C_0N -- the result must be 1+1 ~= N.
+plusCard C_0N C_01 = C_0N -- But for the lower bound we have 4 cases where
+plusCard C_0N C_0N = C_0N -- 0+0 ~= 0 (as opposed to 1), so we match on these.
+plusCard _    _    = C_1N -- Otherwise we return {1,n}
+
+-- | Denotes '*' on 'Card'.
+multCard :: Card -> Card -> Card
+-- Handle C_11 (neutral element)
+multCard C_11 c    = c
+multCard c    C_11 = c
+-- Handle C_00 (annihilating element)
+multCard C_00 _    = C_00
+multCard _    C_00 = C_00
+-- Handle C_10
+multCard C_10 c    = if isStrict c then C_10 else C_00
+multCard c    C_10 = if isStrict c then C_10 else C_00
+-- Handle reflexive C_1N, C_01
+multCard C_1N C_1N = C_1N
+multCard C_01 C_01 = C_01
+-- Handle C_0N and the rest (C_01, C_1N):
+multCard _    _    = C_0N
+
+{-
+************************************************************************
+*                                                                      *
+           Demand: Evaluation contexts
+*                                                                      *
+************************************************************************
+-}
+
+-- | A demand describes a /scaled evaluation context/, e.g. how many times
+-- and how deep the denoted thing is evaluated.
+--
+-- The "how many" component is represented by a 'Card'inality.
+-- The "how deep" component is represented by a 'SubDemand'.
+-- Examples:
+--
+--   * 'seq' puts demand @SA@ on its argument: It evaluates the argument
+--     strictly (@S@), but not any deeper (@A@).
+--   * 'fst' puts demand @S(SU,A)@ on its argument: It evaluates the argument
+--     pair strictly and the first component strictly, but no nested info
+--     beyond that (@U@). Its second argument is not used at all.
+--   * '$' puts demand @CS(U)@ on its first argument: It calls (@C@) the
+--     argument function with one argument, exactly once (@S@). No info
+--     on how the result of that call is evaluated (@U@).
+--   * 'maybe' puts demand @C1(U)@ on its second argument: It calls the
+--     argument function at most once (in the 'Just' case), but possibly
+--     never (in the 'Nothing' case).
+--   * @fst p + fst p@ puts demand @M(M,A)@ on @p@: It's @S(S,A)@ multiplied
+--     by two, so we get @M@ (used at least once, possibly multiple times).
+--
+-- This data type is quite similar to @'Scaled' 'SubDemand'@, but it's scaled
+-- by 'Card', which is an /interval/ on 'Multiplicity', the upper bound of
+-- which could be used to infer uniqueness types.
+data Demand = !Card :* !SubDemand
+  deriving Eq
+
+-- | A sub-demand describes an /evaluation context/, e.g. how deep the
+-- denoted thing is evaluated. See 'Demand' for examples.
+--
+-- The nested 'SubDemand' @d@ of a 'Call' @Cn(d)@ is /relative/ to a single such call.
+-- E.g. The expression @f 1 2 + f 3 4@ puts call demand @CM(CS(U))@ on @f@:
+-- @f@ is called exactly twice (@M@), each time exactly once (@S@) with an
+-- additional argument.
+--
+-- The nested 'Demand's @dn@ of a 'Prod' @(d1,d2,...)@ apply /absolutely/:
+-- If @dn@ is a used once demand (cf. 'isUsedOnce'), then that means that
+-- the denoted sub-expression is used once in the entire evaluation context
+-- described by the surrounding 'Demand'. E.g., @U(1U)@ means that the
+-- field of the denoted expression is used at most once, although the
+-- entire expression might be used many times.
+--
+-- See Note [Call demands are relative].
+data SubDemand
+  = Poly !Card
+  -- ^ Polymorphic demand, the denoted thing is evaluated arbitrarily deep,
+  -- with the specified cardinality at every level.
+  -- Expands to 'Call' via 'viewCall' and to 'Prod' via 'viewProd'.
+  --
+  -- @Poly n@ is semantically equivalent to @n(n,n,...)@ or @Cn(C(n(..Cn(n))))@.
+  -- So @U === U(U,U,...)@ and @U === CU(CU(..CU(U)))@,
+  --    @S === S(S,S,...)@ and @S === CS(CS(..CS(S)))@, and so on.
+  | Call !Card !SubDemand
+  -- ^ @Call n cd@ describes the evaluation context of @n@ function
+  -- applications, where every individual result is evaluated according to @cd@.
+  -- @cd@ is /relative/ to a single call, cf. Note [Call demands are relative].
+  -- Used only for values of function type.
+  | Prod ![Demand]
+  -- ^ @Prod ds@ describes the evaluation context of a case scrutinisation
+  -- on an expression of product type, where the product components are
+  -- evaluated according to @ds@.
+  deriving Eq
+
+poly00, poly01, poly0N, poly11, poly1N, poly10 :: SubDemand
+topSubDmd, botSubDmd, seqSubDmd :: SubDemand
+poly00 = Poly C_00
+poly01 = Poly C_01
+poly0N = Poly C_0N
+poly11 = Poly C_11
+poly1N = Poly C_1N
+poly10 = Poly C_10
+topSubDmd = poly0N
+botSubDmd = poly10
+seqSubDmd = poly00
+
+polyDmd :: Card -> Demand
+polyDmd C_00 = C_00 :* poly00
+polyDmd C_01 = C_01 :* poly01
+polyDmd C_0N = C_0N :* poly0N
+polyDmd C_11 = C_11 :* poly11
+polyDmd C_1N = C_1N :* poly1N
+polyDmd C_10 = C_10 :* poly10
+
+topDmd, absDmd, botDmd, seqDmd :: Demand
+topDmd = polyDmd C_0N
+absDmd = polyDmd C_00
+botDmd = polyDmd C_10
+seqDmd = C_11 :* seqSubDmd
+
+-- | First argument of 'GHC.Exts.maskAsyncExceptions#': @CS(U)@.
+-- Called exactly once.
+strictOnceApply1Dmd :: Demand
+strictOnceApply1Dmd = C_11 :* Call C_11 topSubDmd
+
+-- | First argument of 'GHC.Exts.atomically#': @CM(U)@.
+-- Called at least once, possibly many times.
+strictManyApply1Dmd :: Demand
+strictManyApply1Dmd = C_1N :* Call C_1N topSubDmd
+
+-- | First argument of catch#: @C1(U)@.
+-- Uses its arg at most once, applies it at most once to one argument.
+lazyApply1Dmd :: Demand
+lazyApply1Dmd = C_01 :* Call C_01 topSubDmd
+
+-- | Second argument of catch#: @C1(CS(U))@.
+-- Uses its arg at most once, applies it at most once to two arguments.
+lazyApply2Dmd :: Demand
+lazyApply2Dmd = C_01 :* Call C_01 (Call C_11 topSubDmd)
+
+-- | A smart constructor for 'Prod', applying rewrite rules along the semantic
+-- equalities @Prod [polyDmd n, ...] === polyDmd n@, simplifying to polymorphic
+-- demands when possible. Note that this degrades boxity information! E.g. a
+-- polymorphic demand will never unbox.
+mkProd :: [Demand] -> SubDemand
+mkProd [] = botSubDmd
+mkProd ds@(n:*cd : _)
+  | want_to_simplify n, all (== polyDmd n) ds = cd
+  | otherwise                                 = Prod ds
+  where
+    -- We only want to simplify absent and bottom demands and unbox the others.
+    -- See also Note [Used should win].
+    want_to_simplify C_00 = True
+    want_to_simplify C_10 = True
+    want_to_simplify _    = False
+
+viewProd :: Arity -> SubDemand -> Maybe [Demand]
+-- It's quite important that this function is optimised well;
+-- it is used by lubSubDmd and plusSubDmd. Note the strict
+-- application to 'polyDmd':
+viewProd n (Prod ds)   | ds `lengthIs` n = Just ds
+-- Note the strict application to replicate: This makes sure we don't allocate
+-- a thunk for it, inlines it and lets case-of-case fire at call sites.
+viewProd n (Poly card)                   = Just (replicate n $! polyDmd card)
+viewProd _ _                             = Nothing
+{-# INLINE viewProd #-} -- we want to fuse away the replicate and the allocation
+                        -- for Arity. Otherwise, #18304 bites us.
+
+viewCall :: SubDemand -> Maybe (Card, SubDemand)
+viewCall (Call n cd)    = Just (n, cd)
+viewCall cd@(Poly card) = Just (card, cd)
+viewCall _              = Nothing
+
+lubSubDmd :: SubDemand -> SubDemand -> SubDemand
+-- Handle Prod
+lubSubDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
+  Prod $ zipWith lubDmd ds2 ds1 -- try to fuse with ds2
+-- Handle Call
+lubSubDmd (Call n1 d1) (viewCall -> Just (n2, d2))
+  -- See Note [Call demands are relative]
+  | isAbs n2  = Call (lubCard n1 n2) (lubSubDmd d1 botSubDmd)
+  | otherwise = Call (lubCard n1 n2) (lubSubDmd d1          d2)
+-- Handle Poly
+lubSubDmd (Poly n1)  (Poly n2) = Poly (lubCard n1 n2)
+-- Make use of reflexivity (so we'll match the Prod or Call cases again).
+lubSubDmd cd1@Poly{} cd2       = lubSubDmd cd2 cd1
+-- Otherwise (Call `lub` Prod) return Top
+lubSubDmd _          _         = topSubDmd
+
+lubDmd :: Demand -> Demand -> Demand
+lubDmd (n1 :* cd1) (n2 :* cd2) = lubCard n1 n2 :* lubSubDmd cd1 cd2
+
+plusSubDmd :: SubDemand -> SubDemand -> SubDemand
+-- Handle Prod
+plusSubDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
+  Prod $ zipWith plusDmd ds2 ds1 -- try to fuse with ds2
+-- Handle Call
+plusSubDmd (Call n1 d1) (viewCall -> Just (n2, d2))
+  -- See Note [Call demands are relative]
+  | isAbs n2  = Call (plusCard n1 n2) (lubSubDmd d1 botSubDmd)
+  | otherwise = Call (plusCard n1 n2) (lubSubDmd d1          d2)
+-- Handle Poly
+plusSubDmd (Poly n1)  (Poly n2) = Poly (plusCard n1 n2)
+-- Make use of reflexivity (so we'll match the Prod or Call cases again).
+plusSubDmd cd1@Poly{} cd2       = plusSubDmd cd2 cd1
+-- Otherwise (Call `lub` Prod) return Top
+plusSubDmd _          _         = topSubDmd
+
+plusDmd :: Demand -> Demand -> Demand
+plusDmd (n1 :* cd1) (n2 :* cd2) = plusCard n1 n2 :* plusSubDmd cd1 cd2
+
+oneifyDmd :: Demand -> Demand
+oneifyDmd (n :* cd) = oneifyCard n :* cd
+
+strictifyDmd :: Demand -> Demand
+strictifyDmd (n :* cd) = plusCard C_10 n :* cd
+
+isTopDmd :: Demand -> Bool
+-- ^ Used to suppress pretty-printing of an uninformative demand
+isTopDmd dmd = dmd == topDmd
+
+isAbsDmd :: Demand -> Bool
+isAbsDmd (n :* _) = isAbs n
+
+-- | Not absent and used strictly. See Note [Strict demands]
+isStrUsedDmd :: Demand -> Bool
+isStrUsedDmd (n :* _) = isStrict n && not (isAbs n)
+
+isSeqDmd :: Demand -> Bool
+isSeqDmd (C_11 :* cd) = cd == seqSubDmd
+isSeqDmd (C_1N :* cd) = cd == seqSubDmd -- I wonder if we need this case.
+isSeqDmd _            = False
+
+-- | Is the value used at most once?
+isUsedOnceDmd :: Demand -> Bool
+isUsedOnceDmd (n :* _) = isUsedOnce n
+
+-- More utility functions for strictness
+seqDemand :: Demand -> ()
+seqDemand (_ :* cd) = seqSubDemand cd
+
+seqSubDemand :: SubDemand -> ()
+seqSubDemand (Prod ds)   = seqDemandList ds
+seqSubDemand (Call _ cd) = seqSubDemand cd
+seqSubDemand (Poly _)    = ()
+
+seqDemandList :: [Demand] -> ()
+seqDemandList = foldr (seq . seqDemand) ()
+
+{- Note [Strict demands]
+~~~~~~~~~~~~~~~~~~~~~~~~
+'isStrUsedDmd' returns true only of demands that are
+   both strict
+   and  used
+In particular, it is False for <B>, which can and does
+arise in, say (#7319)
+   f x = raise# <some exception>
+Then 'x' is not used, so f gets strictness <B> -> .
+Now the w/w generates
+   fx = let x <B> = absentError "unused"
+        in raise <some exception>
+At this point we really don't want to convert to
+   fx = case absentError "unused" of x -> raise <some exception>
+Since the program is going to diverge, this swaps one error for another,
+but it's really a bad idea to *ever* evaluate an absent argument.
+In #7319 we get
+   T7319.exe: Oops!  Entered absent arg w_s1Hd{v} [lid] [base:GHC.Base.String{tc 36u}]
+
+Note [Call demands are relative]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The expression @if b then 0 else f 1 2 + f 3 4@ uses @f@ according to the demand
+@UCU(CS(S(U)))@, meaning
+
+  "f is called multiple times (CU) or not at all, but each time it is called,
+   it's called with *exactly one* (CS) more argument.
+   Whenever it is called with two arguments, the result is used exactly once
+   (S(..)), but we have no info on how often the field is used (U)."
+
+So the 'SubDemand' nested in a 'Call' demand is relative to exactly one call.
+And that extends to the information we have how its results are used in each
+call site. Consider (#18903)
+
+  h :: Int -> Int
+  h m =
+    let g :: Int -> (Int,Int)
+        g 1 = (m, 0)
+        g n = (2 * n, 2 `div` n)
+        {-# NOINLINE g #-}
+    in case m of
+      1 -> 0
+      2 -> snd (g m)
+      _ -> uncurry (+) (g m)
+
+We want to give @g@ the demand @1C1((1(U),S(U)))@, so we see that in each call
+site of @g@, we are strict in the second component of the returned pair.
+
+This relative cardinality leads to an otherwise unexpected call to 'lubSubDmd'
+in 'plusSubDmd', but if you do the math it's just the right thing.
+
+There's one more subtlety: Since the nested demand is relative to exactly one
+call, in the case where we have *at most zero calls* (e.g. CA(...)), the premise
+is hurt and we can assume that the nested demand is 'botSubDmd'. That ensures
+that @g@ above actually gets the @S(U)@ demand on its second pair component,
+rather than the lazy @1(U)@ if we 'lub'bed with an absent demand.
+-}
 
 {-
 Note [Exceptions and strictness]
@@ -261,356 +674,25 @@ should be: <L,C(U(AU))>m
 evalDmd :: Demand
 evalDmd = C_1N :* cleanEvalDmd
 
--- | Wraps the 'CleanDemand' with a one-shot call demand: @d@ -> @C1(d)@.
-mkCallDmd :: CleanDemand -> CleanDemand
+-- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @C1(d)@.
+mkCallDmd :: SubDemand -> SubDemand
 mkCallDmd cd = Call C_11 cd
 
 -- | @mkCallDmds n d@ returns @C1(C1...(C1 d))@ where there are @n@ @C1@'s.
-mkCallDmds :: Arity -> CleanDemand -> CleanDemand
+mkCallDmds :: Arity -> SubDemand -> SubDemand
 mkCallDmds arity cd = iterate mkCallDmd cd !! arity
 
 -- See Note [Demand on the worker] in GHC.Core.Opt.WorkWrap
 mkWorkerDemand :: Int -> Demand
 mkWorkerDemand n = C_01 :* go n
-  where go 0 = topCleanDmd
+  where go 0 = topSubDmd
         go n = Call C_01 $ go (n-1)
 
-cleanEvalDmd :: CleanDemand
-cleanEvalDmd = topCleanDmd
+cleanEvalDmd :: SubDemand
+cleanEvalDmd = topSubDmd
 
-cleanEvalProdDmd :: Arity -> CleanDemand
+cleanEvalProdDmd :: Arity -> SubDemand
 cleanEvalProdDmd n = Prod (replicate n topDmd)
-
-{-
-************************************************************************
-*                                                                      *
-           Demand: Combining Strictness and Usage
-*                                                                      *
-************************************************************************
--}
-
-data Card
-  = C_00 -- ^ {0}
-  | C_01 -- ^ {0,1}
-  | C_0N -- ^ {0,1,n} Every possible cardinality; the top element.
-  | C_11 -- ^ {1,1}
-  | C_1N -- ^ {1,n}   TODO: Think about whether this cardinality is of any
-         --                 practical relevance. If we are strict, we can
-         --                 assume that it is used at most once because of
-         --                 call-by-value. Ah yes, it's relevant for call
-         --                 demands.
-  | C_10 -- ^ {}      The empty interval; the bottom element of the powerset lattice.
-  deriving ( Eq )
-
-instance Show Card where
-  show C_00 = "A"
-  show C_01 = "1"
-  show C_0N = "U"
-  show C_11 = "S"
-  show C_1N = "S*"
-  show C_10 = "B"
-
-_botCard, topCard :: Card
-_botCard = C_10
-topCard = C_0N
-
--- | True <=> lower bound is 1.
-isStrict :: Card -> Bool
-isStrict C_10 = True
-isStrict C_11 = True
-isStrict C_1N = True
-isStrict _    = False
-
--- | True <=> upper bound is 0.
-isAbs :: Card -> Bool
-isAbs C_00 = True
-isAbs C_10 = True -- Bottom cardinality is also absent
-isAbs _    = False
-
--- | True <=> upper bound is 1.
-isUsedOnce :: Card -> Bool
-isUsedOnce C_0N = False
-isUsedOnce C_1N = False
-isUsedOnce _    = True
-
--- | Intersect with [0,1].
-oneifyCard :: Card -> Card
-oneifyCard C_0N = C_01
-oneifyCard C_1N = C_11
-oneifyCard c    = c
-
--- | Denotes '∪' on 'Card'.
-lubCard :: Card -> Card -> Card
--- Handle C_10 (bot)
-lubCard C_10 n    = n    -- bot
-lubCard n    C_10 = n    -- bot
--- Handle C_0N (top)
-lubCard C_0N _    = C_0N -- top
-lubCard _    C_0N = C_0N -- top
--- Handle C_11
-lubCard C_00 C_11 = C_01 -- {0} ∪ {1} = {0,1}
-lubCard C_11 C_00 = C_01 -- {0} ∪ {1} = {0,1}
-lubCard C_11 n    = n    -- {1} is a subset of all other intervals
-lubCard n    C_11 = n    -- {1} is a subset of all other intervals
--- Handle C_1N
-lubCard C_1N C_1N = C_1N -- reflexivity
-lubCard _    C_1N = C_0N -- {0} ∪ {1,n} = top
-lubCard C_1N _    = C_0N -- {0} ∪ {1,n} = top
--- Handle C_01
-lubCard C_01 _    = C_01 -- {0} ∪ {0,1} = {0,1}
-lubCard _    C_01 = C_01 -- {0} ∪ {0,1} = {0,1}
--- Handle C_00
-lubCard C_00 C_00 = C_00 -- reflexivity
-
--- | Denotes '+' on 'Card'.
-plusCard :: Card -> Card -> Card
--- Handle C_00
-plusCard C_00 n    = n    -- {0}+n = n
-plusCard n    C_00 = n    -- {0}+n = n
--- Handle C_10
-plusCard C_10 C_01 = C_11 -- These follow by applying + to lower and upper
-plusCard C_10 C_0N = C_1N -- bounds individually
-plusCard C_10 n    = n
-plusCard C_01 C_10 = C_11
-plusCard C_0N C_10 = C_1N
-plusCard n    C_10 = n
--- Handle the rest (C_01, C_0N, C_11, C_1N)
-plusCard C_01 C_01 = C_0N -- The upper bound is at least 1, so upper bound of
-plusCard C_01 C_0N = C_0N -- the result must be 1+1 ~= N.
-plusCard C_0N C_01 = C_0N -- But for the lower bound we have 4 cases where
-plusCard C_0N C_0N = C_0N -- 0+0 ~= 0 (as opposed to 1), so we match on these.
-plusCard _    _    = C_1N -- Otherwise we return {1,n}
-
--- | Denotes '*' on 'Card'.
-multCard :: Card -> Card -> Card
--- Handle C_11 (neutral element)
-multCard C_11 c    = c
-multCard c    C_11 = c
--- Handle C_00 (annihilating element)
-multCard C_00 _    = C_00
-multCard _    C_00 = C_00
--- Handle C_10
-multCard C_10 c    = if isStrict c then C_10 else C_00
-multCard c    C_10 = if isStrict c then C_10 else C_00
--- Handle reflexive C_1N, C_01
-multCard C_1N C_1N = C_1N
-multCard C_01 C_01 = C_01
--- Handle C_0N and the rest (C_01, C_1N):
-multCard _    _    = C_0N
-
--- It's similar to @'Scaled' 'CleanDemand'@, but it's scaled by 'Card', which
--- is an interval on 'Multiplicity'.
-data Demand = !Card :* !CleanDemand
-  deriving ( Eq, Show )
-
-data CleanDemand
-  = Poly !Card     -- ^ Polymorphic head demand with nested evaluation
-                   -- cardinalities.
-
-  | Call !Card !CleanDemand -- ^ Call demand
-                          -- Used only for values of function type
-
-  | Prod ![Demand]       -- ^ Product
-                        -- Used only for values of product type
-                        -- Invariant: not all components are HyperDmd (use HyperDmd)
-                        --            not all components are Lazy     (use HeadStr)
-
-  deriving ( Eq, Show )
-
-poly00, poly01, poly0N, poly11, poly1N, poly10 :: CleanDemand
-topCleanDmd, botCleanDmd, seqCleanDmd :: CleanDemand
-poly00 = Poly C_00
-poly01 = Poly C_01
-poly0N = Poly C_0N
-poly11 = Poly C_11
-poly1N = Poly C_1N
-poly10 = Poly C_10
-topCleanDmd = poly0N
-botCleanDmd = poly10
-seqCleanDmd = poly00
-
-polyDmd :: Card -> Demand
-polyDmd C_00 = C_00 :* poly00
-polyDmd C_01 = C_01 :* poly01
-polyDmd C_0N = C_0N :* poly0N
-polyDmd C_11 = C_11 :* poly11
-polyDmd C_1N = C_1N :* poly1N
-polyDmd C_10 = C_10 :* poly10
-
-topDmd, absDmd, botDmd, seqDmd :: Demand
-strictApply1Dmd, lazyApply1Dmd, lazyApply2Dmd :: Demand
-topDmd = polyDmd C_0N
-absDmd = polyDmd C_00
-botDmd = polyDmd C_10
-seqDmd = C_11 :* seqCleanDmd
-strictApply1Dmd = C_1N :* Call C_1N topCleanDmd
-lazyApply1Dmd   = C_01 :* Call C_01 topCleanDmd
--- | Second argument of catch#:
---    uses its arg at most once, applies it once
---    but is lazy (might not be called at all)
-lazyApply2Dmd = C_01 :* Call C_01 (Call C_01 topCleanDmd)
-
--- | A smart constructor for 'Prod', applying rewrite rules along the semantic
--- equalities @Prod [polyDmd n, ...] === polyDmd n@, simplifying to polymorphic
--- demands when possible. Note that this degrades boxity information! E.g. a
--- polymorphic demand will never unbox.
-mkProd :: [Demand] -> CleanDemand
-mkProd [] = botCleanDmd
-mkProd ds@(n:*cd : _)
-  | want_to_simplify n, all (== polyDmd n) ds = cd
-  | otherwise                                 = Prod ds
-  where
-    -- we only want to simplify absent and bottom demands
-    want_to_simplify C_00 = True
-    want_to_simplify C_10 = True
-    want_to_simplify _    = False
-
-viewProd :: Arity -> CleanDemand -> Maybe [Demand]
--- It's quite important that this function is optimised well;
--- it is used by lubCleanDmd and plusCleanDmd. Note the strict
--- application to 'polyDmd':
-viewProd n (Prod ds)   | ds `lengthIs` n = Just ds
--- Note the strict application to replicate: This makes sure we don't allocate
--- a thunk for it, inlines it and lets case-of-case fire at call sites.
-viewProd n (Poly card)                   = Just (replicate n $! polyDmd card)
-viewProd _ _                             = Nothing
-{-# INLINE viewProd #-} -- we want to fuse away the replicate and the allocation
-                        -- for Arity. Otherwise, #18304 bites us.
-
-viewCall :: CleanDemand -> Maybe (Card, CleanDemand)
-viewCall (Call n cd)    = Just (n, cd)
-viewCall cd@(Poly card) = Just (card, cd)
-viewCall _              = Nothing
-
-lubCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
--- Handle Prod
-lubCleanDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
-  Prod $ zipWith lubDmd ds2 ds1 -- try to fuse with ds2
--- Handle Call
-lubCleanDmd (Call n1 d1) (viewCall -> Just (n2, d2))
-  -- See Note [Call demands are relative]
-  | isAbs n2  = Call (lubCard n1 n2) (lubCleanDmd d1 botCleanDmd)
-  | otherwise = Call (lubCard n1 n2) (lubCleanDmd d1          d2)
--- Handle Poly
-lubCleanDmd (Poly n1)  (Poly n2) = Poly (lubCard n1 n2)
--- Make use of reflexivity (so we'll match the Prod or Call cases again).
-lubCleanDmd cd1@Poly{} cd2       = lubCleanDmd cd2 cd1
--- Otherwise (Call `lub` Prod) return Top
-lubCleanDmd _          _         = topCleanDmd
-
-lubDmd :: Demand -> Demand -> Demand
-lubDmd (n1 :* cd1) (n2 :* cd2) = lubCard n1 n2 :* lubCleanDmd cd1 cd2
-
-plusCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
--- Handle Prod
-plusCleanDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
-  Prod $ zipWith plusDmd ds2 ds1 -- try to fuse with ds2
--- Handle Call
-plusCleanDmd (Call n1 d1) (viewCall -> Just (n2, d2))
-  -- See Note [Call demands are relative]
-  | isAbs n2  = Call (plusCard n1 n2) (lubCleanDmd d1 botCleanDmd)
-  | otherwise = Call (plusCard n1 n2) (lubCleanDmd d1          d2)
--- Handle Poly
-plusCleanDmd (Poly n1)  (Poly n2) = Poly (plusCard n1 n2)
--- Make use of reflexivity (so we'll match the Prod or Call cases again).
-plusCleanDmd cd1@Poly{} cd2       = plusCleanDmd cd2 cd1
--- Otherwise (Call `lub` Prod) return Top
-plusCleanDmd _          _         = topCleanDmd
-
-plusDmd :: Demand -> Demand -> Demand
-plusDmd (n1 :* cd1) (n2 :* cd2) = plusCard n1 n2 :* plusCleanDmd cd1 cd2
-
-oneifyDmd :: Demand -> Demand
-oneifyDmd (n :* cd) = oneifyCard n :* cd
-
-isTopDmd :: Demand -> Bool
--- ^ Used to suppress pretty-printing of an uninformative demand
-isTopDmd dmd = dmd == topDmd
-
-isAbsDmd :: Demand -> Bool
-isAbsDmd (n :* _) = isAbs n
-
--- | Not absent and used strictly. See Note [Strict demands]
-isStrUsedDmd :: Demand -> Bool
-isStrUsedDmd (n :* _) = isStrict n && not (isAbs n)
-
-isSeqDmd :: Demand -> Bool
-isSeqDmd (C_11 :* cd) = cd == seqCleanDmd
-isSeqDmd (C_1N :* cd) = cd == seqCleanDmd -- I wonder if we need this case.
-isSeqDmd _            = False
-
--- | Is the value used at most once?
-isUsedOnceDmd :: Demand -> Bool
-isUsedOnceDmd (n :* _) = isUsedOnce n
-
--- More utility functions for strictness
-seqDemand :: Demand -> ()
-seqDemand (_ :* cd) = seqCleanDemand cd
-
-seqCleanDemand :: CleanDemand -> ()
-seqCleanDemand (Prod ds)   = seqDemandList ds
-seqCleanDemand (Call _ cd) = seqCleanDemand cd
-seqCleanDemand (Poly _)    = ()
-
-seqDemandList :: [Demand] -> ()
-seqDemandList = foldr (seq . seqDemand) ()
-
-{- Note [Strict demands]
-~~~~~~~~~~~~~~~~~~~~~~~~
-'isStrUsedDmd' returns true only of demands that are
-   both strict
-   and  used
-In particular, it is False for <B>, which can and does
-arise in, say (#7319)
-   f x = raise# <some exception>
-Then 'x' is not used, so f gets strictness <B> -> .
-Now the w/w generates
-   fx = let x <B> = absentError "unused"
-        in raise <some exception>
-At this point we really don't want to convert to
-   fx = case absentError "unused" of x -> raise <some exception>
-Since the program is going to diverge, this swaps one error for another,
-but it's really a bad idea to *ever* evaluate an absent argument.
-In #7319 we get
-   T7319.exe: Oops!  Entered absent arg w_s1Hd{v} [lid] [base:GHC.Base.String{tc 36u}]
-
-Note [Call demands are relative]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The expression @if b then 0 else f 1 2 + f 3 4@ uses @f@ according to the demand
-@UCU(CS(S(U)))@, meaning
-
-  "f is called multiple times (CU) or not at all, but each time it is called,
-   it's called with *exactly one* (CS) more argument.
-   Whenever it is called with two arguments, the result is used exactly once
-   (S(..)), but we have no info on how often the field is used (U)."
-
-So the 'CleanDemand' nested in a 'Call' demand is relative to exactly one call.
-And that extends to the information we have how its results are used in each
-call site. Consider (#18903)
-
-  h :: Int -> Int
-  h m =
-    let g :: Int -> (Int,Int)
-        g 1 = (m, 0)
-        g n = (2 * n, 2 `div` n)
-        {-# NOINLINE g #-}
-    in case m of
-      1 -> 0
-      2 -> snd (g m)
-      _ -> uncurry (+) (g m)
-
-We want to give @g@ the demand @1C1((1(U),S(U)))@, so we see that in each call
-site of @g@, we are strict in the second component of the returned pair.
-
-This relative cardinality leads to an otherwise unexpected call to 'lubCleanDmd'
-in 'plusCleanDmd', but if you do the math it's just the right thing.
-
-There's one more subtlety: Since the nested demand is relative to exactly one
-call, in the case where we have *at most zero calls* (e.g. CA(...)), the premise
-is hurt and we can assume that the nested demand is 'botCleanDmd'. That ensures
-that @g@ above actually gets the @S(U)@ demand on its second pair component,
-rather than the lazy @1(U)@ if we 'lub'bed with an absent demand.
--}
 
 {- Note [Scaling demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -635,7 +717,7 @@ exactly iff they are invariant under 'scale*'.
 Note [Scaling Call demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Scaling a 'Call' only concerns the outer call information, because the nested
-'CleanDemand' is implicitly scaled by the outer cardinality. E.g., reusing
+'SubDemand' is implicitly scaled by the outer cardinality. E.g., reusing
        C1(C1(U)) ("Called once with at least two arguments")
 yields C(C1(U))  ("Called multiple times, but each time with at least two
                    arguments"),
@@ -643,11 +725,11 @@ yields C(C1(U))  ("Called multiple times, but each time with at least two
                    PAP is also called multiple times with one argument").
 
 This also follows from the specification
-  scaleCleanDmd cd = plusCleanDmd cd cd,
+  scaleSubDmd cd = plusSubDmd cd cd,
 which dictates that
-  scaleCleanDmd (Call n cd) = Call (scaleCard n) (lubCleanDmd cd cd)
-and 'lubCleanDmd' is reflexive, hence
-  scaleCleanDmd (Call n cd) = Call (scaleCard n) cd.
+  scaleSubDmd (Call n cd) = Call (scaleCard n) (lubSubDmd cd cd)
+and 'lubSubDmd' is reflexive, hence
+  scaleSubDmd (Call n cd) = Call (scaleCard n) cd.
 -}
 
 -- | Whether the given 'Card' is invariant to scaling, as if it was used
@@ -660,14 +742,14 @@ isScaleInvariantCard c = plusCard c c == c
 -- | See Note [Scaling demands].
 isScaleInvariantDmd :: Demand -> Bool
 -- isScaleInvariantDmd dmd = scaleDmd dmd == dmd
-isScaleInvariantDmd (n :* cd) = isScaleInvariantCard n && isScaleInvariantCleanDmd cd
+isScaleInvariantDmd (n :* cd) = isScaleInvariantCard n && isScaleInvariantSubDmd cd
 
 -- | See Note [Scaling demands].
-isScaleInvariantCleanDmd :: CleanDemand -> Bool
--- isScaleInvariantCleanDmd cd = scaleCleanDmd cd == cd
-isScaleInvariantCleanDmd (Poly n)   = isScaleInvariantCard n
-isScaleInvariantCleanDmd (Prod ds)  = all isScaleInvariantDmd ds
-isScaleInvariantCleanDmd (Call n _) = isScaleInvariantCard n -- See Note [Scaling Call demands]
+isScaleInvariantSubDmd :: SubDemand -> Bool
+-- isScaleInvariantSubDmd cd = scaleSubDmd cd == cd
+isScaleInvariantSubDmd (Poly n)   = isScaleInvariantCard n
+isScaleInvariantSubDmd (Prod ds)  = all isScaleInvariantDmd ds
+isScaleInvariantSubDmd (Call n _) = isScaleInvariantCard n -- See Note [Scaling Call demands]
 
 -- | We try to avoid tracking weak free variable demands in strictness
 -- signatures for analysis performance reasons. FVs with weak demands
@@ -717,7 +799,7 @@ trimToType (n :* cd) ts
       | equalLength ds tss    = Prod (zipWith trimToType ds tss)
     go (Call n cd) (TsFun ts) = Call n (go cd ts)
     go cd@Poly{}   _          = cd
-    go _           _          = topCleanDmd
+    go _           _          = topSubDmd
 
 instance Outputable TypeShape where
   ppr TsUnk        = text "TsUnk"
@@ -1001,7 +1083,7 @@ We
  3. combine the termination results, as in plusDivergence.
 
 Since we don't use argument demands of the second argument anyway, 'plus's
-second argument is just a 'BothDmdType'.
+second argument is just a 'PlusDmdType'.
 
 But note that the argument demand types are not guaranteed to be observed in
 left to right order. For example, analysis of a case expression will pass the
@@ -1035,15 +1117,15 @@ lubDmdType d1 d2
     lub_ds  = zipWithEqual "lubDmdType" lubDmd ds1 ds2
     lub_div = lubDivergence r1 r2
 
-type BothDmdArg = (DmdEnv, Divergence)
+type PlusDmdArg = (DmdEnv, Divergence)
 
-mkBothDmdArg :: DmdEnv -> BothDmdArg
-mkBothDmdArg env = (env, topDiv)
+mkPlusDmdArg :: DmdEnv -> PlusDmdArg
+mkPlusDmdArg env = (env, topDiv)
 
-toBothDmdArg :: DmdType -> BothDmdArg
-toBothDmdArg (DmdType fv _ r) = (fv, r)
+toPlusDmdArg :: DmdType -> PlusDmdArg
+toPlusDmdArg (DmdType fv _ r) = (fv, r)
 
-plusDmdType :: DmdType -> BothDmdArg -> DmdType
+plusDmdType :: DmdType -> PlusDmdArg -> DmdType
 plusDmdType (DmdType fv1 ds1 r1) (fv2, t2)
     -- See Note [Asymmetry of 'plus*']
     -- 'plus' takes the argument/result info from its *first* arg,
@@ -1139,37 +1221,6 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (defaultArgDmd res_ty, ty)
 deferAfterPreciseException :: DmdType -> DmdType
 deferAfterPreciseException = lubDmdType exnDmdType
 
-strictenDmd :: Demand -> Demand
-strictenDmd (n :* cd) = plusCard C_10 n :* cd
-
--- This is used in dmdAnalStar when post-processing
--- a function's argument demand. So we only care about what
--- does to free variables, and whether it terminates.
--- see Note [Asymmetry of 'plus*']
-multDmdType :: Card -> DmdType -> BothDmdArg
-multDmdType n (DmdType fv _ res_ty)
-    = -- pprTrace "multDmdType" (ppr n $$ ppr fv $$ ppr (multDmdEnv n fv)) $
-      (multDmdEnv n fv, multDivergence n res_ty)
-
--- | In a non-strict scenario, we might not force the Divergence, in which case
--- we might converge, hence Dunno.
-multDivergence :: Card -> Divergence -> Divergence
-multDivergence n _ | not (isStrict n) = Dunno
-multDivergence _ d                    = d
-
-multDmdEnv :: Card -> DmdEnv -> DmdEnv
-multDmdEnv n env
-  | isAbs n   = emptyDmdEnv
-    -- In this case (multDmd ds) == id; avoid a redundant rebuild
-    -- of the environment. Be careful, bad things will happen if this doesn't
-    -- match multDmd (see #13977).
-  | n == C_11 = env
-  | otherwise = mapVarEnv (multDmd n) env
-
--- | See Note [Scaling demands]
-reuseEnv :: DmdEnv -> DmdEnv
-reuseEnv = multDmdEnv C_1N
-
 -- | The trivial cases of the @mult*@ functions.
 -- If @multTrivial n abs a = ma@, we have the following outcomes
 -- depending on @n@:
@@ -1183,34 +1234,49 @@ multTrivial C_11 _   a           = Just a
 multTrivial n    abs _ | isAbs n = Just abs
 multTrivial _    _   _           = Nothing
 
-multUnsat :: Card -> DmdType -> DmdType
-multUnsat n (DmdType fv args res_ty)
-  = -- pprTrace "multUnsat" (ppr n $$ ppr fv $$ ppr (multDmdEnv n fv)) $
-    DmdType (multDmdEnv n fv)
-            (map (multDmd n) args)
-            (multDivergence n res_ty)
-
-multCleanDmd :: Card -> CleanDemand -> CleanDemand
-multCleanDmd n cd
-  | Just cd' <- multTrivial n seqCleanDmd cd = cd'
-multCleanDmd n (Poly n')    = Poly (multCard n n')
-multCleanDmd n (Call n' cd) = Call (multCard n n') cd -- See Note [Call demands are relative]
-multCleanDmd n (Prod ds)    = Prod (map (multDmd n) ds)
+multSubDmd :: Card -> SubDemand -> SubDemand
+multSubDmd n cd
+  | Just cd' <- multTrivial n seqSubDmd cd = cd'
+multSubDmd n (Poly n')    = Poly (multCard n n')
+multSubDmd n (Call n' cd) = Call (multCard n n') cd -- See Note [Call demands are relative]
+multSubDmd n (Prod ds)    = Prod (map (multDmd n) ds)
 
 multDmd :: Card -> Demand -> Demand
 multDmd n    dmd
   | Just dmd' <- multTrivial n absDmd dmd = dmd'
-multDmd n (m :* dmd) = multCard n m :* multCleanDmd n dmd
+multDmd n (m :* dmd) = multCard n m :* multSubDmd n dmd
+
+-- | In a non-strict scenario, we might not force the Divergence, in which case
+-- we might converge, hence Dunno.
+multDivergence :: Card -> Divergence -> Divergence
+multDivergence n _ | not (isStrict n) = Dunno
+multDivergence _ d                    = d
+
+multDmdEnv :: Card -> DmdEnv -> DmdEnv
+multDmdEnv n env
+  | Just env' <- multTrivial n emptyDmdEnv env = env'
+  | otherwise                                  = mapVarEnv (multDmd n) env
+
+-- | See Note [Scaling demands]
+reuseEnv :: DmdEnv -> DmdEnv
+reuseEnv = multDmdEnv C_1N
+
+multDmdType :: Card -> DmdType -> DmdType
+multDmdType n (DmdType fv args res_ty)
+  = -- pprTrace "multDmdType" (ppr n $$ ppr fv $$ ppr (multDmdEnv n fv)) $
+    DmdType (multDmdEnv n fv)
+            (map (multDmd n) args)
+            (multDivergence n res_ty)
 
 -- | Peels one call level from the demand, and also returns how many times we
 -- entered the lambda body.
-peelCallDmd :: CleanDemand -> (Card, CleanDemand)
-peelCallDmd cd = viewCall cd `orElse` (topCard, topCleanDmd)
+peelCallDmd :: SubDemand -> (Card, SubDemand)
+peelCallDmd cd = viewCall cd `orElse` (topCard, topSubDmd)
 
 -- Peels that multiple nestings of calls clean demand and also returns
 -- whether it was unsaturated (separately for strictness and usage
 -- see Note [Demands from unsaturated function calls]
-peelManyCalls :: Int -> CleanDemand -> Card
+peelManyCalls :: Int -> SubDemand -> Card
 peelManyCalls 0 _                          = C_11
 peelManyCalls n (viewCall -> Just (m, cd)) = m `multCard` peelManyCalls (n-1) cd
 peelManyCalls _ _                          = C_0N
@@ -1345,7 +1411,7 @@ There are several wrinkles:
   usage of 'y', else 'g' will say 'y' is absent, and will w/w so that
   'y' is bound to an aBSENT_ERROR thunk.
 
-  However, the argument of toCleanDmd always satisfies the let/app
+  However, the argument of toSubDmd always satisfies the let/app
   invariant; so if it is unlifted it is also okForSpeculation, and so
   can be evaluated in a short finite time -- and that rules out nasty
   cases like the one above.  (I'm not quite sure why this was a
@@ -1512,7 +1578,7 @@ nopSig = StrictSig nopDmdType
 seqStrictSig :: StrictSig -> ()
 seqStrictSig (StrictSig ty) = seqDmdType ty
 
-dmdTransformSig :: StrictSig -> CleanDemand -> DmdType
+dmdTransformSig :: StrictSig -> SubDemand -> DmdType
 -- (dmdTransformSig fun_sig dmd) considers a call to a function whose
 -- signature is fun_sig, with demand dmd.  We return the demand
 -- that the function places on its context (eg its args)
@@ -1520,7 +1586,7 @@ dmdTransformSig (StrictSig dmd_ty@(DmdType _ arg_ds _)) cd
   = multUnsat (peelManyCalls (length arg_ds) cd) dmd_ty
     -- see Note [Demands from unsaturated function calls]
 
-dmdTransformDataConSig :: Arity -> CleanDemand -> DmdType
+dmdTransformDataConSig :: Arity -> SubDemand -> DmdType
 -- Same as dmdTransformSig but for a data constructor (worker),
 -- which has a special kind of demand transformer.
 -- If the constructor is saturated, we feed the demand on
@@ -1533,7 +1599,7 @@ dmdTransformDataConSig arity cd = case go arity cd of
     go n (viewCall -> Just (C_11, cd)) = go (n-1) cd  -- strict calls only!
     go _ _                             = Nothing
 
-dmdTransformDictSelSig :: StrictSig -> CleanDemand -> DmdType
+dmdTransformDictSelSig :: StrictSig -> SubDemand -> DmdType
 -- Like dmdTransformDataConSig, we have a special demand transformer
 -- for dictionary selectors.  If the selector is saturated (ie has one
 -- argument: the dictionary), we feed the demand on the result into
@@ -1680,7 +1746,7 @@ kill_usage_card _   n                       = n
 kill_usage :: KillFlags -> Demand -> Demand
 kill_usage kfs (n :* cd) = kill_usage_card kfs n :* kill_usage_cd kfs cd
 
-kill_usage_cd :: KillFlags -> CleanDemand -> CleanDemand
+kill_usage_cd :: KillFlags -> SubDemand -> SubDemand
 kill_usage_cd kfs (Call n cd)
   | kf_called_once kfs      = Call (lubCard C_1N n) (kill_usage_cd kfs cd)
   | otherwise               = Call n                (kill_usage_cd kfs cd)
@@ -1697,7 +1763,7 @@ strictifyDictDmd ty (n :* Prod ds)
   , Just field_tys <- as_non_newtype_dict ty
   = C_1N :* -- main idea: ensure it's strict
       if all (not . isAbsDmd) ds
-        then topCleanDmd -- abstract to strict w/ arbitrary component use,
+        then topSubDmd -- abstract to strict w/ arbitrary component use,
                          -- since this smells like reboxing; results in CBV
                          -- boxed
                          --
@@ -1716,9 +1782,6 @@ strictifyDictDmd ty (n :* Prod ds)
       = Nothing
 strictifyDictDmd _  dmd = dmd
 
-strictifyDmd :: Demand -> Demand
-strictifyDmd (n :* cd) = plusCard n C_10 :* cd
-
 {-
 Note [HyperStr and Use demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1734,8 +1797,21 @@ distinguishing the uses on x and y in the True case, we could either not figure
 out how deeply we can unpack x, or that we do not have to pass y.
 -}
 
+{-
+************************************************************************
+*                                                                      *
+                     Outputable and Binary instances
+*                                                                      *
+************************************************************************
+-}
+
 instance Outputable Card where
-  ppr = text . show
+  ppr C_00 = char 'A'
+  ppr C_01 = char '1'
+  ppr C_0N = char 'U'
+  ppr C_11 = char 'S'
+  ppr C_1N = char 'M'
+  ppr C_10 = char 'B'
 
 instance Outputable Demand where
   ppr dmd@(n :* cd)
@@ -1743,7 +1819,7 @@ instance Outputable Demand where
     | dmd == polyDmd n = ppr n
     | otherwise        = ppr n <> ppr cd
 
-instance Outputable CleanDemand where
+instance Outputable SubDemand where
   ppr (Poly cd)   = ppr cd
   ppr (Call n cd) = char 'C' <> ppr n <> parens (ppr cd)
   ppr (Prod ds)   = parens (fields ds)
@@ -1751,14 +1827,6 @@ instance Outputable CleanDemand where
       fields []     = empty
       fields [x]    = ppr x
       fields (x:xs) = ppr x <> char ',' <> fields xs
-
-{-
-************************************************************************
-*                                                                      *
-                     Serialisation
-*                                                                      *
-************************************************************************
--}
 
 instance Binary Card where
   put_ bh C_00 = putByte bh 0
@@ -1782,7 +1850,7 @@ instance Binary Demand where
   put_ bh (n :* cd) = put_ bh n *> put_ bh cd
   get bh = (:*) <$> get bh <*> get bh
 
-instance Binary CleanDemand where
+instance Binary SubDemand where
   put_ bh (Poly cd)   = putByte bh 0 *> put_ bh cd
   put_ bh (Call n cd) = putByte bh 1 *> put_ bh n *> put_ bh cd
   put_ bh (Prod ds)   = putByte bh 2 *> put_ bh ds
@@ -1792,7 +1860,7 @@ instance Binary CleanDemand where
       0 -> Poly <$> get bh
       1 -> Call <$> get bh <*> get bh
       2 -> Prod <$> get bh
-      _ -> pprPanic "Binary:CleanDemand" (ppr (fromIntegral h :: Int))
+      _ -> pprPanic "Binary:SubDemand" (ppr (fromIntegral h :: Int))
 
 instance Binary StrictSig where
   put_ bh (StrictSig aa) = put_ bh aa

@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
 CaseBinderCPR.$trModule:
-CaseBinderCPR.f_list_cmp: <UCU(CS((S*U)))><SU><SU>
+CaseBinderCPR.f_list_cmp: <UCU(CS((MU)))><SU><SU>
 
 
 

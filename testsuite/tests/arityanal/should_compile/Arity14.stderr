@@ -18,7 +18,7 @@ F14.f2 = 1
 
 -- RHS size: {terms: 35, types: 24, coercions: 0, joins: 0/3}
 F14.$wf14 [InlPrag=[2]] :: forall {t}. (t -> t -> Bool) -> Num t => t -> t -> t -> t
-[GblId, Arity=4, Str=<S*CS*(CS(U))><U(UCU(CS(U)),A,A,A,A,A,1C1(U))><U><U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 90 0 0] 300 0}]
+[GblId, Arity=4, Str=<MCM(CS(U))><U(UCU(CS(U)),A,A,A,A,A,1C1(U))><U><U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 90 0 0] 300 0}]
 F14.$wf14
   = \ (@t) (ww :: t -> t -> Bool) (w :: Num t) (w1 :: t) (w2 :: t) ->
       let {
@@ -45,7 +45,7 @@ F14.$wf14
 f14 [InlPrag=[2]] :: forall {t}. (Ord t, Num t) => t -> t -> t -> t
 [GblId,
  Arity=4,
- Str=<S(A,A,S*CS*(CS(U)),A,A,A,A,A)><U(UCU(CS(U)),A,A,A,A,A,UCU(U))><U><U>,
+ Str=<S(A,A,MCM(CS(U)),A,A,A,A,A)><U(UCU(CS(U)),A,A,A,A,A,UCU(U))><U><U>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@t) (w [Occ=Once1!] :: Ord t) (w1 [Occ=Once1] :: Num t) (w2 [Occ=Once1] :: t) (w3 [Occ=Once1] :: t) -> case w of { GHC.Classes.C:Ord _ [Occ=Dead] _ [Occ=Dead] ww3 [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> F14.$wf14 @t ww3 w1 w2 w3 }}]
 f14 = \ (@t) (w :: Ord t) (w1 :: Num t) (w2 :: t) (w3 :: t) -> case w of { GHC.Classes.C:Ord ww1 ww2 ww3 ww4 ww5 ww6 ww7 ww8 -> F14.$wf14 @t ww3 w1 w2 w3 }

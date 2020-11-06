@@ -1,8 +1,8 @@
 
 ==================== Strictness signatures ====================
 UnsatFun.$trModule:
-UnsatFun.f: <S(S*)><B>b
-UnsatFun.g: <S(S*)>b
+UnsatFun.f: <S(M)><B>b
+UnsatFun.g: <S(M)>b
 UnsatFun.g': <1(U)>
 UnsatFun.g3: <U(U)>
 UnsatFun.h: <SCS(U)>
@@ -25,8 +25,8 @@ UnsatFun.h3: m1
 
 ==================== Strictness signatures ====================
 UnsatFun.$trModule:
-UnsatFun.f: <S(S*)><B>b
-UnsatFun.g: <S(S*)>b
+UnsatFun.f: <S(M)><B>b
+UnsatFun.g: <S(M)>b
 UnsatFun.g': <1(U)>
 UnsatFun.g3: <U(U)>
 UnsatFun.h: <SCS(U)>

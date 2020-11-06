@@ -145,7 +145,7 @@ dmdTransformThunkDmd e
 dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
             -> CoreExpr -- Should obey the let/app invariant
-            -> (BothDmdArg, CoreExpr)
+            -> (PlusDmdArg, CoreExpr)
 dmdAnalStar env (n :* cd) e
   | (dmd_ty, e')    <- dmdAnal env cd e
   = ASSERT2( not (isUnliftedType (exprType e)) || exprOkForSpeculation e, ppr e )
@@ -155,10 +155,10 @@ dmdAnalStar env (n :* cd) e
 
 -- Main Demand Analsysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
-        -> CleanDemand         -- The main one takes a *CleanDemand*
+        -> SubDemand         -- The main one takes a *SubDemand*
         -> CoreExpr -> (DmdType, CoreExpr)
 
--- The CleanDemand is always strict and not absent
+-- The SubDemand is always strict and not absent
 --    See Note [Ensure demand is strict]
 
 dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
@@ -173,7 +173,7 @@ dmdAnal' env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
 
 dmdAnal' env dmd (Cast e co)
-  = (dmd_ty `plusDmdType` mkBothDmdArg (coercionDmdEnv co), Cast e' co)
+  = (dmd_ty `plusDmdType` mkPlusDmdArg (coercionDmdEnv co), Cast e' co)
   where
     (dmd_ty, e') = dmdAnal env dmd e
 
@@ -246,7 +246,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         -- See Note [Demand on scrutinee of a product case]
         scrut_dmd          = mkProd id_dmds
         (scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
-        res_ty             = alt_ty3 `plusDmdType` toBothDmdArg scrut_ty
+        res_ty             = alt_ty3 `plusDmdType` toPlusDmdArg scrut_ty
         case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
         bndrs'             = setBndrsDemandInfo bndrs id_dmds
     in
@@ -275,7 +275,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
           = deferAfterPreciseException alt_ty
           | otherwise
           = alt_ty
-        res_ty               = alt_ty2 `plusDmdType` toBothDmdArg scrut_ty
+        res_ty               = alt_ty2 `plusDmdType` toPlusDmdArg scrut_ty
 
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
@@ -374,7 +374,7 @@ forcesRealWorld fam_envs ty
   | otherwise
   = False
 
-dmdAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, Alt Var)
+dmdAnalAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> (DmdType, Alt Var)
 dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
   | null bndrs    -- Literals, DEFAULT, and nullary constructors
   , (rhs_ty, rhs') <- dmdAnal env dmd rhs
@@ -487,7 +487,7 @@ strict in |y|.
 
 dmdTransform :: AnalEnv         -- The strictness environment
              -> Id              -- The function
-             -> CleanDemand     -- The demand on the function
+             -> SubDemand     -- The demand on the function
              -> DmdType         -- The demand type of the function in this context
         -- Returned DmdEnv includes the demand on
         -- this function plus demand on its free variables
@@ -543,7 +543,7 @@ dmdTransform env var dmd
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
 dmdAnalRhsLetDown
   :: Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
-  -> AnalEnv -> CleanDemand
+  -> AnalEnv -> SubDemand
   -> Id -> CoreExpr
   -> (DmdEnv, StrictSig, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
@@ -599,11 +599,11 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
             = exprFreeIds unf_body
             | otherwise = emptyVarSet
 
--- | @mkRhsDmd env rhs_arity rhs@ creates a 'CleanDemand' for
+-- | @mkRhsDmd env rhs_arity rhs@ creates a 'SubDemand' for
 -- unleashing on the given function's @rhs@, by creating
 -- a call demand of @rhs_arity@
 -- See Historical Note [Product demands for function body]
-mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
+mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> SubDemand
 mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity cleanEvalDmd
 
 -- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
@@ -911,7 +911,7 @@ deleted the special case.
 -- Recursive bindings
 dmdFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
-       -> CleanDemand
+       -> SubDemand
        -> [(Id,CoreExpr)]
        -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
 
@@ -1060,7 +1060,7 @@ addVarDmd (DmdType fv ds res) var dmd
 
 addLazyFVs :: DmdType -> DmdEnv -> DmdType
 addLazyFVs dmd_ty lazy_fvs
-  = dmd_ty `plusDmdType` mkBothDmdArg lazy_fvs
+  = dmd_ty `plusDmdType` mkPlusDmdArg lazy_fvs
         -- Using bothDmdType (rather than just both'ing the envs)
         -- is vital.  Consider
         --      let f = \x -> (x,y)
