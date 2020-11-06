@@ -817,8 +817,13 @@ emitProc mb_info lbl live blocks offset do_layout
               proc_block = CmmProc tinfo lbl live blks
 
         ; state <- getState
+        ; dflags <- getDynFlags
+        ; let new_info
+                | gopt Opt_InfoTableMap dflags
+                    = maybe (cgs_used_info state) (: cgs_used_info state) mb_info
+                | otherwise = []
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block
-                           , cgs_used_info = maybe (cgs_used_info state) (: cgs_used_info state) mb_info } }
+                           , cgs_used_info = new_info } }
 
 getCmm :: FCode () -> FCode CmmGroup
 -- Get all the CmmTops (there should be no stmts)
