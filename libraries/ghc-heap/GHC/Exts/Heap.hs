@@ -7,6 +7,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeInType #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE UnliftedFFITypes #-}
 
 {-|
 Module      :  GHC.Exts.Heap
@@ -25,6 +28,7 @@ module GHC.Exts.Heap (
     , ClosureType(..)
     , PrimType(..)
     , HasHeapRep(getClosureData)
+    , getClosureDataFromHeapRep
 
     -- * Info Table types
     , StgInfoTable(..)
@@ -58,7 +62,7 @@ import GHC.Exts.Heap.Utils
 
 import Control.Monad
 import Data.Bits
-import GHC.Arr
+import Foreign
 import GHC.Exts
 import GHC.Int
 import GHC.Word
@@ -66,13 +70,19 @@ import GHC.Word
 #include "ghcconfig.h"
 
 class HasHeapRep (a :: TYPE rep) where
-    getClosureData :: a -> IO Closure
+
+    -- | Decode a closure to it's heap representation ('GenClosure').
+    getClosureData
+        :: a
+        -- ^ Closure to decode.
+        -> IO Closure
+        -- ^ Heap representation of the closure.
 
 instance HasHeapRep (a :: TYPE 'LiftedRep) where
-    getClosureData = getClosure
+    getClosureData = getClosureDataFromHeapObject
 
 instance HasHeapRep (a :: TYPE 'UnliftedRep) where
-    getClosureData x = getClosure (unsafeCoerce# x)
+    getClosureData x = getClosureDataFromHeapObject (unsafeCoerce# x)
 
 instance Int# ~ a => HasHeapRep (a :: TYPE 'IntRep) where
     getClosureData x = return $
@@ -102,49 +112,84 @@ instance Double# ~ a => HasHeapRep (a :: TYPE 'DoubleRep) where
     getClosureData x = return $
         DoubleClosure { ptipe = PDouble, doubleVal = D# x }
 
--- | This returns the raw representation of the given argument. The second
--- component of the triple is the raw words of the closure on the heap, and the
--- third component is those words that are actually pointers. Once back in the
--- Haskell world, the raw words that hold pointers may be outdated after a
--- garbage collector run, but the corresponding values in 'Box's will still
--- point to the correct value.
-getClosureRaw :: a -> IO (Ptr StgInfoTable, [Word], [Box])
-getClosureRaw x = do
+-- | Get the heap representation of a closure _at this moment_, even if it is
+-- unevaluated or an indirection or other exotic stuff. Beware when passing
+-- something to this function, the same caveats as for
+-- 'GHC.Exts.Heap.Closures.asBox' apply.
+--
+-- For most use cases 'getClosureData' is an easier to use alternative.
+--
+-- Currently TSO and STACK objects will return `UnsupportedClosure`. This is
+-- because it is not memory safe to extract TSO and STACK objects (done via
+-- `unpackClosure#`). Other threads may be mutating those objects and interleave
+-- with reads in `unpackClosure#`. This is particularly problematic with STACKs
+-- where pointer values may be overwritten by non-pointer values as the
+-- corresponding haskell thread runs.
+getClosureDataFromHeapObject
+    :: a
+    -- ^ Heap object to decode.
+    -> IO Closure
+    -- ^ Heap representation of the closure.
+getClosureDataFromHeapObject x = do
     case unpackClosure# x of
--- This is a hack to cover the bootstrap compiler using the old version of
--- 'unpackClosure'. The new 'unpackClosure' return values are not merely
--- a reordering, so using the old version would not work.
-        (# iptr, dat, pointers #) -> do
-            let nelems = (I# (sizeofByteArray# dat)) `div` wORD_SIZE
-                end = fromIntegral nelems - 1
-                rawWds = [W# (indexWordArray# dat i) | I# i <- [0.. end] ]
-                pelems = I# (sizeofArray# pointers)
-                ptrList = amap' Box $ Array 0 (pelems - 1) pelems pointers
-            pure (Ptr iptr, rawWds, ptrList)
+#if MIN_VERSION_ghc_prim(0,5,3)
+        (# infoTableAddr, heapRep, pointersArray #) -> do
+#else
+        -- This is a hack to cover the bootstrap compiler using the old version
+        -- of 'unpackClosure'. The new 'unpackClosure' return values are not
+        -- merely a reordering, so using the old version would not work.
+        (# infoTableAddr, pointersArray, heapRep #) -> do
+#endif
+            let infoTablePtr = Ptr infoTableAddr
+                ptrList = [case indexArray# pointersArray i of
+                                (# ptr #) -> Box ptr
+                            | I# i <- [0..(I# (sizeofArray# pointersArray)) - 1]
+                            ]
 
--- From GHC.Runtime.Heap.Inspect
-amap' :: (t -> b) -> Array Int t -> [b]
-amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
-    where g (I# i#) = case indexArray# arr# i# of
-                          (# e #) -> f e
+            infoTable <- peekItbl infoTablePtr
+            case tipe infoTable of
+                TSO   -> pure $ UnsupportedClosure infoTable
+                STACK -> pure $ UnsupportedClosure infoTable
+                _ -> getClosureDataFromHeapRep heapRep infoTablePtr ptrList
 
--- | This function returns a parsed heap representation of the argument _at
--- this moment_, even if it is unevaluated or an indirection or other exotic
--- stuff.  Beware when passing something to this function, the same caveats as
--- for 'asBox' apply.
-getClosure :: a -> IO Closure
-getClosure x = do
-    (iptr, wds, pts) <- getClosureRaw x
-    itbl <- peekItbl iptr
-    -- The remaining words after the header
-    let rawWds = drop (closureTypeHeaderSize (tipe itbl)) wds
-    -- For data args in a pointers then non-pointers closure
-    -- This is incorrect in non pointers-first setups
-    -- not sure if that happens
-        npts = drop (closureTypeHeaderSize (tipe itbl) + length pts) wds
+-- | Convert an unpacked heap object, to a `GenClosure b`. The inputs to this
+-- function can be generated from a heap object using `unpackClosure#`.
+getClosureDataFromHeapRep
+    :: ByteArray#
+    -- ^ Heap representation of the closure as returned by `unpackClosure#`.
+    -- This includes all of the object including the header, info table
+    -- pointer, pointer data, and non-pointer data. The ByteArray# may be
+    -- pinned or unpinned.
+    -> Ptr StgInfoTable
+    -- ^ Pointer to the `StgInfoTable` of the closure, extracted from the heap
+    -- representation. The info table must not be movable by GC i.e. must be in
+    -- pinned or off-heap memory.
+    -> [b]
+    -- ^ Pointers in the payload of the closure, extracted from the heap
+    -- representation as returned by `collect_pointers()` in `Heap.c`. The type
+    -- `b` is some representation of a pointer e.g. `Any` or `Ptr Any`.
+    -> IO (GenClosure b)
+    -- ^ Heap representation of the closure.
+getClosureDataFromHeapRep heapRep infoTablePtr pts = do
+    itbl <- peekItbl infoTablePtr
+    let -- heapRep as a list of words.
+        rawHeapWords :: [Word]
+        rawHeapWords = [W# (indexWordArray# heapRep i) | I# i <- [0.. end] ]
+            where
+            nelems = (I# (sizeofByteArray# heapRep)) `div` wORD_SIZE
+            end = fromIntegral nelems - 1
+
+        -- Just the payload of rawHeapWords (no header).
+        payloadWords :: [Word]
+        payloadWords = drop (closureTypeHeaderSize (tipe itbl)) rawHeapWords
+
+        -- The non-pointer words in the payload. Only valid for closures with a
+        -- "pointers first" layout. Not valid for bit field layout.
+        npts :: [Word]
+        npts = drop (closureTypeHeaderSize (tipe itbl) + length pts) rawHeapWords
     case tipe itbl of
         t | t >= CONSTR && t <= CONSTR_NOCAF -> do
-            (p, m, n) <- dataConNames iptr
+            (p, m, n) <- dataConNames infoTablePtr
             if m == "GHC.ByteCode.Instr" && n == "BreakInfo"
               then pure $ UnsupportedClosure itbl
               else pure $ ConstrClosure itbl pts npts p m n
@@ -164,9 +209,9 @@ getClosure x = do
             unless (length pts >= 1) $
                 fail "Expected at least 1 ptr argument to AP"
             -- We expect at least the arity, n_args, and fun fields
-            unless (length rawWds >= 2) $
+            unless (length payloadWords >= 2) $
                 fail $ "Expected at least 2 raw words to AP"
-            let splitWord = rawWds !! 0
+            let splitWord = payloadWords !! 0
             pure $ APClosure itbl
 #if defined(WORDS_BIGENDIAN)
                 (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
@@ -181,9 +226,9 @@ getClosure x = do
             unless (length pts >= 1) $
                 fail "Expected at least 1 ptr argument to PAP"
             -- We expect at least the arity, n_args, and fun fields
-            unless (length rawWds >= 2) $
+            unless (length payloadWords >= 2) $
                 fail "Expected at least 2 raw words to PAP"
-            let splitWord = rawWds !! 0
+            let splitWord = payloadWords !! 0
             pure $ PAPClosure itbl
 #if defined(WORDS_BIGENDIAN)
                 (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
@@ -218,10 +263,10 @@ getClosure x = do
             unless (length pts >= 3) $
                 fail $ "Expected at least 3 ptr argument to BCO, found "
                         ++ show (length pts)
-            unless (length rawWds >= 4) $
+            unless (length payloadWords >= 4) $
                 fail $ "Expected at least 4 words to BCO, found "
-                        ++ show (length rawWds)
-            let splitWord = rawWds !! 3
+                        ++ show (length payloadWords)
+            let splitWord = payloadWords !! 3
             pure $ BCOClosure itbl (pts !! 0) (pts !! 1) (pts !! 2)
 #if defined(WORDS_BIGENDIAN)
                 (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
@@ -230,27 +275,30 @@ getClosure x = do
                 (fromIntegral splitWord)
                 (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
 #endif
-                (drop 4 rawWds)
+                (drop 4 payloadWords)
 
         ARR_WORDS -> do
-            unless (length rawWds >= 1) $
+            unless (length payloadWords >= 1) $
                 fail $ "Expected at least 1 words to ARR_WORDS, found "
-                        ++ show (length rawWds)
-            pure $ ArrWordsClosure itbl (head rawWds) (tail rawWds)
+                        ++ show (length payloadWords)
+            pure $ ArrWordsClosure itbl (head payloadWords) (tail payloadWords)
 
         t | t >= MUT_ARR_PTRS_CLEAN && t <= MUT_ARR_PTRS_FROZEN_CLEAN -> do
-            unless (length rawWds >= 2) $
+            unless (length payloadWords >= 2) $
                 fail $ "Expected at least 2 words to MUT_ARR_PTRS_* "
-                        ++ "found " ++ show (length rawWds)
-            pure $ MutArrClosure itbl (rawWds !! 0) (rawWds !! 1) pts
+                        ++ "found " ++ show (length payloadWords)
+            pure $ MutArrClosure itbl (payloadWords !! 0) (payloadWords !! 1) pts
 
         t | t >= SMALL_MUT_ARR_PTRS_CLEAN && t <= SMALL_MUT_ARR_PTRS_FROZEN_CLEAN -> do
-            unless (length rawWds >= 1) $
+            unless (length payloadWords >= 1) $
                 fail $ "Expected at least 1 word to SMALL_MUT_ARR_PTRS_* "
-                        ++ "found " ++ show (length rawWds)
-            pure $ SmallMutArrClosure itbl (rawWds !! 0) pts
+                        ++ "found " ++ show (length payloadWords)
+            pure $ SmallMutArrClosure itbl (payloadWords !! 0) pts
 
-        t | t == MUT_VAR_CLEAN || t == MUT_VAR_DIRTY ->
+        t | t == MUT_VAR_CLEAN || t == MUT_VAR_DIRTY -> do
+            unless (length pts >= 1) $
+                fail $ "Expected at least 1 words to MUT_VAR, found "
+                        ++ show (length pts)
             pure $ MutVarClosure itbl (head pts)
 
         t | t == MVAR_CLEAN || t == MVAR_DIRTY -> do
@@ -260,13 +308,12 @@ getClosure x = do
             pure $ MVarClosure itbl (pts !! 0) (pts !! 1) (pts !! 2)
 
         BLOCKING_QUEUE ->
-            pure $ OtherClosure itbl pts wds
+            pure $ OtherClosure itbl pts rawHeapWords
         --    pure $ BlockingQueueClosure itbl
         --        (pts !! 0) (pts !! 1) (pts !! 2) (pts !! 3)
 
-        --  pure $ OtherClosure itbl pts wds
+        --  pure $ OtherClosure itbl pts rawHeapWords
         --
-
         WEAK ->
             pure $ WeakClosure
                 { info = itbl
