@@ -16,3 +16,12 @@ void heap_view_closure_ptrs_in_pap_payload(StgClosure *ptrs[], StgWord *nptrs
                         , StgClosure *fun, StgClosure **payload, StgWord size);
 
 StgWord heap_view_closureSize(StgClosure *closure);
+
+/*
+ * Collect the pointers of a closure into the given array. `size` should be
+ * large enough to hold all collected pointers e.g.
+ * `heap_view_closureSize(closure)`. Returns the number of pointers collected.
+ * The caller must ensure that `closure` is not modified (or moved by the GC)
+ * for the duration of the call to `collect_pointers`.
+ */
+StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[]);
