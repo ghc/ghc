@@ -76,23 +76,12 @@ void heap_view_closure_ptrs_in_pap_payload(StgClosure *ptrs[], StgWord *nptrs
     }
 }
 
-StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
-
-    StgWord size = heap_view_closureSize(closure);
+// See Heap.h
+StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[size]) {
+    StgClosure **end;
+    const StgInfoTable *info = get_itbl(closure);
     StgWord nptrs = 0;
     StgWord i;
-
-    // First collect all pointers here, with the comfortable memory bound
-    // of the whole closure. Afterwards we know how many pointers are in
-    // the closure and then we can allocate space on the heap and copy them
-    // there
-    StgClosure *ptrs[size];
-
-    StgClosure **end;
-    StgClosure **ptr;
-
-    const StgInfoTable *info = get_itbl(closure);
 
     switch (info->type) {
         case INVALID_OBJECT:
@@ -101,6 +90,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
 
         // No pointers
         case ARR_WORDS:
+        case STACK:
             break;
 
         // Default layout
@@ -123,7 +113,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
         case FUN_0_2:
         case FUN_STATIC:
             end = closure->payload + info->layout.payload.ptrs;
-            for (ptr = closure->payload; ptr < end; ptr++) {
+            for (StgClosure **ptr = closure->payload; ptr < end; ptr++) {
                 ptrs[nptrs++] = *ptr;
             }
             break;
@@ -136,7 +126,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
         case THUNK_0_2:
         case THUNK_STATIC:
             end = ((StgThunk *)closure)->payload + info->layout.payload.ptrs;
-            for (ptr = ((StgThunk *)closure)->payload; ptr < end; ptr++) {
+            for (StgClosure **ptr = ((StgThunk *)closure)->payload; ptr < end; ptr++) {
                 ptrs[nptrs++] = *ptr;
             }
             break;
@@ -228,6 +218,21 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
             break;
     }
 
+    return nptrs;
+}
+
+StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
+
+    StgWord size = heap_view_closureSize(closure);
+
+    // First collect all pointers here, with the comfortable memory bound
+    // of the whole closure. Afterwards we know how many pointers are in
+    // the closure and then we can allocate space on the heap and copy them
+    // there
+    StgClosure *ptrs[size];
+    StgWord nptrs = collect_pointers(closure, size, ptrs);
+
     size = nptrs + mutArrPtrsCardTableSize(nptrs);
     StgMutArrPtrs *arr =
         (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
@@ -236,7 +241,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     arr->ptrs = nptrs;
     arr->size = size;
 
-    for (i = 0; i<nptrs; i++) {
+    for (StgWord i = 0; i<nptrs; i++) {
         arr->payload[i] = ptrs[i];
     }
 
