@@ -52,7 +52,7 @@ import GHC.Builtin.Names   ( unsafeEqualityProofName )
 import GHC.Data.Maybe
 
 import Data.List.NonEmpty (nonEmpty, toList)
-import Control.Monad (ap)
+import Control.Monad (when, ap)
 import qualified Data.Set as Set
 import Control.Monad.Trans.RWS
 import GHC.Types.Unique.Map
@@ -952,7 +952,7 @@ incDc dc = CtsM $ \dflags _ _ -> if not (gopt Opt_DistinctConstructorTables dfla
           return (fst . head <$> r)
 
 recordStgIdPosition :: Id -> Maybe (RealSrcSpan, String) -> Maybe (RealSrcSpan, String) -> CtsM ()
-recordStgIdPosition id best_span ss = CtsM $ \dflags _ _ -> do
+recordStgIdPosition id best_span ss = CtsM $ \dflags _ _ -> when (gopt Opt_InfoTableMap dflags) $ do
   cc <- ask
   let tyString = showPpr dflags (idType id)
   --pprTraceM "recordStgIdPosition" (ppr id $$ ppr cc $$ ppr ss)
