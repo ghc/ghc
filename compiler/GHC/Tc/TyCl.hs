@@ -1529,27 +1529,12 @@ kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 --    result kind signature have already been dealt with
 --    by inferInitialKind, so we can ignore them here.
 
-kcTyClDecl (DataDecl { tcdLName    = (L _ name)
-                     , tcdDataDefn = defn }) tyCon
-  | HsDataDefn { dd_cons = cons@((L _ (ConDeclGADT {})) : _)
-               , dd_ctxt = (L _ [])
-               , dd_ND = new_or_data } <- defn
-  = -- See Note [Implementation of UnliftedNewtypes] STEP 2
-    kcConDecls new_or_data (tyConResKind tyCon) cons
-
-    -- hs_tvs and dd_kindSig already dealt with in inferInitialKind
-    -- This must be a GADT-style decl,
-    --        (see invariants of DataDefn declaration)
-    -- so (a) we don't need to bring the hs_tvs into scope, because the
-    --        ConDecls bind all their own variables
-    --    (b) dd_ctxt is not allowed for GADT-style decls, so we can ignore it
-
-  | HsDataDefn { dd_ctxt = ctxt
-               , dd_cons = cons
-               , dd_ND = new_or_data } <- defn
+kcTyClDecl (DataDecl { tcdLName    = (L _ name), tcdDataDefn = defn }) tycon
+  | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_ND = new_or_data } <- defn
   = bindTyClTyVars name $ \ _ _ _ ->
-    do { _ <- tcHsContext ctxt
-       ; kcConDecls new_or_data (tyConResKind tyCon) cons
+    do { traceTc "kcTyClDecl:other" (ppr tycon $$ ppr (tyConTyVars tycon) $$ ppr (tyConResKind tycon))
+       ; _ <- tcHsContext ctxt
+       ; kcConDecls new_or_data (tyConResKind tycon) cons
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = rhs }) _tycon
@@ -1606,13 +1591,11 @@ kcConGADTArgs new_or_data res_kind con_args = case con_args of
 
 kcConDecls :: NewOrData
            -> Kind             -- The result kind signature
+                               --   Used only in H98 case
            -> [LConDecl GhcRn] -- The data constructors
            -> TcM ()
 kcConDecls new_or_data res_kind cons
-  = mapM_ (wrapLocM_ (kcConDecl new_or_data final_res_kind)) cons
-  where
-    (_, final_res_kind) = splitPiTys res_kind
-        -- See Note [kcConDecls result kind]
+  = mapM_ (wrapLocM_ (kcConDecl new_or_data res_kind)) cons
 
 -- Kind check a data constructor. In additional to the data constructor,
 -- we also need to know about whether or not its corresponding type was
@@ -1623,82 +1606,67 @@ kcConDecl :: NewOrData
           -> Kind  -- Result kind of the type constructor
                    -- Usually Type but can be TYPE UnliftedRep
                    -- or even TYPE r, in the case of unlifted newtype
+                   -- Used only in H98 case
           -> ConDecl GhcRn
           -> TcM ()
-kcConDecl new_or_data res_kind (ConDeclH98
+kcConDecl new_or_data tc_res_kind (ConDeclH98
   { con_name = name, con_ex_tvs = ex_tvs
   , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxtName [name]) $
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
-       ; kcConH98Args new_or_data res_kind args
+       ; kcConH98Args new_or_data tc_res_kind args
          -- We don't need to check the telescope here,
          -- because that's done in tcConDecl
        }
 
-kcConDecl new_or_data res_kind (ConDeclGADT
+kcConDecl new_or_data _tc_res_kind (ConDeclGADT
     { con_names = names, con_bndrs = L _ outer_bndrs, con_mb_cxt = cxt
     , con_g_args = args, con_res_ty = res_ty })
-  = -- Even though the GADT-style data constructor's type is closed,
-    -- we must still kind-check the type, because that may influence
-    -- the inferred kind of the /type/ constructor.  Example:
-    --    data T f a where
-    --      MkT :: f a -> T f a
-    -- If we don't look at MkT we won't get the correct kind
-    -- for the type constructor T
+  = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (dataConCtxtName names) $
     discardResult                      $
     bindOuterSigTKBndrs_Tv outer_bndrs $
-        -- Why "_Tv"?  See Note [Kind-checking for GADTs]
+        -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsMbContext cxt
-       ; kcConGADTArgs new_or_data res_kind args
-       ; _ <- tcHsOpenType res_ty
+       ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
+       ; con_res_kind <- newOpenTypeKind
+       ; _ <- tcCheckLHsType res_ty (TheKind con_res_kind)
+       ; kcConGADTArgs new_or_data con_res_kind args
+       ; traceTc "kcConDecl:GADT }" (ppr names $$ ppr con_res_kind)
        ; return () }
 
-{- Note [kcConDecls result kind]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We might have e.g.
-    data T a :: Type -> Type where ...
-or
-    newtype instance N a :: Type -> Type  where ..
-in which case, the 'res_kind' passed to kcConDecls will be
-   Type->Type
+{- Note [kcConDecls: kind-checking data type decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+kcConDecls is used when we are inferring the kind of the type
+constructor in a data type declaration.  E.g.
+    data T f a = MkT (f a)
+we want to infer the kind of 'f' and 'a'. The basic plan is described
+in Note [Inferring kinds for type declarations]; here are doing Step 2.
 
-We must look past those arrows, or even foralls, to the Type in the
-corner, to pass to kcConDecl c.f. #16828. Hence the splitPiTys here.
+In the H98 case, for unlifted newtypes only, we need the result kind of
+the TyCon, to unify with the argument kind.  The tycon's result kind
+is not used at all in the GADT case.
 
-I am a bit concerned about tycons with a declaration like
-   data T a :: Type -> forall k. k -> Type  where ...
+In the GADT case we may have this:
+   data T f a where
+      MkT :: forall g b. g b -> T g b
+Notice that the variables f,a, and g,b are quite distinct.
+Nevertheless, this decl must still influence the kind T (which is,
+remember Step 1, something like T :: kappa1 -> kappa2 -> Type), otherwise
+we'd infer the bogus kind T :: forall k1 k2. k1 -> k2 -> Type.
 
-It does not have a CUSK, so kcInferDeclHeader will make a TcTyCon
-with tyConResKind of Type -> forall k. k -> Type.  Even that is fine:
-the splitPiTys will look past the forall.  But I'm bothered about
-what if the type "in the corner" mentions k?  This is incredibly
-obscure but something like this could be bad:
-   data T a :: Type -> foral k. k -> TYPE (F k) where ...
+The data constructor type influences the kind of T simply by
+kind-checking the result type (T g b), which will force 'f' and 'g' to
+have the same kinds. This is the call to
+    tcCheckLHsType res_ty (TheKind con_res_kind)
+Because this is the result type of an arrow, we know the kind must be
+of form (TYPE rr), and we get better error messages if we enforce that
+here (e.g. test gadt10).
 
-I bet we are not quite right here, but my brain suffered a buffer
-overflow and I thought it best to nail the common cases right now.
-
-Note [Recursion and promoting data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't want to allow promotion in a strongly connected component
-when kind checking.
-
-Consider:
-  data T f = K (f (K Any))
-
-When kind checking the `data T' declaration the local env contains the
-mappings:
-  T -> ATcTyCon <some initial kind>
-  K -> APromotionErr
-
-APromotionErr is only used for DataCons, and only used during type checking
-in tcTyClGroup.
-
-Note [Kind-checking for GADTs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Using TyVarTvs for kind-checking GADTs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
   data Proxy a where
@@ -1708,26 +1676,27 @@ Consider
 It seems reasonable that this should be accepted. But something very strange
 is going on here: when we're kind-checking this declaration, we need to unify
 the kind of `a` with k and j -- even though k and j's scopes are local to the type of
-MkProxy{1,2}. The best approach we've come up with is to use TyVarTvs during
-the kind-checking pass. First off, note that it's OK if the kind-checking pass
-is too permissive: we'll snag the problems in the type-checking pass later.
-(This extra permissiveness might happen with something like
+MkProxy{1,2}.
+
+In effect, we are simply gathering constraints on the shape of Proxy's
+kind, with no skolemisation or implication constraints involved at all.
+
+The best approach we've come up with is to use TyVarTvs during the
+kind-checking pass, rather than ordinary skolems. This is why we use
+the "_Tv" variant, bindOuterSigTKBndrs_Tv.
+
+Our only goal is to gather constraints on the kind of the type constructor;
+we do not certify that the data declaration is well-kinded. For example:
 
   data SameKind :: k -> k -> Type
   data Bad a where
     MkBad :: forall k1 k2 (a :: k1) (b :: k2). Bad (SameKind a b)
 
-which would be accepted if k1 and k2 were TyVarTvs. This is correctly rejected
-in the second pass, though. Test case: polykinds/TyVarTvKinds3)
-Recall that the kind-checking pass exists solely to collect constraints
-on the kinds and to power unification.
+which would be accepted by kcConDecl because k1 and k2 are
+TyVarTvs. It is correctly rejected in the second pass, tcConDecl. Test
+case: polykinds/TyVarTvKinds3)
 
-To achieve the use of TyVarTvs, we must be careful to use specialized functions
-that produce TyVarTvs, not ordinary skolems. This is why we need
-kcExplicitTKBndrs and kcImplicitTKBndrs in GHC.Tc.Gen.HsType, separate from their
-tc... variants.
-
-The drawback of this approach is sometimes it will accept a definition that
+One drawback of this approach is sometimes it will accept a definition that
 a (hypothetical) declarative specification would likely reject. As a general
 rule, we don't want to allow polymorphic recursion without a CUSK. Indeed,
 the whole point of CUSKs is to allow polymorphic recursion. Yet, the TyVarTvs
@@ -1745,6 +1714,23 @@ way to describe exactly what declarations will be accepted and which will
 be rejected (without a CUSK). However, the accepted definitions are indeed
 well-kinded and any rejected definitions would be accepted with a CUSK,
 and so this wrinkle need not cause anyone to lose sleep.
+
+Note [Recursion and promoting data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't want to allow promotion in a strongly connected component
+when kind checking.
+
+Consider:
+  data T f = K (f (K Any))
+
+When kind checking the `data T' declaration the local env contains the
+mappings:
+  T -> ATcTyCon <some initial kind>
+  K -> APromotionErr
+
+APromotionErr is only used for DataCons, and only used during type checking
+in tcTyClGroup.
+
 
 ************************************************************************
 *                                                                      *
