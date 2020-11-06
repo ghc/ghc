@@ -4,6 +4,8 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeApplications #-}
 
 module UnliftedNewtypesUnassociatedFamily where
 
@@ -20,7 +22,16 @@ newtype instance DFT ('TupleRep '[ 'IntRep, 'WordRep])
 data instance DFT 'LiftedRep = MkDFT4 | MkDFT5
 
 data family DF :: TYPE (r :: RuntimeRep)
-newtype instance DF = MkDF1 Int#
-newtype instance DF = MkDF2 Word#
-newtype instance DF = MkDF3 (# Int#, Word# #)
+
+-- Use a type application
+newtype instance DF @IntRep = MkDF1 Int#
+
+-- Use a kind signature
+newtype instance DF :: TYPE 'WordRep where
+  MkDF2 :: Word# -> DF
+
+-- Also uses a kind signature
+newtype instance DF :: TYPE ('TupleRep '[ 'IntRep, 'WordRep ]) where
+  MkDF3 :: (# Int#, Word# #) -> DF
+
 data instance DF = MkDF4 | MkDF5
