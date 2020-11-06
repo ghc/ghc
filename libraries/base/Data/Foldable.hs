@@ -1140,7 +1140,7 @@ minimumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
 minimumBy cmp = fromMaybe (errorWithoutStackTrace "minimumBy: empty structure")
   . foldl' min' Nothing
   where
-    min' mx y = Just $ case mx of
+    min' mx y = Just $! case mx of
       Nothing -> y
       Just x -> case cmp x y of
         GT -> y
