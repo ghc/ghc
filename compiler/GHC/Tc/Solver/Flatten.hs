@@ -787,8 +787,8 @@ flatten_exact_fam_app_fully tc tys
                      ret_co = mkTyConAppCo role tc cos
                       -- ret_co :: F xis ~ F tys; might be heterogeneous
 
-                -- Now, look in the cache
-               ; mb_ct <- liftTcS $ lookupFlatCache tc xis
+                -- Now, look in the inerts and the cache
+               ; mb_ct <- liftTcS $ lookupFamApp tc xis
                ; dflags <- getDynFlags
                ; loc <- getLoc
                ; case mb_ct of
@@ -874,7 +874,7 @@ flatten_exact_fam_app_fully tc tys
                        ; flavour <- getFlavour
                            -- NB: only extend cache with nominal, given equalities
                        ; when (eq_rel == NomEq && flavour == Given) $
-                         liftTcS $ extendFlatCache tc tys (co, xi)
+                         liftTcS $ extendFamAppCache tc tys (co, xi)
                        ; let role = eqRelRole eq_rel
                              xi' = xi `mkCastTy` kind_co
                              co' = update_co $
