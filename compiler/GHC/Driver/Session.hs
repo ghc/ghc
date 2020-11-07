@@ -3404,7 +3404,7 @@ fFlagsDeps = [
   flagSpec "expose-all-unfoldings"            Opt_ExposeAllUnfoldings,
   flagSpec "external-dynamic-refs"            Opt_ExternalDynamicRefs,
   flagSpec "external-interpreter"             Opt_ExternalInterpreter,
-  flagSpec "flat-cache"                       Opt_FlatCache,
+  flagSpec "family-application-cache"         Opt_FamAppCache,
   flagSpec "float-in"                         Opt_FloatIn,
   flagSpec "force-recomp"                     Opt_ForceRecomp,
   flagSpec "ignore-optim-changes"             Opt_IgnoreOptimChanges,
@@ -3760,7 +3760,7 @@ defaultFlags settings
   = [ Opt_AutoLinkPackages,
       Opt_DiagnosticsShowCaret,
       Opt_EmbedManifest,
-      Opt_FlatCache,
+      Opt_FamAppCache,
       Opt_GenManifest,
       Opt_GhciHistory,
       Opt_GhciSandbox,
@@ -5100,4 +5100,3 @@ initSDocContext dflags style = SDC
 -- | Initialize the pretty-printing options using the default user style
 initDefaultSDocContext :: DynFlags -> SDocContext
 initDefaultSDocContext dflags = initSDocContext dflags defaultUserStyle
-

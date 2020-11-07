@@ -70,7 +70,6 @@
 -fextended-default-rules
 -fffi
 -ffi
--fflat-cache
 -ffloat-all-lams
 -ffloat-lam-args
 -ffrontend-opt
