@@ -2100,7 +2100,10 @@ getHasGivenEqs tclvl
 
     is_outer_var :: TyCoVar -> Bool
     is_outer_var tv
-      | isTyVar tv = tclvl `strictlyDeeperThan` tcTyVarLevel tv
+            -- NB: a meta-tv alpha[3] may end up unifying with skolem b[2],
+            -- so treat it as an "outer" var, even at level 3.
+      | isTyVar tv = isTouchableMetaTyVar tclvl tv ||
+                     tclvl `strictlyDeeperThan` tcTyVarLevel tv
       | otherwise  = False
 
 -- | Returns Given constraints that might,
@@ -2247,12 +2250,23 @@ are some wrinkles:
  * What about something like forall a b. a ~ F b => [W] c ~ X y z? That Given
    cannot affect the Wanted, because the Given is entirely *local*: it mentions
    only skolems bound in the very same implication. Such equalities need not
-   prevent floating. (Test case: typecheck/should_compile/LocalGivenEqs) These
+   prevent floating. (Test case typecheck/should_compile/LocalGivenEqs has a
+   real-life motivating example, with some detailed commentary.) These
    equalities are noted with LocalGivenEqs: they do not prevent floating, but
    they also are allowed to show up in error messages. See
    Note [Suppress redundant givens during error reporting] in GHC.Tc.Errors.
    The difference between what stops floating and what is suppressed from
    error messages is why we need three options for HasGivenEqs.
+
+   There is also a simpler case that triggers this behaviour:
+
+     data T where
+       MkT :: F a ~ G b => a -> b -> T
+
+     f (MkT _ _) = True
+
+   Because of this behaviour around local equality givens, we can infer the
+   type of f. This is typecheck/should_compile/LocalGivenEqs2.
 
  * See Note [Let-bound skolems] for another wrinkle
 
