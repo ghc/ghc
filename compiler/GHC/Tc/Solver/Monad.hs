@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, DeriveFunctor, TypeFamilies, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, DeriveFunctor, TypeFamilies, ScopedTypeVariables, TypeApplications,
+             DerivingStrategies, GeneralizedNewtypeDeriving #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 
@@ -80,7 +81,7 @@ module GHC.Tc.Solver.Monad (
     addDictsByClass, delDict, foldDicts, filterDicts, findDict,
 
     -- Inert CEqCans
-    EqualCtList, findTyEqs, foldTyEqs,
+    EqualCtList(..), findTyEqs, foldTyEqs,
     findEq,
 
     -- Inert solved dictionaries
@@ -186,6 +187,8 @@ import GHC.Utils.Monad
 import Data.IORef
 import Data.List ( partition, mapAccumL )
 import qualified Data.Semigroup as S
+import Data.List.NonEmpty ( NonEmpty(..), cons, toList, nonEmpty )
+import qualified Data.List.NonEmpty as NE
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
@@ -716,7 +719,35 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
        }
 
 type InertEqs    = DTyVarEnv EqualCtList
-type EqualCtList = [Ct]  -- See Note [EqualCtList invariants]
+
+newtype EqualCtList = EqualCtList (NonEmpty Ct)
+  deriving newtype Outputable
+  -- See Note [EqualCtList invariants]
+
+unitEqualCtList :: Ct -> EqualCtList
+unitEqualCtList ct = EqualCtList (ct :| [])
+
+addToEqualCtList :: Ct -> EqualCtList -> EqualCtList
+-- NB: This function maintains the "derived-before-wanted" invariant of EqualCtList,
+-- but not the others. See Note [EqualCtList invariants]
+addToEqualCtList ct (EqualCtList old_eqs)
+  | isWantedCt ct
+  , eq1 :| eqs <- old_eqs
+  = EqualCtList (eq1 :| ct : eqs)
+  | otherwise
+  = EqualCtList (ct `cons` old_eqs)
+
+filterEqualCtList :: (Ct -> Bool) -> EqualCtList -> Maybe EqualCtList
+filterEqualCtList pred (EqualCtList cts)
+  = fmap EqualCtList (nonEmpty $ NE.filter pred cts)
+
+equalCtListToList :: EqualCtList -> [Ct]
+equalCtListToList (EqualCtList cts) = toList cts
+
+listToEqualCtList :: [Ct] -> Maybe EqualCtList
+-- NB: This does not maintain invariants other than having the EqualCtList be
+-- non-empty
+listToEqualCtList cts = EqualCtList <$> nonEmpty cts
 
 {- Note [Detailed InertCans Invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1033,7 +1064,7 @@ instance Outputable InertCans where
       , text "Unsolved goals =" <+> int count
       ]
     where
-      folder eqs rest = listToBag eqs `andCts` rest
+      folder (EqualCtList eqs) rest = nonEmptyToBag eqs `andCts` rest
 
 {- *********************************************************************
 *                                                                      *
@@ -1363,7 +1394,7 @@ should_split_match_args inert_eqs fun_eqs tys
 
 canRewriteTv :: InertEqs -> EqRel -> TyVar -> Bool
 canRewriteTv inert_eqs eq_rel tv
-  | Just (ct : _) <- lookupDVarEnv inert_eqs tv
+  | Just (EqualCtList (ct :| _)) <- lookupDVarEnv inert_eqs tv
   , CEqCan { cc_eq_rel = eq_rel1 } <- ct
   = eq_rel1 `eqCanRewrite` eq_rel
   | otherwise
@@ -1371,7 +1402,7 @@ canRewriteTv inert_eqs eq_rel tv
 
 canRewriteTyFam :: FunEqMap EqualCtList -> EqRel -> TyCon -> [Type] -> Bool
 canRewriteTyFam fun_eqs eq_rel tf args
-  | Just (ct : _) <- findFunEq fun_eqs tf args
+  | Just (EqualCtList (ct :| _)) <- findFunEq fun_eqs tf args
   , CEqCan { cc_eq_rel = eq_rel1 } <- ct
   = eq_rel1 `eqCanRewrite` eq_rel
   | otherwise
@@ -1391,7 +1422,7 @@ isImprovable _                                = True
 
 addTyEq :: InertEqs -> TcTyVar -> Ct -> InertEqs
 addTyEq old_eqs tv ct
-  = extendDVarEnv_C add_eq old_eqs tv [ct]
+  = extendDVarEnv_C add_eq old_eqs tv (unitEqualCtList ct)
   where
     add_eq old_eqs _ = addToEqualCtList ct old_eqs
 
@@ -1401,43 +1432,36 @@ addCanFunEq old_eqs fun_tc fun_args ct
   = alterTcApp old_eqs fun_tc fun_args upd
   where
     upd (Just old_equal_ct_list) = Just $ addToEqualCtList ct old_equal_ct_list
-    upd Nothing                  = Just $ [ct]
-
-addToEqualCtList :: Ct -> EqualCtList -> EqualCtList
-addToEqualCtList ct old_eqs
-  | isWantedCt ct
-  , (eq1 : eqs) <- old_eqs
-  = eq1 : ct : eqs
-  | otherwise
-  = ct : old_eqs
+    upd Nothing                  = Just $ unitEqualCtList ct
 
 foldTyEqs :: (Ct -> b -> b) -> InertEqs -> b -> b
 foldTyEqs k eqs z
-  = foldDVarEnv (\cts z -> foldr k z cts) z eqs
+  = foldDVarEnv (\(EqualCtList cts) z -> foldr k z cts) z eqs
 
-findTyEqs :: InertCans -> TyVar -> EqualCtList
-findTyEqs icans tv = lookupDVarEnv (inert_eqs icans) tv `orElse` []
+findTyEqs :: InertCans -> TyVar -> [Ct]
+findTyEqs icans tv = maybe [] id (fmap @Maybe equalCtListToList $
+                                  lookupDVarEnv (inert_eqs icans) tv)
 
 delEq :: InertCans -> CanEqLHS -> TcType -> InertCans
 delEq ic lhs rhs = case lhs of
     TyVarLHS tv
-      -> ic { inert_eqs = modifyDVarEnv (filter (not . isThisOne)) (inert_eqs ic) tv }
+      -> ic { inert_eqs = alterDVarEnv upd (inert_eqs ic) tv }
     TyFamLHS tf args
       -> ic { inert_funeqs = alterTcApp (inert_funeqs ic) tf args upd }
-      where
-        upd (Just eq_ct_list)
-          | null filtered = Nothing
-          | otherwise     = Just filtered
-          where filtered = filter (not . isThisOne) eq_ct_list
-        upd Nothing = Nothing
   where
+    isThisOne :: Ct -> Bool
     isThisOne (CEqCan { cc_rhs = t1 }) = tcEqTypeNoKindCheck rhs t1
     isThisOne other = pprPanic "delEq" (ppr lhs $$ ppr ic $$ ppr other)
 
-findEq :: InertCans -> CanEqLHS -> EqualCtList
+    upd :: Maybe EqualCtList -> Maybe EqualCtList
+    upd (Just eq_ct_list) = filterEqualCtList (not . isThisOne) eq_ct_list
+    upd Nothing           = Nothing
+
+findEq :: InertCans -> CanEqLHS -> [Ct]
 findEq icans (TyVarLHS tv) = findTyEqs icans tv
 findEq icans (TyFamLHS fun_tc fun_args)
-  = findFunEq (inert_funeqs icans) fun_tc fun_args `orElse` []
+  = maybe [] id (fmap @Maybe equalCtListToList $
+                 findFunEq (inert_funeqs icans) fun_tc fun_args)
 
 {- *********************************************************************
 *                                                                      *
@@ -1706,11 +1730,12 @@ kick_out_rewritable new_fr new_lhs
                  -> EqualCtList -> ([Ct], container)
                  -> ([Ct], container)
     kick_out_eqs extend eqs (acc_out, acc_in)
-      = (eqs_out `chkAppend` acc_out, case eqs_in of
-            []      -> acc_in
-            (eq1:_) -> extend acc_in (cc_lhs eq1) eqs_in)
+      = (eqs_out `chkAppend` acc_out, case listToEqualCtList eqs_in of
+            Nothing -> acc_in
+            Just eqs_in_ecl@(EqualCtList (eq1 :| _))
+                    -> extend acc_in (cc_lhs eq1) eqs_in_ecl)
       where
-        (eqs_out, eqs_in) = partition kick_out_eq eqs
+        (eqs_out, eqs_in) = partition kick_out_eq (equalCtListToList eqs)
 
     -- Implements criteria K1-K3 in Note [Extending the inert equalities]
     kick_out_eq (CEqCan { cc_lhs = lhs, cc_rhs = rhs_ty
@@ -1954,8 +1979,9 @@ getInertGivens :: TcS [Ct]
 getInertGivens
   = do { inerts <- getInertCans
        ; let all_cts = foldDicts (:) (inert_dicts inerts)
-                     $ foldFunEqs (++) (inert_funeqs inerts)
-                     $ concat (dVarEnvElts (inert_eqs inerts))
+                     $ foldFunEqs (\ecl out -> equalCtListToList ecl ++ out)
+                                  (inert_funeqs inerts)
+                     $ concatMap equalCtListToList (dVarEnvElts (inert_eqs inerts))
        ; return (filter isGivenCt all_cts) }
 
 getPendingGivenScs :: TcS [Ct]
@@ -2042,8 +2068,9 @@ getUnsolvedInerts
     add_if_unsolved ct cts | is_unsolved ct = ct `consCts` cts
                            | otherwise      = cts
 
-    add_if_unsolveds :: [Ct] -> Cts -> Cts
-    add_if_unsolveds new_cts old_cts = foldr add_if_unsolved old_cts new_cts
+    add_if_unsolveds :: EqualCtList -> Cts -> Cts
+    add_if_unsolveds new_cts old_cts = foldr add_if_unsolved old_cts
+                                             (equalCtListToList new_cts)
 
     is_unsolved ct = not (isGivenCt ct)   -- Wanted or Derived
 
@@ -2078,8 +2105,8 @@ getHasGivenEqs tclvl
     lift_equal_ct_list :: (Ct -> HasGivenEqs) -> EqualCtList -> HasGivenEqs
     -- returns NoGivenEqs for non-singleton lists, as Given lists are always
     -- singletons
-    lift_equal_ct_list check [ct] = check ct
-    lift_equal_ct_list _     _    = NoGivenEqs
+    lift_equal_ct_list check (EqualCtList (ct :| [])) = check ct
+    lift_equal_ct_list _     _                        = NoGivenEqs
 
     check_local_given_tv_eq :: Ct -> HasGivenEqs
     check_local_given_tv_eq (CEqCan { cc_lhs = TyVarLHS tv, cc_ev = ev})
@@ -2350,7 +2377,8 @@ lookupFamApp fam_tc tys
                              lookup_famapps famapp_cache]) }
   where
     lookup_inerts inert_funeqs
-      | Just (CEqCan { cc_ev = ctev, cc_rhs = rhs } : _) <- findFunEq inert_funeqs fam_tc tys
+      | Just (EqualCtList (CEqCan { cc_ev = ctev, cc_rhs = rhs } :| _))
+          <- findFunEq inert_funeqs fam_tc tys
       = Just (ctEvCoercion ctev, rhs, ctEvFlavourRole ctev)
       | otherwise = Nothing
 

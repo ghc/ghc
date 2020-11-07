@@ -31,6 +31,7 @@ import GHC.Tc.Solver.Monad as TcS
 import GHC.Utils.Misc
 import Control.Monad
 import GHC.Utils.Monad ( zipWith3M )
+import Data.List.NonEmpty ( NonEmpty(..) )
 
 import Control.Arrow ( first )
 
@@ -1014,8 +1015,8 @@ flatten_tyvar2 :: TcTyVar -> CtFlavourRole -> FlatM FlattenTvResult
 flatten_tyvar2 tv fr@(_, eq_rel)
   = do { ieqs <- liftTcS $ getInertEqs
        ; case lookupDVarEnv ieqs tv of
-           Just (ct:_)   -- If the first doesn't work,
-                         -- the subsequent ones won't either
+           Just (EqualCtList (ct :| _))   -- If the first doesn't work,
+                                          -- the subsequent ones won't either
              | CEqCan { cc_ev = ctev, cc_lhs = TyVarLHS tv
                       , cc_rhs = rhs_ty, cc_eq_rel = ct_eq_rel } <- ct
              , let ct_fr = (ctEvFlavour ctev, ct_eq_rel)
