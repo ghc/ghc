@@ -1249,11 +1249,9 @@ improveLocalFunEqs :: CtEvidence -> InertCans -> TyCon -> [TcType] -> TcType
 -- E.g.   x + y ~ z,   x + y' ~ z   =>   [D] y ~ y'
 --
 -- See Note [FunDep and implicit parameter reactions]
--- No Givens here: Note [No FunEq improvement for Givens]
 -- Precondition: isImprovable work_ev
 improveLocalFunEqs work_ev inerts fam_tc args rhs
-  = ASSERT( not (isGiven work_ev) )
-    ASSERT( isImprovable work_ev )
+  = ASSERT( isImprovable work_ev )
     unless (null improvement_eqns) $
     do { traceTcS "interactFunEq improvements: " $
                    vcat [ text "Eqns:" <+> ppr improvement_eqns
@@ -1465,21 +1463,18 @@ interactEq tclvl inerts workItem@(CEqCan { cc_lhs = lhs
   = do { traceTcS "Not unifying representational equality" (ppr workItem)
        ; continueWith workItem }
 
-  | isGiven ev         -- See Note [Touchables and givens]
-                       -- See Note [No FunEq improvement for Givens]
-  = continueWith workItem
-
-  | TyVarLHS tv <- lhs
-  , canSolveByUnification tclvl tv rhs
-  = do { solveByUnification ev tv rhs
-       ; n_kicked <- kickOutAfterUnification tv
-       ; return (Stop ev (text "Solved by unification" <+> pprKicked n_kicked)) }
-
     -- try improvement, if possible
   | TyFamLHS fam_tc fam_args <- lhs
   , isImprovable ev
   = do { improveLocalFunEqs ev inerts fam_tc fam_args rhs
        ; continueWith workItem }
+
+  | TyVarLHS tv <- lhs
+  , not (isGiven ev)    -- See Note [Touchables and givens]
+  , canSolveByUnification tclvl tv rhs
+  = do { solveByUnification ev tv rhs
+       ; n_kicked <- kickOutAfterUnification tv
+       ; return (Stop ev (text "Solved by unification" <+> pprKicked n_kicked)) }
 
   | otherwise
   = continueWith workItem
@@ -1751,8 +1746,7 @@ doTopReactEq work_item = doTopReactOther work_item
 improveTopFunEqs :: CtEvidence -> TyCon -> [TcType] -> TcType -> TcS ()
 -- See Note [FunDep and implicit parameter reactions]
 improveTopFunEqs ev fam_tc args rhs
-  | isGiven ev            -- See Note [No FunEq improvement for Givens]
-    || not (isImprovable ev)
+  | not (isImprovable ev)
   = return ()
 
   | otherwise
@@ -1882,24 +1876,6 @@ kinds much match too; so it's easier to let the normal machinery
 handle it.  Instead we are careful to orient the new derived
 equality with the template on the left.  Delicate, but it works.
 
-Note [No FunEq improvement for Givens]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't do improvements (injectivity etc) for Givens. Why?
-
-* It generates Derived constraints on skolems, which don't do us
-  much good, except perhaps identify inaccessible branches.
-  (They'd be perfectly valid though.)
-
-* For type-nat stuff the derived constraints include type families;
-  e.g.  (a < b), (b < c) ==> a < c If we generate a Derived for this,
-  we'll generate a Derived/Wanted CFunEqCan; and, since the same
-  InertCans (after solving Givens) are used for each iteration, that
-  massively confused the unflattening step (GHC.Tc.Solver.Flatten.unflatten).
-
-  In fact it led to some infinite loops:
-     indexed-types/should_compile/T10806
-     indexed-types/should_compile/T10507
-     polykinds/T10742
 -}
 
 {- *******************************************************************
