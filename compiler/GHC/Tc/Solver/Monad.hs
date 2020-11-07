@@ -90,7 +90,7 @@ module GHC.Tc.Solver.Monad (
     foldIrreds,
 
     -- The flattening cache
-    lookupFlatCache, extendFlatCache,
+    lookupFamApp, extendFamAppCache,
     pprKicked,
 
     -- Inert function equalities
@@ -401,12 +401,13 @@ data InertSet
               -- used to undo the cycle-breaking needed to handle
               -- Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical
 
-       , inert_flat_cache :: FunEqMap (TcCoercion, TcType)
+       , inert_famapp_cache :: FunEqMap (TcCoercion, TcType)
               -- If    F tys :-> (co, rhs, flav),
               -- then  co :: F tys ~ rhs
               --       flav is [G]
               --
-              -- Just a hash-cons cache for use when flattening only
+              -- Just a hash-cons cache for use when reducing family applications
+              -- only
               --
               -- Only nominal, Given equalities end up in here (along with
               -- top-level instances)
@@ -440,7 +441,7 @@ emptyInert :: InertSet
 emptyInert
   = IS { inert_cans           = emptyInertCans
        , inert_cycle_breakers = []
-       , inert_flat_cache     = emptyFunEqs
+       , inert_famapp_cache   = emptyFunEqs
        , inert_solved_dicts   = emptyDictMap }
 
 
@@ -2342,20 +2343,21 @@ removeInertCt is ct =
     CIrredCan {}     -> panic "removeInertCt: CIrredEvCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
 
-lookupFlatCache :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtFlavourRole))
-lookupFlatCache fam_tc tys
-  = do { IS { inert_flat_cache = flat_cache
+-- | Looks up a family application in both the inerts and the famapp-cache
+lookupFamApp :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtFlavourRole))
+lookupFamApp fam_tc tys
+  = do { IS { inert_famapp_cache = famapp_cache
             , inert_cans = IC { inert_funeqs = inert_funeqs } } <- getTcSInerts
        ; return (firstJusts [lookup_inerts inert_funeqs,
-                             lookup_flats flat_cache]) }
+                             lookup_famapps famapp_cache]) }
   where
     lookup_inerts inert_funeqs
       | Just (CEqCan { cc_ev = ctev, cc_rhs = rhs } : _) <- findFunEq inert_funeqs fam_tc tys
       = Just (ctEvCoercion ctev, rhs, ctEvFlavourRole ctev)
       | otherwise = Nothing
 
-    lookup_flats flat_cache
-      | Just (co, rhs) <- findFunEq flat_cache fam_tc tys
+    lookup_famapps famapp_cache
+      | Just (co, rhs) <- findFunEq famapp_cache fam_tc tys
       = Just (co, rhs, (Given, NomEq))
       | otherwise = Nothing
 
@@ -2867,10 +2869,8 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
                    , tcs_count         = count
                    } ->
     do { inerts <- TcM.readTcRef old_inert_var
-       ; let nest_inert = emptyInert
-                            { inert_cans = inert_cans inerts
-                            , inert_solved_dicts = inert_solved_dicts inerts }
-                              -- See Note [Do not inherit the flat cache]
+       ; let nest_inert = inerts { inert_cycle_breakers = [] }
+                 -- all other InertSet fields are inherited
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = TcSEnv { tcs_ev_binds      = ref
@@ -2891,22 +2891,10 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
 #endif
        ; return res }
 
-{- Note [Do not inherit the flat cache]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We do not want to inherit the flat cache when processing nested
-implications.  Consider
-   a ~ F b, forall c. b~Int => blah
-If we have F b ~ fsk in the flat-cache, and we push that into the
-nested implication, we might miss that F b can be rewritten to F Int,
-and hence perhaps solve it.  Moreover, the fsk from outside is
-flattened out after solving the outer level, but and we don't
-do that flattening recursively.
--}
-
 nestTcS ::  TcS a -> TcS a
 -- Use the current untouchables, augmenting the current
 -- evidence bindings, and solved dictionaries
--- But have no effect on the InertCans, or on the inert_flat_cache
+-- But have no effect on the InertCans, or on the inert_famapp_cache
 -- (we want to inherit the latter from processing the Givens)
 nestTcS (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
@@ -3194,15 +3182,15 @@ zonkTyCoVarKind :: TcTyCoVar -> TcS TcTyCoVar
 zonkTyCoVarKind tv = wrapTcS (TcM.zonkTyCoVarKind tv)
 
 ----------------------------
-extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
-extendFlatCache tc xi_args stuff@(_, ty)
+extendFamAppCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
+extendFamAppCache tc xi_args stuff@(_, ty)
   = do { dflags <- getDynFlags
-       ; when (gopt Opt_FlatCache dflags) $
-    do { traceTcS "extendFlatCache" (vcat [ ppr tc <+> ppr xi_args
-                                          , ppr ty ])
+       ; when (gopt Opt_FamAppCache dflags) $
+    do { traceTcS "extendFamAppCache" (vcat [ ppr tc <+> ppr xi_args
+                                            , ppr ty ])
             -- 'co' can be bottom, in the case of derived items
-       ; updInertTcS $ \ is@(IS { inert_flat_cache = fc }) ->
-            is { inert_flat_cache = insertFunEq fc tc xi_args stuff } } }
+       ; updInertTcS $ \ is@(IS { inert_famapp_cache = fc }) ->
+            is { inert_famapp_cache = insertFunEq fc tc xi_args stuff } } }
 
 pprKicked :: Int -> SDoc
 pprKicked 0 = empty
