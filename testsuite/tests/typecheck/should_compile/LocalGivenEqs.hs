@@ -6,6 +6,29 @@ module LocalGivenEqs where
 -- See Note [When does an implication have given equalities?] in GHC.Tc.Solver.Monad;
 -- this tests custom treatment for LocalGivenEqs
 
+{-
+I (Richard E) tried somewhat half-heartedly to minimize this, but failed.
+The key bit is the use of the ECP constructor inside the lambda in happyReduction_508.
+(The lack of a type signature on that is not at issue, I believe.) The type
+of ECP is
+  (forall b. DisambECP b => PV (Located b)) -> ECP
+So, the argument to ECP gets a [G] DisambECP b, which (via its superclass) grants
+us [G] b ~ (Body b) GhcPs. In order to infer the type of happy_var_2, we need to
+float some wanted out past this equality. We have Note [Let-bound skolems]
+in GHC.Tc.Solver.Monad to consider this Given equality to be let-like, and thus
+not prevent floating. But, note that the equality isn't quite let-like, because
+it mentions b in its RHS. It thus triggers Note [Type variable cycles in Givens]
+in GHC.Tc.Solver.Canonical. That Note says we change the situation to
+  [G] b ~ cbv GhcPs
+  [G] Body b ~ cbv
+for some fresh CycleBreakerTv cbv. Now, our original equality looks to be let-like,
+but the new cbv equality is *not* let-like -- note that the variable is on the RHS.
+The solution is to consider any equality whose free variables are all at the current
+level to not stop equalities from floating. These are called *local*. Because both
+Givens are local in this way, they no longer prevent floating, and we can type-check
+this example.
+-}
+
 import Data.Kind ( Type )
 import GHC.Exts ( Any )
 
@@ -100,7 +123,9 @@ happyReduction_508 (happy_x_8 `HappyStk`
         case happyOut205 happy_x_6 of { (HappyWrap205 happy_var_6) ->
         case happyOutTok happy_x_7 of { happy_var_7 ->
         case happyOut201 happy_x_8 of { (HappyWrap201 happy_var_8) ->
-        ( runPV (unECP happy_var_2) >>= \ happy_var_2 ->
+                          -- uncomment this next signature to avoid the need
+                          -- for special treatment of floating described above
+        ( runPV (unECP happy_var_2 {- :: PV (LHsExpr GhcPs) -}) >>= \ happy_var_2 ->
                             return $ ECP $
                               unECP happy_var_5 >>= \ happy_var_5 ->
                               unECP happy_var_8 >>= \ happy_var_8 ->
