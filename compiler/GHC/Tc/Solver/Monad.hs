@@ -177,7 +177,6 @@ import GHC.Core.Predicate
 
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
-import GHC.Core.TyCon.Env
 import GHC.Types.Unique.Set
 import GHC.Data.Maybe
 
