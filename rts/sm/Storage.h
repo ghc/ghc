@@ -72,8 +72,11 @@ bool     getNewNursery        (Capability *cap);
 INLINE_HEADER
 bool doYouWantToGC(Capability *cap)
 {
+    // This is necessarily approximate since otherwise we would need to take
+    // SM_LOCK to safely look at n_new_large_words.
+    TSAN_ANNOTATE_BENIGN_RACE(&g0->n_new_large_words, "doYouWantToGC(n_new_large_words)");
     return ((cap->r.rCurrentNursery->link == NULL && !getNewNursery(cap)) ||
-            g0->n_new_large_words >= large_alloc_lim);
+            RELAXED_LOAD(&g0->n_new_large_words) >= large_alloc_lim);
 }
 
 /* -----------------------------------------------------------------------------
@@ -91,7 +94,7 @@ INLINE_HEADER void finishedNurseryBlock (Capability *cap, bdescr *bd) {
 }
 
 INLINE_HEADER void newNurseryBlock (bdescr *bd) {
-    bd->free = bd->start;
+    RELAXED_STORE(&bd->free, bd->start);
 }
 
 void     updateNurseriesStats (void);
