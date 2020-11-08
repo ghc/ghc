@@ -45,6 +45,7 @@ StgIndStatic  *dyn_caf_list        = NULL;
 StgIndStatic  *debug_caf_list      = NULL;
 StgIndStatic  *revertible_caf_list = NULL;
 bool           keepCAFs;
+bool           highMemDynamic;
 
 W_ large_alloc_lim;    /* GC if n_large_blocks in any nursery
                         * reaches this. */
@@ -519,7 +520,7 @@ newCAF(StgRegTable *reg, StgIndStatic *caf)
     bh = lockCAF(reg, caf);
     if (!bh) return NULL;
 
-    if(keepCAFs)
+    if(keepCAFs && !(highMemDynamic && (void*) caf > (void*) 0x80000000))
     {
         // Note [dyn_caf_list]
         // If we are in GHCi _and_ we are using dynamic libraries,
@@ -571,6 +572,12 @@ void
 setKeepCAFs (void)
 {
     keepCAFs = 1;
+}
+
+void
+setHighMemDynamic (void)
+{
+    highMemDynamic = 1;
 }
 
 // An alternate version of newCAF which is used for dynamically loaded
