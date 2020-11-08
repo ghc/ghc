@@ -2432,7 +2432,7 @@ foldIrreds k irreds z = foldr k z irreds
 Note [Use loose types in inert set]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Whenever we are looking up an inert dictionary (CDictCan) or function
-equality (CFunEqCan), we use a TcAppMap, which uses the Unique of the
+equality (CEqCan), we use a TcAppMap, which uses the Unique of the
 class/type family tycon and then a trie which maps the arguments. This
 trie does *not* need to match the kinds of the arguments; this Note
 explains why.
