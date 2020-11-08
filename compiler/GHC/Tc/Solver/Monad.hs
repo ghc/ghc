@@ -175,9 +175,8 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 
-import GHC.Types.Unique
-import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
+import GHC.Core.TyCon.Env
 import GHC.Data.Maybe
 
 import GHC.Core.Map.Type
@@ -2453,41 +2452,41 @@ looking at kinds would be harmless.
 
 -}
 
-type TcAppMap a = UniqDFM TyCon (ListMap LooseTypeMap a)
+type TcAppMap a = DTyConEnv (ListMap LooseTypeMap a)
     -- Indexed by tycon then the arg types, using "loose" matching, where
     -- we don't require kind equality. This allows, for example, (a |> co)
     -- to match (a).
     -- See Note [Use loose types in inert set]
     -- Used for types and classes; hence UniqDFM
-    -- See Note [foldTM determinism] for why we use UniqDFM here
+    -- See Note [foldTM determinism] in GHC.Data.TrieMap for why we use DTyConEnv here
 
 isEmptyTcAppMap :: TcAppMap a -> Bool
-isEmptyTcAppMap m = isNullUDFM m
+isEmptyTcAppMap m = isEmptyDTyConEnv m
 
 emptyTcAppMap :: TcAppMap a
-emptyTcAppMap = emptyUDFM
+emptyTcAppMap = emptyDTyConEnv
 
 findTcApp :: TcAppMap a -> TyCon -> [Type] -> Maybe a
-findTcApp m tc tys = do { tys_map <- lookupUDFM m tc
+findTcApp m tc tys = do { tys_map <- lookupDTyConEnv m tc
                         ; lookupTM tys tys_map }
 
 delTcApp :: TcAppMap a -> TyCon -> [Type] -> TcAppMap a
-delTcApp m tc tys = adjustUDFM (deleteTM tys) m tc
+delTcApp m tc tys = adjustDTyConEnv (deleteTM tys) m tc
 
 insertTcApp :: TcAppMap a -> TyCon -> [Type] -> a -> TcAppMap a
-insertTcApp m tc tys ct = alterUDFM alter_tm m tc
+insertTcApp m tc tys ct = alterDTyConEnv alter_tm m tc
   where
     alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
 
 alterTcApp :: forall a. TcAppMap a -> TyCon -> [Type] -> (Maybe a -> Maybe a) -> TcAppMap a
-alterTcApp m tc tys upd = alterUDFM alter_tm m tc
+alterTcApp m tc tys upd = alterDTyConEnv alter_tm m tc
   where
     alter_tm :: Maybe (ListMap LooseTypeMap a) -> Maybe (ListMap LooseTypeMap a)
     alter_tm m_elt = Just (alterTM tys upd (m_elt `orElse` emptyTM))
 
 filterTcAppMap :: (Ct -> Bool) -> TcAppMap Ct -> TcAppMap Ct
 filterTcAppMap f m
-  = mapUDFM do_tm m
+  = mapDTyConEnv do_tm m
   where
     do_tm tm = foldTM insert_mb tm emptyTM
     insert_mb ct tm
@@ -2502,7 +2501,7 @@ tcAppMapToBag :: TcAppMap a -> Bag a
 tcAppMapToBag m = foldTcAppMap consBag m emptyBag
 
 foldTcAppMap :: (a -> b -> b) -> TcAppMap a -> b -> b
-foldTcAppMap k m z = foldUDFM (foldTM k) z m
+foldTcAppMap k m z = foldDTyConEnv (foldTM k) z m
 
 foldMapTcAppMap :: Monoid m => (a -> m) -> TcAppMap a -> m
 foldMapTcAppMap f = foldMap (foldMap f)
@@ -2576,8 +2575,8 @@ findDict m loc cls tys
 
 findDictsByClass :: DictMap a -> Class -> Bag a
 findDictsByClass m cls
-  | Just tm <- lookupUDFM_Directly m (getUnique cls) = foldTM consBag tm emptyBag
-  | otherwise                  = emptyBag
+  | Just tm <- lookupDTyConEnv m (classTyCon cls) = foldTM consBag tm emptyBag
+  | otherwise                                     = emptyBag
 
 delDict :: DictMap a -> Class -> [Type] -> DictMap a
 delDict m cls tys = delTcApp m (classTyCon cls) tys
@@ -2587,7 +2586,7 @@ addDict m cls tys item = insertTcApp m (classTyCon cls) tys item
 
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
-  = addToUDFM_Directly m (getUnique cls) (foldr add emptyTM items)
+  = extendDTyConEnv m (classTyCon cls) (foldr add emptyTM items)
   where
     add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
     add ct _ = pprPanic "addDictsByClass" (ppr ct)
@@ -2634,8 +2633,8 @@ findFunEqsByTyCon :: FunEqMap a -> TyCon -> [a]
 -- We use this to check for derived interactions with built-in type-function
 -- constructors.
 findFunEqsByTyCon m tc
-  | Just tm <- lookupUDFM m tc = foldTM (:) tm []
-  | otherwise                  = []
+  | Just tm <- lookupDTyConEnv m tc = foldTM (:) tm []
+  | otherwise                       = []
 
 foldFunEqs :: (a -> b -> b) -> FunEqMap a -> b -> b
 foldFunEqs = foldTcAppMap
