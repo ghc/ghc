@@ -726,6 +726,7 @@ void nonmovingStop(void)
                    "waiting for nonmoving collector thread to terminate");
         ACQUIRE_LOCK(&concurrent_coll_finished_lock);
         waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
+        joinOSThread(mark_thread);
     }
 #endif
 }

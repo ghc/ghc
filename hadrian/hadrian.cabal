@@ -105,13 +105,14 @@ executable hadrian
                        , Settings.Default
                        , Settings.Flavours.Benchmark
                        , Settings.Flavours.Development
+                       , Settings.Flavours.GhcInGhci
                        , Settings.Flavours.Llvm
                        , Settings.Flavours.Performance
                        , Settings.Flavours.Profiled
                        , Settings.Flavours.Quick
                        , Settings.Flavours.QuickCross
                        , Settings.Flavours.Quickest
-                       , Settings.Flavours.GhcInGhci
+                       , Settings.Flavours.ThreadSanitizer
                        , Settings.Flavours.Validate
                        , Settings.Packages
                        , Settings.Parser

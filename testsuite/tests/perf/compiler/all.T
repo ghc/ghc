@@ -132,20 +132,23 @@ test('T9675',
 
 test('T9872a',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1)
+       collect_compiler_stats('bytes allocated', 1),
+       high_memory_usage
       ],
      compile_fail,
      [''])
 
 test('T9872b',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1)
+       collect_compiler_stats('bytes allocated', 1),
+       high_memory_usage
       ],
      compile_fail,
      [''])
 test('T9872c',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1)
+       collect_compiler_stats('bytes allocated', 1),
+       high_memory_usage
       ],
      compile_fail,
      [''])

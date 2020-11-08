@@ -62,12 +62,12 @@ EXTERN_INLINE StgInfoTable *reallyLockClosure(StgClosure *p)
             info = xchg((P_)(void *)&p->header.info, (W_)&stg_WHITEHOLE_info);
             if (info != (W_)&stg_WHITEHOLE_info) return (StgInfoTable *)info;
 #if defined(PROF_SPIN)
-            ++whitehole_lockClosure_spin;
+            NONATOMIC_ADD(&whitehole_lockClosure_spin, 1);
 #endif
             busy_wait_nop();
         } while (++i < SPIN_COUNT);
 #if defined(PROF_SPIN)
-        ++whitehole_lockClosure_yield;
+        NONATOMIC_ADD(&whitehole_lockClosure_yield, 1);
 #endif
         yieldThread();
     } while (1);
@@ -119,9 +119,8 @@ tryLockClosure(StgClosure *p)
 
 EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info)
 {
-    // This is a strictly ordered write, so we need a write_barrier():
-    write_barrier();
-    p->header.info = info;
+    // This is a strictly ordered write, so we need a RELEASE ordering.
+    RELEASE_STORE(&p->header.info, info);
 }
 
 #endif /* CMINUSMINUS */
