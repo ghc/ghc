@@ -93,10 +93,11 @@ tyThingToLHsDecl prr t = case t of
            extractFamilyDecl _           =
              Left "tyThingToLHsDecl: impossible associated tycon"
 
+           cvt :: HsTyVarBndr flag (GhcPass p) -> HsType (GhcPass p)
+             -- Without this signature, we trigger GHC#18932
            cvt (UserTyVar _ _ n) = HsTyVar noExtField NotPromoted n
            cvt (KindedTyVar _ _ (L name_loc n) kind) = HsKindSig noExtField
               (L name_loc (HsTyVar noExtField NotPromoted (L name_loc n))) kind
-           cvt (XTyVarBndr nec) = noExtCon nec
 
            -- | Convert a LHsTyVarBndr to an equivalent LHsType.
            hsLTyVarBndrToType :: LHsTyVarBndr flag (GhcPass p) -> LHsType (GhcPass p)
