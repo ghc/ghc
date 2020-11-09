@@ -248,7 +248,7 @@ same_fields flds1 flds2
 selectConMatchVars :: [Scaled Type] -> ConArgPats -> DsM [Id]
 selectConMatchVars arg_tys con = case con of
                                    (RecCon {}) -> newSysLocalsDsNoLP arg_tys
-                                   (PrefixCon ps) -> selectMatchVars (zipMults arg_tys ps)
+                                   (PrefixCon _ ps) -> selectMatchVars (zipMults arg_tys ps)
                                    (InfixCon p1 p2) -> selectMatchVars (zipMults arg_tys [p1, p2])
   where
     zipMults = zipWithEqual "selectConMatchVar" (\a b -> (scaledMult a, unLoc b))
@@ -258,7 +258,7 @@ conArgPats :: [Scaled Type]-- Instantiated argument types
                           -- are probably never looked at anyway
            -> ConArgPats
            -> [Pat GhcTc]
-conArgPats _arg_tys (PrefixCon ps)   = map unLoc ps
+conArgPats _arg_tys (PrefixCon _ ps) = map unLoc ps
 conArgPats _arg_tys (InfixCon p1 p2) = [unLoc p1, unLoc p2]
 conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
   | null rpats = map WildPat (map scaledThing arg_tys)

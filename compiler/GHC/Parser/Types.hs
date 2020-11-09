@@ -41,12 +41,13 @@ pprSumOrTuple boxity = \case
         Boxed -> (text "(", text ")")
         Unboxed -> (text "(#", text "#)")
 
--- | See Note [Ambiguous syntactic categories] and Note [PatBuilder] in
--- GHC.parser.PostProcess
+
+-- | See Note [Ambiguous syntactic categories] and Note [PatBuilder]
 data PatBuilder p
   = PatBuilderPat (Pat p)
   | PatBuilderPar (Located (PatBuilder p))
   | PatBuilderApp (Located (PatBuilder p)) (Located (PatBuilder p))
+  | PatBuilderAppType (Located (PatBuilder p)) (HsPatSigType GhcPs)
   | PatBuilderOpApp (Located (PatBuilder p)) (Located RdrName) (Located (PatBuilder p))
   | PatBuilderVar (Located RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
@@ -55,6 +56,7 @@ instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
   ppr (PatBuilderPar (L _ p)) = parens (ppr p)
   ppr (PatBuilderApp (L _ p1) (L _ p2)) = ppr p1 <+> ppr p2
+  ppr (PatBuilderAppType (L _ p) t) = ppr p <+> text "@" <> ppr t
   ppr (PatBuilderOpApp (L _ p1) op (L _ p2)) = ppr p1 <+> ppr op <+> ppr p2
   ppr (PatBuilderVar v) = ppr v
   ppr (PatBuilderOverLit l) = ppr l

@@ -128,6 +128,7 @@ import GHC.Unit.Module.Warnings
 import GHC.Data.Bag
 import GHC.Data.Maybe
 import Data.Data        hiding (TyCon,Fixity, Infix)
+import Data.Void
 
 {-
 ************************************************************************
@@ -1617,7 +1618,9 @@ or contexts in two parts:
 
 -- | The arguments in a Haskell98-style data constructor.
 type HsConDeclH98Details pass
-   = HsConDetails (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
+   = HsConDetails Void (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
+-- The Void argument to HsConDetails here is a reflection of the fact that
+-- type applications are not allowed in data constructor declarations.
 
 -- | The arguments in a GADT constructor. Unlike Haskell98-style constructors,
 -- GADT constructors cannot be declared with infix syntax. As a result, we do
@@ -1716,8 +1719,8 @@ pprConDecl (ConDeclH98 { con_name = L _ con
     ppr_details (InfixCon t1 t2) = hsep [ppr (hsScaledThing t1),
                                          pprInfixOcc con,
                                          ppr (hsScaledThing t2)]
-    ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
-                                   : map (pprHsType . unLoc . hsScaledThing) tys)
+    ppr_details (PrefixCon _ tys) = hsep (pprPrefixOcc con
+                                    : map (pprHsType . unLoc . hsScaledThing) tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
     cxt = fromMaybe noLHsContext mcxt

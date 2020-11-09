@@ -229,7 +229,7 @@ tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --  If there's an explicit forall, the renamer would have already reported an
 --   error for each out-of-scope type variable used
   = do  { let ctxt = RuleSigCtxt name
-        ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt rn_ty
+        ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt HM_Sig rn_ty OpenKind
         ; let id  = mkLocalId name Many id_ty
                     -- See Note [Typechecking pattern signature binders] in GHC.Tc.Gen.HsType
 

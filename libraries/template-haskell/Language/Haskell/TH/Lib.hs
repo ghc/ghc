@@ -162,6 +162,8 @@ import Language.Haskell.TH.Lib.Internal hiding
   , tupE
   , unboxedTupE
 
+  , conP
+
   , Role
   , InjectivityAnn
   )
@@ -349,3 +351,9 @@ doE = Internal.doE Nothing
 
 mdoE :: Quote m => [m Stmt] -> m Exp
 mdoE = Internal.mdoE Nothing
+
+-------------------------------------------------------------------------------
+-- * Patterns
+
+conP :: Quote m => Name -> [m Pat] -> m Pat
+conP n xs = Internal.conP n [] xs

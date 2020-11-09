@@ -18,6 +18,8 @@
 Main functions for .hie file generation
 -}
 
+#include "HsVersions.h"
+
 module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts, enrichHie) where
 
 import GHC.Utils.Outputable(ppr)
@@ -55,6 +57,7 @@ import GHC.Types.Var.Env
 import GHC.Builtin.Uniques
 import GHC.Iface.Make             ( mkIfaceExports )
 import GHC.Utils.Panic
+import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
@@ -69,7 +72,7 @@ import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
-import Data.List                  ( foldl1' )
+import Data.Void                  ( Void, absurd )
 import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
@@ -484,6 +487,18 @@ patScopes rsp useScope patScope xs =
   map (\(RS sc a) -> PS rsp useScope sc a) $
     listScopes patScope xs
 
+-- | 'listScopes' specialised to 'HsPatSigType'
+tScopes
+  :: Scope
+  -> Scope
+  -> [HsPatSigType (GhcPass a)]
+  -> [TScoped (HsPatSigType (GhcPass a))]
+tScopes scope rhsScope xs =
+  map (\(RS sc a) -> TS (ResolvedScopes [scope, sc]) (unLoc a)) $
+    listScopes rhsScope (map (\hsps -> L (getLoc $ hsps_body hsps) hsps) xs)
+  -- We make the HsPatSigType into a Located one by using the location of the underlying LHsType.
+  -- We then strip off the redundant location information afterward, and take the union of the given scope and those to the right when forming the TS.
+
 -- | 'listScopes' specialised to 'TVScoped' things
 tvScopes
   :: TyVarScope
@@ -566,6 +581,9 @@ class ToHie a where
 -- | Used to collect type info
 class HasType a where
   getTypeNode :: a -> HieM [HieAST Type]
+
+instance ToHie Void where
+  toHie v = absurd v
 
 instance (ToHie a) => ToHie [a] where
   toHie = concatMapM toHie
@@ -855,7 +873,7 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
           varScope = mkLScope var
           patScope = mkScope $ getLoc pat
           detScope = case dets of
-            (PrefixCon args) -> foldr combineScopes NoScope $ map mkLScope args
+            (PrefixCon _ args) -> foldr combineScopes NoScope $ map mkLScope args
             (InfixCon a b) -> combineScopes (mkLScope a) (mkLScope b)
             (RecCon r) -> foldr go NoScope r
           go (RecordPatSynField a b) c = combineScopes c
@@ -863,7 +881,7 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
           detSpan = case detScope of
             LocalScope a -> Just a
             _ -> Nothing
-          toBind (PrefixCon args) = PrefixCon $ map (C Use) args
+          toBind (PrefixCon ts args) = ASSERT(null ts) PrefixCon ts $ map (C Use) args
           toBind (InfixCon a b) = InfixCon (C Use a) (C Use b)
           toBind (RecCon r) = RecCon $ map (PSC detSpan) r
 
@@ -945,7 +963,7 @@ instance HiePass p => ToHie (PScoped (Located (Pat (GhcPass p)))) where
                             , toHie $ L ospan wrap
                             , toHie $ map (C (EvidenceVarBind EvPatternBind evscope rsp)
                                           . L ospan) ev_vars
-                          ]
+                            ]
             ]
           HieRn ->
             [ toHie $ C Use con
@@ -985,9 +1003,10 @@ instance HiePass p => ToHie (PScoped (Located (Pat (GhcPass p)))) where
           HieRn -> []
 #endif
     where
-      contextify :: a ~ LPat (GhcPass p) => HsConDetails a (HsRecFields (GhcPass p) a)
-                 -> HsConDetails (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
-      contextify (PrefixCon args) = PrefixCon $ patScopes rsp scope pscope args
+      contextify :: a ~ LPat (GhcPass p) => HsConDetails (HsPatSigType (NoGhcTc (GhcPass p))) a (HsRecFields (GhcPass p) a)
+                 -> HsConDetails (TScoped (HsPatSigType (NoGhcTc (GhcPass p)))) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
+      contextify (PrefixCon tyargs args) = PrefixCon (tScopes scope argscope tyargs) (patScopes rsp scope pscope args)
+        where argscope = foldr combineScopes NoScope $ map mkLScope args
       contextify (InfixCon a b) = InfixCon a' b'
         where [a', b'] = patScopes rsp scope pscope [a,b]
       contextify (RecCon r) = RecCon $ RC RecFieldMatch $ contextify_rec r
@@ -1303,8 +1322,8 @@ instance HiePass p => ToHie (RScoped (ApplicativeArg (GhcPass p))) where
     , toHie $ PS Nothing sc NoScope pat
     ]
 
-instance (ToHie arg, ToHie rec) => ToHie (HsConDetails arg rec) where
-  toHie (PrefixCon args) = toHie args
+instance (ToHie tyarg, ToHie arg, ToHie rec) => ToHie (HsConDetails tyarg arg rec) where
+  toHie (PrefixCon tyargs args) = concatM [ toHie tyargs, toHie args ]
   toHie (RecCon rec) = toHie rec
   toHie (InfixCon a b) = concatM [ toHie a, toHie b]
 
@@ -1554,9 +1573,9 @@ instance ToHie (Located (ConDecl GhcRn)) where
           rhsScope = combineScopes ctxScope argsScope
           ctxScope = maybe NoScope mkLScope ctx
           argsScope = case dets of
-            PrefixCon xs -> scaled_args_scope xs
-            InfixCon a b -> scaled_args_scope [a, b]
-            RecCon x     -> mkLScope x
+            PrefixCon _ xs -> scaled_args_scope xs
+            InfixCon a b   -> scaled_args_scope [a, b]
+            RecCon x       -> mkLScope x
     where scaled_args_scope :: [HsScaled GhcRn (LHsType GhcRn)] -> Scope
           scaled_args_scope = foldr combineScopes NoScope . map (mkLScope . hsScaledThing)
 

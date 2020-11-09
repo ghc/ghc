@@ -1,0 +1,3 @@
+
+TyAppPat_NonlinearSinglePat.hs:12:6: error:
+    Variable `a' would be bound multiple times by a type argument.

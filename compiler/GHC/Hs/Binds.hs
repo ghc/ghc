@@ -51,6 +51,7 @@ import GHC.Utils.Panic
 import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )
 import Data.Function
+import Data.Void
 
 {-
 ************************************************************************
@@ -766,7 +767,7 @@ instance (OutputableBndrId l, OutputableBndrId r,
 
       ppr_details = case details of
           InfixCon v1 v2 -> hsep [ppr v1, pprInfixOcc psyn, ppr v2]
-          PrefixCon vs   -> hsep (pprPrefixOcc psyn : map ppr vs)
+          PrefixCon _ vs -> hsep (pprPrefixOcc psyn : map ppr vs)
           RecCon vs      -> pprPrefixOcc psyn
                             <> braces (sep (punctuate comma (map ppr vs)))
 
@@ -1229,7 +1230,9 @@ pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 -}
 
 -- | Haskell Pattern Synonym Details
-type HsPatSynDetails pass = HsConDetails (LIdP pass) [RecordPatSynField (LIdP pass)]
+type HsPatSynDetails pass = HsConDetails Void (LIdP pass) [RecordPatSynField (LIdP pass)]
+-- The Void argument to HsConDetails here is a reflection of the fact that
+-- type applications are not allowed in declarations of pattern synonyms at present.
 
 -- See Note [Record PatSyn Fields]
 -- | Record Pattern Synonym Field

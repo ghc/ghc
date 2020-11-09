@@ -10,3 +10,4 @@ Patterns
     view_patterns
     nk_patterns
     pattern_synonyms
+    type_applications

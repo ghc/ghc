@@ -626,7 +626,7 @@ collectPatSynArgInfo :: HsPatSynDetails GhcRn
                      -> ([Name], [Name], Bool)
 collectPatSynArgInfo details =
   case details of
-    PrefixCon names      -> (map unLoc names, [], False)
+    PrefixCon _ names    -> (map unLoc names, [], False)
     InfixCon name1 name2 -> (map unLoc [name1, name2], [], True)
     RecCon names         -> (vars, sels, False)
                          where
@@ -935,7 +935,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
                                     (noLoc (EmptyLocalBinds noExtField))
 
     args = case details of
-              PrefixCon args     -> args
+              PrefixCon _ args   -> args
               InfixCon arg1 arg2 -> [arg1, arg2]
               RecCon args        -> map recordPatSynPatVar args
 
@@ -986,8 +986,9 @@ tcPatToExpr name args pat = go pat
                     -> Either MsgDoc (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
-           ; return (foldl' (\x y -> HsApp noExtField (L loc x) y)
-                            (HsVar noExtField lcon) exprs) }
+           ; let con = L loc (HsVar noExtField lcon)
+           ; return (unLoc $ mkHsApps con exprs)
+           }
 
     mkRecordConExpr :: Located Name -> HsRecFields GhcRn (LPat GhcRn)
                     -> Either MsgDoc (HsExpr GhcRn)
@@ -1001,9 +1002,9 @@ tcPatToExpr name args pat = go pat
     go1 :: Pat GhcRn -> Either MsgDoc (HsExpr GhcRn)
     go1 (ConPat NoExtField con info)
       = case info of
-          PrefixCon ps  -> mkPrefixConExpr con ps
-          InfixCon l r  -> mkPrefixConExpr con [l,r]
-          RecCon fields -> mkRecordConExpr con fields
+          PrefixCon _ ps -> mkPrefixConExpr con ps
+          InfixCon l r   -> mkPrefixConExpr con [l,r]
+          RecCon fields  -> mkRecordConExpr con fields
 
     go1 (SigPat _ pat _) = go1 (unLoc pat)
         -- See Note [Type signatures and the builder expression]
@@ -1186,7 +1187,7 @@ tcCollectEx pat = go pat
     go1 _                   = empty
 
     goConDetails :: HsConPatDetails GhcTc -> ([TyVar], [EvVar])
-    goConDetails (PrefixCon ps) = mergeMany . map go $ ps
+    goConDetails (PrefixCon _ ps) = mergeMany . map go $ ps
     goConDetails (InfixCon p1 p2) = go p1 `merge` go p2
     goConDetails (RecCon HsRecFields{ rec_flds = flds })
       = mergeMany . map goRecFd $ flds

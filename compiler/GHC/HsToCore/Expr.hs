@@ -822,7 +822,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                  req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
 
                  pat = noLoc $ ConPat { pat_con = noLoc con
-                                      , pat_args = PrefixCon $ map nlVarPat arg_ids
+                                      , pat_args = PrefixCon [] $ map nlVarPat arg_ids
                                       , pat_con_ext = ConPatTc
                                         { cpt_tvs = ex_tvs
                                         , cpt_dicts = eqs_vars ++ theta_vars

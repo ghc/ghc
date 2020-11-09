@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
@@ -32,7 +33,7 @@ module GHC.Rename.Pat (-- main entry points
               rnHsRecUpdFields,
 
               -- CpsRn monad
-              CpsRn, liftCps,
+              CpsRn, liftCps, liftCpsWithCont,
 
               -- Literals
               rnLit, rnOverLit,
@@ -77,7 +78,7 @@ import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, ap, guard )
+import Control.Monad       ( when, ap, guard, forM )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 
@@ -132,6 +133,9 @@ liftCpsFV :: RnM (a, FreeVars) -> CpsRn a
 liftCpsFV rn_thing = CpsRn (\k -> do { (v,fvs1) <- rn_thing
                                      ; (r,fvs2) <- k v
                                      ; return (r, fvs1 `plusFV` fvs2) })
+
+liftCpsWithCont :: (forall r. (b -> RnM (r, FreeVars)) -> RnM (r, FreeVars)) -> CpsRn b
+liftCpsWithCont = CpsRn
 
 wrapSrcSpanCps :: (a -> CpsRn b) -> Located a -> CpsRn (Located b)
 -- Set the location, and also wrap it around the value returned
@@ -424,7 +428,7 @@ rnPatAndThen mk (SigPat x pat sig)
        ; return (SigPat x pat' sig' ) }
   where
     rnHsPatSigTypeAndThen :: HsPatSigType GhcPs -> CpsRn (HsPatSigType GhcRn)
-    rnHsPatSigTypeAndThen sig = CpsRn (rnHsPatSigType AlwaysBind PatCtx sig)
+    rnHsPatSigTypeAndThen sig = liftCpsWithCont (rnHsPatSigType AlwaysBind PatCtx sig)
 
 rnPatAndThen mk (LitPat x lit)
   | HsString src s <- lit
@@ -522,13 +526,15 @@ rnConPatAndThen :: NameMaker
                 -> HsConPatDetails GhcPs
                 -> CpsRn (Pat GhcRn)
 
-rnConPatAndThen mk con (PrefixCon pats)
+rnConPatAndThen mk con (PrefixCon tyargs pats)
   = do  { con' <- lookupConCps con
+        ; tyargs' <- forM tyargs $ \t ->
+            liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
         ; pats' <- rnLPatsAndThen mk pats
         ; return $ ConPat
             { pat_con_ext = noExtField
             , pat_con = con'
-            , pat_args = PrefixCon pats'
+            , pat_args = PrefixCon tyargs' pats'
             }
         }
 

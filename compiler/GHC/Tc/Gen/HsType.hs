@@ -66,6 +66,7 @@ module GHC.Tc.Gen.HsType (
 
         -- Pattern type signatures
         tcHsPatSigType,
+        HoleMode(..),
 
         -- Error messages
         funAppCtxt, addTyConFlavCtxt
@@ -819,6 +820,9 @@ data HoleMode = HM_Sig      -- Partial type signatures: f :: _ -> Int
               | HM_VTA      -- Visible type and kind application:
                             --   f @(Maybe _)
                             --   Maybe @(_ -> _)
+              | HM_TyAppPat -- Visible type applications in patterns:
+                            --   foo (Con @_ @t x) = ...
+                            --   case x of Con @_ @t v -> ...
 
 mkMode :: TypeOrKind -> TcTyMode
 mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing }
@@ -835,9 +839,10 @@ mkHoleMode tyki hm
                           , mode_holes = Just (lvl,hm) }) }
 
 instance Outputable HoleMode where
-  ppr HM_Sig     = text "HM_Sig"
-  ppr HM_FamPat  = text "HM_FamPat"
-  ppr HM_VTA     = text "HM_VTA"
+  ppr HM_Sig      = text "HM_Sig"
+  ppr HM_FamPat   = text "HM_FamPat"
+  ppr HM_VTA      = text "HM_VTA"
+  ppr HM_TyAppPat = text "HM_TyAppPat"
 
 instance Outputable TcTyMode where
   ppr (TcTyMode { mode_tyki = tyki, mode_holes = hm })
@@ -2103,14 +2108,16 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
   where
      -- See Note [Wildcard names]
      wc_nm = case hole_mode of
-               HM_Sig     -> "w"
-               HM_FamPat  -> "_"
-               HM_VTA     -> "w"
+               HM_Sig      -> "w"
+               HM_FamPat   -> "_"
+               HM_VTA      -> "w"
+               HM_TyAppPat -> "_"
 
      emit_holes = case hole_mode of
                      HM_Sig     -> True
                      HM_FamPat  -> False
                      HM_VTA     -> False
+                     HM_TyAppPat -> False
 
 tcAnonWildCardOcc _ mode ty _
 -- mode_holes is Nothing.  Should not happen, because renamer
@@ -3931,7 +3938,9 @@ information about how these are printed.
 ********************************************************************* -}
 
 tcHsPatSigType :: UserTypeCtxt
+               -> HoleMode -- HM_Sig when in a SigPat, HM_TyAppPat when in a ConPat checking type applications.
                -> HsPatSigType GhcRn          -- The type signature
+               -> ContextKind                -- What kind is expected
                -> TcM ( [(Name, TcTyVar)]     -- Wildcards
                       , [(Name, TcTyVar)]     -- The new bit of type environment, binding
                                               -- the scoped type variables
@@ -3943,12 +3952,13 @@ tcHsPatSigType :: UserTypeCtxt
 --
 -- This may emit constraints
 -- See Note [Recipe for checking a signature]
-tcHsPatSigType ctxt
+tcHsPatSigType ctxt hole_mode
   (HsPS { hsps_ext  = HsPSRn { hsps_nwcs = sig_wcs, hsps_imp_tvs = sig_ns }
         , hsps_body = hs_ty })
+  ctxt_kind
   = addSigCtxt ctxt hs_ty $
     do { sig_tkv_prs <- mapM new_implicit_tv sig_ns
-       ; mode <- mkHoleMode TypeLevel HM_Sig
+       ; mode <- mkHoleMode TypeLevel hole_mode
        ; (wcs, sig_ty)
             <- addTypeCtxt hs_ty                     $
                solveEqualities "tcHsPatSigType" $
@@ -3956,7 +3966,7 @@ tcHsPatSigType ctxt
                  -- and c.f #16033
                bindNamedWildCardBinders sig_wcs $ \ wcs ->
                tcExtendNameTyVarEnv sig_tkv_prs $
-               do { ek     <- newOpenTypeKind
+               do { ek     <- newExpectedKind ctxt_kind
                   ; sig_ty <- tc_lhs_type mode hs_ty ek
                   ; return (wcs, sig_ty) }
 

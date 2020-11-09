@@ -97,9 +97,8 @@ parseExprPat s =  do  loc <- location
                       dataToPatQ (const Nothing `extQ` antiExprPat) expr
 
 antiExprPat :: Expr -> Maybe (Q Pat)
-antiExprPat  (AntiIntExpr v)  = Just $ conP  (mkName "IntExpr")
-                                                [varP (mkName v)]
-antiExprPat  (AntiExpr v)     = Just $ varP  (mkName v)
+antiExprPat  (AntiIntExpr v)  = Just $ conP (mkName "IntExpr") [varP (mkName v)]
+antiExprPat  (AntiExpr v)     = Just $ varP (mkName v)
 antiExprPat  _                = Nothing
 
 -- Copied from syb for the test

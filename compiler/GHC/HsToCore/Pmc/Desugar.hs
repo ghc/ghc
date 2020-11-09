@@ -255,7 +255,7 @@ desugarListPat x pats = do
 desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
                  -> [EvVar] -> HsConPatDetails GhcTc -> DsM [PmGrd]
 desugarConPatOut x con univ_tys ex_tvs dicts = \case
-    PrefixCon ps                 -> go_field_pats (zip [0..] ps)
+    PrefixCon _ ps               -> go_field_pats (zip [0..] ps)
     InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
     RecCon    (HsRecFields fs _) -> go_field_pats (rec_field_ps fs)
   where

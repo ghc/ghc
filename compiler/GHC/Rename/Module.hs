@@ -2234,9 +2234,9 @@ rnConDeclH98Details ::
    -> HsDocContext
    -> HsConDeclH98Details GhcPs
    -> RnM (HsConDeclH98Details GhcRn, FreeVars)
-rnConDeclH98Details _ doc (PrefixCon tys)
+rnConDeclH98Details _ doc (PrefixCon _ tys)
   = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
-       ; return (PrefixCon new_tys, fvs) }
+       ; return (PrefixCon noTypeArgs new_tys, fvs) }
 rnConDeclH98Details _ doc (InfixCon ty1 ty2)
   = do { (new_ty1, fvs1) <- rnScaledLHsType doc ty1
        ; (new_ty2, fvs2) <- rnScaledLHsType doc ty2

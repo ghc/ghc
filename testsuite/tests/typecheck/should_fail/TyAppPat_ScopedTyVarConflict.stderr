@@ -1,0 +1,8 @@
+
+TyAppPat_ScopedTyVarConflict.hs:10:6: error:
+    Type variable ‘a’ is already in scope.
+    Type applications in patterns must bind fresh variables, without shadowing.
+
+TyAppPat_ScopedTyVarConflict.hs:11:6: error:
+    Type variable ‘a’ is already in scope.
+    Type applications in patterns must bind fresh variables, without shadowing.
