@@ -1682,12 +1682,12 @@ seqStrictSig (StrictSig ty) = seqDmdType ty
 -}
 
 instance Outputable Card where
-  ppr C_00 = char 'a'
+  ppr C_00 = char 'A'
   ppr C_01 = char '1'
-  ppr C_0N = char 'u'
-  ppr C_11 = char 's'
-  ppr C_1N = char 'm'
-  ppr C_10 = char 'b'
+  ppr C_0N = char 'U'
+  ppr C_11 = char 'S'
+  ppr C_1N = char 'M'
+  ppr C_10 = char 'B'
 
 instance Outputable Demand where
   ppr dmd@(n :* sd)
