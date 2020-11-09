@@ -425,6 +425,8 @@ forAllOrNothing has_outer_forall fvs = case has_outer_forall of
     traceRn "forAllOrNothing" $ text "no explicit forall. implicit binders:" <+> ppr fvs
     pure fvs
 
+-- | Create new renamed type variables corresponding to source-level ones. Duplicates are permitted, but will be removed. This is intended especially
+-- for the case of handling the implicitly bound free variables of a type signature.
 rnImplicitTvOccs :: Maybe assoc
                  -- ^ @'Just' _@ => an associated type decl
                  -> FreeKiTyVars
@@ -469,6 +471,9 @@ type signature, since the type signature implicitly carries their binding
 sites. This is less precise, but more accurate.
 -}
 
+-- | Create fresh type variables for binders, disallowing multiple occurrences of the same variable. Similar to `rnImplicitTvOccs` except that duplicate occurrences will
+-- result in an error, and the source locations of the variables are not adjusted, as these variable occurrences are themselves the binding sites for the type variables,
+-- rather than the variables being implicitly bound by a signature.
 rnImplicitTvBndrs :: HsDocContext
                   -> Maybe assoc
                   -- ^ @'Just' _@ => an associated type decl
