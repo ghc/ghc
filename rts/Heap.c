@@ -203,7 +203,26 @@ StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[siz
             ptrs[nptrs++] = (StgClosure *)((StgMVar *)closure)->tail;
             ptrs[nptrs++] = ((StgMVar *)closure)->value;
             break;
+        case TSO:
+            ASSERT((StgClosure *)((StgTSO *)closure)->_link != NULL);
+            ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->_link;
 
+            ASSERT((StgClosure *)((StgTSO *)closure)->global_link != NULL);
+            ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->global_link;
+
+            ASSERT((StgClosure *)((StgTSO *)closure)->stackobj != NULL);
+            ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->stackobj;
+
+            ASSERT((StgClosure *)((StgTSO *)closure)->trec != NULL);
+            ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->trec;
+
+            ASSERT((StgClosure *)((StgTSO *)closure)->blocked_exceptions != NULL);
+            ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->blocked_exceptions;
+
+            ASSERT((StgClosure *)((StgTSO *)closure)->bq != NULL);
+            ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->bq;
+
+            break;
         case WEAK:
             ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->cfinalizers;
             ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->key;
