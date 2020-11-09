@@ -34,7 +34,7 @@
 
   * The argument to `TExpQ` can now be levity polymorphic.
 
-  * The types of ConP and conP have been changed to allow for an additional list
+  * The types of `ConP` and `conP` have been changed to allow for an additional list
     of type applications preceding the argument patterns.
 
 ## 2.16.0.0 *TBA*
