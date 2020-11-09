@@ -708,13 +708,13 @@ instance HasHaddock (Located (ConDecl GhcPs)) where
       ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_args } ->
         addConTrailingDoc (srcSpanEnd l_con_decl) $
         case con_args of
-          PrefixCon ts -> do
+          PrefixCon _ ts -> do
             con_doc' <- getConDoc (getLoc con_name)
             ts' <- traverse addHaddockConDeclFieldTy ts
             pure $ L l_con_decl $
               ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
                            con_doc = con_doc',
-                           con_args = PrefixCon ts' }
+                           con_args = PrefixCon noTypeArgs ts' }
           InfixCon t1 t2 -> do
             t1' <- addHaddockConDeclFieldTy t1
             con_doc' <- getConDoc (getLoc con_name)
@@ -865,9 +865,9 @@ addConTrailingDoc l_sep =
                     doc <- selectDocString trailingDocs
                     return $ L l' (con_fld { cd_fld_doc = doc })
               con_args' <- case con_args con_decl of
-                x@(PrefixCon [])    -> x <$ reportExtraDocs trailingDocs
+                x@(PrefixCon _ [])  -> x <$ reportExtraDocs trailingDocs
                 x@(RecCon (L _ [])) -> x <$ reportExtraDocs trailingDocs
-                PrefixCon ts -> PrefixCon <$> mapLastM mk_doc_ty ts
+                PrefixCon _ ts -> PrefixCon noTypeArgs <$> mapLastM mk_doc_ty ts
                 InfixCon t1 t2 -> InfixCon t1 <$> mk_doc_ty t2
                 RecCon (L l_rec flds) -> do
                   flds' <- mapLastM mk_doc_fld flds
