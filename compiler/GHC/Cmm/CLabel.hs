@@ -283,7 +283,10 @@ data CLabel
   deriving Eq
 
 instance Show CLabel where
-  show = showPprUnsafe . ppr
+  show = showPprUnsafe . pprDebugCLabel genericPlatform
+
+instance Outputable CLabel where
+  ppr = text . show
 
 isIdLabel :: CLabel -> Bool
 isIdLabel IdLabel{} = True
@@ -408,7 +411,6 @@ data ForeignLabelSource
    | ForeignLabelInThisPackage
 
    deriving (Eq, Ord)
-
 
 -- | For debugging problems with the CLabel representation.
 --      We can't make a Show instance for CLabel because lots of its components don't have instances.
@@ -1444,7 +1446,7 @@ pprDynamicLinkerAsmLabel platform dllInfo ppLbl =
           _         -> panic "pprDynamicLinkerAsmLabel"
 
       | platformArch platform == ArchAArch64
-      = ppr lbl
+      = ppLbl
 
 
       | platformArch platform == ArchX86_64
