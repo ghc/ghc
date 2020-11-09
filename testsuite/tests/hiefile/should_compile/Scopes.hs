@@ -37,9 +37,3 @@ sdaf = C{..}
   where
     x = 1
     y = 'a'
-
-data Proxy (a :: k) = Proxy
-data Con k (a :: k) = Con (Proxy a)
-
-tyApp :: Con k a -> Proxy a
-tyApp (Con @kx @ax (x :: Proxy ax)) = x :: Proxy (ax :: kx)
