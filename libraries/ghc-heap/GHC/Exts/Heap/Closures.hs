@@ -12,6 +12,9 @@ module GHC.Exts.Heap.Closures (
       Closure
     , GenClosure(..)
     , PrimType(..)
+    , WhatNext(..)
+    , WhyBlocked(..)
+    , TsoFlags(..)
     , allClosures
 #if __GLASGOW_HASKELL__ >= 809
     -- The closureSize# primop is unsupported on earlier GHC releases but we
@@ -39,6 +42,8 @@ import GHC.Exts.Heap.InfoTable
 -- is fixed.
 import GHC.Exts.Heap.InfoTableProf ()
 #endif
+
+import GHC.Exts.Heap.ProfInfo.Types
 
 import Data.Bits
 import Data.Int
@@ -100,11 +105,11 @@ type Closure = GenClosure Box
 -- | This is the representation of a Haskell value on the heap. It reflects
 -- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/storage/Closures.h>
 --
--- The data type is parametrized by the type to store references in. Usually
--- this is a 'Box' with the type synonym 'Closure'.
+-- The data type is parametrized by `b`: the type to store references in.
+-- Usually this is a 'Box' with the type synonym 'Closure'.
 --
--- All Heap objects have the same basic layout. A header containing a pointer
--- to the info table and a payload with various fields. The @info@ field below
+-- All Heap objects have the same basic layout. A header containing a pointer to
+-- the info table and a payload with various fields. The @info@ field below
 -- always refers to the info table pointed to by the header. The remaining
 -- fields are the payload.
 --
@@ -268,6 +273,39 @@ data GenClosure b
         , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
         }
 
+  -- | Representation of StgTSO: A Thread State Object. The values for
+  -- 'what_next', 'why_blocked' and 'flags' are defined in @Constants.h@.
+  | TSOClosure
+      { info                :: !StgInfoTable
+      -- pointers
+      , link                :: !b
+      , global_link         :: !b
+      , tsoStack            :: !b -- ^ stackobj from StgTSO
+      , trec                :: !b
+      , blocked_exceptions  :: !b
+      , bq                  :: !b
+      -- values
+      , what_next           :: !WhatNext
+      , why_blocked         :: !WhyBlocked
+      , flags               :: ![TsoFlags]
+      , threadId            :: !Word64
+      , saved_errno         :: !Word32
+      , tso_dirty           :: !Word32 -- ^ non-zero => dirty
+      , alloc_limit         :: !Int64
+      , tot_stack_size      :: !Word32
+      , prof                :: !(Maybe StgTSOProfInfo)
+      }
+
+  -- | Representation of StgStack: The 'tsoStack ' of a 'TSOClosure'.
+  | StackClosure
+      { info            :: !StgInfoTable
+      , stack_size      :: !Word32 -- ^ stack size in *words*
+      , stack_dirty     :: !Word8 -- ^ non-zero => dirty
+#if __GLASGOW_HASKELL__ >= 811
+      , stack_marking   :: !Word8
+#endif
+      }
+
     ------------------------------------------------------------
     -- Unboxed unlifted closures
 
@@ -330,6 +368,43 @@ data PrimType
   | PAddr
   | PFloat
   | PDouble
+  deriving (Eq, Show, Generic)
+
+data WhatNext
+  = ThreadRunGHC
+  | ThreadInterpret
+  | ThreadKilled
+  | ThreadComplete
+  | WhatNextUnknownValue Word16 -- ^ Please report this as a bug
+  deriving (Eq, Show, Generic)
+
+data WhyBlocked
+  = NotBlocked
+  | BlockedOnMVar
+  | BlockedOnMVarRead
+  | BlockedOnBlackHole
+  | BlockedOnRead
+  | BlockedOnWrite
+  | BlockedOnDelay
+  | BlockedOnSTM
+  | BlockedOnDoProc
+  | BlockedOnCCall
+  | BlockedOnCCall_Interruptible
+  | BlockedOnMsgThrowTo
+  | ThreadMigrating
+  | BlockedOnIOCompletion
+  | WhyBlockedUnknownValue Word16 -- ^ Please report this as a bug
+  deriving (Eq, Show, Generic)
+
+data TsoFlags
+  = TsoLocked
+  | TsoBlockx
+  | TsoInterruptible
+  | TsoStoppedOnBreakpoint
+  | TsoMarked
+  | TsoSqueezed
+  | TsoAllocLimit
+  | TsoFlagsUnknownValue Word32 -- ^ Please report this as a bug
   deriving (Eq, Show, Generic)
 
 -- | For generic code, this function returns all referenced closures.
