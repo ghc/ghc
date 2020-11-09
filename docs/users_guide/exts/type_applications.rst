@@ -322,7 +322,7 @@ Here, we're binding the type variable t to be the type of the elements of the li
 which is itself the argument to Maybe.
 
 The order of the type arguments specified by the type applications in a pattern is the same
-as that for an expression: either the order as given by the user in an explicit forall in the
+as that for an expression: either the order as given by the user in an explicit ``forall`` in the
 definition of the data constructor, or if that is not present, the order in which the type
 variables appear in its type signature from left to right.
 
