@@ -47,7 +47,7 @@ F1.s1 = 3
 s :: forall {t1} {t2}. Num t1 => (t1 -> t2) -> t2
 [GblId,
  Arity=2,
- Str=<1(A,A,A,A,A,A,1C1(U))><SCS(U)>,
+ Str=<1P(A,A,A,A,A,A,1C1(U))><SCS(U)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@t) (@t1) ($dNum [Occ=Once1] :: Num t) (f [Occ=Once1!] :: t -> t1) -> f (fromInteger @t $dNum F1.s1)}]
 s = \ (@t) (@t1) ($dNum :: Num t) (f :: t -> t1) -> f (fromInteger @t $dNum F1.s1)

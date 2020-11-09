@@ -57,13 +57,13 @@ T18903.h2 = GHC.Types.I# -2#
 T18903.$wh [InlPrag=[2]] :: GHC.Prim.Int# -> Int
 [GblId,
  Arity=1,
- Str=<S*U>,
+ Str=<MU>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [70] 262 10}]
 T18903.$wh
   = \ (ww :: GHC.Prim.Int#) ->
       let {
-        $wg [InlPrag=NOINLINE, Dmd=1C1((1(U),S(U)))]
+        $wg [InlPrag=NOINLINE, Dmd=1C1(P(1P(U),SP(U)))]
           :: GHC.Prim.Int# -> (# Int, Int #)
         [LclId, Arity=1, Str=<SU>, Unf=OtherCon []]
         $wg
@@ -96,7 +96,7 @@ T18903.$wh
 h [InlPrag=[2]] :: Int -> Int
 [GblId,
  Arity=1,
- Str=<S(S*U)>,
+ Str=<SP(MU)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

@@ -1,9 +1,9 @@
 
 ==================== Strictness signatures ====================
 T13380f.$trModule:
-T13380f.f: <S(U)><S(U)><U>
-T13380f.g: <S(U)><1(U)><U>
-T13380f.h: <S(U)><1(U)><U>
+T13380f.f: <SP(U)><SP(U)><U>
+T13380f.g: <SP(U)><1P(U)><U>
+T13380f.h: <SP(U)><1P(U)><U>
 T13380f.interruptibleCall: <U>
 T13380f.safeCall: <U>
 T13380f.unsafeCall: <U>
@@ -23,9 +23,9 @@ T13380f.unsafeCall:
 
 ==================== Strictness signatures ====================
 T13380f.$trModule:
-T13380f.f: <S(U)><S(U)><U>
-T13380f.g: <S(U)><1(U)><U>
-T13380f.h: <S(U)><1(U)><U>
+T13380f.f: <SP(U)><SP(U)><U>
+T13380f.g: <SP(U)><1P(U)><U>
+T13380f.h: <SP(U)><1P(U)><U>
 T13380f.interruptibleCall: <U>
 T13380f.safeCall: <U>
 T13380f.unsafeCall: <U>

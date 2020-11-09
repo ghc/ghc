@@ -9,7 +9,7 @@ DmdAnalGADTs.f: <SU>
 DmdAnalGADTs.f': <SU>
 DmdAnalGADTs.g: <SU>
 DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: <S(U)>
+DmdAnalGADTs.hasStrSig: <SP(U)>
 
 
 
@@ -37,6 +37,6 @@ DmdAnalGADTs.f: <SU>
 DmdAnalGADTs.f': <SU>
 DmdAnalGADTs.g: <SU>
 DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: <S(U)>
+DmdAnalGADTs.hasStrSig: <SP(U)>
 
 

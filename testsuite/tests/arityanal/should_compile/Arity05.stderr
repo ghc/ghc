@@ -11,7 +11,7 @@ F5.f5g1 = 1
 f5g :: forall {a} {t}. Num a => (t -> a) -> t -> a
 [GblId,
  Arity=3,
- Str=<M(SCS(CS(U)),A,A,A,A,A,1C1(U))><1C1(U)><U>,
+ Str=<MP(SCS(CS(U)),A,A,A,A,A,1C1(U))><1C1(U)><U>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@a) (@t) ($dNum :: Num a) (h [Occ=Once1!] :: t -> a) (z [Occ=Once1] :: t) -> + @a $dNum (h z) (fromInteger @a $dNum F5.f5g1)}]
 f5g = \ (@a) (@t) ($dNum :: Num a) (h :: t -> a) (z :: t) -> + @a $dNum (h z) (fromInteger @a $dNum F5.f5g1)
@@ -25,7 +25,7 @@ F5.$wf5h = \ (@a) (@t) (ww :: a -> a -> a) (ww1 :: Integer -> a) (w :: t -> a) (
 f5h [InlPrag=[2]] :: forall {a} {t}. Num a => (t -> a) -> t -> (t -> a) -> a
 [GblId,
  Arity=4,
- Str=<S(MCM(CS(U)),A,A,A,A,A,1C1(U))><1C1(U)><U><1C1(U)>,
+ Str=<SP(MCM(CS(U)),A,A,A,A,A,1C1(U))><1C1(U)><U><1C1(U)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@a) (@t) (w [Occ=Once1!] :: Num a) (w1 [Occ=Once1] :: t -> a) (w2 [Occ=Once1] :: t) (w3 [Occ=Once1] :: t -> a) -> case w of { GHC.Num.C:Num ww1 [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ww7 [Occ=Once1] -> F5.$wf5h @a @t ww1 ww7 w1 w2 w3 }}]
 f5h = \ (@a) (@t) (w :: Num a) (w1 :: t -> a) (w2 :: t) (w3 :: t -> a) -> case w of { GHC.Num.C:Num ww1 ww2 ww3 ww4 ww5 ww6 ww7 -> F5.$wf5h @a @t ww1 ww7 w1 w2 w3 }
