@@ -9,6 +9,6 @@ import Language.Haskell.TH
 
 f :: $(arrowT `appT` (conT ''Identity `appT` (tupleT 1 `appT` (tupleT 0)))
               `appT` (conT ''Identity `appT` (tupleT 1 `appT` (tupleT 0))))
-f $(conP 'Identity [tupP [tupP []]]) = $(conE 'Identity `appE` tupE [tupE []])
+f $(conP 'Identity [] [tupP [tupP []]]) = $(conE 'Identity `appE` tupE [tupE []])
 
 type G = $(conT ''Proxy `appT` (promotedTupleT 1 `appT` (tupleT 0)))

@@ -46,7 +46,7 @@ plus3 = conE ('(:+))
 --------------------------------------------------------------------------------
 -- The only way to test pattern splices is using QuasiQuotation
 mkQQ pat = QuasiQuoter undefined (const pat) undefined undefined
-p = conP (mkName "N") []
+p = conP (mkName "N") [] []
 plus' = mkName ":+"
 times' = mkName ":*"
 
