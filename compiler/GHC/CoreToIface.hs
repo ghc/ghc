@@ -34,23 +34,26 @@ module GHC.CoreToIface
     , toIfaceIdDetails
     , toIfaceIdInfo
     , toIfUnfolding
-    , toIfaceOneShot
     , toIfaceTickish
     , toIfaceBind
     , toIfaceAlt
     , toIfaceCon
     , toIfaceApp
     , toIfaceVar
+      -- * Other stuff
+    , toIfaceLFInfo
     ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
+import GHC.Driver.Ppr
 import GHC.Iface.Syntax
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.StgToCmm.Types
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
@@ -61,10 +64,12 @@ import GHC.Builtin.Names
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
-import Outputable
-import FastString
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
+import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -118,7 +123,8 @@ toIfaceIdBndr :: Id -> IfaceIdBndr
 toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
-toIfaceIdBndrX fr covar = ( occNameFS (getOccName covar)
+toIfaceIdBndrX fr covar = ( toIfaceType (idMult covar)
+                          , occNameFS (getOccName covar)
                           , toIfaceTypeX fr (varType covar)
                           )
 
@@ -170,8 +176,8 @@ toIfaceTypeX fr ty@(AppTy {})  =
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
 toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
-toIfaceTypeX fr (FunTy { ft_arg = t1, ft_res = t2, ft_af = af })
-  = IfaceFunTy af (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+toIfaceTypeX fr (FunTy { ft_arg = t1, ft_mult = w, ft_res = t2, ft_af = af })
+  = IfaceFunTy af (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
 
@@ -182,7 +188,7 @@ toIfaceTypeX fr (TyConApp tc tys)
   = IfaceTupleTy sort NotPromoted (toIfaceTcArgsX fr tc tys)
 
   | Just dc <- isPromotedDataCon_maybe tc
-  , isTupleDataCon dc
+  , isBoxedTupleDataCon dc
   , n_tys == 2*arity
   = IfaceTupleTy BoxedTuple IsPromoted (toIfaceTcArgsX fr tc (drop arity tys))
 
@@ -206,10 +212,10 @@ toIfaceTyVar = occNameFS . getOccName
 toIfaceCoVar :: CoVar -> FastString
 toIfaceCoVar = occNameFS . getOccName
 
-toIfaceForAllBndr :: TyCoVarBinder -> IfaceForAllBndr
+toIfaceForAllBndr :: (VarBndr TyCoVar flag) -> (VarBndr IfaceBndr flag)
 toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 
-toIfaceForAllBndrX :: VarSet -> TyCoVarBinder -> IfaceForAllBndr
+toIfaceForAllBndrX :: VarSet -> (VarBndr TyCoVar flag) -> (VarBndr IfaceBndr flag)
 toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 
 ----------------
@@ -290,9 +296,10 @@ toIfaceCoercionX fr co
                                           (toIfaceTypeX fr t2)
     go (TyConAppCo r tc cos)
       | tc `hasKey` funTyConKey
-      , [_,_,_,_] <- cos         = pprPanic "toIfaceCoercion" (ppr co)
-      | otherwise                = IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
-    go (FunCo r co1 co2)   = IfaceFunCo r (go co1) (go co2)
+      , [_,_,_,_, _] <- cos         = pprPanic "toIfaceCoercion" empty
+      | otherwise                =
+        IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
+    go (FunCo r w co1 co2)   = IfaceFunCo r (go w) (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceBndr tv)
                                           (toIfaceCoercionX fr' k)
@@ -388,7 +395,7 @@ patSynToIfaceDecl ps
                 , ifPatExBndrs    = map toIfaceForAllBndr ex_bndrs'
                 , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
                 , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
-                , ifPatArgs       = map (tidyToIfaceType env2) args
+                , ifPatArgs       = map (tidyToIfaceType env2 . scaledThing) args
                 , ifPatTy         = tidyToIfaceType env2 rhs_ty
                 , ifFieldLabels   = (patSynFieldLabels ps)
                 }
@@ -615,6 +622,31 @@ toIfaceVar v
     | otherwise                       = IfaceLcl (getOccFS name)
   where name = idName v
 
+
+---------------------
+toIfaceLFInfo :: Name -> LambdaFormInfo -> IfaceLFInfo
+toIfaceLFInfo nm lfi = case lfi of
+    LFReEntrant top_lvl arity no_fvs _arg_descr ->
+      -- Exported LFReEntrant closures are top level, and top-level closures
+      -- don't have free variables
+      ASSERT2(isTopLevel top_lvl, ppr nm)
+      ASSERT2(no_fvs, ppr nm)
+      IfLFReEntrant arity
+    LFThunk top_lvl no_fvs updatable sfi mb_fun ->
+      -- Exported LFThunk closures are top level (which don't have free
+      -- variables) and non-standard (see cgTopRhsClosure)
+      ASSERT2(isTopLevel top_lvl, ppr nm)
+      ASSERT2(no_fvs, ppr nm)
+      ASSERT2(sfi == NonStandardThunk, ppr nm)
+      IfLFThunk updatable mb_fun
+    LFCon dc ->
+      IfLFCon (dataConName dc)
+    LFUnknown mb_fun ->
+      IfLFUnknown mb_fun
+    LFUnlifted ->
+      IfLFUnlifted
+    LFLetNoEscape ->
+      panic "toIfaceLFInfo: LFLetNoEscape"
 
 {- Note [Inlining and hs-boot files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,13 +1,10 @@
 {-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DefaultSignatures          #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE Trustworthy                #-}
-{-# LANGUAGE TypeOperators              #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -302,7 +299,14 @@ data Arg a b = Arg
   , Generic1 -- ^ @since 4.9.0.0
   )
 
+-- |
+-- >>> Min (Arg 0 ()) <> Min (Arg 1 ())
+-- Min {getMin = Arg 0 ()}
 type ArgMin a b = Min (Arg a b)
+
+-- |
+-- >>> Max (Arg 0 ()) <> Max (Arg 1 ())
+-- Max {getMax = Arg 1 ()}
 type ArgMax a b = Max (Arg a b)
 
 -- | @since 4.9.0.0
@@ -343,8 +347,6 @@ instance Bifoldable Arg where
 instance Bitraversable Arg where
   bitraverse f g (Arg a b) = Arg <$> f a <*> g b
 
--- | Use @'Option' ('First' a)@ to get the behavior of
--- 'Data.Monoid.First' from "Data.Monoid".
 newtype First a = First { getFirst :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
@@ -401,8 +403,6 @@ instance Monad First where
 instance MonadFix First where
   mfix f = fix (f . getFirst)
 
--- | Use @'Option' ('Last' a)@ to get the behavior of
--- 'Data.Monoid.Last' from "Data.Monoid"
 newtype Last a = Last { getLast :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
@@ -507,6 +507,8 @@ mtimesDefault n x
   | n == 0    = mempty
   | otherwise = unwrapMonoid (stimes n (WrapMonoid x))
 
+{-# DEPRECATED Option, option "will be removed in GHC 9.2; use 'Maybe' instead." #-}
+
 -- | 'Option' is effectively 'Maybe' with a better instance of
 -- 'Monoid', built off of an underlying 'Semigroup' instead of an
 -- underlying 'Monoid'.
@@ -516,8 +518,7 @@ mtimesDefault n x
 --
 -- In GHC 8.4 and higher, the 'Monoid' instance for 'Maybe' has been
 -- corrected to lift a 'Semigroup' instance instead of a 'Monoid'
--- instance. Consequently, this type is no longer useful. It will be
--- marked deprecated in GHC 8.8 and removed in GHC 8.10.
+-- instance. Consequently, this type is no longer useful.
 newtype Option a = Option { getOption :: Maybe a }
   deriving ( Eq       -- ^ @since 4.9.0.0
            , Ord      -- ^ @since 4.9.0.0

@@ -4,7 +4,7 @@ Result size of Tidy Core
   = {terms: 63, types: 43, coercions: 1, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 4, coercions: 1, joins: 0/0}
-T2431.$WRefl [InlPrag=INLINE[0] CONLIKE] :: forall a. a :~: a
+T2431.$WRefl [InlPrag=INLINE[final] CONLIKE] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
  Cpr=m1,

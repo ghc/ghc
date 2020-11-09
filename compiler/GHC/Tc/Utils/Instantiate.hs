@@ -1,81 +1,94 @@
+{-# LANGUAGE CPP              #-}
+{-# LANGUAGE FlexibleContexts #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 -}
 
-{-# LANGUAGE CPP, MultiWayIf, TupleSections #-}
-{-# LANGUAGE FlexibleContexts #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
--- | The @Inst@ type: dictionaries or method instances
 module GHC.Tc.Utils.Instantiate (
-       deeplySkolemise,
-       topInstantiate, topInstantiateInferred, deeplyInstantiate,
-       instCall, instDFunType, instStupidTheta, instTyVarsWith,
-       newWanted, newWanteds,
+     topSkolemise,
+     topInstantiate, instantiateSigma,
+     instCall, instDFunType, instStupidTheta, instTyVarsWith,
+     newWanted, newWanteds,
 
-       tcInstInvisibleTyBinders, tcInstInvisibleTyBinder,
+     tcInstType, tcInstTypeBndrs,
+     tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
+     tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
 
-       newOverloadedLit, mkOverLit,
+     freshenTyVarBndrs, freshenCoVarBndrsX,
 
-       newClsInst,
-       tcGetInsts, tcGetInstEnvs, getOverlapFlag,
-       tcExtendLocalInstEnv,
-       instCallConstraints, newMethodFromName,
-       tcSyntaxName,
+     tcInstInvisibleTyBindersN, tcInstInvisibleTyBinders, tcInstInvisibleTyBinder,
 
-       -- Simple functions over evidence variables
-       tyCoVarsOfWC,
-       tyCoVarsOfCt, tyCoVarsOfCts,
-    ) where
+     newOverloadedLit, mkOverLit,
+
+     newClsInst,
+     tcGetInsts, tcGetInstEnvs, getOverlapFlag,
+     tcExtendLocalInstEnv,
+     instCallConstraints, newMethodFromName,
+     tcSyntaxName,
+
+     -- Simple functions over evidence variables
+     tyCoVarsOfWC,
+     tyCoVarsOfCt, tyCoVarsOfCts,
+  ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckExpr, tcSyntaxOp )
-import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType, unifyKind )
+import GHC.Driver.Session
 
-import GHC.Types.Basic ( IntegralLit(..), SourceText(..) )
-import FastString
+import GHC.Builtin.Types  ( heqDataCon, eqDataCon, integerTyConName )
+import GHC.Builtin.Names
+
 import GHC.Hs
+
+import GHC.Core.InstEnv
+import GHC.Core.Predicate
+import GHC.Core ( Expr(..), isOrphan ) -- For the Coercion constructor
+import GHC.Core.Type
+import GHC.Core.Multiplicity
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr ( debugPprType )
+import GHC.Core.Class( Class )
+import GHC.Core.DataCon
+
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
+import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType, unifyKind )
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
-import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence
-import GHC.Core.InstEnv
-import GHC.Builtin.Types  ( heqDataCon, eqDataCon )
-import GHC.Core    ( isOrphan )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Utils.TcMType
-import GHC.Core.Type
-import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Tc.Utils.TcType
-import GHC.Driver.Types
-import GHC.Core.Class( Class )
+
 import GHC.Types.Id.Make( mkDictFunId )
-import GHC.Core( Expr(..) )  -- For the Coercion constructor
+import GHC.Types.Basic ( TypeOrKind(..) )
+import GHC.Types.SourceText
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.Var ( EvVar, tyVarName, VarBndr(..) )
-import GHC.Core.DataCon
-import GHC.Types.Var.Env
-import GHC.Builtin.Names
-import GHC.Types.SrcLoc as SrcLoc
-import GHC.Driver.Session
-import Util
-import Outputable
-import GHC.Types.Basic ( TypeOrKind(..) )
+import GHC.Types.Var
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List ( sortBy )
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+
+import GHC.Unit.State
+import GHC.Unit.External
+
+import Data.List ( sortBy, mapAccumL )
 import Control.Monad( unless )
 import Data.Function ( on )
 
@@ -91,7 +104,7 @@ newMethodFromName
   :: CtOrigin              -- ^ why do we need this?
   -> Name                  -- ^ name of the method
   -> [TcRhoType]           -- ^ types with which to instantiate the class
-  -> TcM (HsExpr GhcTcId)
+  -> TcM (HsExpr GhcTc)
 -- ^ Used when 'Name' is the wired-in name for a wired-in class method,
 -- so the caller knows its type for sure, which should be of form
 --
@@ -117,66 +130,62 @@ newMethodFromName origin name ty_args
 {-
 ************************************************************************
 *                                                                      *
-        Deep instantiation and skolemisation
+         Instantiation and skolemisation
 *                                                                      *
 ************************************************************************
 
-Note [Deep skolemisation]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-deeplySkolemise decomposes and skolemises a type, returning a type
-with all its arrows visible (ie not buried under foralls)
+Note [Skolemisation]
+~~~~~~~~~~~~~~~~~~~~
+topSkolemise decomposes and skolemises a type, returning a type
+with no top level foralls or (=>)
 
 Examples:
 
-  deeplySkolemise (Int -> forall a. Ord a => blah)
-    =  ( wp, [a], [d:Ord a], Int -> blah )
-    where wp = \x:Int. /\a. \(d:Ord a). <hole> x
+  topSkolemise (forall a. Ord a => a -> a)
+    =  ( wp, [a], [d:Ord a], a->a )
+    where wp = /\a. \(d:Ord a). <hole> a d
 
-  deeplySkolemise  (forall a. Ord a => Maybe a -> forall b. Eq b => blah)
-    =  ( wp, [a,b], [d1:Ord a,d2:Eq b], Maybe a -> blah )
-    where wp = /\a.\(d1:Ord a).\(x:Maybe a)./\b.\(d2:Ord b). <hole> x
+  topSkolemise  (forall a. Ord a => forall b. Eq b => a->b->b)
+    =  ( wp, [a,b], [d1:Ord a,d2:Eq b], a->b->b )
+    where wp = /\a.\(d1:Ord a)./\b.\(d2:Ord b). <hole> a d1 b d2
+
+This second example is the reason for the recursive 'go'
+function in topSkolemise: we must remove successive layers
+of foralls and (=>).
 
 In general,
-  if      deeplySkolemise ty = (wrap, tvs, evs, rho)
+  if      topSkolemise ty = (wrap, tvs, evs, rho)
     and   e :: rho
   then    wrap e :: ty
-    and   'wrap' binds tvs, evs
+    and   'wrap' binds {tvs, evs}
 
-ToDo: this eta-abstraction plays fast and loose with termination,
-      because it can introduce extra lambdas.  Maybe add a `seq` to
-      fix this
 -}
 
-deeplySkolemise :: TcSigmaType
-                -> TcM ( HsWrapper
-                       , [(Name,TyVar)]     -- All skolemised variables
-                       , [EvVar]            -- All "given"s
-                       , TcRhoType )
-
-deeplySkolemise ty
-  = go init_subst ty
+topSkolemise :: TcSigmaType
+             -> TcM ( HsWrapper
+                    , [(Name,TyVar)]     -- All skolemised variables
+                    , [EvVar]            -- All "given"s
+                    , TcRhoType )
+-- See Note [Skolemisation]
+topSkolemise ty
+  = go init_subst idHsWrapper [] [] ty
   where
     init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
 
-    go subst ty
-      | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
-      = do { let arg_tys' = substTys subst arg_tys
-           ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
-           ; (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
+    -- Why recursive?  See Note [Skolemisation]
+    go subst wrap tv_prs ev_vars ty
+      | (tvs, theta, inner_ty) <- tcSplitSigmaTy ty
+      , not (null tvs && null theta)
+      = do { (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
-           ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
-           ; let tv_prs1 = map tyVarName tvs `zip` tvs1
-           ; return ( mkWpLams ids1
-                      <.> mkWpTyLams tvs1
-                      <.> mkWpLams ev_vars1
-                      <.> wrap
-                      <.> mkWpEvVarApps ids1
-                    , tv_prs1  ++ tvs_prs2
-                    , ev_vars1 ++ ev_vars2
-                    , mkVisFunTys arg_tys' rho ) }
+           ; go subst'
+                (wrap <.> mkWpTyLams tvs1 <.> mkWpLams ev_vars1)
+                (tv_prs ++ (map tyVarName tvs `zip` tvs1))
+                (ev_vars ++ ev_vars1)
+                inner_ty }
 
       | otherwise
-      = return (idHsWrapper, [], [], substTy subst ty)
+      = return (wrap, tv_prs, ev_vars, substTy subst ty)
         -- substTy is a quick no-op on an empty substitution
 
 -- | Instantiate all outer type variables
@@ -185,119 +194,45 @@ topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- if    topInstantiate ty = (wrap, rho)
 -- and   e :: ty
 -- then  wrap e :: rho  (that is, wrap :: ty "->" rho)
-topInstantiate = top_instantiate True
+-- NB: always returns a rho-type, with no top-level forall or (=>)
+topInstantiate orig ty
+  | (tvs, theta, body) <- tcSplitSigmaTy ty
+  , not (null tvs && null theta)
+  = do { (_, wrap1, body1) <- instantiateSigma orig tvs theta body
 
--- | Instantiate all outer 'Inferred' binders
--- and any context. Never looks through arrows or specified type variables.
--- Used for visible type application.
-topInstantiateInferred :: CtOrigin -> TcSigmaType
-                       -> TcM (HsWrapper, TcSigmaType)
--- if    topInstantiate ty = (wrap, rho)
--- and   e :: ty
--- then  wrap e :: rho
-topInstantiateInferred = top_instantiate False
+       -- Loop, to account for types like
+       --       forall a. Num a => forall b. Ord b => ...
+       ; (wrap2, rho) <- topInstantiate orig body1
 
-top_instantiate :: Bool   -- True  <=> instantiate *all* variables
-                          -- False <=> instantiate only the inferred ones
-                -> CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
-top_instantiate inst_all orig ty
-  | not (null binders && null theta)
-  = do { let (inst_bndrs, leave_bndrs) = span should_inst binders
-             (inst_theta, leave_theta)
-               | null leave_bndrs = (theta, [])
-               | otherwise        = ([], theta)
-             in_scope    = mkInScopeSet (tyCoVarsOfType ty)
-             empty_subst = mkEmptyTCvSubst in_scope
-             inst_tvs    = binderVars inst_bndrs
-       ; (subst, inst_tvs') <- mapAccumLM newMetaTyVarX empty_subst inst_tvs
-       ; let inst_theta' = substTheta subst inst_theta
-             sigma'      = substTy subst (mkForAllTys leave_bndrs $
-                                          mkPhiTy leave_theta rho)
-             inst_tv_tys' = mkTyVarTys inst_tvs'
-
-       ; wrap1 <- instCall orig inst_tv_tys' inst_theta'
-       ; traceTc "Instantiating"
-                 (vcat [ text "all tyvars?" <+> ppr inst_all
-                       , text "origin" <+> pprCtOrigin orig
-                       , text "type" <+> debugPprType ty
-                       , text "theta" <+> ppr theta
-                       , text "leave_bndrs" <+> ppr leave_bndrs
-                       , text "with" <+> vcat (map debugPprType inst_tv_tys')
-                       , text "theta:" <+>  ppr inst_theta' ])
-
-       ; (wrap2, rho2) <-
-           if null leave_bndrs
-
-         -- account for types like forall a. Num a => forall b. Ord b => ...
-           then top_instantiate inst_all orig sigma'
-
-         -- but don't loop if there were any un-inst'able tyvars
-           else return (idHsWrapper, sigma')
-
-       ; return (wrap2 <.> wrap1, rho2) }
+       ; return (wrap2 <.> wrap1, rho) }
 
   | otherwise = return (idHsWrapper, ty)
+
+instantiateSigma :: CtOrigin -> [TyVar] -> TcThetaType -> TcSigmaType
+                 -> TcM ([TcTyVar], HsWrapper, TcSigmaType)
+-- (instantiate orig tvs theta ty)
+-- instantiates the the type variables tvs, emits the (instantiated)
+-- constraints theta, and returns the (instantiated) type ty
+instantiateSigma orig tvs theta body_ty
+  = do { (subst, inst_tvs) <- mapAccumLM newMetaTyVarX empty_subst tvs
+       ; let inst_theta  = substTheta subst theta
+             inst_body   = substTy subst body_ty
+             inst_tv_tys = mkTyVarTys inst_tvs
+
+       ; wrap <- instCall orig inst_tv_tys inst_theta
+       ; traceTc "Instantiating"
+                 (vcat [ text "origin" <+> pprCtOrigin orig
+                       , text "tvs"   <+> ppr tvs
+                       , text "theta" <+> ppr theta
+                       , text "type" <+> debugPprType body_ty
+                       , text "with" <+> vcat (map debugPprType inst_tv_tys)
+                       , text "theta:" <+>  ppr inst_theta ])
+
+      ; return (inst_tvs, wrap, inst_body) }
   where
-    (binders, phi) = tcSplitForAllVarBndrs ty
-    (theta, rho)   = tcSplitPhiTy phi
-
-    should_inst bndr
-      | inst_all  = True
-      | otherwise = binderArgFlag bndr == Inferred
-
-deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
---   Int -> forall a. a -> a  ==>  (\x:Int. [] x alpha) :: Int -> alpha
--- In general if
--- if    deeplyInstantiate ty = (wrap, rho)
--- and   e :: ty
--- then  wrap e :: rho
--- That is, wrap :: ty ~> rho
---
--- If you don't need the HsWrapper returned from this function, consider
--- using tcSplitNestedSigmaTys in GHC.Tc.Utils.TcType, which is a pure alternative that
--- only computes the returned TcRhoType.
-
-deeplyInstantiate orig ty =
-  deeply_instantiate orig
-                     (mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty)))
-                     ty
-
-deeply_instantiate :: CtOrigin
-                   -> TCvSubst
-                   -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
--- Internal function to deeply instantiate that builds on an existing subst.
--- It extends the input substitution and applies the final substitution to
--- the types on return.  See #12549.
-
-deeply_instantiate orig subst ty
-  | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
-  = do { (subst', tvs') <- newMetaTyVarsX subst tvs
-       ; let arg_tys' = substTys   subst' arg_tys
-             theta'   = substTheta subst' theta
-       ; ids1  <- newSysLocalIds (fsLit "di") arg_tys'
-       ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
-       ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig
-                                                , text "type" <+> ppr ty
-                                                , text "with" <+> ppr tvs'
-                                                , text "args:" <+> ppr ids1
-                                                , text "theta:" <+>  ppr theta'
-                                                , text "subst:" <+> ppr subst'])
-       ; (wrap2, rho2) <- deeply_instantiate orig subst' rho
-       ; return (mkWpLams ids1
-                    <.> wrap2
-                    <.> wrap1
-                    <.> mkWpEvVarApps ids1,
-                 mkVisFunTys arg_tys' rho2) }
-
-  | otherwise
-  = do { let ty' = substTy subst ty
-       ; traceTc "deeply_instantiate final subst"
-                 (vcat [ text "origin:"   <+> pprCtOrigin orig
-                       , text "type:"     <+> ppr ty
-                       , text "new type:" <+> ppr ty'
-                       , text "subst:"    <+> ppr subst ])
-      ; return (idHsWrapper, ty') }
-
+    free_tvs = tyCoVarsOfType body_ty `unionVarSet` tyCoVarsOfTypes theta
+    in_scope = mkInScopeSet (free_tvs `delVarSetList` tvs)
+    empty_subst = mkEmptyTCvSubst in_scope
 
 instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM TCvSubst
 -- Use this when you want to instantiate (forall a b c. ty) with
@@ -423,13 +358,19 @@ instStupidTheta orig theta
 *                                                                      *
 ********************************************************************* -}
 
--- | Instantiates up to n invisible binders
--- Returns the instantiating types, and body kind
-tcInstInvisibleTyBinders :: Int -> TcKind -> TcM ([TcType], TcKind)
+-- | Given ty::forall k1 k2. k, instantiate all the invisible forall-binders
+--   returning ty @kk1 @kk2 :: k[kk1/k1, kk2/k1]
+tcInstInvisibleTyBinders :: TcType -> TcKind -> TcM (TcType, TcKind)
+tcInstInvisibleTyBinders ty kind
+  = do { (extra_args, kind') <- tcInstInvisibleTyBindersN n_invis kind
+       ; return (mkAppTys ty extra_args, kind') }
+  where
+    n_invis = invisibleTyBndrCount kind
 
-tcInstInvisibleTyBinders 0 kind
+tcInstInvisibleTyBindersN :: Int -> TcKind -> TcM ([TcType], TcKind)
+tcInstInvisibleTyBindersN 0 kind
   = return ([], kind)
-tcInstInvisibleTyBinders n ty
+tcInstInvisibleTyBindersN n ty
   = go n empty_subst ty
   where
     empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
@@ -451,7 +392,7 @@ tcInstInvisibleTyBinder subst (Named (Bndr tv _))
        ; return (subst', mkTyVarTy tv') }
 
 tcInstInvisibleTyBinder subst (Anon af ty)
-  | Just (mk, k1, k2) <- get_eq_tys_maybe (substTy subst ty)
+  | Just (mk, k1, k2) <- get_eq_tys_maybe (substTy subst (scaledThing ty))
     -- Equality is the *only* constraint currently handled in types.
     -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
   = ASSERT( af == InvisArg )
@@ -502,14 +443,208 @@ mkEqBoxTy co ty1 ty2
     mkTyConApp (promoteDataCon eqDataCon) [k, ty1, ty2, mkCoercionTy co]
   where k = tcTypeKind ty1
 
-{-
-************************************************************************
+{- *********************************************************************
+*                                                                      *
+        SkolemTvs (immutable)
+*                                                                      *
+********************************************************************* -}
+
+tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
+                   -- ^ How to instantiate the type variables
+           -> Id                                           -- ^ Type to instantiate
+           -> TcM ([(Name, TcTyVar)], TcThetaType, TcType) -- ^ Result
+                -- (type vars, preds (incl equalities), rho)
+tcInstType inst_tyvars id
+  | null tyvars   -- There may be overloading despite no type variables;
+                  --      (?x :: Int) => Int -> Int
+  = return ([], theta, tau)
+  | otherwise
+  = do { (subst, tyvars') <- inst_tyvars tyvars
+       ; let tv_prs  = map tyVarName tyvars `zip` tyvars'
+             subst'  = extendTCvInScopeSet subst (tyCoVarsOfType rho)
+       ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
+  where
+    (tyvars, rho) = tcSplitForAllTys (idType id)
+    (theta, tau)  = tcSplitPhiTy rho
+
+tcInstTypeBndrs :: Id -> TcM ([(Name, InvisTVBinder)], TcThetaType, TcType)
+                     -- (type vars, preds (incl equalities), rho)
+-- Instantiate the binders of a type signature with TyVarTvs
+tcInstTypeBndrs id
+  | null tyvars   -- There may be overloading despite no type variables;
+                  --      (?x :: Int) => Int -> Int
+  = return ([], theta, tau)
+  | otherwise
+  = do { (subst, tyvars') <- mapAccumLM inst_invis_bndr emptyTCvSubst tyvars
+       ; let tv_prs  = map (tyVarName . binderVar) tyvars `zip` tyvars'
+             subst'  = extendTCvInScopeSet subst (tyCoVarsOfType rho)
+       ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
+  where
+    (tyvars, rho) = splitForAllTysInvis (idType id)
+    (theta, tau)  = tcSplitPhiTy rho
+
+    inst_invis_bndr :: TCvSubst -> InvisTVBinder
+                    -> TcM (TCvSubst, InvisTVBinder)
+    inst_invis_bndr subst (Bndr tv spec)
+      = do { (subst', tv') <- newMetaTyVarTyVarX subst tv
+           ; return (subst', Bndr tv' spec) }
+
+tcSkolDFunType :: DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
+-- Instantiate a type signature with skolem constants.
+-- This freshens the names, but no need to do so
+tcSkolDFunType dfun
+  = do { (tv_prs, theta, tau) <- tcInstType tcInstSuperSkolTyVars dfun
+       ; return (map snd tv_prs, theta, tau) }
+
+tcSuperSkolTyVars :: [TyVar] -> (TCvSubst, [TcTyVar])
+-- Make skolem constants, but do *not* give them new names, as above
+-- Moreover, make them "super skolems"; see comments with superSkolemTv
+-- see Note [Kind substitution when instantiating]
+-- Precondition: tyvars should be ordered by scoping
+tcSuperSkolTyVars = mapAccumL tcSuperSkolTyVar emptyTCvSubst
+
+tcSuperSkolTyVar :: TCvSubst -> TyVar -> (TCvSubst, TcTyVar)
+tcSuperSkolTyVar subst tv
+  = (extendTvSubstWithClone subst tv new_tv, new_tv)
+  where
+    kind   = substTyUnchecked subst (tyVarKind tv)
+    new_tv = mkTcTyVar (tyVarName tv) kind superSkolemTv
+
+-- | Given a list of @['TyVar']@, skolemize the type variables,
+-- returning a substitution mapping the original tyvars to the
+-- skolems, and the list of newly bound skolems.
+tcInstSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
+-- See Note [Skolemising type variables]
+tcInstSkolTyVars = tcInstSkolTyVarsX emptyTCvSubst
+
+tcInstSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
+-- See Note [Skolemising type variables]
+tcInstSkolTyVarsX = tcInstSkolTyVarsPushLevel False
+
+tcInstSuperSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
+-- See Note [Skolemising type variables]
+-- This version freshens the names and creates "super skolems";
+-- see comments around superSkolemTv.
+tcInstSuperSkolTyVars = tcInstSuperSkolTyVarsX emptyTCvSubst
+
+tcInstSuperSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
+-- See Note [Skolemising type variables]
+-- This version freshens the names and creates "super skolems";
+-- see comments around superSkolemTv.
+tcInstSuperSkolTyVarsX subst = tcInstSkolTyVarsPushLevel True subst
+
+tcInstSkolTyVarsPushLevel :: Bool  -- True <=> make "super skolem"
+                          -> TCvSubst -> [TyVar]
+                          -> TcM (TCvSubst, [TcTyVar])
+-- Skolemise one level deeper, hence pushTcLevel
+-- See Note [Skolemising type variables]
+tcInstSkolTyVarsPushLevel overlappable subst tvs
+  = do { tc_lvl <- getTcLevel
+       ; let pushed_lvl = pushTcLevel tc_lvl
+       ; tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs }
+
+tcInstSkolTyVarsAt :: TcLevel -> Bool
+                   -> TCvSubst -> [TyVar]
+                   -> TcM (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsAt lvl overlappable subst tvs
+  = freshenTyCoVarsX new_skol_tv subst tvs
+  where
+    details = SkolemTv lvl overlappable
+    new_skol_tv name kind = mkTcTyVar name kind details
+
+------------------
+freshenTyVarBndrs :: [TyVar] -> TcM (TCvSubst, [TyVar])
+-- ^ Give fresh uniques to a bunch of TyVars, but they stay
+--   as TyVars, rather than becoming TcTyVars
+-- Used in 'GHC.Tc.Instance.Family.newFamInst', and 'GHC.Tc.Utils.Instantiate.newClsInst'
+freshenTyVarBndrs = freshenTyCoVars mkTyVar
+
+freshenCoVarBndrsX :: TCvSubst -> [CoVar] -> TcM (TCvSubst, [CoVar])
+-- ^ Give fresh uniques to a bunch of CoVars
+-- Used in "GHC.Tc.Instance.Family.newFamInst"
+freshenCoVarBndrsX subst = freshenTyCoVarsX mkCoVar subst
+
+------------------
+freshenTyCoVars :: (Name -> Kind -> TyCoVar)
+                -> [TyVar] -> TcM (TCvSubst, [TyCoVar])
+freshenTyCoVars mk_tcv = freshenTyCoVarsX mk_tcv emptyTCvSubst
+
+freshenTyCoVarsX :: (Name -> Kind -> TyCoVar)
+                 -> TCvSubst -> [TyCoVar]
+                 -> TcM (TCvSubst, [TyCoVar])
+freshenTyCoVarsX mk_tcv = mapAccumLM (freshenTyCoVarX mk_tcv)
+
+freshenTyCoVarX :: (Name -> Kind -> TyCoVar)
+                -> TCvSubst -> TyCoVar -> TcM (TCvSubst, TyCoVar)
+-- This a complete freshening operation:
+-- the skolems have a fresh unique, and a location from the monad
+-- See Note [Skolemising type variables]
+freshenTyCoVarX mk_tcv subst tycovar
+  = do { loc  <- getSrcSpanM
+       ; uniq <- newUnique
+       ; let old_name = tyVarName tycovar
+             new_name = mkInternalName uniq (getOccName old_name) loc
+             new_kind = substTyUnchecked subst (tyVarKind tycovar)
+             new_tcv  = mk_tcv new_name new_kind
+             subst1   = extendTCvSubstWithClone subst tycovar new_tcv
+       ; return (subst1, new_tcv) }
+
+{- Note [Skolemising type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The tcInstSkolTyVars family of functions instantiate a list of TyVars
+to fresh skolem TcTyVars. Important notes:
+
+a) Level allocation. We generally skolemise /before/ calling
+   pushLevelAndCaptureConstraints.  So we want their level to the level
+   of the soon-to-be-created implication, which has a level ONE HIGHER
+   than the current level.  Hence the pushTcLevel.  It feels like a
+   slight hack.
+
+b) The [TyVar] should be ordered (kind vars first)
+   See Note [Kind substitution when instantiating]
+
+c) Clone the variable to give a fresh unique.  This is essential.
+   Consider (tc160)
+       type Foo x = forall a. a -> x
+   And typecheck the expression
+       (e :: Foo (Foo ())
+   We will skolemise the signature, but after expanding synonyms it
+   looks like
+        forall a. a -> forall a. a -> x
+   We don't want to make two big-lambdas with the same unique!
+
+d) We retain locations. Because the location of the variable is the correct
+   location to report in errors (e.g. in the signature). We don't want the
+   location to change to the body of the function, which does *not* explicitly
+   bind the variable.
+
+e) The resulting skolems are
+        non-overlappable for tcInstSkolTyVars,
+   but overlappable for tcInstSuperSkolTyVars
+   See GHC.Tc.Deriv.Infer Note [Overlap and deriving] for an example
+   of where this matters.
+
+Note [Kind substitution when instantiating]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we instantiate a bunch of kind and type variables, first we
+expect them to be topologically sorted.
+Then we have to instantiate the kind variables, build a substitution
+from old variables to the new variables, then instantiate the type
+variables substituting the original kind.
+
+Exemple: If we want to instantiate
+  [(k1 :: *), (k2 :: *), (a :: k1 -> k2), (b :: k1)]
+we want
+  [(?k1 :: *), (?k2 :: *), (?a :: ?k1 -> ?k2), (?b :: ?k1)]
+instead of the bogus
+  [(?k1 :: *), (?k2 :: *), (?a :: k1 -> k2), (?b :: k1)]
+-}
+
+{- *********************************************************************
 *                                                                      *
                 Literals
 *                                                                      *
-************************************************************************
-
--}
+********************************************************************* -}
 
 {-
 In newOverloadedLit we convert directly to an Int or Integer if we
@@ -521,12 +656,10 @@ cases (the rest are caught in lookupInst).
 
 newOverloadedLit :: HsOverLit GhcRn
                  -> ExpRhoType
-                 -> TcM (HsOverLit GhcTcId)
+                 -> TcM (HsOverLit GhcTc)
 newOverloadedLit
   lit@(OverLit { ol_val = val, ol_ext = rebindable }) res_ty
   | not rebindable
-    -- all built-in overloaded lits are tau-types, so we can just
-    -- tauify the ExpType
   = do { res_ty <- expTypeToType res_ty
        ; dflags <- getDynFlags
        ; let platform = targetPlatform dflags
@@ -550,7 +683,7 @@ newOverloadedLit
 newNonTrivialOverloadedLit :: CtOrigin
                            -> HsOverLit GhcRn
                            -> ExpRhoType
-                           -> TcM (HsOverLit GhcTcId)
+                           -> TcM (HsOverLit GhcTc)
 newNonTrivialOverloadedLit orig
   lit@(OverLit { ol_val = val, ol_witness = HsVar _ (L _ meth_name)
                , ol_ext = rebindable }) res_ty
@@ -558,7 +691,7 @@ newNonTrivialOverloadedLit orig
         ; let lit_ty = hsLitType hs_lit
         ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr meth_name)
                                       [synKnownType lit_ty] res_ty $
-                      \_ -> return ()
+                      \_ _ -> return ()
         ; let L _ witness = nlHsSyntaxApps fi' [nlHsLit hs_lit]
         ; res_ty <- readExpType res_ty
         ; return (lit { ol_witness = witness
@@ -614,10 +747,10 @@ just use the expression inline.
 tcSyntaxName :: CtOrigin
              -> TcType                 -- ^ Type to instantiate it at
              -> (Name, HsExpr GhcRn)   -- ^ (Standard name, user name)
-             -> TcM (Name, HsExpr GhcTcId)
+             -> TcM (Name, HsExpr GhcTc)
                                        -- ^ (Standard name, suitable expression)
 -- USED ONLY FOR CmdTop (sigh) ***
--- See Note [CmdSyntaxTable] in GHC.Hs.Expr
+-- See Note [CmdSyntaxTable] in "GHC.Hs.Expr"
 
 tcSyntaxName orig ty (std_nm, HsVar _ (L _ user_nm))
   | std_nm == user_nm
@@ -639,7 +772,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
         -- same type as the standard one.
         -- Tiresome jiggling because tcCheckSigma takes a located expression
      span <- getSrcSpanM
-     expr <- tcCheckExpr (L span user_nm_expr) sigma1
+     expr <- tcCheckPolyExpr (L span user_nm_expr) sigma1
      return (std_nm, unLoc expr)
 
 syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> TidyEnv
@@ -841,9 +974,10 @@ dupInstErr ispec dup_ispec
                     [ispec, dup_ispec]
 
 addClsInstsErr :: SDoc -> [ClsInst] -> TcRn ()
-addClsInstsErr herald ispecs
-  = setSrcSpan (getSrcSpan (head sorted)) $
-    addErr (hang herald 2 (pprInstances sorted))
+addClsInstsErr herald ispecs = do
+   unit_state <- unitState <$> getDynFlags
+   setSrcSpan (getSrcSpan (head sorted)) $
+      addErr $ pprWithUnitState unit_state $ (hang herald 2 (pprInstances sorted))
  where
    sorted = sortBy (SrcLoc.leftmost_smallest `on` getSrcSpan) ispecs
    -- The sortBy just arranges that instances are displayed in order

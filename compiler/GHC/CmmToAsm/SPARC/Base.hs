@@ -3,7 +3,7 @@
 --      Also import the required constants, so we know what we're using.
 --
 --      In the interests of cross-compilation, we want to free ourselves
---      from the autoconf generated modules like main/Constants
+--      from the autoconf generated modules like "GHC.Settings.Constants"
 
 module GHC.CmmToAsm.SPARC.Base (
         wordLength,
@@ -17,9 +17,9 @@ module GHC.CmmToAsm.SPARC.Base (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Panic
+import GHC.Utils.Panic
 
 import Data.Int
 

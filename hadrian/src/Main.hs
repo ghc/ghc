@@ -1,10 +1,10 @@
 module Main (main) where
 
-import System.Directory (getCurrentDirectory)
 import Development.Shake
 import Hadrian.Expression
 import Hadrian.Utilities
 import Settings.Parser
+import System.Directory (getCurrentDirectory)
 
 import qualified Base
 import qualified CommandLine
@@ -12,9 +12,10 @@ import qualified Environment
 import qualified Rules
 import qualified Rules.Clean
 import qualified Rules.Documentation
+import qualified Rules.Lint
 import qualified Rules.Nofib
-import qualified Rules.SourceDist
 import qualified Rules.Selftest
+import qualified Rules.SourceDist
 import qualified Rules.Test
 import qualified UserSettings
 
@@ -30,7 +31,15 @@ main = do
         BuildRoot buildRoot = CommandLine.lookupBuildRoot argsMap
 
         rebuild = [ (RebuildLater, buildRoot -/- "stage0/**")
-                  | CommandLine.lookupFreeze1 argsMap ]
+                  | CommandLine.lookupFreeze1 argsMap ||
+                    CommandLine.lookupFreeze2 argsMap
+                  ] ++
+                  [ (RebuildLater, buildRoot -/- "stage1/**")
+                  | CommandLine.lookupFreeze2 argsMap
+                  ] ++
+                  (if CommandLine.lookupSkipDepends argsMap
+                   then [(RebuildLater, buildRoot -/- "**/.dependencies.mk"), (RebuildLater, buildRoot -/- "**/.dependencies")]
+                   else [])
 
     cwd <- getCurrentDirectory
     shakeColor <- shouldUseColor
@@ -76,6 +85,7 @@ main = do
             Rules.buildRules
             Rules.Documentation.documentationRules
             Rules.Clean.cleanRules
+            Rules.Lint.lintRules
             Rules.Nofib.nofibRules
             Rules.oracleRules
             Rules.Selftest.selftestRules

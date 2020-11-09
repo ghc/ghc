@@ -6,16 +6,18 @@ import GHC.Driver.Session
 import GHC
 
 import Control.Monad
+import Control.Monad.Catch as MC (try)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (intercalate)
 import Data.Maybe
 import Data.Time.Calendar
 import Data.Time.Clock
-import Exception
+import GHC.Utils.Exception
 import GHC.Parser.Header
-import GHC.Driver.Types
-import Outputable
-import StringBuffer
+import GHC.Types.Target
+import GHC.Types.SourceError
+import GHC.Utils.Outputable
+import GHC.Data.StringBuffer
 import System.Directory
 import System.Environment
 import System.Process
@@ -105,7 +107,7 @@ go label targets mods = do
     liftIO $ hPutStrLn stderr $ "== " ++ label
     t <- liftIO getCurrentTime
     setTargets =<< catMaybes <$> mapM (mkTarget t) mods
-    ex <- gtry $ load LoadAllTargets
+    ex <- MC.try $ load LoadAllTargets
     case ex of
       Left ex -> liftIO $ hPutStrLn stderr $ show (ex :: SourceError)
       Right _ -> return ()

@@ -34,6 +34,7 @@ module GHC.Builtin.Utils (
         primOpRules, builtinRules,
 
         ghcPrimExports,
+        ghcPrimDeclDocs,
         primOpId,
 
         -- * Random other things
@@ -46,36 +47,43 @@ module GHC.Builtin.Utils (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Builtin.Uniques
-import GHC.Types.Unique ( isValidKnownKeyUnique )
-
-import GHC.Core.ConLike ( ConLike(..) )
+import GHC.Builtin.PrimOps
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Literals ( typeNatTyCons )
+import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names.TH ( templateHaskellNames )
 import GHC.Builtin.Names
+
+import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.Opt.ConstantFold
-import GHC.Types.Avail
-import GHC.Builtin.PrimOps
 import GHC.Core.DataCon
+import GHC.Core.Class
+import GHC.Core.TyCon
+
+import GHC.Types.Avail
+import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id.Make
-import Outputable
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
-import GHC.Driver.Types
-import GHC.Core.Class
-import GHC.Core.TyCon
 import GHC.Types.Unique.FM
-import Util
-import GHC.Builtin.Types.Literals ( typeNatTyCons )
+import GHC.Types.TyThing
+import GHC.Types.Unique ( isValidKnownKeyUnique )
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc as Utils
+import GHC.Utils.Panic
+import GHC.Hs.Doc
+import GHC.Unit.Module.ModIface (IfaceExport)
 
 import Control.Applicative ((<|>))
-import Data.List        ( intercalate )
+import Data.List        ( intercalate , find )
 import Data.Array
 import Data.Maybe
+import qualified Data.Map as Map
 
 {-
 ************************************************************************
@@ -107,7 +115,7 @@ Note [About wired-in things]
 
 -- | This list is used to ensure that when you say "Prelude.map" in your source
 -- code, or in an interface file, you get a Name with the correct known key (See
--- Note [Known-key names] in GHC.Builtin.Names)
+-- Note [Known-key names] in "GHC.Builtin.Names")
 knownKeyNames :: [Name]
 knownKeyNames
   | debugIsOn
@@ -121,14 +129,16 @@ knownKeyNames
   = all_names
   where
     all_names =
-      concat [ wired_tycon_kk_names funTyCon
-             , concatMap wired_tycon_kk_names primTyCons
-
+      -- We exclude most tuples from this list—see
+      -- Note [Infinite families of known-key names] in GHC.Builtin.Names.
+      -- We make an exception for Solo (i.e., the boxed 1-tuple), since it does
+      -- not use special syntax like other tuples.
+      -- See Note [One-tuples] (Wrinkle: Make boxed one-tuple names have known keys)
+      -- in GHC.Builtin.Types.
+      tupleTyConName BoxedTuple 1 : tupleDataConName Boxed 1 :
+      concat [ concatMap wired_tycon_kk_names primTyCons
              , concatMap wired_tycon_kk_names wiredInTyCons
-               -- Does not include tuples
-
              , concatMap wired_tycon_kk_names typeNatTyCons
-
              , map idName wiredInIds
              , map (idName . primOpId) allThePrimOps
              , map (idName . primOpWrapperId) allThePrimOps
@@ -172,7 +182,7 @@ knownKeyNamesOkay all_names
   | otherwise
   = Just badNamesStr
   where
-    namesEnv      = foldl' (\m n -> extendNameEnv_Acc (:) singleton m n n)
+    namesEnv      = foldl' (\m n -> extendNameEnv_Acc (:) Utils.singleton m n n)
                            emptyUFM all_names
     badNamesEnv   = filterNameEnv (\ns -> ns `lengthExceeds` 1) namesEnv
     badNamesPairs = nonDetUFMToList badNamesEnv
@@ -191,15 +201,20 @@ knownKeyNamesOkay all_names
 -- known-key thing.
 lookupKnownKeyName :: Unique -> Maybe Name
 lookupKnownKeyName u =
-    knownUniqueName u <|> lookupUFM knownKeysMap u
+    knownUniqueName u <|> lookupUFM_Directly knownKeysMap u
 
 -- | Is a 'Name' known-key?
 isKnownKeyName :: Name -> Bool
 isKnownKeyName n =
     isJust (knownUniqueName $ nameUnique n) || elemUFM n knownKeysMap
 
-knownKeysMap :: UniqFM Name
-knownKeysMap = listToUFM [ (nameUnique n, n) | n <- knownKeyNames ]
+-- | Maps 'Unique's to known-key names.
+--
+-- The type is @UniqFM Name Name@ to denote that the 'Unique's used
+-- in the domain are 'Unique's associated with 'Name's (as opposed
+-- to some other namespace of 'Unique's).
+knownKeysMap :: UniqFM Name Name
+knownKeysMap = listToIdentityUFM knownKeyNames
 
 -- | Given a 'Unique' lookup any associated arbitrary SDoc's to be displayed by
 -- GHCi's ':info' command.
@@ -244,9 +259,6 @@ primOpId op = primOpIds ! primOpTag op
             Export lists for pseudo-modules (GHC.Prim)
 *                                                                      *
 ************************************************************************
-
-GHC.Prim "exports" all the primops and primitive types, some
-wired-in Ids.
 -}
 
 ghcPrimExports :: [IfaceExport]
@@ -254,7 +266,18 @@ ghcPrimExports
  = map (avail . idName) ghcPrimIds ++
    map (avail . idName . primOpId) allThePrimOps ++
    [ AvailTC n [n] []
-   | tc <- funTyCon : exposedPrimTyCons, let n = tyConName tc  ]
+   | tc <- exposedPrimTyCons, let n = tyConName tc  ]
+
+ghcPrimDeclDocs :: DeclDocMap
+ghcPrimDeclDocs = DeclDocMap $ Map.fromList $ mapMaybe findName primOpDocs
+  where
+    names = map idName ghcPrimIds ++
+            map (idName . primOpId) allThePrimOps ++
+            map tyConName exposedPrimTyCons
+    findName (nameStr, doc)
+      | Just name <- find ((nameStr ==) . getOccString) names
+      = Just (name, mkHsDocString doc)
+      | otherwise = Nothing
 
 {-
 ************************************************************************

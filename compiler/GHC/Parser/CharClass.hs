@@ -16,12 +16,12 @@ module GHC.Parser.CharClass
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import Data.Bits        ( Bits((.&.),(.|.)) )
 import Data.Char        ( ord, chr )
 import Data.Word
-import Panic
+import GHC.Utils.Panic
 
 -- Bit masks
 

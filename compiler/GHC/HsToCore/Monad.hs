@@ -1,3 +1,10 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+
+{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -5,14 +12,6 @@
 
 Monadery used in desugaring
 -}
-
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
 
 module GHC.HsToCore.Monad (
         DsM, mapM, mapAndUnzipM,
@@ -30,11 +29,12 @@ module GHC.HsToCore.Monad (
         getGhcModeDs, dsGetFamInstEnvs,
         dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon,
         dsLookupDataCon, dsLookupConLike,
+        getCCIndexDsM,
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
         -- Getting and setting pattern match oracle states
-        getPmDeltas, updPmDeltas,
+        getPmNablas, updPmNablas,
 
         -- Get COMPLETE sets of a TyCon
         dsGetCompleteMatches,
@@ -55,39 +55,60 @@ module GHC.HsToCore.Monad (
         pprRuntimeTrace
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Tc.Utils.Monad
+import GHC.Driver.Env
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+
+import GHC.Hs
+
+import GHC.HsToCore.Types
+import GHC.HsToCore.Pmc.Solver.Types (Nablas, initNablas)
+
 import GHC.Core.FamInstEnv
 import GHC.Core
 import GHC.Core.Make  ( unitExpr )
 import GHC.Core.Utils ( exprType, isExprLevPoly )
-import GHC.Hs
-import GHC.IfaceToCore
-import GHC.Tc.Utils.TcMType ( checkForLevPolyX, formatLevPolyErr )
-import GHC.Builtin.Names
-import GHC.Types.Name.Reader
-import GHC.Driver.Types
-import Bag
-import GHC.Types.Basic ( Origin )
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
-import GHC.HsToCore.PmCheck.Types
-import GHC.Types.Id
-import GHC.Types.Module
-import Outputable
-import GHC.Types.SrcLoc
 import GHC.Core.Type
+import GHC.Core.Multiplicity
+
+import GHC.IfaceToCore
+
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcMType ( checkForLevPolyX, formatLevPolyErr )
+
+import GHC.Builtin.Names
+
+import GHC.Data.Bag
+import GHC.Data.FastString
+
+import GHC.Unit.External
+import GHC.Unit.Module
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Home
+import GHC.Unit.State
+
+import GHC.Types.Name.Reader
+import GHC.Types.Basic ( Origin )
+import GHC.Types.SourceFile
+import GHC.Types.Id
+import GHC.Types.SrcLoc
+import GHC.Types.TypeEnv
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Driver.Session
-import ErrUtils
-import FastString
-import GHC.Types.Unique.FM ( lookupWithDefaultUFM )
+import GHC.Types.Name.Ppr
 import GHC.Types.Literal ( mkLitString )
 import GHC.Types.CostCentre.State
+import GHC.Types.TyThing
+
+import GHC.Utils.Outputable
+import GHC.Utils.Error
+import GHC.Utils.Panic
 
 import Data.IORef
 
@@ -111,7 +132,7 @@ data EquationInfo
               -- ^ The patterns for an equation
               --
               -- NB: We have /already/ applied 'decideBangHood' to
-              -- these patterns.  See Note [decideBangHood] in GHC.HsToCore.Utils
+              -- these patterns.  See Note [decideBangHood] in "GHC.HsToCore.Utils"
 
             , eqn_orig :: Origin
               -- ^ Was this equation present in the user source?
@@ -207,14 +228,18 @@ mkDsEnvsFromTcGbl :: MonadIO m
                   -> m (DsGblEnv, DsLclEnv)
 mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
   = do { cc_st_var   <- liftIO $ newIORef newCostCentreState
+       ; eps <- liftIO $ hscEPS hsc_env
        ; let dflags   = hsc_dflags hsc_env
+             home_unit = hsc_home_unit hsc_env
+             unit_state = unitState dflags
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
              rdr_env  = tcg_rdr_env tcg_env
              fam_inst_env = tcg_fam_inst_env tcg_env
-             complete_matches = hptCompleteSigs hsc_env
-                                ++ tcg_complete_matches tcg_env
-       ; return $ mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
+             complete_matches = hptCompleteSigs hsc_env         -- from the home package
+                                ++ tcg_complete_matches tcg_env -- from the current module
+                                ++ eps_complete_matches eps     -- from imports
+       ; return $ mkDsEnvs unit_state home_unit this_mod rdr_env type_env fam_inst_env
                            msg_var cc_st_var complete_matches
        }
 
@@ -236,19 +261,23 @@ initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages, Maybe a)
 initDsWithModGuts hsc_env guts thing_inside
   = do { cc_st_var   <- newIORef newCostCentreState
        ; msg_var <- newIORef emptyMessages
+       ; eps <- liftIO $ hscEPS hsc_env
        ; let dflags   = hsc_dflags hsc_env
+             home_unit = hsc_home_unit hsc_env
+             unit_state = unitState dflags
              type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
              rdr_env  = mg_rdr_env guts
              fam_inst_env = mg_fam_inst_env guts
              this_mod = mg_module guts
-             complete_matches = hptCompleteSigs hsc_env
-                                ++ mg_complete_sigs guts
+             complete_matches = hptCompleteSigs hsc_env     -- from the home package
+                                ++ mg_complete_matches guts -- from the current module
+                                ++ eps_complete_matches eps -- from imports
 
              bindsToIds (NonRec v _)   = [v]
              bindsToIds (Rec    binds) = map fst binds
              ids = concatMap bindsToIds (mg_binds guts)
 
-             envs  = mkDsEnvs dflags this_mod rdr_env type_env
+             envs  = mkDsEnvs unit_state home_unit this_mod rdr_env type_env
                               fam_inst_env msg_var cc_st_var
                               complete_matches
        ; runDs hsc_env envs thing_inside
@@ -277,28 +306,27 @@ initTcDsForSolver thing_inside
          updGblEnv (\tc_gbl -> tc_gbl { tcg_fam_inst_env = fam_inst_env }) $
          thing_inside }
 
-mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef Messages -> IORef CostCentreState -> [CompleteMatch]
+mkDsEnvs :: UnitState -> HomeUnit -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
+         -> IORef Messages -> IORef CostCentreState -> CompleteMatches
          -> (DsGblEnv, DsLclEnv)
-mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
+mkDsEnvs unit_state home_unit mod rdr_env type_env fam_inst_env msg_var cc_st_var
          complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
                              if_rec_types = Just (mod, return type_env) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
-                             False -- not boot!
+                             NotBoot
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
-        completeMatchMap = mkCompleteMatchMap complete_matches
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
                            , ds_if_env  = (if_genv, if_lenv)
-                           , ds_unqual  = mkPrintUnqualified dflags rdr_env
+                           , ds_unqual  = mkPrintUnqualified unit_state home_unit rdr_env
                            , ds_msgs    = msg_var
-                           , ds_complete_matches = completeMatchMap
+                           , ds_complete_matches = complete_matches
                            , ds_cc_st   = cc_st_var
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
-                           , dsl_deltas  = initDeltas
+                           , dsl_nablas  = initNablas
                            }
     in (gbl_env, lcl_env)
 
@@ -356,7 +384,7 @@ still reporting nice error messages.
 -}
 
 -- Make a new Id with the same print name, but different type, and new unique
-newUniqueId :: Id -> Type -> DsM Id
+newUniqueId :: Id -> Mult -> Type -> DsM Id
 newUniqueId id = mk_local (occNameFS (nameOccName (idName id)))
 
 duplicateLocalDs :: Id -> DsM Id
@@ -366,9 +394,9 @@ duplicateLocalDs old_local
 
 newPredVarDs :: PredType -> DsM Var
 newPredVarDs
- = mkSysLocalOrCoVarM (fsLit "ds")  -- like newSysLocalDs, but we allow covars
+ = mkSysLocalOrCoVarM (fsLit "ds") Many  -- like newSysLocalDs, but we allow covars
 
-newSysLocalDsNoLP, newSysLocalDs, newFailLocalDs :: Type -> DsM Id
+newSysLocalDsNoLP, newSysLocalDs, newFailLocalDs :: Mult -> Type -> DsM Id
 newSysLocalDsNoLP  = mk_local (fsLit "ds")
 
 -- this variant should be used when the caller can be sure that the variable type
@@ -379,15 +407,15 @@ newFailLocalDs = mkSysLocalM (fsLit "fail")
   -- the fail variable is used only in a situation where we can tell that
   -- levity-polymorphism is impossible.
 
-newSysLocalsDsNoLP, newSysLocalsDs :: [Type] -> DsM [Id]
-newSysLocalsDsNoLP = mapM newSysLocalDsNoLP
-newSysLocalsDs = mapM newSysLocalDs
+newSysLocalsDsNoLP, newSysLocalsDs :: [Scaled Type] -> DsM [Id]
+newSysLocalsDsNoLP = mapM (\(Scaled w t) -> newSysLocalDsNoLP w t)
+newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs w t)
 
-mk_local :: FastString -> Type -> DsM Id
-mk_local fs ty = do { dsNoLevPoly ty (text "When trying to create a variable of type:" <+>
-                                      ppr ty)  -- could improve the msg with another
-                                               -- parameter indicating context
-                    ; mkSysLocalOrCoVarM fs ty }
+mk_local :: FastString -> Mult -> Type -> DsM Id
+mk_local fs w ty = do { dsNoLevPoly ty (text "When trying to create a variable of type:" <+>
+                                        ppr ty)  -- could improve the msg with another
+                                                 -- parameter indicating context
+                      ; mkSysLocalOrCoVarM fs w ty }
 
 {-
 We can also reach out and either set/grab location information from
@@ -397,14 +425,14 @@ the @SrcSpan@ being carried around.
 getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
 
--- | Get the current pattern match oracle state. See 'dsl_deltas'.
-getPmDeltas :: DsM Deltas
-getPmDeltas = do { env <- getLclEnv; return (dsl_deltas env) }
+-- | Get the current pattern match oracle state. See 'dsl_nablas'.
+getPmNablas :: DsM Nablas
+getPmNablas = do { env <- getLclEnv; return (dsl_nablas env) }
 
 -- | Set the pattern match oracle state within the scope of the given action.
--- See 'dsl_deltas'.
-updPmDeltas :: Deltas -> DsM a -> DsM a
-updPmDeltas delta = updLclEnv (\env -> env { dsl_deltas = delta })
+-- See 'dsl_nablas'.
+updPmNablas :: Nablas -> DsM a -> DsM a
+updPmNablas nablas = updLclEnv (\env -> env { dsl_nablas = nablas })
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv
@@ -527,15 +555,9 @@ dsGetFamInstEnvs
 dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }
 
--- | The @COMPLETE@ pragmas provided by the user for a given `TyCon`.
-dsGetCompleteMatches :: TyCon -> DsM [CompleteMatch]
-dsGetCompleteMatches tc = do
-  eps <- getEps
-  env <- getGblEnv
-  let lookup_completes ufm = lookupWithDefaultUFM ufm [] tc
-      eps_matches_list = lookup_completes $ eps_complete_matches eps
-      env_matches_list = lookup_completes $ ds_complete_matches env
-  return $ eps_matches_list ++ env_matches_list
+-- | The @COMPLETE@ pragmas that are in scope.
+dsGetCompleteMatches :: DsM CompleteMatches
+dsGetCompleteMatches = ds_complete_matches <$> getGblEnv
 
 dsLookupMetaEnv :: Name -> DsM (Maybe DsMetaVal)
 dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (dsl_meta env) name) }
@@ -561,7 +583,7 @@ discardWarningsDs thing_inside
 -- | Fail with an error message if the type is levity polymorphic.
 dsNoLevPoly :: Type -> SDoc -> DsM ()
 -- See Note [Levity polymorphism checking]
-dsNoLevPoly ty doc = checkForLevPolyX errDs doc ty
+dsNoLevPoly ty doc = checkForLevPolyX failWithDs doc ty
 
 -- | Check an expression for levity polymorphism, failing if it is
 -- levity polymorphic.
@@ -612,3 +634,7 @@ pprRuntimeTrace str doc expr = do
       message = App (Var unpackCStringId) $
                 Lit $ mkLitString $ showSDoc dflags (hang (text str) 4 doc)
   return $ mkApps (Var traceId) [Type (exprType expr), message, expr]
+
+-- | See 'getCCIndexM'.
+getCCIndexDsM :: FastString -> DsM CostCentreIndex
+getCCIndexDsM = getCCIndexM ds_cc_st

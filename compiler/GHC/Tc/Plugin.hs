@@ -10,7 +10,7 @@ module GHC.Tc.Plugin (
         unsafeTcPluginTcM,
 
         -- * Finding Modules and Names
-        FindResult(..),
+        Finder.FindResult(..),
         findImportedModule,
         lookupOrig,
 
@@ -50,15 +50,15 @@ module GHC.Tc.Plugin (
         getEvBindsTcPluginM
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import qualified GHC.Tc.Utils.Monad           as TcM
+import qualified GHC.Tc.Utils.Monad     as TcM
 import qualified GHC.Tc.Solver.Monad    as TcS
-import qualified GHC.Tc.Utils.Env             as TcM
+import qualified GHC.Tc.Utils.Env       as TcM
 import qualified GHC.Tc.Utils.TcMType   as TcM
 import qualified GHC.Tc.Instance.Family as TcM
 import qualified GHC.Iface.Env          as IfaceEnv
-import qualified GHC.Driver.Finder      as Finder
+import qualified GHC.Unit.Finder        as Finder
 
 import GHC.Core.FamInstEnv     ( FamInstEnv )
 import GHC.Tc.Utils.Monad      ( TcGblEnv, TcLclEnv, TcPluginM
@@ -71,18 +71,19 @@ import GHC.Tc.Types.Evidence   ( TcCoercion, CoercionHole, EvTerm(..)
                                , EvExpr, EvBind, mkGivenEvBind )
 import GHC.Types.Var           ( EvVar )
 
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
+import GHC.Types.TyThing
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Class
-import GHC.Driver.Types
-import Outputable
+import GHC.Driver.Env
+import GHC.Utils.Outputable
 import GHC.Core.Type
 import GHC.Core.Coercion   ( BlockSubstFlag(..) )
 import GHC.Types.Id
 import GHC.Core.InstEnv
-import FastString
+import GHC.Data.FastString
 import GHC.Types.Unique
 
 
@@ -95,7 +96,7 @@ tcPluginTrace :: String -> SDoc -> TcPluginM ()
 tcPluginTrace a b = unsafeTcPluginTcM (traceTc a b)
 
 
-findImportedModule :: ModuleName -> Maybe FastString -> TcPluginM FindResult
+findImportedModule :: ModuleName -> Maybe FastString -> TcPluginM Finder.FindResult
 findImportedModule mod_name mb_pkg = do
     hsc_env <- getTopEnv
     tcPluginIO $ Finder.findImportedModule hsc_env mod_name mb_pkg

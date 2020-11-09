@@ -38,9 +38,6 @@ nitpick_ignore = [
 
     ("extension", "DoAndIfThenElse"),
     ("extension", "RelaxedPolyRec"),
-
-    # See #16629
-    ("extension", "UnliftedFFITypes"),
 ]
 
 rst_prolog = """
@@ -96,13 +93,13 @@ htmlhelp_basename = 'GHCUsersGuide'
 latex_elements = {
     'inputenc': '',
     'utf8extra': '',
-    'preamble': '''
+    'preamble': r'''
 \usepackage{fontspec}
 \usepackage{makeidx}
 \setsansfont{DejaVu Sans}
 \setromanfont{DejaVu Serif}
 \setmonofont{DejaVu Sans Mono}
-\setlength{\\tymin}{45pt}
+\setlength{\tymin}{45pt}
 
 % Avoid a torrent of over-full \hbox warnings
 \usepackage{microtype}
@@ -135,7 +132,7 @@ man_pages = [
 ]
 
 # If true, show URL addresses after external links.
-#man_show_urls = False
+man_show_urls = True
 
 
 # -- Options for Texinfo output -------------------------------------------
@@ -284,7 +281,17 @@ def setup(app):
                         parse_node=parse_flag,
                         indextemplate='pair: %s; RTS option',
                         doc_field_types=[
+                            Field('since', label='Introduced in GHC version', names=['since'])
+                        ])
+
+    app.add_object_type('event-type', 'event-type',
+                        objname='event log event type',
+                        indextemplate='pair: %s; eventlog event type',
+                        doc_field_types=[
                             Field('since', label='Introduced in GHC version', names=['since']),
+                            Field('tag', label='Event type ID', names=['tag']),
+                            Field('length', label='Record length', names=['length']),
+                            TypedField('fields', label='Fields', names='field', typenames=('fieldtype', 'type'))
                         ])
 
     app.add_object_type('pragma', 'pragma',

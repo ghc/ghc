@@ -18,12 +18,13 @@ module Language.Haskell.TH.Lib (
 
     -- * Library functions
     -- ** Abbreviations
-        InfoQ, ExpQ, TExpQ, DecQ, DecsQ, ConQ, TypeQ, KindQ, TyVarBndrQ,
+        InfoQ, ExpQ, TExpQ, CodeQ, DecQ, DecsQ, ConQ, TypeQ, KindQ,
         TyLitQ, CxtQ, PredQ, DerivClauseQ, MatchQ, ClauseQ, BodyQ, GuardQ,
         StmtQ, RangeQ, SourceStrictnessQ, SourceUnpackednessQ, BangQ,
         BangTypeQ, VarBangTypeQ, StrictTypeQ, VarStrictTypeQ, FieldExpQ, PatQ,
         FieldPatQ, RuleBndrQ, TySynEqnQ, PatSynDirQ, PatSynArgsQ,
         FamilyResultSigQ, DerivStrategyQ,
+        TyVarBndrUnit, TyVarBndrSpec,
 
     -- ** Constructors lifted to 'Q'
     -- *** Literals
@@ -55,6 +56,7 @@ module Language.Haskell.TH.Lib (
 
     -- *** Types
         forallT, forallVisT, varT, conT, appT, appKindT, arrowT, infixT,
+        mulArrowT,
         uInfixT, parensT, equalityT, listT, tupleT, unboxedTupleT, unboxedSumT,
         sigT, litT, wildCardT, promotedT, promotedTupleT, promotedNilT,
         promotedConsT, implicitParamT,
@@ -75,6 +77,8 @@ module Language.Haskell.TH.Lib (
 
     -- *** Type variable binders
     plainTV, kindedTV,
+    plainInvisTV, kindedInvisTV,
+    specifiedSpec, inferredSpec,
 
     -- *** Roles
     nominalR, representationalR, phantomR, inferR,
@@ -153,12 +157,15 @@ import Language.Haskell.TH.Lib.Internal hiding
   , derivClause
   , standaloneDerivWithStrategyD
 
+  , doE
+  , mdoE
   , tupE
   , unboxedTupE
 
   , Role
   , InjectivityAnn
   )
+import qualified Language.Haskell.TH.Lib.Internal as Internal
 import Language.Haskell.TH.Syntax
 
 import Control.Applicative ( liftA2 )
@@ -174,10 +181,10 @@ import Prelude
 -------------------------------------------------------------------------------
 -- *   Dec
 
-tySynD :: Quote m => Name -> [TyVarBndr] -> m Type -> m Dec
+tySynD :: Quote m => Name -> [TyVarBndr ()] -> m Type -> m Dec
 tySynD tc tvs rhs = do { rhs1 <- rhs; return (TySynD tc tvs rhs1) }
 
-dataD :: Quote m => m Cxt -> Name -> [TyVarBndr] -> Maybe Kind -> [m Con] -> [m DerivClause]
+dataD :: Quote m => m Cxt -> Name -> [TyVarBndr ()] -> Maybe Kind -> [m Con] -> [m DerivClause]
       -> m Dec
 dataD ctxt tc tvs ksig cons derivs =
   do
@@ -186,7 +193,7 @@ dataD ctxt tc tvs ksig cons derivs =
     derivs1 <- sequenceA derivs
     return (DataD ctxt1 tc tvs ksig cons1 derivs1)
 
-newtypeD :: Quote m => m Cxt -> Name -> [TyVarBndr] -> Maybe Kind -> m Con -> [m DerivClause]
+newtypeD :: Quote m => m Cxt -> Name -> [TyVarBndr ()] -> Maybe Kind -> m Con -> [m DerivClause]
          -> m Dec
 newtypeD ctxt tc tvs ksig con derivs =
   do
@@ -195,7 +202,7 @@ newtypeD ctxt tc tvs ksig con derivs =
     derivs1 <- sequenceA derivs
     return (NewtypeD ctxt1 tc tvs ksig con1 derivs1)
 
-classD :: Quote m => m Cxt -> Name -> [TyVarBndr] -> [FunDep] -> [m Dec] -> m Dec
+classD :: Quote m => m Cxt -> Name -> [TyVarBndr ()] -> [FunDep] -> [m Dec] -> m Dec
 classD ctxt cls tvs fds decs =
   do
     decs1 <- sequenceA decs
@@ -230,35 +237,35 @@ newtypeInstD ctxt tc tys ksig con derivs =
     derivs1 <- sequenceA derivs
     return (NewtypeInstD ctxt1 Nothing ty1 ksig con1 derivs1)
 
-dataFamilyD :: Quote m => Name -> [TyVarBndr] -> Maybe Kind -> m Dec
+dataFamilyD :: Quote m => Name -> [TyVarBndr ()] -> Maybe Kind -> m Dec
 dataFamilyD tc tvs kind
     = pure $ DataFamilyD tc tvs kind
 
-openTypeFamilyD :: Quote m => Name -> [TyVarBndr] -> FamilyResultSig
+openTypeFamilyD :: Quote m => Name -> [TyVarBndr ()] -> FamilyResultSig
                 -> Maybe InjectivityAnn -> m Dec
 openTypeFamilyD tc tvs res inj
     = pure $ OpenTypeFamilyD (TypeFamilyHead tc tvs res inj)
 
-closedTypeFamilyD :: Quote m => Name -> [TyVarBndr] -> FamilyResultSig
+closedTypeFamilyD :: Quote m => Name -> [TyVarBndr ()] -> FamilyResultSig
                   -> Maybe InjectivityAnn -> [m TySynEqn] -> m Dec
 closedTypeFamilyD tc tvs result injectivity eqns =
   do eqns1 <- sequenceA eqns
      return (ClosedTypeFamilyD (TypeFamilyHead tc tvs result injectivity) eqns1)
 
-tySynEqn :: Quote m => (Maybe [TyVarBndr]) -> m Type -> m Type -> m TySynEqn
+tySynEqn :: Quote m => (Maybe [TyVarBndr ()]) -> m Type -> m Type -> m TySynEqn
 tySynEqn tvs lhs rhs =
   do
     lhs1 <- lhs
     rhs1 <- rhs
     return (TySynEqn tvs lhs1 rhs1)
 
-forallC :: Quote m => [TyVarBndr] -> m Cxt -> m Con -> m Con
+forallC :: Quote m => [TyVarBndr Specificity] -> m Cxt -> m Con -> m Con
 forallC ns ctxt con = liftA2 (ForallC ns) ctxt con
 
 -------------------------------------------------------------------------------
 -- *   Type
 
-forallT :: Quote m => [TyVarBndr] -> m Cxt -> m Type -> m Type
+forallT :: Quote m => [TyVarBndr Specificity] -> m Cxt -> m Type -> m Type
 forallT tvars ctxt ty = do
     ctxt1 <- ctxt
     ty1   <- ty
@@ -273,11 +280,11 @@ sigT t k
 -------------------------------------------------------------------------------
 -- *   Kind
 
-plainTV :: Name -> TyVarBndr
-plainTV = PlainTV
+plainTV :: Name -> TyVarBndr ()
+plainTV n = PlainTV n ()
 
-kindedTV :: Name -> Kind -> TyVarBndr
-kindedTV = KindedTV
+kindedTV :: Name -> Kind -> TyVarBndr ()
+kindedTV n k = KindedTV n () k
 
 starK :: Kind
 starK = StarT
@@ -294,7 +301,7 @@ noSig = NoSig
 kindSig :: Kind -> FamilyResultSig
 kindSig = KindSig
 
-tyVarSig :: TyVarBndr -> FamilyResultSig
+tyVarSig :: TyVarBndr () -> FamilyResultSig
 tyVarSig = TyVarSig
 
 -------------------------------------------------------------------------------
@@ -333,3 +340,12 @@ tupE es = do { es1 <- sequenceA es; return (TupE $ map Just es1)}
 
 unboxedTupE :: Quote m => [m Exp] -> m Exp
 unboxedTupE es = do { es1 <- sequenceA es; return (UnboxedTupE $ map Just es1)}
+
+-------------------------------------------------------------------------------
+-- * Do expressions
+
+doE :: Quote m => [m Stmt] -> m Exp
+doE = Internal.doE Nothing
+
+mdoE :: Quote m => [m Stmt] -> m Exp
+mdoE = Internal.mdoE Nothing

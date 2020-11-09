@@ -43,6 +43,7 @@ Thumbs.db
 *.prof.sample.normalised
 *.run.stdout
 *.run.stderr
+*.dump-simpl
 
 *.hp
 tests/**/*.ps

@@ -15,10 +15,11 @@ module GHC.Event.Thread
     , registerDelay
     , blockedOnBadFD -- used by RTS
     ) where
-
+-- TODO: Use new Windows I/O manager
 import Control.Exception (finally, SomeException, toException)
 import Data.Foldable (forM_, mapM_, sequence_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.Maybe (fromMaybe)
 import Data.Tuple (snd)
 import Foreign.C.Error (eBADF, errnoToIOError)
 import Foreign.C.Types (CInt(..), CUInt(..))
@@ -196,8 +197,7 @@ eventManager = unsafePerformIO $ do
 {-# NOINLINE eventManager #-}
 
 numEnabledEventManagers :: IORef Int
-numEnabledEventManagers = unsafePerformIO $ do
-  newIORef 0
+numEnabledEventManagers = unsafePerformIO $ newIORef 0
 {-# NOINLINE numEnabledEventManagers #-}
 
 foreign import ccall unsafe "getOrSetSystemEventThreadIOManagerThreadStore"
@@ -212,9 +212,10 @@ ioManagerLock = unsafePerformIO $ do
    sharedCAF m getOrSetSystemEventThreadIOManagerThreadStore
 
 getSystemTimerManager :: IO TM.TimerManager
-getSystemTimerManager = do
-  Just mgr <- readIORef timerManager
-  return mgr
+getSystemTimerManager =
+  fromMaybe err `fmap` readIORef timerManager
+    where
+      err = error "GHC.Event.Thread.getSystemTimerManager: the TimerManager requires linking against the threaded runtime"
 
 foreign import ccall unsafe "getOrSetSystemTimerThreadEventManagerStore"
     getOrSetSystemTimerThreadEventManagerStore :: Ptr a -> IO (Ptr a)
@@ -323,7 +324,7 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
 ioManagerCapabilitiesChanged :: IO ()
-ioManagerCapabilitiesChanged = do
+ioManagerCapabilitiesChanged =
   withMVar ioManagerLock $ \_ -> do
     new_n_caps <- getNumCapabilities
     numEnabled <- readIORef numEnabledEventManagers

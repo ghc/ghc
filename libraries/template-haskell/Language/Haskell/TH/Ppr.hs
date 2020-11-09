@@ -182,13 +182,19 @@ pprExp i (LetE ds_ e) = parensIf (i > noPrec) $ text "let" <+> pprDecs ds_
 pprExp i (CaseE e ms)
  = parensIf (i > noPrec) $ text "case" <+> ppr e <+> text "of"
                         $$ nest nestDepth (ppr ms)
-pprExp i (DoE ss_) = parensIf (i > noPrec) $ text "do" <+> pprStms ss_
+pprExp i (DoE m ss_) = parensIf (i > noPrec) $
+    pprQualifier m <> text "do" <+> pprStms ss_
   where
+    pprQualifier Nothing = empty
+    pprQualifier (Just modName) = text (modString modName) <> char '.'
     pprStms []  = empty
     pprStms [s] = ppr s
     pprStms ss  = braces (semiSep ss)
-pprExp i (MDoE ss_) = parensIf (i > noPrec) $ text "mdo" <+> pprStms ss_
+pprExp i (MDoE m ss_) = parensIf (i > noPrec) $
+    pprQualifier m <> text "mdo" <+> pprStms ss_
   where
+    pprQualifier Nothing = empty
+    pprQualifier (Just modName) = text (modString modName) <> char '.'
     pprStms []  = empty
     pprStms [s] = ppr s
     pprStms ss  = braces (semiSep ss)
@@ -511,7 +517,7 @@ ppr_tf_head (TypeFamilyHead tc tvs res inj)
     maybeInj | (Just inj') <- inj = ppr inj'
              | otherwise          = empty
 
-ppr_bndrs :: Maybe [TyVarBndr] -> Doc
+ppr_bndrs :: PprFlag flag => Maybe [TyVarBndr flag] -> Doc
 ppr_bndrs (Just bndrs) = text "forall" <+> sep (map ppr bndrs) <> text "."
 ppr_bndrs Nothing = empty
 
@@ -660,13 +666,13 @@ instance Ppr PatSynArgs where
 commaSepApplied :: [Name] -> Doc
 commaSepApplied = commaSepWith (pprName' Applied)
 
-pprForall :: [TyVarBndr] -> Cxt -> Doc
+pprForall :: [TyVarBndr Specificity] -> Cxt -> Doc
 pprForall = pprForall' ForallInvis
 
-pprForallVis :: [TyVarBndr] -> Cxt -> Doc
+pprForallVis :: [TyVarBndr ()] -> Cxt -> Doc
 pprForallVis = pprForall' ForallVis
 
-pprForall' :: ForallVisFlag -> [TyVarBndr] -> Cxt -> Doc
+pprForall' :: PprFlag flag => ForallVisFlag -> [TyVarBndr flag] -> Cxt -> Doc
 pprForall' fvf tvs cxt
   -- even in the case without any tvs, there could be a non-empty
   -- context cxt (e.g., in the case of pattern synonyms, where there
@@ -756,6 +762,7 @@ pprParendType (TupleT n)          = parens (hcat (replicate (n-1) comma))
 pprParendType (UnboxedTupleT n)   = hashParens $ hcat $ replicate (n-1) comma
 pprParendType (UnboxedSumT arity) = hashParens $ hcat $ replicate (arity-1) bar
 pprParendType ArrowT              = parens (text "->")
+pprParendType MulArrowT           = text "FUN"
 pprParendType ListT               = text "[]"
 pprParendType (LitT l)            = pprTyLit l
 pprParendType (PromotedT c)       = text "'" <> pprName' Applied c
@@ -812,6 +819,11 @@ parens around it.  E.g. the parens are required here:
 So we always print a SigT with parens (see #10050). -}
 
 pprTyApp :: (Type, [TypeArg]) -> Doc
+pprTyApp (MulArrowT, [TANormal (PromotedT c), TANormal arg1, TANormal arg2])
+  | c == oneName  = sep [pprFunArgType arg1 <+> text "%1 ->", ppr arg2]
+  | c == manyName = sep [pprFunArgType arg1 <+> text "->", ppr arg2]
+pprTyApp (MulArrowT, [TANormal argm, TANormal arg1, TANormal arg2]) =
+                     sep [pprFunArgType arg1 <+> text "%" <> ppr argm <+> text "->", ppr arg2]
 pprTyApp (ArrowT, [TANormal arg1, TANormal arg2]) = sep [pprFunArgType arg1 <+> text "->", ppr arg2]
 pprTyApp (EqualityT, [TANormal arg1, TANormal arg2]) =
     sep [pprFunArgType arg1 <+> text "~", ppr arg2]
@@ -834,6 +846,7 @@ pprFunArgType :: Type -> Doc    -- Should really use a precedence argument
 -- Everything except forall and (->) binds more tightly than (->)
 pprFunArgType ty@(ForallT {})                 = parens (ppr ty)
 pprFunArgType ty@(ForallVisT {})              = parens (ppr ty)
+pprFunArgType ty@(((MulArrowT `AppT` _) `AppT` _) `AppT` _)  = parens (ppr ty)
 pprFunArgType ty@((ArrowT `AppT` _) `AppT` _) = parens (ppr ty)
 pprFunArgType ty@(SigT _ _)                   = parens (ppr ty)
 pprFunArgType ty                              = ppr ty
@@ -859,9 +872,21 @@ instance Ppr TyLit where
   ppr = pprTyLit
 
 ------------------------------
-instance Ppr TyVarBndr where
-    ppr (PlainTV nm)    = ppr nm
-    ppr (KindedTV nm k) = parens (ppr nm <+> dcolon <+> ppr k)
+class PprFlag flag where
+    pprTyVarBndr :: (TyVarBndr flag) -> Doc
+
+instance PprFlag () where
+    pprTyVarBndr (PlainTV nm ())    = ppr nm
+    pprTyVarBndr (KindedTV nm () k) = parens (ppr nm <+> dcolon <+> ppr k)
+
+instance PprFlag Specificity where
+    pprTyVarBndr (PlainTV nm SpecifiedSpec)    = ppr nm
+    pprTyVarBndr (PlainTV nm InferredSpec)     = braces (ppr nm)
+    pprTyVarBndr (KindedTV nm SpecifiedSpec k) = parens (ppr nm <+> dcolon <+> ppr k)
+    pprTyVarBndr (KindedTV nm InferredSpec  k) = braces (ppr nm <+> dcolon <+> ppr k)
+
+instance PprFlag flag => Ppr (TyVarBndr flag) where
+    ppr bndr = pprTyVarBndr bndr
 
 instance Ppr Role where
     ppr NominalR          = text "nominal"

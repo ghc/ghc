@@ -6,10 +6,12 @@
 -- LLVM binding library in Haskell, but enough to generate code for GHC.
 --
 -- This code is derived from code taken from the Essential Haskell Compiler
--- (EHC) project (<http://www.cs.uu.nl/wiki/Ehc/WebHome>).
+-- (EHC) project.
 --
 
 module GHC.Llvm (
+        LlvmOpts (..),
+        initLlvmOpts,
 
         -- * Modules, Functions and Blocks
         LlvmModule(..),
@@ -50,7 +52,7 @@ module GHC.Llvm (
         pLift, pLower, isInt, isFloat, isPointer, isVector, llvmWidthInBits,
 
         -- * Pretty Printing
-        ppLit, ppName, ppPlainName,
+        ppVar, ppLit, ppTypeLit, ppName, ppPlainName,
         ppLlvmModule, ppLlvmComments, ppLlvmComment, ppLlvmGlobals,
         ppLlvmGlobal, ppLlvmFunctionDecls, ppLlvmFunctionDecl, ppLlvmFunctions,
         ppLlvmFunction, ppLlvmAlias, ppLlvmAliases, ppLlvmMetas, ppLlvmMeta,

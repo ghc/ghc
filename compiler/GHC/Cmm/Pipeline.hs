@@ -1,6 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TupleSections #-}
 
 module GHC.Cmm.Pipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
@@ -9,7 +7,7 @@ module GHC.Cmm.Pipeline (
   cmmPipeline
 ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm
 import GHC.Cmm.Lint
@@ -24,10 +22,11 @@ import GHC.Cmm.Dataflow.Collections
 
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
-import ErrUtils
-import GHC.Driver.Types
+import GHC.Driver.Backend
+import GHC.Utils.Error
+import GHC.Driver.Env
 import Control.Monad
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Platform
 import Data.Either (partitionEithers)
 
@@ -44,12 +43,13 @@ cmmPipeline
 
 cmmPipeline hsc_env srtInfo prog = withTimingSilent dflags (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env
+         platform = targetPlatform dflags
 
-     tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
+     tops <- {-# SCC "tops" #-} mapM (cpsTop dflags) prog
 
      let (procs, data_) = partitionEithers tops
      (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo procs data_
-     dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (ppr cmms)
+     dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
 
      return (srtInfo, cmms)
 
@@ -58,106 +58,105 @@ cmmPipeline hsc_env srtInfo prog = withTimingSilent dflags (text "Cmm pipeline")
 
         dflags = hsc_dflags hsc_env
 
-cpsTop :: HscEnv -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
-cpsTop _ p@(CmmData _ statics) = return (Right (cafAnalData statics, p))
-cpsTop hsc_env proc =
+cpsTop :: DynFlags -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
+cpsTop dflags p@(CmmData _ statics) = return (Right (cafAnalData (targetPlatform dflags) statics, p))
+cpsTop dflags proc =
     do
-       ----------- Control-flow optimisations ----------------------------------
+      ----------- Control-flow optimisations ----------------------------------
 
-       -- The first round of control-flow optimisation speeds up the
-       -- later passes by removing lots of empty blocks, so we do it
-       -- even when optimisation isn't turned on.
-       --
-       CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
-            return $ cmmCfgOptsProc splitting_proc_points proc
-       dump Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
+      -- The first round of control-flow optimisation speeds up the
+      -- later passes by removing lots of empty blocks, so we do it
+      -- even when optimisation isn't turned on.
+      --
+      CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
+           return $ cmmCfgOptsProc splitting_proc_points proc
+      dump Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 
-       let !TopInfo {stack_info=StackInfo { arg_space = entry_off
-                                          , do_layout = do_layout }} = h
+      let !TopInfo {stack_info=StackInfo { arg_space = entry_off
+                                         , do_layout = do_layout }} = h
 
-       ----------- Eliminate common blocks -------------------------------------
-       g <- {-# SCC "elimCommonBlocks" #-}
-            condPass Opt_CmmElimCommonBlocks elimCommonBlocks g
-                          Opt_D_dump_cmm_cbe "Post common block elimination"
+      ----------- Eliminate common blocks -------------------------------------
+      g <- {-# SCC "elimCommonBlocks" #-}
+           condPass Opt_CmmElimCommonBlocks elimCommonBlocks g
+                         Opt_D_dump_cmm_cbe "Post common block elimination"
 
-       -- Any work storing block Labels must be performed _after_
-       -- elimCommonBlocks
+      -- Any work storing block Labels must be performed _after_
+      -- elimCommonBlocks
 
-       ----------- Implement switches ------------------------------------------
-       g <- {-# SCC "createSwitchPlans" #-}
-            runUniqSM $ cmmImplementSwitchPlans dflags g
-       dump Opt_D_dump_cmm_switch "Post switch plan" g
+      ----------- Implement switches ------------------------------------------
+      g <- {-# SCC "createSwitchPlans" #-}
+           runUniqSM $ cmmImplementSwitchPlans (backend dflags) platform g
+      dump Opt_D_dump_cmm_switch "Post switch plan" g
 
-       ----------- Proc points -------------------------------------------------
-       let
-         call_pps :: ProcPointSet -- LabelMap
-         call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
-       proc_points <-
-          if splitting_proc_points
-             then do
-               pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
-                  minimalProcPointSet (targetPlatform dflags) call_pps g
-               dumpWith dflags Opt_D_dump_cmm_proc "Proc points"
-                     FormatCMM (ppr l $$ ppr pp $$ ppr g)
-               return pp
-             else
-               return call_pps
-
-       ----------- Layout the stack and manifest Sp ----------------------------
-       (g, stackmaps) <-
-            {-# SCC "layoutStack" #-}
-            if do_layout
-               then runUniqSM $ cmmLayoutStack dflags proc_points entry_off g
-               else return (g, mapEmpty)
-       dump Opt_D_dump_cmm_sp "Layout Stack" g
-
-       ----------- Sink and inline assignments  --------------------------------
-       g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
-            condPass Opt_CmmSink (cmmSink dflags) g
-                     Opt_D_dump_cmm_sink "Sink assignments"
-
-       ------------- CAF analysis ----------------------------------------------
-       let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l g
-       dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" FormatText (ppr cafEnv)
-
-       g <- if splitting_proc_points
+      ----------- Proc points -------------------------------------------------
+      let
+        call_pps :: ProcPointSet -- LabelMap
+        call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
+      proc_points <-
+         if splitting_proc_points
             then do
-               ------------- Split into separate procedures -----------------------
-               let pp_map = {-# SCC "procPointAnalysis" #-}
-                            procPointAnalysis proc_points g
-               dumpWith dflags Opt_D_dump_cmm_procmap "procpoint map"
-                  FormatCMM (ppr pp_map)
-               g <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
-                    splitAtProcPoints dflags l call_pps proc_points pp_map
-                                      (CmmProc h l v g)
-               dumps Opt_D_dump_cmm_split "Post splitting" g
-               return g
-             else do
-               -- attach info tables to return points
-               return $ [attachContInfoTables call_pps (CmmProc h l v g)]
+              pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
+                 minimalProcPointSet platform call_pps g
+              dumpWith dflags Opt_D_dump_cmm_proc "Proc points"
+                    FormatCMM (pdoc platform l $$ ppr pp $$ pdoc platform g)
+              return pp
+            else
+              return call_pps
 
-       ------------- Populate info tables with stack info -----------------
-       g <- {-# SCC "setInfoTableStackMap" #-}
-            return $ map (setInfoTableStackMap platform stackmaps) g
-       dumps Opt_D_dump_cmm_info "after setInfoTableStackMap" g
+      ----------- Layout the stack and manifest Sp ----------------------------
+      (g, stackmaps) <-
+           {-# SCC "layoutStack" #-}
+           if do_layout
+              then runUniqSM $ cmmLayoutStack dflags proc_points entry_off g
+              else return (g, mapEmpty)
+      dump Opt_D_dump_cmm_sp "Layout Stack" g
 
-       ----------- Control-flow optimisations -----------------------------
-       g <- {-# SCC "cmmCfgOpts(2)" #-}
-            return $ if optLevel dflags >= 1
-                     then map (cmmCfgOptsProc splitting_proc_points) g
-                     else g
-       g <- return (map removeUnreachableBlocksProc g)
-            -- See Note [unreachable blocks]
-       dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
+      ----------- Sink and inline assignments  --------------------------------
+      g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
+           condPass Opt_CmmSink (cmmSink platform) g
+                    Opt_D_dump_cmm_sink "Sink assignments"
 
-       return (Left (cafEnv, g))
+      ------------- CAF analysis ----------------------------------------------
+      let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform call_pps l g
+      dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" FormatText (pdoc platform cafEnv)
 
-  where dflags = hsc_dflags hsc_env
-        platform = targetPlatform dflags
+      g <- if splitting_proc_points
+           then do
+             ------------- Split into separate procedures -----------------------
+             let pp_map = {-# SCC "procPointAnalysis" #-}
+                          procPointAnalysis proc_points g
+             dumpWith dflags Opt_D_dump_cmm_procmap "procpoint map"
+                FormatCMM (ppr pp_map)
+             g <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
+                  splitAtProcPoints platform l call_pps proc_points pp_map
+                                    (CmmProc h l v g)
+             dumps Opt_D_dump_cmm_split "Post splitting" g
+             return g
+           else
+             -- attach info tables to return points
+             return $ [attachContInfoTables call_pps (CmmProc h l v g)]
+
+      ------------- Populate info tables with stack info -----------------
+      g <- {-# SCC "setInfoTableStackMap" #-}
+           return $ map (setInfoTableStackMap platform stackmaps) g
+      dumps Opt_D_dump_cmm_info "after setInfoTableStackMap" g
+
+      ----------- Control-flow optimisations -----------------------------
+      g <- {-# SCC "cmmCfgOpts(2)" #-}
+           return $ if optLevel dflags >= 1
+                    then map (cmmCfgOptsProc splitting_proc_points) g
+                    else g
+      g <- return (map removeUnreachableBlocksProc g)
+           -- See Note [unreachable blocks]
+      dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
+
+      return (Left (cafEnv, g))
+
+  where platform = targetPlatform dflags
         dump = dumpGraph dflags
 
         dumps flag name
-           = mapM_ (dumpWith dflags flag name FormatCMM . ppr)
+           = mapM_ (dumpWith dflags flag name FormatCMM . pdoc platform)
 
         condPass flag pass g dumpflag dumpname =
             if gopt flag dflags
@@ -171,8 +170,8 @@ cpsTop hsc_env proc =
         -- tablesNextToCode is off.  The latter is because we have no
         -- label to put on info tables for basic blocks that are not
         -- the entry point.
-        splitting_proc_points = hscTarget dflags /= HscAsm
-                             || not (tablesNextToCode dflags)
+        splitting_proc_points = backend dflags /= NCG
+                             || not (platformTablesNextToCode platform)
                              || -- Note [inconsistent-pic-reg]
                                 usingInconsistentPicReg
         usingInconsistentPicReg
@@ -353,9 +352,10 @@ runUniqSM m = do
 dumpGraph :: DynFlags -> DumpFlag -> String -> CmmGraph -> IO ()
 dumpGraph dflags flag name g = do
   when (gopt Opt_DoCmmLinting dflags) $ do_lint g
-  dumpWith dflags flag name FormatCMM (ppr g)
+  dumpWith dflags flag name FormatCMM (pdoc platform g)
  where
-  do_lint g = case cmmLintGraph dflags g of
+  platform = targetPlatform dflags
+  do_lint g = case cmmLintGraph platform g of
                  Just err -> do { fatalErrorMsg dflags err
                                 ; ghcExit dflags 1
                                 }
@@ -368,6 +368,6 @@ dumpWith dflags flag txt fmt sdoc = do
     -- If `-ddump-cmm-verbose -ddump-to-file` is specified,
     -- dump each Cmm pipeline stage output to a separate file.  #16930
     when (dopt Opt_D_dump_cmm_verbose dflags)
-      $ dumpAction dflags (mkDumpStyle dflags alwaysQualify)
+      $ dumpAction dflags (mkDumpStyle alwaysQualify)
                    (dumpOptionsFromFlag flag) txt fmt sdoc
   dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc txt fmt sdoc

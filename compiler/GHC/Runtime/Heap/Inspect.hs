@@ -25,17 +25,18 @@ module GHC.Runtime.Heap.Inspect(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.Runtime.Interpreter as GHCi
 import GHCi.RemoteTypes
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHCi.Message ( fromSerializableException )
 
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Types.RepType
+import GHC.Core.Multiplicity
 import qualified GHC.Core.Unify as U
 import GHC.Types.Var
 import GHC.Tc.Utils.Monad
@@ -48,16 +49,17 @@ import GHC.Tc.Utils.Env
 import GHC.Core.TyCon
 import GHC.Types.Name
 import GHC.Types.Name.Occurrence as OccName
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Iface.Env
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( Boxity(..) )
 import GHC.Builtin.Types.Prim
-import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Driver.Session
-import Outputable as Ppr
+import GHC.Driver.Ppr
+import GHC.Utils.Outputable as Ppr
+import GHC.Utils.Panic
 import GHC.Char
 import GHC.Exts.Heap
 import GHC.Runtime.Heap.Layout ( roundUpTo )
@@ -65,20 +67,12 @@ import GHC.IO (throwIO)
 
 import Control.Monad
 import Data.Maybe
-import Data.List ((\\))
-#if defined(INTEGER_GMP)
+import Data.List
 import GHC.Exts
-import Data.Array.Base
-import GHC.Integer.GMP.Internals
-#elif defined(INTEGER_SIMPLE)
-import GHC.Exts
-import GHC.Integer.Simple.Internals
-#endif
 import qualified Data.Sequence as Seq
 import Data.Sequence (viewl, ViewL(..))
 import Foreign
 import System.IO.Unsafe
-
 
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
@@ -139,7 +133,7 @@ isThunk _             = False
 constrClosToName :: HscEnv -> GenClosure a -> IO (Either String Name)
 constrClosToName hsc_env ConstrClosure{pkg=pkg,modl=mod,name=occ} = do
    let occName = mkOccName OccName.dataName occ
-       modName = mkModule (stringToUnitId pkg) (mkModuleName mod)
+       modName = mkModule (stringToUnit pkg) (mkModuleName mod)
    Right `fmap` lookupOrigIO hsc_env modName occName
 constrClosToName _hsc_env clos =
    return (Left ("conClosToName: Expected ConstrClosure, got " ++ show (fmap (const ()) clos)))
@@ -329,11 +323,12 @@ cPprTermBase y =
                                       . subTerms)
   , ifTerm (\t -> isTyCon listTyCon (ty t) && subTerms t `lengthIs` 2)
            ppr_list
-  , ifTerm' (isTyCon intTyCon    . ty) ppr_int
-  , ifTerm' (isTyCon charTyCon   . ty) ppr_char
-  , ifTerm' (isTyCon floatTyCon  . ty) ppr_float
-  , ifTerm' (isTyCon doubleTyCon . ty) ppr_double
-  , ifTerm' (isIntegerTy         . ty) ppr_integer
+  , ifTerm' (isTyCon intTyCon     . ty) ppr_int
+  , ifTerm' (isTyCon charTyCon    . ty) ppr_char
+  , ifTerm' (isTyCon floatTyCon   . ty) ppr_float
+  , ifTerm' (isTyCon doubleTyCon  . ty) ppr_double
+  , ifTerm' (isTyCon integerTyCon . ty) ppr_integer
+  , ifTerm' (isTyCon naturalTyCon . ty) ppr_natural
   ]
  where
    ifTerm :: (Term -> Bool)
@@ -355,10 +350,6 @@ cPprTermBase y =
    isTyCon a_tc ty = fromMaybe False $ do
      (tc,_) <- tcSplitTyConApp_maybe ty
      return (a_tc == tc)
-
-   isIntegerTy ty = fromMaybe False $ do
-     (tc,_) <- tcSplitTyConApp_maybe ty
-     return (tyConName tc == integerTyConName)
 
    ppr_int, ppr_char, ppr_float, ppr_double
       :: Precedence -> Term -> m (Maybe SDoc)
@@ -392,62 +383,52 @@ cPprTermBase y =
       return (Just (Ppr.double f))
    ppr_double _ _ = return Nothing
 
-   ppr_integer :: Precedence -> Term -> m (Maybe SDoc)
-#if defined(INTEGER_GMP)
-   -- Reconstructing Integers is a bit of a pain. This depends deeply
-   -- on the integer-gmp representation, so it'll break if that
-   -- changes (but there are several tests in
-   -- tests/ghci.debugger/scripts that will tell us if this is wrong).
+   ppr_bignat :: Bool -> Precedence -> [Word] -> m (Maybe SDoc)
+   ppr_bignat sign _ ws = do
+      let
+         wordSize = finiteBitSize (0 :: Word) -- does the word size depend on the target?
+         makeInteger n _ []     = n
+         makeInteger n s (x:xs) = makeInteger (n + (fromIntegral x `shiftL` s)) (s + wordSize) xs
+         signf = case sign of
+                  False -> 1
+                  True  -> -1
+      return $ Just $ Ppr.integer $ signf * (makeInteger 0 0 ws)
+
+   -- Reconstructing Bignums is a bit of a pain. This depends deeply on their
+   -- representation, so it'll break if that changes (but there are several
+   -- tests in tests/ghci.debugger/scripts that will tell us if this is wrong).
    --
    --   data Integer
-   --     = S# Int#
-   --     | Jp# {-# UNPACK #-} !BigNat
-   --     | Jn# {-# UNPACK #-} !BigNat
+   --     = IS !Int#
+   --     | IP !BigNat
+   --     | IN !BigNat
    --
-   --   data BigNat = BN# ByteArray#
+   --   data Natural
+   --     = NS !Word#
+   --     | NB !BigNat
    --
-   ppr_integer _ Term{subTerms=[Prim{valRaw=[W# w]}]} =
-      return (Just (Ppr.integer (S# (word2Int# w))))
-   ppr_integer _ Term{dc=Right con,
-                      subTerms=[Term{subTerms=[Prim{valRaw=ws}]}]} = do
-      -- We don't need to worry about sizes that are not an integral
-      -- number of words, because luckily GMP uses arrays of words
-      -- (see GMP_LIMB_SHIFT).
-      let
-        !(UArray _ _ _ arr#) = listArray (0,length ws-1) ws
-        constr
-          | "Jp#" <- getOccString (dataConName con) = Jp#
-          | otherwise = Jn#
-      return (Just (Ppr.integer (constr (BN# arr#))))
-#elif defined(INTEGER_SIMPLE)
-   -- As with the GMP case, this depends deeply on the integer-simple
-   -- representation.
-   --
-   -- @
-   -- data Integer = Positive !Digits | Negative !Digits | Naught
-   --
-   -- data Digits = Some !Word# !Digits
-   --             | None
-   -- @
-   --
-   -- NB: the above has some type synonyms expanded out for the sake of brevity
-   ppr_integer _ Term{subTerms=[]} =
-      return (Just (Ppr.integer Naught))
-   ppr_integer _ Term{dc=Right con, subTerms=[digitTerm]}
-        | Just digits <- get_digits digitTerm
-        = return (Just (Ppr.integer (constr digits)))
-      where
-        get_digits :: Term -> Maybe Digits
-        get_digits Term{subTerms=[]} = Just None
-        get_digits Term{subTerms=[Prim{valRaw=[W# w]},t]}
-          = Some w <$> get_digits t
-        get_digits _ = Nothing
+   --   type BigNat = ByteArray#
 
-        constr
-          | "Positive" <- getOccString (dataConName con) = Positive
-          | otherwise = Negative
-#endif
+   ppr_integer :: Precedence -> Term -> m (Maybe SDoc)
+   ppr_integer _ Term{dc=Right con, subTerms=[Prim{valRaw=ws}]}
+      | con == integerISDataCon
+      , [W# w] <- ws
+      = return (Just (Ppr.integer (fromIntegral (I# (word2Int# w)))))
+   ppr_integer p Term{dc=Right con, subTerms=[Term{subTerms=[Prim{valRaw=ws}]}]}
+      | con == integerIPDataCon = ppr_bignat False p ws
+      | con == integerINDataCon = ppr_bignat True  p ws
+      | otherwise = panic "Unexpected Integer constructor"
    ppr_integer _ _ = return Nothing
+
+   ppr_natural :: Precedence -> Term -> m (Maybe SDoc)
+   ppr_natural _ Term{dc=Right con, subTerms=[Prim{valRaw=ws}]}
+      | con == naturalNSDataCon
+      , [w] <- ws
+      = return (Just (Ppr.integer (fromIntegral w)))
+   ppr_natural p Term{dc=Right con, subTerms=[Term{subTerms=[Prim{valRaw=ws}]}]}
+      | con == naturalNBDataCon = ppr_bignat False p ws
+      | otherwise = panic "Unexpected Natural constructor"
+   ppr_natural _ _ = return Nothing
 
    --Note pprinting of list terms is not lazy
    ppr_list :: Precedence -> Term -> m SDoc
@@ -578,11 +559,52 @@ trIO = liftTcM . liftIO
 liftTcM :: TcM a -> TR a
 liftTcM = id
 
+-- When we make new unification variables in the GHCi debugger,
+-- we use RuntimeUnkTvs.   See Note [RuntimeUnkTv].
 newVar :: Kind -> TR TcType
-newVar = liftTcM . newFlexiTyVarTy
+newVar kind = liftTcM (do { tv <- newAnonMetaTyVar RuntimeUnkTv kind
+                          ; return (mkTyVarTy tv) })
 
 newOpenVar :: TR TcType
-newOpenVar = liftTcM newOpenFlexiTyVarTy
+newOpenVar = liftTcM (do { kind <- newOpenTypeKind
+                         ; newVar kind })
+
+{- Note [RuntimeUnkTv]
+~~~~~~~~~~~~~~~~~~~~~~
+In the GHCi debugger we use unification variables whose MetaInfo is
+RuntimeUnkTv.  The special property of a RuntimeUnkTv is that it can
+unify with a polytype (see GHC.Tc.Utils.Unify.metaTyVarUpdateOK).
+If we don't do this `:print <term>` will fail if the type of <term>
+has nested `forall`s or `=>`s.
+
+This is because the GHCi debugger's internals will attempt to unify a
+metavariable with the type of <term> and then display the result, but
+if the type has nested `forall`s or `=>`s, then unification will fail
+unless we do something special.  As a result, `:print` will bail out
+and the unhelpful result will be `<term> = (_t1::t1)` (where `t1` is a
+metavariable).
+
+Beware: <term> can have nested `forall`s even if its definition doesn't use
+RankNTypes! Here is an example from #14828:
+
+  class Functor f where
+    fmap :: (a -> b) -> f a -> f b
+
+Somewhat surprisingly, `:print fmap` considers the type of fmap to have
+nested foralls. This is because the GHCi debugger sees the type
+`fmap :: forall f. Functor f => forall a b. (a -> b) -> f a -> f b`.
+We could envision deeply instantiating this type to get the type
+`forall f a b. Functor f => (a -> b) -> f a -> f b`,
+but this trick wouldn't work for higher-rank types.
+
+Instead, we adopt a simpler fix: allow RuntimeUnkTv to unify with a
+polytype (specifically, see ghci_tv in GHC.Tc.Utils.Unify.preCheck).
+This allows metavariables to unify with types that have
+nested (or higher-rank) `forall`s/`=>`s, which makes `:print fmap`
+display as
+`fmap = (_t1::forall a b. Functor f => (a -> b) -> f a -> f b)`, as expected.
+-}
+
 
 instTyVars :: [TyVar] -> TR (TCvSubst, [TcTyVar])
 -- Instantiate fresh mutable type variables from some TyVars
@@ -597,6 +619,10 @@ type RttiInstantiation = [(TcTyVar, TyVar)]
    -- If the TcTyVar has not been refined by the runtime type
    -- elaboration, then we want to turn it back into the
    -- original RuntimeUnk
+   --
+   -- July 20: I'm not convinced that the little dance from
+   -- RuntimeUnkTv unification variables to RuntimeUnk skolems
+   -- is buying us anything.  ToDo: get rid of it.
 
 -- | Returns the instantiated type scheme ty', and the
 --   mapping from new (instantiated) -to- old (skolem) type variables
@@ -604,6 +630,7 @@ instScheme :: QuantifiedType -> TR (TcType, RttiInstantiation)
 instScheme (tvs, ty)
   = do { (subst, tvs') <- instTyVars tvs
        ; let rtti_inst = [(tv',tv) | (tv',tv) <- tvs' `zip` tvs]
+       ; traceTR (text "instScheme" <+> (ppr tvs $$ ppr ty $$ ppr tvs'))
        ; return (substTy subst ty, rtti_inst) }
 
 applyRevSubst :: RttiInstantiation -> TR ()
@@ -660,7 +687,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   -- as this is needed to be able to manipulate
   -- them properly
    let quant_old_ty@(old_tvs, old_tau) = quantifyType old_ty
-       sigma_old_ty = mkInvForAllTys old_tvs old_tau
+       sigma_old_ty = mkInfForAllTys old_tvs old_tau
    traceTR (text "Term reconstruction started with initial type " <> ppr old_ty)
    term <-
      if null old_tvs
@@ -760,9 +787,9 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
          traceTR (text "Following a MutVar")
          contents_tv <- newVar liftedTypeKind
          MASSERT(isUnliftedType my_ty)
-         (mutvar_ty,_) <- instScheme $ quantifyType $ mkVisFunTy
+         (mutvar_ty,_) <- instScheme $ quantifyType $ mkVisFunTyMany
                             contents_ty (mkTyConApp tycon [world,contents_ty])
-         addConstraint (mkVisFunTy contents_tv my_ty) mutvar_ty
+         addConstraint (mkVisFunTyMany contents_tv my_ty) mutvar_ty
          x <- go (pred max_depth) contents_tv contents_ty contents
          return (RefWrap my_ty x)
 
@@ -891,20 +918,21 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
                 (error "unboxedTupleTerm: no HValue for unboxed tuple") terms
 
     -- Extract a sub-word sized field from a word
-    index item_size_b index_b word_size endian =
-        (word .&. (mask `shiftL` moveBytes)) `shiftR` moveBytes
-      where
-        mask :: Word
-        mask = case item_size_b of
-            1 -> 0xFF
-            2 -> 0xFFFF
-            4 -> 0xFFFFFFFF
-            _ -> panic ("Weird byte-index: " ++ show index_b)
-        (q,r) = index_b `quotRem` word_size
-        word = array!!q
-        moveBytes = case endian of
-         BigEndian    -> word_size - (r + item_size_b) * 8
-         LittleEndian -> r * 8
+    -- A sub word is aligned to the left-most part of a word on big-endian
+    -- platforms, and to the right-most part of a word on little-endian
+    -- platforms.  This allows to write and read it back from memory
+    -- independent of endianness.  Bits not belonging to a sub word are zeroed
+    -- out, although, this is strictly speaking not necessary since a sub word
+    -- is read back from memory by appropriately casted pointers (see e.g.
+    -- ppr_float of cPprTermBase).
+    index size_b aligned_idx word_size endian = case endian of
+      BigEndian    -> (word `shiftL` moveBits) `shiftR` zeroOutBits `shiftL` zeroOutBits
+      LittleEndian -> (word `shiftR` moveBits) `shiftL` zeroOutBits `shiftR` zeroOutBits
+     where
+      (q, r) = aligned_idx `quotRem` word_size
+      word = array!!q
+      moveBits = r * 8
+      zeroOutBits = (word_size - size_b) * 8
 
 
 -- | Fast, breadth-first Type reconstruction
@@ -991,7 +1019,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
         traceTR (text "Constr1" <+> ppr dcname)
         (mb_dc, _) <- tryTc (tcLookupDataCon dcname)
         case mb_dc of
-          Nothing-> do
+          Nothing->
             forM pArgs $ \x -> do
               tv <- newVar liftedTypeKind
               return (tv, x)
@@ -1055,7 +1083,7 @@ getDataConArgTys dc con_app_ty
        ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)
        ; addConstraint rep_con_app_ty (substTy subst (dataConOrigResTy dc))
               -- See Note [Constructor arg types]
-       ; let con_arg_tys = substTys subst (dataConRepArgTys dc)
+       ; let con_arg_tys = substTys subst (map scaledThing $ dataConRepArgTys dc)
        ; traceTR (text "getDataConArgTys 2" <+> (ppr rep_con_app_ty $$ ppr con_arg_tys $$ ppr subst))
        ; return con_arg_tys }
   where
@@ -1263,11 +1291,12 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                           ppr tv, equals, ppr ty_v]
          go ty_v r
 -- FunTy inductive case
-    | Just (l1,l2) <- splitFunTy_maybe l
-    , Just (r1,r2) <- splitFunTy_maybe r
+    | Just (w1,l1,l2) <- splitFunTy_maybe l
+    , Just (w2,r1,r2) <- splitFunTy_maybe r
+    , w1 `eqType` w2
     = do r2' <- go l2 r2
          r1' <- go l1 r1
-         return (mkVisFunTy r1' r2')
+         return (mkVisFunTy w1 r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
     , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs
@@ -1332,7 +1361,7 @@ isMonomorphicOnNonPhantomArgs ty
   , concrete_args <- [ arg | (tyv,arg) <- tyConTyVars tc `zip` all_args
                            , tyv `notElem` phantom_vars]
   = all isMonomorphicOnNonPhantomArgs concrete_args
-  | Just (ty1, ty2) <- splitFunTy_maybe ty
+  | Just (_, ty1, ty2) <- splitFunTy_maybe ty
   = all isMonomorphicOnNonPhantomArgs [ty1,ty2]
   | otherwise = isMonomorphic ty
 

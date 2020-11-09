@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, MagicHash #-}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -6,20 +6,20 @@
 
 -- | Bytecode instruction definitions
 module GHC.ByteCode.Instr (
-        BCInstr(..), ProtoBCO(..), bciStackUse,
+        BCInstr(..), ProtoBCO(..), bciStackUse, LocalLabel(..)
   ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHCi.FFI (C_ffi_cif)
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Core.Ppr
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Name
 import GHC.Types.Unique
 import GHC.Types.Id
@@ -50,7 +50,12 @@ data ProtoBCO a
         protoBCOFFIs       :: [FFIInfo]
    }
 
-type LocalLabel = Word16
+-- | A local block label (e.g. identifying a case alternative).
+newtype LocalLabel = LocalLabel { getLocalLabel :: Word32 }
+  deriving (Eq, Ord)
+
+instance Outputable LocalLabel where
+  ppr (LocalLabel lbl) = text "lbl:" <> ppr lbl
 
 data BCInstr
    -- Messing with the stack

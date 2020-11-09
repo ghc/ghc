@@ -3,9 +3,8 @@
 import Data.Data
 import Data.List
 import GHC
-import GHC.Driver.Session
-import Outputable
-import GHC.Parser.Annotation
+import GHC.Driver.Ppr
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import System.Environment( getArgs )
 import System.Exit
@@ -97,7 +96,7 @@ showAnnsList annsList = "[\n" ++ (intercalate ",\n"
     ++ "\n]\n"
 
 pp :: (Outputable a) => a -> String
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a
 
 
 -- ---------------------------------------------------------------------

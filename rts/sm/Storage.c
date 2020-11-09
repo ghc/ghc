@@ -948,7 +948,7 @@ accountAllocation(Capability *cap, W_ n)
  *
  * When profiling we zero:
  *  - Pinned object alignment slop, see MEMSET_IF_PROFILING_W in allocatePinned.
- *  - Shrunk array slop, see OVERWRITING_MUTABLE_CLOSURE.
+ *  - Shrunk array slop, see OVERWRITING_CLOSURE_MUTABLE.
  *
  * When performing LDV profiling or using a (single threaded) debug RTS we zero
  * slop even when overwriting immutable closures, see Note [zeroing slop when
@@ -1304,6 +1304,7 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
         mvar->header.info = &stg_MUT_VAR_DIRTY_info;
         recordClosureMutated(cap, (StgClosure *) mvar);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            // See Note [Dirty flags in the non-moving collector] in NonMoving.c
             updateRemembSetPushClosure_(reg, old);
         }
     }
@@ -1326,6 +1327,7 @@ dirty_TVAR(Capability *cap, StgTVar *p,
         p->header.info = &stg_TVAR_DIRTY_info;
         recordClosureMutated(cap,(StgClosure*)p);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            // See Note [Dirty flags in the non-moving collector] in NonMoving.c
             updateRemembSetPushClosure(cap, old);
         }
     }
@@ -1407,6 +1409,7 @@ update_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 {
     Capability *cap = regTableToCapability(reg);
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        // See Note [Dirty flags in the non-moving collector] in NonMoving.c
         StgMVar *mvar = (StgMVar *) p;
         updateRemembSetPushClosure(cap, old_val);
         updateRemembSetPushClosure(cap, (StgClosure *) mvar->head);
@@ -1452,10 +1455,10 @@ dirty_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 // program.  Also emits events reporting the per-cap allocation
 // totals.
 //
-StgWord
+uint64_t
 calcTotalAllocated (void)
 {
-    W_ tot_alloc = 0;
+    uint64_t tot_alloc = 0;
     W_ n;
 
     for (n = 0; n < n_capabilities; n++) {

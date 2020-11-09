@@ -12,36 +12,48 @@ module GHC.Tc.Instance.Family (
         reportInjectivityErrors, reportConflictingInjectivityErrs
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Driver.Types
+import GHC.Driver.Session
+import GHC.Driver.Env
+
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv( roughMatchTcs )
 import GHC.Core.Coercion
-import GHC.Core.Lint
-import GHC.Tc.Types.Evidence
-import GHC.Iface.Load
-import GHC.Tc.Utils.Monad
-import GHC.Types.SrcLoc as SrcLoc
 import GHC.Core.TyCon
-import GHC.Tc.Utils.TcType
 import GHC.Core.Coercion.Axiom
-import GHC.Driver.Session
-import GHC.Types.Module
-import Outputable
-import Util
-import GHC.Types.Name.Reader
 import GHC.Core.DataCon ( dataConName )
-import Maybes
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr ( pprWithExplicitKindsWhen )
-import GHC.Tc.Utils.TcMType
+
+import GHC.Iface.Load
+
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Instantiate( freshenTyVarBndrs, freshenCoVarBndrsX )
+import GHC.Tc.Utils.TcType
+
+import GHC.Unit.External
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.Deps
+import GHC.Unit.Home.ModInfo
+
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Name.Reader
 import GHC.Types.Name
-import Panic
 import GHC.Types.Var.Set
-import FV
-import Bag( Bag, unionBags, unitBag )
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Utils.FV
+
+import GHC.Data.Bag( Bag, unionBags, unitBag )
+import GHC.Data.Maybe
+
 import Control.Monad
 import Data.List ( sortBy )
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -162,34 +174,13 @@ addressed yet.
 newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcM FamInst
 -- Freshen the type variables of the FamInst branches
 newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
-  = ASSERT2( tyCoVarsOfTypes lhs `subVarSet` tcv_set, text "lhs" <+> pp_ax )
-    ASSERT2( lhs_kind `eqType` rhs_kind, text "kind" <+> pp_ax $$ ppr lhs_kind $$ ppr rhs_kind )
-    -- We used to have an assertion that the tyvars of the RHS were bound
-    -- by tcv_set, but in error situations like  F Int = a that isn't
-    -- true; a later check in checkValidFamInst rejects it
-    do { (subst, tvs') <- freshenTyVarBndrs tvs
+  = do {
+         -- Freshen the type variables
+         (subst, tvs') <- freshenTyVarBndrs tvs
        ; (subst, cvs') <- freshenCoVarBndrsX subst cvs
-       ; dflags <- getDynFlags
        ; let lhs'     = substTys subst lhs
              rhs'     = substTy  subst rhs
-             tcvs'    = tvs' ++ cvs'
-       ; ifErrsM (return ()) $ -- Don't lint when there are errors, because
-                               -- errors might mean TcTyCons.
-                               -- See Note [Recover from validity error] in GHC.Tc.TyCl
-         when (gopt Opt_DoCoreLinting dflags) $
-           -- Check that the types involved in this instance are well formed.
-           -- Do /not/ expand type synonyms, for the reasons discussed in
-           -- Note [Linting type synonym applications].
-           case lintTypes dflags tcvs' (rhs':lhs') of
-             Nothing       -> pure ()
-             Just fail_msg -> pprPanic "Core Lint error in newFamInst" $
-                              vcat [ fail_msg
-                                   , ppr fam_tc
-                                   , ppr subst
-                                   , ppr tvs'
-                                   , ppr cvs'
-                                   , ppr lhs'
-                                   , ppr rhs' ]
+
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs
@@ -199,10 +190,6 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
                          , fi_rhs      = rhs'
                          , fi_axiom    = axiom }) }
   where
-    lhs_kind = tcTypeKind (mkTyConApp fam_tc lhs)
-    rhs_kind = tcTypeKind rhs
-    tcv_set  = mkVarSet (tvs ++ cvs)
-    pp_ax    = pprCoAxiom axiom
     CoAxBranch { cab_tvs = tvs
                , cab_cvs = cvs
                , cab_lhs = lhs
@@ -241,7 +228,7 @@ two modules are consistent--because we checked that when we compiled M.
 
 For every other pair of family instance modules we import (directly or
 indirectly), we check that they are consistent now. (So that we can be
-certain that the modules in our `GHC.Driver.Types.dep_finsts' are consistent.)
+certain that the modules in our `GHC.Driver.Env.dep_finsts' are consistent.)
 
 There is some fancy footwork regarding hs-boot module loops, see
 Note [Don't check hs-boot type family instances too early]
@@ -632,7 +619,7 @@ loadDependentFamInstModules fam_insts
 
             want_module mod  -- See Note [Home package family instances]
               | mod == this_mod = False
-              | home_fams_only  = moduleUnitId mod == moduleUnitId this_mod
+              | home_fams_only  = moduleUnit mod == moduleUnit this_mod
               | otherwise       = True
             home_fams_only = all (nameIsHomePackage this_mod . fi_fam) fam_insts
 
@@ -736,7 +723,7 @@ checkForInjectivityConflicts instEnvs famInst
 -- this is possible and False if adding this equation would violate injectivity
 -- annotation. This looks only at the one equation; it does not look for
 -- interaction between equations. Use checkForInjectivityConflicts for that.
--- Does checks (2)-(4) of Note [Verifying injectivity annotation] in GHC.Core.FamInstEnv.
+-- Does checks (2)-(4) of Note [Verifying injectivity annotation] in "GHC.Core.FamInstEnv".
 checkInjectiveEquation :: FamInst -> TcM ()
 checkInjectiveEquation famInst
     | isTypeFamilyTyCon tycon

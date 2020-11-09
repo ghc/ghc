@@ -11,11 +11,11 @@ module GHC.Core.Stats (
         CoreStats(..), coreBindsStats, exprStats,
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic
 import GHC.Core
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Core.Coercion
 import GHC.Types.Var
 import GHC.Core.Type(Type, typeSize)

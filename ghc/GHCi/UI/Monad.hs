@@ -1,5 +1,6 @@
-{-# LANGUAGE CPP, FlexibleInstances, DeriveFunctor #-}
+{-# LANGUAGE CPP, FlexibleInstances, DeriveFunctor, DerivingVia #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS -fno-warn-name-shadowing #-}
 
 -----------------------------------------------------------------------------
 --
@@ -38,23 +39,25 @@ module GHCi.UI.Monad (
 import GHCi.UI.Info (ModInfo)
 import qualified GHC
 import GHC.Driver.Monad hiding (liftIO)
-import Outputable       hiding (printForUser, printForUserPartWay)
-import qualified Outputable
+import GHC.Utils.Outputable
+import qualified GHC.Driver.Ppr as Ppr
 import GHC.Types.Name.Occurrence
 import GHC.Driver.Session
-import FastString
-import GHC.Driver.Types
+import GHC.Data.FastString
+import GHC.Driver.Env
 import GHC.Types.SrcLoc
-import GHC.Types.Module
+import GHC.Types.SafeHaskell
+import GHC.Unit
 import GHC.Types.Name.Reader as RdrName (mkOrig)
 import GHC.Builtin.Names (gHC_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Context
 import GHCi.RemoteTypes
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils
-import Util
+import GHC.Utils.Misc
 
-import Exception hiding (uninterruptibleMask, mask, catch)
+import GHC.Utils.Exception hiding (uninterruptibleMask, mask, catch)
 import Numeric
 import Data.Array
 import Data.IORef
@@ -65,8 +68,9 @@ import Control.Monad
 import Prelude hiding ((<>))
 
 import System.Console.Haskeline (CompletionFunc, InputT)
-import Control.Monad.Catch
+import Control.Monad.Catch as MC
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Reader
 import Control.Monad.IO.Class
 import Data.Map.Strict (Map)
 import qualified Data.IntMap.Strict as IntMap
@@ -234,7 +238,7 @@ prettyLocations  locs =
 instance Outputable BreakLocation where
    ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+> pprEnaDisa <+>
                 if null (onBreakCmd loc)
-                   then Outputable.empty
+                   then empty
                    else doubleQuotes (text (onBreakCmd loc))
       where pprEnaDisa = case breakEnabled loc of
                 True  -> text "enabled"
@@ -259,6 +263,7 @@ recordBreak brkLoc = do
 
 newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> Ghc a }
     deriving (Functor)
+    deriving (MonadThrow, MonadCatch, MonadMask) via (ReaderT (IORef GHCiState) Ghc)
 
 reflectGHCi :: (Session, IORef GHCiState) -> GHCi a -> IO a
 reflectGHCi (s, gs) m = unGhc (unGHCi m gs) s
@@ -311,61 +316,6 @@ instance GhcMonad (InputT GHCi) where
   setSession = lift . setSession
   getSession = lift getSession
 
-instance ExceptionMonad GHCi where
-  gcatch m h = GHCi $ \r -> unGHCi m r `gcatch` (\e -> unGHCi (h e) r)
-  gmask f =
-      GHCi $ \s -> gmask $ \io_restore ->
-                             let
-                                g_restore (GHCi m) = GHCi $ \s' -> io_restore (m s')
-                             in
-                                unGHCi (f g_restore) s
-
-instance MonadThrow Ghc where
-  throwM = liftIO . throwM
-
-instance MonadCatch Ghc where
-  catch = gcatch
-
-instance MonadMask Ghc where
-  mask f = Ghc $ \s ->
-    mask $ \io_restore ->
-      let g_restore (Ghc m) = Ghc $ \s -> io_restore (m s)
-      in unGhc (f g_restore) s
-  uninterruptibleMask f = Ghc $ \s ->
-    uninterruptibleMask $ \io_restore ->
-      let g_restore (Ghc m) = Ghc $ \s -> io_restore (m s)
-      in unGhc (f g_restore) s
-  generalBracket acquire release use = Ghc $ \s ->
-    generalBracket
-      (unGhc acquire s)
-      (\resource exitCase -> unGhc (release resource exitCase) s)
-      (\resource -> unGhc (use resource) s)
-
-instance MonadThrow GHCi where
-  throwM = liftIO . throwM
-
-instance MonadCatch GHCi where
-  catch = gcatch
-
-instance MonadMask GHCi where
-  mask f = GHCi $ \s ->
-    mask $ \io_restore ->
-      let g_restore (GHCi m) = GHCi $ \s -> io_restore (m s)
-      in unGHCi (f g_restore) s
-  uninterruptibleMask f = GHCi $ \s ->
-    uninterruptibleMask $ \io_restore ->
-      let g_restore (GHCi m) = GHCi $ \s -> io_restore (m s)
-      in unGHCi (f g_restore) s
-  generalBracket acquire release use = GHCi $ \s ->
-    generalBracket
-      (unGHCi acquire s)
-      (\resource exitCase -> unGHCi (release resource exitCase) s)
-      (\resource -> unGHCi (use resource) s)
-
-instance ExceptionMonad (InputT GHCi) where
-  gcatch = catch
-  gmask = mask
-
 isOptionSet :: GhciMonad m => GHCiOption -> m Bool
 isOptionSet opt
  = do st <- getGHCiState
@@ -384,26 +334,26 @@ unsetOption opt
 printForUserNeverQualify :: GhcMonad m => SDoc -> m ()
 printForUserNeverQualify doc = do
   dflags <- getDynFlags
-  liftIO $ Outputable.printForUser dflags stdout neverQualify doc
+  liftIO $ Ppr.printForUser dflags stdout neverQualify AllTheWay doc
 
 printForUserModInfo :: GhcMonad m => GHC.ModuleInfo -> SDoc -> m ()
 printForUserModInfo info doc = do
   dflags <- getDynFlags
   mUnqual <- GHC.mkPrintUnqualifiedForModule info
   unqual <- maybe GHC.getPrintUnqual return mUnqual
-  liftIO $ Outputable.printForUser dflags stdout unqual doc
+  liftIO $ Ppr.printForUser dflags stdout unqual AllTheWay doc
 
 printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do
   unqual <- GHC.getPrintUnqual
   dflags <- getDynFlags
-  liftIO $ Outputable.printForUser dflags stdout unqual doc
+  liftIO $ Ppr.printForUser dflags stdout unqual AllTheWay doc
 
 printForUserPartWay :: GhcMonad m => SDoc -> m ()
 printForUserPartWay doc = do
   unqual <- GHC.getPrintUnqual
   dflags <- getDynFlags
-  liftIO $ Outputable.printForUserPartWay dflags stdout (pprUserLength dflags) unqual doc
+  liftIO $ Ppr.printForUser dflags stdout unqual DefaultDepth doc
 
 -- | Run a single Haskell expression
 runStmt
@@ -482,7 +432,7 @@ runWithStats
   => (a -> Maybe Integer) -> m a -> m (ActionStats, Either SomeException a)
 runWithStats getAllocs action = do
   t0 <- liftIO getCurrentTime
-  result <- gtry action
+  result <- MC.try action
   let allocs = either (const Nothing) getAllocs result
   t1 <- liftIO getCurrentTime
   let elapsedTime = realToFrac $ t1 `diffUTCTime` t0
@@ -491,7 +441,7 @@ runWithStats getAllocs action = do
 printStats :: DynFlags -> ActionStats -> IO ()
 printStats dflags ActionStats{actionAllocs = mallocs, actionElapsedTime = secs}
    = do let secs_str = showFFloat (Just 2) secs
-        putStrLn (showSDoc dflags (
+        putStrLn (Ppr.showSDoc dflags (
                  parens (text (secs_str "") <+> text "secs" <> comma <+>
                          case mallocs of
                            Nothing -> empty

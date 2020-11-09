@@ -4,14 +4,16 @@
 module Main where
 
 import GHC.Types.Basic
+import GHC.Types.SourceText
 import Data.Data
 import Data.List (intercalate)
 import System.IO
 import GHC
 import GHC.Driver.Session
-import MonadUtils
-import Outputable
-import Bag (filterBag,isEmptyBag)
+import GHC.Driver.Ppr
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
+import GHC.Data.Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
 import qualified Data.Map as Map
@@ -71,7 +73,7 @@ testOneFile libdir fileName = do
        = ["HsIsString [" ++ src ++ "] " ++ show c]
      doOverLit _ = []
 
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a
 
 -- ---------------------------------------------------------------------
 

@@ -1,5 +1,7 @@
 ------------------------------------------------------------------
 -- A primop-table mangling program                              --
+--
+-- See Note [GHC.Prim] in primops.txt.pp for details.
 ------------------------------------------------------------------
 
 module Main where
@@ -189,6 +191,9 @@ main = getArgs >>= \args ->
                       "--make-latex-doc"
                          -> putStr (gen_latex_doc p_o_specs)
 
+                      "--wired-in-docs"
+                         -> putStr (gen_wired_in_docs p_o_specs)
+
                       _ -> error "Should not happen, known_args out of sync?"
                    )
 
@@ -211,7 +216,8 @@ known_args
        "--primop-vector-tycons",
        "--make-haskell-wrappers",
        "--make-haskell-source",
-       "--make-latex-doc"
+       "--make-latex-doc",
+       "--wired-in-docs"
      ]
 
 ------------------------------------------------------------------
@@ -268,7 +274,7 @@ gen_hs_source (Info defaults entries) =
                      -- with Declaration for $fEqMaybe:
                      --       attempting to use module ‘GHC.Classes’
                      --       (libraries/ghc-prim/./GHC/Classes.hs) which is not loaded
-                     -- coming from GHC.IFace.Load.homeModError
+                     -- coming from GHC.Iface.Load.homeModError
                      -- I'm not sure precisely why; but I *am* sure that we don't need
                      -- any type-class defaulting; and it's clearly wrong to need
                      -- the base package when haddocking ghc-prim
@@ -289,8 +295,6 @@ gen_hs_source (Info defaults entries) =
            hdr (PrimOpSpec { name = n })                         = wrapOp n ++ ","
            hdr (PrimVecOpSpec { name = n })                      = wrapOp n ++ ","
            hdr (PseudoOpSpec { name = n })                       = wrapOp n ++ ","
-           hdr (PrimTypeSpec { ty = TyApp (TyCon "->") _ })      = ""
-                  -- GHC lacks the syntax to explicitly export "->"
            hdr (PrimTypeSpec { ty = TyApp (TyCon n) _ })         = wrapOp n ++ ","
            hdr (PrimTypeSpec {})                                 = error $ "Illegal type spec"
            hdr (PrimVecTypeSpec { ty = TyApp (VecTyCon n _) _ }) = wrapOp n ++ ","
@@ -360,21 +364,23 @@ gen_hs_source (Info defaults entries) =
 
            prim_data t = [ "data " ++ pprTy t ]
 
-           unlatex s = case s of
-                '\\':'t':'e':'x':'t':'t':'t':'{':cs -> markup "@" "@" cs
-                '{':'\\':'t':'e':'x':'t':'t':'t':' ':cs -> markup "@" "@" cs
-                '{':'\\':'t':'t':cs -> markup "@" "@" cs
-                '{':'\\':'i':'t':cs -> markup "/" "/" cs
-                '{':'\\':'e':'m':cs -> markup "/" "/" cs
-                c : cs -> c : unlatex cs
-                "" -> ""
-           markup s t xs = s ++ mk (dropWhile isSpace xs)
-                where mk ""        = t
-                      mk ('\n':cs) = ' ' : mk cs
-                      mk ('}':cs)  = t ++ unlatex cs
-                      mk (c:cs)    = c : mk cs
            escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
                 where special = "/'`\"@<"
+
+unlatex :: String -> String
+unlatex s = case s of
+  '\\':'t':'e':'x':'t':'t':'t':'{':cs -> markup "@" "@" cs
+  '{':'\\':'t':'e':'x':'t':'t':'t':' ':cs -> markup "@" "@" cs
+  '{':'\\':'t':'t':cs -> markup "@" "@" cs
+  '{':'\\':'i':'t':cs -> markup "/" "/" cs
+  '{':'\\':'e':'m':cs -> markup "/" "/" cs
+  c : cs -> c : unlatex cs
+  "" -> ""
+  where markup b e xs = b ++ mk (dropWhile isSpace xs)
+          where mk ""        = e
+                mk ('\n':cs) = ' ' : mk cs
+                mk ('}':cs)  = e ++ unlatex cs
+                mk (c:cs)    = c : mk cs
 
 -- | Extract a string representation of the name
 getName :: Entry -> Maybe String
@@ -382,6 +388,7 @@ getName PrimOpSpec{ name = n } = Just n
 getName PrimVecOpSpec{ name = n } = Just n
 getName PseudoOpSpec{ name = n } = Just n
 getName PrimTypeSpec{ ty = TyApp tc _ } = Just (show tc)
+getName PrimVecTypeSpec{ ty = TyApp tc _ } = Just (show tc)
 getName _ = Nothing
 
 {- Note [Placeholder declarations]
@@ -391,8 +398,6 @@ keep GHC's renamer and typechecker happy enough for what Haddock
 needs.  Our main plan is to say
         foo :: <type>
         foo = foo
-We have to silence GHC's complaints about unboxed-top-level declarations
-with an ad-hoc fix in GHC.Tc.Gen.Bind: see Note [Compiling GHC.Prim] in GHC.Tc.Gen.Bind.
 
 That works for all the primitive functions except tagToEnum#.
 If we generate the binding
@@ -782,6 +787,30 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
                -> unlines alternatives
                   ++ fn_name ++ " _ = " ++ getAltRhs xx ++ "\n"
 
+{-
+Note [GHC.Prim Docs]
+~~~~~~~~~~~~~~~~~~~~
+For haddocks of GHC.Prim we generate a dummy haskell file (gen_hs_source) that
+contains the type signatures and the commends (but no implementations)
+specifically for consumption by haddock.
+
+GHCi's :doc command reads directly from ModIface's though, and GHC.Prim has a
+wired-in iface that has nothing to do with the above haskell file. The code
+below converts primops.txt into an intermediate form that would later be turned
+into a proper DeclDocMap.
+
+We output the docs as a list of pairs (name, docs). We use stringy names here
+because mapping names to "Name"s is difficult for things like primtypes and
+pseudoops.
+-}
+gen_wired_in_docs :: Info -> String
+gen_wired_in_docs (Info _ entries)
+  = "primOpDocs =\n  [ " ++ intercalate "\n  , " (catMaybes $ map mkDoc $ concatMap desugarVectorSpec entries) ++ "\n  ]\n"
+    where
+      mkDoc po | Just poName <- getName po
+               , not $ null $ desc po = Just $ show (poName, unlatex $ desc po)
+               | otherwise = Nothing
+
 ------------------------------------------------------------------
 -- Create PrimOpInfo text from PrimOpSpecs -----------------------
 ------------------------------------------------------------------
@@ -805,16 +834,6 @@ mkPOI_RHS_text i
                  TyF t1 (TyF _ _)
                     -> "mkCompare " ++ sl_name i ++ ppType t1
                  _ -> error "Type error in comparison op"
-        Monadic
-           -> case ty i of
-                 TyF t1 _
-                    -> "mkMonadic " ++ sl_name i ++ ppType t1
-                 _ -> error "Type error in monadic op"
-        Dyadic
-           -> case ty i of
-                 TyF t1 (TyF _ _)
-                    -> "mkDyadic " ++ sl_name i ++ ppType t1
-                 _ -> error "Type error in dyadic op"
         GenPrimOp
            -> let (argTys, resTy) = flatTys (ty i)
                   tvs = nub (tvsIn (ty i))
@@ -888,17 +907,17 @@ ppType (TyApp (TyCon "StableName#") [x]) = "mkStableNamePrimTy " ++ ppType x
 
 ppType (TyApp (TyCon "MVar#") [x,y])     = "mkMVarPrimTy " ++ ppType x
                                            ++ " " ++ ppType y
+ppType (TyApp (TyCon "IOPort#") [x,y])   = "mkIOPortPrimTy " ++ ppType x
+                                           ++ " " ++ ppType y
 ppType (TyApp (TyCon "TVar#") [x,y])     = "mkTVarPrimTy " ++ ppType x
                                            ++ " " ++ ppType y
-ppType (TyApp (TyCon "Void#") [])        = "voidPrimTy"
-
 ppType (TyApp (VecTyCon _ pptc) [])      = pptc
 
 ppType (TyUTup ts) = "(mkTupleTy Unboxed "
                      ++ listify (map ppType ts) ++ ")"
 
-ppType (TyF s d) = "(mkVisFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
-ppType (TyC s d) = "(mkInvisFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
+ppType (TyF s d) = "(mkVisFunTyMany ("   ++ ppType s ++ ") (" ++ ppType d ++ "))"
+ppType (TyC s d) = "(mkInvisFunTyMany (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
 
 ppType other
    = error ("ppType: can't handle: " ++ show other ++ "\n")

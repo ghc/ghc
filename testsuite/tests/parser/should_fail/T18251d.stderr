@@ -1,0 +1,3 @@
+
+T18251d.hs:6:1: error:
+    Type applications in patterns are not yet supported

@@ -31,7 +31,6 @@ instance Applicative (M m) where
 
 instance Monad m => Monad (M m) where
     (>>=) = undefined
-    return = undefined
 
 instance MonadError e m => MonadError e (M m)
 

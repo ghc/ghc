@@ -9,16 +9,16 @@ module GHC.Types.CostCentre.State
    )
 where
 
-import GhcPrelude
-import FastString
-import FastStringEnv
+import GHC.Prelude
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
 
 import Data.Data
-import Binary
+import GHC.Utils.Binary
 
 -- | Per-module state for tracking cost centre indices.
 --
--- See documentation of 'CostCentre.cc_flavour' for more details.
+-- See documentation of 'GHC.Types.CostCentre.cc_flavour' for more details.
 newtype CostCentreState = CostCentreState (FastStringEnv Int)
 
 -- | Initialize cost centre state.

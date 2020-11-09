@@ -1,24 +1,28 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+
 --
 -- Copyright (c) 2018 Andreas Klebinger
 --
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module GHC.CmmToAsm.BlockLayout
     ( sequenceTop, backendMaintainsCfg)
 where
 
 #include "HsVersions.h"
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Ppr     (pprTrace)
 
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.CFG
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Config
 
 import GHC.Cmm.BlockId
 import GHC.Cmm
@@ -26,21 +30,20 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 
 import GHC.Platform
-import GHC.Driver.Session (gopt, GeneralFlag(..), DynFlags, targetPlatform)
 import GHC.Types.Unique.FM
-import Util
-import GHC.Types.Unique
+import GHC.Utils.Misc
 
-import Digraph
-import Outputable
-import Maybes
+import GHC.Data.Graph.Directed
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.Maybe
 
 -- DEBUGGING ONLY
 --import GHC.Cmm.DebugBlock
 --import Debug.Trace
-import ListSetOps (removeDups)
+import GHC.Data.List.SetOps (removeDups)
 
-import OrdList
+import GHC.Data.OrdList
 import Data.List
 import Data.Foldable (toList)
 
@@ -240,7 +243,44 @@ import Control.Monad (foldM)
   Assuming that Lwork is large the chance that the "call" ends up
   in the same cache line is also fairly small.
 
--}
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ~~~ Note [Layout relevant edge weights]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  The input to the chain based code layout algorithm is a CFG
+  with edges annotated with their frequency. The frequency
+  of traversal corresponds quite well to the cost of not placing
+  the connected blocks next to each other.
+
+  However even if having the same frequency certain edges are
+  inherently more or less relevant to code layout.
+
+  In particular:
+
+  * Edges which cross an info table are less relevant than others.
+
+    If we place the blocks across this edge next to each other
+    they are still separated by the info table which negates
+    much of the benefit. It makes it less likely both blocks
+    will share a cache line reducing the benefits from locality.
+    But it also prevents us from eliminating jump instructions.
+
+  * Conditional branches and switches are slightly less relevant.
+
+    We can completely remove unconditional jumps by placing them
+    next to each other. This is not true for conditional branch edges.
+    We apply a small modifier to them to ensure edges for which we can
+    eliminate the overhead completely are considered first. See also #18053.
+
+  * Edges constituted by a call are ignored.
+
+    Considering these hardly helped with performance and ignoring
+    them helps quite a bit to improve compiler performance.
+
+  So we perform a preprocessing step where we apply a multiplicator
+  to these kinds of edges.
+
+  -}
 
 
 -- | Look at X number of blocks in two chains to determine
@@ -435,7 +475,6 @@ combineNeighbourhood edges chains
                  applyEdges edges newEnds newFronts (Set.insert (from,to) combined)
             | otherwise
             = applyEdges edges chainEnds chainFronts combined
-         where
 
         getFronts chain = takeL neighbourOverlapp chain
         getEnds chain = takeR neighbourOverlapp chain
@@ -508,7 +547,7 @@ buildChains edges blocks
     -- buildNext builds up chains from edges one at a time.
 
     -- We keep a map from the ends of chains to the chains.
-    -- This we we can easily check if an block should be appended to an
+    -- This way we can easily check if an block should be appended to an
     -- existing chain!
     -- We store them using STRefs so we don't have to rebuild the spine of both
     -- maps every time we update a chain.
@@ -548,19 +587,14 @@ buildChains edges blocks
         , Just predChain <- mapLookup from chainEnds
         , Just succChain <- mapLookup to chainStarts
         , predChain /= succChain -- Otherwise we try to create a cycle.
-        = do
-            -- pprTraceM "Fusing edge" (ppr edge)
-            fuseChain predChain succChain
+          = fuseChain predChain succChain
 
         | (alreadyPlaced from) &&
           (alreadyPlaced to)
-        =   --pprTraceM "Skipping:" (ppr edge) >>
-            buildNext placed chainStarts chainEnds todo linked
+          = buildNext placed chainStarts chainEnds todo linked
 
         | otherwise
-        = do -- pprTraceM "Finding chain for:" (ppr edge $$
-             --         text "placed" <+> ppr placed)
-             findChain
+          = findChain
       where
         from = edgeFrom edge
         to   = edgeTo   edge
@@ -629,42 +663,42 @@ buildChains edges blocks
 
 -- | Place basic blocks based on the given CFG.
 -- See Note [Chain based CFG serialization]
-sequenceChain :: forall a i. (Instruction i, Outputable i)
+sequenceChain :: forall a i. Instruction i
               => LabelMap a -- ^ Keys indicate an info table on the block.
               -> CFG -- ^ Control flow graph and some meta data.
               -> [GenBasicBlock i] -- ^ List of basic blocks to be placed.
               -> [GenBasicBlock i] -- ^ Blocks placed in sequence.
 sequenceChain _info _weights    [] = []
 sequenceChain _info _weights    [x] = [x]
-sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
-    let weights :: CFG
-        weights = --pprTrace "cfg'" (pprEdgeWeights cfg')
-                  cfg'
-          where
-            (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-} mkGlobalWeights entry weights'
-            cfg' = {-# SCC rewriteEdges #-}
-                    mapFoldlWithKey
-                        (\cfg from m ->
-                            mapFoldlWithKey
-                                (\cfg to w -> setEdgeWeight cfg (EdgeWeight w) from to )
-                                cfg m )
-                        weights'
-                        globalEdgeWeights
-
-        directEdges :: [CfgEdge]
+sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
+    let directEdges :: [CfgEdge]
         directEdges = sortBy (flip compare) $ catMaybes . map relevantWeight $ (infoEdgeList weights)
           where
+            -- Apply modifiers to turn edge frequencies into useable weights
+            -- for computing code layout.
+            -- See also Note [Layout relevant edge weights]
             relevantWeight :: CfgEdge -> Maybe CfgEdge
             relevantWeight edge@(CfgEdge from to edgeInfo)
                 | (EdgeInfo CmmSource { trans_cmmNode = CmmCall {} } _) <- edgeInfo
-                -- Ignore edges across calls
+                -- Ignore edges across calls.
                 = Nothing
                 | mapMember to info
                 , w <- edgeWeight edgeInfo
-                -- The payoff is small if we jump over an info table
+                -- The payoff is quite small if we jump over an info table
                 = Just (CfgEdge from to edgeInfo { edgeWeight = w/8 })
+                | (EdgeInfo CmmSource { trans_cmmNode = exitNode } _) <- edgeInfo
+                , cantEliminate exitNode
+                , w <- edgeWeight edgeInfo
+                -- A small penalty to edge types which
+                -- we can't optimize away by layout.
+                -- w * 0.96875 == w - w/32
+                = Just (CfgEdge from to edgeInfo { edgeWeight = w * 0.96875 })
                 | otherwise
                 = Just edge
+                where
+                  cantEliminate CmmCondBranch {} = True
+                  cantEliminate CmmSwitch {} = True
+                  cantEliminate _ = False
 
         blockMap :: LabelMap (GenBasicBlock i)
         blockMap
@@ -776,31 +810,33 @@ dropJumps info ((BasicBlock lbl ins):todo)
 -- fallthroughs.
 
 sequenceTop
-    :: (Instruction instr, Outputable instr)
-    => DynFlags -- Determine which layout algo to use
-    -> NcgImpl statics instr jumpDest
+    :: Instruction instr
+    => NcgImpl statics instr jumpDest
     -> Maybe CFG -- ^ CFG if we have one.
     -> NatCmmDecl statics instr -- ^ Function to serialize
     -> NatCmmDecl statics instr
 
-sequenceTop _     _       _           top@(CmmData _ _) = top
-sequenceTop dflags ncgImpl edgeWeights
-            (CmmProc info lbl live (ListGraph blocks))
-  | (gopt Opt_CfgBlocklayout dflags) && backendMaintainsCfg (targetPlatform dflags)
-  --Use chain based algorithm
-  , Just cfg <- edgeWeights
-  = CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
-                            {-# SCC layoutBlocks #-}
-                            sequenceChain info cfg blocks )
-  | otherwise
-  --Use old algorithm
-  = let cfg = if dontUseCfg then Nothing else edgeWeights
-    in  CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
-                                {-# SCC layoutBlocks #-}
-                                sequenceBlocks cfg info blocks)
-  where
-    dontUseCfg = gopt Opt_WeightlessBlocklayout dflags ||
-                 (not $ backendMaintainsCfg (targetPlatform dflags))
+sequenceTop _       _           top@(CmmData _ _) = top
+sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks))
+  = let
+      config     = ncgConfig ncgImpl
+      platform   = ncgPlatform config
+
+    in CmmProc info lbl live $ ListGraph $ ncgMakeFarBranches ncgImpl info $
+         if -- Chain based algorithm
+            | ncgCfgBlockLayout config
+            , backendMaintainsCfg platform
+            , Just cfg <- edgeWeights
+            -> {-# SCC layoutBlocks #-} sequenceChain info cfg blocks
+
+            -- Old algorithm without edge weights
+            | ncgCfgWeightlessLayout config
+               || not (backendMaintainsCfg platform)
+            -> {-# SCC layoutBlocks #-} sequenceBlocks Nothing info blocks
+
+            -- Old algorithm with edge weights (if any)
+            | otherwise
+            -> {-# SCC layoutBlocks #-} sequenceBlocks edgeWeights info blocks
 
 -- The old algorithm:
 -- It is very simple (and stupid): We make a graph out of
@@ -889,8 +925,8 @@ seqBlocks infos blocks = placeNext pullable0 todo0
         = pprPanic "seqBlocks" (ppr tooManyNextNodes)
 
 
-lookupDeleteUFM :: Uniquable key => UniqFM elt -> key
-                -> Maybe (elt, UniqFM elt)
+lookupDeleteUFM :: UniqFM BlockId elt -> BlockId
+                -> Maybe (elt, UniqFM BlockId elt)
 lookupDeleteUFM m k = do -- Maybe monad
     v <- lookupUFM m k
     return (v, delFromUFM m k)

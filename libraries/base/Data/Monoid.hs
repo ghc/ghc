@@ -129,16 +129,6 @@ import Data.Semigroup.Internal
 --
 -- >>> getFirst (First (Just "hello") <> First Nothing <> First (Just "world"))
 -- Just "hello"
---
--- Use of this type is discouraged. Note the following equivalence:
---
--- > Data.Monoid.First x === Maybe (Data.Semigroup.First x)
---
--- In addition to being equivalent in the structural sense, the two
--- also have 'Monoid' instances that behave the same. This type will
--- be marked deprecated in GHC 8.8, and removed in GHC 8.10.
--- Users are advised to use the variant from "Data.Semigroup" and wrap
--- it in 'Maybe'.
 newtype First a = First { getFirst :: Maybe a }
         deriving ( Eq          -- ^ @since 2.01
                  , Ord         -- ^ @since 2.01
@@ -168,16 +158,6 @@ instance Monoid (First a) where
 --
 -- >>> getLast (Last (Just "hello") <> Last Nothing <> Last (Just "world"))
 -- Just "world"
---
--- Use of this type is discouraged. Note the following equivalence:
---
--- > Data.Monoid.Last x === Maybe (Data.Semigroup.Last x)
---
--- In addition to being equivalent in the structural sense, the two
--- also have 'Monoid' instances that behave the same. This type will
--- be marked deprecated in GHC 8.8, and removed in GHC 8.10.
--- Users are advised to use the variant from "Data.Semigroup" and wrap
--- it in 'Maybe'.
 newtype Last a = Last { getLast :: Maybe a }
         deriving ( Eq          -- ^ @since 2.01
                  , Ord         -- ^ @since 2.01
@@ -233,7 +213,33 @@ instance (Applicative f, Bounded a) => Bounded (Ap f a) where
   minBound = pure minBound
   maxBound = pure maxBound
 
--- | @since 4.12.0.0
+-- | Note that even if the underlying 'Num' and 'Applicative' instances are
+-- lawful, for most 'Applicative's, this instance will not be lawful. If you use
+-- this instance with the list 'Applicative', the following customary laws will
+-- not hold:
+--
+-- Commutativity:
+--
+-- >>> Ap [10,20] + Ap [1,2]
+-- Ap {getAp = [11,12,21,22]}
+-- >>> Ap [1,2] + Ap [10,20]
+-- Ap {getAp = [11,21,12,22]}
+--
+-- Additive inverse:
+--
+-- >>> Ap [] + negate (Ap [])
+-- Ap {getAp = []}
+-- >>> fromInteger 0 :: Ap [] Int
+-- Ap {getAp = [0]}
+--
+-- Distributivity:
+--
+-- >>> Ap [1,2] * (3 + 4)
+-- Ap {getAp = [7,14]}
+-- >>> (Ap [1,2] * 3) + (Ap [1,2] * 4)
+-- Ap {getAp = [7,11,10,14]}
+--
+-- @since 4.12.0.0
 instance (Applicative f, Num a) => Num (Ap f a) where
   (+)         = liftA2 (+)
   (*)         = liftA2 (*)

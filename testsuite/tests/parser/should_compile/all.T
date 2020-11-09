@@ -86,6 +86,7 @@ test('T3303', [], multimod_compile, ['T3303', '-v0'])
 test('T3741', normal, compile, [''])
 test('DoAndIfThenElse', normal, compile, [''])
 test('BlockArguments', normal, compile, [''])
+test('BlockArgumentsArrowCmds', normal, compile, [''])
 test('BlockArgumentsLambdaCase', normal, compile, [''])
 test('NoBlockArguments', normal, compile, [''])
 test('NondecreasingIndentation', normal, compile, [''])
@@ -93,6 +94,7 @@ test('mc15', normal, compile, [''])
 test('mc16', normal, compile, [''])
 test('EmptyDecls', normal, compile, [''])
 test('ParserLambdaCase', [], compile, [''])
+test('ParserArrowLambdaCase', [], compile, [''])
 
 test('ColumnPragma', normal, compile, [''])
 test('T5243', [], multimod_compile, ['T5243', ''])
@@ -150,6 +152,9 @@ test('proposal-229a', normal, compile, [''])
 test('proposal-229b', normal, compile, [''])
 test('proposal-229d', normal, compile, [''])
 test('proposal-229e', normal, compile, [''])
+test('LexicalNegation', normal, compile, [''])
+test('NegativeLiterals', normal, compile, [''])
+test('NegativeLiteralsNoExt', normal, compile, [''])
 
 # We omit 'profasm' because it fails with:
 # Cannot load -prof objects when GHC is built with -dynamic
@@ -164,3 +169,7 @@ test('proposal-229f',
      multimod_compile_and_run, ['proposal-229f.hs', ''])
 
 test('T15730a', normal, compile_and_run, [''])
+test('T18130', normal, compile, [''])
+test('T18834a', normal, compile, [''])
+test('T18834b', normal, compile, [''])
+test('T12862', normal, compile, [''])

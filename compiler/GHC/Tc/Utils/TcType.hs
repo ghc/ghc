@@ -1,13 +1,16 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 -}
 
-{-# LANGUAGE CPP, ScopedTypeVariables, MultiWayIf, FlexibleContexts #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
--- | Types used in the typechecker}
+-- | Types used in the typechecker
 --
 -- This module provides the Type interface for front-end parts of the
 -- compiler.  These parts
@@ -21,8 +24,8 @@ module GHC.Tc.Utils.TcType (
   -- Types
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
-  TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcTyCon,
-  KnotTied,
+  TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcInvisTVBinder, TcReqTVBinder,
+  TcTyCon, KnotTied,
 
   ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
 
@@ -57,7 +60,8 @@ module GHC.Tc.Utils.TcType (
   -- These are important because they do not look through newtypes
   getTyVar,
   tcSplitForAllTy_maybe,
-  tcSplitForAllTys, tcSplitForAllTysSameVis,
+  tcSplitForAllTys, tcSplitSomeForAllTys,
+  tcSplitForAllTysReq, tcSplitForAllTysInvis,
   tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllVarBndrs,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
@@ -67,7 +71,7 @@ module GHC.Tc.Utils.TcType (
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
   tcRepGetNumAppTys,
   tcGetCastedTyVar_maybe, tcGetTyVar_maybe, tcGetTyVar,
-  tcSplitSigmaTy, tcSplitNestedSigmaTys, tcDeepSplitSigmaTy_maybe,
+  tcSplitSigmaTy, tcSplitNestedSigmaTys,
 
   ---------------------------------
   -- Predicates.
@@ -76,8 +80,9 @@ module GHC.Tc.Utils.TcType (
   pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
-  isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
-  hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
+  isIntegerTy, isNaturalTy,
+  isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
+  isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
   isRigidTy, isAlmostFunctionFree,
@@ -128,16 +133,18 @@ module GHC.Tc.Utils.TcType (
   --------------------------------
   -- Reexported from Type
   Type, PredType, ThetaType, TyCoBinder,
-  ArgFlag(..), AnonArgFlag(..), ForallVisFlag(..),
+  ArgFlag(..), AnonArgFlag(..),
 
-  mkForAllTy, mkForAllTys, mkTyCoInvForAllTys, mkSpecForAllTys, mkTyCoInvForAllTy,
-  mkInvForAllTy, mkInvForAllTys,
-  mkVisFunTy, mkVisFunTys, mkInvisFunTy, mkInvisFunTys,
+  mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
+  mkSpecForAllTys, mkTyCoInvForAllTy,
+  mkInfForAllTy, mkInfForAllTys,
+  mkVisFunTy, mkVisFunTys, mkInvisFunTy, mkInvisFunTyMany,
+  mkVisFunTyMany, mkVisFunTysMany, mkInvisFunTysMany,
   mkTyConApp, mkAppTy, mkAppTys,
   mkTyConTy, mkTyVarTy, mkTyVarTys,
   mkTyCoVarTy, mkTyCoVarTys,
 
-  isClassPred, isEqPrimPred, isIPPred, isEqPred, isEqPredClass,
+  isClassPred, isEqPrimPred, isIPLikePred, isEqPred, isEqPredClass,
   mkClassPred,
   tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
   isRuntimeRepVar, isKindLevPoly,
@@ -153,9 +160,10 @@ module GHC.Tc.Utils.TcType (
   Type.lookupTyVar, Type.extendTCvSubst, Type.substTyVarBndr,
   Type.extendTvSubst,
   isInScope, mkTCvSubst, mkTvSubst, zipTyEnv, zipCoEnv,
-  Type.substTy, substTys, substTyWith, substTyWithCoVars,
+  Type.substTy, substTys, substScaledTys, substTyWith, substTyWithCoVars,
   substTyAddInScope,
-  substTyUnchecked, substTysUnchecked, substThetaUnchecked,
+  substTyUnchecked, substTysUnchecked, substScaledTyUnchecked,
+  substThetaUnchecked,
   substTyWithUnchecked,
   substCoUnchecked, substCoWithUnchecked,
   substTheta,
@@ -174,7 +182,7 @@ module GHC.Tc.Utils.TcType (
 
   --------------------------------
   pprKind, pprParendKind, pprSigmaType,
-  pprType, pprParendType, pprTypeApp, pprTyThingCategory, tyThingCategory,
+  pprType, pprParendType, pprTypeApp,
   pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
   pprTCvBndr, pprTCvBndrs,
 
@@ -189,7 +197,7 @@ module GHC.Tc.Utils.TcType (
 #include "HsVersions.h"
 
 -- friends:
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst ( mkTvSubst, substTyWithCoVars )
@@ -217,12 +225,13 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyCon, unitTyConKey
                          , listTyCon, constraintKind )
 import GHC.Types.Basic
-import Util
-import Maybes
-import ListSetOps ( getNth, findDupsEq )
-import Outputable
-import FastString
-import ErrUtils( Validity(..), MsgDoc, isValid )
+import GHC.Utils.Misc
+import GHC.Data.Maybe
+import GHC.Data.List.SetOps ( getNth, findDupsEq )
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
+import GHC.Utils.Error( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )
@@ -337,8 +346,10 @@ type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
         -- a cannot occur inside a MutTyVar in T; that is,
         -- T is "flattened" before quantifying over a
 
-type TcTyVarBinder   = TyVarBinder
-type TcTyCon         = TyCon   -- these can be the TcTyCon constructor
+type TcTyVarBinder     = TyVarBinder
+type TcInvisTVBinder   = InvisTVBinder
+type TcReqTVBinder     = ReqTVBinder
+type TcTyCon           = TyCon   -- these can be the TcTyCon constructor
 
 -- These types do not have boxy type variables in them
 type TcPredType     = PredType
@@ -359,7 +370,7 @@ type TcDTyCoVarSet  = DTyCoVarSet
 ********************************************************************* -}
 
 -- | An expected type to check against during type-checking.
--- See Note [ExpType] in GHC.Tc.Utils.TcMType, where you'll also find manipulators.
+-- See Note [ExpType] in "GHC.Tc.Utils.TcMType", where you'll also find manipulators.
 data ExpType = Check TcType
              | Infer !InferResult
 
@@ -407,10 +418,13 @@ mkCheckExpType = Check
 -- for the 'SynType', because you've said positively that it should be an
 -- Int, and so it shall be.
 --
--- This is defined here to avoid defining it in GHC.Tc.Gen.Expr boot file.
+-- You'll also get three multiplicities back: one for each function arrow. See
+-- also Note [Linear types] in Multiplicity.
+--
+-- This is defined here to avoid defining it in "GHC.Tc.Gen.Expr" boot file.
 data SyntaxOpType
   = SynAny     -- ^ Any type
-  | SynRho     -- ^ A rho type, deeply skolemised or instantiated as appropriate
+  | SynRho     -- ^ A rho type, skolemised or instantiated as appropriate
   | SynList    -- ^ A list type. You get back the element type of the list
   | SynFun SyntaxOpType SyntaxOpType
                -- ^ A function.
@@ -429,11 +443,12 @@ mkSynFunTys arg_tys res_ty = foldr SynFun (SynType res_ty) arg_tys
 {-
 Note [TcRhoType]
 ~~~~~~~~~~~~~~~~
-A TcRhoType has no foralls or contexts at the top, or to the right of an arrow
-  YES    (forall a. a->a) -> Int
+A TcRhoType has no foralls or contexts at the top
   NO     forall a. a ->  Int
   NO     Eq a => a -> a
-  NO     Int -> forall a. a -> Int
+  YES    a -> a
+  YES    (forall a. a->a) -> Int
+  YES    Int -> forall a. a -> Int
 
 
 ************************************************************************
@@ -444,8 +459,8 @@ A TcRhoType has no foralls or contexts at the top, or to the right of an arrow
 
 TyVarDetails gives extra info about type variables, used during type
 checking.  It's attached to mutable type variables only.
-It's knot-tied back to Var.hs.  There is no reason in principle
-why Var.hs shouldn't actually have the definition, but it "belongs" here.
+It's knot-tied back to "GHC.Types.Var".  There is no reason in principle
+why "GHC.Types.Var" shouldn't actually have the definition, but it "belongs" here.
 
 Note [Signature skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -549,6 +564,9 @@ data MetaInfo
                    -- It is filled in /only/ by unflattenGivens
                    -- See Note [The flattening story] in GHC.Tc.Solver.Flatten
 
+   | RuntimeUnkTv  -- A unification variable used in the GHCi debugger.
+                   -- It /is/ allowed to unify with a polytype, unlike TauTv
+
 instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
@@ -558,6 +576,7 @@ instance Outputable MetaInfo where
   ppr TyVarTv       = text "tyv"
   ppr FlatMetaTv    = text "fmv"
   ppr FlatSkolTv    = text "fsk"
+  ppr RuntimeUnkTv  = text "rutv"
 
 {- *********************************************************************
 *                                                                      *
@@ -693,7 +712,9 @@ tcTyVarLevel tv
 tcTypeLevel :: TcType -> TcLevel
 -- Max level of any free var of the type
 tcTypeLevel ty
-  = foldDVarSet add topTcLevel (tyCoVarsOfTypeDSet ty)
+  = nonDetStrictFoldDVarSet add topTcLevel (tyCoVarsOfTypeDSet ty)
+    -- It's safe to use a non-deterministic fold because `maxTcLevel` is
+    -- commutative.
   where
     add v lvl
       | isTcTyVar v = lvl `maxTcLevel` tcTyVarLevel v
@@ -744,8 +765,8 @@ promoteSkolemsX tclvl = mapAccumL (promoteSkolemX tclvl)
 --
 -- This is important for its use in deciding termination of type
 -- instances (see #11581).  E.g.
---    type instance G [Int] = ...(F Int <big type>)...
--- we don't need to take <big type> into account when asking if
+--    type instance G [Int] = ...(F Int \<big type>)...
+-- we don't need to take \<big type> into account when asking if
 -- the calls on the RHS are smaller than the LHS
 tcTyFamInsts :: Type -> [(TyCon, [Type])]
 tcTyFamInsts = map (\(_,b,c) -> (b,c)) . tcTyFamInstsAndVis
@@ -797,7 +818,8 @@ tcTyFamInstsAndVisX = go
     go _            (LitTy {})         = []
     go is_invis_arg (ForAllTy bndr ty) = go is_invis_arg (binderType bndr)
                                          ++ go is_invis_arg ty
-    go is_invis_arg (FunTy _ ty1 ty2)  = go is_invis_arg ty1
+    go is_invis_arg (FunTy _ w ty1 ty2)  = go is_invis_arg w
+                                         ++ go is_invis_arg ty1
                                          ++ go is_invis_arg ty2
     go is_invis_arg ty@(AppTy _ _)     =
       let (ty_head, ty_args) = splitAppTys ty
@@ -854,8 +876,8 @@ anyRewritableTyVar ignore_cos role pred ty
     go _ _     (LitTy {})        = False
     go rl bvs (TyConApp tc tys)  = go_tc rl bvs tc tys
     go rl bvs (AppTy fun arg)    = go rl bvs fun || go NomEq bvs arg
-    go rl bvs (FunTy _ arg res)  = go NomEq bvs arg_rep || go NomEq bvs res_rep ||
-                                   go rl bvs arg || go rl bvs res
+    go rl bvs (FunTy _ w arg res)  = go NomEq bvs arg_rep || go NomEq bvs res_rep ||
+                                     go rl bvs arg || go rl bvs res || go NomEq bvs w
       where arg_rep = getRuntimeRep arg -- forgetting these causes #17024
             res_rep = getRuntimeRep res
     go rl bvs (ForAllTy tv ty)   = go rl (bvs `extendVarSet` binderVar tv) ty
@@ -1126,7 +1148,7 @@ mkSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
 mkSpecSigmaTy tyvars preds ty = mkSigmaTy (mkTyCoVarBinders Specified tyvars) preds ty
 
 mkPhiTy :: [PredType] -> Type -> Type
-mkPhiTy = mkInvisFunTys
+mkPhiTy = mkInvisFunTysMany
 
 ---------------
 getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to
@@ -1207,13 +1229,30 @@ tcSplitForAllTys ty
   = ASSERT( all isTyVar (fst sty) ) sty
   where sty = splitForAllTys ty
 
--- | Like 'tcSplitForAllTys', but only splits a 'ForAllTy' if
--- @'sameVis' argf supplied_argf@ is 'True', where @argf@ is the visibility
--- of the @ForAllTy@'s binder and @supplied_argf@ is the visibility provided
--- as an argument to this function.
-tcSplitForAllTysSameVis :: ArgFlag -> Type -> ([TyVar], Type)
-tcSplitForAllTysSameVis supplied_argf ty = ASSERT( all isTyVar (fst sty) ) sty
-  where sty = splitForAllTysSameVis supplied_argf ty
+-- | Like 'tcSplitForAllTys', but only splits a 'ForAllTy' if @argf_pred argf@
+-- is 'True', where @argf@ is the visibility of the @ForAllTy@'s binder and
+-- @argf_pred@ is a predicate over visibilities provided as an argument to this
+-- function.
+tcSplitSomeForAllTys :: (ArgFlag -> Bool) -> Type -> ([TyVar], Type)
+tcSplitSomeForAllTys argf_pred ty
+  = split ty ty []
+  where
+    split _ (ForAllTy (Bndr tv argf) ty) tvs
+      | argf_pred argf                             = split ty ty (tv:tvs)
+    split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
+    split orig_ty _                            tvs = (reverse tvs, orig_ty)
+
+-- | Like 'tcSplitForAllTys', but only splits 'ForAllTy's with 'Required' type
+-- variable binders. All split tyvars are annotated with '()'.
+tcSplitForAllTysReq :: Type -> ([TcReqTVBinder], Type)
+tcSplitForAllTysReq ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
+  where sty = splitForAllTysReq ty
+
+-- | Like 'tcSplitForAllTys', but only splits 'ForAllTy's with 'Invisible' type
+-- variable binders. All split tyvars are annotated with their 'Specificity'.
+tcSplitForAllTysInvis :: Type -> ([TcInvisTVBinder], Type)
+tcSplitForAllTysInvis ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
+  where sty = splitForAllTysInvis ty
 
 -- | Like 'tcSplitForAllTys', but splits off only named binders.
 tcSplitForAllVarBndrs :: Type -> ([TyVarBinder], Type)
@@ -1268,33 +1307,17 @@ tcSplitSigmaTy ty = case tcSplitForAllTys ty of
 -- if you instead called @tcSplitNestedSigmaTys@ on the type, it would return
 -- @([s,t,a,b,f], [Each s t a b, Applicative f], (a -> f b) -> s -> f t)@.
 tcSplitNestedSigmaTys :: Type -> ([TyVar], ThetaType, Type)
--- NB: This is basically a pure version of deeplyInstantiate (from Inst) that
+-- NB: This is basically a pure version of topInstantiate (from Inst) that
 -- doesn't compute an HsWrapper.
 tcSplitNestedSigmaTys ty
     -- If there's a forall, split it apart and try splitting the rho type
     -- underneath it.
-  | Just (arg_tys, tvs1, theta1, rho1) <- tcDeepSplitSigmaTy_maybe ty
+  | (tvs1, theta1, rho1) <- tcSplitSigmaTy ty
+  , not (null tvs1 && null theta1)
   = let (tvs2, theta2, rho2) = tcSplitNestedSigmaTys rho1
-    in (tvs1 ++ tvs2, theta1 ++ theta2, mkVisFunTys arg_tys rho2)
+    in (tvs1 ++ tvs2, theta1 ++ theta2, rho2)
     -- If there's no forall, we're done.
   | otherwise = ([], [], ty)
-
------------------------
-tcDeepSplitSigmaTy_maybe
-  :: TcSigmaType -> Maybe ([TcType], [TyVar], ThetaType, TcSigmaType)
--- Looks for a *non-trivial* quantified type, under zero or more function arrows
--- By "non-trivial" we mean either tyvars or constraints are non-empty
-
-tcDeepSplitSigmaTy_maybe ty
-  | Just (arg_ty, res_ty)           <- tcSplitFunTy_maybe ty
-  , Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe res_ty
-  = Just (arg_ty:arg_tys, tvs, theta, rho)
-
-  | (tvs, theta, rho) <- tcSplitSigmaTy ty
-  , not (null tvs && null theta)
-  = Just ([], tvs, theta, rho)
-
-  | otherwise = Nothing
 
 -----------------------
 tcTyConAppTyCon :: Type -> TyCon
@@ -1326,18 +1349,18 @@ tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
                         Nothing    -> pprPanic "tcSplitTyConApp" (pprType ty)
 
 -----------------------
-tcSplitFunTys :: Type -> ([Type], Type)
+tcSplitFunTys :: Type -> ([Scaled Type], Type)
 tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
                         Nothing        -> ([], ty)
                         Just (arg,res) -> (arg:args, res')
                                        where
                                           (args,res') = tcSplitFunTys res
 
-tcSplitFunTy_maybe :: Type -> Maybe (Type, Type)
+tcSplitFunTy_maybe :: Type -> Maybe (Scaled Type, Type)
 tcSplitFunTy_maybe ty
   | Just ty' <- tcView ty = tcSplitFunTy_maybe ty'
-tcSplitFunTy_maybe (FunTy { ft_af = af, ft_arg = arg, ft_res = res })
-  | VisArg <- af = Just (arg, res)
+tcSplitFunTy_maybe (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
+  | VisArg <- af = Just (Scaled w arg, res)
 tcSplitFunTy_maybe _ = Nothing
         -- Note the VisArg guard
         -- Consider     (?x::Int) => Bool
@@ -1350,7 +1373,7 @@ tcSplitFunTy_maybe _ = Nothing
 tcSplitFunTysN :: Arity                      -- n: Number of desired args
                -> TcRhoType
                -> Either Arity               -- Number of missing arrows
-                        ([TcSigmaType],      -- Arg types (always N types)
+                        ([Scaled TcSigmaType],-- Arg types (always N types)
                          TcSigmaType)        -- The rest of the type
 -- ^ Split off exactly the specified number argument types
 -- Returns
@@ -1366,10 +1389,10 @@ tcSplitFunTysN n ty
  | otherwise
  = Left n
 
-tcSplitFunTy :: Type -> (Type, Type)
+tcSplitFunTy :: Type -> (Scaled Type, Type)
 tcSplitFunTy  ty = expectJust "tcSplitFunTy" (tcSplitFunTy_maybe ty)
 
-tcFunArgTy :: Type -> Type
+tcFunArgTy :: Type -> Scaled Type
 tcFunArgTy    ty = fst (tcSplitFunTy ty)
 
 tcFunResultTy :: Type -> Type
@@ -1449,7 +1472,7 @@ tcSplitDFunTy ty
   = case tcSplitForAllTys ty   of { (tvs, rho)    ->
     case splitFunTys rho       of { (theta, tau)  ->
     case tcSplitDFunHead tau   of { (clas, tys)   ->
-    (tvs, theta, clas, tys) }}}
+    (tvs, map scaledThing theta, clas, tys) }}}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead = getClassPredTys
@@ -1483,9 +1506,8 @@ tcEqKind :: HasDebugCallStack => TcKind -> TcKind -> Bool
 tcEqKind = tcEqType
 
 tcEqType :: HasDebugCallStack => TcType -> TcType -> Bool
--- tcEqType is a proper implements the same Note [Non-trivial definitional
--- equality] (in GHC.Core.TyCo.Rep) as `eqType`, but Type.eqType believes (* ==
--- Constraint), and that is NOT what we want in the type checker!
+-- ^ tcEqType implements typechecker equality, as described in
+-- @Note [Typechecker equality vs definitional equality]@.
 tcEqType ty1 ty2
   =  tc_eq_type False False ki1 ki2
   && tc_eq_type False False ty1 ty2
@@ -1534,17 +1556,19 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
 
     go env (ForAllTy (Bndr tv1 vis1) ty1)
            (ForAllTy (Bndr tv2 vis2) ty2)
-      =  vis1 == vis2
+      =  vis1 `sameVis` vis2
+           -- See Note [ForAllTy and typechecker equality] in
+           -- GHC.Tc.Solver.Canonical for why we use `sameVis` here
       && (vis_only || go env (varType tv1) (varType tv2))
       && go (rnBndr2 env tv1 tv2) ty1 ty2
 
     -- Make sure we handle all FunTy cases since falling through to the
     -- AppTy case means that tcRepSplitAppTy_maybe may see an unzonked
     -- kind variable, which causes things to blow up.
-    go env (FunTy _ arg1 res1) (FunTy _ arg2 res2)
-      = go env arg1 arg2 && go env res1 res2
-    go env ty (FunTy _ arg res) = eqFunTy env arg res ty
-    go env (FunTy _ arg res) ty = eqFunTy env arg res ty
+    go env (FunTy _ w1 arg1 res1) (FunTy _ w2 arg2 res2)
+      = go env w1 w2 && go env arg1 arg2 && go env res1 res2
+    go env ty (FunTy _ w arg res) = eqFunTy env w arg res ty
+    go env (FunTy _ w arg res) ty = eqFunTy env w arg res ty
 
       -- See Note [Equality on AppTys] in GHC.Core.Type
     go env (AppTy s1 t1)        ty2
@@ -1579,25 +1603,48 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
 
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
 
-    -- @eqFunTy arg res ty@ is True when @ty@ equals @FunTy arg res@. This is
+    -- @eqFunTy w arg res ty@ is True when @ty@ equals @FunTy w arg res@. This is
     -- sometimes hard to know directly because @ty@ might have some casts
     -- obscuring the FunTy. And 'splitAppTy' is difficult because we can't
     -- always extract a RuntimeRep (see Note [xyz]) if the kind of the arg or
     -- res is unzonked/unflattened. Thus this function, which handles this
     -- corner case.
-    eqFunTy :: RnEnv2 -> Type -> Type -> Type -> Bool
+    eqFunTy :: RnEnv2 -> Mult -> Type -> Type -> Type -> Bool
                -- Last arg is /not/ FunTy
-    eqFunTy env arg res ty@(AppTy{}) = get_args ty []
+    eqFunTy env w arg res ty@(AppTy{}) = get_args ty []
       where
         get_args :: Type -> [Type] -> Bool
         get_args (AppTy f x)       args = get_args f (x:args)
         get_args (CastTy t _)      args = get_args t args
         get_args (TyConApp tc tys) args
           | tc == funTyCon
-          , [_, _, arg', res'] <- tys ++ args
-          = go env arg arg' && go env res res'
+          , [w', _, _, arg', res'] <- tys ++ args
+          = go env w w' && go env arg arg' && go env res res'
         get_args _ _    = False
-    eqFunTy _ _ _ _     = False
+    eqFunTy _ _ _ _ _   = False
+
+{- Note [Typechecker equality vs definitional equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC has two notions of equality over Core types:
+
+* Definitional equality, as implemented by GHC.Core.Type.eqType.
+  See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
+* Typechecker equality, as implemented by tcEqType (in GHC.Tc.Utils.TcType).
+  GHC.Tc.Solver.Canonical.canEqNC also respects typechecker equality.
+
+Typechecker equality implies definitional equality: if two types are equal
+according to typechecker equality, then they are also equal according to
+definitional equality. The converse is not always true, as typechecker equality
+is more finer-grained than definitional equality in two places:
+
+* Unlike definitional equality, which equates Type and Constraint, typechecker
+  treats them as distinct types. See Note [Kind Constraint and kind Type] in
+  GHC.Core.Type.
+* Unlike definitional equality, which does not care about the ArgFlag of a
+  ForAllTy, typechecker equality treats Required type variable binders as
+  distinct from Invisible type variable binders.
+  See Note [ForAllTy and typechecker equality] in GHC.Tc.Solver.Canonical.
+-}
 
 {- *********************************************************************
 *                                                                      *
@@ -1744,7 +1791,7 @@ pickCapturedPreds
 pickCapturedPreds qtvs theta
   = filter captured theta
   where
-    captured pred = isIPPred pred || (tyCoVarsOfType pred `intersectsVarSet` qtvs)
+    captured pred = isIPLikePred pred || (tyCoVarsOfType pred `intersectsVarSet` qtvs)
 
 
 -- Superclasses
@@ -1836,7 +1883,7 @@ isImprovementPred ty
 --      a ~R ...(N a)...  -- Not definitely insoluble
 --                        -- Perhaps newtype N a = MkN Int
 -- See Note [Occurs check error] in
--- GHC.Tc.Solver.Canonical for the motivation for this function.
+-- "GHC.Tc.Solver.Canonical" for the motivation for this function.
 isInsolubleOccursCheck :: EqRel -> TcTyVar -> TcType -> Bool
 isInsolubleOccursCheck eq_rel tv ty
   = go ty
@@ -1847,7 +1894,7 @@ isInsolubleOccursCheck eq_rel tv ty
     go (AppTy t1 t2) = case eq_rel of  -- See Note [AppTy and ReprEq]
                          NomEq  -> go t1 || go t2
                          ReprEq -> go t1
-    go (FunTy _ t1 t2) = go t1 || go t2
+    go (FunTy _ w t1 t2) = go w || go t1 || go t2
     go (ForAllTy (Bndr tv' _) inner_ty)
       | tv' == tv = False
       | otherwise = go (varType tv') || go inner_ty
@@ -1992,9 +2039,9 @@ isSigmaTy _                            = False
 
 isRhoTy :: TcType -> Bool   -- True of TcRhoTypes; see Note [TcRhoType]
 isRhoTy ty | Just ty' <- tcView ty = isRhoTy ty'
-isRhoTy (ForAllTy {})                          = False
-isRhoTy (FunTy { ft_af = VisArg, ft_res = r }) = isRhoTy r
-isRhoTy _                                      = True
+isRhoTy (ForAllTy {})                = False
+isRhoTy (FunTy { ft_af = InvisArg }) = False
+isRhoTy _                            = True
 
 -- | Like 'isRhoTy', but also says 'True' for 'Infer' types
 isRhoExpTy :: ExpType -> Bool
@@ -2009,11 +2056,13 @@ isOverloadedTy (ForAllTy _  ty)             = isOverloadedTy ty
 isOverloadedTy (FunTy { ft_af = InvisArg }) = True
 isOverloadedTy _                            = False
 
-isFloatTy, isDoubleTy, isIntegerTy, isIntTy, isWordTy, isBoolTy,
+isFloatTy, isDoubleTy, isIntegerTy, isNaturalTy,
+    isIntTy, isWordTy, isBoolTy,
     isUnitTy, isCharTy, isAnyTy :: Type -> Bool
 isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
 isIntegerTy    = is_tc integerTyConKey
+isNaturalTy    = is_tc naturalTyConKey
 isIntTy        = is_tc intTyConKey
 isWordTy       = is_tc wordTyConKey
 isBoolTy       = is_tc boolTyConKey
@@ -2092,7 +2141,7 @@ isRigidTy ty
 
 
 -- | Is this type *almost function-free*? See Note [Almost function-free]
--- in GHC.Tc.Types
+-- in "GHC.Tc.Types"
 isAlmostFunctionFree :: TcType -> Bool
 isAlmostFunctionFree ty | Just ty' <- tcView ty = isAlmostFunctionFree ty'
 isAlmostFunctionFree (TyVarTy {})    = True
@@ -2102,8 +2151,9 @@ isAlmostFunctionFree (TyConApp tc args)
   | isTypeFamilyTyCon tc = False
   | otherwise            = all isAlmostFunctionFree args
 isAlmostFunctionFree (ForAllTy bndr _) = isAlmostFunctionFree (binderType bndr)
-isAlmostFunctionFree (FunTy _ ty1 ty2) = isAlmostFunctionFree ty1 &&
-                                         isAlmostFunctionFree ty2
+isAlmostFunctionFree (FunTy _ w ty1 ty2) = isAlmostFunctionFree w &&
+                                           isAlmostFunctionFree ty1 &&
+                                           isAlmostFunctionFree ty2
 isAlmostFunctionFree (LitTy {})        = True
 isAlmostFunctionFree (CastTy ty _)     = isAlmostFunctionFree ty
 isAlmostFunctionFree (CoercionTy {})   = True
@@ -2444,7 +2494,7 @@ sizeType = go
                                    -- size ordering is sound, but why is this better?
                                    -- I came across this when investigating #14010.
     go (LitTy {})                = 1
-    go (FunTy _ arg res)         = go arg + go res + 1
+    go (FunTy _ w arg res)       = go w + go arg + go res + 1
     go (AppTy fun arg)           = go fun + go arg
     go (ForAllTy (Bndr tv vis) ty)
         | isVisibleArgFlag vis   = go (tyVarKind tv) + go ty + 1

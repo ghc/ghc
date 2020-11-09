@@ -20,6 +20,7 @@
 #define open wopen
 #define WSTR(s) L##s
 #define pathprintf swprintf
+#define pathcopy wcscpy
 #define pathsize sizeof(wchar_t)
 #else
 #define pathcmp strcmp
@@ -30,6 +31,7 @@
 #define WSTR(s) s
 #define pathprintf snprintf
 #define pathsize sizeof(char)
+#define pathcopy strcpy
 #endif
 
 pathchar* pathdup(pathchar *path);

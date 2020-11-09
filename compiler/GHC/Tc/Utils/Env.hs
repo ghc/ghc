@@ -34,6 +34,7 @@ module GHC.Tc.Utils.Env(
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendBinderStack, tcExtendLocalTypeEnv,
         isTypeClosedLetBndr,
+        tcCheckUsage,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
@@ -63,27 +64,37 @@ module GHC.Tc.Utils.Env(
         topIdLvl, isBrackStage,
 
         -- New Ids
-        newDFunName, newFamInstTyConName,
-        newFamInstAxiomName,
+        newDFunName,
+        newFamInstTyConName, newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
         mkWrapperName
   ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Env
+import GHC.Driver.Session
+
+import GHC.Builtin.Names
+import GHC.Builtin.Types
+
+import GHC.Runtime.Context
 
 import GHC.Hs
+
 import GHC.Iface.Env
+import GHC.Iface.Load
+
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
-import GHC.Iface.Load
-import GHC.Builtin.Names
-import GHC.Builtin.Types
-import GHC.Types.Id
-import GHC.Types.Var
-import GHC.Types.Name.Reader
+import GHC.Tc.Types.Evidence (HsWrapper, idHsWrapper)
+import {-# SOURCE #-} GHC.Tc.Utils.Unify ( tcSubMult )
+import GHC.Tc.Types.Origin ( CtOrigin(UsageEnvironmentOf) )
+
+import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
 import GHC.Core.DataCon ( DataCon )
 import GHC.Core.PatSyn  ( PatSyn )
@@ -92,24 +103,35 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
+
+import GHC.Unit.Module
+import GHC.Unit.Home
+import GHC.Unit.External
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Encoding
+import GHC.Utils.Error
+import GHC.Utils.Misc ( HasDebugCallStack )
+
+import GHC.Data.FastString
+import GHC.Data.Bag
+import GHC.Data.List.SetOps
+import GHC.Data.Maybe( MaybeErr(..), orElse )
+
+import GHC.Types.SrcLoc
+import GHC.Types.Basic hiding( SuccessFlag(..) )
+import GHC.Types.TypeEnv
+import GHC.Types.SourceFile
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
+import GHC.Types.Id
+import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Driver.Types
-import GHC.Driver.Session
-import GHC.Types.SrcLoc
-import GHC.Types.Basic hiding( SuccessFlag(..) )
-import GHC.Types.Module
-import Outputable
-import Encoding
-import FastString
-import Bag
-import ListSetOps
-import ErrUtils
-import Maybes( MaybeErr(..), orElse )
+import GHC.Types.Name.Reader
+import GHC.Types.TyThing
 import qualified GHC.LanguageExtensions as LangExt
-import Util ( HasDebugCallStack )
 
 import Data.IORef
 import Data.List (intercalate)
@@ -133,14 +155,14 @@ lookupGlobal hsc_env name
         }
 
 lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
--- This may look up an Id that one one has previously looked up.
+-- This may look up an Id that one has previously looked up.
 -- If so, we are going to read its interface file, and add its bindings
 -- to the ExternalPackageTable.
 lookupGlobal_maybe hsc_env name
   = do  {    -- Try local envt
           let mod = icInteractiveModule (hsc_IC hsc_env)
-              dflags = hsc_dflags hsc_env
-              tcg_semantic_mod = canonicalizeModuleIfHome dflags mod
+              home_unit = hsc_home_unit hsc_env
+              tcg_semantic_mod = homeModuleInstantiation home_unit mod
 
         ; if nameIsLocalOrFrom tcg_semantic_mod name
               then (return
@@ -154,7 +176,7 @@ lookupGlobal_maybe hsc_env name
 lookupImported_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
 -- Returns (Failed err) if we can't find the interface file for the thing
 lookupImported_maybe hsc_env name
-  = do  { mb_thing <- lookupTypeHscEnv hsc_env name
+  = do  { mb_thing <- lookupType hsc_env name
         ; case mb_thing of
             Just thing -> return (Succeeded thing)
             Nothing    -> importDecl_maybe hsc_env name
@@ -498,13 +520,14 @@ tcExtendNameTyVarEnv :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendNameTyVarEnv binds thing_inside
   -- this should be used only for explicitly mentioned scoped variables.
   -- thus, no coercion variables
-  = do { tc_extend_local_env NotTopLevel
-                    [(name, ATyVar name tv) | (name, tv) <- binds] $
-         tcExtendBinderStack tv_binds $
-         thing_inside }
+  = tc_extend_local_env NotTopLevel names $
+        tcExtendBinderStack tv_binds $
+        thing_inside
   where
     tv_binds :: [TcBinder]
     tv_binds = [TcTvBndr name tv | (name,tv) <- binds]
+
+    names = [(name, ATyVar name tv) | (name, tv) <- binds]
 
 isTypeClosedLetBndr :: Id -> Bool
 -- See Note [Bindings with closed types] in GHC.Tc.Types
@@ -593,28 +616,56 @@ tc_extend_local_env top_lvl extra_env thing_inside
 -- that are bound together with extra_env and should not be regarded
 -- as free in the types of extra_env.
   = do  { traceTc "tc_extend_local_env" (ppr extra_env)
-        ; env0 <- getLclEnv
-        ; let env1 = tcExtendLocalTypeEnv env0 extra_env
         ; stage <- getStage
-        ; let env2 = extend_local_env (top_lvl, thLevel stage) extra_env env1
-        ; setLclEnv env2 thing_inside }
-  where
-    extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)] -> TcLclEnv -> TcLclEnv
-    -- Extend the local LocalRdrEnv and Template Haskell staging env simultaneously
-    -- Reason for extending LocalRdrEnv: after running a TH splice we need
-    -- to do renaming.
-    extend_local_env thlvl pairs env@(TcLclEnv { tcl_rdr = rdr_env
-                                               , tcl_th_bndrs = th_bndrs })
-      = env { tcl_rdr      = extendLocalRdrEnvList rdr_env
-                                [ n | (n, _) <- pairs, isInternalName n ]
-                                -- The LocalRdrEnv contains only non-top-level names
-                                -- (GlobalRdrEnv handles the top level)
-            , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
-                                 [(n, thlvl) | (n, ATcId {}) <- pairs] }
+        ; env0@(TcLclEnv { tcl_rdr      = rdr_env
+                         , tcl_th_bndrs = th_bndrs
+                         , tcl_env      = lcl_type_env }) <- getLclEnv
+
+        ; let thlvl = (top_lvl, thLevel stage)
+
+              env1 = env0 { tcl_rdr = extendLocalRdrEnvList rdr_env
+                                      [ n | (n, _) <- extra_env, isInternalName n ]
+                                      -- The LocalRdrEnv contains only non-top-level names
+                                      -- (GlobalRdrEnv handles the top level)
+
+                         , tcl_th_bndrs = extendNameEnvList th_bndrs
+                                          [(n, thlvl) | (n, ATcId {}) <- extra_env]
+                                          -- We only track Ids in tcl_th_bndrs
+
+                         , tcl_env = extendNameEnvList lcl_type_env extra_env }
+
+              -- tcl_rdr and tcl_th_bndrs: extend the local LocalRdrEnv and
+              -- Template Haskell staging env simultaneously. Reason for extending
+              -- LocalRdrEnv: after running a TH splice we need to do renaming.
+
+        ; setLclEnv env1 thing_inside }
 
 tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
   = lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things }
+
+-- | @tcCheckUsage name mult thing_inside@ runs @thing_inside@, checks that the
+-- usage of @name@ is a submultiplicity of @mult@, and removes @name@ from the
+-- usage environment. See also Note [Wrapper returned from tcSubMult] in
+-- GHC.Tc.Utils.Unify, which applies to the wrapper returned from this function.
+tcCheckUsage :: Name -> Mult -> TcM a -> TcM (a, HsWrapper)
+tcCheckUsage name id_mult thing_inside
+  = do { (local_usage, result) <- tcCollectingUsage thing_inside
+       ; wrapper <- check_then_add_usage local_usage
+       ; return (result, wrapper) }
+    where
+    check_then_add_usage :: UsageEnv -> TcM HsWrapper
+    -- Checks that the usage of the newly introduced binder is compatible with
+    -- its multiplicity, and combines the usage of non-new binders to |uenv|
+    check_then_add_usage uenv
+      = do { let actual_u = lookupUE uenv name
+           ; traceTc "check_then_add_usage" (ppr id_mult $$ ppr actual_u)
+           ; wrapper <- case actual_u of
+               Bottom -> return idHsWrapper
+               Zero     -> tcSubMult (UsageEnvironmentOf name) Many id_mult
+               MUsage m -> tcSubMult (UsageEnvironmentOf name) m id_mult
+           ; tcEmitBindingUsage (deleteUE uenv name)
+           ; return wrapper }
 
 {- *********************************************************************
 *                                                                      *
@@ -683,8 +734,8 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
       = concatMap (get_fi_cons . unLoc) fids
 
     get_fi_cons :: DataFamInstDecl GhcRn -> [Name]
-    get_fi_cons (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                  FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons } }}})
+    get_fi_cons (DataFamInstDecl { dfid_eqn =
+                  FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons } }})
       = map unLoc $ concatMap (getConNames . unLoc) cons
 
 
@@ -1022,7 +1073,7 @@ mkWrapperName what nameBase
          thisMod <- getModule
          let -- Note [Generating fresh names for ccall wrapper]
              wrapperRef = nextWrapperNum dflags
-             pkg = unitIdString  (moduleUnitId thisMod)
+             pkg = unitString  (moduleUnit thisMod)
              mod = moduleNameString (moduleName      thisMod)
          wrapperNum <- liftIO $ atomicModifyIORef' wrapperRef $ \mod_env ->
              let num = lookupWithDefaultModuleEnv mod_env 0 thisMod

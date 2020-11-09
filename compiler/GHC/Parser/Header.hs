@@ -1,5 +1,4 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP          #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
@@ -24,28 +23,37 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
-import GHC.Driver.Types
+
+import GHC.Driver.Session
+import GHC.Driver.Config
+
+import GHC.Parser.Errors.Ppr
+import GHC.Parser.Errors
 import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer
-import FastString
+
 import GHC.Hs
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Builtin.Names
-import StringBuffer
+
 import GHC.Types.SrcLoc
-import GHC.Driver.Session
-import ErrUtils
-import Util
-import Outputable
-import Maybes
-import Bag              ( emptyBag, listToBag, unitBag )
-import MonadUtils
-import Exception
-import GHC.Types.Basic
-import qualified GHC.LanguageExtensions as LangExt
+import GHC.Types.SourceError
+import GHC.Types.SourceText
+
+import GHC.Utils.Error
+import GHC.Utils.Misc
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Monad
+import GHC.Utils.Exception as Exception
+
+import GHC.Data.StringBuffer
+import GHC.Data.Maybe
+import GHC.Data.Bag         ( Bag, emptyBag, listToBag, unitBag, isEmptyBag )
+import GHC.Data.FastString
 
 import Control.Monad
 import System.IO
@@ -57,33 +65,32 @@ import Data.List
 -- | Parse the imports of a source file.
 --
 -- Throws a 'SourceError' if parsing fails.
-getImports :: DynFlags
+getImports :: ParserOpts   -- ^ Parser options
+           -> Bool         -- ^ Implicit Prelude?
            -> StringBuffer -- ^ Parse this.
            -> FilePath     -- ^ Filename the buffer came from.  Used for
                            --   reporting parse error locations.
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
            -> IO (Either
-               ErrorMessages
+               (Bag Error)
                ([(Maybe FastString, Located ModuleName)],
                 [(Maybe FastString, Located ModuleName)],
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
-getImports dflags buf filename source_filename = do
+getImports popts implicit_prelude buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
-  case unP parseHeader (mkPState dflags buf loc) of
+  case unP parseHeader (initParserState popts buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
-      return $ Left $ getErrorMessages pst dflags
+      return $ Left $ getErrorMessages pst
     POk pst rdr_module -> fmap Right $ do
-      let _ms@(_warns, errs) = getMessages pst dflags
+      let (_warns, errs) = getMessages pst
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
-          ms = (emptyBag, errs)
-      -- logWarnings warns
-      if errorsFound dflags ms
-        then throwIO $ mkSrcErr errs
+      if not (isEmptyBag errs)
+        then throwIO $ mkSrcErr (fmap pprError errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -91,14 +98,13 @@ getImports dflags buf filename source_filename = do
                 main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename)
                                        1 1)
                 mod = mb_mod `orElse` L main_loc mAIN_NAME
-                (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
+                (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
                -- GHC.Prim doesn't exist physically, so don't go looking for it.
                 ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc
                                         . ideclName . unLoc)
                                        ord_idecls
 
-                implicit_prelude = xopt LangExt.ImplicitPrelude dflags
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
                 convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)
@@ -135,7 +141,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
                                ideclSourceSrc = NoSourceText,
                                ideclName      = L loc pRELUDE_NAME,
                                ideclPkgQual   = Nothing,
-                               ideclSource    = False,
+                               ideclSource    = NotBoot,
                                ideclSafe      = False,  -- Not a safe import
                                ideclQualified = NotQualified,
                                ideclImplicit  = True,   -- Implicit!
@@ -158,7 +164,7 @@ getOptionsFromFile dflags filename
               (hClose)
               (\handle -> do
                   opts <- fmap (getOptions' dflags)
-                               (lazyGetToks dflags' filename handle)
+                               (lazyGetToks (initParserOpts dflags') filename handle)
                   seqList opts $ return opts)
     where -- We don't need to get haddock doc tokens when we're just
           -- getting the options from pragmas, and lazily lexing them
@@ -174,15 +180,16 @@ blockSize :: Int
 -- blockSize = 17 -- for testing :-)
 blockSize = 1024
 
-lazyGetToks :: DynFlags -> FilePath -> Handle -> IO [Located Token]
-lazyGetToks dflags filename handle = do
+lazyGetToks :: ParserOpts -> FilePath -> Handle -> IO [Located Token]
+lazyGetToks popts filename handle = do
   buf <- hGetStringBufferBlock handle blockSize
-  unsafeInterleaveIO $ lazyLexBuf handle (pragState dflags buf loc) False blockSize
+  let prag_state = initPragState popts buf loc
+  unsafeInterleaveIO $ lazyLexBuf handle prag_state False blockSize
  where
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
   lazyLexBuf :: Handle -> PState -> Bool -> Int -> IO [Located Token]
-  lazyLexBuf handle state eof size = do
+  lazyLexBuf handle state eof size =
     case unP (lexer False return) state of
       POk state' t -> do
         -- pprTrace "lazyLexBuf" (text (show (buffer state'))) (return ())
@@ -212,9 +219,10 @@ lazyGetToks dflags filename handle = do
        unsafeInterleaveIO $ lazyLexBuf handle state{buffer=newbuf} False new_size
 
 
-getToks :: DynFlags -> FilePath -> StringBuffer -> [Located Token]
-getToks dflags filename buf = lexAll (pragState dflags buf loc)
+getToks :: ParserOpts -> FilePath -> StringBuffer -> [Located Token]
+getToks popts filename buf = lexAll pstate
  where
+  pstate = initPragState popts buf loc
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
   lexAll state = case unP (lexer False return) state of
@@ -231,7 +239,7 @@ getOptions :: DynFlags
            -> FilePath     -- ^ Source filename.  Used for location info.
            -> [Located String] -- ^ Parsed options.
 getOptions dflags buf filename
-    = getOptions' dflags (getToks dflags filename buf)
+    = getOptions' dflags (getToks (initParserOpts dflags) filename buf)
 
 -- The token parser is written manually because Happy can't
 -- return a partial result when it encounters a lexer error.
@@ -316,7 +324,7 @@ checkExtension dflags (L l ext)
     else unsupportedExtnError dflags l ext'
   where
     ext' = unpackFS ext
-    supported = supportedLanguagesAndExtensions $ platformMini $ targetPlatform dflags
+    supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
 
 languagePragParseError :: DynFlags -> SrcSpan -> a
 languagePragParseError dflags loc =
@@ -332,7 +340,7 @@ unsupportedExtnError dflags loc unsup =
         text "Unsupported extension: " <> text unsup $$
         if null suggestions then Outputable.empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
   where
-     supported = supportedLanguagesAndExtensions $ platformMini $ targetPlatform dflags
+     supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
      suggestions = fuzzyMatch unsup supported
 
 
@@ -345,7 +353,7 @@ optionsErrorMsgs dflags unhandled_flags flags_lines _filename
                                 , L l f' <- flags_lines
                                 , f == f' ]
         mkMsg (L flagSpan flag) =
-            ErrUtils.mkPlainErrMsg dflags flagSpan $
+            GHC.Utils.Error.mkPlainErrMsg dflags flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
 optionsParseError :: String -> DynFlags -> SrcSpan -> a     -- #15053

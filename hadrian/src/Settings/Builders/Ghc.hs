@@ -35,6 +35,9 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
         hasDynamic = elem dynamic ways
     mconcat [ arg "-Wall"
             , not useColor ? builder (Ghc CompileHs) ?
+              -- N.B. Target.trackArgument ignores this argument from the
+              -- input hash to avoid superfluous recompilation, avoiding
+              -- #18672.
               arg "-fdiagnostics-color=never"
             , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ?
               platformSupportsSharedLibs ? way vanilla ?
@@ -153,6 +156,7 @@ findHsDependencies = builder (Ghc FindHsDependencies) ? do
             , ghcVersion > [8,9,0] ? arg "-include-cpp-deps"
 
             , commonGhcArgs
+            , defaultGhcWarningsArgs
             , arg "-include-pkg-deps"
             , arg "-dep-makefile", arg =<< getOutput
             , pure $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]

@@ -5,6 +5,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
+-- This module contains exclusively Data instances, which are going to be slow
+-- no matter what we do. Furthermore, they are incredibly slow to compile with
+-- optimisation (see #9557). Consequently we compile this with -O0.
+-- See #18254.
+{-# OPTIONS_GHC -O0 #-}
+
 module GHC.Hs.Instances where
 
 -- This module defines the Data instances for the hsSyn AST.
@@ -16,15 +23,17 @@ module GHC.Hs.Instances where
 
 import Data.Data hiding ( Fixity )
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Hs.Extension
 import GHC.Hs.Binds
 import GHC.Hs.Decls
 import GHC.Hs.Expr
 import GHC.Hs.Lit
-import GHC.Hs.Types
+import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
+
+import GHC.Types.SrcLoc ( Located )
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -154,10 +163,20 @@ deriving instance Data (HsDerivingClause GhcPs)
 deriving instance Data (HsDerivingClause GhcRn)
 deriving instance Data (HsDerivingClause GhcTc)
 
+-- deriving instance DataIdLR p p => Data (DerivClauseTys p)
+deriving instance Data (DerivClauseTys GhcPs)
+deriving instance Data (DerivClauseTys GhcRn)
+deriving instance Data (DerivClauseTys GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (ConDecl p)
 deriving instance Data (ConDecl GhcPs)
 deriving instance Data (ConDecl GhcRn)
 deriving instance Data (ConDecl GhcTc)
+
+-- deriving instance DataIdLR p p => Data (HsConDeclGADTDetails p)
+deriving instance Data (HsConDeclGADTDetails GhcPs)
+deriving instance Data (HsConDeclGADTDetails GhcRn)
+deriving instance Data (HsConDeclGADTDetails GhcTc)
 
 -- deriving instance DataIdLR p p   => Data (TyFamInstDecl p)
 deriving instance Data (TyFamInstDecl GhcPs)
@@ -306,6 +325,14 @@ deriving instance Data (ApplicativeArg GhcPs)
 deriving instance Data (ApplicativeArg GhcRn)
 deriving instance Data (ApplicativeArg GhcTc)
 
+deriving instance Data (HsStmtContext GhcPs)
+deriving instance Data (HsStmtContext GhcRn)
+deriving instance Data (HsStmtContext GhcTc)
+
+deriving instance Data (HsMatchContext GhcPs)
+deriving instance Data (HsMatchContext GhcRn)
+deriving instance Data (HsMatchContext GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (HsSplice p)
 deriving instance Data (HsSplice GhcPs)
 deriving instance Data (HsSplice GhcRn)
@@ -358,6 +385,9 @@ deriving instance Data (Pat GhcPs)
 deriving instance Data (Pat GhcRn)
 deriving instance Data (Pat GhcTc)
 
+deriving instance Data CoPat
+deriving instance Data ConPatTc
+
 deriving instance Data ListPatTc
 
 -- deriving instance (DataIdLR p p, Data body) => Data (HsRecFields p body)
@@ -366,7 +396,7 @@ deriving instance (Data body) => Data (HsRecFields GhcRn body)
 deriving instance (Data body) => Data (HsRecFields GhcTc body)
 
 -- ---------------------------------------------------------------------
--- Data derivations from GHC.Hs.Types ----------------------------------
+-- Data derivations from GHC.Hs.Type ----------------------------------
 
 -- deriving instance (DataIdLR p p) => Data (LHsQTyVars p)
 deriving instance Data (LHsQTyVars GhcPs)
@@ -378,20 +408,35 @@ deriving instance Data (LHsQTyVisVars GhcPs)
 deriving instance Data (LHsQTyVisVars GhcRn)
 deriving instance Data (LHsQTyVisVars GhcTc)
 
--- deriving instance (DataIdLR p p, Data thing) =>Data (HsImplicitBndrs p thing)
-deriving instance (Data thing) => Data (HsImplicitBndrs GhcPs thing)
-deriving instance (Data thing) => Data (HsImplicitBndrs GhcRn thing)
-deriving instance (Data thing) => Data (HsImplicitBndrs GhcTc thing)
+-- deriving instance (Data flag, DataIdLR p p) => Data (HsOuterTyVarBndrs p)
+deriving instance Data flag => Data (HsOuterTyVarBndrs flag GhcPs)
+deriving instance Data flag => Data (HsOuterTyVarBndrs flag GhcRn)
+deriving instance Data flag => Data (HsOuterTyVarBndrs flag GhcTc)
+
+-- deriving instance (DataIdLR p p) => Data (HsSigType p)
+deriving instance Data (HsSigType GhcPs)
+deriving instance Data (HsSigType GhcRn)
+deriving instance Data (HsSigType GhcTc)
 
 -- deriving instance (DataIdLR p p, Data thing) =>Data (HsWildCardBndrs p thing)
 deriving instance (Data thing) => Data (HsWildCardBndrs GhcPs thing)
 deriving instance (Data thing) => Data (HsWildCardBndrs GhcRn thing)
 deriving instance (Data thing) => Data (HsWildCardBndrs GhcTc thing)
 
+-- deriving instance (DataIdLR p p) => Data (HsPatSigType p)
+deriving instance Data (HsPatSigType GhcPs)
+deriving instance Data (HsPatSigType GhcRn)
+deriving instance Data (HsPatSigType GhcTc)
+
+-- deriving instance (DataIdLR p p) => Data (HsForAllTelescope p)
+deriving instance Data (HsForAllTelescope GhcPs)
+deriving instance Data (HsForAllTelescope GhcRn)
+deriving instance Data (HsForAllTelescope GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (HsTyVarBndr p)
-deriving instance Data (HsTyVarBndr GhcPs)
-deriving instance Data (HsTyVarBndr GhcRn)
-deriving instance Data (HsTyVarBndr GhcTc)
+deriving instance (Data flag) => Data (HsTyVarBndr flag GhcPs)
+deriving instance (Data flag) => Data (HsTyVarBndr flag GhcRn)
+deriving instance (Data flag) => Data (HsTyVarBndr flag GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (HsTyVarTermBndr p)
 deriving instance Data (HsTyVarTermBndr GhcPs)
@@ -403,9 +448,19 @@ deriving instance Data (HsType GhcPs)
 deriving instance Data (HsType GhcRn)
 deriving instance Data (HsType GhcTc)
 
-deriving instance Data (LHsTypeArg GhcPs)
-deriving instance Data (LHsTypeArg GhcRn)
-deriving instance Data (LHsTypeArg GhcTc)
+-- deriving instance (DataIdLR p p) => Data (HsArrow p)
+deriving instance Data (HsArrow GhcPs)
+deriving instance Data (HsArrow GhcRn)
+deriving instance Data (HsArrow GhcTc)
+
+-- deriving instance (DataIdLR p p) => Data (HsScaled p a)
+deriving instance Data thing => Data (HsScaled GhcPs thing)
+deriving instance Data thing => Data (HsScaled GhcRn thing)
+deriving instance Data thing => Data (HsScaled GhcTc thing)
+
+deriving instance Data (HsArg (Located (HsType GhcPs)) (Located (HsKind GhcPs)))
+deriving instance Data (HsArg (Located (HsType GhcRn)) (Located (HsKind GhcRn)))
+deriving instance Data (HsArg (Located (HsType GhcTc)) (Located (HsKind GhcTc)))
 
 -- deriving instance (DataIdLR p p) => Data (ConDeclField p)
 deriving instance Data (ConDeclField GhcPs)
@@ -438,4 +493,7 @@ deriving instance Eq (IE GhcPs)
 deriving instance Eq (IE GhcRn)
 deriving instance Eq (IE GhcTc)
 
+
 -- ---------------------------------------------------------------------
+
+deriving instance Data XXExprGhcTc

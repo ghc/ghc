@@ -24,9 +24,13 @@ typedef struct {
     void (* initEventLogWriter) (void);
 
     // Write a series of events returning true on success.
+    // Note that this may be called by multiple threads simultaneously.
+    // The writer is responsible for concurrency control.
     bool (* writeEventLog) (void *eventlog, size_t eventlog_size);
 
     // Flush possibly existing buffers (may be NULL)
+    // Note that this may be called by multiple threads simultaneously.
+    // The writer is responsible for concurrency control.
     void (* flushEventLog) (void);
 
     // Close an initialized EventLogOutput (may be NULL)

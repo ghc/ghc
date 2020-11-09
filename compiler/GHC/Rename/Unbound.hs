@@ -14,26 +14,34 @@ module GHC.Rename.Unbound
    , unboundName
    , unboundNameX
    , notInScopeErr
+   , exactNameErr
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Types.Name.Reader
-import GHC.Driver.Types
-import GHC.Tc.Utils.Monad
-import GHC.Types.Name
-import GHC.Types.Module
-import GHC.Types.SrcLoc as SrcLoc
-import Outputable
-import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
-import Util
-import Maybes
 import GHC.Driver.Session
-import FastString
+import GHC.Driver.Ppr
+
+import GHC.Tc.Utils.Monad
+import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Misc
+
+import GHC.Data.Maybe
+import GHC.Data.FastString
+
+import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.Unique.DFM (udfmToList)
+
+import GHC.Unit.Module
+import GHC.Unit.Module.Imported
+import GHC.Unit.Home.ModInfo
+
 import Data.List
 import Data.Function ( on )
-import GHC.Types.Unique.DFM (udfmToList)
 
 {-
 ************************************************************************
@@ -80,8 +88,10 @@ unboundNameX where_look rdr_name extra
 
 notInScopeErr :: RdrName -> SDoc
 notInScopeErr rdr_name
-  = hang (text "Not in scope:")
-       2 (what <+> quotes (ppr rdr_name))
+  = case isExact_maybe rdr_name of
+      Just name -> exactNameErr name
+      Nothing -> hang (text "Not in scope:")
+                  2 (what <+> quotes (ppr rdr_name))
   where
     what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
 
@@ -90,7 +100,7 @@ type HowInScope = Either SrcSpan ImpDeclSpec
      -- Right ispec =>  imported as specified by ispec
 
 
--- | Called from the typechecker (GHC.Tc.Errors) when we find an unbound variable
+-- | Called from the typechecker ("GHC.Tc.Errors") when we find an unbound variable
 unknownNameSuggestions :: DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
@@ -385,3 +395,10 @@ there are 2 cases, where we hide the last "no module is imported" line:
        and we have to check the current module in the last added entry of
        the HomePackageTable. (See test T15611b)
 -}
+
+exactNameErr :: Name -> SDoc
+exactNameErr name =
+  hang (text "The exact Name" <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
+    2 (vcat [ text "Probable cause: you used a unique Template Haskell name (NameU), "
+            , text "perhaps via newName, but did not bind it"
+            , text "If that's it, then -ddump-splices might be useful" ])

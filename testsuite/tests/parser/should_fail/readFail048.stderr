@@ -1,11 +1,10 @@
 
-readFail048.hs:25:38:
-     Couldn't match type ‘Char’ with ‘[Char]’
-      Expected type: [[Char]]
-        Actual type: [Char]
-     In the second argument of ‘(:)’, namely ‘"Type error on line 25"’
+readFail048.hs:25:38: error:
+    • Couldn't match type ‘Char’ with ‘[Char]’
+      Expected: [String]
+        Actual: String
+    • In the second argument of ‘(:)’, namely ‘"Type error on line 25"’
       In the expression:
-          "Type error on line 25" : "Type error on line 25"
+        "Type error on line 25" : "Type error on line 25"
       In an equation for ‘type_error’:
           type_error = "Type error on line 25" : "Type error on line 25"
-

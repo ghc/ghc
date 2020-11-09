@@ -4,7 +4,7 @@
 
 from my_typing import *
 from pathlib import Path
-from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles
+from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles, GitRef
 from datetime import datetime
 
 # -----------------------------------------------------------------------------
@@ -22,7 +22,7 @@ class TestConfig:
     def __init__(self):
 
         # Where the testsuite root is
-        self.top = ''
+        self.top = Path('.')
 
         # Directories below which to look for test description files (foo.T)
         self.rootdirs = []
@@ -43,7 +43,7 @@ class TestConfig:
         self.summary_file = ''
 
         # Path to Ghostscript
-        self.gs = ''
+        self.gs = None # type: Optional[Path]
 
         # Run tests requiring Haddock
         self.haddock = False
@@ -115,6 +115,9 @@ class TestConfig:
         self.way_flags = {}  # type: Dict[WayName, List[str]]
         self.way_rts_flags = {}  # type: Dict[WayName, List[str]]
 
+        # Do we have a functional LLVM toolchain?
+        self.have_llvm = False
+
         # Do we have vanilla libraries?
         self.have_vanilla = False
 
@@ -139,11 +142,17 @@ class TestConfig:
         # Is readelf available?
         self.have_readelf = False
 
+        # Do we use a fast backend for bignum (e.g. GMP)
+        self.have_fast_bignum = True
+
         # Are we testing an in-tree compiler?
         self.in_tree_compiler = True
 
         # Is the compiler dynamically linked?
         self.ghc_dynamic = False
+
+        # Do symbols use leading underscores?
+        self.leading_underscore = False
 
         # the timeout program
         self.timeout_prog = ''
@@ -156,6 +165,12 @@ class TestConfig:
         # tests which should be considered to be broken during this testsuite
         # run.
         self.broken_tests = set() # type: Set[TestName]
+
+        # Baseline commit for performane metric comparisons.
+        self.baseline_commit = None # type: Optional[GitRef]
+
+        # Additional package dbs to inspect for test dependencies.
+        self.test_package_db = [] # type: [PathToPackageDb]
 
         # Should we skip performance tests
         self.skip_perf_tests = False

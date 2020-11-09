@@ -2,7 +2,7 @@
 import GHC.Cmm.Expr
 #if !(defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
     || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc))
-import PlainPanic
+import GHC.Utils.Panic.Plain
 #endif
 import GHC.Platform.Reg
 
@@ -925,7 +925,7 @@ freeReg 13 = False -- reserved for system thread ID on 64 bit
 freeReg 30 = False
 {- TODO: reserve r13 on 64 bit systems only and r30 on 32 bit respectively.
    For now we use r30 on 64 bit and r13 on 32 bit as a temporary register
-   in stack handling code. See compiler/nativeGen/PPC/Instr.hs.
+   in stack handling code. See compiler/GHC/CmmToAsm/PPC/Instr.hs.
 
    Later we might want to reserve r13 and r30 only where it is required.
    Then use r12 as temporary register, which is also what the C ABI does.

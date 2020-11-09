@@ -1,0 +1,5 @@
+
+T18708.hs:18:3: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched: p where p is not one of {"y"}

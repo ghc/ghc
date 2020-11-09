@@ -1,15 +1,15 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module GHC.Core.Map (
    -- * Maps over Core expressions
@@ -37,23 +37,26 @@ module GHC.Core.Map (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import TrieMap
+import GHC.Data.TrieMap
 import GHC.Core
 import GHC.Core.Coercion
 import GHC.Types.Name
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Types.Var
-import FastString(FastString)
-import Util
+import GHC.Data.FastString(FastString)
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
+import GHC.Types.Unique.FM
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
-import Outputable
 import Control.Monad( (>=>) )
 
 {-
@@ -179,7 +182,8 @@ data CoreMapX a
 
 instance Eq (DeBruijn CoreExpr) where
   D env1 e1 == D env2 e2 = go e1 e2 where
-    go (Var v1) (Var v2) = case (lookupCME env1 v1, lookupCME env2 v2) of
+    go (Var v1) (Var v2)
+      = case (lookupCME env1 v1, lookupCME env2 v2) of
                             (Just b1, Just b2) -> b1 == b2
                             (Nothing, Nothing) -> v1 == v2
                             _ -> False
@@ -193,6 +197,7 @@ instance Eq (DeBruijn CoreExpr) where
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  D env1 (varType b1) == D env2 (varType b2)
+      && D env1 (varMultMaybe b1) == D env2 (varMultMaybe b2)
       && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
 
     go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
@@ -478,7 +483,7 @@ data TypeMapX a
     -- Note that there is no tyconapp case; see Note [Equality on AppTys] in GHC.Core.Type
 
 -- | Squeeze out any synonyms, and change TyConApps to nested AppTys. Why the
--- last one? See Note [Equality on AppTys] in GHC.Core.Type
+-- last one? See Note [Equality on AppTys] in "GHC.Core.Type"
 --
 -- Note, however, that we keep Constraint and Type apart here, despite the fact
 -- that they are both synonyms of TYPE 'LiftedRep (see #11715).
@@ -520,8 +525,8 @@ instance Eq (DeBruijn Type) where
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
-        (FunTy _ t1 t2, FunTy _ t1' t2')
-            -> D env t1 == D env' t1' && D env t2 == D env' t2'
+        (FunTy _ w1 t1 t2, FunTy _ w1' t1' t2')
+            -> D env w1 == D env w1' && D env t1 == D env' t1' && D env t2 == D env' t2'
         (TyConApp tc tys, TyConApp tc' tys')
             -> tc == tc' && D env tys == D env' tys'
         (LitTy l, LitTy l')
@@ -600,7 +605,7 @@ fdT k m = foldTM k (tm_var m)
 
 ------------------------
 data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
-                      , tlm_string :: Map.Map FastString a
+                      , tlm_string :: UniqFM  FastString a
                       }
 
 instance TrieMap TyLitMap where
@@ -612,27 +617,27 @@ instance TrieMap TyLitMap where
    mapTM    = mapTyLit
 
 emptyTyLitMap :: TyLitMap a
-emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = Map.empty }
+emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUFM }
 
 mapTyLit :: (a->b) -> TyLitMap a -> TyLitMap b
 mapTyLit f (TLM { tlm_number = tn, tlm_string = ts })
-  = TLM { tlm_number = Map.map f tn, tlm_string = Map.map f ts }
+  = TLM { tlm_number = Map.map f tn, tlm_string = mapUFM f ts }
 
 lkTyLit :: TyLit -> TyLitMap a -> Maybe a
 lkTyLit l =
   case l of
     NumTyLit n -> tlm_number >.> Map.lookup n
-    StrTyLit n -> tlm_string >.> Map.lookup n
+    StrTyLit n -> tlm_string >.> (`lookupUFM` n)
 
 xtTyLit :: TyLit -> XT a -> TyLitMap a -> TyLitMap a
 xtTyLit l f m =
   case l of
-    NumTyLit n -> m { tlm_number = tlm_number m |> Map.alter f n }
-    StrTyLit n -> m { tlm_string = tlm_string m |> Map.alter f n }
+    NumTyLit n -> m { tlm_number = Map.alter f n (tlm_number m) }
+    StrTyLit n -> m { tlm_string = alterUFM  f (tlm_string m) n }
 
 foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
-foldTyLit l m = flip (Map.foldr l) (tlm_string m)
-              . flip (Map.foldr l) (tlm_number m)
+foldTyLit l m = flip (foldUFM l) (tlm_string m)
+              . flip (Map.foldr l)   (tlm_number m)
 
 -------------------------------------------------
 -- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this
@@ -745,6 +750,11 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
                                       D env xs == D env' xs'
     _            == _               = False
 
+instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
+    D _   Nothing  == D _    Nothing   = True
+    D env (Just x) == D env' (Just x') = D env x  == D env' x'
+    _              == _                = False
+
 --------- Variable binders -------------
 
 -- | A 'BndrMap' is a 'TypeMapG' which allows us to distinguish between
@@ -753,7 +763,26 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
 -- not pick up an entry in the 'TrieMap' for @\(x :: Bool) -> ()@:
 -- we can disambiguate this by matching on the type (or kind, if this
 -- a binder in a type) of the binder.
-type BndrMap = TypeMapG
+--
+-- We also need to do the same for multiplicity! Which, since multiplicities are
+-- encoded simply as a 'Type', amounts to have a Trie for a pair of types. Tries
+-- of pairs are composition.
+data BndrMap a = BndrMap (TypeMapG (MaybeMap TypeMapG a))
+
+instance TrieMap BndrMap where
+   type Key BndrMap = Var
+   emptyTM  = BndrMap emptyTM
+   lookupTM = lkBndr emptyCME
+   alterTM  = xtBndr emptyCME
+   foldTM   = fdBndrMap
+   mapTM    = mapBndrMap
+
+mapBndrMap :: (a -> b) -> BndrMap a -> BndrMap b
+mapBndrMap f (BndrMap tm) = BndrMap (mapTM (mapTM f) tm)
+
+fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
+fdBndrMap f (BndrMap tm) = foldTM (foldTM f) tm
+
 
 -- Note [Binders]
 -- ~~~~~~~~~~~~~~
@@ -761,10 +790,15 @@ type BndrMap = TypeMapG
 -- of these data types have binding forms.
 
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
-lkBndr env v m = lkG (D env (varType v)) m
+lkBndr env v (BndrMap tymap) = do
+  multmap <- lkG (D env (varType v)) tymap
+  lookupTM (D env <$> varMultMaybe v) multmap
 
-xtBndr :: CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
-xtBndr env v f = xtG (D env (varType v)) f
+
+xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
+xtBndr env v xt (BndrMap tymap)  =
+  BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (D env <$> varMultMaybe v) xt))
+
 
 --------- Variable occurrence -------------
 data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable

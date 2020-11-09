@@ -9,34 +9,39 @@
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Opt.DmdAnal ( dmdAnalProgram ) where
+module GHC.Core.Opt.DmdAnal
+   ( DmdAnalOpts(..)
+   , dmdAnalProgram
+   )
+where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Driver.Session
-import GHC.Core.Opt.WorkWrap.Utils ( findTypeShape )
+import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Types.Demand   -- All of it
 import GHC.Core
-import GHC.Core.Seq     ( seqBinds )
-import Outputable
+import GHC.Core.Multiplicity ( scaledThing )
+import GHC.Utils.Outputable
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Basic
 import Data.List        ( mapAccumL )
 import GHC.Core.DataCon
+import GHC.Types.ForeignCall ( isSafeForeignCall )
 import GHC.Types.Id
-import GHC.Types.Id.Info
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Core.FVs      ( exprFreeIds, ruleRhsFreeIds )
 import GHC.Core.Coercion ( Coercion, coVarsOfCo )
 import GHC.Core.FamInstEnv
-import Util
-import Maybes           ( isJust )
-import GHC.Builtin.Types
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Data.Maybe         ( isJust )
+import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
-import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Types.Unique.Set
 
 {-
@@ -47,23 +52,31 @@ import GHC.Types.Unique.Set
 ************************************************************************
 -}
 
-dmdAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
-dmdAnalProgram dflags fam_envs binds = do
-  let env             = emptyAnalEnv dflags fam_envs
-  let binds_plus_dmds = snd $ mapAccumL dmdAnalTopBind env binds
-  dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
-    dumpIdInfoOfProgram (pprIfaceStrictSig . strictnessInfo) binds_plus_dmds
-  -- See Note [Stamp out space leaks in demand analysis]
-  seqBinds binds_plus_dmds `seq` return binds_plus_dmds
+-- | Options for the demand analysis
+data DmdAnalOpts = DmdAnalOpts
+   { dmd_strict_dicts :: !Bool -- ^ Use strict dictionaries
+   }
+
+-- | Outputs a new copy of the Core program in which binders have been annotated
+-- with demand and strictness information.
+--
+-- Note: use `seqBinds` on the result to avoid leaks due to lazyness (cf Note
+-- [Stamp out space leaks in demand analysis])
+dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> CoreProgram -> CoreProgram
+dmdAnalProgram opts fam_envs binds = binds_plus_dmds
+   where
+      env             = emptyAnalEnv opts fam_envs
+      binds_plus_dmds = snd $ mapAccumL dmdAnalTopBind env binds
 
 -- Analyse a (group of) top-level binding(s)
 dmdAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 dmdAnalTopBind env (NonRec id rhs)
-  = (extendAnalEnv TopLevel env id' (idStrictness id'), NonRec id' rhs')
+  = ( extendAnalEnv TopLevel env id sig
+    , NonRec (setIdStrictness id sig) rhs')
   where
-    ( _, id', rhs') = dmdAnalRhsLetDown Nothing env cleanEvalDmd id rhs
+    ( _, sig, rhs') = dmdAnalRhsLetDown Nothing env cleanEvalDmd id rhs
 
 dmdAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
@@ -151,7 +164,7 @@ dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
                   dmdAnal' env d e
 
 dmdAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
-dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty)      -- Doesn't happen, in fact
+dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty) -- Doesn't happen, in fact
 dmdAnal' _ _ (Coercion co)
   = (unitDmdType (coercionDmdEnv co), Coercion co)
 
@@ -215,15 +228,18 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
   , isJust (isDataProductTyCon_maybe tycon)
-  , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
   = let
-        env_alt                  = env { ae_rec_tc = rec_tc' }
-        (rhs_ty, rhs')           = dmdAnal env_alt dmd rhs
+        (rhs_ty, rhs')           = dmdAnal env dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
-        alt_ty3 | io_hack_reqd scrut dc bndrs = deferAfterIO alt_ty2
-                | otherwise                   = alt_ty2
+        fam_envs                 = ae_fam_envs env
+        alt_ty3
+          -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
+          | exprMayThrowPreciseException fam_envs scrut
+          = deferAfterPreciseException alt_ty2
+          | otherwise
+          = alt_ty2
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
@@ -251,12 +267,20 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
                                -- NB: Base case is botDmdType, for empty case alternatives
                                --     This is a unit for lubDmdType, and the right result
                                --     when there really are no alternatives
-        res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
+        fam_envs             = ae_fam_envs env
+        alt_ty2
+          -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
+          | exprMayThrowPreciseException fam_envs scrut
+          = deferAfterPreciseException alt_ty
+          | otherwise
+          = alt_ty
+        res_ty               = alt_ty2 `bothDmdType` toBothDmdArg scrut_ty
+
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_tys" <+> ppr alt_tys
---                                   , text "alt_ty" <+> ppr alt_ty
+--                                   , text "alt_ty2" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty alts')
 
@@ -285,8 +309,9 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 rhs') body')
   where
-    (lazy_fv, id1, rhs') = dmdAnalRhsLetDown Nothing env dmd id rhs
-    env1                 = extendAnalEnv NotTopLevel env id1 (idStrictness id1)
+    (lazy_fv, sig, rhs') = dmdAnalRhsLetDown Nothing env dmd id rhs
+    id1                  = setIdStrictness id sig
+    env1                 = extendAnalEnv NotTopLevel env id sig
     (body_ty, body')     = dmdAnal env1 dmd body
     (body_ty1, id2)      = annotateBndr env body_ty id1
     body_ty2             = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
@@ -314,16 +339,37 @@ dmdAnal' env dmd (Let (Rec pairs) body)
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
 
-io_hack_reqd :: CoreExpr -> DataCon -> [Var] -> Bool
--- See Note [IO hack in the demand analyser]
-io_hack_reqd scrut con bndrs
-  | (bndr:_) <- bndrs
-  , con == tupleDataCon Unboxed 2
-  , idType bndr `eqType` realWorldStatePrimTy
-  , (fun, _) <- collectArgs scrut
-  = case fun of
-      Var f -> not (isPrimOpId f)
-      _     -> True
+-- | A simple, syntactic analysis of whether an expression MAY throw a precise
+-- exception when evaluated. It's always sound to return 'True'.
+-- See Note [Which scrutinees may throw precise exceptions].
+exprMayThrowPreciseException :: FamInstEnvs -> CoreExpr -> Bool
+exprMayThrowPreciseException envs e
+  | not (forcesRealWorld envs (exprType e))
+  = False -- 1. in the Note
+  | (Var f, _) <- collectArgs e
+  , Just op    <- isPrimOpId_maybe f
+  , op /= RaiseIOOp
+  = False -- 2. in the Note
+  | (Var f, _) <- collectArgs e
+  , Just fcall <- isFCallId_maybe f
+  , not (isSafeForeignCall fcall)
+  = False -- 3. in the Note
+  | otherwise
+  = True  -- _. in the Note
+
+-- | Recognises types that are
+--    * @State# RealWorld@
+--    * Unboxed tuples with a @State# RealWorld@ field
+-- modulo coercions. This will detect 'IO' actions (even post Nested CPR! See
+-- T13380e) and user-written variants thereof by their type.
+forcesRealWorld :: FamInstEnvs -> Type -> Bool
+forcesRealWorld fam_envs ty
+  | ty `eqType` realWorldStatePrimTy
+  = True
+  | Just DataConAppContext{ dcac_dc = dc, dcac_arg_tys = field_tys }
+      <- deepSplitProductType_maybe fam_envs ty
+  , isUnboxedTupleDataCon dc
+  = any (\(ty,_) -> scaledThing ty `eqType` realWorldStatePrimTy) field_tys
   | otherwise
   = False
 
@@ -340,49 +386,42 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
         id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
+{- Note [Which scrutinees may throw precise exceptions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This is the specification of 'exprMayThrowPreciseExceptions',
+which is important for Scenario 2 of
+Note [Precise exceptions and strictness analysis] in GHC.Types.Demand.
 
-{- Note [IO hack in the demand analyser]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There's a hack here for I/O operations.  Consider
+For an expression @f a1 ... an :: ty@ we determine that
+  1. False  If ty is *not* @State# RealWorld@ or an unboxed tuple thereof.
+            This check is done by 'forcesRealWorld'.
+            (Why not simply unboxed pairs as above? This is motivated by
+            T13380{d,e}.)
+  2. False  If f is a PrimOp, and it is *not* raiseIO#
+  3. False  If f is an unsafe FFI call ('PlayRisky')
+  _. True   Otherwise "give up".
 
-     case foo x s of { (# s', r #) -> y }
+It is sound to return False in those cases, because
+  1. We don't give any guarantees for unsafePerformIO, so no precise exceptions
+     from pure code.
+  2. raiseIO# is the only primop that may throw a precise exception.
+  3. Unsafe FFI calls may not interact with the RTS (to throw, for example).
+     See haddock on GHC.Types.ForeignCall.PlayRisky.
 
-Is this strict in 'y'? Often not! If foo x s performs some observable action
-(including raising an exception with raiseIO#, modifying a mutable variable, or
-even ending the program normally), then we must not force 'y' (which may fail
-to terminate) until we have performed foo x s.
+We *need* to return False in those cases, because
+  1. We would lose too much strictness in pure code, all over the place.
+  2. We would lose strictness for primops like getMaskingState#, which
+     introduces a substantial regression in
+     GHC.IO.Handle.Internals.wantReadableHandle.
+  3. We would lose strictness for code like GHC.Fingerprint.fingerprintData,
+     where an intermittent FFI call to c_MD5Init would otherwise lose
+     strictness on the arguments len and buf, leading to regressions in T9203
+     (2%) and i386's haddock.base (5%). Tested by T13380f.
 
-Hackish solution: spot the IO-like situation and add a virtual branch,
-as if we had
-     case foo x s of
-        (# s, r #) -> y
-        other      -> return ()
-So the 'y' isn't necessarily going to be evaluated
-
-A more complete example (#148, #1592) where this shows up is:
-     do { let len = <expensive> ;
-        ; when (...) (exitWith ExitSuccess)
-        ; print len }
-
-However, consider
-  f x s = case getMaskingState# s of
-            (# s, r #) ->
-          case x of I# x2 -> ...
-
-Here it is terribly sad to make 'f' lazy in 's'.  After all,
-getMaskingState# is not going to diverge or throw an exception!  This
-situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
-(on an MVar not an Int), and made a material difference.
-
-So if the scrutinee is a primop call, we *don't* apply the
-state hack:
-  - If it is a simple, terminating one like getMaskingState,
-    applying the hack is over-conservative.
-  - If the primop is raise# then it returns bottom, so
-    the case alternatives are already discarded.
-  - If the primop can raise a non-IO exception, like
-    divide by zero or seg-fault (eg writing an array
-    out of bounds) then we don't mind evaluating 'x' first.
+In !3014 we tried a more sophisticated analysis by introducing ConOrDiv (nic)
+to the Divergence lattice, but in practice it turned out to be hard to untaint
+from 'topDiv' to 'conDiv', leading to bugs, performance regressions and
+complexity that didn't justify the single fixed testcase T13380c.
 
 Note [Demand on the scrutinee of a product case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -453,117 +492,40 @@ dmdTransform :: AnalEnv         -- The strictness environment
         -- this function plus demand on its free variables
 
 dmdTransform env var dmd
-  | isDataConWorkId var                          -- Data constructor
+  -- Data constructors
+  | isDataConWorkId var
   = dmdTransformDataConSig (idArity var) dmd
-
-  | gopt Opt_DmdTxDictSel (ae_dflags env),
-    Just _ <- isClassOpId_maybe var -- Dictionary component selector
+  -- Dictionary component selectors
+  -- Used to be controlled by a flag.
+  -- See #18429 for some perf measurements.
+  | Just _ <- isClassOpId_maybe var
   = dmdTransformDictSelSig (idStrictness var) dmd
-
-  | isGlobalId var                               -- Imported function
+  -- Imported functions
+  | isGlobalId var
   , let res = dmdTransformSig (idStrictness var) dmd
-  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
+  = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
     res
-
-  | Just (sig, top_lvl) <- lookupSigEnv env var  -- Local letrec bound thing
+  -- Top-level or local let-bound thing for which we use LetDown ('useLetUp').
+  -- In that case, we have a strictness signature to unleash in our AnalEnv.
+  | Just (sig, top_lvl) <- lookupSigEnv env var
   , let fn_ty = dmdTransformSig sig dmd
-  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
+  = -- pprTrace "dmdTransform:LetDown" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
     if isTopLevel top_lvl
-    then fn_ty   -- Don't record top level things
+    then fn_ty   -- Don't record demand on top-level things
     else addVarDmd fn_ty var (mkOnceUsedDmd dmd)
+  -- Everything else:
+  --   * Local let binders for which we use LetUp (cf. 'useLetUp')
+  --   * Lambda binders
+  --   * Case and constructor field binders
+  | otherwise
+  = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr sig, ppr dmd, ppr res]) $
+    unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
 
-  | otherwise                                    -- Local non-letrec-bound thing
-  = unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
-
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Bindings}
+                      Binding right-hand sides
 *                                                                      *
-************************************************************************
--}
-
--- Recursive bindings
-dmdFix :: TopLevelFlag
-       -> AnalEnv                            -- Does not include bindings for this binding
-       -> CleanDemand
-       -> [(Id,CoreExpr)]
-       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
-
-dmdFix top_lvl env let_dmd orig_pairs
-  = loop 1 initial_pairs
-  where
-    bndrs = map fst orig_pairs
-
-    -- See Note [Initialising strictness]
-    initial_pairs | ae_virgin env = [(setIdStrictness id botSig, rhs) | (id, rhs) <- orig_pairs ]
-                  | otherwise     = orig_pairs
-
-    -- If fixed-point iteration does not yield a result we use this instead
-    -- See Note [Safe abortion in the fixed-point iteration]
-    abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    abort = (env, lazy_fv', zapped_pairs)
-      where (lazy_fv, pairs') = step True (zapIdStrictness orig_pairs)
-            -- Note [Lazy and unleashable free variables]
-            non_lazy_fvs = plusVarEnvList $ map (strictSigDmdEnv . idStrictness . fst) pairs'
-            lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
-            zapped_pairs = zapIdStrictness pairs'
-
-    -- The fixed-point varies the idStrictness field of the binders, and terminates if that
-    -- annotation does not change any more.
-    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    loop n pairs
-      | found_fixpoint = (final_anal_env, lazy_fv, pairs')
-      | n == 10        = abort
-      | otherwise      = loop (n+1) pairs'
-      where
-        found_fixpoint    = map (idStrictness . fst) pairs' == map (idStrictness . fst) pairs
-        first_round       = n == 1
-        (lazy_fv, pairs') = step first_round pairs
-        final_anal_env    = extendAnalEnvs top_lvl env (map fst pairs')
-
-    step :: Bool -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
-    step first_round pairs = (lazy_fv, pairs')
-      where
-        -- In all but the first iteration, delete the virgin flag
-        start_env | first_round = env
-                  | otherwise   = nonVirgin env
-
-        start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyDmdEnv)
-
-        ((_,lazy_fv), pairs') = mapAccumL my_downRhs start pairs
-                -- mapAccumL: Use the new signature to do the next pair
-                -- The occurrence analyser has arranged them in a good order
-                -- so this can significantly reduce the number of iterations needed
-
-        my_downRhs (env, lazy_fv) (id,rhs)
-          = ((env', lazy_fv'), (id', rhs'))
-          where
-            (lazy_fv1, id', rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
-            lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
-            env'                  = extendAnalEnv top_lvl env id (idStrictness id')
-
-
-    zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
-
-{-
-Note [Safe abortion in the fixed-point iteration]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Fixed-point iteration may fail to terminate. But we cannot simply give up and
-return the environment and code unchanged! We still need to do one additional
-round, for two reasons:
-
- * To get information on used free variables (both lazy and strict!)
-   (see Note [Lazy and unleashable free variables])
- * To ensure that all expressions have been traversed at least once, and any left-over
-   strictness annotations have been updated.
-
-This final iteration does not add the variables to the strictness signature
-environment, which effectively assigns them 'nopSig' (see "getStrictness")
-
--}
+********************************************************************* -}
 
 -- Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
@@ -581,40 +543,49 @@ dmdAnalRhsLetDown
   :: Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
   -> AnalEnv -> CleanDemand
   -> Id -> CoreExpr
-  -> (DmdEnv, Id, CoreExpr)
+  -> (DmdEnv, StrictSig, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
+-- See Note [NOINLINE and strictness]
 dmdAnalRhsLetDown rec_flag env let_dmd id rhs
-  = (lazy_fv, id', rhs')
+  = (lazy_fv, sig, rhs')
   where
-    rhs_arity      = idArity id
-    rhs_dmd
-      -- See Note [Demand analysis for join points]
-      -- See Note [Invariants on join points] invariant 2b, in GHC.Core
-      --     rhs_arity matches the join arity of the join point
-      | isJoinId id
-      = mkCallDmds rhs_arity let_dmd
-      | otherwise
-      -- NB: rhs_arity
-      -- See Note [Demand signatures are computed for a threshold demand based on idArity]
-      = mkRhsDmd env rhs_arity rhs
-    (DmdType rhs_fv rhs_dmds rhs_div, rhs')
-                   = dmdAnal env rhs_dmd rhs
-    -- TODO: Won't the following line unnecessarily trim down arity for join
-    --       points returning a lambda in a C(S) context?
-    sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_div)
-    id'            = setIdStrictness id sig
-        -- See Note [NOINLINE and strictness]
+    rhs_arity = idArity id
+    rhs_dmd -- See Note [Demand analysis for join points]
+            -- See Note [Invariants on join points] invariant 2b, in GHC.Core
+            --     rhs_arity matches the join arity of the join point
+            | isJoinId id
+            = mkCallDmds rhs_arity let_dmd
+            | otherwise
+            -- NB: rhs_arity
+            -- See Note [Demand signatures are computed for a threshold demand based on idArity]
+            = mkRhsDmd env rhs_arity rhs
 
+    (rhs_dmd_ty, rhs') = dmdAnal env rhs_dmd rhs
+    DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
+
+    sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
 
     -- See Note [Aggregated demand for cardinality]
     rhs_fv1 = case rec_flag of
                 Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
                 Nothing -> rhs_fv
 
+    rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` extra_fvs
+
     -- See Note [Lazy and unleashable free variables]
-    (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv1
-    is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
+    (lazy_fv, sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
+
+    -- Find the RHS free vars of the unfoldings and RULES
+    -- See Note [Absence analysis for stable unfoldings and RULES]
+    extra_fvs = foldr (unionVarSet . ruleRhsFreeIds) unf_fvs $
+                idCoreRules id
+
+    unf = realIdUnfolding id
+    unf_fvs | isStableUnfolding unf
+            , Just unf_body <- maybeUnfoldingTemplate unf
+            = exprFreeIds unf_body
+            | otherwise = emptyVarSet
 
 -- | @mkRhsDmd env rhs_arity rhs@ creates a 'CleanDemand' for
 -- unleashing on the given function's @rhs@, by creating
@@ -623,8 +594,9 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
 mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> CleanDemand
 mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity cleanEvalDmd
 
--- | If given the let-bound 'Id', 'useLetUp' determines whether we should
--- process the binding up (body before rhs) or down (rhs before body).
+-- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
+-- whether we should process the binding up (body before rhs) or down (rhs
+-- before body).
 --
 -- We use LetDown if there is a chance to get a useful strictness signature to
 -- unleash at call sites. LetDown is generally more precise than LetUp if we can
@@ -847,10 +819,47 @@ we want plusInt's strictness to propagate to foo!  But because it has
 no manifest lambdas, it won't do so automatically, and indeed 'co' might
 have type (Int->Int->Int) ~ T.
 
-Fortunately, GHC.Core.Arity gives 'foo' arity 2, which is enough for LetDown to
+Fortunately, GHC.Core.Opt.Arity gives 'foo' arity 2, which is enough for LetDown to
 forward plusInt's demand signature, and all is well (see Note [Newtype arity] in
-GHC.Core.Arity)! A small example is the test case NewtypeArity.
+GHC.Core.Opt.Arity)! A small example is the test case NewtypeArity.
 
+Note [Absence analysis for stable unfoldings and RULES]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ticket #18638 shows that it's really important to do absence analysis
+for stable unfoldings. Consider
+
+   g = blah
+
+   f = \x.  ...no use of g....
+   {- f's stable unfolding is f = \x. ...g... -}
+
+If f is ever inlined we use 'g'. But f's current RHS makes no use
+of 'g', so if we don't look at the unfolding we'll mark g as Absent,
+and transform to
+
+   g = error "Entered absent value"
+   f = \x. ...
+   {- f's stable unfolding is f = \x. ...g... -}
+
+Now if f is subsequently inlined, we'll use 'g' and ... disaster.
+
+SOLUTION: if f has a stable unfolding, adjust its DmdEnv (the demands
+on its free variables) so that no variable mentioned in its unfolding
+is Absent.  This is done by the function Demand.keepAliveDmdEnv.
+
+ALSO: do the same for Ids free in the RHS of any RULES for f.
+
+PS: You may wonder how it can be that f's optimised RHS has somehow
+discarded 'g', but when f is inlined we /don't/ discard g in the same
+way. I think a simple example is
+   g = (a,b)
+   f = \x.  fst g
+   {-# INLINE f #-}
+
+Now f's optimised RHS will be \x.a, but if we change g to (error "..")
+(since it is apparently Absent) and then inline (\x. fst g) we get
+disaster.  But regardless, #18638 was a more complicated version of
+this, that actually happened in practice.
 
 Historical Note [Product demands for function body]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -879,13 +888,151 @@ That motivated using a demand of C(C(C(S(L,L)))) for the RHS, where
 behaviour -- see #17932.   Happily it turns out now to be entirely
 unnecessary: we get good results with C(C(C(S))).   So I simply
 deleted the special case.
-
-************************************************************************
-*                                                                      *
-\subsection{Strictness signatures and types}
-*                                                                      *
-************************************************************************
 -}
+
+{- *********************************************************************
+*                                                                      *
+                      Fixpoints
+*                                                                      *
+********************************************************************* -}
+
+-- Recursive bindings
+dmdFix :: TopLevelFlag
+       -> AnalEnv                            -- Does not include bindings for this binding
+       -> CleanDemand
+       -> [(Id,CoreExpr)]
+       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
+
+dmdFix top_lvl env let_dmd orig_pairs
+  = loop 1 initial_pairs
+  where
+    bndrs = map fst orig_pairs
+
+    -- See Note [Initialising strictness]
+    initial_pairs | ae_virgin env = [(setIdStrictness id botSig, rhs) | (id, rhs) <- orig_pairs ]
+                  | otherwise     = orig_pairs
+
+    -- If fixed-point iteration does not yield a result we use this instead
+    -- See Note [Safe abortion in the fixed-point iteration]
+    abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
+    abort = (env, lazy_fv', zapped_pairs)
+      where (lazy_fv, pairs') = step True (zapIdStrictness orig_pairs)
+            -- Note [Lazy and unleashable free variables]
+            non_lazy_fvs = plusVarEnvList $ map (strictSigDmdEnv . idStrictness . fst) pairs'
+            lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
+            zapped_pairs = zapIdStrictness pairs'
+
+    -- The fixed-point varies the idStrictness field of the binders, and terminates if that
+    -- annotation does not change any more.
+    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
+    loop n pairs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idStrictness id)
+                   --                                     | (id,_)<- pairs]) $
+                   loop' n pairs
+
+    loop' n pairs
+      | found_fixpoint = (final_anal_env, lazy_fv, pairs')
+      | n == 10        = abort
+      | otherwise      = loop (n+1) pairs'
+      where
+        found_fixpoint    = map (idStrictness . fst) pairs' == map (idStrictness . fst) pairs
+        first_round       = n == 1
+        (lazy_fv, pairs') = step first_round pairs
+        final_anal_env    = extendAnalEnvs top_lvl env (map fst pairs')
+
+    step :: Bool -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
+    step first_round pairs = (lazy_fv, pairs')
+      where
+        -- In all but the first iteration, delete the virgin flag
+        start_env | first_round = env
+                  | otherwise   = nonVirgin env
+
+        start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyDmdEnv)
+
+        ((_,lazy_fv), pairs') = mapAccumL my_downRhs start pairs
+                -- mapAccumL: Use the new signature to do the next pair
+                -- The occurrence analyser has arranged them in a good order
+                -- so this can significantly reduce the number of iterations needed
+
+        my_downRhs (env, lazy_fv) (id,rhs)
+          = ((env', lazy_fv'), (id', rhs'))
+          where
+            (lazy_fv1, sig, rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
+            lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
+            env'                  = extendAnalEnv top_lvl env id sig
+            id'                   = setIdStrictness id sig
+
+    zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
+    zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
+
+{- Note [Safe abortion in the fixed-point iteration]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Fixed-point iteration may fail to terminate. But we cannot simply give up and
+return the environment and code unchanged! We still need to do one additional
+round, for two reasons:
+
+ * To get information on used free variables (both lazy and strict!)
+   (see Note [Lazy and unleashable free variables])
+ * To ensure that all expressions have been traversed at least once, and any left-over
+   strictness annotations have been updated.
+
+This final iteration does not add the variables to the strictness signature
+environment, which effectively assigns them 'nopSig' (see "getStrictness")
+
+Note [Trimming a demand to a type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are two reasons we sometimes trim a demand to match a type.
+  1. GADTs
+  2. Recursive products and widening
+
+More on both below.  But the botttom line is: we really don't want to
+have a binder whose demand is more deeply-nested than its type
+"allows". So in findBndrDmd we call trimToType and findTypeShape to
+trim the demand on the binder to a form that matches the type
+
+Now to the reasons. For (1) consider
+  f :: a -> Bool
+  f x = case ... of
+          A g1 -> case (x |> g1) of (p,q) -> ...
+          B    -> error "urk"
+
+where A,B are the constructors of a GADT.  We'll get a U(U,U) demand
+on x from the A branch, but that's a stupid demand for x itself, which
+has type 'a'. Indeed we get ASSERTs going off (notably in
+splitUseProdDmd, #8569).
+
+For (2) consider
+  data T = MkT Int T    -- A recursive product
+  f :: Int -> T -> Int
+  f 0 _         = 0
+  f _ (MkT n t) = f n t
+
+Here f is lazy in T, but its *usage* is infinite: U(U,U(U,U(U, ...))).
+Notice that this happens becuase T is a product type, and is recrusive.
+If we are not careful, we'll fail to iterate to a fixpoint in dmdFix,
+and bale out entirely, which is inefficient and over-conservative.
+
+Worse, as we discovered in #18304, the size of the usages we compute
+can grow /exponentially/, so even 10 iterations costs far too much.
+Especially since we then discard the result.
+
+To avoid this we use the same findTypeShape function as for (1), but
+arrange that it trims the demand if it encounters the same type constructor
+twice (or three times, etc).  We use our standard RecTcChecker mechanism
+for this -- see GHC.Core.Opt.WorkWrap.Utils.findTypeShape.
+
+This is usually call "widening".  We could do it just in dmdFix, but
+since are doing this findTypeShape business /anyway/ because of (1),
+and it has all the right information to hand, it's extremely
+convenient to do it there.
+
+-}
+
+{- *********************************************************************
+*                                                                      *
+                 Strictness signatures and types
+*                                                                      *
+********************************************************************* -}
 
 unitDmdType :: DmdEnv -> DmdType
 unitDmdType dmd_env = DmdType dmd_env [] topDiv
@@ -1095,14 +1242,13 @@ type DFunFlag = Bool  -- indicates if the lambda being considered is in the
 notArgOfDfun :: DFunFlag
 notArgOfDfun = False
 
-data AnalEnv
-  = AE { ae_dflags :: DynFlags
-       , ae_sigs   :: SigEnv
-       , ae_virgin :: Bool    -- True on first iteration only
+data AnalEnv = AE
+   { ae_strict_dicts :: !Bool -- ^ Enable strict dict
+   , ae_sigs         :: !SigEnv
+   , ae_virgin       :: !Bool -- ^ True on first iteration only
                               -- See Note [Initialising strictness]
-       , ae_rec_tc :: RecTcChecker
-       , ae_fam_envs :: FamInstEnvs
- }
+   , ae_fam_envs     :: !FamInstEnvs
+   }
 
         -- We use the se_env to tell us whether to
         -- record info about a variable in the DmdEnv
@@ -1114,18 +1260,18 @@ data AnalEnv
 type SigEnv = VarEnv (StrictSig, TopLevelFlag)
 
 instance Outputable AnalEnv where
-  ppr (AE { ae_sigs = env, ae_virgin = virgin })
-    = text "AE" <+> braces (vcat
-         [ text "ae_virgin =" <+> ppr virgin
-         , text "ae_sigs =" <+> ppr env ])
+  ppr env = text "AE" <+> braces (vcat
+         [ text "ae_virgin =" <+> ppr (ae_virgin env)
+         , text "ae_strict_dicts =" <+> ppr (ae_strict_dicts env)
+         , text "ae_sigs =" <+> ppr (ae_sigs env)
+         ])
 
-emptyAnalEnv :: DynFlags -> FamInstEnvs -> AnalEnv
-emptyAnalEnv dflags fam_envs
-    = AE { ae_dflags = dflags
-         , ae_sigs = emptySigEnv
-         , ae_virgin = True
-         , ae_rec_tc = initRecTc
-         , ae_fam_envs = fam_envs
+emptyAnalEnv :: DmdAnalOpts -> FamInstEnvs -> AnalEnv
+emptyAnalEnv opts fam_envs
+    = AE { ae_strict_dicts = dmd_strict_dicts opts
+         , ae_sigs         = emptySigEnv
+         , ae_virgin       = True
+         , ae_fam_envs     = fam_envs
          }
 
 emptySigEnv :: SigEnv
@@ -1166,7 +1312,7 @@ findBndrsDmds env dmd_ty bndrs
       | otherwise = go dmd_ty bs
 
 findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
--- See Note [Trimming a demand to a type] in GHC.Types.Demand
+-- See Note [Trimming a demand to a type]
 findBndrDmd env arg_of_dfun dmd_ty id
   = (dmd_ty', dmd')
   where
@@ -1178,7 +1324,7 @@ findBndrDmd env arg_of_dfun dmd_ty id
     id_ty = idType id
 
     strictify dmd
-      | gopt Opt_DictsStrict (ae_dflags env)
+      | ae_strict_dicts env
              -- We never want to strictify a recursive let. At the moment
              -- annotateBndr is only call for non-recursive lets; if that
              -- changes, we need a RecFlag parameter and another guard here.

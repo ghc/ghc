@@ -134,6 +134,12 @@ promotion quote and the data constructor: ::
   type S = 'A'   -- ERROR: looks like a character
   type R = ' A'  -- OK: promoted `A'`
 
+Type-level literals
+-------------------
+
+:extension:`DataKinds` enables the use of numeric and string literals at the
+type level. For more information, see :ref:`type-level-literals`.
+
 .. _promoted-lists-and-tuples:
 
 Promoted list and tuple types
@@ -207,4 +213,27 @@ above code is valid.
 
 See also :ghc-ticket:`7347`.
 
+.. _constraints_in_kinds:
 
+Constraints in kinds
+--------------------
+
+Kinds can (with :extension:`DataKinds`) contain type constraints. However,
+only equality constraints are supported.
+
+Here is an example of a constrained kind: ::
+
+  type family IsTypeLit a where
+    IsTypeLit Nat    = 'True
+    IsTypeLit Symbol = 'True
+    IsTypeLit a      = 'False
+
+  data T :: forall a. (IsTypeLit a ~ 'True) => a -> Type where
+    MkNat    :: T 42
+    MkSymbol :: T "Don't panic!"
+
+The declarations above are accepted. However, if we add ``MkOther :: T Int``,
+we get an error that the equality constraint is not satisfied; ``Int`` is
+not a type literal. Note that explicitly quantifying with ``forall a`` is
+necessary in order for ``T`` to typecheck
+(see :ref:`complete-kind-signatures`).

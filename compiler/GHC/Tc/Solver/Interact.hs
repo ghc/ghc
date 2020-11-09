@@ -10,41 +10,40 @@ module GHC.Tc.Solver.Interact (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Types.Basic ( SwapFlag(..), isSwapped,
                          infinity, IntWithInf, intGtLimit )
 import GHC.Tc.Solver.Canonical
 import GHC.Tc.Solver.Flatten
-import GHC.Tc.Utils.Unify( canSolveByUnification )
+import GHC.Tc.Utils.Unify ( canSolveByUnification )
 import GHC.Types.Var.Set
 import GHC.Core.Type as Type
 import GHC.Core.Coercion        ( BlockSubstFlag(..) )
 import GHC.Core.InstEnv         ( DFunInstType )
-import GHC.Core.Coercion.Axiom  ( sfInteractTop, sfInteractInert )
 
 import GHC.Types.Var
 import GHC.Tc.Utils.TcType
-import GHC.Builtin.Names ( coercibleTyConKey,
-                   heqTyConKey, eqTyConKey, ipClassKey )
-import GHC.Core.Coercion.Axiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
+import GHC.Builtin.Names ( coercibleTyConKey, heqTyConKey, eqTyConKey, ipClassKey )
+import GHC.Core.Coercion.Axiom ( CoAxBranch (..), CoAxiom (..), TypeEqn, fromBranches, sfInteractInert, sfInteractTop )
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
-import GHC.Tc.Instance.Class( InstanceWhat(..), safeOverlap )
+import GHC.Tc.Instance.Class ( InstanceWhat(..), safeOverlap )
 import GHC.Core.FamInstEnv
 import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 
 import GHC.Tc.Types.Evidence
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import GHC.Tc.Types
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Solver.Monad
-import Bag
-import MonadUtils ( concatMapM, foldlM )
+import GHC.Data.Bag
+import GHC.Utils.Monad ( concatMapM, foldlM )
 
 import GHC.Core
 import Data.List( partition, deleteFirstsBy )
@@ -52,11 +51,11 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
 
 import Control.Monad
-import Maybes( isJust )
-import Pair (Pair(..))
+import GHC.Data.Maybe( isJust )
+import GHC.Data.Pair (Pair(..))
 import GHC.Types.Unique( hasKey )
 import GHC.Driver.Session
-import Util
+import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad.Trans.Class
@@ -87,7 +86,7 @@ Note [Basic Simplifier Plan]
       - If (ContinueWith ct) is returned by a stage, we feed 'ct' on to
         the next stage in the pipeline.
 4. If the element has survived (i.e. ContinueWith x) the last stage
-   then we add him in the inerts and jump back to Step 1.
+   then we add it in the inerts and jump back to Step 1.
 
 If in Step 1 no such element exists, we have exceeded our context-stack
 depth and will simply fail.
@@ -195,7 +194,7 @@ solve_simple_wanteds :: WantedConstraints -> TcS (Int, WantedConstraints)
 -- Try solving these constraints
 -- Affects the unification state (of course) but not the inert set
 -- The result is not necessarily zonked
-solve_simple_wanteds (WC { wc_simple = simples1, wc_impl = implics1 })
+solve_simple_wanteds (WC { wc_simple = simples1, wc_impl = implics1, wc_holes = holes })
   = nestTcS $
     do { solveSimples simples1
        ; (implics2, tv_eqs, fun_eqs, others) <- getUnsolvedInerts
@@ -204,7 +203,8 @@ solve_simple_wanteds (WC { wc_simple = simples1, wc_impl = implics1 })
             -- See Note [Unflatten after solving the simple wanteds]
        ; return ( unif_count
                 , WC { wc_simple = others `andCts` unflattened_eqs
-                     , wc_impl   = implics1 `unionBags` implics2 }) }
+                     , wc_impl   = implics1 `unionBags` implics2
+                     , wc_holes  = holes }) }
 
 {- Note [The solveSimpleWanteds loop]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -264,7 +264,7 @@ runTcPluginsGiven
 -- 'solveSimpleWanteds' should feed the updated wanteds back into the
 -- main solver.
 runTcPluginsWanted :: WantedConstraints -> TcS (Bool, WantedConstraints)
-runTcPluginsWanted wc@(WC { wc_simple = simples1, wc_impl = implics1 })
+runTcPluginsWanted wc@(WC { wc_simple = simples1 })
   | isEmptyBag simples1
   = return (False, wc)
   | otherwise
@@ -285,11 +285,10 @@ runTcPluginsWanted wc@(WC { wc_simple = simples1, wc_impl = implics1 })
 
        ; mapM_ setEv solved_wanted
        ; return ( notNull (pluginNewCts p)
-                , WC { wc_simple = listToBag new_wanted       `andCts`
+                , wc { wc_simple = listToBag new_wanted       `andCts`
                                    listToBag unsolved_wanted  `andCts`
                                    listToBag unsolved_derived `andCts`
-                                   listToBag insols
-                     , wc_impl   = implics1 } ) } }
+                                   listToBag insols } ) } }
   where
     setEv :: (EvTerm,Ct) -> TcS ()
     setEv (ev,ct) = case ctEvidence ct of
@@ -494,7 +493,6 @@ interactWithInertsStage wi
              CIrredCan {} -> interactIrred   ics wi
              CDictCan  {} -> interactDict    ics wi
              _ -> pprPanic "interactWithInerts" (ppr wi) }
-                -- CHoleCan are put straight into inert_frozen, so never get here
                 -- CNonCanonical have been canonicalised
 
 data InteractResult
@@ -566,10 +564,10 @@ solveOneFromTheOther ev_i ev_w
      ev_id_w = ctEvEvId ev_w
 
      different_level_strategy  -- Both Given
-       | isIPPred pred = if lvl_w > lvl_i then KeepWork  else KeepInert
-       | otherwise     = if lvl_w > lvl_i then KeepInert else KeepWork
+       | isIPLikePred pred = if lvl_w > lvl_i then KeepWork  else KeepInert
+       | otherwise         = if lvl_w > lvl_i then KeepInert else KeepWork
        -- See Note [Replacement vs keeping] (the different-level bullet)
-       -- For the isIPPred case see Note [Shadowing of Implicit Parameters]
+       -- For the isIPLikePred case see Note [Shadowing of Implicit Parameters]
 
      same_level_strategy binds -- Both Given
        | GivenOrigin (InstSC s_i) <- ctLocOrigin loc_i
@@ -939,7 +937,7 @@ can change the behavior of the user's code.
 The following four modules produce a program whose output would change depending
 on whether we apply this optimization when IncoherentInstances is in effect:
 
-#########
+=========
     {-# LANGUAGE MultiParamTypeClasses #-}
     module A where
 
@@ -949,8 +947,9 @@ on whether we apply this optimization when IncoherentInstances is in effect:
     class A a => C a b where
       m :: b -> a -> a
 
-#########
-    {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+=========
+    {-# LANGUAGE FlexibleInstances     #-}
+    {-# LANGUAGE MultiParamTypeClasses #-}
     module B where
 
     import A
@@ -961,9 +960,11 @@ on whether we apply this optimization when IncoherentInstances is in effect:
     instance C a [b] where
       m _ = id
 
-#########
-    {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FlexibleContexts #-}
-    {-# LANGUAGE IncoherentInstances #-}
+=========
+    {-# LANGUAGE FlexibleContexts      #-}
+    {-# LANGUAGE FlexibleInstances     #-}
+    {-# LANGUAGE IncoherentInstances   #-}
+    {-# LANGUAGE MultiParamTypeClasses #-}
     module C where
 
     import A
@@ -977,7 +978,7 @@ on whether we apply this optimization when IncoherentInstances is in effect:
     intC :: C Int a => a -> Int -> Int
     intC _ x = int x
 
-#########
+=========
     module Main where
 
     import A
@@ -1071,6 +1072,8 @@ shortCutSolver dflags ev_w ev_i
  -- programs should typecheck regardless of whether we take this step or
  -- not. See Note [Shortcut solving]
 
+ && not (isIPLikePred (ctEvPred ev_w))   -- Not for implicit parameters (#18627)
+
  && not (xopt LangExt.IncoherentInstances dflags)
  -- If IncoherentInstances is on then we cannot rely on coherence of proofs
  -- in order to justify this optimization: The proof provided by the
@@ -1079,6 +1082,7 @@ shortCutSolver dflags ev_w ev_i
 
  && gopt Opt_SolveConstantDicts dflags
  -- Enabled by the -fsolve-constant-dicts flag
+
   = do { ev_binds_var <- getTcEvBindsVar
        ; ev_binds <- ASSERT2( not (isCoEvBindsVar ev_binds_var ), ppr ev_w )
                      getTcEvBindsMap ev_binds_var
@@ -1665,7 +1669,7 @@ variable *on the left* of the equality. Here is what happens if not:
   Original wanted:  (a ~ alpha),  (alpha ~ Int)
 We spontaneously solve the first wanted, without changing the order!
       given : a ~ alpha      [having unified alpha := a]
-Now the second wanted comes along, but he cannot rewrite the given, so we simply continue.
+Now the second wanted comes along, but it cannot rewrite the given, so we simply continue.
 At the end we spontaneously solve that guy, *reunifying*  [alpha := Int]
 
 We avoid this problem by orienting the resulting given so that the unification
@@ -2489,7 +2493,7 @@ matchClassInst dflags inerts clas tys loc
 -- | If a class is "naturally coherent", then we needn't worry at all, in any
 -- way, about overlapping/incoherent instances. Just solve the thing!
 -- See Note [Naturally coherent classes]
--- See also Note [The equality class story] in GHC.Builtin.Types.Prim.
+-- See also Note [The equality class story] in "GHC.Builtin.Types.Prim".
 naturallyCoherentClass :: Class -> Bool
 naturallyCoherentClass cls
   = isCTupleClass cls
@@ -2603,7 +2607,7 @@ because many good things flow from [W] t1 ~# t2.
 
 The same reasoning applies to
 
-* (~~)        heqTyCOn
+* (~~)        heqTyCon
 * (~)         eqTyCon
 * Coercible   coercibleTyCon
 

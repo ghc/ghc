@@ -1,7 +1,12 @@
--- (c) The University of Glasgow 2012
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE RoleAnnotations     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-{-# LANGUAGE CPP, DataKinds, DeriveDataTypeable, GADTs, KindSignatures,
-             ScopedTypeVariables, StandaloneDeriving, RoleAnnotations #-}
+-- (c) The University of Glasgow 2012
 
 -- | Module for coercion axioms, used to represent type family instances
 -- and newtypes
@@ -26,22 +31,23 @@ module GHC.Core.Coercion.Axiom (
        Role(..), fsFromRole,
 
        CoAxiomRule(..), TypeEqn,
-       BuiltInSynFamily(..)
+       BuiltInSynFamily(..), trivialBuiltInFamily
        ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType )
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Name
 import GHC.Types.Unique
 import GHC.Types.Var
-import Util
-import Binary
-import Pair
+import GHC.Utils.Misc
+import GHC.Utils.Binary
+import GHC.Utils.Panic
+import GHC.Data.Pair
 import GHC.Types.Basic
 import Data.Typeable ( Typeable )
 import GHC.Types.SrcLoc
@@ -184,9 +190,10 @@ Note [Storing compatibility]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 During axiom application, we need to be aware of which branches are compatible
 with which others. The full explanation is in Note [Compatibility] in
-FamInstEnv. (The code is placed there to avoid a dependency from CoAxiom on
-the unification algorithm.) Although we could theoretically compute
-compatibility on the fly, this is silly, so we store it in a CoAxiom.
+GHc.Core.FamInstEnv. (The code is placed there to avoid a dependency from
+GHC.Core.Coercion.Axiom on the unification algorithm.) Although we could
+theoretically compute compatibility on the fly, this is silly, so we store it
+in a CoAxiom.
 
 Specifically, each branch refers to all other branches with which it is
 incompatible. This list might well be empty, and it will always be for the
@@ -233,8 +240,8 @@ data CoAxBranch
     { cab_loc      :: SrcSpan       -- Location of the defining equation
                                     -- See Note [CoAxiom locations]
     , cab_tvs      :: [TyVar]       -- Bound type variables; not necessarily fresh
-    , cab_eta_tvs  :: [TyVar]       -- Eta-reduced tyvars
                                     -- See Note [CoAxBranch type variables]
+    , cab_eta_tvs  :: [TyVar]       -- Eta-reduced tyvars
                                     -- cab_tvs and cab_lhs may be eta-reduced; see
                                     -- Note [Eta reduction for data families]
     , cab_cvs      :: [CoVar]       -- Bound coercion variables
@@ -378,7 +385,7 @@ giving rise to the FamInstBranch.
 
 Note [Implicit axioms]
 ~~~~~~~~~~~~~~~~~~~~~~
-See also Note [Implicit TyThings] in GHC.Driver.Types
+See also Note [Implicit TyThings] in GHC.Types.TyThing
 * A CoAxiom arising from data/type family instances is not "implicit".
   That is, it has its own IfaceAxiom declaration in an interface file
 
@@ -448,7 +455,7 @@ See also:
 * Note [Newtype eta] in GHC.Core.TyCon.  This is notionally separate
   and deals with the axiom connecting a newtype with its representation
   type; but it too is eta-reduced.
-* Note [Implementing eta reduction for data families] in TcInstDcls. This
+* Note [Implementing eta reduction for data families] in "GHC.Tc.TyCl.Instance". This
   describes the implementation details of this eta reduction happen.
 -}
 
@@ -566,7 +573,9 @@ instance Eq CoAxiomRule where
   x == y = coaxrName x == coaxrName y
 
 instance Ord CoAxiomRule where
-  compare x y = compare (coaxrName x) (coaxrName y)
+  -- we compare lexically to avoid non-deterministic output when sets of rules
+  -- are printed
+  compare x y = lexicalCompareFS (coaxrName x) (coaxrName y)
 
 instance Outputable CoAxiomRule where
   ppr = ppr . coaxrName
@@ -578,4 +587,12 @@ data BuiltInSynFamily = BuiltInSynFamily
   , sfInteractTop   :: [Type] -> Type -> [TypeEqn]
   , sfInteractInert :: [Type] -> Type ->
                        [Type] -> Type -> [TypeEqn]
+  }
+
+-- Provides default implementations that do nothing.
+trivialBuiltInFamily :: BuiltInSynFamily
+trivialBuiltInFamily = BuiltInSynFamily
+  { sfMatchFam      = \_ -> Nothing
+  , sfInteractTop   = \_ _ -> []
+  , sfInteractInert = \_ _ _ _ -> []
   }

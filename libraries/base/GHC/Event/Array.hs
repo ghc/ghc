@@ -19,6 +19,7 @@ module GHC.Event.Array
     , removeAt
     , snoc
     , unsafeLoad
+    , unsafeCopyFromBuffer
     , unsafeRead
     , unsafeWrite
     , useAsPtr
@@ -127,7 +128,7 @@ unsafeWrite (Array ref) ix a = do
     unsafeWrite' ac ix a
 
 unsafeWrite' :: Storable a => AC a -> Int -> a -> IO ()
-unsafeWrite' (AC es _ cap) ix a = do
+unsafeWrite' (AC es _ cap) ix a =
     CHECK_BOUNDS("unsafeWrite'",cap,ix)
       withForeignPtr es $ \p ->
         pokeElemOff p ix a
@@ -139,6 +140,20 @@ unsafeLoad (Array ref) load = do
     writeIORef ref (AC es len' cap)
     return len'
 
+-- | Reads n elements from the pointer and copies them
+-- into the array.
+unsafeCopyFromBuffer :: Storable a => Array a -> Ptr a -> Int -> IO ()
+unsafeCopyFromBuffer (Array ref) sptr n =
+    readIORef ref >>= \(AC es _ cap) ->
+    CHECK_BOUNDS("unsafeCopyFromBuffer", cap, n)
+    withForeignPtr es $ \pdest -> do
+      let size = sizeOfPtr sptr undefined
+      _ <- memcpy pdest sptr (fromIntegral $ n * size)
+      writeIORef ref (AC es n cap)
+  where
+    sizeOfPtr :: Storable a => Ptr a -> a -> Int
+    sizeOfPtr _ a = sizeOf a
+
 ensureCapacity :: Storable a => Array a -> Int -> IO ()
 ensureCapacity (Array ref) c = do
     ac@(AC _ _ cap) <- readIORef ref
@@ -147,7 +162,7 @@ ensureCapacity (Array ref) c = do
       writeIORef ref ac'
 
 ensureCapacity' :: Storable a => AC a -> Int -> IO (AC a)
-ensureCapacity' ac@(AC es len cap) c = do
+ensureCapacity' ac@(AC es len cap) c =
     if c > cap
       then do
         es' <- reallocArray es cap' cap
@@ -171,7 +186,7 @@ snoc (Array ref) e = do
     writeIORef ref (AC es len' cap)
 
 clear :: Array a -> IO ()
-clear (Array ref) = do
+clear (Array ref) =
   atomicModifyIORef' ref $ \(AC es _ cap) ->
         (AC es 0 cap, ())
 

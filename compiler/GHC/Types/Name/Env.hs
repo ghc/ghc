@@ -20,7 +20,7 @@ module GHC.Types.Name.Env (
         extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
         extendNameEnvList, extendNameEnvList_C,
         filterNameEnv, anyNameEnv,
-        plusNameEnv, plusNameEnv_C, alterNameEnv,
+        plusNameEnv, plusNameEnv_C, plusNameEnv_CD, plusNameEnv_CD2, alterNameEnv,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
         elemNameEnv, mapNameEnv, disjointNameEnv,
 
@@ -37,13 +37,13 @@ module GHC.Types.Name.Env (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Digraph
+import GHC.Data.Graph.Directed
 import GHC.Types.Name
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
-import Maybes
+import GHC.Data.Maybe
 
 {-
 ************************************************************************
@@ -60,7 +60,7 @@ depAnal is deterministic provided it gets the nodes in a deterministic order.
 The order of lists that get_defs and get_uses return doesn't matter, as these
 are only used to construct the edges, and stronglyConnCompFromEdgedVertices is
 deterministic even when the edges are not in deterministic order as explained
-in Note [Deterministic SCC] in Digraph.
+in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
 -}
 
 depAnal :: forall node.
@@ -93,7 +93,7 @@ depAnal get_defs get_uses nodes
 -}
 
 -- | Name Environment
-type NameEnv a = UniqFM a       -- Domain is Name
+type NameEnv a = UniqFM Name a       -- Domain is Name
 
 emptyNameEnv       :: NameEnv a
 isEmptyNameEnv     :: NameEnv a -> Bool
@@ -106,6 +106,8 @@ extendNameEnv_Acc  :: (a->b->b) -> (a->b) -> NameEnv b -> Name -> a -> NameEnv b
 extendNameEnv      :: NameEnv a -> Name -> a -> NameEnv a
 plusNameEnv        :: NameEnv a -> NameEnv a -> NameEnv a
 plusNameEnv_C      :: (a->a->a) -> NameEnv a -> NameEnv a -> NameEnv a
+plusNameEnv_CD     :: (a->a->a) -> NameEnv a -> a -> NameEnv a -> a -> NameEnv a
+plusNameEnv_CD2    :: (Maybe a->Maybe a->a) -> NameEnv a -> NameEnv a -> NameEnv a
 extendNameEnvList  :: NameEnv a -> [(Name,a)] -> NameEnv a
 extendNameEnvList_C :: (a->a->a) -> NameEnv a -> [(Name,a)] -> NameEnv a
 delFromNameEnv     :: NameEnv a -> Name -> NameEnv a
@@ -132,6 +134,8 @@ mkNameEnvWith f       = mkNameEnv . map (\a -> (f a, a))
 elemNameEnv x y          = elemUFM x y
 plusNameEnv x y          = plusUFM x y
 plusNameEnv_C f x y      = plusUFM_C f x y
+plusNameEnv_CD f x d y b = plusUFM_CD f x d y b
+plusNameEnv_CD2 f x y    = plusUFM_CD2 f x y
 extendNameEnv_C f x y z  = addToUFM_C f x y z
 mapNameEnv f x           = mapUFM f x
 extendNameEnv_Acc x y z a b  = addToUFM_Acc x y z a b
@@ -140,15 +144,15 @@ delFromNameEnv x y      = delFromUFM x y
 delListFromNameEnv x y  = delListFromUFM x y
 filterNameEnv x y       = filterUFM x y
 anyNameEnv f x          = foldUFM ((||) . f) False x
-disjointNameEnv x y     = isNullUFM (intersectUFM x y)
+disjointNameEnv x y     = disjointUFM x y
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
 
 -- | Deterministic Name Environment
 --
--- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why
+-- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" for explanation why
 -- we need DNameEnv.
-type DNameEnv a = UniqDFM a
+type DNameEnv a = UniqDFM Name a
 
 emptyDNameEnv :: DNameEnv a
 emptyDNameEnv = emptyUDFM

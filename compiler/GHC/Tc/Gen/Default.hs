@@ -8,7 +8,7 @@
 -- | Typechecking @default@ declarations
 module GHC.Tc.Gen.Default ( tcDefaults ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Core.Class
@@ -21,8 +21,9 @@ import GHC.Tc.Validity
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 
 tcDefaults :: [LDefaultDecl GhcRn]
@@ -70,8 +71,8 @@ tcDefaults decls@(L locn (DefaultDecl _ _) : _)
 
 tc_default_ty :: [Class] -> LHsType GhcRn -> TcM Type
 tc_default_ty deflt_clss hs_ty
- = do   { (ty, _kind) <- solveEqualities $
-                         tcLHsType hs_ty
+ = do   { ty <- solveEqualities "tc_default_ty" $
+                tcInferLHsType hs_ty
         ; ty <- zonkTcTypeToType ty   -- establish Type invariants
         ; checkValidType DefaultDeclCtxt ty
 

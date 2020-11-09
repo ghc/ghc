@@ -53,38 +53,49 @@ module GHC.Runtime.Interpreter
   , fromEvalResult
   ) where
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Ppr (showSDoc)
+import GHC.Driver.Env
+import GHC.Driver.Session
 
 import GHC.Runtime.Interpreter.Types
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
-import Fingerprint
-import GHC.Driver.Types
-import GHC.Types.Unique.FM
-import Panic
-import GHC.Driver.Session
-import Exception
-import GHC.Types.Basic
-import FastString
-import Util
 import GHC.Runtime.Eval.Types(BreakInfo(..))
-import Outputable(brackets, ppr, showSDocUnqual)
-import GHC.Types.SrcLoc
-import Maybes
-import GHC.Types.Module
 import GHC.ByteCode.Types
+
+import GHC.Linker.Types
+
+import GHC.Data.Maybe
+import GHC.Data.FastString
+
 import GHC.Types.Unique
+import GHC.Types.SrcLoc
+import GHC.Types.Unique.FM
+import GHC.Types.Basic
+
+import GHC.Utils.Panic
+import GHC.Utils.Exception as Ex
+import GHC.Utils.Outputable(brackets, ppr)
+import GHC.Utils.Fingerprint
+import GHC.Utils.Misc
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Home.ModInfo
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run
-import GHC.Driver.Ways
+import GHC.Platform.Ways
 #endif
 
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Catch as MC (mask, onException)
 import Data.Binary
 import Data.Binary.Put
 import Data.ByteString (ByteString)
@@ -165,7 +176,7 @@ Other Notes on Remote GHCi
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
   * This wiki page has an implementation overview:
     https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/external-interpreter
-  * Note [External GHCi pointers] in compiler/ghci/GHCi.hs
+  * Note [External GHCi pointers] in "GHC.Runtime.Interpreter"
   * Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs
 -}
 
@@ -181,7 +192,7 @@ iservCmd hsc_env msg = withInterp hsc_env $ \case
   InternalInterp     -> run msg -- Just run it directly
 #endif
   (ExternalInterp c i) -> withIServ_ c i $ \iserv ->
-    uninterruptibleMask_ $ do -- Note [uninterruptibleMask_]
+    uninterruptibleMask_ $ -- Note [uninterruptibleMask_]
       iservCall iserv msg
 
 
@@ -211,17 +222,17 @@ hscInterp hsc_env = case hsc_interp hsc_env of
 -- | Grab a lock on the 'IServ' and do something with it.
 -- Overloaded because this is used from TcM as well as IO.
 withIServ
-  :: (MonadIO m, ExceptionMonad m)
+  :: (ExceptionMonad m)
   => IServConfig -> IServ -> (IServInstance -> m (IServInstance, a)) -> m a
-withIServ conf (IServ mIServState) action = do
-  gmask $ \restore -> do
+withIServ conf (IServ mIServState) action =
+  MC.mask $ \restore -> do
     state <- liftIO $ takeMVar mIServState
 
     iserv <- case state of
       -- start the external iserv process if we haven't done so yet
       IServPending ->
          liftIO (spawnIServ conf)
-           `gonException` (liftIO $ putMVar mIServState state)
+           `MC.onException` (liftIO $ putMVar mIServState state)
 
       IServRunning inst -> return inst
 
@@ -234,7 +245,7 @@ withIServ conf (IServ mIServState) action = do
         iservCall iserv (FreeHValueRefs (iservPendingFrees iserv))
       -- run the inner action
       restore $ action iserv')
-          `gonException` (liftIO $ putMVar mIServState (IServRunning iserv'))
+          `MC.onException` (liftIO $ putMVar mIServState (IServRunning iserv'))
     liftIO $ putMVar mIServState (IServRunning iserv'')
     return a
 
@@ -276,7 +287,7 @@ resumeStmt hsc_env step resume_ctxt = do
   handleEvalStatus hsc_env status
 
 abandonStmt :: HscEnv -> ForeignRef (ResumeContext [HValueRef]) -> IO ()
-abandonStmt hsc_env resume_ctxt = do
+abandonStmt hsc_env resume_ctxt =
   withForeignRef resume_ctxt $ \rhv ->
     iservCmd hsc_env (AbandonStmt rhv)
 
@@ -290,24 +301,24 @@ handleEvalStatus hsc_env status =
       EvalComplete alloc <$> addFinalizer res
  where
   addFinalizer (EvalException e) = return (EvalException e)
-  addFinalizer (EvalSuccess rs) = do
+  addFinalizer (EvalSuccess rs)  =
     EvalSuccess <$> mapM (mkFinalizedHValue hsc_env) rs
 
 -- | Execute an action of type @IO ()@
 evalIO :: HscEnv -> ForeignHValue -> IO ()
-evalIO hsc_env fhv = do
+evalIO hsc_env fhv =
   liftIO $ withForeignRef fhv $ \fhv ->
     iservCmd hsc_env (EvalIO fhv) >>= fromEvalResult
 
 -- | Execute an action of type @IO String@
 evalString :: HscEnv -> ForeignHValue -> IO String
-evalString hsc_env fhv = do
+evalString hsc_env fhv =
   liftIO $ withForeignRef fhv $ \fhv ->
     iservCmd hsc_env (EvalString fhv) >>= fromEvalResult
 
 -- | Execute an action of type @String -> IO String@
 evalStringToIOString :: HscEnv -> ForeignHValue -> String -> IO String
-evalStringToIOString hsc_env fhv str = do
+evalStringToIOString hsc_env fhv str =
   liftIO $ withForeignRef fhv $ \fhv ->
     iservCmd hsc_env (EvalStringToString fhv str) >>= fromEvalResult
 
@@ -369,12 +380,12 @@ newBreakArray hsc_env size = do
   mkFinalizedHValue hsc_env breakArray
 
 enableBreakpoint :: HscEnv -> ForeignRef BreakArray -> Int -> Bool -> IO ()
-enableBreakpoint hsc_env ref ix b = do
+enableBreakpoint hsc_env ref ix b =
   withForeignRef ref $ \breakarray ->
     iservCmd hsc_env (EnableBreakpoint breakarray ix b)
 
 breakpointStatus :: HscEnv -> ForeignRef BreakArray -> Int -> IO Bool
-breakpointStatus hsc_env ref ix = do
+breakpointStatus hsc_env ref ix =
   withForeignRef ref $ \breakarray ->
     iservCmd hsc_env (BreakpointStatus breakarray ix)
 
@@ -398,10 +409,10 @@ seqHValue hsc_env ref =
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
 handleSeqHValueStatus :: HscEnv -> EvalStatus () -> IO (EvalResult ())
-handleSeqHValueStatus hsc_env eval_status = do
+handleSeqHValueStatus hsc_env eval_status =
   case eval_status of
     (EvalBreak is_exception _ ix mod_uniq resume_ctxt _) -> do
-      -- A breakpoint was hit, inform the user and tell him
+      -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue hsc_env resume_ctxt
       let hmi = expectJust "handleRunStatus" $
@@ -412,7 +423,7 @@ handleSeqHValueStatus hsc_env eval_status = do
              | otherwise = Just (BreakInfo modl ix)
           sdocBpLoc = brackets . ppr . getSeqBpSpan
       putStrLn ("*** Ignoring breakpoint " ++
-            (showSDocUnqual (hsc_dflags hsc_env) $ sdocBpLoc bp))
+            (showSDoc (hsc_dflags hsc_env) $ sdocBpLoc bp))
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval ->
         iservCmd hsc_env (ResumeSeq hval) >>= handleSeqHValueStatus hsc_env
@@ -584,7 +595,7 @@ stopInterp hsc_env = case hsc_interp hsc_env of
   Just InternalInterp -> pure ()
 #endif
   Just (ExternalInterp _ (IServ mstate)) ->
-    gmask $ \_restore -> modifyMVar_ mstate $ \state -> do
+    MC.mask $ \_restore -> modifyMVar_ mstate $ \state -> do
       case state of
         IServPending    -> pure state -- already stopped
         IServRunning i  -> do
@@ -614,7 +625,7 @@ runWithPipes createProc prog opts = do
     wh <- mkHandle wfd2
     return (ph, rh, wh)
       where mkHandle :: CInt -> IO Handle
-            mkHandle fd = (fdToHandle fd) `onException` (c__close fd)
+            mkHandle fd = (fdToHandle fd) `Ex.onException` (c__close fd)
 
 #else
 runWithPipes createProc prog opts = do

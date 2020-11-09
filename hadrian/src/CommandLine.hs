@@ -1,7 +1,8 @@
 module CommandLine (
-    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
-    cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
-    cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
+    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2, lookupSkipDepends,
+    cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
+    cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
+    cmdPrefix
     ) where
 
 import Data.Either
@@ -24,11 +25,15 @@ data CommandLineArgs = CommandLineArgs
     { configure      :: Bool
     , flavour        :: Maybe String
     , freeze1        :: Bool
-    , integerSimple  :: Bool
+    , freeze2        :: Bool
+    , skipDepends    :: Bool
+    , bignum         :: Maybe String
+    , bignumCheck    :: Bool
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
     , docTargets     :: DocTargets
+    , prefix         :: Maybe FilePath
     , completeStg    :: Maybe String }
     deriving (Eq, Show)
 
@@ -38,11 +43,15 @@ defaultCommandLineArgs = CommandLineArgs
     { configure      = False
     , flavour        = Nothing
     , freeze1        = False
-    , integerSimple  = False
+    , freeze2        = False
+    , skipDepends    = False
+    , bignum         = Nothing
+    , bignumCheck    = False
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
     , docTargets     = Set.fromList [minBound..maxBound]
+    , prefix         = Nothing
     , completeStg    = Nothing }
 
 -- | These arguments are used by the `test` target.
@@ -91,6 +100,13 @@ readConfigure = Right $ \flags -> flags { configure = True }
 readFlavour :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
 
+readBignum :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readBignum Nothing   = Right id
+readBignum (Just ms) = Right $ \flags -> case break (== '-') (lower ms) of
+   (backend,"")          -> flags { bignum = Just backend }
+   ("check",'-':backend) -> flags { bignum = Just backend, bignumCheck = True }
+   _                     -> flags { bignum = Just (lower ms) }
+
 readBuildRoot :: Maybe FilePath -> Either String (CommandLineArgs -> CommandLineArgs)
 readBuildRoot ms =
     maybe (Left "Cannot parse build-root") (Right . set) (go =<< ms)
@@ -100,11 +116,10 @@ readBuildRoot ms =
     set :: BuildRoot -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { buildRoot = flag }
 
-readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
+readFreeze1, readFreeze2, readSkipDepends :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
-
-readIntegerSimple :: Either String (CommandLineArgs -> CommandLineArgs)
-readIntegerSimple = Right $ \flags -> flags { integerSimple = True }
+readFreeze2 = Right $ \flags -> flags { freeze1 = True, freeze2 = True }
+readSkipDepends = Right $ \flags -> flags { skipDepends = True }
 
 readProgressInfo :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readProgressInfo ms =
@@ -204,6 +219,9 @@ readBrokenTests way =
             let newTests = words tests ++ brokenTests (testArgs flags)
             in flags { testArgs = (testArgs flags) {brokenTests = newTests} }
 
+readPrefix :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readPrefix ms = Right $ \flags -> flags { prefix = ms }
+
 readCompleteStg :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readCompleteStg ms = Right $ \flags -> flags { completeStg = ms }
 
@@ -239,8 +257,12 @@ optDescrs =
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["freeze1"] (NoArg readFreeze1)
       "Freeze Stage1 GHC."
-    , Option [] ["integer-simple"] (NoArg readIntegerSimple)
-      "Build GHC with integer-simple library."
+    , Option [] ["freeze2"] (NoArg readFreeze2)
+      "Freeze Stage2 GHC."
+    , Option [] ["skip-depends"] (NoArg readSkipDepends)
+      "Skip rebuilding dependency information."
+    , Option [] ["bignum"] (OptArg readBignum "BIGNUM")
+      "Select GHC BigNum backend: native, gmp, ffi."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal or Unicorn)."
     , Option [] ["docs"] (OptArg readDocsArg "TARGET")
@@ -276,6 +298,8 @@ optDescrs =
     , Option [] ["broken-test"] (OptArg readBrokenTests "TEST_NAME")
       "consider these tests to be broken"
     , Option ['a'] ["test-accept"] (NoArg readTestAccept) "Accept new output of tests"
+    , Option [] ["prefix"] (OptArg readPrefix "PATH")
+        "Destination path for the bindist 'install' rule"
     , Option [] ["complete-setting"] (OptArg readCompleteStg "SETTING")
         "Setting key to autocomplete, for the 'autocomplete' target."
     ]
@@ -327,6 +351,9 @@ cmdConfigure = configure <$> cmdLineArgs
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs
 
+cmdPrefix :: Action (Maybe String)
+cmdPrefix = prefix <$> cmdLineArgs
+
 cmdCompleteSetting :: Action (Maybe String)
 cmdCompleteSetting = completeStg <$> cmdLineArgs
 
@@ -336,8 +363,17 @@ lookupBuildRoot = buildRoot . lookupExtra defaultCommandLineArgs
 lookupFreeze1 :: Map.HashMap TypeRep Dynamic -> Bool
 lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
 
-cmdIntegerSimple :: Action Bool
-cmdIntegerSimple = integerSimple <$> cmdLineArgs
+lookupFreeze2 :: Map.HashMap TypeRep Dynamic -> Bool
+lookupFreeze2 = freeze2 . lookupExtra defaultCommandLineArgs
+
+lookupSkipDepends :: Map.HashMap TypeRep Dynamic -> Bool
+lookupSkipDepends = skipDepends . lookupExtra defaultCommandLineArgs
+
+cmdBignum :: Action (Maybe String)
+cmdBignum = bignum <$> cmdLineArgs
+
+cmdBignumCheck :: Action Bool
+cmdBignumCheck = bignumCheck <$> cmdLineArgs
 
 cmdProgressInfo :: Action ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs

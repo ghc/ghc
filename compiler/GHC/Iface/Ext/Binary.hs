@@ -2,6 +2,8 @@
 Binary serialization for .hie files.
 -}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
+
 module GHC.Iface.Ext.Binary
    ( readHieFile
    , readHieFileWithVersion
@@ -12,27 +14,27 @@ module GHC.Iface.Ext.Binary
    , HieFileResult(..)
    , hieMagic
    , hieNameOcc
+   , NameCacheUpdater(..)
    )
 where
 
 import GHC.Settings.Utils         ( maybeRead )
-
-import Config                     ( cProjectVersion )
-import GhcPrelude
-import Binary
+import GHC.Settings.Config        ( cProjectVersion )
+import GHC.Prelude
+import GHC.Utils.Binary
 import GHC.Iface.Binary           ( getDictFastString )
-import FastMutInt
-import FastString                 ( FastString )
-import GHC.Types.Module           ( Module )
+import GHC.Data.FastMutInt
+import GHC.Data.FastString        ( FastString )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Builtin.Utils
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique.Supply    ( takeUniqFromSupply )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import Util
+import GHC.Iface.Env (NameCacheUpdater(..))
 
 import qualified Data.Array as A
 import Data.IORef
@@ -47,56 +49,20 @@ import System.FilePath            ( takeDirectory )
 
 import GHC.Iface.Ext.Types
 
--- | `Name`'s get converted into `HieName`'s before being written into @.hie@
--- files. See 'toHieName' and 'fromHieName' for logic on how to convert between
--- these two types.
-data HieName
-  = ExternalName !Module !OccName !SrcSpan
-  | LocalName !OccName !SrcSpan
-  | KnownKeyName !Unique
-  deriving (Eq)
-
-instance Ord HieName where
-  compare (ExternalName a b c) (ExternalName d e f) = compare (a,b) (d,e) `thenCmp` SrcLoc.leftmost_smallest c f
-    -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
-  compare (LocalName a b) (LocalName c d) = compare a c `thenCmp` SrcLoc.leftmost_smallest b d
-    -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
-  compare (KnownKeyName a) (KnownKeyName b) = nonDetCmpUnique a b
-    -- Not actually non deterministic as it is a KnownKey
-  compare ExternalName{} _ = LT
-  compare LocalName{} ExternalName{} = GT
-  compare LocalName{} _ = LT
-  compare KnownKeyName{} _ = GT
-
-instance Outputable HieName where
-  ppr (ExternalName m n sp) = text "ExternalName" <+> ppr m <+> ppr n <+> ppr sp
-  ppr (LocalName n sp) = text "LocalName" <+> ppr n <+> ppr sp
-  ppr (KnownKeyName u) = text "KnownKeyName" <+> ppr u
-
-hieNameOcc :: HieName -> OccName
-hieNameOcc (ExternalName _ occ _) = occ
-hieNameOcc (LocalName occ _) = occ
-hieNameOcc (KnownKeyName u) =
-  case lookupKnownKeyName u of
-    Just n -> nameOccName n
-    Nothing -> pprPanic "hieNameOcc:unknown known-key unique"
-                        (ppr (unpkUnique u))
-
-
 data HieSymbolTable = HieSymbolTable
   { hie_symtab_next :: !FastMutInt
-  , hie_symtab_map  :: !(IORef (UniqFM (Int, HieName)))
+  , hie_symtab_map  :: !(IORef (UniqFM Name (Int, HieName)))
   }
 
 data HieDictionary = HieDictionary
   { hie_dict_next :: !FastMutInt -- The next index to use
-  , hie_dict_map  :: !(IORef (UniqFM (Int,FastString))) -- indexed by FastString
+  , hie_dict_map  :: !(IORef (UniqFM FastString (Int,FastString))) -- indexed by FastString
   }
 
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
 
--- | The header for HIE files - Capital ASCII letters "HIE".
+-- | The header for HIE files - Capital ASCII letters \"HIE\".
 hieMagic :: [Word8]
 hieMagic = [72,73,69]
 
@@ -134,7 +100,7 @@ writeHieFile hie_file_path hiefile = do
   -- Make some initial state
   symtab_next <- newFastMutInt
   writeFastMutInt symtab_next 0
-  symtab_map <- newIORef emptyUFM
+  symtab_map <- newIORef emptyUFM :: IO (IORef (UniqFM Name (Int, HieName)))
   let hie_symtab = HieSymbolTable {
                       hie_symtab_next = symtab_next,
                       hie_symtab_map  = symtab_map }
@@ -189,23 +155,23 @@ type HieHeader = (Integer, ByteString)
 -- an existing `NameCache`. Allows you to specify
 -- which versions of hieFile to attempt to read.
 -- `Left` case returns the failing header versions.
-readHieFileWithVersion :: (HieHeader -> Bool) -> NameCache -> FilePath -> IO (Either HieHeader (HieFileResult, NameCache))
-readHieFileWithVersion readVersion nc file = do
+readHieFileWithVersion :: (HieHeader -> Bool) -> NameCacheUpdater -> FilePath -> IO (Either HieHeader HieFileResult)
+readHieFileWithVersion readVersion ncu file = do
   bh0 <- readBinMem file
 
   (hieVersion, ghcVersion) <- readHieFileHeader file bh0
 
   if readVersion (hieVersion, ghcVersion)
   then do
-    (hieFile, nc') <- readHieFileContents bh0 nc
-    return $ Right (HieFileResult hieVersion ghcVersion hieFile, nc')
+    hieFile <- readHieFileContents bh0 ncu
+    return $ Right (HieFileResult hieVersion ghcVersion hieFile)
   else return $ Left (hieVersion, ghcVersion)
 
 
 -- | Read a `HieFile` from a `FilePath`. Can use
 -- an existing `NameCache`.
-readHieFile :: NameCache -> FilePath -> IO (HieFileResult, NameCache)
-readHieFile nc file = do
+readHieFile :: NameCacheUpdater -> FilePath -> IO HieFileResult
+readHieFile ncu file = do
 
   bh0 <- readBinMem file
 
@@ -219,8 +185,8 @@ readHieFile nc file = do
                     , show hieVersion
                     , "but got", show readHieVersion
                     ]
-  (hieFile, nc') <- readHieFileContents bh0 nc
-  return $ (HieFileResult hieVersion ghcVersion hieFile, nc')
+  hieFile <- readHieFileContents bh0 ncu
+  return $ HieFileResult hieVersion ghcVersion hieFile
 
 readBinLine :: BinHandle -> IO ByteString
 readBinLine bh = BS.pack . reverse <$> loop []
@@ -254,24 +220,21 @@ readHieFileHeader file bh0 = do
                         ]
       return (readHieVersion, ghcVersion)
 
-readHieFileContents :: BinHandle -> NameCache -> IO (HieFile, NameCache)
-readHieFileContents bh0 nc = do
-
-  dict  <- get_dictionary bh0
-
+readHieFileContents :: BinHandle -> NameCacheUpdater -> IO HieFile
+readHieFileContents bh0 ncu = do
+  dict <- get_dictionary bh0
   -- read the symbol table so we are capable of reading the actual data
-  (bh1, nc') <- do
+  bh1 <- do
       let bh1 = setUserData bh0 $ newReadState (error "getSymtabName")
                                                (getDictFastString dict)
-      (nc', symtab) <- get_symbol_table bh1
+      symtab <- get_symbol_table bh1
       let bh1' = setUserData bh1
                $ newReadState (getSymTabName symtab)
                               (getDictFastString dict)
-      return (bh1', nc')
+      return bh1'
 
   -- load the actual data
-  hiefile <- get bh1
-  return (hiefile, nc')
+  get bh1
   where
     get_dictionary bin_handle = do
       dict_p <- get bin_handle
@@ -285,37 +248,38 @@ readHieFileContents bh0 nc = do
       symtab_p <- get bh1
       data_p'  <- tellBin bh1
       seekBin bh1 symtab_p
-      (nc', symtab) <- getSymbolTable bh1 nc
+      symtab <- getSymbolTable bh1 ncu
       seekBin bh1 data_p'
-      return (nc', symtab)
+      return symtab
 
 putFastString :: HieDictionary -> BinHandle -> FastString -> IO ()
 putFastString HieDictionary { hie_dict_next = j_r,
                               hie_dict_map  = out_r}  bh f
   = do
     out <- readIORef out_r
-    let unique = getUnique f
-    case lookupUFM out unique of
+    let !unique = getUnique f
+    case lookupUFM_Directly out unique of
         Just (j, _)  -> put_ bh (fromIntegral j :: Word32)
         Nothing -> do
            j <- readFastMutInt j_r
            put_ bh (fromIntegral j :: Word32)
            writeFastMutInt j_r (j + 1)
-           writeIORef out_r $! addToUFM out unique (j, f)
+           writeIORef out_r $! addToUFM_Directly out unique (j, f)
 
-putSymbolTable :: BinHandle -> Int -> UniqFM (Int,HieName) -> IO ()
+putSymbolTable :: BinHandle -> Int -> UniqFM Name (Int,HieName) -> IO ()
 putSymbolTable bh next_off symtab = do
   put_ bh next_off
   let names = A.elems (A.array (0,next_off-1) (nonDetEltsUFM symtab))
   mapM_ (putHieName bh) names
 
-getSymbolTable :: BinHandle -> NameCache -> IO (NameCache, SymbolTable)
-getSymbolTable bh namecache = do
+getSymbolTable :: BinHandle -> NameCacheUpdater -> IO SymbolTable
+getSymbolTable bh ncu = do
   sz <- get bh
   od_names <- replicateM sz (getHieName bh)
-  let arr = A.listArray (0,sz-1) names
-      (namecache', names) = mapAccumR fromHieName namecache od_names
-  return (namecache', arr)
+  updateNameCache ncu $ \nc ->
+    let arr = A.listArray (0,sz-1) names
+        (nc', names) = mapAccumR fromHieName nc od_names
+        in (nc',arr)
 
 getSymTabName :: SymbolTable -> BinHandle -> IO Name
 getSymTabName st bh = do
@@ -349,14 +313,6 @@ putName (HieSymbolTable next ref) bh name = do
 
 
 -- ** Converting to and from `HieName`'s
-
-toHieName :: Name -> HieName
-toHieName name
-  | isKnownKeyName name = KnownKeyName (nameUnique name)
-  | isExternalName name = ExternalName (nameModule name)
-                                       (nameOccName name)
-                                       (nameSrcSpan name)
-  | otherwise = LocalName (nameOccName name) (nameSrcSpan name)
 
 fromHieName :: NameCache -> HieName -> (NameCache, Name)
 fromHieName nc (ExternalName mod occ span) =

@@ -22,27 +22,31 @@ module GHC.Tc.Types.Origin (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Utils.TcType
 
 import GHC.Hs
 
-import GHC.Types.Id
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.PatSyn
+import GHC.Core.Multiplicity ( scaledThing )
 
-import GHC.Types.Module
+import GHC.Unit.Module
+import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader
-
-import GHC.Types.SrcLoc
-import FastString
-import Outputable
 import GHC.Types.Basic
+import GHC.Types.SrcLoc
+
+import GHC.Data.FastString
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Driver.Ppr
 
 {- *********************************************************************
 *                                                                      *
@@ -80,15 +84,12 @@ data UserTypeCtxt
                         --   or  (x::t, y) = e
   | RuleSigCtxt Name    -- LHS of a RULE forall
                         --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
-  | ResSigCtxt          -- Result type sig
-                        --      f x :: t = ....
   | ForSigCtxt Name     -- Foreign import or export signature
   | DefaultDeclCtxt     -- Types in a default declaration
   | InstDeclCtxt Bool   -- An instance declaration
                         --    True:  stand-alone deriving
                         --    False: vanilla instance declaration
   | SpecInstCtxt        -- SPECIALISE instance pragma
-  | ThBrackCtxt         -- Template Haskell type brackets [t| ... |]
   | GenSigCtxt          -- Higher-rank or impredicative situations
                         -- e.g. (f e) where f has a higher-rank type
                         -- We might want to elaborate this
@@ -125,16 +126,14 @@ data UserTypeCtxt
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (ppr n)
 pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt n)   = text "a RULE for" <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt n)   = text "the type signature for" <+> quotes (ppr n)
 pprUserTypeCtxt ExprSigCtxt       = text "an expression type signature"
 pprUserTypeCtxt KindSigCtxt       = text "a kind signature"
 pprUserTypeCtxt (StandaloneKindSigCtxt n) = text "a standalone kind signature for" <+> quotes (ppr n)
 pprUserTypeCtxt TypeAppCtxt       = text "a type argument"
 pprUserTypeCtxt (ConArgCtxt c)    = text "the type of the constructor" <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)     = text "the RHS of the type synonym" <+> quotes (ppr c)
-pprUserTypeCtxt ThBrackCtxt       = text "a Template Haskell quotation [t|...|]"
 pprUserTypeCtxt PatSigCtxt        = text "a pattern type signature"
-pprUserTypeCtxt ResSigCtxt        = text "a result type signature"
 pprUserTypeCtxt (ForSigCtxt n)    = text "the foreign declaration for" <+> quotes (ppr n)
 pprUserTypeCtxt DefaultDeclCtxt   = text "a type in a `default' declaration"
 pprUserTypeCtxt (InstDeclCtxt False) = text "an instance declaration"
@@ -184,7 +183,9 @@ data SkolemInfo
                  -- like SigSkol, but when we're kind-checking the *type*
                  -- hence, we have less info
 
-  | ForAllSkol SDoc     -- Bound by a user-written "forall".
+  | ForAllSkol  -- Bound by a user-written "forall".
+       SDoc        -- Shows just the binders, used when reporting a bad telescope
+                   -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
 
   | DerivSkol Type      -- Bound by a 'deriving' clause;
                         -- the type is the instance we are trying to derive
@@ -242,7 +243,7 @@ pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
-pprSkolInfo (ForAllSkol doc)  = quotes doc
+pprSkolInfo (ForAllSkol tvs)  = text "an explicit forall" <+> tvs
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
                                  <+> pprWithCommas ppr ips
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)
@@ -282,12 +283,13 @@ pprSigSkolInfo ctxt ty
 
 pprPatSkolInfo :: ConLike -> SDoc
 pprPatSkolInfo (RealDataCon dc)
-  = sep [ text "a pattern with constructor:"
-        , nest 2 $ ppr dc <+> dcolon
-          <+> pprType (dataConUserType dc) <> comma ]
-          -- pprType prints forall's regardless of -fprint-explicit-foralls
-          -- which is what we want here, since we might be saying
-          -- type variable 't' is bound by ...
+  = sdocOption sdocLinearTypes (\show_linear_types ->
+      sep [ text "a pattern with constructor:"
+          , nest 2 $ ppr dc <+> dcolon
+            <+> pprType (dataConDisplayType show_linear_types dc) <> comma ])
+            -- pprType prints forall's regardless of -fprint-explicit-foralls
+            -- which is what we want here, since we might be saying
+            -- type variable 't' is bound by ...
 
 pprPatSkolInfo (PatSynCon ps)
   = sep [ text "a pattern with pattern synonym:"
@@ -301,13 +303,13 @@ For pattern synonym SkolemInfo we have
 but the type 'ty' is not very helpful.  The full pattern-synonym type
 has the provided and required pieces, which it is inconvenient to
 record and display here. So we simply don't display the type at all,
-contenting outselves with just the name of the pattern synonym, which
+contenting ourselves with just the name of the pattern synonym, which
 is fine.  We could do more, but it doesn't seem worth it.
 
 Note [SigSkol SkolemInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we (deeply) skolemise a type
-   f :: forall a. a -> forall b. b -> a
+Suppose we skolemise a type
+   f :: forall a. Eq a => forall b. b -> a
 Then we'll instantiate [a :-> a', b :-> b'], and with the instantiated
       a' -> b' -> a.
 But when, in an error message, we report that "b is a rigid type
@@ -321,8 +323,8 @@ in the right place.  So we proceed as follows:
 * Then when tidying in GHC.Tc.Utils.TcMType.tidySkolemInfo, we first tidy a' to
   whatever it tidies to, say a''; and then we walk over the type
   replacing the binder a by the tidied version a'', to give
-       forall a''. a'' -> forall b''. b'' -> a''
-  We need to do this under function arrows, to match what deeplySkolemise
+       forall a''. Eq a'' => forall b''. b'' -> a''
+  We need to do this under (=>) arrows, to match what topSkolemise
   does.
 
 * Typically a'' will have a nice pretty name like "a", but the point is
@@ -427,7 +429,9 @@ data CtOrigin
         -- We only need a CtOrigin on the first, because the location
         -- is pinned on the entire error message
 
-  | HoleOrigin
+  | ExprHoleOrigin OccName   -- from an expression hole
+  | TypeHoleOrigin OccName   -- from a type hole (partial type signature)
+  | PatCheckOrigin      -- normalisation of a type during pattern-match checking
   | UnboundOccurrenceOf OccName
   | ListOrigin          -- An overloaded list
   | BracketOrigin       -- An overloaded quotation bracket
@@ -439,6 +443,9 @@ data CtOrigin
   | InstProvidedOrigin Module ClsInst
         -- Skolem variable arose when we were testing if an instance
         -- is solvable or not.
+  | NonLinearPatternOrigin
+  | UsageEnvironmentOf Name
+
 -- An origin is visible if the place where the constraint arises is manifest
 -- in user code. Currently, all origins are visible except for invisible
 -- TypeEqOrigins. This is used when choosing which error of
@@ -491,7 +498,6 @@ exprCtOrigin (SectionR _ _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {})   = Shouldn'tHappenOrigin "explicit tuple"
 exprCtOrigin ExplicitSum{}        = Shouldn'tHappenOrigin "explicit sum"
 exprCtOrigin (HsCase _ _ matches) = matchesCtOrigin matches
-exprCtOrigin (HsIf _ (SyntaxExprRn syn) _ _ _) = exprCtOrigin syn
 exprCtOrigin (HsIf {})           = Shouldn'tHappenOrigin "if expression"
 exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e
@@ -510,6 +516,7 @@ exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsTick _ _ e)           = lexprCtOrigin e
 exprCtOrigin (HsBinTick _ _ _ e)      = lexprCtOrigin e
+exprCtOrigin (XExpr (HsExpanded a _)) = exprCtOrigin a
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
@@ -570,7 +577,7 @@ pprCtOrigin (UnboundOccurrenceOf name)
 pprCtOrigin (DerivOriginDC dc n _)
   = hang (ctoHerald <+> text "the" <+> speakNth n
           <+> text "field of" <+> quotes (ppr dc))
-       2 (parens (text "type" <+> quotes (ppr ty)))
+       2 (parens (text "type" <+> quotes (ppr (scaledThing ty))))
   where
     ty = dataConOrigArgTys dc !! (n-1)
 
@@ -640,8 +647,12 @@ pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
 pprCtO (TypeEqOrigin t1 t2 _ _)= text "a type equality" <+> sep [ppr t1, char '~', ppr t2]
 pprCtO AnnOrigin             = text "an annotation"
-pprCtO HoleOrigin            = text "a use of" <+> quotes (text "_")
+pprCtO (ExprHoleOrigin occ)  = text "a use of" <+> quotes (ppr occ)
+pprCtO (TypeHoleOrigin occ)  = text "a use of wildcard" <+> quotes (ppr occ)
+pprCtO PatCheckOrigin        = text "a pattern-match completeness check"
 pprCtO ListOrigin            = text "an overloaded list"
 pprCtO StaticOrigin          = text "a static form"
+pprCtO NonLinearPatternOrigin = text "a non-linear pattern"
+pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO BracketOrigin         = text "a quotation bracket"
 pprCtO _                     = panic "pprCtOrigin"

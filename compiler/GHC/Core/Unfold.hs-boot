@@ -1,16 +1,13 @@
-module GHC.Core.Unfold (
-        mkUnfolding, mkInlineUnfolding
-    ) where
+module GHC.Core.Unfold where
 
-import GhcPrelude
-import GHC.Core
-import GHC.Driver.Session
+import GHC.Prelude
 
-mkInlineUnfolding :: CoreExpr -> Unfolding
+data UnfoldingOpts
 
-mkUnfolding :: DynFlags
-            -> UnfoldingSource
-            -> Bool
-            -> Bool
-            -> CoreExpr
-            -> Unfolding
+defaultUnfoldingOpts :: UnfoldingOpts
+
+updateCreationThreshold :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateUseThreshold      :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateFunAppDiscount    :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateDictDiscount      :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateVeryAggressive    :: Bool -> UnfoldingOpts -> UnfoldingOpts

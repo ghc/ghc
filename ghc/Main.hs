@@ -16,66 +16,67 @@ module Main (main) where
 
 -- The official GHC API
 import qualified GHC
-import GHC              ( -- DynFlags(..), HscTarget(..),
-                          -- GhcMode(..), GhcLink(..),
-                          Ghc, GhcMonad(..),
+import GHC              (parseTargetFiles,  Ghc, GhcMonad(..), Backend (..),
                           LoadHowMuch(..) )
-import GHC.Driver.CmdLine
 
--- Implementations of the various modes (--show-iface, mkdependHS. etc.)
-import GHC.Iface.Load       ( showIface )
+import GHC.Driver.CmdLine
+import GHC.Driver.Env
+import GHC.Driver.Phases
+import GHC.Driver.Session hiding (WarnReason(..))
+import GHC.Driver.Ppr
 import GHC.Driver.Main      ( newHscEnv )
 import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
-import GHC.Driver.Ways
-#if defined(HAVE_INTERNAL_INTERPRETER)
-import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
-#endif
-
--- Frontend plugins
-import GHC.Runtime.Loader   ( loadFrontendPlugin )
 import GHC.Driver.Plugins
+
+import GHC.Platform
+import GHC.Platform.Ways
+import GHC.Platform.Host
+
 #if defined(HAVE_INTERNAL_INTERPRETER)
+import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 import GHC.Runtime.Loader   ( initializePlugins )
 #endif
-import GHC.Types.Module     ( ModuleName, mkModuleName )
 
+import GHC.Runtime.Loader   ( loadFrontendPlugin )
 
--- Various other random stuff that we need
-import GHC.HandleEncoding
-import GHC.Platform
-import GHC.Platform.Host
-import Config
-import GHC.Settings.Constants
-import GHC.Driver.Types
-import GHC.Driver.Packages ( pprPackages, pprPackagesSimple )
-import GHC.Driver.Phases
+import GHC.Unit.Module ( ModuleName, mkModuleName )
+import GHC.Unit.Module.ModIface
+import GHC.Unit.State  ( pprUnits, pprUnitsSimple )
+import GHC.Unit.Finder ( findImportedModule, cannotFindModule, FindResult(..) )
+import GHC.Unit.Types  ( IsBootInterface(..) )
+
 import GHC.Types.Basic     ( failed )
-import GHC.Driver.Session hiding (WarnReason(..))
-import ErrUtils
-import FastString
-import Outputable
-import GHC.SysTools.BaseDir
-import GHC.Settings.IO
 import GHC.Types.SrcLoc
-import Util
-import Panic
+import GHC.Types.SourceError
 import GHC.Types.Unique.Supply
-import MonadUtils       ( liftIO )
 
--- Imports for --abi-hash
-import GHC.Iface.Load      ( loadUserInterface )
-import GHC.Driver.Finder   ( findImportedModule, cannotFindModule )
-import GHC.Tc.Utils.Monad        ( initIfaceCheck )
-import Binary              ( openBinMem, put_ )
-import GHC.Iface.Recomp.Binary      ( fingerprintBinMem )
+import GHC.Utils.Error
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Monad       ( liftIO )
+import GHC.Utils.Binary        ( openBinMem, put_ )
+
+import GHC.Settings.Config
+import GHC.Settings.Constants
+import GHC.Settings.IO
+
+import GHC.HandleEncoding
+import GHC.Data.FastString
+import GHC.SysTools.BaseDir
+
+import GHC.Iface.Load       ( showIface )
+import GHC.Iface.Load          ( loadUserInterface )
+import GHC.Iface.Recomp.Binary ( fingerprintBinMem )
+
+import GHC.Tc.Utils.Monad      ( initIfaceCheck )
 
 -- Standard Haskell libraries
 import System.IO
 import System.Environment
 import System.Exit
-import System.FilePath
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
@@ -152,23 +153,23 @@ main = do
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Warn]
       -> Ghc ()
 main' postLoadMode dflags0 args flagWarnings = do
-  -- set the default GhcMode, HscTarget and GhcLink.  The HscTarget
+  -- set the default GhcMode, backend and GhcLink.  The backend
   -- can be further adjusted on a module by module basis, using only
-  -- the -fvia-C and -fasm flags.  If the default HscTarget is not
-  -- HscC or HscAsm, -fvia-C and -fasm have no effect.
-  let dflt_target = hscTarget dflags0
-      (mode, lang, link)
+  -- the -fllvm and -fasm flags.  If the default backend is not
+  -- LLVM or NCG, -fllvm and -fasm have no effect.
+  let dflt_backend = backend dflags0
+      (mode, bcknd, link)
          = case postLoadMode of
-               DoInteractive   -> (CompManager, HscInterpreted, LinkInMemory)
-               DoEval _        -> (CompManager, HscInterpreted, LinkInMemory)
-               DoMake          -> (CompManager, dflt_target,    LinkBinary)
-               DoBackpack      -> (CompManager, dflt_target,    LinkBinary)
-               DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
-               DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
-               _               -> (OneShot,     dflt_target,    LinkBinary)
+               DoInteractive   -> (CompManager, Interpreter,  LinkInMemory)
+               DoEval _        -> (CompManager, Interpreter,  LinkInMemory)
+               DoMake          -> (CompManager, dflt_backend, LinkBinary)
+               DoBackpack      -> (CompManager, dflt_backend, LinkBinary)
+               DoMkDependHS    -> (MkDepend,    dflt_backend, LinkBinary)
+               DoAbiHash       -> (OneShot,     dflt_backend, LinkBinary)
+               _               -> (OneShot,     dflt_backend, LinkBinary)
 
   let dflags1 = dflags0{ ghcMode   = mode,
-                         hscTarget = lang,
+                         backend   = bcknd,
                          ghcLink   = link,
                          verbosity = case postLoadMode of
                                          DoEval _ -> 0
@@ -195,10 +196,10 @@ main' postLoadMode dflags0 args flagWarnings = do
   (dflags3, fileish_args, dynamicFlagWarnings) <-
       GHC.parseDynamicFlags dflags2 args
 
-  let dflags4 = case lang of
-                HscInterpreted | not (gopt Opt_ExternalInterpreter dflags3) ->
+  let dflags4 = case bcknd of
+                Interpreter | not (gopt Opt_ExternalInterpreter dflags3) ->
                     let platform = targetPlatform dflags3
-                        dflags3a = updateWays $ dflags3 { ways = hostFullWays }
+                        dflags3a = dflags3 { targetWays_ = hostFullWays }
                         dflags3b = foldl gopt_set dflags3a
                                  $ concatMap (wayGeneralFlags platform)
                                              hostFullWays
@@ -220,29 +221,7 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   liftIO $ showBanner postLoadMode dflags4
 
-  let
-     -- To simplify the handling of filepaths, we normalise all filepaths right
-     -- away. Note the asymmetry of FilePath.normalise:
-     --    Linux:   p/q -> p/q; p\q -> p\q
-     --    Windows: p/q -> p\q; p\q -> p\q
-     -- #12674: Filenames starting with a hypen get normalised from ./-foo.hs
-     -- to -foo.hs. We have to re-prepend the current directory.
-    normalise_hyp fp
-        | strt_dot_sl && "-" `isPrefixOf` nfp = cur_dir ++ nfp
-        | otherwise                           = nfp
-        where
-#if defined(mingw32_HOST_OS)
-          strt_dot_sl = "./" `isPrefixOf` fp || ".\\" `isPrefixOf` fp
-#else
-          strt_dot_sl = "./" `isPrefixOf` fp
-#endif
-          cur_dir = '.' : [pathSeparator]
-          nfp = normalise fp
-    normal_fileish_paths = map (normalise_hyp . unLoc) fileish_args
-    (srcs, objs)         = partition_args normal_fileish_paths [] []
-
-    dflags5 = dflags4 { ldInputs = map (FileOption "") objs
-                                   ++ ldInputs dflags4 }
+  let (dflags5, srcs, objs) = parseTargetFiles dflags4 (map unLoc fileish_args)
 
   -- we've finished manipulating the DynFlags, update the session
   _ <- GHC.setSessionDynFlags dflags5
@@ -251,8 +230,8 @@ main' postLoadMode dflags0 args flagWarnings = do
 
         ---------------- Display configuration -----------
   case verbosity dflags6 of
-    v | v == 4 -> liftIO $ dumpPackagesSimple dflags6
-      | v >= 5 -> liftIO $ dumpPackages dflags6
+    v | v == 4 -> liftIO $ dumpUnitsSimple dflags6
+      | v >= 5 -> liftIO $ dumpUnits dflags6
       | otherwise -> return ()
 
   liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
@@ -272,7 +251,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoEval exprs           -> ghciUI hsc_env dflags6 srcs $ Just $
                                    reverse exprs
        DoAbiHash              -> abiHash (map fst srcs)
-       ShowPackages           -> liftIO $ showPackages dflags6
+       ShowPackages           -> liftIO $ showUnits dflags6
        DoFrontend f           -> doFrontend f srcs
        DoBackpack             -> doBackpack (map fst srcs)
 
@@ -290,51 +269,6 @@ ghciUI hsc_env dflags0 srcs maybe_expr = do
   interactiveUI defaultGhciSettings srcs maybe_expr
 #endif
 
--- -----------------------------------------------------------------------------
--- Splitting arguments into source files and object files.  This is where we
--- interpret the -x <suffix> option, and attach a (Maybe Phase) to each source
--- file indicating the phase specified by the -x option in force, if any.
-
-partition_args :: [String] -> [(String, Maybe Phase)] -> [String]
-               -> ([(String, Maybe Phase)], [String])
-partition_args [] srcs objs = (reverse srcs, reverse objs)
-partition_args ("-x":suff:args) srcs objs
-  | "none" <- suff      = partition_args args srcs objs
-  | StopLn <- phase     = partition_args args srcs (slurp ++ objs)
-  | otherwise           = partition_args rest (these_srcs ++ srcs) objs
-        where phase = startPhase suff
-              (slurp,rest) = break (== "-x") args
-              these_srcs = zip slurp (repeat (Just phase))
-partition_args (arg:args) srcs objs
-  | looks_like_an_input arg = partition_args args ((arg,Nothing):srcs) objs
-  | otherwise               = partition_args args srcs (arg:objs)
-
-    {-
-      We split out the object files (.o, .dll) and add them
-      to ldInputs for use by the linker.
-
-      The following things should be considered compilation manager inputs:
-
-       - haskell source files (strings ending in .hs, .lhs or other
-         haskellish extension),
-
-       - module names (not forgetting hierarchical module names),
-
-       - things beginning with '-' are flags that were not recognised by
-         the flag parser, and we want them to generate errors later in
-         checkOptions, so we class them as source files (#5921)
-
-       - and finally we consider everything without an extension to be
-         a comp manager input, as shorthand for a .hs or .lhs filename.
-
-      Everything else is considered to be a linker object, and passed
-      straight through to the linker.
-    -}
-looks_like_an_input :: String -> Bool
-looks_like_an_input m =  isSourceFilename m
-                      || looksLikeModuleName m
-                      || "-" `isPrefixOf` m
-                      || not (hasExtension m)
 
 -- -----------------------------------------------------------------------------
 -- Option sanity checks
@@ -349,12 +283,12 @@ checkOptions mode dflags srcs objs = do
    let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
-   when (not (Set.null (Set.filter wayRTSOnly (ways dflags)))
+   when (not (Set.null (rtsWays (ways dflags)))
          && isInterpretiveMode mode) $
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
-   when ((Set.filter (not . wayRTSOnly) (ways dflags) /= hostFullWays)
+   when ((fullWays (ways dflags) /= hostFullWays)
          && isInterpretiveMode mode
          && not (gopt Opt_ExternalInterpreter dflags)) $
       do throwGhcException (UsageError
@@ -383,7 +317,7 @@ checkOptions mode dflags srcs objs = do
         else do
 
    case mode of
-      StopBefore HCc | hscTarget dflags /= HscC
+      StopBefore HCc | backend dflags /= ViaC
         -> throwGhcException $ UsageError $
            "the option -C is only available with an unregisterised GHC"
       StopBefore (As False) | ghcLink dflags == NoLink
@@ -493,12 +427,12 @@ data PostLoadMode
   | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
 
 doMkDependHSMode, doMakeMode, doInteractiveMode,
-  doAbiHashMode, showPackagesMode :: Mode
+  doAbiHashMode, showUnitsMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
-showPackagesMode = mkPostLoadMode ShowPackages
+showUnitsMode = mkPostLoadMode ShowPackages
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -604,7 +538,7 @@ mode_flags =
   , defFlag "-show-options"         (PassFlag (setMode showOptionsMode))
   , defFlag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
   , defFlag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
-  , defFlag "-show-packages"        (PassFlag (setMode showPackagesMode))
+  , defFlag "-show-packages"        (PassFlag (setMode showUnitsMode))
   ] ++
   [ defFlag k'                      (PassFlag (setMode (printSetting k)))
   | k <- ["Project version",
@@ -786,7 +720,7 @@ showInfo dflags = do
         let sq x = " [" ++ x ++ "\n ]"
         putStrLn $ sq $ intercalate "\n ," $ map show $ compilerInfo dflags
 
--- TODO use ErrUtils once that is disentangled from all the other GhcMonad stuff?
+-- TODO use GHC.Utils.Error once that is disentangled from all the other GhcMonad stuff?
 showSupportedExtensions :: Maybe String -> IO ()
 showSupportedExtensions m_top_dir = do
   res <- runExceptT $ do
@@ -794,16 +728,16 @@ showSupportedExtensions m_top_dir = do
       Nothing -> throwE $ SettingsError_MissingData "Could not find the top directory, missing -B flag"
       Just dir -> pure dir
     initSettings top_dir
-  targetPlatformMini <- case res of
-    Right s -> pure $ platformMini $ sTargetPlatform s
+  arch_os <- case res of
+    Right s -> pure $ platformArchOS $ sTargetPlatform s
     Left (SettingsError_MissingData msg) -> do
       hPutStrLn stderr $ "WARNING: " ++ show msg
       hPutStrLn stderr $ "cannot know target platform so guessing target == host (native compiler)."
-      pure cHostPlatformMini
+      pure hostPlatformArchOS
     Left (SettingsError_BadData msg) -> do
       hPutStrLn stderr msg
       exitWith $ ExitFailure 1
-  mapM_ putStrLn $ supportedLanguagesAndExtensions targetPlatformMini
+  mapM_ putStrLn $ supportedLanguagesAndExtensions arch_os
 
 showVersion :: IO ()
 showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
@@ -864,10 +798,10 @@ dumpFastStringStats dflags = do
   where
    x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
-showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
-showPackages       dflags = putStrLn (showSDoc dflags (pprPackages (pkgState dflags)))
-dumpPackages       dflags = putMsg dflags (pprPackages (pkgState dflags))
-dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple (pkgState dflags))
+showUnits, dumpUnits, dumpUnitsSimple :: DynFlags -> IO ()
+showUnits       dflags = putStrLn (showSDoc dflags (pprUnits (unitState dflags)))
+dumpUnits       dflags = putMsg dflags (pprUnits (unitState dflags))
+dumpUnitsSimple dflags = putMsg dflags (pprUnitsSimple (unitState dflags))
 
 -- -----------------------------------------------------------------------------
 -- Frontend plugin support
@@ -918,7 +852,7 @@ abiHash strs = do
 
   mods <- mapM find_it strs
 
-  let get_iface modl = loadUserInterface False (text "abiHash") modl
+  let get_iface modl = loadUserInterface NotBoot (text "abiHash") modl
   ifaces <- initIfaceCheck (text "abiHash") hsc_env $ mapM get_iface mods
 
   bh <- openBinMem (3*1024) -- just less than a block

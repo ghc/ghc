@@ -4,8 +4,8 @@ T13610.hs:11:15: error:
       When matching types
         a :: *
         Weak# () :: TYPE 'UnliftedRep
-      Expected type: (# State# RealWorld, a #)
-        Actual type: (# State# RealWorld, Weak# () #)
+      Expected: (# State# RealWorld, a #)
+        Actual: (# State# RealWorld, Weak# () #)
     • In the expression: mkWeakNoFinalizer# double () s
       In the first argument of ‘IO’, namely
         ‘(\ s -> mkWeakNoFinalizer# double () s)’

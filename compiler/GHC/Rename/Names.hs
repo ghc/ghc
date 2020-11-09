@@ -4,7 +4,7 @@
 Extracting imported and top-level names in scope
 -}
 
-{-# LANGUAGE CPP, NondecreasingIndentation, MultiWayIf, NamedFieldPuns #-}
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -32,45 +32,63 @@ module GHC.Rename.Names (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
+import GHC.Driver.Env
 import GHC.Driver.Session
-import GHC.Core.TyCo.Ppr
-import GHC.Hs
-import GHC.Tc.Utils.Env
+import GHC.Driver.Ppr
+
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
-import GHC.Iface.Load   ( loadSrcInterface )
+
+import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
+
+import GHC.Hs
+import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Builtin.Names
-import GHC.Types.Module
+import GHC.Parser.PostProcess ( setRdrNameSpace )
+import GHC.Core.Type
+import GHC.Core.PatSyn
+import GHC.Core.TyCo.Ppr
+import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Misc as Utils
+import GHC.Utils.Panic
+
+import GHC.Types.Fixity.Env
+import GHC.Types.SafeHaskell
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.Name.Reader
 import GHC.Types.Avail
 import GHC.Types.FieldLabel
-import GHC.Driver.Types
-import GHC.Types.Name.Reader
-import GHC.Parser.PostProcess ( setRdrNameSpace )
-import Outputable
-import Maybes
+import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Basic  ( TopLevelFlag(..), StringLiteral(..) )
-import Util
-import FastString
-import FastStringEnv
+import GHC.Types.Basic  ( TopLevelFlag(..) )
+import GHC.Types.SourceText
 import GHC.Types.Id
-import GHC.Core.Type
-import GHC.Core.PatSyn
-import qualified GHC.LanguageExtensions as LangExt
+import GHC.Types.HpcInfo
+
+import GHC.Unit
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Imported
+import GHC.Unit.Module.Deps
+
+import GHC.Data.Maybe
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
 
 import Control.Monad
 import Data.Either      ( partitionEithers, isRight, rights )
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
-import Data.List        ( partition, (\\), find, sortBy )
+import Data.List        ( partition, (\\), find, sortBy, groupBy, sortOn )
 import Data.Function    ( on )
 import qualified Data.Set as S
 import System.FilePath  ((</>))
@@ -176,7 +194,7 @@ rnImports imports = do
     -- module to import from its implementor
     let this_mod = tcg_mod tcg_env
     let (source, ordinary) = partition is_source_import imports
-        is_source_import d = ideclSource (unLoc d)
+        is_source_import d = ideclSource (unLoc d) == IsBoot
     stuff1 <- mapAndReportM (rnImportDecl this_mod) ordinary
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]
@@ -306,7 +324,7 @@ rnImportDecl this_mod
                            -- c.f. GHC.findModule, and #9997
              Nothing         -> True
              Just (StringLiteral _ pkg_fs) -> pkg_fs == fsLit "this" ||
-                            fsToUnitId pkg_fs == moduleUnitId this_mod))
+                            fsToUnit pkg_fs == moduleUnit this_mod))
          (addErr (text "A module cannot import itself:" <+> ppr imp_mod_name))
 
     -- Check for a missing import list (Opt_WarnMissingImportList also
@@ -323,7 +341,7 @@ rnImportDecl this_mod
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
-    WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) do
+    WARN( (want_boot == NotBoot) && (mi_boot iface == IsBoot), ppr imp_mod_name ) do
 
     -- Issue a user warning for a redundant {- SOURCE -} import
     -- NB that we arrange to read all the ordinary imports before
@@ -334,7 +352,7 @@ rnImportDecl this_mod
     -- the non-boot module depends on the compilation order, which
     -- is not deterministic.  The hs-boot test can show this up.
     dflags <- getDynFlags
-    warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
+    warnIf ((want_boot == IsBoot) && (mi_boot iface == NotBoot) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (text "safe import can't be used as Safe Haskell isn't on!"
@@ -363,7 +381,9 @@ rnImportDecl this_mod
                     || (not implicit && safeDirectImpsReq dflags)
                     || (implicit && safeImplicitImpsReq dflags)
 
-    let imv = ImportedModsVal
+    hsc_env <- getTopEnv
+    let home_unit = hsc_home_unit hsc_env
+        imv = ImportedModsVal
             { imv_name        = qual_mod_name
             , imv_span        = loc
             , imv_is_safe     = mod_safe'
@@ -371,7 +391,7 @@ rnImportDecl this_mod
             , imv_all_exports = potential_gres
             , imv_qualified   = qual_only
             }
-        imports = calculateAvails dflags iface mod_safe' want_boot (ImportedByUser imv)
+        imports = calculateAvails home_unit iface mod_safe' want_boot (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
@@ -385,19 +405,21 @@ rnImportDecl this_mod
     warnUnqualifiedImport decl iface
 
     let new_imp_decl = L loc (decl { ideclExt = noExtField, ideclSafe = mod_safe'
-                                   , ideclHiding = new_imp_details })
+                                   , ideclHiding = new_imp_details
+                                   , ideclName = ideclName decl
+                                   , ideclAs = ideclAs decl })
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
-calculateAvails :: DynFlags
+calculateAvails :: HomeUnit
                 -> ModIface
                 -> IsSafeImport
                 -> IsBootInterface
                 -> ImportedBy
                 -> ImportAvails
-calculateAvails dflags iface mod_safe' want_boot imported_by =
+calculateAvails home_unit iface mod_safe' want_boot imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
       orph_iface = mi_orphan (mi_final_exts iface)
@@ -440,15 +462,15 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
                             imp_sem_mod : dep_finsts deps
              | otherwise  = dep_finsts deps
 
-      pkg = moduleUnitId (mi_module iface)
-      ipkg = toInstalledUnitId pkg
+      pkg = moduleUnit (mi_module iface)
+      ipkg = toUnitId pkg
 
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]
       ptrust = trust == Sf_Trustworthy || trust_pkg
 
       (dependent_mods, dependent_pkgs, pkg_trust_req)
-         | pkg == thisPackage dflags =
+         | isHomeUnit home_unit pkg =
             -- Imported module is from the home package
             -- Take its dependent modules and add imp_mod itself
             -- Take its dependent packages unchanged
@@ -460,7 +482,10 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
             -- know if any of them depended on CM.hi-boot, in
             -- which case we should do the hi-boot consistency
             -- check.  See GHC.Iface.Load.loadHiBootInterface
-            ((moduleName imp_mod,want_boot):dep_mods deps,dep_pkgs deps,ptrust)
+            ( GWIB { gwib_mod = moduleName imp_mod, gwib_isBoot = want_boot } : dep_mods deps
+            , dep_pkgs deps
+            , ptrust
+            )
 
          | otherwise =
             -- Imported module is from another package
@@ -543,7 +568,7 @@ created by its bindings.
 
 Note [Top-level Names in Template Haskell decl quotes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also: Note [Interactively-bound Ids in GHCi] in GHC.Driver.Types
+See also: Note [Interactively-bound Ids in GHCi] in GHC.Driver.Env
           Note [Looking up Exact RdrNames] in GHC.Rename.Env
 
 Consider a Template Haskell declaration quotation like this:
@@ -638,9 +663,12 @@ extendGlobalRdrEnvRn avails new_fixities
       | otherwise
       = return (extendGlobalRdrEnv env gre)
       where
-        name = gre_name gre
-        occ  = nameOccName name
-        dups = filter isLocalGRE (lookupGlobalRdrEnv env occ)
+        occ  = greOccName gre
+        dups = filter isDupGRE (lookupGlobalRdrEnv env occ)
+        -- Duplicate GREs are those defined locally with the same OccName,
+        -- except cases where *both* GREs are DuplicateRecordFields (#17965).
+        isDupGRE gre' = isLocalGRE gre'
+                && not (isOverloadedRecFldGRE gre && isOverloadedRecFldGRE gre')
 
 
 {- *********************************************************************
@@ -747,7 +775,7 @@ getLocalNonValBinders fixity_env
             = [( find_con_name rdr
                , concatMap find_con_decl_flds (unLoc cdflds) )]
         find_con_flds (L _ (ConDeclGADT { con_names = rdrs
-                                        , con_args = RecCon flds }))
+                                        , con_g_args = RecConGADT flds }))
             = [ ( find_con_name rdr
                  , concatMap find_con_decl_flds (unLoc flds))
               | L _ rdr <- rdrs ]
@@ -802,8 +830,7 @@ getLocalNonValBinders fixity_env
 
     new_di :: Bool -> Maybe Name -> DataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
-    new_di overload_ok mb_cls dfid@(DataFamInstDecl { dfid_eqn =
-                                     HsIB { hsib_body = ti_decl }})
+    new_di overload_ok mb_cls dfid@(DataFamInstDecl { dfid_eqn = ti_decl })
         = do { main_name <- lookupFamInstName mb_cls (feqn_tycon ti_decl)
              ; let (bndrs, flds) = hsDataFamInstBinders dfid
              ; sub_names <- mapM newTopSrcBinder bndrs
@@ -830,8 +857,8 @@ newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
               -- of an already renamer-resolved field and its use
               -- sites. This is needed to correctly support record
               -- selectors in Template Haskell. See Note [Binders in
-              -- Template Haskell] in Convert.hs and Note [Looking up
-              -- Exact RdrNames] in GHC.Rename.Env.
+              -- Template Haskell] in "GHC.ThToHs" and Note [Looking up
+              -- Exact RdrNames] in "GHC.Rename.Env".
           | otherwise   = mkRdrUnqual (flSelector qualFieldLbl)
 
 {-
@@ -997,7 +1024,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         -- different parents).  See Note [Dealing with imports]
     lookup_ie :: IE GhcPs
               -> IELookupM ([(IE GhcRn, AvailInfo)], [IELookupWarning])
-    lookup_ie ie = handle_bad_import $ do
+    lookup_ie ie = handle_bad_import $
       case ie of
         IEVar _ (L l n) -> do
             (name, avail, _) <- lookup_name ie $ ieWrappedName n
@@ -1174,8 +1201,8 @@ mkChildEnv :: [GlobalRdrElt] -> NameEnv [GlobalRdrElt]
 mkChildEnv gres = foldr add emptyNameEnv gres
   where
     add gre env = case gre_par gre of
-        FldParent p _  -> extendNameEnv_Acc (:) singleton env p gre
-        ParentIs  p    -> extendNameEnv_Acc (:) singleton env p gre
+        FldParent p _  -> extendNameEnv_Acc (:) Utils.singleton env p gre
+        ParentIs  p    -> extendNameEnv_Acc (:) Utils.singleton env p gre
         NoParent       -> env
 
 findChildren :: NameEnv [a] -> Name -> [a]
@@ -1226,11 +1253,11 @@ lookupChildren all_kids rdr_items
 *********************************************************
 -}
 
-reportUnusedNames :: TcGblEnv -> RnM ()
-reportUnusedNames gbl_env
+reportUnusedNames :: TcGblEnv -> HscSource -> RnM ()
+reportUnusedNames gbl_env hsc_src
   = do  { keep <- readTcRef (tcg_keep gbl_env)
         ; traceRn "RUN" (ppr (tcg_dus gbl_env))
-        ; warnUnusedImportDecls gbl_env
+        ; warnUnusedImportDecls gbl_env hsc_src
         ; warnUnusedTopBinds $ unused_locals keep
         ; warnMissingSignatures gbl_env }
   where
@@ -1352,8 +1379,8 @@ type ImportDeclUsage
      , [GlobalRdrElt]      -- What *is* used (normalised)
      , [Name] )            -- What is imported but *not* used
 
-warnUnusedImportDecls :: TcGblEnv -> RnM ()
-warnUnusedImportDecls gbl_env
+warnUnusedImportDecls :: TcGblEnv -> HscSource -> RnM ()
+warnUnusedImportDecls gbl_env hsc_src
   = do { uses <- readMutVar (tcg_used_gres gbl_env)
        ; let user_imports = filterOut
                               (ideclImplicit . unLoc)
@@ -1375,7 +1402,7 @@ warnUnusedImportDecls gbl_env
          mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
 
        ; whenGOptM Opt_D_dump_minimal_imports $
-         printMinimalImports usage }
+         printMinimalImports hsc_src usage }
 
 findImportUsage :: [LImportDecl GhcRn]
                 -> [GlobalRdrElt]
@@ -1387,6 +1414,7 @@ findImportUsage imports used_gres
     import_usage :: ImportMap
     import_usage = mkImportMap used_gres
 
+    unused_decl :: LImportDecl GhcRn -> (LImportDecl GhcRn, [GlobalRdrElt], [Name])
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, used_gres, nameSetElemsStable unused_imps)
       where
@@ -1495,9 +1523,16 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
   | null unused
   = return ()
 
+  -- Only one import is unused, with `SrcSpan` covering only the unused item instead of
+  -- the whole import statement
+  | Just (_, L _ imports) <- ideclHiding decl
+  , length unused == 1
+  , Just (L loc _) <- find (\(L _ ie) -> ((ieName ie) :: Name) `elem` unused) imports
+  = addWarnAt (Reason flag) loc msg2
+
   -- Some imports are unused
   | otherwise
-  = addWarnAt (Reason flag) loc  msg2
+  = addWarnAt (Reason flag) loc msg2
 
   where
     msg1 = vcat [ pp_herald <+> quotes pp_mod <+> is_redundant
@@ -1550,7 +1585,7 @@ decls, and simply trim their import lists.  NB that
 -}
 
 getMinimalImports :: [ImportDeclUsage] -> RnM [LImportDecl GhcRn]
-getMinimalImports = mapM mk_minimal
+getMinimalImports = fmap combine . mapM mk_minimal
   where
     mk_minimal (L l decl, used_gres, unused)
       | null unused
@@ -1603,15 +1638,33 @@ getMinimalImports = mapM mk_minimal
 
           all_non_overloaded = all (not . flIsOverloaded)
 
-printMinimalImports :: [ImportDeclUsage] -> RnM ()
+    combine :: [LImportDecl GhcRn] -> [LImportDecl GhcRn]
+    combine = map merge . groupBy ((==) `on` getKey) . sortOn getKey
+
+    getKey :: LImportDecl GhcRn -> (Bool, Maybe ModuleName, ModuleName)
+    getKey decl =
+      ( isImportDeclQualified . ideclQualified $ idecl -- is this qualified? (important that this be first)
+      , unLoc <$> ideclAs idecl -- what is the qualifier (inside Maybe monad)
+      , unLoc . ideclName $ idecl -- Module Name
+      )
+      where
+        idecl :: ImportDecl GhcRn
+        idecl = unLoc decl
+
+    merge :: [LImportDecl GhcRn] -> LImportDecl GhcRn
+    merge []                     = error "getMinimalImports: unexpected empty list"
+    merge decls@((L l decl) : _) = L l (decl { ideclHiding = Just (False, L l lies) })
+      where lies = concatMap (unLoc . snd) $ mapMaybe (ideclHiding . unLoc) decls
+
+
+printMinimalImports :: HscSource -> [ImportDeclUsage] -> RnM ()
 -- See Note [Printing minimal imports]
-printMinimalImports imports_w_usage
+printMinimalImports hsc_src imports_w_usage
   = do { imports' <- getMinimalImports imports_w_usage
        ; this_mod <- getModule
        ; dflags   <- getDynFlags
-       ; liftIO $
-         do { h <- openFile (mkFilename dflags this_mod) WriteMode
-            ; printForUser dflags h neverQualify (vcat (map ppr imports')) }
+       ; liftIO $ withFile (mkFilename dflags this_mod) WriteMode $ \h ->
+          printForUser dflags h neverQualify AllTheWay (vcat (map ppr imports'))
               -- The neverQualify is important.  We are printing Names
               -- but they are in the context of an 'import' decl, and
               -- we never qualify things inside there
@@ -1623,7 +1676,11 @@ printMinimalImports imports_w_usage
       | Just d <- dumpDir dflags = d </> basefn
       | otherwise                = basefn
       where
-        basefn = moduleNameString (moduleName this_mod) ++ ".imports"
+        suffix = case hsc_src of
+                     HsBootFile -> ".imports-boot"
+                     HsSrcFile  -> ".imports"
+                     HsigFile   -> ".imports"
+        basefn = moduleNameString (moduleName this_mod) ++ suffix
 
 
 to_ie_post_rn_var :: (HasOccName name) => Located name -> LIEWrappedName name
@@ -1689,20 +1746,23 @@ qualImportItemErr rdr
   = hang (text "Illegal qualified name in import item:")
        2 (ppr rdr)
 
+pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
+pprImpDeclSpec iface decl_spec =
+  quotes (ppr (is_mod decl_spec)) <+> case mi_boot iface of
+    IsBoot -> text "(hi-boot interface)"
+    NotBoot -> Outputable.empty
+
 badImportItemErrStd :: ModIface -> ImpDeclSpec -> IE GhcPs -> SDoc
 badImportItemErrStd iface decl_spec ie
-  = sep [text "Module", quotes (ppr (is_mod decl_spec)), source_import,
+  = sep [text "Module", pprImpDeclSpec iface decl_spec,
          text "does not export", quotes (ppr ie)]
-  where
-    source_import | mi_boot iface = text "(hi-boot interface)"
-                  | otherwise     = Outputable.empty
 
 badImportItemErrDataCon :: OccName -> ModIface -> ImpDeclSpec -> IE GhcPs
                         -> SDoc
 badImportItemErrDataCon dataType_occ iface decl_spec ie
   = vcat [ text "In module"
-             <+> quotes (ppr (is_mod decl_spec))
-             <+> source_import <> colon
+             <+> pprImpDeclSpec iface decl_spec
+             <> colon
          , nest 2 $ quotes datacon
              <+> text "is a data constructor of"
              <+> quotes dataType
@@ -1719,8 +1779,6 @@ badImportItemErrDataCon dataType_occ iface decl_spec ie
     datacon_occ = rdrNameOcc $ ieName ie
     datacon = parenSymOcc datacon_occ (ppr datacon_occ)
     dataType = parenSymOcc dataType_occ (ppr dataType_occ)
-    source_import | mi_boot iface = text "(hi-boot interface)"
-                  | otherwise     = Outputable.empty
     parens_sp d = parens (space <> d <> space)  -- T( f,g )
 
 badImportItemErr :: ModIface -> ImpDeclSpec -> IE GhcPs -> [AvailInfo] -> SDoc
@@ -1767,14 +1825,13 @@ addDupDeclErr gres@(gre : _)
   = addErrAt (getSrcSpan (last sorted_names)) $
     -- Report the error at the later location
     vcat [text "Multiple declarations of" <+>
-             quotes (ppr (nameOccName name)),
+             quotes (ppr (greOccName gre)),
              -- NB. print the OccName, not the Name, because the
              -- latter might not be in scope in the RdrEnv and so will
              -- be printed qualified.
           text "Declared at:" <+>
                    vcat (map (ppr . nameSrcLoc) sorted_names)]
   where
-    name = gre_name gre
     sorted_names =
       sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan)
              (map gre_name gres)

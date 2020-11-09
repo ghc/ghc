@@ -35,7 +35,6 @@ typedef struct hashlist {
 } HashList;
 
 typedef struct chunklist {
-  HashList *chunk;
   struct chunklist *next;
 } HashListChunk;
 
@@ -48,7 +47,7 @@ struct hashtable {
     int bcount;             /* Number of buckets */
     HashList **dir[HDIRSIZE];   /* Directory of segments */
     HashList *freeList;         /* free list of HashLists */
-    HashListChunk *chunks;
+    HashListChunk *chunks;      /* list of HashListChunks so we can later free them */
 };
 
 /* Create an identical structure, but is distinct on a type level,
@@ -264,35 +263,49 @@ int keysHashTable(HashTable *table, StgWord keys[], int szKeys) {
 /* -----------------------------------------------------------------------------
  * We allocate the hashlist cells in large chunks to cut down on malloc
  * overhead.  Although we keep a free list of hashlist cells, we make
- * no effort to actually return the space to the malloc arena.
+ * no effort to actually return the space to the malloc arena. Eventually
+ * they will all be freed when we free the HashListChunks.
  * -------------------------------------------------------------------------- */
 
 static HashList *
 allocHashList (HashTable *table)
 {
-    HashList *hl, *p;
-    HashListChunk *cl;
-
-    if ((hl = table->freeList) != NULL) {
+    if (table->freeList != NULL) {
+        HashList *hl = table->freeList;
         table->freeList = hl->next;
+        return hl;
     } else {
-        hl = stgMallocBytes(HCHUNK * sizeof(HashList), "allocHashList");
-        cl = stgMallocBytes(sizeof (*cl), "allocHashList: chunkList");
-        cl->chunk = hl;
+        /* We allocate one block of memory which contains:
+         *
+         *  1. A HashListChunk, which gets linked onto HashTable.chunks.
+         *     This forms a list of all chunks associated with the HashTable
+         *     and is what we will free when we free the HashTable.
+         *
+         *  2. Several HashLists. One of these will get returned. The rest are
+         *     placed on the freeList.
+         *
+         */
+        HashListChunk *cl = stgMallocBytes(sizeof(HashListChunk) + HCHUNK * sizeof(HashList), "allocHashList");
+        HashList *hl = (HashList *) &cl[1];
         cl->next = table->chunks;
         table->chunks = cl;
 
         table->freeList = hl + 1;
-        for (p = table->freeList; p < hl + HCHUNK - 1; p++)
+        HashList *p = table->freeList;
+        for (; p < hl + HCHUNK - 1; p++)
             p->next = p + 1;
         p->next = NULL;
+        return hl;
     }
-    return hl;
 }
 
 static void
 freeHashList (HashTable *table, HashList *hl)
 {
+    // We place the HashList on the freeList. We make no attempt to bound the
+    // size of the free list for the time being. The HashLists on the freeList
+    // are freed when the HashTable itself is freed as a result of freeing the
+    // HashListChunks.
     hl->next = table->freeList;
     table->freeList = hl;
 }
@@ -406,19 +419,15 @@ removeStrHashTable(StrHashTable *table, const char * key, const void *data)
 void
 freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
 {
-    long segment;
-    long index;
-    HashList *hl;
-    HashList *next;
-    HashListChunk *cl, *cl_next;
-
     /* The last bucket with something in it is table->max + table->split - 1 */
-    segment = (table->max + table->split - 1) / HSEGSIZE;
-    index = (table->max + table->split - 1) % HSEGSIZE;
+    long segment = (table->max + table->split - 1) / HSEGSIZE;
+    long index = (table->max + table->split - 1) % HSEGSIZE;
 
+    /* Free table segments */
     while (segment >= 0) {
         while (index >= 0) {
-            for (hl = table->dir[segment][index]; hl != NULL; hl = next) {
+            HashList *next;
+            for (HashList *hl = table->dir[segment][index]; hl != NULL; hl = next) {
                 next = hl->next;
                 if (freeDataFun != NULL)
                     (*freeDataFun)((void *) hl->data);
@@ -429,11 +438,15 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
         segment--;
         index = HSEGSIZE - 1;
     }
-    for (cl = table->chunks; cl != NULL; cl = cl_next) {
-        cl_next = cl->next;
-        stgFree(cl->chunk);
-        stgFree(cl);
+
+    /* Free chunks */
+    HashListChunk *cl = table->chunks;
+    while (cl != NULL) {
+        HashListChunk *old = cl;
+        cl = cl->next;
+        stgFree(old);
     }
+
     stgFree(table);
 }
 

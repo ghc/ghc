@@ -146,7 +146,7 @@ unescapeRoundtripCharacterSurrogate c
 recoverDecode :: CodingFailureMode -> Buffer Word8 -> Buffer Char
               -> IO (Buffer Word8, Buffer Char)
 recoverDecode cfm input@Buffer{  bufRaw=iraw, bufL=ir, bufR=_  }
-                  output@Buffer{ bufRaw=oraw, bufL=_,  bufR=ow } = do
+                  output@Buffer{ bufRaw=oraw, bufL=_,  bufR=ow } =
  --puts $ "recoverDecode " ++ show ir
  case cfm of
   ErrorOnCodingFailure       -> ioe_decodingError

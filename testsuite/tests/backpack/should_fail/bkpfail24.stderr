@@ -24,9 +24,8 @@ bkpfail24.bkp:14:15: error:
         f :: a -> b (bound at bkpfail24.bkp:14:9)
 
 bkpfail24.bkp:19:15: error:
-    • Couldn't match expected type ‘{H2.T}’
-                  with actual type ‘{H1.T}’
-      NB: ‘{H1.T}’ is defined at bkpfail24.bkp:4:9-14
-          ‘{H2.T}’ is defined at bkpfail24.bkp:6:9-14
+    • Couldn't match expected type ‘{H2.T}’ with actual type ‘{H1.T}’
+      NB: ‘{H2.T}’ is defined at bkpfail24.bkp:6:9-14
+          ‘{H1.T}’ is defined at bkpfail24.bkp:4:9-14
     • In the expression: x
       In an equation for ‘g’: g x = x

@@ -1,30 +1,30 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 -}
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 -- | Typechecking pattern synonym declarations
 module GHC.Tc.TyCl.PatSyn
    ( tcPatSynDecl
    , tcPatSynBuilderBind
-   , tcPatSynBuilderOcc
-   , nonBidirectionalErr
+   , patSynBuilderOcc
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Tc.Gen.Pat
+import GHC.Core.Multiplicity
 import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType )
+import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Sig( emptyPragEnv, completeSigFromId )
 import GHC.Tc.Utils.Env
@@ -32,12 +32,12 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Zonk
 import GHC.Builtin.Types.Prim
 import GHC.Types.Name
+import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Core.PatSyn
-import GHC.Types.Name.Set
-import Panic
-import Outputable
-import FastString
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Var
 import GHC.Types.Var.Env( emptyTidyEnv, mkInScopeSet )
 import GHC.Types.Id
@@ -57,12 +57,12 @@ import GHC.Types.Id.Make
 import GHC.Tc.TyCl.Utils
 import GHC.Core.ConLike
 import GHC.Types.FieldLabel
-import Bag
-import Util
-import ErrUtils
+import GHC.Data.Bag
+import GHC.Utils.Misc
+import GHC.Utils.Error
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
-import Data.List( partition )
+import Data.List( partition, mapAccumL )
 
 #include "HsVersions.h"
 
@@ -98,7 +98,7 @@ recoverPSB (PSB { psb_id = L _ name
     (_arg_names, _rec_fields, is_infix) = collectPatSynArgInfo details
     mk_placeholder matcher_name
       = mkPatSyn name is_infix
-                        ([mkTyVarBinder Specified alphaTyVar], []) ([], [])
+                        ([mkTyVarBinder SpecifiedSpec alphaTyVar], []) ([], [])
                         [] -- Arg tys
                         alphaTy
                         (matcher_id, True) Nothing
@@ -106,7 +106,7 @@ recoverPSB (PSB { psb_id = L _ name
        where
          -- The matcher_id is used only by the desugarer, so actually
          -- and error-thunk would probably do just as well here.
-         matcher_id = mkLocalId matcher_name $
+         matcher_id = mkLocalId matcher_name Many $
                       mkSpecForAllTys [alphaTyVar] alphaTy
 
 {- Note [Pattern synonym error recovery]
@@ -185,9 +185,9 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
 
        ; traceTc "tcInferPatSynDecl }" $ (ppr name $$ ppr ex_tvs)
        ; tc_patsyn_finish lname dir is_infix lpat'
-                          (mkTyVarBinders Inferred univ_tvs
+                          (mkTyVarBinders InferredSpec univ_tvs
                             , req_theta,  ev_binds, req_dicts)
-                          (mkTyVarBinders Inferred ex_tvs
+                          (mkTyVarBinders InferredSpec ex_tvs
                             , mkTyVarTys ex_tvs, prov_theta, prov_evs)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields } }
@@ -345,17 +345,17 @@ tcCheckPatSynDecl :: PatSynBind GhcRn GhcRn
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
 tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                          , psb_def = lpat, psb_dir = dir }
-                  TPSI{ patsig_implicit_bndrs = implicit_tvs
-                      , patsig_univ_bndrs = explicit_univ_tvs, patsig_prov = prov_theta
-                      , patsig_ex_bndrs   = explicit_ex_tvs,   patsig_req  = req_theta
+                  TPSI{ patsig_implicit_bndrs = implicit_bndrs
+                      , patsig_univ_bndrs = explicit_univ_bndrs, patsig_req  = req_theta
+                      , patsig_ex_bndrs   = explicit_ex_bndrs,   patsig_prov = prov_theta
                       , patsig_body_ty    = sig_body_ty }
   = addPatSynCtxt lname $
-    do { let decl_arity = length arg_names
-             (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
+    do { traceTc "tcCheckPatSynDecl" $
+         vcat [ ppr implicit_bndrs, ppr explicit_univ_bndrs, ppr req_theta
+              , ppr explicit_ex_bndrs, ppr prov_theta, ppr sig_body_ty ]
 
-       ; traceTc "tcCheckPatSynDecl" $
-         vcat [ ppr implicit_tvs, ppr explicit_univ_tvs, ppr req_theta
-              , ppr explicit_ex_tvs, ppr prov_theta, ppr sig_body_ty ]
+       ; let decl_arity = length arg_names
+             (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
 
        ; (arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of
                                  Right stuff  -> return stuff
@@ -363,8 +363,8 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
 
        -- Complain about:  pattern P :: () => forall x. x -> P x
        -- The existential 'x' should not appear in the result type
-       -- Can't check this until we know P's arity
-       ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType pat_ty) explicit_ex_tvs
+       -- Can't check this until we know P's arity (decl_arity above)
+       ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType pat_ty) $ binderVars explicit_ex_bndrs
        ; checkTc (null bad_tvs) $
          hang (sep [ text "The result type of the signature for" <+> quotes (ppr name) <> comma
                    , text "namely" <+> quotes (ppr pat_ty) ])
@@ -373,43 +373,62 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
 
          -- See Note [The pattern-synonym signature splitting rule] in GHC.Tc.Gen.Sig
        ; let univ_fvs = closeOverKinds $
-                        (tyCoVarsOfTypes (pat_ty : req_theta) `extendVarSetList` explicit_univ_tvs)
-             (extra_univ, extra_ex) = partition ((`elemVarSet` univ_fvs) . binderVar) implicit_tvs
-             univ_bndrs = extra_univ ++ mkTyVarBinders Specified explicit_univ_tvs
-             ex_bndrs   = extra_ex   ++ mkTyVarBinders Specified explicit_ex_tvs
+                        (tyCoVarsOfTypes (pat_ty : req_theta) `extendVarSetList` (binderVars explicit_univ_bndrs))
+             (extra_univ, extra_ex) = partition ((`elemVarSet` univ_fvs) . binderVar) implicit_bndrs
+             univ_bndrs = extra_univ ++ explicit_univ_bndrs
+             ex_bndrs   = extra_ex   ++ explicit_ex_bndrs
              univ_tvs   = binderVars univ_bndrs
              ex_tvs     = binderVars ex_bndrs
 
+         -- Skolemise the quantified type variables. This is necessary
+         -- in order to check the actual pattern type against the
+         -- expected type. Even though the tyvars in the type are
+         -- already skolems, this step changes their TcLevels,
+         -- avoiding level-check errors when unifying.
+       ; (skol_subst0, skol_univ_bndrs) <- skolemiseTvBndrsX emptyTCvSubst univ_bndrs
+       ; (skol_subst, skol_ex_bndrs)    <- skolemiseTvBndrsX skol_subst0   ex_bndrs
+       ; let skol_univ_tvs   = binderVars skol_univ_bndrs
+             skol_ex_tvs     = binderVars skol_ex_bndrs
+             skol_req_theta  = substTheta skol_subst0 req_theta
+             skol_prov_theta = substTheta skol_subst  prov_theta
+             skol_arg_tys    = substTys   skol_subst  (map scaledThing arg_tys)
+             skol_pat_ty     = substTy    skol_subst  pat_ty
+
+             univ_tv_prs     = [ (getName orig_univ_tv, skol_univ_tv)
+                               | (orig_univ_tv, skol_univ_tv) <- univ_tvs `zip` skol_univ_tvs ]
+
        -- Right!  Let's check the pattern against the signature
        -- See Note [Checking against a pattern signature]
-       ; req_dicts <- newEvVars req_theta
+       ; req_dicts <- newEvVars skol_req_theta
        ; (tclvl, wanted, (lpat', (ex_tvs', prov_dicts, args'))) <-
            ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
            pushLevelAndCaptureConstraints   $
-           tcExtendTyVarEnv univ_tvs        $
-           tcCheckPat PatSyn lpat pat_ty    $
-           do { let in_scope    = mkInScopeSet (mkVarSet univ_tvs)
+           tcExtendNameTyVarEnv univ_tv_prs $
+           tcCheckPat PatSyn lpat (unrestricted skol_pat_ty)   $
+           do { let in_scope    = mkInScopeSet (mkVarSet skol_univ_tvs)
                     empty_subst = mkEmptyTCvSubst in_scope
-              ; (subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst ex_tvs
+              ; (inst_subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst skol_ex_tvs
                     -- newMetaTyVarX: see the "Existential type variables"
                     -- part of Note [Checking against a pattern signature]
               ; traceTc "tcpatsyn1" (vcat [ ppr v <+> dcolon <+> ppr (tyVarKind v) | v <- ex_tvs])
               ; traceTc "tcpatsyn2" (vcat [ ppr v <+> dcolon <+> ppr (tyVarKind v) | v <- ex_tvs'])
-              ; let prov_theta' = substTheta subst prov_theta
+              ; let prov_theta' = substTheta inst_subst skol_prov_theta
                   -- Add univ_tvs to the in_scope set to
                   -- satisfy the substitution invariant. There's no need to
                   -- add 'ex_tvs' as they are already in the domain of the
                   -- substitution.
                   -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
               ; prov_dicts <- mapM (emitWanted (ProvCtxtOrigin psb)) prov_theta'
-              ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
+              ; args'      <- zipWithM (tc_arg inst_subst) arg_names
+                                       skol_arg_tys
               ; return (ex_tvs', prov_dicts, args') }
 
        ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
                          -- The type here is a bit bogus, but we do not print
                          -- the type for PatSynCtxt, so it doesn't matter
-                         -- See Note [Skolem info for pattern synonyms] in Origin
-       ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info univ_tvs req_dicts wanted
+                         -- See Note [Skolem info for pattern synonyms] in "GHC.Tc.Types.Origin"
+       ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_univ_tvs
+                                                    req_dicts wanted
 
        -- Solve the constraints now, because we are about to make a PatSyn,
        -- which should not contain unification variables and the like (#10997)
@@ -420,26 +439,72 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        -- when that should be impossible
 
        ; traceTc "tcCheckPatSynDecl }" $ ppr name
+
        ; tc_patsyn_finish lname dir is_infix lpat'
-                          (univ_bndrs, req_theta, ev_binds, req_dicts)
-                          (ex_bndrs, mkTyVarTys ex_tvs', prov_theta, prov_dicts)
-                          (args', arg_tys)
-                          pat_ty rec_fields }
+                          (skol_univ_bndrs, skol_req_theta, ev_binds, req_dicts)
+                          (skol_ex_bndrs, mkTyVarTys ex_tvs', skol_prov_theta, prov_dicts)
+                          (args', skol_arg_tys)
+                          skol_pat_ty rec_fields }
   where
-    tc_arg :: TCvSubst -> Name -> Type -> TcM (LHsExpr GhcTcId)
+    tc_arg :: TCvSubst -> Name -> Type -> TcM (LHsExpr GhcTc)
+     -- Look up the variable actually bound by lpat
+     -- and check that it has the expected type
     tc_arg subst arg_name arg_ty
-      = do {   -- Look up the variable actually bound by lpat
-               -- and check that it has the expected type
-             arg_id <- tcLookupId arg_name
-           ; wrap <- tcSubType_NC GenSigCtxt
-                                 (idType arg_id)
-                                 (substTyUnchecked subst arg_ty)
+      = setSrcSpan (nameSrcSpan arg_name) $
+           -- Set the SrcSpan to be the binding site of the Id (#18856)
+           -- e.g.  pattern P :: Int -> Maybe (Int,Bool)
+           --       pattern P x = Just (x,True)
+           -- Before unifying x's actual type with its expected type, in tc_arg, set
+           -- location to x's binding site in lpat, namely the 'x' in Just (x,True).
+           -- Else the error message location is wherever tcCheckPat finished,
+           -- namely the right-hand corner of the pattern
+        do { arg_id <- tcLookupId arg_name
+           ; wrap <- tcSubTypeSigma GenSigCtxt
+                                    (idType arg_id)
+                                    (substTy subst arg_ty)
                 -- Why do we need tcSubType here?
                 -- See Note [Pattern synonyms and higher rank types]
            ; return (mkLHsWrap wrap $ nlHsVar arg_id) }
 
-{- [Pattern synonyms and higher rank types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+skolemiseTvBndrsX :: TCvSubst -> [VarBndr TyVar flag]
+                  -> TcM (TCvSubst, [VarBndr TcTyVar flag])
+-- Make new TcTyVars, all skolems with levels, but do not clone
+-- The level is one level deeper than the current level
+-- See Note [Skolemising when checking a pattern synonym]
+skolemiseTvBndrsX orig_subst tvs
+  = do { tc_lvl <- getTcLevel
+       ; let pushed_lvl = pushTcLevel tc_lvl
+             details    = SkolemTv pushed_lvl False
+
+             mk_skol_tv_x :: TCvSubst -> VarBndr TyVar flag
+                          -> (TCvSubst, VarBndr TcTyVar flag)
+             mk_skol_tv_x subst (Bndr tv flag)
+               = (subst', Bndr new_tv flag)
+               where
+                 new_kind = substTyUnchecked subst (tyVarKind tv)
+                 new_tv   = mkTcTyVar (tyVarName tv) new_kind details
+                 subst'   = extendTvSubstWithClone subst tv new_tv
+
+       ; return (mapAccumL mk_skol_tv_x orig_subst tvs) }
+
+{- Note [Skolemising when checking a pattern synonym]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   pattern P1 :: forall a. a -> Maybe a
+   pattern P1 x <- Just x where
+      P1 x = Just (x :: a)
+
+The scoped type variable 'a' scopes over the builder RHS, Just (x::a).
+But the builder RHS is typechecked much later in tcPatSynBuilderBind,
+and gets its scoped type variables from the type of the builder_id.
+The easiest way to achieve this is not to clone when skolemising.
+
+Hence a special-purpose skolemiseTvBndrX here, similar to
+GHC.Tc.Utils.Instantiate.tcInstSkolTyVarsX except that the latter
+does cloning.
+
+[Pattern synonyms and higher rank types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   data T = MkT (forall a. a->a)
 
@@ -557,7 +622,7 @@ a pattern synonym.  What about the /building/ side?
   a bad idea.
 -}
 
-collectPatSynArgInfo :: HsPatSynDetails (Located Name)
+collectPatSynArgInfo :: HsPatSynDetails GhcRn
                      -> ([Name], [Name], Bool)
 collectPatSynArgInfo details =
   case details of
@@ -594,10 +659,9 @@ tc_patsyn_finish :: Located Name      -- ^ PatSyn Name
                  -> HsPatSynDir GhcRn -- ^ PatSyn type (Uni/Bidir/ExplicitBidir)
                  -> Bool              -- ^ Whether infix
                  -> LPat GhcTc        -- ^ Pattern of the PatSyn
-                 -> ([TcTyVarBinder], [PredType], TcEvBinds, [EvVar])
-                 -> ([TcTyVarBinder], [TcType], [PredType], [EvTerm])
-                 -> ([LHsExpr GhcTcId], [TcType])   -- ^ Pattern arguments and
-                                                    -- types
+                 -> ([TcInvisTVBinder], [PredType], TcEvBinds, [EvVar])
+                 -> ([TcInvisTVBinder], [TcType], [PredType], [EvTerm])
+                 -> ([LHsExpr GhcTc], [TcType])  -- ^ Pattern arguments and types
                  -> TcType            -- ^ Pattern type
                  -> [Name]            -- ^ Selector names
                  -- ^ Whether fields, empty if not record PatSyn
@@ -682,7 +746,7 @@ tcPatSynMatcher :: Located Name
                 -> LPat GhcTc
                 -> ([TcTyVar], ThetaType, TcEvBinds, [EvVar])
                 -> ([TcTyVar], [TcType], ThetaType, [EvTerm])
-                -> ([LHsExpr GhcTcId], [TcType])
+                -> ([LHsExpr GhcTc], [TcType])
                 -> TcType
                 -> TcM ((Id, Bool), LHsBinds GhcTc)
 -- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
@@ -698,19 +762,19 @@ tcPatSynMatcher (L loc name) lpat
              res_ty = mkTyVarTy res_tv
              is_unlifted = null args && null prov_dicts
              (cont_args, cont_arg_tys)
-               | is_unlifted = ([nlHsVar voidPrimId], [voidPrimTy])
+               | is_unlifted = ([nlHsVar voidPrimId], [unboxedUnitTy])
                | otherwise   = (args,                 arg_tys)
              cont_ty = mkInfSigmaTy ex_tvs prov_theta $
-                       mkVisFunTys cont_arg_tys res_ty
+                       mkVisFunTysMany cont_arg_tys res_ty
 
-             fail_ty  = mkVisFunTy voidPrimTy res_ty
+             fail_ty  = mkVisFunTyMany unboxedUnitTy res_ty
 
        ; matcher_name <- newImplicitBinder name mkMatcherOcc
-       ; scrutinee    <- newSysLocalId (fsLit "scrut") pat_ty
-       ; cont         <- newSysLocalId (fsLit "cont")  cont_ty
-       ; fail         <- newSysLocalId (fsLit "fail")  fail_ty
+       ; scrutinee    <- newSysLocalId (fsLit "scrut") Many pat_ty
+       ; cont         <- newSysLocalId (fsLit "cont")  Many cont_ty
+       ; fail         <- newSysLocalId (fsLit "fail")  Many fail_ty
 
-       ; let matcher_tau   = mkVisFunTys [pat_ty, cont_ty, fail_ty] res_ty
+       ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
                              -- See Note [Exported LocalIds] in GHC.Types.Id
@@ -730,14 +794,14 @@ tcPatSynMatcher (L loc name) lpat
                     L (getLoc lpat) $
                     HsCase noExtField (nlHsVar scrutinee) $
                     MG{ mg_alts = L (getLoc lpat) cases
-                      , mg_ext = MatchGroupTc [pat_ty] res_ty
+                      , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty
                       , mg_origin = Generated
                       }
              body' = noLoc $
                      HsLam noExtField $
                      MG{ mg_alts = noLoc [mkSimpleMatch LambdaExpr
                                                         args body]
-                       , mg_ext = MatchGroupTc [pat_ty, cont_ty, fail_ty] res_ty
+                       , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
                        , mg_origin = Generated
                        }
              match = mkMatch (mkPrefixFunRhs (L loc name)) []
@@ -782,8 +846,8 @@ isUnidirectional ExplicitBidirectional{} = False
 -}
 
 mkPatSynBuilderId :: HsPatSynDir a -> Located Name
-                  -> [TyVarBinder] -> ThetaType
-                  -> [TyVarBinder] -> ThetaType
+                  -> [InvisTVBinder] -> ThetaType
+                  -> [InvisTVBinder] -> ThetaType
                   -> [Type] -> Type
                   -> TcM (Maybe (Id, Bool))
 mkPatSynBuilderId dir (L _ name)
@@ -796,10 +860,10 @@ mkPatSynBuilderId dir (L _ name)
        ; let theta          = req_theta ++ prov_theta
              need_dummy_arg = isUnliftedType pat_ty && null arg_tys && null theta
              builder_sigma  = add_void need_dummy_arg $
-                              mkForAllTys univ_bndrs $
-                              mkForAllTys ex_bndrs $
+                              mkInvisForAllTys univ_bndrs $
+                              mkInvisForAllTys ex_bndrs $
                               mkPhiTy theta $
-                              mkVisFunTys arg_tys $
+                              mkVisFunTysMany arg_tys $
                               pat_ty
              builder_id     = mkExportedVanillaId builder_name builder_sigma
               -- See Note [Exported LocalIds] in GHC.Types.Id
@@ -807,7 +871,6 @@ mkPatSynBuilderId dir (L _ name)
              builder_id'    = modifyIdInfo (`setLevityInfoWithType` pat_ty) builder_id
 
        ; return (Just (builder_id', need_dummy_arg)) }
-  where
 
 tcPatSynBuilderBind :: PatSynBind GhcRn GhcRn
                     -> TcM (LHsBinds GhcTc)
@@ -884,13 +947,12 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
 
-tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)
--- monadic only for failure
-tcPatSynBuilderOcc ps
-  | Just (builder_id, add_void_arg) <- builder
+patSynBuilderOcc :: PatSyn -> Maybe (HsExpr GhcTc, TcSigmaType)
+patSynBuilderOcc ps
+  | Just (builder_id, add_void_arg) <- patSynBuilder ps
   , let builder_expr = HsConLikeOut noExtField (PatSynCon ps)
         builder_ty   = idType builder_id
-  = return $
+  = Just $
     if add_void_arg
     then ( builder_expr   -- still just return builder_expr; the void# arg is added
                           -- by dsConLike in the desugarer
@@ -898,14 +960,11 @@ tcPatSynBuilderOcc ps
     else (builder_expr, builder_ty)
 
   | otherwise  -- Unidirectional
-  = nonBidirectionalErr name
-  where
-    name    = patSynName ps
-    builder = patSynBuilder ps
+  = Nothing
 
 add_void :: Bool -> Type -> Type
 add_void need_dummy_arg ty
-  | need_dummy_arg = mkVisFunTy voidPrimTy ty
+  | need_dummy_arg = mkVisFunTyMany unboxedUnitTy ty
   | otherwise      = ty
 
 tcPatToExpr :: Name -> [Located Name] -> LPat GhcRn
@@ -940,7 +999,7 @@ tcPatToExpr name args pat = go pat
     go (L loc p) = L loc <$> go1 p
 
     go1 :: Pat GhcRn -> Either MsgDoc (HsExpr GhcRn)
-    go1 (ConPatIn con info)
+    go1 (ConPat NoExtField con info)
       = case info of
           PrefixCon ps  -> mkPrefixConExpr con ps
           InfixCon l r  -> mkPrefixConExpr con [l,r]
@@ -973,8 +1032,6 @@ tcPatToExpr name args pat = go pat
                                     = return $ unLoc $ foldl' nlHsApp (noLoc neg)
                                                        [noLoc (HsOverLit noExtField n)]
         | otherwise                 = return $ HsOverLit noExtField n
-    go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
-    go1 (CoPat{})                   = panic "CoPat in output of renamer"
     go1 (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                                     = go1 pat
     go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
@@ -1093,11 +1150,6 @@ want to avoid difficult to decipher core lint errors!
  -}
 
 
-nonBidirectionalErr :: Outputable name => name -> TcM a
-nonBidirectionalErr name = failWithTc $
-    text "non-bidirectional pattern synonym"
-    <+> quotes (ppr name) <+> text "used in an expression"
-
 -- Walk the whole pattern and for all ConPatOuts, collect the
 -- existentially-bound type variables and evidence binding variables.
 --
@@ -1124,10 +1176,11 @@ tcCollectEx pat = go pat
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps
     go1 (SumPat _ p _ _)   = go p
     go1 (ViewPat _ _ p)    = go p
-    go1 con@ConPatOut{}    = merge (pat_tvs con, pat_dicts con) $
+    go1 con@ConPat{ pat_con_ext = con' }
+                           = merge (cpt_tvs con', cpt_dicts con') $
                               goConDetails $ pat_args con
     go1 (SigPat _ p _)     = go p
-    go1 (CoPat _ _ p _)    = go1 p
+    go1 (XPat (CoPat _ p _)) = go1 p
     go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = empty

@@ -1,0 +1,20 @@
+
+T18191.hs:6:11: error:
+    GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    In the definition of data constructor ‘MkT’
+
+T18191.hs:9:11: error:
+    GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    In the definition of data constructor ‘MkS’
+
+T18191.hs:12:11: error:
+    GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    In the definition of data constructor ‘MkU’
+
+T18191.hs:15:21: error:
+    GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    In the definition of data constructor ‘MkZ1’
+
+T18191.hs:16:19: error:
+    GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    In the definition of data constructor ‘MkZ2’

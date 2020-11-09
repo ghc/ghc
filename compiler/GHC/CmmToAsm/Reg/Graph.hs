@@ -1,13 +1,17 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 
 -- | Graph coloring register allocator.
 module GHC.CmmToAsm.Reg.Graph (
         regAlloc
 ) where
-import GhcPrelude
+import GHC.Prelude
 
-import qualified GraphColor as Color
+import qualified GHC.Data.Graph.Color as Color
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Reg.Graph.Spill
 import GHC.CmmToAsm.Reg.Graph.SpillClean
@@ -17,16 +21,18 @@ import GHC.CmmToAsm.Reg.Graph.TrivColorable
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
-import Bag
-import Outputable
+import GHC.Data.Bag
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
-import Util (seqList)
+import GHC.Utils.Misc (seqList)
 import GHC.CmmToAsm.CFG
 
 import Data.Maybe
@@ -44,9 +50,9 @@ maxSpinCount    = 10
 
 -- | The top level of the graph coloring register allocator.
 regAlloc
-        :: (Outputable statics, Outputable instr, Instruction instr)
+        :: (OutputableP Platform statics, Instruction instr)
         => NCGConfig
-        -> UniqFM (UniqSet RealReg)     -- ^ registers we can use for allocation
+        -> UniqFM RegClass (UniqSet RealReg)     -- ^ registers we can use for allocation
         -> UniqSet Int                  -- ^ set of available spill slots.
         -> Int                          -- ^ current number of spill slots
         -> [LiveCmmDecl statics instr]  -- ^ code annotated with liveness information.
@@ -89,14 +95,13 @@ regAlloc config regsFree slotsFree slotsCount code cfg
 regAlloc_spin
         :: forall instr statics.
            (Instruction instr,
-            Outputable instr,
-            Outputable statics)
+            OutputableP Platform statics)
         => NCGConfig
         -> Int  -- ^ Number of solver iterations we've already performed.
         -> Color.Triv VirtualReg RegClass RealReg
                 -- ^ Function for calculating whether a register is trivially
                 --   colourable.
-        -> UniqFM (UniqSet RealReg)      -- ^ Free registers that we can allocate.
+        -> UniqFM RegClass (UniqSet RealReg)      -- ^ Free registers that we can allocate.
         -> UniqSet Int                   -- ^ Free stack slots that we can use.
         -> Int                           -- ^ Number of spill slots in use
         -> [RegAllocStats statics instr] -- ^ Current regalloc stats to add to.
@@ -387,7 +392,7 @@ graphAddCoalesce (r1, r2) graph
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph
-        :: (Outputable statics, Outputable instr, Instruction instr)
+        :: (OutputableP Platform statics, Instruction instr)
         => Platform -> Color.Graph VirtualReg RegClass RealReg
         -> LiveCmmDecl statics instr -> LiveCmmDecl statics instr
 
@@ -412,7 +417,7 @@ patchRegsFromGraph platform graph code
                 = pprPanic "patchRegsFromGraph: register mapping failed."
                         (  text "There is no node in the graph for register "
                                 <> ppr reg
-                        $$ ppr code
+                        $$ pprLiveCmmDecl platform code
                         $$ Color.dotGraph
                                 (\_ -> text "white")
                                 (trivColorable platform

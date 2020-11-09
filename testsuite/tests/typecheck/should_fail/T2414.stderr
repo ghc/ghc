@@ -1,8 +1,8 @@
 
 T2414.hs:9:13: error:
-    • Occurs check: cannot construct the infinite type: b0 ~ (Bool, b0)
-      Expected type: b0 -> Maybe (Bool, b0)
-        Actual type: (Bool, b0) -> Maybe (Bool, b0)
+    • Couldn't match type ‘b0’ with ‘(Bool, b0)’
+      Expected: b0 -> Maybe (Bool, b0)
+        Actual: b0 -> Maybe b0
     • In the first argument of ‘unfoldr’, namely ‘Just’
       In the expression: unfoldr Just
       In an equation for ‘f’: f = unfoldr Just

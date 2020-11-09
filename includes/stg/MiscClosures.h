@@ -337,6 +337,10 @@ RTS_FUN_DECL(stg_block_stmwait);
 RTS_FUN_DECL(stg_block_throwto);
 RTS_RET(stg_block_throwto);
 
+RTS_FUN_DECL(stg_readIOPortzh);
+RTS_FUN_DECL(stg_writeIOPortzh);
+RTS_FUN_DECL(stg_newIOPortzh);
+
 /* Entry/exit points from StgStartup.cmm */
 
 RTS_RET(stg_stop_thread);
@@ -418,6 +422,7 @@ RTS_FUN_DECL(stg_raiseDivZZerozh);
 RTS_FUN_DECL(stg_raiseUnderflowzh);
 RTS_FUN_DECL(stg_raiseOverflowzh);
 RTS_FUN_DECL(stg_raiseIOzh);
+RTS_FUN_DECL(stg_paniczh);
 
 RTS_FUN_DECL(stg_makeStableNamezh);
 RTS_FUN_DECL(stg_makeStablePtrzh);

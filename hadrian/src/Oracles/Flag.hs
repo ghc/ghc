@@ -2,7 +2,7 @@
 
 module Oracles.Flag (
     Flag (..), flag, getFlag, platformSupportsSharedLibs,
-    ghcWithNativeCodeGen, targetSupportsSMP
+    targetSupportsSMP
     ) where
 
 import Hadrian.Oracles.TextFile
@@ -24,25 +24,29 @@ data Flag = ArSupportsAtFile
           | WithLibnuma
           | HaveLibMingwEx
           | UseSystemFfi
+          | BootstrapThreadedRts
+          | SystemDistroMINGW
 
 -- Note, if a flag is set to empty string we treat it as set to NO. This seems
 -- fragile, but some flags do behave like this.
 flag :: Flag -> Action Bool
 flag f = do
     let key = case f of
-            ArSupportsAtFile   -> "ar-supports-at-file"
-            CrossCompiling     -> "cross-compiling"
-            CcLlvmBackend      -> "cc-llvm-backend"
-            GhcUnregisterised  -> "ghc-unregisterised"
-            TablesNextToCode   -> "tables-next-to-code"
-            GmpInTree          -> "intree-gmp"
-            GmpFrameworkPref   -> "gmp-framework-preferred"
-            LeadingUnderscore  -> "leading-underscore"
-            SolarisBrokenShld  -> "solaris-broken-shld"
-            WithLibdw          -> "with-libdw"
-            WithLibnuma        -> "with-libnuma"
-            HaveLibMingwEx     -> "have-lib-mingw-ex"
-            UseSystemFfi       -> "use-system-ffi"
+            ArSupportsAtFile     -> "ar-supports-at-file"
+            CrossCompiling       -> "cross-compiling"
+            CcLlvmBackend        -> "cc-llvm-backend"
+            GhcUnregisterised    -> "ghc-unregisterised"
+            TablesNextToCode     -> "tables-next-to-code"
+            GmpInTree            -> "intree-gmp"
+            GmpFrameworkPref     -> "gmp-framework-preferred"
+            LeadingUnderscore    -> "leading-underscore"
+            SolarisBrokenShld    -> "solaris-broken-shld"
+            WithLibdw            -> "with-libdw"
+            WithLibnuma          -> "with-libnuma"
+            HaveLibMingwEx       -> "have-lib-mingw-ex"
+            UseSystemFfi         -> "use-system-ffi"
+            BootstrapThreadedRts -> "bootstrap-threaded-rts"
+            SystemDistroMINGW    -> "system-use-distro-mingw"
     value <- lookupValueOrError configFile key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
         ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."
@@ -75,10 +79,3 @@ targetSupportsSMP = do
      , ver < ARMv7          -> return False
      | goodArch             -> return True
      | otherwise            -> return False
-
-ghcWithNativeCodeGen :: Action Bool
-ghcWithNativeCodeGen = do
-    goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc"]
-    badOs    <- anyTargetOs ["ios", "aix"]
-    ghcUnreg <- flag GhcUnregisterised
-    return $ goodArch && not badOs && not ghcUnreg

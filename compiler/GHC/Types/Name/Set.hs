@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module GHC.Types.Name.Set (
         -- * Names set type
         NameSet,
@@ -12,7 +13,7 @@ module GHC.Types.Name.Set (
         emptyNameSet, unitNameSet, mkNameSet, unionNameSet, unionNameSets,
         minusNameSet, elemNameSet, extendNameSet, extendNameSetList,
         delFromNameSet, delListFromNameSet, isEmptyNameSet, filterNameSet,
-        intersectsNameSet, intersectNameSet,
+        intersectsNameSet, disjointNameSet, intersectNameSet,
         nameSetAny, nameSetAll, nameSetElemsStable,
 
         -- * Free variables
@@ -28,15 +29,18 @@ module GHC.Types.Name.Set (
 
         -- ** Manipulating defs and uses
         emptyDUs, usesOnly, mkDUs, plusDU,
-        findUses, duDefs, duUses, allUses
+        findUses, duDefs, duUses, allUses,
+
+        -- * Non-CAFfy names
+        NonCaffySet(..)
     ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Name
-import OrdList
+import GHC.Data.OrdList
 import GHC.Types.Unique.Set
 import Data.List (sortBy)
 
@@ -65,6 +69,7 @@ delListFromNameSet :: NameSet -> [Name] -> NameSet
 filterNameSet      :: (Name -> Bool) -> NameSet -> NameSet
 intersectNameSet   :: NameSet -> NameSet -> NameSet
 intersectsNameSet  :: NameSet -> NameSet -> Bool
+disjointNameSet    :: NameSet -> NameSet -> Bool
 -- ^ True if there is a non-empty intersection.
 -- @s1 `intersectsNameSet` s2@ doesn't compute @s2@ if @s1@ is empty
 
@@ -81,10 +86,11 @@ elemNameSet       = elementOfUniqSet
 delFromNameSet    = delOneFromUniqSet
 filterNameSet     = filterUniqSet
 intersectNameSet  = intersectUniqSets
+disjointNameSet   = disjointUniqSets
 
 delListFromNameSet set ns = foldl' delFromNameSet set ns
 
-intersectsNameSet s1 s2 = not (isEmptyNameSet (s1 `intersectNameSet` s2))
+intersectsNameSet s1 s2 = not (s1 `disjointNameSet` s2)
 
 nameSetAny :: (Name -> Bool) -> NameSet -> Bool
 nameSetAny = uniqSetAny
@@ -213,3 +219,8 @@ findUses dus uses
         = rhs_uses `unionNameSet` uses
         | otherwise     -- No def is used
         = uses
+
+-- | 'Id's which have no CAF references. This is a result of analysis of C--.
+-- It is always safe to use an empty 'NonCaffySet'. TODO Refer to Note.
+newtype NonCaffySet = NonCaffySet NameSet
+  deriving (Semigroup, Monoid)

@@ -1,3 +1,17 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
+{-# LANGUAGE ViewPatterns #-}
+
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -7,23 +21,9 @@
 Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-                                      -- in module GHC.Hs.Extension
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE LambdaCase #-}
-
 module GHC.Hs.Binds where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, LHsExpr,
                                     MatchGroup, pprFunBind,
@@ -31,18 +31,22 @@ import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, LHsExpr,
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 
 import GHC.Hs.Extension
-import GHC.Hs.Types
+import GHC.Hs.Type
 import GHC.Core
 import GHC.Tc.Types.Evidence
 import GHC.Core.Type
 import GHC.Types.Name.Set
 import GHC.Types.Basic
-import Outputable
+import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var
-import Bag
-import FastString
-import BooleanFormula (LBooleanFormula)
+import GHC.Types.Fixity
+import GHC.Data.Bag
+import GHC.Data.FastString
+import GHC.Data.BooleanFormula (LBooleanFormula)
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )
@@ -68,7 +72,7 @@ Global bindings (where clauses)
 type HsLocalBinds id = HsLocalBindsLR id id
 
 -- | Located Haskell local bindings
-type LHsLocalBinds id = Located (HsLocalBinds id)
+type LHsLocalBinds id = XRec id (HsLocalBinds id)
 
 -- | Haskell Local Bindings with separate Left and Right identifier types
 --
@@ -101,7 +105,7 @@ type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
 
-type LHsLocalBindsLR idL idR = Located (HsLocalBindsLR idL idR)
+type LHsLocalBindsLR idL idR = XRec idL (HsLocalBindsLR idL idR)
 
 
 -- | Haskell Value Bindings
@@ -156,7 +160,7 @@ type HsBind   id = HsBindLR   id id
 type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
 
 -- | Located Haskell Binding with separate Left and Right identifier types
-type LHsBindLR  idL idR = Located (HsBindLR idL idR)
+type LHsBindLR  idL idR = XRec idL (HsBindLR idL idR)
 
 {- Note [FunBind vs PatBind]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -211,12 +215,12 @@ data HsBindLR idL idR
     -- 'MatchContext'. See Note [FunBind vs PatBind] for
     -- details about the relationship between FunBind and PatBind.
     --
-    --  'ApiAnnotation.AnnKeywordId's
+    --  'GHC.Parser.Annotation.AnnKeywordId's
     --
-    --  - 'ApiAnnotation.AnnFunId', attached to each element of fun_matches
+    --  - 'GHC.Parser.Annotation.AnnFunId', attached to each element of fun_matches
     --
-    --  - 'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
-    --    'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
+    --  - 'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnWhere',
+    --    'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     FunBind {
@@ -240,7 +244,7 @@ data HsBindLR idL idR
           -- type         Int -> forall a'. a' -> a'
           -- Notice that the coercion captures the free a'.
 
-        fun_id :: Located (IdP idL), -- Note [fun_id in Match] in GHC.Hs.Expr
+        fun_id :: LIdP idL, -- Note [fun_id in Match] in GHC.Hs.Expr
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
@@ -255,9 +259,9 @@ data HsBindLR idL idR
   -- relationship between FunBind and PatBind.
 
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang',
-  --       'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
-  --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang',
+  --       'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnWhere',
+  --       'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | PatBind {
@@ -291,7 +295,7 @@ data HsBindLR idL idR
         abs_exports :: [ABExport idL],
 
         -- | Evidence bindings
-        -- Why a list? See GHC.Tc.TyCl.Instance
+        -- Why a list? See "GHC.Tc.TyCl.Instance"
         -- Note [Typechecking plan for instance declarations]
         abs_ev_binds :: [TcEvBinds],
 
@@ -305,19 +309,14 @@ data HsBindLR idL idR
   | PatSynBind
         (XPatSynBind idL idR)
         (PatSynBind idL idR)
-        -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
-        --          'ApiAnnotation.AnnLarrow','ApiAnnotation.AnnEqual',
-        --          'ApiAnnotation.AnnWhere'
-        --          'ApiAnnotation.AnnOpen' @'{'@,'ApiAnnotation.AnnClose' @'}'@
+        -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnPattern',
+        --          'GHC.Parser.Annotation.AnnLarrow','GHC.Parser.Annotation.AnnEqual',
+        --          'GHC.Parser.Annotation.AnnWhere'
+        --          'GHC.Parser.Annotation.AnnOpen' @'{'@,'GHC.Parser.Annotation.AnnClose' @'}'@
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | XHsBindsLR !(XXHsBindsLR idL idR)
-
-data NPatBindTc = NPatBindTc {
-     pat_fvs :: NameSet, -- ^ Free variables
-     pat_rhs_ty :: Type  -- ^ Type of the GRHSs
-     } deriving Data
 
 type instance XFunBind    (GhcPass pL) GhcPs = NoExtField
 type instance XFunBind    (GhcPass pL) GhcRn = NameSet    -- Free variables
@@ -325,7 +324,7 @@ type instance XFunBind    (GhcPass pL) GhcTc = HsWrapper  -- See comments on Fun
 
 type instance XPatBind    GhcPs (GhcPass pR) = NoExtField
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
-type instance XPatBind    GhcTc (GhcPass pR) = NPatBindTc
+type instance XPatBind    GhcTc (GhcPass pR) = Type    -- Type of the GRHSs
 
 type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = NoExtField
@@ -360,10 +359,10 @@ type instance XABE       (GhcPass p) = NoExtField
 type instance XXABExport (GhcPass p) = NoExtCon
 
 
--- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
---             'ApiAnnotation.AnnEqual','ApiAnnotation.AnnLarrow'
---             'ApiAnnotation.AnnWhere','ApiAnnotation.AnnOpen' @'{'@,
---             'ApiAnnotation.AnnClose' @'}'@,
+-- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnPattern',
+--             'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnLarrow',
+--             'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen' @'{'@,
+--             'GHC.Parser.Annotation.AnnClose' @'}'@,
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -371,9 +370,8 @@ type instance XXABExport (GhcPass p) = NoExtCon
 data PatSynBind idL idR
   = PSB { psb_ext  :: XPSB idL idR,            -- ^ Post renaming, FVs.
                                                -- See Note [Bind free vars]
-          psb_id   :: Located (IdP idL),       -- ^ Name of the pattern synonym
-          psb_args :: HsPatSynDetails (Located (IdP idR)),
-                                               -- ^ Formal parameter names
+          psb_id   :: LIdP idL,                -- ^ Name of the pattern synonym
+          psb_args :: HsPatSynDetails idR,     -- ^ Formal parameter names
           psb_def  :: LPat idR,                -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
      }
@@ -630,11 +628,10 @@ instance (OutputableBndrId pl, OutputableBndrId pr)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
   ppr (XValBindsLR (NValBinds sccs sigs))
-    = getPprStyle $ \ sty ->
-      if debugStyle sty then    -- Print with sccs showing
-        vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
-     else
-        pprDeclList (pprLHsBindsForUser (unionManyBags (map snd sccs)) sigs)
+    = getPprDebug $ \case
+        -- Print with sccs showing
+        True  -> vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
+        False -> pprDeclList (pprLHsBindsForUser (unionManyBags (map snd sccs)) sigs)
    where
      ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
      pp_rec Recursive    = text "rec"
@@ -693,10 +690,10 @@ emptyValBindsIn, emptyValBindsOut :: HsValBindsLR (GhcPass a) (GhcPass b)
 emptyValBindsIn  = ValBinds noExtField emptyBag []
 emptyValBindsOut = XValBindsLR (NValBinds [] [])
 
-emptyLHsBinds :: LHsBindsLR idL idR
+emptyLHsBinds :: LHsBindsLR (GhcPass idL) idR
 emptyLHsBinds = emptyBag
 
-isEmptyLHsBinds :: LHsBindsLR idL idR -> Bool
+isEmptyLHsBinds :: LHsBindsLR (GhcPass idL) idR -> Bool
 isEmptyLHsBinds = isEmptyBag
 
 ------------
@@ -739,8 +736,9 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
   = sdocOption sdocPrintTypecheckerElaboration $ \case
       False -> pprLHsBinds val_binds
       True  -> -- Show extra information (bug number: #10662)
-               hang (text "AbsBinds" <+> brackets (interpp'SP tyvars)
-                                             <+> brackets (interpp'SP dictvars))
+               hang (text "AbsBinds"
+                     <+> sep [ brackets (interpp'SP tyvars)
+                             , brackets (interpp'SP dictvars) ])
                   2 $ braces $ vcat
                [ text "Exports:" <+>
                    brackets (sep (punctuate comma (map ppr exports)))
@@ -752,7 +750,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
 
 instance OutputableBndrId p => Outputable (ABExport (GhcPass p)) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
-    = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
+    = vcat [ sep [ ppr gbl, nest 2 (text "<=" <+> ppr lcl) ]
            , nest 2 (pprTcSpecPrags prags)
            , pprIfTc @p $ nest 2 (text "wrap:" <+> ppr wrap) ]
 
@@ -784,9 +782,11 @@ pprTicks :: SDoc -> SDoc -> SDoc
 -- Also print ticks in dumpStyle, so that -ddump-hpc actually does
 -- something useful.
 pprTicks pp_no_debug pp_when_debug
-  = getPprStyle (\ sty -> if debugStyle sty || dumpStyle sty
-                             then pp_when_debug
-                             else pp_no_debug)
+  = getPprStyle $ \sty ->
+    getPprDebug $ \debug ->
+      if debug || dumpStyle sty
+         then pp_when_debug
+         else pp_no_debug
 
 {-
 ************************************************************************
@@ -820,8 +820,8 @@ isEmptyIPBindsTc :: HsIPBinds GhcTc -> Bool
 isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
 
 -- | Located Implicit Parameter Binding
-type LIPBind id = Located (IPBind id)
--- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
+type LIPBind id = XRec id (IPBind id)
+-- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi' when in a
 --   list
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -833,13 +833,13 @@ type LIPBind id = Located (IPBind id)
 -- (Right d), where "d" is the name of the dictionary holding the
 -- evidence for the implicit parameter.
 --
--- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual'
+-- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual'
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data IPBind id
   = IPBind
         (XCIPBind id)
-        (Either (Located HsIPName) (IdP id))
+        (Either (XRec id HsIPName) (IdP id))
         (LHsExpr id)
   | XIPBind !(XXIPBind id)
 
@@ -871,7 +871,7 @@ serves for both.
 -}
 
 -- | Located Signature
-type LSig pass = Located (Sig pass)
+type LSig pass = XRec pass (Sig pass)
 
 -- | Signatures and pragmas
 data Sig pass
@@ -887,25 +887,25 @@ data Sig pass
       -- signature that brought them into scope, in this third field to be
       -- more specific.
       --
-      --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon',
-      --          'ApiAnnotation.AnnComma'
+      --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon',
+      --          'GHC.Parser.Annotation.AnnComma'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     TypeSig
        (XTypeSig pass)
-       [Located (IdP pass)]  -- LHS of the signature; e.g.  f,g,h :: blah
+       [LIdP pass]           -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 
       -- | A pattern synonym type signature
       --
       -- > pattern Single :: () => (Show a) => a -> [a]
       --
-      --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
-      --           'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnForall'
-      --           'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
+      --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnPattern',
+      --           'GHC.Parser.Annotation.AnnDcolon','GHC.Parser.Annotation.AnnForall'
+      --           'GHC.Parser.Annotation.AnnDot','GHC.Parser.Annotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | PatSynSig (XPatSynSig pass) [Located (IdP pass)] (LHsSigType pass)
+  | PatSynSig (XPatSynSig pass) [LIdP pass] (LHsSigType pass)
       -- P :: forall a b. Req => Prov => ty
 
       -- | A signature for a class method
@@ -916,9 +916,9 @@ data Sig pass
       --          default op :: Eq a => a -> a   -- Generic default
       -- No wildcards allowed here
       --
-      --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDefault',
-      --           'ApiAnnotation.AnnDcolon'
-  | ClassOpSig (XClassOpSig pass) Bool [Located (IdP pass)] (LHsSigType pass)
+      --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDefault',
+      --           'GHC.Parser.Annotation.AnnDcolon'
+  | ClassOpSig (XClassOpSig pass) Bool [LIdP pass] (LHsSigType pass)
 
         -- | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
@@ -932,8 +932,8 @@ data Sig pass
         -- >     infixl 8 ***
         --
         --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnInfix',
-        --           'ApiAnnotation.AnnVal'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnInfix',
+        --           'GHC.Parser.Annotation.AnnVal'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | FixSig (XFixSig pass) (FixitySig pass)
@@ -942,31 +942,31 @@ data Sig pass
         --
         -- > {#- INLINE f #-}
         --
-        --  - 'ApiAnnotation.AnnKeywordId' :
-        --       'ApiAnnotation.AnnOpen' @'{-\# INLINE'@ and @'['@,
-        --       'ApiAnnotation.AnnClose','ApiAnnotation.AnnOpen',
-        --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnTilde',
-        --       'ApiAnnotation.AnnClose'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' :
+        --       'GHC.Parser.Annotation.AnnOpen' @'{-\# INLINE'@ and @'['@,
+        --       'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnOpen',
+        --       'GHC.Parser.Annotation.AnnVal','GHC.Parser.Annotation.AnnTilde',
+        --       'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | InlineSig   (XInlineSig pass)
-                (Located (IdP pass)) -- Function name
-                InlinePragma         -- Never defaultInlinePragma
+                (LIdP pass)        -- Function name
+                InlinePragma       -- Never defaultInlinePragma
 
         -- | A specialisation pragma
         --
         -- > {-# SPECIALISE f :: Int -> Int #-}
         --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-        --      'ApiAnnotation.AnnOpen' @'{-\# SPECIALISE'@ and @'['@,
-        --      'ApiAnnotation.AnnTilde',
-        --      'ApiAnnotation.AnnVal',
-        --      'ApiAnnotation.AnnClose' @']'@ and @'\#-}'@,
-        --      'ApiAnnotation.AnnDcolon'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+        --      'GHC.Parser.Annotation.AnnOpen' @'{-\# SPECIALISE'@ and @'['@,
+        --      'GHC.Parser.Annotation.AnnTilde',
+        --      'GHC.Parser.Annotation.AnnVal',
+        --      'GHC.Parser.Annotation.AnnClose' @']'@ and @'\#-}'@,
+        --      'GHC.Parser.Annotation.AnnDcolon'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SpecSig     (XSpecSig pass)
-                (Located (IdP pass)) -- Specialise a function or datatype  ...
+                (LIdP pass)        -- Specialise a function or datatype  ...
                 [LHsSigType pass]  -- ... to these types
                 InlinePragma       -- The pragma on SPECIALISE_INLINE form.
                                    -- If it's just defaultInlinePragma, then we said
@@ -979,25 +979,25 @@ data Sig pass
         -- (Class tys); should be a specialisation of the
         -- current instance declaration
         --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-        --      'ApiAnnotation.AnnInstance','ApiAnnotation.AnnClose'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+        --      'GHC.Parser.Annotation.AnnInstance','GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType pass)
-                  -- Note [Pragma source text] in GHC.Types.Basic
+                  -- Note [Pragma source text] in GHC.Types.SourceText
 
         -- | A minimal complete definition pragma
         --
         -- > {-# MINIMAL a | (b, c | (d | e)) #-}
         --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-        --      'ApiAnnotation.AnnVbar','ApiAnnotation.AnnComma',
-        --      'ApiAnnotation.AnnClose'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+        --      'GHC.Parser.Annotation.AnnVbar','GHC.Parser.Annotation.AnnComma',
+        --      'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | MinimalSig (XMinimalSig pass)
-               SourceText (LBooleanFormula (Located (IdP pass)))
-               -- Note [Pragma source text] in GHC.Types.Basic
+               SourceText (LBooleanFormula (LIdP pass))
+               -- Note [Pragma source text] in GHC.Types.SourceText
 
         -- | A "set cost centre" pragma for declarations
         --
@@ -1008,9 +1008,9 @@ data Sig pass
         -- > {-# SCC funName "cost_centre_name" #-}
 
   | SCCFunSig  (XSCCFunSig pass)
-               SourceText      -- Note [Pragma source text] in GHC.Types.Basic
-               (Located (IdP pass))  -- Function name
-               (Maybe (Located StringLiteral))
+               SourceText     -- Note [Pragma source text] in GHC.Types.SourceText
+               (LIdP pass)    -- Function name
+               (Maybe (XRec pass StringLiteral))
        -- | A complete match pragma
        --
        -- > {-# COMPLETE C, D [:: T] #-}
@@ -1020,8 +1020,8 @@ data Sig pass
        -- synonym definitions.
   | CompleteMatchSig (XCompleteMatchSig pass)
                      SourceText
-                     (Located [Located (IdP pass)])
-                     (Maybe (Located (IdP pass)))
+                     (XRec pass [LIdP pass])
+                     (Maybe (LIdP pass))
   | XSig !(XXSig pass)
 
 type instance XTypeSig          (GhcPass p) = NoExtField
@@ -1038,10 +1038,10 @@ type instance XCompleteMatchSig (GhcPass p) = NoExtField
 type instance XXSig             (GhcPass p) = NoExtCon
 
 -- | Located Fixity Signature
-type LFixitySig pass = Located (FixitySig pass)
+type LFixitySig pass = XRec pass (FixitySig pass)
 
 -- | Fixity Signature
-data FixitySig pass = FixitySig (XFixitySig pass) [Located (IdP pass)] Fixity
+data FixitySig pass = FixitySig (XFixitySig pass) [LIdP pass] Fixity
                     | XFixitySig !(XXFixitySig pass)
 
 type instance XFixitySig  (GhcPass p) = NoExtField
@@ -1080,48 +1080,47 @@ isDefaultMethod :: TcSpecPrags -> Bool
 isDefaultMethod IsDefaultMethod = True
 isDefaultMethod (SpecPrags {})  = False
 
-
-isFixityLSig :: LSig name -> Bool
-isFixityLSig (L _ (FixSig {})) = True
+isFixityLSig :: forall p. UnXRec p => LSig p -> Bool
+isFixityLSig (unXRec @p -> FixSig {}) = True
 isFixityLSig _                 = False
 
-isTypeLSig :: LSig name -> Bool  -- Type signatures
-isTypeLSig (L _(TypeSig {}))    = True
-isTypeLSig (L _(ClassOpSig {})) = True
-isTypeLSig (L _(IdSig {}))      = True
+isTypeLSig :: forall p. UnXRec p => LSig p -> Bool  -- Type signatures
+isTypeLSig (unXRec @p -> TypeSig {})    = True
+isTypeLSig (unXRec @p -> ClassOpSig {}) = True
+isTypeLSig (unXRec @p -> IdSig {})      = True
 isTypeLSig _                    = False
 
-isSpecLSig :: LSig name -> Bool
-isSpecLSig (L _(SpecSig {})) = True
+isSpecLSig :: forall p. UnXRec p => LSig p -> Bool
+isSpecLSig (unXRec @p -> SpecSig {}) = True
 isSpecLSig _                 = False
 
-isSpecInstLSig :: LSig name -> Bool
-isSpecInstLSig (L _ (SpecInstSig {})) = True
+isSpecInstLSig :: forall p. UnXRec p => LSig p -> Bool
+isSpecInstLSig (unXRec @p -> SpecInstSig {}) = True
 isSpecInstLSig _                      = False
 
-isPragLSig :: LSig name -> Bool
+isPragLSig :: forall p. UnXRec p => LSig p -> Bool
 -- Identifies pragmas
-isPragLSig (L _ (SpecSig {}))   = True
-isPragLSig (L _ (InlineSig {})) = True
-isPragLSig (L _ (SCCFunSig {})) = True
-isPragLSig (L _ (CompleteMatchSig {})) = True
+isPragLSig (unXRec @p -> SpecSig {})   = True
+isPragLSig (unXRec @p -> InlineSig {}) = True
+isPragLSig (unXRec @p -> SCCFunSig {}) = True
+isPragLSig (unXRec @p -> CompleteMatchSig {}) = True
 isPragLSig _                    = False
 
-isInlineLSig :: LSig name -> Bool
+isInlineLSig :: forall p. UnXRec p => LSig p -> Bool
 -- Identifies inline pragmas
-isInlineLSig (L _ (InlineSig {})) = True
+isInlineLSig (unXRec @p -> InlineSig {}) = True
 isInlineLSig _                    = False
 
-isMinimalLSig :: LSig name -> Bool
-isMinimalLSig (L _ (MinimalSig {})) = True
-isMinimalLSig _                     = False
+isMinimalLSig :: forall p. UnXRec p => LSig p -> Bool
+isMinimalLSig (unXRec @p -> MinimalSig {}) = True
+isMinimalLSig _                               = False
 
-isSCCFunSig :: LSig name -> Bool
-isSCCFunSig (L _ (SCCFunSig {})) = True
+isSCCFunSig :: forall p. UnXRec p => LSig p -> Bool
+isSCCFunSig (unXRec @p -> SCCFunSig {}) = True
 isSCCFunSig _                    = False
 
-isCompleteMatchSig :: LSig name -> Bool
-isCompleteMatchSig (L _ (CompleteMatchSig {} )) = True
+isCompleteMatchSig :: forall p. UnXRec p => LSig p -> Bool
+isCompleteMatchSig (unXRec @p -> CompleteMatchSig {} ) = True
 isCompleteMatchSig _                            = False
 
 hsSigDoc :: Sig name -> SDoc
@@ -1163,8 +1162,8 @@ ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
                                              (interpp'SP ty) inl)
     where
       pragmaSrc = case spec of
-        NoUserInline -> "{-# SPECIALISE"
-        _            -> "{-# SPECIALISE_INLINE"
+        NoUserInlinePrag -> "{-# SPECIALISE"
+        _                -> "{-# SPECIALISE_INLINE"
 ppr_sig (InlineSig _ var inl)
   = pragSrcBrackets (inl_src inl) "{-# INLINE"  (pprInline inl
                                    <+> pprPrefixOcc (unLoc var))
@@ -1230,14 +1229,14 @@ pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 -}
 
 -- | Haskell Pattern Synonym Details
-type HsPatSynDetails arg = HsConDetails arg [RecordPatSynField arg]
+type HsPatSynDetails pass = HsConDetails (LIdP pass) [RecordPatSynField (LIdP pass)]
 
 -- See Note [Record PatSyn Fields]
 -- | Record Pattern Synonym Field
-data RecordPatSynField a
+data RecordPatSynField fld
   = RecordPatSynField {
-      recordPatSynSelectorId :: a  -- Selector name visible in rest of the file
-      , recordPatSynPatVar :: a
+      recordPatSynSelectorId :: fld  -- Selector name visible in rest of the file
+      , recordPatSynPatVar   :: fld
       -- Filled in by renamer, the name used internally
       -- by the pattern
       } deriving (Data, Functor)

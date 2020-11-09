@@ -185,6 +185,11 @@ $(error BUILD_SPHINX_PDF=YES, but `xelatex` was not found. \
   Install `xelatex`, then rerun `./configure`. \
   See https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation)
 endif
+ifeq "$(MAKEINDEX)" ""
+$(error BUILD_SPHINX_PDF=YES, but `makeindex` was not found. \
+  Install `xelatex`, then rerun `./configure`. \
+  See https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation)
+endif
 endif
 
 ifeq "$(HSCOLOUR_SRCS)" "YES"
@@ -414,13 +419,13 @@ else # CLEANING
 # programs such as GHC and ghc-pkg, that we do not assume the stage0
 # compiler already has installed (or up-to-date enough).
 # Note that these must be given in topological order.
-PACKAGES_STAGE0 = binary transformers mtl hpc ghc-boot-th ghc-boot template-haskell text parsec Cabal/Cabal ghc-heap ghci
+PACKAGES_STAGE0 = binary transformers mtl hpc ghc-boot-th ghc-boot template-haskell text parsec Cabal/Cabal ghc-heap exceptions ghci
 ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
 
 PACKAGES_STAGE1 += ghc-prim
-PACKAGES_STAGE1 += $(INTEGER_LIBRARY)
+PACKAGES_STAGE1 += ghc-bignum
 PACKAGES_STAGE1 += base
 PACKAGES_STAGE1 += filepath
 PACKAGES_STAGE1 += array
@@ -451,6 +456,7 @@ PACKAGES_STAGE1 += parsec
 PACKAGES_STAGE1 += Cabal/Cabal
 PACKAGES_STAGE1 += ghc-compact
 PACKAGES_STAGE1 += ghc-heap
+PACKAGES_STAGE1 += integer-gmp # compat library
 
 ifeq "$(HADDOCK_DOCS)" "YES"
 PACKAGES_STAGE1 += xhtml
@@ -465,6 +471,15 @@ endif
 # ghc-cabal doesn't currently support packages containing both libraries
 # and executables. This flag disables the latter.
 libraries/haskeline_CONFIGURE_OPTS += --flags=-examples
+
+libraries/ghc-bignum_CONFIGURE_OPTS += -f $(BIGNUM_BACKEND)
+
+ifeq "$(BIGNUM_BACKEND)" "gmp"
+GMP_ENABLED = YES
+libraries/ghc-bignum_CONFIGURE_OPTS += --configure-option="--with-gmp"
+else
+GMP_ENABLED = NO
+endif
 
 PACKAGES_STAGE1 += stm
 PACKAGES_STAGE1 += exceptions
@@ -583,7 +598,7 @@ endif
 BOOT_LIBS = $(foreach lib,$(PACKAGES_STAGE0),$(libraries/$(lib)_dist-boot_v_LIB))
 
 # Only build internal interpreter support for the stage2 ghci lib
-libraries/ghci_dist-install_CONFIGURE_OPTS += --flags=ghci
+libraries/ghci_dist-install_CONFIGURE_OPTS += --flags=internal-interpreter
 
 # ----------------------------------------
 # Special magic for the ghc-prim package
@@ -604,21 +619,6 @@ libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $$(genprimopcode_I
 
 # Required so that Haddock documents the primops.
 libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs
-
-# ----------------------------------------
-# Special magic for the integer package
-
-ifneq "$(CLEANING)" "YES"
-ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
-libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-gmp
-compiler_stage2_CONFIGURE_OPTS += --flags=integer-gmp
-else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
-libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-simple
-compiler_stage2_CONFIGURE_OPTS += --flags=integer-simple
-else
-$(error Unknown integer library: $(INTEGER_LIBRARY))
-endif
-endif
 
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
@@ -656,7 +656,9 @@ BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
 endif
 
-BUILD_DIRS += libraries/integer-gmp/gmp
+ifeq "$(BIGNUM_BACKEND)" "gmp"
+BUILD_DIRS += libraries/ghc-bignum/gmp
+endif
 BUILD_DIRS += utils/haddock
 BUILD_DIRS += utils/haddock/doc
 BUILD_DIRS += compiler
@@ -701,9 +703,6 @@ endif
 ifeq "$(GhcWithInterpreter)" "NO"
 # runghc is just GHCi in disguise
 BUILD_DIRS := $(filter-out utils/runghc,$(BUILD_DIRS))
-endif
-ifneq "$(INTEGER_LIBRARY)" "integer-gmp"
-BUILD_DIRS := $(filter-out libraries/integer-gmp/gmp,$(BUILD_DIRS))
 endif
 ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].
@@ -934,6 +933,11 @@ endif
 ifneq "$(INSTALL_HTML_DOC_DIRS)" ""
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
 		$(CP) -Rp $$i "$(DESTDIR)$(docdir)/html"; \
+	done
+	for i in "$(DESTDIR)$(docdir)/html"/*/.doctrees; do \
+		if [ -d "$$i" ]; then \
+			rm -r "$$i"; \
+		fi \
 	done
 endif
 
@@ -1169,7 +1173,8 @@ SRC_DIST_TESTSUITE_TARBALL        = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).
 # Files to include in source distributions
 #
 SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
-    utils docs rts compiler ghc driver libraries libffi-tarballs
+    utils docs rts compiler ghc driver libraries libffi-tarballs \
+		hadrian
 SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
     aclocal.m4 README.md ANNOUNCE HACKING.md INSTALL.md LICENSE Makefile \
@@ -1210,6 +1215,8 @@ sdist-ghc-prep-tree :
 	cd $(SRC_DIST_GHC_DIR) && $(MAKE) distclean
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/tarballs/)
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/stamp/)
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/hadrian/_build/)
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/hadrian/dist-newstyle/)
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/compiler/stage[123])
 	$(call removeFiles,$(SRC_DIST_GHC_DIR)/mk/build.mk)
 	$(call removeFiles,$(SRC_DIST_GHC_DIR)/rts/rts.cabal)
@@ -1301,7 +1308,8 @@ sdist_%:
 
 .PHONY: clean
 
-CLEAN_FILES += libraries/integer-gmp/include/HsIntegerGmp.h
+CLEAN_FILES += libraries/ghc-bignum/include/ghc-gmp.h
+CLEAN_FILES += libraries/ghc-bignum/include/HsIntegerGmp.h
 CLEAN_FILES += libraries/base/include/EventConfig.h
 CLEAN_FILES += mk/config.mk.old
 CLEAN_FILES += mk/project.mk.old
@@ -1416,6 +1424,13 @@ distclean : clean
 # Also clean Windows-only inplace directories.
 # Don't delete 'inplace' itself, it contains source files.
 	$(call removeTrees,inplace/mingw)
+
+# Remove the download tarballs.  This is because updating
+# the tarballs doesn't remove old ones.  After a tarbal is updated
+# you end up with both in your tree and get a franken build.
+# The downside here is that a maintainer clean will trigger more
+# bandwidth usage from haskell.org
+	$(call removeTrees,ghc-tarballs)
 
 # Remove the fs utilities.
 	$(call removeFiles,utils/lndir/fs.h)
@@ -1545,7 +1560,7 @@ phase_0_builds: $(utils/hsc2hs_dist_depfile_c_asm)
 phase_0_builds: $(utils/genprimopcode_dist_depfile_haskell)
 phase_0_builds: $(utils/genprimopcode_dist_depfile_c_asm)
 # deriveConstants is used to create header files included in the
-# ghc package.
+# ghc-boot package.
 phase_0_builds: $(utils/deriveConstants_dist_depfile_haskell)
 phase_0_builds: $(utils/deriveConstants_dist_depfile_c_asm)
 

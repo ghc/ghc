@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -48,10 +50,9 @@ The previous patch, to fix polymorphic floatout demand signatures, is
 essential to make this work well!
 -}
 
-{-# LANGUAGE CPP #-}
 module GHC.Core.Opt.StaticArgs ( doStaticArgs ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Var
 import GHC.Core
@@ -62,15 +63,16 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Supply
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Set
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.List (mapAccumL)
-import FastString
+import GHC.Data.FastString
 
 #include "HsVersions.h"
 
@@ -187,7 +189,7 @@ satExpr var@(Var v) interesting_ids = do
                    else Nothing
     return (var, emptyIdSATInfo, app_info)
 
-satExpr lit@(Lit _) _ = do
+satExpr lit@(Lit _) _ =
     return (lit, emptyIdSATInfo, Nothing)
 
 satExpr (Lam binders body) interesting_ids = do
@@ -236,10 +238,10 @@ satExpr (Tick tickish expr) interesting_ids = do
     (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids
     return (Tick tickish expr', sat_info_expr, expr_app)
 
-satExpr ty@(Type _) _ = do
+satExpr ty@(Type _) _ =
     return (ty, emptyIdSATInfo, Nothing)
 
-satExpr co@(Coercion _) _ = do
+satExpr co@(Coercion _) _ =
     return (co, emptyIdSATInfo, Nothing)
 
 satExpr (Cast expr coercion) interesting_ids = do
@@ -420,12 +422,13 @@ saTransform binder arg_staticness rhs_binders rhs_body
           shadow_rhs = mkLams shadow_lam_bndrs local_body
             -- nonrec_rhs = \alpha' beta' c n xs -> sat_worker xs
 
-          rec_body_bndr = mkSysLocal (fsLit "sat_worker") uniq (exprType rec_body)
+          rec_body_bndr = mkSysLocal (fsLit "sat_worker") uniq Many (exprType rec_body)
             -- rec_body_bndr = sat_worker
 
             -- See Note [Shadow binding]; make a SysLocal
           shadow_bndr = mkSysLocal (occNameFS (getOccName binder))
                                    (idUnique binder)
+                                   Many
                                    (exprType shadow_rhs)
 
 isStaticValue :: Staticness App -> Bool

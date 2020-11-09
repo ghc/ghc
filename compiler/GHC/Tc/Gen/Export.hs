@@ -1,46 +1,47 @@
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE TypeFamilies      #-}
 
 module GHC.Tc.Gen.Export (tcRnExports, exports_from_avail) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Builtin.Names
-import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Unbound ( reportUnboundName )
-import ErrUtils
-import GHC.Types.Id
-import GHC.Types.Id.Info
-import GHC.Types.Module
+import GHC.Utils.Error
+import GHC.Unit.Module
+import GHC.Unit.Module.Imported
+import GHC.Core.TyCon
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.PatSyn
+import GHC.Data.Maybe
+import GHC.Utils.Misc (capitalise)
+import GHC.Data.FastString (fsLit)
+
+import GHC.Types.Unique.Set
+import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Avail
-import GHC.Core.TyCon
-import GHC.Types.SrcLoc as SrcLoc
-import GHC.Driver.Types
-import Outputable
-import GHC.Core.ConLike
-import GHC.Core.DataCon
-import GHC.Core.PatSyn
-import Maybes
-import GHC.Types.Unique.Set
-import Util (capitalise)
-import FastString (fsLit)
+import GHC.Types.SourceFile
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.TyThing
+import GHC.Types.Name.Reader
 
 import Control.Monad
 import GHC.Driver.Session
-import GHC.Rename.Doc         ( rnHsDoc )
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import Data.Either            ( partitionEithers )
 
@@ -322,9 +323,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                               , new_exports))) }
 
     exports_from_item acc@(ExportAccum occs mods) (L loc ie)
-        | isDoc ie
-        = do new_ie <- lookup_doc_ie ie
-             return (Just (acc, (L loc new_ie, [])))
+        | Just new_ie <- lookup_doc_ie ie
+        = return (Just (acc, (L loc new_ie, [])))
 
         | otherwise
         = do (new_ie, avail) <- lookup_ie ie
@@ -405,13 +405,11 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              return (L l name, non_flds, flds)
 
     -------------
-    lookup_doc_ie :: IE GhcPs -> RnM (IE GhcRn)
-    lookup_doc_ie (IEGroup _ lev doc) = do rn_doc <- rnHsDoc doc
-                                           return (IEGroup noExtField lev rn_doc)
-    lookup_doc_ie (IEDoc _ doc)       = do rn_doc <- rnHsDoc doc
-                                           return (IEDoc noExtField rn_doc)
-    lookup_doc_ie (IEDocNamed _ str)  = return (IEDocNamed noExtField str)
-    lookup_doc_ie _ = panic "lookup_doc_ie"    -- Other cases covered earlier
+    lookup_doc_ie :: IE GhcPs -> Maybe (IE GhcRn)
+    lookup_doc_ie (IEGroup _ lev doc) = Just (IEGroup noExtField lev doc)
+    lookup_doc_ie (IEDoc _ doc)       = Just (IEDoc noExtField doc)
+    lookup_doc_ie (IEDocNamed _ str)  = Just (IEDocNamed noExtField str)
+    lookup_doc_ie _ = Nothing
 
     -- In an export item M.T(A,B,C), we want to treat the uses of
     -- A,B,C as if they were M.A, M.B, M.C
@@ -429,12 +427,6 @@ classifyGRE gre = case gre_par gre of
   _                      -> Left  n
   where
     n = gre_name gre
-
-isDoc :: IE GhcPs -> Bool
-isDoc (IEDoc {})      = True
-isDoc (IEDocNamed {}) = True
-isDoc (IEGroup {})    = True
-isDoc _ = False
 
 -- Renaming and typechecking of exports happens after everything else has
 -- been typechecked.
@@ -588,7 +580,7 @@ lookupChildrenExport spec_parent rdr_items =
 --
 -- Note: [Types of TyCon]
 --
--- This check appears to be overlly complicated, Richard asked why it
+-- This check appears to be overly complicated, Richard asked why it
 -- is not simply just `isAlgTyCon`. The answer for this is that
 -- a classTyCon is also an `AlgTyCon` which we explicitly want to disallow.
 -- (It is either a newtype or data depending on the number of methods)

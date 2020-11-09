@@ -1,5 +1,13 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.16.0.0 *TBA*
+
+  * Make it possible to promote `Natural`s and remove the separate `Nat` kind.
+    For backwards compatibility, `Nat` is now a type synonym for `Natural`.
+    As a consequence, one must enable `TypeSynonymInstances`
+    in order to define instances for `Nat`. Also, different instances for `Nat` and `Natural`
+    won't typecheck anymore.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
@@ -11,6 +19,33 @@
 
   * Add `singleton` function for `Data.List.NonEmpty`.
 
+  * The planned deprecation of `Data.Monoid.First` and `Data.Monoid.Last`
+    is scrapped due to difficulties with the suggested migration path.
+
+  * `Data.Semigroup.Option` and the accompanying `option` function are
+    deprecated and scheduled for removal in 4.16.
+
+  * Add `Generic` instances to `Fingerprint`, `GiveGCStats`, `GCFlags`,
+    `ConcFlags`, `DebugFlags`, `CCFlags`, `DoHeapProfile`, `ProfFlags`,
+    `DoTrace`, `TraceFlags`, `TickyFlags`, `ParFlags`, `RTSFlags`, `RTSStats`,
+    `GCStats`, `ByteOrder`, `GeneralCategory`, `SrcLoc`
+
+  * Add rules `unpackUtf8`, `unpack-listUtf8` and `unpack-appendUtf8` to `GHC.Base`.
+    They correspond to their ascii versions and hopefully make it easier
+    for libraries to handle utf8 encoded strings efficiently.
+
+  * An issue with list fusion and `elem` was fixed. `elem` applied to known
+    small lists will now compile to a simple case statement more often.
+
+  * Add `MonadFix` and `MonadZip` instances for `Complex`
+
+  * Add `Ix` instances for tuples of size 6 through 15
+
+  * `catMaybes` is now implemented using `mapMaybe`, so that it is both a "good
+    consumer" and "good producer" for list-fusion (#18574)
+
+  * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
+    `Data.Ord.Down`.
 
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1

@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-
 (c) The AQUA Project, Glasgow University, 1993-1998
 
@@ -9,7 +10,7 @@ module GHC.Core.Opt.Simplify.Monad (
         -- The monad
         SimplM,
         initSmpl, traceSmpl,
-        getSimplRules, getFamEnvs,
+        getSimplRules, getFamEnvs, getOptCoercionOpts,
 
         -- Unique supply
         MonadUnique(..), newId, newJoinId,
@@ -20,26 +21,31 @@ module GHC.Core.Opt.Simplify.Monad (
         plusSimplCount, isZeroSimplCount
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Var       ( Var, isId, mkLocalVar )
 import GHC.Types.Name      ( mkSystemVarName )
 import GHC.Types.Id        ( Id, mkSysLocalOrCoVar )
 import GHC.Types.Id.Info   ( IdDetails(..), vanillaIdInfo, setArityInfo )
-import GHC.Core.Type       ( Type, mkLamTypes )
+import GHC.Core.Type       ( Type, Mult )
 import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Core            ( RuleEnv(..) )
+import GHC.Core.Utils      ( mkLamTypes )
+import GHC.Core.Coercion.Opt
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
+import GHC.Driver.Config
 import GHC.Core.Opt.Monad
-import Outputable
-import FastString
-import MonadUtils
-import ErrUtils as Err
-import Util                ( count )
-import Panic               (throwGhcExceptionIO, GhcException (..))
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Utils.Monad
+import GHC.Utils.Error as Err
+import GHC.Utils.Misc      ( count )
+import GHC.Utils.Panic     (throwGhcExceptionIO, GhcException (..))
 import GHC.Types.Basic     ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
+import GHC.Core.Multiplicity        ( pattern Many )
+import GHC.Exts( oneShot )
 
 {-
 ************************************************************************
@@ -53,19 +59,34 @@ For the simplifier monad, we want to {\em thread} a unique supply and a counter.
 -}
 
 newtype SimplM result
-  =  SM  { unSM :: SimplTopEnv  -- Envt that does not change much
-                -> UniqSupply   -- We thread the unique supply because
-                                -- constantly splitting it is rather expensive
-                -> SimplCount
-                -> IO (result, UniqSupply, SimplCount)}
-  -- we only need IO here for dump output
+  =  SM'  { unSM :: SimplTopEnv  -- Envt that does not change much
+                 -> UniqSupply   -- We thread the unique supply because
+                                 -- constantly splitting it is rather expensive
+                 -> SimplCount
+                 -> IO (result, UniqSupply, SimplCount)}
+    -- We only need IO here for dump output
     deriving (Functor)
+
+pattern SM :: (SimplTopEnv -> UniqSupply -> SimplCount
+               -> IO (result, UniqSupply, SimplCount))
+          -> SimplM result
+-- This pattern synonym makes the simplifier monad eta-expand,
+-- which as a very beneficial effect on compiler performance
+-- (worth a 1-2% reduction in bytes-allocated).  See #18202.
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+pattern SM m <- SM' m
+  where
+    SM m = SM' (oneShot m)
 
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
-        , st_max_ticks :: IntWithInf  -- Max #ticks in this simplifier run
+        , st_max_ticks :: IntWithInf  -- ^ Max #ticks in this simplifier run
         , st_rules     :: RuleEnv
-        , st_fams      :: (FamInstEnv, FamInstEnv) }
+        , st_fams      :: (FamInstEnv, FamInstEnv)
+
+        , st_co_opt_opts :: !OptCoercionOpts
+            -- ^ Coercion optimiser options
+        }
 
 initSmpl :: DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
          -> UniqSupply          -- No init count; set to 0
@@ -78,9 +99,12 @@ initSmpl dflags rules fam_envs us size m
   = do (result, _, count) <- unSM m env us (zeroSimplCount dflags)
        return (result, count)
   where
-    env = STE { st_flags = dflags, st_rules = rules
+    env = STE { st_flags = dflags
+              , st_rules = rules
               , st_max_ticks = computeMaxTicks dflags size
-              , st_fams = fam_envs }
+              , st_fams = fam_envs
+              , st_co_opt_opts = initOptCoercionOpts dflags
+              }
 
 computeMaxTicks :: DynFlags -> Int -> IntWithInf
 -- Compute the max simplifier ticks as
@@ -143,6 +167,7 @@ traceSmpl herald doc
        ; liftIO $ Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_trace "Simpl Trace"
            FormatText
            (hang (text herald) 2 doc) }
+{-# INLINE traceSmpl #-}  -- see Note [INLINE conditional tracing utilities]
 
 {-
 ************************************************************************
@@ -179,9 +204,12 @@ getSimplRules = SM (\st_env us sc -> return (st_rules st_env, us, sc))
 getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
 getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
 
-newId :: FastString -> Type -> SimplM Id
-newId fs ty = do uniq <- getUniqueM
-                 return (mkSysLocalOrCoVar fs uniq ty)
+getOptCoercionOpts :: SimplM OptCoercionOpts
+getOptCoercionOpts = SM (\st_env us sc -> return (st_co_opt_opts st_env, us, sc))
+
+newId :: FastString -> Mult -> Type -> SimplM Id
+newId fs w ty = do uniq <- getUniqueM
+                   return (mkSysLocalOrCoVar fs uniq w ty)
 
 newJoinId :: [Var] -> Type -> SimplM Id
 newJoinId bndrs body_ty
@@ -195,7 +223,7 @@ newJoinId bndrs body_ty
              id_info    = vanillaIdInfo `setArityInfo` arity
 --                                        `setOccInfo` strongLoopBreaker
 
-       ; return (mkLocalVar details name join_id_ty id_info) }
+       ; return (mkLocalVar details name Many join_id_ty id_info) }
 
 {-
 ************************************************************************

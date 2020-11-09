@@ -48,14 +48,14 @@ Library
         Language.Haskell.TH.Quote
         Language.Haskell.TH.Syntax
         Language.Haskell.TH.LanguageExtensions
-
+        Language.Haskell.TH.CodeDo
         Language.Haskell.TH.Lib.Internal
 
     other-modules:
         Language.Haskell.TH.Lib.Map
 
     build-depends:
-        base        >= 4.11 && < 4.15,
+        base        >= 4.11 && < 4.17,
         ghc-boot-th == @ProjectVersionMunged@,
         ghc-prim,
         pretty      == 1.1.*

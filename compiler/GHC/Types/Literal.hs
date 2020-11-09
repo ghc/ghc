@@ -15,7 +15,7 @@ module GHC.Types.Literal
         , LitNumType(..)
 
         -- ** Creating Literals
-        , mkLitInt, mkLitIntWrap, mkLitIntWrapC
+        , mkLitInt, mkLitIntWrap, mkLitIntWrapC, mkLitIntUnchecked
         , mkLitWord, mkLitWordWrap, mkLitWordWrapC
         , mkLitInt64, mkLitInt64Wrap
         , mkLitWord64, mkLitWord64Wrap
@@ -36,40 +36,41 @@ module GHC.Types.Literal
         , inCharRange
         , isZeroLit
         , litFitsInChar
-        , litValue, isLitValue, isLitValue_maybe, mapLitValue
+        , litValue, mapLitValue
 
         -- ** Coercions
-        , word2IntLit, int2WordLit
+        , wordToIntLit, intToWordLit
         , narrowLit
         , narrow8IntLit, narrow16IntLit, narrow32IntLit
         , narrow8WordLit, narrow16WordLit, narrow32WordLit
-        , char2IntLit, int2CharLit
-        , float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
-        , nullAddrLit, rubbishLit, float2DoubleLit, double2FloatLit
+        , charToIntLit, intToCharLit
+        , floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit
+        , nullAddrLit, rubbishLit, floatToDoubleLit, doubleToFloatLit
         ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
+import {-# SOURCE #-} GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Core.Type
 import GHC.Core.TyCon
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Basic
-import Binary
+import GHC.Utils.Binary
 import GHC.Settings.Constants
 import GHC.Platform
 import GHC.Types.Unique.FM
-import Util
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import Data.ByteString (ByteString)
 import Data.Int
 import Data.Word
 import Data.Char
-import Data.Maybe ( isJust )
 import Data.Data ( Data )
 import Data.Proxy
 import Numeric ( fromRat )
@@ -98,7 +99,7 @@ import Numeric ( fromRat )
 --   declaration ('LitLabel')
 --
 -- * A 'LitRubbish' to be used in place of values of 'UnliftedRep'
---   (i.e. 'MutVar#') when the the value is never used.
+--   (i.e. 'MutVar#') when the value is never used.
 --
 -- * A character
 -- * A string
@@ -108,13 +109,11 @@ data Literal
   = LitChar    Char             -- ^ @Char#@ - at least 31 bits. Create with
                                 -- 'mkLitChar'
 
-  | LitNumber !LitNumType !Integer Type
+  | LitNumber !LitNumType !Integer
                                 -- ^ Any numeric literal that can be
                                 -- internally represented with an Integer.
-                                -- See Note [Types of LitNumbers] below for the
-                                -- Type field.
 
-  | LitString  ByteString       -- ^ A string-literal: stored and emitted
+  | LitString !ByteString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
                                 -- at runtime.  Also emitted with a @\'\\0\'@
                                 -- terminator. Create with 'mkLitString'
@@ -150,8 +149,8 @@ data Literal
 
 -- | Numeric literal type
 data LitNumType
-  = LitNumInteger -- ^ @Integer@ (see Note [Integer literals])
-  | LitNumNatural -- ^ @Natural@ (see Note [Natural literals])
+  = LitNumInteger -- ^ @Integer@ (see Note [BigNum literals])
+  | LitNumNatural -- ^ @Natural@ (see Note [BigNum literals])
   | LitNumInt     -- ^ @Int#@ - according to target machine
   | LitNumInt64   -- ^ @Int64#@ - exactly 64 bits
   | LitNumWord    -- ^ @Word#@ - according to target machine
@@ -169,26 +168,19 @@ litNumIsSigned nt = case nt of
   LitNumWord64  -> False
 
 {-
-Note [Integer literals]
-~~~~~~~~~~~~~~~~~~~~~~~
-An Integer literal is represented using, well, an Integer, to make it
-easier to write RULEs for them. They also contain the Integer type, so
-that e.g. literalType can return the right Type for them.
+Note [BigNum literals]
+~~~~~~~~~~~~~~~~~~~~~~
 
-They only get converted into real Core,
-    mkInteger [c1, c2, .., cn]
-during the CorePrep phase, although GHC.Iface.Tidy looks ahead at what the
-core will be, so that it can see whether it involves CAFs.
+GHC supports 2 kinds of arbitrary precision integers (a.k.a BigNum):
 
-When we initially build an Integer literal, notably when
-deserialising it from an interface file (see the Binary instance
-below), we don't have convenient access to the mkInteger Id.  So we
-just use an error thunk, and fill in the real Id when we do tcIfaceLit
-in GHC.IfaceToCore.
+   * Natural: natural represented as a Word# or as a BigNat
 
-Note [Natural literals]
-~~~~~~~~~~~~~~~~~~~~~~~
-Similar to Integer literals.
+   * Integer: integer represented a an Int# or as a BigNat (Integer's
+   constructors indicate the sign)
+
+BigNum literal instances are removed from Core during the CorePrep phase. They
+are replaced with expression to build them at runtime from machine literals
+(Word#, Int#, etc.) or from a list of Word#s.
 
 Note [String literals]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -215,7 +207,7 @@ instance Binary LitNumType where
 instance Binary Literal where
     put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
     put_ bh (LitString ab)   = do putByte bh 1; put_ bh ab
-    put_ bh (LitNullAddr)    = do putByte bh 2
+    put_ bh (LitNullAddr)    = putByte bh 2
     put_ bh (LitFloat ah)    = do putByte bh 3; put_ bh ah
     put_ bh (LitDouble ai)   = do putByte bh 4; put_ bh ai
     put_ bh (LitLabel aj mb fod)
@@ -223,11 +215,11 @@ instance Binary Literal where
              put_ bh aj
              put_ bh mb
              put_ bh fod
-    put_ bh (LitNumber nt i _)
+    put_ bh (LitNumber nt i)
         = do putByte bh 6
              put_ bh nt
              put_ bh i
-    put_ bh (LitRubbish)     = do putByte bh 7
+    put_ bh (LitRubbish) = putByte bh 7
     get bh = do
             h <- getByte bh
             case h of
@@ -237,8 +229,7 @@ instance Binary Literal where
               1 -> do
                     ab <- get bh
                     return (LitString ab)
-              2 -> do
-                    return (LitNullAddr)
+              2 -> return (LitNullAddr)
               3 -> do
                     ah <- get bh
                     return (LitFloat ah)
@@ -253,21 +244,8 @@ instance Binary Literal where
               6 -> do
                     nt <- get bh
                     i  <- get bh
-                    -- Note [Types of LitNumbers]
-                    let t = case nt of
-                            LitNumInt     -> intPrimTy
-                            LitNumInt64   -> int64PrimTy
-                            LitNumWord    -> wordPrimTy
-                            LitNumWord64  -> word64PrimTy
-                            -- See Note [Integer literals]
-                            LitNumInteger ->
-                              panic "Evaluated the place holder for mkInteger"
-                            -- and Note [Natural literals]
-                            LitNumNatural ->
-                              panic "Evaluated the place holder for mkNatural"
-                    return (LitNumber nt i t)
-              _ -> do
-                    return (LitRubbish)
+                    return (LitNumber nt i)
+              _ -> return (LitRubbish)
 
 instance Outputable Literal where
     ppr = pprLiteral id
@@ -276,7 +254,7 @@ instance Eq Literal where
     a == b = compare a b == EQ
 
 -- | Needed for the @Ord@ instance of 'AltCon', which in turn is needed in
--- 'TrieMap.CoreMap'.
+-- 'GHC.Data.TrieMap.CoreMap'.
 instance Ord Literal where
     compare = cmpLit
 
@@ -305,22 +283,22 @@ Int/Word range.
 
 -- | Wrap a literal number according to its type
 wrapLitNumber :: Platform -> Literal -> Literal
-wrapLitNumber platform v@(LitNumber nt i t) = case nt of
+wrapLitNumber platform v@(LitNumber nt i) = case nt of
   LitNumInt -> case platformWordSize platform of
-    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Int32)) t
-    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
+    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Int32))
+    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Int64))
   LitNumWord -> case platformWordSize platform of
-    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Word32)) t
-    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
-  LitNumInt64   -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
-  LitNumWord64  -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
+    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Word32))
+    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Word64))
+  LitNumInt64   -> LitNumber nt (toInteger (fromIntegral i :: Int64))
+  LitNumWord64  -> LitNumber nt (toInteger (fromIntegral i :: Word64))
   LitNumInteger -> v
   LitNumNatural -> v
 wrapLitNumber _ x = x
 
 -- | Create a numeric 'Literal' of the given type
-mkLitNumberWrap :: Platform -> LitNumType -> Integer -> Type -> Literal
-mkLitNumberWrap platform nt i t = wrapLitNumber platform (LitNumber nt i t)
+mkLitNumberWrap :: Platform -> LitNumType -> Integer -> Literal
+mkLitNumberWrap platform nt i = wrapLitNumber platform (LitNumber nt i)
 
 -- | Check that a given number is in the range of a numeric literal
 litNumCheckRange :: Platform -> LitNumType -> Integer -> Bool
@@ -333,10 +311,10 @@ litNumCheckRange platform nt i = case nt of
      LitNumInteger -> True
 
 -- | Create a numeric 'Literal' of the given type
-mkLitNumber :: Platform -> LitNumType -> Integer -> Type -> Literal
-mkLitNumber platform nt i t =
+mkLitNumber :: Platform -> LitNumType -> Integer -> Literal
+mkLitNumber platform nt i =
   ASSERT2(litNumCheckRange platform nt i, integer i)
-  (LitNumber nt i t)
+  (LitNumber nt i)
 
 -- | Creates a 'Literal' of type @Int#@
 mkLitInt :: Platform -> Integer -> Literal
@@ -351,7 +329,7 @@ mkLitIntWrap platform i = wrapLitNumber platform $ mkLitIntUnchecked i
 
 -- | Creates a 'Literal' of type @Int#@ without checking its range.
 mkLitIntUnchecked :: Integer -> Literal
-mkLitIntUnchecked i = LitNumber LitNumInt i intPrimTy
+mkLitIntUnchecked i = LitNumber LitNumInt i
 
 -- | Creates a 'Literal' of type @Int#@, as well as a 'Bool'ean flag indicating
 --   overflow. That is, if the argument is out of the (target-dependent) range
@@ -360,7 +338,7 @@ mkLitIntUnchecked i = LitNumber LitNumInt i intPrimTy
 mkLitIntWrapC :: Platform -> Integer -> (Literal, Bool)
 mkLitIntWrapC platform i = (n, i /= i')
   where
-    n@(LitNumber _ i' _) = mkLitIntWrap platform i
+    n@(LitNumber _ i') = mkLitIntWrap platform i
 
 -- | Creates a 'Literal' of type @Word#@
 mkLitWord :: Platform -> Integer -> Literal
@@ -375,7 +353,7 @@ mkLitWordWrap platform i = wrapLitNumber platform $ mkLitWordUnchecked i
 
 -- | Creates a 'Literal' of type @Word#@ without checking its range.
 mkLitWordUnchecked :: Integer -> Literal
-mkLitWordUnchecked i = LitNumber LitNumWord i wordPrimTy
+mkLitWordUnchecked i = LitNumber LitNumWord i
 
 -- | Creates a 'Literal' of type @Word#@, as well as a 'Bool'ean flag indicating
 --   carry. That is, if the argument is out of the (target-dependent) range
@@ -384,7 +362,7 @@ mkLitWordUnchecked i = LitNumber LitNumWord i wordPrimTy
 mkLitWordWrapC :: Platform -> Integer -> (Literal, Bool)
 mkLitWordWrapC platform i = (n, i /= i')
   where
-    n@(LitNumber _ i' _) = mkLitWordWrap platform i
+    n@(LitNumber _ i') = mkLitWordWrap platform i
 
 -- | Creates a 'Literal' of type @Int64#@
 mkLitInt64 :: Integer -> Literal
@@ -397,7 +375,7 @@ mkLitInt64Wrap platform i = wrapLitNumber platform $ mkLitInt64Unchecked i
 
 -- | Creates a 'Literal' of type @Int64#@ without checking its range.
 mkLitInt64Unchecked :: Integer -> Literal
-mkLitInt64Unchecked i = LitNumber LitNumInt64 i int64PrimTy
+mkLitInt64Unchecked i = LitNumber LitNumInt64 i
 
 -- | Creates a 'Literal' of type @Word64#@
 mkLitWord64 :: Integer -> Literal
@@ -410,7 +388,7 @@ mkLitWord64Wrap platform i = wrapLitNumber platform $ mkLitWord64Unchecked i
 
 -- | Creates a 'Literal' of type @Word64#@ without checking its range.
 mkLitWord64Unchecked :: Integer -> Literal
-mkLitWord64Unchecked i = LitNumber LitNumWord64 i word64PrimTy
+mkLitWord64Unchecked i = LitNumber LitNumWord64 i
 
 -- | Creates a 'Literal' of type @Float#@
 mkLitFloat :: Rational -> Literal
@@ -430,12 +408,12 @@ mkLitString :: String -> Literal
 -- stored UTF-8 encoded
 mkLitString s = LitString (bytesFS $ mkFastString s)
 
-mkLitInteger :: Integer -> Type -> Literal
-mkLitInteger x ty = LitNumber LitNumInteger x ty
+mkLitInteger :: Integer -> Literal
+mkLitInteger x = LitNumber LitNumInteger x
 
-mkLitNatural :: Integer -> Type -> Literal
-mkLitNatural x ty = ASSERT2( inNaturalRange x,  integer x )
-                    (LitNumber LitNumNatural x ty)
+mkLitNatural :: Integer -> Literal
+mkLitNatural x = ASSERT2( inNaturalRange x,  integer x )
+                    (LitNumber LitNumNatural x)
 
 inNaturalRange :: Integer -> Bool
 inNaturalRange x = x >= 0
@@ -451,10 +429,10 @@ inCharRange c =  c >= '\0' && c <= chr tARGET_MAX_CHAR
 
 -- | Tests whether the literal represents a zero of whatever type it is
 isZeroLit :: Literal -> Bool
-isZeroLit (LitNumber _ 0 _) = True
-isZeroLit (LitFloat  0)     = True
-isZeroLit (LitDouble 0)     = True
-isZeroLit _                 = False
+isZeroLit (LitNumber _ 0) = True
+isZeroLit (LitFloat  0)   = True
+isZeroLit (LitDouble 0)   = True
+isZeroLit _               = False
 
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
 -- sense, i.e. for 'Char', 'Int', 'Word', 'LitInteger' and 'LitNatural'.
@@ -467,7 +445,7 @@ litValue l = case isLitValue_maybe l of
 -- sense, i.e. for 'Char' and numbers.
 isLitValue_maybe  :: Literal -> Maybe Integer
 isLitValue_maybe (LitChar   c)     = Just $ toInteger $ ord c
-isLitValue_maybe (LitNumber _ i _) = Just i
+isLitValue_maybe (LitNumber _ i)   = Just i
 isLitValue_maybe _                 = Nothing
 
 -- | Apply a function to the 'Integer' contained in the 'Literal', for when that
@@ -478,14 +456,8 @@ isLitValue_maybe _                 = Nothing
 mapLitValue  :: Platform -> (Integer -> Integer) -> Literal -> Literal
 mapLitValue _        f (LitChar   c)      = mkLitChar (fchar c)
    where fchar = chr . fromInteger . f . toInteger . ord
-mapLitValue platform f (LitNumber nt i t) = wrapLitNumber platform
-                                                        (LitNumber nt (f i) t)
+mapLitValue platform f (LitNumber nt i)   = wrapLitNumber platform (LitNumber nt (f i))
 mapLitValue _        _ l                  = pprPanic "mapLitValue" (ppr l)
-
--- | Indicate if the `Literal` contains an 'Integer' value, e.g. 'Char',
--- 'Int', 'Word', 'LitInteger' and 'LitNatural'.
-isLitValue  :: Literal -> Bool
-isLitValue = isJust . isLitValue_maybe
 
 {-
         Coercions
@@ -494,32 +466,32 @@ isLitValue = isJust . isLitValue_maybe
 
 narrow8IntLit, narrow16IntLit, narrow32IntLit,
   narrow8WordLit, narrow16WordLit, narrow32WordLit,
-  char2IntLit, int2CharLit,
-  float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit,
-  float2DoubleLit, double2FloatLit
+  charToIntLit, intToCharLit,
+  floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit,
+  floatToDoubleLit, doubleToFloatLit
   :: Literal -> Literal
 
-word2IntLit, int2WordLit :: Platform -> Literal -> Literal
-word2IntLit platform (LitNumber LitNumWord w _)
+wordToIntLit, intToWordLit :: Platform -> Literal -> Literal
+wordToIntLit platform (LitNumber LitNumWord w)
   -- Map Word range [max_int+1, max_word]
   -- to Int range   [min_int  , -1]
   -- Range [0,max_int] has the same representation with both Int and Word
   | w > platformMaxInt platform = mkLitInt platform (w - platformMaxWord platform - 1)
   | otherwise                   = mkLitInt platform w
-word2IntLit _ l = pprPanic "word2IntLit" (ppr l)
+wordToIntLit _ l = pprPanic "wordToIntLit" (ppr l)
 
-int2WordLit platform (LitNumber LitNumInt i _)
+intToWordLit platform (LitNumber LitNumInt i)
   -- Map Int range [min_int  , -1]
   -- to Word range [max_int+1, max_word]
   -- Range [0,max_int] has the same representation with both Int and Word
   | i < 0     = mkLitWord platform (1 + platformMaxWord platform + i)
   | otherwise = mkLitWord platform i
-int2WordLit _ l = pprPanic "int2WordLit" (ppr l)
+intToWordLit _ l = pprPanic "intToWordLit" (ppr l)
 
 -- | Narrow a literal number (unchecked result range)
 narrowLit :: forall a. Integral a => Proxy a -> Literal -> Literal
-narrowLit _ (LitNumber nt i t) = LitNumber nt (toInteger (fromInteger i :: a)) t
-narrowLit _ l                  = pprPanic "narrowLit" (ppr l)
+narrowLit _ (LitNumber nt i) = LitNumber nt (toInteger (fromInteger i :: a))
+narrowLit _ l                = pprPanic "narrowLit" (ppr l)
 
 narrow8IntLit   = narrowLit (Proxy :: Proxy Int8)
 narrow16IntLit  = narrowLit (Proxy :: Proxy Int16)
@@ -528,25 +500,25 @@ narrow8WordLit  = narrowLit (Proxy :: Proxy Word8)
 narrow16WordLit = narrowLit (Proxy :: Proxy Word16)
 narrow32WordLit = narrowLit (Proxy :: Proxy Word32)
 
-char2IntLit (LitChar c)       = mkLitIntUnchecked (toInteger (ord c))
-char2IntLit l                 = pprPanic "char2IntLit" (ppr l)
-int2CharLit (LitNumber _ i _) = LitChar (chr (fromInteger i))
-int2CharLit l                 = pprPanic "int2CharLit" (ppr l)
+charToIntLit (LitChar c)       = mkLitIntUnchecked (toInteger (ord c))
+charToIntLit l                 = pprPanic "charToIntLit" (ppr l)
+intToCharLit (LitNumber _ i)   = LitChar (chr (fromInteger i))
+intToCharLit l                 = pprPanic "intToCharLit" (ppr l)
 
-float2IntLit (LitFloat f)      = mkLitIntUnchecked (truncate f)
-float2IntLit l                 = pprPanic "float2IntLit" (ppr l)
-int2FloatLit (LitNumber _ i _) = LitFloat (fromInteger i)
-int2FloatLit l                 = pprPanic "int2FloatLit" (ppr l)
+floatToIntLit (LitFloat f)      = mkLitIntUnchecked (truncate f)
+floatToIntLit l                 = pprPanic "floatToIntLit" (ppr l)
+intToFloatLit (LitNumber _ i)   = LitFloat (fromInteger i)
+intToFloatLit l                 = pprPanic "intToFloatLit" (ppr l)
 
-double2IntLit (LitDouble f)     = mkLitIntUnchecked (truncate f)
-double2IntLit l                 = pprPanic "double2IntLit" (ppr l)
-int2DoubleLit (LitNumber _ i _) = LitDouble (fromInteger i)
-int2DoubleLit l                 = pprPanic "int2DoubleLit" (ppr l)
+doubleToIntLit (LitDouble f)     = mkLitIntUnchecked (truncate f)
+doubleToIntLit l                 = pprPanic "doubleToIntLit" (ppr l)
+intToDoubleLit (LitNumber _ i)   = LitDouble (fromInteger i)
+intToDoubleLit l                 = pprPanic "intToDoubleLit" (ppr l)
 
-float2DoubleLit (LitFloat  f) = LitDouble f
-float2DoubleLit l             = pprPanic "float2DoubleLit" (ppr l)
-double2FloatLit (LitDouble d) = LitFloat  d
-double2FloatLit l             = pprPanic "double2FloatLit" (ppr l)
+floatToDoubleLit (LitFloat  f) = LitDouble f
+floatToDoubleLit l             = pprPanic "floatToDoubleLit" (ppr l)
+doubleToFloatLit (LitDouble d) = LitFloat  d
+doubleToFloatLit l             = pprPanic "doubleToFloatLit" (ppr l)
 
 nullAddrLit :: Literal
 nullAddrLit = LitNullAddr
@@ -595,8 +567,8 @@ rubbishLit = LitRubbish
 -- user code. One approach to this is described in #8472.
 litIsTrivial :: Literal -> Bool
 --      c.f. GHC.Core.Utils.exprIsTrivial
-litIsTrivial (LitString _)      = False
-litIsTrivial (LitNumber nt _ _) = case nt of
+litIsTrivial (LitString _)    = False
+litIsTrivial (LitNumber nt _) = case nt of
   LitNumInteger -> False
   LitNumNatural -> False
   LitNumInt     -> True
@@ -609,7 +581,7 @@ litIsTrivial _                  = True
 litIsDupable :: Platform -> Literal -> Bool
 --      c.f. GHC.Core.Utils.exprIsDupable
 litIsDupable platform x = case x of
-   (LitNumber nt i _) -> case nt of
+   (LitNumber nt i) -> case nt of
       LitNumInteger -> platformInIntRange platform i
       LitNumNatural -> platformInWordRange platform i
       LitNumInt     -> True
@@ -620,12 +592,12 @@ litIsDupable platform x = case x of
    _             -> True
 
 litFitsInChar :: Literal -> Bool
-litFitsInChar (LitNumber _ i _) = i >= toInteger (ord minBound)
-                               && i <= toInteger (ord maxBound)
-litFitsInChar _                 = False
+litFitsInChar (LitNumber _ i) = i >= toInteger (ord minBound)
+                              && i <= toInteger (ord maxBound)
+litFitsInChar _               = False
 
 litIsLifted :: Literal -> Bool
-litIsLifted (LitNumber nt _ _) = case nt of
+litIsLifted (LitNumber nt _) = case nt of
   LitNumInteger -> True
   LitNumNatural -> True
   LitNumInt     -> False
@@ -637,26 +609,6 @@ litIsLifted _                  = False
 {-
         Types
         ~~~~~
-
-Note [Types of LitNumbers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A LitNumber's type is always known from its LitNumType:
-
-  LitNumInteger -> Integer
-  LitNumNatural -> Natural
-  LitNumInt     -> Int# (intPrimTy)
-  LitNumInt64   -> Int64# (int64PrimTy)
-  LitNumWord    -> Word# (wordPrimTy)
-  LitNumWord64  -> Word64# (word64PrimTy)
-
-The reason why we have a Type field is because Integer and Natural types live
-outside of GHC (in the libraries), so we have to get the actual Type via
-lookupTyCon, tcIfaceTyConByName etc. that's too inconvenient in the call sites
-of literalType, so we do that when creating these literals, and literalType
-simply reads the field.
-
-(But see also Note [Integer literals] and Note [Natural literals])
 -}
 
 -- | Find the Haskell 'Type' the literal occupies
@@ -667,7 +619,13 @@ literalType (LitString  _)    = addrPrimTy
 literalType (LitFloat _)      = floatPrimTy
 literalType (LitDouble _)     = doublePrimTy
 literalType (LitLabel _ _ _)  = addrPrimTy
-literalType (LitNumber _ _ t) = t -- Note [Types of LitNumbers]
+literalType (LitNumber lt _)  = case lt of
+   LitNumInteger -> integerTy
+   LitNumNatural -> naturalTy
+   LitNumInt     -> intPrimTy
+   LitNumInt64   -> int64PrimTy
+   LitNumWord    -> wordPrimTy
+   LitNumWord64  -> word64PrimTy
 literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
@@ -678,10 +636,14 @@ absentLiteralOf :: TyCon -> Maybe Literal
 -- Rubbish literals are handled in GHC.Core.Opt.WorkWrap.Utils, because
 --  1. Looking at the TyCon is not enough, we need the actual type
 --  2. This would need to return a type application to a literal
-absentLiteralOf tc = lookupUFM absent_lits (tyConName tc)
+absentLiteralOf tc = lookupUFM absent_lits tc
 
-absent_lits :: UniqFM Literal
-absent_lits = listToUFM [ (addrPrimTyConKey,    LitNullAddr)
+-- We do not use TyConEnv here to avoid import cycles.
+absent_lits :: UniqFM TyCon Literal
+absent_lits = listToUFM_Directly
+                        -- Explicitly construct the mape from the known
+                        -- keys of these tyCons.
+                        [ (addrPrimTyConKey,    LitNullAddr)
                         , (charPrimTyConKey,    LitChar 'x')
                         , (intPrimTyConKey,     mkLitIntUnchecked 0)
                         , (int64PrimTyConKey,   mkLitInt64Unchecked 0)
@@ -702,8 +664,8 @@ cmpLit (LitString    a)     (LitString     b)     = a `compare` b
 cmpLit (LitNullAddr)        (LitNullAddr)         = EQ
 cmpLit (LitFloat     a)     (LitFloat      b)     = a `compare` b
 cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
-cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `compare` b
-cmpLit (LitNumber nt1 a _)  (LitNumber nt2  b _)
+cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `uniqCompareFS` b
+cmpLit (LitNumber nt1 a)    (LitNumber nt2  b)
   | nt1 == nt2 = a   `compare` b
   | otherwise  = nt1 `compare` nt2
 cmpLit (LitRubbish)         (LitRubbish)          = EQ
@@ -733,7 +695,7 @@ pprLiteral _       (LitString s)   = pprHsBytes s
 pprLiteral _       (LitNullAddr)   = text "__NULL"
 pprLiteral _       (LitFloat f)    = float (fromRat f) <> primFloatSuffix
 pprLiteral _       (LitDouble d)   = double (fromRat d) <> primDoubleSuffix
-pprLiteral add_par (LitNumber nt i _)
+pprLiteral add_par (LitNumber nt i)
    = case nt of
        LitNumInteger -> pprIntegerVal add_par i
        LitNumNatural -> pprIntegerVal add_par i

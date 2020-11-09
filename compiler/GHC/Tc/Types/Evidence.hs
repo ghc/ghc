@@ -9,14 +9,18 @@ module GHC.Tc.Types.Evidence (
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
-  mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
-  pprHsWrapper,
+  mkWpFun, idHsWrapper, isIdHsWrapper,
+  pprHsWrapper, hsWrapDictBinders,
 
   -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
   EvBindMap(..), emptyEvBindMap, extendEvBinds,
-  lookupEvBind, evBindMapBinds, foldEvBindMap, filterEvBindMap,
+  lookupEvBind, evBindMapBinds,
+  foldEvBindMap, nonDetStrictFoldEvBindMap,
+  filterEvBindMap,
   isEmptyEvBindMap,
+  evBindMapToVarSet,
+  varSetMinusEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   evBindVar, isCoEvBindsVar,
 
@@ -42,9 +46,10 @@ module GHC.Tc.Types.Evidence (
   mkTcCoherenceLeftCo,
   mkTcCoherenceRightCo,
   mkTcKindCo,
-  tcCoercionKind, coVarsOfTcCo,
+  tcCoercionKind,
   mkTcCoVarCo,
-  isTcReflCo, isTcReflexiveCo, isTcGReflMCo, tcCoToMCo,
+  mkTcFamilyTyConAppCo,
+  isTcReflCo, isTcReflexiveCo,
   tcCoercionRole,
   unwrapIP, wrapIP,
 
@@ -53,8 +58,10 @@ module GHC.Tc.Types.Evidence (
   ) where
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
+import GHC.Types.Unique.DFM
+import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
@@ -62,26 +69,28 @@ import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.TyCon
-import GHC.Core.DataCon( DataCon, dataConWrapId )
-import GHC.Core.Class( Class )
+import GHC.Core.DataCon ( DataCon, dataConWrapId )
 import GHC.Builtin.Names
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Predicate
 import GHC.Types.Name
-import Pair
+import GHC.Data.Pair
 
 import GHC.Core
-import GHC.Core.Class ( classSCSelId )
+import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
 
-import Util
-import Bag
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+
+import GHC.Data.Bag
 import qualified Data.Data as Data
-import Outputable
 import GHC.Types.SrcLoc
 import Data.IORef( IORef )
 import GHC.Types.Unique.Set
+import GHC.Core.Multiplicity
 
 {-
 Note [TcCoercions]
@@ -111,7 +120,7 @@ mkTcNomReflCo          :: TcType -> TcCoercionN
 mkTcRepReflCo          :: TcType -> TcCoercionR
 mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
 mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion
+mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
                        -> [TcType] -> [TcCoercion] -> TcCoercion
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
@@ -132,12 +141,11 @@ mkTcCoherenceRightCo   :: Role -> TcType -> TcCoercionN
 mkTcPhantomCo          :: TcCoercionN -> TcType -> TcType -> TcCoercionP
 mkTcKindCo             :: TcCoercion -> TcCoercionN
 mkTcCoVarCo            :: CoVar -> TcCoercion
+mkTcFamilyTyConAppCo   :: TyCon -> [TcCoercionN] -> TcCoercionN
 
 tcCoercionKind         :: TcCoercion -> Pair TcType
 tcCoercionRole         :: TcCoercion -> Role
-coVarsOfTcCo           :: TcCoercion -> TcTyCoVarSet
 isTcReflCo             :: TcCoercion -> Bool
-isTcGReflMCo           :: TcMCoercion -> Bool
 
 -- | This version does a slow check, calculating the related types and seeing
 -- if they are equal.
@@ -167,16 +175,12 @@ mkTcCoherenceRightCo   = mkCoherenceRightCo
 mkTcPhantomCo          = mkPhantomCo
 mkTcKindCo             = mkKindCo
 mkTcCoVarCo            = mkCoVarCo
+mkTcFamilyTyConAppCo   = mkFamilyTyConAppCo
 
 tcCoercionKind         = coercionKind
 tcCoercionRole         = coercionRole
-coVarsOfTcCo           = coVarsOfCo
 isTcReflCo             = isReflCo
-isTcGReflMCo           = isGReflMCo
 isTcReflexiveCo        = isReflexiveCo
-
-tcCoToMCo :: TcCoercion -> TcMCoercion
-tcCoToMCo = coToMCo
 
 -- | If the EqRel is ReprEq, makes a SubCo; otherwise, does nothing.
 -- Note that the input coercion should always be nominal.
@@ -202,8 +206,8 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun HsWrapper HsWrapper TcType SDoc
-       -- (WpFun wrap1 wrap2 t1)[e] = \(x:t1). wrap2[ e wrap1[x] ]
+  | WpFun HsWrapper HsWrapper (Scaled TcType) SDoc
+       -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
        --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) <= (exp_arg -> exp_res)
@@ -230,6 +234,10 @@ data HsWrapper
   | WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
                                 -- so that the identity coercion is always exactly WpHole
 
+  | WpMultCoercion Coercion     -- Require that a Coercion be reflexive; otherwise,
+                                -- error in the desugarer. See GHC.Tc.Utils.Unify
+                                -- Note [Wrapper returned from tcSubMult]
+
 -- Cannot derive Data instance because SDoc is not Data (it stores a function).
 -- So we do it manually:
 instance Data.Data HsWrapper where
@@ -242,6 +250,7 @@ instance Data.Data HsWrapper where
   gfoldl k z (WpTyLam a1)       = z WpTyLam `k` a1
   gfoldl k z (WpTyApp a1)       = z WpTyApp `k` a1
   gfoldl k z (WpLet a1)         = z WpLet `k` a1
+  gfoldl k z (WpMultCoercion a1) = z WpMultCoercion `k` a1
 
   gunfold k z c = case Data.constrIndex c of
                     1 -> z WpHole
@@ -252,7 +261,8 @@ instance Data.Data HsWrapper where
                     6 -> k (z WpEvApp)
                     7 -> k (z WpTyLam)
                     8 -> k (z WpTyApp)
-                    _ -> k (z WpLet)
+                    9 -> k (z WpLet)
+                    _ -> k (z WpMultCoercion)
 
   toConstr WpHole          = wpHole_constr
   toConstr (WpCompose _ _) = wpCompose_constr
@@ -263,6 +273,7 @@ instance Data.Data HsWrapper where
   toConstr (WpTyLam _)     = wpTyLam_constr
   toConstr (WpTyApp _)     = wpTyApp_constr
   toConstr (WpLet _)       = wpLet_constr
+  toConstr (WpMultCoercion _) = wpMultCoercion_constr
 
   dataTypeOf _ = hsWrapper_dataType
 
@@ -271,10 +282,11 @@ hsWrapper_dataType
   = Data.mkDataType "HsWrapper"
       [ wpHole_constr, wpCompose_constr, wpFun_constr, wpCast_constr
       , wpEvLam_constr, wpEvApp_constr, wpTyLam_constr, wpTyApp_constr
-      , wpLet_constr]
+      , wpLet_constr, wpMultCoercion_constr ]
 
 wpHole_constr, wpCompose_constr, wpFun_constr, wpCast_constr, wpEvLam_constr,
-  wpEvApp_constr, wpTyLam_constr, wpTyApp_constr, wpLet_constr :: Data.Constr
+  wpEvApp_constr, wpTyLam_constr, wpTyApp_constr, wpLet_constr,
+  wpMultCoercion_constr :: Data.Constr
 wpHole_constr    = mkHsWrapperConstr "WpHole"
 wpCompose_constr = mkHsWrapperConstr "WpCompose"
 wpFun_constr     = mkHsWrapperConstr "WpFun"
@@ -284,11 +296,12 @@ wpEvApp_constr   = mkHsWrapperConstr "WpEvApp"
 wpTyLam_constr   = mkHsWrapperConstr "WpTyLam"
 wpTyApp_constr   = mkHsWrapperConstr "WpTyApp"
 wpLet_constr     = mkHsWrapperConstr "WpLet"
+wpMultCoercion_constr     = mkHsWrapperConstr "WpMultCoercion"
 
 mkHsWrapperConstr :: String -> Data.Constr
 mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
 
-wpFunEmpty :: HsWrapper -> HsWrapper -> TcType -> HsWrapper
+wpFunEmpty :: HsWrapper -> HsWrapper -> Scaled TcType -> HsWrapper
 wpFunEmpty c1 c2 t1 = WpFun c1 c2 t1 empty
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
@@ -297,15 +310,15 @@ c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
 mkWpFun :: HsWrapper -> HsWrapper
-        -> TcType    -- the "from" type of the first wrapper
+        -> (Scaled TcType)    -- the "from" type of the first wrapper
         -> TcType    -- either type of the second wrapper (used only when the
                      -- second wrapper is the identity)
         -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
         -> HsWrapper
 mkWpFun WpHole       WpHole       _  _  _ = WpHole
-mkWpFun WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
+mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  _ = WpCast (mkTcFunCo Representational (multToCo w) (mkTcRepReflCo t1) co2)
+mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 _ = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) (mkTcRepReflCo t2))
+mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  _ = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) co2)
 mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
 
 mkWpCastR :: TcCoercionR -> HsWrapper
@@ -356,19 +369,27 @@ isIdHsWrapper :: HsWrapper -> Bool
 isIdHsWrapper WpHole = True
 isIdHsWrapper _      = False
 
--- | Is the wrapper erasable, i.e., will not affect runtime semantics?
-isErasableHsWrapper :: HsWrapper -> Bool
-isErasableHsWrapper = go
-  where
-    go WpHole                  = True
-    go (WpCompose wrap1 wrap2) = go wrap1 && go wrap2
-    go WpFun{}                 = False
-    go WpCast{}                = True
-    go WpEvLam{}               = False -- case in point
-    go WpEvApp{}               = False
-    go WpTyLam{}               = True
-    go WpTyApp{}               = True
-    go WpLet{}                 = False
+hsWrapDictBinders :: HsWrapper -> Bag DictId
+-- ^ Identifies the /lambda-bound/ dictionaries of an 'HsWrapper'. This is used
+-- (only) to allow the pattern-match overlap checker to know what Given
+-- dictionaries are in scope.
+--
+-- We specifically do not collect dictionaries bound in a 'WpLet'. These are
+-- either superclasses of lambda-bound ones, or (extremely numerous) results of
+-- binding Wanted dictionaries.  We definitely don't want all those cluttering
+-- up the Given dictionaries for pattern-match overlap checking!
+hsWrapDictBinders wrap = go wrap
+ where
+   go (WpEvLam dict_id)   = unitBag dict_id
+   go (w1 `WpCompose` w2) = go w1 `unionBags` go w2
+   go (WpFun _ w _ _)     = go w
+   go WpHole              = emptyBag
+   go (WpCast  {})        = emptyBag
+   go (WpEvApp {})        = emptyBag
+   go (WpTyLam {})        = emptyBag
+   go (WpTyApp {})        = emptyBag
+   go (WpLet   {})        = emptyBag
+   go (WpMultCoercion {}) = emptyBag
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,
@@ -442,7 +463,7 @@ use CoEvBindsVar (see newCoTcEvBinds) to signal that no term-level
 evidence bindings are allowed.  Notebly ():
 
   - Places in types where we are solving kind constraints (all of which
-    are equalities); see solveEqualities, solveLocalEqualities
+    are equalities); see solveEqualities
 
   - When unifying forall-types
 -}
@@ -496,9 +517,21 @@ evBindMapBinds = foldEvBindMap consBag emptyBag
 foldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
 foldEvBindMap k z bs = foldDVarEnv k z (ev_bind_varenv bs)
 
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
+nonDetStrictFoldEvBindMap k z bs = nonDetStrictFoldDVarEnv k z (ev_bind_varenv bs)
+
 filterEvBindMap :: (EvBind -> Bool) -> EvBindMap -> EvBindMap
 filterEvBindMap k (EvBindMap { ev_bind_varenv = env })
   = EvBindMap { ev_bind_varenv = filterDVarEnv k env }
+
+evBindMapToVarSet :: EvBindMap -> VarSet
+evBindMapToVarSet (EvBindMap dve) = unsafeUFMToUniqSet (mapUFM evBindVar (udfmToUfm dve))
+
+varSetMinusEvBindMap :: VarSet -> EvBindMap -> VarSet
+varSetMinusEvBindMap vs (EvBindMap dve) = vs `uniqSetMinusUDFM` dve
 
 instance Outputable EvBindMap where
   ppr (EvBindMap m) = ppr m
@@ -590,9 +623,9 @@ data EvTypeable
     -- ^ Dictionary for @Typeable (s t)@,
     -- given a dictionaries for @s@ and @t@.
 
-  | EvTypeableTrFun EvTerm EvTerm
-    -- ^ Dictionary for @Typeable (s -> t)@,
-    -- given a dictionaries for @s@ and @t@.
+  | EvTypeableTrFun EvTerm EvTerm EvTerm
+    -- ^ Dictionary for @Typeable (s # w -> t)@,
+    -- given a dictionaries for @w@, @s@, and @t@.
 
   | EvTypeableTyLit EvTerm
     -- ^ Dictionary for a type literal,
@@ -732,7 +765,7 @@ important) are solved in three steps:
 
      EvCsEmpty
 
-   (see GHC.Tc.Solver.simpl_top and GHC.Tc.Solver.defaultCallStacks)
+   (see GHC.Tc.Solver.simplifyTopWanteds and GHC.Tc.Solver.defaultCallStacks)
 
 This provides a lightweight mechanism for building up call-stacks
 explicitly, but is notably limited by the fact that the stack will
@@ -851,8 +884,8 @@ findNeededEvVars ev_binds seeds
   = transCloVarSet also_needs seeds
   where
    also_needs :: VarSet -> VarSet
-   also_needs needs = nonDetFoldUniqSet add emptyVarSet needs
-     -- It's OK to use nonDetFoldUFM here because we immediately
+   also_needs needs = nonDetStrictFoldUniqSet add emptyVarSet needs
+     -- It's OK to use a non-deterministic fold here because we immediately
      -- forget about the ordering by creating a set
 
    add :: Var -> VarSet -> VarSet
@@ -875,10 +908,10 @@ evVarsOfTerms = mapUnionVarSet evVarsOfTerm
 evVarsOfTypeable :: EvTypeable -> VarSet
 evVarsOfTypeable ev =
   case ev of
-    EvTypeableTyCon _ e   -> mapUnionVarSet evVarsOfTerm e
-    EvTypeableTyApp e1 e2 -> evVarsOfTerms [e1,e2]
-    EvTypeableTrFun e1 e2 -> evVarsOfTerms [e1,e2]
-    EvTypeableTyLit e     -> evVarsOfTerm e
+    EvTypeableTyCon _ e      -> mapUnionVarSet evVarsOfTerm e
+    EvTypeableTyApp e1 e2    -> evVarsOfTerms [e1,e2]
+    EvTypeableTrFun em e1 e2 -> evVarsOfTerms [em,e1,e2]
+    EvTypeableTyLit e        -> evVarsOfTerm e
 
 
 {- Note [Free vars of EvFun]
@@ -919,7 +952,7 @@ pprHsWrapper wrap pp_thing_inside
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 t1 _) = add_parens $ text "\\(x" <> dcolon <> ppr t1 <> text ")." <+>
+    help it (WpFun f1 f2 (Scaled w t1) _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
                                               help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
@@ -928,6 +961,8 @@ pprHsWrapper wrap pp_thing_inside
     help it (WpEvLam id)  = add_parens $ sep [ text "\\" <> pprLamBndr id <> dot, it False]
     help it (WpTyLam tv)  = add_parens $ sep [text "/\\" <> pprLamBndr tv <> dot, it False]
     help it (WpLet binds) = add_parens $ sep [text "let" <+> braces (ppr binds), it False]
+    help it (WpMultCoercion co)   = add_parens $ sep [it False, nest 2 (text "<multiplicity coercion>"
+                                              <+> pprParendCo co)]
 
 pprLamBndr :: Id -> SDoc
 pprLamBndr v = pprBndr LambdaBind v
@@ -974,7 +1009,7 @@ instance Outputable EvCallStack where
 instance Outputable EvTypeable where
   ppr (EvTypeableTyCon ts _)  = text "TyCon" <+> ppr ts
   ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
-  ppr (EvTypeableTrFun t1 t2) = parens (ppr t1 <+> arrow <+> ppr t2)
+  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> mulArrow (ppr tm) <+> ppr t2)
   ppr (EvTypeableTyLit t1)    = text "TyLit" <> ppr t1
 
 
@@ -986,8 +1021,8 @@ instance Outputable EvTypeable where
 -- overloaded-label dictionary to expose the underlying value. We
 -- expect the 'Type' to have the form `IP sym ty` or `IsLabel sym ty`,
 -- and return a 'Coercion' `co :: IP sym ty ~ ty` or
--- `co :: IsLabel sym ty ~ Proxy# sym -> ty`.  See also
--- Note [Type-checking overloaded labels] in GHC.Tc.Gen.Expr.
+-- `co :: IsLabel sym ty ~ ty`.  See also
+-- Note [Type-checking overloaded labels] in "GHC.Tc.Gen.Expr".
 unwrapIP :: Type -> CoercionR
 unwrapIP ty =
   case unwrapNewTyCon_maybe tc of

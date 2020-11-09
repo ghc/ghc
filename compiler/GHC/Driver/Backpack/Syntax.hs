@@ -16,14 +16,18 @@ module GHC.Driver.Backpack.Syntax (
     LRenaming, Renaming(..),
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Driver.Phases
 import GHC.Hs
+
 import GHC.Types.SrcLoc
-import Outputable
-import GHC.Types.Module
-import UnitInfo
+import GHC.Types.SourceFile
+
+import GHC.Unit.Module.Name
+import GHC.Unit.Types
+import GHC.Unit.Info
+
+import GHC.Utils.Outputable
 
 {-
 ************************************************************************
@@ -35,7 +39,7 @@ import UnitInfo
 
 data HsComponentId = HsComponentId {
     hsPackageName :: PackageName,
-    hsComponentId :: ComponentId
+    hsComponentId :: IndefUnitId
     }
 
 instance Outputable HsComponentId where

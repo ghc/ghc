@@ -4,13 +4,17 @@ module GHC.Stg.Subst where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import Control.Monad.Trans.State.Strict
-import Outputable
-import Util
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+
+import GHC.Driver.Ppr
 
 -- | A renaming substitution from 'Id's to 'Id's. Like 'RnEnv2', but not
 -- maintaining pairs of substitutions. Like 'GHC.Core.Subst.Subst', but

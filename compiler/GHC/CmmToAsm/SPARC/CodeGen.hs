@@ -20,7 +20,7 @@ where
 #include "HsVersions.h"
 
 -- NCG stuff:
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.Base
 import GHC.CmmToAsm.SPARC.CodeGen.Sanity
@@ -34,7 +34,7 @@ import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.SPARC.AddrMode
 import GHC.CmmToAsm.SPARC.Regs
 import GHC.CmmToAsm.SPARC.Stack
-import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Monad   ( NatM, getNewRegNat, getNewLabelNat, getPlatform, getConfig )
 import GHC.CmmToAsm.Config
@@ -53,9 +53,9 @@ import GHC.CmmToAsm.CPrim
 
 -- The rest:
 import GHC.Types.Basic
-import FastString
-import OrdList
-import Outputable
+import GHC.Data.FastString
+import GHC.Data.OrdList
+import GHC.Utils.Panic
 import GHC.Platform
 
 import Control.Monad    ( mapAndUnzipM )
@@ -73,7 +73,7 @@ cmmTopCodeGen (CmmProc info lab live graph)
 
       return tops
 
-cmmTopCodeGen (CmmData sec dat) = do
+cmmTopCodeGen (CmmData sec dat) =
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
 
@@ -90,6 +90,7 @@ basicBlockCodeGen block = do
   let (_, nodes, tail)  = blockSplit block
       id = entryLabel block
       stmts = blockToList nodes
+  platform <- getPlatform
   mid_instrs <- stmtsToInstrs stmts
   tail_instrs <- stmtToInstrs tail
   let instrs = mid_instrs `appOL` tail_instrs
@@ -108,7 +109,7 @@ basicBlockCodeGen block = do
 
         -- do intra-block sanity checking
         blocksChecked
-                = map (checkBlock block)
+                = map (checkBlock platform block)
                 $ BasicBlock id top : other_blocks
 
   return (blocksChecked, statics)
@@ -429,8 +430,8 @@ genCCall target dest_regs args
 
                 PrimTarget mop
                  -> do  res     <- outOfLineMachOp mop
-                        lblOrMopExpr <- case res of
-                                Left lbl -> do
+                        case res of
+                                Left lbl ->
                                         return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
 
                                 Right mopExpr -> do
@@ -439,8 +440,6 @@ genCCall target dest_regs args
                                                       [dyn_r'] -> dyn_r'
                                                       _ -> panic "SPARC.CodeGen.genCCall: arg_to_int"
                                         return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
-
-                        return lblOrMopExpr
 
         let argcode = concatOL argcodes
 
@@ -677,6 +676,7 @@ outOfLineMachOp_table mop
         MO_Ctz w     -> fsLit $ ctzLabel w
         MO_AtomicRMW w amop -> fsLit $ atomicRMWLabel w amop
         MO_Cmpxchg w -> fsLit $ cmpxchgLabel w
+        MO_Xchg w -> fsLit $ xchgLabel w
         MO_AtomicRead w -> fsLit $ atomicReadLabel w
         MO_AtomicWrite w -> fsLit $ atomicWriteLabel w
 

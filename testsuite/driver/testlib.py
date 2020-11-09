@@ -22,7 +22,7 @@ from testglobals import config, ghc_env, default_testopts, brokens, t, \
                         TestRun, TestResult, TestOptions, PerfMetric
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, testing_metrics, \
-                     PassFail
+                     PassFail, memoize
 from term_color import Color, colored
 import testutil
 from cpu_features import have_cpu_feature
@@ -165,7 +165,16 @@ def have_library(lib: str) -> bool:
         got_it = have_lib_cache[lib]
     else:
         cmd = strip_quotes(config.ghc_pkg)
-        p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
+        cmd_line = [cmd, '--no-user-package-db']
+
+        for db in config.test_package_db:
+            cmd_line.append("--package-db="+db)
+
+        cmd_line.extend(['describe', lib])
+
+        print(cmd_line)
+
+        p = subprocess.Popen(cmd_line,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
                              env=ghc_env)
@@ -181,6 +190,10 @@ def have_library(lib: str) -> bool:
 def _reqlib( name, opts, lib ):
     if not have_library(lib):
         opts.expect = 'missing-lib'
+    else:
+        opts.extra_hc_opts = opts.extra_hc_opts + ' -package ' + lib + ' '
+        for db in config.test_package_db:
+            opts.extra_hc_opts = opts.extra_hc_opts + ' -package-db=' + db + ' '
 
 def req_haddock( name, opts ):
     if not config.haddock:
@@ -477,7 +490,8 @@ def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_t
         metric = '{}/{}'.format(tag, metric_name)
         def baselineByWay(way, target_commit, metric=metric):
             return Perf.baseline_metric( \
-                              target_commit, name, config.test_env, metric, way)
+                              target_commit, name, config.test_env, metric, way, \
+                              config.baseline_commit )
 
         opts.stats_range_fields[metric] = MetricOracles(baseline=baselineByWay,
                                                         deviation=deviation)
@@ -500,6 +514,11 @@ def doing_ghci() -> bool:
 
 def ghc_dynamic() -> bool:
     return config.ghc_dynamic
+
+# Symbols have a leading underscore
+def leading_underscore() -> bool:
+    return config.leading_underscore
+
 
 def fast() -> bool:
     return config.speed == 2
@@ -563,11 +582,11 @@ def have_gdb( ) -> bool:
 def have_readelf( ) -> bool:
     return config.have_readelf
 
-def integer_gmp( ) -> bool:
-    return have_library("integer-gmp")
+def have_fast_bignum( ) -> bool:
+    return config.have_fast_bignum
 
-def integer_simple( ) -> bool:
-    return have_library("integer-simple")
+def have_slow_bignum( ) -> bool:
+    return not(have_fast_bignum())
 
 def llvm_build ( ) -> bool:
     return config.ghc_built_by_llvm
@@ -737,6 +756,32 @@ def normalise_whitespace_fun(f):
 
 def _normalise_whitespace_fun(name, opts, f):
     opts.whitespace_normaliser = f
+
+def normalise_win32_io_errors(name, opts):
+    """
+    On Windows we currently have two IO manager implementations: both WinIO IO
+    manager and the old POSIX-emulated implementation. These currently differ
+    slightly in the error messages that they provide. Normalise these
+    differences away, preferring the new WinIO errors.
+
+    This normalization can be dropped when the old IO manager is removed.
+    """
+
+    SUBS = [
+        ('Bad file descriptor', 'The handle is invalid.'),
+        ('Permission denied', 'Access is denied.'),
+        ('No such file or directory', 'The system cannot find the file specified.'),
+    ]
+
+    def normalizer(s: str) -> str:
+        for old,new in SUBS:
+            s = s.replace(old, new)
+
+        return s
+
+    if opsys('mingw32'):
+        _normalise_fun(name, opts, normalizer)
+        _normalise_errmsg_fun(name, opts, normalizer)
 
 def normalise_version_( *pkgs ):
     def normalise_version__( str ):
@@ -914,7 +959,7 @@ def test_common_work(watcher: testutil.Watcher,
         # All the ways we might run this test
         if func == compile or func == multimod_compile:
             all_ways = config.compile_ways
-        elif func == compile_and_run or func == multimod_compile_and_run:
+        elif func in [compile_and_run, multi_compile_and_run, multimod_compile_and_run]:
             all_ways = config.run_ways
         elif func == ghci_script:
             if WayName('ghci') in config.run_ways:
@@ -1078,7 +1123,7 @@ def do_test(name: TestName,
         dst_makefile = in_testdir('Makefile')
         if src_makefile.exists():
             makefile = src_makefile.read_text(encoding='UTF-8')
-            makefile = re.sub('TOP=.*', 'TOP=' + config.top, makefile, 1)
+            makefile = re.sub('TOP=.*', 'TOP=%s' % config.top, makefile, 1)
             dst_makefile.write_text(makefile, encoding='UTF-8')
 
     if opts.pre_cmd:
@@ -1344,6 +1389,26 @@ def compile_grep_asm(name: TestName,
     # no problems found, this test passed
     return passed()
 
+def compile_grep_core(name: TestName,
+                      way: WayName,
+                      extra_hc_opts: str
+                      ) -> PassFail:
+    print('Compile only, extra args = ', extra_hc_opts)
+    result = simple_build(name + '.hs', way, '-ddump-to-file -dsuppress-all -ddump-simpl -O ' + extra_hc_opts, False, None, False, False)
+
+    if badResult(result):
+        return result
+
+    expected_pat_file = find_expected_file(name, 'substr-simpl')
+    actual_core_file = add_suffix(name, 'dump-simpl')
+
+    if not grep_output(join_normalisers(normalise_errmsg),
+                       expected_pat_file, actual_core_file):
+        return failBecause('simplified core mismatch')
+
+    # no problems found, this test passed
+    return passed()
+
 # -----------------------------------------------------------------------------
 # Compile-and-run tests
 
@@ -1527,8 +1592,7 @@ def simple_build(name: Union[TestName, str],
     # Required by GHC 7.3+, harmless for earlier versions:
     if (getTestOpts().c_src or
         getTestOpts().objc_src or
-        getTestOpts().objcpp_src or
-        getTestOpts().cmm_src):
+        getTestOpts().objcpp_src):
         extra_hc_opts += ' -no-hs-main '
 
     if getTestOpts().compile_cmd_prefix == '':
@@ -1875,7 +1939,7 @@ def check_hp_ok(name: TestName) -> bool:
 
     if hp2psResult == 0:
         if actual_ps_path.exists():
-            if gs_working:
+            if does_ghostscript_work():
                 gsResult = runCmd(genGSCmd(actual_ps_path))
                 if (gsResult == 0):
                     return True
@@ -2123,11 +2187,11 @@ def normalise_errmsg(s: str) -> str:
     # collisions, so we need to normalise that to just "ghc"
     s = re.sub('ghc-stage[123]', 'ghc', s)
 
-    # Error messages sometimes contain integer implementation package
-    s = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', s)
+    # Error messages sometimes contain ghc-bignum implementation package
+    s = re.sub('ghc-bignum-[0-9.]+', 'ghc-bignum-<VERSION>', s)
 
     # Error messages sometimes contain this blurb which can vary
-    # spuriously depending upon build configuration (e.g. based on integer
+    # spuriously depending upon build configuration (e.g. based on bignum
     # backend)
     s = re.sub('...plus ([a-z]+|[0-9]+) instances involving out-of-scope types',
                  '...plus N instances involving out-of-scope types', s)
@@ -2315,31 +2379,38 @@ def runCmd(cmd: str,
 
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps
-
 def genGSCmd(psfile: Path) -> str:
     return '{{gs}} -dNODISPLAY -dBATCH -dQUIET -dNOPAUSE "{0}"'.format(psfile)
 
-def gsNotWorking() -> None:
-    global gs_working
-    print("GhostScript not available for hp2ps tests")
+@memoize
+def does_ghostscript_work() -> bool:
+    """
+    Detect whether Ghostscript is functional.
+    """
+    def gsNotWorking(reason: str) -> None:
+        print("GhostScript not available for hp2ps tests:", reason)
 
-global gs_working
-gs_working = False
-if config.have_profiling:
-  if config.gs != '':
-    resultGood = runCmd(genGSCmd(config.top + '/config/good.ps'));
-    if resultGood == 0:
-        resultBad = runCmd(genGSCmd(config.top + '/config/bad.ps') +
-                                   ' >/dev/null 2>&1')
-        if resultBad != 0:
-            print("GhostScript available for hp2ps tests")
-            gs_working = True
-        else:
-            gsNotWorking();
-    else:
-        gsNotWorking();
-  else:
-    gsNotWorking();
+    if config.gs is None:
+        return False
+
+    try:
+        if runCmd(genGSCmd(config.top / 'config' / 'good.ps')) != 0:
+            gsNotWorking("gs can't process good input")
+            return False
+    except Exception as e:
+        gsNotWorking('error invoking gs on bad input: %s' % e)
+        return False
+
+    try:
+        cmd = genGSCmd(config.top / 'config' / 'bad.ps') + ' >/dev/null 2>&1'
+        if runCmd(cmd) == 0:
+            gsNotWorking('gs accepts bad input')
+            return False
+    except Exception as e:
+        gsNotWorking('error invoking gs on bad input: %s' % e)
+        return False
+
+    return True
 
 def add_suffix( name: Union[str, Path], suffix: str ) -> Path:
     if suffix == '':

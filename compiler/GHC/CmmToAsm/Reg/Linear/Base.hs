@@ -17,19 +17,20 @@ module GHC.CmmToAsm.Reg.Linear.Base (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Cmm.BlockId
 
+data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 
 -- | Used to store the register assignment on entry to a basic block.
 --      We use this to handle join points, where multiple branch instructions
@@ -99,7 +100,9 @@ data SpillReason
 -- | Used to carry interesting stats out of the register allocator.
 data RegAllocStats
         = RegAllocStats
-        { ra_spillInstrs        :: UniqFM [Int]
+        { ra_spillInstrs        :: UniqFM Unique [Int] -- Keys are the uniques of regs
+                                                       -- and taken from SpillReason
+                                                       -- See Note [UniqFM and the register allocator]
         , ra_fixupList     :: [(BlockId,BlockId,BlockId)]
         -- ^ (from,fixup,to) : We inserted fixup code between from and to
         }
@@ -138,6 +141,8 @@ data RA_State freeRegs
         , ra_config     :: !NCGConfig
 
         -- | (from,fixup,to) : We inserted fixup code between from and to
-        , ra_fixups     :: [(BlockId,BlockId,BlockId)] }
+        , ra_fixups     :: [(BlockId,BlockId,BlockId)]
+
+        }
 
 

@@ -46,10 +46,8 @@ $(foreach n,1 2 3, \
   )
 
 $(foreach n,1 2 3, \
-    $(eval compiler/stage$n/package-data.mk : compiler/stage$n/build/Config.hs) \
-    $(eval compiler/stage$n/build/PlatformConstants.o : $(includes_GHCCONSTANTS_HASKELL_TYPE)) \
-    $(eval compiler/stage$n/build/GHC/Driver/Session.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)) \
-    $(eval compiler/stage$n/build/GHC/Driver/Session.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)) \
+    $(eval compiler/stage$n/package-data.mk : compiler/stage$n/build/GHC/Settings/Config.hs) \
+    $(eval compiler/stage$n/build/GHC/Platform/Constants.o: compiler/stage$n/build/GHC/Platform/Constants.hs) \
   )
 endif
 
@@ -63,11 +61,11 @@ HOSTPLATFORM_3 = $(TARGETPLATFORM)
 
 define compilerConfig
 # $1 = compile stage (1-indexed)
-compiler/stage$1/build/Config.hs : mk/config.mk mk/project.mk | $$$$(dir $$$$@)/.
+compiler/stage$1/build/GHC/Settings/Config.hs : mk/config.mk mk/project.mk | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@)
 	@echo 'Creating $$@ ... '
 	@echo '{-# LANGUAGE CPP #-}'                                        >> $$@
-	@echo 'module Config'                                               >> $$@
+	@echo 'module GHC.Settings.Config'                                  >> $$@
 	@echo '  ( module GHC.Version'                                      >> $$@
 	@echo '  , cBuildPlatformString'                                    >> $$@
 	@echo '  , cHostPlatformString'                                     >> $$@
@@ -76,7 +74,7 @@ compiler/stage$1/build/Config.hs : mk/config.mk mk/project.mk | $$$$(dir $$$$@)/
 	@echo '  , cStage'                                                  >> $$@
 	@echo '  ) where'                                                   >> $$@
 	@echo                                                               >> $$@
-	@echo 'import GhcPrelude'                                           >> $$@
+	@echo 'import GHC.Prelude'                                          >> $$@
 	@echo                                                               >> $$@
 	@echo 'import GHC.Version'                                          >> $$@
 	@echo                                                               >> $$@
@@ -95,6 +93,10 @@ compiler/stage$1/build/Config.hs : mk/config.mk mk/project.mk | $$$$(dir $$$$@)/
 	@echo 'cStage                :: String'                             >> $$@
 	@echo 'cStage                = show ($1 :: Int)'                    >> $$@
 	@echo done.
+
+compiler/stage$1/build/GHC/Platform/Constants.hs : $$(includes_GHCCONSTANTS_HASKELL_TYPE) | $$$$(dir $$$$@)/.
+	$$(call removeFiles,$$@)
+	"$$(CP)" $$< $$@
 endef
 
 $(eval $(call compilerConfig,0))
@@ -102,8 +104,8 @@ $(eval $(call compilerConfig,1))
 $(eval $(call compilerConfig,2))
 
 # ----------------------------------------------------------------------------
-#		Generate supporting stuff for prelude/PrimOp.hs
-#		from prelude/primops.txt
+#		Generate supporting stuff for GHC/Builtin/PrimOps.hs
+#		from GHC/Builtin/primops.txt
 
 PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
                     primop-tag.hs-incl              \
@@ -119,7 +121,8 @@ PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
                     primop-vector-uniques.hs-incl   \
                     primop-vector-tys.hs-incl       \
                     primop-vector-tys-exports.hs-incl \
-                    primop-vector-tycons.hs-incl
+                    primop-vector-tycons.hs-incl    \
+                    primop-docs.hs-incl
 
 PRIMOP_BITS_STAGE1 = $(addprefix compiler/stage1/build/,$(PRIMOP_BITS_NAMES))
 PRIMOP_BITS_STAGE2 = $(addprefix compiler/stage2/build/,$(PRIMOP_BITS_NAMES))
@@ -166,6 +169,8 @@ compiler/stage$1/build/primop-vector-tys-exports.hs-incl: compiler/stage$1/build
 	"$$(genprimopcode_INPLACE)" --primop-vector-tys-exports < $$< > $$@
 compiler/stage$1/build/primop-vector-tycons.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-vector-tycons      < $$< > $$@
+compiler/stage$1/build/primop-docs.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --wired-in-docs             < $$< > $$@
 
 # Usages aren't used any more; but the generator
 # can still generate them if we want them back
@@ -191,13 +196,14 @@ ifeq "$(GhcThreaded)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --ghc-option=-optc-DTHREADED_RTS
 endif
 
-ifeq "$(GhcWithNativeCodeGen)" "YES"
-compiler_stage1_CONFIGURE_OPTS += --flags=ncg
-compiler_stage2_CONFIGURE_OPTS += --flags=ncg
+# If the bootstrapping GHC supplies the threaded RTS, then we can have a
+# threaded stage 1 too.
+ifeq "$(GhcThreadedRts)" "YES"
+compiler_stage1_CONFIGURE_OPTS += --ghc-option=-optc-DTHREADED_RTS
 endif
 
 ifeq "$(GhcWithInterpreter)" "YES"
-compiler_stage2_CONFIGURE_OPTS += --flags=ghci
+compiler_stage2_CONFIGURE_OPTS += --flags=internal-interpreter
 
 # Should the debugger commands be enabled?
 ifeq "$(GhciWithDebugger)" "YES"
@@ -347,9 +353,6 @@ $(compiler_stage2_depfile_haskell) : $(includes_1_H_CONFIG) $(includes_1_H_PLATF
 $(compiler_stage3_depfile_haskell) : $(includes_2_H_CONFIG) $(includes_2_H_PLATFORM)
 
 COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)
-COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_TYPE)
-COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
-COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
 COMPILER_INCLUDES_DEPS += $(includes_DERIVEDCONSTANTS)
 
 $(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE1)

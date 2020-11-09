@@ -21,6 +21,7 @@ powers of 16, while the ones to the right correspond to negative ones.
 
 You may also write an explicit exponent, which is similar to the exponent
 in decimal notation with the following differences:
+
 - the exponent begins with ``p`` instead of ``e``
 - the exponent is written in base ``10`` (**not** 16)
 - the base of the exponent is ``2`` (**not** 16).

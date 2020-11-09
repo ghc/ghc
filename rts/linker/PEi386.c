@@ -735,7 +735,7 @@ addDLL_PEi386( pathchar *dll_name, HINSTANCE *loaded )
 error:
     stgFree(buf);
 
-    char* errormsg = malloc(sizeof(char) * 80);
+    char* errormsg = stgMallocBytes(sizeof(char) * 80, "addDLL_PEi386");
     snprintf(errormsg, 80, "addDLL: %" PATH_FMT " or dependencies not loaded. (Win32 error %lu)", dll_name, GetLastError());
     /* LoadLibrary failed; return a ptr to the error msg. */
     return errormsg;
@@ -745,7 +745,7 @@ pathchar* findSystemLibrary_PEi386( pathchar* dll_name )
 {
     const unsigned int init_buf_size = 1024;
     unsigned int bufsize             = init_buf_size;
-    wchar_t* result = malloc(sizeof(wchar_t) * bufsize);
+    wchar_t* result = stgMallocBytes(sizeof(wchar_t) * bufsize, "findSystemLibrary_PEi386");
     DWORD wResult   = SearchPathW(NULL, dll_name, NULL, bufsize, result, NULL);
 
     if (wResult > bufsize) {
@@ -755,7 +755,7 @@ pathchar* findSystemLibrary_PEi386( pathchar* dll_name )
 
 
     if (!wResult) {
-        free(result);
+        stgFree(result);
         return NULL;
     }
 
@@ -773,15 +773,15 @@ HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
     int bufsize                      = init_buf_size;
 
     // Make sure the path is an absolute path
-    WCHAR* abs_path = malloc(sizeof(WCHAR) * init_buf_size);
+    WCHAR* abs_path = stgMallocBytes(sizeof(WCHAR) * init_buf_size, "addLibrarySearchPath_PEi386(1)");
     DWORD wResult = GetFullPathNameW(dll_path, bufsize, abs_path, NULL);
     if (!wResult){
-        sysErrorBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
+        IF_DEBUG(linker, debugBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError()));
     }
     else if (wResult > init_buf_size) {
         abs_path = realloc(abs_path, sizeof(WCHAR) * wResult);
         if (!GetFullPathNameW(dll_path, bufsize, abs_path, NULL)) {
-            sysErrorBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
+            IF_DEBUG(linker, debugBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError()));
         }
     }
 
@@ -791,7 +791,7 @@ HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
     else
     {
         warnMissingKBLibraryPaths();
-        WCHAR* str = malloc(sizeof(WCHAR) * init_buf_size);
+        WCHAR* str = stgMallocBytes(sizeof(WCHAR) * init_buf_size, "addLibrarySearchPath_PEi386(2)");
         wResult = GetEnvironmentVariableW(L"PATH", str, bufsize);
 
         if (wResult > init_buf_size) {
@@ -804,7 +804,7 @@ HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
         }
 
         bufsize = wResult + 2 + pathlen(abs_path);
-        wchar_t* newPath = malloc(sizeof(wchar_t) * bufsize);
+        wchar_t* newPath = stgMallocBytes(sizeof(wchar_t) * bufsize, "addLibrarySearchPath_PEi386(3)");
 
         wcscpy(newPath, abs_path);
         wcscat(newPath, L";");
@@ -813,19 +813,19 @@ HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
             sysErrorBelch("addLibrarySearchPath[SetEnvironmentVariableW]: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
         }
 
-        free(newPath);
-        free(abs_path);
+        stgFree(newPath);
+        stgFree(abs_path);
 
         return str;
     }
 
     if (!result) {
         sysErrorBelch("addLibrarySearchPath: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
-        free(abs_path);
+        stgFree(abs_path);
         return NULL;
     }
 
-    free(abs_path);
+    stgFree(abs_path);
     return result;
 }
 
@@ -1810,8 +1810,8 @@ makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index, size_t s, char* symbol )
     SymbolExtra *extra;
     curr_thunk = oc->first_symbol_extra + index;
     if (index >= oc->n_symbol_extras) {
-      IF_DEBUG(linker, debugBelch("makeSymbolExtra first:%d, num:%lu, member:%s, index:%llu\n", curr_thunk, oc->n_symbol_extras, oc->archiveMemberName, index));
-      barf("Can't allocate thunk for `%s' in `%" PATH_FMT "' with member `%s'", symbol, oc->fileName, oc->archiveMemberName);
+      IF_DEBUG(linker, debugBelch("makeSymbolExtra first:%d, num:%lu, member:%" PATH_FMT ", index:%llu\n", curr_thunk, oc->n_symbol_extras, oc->archiveMemberName, index));
+      barf("Can't allocate thunk for `%s' in `%" PATH_FMT "' with member `%" PATH_FMT "'", symbol, oc->fileName, oc->archiveMemberName);
     }
 
     extra = oc->symbol_extras + curr_thunk;
@@ -2060,7 +2060,6 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
         sym = lookupSymbolInDLLs(lbl);
         return sym; // might be NULL if not found
     } else {
-#if defined(mingw32_HOST_OS)
         // If Windows, perform initialization of uninitialized
         // Symbols from the C runtime which was loaded above.
         // We do this on lookup to prevent the hit when
@@ -2093,7 +2092,6 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
             clearImportSymbol (pinfo->owner, lbl);
             return pinfo->value;
         }
-#endif
         return loadSymbol(lbl, pinfo);
     }
 }
@@ -2177,9 +2175,7 @@ resolveSymbolAddr_PEi386 (pathchar* buffer, int size,
                   wcscat (buffer, WSTR(" "));
                   if (oc->archiveMemberName)
                   {
-                      pathchar* name = mkPath (oc->archiveMemberName);
-                      wcscat (buffer, name);
-                      stgFree (name);
+                      wcscat (buffer, oc->archiveMemberName);
                   }
                   else
                   {

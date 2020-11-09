@@ -21,4 +21,5 @@ genPrimopCodeBuilderArgs = builder GenPrimopCode ? mconcat
     , output "//primop-vector-tys.hs-incl"         ? arg "--primop-vector-tys"
     , output "//primop-vector-tys-exports.hs-incl" ? arg "--primop-vector-tys-exports"
     , output "//primop-vector-tycons.hs-incl"      ? arg "--primop-vector-tycons"
+    , output "//primop-docs.hs-incl"               ? arg "--wired-in-docs"
     , output "//primop-usage.hs-incl"              ? arg "--usage" ]

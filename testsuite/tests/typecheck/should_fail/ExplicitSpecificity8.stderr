@@ -1,0 +1,3 @@
+
+ExplicitSpecificity8.hs:9:19: error:
+    Inferred type variables are not allowed here

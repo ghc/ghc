@@ -29,12 +29,12 @@ module GHC.Cmm.Type
 where
 
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
-import GHC.Driver.Session
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.Word
 import Data.Int
@@ -130,8 +130,8 @@ bHalfWord platform = cmmBits (halfWordWidth platform)
 gcWord :: Platform -> CmmType
 gcWord platform = CmmType GcPtrCat (wordWidth platform)
 
-cInt :: DynFlags -> CmmType
-cInt dflags = cmmBits (cIntWidth  dflags)
+cInt :: Platform -> CmmType
+cInt platform = cmmBits (cIntWidth platform)
 
 ------------ Predicates ----------------
 isFloatType, isGcPtrType, isBitsType :: CmmType -> Bool
@@ -196,8 +196,8 @@ halfWordMask platform = case platformWordSize platform of
  PW8 -> 0xFFFFFFFF
 
 -- cIntRep is the Width for a C-language 'int'
-cIntWidth :: DynFlags -> Width
-cIntWidth dflags = case cINT_SIZE dflags of
+cIntWidth :: Platform -> Width
+cIntWidth platform = case pc_CINT_SIZE (platformConstants platform) of
                    4 -> W32
                    8 -> W64
                    s -> panic ("cIntWidth: Unknown cINT_SIZE: " ++ show s)
@@ -311,6 +311,8 @@ isVecType _                       = False
 -- Hints are extra type information we attach to the arguments and
 -- results of a foreign call, where more type information is sometimes
 -- needed by the ABI to make the correct kind of call.
+--
+-- See Note [Signed vs unsigned] for one case where this is used.
 
 data ForeignHint
   = NoHint | AddrHint | SignedHint
@@ -323,25 +325,25 @@ data ForeignHint
 -- These don't really belong here, but I don't know where is best to
 -- put them.
 
-rEP_CostCentreStack_mem_alloc :: DynFlags -> CmmType
-rEP_CostCentreStack_mem_alloc dflags
+rEP_CostCentreStack_mem_alloc :: Platform -> CmmType
+rEP_CostCentreStack_mem_alloc platform
     = cmmBits (widthFromBytes (pc_REP_CostCentreStack_mem_alloc pc))
-    where pc = platformConstants dflags
+    where pc = platformConstants platform
 
-rEP_CostCentreStack_scc_count :: DynFlags -> CmmType
-rEP_CostCentreStack_scc_count dflags
+rEP_CostCentreStack_scc_count :: Platform -> CmmType
+rEP_CostCentreStack_scc_count platform
     = cmmBits (widthFromBytes (pc_REP_CostCentreStack_scc_count pc))
-    where pc = platformConstants dflags
+    where pc = platformConstants platform
 
-rEP_StgEntCounter_allocs :: DynFlags -> CmmType
-rEP_StgEntCounter_allocs dflags
+rEP_StgEntCounter_allocs :: Platform -> CmmType
+rEP_StgEntCounter_allocs platform
     = cmmBits (widthFromBytes (pc_REP_StgEntCounter_allocs pc))
-    where pc = platformConstants dflags
+    where pc = platformConstants platform
 
-rEP_StgEntCounter_allocd :: DynFlags -> CmmType
-rEP_StgEntCounter_allocd dflags
+rEP_StgEntCounter_allocd :: Platform -> CmmType
+rEP_StgEntCounter_allocd platform
     = cmmBits (widthFromBytes (pc_REP_StgEntCounter_allocd pc))
-    where pc = platformConstants dflags
+    where pc = platformConstants platform
 
 -------------------------------------------------------------------------
 {-      Note [Signed vs unsigned]

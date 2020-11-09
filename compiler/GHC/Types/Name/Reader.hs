@@ -9,18 +9,18 @@
 -- #name_types#
 -- GHC uses several kinds of name internally:
 --
--- * 'OccName.OccName': see "OccName#name_types"
+-- * 'GHC.Types.Name.Occurrence.OccName': see "GHC.Types.Name.Occurrence#name_types"
 --
--- * 'RdrName.RdrName' is the type of names that come directly from the parser. They
+-- * 'GHC.Types.Name.Reader.RdrName' is the type of names that come directly from the parser. They
 --   have not yet had their scoping and binding resolved by the renamer and can be
---   thought of to a first approximation as an 'OccName.OccName' with an optional module
+--   thought of to a first approximation as an 'GHC.Types.Name.Occurrence.OccName' with an optional module
 --   qualifier
 --
--- * 'Name.Name': see "Name#name_types"
+-- * 'GHC.Types.Name.Name': see "GHC.Types.Name#name_types"
 --
--- * 'Id.Id': see "Id#name_types"
+-- * 'GHC.Types.Id.Id': see "GHC.Types.Id#name_types"
 --
--- * 'Var.Var': see "Var#name_types"
+-- * 'GHC.Types.Var.Var': see "GHC.Types.Var#name_types"
 
 module GHC.Types.Name.Reader (
         -- * The main type
@@ -32,7 +32,7 @@ module GHC.Types.Name.Reader (
         nameRdrName, getRdrName,
 
         -- ** Destruction
-        rdrNameOcc, rdrNameSpace, demoteRdrName,
+        rdrNameOcc, rdrNameSpace, demoteRdrName, promoteRdrName,
         isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
         isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
@@ -57,7 +57,7 @@ module GHC.Types.Name.Reader (
         gresToAvailInfo,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
-        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, greLabel,
+        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, greLabel,
         unQualOK, qualSpecOK, unQualSpecOK,
         pprNameProvenance,
         Parent(..), greParent_maybe,
@@ -65,26 +65,30 @@ module GHC.Types.Name.Reader (
         importSpecLoc, importSpecModule, isExplicitItem, bestImport,
 
         -- * Utils for StarIsType
-        starInfo
+        starInfo,
+
+        -- * Utils
+        opIsAt,
   ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Avail
 import GHC.Types.Name.Set
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.SrcLoc as SrcLoc
-import FastString
+import GHC.Data.FastString
 import GHC.Types.FieldLabel
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import Util
+import GHC.Utils.Misc as Utils
+import GHC.Utils.Panic
 import GHC.Types.Name.Env
 
 import Data.Data
@@ -110,14 +114,14 @@ import Data.List( sortBy )
 -- > `bar`
 -- > ( ~ )
 --
--- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
---           'ApiAnnotation.AnnOpen'  @'('@ or @'['@ or @'[:'@,
---           'ApiAnnotation.AnnClose' @')'@ or @']'@ or @':]'@,,
---           'ApiAnnotation.AnnBackquote' @'`'@,
---           'ApiAnnotation.AnnVal'
---           'ApiAnnotation.AnnTilde',
+-- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnType',
+--           'GHC.Parser.Annotation.AnnOpen'  @'('@ or @'['@ or @'[:'@,
+--           'GHC.Parser.Annotation.AnnClose' @')'@ or @']'@ or @':]'@,,
+--           'GHC.Parser.Annotation.AnnBackquote' @'`'@,
+--           'GHC.Parser.Annotation.AnnVal'
+--           'GHC.Parser.Annotation.AnnTilde',
 
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [Api annotations] in "GHC.Parser.Annotation"
 data RdrName
   = Unqual OccName
         -- ^ Unqualified  name
@@ -178,12 +182,20 @@ rdrNameSpace :: RdrName -> NameSpace
 rdrNameSpace = occNameSpace . rdrNameOcc
 
 -- demoteRdrName lowers the NameSpace of RdrName.
--- see Note [Demotion] in GHC.Types.Name.Occurrence
+-- See Note [Demotion] in GHC.Rename.Env
 demoteRdrName :: RdrName -> Maybe RdrName
 demoteRdrName (Unqual occ) = fmap Unqual (demoteOccName occ)
 demoteRdrName (Qual m occ) = fmap (Qual m) (demoteOccName occ)
-demoteRdrName (Orig _ _) = panic "demoteRdrName"
-demoteRdrName (Exact _) = panic "demoteRdrName"
+demoteRdrName (Orig _ _) = Nothing
+demoteRdrName (Exact _) = Nothing
+
+-- promoteRdrName promotes the NameSpace of RdrName.
+-- See Note [Promotion] in GHC.Rename.Env.
+promoteRdrName :: RdrName -> Maybe RdrName
+promoteRdrName (Unqual occ) = fmap Unqual (promoteOccName occ)
+promoteRdrName (Qual m occ) = fmap (Qual m) (promoteOccName occ)
+promoteRdrName (Orig _ _) = Nothing
+promoteRdrName (Exact _)  = Nothing
 
         -- These two are the basic constructors
 mkRdrUnqual :: OccName -> RdrName
@@ -338,13 +350,24 @@ instance Ord RdrName where
 ************************************************************************
 -}
 
+{- Note [LocalRdrEnv]
+~~~~~~~~~~~~~~~~~~~~~
+The LocalRdrEnv is used to store local bindings (let, where, lambda, case).
+
+* It is keyed by OccName, because we never use it for qualified names.
+
+* It maps the OccName to a Name.  That Name is almost always an
+  Internal Name, but (hackily) it can be External too for top-level
+  pattern bindings.  See Note [bindLocalNames for an External name]
+  in GHC.Rename.Pat
+
+* We keep the current mapping (lre_env), *and* the set of all Names in
+  scope (lre_in_scope).  Reason: see Note [Splicing Exact names] in
+  GHC.Rename.Env.
+-}
+
 -- | Local Reader Environment
---
--- This environment is used to store local bindings
--- (@let@, @where@, lambda, @case@).
--- It is keyed by OccName, because we never use it for qualified names
--- We keep the current mapping, *and* the set of all Names in scope
--- Reason: see Note [Splicing Exact names] in GHC.Rename.Env
+-- See Note [LocalRdrEnv]
 data LocalRdrEnv = LRE { lre_env      :: OccEnv Name
                        , lre_in_scope :: NameSet }
 
@@ -364,16 +387,15 @@ emptyLocalRdrEnv = LRE { lre_env = emptyOccEnv
                        , lre_in_scope = emptyNameSet }
 
 extendLocalRdrEnv :: LocalRdrEnv -> Name -> LocalRdrEnv
--- The Name should be a non-top-level thing
+-- See Note [LocalRdrEnv]
 extendLocalRdrEnv lre@(LRE { lre_env = env, lre_in_scope = ns }) name
-  = WARN( isExternalName name, ppr name )
-    lre { lre_env      = extendOccEnv env (nameOccName name) name
+  = lre { lre_env      = extendOccEnv env (nameOccName name) name
         , lre_in_scope = extendNameSet ns name }
 
 extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
+-- See Note [LocalRdrEnv]
 extendLocalRdrEnvList lre@(LRE { lre_env = env, lre_in_scope = ns }) names
-  = WARN( any isExternalName names, ppr names )
-    lre { lre_env = extendOccEnvList env [(nameOccName n, n) | n <- names]
+  = lre { lre_env = extendOccEnvList env [(nameOccName n, n) | n <- names]
         , lre_in_scope = extendNameSetList ns names }
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
@@ -842,6 +864,12 @@ isRecFldGRE :: GlobalRdrElt -> Bool
 isRecFldGRE (GRE {gre_par = FldParent{}}) = True
 isRecFldGRE _                             = False
 
+isOverloadedRecFldGRE :: GlobalRdrElt -> Bool
+-- ^ Is this a record field defined with DuplicateRecordFields?
+-- (See Note [Parents for record fields])
+isOverloadedRecFldGRE (GRE {gre_par = FldParent{par_lbl = Just _}}) = True
+isOverloadedRecFldGRE _                                             = False
+
 -- Returns the field label of this GRE, if it has one
 greLabel :: GlobalRdrElt -> Maybe FieldLabelString
 greLabel (GRE{gre_par = FldParent{par_lbl = Just lbl}}) = Just lbl
@@ -928,21 +956,20 @@ pickGREsModExp :: ModuleName -> [GlobalRdrElt] -> [(GlobalRdrElt,GlobalRdrElt)]
 -- it is in scope qualified an unqualified respectively
 --
 -- Used only for the 'module M' item in export list;
---   see GHC.Rename.Names.exports_from_avail
+--   see 'GHC.Tc.Gen.Export.exports_from_avail'
 pickGREsModExp mod gres = mapMaybe (pickBothGRE mod) gres
 
+-- | isBuiltInSyntax filter out names for built-in syntax They
+-- just clutter up the environment (esp tuples), and the
+-- parser will generate Exact RdrNames for them, so the
+-- cluttered envt is no use.  Really, it's only useful for
+-- GHC.Base and GHC.Tuple.
 pickBothGRE :: ModuleName -> GlobalRdrElt -> Maybe (GlobalRdrElt, GlobalRdrElt)
 pickBothGRE mod gre@(GRE { gre_name = n })
   | isBuiltInSyntax n                = Nothing
   | Just gre1 <- pickQualGRE mod gre
   , Just gre2 <- pickUnqualGRE   gre = Just (gre1, gre2)
   | otherwise                        = Nothing
-  where
-        -- isBuiltInSyntax filter out names for built-in syntax They
-        -- just clutter up the environment (esp tuples), and the
-        -- parser will generate Exact RdrNames for them, so the
-        -- cluttered envt is no use.  Really, it's only useful for
-        -- GHC.Base and GHC.Tuple.
 
 -- Building GlobalRdrEnvs
 
@@ -953,7 +980,7 @@ mkGlobalRdrEnv :: [GlobalRdrElt] -> GlobalRdrEnv
 mkGlobalRdrEnv gres
   = foldr add emptyGlobalRdrEnv gres
   where
-    add gre env = extendOccEnv_Acc insertGRE singleton env
+    add gre env = extendOccEnv_Acc insertGRE Utils.singleton env
                                    (greOccName gre)
                                    gre
 
@@ -987,7 +1014,7 @@ transformGREs trans_gre occs rdr_env
 
 extendGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrElt -> GlobalRdrEnv
 extendGlobalRdrEnv env gre
-  = extendOccEnv_Acc insertGRE singleton env
+  = extendOccEnv_Acc insertGRE Utils.singleton env
                      (greOccName gre) gre
 
 shadowNames :: GlobalRdrEnv -> [Name] -> GlobalRdrEnv
@@ -1033,7 +1060,7 @@ There are two reasons for shadowing:
     So when we add `x = True` we must not delete the `M.x` from the
     `GlobalRdrEnv`; rather we just want to make it "qualified only";
     hence the `mk_fake-imp_spec` in `shadowName`.  See also Note
-    [Interactively-bound Ids in GHCi] in GHC.Driver.Types
+    [Interactively-bound Ids in GHCi] in GHC.Runtime.Context
 
   - Data types also have External Names, like Ghci4.T; but we still want
     'T' to mean the newly-declared 'T', not an old one.
@@ -1317,7 +1344,7 @@ pprLoc (UnhelpfulSpan {}) = empty
 --   (b) it is always in scope
 --   (c) it is a synonym for Data.Kind.Type
 --
--- However, the user might not know that he's working on a module with
+-- However, the user might not know that they are working on a module with
 -- NoStarIsType and write code that still assumes (a), (b), and (c), which
 -- actually do not hold in that module.
 --
@@ -1385,3 +1412,7 @@ starInfo star_is_type rdr_name =
       = let fs = occNameFS occName
         in fs == fsLit "*" || fs == fsLit "★"
       | otherwise = False
+
+-- | Indicate if the given name is the "@" operator
+opIsAt :: RdrName -> Bool
+opIsAt e = e == mkUnqual varName (fsLit "@")

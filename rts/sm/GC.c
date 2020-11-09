@@ -738,11 +738,13 @@ GarbageCollect (uint32_t collect_gen,
     }
   } // for all generations
 
-  // Flush the update remembered set. See Note [Eager update remembered set
+  // Flush the update remembered sets. See Note [Eager update remembered set
   // flushing] in NonMovingMark.c
   if (RtsFlags.GcFlags.useNonmoving) {
       RELEASE_SM_LOCK;
-      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
+      for (n = 0; n < n_capabilities; n++) {
+          nonmovingAddUpdRemSetBlocks(&capabilities[n]->upd_rem_set.queue);
+      }
       ACQUIRE_SM_LOCK;
   }
 
@@ -1255,10 +1257,10 @@ gcWorkerThread (Capability *cap)
 
     // Wait until we're told to continue
     RELEASE_SPIN_LOCK(&gct->gc_spin);
+    stat_endGCWorker (cap, gct); // write stats before setting gct->wakeup (#17964,#18717)
     gct->wakeup = GC_THREAD_WAITING_TO_CONTINUE;
     debugTrace(DEBUG_gc, "GC thread %d waiting to continue...",
                gct->thread_index);
-    stat_endGCWorker (cap, gct);
     ACQUIRE_SPIN_LOCK(&gct->mut_spin);
     debugTrace(DEBUG_gc, "GC thread %d on my way...", gct->thread_index);
 

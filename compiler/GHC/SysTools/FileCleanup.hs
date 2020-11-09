@@ -7,13 +7,13 @@ module GHC.SysTools.FileCleanup
   , withSystemTempDirectory, withTempDirectory
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Driver.Session
-import ErrUtils
-import Outputable
-import Util
-import Exception
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Exception as Exception
 import GHC.Driver.Phases
 
 import Control.Monad
@@ -299,7 +299,7 @@ withTempDirectory targetDir template =
     (ignoringIOErrors . removeDirectoryRecursive)
 
 ignoringIOErrors :: IO () -> IO ()
-ignoringIOErrors ioe = ioe `catch` (\e -> const (return ()) (e :: IOError))
+ignoringIOErrors ioe = ioe `catchIO` const (return ())
 
 
 createTempDirectory :: FilePath -> String -> IO FilePath

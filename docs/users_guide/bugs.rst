@@ -76,13 +76,20 @@ Lexical syntax
    See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
    for the precise rules.
 
--  As-patterns must not be surrounded by whitespace::
+-  As-patterns must not be surrounded by whitespace on either side::
 
      f p@(x, y, z) = ...    -- accepted by both GHC and the Haskell Report
-     f p @ (x, y, z) = ...  -- accepted by the Haskell Report but not GHC
 
-   When surrounded by whitespace, ``(@)`` is treated by GHC as a regular infix
-   operator.
+     -- accepted by the Haskell Report but not GHC:
+     f p @ (x, y, z) = ...
+     f p @(x, y, z) = ...
+     f p@ (x, y, z) = ...
+
+   When surrounded by whitespace on both sides, ``(@)`` is treated by GHC as a
+   regular infix operator.
+
+   When preceded but not followed by whitespace, ``(@)`` is treated as a
+   visible type application.
 
    See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
    for the precise rules.
@@ -431,31 +438,6 @@ The Foreign Function Interface
         single: hs_init
         single: hs_exit
 
-.. _infelicities-operator-sections:
-
-Operator sections
-^^^^^^^^^^^^^^^^^
-
-The Haskell Report demands that, for infix operators ``%``, the following
-identities hold:
-
-::
-
-    (% expr) = \x -> x % expr
-    (expr %) = \x -> expr % x
-
-However, the second law is violated in the presence of undefined operators,
-
-::
-
-    (%) = error "urk"
-    (() %)         `seq` () -- urk
-    (\x -> () % x) `seq` () -- OK, result ()
-
-The operator section is treated like function application of an undefined
-function, while the lambda form is in WHNF that contains an application of an
-undefined function.
-
 .. _haskell-98-2010-undefined:
 
 GHC's interpretation of undefined behaviour in Haskell 98 and Haskell 2010
@@ -523,9 +505,8 @@ Large tuple support
     The Haskell Report only requires implementations to provide tuple
     types and their accompanying standard instances up to size 15. GHC
     limits the size of tuple types to 62 and provides instances of
-    ``Eq``, ``Ord``, ``Bounded``, ``Read``, and ``Show`` for tuples up
-    to size 15. However, ``Ix`` instances are provided only for tuples
-    up to size 5.
+    ``Eq``, ``Ord``, ``Bounded``, ``Read``, ``Show``, and ``Ix`` for
+    tuples up to size 15.
 
 .. _bugs:
 

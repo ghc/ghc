@@ -15,7 +15,7 @@ module GHC.Core.Tidy (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Seq ( seqUnfolding )
@@ -26,10 +26,11 @@ import GHC.Core.Type     ( tidyType, tidyVarBndr )
 import GHC.Core.Coercion ( tidyCo )
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Unique (getUnique)
 import GHC.Types.Unique.FM
 import GHC.Types.Name hiding (tidyNameOcc)
 import GHC.Types.SrcLoc
-import Maybes
+import GHC.Data.Maybe
 import Data.List
 
 {-
@@ -121,7 +122,7 @@ tidyRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs,
 tidyNameOcc :: TidyEnv -> Name -> Name
 -- In rules and instances, we have Names, and we must tidy them too
 -- Fortunately, we can lookup in the VarEnv with a name
-tidyNameOcc (_, var_env) n = case lookupUFM var_env n of
+tidyNameOcc (_, var_env) n = case lookupUFM_Directly var_env (getUnique n) of
                                 Nothing -> n
                                 Just v  -> idName v
 
@@ -149,8 +150,9 @@ tidyIdBndr env@(tidy_env, var_env) id
         -- though we could extract it from the Id
         --
         ty'      = tidyType env (idType id)
+        mult'    = tidyType env (idMult id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
-        id'      = mkLocalIdWithInfo name' ty' new_info
+        id'      = mkLocalIdWithInfo name' mult' ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]
@@ -174,9 +176,10 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
   = case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') ->
     let
         ty'      = tidyType env (idType id)
+        mult'    = tidyType env (idMult id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
         details  = idDetails id
-        id'      = mkLocalVar details name' ty' new_info
+        id'      = mkLocalVar details name' mult' ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]

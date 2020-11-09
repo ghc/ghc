@@ -112,7 +112,7 @@ instance Num Word8 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = W8# (narrow8Word# (integerToWord i))
+    fromInteger i          = W8# (narrow8Word# (integerToWord# i))
 
 -- | @since 2.01
 instance Real Word8 where
@@ -156,7 +156,7 @@ instance Integral Word8 where
     divMod  (W8# x#) y@(W8# y#)
         | y /= 0                  = (W8# (x# `quotWord#` y#), W8# (x# `remWord#` y#))
         | otherwise               = divZeroError
-    toInteger (W8# x#)            = smallInteger (word2Int# x#)
+    toInteger (W8# x#)            = IS (word2Int# x#)
 
 -- | @since 2.01
 instance Bounded Word8 where
@@ -303,7 +303,7 @@ instance Num Word16 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = W16# (narrow16Word# (integerToWord i))
+    fromInteger i          = W16# (narrow16Word# (integerToWord# i))
 
 -- | @since 2.01
 instance Real Word16 where
@@ -347,7 +347,7 @@ instance Integral Word16 where
     divMod  (W16# x#) y@(W16# y#)
         | y /= 0                    = (W16# (x# `quotWord#` y#), W16# (x# `remWord#` y#))
         | otherwise                 = divZeroError
-    toInteger (W16# x#)             = smallInteger (word2Int# x#)
+    toInteger (W16# x#)             = IS (word2Int# x#)
 
 -- | @since 2.01
 instance Bounded Word16 where
@@ -533,7 +533,7 @@ instance Num Word32 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = W32# (narrow32Word# (integerToWord i))
+    fromInteger i          = W32# (narrow32Word# (integerToWord# i))
 
 -- | @since 2.01
 instance Enum Word32 where
@@ -589,12 +589,12 @@ instance Integral Word32 where
         | otherwise                 = divZeroError
     toInteger (W32# x#)
 #if WORD_SIZE_IN_BITS == 32
-        | isTrue# (i# >=# 0#)       = smallInteger i#
-        | otherwise                 = wordToInteger x#
+        | isTrue# (i# >=# 0#)       = IS i#
+        | otherwise                 = integerFromWord# x#
         where
         !i# = word2Int# x#
 #else
-                                    = smallInteger (word2Int# x#)
+                                    = IS (word2Int# x#)
 #endif
 
 -- | @since 2.01
@@ -728,7 +728,7 @@ instance Num Word64 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = W64# (integerToWord64 i)
+    fromInteger i          = W64# (integerToWord64# i)
 
 -- | @since 2.01
 instance Enum Word64 where
@@ -770,7 +770,7 @@ instance Integral Word64 where
     divMod  (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
         | otherwise                 = divZeroError
-    toInteger (W64# x#)             = word64ToInteger x#
+    toInteger (W64# x#)             = integerFromWord64# x#
 
 -- | @since 2.01
 instance Bits Word64 where
@@ -875,7 +875,7 @@ instance Num Word64 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = W64# (integerToWord i)
+    fromInteger i          = W64# (integerToWord# i)
 
 -- | @since 2.01
 instance Enum Word64 where
@@ -892,10 +892,44 @@ instance Enum Word64 where
         | x <= fromIntegral (maxBound::Int)
                         = I# (word2Int# x#)
         | otherwise     = fromEnumError "Word64" x
-    enumFrom            = integralEnumFrom
-    enumFromThen        = integralEnumFromThen
-    enumFromTo          = integralEnumFromTo
-    enumFromThenTo      = integralEnumFromThenTo
+
+#if WORD_SIZE_IN_BITS < 64
+    enumFrom       = integralEnumFrom
+    enumFromThen   = integralEnumFromThen
+    enumFromTo     = integralEnumFromTo
+    enumFromThenTo = integralEnumFromThenTo
+#else
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINABLE enumFrom #-}
+    enumFrom w
+        = map wordToWord64
+        $ enumFrom (word64ToWord w)
+
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINABLE enumFromThen #-}
+    enumFromThen w s
+        = map wordToWord64
+        $ enumFromThen (word64ToWord w) (word64ToWord s)
+
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINABLE enumFromTo #-}
+    enumFromTo w1 w2
+        = map wordToWord64
+        $ enumFromTo (word64ToWord w1) (word64ToWord w2)
+
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINABLE enumFromThenTo #-}
+    enumFromThenTo w1 s w2
+        = map wordToWord64
+        $ enumFromThenTo (word64ToWord w1) (word64ToWord s) (word64ToWord w2)
+
+word64ToWord :: Word64 -> Word
+word64ToWord (W64# w#) = (W# w#)
+
+wordToWord64 :: Word -> Word64
+wordToWord64 (W# w#) = (W64# w#)
+#endif
+
 
 -- | @since 2.01
 instance Integral Word64 where
@@ -920,8 +954,8 @@ instance Integral Word64 where
         | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
         | otherwise                 = divZeroError
     toInteger (W64# x#)
-        | isTrue# (i# >=# 0#)       = smallInteger i#
-        | otherwise                 = wordToInteger x#
+        | isTrue# (i# >=# 0#)       = IS i#
+        | otherwise                 = integerFromWord# x#
         where
         !i# = word2Int# x#
 
@@ -1054,11 +1088,11 @@ bitReverse64 (W64# w#) = W64# (bitReverse# w#)
 
 {-# RULES
 "fromIntegral/Word8->Natural"
-    fromIntegral = wordToNatural . (fromIntegral :: Word8  -> Word)
+    fromIntegral = naturalFromWord . (fromIntegral :: Word8  -> Word)
 "fromIntegral/Word16->Natural"
-    fromIntegral = wordToNatural . (fromIntegral :: Word16 -> Word)
+    fromIntegral = naturalFromWord . (fromIntegral :: Word16 -> Word)
 "fromIntegral/Word32->Natural"
-    fromIntegral = wordToNatural . (fromIntegral :: Word32 -> Word)
+    fromIntegral = naturalFromWord . (fromIntegral :: Word32 -> Word)
   #-}
 
 #if WORD_SIZE_IN_BITS == 64
@@ -1067,6 +1101,6 @@ bitReverse64 (W64# w#) = W64# (bitReverse# w#)
 "fromIntegral/Natural->Word64"
     fromIntegral = (fromIntegral :: Word -> Word64) . naturalToWord
 "fromIntegral/Word64->Natural"
-    fromIntegral = wordToNatural . (fromIntegral :: Word64 -> Word)
+    fromIntegral = naturalFromWord . (fromIntegral :: Word64 -> Word)
   #-}
 #endif

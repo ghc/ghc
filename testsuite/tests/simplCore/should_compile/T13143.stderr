@@ -6,13 +6,13 @@ Result size of Tidy Core
 Rec {
 -- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
-  :: forall {a}. GHC.Prim.Void# -> a
+  :: forall {a}. (# #) -> a
 [GblId, Arity=1, Str=<B,A>b, Cpr=b, Unf=OtherCon []]
-T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#
+T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.(##)
 end Rec }
 
 -- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
-f [InlPrag=NOUSERINLINE[0]] :: forall a. Int -> a
+f [InlPrag=[final]] :: forall a. Int -> a
 [GblId,
  Arity=1,
  Str=<B,A>b,
@@ -20,8 +20,8 @@ f [InlPrag=NOUSERINLINE[0]] :: forall a. Int -> a
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
-         Tmpl= \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#}]
-f = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#
+         Tmpl= \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.(##)}]
+f = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.(##)
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule4 :: GHC.Prim.Addr#
@@ -33,9 +33,8 @@ T13143.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule3 :: GHC.Types.TrName
 [GblId,
- Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T13143.$trModule3 = GHC.Types.TrNameS T13143.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -48,28 +47,26 @@ T13143.$trModule2 = "T13143"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule1 :: GHC.Types.TrName
 [GblId,
- Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T13143.$trModule1 = GHC.Types.TrNameS T13143.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule :: GHC.Types.Module
 [GblId,
- Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T13143.$trModule
   = GHC.Types.Module T13143.$trModule3 T13143.$trModule1
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 lvl :: Int
 [GblId, Str=b, Cpr=b]
-lvl = T13143.$wf @Int GHC.Prim.void#
+lvl = T13143.$wf @Int GHC.Prim.(##)
 
 Rec {
 -- RHS size: {terms: 28, types: 7, coercions: 0, joins: 0/0}
-T13143.$wg [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker]
+T13143.$wg [InlPrag=[2], Occ=LoopBreaker]
   :: Bool -> Bool -> GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId, Arity=3, Str=<S,1*U><S,1*U><L,U>, Unf=OtherCon []]
 T13143.$wg
@@ -89,7 +86,7 @@ T13143.$wg
 end Rec }
 
 -- RHS size: {terms: 14, types: 6, coercions: 0, joins: 0/0}
-g [InlPrag=NOUSERINLINE[2]] :: Bool -> Bool -> Int -> Int
+g [InlPrag=[2]] :: Bool -> Bool -> Int -> Int
 [GblId,
  Arity=3,
  Str=<S,1*U><S,1*U><S,1*U(U)>,
@@ -97,11 +94,11 @@ g [InlPrag=NOUSERINLINE[2]] :: Bool -> Bool -> Int -> Int
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once] :: Bool)
-                 (w1 [Occ=Once] :: Bool)
-                 (w2 [Occ=Once!] :: Int) ->
-                 case w2 of { GHC.Types.I# ww1 [Occ=Once] ->
-                 case T13143.$wg w w1 ww1 of ww2 [Occ=Once] { __DEFAULT ->
+         Tmpl= \ (w [Occ=Once1] :: Bool)
+                 (w1 [Occ=Once1] :: Bool)
+                 (w2 [Occ=Once1!] :: Int) ->
+                 case w2 of { GHC.Types.I# ww1 [Occ=Once1] ->
+                 case T13143.$wg w w1 ww1 of ww2 [Occ=Once1] { __DEFAULT ->
                  GHC.Types.I# ww2
                  }
                  }}]

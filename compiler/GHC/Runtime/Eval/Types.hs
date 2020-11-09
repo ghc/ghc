@@ -12,17 +12,17 @@ module GHC.Runtime.Eval.Types (
         BreakInfo(..)
         ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHCi.RemoteTypes
 import GHCi.Message (EvalExpr, ResumeContext)
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.Module
+import GHC.Types.TyThing
+import GHC.Unit.Module
 import GHC.Types.Name.Reader
-import GHC.Core.Type
 import GHC.Types.SrcLoc
-import Exception
+import GHC.Utils.Exception
 
 import Data.Word
 import GHC.Stack.CCS

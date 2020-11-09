@@ -1,6 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -11,23 +9,37 @@ module GHC.HsToCore.Usage (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
+import GHC.Driver.Env
 import GHC.Driver.Session
-import GHC.Driver.Ways
-import GHC.Driver.Types
+
+import GHC.Platform
+import GHC.Platform.Ways
+
 import GHC.Tc.Types
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Fingerprint
+import GHC.Utils.Panic
+
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Module
-import Outputable
-import Util
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
-import Fingerprint
-import Maybes
-import GHC.Driver.Packages
-import GHC.Driver.Finder
+
+import GHC.Unit
+import GHC.Unit.External
+import GHC.Unit.State
+import GHC.Unit.Finder
+import GHC.Unit.Module.Imported
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Deps
+
+import GHC.Linker.Unit
+
+import GHC.Data.Maybe
 
 import Control.Monad (filterM)
 import Data.List
@@ -60,8 +72,8 @@ its dep_orphs. This was the cause of #14128.
 -- | Extract information from the rename and typecheck phases to produce
 -- a dependencies information for the module being compiled.
 --
--- The first argument is additional dependencies from plugins
-mkDependencies :: InstalledUnitId -> [Module] -> TcGblEnv -> IO Dependencies
+-- The second argument is additional dependencies from plugins
+mkDependencies :: UnitId -> [Module] -> TcGblEnv -> IO Dependencies
 mkDependencies iuid pluginModules
           (TcGblEnv{ tcg_mod = mod,
                     tcg_imports = imports,
@@ -70,7 +82,7 @@ mkDependencies iuid pluginModules
  = do
       -- Template Haskell used?
       let (dep_plgins, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
-          plugin_dep_pkgs = filter (/= iuid) (map (toInstalledUnitId . moduleUnitId) ms)
+          plugin_dep_pkgs = filter (/= iuid) (map (toUnitId . moduleUnit) ms)
       th_used <- readIORef th_var
       let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
                                              (moduleName mod))
@@ -87,7 +99,7 @@ mkDependencies iuid pluginModules
 
           raw_pkgs = foldr Set.insert (imp_dep_pkgs imports) plugin_dep_pkgs
 
-          pkgs | th_used   = Set.insert (toInstalledUnitId thUnitId) raw_pkgs
+          pkgs | th_used   = Set.insert thUnitId raw_pkgs
                | otherwise = raw_pkgs
 
           -- Set the packages required to be Safe according to Safe Haskell.
@@ -132,6 +144,8 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
     -- the entire collection of Ifaces.
 
 {- Note [Plugin dependencies]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Modules for which plugins were used in the compilation process, should be
 recompiled whenever one of those plugins changes. But how do we know if a
 plugin changed from the previous time a module was compiled?
@@ -155,7 +169,7 @@ During recompilation we then compare the hashes of those files again to see
 if anything has changed.
 
 One issue with this approach is that object files are currently (GHC 8.6.1)
-not created fully deterministicly, which could sometimes induce accidental
+not created fully deterministically, which could sometimes induce accidental
 recompilation of a module for which plugins were used in the compile process.
 
 One way to improve this is to either:
@@ -168,13 +182,13 @@ One way to improve this is to either:
 -}
 mkPluginUsage :: HscEnv -> ModIface -> IO [Usage]
 mkPluginUsage hsc_env pluginModule
-  = case lookupPluginModuleWithSuggestions dflags pNm Nothing of
+  = case lookupPluginModuleWithSuggestions pkgs pNm Nothing of
     LookupFound _ pkg -> do
     -- The plugin is from an external package:
     -- search for the library files containing the plugin.
-      let searchPaths = collectLibraryPaths dflags [pkg]
+      let searchPaths = collectLibraryPaths (ways dflags) [pkg]
           useDyn = WayDyn `elem` ways dflags
-          suffix = if useDyn then soExt platform else "a"
+          suffix = if useDyn then platformSOExt platform else "a"
           libLocs = [ searchPath </> "lib" ++ libLoc <.> suffix
                     | searchPath <- searchPaths
                     , libLoc     <- packageHsLibs dflags pkg
@@ -185,8 +199,8 @@ mkPluginUsage hsc_env pluginModule
             if useDyn
               then libLocs
               else
-                let dflags'  = updateWays (addWay' WayDyn dflags)
-                    dlibLocs = [ searchPath </> mkHsSOName platform dlibLoc
+                let dflags'  = dflags { targetWays_ = addWay WayDyn (targetWays_ dflags) }
+                    dlibLocs = [ searchPath </> platformHsSOName platform dlibLoc
                                | searchPath <- searchPaths
                                , dlibLoc    <- packageHsLibs dflags' pkg
                                ]
@@ -214,9 +228,11 @@ mkPluginUsage hsc_env pluginModule
   where
     dflags   = hsc_dflags hsc_env
     platform = targetPlatform dflags
-    pNm      = moduleName (mi_module pluginModule)
-    pPkg     = moduleUnitId (mi_module pluginModule)
-    deps     = map fst (dep_mods (mi_deps pluginModule))
+    pkgs     = unitState dflags
+    pNm      = moduleName $ mi_module pluginModule
+    pPkg     = moduleUnit $ mi_module pluginModule
+    deps     = map gwib_mod $
+      dep_mods $ mi_deps pluginModule
 
     -- Lookup object file for a plugin dependency,
     -- from the same package as the plugin.
@@ -224,7 +240,7 @@ mkPluginUsage hsc_env pluginModule
       foundM <- findImportedModule hsc_env nm Nothing
       case foundM of
         Found ml m
-          | moduleUnitId m == pPkg -> Just <$> hashFile (ml_obj_file ml)
+          | moduleUnit m == pPkg -> Just <$> hashFile (ml_obj_file ml)
           | otherwise              -> return Nothing
         _ -> pprPanic "mkPluginUsage: no object for dependency"
                       (ppr pNm <+> ppr nm)
@@ -248,7 +264,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
   where
     hpt = hsc_HPT hsc_env
     dflags = hsc_dflags hsc_env
-    this_pkg = thisPackage dflags
+    home_unit = hsc_home_unit hsc_env
 
     used_mods    = moduleEnvKeys ent_map
     dir_imp_mods = moduleEnvKeys direct_imports
@@ -260,9 +276,9 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
     -- ent_map groups together all the things imported and used
     -- from a particular module
     ent_map :: ModuleEnv [OccName]
-    ent_map  = nonDetFoldUniqSet add_mv emptyModuleEnv used_names
-     -- nonDetFoldUFM is OK here. If you follow the logic, we sort by OccName
-     -- in ent_hashs
+    ent_map  = nonDetStrictFoldUniqSet add_mv emptyModuleEnv used_names
+     -- nonDetStrictFoldUniqSet is OK here. If you follow the logic, we sort by
+     -- OccName in ent_hashs
      where
       add_mv name mv_map
         | isWiredInName name = mv_map  -- ignore wired-in names
@@ -274,7 +290,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
              Just mod ->
                 -- See Note [Identity versus semantic module]
                 let mod' = if isHoleModule mod
-                            then mkModule this_pkg (moduleName mod)
+                            then mkHomeModule home_unit (moduleName mod)
                             else mod
                 -- This lambda function is really just a
                 -- specialised (++); originally came about to
@@ -294,7 +310,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                                         -- things in *this* module
       = Nothing
 
-      | moduleUnitId mod /= this_pkg
+      | not (isHomeModule home_unit mod)
       = Just UsagePackageModule{ usg_mod      = mod,
                                  usg_mod_hash = mod_hash,
                                  usg_safe     = imp_safe }
@@ -374,3 +390,19 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
               from generating many of these usages (at least in
               one-shot mode), but that's even more bogus!
         -}
+
+{-
+Note [Internal used_names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Most of the used_names are External Names, but we can have System
+Names too. Two examples:
+
+* Names arising from Language.Haskell.TH.newName.
+  See Note [Binders in Template Haskell] in GHC.ThToHs (and #5362).
+* The names of auxiliary bindings in derived instances.
+  See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
+
+Such Names are always for locally-defined things, for which we don't gather
+usage info, so we can just ignore them in ent_map. Moreover, they are always
+System Names, hence the assert, just as a double check.
+-}

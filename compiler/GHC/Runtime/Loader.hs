@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, MagicHash #-}
+{-# LANGUAGE CPP #-}
 
 -- | Dynamically lookup up values from modules and loading them.
 module GHC.Runtime.Loader (
@@ -20,38 +20,46 @@ module GHC.Runtime.Loader (
         lessUnsafeCoerce
     ) where
 
-import GhcPrelude
-import GHC.Driver.Session
+import GHC.Prelude
 
-import GHC.Runtime.Linker      ( linkModule, getHValue )
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Hooks
+import GHC.Driver.Plugins
+
+import GHC.Linker.Loader       ( loadModule, loadName )
 import GHC.Runtime.Interpreter ( wormhole, withInterp )
 import GHC.Runtime.Interpreter.Types
-import GHC.Types.SrcLoc        ( noSrcSpan )
-import GHC.Driver.Finder       ( findPluginModule, cannotFindModule )
+
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
 import GHC.Iface.Load          ( loadPluginInterface )
+import GHC.Rename.Names ( gresFromAvails )
+import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
+
+import GHC.Driver.Env
+import GHCi.RemoteTypes  ( HValue )
+import GHC.Core.Type     ( Type, eqType, mkTyConTy )
+import GHC.Core.TyCon    ( TyCon )
+
+import GHC.Types.SrcLoc        ( noSrcSpan )
+import GHC.Types.Name    ( Name, nameModule_maybe )
+import GHC.Types.Id      ( idType )
+import GHC.Types.TyThing
+import GHC.Types.Name.Occurrence ( OccName, mkVarOcc )
 import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                                , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
                                , gre_name, mkRdrQual )
-import GHC.Types.Name.Occurrence ( OccName, mkVarOcc )
-import GHC.Rename.Names ( gresFromAvails )
-import GHC.Driver.Plugins
-import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
 
-import GHC.Driver.Types
-import GHCi.RemoteTypes  ( HValue )
-import GHC.Core.Type     ( Type, eqType, mkTyConTy )
-import GHC.Core.TyCo.Ppr ( pprTyThingCategory )
-import GHC.Core.TyCon    ( TyCon )
-import GHC.Types.Name    ( Name, nameModule_maybe )
-import GHC.Types.Id      ( idType )
-import GHC.Types.Module  ( Module, ModuleName )
-import Panic
-import FastString
-import ErrUtils
-import Outputable
-import Exception
-import GHC.Driver.Hooks
+import GHC.Unit.Finder         ( findPluginModule, cannotFindModule, FindResult(..) )
+import GHC.Unit.Module   ( Module, ModuleName )
+import GHC.Unit.Module.ModIface
+
+import GHC.Utils.Panic
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Exception
+
+import GHC.Data.FastString
 
 import Control.Monad     ( unless )
 import Data.Maybe        ( mapMaybe )
@@ -72,8 +80,7 @@ initializePlugins hsc_env df
   | otherwise
   = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
        let df' = df { cachedPlugins = loadedPlugins }
-       df'' <- withPlugins df' runDflagsPlugin df'
-       return df''
+       withPlugins df' runDflagsPlugin df'
 
   where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
         runDflagsPlugin p opts dynflags = dynflagsPlugin p opts dynflags
@@ -160,7 +167,7 @@ forceLoadTyCon :: HscEnv -> Name -> IO TyCon
 forceLoadTyCon hsc_env con_name = do
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of loadTyConTy") con_name
 
-    mb_con_thing <- lookupTypeHscEnv hsc_env con_name
+    mb_con_thing <- lookupType hsc_env con_name
     case mb_con_thing of
         Nothing -> throwCmdLineErrorS dflags $ missingTyThingError con_name
         Just (ATyCon tycon) -> return tycon
@@ -192,7 +199,7 @@ getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
 getHValueSafely hsc_env val_name expected_type = do
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment
-    mb_val_thing <- lookupTypeHscEnv hsc_env val_name
+    mb_val_thing <- lookupType hsc_env val_name
     case mb_val_thing of
         Nothing -> throwCmdLineErrorS dflags $ missingTyThingError val_name
         Just (AnId id) -> do
@@ -202,11 +209,11 @@ getHValueSafely hsc_env val_name expected_type = do
              then do
                 -- Link in the module that contains the value, if it has such a module
                 case nameModule_maybe val_name of
-                    Just mod -> do linkModule hsc_env mod
+                    Just mod -> do loadModule hsc_env mod
                                    return ()
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
-                hval <- withInterp hsc_env $ \interp -> getHValue hsc_env val_name >>= wormhole interp
+                hval <- withInterp hsc_env $ \interp -> loadName hsc_env val_name >>= wormhole interp
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
@@ -244,7 +251,7 @@ lessUnsafeCoerce dflags context what = do
 lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName
                                 -> IO (Maybe (Name, ModIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
-    -- First find the package the module resides in by searching exposed packages and home modules
+    -- First find the unit the module resides in by searching exposed units and home modules
     found_module <- findPluginModule hsc_env mod_name
     case found_module of
         Found _ mod -> do

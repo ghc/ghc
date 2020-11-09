@@ -6,56 +6,49 @@
 set -e -o pipefail
 
 # Configuration:
-hackage_index_state="@1579718451"
-
-# Colors
-BLACK="0;30"
-GRAY="1;30"
-RED="0;31"
-LT_RED="1;31"
-BROWN="0;33"
-LT_BROWN="1;33"
-GREEN="0;32"
-LT_GREEN="1;32"
-BLUE="0;34"
-LT_BLUE="1;34"
-PURPLE="0;35"
-LT_PURPLE="1;35"
-CYAN="0;36"
-LT_CYAN="1;36"
-WHITE="1;37"
-LT_GRAY="0;37"
-
-# GitLab Pipelines log section delimiters
-# https://gitlab.com/gitlab-org/gitlab-foss/issues/14664
-start_section() {
-  name="$1"
-  echo -e "section_start:$(date +%s):$name\015\033[0K"
-}
-
-end_section() {
-  name="$1"
-  echo -e "section_end:$(date +%s):$name\015\033[0K"
-}
-
-echo_color() {
-  local color="$1"
-  local msg="$2"
-  echo -e "\033[${color}m${msg}\033[0m"
-}
-
-error() { echo_color "${RED}" "$1"; }
-warn() { echo_color "${LT_BROWN}" "$1"; }
-info() { echo_color "${LT_BLUE}" "$1"; }
-
-fail() { error "error: $1"; exit 1; }
-
-function run() {
-  info "Running $*..."
-  "$@" || ( error "$* failed"; return 1; )
-}
+hackage_index_state="2020-09-14T19:30:43Z"
+MIN_HAPPY_VERSION="1.20"
+MIN_ALEX_VERSION="3.2"
 
 TOP="$(pwd)"
+if [ ! -d "$TOP/.gitlab" ]; then
+  echo "This script expects to be run from the root of a ghc checkout"
+fi
+
+source $TOP/.gitlab/common.sh
+
+function setup_locale() {
+  # Musl doesn't provide locale support at all...
+  if ! which locale > /dev/null; then
+    info "No locale executable. Skipping locale setup..."
+    return
+  fi
+
+  # BSD grep terminates early with -q, consequently locale -a will get a
+  # SIGPIPE and the pipeline will fail with pipefail.
+  shopt -o -u pipefail
+  if locale -a | grep -q C.UTF-8; then
+    # Debian
+    export LANG=C.UTF-8
+  elif locale -a | grep -q C.utf8; then
+    # Fedora calls it this
+    export LANG=C.utf8
+  elif locale -a | grep -q en_US.UTF-8; then
+    # Centos doesn't have C.UTF-8
+    export LANG=en_US.UTF-8
+  elif locale -a | grep -q en_US.utf8; then
+    # Centos doesn't have C.UTF-8
+    export LANG=en_US.utf8
+  else
+    error "Failed to find usable locale"
+    info "Available locales:"
+    locale -a
+    fail "No usable locale, aborting..."
+  fi
+  info "Using locale $LANG..."
+  export LC_ALL=$LANG
+  shopt -o -s pipefail
+}
 
 function mingw_init() {
   case "$MSYSTEM" in
@@ -119,22 +112,26 @@ function show_tool() {
 function set_toolchain_paths() {
   needs_toolchain=1
   case "$(uname)" in
-    Linux) needs_toolchain="" ;;
+    Linux) needs_toolchain="0" ;;
     *) ;;
   esac
 
-  if [[ -n "$needs_toolchain" ]]; then
+  if [[ "$needs_toolchain" = 1 ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
       HAPPY="$toolchain/bin/happy$exe"
       ALEX="$toolchain/bin/alex$exe"
   else
-      GHC="$(which ghc)"
-      CABAL="/usr/local/bin/cabal"
-      HAPPY="$HOME/.cabal/bin/happy"
-      ALEX="$HOME/.cabal/bin/alex"
+      # These are generally set by the Docker image but
+      # we provide these handy fallbacks in case the
+      # script isn't run from within a GHC CI docker image.
+      if [ -z "$GHC" ]; then GHC="$(which ghc)"; fi
+      if [ -z "$CABAL" ]; then GHC="$(which cabal)"; fi
+      if [ -z "$HAPPY" ]; then GHC="$(which happy)"; fi
+      if [ -z "$ALEX" ]; then GHC="$(which alex)"; fi
   fi
+
   export GHC
   export CABAL
   export HAPPY
@@ -171,12 +168,12 @@ function setup() {
 }
 
 function fetch_ghc() {
-  local v="$GHC_VERSION"
-  if [[ -z "$v" ]]; then
-      fail "GHC_VERSION is not set"
-  fi
-
   if [ ! -e "$GHC" ]; then
+      local v="$GHC_VERSION"
+      if [[ -z "$v" ]]; then
+          fail "neither GHC nor GHC_VERSION are not set"
+      fi
+
       start_section "fetch GHC"
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
@@ -200,12 +197,12 @@ function fetch_ghc() {
 }
 
 function fetch_cabal() {
-  local v="$CABAL_INSTALL_VERSION"
-  if [[ -z "$v" ]]; then
-      fail "CABAL_INSTALL_VERSION is not set"
-  fi
-
   if [ ! -e "$CABAL" ]; then
+      local v="$CABAL_INSTALL_VERSION"
+      if [[ -z "$v" ]]; then
+          fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
+      fi
+
       start_section "fetch GHC"
       case "$(uname)" in
         # N.B. Windows uses zip whereas all others use .tar.xz
@@ -246,24 +243,26 @@ function fetch_cabal() {
 function setup_toolchain() {
   fetch_ghc
   fetch_cabal
-  cabal_install="$CABAL v2-install --index-state=$hackage_index_state --installdir=$toolchain/bin"
+
+  cabal_install="$CABAL v2-install \
+    --with-compiler=$GHC \
+    --index-state=$hackage_index_state \
+    --installdir=$toolchain/bin \
+    --overwrite-policy=always"
+
   # Avoid symlinks on Windows
   case "$(uname)" in
     MSYS_*|MINGW*) cabal_install="$cabal_install --install-method=copy" ;;
     *) ;;
   esac
 
-  if [ ! -e "$HAPPY" ]; then
-      info "Building happy..."
-      cabal update
-      $cabal_install happy
-  fi
+  cabal update
 
-  if [ ! -e "$ALEX" ]; then
-      info "Building alex..."
-      cabal update
-      $cabal_install alex
-  fi
+  info "Building happy..."
+  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION"
+
+  info "Building alex..."
+  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
 }
 
 function cleanup_submodules() {
@@ -282,7 +281,7 @@ function prepare_build_mk() {
   if [[ -z "$BUILD_FLAVOUR" ]]; then fail "BUILD_FLAVOUR is not set"; fi
   if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
   if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
-  if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
+  if [[ -z ${BIGNUM_BACKEND:-} ]]; then BIGNUM_BACKEND=gmp; fi
 
   cat > mk/build.mk <<EOF
 V=1
@@ -292,7 +291,7 @@ HSCOLOUR_SRCS=YES
 BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
 BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
-INTEGER_LIBRARY=$INTEGER_LIBRARY
+BIGNUM_BACKEND=$BIGNUM_BACKEND
 XZ_CMD=$XZ
 
 BuildFlavour=$BUILD_FLAVOUR
@@ -360,6 +359,13 @@ function push_perf_notes() {
   "$TOP/.gitlab/test-metrics.sh" push
 }
 
+# Figure out which commit should be used by the testsuite driver as a
+# performance baseline. See Note [The CI Story].
+function determine_metric_baseline() {
+  export PERF_BASELINE_COMMIT="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME HEAD)"
+  info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
+}
+
 function test_make() {
   run "$MAKE" test_bindist TEST_PREP=YES
   run "$MAKE" V=0 test \
@@ -368,13 +374,16 @@ function test_make() {
 }
 
 function build_hadrian() {
-  if [ -z "$FLAVOUR" ]; then
-    fail "FLAVOUR not set"
+  if [ -z "$BUILD_FLAVOUR" ]; then
+    fail "BUILD_FLAVOUR not set"
+  fi
+  if [ -z "$BIN_DIST_NAME" ]; then
+    fail "BIN_DIST_NAME not set"
   fi
 
   run_hadrian binary-dist
 
-  mv _build/bindist/ghc*.tar.xz ghc.tar.xz
+  mv _build/bindist/ghc*.tar.xz $BIN_DIST_NAME.tar.xz
 }
 
 function test_hadrian() {
@@ -389,6 +398,34 @@ function test_hadrian() {
     --test-compiler="$TOP"/_build/install/bin/ghc
 }
 
+function cabal_test() {
+  if [ -z "$OUT" ]; then
+    fail "OUT not set"
+  fi
+
+  start_section "Cabal test: $OUT"
+  mkdir -p "$OUT"
+  run "$HC" \
+    -hidir tmp -odir tmp -fforce-recomp \
+    -ddump-to-file -dumpdir "$OUT/dumps" -ddump-timings \
+    +RTS --machine-readable "-t$OUT/rts.log" -RTS \
+    -package mtl -ilibraries/Cabal/Cabal libraries/Cabal/Cabal/Setup.hs \
+    $@
+  rm -Rf tmp
+  end_section "Cabal test: $OUT"
+}
+
+function run_perf_test() {
+  if [ -z "$HC" ]; then
+    fail "HC not set"
+  fi
+
+  mkdir -p out
+  OUT=out/Cabal-O0 cabal_test -O0
+  OUT=out/Cabal-O1 cabal_test -O1
+  OUT=out/Cabal-O2 cabal_test -O2
+}
+
 function clean() {
   rm -R tmp
   run "$MAKE" --quiet clean || true
@@ -396,10 +433,12 @@ function clean() {
 }
 
 function run_hadrian() {
+  if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
   run hadrian/build-cabal \
-    --flavour="$FLAVOUR" \
+    --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
     --broken-test="$BROKEN_TESTS" \
+    --bignum=$BIGNUM_BACKEND \
     $HADRIAN_ARGS \
     $@
 }
@@ -412,6 +451,8 @@ function shell() {
   fi
   run $cmd
 }
+
+setup_locale
 
 # Determine Cabal data directory
 case "$(uname)" in
@@ -438,10 +479,24 @@ case $1 in
   setup) setup && cleanup_submodules ;;
   configure) configure ;;
   build_make) build_make ;;
-  test_make) fetch_perf_notes; test_make; push_perf_notes ;;
+  test_make)
+    fetch_perf_notes
+    res=0
+    test_make || res=$?
+    push_perf_notes
+    exit $res ;;
   build_hadrian) build_hadrian ;;
-  test_hadrian) fetch_perf_notes; test_hadrian; push_perf_notes ;;
+  # N.B. Always push notes, even if the build fails. This is okay to do as the
+  # testsuite driver doesn't record notes for tests that fail due to
+  # correctness.
+  test_hadrian)
+    fetch_perf_notes
+    res=0
+    test_hadrian || res=$?
+    push_perf_notes
+    exit $res ;;
   run_hadrian) run_hadrian $@ ;;
+  perf_test) run_perf_test ;;
   clean) clean ;;
   shell) shell $@ ;;
   *) fail "unknown mode $1" ;;

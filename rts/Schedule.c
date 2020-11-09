@@ -34,6 +34,7 @@
 #include "AwaitEvent.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/IOManager.h"
+#include "win32/AsyncWinIO.h"
 #endif
 #include "Trace.h"
 #include "RaiseAsync.h"
@@ -136,7 +137,6 @@ static Capability *schedule (Capability *initialCapability, Task *task);
 // abstracted only to make the structure and control flow of the
 // scheduler clearer.
 //
-static void schedulePreLoop (void);
 static void scheduleFindWork (Capability **pcap);
 #if defined(THREADED_RTS)
 static void scheduleYield (Capability **pcap, Task *task);
@@ -198,14 +198,13 @@ schedule (Capability *initialCapability, Task *task)
   bool ready_to_gc;
 
   cap = initialCapability;
+  t = NULL;
 
   // Pre-condition: this task owns initialCapability.
   // The sched_mutex is *NOT* held
   // NB. on return, we still hold a capability.
 
   debugTrace (DEBUG_sched, "cap %d: schedule()", initialCapability->no);
-
-  schedulePreLoop();
 
   // -----------------------------------------------------------
   // Scheduler loop starts here:
@@ -301,8 +300,13 @@ schedule (Capability *initialCapability, Task *task)
     // Additionally, it is not fatal for the
     // threaded RTS to reach here with no threads to run.
     //
+    // Since IOPorts have no deadlock avoidance guarantees you may also reach
+    // this point when blocked on an IO Port.  If this is the case the only
+    // thing that could unblock it is an I/O event.
+    //
     // win32: might be here due to awaitEvent() being abandoned
-    // as a result of a console event having been delivered.
+    // as a result of a console event having been delivered or as a result of
+    // waiting on an async I/O to complete with WinIO.
 
 #if defined(THREADED_RTS)
     scheduleYield(&cap,task);
@@ -310,9 +314,16 @@ schedule (Capability *initialCapability, Task *task)
     if (emptyRunQueue(cap)) continue; // look for work again
 #endif
 
-#if !defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+#if !defined(THREADED_RTS)
     if ( emptyRunQueue(cap) ) {
+#if defined(mingw32_HOST_OS)
+        /* Notify the I/O manager that we have nothing to do.  If there are
+           any outstanding I/O requests we'll block here.  If there are not
+           then this is a user error and we will abort soon.  */
+        awaitEvent (emptyRunQueue(cap));
+#else
         ASSERT(sched_state >= SCHED_INTERRUPTING);
+#endif
     }
 #endif
 
@@ -599,20 +610,6 @@ promoteInRunQueue (Capability *cap, StgTSO *tso)
     pushOnRunQueue(cap, tso);
 }
 
-/* ----------------------------------------------------------------------------
- * Setting up the scheduler loop
- * ------------------------------------------------------------------------- */
-
-static void
-schedulePreLoop(void)
-{
-  // initialisation for scheduler - what cannot go into initScheduler()
-
-#if defined(mingw32_HOST_OS) && !defined(USE_MINIINTERPRETER)
-    win32AllocStack();
-#endif
-}
-
 /* -----------------------------------------------------------------------------
  * scheduleFindWork()
  *
@@ -622,6 +619,9 @@ schedulePreLoop(void)
 static void
 scheduleFindWork (Capability **pcap)
 {
+#if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
+    queueIOThread();
+#endif
     scheduleStartSignalHandlers(*pcap);
 
     scheduleProcessInbox(pcap);
@@ -928,6 +928,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
          */
         if (recent_activity != ACTIVITY_INACTIVE) return;
 #endif
+        if (task->incall->tso && task->incall->tso->why_blocked == BlockedOnIOCompletion) return;
 
         debugTrace(DEBUG_sched, "deadlocked, forcing major GC...");
 
@@ -979,6 +980,10 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
             case BlockedOnMVarRead:
                 throwToSingleThreaded(cap, task->incall->tso,
                                       (StgClosure *)nonTermination_closure);
+                return;
+            case BlockedOnIOCompletion:
+                /* We're blocked waiting for an external I/O call, let's just
+                   chill for a bit.  */
                 return;
             default:
                 barf("deadlock: main thread blocked in a strange way");
@@ -1389,7 +1394,15 @@ scheduleNeedHeapProfile( bool ready_to_gc )
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-void stopAllCapabilities (Capability **pCap, Task *task)
+void stopAllCapabilities
+    ( Capability **pCap     // [in/out] This thread's task's owned capability.
+                            //          pCap may be NULL if no capability is owned.
+                            //          Else *pCap != NULL
+                            // On return, set to the task's newly owned
+                            // capability (task->cap). Though, the Task will
+                            // technically own all capabilities.
+    , Task *task            // [in] This thread's task.
+    )
 {
     stopAllCapabilitiesWith(pCap, task, SYNC_OTHER);
 }
@@ -1441,9 +1454,16 @@ void stopAllCapabilitiesWith (Capability **pCap, Task *task, SyncType sync_type)
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-static bool requestSync (
-    Capability **pcap, Task *task, PendingSync *new_sync,
-    SyncType *prev_sync_type)
+static bool requestSync
+    ( Capability **pcap         // [in/out] This thread's task's owned capability.
+                                // May change if there is an existing sync (true is returned).
+                                // Precondition:
+                                //      pcap may be NULL
+                                //      *pcap != NULL
+    , Task *task                // [in] This thread's task.
+    , PendingSync *new_sync     // [in] The new requested sync.
+    , SyncType *prev_sync_type  // [out] Only set if there is an existing sync (true is returned).
+    )
 {
     PendingSync *sync;
 
@@ -1537,7 +1557,7 @@ static void acquireAllCapabilities(Capability *cap, Task *task)
 void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task)
 {
     uint32_t i;
-
+    ASSERT( task != NULL);
     for (i = 0; i < n; i++) {
         Capability *tmpcap = capabilities[i];
         if (keep_cap != tmpcap) {
@@ -2060,7 +2080,7 @@ forkProcess(HsStablePtr *entry
             RELEASE_LOCK(&capabilities[i]->lock);
         }
 
-        boundTaskExiting(task);
+        exitMyTask();
 
         // just return the pid
         return pid;
@@ -2555,6 +2575,14 @@ scheduleThread(Capability *cap, StgTSO *tso)
 }
 
 void
+scheduleThreadNow(Capability *cap, StgTSO *tso)
+{
+    // The thread goes at the *beginning* of the run-queue,
+    // in order to execute it as soon as possible.
+    pushOnRunQueue(cap,tso);
+}
+
+void
 scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
 {
     tso->flags |= TSO_LOCKED; // we requested explicit affinity; don't
@@ -2571,6 +2599,7 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
 #endif
 }
 
+// See includes/rts/Threads.h
 void
 scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
 {
@@ -2597,6 +2626,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
     DEBUG_ONLY( id = tso->id );
     debugTrace(DEBUG_sched, "new bound thread (%lu)", (unsigned long)id);
 
+    // As the TSO is bound and on the run queue, schedule() will run the TSO.
     cap = schedule(cap,task);
 
     ASSERT(task->incall->rstat != NoStatus);
@@ -2676,9 +2706,10 @@ initScheduler(void)
   sched_state    = SCHED_RUNNING;
   recent_activity = ACTIVITY_YES;
 
-#if defined(THREADED_RTS)
+
   /* Initialise the mutex and condition variables used by
    * the scheduler. */
+#if defined(THREADED_RTS)
   initMutex(&sched_mutex);
   initMutex(&sync_finished_mutex);
   initCondition(&sync_finished_cond);
@@ -2731,7 +2762,7 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
     // debugBelch("n_failed_trygrab_idles = %d, n_idle_caps = %d\n",
     //            n_failed_trygrab_idles, n_idle_caps);
 
-    boundTaskExiting(task);
+    exitMyTask();
 }
 
 void
@@ -2790,7 +2821,7 @@ performGC_(bool force_major)
     waitForCapability(&cap,task);
     scheduleDoGC(&cap,task,force_major,false);
     releaseCapability(cap);
-    boundTaskExiting(task);
+    exitMyTask();
 }
 
 void
@@ -3164,6 +3195,11 @@ resurrectThreads (StgTSO *threads)
             throwToSingleThreaded(cap, tso,
                                   (StgClosure *)blockedIndefinitelyOnSTM_closure);
             break;
+        case BlockedOnIOCompletion:
+            /* I/O Ports may not be reachable by the GC as they may be getting
+             * notified by the RTS.  As such this call should be treated as if
+             * it is masking the exception.  */
+            continue;
         case NotBlocked:
             /* This might happen if the thread was blocked on a black hole
              * belonging to a thread that we've just woken up (raiseAsync

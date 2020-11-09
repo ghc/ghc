@@ -2,7 +2,7 @@
 
 module GHC.Core.Coercion where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep
 import {-# SOURCE #-} GHC.Core.TyCon
@@ -10,14 +10,14 @@ import {-# SOURCE #-} GHC.Core.TyCon
 import GHC.Types.Basic ( LeftOrRight )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
-import Pair
-import Util
+import GHC.Data.Pair
+import GHC.Utils.Misc
 
 mkReflCo :: Role -> Type -> Coercion
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkAppCo :: Coercion -> Coercion -> Coercion
 mkForAllCo :: TyCoVar -> Coercion -> Coercion -> Coercion
-mkFunCo :: Role -> Coercion -> Coercion -> Coercion
+mkFunCo :: Role -> CoercionN -> Coercion -> Coercion -> Coercion
 mkCoVarCo :: CoVar -> Coercion
 mkAxiomInstCo :: CoAxiom Branched -> BranchIndex -> [Coercion] -> Coercion
 mkPhantomCo :: Coercion -> Type -> Type -> Coercion

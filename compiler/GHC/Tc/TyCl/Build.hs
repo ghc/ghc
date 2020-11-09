@@ -17,12 +17,11 @@ module GHC.Tc.TyCl.Build (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Iface.Env
 import GHC.Core.FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
-import GHC.Builtin.Types( isCTupleTyConName )
-import GHC.Builtin.Types.Prim ( voidPrimTy )
+import GHC.Builtin.Types( isCTupleTyConName, unboxedUnitTy )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Types.Var
@@ -35,14 +34,17 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Types.Id
+import GHC.Types.SourceText
 import GHC.Tc.Utils.TcType
+import GHC.Core.Multiplicity
 
 import GHC.Types.SrcLoc( SrcSpan, noSrcSpan )
 import GHC.Driver.Session
 import GHC.Tc.Utils.Monad
 import GHC.Types.Unique.Supply
-import Util
-import Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 
 mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
@@ -65,7 +67,7 @@ mkNewTyConRhs tycon_name tycon con
     roles    = tyConRoles tycon
     res_kind = tyConResKind tycon
     con_arg_ty = case dataConRepArgTys con of
-                   [arg_ty] -> arg_ty
+                   [arg_ty] -> scaledThing arg_ty
                    tys -> pprPanic "mkNewTyConRhs" (ppr con <+> ppr tys)
     rhs_ty = substTyWith (dataConUnivTyVars con)
                          (mkTyVarTys tvs) con_arg_ty
@@ -106,11 +108,11 @@ buildDataCon :: FamInstEnvs
            -> [FieldLabel]             -- Field labels
            -> [TyVar]                  -- Universals
            -> [TyCoVar]                -- Existentials
-           -> [TyVarBinder]            -- User-written 'TyVarBinder's
+           -> [InvisTVBinder]          -- User-written 'TyVarBinder's
            -> [EqSpec]                 -- Equality spec
            -> KnotTied ThetaType       -- Does not include the "stupid theta"
                                        -- or the GADT equalities
-           -> [KnotTied Type]          -- Arguments
+           -> [KnotTied (Scaled Type)] -- Arguments
            -> KnotTied Type            -- Result types
            -> KnotTied TyCon           -- Rep tycon
            -> NameEnv ConTag           -- Maps the Name of each DataCon to its
@@ -132,7 +134,7 @@ buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs
         ; traceIf (text "buildDataCon 1" <+> ppr src_name)
         ; us <- newUniqueSupply
         ; dflags <- getDynFlags
-        ; let stupid_ctxt = mkDataConStupidTheta rep_tycon arg_tys univ_tvs
+        ; let stupid_ctxt = mkDataConStupidTheta rep_tycon (map scaledThing arg_tys) univ_tvs
               tag = lookupNameEnv_NF tag_map src_name
               -- See Note [Constructor tag allocation], fixes #14657
               data_con = mkDataCon src_name declared_infix prom_info
@@ -164,19 +166,18 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
         -- stupid theta, taken from the TyCon
 
     arg_tyvars      = tyCoVarsOfTypes arg_tys
-    in_arg_tys pred = not $ isEmptyVarSet $
-                      tyCoVarsOfType pred `intersectVarSet` arg_tyvars
+    in_arg_tys pred = tyCoVarsOfType pred `intersectsVarSet` arg_tyvars
 
 
 ------------------------------------------------------
 buildPatSyn :: Name -> Bool
             -> (Id,Bool) -> Maybe (Id, Bool)
-            -> ([TyVarBinder], ThetaType) -- ^ Univ and req
-            -> ([TyVarBinder], ThetaType) -- ^ Ex and prov
-            -> [Type]               -- ^ Argument types
-            -> Type                 -- ^ Result type
-            -> [FieldLabel]         -- ^ Field labels for
-                                    --   a record pattern synonym
+            -> ([InvisTVBinder], ThetaType) -- ^ Univ and req
+            -> ([InvisTVBinder], ThetaType) -- ^ Ex and prov
+            -> [Type]                       -- ^ Argument types
+            -> Type                         -- ^ Result type
+            -> [FieldLabel]                 -- ^ Field labels for
+                                            --   a record pattern synonym
             -> PatSyn
 buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
             (univ_tvs, req_theta) (ex_tvs, prov_theta) arg_tys
@@ -185,10 +186,10 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     -- compatible with the pattern synonym
     ASSERT2((and [ univ_tvs `equalLength` univ_tvs1
                  , ex_tvs `equalLength` ex_tvs1
-                 , pat_ty `eqType` substTy subst pat_ty1
+                 , pat_ty `eqType` substTy subst (scaledThing pat_ty1)
                  , prov_theta `eqTypes` substTys subst prov_theta1
                  , req_theta `eqTypes` substTys subst req_theta1
-                 , compareArgTys arg_tys (substTys subst arg_tys1)
+                 , compareArgTys arg_tys (substTys subst (map scaledThing arg_tys1))
                  ])
             , (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
                     , ppr ex_tvs <+> twiddle <+> ppr ex_tvs1
@@ -203,17 +204,17 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
   where
     ((_:_:univ_tvs1), req_theta1, tau) = tcSplitSigmaTy $ idType matcher_id
     ([pat_ty1, cont_sigma, _], _)      = tcSplitFunTys tau
-    (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy cont_sigma
+    (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy (scaledThing cont_sigma)
     (arg_tys1, _) = (tcSplitFunTys cont_tau)
     twiddle = char '~'
     subst = zipTvSubst (univ_tvs1 ++ ex_tvs1)
                        (mkTyVarTys (binderVars (univ_tvs ++ ex_tvs)))
 
-    -- For a nullary pattern synonym we add a single void argument to the
+    -- For a nullary pattern synonym we add a single (# #) argument to the
     -- matcher to preserve laziness in the case of unlifted types.
     -- See #12746
     compareArgTys :: [Type] -> [Type] -> Bool
-    compareArgTys [] [x] = x `eqType` voidPrimTy
+    compareArgTys [] [x] = x `eqType` unboxedUnitTy
     compareArgTys arg_tys matcher_arg_tys = arg_tys `eqTypes` matcher_arg_tys
 
 
@@ -299,7 +300,7 @@ buildClass tycon_name binders roles fds
               op_names   = [op | (op,_,_) <- sig_stuff]
               arg_tys    = sc_theta ++ op_tys
               rec_tycon  = classTyCon rec_clas
-              univ_bndrs = tyConTyVarBinders binders
+              univ_bndrs = tyConInvisTVBinders binders
               univ_tvs   = binderVars univ_bndrs
 
         ; rep_nm   <- newTyConRepName datacon_name
@@ -315,7 +316,7 @@ buildClass tycon_name binders roles fds
                                    univ_bndrs
                                    [{- No GADT equalities -}]
                                    [{- No theta -}]
-                                   arg_tys
+                                   (map unrestricted arg_tys) -- type classes are unrestricted
                                    (mkTyConApp rec_tycon (mkTyVarTys univ_tvs))
                                    rec_tycon
                                    (mkTyConTagMap rec_tycon)

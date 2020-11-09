@@ -37,28 +37,11 @@ static alloc_rec* allocs = NULL;
 /* free_blocks are kept in ascending order, and adjacent blocks are merged */
 static block_rec* free_blocks = NULL;
 
-/* Mingw-w64 does not currently have this in their header. So we have to import it.*/
-typedef LPVOID(WINAPI *VirtualAllocExNumaProc)(HANDLE, LPVOID, SIZE_T, DWORD, DWORD, DWORD);
-
-/* Cache NUMA API call. */
-VirtualAllocExNumaProc _VirtualAllocExNuma;
-
 void
 osMemInit(void)
 {
     allocs = NULL;
     free_blocks = NULL;
-
-    /* Resolve and cache VirtualAllocExNuma. */
-    if (osNumaAvailable() && RtsFlags.GcFlags.numa)
-    {
-        _VirtualAllocExNuma = (VirtualAllocExNumaProc)(void*)GetProcAddress(GetModuleHandleW(L"kernel32"), "VirtualAllocExNuma");
-        if (!_VirtualAllocExNuma)
-        {
-            sysErrorBelch(
-                "osBindMBlocksToNode: VirtualAllocExNuma does not exist. How did you get this far?");
-        }
-    }
 }
 
 static
@@ -459,7 +442,7 @@ void *osReserveHeapMemory (void *startAddress, W_ *len)
     void *start;
 
     heap_base = VirtualAlloc(startAddress, *len + MBLOCK_SIZE,
-                              MEM_RESERVE, PAGE_READWRITE);
+                              MEM_RESERVE | MEM_TOP_DOWN, PAGE_READWRITE);
     if (heap_base == NULL) {
         if (GetLastError() == ERROR_NOT_ENOUGH_MEMORY) {
             errorBelch("out of memory");
@@ -489,7 +472,7 @@ void osCommitMemory (void *at, W_ size)
     temp = VirtualAlloc(at, size, MEM_COMMIT, PAGE_READWRITE);
     if (temp == NULL) {
         sysErrorBelch("osCommitMemory: VirtualAlloc MEM_COMMIT failed");
-        stg_exit(EXIT_FAILURE);
+        stg_exit(EXIT_HEAPOVERFLOW);
     }
 }
 
@@ -569,7 +552,7 @@ void osBindMBlocksToNode(
                On windows also -xb is broken, it does nothing so that can't
                be used to tweak it (see #12577). So for now, just let the OS decide.
             */
-            temp = _VirtualAllocExNuma(
+            temp = VirtualAllocExNuma(
                           GetCurrentProcess(),
                           NULL, // addr? See base memory
                           size,

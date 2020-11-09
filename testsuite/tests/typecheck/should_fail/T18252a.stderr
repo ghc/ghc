@@ -1,0 +1,4 @@
+
+T18252a.hs:8:10:
+    Precedence parsing error
+        cannot mix ‘~’ [infix 4] and ‘~’ [infix 4] in the same infix expression

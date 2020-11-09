@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
--- | Computing fingerprints of values serializeable with GHC's "Binary" module.
+-- | Computing fingerprints of values serializeable with GHC's \"Binary\" module.
 module GHC.Iface.Recomp.Binary
   ( -- * Computing fingerprints
     fingerprintBinMem
@@ -10,13 +10,13 @@ module GHC.Iface.Recomp.Binary
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Fingerprint
-import Binary
+import GHC.Utils.Fingerprint
+import GHC.Utils.Binary
 import GHC.Types.Name
-import PlainPanic
-import Util
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Misc
 
 fingerprintBinMem :: BinHandle -> IO Fingerprint
 fingerprintBinMem bh = withBinBuffer bh f
@@ -35,8 +35,7 @@ computeFingerprint :: (Binary a)
 computeFingerprint put_nonbinding_name a = do
     bh <- fmap set_user_data $ openBinMem (3*1024) -- just less than a block
     put_ bh a
-    fp <- fingerprintBinMem bh
-    return fp
+    fingerprintBinMem bh
   where
     set_user_data bh =
       setUserData bh $ newWriteState put_nonbinding_name putNameLiterally putFS

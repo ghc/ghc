@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 -- | Types for the Constructed Product Result lattice. "GHC.Core.Opt.CprAnal" and "GHC.Core.Opt.WorkWrap.Utils"
--- are its primary customers via 'idCprInfo'.
+-- are its primary customers via 'GHC.Types.Id.idCprInfo'.
 module GHC.Types.Cpr (
     CprResult, topCpr, botCpr, conCpr, asConCpr,
     CprType (..), topCprType, botCprType, conCprType,
@@ -8,11 +8,11 @@ module GHC.Types.Cpr (
     CprSig (..), topCprSig, mkCprSigForArity, mkCprSig, seqCprSig
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic
-import Outputable
-import Binary
+import GHC.Utils.Outputable
+import GHC.Utils.Binary
 
 --
 -- * CprResult
@@ -113,13 +113,13 @@ trimCprTy :: CprType -> CprType
 trimCprTy (CprType arty res) = CprType arty (trimCpr res)
 
 -- | The arity of the wrapped 'CprType' is the arity at which it is safe
--- to unleash. See Note [Understanding DmdType and StrictSig] in GHC.Types.Demand
+-- to unleash. See Note [Understanding DmdType and StrictSig] in "GHC.Types.Demand"
 newtype CprSig = CprSig { getCprSig :: CprType }
   deriving (Eq, Binary)
 
 -- | Turns a 'CprType' computed for the particular 'Arity' into a 'CprSig'
 -- unleashable at that arity. See Note [Understanding DmdType and StrictSig] in
--- Demand
+-- "GHC.Types.Demand"
 mkCprSigForArity :: Arity -> CprType -> CprSig
 mkCprSigForArity arty ty = CprSig (ensureCprTyArity arty ty)
 

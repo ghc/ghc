@@ -12,6 +12,7 @@ import Oracles.ModuleFiles
 import Packages
 import Rules.Gmp
 import Rules.Register
+import Settings
 import Target
 import Utilities
 
@@ -91,6 +92,7 @@ buildDynamicLibUnix root suffix dynlibpath = do
 
 -- | Build a "GHCi library" ('LibGhci') under the given build root, with the
 -- complete path of the file to build is given as the second argument.
+-- See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
 buildGhciLibO :: FilePath -> FilePath -> Action ()
 buildGhciLibO root ghcilibPath = do
     l@(BuildPath _ stage _ (LibGhci _ _ _))
@@ -100,7 +102,7 @@ buildGhciLibO root ghcilibPath = do
     let context = libGhciContext l
     objs <- allObjects context
     need objs
-    build $ target context (Ld stage) objs [ghcilibPath]
+    build $ target context (MergeObjects stage) objs [ghcilibPath]
 
 -- * Helpers
 
@@ -131,11 +133,15 @@ cObjects context = do
 
 -- | Return extra object files needed to build the given library context. The
 -- resulting list is currently non-empty only when the package from the
--- 'Context' is @integer-gmp@.
+-- 'Context' is @ghc-bignum@ built with in-tree GMP backend.
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
-    | package context == integerGmp = gmpObjects (stage context)
-    | otherwise                     = return []
+    | package context == ghcBignum = do
+         interpretInContext context getBignumBackend >>= \case
+            "gmp" -> gmpObjects (stage context)
+            _     -> return []
+
+    | otherwise = return []
 
 -- | Return all the object files to be put into the library we're building for
 -- the given 'Context'.

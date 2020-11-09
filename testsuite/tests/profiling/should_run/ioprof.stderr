@@ -1,5 +1,5 @@
 ioprof: a
-CallStack (from ImplicitParams):
+CallStack (from HasCallStack):
   error, called at ioprof.hs:23:22 in main:Main
 CallStack (from -prof):
   Main.errorM.\ (ioprof.hs:23:22-28)
@@ -11,4 +11,3 @@ CallStack (from -prof):
   Main.bar (ioprof.hs:31:1-20)
   Main.runM (ioprof.hs:26:1-37)
   Main.main (ioprof.hs:28:1-43)
-  Main.CAF (<entire-module>)

@@ -13,7 +13,7 @@ module GHC.Stg.Pipeline ( stg2stg ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Stg.Syntax
 
@@ -23,12 +23,14 @@ import GHC.Stg.DepAnal  ( depSortStgPgm )
 import GHC.Stg.Unarise  ( unarise )
 import GHC.Stg.CSE      ( stgCse )
 import GHC.Stg.Lift     ( stgLiftLams )
-import GHC.Types.Module ( Module )
+import GHC.Unit.Module ( Module )
 
 import GHC.Driver.Session
-import ErrUtils
+import GHC.Utils.Error
+import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict
@@ -51,7 +53,7 @@ stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes 
         -> IO [StgTopBinding]        -- output program
 
 stg2stg dflags this_mod binds
-  = do  { dump_when Opt_D_dump_stg "STG:" binds
+  = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass dflags "Stg2Stg"
         -- Do the main business!
         ; binds' <- runStgM 'g' $
@@ -103,13 +105,14 @@ stg2stg dflags this_mod binds
             liftIO (stg_linter True "Unarise" binds')
             return binds'
 
+    opts = initStgPprOpts dflags
     dump_when flag header binds
-      = dumpIfSet_dyn dflags flag header FormatSTG (pprStgTopBindings binds)
+      = dumpIfSet_dyn dflags flag header FormatSTG (pprStgTopBindings opts binds)
 
     end_pass what binds2
       = liftIO $ do -- report verbosely, if required
           dumpIfSet_dyn dflags Opt_D_verbose_stg2stg what
-            FormatSTG (vcat (map ppr binds2))
+            FormatSTG (vcat (map (pprStgTopBinding opts) binds2))
           stg_linter False what binds2
           return binds2
 

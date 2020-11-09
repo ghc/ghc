@@ -5,5 +5,5 @@ module TypedSplice where
 
 import Language.Haskell.TH
 
-metaExp :: Q (TExp (Bool -> Bool))
+metaExp :: Code Q (Bool -> Bool)
 metaExp = [|| not :: _ -> _b ||]

@@ -10,18 +10,18 @@ module GHC.Types.Var.Env (
         -- ** Manipulating these environments
         emptyVarEnv, unitVarEnv, mkVarEnv, mkVarEnv_Directly,
         elemVarEnv, disjointVarEnv,
-        extendVarEnv, extendVarEnv_C, extendVarEnv_Acc, extendVarEnv_Directly,
+        extendVarEnv, extendVarEnv_C, extendVarEnv_Acc,
         extendVarEnvList,
         plusVarEnv, plusVarEnv_C, plusVarEnv_CD, plusMaybeVarEnv_C,
         plusVarEnvList, alterVarEnv,
-        delVarEnvList, delVarEnv, delVarEnv_Directly,
-        minusVarEnv, intersectsVarEnv,
+        delVarEnvList, delVarEnv,
+        minusVarEnv,
         lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
         mapVarEnv, zipVarEnv,
         modifyVarEnv, modifyVarEnv_Directly,
         isEmptyVarEnv,
-        elemVarEnvByKey, lookupVarEnv_Directly,
-        filterVarEnv, filterVarEnv_Directly, restrictVarEnv,
+        elemVarEnvByKey,
+        filterVarEnv, restrictVarEnv,
         partitionVarEnv,
 
         -- * Deterministic Var environments (maps)
@@ -33,7 +33,7 @@ module GHC.Types.Var.Env (
         extendDVarEnv, extendDVarEnv_C,
         extendDVarEnvList,
         lookupDVarEnv, elemDVarEnv,
-        isEmptyDVarEnv, foldDVarEnv,
+        isEmptyDVarEnv, foldDVarEnv, nonDetStrictFoldDVarEnv,
         mapDVarEnv, filterDVarEnv,
         modifyDVarEnv,
         alterDVarEnv,
@@ -74,7 +74,7 @@ module GHC.Types.Var.Env (
         emptyTidyEnv, mkEmptyTidyEnv, delTidyEnvList
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 import qualified Data.IntMap.Strict as IntMap -- TODO: Move this to UniqFM
 
 import GHC.Types.Name.Occurrence
@@ -85,9 +85,10 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique
-import Util
-import Maybes
-import Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Data.Maybe
+import GHC.Utils.Outputable
 
 {-
 ************************************************************************
@@ -439,20 +440,24 @@ delTidyEnvList (occ_env, var_env) vs = (occ_env', var_env')
 ************************************************************************
 -}
 
+-- We would like this to be `UniqFM Var elt`
+-- but the code uses various key types.
+-- So for now make it explicitly untyped
+
 -- | Variable Environment
-type VarEnv elt     = UniqFM elt
+type VarEnv elt     = UniqFM Var elt
 
 -- | Identifier Environment
-type IdEnv elt      = VarEnv elt
+type IdEnv elt      = UniqFM Id elt
 
 -- | Type Variable Environment
-type TyVarEnv elt   = VarEnv elt
+type TyVarEnv elt   = UniqFM Var elt
 
 -- | Type or Coercion Variable Environment
-type TyCoVarEnv elt = VarEnv elt
+type TyCoVarEnv elt = UniqFM TyCoVar elt
 
 -- | Coercion Variable Environment
-type CoVarEnv elt   = VarEnv elt
+type CoVarEnv elt   = UniqFM CoVar elt
 
 emptyVarEnv       :: VarEnv a
 mkVarEnv          :: [(Var, a)] -> VarEnv a
@@ -463,20 +468,15 @@ alterVarEnv       :: (Maybe a -> Maybe a) -> VarEnv a -> Var -> VarEnv a
 extendVarEnv      :: VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_C    :: (a->a->a) -> VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_Acc  :: (a->b->b) -> (a->b) -> VarEnv b -> Var -> a -> VarEnv b
-extendVarEnv_Directly :: VarEnv a -> Unique -> a -> VarEnv a
 plusVarEnv        :: VarEnv a -> VarEnv a -> VarEnv a
 plusVarEnvList    :: [VarEnv a] -> VarEnv a
 extendVarEnvList  :: VarEnv a -> [(Var, a)] -> VarEnv a
 
-lookupVarEnv_Directly :: VarEnv a -> Unique -> Maybe a
-filterVarEnv_Directly :: (Unique -> a -> Bool) -> VarEnv a -> VarEnv a
-delVarEnv_Directly    :: VarEnv a -> Unique -> VarEnv a
 partitionVarEnv   :: (a -> Bool) -> VarEnv a -> (VarEnv a, VarEnv a)
 restrictVarEnv    :: VarEnv a -> VarSet -> VarEnv a
 delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
 delVarEnv         :: VarEnv a -> Var -> VarEnv a
 minusVarEnv       :: VarEnv a -> VarEnv b -> VarEnv a
-intersectsVarEnv  :: VarEnv a -> VarEnv a -> Bool
 plusVarEnv_C      :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
 plusVarEnv_CD     :: (a -> a -> a) -> VarEnv a -> a -> VarEnv a -> a -> VarEnv a
 plusMaybeVarEnv_C :: (a -> a -> Maybe a) -> VarEnv a -> VarEnv a -> VarEnv a
@@ -499,7 +499,6 @@ alterVarEnv      = alterUFM
 extendVarEnv     = addToUFM
 extendVarEnv_C   = addToUFM_C
 extendVarEnv_Acc = addToUFM_Acc
-extendVarEnv_Directly = addToUFM_Directly
 extendVarEnvList = addListToUFM
 plusVarEnv_C     = plusUFM_C
 plusVarEnv_CD    = plusUFM_CD
@@ -507,7 +506,6 @@ plusMaybeVarEnv_C = plusMaybeUFM_C
 delVarEnvList    = delListFromUFM
 delVarEnv        = delFromUFM
 minusVarEnv      = minusUFM
-intersectsVarEnv e1 e2 = not (isEmptyVarEnv (e1 `intersectUFM` e2))
 plusVarEnv       = plusUFM
 plusVarEnvList   = plusUFMList
 lookupVarEnv     = lookupUFM
@@ -519,12 +517,9 @@ mkVarEnv_Directly= listToUFM_Directly
 emptyVarEnv      = emptyUFM
 unitVarEnv       = unitUFM
 isEmptyVarEnv    = isNullUFM
-lookupVarEnv_Directly = lookupUFM_Directly
-filterVarEnv_Directly = filterUFM_Directly
-delVarEnv_Directly    = delFromUFM_Directly
 partitionVarEnv       = partitionUFM
 
-restrictVarEnv env vs = filterVarEnv_Directly keep env
+restrictVarEnv env vs = filterUFM_Directly keep env
   where
     keep u _ = u `elemVarSetByKey` vs
 
@@ -543,7 +538,7 @@ modifyVarEnv mangle_fn env key
       Nothing -> env
       Just xx -> extendVarEnv env key (mangle_fn xx)
 
-modifyVarEnv_Directly :: (a -> a) -> UniqFM a -> Unique -> UniqFM a
+modifyVarEnv_Directly :: (a -> a) -> UniqFM key a -> Unique -> UniqFM key a
 modifyVarEnv_Directly mangle_fn env key
   = case (lookupUFM_Directly env key) of
       Nothing -> env
@@ -554,13 +549,14 @@ modifyVarEnv_Directly mangle_fn env key
 -- DVarEnv.
 
 -- | Deterministic Variable Environment
-type DVarEnv elt = UniqDFM elt
+type DVarEnv elt = UniqDFM Var elt
 
 -- | Deterministic Identifier Environment
-type DIdEnv elt = DVarEnv elt
+-- Sadly not always indexed by Id, but it is in the common case.
+type DIdEnv elt = UniqDFM Var elt
 
 -- | Deterministic Type Variable Environment
-type DTyVarEnv elt = DVarEnv elt
+type DTyVarEnv elt = UniqDFM TyVar elt
 
 emptyDVarEnv :: DVarEnv a
 emptyDVarEnv = emptyUDFM
@@ -582,6 +578,12 @@ lookupDVarEnv = lookupUDFM
 
 foldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
 foldDVarEnv = foldUDFM
+
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
+nonDetStrictFoldDVarEnv = nonDetStrictFoldUDFM
 
 mapDVarEnv :: (a -> b) -> DVarEnv a -> DVarEnv b
 mapDVarEnv = mapUDFM

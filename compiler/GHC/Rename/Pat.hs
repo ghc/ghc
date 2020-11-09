@@ -1,3 +1,14 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ViewPatterns        #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -9,18 +20,6 @@ Handles @Match@, @GRHSs@, @HsExpr@, and @Qualifier@ datatypes.  In
 general, all of these functions return a renamed thing, and a set of
 free variables.
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DeriveFunctor #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 module GHC.Rename.Pat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
 
@@ -38,13 +37,13 @@ module GHC.Rename.Pat (-- main entry points
               -- Literals
               rnLit, rnOverLit,
 
-             -- Pattern Error messages that are also used elsewhere
-             checkTupSize, patSigErr
+             -- Pattern Error message that is also used elsewhere
+             patSigErr
              ) where
 
 -- ENH: thin imports to only what is necessary for patterns
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
@@ -60,16 +59,18 @@ import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
-                           , checkTupSize , unknownSubordinateErr )
+                           , unknownSubordinateErr )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
-import Util
-import ListSetOps          ( removeDups )
-import Outputable
+import GHC.Types.SourceText
+import GHC.Utils.Misc
+import GHC.Data.List.SetOps( removeDups )
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
 import GHC.Builtin.Types   ( nilDataCon )
@@ -160,8 +161,8 @@ Consider
   g _ = T1
 
 Arguably we should report T2 as unused, even though it appears in a
-pattern, because it never occurs in a constructed position.  See
-#7336.
+pattern, because it never occurs in a constructed position.
+See #7336.
 However, implementing this in the face of pattern synonyms would be
 less straightforward, since given two pattern synonyms
 
@@ -218,9 +219,6 @@ matchNameMaker ctxt = LamMk report_unused
                       ThPatQuote            -> False
                       _                     -> True
 
-rnHsSigCps :: LHsSigWcType GhcPs -> CpsRn (LHsSigWcType GhcRn)
-rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped AlwaysBind PatCtx sig)
-
 newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
 newPatLName name_maker rdr_name@(L loc _)
   = do { name <- newPatName name_maker rdr_name
@@ -239,19 +237,30 @@ newPatName (LetMk is_top fix_env) rdr_name
         do { name <- case is_top of
                        NotTopLevel -> newLocalBndrRn rdr_name
                        TopLevel    -> newTopSrcBinder rdr_name
-           ; bindLocalNames [name] $       -- Do *not* use bindLocalNameFV here
-                                        -- See Note [View pattern usage]
+           ; bindLocalNames [name] $
+                 -- Do *not* use bindLocalNameFV here;
+                 --   see Note [View pattern usage]
+                 -- For the TopLevel case
+                 --   see Note [bindLocalNames for an External name]
              addLocalFixities fix_env [name] $
              thing_inside name })
 
-    -- Note: the bindLocalNames is somewhat suspicious
-    --       because it binds a top-level name as a local name.
-    --       however, this binding seems to work, and it only exists for
-    --       the duration of the patterns and the continuation;
-    --       then the top-level name is added to the global env
-    --       before going on to the RHSes (see GHC.Rename.Module).
+{- Note [bindLocalNames for an External name]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the TopLevel case, the use of bindLocalNames here is somewhat
+suspicious because it binds a top-level External name in the
+LocalRdrEnv.  c.f. Note [LocalRdrEnv] in GHC.Types.Name.Reader.
 
-{-
+However, this only happens when renaming the LHS (only) of a top-level
+pattern binding.  Even though this only the LHS, we need to bring the
+binder into scope in the pattern itself in case the binder is used in
+subsequent view patterns.  A bit bizarre, something like
+  (x, Just y <- f x) = e
+
+Anyway, bindLocalNames does work, and the binding only exists for the
+duration of the pattern; then the top-level name is added to the
+global env before going on to the RHSes (see GHC.Rename.Module).
+
 Note [View pattern usage]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -410,9 +419,12 @@ rnPatAndThen mk (SigPat x pat sig)
   -- f ((Just (x :: a) :: Maybe a)
   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~^       `a' is first bound here
   -- ~~~~~~~~~~~~~~~^                   the same `a' then used here
-  = do { sig' <- rnHsSigCps sig
+  = do { sig' <- rnHsPatSigTypeAndThen sig
        ; pat' <- rnLPatAndThen mk pat
        ; return (SigPat x pat' sig' ) }
+  where
+    rnHsPatSigTypeAndThen :: HsPatSigType GhcPs -> CpsRn (HsPatSigType GhcRn)
+    rnHsPatSigTypeAndThen sig = CpsRn (rnHsPatSigType AlwaysBind PatCtx sig)
 
 rnPatAndThen mk (LitPat x lit)
   | HsString src s <- lit
@@ -468,14 +480,14 @@ rnPatAndThen mk p@(ViewPat x expr pat)
        -- ; return (ViewPat expr' pat' ty) }
        ; return (ViewPat x expr' pat') }
 
-rnPatAndThen mk (ConPatIn con stuff)
+rnPatAndThen mk (ConPat NoExtField con args)
    -- rnConPatAndThen takes care of reconstructing the pattern
    -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
   = case unLoc con == nameRdrName (dataConName nilDataCon) of
       True    -> do { ol_flag <- liftCps $ xoptM LangExt.OverloadedLists
                     ; if ol_flag then rnPatAndThen mk (ListPat noExtField [])
-                                 else rnConPatAndThen mk con stuff}
-      False   -> rnConPatAndThen mk con stuff
+                                 else rnConPatAndThen mk con args}
+      False   -> rnConPatAndThen mk con args
 
 rnPatAndThen mk (ListPat _ pats)
   = do { opt_OverloadedLists <- liftCps $ xoptM LangExt.OverloadedLists
@@ -486,8 +498,7 @@ rnPatAndThen mk (ListPat _ pats)
           False -> return (ListPat Nothing pats') }
 
 rnPatAndThen mk (TuplePat x pats boxed)
-  = do { liftCps $ checkTupSize (length pats)
-       ; pats' <- rnLPatsAndThen mk pats
+  = do { pats' <- rnLPatsAndThen mk pats
        ; return (TuplePat x pats' boxed) }
 
 rnPatAndThen mk (SumPat x pat alt arity)
@@ -505,9 +516,6 @@ rnPatAndThen mk (SplicePat _ splice)
            Left  not_yet_renamed -> rnPatAndThen mk not_yet_renamed
            Right already_renamed -> return already_renamed }
 
-rnPatAndThen _ pat = pprPanic "rnLPatAndThen" (ppr pat)
-
-
 --------------------
 rnConPatAndThen :: NameMaker
                 -> Located RdrName    -- the constructor
@@ -517,7 +525,12 @@ rnConPatAndThen :: NameMaker
 rnConPatAndThen mk con (PrefixCon pats)
   = do  { con' <- lookupConCps con
         ; pats' <- rnLPatsAndThen mk pats
-        ; return (ConPatIn con' (PrefixCon pats')) }
+        ; return $ ConPat
+            { pat_con_ext = noExtField
+            , pat_con = con'
+            , pat_args = PrefixCon pats'
+            }
+        }
 
 rnConPatAndThen mk con (InfixCon pat1 pat2)
   = do  { con' <- lookupConCps con
@@ -529,7 +542,12 @@ rnConPatAndThen mk con (InfixCon pat1 pat2)
 rnConPatAndThen mk con (RecCon rpats)
   = do  { con' <- lookupConCps con
         ; rpats' <- rnHsRecPatsAndThen mk con' rpats
-        ; return (ConPatIn con' (RecCon rpats')) }
+        ; return $ ConPat
+            { pat_con_ext = noExtField
+            , pat_con = con'
+            , pat_args = RecCon rpats'
+            }
+        }
 
 checkUnusedRecordWildcardCps :: SrcSpan -> Maybe [Name] -> CpsRn ()
 checkUnusedRecordWildcardCps loc dotdot_names =
@@ -730,7 +748,7 @@ rnHsRecUpdFields flds
       = do { let lbl = rdrNameAmbiguousFieldOcc f
            ; sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
-                      -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Expr
+                      -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
                       if overload_ok
                           then do { mb <- lookupGlobalOccRn_overloaded
                                             overload_ok lbl

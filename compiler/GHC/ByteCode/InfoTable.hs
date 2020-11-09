@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, MagicHash, ScopedTypeVariables #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -9,21 +10,30 @@ module GHC.ByteCode.InfoTable ( mkITbls ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Session
+import GHC.Driver.Env
+
+import GHC.Platform
+import GHC.Platform.Profile
 
 import GHC.ByteCode.Types
 import GHC.Runtime.Interpreter
-import GHC.Driver.Session
-import GHC.Driver.Types
+
 import GHC.Types.Name       ( Name, getName )
 import GHC.Types.Name.Env
+import GHC.Types.RepType
+
 import GHC.Core.DataCon     ( DataCon, dataConRepArgTys, dataConIdentity )
 import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
-import GHC.Types.RepType
+import GHC.Core.Multiplicity     ( scaledThing )
+
 import GHC.StgToCmm.Layout  ( mkVirtConstrSizes )
 import GHC.StgToCmm.Closure ( tagForCon, NonVoid (..) )
-import Util
-import Panic
+
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 {-
   Manufacturing of info tables for DataCons
@@ -52,27 +62,29 @@ make_constr_itbls :: HscEnv -> [DataCon] -> IO ItblEnv
 make_constr_itbls hsc_env cons =
   mkItblEnv <$> mapM (uncurry mk_itbl) (zip cons [0..])
  where
-  dflags = hsc_dflags hsc_env
+  profile = targetProfile (hsc_dflags hsc_env)
 
   mk_itbl :: DataCon -> Int -> IO (Name,ItblPtr)
   mk_itbl dcon conNo = do
      let rep_args = [ NonVoid prim_rep
                     | arg <- dataConRepArgTys dcon
-                    , prim_rep <- typePrimRep arg ]
+                    , prim_rep <- typePrimRep (scaledThing arg) ]
 
          (tot_wds, ptr_wds) =
-             mkVirtConstrSizes dflags rep_args
+             mkVirtConstrSizes profile rep_args
 
          ptrs'  = ptr_wds
          nptrs' = tot_wds - ptr_wds
          nptrs_really
-            | ptrs' + nptrs' >= mIN_PAYLOAD_SIZE dflags = nptrs'
-            | otherwise = mIN_PAYLOAD_SIZE dflags - ptrs'
+            | ptrs' + nptrs' >= pc_MIN_PAYLOAD_SIZE constants = nptrs'
+            | otherwise = pc_MIN_PAYLOAD_SIZE constants - ptrs'
 
          descr = dataConIdentity dcon
 
-         tables_next_to_code = tablesNextToCode dflags
+         platform = profilePlatform profile
+         constants = platformConstants platform
+         tables_next_to_code = platformTablesNextToCode platform
 
      r <- iservCmd hsc_env (MkConInfoTable tables_next_to_code ptrs' nptrs_really
-                              conNo (tagForCon dflags dcon) descr)
+                              conNo (tagForCon platform dcon) descr)
      return (getName dcon, ItblPtr r)

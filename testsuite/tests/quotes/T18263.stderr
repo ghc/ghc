@@ -1,0 +1,3 @@
+
+T18263.hs:1:1:
+    ‘x’ is not in the type environment at a reify

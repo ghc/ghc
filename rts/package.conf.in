@@ -97,7 +97,7 @@ ld-options:
          , "-Wl,-u,_base_GHCziIOziException_cannotCompactFunction_closure"
          , "-Wl,-u,_base_GHCziIOziException_cannotCompactPinned_closure"
          , "-Wl,-u,_base_GHCziIOziException_cannotCompactMutable_closure"
-         , "-Wl,-u,_base_ControlziExceptionziBase_absentSumFieldError_closure"
+         , "-Wl,-u,_base_GHCziIOPort_doubleReadException_closure"
          , "-Wl,-u,_base_ControlziExceptionziBase_nonTermination_closure"
          , "-Wl,-u,_base_ControlziExceptionziBase_nestedAtomically_closure"
          , "-Wl,-u,_base_GHCziEventziThread_blockedOnBadFD_closure"
@@ -106,8 +106,12 @@ ld-options:
          , "-Wl,-u,_base_GHCziExceptionziType_overflowException_closure"
          , "-Wl,-u,_base_GHCziConcziSync_runSparks_closure"
          , "-Wl,-u,_base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         , "-Wl,-u,_base_GHCziConcziIO_interruptIOManager_closure"
          , "-Wl,-u,_base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
          , "-Wl,-u,_base_GHCziConcziSignal_runHandlersPtr_closure"
+#if defined(mingw32_HOST_OS)
+         , "-Wl,-u,_base_GHCziEventziWindows_processRemoteCompletion_closure"
+#endif
          , "-Wl,-u,_base_GHCziTopHandler_flushStdHandles_closure"
          , "-Wl,-u,_base_GHCziTopHandler_runMainIO_closure"
          , "-Wl,-u,_ghczmprim_GHCziTypes_Czh_con_info"
@@ -169,6 +173,10 @@ ld-options:
 #if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_cmpxchg64"
 #endif
+         , "-Wl,-u,_hs_xchg8"
+         , "-Wl,-u,_hs_xchg16"
+         , "-Wl,-u,_hs_xchg32"
+         , "-Wl,-u,_hs_xchg64"
          , "-Wl,-u,_hs_atomicread8"
          , "-Wl,-u,_hs_atomicread16"
          , "-Wl,-u,_hs_atomicread32"
@@ -203,7 +211,7 @@ ld-options:
          , "-Wl,-u,base_GHCziIOziException_cannotCompactFunction_closure"
          , "-Wl,-u,base_GHCziIOziException_cannotCompactPinned_closure"
          , "-Wl,-u,base_GHCziIOziException_cannotCompactMutable_closure"
-         , "-Wl,-u,base_ControlziExceptionziBase_absentSumFieldError_closure"
+         , "-Wl,-u,base_GHCziIOPort_doubleReadException_closure"
          , "-Wl,-u,base_ControlziExceptionziBase_nonTermination_closure"
          , "-Wl,-u,base_ControlziExceptionziBase_nestedAtomically_closure"
          , "-Wl,-u,base_GHCziEventziThread_blockedOnBadFD_closure"
@@ -212,8 +220,12 @@ ld-options:
          , "-Wl,-u,base_GHCziExceptionziType_overflowException_closure"
          , "-Wl,-u,base_GHCziConcziSync_runSparks_closure"
          , "-Wl,-u,base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         , "-Wl,-u,base_GHCziConcziIO_interruptIOManager_closure"
          , "-Wl,-u,base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
          , "-Wl,-u,base_GHCziConcziSignal_runHandlersPtr_closure"
+#if defined(mingw32_HOST_OS)
+         , "-Wl,-u,base_GHCziEventziWindows_processRemoteCompletion_closure"
+#endif
          , "-Wl,-u,base_GHCziTopHandler_flushStdHandles_closure"
          , "-Wl,-u,base_GHCziTopHandler_runMainIO_closure"
          , "-Wl,-u,ghczmprim_GHCziTypes_Czh_con_info"
@@ -275,6 +287,10 @@ ld-options:
 #if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_cmpxchg64"
 #endif
+         , "-Wl,-u,hs_xchg8"
+         , "-Wl,-u,hs_xchg16"
+         , "-Wl,-u,hs_xchg32"
+         , "-Wl,-u,hs_xchg64"
          , "-Wl,-u,hs_atomicread8"
          , "-Wl,-u,hs_atomicread16"
          , "-Wl,-u,hs_atomicread32"

@@ -1,6 +1,9 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
 ## 2.17.0.0
+  * Typed Quotations now return a value of type `Code m a` (GHC Proposal #195).
+    The main motiviation is to make writing instances easier and make it easier to
+    store `Code` values in type-indexed maps.
 
   * Implement Overloaded Quotations (GHC Proposal #246). This patch modifies a
     few fundamental things in the API. All the library combinators are generalised
@@ -9,6 +12,27 @@
     written in terms of `Q` are now disallowed. The types of `unsafeTExpCoerce`
     and `unTypeQ` are also generalised in terms of `Quote` rather than specific
     to `Q`.
+
+  * Implement Explicit specificity in type variable binders (GHC Proposal #99).
+    In `Language.Haskell.TH.Syntax`, `TyVarBndr` is now annotated with a `flag`,
+    denoting the additional argument to its constructors `PlainTV` and `KindedTV`.
+    `flag` is either the `Specificity` of the type variable (`SpecifiedSpec` or
+    `InferredSpec`) or `()`.
+
+  * Fix Eq/Ord instances for `Bytes`: we were comparing pointers while we should
+    compare the actual bytes (#16457).
+
+  * Fix Show instance for `Bytes`: we were showing the pointer value while we
+    want to show the contents (#16457).
+
+  * Add `Semigroup` and `Monoid` instances for `Q` (#18123).
+
+  * Add `MonadFix` instance for `Q` (#12073).
+
+  * Add support for QualifiedDo. The data constructors `DoE` and `MDoE` got a new
+    `Maybe ModName` argument to describe the qualifier of do blocks.
+
+  * The argument to `TExpQ` can now be levity polymorphic.
 
 ## 2.16.0.0 *TBA*
 

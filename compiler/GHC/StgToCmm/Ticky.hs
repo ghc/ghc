@@ -82,32 +82,29 @@ module GHC.StgToCmm.Ticky (
   tickyHeapCheck,
   tickyStackCheck,
 
-  tickyUnknownCall, tickyDirectCall,
+  tickyDirectCall,
 
   tickyPushUpdateFrame,
   tickyUpdateFrameOmitted,
 
   tickyEnterDynCon,
-  tickyEnterStaticCon,
-  tickyEnterViaNode,
 
   tickyEnterFun,
-  tickyEnterThunk, tickyEnterStdThunk,        -- dynamic non-value
-                                              -- thunks only
+  tickyEnterThunk,
   tickyEnterLNE,
 
   tickyUpdateBhCaf,
-  tickyBlackHole,
   tickyUnboxedTupleReturn,
   tickyReturnOldCon, tickyReturnNewCon,
 
-  tickyKnownCallTooFewArgs, tickyKnownCallExact, tickyKnownCallExtraArgs,
-  tickySlowCall, tickySlowCallPat,
+  tickySlowCall
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
+import GHC.Platform.Profile
+
 import GHC.StgToCmm.ArgRep    ( slowCallPattern , toArgRep , argRepString )
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Utils
@@ -120,19 +117,21 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 
-import GHC.Types.Module
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Basic
-import FastString
-import Outputable
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
 
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 
 -- Turgid imports for showTypeCategory
 import GHC.Builtin.Names
 import GHC.Tc.Utils.TcType
+import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Predicate
 
@@ -150,6 +149,7 @@ data TickyClosureType
     = TickyFun
         Bool -- True <-> single entry
     | TickyCon
+        DataCon -- the allocated constructor
     | TickyThunk
         Bool -- True <-> updateable
         Bool -- True <-> standard thunk (AP or selector), has no entry counter
@@ -193,13 +193,14 @@ withNewTickyCounterStdThunk isUpdatable name code = do
 
 withNewTickyCounterCon
   :: Name
+  -> DataCon
   -> FCode a
   -> FCode a
-withNewTickyCounterCon name code = do
+withNewTickyCounterCon name datacon code = do
     has_ctr <- thunkHasCounter False
     if not has_ctr
       then code
-      else withNewTickyCounter TickyCon name [] code
+      else withNewTickyCounter (TickyCon datacon) name [] code
 
 -- args does not include the void arguments
 withNewTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode a -> FCode a
@@ -227,7 +228,7 @@ emitTickyCounter cloType name args
                     ext = case cloType of
                               TickyFun single_entry -> parens $ hcat $ punctuate comma $
                                   [text "fun"] ++ [text "se"|single_entry]
-                              TickyCon -> parens (text "con")
+                              TickyCon datacon -> parens (text "con:" <+> ppr (dataConName datacon))
                               TickyThunk upd std -> parens $ hcat $ punctuate comma $
                                   [text "thk"] ++ [text "se"|not upd] ++ [text "std"|std]
                               TickyLNE | isInternalName name -> parens (text "LNE")
@@ -276,10 +277,8 @@ tickyUpdateFrameOmitted = ifTicky $ bumpTickyCounter (fsLit "UPDF_OMITTED_ctr")
 -- bump of name-specific ticky counter into. On the other hand, we can
 -- still track allocation their allocation.
 
-tickyEnterDynCon, tickyEnterStaticCon, tickyEnterViaNode :: FCode ()
-tickyEnterDynCon      = ifTicky $ bumpTickyCounter (fsLit "ENT_DYN_CON_ctr")
-tickyEnterStaticCon   = ifTicky $ bumpTickyCounter (fsLit "ENT_STATIC_CON_ctr")
-tickyEnterViaNode     = ifTicky $ bumpTickyCounter (fsLit "ENT_VIA_NODE_ctr")
+tickyEnterDynCon :: FCode ()
+tickyEnterDynCon = ifTicky $ bumpTickyCounter (fsLit "ENT_DYN_CON_ctr")
 
 tickyEnterThunk :: ClosureInfo -> FCode ()
 tickyEnterThunk cl_info
@@ -291,23 +290,13 @@ tickyEnterThunk cl_info
       registerTickyCtrAtEntryDyn ticky_ctr_lbl
       bumpTickyEntryCount ticky_ctr_lbl }
   where
-    updatable = closureSingleEntry cl_info
+    updatable = not (closureUpdReqd cl_info)
     static    = isStaticClosure cl_info
 
     ctr | static    = if updatable then fsLit "ENT_STATIC_THK_SINGLE_ctr"
                                    else fsLit "ENT_STATIC_THK_MANY_ctr"
         | otherwise = if updatable then fsLit "ENT_DYN_THK_SINGLE_ctr"
                                    else fsLit "ENT_DYN_THK_MANY_ctr"
-
-tickyEnterStdThunk :: ClosureInfo -> FCode ()
-tickyEnterStdThunk = tickyEnterThunk
-
-tickyBlackHole :: Bool{-updatable-} -> FCode ()
-tickyBlackHole updatable
-  = ifTicky (bumpTickyCounter ctr)
-  where
-    ctr | updatable = (fsLit "UPD_BH_SINGLE_ENTRY_ctr")
-        | otherwise = (fsLit "UPD_BH_UPDATABLE_ctr")
 
 tickyUpdateBhCaf :: ClosureInfo -> FCode ()
 tickyUpdateBhCaf cl_info
@@ -355,22 +344,22 @@ registerTickyCtr :: CLabel -> FCode ()
 --          ticky_entry_ctrs = & (f_ct);        /* mark it as "registered" */
 --          f_ct.registeredp = 1 }
 registerTickyCtr ctr_lbl = do
-  dflags <- getDynFlags
   platform <- getPlatform
   let
+    constants = platformConstants platform
     -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
     test = CmmMachOp (MO_Eq (wordWidth platform))
               [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl
-                                (oFFSET_StgEntCounter_registeredp dflags))) (bWord platform),
+                                (pc_OFFSET_StgEntCounter_registeredp constants))) (bWord platform),
                zeroExpr platform]
     register_stmts
-      = [ mkStore (CmmLit (cmmLabelOffB ctr_lbl (oFFSET_StgEntCounter_link dflags)))
+      = [ mkStore (CmmLit (cmmLabelOffB ctr_lbl (pc_OFFSET_StgEntCounter_link constants)))
                    (CmmLoad ticky_entry_ctrs (bWord platform))
         , mkStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
         , mkStore (CmmLit (cmmLabelOffB ctr_lbl
-                                (oFFSET_StgEntCounter_registeredp dflags)))
+                                (pc_OFFSET_StgEntCounter_registeredp constants)))
                    (mkIntExpr platform 1) ]
-    ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsUnitId (fsLit "ticky_entry_ctrs"))
+    ticky_entry_ctrs = mkLblExpr (mkRtsCmmDataLabel (fsLit "ticky_entry_ctrs"))
   emit =<< mkCmmIfThen test (catAGraphs register_stmts)
 
 tickyReturnOldCon, tickyReturnNewCon :: RepArity -> FCode ()
@@ -455,9 +444,9 @@ tickyDynAlloc :: Maybe Id -> SMRep -> LambdaFormInfo -> FCode ()
 --
 -- TODO what else to count while we're here?
 tickyDynAlloc mb_id rep lf = ifTicky $ do
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
-      bytes = platformWordSizeInBytes platform * heapClosureSizeW dflags rep
+  profile <- getProfile
+  let platform = profilePlatform profile
+      bytes = platformWordSizeInBytes platform * heapClosureSizeW profile rep
 
       countGlobal tot ctr = do
         bumpTickyCounterBy tot bytes
@@ -497,8 +486,7 @@ tickyAllocHeap ::
 -- Must be lazy in the amount of allocation!
 tickyAllocHeap genuine hp
   = ifTicky $
-    do  { dflags <- getDynFlags
-        ; platform <- getPlatform
+    do  { platform <- getPlatform
         ; ticky_ctr <- getTickyCtrLabel
         ; emit $ catAGraphs $
             -- only test hp from within the emit so that the monadic
@@ -507,17 +495,17 @@ tickyAllocHeap genuine hp
           if hp == 0 then []
           else let !bytes = platformWordSizeInBytes platform * hp in [
             -- Bump the allocation total in the closure's StgEntCounter
-            addToMem (rEP_StgEntCounter_allocs dflags)
-                     (CmmLit (cmmLabelOffB ticky_ctr (oFFSET_StgEntCounter_allocs dflags)))
+            addToMem (rEP_StgEntCounter_allocs platform)
+                     (CmmLit (cmmLabelOffB ticky_ctr (pc_OFFSET_StgEntCounter_allocs (platformConstants platform))))
                      bytes,
             -- Bump the global allocation total ALLOC_HEAP_tot
             addToMemLbl (bWord platform)
-                        (mkCmmDataLabel rtsUnitId (fsLit "ALLOC_HEAP_tot"))
+                        (mkRtsCmmDataLabel (fsLit "ALLOC_HEAP_tot"))
                         bytes,
             -- Bump the global allocation counter ALLOC_HEAP_ctr
             if not genuine then mkNop
             else addToMemLbl (bWord platform)
-                             (mkCmmDataLabel rtsUnitId (fsLit "ALLOC_HEAP_ctr"))
+                             (mkRtsCmmDataLabel (fsLit "ALLOC_HEAP_ctr"))
                              1
             ]}
 
@@ -581,23 +569,23 @@ ifTickyDynThunk :: FCode () -> FCode ()
 ifTickyDynThunk code = tickyDynThunkIsOn >>= \b -> when b code
 
 bumpTickyCounter :: FastString -> FCode ()
-bumpTickyCounter lbl = bumpTickyLbl (mkCmmDataLabel rtsUnitId lbl)
+bumpTickyCounter lbl = bumpTickyLbl (mkRtsCmmDataLabel lbl)
 
 bumpTickyCounterBy :: FastString -> Int -> FCode ()
-bumpTickyCounterBy lbl = bumpTickyLblBy (mkCmmDataLabel rtsUnitId lbl)
+bumpTickyCounterBy lbl = bumpTickyLblBy (mkRtsCmmDataLabel lbl)
 
 bumpTickyCounterByE :: FastString -> CmmExpr -> FCode ()
-bumpTickyCounterByE lbl = bumpTickyLblByE (mkCmmDataLabel rtsUnitId lbl)
+bumpTickyCounterByE lbl = bumpTickyLblByE (mkRtsCmmDataLabel lbl)
 
 bumpTickyEntryCount :: CLabel -> FCode ()
 bumpTickyEntryCount lbl = do
-  dflags <- getDynFlags
-  bumpTickyLit (cmmLabelOffB lbl (oFFSET_StgEntCounter_entry_count dflags))
+  platform <- getPlatform
+  bumpTickyLit (cmmLabelOffB lbl (pc_OFFSET_StgEntCounter_entry_count (platformConstants platform)))
 
 bumpTickyAllocd :: CLabel -> Int -> FCode ()
 bumpTickyAllocd lbl bytes = do
-  dflags <- getDynFlags
-  bumpTickyLitBy (cmmLabelOffB lbl (oFFSET_StgEntCounter_allocd dflags)) bytes
+  platform <- getPlatform
+  bumpTickyLitBy (cmmLabelOffB lbl (pc_OFFSET_StgEntCounter_allocd (platformConstants platform))) bytes
 
 bumpTickyLbl :: CLabel -> FCode ()
 bumpTickyLbl lhs = bumpTickyLitBy (cmmLabelOffB lhs 0) 1
@@ -623,13 +611,12 @@ bumpTickyLitByE lhs e = do
 
 bumpHistogram :: FastString -> Int -> FCode ()
 bumpHistogram lbl n = do
-    dflags <- getDynFlags
     platform <- getPlatform
-    let offset = n `min` (tICKY_BIN_COUNT dflags - 1)
+    let offset = n `min` (pc_TICKY_BIN_COUNT (platformConstants platform) - 1)
     emit (addToMem (bWord platform)
            (cmmIndexExpr platform
                 (wordWidth platform)
-                (CmmLit (CmmLabel (mkCmmDataLabel rtsUnitId lbl)))
+                (CmmLit (CmmLabel (mkRtsCmmDataLabel lbl)))
                 (CmmLit (CmmInt (fromIntegral offset) (wordWidth platform))))
            1)
 

@@ -1,8 +1,6 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
-           , BangPatterns
-  #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy       #-}
 
 -- ----------------------------------------------------------------------------
 --
@@ -44,11 +42,11 @@ fingerprint0 = Fingerprint 0 0
 
 fingerprintFingerprints :: [Fingerprint] -> Fingerprint
 fingerprintFingerprints fs = unsafeDupablePerformIO $
-  withArrayLen fs $ \len p -> do
+  withArrayLen fs $ \len p ->
     fingerprintData (castPtr p) (len * sizeOf (head fs))
 
 fingerprintData :: Ptr Word8 -> Int -> IO Fingerprint
-fingerprintData buf len = do
+fingerprintData buf len =
   allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do
     c_MD5Init pctxt
     c_MD5Update pctxt buf (fromIntegral len)
@@ -73,7 +71,7 @@ fingerprintString str = unsafeDupablePerformIO $
 --
 -- @since 4.7.0.0
 getFileHash :: FilePath -> IO Fingerprint
-getFileHash path = withBinaryFile path ReadMode $ \h -> do
+getFileHash path = withBinaryFile path ReadMode $ \h ->
   allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do
     c_MD5Init pctxt
 

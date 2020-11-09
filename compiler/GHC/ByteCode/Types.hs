@@ -1,4 +1,5 @@
-{-# LANGUAGE MagicHash, RecordWildCards, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards            #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -13,13 +14,13 @@ module GHC.ByteCode.Types
   , CCostCentre
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import FastString
+import GHC.Data.FastString
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Builtin.PrimOps
 import SizedSeq
 import GHC.Core.Type
@@ -154,6 +155,7 @@ data ModBreaks
         -- ^ An array giving the names of the free variables at each breakpoint.
    , modBreaks_decls :: !(Array BreakIndex [String])
         -- ^ An array giving the names of the declarations enclosing each breakpoint.
+        -- See Note [Field modBreaks_decls]
    , modBreaks_ccs :: !(Array BreakIndex (RemotePtr CostCentre))
         -- ^ Array pointing to cost centre for each breakpoint
    , modBreaks_breakInfo :: IntMap CgBreakInfo
@@ -180,3 +182,12 @@ emptyModBreaks = ModBreaks
    , modBreaks_ccs = array (0,-1) []
    , modBreaks_breakInfo = IntMap.empty
    }
+
+{-
+Note [Field modBreaks_decls]
+~~~~~~~~~~~~~~~~~~~~~~
+A value of eg ["foo", "bar", "baz"] in a `modBreaks_decls` field means:
+The breakpoint is in the function called "baz" that is declared in a `let`
+or `where` clause of a declaration called "bar", which itself is declared
+in a `let` or `where` clause of the top-level function called "foo".
+-}

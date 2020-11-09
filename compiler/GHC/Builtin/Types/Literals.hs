@@ -21,10 +21,10 @@ module GHC.Builtin.Types.Literals
   , typeSymbolAppendTyCon
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Type
-import Pair
+import GHC.Data.Pair
 import GHC.Tc.Utils.TcType ( TcType, tcEqType )
 import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon
                          , Injectivity(..) )
@@ -32,8 +32,9 @@ import GHC.Core.Coercion ( Role(..) )
 import GHC.Tc.Types.Constraint ( Xi )
 import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
+import GHC.Types.Unique.FM
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim    ( mkTemplateAnonTyConBinders )
+import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders )
 import GHC.Builtin.Names
                   ( gHC_TYPELITS
                   , gHC_TYPENATS
@@ -49,10 +50,7 @@ import GHC.Builtin.Names
                   , typeSymbolCmpTyFamNameKey
                   , typeSymbolAppendFamNameKey
                   )
-import FastString ( FastString
-                  , fsLit, nilFS, nullFS, unpackFS, mkFastString, appendFS
-                  )
-import qualified Data.Map as Map
+import GHC.Data.FastString
 import Data.Maybe ( isJust )
 import Control.Monad ( guard )
 import Data.List  ( isPrefixOf, isSuffixOf )
@@ -238,7 +236,7 @@ typeNatLogTyCon = mkTypeNatFunTyCon1 name
 typeNatLeqTyCon :: TyCon
 typeNatLeqTyCon =
   mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [ typeNatKind, typeNatKind ])
+    (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
     boolTy
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -257,7 +255,7 @@ typeNatLeqTyCon =
 typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon =
   mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [ typeNatKind, typeNatKind ])
+    (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
     orderingKind
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -303,14 +301,12 @@ typeSymbolAppendTyCon = mkTypeSymbolFunTyCon2 name
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "AppendSymbol")
                 typeSymbolAppendFamNameKey typeSymbolAppendTyCon
 
-
-
 -- Make a unary built-in constructor of kind: Nat -> Nat
 mkTypeNatFunTyCon1 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon1 op tcb =
   mkFamilyTyCon op
-    (mkTemplateAnonTyConBinders [ typeNatKind ])
-    typeNatKind
+    (mkTemplateAnonTyConBinders [ naturalTy ])
+    naturalTy
     Nothing
     (BuiltInSynFamTyCon tcb)
     Nothing
@@ -321,8 +317,8 @@ mkTypeNatFunTyCon1 op tcb =
 mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon2 op tcb =
   mkFamilyTyCon op
-    (mkTemplateAnonTyConBinders [ typeNatKind, typeNatKind ])
-    typeNatKind
+    (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
+    naturalTy
     Nothing
     (BuiltInSynFamTyCon tcb)
     Nothing
@@ -403,7 +399,7 @@ axCmpSymbolDef =
            s2' <- isStrLitTy s2
            t2' <- isStrLitTy t2
            return (mkTyConApp typeSymbolCmpTyCon [s1,t1] ===
-                   ordering (compare s2' t2')) }
+                   ordering (lexicalCompareFS s2' t2')) }
 
 axAppendSymbolDef = CoAxiomRule
     { coaxrName      = fsLit "AppendSymbolDef"
@@ -459,8 +455,8 @@ axAppendSymbol0L  = mkAxiom1 "Concat0L"
 -- The list of built-in type family axioms that GHC uses.
 -- If you define new axioms, make sure to include them in this list.
 -- See Note [Adding built-in type families]
-typeNatCoAxiomRules :: Map.Map FastString CoAxiomRule
-typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
+typeNatCoAxiomRules :: UniqFM FastString CoAxiomRule
+typeNatCoAxiomRules = listToUFM $ map (\x -> (coaxrName x, x))
   [ axAddDef
   , axMulDef
   , axExpDef
@@ -708,7 +704,7 @@ matchFamCmpNat _ = Nothing
 matchFamCmpSymbol :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamCmpSymbol [s,t]
   | Just x <- mbX, Just y <- mbY =
-    Just (axCmpSymbolDef, [s,t], ordering (compare x y))
+    Just (axCmpSymbolDef, [s,t], ordering (lexicalCompareFS x y))
   | tcEqType s t = Just (axCmpSymbolRefl, [s], ordering EQ)
   where mbX = isStrLitTy s
         mbY = isStrLitTy t

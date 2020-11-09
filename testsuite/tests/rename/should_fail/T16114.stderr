@@ -1,6 +1,4 @@
 
-T16114.hs:4:10: error:
-    Illegal class instance: ‘Eq a => Eq a => Eq (T a)’
-      Class instances must be of the form
-        context => C ty_1 ... ty_n
-      where ‘C’ is a class
+T16114.hs:4:18: error:
+    Instance head cannot contain nested ‘forall’s or contexts
+    In an instance declaration

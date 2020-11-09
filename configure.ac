@@ -13,7 +13,7 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.11.0], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [9.1.0], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
 
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
@@ -117,12 +117,27 @@ if test "$EnableDistroToolchain" = "YES"; then
   TarballsAutodownload=NO
 fi
 
+AC_ARG_ENABLE(native-io-manager,
+[AC_HELP_STRING([--enable-native-io-manager],
+                [Enable the native I/O manager by default.])],
+        EnableNativeIOManager=YES,
+        EnableNativeIOManager=NO
+)
+
+if test "$EnableNativeIOManager" = "YES"; then
+  AC_DEFINE_UNQUOTED([DEFAULT_NATIVE_IO_MANAGER], [1], [Enable Native I/O manager as default.])
+
+fi
+
 dnl CC_STAGE0, LD_STAGE0, AR_STAGE0 are like the "previous" variable
 dnl CC, LD, AR (inherited by CC_STAGE[123], etc.)
 dnl but instead used by stage0 for bootstrapping stage1
 AC_ARG_VAR(CC_STAGE0, [C compiler command (bootstrap)])
 AC_ARG_VAR(LD_STAGE0, [Linker command (bootstrap)])
 AC_ARG_VAR(AR_STAGE0, [Archive command (bootstrap)])
+
+dnl RTS ways supplied by the bootstrapping compiler.
+AC_ARG_VAR(RTS_WAYS_STAGE0, [RTS ways])
 
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
@@ -151,6 +166,21 @@ if test "$WithGhc" != ""; then
   fi
   BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
   BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
+  BOOTSTRAPPING_GHC_INFO_FIELD([SUPPORT_SMP_STAGE0],[Support SMP])
+  BOOTSTRAPPING_GHC_INFO_FIELD([RTS_WAYS_STAGE0],[RTS ways])
+
+  dnl Check whether or not the bootstrapping GHC has a threaded RTS. This
+  dnl determines whether or not we can have a threaded stage 1.
+  dnl See Note [Linking ghc-bin against threaded stage0 RTS] in
+  dnl hadrian/src/Settings/Packages.hs for details.
+  dnl SMP support which implies a registerised stage0 is also required (see issue 18266)
+  if echo ${RTS_WAYS_STAGE0} | grep '.*thr.*' 2>&1 >/dev/null && \
+     test "$SUPPORT_SMP_STAGE0" = "YES"
+  then
+      AC_SUBST(GhcThreadedRts, YES)
+  else
+      AC_SUBST(GhcThreadedRts, NO)
+  fi
 fi
 
 dnl ** Must have GHC to build GHC
@@ -387,7 +417,8 @@ set_up_tarballs() {
         rm -rf inplace/mingw
         local base_dir="../ghc-tarballs/${tarball_dest_dir}"
         ( cd inplace &&
-        find "${base_dir}" -name "*.tar.xz" -exec tar xfJ {} \; &&
+        find "${base_dir}" -name "*.tar.xz" -exec tar --xz -xf {} \; &&
+        find "${base_dir}" -name "*.tar.zst" -exec tar --zstd -xf {} \; &&
         rm ".MTREE" &&
         rm ".PKGINFO" &&
         cd .. ) || AC_MSG_ERROR([Could not extract Windows toolchains.])
@@ -405,6 +436,7 @@ set_up_tarballs() {
     fi
 }
 
+# See Note [tooldir: How GHC finds mingw on Windows]
 if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"
 then
     test -d inplace || mkdir inplace
@@ -418,6 +450,8 @@ then
     NM="${mingwbin}nm.exe"
     RANLIB="${mingwbin}ranlib.exe"
     OBJDUMP="${mingwbin}objdump.exe"
+    MergeObjsCmd="$LD"
+    MergeObjsArgs="-r --oformat=pe-bigobj-x86-64"
     fp_prog_ar="${mingwbin}ar.exe"
 
     AC_PATH_PROG([Genlib],[genlib])
@@ -425,6 +459,7 @@ fi
 
 # We don't want to bundle a MinGW-w64 toolchain
 # So we have to find these individual tools.
+# See Note [tooldir: How GHC finds mingw on Windows]
 if test "$EnableDistroToolchain" = "YES"
 then
     # Ideally should use AC_CHECK_TARGET_TOOL but our triples
@@ -432,6 +467,7 @@ then
     # so never tried without the prefix.
     AC_PATH_PROG([CC],[gcc], [clang])
     AC_PATH_PROG([NM],[nm])
+    AC_PATH_PROG([LD],[ld])
     AC_PATH_PROG([AR],[ar])
     AC_PATH_PROG([RANLIB],[ranlib])
     AC_PATH_PROG([OBJDUMP],[objdump])
@@ -572,13 +608,12 @@ dnl ** Which ld to use
 dnl --------------------------------------------------------------
 AC_ARG_VAR(LD,[Use as the path to ld. See also --disable-ld-override.])
 FIND_LD([$target],[GccUseLdOpt])
+FIND_MERGE_OBJECTS()
 CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
 CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
 LdCmd="$LD"
-LdNoGoldCmd="$LD_NO_GOLD"
 CFLAGS="$CFLAGS $GccUseLdOpt"
 AC_SUBST([LdCmd])
-AC_SUBST([LdNoGoldCmd])
 
 FP_PROG_LD_IS_GNU
 FP_PROG_LD_BUILD_ID
@@ -665,11 +700,23 @@ else
 fi
 AC_SUBST([LibtoolCmd])
 
+dnl ** Which otool to use on macOS
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([OTOOL], [otool])
+OtoolCmd="$OTOOL"
+AC_SUBST(OtoolCmd)
+
+dnl ** Which install_name_tool to use on macOS
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([INSTALL_NAME_TOOL], [install_name_tool])
+InstallNameToolCmd="$INSTALL_NAME_TOOL"
+AC_SUBST(InstallNameToolCmd)
+
 # Here is where we re-target which specific version of the LLVM
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
-LlvmVersion=9
+LlvmVersion=10
 AC_SUBST([LlvmVersion])
 sUPPORTED_LLVM_VERSION=$(echo \($LlvmVersion\) | sed 's/\./,/')
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION], ${sUPPORTED_LLVM_VERSION}, [The supported LLVM version number])
@@ -730,6 +777,8 @@ dnl    unregisterised, Sparc, and PPC backends.
 FP_GCC_SUPPORTS__ATOMICS
 if test $CONF_GCC_SUPPORTS__ATOMICS = YES ; then
   AC_DEFINE([HAVE_C11_ATOMICS], [1], [Does GCC support __atomic primitives?])
+else
+  AC_MSG_ERROR([C compiler needs to support __atomic primitives.])
 fi
 
 FP_GCC_EXTRA_FLAGS
@@ -864,6 +913,7 @@ fi
 
 dnl ** check for xelatex
 AC_PATH_PROG(XELATEX,xelatex)
+AC_PATH_PROG(MAKEINDEX,makeindex)
 
 dnl ** check for makeinfo
 AC_PATH_PROG(MAKEINFO,makeinfo)
@@ -964,7 +1014,7 @@ FP_CHECK_FUNC([GetModuleFileName],
 
 dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
-AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r sched_setaffinity setlocale])
+AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r sched_setaffinity sched_getaffinity setlocale])
 
 dnl ** On OS X 10.4 (at least), time.h doesn't declare ctime_r if
 dnl ** _POSIX_C_SOURCE is defined
@@ -1203,11 +1253,15 @@ if test "$ac_cv_sizeof_void_p" -eq 8 ; then
     if test "x$EnableLargeAddressSpace" = "xyes" ; then
         if test "$ghc_host_os" = "darwin" ; then
             use_large_address_space=yes
-	elif test "$ghc_host_os" = "openbsd" ; then
-	    # as of OpenBSD 5.8 (2015), OpenBSD does not support mmap with MAP_NORESERVE.
-	    # The flag MAP_NORESERVE is supported for source compatibility reasons,
-	    # but is completely ignored by OS mmap
-            use_large_address_space=no
+        elif test "$ghc_host_os" = "openbsd" ; then
+            # as of OpenBSD 5.8 (2015), OpenBSD does not support mmap with MAP_NORESERVE.
+            # The flag MAP_NORESERVE is supported for source compatibility reasons,
+            # but is completely ignored by OS mmap
+                  use_large_address_space=no
+        elif test "$ghc_host_os" = "mingw32" ; then
+            # as of Windows 8.1/Server 2012 windows does no longer allocate the page
+            # tabe for reserved memory eagerly. So we are now free to use LAS there too.
+                  use_large_address_space=yes
         else
             AC_CHECK_DECLS([MAP_NORESERVE, MADV_FREE, MADV_DONTNEED],[],[],
                 [
@@ -1363,7 +1417,7 @@ dnl --------------------------------------------------------------
 if test -n "$SPHINXBUILD"; then
     BUILD_MAN=YES
     BUILD_SPHINX_HTML=YES
-    if test -n "$XELATEX"; then
+    if test -n "$XELATEX" -a -n "$MAKEINDEX"; then
         BUILD_SPHINX_PDF=YES
     else
         BUILD_SPHINX_PDF=NO
@@ -1404,6 +1458,7 @@ fi
 # Create the configuration for the Hadrian build system if it is present
 if test -e hadrian/cfg/system.config.in; then
     AC_CONFIG_FILES([hadrian/cfg/system.config])
+    AC_CONFIG_FILES([hadrian/ghci-cabal hadrian/ghci-stack])
 fi
 
 # We got caught by
@@ -1454,6 +1509,7 @@ Configure completed successfully.
 echo "\
    Bootstrapping using   : $WithGhc
       which is version   : $GhcVersion
+      with threaded RTS? : $GhcThreadedRts
 "
 
 if test "x$CcLlvmBackend" = "xYES"; then
@@ -1479,6 +1535,8 @@ echo "\
    libtool      : $LibtoolCmd
    objdump      : $ObjdumpCmd
    ranlib       : $RanlibCmd
+   otool        : $OtoolCmd
+   install_name_tool : $InstallNameToolCmd
    windres      : $WindresCmd
    dllwrap      : $DllWrapCmd
    genlib       : $GenlibCmd

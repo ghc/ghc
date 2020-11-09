@@ -59,7 +59,7 @@ assert_32_64 actual expected32 expected64 = do
       expected
           | word_size == 4 = expected32
           | word_size == 8 = expected64
-      word_size = wORD_SIZE dflags
+      word_size = pc_WORD_SIZE (platformConstants (targetPlatform dflags))
     case actual == expected of
         True -> return ()
         False ->
@@ -69,7 +69,7 @@ assert_32_64 actual expected32 expected64 = do
 runTest :: [(a, PrimRep)] -> Ghc (WordOff , WordOff, [FieldOffOrPadding a])
 runTest prim_reps = do
     dflags <- getDynFlags
-    return $ mkVirtHeapOffsetsWithPadding dflags StdHeader (mkNonVoids prim_reps)
+    return $ mkVirtHeapOffsetsWithPadding (targetProfile dflags) StdHeader (mkNonVoids prim_reps)
   where
     mkNonVoids = map (\(a, prim_rep) -> NonVoid (prim_rep, a))
 

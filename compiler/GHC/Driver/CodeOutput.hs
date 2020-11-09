@@ -15,30 +15,40 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+import GHC.Platform
+import GHC.ForeignSrcLang
 
 import GHC.CmmToAsm     ( nativeCodeGen )
 import GHC.CmmToLlvm    ( llvmCodeGen )
 
-import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
-
-import GHC.Driver.Finder    ( mkStubPaths )
-import GHC.CmmToC           ( writeC )
+import GHC.CmmToC           ( cmmToC )
 import GHC.Cmm.Lint         ( cmmLint )
-import GHC.Driver.Packages
 import GHC.Cmm              ( RawCmmGroup )
 import GHC.Cmm.CLabel
-import GHC.Driver.Types
+
 import GHC.Driver.Session
-import Stream           ( Stream )
-import qualified Stream
+import GHC.Driver.Ppr
+import GHC.Driver.Backend
+
+import qualified GHC.Data.ShortText as ST
+import GHC.Data.Stream           ( Stream )
+import qualified GHC.Data.Stream as Stream
+
 import GHC.SysTools.FileCleanup
 
-import ErrUtils
-import Outputable
-import GHC.Types.Module
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+
+import GHC.Unit
+import GHC.Unit.State
+import GHC.Unit.Finder      ( mkStubPaths )
+
 import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
+import GHC.Types.ForeignStubs
+import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 
 import Control.Exception
 import System.Directory
@@ -59,8 +69,8 @@ codeOutput :: DynFlags
            -> ModLocation
            -> ForeignStubs
            -> [(ForeignSrcLang, FilePath)]
-           -- ^ additional files to be compiled with with the C compiler
-           -> [InstalledUnitId]
+           -- ^ additional files to be compiled with the C compiler
+           -> [UnitId]
            -> Stream IO RawCmmGroup a                       -- Compiled C--
            -> IO (FilePath,
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
@@ -81,14 +91,13 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                   dflags
                   (text "CmmLint"<+>brackets (ppr this_mod))
                   (const ()) $ do
-                { case cmmLint dflags cmm of
+                { case cmmLint (targetPlatform dflags) cmm of
                         Just err -> do { log_action dflags
                                                    dflags
                                                    NoReason
                                                    SevDump
                                                    noSrcSpan
-                                                   (defaultDumpStyle dflags)
-                                                   err
+                                                   $ withPprStyle defaultDumpStyle err
                                        ; ghcExit dflags 1
                                        }
                         Nothing  -> return ()
@@ -96,13 +105,13 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                 }
 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
-        ; a <- case hscTarget dflags of
-                 HscAsm         -> outputAsm dflags this_mod location filenm
-                                             linted_cmm_stream
-                 HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps
-                 HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream
-                 HscInterpreted -> panic "codeOutput: HscInterpreted"
-                 HscNothing     -> panic "codeOutput: HscNothing"
+        ; a <- case backend dflags of
+                 NCG         -> outputAsm dflags this_mod location filenm
+                                          linted_cmm_stream
+                 ViaC        -> outputC dflags filenm linted_cmm_stream pkg_deps
+                 LLVM        -> outputLlvm dflags filenm linted_cmm_stream
+                 Interpreter -> panic "codeOutput: Interpreter"
+                 NoBackend   -> panic "codeOutput: NoBackend"
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
@@ -120,34 +129,17 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 outputC :: DynFlags
         -> FilePath
         -> Stream IO RawCmmGroup a
-        -> [InstalledUnitId]
+        -> [UnitId]
         -> IO a
-
-outputC dflags filenm cmm_stream packages
-  = do
-       withTiming dflags (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
-
-         -- figure out which header files to #include in the generated .hc file:
-         --
-         --   * extra_includes from packages
-         --   * -#include options from the cmdline and OPTIONS pragmas
-         --   * the _stub.h file, if there is one.
-         --
-         let rts = getPackageDetails dflags rtsUnitId
-
-         let cc_injects = unlines (map mk_include (includes rts))
-             mk_include h_file =
-              case h_file of
-                 '"':_{-"-} -> "#include "++h_file
-                 '<':_      -> "#include "++h_file
-                 _          -> "#include \""++h_file++"\""
-
-         let pkg_names = map installedUnitIdString packages
-
-         doOutput filenm $ \ h -> do
-            hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
-            hPutStr h cc_injects
-            Stream.consume cmm_stream (writeC dflags h)
+outputC dflags filenm cmm_stream packages =
+  withTiming dflags (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
+    let pkg_names = map unitIdString packages
+    doOutput filenm $ \ h -> do
+      hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
+      hPutStr h "#include \"Stg.h\"\n"
+      let platform = targetPlatform dflags
+          writeC = printForC dflags h . cmmToC platform
+      Stream.consume cmm_stream writeC
 
 {-
 ************************************************************************
@@ -157,21 +149,18 @@ outputC dflags filenm cmm_stream packages
 ************************************************************************
 -}
 
-outputAsm :: DynFlags -> Module -> ModLocation -> FilePath
+outputAsm :: DynFlags
+          -> Module
+          -> ModLocation
+          -> FilePath
           -> Stream IO RawCmmGroup a
           -> IO a
-outputAsm dflags this_mod location filenm cmm_stream
- | platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
-  = do ncg_uniqs <- mkSplitUniqSupply 'n'
-
-       debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
-
-       {-# SCC "OutputAsm" #-} doOutput filenm $
-           \h -> {-# SCC "NativeCodeGen" #-}
-                 nativeCodeGen dflags this_mod location h ncg_uniqs cmm_stream
-
- | otherwise
-  = panic "This compiler was built without a native code generator"
+outputAsm dflags this_mod location filenm cmm_stream = do
+  ncg_uniqs <- mkSplitUniqSupply 'n'
+  debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
+  {-# SCC "OutputAsm" #-} doOutput filenm $
+    \h -> {-# SCC "NativeCodeGen" #-}
+      nativeCodeGen dflags this_mod location h ncg_uniqs cmm_stream
 
 {-
 ************************************************************************
@@ -182,10 +171,10 @@ outputAsm dflags this_mod location filenm cmm_stream
 -}
 
 outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
-outputLlvm dflags filenm cmm_stream
-  = do {-# SCC "llvm_output" #-} doOutput filenm $
-           \f -> {-# SCC "llvm_CodeGen" #-}
-                 llvmCodeGen dflags f cmm_stream
+outputLlvm dflags filenm cmm_stream =
+  {-# SCC "llvm_output" #-} doOutput filenm $
+    \f -> {-# SCC "llvm_CodeGen" #-}
+      llvmCodeGen dflags f cmm_stream
 
 {-
 ************************************************************************
@@ -225,9 +214,9 @@ outputForeignStubs dflags mod location stubs
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
-               let rts_pkg = getPackageDetails dflags rtsUnitId in
-               concatMap mk_include (includes rts_pkg)
-            mk_include i = "#include \"" ++ i ++ "\"\n"
+               let rts_pkg = unsafeLookupUnitId (unitState dflags) rtsUnitId in
+               concatMap mk_include (unitIncludes rts_pkg)
+            mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
@@ -277,11 +266,9 @@ outputForeignStubs_help fname doc_str header footer
 -- module;
 
 -- | Generate code to initialise cost centres
-profilingInitCode :: DynFlags -> Module -> CollectedCCs -> SDoc
-profilingInitCode dflags this_mod (local_CCs, singleton_CCSs)
- = if not (gopt Opt_SccProfilingOn dflags)
-   then empty
-   else vcat
+profilingInitCode :: Platform -> Module -> CollectedCCs -> SDoc
+profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
+ = vcat
     $  map emit_cc_decl local_CCs
     ++ map emit_ccs_decl singleton_CCSs
     ++ [emit_cc_list local_CCs]
@@ -297,22 +284,22 @@ profilingInitCode dflags this_mod (local_CCs, singleton_CCSs)
  where
    emit_cc_decl cc =
        text "extern CostCentre" <+> cc_lbl <> text "[];"
-     where cc_lbl = ppr (mkCCLabel cc)
+     where cc_lbl = pdoc platform (mkCCLabel cc)
    local_cc_list_label = text "local_cc_" <> ppr this_mod
    emit_cc_list ccs =
       text "static CostCentre *" <> local_cc_list_label <> text "[] ="
-      <+> braces (vcat $ [ ppr (mkCCLabel cc) <> comma
+      <+> braces (vcat $ [ pdoc platform (mkCCLabel cc) <> comma
                          | cc <- ccs
                          ] ++ [text "NULL"])
       <> semi
 
    emit_ccs_decl ccs =
        text "extern CostCentreStack" <+> ccs_lbl <> text "[];"
-     where ccs_lbl = ppr (mkCCSLabel ccs)
+     where ccs_lbl = pdoc platform (mkCCSLabel ccs)
    singleton_cc_list_label = text "singleton_cc_" <> ppr this_mod
    emit_ccs_list ccs =
       text "static CostCentreStack *" <> singleton_cc_list_label <> text "[] ="
-      <+> braces (vcat $ [ ppr (mkCCSLabel cc) <> comma
+      <+> braces (vcat $ [ pdoc platform (mkCCSLabel cc) <> comma
                          | cc <- ccs
                          ] ++ [text "NULL"])
       <> semi

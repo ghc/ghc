@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TypeFamilies      #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -5,27 +9,23 @@
 \section[Name]{@Name@: to transmit name info from renamer to typechecker}
 -}
 
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE PatternSynonyms #-}
-
 -- |
 -- #name_types#
 -- GHC uses several kinds of name internally:
 --
--- * 'OccName.OccName': see "OccName#name_types"
+-- * 'GHC.Types.Name.Occurrence.OccName': see "GHC.Types.Name.Occurrence#name_types"
 --
--- * 'RdrName.RdrName': see "RdrName#name_types"
+-- * 'GHC.Types.Name.Reader.RdrName': see "GHC.Types.Name.Reader#name_types"
 --
--- *  'Name.Name' is the type of names that have had their scoping and binding resolved. They
---   have an 'OccName.OccName' but also a 'Unique.Unique' that disambiguates Names that have
---   the same 'OccName.OccName' and indeed is used for all 'Name.Name' comparison. Names
---   also contain information about where they originated from, see "Name#name_sorts"
+-- * 'GHC.Types.Name.Name' is the type of names that have had their scoping and
+--   binding resolved. They have an 'OccName' but also a 'GHC.Types.Unique.Unique'
+--   that disambiguates Names that have the same 'OccName' and indeed is used for all
+--   'Name' comparison. Names also contain information about where they originated
+--   from, see "GHC.Types.Name#name_sorts"
 --
--- * 'Id.Id': see "Id#name_types"
+-- * 'GHC.Types.Id.Id': see "GHC.Types.Id#name_types"
 --
--- * 'Var.Var': see "Var#name_types"
+-- * 'GHC.Types.Var.Var': see "GHC.Types.Var#name_types"
 --
 -- #name_sorts#
 -- Names are one of:
@@ -60,7 +60,7 @@ module GHC.Types.Name (
         -- ** Predicates on 'Name's
         isSystemName, isInternalName, isExternalName,
         isTyVarName, isTyConName, isDataConName,
-        isValName, isVarName,
+        isValName, isVarName, isDynLinkName,
         isWiredInName, isWiredIn, isBuiltInSyntax,
         isHoleName,
         wiredInNameTyThing_maybe,
@@ -79,19 +79,22 @@ module GHC.Types.Name (
         module GHC.Types.Name.Occurrence
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Core.TyCo.Rep( TyThing )
+import {-# SOURCE #-} GHC.Types.TyThing ( TyThing )
 
+import GHC.Platform
 import GHC.Types.Name.Occurrence
-import GHC.Types.Module
+import GHC.Unit.Module
+import GHC.Unit.Home
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
-import Util
-import Maybes
-import Binary
-import FastString
-import Outputable
+import GHC.Utils.Misc
+import GHC.Data.Maybe
+import GHC.Utils.Binary
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Control.DeepSeq
 import Data.Data
@@ -242,6 +245,39 @@ isInternalName name = not (isExternalName name)
 isHoleName :: Name -> Bool
 isHoleName = isHoleModule . nameModule
 
+-- | Will the 'Name' come from a dynamically linked package?
+isDynLinkName :: Platform -> Module -> Name -> Bool
+isDynLinkName platform this_mod name
+  | Just mod <- nameModule_maybe name
+    -- Issue #8696 - when GHC is dynamically linked, it will attempt
+    -- to load the dynamic dependencies of object files at compile
+    -- time for things like QuasiQuotes or
+    -- TemplateHaskell. Unfortunately, this interacts badly with
+    -- intra-package linking, because we don't generate indirect
+    -- (dynamic) symbols for intra-package calls. This means that if a
+    -- module with an intra-package call is loaded without its
+    -- dependencies, then GHC fails to link.
+    --
+    -- In the mean time, always force dynamic indirections to be
+    -- generated: when the module name isn't the module being
+    -- compiled, references are dynamic.
+    = case platformOS platform of
+        -- On Windows the hack for #8696 makes it unlinkable.
+        -- As the entire setup of the code from Cmm down to the RTS expects
+        -- the use of trampolines for the imported functions only when
+        -- doing intra-package linking, e.g. referring to a symbol defined in the same
+        -- package should not use a trampoline.
+        -- I much rather have dynamic TH not supported than the entire Dynamic linking
+        -- not due to a hack.
+        -- Also not sure this would break on Windows anyway.
+        OSMinGW32 -> moduleUnit mod /= moduleUnit this_mod
+
+        -- For the other platforms, still perform the hack
+        _         -> mod /= this_mod
+
+  | otherwise = False  -- no, it is not even an external name
+
+
 nameModule name =
   nameModule_maybe name `orElse`
   pprPanic "nameModule" (ppr (n_sort name) <+> ppr name)
@@ -272,7 +308,7 @@ nameIsLocalOrFrom :: Module -> Name -> Bool
 -- each give rise to a fresh module (Ghci1, Ghci2, etc), but they all come
 -- from the magic 'interactive' package; and all the details are kept in the
 -- TcLclEnv, TcGblEnv, NOT in the HPT or EPT.
--- See Note [The interactive package] in GHC.Driver.Types
+-- See Note [The interactive package] in "GHC.Runtime.Context"
 
 nameIsLocalOrFrom from name
   | Just mod <- nameModule_maybe name = from == mod || isInteractiveModule mod
@@ -282,12 +318,12 @@ nameIsHomePackage :: Module -> Name -> Bool
 -- True if the Name is defined in module of this package
 nameIsHomePackage this_mod
   = \nm -> case n_sort nm of
-              External nm_mod    -> moduleUnitId nm_mod == this_pkg
-              WiredIn nm_mod _ _ -> moduleUnitId nm_mod == this_pkg
+              External nm_mod    -> moduleUnit nm_mod == this_pkg
+              WiredIn nm_mod _ _ -> moduleUnit nm_mod == this_pkg
               Internal -> True
               System   -> False
   where
-    this_pkg = moduleUnitId this_mod
+    this_pkg = moduleUnit this_mod
 
 nameIsHomePackageImport :: Module -> Name -> Bool
 -- True if the Name is defined in module of this package
@@ -296,17 +332,17 @@ nameIsHomePackageImport this_mod
   = \nm -> case nameModule_maybe nm of
               Nothing -> False
               Just nm_mod -> nm_mod /= this_mod
-                          && moduleUnitId nm_mod == this_pkg
+                          && moduleUnit nm_mod == this_pkg
   where
-    this_pkg = moduleUnitId this_mod
+    this_pkg = moduleUnit this_mod
 
 -- | Returns True if the Name comes from some other package: neither this
 -- package nor the interactive package.
-nameIsFromExternalPackage :: UnitId -> Name -> Bool
-nameIsFromExternalPackage this_pkg name
+nameIsFromExternalPackage :: HomeUnit -> Name -> Bool
+nameIsFromExternalPackage home_unit name
   | Just mod <- nameModule_maybe name
-  , moduleUnitId mod /= this_pkg    -- Not this package
-  , not (isInteractiveModule mod)       -- Not the 'interactive' package
+  , notHomeModule home_unit mod   -- Not the current unit
+  , not (isInteractiveModule mod) -- Not the 'interactive' package
   = True
   | otherwise
   = False
@@ -531,24 +567,25 @@ instance OutputableBndr Name where
 
 pprName :: Name -> SDoc
 pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
-  = getPprStyle $ \ sty ->
+  = getPprStyle $ \sty ->
+    getPprDebug $ \debug ->
     case sort of
-      WiredIn mod _ builtin   -> pprExternal sty uniq mod occ True  builtin
-      External mod            -> pprExternal sty uniq mod occ False UserSyntax
-      System                  -> pprSystem sty uniq occ
-      Internal                -> pprInternal sty uniq occ
+      WiredIn mod _ builtin   -> pprExternal debug sty uniq mod occ True  builtin
+      External mod            -> pprExternal debug sty uniq mod occ False UserSyntax
+      System                  -> pprSystem   debug sty uniq occ
+      Internal                -> pprInternal debug sty uniq occ
 
 -- | Print the string of Name unqualifiedly directly.
 pprNameUnqualified :: Name -> SDoc
 pprNameUnqualified Name { n_occ = occ } = ppr_occ_name occ
 
-pprExternal :: PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
-pprExternal sty uniq mod occ is_wired is_builtin
+pprExternal :: Bool -> PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
+pprExternal debug sty uniq mod occ is_wired is_builtin
   | codeStyle sty = ppr mod <> char '_' <> ppr_z_occ_name occ
         -- In code style, always qualify
         -- ToDo: maybe we could print all wired-in things unqualified
         --       in code style, to reduce symbol table bloat?
-  | debugStyle sty = pp_mod <> ppr_occ_name occ
+  | debug         = pp_mod <> ppr_occ_name occ
                      <> braces (hsep [if is_wired then text "(w)" else empty,
                                       pprNameSpaceBrief (occNameSpace occ),
                                       pprUnique uniq])
@@ -563,10 +600,10 @@ pprExternal sty uniq mod occ is_wired is_builtin
     pp_mod = ppUnlessOption sdocSuppressModulePrefixes
                (ppr mod <> dot)
 
-pprInternal :: PprStyle -> Unique -> OccName -> SDoc
-pprInternal sty uniq occ
+pprInternal :: Bool -> PprStyle -> Unique -> OccName -> SDoc
+pprInternal debug sty uniq occ
   | codeStyle sty  = pprUniqueAlways uniq
-  | debugStyle sty = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ),
+  | debug          = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ),
                                                        pprUnique uniq])
   | dumpStyle sty  = ppr_occ_name occ <> ppr_underscore_unique uniq
                         -- For debug dumps, we're not necessarily dumping
@@ -574,10 +611,10 @@ pprInternal sty uniq occ
   | otherwise      = ppr_occ_name occ   -- User style
 
 -- Like Internal, except that we only omit the unique in Iface style
-pprSystem :: PprStyle -> Unique -> OccName -> SDoc
-pprSystem sty uniq occ
+pprSystem :: Bool -> PprStyle -> Unique -> OccName -> SDoc
+pprSystem debug sty uniq occ
   | codeStyle sty  = pprUniqueAlways uniq
-  | debugStyle sty = ppr_occ_name occ <> ppr_underscore_unique uniq
+  | debug          = ppr_occ_name occ <> ppr_underscore_unique uniq
                      <> braces (pprNameSpaceBrief (occNameSpace occ))
   | otherwise      = ppr_occ_name occ <> ppr_underscore_unique uniq
                                 -- If the tidy phase hasn't run, the OccName
@@ -587,12 +624,12 @@ pprSystem sty uniq occ
 
 pprModulePrefix :: PprStyle -> Module -> OccName -> SDoc
 -- Print the "M." part of a name, based on whether it's in scope or not
--- See Note [Printing original names] in GHC.Driver.Types
+-- See Note [Printing original names] in GHC.Types.Name.Ppr
 pprModulePrefix sty mod occ = ppUnlessOption sdocSuppressModulePrefixes $
     case qualName sty mod occ of              -- See Outputable.QualifyName:
       NameQual modname -> ppr modname <> dot       -- Name is in scope
       NameNotInScope1  -> ppr mod <> dot           -- Not in scope
-      NameNotInScope2  -> ppr (moduleUnitId mod) <> colon     -- Module not in
+      NameNotInScope2  -> ppr (moduleUnit mod) <> colon     -- Module not in
                           <> ppr (moduleName mod) <> dot          -- scope either
       NameUnqual       -> empty                   -- In scope unqualified
 

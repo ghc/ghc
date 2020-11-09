@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables, MagicHash #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -36,7 +36,7 @@ module GHC.List (
 import Data.Maybe
 import GHC.Base
 import GHC.Num (Num(..))
-import GHC.Integer (Integer)
+import GHC.Num.Integer (Integer)
 
 infixl 9  !!
 infix  4 `elem`, `notElem`
@@ -277,10 +277,10 @@ to list-producing functions abstracted over cons and nil. Here we call them
 FB functions because their names usually end with 'FB'. It's a good idea to
 inline FB functions because:
 
-* They are higher-order functions and therefore benefits from inlining.
+* They are higher-order functions and therefore benefit from inlining.
 
 * When the final consumer is a left fold, inlining the FB functions is the only
-  way to make arity expansion to happen. See Note [Left fold via right fold].
+  way to make arity expansion happen. See Note [Left fold via right fold].
 
 For this reason we mark all FB functions INLINE [0]. The [0] phase-specifier
 ensures that calls to FB functions can be written back to the original form
@@ -1149,7 +1149,7 @@ elem _ []       = False
 elem x (y:ys)   = x==y || elem x ys
 {-# NOINLINE [1] elem #-}
 {-# RULES
-"elem/build"    forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+"elem/build"    forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . elem x (build g) = g (\ y r -> (x == y) || r) False
  #-}
 #endif
@@ -1174,7 +1174,7 @@ notElem _ []    =  True
 notElem x (y:ys)=  x /= y && notElem x ys
 {-# NOINLINE [1] notElem #-}
 {-# RULES
-"notElem/build" forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+"notElem/build" forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . notElem x (build g) = g (\ y r -> (x /= y) && r) True
  #-}
 #endif

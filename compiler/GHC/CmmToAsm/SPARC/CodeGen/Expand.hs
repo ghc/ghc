@@ -7,20 +7,21 @@ module GHC.CmmToAsm.SPARC.CodeGen.Expand (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.Instr
 import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.SPARC.AddrMode
 import GHC.CmmToAsm.SPARC.Regs
-import GHC.CmmToAsm.Instr
-import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
+import GHC.CmmToAsm.Types
 import GHC.Cmm
 
+import GHC.Platform.Reg
 
-import Outputable
-import OrdList
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.OrdList
 
 -- | Expand out synthetic instructions in this top level thing
 expandTop :: NatCmmDecl RawCmmStatics Instr -> NatCmmDecl RawCmmStatics Instr

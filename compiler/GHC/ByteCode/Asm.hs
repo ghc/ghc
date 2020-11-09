@@ -1,4 +1,6 @@
-{-# LANGUAGE BangPatterns, CPP, DeriveFunctor, MagicHash, RecordWildCards #-}
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE DeriveFunctor   #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -15,28 +17,32 @@ module GHC.ByteCode.Asm (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Env
+import GHC.Driver.Session
 
 import GHC.ByteCode.Instr
 import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Heap.Layout
 
-import GHC.Driver.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Literal
-import GHC.Core.TyCon
-import FastString
-import GHC.StgToCmm.Layout     ( ArgRep(..) )
-import GHC.Runtime.Heap.Layout
-import GHC.Driver.Session
-import Outputable
-import GHC.Platform
-import Util
 import GHC.Types.Unique
 import GHC.Types.Unique.DSet
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+
+import GHC.Core.TyCon
+import GHC.Data.FastString
+import GHC.StgToCmm.Layout     ( ArgRep(..) )
+import GHC.Platform
 
 -- From iserv
 import SizedSeq
@@ -56,9 +62,9 @@ import Data.Array.Unsafe( castSTUArray )
 import Foreign
 import Data.Char        ( ord )
 import Data.List        ( genericLength )
-import Data.Map (Map)
+import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 
 -- -----------------------------------------------------------------------------
 -- Unlinked BCOs
@@ -176,10 +182,12 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
       -- this BCO to be long.
       (n_insns0, lbl_map0) = inspectAsm platform False initial_offset asm
       ((n_insns, lbl_map), long_jumps)
-        | isLarge n_insns0 = (inspectAsm platform True initial_offset asm, True)
+        | isLarge (fromIntegral $ Map.size lbl_map0)
+          || isLarge n_insns0
+                    = (inspectAsm platform True initial_offset asm, True)
         | otherwise = ((n_insns0, lbl_map0), False)
 
-      env :: Word16 -> Word
+      env :: LocalLabel -> Word
       env lbl = fromMaybe
         (pprPanic "assembleBCO.findLabel" (ppr lbl))
         (Map.lookup lbl lbl_map)
@@ -219,13 +227,13 @@ type AsmState = (SizedSeq Word16,
 data Operand
   = Op Word
   | SmallOp Word16
-  | LabelOp Word16
+  | LabelOp LocalLabel
 -- (unused)  | LargeOp Word
 
 data Assembler a
   = AllocPtr (IO BCOPtr) (Word -> Assembler a)
   | AllocLit [BCONPtr] (Word -> Assembler a)
-  | AllocLabel Word16 (Assembler a)
+  | AllocLabel LocalLabel (Assembler a)
   | Emit Word16 [Operand] (Assembler a)
   | NullAsm a
   deriving (Functor)
@@ -250,13 +258,13 @@ ptr = ioptr . return
 lit :: [BCONPtr] -> Assembler Word
 lit l = AllocLit l return
 
-label :: Word16 -> Assembler ()
+label :: LocalLabel -> Assembler ()
 label w = AllocLabel w (return ())
 
 emit :: Word16 -> [Operand] -> Assembler ()
 emit w ops = Emit w ops (return ())
 
-type LabelEnv = Word16 -> Word
+type LabelEnv = LocalLabel -> Word
 
 largeOp :: Bool -> Operand -> Bool
 largeOp long_jumps op = case op of
@@ -296,7 +304,7 @@ runAsm platform long_jumps e = go
         in ((), (st_i1,st_l0,st_p0))
       go k
 
-type LabelEnvMap = Map Word16 Word
+type LabelEnvMap = Map LocalLabel Word
 
 data InspectState = InspectState
   { instrCount :: !Word
@@ -453,7 +461,7 @@ assembleI platform i = case i of
     literal (LitChar c)       = int (ord c)
     literal (LitString bs)    = lit [BCONPtrStr bs]
        -- LitString requires a zero-terminator when emitted
-    literal (LitNumber nt i _) = case nt of
+    literal (LitNumber nt i) = case nt of
       LitNumInt     -> int (fromIntegral i)
       LitNumWord    -> int (fromIntegral i)
       LitNumInt64   -> int64 (fromIntegral i)

@@ -210,7 +210,7 @@ test('T12076lit', normal, compile, ['-O'])
 test('T12076sat', normal, compile, ['-O'])
 test('T12212', normal, compile, ['-O'])
 
-test('noinline01', only_ways(['optasm']), compile, ['-ddump-stg -dsuppress-uniques -dsuppress-ticks -O'])
+test('noinline01', only_ways(['optasm']), compile, ['-ddump-stg-from-core -dsuppress-uniques -dsuppress-ticks -O'])
 test('par01', only_ways(['optasm']), compile, ['-ddump-prep -dsuppress-uniques -dsuppress-ticks -O2'])
 test('T12776', normal, compile, ['-O2'])
 test('T9509',
@@ -317,3 +317,28 @@ test('T17966',
 # NB: T17810: -fspecialise-aggressively
 test('T17810', normal, multimod_compile, ['T17810', '-fspecialise-aggressively -dcore-lint -O -v0'])
 test('T18013', normal, multimod_compile, ['T18013', '-v0 -O'])
+test('T18098', normal, compile, ['-dcore-lint -O2'])
+test('T18120', normal, compile, ['-dcore-lint -O'])
+
+# Verify that there are only two top-level functions (the rec group of m's cast
+# WW worker m1). Ideally, it would be one, but we fail to inline dead-ending
+# recursive groups due to Note [Bottoming floats].
+test('T18231', [ only_ways(['optasm']), grep_errmsg(r'^[\w\.]+ ::.*->.*') ], compile, ['-ddump-simpl -dsuppress-idinfo -dppr-cols=99999 -dsuppress-uniques'])
+
+# Cast WW
+test('T17673', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
+test('T18078', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
+test('T18328', [ only_ways(['optasm']), grep_errmsg(r'Arity=') ], compile, ['-ddump-simpl -dsuppress-uniques'])
+test('T18347', normal, compile, ['-dcore-lint -O'])
+test('T18355', [ grep_errmsg(r'OneShot') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('T18399', normal, compile, ['-dcore-lint -O'])
+test('T18589', normal, compile, ['-dcore-lint -O'])
+test('T18603', normal, compile, ['-dcore-lint -O'])
+
+# T18649 should /not/ generate a specialisation rule
+test('T18649', normal, compile, ['-O -ddump-rules -Wno-simplifiable-class-constraints'])
+
+test('T18747A', normal, compile, [''])
+test('T18747B', normal, compile, [''])
+test('T18815', only_ways(['optasm']), makefile_test, ['T18815'])
+

@@ -13,25 +13,24 @@ packageArgs = do
     stage        <- getStage
     rtsWays      <- getRtsWays
     path         <- getBuildPath
-    intLib       <- getIntegerPackage
     compilerPath <- expr $ buildPath (vanillaContext stage compiler)
     let -- Do not bind the result to a Boolean: this forces the configure rule
         -- immediately and may lead to cyclic dependencies.
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
         cross = flag CrossCompiling
 
+        -- Check if the bootstrap compiler has the same version as the one we
+        -- are building. This is used to build cross-compilers
+        bootCross = (==) <$> ghcVersionStage Stage0 <*> ghcVersionStage Stage1
+
     mconcat
         --------------------------------- base ---------------------------------
         [ package base ? mconcat
-          [ builder (Cabal Flags) ? notStage0 ? arg (pkgName intLib)
+          [ builder (Cabal Flags) ? notStage0 ? arg (pkgName ghcBignum)
 
           -- This fixes the 'unknown symbol stat' issue.
           -- See: https://github.com/snowleopard/hadrian/issues/259.
           , builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ]
-
-        ------------------------------ bytestring ------------------------------
-        , package bytestring ?
-          builder (Cabal Flags) ? intLib == integerSimple ? arg "integer-simple"
 
         --------------------------------- cabal --------------------------------
         -- Cabal is a large library and slow to compile. Moreover, we build it
@@ -60,8 +59,13 @@ packageArgs = do
             , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
             , notM targetSupportsSMP ? arg "--ghc-option=-DNOSMP"
             , notM targetSupportsSMP ? arg "--ghc-option=-optc-DNOSMP"
+            -- When building stage 1 or later, use thread-safe RTS functions if
+            -- the configuration calls for a threaded GHC.
             , (any (wayUnit Threaded) rtsWays) ?
               notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
+            -- When building stage 1, use thread-safe RTS functions if the
+            -- bootstrapping (stage 0) compiler provides a threaded RTS way.
+            , stage0 ? threadedBootstrapper ? arg "--ghc-option=-optc-DTHREADED_RTS"
             , ghcWithInterpreter ?
               ghciWithDebugger <$> flavour ?
               notStage0 ? arg "--ghc-option=-DDEBUGGER"
@@ -69,13 +73,9 @@ packageArgs = do
               notStage0 ? arg "--ghc-pkg-option=--force" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ ghcWithNativeCodeGen ? arg "ncg"
-            , ghcWithInterpreter ? notStage0 ? arg "ghci"
+            [ ghcWithInterpreter ? notStage0 ? arg "internal-interpreter"
             , cross ? arg "-terminfo"
-            , notStage0 ? intLib == integerGmp ?
-              arg "integer-gmp"
-            , notStage0 ? intLib == integerSimple ?
-              arg "integer-simple" ]
+            ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
 
@@ -84,13 +84,28 @@ packageArgs = do
           [ builder Ghc ? arg ("-I" ++ compilerPath)
 
           , builder (Cabal Flags) ? mconcat
-            [ ghcWithInterpreter ? notStage0 ? arg "ghci"
+            [ ghcWithInterpreter ? notStage0 ? arg "internal-interpreter"
             , cross ? arg "-terminfo"
-            -- the 'threaded' flag is True by default, but
-            -- let's record explicitly that we link all ghc
-            -- executables with the threaded runtime.
-            , stage0 ? arg "-threaded"
-            , notStage0 ? ifM (ghcThreaded <$> expr flavour) (arg "threaded") (arg "-threaded") ]
+            -- Note [Linking ghc-bin against threaded stage0 RTS]
+            -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            -- We must maintain the invariant that GHCs linked with '-threaded'
+            -- are built with '-optc=-DTHREADED_RTS', otherwise we'll end up
+            -- with a GHC that can use the threaded runtime, but contains some
+            -- non-thread-safe functions. See
+            -- https://gitlab.haskell.org/ghc/ghc/issues/18024 for an example of
+            -- the sort of issues this can cause.
+            , ifM stage0
+                  -- We build a threaded stage 1 if the bootstrapping compiler
+                  -- supports it.
+                  (ifM threadedBootstrapper
+                       (arg "threaded")
+                       (arg "-threaded"))
+                  -- We build a threaded stage N, N>1 if the configuration calls
+                  -- for it.
+                  (ifM (ghcThreaded <$> expr flavour)
+                       (arg "threaded")
+                       (arg "-threaded"))
+            ]
           ]
 
         -------------------------------- ghcPkg --------------------------------
@@ -105,22 +120,38 @@ packageArgs = do
             input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
 
         --------------------------------- ghci ---------------------------------
-        -- TODO: This should not be @not <$> flag CrossCompiling@. Instead we
-        -- should ensure that the bootstrap compiler has the same version as the
-        -- one we are building.
-
-        -- TODO: In that case we also do not need to build most of the Stage1
-        -- libraries, as we already know that the compiler comes with the most
-        -- recent versions.
-
-        -- TODO: The use case here is that we want to build @ghc-proxy@ for the
-        -- cross compiler. That one needs to be compiled by the bootstrap
-        -- compiler as it needs to run on the host. Hence @libiserv@ needs
-        -- @GHCi.TH@, @GHCi.Message@ and @GHCi.Run@ from @ghci@. And those are
-        -- behind the @-fghci@ flag.
         , package ghci ? mconcat
-          [ notStage0 ? builder (Cabal Flags) ? arg "ghci"
-          , cross ? stage0 ? builder (Cabal Flags) ? arg "ghci" ]
+          [ notStage0 ? builder (Cabal Flags) ? arg "internal-interpreter"
+
+          -- The use case here is that we want to build @iserv-proxy@ for the
+          -- cross compiler. That one needs to be compiled by the bootstrap
+          -- compiler as it needs to run on the host. Hence @libiserv@ needs
+          -- @GHCi.TH@, @GHCi.Message@ and @GHCi.Run@ from @ghci@. And those are
+          -- behind the @-finternal-interpreter@ flag.
+          --
+          -- But it may not build if we have made some changes to ghci's
+          -- dependencies (see #16051).
+          --
+          -- To fix this properly Hadrian would need to:
+          --   * first build a compiler for the build platform (stage1 is enough)
+          --   * use it as a bootstrap compiler to build the stage1 cross-compiler
+          --
+          -- The issue is that "configure" would have to be executed twice (for
+          -- the build platform and for the cross-platform) and Hadrian would
+          -- need to be fixed to support two different stage1 compilers.
+          --
+          -- The workaround we use is to check if the bootstrap compiler has
+          -- the same version as the one we are building. In this case we can
+          -- avoid the first step above and directly build with
+          -- `-finternal-interpreter`.
+          --
+          -- TODO: Note that in that case we also do not need to build most of
+          -- the Stage1 libraries, as we already know that the bootstrap
+          -- compiler comes with the same versions as the one we are building.
+          --
+          , cross ? stage0 ? bootCross ? builder (Cabal Flags) ? arg "internal-interpreter"
+
+          ]
 
         --------------------------------- iserv --------------------------------
         -- Add -Wl,--export-dynamic enables GHCi to load dynamic objects that
@@ -154,8 +185,8 @@ packageArgs = do
         , package hsc2hs ?
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
-        ------------------------------ integerGmp ------------------------------
-        , gmpPackageArgs
+        ------------------------------ ghc-bignum ------------------------------
+        , ghcBignumArgs
 
         ---------------------------------- rts ---------------------------------
         , package rts ? rtsPackageArgs -- RTS deserves a separate function
@@ -164,40 +195,50 @@ packageArgs = do
         , package runGhc ?
           builder Ghc ? input "**/Main.hs" ?
           (\version -> ["-cpp", "-DVERSION=" ++ show version]) <$> getSetting ProjectVersion
+        ]
 
-        --------------------------------- text ---------------------------------
-        -- The package @text@ is rather tricky. It's a boot library, and it
-        -- tries to determine on its own if it should link against @integer-gmp@
-        -- or @integer-simple@. For Stage0, we need to use the integer library
-        -- that the bootstrap compiler has (since @interger@ is not a boot
-        -- library) and therefore we copy it over into the Stage0 package-db.
-        -- Maybe we should stop doing this? And subsequently @text@ for Stage1
-        -- detects the same integer library again, even though we don't build it
-        -- in Stage1, and at that point the configuration is just wrong.
-        , package text ?
-          builder (Cabal Flags) ? notStage0 ? intLib == integerSimple ?
-          pure ["+integer-simple", "-bytestring-builder"] ]
+ghcBignumArgs :: Args
+ghcBignumArgs = package ghcBignum ? do
+    -- These are only used for non-in-tree builds.
+    librariesGmp <- getSetting GmpLibDir
+    includesGmp <- getSetting GmpIncludeDir
 
-gmpPackageArgs :: Args
-gmpPackageArgs = do
-    package integerGmp ? do
-        -- These are only used for non-in-tree builds.
-        librariesGmp <- getSetting GmpLibDir
-        includesGmp  <- getSetting GmpIncludeDir
+    backend <- getBignumBackend
+    check   <- getBignumCheck
 
-        mconcat
-          [ builder (Cabal Setup) ? mconcat
-            [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
-            , flag GmpFrameworkPref ?
-              arg "--configure-option=--with-gmp-framework-preferred"
+    mconcat
+          [ -- select BigNum backend
+            builder (Cabal Flags) ? arg backend
 
-              -- Ensure that the integer-gmp package registration includes
-              -- knowledge of the system gmp's library and include directories.
-            , notM (flag GmpInTree) ? mconcat
-              [ if not (null librariesGmp) then arg ("--extra-lib-dirs=" ++ librariesGmp) else mempty
-              , if not (null includesGmp) then arg ("--extra-include-dirs=" ++ includesGmp) else mempty
-              ]
-            ]
+          , -- check the selected backend against native backend
+            builder (Cabal Flags) ? check ? arg "check"
+
+            -- backend specific
+          , case backend of
+               "gmp" -> mconcat
+                   [ builder (Cabal Setup) ? mconcat
+
+                       -- enable GMP backend: configure script will produce
+                       -- `ghc-bignum.buildinfo` and `include/HsIntegerGmp.h`
+                     [ arg "--configure-option=--with-gmp"
+
+                       -- enable in-tree support: don't depend on external "gmp"
+                       -- library
+                     , flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
+
+                       -- prefer framework over library (on Darwin)
+                     , flag GmpFrameworkPref ?
+                       arg "--configure-option=--with-gmp-framework-preferred"
+
+                       -- Ensure that the ghc-bignum package registration includes
+                       -- knowledge of the system gmp's library and include directories.
+                     , notM (flag GmpInTree) ? mconcat
+                       [ if not (null librariesGmp) then arg ("--extra-lib-dirs=" ++ librariesGmp) else mempty
+                       , if not (null includesGmp) then arg ("--extra-include-dirs=" ++ includesGmp) else mempty
+                       ]
+                     ]
+                  ]
+               _ -> mempty
           ]
 
 -- | RTS-specific command line arguments.
@@ -234,16 +275,13 @@ rtsPackageArgs = package rts ? do
     let ghcArgs = mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
-          , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
-          , flag WithLibdw ? if not (null libdwLibraryDir) then arg ("-L" ++ libdwLibraryDir) else mempty
-          , flag WithLibnuma ? if not (null libnumaIncludeDir) then arg ("-I" ++ libnumaIncludeDir) else mempty
-          , flag WithLibnuma ? if not (null libnumaLibraryDir) then arg ("-L" ++ libnumaLibraryDir) else mempty
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
           , arg $ "-DCOMPILING_RTS"
           , notM targetSupportsSMP           ? arg "-DNOSMP"
-          , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
+          , way `elem` [debug, debugDynamic] ? pure [ "-DTICKY_TICKY"
+                                                    , "-optc-DTICKY_TICKY"]
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
           , notM targetSupportsSMP           ? pure [ "-DNOSMP"
@@ -331,7 +369,6 @@ rtsPackageArgs = package rts ? do
 
             , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
               arg "-Wno-incompatible-pointer-types"
-            , windowsHost ? arg ("-DWINVER=" ++ windowsVersion)
 
             -- libffi's ffi.h triggers various warnings
             , inputs [ "**/Interpreter.c", "**/Storage.c", "**/Adjustor.c" ] ?
@@ -347,9 +384,12 @@ rtsPackageArgs = package rts ? do
           , any (wayUnit Dynamic) rtsWays ? arg "dynamic"
           , Debug `wayUnit` way           ? arg "find-ptr"
           ]
-        , builder (Cabal Setup) ?
-               if not (null libnumaLibraryDir) then arg ("--extra-lib-dirs="++libnumaLibraryDir) else mempty
-            <> if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
+        , builder (Cabal Setup) ? mconcat
+          [ if not (null libdwLibraryDir) then arg ("--extra-lib-dirs="++libdwLibraryDir) else mempty
+          , if not (null libdwIncludeDir) then arg ("--extra-include-dirs="++libdwIncludeDir) else mempty
+          , if not (null libnumaLibraryDir) then arg ("--extra-lib-dirs="++libnumaLibraryDir) else mempty
+          , if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
+          ]
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder Ghc ? ghcArgs
@@ -415,12 +455,3 @@ rtsWarnings = mconcat
     , arg "-Wredundant-decls"
     , arg "-Wundef"
     , arg "-fno-strict-aliasing" ]
-
--- These numbers can be found at:
--- https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
--- If we're compiling on windows, enforce that we only support Vista SP1+
--- Adding this here means it doesn't have to be done in individual .c files
--- and also centralizes the versioning.
--- | Minimum supported Windows version.
-windowsVersion :: String
-windowsVersion = "0x06000100"

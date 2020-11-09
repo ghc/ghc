@@ -12,9 +12,8 @@ you write will be optimised to the efficient unboxed version in any
 case. And if it isn't, we'd like to know about it.
 
 All these primitive data types and operations are exported by the
-library ``GHC.Prim``, for which there is
-:ghc-prim-ref:`detailed online documentation <GHC.Prim.>`. (This
-documentation is generated from the file ``compiler/GHC/Builtin/primops.txt.pp``.)
+library :ghc-prim-ref:`GHC.Prim.`. (This documentation is generated from
+the file ``compiler/GHC/Builtin/primops.txt.pp``.)
 
 If you want to mention any of the primitive data types or operations in
 your program, you must first import ``GHC.Prim`` to bring them into
@@ -71,7 +70,7 @@ Unboxed type kinds
 ------------------
 
 Because unboxed types are represented without the use of pointers, we
-cannot store them in use a polymorphic datatype at an unboxed type.
+cannot store them in a polymorphic datatype.
 For example, the ``Just`` node
 of ``Just 42#`` would have to be different from the ``Just`` node of
 ``Just 42``; the former stores an integer directly, while the latter
@@ -91,7 +90,7 @@ point. In contrast, the kind ``Type`` is actually just a synonym for ``TYPE
 'LiftedRep``. More details of the ``TYPE`` mechanisms appear in the `section
 on runtime representation polymorphism <#runtime-rep>`__.
 
-Given that ``Int#``'s kind is not ``Type``, it then it follows that ``Maybe
+Given that ``Int#``'s kind is not ``Type``, then it follows that ``Maybe
 Int#`` is disallowed. Similarly, because type variables tend to be of kind
 ``Type`` (for example, in ``(.) :: (b -> c) -> (a -> b) -> a -> c``, all the
 type variables have kind ``Type``), polymorphism tends not to work over
@@ -316,7 +315,7 @@ of a `newtype`. For example, the type ::
 is accepted when this extension is enabled. This creates a type
 ``A :: TYPE 'IntRep`` and a data constructor ``MkA :: Int# -> A``.
 Although the kind of ``A`` is inferred by GHC, there is nothing visually
-distictive about this type that indicated that is it not of kind ``Type``
+distinctive about this type that indicated that is it not of kind ``Type``
 like newtypes typically are. `GADTSyntax <#gadt-style>`__ can be used to
 provide a kind signature for additional clarity ::
 

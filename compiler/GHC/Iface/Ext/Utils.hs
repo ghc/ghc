@@ -1,17 +1,23 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveFunctor #-}
 module GHC.Iface.Ext.Utils where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Map
-import GHC.Driver.Session         ( DynFlags )
-import FastString                 ( FastString, mkFastString )
+import GHC.Driver.Session    ( DynFlags )
+import GHC.Driver.Ppr
+import GHC.Data.FastString   ( FastString, mkFastString )
 import GHC.Iface.Type
+import GHC.Core.Multiplicity
 import GHC.Types.Name hiding (varName)
-import Outputable                 ( renderWithStyle, ppr, defaultUserStyle, initSDocContext )
+import GHC.Types.Name.Set
+import GHC.Utils.Outputable hiding ( (<>) )
+import qualified GHC.Utils.Outputable as O
 import GHC.Types.SrcLoc
 import GHC.CoreToIface
 import GHC.Core.TyCon
@@ -27,25 +33,29 @@ import qualified Data.Set as S
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Array as A
 import Data.Data                  ( typeOf, typeRepTyCon, Data(toConstr) )
-import Data.Maybe                 ( maybeToList )
+import Data.Maybe                 ( maybeToList, mapMaybe)
 import Data.Monoid
+import Data.List                  (find)
 import Data.Traversable           ( for )
+import Data.Coerce
 import Control.Monad.Trans.State.Strict hiding (get)
+import Control.Monad.Trans.Reader
+import qualified Data.Tree as Tree
 
+type RefMap a = M.Map Identifier [(Span, IdentifierDetails a)]
 
 generateReferencesMap
   :: Foldable f
   => f (HieAST a)
-  -> M.Map Identifier [(Span, IdentifierDetails a)]
+  -> RefMap a
 generateReferencesMap = foldr (\ast m -> M.unionWith (++) (go ast) m) M.empty
   where
     go ast = M.unionsWith (++) (this : map go (nodeChildren ast))
       where
-        this = fmap (pure . (nodeSpan ast,)) $ nodeIdentifiers $ nodeInfo ast
+        this = fmap (pure . (nodeSpan ast,)) $ sourcedNodeIdents $ sourcedNodeInfo ast
 
 renderHieType :: DynFlags -> HieTypeFix -> String
-renderHieType df ht = renderWithStyle (initSDocContext df sty) (ppr $ hieTypeToIface ht)
-  where sty = defaultUserStyle df
+renderHieType dflags ht = showSDoc dflags (ppr $ hieTypeToIface ht)
 
 resolveVisibility :: Type -> [Type] -> [(Bool,Type)]
 resolveVisibility kind ty_args
@@ -73,6 +83,73 @@ resolveVisibility kind ty_args
 foldType :: (HieType a -> a) -> HieTypeFix -> a
 foldType f (Roll t) = f $ fmap (foldType f) t
 
+selectPoint :: HieFile -> (Int,Int) -> Maybe (HieAST Int)
+selectPoint hf (sl,sc) = getFirst $
+  flip foldMap (M.toList (getAsts $ hie_asts hf)) $ \(HiePath fs,ast) -> First $
+      case selectSmallestContaining (sp fs) ast of
+        Nothing -> Nothing
+        Just ast' -> Just ast'
+ where
+   sloc fs = mkRealSrcLoc fs sl sc
+   sp fs = mkRealSrcSpan (sloc fs) (sloc fs)
+
+findEvidenceUse :: NodeIdentifiers a -> [Name]
+findEvidenceUse ni = [n | (Right n, dets) <- xs, any isEvidenceUse (identInfo dets)]
+ where
+   xs = M.toList ni
+
+data EvidenceInfo a
+  = EvidenceInfo
+  { evidenceVar :: Name
+  , evidenceSpan :: RealSrcSpan
+  , evidenceType :: a
+  , evidenceDetails :: Maybe (EvVarSource, Scope, Maybe Span)
+  } deriving (Eq,Ord,Functor)
+
+instance (Outputable a) => Outputable (EvidenceInfo a) where
+  ppr (EvidenceInfo name span typ dets) =
+    hang (ppr name <+> text "at" <+> ppr span O.<> text ", of type:" <+> ppr typ) 4 $
+      pdets $$ (pprDefinedAt name)
+    where
+      pdets = case dets of
+        Nothing -> text "is a usage of an external evidence variable"
+        Just (src,scp,spn) -> text "is an" <+> ppr (EvidenceVarBind src scp spn)
+
+getEvidenceTreesAtPoint :: HieFile -> RefMap a -> (Int,Int) -> Tree.Forest (EvidenceInfo a)
+getEvidenceTreesAtPoint hf refmap point =
+  [t | Just ast <- pure $ selectPoint hf point
+     , n        <- findEvidenceUse (sourcedNodeIdents $ sourcedNodeInfo ast)
+     , Just t   <- pure $ getEvidenceTree refmap n
+     ]
+
+getEvidenceTree :: RefMap a -> Name -> Maybe (Tree.Tree (EvidenceInfo a))
+getEvidenceTree refmap var = go emptyNameSet var
+  where
+    go seen var
+      | var `elemNameSet` seen = Nothing
+      | otherwise = do
+          xs <- M.lookup (Right var) refmap
+          case find (any isEvidenceBind . identInfo . snd) xs of
+            Just (sp,dets) -> do
+              typ <- identType dets
+              (evdet,children) <- getFirst $ foldMap First $ do
+                 det <- S.toList $ identInfo dets
+                 case det of
+                   EvidenceVarBind src@(EvLetBind (getEvBindDeps -> xs)) scp spn ->
+                     pure $ Just ((src,scp,spn),mapMaybe (go $ extendNameSet seen var) xs)
+                   EvidenceVarBind src scp spn -> pure $ Just ((src,scp,spn),[])
+                   _ -> pure Nothing
+              pure $ Tree.Node (EvidenceInfo var sp typ (Just evdet)) children
+            -- It is externally bound
+            Nothing -> getFirst $ foldMap First $ do
+              (sp,dets) <- xs
+              if (any isEvidenceUse $ identInfo dets)
+                then do
+                  case identType dets of
+                    Nothing -> pure Nothing
+                    Just typ -> pure $ Just $ Tree.Node (EvidenceInfo var sp typ Nothing) []
+                else pure Nothing
+
 hieTypeToIface :: HieTypeFix -> IfaceType
 hieTypeToIface = foldType go
   where
@@ -81,8 +158,8 @@ hieTypeToIface = foldType go
     go (HLitTy l) = IfaceLitTy l
     go (HForAllTy ((n,k),af) t) = let b = (occNameFS $ getOccName n, k)
                                   in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
-    go (HFunTy a b)     = IfaceFunTy VisArg   a    b
-    go (HQualTy pred b) = IfaceFunTy InvisArg pred b
+    go (HFunTy w a b)   = IfaceFunTy VisArg   w       a    b
+    go (HQualTy pred b) = IfaceFunTy InvisArg many_ty pred b
     go (HCastTy a) = a
     go HCoercionTy = IfaceTyVar "<coercion type>"
     go (HTyConApp a xs) = IfaceTyConApp a (hieToIfaceArgs xs)
@@ -117,9 +194,8 @@ compressTypes
 compressTypes asts = (a, arr)
   where
     (a, (HTS _ m i)) = flip runState initialHTS $
-      for asts $ \typ -> do
-        i <- getTypeIndex typ
-        return i
+      for asts $ \typ ->
+        getTypeIndex typ
     arr = A.array (0,i-1) (IM.toList m)
 
 recoverFullType :: TypeIndex -> A.Array TypeIndex HieTypeFlat -> HieTypeFix
@@ -158,24 +234,25 @@ getTypeIndex t
       k <- getTypeIndex (varType v)
       i <- getTypeIndex t
       return $ HForAllTy ((varName v,k),a) i
-    go (FunTy { ft_af = af, ft_arg = a, ft_res = b }) = do
+    go (FunTy { ft_af = af, ft_mult = w, ft_arg = a, ft_res = b }) = do
       ai <- getTypeIndex a
       bi <- getTypeIndex b
+      wi <- getTypeIndex w
       return $ case af of
-                 InvisArg -> HQualTy ai bi
-                 VisArg   -> HFunTy ai bi
+                 InvisArg -> case w of Many -> HQualTy ai bi; _ -> error "Unexpected non-unrestricted predicate"
+                 VisArg   -> HFunTy wi ai bi
     go (LitTy a) = return $ HLitTy $ toIfaceTyLit a
     go (CastTy t _) = do
       i <- getTypeIndex t
       return $ HCastTy i
     go (CoercionTy _) = return HCoercionTy
 
-resolveTyVarScopes :: M.Map FastString (HieAST a) -> M.Map FastString (HieAST a)
+resolveTyVarScopes :: M.Map HiePath (HieAST a) -> M.Map HiePath (HieAST a)
 resolveTyVarScopes asts = M.map go asts
   where
     go ast = resolveTyVarScopeLocal ast asts
 
-resolveTyVarScopeLocal :: HieAST a -> M.Map FastString (HieAST a) -> HieAST a
+resolveTyVarScopeLocal :: HieAST a -> M.Map HiePath (HieAST a) -> HieAST a
 resolveTyVarScopeLocal ast asts = go ast
   where
     resolveNameScope dets = dets{identInfo =
@@ -195,15 +272,17 @@ resolveTyVarScopeLocal ast asts = go ast
     resolveScope scope = scope
     go (Node info span children) = Node info' span $ map go children
       where
-        info' = info { nodeIdentifiers = idents }
-        idents = M.map resolveNameScope $ nodeIdentifiers info
+        info' = SourcedNodeInfo (updateNodeInfo <$> getSourcedNodeInfo info)
+        updateNodeInfo i = i { nodeIdentifiers = idents }
+          where
+            idents = M.map resolveNameScope $ nodeIdentifiers i
 
-getNameBinding :: Name -> M.Map FastString (HieAST a) -> Maybe Span
+getNameBinding :: Name -> M.Map HiePath (HieAST a) -> Maybe Span
 getNameBinding n asts = do
   (_,msp) <- getNameScopeAndBinding n asts
   msp
 
-getNameScope :: Name -> M.Map FastString (HieAST a) -> Maybe [Scope]
+getNameScope :: Name -> M.Map HiePath (HieAST a) -> Maybe [Scope]
 getNameScope n asts = do
   (scopes,_) <- getNameScopeAndBinding n asts
   return scopes
@@ -211,29 +290,29 @@ getNameScope n asts = do
 getNameBindingInClass
   :: Name
   -> Span
-  -> M.Map FastString (HieAST a)
+  -> M.Map HiePath (HieAST a)
   -> Maybe Span
 getNameBindingInClass n sp asts = do
-  ast <- M.lookup (srcSpanFile sp) asts
+  ast <- M.lookup (HiePath (srcSpanFile sp)) asts
   getFirst $ foldMap First $ do
     child <- flattenAst ast
     dets <- maybeToList
-      $ M.lookup (Right n) $ nodeIdentifiers $ nodeInfo child
+      $ M.lookup (Right n) $ sourcedNodeIdents $ sourcedNodeInfo child
     let binding = foldMap (First . getBindSiteFromContext) (identInfo dets)
     return (getFirst binding)
 
 getNameScopeAndBinding
   :: Name
-  -> M.Map FastString (HieAST a)
+  -> M.Map HiePath (HieAST a)
   -> Maybe ([Scope], Maybe Span)
 getNameScopeAndBinding n asts = case nameSrcSpan n of
   RealSrcSpan sp _ -> do -- @Maybe
-    ast <- M.lookup (srcSpanFile sp) asts
+    ast <- M.lookup (HiePath (srcSpanFile sp)) asts
     defNode <- selectLargestContainedBy sp ast
     getFirst $ foldMap First $ do -- @[]
       node <- flattenAst defNode
       dets <- maybeToList
-        $ M.lookup (Right n) $ nodeIdentifiers $ nodeInfo node
+        $ M.lookup (Right n) $ sourcedNodeIdents $ sourcedNodeInfo node
       scopes <- maybeToList $ foldMap getScopeFromContext (identInfo dets)
       let binding = foldMap (First . getBindSiteFromContext) (identInfo dets)
       return $ Just (scopes, getFirst binding)
@@ -246,6 +325,7 @@ getScopeFromContext (ClassTyDecl _) = Just [ModuleScope]
 getScopeFromContext (Decl _ _) = Just [ModuleScope]
 getScopeFromContext (TyVarBind a (ResolvedScopes xs)) = Just $ a:xs
 getScopeFromContext (TyVarBind a _) = Just [a]
+getScopeFromContext (EvidenceVarBind _ a _) = Just [a]
 getScopeFromContext _ = Nothing
 
 getBindSiteFromContext :: ContextInfo -> Maybe Span
@@ -288,13 +368,32 @@ selectSmallestContaining sp node
   | sp `containsSpan` nodeSpan node = Nothing
   | otherwise = Nothing
 
-definedInAsts :: M.Map FastString (HieAST a) -> Name -> Bool
+definedInAsts :: M.Map HiePath (HieAST a) -> Name -> Bool
 definedInAsts asts n = case nameSrcSpan n of
-  RealSrcSpan sp _ -> srcSpanFile sp `elem` M.keys asts
+  RealSrcSpan sp _ -> M.member (HiePath (srcSpanFile sp)) asts
   _ -> False
+
+getEvidenceBindDeps :: ContextInfo -> [Name]
+getEvidenceBindDeps (EvidenceVarBind (EvLetBind xs) _ _) =
+  getEvBindDeps xs
+getEvidenceBindDeps _ = []
+
+isEvidenceBind :: ContextInfo -> Bool
+isEvidenceBind EvidenceVarBind{} = True
+isEvidenceBind _ = False
+
+isEvidenceContext :: ContextInfo -> Bool
+isEvidenceContext EvidenceVarUse = True
+isEvidenceContext EvidenceVarBind{} = True
+isEvidenceContext _ = False
+
+isEvidenceUse :: ContextInfo -> Bool
+isEvidenceUse EvidenceVarUse = True
+isEvidenceUse _ = False
 
 isOccurrence :: ContextInfo -> Bool
 isOccurrence Use = True
+isOccurrence EvidenceVarUse = True
 isOccurrence _ = False
 
 scopeContainsSpan :: Scope -> Span -> Bool
@@ -305,13 +404,25 @@ scopeContainsSpan (LocalScope a) b = a `containsSpan` b
 -- | One must contain the other. Leaf nodes cannot contain anything
 combineAst :: HieAST Type -> HieAST Type -> HieAST Type
 combineAst a@(Node aInf aSpn xs) b@(Node bInf bSpn ys)
-  | aSpn == bSpn = Node (aInf `combineNodeInfo` bInf) aSpn (mergeAsts xs ys)
+  | aSpn == bSpn = Node (aInf `combineSourcedNodeInfo` bInf) aSpn (mergeAsts xs ys)
   | aSpn `containsSpan` bSpn = combineAst b a
 combineAst a (Node xs span children) = Node xs span (insertAst a children)
 
 -- | Insert an AST in a sorted list of disjoint Asts
 insertAst :: HieAST Type -> [HieAST Type] -> [HieAST Type]
 insertAst x = mergeAsts [x]
+
+nodeInfo :: HieAST Type -> NodeInfo Type
+nodeInfo = foldl' combineNodeInfo emptyNodeInfo . getSourcedNodeInfo . sourcedNodeInfo
+
+emptyNodeInfo :: NodeInfo a
+emptyNodeInfo = NodeInfo S.empty [] M.empty
+
+sourcedNodeIdents :: SourcedNodeInfo a -> NodeIdentifiers a
+sourcedNodeIdents = M.unionsWith (<>) . fmap nodeIdentifiers . getSourcedNodeInfo
+
+combineSourcedNodeInfo :: SourcedNodeInfo Type -> SourcedNodeInfo Type -> SourcedNodeInfo Type
+combineSourcedNodeInfo = coerce $ M.unionWith combineNodeInfo
 
 -- | Merge two nodes together.
 --
@@ -403,13 +514,14 @@ mergeSortAsts = go . map pure
     mergePairs (xs:ys:xss) = mergeAsts xs ys : mergePairs xss
 
 simpleNodeInfo :: FastString -> FastString -> NodeInfo a
-simpleNodeInfo cons typ = NodeInfo (S.singleton (cons, typ)) [] M.empty
+simpleNodeInfo cons typ = NodeInfo (S.singleton (NodeAnnotation cons typ)) [] M.empty
 
-locOnly :: SrcSpan -> [HieAST a]
-locOnly (RealSrcSpan span _) =
-  [Node e span []]
-    where e = NodeInfo S.empty [] M.empty
-locOnly _ = []
+locOnly :: Monad m => SrcSpan -> ReaderT NodeOrigin m [HieAST a]
+locOnly (RealSrcSpan span _) = do
+  org <- ask
+  let e = mkSourcedNodeInfo org $ emptyNodeInfo
+  pure [Node e span []]
+locOnly _ = pure []
 
 mkScope :: SrcSpan -> Scope
 mkScope (RealSrcSpan sp _) = LocalScope sp
@@ -426,30 +538,37 @@ combineScopes x NoScope = x
 combineScopes (LocalScope a) (LocalScope b) =
   mkScope $ combineSrcSpans (RealSrcSpan a Nothing) (RealSrcSpan b Nothing)
 
+mkSourcedNodeInfo :: NodeOrigin -> NodeInfo a -> SourcedNodeInfo a
+mkSourcedNodeInfo org ni = SourcedNodeInfo $ M.singleton org ni
+
 {-# INLINEABLE makeNode #-}
 makeNode
-  :: (Applicative m, Data a)
+  :: (Monad m, Data a)
   => a                       -- ^ helps fill in 'nodeAnnotations' (with 'Data')
   -> SrcSpan                 -- ^ return an empty list if this is unhelpful
-  -> m [HieAST b]
-makeNode x spn = pure $ case spn of
-  RealSrcSpan span _ -> [Node (simpleNodeInfo cons typ) span []]
-  _ -> []
+  -> ReaderT NodeOrigin m [HieAST b]
+makeNode x spn = do
+  org <- ask
+  pure $ case spn of
+    RealSrcSpan span _ -> [Node (mkSourcedNodeInfo org $ simpleNodeInfo cons typ) span []]
+    _ -> []
   where
     cons = mkFastString . show . toConstr $ x
     typ = mkFastString . show . typeRepTyCon . typeOf $ x
 
 {-# INLINEABLE makeTypeNode #-}
 makeTypeNode
-  :: (Applicative m, Data a)
+  :: (Monad m, Data a)
   => a                       -- ^ helps fill in 'nodeAnnotations' (with 'Data')
   -> SrcSpan                 -- ^ return an empty list if this is unhelpful
   -> Type                    -- ^ type to associate with the node
-  -> m [HieAST Type]
-makeTypeNode x spn etyp = pure $ case spn of
-  RealSrcSpan span _ ->
-    [Node (NodeInfo (S.singleton (cons,typ)) [etyp] M.empty) span []]
-  _ -> []
+  -> ReaderT NodeOrigin m [HieAST Type]
+makeTypeNode x spn etyp = do
+  org <- ask
+  pure $ case spn of
+    RealSrcSpan span _ ->
+      [Node (mkSourcedNodeInfo org $ NodeInfo (S.singleton (NodeAnnotation cons typ)) [etyp] M.empty) span []]
+    _ -> []
   where
     cons = mkFastString . show . toConstr $ x
     typ = mkFastString . show . typeRepTyCon . typeOf $ x

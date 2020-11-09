@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, PatternSynonyms #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 
@@ -26,7 +26,7 @@ module GHC.Core.Unify (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -38,12 +38,13 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs   ( tyCoVarsOfCoList, tyCoFVsOfTypes )
 import GHC.Core.TyCo.Subst ( mkTvSubst )
-import FV( FV, fvVarSet, fvVarList )
-import Util
-import Pair
-import Outputable
+import GHC.Utils.FV( FV, fvVarSet, fvVarList )
+import GHC.Utils.Misc
+import GHC.Data.Pair
+import GHC.Utils.Outputable
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
+import GHC.Exts( oneShot )
 
 import Control.Monad
 import Control.Applicative hiding ( empty )
@@ -658,9 +659,9 @@ niSubstTvSet :: TvSubstEnv -> TyCoVarSet -> TyCoVarSet
 -- remembering that the substitution isn't necessarily idempotent
 -- This is used in the occurs check, before extending the substitution
 niSubstTvSet tsubst tvs
-  = nonDetFoldUniqSet (unionVarSet . get) emptyVarSet tvs
-  -- It's OK to nonDetFoldUFM here because we immediately forget the
-  -- ordering by creating a set.
+  = nonDetStrictFoldUniqSet (unionVarSet . get) emptyVarSet tvs
+  -- It's OK to use a non-deterministic fold here because we immediately forget
+  -- the ordering by creating a set.
   where
     get tv
       | Just ty <- lookupVarEnv tsubst tv
@@ -956,7 +957,7 @@ unify_ty :: UMEnv
 -- Respects newtypes, PredTypes
 
 unify_ty env ty1 ty2 kco
-    -- TODO: More commentary needed here
+    -- Use tcView, not coreView. See Note [coreView vs tcView] in GHC.Core.Type.
   | Just ty1' <- tcView ty1   = unify_ty env ty1' ty2 kco
   | Just ty2' <- tcView ty2   = unify_ty env ty1 ty2' kco
   | CastTy ty1' co <- ty1     = if um_unif env
@@ -1041,7 +1042,9 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
              , not (cv `elemVarEnv` c_subst)
              , BindMe <- tvBindFlag env cv
              -> do { checkRnEnv env (tyCoVarsOfCo co2)
-                   ; let (co_l, co_r) = decomposeFunCo Nominal kco
+                   ; let (_, co_l, co_r) = decomposeFunCo Nominal kco
+                     -- Because the coercion is nominal, it should be safe to
+                     -- ignore the multiplicity coercion.
                       -- cv :: t1 ~ t2
                       -- co2 :: s1 ~ s2
                       -- co_l :: t1 ~ s1
@@ -1118,7 +1121,8 @@ uUnrefined :: UMEnv
 -- We know that tv1 isn't refined
 
 uUnrefined env tv1' ty2 ty2' kco
-  | Just ty2'' <- coreView ty2'
+    -- Use tcView, not coreView. See Note [coreView vs tcView] in GHC.Core.Type.
+  | Just ty2'' <- tcView ty2'
   = uUnrefined env tv1' ty2 ty2'' kco    -- Unwrap synonyms
                 -- This is essential, in case we have
                 --      type Foo a = a
@@ -1235,8 +1239,16 @@ data UMState = UMState
                    { um_tv_env   :: TvSubstEnv
                    , um_cv_env   :: CvSubstEnv }
 
-newtype UM a = UM { unUM :: UMState -> UnifyResultM (UMState, a) }
-    deriving (Functor)
+newtype UM a
+  = UM' { unUM :: UMState -> UnifyResultM (UMState, a) }
+    -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+  deriving (Functor)
+
+pattern UM :: (UMState -> UnifyResultM (UMState, a)) -> UM a
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+pattern UM m <- UM' m
+  where
+    UM m = UM' (oneShot m)
 
 instance Applicative UM where
       pure a = UM (\s -> pure (s, a))
@@ -1401,6 +1413,8 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
             -> Maybe LiftCoEnv
 ty_co_match menv subst ty co lkco rkco
   | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
+     -- why coreView here, not tcView? Because we're firmly after type-checking.
+     -- This function is used only during coercion optimisation.
 
   -- handle Refl case:
   | tyCoVarsOfType ty `isNotInDomainOf` subst
@@ -1440,7 +1454,7 @@ ty_co_match menv subst (TyVarTy tv1) co lkco rkco
   = if any (inRnEnvR rn_env) (tyCoVarsOfCoList co)
     then Nothing      -- occurs check failed
     else Just $ extendVarEnv subst tv1' $
-                castCoercionKindI co (mkSymCo lkco) (mkSymCo rkco)
+                castCoercionKind co (mkSymCo lkco) (mkSymCo rkco)
 
   | otherwise
   = Nothing
@@ -1463,15 +1477,15 @@ ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
 
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
-ty_co_match menv subst (FunTy _ ty1 ty2) co _lkco _rkco
-    -- Despite the fact that (->) is polymorphic in four type variables (two
-    -- runtime rep and two types), we shouldn't need to explicitly unify the
-    -- runtime reps here; unifying the types themselves should be sufficient.
-    -- See Note [Representation of function types].
-  | Just (tc, [_,_,co1,co2]) <- splitTyConAppCo_maybe co
+ty_co_match menv subst (FunTy _ w ty1 ty2) co _lkco _rkco
+    -- Despite the fact that (->) is polymorphic in five type variables (two
+    -- runtime rep, a multiplicity and two types), we shouldn't need to
+    -- explicitly unify the runtime reps here; unifying the types themselves
+    -- should be sufficient.  See Note [Representation of function types].
+  | Just (tc, [co_mult, _,_,co1,co2]) <- splitTyConAppCo_maybe co
   , tc == funTyCon
-  = let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) [co1,co2]
-    in ty_co_match_args menv subst [ty1, ty2] [co1, co2] lkcos rkcos
+  = let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) [co_mult,co1,co2]
+    in ty_co_match_args menv subst [w, ty1, ty2] [co_mult, co1, co2] lkcos rkcos
 
 ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
                        (ForAllCo tv2 kind_co2 co2)
@@ -1575,10 +1589,10 @@ pushRefl co =
   case (isReflCo_maybe co) of
     Just (AppTy ty1 ty2, Nominal)
       -> Just (AppCo (mkReflCo Nominal ty1) (mkNomReflCo ty2))
-    Just (FunTy _ ty1 ty2, r)
+    Just (FunTy _ w ty1 ty2, r)
       | Just rep1 <- getRuntimeRep_maybe ty1
       , Just rep2 <- getRuntimeRep_maybe ty2
-      ->  Just (TyConAppCo r funTyCon [ mkReflCo r rep1, mkReflCo r rep2
+      ->  Just (TyConAppCo r funTyCon [ multToCo w, mkReflCo r rep1, mkReflCo r rep2
                                        , mkReflCo r ty1,  mkReflCo r ty2 ])
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))

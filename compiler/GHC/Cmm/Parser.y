@@ -202,15 +202,18 @@ necessary to the stack to accommodate it (e.g. 2).
 
 module GHC.Cmm.Parser ( parseCmmFile ) where
 
-import GhcPrelude
+import GHC.Prelude
+import qualified Prelude -- for happy-generated code
+
+import GHC.Platform
+import GHC.Platform.Profile
 
 import GHC.StgToCmm.ExtCode
-import GHC.Cmm.CallConv
 import GHC.StgToCmm.Prof
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Monad hiding ( getCode, getCodeR, getCodeScoped, emitLabel, emit
-                               , emitStore, emitAssign, emitOutOfLine, withUpdFrameOff
-                               , getUpdFrameOff )
+                                 , emitStore, emitAssign, emitOutOfLine, withUpdFrameOff
+                                 , getUpdFrameOff, getProfile, getPlatform, getPtrOpts )
 import qualified GHC.StgToCmm.Monad as F
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Foreign
@@ -219,6 +222,7 @@ import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Layout     hiding (ArgRep(..))
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Bind  ( emitBlackHoleCode, emitUpdateFrame )
+
 import GHC.Core           ( Tickish(SourceNote) )
 
 import GHC.Cmm.Opt
@@ -230,27 +234,31 @@ import GHC.Cmm.Info
 import GHC.Cmm.BlockId
 import GHC.Cmm.Lexer
 import GHC.Cmm.CLabel
-import GHC.Cmm.Monad
+import GHC.Cmm.Parser.Monad hiding (getPlatform, getProfile, getPtrOpts)
+import qualified GHC.Cmm.Parser.Monad as PD
+import GHC.Cmm.CallConv
 import GHC.Runtime.Heap.Layout
 import GHC.Parser.Lexer
+import GHC.Parser.Errors
 
 import GHC.Types.CostCentre
 import GHC.Types.ForeignCall
-import GHC.Types.Module
-import GHC.Platform
+import GHC.Unit.Module
 import GHC.Types.Literal
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
-import ErrUtils
-import StringBuffer
-import FastString
-import Panic
+import GHC.Driver.Ppr
+import GHC.Driver.Config
+import GHC.Utils.Error
+import GHC.Data.StringBuffer
+import GHC.Data.FastString
+import GHC.Utils.Panic
 import GHC.Settings.Constants
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Basic
-import Bag              ( emptyBag, unitBag )
+import GHC.Data.Bag     ( Bag, emptyBag, unitBag, isEmptyBag )
 import GHC.Types.Var
 
 import Control.Monad
@@ -377,9 +385,11 @@ cmmtop  :: { CmmParse () }
         | cmmdata                       { $1 }
         | decl                          { $1 }
         | 'CLOSURE' '(' NAME ',' NAME lits ')' ';'
-                {% liftP . withThisPackage $ \pkg ->
-                   do lits <- sequence $6;
-                      staticClosure pkg $3 $5 (map getLit lits) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        lits <- sequence $6;
+                        staticClosure home_unit_id $3 $5 (map getLit lits) }
 
 -- The only static closures in the RTS are dummy closures like
 -- stg_END_TSO_QUEUE_closure and stg_dummy_ret.  We don't need
@@ -398,8 +408,10 @@ cmmdata :: { CmmParse () }
 
 data_label :: { CmmParse CLabel }
     : NAME ':'
-                {% liftP . withThisPackage $ \pkg ->
-                   return (mkCmmDataLabel pkg $1) }
+                {% do
+                   home_unit_id <- getHomeUnitId
+                   liftP $ pure $ do
+                     pure (mkCmmDataLabel home_unit_id (NeedExternDecl False) $1) }
 
 statics :: { [CmmParse [CmmStatic]] }
         : {- empty -}                   { [] }
@@ -418,9 +430,9 @@ static  :: { CmmParse [CmmStatic] }
                                                         fromIntegral $3)] }
         | 'CLOSURE' '(' NAME lits ')'
                 { do { lits <- sequence $4
-                ; dflags <- getDynFlags
+                ; profile <- getProfile
                      ; return $ map CmmStaticLit $
-                        mkStaticClosure dflags (mkForeignLabel $3 Nothing ForeignLabelInExternalPackage IsData)
+                        mkStaticClosure profile (mkForeignLabel $3 Nothing ForeignLabelInExternalPackage IsData)
                          -- mkForeignLabel because these are only used
                          -- for CHARLIKE and INTLIKE closures in the RTS.
                         dontCareCCS (map getLit lits) [] [] [] } }
@@ -436,8 +448,9 @@ cmmproc :: { CmmParse () }
                        getCodeScoped $ loopDecls $ do {
                          (entry_ret_label, info, stk_formals) <- $1;
                          dflags <- getDynFlags;
+                         platform <- getPlatform;
                          formals <- sequence (fromMaybe [] $3);
-                         withName (showSDoc dflags (ppr entry_ret_label))
+                         withName (showSDoc dflags (pdoc platform entry_ret_label))
                            $4;
                          return (entry_ret_label, info, stk_formals, formals) }
                      let do_layout = isJust $3
@@ -455,104 +468,117 @@ maybe_body :: { CmmParse () }
 
 info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
         : NAME
-                {% liftP . withThisPackage $ \pkg ->
-                   do   newFunctionName $1 pkg
-                        return (mkCmmCodeLabel pkg $1, Nothing, []) }
+                {% do
+                     home_unit_id <- getHomeUnitId
+                     liftP $ pure $ do
+                       newFunctionName $1 home_unit_id
+                       return (mkCmmCodeLabel home_unit_id $1, Nothing, []) }
 
 
         | 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, closure type, description, type
-                {% liftP . withThisPackage $ \pkg ->
-                   do dflags <- getDynFlags
-                      let prof = profilingInfo dflags $11 $13
-                          rep  = mkRTSRep (fromIntegral $9) $
-                                   mkHeapRep dflags False (fromIntegral $5)
-                                                   (fromIntegral $7) Thunk
-                              -- not really Thunk, but that makes the info table
-                              -- we want.
-                      return (mkCmmEntryLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                              []) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        profile <- getProfile
+                        let prof = profilingInfo profile $11 $13
+                            rep  = mkRTSRep (fromIntegral $9) $
+                                     mkHeapRep profile False (fromIntegral $5)
+                                                     (fromIntegral $7) Thunk
+                                -- not really Thunk, but that makes the info table
+                                -- we want.
+                        return (mkCmmEntryLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
+                                []) }
 
         | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
                 -- ptrs, nptrs, closure type, description, type, fun type
-                {% liftP . withThisPackage $ \pkg ->
-                   do dflags <- getDynFlags
-                      let prof = profilingInfo dflags $11 $13
-                          ty   = Fun 0 (ArgSpec (fromIntegral $15))
-                                -- Arity zero, arg_type $15
-                          rep = mkRTSRep (fromIntegral $9) $
-                                    mkHeapRep dflags False (fromIntegral $5)
-                                                    (fromIntegral $7) ty
-                      return (mkCmmEntryLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                              []) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        profile <- getProfile
+                        let prof = profilingInfo profile $11 $13
+                            ty   = Fun 0 (ArgSpec (fromIntegral $15))
+                                  -- Arity zero, arg_type $15
+                            rep = mkRTSRep (fromIntegral $9) $
+                                      mkHeapRep profile False (fromIntegral $5)
+                                                      (fromIntegral $7) ty
+                        return (mkCmmEntryLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
+                                []) }
                 -- we leave most of the fields zero here.  This is only used
                 -- to generate the BCO info table in the RTS at the moment.
 
         | 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, tag, closure type, description, type
-                {% liftP . withThisPackage $ \pkg ->
-                   do dflags <- getDynFlags
-                      let prof = profilingInfo dflags $13 $15
-                          ty  = Constr (fromIntegral $9)  -- Tag
-                                       (BS8.pack $13)
-                          rep = mkRTSRep (fromIntegral $11) $
-                                  mkHeapRep dflags False (fromIntegral $5)
-                                                  (fromIntegral $7) ty
-                      return (mkCmmEntryLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing,cit_clo = Nothing },
-                              []) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        profile <- getProfile
+                        let prof = profilingInfo profile $13 $15
+                            ty  = Constr (fromIntegral $9)  -- Tag
+                                         (BS8.pack $13)
+                            rep = mkRTSRep (fromIntegral $11) $
+                                    mkHeapRep profile False (fromIntegral $5)
+                                                    (fromIntegral $7) ty
+                        return (mkCmmEntryLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing,cit_clo = Nothing },
+                                []) }
 
                      -- If profiling is on, this string gets duplicated,
                      -- but that's the way the old code did it we can fix it some other time.
 
         | 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- selector, closure type, description, type
-                {% liftP . withThisPackage $ \pkg ->
-                   do dflags <- getDynFlags
-                      let prof = profilingInfo dflags $9 $11
-                          ty  = ThunkSelector (fromIntegral $5)
-                          rep = mkRTSRep (fromIntegral $7) $
-                                   mkHeapRep dflags False 0 0 ty
-                      return (mkCmmEntryLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                              []) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        profile <- getProfile
+                        let prof = profilingInfo profile $9 $11
+                            ty  = ThunkSelector (fromIntegral $5)
+                            rep = mkRTSRep (fromIntegral $7) $
+                                     mkHeapRep profile False 0 0 ty
+                        return (mkCmmEntryLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
+                                []) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ')'
                 -- closure type (no live regs)
-                {% liftP . withThisPackage $ \pkg ->
-                   do let prof = NoProfilingInfo
-                          rep  = mkRTSRep (fromIntegral $5) $ mkStackRep []
-                      return (mkCmmRetLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                              []) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        let prof = NoProfilingInfo
+                            rep  = mkRTSRep (fromIntegral $5) $ mkStackRep []
+                        return (mkCmmRetLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
+                                []) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals0 ')'
                 -- closure type, live regs
-                {% liftP . withThisPackage $ \pkg ->
-                   do dflags <- getDynFlags
-                      let platform = targetPlatform dflags
-                      live <- sequence $7
-                      let prof = NoProfilingInfo
-                          -- drop one for the info pointer
-                          bitmap = mkLiveness platform (drop 1 live)
-                          rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
-                      return (mkCmmRetLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel pkg $3
-                                           , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                              live) }
+                {% do
+                      home_unit_id <- getHomeUnitId
+                      liftP $ pure $ do
+                        platform <- getPlatform
+                        live <- sequence $7
+                        let prof = NoProfilingInfo
+                            -- drop one for the info pointer
+                            bitmap = mkLiveness platform (drop 1 live)
+                            rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
+                        return (mkCmmRetLabel home_unit_id $3,
+                                Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel home_unit_id $3
+                                             , cit_rep = rep
+                                             , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
+                                live) }
 
 body    :: { CmmParse () }
         : {- empty -}                   { return () }
@@ -583,9 +609,9 @@ importName
         | 'CLOSURE' NAME
         { ($2, mkForeignLabel $2 Nothing ForeignLabelInExternalPackage IsData) }
 
-        -- A label imported with an explicit packageId.
+        -- A label imported with an explicit UnitId.
         | STRING NAME
-        { ($2, mkCmmCodeLabel (fsToUnitId (mkFastString $1)) $2) }
+        { ($2, mkCmmCodeLabel (UnitId (mkFastString $1)) $2) }
 
 
 names   :: { [FastString] }
@@ -686,8 +712,8 @@ safety  :: { Safety }
 
 vols    :: { [GlobalReg] }
         : '[' ']'                       { [] }
-        | '[' '*' ']'                   {% do df <- getDynFlags
-                                         ; return (realArgRegsCover df) }
+        | '[' '*' ']'                   {% do platform <- PD.getPlatform
+                                         ; return (realArgRegsCover platform) }
                                            -- All of them. See comment attached
                                            -- to realArgRegsCover
         | '[' globals ']'               { $2 }
@@ -771,7 +797,7 @@ expr0   :: { CmmParse CmmExpr }
 
 -- leaving out the type of a literal gives you the native word size in C--
 maybe_ty :: { CmmType }
-        : {- empty -}                   {% do dflags <- getDynFlags; return $ bWord (targetPlatform dflags) }
+        : {- empty -}                   {% do platform <- PD.getPlatform; return $ bWord platform }
         | '::' type                     { $2 }
 
 cmm_hint_exprs0 :: { [CmmParse (CmmExpr, ForeignHint)] }
@@ -860,7 +886,7 @@ typenot8 :: { CmmType }
         | 'bits512'             { b512 }
         | 'float32'             { f32 }
         | 'float64'             { f64 }
-        | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord (targetPlatform dflags) }
+        | 'gcptr'               {% do platform <- PD.getPlatform; return $ gcWord platform }
 
 {
 section :: String -> SectionType
@@ -880,8 +906,7 @@ mkString s = CmmString (BS8.pack s)
 -- the op.
 mkMachOp :: (Width -> MachOp) -> [CmmParse CmmExpr] -> CmmParse CmmExpr
 mkMachOp fn args = do
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
+  platform <- getPlatform
   arg_exprs <- sequence args
   return (CmmMachOp (fn (typeWidth (cmmExprType platform (head arg_exprs)))) arg_exprs)
 
@@ -893,13 +918,13 @@ getLit _ = panic "invalid literal" -- TODO messy failure
 nameToMachOp :: FastString -> PD (Width -> MachOp)
 nameToMachOp name =
   case lookupUFM machOps name of
-        Nothing -> failMsgPD ("unknown primitive " ++ unpackFS name)
+        Nothing -> failMsgPD $ Error (ErrCmmParser (CmmUnknownPrimitive name)) []
         Just m  -> return m
 
 exprOp :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse CmmExpr)
 exprOp name args_code = do
-  dflags <- getDynFlags
-  case lookupUFM (exprMacros dflags) name of
+  ptr_opts <- PD.getPtrOpts
+  case lookupUFM (exprMacros ptr_opts) name of
      Just f  -> return $ do
         args <- sequence args_code
         return (f args)
@@ -907,19 +932,22 @@ exprOp name args_code = do
         mo <- nameToMachOp name
         return $ mkMachOp mo args_code
 
-exprMacros :: DynFlags -> UniqFM ([CmmExpr] -> CmmExpr)
-exprMacros dflags = listToUFM [
-  ( fsLit "ENTRY_CODE",   \ [x] -> entryCode dflags x ),
-  ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr dflags x ),
-  ( fsLit "STD_INFO",     \ [x] -> infoTable dflags x ),
-  ( fsLit "FUN_INFO",     \ [x] -> funInfoTable dflags x ),
-  ( fsLit "GET_ENTRY",    \ [x] -> entryCode dflags (closureInfoPtr dflags x) ),
-  ( fsLit "GET_STD_INFO", \ [x] -> infoTable dflags (closureInfoPtr dflags x) ),
-  ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable dflags (closureInfoPtr dflags x) ),
-  ( fsLit "INFO_TYPE",    \ [x] -> infoTableClosureType dflags x ),
-  ( fsLit "INFO_PTRS",    \ [x] -> infoTablePtrs dflags x ),
-  ( fsLit "INFO_NPTRS",   \ [x] -> infoTableNonPtrs dflags x )
+exprMacros :: PtrOpts -> UniqFM FastString ([CmmExpr] -> CmmExpr)
+exprMacros ptr_opts = listToUFM [
+  ( fsLit "ENTRY_CODE",   \ [x] -> entryCode platform x ),
+  ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr ptr_opts x ),
+  ( fsLit "STD_INFO",     \ [x] -> infoTable profile x ),
+  ( fsLit "FUN_INFO",     \ [x] -> funInfoTable profile x ),
+  ( fsLit "GET_ENTRY",    \ [x] -> entryCode platform (closureInfoPtr ptr_opts x) ),
+  ( fsLit "GET_STD_INFO", \ [x] -> infoTable profile (closureInfoPtr ptr_opts x) ),
+  ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable profile (closureInfoPtr ptr_opts x) ),
+  ( fsLit "INFO_TYPE",    \ [x] -> infoTableClosureType profile x ),
+  ( fsLit "INFO_PTRS",    \ [x] -> infoTablePtrs profile x ),
+  ( fsLit "INFO_NPTRS",   \ [x] -> infoTableNonPtrs profile x )
   ]
+  where
+    profile  = po_profile ptr_opts
+    platform = profilePlatform profile
 
 -- we understand a subset of C-- primitives:
 machOps = listToUFM $
@@ -989,8 +1017,8 @@ machOps = listToUFM $
         ( "i2f64",    flip MO_SF_Conv W64 )
         ]
 
-callishMachOps :: UniqFM ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
-callishMachOps = listToUFM $
+callishMachOps :: Platform -> UniqFM FastString ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
+callishMachOps platform = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
         ( "read_barrier", (MO_ReadBarrier,)),
         ( "write_barrier", (MO_WriteBarrier,)),
@@ -1022,7 +1050,12 @@ callishMachOps = listToUFM $
         ( "cmpxchg8",  (MO_Cmpxchg W8,)),
         ( "cmpxchg16", (MO_Cmpxchg W16,)),
         ( "cmpxchg32", (MO_Cmpxchg W32,)),
-        ( "cmpxchg64", (MO_Cmpxchg W64,))
+        ( "cmpxchg64", (MO_Cmpxchg W64,)),
+
+        ( "xchg8",  (MO_Xchg W8,)),
+        ( "xchg16", (MO_Xchg W16,)),
+        ( "xchg32", (MO_Xchg W32,)),
+        ( "xchg64", (MO_Xchg W64,))
 
         -- ToDo: the rest, maybe
         -- edit: which rest?
@@ -1037,7 +1070,7 @@ callishMachOps = listToUFM $
         args' = init args
         align = case last args of
           CmmLit (CmmInt alignInteger _) -> fromInteger alignInteger
-          e -> pprPgmError "Non-constant alignment in memcpy-like function:" (ppr e)
+          e -> pgmErrorDoc "Non-constant alignment in memcpy-like function:" (pdoc platform e)
         -- The alignment of memcpy-ish operations must be a
         -- compile-time constant. We verify this here, passing it around
         -- in the MO_* constructor. In order to do this, however, we
@@ -1047,12 +1080,12 @@ parseSafety :: String -> PD Safety
 parseSafety "safe"   = return PlaySafe
 parseSafety "unsafe" = return PlayRisky
 parseSafety "interruptible" = return PlayInterruptible
-parseSafety str      = failMsgPD ("unrecognised safety: " ++ str)
+parseSafety str      = failMsgPD $ Error (ErrCmmParser (CmmUnrecognisedSafety str)) []
 
 parseCmmHint :: String -> PD ForeignHint
 parseCmmHint "ptr"    = return AddrHint
 parseCmmHint "signed" = return SignedHint
-parseCmmHint str      = failMsgPD ("unrecognised hint: " ++ str)
+parseCmmHint str      = failMsgPD $ Error (ErrCmmParser (CmmUnrecognisedHint str)) []
 
 -- labels are always pointers, so we might as well infer the hint
 inferCmmHint :: CmmExpr -> ForeignHint
@@ -1079,12 +1112,12 @@ happyError = PD $ \_ s -> unP srcParseFail s
 stmtMacro :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse ())
 stmtMacro fun args_code = do
   case lookupUFM stmtMacros fun of
-    Nothing -> failMsgPD ("unknown macro: " ++ unpackFS fun)
+    Nothing -> failMsgPD $ Error (ErrCmmParser (CmmUnknownMacro fun)) []
     Just fcode -> return $ do
         args <- sequence args_code
         code (fcode args)
 
-stmtMacros :: UniqFM ([CmmExpr] -> FCode ())
+stmtMacros :: UniqFM FastString ([CmmExpr] -> FCode ())
 stmtMacros = listToUFM [
   ( fsLit "CCS_ALLOC",             \[words,ccs]  -> profAlloc words ccs ),
   ( fsLit "ENTER_CCS_THUNK",       \[e] -> enterCostCentreThunk e ),
@@ -1109,6 +1142,9 @@ stmtMacros = listToUFM [
   ( fsLit "LOAD_THREAD_STATE",     \[] -> emitLoadThreadState ),
   ( fsLit "SAVE_THREAD_STATE",     \[] -> emitSaveThreadState ),
 
+  ( fsLit "SAVE_REGS",             \[] -> emitSaveRegs ),
+  ( fsLit "RESTORE_REGS",          \[] -> emitRestoreRegs ),
+
   ( fsLit "LDV_ENTER",             \[e] -> ldvEnter e ),
   ( fsLit "LDV_RECORD_CREATE",     \[e] -> ldvRecordCreate e ),
 
@@ -1126,15 +1162,14 @@ stmtMacros = listToUFM [
 
 emitPushUpdateFrame :: CmmExpr -> CmmExpr -> FCode ()
 emitPushUpdateFrame sp e = do
-  dflags <- getDynFlags
-  emitUpdateFrame dflags sp mkUpdInfoLabel e
+  emitUpdateFrame sp mkUpdInfoLabel e
 
 pushStackFrame :: [CmmParse CmmExpr] -> CmmParse () -> CmmParse ()
 pushStackFrame fields body = do
-  dflags <- getDynFlags
+  profile <- getProfile
   exprs <- sequence fields
   updfr_off <- getUpdFrameOff
-  let (new_updfr_off, _, g) = copyOutOflow dflags NativeReturn Ret Old
+  let (new_updfr_off, _, g) = copyOutOflow profile NativeReturn Ret Old
                                            [] updfr_off exprs
   emit g
   withUpdFrameOff new_updfr_off body
@@ -1145,29 +1180,28 @@ reserveStackFrame
   -> CmmParse ()
   -> CmmParse ()
 reserveStackFrame psize preg body = do
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
+  platform <- getPlatform
   old_updfr_off <- getUpdFrameOff
   reg <- preg
   esize <- psize
   let size = case constantFoldExpr platform esize of
                CmmLit (CmmInt n _) -> n
                _other -> pprPanic "CmmParse: not a compile-time integer: "
-                            (ppr esize)
+                            (pdoc platform esize)
   let frame = old_updfr_off + platformWordSizeInBytes platform * fromIntegral size
   emitAssign reg (CmmStackSlot Old frame)
   withUpdFrameOff frame body
 
-profilingInfo dflags desc_str ty_str
-  = if not (gopt Opt_SccProfilingOn dflags)
+profilingInfo profile desc_str ty_str
+  = if not (profileIsProfiling profile)
     then NoProfilingInfo
     else ProfilingInfo (BS8.pack desc_str) (BS8.pack ty_str)
 
 staticClosure :: UnitId -> FastString -> FastString -> [CmmLit] -> CmmParse ()
 staticClosure pkg cl_label info payload
-  = do dflags <- getDynFlags
-       let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []
-       code $ emitDataLits (mkCmmDataLabel pkg cl_label) lits
+  = do profile <- getProfile
+       let lits = mkStaticClosure profile (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []
+       code $ emitDataLits (mkCmmDataLabel pkg (NeedExternDecl True) cl_label) lits
 
 foreignCall
         :: String
@@ -1179,16 +1213,15 @@ foreignCall
         -> PD (CmmParse ())
 foreignCall conv_string results_code expr_code args_code safety ret
   = do  conv <- case conv_string of
-          "C" -> return CCallConv
+          "C"       -> return CCallConv
           "stdcall" -> return StdCallConv
-          _ -> failMsgPD ("unknown calling convention: " ++ conv_string)
+          _         -> failMsgPD $ Error (ErrCmmParser (CmmUnknownCConv conv_string)) []
         return $ do
-          dflags <- getDynFlags
+          platform <- getPlatform
           results <- sequence results_code
           expr <- expr_code
           args <- sequence args_code
           let
-                  platform = targetPlatform dflags
                   expr' = adjCallTarget platform conv expr args
                   (arg_exprs, arg_hints) = unzip args
                   (res_regs,  res_hints) = unzip results
@@ -1200,34 +1233,34 @@ foreignCall conv_string results_code expr_code args_code safety ret
 
 doReturn :: [CmmParse CmmExpr] -> CmmParse ()
 doReturn exprs_code = do
-  dflags <- getDynFlags
+  profile <- getProfile
   exprs <- sequence exprs_code
   updfr_off <- getUpdFrameOff
-  emit (mkReturnSimple dflags exprs updfr_off)
+  emit (mkReturnSimple profile exprs updfr_off)
 
-mkReturnSimple  :: DynFlags -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
-mkReturnSimple dflags actuals updfr_off =
-  mkReturn dflags e actuals updfr_off
-  where e = entryCode dflags (CmmLoad (CmmStackSlot Old updfr_off)
+mkReturnSimple  :: Profile -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkReturnSimple profile actuals updfr_off =
+  mkReturn profile e actuals updfr_off
+  where e = entryCode platform (CmmLoad (CmmStackSlot Old updfr_off)
                              (gcWord platform))
-        platform = targetPlatform dflags
+        platform = profilePlatform profile
 
 doRawJump :: CmmParse CmmExpr -> [GlobalReg] -> CmmParse ()
 doRawJump expr_code vols = do
-  dflags <- getDynFlags
+  profile <- getProfile
   expr <- expr_code
   updfr_off <- getUpdFrameOff
-  emit (mkRawJump dflags expr updfr_off vols)
+  emit (mkRawJump profile expr updfr_off vols)
 
 doJumpWithStack :: CmmParse CmmExpr -> [CmmParse CmmExpr]
                 -> [CmmParse CmmExpr] -> CmmParse ()
 doJumpWithStack expr_code stk_code args_code = do
-  dflags <- getDynFlags
+  profile <- getProfile
   expr <- expr_code
   stk_args <- sequence stk_code
   args <- sequence args_code
   updfr_off <- getUpdFrameOff
-  emit (mkJumpExtra dflags NativeNodeCall expr args updfr_off stk_args)
+  emit (mkJumpExtra profile NativeNodeCall expr args updfr_off stk_args)
 
 doCall :: CmmParse CmmExpr -> [CmmParse LocalReg] -> [CmmParse CmmExpr]
        -> CmmParse ()
@@ -1257,8 +1290,10 @@ primCall
         -> [CmmParse CmmExpr]
         -> PD (CmmParse ())
 primCall results_code name args_code
-  = case lookupUFM callishMachOps name of
-        Nothing -> failMsgPD ("unknown primitive " ++ unpackFS name)
+  = do
+    platform <- PD.getPlatform
+    case lookupUFM (callishMachOps platform) name of
+        Nothing -> failMsgPD $ Error (ErrCmmParser (CmmUnknownPrimitive name)) []
         Just f  -> return $ do
                 results <- sequence results_code
                 args <- sequence args_code
@@ -1267,7 +1302,7 @@ primCall results_code name args_code
 
 doStore :: CmmType -> CmmParse CmmExpr  -> CmmParse CmmExpr -> CmmParse ()
 doStore rep addr_code val_code
-  = do dflags <- getDynFlags
+  = do platform <- getPlatform
        addr <- addr_code
        val <- val_code
         -- if the specified store type does not match the type of the expr
@@ -1277,7 +1312,6 @@ doStore rep addr_code val_code
         -- be noticed.
        let val_width = typeWidth (cmmExprType platform val)
            rep_width = typeWidth rep
-           platform  = targetPlatform dflags
        let coerce_val
                 | val_width /= rep_width = CmmMachOp (MO_UU_Conv val_width rep_width) [val]
                 | otherwise              = val
@@ -1379,8 +1413,7 @@ doSwitch mb_range scrut arms deflt
         table_entries <- mapM emitArm arms
         let table = M.fromList (concat table_entries)
 
-        dflags <- getDynFlags
-        let platform = targetPlatform dflags
+        platform <- getPlatform
         let range = fromMaybe (0, platformMaxWord platform) mb_range
 
         expr <- scrut
@@ -1405,34 +1438,36 @@ forkLabelledCode p = do
 
 -- The initial environment: we define some constants that the compiler
 -- knows about here.
-initEnv :: DynFlags -> Env
-initEnv dflags = listToUFM [
+initEnv :: Profile -> Env
+initEnv profile = listToUFM [
   ( fsLit "SIZEOF_StgHeader",
-    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags)) (wordWidth platform)) )),
+    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize profile)) (wordWidth platform)) )),
   ( fsLit "SIZEOF_StgInfoTable",
-    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) (wordWidth platform)) ))
+    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB profile)) (wordWidth platform)) ))
   ]
-  where platform = targetPlatform dflags
+  where platform = profilePlatform profile
 
-parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroup)
-parseCmmFile dflags filename = withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ()) $ do
+parseCmmFile :: DynFlags -> FilePath -> IO (Bag Warning, Bag Error, Maybe CmmGroup)
+parseCmmFile dflags filename = do
   buf <- hGetStringBuffer filename
   let
         init_loc = mkRealSrcLoc (mkFastString filename) 1 1
-        init_state = (mkPState dflags buf init_loc) { lex_state = [0] }
+        opts       = initParserOpts dflags
+        init_state = (initParserState opts buf init_loc) { lex_state = [0] }
                 -- reset the lex_state: the Lexer monad leaves some stuff
                 -- in there we don't want.
   case unPD cmmParse dflags init_state of
-    PFailed pst ->
-        return (getMessages pst dflags, Nothing)
+    PFailed pst -> do
+        let (warnings,errors) = getMessages pst
+        return (warnings, errors, Nothing)
     POk pst code -> do
         st <- initC
-        let fcode = getCmm $ unEC code "global" (initEnv dflags) [] >> return ()
+        let fcode = getCmm $ unEC code "global" (initEnv (targetProfile dflags)) [] >> return ()
             (cmm,_) = runC dflags no_module st fcode
-        let ms = getMessages pst dflags
-        if (errorsFound dflags ms)
-         then return (ms, Nothing)
-         else return (ms, Just cmm)
+            (warnings,errors) = getMessages pst
+        if not (isEmptyBag errors)
+         then return (warnings, errors, Nothing)
+         else return (warnings, errors, Just cmm)
   where
         no_module = panic "parseCmmFile: no module"
 }

@@ -9,11 +9,8 @@ import Control.Monad
 
 import GHC.Word
 import GHC.Base
-import GHC.Integer.GMP.Internals (Integer(S#,Jp#,Jn#))
-import qualified GHC.Integer.GMP.Internals as I
-
-recipModInteger :: Integer -> Integer -> Integer
-recipModInteger = I.recipModInteger
+import GHC.Num.Integer
+import qualified GHC.Num.Integer as I
 
 -- FIXME: Lacks GMP2 version
 powInteger :: Integer -> Word -> Integer
@@ -25,7 +22,6 @@ main = do
     print $ powInteger 12345 0
     print $ powInteger 12345 1
     print $ powInteger 12345 30
-    print $ [ (x,i) | x <- [-7..71], let i = recipModInteger x (2*3*11*11*17*17), i /= 0 ]
 
     putStrLn "\n# nextPrimeInteger"
     print $ I.nextPrimeInteger b

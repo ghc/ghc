@@ -8,10 +8,10 @@ module GHC.Driver.Flags
    )
 where
 
-import GhcPrelude
-import Outputable
-import EnumSet
-import Json
+import GHC.Prelude
+import GHC.Utils.Outputable
+import GHC.Data.EnumSet as EnumSet
+import GHC.Utils.Json
 
 -- | Debugging flags
 data DumpFlag
@@ -68,9 +68,9 @@ data DumpFlag
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_spec
    | Opt_D_dump_prep
-   | Opt_D_dump_stg -- CoreToStg output
-   | Opt_D_dump_stg_unarised -- STG after unarise
-   | Opt_D_dump_stg_final -- STG after stg2stg
+   | Opt_D_dump_stg_from_core -- ^ Initial STG (CoreToStg output)
+   | Opt_D_dump_stg_unarised  -- ^ STG after unarise
+   | Opt_D_dump_stg_final     -- ^ Final STG (after stg2stg)
    | Opt_D_dump_call_arity
    | Opt_D_dump_exitify
    | Opt_D_dump_stranal
@@ -121,6 +121,7 @@ data GeneralFlag
    | Opt_D_faststring_stats
    | Opt_D_dump_minimal_imports
    | Opt_DoCoreLinting
+   | Opt_DoLinearCoreLinting
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
@@ -157,6 +158,8 @@ data GeneralFlag
    | Opt_Specialise
    | Opt_SpecialiseAggressively
    | Opt_CrossModuleSpecialise
+   | Opt_InlineGenerics
+   | Opt_InlineGenericsAggressively
    | Opt_StaticArgumentTransformation
    | Opt_CSE
    | Opt_StgCSE
@@ -181,12 +184,14 @@ data GeneralFlag
    | Opt_LlvmFillUndefWithGarbage       -- Testing for undef bugs (hidden flag)
    | Opt_IrrefutableTuples
    | Opt_CmmSink
+   | Opt_CmmStaticPred
    | Opt_CmmElimCommonBlocks
    | Opt_AsmShortcutting
    | Opt_OmitYields
    | Opt_FunToThunk               -- allow GHC.Core.Opt.WorkWrap.Utils.mkWorkerArgs to remove all value lambdas
    | Opt_DictsStrict                     -- be strict in argument dictionaries
-   | Opt_DmdTxDictSel              -- use a special demand transformer for dictionary selectors
+   | Opt_DmdTxDictSel              -- ^ deprecated, no effect and behaviour is now default.
+                                   -- Allowed switching of a special demand transformer for dictionary selectors
    | Opt_Loopification                  -- See Note [Self-recursive tail calls]
    | Opt_CfgBlocklayout             -- ^ Use the cfg based block layout algorithm.
    | Opt_WeightlessBlocklayout         -- ^ Layout based on last instruction per block.
@@ -250,7 +255,6 @@ data GeneralFlag
    | Opt_PIE                         -- ^ @-fPIE@
    | Opt_PICExecutable               -- ^ @-pie@
    | Opt_ExternalDynamicRefs
-   | Opt_SccProfilingOn
    | Opt_Ticky
    | Opt_Ticky_Allocd
    | Opt_Ticky_LNE
@@ -273,6 +277,7 @@ data GeneralFlag
    | Opt_KeepCAFs
    | Opt_KeepGoing
    | Opt_ByteCode
+   | Opt_LinkRts
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
@@ -439,6 +444,7 @@ data WarningFlag =
    | Opt_WarnUnusedTypePatterns
    | Opt_WarnUnusedForalls
    | Opt_WarnUnusedRecordWildcards
+   | Opt_WarnRedundantBangPatterns
    | Opt_WarnRedundantRecordWildcards
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
@@ -494,6 +500,9 @@ data WarningFlag =
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
    | Opt_WarnCompatUnqualifiedImports     -- Since 8.10
    | Opt_WarnDerivingDefaults
+   | Opt_WarnInvalidHaddock               -- Since 8.12
+   | Opt_WarnOperatorWhitespaceExtConflict  -- Since 9.2
+   | Opt_WarnOperatorWhitespace             -- Since 9.2
    deriving (Eq, Show, Enum)
 
 -- | Used when outputting warnings: if a reason is given, it is
@@ -518,8 +527,7 @@ instance ToJson WarnReason where
 
 
 data Language = Haskell98 | Haskell2010
-   deriving (Eq, Enum, Show)
+   deriving (Eq, Enum, Show, Bounded)
 
 instance Outputable Language where
     ppr = text . show
-

@@ -16,6 +16,8 @@
 #include <sys/mman.h>
 #endif
 
+void printLoadedObjects(void);
+
 #include "BeginPrivate.h"
 
 typedef void SymbolAddr;
@@ -74,12 +76,10 @@ typedef enum {
     SEGMENT_PROT_RO  = PROT_READ,
     SEGMENT_PROT_RX  = PROT_READ | PROT_EXEC,
     SEGMENT_PROT_RWO = PROT_READ | PROT_WRITE,
-    SEGMENT_PROT_RWX = PROT_READ | PROT_WRITE | PROT_EXEC
 #else
     SEGMENT_PROT_RO,
     SEGMENT_PROT_RX,
     SEGMENT_PROT_RWO,
-    SEGMENT_PROT_RWX
 #endif
 } SegmentProt;
 
@@ -134,17 +134,6 @@ typedef struct _Segment {
     int n_sections;
 } Segment;
 
-/*
- * We must keep track of the StablePtrs that are created for foreign
- * exports by constructor functions when the module is loaded, so that
- * we can free them again when the module is unloaded.  If we don't do
- * this, then the StablePtr will keep the module alive indefinitely.
- */
-typedef struct ForeignExportStablePtr_ {
-    StgStablePtr stable_ptr;
-    struct ForeignExportStablePtr_ *next;
-} ForeignExportStablePtr;
-
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 #define NEED_SYMBOL_EXTRAS 1
 #endif
@@ -181,7 +170,7 @@ typedef struct _ObjectCode {
     /* If this object is a member of an archive, archiveMemberName is
      * like "libarchive.a(object.o)". Otherwise it's NULL.
      */
-    char*      archiveMemberName;
+    pathchar*      archiveMemberName;
 
     /* An array containing ptrs to all the symbol names copied from
        this object into the global symbol hash table.  This is so that
@@ -235,11 +224,12 @@ typedef struct _ObjectCode {
     unsigned long   n_symbol_extras;
 #endif
     /* Additional memory that is preallocated and contiguous with image
-       which can be used used to relocate bss sections. */
+       which can be used to relocate bss sections. */
     char* bssBegin;
     char* bssEnd;
 
-    ForeignExportStablePtr *stable_ptrs;
+    /* a list of all ForeignExportsLists owned by this object */
+    struct ForeignExportsList *foreign_exports;
 
     /* Holds the list of symbols in the .o file which
        require extra information.*/
@@ -293,7 +283,7 @@ void exitLinker( void );
 void freeObjectCode (ObjectCode *oc);
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo);
 
-void *mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset);
+void *mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset);
 void mmapForLinkerMarkExecutable (void *start, size_t len);
 
 void addProddableBlock ( ObjectCode* oc, void* start, int size );
@@ -348,7 +338,7 @@ resolveSymbolAddr (pathchar* buffer, int size,
 HsInt isAlreadyLoaded( pathchar *path );
 HsInt loadOc( ObjectCode* oc );
 ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
-                  bool mapped, char *archiveMemberName,
+                  bool mapped, pathchar *archiveMemberName,
                   int misalignment
                   );
 

@@ -171,7 +171,7 @@ stackFrames st@(StackTrace fptr) = unsafePerformIO $ withSession $ \sess -> do
             frame' = frame `plusPtr` sizeOf (undefined :: Addr)
 
         lookupFrame :: Addr -> IO (Maybe Location)
-        lookupFrame pc = withForeignPtr fptr $ const $ do
+        lookupFrame pc = withForeignPtr fptr $ const $
             allocaBytes locationSize $ \buf -> do
                 ret <- withForeignPtr sess $ \sessPtr -> libdw_lookup_location sessPtr buf pc
                 case ret of

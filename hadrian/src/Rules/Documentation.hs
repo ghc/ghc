@@ -103,9 +103,8 @@ documentationRules = do
 
                       -- include toplevel html target unless we neither want
                       -- haddocks nor html pages produced by sphinx.
-                   ++ [ html | Set.size (doctargets `Set.intersection`
-                                         Set.fromList [Haddocks, SphinxHTML]
-                                        ) > 0 ]
+                   ++ [ html |    Haddocks   `Set.member` doctargets
+                               || SphinxHTML `Set.member` doctargets ]
 
                       -- include archives for whatever targets remain from
                       -- the --docs arguments we got.
@@ -128,6 +127,21 @@ checkSphinxWarnings :: FilePath  -- ^ output directory
                     -> Action ()
 checkSphinxWarnings out = do
     log <- liftIO $ readFile (out -/- ".log")
+    when ("Inline literal start-string without end-string." `isInfixOf` log)
+      $ fail $ unlines
+        [ "Syntax error found in Sphinx log. "
+        , ""
+        , "This likely means that you have forgotten a \\ after inline code block. For instance,"
+        , "you might have written:"
+        , ""
+        , "    are not allowed to contain nested ``forall``s."
+        , ""
+        , "Whereas you need to write:"
+        , ""
+        , "    are not allowed to contain nested ``forall``\\s."
+        , ""
+        ]
+
     when ("reference target not found" `isInfixOf` log)
       $ fail "Undefined reference targets found in Sphinx log."
 
@@ -291,6 +305,13 @@ buildSphinxPdf path = do
             need (map (rstFilesDir -/-) rstFiles)
             build $ target docContext (Sphinx LatexMode) [pathPath path] [dir]
             checkSphinxWarnings dir
+
+            -- LaTeX "fixed point"
+            build $ target docContext Xelatex [path <.> "tex"] [dir]
+            build $ target docContext Xelatex [path <.> "tex"] [dir]
+            build $ target docContext Xelatex [path <.> "tex"] [dir]
+            build $ target docContext Makeindex [path <.> "idx"] [dir]
+            build $ target docContext Xelatex [path <.> "tex"] [dir]
             build $ target docContext Xelatex [path <.> "tex"] [dir]
             copyFileUntracked (dir -/- path <.> "pdf") file
 

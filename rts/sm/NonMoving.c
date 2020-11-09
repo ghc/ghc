@@ -228,6 +228,10 @@ Mutex concurrent_coll_finished_lock;
  *  - Note [Static objects under the nonmoving collector] (Storage.c) describes
  *    treatment of static objects.
  *
+ *  - Note [Dirty flags in the non-moving collector] (NonMoving.c) describes
+ *    how we use the DIRTY flags associated with MUT_VARs and TVARs to improve
+ *    barrier efficiency.
+ *
  *
  * Note [Concurrent non-moving collection]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -369,6 +373,7 @@ Mutex concurrent_coll_finished_lock;
  * approximate due to concurrent collection and ultimately seems more costly
  * than the problem demands.
  *
+ *
  * Note [Spark management under the nonmoving collector]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * Every GC, both minor and major, prunes the spark queue (using
@@ -387,6 +392,88 @@ Mutex concurrent_coll_finished_lock;
  *    BF_EVACUATED flag won't be set on the nursery blocks) and will consequently
  *    only prune dead sparks living in the non-moving heap.
  *
+ *
+ * Note [Dirty flags in the non-moving collector]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Some mutable object types (e.g. MUT_VARs, TVARs) have a one-bit dirty flag
+ * encoded in their info table pointer. The moving collector uses this flag
+ * to minimize redundant mut_list entries. The flag is preserves the following
+ * simple invariant:
+ *
+ *     An object being marked as dirty implies that the object is on mut_list.
+ *
+ * This allows a nice optimisation in the write barrier (e.g. dirty_MUT_VAR):
+ * if we write to an already-dirty object there is no need to
+ * push it to the mut_list as we know it's already there.
+ *
+ * During GC (scavenging) we will then keep track of whether all of the
+ * object's reference have been promoted. If so we can mark the object as clean.
+ * If not then we re-add it to mut_list and mark it as dirty.
+ *
+ * In the non-moving collector we use the same dirty flag to implement a
+ * related optimisation on the non-moving write barrier: Specifically, the
+ * snapshot invariant only requires that the non-moving write barrier applies
+ * to the *first* mutation to an object after collection begins. To achieve this,
+ * we impose the following invariant:
+ *
+ *     An object being marked as dirty implies that all of its fields are on
+ *     the mark queue (or, equivalently, update remembered set).
+ *
+ * With this guarantee we can safely make the write barriers dirty objects
+ * no-ops. We perform this optimisation for the following object types:
+ *
+ *  - MVAR
+ *  - TVAR
+ *  - MUT_VAR
+ *
+ * However, maintaining this invariant requires great care. For instance,
+ * consider the case of an MVar (which has two pointer fields) before
+ * preparatory collection:
+ *
+ *    Non-moving heap     ┊      Moving heap
+ *         gen 1          ┊         gen 0
+ *  ──────────────────────┼────────────────────────────────
+ *                        ┊
+ *         MVAR A  ────────────────→ X
+ *        (dirty)  ───────────╮
+ *                        ┊   ╰────→ Y
+ *                        ┊          │
+ *                        ┊          │
+ *           ╭───────────────────────╯
+ *           │            ┊
+ *           ↓            ┊
+ *           Z            ┊
+ *                        ┊
+ *
+ * During the preparatory collection we promote Y to the nonmoving heap but
+ * fail to promote X. Since the failed_to_evac field is conservative (being set
+ * if *any* of the fields are not promoted), this gives us:
+ *
+ *    Non-moving heap     ┊      Moving heap
+ *         gen 1          ┊         gen 0
+ *  ──────────────────────┼────────────────────────────────
+ *                        ┊
+ *         MVAR A  ────────────────→ X
+ *        (dirty)         ┊
+ *           │            ┊
+ *           │            ┊
+ *           ↓            ┊
+ *           Y            ┊
+ *           │            ┊
+ *           │            ┊
+ *           ↓            ┊
+ *           Z            ┊
+ *                        ┊
+ *
+ * This is bad. When we resume mutation a mutator may mutate MVAR A; since it's
+ * already dirty we would fail to add Y to the update remembered set, breaking the
+ * snapshot invariant and potentially losing track of the liveness of Z.
+ *
+ * To avoid this nonmovingScavengeOne we eagerly pushes the values of the
+ * fields of all objects which it fails to evacuate (e.g. MVAR A) to the update
+ * remembered set during the preparatory GC. This allows us to safely skip the
+ * non-moving write barrier without jeopardizing the snapshot invariant.
+ *
  */
 
 memcount nonmoving_live_words = 0;
@@ -402,10 +489,10 @@ static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block
     seg->link = NULL;
     seg->todo_link = NULL;
     seg->next_free = 0;
-    nonmovingClearBitmap(seg);
     bd->nonmoving_segment.log_block_size = log_block_size;
     bd->nonmoving_segment.next_free_snap = 0;
     bd->u.scan = nonmovingSegmentGetBlock(seg, 0);
+    nonmovingClearBitmap(seg);
 }
 
 // Add a segment to the free list.
@@ -499,15 +586,9 @@ static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
     return ret;
 }
 
-static inline unsigned long log2_floor(unsigned long x)
-{
-    return sizeof(unsigned long)*8 - 1 - __builtin_clzl(x);
-}
-
 static inline unsigned long log2_ceil(unsigned long x)
 {
-    unsigned long log = log2_floor(x);
-    return (x - (1 << log)) ? log + 1 : log;
+    return (sizeof(unsigned long)*8) - __builtin_clzl(x-1);
 }
 
 // Advance a segment's next_free pointer. Returns true if segment if full.
@@ -910,7 +991,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 #endif
 }
 
-/* Mark mark queue, threads, and weak pointers until no more weaks have been
+/* Mark queue, threads, and weak pointers until no more weaks have been
  * resuscitated
  */
 static void nonmovingMarkThreadsWeaks(MarkQueue *mark_queue)
@@ -1125,12 +1206,16 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     if (RtsFlags.DebugFlags.nonmoving_gc)
         nonmovingPrintAllocatorCensus();
 #endif
+#if defined(TRACING)
+    if (RtsFlags.TraceFlags.nonmoving_gc)
+        nonmovingTraceAllocatorCensus();
+#endif
 
     // TODO: Remainder of things done by GarbageCollect (update stats)
 
 #if defined(THREADED_RTS)
 finish:
-    boundTaskExiting(task);
+    exitMyTask();
 
     // We are done...
     mark_thread = 0;

@@ -93,12 +93,22 @@ else
 RUNTEST_OPTS += -e ghc_with_native_codegen=False
 endif
 
+ifeq "$(GhcLeadingUnderscore)" "YES"
+RUNTEST_OPTS += -e "config.leading_underscore=True"
+else
+RUNTEST_OPTS += -e "config.leading_underscore=False"
+endif
+
 GHC_PRIM_LIBDIR := $(subst library-dirs: ,,$(shell "$(GHC_PKG)" field ghc-prim library-dirs --simple-output))
 HAVE_VANILLA := $(shell if [ -f $(subst \,/,$(GHC_PRIM_LIBDIR))/GHC/PrimopWrappers.hi ]; then echo YES; else echo NO; fi)
 HAVE_DYNAMIC := $(shell if [ -f $(subst \,/,$(GHC_PRIM_LIBDIR))/GHC/PrimopWrappers.dyn_hi ]; then echo YES; else echo NO; fi)
 HAVE_PROFILING := $(shell if [ -f $(subst \,/,$(GHC_PRIM_LIBDIR))/GHC/PrimopWrappers.p_hi ]; then echo YES; else echo NO; fi)
 HAVE_GDB := $(shell if gdb --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
 HAVE_READELF := $(shell if readelf --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
+
+# we need a better way to find which backend is selected and if --check flag is
+# used
+BIGNUM_GMP := $(shell "$(GHC_PKG)" field ghc-bignum exposed-modules | grep GMP)
 
 ifeq "$(HAVE_VANILLA)" "YES"
 RUNTEST_OPTS += -e config.have_vanilla=True
@@ -156,6 +166,12 @@ else
 RUNTEST_OPTS += -e config.have_readelf=False
 endif
 
+ifeq "$(BIGNUM_GMP)" ""
+RUNTEST_OPTS += -e config.have_fast_bignum=False
+else
+RUNTEST_OPTS += -e config.have_fast_bignum=True
+endif
+
 ifeq "$(GhcDynamicByDefault)" "YES"
 RUNTEST_OPTS += -e config.ghc_dynamic_by_default=True
 CABAL_MINIMAL_BUILD = --enable-shared --disable-library-vanilla
@@ -176,18 +192,6 @@ ifeq "$(GhcWithSMP)" "YES"
 RUNTEST_OPTS += -e ghc_with_smp=True
 else
 RUNTEST_OPTS += -e ghc_with_smp=False
-endif
-
-# Does the LLVM backend work?
-ifeq "$(LLC)" ""
-RUNTEST_OPTS += -e ghc_with_llvm=False
-else ifeq "$(TargetARCH_CPP)" "powerpc"
-RUNTEST_OPTS += -e ghc_with_llvm=False
-else ifneq "$(LLC)" "llc"
-# If we have a real detected value for LLVM, then it really ought to work
-RUNTEST_OPTS += -e ghc_with_llvm=True
-else
-RUNTEST_OPTS += -e ghc_with_llvm=False
 endif
 
 ifeq "$(WINDOWS)" "YES"
@@ -212,8 +216,16 @@ ifneq "$(THREADS)" ""
 RUNTEST_OPTS += --threads=$(THREADS)
 endif
 
+ifneq "$(PACKAGE_DB)" ""
+RUNTEST_OPTS += --test-package-db=$(PACKAGE_DB)
+endif
+
 ifneq "$(VERBOSE)" ""
 RUNTEST_OPTS += --verbose=$(VERBOSE)
+endif
+
+ifneq "$(PERF_TEST_BASELINE_COMMIT)" ""
+RUNTEST_OPTS += --perf-baseline=$(PERF_TEST_BASELINE_COMMIT)
 endif
 
 ifeq "$(SKIP_PERF_TESTS)" "YES"
@@ -248,13 +260,13 @@ endif
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config-file=$(CONFIG) \
+	--top="$(TOP_ABS)" \
 	-e 'config.platform="$(TARGETPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
 	-e 'config.arch="$(TargetARCH_CPP)"' \
 	-e 'config.wordsize="$(WORDSIZE)"' \
 	-e 'config.timeout=int($(TIMEOUT)) or config.timeout' \
-	-e 'config.exeext="$(exeext)"' \
-	-e 'config.top="$(TOP_ABS)"'
+	-e 'config.exeext="$(exeext)"'
 
 # Wrap non-empty program paths in quotes, because they may contain spaces. Do
 # it here, so we don't have to (and don't forget to do it) in the .T test

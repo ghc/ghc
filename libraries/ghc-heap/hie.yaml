@@ -1,0 +1,12 @@
+cradle:
+  multi:
+    - path: ./GHC/
+      config:
+        cradle:
+          cabal:
+            component: 'lib:ghc-heap'
+    - path: ./tests
+      config:
+        cradle:
+          direct:
+            arguments: []

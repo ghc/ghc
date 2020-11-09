@@ -32,6 +32,9 @@
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 --
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module GHC.Cmm.Ppr.Expr
@@ -39,29 +42,28 @@ module GHC.Cmm.Ppr.Expr
     )
 where
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Ppr
 
 import GHC.Platform
-import GHC.Driver.Session (targetPlatform)
 import GHC.Cmm.Expr
 
-import Outputable
+import GHC.Utils.Outputable
 
 import Data.Maybe
 import Numeric ( fromRat )
 
 -----------------------------------------------------------------------------
 
-instance Outputable CmmExpr where
-    ppr e = sdocWithDynFlags $ \dflags ->
-            pprExpr (targetPlatform dflags) e
+instance OutputableP Platform CmmExpr where
+    pdoc = pprExpr
 
 instance Outputable CmmReg where
     ppr e = pprReg e
 
-instance Outputable CmmLit where
-    ppr l = sdocWithDynFlags $ \dflags ->
-            pprLit (targetPlatform dflags) l
+instance OutputableP Platform CmmLit where
+    pdoc = pprLit
 
 instance Outputable LocalReg where
     ppr e = pprLocalReg e
@@ -71,6 +73,9 @@ instance Outputable Area where
 
 instance Outputable GlobalReg where
     ppr e = pprGlobalReg e
+
+instance OutputableP env GlobalReg where
+    pdoc _ = ppr
 
 -- --------------------------------------------------------------------------
 -- Expressions
@@ -145,7 +150,7 @@ pprExpr9 :: Platform -> CmmExpr -> SDoc
 pprExpr9 platform e =
    case e of
         CmmLit    lit       -> pprLit1 platform lit
-        CmmLoad   expr rep  -> ppr rep <> brackets (ppr expr)
+        CmmLoad   expr rep  -> ppr rep <> brackets (pdoc platform expr)
         CmmReg    reg       -> ppr reg
         CmmRegOff  reg off  -> parens (ppr reg <+> char '+' <+> int off)
         CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)
@@ -202,10 +207,10 @@ pprLit platform lit = case lit of
 
     CmmFloat f rep     -> hsep [ double (fromRat f), dcolon, ppr rep ]
     CmmVec lits        -> char '<' <> commafy (map (pprLit platform) lits) <> char '>'
-    CmmLabel clbl      -> ppr clbl
-    CmmLabelOff clbl i -> ppr clbl <> ppr_offset i
-    CmmLabelDiffOff clbl1 clbl2 i _ -> ppr clbl1 <> char '-'
-                                  <> ppr clbl2 <> ppr_offset i
+    CmmLabel clbl      -> pdoc platform clbl
+    CmmLabelOff clbl i -> pdoc platform clbl <> ppr_offset i
+    CmmLabelDiffOff clbl1 clbl2 i _ -> pdoc platform clbl1 <> char '-'
+                                       <> pdoc platform clbl2 <> ppr_offset i
     CmmBlock id        -> ppr id
     CmmHighStackMark -> text "<highSp>"
 
@@ -253,7 +258,7 @@ pprArea :: Area -> SDoc
 pprArea Old        = text "old"
 pprArea (Young id) = hcat [ text "young<", ppr id, text ">" ]
 
--- needs to be kept in syn with CmmExpr.hs.GlobalReg
+-- needs to be kept in syn with 'GHC.Cmm.Expr.GlobalReg'
 --
 pprGlobalReg :: GlobalReg -> SDoc
 pprGlobalReg gr

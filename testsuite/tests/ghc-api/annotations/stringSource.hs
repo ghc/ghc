@@ -12,13 +12,16 @@ import Data.List (intercalate)
 import System.IO
 import GHC
 import GHC.Types.Basic
+import GHC.Types.SourceText
+import GHC.Unit.Module.Warnings
 import GHC.Driver.Session
-import FastString
+import GHC.Driver.Ppr
+import GHC.Data.FastString
 import GHC.Types.ForeignCall
-import MonadUtils
-import Outputable
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
 import GHC.Hs.Decls
-import Bag (filterBag,isEmptyBag)
+import GHC.Data.Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
 import qualified Data.Map as Map
@@ -84,9 +87,7 @@ testOneFile libdir fileName = do
      doHsExpr _ = []
 
      doPragE :: HsPragE GhcPs -> [(String,[Located (SourceText,FastString)])]
-     doPragE (HsPragCore _ src ss) = [("co",[conv (noLoc ss)])]
      doPragE (HsPragSCC  _ src ss) = [("sc",[conv (noLoc ss)])]
-     doPragE (HsPragTick _ src (ss,_,_) _ss2) = [("tp",[conv (noLoc ss)])]
 
      conv (GHC.L l (StringLiteral st fs)) = GHC.L l (st,fs)
 
@@ -96,7 +97,7 @@ showAnns anns = "[\n" ++ (intercalate "\n"
    $ Map.toList anns)
     ++ "]\n"
 
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a
 
 -- ---------------------------------------------------------------------
 

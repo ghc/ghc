@@ -1,3 +1,9 @@
+{-# LANGUAGE DeriveDataTypeable   #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -6,26 +12,19 @@
 GHC.Hs.ImpExp: Abstract syntax: imports, exports, interfaces
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-                                      -- in module GHC.Hs.Extension
-
 module GHC.Hs.ImpExp where
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Types.Module       ( ModuleName )
+import GHC.Unit.Module        ( ModuleName, IsBootInterface(..) )
 import GHC.Hs.Doc             ( HsDocString )
 import GHC.Types.Name.Occurrence ( HasOccName(..), isTcOcc, isSymOcc )
-import GHC.Types.Basic        ( SourceText(..), StringLiteral(..), pprWithSourceText )
+import GHC.Types.SourceText   ( SourceText(..), StringLiteral(..), pprWithSourceText )
 import GHC.Types.FieldLabel   ( FieldLbl(..) )
 
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Hs.Extension
 
@@ -43,10 +42,10 @@ One per \tr{import} declaration in a module.
 -}
 
 -- | Located Import Declaration
-type LImportDecl pass = Located (ImportDecl pass)
+type LImportDecl pass = XRec pass (ImportDecl pass)
         -- ^ When in a list this may have
         --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -59,7 +58,7 @@ data ImportDeclQualifiedStyle
 
 -- | Given two possible located 'qualified' tokens, compute a style
 -- (in a conforming Haskell program only one of the two can be not
--- 'Nothing'). This is called from 'GHC.Parser'.
+-- 'Nothing'). This is called from "GHC.Parser".
 importDeclQualifiedStyle :: Maybe (Located a)
                          -> Maybe (Located a)
                          -> ImportDeclQualifiedStyle
@@ -80,31 +79,31 @@ data ImportDecl pass
   = ImportDecl {
       ideclExt       :: XCImportDecl pass,
       ideclSourceSrc :: SourceText,
-                                 -- Note [Pragma source text] in GHC.Types.Basic
-      ideclName      :: Located ModuleName, -- ^ Module name.
+                                 -- Note [Pragma source text] in GHC.Types.SourceText
+      ideclName      :: XRec pass ModuleName, -- ^ Module name.
       ideclPkgQual   :: Maybe StringLiteral,  -- ^ Package qualifier.
-      ideclSource    :: Bool,          -- ^ True <=> {-\# SOURCE \#-} import
+      ideclSource    :: IsBootInterface,      -- ^ IsBoot <=> {-\# SOURCE \#-} import
       ideclSafe      :: Bool,          -- ^ True => safe import
       ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
-      ideclAs        :: Maybe (Located ModuleName),  -- ^ as Module
-      ideclHiding    :: Maybe (Bool, Located [LIE pass])
+      ideclAs        :: Maybe (XRec pass ModuleName),  -- ^ as Module
+      ideclHiding    :: Maybe (Bool, XRec pass [LIE pass])
                                        -- ^ (True => hiding, names)
     }
   | XImportDecl !(XXImportDecl pass)
      -- ^
-     --  'ApiAnnotation.AnnKeywordId's
+     --  'GHC.Parser.Annotation.AnnKeywordId's
      --
-     --  - 'ApiAnnotation.AnnImport'
+     --  - 'GHC.Parser.Annotation.AnnImport'
      --
-     --  - 'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnClose' for ideclSource
+     --  - 'GHC.Parser.Annotation.AnnOpen', 'GHC.Parser.Annotation.AnnClose' for ideclSource
      --
-     --  - 'ApiAnnotation.AnnSafe','ApiAnnotation.AnnQualified',
-     --    'ApiAnnotation.AnnPackageName','ApiAnnotation.AnnAs',
-     --    'ApiAnnotation.AnnVal'
+     --  - 'GHC.Parser.Annotation.AnnSafe','GHC.Parser.Annotation.AnnQualified',
+     --    'GHC.Parser.Annotation.AnnPackageName','GHC.Parser.Annotation.AnnAs',
+     --    'GHC.Parser.Annotation.AnnVal'
      --
-     --  - 'ApiAnnotation.AnnHiding','ApiAnnotation.AnnOpen',
-     --    'ApiAnnotation.AnnClose' attached
+     --  - 'GHC.Parser.Annotation.AnnHiding','GHC.Parser.Annotation.AnnOpen',
+     --    'GHC.Parser.Annotation.AnnClose' attached
      --     to location in ideclHiding
 
      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -118,7 +117,7 @@ simpleImportDecl mn = ImportDecl {
       ideclSourceSrc = NoSourceText,
       ideclName      = noLoc mn,
       ideclPkgQual   = Nothing,
-      ideclSource    = False,
+      ideclSource    = NotBoot,
       ideclSafe      = False,
       ideclImplicit  = False,
       ideclQualified = NotQualified,
@@ -156,10 +155,10 @@ instance OutputableBndrId p
         pp_as Nothing   = empty
         pp_as (Just a)  = text "as" <+> ppr a
 
-        ppr_imp True  = case mSrcText of
+        ppr_imp IsBoot = case mSrcText of
                           NoSourceText   -> text "{-# SOURCE #-}"
                           SourceText src -> text src <+> text "#-}"
-        ppr_imp False = empty
+        ppr_imp NotBoot = empty
 
         pp_spec Nothing             = empty
         pp_spec (Just (False, (L _ ies))) = ppr_ies ies
@@ -186,17 +185,17 @@ data IEWrappedName name
   deriving (Eq,Data)
 
 -- | Located name with possible adornment
--- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnType',
---         'ApiAnnotation.AnnPattern'
+-- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnType',
+--         'GHC.Parser.Annotation.AnnPattern'
 type LIEWrappedName name = Located (IEWrappedName name)
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 
 -- | Located Import or Export
-type LIE pass = Located (IE pass)
+type LIE pass = XRec pass (IE pass)
         -- ^ When in a list this may have
         --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -209,8 +208,8 @@ data IE pass
         -- ^ Imported or exported Thing with Absent list
         --
         -- The thing is a Class/Type (can't tell)
-        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
-        --             'ApiAnnotation.AnnType','ApiAnnotation.AnnVal'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnPattern',
+        --             'GHC.Parser.Annotation.AnnType','GHC.Parser.Annotation.AnnVal'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
@@ -219,9 +218,9 @@ data IE pass
         --
         -- The thing is a Class/Type and the All refers to methods/constructors
         --
-        -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
-        --       'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose',
-        --                                 'ApiAnnotation.AnnType'
+        -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen',
+        --       'GHC.Parser.Annotation.AnnDotdot','GHC.Parser.Annotation.AnnClose',
+        --                                 'GHC.Parser.Annotation.AnnType'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
@@ -230,23 +229,23 @@ data IE pass
                 (LIEWrappedName (IdP pass))
                 IEWildcard
                 [LIEWrappedName (IdP pass)]
-                [Located (FieldLbl (IdP pass))]
+                [XRec pass (FieldLbl (IdP pass))]
         -- ^ Imported or exported Thing With given imported or exported
         --
         -- The thing is a Class/Type and the imported or exported things are
         -- methods/constructors and record fields; see Note [IEThingWith]
-        -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
-        --                                   'ApiAnnotation.AnnClose',
-        --                                   'ApiAnnotation.AnnComma',
-        --                                   'ApiAnnotation.AnnType'
+        -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen',
+        --                                   'GHC.Parser.Annotation.AnnClose',
+        --                                   'GHC.Parser.Annotation.AnnComma',
+        --                                   'GHC.Parser.Annotation.AnnType'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | IEModuleContents  (XIEModuleContents pass) (Located ModuleName)
+  | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
         -- ^ Imported or exported module contents
         --
         -- (Export Only)
         --
-        -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnModule'
+        -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnModule'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | IEGroup             (XIEGroup pass) Int HsDocString -- ^ Doc section heading
@@ -309,9 +308,6 @@ ieWrappedName (IEType    (L _ n)) = n
 
 lieWrappedName :: LIEWrappedName name -> name
 lieWrappedName (L _ n) = ieWrappedName n
-
-ieLWrappedName :: LIEWrappedName name -> Located name
-ieLWrappedName (L l n) = L l (ieWrappedName n)
 
 replaceWrappedName :: IEWrappedName name1 -> name2 -> IEWrappedName name2
 replaceWrappedName (IEName    (L l _)) n = IEName    (L l n)

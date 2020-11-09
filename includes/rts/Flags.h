@@ -200,11 +200,14 @@ typedef struct _CONCURRENT_FLAGS {
  * files were compiled with -fPIC -fexternal-dynamic-refs and load them
  * anywhere in the address space.
  */
-#if defined(x86_64_HOST_ARCH) && defined(darwin_HOST_OS)
+#if defined(darwin_HOST_OS) || defined(aarch64_HOST_ARCH)
 #define DEFAULT_LINKER_ALWAYS_PIC true
 #else
 #define DEFAULT_LINKER_ALWAYS_PIC false
 #endif
+
+/* Which I/O Manager to use in the target program.  */
+typedef enum _IO_MANAGER { IO_MNGR_NATIVE, IO_MNGR_POSIX } IO_MANAGER;
 
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _MISC_FLAGS {
@@ -224,6 +227,8 @@ typedef struct _MISC_FLAGS {
     bool linkerAlwaysPic;        /* Assume the object code is always PIC */
     StgWord linkerMemBase;       /* address to ask the OS for memory
                                   * for the linker, NULL ==> off */
+    IO_MANAGER ioManager;        /* The I/O manager to use.  */
+    uint32_t numIoWorkerThreads; /* Number of I/O worker threads to use.  */
 } MISC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

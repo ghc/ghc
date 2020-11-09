@@ -51,7 +51,8 @@ test('TH_NestedSplices', [], multimod_compile,
 # normal way first, which is why the work is done by a Makefile rule.
 test('TH_spliceE5_prof',
      [req_profiling, only_ways(['normal']),
-      when(ghc_dynamic(), expect_broken(11495))],
+      when(ghc_dynamic(), expect_broken(11495)),
+      when(opsys('mingw32'), expect_broken(18271))],
      makefile_test, ['TH_spliceE5_prof'])
 
 test('TH_spliceE5_prof_ext', [req_profiling, only_ways(['normal'])],
@@ -64,6 +65,7 @@ test('TH_spliceD2', [], multimod_compile, ['TH_spliceD2', '-v0'])
 
 test('TH_reifyDecl1', normal, compile, ['-v0'])
 test('TH_reifyDecl2', normal, compile, ['-v0'])
+test('TH_reifyLinear', normal, compile, ['-v0'])
 test('TH_reifyLocalDefs', normal, compile, ['-v0'])
 test('TH_reifyLocalDefs2', normal, compile, ['-v0'])
 
@@ -253,7 +255,7 @@ test('T8028', [], multimod_compile, ['T8028', '-v0 ' + config.ghc_th_way_flags])
 test('TH_Roles1', normal, compile_fail, ['-v0'])
 test('TH_Roles2', normalise_version('array', 'base', 'deepseq', 'ghc-prim',
                                     'ghc-boot', 'ghc-boot-th',
-                                    'integer-gmp', 'pretty', 'template-haskell',
+                                    'ghc-bignum', 'pretty', 'template-haskell',
                                     'binary', 'bytestring', 'containers'
                                     ), compile, ['-v0 -ddump-tc -dsuppress-uniques'])
 test('TH_Roles3', normal, compile, ['-v0 -dsuppress-uniques'])
@@ -364,6 +366,7 @@ test('T11629', normal, compile, ['-v0'])
 test('T8761', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T12045TH1', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T12045TH2', normal, compile, ['-v0'])
+test('T12073', normal, compile_and_run, [''])
 test('T12130', [], multimod_compile,
      ['T12130', '-v0 ' + config.ghc_th_way_flags])
 test('T12387', normal, compile_fail, ['-v0'])
@@ -502,5 +505,15 @@ test('T17511', normal, compile, [''])
 test('T17608', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T17688a', normal, compile, [''])
 test('T17688b', normal, compile, [''])
+test('T18097', normal, compile, [''])
 test('TH_PprStar', normal, compile, ['-v0 -dsuppress-uniques'])
 test('TH_StringLift', normal, compile, [''])
+test('TH_BytesShowEqOrd', normal, compile_and_run, [''])
+test('T18102', normal, compile_fail, [''])
+test('T18102b', extra_files(['T18102b_aux.hs']), compile_and_run, [''])
+test('T18121', normal, compile, [''])
+test('T18123', normal, compile, [''])
+test('T18388', normal, compile, [''])
+test('T18612', normal, compile, [''])
+test('T18740c', normal, compile_fail, [''])
+test('T18740d', normal, compile_fail, [''])

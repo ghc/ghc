@@ -1,13 +1,10 @@
 module GHC.CmmToAsm.SPARC.Cond (
         Cond(..),
-        condUnsigned,
-        condToSigned,
-        condToUnsigned
 )
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 -- | Branch condition codes.
 data Cond
@@ -28,27 +25,3 @@ data Cond
         | VC
         | VS
         deriving Eq
-
-
-condUnsigned :: Cond -> Bool
-condUnsigned GU  = True
-condUnsigned LU  = True
-condUnsigned GEU = True
-condUnsigned LEU = True
-condUnsigned _   = False
-
-
-condToSigned :: Cond -> Cond
-condToSigned GU  = GTT
-condToSigned LU  = LTT
-condToSigned GEU = GE
-condToSigned LEU = LE
-condToSigned x   = x
-
-
-condToUnsigned :: Cond -> Cond
-condToUnsigned GTT = GU
-condToUnsigned LTT = LU
-condToUnsigned GE  = GEU
-condToUnsigned LE  = LEU
-condToUnsigned x   = x

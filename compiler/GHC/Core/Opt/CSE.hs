@@ -13,7 +13,7 @@ module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Subst
 import GHC.Types.Var    ( Var )
@@ -28,10 +28,11 @@ import GHC.Core.Utils   ( mkAltExpr, eqExpr
 import GHC.Core.FVs     ( exprFreeVars )
 import GHC.Core.Type    ( tyConAppArgs )
 import GHC.Core
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Core.Map
-import Util             ( filterOut, equalLength, debugIsOn )
+import GHC.Utils.Misc   ( filterOut, equalLength, debugIsOn )
+import GHC.Utils.Panic
 import Data.List        ( mapAccumL )
 
 {-
@@ -404,7 +405,7 @@ delayInlining top_lvl bndr
        -- These rules are probably auto-generated specialisations,
        -- since Ids with manual rules usually have manually-inserted
        -- delayed inlining anyway
-  = bndr `setInlineActivation` activeAfterInitial
+  = bndr `setInlineActivation` activateAfterInitial
   | otherwise
   = bndr
 
@@ -775,7 +776,7 @@ csEnvSubst :: CSEnv -> Subst
 csEnvSubst = cs_subst
 
 lookupSubst :: CSEnv -> Id -> OutExpr
-lookupSubst (CS { cs_subst = sub}) x = lookupIdSubst (text "CSE.lookupSubst") sub x
+lookupSubst (CS { cs_subst = sub}) x = lookupIdSubst sub x
 
 extendCSSubst :: CSEnv -> Id  -> CoreExpr -> CSEnv
 extendCSSubst cse x rhs = cse { cs_subst = extendSubst (cs_subst cse) x rhs }

@@ -46,12 +46,9 @@ module GHC.Cmm.Utils(
         baseExpr, spExpr, hpExpr, spLimExpr, hpLimExpr,
         currentTSOExpr, currentNurseryExpr, cccsExpr,
 
-        -- Statics
-        blankWord,
-
         -- Tagging
         cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged,
-        cmmConstrTag1,
+        cmmConstrTag1, mAX_PTR_TAG, tAG_MASK,
 
         -- Overlap and usage
         regsOverlap, regUsedIn,
@@ -71,7 +68,7 @@ module GHC.Cmm.Utils(
         blockTicks
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.TyCon     ( PrimRep(..), PrimElemRep(..) )
 import GHC.Types.RepType  ( UnaryType, SlotTy (..), typePrimRep1 )
@@ -81,8 +78,8 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import Outputable
-import GHC.Driver.Session
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique
 import GHC.Platform.Regs
 
@@ -380,9 +377,6 @@ cmmNegate platform = \case
      -> CmmLit (CmmInt (-n) rep)
    e -> CmmMachOp (MO_S_Neg (cmmExprWidth platform e)) [e]
 
-blankWord :: Platform -> CmmStatic
-blankWord platform = CmmUninitialised (platformWordSizeInBytes platform)
-
 cmmToWord :: Platform -> CmmExpr -> CmmExpr
 cmmToWord platform e
   | w == word  = e
@@ -434,26 +428,29 @@ isComparisonExpr _                  = False
 --
 ---------------------------------------------------
 
+tAG_MASK :: Platform -> Int
+tAG_MASK platform = (1 `shiftL` pc_TAG_BITS (platformConstants platform)) - 1
+
+mAX_PTR_TAG :: Platform -> Int
+mAX_PTR_TAG = tAG_MASK
+
 -- Tag bits mask
-cmmTagMask, cmmPointerMask :: DynFlags -> CmmExpr
-cmmTagMask dflags = mkIntExpr (targetPlatform dflags) (tAG_MASK dflags)
-cmmPointerMask dflags = mkIntExpr (targetPlatform dflags) (complement (tAG_MASK dflags))
+cmmTagMask, cmmPointerMask :: Platform -> CmmExpr
+cmmTagMask platform = mkIntExpr platform (tAG_MASK platform)
+cmmPointerMask platform = mkIntExpr platform (complement (tAG_MASK platform))
 
 -- Used to untag a possibly tagged pointer
 -- A static label need not be untagged
-cmmUntag, cmmIsTagged, cmmConstrTag1 :: DynFlags -> CmmExpr -> CmmExpr
+cmmUntag, cmmIsTagged, cmmConstrTag1 :: Platform -> CmmExpr -> CmmExpr
 cmmUntag _ e@(CmmLit (CmmLabel _)) = e
 -- Default case
-cmmUntag dflags e = cmmAndWord platform e (cmmPointerMask dflags)
-   where platform = targetPlatform dflags
+cmmUntag platform e = cmmAndWord platform e (cmmPointerMask platform)
 
 -- Test if a closure pointer is untagged
-cmmIsTagged dflags e = cmmNeWord platform (cmmAndWord platform e (cmmTagMask dflags)) (zeroExpr platform)
-   where platform = targetPlatform dflags
+cmmIsTagged platform e = cmmNeWord platform (cmmAndWord platform e (cmmTagMask platform)) (zeroExpr platform)
 
 -- Get constructor tag, but one based.
-cmmConstrTag1 dflags e = cmmAndWord platform e (cmmTagMask dflags)
-   where platform = targetPlatform dflags
+cmmConstrTag1 platform e = cmmAndWord platform e (cmmTagMask platform)
 
 
 -----------------------------------------------------------------------------
@@ -548,7 +545,7 @@ toBlockListEntryFirst g
 -- have both true and false successors. Block ordering can make a big difference
 -- in performance in the LLVM backend. Note that we rely crucially on the order
 -- of successors returned for CmmCondBranch by the NonLocal instance for CmmNode
--- defined in cmm/CmmNode.hs. -GBM
+-- defined in "GHC.Cmm.Node". -GBM
 toBlockListEntryFirstFalseFallthrough :: CmmGraph -> [CmmBlock]
 toBlockListEntryFirstFalseFallthrough g
   | mapNull m  = []

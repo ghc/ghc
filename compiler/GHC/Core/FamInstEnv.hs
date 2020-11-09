@@ -1,11 +1,13 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 -- (c) The University of Glasgow 2006
 --
 -- FamInstEnv: Type checked family instance declarations
-
-{-# LANGUAGE CPP, GADTs, ScopedTypeVariables, BangPatterns, TupleSections,
-    DeriveFunctor #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Core.FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
@@ -32,8 +34,8 @@ module GHC.Core.FamInstEnv (
 
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
-        normaliseType, normaliseTcApp, normaliseTcArgs,
-        reduceTyFamApp_maybe,
+        normaliseType, normaliseTcApp,
+        topReduceTyFamApp_maybe, reduceTyFamApp_maybe,
 
         -- Flattening
         flattenTys
@@ -41,7 +43,7 @@ module GHC.Core.FamInstEnv (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Unify
 import GHC.Core.Type as Type
@@ -53,17 +55,19 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name
 import GHC.Types.Unique.DFM
-import Outputable
-import Maybes
+import GHC.Data.Maybe
 import GHC.Core.Map
 import GHC.Types.Unique
-import Util
 import GHC.Types.Var
 import GHC.Types.SrcLoc
-import FastString
+import GHC.Data.FastString
 import Control.Monad
 import Data.List( mapAccumL )
 import Data.Array( Array, assocs )
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 {-
 ************************************************************************
@@ -222,7 +226,7 @@ instance Outputable FamInst where
 pprFamInst :: FamInst -> SDoc
 -- Prints the FamInst as a family instance declaration
 -- NB: This function, FamInstEnv.pprFamInst, is used only for internal,
---     debug printing. See GHC.Core.Ppr.TyThing.pprFamInst for printing for the user
+--     debug printing. See GHC.Types.TyThing.Ppr.pprFamInst for printing for the user
 pprFamInst (FamInst { fi_flavor = flavor, fi_axiom = ax
                     , fi_tvs = tvs, fi_tys = tys, fi_rhs = rhs })
   = hang (ppr_tc_sort <+> text "instance"
@@ -352,7 +356,10 @@ UniqFM and UniqDFM.
 See Note [Deterministic UniqFM].
 -}
 
-type FamInstEnv = UniqDFM FamilyInstEnv  -- Maps a family to its instances
+-- Internally we sometimes index by Name instead of TyCon despite
+-- of what the type says. This is safe since
+-- getUnique (tyCon) == getUniqe (tcName tyCon)
+type FamInstEnv = UniqDFM TyCon FamilyInstEnv  -- Maps a family to its instances
      -- See Note [FamInstEnv]
      -- See Note [FamInstEnv determinism]
 
@@ -364,6 +371,14 @@ newtype FamilyInstEnv
 
 instance Outputable FamilyInstEnv where
   ppr (FamIE fs) = text "FamIE" <+> vcat (map ppr fs)
+
+-- | Index a FamInstEnv by the tyCons name.
+toNameInstEnv :: FamInstEnv -> UniqDFM Name FamilyInstEnv
+toNameInstEnv = unsafeCastUDFMKey
+
+-- | Create a FamInstEnv from Name indices.
+fromNameInstEnv :: UniqDFM Name FamilyInstEnv -> FamInstEnv
+fromNameInstEnv = unsafeCastUDFMKey
 
 -- INVARIANTS:
 --  * The fs_tvs are distinct in each FamInst
@@ -380,8 +395,8 @@ famInstEnvElts fi = [elt | FamIE elts <- eltsUDFM fi, elt <- elts]
   -- See Note [FamInstEnv determinism]
 
 famInstEnvSize :: FamInstEnv -> Int
-famInstEnvSize = nonDetFoldUDFM (\(FamIE elt) sum -> sum + length elt) 0
-  -- It's OK to use nonDetFoldUDFM here since we're just computing the
+famInstEnvSize = nonDetStrictFoldUDFM (\(FamIE elt) sum -> sum + length elt) 0
+  -- It's OK to use nonDetStrictFoldUDFM here since we're just computing the
   -- size.
 
 familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst]
@@ -398,7 +413,7 @@ extendFamInstEnvList inst_env fis = foldl' extendFamInstEnv inst_env fis
 extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
 extendFamInstEnv inst_env
                  ins_item@(FamInst {fi_fam = cls_nm})
-  = addToUDFM_C add inst_env cls_nm (FamIE [ins_item])
+  = fromNameInstEnv $ addToUDFM_C add (toNameInstEnv inst_env) cls_nm (FamIE [ins_item])
   where
     add (FamIE items) _ = FamIE (ins_item:items)
 
@@ -640,16 +655,13 @@ that Note.
 mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
              -> [TyVar] -- Extra eta tyvars
              -> [CoVar] -- possibly stale covars
-             -> TyCon   -- family/newtype TyCon (for error-checking only)
              -> [Type]  -- LHS patterns
              -> Type    -- RHS
              -> [Role]
              -> SrcSpan
              -> CoAxBranch
-mkCoAxBranch tvs eta_tvs cvs ax_tc lhs rhs roles loc
-  = -- See Note [CoAxioms are homogeneous] in Core.Coercion.Axiom
-    ASSERT( typeKind (mkTyConApp ax_tc lhs) `eqType` typeKind rhs )
-    CoAxBranch { cab_tvs     = tvs'
+mkCoAxBranch tvs eta_tvs cvs lhs rhs roles loc
+  = CoAxBranch { cab_tvs     = tvs'
                , cab_eta_tvs = eta_tvs'
                , cab_cvs     = cvs'
                , cab_lhs     = tidyTypes env lhs
@@ -703,7 +715,7 @@ mkSingleCoAxiom role ax_name tvs eta_tvs cvs fam_tc lhs_tys rhs_ty
             , co_ax_implicit = False
             , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
   where
-    branch = mkCoAxBranch tvs eta_tvs cvs fam_tc lhs_tys rhs_ty
+    branch = mkCoAxBranch tvs eta_tvs cvs lhs_tys rhs_ty
                           (map (const Nominal) tvs)
                           (getSrcSpan ax_name)
 
@@ -721,7 +733,7 @@ mkNewTypeCoAxiom name tycon tvs roles rhs_ty
             , co_ax_tc       = tycon
             , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
   where
-    branch = mkCoAxBranch tvs [] [] tycon (mkTyVarTys tvs) rhs_ty
+    branch = mkCoAxBranch tvs [] [] (mkTyVarTys tvs) rhs_ty
                           roles (getSrcSpan name)
 
 {-
@@ -1100,7 +1112,7 @@ reduceTyFamApp_maybe :: FamInstEnvs
 --     the role we seek is representational
 -- It does *not* normalise the type arguments first, so this may not
 --     go as far as you want. If you want normalised type arguments,
---     use normaliseTcArgs first.
+--     use topReduceTyFamApp_maybe
 --
 -- The TyCon can be oversaturated.
 -- Works on both open and closed families
@@ -1308,10 +1320,9 @@ topNormaliseType_maybe env ty
       -- to the normalised type's kind
     tyFamStepper :: NormaliseStepper (Coercion, MCoercionN)
     tyFamStepper rec_nts tc tys  -- Try to step a type/data family
-      = let (args_co, ntys, res_co) = normaliseTcArgs env Representational tc tys in
-        case reduceTyFamApp_maybe env Representational tc ntys of
-          Just (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co, MCo res_co)
-          _              -> NS_Done
+      = case topReduceTyFamApp_maybe env tc tys of
+          Just (co, rhs, res_co) -> NS_Step rec_nts rhs (co, MCo res_co)
+          _                      -> NS_Done
 
 ---------------
 normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
@@ -1366,18 +1377,23 @@ normalise_tc_app tc tys
         final_co     = mkCoherenceRightCo r nty (mkSymCo kind_co) orig_to_nty
 
 ---------------
--- | Normalise arguments to a tycon
-normaliseTcArgs :: FamInstEnvs          -- ^ env't with family instances
-                -> Role                 -- ^ desired role of output coercion
-                -> TyCon                -- ^ tc
-                -> [Type]               -- ^ tys
-                -> (Coercion, [Type], CoercionN)
-                                        -- ^ co :: tc tys ~ tc new_tys
-                                        -- NB: co might not be homogeneous
-                                        -- last coercion :: kind(tc tys) ~ kind(tc new_tys)
-normaliseTcArgs env role tc tys
-  = initNormM env role (tyCoVarsOfTypes tys) $
-    normalise_tc_args tc tys
+-- | Try to simplify a type-family application, by *one* step
+-- If topReduceTyFamApp_maybe env r F tys = Just (co, rhs, res_co)
+-- then    co     :: F tys ~R# rhs
+--         res_co :: typeKind(F tys) ~ typeKind(rhs)
+-- Type families and data families; always Representational role
+topReduceTyFamApp_maybe :: FamInstEnvs -> TyCon -> [Type]
+                        -> Maybe (Coercion, Type, Coercion)
+topReduceTyFamApp_maybe envs fam_tc arg_tys
+  | isFamilyTyCon fam_tc   -- type families and data families
+  , Just (co, rhs) <- reduceTyFamApp_maybe envs role fam_tc ntys
+  = Just (args_co `mkTransCo` co, rhs, res_co)
+  | otherwise
+  = Nothing
+  where
+    role = Representational
+    (args_co, ntys, res_co) = initNormM envs role (tyCoVarsOfTypes arg_tys) $
+                              normalise_tc_args fam_tc arg_tys
 
 normalise_tc_args :: TyCon -> [Type]             -- tc tys
                   -> NormM (Coercion, [Type], CoercionN)
@@ -1413,14 +1429,14 @@ normalise_type ty
     go (TyConApp tc tys) = normalise_tc_app tc tys
     go ty@(LitTy {})     = do { r <- getRole
                               ; return (mkReflCo r ty, ty) }
-
     go (AppTy ty1 ty2) = go_app_tys ty1 [ty2]
 
-    go ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+    go ty@(FunTy { ft_mult = w, ft_arg = ty1, ft_res = ty2 })
       = do { (co1, nty1) <- go ty1
            ; (co2, nty2) <- go ty2
+           ; (wco, wty) <- withRole Nominal $ go w
            ; r <- getRole
-           ; return (mkFunCo r co1 co2, ty { ft_arg = nty1, ft_res = nty2 }) }
+           ; return (mkFunCo r wco co1 co2, ty { ft_mult = wty, ft_arg = nty1, ft_res = nty2 }) }
     go (ForAllTy (Bndr tcvar vis) ty)
       = do { (lc', tv', h, ki') <- normalise_var_bndr tcvar
            ; (co, nty)          <- withLC lc' $ normalise_type ty
@@ -1431,7 +1447,7 @@ normalise_type ty
       = do { (nco, nty) <- go ty
            ; lc <- getLC
            ; let co' = substRightCo lc co
-           ; return (castCoercionKind nco Nominal ty nty co co'
+           ; return (castCoercionKind2 nco Nominal ty nty co co'
                     , mkCastTy nty co') }
     go (CoercionTy co)
       = do { lc <- getLC
@@ -1749,10 +1765,11 @@ coreFlattenTy subst = go
       = let (env', tys') = coreFlattenTys subst env tys in
         (env', mkTyConApp tc tys')
 
-    go env ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+    go env ty@(FunTy { ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
       = let (env1, ty1') = go env  ty1
-            (env2, ty2') = go env1 ty2 in
-        (env2, ty { ft_arg = ty1', ft_res = ty2' })
+            (env2, ty2') = go env1 ty2
+            (env3, mult') = go env2 mult in
+        (env3, ty { ft_mult = mult', ft_arg = ty1', ft_res = ty2' })
 
     go env (ForAllTy (Bndr tv vis) ty)
       = let (env1, subst', tv') = coreFlattenVarBndr subst env tv
@@ -1769,6 +1786,7 @@ coreFlattenTy subst = go
     go env (CoercionTy co)
       = let (env', co') = coreFlattenCo subst env co in
         (env', CoercionTy co')
+
 
 -- when flattening, we don't care about the contents of coercions.
 -- so, just return a fresh variable of the right (flattened) type

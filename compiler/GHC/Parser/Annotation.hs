@@ -6,6 +6,7 @@ module GHC.Parser.Annotation (
   ApiAnns(..),
   ApiAnnKey,
   AnnKeywordId(..),
+  AddAnn(..),mkParensApiAnn,
   AnnotationComment(..),
   IsUnicodeSyntax(..),
   unicodeAnn,
@@ -13,10 +14,10 @@ module GHC.Parser.Annotation (
   LRdrName -- Exists for haddocks only
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Name.Reader
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import qualified Data.Map as Map
 import Data.Data
@@ -148,6 +149,44 @@ data ApiAnns =
 type ApiAnnKey = (RealSrcSpan,AnnKeywordId)
 
 
+-- ---------------------------------------------------------------------
+
+-- | Encapsulated call to addAnnotation, requiring only the SrcSpan of
+--   the AST construct the annotation belongs to; together with the
+--   AnnKeywordId, this is the key of the annotation map.
+--
+--   This type is useful for places in the parser where it is not yet
+--   known what SrcSpan an annotation should be added to.  The most
+--   common situation is when we are parsing a list: the annotations
+--   need to be associated with the AST element that *contains* the
+--   list, not the list itself.  'AddAnn' lets us defer adding the
+--   annotations until we finish parsing the list and are now parsing
+--   the enclosing element; we then apply the 'AddAnn' to associate
+--   the annotations.  Another common situation is where a common fragment of
+--   the AST has been factored out but there is no separate AST node for
+--   this fragment (this occurs in class and data declarations). In this
+--   case, the annotation belongs to the parent data declaration.
+--
+--   The usual way an 'AddAnn' is created is using the 'mj' ("make jump")
+--   function, and then it can be discharged using the 'ams' function.
+data AddAnn = AddAnn AnnKeywordId SrcSpan
+
+-- |Given a 'SrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
+-- 'AddAnn' values for the opening and closing bordering on the start
+-- and end of the span
+mkParensApiAnn :: SrcSpan -> [AddAnn]
+mkParensApiAnn (UnhelpfulSpan _)  = []
+mkParensApiAnn (RealSrcSpan ss _) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
+  where
+    f = srcSpanFile ss
+    sl = srcSpanStartLine ss
+    sc = srcSpanStartCol ss
+    el = srcSpanEndLine ss
+    ec = srcSpanEndCol ss
+    lo = RealSrcSpan (mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))) Nothing
+    lc = RealSrcSpan (mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss))        Nothing
+
+-- ---------------------------------------------------------------------
 -- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
 -- of the annotated AST element, and the known type of the annotation.
 getAnnotation :: ApiAnns -> RealSrcSpan -> AnnKeywordId -> [RealSrcSpan]
@@ -197,10 +236,9 @@ getAndRemoveAnnotationComments anns span =
 -- various syntactic keywords that are not captured in the existing
 -- AST.
 --
--- The annotations, together with original source comments are made
--- available in the @'pm_annotations'@ field of @'GHC.ParsedModule'@.
--- Comments are only retained if @'Opt_KeepRawTokenStream'@ is set in
--- @'DynFlags.DynFlags'@ before parsing.
+-- The annotations, together with original source comments are made available in
+-- the @'pm_annotations'@ field of @'GHC.Driver.Env.HsParsedModule'@.
+-- Comments are only retained if @'Opt_KeepRawTokenStream'@ is set.
 --
 -- The wiki page describing this feature is
 -- https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
@@ -259,6 +297,7 @@ data AnnKeywordId
     | AnnLarrow     -- ^ '<-'
     | AnnLarrowU    -- ^ '<-', unicode variant
     | AnnLet
+    | AnnLollyU     -- ^ The '⊸' unicode arrow
     | AnnMdo
     | AnnMinus -- ^ '-'
     | AnnModule
@@ -278,6 +317,8 @@ data AnnKeywordId
     | AnnDollarDollar    -- ^ prefix '$$'  -- TemplateHaskell
     | AnnPackageName
     | AnnPattern
+    | AnnPercent    -- ^ '%'  -- for HsExplicitMult
+    | AnnPercentOne -- ^ '%1' -- for HsLinearArrow
     | AnnProc
     | AnnQualified
     | AnnRarrow -- ^ '->'
@@ -291,8 +332,6 @@ data AnnKeywordId
     | AnnStatic -- ^ 'static'
     | AnnStock
     | AnnThen
-    | AnnThIdSplice -- ^ '$'
-    | AnnThIdTySplice -- ^ '$$'
     | AnnThTyQuote -- ^ double '''
     | AnnTilde -- ^ '~'
     | AnnType
@@ -334,11 +373,11 @@ data AnnotationComment =
 instance Outputable AnnotationComment where
   ppr x = text (show x)
 
--- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
---             'ApiAnnotation.AnnClose','ApiAnnotation.AnnComma',
---             'ApiAnnotation.AnnRarrow'
---             'ApiAnnotation.AnnTilde'
---   - May have 'ApiAnnotation.AnnComma' when in a list
+-- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+--             'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnComma',
+--             'GHC.Parser.Annotation.AnnRarrow'
+--             'GHC.Parser.Annotation.AnnTilde'
+--   - May have 'GHC.Parser.Annotation.AnnComma' when in a list
 type LRdrName = Located RdrName
 
 

@@ -1,8 +1,8 @@
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GHC.Cmm.Dataflow.Label
     ( Label
@@ -13,15 +13,15 @@ module GHC.Cmm.Dataflow.Label
     , mkHooplLabel
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
 
 -- TODO: This should really just use GHC's Unique and Uniq{Set,FM}
 import GHC.Cmm.Dataflow.Collections
 
 import GHC.Types.Unique (Uniquable(..))
-import TrieMap
+import GHC.Data.TrieMap
 
 
 -----------------------------------------------------------------------------
@@ -42,6 +42,9 @@ instance Uniquable Label where
 
 instance Outputable Label where
   ppr label = ppr (getUnique label)
+
+instance OutputableP env Label where
+  pdoc _ l = ppr l
 
 -----------------------------------------------------------------------------
 -- LabelSet
@@ -127,6 +130,9 @@ instance Outputable LabelSet where
 
 instance Outputable a => Outputable (LabelMap a) where
   ppr = ppr . mapToList
+
+instance OutputableP env a => OutputableP env (LabelMap a) where
+  pdoc env = pdoc env . mapToList
 
 instance TrieMap LabelMap where
   type Key LabelMap = Label

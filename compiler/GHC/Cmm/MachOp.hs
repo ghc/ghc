@@ -28,11 +28,11 @@ module GHC.Cmm.MachOp
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Cmm.Type
-import Outputable
+import GHC.Utils.Outputable
 
 -----------------------------------------------------------------------------
 --              MachOp
@@ -45,6 +45,9 @@ native code generators to handle.
 Most operations are parameterised by the 'Width' that they operate on.
 Some operations have separate signed and unsigned versions, and float
 and integer versions.
+
+Note that there are variety of places in the native code generator where we
+assume that the code produced for a MachOp does not introduce new blocks.
 -}
 
 data MachOp
@@ -632,6 +635,9 @@ data CallishMachOp
   | MO_AtomicRead Width
   | MO_AtomicWrite Width
   | MO_Cmpxchg Width
+  -- Should be an AtomicRMW variant eventually.
+  -- Sequential consistent.
+  | MO_Xchg Width
   deriving (Eq, Show)
 
 -- | The operation to perform atomically.

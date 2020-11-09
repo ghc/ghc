@@ -7,7 +7,7 @@ module GHC.CmmToAsm.SPARC.CodeGen.Gen64 (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.CmmToAsm.SPARC.CodeGen.Gen32
 import GHC.CmmToAsm.SPARC.CodeGen.Base
@@ -16,16 +16,15 @@ import GHC.CmmToAsm.SPARC.Regs
 import GHC.CmmToAsm.SPARC.AddrMode
 import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.SPARC.Instr
--- GHC.CmmToAsm.SPARC.Ppr()
 import GHC.CmmToAsm.Monad
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
 
 import GHC.Cmm
 
-import OrdList
-import Outputable
+import GHC.Data.OrdList
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- | Code to assign a 64 bit value to memory.
 assignMem_I64Code
@@ -210,4 +209,6 @@ iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr])
 
 
 iselExpr64 expr
-   = pprPanic "iselExpr64(sparc)" (ppr expr)
+   = do
+      platform <- getPlatform
+      pprPanic "iselExpr64(sparc)" (pdoc platform expr)

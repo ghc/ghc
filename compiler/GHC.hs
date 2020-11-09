@@ -22,15 +22,14 @@ module GHC (
         -- * GHC Monad
         Ghc, GhcT, GhcMonad(..), HscEnv,
         runGhc, runGhcT, initGhcMonad,
-        gcatch, gbracket, gfinally,
         printException,
         handleSourceError,
         needsTemplateHaskellOrQQ,
 
         -- * Flags and settings
-        DynFlags(..), GeneralFlag(..), Severity(..), HscTarget(..), gopt,
-        GhcMode(..), GhcLink(..), defaultObjectTarget,
-        parseDynamicFlags,
+        DynFlags(..), GeneralFlag(..), Severity(..), Backend(..), gopt,
+        GhcMode(..), GhcLink(..),
+        parseDynamicFlags, parseTargetFiles,
         getSessionDynFlags, setSessionDynFlags,
         getProgramDynFlags, setProgramDynFlags, setLogAction,
         getInteractiveDynFlags, setInteractiveDynFlags,
@@ -159,11 +158,11 @@ module GHC (
 
         -- * Abstract syntax elements
 
-        -- ** Packages
-        UnitId,
+        -- ** Units
+        Unit,
 
         -- ** Modules
-        Module, mkModule, pprModule, moduleName, moduleUnitId,
+        Module, mkModule, pprModule, moduleName, moduleUnit,
         ModuleName, mkModuleName, moduleNameString,
 
         -- ** Names
@@ -179,7 +178,7 @@ module GHC (
         isRecordSelector,
         isPrimOpId, isFCallId, isClassOpId_maybe,
         isDataConWorkId, idDataCon,
-        isBottomingId, isDictonaryId,
+        isDeadEndId, isDictonaryId,
         recordSelectorTyCon,
 
         -- ** Type constructors
@@ -198,7 +197,7 @@ module GHC (
         -- ** Data constructors
         DataCon,
         dataConType, dataConTyCon, dataConFieldLabels,
-        dataConIsInfix, isVanillaDataCon, dataConUserType,
+        dataConIsInfix, isVanillaDataCon, dataConWrapperType,
         dataConSrcBangs,
         StrictnessMark(..), isMarkedStrict,
 
@@ -249,7 +248,7 @@ module GHC (
         srcSpanStartCol, srcSpanEndCol,
 
         -- ** Located
-        GenLocated(..), Located,
+        GenLocated(..), Located, RealLocated,
 
         -- *** Constructing Located
         noLoc, mkGeneralLocated,
@@ -265,6 +264,7 @@ module GHC (
 
         -- * Exceptions
         GhcException(..), showGhcException,
+        GhcApiError(..),
 
         -- * Token stream manipulations
         Token,
@@ -275,7 +275,7 @@ module GHC (
         parser,
 
         -- * API Annotations
-        ApiAnns(..),AnnKeywordId(..),AnnotationComment(..),
+        ApiAnns(..),AnnKeywordId(..),AnnotationComment(..), ApiAnnKey,
         getAnnotation, getAndRemoveAnnotation,
         getAnnotationComments, getAndRemoveAnnotationComments,
         unicodeAnn,
@@ -293,33 +293,66 @@ module GHC (
 
 #include "HsVersions.h"
 
-import GhcPrelude hiding (init)
+import GHC.Prelude hiding (init)
+
+import GHC.Platform
+import GHC.Platform.Ways
+
+import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
+                           , isSourceFilename, startPhase )
+import GHC.Driver.Env
+import GHC.Driver.CmdLine
+import GHC.Driver.Session hiding (WarnReason(..))
+import GHC.Driver.Backend
+import GHC.Driver.Config
+import GHC.Driver.Main
+import GHC.Driver.Make
+import GHC.Driver.Hooks
+import GHC.Driver.Pipeline   ( compileOne' )
+import GHC.Driver.Monad
+import GHC.Driver.Ppr
 
 import GHC.ByteCode.Types
 import GHC.Runtime.Eval
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Interpreter.Types
+import GHC.Runtime.Context
 import GHCi.RemoteTypes
 
-import GHC.Core.Ppr.TyThing  ( pprFamInst )
-import GHC.Driver.Main
-import GHC.Driver.Make
-import GHC.Driver.Hooks
-import GHC.Driver.Pipeline   ( compileOne' )
-import GHC.Driver.Monad
-import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
+import qualified GHC.Parser as Parser
+import GHC.Parser.Lexer
+import GHC.Parser.Annotation
+import GHC.Parser.Errors.Ppr
+
 import GHC.Iface.Load        ( loadSysInterface )
-import GHC.Tc.Types
-import GHC.Core.Predicate
-import GHC.Driver.Packages
-import GHC.Types.Name.Set
-import GHC.Types.Name.Reader
 import GHC.Hs
-import GHC.Core.Type  hiding( typeKind )
-import GHC.Tc.Utils.TcType
-import GHC.Types.Id
 import GHC.Builtin.Types.Prim ( alphaTyVars )
+import GHC.Iface.Tidy
+import GHC.Data.Bag        ( listToBag )
+import GHC.Data.StringBuffer
+import GHC.Data.FastString
+import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
+import GHC.Tc.Types
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Module
+import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Instance.Family
+
+import GHC.SysTools.FileCleanup
+import GHC.SysTools
+import GHC.SysTools.BaseDir
+
+import GHC.Utils.Error
+import GHC.Utils.Monad
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+
+import GHC.Core.Predicate
+import GHC.Core.Type  hiding( typeKind )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr   ( pprForAll )
 import GHC.Core.Class
@@ -327,40 +360,37 @@ import GHC.Core.DataCon
 import GHC.Core.FVs        ( orphNamesOfFamInst )
 import GHC.Core.FamInstEnv ( FamInst, famInstEnvElts )
 import GHC.Core.InstEnv
+import GHC.Core
+
+import GHC.Types.Id
 import GHC.Types.Name      hiding ( varName )
 import GHC.Types.Avail
 import GHC.Types.SrcLoc
-import GHC.Core
-import GHC.Iface.Tidy
-import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename )
-import GHC.Driver.Finder
-import GHC.Driver.Types
-import GHC.Driver.CmdLine
-import GHC.Driver.Session hiding (WarnReason(..))
-import GHC.Driver.Ways
-import GHC.SysTools
-import GHC.SysTools.BaseDir
+import GHC.Types.TyThing.Ppr  ( pprFamInst )
 import GHC.Types.Annotations
-import GHC.Types.Module
-import Panic
-import GHC.Platform
-import Bag              ( listToBag )
-import ErrUtils
-import MonadUtils
-import Util
-import StringBuffer
-import Outputable
+import GHC.Types.Name.Set
+import GHC.Types.Name.Reader
+import GHC.Types.SourceError
+import GHC.Types.SafeHaskell
+import GHC.Types.Fixity
+import GHC.Types.Target
 import GHC.Types.Basic
-import FastString
-import qualified GHC.Parser as Parser
-import GHC.Parser.Lexer
-import GHC.Parser.Annotation
-import qualified GHC.LanguageExtensions as LangExt
+import GHC.Types.TyThing
 import GHC.Types.Name.Env
-import GHC.Tc.Module
-import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Instance.Family
-import GHC.SysTools.FileCleanup
+import GHC.Types.Name.Ppr
+import GHC.Types.TypeEnv
+import GHC.Types.SourceFile
+
+import GHC.Unit
+import GHC.Unit.External
+import GHC.Unit.State
+import GHC.Unit.Finder
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.Graph
+import GHC.Unit.Home.ModInfo
 
 import Data.Foldable
 import qualified Data.Map.Strict as Map
@@ -373,16 +403,18 @@ import Data.Typeable    ( Typeable )
 import Data.Word        ( Word8 )
 import Control.Monad
 import System.Exit      ( exitWith, ExitCode(..) )
-import Exception
+import GHC.Utils.Exception
 import Data.IORef
 import System.FilePath
 import Control.Concurrent
 import Control.Applicative ((<|>))
+import Control.Monad.Catch as MC
 
-import Maybes
+import GHC.Data.Maybe
 import System.IO.Error  ( isDoesNotExistError )
 import System.Environment ( getEnv )
 import System.Directory
+import Data.List (isPrefixOf)
 
 
 -- %************************************************************************
@@ -400,7 +432,7 @@ defaultErrorHandler :: (ExceptionMonad m)
                     => FatalMessager -> FlushOut -> m a -> m a
 defaultErrorHandler fm (FlushOut flushOut) inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
-  ghandle (\exception -> liftIO $ do
+  MC.handle (\exception -> liftIO $ do
            flushOut
            case fromException exception of
                 -- an IO exception probably isn't our fault, so don't panic
@@ -437,7 +469,7 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
 {-# DEPRECATED defaultCleanupHandler "Cleanup is now done by runGhc/runGhcT" #-}
 defaultCleanupHandler :: (ExceptionMonad m) => DynFlags -> m a -> m a
 defaultCleanupHandler _ m = m
- where _warning_suppression = m `gonException` undefined
+ where _warning_suppression = m `MC.onException` undefined
 
 
 -- %************************************************************************
@@ -483,7 +515,7 @@ runGhcT mb_top_dir ghct = do
     withCleanupSession ghct
 
 withCleanupSession :: GhcMonad m => m a -> m a
-withCleanupSession ghc = ghc `gfinally` cleanup
+withCleanupSession ghc = ghc `MC.finally` cleanup
   where
    cleanup = do
       hsc_env <- getSession
@@ -545,7 +577,7 @@ checkBrokenTablesNextToCode' :: MonadIO m => DynFlags -> m Bool
 checkBrokenTablesNextToCode' dflags
   | not (isARM arch)                 = return False
   | WayDyn `S.notMember` ways dflags = return False
-  | not (tablesNextToCode dflags)    = return False
+  | not tablesNextToCode             = return False
   | otherwise                        = do
     linkerInfo <- liftIO $ getLinkerInfo dflags
     case linkerInfo of
@@ -553,6 +585,7 @@ checkBrokenTablesNextToCode' dflags
       _        -> return False
   where platform = targetPlatform dflags
         arch = platformArch platform
+        tablesNextToCode = platformTablesNextToCode platform
 
 
 -- %************************************************************************
@@ -588,37 +621,32 @@ checkBrokenTablesNextToCode' dflags
 -- read), and prepares the compilers knowledge about packages.  It can
 -- be called again to load new packages: just add new package flags to
 -- (packageFlags dflags).
---
--- Returns a list of new packages that may need to be linked in using
--- the dynamic linker (see 'linkPackages') as a result of new package
--- flags.  If you are not doing linking or doing static linking, you
--- can ignore the list of packages returned.
---
-setSessionDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
-setSessionDynFlags dflags = do
-  dflags' <- checkNewDynFlags dflags
-  dflags'' <- liftIO $ interpretPackageEnv dflags'
-  (dflags''', preload) <- liftIO $ initPackages dflags''
+setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
+setSessionDynFlags dflags0 = do
+  dflags1 <- checkNewDynFlags dflags0
+  dflags <- liftIO $ initUnits dflags1
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
     then do
          let
            prog = pgm_i dflags ++ flavour
+           profiled = ways dflags `hasWay` WayProf
+           dynamic  = ways dflags `hasWay` WayDyn
            flavour
-             | WayProf `S.member` ways dflags = "-prof"
-             | WayDyn `S.member` ways dflags  = "-dyn"
-             | otherwise                      = ""
+             | profiled  = "-prof" -- FIXME: can't we have both?
+             | dynamic   = "-dyn"
+             | otherwise = ""
            msg = text "Starting " <> text prog
          tr <- if verbosity dflags >= 3
-                then return (logInfo dflags (defaultDumpStyle dflags) msg)
+                then return (logInfo dflags $ withPprStyle defaultDumpStyle msg)
                 else return (pure ())
          let
           conf = IServConfig
             { iservConfProgram  = prog
             , iservConfOpts     = getOpts dflags opt_i
-            , iservConfProfiled = gopt Opt_SccProfilingOn dflags
-            , iservConfDynamic  = WayDyn `S.member` ways dflags
+            , iservConfProfiled = profiled
+            , iservConfDynamic  = dynamic
             , iservConfHook     = createIservProcessHook (hooks dflags)
             , iservConfTrace    = tr
             }
@@ -631,19 +659,22 @@ setSessionDynFlags dflags = do
       return Nothing
 #endif
 
-  modifySession $ \h -> h{ hsc_dflags = dflags'''
-                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags''' }
+  modifySession $ \h -> h{ hsc_dflags = dflags
+                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags }
                          , hsc_interp = hsc_interp h <|> interp
                            -- we only update the interpreter if there wasn't
                            -- already one set up
+                         , hsc_home_unit = mkHomeUnitFromFlags dflags
                          }
   invalidateModSummaryCache
-  return preload
 
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
 -- cached module graph, causing more work to be done the next time
 -- 'load' is called.
-setProgramDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
+--
+-- Returns a boolean indicating if preload units have changed and need to be
+-- reloaded.
+setProgramDynFlags :: GhcMonad m => DynFlags -> m Bool
 setProgramDynFlags dflags = setProgramDynFlags_ True dflags
 
 -- | Set the action taken when the compiler produces a message.  This
@@ -655,17 +686,17 @@ setLogAction action = do
   void $ setProgramDynFlags_ False $
     dflags' { log_action = action }
 
-setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m [InstalledUnitId]
+setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m Bool
 setProgramDynFlags_ invalidate_needed dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags_prev <- getProgramDynFlags
-  (dflags'', preload) <-
-    if (packageFlagsChanged dflags_prev dflags')
-       then liftIO $ initPackages dflags'
-       else return (dflags', [])
+  let changed = packageFlagsChanged dflags_prev dflags'
+  dflags'' <- if changed
+               then liftIO $ initUnits dflags'
+               else return dflags'
   modifySession $ \h -> h{ hsc_dflags = dflags'' }
   when invalidate_needed $ invalidateModSummaryCache
-  return preload
+  return changed
 
 
 -- When changing the DynFlags, we want the changes to apply to future
@@ -700,7 +731,7 @@ getProgramDynFlags = getSessionDynFlags
 -- | Set the 'DynFlags' used to evaluate interactive expressions.
 -- Note: this cannot be used for changes to packages.  Use
 -- 'setSessionDynFlags', or 'setProgramDynFlags' and then copy the
--- 'pkgState' into the interactive @DynFlags@.
+-- 'unitState' into the interactive @DynFlags@.
 setInteractiveDynFlags :: GhcMonad m => DynFlags -> m ()
 setInteractiveDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
@@ -715,7 +746,93 @@ getInteractiveDynFlags = withSession $ \h -> return (ic_dflags (hsc_IC h))
 parseDynamicFlags :: MonadIO m =>
                      DynFlags -> [Located String]
                   -> m (DynFlags, [Located String], [Warn])
-parseDynamicFlags = parseDynamicFlagsCmdLine
+parseDynamicFlags dflags cmdline = do
+  (dflags1, leftovers, warns) <- parseDynamicFlagsCmdLine dflags cmdline
+  dflags2 <- liftIO $ interpretPackageEnv dflags1
+  return (dflags2, leftovers, warns)
+
+-- | Parse command line arguments that look like files.
+-- First normalises its arguments and then splits them into source files
+-- and object files.
+-- A source file can be turned into a 'Target' via 'guessTarget'
+parseTargetFiles :: DynFlags -> [String] -> (DynFlags, [(String, Maybe Phase)], [String])
+parseTargetFiles dflags0 fileish_args =
+  let
+    normal_fileish_paths = map normalise_hyp fileish_args
+    (srcs, objs)         = partition_args normal_fileish_paths [] []
+
+    dflags1 = dflags0 { ldInputs = map (FileOption "") objs
+                                   ++ ldInputs dflags0 }
+    {-
+      We split out the object files (.o, .dll) and add them
+      to ldInputs for use by the linker.
+
+      The following things should be considered compilation manager inputs:
+
+       - haskell source files (strings ending in .hs, .lhs or other
+         haskellish extension),
+
+       - module names (not forgetting hierarchical module names),
+
+       - things beginning with '-' are flags that were not recognised by
+         the flag parser, and we want them to generate errors later in
+         checkOptions, so we class them as source files (#5921)
+
+       - and finally we consider everything without an extension to be
+         a comp manager input, as shorthand for a .hs or .lhs filename.
+
+      Everything else is considered to be a linker object, and passed
+      straight through to the linker.
+    -}
+  in (dflags1, srcs, objs)
+
+-- -----------------------------------------------------------------------------
+
+-- | Splitting arguments into source files and object files.  This is where we
+-- interpret the -x <suffix> option, and attach a (Maybe Phase) to each source
+-- file indicating the phase specified by the -x option in force, if any.
+partition_args :: [String] -> [(String, Maybe Phase)] -> [String]
+               -> ([(String, Maybe Phase)], [String])
+partition_args [] srcs objs = (reverse srcs, reverse objs)
+partition_args ("-x":suff:args) srcs objs
+  | "none" <- suff      = partition_args args srcs objs
+  | StopLn <- phase     = partition_args args srcs (slurp ++ objs)
+  | otherwise           = partition_args rest (these_srcs ++ srcs) objs
+        where phase = startPhase suff
+              (slurp,rest) = break (== "-x") args
+              these_srcs = zip slurp (repeat (Just phase))
+partition_args (arg:args) srcs objs
+  | looks_like_an_input arg = partition_args args ((arg,Nothing):srcs) objs
+  | otherwise               = partition_args args srcs (arg:objs)
+
+
+looks_like_an_input :: String -> Bool
+looks_like_an_input m =  isSourceFilename m
+                      || looksLikeModuleName m
+                      || "-" `isPrefixOf` m
+                      || not (hasExtension m)
+
+
+-- | To simplify the handling of filepaths, we normalise all filepaths right
+-- away. Note the asymmetry of FilePath.normalise:
+--    Linux:   p\/q -> p\/q; p\\q -> p\\q
+--    Windows: p\/q -> p\\q; p\\q -> p\\q
+-- #12674: Filenames starting with a hypen get normalised from ./-foo.hs
+-- to -foo.hs. We have to re-prepend the current directory.
+normalise_hyp :: FilePath -> FilePath
+normalise_hyp fp
+  | strt_dot_sl && "-" `isPrefixOf` nfp = cur_dir ++ nfp
+  | otherwise                           = nfp
+  where
+#if defined(mingw32_HOST_OS)
+    strt_dot_sl = "./" `isPrefixOf` fp || ".\\" `isPrefixOf` fp
+#else
+    strt_dot_sl = "./" `isPrefixOf` fp
+#endif
+    cur_dir = '.' : [pathSeparator]
+    nfp = normalise fp
+
+-----------------------------------------------------------------------------
 
 -- | Checks the set of new DynFlags for possibly erroneous option
 -- combinations when invoking 'setSessionDynFlags' and friends, and if
@@ -933,7 +1050,7 @@ getModSummary mod = do
    mg <- liftM hsc_mod_graph getSession
    let mods_by_name = [ ms | ms <- mgModSummaries mg
                       , ms_mod_name ms == mod
-                      , not (isBootSummary ms) ]
+                      , isBootSummary ms == NotBoot ]
    case mods_by_name of
      [] -> do dflags <- getDynFlags
               liftIO $ throwIO $ mkApiErr dflags (text "Module not part of module graph")
@@ -1004,7 +1121,7 @@ desugarModule tcm = do
 --
 -- A module must be loaded before dependent modules can be typechecked.  This
 -- always includes generating a 'ModIface' and, depending on the
--- 'DynFlags.hscTarget', may also include code generation.
+-- @DynFlags@\'s 'GHC.Driver.Session.backend', may also include code generation.
 --
 -- This function will always cause recompilation and will always overwrite
 -- previous compilation results (potentially files on disk).
@@ -1139,7 +1256,7 @@ compileCore simplify fn = do
 getModuleGraph :: GhcMonad m => m ModuleGraph -- ToDo: DiGraph ModSummary
 getModuleGraph = liftM hsc_mod_graph getSession
 
--- | Return @True@ <==> module is loaded.
+-- | Return @True@ \<==> module is loaded.
 isLoaded :: GhcMonad m => ModuleName -> m Bool
 isLoaded m = withSession $ \hsc_env ->
   return $! isJust (lookupHpt (hsc_HPT hsc_env) m)
@@ -1155,8 +1272,12 @@ getInsts = withSession $ \hsc_env ->
     return $ ic_instances (hsc_IC hsc_env)
 
 getPrintUnqual :: GhcMonad m => m PrintUnqualified
-getPrintUnqual = withSession $ \hsc_env ->
-  return (icPrintUnqual (hsc_dflags hsc_env) (hsc_IC hsc_env))
+getPrintUnqual = withSession $ \hsc_env -> do
+  let dflags = hsc_dflags hsc_env
+  return $ icPrintUnqual
+               (unitState dflags)
+               (hsc_home_unit hsc_env)
+               (hsc_IC hsc_env)
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
@@ -1251,7 +1372,11 @@ mkPrintUnqualifiedForModule :: GhcMonad m =>
                                ModuleInfo
                             -> m (Maybe PrintUnqualified) -- XXX: returns a Maybe X
 mkPrintUnqualifiedForModule minf = withSession $ \hsc_env -> do
-  return (fmap (mkPrintUnqualified (hsc_dflags hsc_env)) (minf_rdr_env minf))
+  let dflags          = hsc_dflags hsc_env
+      mk_print_unqual = mkPrintUnqualified
+                           (unitState dflags)
+                           (hsc_home_unit hsc_env)
+  return (fmap mk_print_unqual (minf_rdr_env minf))
 
 modInfoLookupName :: GhcMonad m =>
                      ModuleInfo -> Name
@@ -1259,10 +1384,7 @@ modInfoLookupName :: GhcMonad m =>
 modInfoLookupName minf name = withSession $ \hsc_env -> do
    case lookupTypeEnv (minf_type_env minf) name of
      Just tyThing -> return (Just tyThing)
-     Nothing      -> do
-       eps <- liftIO $ readIORef (hsc_EPS hsc_env)
-       return $! lookupType (hsc_dflags hsc_env)
-                            (hsc_HPT hsc_env) (eps_PTE eps) name
+     Nothing      -> liftIO (lookupType hsc_env name)
 
 modInfoIface :: ModuleInfo -> Maybe ModIface
 modInfoIface = minf_iface
@@ -1288,7 +1410,7 @@ isDictonaryId id
 -- 'setContext'.
 lookupGlobalName :: GhcMonad m => Name -> m (Maybe TyThing)
 lookupGlobalName name = withSession $ \hsc_env -> do
-   liftIO $ lookupTypeHscEnv hsc_env name
+   liftIO $ lookupType hsc_env name
 
 findGlobalAnns :: (GhcMonad m, Typeable a) => ([Word8] -> a) -> AnnTarget Name -> m [a]
 findGlobalAnns deserialize target = withSession $ \hsc_env -> do
@@ -1343,7 +1465,7 @@ getNameToInstancesIndex visible_mods mods_to_load = do
 
 -- -----------------------------------------------------------------------------
 
-{- ToDo: Move the primary logic here to compiler/main/Packages.hs
+{- ToDo: Move the primary logic here to "GHC.Unit.State"
 -- | Return all /external/ modules available in the package database.
 -- Modules from the current session (i.e., from the 'HomePackageTable') are
 -- not included.  This includes module names which are reexported by packages.
@@ -1352,12 +1474,12 @@ packageDbModules :: GhcMonad m =>
                  -> m [Module]
 packageDbModules only_exposed = do
    dflags <- getSessionDynFlags
-   let pkgs = eltsUFM (unitInfoMap (pkgState dflags))
+   let pkgs = eltsUFM (unitInfoMap (unitState dflags))
    return $
      [ mkModule pid modname
      | p <- pkgs
      , not only_exposed || exposed p
-     , let pid = packageConfigId p
+     , let pid = mkUnit p
      , modname <- exposedModules p
                ++ map exportName (reexportedModules p) ]
                -}
@@ -1405,29 +1527,25 @@ getModuleSourceAndFlags mod = do
 -- | Return module source as token stream, including comments.
 --
 -- The module must be in the module graph and its source must be available.
--- Throws a 'GHC.Driver.Types.SourceError' on parse error.
+-- Throws a 'GHC.Driver.Env.SourceError' on parse error.
 getTokenStream :: GhcMonad m => Module -> m [Located Token]
 getTokenStream mod = do
-  (sourceFile, source, flags) <- getModuleSourceAndFlags mod
+  (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
-  case lexTokenStream source startLoc flags of
-    POk _ ts  -> return ts
-    PFailed pst ->
-        do dflags <- getDynFlags
-           throwErrors (getErrorMessages pst dflags)
+  case lexTokenStream (initParserOpts dflags) source startLoc of
+    POk _ ts    -> return ts
+    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
 -- 'showRichTokenStream'.
 getRichTokenStream :: GhcMonad m => Module -> m [(Located Token, String)]
 getRichTokenStream mod = do
-  (sourceFile, source, flags) <- getModuleSourceAndFlags mod
+  (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
-  case lexTokenStream source startLoc flags of
-    POk _ ts -> return $ addSourceToTokens startLoc source ts
-    PFailed pst ->
-        do dflags <- getDynFlags
-           throwErrors (getErrorMessages pst dflags)
+  case lexTokenStream (initParserOpts dflags) source startLoc of
+    POk _ ts    -> return $ addSourceToTokens startLoc source ts
+    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1484,12 +1602,10 @@ showRichTokenStream ts = go startLoc ts ""
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
-  let
-    dflags   = hsc_dflags hsc_env
-    this_pkg = thisPackage dflags
-  --
+  let dflags = hsc_dflags hsc_env
+      home_unit = hsc_home_unit hsc_env
   case maybe_pkg of
-    Just pkg | fsToUnitId pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
+    Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
         Found _ m -> return m
@@ -1501,7 +1617,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
         Nothing -> liftIO $ do
            res <- findImportedModule hsc_env mod_name maybe_pkg
            case res of
-             Found loc m | moduleUnitId m /= this_pkg -> return m
+             Found loc m | not (isHomeModule home_unit m) -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError dflags noSrcSpan mod_name err
 
@@ -1545,7 +1661,7 @@ isModuleTrusted m = withSession $ \hsc_env ->
     liftIO $ hscCheckSafe hsc_env m noSrcSpan
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-moduleTrustReqs :: GhcMonad m => Module -> m (Bool, Set InstalledUnitId)
+moduleTrustReqs :: GhcMonad m => Module -> m (Bool, Set UnitId)
 moduleTrustReqs m = withSession $ \hsc_env ->
     liftIO $ hscGetSafe hsc_env m noSrcSpan
 
@@ -1600,15 +1716,15 @@ parser str dflags filename =
        loc  = mkRealSrcLoc (mkFastString filename) 1 1
        buf  = stringToStringBuffer str
    in
-   case unP Parser.parseModule (mkPState dflags buf loc) of
+   case unP Parser.parseModule (initParserState (initParserOpts dflags) buf loc) of
 
      PFailed pst ->
-         let (warns,errs) = getMessages pst dflags in
-         (warns, Left errs)
+         let (warns,errs) = getMessages pst in
+         (fmap pprWarning warns, Left (fmap pprError errs))
 
      POk pst rdr_module ->
-         let (warns,_) = getMessages pst dflags in
-         (warns, Right rdr_module)
+         let (warns,_) = getMessages pst in
+         (fmap pprWarning warns, Right rdr_module)
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)
@@ -1667,16 +1783,18 @@ interpretPackageEnv dflags = do
         return dflags
       Just envfile -> do
         content <- readFile envfile
-        compilationProgressMsg dflags ("Loaded package environment from " ++ envfile)
+        compilationProgressMsg dflags (text "Loaded package environment from " <> text envfile)
         let (_, dflags') = runCmdLine (runEwM (setFlagsFromEnvFile envfile content)) dflags
 
         return dflags'
   where
     -- Loading environments (by name or by location)
 
+    archOS = platformArchOS (targetPlatform dflags)
+
     namedEnvPath :: String -> MaybeT IO FilePath
     namedEnvPath name = do
-     appdir <- versionedAppDir dflags
+     appdir <- versionedAppDir (programName dflags) archOS
      return $ appdir </> "environments" </> name
 
     probeEnvName :: String -> MaybeT IO FilePath
@@ -1698,7 +1816,7 @@ interpretPackageEnv dflags = do
 
     getEnvVar :: MaybeT IO String
     getEnvVar = do
-      mvar <- liftMaybeT $ try $ getEnv "GHC_ENVIRONMENT"
+      mvar <- liftMaybeT $ MC.try $ getEnv "GHC_ENVIRONMENT"
       case mvar of
         Right var -> return var
         Left err  -> if isDoesNotExistError err then mzero
@@ -1713,7 +1831,7 @@ interpretPackageEnv dflags = do
 
     -- e.g. .ghc.environment.x86_64-linux-7.6.3
     localEnvFileName :: FilePath
-    localEnvFileName = ".ghc.environment" <.> versionedFilePath dflags
+    localEnvFileName = ".ghc.environment" <.> versionedFilePath archOS
 
     -- Search for an env file, starting in the current dir and looking upwards.
     -- Fail if we get to the users home dir or the filesystem root. That is,
@@ -1744,3 +1862,15 @@ interpretPackageEnv dflags = do
          "Package environment "
       ++ show env
       ++ " (specified in GHC_ENVIRONMENT) not found"
+
+-- | An error thrown if the GHC API is used in an incorrect fashion.
+newtype GhcApiError = GhcApiError String
+
+instance Show GhcApiError where
+  show (GhcApiError msg) = msg
+
+instance Exception GhcApiError
+
+mkApiErr :: DynFlags -> SDoc -> GhcApiError
+mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
+

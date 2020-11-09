@@ -2,6 +2,6 @@ newThread started
 mainThread
 Haskell: 2
 newThread back again
-1 sec later
+2 secs later
 
 shutting down

@@ -14,8 +14,8 @@ import Language.Haskell.TH
 $( return
    [ OpenTypeFamilyD (TypeFamilyHead
        (mkName "F")
-       [ PlainTV (mkName "a"), PlainTV (mkName "b"), PlainTV (mkName "c") ]
-       (TyVarSig (KindedTV (mkName "result") (VarT (mkName "k"))))
+       [ PlainTV (mkName "a") (), PlainTV (mkName "b") (), PlainTV (mkName "c") () ]
+       (TyVarSig (KindedTV (mkName "result") () (VarT (mkName "k"))))
        (Just $ InjectivityAnn (mkName "result")
                              [(mkName "a"), (mkName "b"), (mkName "c") ]))
    , TySynInstD
@@ -41,8 +41,8 @@ $( return
 $( return
    [ OpenTypeFamilyD (TypeFamilyHead
        (mkName "J")
-       [ PlainTV (mkName "a"), KindedTV (mkName "b") (VarT (mkName "k")) ]
-       (TyVarSig (PlainTV (mkName "r")))
+       [ PlainTV (mkName "a") (), KindedTV (mkName "b") () (VarT (mkName "k")) ]
+       (TyVarSig (PlainTV (mkName "r") ()))
        (Just $ InjectivityAnn (mkName "r") [mkName "a"]))
    , TySynInstD
        (TySynEqn Nothing (AppT (AppT (ConT (mkName "J")) (ConT (mkName "Int")))
@@ -60,9 +60,9 @@ $( return
 $( return
    [ ClosedTypeFamilyD (TypeFamilyHead
        (mkName "I")
-       [ KindedTV (mkName "a") StarT, KindedTV (mkName "b") StarT
-       , KindedTV (mkName "c") StarT ]
-       (TyVarSig (PlainTV (mkName "r")))
+       [ KindedTV (mkName "a") () StarT, KindedTV (mkName "b") () StarT
+       , KindedTV (mkName "c") () StarT ]
+       (TyVarSig (PlainTV (mkName "r") ()))
        (Just $ InjectivityAnn (mkName "r") [(mkName "a"), (mkName "b")]))
 
        [ TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "I")) (ConT (mkName "Int")))
@@ -98,8 +98,8 @@ $( do { decl@([ClosedTypeFamilyD (TypeFamilyHead _ _ _ (Just inj)) _]) <-
 $( return
    [ OpenTypeFamilyD (TypeFamilyHead
        (mkName "H")
-       [ PlainTV (mkName "a"), PlainTV (mkName "b"), PlainTV (mkName "c") ]
-       (TyVarSig (PlainTV (mkName "r")))
+       [ PlainTV (mkName "a") (), PlainTV (mkName "b") (), PlainTV (mkName "c") () ]
+       (TyVarSig (PlainTV (mkName "r") ()))
        (Just $ InjectivityAnn (mkName "r")
                              [(mkName "a"), (mkName "b") ]))
 

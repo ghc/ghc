@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -17,35 +16,42 @@ module GHC.Iface.Rename (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Session
+import GHC.Driver.Env
+
+import GHC.Tc.Utils.Monad
+
+import GHC.Iface.Syntax
+import GHC.Iface.Env
+import {-# SOURCE #-} GHC.Iface.Load -- a bit vexing
+
+import GHC.Unit
+import GHC.Unit.State
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Deps
 
 import GHC.Types.SrcLoc
-import Outputable
-import GHC.Driver.Types
-import GHC.Types.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Avail
-import GHC.Iface.Syntax
 import GHC.Types.FieldLabel
 import GHC.Types.Var
-import ErrUtils
-
-import GHC.Types.Name
-import GHC.Tc.Utils.Monad
-import Util
-import Fingerprint
 import GHC.Types.Basic
+import GHC.Types.Name
+import GHC.Types.Name.Shape
 
--- a bit vexing
-import {-# SOURCE #-} GHC.Iface.Load
-import GHC.Driver.Session
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Fingerprint
+import GHC.Utils.Panic
+
+import GHC.Data.Bag
 
 import qualified Data.Traversable as T
 
-import Bag
 import Data.IORef
-import GHC.Types.Name.Shape
-import GHC.Iface.Env
 
 tcRnMsgMaybe :: IO (Either ErrorMessages a) -> TcM a
 tcRnMsgMaybe do_this = do
@@ -76,18 +82,18 @@ failWithRn doc = do
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to
--- a module that looks like p[A=<A>]:B.  We need a *specific* ModIface, e.g.
--- p[A=q():A]:B (or maybe even p[A=<B>]:B) which we load
+-- a module that looks like p[A=\<A>]:B.  We need a *specific* ModIface, e.g.
+-- p[A=q():A]:B (or maybe even p[A=\<B>]:B) which we load
 -- up (either to merge it, or to just use during typechecking).
 --
 -- Suppose we have:
 --
---  p[A=<A>]:M  ==>  p[A=q():A]:M
+--  p[A=\<A>]:M  ==>  p[A=q():A]:M
 --
--- Substitute all occurrences of <A> with q():A (renameHoleModule).
+-- Substitute all occurrences of \<A> with q():A (renameHoleModule).
 -- Then, for any Name of form {A.T}, replace the Name with
 -- the Name according to the exports of the implementing module.
--- This works even for p[A=<B>]:M, since we just read in the
+-- This works even for p[A=\<B>]:M, since we just read in the
 -- exports of B.hi, which is assumed to be ready now.
 --
 -- This function takes an optional 'NameShape', which can be used
@@ -97,7 +103,7 @@ failWithRn doc = do
 -- when loading an interface to merge it into a requirement.)
 rnModIface :: HscEnv -> [(ModuleName, Module)] -> Maybe NameShape
            -> ModIface -> IO (Either ErrorMessages ModIface)
-rnModIface hsc_env insts nsubst iface = do
+rnModIface hsc_env insts nsubst iface =
     initRnIface hsc_env iface insts nsubst $ do
         mod <- rnModule (mi_module iface)
         sig_of <- case mi_sig_of iface of
@@ -148,7 +154,7 @@ rnDepModules sel deps = do
         --
         -- However, we MUST NOT do this for regular modules.
         -- First, for efficiency reasons, doing this
-        -- bloats the the dep_finsts list, because we *already* had
+        -- bloats the dep_finsts list, because we *already* had
         -- those modules in the list (it wasn't a hole module, after
         -- all). But there's a second, more important correctness
         -- consideration: we perform module renaming when running
@@ -158,13 +164,13 @@ rnDepModules sel deps = do
         -- --abi-hash is just to get a hash of the on-disk interfaces
         -- for this *specific* package.  If we go off and tug on the
         -- interface for /everything/ in dep_finsts, we're gonna have a
-        -- bad time.  (It's safe to do do this for hole modules, though,
+        -- bad time.  (It's safe to do this for hole modules, though,
         -- because the hmap for --abi-hash is always trivial, so the
         -- interface we request is local.  Though, maybe we ought
         -- not to do it in this case either...)
         --
         -- This mistake was bug #15594.
-        let mod' = renameHoleModule dflags hmap mod
+        let mod' = renameHoleModule (unitState dflags) hmap mod
         if isHoleModule mod
           then do iface <- liftIO . initIfaceCheck (text "rnDepModule") hsc_env
                                   $ loadSysInterface (text "rnDepModule") mod'
@@ -186,7 +192,7 @@ initRnIface hsc_env iface insts nsubst do_this = do
     errs_var <- newIORef emptyBag
     let dflags = hsc_dflags hsc_env
         hsubst = listToUFM insts
-        rn_mod = renameHoleModule dflags hsubst
+        rn_mod = renameHoleModule (unitState dflags) hsubst
         env = ShIfEnv {
             sh_if_module = rn_mod (mi_module iface),
             sh_if_semantic_module = rn_mod (mi_semantic_module iface),
@@ -211,7 +217,7 @@ data ShIfEnv = ShIfEnv {
         -- The semantic module that we are renaming to
         sh_if_semantic_module :: Module,
         -- Cached hole substitution, e.g.
-        -- @sh_if_hole_subst == listToUFM . unitIdInsts . moduleUnitId . sh_if_module@
+        -- @sh_if_hole_subst == listToUFM . unitIdInsts . moduleUnit . sh_if_module@
         sh_if_hole_subst :: ShHoleSubst,
         -- An optional name substitution to be applied when renaming
         -- the names in the interface.  If this is 'Nothing', then
@@ -233,7 +239,7 @@ rnModule :: Rename Module
 rnModule mod = do
     hmap <- getHoleSubst
     dflags <- getDynFlags
-    return (renameHoleModule dflags hmap mod)
+    return (renameHoleModule (unitState dflags) hmap mod)
 
 rnAvailInfo :: Rename AvailInfo
 rnAvailInfo (Avail n) = Avail <$> rnIfaceGlobal n
@@ -261,9 +267,9 @@ rnFieldLabel (FieldLabel l b sel) = do
 
 -- | The key function.  This gets called on every Name embedded
 -- inside a ModIface.  Our job is to take a Name from some
--- generalized unit ID p[A=<A>, B=<B>], and change
+-- generalized unit ID p[A=\<A>, B=\<B>], and change
 -- it to the correct name for a (partially) instantiated unit
--- ID, e.g. p[A=q[]:A, B=<B>].
+-- ID, e.g. p[A=q[]:A, B=\<B>].
 --
 -- There are two important things to do:
 --
@@ -278,12 +284,12 @@ rnFieldLabel (FieldLabel l b sel) = do
 -- interface precisely to "merge it in".
 --
 --     External case:
---         p[A=<B>]:A (and thisUnitId is something else)
+--         p[A=\<B>]:A (and thisUnitId is something else)
 --     We are loading this in order to determine B.hi!  So
 --     don't load B.hi to find the exports.
 --
 --     Local case:
---         p[A=<A>]:A (and thisUnitId is p[A=<A>])
+--         p[A=\<A>]:A (and thisUnitId is p[A=\<A>])
 --     This should not happen, because the rename is not necessary
 --     in this case, but if it does we shouldn't load A.hi!
 --
@@ -298,11 +304,12 @@ rnIfaceGlobal :: Name -> ShIfM Name
 rnIfaceGlobal n = do
     hsc_env <- getTopEnv
     let dflags = hsc_dflags hsc_env
+        home_unit = hsc_home_unit hsc_env
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
     mb_nsubst <- fmap sh_if_shape getGblEnv
     hmap <- getHoleSubst
     let m = nameModule n
-        m' = renameHoleModule dflags hmap m
+        m' = renameHoleModule (unitState dflags) hmap m
     case () of
        -- Did we encounter {A.T} while renaming p[A=<B>]:A? If so,
        -- do NOT assume B.hi is available.
@@ -341,7 +348,7 @@ rnIfaceGlobal n = do
             -- went from <A> to <B>.
             let m'' = if isHoleModule m'
                         -- Pull out the local guy!!
-                        then mkModule (thisPackage dflags) (moduleName m')
+                        then mkHomeModule home_unit (moduleName m')
                         else m'
             iface <- liftIO . initIfaceCheck (text "rnIfaceGlobal") hsc_env
                             $ loadSysInterface (text "rnIfaceGlobal") m''
@@ -363,7 +370,7 @@ rnIfaceNeverExported name = do
     hmap <- getHoleSubst
     dflags <- getDynFlags
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
-    let m = renameHoleModule dflags hmap $ nameModule name
+    let m = renameHoleModule (unitState dflags) hmap $ nameModule name
     -- Doublecheck that this DFun/coercion axiom was, indeed, locally defined.
     MASSERT2( iface_semantic_mod == m, ppr iface_semantic_mod <+> ppr m )
     setNameModule (Just m) name
@@ -557,7 +564,7 @@ rnIfaceConDecl d = do
     let rnIfConEqSpec (n,t) = (,) n <$> rnIfaceType t
     con_eq_spec <- mapM rnIfConEqSpec (ifConEqSpec d)
     con_ctxt <- mapM rnIfaceType (ifConCtxt d)
-    con_arg_tys <- mapM rnIfaceType (ifConArgTys d)
+    con_arg_tys <- mapM rnIfaceScaledType (ifConArgTys d)
     con_fields <- mapM rnFieldLabel (ifConFields d)
     let rnIfaceBang (IfUnpackCo co) = IfUnpackCo <$> rnIfaceCo co
         rnIfaceBang bang = pure bang
@@ -644,7 +651,7 @@ rnIfaceBndrs :: Rename [IfaceBndr]
 rnIfaceBndrs = mapM rnIfaceBndr
 
 rnIfaceBndr :: Rename IfaceBndr
-rnIfaceBndr (IfaceIdBndr (fs, ty)) = IfaceIdBndr <$> ((,) fs <$> rnIfaceType ty)
+rnIfaceBndr (IfaceIdBndr (w, fs, ty)) = IfaceIdBndr <$> ((,,) w fs <$> rnIfaceType ty)
 rnIfaceBndr (IfaceTvBndr tv_bndr) = IfaceTvBndr <$> rnIfaceTvBndr tv_bndr
 
 rnIfaceTvBndr :: Rename IfaceTvBndr
@@ -676,8 +683,8 @@ rnIfaceCo :: Rename IfaceCoercion
 rnIfaceCo (IfaceReflCo ty) = IfaceReflCo <$> rnIfaceType ty
 rnIfaceCo (IfaceGReflCo role ty mco)
   = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
-rnIfaceCo (IfaceFunCo role co1 co2)
-    = IfaceFunCo role <$> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceFunCo role w co1 co2)
+    = IfaceFunCo role <$> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceTyConAppCo role tc cos)
     = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
 rnIfaceCo (IfaceAppCo co1 co2)
@@ -722,8 +729,8 @@ rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
 rnIfaceType (IfaceAppTy t1 t2)
     = IfaceAppTy <$> rnIfaceType t1 <*> rnIfaceAppArgs t2
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)
-rnIfaceType (IfaceFunTy af t1 t2)
-    = IfaceFunTy af <$> rnIfaceType t1 <*> rnIfaceType t2
+rnIfaceType (IfaceFunTy af w t1 t2)
+    = IfaceFunTy af <$> rnIfaceType w <*> rnIfaceType t1 <*> rnIfaceType t2
 rnIfaceType (IfaceTupleTy s i tks)
     = IfaceTupleTy s i <$> rnIfaceAppArgs tks
 rnIfaceType (IfaceTyConApp tc tks)
@@ -735,7 +742,10 @@ rnIfaceType (IfaceCoercionTy co)
 rnIfaceType (IfaceCastTy ty co)
     = IfaceCastTy <$> rnIfaceType ty <*> rnIfaceCo co
 
-rnIfaceForAllBndr :: Rename IfaceForAllBndr
+rnIfaceScaledType :: Rename (IfaceMult, IfaceType)
+rnIfaceScaledType (m, t) = (,) <$> rnIfaceType m <*> rnIfaceType t
+
+rnIfaceForAllBndr :: Rename (VarBndr IfaceBndr flag)
 rnIfaceForAllBndr (Bndr tv vis) = Bndr <$> rnIfaceBndr tv <*> pure vis
 
 rnIfaceAppArgs :: Rename IfaceAppArgs

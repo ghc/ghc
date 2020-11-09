@@ -2,7 +2,8 @@ module Main where
 
 import GHC
 import GHC.Driver.Monad
-import Outputable
+import GHC.Driver.Ppr
+import GHC.Utils.Outputable
 import System.IO
 import System.Environment( getArgs )
 
@@ -10,7 +11,7 @@ main
  = do { [libdir] <- getArgs
       ; runGhc (Just libdir) $ do
            flags <- getSessionDynFlags
-           setSessionDynFlags (flags{ hscTarget = HscInterpreted, ghcLink = LinkInMemory})
+           setSessionDynFlags (flags{ backend = Interpreter, ghcLink = LinkInMemory})
            target <- guessTarget "T8639_api_a.hs" Nothing
            setTargets [target]
            load LoadAllTargets

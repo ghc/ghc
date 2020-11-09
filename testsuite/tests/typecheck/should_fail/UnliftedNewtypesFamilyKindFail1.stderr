@@ -1,5 +1,5 @@
 
 UnliftedNewtypesFamilyKindFail1.hs:11:31: error:
-    • Expected a type, but ‘5’ has kind ‘GHC.Types.Nat’
+    • Expected a type, but ‘5’ has kind ‘GHC.Num.Natural.Natural’
     • In the kind ‘5’
       In the data family declaration for ‘DF’

@@ -11,7 +11,7 @@ module GHC.Tc.Solver.Canonical(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
@@ -25,26 +25,27 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
 import GHC.Core.Class
 import GHC.Core.TyCon
+import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
 import GHC.Core.Coercion
 import GHC.Core
-import GHC.Types.Id( idType, mkTemplateLocals )
+import GHC.Types.Id( mkTemplateLocals )
 import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Tc.Instance.Family ( tcTopNormaliseNewTypeTF_maybe )
 import GHC.Types.Var
 import GHC.Types.Var.Env( mkInScopeSet )
 import GHC.Types.Var.Set( delVarSetList )
-import GHC.Types.Name.Occurrence ( OccName )
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Driver.Session( DynFlags )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
-import GHC.Hs.Types( HsIPName(..) )
+import GHC.Hs.Type( HsIPName(..) )
 
-import Pair
-import Util
-import Bag
-import MonadUtils
+import GHC.Data.Pair
+import GHC.Utils.Misc
+import GHC.Data.Bag
+import GHC.Utils.Monad
 import Control.Monad
 import Data.Maybe ( isJust )
 import Data.List  ( zip4 )
@@ -67,8 +68,7 @@ Canonicalization converts a simple constraint to a canonical form. It is
 unary (i.e. treats individual constraints one at a time).
 
 Constraints originating from user-written code come into being as
-CNonCanonicals (except for CHoleCans, arising from holes). We know nothing
-about these constraints. So, first:
+CNonCanonicals. We know nothing about these constraints. So, first:
 
      Classify CNonCanoncal constraints, depending on whether they
      are equalities, class predicates, or other.
@@ -96,8 +96,8 @@ canonicalize (CNonCanonical { cc_ev = ev })
                                   canEqNC    ev eq_rel ty1 ty2
       IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr pred)
                                   canIrred OtherCIS ev
-      ForAllPred tvs theta p -> do traceTcS "canEvNC:forall" (ppr pred)
-                                   canForAllNC ev tvs theta p
+      ForAllPred tvs th p   -> do traceTcS "canEvNC:forall" (ppr pred)
+                                  canForAllNC ev tvs th p
   where
     pred = ctEvPred ev
 
@@ -136,9 +136,6 @@ canonicalize (CFunEqCan { cc_ev = ev
                         , cc_fsk    = fsk })
   = {-# SCC "canEqLeafFunEq" #-}
     canCFunEqCan ev fn xis1 fsk
-
-canonicalize (CHoleCan { cc_ev = ev, cc_occ = occ, cc_hole = hole })
-  = canHole ev occ hole
 
 {-
 ************************************************************************
@@ -545,7 +542,7 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
                          mk_given_desc sel_id sc_pred
            ; mk_superclasses rec_clss given_ev tvs theta sc_pred }
       where
-        sc_pred  = funResultTy (piResultTys (idType sel_id) tys)
+        sc_pred = classMethodInstTy sel_id tys
 
       -- See Note [Nested quantified constraint superclasses]
     mk_given_desc :: Id -> PredType -> (PredType, EvTerm)
@@ -556,7 +553,7 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
         (sc_theta, sc_inner_pred) = splitFunTys sc_rho
 
         all_tvs       = tvs `chkAppend` sc_tvs
-        all_theta     = theta `chkAppend` sc_theta
+        all_theta     = theta `chkAppend` (map scaledThing sc_theta)
         swizzled_pred = mkInfSigmaTy all_tvs all_theta sc_inner_pred
 
         -- evar :: forall tvs. theta => cls tys
@@ -711,23 +708,17 @@ canIrred status ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr pred)
        ; (xi,co) <- flatten FM_FlattenAll ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
+
     do { -- Re-classify, in case flattening has improved its shape
+         -- Code is like the CNonCanonical case of canonicalize, except
+         -- that the IrredPred branch stops work
        ; case classifyPredType (ctEvPred new_ev) of
            ClassPred cls tys     -> canClassNC new_ev cls tys
            EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
-           _                     -> continueWith $
+           ForAllPred tvs th p   -> do traceTcS "canEvNC:forall" (ppr pred)
+                                       canForAllNC ev tvs th p
+           IrredPred {}          -> continueWith $
                                     mkIrredCt status new_ev } }
-
-canHole :: CtEvidence -> OccName -> HoleSort -> TcS (StopOrContinue Ct)
-canHole ev occ hole_sort
-  = do { let pred = ctEvPred ev
-       ; (xi,co) <- flatten FM_SubstOnly ev pred -- co :: xi ~ pred
-       ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
-    do { updInertIrreds (`snocCts` (CHoleCan { cc_ev = new_ev
-                                             , cc_occ = occ
-                                             , cc_hole = hole_sort }))
-       ; stopWith new_ev "Emit insoluble hole" } }
-
 
 {- *********************************************************************
 *                                                                      *
@@ -920,22 +911,23 @@ It is conceivable to do a better job at tracking whether or not a type
 is flattened, but this is left as future work. (Mar '15)
 
 
-Note [FunTy and decomposing tycon applications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When can_eq_nc' attempts to decompose a tycon application we haven't yet zonked.
-This means that we may very well have a FunTy containing a type of some unknown
-kind. For instance, we may have,
+Note [Decomposing FunTy]
+~~~~~~~~~~~~~~~~~~~~~~~~
+can_eq_nc' may attempt to decompose a FunTy that is un-zonked.  This
+means that we may very well have a FunTy containing a type of some
+unknown kind. For instance, we may have,
 
     FunTy (a :: k) Int
 
-Where k is a unification variable. tcRepSplitTyConApp_maybe panics in the event
-that it sees such a type as it cannot determine the RuntimeReps which the (->)
-is applied to. Consequently, it is vital that we instead use
-tcRepSplitTyConApp_maybe', which simply returns Nothing in such a case.
-
-When this happens can_eq_nc' will fail to decompose, zonk, and try again.
+Where k is a unification variable. So the calls to getRuntimeRep_maybe may
+fail (returning Nothing).  In that case we'll fall through, zonk, and try again.
 Zonking should fill the variable k, meaning that decomposition will succeed the
 second time around.
+
+Also note that we require the AnonArgFlag to match.  This will stop
+us decomposing
+   (Int -> Bool)  ~  (Show a => blah)
+It's as if we treat (->) and (=>) as different type constructors.
 -}
 
 canEqNC :: CtEvidence -> EqRel -> Type -> Type -> TcS (StopOrContinue Ct)
@@ -1019,18 +1011,33 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
   = do { setEvBindIfWanted ev (evCoercion $ mkReflCo (eqRelRole eq_rel) ty1)
        ; stopWith ev "Equal LitTy" }
 
--- Try to decompose type constructor applications
--- Including FunTy (s -> t)
-can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
-    --- See Note [FunTy and decomposing type constructor applications].
-  | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
-  , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
-  , not (isTypeFamilyTyCon tc1)
+-- Decompose FunTy: (s -> t) and (c => t)
+-- NB: don't decompose (Int -> blah) ~ (Show a => blah)
+can_eq_nc' _flat _rdr_env _envs ev eq_rel
+           (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _
+           (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _
+  | af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
+  , Just ty1a_rep <- getRuntimeRep_maybe ty1a  -- getRutimeRep_maybe:
+  , Just ty1b_rep <- getRuntimeRep_maybe ty1b  -- see Note [Decomposing FunTy]
+  , Just ty2a_rep <- getRuntimeRep_maybe ty2a
+  , Just ty2b_rep <- getRuntimeRep_maybe ty2b
+  = canDecomposableTyConAppOK ev eq_rel funTyCon
+                              [am1, ty1a_rep, ty1b_rep, ty1a, ty1b]
+                              [am2, ty2a_rep, ty2b_rep, ty2a, ty2b]
+
+-- Decompose type constructor applications
+-- NB: e have expanded type synonyms already
+can_eq_nc' _flat _rdr_env _envs ev eq_rel
+           (TyConApp tc1 tys1) _
+           (TyConApp tc2 tys2) _
+  | not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
-           s1@(ForAllTy {}) _ s2@(ForAllTy {}) _
+           s1@(ForAllTy (Bndr _ vis1) _) _
+           s2@(ForAllTy (Bndr _ vis2) _) _
+  | vis1 `sameVis` vis2 -- Note [ForAllTy and typechecker equality]
   = can_eq_nc_forall ev eq_rel s1 s2
 
 -- See Note [Canonicalising type applications] about why we require flat types
@@ -1066,6 +1073,63 @@ If we have an unsolved equality like
 that is not necessarily insoluble!  Maybe 'a' will turn out to be a newtype.
 So we want to make it a potentially-soluble Irred not an insoluble one.
 Missing this point is what caused #15431
+
+Note [ForAllTy and typechecker equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Should GHC type-check the following program (adapted from #15740)?
+
+  {-# LANGUAGE PolyKinds, ... #-}
+  data D a
+  type family F :: forall k. k -> Type
+  type instance F = D
+
+Due to the way F is declared, any instance of F must have a right-hand side
+whose kind is equal to `forall k. k -> Type`. The kind of D is
+`forall {k}. k -> Type`, which is very close, but technically uses distinct
+Core:
+
+  -----------------------------------------------------------
+  | Source Haskell    | Core                                |
+  -----------------------------------------------------------
+  | forall  k.  <...> | ForAllTy (Bndr k Specified) (<...>) |
+  | forall {k}. <...> | ForAllTy (Bndr k Inferred)  (<...>) |
+  -----------------------------------------------------------
+
+We could deem these kinds to be unequal, but that would imply rejecting
+programs like the one above. Whether a kind variable binder ends up being
+specified or inferred can be somewhat subtle, however, especially for kinds
+that aren't explicitly written out in the source code (like in D above).
+For now, we decide to not make the specified/inferred status of an invisible
+type variable binder affect GHC's notion of typechecker equality
+(see Note [Typechecker equality vs definitional equality] in
+GHC.Tc.Utils.TcType). That is, we have the following:
+
+  --------------------------------------------------
+  | Type 1            | Type 2            | Equal? |
+  --------------------|-----------------------------
+  | forall k. <...>   | forall k. <...>   | Yes    |
+  |                   | forall {k}. <...> | Yes    |
+  |                   | forall k -> <...> | No     |
+  --------------------------------------------------
+  | forall {k}. <...> | forall k. <...>   | Yes    |
+  |                   | forall {k}. <...> | Yes    |
+  |                   | forall k -> <...> | No     |
+  --------------------------------------------------
+  | forall k -> <...> | forall k. <...>   | No     |
+  |                   | forall {k}. <...> | No     |
+  |                   | forall k -> <...> | Yes    |
+  --------------------------------------------------
+
+We implement this nuance by using the GHC.Types.Var.sameVis function in
+GHC.Tc.Solver.Canonical.canEqNC and GHC.Tc.Utils.TcType.tcEqType, which
+respect typechecker equality. sameVis puts both forms of invisible type
+variable binders into the same equivalence class.
+
+Note that we do /not/ use sameVis in GHC.Core.Type.eqType, which implements
+/definitional/ equality, a slighty more coarse-grained notion of equality
+(see Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep) that does
+not consider the ArgFlag of ForAllTys at all. That is, eqType would equate all
+of forall k. <...>, forall {k}. <...>, and forall k -> <...>.
 -}
 
 ---------------------------------
@@ -1179,11 +1243,12 @@ zonk_eq_types = go
     -- RuntimeReps of the argument and result types. This can be observed in
     -- testcase tc269.
     go ty1 ty2
-      | Just (arg1, res1) <- split1
-      , Just (arg2, res2) <- split2
+      | Just (Scaled w1 arg1, res1) <- split1
+      , Just (Scaled w2 arg2, res2) <- split2
+      , eqType w1 w2
       = do { res_a <- go arg1 arg2
            ; res_b <- go res1 res2
-           ; return $ combine_rev mkVisFunTy res_b res_a
+           ; return $ combine_rev (mkVisFunTy w1) res_b res_a
            }
       | isJust split1 || isJust split2
       = bale_out ty1 ty2
@@ -1401,6 +1466,7 @@ can_eq_app ev s1 t1 s2 t2
   | CtDerived {} <- ev
   = do { unifyDeriveds loc [Nominal, Nominal] [s1, t1] [s2, t2]
        ; stopWith ev "Decomposed [D] AppTy" }
+
   | CtWanted { ctev_dest = dest } <- ev
   = do { co_s <- unifyWanted loc Nominal s1 s2
        ; let arg_loc
@@ -1467,15 +1533,13 @@ canTyConApp :: CtEvidence -> EqRel
             -> TyCon -> [TcType]
             -> TcS (StopOrContinue Ct)
 -- See Note [Decomposing TyConApps]
+-- Neither tc1 nor tc2 is a saturated funTyCon
 canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | tc1 == tc2
   , tys1 `equalLength` tys2
   = do { inerts <- getTcSInerts
        ; if can_decompose inerts
-         then do { traceTcS "canTyConApp"
-                       (ppr ev $$ ppr eq_rel $$ ppr tc1 $$ ppr tys1 $$ ppr tys2)
-                 ; canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
-                 ; stopWith ev "Decomposed TyConApp" }
+         then canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
          else canEqFailure ev eq_rel ty1 ty2 }
 
   -- See Note [Skolem abstract data] (at tyConSkolem)
@@ -1491,6 +1555,10 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | otherwise
   = canEqHardFailure ev ty1 ty2
   where
+    -- Reconstruct the types for error messages. This would do
+    -- the wrong thing (from a pretty printing point of view)
+    -- for functions, because we've lost the AnonArgFlag; but
+    -- in fact we never call canTyConApp on a saturated FunTyCon
     ty1 = mkTyConApp tc1 tys1
     ty2 = mkTyConApp tc2 tys2
 
@@ -1688,30 +1756,35 @@ Conclusion:
 
 canDecomposableTyConAppOK :: CtEvidence -> EqRel
                           -> TyCon -> [TcType] -> [TcType]
-                          -> TcS ()
+                          -> TcS (StopOrContinue Ct)
 -- Precondition: tys1 and tys2 are the same length, hence "OK"
 canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
   = ASSERT( tys1 `equalLength` tys2 )
-    case ev of
-     CtDerived {}
-        -> unifyDeriveds loc tc_roles tys1 tys2
+    do { traceTcS "canDecomposableTyConAppOK"
+                  (ppr ev $$ ppr eq_rel $$ ppr tc $$ ppr tys1 $$ ppr tys2)
+       ; case ev of
+           CtDerived {}
+             -> unifyDeriveds loc tc_roles tys1 tys2
 
-     CtWanted { ctev_dest = dest }
-                   -- new_locs and tc_roles are both infinite, so
-                   -- we are guaranteed that cos has the same length
-                   -- as tys1 and tys2
-        -> do { cos <- zipWith4M unifyWanted new_locs tc_roles tys1 tys2
-              ; setWantedEq dest (mkTyConAppCo role tc cos) }
+           CtWanted { ctev_dest = dest }
+                  -- new_locs and tc_roles are both infinite, so
+                  -- we are guaranteed that cos has the same length
+                  -- as tys1 and tys2
+             -> do { cos <- zipWith4M unifyWanted new_locs tc_roles tys1 tys2
+                   ; setWantedEq dest (mkTyConAppCo role tc cos) }
 
-     CtGiven { ctev_evar = evar }
-        -> do { let ev_co = mkCoVarCo evar
-              ; given_evs <- newGivenEvVars loc $
-                             [ ( mkPrimEqPredRole r ty1 ty2
-                               , evCoercion $ mkNthCo r i ev_co )
-                             | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
-                             , r /= Phantom
-                             , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]
-              ; emitWorkNC given_evs }
+           CtGiven { ctev_evar = evar }
+             -> do { let ev_co = mkCoVarCo evar
+                   ; given_evs <- newGivenEvVars loc $
+                                  [ ( mkPrimEqPredRole r ty1 ty2
+                                    , evCoercion $ mkNthCo r i ev_co )
+                                  | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
+                                  , r /= Phantom
+                                  , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]
+                   ; emitWorkNC given_evs }
+
+    ; stopWith ev "Decomposed TyConApp" }
+
   where
     loc        = ctEvLoc ev
     role       = eqRelRole eq_rel
@@ -1762,7 +1835,8 @@ canEqHardFailure :: CtEvidence
                  -> TcType -> TcType -> TcS (StopOrContinue Ct)
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqHardFailure ev ty1 ty2
-  = do { (s1, co1) <- flatten FM_SubstOnly ev ty1
+  = do { traceTcS "canEqHardFailure" (ppr ty1 $$ ppr ty2)
+       ; (s1, co1) <- flatten FM_SubstOnly ev ty1
        ; (s2, co2) <- flatten FM_SubstOnly ev ty2
        ; new_ev <- rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
        ; continueWith (mkIrredCt InsolubleCIS new_ev) }
@@ -2022,7 +2096,7 @@ canEqTyVarHomo ev eq_rel swapped tv1 ps_xi1 xi2 _
 
     -- this guarantees (TyEq:TV)
   | Just (tv2, co2) <- tcGetCastedTyVar_maybe xi2
-  , swapOverTyVars tv1 tv2
+  , swapOverTyVars (isGiven ev) tv1 tv2
   = do { traceTcS "canEqTyVar swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
        ; let role    = eqRelRole eq_rel
              sym_co2 = mkTcSymCo co2
@@ -2071,7 +2145,7 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 rhs
 
   | otherwise  -- For some reason (occurs check, or forall) we can't unify
                -- We must not use it for further rewriting!
-  = do { traceTcS "canEqTyVar2 can't unify" (ppr tv1 $$ ppr rhs)
+  = do { traceTcS "canEqTyVar2 can't unify" (ppr tv1 $$ ppr rhs $$ ppr mtvu)
        ; new_ev <- rewriteEqEvidence ev swapped lhs rhs rewrite_co1 rewrite_co2
        ; let status | isInsolubleOccursCheck eq_rel tv1 rhs
                     = InsolubleCIS
@@ -2096,6 +2170,10 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 rhs
        ; continueWith (mkIrredCt status new_ev) }
   where
     mtvu = metaTyVarUpdateOK dflags tv1 rhs
+           -- Despite the name of the function, tv1 may not be a
+           -- unification variable; we are really checking that this
+           -- equality is ok to be used to rewrite others, i.e.  that
+           -- it satisfies the conditions for CTyEqCan
 
     role = eqRelRole eq_rel
 
@@ -2125,7 +2203,7 @@ k2 and use this to cast. To wit, from
 
   [X] (tv :: k1) ~ (rhs :: k2)
 
-we go to
+(where [X] is [G], [W], or [D]), we go to
 
   [noDerived X] co :: k2 ~ k1
   [X]           (tv :: k1) ~ ((rhs |> co) :: k1)
@@ -2134,6 +2212,9 @@ where
 
   noDerived G = G
   noDerived _ = W
+
+For Wanted/Derived, the [X] constraint is "blocked" (not CTyEqCan, is CIrred)
+until the k1~k2 constraint solved: Wrinkle (2).
 
 Wrinkles:
 
@@ -2147,7 +2228,7 @@ Wrinkles:
        [W] (tv :: k1) ~ ((rhs |> co) :: k1)
      as canonical in the inert set. In particular, we must not unify tv.
      If we did, the Wanted becomes a Given (effectively), and then can
-     rewrite other Wanteds. But that's bad: See Note [Wanteds to not rewrite Wanteds]
+     rewrite other Wanteds. But that's bad: See Note [Wanteds do not rewrite Wanteds]
      in GHC.Tc.Types.Constraint. The problem is about poor error messages. See #11198 for
      tales of destruction.
 
@@ -2462,10 +2543,11 @@ unifyWanted loc role orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy _ s1 t1) (FunTy _ s2 t2)
+    go (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
       = do { co_s <- unifyWanted loc role s1 s2
            ; co_t <- unifyWanted loc role t1 t2
-           ; return (mkFunCo role co_s co_t) }
+           ; co_w <- unifyWanted loc Nominal w1 w2
+           ; return (mkFunCo role co_w co_s co_t) }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality
@@ -2513,9 +2595,10 @@ unify_derived loc role    orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy _ s1 t1) (FunTy _ s2 t2)
+    go (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
       = do { unify_derived loc role s1 s2
-           ; unify_derived loc role t1 t2 }
+           ; unify_derived loc role t1 t2
+           ; unify_derived loc Nominal w1 w2 }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role

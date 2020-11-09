@@ -47,8 +47,8 @@ import GHC.Compact
 -- sent out of band in advance if the data is to be sent over RDMA
 -- (which requires both sender and receiver to have pinned buffers).
 data SerializedCompact a = SerializedCompact
-  { serializedCompactBlockList :: [(Ptr a, Word)]
-  , serializedCompactRoot :: Ptr a
+  { serializedCompactBlockList :: [(Ptr (), Word)]
+  , serializedCompactRoot :: Ptr ()
   }
 
 addrIsNull :: Addr# -> Bool

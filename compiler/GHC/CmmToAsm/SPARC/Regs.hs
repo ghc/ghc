@@ -32,7 +32,7 @@ module GHC.CmmToAsm.SPARC.Regs (
 where
 
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.SPARC
 import GHC.Platform.Reg
@@ -40,7 +40,8 @@ import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Format
 
 import GHC.Types.Unique
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 {-
         The SPARC has 64 registers of interest; 32 integer registers and 32
@@ -218,7 +219,7 @@ argRegs r
         _       -> panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
 
 
--- | All all the regs that could possibly be returned by argRegs
+-- | All the regs that could possibly be returned by argRegs
 --
 allArgRegs :: [Reg]
 allArgRegs

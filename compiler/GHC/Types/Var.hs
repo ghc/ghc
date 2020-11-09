@@ -5,7 +5,8 @@
 \section{@Vars@: Variables}
 -}
 
-{-# LANGUAGE CPP, FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable #-}
+{-# LANGUAGE CPP, FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable,
+             PatternSynonyms, BangPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -13,20 +14,20 @@
 -- #name_types#
 -- GHC uses several kinds of name internally:
 --
--- * 'OccName.OccName': see "OccName#name_types"
+-- * 'GHC.Types.Name.Occurrence.OccName': see "GHC.Types.Name.Occurrence#name_types"
 --
--- * 'RdrName.RdrName': see "RdrName#name_types"
+-- * 'GHC.Types.Name.Reader.RdrName': see "GHC.Types.Name.Reader#name_types"
 --
--- * 'Name.Name': see "Name#name_types"
+-- * 'GHC.Types.Name.Name': see "GHC.Types.Name#name_types"
 --
--- * 'Id.Id': see "Id#name_types"
+-- * 'GHC.Types.Id.Id': see "GHC.Types.Id#name_types"
 --
--- * 'Var.Var' is a synonym for the 'Id.Id' type but it may additionally
+-- * 'GHC.Types.Var.Var' is a synonym for the 'GHC.Types.Id.Id' type but it may additionally
 --   potentially contain type variables, which have a 'GHC.Core.TyCo.Rep.Kind'
 --   rather than a 'GHC.Core.TyCo.Rep.Type' and only contain some extra
 --   details during typechecking.
 --
---   These 'Var.Var' names may either be global or local, see "Var#globalvslocal"
+--   These 'Var' names may either be global or local, see "GHC.Types.Var#globalvslocal"
 --
 -- #globalvslocal#
 -- Global 'Id's and 'Var's are those that are imported or correspond
@@ -45,16 +46,19 @@ module GHC.Types.Var (
 
         -- ** Taking 'Var's apart
         varName, varUnique, varType,
+        varMult, varMultMaybe,
 
         -- ** Modifying 'Var's
-        setVarName, setVarUnique, setVarType, updateVarType,
-        updateVarTypeM,
+        setVarName, setVarUnique, setVarType,
+        updateVarType, updateVarTypeM,
 
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
         idInfo, idDetails,
         lazySetIdInfo, setIdDetails, globaliseId,
-        setIdExported, setIdNotExported,
+        setIdExported, setIdNotExported, setIdMult,
+        updateIdTypeButNotMult,
+        updateIdTypeAndMult, updateIdTypeAndMultM,
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
@@ -63,15 +67,18 @@ module GHC.Types.Var (
         mustHaveLocalBinding,
 
         -- * ArgFlags
-        ArgFlag(..), isVisibleArgFlag, isInvisibleArgFlag, sameVis,
-        AnonArgFlag(..), ForallVisFlag(..), argToForallVisFlag,
+        ArgFlag(Invisible,Required,Specified,Inferred),
+        isVisibleArgFlag, isInvisibleArgFlag, sameVis,
+        AnonArgFlag(..), Specificity(..),
 
         -- * TyVar's
-        VarBndr(..), TyCoVarBinder, TyVarBinder,
+        VarBndr(..), TyCoVarBinder, TyVarBinder, InvisTVBinder, ReqTVBinder,
         binderVar, binderVars, binderArgFlag, binderType,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinder, mkTyVarBinders,
         isTyVarBinder,
+        tyVarSpecToBinder, tyVarSpecToBinders, tyVarReqToBinder, tyVarReqToBinders,
+        mapVarBndr, mapVarBndrs, lookupVarBndr,
 
         -- ** Constructing TyVar's
         mkTyVar, mkTcTyVar,
@@ -89,20 +96,21 @@ module GHC.Types.Var (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind )
+import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
 import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                            vanillaIdInfo, pprIdDetails )
-
-import GHC.Types.Name hiding (varName)
+import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
+import {-# SOURCE #-}   GHC.Types.Name
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , mkUniqueGrimily, nonDetCmpUnique )
-import Util
-import Binary
-import Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Binary
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.Data
 
@@ -113,7 +121,7 @@ import Data.Data
 *                                                                      *
 ************************************************************************
 -- These synonyms are here and not in Id because otherwise we need a very
--- large number of SOURCE imports of Id.hs :-(
+-- large number of SOURCE imports of "GHC.Types.Id" :-(
 -}
 
 -- | Identifier
@@ -246,6 +254,7 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
+        varMult    :: Mult,             -- See Note [Multiplicity of let binders]
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
@@ -296,25 +305,46 @@ A LocalId is
   * always treated as a candidate by the free-variable finder
 
 After CoreTidy, top-level LocalIds are turned into GlobalIds
+
+Note [Multiplicity of let binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Core, let-binders' multiplicity is always completely determined by syntax:
+a recursive let will always have multiplicity Many (it's a prerequisite for
+being recursive), and non-recursive let doesn't have a conventional multiplicity,
+instead they act, for the purpose of multiplicity, as an alias for their
+right-hand side.
+
+Therefore, the `varMult` field of identifier is only used by binders in lambda
+and case expressions. In a let expression the `varMult` field holds an
+arbitrary value which will (and must!) be ignored.
 -}
 
 instance Outputable Var where
   ppr var = sdocOption sdocSuppressVarKinds $ \supp_var_kinds ->
-            getPprStyle $ \ppr_style ->
-            if |  debugStyle ppr_style && (not supp_var_kinds)
-                 -> parens (ppr (varName var) <+> ppr_debug var ppr_style <+>
+            getPprDebug $ \debug ->
+            getPprStyle $ \sty ->
+            let
+              ppr_var = case var of
+                  (TyVar {})
+                     | debug
+                     -> brackets (text "tv")
+
+                  (TcTyVar {tc_tv_details = d})
+                     | dumpStyle sty || debug
+                     -> brackets (pprTcTyVarDetails d)
+
+                  (Id { idScope = s, id_details = d })
+                     | debug
+                     -> brackets (ppr_id_scope s <> pprIdDetails d)
+
+                  _  -> empty
+            in if
+               |  debug && (not supp_var_kinds)
+                 -> parens (ppr (varName var) <+> ppr (varMultMaybe var)
+                                              <+> ppr_var <+>
                           dcolon <+> pprKind (tyVarKind var))
                |  otherwise
-                 -> ppr (varName var) <> ppr_debug var ppr_style
-
-ppr_debug :: Var -> PprStyle -> SDoc
-ppr_debug (TyVar {}) sty
-  | debugStyle sty = brackets (text "tv")
-ppr_debug (TcTyVar {tc_tv_details = d}) sty
-  | dumpStyle sty || debugStyle sty = brackets (pprTcTyVarDetails d)
-ppr_debug (Id { idScope = s, id_details = d }) sty
-  | debugStyle sty = brackets (ppr_id_scope s <> pprIdDetails d)
-ppr_debug _ _ = empty
+                 -> ppr (varName var) <> ppr_var
 
 ppr_id_scope :: IdScope -> SDoc
 ppr_id_scope GlobalId              = text "gid"
@@ -356,6 +386,10 @@ instance HasOccName Var where
 varUnique :: Var -> Unique
 varUnique var = mkUniqueGrimily (realUnique var)
 
+varMultMaybe :: Id -> Maybe Mult
+varMultMaybe (Id { varMult = mult }) = Just mult
+varMultMaybe _ = Nothing
+
 setVarUnique :: Var -> Unique -> Var
 setVarUnique var uniq
   = var { realUnique = getKey uniq,
@@ -366,15 +400,39 @@ setVarName var new_name
   = var { realUnique = getKey (getUnique new_name),
           varName = new_name }
 
-setVarType :: Id -> Type -> Id
+setVarType :: Var -> Type -> Var
 setVarType id ty = id { varType = ty }
 
-updateVarType :: (Type -> Type) -> Id -> Id
-updateVarType f id = id { varType = f (varType id) }
+-- | Update a 'Var's type. Does not update the /multiplicity/
+-- stored in an 'Id', if any. Because of the possibility for
+-- abuse, ASSERTs that there is no multiplicity to update.
+updateVarType :: (Type -> Type) -> Var -> Var
+updateVarType upd var
+  | debugIsOn
+  = case var of
+      Id { id_details = details } -> ASSERT( isCoVarDetails details )
+                                     result
+      _ -> result
+  | otherwise
+  = result
+  where
+    result = var { varType = upd (varType var) }
 
-updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
-updateVarTypeM f id = do { ty' <- f (varType id)
-                         ; return (id { varType = ty' }) }
+-- | Update a 'Var's type monadically. Does not update the /multiplicity/
+-- stored in an 'Id', if any. Because of the possibility for
+-- abuse, ASSERTs that there is no multiplicity to update.
+updateVarTypeM :: Monad m => (Type -> m Type) -> Var -> m Var
+updateVarTypeM upd var
+  | debugIsOn
+  = case var of
+      Id { id_details = details } -> ASSERT( isCoVarDetails details )
+                                     result
+      _ -> result
+  | otherwise
+  = result
+  where
+    result = do { ty' <- upd (varType var)
+                ; return (var { varType = ty' }) }
 
 {- *********************************************************************
 *                                                                      *
@@ -387,10 +445,26 @@ updateVarTypeM f id = do { ty' <- f (varType id)
 -- Is something required to appear in source Haskell ('Required'),
 -- permitted by request ('Specified') (visible type application), or
 -- prohibited entirely from appearing in source Haskell ('Inferred')?
--- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep
-data ArgFlag = Inferred | Specified | Required
+-- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
+data ArgFlag = Invisible Specificity
+             | Required
   deriving (Eq, Ord, Data)
   -- (<) on ArgFlag means "is less visible than"
+
+-- | Whether an 'Invisible' argument may appear in source Haskell.
+data Specificity = InferredSpec
+                   -- ^ the argument may not appear in source Haskell, it is
+                   -- only inferred.
+                 | SpecifiedSpec
+                   -- ^ the argument may appear in source Haskell, but isn't
+                   -- required.
+  deriving (Eq, Ord, Data)
+
+pattern Inferred, Specified :: ArgFlag
+pattern Inferred  = Invisible InferredSpec
+pattern Specified = Invisible SpecifiedSpec
+
+{-# COMPLETE Required, Specified, Inferred #-}
 
 -- | Does this 'ArgFlag' classify an argument that is written in Haskell?
 isVisibleArgFlag :: ArgFlag -> Bool
@@ -405,15 +479,24 @@ isInvisibleArgFlag = not . isVisibleArgFlag
 -- arguments are visible, others are not. So this function
 -- equates 'Specified' and 'Inferred'. Used for printing.
 sameVis :: ArgFlag -> ArgFlag -> Bool
-sameVis Required Required = True
-sameVis Required _        = False
-sameVis _        Required = False
-sameVis _        _        = True
+sameVis Required      Required      = True
+sameVis (Invisible _) (Invisible _) = True
+sameVis _             _             = False
 
 instance Outputable ArgFlag where
   ppr Required  = text "[req]"
   ppr Specified = text "[spec]"
   ppr Inferred  = text "[infrd]"
+
+instance Binary Specificity where
+  put_ bh SpecifiedSpec = putByte bh 0
+  put_ bh InferredSpec  = putByte bh 1
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return SpecifiedSpec
+      _ -> return InferredSpec
 
 instance Binary ArgFlag where
   put_ bh Required  = putByte bh 0
@@ -428,11 +511,10 @@ instance Binary ArgFlag where
       _ -> return Inferred
 
 -- | The non-dependent version of 'ArgFlag'.
-
--- Appears here partly so that it's together with its friend ArgFlag,
--- but also because it is used in IfaceType, rather early in the
--- compilation chain
--- See Note [AnonArgFlag vs. ForallVisFlag]
+-- See Note [AnonArgFlag]
+-- Appears here partly so that it's together with its friends ArgFlag
+-- and ForallVisFlag, but also because it is used in IfaceType, rather
+-- early in the compilation chain
 data AnonArgFlag
   = VisArg    -- ^ Used for @(->)@: an ordinary non-dependent arrow.
               --   The argument is visible in source code.
@@ -454,45 +536,59 @@ instance Binary AnonArgFlag where
       0 -> return VisArg
       _ -> return InvisArg
 
--- | Is a @forall@ invisible (e.g., @forall a b. {...}@, with a dot) or visible
--- (e.g., @forall a b -> {...}@, with an arrow)?
+{- Note [AnonArgFlag]
+~~~~~~~~~~~~~~~~~~~~~
+AnonArgFlag is used principally in the FunTy constructor of Type.
+  FunTy VisArg   t1 t2   means   t1 -> t2
+  FunTy InvisArg t1 t2   means   t1 => t2
 
--- See Note [AnonArgFlag vs. ForallVisFlag]
-data ForallVisFlag
-  = ForallVis   -- ^ A visible @forall@ (with an arrow)
-  | ForallInvis -- ^ An invisible @forall@ (with a dot)
-  deriving (Eq, Ord, Data)
+However, the AnonArgFlag in a FunTy is just redundant, cached
+information.  In (FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
+  * if (isPredTy t1 = True)  then af = InvisArg
+  * if (isPredTy t1 = False) then af = VisArg
+where isPredTy is defined in GHC.Core.Type, and sees if t1's
+kind is Constraint.  See GHC.Core.TyCo.Rep
+Note [Types for coercions, predicates, and evidence]
 
-instance Outputable ForallVisFlag where
-  ppr f = text $ case f of
-                   ForallVis   -> "ForallVis"
-                   ForallInvis -> "ForallInvis"
+GHC.Core.Utils.mkFunctionType :: Mult -> Type -> Type -> Type
+uses isPredTy to decide the AnonArgFlag for the FunTy.
 
--- | Convert an 'ArgFlag' to its corresponding 'ForallVisFlag'.
-argToForallVisFlag :: ArgFlag -> ForallVisFlag
-argToForallVisFlag Required  = ForallVis
-argToForallVisFlag Specified = ForallInvis
-argToForallVisFlag Inferred  = ForallInvis
+The term (Lam b e), and coercion (FunCo co1 co2) don't carry
+AnonArgFlags; instead they use mkFunctionType when we want to
+get their types; see mkLamType and coercionLKind/RKind resp.
+This is just an engineering choice; we could cache here too
+if we wanted.
 
-{-
-Note [AnonArgFlag vs. ForallVisFlag]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The AnonArgFlag and ForallVisFlag data types are quite similar at a first
-glance:
+Why bother with all this? After all, we are in Core, where (=>) and
+(->) behave the same.  We maintain this distinction throughout Core so
+that we can cheaply and conveniently determine
+* How to print a type
+* How to split up a type: tcSplitSigmaTy
+* How to specialise it (over type classes; GHC.Core.Opt.Specialise)
 
-  data AnonArgFlag   = VisArg    | InvisArg
-  data ForallVisFlag = ForallVis | ForallInvis
+For the specialisation point, consider
+(\ (d :: Ord a). blah).  We want to give it type
+           (Ord a => blah_ty)
+with a fat arrow; that is, using mkInvisFunTy, not mkVisFunTy.
+Why?  Because the /specialiser/ treats dictionary arguments specially.
+Suppose we do w/w on 'foo', thus (#11272, #6056)
+   foo :: Ord a => Int -> blah
+   foo a d x = case x of I# x' -> $wfoo @a d x'
 
-Both data types keep track of visibility of some sort. AnonArgFlag tracks
-whether a FunTy has a visible argument (->) or an invisible predicate argument
-(=>). ForallVisFlag tracks whether a `forall` quantifier is visible
-(forall a -> {...}) or invisible (forall a. {...}).
+   $wfoo :: Ord a => Int# -> blah
 
-Given their similarities, it's tempting to want to combine these two data types
-into one, but they actually represent distinct concepts. AnonArgFlag reflects a
-property of *Core* types, whereas ForallVisFlag reflects a property of the GHC
-AST. In other words, AnonArgFlag is all about internals, whereas ForallVisFlag
-is all about surface syntax. Therefore, they are kept as separate data types.
+Now, at a call we see (foo @Int dOrdInt).  The specialiser will
+specialise this to $sfoo, where
+   $sfoo :: Int -> blah
+   $sfoo x = case x of I# x' -> $wfoo @Int dOrdInt x'
+
+Now we /must/ also specialise $wfoo!  But it wasn't user-written,
+and has a type built with mkLamTypes.
+
+Conclusion: the easiest thing is to make mkLamType build
+            (c => ty)
+when the argument is a predicate type.  See GHC.Core.TyCo.Rep
+Note [Types for coercions, predicates, and evidence]
 -}
 
 {- *********************************************************************
@@ -501,28 +597,65 @@ is all about surface syntax. Therefore, they are kept as separate data types.
 *                                                                      *
 ********************************************************************* -}
 
--- Variable Binder
---
--- VarBndr is polymorphic in both var and visibility fields.
--- Currently there are six different uses of 'VarBndr':
---   * Var.TyVarBinder   = VarBndr TyVar ArgFlag
---   * Var.TyCoVarBinder = VarBndr TyCoVar ArgFlag
---   * TyCon.TyConBinder     = VarBndr TyVar TyConBndrVis
---   * TyCon.TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
---   * IfaceType.IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
---   * IfaceType.IfaceTyConBinder = VarBndr IfaceBndr TyConBndrVis
+{- Note [The VarBndr type and its uses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+VarBndr is polymorphic in both var and visibility fields.
+Currently there are nine different uses of 'VarBndr':
+
+* Var.TyCoVarBinder = VarBndr TyCoVar ArgFlag
+  Binder of a forall-type; see ForAllTy in GHC.Core.TyCo.Rep
+
+* Var.TyVarBinder = VarBndr TyVar ArgFlag
+  Subset of TyCoVarBinder when we are sure the binder is a TyVar
+
+* Var.InvisTVBinder = VarBndr TyVar Specificity
+  Specialised form of TyVarBinder, when ArgFlag = Invisible s
+  See GHC.Core.Type.splitForAllTysInvis
+
+* Var.ReqTVBinder = VarBndr TyVar ()
+  Specialised form of TyVarBinder, when ArgFlag = Required
+  See GHC.Core.Type.splitForAllTysReq
+  This one is barely used
+
+* TyCon.TyConBinder = VarBndr TyVar TyConBndrVis
+  Binders of a TyCon; see TyCon in GHC.Core.TyCon
+
+* TyCon.TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
+  Binders of a PromotedDataCon
+  See Note [Promoted GADT data construtors] in GHC.Core.TyCon
+
+* IfaceType.IfaceForAllBndr     = VarBndr IfaceBndr ArgFlag
+* IfaceType.IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
+* IfaceType.IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
+-}
+
 data VarBndr var argf = Bndr var argf
+  -- See Note [The VarBndr type and its uses]
   deriving( Data )
 
 -- | Variable Binder
 --
 -- A 'TyCoVarBinder' is the binder of a ForAllTy
 -- It's convenient to define this synonym here rather its natural
--- home in GHC.Core.TyCo.Rep, because it's used in GHC.Core.DataCon.hs-boot
+-- home in "GHC.Core.TyCo.Rep", because it's used in GHC.Core.DataCon.hs-boot
 --
 -- A 'TyVarBinder' is a binder with only TyVar
-type TyCoVarBinder = VarBndr TyCoVar ArgFlag
-type TyVarBinder   = VarBndr TyVar ArgFlag
+type TyCoVarBinder     = VarBndr TyCoVar ArgFlag
+type TyVarBinder       = VarBndr TyVar   ArgFlag
+type InvisTVBinder     = VarBndr TyVar   Specificity
+type ReqTVBinder       = VarBndr TyVar   ()
+
+tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ArgFlag]
+tyVarSpecToBinders = map tyVarSpecToBinder
+
+tyVarSpecToBinder :: VarBndr a Specificity -> VarBndr a ArgFlag
+tyVarSpecToBinder (Bndr tv vis) = Bndr tv (Invisible vis)
+
+tyVarReqToBinders :: [VarBndr a ()] -> [VarBndr a ArgFlag]
+tyVarReqToBinders = map tyVarReqToBinder
+
+tyVarReqToBinder :: VarBndr a () -> VarBndr a ArgFlag
+tyVarReqToBinder (Bndr tv _) = Bndr tv Required
 
 binderVar :: VarBndr tv argf -> tv
 binderVar (Bndr v _) = v
@@ -537,32 +670,46 @@ binderType :: VarBndr TyCoVar argf -> Type
 binderType (Bndr tv _) = varType tv
 
 -- | Make a named binder
-mkTyCoVarBinder :: ArgFlag -> TyCoVar -> TyCoVarBinder
+mkTyCoVarBinder :: vis -> TyCoVar -> VarBndr TyCoVar vis
 mkTyCoVarBinder vis var = Bndr var vis
 
 -- | Make a named binder
 -- 'var' should be a type variable
-mkTyVarBinder :: ArgFlag -> TyVar -> TyVarBinder
+mkTyVarBinder :: vis -> TyVar -> VarBndr TyVar vis
 mkTyVarBinder vis var
   = ASSERT( isTyVar var )
     Bndr var vis
 
 -- | Make many named binders
-mkTyCoVarBinders :: ArgFlag -> [TyCoVar] -> [TyCoVarBinder]
+mkTyCoVarBinders :: vis -> [TyCoVar] -> [VarBndr TyCoVar vis]
 mkTyCoVarBinders vis = map (mkTyCoVarBinder vis)
 
 -- | Make many named binders
 -- Input vars should be type variables
-mkTyVarBinders :: ArgFlag -> [TyVar] -> [TyVarBinder]
+mkTyVarBinders :: vis -> [TyVar] -> [VarBndr TyVar vis]
 mkTyVarBinders vis = map (mkTyVarBinder vis)
 
 isTyVarBinder :: TyCoVarBinder -> Bool
 isTyVarBinder (Bndr v _) = isTyVar v
 
+mapVarBndr :: (var -> var') -> (VarBndr var flag) -> (VarBndr var' flag)
+mapVarBndr f (Bndr v fl) = Bndr (f v) fl
+
+mapVarBndrs :: (var -> var') -> [VarBndr var flag] -> [VarBndr var' flag]
+mapVarBndrs f = map (mapVarBndr f)
+
+lookupVarBndr :: Eq var => var -> [VarBndr var flag] -> Maybe flag
+lookupVarBndr var bndrs = lookup var zipped_bndrs
+  where
+    zipped_bndrs = map (\(Bndr v f) -> (v,f)) bndrs
+
 instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
   ppr (Bndr v Required)  = ppr v
   ppr (Bndr v Specified) = char '@' <> ppr v
   ppr (Bndr v Inferred)  = braces (ppr v)
+
+instance Outputable tv => Outputable (VarBndr tv Specificity) where
+  ppr = ppr . tyVarSpecToBinder
 
 instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
   put_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }
@@ -644,28 +791,32 @@ idDetails (Id { id_details = details }) = details
 idDetails other                         = pprPanic "idDetails" (ppr other)
 
 -- The next three have a 'Var' suffix even though they always build
--- Ids, because Id.hs uses 'mkGlobalId' etc with different types
+-- Ids, because "GHC.Types.Id" uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  = mk_id name ty GlobalId details info
+  = mk_id name manyDataConTy ty GlobalId details info
+  -- There is no support for linear global variables yet. They would require
+  -- being checked at link-time, which can be useful, but is not a priority.
 
-mkLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
-mkLocalVar details name ty info
-  = mk_id name ty (LocalId NotExported) details  info
+mkLocalVar :: IdDetails -> Name -> Mult -> Type -> IdInfo -> Id
+mkLocalVar details name w ty info
+  = mk_id name w ty (LocalId NotExported) details  info
 
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
-mkCoVar name ty = mk_id name ty (LocalId NotExported) coVarDetails vanillaIdInfo
+mkCoVar name ty = mk_id name manyDataConTy ty (LocalId NotExported) coVarDetails vanillaIdInfo
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  = mk_id name ty (LocalId Exported) details info
+  = mk_id name manyDataConTy ty (LocalId Exported) details info
+  -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
-mk_id :: Name -> Type -> IdScope -> IdDetails -> IdInfo -> Id
-mk_id name ty scope details info
+mk_id :: Name -> Mult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
+mk_id name !w ty scope details info
   = Id { varName    = name,
          realUnique = getKey (nameUnique name),
+         varMult    = w,
          varType    = ty,
          idScope    = scope,
          id_details = details,
@@ -693,6 +844,33 @@ setIdNotExported :: Id -> Id
 -- ^ We can only do this to LocalIds
 setIdNotExported id = ASSERT( isLocalId id )
                       id { idScope = LocalId NotExported }
+
+-----------------------
+updateIdTypeButNotMult :: (Type -> Type) -> Id -> Id
+updateIdTypeButNotMult f id = id { varType = f (varType id) }
+
+
+updateIdTypeAndMult :: (Type -> Type) -> Id -> Id
+updateIdTypeAndMult f id@(Id { varType = ty
+                             , varMult = mult })
+  = id { varType = ty'
+       , varMult = mult' }
+  where
+    !ty'   = f ty
+    !mult' = f mult
+updateIdTypeAndMult _ other = pprPanic "updateIdTypeAndMult" (ppr other)
+
+updateIdTypeAndMultM :: Monad m => (Type -> m Type) -> Id -> m Id
+updateIdTypeAndMultM f id@(Id { varType = ty
+                              , varMult = mult })
+  = do { !ty' <- f ty
+       ; !mult' <- f mult
+       ; return (id { varType = ty', varMult = mult' }) }
+updateIdTypeAndMultM _ other = pprPanic "updateIdTypeAndMultM" (ppr other)
+
+setIdMult :: Id -> Mult -> Id
+setIdMult id r | isId id = id { varMult = r }
+               | otherwise = pprPanic "setIdMult" (ppr id <+> ppr r)
 
 {-
 ************************************************************************

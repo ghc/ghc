@@ -27,6 +27,7 @@
 #include "MarkWeak.h"
 #include "StablePtr.h"
 #include "StableName.h"
+#include "Hash.h"
 
 // Turn off inlining when debugging - it obfuscates things
 #if defined(DEBUG)
@@ -460,6 +461,7 @@ thread_TSO (StgTSO *tso)
         || tso->why_blocked == BlockedOnMVarRead
         || tso->why_blocked == BlockedOnBlackHole
         || tso->why_blocked == BlockedOnMsgThrowTo
+        || tso->why_blocked == BlockedOnIOCompletion
         || tso->why_blocked == NotBlocked
         ) {
         thread_(&tso->block_info.closure);

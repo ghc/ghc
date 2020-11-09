@@ -36,8 +36,6 @@ import Syntax
     defaults        { TDefaults }
     true            { TTrue }
     false           { TFalse }
-    dyadic          { TDyadic }
-    monadic         { TMonadic }
     compare         { TCompare }
     genprimop       { TGenPrimOp }
     fixity          { TFixity }
@@ -122,9 +120,7 @@ pWithOptions : with pOptions { $2 }
              | {- empty -}   { [] }
 
 pCategory :: { Category }
-pCategory : dyadic { Dyadic }
-          | monadic { Monadic }
-          | compare { Compare }
+pCategory : compare { Compare }
           | genprimop { GenPrimOp }
 
 pDesc :: { String }
@@ -167,6 +163,7 @@ paT : pTycon ppTs     { TyApp $1 $2 }
 
 pUnboxedTupleTy :: { Ty }
 pUnboxedTupleTy : '(#' pCommaTypes '#)' { TyUTup $2 }
+                | '(#' '#)' { TyUTup [] }
 
 pCommaTypes :: { [Ty] }
 pCommaTypes : pType ',' pCommaTypes { $1 : $3 }

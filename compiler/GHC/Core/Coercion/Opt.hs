@@ -2,13 +2,19 @@
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Coercion.Opt ( optCoercion, checkAxInstCo ) where
+module GHC.Core.Coercion.Opt
+   ( optCoercion
+   , checkAxInstCo
+   , OptCoercionOpts (..)
+   )
+where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.Ppr
+
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
 import GHC.Core.Coercion
@@ -18,14 +24,16 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import Outputable
 import GHC.Core.FamInstEnv ( flattenTys )
-import Pair
-import ListSetOps ( getNth )
-import Util
+import GHC.Data.Pair
+import GHC.Data.List.SetOps ( getNth )
 import GHC.Core.Unify
 import GHC.Core.InstEnv
 import Control.Monad   ( zipWithM )
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 {-
 %************************************************************************
@@ -105,12 +113,17 @@ So we substitute the coercion variable c for the coercion
 (h1 ~N (n1; h2; sym n2)) in g.
 -}
 
-optCoercion :: DynFlags -> TCvSubst -> Coercion -> NormalCo
+-- | Coercion optimisation options
+newtype OptCoercionOpts = OptCoercionOpts
+   { optCoercionEnabled :: Bool  -- ^ Enable coercion optimisation (reduce its size)
+   }
+
+optCoercion :: OptCoercionOpts -> TCvSubst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,
 --   *and* optimises it to reduce its size
-optCoercion dflags env co
-  | hasNoOptCoercion dflags = substCo env co
-  | otherwise               = optCoercion' env co
+optCoercion opts env co
+  | optCoercionEnabled opts = optCoercion' env co
+  | otherwise               = substCo env co
 
 optCoercion' :: TCvSubst -> Coercion -> NormalCo
 optCoercion' env co
@@ -251,14 +264,15 @@ opt_co4 env sym rep r (ForAllCo tv k_co co)
                             opt_co4_wrap env' sym rep r co
      -- Use the "mk" functions to check for nested Refls
 
-opt_co4 env sym rep r (FunCo _r co1 co2)
+opt_co4 env sym rep r (FunCo _r cow co1 co2)
   = ASSERT( r == _r )
     if rep
-    then mkFunCo Representational co1' co2'
-    else mkFunCo r co1' co2'
+    then mkFunCo Representational cow' co1' co2'
+    else mkFunCo r cow' co1' co2'
   where
     co1' = opt_co4_wrap env sym rep r co1
     co2' = opt_co4_wrap env sym rep r co2
+    cow' = opt_co1 env sym cow
 
 opt_co4 env sym rep r (CoVarCo cv)
   | Just co <- lookupCoVar (lcTCvSubst env) cv
@@ -318,6 +332,7 @@ opt_co4 env _sym rep r (NthCo _r n co)
   , Just (_tc, args) <- ASSERT( r == _r )
                         splitTyConApp_maybe ty
   = liftCoSubst (chooseRole rep r) env (args `getNth` n)
+
   | Just (ty, _) <- isReflCo_maybe co
   , n == 0
   , Just (tv, _) <- splitForAllTy_maybe ty
@@ -328,6 +343,11 @@ opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
   = ASSERT( r == r1 )
     opt_co4_wrap env sym rep r (cos `getNth` n)
 
+-- see the definition of GHC.Builtin.Types.Prim.funTyCon
+opt_co4 env sym rep r (NthCo r1 n (FunCo _r2 w co1 co2))
+  = ASSERT( r == r1 )
+    opt_co4_wrap env sym rep r (mkNthCoFunCo n w co1 co2)
+
 opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
       -- works for both tyvar and covar
   = ASSERT( r == _r )
@@ -335,17 +355,15 @@ opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
     opt_co4_wrap env sym rep Nominal eta
 
 opt_co4 env sym rep r (NthCo _r n co)
-  | TyConAppCo _ _ cos <- co'
-  , let nth_co = cos `getNth` n
+  | Just nth_co <- case co' of
+      TyConAppCo _ _ cos -> Just (cos `getNth` n)
+      FunCo _ w co1 co2  -> Just (mkNthCoFunCo n w co1 co2)
+      ForAllCo _ eta _   -> Just eta
+      _                  -> Nothing
   = if rep && (r == Nominal)
       -- keep propagating the SubCo
     then opt_co4_wrap (zapLiftingContext env) False True Nominal nth_co
     else nth_co
-
-  | ForAllCo _ eta _ <- co'
-  = if rep
-    then opt_co4_wrap (zapLiftingContext env) False True Nominal eta
-    else eta
 
   | otherwise
   = wrapRole rep r $ NthCo r n co'
@@ -554,7 +572,10 @@ opt_univ env sym prov role oty1 oty2
 
   where
     prov' = case prov of
+#if __GLASGOW_HASKELL__ <= 810
+-- This alt is redundant with the first match of the FunDef
       PhantomProv kco    -> PhantomProv $ opt_co4_wrap env sym False Nominal kco
+#endif
       ProofIrrelProv kco -> ProofIrrelProv $ opt_co4_wrap env sym False Nominal kco
       PluginProv _       -> prov
 
@@ -648,10 +669,10 @@ opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2 cos2
     fireTransRule "PushTyConApp" in_co1 in_co2 $
     mkTyConAppCo r1 tc1 (opt_transList is cos1 cos2)
 
-opt_trans_rule is in_co1@(FunCo r1 co1a co1b) in_co2@(FunCo r2 co2a co2b)
-  = ASSERT( r1 == r2 )   -- Just like the TyConAppCo/TyConAppCo case
+opt_trans_rule is in_co1@(FunCo r1 w1 co1a co1b) in_co2@(FunCo r2 w2 co2a co2b)
+  = ASSERT( r1 == r2)   -- Just like the TyConAppCo/TyConAppCo case
     fireTransRule "PushFun" in_co1 in_co2 $
-    mkFunCo r1 (opt_trans is co1a co2a) (opt_trans is co1b co2b)
+    mkFunCo r1 (opt_trans is w1 w2) (opt_trans is co1a co2a) (opt_trans is co1b co2b)
 
 opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
   -- Must call opt_trans_rule_app; see Note [EtaAppCo]
@@ -866,7 +887,7 @@ False) and that all is OK. But, all is not OK: we want to use the first branch
 of the axiom in this case, not the second. The problem is that the parameters
 of the first branch can unify with the supplied coercions, thus meaning that
 the first branch should be taken. See also Note [Apartness] in
-types/FamInstEnv.hs.
+"GHC.Core.FamInstEnv".
 
 Note [Why call checkAxInstCo during optimisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

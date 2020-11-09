@@ -1,5 +1,10 @@
-{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts, FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 ----------------------------------------------------------------------------
@@ -40,19 +45,18 @@ module GHC.Cmm.Ppr
   )
 where
 
-import GhcPrelude hiding (succ)
+import GHC.Prelude hiding (succ)
 
 import GHC.Platform
-import GHC.Driver.Session (targetPlatform)
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Cmm.Ppr.Decl
 import GHC.Cmm.Ppr.Expr
-import Util
+import GHC.Utils.Misc
 
 import GHC.Types.Basic
 import GHC.Cmm.Dataflow.Block
@@ -64,13 +68,12 @@ import GHC.Cmm.Dataflow.Graph
 instance Outputable CmmStackInfo where
     ppr = pprStackInfo
 
-instance Outputable CmmTopInfo where
-    ppr = pprTopInfo
+instance OutputableP Platform CmmTopInfo where
+    pdoc = pprTopInfo
 
 
-instance Outputable (CmmNode e x) where
-    ppr e = sdocWithDynFlags $ \dflags ->
-            pprNode (targetPlatform dflags) e
+instance OutputableP Platform (CmmNode e x) where
+    pdoc = pprNode
 
 instance Outputable Convention where
     ppr = pprConvention
@@ -78,69 +81,69 @@ instance Outputable Convention where
 instance Outputable ForeignConvention where
     ppr = pprForeignConvention
 
-instance Outputable ForeignTarget where
-    ppr = pprForeignTarget
+instance OutputableP Platform ForeignTarget where
+    pdoc = pprForeignTarget
 
 instance Outputable CmmReturnInfo where
     ppr = pprReturnInfo
 
-instance Outputable (Block CmmNode C C) where
-    ppr = pprBlock
-instance Outputable (Block CmmNode C O) where
-    ppr = pprBlock
-instance Outputable (Block CmmNode O C) where
-    ppr = pprBlock
-instance Outputable (Block CmmNode O O) where
-    ppr = pprBlock
+instance OutputableP Platform (Block CmmNode C C) where
+    pdoc = pprBlock
+instance OutputableP Platform (Block CmmNode C O) where
+    pdoc = pprBlock
+instance OutputableP Platform (Block CmmNode O C) where
+    pdoc = pprBlock
+instance OutputableP Platform (Block CmmNode O O) where
+    pdoc = pprBlock
 
-instance Outputable (Graph CmmNode e x) where
-    ppr = pprGraph
+instance OutputableP Platform (Graph CmmNode e x) where
+    pdoc = pprGraph
 
-instance Outputable CmmGraph where
-    ppr = pprCmmGraph
+instance OutputableP Platform CmmGraph where
+    pdoc = pprCmmGraph
 
 ----------------------------------------------------------
 -- Outputting types Cmm contains
 
 pprStackInfo :: CmmStackInfo -> SDoc
-pprStackInfo (StackInfo {arg_space=arg_space, updfr_space=updfr_space}) =
-  text "arg_space: " <> ppr arg_space <+>
-  text "updfr_space: " <> ppr updfr_space
+pprStackInfo (StackInfo {arg_space=arg_space}) =
+  text "arg_space: " <> ppr arg_space
 
-pprTopInfo :: CmmTopInfo -> SDoc
-pprTopInfo (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
-  vcat [text "info_tbls: " <> ppr info_tbl,
+pprTopInfo :: Platform -> CmmTopInfo -> SDoc
+pprTopInfo platform (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
+  vcat [text "info_tbls: " <> pdoc platform info_tbl,
         text "stack_info: " <> ppr stack_info]
 
 ----------------------------------------------------------
 -- Outputting blocks and graphs
 
 pprBlock :: IndexedCO x SDoc SDoc ~ SDoc
-         => Block CmmNode e x -> IndexedCO e SDoc SDoc
-pprBlock block
-    = foldBlockNodesB3 ( ($$) . ppr
-                       , ($$) . (nest 4) . ppr
-                       , ($$) . (nest 4) . ppr
+         => Platform -> Block CmmNode e x -> IndexedCO e SDoc SDoc
+pprBlock platform block
+    = foldBlockNodesB3 ( ($$) . pdoc platform
+                       , ($$) . (nest 4) . pdoc platform
+                       , ($$) . (nest 4) . pdoc platform
                        )
                        block
                        empty
 
-pprGraph :: Graph CmmNode e x -> SDoc
-pprGraph GNil = empty
-pprGraph (GUnit block) = ppr block
-pprGraph (GMany entry body exit)
-   = text "{"
-  $$ nest 2 (pprMaybeO entry $$ (vcat $ map ppr $ bodyToBlockList body) $$ pprMaybeO exit)
-  $$ text "}"
-  where pprMaybeO :: Outputable (Block CmmNode e x)
-                  => MaybeO ex (Block CmmNode e x) -> SDoc
-        pprMaybeO NothingO = empty
-        pprMaybeO (JustO block) = ppr block
+pprGraph :: Platform -> Graph CmmNode e x -> SDoc
+pprGraph platform = \case
+   GNil                  -> empty
+   GUnit block           -> pdoc platform block
+   GMany entry body exit ->
+         text "{"
+      $$ nest 2 (pprMaybeO entry $$ (vcat $ map (pdoc platform) $ bodyToBlockList body) $$ pprMaybeO exit)
+      $$ text "}"
+      where pprMaybeO :: OutputableP Platform (Block CmmNode e x)
+                      => MaybeO ex (Block CmmNode e x) -> SDoc
+            pprMaybeO NothingO = empty
+            pprMaybeO (JustO block) = pdoc platform block
 
-pprCmmGraph :: CmmGraph -> SDoc
-pprCmmGraph g
+pprCmmGraph :: Platform -> CmmGraph -> SDoc
+pprCmmGraph platform g
    = text "{" <> text "offset"
-  $$ nest 2 (vcat $ map ppr blocks)
+  $$ nest 2 (vcat $ map (pdoc platform) blocks)
   $$ text "}"
   where blocks = revPostorder g
     -- revPostorder has the side-effect of discarding unreachable code,
@@ -165,17 +168,17 @@ pprReturnInfo :: CmmReturnInfo -> SDoc
 pprReturnInfo CmmMayReturn = empty
 pprReturnInfo CmmNeverReturns = text "never returns"
 
-pprForeignTarget :: ForeignTarget -> SDoc
-pprForeignTarget (ForeignTarget fn c) = ppr c <+> ppr_target fn
+pprForeignTarget :: Platform -> ForeignTarget -> SDoc
+pprForeignTarget platform (ForeignTarget fn c) = ppr c <+> ppr_target fn
   where
         ppr_target :: CmmExpr -> SDoc
-        ppr_target t@(CmmLit _) = ppr t
-        ppr_target fn'          = parens (ppr fn')
+        ppr_target t@(CmmLit _) = pdoc platform t
+        ppr_target fn'          = parens (pdoc platform fn')
 
-pprForeignTarget (PrimTarget op)
+pprForeignTarget platform (PrimTarget op)
  -- HACK: We're just using a ForeignLabel to get this printed, the label
  --       might not really be foreign.
- = ppr
+ = pdoc platform
                (CmmLabel (mkForeignLabel
                          (mkFastString (show op))
                          Nothing ForeignLabelInThisPackage IsFunction))
@@ -204,13 +207,13 @@ pprNode platform node = pp_node <+> pp_debug
       -- unwind reg = expr;
       CmmUnwind regs ->
           text "unwind "
-          <> commafy (map (\(r,e) -> ppr r <+> char '=' <+> ppr e) regs) <> semi
+          <> commafy (map (\(r,e) -> ppr r <+> char '=' <+> pdoc platform e) regs) <> semi
 
       -- reg = expr;
-      CmmAssign reg expr -> ppr reg <+> equals <+> ppr expr <> semi
+      CmmAssign reg expr -> ppr reg <+> equals <+> pdoc platform expr <> semi
 
       -- rep[lv] = expr;
-      CmmStore lv expr -> rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
+      CmmStore lv expr -> rep <> brackets (pdoc platform lv) <+> equals <+> pdoc platform expr <> semi
           where
             rep = ppr ( cmmExprType platform expr )
 
@@ -220,7 +223,7 @@ pprNode platform node = pp_node <+> pp_debug
           hsep [ ppUnless (null results) $
                     parens (commafy $ map ppr results) <+> equals,
                  text "call",
-                 ppr target <> parens (commafy $ map ppr args) <> semi]
+                 pdoc platform target <> parens (commafy $ map (pdoc platform) args) <> semi]
 
       -- goto label;
       CmmBranch ident -> text "goto" <+> ppr ident <> semi
@@ -228,7 +231,7 @@ pprNode platform node = pp_node <+> pp_debug
       -- if (expr) goto t; else goto f;
       CmmCondBranch expr t f l ->
           hsep [ text "if"
-               , parens(ppr expr)
+               , parens (pdoc platform expr)
                , case l of
                    Nothing -> empty
                    Just b -> parens (text "likely:" <+> ppr b)
@@ -242,8 +245,8 @@ pprNode platform node = pp_node <+> pp_debug
           hang (hsep [ text "switch"
                      , range
                      , if isTrivialCmmExpr expr
-                       then ppr expr
-                       else parens (ppr expr)
+                       then pdoc platform expr
+                       else parens (pdoc platform expr)
                      , text "{"
                      ])
              4 (vcat (map ppCase cases) $$ def) $$ rbrace
@@ -272,8 +275,8 @@ pprNode platform node = pp_node <+> pp_debug
                  text "res: " <> ppr res <> comma <+>
                  text "upd: " <> ppr updfr_off
                , semi ]
-          where pprFun f@(CmmLit _) = ppr f
-                pprFun f = parens (ppr f)
+          where pprFun f@(CmmLit _) = pdoc platform f
+                pprFun f = parens (pdoc platform f)
 
                 returns
                   | Just r <- k = text "returns to" <+> ppr r <> comma
@@ -282,9 +285,9 @@ pprNode platform node = pp_node <+> pp_debug
       CmmForeignCall {tgt=t, res=rs, args=as, succ=s, ret_args=a, ret_off=u, intrbl=i} ->
           hcat $ if i then [text "interruptible", space] else [] ++
                [ text "foreign call", space
-               , ppr t, text "(...)", space
+               , pdoc platform t, text "(...)", space
                , text "returns to" <+> ppr s
-                    <+> text "args:" <+> parens (ppr as)
+                    <+> text "args:" <+> parens (pdoc platform as)
                     <+> text "ress:" <+> parens (ppr rs)
                , text "ret_args:" <+> ppr a
                , text "ret_off:" <+> ppr u

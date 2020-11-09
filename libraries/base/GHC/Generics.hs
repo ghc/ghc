@@ -7,7 +7,6 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE PolyKinds                  #-}
@@ -16,7 +15,6 @@
 {-# LANGUAGE Trustworthy                #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
-{-# LANGUAGE TypeSynonymInstances       #-}
 {-# LANGUAGE UndecidableInstances       #-}
 
 -----------------------------------------------------------------------------
@@ -730,7 +728,7 @@ module GHC.Generics  (
 import Data.Either ( Either (..) )
 import Data.Maybe  ( Maybe(..), fromMaybe )
 import Data.Ord    ( Down(..) )
-import GHC.Integer ( Integer, integerToInt )
+import GHC.Num.Integer ( Integer, integerToInt )
 import GHC.Prim    ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Ptr     ( Ptr )
 import GHC.Types
@@ -744,10 +742,13 @@ import GHC.Classes ( Eq(..), Ord(..) )
 import GHC.Enum    ( Bounded, Enum )
 import GHC.Read    ( Read(..) )
 import GHC.Show    ( Show(..), showString )
+import GHC.Stack.Types ( SrcLoc(..) )
+import GHC.Unicode ( GeneralCategory(..) )
+import GHC.Fingerprint.Type ( Fingerprint(..) )
 
 -- Needed for metadata
 import Data.Proxy   ( Proxy(..) )
-import GHC.TypeLits ( KnownSymbol, KnownNat, symbolVal, natVal )
+import GHC.TypeLits ( KnownSymbol, KnownNat, Nat, symbolVal, natVal )
 
 --------------------------------------------------------------------------------
 -- Representation types
@@ -1437,6 +1438,14 @@ deriving instance Generic ((,,,,,,) a b c d e f g)
 -- | @since 4.12.0.0
 deriving instance Generic (Down a)
 
+-- | @since 4.15.0.0
+deriving instance Generic SrcLoc
+
+-- | @since 4.15.0.0
+deriving instance Generic GeneralCategory
+
+-- | @since 4.15.0.0
+deriving instance Generic Fingerprint
 
 -- | @since 4.6.0.0
 deriving instance Generic1 []
@@ -1560,7 +1569,7 @@ instance (SingI a, KnownNat n) => SingI ('InfixI a n) where
 instance SingKind FixityI where
   type DemoteRep FixityI = Fixity
   fromSing SPrefix      = Prefix
-  fromSing (SInfix a n) = Infix (fromSing a) (I# (integerToInt n))
+  fromSing (SInfix a n) = Infix (fromSing a) (integerToInt n)
 
 -- Singleton Associativity
 data instance Sing (a :: Associativity) where
