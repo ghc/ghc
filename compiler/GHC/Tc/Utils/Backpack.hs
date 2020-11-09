@@ -353,7 +353,7 @@ checkUnit (VirtUnit indef) = do
 -- an @hsig@ file.)
 tcRnCheckUnit ::
     HscEnv -> Unit ->
-    IO (Messages TcRnError, Maybe ())
+    IO (Messages ErrDoc TcRnError, Maybe ())
 tcRnCheckUnit hsc_env uid =
    withTiming dflags
               (text "Check unit id" <+> ppr uid)
@@ -373,7 +373,7 @@ tcRnCheckUnit hsc_env uid =
 -- | Top-level driver for signature merging (run after typechecking
 -- an @hsig@ file).
 tcRnMergeSignatures :: HscEnv -> HsParsedModule -> TcGblEnv {- from local sig -} -> ModIface
-                    -> IO (Messages TcRnError, Maybe TcGblEnv)
+                    -> IO (Messages ErrDoc TcRnError, Maybe TcGblEnv)
 tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
   withTiming dflags
              (text "Signature merging" <+> brackets (ppr this_mod))
@@ -905,7 +905,7 @@ mergeSignatures
 -- an @hsig@ file.)
 tcRnInstantiateSignature ::
     HscEnv -> Module -> RealSrcSpan ->
-    IO (Messages TcRnError, Maybe TcGblEnv)
+    IO (Messages ErrDoc TcRnError, Maybe TcGblEnv)
 tcRnInstantiateSignature hsc_env this_mod real_loc =
    withTiming dflags
               (text "Signature instantiation"<+>brackets (ppr this_mod))

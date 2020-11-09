@@ -99,7 +99,6 @@ import GHC.Unit.Home
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Finder
 
-import GHC.Data.Bag
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
@@ -676,7 +675,8 @@ computeInterface doc_str hi_boot_file mod0 = do
                                    Nothing iface0
                     case r of
                         Right x -> return (Succeeded (x, path))
-                        Left errs -> liftIO . throwIO . mkSrcErr $ mapBag (fmap GhcErrorTcRn) errs
+                        Left errs ->
+                          liftIO . throwIO . mkSrcErr $ (GhcErrorTcRn <$> errs)
                 Failed err -> return (Failed err)
         (mod, _) ->
             findAndReadIface doc_str mod mod0 hi_boot_file

@@ -44,10 +44,11 @@ import GHC.HsToCore.Pmc.Utils ( tracePm, mkPmId )
 import GHC.Driver.Session
 import GHC.Driver.Config
 import GHC.Utils.Outputable
-import GHC.Utils.Error ( pprErrMsgBagWithLoc, renderError )
+import GHC.Utils.Error ( pprErrMsgBagWithLoc, renderDiagnostic )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
+import GHC.Types.Error (getErrorMessages)
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.SDFM
@@ -665,7 +666,7 @@ tyOracle ty_st@(TySt n inert) cts
             -- return the new inert set and increment the sequence number n
             Just mb_new_inert -> return (TySt (n+1) <$> mb_new_inert)
             Nothing           -> pprPanic "tyOracle"
-              (vcat $ pprErrMsgBagWithLoc $ mapBag (fmap renderError) errs) }
+              (vcat $ pprErrMsgBagWithLoc $ getErrorMessages $ fmap renderDiagnostic errs) }
 
 
 -- | Allocates a fresh 'EvVar' name for 'PredTy's.

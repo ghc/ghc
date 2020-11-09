@@ -117,7 +117,6 @@ import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Parser.Types
-import GHC.Parser.Error
 import GHC.Parser.Lexer
 import GHC.Parser.Errors
 import GHC.Utils.Lexeme ( isLexCon )

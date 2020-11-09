@@ -25,16 +25,17 @@ module GHC.Driver.Monad (
 
 import GHC.Prelude
 
-import GHC.Data.Bag (mapBag)
 import GHC.Utils.Monad
 import GHC.Driver.Session
 import GHC.Driver.Env
 import GHC.Driver.Errors ()
+import GHC.Driver.Errors.Types (GhcWarning)
 
 import GHC.Utils.Exception
 import GHC.Utils.Error
 
 import GHC.Types.SourceError
+import GHC.Types.Error (getErrorMessages)
 
 import Control.Monad
 import Control.Monad.Catch as MC
@@ -88,7 +89,7 @@ withTempSession f m =
 -- -----------------------------------------------------------------------------
 -- | A monad that allows logging of warnings.
 
-logWarnings :: GhcMonad m => WarningMessages -> m ()
+logWarnings :: GhcMonad m => WarningMessages GhcWarning -> m ()
 logWarnings warns = do
   dflags <- getSessionDynFlags
   liftIO $ printOrThrowWarnings dflags warns
@@ -183,8 +184,7 @@ instance ExceptionMonad m => GhcMonad (GhcT m) where
 printException :: GhcMonad m => SourceError -> m ()
 printException err = do
   dflags <- getSessionDynFlags
-  liftIO $ printBagOfErrors dflags $
-    mapBag (fmap renderError) (srcErrorMessages err)
+  liftIO $ printBagOfErrors dflags . getErrorMessages . srcErrorMessages $ err
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = forall m. GhcMonad m => Maybe SourceError -> m ()

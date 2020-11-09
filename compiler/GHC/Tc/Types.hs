@@ -110,9 +110,6 @@ import GHC.Types.Id         ( idType, idName )
 import GHC.Types.FieldLabel ( FieldLabel )
 import GHC.Types.Fixity.Env
 import GHC.Tc.Errors.Types
-import GHC.Tc.Utils.TcType
-import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Origin
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Types.Name.Reader
@@ -549,7 +546,7 @@ data TcGblEnv
                                              -- function, if this module is
                                              -- the main module.
 
-        tcg_safeInfer :: TcRef (Bool, WarningMessages),
+        tcg_safeInfer :: TcRef (Bool, WarningMessages ErrDoc),
         -- ^ Has the typechecker inferred this module as -XSafe (Safe Haskell)
         -- See Note [Safe Haskell Overlapping Instances Implementation],
         -- although this is used for more than just that failure case.
@@ -752,7 +749,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef (Messages TcRnError)     -- Place to accumulate errors
+        tcl_errs :: TcRef (Messages ErrDoc TcRnError)     -- Place to accumulate errors
     }
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv

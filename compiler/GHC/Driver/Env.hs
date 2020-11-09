@@ -56,7 +56,6 @@ import GHC.Types.TyThing
 import GHC.Builtin.Names ( gHC_PRIM )
 
 import GHC.Data.Maybe
-import GHC.Data.Bag
 
 import GHC.Unit.Module.Graph
 
@@ -70,7 +69,7 @@ import Control.Monad    ( guard, ap )
 import Data.IORef
 
 -- | The Hsc monad: Passing an environment and warning state
-newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
+newtype Hsc a = Hsc (HscEnv -> WarningMessages ErrDoc -> IO (a, WarningMessages ErrDoc))
     deriving (Functor)
 
 instance Applicative Hsc where
@@ -90,7 +89,7 @@ instance HasDynFlags Hsc where
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
-    (a, w) <- hsc hsc_env emptyBag
+    (a, w) <- hsc hsc_env mempty
     printOrThrowWarnings (hsc_dflags hsc_env) w
     return a
 

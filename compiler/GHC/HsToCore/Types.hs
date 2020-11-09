@@ -44,7 +44,7 @@ data DsGblEnv
   { ds_mod          :: Module             -- For SCC profiling
   , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
   , ds_unqual  :: PrintUnqualified
-  , ds_msgs    :: IORef (Messages DsError) -- Warning messages
+  , ds_msgs    :: IORef (Messages ErrDoc DsError) -- Warning messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                           -- possibly-imported things
   , ds_complete_matches :: CompleteMatches

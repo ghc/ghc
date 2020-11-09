@@ -65,8 +65,8 @@ tcRnErrorDoc (TcRnOutOfScopeHole occ ty suggs) =
 
         suggestions = pprOutOfScopeSuggestions occ suggs
 
-instance RenderableError TcRnError where
-  renderError = tcRnErrorDoc
+instance RenderableDiagnostic TcRnError where
+  renderDiagnostic = tcRnErrorDoc
 
 type HowInScope = Either SrcSpan ImpDeclSpec
      -- Left loc    =>  locally bound at loc

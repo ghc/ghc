@@ -1,9 +1,9 @@
 
 module GHC.Driver.Errors.Types where
 
-import GHC.Types.Error (ErrDoc, RenderableError)
+import GHC.Types.Error (ErrDoc, RenderableDiagnostic)
 
 data GhcError
 ghcErrorRawErrDoc :: ErrDoc -> GhcError
 
-instance RenderableError GhcError
+instance RenderableDiagnostic GhcError

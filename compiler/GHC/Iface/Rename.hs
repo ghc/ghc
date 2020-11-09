@@ -41,6 +41,7 @@ import GHC.Types.Var
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Shape
+import GHC.Types.Error (ErrorMessages(..))
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -59,7 +60,7 @@ tcRnMsgMaybe do_this = do
     r <- liftIO $ do_this
     case r of
         Left errs -> do
-            addMessages (emptyBag, errs)
+            addMessages (mempty, errs)
             failM
         Right x -> return x
 
@@ -76,9 +77,9 @@ tcRnModExports x y = do
 failWithRn :: SDoc -> ShIfM a
 failWithRn doc = do
     errs_var <- fmap sh_if_errs getGblEnv
-    errs <- readTcRef errs_var
+    (ErrorMessages errs) <- readTcRef errs_var
     -- TODO: maybe associate this with a source location?
-    writeTcRef errs_var (errs `snocBag` (fmap TcRnErrorDoc $ mkPlainErrMsg noSrcSpan doc))
+    writeTcRef errs_var (ErrorMessages $ errs `snocBag` (fmap TcRnErrorDoc $ mkPlainErrMsg noSrcSpan doc))
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to
@@ -189,7 +190,7 @@ rnDepModules sel deps = do
 initRnIface :: HscEnv -> ModIface -> [(ModuleName, Module)] -> Maybe NameShape
             -> ShIfM a -> IO (Either (ErrorMessages TcRnError) a)
 initRnIface hsc_env iface insts nsubst do_this = do
-    errs_var <- newIORef emptyBag
+    errs_var <- newIORef mempty
     let dflags = hsc_dflags hsc_env
         hsubst = listToUFM insts
         rn_mod = renameHoleModule (unitState dflags) hsubst
@@ -204,9 +205,9 @@ initRnIface hsc_env iface insts nsubst do_this = do
     res <- initTcRnIf 'c' hsc_env env () $ tryM do_this
     msgs <- readIORef errs_var
     case res of
-        Left _                          -> return (Left msgs)
-        Right r | not (isEmptyBag msgs) -> return (Left msgs)
-                | otherwise             -> return (Right r)
+        Left _                        -> return (Left msgs)
+        Right r | not (noErrors msgs) -> return (Left msgs)
+                | otherwise           -> return (Right r)
 
 -- | Environment for 'ShIfM' monads.
 data ShIfEnv = ShIfEnv {

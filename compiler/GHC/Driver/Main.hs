@@ -93,7 +93,7 @@ import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Env
-import GHC.Driver.Errors (GhcError(..), DriverError(..), ghcErrorRawErrDoc)
+import GHC.Driver.Errors ( GhcWarning(..), GhcError(..), DriverError(..), ghcErrorRawErrDoc )
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config
 import GHC.Driver.Hooks
@@ -258,13 +258,13 @@ newHscEnv dflags = do
 
 -- -----------------------------------------------------------------------------
 
-getWarnings :: Hsc WarningMessages
+getWarnings :: Hsc (WarningMessages GhcWarning)
 getWarnings = Hsc $ \_ w -> return (w, w)
 
 clearWarnings :: Hsc ()
 clearWarnings = Hsc $ \_ _ -> return ((), emptyBag)
 
-logWarnings :: WarningMessages -> Hsc ()
+logWarnings :: WarningMessages GhcWarning -> Hsc ()
 logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 
 getHscEnv :: Hsc HscEnv
@@ -291,7 +291,7 @@ logWarningsReportErrors :: (Bag Parser.Warning, Bag GhcError) -> Hsc ()
 logWarningsReportErrors (warnings,errs) = do
     let warns = fmap pprWarning warnings
     logWarnings warns
-    when (not $ isEmptyBag errs) $ throwErrors (error "adinapoli") -- errs
+    when (not $ isEmptyBag errs) $ throwErrors _
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
@@ -332,7 +332,7 @@ handleWarningsThrowErrors (warnings, errs) = do
 --  2. If there are no error messages, but the second result indicates failure
 --     there should be warnings in the first result. That is, if the action
 --     failed, it must have been due to the warnings (i.e., @-Werror@).
-ioMsgMaybe :: IO (Messages GhcError, Maybe a) -> Hsc a
+ioMsgMaybe :: IO (Messages GhcWarning GhcError, Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
     ((warns,errs), mb_r) <- liftIO ioA
     logWarnings warns
@@ -342,7 +342,7 @@ ioMsgMaybe ioA = do
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
-ioMsgMaybe' :: IO (Messages e, Maybe a) -> Hsc (Maybe a)
+ioMsgMaybe' :: IO (Messages w e, Maybe a) -> Hsc (Maybe a)
 ioMsgMaybe' ioA = do
     ((warns,_errs), mb_r) <- liftIO $ ioA
     logWarnings warns
@@ -350,8 +350,8 @@ ioMsgMaybe' ioA = do
 
 wrappingErrors
   :: (e -> GhcError)
-  -> IO (Messages e, Maybe a)
-  -> IO (Messages GhcError, Maybe a)
+  -> IO (Messages GhcWarning e, Maybe a)
+  -> IO (Messages GhcWarning GhcError, Maybe a)
 wrappingErrors f = fmap (\(e, ma) -> (mapMessages f e, ma))
 
 -- -----------------------------------------------------------------------------

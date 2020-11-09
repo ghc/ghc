@@ -1,11 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
 
-module GHC.Parser.Errors.Ppr
-   ( pprWarning
-   , pprError
-   )
-where
+module GHC.Parser.Errors.Ppr () where
 
 import GHC.Prelude
 import GHC.Driver.Flags
@@ -24,14 +20,17 @@ import GHC.Hs.Type (pprLHsContext)
 import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
 
-instance RenderableError Parser.Error where
-  renderError = errMsgDoc . pprError
+instance RenderableDiagnostic Parser.Error where
+  renderDiagnostic = errMsgDiagnostic . pprError
+
+instance RenderableDiagnostic Parser.Warning where
+  renderDiagnostic = errMsgDiagnostic . pprWarning
 
 mkParserErr :: SrcSpan -> SDoc -> ErrMsg ErrDoc
 mkParserErr span doc = ErrMsg
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDoc         = ErrDoc [doc] [] []
+   , errMsgDiagnostic  = ErrDoc [doc] [] []
    , errMsgSeverity    = SevError
    , errMsgReason      = NoReason
    }
@@ -40,7 +39,7 @@ mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> ErrMsg ErrDoc
 mkParserWarn flag span doc = ErrMsg
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDoc         = ErrDoc [doc] [] []
+   , errMsgDiagnostic  = ErrDoc [doc] [] []
    , errMsgSeverity    = SevWarning
    , errMsgReason      = Reason flag
    }

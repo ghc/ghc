@@ -2010,7 +2010,7 @@ doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
          -- See Note [Deriving strategies]
        ; when (exotic_mechanism && className clas `elem` genericClassNames) $
          do { failIfTc (safeLanguageOn dflags) gen_inst_err
-            ; when (safeInferOn dflags) (recordUnsafeInfer emptyBag) } }
+            ; when (safeInferOn dflags) (recordUnsafeInfer mempty) } }
   where
     exotic_mechanism = not $ isDerivSpecStock mechanism
 

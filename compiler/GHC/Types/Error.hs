@@ -1,17 +1,18 @@
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Types.Error
    ( Messages
-   , WarningMessages
-   , ErrorMessages
+   , WarningMessages(..)
+   , ErrorMessages(..)
    , ErrMsg (..)
    , WarnMsg
    , ErrDoc (..)
    , MsgDoc
    , Severity (..)
-   , RenderableError (..)
+   , RenderableDiagnostic (..)
    , showErrMsg
    , mapMessages
    , unionMessages
@@ -20,18 +21,30 @@ module GHC.Types.Error
    , pprMessageBag
    , mkLocMessage
    , mkLocMessageAnn
+   , getErrorMessages
+   , getWarningMessages
    , getSeverityColour
    , getCaretDiagnostic
+
+   -- * Promoting and demoting a single warning/error
    , makeIntoWarning
+   , makeIntoError
+
+   -- * Promoting and demoting a warnings/errors
+   , promoteWarningsToErrors
    )
 where
+
+import Data.Coerce (coerce)
+import Data.Monoid
 
 import GHC.Prelude
 
 import GHC.Driver.Flags
 
 import GHC.Data.Bag
-import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Outputable as Outputable hiding ((<>))
+import qualified GHC.Utils.Outputable as Outputable
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.FastString (unpackFS)
@@ -40,23 +53,43 @@ import GHC.Utils.Json
 
 import System.IO.Error  ( catchIOError )
 
-type Messages        e = (WarningMessages, ErrorMessages e)
-type WarningMessages   = Bag WarnMsg
-type ErrorMessages   e = Bag (ErrMsg e)
-type MsgDoc            = SDoc
-type WarnMsg           = ErrMsg ErrDoc
+type Messages         w e = (WarningMessages w, ErrorMessages e)
+newtype WarningMessages w = WarningMessages { getWarningMessages :: Bag (ErrMsg w) }
+newtype ErrorMessages   e = ErrorMessages   { getErrorMessages   :: Bag (ErrMsg e) }
+type MsgDoc               = SDoc
+type WarnMsg              = ErrMsg ErrDoc
 
--- | A class for types which can be \"rendered\" into a opaque 'ErrDoc'.
-class RenderableError e where
-  renderError :: e -> ErrDoc
+instance Functor WarningMessages where
+  fmap f (WarningMessages xs) = WarningMessages (mapBag (fmap f) xs)
 
--- | The main 'GHC' error type, parameterised over the /domain-specific/ error 'e'.
+instance Semigroup (WarningMessages w) where
+  (WarningMessages a) <> (WarningMessages b) = WarningMessages $ a `unionBags` b
+
+instance Monoid (WarningMessages w) where
+  mempty  = WarningMessages emptyBag
+  mappend = (<>)
+
+instance Functor ErrorMessages where
+  fmap f (ErrorMessages xs) = ErrorMessages (mapBag (fmap f) xs)
+
+instance Semigroup (ErrorMessages w) where
+  (ErrorMessages a) <> (ErrorMessages b) = ErrorMessages $ a `unionBags` b
+
+instance Monoid (ErrorMessages w) where
+  mempty  = ErrorMessages emptyBag
+  mappend = (<>)
+
+-- | A class for types (typically errors and warnings) which can be \"rendered\" into a opaque 'ErrDoc'.
+class RenderableDiagnostic a where
+  renderDiagnostic :: a -> ErrDoc
+
+-- | The main 'GHC' error type, parameterised over the /domain-specific/ error /or/ warning 'a'.
 -- There is deliberately no 'Show' instance for an 'ErrMsg', see Note [Showing ErrMsg].
-data ErrMsg e = ErrMsg
+data ErrMsg a = ErrMsg
    { errMsgSpan        :: SrcSpan
       -- ^ The SrcSpan is used for sorting errors into line-number order
    , errMsgContext     :: PrintUnqualified
-   , errMsgDoc         :: e
+   , errMsgDiagnostic  :: a
    , errMsgSeverity    :: Severity
    , errMsgReason      :: WarnReason
    } deriving Functor
@@ -73,15 +106,19 @@ data ErrDoc = ErrDoc {
         errDocSupplementary :: [MsgDoc]
         }
 
-instance RenderableError ErrDoc where
-  renderError = id
+instance RenderableDiagnostic ErrDoc where
+  renderDiagnostic = id
 
-mapMessages :: (e -> e') -> Messages e -> Messages e'
-mapMessages f (ws, es) = (ws, mapBag (fmap f) es)
 
-unionMessages :: Messages e -> Messages e -> Messages e
-unionMessages (warns1, errs1) (warns2, errs2) =
-  (warns1 `unionBags` warns2, errs1 `unionBags` errs2)
+mapMessages :: (e -> e') -> Messages w e -> Messages w e'
+mapMessages f (ws, es) = bimapMessages id f (ws, es)
+
+bimapMessages :: (w -> w') -> (e -> e') -> Messages w e -> Messages w' e'
+bimapMessages f g (ws, es) = (fmap f ws, fmap g es)
+
+unionMessages :: Messages w e -> Messages w e -> Messages w e
+unionMessages (coerce -> warns1, coerce -> errs1) (coerce -> warns2, coerce -> errs2) =
+  (WarningMessages $ warns1 `unionBags` warns2, ErrorMessages $ errs1 `unionBags` errs2)
 
 errDoc :: [MsgDoc] -> [MsgDoc] -> [MsgDoc] -> ErrDoc
 errDoc = ErrDoc
@@ -133,9 +170,9 @@ instance ToJson Severity where
 
 -- | Shows an 'ErrMsg'. See NOTE [Showing ErrMsg]. Use this function only for debugging and testing
 -- purposes.
-showErrMsg :: RenderableError e => ErrMsg e -> String
+showErrMsg :: RenderableDiagnostic a => ErrMsg a -> String
 showErrMsg err =
-  renderWithContext defaultSDocContext (vcat (errDocImportant $ renderError $ errMsgDoc err))
+  renderWithContext defaultSDocContext (vcat (errDocImportant $ renderDiagnostic $ errMsgDiagnostic err))
 
 pprMessageBag :: Bag MsgDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
@@ -165,12 +202,12 @@ mkLocMessageAnn ann severity locn msg
           -- Add optional information
           optAnn = case ann of
             Nothing -> text ""
-            Just i  -> text " [" <> coloured sevColour (text i) <> text "]"
+            Just i  -> text " [" Outputable.<> coloured sevColour (text i) Outputable.<> text "]"
 
           -- Add prefixes, like    Foo.hs:34: warning:
           --                           <the warning message>
-          header = locn' <> colon <+>
-                   coloured sevColour sevText <> optAnn
+          header = locn' Outputable.<> colon <+>
+                   coloured sevColour sevText Outputable.<> optAnn
 
       in coloured (Col.sMessage col_scheme)
                   (hang (coloured (Col.sHeader col_scheme) header) 4
@@ -228,13 +265,13 @@ getCaretDiagnostic severity (RealSrcSpan span _) =
       let sevColour = getSeverityColour severity col_scheme
           marginColour = Col.sMargin col_scheme
       in
-      coloured marginColour (text marginSpace) <>
-      text ("\n") <>
-      coloured marginColour (text marginRow) <>
-      text (" " ++ srcLinePre) <>
-      coloured sevColour (text srcLineSpan) <>
-      text (srcLinePost ++ "\n") <>
-      coloured marginColour (text marginSpace) <>
+      coloured marginColour (text marginSpace) Outputable.<>
+      text ("\n") Outputable.<>
+      coloured marginColour (text marginRow) Outputable.<>
+      text (" " ++ srcLinePre) Outputable.<>
+      coloured sevColour (text srcLineSpan) Outputable.<>
+      text (srcLinePost ++ "\n") Outputable.<>
+      coloured marginColour (text marginSpace) Outputable.<>
       coloured sevColour (text (" " ++ caretLine))
 
       where
@@ -270,4 +307,15 @@ makeIntoWarning :: WarnReason -> ErrMsg e -> ErrMsg e
 makeIntoWarning reason err = err
     { errMsgSeverity = SevWarning
     , errMsgReason = reason }
+
+makeIntoError :: WarnReason -> ErrMsg e -> ErrMsg e
+makeIntoError reason err = err
+    { errMsgSeverity = SevError
+    , errMsgReason = reason }
+
+-- | \"Promotes\" plain 'WarningMessages' into 'ErrorMessages', by applying the input
+-- function. The typical case when you want to do that is when \"-Werror\" is enabled,
+-- and therefore warnings need to be treated as errors.
+promoteWarningsToErrors :: (w -> e) -> WarningMessages w -> ErrorMessages e
+promoteWarningsToErrors toError (WarningMessages warns) = ErrorMessages (mapBag (fmap toError) warns)
 

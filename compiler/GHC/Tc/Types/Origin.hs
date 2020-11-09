@@ -38,7 +38,6 @@ import GHC.Core.PatSyn
 import GHC.Core.Multiplicity ( scaledThing )
 
 import GHC.Unit.Module
-import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
