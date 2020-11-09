@@ -81,9 +81,9 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
 
 pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl =
-   pprGloblDecl lbl
+   pprGloblDecl platform lbl
    $$ pprTypeDecl platform lbl
-   $$ (ppr lbl <> char ':')
+   $$ (pdoc platform lbl <> char ':')
 
 pprAlign :: Platform -> Alignment -> SDoc
 pprAlign _platform alignment
@@ -96,8 +96,7 @@ pprAlignForSection _platform _seg
     = text "\t.balign 8" --  always 8
 
 instance Outputable Instr where
-    ppr instr = sdocWithDynFlags $ \dflags ->
-                       pprInstr (targetPlatform dflags) instr
+    ppr = pprInstr genericPlatform
 
 -- | Print section header and appropriate alignment for that section.
 --
@@ -117,7 +116,7 @@ pprSectionAlign config sec@(Section seg _) =
 pprSizeDecl :: Platform -> CLabel -> SDoc
 pprSizeDecl platform lbl
  = if osElfTarget (platformOS platform)
-   then text "\t.size" <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
+   then text "\t.size" <+> pdoc platform lbl <> ptext (sLit ", .-") <> pdoc platform lbl
    else empty
 
 pprBasicBlock :: NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr
@@ -186,15 +185,15 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
 
 pprDatas :: NCGConfig -> RawCmmStatics -> SDoc
 -- See note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
-pprDatas _config (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas config (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing
   , Just ind' <- labelInd ind
   , alias `mayRedirectTo` ind'
-  = pprGloblDecl alias
-    $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
+  = pprGloblDecl (ncgPlatform config) alias
+    $$ text ".equiv" <+> pdoc (ncgPlatform config) alias <> comma <> pdoc (ncgPlatform config) (CmmLabel ind')
 
 pprDatas config (CmmStaticsRaw lbl dats)
   = vcat (pprLabel platform lbl : map (pprData config) dats)
@@ -213,10 +212,10 @@ pprData config (CmmUninitialised bytes)
 
 pprData config (CmmStaticLit lit) = pprDataItem config lit
 
-pprGloblDecl :: CLabel -> SDoc
-pprGloblDecl lbl
+pprGloblDecl :: Platform -> CLabel -> SDoc
+pprGloblDecl platform lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = text "\t.globl " <> ppr lbl
+  | otherwise = text "\t.globl " <> pdoc platform lbl
 
 -- See discussion in X86.Ppr
 -- for why this is necessary.  Essentially we need to ensure that we never
@@ -237,7 +236,7 @@ pprLabelType' platform lbl =
 pprTypeDecl :: Platform -> CLabel -> SDoc
 pprTypeDecl platform lbl
     = if osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
-      then text ".type " <> ppr lbl <> ptext (sLit  ", ") <> pprLabelType' platform lbl
+      then text ".type " <> pdoc platform lbl <> ptext (sLit  ", ") <> pprLabelType' platform lbl
       else empty
 
 pprDataItem :: NCGConfig -> CmmLit -> SDoc
@@ -248,18 +247,18 @@ pprDataItem config lit
 
         imm = litToImm lit
 
-        ppr_item II8  _ = [text "\t.byte\t"  <> pprImm imm]
-        ppr_item II16 _ = [text "\t.short\t" <> pprImm imm]
-        ppr_item II32 _ = [text "\t.long\t"  <> pprImm imm]
-        ppr_item II64 _ = [text "\t.quad\t"  <> pprImm imm]
+        ppr_item II8  _ = [text "\t.byte\t"  <> pprImm platform imm]
+        ppr_item II16 _ = [text "\t.short\t" <> pprImm platform imm]
+        ppr_item II32 _ = [text "\t.long\t"  <> pprImm platform imm]
+        ppr_item II64 _ = [text "\t.quad\t"  <> pprImm platform imm]
 
         ppr_item FF32  (CmmFloat r _)
            = let bs = floatToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+             in  map (\b -> text "\t.byte\t" <> pprImm platform (ImmInt b)) bs
 
         ppr_item FF64 (CmmFloat r _)
            = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+             in  map (\b -> text "\t.byte\t" <> pprImm platform (ImmInt b)) bs
 
         ppr_item _ _ = pprPanic "pprDataItem:ppr_item" (text $ show lit)
 
@@ -279,24 +278,24 @@ floatToBytes f
 castFloatToWord8Array :: STUArray s Int Float -> ST s (STUArray s Int Word8)
 castFloatToWord8Array = U.castSTUArray
 
-pprImm :: Imm -> SDoc
-pprImm (ImmInt i)     = int i
-pprImm (ImmInteger i) = integer i
-pprImm (ImmCLbl l)    = ppr l
-pprImm (ImmIndex l i) = ppr l <> char '+' <> int i
-pprImm (ImmLit s)     = s
+pprImm :: Platform -> Imm -> SDoc
+pprImm _ (ImmInt i)     = int i
+pprImm _ (ImmInteger i) = integer i
+pprImm p (ImmCLbl l)    = pdoc p l
+pprImm p (ImmIndex l i) = pdoc p l <> char '+' <> int i
+pprImm _ (ImmLit s)     = s
 
 -- XXX: See pprIm below for why this is a bad idea!
-pprImm (ImmFloat f)
+pprImm _ (ImmFloat f)
   | f == 0 = text "wzr"
   | otherwise = float (fromRational f)
-pprImm (ImmDouble d)
+pprImm _ (ImmDouble d)
   | d == 0 = text "xzr"
   | otherwise = double (fromRational d)
 
-pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
-pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
-                   <> lparen <> pprImm b <> rparen
+pprImm p (ImmConstantSum a b) = pprImm p a <> char '+' <> pprImm p b
+pprImm p (ImmConstantDiff a b) = pprImm p a <> char '-'
+                   <> lparen <> pprImm p b <> rparen
 
 
 -- aarch64 GNU as uses // for comments.
@@ -309,8 +308,8 @@ asmDoubleslashComment c = whenPprDebug $ text "//" <+> c
 asmMultilineComment :: SDoc -> SDoc
 asmMultilineComment c = whenPprDebug $ text "/*" $+$ c $+$ text "*/"
 
-pprIm :: Imm -> SDoc
-pprIm im = case im of
+pprIm :: Platform -> Imm -> SDoc
+pprIm platform im = case im of
   ImmInt i     -> char '#' <> int i
   ImmInteger i -> char '#' <> integer i
 
@@ -331,8 +330,8 @@ pprIm im = case im of
   ImmDouble d | d == 0 -> text "xzr"
   ImmDouble d -> char '#' <> double (fromRational d)
   -- =<lbl> pseudo instruction!
-  ImmCLbl l    -> char '=' <> ppr l
-  ImmIndex l o -> text "[=" <> ppr l <> comma <+> char '#' <> int o <> char ']'
+  ImmCLbl l    -> char '=' <> pdoc platform l
+  ImmIndex l o -> text "[=" <> pdoc platform l <> comma <+> char '#' <> int o <> char ']'
   _            -> panic "AArch64.pprIm"
 
 pprExt :: ExtMode -> SDoc
@@ -351,17 +350,17 @@ pprShift SLSR = text "lsr"
 pprShift SASR = text "asr"
 pprShift SROR = text "ror"
 
-pprOp :: Operand -> SDoc
-pprOp op = case op of
+pprOp :: Platform -> Operand -> SDoc
+pprOp plat op = case op of
   OpReg w r           -> pprReg w r
   OpRegExt w r x 0 -> pprReg w r <> comma <+> pprExt x
   OpRegExt w r x i -> pprReg w r <> comma <+> pprExt x <> comma <+> char '#' <> int i
   OpRegShift w r s i -> pprReg w r <> comma <+> pprShift s <> comma <+> char '#' <> int i
-  OpImm im          -> pprIm im
-  OpImmShift im s i -> pprIm im <> comma <+> pprShift s <+> char '#' <> int i
+  OpImm im          -> pprIm plat im
+  OpImmShift im s i -> pprIm plat im <> comma <+> pprShift s <+> char '#' <> int i
   -- XXX: Address compuation always use registers as 64bit -- is this correct?
   OpAddr (AddrRegReg r1 r2) -> char '[' <+> pprReg W64 r1 <> comma <+> pprReg W64 r2 <+> char ']'
-  OpAddr (AddrRegImm r1 im) -> char '[' <+> pprReg W64 r1 <> comma <+> pprImm im <+> char ']'
+  OpAddr (AddrRegImm r1 im) -> char '[' <+> pprReg W64 r1 <> comma <+> pprImm plat im <+> char ']'
   OpAddr (AddrReg r1)       -> char '[' <+> pprReg W64 r1 <+> char ']'
 
 pprReg :: Width -> Reg -> SDoc
@@ -426,75 +425,75 @@ pprInstr platform instr = case instr of
   -- AArch64 Instruction Set
   -- 1. Arithmetic Instructions ------------------------------------------------
   ADD  o1 o2 o3
-    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> text "\tfadd"  <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-    | otherwise -> text "\tadd"  <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  CMN  o1 o2    -> text "\tcmn"  <+> pprOp o1 <> comma <+> pprOp o2
+    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> text "\tfadd"  <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+    | otherwise -> text "\tadd"  <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  CMN  o1 o2    -> text "\tcmn"  <+> pprOp platform o1 <> comma <+> pprOp platform o2
   CMP  o1 o2
-    | isFloatOp o1 && isFloatOp o2 -> text "\tfcmp"  <+> pprOp o1 <> comma <+> pprOp o2
-    | otherwise -> text "\tcmp" <+> pprOp o1 <> comma <+> pprOp o2
-  MSUB o1 o2 o3 o4 -> text "\tmsub" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3 <> comma <+> pprOp o4
+    | isFloatOp o1 && isFloatOp o2 -> text "\tfcmp"  <+> pprOp platform o1 <> comma <+> pprOp platform o2
+    | otherwise -> text "\tcmp" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  MSUB o1 o2 o3 o4 -> text "\tmsub" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
   MUL  o1 o2 o3
-    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> text "\tfmul"  <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-    | otherwise -> text "\tmul"  <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
+    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> text "\tfmul"  <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+    | otherwise -> text "\tmul"  <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
   NEG  o1 o2
-    | isFloatOp o1 && isFloatOp o2 -> text "\tfneg"  <+> pprOp o1 <> comma <+> pprOp o2
-    | otherwise -> text "\tneg"  <+> pprOp o1 <> comma <+> pprOp o2
+    | isFloatOp o1 && isFloatOp o2 -> text "\tfneg"  <+> pprOp platform o1 <> comma <+> pprOp platform o2
+    | otherwise -> text "\tneg"  <+> pprOp platform o1 <> comma <+> pprOp platform o2
   SDIV o1 o2 o3 | isFloatOp o1 && isFloatOp o2 && isFloatOp o3
-    -> text "\tfdiv" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  SDIV o1 o2 o3 -> text "\tsdiv" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
+    -> text "\tfdiv" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  SDIV o1 o2 o3 -> text "\tsdiv" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
 
   SUB  o1 o2 o3
-    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> text "\tfsub"  <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-    | otherwise -> text "\tsub"  <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  UDIV o1 o2 o3 -> text "\tudiv" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
+    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> text "\tfsub"  <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+    | otherwise -> text "\tsub"  <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  UDIV o1 o2 o3 -> text "\tudiv" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
 
   -- 2. Bit Manipulation Instructions ------------------------------------------
-  SBFM o1 o2 o3 o4 -> text "\tsbfm" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3 <> comma <+> pprOp o4
-  UBFM o1 o2 o3 o4 -> text "\tubfm" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3 <> comma <+> pprOp o4
+  SBFM o1 o2 o3 o4 -> text "\tsbfm" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
+  UBFM o1 o2 o3 o4 -> text "\tubfm" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
   -- 3. Logical and Move Instructions ------------------------------------------
-  AND o1 o2 o3  -> text "\tand" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  ANDS o1 o2 o3 -> text "\tands" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  ASR o1 o2 o3  -> text "\tasr" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  BIC o1 o2 o3  -> text "\tbic" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  BICS o1 o2 o3 -> text "\tbics" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  EON o1 o2 o3  -> text "\teon" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  EOR o1 o2 o3  -> text "\teor" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  LSL o1 o2 o3  -> text "\tlsl" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  LSR o1 o2 o3  -> text "\tlsr" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
+  AND o1 o2 o3  -> text "\tand" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  ANDS o1 o2 o3 -> text "\tands" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  ASR o1 o2 o3  -> text "\tasr" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  BIC o1 o2 o3  -> text "\tbic" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  BICS o1 o2 o3 -> text "\tbics" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  EON o1 o2 o3  -> text "\teon" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  EOR o1 o2 o3  -> text "\teor" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  LSL o1 o2 o3  -> text "\tlsl" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  LSR o1 o2 o3  -> text "\tlsr" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
   MOV o1 o2
-    | isFloatOp o1 || isFloatOp o2 -> text "\tfmov" <+> pprOp o1 <> comma <+> pprOp o2
-    | otherwise -> text "\tmov" <+> pprOp o1 <> comma <+> pprOp o2
-  MOVK o1 o2    -> text "\tmovk" <+> pprOp o1 <> comma <+> pprOp o2
-  MVN o1 o2     -> text "\tmvn" <+> pprOp o1 <> comma <+> pprOp o2
-  ORN o1 o2 o3  -> text "\torn" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  ORR o1 o2 o3  -> text "\torr" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  ROR o1 o2 o3  -> text "\tror" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  TST o1 o2     -> text "\ttst" <+> pprOp o1 <> comma <+> pprOp o2
+    | isFloatOp o1 || isFloatOp o2 -> text "\tfmov" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+    | otherwise -> text "\tmov" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  MOVK o1 o2    -> text "\tmovk" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  MVN o1 o2     -> text "\tmvn" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  ORN o1 o2 o3  -> text "\torn" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  ORR o1 o2 o3  -> text "\torr" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  ROR o1 o2 o3  -> text "\tror" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  TST o1 o2     -> text "\ttst" <+> pprOp platform o1 <> comma <+> pprOp platform o2
 
   -- 4. Branch Instructions ----------------------------------------------------
   J t            -> pprInstr platform (B t)
-  B (TBlock bid) -> text "\tb" <+> ppr (mkLocalBlockLabel (getUnique bid))
-  B (TLabel lbl) -> text "\tb" <+> ppr lbl
+  B (TBlock bid) -> text "\tb" <+> pdoc platform (mkLocalBlockLabel (getUnique bid))
+  B (TLabel lbl) -> text "\tb" <+> pdoc platform lbl
   B (TReg r)     -> text "\tbr" <+> pprReg W64 r
 
-  BL (TBlock bid) _ _ -> text "\tbl" <+> ppr (mkLocalBlockLabel (getUnique bid))
-  BL (TLabel lbl) _ _ -> text "\tbl" <+> ppr lbl
+  BL (TBlock bid) _ _ -> text "\tbl" <+> pdoc platform (mkLocalBlockLabel (getUnique bid))
+  BL (TLabel lbl) _ _ -> text "\tbl" <+> pdoc platform lbl
   BL (TReg r)     _ _ -> text "\tblr" <+> pprReg W64 r
 
-  BCOND c (TBlock bid) -> text "\t" <> pprBcond c <+> ppr (mkLocalBlockLabel (getUnique bid))
-  BCOND c (TLabel lbl) -> text "\t" <> pprBcond c <+> ppr lbl
+  BCOND c (TBlock bid) -> text "\t" <> pprBcond c <+> pdoc platform (mkLocalBlockLabel (getUnique bid))
+  BCOND c (TLabel lbl) -> text "\t" <> pprBcond c <+> pdoc platform lbl
   BCOND _ (TReg _)     -> panic "AArch64.ppr: No conditional branching to registers!"
 
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
-  CSET o c  -> text "\tcset" <+> pprOp o <> comma <+> pprCond c
+  CSET o c  -> text "\tcset" <+> pprOp platform o <> comma <+> pprCond c
 
-  CBZ o (TBlock bid) -> text "\tcbz" <+> pprOp o <> comma <+> ppr (mkLocalBlockLabel (getUnique bid))
-  CBZ o (TLabel lbl) -> text "\tcbz" <+> pprOp o <> comma <+> ppr lbl
+  CBZ o (TBlock bid) -> text "\tcbz" <+> pprOp platform o <> comma <+> pdoc platform (mkLocalBlockLabel (getUnique bid))
+  CBZ o (TLabel lbl) -> text "\tcbz" <+> pprOp platform o <> comma <+> pdoc platform lbl
   CBZ _ (TReg _)     -> panic "AArch64.ppr: No conditional (cbz) branching to registers!"
 
-  CBNZ o (TBlock bid) -> text "\tcbnz" <+> pprOp o <> comma <+> ppr (mkLocalBlockLabel (getUnique bid))
-  CBNZ o (TLabel lbl) -> text "\tcbnz" <+> pprOp o <> comma <+> ppr lbl
+  CBNZ o (TBlock bid) -> text "\tcbnz" <+> pprOp platform o <> comma <+> pdoc platform (mkLocalBlockLabel (getUnique bid))
+  CBNZ o (TLabel lbl) -> text "\tcbnz" <+> pprOp platform o <> comma <+> pdoc platform lbl
   CBNZ _ (TReg _)     -> panic "AArch64.ppr: No conditional (cbnz) branching to registers!"
 
   -- 7. Load and Store Instructions --------------------------------------------
@@ -502,82 +501,82 @@ pprInstr platform instr = case instr of
   --       address. Not observing the correct size when loading will lead
   --       inevitably to crashes.
   STR _f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    text "\tstrb" <+> pprOp o1 <> comma <+> pprOp o2
+    text "\tstrb" <+> pprOp platform o1 <> comma <+> pprOp platform o2
   STR _f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    text "\tstrh" <+> pprOp o1 <> comma <+> pprOp o2
-  STR _f o1 o2 -> text "\tstr" <+> pprOp o1 <> comma <+> pprOp o2
+    text "\tstrh" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  STR _f o1 o2 -> text "\tstr" <+> pprOp platform o1 <> comma <+> pprOp platform o2
 
 #if defined(darwin_HOST_OS)
   LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl <> text "@gotpage" $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> ppr lbl <> text "@gotpageoff" <> text "]" $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpage" $$
+    text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpageoff" <> text "]" $$
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) | isForeignLabel lbl ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl <> text "@gotpage" $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> ppr lbl <> text "@gotpageoff" <> text "]" $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpage" $$
+    text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpageoff" <> text "]" $$
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl <> text "@page" $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> ppr lbl <> text "@pageoff" $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@page" $$
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@pageoff" $$
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl <> text "@gotpage" $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> ppr lbl <> text "@gotpageoff" <> text "]"
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpage" $$
+    text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpageoff" <> text "]"
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) | isForeignLabel lbl ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl <> text "@gotpage" $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> ppr lbl <> text "@gotpageoff" <> text "]"
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpage" $$
+    text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpageoff" <> text "]"
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl <> text "@page" $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> ppr lbl <> text "@pageoff"
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@page" $$
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@pageoff"
 #else
   LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text ":got_lo12:" <> ppr lbl <> text "]" $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> text ":got:" <> pdoc platform lbl $$
+    text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> text ":got_lo12:" <> pdoc platform lbl <> text "]" $$
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) | isForeignLabel lbl ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text ":got_lo12:" <> ppr lbl <> text "]" $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> text ":got:" <> pdoc platform lbl $$
+    text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> text ":got_lo12:" <> pdoc platform lbl <> text "]" $$
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> text ":lo12:" <> ppr lbl $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl $$
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text ":lo12:" <> pdoc platform lbl $$
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text ":got_lo12:" <> ppr lbl <> text "]"
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> text ":got:" <> pdoc platform lbl $$
+    text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> text ":got_lo12:" <> pdoc platform lbl <> text "]"
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) | isForeignLabel lbl ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text ":got_lo12:" <> ppr lbl <> text "]"
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> text ":got:" <> pdoc platform lbl $$
+    text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> text ":got_lo12:" <> pdoc platform lbl <> text "]"
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl $$
-    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> text ":lo12:" <> ppr lbl
+    text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl $$
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text ":lo12:" <> pdoc platform lbl
 #endif
 
   LDR _f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    text "\tldrsb" <+> pprOp o1 <> comma <+> pprOp o2
+    text "\tldrsb" <+> pprOp platform o1 <> comma <+> pprOp platform o2
   LDR _f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    text "\tldrsh" <+> pprOp o1 <> comma <+> pprOp o2
-  LDR _f o1 o2 -> text "\tldr" <+> pprOp o1 <> comma <+> pprOp o2
+    text "\tldrsh" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  LDR _f o1 o2 -> text "\tldr" <+> pprOp platform o1 <> comma <+> pprOp platform o2
 
-  STP _f o1 o2 o3 -> text "\tstp" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  LDP _f o1 o2 o3 -> text "\tldp" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
+  STP _f o1 o2 o3 -> text "\tstp" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  LDP _f o1 o2 o3 -> text "\tldp" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
 
   -- 8. Synchronization Instructions -------------------------------------------
   DMBSY -> text "\tdmb sy"
   -- 8. Synchronization Instructions -------------------------------------------
-  FCVT o1 o2 -> text "\tfcvt" <+> pprOp o1 <> comma <+> pprOp o2
-  SCVTF o1 o2 -> text "\tscvtf" <+> pprOp o1 <> comma <+> pprOp o2
-  FCVTZS o1 o2 -> text "\tfcvtzs" <+> pprOp o1 <> comma <+> pprOp o2
+  FCVT o1 o2 -> text "\tfcvt" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  SCVTF o1 o2 -> text "\tscvtf" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  FCVTZS o1 o2 -> text "\tfcvtzs" <+> pprOp platform o1 <> comma <+> pprOp platform o2
 
 pprBcond :: Cond -> SDoc
 pprBcond c = text "b." <> pprCond c

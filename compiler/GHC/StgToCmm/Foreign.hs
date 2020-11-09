@@ -108,7 +108,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                                            [] -> panic "cgForeignCall []"
               fc = ForeignConvention cconv arg_hints res_hints CmmMayReturn
               call_target = ForeignTarget cmm_target fc
-
+        {-
         ; forM cmm_args $ \arg -> case arg of
             (CmmLit _, AddrHint) -> pure ()
             (CmmReg _, AddrHint) -> pure ()
@@ -121,7 +121,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
             (CmmReg (CmmLocal (LocalReg _ ty)), SignedHint w) | isBitsType ty && typeWidth ty == w -> pure ()
             (CmmReg (CmmLocal (LocalReg _ ty)), NoHint w)     | isBitsType ty && typeWidth ty == w -> pure ()
             arg -> traceM $ show cmm_args ++ "\n\t" ++ show arg ++ "; sized don't match! in" ++ "\n\t" ++ showPprUnsafe (ppr cmm_target)
-
+        -}
         -- we want to emit code for the call, and then emitReturn.
         -- However, if the sequel is AssignTo, we shortcut a little
         -- and generate a foreign call that assigns the results
