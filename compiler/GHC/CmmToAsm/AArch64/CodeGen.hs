@@ -1252,7 +1252,7 @@ genCCall target dest_regs arg_regs bid = do
       config <- getConfig
       target <- cmmMakeDynamicReference config CallReference $
           mkForeignLabel (fsLit name) Nothing ForeignLabelInThisPackage IsFunction
-      let cconv = ForeignConvention CCallConv [NoHint W64] [NoHint W64] CmmMayReturn
+      let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
       genCCall (ForeignTarget target cconv) dest_regs arg_regs bid
 
     -- XXX: Optimize using paired load LDP
