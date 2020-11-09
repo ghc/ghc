@@ -151,7 +151,7 @@ dmdAnalStar env (n :* cd) e
   = ASSERT2( not (isUnliftedType (exprType e)) || exprOkForSpeculation e, ppr e )
     -- The argument 'e' should satisfy the let/app invariant
     -- See Note [Analysing with absent demand] in GHC.Types.Demand
-    (multDmdType n dmd_ty, e')
+    (toPlusDmdArg $ multDmdType n dmd_ty, e')
 
 -- Main Demand Analsysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
@@ -223,7 +223,7 @@ dmdAnal' env dmd (Lam var body)
         (body_ty, body') = dmdAnal env body_dmd body
         (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty var
     in
-    (multUnsat n lam_ty, Lam var' body')
+    (multDmdType n lam_ty, Lam var' body')
 
 dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
@@ -387,8 +387,68 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
         id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
-{- Note [Which scrutinees may throw precise exceptions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [Analysing with absent demand]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we analyse an expression with demand A.  The "A" means
+"absent", so this expression will never be needed.  What should happen?
+There are several wrinkles:
+
+* We *do* want to analyse the expression regardless.
+  Reason: Note [Always analyse in virgin pass]
+
+  But we can post-process the results to ignore all the usage
+  demands coming back. This is done by multDmdType.
+
+* In a previous incarnation of GHC we needed to be extra careful in the
+  case of an *unlifted type*, because unlifted values are evaluated
+  even if they are not used.  Example (see #9254):
+     f :: (() -> (# Int#, () #)) -> ()
+          -- Strictness signature is
+          --    <CS(S(A,SU))>
+          -- I.e. calls k, but discards first component of result
+     f k = case k () of (# _, r #) -> r
+
+     g :: Int -> ()
+     g y = f (\n -> (# case y of I# y2 -> y2, n #))
+
+  Here f's strictness signature says (correctly) that it calls its
+  argument function and ignores the first component of its result.
+  This is correct in the sense that it'd be fine to (say) modify the
+  function so that always returned 0# in the first component.
+
+  But in function g, we *will* evaluate the 'case y of ...', because
+  it has type Int#.  So 'y' will be evaluated.  So we must record this
+  usage of 'y', else 'g' will say 'y' is absent, and will w/w so that
+  'y' is bound to an aBSENT_ERROR thunk.
+
+  However, the argument of toSubDmd always satisfies the let/app
+  invariant; so if it is unlifted it is also okForSpeculation, and so
+  can be evaluated in a short finite time -- and that rules out nasty
+  cases like the one above.  (I'm not quite sure why this was a
+  problem in an earlier version of GHC, but it isn't now.)
+
+Note [Always analyse in virgin pass]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Tricky point: make sure that we analyse in the 'virgin' pass. Consider
+   rec { f acc x True  = f (...rec { g y = ...g... }...)
+         f acc x False = acc }
+In the virgin pass for 'f' we'll give 'f' a very strict (bottom) type.
+That might mean that we analyse the sub-expression containing the
+E = "...rec g..." stuff in a bottom demand.  Suppose we *didn't analyse*
+E, but just returned botType.
+
+Then in the *next* (non-virgin) iteration for 'f', we might analyse E
+in a weaker demand, and that will trigger doing a fixpoint iteration
+for g.  But *because it's not the virgin pass* we won't start g's
+iteration at bottom.  Disaster.  (This happened in $sfibToList' of
+nofib/spectral/fibheaps.)
+
+So in the virgin pass we make sure that we do analyse the expression
+at least once, to initialise its signatures.
+
+Note [Which scrutinees may throw precise exceptions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This is the specification of 'exprMayThrowPreciseExceptions',
 which is important for Scenario 2 of
 Note [Precise exceptions and strictness analysis] in GHC.Types.Demand.
@@ -770,57 +830,6 @@ coercion into the binding, leading to an arity decrease:
 
 With the CoreLint check, we would have to zap `go`'s perfectly viable strictness
 signature.
-
-Note [What are demand signatures?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Demand analysis interprets expressions in the abstract domain of demand
-transformers. Given an incoming demand we put an expression under, its abstract
-transformer gives us back a demand type denoting how other things (like
-arguments and free vars) were used when the expression was evaluated.
-Here's an example:
-
-  f x y =
-    if x + expensive
-      then \z -> z + y * ...
-      else \z -> z * ...
-
-The abstract transformer (let's call it F_e) of the if expression (let's call it
-e) would transform an incoming head demand <S,HU> into a demand type like
-{x-><S,1*U>,y-><L,U>}<L,U>. In pictures:
-
-     Demand ---F_e---> DmdType
-     <S,HU>            {x-><S,1*U>,y-><L,U>}<L,U>
-
-Let's assume that the demand transformers we compute for an expression are
-correct wrt. to some concrete semantics for Core. How do demand signatures fit
-in? They are strange beasts, given that they come with strict rules when to
-it's sound to unleash them.
-
-Fortunately, we can formalise the rules with Galois connections. Consider
-f's strictness signature, {}<S,1*U><L,U>. It's a single-point approximation of
-the actual abstract transformer of f's RHS for arity 2. So, what happens is that
-we abstract *once more* from the abstract domain we already are in, replacing
-the incoming Demand by a simple lattice with two elements denoting incoming
-arity: A_2 = {<2, >=2} (where '<2' is the top element and >=2 the bottom
-element). Here's the diagram:
-
-     A_2 -----f_f----> DmdType
-      ^                   |
-      | α               γ |
-      |                   v
-     Demand ---F_f---> DmdType
-
-With
-  α(C1(C1(_))) = >=2 -- example for usage demands, but similar for strictness
-  α(_)         =  <2
-  γ(ty)        =  ty
-and F_f being the abstract transformer of f's RHS and f_f being the abstracted
-abstract transformer computable from our demand signature simply by
-
-  f_f(>=2) = {}<S,1*U><L,U>
-  f_f(<2)  = postProcessUnsat {}<S,1*U><L,U>
-
-where postProcessUnsat makes a proper top element out of the given demand type.
 
 Note [Demand analysis for trivial right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
