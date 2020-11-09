@@ -1128,7 +1128,7 @@ parseCmmHint str      = failMsgPD $ Error (ErrCmmParser (CmmUnrecognisedHint str
 inferCmmHint :: CmmExpr -> ForeignHint
 inferCmmHint (CmmLit (CmmLabel _)) = AddrHint
 inferCmmHint (CmmReg (CmmGlobal g)) | isPtrGlobalReg g = AddrHint
-inferCmmHint _ = NoHint W64
+inferCmmHint _ = NoHint
 
 isPtrGlobalReg Sp                    = True
 isPtrGlobalReg SpLim                 = True

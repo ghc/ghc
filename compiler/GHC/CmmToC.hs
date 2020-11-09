@@ -1006,13 +1006,13 @@ pprCall platform ppr_fn cconv results args
      pprArg (expr, AddrHint)
         = cCast platform (text "void *") expr
         -- see comment by machRepHintCType below
-     pprArg (expr, SignedHint _)
+     pprArg (expr, SignedHint)
         = cCast platform (machRep_S_CType platform $ typeWidth $ cmmExprType platform expr) expr
      pprArg (expr, _other)
         = pprExpr platform expr
 
-     pprUnHint AddrHint       rep = parens (machRepCType platform rep)
-     pprUnHint (SignedHint _) rep = parens (machRepCType platform rep)
+     pprUnHint AddrHint   rep = parens (machRepCType platform rep)
+     pprUnHint SignedHint rep = parens (machRepCType platform rep)
      pprUnHint _          _   = empty
 
 -- Currently we only have these two calling conventions, but this might
@@ -1176,9 +1176,9 @@ isCmmWordType platform ty = not (isFloatType ty)
 -- the C compiler.
 machRepHintCType :: Platform -> CmmType -> ForeignHint -> SDoc
 machRepHintCType platform rep = \case
-   AddrHint       -> text "void *"
-   (SignedHint _) -> machRep_S_CType platform (typeWidth rep)
-   _other         -> machRepCType platform rep
+   AddrHint   -> text "void *"
+   SignedHint -> machRep_S_CType platform (typeWidth rep)
+   _other     -> machRepCType platform rep
 
 machRepPtrCType :: Platform -> CmmType -> SDoc
 machRepPtrCType platform r

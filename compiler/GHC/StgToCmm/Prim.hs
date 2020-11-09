@@ -265,12 +265,12 @@ emitPrimOp dflags primop = case primop of
     _ -> PrimopCmmEmit_External
 
 -- First we handle various awkward cases specially.
--- Note: StgInt newSpark (StgRegTable *reg, StgClosure *p)
+
   ParOp -> \[arg] -> opIntoRegs $ \[res] ->
     -- for now, just implement this in a C function
     -- later, we might want to inline it.
     emitCCall
-        [(res,NoHint W32)]
+        [(res,NoHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
         [(baseExpr, AddrHint), (arg,AddrHint)]
 
@@ -281,7 +281,7 @@ emitPrimOp dflags primop = case primop of
     tmp <- assignTemp arg
     tmp2 <- newTemp (bWord platform)
     emitCCall
-        [(tmp2,NoHint W32)]
+        [(tmp2,NoHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
         [(baseExpr, AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
     emitAssign (CmmLocal res) (CmmReg (CmmLocal tmp))

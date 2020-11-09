@@ -317,8 +317,8 @@ isVecType _                       = False
 -- See Note [Signed vs unsigned] for one case where this is used.
 
 data ForeignHint
-  = NoHint Width | AddrHint | SignedHint Width
-  deriving( Eq, Show )
+  = NoHint | AddrHint | SignedHint
+  deriving( Eq )
         -- Used to give extra per-argument or per-result
         -- information needed by foreign calling conventions
 
