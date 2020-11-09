@@ -27,6 +27,9 @@ module GHC.Exts.Heap (
     , GenClosure(..)
     , ClosureType(..)
     , PrimType(..)
+    , WhatNext(..)
+    , WhyBlocked(..)
+    , TsoFlags(..)
     , HasHeapRep(getClosureData)
     , getClosureDataFromHeapRep
     , getClosureDataFromHeapRepPrim
@@ -39,6 +42,12 @@ module GHC.Exts.Heap (
     , itblSize
     , peekItbl
     , pokeItbl
+
+    -- * Cost Centre (profiling) types
+    , StgTSOProfInfo(..)
+    , IndexTable(..)
+    , CostCentre(..)
+    , CostCentreStack(..)
 
      -- * Closure inspection
     , getBoxedClosureData
@@ -54,12 +63,14 @@ import Prelude
 import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Constants
+import GHC.Exts.Heap.ProfInfo.Types
 #if defined(PROFILING)
 import GHC.Exts.Heap.InfoTableProf
 #else
 import GHC.Exts.Heap.InfoTable
 #endif
 import GHC.Exts.Heap.Utils
+import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 
 import Control.Monad
 import Data.Bits
@@ -330,6 +341,45 @@ getClosureDataFromHeapRepPrim getConDesc itbl heapRep pts = do
                 , finalizer = pts !! 3
                 , link = pts !! 4
                 }
+        TSO | [ u_lnk, u_gbl_lnk, tso_stack, u_trec, u_blk_ex, u_bq] <- pts
+                -> withArray rawHeapWords (\ptr -> do
+                    fields <- FFIClosures.peekTSOFields ptr
+                    pure $ TSOClosure
+                        { info = itbl
+                        , link = u_lnk
+                        , global_link = u_gbl_lnk
+                        , tsoStack = tso_stack
+                        , trec = u_trec
+                        , blocked_exceptions = u_blk_ex
+                        , bq = u_bq
+                        , what_next = FFIClosures.tso_what_next fields
+                        , why_blocked = FFIClosures.tso_why_blocked fields
+                        , flags = FFIClosures.tso_flags fields
+                        , threadId = FFIClosures.tso_threadId fields
+                        , saved_errno = FFIClosures.tso_saved_errno fields
+                        , tso_dirty = FFIClosures.tso_dirty fields
+                        , alloc_limit = FFIClosures.tso_alloc_limit fields
+                        , tot_stack_size = FFIClosures.tso_tot_stack_size fields
+                        , prof = FFIClosures.tso_prof fields
+                        })
+            | otherwise
+                -> fail $ "Expected 6 ptr arguments to TSO, found "
+                        ++ show (length pts)
+        STACK
+            | [] <- pts
+            -> withArray rawHeapWords (\ptr -> do
+                            fields <- FFIClosures.peekStackFields ptr
+                            pure $ StackClosure
+                                { info = itbl
+                                , stack_size = FFIClosures.stack_size fields
+                                , stack_dirty = FFIClosures.stack_dirty fields
+#if __GLASGOW_HASKELL__ >= 811
+                                , stack_marking = FFIClosures.stack_marking fields
+#endif
+                                })
+            | otherwise
+                -> fail $ "Expected 0 ptr argument to STACK, found "
+                    ++ show (length pts)
 
         _ ->
             pure $ UnsupportedClosure itbl
