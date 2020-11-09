@@ -52,6 +52,7 @@
           []
           (Nothing)
           (PrefixCon
+           []
            [])
           (Nothing)))
        ,({ DumpParsedAst.hs:7:21-30 }
@@ -65,6 +66,7 @@
           []
           (Nothing)
           (PrefixCon
+           []
            [(HsScaled
              (HsLinearArrow
               (NormalSyntax))
@@ -256,6 +258,7 @@
           []
           (Nothing)
           (PrefixCon
+           []
            [(HsScaled
              (HsLinearArrow
               (NormalSyntax))

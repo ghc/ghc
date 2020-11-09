@@ -87,6 +87,7 @@
             []
             (Nothing)
             (PrefixCon
+             []
              [])
             (Nothing)))
          ,({ DumpRenamedAst.hs:9:21-30 }
@@ -99,6 +100,7 @@
             []
             (Nothing)
             (PrefixCon
+             []
              [(HsScaled
                (HsLinearArrow
                 (NormalSyntax))
@@ -500,6 +502,7 @@
             []
             (Nothing)
             (PrefixCon
+             []
              [(HsScaled
                (HsLinearArrow
                 (NormalSyntax))

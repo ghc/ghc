@@ -1296,7 +1296,7 @@ dataToPatQ = dataToQa id litP conP
             case nameSpace n of
                 Just DataName -> do
                     ps' <- sequence ps
-                    return (ConP n ps')
+                    return (ConP n [] ps')
                 _ -> error $ "Can't construct a pattern from name "
                           ++ showName n
 
@@ -2018,7 +2018,7 @@ data Pat
   | TupP [Pat]                      -- ^ @{ (p1,p2) }@
   | UnboxedTupP [Pat]               -- ^ @{ (\# p1,p2 \#) }@
   | UnboxedSumP Pat SumAlt SumArity -- ^ @{ (\#|p|\#) }@
-  | ConP Name [Pat]                 -- ^ @data T1 = C1 t1 t2; {C1 p1 p1} = e@
+  | ConP Name [Type] [Pat]          -- ^ @data T1 = C1 t1 t2; {C1 \@ty1 p1 p2} = e@
   | InfixP Pat Name Pat             -- ^ @foo ({x :+ y}) = e@
   | UInfixP Pat Name Pat            -- ^ @foo ({x :+ y}) = e@
                                     --
