@@ -6,14 +6,16 @@
 --
 -----------------------------------------------------------------------------
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 module GHC.Cmm.Lint (
     cmmLint, cmmLintGraph
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
+import GHC.Platform.Regs (callerSaves)
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
@@ -23,10 +25,9 @@ import GHC.Cmm.Utils
 import GHC.Cmm.Liveness
 import GHC.Cmm.Switch (switchTargetsToList)
 import GHC.Cmm.Ppr () -- For Outputable instances
-import Outputable
-import GHC.Driver.Session
+import GHC.Utils.Outputable
 
-import Control.Monad (ap)
+import Control.Monad (ap, unless)
 
 -- Things to check:
 --     - invariant on CmmBlock in GHC.Cmm.Expr (see comment there)
@@ -36,38 +37,41 @@ import Control.Monad (ap)
 -- -----------------------------------------------------------------------------
 -- Exported entry points:
 
-cmmLint :: (Outputable d, Outputable h)
-        => DynFlags -> GenCmmGroup d h CmmGraph -> Maybe SDoc
-cmmLint dflags tops = runCmmLint dflags (mapM_ (lintCmmDecl dflags)) tops
+cmmLint :: (OutputableP Platform d, OutputableP Platform h)
+        => Platform -> GenCmmGroup d h CmmGraph -> Maybe SDoc
+cmmLint platform tops = runCmmLint platform (mapM_ lintCmmDecl) tops
 
-cmmLintGraph :: DynFlags -> CmmGraph -> Maybe SDoc
-cmmLintGraph dflags g = runCmmLint dflags (lintCmmGraph dflags) g
+cmmLintGraph :: Platform -> CmmGraph -> Maybe SDoc
+cmmLintGraph platform g = runCmmLint platform lintCmmGraph g
 
-runCmmLint :: Outputable a => DynFlags -> (a -> CmmLint b) -> a -> Maybe SDoc
-runCmmLint dflags l p =
-   case unCL (l p) dflags of
+runCmmLint :: OutputableP Platform a => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
+runCmmLint platform l p =
+   case unCL (l p) platform of
      Left err -> Just (vcat [text "Cmm lint error:",
                              nest 2 err,
                              text "Program was:",
-                             nest 2 (ppr p)])
+                             nest 2 (pdoc platform p)])
      Right _  -> Nothing
 
-lintCmmDecl :: DynFlags -> GenCmmDecl h i CmmGraph -> CmmLint ()
-lintCmmDecl dflags (CmmProc _ lbl _ g)
-  = addLintInfo (text "in proc " <> ppr lbl) $ lintCmmGraph dflags g
-lintCmmDecl _ (CmmData {})
+lintCmmDecl :: GenCmmDecl h i CmmGraph -> CmmLint ()
+lintCmmDecl (CmmProc _ lbl _ g)
+  = do
+    platform <- getPlatform
+    addLintInfo (text "in proc " <> pdoc platform lbl) $ lintCmmGraph g
+lintCmmDecl (CmmData {})
   = return ()
 
 
-lintCmmGraph :: DynFlags -> CmmGraph -> CmmLint ()
-lintCmmGraph dflags g =
-    cmmLocalLiveness dflags g `seq` mapM_ (lintCmmBlock labels) blocks
-    -- cmmLiveness throws an error if there are registers
-    -- live on entry to the graph (i.e. undefined
-    -- variables)
-  where
-       blocks = toBlockList g
-       labels = setFromList (map entryLabel blocks)
+lintCmmGraph :: CmmGraph -> CmmLint ()
+lintCmmGraph g = do
+   platform <- getPlatform
+   let
+      blocks = toBlockList g
+      labels = setFromList (map entryLabel blocks)
+   cmmLocalLiveness platform g `seq` mapM_ (lintCmmBlock labels) blocks
+   -- cmmLiveness throws an error if there are registers
+   -- live on entry to the graph (i.e. undefined
+   -- variables)
 
 
 lintCmmBlock :: LabelSet -> CmmBlock -> CmmLint ()
@@ -160,7 +164,13 @@ lintCmmMiddle node = case node of
 
   CmmUnsafeForeignCall target _formals actuals -> do
             lintTarget target
-            mapM_ lintCmmExpr actuals
+            let lintArg expr = do
+                  -- Arguments can't mention caller-saved
+                  -- registers. See Note [Register parameter passing].
+                  mayNotMentionCallerSavedRegs (text "foreign call argument") expr
+                  lintCmmExpr expr
+
+            mapM_ lintArg actuals
 
 
 lintCmmLast :: LabelSet -> CmmNode O C -> CmmLint ()
@@ -180,7 +190,7 @@ lintCmmLast labels node = case node of
             if (erep `cmmEqType_ignoring_ptrhood` bWord platform)
               then return ()
               else cmmLintErr (text "switch scrutinee is not a word: " <>
-                               ppr e <> text " :: " <> ppr erep)
+                               pdoc platform e <> text " :: " <> ppr erep)
 
   CmmCall { cml_target = target, cml_cont = cont } -> do
           _ <- lintCmmExpr target
@@ -188,32 +198,54 @@ lintCmmLast labels node = case node of
 
   CmmForeignCall tgt _ args succ _ _ _ -> do
           lintTarget tgt
-          mapM_ lintCmmExpr args
+          let lintArg expr = do
+                -- Arguments can't mention caller-saved
+                -- registers. See Note [Register
+                -- parameter passing].
+                -- N.B. This won't catch local registers
+                -- which the NCG's register allocator later
+                -- places in caller-saved registers.
+                mayNotMentionCallerSavedRegs (text "foreign call argument") expr
+                lintCmmExpr expr
+          mapM_ lintArg args
           checkTarget succ
  where
   checkTarget id
      | setMember id labels = return ()
      | otherwise = cmmLintErr (text "Branch to nonexistent id" <+> ppr id)
 
-
 lintTarget :: ForeignTarget -> CmmLint ()
-lintTarget (ForeignTarget e _) = lintCmmExpr e >> return ()
+lintTarget (ForeignTarget e _) = do
+    mayNotMentionCallerSavedRegs (text "foreign target") e
+    _ <- lintCmmExpr e
+    return ()
 lintTarget (PrimTarget {})     = return ()
 
+-- | As noted in Note [Register parameter passing], the arguments and
+-- 'ForeignTarget' of a foreign call mustn't mention
+-- caller-saved registers.
+mayNotMentionCallerSavedRegs :: (UserOfRegs GlobalReg a, OutputableP Platform a)
+                             => SDoc -> a -> CmmLint ()
+mayNotMentionCallerSavedRegs what thing = do
+    platform <- getPlatform
+    let badRegs = filter (callerSaves platform)
+                  $ foldRegsUsed platform (flip (:)) [] thing
+    unless (null badRegs)
+      $ cmmLintErr (what <+> text "mentions caller-saved registers: " <> ppr badRegs $$ pdoc platform thing)
 
 checkCond :: Platform -> CmmExpr -> CmmLint ()
 checkCond _ (CmmMachOp mop _) | isComparisonMachOp mop = return ()
 checkCond platform (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth platform = return () -- constant values
-checkCond _ expr
+checkCond platform expr
     = cmmLintErr (hang (text "expression is not a conditional:") 2
-                         (ppr expr))
+                         (pdoc platform expr))
 
 -- -----------------------------------------------------------------------------
 -- CmmLint monad
 
 -- just a basic error monad:
 
-newtype CmmLint a = CmmLint { unCL :: DynFlags -> Either SDoc a }
+newtype CmmLint a = CmmLint { unCL :: Platform -> Either SDoc a }
     deriving (Functor)
 
 instance Applicative CmmLint where
@@ -221,37 +253,38 @@ instance Applicative CmmLint where
       (<*>) = ap
 
 instance Monad CmmLint where
-  CmmLint m >>= k = CmmLint $ \dflags ->
-                                case m dflags of
+  CmmLint m >>= k = CmmLint $ \platform ->
+                                case m platform of
                                 Left e -> Left e
-                                Right a -> unCL (k a) dflags
-
-instance HasDynFlags CmmLint where
-    getDynFlags = CmmLint (\dflags -> Right dflags)
+                                Right a -> unCL (k a) platform
 
 getPlatform :: CmmLint Platform
-getPlatform = targetPlatform <$> getDynFlags
+getPlatform = CmmLint $ \platform -> Right platform
 
 cmmLintErr :: SDoc -> CmmLint a
 cmmLintErr msg = CmmLint (\_ -> Left msg)
 
 addLintInfo :: SDoc -> CmmLint a -> CmmLint a
-addLintInfo info thing = CmmLint $ \dflags ->
-   case unCL thing dflags of
+addLintInfo info thing = CmmLint $ \platform ->
+   case unCL thing platform of
         Left err -> Left (hang info 2 err)
         Right a  -> Right a
 
 cmmLintMachOpErr :: CmmExpr -> [CmmType] -> [Width] -> CmmLint a
 cmmLintMachOpErr expr argsRep opExpectsRep
-     = cmmLintErr (text "in MachOp application: " $$
-                   nest 2 (ppr  expr) $$
+     = do
+       platform <- getPlatform
+       cmmLintErr (text "in MachOp application: " $$
+                   nest 2 (pdoc platform expr) $$
                       (text "op is expecting: " <+> ppr opExpectsRep) $$
                       (text "arguments provide: " <+> ppr argsRep))
 
 cmmLintAssignErr :: CmmNode e x -> CmmType -> CmmType -> CmmLint a
 cmmLintAssignErr stmt e_ty r_ty
-  = cmmLintErr (text "in assignment: " $$
-                nest 2 (vcat [ppr stmt,
+  = do
+    platform <- getPlatform
+    cmmLintErr (text "in assignment: " $$
+                nest 2 (vcat [pdoc platform stmt,
                               text "Reg ty:" <+> ppr r_ty,
                               text "Rhs ty:" <+> ppr e_ty]))
 

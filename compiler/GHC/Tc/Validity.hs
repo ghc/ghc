@@ -1,12 +1,12 @@
+{-# LANGUAGE CPP           #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
-
-{-# LANGUAGE CPP, TupleSections, ViewPatterns #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 module GHC.Tc.Validity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
@@ -14,7 +14,7 @@ module GHC.Tc.Validity (
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs,
   checkValidCoAxiom, checkValidCoAxBranch,
-  checkValidTyFamEqn, checkConsistentFamInst,
+  checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
   badATErr, arityErr,
   checkTyConTelescope,
   allDistinctTyVars
@@ -22,19 +22,19 @@ module GHC.Tc.Validity (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Maybes
+import GHC.Data.Maybe
 
 -- friends:
-import GHC.Tc.Utils.Unify    ( tcSubType_NC )
+import GHC.Tc.Utils.Unify    ( tcSubTypeSigma )
 import GHC.Tc.Solver         ( simplifyAmbiguityCheck )
 import GHC.Tc.Instance.Class ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 import GHC.Tc.Utils.TcType hiding ( sizeType, sizeTypes )
-import GHC.Builtin.Types ( heqTyConName, eqTyConName, coercibleTyConName )
+import GHC.Builtin.Types ( heqTyConName, eqTyConName, coercibleTyConName, manyDataConTy )
 import GHC.Builtin.Names
 import GHC.Core.Type
 import GHC.Core.Unify ( tcMatchTyX_BM, BindFlag(..) )
@@ -59,19 +59,21 @@ import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( VarBndr(..), mkTyVar )
-import FV
-import ErrUtils
+import GHC.Utils.FV
+import GHC.Utils.Error
 import GHC.Driver.Session
-import Util
-import ListSetOps
+import GHC.Utils.Misc
+import GHC.Data.List.SetOps
 import GHC.Types.SrcLoc
-import Outputable
-import GHC.Types.Unique  ( mkAlphaTyVarUnique )
-import Bag               ( emptyBag )
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
+import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
+import GHC.Data.Bag      ( emptyBag )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Foldable
+import Data.Function
 import Data.List        ( (\\), nub )
 import qualified Data.List.NonEmpty as NE
 
@@ -122,7 +124,7 @@ Consider
 You would think that the definition of g would surely typecheck!
 After all f has exactly the same type, and g=f. But in fact f's type
 is instantiated and the instantiated constraints are solved against
-the originals, so in the case an ambiguous type it won't work.
+the originals, so in the case of an ambiguous type it won't work.
 Consider our earlier example f :: C a => Int.  Then in g's definition,
 we'll instantiate to (C alpha) and try to deduce (C alpha) from (C a),
 and fail.
@@ -216,7 +218,7 @@ checkAmbiguity ctxt ty
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
                             captureConstraints $
-                            tcSubType_NC ctxt ty ty
+                            tcSubTypeSigma ctxt ty ty
        ; simplifyAmbiguityCheck ty wanted
 
        ; traceTc "Done ambiguity check for" (ppr ty) }
@@ -346,7 +348,6 @@ checkValidType ctxt ty
              rank
                = case ctxt of
                  DefaultDeclCtxt-> MustBeMonoType
-                 ResSigCtxt     -> MustBeMonoType
                  PatSigCtxt     -> rank0
                  RuleSigCtxt _  -> rank1
                  TySynCtxt _    -> rank0
@@ -370,7 +371,6 @@ checkValidType ctxt ty
 
                  ForSigCtxt _   -> rank1
                  SpecInstCtxt   -> rank1
-                 ThBrackCtxt    -> rank1
                  GhciCtxt {}    -> ArbitraryRank
 
                  TyVarBndrKindCtxt _ -> rank0
@@ -456,7 +456,7 @@ instance Outputable Rank where
 
 rankZeroMonoType, tyConArgMonoType, synArgMonoType, constraintMonoType :: Rank
 rankZeroMonoType   = MonoType (text "Perhaps you intended to use RankNTypes")
-tyConArgMonoType   = MonoType (text "GHC doesn't yet support impredicative polymorphism")
+tyConArgMonoType   = MonoType (text "Perhaps you intended to use ImpredicativeTypes")
 synArgMonoType     = MonoType (text "Perhaps you intended to use LiberalTypeSynonyms")
 constraintMonoType = MonoType (vcat [ text "A constraint must be a monotype"
                                     , text "Perhaps you intended to use QuantifiedConstraints" ])
@@ -470,18 +470,92 @@ forAllAllowed ArbitraryRank             = True
 forAllAllowed (LimitedRank forall_ok _) = forall_ok
 forAllAllowed _                         = False
 
+-- | Indicates whether a 'UserTypeCtxt' represents type-level contexts,
+-- kind-level contexts, or both.
+data TypeOrKindCtxt
+  = OnlyTypeCtxt
+    -- ^ A 'UserTypeCtxt' that only represents type-level positions.
+  | OnlyKindCtxt
+    -- ^ A 'UserTypeCtxt' that only represents kind-level positions.
+  | BothTypeAndKindCtxt
+    -- ^ A 'UserTypeCtxt' that can represent both type- and kind-level positions.
+  deriving Eq
+
+instance Outputable TypeOrKindCtxt where
+  ppr ctxt = text $ case ctxt of
+    OnlyTypeCtxt        -> "OnlyTypeCtxt"
+    OnlyKindCtxt        -> "OnlyKindCtxt"
+    BothTypeAndKindCtxt -> "BothTypeAndKindCtxt"
+
+-- | Determine whether a 'UserTypeCtxt' can represent type-level contexts,
+-- kind-level contexts, or both.
+typeOrKindCtxt :: UserTypeCtxt -> TypeOrKindCtxt
+typeOrKindCtxt (FunSigCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (InfSigCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (ExprSigCtxt {})     = OnlyTypeCtxt
+typeOrKindCtxt (TypeAppCtxt {})     = OnlyTypeCtxt
+typeOrKindCtxt (PatSynCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (PatSigCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (RuleSigCtxt {})     = OnlyTypeCtxt
+typeOrKindCtxt (ForSigCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (DefaultDeclCtxt {}) = OnlyTypeCtxt
+typeOrKindCtxt (InstDeclCtxt {})    = OnlyTypeCtxt
+typeOrKindCtxt (SpecInstCtxt {})    = OnlyTypeCtxt
+typeOrKindCtxt (GenSigCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (ClassSCCtxt {})     = OnlyTypeCtxt
+typeOrKindCtxt (SigmaCtxt {})       = OnlyTypeCtxt
+typeOrKindCtxt (DataTyCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (DerivClauseCtxt {}) = OnlyTypeCtxt
+typeOrKindCtxt (ConArgCtxt {})      = OnlyTypeCtxt
+  -- Although data constructors can be promoted with DataKinds, we always
+  -- validity-check them as though they are the types of terms. We may need
+  -- to revisit this decision if we ever allow visible dependent quantification
+  -- in the types of data constructors.
+
+typeOrKindCtxt (KindSigCtxt {})           = OnlyKindCtxt
+typeOrKindCtxt (StandaloneKindSigCtxt {}) = OnlyKindCtxt
+typeOrKindCtxt (TyVarBndrKindCtxt {})     = OnlyKindCtxt
+typeOrKindCtxt (DataKindCtxt {})          = OnlyKindCtxt
+typeOrKindCtxt (TySynKindCtxt {})         = OnlyKindCtxt
+typeOrKindCtxt (TyFamResKindCtxt {})      = OnlyKindCtxt
+
+typeOrKindCtxt (TySynCtxt {}) = BothTypeAndKindCtxt
+  -- Type synonyms can have types and kinds on their RHSs
+typeOrKindCtxt (GhciCtxt {})  = BothTypeAndKindCtxt
+  -- GHCi's :kind command accepts both types and kinds
+
+-- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
+-- context for a kind of a type.
+-- If the 'UserTypeCtxt' can refer to both types and kinds, this function
+-- conservatively returns 'True'.
+--
+-- An example of something that is unambiguously the kind of a type is the
+-- @Show a => a -> a@ in @type Foo :: Show a => a -> a@. On the other hand, the
+-- same type in @foo :: Show a => a -> a@ is unambiguously the type of a term,
+-- not the kind of a type, so it is permitted.
+typeLevelUserTypeCtxt :: UserTypeCtxt -> Bool
+typeLevelUserTypeCtxt ctxt = case typeOrKindCtxt ctxt of
+  OnlyTypeCtxt        -> True
+  OnlyKindCtxt        -> False
+  BothTypeAndKindCtxt -> True
+
+-- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
+-- context for a kind of a type, where the arbitrary use of constraints is
+-- currently disallowed.
+-- (See @Note [Constraints in kinds]@ in "GHC.Core.TyCo.Rep".)
 allConstraintsAllowed :: UserTypeCtxt -> Bool
--- We don't allow arbitrary constraints in kinds
-allConstraintsAllowed (TyVarBndrKindCtxt {}) = False
-allConstraintsAllowed (DataKindCtxt {})      = False
-allConstraintsAllowed (TySynKindCtxt {})     = False
-allConstraintsAllowed (TyFamResKindCtxt {})  = False
-allConstraintsAllowed (StandaloneKindSigCtxt {}) = False
-allConstraintsAllowed _ = True
+allConstraintsAllowed = typeLevelUserTypeCtxt
+
+-- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
+-- context for a kind of a type, where all function arrows currently
+-- must be unrestricted.
+linearityAllowed :: UserTypeCtxt -> Bool
+linearityAllowed = typeLevelUserTypeCtxt
 
 -- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
 -- context for the type of a term, where visible, dependent quantification is
--- currently disallowed.
+-- currently disallowed. If the 'UserTypeCtxt' can refer to both types and
+-- kinds, this function conservatively returns 'True'.
 --
 -- An example of something that is unambiguously the type of a term is the
 -- @forall a -> a -> a@ in @foo :: forall a -> a -> a@. On the other hand, the
@@ -494,40 +568,10 @@ allConstraintsAllowed _ = True
 -- @testsuite/tests/dependent/should_fail/T16326_Fail*.hs@ (for places where
 -- VDQ is disallowed).
 vdqAllowed :: UserTypeCtxt -> Bool
--- Currently allowed in the kinds of types...
-vdqAllowed (KindSigCtxt {}) = True
-vdqAllowed (StandaloneKindSigCtxt {}) = True
-vdqAllowed (TySynCtxt {}) = True
-vdqAllowed (ThBrackCtxt {}) = True
-vdqAllowed (GhciCtxt {}) = True
-vdqAllowed (TyVarBndrKindCtxt {}) = True
-vdqAllowed (DataKindCtxt {}) = True
-vdqAllowed (TySynKindCtxt {}) = True
-vdqAllowed (TyFamResKindCtxt {}) = True
--- ...but not in the types of terms.
-vdqAllowed (ConArgCtxt {}) = False
-  -- We could envision allowing VDQ in data constructor types so long as the
-  -- constructor is only ever used at the type level, but for now, GHC adopts
-  -- the stance that VDQ is never allowed in data constructor types.
-vdqAllowed (FunSigCtxt {}) = False
-vdqAllowed (InfSigCtxt {}) = False
-vdqAllowed (ExprSigCtxt {}) = False
-vdqAllowed (TypeAppCtxt {}) = False
-vdqAllowed (PatSynCtxt {}) = False
-vdqAllowed (PatSigCtxt {}) = False
-vdqAllowed (RuleSigCtxt {}) = False
-vdqAllowed (ResSigCtxt {}) = False
-vdqAllowed (ForSigCtxt {}) = False
-vdqAllowed (DefaultDeclCtxt {}) = False
--- We count class constraints as "types of terms". All of the cases below deal
--- with class constraints.
-vdqAllowed (InstDeclCtxt {}) = False
-vdqAllowed (SpecInstCtxt {}) = False
-vdqAllowed (GenSigCtxt {}) = False
-vdqAllowed (ClassSCCtxt {}) = False
-vdqAllowed (SigmaCtxt {}) = False
-vdqAllowed (DataTyCtxt {}) = False
-vdqAllowed (DerivClauseCtxt {}) = False
+vdqAllowed ctxt = case typeOrKindCtxt ctxt of
+  OnlyTypeCtxt        -> False
+  OnlyKindCtxt        -> True
+  BothTypeAndKindCtxt -> True
 
 {-
 Note [Correctness and performance of type synonym validity checking]
@@ -711,8 +755,12 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
     (theta, tau)  = tcSplitPhiTy phi
     (env', tvbs') = tidyTyCoVarBinders env tvbs
 
-check_type (ve@ValidityEnv{ve_rank = rank}) (FunTy _ arg_ty res_ty)
-  = do  { check_type (ve{ve_rank = arg_rank}) arg_ty
+check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
+                          , ve_rank = rank })
+           ty@(FunTy _ mult arg_ty res_ty)
+  = do  { failIfTcM (not (linearityAllowed ctxt) && not (isManyDataConTy mult))
+                     (linearFunKindErr env ty)
+        ; check_type (ve{ve_rank = arg_rank}) arg_ty
         ; check_type (ve{ve_rank = res_rank}) res_ty }
   where
     (arg_rank, res_rank) = funArgResRank rank
@@ -959,6 +1007,11 @@ illegalVDQTyErr env ty =
           text "in the type of a term:")
        2 (ppr_tidy env ty)
   , text "(GHC does not yet support this)" ] )
+
+-- | Reject uses of linear function arrows in kinds.
+linearFunKindErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+linearFunKindErr env ty =
+  (env, text "Illegal linear function in a kind:" <+> ppr_tidy env ty)
 
 {-
 Note [Liberal type synonyms]
@@ -1327,11 +1380,9 @@ okIPCtxt (InfSigCtxt {})        = True
 okIPCtxt ExprSigCtxt            = True
 okIPCtxt TypeAppCtxt            = True
 okIPCtxt PatSigCtxt             = True
-okIPCtxt ResSigCtxt             = True
 okIPCtxt GenSigCtxt             = True
 okIPCtxt (ConArgCtxt {})        = True
 okIPCtxt (ForSigCtxt {})        = True  -- ??
-okIPCtxt ThBrackCtxt            = True
 okIPCtxt (GhciCtxt {})          = True
 okIPCtxt SigmaCtxt              = True
 okIPCtxt (DataTyCtxt {})        = True
@@ -1635,17 +1686,24 @@ tcInstHeadTyNotSynonym :: Type -> Bool
 tcInstHeadTyNotSynonym ty
   = case ty of  -- Do not use splitTyConApp,
                 -- because that expands synonyms!
-        TyConApp tc _ -> not (isTypeSynonymTyCon tc)
+        TyConApp tc _ -> not (isTypeSynonymTyCon tc) || tc == unrestrictedFunTyCon
+                -- Allow (->), e.g. instance Category (->),
+                -- even though it's a type synonym for FUN 'Many
         _ -> True
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
 -- These must be a constructor applied to type variable arguments
 -- or a type-level literal.
--- But we allow kind instantiations.
+-- But we allow
+-- 1) kind instantiations
+-- 2) the type (->) = FUN 'Many, even though it's not in this form.
 tcInstHeadTyAppAllTyVars ty
   | Just (tc, tys) <- tcSplitTyConApp_maybe (dropCasts ty)
-  = ok (filterOutInvisibleTypes tc tys)  -- avoid kinds
+  = let tys' = filterOutInvisibleTypes tc tys  -- avoid kinds
+        tys'' | tc == funTyCon, tys_h:tys_t <- tys', tys_h `eqType` manyDataConTy = tys_t
+              | otherwise = tys'
+    in ok tys''
   | LitTy _ <- ty = True  -- accept type literals (#13833)
   | otherwise
   = False
@@ -1663,7 +1721,7 @@ dropCasts :: Type -> Type
 -- To consider: drop only HoleCo casts
 dropCasts (CastTy ty _)       = dropCasts ty
 dropCasts (AppTy t1 t2)       = mkAppTy (dropCasts t1) (dropCasts t2)
-dropCasts ty@(FunTy _ t1 t2)  = ty { ft_arg = dropCasts t1, ft_res = dropCasts t2 }
+dropCasts ty@(FunTy _ w t1 t2)  = ty { ft_mult = dropCasts w, ft_arg = dropCasts t1, ft_res = dropCasts t2 }
 dropCasts (TyConApp tc tys)   = mkTyConApp tc (map dropCasts tys)
 dropCasts (ForAllTy b ty)     = ForAllTy (dropCastsB b) (dropCasts ty)
 dropCasts ty                  = ty  -- LitTy, TyVarTy, CoercionTy
@@ -2109,6 +2167,68 @@ checkValidTyFamEqn fam_tc qvs typats rhs
        ; unless undecidable_ok $
          mapM_ addErrTc (checkFamInstRhs fam_tc typats (tcTyFamInsts rhs)) }
 
+-- | Checks that an associated type family default:
+--
+-- 1. Only consists of arguments that are bare type variables, and
+--
+-- 2. Has a distinct type variable in each argument.
+--
+-- See @Note [Type-checking default assoc decls]@ in "GHC.Tc.TyCl".
+checkValidAssocTyFamDeflt :: TyCon  -- ^ of the type family
+                          -> [Type] -- ^ Type patterns
+                          -> TcM ()
+checkValidAssocTyFamDeflt fam_tc pats =
+  do { cpt_tvs <- zipWithM extract_tv pats pats_vis
+     ; check_all_distinct_tvs $ zip cpt_tvs pats_vis }
+  where
+    pats_vis :: [ArgFlag]
+    pats_vis = tyConArgFlags fam_tc pats
+
+    -- Checks that a pattern on the LHS of a default is a type
+    -- variable. If so, return the underlying type variable, and if
+    -- not, throw an error.
+    -- See Note [Type-checking default assoc decls]
+    extract_tv :: Type    -- The particular type pattern from which to extract
+                          -- its underlying type variable
+               -> ArgFlag -- The visibility of the type pattern
+                          -- (only used for error message purposes)
+               -> TcM TyVar
+    extract_tv pat pat_vis =
+      case getTyVar_maybe pat of
+        Just tv -> pure tv
+        Nothing -> failWithTc $
+          pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
+          hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
+             2 (vcat [ppr_eqn, suggestion])
+
+    -- Checks that no type variables in an associated default declaration are
+    -- duplicated. If that is the case, throw an error.
+    -- See Note [Type-checking default assoc decls]
+    check_all_distinct_tvs ::
+         [(TyVar, ArgFlag)] -- The type variable arguments in the associated
+                            -- default declaration, along with their respective
+                            -- visibilities (the latter are only used for error
+                            -- message purposes)
+      -> TcM ()
+    check_all_distinct_tvs cpt_tvs_vis =
+      let dups = findDupsEq ((==) `on` fst) cpt_tvs_vis in
+      traverse_
+        (\d -> let (pat_tv, pat_vis) = NE.head d in failWithTc $
+               pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
+               hang (text "Illegal duplicate variable"
+                       <+> quotes (ppr pat_tv) <+> text "in:")
+                  2 (vcat [ppr_eqn, suggestion]))
+        dups
+
+    ppr_eqn :: SDoc
+    ppr_eqn =
+      quotes (text "type" <+> ppr (mkTyConApp fam_tc pats)
+                <+> equals <+> text "...")
+
+    suggestion :: SDoc
+    suggestion = text "The arguments to" <+> quotes (ppr fam_tc)
+             <+> text "must all be distinct type variables"
+
 -- Make sure that each type family application is
 --   (1) strictly smaller than the lhs,
 --   (2) mentions no type variable more often than the lhs, and
@@ -2155,8 +2275,8 @@ checkFamPatBinders fam_tc qtvs pats rhs
               , ppr (mkTyConApp fam_tc pats)
               , text "qtvs:" <+> ppr qtvs
               , text "rhs_tvs:" <+> ppr (fvVarSet rhs_fvs)
-              , text "pat_tvs:" <+> ppr pat_tvs
-              , text "inj_pat_tvs:" <+> ppr inj_pat_tvs ]
+              , text "cpt_tvs:" <+> ppr cpt_tvs
+              , text "inj_cpt_tvs:" <+> ppr inj_cpt_tvs ]
 
          -- Check for implicitly-bound tyvars, mentioned on the
          -- RHS but not bound on the LHS
@@ -2176,23 +2296,23 @@ checkFamPatBinders fam_tc qtvs pats rhs
                             (text "used in")
        }
   where
-    pat_tvs     = tyCoVarsOfTypes pats
-    inj_pat_tvs = fvVarSet $ injectiveVarsOfTypes False pats
+    cpt_tvs     = tyCoVarsOfTypes pats
+    inj_cpt_tvs = fvVarSet $ injectiveVarsOfTypes False pats
       -- The type variables that are in injective positions.
       -- See Note [Dodgy binding sites in type family instances]
       -- NB: The False above is irrelevant, as we never have type families in
       -- patterns.
       --
       -- NB: It's OK to use the nondeterministic `fvVarSet` function here,
-      -- since the order of `inj_pat_tvs` is never revealed in an error
+      -- since the order of `inj_cpt_tvs` is never revealed in an error
       -- message.
     rhs_fvs     = tyCoFVsOfType rhs
-    used_tvs    = pat_tvs `unionVarSet` fvVarSet rhs_fvs
+    used_tvs    = cpt_tvs `unionVarSet` fvVarSet rhs_fvs
     bad_qtvs    = filterOut (`elemVarSet` used_tvs) qtvs
                   -- Bound but not used at all
-    bad_rhs_tvs = filterOut (`elemVarSet` inj_pat_tvs) (fvVarList rhs_fvs)
+    bad_rhs_tvs = filterOut (`elemVarSet` inj_cpt_tvs) (fvVarList rhs_fvs)
                   -- Used on RHS but not bound on LHS
-    dodgy_tvs   = pat_tvs `minusVarSet` inj_pat_tvs
+    dodgy_tvs   = cpt_tvs `minusVarSet` inj_cpt_tvs
 
     check_tvs tvs what what2
       = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $
@@ -2734,7 +2854,8 @@ Now, it's impossible for a Specified variable not to occur
 at all in the kind -- after all, it is Specified so it must have
 occurred.  (It /used/ to be possible; see tests T13983 and T7873.  But
 with the advent of the forall-or-nothing rule for kind variables,
-those strange cases went away. See Note [forall-or-nothing rule].)
+those strange cases went away. See Note [forall-or-nothing rule] in
+GHC.Hs.Type.)
 
 But one might worry about
     type v k = *
@@ -2830,7 +2951,7 @@ fvType (TyVarTy tv)          = [tv]
 fvType (TyConApp _ tys)      = fvTypes tys
 fvType (LitTy {})            = []
 fvType (AppTy fun arg)       = fvType fun ++ fvType arg
-fvType (FunTy _ arg res)     = fvType arg ++ fvType res
+fvType (FunTy _ w arg res)   = fvType w ++ fvType arg ++ fvType res
 fvType (ForAllTy (Bndr tv _) ty)
   = fvType (tyVarKind tv) ++
     filter (/= tv) (fvType ty)
@@ -2847,7 +2968,7 @@ sizeType (TyVarTy {})      = 1
 sizeType (TyConApp tc tys) = 1 + sizeTyConAppArgs tc tys
 sizeType (LitTy {})        = 1
 sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
-sizeType (FunTy _ arg res) = sizeType arg + sizeType res + 1
+sizeType (FunTy _ w arg res) = sizeType w + sizeType arg + sizeType res + 1
 sizeType (ForAllTy _ ty)   = sizeType ty
 sizeType (CastTy ty _)     = sizeType ty
 sizeType (CoercionTy _)    = 0

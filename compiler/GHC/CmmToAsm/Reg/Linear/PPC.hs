@@ -1,13 +1,14 @@
 -- | Free regs map for PowerPC
 module GHC.CmmToAsm.Reg.Linear.PPC where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.PPC.Regs
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 
 import Data.Word
@@ -26,6 +27,9 @@ import Data.Bits
 
 data FreeRegs = FreeRegs !Word32 !Word32
               deriving( Show )  -- The Show is used in an ASSERT
+
+instance Outputable FreeRegs where
+    ppr = text . show
 
 noFreeRegs :: FreeRegs
 noFreeRegs = FreeRegs 0 0

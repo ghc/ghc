@@ -6,10 +6,8 @@ module GHC.Settings
   , ToolSettings (..)
   , FileSettings (..)
   , GhcNameVersion (..)
-  , PlatformConstants (..)
   , Platform (..)
   , PlatformMisc (..)
-  , PlatformMini (..)
   -- * Accessors
   , sProgramName
   , sProjectVersion
@@ -30,11 +28,14 @@ module GHC.Settings
   , sPgm_c
   , sPgm_a
   , sPgm_l
+  , sPgm_lm
   , sPgm_dll
   , sPgm_T
   , sPgm_windres
   , sPgm_libtool
   , sPgm_ar
+  , sPgm_otool
+  , sPgm_install_name_tool
   , sPgm_ranlib
   , sPgm_lo
   , sPgm_lc
@@ -48,6 +49,7 @@ module GHC.Settings
   , sOpt_cxx
   , sOpt_a
   , sOpt_l
+  , sOpt_lm
   , sOpt_windres
   , sOpt_lo
   , sOpt_lc
@@ -55,24 +57,17 @@ module GHC.Settings
   , sOpt_i
   , sExtraGccViaCFlags
   , sTargetPlatformString
-  , sIntegerLibrary
-  , sIntegerLibraryType
   , sGhcWithInterpreter
-  , sGhcWithNativeCodeGen
   , sGhcWithSMP
   , sGhcRTSWays
-  , sTablesNextToCode
-  , sLeadingUnderscore
   , sLibFFI
-  , sGhcThreaded
-  , sGhcDebugged
   , sGhcRtsWithLibdw
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import CliOption
-import Fingerprint
+import GHC.Utils.CliOption
+import GHC.Utils.Fingerprint
 import GHC.Platform
 
 data Settings = Settings
@@ -106,11 +101,14 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_c       :: String
   , toolSettings_pgm_a       :: (String, [Option])
   , toolSettings_pgm_l       :: (String, [Option])
+  , toolSettings_pgm_lm      :: (String, [Option])
   , toolSettings_pgm_dll     :: (String, [Option])
   , toolSettings_pgm_T       :: String
   , toolSettings_pgm_windres :: String
   , toolSettings_pgm_libtool :: String
   , toolSettings_pgm_ar      :: String
+  , toolSettings_pgm_otool   :: String
+  , toolSettings_pgm_install_name_tool :: String
   , toolSettings_pgm_ranlib  :: String
   , -- | LLVM: opt llvm optimiser
     toolSettings_pgm_lo      :: (String, [Option])
@@ -131,6 +129,7 @@ data ToolSettings = ToolSettings
   , toolSettings_opt_cxx           :: [String]
   , toolSettings_opt_a             :: [String]
   , toolSettings_opt_l             :: [String]
+  , toolSettings_opt_lm            :: [String]
   , toolSettings_opt_windres       :: [String]
   , -- | LLVM: llvm optimiser
     toolSettings_opt_lo            :: [String]
@@ -162,10 +161,6 @@ data GhcNameVersion = GhcNameVersion
   { ghcNameVersion_programName    :: String
   , ghcNameVersion_projectVersion :: String
   }
-
--- Produced by deriveConstants
--- Provides PlatformConstants datatype
-#include "GHCConstantsHaskellType.hs"
 
 -----------------------------------------------------------------------------
 -- Accessessors from 'Settings'
@@ -211,6 +206,8 @@ sPgm_a :: Settings -> (String, [Option])
 sPgm_a = toolSettings_pgm_a . sToolSettings
 sPgm_l :: Settings -> (String, [Option])
 sPgm_l = toolSettings_pgm_l . sToolSettings
+sPgm_lm :: Settings -> (String, [Option])
+sPgm_lm = toolSettings_pgm_lm . sToolSettings
 sPgm_dll :: Settings -> (String, [Option])
 sPgm_dll = toolSettings_pgm_dll . sToolSettings
 sPgm_T :: Settings -> String
@@ -221,6 +218,10 @@ sPgm_libtool :: Settings -> String
 sPgm_libtool = toolSettings_pgm_libtool . sToolSettings
 sPgm_ar :: Settings -> String
 sPgm_ar = toolSettings_pgm_ar . sToolSettings
+sPgm_otool :: Settings -> String
+sPgm_otool = toolSettings_pgm_otool . sToolSettings
+sPgm_install_name_tool :: Settings -> String
+sPgm_install_name_tool = toolSettings_pgm_install_name_tool . sToolSettings
 sPgm_ranlib :: Settings -> String
 sPgm_ranlib = toolSettings_pgm_ranlib . sToolSettings
 sPgm_lo :: Settings -> (String, [Option])
@@ -247,6 +248,8 @@ sOpt_a :: Settings -> [String]
 sOpt_a = toolSettings_opt_a . sToolSettings
 sOpt_l :: Settings -> [String]
 sOpt_l = toolSettings_opt_l . sToolSettings
+sOpt_lm :: Settings -> [String]
+sOpt_lm = toolSettings_opt_lm . sToolSettings
 sOpt_windres :: Settings -> [String]
 sOpt_windres = toolSettings_opt_windres . sToolSettings
 sOpt_lo :: Settings -> [String]
@@ -263,27 +266,13 @@ sExtraGccViaCFlags = toolSettings_extraGccViaCFlags . sToolSettings
 
 sTargetPlatformString :: Settings -> String
 sTargetPlatformString = platformMisc_targetPlatformString . sPlatformMisc
-sIntegerLibrary :: Settings -> String
-sIntegerLibrary = platformMisc_integerLibrary . sPlatformMisc
-sIntegerLibraryType :: Settings -> IntegerLibrary
-sIntegerLibraryType = platformMisc_integerLibraryType . sPlatformMisc
 sGhcWithInterpreter :: Settings -> Bool
 sGhcWithInterpreter = platformMisc_ghcWithInterpreter . sPlatformMisc
-sGhcWithNativeCodeGen :: Settings -> Bool
-sGhcWithNativeCodeGen = platformMisc_ghcWithNativeCodeGen . sPlatformMisc
 sGhcWithSMP :: Settings -> Bool
 sGhcWithSMP = platformMisc_ghcWithSMP . sPlatformMisc
 sGhcRTSWays :: Settings -> String
 sGhcRTSWays = platformMisc_ghcRTSWays . sPlatformMisc
-sTablesNextToCode :: Settings -> Bool
-sTablesNextToCode = platformMisc_tablesNextToCode . sPlatformMisc
-sLeadingUnderscore :: Settings -> Bool
-sLeadingUnderscore = platformMisc_leadingUnderscore . sPlatformMisc
 sLibFFI :: Settings -> Bool
 sLibFFI = platformMisc_libFFI . sPlatformMisc
-sGhcThreaded :: Settings -> Bool
-sGhcThreaded = platformMisc_ghcThreaded . sPlatformMisc
-sGhcDebugged :: Settings -> Bool
-sGhcDebugged = platformMisc_ghcDebugged . sPlatformMisc
 sGhcRtsWithLibdw :: Settings -> Bool
 sGhcRtsWithLibdw = platformMisc_ghcRtsWithLibdw . sPlatformMisc

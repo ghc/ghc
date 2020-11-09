@@ -8,7 +8,7 @@
 module GHC.Core.Class (
         Class,
         ClassOpItem,
-        ClassATItem(..),
+        ClassATItem(..), ATValidityInfo(..),
         ClassMinimalDef,
         DefMethInfo, pprDefMethInfo,
 
@@ -23,7 +23,7 @@ module GHC.Core.Class (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, PredType )
@@ -32,10 +32,11 @@ import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.Unique
-import Util
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
-import Outputable
-import BooleanFormula (BooleanFormula, mkTrue)
+import GHC.Utils.Outputable
+import GHC.Data.BooleanFormula (BooleanFormula, mkTrue)
 
 import qualified Data.Data as Data
 
@@ -77,7 +78,7 @@ data Class
 --
 --  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
 --
---  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'',
+--  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'',
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 type FunDep a = ([a],[a])
@@ -96,9 +97,20 @@ type DefMethInfo = Maybe (Name, DefMethSpec Type)
 
 data ClassATItem
   = ATI TyCon         -- See Note [Associated type tyvar names]
-        (Maybe (Type, SrcSpan))
+        (Maybe (Type, ATValidityInfo))
                       -- Default associated type (if any) from this template
                       -- Note [Associated type defaults]
+
+-- | Information about an associated type family default implementation. This
+-- is used solely for validity checking.
+-- See @Note [Type-checking default assoc decls]@ in "GHC.Tc.TyCl".
+data ATValidityInfo
+  = NoATVI               -- Used for associated type families that are imported
+                         -- from another module, for which we don't need to
+                         -- perform any validity checking.
+
+  | ATVI SrcSpan [Type]  -- Used for locally defined associated type families.
+                         -- The [Type] are the LHS patterns.
 
 type ClassMinimalDef = BooleanFormula Name -- Required methods
 

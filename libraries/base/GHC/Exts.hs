@@ -1,6 +1,12 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE MagicHash, UnboxedTuples, TypeFamilies, DeriveDataTypeable,
-             MultiParamTypeClasses, FlexibleInstances, NoImplicitPrelude #-}
+
+{-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -28,12 +34,14 @@ module GHC.Exts
         maxTupleSize,
 
         -- * Primitive operations
+        FUN, -- See https://gitlab.haskell.org/ghc/ghc/issues/18302
         module GHC.Prim,
         module GHC.Prim.Ext,
         shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
         uncheckedShiftL64#, uncheckedShiftRL64#,
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
         isTrue#,
+        Void#,  -- Previously exported by GHC.Prim
 
         -- * Compat wrapper
         atomicModifyMutVar#,
@@ -51,6 +59,14 @@ module GHC.Exts
 
         -- * Overloaded string literals
         IsString(..),
+
+        -- * CString
+        unpackCString#,
+        unpackAppendCString#,
+        unpackFoldrCString#,
+        unpackCStringUtf8#,
+        unpackNBytes#,
+        cstringLength#,
 
         -- * Debugging
         breakpoint, breakpointCond,
@@ -83,9 +99,6 @@ module GHC.Exts
         -- * Event logging
         traceEvent,
 
-        -- * SpecConstr annotations
-        SpecConstrAnnotation(..),
-
         -- * The call stack
         currentCallStack,
 
@@ -111,7 +124,6 @@ import GHC.Stack
 import qualified Data.Coerce
 import Data.String
 import Data.OldList
-import Data.Data
 import Data.Ord
 import Data.Version ( Version(..), makeVersion )
 import qualified Debug.Trace
@@ -121,7 +133,7 @@ import Control.Applicative (ZipList(..))
 
 -- XXX This should really be in Data.Tuple, where the definitions are
 maxTupleSize :: Int
-maxTupleSize = 62
+maxTupleSize = 64
 
 -- | 'the' ensures that all the elements of the list are identical
 -- and then returns that unique element
@@ -161,25 +173,6 @@ traceEvent = Debug.Trace.traceEventIO
 
 {- **********************************************************************
 *                                                                       *
-*              SpecConstr annotation                                    *
-*                                                                       *
-********************************************************************** -}
-
--- Annotating a type with NoSpecConstr will make SpecConstr
--- not specialise for arguments of that type.
-
--- This data type is defined here, rather than in the SpecConstr module
--- itself, so that importing it doesn't force stupidly linking the
--- entire ghc package at runtime
-
-data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
-                deriving ( Data -- ^ @since 4.3.0.0
-                         , Eq   -- ^ @since 4.3.0.0
-                         )
-
-
-{- **********************************************************************
-*                                                                       *
 *              The IsList class                                         *
 *                                                                       *
 ********************************************************************** -}
@@ -197,11 +190,12 @@ class IsList l where
   --   list of @Item l@
   fromList  :: [Item l] -> l
 
-  -- | The 'fromListN' function takes the input list's length as a hint. Its
-  --   behaviour should be equivalent to 'fromList'. The hint can be used to
-  --   construct the structure @l@ more efficiently compared to 'fromList'. If
-  --   the given hint does not equal to the input list's length the behaviour of
-  --   'fromListN' is not specified.
+  -- | The 'fromListN' function takes the input list's length and potentially
+  --   uses it to construct the structure @l@ more efficiently compared to 
+  --   'fromList'. If the given number does not equal to the input list's length 
+  --   the behaviour of 'fromListN' is not specified.
+  --
+  --   prop> fromListN (length xs) xs == fromList xs
   fromListN :: Int -> [Item l] -> l
   fromListN _ = fromList
 

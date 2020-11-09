@@ -1,34 +1,32 @@
+{-# LANGUAGE CPP                  #-}
+{-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[HsLit]{Abstract syntax: source-language literals}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-                                      -- in module GHC.Hs.Extension
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TypeFamilies #-}
-
+-- | Source-language literals
 module GHC.Hs.Lit where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, pprExpr )
-import GHC.Types.Basic
-   ( IntegralLit(..), FractionalLit(..), negateIntegralLit
-   , negateFractionalLit, SourceText(..), pprWithSourceText
-   , PprPrec(..), topPrec )
+import GHC.Types.Basic (PprPrec(..), topPrec )
+import GHC.Types.SourceText
 import GHC.Core.Type
-import Outputable
-import FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
 import GHC.Hs.Extension
 
 import Data.ByteString (ByteString)
@@ -53,11 +51,11 @@ data HsLit x
       -- ^ Unboxed character
   | HsString (XHsString x) {- SourceText -} FastString
       -- ^ String
-  | HsStringPrim (XHsStringPrim x) {- SourceText -} ByteString
+  | HsStringPrim (XHsStringPrim x) {- SourceText -} !ByteString
       -- ^ Packed bytes
   | HsInt (XHsInt x)  IntegralLit
       -- ^ Genuinely an Int; arises from
-      -- @GHC.Tc.Deriv.Generate@, and from TRANSLATION
+      -- "GHC.Tc.Deriv.Generate", and from TRANSLATION
   | HsIntPrim (XHsIntPrim x) {- SourceText -} Integer
       -- ^ literal @Int#@
   | HsWordPrim (XHsWordPrim x) {- SourceText -} Integer
@@ -222,7 +220,7 @@ instance Ord OverLitVal where
   compare (HsFractional f1)   (HsFractional f2)   = f1 `compare` f2
   compare (HsFractional _)    (HsIntegral   _)    = GT
   compare (HsFractional _)    (HsIsString _ _)    = LT
-  compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `compare` s2
+  compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `uniqCompareFS` s2
   compare (HsIsString _ _)    (HsIntegral   _)    = GT
   compare (HsIsString _ _)    (HsFractional _)    = GT
 

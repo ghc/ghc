@@ -23,7 +23,7 @@ module GHC.Types.Var.Set (
         sizeVarSet, seqVarSet,
         elemVarSetByKey, partitionVarSet,
         pluralVarSet, pprVarSet,
-        nonDetFoldVarSet,
+        nonDetStrictFoldVarSet,
 
         -- * Deterministic Var set types
         DVarSet, DIdSet, DTyVarSet, DTyCoVarSet,
@@ -36,7 +36,9 @@ module GHC.Types.Var.Set (
         intersectDVarSet, dVarSetIntersectVarSet,
         intersectsDVarSet, disjointDVarSet,
         isEmptyDVarSet, delDVarSet, delDVarSetList,
-        minusDVarSet, foldDVarSet, filterDVarSet, mapDVarSet,
+        minusDVarSet,
+        nonDetStrictFoldDVarSet,
+        filterDVarSet, mapDVarSet,
         dVarSetMinusVarSet, anyDVarSet, allDVarSet,
         transCloDVarSet,
         sizeDVarSet, seqDVarSet,
@@ -46,7 +48,7 @@ module GHC.Types.Var.Set (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Var      ( Var, TyVar, CoVar, TyCoVar, Id )
 import GHC.Types.Unique
@@ -55,12 +57,12 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.FM( disjointUFM, pluralUFM, pprUFM )
 import GHC.Types.Unique.DFM( disjointUDFM, udfmToUfm, anyUDFM, allUDFM )
-import Outputable (SDoc)
+import GHC.Utils.Outputable (SDoc)
 
 -- | A non-deterministic Variable Set
 --
 -- A non-deterministic set of variables.
--- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why it's not
+-- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" for explanation why it's not
 -- deterministic and why it matters. Use DVarSet if the set eventually
 -- gets converted into a list or folded over in a way where the order
 -- changes the generated code, for example when abstracting variables.
@@ -129,7 +131,7 @@ isEmptyVarSet   = isEmptyUniqSet
 mkVarSet        = mkUniqSet
 lookupVarSet_Directly = lookupUniqSet_Directly
 lookupVarSet    = lookupUniqSet
-lookupVarSetByName = lookupUniqSet
+lookupVarSetByName set name = lookupUniqSet_Directly set (getUnique name)
 sizeVarSet      = sizeUniqSet
 filterVarSet    = filterUniqSet
 delVarSetByKey  = delOneFromUniqSet_Directly
@@ -152,8 +154,11 @@ allVarSet = uniqSetAll
 mapVarSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b
 mapVarSet = mapUniqSet
 
-nonDetFoldVarSet :: (Var -> a -> a) -> a -> VarSet -> a
-nonDetFoldVarSet = nonDetFoldUniqSet
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldVarSet :: (Var -> a -> a) -> a -> VarSet -> a
+nonDetStrictFoldVarSet = nonDetStrictFoldUniqSet
 
 fixVarSet :: (VarSet -> VarSet)   -- Map the current set to a new set
           -> VarSet -> VarSet
@@ -290,8 +295,11 @@ minusDVarSet = minusUniqDSet
 dVarSetMinusVarSet :: DVarSet -> VarSet -> DVarSet
 dVarSetMinusVarSet = uniqDSetMinusUniqSet
 
-foldDVarSet :: (Var -> a -> a) -> a -> DVarSet -> a
-foldDVarSet = foldUniqDSet
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldDVarSet :: (Var -> a -> a) -> a -> DVarSet -> a
+nonDetStrictFoldDVarSet = nonDetStrictFoldUniqDSet
 
 anyDVarSet :: (Var -> Bool) -> DVarSet -> Bool
 anyDVarSet p = anyUDFM p . getUniqDSet

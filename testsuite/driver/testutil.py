@@ -55,7 +55,7 @@ def getStdout(cmd_and_args: List[str]):
     if r != 0:
         raise Exception("Command failed: " + str(cmd_and_args))
     if stderr:
-        raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr))
+        raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr.decode('utf-8')))
     return stdout.decode('utf-8')
 
 def lndir(srcdir: Path, dstdir: Path):
@@ -98,7 +98,10 @@ def symlinks_work() -> bool:
             except OSError as e:
                 print('Saw {} during symlink test; assuming symlinks do not work.'.format(e))
             finally:
-                os.unlink('__symlink-test')
+                try:
+                    os.unlink('__symlink-test')
+                except:
+                    pass
 
         return works
     else:
@@ -128,3 +131,42 @@ class Watcher(object):
         if self.pool <= 0:
             self.evt.set()
         self.sync_lock.release()
+
+def memoize(f):
+    """
+    A decorator to memoize a nullary function.
+    """
+    def cached():
+        if cached._cache is None:
+            cached._cache = f()
+
+        return cached._cache
+
+    cached._cache = None
+    return cached
+
+# Print the matrix data in a tabular format.
+def print_table(header_rows: List[List[str]], data_rows: List[List[str]], padding=2) -> None:
+    # Calculate column widths then print each row.
+    colWidths = [(0 if idx == 0 else padding) + max([len(cell) for cell in col])
+                 for (idx, col) in enumerate(zip(*(header_rows + data_rows)))]
+    col_fmts = ['{:>' + str(w) + '}' for w in colWidths]
+
+    def printCols(cols):
+        for row in cols:
+            print(''.join([f.format(cell) for (f,cell) in zip(col_fmts, row)]))
+
+    printCols(header_rows)
+    print('-' * sum(colWidths))
+    printCols(data_rows)
+
+def shorten_metric_name(name: str) -> str:
+    dic = {
+        "runtime/bytes allocated": "run/alloc",
+        "runtime/peak_megabytes_allocated": "run/peak",
+        "runtime/max_bytes_used": "run/max",
+        "compile_time/bytes allocated": "ghc/alloc",
+        "compile_time/peak_megabytes_allocated": "ghc/peak",
+        "compile_time/max_bytes_used": "ghc/max",
+    }
+    return dic.get(name, name)

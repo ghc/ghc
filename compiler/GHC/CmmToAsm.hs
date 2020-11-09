@@ -2,12 +2,15 @@
 --
 -- (c) The University of Glasgow 1993-2004
 --
--- This is the top-level module in the native code generator.
 --
 -- -----------------------------------------------------------------------------
 
 {-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, PatternSynonyms,
     DeriveFunctor #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
@@ -15,61 +18,98 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module GHC.CmmToAsm (
-                    -- * Module entry point
-                    nativeCodeGen
+-- | Native code generator
+--
+-- The native-code generator has machine-independent and
+-- machine-dependent modules.
+--
+-- This module ("GHC.CmmToAsm") is the top-level machine-independent
+-- module.  Before entering machine-dependent land, we do some
+-- machine-independent optimisations (defined below) on the
+-- 'CmmStmts's.
+--
+-- We convert to the machine-specific 'Instr' datatype with
+-- 'cmmCodeGen', assuming an infinite supply of registers.  We then use
+-- a machine-independent register allocator ('regAlloc') to rejoin
+-- reality.  Obviously, 'regAlloc' has machine-specific helper
+-- functions (see about "RegAllocInfo" below).
+--
+-- Finally, we order the basic blocks of the function so as to minimise
+-- the number of jumps between blocks, by utilising fallthrough wherever
+-- possible.
+--
+-- The machine-dependent bits break down as follows:
+--
+--   * ["MachRegs"]  Everything about the target platform's machine
+--     registers (and immediate operands, and addresses, which tend to
+--     intermingle/interact with registers).
+--
+--   * ["MachInstrs"]  Includes the 'Instr' datatype (possibly should
+--     have a module of its own), plus a miscellany of other things
+--     (e.g., 'targetDoubleSize', 'smStablePtrTable', ...)
+--
+--   * ["MachCodeGen"]  is where 'Cmm' stuff turns into
+--     machine instructions.
+--
+--   * ["PprMach"] 'pprInstr' turns an 'Instr' into text (well, really
+--     a 'SDoc').
+--
+--   * ["RegAllocInfo"] In the register allocator, we manipulate
+--     'MRegsState's, which are 'BitSet's, one bit per machine register.
+--     When we want to say something about a specific machine register
+--     (e.g., ``it gets clobbered by this instruction''), we set/unset
+--     its bit.  Obviously, we do this 'BitSet' thing for efficiency
+--     reasons.
+--
+--     The 'RegAllocInfo' module collects together the machine-specific
+--     info needed to do register allocation.
+--
+--    * ["RegisterAlloc"] The (machine-independent) register allocator.
+-- -}
+--
+module GHC.CmmToAsm
+   ( nativeCodeGen
 
-                    -- * Test-only exports: see trac #12744
-                    -- used by testGraphNoSpills, which needs to access
-                    -- the register allocator intermediate data structures
-                    -- cmmNativeGen emits
-                  , cmmNativeGen
-                  , NcgImpl(..)
-                  , x86NcgImpl
-                  ) where
+   -- * Test-only exports: see trac #12744
+   -- used by testGraphNoSpills, which needs to access
+   -- the register allocator intermediate data structures
+   -- cmmNativeGen emits
+   , cmmNativeGen
+   , NcgImpl(..)
+   , initNCGConfig
+   )
+where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import qualified GHC.CmmToAsm.X86.CodeGen as X86.CodeGen
-import qualified GHC.CmmToAsm.X86.Regs    as X86.Regs
-import qualified GHC.CmmToAsm.X86.Instr   as X86.Instr
-import qualified GHC.CmmToAsm.X86.Ppr     as X86.Ppr
-
-import qualified GHC.CmmToAsm.SPARC.CodeGen as SPARC.CodeGen
-import qualified GHC.CmmToAsm.SPARC.Regs    as SPARC.Regs
-import qualified GHC.CmmToAsm.SPARC.Instr   as SPARC.Instr
-import qualified GHC.CmmToAsm.SPARC.Ppr     as SPARC.Ppr
-import qualified GHC.CmmToAsm.SPARC.ShortcutJump   as SPARC.ShortcutJump
-import qualified GHC.CmmToAsm.SPARC.CodeGen.Expand as SPARC.CodeGen.Expand
-
-import qualified GHC.CmmToAsm.PPC.CodeGen as PPC.CodeGen
-import qualified GHC.CmmToAsm.PPC.Regs    as PPC.Regs
-import qualified GHC.CmmToAsm.PPC.RegInfo as PPC.RegInfo
-import qualified GHC.CmmToAsm.PPC.Instr   as PPC.Instr
-import qualified GHC.CmmToAsm.PPC.Ppr     as PPC.Ppr
+import qualified GHC.CmmToAsm.X86   as X86
+import qualified GHC.CmmToAsm.PPC   as PPC
+import qualified GHC.CmmToAsm.SPARC as SPARC
 
 import GHC.CmmToAsm.Reg.Liveness
 import qualified GHC.CmmToAsm.Reg.Linear                as Linear
 
-import qualified GraphColor                             as Color
+import qualified GHC.Data.Graph.Color                   as Color
 import qualified GHC.CmmToAsm.Reg.Graph                 as Color
 import qualified GHC.CmmToAsm.Reg.Graph.Stats           as Color
 import qualified GHC.CmmToAsm.Reg.Graph.TrivColorable   as Color
 
-import AsmUtils
+import GHC.Utils.Asm
 import GHC.CmmToAsm.Reg.Target
 import GHC.Platform
 import GHC.CmmToAsm.BlockLayout as BlockLayout
-import Config
+import GHC.Settings.Config
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
 import GHC.Platform.Reg
+import GHC.Platform.Reg.Class (RegClass)
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Dwarf
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
 import GHC.Cmm.DebugBlock
 
 import GHC.Cmm.BlockId
@@ -86,21 +126,19 @@ import GHC.Cmm.CLabel
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
-import Util
+import GHC.Driver.Ppr
+import GHC.Utils.Misc
 
-import GHC.Types.Basic       ( Alignment )
-import qualified Pretty
-import BufWrite
-import Outputable
-import FastString
+import qualified GHC.Utils.Ppr as Pretty
+import GHC.Utils.BufHandle
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
 import GHC.Types.Unique.Set
-import ErrUtils
-import GHC.Types.Module
-import Stream (Stream)
-import qualified Stream
-
--- DEBUGGING ONLY
---import OrdList
+import GHC.Utils.Error
+import GHC.Unit
+import GHC.Data.Stream (Stream)
+import qualified GHC.Data.Stream as Stream
 
 import Data.List
 import Data.Maybe
@@ -109,168 +147,31 @@ import Control.Exception
 import Control.Monad
 import System.IO
 
-{-
-The native-code generator has machine-independent and
-machine-dependent modules.
-
-This module ("AsmCodeGen") is the top-level machine-independent
-module.  Before entering machine-dependent land, we do some
-machine-independent optimisations (defined below) on the
-'CmmStmts's.
-
-We convert to the machine-specific 'Instr' datatype with
-'cmmCodeGen', assuming an infinite supply of registers.  We then use
-a machine-independent register allocator ('regAlloc') to rejoin
-reality.  Obviously, 'regAlloc' has machine-specific helper
-functions (see about "RegAllocInfo" below).
-
-Finally, we order the basic blocks of the function so as to minimise
-the number of jumps between blocks, by utilising fallthrough wherever
-possible.
-
-The machine-dependent bits break down as follows:
-
-  * ["MachRegs"]  Everything about the target platform's machine
-    registers (and immediate operands, and addresses, which tend to
-    intermingle/interact with registers).
-
-  * ["MachInstrs"]  Includes the 'Instr' datatype (possibly should
-    have a module of its own), plus a miscellany of other things
-    (e.g., 'targetDoubleSize', 'smStablePtrTable', ...)
-
-  * ["MachCodeGen"]  is where 'Cmm' stuff turns into
-    machine instructions.
-
-  * ["PprMach"] 'pprInstr' turns an 'Instr' into text (well, really
-    a 'SDoc').
-
-  * ["RegAllocInfo"] In the register allocator, we manipulate
-    'MRegsState's, which are 'BitSet's, one bit per machine register.
-    When we want to say something about a specific machine register
-    (e.g., ``it gets clobbered by this instruction''), we set/unset
-    its bit.  Obviously, we do this 'BitSet' thing for efficiency
-    reasons.
-
-    The 'RegAllocInfo' module collects together the machine-specific
-    info needed to do register allocation.
-
-   * ["RegisterAlloc"] The (machine-independent) register allocator.
--}
-
 --------------------
 nativeCodeGen :: forall a . DynFlags -> Module -> ModLocation -> Handle -> UniqSupply
               -> Stream IO RawCmmGroup a
               -> IO a
 nativeCodeGen dflags this_mod modLoc h us cmms
- = let config   = initConfig dflags
+ = let config   = initNCGConfig dflags
        platform = ncgPlatform config
-       nCG' :: ( Outputable statics, Outputable instr
-               , Outputable jumpDest, Instruction instr)
+       nCG' :: ( OutputableP Platform statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
-       nCG' ncgImpl = nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
+       nCG' ncgImpl = nativeCodeGen' dflags config this_mod modLoc ncgImpl h us cmms
    in case platformArch platform of
-      ArchX86       -> nCG' (x86NcgImpl    config)
-      ArchX86_64    -> nCG' (x86_64NcgImpl config)
-      ArchPPC       -> nCG' (ppcNcgImpl    config)
-      ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
-      ArchSPARC     -> nCG' (sparcNcgImpl  config)
+      ArchX86       -> nCG' (X86.ncgX86     config)
+      ArchX86_64    -> nCG' (X86.ncgX86_64  config)
+      ArchPPC       -> nCG' (PPC.ncgPPC     config)
+      ArchPPC_64 _  -> nCG' (PPC.ncgPPC     config)
+      ArchSPARC     -> nCG' (SPARC.ncgSPARC config)
       ArchSPARC64   -> panic "nativeCodeGen: No NCG for SPARC64"
+      ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
       ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
       ArchARM64     -> panic "nativeCodeGen: No NCG for ARM64"
-      ArchPPC_64 _  -> nCG' (ppcNcgImpl    config)
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
-
-x86NcgImpl :: NCGConfig -> NcgImpl (Alignment, RawCmmStatics)
-                                  X86.Instr.Instr X86.Instr.JumpDest
-x86NcgImpl config
- = (x86_64NcgImpl config)
-
-x86_64NcgImpl :: NCGConfig -> NcgImpl (Alignment, RawCmmStatics)
-                                  X86.Instr.Instr X86.Instr.JumpDest
-x86_64NcgImpl config
- = NcgImpl {
-        ncgConfig                 = config
-       ,cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
-       ,generateJumpTableForInstr = X86.CodeGen.generateJumpTableForInstr config
-       ,getJumpDestBlockId        = X86.Instr.getJumpDestBlockId
-       ,canShortcut               = X86.Instr.canShortcut
-       ,shortcutStatics           = X86.Instr.shortcutStatics
-       ,shortcutJump              = X86.Instr.shortcutJump
-       ,pprNatCmmDecl             = X86.Ppr.pprNatCmmDecl config
-       ,maxSpillSlots             = X86.Instr.maxSpillSlots config
-       ,allocatableRegs           = X86.Regs.allocatableRegs platform
-       ,ncgAllocMoreStack         = X86.Instr.allocMoreStack platform
-       ,ncgExpandTop              = id
-       ,ncgMakeFarBranches        = const id
-       ,extractUnwindPoints       = X86.CodeGen.extractUnwindPoints
-       ,invertCondBranches        = X86.CodeGen.invertCondBranches
-   }
-    where
-      platform = ncgPlatform config
-
-ppcNcgImpl :: NCGConfig -> NcgImpl RawCmmStatics PPC.Instr.Instr PPC.RegInfo.JumpDest
-ppcNcgImpl config
- = NcgImpl {
-        ncgConfig                 = config
-       ,cmmTopCodeGen             = PPC.CodeGen.cmmTopCodeGen
-       ,generateJumpTableForInstr = PPC.CodeGen.generateJumpTableForInstr config
-       ,getJumpDestBlockId        = PPC.RegInfo.getJumpDestBlockId
-       ,canShortcut               = PPC.RegInfo.canShortcut
-       ,shortcutStatics           = PPC.RegInfo.shortcutStatics
-       ,shortcutJump              = PPC.RegInfo.shortcutJump
-       ,pprNatCmmDecl             = PPC.Ppr.pprNatCmmDecl config
-       ,maxSpillSlots             = PPC.Instr.maxSpillSlots config
-       ,allocatableRegs           = PPC.Regs.allocatableRegs platform
-       ,ncgAllocMoreStack         = PPC.Instr.allocMoreStack platform
-       ,ncgExpandTop              = id
-       ,ncgMakeFarBranches        = PPC.Instr.makeFarBranches
-       ,extractUnwindPoints       = const []
-       ,invertCondBranches        = \_ _ -> id
-   }
-    where
-      platform = ncgPlatform config
-
-sparcNcgImpl :: NCGConfig -> NcgImpl RawCmmStatics SPARC.Instr.Instr SPARC.ShortcutJump.JumpDest
-sparcNcgImpl config
- = NcgImpl {
-        ncgConfig                 = config
-       ,cmmTopCodeGen             = SPARC.CodeGen.cmmTopCodeGen
-       ,generateJumpTableForInstr = SPARC.CodeGen.generateJumpTableForInstr platform
-       ,getJumpDestBlockId        = SPARC.ShortcutJump.getJumpDestBlockId
-       ,canShortcut               = SPARC.ShortcutJump.canShortcut
-       ,shortcutStatics           = SPARC.ShortcutJump.shortcutStatics
-       ,shortcutJump              = SPARC.ShortcutJump.shortcutJump
-       ,pprNatCmmDecl             = SPARC.Ppr.pprNatCmmDecl config
-       ,maxSpillSlots             = SPARC.Instr.maxSpillSlots config
-       ,allocatableRegs           = SPARC.Regs.allocatableRegs
-       ,ncgAllocMoreStack         = noAllocMoreStack
-       ,ncgExpandTop              = map SPARC.CodeGen.Expand.expandTop
-       ,ncgMakeFarBranches        = const id
-       ,extractUnwindPoints       = const []
-       ,invertCondBranches        = \_ _ -> id
-   }
-    where
-      platform = ncgPlatform config
-
---
--- Allocating more stack space for spilling is currently only
--- supported for the linear register allocator on x86/x86_64, the rest
--- default to the panic below.  To support allocating extra stack on
--- more platforms provide a definition of ncgAllocMoreStack.
---
-noAllocMoreStack :: Int -> NatCmmDecl statics instr
-                 -> UniqSM (NatCmmDecl statics instr, [(BlockId,BlockId)])
-noAllocMoreStack amount _
-  = panic $   "Register allocator: out of stack slots (need " ++ show amount ++ ")\n"
-        ++  "   If you are trying to compile SHA1.hs from the crypto library then this\n"
-        ++  "   is a known limitation in the linear allocator.\n"
-        ++  "\n"
-        ++  "   Try enabling the graph colouring allocator with -fregs-graph instead."
-        ++  "   You can still file a bug report if you like.\n"
 
 
 -- | Data accumulated during code generation. Mostly about statistics,
@@ -289,7 +190,7 @@ data NativeGenAcc statics instr
         , ngs_dwarfFiles  :: !DwarfFiles
         , ngs_unwinds     :: !(LabelMap [UnwindPoint])
              -- ^ see Note [Unwinding information in the NCG]
-             -- and Note [What is this unwinding business?] in Debug.
+             -- and Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
         }
 
 {-
@@ -314,45 +215,47 @@ field of NativeGenAcc. This is a label map which contains an entry for each
 procedure, containing a list of unwinding points (e.g. a label and an associated
 unwinding table).
 
-See also Note [What is this unwinding business?] in Debug.
+See also Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
 -}
 
-nativeCodeGen' :: (Outputable statics, Outputable instr,Outputable jumpDest,
-                   Instruction instr)
+nativeCodeGen' :: (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
                => DynFlags
+               -> NCGConfig
                -> Module -> ModLocation
                -> NcgImpl statics instr jumpDest
                -> Handle
                -> UniqSupply
                -> Stream IO RawCmmGroup a
                -> IO a
-nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
+nativeCodeGen' dflags config this_mod modLoc ncgImpl h us cmms
  = do
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
         let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
-        (ngs, us', a) <- cmmNativeGenStream dflags this_mod modLoc ncgImpl bufh us
+        (ngs, us', a) <- cmmNativeGenStream dflags config this_mod modLoc ncgImpl bufh us
                                          cmms ngs0
-        _ <- finishNativeGen dflags modLoc bufh us' ngs
+        _ <- finishNativeGen dflags config modLoc bufh us' ngs
         return a
 
 finishNativeGen :: Instruction instr
                 => DynFlags
+                -> NCGConfig
                 -> ModLocation
                 -> BufHandle
                 -> UniqSupply
                 -> NativeGenAcc statics instr
                 -> IO UniqSupply
-finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
+finishNativeGen dflags config modLoc bufh@(BufHandle _ _ h) us ngs
  = withTimingSilent dflags (text "NCG") (`seq` ()) $ do
         -- Write debug data and finish
-        let emitDw = debugLevel dflags > 0
-        us' <- if not emitDw then return us else do
-          (dwarf, us') <- dwarfGen dflags modLoc us (ngs_debug ngs)
-          emitNativeCode dflags bufh dwarf
-          return us'
+        us' <- if not (ncgDwarfEnabled config)
+                  then return us
+                  else do
+                     (dwarf, us') <- dwarfGen config modLoc us (ngs_debug ngs)
+                     emitNativeCode dflags config bufh dwarf
+                     return us'
         bFlush bufh
 
         -- dump global NCG stats for graph coloring allocator
@@ -367,7 +270,7 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
 
           dump_stats (Color.pprStats stats graphGlobal)
 
-          let platform = targetPlatform dflags
+          let platform = ncgPlatform config
           dumpIfSet_dyn dflags
                   Opt_D_dump_asm_conflicts "Register conflict graph"
                   FormatText
@@ -385,18 +288,18 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
           dump_stats (Linear.pprStats (concat (ngs_natives ngs)) linearStats)
 
         -- write out the imports
-        let ctx = initSDocContext dflags (mkCodeStyle AsmStyle)
+        let ctx = ncgAsmContext config
         printSDocLn ctx Pretty.LeftMode h
                 $ makeImportsDoc dflags (concat (ngs_imports ngs))
         return us'
   where
-    dump_stats = dumpAction dflags (mkDumpStyle dflags alwaysQualify)
+    dump_stats = dumpAction dflags (mkDumpStyle alwaysQualify)
                    (dumpOptionsFromFlag Opt_D_dump_asm_stats) "NCG stats"
                    FormatText
 
-cmmNativeGenStream :: (Outputable statics, Outputable instr
-                      ,Outputable jumpDest, Instruction instr)
+cmmNativeGenStream :: (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
               => DynFlags
+              -> NCGConfig
               -> Module -> ModLocation
               -> NcgImpl statics instr jumpDest
               -> BufHandle
@@ -405,7 +308,7 @@ cmmNativeGenStream :: (Outputable statics, Outputable instr
               -> NativeGenAcc statics instr
               -> IO (NativeGenAcc statics instr, UniqSupply, a)
 
-cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
+cmmNativeGenStream dflags config this_mod modLoc ncgImpl h us cmm_stream ngs
  = do r <- Stream.runStream cmm_stream
       case r of
         Left a ->
@@ -422,27 +325,27 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
                 dflags
                 ncglabel (\(a, b) -> a `seq` b `seq` ()) $ do
               -- Generate debug information
-              let debugFlag = debugLevel dflags > 0
-                  !ndbgs | debugFlag = cmmDebugGen modLoc cmms
-                         | otherwise = []
+              let !ndbgs | ncgDwarfEnabled config = cmmDebugGen modLoc cmms
+                         | otherwise              = []
                   dbgMap = debugToMap ndbgs
 
               -- Generate native code
-              (ngs',us') <- cmmNativeGens dflags this_mod modLoc ncgImpl h
+              (ngs',us') <- cmmNativeGens dflags config this_mod modLoc ncgImpl h
                                                dbgMap us cmms ngs 0
 
               -- Link native code information into debug blocks
-              -- See Note [What is this unwinding business?] in Debug.
+              -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
               let !ldbgs = cmmDebugLink (ngs_labels ngs') (ngs_unwinds ngs') ndbgs
+                  platform = targetPlatform dflags
               unless (null ldbgs) $
                 dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos" FormatText
-                  (vcat $ map ppr ldbgs)
+                  (vcat $ map (pdoc platform) ldbgs)
 
               -- Accumulate debug information for emission in finishNativeGen.
               let ngs'' = ngs' { ngs_debug = ngs_debug ngs' ++ ldbgs, ngs_labels = [] }
               return (us', ngs'')
 
-          cmmNativeGenStream dflags this_mod modLoc ncgImpl h us'
+          cmmNativeGenStream dflags config this_mod modLoc ncgImpl h us'
               cmm_stream' ngs''
 
     where ncglabel = text "NCG"
@@ -450,9 +353,9 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
 -- | Do native code generation on all these cmms.
 --
 cmmNativeGens :: forall statics instr jumpDest.
-                 (Outputable statics, Outputable instr
-                 ,Outputable jumpDest, Instruction instr)
+                 (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
               => DynFlags
+              -> NCGConfig
               -> Module -> ModLocation
               -> NcgImpl statics instr jumpDest
               -> BufHandle
@@ -463,7 +366,7 @@ cmmNativeGens :: forall statics instr jumpDest.
               -> Int
               -> IO (NativeGenAcc statics instr, UniqSupply)
 
-cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
+cmmNativeGens dflags config this_mod modLoc ncgImpl h dbgMap = go
   where
     go :: UniqSupply -> [RawCmmDecl]
        -> NativeGenAcc statics instr -> Int
@@ -488,14 +391,15 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
             pprDecl (f,n) = text "\t.file " <> ppr n <+>
                             pprFilePathString (unpackFS f)
 
-        emitNativeCode dflags h $ vcat $
+        emitNativeCode dflags config h $ vcat $
           map pprDecl newFileIds ++
           map (pprNatCmmDecl ncgImpl) native
 
         -- force evaluation all this stuff to avoid space leaks
-        {-# SCC "seqString" #-} evaluate $ seqList (showSDoc dflags $ vcat $ map ppr imports) ()
+        let platform = targetPlatform dflags
+        {-# SCC "seqString" #-} evaluate $ seqList (showSDoc dflags $ vcat $ map (pdoc platform) imports) ()
 
-        let !labels' = if debugLevel dflags > 0
+        let !labels' = if ncgDwarfEnabled config
                        then cmmDebugLabels isMetaInstr native else []
             !natives' = if dopt Opt_D_dump_asm_stats dflags
                         then native : ngs_natives ngs else []
@@ -512,10 +416,10 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
         go us' cmms ngs' (count + 1)
 
 
-emitNativeCode :: DynFlags -> BufHandle -> SDoc -> IO ()
-emitNativeCode dflags h sdoc = do
+emitNativeCode :: DynFlags -> NCGConfig -> BufHandle -> SDoc -> IO ()
+emitNativeCode dflags config h sdoc = do
 
-        let ctx = initSDocContext dflags (mkCodeStyle AsmStyle)
+        let ctx = ncgAsmContext config
         {-# SCC "pprNativeCode" #-} bufLeftRenderSDoc ctx h sdoc
 
         -- dump native code
@@ -527,8 +431,7 @@ emitNativeCode dflags h sdoc = do
 --      Dumping the output of each stage along the way.
 --      Global conflict graph and NGC stats
 cmmNativeGen
-    :: forall statics instr jumpDest. (Instruction instr,
-        Outputable statics, Outputable instr, Outputable jumpDest)
+    :: forall statics instr jumpDest. (Instruction instr, OutputableP Platform statics, Outputable jumpDest)
     => DynFlags
     -> Module -> ModLocation
     -> NcgImpl statics instr jumpDest
@@ -550,15 +453,16 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
  = do
         let config   = ncgConfig ncgImpl
         let platform = ncgPlatform config
+        let weights  = ncgCfgWeights config
 
         let proc_name = case cmm of
-                (CmmProc _ entry_label _ _) -> ppr entry_label
+                (CmmProc _ entry_label _ _) -> pdoc platform entry_label
                 _                           -> text "DataChunk"
 
         -- rewrite assignments to global regs
         let fixed_cmm =
                 {-# SCC "fixStgRegisters" #-}
-                fixStgRegisters dflags cmm
+                fixStgRegisters platform cmm
 
         -- cmm to cmm optimisations
         let (opt_cmm, imports) =
@@ -567,15 +471,15 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_opt_cmm "Optimised Cmm" FormatCMM
-                (pprCmmGroup [opt_cmm])
+                (pprCmmGroup platform [opt_cmm])
 
         let cmmCfg = {-# SCC "getCFG" #-}
-                     getCfgProc (cfgWeightInfo dflags) opt_cmm
+                     getCfgProc platform weights opt_cmm
 
         -- generate native code from cmm
         let ((native, lastMinuteImports, fileIds', nativeCfgWeights), usGen) =
                 {-# SCC "genMachCode" #-}
-                initUs us $ genMachCode dflags this_mod modLoc
+                initUs us $ genMachCode config this_mod modLoc
                                         (cmmTopCodeGen ncgImpl)
                                         fileIds dbgMap opt_cmm cmmCfg
 
@@ -599,7 +503,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_liveness "Liveness annotations added"
                 FormatCMM
-                (vcat $ map ppr withLiveness)
+                (vcat $ map (pprLiveCmmDecl platform) withLiveness)
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear, raStats, stack_updt_blks) <-
@@ -607,7 +511,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
            || gopt Opt_RegsIterative dflags )
           then do
                 -- the regs usable for allocation
-                let (alloc_regs :: UniqFM (UniqSet RealReg))
+                let (alloc_regs :: UniqFM RegClass (UniqSet RealReg))
                         = foldr (\r -> plusUFM_C unionUniqSets
                                         $ unitUFM (targetClassOfRealReg platform r) (unitUniqSet r))
                                 emptyUFM
@@ -647,7 +551,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                         (vcat   $ map (\(stage, stats)
                                         -> text "# --------------------------"
                                         $$ text "#  cmm " <> int count <> text " Stage " <> int stage
-                                        $$ ppr stats)
+                                        $$ ppr (fmap (pprInstr platform) stats))
                                 $ zip [0..] regAllocStats)
 
                 let mPprStats =
@@ -702,11 +606,11 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
             cfgRegAllocUpdates = (concatMap Linear.ra_fixupList raStats)
 
         let cfgWithFixupBlks =
-                (\cfg -> addNodesBetween dflags cfg cfgRegAllocUpdates) <$> livenessCfg
+                (\cfg -> addNodesBetween weights cfg cfgRegAllocUpdates) <$> livenessCfg
 
         -- Insert stack update blocks
         let postRegCFG =
-                pure (foldl' (\m (from,to) -> addImmediateSuccessor dflags from to m ))
+                pure (foldl' (\m (from,to) -> addImmediateSuccessor weights from to m ))
                      <*> cfgWithFixupBlks
                      <*> pure stack_updt_blks
 
@@ -728,7 +632,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
         let optimizedCFG :: Maybe CFG
             optimizedCFG =
-                optimizeCFG (cfgWeightInfo dflags) cmm <$!> postShortCFG
+                optimizeCFG (gopt Opt_CmmStaticPred dflags) weights cmm <$!> postShortCFG
 
         maybeDumpCfg dflags optimizedCFG "CFG Weights - Final" proc_name
 
@@ -750,7 +654,6 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 checkLayout shorted $
                 {-# SCC "sequenceBlocks" #-}
                 map (BlockLayout.sequenceTop
-                        dflags
                         ncgImpl optimizedCFG)
                     shorted
 
@@ -876,7 +779,7 @@ makeImportsDoc dflags imports
              else Outputable.empty)
 
  where
-        config   = initConfig dflags
+        config   = initNCGConfig dflags
         platform = ncgPlatform config
 
         -- Generate "symbol stubs" for all external symbols that might
@@ -890,7 +793,7 @@ makeImportsDoc dflags imports
                 | needImportedSymbols config
                 = vcat $
                         (pprGotDeclaration config :) $
-                        map ( pprImportedSymbol dflags config . fst . head) $
+                        map ( pprImportedSymbol config . fst . head) $
                         groupBy (\(_,a) (_,b) -> a == b) $
                         sortBy (\(_,a) (_,b) -> compare a b) $
                         map doPpr $
@@ -898,10 +801,9 @@ makeImportsDoc dflags imports
                 | otherwise
                 = Outputable.empty
 
-        doPpr lbl = (lbl, renderWithStyle
-                              (initSDocContext dflags astyle)
-                              (pprCLabel dflags lbl))
-        astyle = mkCodeStyle AsmStyle
+        doPpr lbl = (lbl, renderWithContext
+                              (ncgAsmContext config)
+                              (pprCLabel platform AsmStyle lbl))
 
 -- -----------------------------------------------------------------------------
 -- Generate jump tables
@@ -1012,7 +914,7 @@ apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
 -- Unique supply breaks abstraction.  Is that bad?
 
 genMachCode
-        :: DynFlags
+        :: NCGConfig
         -> Module -> ModLocation
         -> (RawCmmDecl -> NatM [NatCmmDecl statics instr])
         -> DwarfFiles
@@ -1026,9 +928,9 @@ genMachCode
                 , CFG
                 )
 
-genMachCode dflags this_mod modLoc cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
+genMachCode config this_mod modLoc cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
   = do  { initial_us <- getUniqueSupplyM
-        ; let initial_st           = mkNatM_State initial_us 0 dflags this_mod
+        ; let initial_st           = mkNatM_State initial_us 0 config this_mod
                                                   modLoc fileIds dbgMap cmm_cfg
               (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
               final_delta          = natm_delta final_st
@@ -1199,30 +1101,28 @@ cmmExprNative referenceKind expr = do
          arch = platformArch platform
      case expr of
         CmmLoad addr rep
-           -> do addr' <- cmmExprNative DataReference addr
-                 return $ CmmLoad addr' rep
+          -> do addr' <- cmmExprNative DataReference addr
+                return $ CmmLoad addr' rep
 
         CmmMachOp mop args
-           -> do args' <- mapM (cmmExprNative DataReference) args
-                 return $ CmmMachOp mop args'
+          -> do args' <- mapM (cmmExprNative DataReference) args
+                return $ CmmMachOp mop args'
 
         CmmLit (CmmBlock id)
-           -> cmmExprNative referenceKind (CmmLit (CmmLabel (infoTblLbl id)))
-           -- we must convert block Ids to CLabels here, because we
-           -- might have to do the PIC transformation.  Hence we must
-           -- not modify BlockIds beyond this point.
+          -> cmmExprNative referenceKind (CmmLit (CmmLabel (infoTblLbl id)))
+          -- we must convert block Ids to CLabels here, because we
+          -- might have to do the PIC transformation.  Hence we must
+          -- not modify BlockIds beyond this point.
 
         CmmLit (CmmLabel lbl)
-           -> do
-                cmmMakeDynamicReference config referenceKind lbl
+          -> cmmMakeDynamicReference config referenceKind lbl
         CmmLit (CmmLabelOff lbl off)
-           -> do
-                 dynRef <- cmmMakeDynamicReference config referenceKind lbl
-                 -- need to optimize here, since it's late
-                 return $ cmmMachOpFold platform (MO_Add (wordWidth platform)) [
-                     dynRef,
-                     (CmmLit $ CmmInt (fromIntegral off) (wordWidth platform))
-                   ]
+          -> do dynRef <- cmmMakeDynamicReference config referenceKind lbl
+                -- need to optimize here, since it's late
+                return $ cmmMachOpFold platform (MO_Add (wordWidth platform)) [
+                    dynRef,
+                    (CmmLit $ CmmInt (fromIntegral off) (wordWidth platform))
+                  ]
 
         -- On powerpc (non-PIC), it's easier to jump directly to a label than
         -- to use the register table, so we replace these registers
@@ -1242,3 +1142,54 @@ cmmExprNative referenceKind expr = do
 
         other
            -> return other
+
+-- | Initialize the native code generator configuration from the DynFlags
+initNCGConfig :: DynFlags -> NCGConfig
+initNCGConfig dflags = NCGConfig
+   { ncgPlatform              = targetPlatform dflags
+   , ncgAsmContext            = initSDocContext dflags (PprCode AsmStyle)
+   , ncgProcAlignment         = cmmProcAlignment dflags
+   , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
+   , ncgPIC                   = positionIndependent dflags
+   , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
+   , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
+   , ncgSplitSections         = gopt Opt_SplitSections dflags
+   , ncgRegsIterative         = gopt Opt_RegsIterative dflags
+   , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
+   , ncgCfgWeights            = cfgWeights dflags
+   , ncgCfgBlockLayout        = gopt Opt_CfgBlocklayout dflags
+   , ncgCfgWeightlessLayout   = gopt Opt_WeightlessBlocklayout dflags
+
+     -- With -O1 and greater, the cmmSink pass does constant-folding, so
+     -- we don't need to do it again in the native code generator.
+   , ncgDoConstantFolding     = optLevel dflags < 1
+
+   , ncgDumpRegAllocStages    = dopt Opt_D_dump_asm_regalloc_stages dflags
+   , ncgDumpAsmStats          = dopt Opt_D_dump_asm_stats dflags
+   , ncgDumpAsmConflicts      = dopt Opt_D_dump_asm_conflicts dflags
+   , ncgBmiVersion            = case platformArch (targetPlatform dflags) of
+                                 ArchX86_64 -> bmiVersion dflags
+                                 ArchX86    -> bmiVersion dflags
+                                 _          -> Nothing
+
+     -- We assume  SSE1 and SSE2 operations are available on both
+     -- x86 and x86_64. Historically we didn't default to SSE2 and
+     -- SSE1 on x86, which results in defacto nondeterminism for how
+     -- rounding behaves in the associated x87 floating point instructions
+     -- because variations in the spill/fpu stack placement of arguments for
+     -- operations would change the precision and final result of what
+     -- would otherwise be the same expressions with respect to single or
+     -- double precision IEEE floating point computations.
+   , ncgSseVersion =
+      let v | sseVersion dflags < Just SSE2 = Just SSE2
+            | otherwise                     = sseVersion dflags
+      in case platformArch (targetPlatform dflags) of
+            ArchX86_64 -> v
+            ArchX86    -> v
+            _          -> Nothing
+
+   , ncgDwarfEnabled        = debugLevel dflags > 0
+   , ncgDwarfUnwindings     = debugLevel dflags >= 1
+   , ncgDwarfStripBlockInfo = debugLevel dflags < 2 -- We strip out block information when running with -g0 or -g1.
+   }
+

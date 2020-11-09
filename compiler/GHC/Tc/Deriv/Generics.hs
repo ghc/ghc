@@ -1,13 +1,14 @@
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The University of Glasgow 2011
 
 -}
-
-{-# LANGUAGE CPP, ScopedTypeVariables, TupleSections #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | The deriving code for the Generic class
 module GHC.Tc.Deriv.Generics
@@ -19,7 +20,7 @@ module GHC.Tc.Deriv.Generics
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Core.Type
@@ -29,27 +30,32 @@ import GHC.Tc.Deriv.Functor
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.FamInstEnv ( FamInst, FamFlavor(..), mkSingleCoAxiom )
+import GHC.Core.Multiplicity
 import GHC.Tc.Instance.Family
-import GHC.Types.Module ( moduleName, moduleNameFS
-                        , moduleUnitId, unitIdFS, getModule )
+import GHC.Unit.Module ( moduleName, moduleNameFS
+                        , moduleUnit, unitFS, getModule )
 import GHC.Iface.Env    ( newGlobalBinder )
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Name.Reader
+import GHC.Types.Fixity.Env
+import GHC.Types.SourceText
+import GHC.Types.Fixity
 import GHC.Types.Basic
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
-import GHC.Driver.Types
-import ErrUtils( Validity(..), andValid )
+import GHC.Driver.Session
+import GHC.Utils.Error( Validity(..), andValid )
 import GHC.Types.SrcLoc
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set (elemVarSet)
-import Outputable
-import FastString
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
+import GHC.Utils.Misc
 
 import Control.Monad (mplus)
 import Data.List (zip4, partition)
@@ -73,10 +79,12 @@ For the generic representation we need to generate:
 -}
 
 gen_Generic_binds :: GenericKind -> TyCon -> [Type]
-                 -> TcM (LHsBinds GhcPs, FamInst)
+                 -> TcM (LHsBinds GhcPs, [LSig GhcPs], FamInst)
 gen_Generic_binds gk tc inst_tys = do
+  dflags <- getDynFlags
   repTyInsts <- tc_mkRepFamInsts gk tc inst_tys
-  return (mkBindsRep gk tc, repTyInsts)
+  let (binds, sigs) = mkBindsRep dflags gk tc
+  return (binds, sigs, repTyInsts)
 
 {-
 ************************************************************************
@@ -168,7 +176,7 @@ canDoGenerics tc
         -- then we can't build the embedding-projection pair, because
         -- it relies on instantiating *polymorphic* sum and product types
         -- at the argument types of the constructors
-    bad_con dc = if (any bad_arg_type (dataConOrigArgTys dc))
+    bad_con dc = if (any bad_arg_type (map scaledThing $ dataConOrigArgTys dc))
                   then (NotValid (ppr dc <+> text
                     "must not have exotic unlifted or polymorphic arguments"))
                   else (if (not (isVanillaDataCon dc))
@@ -329,12 +337,33 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
 
 -- Bindings for the Generic instance
-mkBindsRep :: GenericKind -> TyCon -> LHsBinds GhcPs
-mkBindsRep gk tycon =
-    unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
-  `unionBags`
-    unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+mkBindsRep :: DynFlags -> GenericKind -> TyCon -> (LHsBinds GhcPs, [LSig GhcPs])
+mkBindsRep dflags gk tycon = (binds, sigs)
       where
+        binds = unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
+              `unionBags`
+                unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+
+        -- See Note [Generics performance tricks]
+        sigs = if     gopt Opt_InlineGenericsAggressively dflags
+                  || (gopt Opt_InlineGenerics dflags && inlining_useful)
+               then [inline1 from01_RDR, inline1 to01_RDR]
+               else []
+         where
+           inlining_useful
+             | cons <= 1  = True
+             | cons <= 4  = max_fields <= 5
+             | cons <= 8  = max_fields <= 2
+             | cons <= 16 = max_fields <= 1
+             | cons <= 24 = max_fields == 0
+             | otherwise  = False
+             where
+               cons       = length datacons
+               max_fields = maximum $ map dataConSourceArity datacons
+
+           inline1 f = L loc . InlineSig noExtField (L loc f)
+                     $ alwaysInlinePragma { inl_act = ActiveAfter NoSourceText 1 }
+
         -- The topmost M1 (the datatype metadata) has the exact same type
         -- across all cases of a from/to definition, and can be factored out
         -- to save some allocations during typechecking.
@@ -575,7 +604,7 @@ tc_mkRepTy gk_ tycon k =
         mkD    a   = mkTyConApp d1 [ k, metaDataTy, sumP (tyConDataCons a) ]
         mkC      a = mkTyConApp c1 [ k
                                    , metaConsTy a
-                                   , prod (dataConInstOrigArgTys a
+                                   , prod (map scaledThing . dataConInstOrigArgTys a
                                             . mkTyVarTys . tyConTyVars $ tycon)
                                           (dataConSrcBangs    a)
                                           (dataConImplBangs   a)
@@ -615,7 +644,7 @@ tc_mkRepTy gk_ tycon k =
         dtName  = mkStrLitTy . occNameFS . nameOccName $ tyConName_user
         mdName  = mkStrLitTy . moduleNameFS . moduleName
                 . nameModule . tyConName $ tycon
-        pkgName = mkStrLitTy . unitIdFS . moduleUnitId
+        pkgName = mkStrLitTy . unitFS . moduleUnit
                 . nameModule . tyConName $ tycon
         isNT    = mkTyConTy $ if isNewTyCon tycon
                               then promotedTrueDataCon
@@ -741,7 +770,7 @@ mk1Sum gk_ us i n datacon = (from_alt, to_alt)
     argTys = dataConOrigArgTys datacon
     n_args = dataConSourceArity datacon
 
-    datacon_varTys = zip (map mkGenericLocal [us .. us+n_args-1]) argTys
+    datacon_varTys = zip (map mkGenericLocal [us .. us+n_args-1]) (map scaledThing argTys)
     datacon_vars = map fst datacon_varTys
 
     datacon_rdr  = getRdrName datacon
@@ -1036,4 +1065,48 @@ factor it out reduce the typechecker's burden:
 
 A simple change, but one that pays off, since it goes turns an O(n) amount of
 coercions to an O(1) amount.
+
+Note [Generics performance tricks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generics-based algorithms tend to rely on GHC optimizing away the intermediate
+representation for optimal performance. However, the default unfolding threshold
+is usually too small for GHC to do that.
+
+The recommended approach thus far was to increase unfolding threshold, but this
+makes GHC inline more aggressively in general, whereas it should only be more
+aggresive with generics-based code.
+
+The solution is to use a heuristic that'll annotate Generic class methods with
+INLINE[1] pragmas (the explicit phase is used to give users phase control as
+they can annotate their functions with INLINE[2] or INLINE[0] if appropriate).
+
+The current heuristic was chosen by looking at how annotating Generic methods
+INLINE[1] helps with optimal code generation for several types of generic
+algorithms:
+
+* Round trip through the generic representation.
+
+* Generation of NFData instances.
+
+* Generation of field lenses.
+
+The experimentation was done by picking data types having N constructors with M
+fields each and using their derived Generic instances to generate code with the
+above algorithms.
+
+The results are threshold values for N and M (contained in
+`mkBindsRep.inlining_useful`) for which inlining is beneficial, i.e. it usually
+leads to performance improvements at both compile time (the simplifier has to do
+more work, but then there's much less code left for subsequent phases to work
+with) and run time (the generic representation of a data type is optimized
+away).
+
+The T11068 test case, which includes the algorithms mentioned above, tests that
+the generic representations of several data types optimize away using the
+threshold values in `mkBindsRep.inlining_useful`.
+
+If one uses threshold values higher what is found in
+`mkBindsRep.inlining_useful`, then annotating Generic class methods with INLINE
+pragmas tends to be at best useless and at worst lead to code size blowup
+without runtime performance improvements.
 -}

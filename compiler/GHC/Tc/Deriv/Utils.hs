@@ -22,22 +22,24 @@ module GHC.Tc.Deriv.Utils (
         newDerivClsInst, extendLocalInstEnv
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Driver.Session
-import ErrUtils
-import GHC.Driver.Types (lookupFixity, mi_fix)
+import GHC.Utils.Error
+import GHC.Types.Fixity.Env (lookupFixity)
 import GHC.Hs
 import GHC.Tc.Utils.Instantiate
 import GHC.Core.InstEnv
 import GHC.Iface.Load   (loadInterfaceForName)
-import GHC.Types.Module (getModule)
+import GHC.Unit.Module (getModule)
+import GHC.Unit.Module.ModIface (mi_fix)
 import GHC.Types.Name
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import GHC.Tc.Deriv.Generate
@@ -48,18 +50,19 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names.TH (liftClassKey)
 import GHC.Core.TyCon
+import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Ppr (pprSourceTyCon)
 import GHC.Core.Type
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Set
 
 import Control.Monad.Trans.Reader
 import Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
-import ListSetOps (assocMaybe)
+import GHC.Data.List.SetOps (assocMaybe)
 
 -- | To avoid having to manually plumb everything in 'DerivEnv' throughout
--- various functions in @GHC.Tc.Deriv@ and @GHC.Tc.Deriv.Infer@, we use 'DerivM', which
+-- various functions in "GHC.Tc.Deriv" and "GHC.Tc.Deriv.Infer", we use 'DerivM', which
 -- is a simple reader around 'TcRn'.
 type DerivM = ReaderT DerivEnv TcRn
 
@@ -99,7 +102,7 @@ data DerivEnv = DerivEnv
   , denv_cls          :: Class
     -- ^ Class for which we need to derive an instance
   , denv_inst_tys     :: [Type]
-    -- ^ All arguments to to 'denv_cls' in the derived instance.
+    -- ^ All arguments to 'denv_cls' in the derived instance.
   , denv_ctxt         :: DerivContext
     -- ^ @'SupplyContext' theta@ for standalone deriving (where @theta@ is the
     --   context of the instance).
@@ -217,21 +220,25 @@ data DerivSpecMechanism
       -- instance, including what type constructor the last argument is
       -- headed by. See @Note [DerivEnv and DerivSpecMechanism]@.
     , dsm_stock_gen_fn ::
-        SrcSpan -> TyCon
-                -> [Type]
-                -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name])
-      -- ^ This function returns three things:
+        SrcSpan -> TyCon  -- dit_rep_tc
+                -> [Type] -- dit_rep_tc_args
+                -> [Type] -- inst_tys
+                -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name])
+      -- ^ This function returns four things:
       --
       -- 1. @LHsBinds GhcPs@: The derived instance's function bindings
       --    (e.g., @compare (T x) (T y) = compare x y@)
       --
-      -- 2. @BagDerivStuff@: Auxiliary bindings needed to support the derived
+      -- 2. @[LSig GhcPs]@: A list of instance specific signatures/pragmas.
+      --    Most likely INLINE pragmas for class methods.
+      --
+      -- 3. @BagDerivStuff@: Auxiliary bindings needed to support the derived
       --    instance. As examples, derived 'Generic' instances require
       --    associated type family instances, and derived 'Eq' and 'Ord'
       --    instances require top-level @con2tag@ functions.
       --    See @Note [Auxiliary binders]@ in "GHC.Tc.Deriv.Generate".
       --
-      -- 3. @[Name]@: A list of Names for which @-Wunused-binds@ should be
+      -- 4. @[Name]@: A list of Names for which @-Wunused-binds@ should be
       --    suppressed. This is used to suppress unused warnings for record
       --    selectors when deriving 'Read', 'Show', or 'Generic'.
       --    See @Note [Deriving and unused record selectors]@.
@@ -423,8 +430,8 @@ instance Outputable DerivContext where
 -- See @Note [Deriving strategies]@ in "GHC.Tc.Deriv".
 data OriginativeDerivStatus
   = CanDeriveStock            -- Stock class, can derive
-      (SrcSpan -> TyCon -> [Type]
-               -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
+      (SrcSpan -> TyCon -> [Type] -> [Type]
+               -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))
   | StockClassError SDoc      -- Stock class, but can't do it
   | CanDeriveAnyClass         -- See Note [Deriving any class]
   | NonDerivableClass SDoc    -- Cannot derive with either stock or anyclass
@@ -562,7 +569,8 @@ hasStockDeriving
   :: Class -> Maybe (SrcSpan
                      -> TyCon
                      -> [Type]
-                     -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
+                     -> [Type]
+                     -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))
 hasStockDeriving clas
   = assocMaybe gen_list (getUnique clas)
   where
@@ -570,7 +578,8 @@ hasStockDeriving clas
       :: [(Unique, SrcSpan
                    -> TyCon
                    -> [Type]
-                   -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))]
+                   -> [Type]
+                   -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))]
     gen_list = [ (eqClassKey,          simpleM gen_Eq_binds)
                , (ordClassKey,         simpleM gen_Ord_binds)
                , (enumClassKey,        simpleM gen_Enum_binds)
@@ -586,24 +595,28 @@ hasStockDeriving clas
                , (genClassKey,         generic (gen_Generic_binds Gen0))
                , (gen1ClassKey,        generic (gen_Generic_binds Gen1)) ]
 
-    simple gen_fn loc tc _
-      = let (binds, deriv_stuff) = gen_fn loc tc
-        in return (binds, deriv_stuff, [])
+    simple gen_fn loc tc tc_args _
+      = let (binds, deriv_stuff) = gen_fn loc tc tc_args
+        in return (binds, [], deriv_stuff, [])
 
-    simpleM gen_fn loc tc _
-      = do { (binds, deriv_stuff) <- gen_fn loc tc
-           ; return (binds, deriv_stuff, []) }
+    -- Like `simple`, but monadic. The only monadic thing that these functions
+    -- do is allocate new Uniques, which are used for generating the names of
+    -- auxiliary bindings.
+    -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
+    simpleM gen_fn loc tc tc_args _
+      = do { (binds, deriv_stuff) <- gen_fn loc tc tc_args
+           ; return (binds, [], deriv_stuff, []) }
 
-    read_or_show gen_fn loc tc _
+    read_or_show gen_fn loc tc tc_args _
       = do { fix_env <- getDataConFixityFun tc
-           ; let (binds, deriv_stuff) = gen_fn fix_env loc tc
+           ; let (binds, deriv_stuff) = gen_fn fix_env loc tc tc_args
                  field_names          = all_field_names tc
-           ; return (binds, deriv_stuff, field_names) }
+           ; return (binds, [], deriv_stuff, field_names) }
 
-    generic gen_fn _ tc inst_tys
-      = do { (binds, faminst) <- gen_fn tc inst_tys
+    generic gen_fn _ tc _ inst_tys
+      = do { (binds, sigs, faminst) <- gen_fn tc inst_tys
            ; let field_names = all_field_names tc
-           ; return (binds, unitBag (DerivFamInst faminst), field_names) }
+           ; return (binds, sigs, unitBag (DerivFamInst faminst), field_names) }
 
     -- See Note [Deriving and unused record selectors]
     all_field_names = map flSelector . concatMap dataConFieldLabels
@@ -853,7 +866,7 @@ cond_stdOK deriv_ctxt permissive dflags tc rep_tc
       = bad "has existential type variables in its type"
       | not (null theta) -- 4.
       = bad "has constraints in its type"
-      | not (permissive || all isTauTy (dataConOrigArgTys con)) -- 5.
+      | not (permissive || all isTauTy (map scaledThing $ dataConOrigArgTys con)) -- 5.
       = bad "has a higher-rank type"
       | otherwise
       = IsValid
@@ -887,7 +900,7 @@ cond_args cls _ _ rep_tc
                              2 (text "for type" <+> quotes (ppr ty)))
   where
     bad_args = [ arg_ty | con <- tyConDataCons rep_tc
-                        , arg_ty <- dataConOrigArgTys con
+                        , Scaled _ arg_ty <- dataConOrigArgTys con
                         , isLiftedType_maybe arg_ty /= Just True
                         , not (ok_ty arg_ty) ]
 
@@ -1104,8 +1117,7 @@ example of this is:
     data T a b = C (Show a) b => MkT b
 
 Here, the existential context (C (Show a) b) does technically mention the last
-type variable b. But this is OK, because expanding the type synonym C would
-give us the context (Show a), which doesn't mention b. Therefore, we must make
-sure to expand type synonyms before performing this check. Not doing so led to
-#13813.
+type variable b. But this is OK, because expanding the type synonym C would give
+us the context (Show a), which doesn't mention b. Therefore, we must make sure
+to expand type synonyms before performing this check. Not doing so led to #13813.
 -}

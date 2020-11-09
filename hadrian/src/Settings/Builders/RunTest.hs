@@ -77,6 +77,7 @@ runTestBuilderArgs = builder RunTest ? do
             <*> (maybe False (=="YES") <$> lookupEnv "OS")
     (testEnv, testMetricsFile) <- expr . liftIO $
         (,) <$> lookupEnv "TEST_ENV" <*> lookupEnv "METRICS_FILE"
+    perfBaseline <- expr . liftIO $ lookupEnv "PERF_BASELINE_COMMIT"
 
     threads     <- shakeThreads <$> expr getShakeOptions
     os          <- getTestSetting TestHostOS
@@ -86,6 +87,8 @@ runTestBuilderArgs = builder RunTest ? do
     top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
     cmdrootdirs <- expr (testRootDirs <$> userSetting defaultTestArgs)
+    bignumBackend <- getBignumBackend
+    bignumCheck   <- getBignumCheck
     let defaultRootdirs = ("testsuite" -/- "tests") : libTests
         rootdirs | null cmdrootdirs = defaultRootdirs
                  | otherwise        = cmdrootdirs
@@ -99,6 +102,7 @@ runTestBuilderArgs = builder RunTest ? do
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
     mconcat [ arg $ "testsuite/driver/runtests.py"
             , pure [ "--rootdir=" ++ testdir | testdir <- rootdirs ]
+            , arg "--top", arg (top -/- "testsuite")
             , arg "-e", arg $ "windows=" ++ show windowsHost
             , arg "-e", arg $ "darwin=" ++ show osxHost
             , arg "-e", arg $ "config.local=False"
@@ -120,13 +124,12 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ asBool "config.have_vanilla="   (hasLibWay vanilla)
             , arg "-e", arg $ asBool "config.have_dynamic="   (hasLibWay dynamic)
             , arg "-e", arg $ asBool "config.have_profiling=" (hasLibWay profiling)
+            , arg "-e", arg $ asBool "config.have_fast_bignum=" (bignumBackend /= "native" && not bignumCheck)
             , arg "-e", arg $ asBool "ghc_with_smp=" withSMP
-            , arg "-e", arg $ "ghc_with_llvm=0" -- TODO: support LLVM
 
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
 
-            , arg "-e", arg $ "config.top=" ++ show (top -/- "testsuite")
             , arg "-e", arg $ "config.wordsize=" ++ show wordsize
             , arg "-e", arg $ "config.os="       ++ show os
             , arg "-e", arg $ "config.arch="     ++ show arch
@@ -136,7 +139,10 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "--config", arg $ "timeout_prog=" ++ show (top -/- timeoutProg)
             , arg "--config", arg $ "stats_files_dir=" ++ statsFilesDir
             , arg $ "--threads=" ++ show threads
-            , emitWhenSet testEnv $ \env -> arg ("--test-env=" ++ show env)
+            , case perfBaseline of
+                Just commit | not (null commit) -> arg ("--perf-baseline=" ++ commit)
+                _ -> mempty
+            , emitWhenSet testEnv $ \env -> arg ("--test-env=" ++ env)
             , emitWhenSet testMetricsFile $ \file -> arg ("--metrics-file=" ++ file)
             , getTestArgs -- User-provided arguments from command line.
             ]

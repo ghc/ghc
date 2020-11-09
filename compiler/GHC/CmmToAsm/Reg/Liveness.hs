@@ -2,6 +2,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -26,6 +30,7 @@ module GHC.CmmToAsm.Reg.Liveness (
 
         mapBlockTop,    mapBlockTopM,   mapSCCM,
         mapGenBlockTop, mapGenBlockTopM,
+        mapLiveCmmDecl, pprLiveCmmDecl,
         stripLive,
         stripLiveBlock,
         slurpConflicts,
@@ -37,27 +42,30 @@ module GHC.CmmToAsm.Reg.Liveness (
         regLiveness,
         cmmTopLiveness
   ) where
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm hiding (RegSet, emptyRegSet)
 
-import Digraph
-import MonadUtils
-import Outputable
+import GHC.Data.Graph.Directed
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
-import Bag
-import State
+import GHC.Data.Bag
+import GHC.Utils.Monad.State
 
 import Data.List
 import Data.Maybe
@@ -66,9 +74,14 @@ import Data.IntSet              (IntSet)
 -----------------------------------------------------------------------------
 type RegSet = UniqSet Reg
 
-type RegMap a = UniqFM a
+-- | Map from some kind of register to a.
+--
+-- While we give the type for keys as Reg which is the common case
+-- sometimes we end up using VirtualReq or naked Uniques.
+-- See Note [UniqFM and the register allocator]
+type RegMap a = UniqFM Reg a
 
-emptyRegMap :: UniqFM a
+emptyRegMap :: RegMap a
 emptyRegMap = emptyUFM
 
 emptyRegSet :: RegSet
@@ -76,6 +89,9 @@ emptyRegSet = emptyUniqSet
 
 type BlockMap a = LabelMap a
 
+type SlotMap a = UniqFM Slot a
+
+type Slot = Int
 
 -- | A top level thing which carries liveness information.
 type LiveCmmDecl statics instr
@@ -96,6 +112,8 @@ data InstrSR instr
 
         -- | reload this reg from a stack slot
         | RELOAD Int Reg
+
+        deriving (Functor)
 
 instance Instruction instr => Instruction (InstrSR instr) where
         regUsageOfInstr platform i
@@ -154,10 +172,13 @@ instance Instruction instr => Instruction (InstrSR instr) where
         mkStackDeallocInstr platform amount =
              Instr <$> mkStackDeallocInstr platform amount
 
+        pprInstr platform i = ppr (fmap (pprInstr platform) i)
+
 
 -- | An instruction with liveness information.
 data LiveInstr instr
         = LiveInstr (InstrSR instr) (Maybe Liveness)
+        deriving (Functor)
 
 -- | Liveness information.
 --   The regs which die are ones which are no longer live in the *next* instruction
@@ -231,12 +252,16 @@ instance Outputable instr
                  | otherwise            = name <>
                      (pprUFM (getUniqSet regs) (hcat . punctuate space . map ppr))
 
-instance Outputable LiveInfo where
-    ppr (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
-        =  (ppr mb_static)
+instance OutputableP env instr => OutputableP env (LiveInstr instr) where
+   pdoc env i = ppr (fmap (pdoc env) i)
+
+instance OutputableP Platform LiveInfo where
+    pdoc env (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
+        =  (pdoc env mb_static)
         $$ text "# entryIds         = " <> ppr entryIds
         $$ text "# liveVRegsOnEntry = " <> ppr liveVRegsOnEntry
         $$ text "# liveSlotsOnEntry = " <> text (show liveSlotsOnEntry)
+
 
 
 
@@ -400,7 +425,7 @@ slurpReloadCoalesce live
            in   unionManyBags (cs : moveBags)
 
         slurpCompM :: [LiveBasicBlock instr]
-                   -> State (UniqFM [UniqFM Reg]) [Bag (Reg, Reg)]
+                   -> State (UniqFM BlockId [UniqFM Slot Reg]) [Bag (Reg, Reg)]
         slurpCompM blocks
          = do   -- run the analysis once to record the mapping across jumps.
                 mapM_   (slurpBlock False) blocks
@@ -412,7 +437,7 @@ slurpReloadCoalesce live
                 mapM    (slurpBlock True) blocks
 
         slurpBlock :: Bool -> LiveBasicBlock instr
-                   -> State (UniqFM [UniqFM Reg]) (Bag (Reg, Reg))
+                   -> State (UniqFM BlockId [UniqFM Slot Reg]) (Bag (Reg, Reg))
         slurpBlock propagate (BasicBlock blockId instrs)
          = do   -- grab the slot map for entry to this block
                 slotMap         <- if propagate
@@ -422,12 +447,12 @@ slurpReloadCoalesce live
                 (_, mMoves)     <- mapAccumLM slurpLI slotMap instrs
                 return $ listToBag $ catMaybes mMoves
 
-        slurpLI :: UniqFM Reg                           -- current slotMap
+        slurpLI :: SlotMap Reg                           -- current slotMap
                 -> LiveInstr instr
-                -> State (UniqFM [UniqFM Reg])          -- blockId -> [slot -> reg]
+                -> State (UniqFM BlockId [SlotMap Reg])  -- blockId -> [slot -> reg]
                                                         --      for tracking slotMaps across jumps
 
-                         ( UniqFM Reg                   -- new slotMap
+                         ( SlotMap Reg           -- new slotMap
                          , Maybe (Reg, Reg))            -- maybe a new coalesce edge
 
         slurpLI slotMap li
@@ -467,22 +492,25 @@ slurpReloadCoalesce live
                 let slotMaps    = fromMaybe [] (lookupUFM map blockId)
                 return          $ foldr mergeSlotMaps emptyUFM slotMaps
 
-        mergeSlotMaps :: UniqFM Reg -> UniqFM Reg -> UniqFM Reg
+        mergeSlotMaps :: SlotMap Reg -> SlotMap Reg -> SlotMap Reg
         mergeSlotMaps map1 map2
-                = listToUFM
+                -- toList sadly means we have to use the _Directly style
+                -- functions.
+                -- TODO: We shouldn't need to go through a list here.
+                = listToUFM_Directly
                 $ [ (k, r1)
                   | (k, r1) <- nonDetUFMToList map1
                   -- This is non-deterministic but we do not
                   -- currently support deterministic code-generation.
                   -- See Note [Unique Determinism and code generation]
-                  , case lookupUFM map2 k of
+                  , case lookupUFM_Directly map2 k of
                           Nothing -> False
                           Just r2 -> r1 == r2 ]
 
 
 -- | Strip away liveness information, yielding NatCmmDecl
 stripLive
-        :: (Outputable statics, Outputable instr, Instruction instr)
+        :: (OutputableP Platform statics, Instruction instr)
         => NCGConfig
         -> LiveCmmDecl statics instr
         -> NatCmmDecl statics instr
@@ -490,7 +518,7 @@ stripLive
 stripLive config live
         = stripCmm live
 
- where  stripCmm :: (Outputable statics, Outputable instr, Instruction instr)
+ where  stripCmm :: (OutputableP Platform statics, Instruction instr)
                  => LiveCmmDecl statics instr -> NatCmmDecl statics instr
         stripCmm (CmmData sec ds)       = CmmData sec ds
         stripCmm (CmmProc (LiveInfo info (first_id:_) _ _) label live sccs)
@@ -507,7 +535,20 @@ stripLive config live
 
         -- If the proc has blocks but we don't know what the first one was, then we're dead.
         stripCmm proc
-                 = pprPanic "RegAlloc.Liveness.stripLive: no first_id on proc" (ppr proc)
+                 = pprPanic "RegAlloc.Liveness.stripLive: no first_id on proc" (pprLiveCmmDecl (ncgPlatform config) proc)
+
+
+-- | Pretty-print a `LiveCmmDecl`
+pprLiveCmmDecl :: (OutputableP Platform statics, Instruction instr) => Platform -> LiveCmmDecl statics instr -> SDoc
+pprLiveCmmDecl platform d = pdoc platform (mapLiveCmmDecl (pprInstr platform) d)
+
+
+-- | Map over instruction type in `LiveCmmDecl`
+mapLiveCmmDecl
+   :: (instr -> b)
+   -> LiveCmmDecl statics instr
+   -> LiveCmmDecl statics b
+mapLiveCmmDecl f proc = fmap (fmap (fmap (fmap (fmap f)))) proc
 
 -- | Strip away liveness information from a basic block,
 --   and make real spill instructions out of SPILL, RELOAD pseudos along the way.
@@ -641,15 +682,16 @@ patchRegsLiveInstr patchF li
 -- | Convert a NatCmmDecl to a LiveCmmDecl, with liveness information
 
 cmmTopLiveness
-        :: (Outputable instr, Instruction instr)
-        => Maybe CFG -> Platform
+        :: Instruction instr
+        => Maybe CFG
+        -> Platform
         -> NatCmmDecl statics instr
         -> UniqSM (LiveCmmDecl statics instr)
 cmmTopLiveness cfg platform cmm
         = regLiveness platform $ natCmmTopToLive cfg cmm
 
 natCmmTopToLive
-        :: (Instruction instr, Outputable instr)
+        :: Instruction instr
         => Maybe CFG -> NatCmmDecl statics instr
         -> LiveCmmDecl statics instr
 
@@ -735,7 +777,7 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
 --
 
 regLiveness
-        :: (Outputable instr, Instruction instr)
+        :: Instruction instr
         => Platform
         -> LiveCmmDecl statics instr
         -> UniqSM (LiveCmmDecl statics instr)
@@ -818,7 +860,7 @@ reverseBlocksInTops top
 --  want for the next pass.
 --
 computeLiveness
-        :: (Outputable instr, Instruction instr)
+        :: Instruction instr
         => Platform
         -> [SCC (LiveBasicBlock instr)]
         -> ([SCC (LiveBasicBlock instr)],       -- instructions annotated with list of registers
@@ -829,10 +871,11 @@ computeLiveness
 computeLiveness platform sccs
  = case checkIsReverseDependent sccs of
         Nothing         -> livenessSCCs platform mapEmpty [] sccs
-        Just bad        -> pprPanic "RegAlloc.Liveness.computeLiveness"
+        Just bad        -> let sccs' = fmap (fmap (fmap (fmap (pprInstr platform)))) sccs
+                           in pprPanic "RegAlloc.Liveness.computeLiveness"
                                 (vcat   [ text "SCCs aren't in reverse dependent order"
                                         , text "bad blockId" <+> ppr bad
-                                        , ppr sccs])
+                                        , ppr sccs'])
 
 livenessSCCs
        :: Instruction instr

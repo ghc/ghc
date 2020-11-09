@@ -1,0 +1,4 @@
+
+T18300.hs:13:1: error:
+    • Data instance has non-* return kind ‘TYPE (F Int)’
+    • In the data instance declaration for ‘T’

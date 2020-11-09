@@ -74,7 +74,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    that declaration splices are not allowed anywhere except at top level
    (outside any other declarations).
 
-   The ``Q`` monad is a monad defined in ``Language.Haskell.TH.Syntax`` which
+   The ``Q`` monad is a monad defined in :th-ref:`Language.Haskell.TH.Syntax.` which
    supports several useful operations during code generation such as reporting
    errors or looking up identifiers in the environment.
 
@@ -92,9 +92,10 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    -  ``[p| ... |]``, where the "..." is a pattern; the quotation has
       type ``Quote m => m Pat``.
 
-   The ``Quote`` type class is the minimal interface necessary to implement
-   the desugaring of quotations. The ``Q`` monad is an instance of ``Quote`` but
-   contains many more operations which are not needed for defining quotations.
+   The ``Quote`` type class (:th-ref:`Language.Haskell.TH.Syntax.Quote`) is
+   the minimal interface necessary to implement the desugaring of quotations.
+   The ``Q`` monad is an instance of ``Quote`` but contains many more
+   operations which are not needed for defining quotations.
 
    See :ref:`pts-where` for using partial type signatures in quotations.
 
@@ -108,7 +109,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
     plusC = [| $oneC + $twoC |]
 
-- The precise type of a quotation depends on the types of the nested splices inside it::
+-  The precise type of a quotation depends on the types of the nested splices inside it::
 
       -- Add a redundant constraint to demonstrate that constraints on the
       -- monad used to build the representation are propagated when using nested
@@ -124,23 +125,22 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    Remember, a top-level splice still requires its argument to be of type ``Q Exp``.
    So then splicing in ``g`` will cause ``m`` to be instantiated to ``Q``::
 
-    h :: Int
-    h = $(g) -- m ~ Q
-
+      h :: Int
+      h = $(g) -- m ~ Q
 
 -  A *typed* expression splice is written ``$$x``, where ``x`` is
    is an arbitrary expression.
 
    A top-level typed expression splice can occur in place of an expression; the
-   spliced expression must have type ``Q (TExp a)``
+   spliced expression must have type ``Code Q a``
 
 -  A *typed* expression quotation is written as ``[|| ... ||]``, or
    ``[e|| ... ||]``, where the "..." is an expression; if the "..."
    expression has type ``a``, then the quotation has type
-   ``Quote m => m (TExp a)``.
+   ``Quote m => Code m a``.
 
-   Values of type ``TExp a`` may be converted to values of type ``Exp``
-   using the function ``unType :: TExp a -> Exp``.
+   It is possible to extract a value of type ``m Exp`` from ``Code m a``
+   using the ``unTypeCode :: Code m a -> m Exp`` function.
 
 -  A quasi-quotation can appear in a pattern, type, expression, or
    declaration context and is also written in Oxford brackets:
@@ -201,7 +201,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
        class Lift t where
            lift :: Quote m => t -> m Exp
-           liftTyped :: Quote m => t -> m (TExp t)
+           liftTyped :: Quote m => t -> Code m t
 
    In general, if GHC sees an expression within Oxford brackets (e.g., ``[|
    foo bar |]``, then GHC looks up each name within the brackets. If a name
@@ -375,8 +375,6 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    However, there are some GHC-specific extensions which expression
    quotations currently do not support, including
 
-   -  Recursive ``do``-statements (see :ghc-ticket:`1262`)
-
    -  Type holes in typed splices (see :ghc-ticket:`10945` and
       :ghc-ticket:`10946`)
 
@@ -402,7 +400,7 @@ Using Template Haskell
 ----------------------
 
 -  The data types and monadic constructor functions for Template Haskell
-   are in the library ``Language.Haskell.TH.Syntax``.
+   are in the library :th-ref:`Language.Haskell.TH.Syntax.`.
 
 -  You can only run a function at compile time if it is imported from
    another module. That is, you can't define a function in a module, and
@@ -541,6 +539,30 @@ Run :file:`main` and here is your output:
     $ ./main
     Hello
 
+.. _th-rs:
+
+Template Haskell quotes and Rebindable Syntax
+---------------------------------------------
+
+Rebindable syntax does not play well with untyped TH quotes:
+applying the rebindable syntax rules would go against the lax
+nature of untyped quotes that are accepted even in the presence of
+unbound identifiers (see :ghc-ticket:`18102`). Applying the rebindable syntax
+rules to them would force the code that defines the said quotes to have all
+the necessary functions (e.g ``ifThenElse`` or ``fromInteger``) in scope,
+instead of delaying the resolution of those symbols to the code that splices
+the quoted Haskell syntax, as is usually done with untyped TH. For this reason,
+even if a module has untyped TH quotes with ``RebindableSyntax`` enabled, GHC
+turns off rebindable syntax while processing the quotes. The code that splices
+the quotes is however free to turn on ``RebindableSyntax`` to have the usual
+rules applied to the resulting code.
+
+Typed TH quotes on the other hand are perfectly compatible with the eager
+application of rebindable syntax rules, and GHC will therefore process any
+such quotes according to the rebindable syntax rules whenever the
+``RebindableSyntax`` extension is turned on in the modules where such quotes
+appear.
+
 .. _th-profiling:
 
 Using Template Haskell with Profiling
@@ -645,7 +667,7 @@ Here are the salient features
    (Only the first two are described in the paper.)
 
 -  A quoter is a value of type
-   ``Language.Haskell.TH.Quote.QuasiQuoter``, which is defined thus: ::
+   :th-ref:`Language.Haskell.TH.Quote.QuasiQuoter`, which is defined thus: ::
 
        data QuasiQuoter = QuasiQuoter { quoteExp  :: String -> Q Exp,
                                         quotePat  :: String -> Q Pat,

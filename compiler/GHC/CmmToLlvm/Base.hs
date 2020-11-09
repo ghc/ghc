@@ -21,9 +21,9 @@ module GHC.CmmToLlvm.Base (
         LlvmM,
         runLlvm, liftStream, withClearVars, varLookup, varInsert,
         markStackReg, checkStackReg,
-        funLookup, funInsert, getLlvmVer, getDynFlags, getDynFlag, getLlvmPlatform,
+        funLookup, funInsert, getLlvmVer, getDynFlags,
         dumpIfSetLlvm, renderLlvm, markUsedVar, getUsedVars,
-        ghcInternalFunctions, getPlatform,
+        ghcInternalFunctions, getPlatform, getLlvmOpts,
 
         getMetaUniqueId,
         setUniqMeta, getUniqMeta,
@@ -32,7 +32,7 @@ module GHC.CmmToLlvm.Base (
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
         llvmPtrBits, tysToParams, llvmFunSection, padLiveArgs, isFPR,
 
-        strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
+        strCLabel_llvm,
         getGlobalPtr, generateExternDecls,
 
         aliasify, llvmDefLabel
@@ -41,31 +41,34 @@ module GHC.CmmToLlvm.Base (
 #include "HsVersions.h"
 #include "ghcautoconf.h"
 
-import GhcPrelude
+import GHC.Prelude
+import GHC.Utils.Panic
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Regs
 
 import GHC.Cmm.CLabel
-import GHC.Platform.Regs ( activeStgRegs )
+import GHC.Cmm.Ppr.Expr ()
+import GHC.Platform.Regs ( activeStgRegs, globalRegMaybe )
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Cmm              hiding ( succ )
 import GHC.Cmm.Utils (regsOverlap)
-import Outputable as Outp
+import GHC.Utils.Outputable as Outp
 import GHC.Platform
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
-import BufWrite   ( BufHandle )
+import GHC.Utils.BufHandle   ( BufHandle )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
-import ErrUtils
-import qualified Stream
+import GHC.Utils.Error
+import qualified GHC.Data.Stream as Stream
 
 import Data.Maybe (fromJust)
 import Control.Monad (ap)
 import Data.Char (isDigit)
-import Data.List (sort, groupBy, intercalate)
+import Data.List (sortBy, groupBy, intercalate)
+import Data.Ord (comparing)
 import qualified Data.List.NonEmpty as NE
 
 -- ----------------------------------------------------------------------------
@@ -114,10 +117,10 @@ widthToLlvmInt :: Width -> LlvmType
 widthToLlvmInt w = LMInt $ widthInBits w
 
 -- | GHC Call Convention for LLVM
-llvmGhcCC :: DynFlags -> LlvmCallConvention
-llvmGhcCC dflags
- | platformUnregisterised (targetPlatform dflags) = CC_Ccc
- | otherwise                                      = CC_Ghc
+llvmGhcCC :: Platform -> LlvmCallConvention
+llvmGhcCC platform
+ | platformUnregisterised platform = CC_Ccc
+ | otherwise                       = CC_Ghc
 
 -- | Llvm Function type for Cmm function
 llvmFunTy :: LiveGlobalRegs -> LlvmM LlvmType
@@ -133,9 +136,8 @@ llvmFunSig' :: LiveGlobalRegs -> LMString -> LlvmLinkageType -> LlvmM LlvmFuncti
 llvmFunSig' live lbl link
   = do let toParams x | isPointer x = (x, [NoAlias, NoCapture])
                       | otherwise   = (x, [])
-       dflags <- getDynFlags
        platform <- getPlatform
-       return $ LlvmFunctionDecl lbl link (llvmGhcCC dflags) LMVoid FixedArgs
+       return $ LlvmFunctionDecl lbl link (llvmGhcCC platform) LMVoid FixedArgs
                                  (map (toParams . getVarType) (llvmFunArgs platform live))
                                  (llvmFunAlign platform)
 
@@ -148,18 +150,20 @@ llvmInfAlign :: Platform -> LMAlign
 llvmInfAlign platform = Just (platformWordSizeInBytes platform)
 
 -- | Section to use for a function
-llvmFunSection :: DynFlags -> LMString -> LMSection
-llvmFunSection dflags lbl
-    | gopt Opt_SplitSections dflags = Just (concatFS [fsLit ".text.", lbl])
-    | otherwise                     = Nothing
+llvmFunSection :: LlvmOpts -> LMString -> LMSection
+llvmFunSection opts lbl
+    | llvmOptsSplitSections opts = Just (concatFS [fsLit ".text.", lbl])
+    | otherwise                  = Nothing
 
 -- | A Function's arguments
 llvmFunArgs :: Platform -> LiveGlobalRegs -> [LlvmVar]
 llvmFunArgs platform live =
     map (lmGlobalRegArg platform) (filter isPassed allRegs)
     where allRegs = activeStgRegs platform
-          paddedLive = map (\(_,r) -> r) $ padLiveArgs platform live
-          isLive r = r `elem` alwaysLive || r `elem` paddedLive
+          paddingRegs = padLiveArgs platform live
+          isLive r = r `elem` alwaysLive
+                     || r `elem` live
+                     || r `elem` paddingRegs
           isPassed r = not (isFPR r) || isLive r
 
 
@@ -171,91 +175,76 @@ isFPR (YmmReg _)    = True
 isFPR (ZmmReg _)    = True
 isFPR _             = False
 
-sameFPRClass :: GlobalReg -> GlobalReg -> Bool
-sameFPRClass (FloatReg _)  (FloatReg _) = True
-sameFPRClass (DoubleReg _) (DoubleReg _) = True
-sameFPRClass (XmmReg _)    (XmmReg _) = True
-sameFPRClass (YmmReg _)    (YmmReg _) = True
-sameFPRClass (ZmmReg _)    (ZmmReg _) = True
-sameFPRClass _             _          = False
-
-normalizeFPRNum :: GlobalReg -> GlobalReg
-normalizeFPRNum (FloatReg _)  = FloatReg 1
-normalizeFPRNum (DoubleReg _) = DoubleReg 1
-normalizeFPRNum (XmmReg _)    = XmmReg 1
-normalizeFPRNum (YmmReg _)    = YmmReg 1
-normalizeFPRNum (ZmmReg _)    = ZmmReg 1
-normalizeFPRNum _ = error "normalizeFPRNum expected only FPR regs"
-
-getFPRCtor :: GlobalReg -> Int -> GlobalReg
-getFPRCtor (FloatReg _)  = FloatReg
-getFPRCtor (DoubleReg _) = DoubleReg
-getFPRCtor (XmmReg _)    = XmmReg
-getFPRCtor (YmmReg _)    = YmmReg
-getFPRCtor (ZmmReg _)    = ZmmReg
-getFPRCtor _ = error "getFPRCtor expected only FPR regs"
-
-fprRegNum :: GlobalReg -> Int
-fprRegNum (FloatReg i)  = i
-fprRegNum (DoubleReg i) = i
-fprRegNum (XmmReg i)    = i
-fprRegNum (YmmReg i)    = i
-fprRegNum (ZmmReg i)    = i
-fprRegNum _ = error "fprRegNum expected only FPR regs"
-
--- | Input: dynflags, and the list of live registers
+-- | Return a list of "padding" registers for LLVM function calls.
 --
--- Output: An augmented list of live registers, where padding was
--- added to the list of registers to ensure the calling convention is
--- correctly used by LLVM.
+-- When we generate LLVM function signatures, we can't just make any register
+-- alive on function entry. Instead, we need to insert fake arguments of the
+-- same register class until we are sure that one of them is mapped to the
+-- register we want alive. E.g. to ensure that F5 is alive, we may need to
+-- insert fake arguments mapped to F1, F2, F3 and F4.
 --
--- Each global reg in the returned list is tagged with a bool, which
--- indicates whether the global reg was added as padding, or was an original
--- live register.
---
--- That is, True => padding, False => a real, live global register.
---
--- Also, the returned list is not sorted in any particular order.
---
-padLiveArgs :: Platform -> LiveGlobalRegs -> [(Bool, GlobalReg)]
-padLiveArgs plat live =
-      if platformUnregisterised plat
-        then taggedLive -- not using GHC's register convention for platform.
-        else padding ++ taggedLive
+-- Invariant: Cmm FPR regs with number "n" maps to real registers with number
+-- "n" If the calling convention uses registers in a different order or if the
+-- invariant doesn't hold, this code probably won't be correct.
+padLiveArgs :: Platform -> LiveGlobalRegs -> LiveGlobalRegs
+padLiveArgs platform live =
+      if platformUnregisterised platform
+        then [] -- not using GHC's register convention for platform.
+        else padded
   where
-    taggedLive = map (\x -> (False, x)) live
+    ----------------------------------
+    -- handle floating-point registers (FPR)
 
-    fprLive = filter isFPR live
-    padding = concatMap calcPad $ groupBy sharesClass fprLive
+    fprLive = filter isFPR live  -- real live FPR registers
 
-    sharesClass :: GlobalReg -> GlobalReg -> Bool
-    sharesClass a b = sameFPRClass a b || overlappingClass
+    -- we group live registers sharing the same classes, i.e. that use the same
+    -- set of real registers to be passed. E.g. FloatReg, DoubleReg and XmmReg
+    -- all use the same real regs on X86-64 (XMM registers).
+    --
+    classes         = groupBy sharesClass fprLive
+    sharesClass a b = regsOverlap platform (norm a) (norm b) -- check if mapped to overlapping registers
+    norm x          = CmmGlobal ((fpr_ctor x) 1)             -- get the first register of the family
+
+    -- For each class, we just have to fill missing registers numbers. We use
+    -- the constructor of the greatest register to build padding registers.
+    --
+    -- E.g. sortedRs = [   F2,   XMM4, D5]
+    --      output   = [D1,   D3]
+    padded      = concatMap padClass classes
+    padClass rs = go sortedRs [1..]
       where
-        overlappingClass = regsOverlap plat (norm a) (norm b)
-        norm = CmmGlobal . normalizeFPRNum
+         sortedRs = sortBy (comparing fpr_num) rs
+         maxr     = last sortedRs
+         ctor     = fpr_ctor maxr
 
-    calcPad :: [GlobalReg] -> [(Bool, GlobalReg)]
-    calcPad rs = getFPRPadding (getFPRCtor $ head rs) rs
+         go [] _ = []
+         go (c1:c2:_) _   -- detect bogus case (see #17920)
+            | fpr_num c1 == fpr_num c2
+            , Just real <- globalRegMaybe platform c1
+            = sorryDoc "LLVM code generator" $
+               text "Found two different Cmm registers (" <> ppr c1 <> text "," <> ppr c2 <>
+               text ") both alive AND mapped to the same real register: " <> ppr real <>
+               text ". This isn't currently supported by the LLVM backend."
+         go (c:cs) (f:fs)
+            | fpr_num c == f = go cs fs              -- already covered by a real register
+            | otherwise      = ctor f : go (c:cs) fs -- add padding register
+         go _ _ = undefined -- unreachable
 
-getFPRPadding :: (Int -> GlobalReg) -> LiveGlobalRegs -> [(Bool, GlobalReg)]
-getFPRPadding paddingCtor live = padding
-    where
-        fprRegNums = sort $ map fprRegNum live
-        (_, padding) = foldl assignSlots (1, []) $ fprRegNums
+    fpr_ctor :: GlobalReg -> Int -> GlobalReg
+    fpr_ctor (FloatReg _)  = FloatReg
+    fpr_ctor (DoubleReg _) = DoubleReg
+    fpr_ctor (XmmReg _)    = XmmReg
+    fpr_ctor (YmmReg _)    = YmmReg
+    fpr_ctor (ZmmReg _)    = ZmmReg
+    fpr_ctor _ = error "fpr_ctor expected only FPR regs"
 
-        assignSlots (i, acc) regNum
-            | i == regNum = -- don't need padding here
-                  (i+1, acc)
-            | i < regNum = let -- add padding for slots i .. regNum-1
-                  numNeeded = regNum-i
-                  acc' = genPad i numNeeded ++ acc
-                in
-                  (regNum+1, acc')
-            | otherwise = error "padLiveArgs -- i > regNum ??"
-
-        genPad start n =
-            take n $ flip map (iterate (+1) start) (\i ->
-                (True, paddingCtor i))
+    fpr_num :: GlobalReg -> Int
+    fpr_num (FloatReg i)  = i
+    fpr_num (DoubleReg i) = i
+    fpr_num (XmmReg i)    = i
+    fpr_num (YmmReg i)    = i
+    fpr_num (ZmmReg i)    = i
+    fpr_num _ = error "fpr_num expected only FPR regs"
 
 
 -- | Llvm standard fun attributes
@@ -311,11 +300,12 @@ llvmVersionList = NE.toList . llvmVersionNE
 
 data LlvmEnv = LlvmEnv
   { envVersion :: LlvmVersion      -- ^ LLVM version
+  , envOpts    :: LlvmOpts         -- ^ LLVM backend options
   , envDynFlags :: DynFlags        -- ^ Dynamic flags
   , envOutput :: BufHandle         -- ^ Output buffer
   , envMask :: !Char               -- ^ Mask for creating unique values
   , envFreshMeta :: MetaId         -- ^ Supply of fresh metadata IDs
-  , envUniqMeta :: UniqFM MetaId   -- ^ Global metadata nodes
+  , envUniqMeta :: UniqFM Unique MetaId   -- ^ Global metadata nodes
   , envFunMap :: LlvmEnvMap        -- ^ Global functions so far, with type
   , envAliases :: UniqSet LMString -- ^ Globals that we had to alias, see [Llvm Forward References]
   , envUsedVars :: [LlvmVar]       -- ^ Pointers to be added to llvm.used (see @cmmUsedLlvmGens@)
@@ -325,7 +315,7 @@ data LlvmEnv = LlvmEnv
   , envStackRegs :: [GlobalReg]    -- ^ Non-constant registers (alloca'd in the function prelude)
   }
 
-type LlvmEnvMap = UniqFM LlvmType
+type LlvmEnvMap = UniqFM Unique LlvmType
 
 -- | The Llvm monad. Wraps @LlvmEnv@ state as well as the @IO@ monad
 newtype LlvmM a = LlvmM { runLlvmM :: LlvmEnv -> IO (a, LlvmEnv) }
@@ -342,8 +332,13 @@ instance Monad LlvmM where
 instance HasDynFlags LlvmM where
     getDynFlags = LlvmM $ \env -> return (envDynFlags env, env)
 
+-- | Get target platform
 getPlatform :: LlvmM Platform
-getPlatform = targetPlatform <$> getDynFlags
+getPlatform = llvmOptsPlatform <$> getLlvmOpts
+
+-- | Get LLVM options
+getLlvmOpts :: LlvmM LlvmOpts
+getLlvmOpts = LlvmM $ \env -> return (envOpts env, env)
 
 instance MonadUnique LlvmM where
     getUniqueSupplyM = do
@@ -370,6 +365,7 @@ runLlvm dflags ver out m = do
                       , envUsedVars = []
                       , envAliases = emptyUniqSet
                       , envVersion = ver
+                      , envOpts = initLlvmOpts dflags
                       , envDynFlags = dflags
                       , envOutput = out
                       , envMask = 'n'
@@ -401,13 +397,13 @@ withClearVars m = LlvmM $ \env -> do
 
 -- | Insert variables or functions into the environment.
 varInsert, funInsert :: Uniquable key => key -> LlvmType -> LlvmM ()
-varInsert s t = modifyEnv $ \env -> env { envVarMap = addToUFM (envVarMap env) s t }
-funInsert s t = modifyEnv $ \env -> env { envFunMap = addToUFM (envFunMap env) s t }
+varInsert s t = modifyEnv $ \env -> env { envVarMap = addToUFM (envVarMap env) (getUnique s) t }
+funInsert s t = modifyEnv $ \env -> env { envFunMap = addToUFM (envFunMap env) (getUnique s) t }
 
 -- | Lookup variables or functions in the environment.
 varLookup, funLookup :: Uniquable key => key -> LlvmM (Maybe LlvmType)
-varLookup s = getEnv (flip lookupUFM s . envVarMap)
-funLookup s = getEnv (flip lookupUFM s . envFunMap)
+varLookup s = getEnv (flip lookupUFM (getUnique s) . envVarMap)
+funLookup s = getEnv (flip lookupUFM (getUnique s) . envFunMap)
 
 -- | Set a register as allocated on the stack
 markStackReg :: GlobalReg -> LlvmM ()
@@ -426,14 +422,6 @@ getMetaUniqueId = LlvmM $ \env ->
 getLlvmVer :: LlvmM LlvmVersion
 getLlvmVer = getEnv envVersion
 
--- | Get the platform we are generating code for
-getDynFlag :: (DynFlags -> a) -> LlvmM a
-getDynFlag f = getEnv (f . envDynFlags)
-
--- | Get the platform we are generating code for
-getLlvmPlatform :: LlvmM Platform
-getLlvmPlatform = getDynFlag targetPlatform
-
 -- | Dumps the document if the corresponding flag has been set by the user
 dumpIfSetLlvm :: DumpFlag -> String -> DumpFormat -> Outp.SDoc -> LlvmM ()
 dumpIfSetLlvm flag hdr fmt doc = do
@@ -447,7 +435,7 @@ renderLlvm sdoc = do
     -- Write to output
     dflags <- getDynFlags
     out <- getEnv envOutput
-    let ctx = initSDocContext dflags (Outp.mkCodeStyle Outp.CStyle)
+    let ctx = initSDocContext dflags (Outp.PprCode Outp.CStyle)
     liftIO $ Outp.bufLeftRenderSDoc ctx out sdoc
 
     -- Dump, if requested
@@ -508,36 +496,11 @@ ghcInternalFunctions = do
 strCLabel_llvm :: CLabel -> LlvmM LMString
 strCLabel_llvm lbl = do
     dflags <- getDynFlags
-    let sdoc = pprCLabel dflags lbl
-        str = Outp.renderWithStyle
-                  (initSDocContext dflags (Outp.mkCodeStyle Outp.CStyle))
+    platform <- getPlatform
+    let sdoc = pprCLabel platform CStyle lbl
+        str = Outp.renderWithContext
+                  (initSDocContext dflags (Outp.PprCode Outp.CStyle))
                   sdoc
-    return (fsLit str)
-
-strDisplayName_llvm :: CLabel -> LlvmM LMString
-strDisplayName_llvm lbl = do
-    dflags <- getDynFlags
-    let sdoc = pprCLabel dflags lbl
-        depth = Outp.PartWay 1
-        style = Outp.mkUserStyle dflags Outp.reallyAlwaysQualify depth
-        str = Outp.renderWithStyle (initSDocContext dflags style) sdoc
-    return (fsLit (dropInfoSuffix str))
-
-dropInfoSuffix :: String -> String
-dropInfoSuffix = go
-  where go "_info"        = []
-        go "_static_info" = []
-        go "_con_info"    = []
-        go (x:xs)         = x:go xs
-        go []             = []
-
-strProcedureName_llvm :: CLabel -> LlvmM LMString
-strProcedureName_llvm lbl = do
-    dflags <- getDynFlags
-    let sdoc = pprCLabel dflags lbl
-        depth = Outp.PartWay 1
-        style = Outp.mkUserStyle dflags Outp.neverQualify depth
-        str = Outp.renderWithStyle (initSDocContext dflags style) sdoc
     return (fsLit str)
 
 -- ----------------------------------------------------------------------------
@@ -594,7 +557,7 @@ generateExternDecls = do
 -- | Here we take a global variable definition, rename it with a
 -- @$def@ suffix, and generate the appropriate alias.
 aliasify :: LMGlobal -> LlvmM [LMGlobal]
--- See note [emit-time elimination of static indirections] in CLabel.
+-- See note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
 -- Here we obtain the indirectee's precise type and introduce
 -- fresh aliases to both the precise typed label (lbl$def) and the i8*
 -- typed (regular) label of it with the matching new names.

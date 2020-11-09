@@ -15,7 +15,7 @@ module GHC.Tc.Deriv ( tcDeriving, DerivInfo(..) ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Driver.Session
@@ -26,11 +26,10 @@ import GHC.Tc.Types.Origin
 import GHC.Core.Predicate
 import GHC.Tc.Deriv.Infer
 import GHC.Tc.Deriv.Utils
-import GHC.Tc.Validity( allDistinctTyVars )
 import GHC.Tc.TyCl.Class( instDeclCtxt3, tcATDefault )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Deriv.Generate
-import GHC.Tc.Validity( checkValidInstHead )
+import GHC.Tc.Validity( allDistinctTyVars, checkValidInstHead )
 import GHC.Core.InstEnv
 import GHC.Tc.Utils.Instantiate
 import GHC.Core.FamInstEnv
@@ -38,18 +37,17 @@ import GHC.Tc.Gen.HsType
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr ( pprTyVars )
 
-import GHC.Rename.Names  ( extendGlobalRdrEnvRn )
 import GHC.Rename.Bind
 import GHC.Rename.Env
 import GHC.Rename.Module ( addTcgDUs )
-import GHC.Types.Avail
+import GHC.Rename.Utils
 
 import GHC.Core.Unify( tcUnifyTy )
 import GHC.Core.Class
 import GHC.Core.Type
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Core.DataCon
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Name.Set as NameSet
@@ -60,11 +58,12 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc
-import Util
-import Outputable
-import FastString
-import Bag
-import FV (fvVarList, unionFV, mkFVs)
+import GHC.Utils.Misc
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
+import GHC.Data.Bag
+import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -294,11 +293,12 @@ renameDeriv inst_infos bagBinds
         ; traceTc "rnd" (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos))
         ; (aux_binds, aux_sigs) <- mapAndUnzipBagM return bagBinds
         ; let aux_val_binds = ValBinds noExtField aux_binds (bagToList aux_sigs)
-        ; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv aux_val_binds
-        ; let bndrs = collectHsValBinders rn_aux_lhs
-        ; envs <- extendGlobalRdrEnvRn (map avail bndrs) emptyFsEnv ;
-        ; setEnvs envs $
-    do  { (rn_aux, dus_aux) <- rnValBindsRHS (TopSigCtxt (mkNameSet bndrs)) rn_aux_lhs
+        -- Importantly, we use rnLocalValBindsLHS, not rnTopBindsLHS, to rename
+        -- auxiliary bindings as if they were defined locally.
+        -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
+        ; (bndrs, rn_aux_lhs) <- rnLocalValBindsLHS emptyFsEnv aux_val_binds
+        ; bindLocalNames bndrs $
+    do  { (rn_aux, dus_aux) <- rnLocalValBindsRHS (mkNameSet bndrs) rn_aux_lhs
         ; (rn_inst_infos, fvs_insts) <- mapAndUnzipM rn_inst_info inst_infos
         ; return (listToBag rn_inst_infos, rn_aux,
                   dus_aux `plusDU` usesOnly (plusFVs fvs_insts)) } }
@@ -436,23 +436,28 @@ makeDerivSpecs :: [DerivInfo]
                -> TcM [EarlyDerivSpec]
 makeDerivSpecs deriv_infos deriv_decls
   = do  { eqns1 <- sequenceA
-                     [ deriveClause rep_tc scoped_tvs dcs preds err_ctxt
+                     [ deriveClause rep_tc scoped_tvs dcs (deriv_clause_preds dct) err_ctxt
                      | DerivInfo { di_rep_tc = rep_tc
                                  , di_scoped_tvs = scoped_tvs
                                  , di_clauses = clauses
                                  , di_ctxt = err_ctxt } <- deriv_infos
                      , L _ (HsDerivingClause { deriv_clause_strategy = dcs
-                                             , deriv_clause_tys = L _ preds })
+                                             , deriv_clause_tys = dct })
                          <- clauses
                      ]
         ; eqns2 <- mapM (recoverM (pure Nothing) . deriveStandalone) deriv_decls
         ; return $ concat eqns1 ++ catMaybes eqns2 }
+  where
+    deriv_clause_preds :: LDerivClauseTys GhcRn -> [LHsSigType GhcRn]
+    deriv_clause_preds (L _ dct) = case dct of
+      DctSingle _ ty -> [ty]
+      DctMulti _ tys -> tys
 
 ------------------------------------------------------------------
 -- | Process the derived classes in a single @deriving@ clause.
 deriveClause :: TyCon
              -> [(Name, TcTyVar)]  -- Scoped type variables taken from tcTyConScopedTyVars
-                                   -- See Note [Scoped tyvars in a TcTyCon] in types/TyCon
+                                   -- See Note [Scoped tyvars in a TcTyCon] in "GHC.Core.TyCon"
              -> Maybe (LDerivStrategy GhcRn)
              -> [LHsSigType GhcRn] -> SDoc
              -> TcM [EarlyDerivSpec]
@@ -495,7 +500,7 @@ derivePred tc tys mb_lderiv_strat via_tvs deriv_pred =
   -- We carefully set up uses of recoverM to minimize error message
   -- cascades. See Note [Recovering from failures in deriving clauses].
   recoverM (pure Nothing) $
-  setSrcSpan (getLoc (hsSigType deriv_pred)) $ do
+  setSrcSpan (getLoc deriv_pred) $ do
     traceTc "derivePred" $ vcat
       [ text "tc"              <+> ppr tc
       , text "tys"             <+> ppr tys
@@ -713,19 +718,15 @@ tcStandaloneDerivInstType
   :: UserTypeCtxt -> LHsSigWcType GhcRn
   -> TcM ([TyVar], DerivContext, Class, [Type])
 tcStandaloneDerivInstType ctxt
-    (HsWC { hswc_body = deriv_ty@(HsIB { hsib_ext = vars
-                                       , hsib_body   = deriv_ty_body })})
-  | (tvs, theta, rho) <- splitLHsSigmaTyInvis deriv_ty_body
+    (HsWC { hswc_body = deriv_ty@(L loc (HsSig { sig_bndrs = outer_bndrs
+                                               , sig_body = deriv_ty_body }))})
+  | (theta, rho) <- splitLHsQualTy deriv_ty_body
   , L _ [wc_pred] <- theta
   , L wc_span (HsWildCardTy _) <- ignoreParens wc_pred
-  = do dfun_ty <- tcHsClsInstType ctxt $
-                  HsIB { hsib_ext = vars
-                       , hsib_body
-                           = L (getLoc deriv_ty_body) $
-                             HsForAllTy { hst_fvf = ForallInvis
-                                        , hst_bndrs = tvs
-                                        , hst_xforall = noExtField
-                                        , hst_body  = rho }}
+  = do dfun_ty <- tcHsClsInstType ctxt $ L loc $
+                  HsSig { sig_ext   = noExtField
+                        , sig_bndrs = outer_bndrs
+                        , sig_body  = rho }
        let (tvs, _theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
        pure (tvs, InferContext (Just wc_span), cls, inst_tys)
   | otherwise
@@ -2039,10 +2040,12 @@ genDerivStuff mechanism loc clas inst_tys tyvars
         -> gen_newtype_or_via rhs_ty
 
       -- Try a stock deriver
-      DerivSpecStock { dsm_stock_dit    = DerivInstTys{dit_rep_tc = rep_tc}
+      DerivSpecStock { dsm_stock_dit    = DerivInstTys
+                        { dit_rep_tc = rep_tc
+                        , dit_rep_tc_args = rep_tc_args
+                        }
                      , dsm_stock_gen_fn = gen_fn }
-        -> do (binds, faminsts, field_names) <- gen_fn loc rep_tc inst_tys
-              pure (binds, [], faminsts, field_names)
+        -> gen_fn loc rep_tc rep_tc_args inst_tys
 
       -- Try DeriveAnyClass
       DerivSpecAnyClass -> do

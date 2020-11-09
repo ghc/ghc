@@ -1,5 +1,10 @@
 Thank you for your contribution to GHC!
 
+**Please read the checklist below to make sure your contribution fulfills these
+expectations. Also please answer the following question in your MR description:**
+
+**Where is the key part of this patch? That is, what should reviewers look at first?**
+
 Please take a few moments to verify that your commits fulfill the following:
 
  * [ ] are either individually buildable or squashed
@@ -10,7 +15,7 @@ Please take a few moments to verify that your commits fulfill the following:
    likely should add a [Note][notes] and cross-reference it from the relevant
    places.
  * [ ] add a [testcase to the testsuite](https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/adding).
- * [ ] if your MR affects library interfaces (e.g. changes `base`) please add
+ * [ ] if your MR affects library interfaces (e.g. changes `base`) or affects whether GHC will accept user-written code, please add
    the ~"user facing" label.
  * [ ] updates the users guide if applicable
  * [ ] mentions new features in the release notes for the next release

@@ -26,13 +26,14 @@ module GHC.Plugins
    , module GHC.Core.Rules
    , module GHC.Types.Annotations
    , module GHC.Driver.Session
-   , module GHC.Driver.Packages
-   , module GHC.Types.Module
+   , module GHC.Driver.Ppr
+   , module GHC.Unit.State
+   , module GHC.Unit.Module
    , module GHC.Core.Type
    , module GHC.Core.TyCon
    , module GHC.Core.Coercion
    , module GHC.Builtin.Types
-   , module GHC.Driver.Types
+   , module GHC.Driver.Env
    , module GHC.Types.Basic
    , module GHC.Types.Var.Set
    , module GHC.Types.Var.Env
@@ -41,13 +42,20 @@ module GHC.Plugins
    , module GHC.Types.Unique
    , module GHC.Types.Unique.Set
    , module GHC.Types.Unique.FM
-   , module FiniteMap
-   , module Util
+   , module GHC.Data.FiniteMap
+   , module GHC.Utils.Misc
    , module GHC.Serialized
    , module GHC.Types.SrcLoc
-   , module Outputable
+   , module GHC.Utils.Outputable
+   , module GHC.Utils.Panic
    , module GHC.Types.Unique.Supply
-   , module FastString
+   , module GHC.Data.FastString
+   , module GHC.Tc.Errors.Hole.FitTypes   -- for hole-fit plugins
+   , module GHC.Unit.Module.ModGuts
+   , module GHC.Unit.Module.ModSummary
+   , module GHC.Unit.Module.ModIface
+   , module GHC.Types.Meta
+   , module GHC.Types.SourceError
    , -- * Getting 'Name's
      thNameToGhcName
    )
@@ -57,6 +65,8 @@ where
 import GHC.Driver.Plugins
 
 -- Variable naming
+import GHC.Types.TyThing
+import GHC.Types.SourceError
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence  hiding  ( varName {- conflicts with Var.varName -} )
 import GHC.Types.Name     hiding  ( varName {- reexport from OccName, conflicts with Var.varName -} )
@@ -75,24 +85,25 @@ import GHC.Core.FVs
 import GHC.Core.Subst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst )
        -- These names are also exported by Type
 
--- Core "extras"
 import GHC.Core.Rules
 import GHC.Types.Annotations
+import GHC.Types.Meta
 
--- Pipeline-related stuff
 import GHC.Driver.Session
-import GHC.Driver.Packages
+import GHC.Unit.State
 
--- Important GHC types
-import GHC.Types.Module
+import GHC.Unit.Module
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.ModIface
 import GHC.Core.Type hiding {- conflict with GHC.Core.Subst -}
                 ( substTy, extendTvSubst, extendTvSubstList, isInScope )
 import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
                 ( substCo )
 import GHC.Core.TyCon
 import GHC.Builtin.Types
-import GHC.Driver.Types
-import GHC.Types.Basic hiding ( Version {- conflicts with Packages.Version -} )
+import GHC.Driver.Env
+import GHC.Types.Basic
 
 -- Collections and maps
 import GHC.Types.Var.Set
@@ -103,27 +114,31 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 -- Conflicts with UniqFM:
 --import LazyUniqFM
-import FiniteMap
+import GHC.Data.FiniteMap
 
 -- Common utilities
-import Util
+import GHC.Utils.Misc
 import GHC.Serialized
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Driver.Ppr
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique ( Unique, Uniquable(..) )
-import FastString
+import GHC.Data.FastString
 import Data.Maybe
 
 import GHC.Iface.Env    ( lookupOrigIO )
-import GhcPrelude
-import MonadUtils       ( mapMaybeM )
+import GHC.Prelude
+import GHC.Utils.Monad  ( mapMaybeM )
 import GHC.ThToHs       ( thRdrNameGuesses )
 import GHC.Tc.Utils.Env ( lookupGlobal )
 
+import GHC.Tc.Errors.Hole.FitTypes
+
 import qualified Language.Haskell.TH as TH
 
-{- This instance is defined outside GHC.Core.Opt.Monad.hs so that
+{- This instance is defined outside GHC.Core.Opt.Monad so that
    GHC.Core.Opt.Monad does not depend on GHC.Tc.Utils.Env -}
 instance MonadThings CoreM where
     lookupThing name = do { hsc_env <- getHscEnv

@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, PatternSynonyms, DeriveFunctor #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
@@ -38,7 +39,7 @@ module GHC.CmmToAsm.Reg.Linear.State (
 )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.Stats
 import GHC.CmmToAsm.Reg.Linear.StackMap

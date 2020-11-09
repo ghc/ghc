@@ -1,3 +1,6 @@
+{-# LANGUAGE LambdaCase #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The AQUA Project, Glasgow University, 1996-1998
@@ -6,10 +9,6 @@
 Printing of Core syntax
 -}
 
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE LambdaCase #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module GHC.Core.Ppr (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
@@ -17,7 +16,7 @@ module GHC.Core.Ppr (
         pprRules, pprOptCo
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Stats (exprStats)
@@ -33,10 +32,10 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr
 import GHC.Core.Coercion
 import GHC.Types.Basic
-import Maybes
-import Util
-import Outputable
-import FastString
+import GHC.Data.Maybe
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.SrcLoc ( pprUserRealSpan )
 
 {-
@@ -161,15 +160,20 @@ pprOptCo co = sdocOption sdocSuppressCoercions $ \case
               True  -> angleBrackets (text "Co:" <> int (coercionSize co))
               False -> parens $ sep [ppr co, dcolon <+> ppr (coercionType co)]
 
+ppr_id_occ :: (SDoc -> SDoc) -> Id -> SDoc
+ppr_id_occ add_par id
+  | isJoinId id = add_par ((text "jump") <+> pp_id)
+  | otherwise   = pp_id
+  where
+    pp_id = ppr id  -- We could use pprPrefixOcc to print (+) etc, but this is
+                    -- Core where we don't print things infix anyway, so doing
+                    -- so just adds extra redundant parens
+
 ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
 
-ppr_expr add_par (Var name)
- | isJoinId name               = add_par ((text "jump") <+> pp_name)
- | otherwise                   = pp_name
- where
-   pp_name = pprPrefixOcc name
+ppr_expr add_par (Var id)      = ppr_id_occ add_par id
 ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
 ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
@@ -212,8 +216,7 @@ ppr_expr add_par expr@(App {})
 
                    _ -> parens (hang fun_doc 2 pp_args)
                    where
-                     fun_doc | isJoinId f = text "jump" <+> ppr f
-                             | otherwise  = ppr f
+                     fun_doc = ppr_id_occ noParens f
 
         _ -> parens (hang (pprParendExpr fun) 2 pp_args)
     }
@@ -375,8 +378,8 @@ pprCoreBinder LetBind binder
 
 -- Lambda bound type variables are preceded by "@"
 pprCoreBinder bind_site bndr
-  = getPprStyle $ \ sty ->
-    pprTypedLamBinder bind_site (debugStyle sty) bndr
+  = getPprDebug $ \debug ->
+    pprTypedLamBinder bind_site debug bndr
 
 pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
@@ -446,7 +449,7 @@ pprIdBndrInfo info
     lbv_info  = oneShotInfo info
 
     has_prag  = not (isDefaultInlinePragma prag_info)
-    has_occ   = not (isManyOccs occ_info)
+    has_occ   = not (isNoOccInfo occ_info)
     has_dmd   = not $ isTopDmd dmd_info
     has_lbv   = not (hasNoOneShotInfo lbv_info)
 

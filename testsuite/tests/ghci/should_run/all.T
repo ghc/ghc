@@ -1,7 +1,7 @@
 
 # We only want to run these tests with GHCi
-def just_ghci( name, opts ):
-  opts.only_ways = ['ghci']
+# N.B. ghci is slightly broken under unregisterised compilers.
+just_ghci = [ only_ways(['ghci']), when(unregisterised(), fragile(18463)) ]
 
 test('ghcirun001', just_ghci, compile_and_run, [''])
 test('ghcirun002', just_ghci, compile_and_run, [''])
@@ -62,5 +62,18 @@ test('T15633b',
       ],
      ghci_script, ['T15633b.script'])
 
+test('T16012', just_ghci, ghci_script, ['T16012.script'])
 test('T16096', just_ghci, ghci_script, ['T16096.script'])
 test('T507', just_ghci, ghci_script, ['T507.script'])
+test('T18027', just_ghci, ghci_script, ['T18027.script'])
+test('T18064',
+   [just_ghci,
+    when(leading_underscore(),skip)
+    # we need to skip otherwise the test fails on platforms prepending leading
+    # underscores to symbols (we get "Could not load '_blah'" instead of "Could
+    # not load 'blah').
+    ],
+   ghci_script,
+   ['T18064.script'])
+test('T18594', just_ghci, ghci_script, ['T18594.script'])
+test('T18562', just_ghci, ghci_script, ['T18562.script'])

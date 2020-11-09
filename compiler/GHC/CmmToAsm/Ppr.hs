@@ -9,9 +9,6 @@
 -----------------------------------------------------------------------------
 
 module GHC.CmmToAsm.Ppr (
-        castFloatToWord8Array,
-        castDoubleToWord8Array,
-        floatToBytes,
         doubleToBytes,
         pprASCII,
         pprString,
@@ -21,14 +18,15 @@ module GHC.CmmToAsm.Ppr (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
-import AsmUtils
+import GHC.Utils.Asm
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.CmmToAsm.Config
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 
 import qualified Data.Array.Unsafe as U ( castSTUArray )
@@ -43,13 +41,13 @@ import qualified Data.ByteString as BS
 import GHC.Exts
 import GHC.Word
 
-
-
 -- -----------------------------------------------------------------------------
 -- Converting floating-point literals to integrals for printing
 
-castFloatToWord8Array :: STUArray s Int Float -> ST s (STUArray s Int Word8)
-castFloatToWord8Array = U.castSTUArray
+-- ToDo: this code is currently shared between SPARC and LLVM.
+--       Similar functions for (single precision) floats are
+--       present in the SPARC backend only. We need to fix both
+--       LLVM and SPARC.
 
 castDoubleToWord8Array :: STUArray s Int Double -> ST s (STUArray s Int Word8)
 castDoubleToWord8Array = U.castSTUArray
@@ -61,19 +59,6 @@ castDoubleToWord8Array = U.castSTUArray
 
 -- ToDo: this stuff is very similar to the shenanigans in PprAbs,
 -- could they be merged?
-
-floatToBytes :: Float -> [Int]
-floatToBytes f
-   = runST (do
-        arr <- newArray_ ((0::Int),3)
-        writeArray arr 0 f
-        arr <- castFloatToWord8Array arr
-        i0 <- readArray arr 0
-        i1 <- readArray arr 1
-        i2 <- readArray arr 2
-        i3 <- readArray arr 3
-        return (map fromIntegral [i0,i1,i2,i3])
-     )
 
 doubleToBytes :: Double -> [Int]
 doubleToBytes d
@@ -96,7 +81,7 @@ doubleToBytes d
 -- Printing ASCII strings.
 --
 -- Print as a string and escape non-printable characters.
--- This is similar to charToC in Utils.
+-- This is similar to charToC in GHC.Utils.Misc
 
 pprASCII :: ByteString -> SDoc
 pprASCII str
@@ -211,7 +196,7 @@ pprGNUSectionHeader config sep t suffix =
     platform      = ncgPlatform config
     splitSections = ncgSplitSections config
     subsection
-      | splitSections = sep <> ppr suffix
+      | splitSections = sep <> pdoc platform suffix
       | otherwise     = empty
     header = case t of
       Text -> sLit ".text"

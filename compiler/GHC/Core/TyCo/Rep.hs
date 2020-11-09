@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP                #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+
+{-# OPTIONS_HADDOCK not-home #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1998
@@ -18,23 +23,16 @@ Note [The Type-related module hierarchy]
 -}
 
 -- We expose the relevant stuff from this module via the Type module
-{-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, PatternSynonyms, BangPatterns #-}
-
 module GHC.Core.TyCo.Rep (
-        TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
 
         -- * Types
-        Type( TyVarTy, AppTy, TyConApp, ForAllTy
-            , LitTy, CastTy, CoercionTy
-            , FunTy, ft_arg, ft_res, ft_af
-            ),  -- Export the type synonym FunTy too
+        Type(..),
 
         TyLit(..),
         KindOrType, Kind,
         KnotTied,
         PredType, ThetaType,      -- Synonyms
-        ArgFlag(..), AnonArgFlag(..), ForallVisFlag(..),
+        ArgFlag(..), AnonArgFlag(..),
 
         -- * Coercions
         Coercion(..),
@@ -46,9 +44,14 @@ module GHC.Core.TyCo.Rep (
         -- * Functions over types
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
-        mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
-        mkForAllTy, mkForAllTys,
+        mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys,
+        mkForAllTy, mkForAllTys, mkInvisForAllTys,
         mkPiTy, mkPiTys,
+        mkFunTyMany,
+        mkScaledFunTy,
+        mkVisFunTyMany, mkVisFunTysMany,
+        mkInvisFunTyMany, mkInvisFunTysMany,
+        mkTyConApp,
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -65,96 +68,40 @@ module GHC.Core.TyCo.Rep (
         TyCoFolder(..), foldTyCo,
 
         -- * Sizes
-        typeSize, coercionSize, provSize
+        typeSize, coercionSize, provSize,
+
+        -- * Multiplicities
+        Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
     ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
-import {-# SOURCE #-} GHC.Core.ConLike ( ConLike(..), conLikeName )
-
 -- friends:
 import GHC.Iface.Type
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Types.Name hiding ( varName )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
+import GHC.Builtin.Names ( liftedTypeKindTyConKey, manyDataConKey )
+import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, manyDataConTy )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
-import Outputable
-import FastString
-import Util
+import GHC.Types.Unique ( hasKey )
+import GHC.Utils.Outputable
+import GHC.Data.FastString
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.IORef ( IORef )   -- for CoercionHole
-
-{-
-%************************************************************************
-%*                                                                      *
-                        TyThing
-%*                                                                      *
-%************************************************************************
-
-Despite the fact that DataCon has to be imported via a hi-boot route,
-this module seems the right place for TyThing, because it's needed for
-funTyCon and all the types in GHC.Builtin.Types.Prim.
-
-It is also SOURCE-imported into Name.hs
-
-
-Note [ATyCon for classes]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Both classes and type constructors are represented in the type environment
-as ATyCon.  You can tell the difference, and get to the class, with
-   isClassTyCon :: TyCon -> Bool
-   tyConClass_maybe :: TyCon -> Maybe Class
-The Class and its associated TyCon have the same Name.
--}
-
--- | A global typecheckable-thing, essentially anything that has a name.
--- Not to be confused with a 'TcTyThing', which is also a typecheckable
--- thing but in the *local* context.  See 'GHC.Tc.Utils.Env' for how to retrieve
--- a 'TyThing' given a 'Name'.
-data TyThing
-  = AnId     Id
-  | AConLike ConLike
-  | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
-  | ACoAxiom (CoAxiom Branched)
-
-instance Outputable TyThing where
-  ppr = pprShortTyThing
-
-instance NamedThing TyThing where       -- Can't put this with the type
-  getName (AnId id)     = getName id    -- decl, because the DataCon instance
-  getName (ATyCon tc)   = getName tc    -- isn't visible there
-  getName (ACoAxiom cc) = getName cc
-  getName (AConLike cl) = conLikeName cl
-
-pprShortTyThing :: TyThing -> SDoc
--- c.f. GHC.Core.Ppr.TyThing.pprTyThing, which prints all the details
-pprShortTyThing thing
-  = pprTyThingCategory thing <+> quotes (ppr (getName thing))
-
-pprTyThingCategory :: TyThing -> SDoc
-pprTyThingCategory = text . capitalise . tyThingCategory
-
-tyThingCategory :: TyThing -> String
-tyThingCategory (ATyCon tc)
-  | isClassTyCon tc = "class"
-  | otherwise       = "type constructor"
-tyThingCategory (ACoAxiom _) = "coercion axiom"
-tyThingCategory (AnId   _)   = "identifier"
-tyThingCategory (AConLike (RealDataCon _)) = "data constructor"
-tyThingCategory (AConLike (PatSynCon _))  = "pattern synonym"
-
 
 {- **********************************************************************
 *                                                                       *
@@ -181,7 +128,7 @@ data Type
                         --
                         --  1) Function: must /not/ be a 'TyConApp' or 'CastTy',
                         --     must be another 'AppTy', or 'TyVarTy'
-                        --     See Note [Respecting definitional equality] (EQ1) about the
+                        --     See Note [Respecting definitional equality] \(EQ1) about the
                         --     no 'CastTy' requirement
                         --
                         --  2) Argument type
@@ -210,9 +157,10 @@ data Type
              -- be mentioned in the Type. See
              -- Note [Unused coercion variable in ForAllTy]
 
-  | FunTy      -- ^ t1 -> t2   Very common, so an important special case
+  | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
                 -- See Note [Function types]
-     { ft_af  :: AnonArgFlag  -- Is this (->) or (=>)?
+     { ft_af  :: AnonArgFlag    -- Is this (->) or (=>)?
+     , ft_mult :: Mult          -- Multiplicity
      , ft_arg :: Type           -- Argument type
      , ft_res :: Type }         -- Result type
 
@@ -224,7 +172,7 @@ data Type
                       -- INVARIANT: The cast is never reflexive
                       -- INVARIANT: The Type is not a CastTy (use TransCo instead)
                       -- INVARIANT: The Type is not a ForAllTy over a type variable
-                      -- See Note [Respecting definitional equality] (EQ2), (EQ3), (EQ4)
+                      -- See Note [Respecting definitional equality] \(EQ2), (EQ3), (EQ4)
 
   | CoercionTy
         Coercion    -- ^ Injection of a Coercion into a type
@@ -242,7 +190,13 @@ instance Outputable Type where
 data TyLit
   = NumTyLit Integer
   | StrTyLit FastString
-  deriving (Eq, Ord, Data.Data)
+  deriving (Eq, Data.Data)
+
+instance Ord TyLit where
+   compare (NumTyLit _) (StrTyLit _) = LT
+   compare (StrTyLit _) (NumTyLit _) = GT
+   compare (NumTyLit x) (NumTyLit y) = compare x y
+   compare (StrTyLit x) (StrTyLit y) = uniqCompareFS x y
 
 instance Outputable TyLit where
    ppr = pprTyLit
@@ -255,11 +209,14 @@ about it!
 * FFunTy is the data constructor, meaning "full function type".
 
 * The function type constructor (->) has kind
-     (->) :: forall r1 r2. TYPE r1 -> TYPE r2 -> Type LiftedRep
+     (->) :: forall {r1} {r2}. TYPE r1 -> TYPE r2 -> Type LiftedRep
   mkTyConApp ensure that we convert a saturated application
     TyConApp (->) [r1,r2,t1,t2] into FunTy t1 t2
   dropping the 'r1' and 'r2' arguments; they are easily recovered
   from 't1' and 't2'.
+
+* For the time being its RuntimeRep quantifiers are left
+  inferred. This is to allow for it to evolve.
 
 * The ft_af field says whether or not this is an invisible argument
      VisArg:   t1 -> t2    Ordinary function type
@@ -528,6 +485,12 @@ Another helpful principle with eqType is this:
 This principle also tells us that eqType must relate only types with the
 same kinds.
 
+Besides eqType, another equality relation that upholds the (EQ) property above
+is /typechecker equality/, which is implemented as
+GHC.Tc.Utils.TcType.tcEqType. See
+Note [Typechecker equality vs definitional equality] in GHC.Tc.Utils.TcType for
+what the difference between eqType and tcEqType is.
+
 Note [Respecting definitional equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Note [Non-trivial definitional equality] introduces the property (EQ).
@@ -663,7 +626,7 @@ are truly unrelated.
 
 -- | A type labeled 'KnotTied' might have knot-tied tycons in it. See
 -- Note [Type checking recursive type and class declarations] in
--- GHC.Tc.TyCl
+-- "GHC.Tc.TyCl"
 type KnotTied ty = ty
 
 {- **********************************************************************
@@ -677,15 +640,17 @@ type KnotTied ty = ty
 -- not. See Note [TyCoBinders]
 data TyCoBinder
   = Named TyCoVarBinder    -- A type-lambda binder
-  | Anon AnonArgFlag Type  -- A term-lambda binder. Type here can be CoercionTy.
-                           -- Visibility is determined by the AnonArgFlag
+  | Anon AnonArgFlag (Scaled Type)  -- A term-lambda binder. Type here can be CoercionTy.
+                                    -- Visibility is determined by the AnonArgFlag
   deriving Data.Data
 
 instance Outputable TyCoBinder where
   ppr (Anon af ty) = ppr af <+> ppr ty
   ppr (Named (Bndr v Required))  = ppr v
-  ppr (Named (Bndr v Specified)) = char '@' <> ppr v
-  ppr (Named (Bndr v Inferred))  = braces (ppr v)
+  -- See Note [Explicit Case Statement for Specificity]
+  ppr (Named (Bndr v (Invisible spec))) = case spec of
+    SpecifiedSpec -> char '@' <> ppr v
+    InferredSpec  -> braces (ppr v)
 
 
 -- | 'TyBinder' is like 'TyCoBinder', but there can only be 'TyVarBinder'
@@ -799,16 +764,22 @@ This table summarises the visibility rules:
      f3 :: forall a. a -> a; f3 x = x
   So f3 gets the type f3 :: forall a. a -> a, with 'a' Specified
 
+* Inferred.  Function defn, with signature (explicit forall), marked as inferred:
+     f4 :: forall {a}. a -> a; f4 x = x
+  So f4 gets the type f4 :: forall {a}. a -> a, with 'a' Inferred
+  It's Inferred because the user marked it as such, even though it does appear
+  in the user-written signature for f4
+
 * Inferred/Specified.  Function signature with inferred kind polymorphism.
-     f4 :: a b -> Int
-  So 'f4' gets the type f4 :: forall {k} (a:k->*) (b:k). a b -> Int
+     f5 :: a b -> Int
+  So 'f5' gets the type f5 :: forall {k} (a:k->*) (b:k). a b -> Int
   Here 'k' is Inferred (it's not mentioned in the type),
   but 'a' and 'b' are Specified.
 
 * Specified.  Function signature with explicit kind polymorphism
-     f5 :: a (b :: k) -> Int
+     f6 :: a (b :: k) -> Int
   This time 'k' is Specified, because it is mentioned explicitly,
-  so we get f5 :: forall (k:*) (a:k->*) (b:k). a b -> Int
+  so we get f6 :: forall (k:*) (a:k->*) (b:k). a b -> Int
 
 * Similarly pattern synonyms:
   Inferred - from inferred types (e.g. no pattern type signature)
@@ -969,19 +940,41 @@ mkTyCoVarTy v
 mkTyCoVarTys :: [TyCoVar] -> [Type]
 mkTyCoVarTys = map mkTyCoVarTy
 
-infixr 3 `mkFunTy`, `mkVisFunTy`, `mkInvisFunTy`      -- Associates to the right
+infixr 3 `mkFunTy`, `mkVisFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`,
+         `mkInvisFunTyMany`      -- Associates to the right
 
-mkFunTy :: AnonArgFlag -> Type -> Type -> Type
-mkFunTy af arg res = FunTy { ft_af = af, ft_arg = arg, ft_res = res }
+mkFunTy :: AnonArgFlag -> Mult -> Type -> Type -> Type
+mkFunTy af mult arg res = FunTy { ft_af = af
+                                , ft_mult = mult
+                                , ft_arg = arg
+                                , ft_res = res }
 
-mkVisFunTy, mkInvisFunTy :: Type -> Type -> Type
+mkScaledFunTy :: AnonArgFlag -> Scaled Type -> Type -> Type
+mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
+
+mkVisFunTy, mkInvisFunTy :: Mult -> Type -> Type -> Type
 mkVisFunTy   = mkFunTy VisArg
 mkInvisFunTy = mkFunTy InvisArg
 
+mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
+mkFunTyMany af = mkFunTy af manyDataConTy
+
+-- | Special, common, case: Arrow type with mult Many
+mkVisFunTyMany :: Type -> Type -> Type
+mkVisFunTyMany = mkVisFunTy manyDataConTy
+
+mkInvisFunTyMany :: Type -> Type -> Type
+mkInvisFunTyMany = mkInvisFunTy manyDataConTy
+
 -- | Make nested arrow types
-mkVisFunTys, mkInvisFunTys :: [Type] -> Type -> Type
-mkVisFunTys   tys ty = foldr mkVisFunTy   ty tys
-mkInvisFunTys tys ty = foldr mkInvisFunTy ty tys
+mkVisFunTys :: [Scaled Type] -> Type -> Type
+mkVisFunTys tys ty = foldr (mkScaledFunTy VisArg) ty tys
+
+mkVisFunTysMany :: [Type] -> Type -> Type
+mkVisFunTysMany tys ty = foldr mkVisFunTyMany ty tys
+
+mkInvisFunTysMany :: [Type] -> Type -> Type
+mkInvisFunTysMany tys ty = foldr mkInvisFunTyMany ty tys
 
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
 -- See Note [Unused coercion variable in ForAllTy]
@@ -992,8 +985,12 @@ mkForAllTy tv vis ty = ForAllTy (Bndr tv vis) ty
 mkForAllTys :: [TyCoVarBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
-mkPiTy:: TyCoBinder -> Type -> Type
-mkPiTy (Anon af ty1) ty2        = FunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 }
+-- | Wraps foralls over the type using the provided 'InvisTVBinder's from left to right
+mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
+mkInvisForAllTys tyvars ty = foldr ForAllTy ty $ tyVarSpecToBinders tyvars
+
+mkPiTy :: TyCoBinder -> Type -> Type
+mkPiTy (Anon af ty1) ty2        = mkScaledFunTy af ty1 ty2
 mkPiTy (Named (Bndr tv vis)) ty = mkForAllTy tv vis ty
 
 mkPiTys :: [TyCoBinder] -> Type -> Type
@@ -1002,6 +999,58 @@ mkPiTys tbs ty = foldr mkPiTy ty tbs
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = TyConApp tycon []
+
+-- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
+-- its arguments.  Applies its arguments to the constructor from left to right.
+mkTyConApp :: TyCon -> [Type] -> Type
+mkTyConApp tycon tys
+  | isFunTyCon tycon
+  , [w, _rep1,_rep2,ty1,ty2] <- tys
+  -- The FunTyCon (->) is always a visible one
+  = FunTy { ft_af = VisArg, ft_mult = w, ft_arg = ty1, ft_res = ty2 }
+
+  -- Note [mkTyConApp and Type]
+  | tycon `hasKey` liftedTypeKindTyConKey
+  = ASSERT2( null tys, ppr tycon $$ ppr tys )
+    liftedTypeKindTyConApp
+  | tycon `hasKey` manyDataConKey
+  -- There are a lot of occurrences of 'Many' so it's a small optimisation to
+  -- avoid reboxing every time `mkTyConApp` is called.
+  = ASSERT2( null tys, ppr tycon $$ ppr tys )
+    manyDataConTy
+  | otherwise
+  = TyConApp tycon tys
+
+-- This is a single, global definition of the type `Type`
+-- Defined here so it is only allocated once.
+-- See Note [mkTyConApp and Type]
+liftedTypeKindTyConApp :: Type
+liftedTypeKindTyConApp = TyConApp liftedTypeKindTyCon []
+
+{-
+Note [mkTyConApp and Type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whilst benchmarking it was observed in #17292 that GHC allocated a lot
+of `TyConApp` constructors. Upon further inspection a large number of these
+TyConApp constructors were all duplicates of `Type` applied to no arguments.
+
+```
+(From a sample of 100000 TyConApp closures)
+0x45f3523    - 28732 - `Type`
+0x420b840702 - 9629  - generic type constructors
+0x42055b7e46 - 9596
+0x420559b582 - 9511
+0x420bb15a1e - 9509
+0x420b86c6ba - 9501
+0x42055bac1e - 9496
+0x45e68fd    - 538 - `TYPE ...`
+```
+
+Therefore in `mkTyConApp` we have a special case for `Type` to ensure that
+only one `TyConApp 'Type []` closure is allocated during the course of
+compilation. In order to avoid a potentially expensive series of checks in
+`mkTyConApp` only this egregious case is special cased at the moment.
+-}
 
 {-
 %************************************************************************
@@ -1027,18 +1076,10 @@ data Coercion
 
   -- These ones mirror the shape of types
   = -- Refl :: _ -> N
+    -- A special case reflexivity for a very common case: Nominal reflexivity
+    -- If you need Representational, use (GRefl Representational ty MRefl)
+    --                               not (SubCo (Refl ty))
     Refl Type  -- See Note [Refl invariant]
-          -- Invariant: applications of (Refl T) to a bunch of identity coercions
-          --            always show up as Refl.
-          -- For example  (Refl T) (Refl a) (Refl b) shows up as (Refl (T a b)).
-
-          -- Applications of (Refl T) to some coercions, at least one of
-          -- which is NOT the identity, show up as TyConAppCo.
-          -- (They may not be fully saturated however.)
-          -- ConAppCo coercions (like all coercions other than Refl)
-          -- are NEVER the identity.
-
-          -- Use (GRefl Representational ty MRefl), not (SubCo (Refl ty))
 
   -- GRefl :: "e" -> _ -> Maybe N -> e
   -- See Note [Generalized reflexive coercion]
@@ -1064,8 +1105,8 @@ data Coercion
   | ForAllCo TyCoVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo Role Coercion Coercion         -- lift FunTy
-         -- FunCo :: "e" -> e -> e -> e
+  | FunCo Role CoercionN Coercion Coercion         -- lift FunTy
+         -- FunCo :: "e" -> N -> e -> e -> e
          -- Note: why doesn't FunCo have a AnonArgFlag, like FunTy?
          -- Because the AnonArgFlag has no impact on Core; it is only
          -- there to guide implicit instantiation of Haskell source
@@ -1147,26 +1188,30 @@ instance Outputable MCoercion where
   ppr MRefl    = text "MRefl"
   ppr (MCo co) = text "MCo" <+> ppr co
 
-{-
-Note [Refl invariant]
-~~~~~~~~~~~~~~~~~~~~~
-Invariant 1:
+{- Note [Refl invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Invariant 1: Refl lifting
+        Refl (similar for GRefl r ty MRefl) is always lifted as far as possible.
+    For example
+        (Refl T) (Refl a) (Refl b) is normalised (by mkAPpCo) to  (Refl (T a b)).
 
-Coercions have the following invariant
-     Refl (similar for GRefl r ty MRefl) is always lifted as far as possible.
+    You might think that a consequences is:
+         Every identity coercion has Refl at the root
 
-You might think that a consequences is:
-     Every identity coercions has Refl at the root
+    But that's not quite true because of coercion variables.  Consider
+         g         where g :: Int~Int
+         Left h    where h :: Maybe Int ~ Maybe Int
+    etc.  So the consequence is only true of coercions that
+    have no coercion variables.
 
-But that's not quite true because of coercion variables.  Consider
-     g         where g :: Int~Int
-     Left h    where h :: Maybe Int ~ Maybe Int
-etc.  So the consequence is only true of coercions that
-have no coercion variables.
+Invariant 2: TyConAppCo
+   An application of (Refl T) to some coercions, at least one of which is
+   NOT the identity, is normalised to TyConAppCo.  (They may not be
+   fully saturated however.)  TyConAppCo coercions (like all coercions
+   other than Refl) are NEVER the identity.
 
 Note [Generalized reflexive coercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 GRefl is a generalized reflexive coercion (see #15192). It wraps a kind
 coercion, which might be reflexive (MRefl) or any coercion (MCo co). The typing
 rules for GRefl:
@@ -1788,7 +1833,7 @@ data TyCoFolder env a
       , tcf_covar :: env -> CoVar -> a
       , tcf_hole  :: env -> CoercionHole -> a
           -- ^ What to do with coercion holes.
-          -- See Note [Coercion holes] in GHC.Core.TyCo.Rep.
+          -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
 
       , tcf_tycobinder :: env -> TyCoVar -> ArgFlag -> env
           -- ^ The returned env is used in the extended scope
@@ -1810,7 +1855,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty _   (LitTy {})        = mempty
     go_ty env (CastTy ty co)    = go_ty env ty `mappend` go_co env co
     go_ty env (CoercionTy co)   = go_co env co
-    go_ty env (FunTy _ arg res) = go_ty env arg `mappend` go_ty env res
+    go_ty env (FunTy _ w arg res) = go_ty env w `mappend` go_ty env arg `mappend` go_ty env res
     go_ty env (TyConApp _ tys)  = go_tys env tys
     go_ty env (ForAllTy (Bndr tv vis) inner)
       = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
@@ -1830,7 +1875,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (GRefl _ ty (MCo co))   = go_ty env ty `mappend` go_co env co
     go_co env (TyConAppCo _ _ args)   = go_cos env args
     go_co env (AppCo c1 c2)           = go_co env c1 `mappend` go_co env c2
-    go_co env (FunCo _ c1 c2)         = go_co env c1 `mappend` go_co env c2
+    go_co env (FunCo _ cw c1 c2)      = go_co env cw `mappend`
+                                        go_co env c1 `mappend`
+                                        go_co env c2
     go_co env (CoVarCo cv)            = covar env cv
     go_co env (AxiomInstCo _ _ args)  = go_cos env args
     go_co env (HoleCo hole)           = cohole env hole
@@ -1877,7 +1924,7 @@ typeSize :: Type -> Int
 typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (FunTy _ t1 t2)            = typeSize t1 + typeSize t2
+typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + sum (map typeSize ts)
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
@@ -1890,7 +1937,8 @@ coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (FunCo _ co1 co2)   = 1 + coercionSize co1 + coercionSize co2
+coercionSize (FunCo _ w co1 co2) = 1 + coercionSize co1 + coercionSize co2
+                                                        + coercionSize w
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
@@ -1908,3 +1956,56 @@ provSize :: UnivCoProvenance -> Int
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1
+
+{-
+************************************************************************
+*                                                                      *
+                    Multiplicities
+*                                                                      *
+************************************************************************
+
+These definitions are here to avoid module loops, and to keep
+GHC.Core.Multiplicity above this module.
+
+-}
+
+-- | A shorthand for data with an attached 'Mult' element (the multiplicity).
+data Scaled a = Scaled Mult a
+  deriving (Data.Data)
+  -- You might think that this would be a natural candidate for
+  -- Functor, Traversable but Krzysztof says (!3674) "it was too easy
+  -- to accidentally lift functions (substitutions, zonking etc.) from
+  -- Type -> Type to Scaled Type -> Scaled Type, ignoring
+  -- multiplicities and causing bugs".  So we don't.
+
+
+instance (Outputable a) => Outputable (Scaled a) where
+   ppr (Scaled _cnt t) = ppr t
+     -- Do not print the multiplicity here because it tends to be too verbose
+
+scaledMult :: Scaled a -> Mult
+scaledMult (Scaled m _) = m
+
+scaledThing :: Scaled a -> a
+scaledThing (Scaled _ t) = t
+
+-- | Apply a function to both the Mult and the Type in a 'Scaled Type'
+mapScaledType :: (Type -> Type) -> Scaled Type -> Scaled Type
+mapScaledType f (Scaled m t) = Scaled (f m) (f t)
+
+{- |
+Mult is a type alias for Type.
+
+Mult must contain Type because multiplicity variables are mere type variables
+(of kind Multiplicity) in Haskell. So the simplest implementation is to make
+Mult be Type.
+
+Multiplicities can be formed with:
+- One: GHC.Types.One (= oneDataCon)
+- Many: GHC.Types.Many (= manyDataCon)
+- Multiplication: GHC.Types.MultMul (= multMulTyCon)
+
+So that Mult feels a bit more structured, we provide pattern synonyms and smart
+constructors for these.
+-}
+type Mult = Type

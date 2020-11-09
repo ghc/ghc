@@ -1,10 +1,12 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Clean out unneeded spill\/reload instructions.
 --
 --   Handling of join points
 --   ~~~~~~~~~~~~~~~~~~~~~~~
 --
+--   @
 --   B1:                          B2:
 --    ...                          ...
 --       RELOAD SLOT(0), %r1          RELOAD SLOT(0), %r1
@@ -14,9 +16,11 @@
 --                B3: ... C ...
 --                    RELOAD SLOT(0), %r1
 --                    ...
+--   @
 --
 --   The Plan
 --   ~~~~~~~~
+--
 --   As long as %r1 hasn't been written to in A, B or C then we don't need
 --   the reload in B3.
 --
@@ -29,7 +33,7 @@
 module GHC.CmmToAsm.Reg.Graph.SpillClean (
         cleanSpills
 ) where
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
@@ -40,8 +44,10 @@ import GHC.Cmm
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
-import State
-import Outputable
+import GHC.Builtin.Uniques
+import GHC.Utils.Monad.State
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Cmm.Dataflow.Collections
 
@@ -337,7 +343,7 @@ cleanBackward liveSlotsOnEntry noReloads acc lis
 cleanBackward'
         :: Instruction instr
         => BlockMap IntSet
-        -> UniqFM [BlockId]
+        -> UniqFM Store [BlockId]
         -> UniqSet Int
         -> [LiveInstr instr]
         -> [LiveInstr instr]
@@ -435,17 +441,17 @@ type CleanM
 data CleanS
         = CleanS
         { -- | Regs which are valid at the start of each block.
-          sJumpValid            :: UniqFM (Assoc Store)
+          sJumpValid            :: UniqFM BlockId (Assoc Store)
 
           -- | Collecting up what regs were valid across each jump.
           --    in the next pass we can collate these and write the results
           --    to sJumpValid.
-        , sJumpValidAcc         :: UniqFM [Assoc Store]
+        , sJumpValidAcc         :: UniqFM BlockId [Assoc Store]
 
           -- | Map of (slot -> blocks which reload from this slot)
           --    used to decide if whether slot spilled to will ever be
           --    reloaded from on this path.
-        , sReloadedBy           :: UniqFM [BlockId]
+        , sReloadedBy           :: UniqFM Store [BlockId]
 
           -- | Spills and reloads cleaned each pass (latest at front)
         , sCleanedCount         :: [(Int, Int)]
@@ -530,7 +536,8 @@ instance Outputable Store where
 -- In the spill cleaner, two store locations are associated if they are known
 -- to hold the same value.
 --
-type Assoc a    = UniqFM (UniqSet a)
+-- TODO: Monomorphize: I think we only ever use this with a ~ Store
+type Assoc a    = UniqFM a (UniqSet a)
 
 -- | An empty association
 emptyAssoc :: Assoc a
@@ -538,8 +545,9 @@ emptyAssoc      = emptyUFM
 
 
 -- | Add an association between these two things.
-addAssoc :: Uniquable a
-         => a -> a -> Assoc a -> Assoc a
+-- addAssoc :: Uniquable a
+--          => a -> a -> Assoc a -> Assoc a
+addAssoc :: Store -> Store -> Assoc Store -> Assoc Store
 
 addAssoc a b m
  = let  m1      = addToUFM_C unionUniqSets m  a (unitUniqSet b)
@@ -548,22 +556,19 @@ addAssoc a b m
 
 
 -- | Delete all associations to a node.
-delAssoc :: (Uniquable a)
-         => a -> Assoc a -> Assoc a
-
+delAssoc :: Store -> Assoc Store -> Assoc Store
 delAssoc a m
         | Just aSet     <- lookupUFM  m a
         , m1            <- delFromUFM m a
-        = nonDetFoldUniqSet (\x m -> delAssoc1 x a m) m1 aSet
-          -- It's OK to use nonDetFoldUFM here because deletion is commutative
+        = nonDetStrictFoldUniqSet (\x m -> delAssoc1 x a m) m1 aSet
+          -- It's OK to use a non-deterministic fold here because deletion is
+          -- commutative
 
         | otherwise     = m
 
 
 -- | Delete a single association edge (a -> b).
-delAssoc1 :: Uniquable a
-          => a -> a -> Assoc a -> Assoc a
-
+delAssoc1 :: Store -> Store -> Assoc Store -> Assoc Store
 delAssoc1 a b m
         | Just aSet     <- lookupUFM m a
         = addToUFM m a (delOneFromUniqSet aSet b)
@@ -572,17 +577,14 @@ delAssoc1 a b m
 
 
 -- | Check if these two things are associated.
-elemAssoc :: (Uniquable a)
-          => a -> a -> Assoc a -> Bool
+elemAssoc :: Store -> Store -> Assoc Store -> Bool
 
 elemAssoc a b m
         = elementOfUniqSet b (closeAssoc a m)
 
 
 -- | Find the refl. trans. closure of the association from this point.
-closeAssoc :: (Uniquable a)
-        => a -> Assoc a -> UniqSet a
-
+closeAssoc :: Store -> Assoc Store -> UniqSet Store
 closeAssoc a assoc
  =      closeAssoc' assoc emptyUniqSet (unitUniqSet a)
  where
@@ -611,6 +613,6 @@ closeAssoc a assoc
                         (unionUniqSets   toVisit neighbors)
 
 -- | Intersect two associations.
-intersectAssoc :: Assoc a -> Assoc a -> Assoc a
+intersectAssoc :: Assoc Store -> Assoc Store -> Assoc Store
 intersectAssoc a b
         = intersectUFM_C (intersectUniqSets) a b

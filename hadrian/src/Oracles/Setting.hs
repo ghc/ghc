@@ -91,6 +91,7 @@ data SettingList = ConfCcArgs Stage
                  | ConfCppArgs Stage
                  | ConfGccLinkerArgs Stage
                  | ConfLdLinkerArgs Stage
+                 | ConfMergeObjectsArgs Stage
                  | HsCppArgs
 
 -- TODO compute solely in Hadrian, removing these variables' definitions
@@ -109,8 +110,12 @@ data SettingsFileSetting
     | SettingsFileSetting_CCompilerSupportsNoPie
     | SettingsFileSetting_LdCommand
     | SettingsFileSetting_LdFlags
+    | SettingsFileSetting_MergeObjectsCommand
+    | SettingsFileSetting_MergeObjectsFlags
     | SettingsFileSetting_ArCommand
     | SettingsFileSetting_RanlibCommand
+    | SettingsFileSetting_OtoolCommand
+    | SettingsFileSetting_InstallNameToolCommand
     | SettingsFileSetting_DllWrapCommand
     | SettingsFileSetting_WindresCommand
     | SettingsFileSetting_LibtoolCommand
@@ -176,10 +181,12 @@ settingList key = fmap words $ lookupValueOrError configFile $ case key of
     ConfCppArgs       stage -> "conf-cpp-args-"        ++ stageString stage
     ConfGccLinkerArgs stage -> "conf-gcc-linker-args-" ++ stageString stage
     ConfLdLinkerArgs  stage -> "conf-ld-linker-args-"  ++ stageString stage
+    ConfMergeObjectsArgs stage -> "conf-merge-objects-args-"  ++ stageString stage
     HsCppArgs               -> "hs-cpp-args"
 
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.
+-- See Note [tooldir: How GHC finds mingw on Windows]
 settingsFileSetting :: SettingsFileSetting -> Action String
 settingsFileSetting key = lookupValueOrError configFile $ case key of
     SettingsFileSetting_CCompilerCommand -> "settings-c-compiler-command"
@@ -191,8 +198,12 @@ settingsFileSetting key = lookupValueOrError configFile $ case key of
     SettingsFileSetting_CCompilerSupportsNoPie -> "settings-c-compiler-supports-no-pie"
     SettingsFileSetting_LdCommand -> "settings-ld-command"
     SettingsFileSetting_LdFlags -> "settings-ld-flags"
+    SettingsFileSetting_MergeObjectsCommand -> "settings-merge-objects-command"
+    SettingsFileSetting_MergeObjectsFlags -> "settings-merge-objects-flags"
     SettingsFileSetting_ArCommand -> "settings-ar-command"
     SettingsFileSetting_RanlibCommand -> "settings-ranlib-command"
+    SettingsFileSetting_OtoolCommand -> "settings-otool-command"
+    SettingsFileSetting_InstallNameToolCommand -> "settings-install_name_tool-command"
     SettingsFileSetting_DllWrapCommand -> "settings-dll-wrap-command"
     SettingsFileSetting_WindresCommand -> "settings-windres-command"
     SettingsFileSetting_LibtoolCommand -> "settings-libtool-command"

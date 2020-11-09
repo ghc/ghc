@@ -15,21 +15,23 @@ module GHC.Hs.Dump (
         BlankSrcSpan(..),
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Data.Data hiding (Fixity)
-import Bag
-import GHC.Types.Basic
-import FastString
+import GHC.Hs
+
+import GHC.Core.DataCon
+
+import GHC.Data.Bag
+import GHC.Data.FastString
 import GHC.Types.Name.Set
 import GHC.Types.Name
-import GHC.Core.DataCon
 import GHC.Types.SrcLoc
-import GHC.Hs
 import GHC.Types.Var
-import GHC.Types.Module
-import Outputable
+import GHC.Types.SourceText
+import GHC.Unit.Module
+import GHC.Utils.Outputable
 
+import Data.Data hiding (Fixity)
 import qualified Data.ByteString as B
 
 data BlankSrcSpan = BlankSrcSpan | NoBlankSrcSpan

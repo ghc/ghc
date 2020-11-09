@@ -13,9 +13,8 @@ Roman.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule3 :: GHC.Types.TrName
 [GblId,
- Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule3 = GHC.Types.TrNameS Roman.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -28,17 +27,15 @@ Roman.$trModule2 = "Roman"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule1 :: GHC.Types.TrName
 [GblId,
- Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule1 = GHC.Types.TrNameS Roman.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule :: GHC.Types.Module
 [GblId,
- Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule
   = GHC.Types.Module Roman.$trModule3 Roman.$trModule1
 
@@ -76,8 +73,7 @@ Roman.foo_$s$wgo
 end Rec }
 
 -- RHS size: {terms: 61, types: 18, coercions: 0, joins: 0/0}
-Roman.$wgo [InlPrag=NOUSERINLINE[2]]
-  :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
+Roman.$wgo [InlPrag=[2]] :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
 [GblId,
  Arity=2,
  Str=<S,1*U><S,1*U>,
@@ -112,8 +108,7 @@ Roman.$wgo
       }
 
 -- RHS size: {terms: 9, types: 5, coercions: 0, joins: 0/0}
-Roman.foo_go [InlPrag=NOUSERINLINE[2]]
-  :: Maybe Int -> Maybe Int -> Int
+Roman.foo_go [InlPrag=[2]] :: Maybe Int -> Maybe Int -> Int
 [GblId,
  Arity=2,
  Str=<S,1*U><S,1*U>,
@@ -121,8 +116,9 @@ Roman.foo_go [InlPrag=NOUSERINLINE[2]]
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once] :: Maybe Int) (w1 [Occ=Once] :: Maybe Int) ->
-                 case Roman.$wgo w w1 of ww [Occ=Once] { __DEFAULT ->
+         Tmpl= \ (w [Occ=Once1] :: Maybe Int)
+                 (w1 [Occ=Once1] :: Maybe Int) ->
+                 case Roman.$wgo w w1 of ww [Occ=Once1] { __DEFAULT ->
                  GHC.Types.I# ww
                  }}]
 Roman.foo_go
@@ -132,17 +128,15 @@ Roman.foo_go
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.foo2 :: Int
 [GblId,
- Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.foo2 = GHC.Types.I# 6#
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 Roman.foo1 :: Maybe Int
 [GblId,
- Cpr=m2,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.foo1 = GHC.Maybe.Just @Int Roman.foo2
 
 -- RHS size: {terms: 11, types: 4, coercions: 0, joins: 0/0}
@@ -154,8 +148,8 @@ foo :: Int -> Int
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n [Occ=Once!] :: Int) ->
-                 case n of n1 [Occ=Once] { GHC.Types.I# _ [Occ=Dead] ->
+         Tmpl= \ (n [Occ=Once1!] :: Int) ->
+                 case n of n1 [Occ=Once1] { GHC.Types.I# _ [Occ=Dead] ->
                  Roman.foo_go (GHC.Maybe.Just @Int n1) Roman.foo1
                  }}]
 foo

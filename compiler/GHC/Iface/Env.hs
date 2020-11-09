@@ -16,30 +16,37 @@ module GHC.Iface.Env (
         ifaceExportNames,
 
         -- Name-cache stuff
-        allocateGlobalBinder, updNameCacheTc,
+        allocateGlobalBinder, updNameCacheTc, updNameCache,
         mkNameCacheUpdater, NameCacheUpdater(..),
    ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Env
 
 import GHC.Tc.Utils.Monad
-import GHC.Driver.Types
 import GHC.Core.Type
+import GHC.Iface.Type
+import GHC.Runtime.Context
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
+
 import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Avail
-import GHC.Types.Module
-import FastString
-import FastStringEnv
-import GHC.Iface.Type
 import GHC.Types.Name.Cache
 import GHC.Types.Unique.Supply
 import GHC.Types.SrcLoc
 
-import Outputable
+import GHC.Utils.Outputable
 import Data.List     ( partition )
+import Data.IORef
 
 {-
 *********************************************************
@@ -54,9 +61,9 @@ See Also: Note [The Name Cache] in GHC.Types.Name.Cache
 newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- Used for source code and interface files, to make the
 -- Name for a thing, given its Module and OccName
--- See Note [The Name Cache]
+-- See Note [The Name Cache] in GHC.Types.Name.Cache
 --
--- The cache may already already have a binding for this thing,
+-- The cache may already have a binding for this thing,
 -- because we may have seen an occurrence before, but now is the
 -- moment when we know its Module and SrcLoc in their full glory
 
@@ -79,7 +86,7 @@ allocateGlobalBinder
   :: NameCache
   -> Module -> OccName -> SrcSpan
   -> (NameCache, Name)
--- See Note [The Name Cache]
+-- See Note [The Name Cache] in GHC.Types.Name.Cache
 allocateGlobalBinder name_supply mod occ loc
   = case lookupOrigNameCache (nsNames name_supply) mod occ of
         -- A hit in the cache!  We are at the binding site of the name.
@@ -251,7 +258,7 @@ lookupIfaceTyVar (occ, _)
         ; return (lookupFsEnv (if_tv_env lcl) occ) }
 
 lookupIfaceVar :: IfaceBndr -> IfL (Maybe TyCoVar)
-lookupIfaceVar (IfaceIdBndr (occ, _))
+lookupIfaceVar (IfaceIdBndr (_, occ, _))
   = do  { lcl <- getLclEnv
         ; return (lookupFsEnv (if_id_env lcl) occ) }
 lookupIfaceVar (IfaceTvBndr (occ, _))
@@ -296,3 +303,20 @@ newIfaceNames occs
   = do  { uniqs <- newUniqueSupply
         ; return [ mkInternalName uniq occ noSrcSpan
                  | (occ,uniq) <- occs `zip` uniqsFromSupply uniqs] }
+
+{-
+Names in a NameCache are always stored as a Global, and have the SrcLoc
+of their binding locations.
+
+Actually that's not quite right.  When we first encounter the original
+name, we might not be at its binding site (e.g. we are reading an
+interface file); so we give it 'noSrcLoc' then.  Later, when we find
+its binding site, we fix it up.
+-}
+
+updNameCache :: IORef NameCache
+             -> (NameCache -> (NameCache, c))  -- The updating function
+             -> IO c
+updNameCache ncRef upd_fn
+  = atomicModifyIORef' ncRef upd_fn
+

@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP              #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections    #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-2012
 
@@ -192,33 +198,30 @@ STG programs after unarisation have these invariants:
   * Binders always have zero (for void arguments) or one PrimRep.
 -}
 
-{-# LANGUAGE CPP, TupleSections #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 module GHC.Stg.Unarise (unarise) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic
 import GHC.Core
 import GHC.Core.DataCon
-import FastString (FastString, mkFastString)
+import GHC.Data.FastString (FastString, mkFastString)
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
 import GHC.Types.Id.Make (voidPrimId, voidArgId)
-import MonadUtils (mapAccumLM)
-import Outputable
+import GHC.Utils.Monad (mapAccumLM)
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.RepType
 import GHC.Stg.Syntax
 import GHC.Core.Type
-import GHC.Builtin.Types.Prim (intPrimTy,wordPrimTy,word64PrimTy)
+import GHC.Builtin.Types.Prim (intPrimTy)
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Env
 
 import Data.Bifunctor (second)
@@ -291,7 +294,7 @@ unariseRhs rho (StgRhsClosure ext ccs update_flag args expr)
        return (StgRhsClosure ext ccs update_flag args1 expr')
 
 unariseRhs rho (StgRhsCon ccs con args)
-  = ASSERT(not (isUnboxedTupleCon con || isUnboxedSumCon con))
+  = ASSERT(not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
     return (StgRhsCon ccs con (unariseConArgs rho args))
 
 --------------------------------------------------------------------------------
@@ -315,7 +318,7 @@ unariseExpr rho e@(StgApp f args)
     f' = case lookupVarEnv rho f of
            Just (UnaryVal (StgVarArg f')) -> f'
            Nothing -> f
-           err -> pprPanic "unariseExpr - app2" (ppr e $$ ppr err)
+           err -> pprPanic "unariseExpr - app2" (pprStgExpr panicStgPprOpts e $$ ppr err)
                -- Can't happen because 'args' is non-empty, and
                -- a tuple or sum cannot be applied to anything
 
@@ -334,7 +337,7 @@ unariseExpr rho (StgOpApp op args ty)
   = return (StgOpApp op (unariseFunArgs rho args) ty)
 
 unariseExpr _ e@StgLam{}
-  = pprPanic "unariseExpr: found lambda" (ppr e)
+  = pprPanic "unariseExpr: found lambda" (pprStgExpr panicStgPprOpts e)
 
 unariseExpr rho (StgCase scrut bndr alt_ty alts)
   -- tuple/sum binders in the scrutinee can always be eliminated
@@ -369,10 +372,10 @@ unariseExpr rho (StgTick tick e)
 -- Doesn't return void args.
 unariseMulti_maybe :: UnariseEnv -> DataCon -> [InStgArg] -> [Type] -> Maybe [OutStgArg]
 unariseMulti_maybe rho dc args ty_args
-  | isUnboxedTupleCon dc
+  | isUnboxedTupleDataCon dc
   = Just (unariseConArgs rho args)
 
-  | isUnboxedSumCon dc
+  | isUnboxedSumDataCon dc
   , let args1 = ASSERT(isSingleton args) (unariseConArgs rho args)
   = Just (mkUbxSum dc ty_args args1)
 
@@ -412,7 +415,7 @@ elimCase rho args bndr (MultiValAlt _) alts
 
 elimCase _ args bndr alt_ty alts
   = pprPanic "elimCase - unhandled case"
-      (ppr args <+> ppr bndr <+> ppr alt_ty $$ ppr alts)
+      (ppr args <+> ppr bndr <+> ppr alt_ty $$ pprPanicAlts alts)
 
 --------------------------------------------------------------------------------
 
@@ -433,7 +436,7 @@ unariseAlts rho (MultiValAlt n) bndr [(DataAlt _, ys, e)]
 
 unariseAlts _ (MultiValAlt _) bndr alts
   | isUnboxedTupleBndr bndr
-  = pprPanic "unariseExpr: strange multi val alts" (ppr alts)
+  = pprPanic "unariseExpr: strange multi val alts" (pprPanicAlts alts)
 
 -- In this case we don't need to scrutinize the tag bit
 unariseAlts rho (MultiValAlt _) bndr [(DEFAULT, _, rhs)]
@@ -481,10 +484,10 @@ unariseSumAlt rho _ (DEFAULT, _, e)
 unariseSumAlt rho args (DataAlt sumCon, bs, e)
   = do let rho' = mapSumIdBinders bs args rho
        e' <- unariseExpr rho' e
-       return ( LitAlt (LitNumber LitNumInt (fromIntegral (dataConTag sumCon)) intPrimTy), [], e' )
+       return ( LitAlt (LitNumber LitNumInt (fromIntegral (dataConTag sumCon))), [], e' )
 
 unariseSumAlt _ scrt alt
-  = pprPanic "unariseSumAlt" (ppr scrt $$ ppr alt)
+  = pprPanic "unariseSumAlt" (ppr scrt $$ pprPanicAlt alt)
 
 --------------------------------------------------------------------------------
 
@@ -567,7 +570,7 @@ mkUbxSum dc ty_args args0
       tag = dataConTag dc
 
       layout'  = layoutUbxSum sum_slots (mapMaybe (typeSlotTy . stgArgType) args0)
-      tag_arg  = StgLitArg (LitNumber LitNumInt (fromIntegral tag) intPrimTy)
+      tag_arg  = StgLitArg (LitNumber LitNumInt (fromIntegral tag))
       arg_idxs = IM.fromList (zipEqual "mkUbxSum" layout' args0)
 
       mkTupArgs :: Int -> [SlotTy] -> IM.IntMap StgArg -> [StgArg]
@@ -577,17 +580,25 @@ mkUbxSum dc ty_args args0
         | Just stg_arg <- IM.lookup arg_idx arg_map
         = stg_arg : mkTupArgs (arg_idx + 1) slots_left arg_map
         | otherwise
-        = slotRubbishArg slot : mkTupArgs (arg_idx + 1) slots_left arg_map
-
-      slotRubbishArg :: SlotTy -> StgArg
-      slotRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
-                         -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in GHC.Core.Make
-      slotRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0 wordPrimTy)
-      slotRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0 word64PrimTy)
-      slotRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
-      slotRubbishArg DoubleSlot = StgLitArg (LitDouble 0)
+        = ubxSumRubbishArg slot : mkTupArgs (arg_idx + 1) slots_left arg_map
     in
       tag_arg : mkTupArgs 0 sum_slots arg_idxs
+
+
+-- | Return a rubbish value for the given slot type.
+--
+-- We use the following rubbish values:
+--    * Literals: 0 or 0.0
+--    * Pointers: `ghc-prim:GHC.Prim.Panic.absentSumFieldError`
+--
+-- See Note [aBSENT_SUM_FIELD_ERROR_ID] in "GHC.Core.Make"
+--
+ubxSumRubbishArg :: SlotTy -> StgArg
+ubxSumRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+ubxSumRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0)
+ubxSumRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0)
+ubxSumRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
+ubxSumRubbishArg DoubleSlot = StgLitArg (LitDouble 0)
 
 --------------------------------------------------------------------------------
 
@@ -664,7 +675,7 @@ unariseArgBinder is_con_arg rho x =
       --
       -- While not unarising the binder in this case does not break any programs
       -- (because it unarises to a single variable), it triggers StgLint as we
-      -- break the the post-unarisation invariant that says unboxed tuple/sum
+      -- break the post-unarisation invariant that says unboxed tuple/sum
       -- binders should vanish. See Note [Post-unarisation invariants].
       | isUnboxedSumType (idType x) || isUnboxedTupleType (idType x)
       -> do x' <- mkId (mkFastString "us") (primRepToType rep)
@@ -732,7 +743,7 @@ mkIds :: FastString -> [UnaryType] -> UniqSM [Id]
 mkIds fs tys = mapM (mkId fs) tys
 
 mkId :: FastString -> UnaryType -> UniqSM Id
-mkId = mkSysLocalM
+mkId s t = mkSysLocalM s Many t
 
 isMultiValBndr :: Id -> Bool
 isMultiValBndr id
@@ -768,4 +779,10 @@ mkDefaultLitAlt :: [StgAlt] -> [StgAlt]
 mkDefaultLitAlt [] = pprPanic "elimUbxSumExpr.mkDefaultAlt" (text "Empty alts")
 mkDefaultLitAlt alts@((DEFAULT, _, _) : _) = alts
 mkDefaultLitAlt ((LitAlt{}, [], rhs) : alts) = (DEFAULT, [], rhs) : alts
-mkDefaultLitAlt alts = pprPanic "mkDefaultLitAlt" (text "Not a lit alt:" <+> ppr alts)
+mkDefaultLitAlt alts = pprPanic "mkDefaultLitAlt" (text "Not a lit alt:" <+> pprPanicAlts alts)
+
+pprPanicAlts :: (Outputable a, Outputable b, OutputablePass pass) => [(a,b,GenStgExpr pass)] -> SDoc
+pprPanicAlts alts = ppr (map pprPanicAlt alts)
+
+pprPanicAlt :: (Outputable a, Outputable b, OutputablePass pass) => (a,b,GenStgExpr pass) -> SDoc
+pprPanicAlt (c,b,e) = ppr (c,b,pprStgExpr panicStgPprOpts e)

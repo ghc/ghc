@@ -1,7 +1,6 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
@@ -18,24 +17,30 @@ module GHC.ByteCode.Linker (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
+import GHC.Driver.Env
+
+import GHC.Runtime.Interpreter
+import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray
 import SizedSeq
 
-import GHC.Runtime.Interpreter
-import GHC.ByteCode.Types
-import GHC.Driver.Types
+import GHC.Builtin.PrimOps
+
+import GHC.Unit.Types
+import GHC.Unit.Module.Name
+
+import GHC.Data.FastString
+
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Builtin.PrimOps
-import GHC.Types.Module
-import FastString
-import Panic
-import Outputable
-import Util
 
 -- Standard libraries
 import Data.Array.Unboxed
@@ -164,18 +169,19 @@ nameToCLabel n suffix = mkFastString label
   where
     encodeZ = zString . zEncodeFS
     (Module pkgKey modName) = ASSERT( isExternalName n ) nameModule n
-    packagePart = encodeZ (unitIdFS pkgKey)
+    packagePart = encodeZ (unitFS pkgKey)
     modulePart  = encodeZ (moduleNameFS modName)
     occPart     = encodeZ (occNameFS (nameOccName n))
 
     label = concat
-        [ if pkgKey == mainUnitId then "" else packagePart ++ "_"
+        [ if pkgKey == mainUnit then "" else packagePart ++ "_"
         , modulePart
         , '_':occPart
         , '_':suffix
         ]
 
 
+-- See Note [Primop wrappers] in GHC.Builtin.PrimOps
 primopToCLabel :: PrimOp -> String -> String
 primopToCLabel primop suffix = concat
     [ "ghczmprim_GHCziPrimopWrappers_"

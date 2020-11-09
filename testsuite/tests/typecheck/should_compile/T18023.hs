@@ -3,6 +3,8 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 module T18023 where
 
 import Data.Kind
@@ -32,3 +34,12 @@ toP2True = MkP2 @True @True
 
 fromP2True :: P2 True True -> (Proxy True, Proxy True)
 fromP2True = unP2 @True @True
+
+type    P3 :: forall {k}. k -> Type
+newtype P3 a = MkP3 { unP3 :: Proxy a }
+
+toP3True :: Proxy True -> P3 True
+toP3True = MkP3 @True
+
+fromP3True :: P3 True -> Proxy True
+fromP3True = unP3 @True

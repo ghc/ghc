@@ -15,27 +15,31 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import qualified GHC
 import GHC.Driver.Monad
 import GHC.Driver.Session
-import GHC.Driver.Ways
-import Util
-import GHC.Driver.Types
+import GHC.Driver.Ppr
+import GHC.Utils.Misc
+import GHC.Driver.Env
 import qualified GHC.SysTools as SysTools
-import GHC.Types.Module
-import Digraph          ( SCC(..) )
-import GHC.Driver.Finder
-import Outputable
-import Panic
+import GHC.Data.Graph.Directed ( SCC(..) )
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import Data.List
-import FastString
+import GHC.Data.FastString
 import GHC.SysTools.FileCleanup
 
-import Exception
-import ErrUtils
+import GHC.Unit.Module
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.Graph
+import GHC.Unit.Finder
+
+import GHC.Utils.Exception
+import GHC.Utils.Error
 
 import System.Directory
 import System.FilePath
@@ -63,13 +67,12 @@ doMkDependHS srcs = do
     -- We therefore do the initial dependency generation with an empty
     -- way and .o/.hi extensions, regardless of any flags that might
     -- be specified.
-    let dflags = dflags0 {
-                     ways = Set.empty,
-                     buildTag = waysTag Set.empty,
-                     hiSuf = "hi",
-                     objectSuf = "o"
-                 }
-    _ <- GHC.setSessionDynFlags dflags
+    let dflags = dflags0
+            { targetWays_ = Set.empty
+            , hiSuf_      = "hi"
+            , objectSuf_  = "o"
+            }
+    GHC.setSessionDynFlags dflags
 
     when (null (depSuffixes dflags)) $ liftIO $
         throwGhcExceptionIO (ProgramError "You must specify at least one -dep-suffix")
@@ -247,8 +250,8 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
                     | (mb_pkg, L loc mod) <- idecls,
                       mod `notElem` excl_mods ]
 
-        ; do_imps True  (ms_srcimps node)
-        ; do_imps False (ms_imps node)
+        ; do_imps IsBoot (ms_srcimps node)
+        ; do_imps NotBoot (ms_imps node)
         }
 
 
@@ -258,7 +261,7 @@ findDependency  :: HscEnv
                 -> ModuleName           -- Imported module
                 -> IsBootInterface      -- Source import
                 -> Bool                 -- Record dependency on package modules
-                -> IO (Maybe FilePath)  -- Interface file file
+                -> IO (Maybe FilePath)  -- Interface file
 findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
   = do  {       -- Find the module; this will be fast because
                 -- we've done it once during downsweep
@@ -298,7 +301,7 @@ insertSuffixes
         :: FilePath     -- Original filename;   e.g. "foo.o"
         -> [String]     -- Suffix prefixes      e.g. ["x_", "y_"]
         -> [FilePath]   -- Zapped filenames     e.g. ["foo.x_o", "foo.y_o"]
-        -- Note that that the extra bit gets inserted *before* the old suffix
+        -- Note that the extra bit gets inserted *before* the old suffix
         -- We assume the old suffix contains no dots, so we know where to
         -- split it
 insertSuffixes file_name extras

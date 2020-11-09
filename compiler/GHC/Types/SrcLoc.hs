@@ -1,17 +1,11 @@
--- (c) The University of Glasgow, 1992-2006
-
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DeriveFunctor      #-}
-{-# LANGUAGE DeriveFoldable     #-}
 {-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE TypeFamilies       #-}
-{-# LANGUAGE ViewPatterns       #-}
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE PatternSynonyms    #-}
 
+-- (c) The University of Glasgow, 1992-2006
 
 -- | This module contains types that relate to the positions of things
 -- in source files, and allow tagging of those things with locations
@@ -39,10 +33,11 @@ module GHC.Types.SrcLoc (
         -- * SrcSpan
         RealSrcSpan,            -- Abstract
         SrcSpan(..),
+        UnhelpfulSpanReason(..),
 
         -- ** Constructing SrcSpan
         mkGeneralSrcSpan, mkSrcSpan, mkRealSrcSpan,
-        noSrcSpan,
+        noSrcSpan, generatedSrcSpan, isGeneratedSrcSpan,
         wiredInSrcSpan,         -- Something wired into the compiler
         interactiveSrcSpan,
         srcLocSpan, realSrcLocSpan,
@@ -53,7 +48,8 @@ module GHC.Types.SrcLoc (
         srcSpanStart, srcSpanEnd,
         realSrcSpanStart, realSrcSpanEnd,
         srcSpanFileName_maybe,
-        pprUserRealSpan,
+        pprUserRealSpan, pprUnhelpfulSpanReason,
+        unhelpfulSpanFS,
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
@@ -67,7 +63,9 @@ module GHC.Types.SrcLoc (
 
         -- * StringBuffer locations
         BufPos(..),
+        getBufPos,
         BufSpan(..),
+        getBufSpan,
 
         -- * Located
         Located,
@@ -86,10 +84,11 @@ module GHC.Types.SrcLoc (
         mapLoc,
 
         -- ** Combining and comparing Located values
-        eqLocated, cmpLocated, combineLocs, addCLoc,
+        eqLocated, cmpLocated, cmpBufSpan,
+        combineLocs, addCLoc,
         leftmost_smallest, leftmost_largest, rightmost_smallest,
-        spans, isSubspanOf, isRealSubspanOf, sortLocated,
-        sortRealLocated,
+        spans, isSubspanOf, isRealSubspanOf,
+        sortLocated, sortRealLocated,
         lookupSrcLoc, lookupSrcSpan,
 
         liftL,
@@ -104,14 +103,19 @@ module GHC.Types.SrcLoc (
         psSpanEnd,
         mkSrcSpanPs,
 
+        -- * Layout information
+        LayoutInfo(..),
+        leftmostColumn
+
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Util
-import Json
-import Outputable
-import FastString
+import GHC.Utils.Misc
+import GHC.Utils.Json
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
 
 import Control.DeepSeq
 import Control.Applicative (liftA2)
@@ -120,6 +124,7 @@ import Data.Data
 import Data.List (sortBy, intercalate)
 import Data.Function (on)
 import qualified Data.Map as Map
+import qualified Data.Semigroup
 
 {-
 ************************************************************************
@@ -136,18 +141,82 @@ this is the obvious stuff:
 --
 -- Represents a single point within a file
 data RealSrcLoc
-  = SrcLoc      FastString              -- A precise location (file name)
+  = SrcLoc      LexicalFastString       -- A precise location (file name)
                 {-# UNPACK #-} !Int     -- line number, begins at 1
                 {-# UNPACK #-} !Int     -- column number, begins at 1
   deriving (Eq, Ord)
 
--- | 0-based index identifying the raw location in the StringBuffer.
+-- | 0-based offset identifying the raw location in the 'StringBuffer'.
 --
--- Unlike 'RealSrcLoc', it is not affected by #line and {-# LINE ... #-}
--- pragmas. In particular, notice how 'setSrcLoc' and 'resetAlrLastLoc' in
--- GHC.Parser.Lexer update 'PsLoc' preserving 'BufPos'.
+-- The lexer increments the 'BufPos' every time a character (UTF-8 code point)
+-- is read from the input buffer. As UTF-8 is a variable-length encoding and
+-- 'StringBuffer' needs a byte offset for indexing, a 'BufPos' cannot be used
+-- for indexing.
 --
--- The parser guarantees that 'BufPos' are monotonic. See #17632.
+-- The parser guarantees that 'BufPos' are monotonic. See #17632. This means
+-- that syntactic constructs that appear later in the 'StringBuffer' are guaranteed to
+-- have a higher 'BufPos'. Constrast that with 'RealSrcLoc', which does *not* make the
+-- analogous guarantee about higher line/column numbers.
+--
+-- This is due to #line and {-# LINE ... #-} pragmas that can arbitrarily
+-- modify 'RealSrcLoc'. Notice how 'setSrcLoc' and 'resetAlrLastLoc' in
+-- "GHC.Parser.Lexer" update 'PsLoc', modifying 'RealSrcLoc' but preserving
+-- 'BufPos'.
+--
+-- Monotonicity makes 'BufPos' useful to determine the order in which syntactic
+-- elements appear in the source. Consider this example (haddockA041 in the test suite):
+--
+--  haddockA041.hs
+--      {-# LANGUAGE CPP #-}
+--      -- | Module header documentation
+--      module Comments_and_CPP_include where
+--      #include "IncludeMe.hs"
+--
+--  IncludeMe.hs:
+--      -- | Comment on T
+--      data T = MkT -- ^ Comment on MkT
+--
+-- After the C preprocessor runs, the 'StringBuffer' will contain a program that
+-- looks like this (unimportant lines at the beginning removed):
+--
+--    # 1 "haddockA041.hs"
+--    {-# LANGUAGE CPP #-}
+--    -- | Module header documentation
+--    module Comments_and_CPP_include where
+--    # 1 "IncludeMe.hs" 1
+--    -- | Comment on T
+--    data T = MkT -- ^ Comment on MkT
+--    # 7 "haddockA041.hs" 2
+--
+-- The line pragmas inserted by CPP make the error messages more informative.
+-- The downside is that we can't use RealSrcLoc to determine the ordering of
+-- syntactic elements.
+--
+-- With RealSrcLoc, we have the following location information recorded in the AST:
+--   * The module name is located at haddockA041.hs:3:8-31
+--   * The Haddock comment "Comment on T" is located at IncludeMe:1:1-17
+--   * The data declaration is located at IncludeMe.hs:2:1-32
+--
+-- Is the Haddock comment located between the module name and the data
+-- declaration? This is impossible to tell because the locations are not
+-- comparable; they even refer to different files.
+--
+-- On the other hand, with 'BufPos', we have the following location information:
+--   * The module name is located at 846-870
+--   * The Haddock comment "Comment on T" is located at 898-915
+--   * The data declaration is located at 916-928
+--
+-- Aside:  if you're wondering why the numbers are so high, try running
+--           @ghc -E haddockA041.hs@
+--         and see the extra fluff that CPP inserts at the start of the file.
+--
+-- For error messages, 'BufPos' is not useful at all. On the other hand, this is
+-- exactly what we need to determine the order of syntactic elements:
+--    870 < 898, therefore the Haddock comment appears *after* the module name.
+--    915 < 916, therefore the Haddock comment appears *before* the data declaration.
+--
+-- We use 'BufPos' in in GHC.Parser.PostProcess.Haddock to associate Haddock
+-- comments with parts of the AST using location information (#17544).
 newtype BufPos = BufPos { bufPos :: Int }
   deriving (Eq, Ord, Show)
 
@@ -169,7 +238,11 @@ mkSrcLoc :: FastString -> Int -> Int -> SrcLoc
 mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col) Nothing
 
 mkRealSrcLoc :: FastString -> Int -> Int -> RealSrcLoc
-mkRealSrcLoc x line col = SrcLoc x line col
+mkRealSrcLoc x line col = SrcLoc (LexicalFastString x) line col
+
+getBufPos :: SrcLoc -> Maybe BufPos
+getBufPos (RealSrcLoc _ mbpos) = mbpos
+getBufPos (UnhelpfulLoc _) = Nothing
 
 -- | Built-in "bad" 'SrcLoc' values for particular locations
 noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
@@ -183,7 +256,7 @@ mkGeneralSrcLoc = UnhelpfulLoc
 
 -- | Gives the filename of the 'RealSrcLoc'
 srcLocFile :: RealSrcLoc -> FastString
-srcLocFile (SrcLoc fname _ _) = fname
+srcLocFile (SrcLoc (LexicalFastString fname) _ _) = fname
 
 -- | Raises an error when used on a "bad" 'SrcLoc'
 srcLocLine :: RealSrcLoc -> Int
@@ -230,7 +303,7 @@ lookupSrcSpan (RealSrcSpan l _) = Map.lookup l
 lookupSrcSpan (UnhelpfulSpan _) = const Nothing
 
 instance Outputable RealSrcLoc where
-    ppr (SrcLoc src_path src_line src_col)
+    ppr (SrcLoc (LexicalFastString src_path) src_line src_col)
       = hcat [ pprFastFilePath src_path <> colon
              , int src_line <> colon
              , int src_col ]
@@ -296,17 +369,28 @@ data BufSpan =
   BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
   deriving (Eq, Ord, Show)
 
+instance Semigroup BufSpan where
+  BufSpan start1 end1 <> BufSpan start2 end2 =
+    BufSpan (min start1 start2) (max end1 end2)
+
 -- | Source Span
 --
 -- A 'SrcSpan' identifies either a specific portion of a text file
 -- or a human-readable description of a location.
 data SrcSpan =
     RealSrcSpan !RealSrcSpan !(Maybe BufSpan)  -- See Note [Why Maybe BufPos]
-  | UnhelpfulSpan !FastString   -- Just a general indication
-                                -- also used to indicate an empty span
+  | UnhelpfulSpan !UnhelpfulSpanReason
 
   deriving (Eq, Show) -- Show is used by GHC.Parser.Lexer, because we
                       -- derive Show for Token
+
+data UnhelpfulSpanReason
+  = UnhelpfulNoLocationInfo
+  | UnhelpfulWiredIn
+  | UnhelpfulInteractive
+  | UnhelpfulGenerated
+  | UnhelpfulOther !FastString
+  deriving (Eq, Show)
 
 {- Note [Why Maybe BufPos]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -343,23 +427,32 @@ instance ToJson RealSrcSpan where
 instance NFData SrcSpan where
   rnf x = x `seq` ()
 
+getBufSpan :: SrcSpan -> Maybe BufSpan
+getBufSpan (RealSrcSpan _ mbspan) = mbspan
+getBufSpan (UnhelpfulSpan _) = Nothing
+
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
-noSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
-noSrcSpan          = UnhelpfulSpan (fsLit "<no location info>")
-wiredInSrcSpan     = UnhelpfulSpan (fsLit "<wired into compiler>")
-interactiveSrcSpan = UnhelpfulSpan (fsLit "<interactive>")
+noSrcSpan, generatedSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
+noSrcSpan          = UnhelpfulSpan UnhelpfulNoLocationInfo
+wiredInSrcSpan     = UnhelpfulSpan UnhelpfulWiredIn
+interactiveSrcSpan = UnhelpfulSpan UnhelpfulInteractive
+generatedSrcSpan   = UnhelpfulSpan UnhelpfulGenerated
+
+isGeneratedSrcSpan :: SrcSpan -> Bool
+isGeneratedSrcSpan (UnhelpfulSpan UnhelpfulGenerated) = True
+isGeneratedSrcSpan _                                  = False
 
 -- | Create a "bad" 'SrcSpan' that has not location information
 mkGeneralSrcSpan :: FastString -> SrcSpan
-mkGeneralSrcSpan = UnhelpfulSpan
+mkGeneralSrcSpan = UnhelpfulSpan . UnhelpfulOther
 
 -- | Create a 'SrcSpan' corresponding to a single point
 srcLocSpan :: SrcLoc -> SrcSpan
-srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan str
+srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan (UnhelpfulOther str)
 srcLocSpan (RealSrcLoc l mb) = RealSrcSpan (realSrcLocSpan l) (fmap (\b -> BufSpan b b) mb)
 
 realSrcLocSpan :: RealSrcLoc -> RealSrcSpan
-realSrcLocSpan (SrcLoc file line col) = RealSrcSpan' file line col line col
+realSrcLocSpan (SrcLoc (LexicalFastString file) line col) = RealSrcSpan' file line col line col
 
 -- | Create a 'SrcSpan' between two points in a file
 mkRealSrcSpan :: RealSrcLoc -> RealSrcLoc -> RealSrcSpan
@@ -383,8 +476,8 @@ isPointRealSpan (RealSrcSpan' _ line1 col1 line2 col2)
 
 -- | Create a 'SrcSpan' between two points in a file
 mkSrcSpan :: SrcLoc -> SrcLoc -> SrcSpan
-mkSrcSpan (UnhelpfulLoc str) _ = UnhelpfulSpan str
-mkSrcSpan _ (UnhelpfulLoc str) = UnhelpfulSpan str
+mkSrcSpan (UnhelpfulLoc str) _ = UnhelpfulSpan (UnhelpfulOther str)
+mkSrcSpan _ (UnhelpfulLoc str) = UnhelpfulSpan (UnhelpfulOther str)
 mkSrcSpan (RealSrcLoc loc1 mbpos1) (RealSrcLoc loc2 mbpos2)
     = RealSrcSpan (mkRealSrcSpan loc1 loc2) (liftA2 BufSpan mbpos1 mbpos2)
 
@@ -396,7 +489,8 @@ combineSrcSpans l (UnhelpfulSpan _) = l
 combineSrcSpans (RealSrcSpan span1 mbspan1) (RealSrcSpan span2 mbspan2)
   | srcSpanFile span1 == srcSpanFile span2
       = RealSrcSpan (combineRealSrcSpans span1 span2) (liftA2 combineBufSpans mbspan1 mbspan2)
-  | otherwise = UnhelpfulSpan (fsLit "<combineSrcSpans: files differ>")
+  | otherwise = UnhelpfulSpan $
+      UnhelpfulOther (fsLit "<combineSrcSpans: files differ>")
 
 -- | Combines two 'SrcSpan' into one that spans at least all the characters
 -- within both spans. Assumes the "file" part is the same in both inputs
@@ -488,12 +582,12 @@ srcSpanEndCol RealSrcSpan'{ srcSpanECol=c } = c
 
 -- | Returns the location at the start of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanStart :: SrcSpan -> SrcLoc
-srcSpanStart (UnhelpfulSpan str) = UnhelpfulLoc str
+srcSpanStart (UnhelpfulSpan r) = UnhelpfulLoc (unhelpfulSpanFS r)
 srcSpanStart (RealSrcSpan s b) = RealSrcLoc (realSrcSpanStart s) (fmap bufSpanStart b)
 
 -- | Returns the location at the end of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanEnd :: SrcSpan -> SrcLoc
-srcSpanEnd (UnhelpfulSpan str) = UnhelpfulLoc str
+srcSpanEnd (UnhelpfulSpan r) = UnhelpfulLoc (unhelpfulSpanFS r)
 srcSpanEnd (RealSrcSpan s b) = RealSrcLoc (realSrcSpanEnd s) (fmap bufSpanEnd b)
 
 realSrcSpanStart :: RealSrcSpan -> RealSrcLoc
@@ -559,6 +653,9 @@ instance Outputable RealSrcSpan where
 instance Outputable SrcSpan where
     ppr span = pprUserSpan True span
 
+instance Outputable UnhelpfulSpanReason where
+    ppr = pprUnhelpfulSpanReason
+
 -- I don't know why there is this style-based difference
 --      = getPprStyle $ \ sty ->
 --        if userStyle sty || debugStyle sty then
@@ -568,8 +665,19 @@ instance Outputable SrcSpan where
 --           UnhelpfulSpan _ -> panic "Outputable UnhelpfulSpan"
 --           RealSrcSpan s -> ppr s
 
+unhelpfulSpanFS :: UnhelpfulSpanReason -> FastString
+unhelpfulSpanFS r = case r of
+  UnhelpfulOther s        -> s
+  UnhelpfulNoLocationInfo -> fsLit "<no location info>"
+  UnhelpfulWiredIn        -> fsLit "<wired into compiler>"
+  UnhelpfulInteractive    -> fsLit "<interactive>"
+  UnhelpfulGenerated      -> fsLit "<generated>"
+
+pprUnhelpfulSpanReason :: UnhelpfulSpanReason -> SDoc
+pprUnhelpfulSpanReason r = ftext (unhelpfulSpanFS r)
+
 pprUserSpan :: Bool -> SrcSpan -> SDoc
-pprUserSpan _         (UnhelpfulSpan s) = ftext s
+pprUserSpan _         (UnhelpfulSpan r) = pprUnhelpfulSpanReason r
 pprUserSpan show_path (RealSrcSpan s _) = pprUserRealSpan show_path s
 
 pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
@@ -644,6 +752,17 @@ eqLocated a b = unLoc a == unLoc b
 -- | Tests the ordering of the two located things
 cmpLocated :: Ord a => GenLocated l a -> GenLocated l a -> Ordering
 cmpLocated a b = unLoc a `compare` unLoc b
+
+-- | Compare the 'BufSpan' of two located things.
+--
+-- Precondition: both operands have an associated 'BufSpan'.
+cmpBufSpan :: HasDebugCallStack => Located a -> Located a -> Ordering
+cmpBufSpan (L l1 _) (L l2  _)
+  | Just a <- getBufSpan l1
+  , Just b <- getBufSpan l2
+  = compare a b
+
+  | otherwise = panic "cmpBufSpan: no BufSpan"
 
 instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
   ppr (L l e) = -- TODO: We can't do this since Located was refactored into
@@ -739,3 +858,33 @@ psSpanEnd (PsSpan r b) = PsLoc (realSrcSpanEnd r) (bufSpanEnd b)
 
 mkSrcSpanPs :: PsSpan -> SrcSpan
 mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Just b)
+
+-- | Layout information for declarations.
+data LayoutInfo =
+
+    -- | Explicit braces written by the user.
+    --
+    -- @
+    -- class C a where { foo :: a; bar :: a }
+    -- @
+    ExplicitBraces
+  |
+    -- | Virtual braces inserted by the layout algorithm.
+    --
+    -- @
+    -- class C a where
+    --   foo :: a
+    --   bar :: a
+    -- @
+    VirtualBraces
+      !Int -- ^ Layout column (indentation level, begins at 1)
+  |
+    -- | Empty or compiler-generated blocks do not have layout information
+    -- associated with them.
+    NoLayoutInfo
+
+  deriving (Eq, Ord, Show, Data)
+
+-- | Indentation level is 1-indexed, so the leftmost column is 1.
+leftmostColumn :: Int
+leftmostColumn = 1

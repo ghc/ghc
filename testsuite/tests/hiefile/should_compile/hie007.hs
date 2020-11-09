@@ -64,3 +64,6 @@ thud f x =
     (x :: a, y) :: (a, b)
   where
     y = (f :: a -> b) x :: b
+
+rankn :: (forall a1. a1 -> b) -> a2 -> b
+rankn (g :: forall a1. a1 -> b) x = g x :: b

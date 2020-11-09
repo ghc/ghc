@@ -1,7 +1,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[CoreRules]{Transformation rules}
+\section[CoreRules]{Rewrite rules}
 -}
 
 {-# LANGUAGE CPP #-}
@@ -23,15 +23,16 @@ module GHC.Core.Rules (
         -- * Misc. CoreRule helpers
         rulesOfBinds, getRules, pprRulesForUser,
 
-        lookupRule, mkRule, roughTopNames
+        lookupRule, mkRule, roughTopNames, initRuleOpts
     ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core         -- All of it
-import GHC.Types.Module   ( Module, ModuleSet, elemModuleSet )
+import GHC.Unit.Module   ( Module )
+import GHC.Unit.Module.Env
 import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, exprsFreeVars, bindFreeVars
@@ -59,14 +60,16 @@ import GHC.Types.Unique.FM
 import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Types.Basic
 import GHC.Driver.Session      ( DynFlags, gopt, targetPlatform )
+import GHC.Driver.Ppr
 import GHC.Driver.Flags
-import Outputable
-import FastString
-import Maybes
-import Bag
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
+import GHC.Data.Maybe
+import GHC.Data.Bag
+import GHC.Utils.Misc as Utils
 import Data.List
-import Data.Ord
+import Data.Function    ( on )
 import Control.Monad    ( guard )
 
 {-
@@ -201,7 +204,7 @@ roughTopNames :: [CoreExpr] -> [Maybe Name]
 -- Such names are either:
 --
 -- 1. The function finally being applied to in an application chain
---    (if that name is a GlobalId: see "Var#globalvslocal"), or
+--    (if that name is a GlobalId: see "GHC.Types.Var#globalvslocal"), or
 --
 -- 2. The 'TyCon' if the expression is a 'Type'
 --
@@ -259,16 +262,16 @@ functions (lambdas) except by name, so in this case it seems like
 a good idea to treat 'M.k' as a roughTopName of the call.
 -}
 
-pprRulesForUser :: DynFlags -> [CoreRule] -> SDoc
+pprRulesForUser :: [CoreRule] -> SDoc
 -- (a) tidy the rules
 -- (b) sort them into order based on the rule name
 -- (c) suppress uniques (unless -dppr-debug is on)
 -- This combination makes the output stable so we can use in testing
 -- It's here rather than in GHC.Core.Ppr because it calls tidyRules
-pprRulesForUser dflags rules
-  = withPprStyle (defaultUserStyle dflags) $
+pprRulesForUser rules
+  = withPprStyle defaultUserStyle $
     pprRules $
-    sortBy (comparing ruleName) $
+    sortBy (lexicalCompareFS `on` ruleName) $
     tidyRules emptyTidyEnv rules
 
 {-
@@ -355,7 +358,7 @@ unionRuleBase rb1 rb2 = plusNameEnv_C (++) rb1 rb2
 
 extendRuleBase :: RuleBase -> CoreRule -> RuleBase
 extendRuleBase rule_base rule
-  = extendNameEnv_Acc (:) singleton rule_base (ruleIdName rule) rule
+  = extendNameEnv_Acc (:) Utils.singleton rule_base (ruleIdName rule) rule
 
 pprRuleBase :: RuleBase -> SDoc
 pprRuleBase rules = pprUFM rules $ \rss ->
@@ -374,14 +377,14 @@ pprRuleBase rules = pprUFM rules $ \rss ->
 -- supplied rules to this instance of an application in a given
 -- context, returning the rule applied and the resulting expression if
 -- successful.
-lookupRule :: DynFlags -> InScopeEnv
+lookupRule :: RuleOpts -> InScopeEnv
            -> (Activation -> Bool)      -- When rule is active
            -> Id -> [CoreExpr]
            -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 
 -- See Note [Extra args in rule matching]
 -- See comments on matchRule
-lookupRule dflags in_scope is_active fn args rules
+lookupRule opts in_scope is_active fn args rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
     case go [] rules of
         []     -> Nothing
@@ -398,7 +401,7 @@ lookupRule dflags in_scope is_active fn args rules
     go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
     go ms [] = ms
     go ms (r:rs)
-      | Just e <- matchRule dflags in_scope is_active fn args' rough_args r
+      | Just e <- matchRule opts in_scope is_active fn args' rough_args r
       = go ((r,mkTicks ticks e):ms) rs
       | otherwise
       = -- pprTrace "match failed" (ppr r $$ ppr args $$
@@ -477,7 +480,7 @@ to lookupRule are the result of a lazy substitution
 -}
 
 ------------------------------------
-matchRule :: DynFlags -> InScopeEnv -> (Activation -> Bool)
+matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
           -> Id -> [CoreExpr] -> [Maybe Name]
           -> CoreRule -> Maybe CoreExpr
 
@@ -503,15 +506,10 @@ matchRule :: DynFlags -> InScopeEnv -> (Activation -> Bool)
 -- Any 'surplus' arguments in the input are simply put on the end
 -- of the output.
 
-matchRule dflags rule_env _is_active fn args _rough_args
+matchRule opts rule_env _is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
-  = let env = RuleOpts
-               { roPlatform = targetPlatform dflags
-               , roNumConstantFolding = gopt Opt_NumConstantFolding dflags
-               , roExcessRationalPrecision = gopt Opt_ExcessPrecision dflags
-               }
-    in case match_fn env rule_env fn args of
+  = case match_fn opts rule_env fn args of
         Nothing   -> Nothing
         Just expr -> Just expr
 
@@ -521,6 +519,16 @@ matchRule _ in_scope is_active _ args rough_args
   | not (is_active act)               = Nothing
   | ruleCantMatch tpl_tops rough_args = Nothing
   | otherwise = matchN in_scope rule_name tpl_vars tpl_args args rhs
+
+
+-- | Initialize RuleOpts from DynFlags
+initRuleOpts :: DynFlags -> RuleOpts
+initRuleOpts dflags = RuleOpts
+  { roPlatform = targetPlatform dflags
+  , roNumConstantFolding = gopt Opt_NumConstantFolding dflags
+  , roExcessRationalPrecision = gopt Opt_ExcessPrecision dflags
+  }
+
 
 ---------------------------------------
 matchN  :: InScopeEnv
@@ -713,11 +721,15 @@ match :: RuleMatchEnv
       -> CoreExpr               -- Target
       -> Maybe RuleSubst
 
--- We look through certain ticks. See note [Tick annotations in RULE matching]
+-- We look through certain ticks. See Note [Tick annotations in RULE matching]
 match renv subst e1 (Tick t e2)
   | tickishFloatable t
   = match renv subst' e1 e2
   where subst' = subst { rs_binds = rs_binds subst . mkTick t }
+match renv subst (Tick t e1) e2
+  -- Ignore ticks in rule template.
+  | tickishFloatable t
+  =  match renv subst e1 e2
 match _ _ e@Tick{} _
   = pprPanic "Tick in rule" (ppr e)
 
@@ -912,7 +924,7 @@ match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
        Var v2 | v1' == rnOccR rn_env v2
               -> Just subst
 
-              | Var v2' <- lookupIdSubst (text "match_var") flt_env v2
+              | Var v2' <- lookupIdSubst flt_env v2
               , v1' == v2'
               -> Just subst
 
@@ -960,7 +972,7 @@ match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
   where
     -- e2' is the result of applying flt_env to e2
     e2' | isEmptyVarSet let_bndrs = e2
-        | otherwise = substExpr (text "match_tmpl_var") flt_env e2
+        | otherwise = substExpr flt_env e2
 
     id_subst' = extendVarEnv (rs_id_subst subst) v1' e2'
          -- No further renaming to do on e2',
@@ -1015,7 +1027,7 @@ Hence, (a) the guard (not (isLocallyBoundR v2))
 Note [Tick annotations in RULE matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We used to unconditionally look through Notes in both template and
+We used to unconditionally look through ticks in both template and
 expression being matched. This is actually illegal for counting or
 cost-centre-scoped ticks, because we have no place to put them without
 changing entry counts and/or costs. So now we just fail the match in
@@ -1024,7 +1036,12 @@ these cases.
 On the other hand, where we are allowed to insert new cost into the
 tick scope, we can float them upwards to the rule application site.
 
-cf Note [Notes in call patterns] in GHC.Core.Opt.SpecConstr
+Moreover, we may encounter ticks in the template of a rule. There are a few
+ways in which these may be introduced (e.g. #18162, #17619). Such ticks are
+ignored by the matcher. See Note [Simplifying rules] in
+GHC.Core.Opt.Simplify.Utils for details.
+
+cf Note [Tick annotations in call patterns] in GHC.Core.Opt.SpecConstr
 
 Note [Matching lets]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1145,12 +1162,13 @@ is so important.
 
 -- | Report partial matches for rules beginning with the specified
 -- string for the purposes of error reporting
-ruleCheckProgram :: CompilerPhase               -- ^ Rule activation test
+ruleCheckProgram :: RuleOpts                    -- ^ Rule options
+                 -> CompilerPhase               -- ^ Rule activation test
                  -> String                      -- ^ Rule pattern
                  -> (Id -> [CoreRule])          -- ^ Rules for an Id
                  -> CoreProgram                 -- ^ Bindings to check in
                  -> SDoc                        -- ^ Resulting check message
-ruleCheckProgram phase rule_pat rules binds
+ruleCheckProgram ropts phase rule_pat rules binds
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
   | otherwise
@@ -1163,7 +1181,9 @@ ruleCheckProgram phase rule_pat rules binds
                        , rc_id_unf    = idUnfolding     -- Not quite right
                                                         -- Should use activeUnfolding
                        , rc_pattern   = rule_pat
-                       , rc_rules = rules }
+                       , rc_rules     = rules
+                       , rc_ropts     = ropts
+                       }
     results = unionManyBags (map (ruleCheckBind env) binds)
     line = text (replicate 20 '-')
 
@@ -1171,7 +1191,8 @@ data RuleCheckEnv = RuleCheckEnv {
     rc_is_active :: Activation -> Bool,
     rc_id_unf  :: IdUnfoldingFun,
     rc_pattern :: String,
-    rc_rules :: Id -> [CoreRule]
+    rc_rules :: Id -> [CoreRule],
+    rc_ropts :: RuleOpts
 }
 
 ruleCheckBind :: RuleCheckEnv -> CoreBind -> Bag SDoc
@@ -1218,16 +1239,15 @@ ruleAppCheck_help env fn args rules
     i_args = args `zip` [1::Int ..]
     rough_args = map roughTopName args
 
-    check_rule rule = sdocWithDynFlags $ \dflags ->
-                      rule_herald rule <> colon <+> rule_info dflags rule
+    check_rule rule = rule_herald rule <> colon <+> rule_info (rc_ropts env) rule
 
     rule_herald (BuiltinRule { ru_name = name })
         = text "Builtin rule" <+> doubleQuotes (ftext name)
     rule_herald (Rule { ru_name = name })
         = text "Rule" <+> doubleQuotes (ftext name)
 
-    rule_info dflags rule
-        | Just _ <- matchRule dflags (emptyInScopeSet, rc_id_unf env)
+    rule_info opts rule
+        | Just _ <- matchRule opts (emptyInScopeSet, rc_id_unf env)
                               noBlackList fn args rough_args rule
         = text "matches (which is very peculiar!)"
 

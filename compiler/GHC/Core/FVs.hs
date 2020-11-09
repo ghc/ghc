@@ -10,16 +10,12 @@ Taken quite directly from the Peyton Jones/Lester paper.
 -- | A module concerned with finding the free variables of an expression.
 module GHC.Core.FVs (
         -- * Free variables of expressions and binding groups
-        exprFreeVars,
+        exprFreeVars,     exprsFreeVars,
         exprFreeVarsDSet,
-        exprFreeVarsList,
-        exprFreeIds,
-        exprFreeIdsDSet,
-        exprFreeIdsList,
-        exprsFreeIdsDSet,
-        exprsFreeIdsList,
-        exprsFreeVars,
-        exprsFreeVarsList,
+        exprFreeVarsList, exprsFreeVarsList,
+        exprFreeIds,      exprsFreeIds,
+        exprFreeIdsDSet,  exprsFreeIdsDSet,
+        exprFreeIdsList,  exprsFreeIdsList,
         bindFreeVars,
 
         -- * Selective free variables of expressions
@@ -34,9 +30,10 @@ module GHC.Core.FVs (
         bndrRuleAndUnfoldingVarsDSet,
         idFVs,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
-        ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
+        ruleFreeVars, rulesFreeVars,
         rulesFreeVarsDSet, mkRuleInfo,
         ruleLhsFreeIds, ruleLhsFreeIdsList,
+        ruleRhsFreeVars, ruleRhsFreeIds,
 
         expr_fvs,
 
@@ -59,7 +56,7 @@ module GHC.Core.FVs (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Types.Id
@@ -76,12 +73,14 @@ import GHC.Core.TyCo.FVs
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FamInstEnv
+import GHC.Builtin.Types( unrestrictedFunTyConName )
 import GHC.Builtin.Types.Prim( funTyConName )
-import Maybes( orElse )
-import Util
+import GHC.Data.Maybe( orElse )
 import GHC.Types.Basic( Activation )
-import Outputable
-import FV
+
+import GHC.Utils.FV as FV
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 {-
 ************************************************************************
@@ -105,7 +104,7 @@ exprFreeVars :: CoreExpr -> VarSet
 exprFreeVars = fvVarSet . exprFVs
 
 -- | Find all locally-defined free Ids or type variables in an expression
--- returning a composable FV computation. See Note [FV naming conventions] in FV
+-- returning a composable FV computation. See Note [FV naming conventions] in "GHC.Utils.FV"
 -- for why export it.
 exprFVs :: CoreExpr -> FV
 exprFVs = filterFV isLocalVar . expr_fvs
@@ -123,6 +122,9 @@ exprFreeVarsList = fvVarList . exprFVs
 -- | Find all locally-defined free Ids in an expression
 exprFreeIds :: CoreExpr -> IdSet        -- Find all locally-defined free Ids
 exprFreeIds = exprSomeFreeVars isLocalId
+
+exprsFreeIds :: [CoreExpr] -> IdSet        -- Find all locally-defined free Ids
+exprsFreeIds = exprsSomeFreeVars isLocalId
 
 -- | Find all locally-defined free Ids in an expression
 -- returning a deterministic set.
@@ -150,7 +152,7 @@ exprsFreeVars :: [CoreExpr] -> VarSet
 exprsFreeVars = fvVarSet . exprsFVs
 
 -- | Find all locally-defined free Ids or type variables in several expressions
--- returning a composable FV computation. See Note [FV naming conventions] in FV
+-- returning a composable FV computation. See Note [FV naming conventions] in "GHC.Utils.FV"
 -- for why export it.
 exprsFVs :: [CoreExpr] -> FV
 exprsFVs exprs = mapUnionFV exprFVs exprs
@@ -350,11 +352,17 @@ orphNamesOfType ty | Just ty' <- coreView ty = orphNamesOfType ty'
                 -- Look through type synonyms (#4912)
 orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (LitTy {})           = emptyNameSet
-orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
+orphNamesOfType (TyConApp tycon tys) = func
+                                       `unionNameSet` orphNamesOfTyCon tycon
                                        `unionNameSet` orphNamesOfTypes tys
+        where func = case tys of
+                       arg:_ | tycon == funTyCon -> orph_names_of_fun_ty_con arg
+                       _ -> emptyNameSet
 orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderType bndr)
                                        `unionNameSet` orphNamesOfType res
-orphNamesOfType (FunTy _ arg res)    = unitNameSet funTyConName    -- NB!  See #8535
+orphNamesOfType (FunTy _ w arg res)  =  orph_names_of_fun_ty_con w
+                                       `unionNameSet` unitNameSet funTyConName
+                                       `unionNameSet` orphNamesOfType w
                                        `unionNameSet` orphNamesOfType arg
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
@@ -378,7 +386,7 @@ orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSet` or
 orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (ForAllCo _ kind_co co)
   = orphNamesOfCo kind_co `unionNameSet` orphNamesOfCo co
-orphNamesOfCo (FunCo _ co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
+orphNamesOfCo (FunCo _ co_mult co1 co2) = orphNamesOfCo co_mult `unionNameSet` orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (CoVarCo _)           = emptyNameSet
 orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSet` orphNamesOfCos cos
 orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNamesOfType t1 `unionNameSet` orphNamesOfType t2
@@ -427,6 +435,12 @@ orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
 -- Used in the implementation of ":info" in GHCi.
 orphNamesOfFamInst :: FamInst -> NameSet
 orphNamesOfFamInst fam_inst = orphNamesOfAxiom (famInstAxiom fam_inst)
+
+-- Detect FUN 'Many as an application of (->), so that :i (->) works as expected
+-- (see #8535) Issue #16475 describes a more robust solution
+orph_names_of_fun_ty_con :: Mult -> NameSet
+orph_names_of_fun_ty_con Many = unitNameSet unrestrictedFunTyConName
+orph_names_of_fun_ty_con _ = emptyNameSet
 
 {-
 ************************************************************************
@@ -482,7 +496,7 @@ idRuleRhsVars is_active id
     get_fvs (Rule { ru_fn = fn, ru_bndrs = bndrs
                   , ru_rhs = rhs, ru_act = act })
       | is_active act
-            -- See Note [Finding rule RHS free vars] in OccAnal.hs
+            -- See Note [Finding rule RHS free vars] in "GHC.Core.Opt.OccurAnal"
       = delOneFromUniqSet_Directly fvs (getUnique fn)
             -- Note [Rule free var hack]
       where
@@ -509,6 +523,14 @@ ruleLhsFVIds :: CoreRule -> FV
 ruleLhsFVIds (BuiltinRule {}) = emptyFV
 ruleLhsFVIds (Rule { ru_bndrs = bndrs, ru_args = args })
   = filterFV isLocalId $ addBndrs bndrs (exprs_fvs args)
+
+ruleRhsFreeIds :: CoreRule -> VarSet
+-- ^ This finds all locally-defined free Ids on the left hand side of a rule
+-- and returns them as a non-deterministic set
+ruleRhsFreeIds (BuiltinRule {}) = emptyVarSet
+ruleRhsFreeIds (Rule { ru_bndrs = bndrs, ru_args = args })
+  = fvVarSet $ filterFV isLocalId $
+     addBndrs bndrs $ exprs_fvs args
 
 {-
 Note [Rule free var hack]  (Not a hack any more)
@@ -716,9 +738,10 @@ freeVars = go
   where
     go :: CoreExpr -> CoreExprWithFVs
     go (Var v)
-      | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs, AnnVar v)
+      | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs `unionFVs` mult_vars, AnnVar v)
       | otherwise    = (emptyDVarSet,                 AnnVar v)
       where
+        mult_vars = tyCoVarsOfTypeDSet (varMult v)
         ty_fvs = dVarTypeTyCoVars v
                  -- See Note [The FVAnn invariant]
 

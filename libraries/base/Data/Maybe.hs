@@ -149,7 +149,7 @@ fromJust Nothing  = error "Maybe.fromJust: Nothing" -- yuck
 fromJust (Just x) = x
 
 -- | The 'fromMaybe' function takes a default value and a 'Maybe'
--- value.  If the 'Maybe' is 'Nothing', it returns the default values;
+-- value.  If the 'Maybe' is 'Nothing', it returns the default value;
 -- otherwise, it returns the value contained in the 'Maybe'.
 --
 -- ==== __Examples__
@@ -256,8 +256,8 @@ listToMaybe = foldr (const . Just) Nothing
 -- >>> catMaybes $ [readMaybe x :: Maybe Int | x <- ["1", "Foo", "3"] ]
 -- [1,3]
 --
-catMaybes              :: [Maybe a] -> [a]
-catMaybes ls = [x | Just x <- ls]
+catMaybes :: [Maybe a] -> [a]
+catMaybes = mapMaybe id -- use mapMaybe to allow fusion (#18574)
 
 -- | The 'mapMaybe' function is a version of 'map' which can throw
 -- out elements.  In particular, the functional argument returns

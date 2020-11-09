@@ -1,12 +1,12 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module GHC.Hs.Doc
   ( HsDocString
   , LHsDocString
   , mkHsDocString
   , mkHsDocStringUtf8ByteString
+  , isEmptyDocString
   , unpackHDS
   , hsDocStringToByteString
   , ppr_mbDoc
@@ -23,13 +23,13 @@ module GHC.Hs.Doc
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Binary
-import Encoding
-import FastFunctions
+import GHC.Utils.Binary
+import GHC.Utils.Encoding
+import GHC.Utils.IO.Unsafe
 import GHC.Types.Name
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
 
 import Data.ByteString (ByteString)
@@ -63,6 +63,9 @@ instance Binary HsDocString where
 
 instance Outputable HsDocString where
   ppr = doubleQuotes . text . unpackHDS
+
+isEmptyDocString :: HsDocString -> Bool
+isEmptyDocString (HsDocString bs) = BS.null bs
 
 mkHsDocString :: String -> HsDocString
 mkHsDocString s =

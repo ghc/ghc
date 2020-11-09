@@ -1,5 +1,5 @@
 pattern Q1 x1_0 x2_1 x3_2 <- ((x1_0, x2_1), [x3_2], _, _)
-pattern x1_0 Q2 x2_1 = GHC.Tuple.Unit (x1_0, x2_1)
+pattern x1_0 Q2 x2_1 = GHC.Tuple.Solo (x1_0, x2_1)
 pattern Q3 {qx3, qy3, qz3} <- ((qx3, qy3), [qz3]) where
                                   Q3 qx3 qy3 qz3 = ((qx3, qy3), [qz3])
 T8761.hs:(16,1)-(39,13): Splicing declarations
@@ -28,7 +28,7 @@ T8761.hs:(16,1)-(39,13): Splicing declarations
        return pats
   ======>
     pattern Q1 x1 x2 x3 <- ((x1, x2), [x3], _, _)
-    pattern x1 `Q2` x2 = Unit(x1, x2)
+    pattern x1 `Q2` x2 = Solo(x1, x2)
     pattern Q3{qx3, qy3, qz3} <- ((qx3, qy3), [qz3]) where
                                 Q3 qx3 qy3 qz3 = ((qx3, qy3), [qz3])
 T8761.hs:(42,1)-(46,29): Splicing declarations

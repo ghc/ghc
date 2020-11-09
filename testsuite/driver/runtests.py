@@ -14,6 +14,7 @@ import tempfile
 import time
 import re
 import traceback
+from pathlib import Path
 
 # We don't actually need subprocess in runtests.py, but:
 # * We do need it in testlibs.py
@@ -23,11 +24,11 @@ import traceback
 # So we import it here first, so that the testsuite doesn't appear to fail.
 import subprocess
 
-from testutil import getStdout, Watcher, str_warn, str_info
+from testutil import getStdout, Watcher, str_warn, str_info, print_table, shorten_metric_name
 from testglobals import getConfig, ghc_env, getTestRun, TestConfig, \
                         TestOptions, brokens, PerfMetric
 from my_typing import TestName
-from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty, format_perf_stat
+from perf_notes import MetricChange, GitRef, inside_git_repo, is_worktree_dirty, format_perf_stat, get_abbrev_hash_length, is_commit_hash
 from junit import junit
 import term_color
 from term_color import Color, colored
@@ -56,6 +57,7 @@ parser = argparse.ArgumentParser(description="GHC's testsuite driver")
 perf_group = parser.add_mutually_exclusive_group()
 
 parser.add_argument("-e", action='append', help="A string to execute from the command line.")
+parser.add_argument("--top", type=Path, help="path to top of testsuite/ tree")
 parser.add_argument("--config-file", action="append", help="config file")
 parser.add_argument("--config", action='append', help="config field")
 parser.add_argument("--rootdir", action='append', help="root of tree containing tests (default: .)")
@@ -70,6 +72,8 @@ parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose 
 parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
 parser.add_argument("--broken-test", action="append", default=[], help="a test name to mark as broken for this run")
 parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
+parser.add_argument("--perf-baseline", type=GitRef, metavar='COMMIT', help="Baseline commit for performance comparsons.")
+parser.add_argument("--test-package-db", dest="test_package_db", action="append", help="Package db providing optional packages used by the testsuite.")
 perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
 
@@ -101,6 +105,13 @@ config.metrics_file = args.metrics_file
 hasMetricsFile = config.metrics_file is not None
 config.summary_file = args.summary_file
 config.no_print_summary = args.no_print_summary
+config.baseline_commit = args.perf_baseline
+
+if args.top:
+    config.top = args.top
+
+if args.test_package_db:
+    config.test_package_db = args.test_package_db
 
 if args.only:
     config.only = args.only
@@ -275,7 +286,7 @@ testopts_local.x = TestOptions()
 
 # if timeout == -1 then we try to calculate a sensible value
 if config.timeout == -1:
-    config.timeout = int(read_no_crs(config.top + '/timeout/calibrate.out'))
+    config.timeout = int(read_no_crs(config.top / 'timeout' / 'calibrate.out'))
 
 print('Timeout is ' + str(config.timeout))
 print('Known ways: ' + ', '.join(config.other_ways))
@@ -339,23 +350,53 @@ def cleanup_and_exit(exitcode):
     exit(exitcode)
 
 def tabulate_metrics(metrics: List[PerfMetric]) -> None:
-    for metric in sorted(metrics, key=lambda m: (m.stat.test, m.stat.way)):
-        print("{test:24}  {metric:40}  {value:15.3f}".format(
-            test = "{}({})".format(metric.stat.test, metric.stat.way),
-            metric = metric.stat.metric,
-            value = metric.stat.value
-        ))
-        if metric.baseline is not None:
-            val0 = metric.baseline.perfStat.value
-            val1 = metric.stat.value
-            rel = 100 * (val1 - val0) / val0
-            print("{space:24}  {herald:40}  {value:15.3f}  [{direction} {rel:2.1f}%]".format(
-                space = "",
-                herald = "(baseline @ HEAD~{depth})".format(
-                    depth = metric.baseline.commitDepth),
-                value = val0,
-                direction = metric.change,
-                rel = abs(rel)
+    abbrevLen = get_abbrev_hash_length()
+    hasBaseline = any([x.baseline is not None for x in metrics])
+    baselineCommitSet = set([x.baseline.commit for x in metrics if x.baseline is not None])
+    hideBaselineCommit = not hasBaseline or len(baselineCommitSet) == 1
+    hideBaselineEnv = not hasBaseline or all(
+        [x.stat.test_env == x.baseline.perfStat.test_env
+         for x in metrics if x.baseline is not None])
+    def row(cells: Tuple[str, str, str, str, str, str, str, str]) -> List[str]:
+        return [x for (idx, x) in enumerate(list(cells)) if
+                (idx != 2 or not hideBaselineCommit) and
+                (idx != 3 or not hideBaselineEnv )]
+
+    headerRows = [
+        row(("", "", "Baseline", "Baseline", "Baseline", "", "", "")),
+        row(("Test", "Metric", "commit", "environment", "value", "New value", "Change", ""))
+    ]
+    def strDiff(x: PerfMetric) -> str:
+        if x.baseline is None:
+            return ""
+        val0 = x.baseline.perfStat.value
+        val1 = x.stat.value
+        return "{:+2.1f}%".format(100 * (val1 - val0) / val0)
+    dataRows = [row((
+        "{}({})".format(x.stat.test, x.stat.way),
+        shorten_metric_name(x.stat.metric),
+          "{}".format(x.baseline.commit[:abbrevLen]
+                      if is_commit_hash(x.baseline.commit) else x.baseline.commit)
+          if x.baseline is not None else "",
+        "{}".format(x.baseline.perfStat.test_env)
+          if x.baseline is not None else "",
+        "{:13.1f}".format(x.baseline.perfStat.value)
+          if x.baseline is not None else "",
+        "{:13.1f}".format(x.stat.value),
+        strDiff(x),
+        "{}".format(x.change.hint())
+    )) for x in sorted(metrics, key =
+                      lambda m: (m.stat.test, m.stat.way, m.stat.metric))]
+    print_table(headerRows, dataRows, 1)
+    print("")
+    if hasBaseline:
+        if hideBaselineEnv:
+            print("* All baselines were measured in the same environment as this test run")
+        if hideBaselineCommit:
+            commit = next(iter(baselineCommitSet))
+            print("* All baseline commits are {}".format(
+                commit[:abbrevLen]
+                if is_commit_hash(commit) else commit
             ))
 
 # First collect all the tests to be run
@@ -422,8 +463,24 @@ else:
 
     # Dump metrics data.
     print("\nPerformance Metrics (test environment: {}):\n".format(config.test_env))
+    if config.baseline_commit:
+        print('Performance baseline: %s\n' % config.baseline_commit)
     if any(t.metrics):
-        tabulate_metrics(t.metrics)
+        # Group metrics by metric type
+        groups = {} # type: Dict[MetricName, List[PerfMetric]]
+        for m in t.metrics:
+            if m.stat.metric not in groups:
+                groups[m.stat.metric] = []
+
+            groups[m.stat.metric].append(m)
+
+        for metric_name, stats in groups.items():
+            heading = 'Metrics: %s' % metric_name
+            print()
+            print(heading)
+            print('-' * len(heading))
+            print()
+            tabulate_metrics(stats)
     else:
         print("\nNone collected.")
     print("")
@@ -477,19 +534,19 @@ else:
     summary(t, sys.stdout, config.no_print_summary, config.supports_colors)
 
     # Write perf stats if any exist or if a metrics file is specified.
-    stats = [stat for (_, stat, __) in t.metrics]
+    stats_metrics = [stat for (_, stat, __) in t.metrics] # type: List[PerfStat]
     if hasMetricsFile:
-        print('Appending ' + str(len(stats)) + ' stats to file: ' + config.metrics_file)
+        print('Appending ' + str(len(stats_metrics)) + ' stats to file: ' + config.metrics_file)
         with open(config.metrics_file, 'a') as f:
-            f.write("\n" + Perf.format_perf_stat(stats))
-    elif inside_git_repo() and any(stats):
+            f.write("\n" + Perf.format_perf_stat(stats_metrics))
+    elif inside_git_repo() and any(stats_metrics):
         if is_worktree_dirty():
             print()
             print(str_warn('Performance Metrics NOT Saved') + \
                 ' working tree is dirty. Commit changes or use ' + \
                 '--metrics-file to save metrics to a file.')
         else:
-            Perf.append_perf_stat(stats)
+            Perf.append_perf_stat(stats_metrics)
 
     # Write summary
     if config.summary_file:

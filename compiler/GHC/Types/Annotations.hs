@@ -17,16 +17,14 @@ module GHC.Types.Annotations (
         deserializeAnns
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Binary
-import GHC.Types.Module ( Module
-                        , ModuleEnv, emptyModuleEnv, extendModuleEnvWith
-                        , plusModuleEnv_C, lookupWithDefaultModuleEnv
-                        , mapModuleEnv )
+import GHC.Utils.Binary
+import GHC.Unit.Module ( Module )
+import GHC.Unit.Module.Env
 import GHC.Types.Name.Env
 import GHC.Types.Name
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Serialized
 
 import Control.Monad
@@ -36,7 +34,7 @@ import Data.Word        ( Word8 )
 
 
 -- | Represents an annotation after it has been sufficiently desugared from
--- it's initial form of 'HsDecls.AnnDecl'
+-- it's initial form of 'GHC.Hs.Decls.AnnDecl'
 data Annotation = Annotation {
         ann_target :: CoreAnnTarget,    -- ^ The target of the annotation
         ann_value  :: AnnPayload

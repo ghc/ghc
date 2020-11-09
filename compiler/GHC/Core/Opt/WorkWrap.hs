@@ -7,11 +7,12 @@
 {-# LANGUAGE CPP #-}
 module GHC.Core.Opt.WorkWrap ( wwTopBinds ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Core.Arity  ( manifestArity )
+import GHC.Core.Opt.Arity  ( manifestArity )
 import GHC.Core
-import GHC.Core.Unfold ( certainlyWillInline, mkWwInlineRule, mkWorkerUnfolding )
+import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.FVs    ( exprFreeVars )
 import GHC.Types.Var
@@ -21,13 +22,17 @@ import GHC.Core.Type
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
 import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Config
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.SourceText
 import GHC.Core.Opt.WorkWrap.Utils
-import Util
-import Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Core.FamInstEnv
-import MonadUtils
+import GHC.Utils.Monad
 
 #include "HsVersions.h"
 
@@ -245,8 +250,8 @@ NOINLINE pragma to the worker.
 (See #13143 for a real-world example.)
 
 It is crucial that we do this for *all* NOINLINE functions. #10069
-demonstrates what happens when we promise to w/w a (NOINLINE) leaf function, but
-fail to deliver:
+demonstrates what happens when we promise to w/w a (NOINLINE) leaf
+function, but fail to deliver:
 
   data C = C Int# Int#
 
@@ -421,26 +426,40 @@ When should the wrapper inlining be active?
    In module Bar we want to give specialisations a chance to fire
    before inlining f's wrapper.
 
+   Historical note: At one stage I tried making the wrapper inlining
+   always-active, and that had a very bad effect on nofib/imaginary/x2n1;
+   a wrapper was inlined before the specialisation fired.
+
 Reminder: Note [Don't w/w INLINE things], so we don't need to worry
           about INLINE things here.
 
 Conclusion:
   - If the user said NOINLINE[n], respect that
-  - If the user said NOINLINE, inline the wrapper as late as
-    poss (phase 0). This is a compromise driven by (2) above
+
+  - If the user said NOINLINE, inline the wrapper only after
+    phase 0, the last user-visible phase.  That means that all
+    rules will have had a chance to fire.
+
+    What phase is after phase 0?  Answer: FinalPhase, that's the reason it
+    exists. NB: Similar to InitialPhase, users can't write INLINE[Final] f;
+    it's syntactically illegal.
+
   - Otherwise inline wrapper in phase 2.  That allows the
     'gentle' simplification pass to apply specialisation rules
 
-Historical note: At one stage I tried making the wrapper inlining
-always-active, and that had a very bad effect on nofib/imaginary/x2n1;
-a wrapper was inlined before the specialisation fired.
-
-Note [Wrapper NoUserInline]
+Note [Wrapper NoUserInlinePrag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The use an inl_inline of NoUserInline on the wrapper distinguishes
-this pragma from one that was given by the user. In particular, CSE
-will not happen if there is a user-specified pragma, but should happen
-for w/w’ed things (#14186).
+We use NoUserInlinePrag on the wrapper, to say that there is no
+user-specified inline pragma. (The worker inherits that; see Note
+[Worker-wrapper for INLINABLE functions].)  The wrapper has no pragma
+given by the user.
+
+(Historical note: we used to give the wrapper an INLINE pragma, but
+CSE will not happen if there is a user-specified pragma, but should
+happen for w/w’ed things (#14186).  We don't need a pragma, because
+everything we needs is expressed by (a) the stable unfolding and (b)
+the inl_act activation.)
+
 -}
 
 tryWW   :: DynFlags
@@ -457,7 +476,7 @@ tryWW   :: DynFlags
 tryWW dflags fam_envs is_rec fn_id rhs
   -- See Note [Worker-wrapper for NOINLINE functions]
 
-  | Just stable_unf <- certainlyWillInline dflags fn_info
+  | Just stable_unf <- certainlyWillInline uf_opts fn_info
   = return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
         -- See Note [Don't w/w INLINE things]
         -- See Note [Don't w/w inline small non-loop-breaker things]
@@ -472,6 +491,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
   = return [ (new_fn_id, rhs) ]
 
   where
+    uf_opts      = unfoldingOpts dflags
     fn_info      = idInfo fn_id
     (wrap_dmds, div) = splitStrictSig (strictnessInfo fn_info)
 
@@ -534,12 +554,12 @@ Note [Zapping DmdEnv after Demand Analyzer] above.
 Note [Don't eta expand in w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A binding where the manifestArity of the RHS is less than idArity of the binder
-means GHC.Core.Arity didn't eta expand that binding. When this happens, it does so
-for a reason (see Note [exprArity invariant] in GHC.Core.Arity) and we probably have
+means GHC.Core.Opt.Arity didn't eta expand that binding. When this happens, it does so
+for a reason (see Note [exprArity invariant] in GHC.Core.Opt.Arity) and we probably have
 a PAP, cast or trivial expression as RHS.
 
 Performing the worker/wrapper split will implicitly eta-expand the binding to
-idArity, overriding GHC.Core.Arity's decision. Other than playing fast and loose with
+idArity, overriding GHC.Core.Opt.Arity's decision. Other than playing fast and loose with
 divergence, it's also broken for newtypes:
 
   f = (\xy.blah) |> co
@@ -575,8 +595,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
         work_uniq <- getUniqueM
         let work_rhs = work_fn rhs
             work_act = case fn_inline_spec of  -- See Note [Worker activation]
-                          NoInline -> fn_act
-                          _        -> wrap_act
+                          NoInline -> inl_act fn_inl_prag
+                          _        -> inl_act wrap_prag
 
             work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
                                      , inl_inline = fn_inline_spec
@@ -592,6 +612,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
               -- worker is join point iff wrapper is join point
               -- (see Note [Don't w/w join points for CPR])
 
+            simpl_opts = initSimpleOpts dflags
+
             work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
                         `setIdOccInfo` occInfo fn_info
                                 -- Copy over occurrence info from parent
@@ -601,7 +623,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 
                         `setInlinePragma` work_prag
 
-                        `setIdUnfolding` mkWorkerUnfolding dflags work_fn fn_unfolding
+                        `setIdUnfolding` mkWorkerUnfolding simpl_opts work_fn fn_unfolding
                                 -- See Note [Worker-wrapper for INLINABLE functions]
 
                         `setIdStrictness` mkClosedStrictSig work_demands div
@@ -626,20 +648,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
                           | otherwise   = topDmd
 
             wrap_rhs  = wrap_fn work_id
-            wrap_act  = case fn_act of  -- See Note [Wrapper activation]
-                           ActiveAfter {} -> fn_act
-                           NeverActive    -> activeDuringFinal
-                           _              -> activeAfterInitial
-            wrap_prag = InlinePragma { inl_src    = SourceText "{-# INLINE"
-                                     , inl_inline = NoUserInline
-                                     , inl_sat    = Nothing
-                                     , inl_act    = wrap_act
-                                     , inl_rule   = rule_match_info }
-                -- inl_act:    see Note [Wrapper activation]
-                -- inl_inline: see Note [Wrapper NoUserInline]
-                -- inl_rule:   RuleMatchInfo is (and must be) unaffected
-
-            wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule dflags wrap_rhs arity
+            wrap_prag = mkStrWrapperInlinePrag fn_inl_prag
+            wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule simpl_opts wrap_rhs arity
                               `setInlinePragma` wrap_prag
                               `setIdOccInfo`    noOccInfo
                                 -- Zap any loop-breaker-ness, to avoid bleating from Lint
@@ -655,8 +665,6 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
     rhs_fvs         = exprFreeVars rhs
     fn_inl_prag     = inlinePragInfo fn_info
     fn_inline_spec  = inl_inline fn_inl_prag
-    fn_act          = inl_act fn_inl_prag
-    rule_match_info = inlinePragmaRuleMatchInfo fn_inl_prag
     fn_unfolding    = unfoldingInfo fn_info
     arity           = arityInfo fn_info
                     -- The arity is set by the simplifier using exprEtaExpandArity
@@ -673,6 +681,25 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
     work_cpr_info | isJoinId fn_id = cpr
                   | otherwise      = topCpr
 
+
+mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma
+mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
+  = InlinePragma { inl_src    = SourceText "{-# INLINE"
+                 , inl_inline = NoUserInlinePrag -- See Note [Wrapper NoUserInline]
+                 , inl_sat    = Nothing
+                 , inl_act    = wrap_act
+                 , inl_rule   = rule_info }  -- RuleMatchInfo is (and must be) unaffected
+  where
+    wrap_act  = case act of  -- See Note [Wrapper activation]
+                   NeverActive     -> activateDuringFinal
+                   FinalActive     -> act
+                   ActiveAfter {}  -> act
+                   ActiveBefore {} -> activateAfterInitial
+                   AlwaysActive    -> activateAfterInitial
+      -- For the last two cases, see (4) in Note [Wrapper activation]
+      -- NB: the (ActiveBefore n) isn't quite right. We really want
+      -- it to be active *after* Initial but *before* n.  We don't have
+      -- a way to say that, alas.
 
 {-
 Note [Demand on the worker]

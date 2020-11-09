@@ -4,21 +4,27 @@ module GHC.Tc.Types.EvTerm
     ( evDelayedError, evCallStack )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
-import FastString
+import GHC.Driver.Session
+
+import GHC.Tc.Types.Evidence
+
+import GHC.Unit
+
+import GHC.Builtin.Names
+
 import GHC.Core.Type
 import GHC.Core
 import GHC.Core.Make
-import GHC.Types.Literal ( Literal(..) )
-import GHC.Tc.Types.Evidence
-import GHC.Driver.Types
-import GHC.Driver.Session
-import GHC.Types.Name
-import GHC.Types.Module
 import GHC.Core.Utils
-import GHC.Builtin.Names
+
+import GHC.Types.Literal ( Literal(..) )
 import GHC.Types.SrcLoc
+import GHC.Types.Name
+import GHC.Types.TyThing
+
+import GHC.Data.FastString
 
 -- Used with Opt_DeferTypeErrors
 -- See Note [Deferring coercion errors to runtime]
@@ -41,7 +47,7 @@ evCallStack cs = do
   m             <- getModule
   srcLocDataCon <- lookupDataCon srcLocDataConName
   let mkSrcLoc l = mkCoreConApps srcLocDataCon <$>
-               sequence [ mkStringExprFS (unitIdFS $ moduleUnitId m)
+               sequence [ mkStringExprFS (unitFS $ moduleUnit m)
                         , mkStringExprFS (moduleNameFS $ moduleName m)
                         , mkStringExprFS (srcSpanFile l)
                         , return $ mkIntExprInt platform (srcSpanStartLine l)

@@ -1,2 +1,2 @@
 
-readFail018.hs:3:1: unterminated `{-'
+readFail018.hs:3:1: error: unterminated `{-' at end of input

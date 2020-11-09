@@ -1,13 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -26,15 +25,14 @@ module GHC.Cmm.Node (
      CmmTickScope(..), isTickSubScope, combineTickScopes,
   ) where
 
-import GhcPrelude hiding (succ)
+import GHC.Prelude hiding (succ)
 
 import GHC.Platform.Regs
 import GHC.Cmm.Expr
 import GHC.Cmm.Switch
-import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import GHC.Types.ForeignCall
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Runtime.Heap.Layout
 import GHC.Core (Tickish)
 import qualified GHC.Types.Unique as U
@@ -46,7 +44,7 @@ import GHC.Cmm.Dataflow.Label
 import Data.Maybe
 import Data.List (tails,sortBy)
 import GHC.Types.Unique (nonDetCmpUnique)
-import Util
+import GHC.Utils.Misc
 
 
 ------------------------
@@ -70,7 +68,7 @@ data CmmNode e x where
     -- up one frame. Having unwind information for @Sp@ will allow the
     -- debugger to "walk" the stack.
     --
-    -- See Note [What is this unwinding business?] in Debug
+    -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
   CmmUnwind :: [(GlobalReg, Maybe CmmExpr)] -> CmmNode O O
 
   CmmAssign :: !CmmReg -> !CmmExpr -> CmmNode O O
@@ -93,7 +91,7 @@ data CmmNode e x where
       --
       -- Invariant: the arguments and the ForeignTarget must not
       -- mention any registers for which GHC.Platform.callerSaves
-      -- is True.  See Note [Register Parameter Passing].
+      -- is True.  See Note [Register parameter passing].
 
   CmmBranch :: ULabel -> CmmNode O C
                                    -- Goto another block in the same procedure
@@ -223,11 +221,12 @@ convention, rdi, rsi, rdx and rcx (as well as r8 and r9) may be used for
 argument passing.  These are registers R3-R6, which our generated
 code may also be using; as a result, it's necessary to save these
 values before doing a foreign call.  This is done during initial
-code generation in callerSaveVolatileRegs in GHC.StgToCmm.Utils.  However,
-one result of doing this is that the contents of these registers
-may mysteriously change if referenced inside the arguments.  This
-is dangerous, so you'll need to disable inlining much in the same
-way is done in GHC.Cmm.Opt currently.  We should fix this!
+code generation in callerSaveVolatileRegs in GHC.StgToCmm.Utils.
+
+However, one result of doing this is that the contents of these registers may
+mysteriously change if referenced inside the arguments.  This is dangerous, so
+you'll need to disable inlining much in the same way is done in GHC.Cmm.Sink
+currently.  We should fix this!
 -}
 
 ---------------------------------------------
@@ -319,7 +318,7 @@ foreignTargetHints target
 -- Instances of register and slot users / definers
 
 instance UserOfRegs LocalReg (CmmNode e x) where
-  foldRegsUsed dflags f !z n = case n of
+  foldRegsUsed platform f !z n = case n of
     CmmAssign _ expr -> fold f z expr
     CmmStore addr rval -> fold f (fold f z addr) rval
     CmmUnsafeForeignCall t _ args -> fold f (fold f z t) args
@@ -330,10 +329,10 @@ instance UserOfRegs LocalReg (CmmNode e x) where
     _ -> z
     where fold :: forall a b. UserOfRegs LocalReg a
                => (b -> LocalReg -> b) -> b -> a -> b
-          fold f z n = foldRegsUsed dflags f z n
+          fold f z n = foldRegsUsed platform f z n
 
 instance UserOfRegs GlobalReg (CmmNode e x) where
-  foldRegsUsed dflags f !z n = case n of
+  foldRegsUsed platform f !z n = case n of
     CmmAssign _ expr -> fold f z expr
     CmmStore addr rval -> fold f (fold f z addr) rval
     CmmUnsafeForeignCall t _ args -> fold f (fold f z t) args
@@ -344,26 +343,26 @@ instance UserOfRegs GlobalReg (CmmNode e x) where
     _ -> z
     where fold :: forall a b.  UserOfRegs GlobalReg a
                => (b -> GlobalReg -> b) -> b -> a -> b
-          fold f z n = foldRegsUsed dflags f z n
+          fold f z n = foldRegsUsed platform f z n
 
 instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r ForeignTarget where
   -- The (Ord r) in the context is necessary here
   -- See Note [Recursive superclasses] in GHC.Tc.TyCl.Instance
-  foldRegsUsed _      _ !z (PrimTarget _)      = z
-  foldRegsUsed dflags f !z (ForeignTarget e _) = foldRegsUsed dflags f z e
+  foldRegsUsed _        _ !z (PrimTarget _)      = z
+  foldRegsUsed platform f !z (ForeignTarget e _) = foldRegsUsed platform f z e
 
 instance DefinerOfRegs LocalReg (CmmNode e x) where
-  foldRegsDefd dflags f !z n = case n of
+  foldRegsDefd platform f !z n = case n of
     CmmAssign lhs _ -> fold f z lhs
     CmmUnsafeForeignCall _ fs _ -> fold f z fs
     CmmForeignCall {res=res} -> fold f z res
     _ -> z
     where fold :: forall a b. DefinerOfRegs LocalReg a
                => (b -> LocalReg -> b) -> b -> a -> b
-          fold f z n = foldRegsDefd dflags f z n
+          fold f z n = foldRegsDefd platform f z n
 
 instance DefinerOfRegs GlobalReg (CmmNode e x) where
-  foldRegsDefd dflags f !z n = case n of
+  foldRegsDefd platform f !z n = case n of
     CmmAssign lhs _ -> fold f z lhs
     CmmUnsafeForeignCall tgt _ _  -> fold f z (foreignTargetRegs tgt)
     CmmCall        {} -> fold f z activeRegs
@@ -372,9 +371,8 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
     _ -> z
     where fold :: forall a b. DefinerOfRegs GlobalReg a
                => (b -> GlobalReg -> b) -> b -> a -> b
-          fold f z n = foldRegsDefd dflags f z n
+          fold f z n = foldRegsDefd platform f z n
 
-          platform = targetPlatform dflags
           activeRegs = activeStgRegs platform
           activeCallerSavesRegs = filter (callerSaves platform) activeRegs
 

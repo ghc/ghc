@@ -1,20 +1,22 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- | Free regs map for i386
 module GHC.CmmToAsm.Reg.Linear.X86 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.X86.Regs
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
-import Panic
+import GHC.Utils.Panic
 import GHC.Platform
+import GHC.Utils.Outputable
 
 import Data.Word
 import Data.Bits
 
 newtype FreeRegs = FreeRegs Word32
-    deriving Show
+    deriving (Show,Outputable)
 
 noFreeRegs :: FreeRegs
 noFreeRegs = FreeRegs 0

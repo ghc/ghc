@@ -333,8 +333,8 @@ Redirecting the compilation output(s)
     :category:
 
     The ``-outputdir`` option is shorthand for the combination of
-    :ghc-flag:`-odir ⟨dir⟩`, :ghc-flag:`-hidir ⟨dir⟩`, :ghc-flag:`-stubdir
-    ⟨dir⟩` and :ghc-flag:`-dumpdir ⟨dir⟩`.
+    :ghc-flag:`-odir ⟨dir⟩`, :ghc-flag:`-hidir ⟨dir⟩`, :ghc-flag:`-hiedir ⟨dir⟩`, 
+    :ghc-flag:`-stubdir ⟨dir⟩` and :ghc-flag:`-dumpdir ⟨dir⟩`.
 
 .. ghc-flag:: -osuf ⟨suffix⟩
     :shortdesc: set the output file suffix
@@ -497,7 +497,7 @@ Redirecting temporary files
 
     If you have trouble because of running out of space in ``/tmp`` (or
     wherever your installation thinks temporary files should go), you
-    may use the :ghc-flag:`-tmpdir ⟨dir⟩` option option to specify an
+    may use the :ghc-flag:`-tmpdir ⟨dir⟩` option to specify an
     alternate directory. For example, ``-tmpdir .`` says to put temporary files
     in the current working directory.
 
@@ -758,7 +758,7 @@ There are several points to note here:
       the same machine-generated binary format as any other
       GHC-generated interface file (e.g. ``B.hi``). You can display its
       contents with ``ghc --show-iface``. If you specify a directory for
-      interface files, the ``-ohidir`` flag, then that affects ``hi-boot`` files
+      interface files, the ``-hidir`` flag, then that affects ``hi-boot`` files
       too.
 
 -  If hs-boot files are considered distinct from their parent source
@@ -1500,7 +1500,6 @@ module:
    instance* or at least one *orphan rule*.
 
 -  An instance declaration in a module ``M`` is an *orphan instance* if
-   orphan instance
 
    -  The class of the instance declaration is not declared in ``M``, and
 

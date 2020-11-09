@@ -1,10 +1,10 @@
+{-# LANGUAGE CPP                      #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+
 {-
 (c) The University of Glasgow 2006-2008
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 -}
-
-{-# LANGUAGE CPP, NondecreasingIndentation #-}
-{-# LANGUAGE MultiWayIf #-}
 
 -- | Module for constructing @ModIface@ values (interface files),
 -- writing them to disk and comparing two versions to see if
@@ -21,16 +21,23 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Hs
+
+import GHC.StgToCmm.Types (CgInfos (..))
+
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Monad
 
 import GHC.Iface.Syntax
 import GHC.Iface.Recomp
 import GHC.Iface.Load
+import GHC.Iface.Ext.Fields
+
 import GHC.CoreToIface
 
-import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames, mkDependencies )
-import GHC.Types.Id
-import GHC.Types.Annotations
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -38,13 +45,20 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Type
-import GHC.Tc.Utils.TcType
+import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Tc.Utils.Monad
-import GHC.Hs
-import GHC.Driver.Types
+
+import GHC.Driver.Env
+import GHC.Driver.Backend
 import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Plugins (LoadedPlugin(..))
+
+import GHC.Types.Id
+import GHC.Types.Fixity.Env
+import GHC.Types.SafeHaskell
+import GHC.Types.Annotations
 import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Name
@@ -52,20 +66,35 @@ import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Types.Module
-import ErrUtils
-import Outputable
-import GHC.Types.Basic  hiding ( SuccessFlag(..) )
-import Util             hiding ( eqListBy )
-import FastString
-import Maybes
+import GHC.Types.Unique.DSet
+import GHC.Types.Basic hiding ( SuccessFlag(..) )
+import GHC.Types.TypeEnv
+import GHC.Types.SourceFile
+import GHC.Types.TyThing
+import GHC.Types.HpcInfo
+
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc  hiding ( eqListBy )
+
+import GHC.Data.FastString
+import GHC.Data.Maybe
+
 import GHC.HsToCore.Docs
+import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames, mkDependencies )
+
+import GHC.Unit
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.Deps
 
 import Data.Function
 import Data.List ( findIndex, mapAccumL, sortBy )
 import Data.Ord
 import Data.IORef
-import GHC.Driver.Plugins (LoadedPlugin(..))
 
 {-
 ************************************************************************
@@ -98,39 +127,53 @@ mkPartialIface hsc_env mod_details
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
              safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
--- | Fully instantiate a interface
--- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe NameSet -> IO ModIface
-mkFullIface hsc_env partial_iface mb_non_cafs = do
+-- | Fully instantiate an interface. Adds fingerprints and potentially code
+-- generator produced information.
+--
+-- CgInfos is not available when not generating code (-fno-code), or when not
+-- generating interface pragmas (-fomit-interface-pragmas). See also
+-- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
+mkFullIface :: HscEnv -> PartialModIface -> Maybe CgInfos -> IO ModIface
+mkFullIface hsc_env partial_iface mb_cg_infos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
-          = updateDeclCafInfos (mi_decls partial_iface) mb_non_cafs
+          = updateDecl (mi_decls partial_iface) mb_cg_infos
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
       addFingerprints hsc_env partial_iface{ mi_decls = decls }
 
     -- Debug printing
-    dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText (pprModIface full_iface)
+    let unit_state = unitState (hsc_dflags hsc_env)
+    dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText
+      (pprWithUnitState unit_state $ pprModIface full_iface)
 
     return full_iface
 
-updateDeclCafInfos :: [IfaceDecl] -> Maybe NameSet -> [IfaceDecl]
-updateDeclCafInfos decls Nothing = decls
-updateDeclCafInfos decls (Just non_cafs) = map update_decl decls
+updateDecl :: [IfaceDecl] -> Maybe CgInfos -> [IfaceDecl]
+updateDecl decls Nothing = decls
+updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf_infos }) = map update_decl decls
   where
+    update_decl (IfaceId nm ty details infos)
+      | let not_caffy = elemNameSet nm non_cafs
+      , let mb_lf_info = lookupNameEnv lf_infos nm
+      , WARN( isNothing mb_lf_info, text "Name without LFInfo:" <+> ppr nm ) True
+        -- Only allocate a new IfaceId if we're going to update the infos
+      , isJust mb_lf_info || not_caffy
+      = IfaceId nm ty details $
+          (if not_caffy then (HsNoCafRefs :) else id)
+          (case mb_lf_info of
+             Nothing -> infos -- LFInfos not available when building .cmm files
+             Just lf_info -> HsLFInfo (toIfaceLFInfo nm lf_info) : infos)
+
     update_decl decl
-      | IfaceId nm ty details infos <- decl
-      , elemNameSet nm non_cafs
-      = IfaceId nm ty details (HsNoCafRefs : infos)
-      | otherwise
       = decl
 
 -- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
--- object code at all ('HscNothing').
+-- object code at all ('NoBackend').
 mkIfaceTc :: HscEnv
           -> SafeHaskellMode    -- The safe haskell mode
           -> ModDetails         -- gotten from mkBootModDetails, probably
@@ -150,10 +193,9 @@ mkIfaceTc hsc_env safe_mode mod_details
                     }
   = do
           let used_names = mkUsedNames tc_result
-          let pluginModules =
-                map lpModule (cachedPlugins (hsc_dflags hsc_env))
-          deps <- mkDependencies
-                    (thisInstalledUnitId (hsc_dflags hsc_env))
+          let pluginModules = map lpModule (cachedPlugins (hsc_dflags hsc_env))
+          let home_unit = hsc_home_unit hsc_env
+          deps <- mkDependencies (homeUnitId home_unit)
                     (map mi_module pluginModules) tc_result
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used
@@ -201,16 +243,18 @@ mkIface_ hsc_env
                       md_anns      = anns,
                       md_types     = type_env,
                       md_exports   = exports,
-                      md_complete_sigs = complete_sigs }
+                      md_complete_matches = complete_matches }
 -- NB:  notice that mkIface does not look at the bindings
 --      only at the TypeEnv.  The previous Tidy phase has
 --      put exactly the info into the TypeEnv that we want
 --      to expose in the interface
 
   = do
-    let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
+    let home_unit    = hsc_home_unit hsc_env
+        semantic_mod = homeModuleNameInstantiation home_unit (moduleName this_mod)
         entities = typeEnvElts type_env
-        decls  = [ tyThingToIfaceDecl entity
+        show_linear_types = xopt LangExt.LinearTypes (hsc_dflags hsc_env)
+        decls  = [ tyThingToIfaceDecl show_linear_types entity
                  | entity <- entities,
                    let name = getName entity,
                    not (isImplicitTyThing entity),
@@ -235,7 +279,7 @@ mkIface_ hsc_env
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
-        icomplete_sigs = map mkIfaceCompleteSig complete_sigs
+        icomplete_matches = map mkIfaceCompleteMatch complete_matches
 
     ModIface {
           mi_module      = this_mod,
@@ -264,14 +308,14 @@ mkIface_ hsc_env
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,
-          mi_complete_sigs = icomplete_sigs,
+          mi_complete_matches = icomplete_matches,
           mi_doc_hdr     = doc_hdr,
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
           mi_final_exts  = (),
           mi_ext_fields  = emptyExtensibleFields }
   where
-     cmp_rule     = comparing ifRuleName
+     cmp_rule     = lexicalCompareFS `on` ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
      -- because the latter is not stable across compilations:
      cmp_inst     = comparing (nameOccName . ifDFun)
@@ -287,8 +331,8 @@ mkIface_ hsc_env
      -- scope available. (#5534)
      maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe GlobalRdrEnv
      maybeGlobalRdrEnv rdr_env
-         | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
-         | otherwise                                   = Nothing
+         | backendRetainsAllBindings (backend dflags) = Just rdr_env
+         | otherwise                                  = Nothing
 
      ifFamInstTcName = ifFamInstFam
 
@@ -301,8 +345,9 @@ mkIface_ hsc_env
 ************************************************************************
 -}
 
-mkIfaceCompleteSig :: CompleteMatch -> IfaceCompleteMatch
-mkIfaceCompleteSig (CompleteMatch cls tc) = IfaceCompleteMatch cls tc
+mkIfaceCompleteMatch :: CompleteMatch -> IfaceCompleteMatch
+mkIfaceCompleteMatch cls =
+  IfaceCompleteMatch (map conLikeName (uniqDSetToList cls))
 
 
 {-
@@ -350,16 +395,6 @@ That is, in Y,
 
 In the result of mkIfaceExports, the names are grouped by defining module,
 so we may need to split up a single Avail into multiple ones.
-
-Note [Internal used_names]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Most of the used_names are External Names, but we can have Internal
-Names too: see Note [Binders in Template Haskell] in Convert, and
-#5362 for an example.  Such Names are always
-  - Such Names are always for locally-defined things, for which we
-    don't gather usage info, so we can just ignore them in ent_map
-  - They are always System Names, hence the assert, just as a double check.
-
 -}
 
 
@@ -371,12 +406,12 @@ Names too: see Note [Binders in Template Haskell] in Convert, and
 ************************************************************************
 -}
 
-tyThingToIfaceDecl :: TyThing -> IfaceDecl
-tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
-tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
-tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
-tyThingToIfaceDecl (AConLike cl)  = case cl of
-    RealDataCon dc -> dataConToIfaceDecl dc -- for ppr purposes only
+tyThingToIfaceDecl :: Bool -> TyThing -> IfaceDecl
+tyThingToIfaceDecl _ (AnId id)      = idToIfaceDecl id
+tyThingToIfaceDecl _ (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
+tyThingToIfaceDecl _ (ACoAxiom ax)  = coAxiomToIfaceDecl ax
+tyThingToIfaceDecl show_linear_types (AConLike cl)  = case cl of
+    RealDataCon dc -> dataConToIfaceDecl show_linear_types dc -- for ppr purposes only
     PatSynCon ps   -> patSynToIfaceDecl ps
 
 --------------------------
@@ -392,10 +427,10 @@ idToIfaceDecl id
               ifIdInfo    = toIfaceIdInfo (idInfo id) }
 
 --------------------------
-dataConToIfaceDecl :: DataCon -> IfaceDecl
-dataConToIfaceDecl dataCon
+dataConToIfaceDecl :: Bool -> DataCon -> IfaceDecl
+dataConToIfaceDecl show_linear_types dataCon
   = IfaceId { ifName      = getName dataCon,
-              ifType      = toIfaceType (dataConUserType dataCon),
+              ifType      = toIfaceType (dataConDisplayType show_linear_types dataCon),
               ifIdDetails = IfVanillaId,
               ifIdInfo    = [] }
 
@@ -542,7 +577,9 @@ tyConToIfaceDecl env tycon
                     ifConUserTvBinders = map toIfaceForAllBndr user_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
-                    ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
+                    ifConArgTys  =
+                      map (\(Scaled w t) -> (tidyToIfaceType con_env2 w
+                                          , (tidyToIfaceType con_env2 t))) arg_tys,
                     ifConFields  = dataConFieldLabels data_con,
                     ifConStricts = map (toIfaceBang con_env2)
                                        (dataConImplBangs data_con),
@@ -574,7 +611,7 @@ tyConToIfaceDecl env tycon
           -- tidying produced. Therefore, tidying the user-written tyvars is a
           -- simple matter of looking up each variable in the substitution,
           -- which tidyTyCoVarOcc accomplishes.
-          tidyUserTyCoVarBinder :: TidyEnv -> TyCoVarBinder -> TyCoVarBinder
+          tidyUserTyCoVarBinder :: TidyEnv -> InvisTVBinder -> InvisTVBinder
           tidyUserTyCoVarBinder env (Bndr tv vis) =
             Bndr (tidyTyCoVarOcc env tv) vis
 

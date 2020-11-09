@@ -11,9 +11,10 @@ module Main where
 
 import GHC
 import GHC.Driver.Session
-import MonadUtils ( MonadIO(..) )
+import GHC.Driver.Backend
+import GHC.Utils.Monad ( MonadIO(..) )
 import GHC.Types.Basic ( failed )
-import Bag        ( bagToList )
+import GHC.Data.Bag        ( bagToList )
 import System.Environment
 import Control.Monad
 import System.IO
@@ -24,8 +25,8 @@ main = do
     dflags0 <- getSessionDynFlags
     (dflags, _, _) <- parseDynamicFlags dflags0
       (map (mkGeneralLocated "on the commandline") args)
-    setSessionDynFlags $ dflags { hscTarget = HscNothing
-                                , ghcLink  = LinkInMemory
+    setSessionDynFlags $ dflags { backend   = NoBackend
+                                , ghcLink   = LinkInMemory
                                 , verbosity = 0 -- silence please
                                 }
     root_mod <- guessTarget "A.hs" Nothing
@@ -35,7 +36,7 @@ main = do
     prn "target nothing: ok"
 
     dflags <- getSessionDynFlags
-    setSessionDynFlags $ dflags { hscTarget = HscInterpreted }
+    setSessionDynFlags $ dflags { backend = Interpreter }
     ok <- load LoadAllTargets
     when (failed ok) $ error "Couldn't load A.hs in interpreted mode"
     prn "target interpreted: ok"

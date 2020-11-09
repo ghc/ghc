@@ -1,6 +1,7 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
-             PolyKinds #-}
+             PolyKinds, NegativeLiterals, DataKinds #-}
+-- NegativeLiterals: see Note [Fixity of (->)]
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -29,7 +30,7 @@ module GHC.Types (
         Ordering(..), IO(..),
         isTrue#,
         SPEC(..),
-        Nat, Symbol,
+        Symbol,
         Any,
         type (~~), Coercible,
         TYPE, RuntimeRep(..), Type, Constraint,
@@ -37,15 +38,43 @@ module GHC.Types (
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
         VecCount(..), VecElem(..),
+        Void#,
 
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
-        KindRep(..), KindBndr
+        KindRep(..), KindBndr,
+
+        -- * Multiplicity Types
+        Multiplicity(..), MultMul
     ) where
 
 import GHC.Prim
 
 infixr 5 :
+
+
+{- *********************************************************************
+*                                                                      *
+                  Functions
+*                                                                      *
+********************************************************************* -}
+
+infixr -1 ->
+{-
+Note [Fixity of (->)]
+~~~~~~~~~~~~~~~~~~~~~
+This declaration is important for :info (->) command (issue #10145)
+1) The parser parses -> as if it had lower fixity than 0,
+   so we conventionally use -1 (issue #15235).
+2) Fixities outside the 0-9 range are exceptionally allowed
+   for (->) (see checkPrecP in RdrHsSyn)
+3) The negative fixity -1 must be parsed as a single token,
+   hence this module requires NegativeLiterals.
+-}
+
+-- | The regular function type
+type (->) = FUN 'Many
+-- See Note [Linear Types] in Multiplicity
 
 {- *********************************************************************
 *                                                                      *
@@ -59,14 +88,19 @@ data Constraint
 -- | The kind of types with lifted values. For example @Int :: Type@.
 type Type = TYPE 'LiftedRep
 
+data Multiplicity = Many | One
+
+type family MultMul (a :: Multiplicity) (b :: Multiplicity) :: Multiplicity where
+  MultMul 'One x = x
+  MultMul x 'One = x
+  MultMul 'Many x = 'Many
+  MultMul x 'Many = 'Many
+
 {- *********************************************************************
 *                                                                      *
-                  Nat and Symbol
+                  Symbol
 *                                                                      *
 ********************************************************************* -}
-
--- | (Kind) This is the kind of type-level natural numbers.
-data Nat
 
 -- | (Kind) This is the kind of type-level symbols.
 -- Declared here because class IP needs it
@@ -185,13 +219,6 @@ or the 'Prelude.>>' and 'Prelude.>>=' operations from the 'Prelude.Monad'
 class.
 -}
 newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
-type role IO representational
-
-{- The 'type role' role annotation for IO is redundant but is included
-because this role is significant in the normalisation of FFI
-types. Specifically, if this role were to become nominal (which would
-be very strange, indeed!), changes elsewhere in GHC would be
-necessary. See [FFI type roles] in GHC.Tc.Gen.Foreign.  -}
 
 
 {- *********************************************************************
@@ -226,13 +253,20 @@ inside GHC, to change the kind and type.
 -- about the difference between heterogeneous equality @~~@ and
 -- homogeneous equality @~@, this is printed as @~@ unless
 -- @-fprint-equality-relations@ is set.
+--
+-- In @0.7.0@, the fixity was set to @infix 4@ to match the fixity of 'Data.Type.Equality.:~~:'.
 class a ~~ b
+
   -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 
 -- | Lifted, homogeneous equality. By lifted, we mean that it
 -- can be bogus (deferred type error). By homogeneous, the two
 -- types @a@ and @b@ must have the same kinds.
+
+-- In @0.7.0@, the fixity was set to @infix 4@ to match the fixity of 'Data.Type.Equality.:~:'.
 class a ~ b
+
+infix 4 ~, ~~
   -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 
 -- | @Coercible@ is a two-parameter class that has instances for types @a@ and @b@ if
@@ -433,6 +467,9 @@ data VecElem = Int8ElemRep
              | DoubleElemRep
 -- Enum, Bounded instances in GHC.Enum
 
+{-# DEPRECATED Void# "Void# is now an alias for the unboxed tuple (# #)." #-}
+type Void# = (# #)
+
 {- *********************************************************************
 *                                                                      *
              Runtime representation of TyCon
@@ -459,12 +496,12 @@ can't conveniently come up with an Addr#.
 #include "MachDeps.h"
 
 data Module = Module
-                TrName   -- Package name
-                TrName   -- Module name
+                TrName   -- ^ Package name
+                TrName   -- ^ Module name
 
 data TrName
-  = TrNameS Addr#  -- Static
-  | TrNameD [Char] -- Dynamic
+  = TrNameS Addr#  -- ^ Static
+  | TrNameD [Char] -- ^ Dynamic
 
 -- | A de Bruijn index for a binder within a 'KindRep'.
 type KindBndr = Int
@@ -491,8 +528,9 @@ data TypeLitSort = TypeLitSymbol
                  | TypeLitNat
 
 -- Show instance for TyCon found in GHC.Show
-data TyCon = TyCon WORD64_TY WORD64_TY   -- Fingerprint
-                   Module                -- Module in which this is defined
-                   TrName                -- Type constructor name
-                   Int#                  -- How many kind variables do we accept?
-                   KindRep               -- A representation of the type's kind
+data TyCon = TyCon WORD64_TY  -- ^ Fingerprint (high)
+                   WORD64_TY  -- ^ Fingerprint (low)
+                   Module     -- ^ Module in which this is defined
+                   TrName     -- ^ Type constructor name
+                   Int#       -- ^ How many kind variables do we accept?
+                   KindRep    -- ^ A representation of the type's kind

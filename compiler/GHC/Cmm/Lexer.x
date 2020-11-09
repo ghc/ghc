@@ -15,18 +15,19 @@ module GHC.Cmm.Lexer (
    CmmToken(..), cmmlex,
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.Expr
 
 import GHC.Parser.Lexer
-import GHC.Cmm.Monad
+import GHC.Cmm.Parser.Monad
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
-import StringBuffer
-import FastString
+import GHC.Data.StringBuffer
+import GHC.Data.FastString
 import GHC.Parser.CharClass
-import Util
+import GHC.Parser.Errors
+import GHC.Utils.Misc
 --import TRACE
 
 import Data.Word
@@ -325,7 +326,7 @@ lexToken = do
     AlexEOF -> do let span = mkPsSpan loc1 loc1
                   liftP (setLastToken span 0)
                   return (L span CmmT_EOF)
-    AlexError (loc2,_) -> liftP $ failLocMsgP (psRealLoc loc1) (psRealLoc loc2) "lexical error"
+    AlexError (loc2,_) -> liftP $ failLocMsgP (psRealLoc loc1) (psRealLoc loc2) (Error ErrCmmLexer [])
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken

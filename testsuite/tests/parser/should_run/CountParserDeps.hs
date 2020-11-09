@@ -10,27 +10,31 @@ module Main(main) where
 -- provided with as small a number of modules as possible for when the
 -- need exists to produce ASTs and nothing more.
 
-import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Driver.Env
+import GHC.Unit.Module
 import GHC.Driver.Session
 import GHC.Driver.Main
 import GHC
-import Util
+import GHC.Utils.Misc
 import Data.Maybe
 import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment
 import System.Exit
 import GHC.Types.Unique.Set
+import GHC.Unit.Module.Deps
 
 main :: IO ()
 main = do
   [libdir] <- getArgs
   modules <- parserDeps libdir
   let num = sizeUniqSet modules
---  print num
---  print (map moduleNameString $ nonDetEltsUniqSet modules)
-  unless (num < 190) $ exitWith (ExitFailure num)
+      max_num = 234
+      min_num = max_num - 10 -- so that we don't forget to change the number
+                             -- when the number of dependencies decreases
+  -- putStrLn $ "Found " ++ show num ++ " parser module dependencies"
+  -- forM_ (map moduleNameString $ nonDetEltsUniqSet modules) putStrLn
+  unless (num <= max_num && num >= min_num) $ exitWith (ExitFailure num)
 
 parserDeps :: FilePath -> IO (UniqSet ModuleName)
 parserDeps libdir =
@@ -56,7 +60,7 @@ parserDeps libdir =
     loop _ modules [] = return modules
 
     mkModule :: ModuleName -> Module
-    mkModule = Module (stringToUnitId "ghc")
+    mkModule = Module (stringToUnit "ghc")
 
     modDeps :: ModIface -> [ModuleName]
-    modDeps mi = map fst $ dep_mods (mi_deps mi)
+    modDeps mi = map gwib_mod $ dep_mods (mi_deps mi)

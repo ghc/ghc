@@ -105,6 +105,7 @@ test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
 test('ghci063', normal, ghci_script, ['ghci063.script'])
 test('ghci064', normal, ghci_script, ['ghci064.script'])
 test('ghci065', [extra_hc_opts("-haddock")], ghci_script, ['ghci065.script'])
+test('ghci066', normal, ghci_script, ['ghci066.script'])
 test('T2452', [extra_hc_opts("-fno-implicit-import-qualified")],
     ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
@@ -140,8 +141,11 @@ test('T5979',
      normalise_slashes,
      normalise_version("transformers")],
     ghci_script, ['T5979.script'])
-test('T5975a', [pre_cmd('touch föøbàr1.hs')], ghci_script, ['T5975a.script'])
-test('T5975b', [pre_cmd('touch föøbàr2.hs'), extra_hc_opts('föøbàr2.hs')],
+test('T5975a',
+     pre_cmd('touch föøbàr1.hs'),
+     ghci_script, ['T5975a.script'])
+test('T5975b',
+     [pre_cmd('touch föøbàr2.hs'), extra_hc_opts('föøbàr2.hs')],
      ghci_script, ['T5975b.script'])
 test('T6027ghci', normal, ghci_script, ['T6027ghci.script'])
 
@@ -170,6 +174,7 @@ test('T7872', normal, ghci_script, ['T7872.script'])
 test('T7873', normal, ghci_script, ['T7873.script'])
 test('T7939', normal, ghci_script, ['T7939.script'])
 test('T7894', normal, ghci_script, ['T7894.script'])
+test('T8042', normal, ghci_script, ['T8042.script'])
 test('T8116', normal, ghci_script, ['T8116.script'])
 test('T8113', normal, ghci_script, ['T8113.script'])
 test('T8172', when(opsys('mingw32'), normalise_drive_letter),
@@ -274,6 +279,7 @@ test('T13591', expect_broken(13591), ghci_script, ['T13591.script'])
 test('T13699', normal, ghci_script, ['T13699.script'])
 test('T13988', normal, ghci_script, ['T13988.script'])
 test('T13407', normal, ghci_script, ['T13407.script'])
+test('T13795', normal, ghci_script, ['T13795.script'])
 test('T13963', normal, ghci_script, ['T13963.script'])
 test('T14342', [extra_hc_opts("-XOverloadedStrings -XRebindableSyntax")],
                ghci_script, ['T14342.script'])
@@ -313,3 +319,8 @@ test('T17384', normal, ghci_script, ['T17384.script'])
 test('T17403', normal, ghci_script, ['T17403.script'])
 test('T17431', normal, ghci_script, ['T17431.script'])
 test('T17549', normal, ghci_script, ['T17549.script'])
+test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code'), expect_broken(17669)], ghci_script, ['T17669.script'])
+test('T18501', normal, ghci_script, ['T18501.script'])
+test('T18644', normal, ghci_script, ['T18644.script'])
+test('T18755', normal, ghci_script, ['T18755.script'])
+test('T18828', normal, ghci_script, ['T18828.script'])

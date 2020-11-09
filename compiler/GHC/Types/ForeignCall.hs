@@ -18,13 +18,14 @@ module GHC.Types.ForeignCall (
         Header(..), CType(..),
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import FastString
-import Binary
-import Outputable
-import GHC.Types.Module
-import GHC.Types.Basic ( SourceText, pprWithSourceText )
+import GHC.Data.FastString
+import GHC.Utils.Binary
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Unit.Module
+import GHC.Types.SourceText ( SourceText, pprWithSourceText )
 
 import Data.Char
 import Data.Data
@@ -49,20 +50,27 @@ instance Outputable ForeignCall where
   ppr (CCall cc)  = ppr cc
 
 data Safety
-  = PlaySafe            -- Might invoke Haskell GC, or do a call back, or
-                        -- switch threads, etc.  So make sure things are
-                        -- tidy before the call. Additionally, in the threaded
-                        -- RTS we arrange for the external call to be executed
-                        -- by a separate OS thread, i.e., _concurrently_ to the
-                        -- execution of other Haskell threads.
+  = PlaySafe          -- ^ Might invoke Haskell GC, or do a call back, or
+                      --   switch threads, etc.  So make sure things are
+                      --   tidy before the call. Additionally, in the threaded
+                      --   RTS we arrange for the external call to be executed
+                      --   by a separate OS thread, i.e., _concurrently_ to the
+                      --   execution of other Haskell threads.
 
-  | PlayInterruptible   -- Like PlaySafe, but additionally
-                        -- the worker thread running this foreign call may
-                        -- be unceremoniously killed, so it must be scheduled
-                        -- on an unbound thread.
+  | PlayInterruptible -- ^ Like PlaySafe, but additionally
+                      --   the worker thread running this foreign call may
+                      --   be unceremoniously killed, so it must be scheduled
+                      --   on an unbound thread.
 
-  | PlayRisky           -- None of the above can happen; the call will return
-                        -- without interacting with the runtime system at all
+  | PlayRisky         -- ^ None of the above can happen; the call will return
+                      --   without interacting with the runtime system at all.
+                      --   Specifically:
+                      --
+                      --     * No GC
+                      --     * No call backs
+                      --     * No blocking
+                      --     * No precise exceptions
+                      --
   deriving ( Eq, Show, Data )
         -- Show used just for Show Lex.Token, I think
 
@@ -91,7 +99,7 @@ playInterruptible _ = False
 data CExportSpec
   = CExportStatic               -- foreign export ccall foo :: ty
         SourceText              -- of the CLabelString.
-                                -- See note [Pragma source text] in GHC.Types.Basic
+                                -- See note [Pragma source text] in GHC.Types.SourceText
         CLabelString            -- C Name of exported function
         CCallConv
   deriving Data
@@ -109,10 +117,10 @@ data CCallTarget
   -- An "unboxed" ccall# to named function in a particular package.
   = StaticTarget
         SourceText                -- of the CLabelString.
-                                  -- See note [Pragma source text] in GHC.Types.Basic
+                                  -- See note [Pragma source text] in GHC.Types.SourceText
         CLabelString                    -- C-land name of label.
 
-        (Maybe UnitId)              -- What package the function is in.
+        (Maybe Unit)                    -- What package the function is in.
                                         -- If Nothing, then it's taken to be in the current package.
                                         -- Note: This information is only used for PrimCalls on Windows.
                                         --       See CLabel.labelDynamic and CoreToStg.coreToStgApp
@@ -218,7 +226,7 @@ instance Outputable CCallSpec where
         = text "__dyn_ccall" <> gc_suf <+> text "\"\""
 
 -- The filename for a C header file
--- Note [Pragma source text] in GHC.Types.Basic
+-- Note [Pragma source text] in GHC.Types.SourceText
 data Header = Header SourceText FastString
     deriving (Eq, Data)
 
@@ -227,12 +235,12 @@ instance Outputable Header where
 
 -- | A C type, used in CAPI FFI calls
 --
---  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CTYPE'@,
---        'ApiAnnotation.AnnHeader','ApiAnnotation.AnnVal',
---        'ApiAnnotation.AnnClose' @'\#-}'@,
+--  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{-\# CTYPE'@,
+--        'GHC.Parser.Annotation.AnnHeader','GHC.Parser.Annotation.AnnVal',
+--        'GHC.Parser.Annotation.AnnClose' @'\#-}'@,
 
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
-data CType = CType SourceText -- Note [Pragma source text] in GHC.Types.Basic
+-- For details on above see note [Api annotations] in "GHC.Parser.Annotation"
+data CType = CType SourceText -- Note [Pragma source text] in GHC.Types.SourceText
                    (Maybe Header) -- header to include for this type
                    (SourceText,FastString) -- the type itself
     deriving (Eq, Data)
@@ -258,18 +266,18 @@ instance Binary ForeignCall where
     get bh = do aa <- get bh; return (CCall aa)
 
 instance Binary Safety where
-    put_ bh PlaySafe = do
+    put_ bh PlaySafe =
             putByte bh 0
-    put_ bh PlayInterruptible = do
+    put_ bh PlayInterruptible =
             putByte bh 1
-    put_ bh PlayRisky = do
+    put_ bh PlayRisky =
             putByte bh 2
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return PlaySafe
-              1 -> do return PlayInterruptible
-              _ -> do return PlayRisky
+              0 -> return PlaySafe
+              1 -> return PlayInterruptible
+              _ -> return PlayRisky
 
 instance Binary CExportSpec where
     put_ bh (CExportStatic ss aa ab) = do
@@ -300,7 +308,7 @@ instance Binary CCallTarget where
             put_ bh aa
             put_ bh ab
             put_ bh ac
-    put_ bh DynamicTarget = do
+    put_ bh DynamicTarget =
             putByte bh 1
     get bh = do
             h <- getByte bh
@@ -310,27 +318,27 @@ instance Binary CCallTarget where
                       ab <- get bh
                       ac <- get bh
                       return (StaticTarget ss aa ab ac)
-              _ -> do return DynamicTarget
+              _ -> return DynamicTarget
 
 instance Binary CCallConv where
-    put_ bh CCallConv = do
+    put_ bh CCallConv =
             putByte bh 0
-    put_ bh StdCallConv = do
+    put_ bh StdCallConv =
             putByte bh 1
-    put_ bh PrimCallConv = do
+    put_ bh PrimCallConv =
             putByte bh 2
-    put_ bh CApiConv = do
+    put_ bh CApiConv =
             putByte bh 3
-    put_ bh JavaScriptCallConv = do
+    put_ bh JavaScriptCallConv =
             putByte bh 4
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return CCallConv
-              1 -> do return StdCallConv
-              2 -> do return PrimCallConv
-              3 -> do return CApiConv
-              _ -> do return JavaScriptCallConv
+              0 -> return CCallConv
+              1 -> return StdCallConv
+              2 -> return PrimCallConv
+              3 -> return CApiConv
+              _ -> return JavaScriptCallConv
 
 instance Binary CType where
     put_ bh (CType s mh fs) = do put_ bh s

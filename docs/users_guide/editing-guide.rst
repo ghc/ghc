@@ -228,7 +228,7 @@ For instance,
 
 .. code-block:: rest
 
-    See the documentation for :base-ref:`Control.Applicative <Control-Applicative.html>`
+    See the documentation for :base-ref:`Control.Applicative.`
     for details.
 
 Math

@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -6,17 +11,11 @@
 Pattern-matching constructors
 -}
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 module GHC.HsToCore.Match.Constructor ( matchConFamily, matchPatSyn ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.HsToCore.Match ( match )
 
@@ -25,16 +24,18 @@ import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Types.Basic ( Origin(..) )
 import GHC.Tc.Utils.TcType
+import GHC.Core.Multiplicity
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 import GHC.Core ( CoreExpr )
 import GHC.Core.Make ( mkCoreLets )
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Id
 import GHC.Types.Name.Env
 import GHC.Types.FieldLabel ( flSelector )
 import GHC.Types.SrcLoc
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import Control.Monad(liftM)
 import Data.List (groupBy)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -98,7 +99,13 @@ matchConFamily :: NonEmpty Id
                -> DsM (MatchResult CoreExpr)
 -- Each group of eqns is for a single constructor
 matchConFamily (var :| vars) ty groups
-  = do alts <- mapM (fmap toRealAlt . matchOneConLike vars ty) groups
+  = do let mult = idMult var
+           -- Each variable in the argument list correspond to one column in the
+           -- pattern matching equations. Its multiplicity is the context
+           -- multiplicity of the pattern. We extract that multiplicity, so that
+           -- 'matchOneconLike' knows the context multiplicity, in case it needs
+           -- to come up with new variables.
+       alts <- mapM (fmap toRealAlt . matchOneConLike vars ty mult) groups
        return (mkCoAlgCaseMatchResult var ty alts)
   where
     toRealAlt alt = case alt_pat alt of
@@ -110,20 +117,22 @@ matchPatSyn :: NonEmpty Id
             -> NonEmpty EquationInfo
             -> DsM (MatchResult CoreExpr)
 matchPatSyn (var :| vars) ty eqns
-  = do alt <- fmap toSynAlt $ matchOneConLike vars ty eqns
+  = do let mult = idMult var
+       alt <- fmap toSynAlt $ matchOneConLike vars ty mult eqns
        return (mkCoSynCaseMatchResult var ty alt)
   where
     toSynAlt alt = case alt_pat alt of
         PatSynCon psyn -> alt{ alt_pat = psyn }
         _ -> panic "matchPatSyn: not PatSynCon"
 
-type ConArgPats = HsConDetails (LPat GhcTc) (HsRecFields GhcTc (LPat GhcTc))
+type ConArgPats = HsConPatDetails GhcTc
 
 matchOneConLike :: [Id]
                 -> Type
+                -> Mult
                 -> NonEmpty EquationInfo
                 -> DsM (CaseAlt ConLike)
-matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
+matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single constructor
   = do  { let inst_tys = ASSERT( all tcIsTcTyVar ex_tvs )
                            -- ex_tvs can only be tyvars as data types in source
                            -- Haskell cannot mention covar yet (Aug 2018).
@@ -145,9 +154,16 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
                      ; return $ foldr1 (.) wraps <$> match_result
                      }
 
-              shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds,
-                                                             pat_binds = bind, pat_args = args
-                                                  } : pats }))
+              shift (_, eqn@(EqnInfo
+                             { eqn_pats = ConPat
+                               { pat_args = args
+                               , pat_con_ext = ConPatTc
+                                 { cpt_tvs = tvs
+                                 , cpt_dicts = ds
+                                 , cpt_binds = bind
+                                 }
+                               } : pats
+                             }))
                 = do ds_bind <- dsTcEvBinds bind
                      return ( wrapBinds (tvs `zip` tvs1)
                             . wrapBinds (ds  `zip` dicts1)
@@ -156,8 +172,15 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
                                   , eqn_pats = conArgPats val_arg_tys args ++ pats }
                             )
               shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
-
-        ; arg_vars <- selectConMatchVars val_arg_tys args1
+        ; let scaled_arg_tys = map (scaleScaled mult) val_arg_tys
+            -- The 'val_arg_tys' are taken from the data type definition, they
+            -- do not take into account the context multiplicity, therefore we
+            -- need to scale them back to get the correct context multiplicity
+            -- to desugar the sub-pattern in each field. We need to know these
+            -- multiplicity because of the invariant that, in Core, binders in a
+            -- constructor pattern must be scaled by the multiplicity of the
+            -- case. See Note [Case expression invariants].
+        ; arg_vars <- selectConMatchVars scaled_arg_tys args1
                 -- Use the first equation as a source of
                 -- suggestions for the new variables
 
@@ -173,10 +196,15 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
-    ConPatOut { pat_con = L _ con1
-              , pat_arg_tys = arg_tys, pat_wrap = wrapper1,
-                pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
-              = firstPat eqn1
+    ConPat { pat_con = L _ con1
+           , pat_args = args1
+           , pat_con_ext = ConPatTc
+             { cpt_arg_tys = arg_tys
+             , cpt_wrap = wrapper1
+             , cpt_tvs = tvs1
+             , cpt_dicts = dicts1
+             }
+           } = firstPat eqn1
     fields1 = map flSelector (conLikeFieldLabels con1)
 
     ex_tvs = conLikeExTyCoVars con1
@@ -217,12 +245,15 @@ same_fields flds1 flds2
 
 
 -----------------
-selectConMatchVars :: [Type] -> ConArgPats -> DsM [Id]
-selectConMatchVars arg_tys (RecCon {})      = newSysLocalsDsNoLP arg_tys
-selectConMatchVars _       (PrefixCon ps)   = selectMatchVars (map unLoc ps)
-selectConMatchVars _       (InfixCon p1 p2) = selectMatchVars [unLoc p1, unLoc p2]
+selectConMatchVars :: [Scaled Type] -> ConArgPats -> DsM [Id]
+selectConMatchVars arg_tys con = case con of
+                                   (RecCon {}) -> newSysLocalsDsNoLP arg_tys
+                                   (PrefixCon ps) -> selectMatchVars (zipMults arg_tys ps)
+                                   (InfixCon p1 p2) -> selectMatchVars (zipMults arg_tys [p1, p2])
+  where
+    zipMults = zipWithEqual "selectConMatchVar" (\a b -> (scaledMult a, unLoc b))
 
-conArgPats :: [Type]      -- Instantiated argument types
+conArgPats :: [Scaled Type]-- Instantiated argument types
                           -- Used only to fill in the types of WildPats, which
                           -- are probably never looked at anyway
            -> ConArgPats
@@ -230,7 +261,7 @@ conArgPats :: [Type]      -- Instantiated argument types
 conArgPats _arg_tys (PrefixCon ps)   = map unLoc ps
 conArgPats _arg_tys (InfixCon p1 p2) = [unLoc p1, unLoc p2]
 conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
-  | null rpats = map WildPat arg_tys
+  | null rpats = map WildPat (map scaledThing arg_tys)
         -- Important special case for C {}, which can be used for a
         -- datacon that isn't declared to have fields at all
   | otherwise  = map (unLoc . hsRecFieldArg . unLoc) rpats

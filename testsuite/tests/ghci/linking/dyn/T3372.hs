@@ -11,7 +11,7 @@ import Control.Concurrent.Chan
 
 import GHC ( Ghc )
 import qualified GHC
-import qualified MonadUtils as GHC
+import qualified GHC.Utils.Monad as GHC
 
 import qualified GHC.Exts
 
@@ -41,7 +41,7 @@ newGhcServer = do (libdir:_) <- getArgs
   where ghc action libdir = GHC.runGhc (Just libdir) (init >> action)
         init = do df <- GHC.getSessionDynFlags
                   GHC.setSessionDynFlags df{GHC.ghcMode    = GHC.CompManager,
-                                            GHC.hscTarget  = GHC.HscInterpreted,
+                                            GHC.backend    = GHC.Interpreter,
                                             GHC.ghcLink    = GHC.LinkInMemory,
                                             GHC.verbosity  = 0}
 

@@ -9,8 +9,8 @@ module Settings.Default (
     SourceArgs (..), sourceArgs, defaultBuilderArgs, defaultPackageArgs,
     defaultArgs,
 
-    -- * Default build flavour
-    defaultFlavour
+    -- * Default build flavour and BigNum backend
+    defaultFlavour, defaultBignumBackend
     ) where
 
 import qualified Hadrian.Builder.Ar
@@ -23,7 +23,6 @@ import Expression
 import Flavour
 import Oracles.Flag
 import Packages
-import Settings
 import Settings.Builders.Alex
 import Settings.Builders.DeriveConstants
 import Settings.Builders.Cabal
@@ -38,6 +37,7 @@ import Settings.Builders.Hsc2Hs
 import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Builders.Make
+import Settings.Builders.MergeObjects
 import Settings.Builders.RunTest
 import Settings.Builders.Xelatex
 import Settings.Packages
@@ -50,6 +50,10 @@ defaultPackages Stage1 = stage1Packages
 defaultPackages Stage2 = stage2Packages
 defaultPackages Stage3 = return []
 
+-- | Default bignum backend.
+defaultBignumBackend :: String
+defaultBignumBackend = "gmp"
+
 -- | Packages built in 'Stage0' by default. You can change this in "UserSettings".
 stage0Packages :: Action [Package]
 stage0Packages = do
@@ -59,6 +63,7 @@ stage0Packages = do
              , compareSizes
              , compiler
              , deriveConstants
+             , exceptions
              , genapply
              , genprimopcode
              , ghc
@@ -80,11 +85,11 @@ stage0Packages = do
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]
           ++ [ touchy   | windowsHost                ]
+          ++ [ hp2ps    | cross                      ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
 stage1Packages :: Action [Package]
 stage1Packages = do
-    intLib     <- integerLibrary =<< flavour
     libraries0 <- filter isLibrary <$> stage0Packages
     cross      <- flag CrossCompiling
     return $ libraries0 -- Build all Stage0 libraries in Stage1
@@ -97,13 +102,14 @@ stage1Packages = do
              , exceptions
              , filepath
              , ghc
+             , ghcBignum
              , ghcCompact
              , ghcPkg
              , ghcPrim
              , haskeline
              , hp2ps
              , hsc2hs
-             , intLib
+             , integerGmp
              , pretty
              , process
              , rts
@@ -200,7 +206,8 @@ defaultFlavour = Flavour
     { name               = "default"
     , args               = defaultArgs
     , packages           = defaultPackages
-    , integerLibrary     = (\x -> if x then integerSimple else integerGmp) <$> cmdIntegerSimple
+    , bignumBackend      = defaultBignumBackend
+    , bignumCheck        = False
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays
     , dynamicGhcPrograms = defaultDynamicGhcPrograms
@@ -238,6 +245,7 @@ defaultBuilderArgs = mconcat
     , hsCppBuilderArgs
     , ldBuilderArgs
     , makeBuilderArgs
+    , mergeObjectsBuilderArgs
     , runTestBuilderArgs
     , validateBuilderArgs
     , xelatexBuilderArgs

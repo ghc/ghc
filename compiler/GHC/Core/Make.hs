@@ -13,8 +13,8 @@ module GHC.Core.Make (
         sortQuantVars, castBottomExpr,
 
         -- * Constructing boxed literals
-        mkWordExpr, mkWordExprWord,
-        mkIntExpr, mkIntExprInt,
+        mkWordExpr,
+        mkIntExpr, mkIntExprInt, mkUncheckedIntExpr,
         mkIntegerExpr, mkNaturalExpr,
         mkFloatExpr, mkDoubleExpr,
         mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
@@ -54,36 +54,40 @@ module GHC.Core.Make (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+import GHC.Platform
 
 import GHC.Types.Id
 import GHC.Types.Var  ( EvVar, setTyVarUnique )
-
-import GHC.Core
-import GHC.Core.Utils ( exprType, needsCaseBinding, mkSingleAltCase, bindNonRec )
-import GHC.Types.Literal
-import GHC.Driver.Types
-import GHC.Platform
-
-import GHC.Builtin.Types
-import GHC.Builtin.Names
-
-import GHC.Hs.Utils      ( mkChunkified, chunkify )
-import GHC.Core.Type
-import GHC.Core.Coercion ( isCoVar )
-import GHC.Core.DataCon  ( DataCon, dataConWorkId )
-import GHC.Builtin.Types.Prim
+import GHC.Types.TyThing
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Name      hiding ( varName )
-import Outputable
-import FastString
+import GHC.Types.Literal
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
-import Util
-import Data.List
 
+import GHC.Core
+import GHC.Core.Utils ( exprType, needsCaseBinding, mkSingleAltCase, bindNonRec )
+import GHC.Core.Type
+import GHC.Core.Coercion ( isCoVar )
+import GHC.Core.DataCon  ( DataCon, dataConWorkId )
+import GHC.Core.Multiplicity
+
+import GHC.Hs.Utils      ( mkChunkified, chunkify )
+
+import GHC.Builtin.Types
+import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+
+import GHC.Data.FastString
+
+import Data.List
 import Data.Char        ( ord )
 
 infixl 4 `mkCoreApp`, `mkCoreApps`
@@ -134,7 +138,7 @@ mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 -- | Construct an expression which represents the application of a number of
 -- expressions to another. The leftmost expression in the list is applied first
 -- Respects the let/app invariant by building a case expression where necessary
---   See Note [Core let/app invariant] in GHC.Core
+--   See Note [Core let/app invariant] in "GHC.Core"
 mkCoreApps :: CoreExpr -> [CoreExpr] -> CoreExpr
 mkCoreApps fun args
   = fst $
@@ -146,7 +150,7 @@ mkCoreApps fun args
 -- | Construct an expression which represents the application of one expression
 -- to the other
 -- Respects the let/app invariant by building a case expression where necessary
---   See Note [Core let/app invariant] in GHC.Core
+--   See Note [Core let/app invariant] in "GHC.Core"
 mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
 mkCoreApp s fun arg
   = fst $ mkCoreAppTyped s (fun, exprType fun) arg
@@ -156,7 +160,7 @@ mkCoreApp s fun arg
 -- function is not exported and used in the definition of 'mkCoreApp' and
 -- 'mkCoreApps'.
 -- Respects the let/app invariant by building a case expression where necessary
---   See Note [Core let/app invariant] in GHC.Core
+--   See Note [Core let/app invariant] in "GHC.Core"
 mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
 mkCoreAppTyped _ (fun, fun_ty) (Type ty)
   = (App fun (Type ty), piResultTy fun_ty ty)
@@ -164,20 +168,20 @@ mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
   = (App fun (Coercion co), funResultTy fun_ty)
 mkCoreAppTyped d (fun, fun_ty) arg
   = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
-    (mkValApp fun arg arg_ty res_ty, res_ty)
+    (mkValApp fun arg (Scaled mult arg_ty) res_ty, res_ty)
   where
-    (arg_ty, res_ty) = splitFunTy fun_ty
+    (mult, arg_ty, res_ty) = splitFunTy fun_ty
 
-mkValApp :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
+mkValApp :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
 -- Build an application (e1 e2),
 -- or a strict binding  (case e2 of x -> e1 x)
 -- using the latter when necessary to respect the let/app invariant
 --   See Note [Core let/app invariant] in GHC.Core
-mkValApp fun arg arg_ty res_ty
+mkValApp fun arg (Scaled w arg_ty) res_ty
   | not (needsCaseBinding arg_ty arg)
   = App fun arg                -- The vastly common case
   | otherwise
-  = mkStrictApp fun arg arg_ty res_ty
+  = mkStrictApp fun arg (Scaled w arg_ty) res_ty
 
 {- *********************************************************************
 *                                                                      *
@@ -186,33 +190,33 @@ mkValApp fun arg arg_ty res_ty
 ********************************************************************* -}
 
 mkWildEvBinder :: PredType -> EvVar
-mkWildEvBinder pred = mkWildValBinder pred
+mkWildEvBinder pred = mkWildValBinder Many pred
 
 -- | Make a /wildcard binder/. This is typically used when you need a binder
 -- that you expect to use only at a *binding* site.  Do not use it at
 -- occurrence sites because it has a single, fixed unique, and it's very
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
--- See Note [WildCard binders] in GHC.Core.Opt.Simplify.Env
-mkWildValBinder :: Type -> Id
-mkWildValBinder ty = mkLocalIdOrCoVar wildCardName ty
+-- See Note [WildCard binders] in "GHC.Core.Opt.Simplify.Env"
+mkWildValBinder :: Mult -> Type -> Id
+mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName w ty
   -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
   -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
 
-mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
+mkWildCase :: CoreExpr -> Scaled Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
 -- The alts and res_ty should not have any occurrences of WildId
-mkWildCase scrut scrut_ty res_ty alts
-  = Case scrut (mkWildValBinder scrut_ty) res_ty alts
+mkWildCase scrut (Scaled w scrut_ty) res_ty alts
+  = Case scrut (mkWildValBinder w scrut_ty) res_ty alts
 
-mkStrictApp :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
+mkStrictApp :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
 -- Build a strict application (case e2 of x -> e1 x)
-mkStrictApp fun arg arg_ty res_ty
+mkStrictApp fun arg (Scaled w arg_ty) res_ty
   = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
        -- mkDefaultCase looks attractive here, and would be sound.
        -- But it uses (exprType alt_rhs) to compute the result type,
        -- whereas here we already know that the result type is res_ty
   where
-    arg_id = mkWildValBinder arg_ty
+    arg_id = mkWildValBinder w arg_ty
         -- Lots of shadowing, but it doesn't matter,
         -- because 'fun' and 'res_ty' should not have a free wild-id
         --
@@ -226,7 +230,7 @@ mkStrictApp fun arg arg_ty res_ty
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
 -- Not going to be refining, so okay to take the type of the "then" clause
-  = mkWildCase guard boolTy (exprType then_expr)
+  = mkWildCase guard (linear boolTy) (exprType then_expr)
          [ (DataAlt falseDataCon, [], else_expr),       -- Increasing order of tag!
            (DataAlt trueDataCon,  [], then_expr) ]
 
@@ -236,7 +240,7 @@ castBottomExpr :: CoreExpr -> Type -> CoreExpr
 -- See Note [Empty case alternatives] in GHC.Core
 castBottomExpr e res_ty
   | e_ty `eqType` res_ty = e
-  | otherwise            = Case e (mkWildValBinder e_ty) res_ty []
+  | otherwise            = Case e (mkWildValBinder One e_ty) res_ty []
   where
     e_ty = exprType e
 
@@ -252,27 +256,26 @@ castBottomExpr e res_ty
 mkIntExpr :: Platform -> Integer -> CoreExpr        -- Result = I# i :: Int
 mkIntExpr platform i = mkCoreConApps intDataCon  [mkIntLit platform i]
 
+-- | Create a 'CoreExpr' which will evaluate to the given @Int@. Don't check
+-- that the number is in the range of the target platform @Int@
+mkUncheckedIntExpr :: Integer -> CoreExpr        -- Result = I# i :: Int
+mkUncheckedIntExpr i = mkCoreConApps intDataCon  [Lit (mkLitIntUnchecked i)]
+
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
 mkIntExprInt :: Platform -> Int -> CoreExpr         -- Result = I# i :: Int
-mkIntExprInt platform i = mkCoreConApps intDataCon  [mkIntLitInt platform i]
+mkIntExprInt platform i = mkCoreConApps intDataCon  [mkIntLit platform (fromIntegral i)]
 
 -- | Create a 'CoreExpr' which will evaluate to the a @Word@ with the given value
 mkWordExpr :: Platform -> Integer -> CoreExpr
 mkWordExpr platform w = mkCoreConApps wordDataCon [mkWordLit platform w]
 
--- | Create a 'CoreExpr' which will evaluate to the given @Word@
-mkWordExprWord :: Platform -> Word -> CoreExpr
-mkWordExprWord platform w = mkCoreConApps wordDataCon [mkWordLitWord platform w]
-
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
-mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer
-mkIntegerExpr i = do t <- lookupTyCon integerTyConName
-                     return (Lit (mkLitInteger i (mkTyConTy t)))
+mkIntegerExpr  :: Integer -> CoreExpr  -- Result :: Integer
+mkIntegerExpr i = Lit (mkLitInteger i)
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Natural@
-mkNaturalExpr  :: MonadThings m => Integer -> m CoreExpr
-mkNaturalExpr i = do t <- lookupTyCon naturalTyConName
-                     return (Lit (mkLitNatural i (mkTyConTy t)))
+mkNaturalExpr  :: Integer -> CoreExpr
+mkNaturalExpr i = Lit (mkLitNatural i)
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Float@
 mkFloatExpr :: Float -> CoreExpr
@@ -344,12 +347,12 @@ We could do one of two things:
     mkCoreTup [e1] = e1
 
 * Build a one-tuple (see Note [One-tuples] in GHC.Builtin.Types)
-    mkCoreTup1 [e1] = Unit e1
+    mkCoreTup1 [e1] = Solo e1
   We use a suffix "1" to indicate this.
 
 Usually we want the former, but occasionally the latter.
 
-NB: The logic in tupleDataCon knows about () and Unit and (,), etc.
+NB: The logic in tupleDataCon knows about () and Solo and (,), etc.
 
 Note [Don't flatten tuples from HsSyn]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -448,6 +451,10 @@ unitExpr = Var unitDataConId
 -- just the identity.
 --
 -- If necessary, we pattern match on a \"big\" tuple.
+--
+-- A tuple selector is not linear in its argument. Consequently, the case
+-- expression built by `mkTupleSelector` must consume its scrutinee 'Many'
+-- times. And all the argument variables must have multiplicity 'Many'.
 mkTupleSelector, mkTupleSelector1
     :: [Id]         -- ^ The 'Id's to pattern match the tuple against
     -> Id           -- ^ The 'Id' to select
@@ -542,7 +549,7 @@ mkTupleCase uniqs vars body scrut_var scrut
 
     one_tuple_case chunk_vars (us, vs, body)
       = let (uniq, us') = takeUniqFromSupply us
-            scrut_var = mkSysLocal (fsLit "ds") uniq
+            scrut_var = mkSysLocal (fsLit "ds") uniq Many
               (mkBoxedTupleTy (map idType chunk_vars))
             body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
         in (us', scrut_var:vs, body')
@@ -648,8 +655,8 @@ mkBuildExpr :: (MonadFail m, MonadThings m, MonadUnique m)
 mkBuildExpr elt_ty mk_build_inside = do
     n_tyvar <- newTyVar alphaTyVar
     let n_ty = mkTyVarTy n_tyvar
-        c_ty = mkVisFunTys [elt_ty, n_ty] n_ty
-    [c, n] <- sequence [mkSysLocalM (fsLit "c") c_ty, mkSysLocalM (fsLit "n") n_ty]
+        c_ty = mkVisFunTysMany [elt_ty, n_ty] n_ty
+    [c, n] <- sequence [mkSysLocalM (fsLit "c") Many c_ty, mkSysLocalM (fsLit "n") Many n_ty]
 
     build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
 
@@ -735,7 +742,11 @@ errorIds
       rEC_CON_ERROR_ID,
       rEC_SEL_ERROR_ID,
       aBSENT_ERROR_ID,
-      tYPE_ERROR_ID   -- Used with Opt_DeferTypeErrors, see #10284
+      aBSENT_SUM_FIELD_ERROR_ID,
+      tYPE_ERROR_ID,   -- Used with Opt_DeferTypeErrors, see #10284
+      rAISE_OVERFLOW_ID,
+      rAISE_UNDERFLOW_ID,
+      rAISE_DIVZERO_ID
       ]
 
 recSelErrorName, runtimeErrorName, absentErrorName :: Name
@@ -743,11 +754,10 @@ recConErrorName, patErrorName :: Name
 nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 typeErrorName :: Name
 absentSumFieldErrorName :: Name
+raiseOverflowName, raiseUnderflowName, raiseDivZeroName :: Name
 
 recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
 absentErrorName     = err_nm "absentError"     absentErrorIdKey     aBSENT_ERROR_ID
-absentSumFieldErrorName = err_nm "absentSumFieldError"  absentSumFieldErrorIdKey
-                            aBSENT_SUM_FIELD_ERROR_ID
 runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
 recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
 patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
@@ -764,6 +774,7 @@ err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
 tYPE_ERROR_ID, aBSENT_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID :: Id
+rAISE_OVERFLOW_ID, rAISE_UNDERFLOW_ID, rAISE_DIVZERO_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
 rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
@@ -774,28 +785,99 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 
 -- Note [aBSENT_SUM_FIELD_ERROR_ID]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Absent argument error for unused unboxed sum fields are different than absent
--- error used in dummy worker functions (see `mkAbsentErrorApp`):
 --
--- - `absentSumFieldError` can't take arguments because it's used in unarise for
---   unused pointer fields in unboxed sums, and applying an argument would
---   require allocating a thunk.
+-- Unboxed sums are transformed into unboxed tuples in GHC.Stg.Unarise.mkUbxSum
+-- and fields that can't be reached are filled with rubbish values. It's easy to
+-- come up with rubbish literal values: we use 0 (ints/words) and 0.0
+-- (floats/doubles). Coming up with a rubbish pointer value is more delicate:
 --
--- - `absentSumFieldError` can't be CAFFY because that would mean making some
---   non-CAFFY definitions that use unboxed sums CAFFY in unarise.
+--    1. it needs to be a valid closure pointer for the GC (not a NULL pointer)
 --
---   To make `absentSumFieldError` non-CAFFY we get a stable pointer to it in
---   RtsStartup.c and mark it as non-CAFFY here.
+--    2. it is never used in Core, only in STG; and even then only for filling a
+--       GC-ptr slot in an unboxed sum (see GHC.Stg.Unarise.ubxSumRubbishArg).
+--       So all we need is a pointer, and its levity doesn't matter. Hence we
+--       can safely give it the (lifted) type:
 --
--- Getting this wrong causes hard-to-debug runtime issues, see #15038.
+--             absentSumFieldError :: forall a. a
 --
--- TODO: Remove stable pointer hack after fixing #9718.
---       However, we should still be careful about not making things CAFFY just
---       because they use unboxed sums. Unboxed objects are supposed to be
---       efficient, and none of the other unboxed literals make things CAFFY.
+--       despite the fact that Unarise might instantiate it at non-lifted
+--       types.
+--
+--    3. it can't take arguments because it's used in unarise and applying an
+--       argument would require allocating a thunk.
+--
+--    4. it can't be CAFFY because that would mean making some non-CAFFY
+--       definitions that use unboxed sums CAFFY in unarise.
+--
+--       Getting this wrong causes hard-to-debug runtime issues, see #15038.
+--
+--    5. it can't be defined in `base` package.
+--
+--       Defining `absentSumFieldError` in `base` package introduces a
+--       dependency on `base` for any code using unboxed sums. It became an
+--       issue when we wanted to use unboxed sums in boot libraries used by
+--       `base`, see #17791.
+--
+--
+-- * Most runtime-error functions throw a proper Haskell exception, which can be
+--   caught in the usual way. But these functions are defined in
+--   `base:Control.Exception.Base`, hence, they cannot be directly invoked in
+--   any library compiled before `base`.  Only exceptions that have been wired
+--   in the RTS can be thrown (indirectly, via a call into the RTS) by libraries
+--   compiled before `base`.
+--
+--   However wiring exceptions in the RTS is a bit annoying because we need to
+--   explicitly import exception closures via their mangled symbol name (e.g.
+--   `import CLOSURE base_GHCziIOziException_heapOverflow_closure`) in Cmm files
+--   and every imported symbol must be indicated to the linker in a few files
+--   (`package.conf`, `rts.cabal`, `win32/libHSbase.def`, `Prelude.h`...). It
+--   explains why exceptions are only wired in the RTS when necessary.
+--
+-- * `absentSumFieldError` is defined in ghc-prim:GHC.Prim.Panic, hence, it can
+--   be invoked in libraries compiled before `base`. It does not throw a Haskell
+--   exception; instead, it calls `stg_panic#`, which immediately halts
+--   execution.  A runtime invocation of `absentSumFieldError` indicates a GHC
+--   bug. Unlike (say) pattern-match errors, it cannot be caused by a user
+--   error. That's why it is OK for it to be un-catchable.
+--
 
-aBSENT_SUM_FIELD_ERROR_ID
-  = mkVanillaGlobalWithInfo absentSumFieldErrorName
+absentSumFieldErrorName
+   = mkWiredInIdName
+      gHC_PRIM_PANIC
+      (fsLit "absentSumFieldError")
+      absentSumFieldErrorIdKey
+      aBSENT_SUM_FIELD_ERROR_ID
+
+raiseOverflowName
+   = mkWiredInIdName
+      gHC_PRIM_EXCEPTION
+      (fsLit "raiseOverflow")
+      raiseOverflowIdKey
+      rAISE_OVERFLOW_ID
+
+raiseUnderflowName
+   = mkWiredInIdName
+      gHC_PRIM_EXCEPTION
+      (fsLit "raiseUnderflow")
+      raiseUnderflowIdKey
+      rAISE_UNDERFLOW_ID
+
+raiseDivZeroName
+   = mkWiredInIdName
+      gHC_PRIM_EXCEPTION
+      (fsLit "raiseDivZero")
+      raiseDivZeroIdKey
+      rAISE_DIVZERO_ID
+
+aBSENT_SUM_FIELD_ERROR_ID = mkExceptionId absentSumFieldErrorName
+rAISE_OVERFLOW_ID         = mkExceptionId raiseOverflowName
+rAISE_UNDERFLOW_ID        = mkExceptionId raiseUnderflowName
+rAISE_DIVZERO_ID          = mkExceptionId raiseDivZeroName
+
+-- | Exception with type \"forall a. a\"
+mkExceptionId :: Name -> Id
+mkExceptionId name
+  = mkVanillaGlobalWithInfo name
       (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
       (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] botDiv
                      `setCprInfo` mkCprSig 0 botCpr
@@ -832,7 +914,7 @@ runtimeErrorTy :: Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
 --   See Note [Error and friends have an "open-tyvar" forall]
 runtimeErrorTy = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar]
-                                 (mkVisFunTy addrPrimTy openAlphaTy)
+                                 (mkVisFunTyMany addrPrimTy openAlphaTy)
 
 {- Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -856,7 +938,7 @@ We use aBSENT_ERROR_ID to build dummy values in workers.  E.g.
 
    f x = (case x of (a,b) -> b) + 1::Int
 
-The demand analyser figures ot that only the second component of x is
+The demand analyser figures out that only the second component of x is
 used, and does a w/w split thus
 
    f x = case x of (a,b) -> $wf b
@@ -922,7 +1004,7 @@ be relying on anything from it.
 aBSENT_ERROR_ID
  = mkVanillaGlobalWithInfo absentErrorName absent_ty arity_info
  where
-   absent_ty = mkSpecForAllTys [alphaTyVar] (mkVisFunTy addrPrimTy alphaTy)
+   absent_ty = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany addrPrimTy alphaTy)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent errors] in GHC.Core.Opt.WorkWrap.Utils
    arity_info = vanillaIdInfo `setArityInfo` 1

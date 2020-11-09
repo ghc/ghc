@@ -1,10 +1,11 @@
 
 T7264.hs:13:19: error:
     • Couldn't match type ‘a’ with ‘forall r. r -> String’
+      Expected: a -> Foo
+        Actual: (forall r. r -> String) -> Foo
       ‘a’ is a rigid type variable bound by
-        the inferred type of mkFoo2 :: a -> Maybe Foo at T7264.hs:13:1-32
-      Expected type: a -> Foo
-        Actual type: (forall r. r -> String) -> Foo
+        the inferred type of mkFoo2 :: a -> Maybe Foo
+        at T7264.hs:13:1-32
     • In the first argument of ‘mmap’, namely ‘Foo’
       In the expression: mmap Foo (Just val)
       In an equation for ‘mkFoo2’: mkFoo2 val = mmap Foo (Just val)

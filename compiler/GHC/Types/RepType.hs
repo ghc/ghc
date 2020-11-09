@@ -23,19 +23,22 @@ module GHC.Types.RepType
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Basic (Arity, RepArity)
 import GHC.Core.DataCon
-import Outputable
 import GHC.Builtin.Names
 import GHC.Core.Coercion
 import GHC.Core.TyCon
+import GHC.Core.TyCon.RecWalk
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import Util
 import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind )
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.List (sort)
 import qualified Data.IntSet as IS
@@ -108,7 +111,7 @@ countFunRepArgs :: Arity -> Type -> RepArity
 countFunRepArgs 0 _
   = 0
 countFunRepArgs n ty
-  | FunTy _ arg res <- unwrapType ty
+  | FunTy _ _ arg res <- unwrapType ty
   = length (typePrimRepArgs arg) + countFunRepArgs (n - 1) res
   | otherwise
   = pprPanic "countFunRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))
@@ -120,7 +123,7 @@ countConRepArgs dc = go (dataConRepArity dc) (dataConRepType dc)
     go 0 _
       = 0
     go n ty
-      | FunTy _ arg res <- unwrapType ty
+      | FunTy _ _ arg res <- unwrapType ty
       = length (typePrimRep arg) + go (n - 1) res
       | otherwise
       = pprPanic "countConRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))
@@ -312,7 +315,7 @@ fitsIn ty1 ty2
 Note [RuntimeRep and PrimRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This Note describes the relationship between GHC.Types.RuntimeRep
-(of levity-polymorphism fame) and TyCon.PrimRep, as these types
+(of levity-polymorphism fame) and GHC.Core.TyCon.PrimRep, as these types
 are closely related.
 
 A "primitive entity" is one that can be
@@ -329,7 +332,7 @@ Examples include:
  * ...etc...
 
 The "representation or a primitive entity" specifies what kind of register is
-needed and how many bits are required. The data type TyCon.PrimRep
+needed and how many bits are required. The data type GHC.Core.TyCon.PrimRep
 enumerates all the possibilities.
 
 data PrimRep
@@ -367,7 +370,7 @@ It's all in 1-1 correspondence with PrimRep except for TupleRep and SumRep,
 which describe unboxed products and sums respectively. RuntimeRep is defined
 in the library ghc-prim:GHC.Types. It is also "wired-in" to GHC: see
 GHC.Builtin.Types.runtimeRepTyCon. The unarisation pass, in GHC.Stg.Unarise, transforms the
-program, so that that every variable has a type that has a PrimRep. For
+program, so that every variable has a type that has a PrimRep. For
 example, unarisation transforms our utup function above, to take two Int
 arguments instead of one (# Int, Int #) argument.
 
@@ -392,7 +395,7 @@ Note [Getting from RuntimeRep to PrimRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 General info on RuntimeRep and PrimRep is in Note [RuntimeRep and PrimRep].
 
-How do we get from an Id to the the list or PrimReps used to store it? We get
+How do we get from an Id to the list or PrimReps used to store it? We get
 the Id's type ty (using idType), then ty's kind ki (using typeKind), then
 pattern-match on ki to extract rep (in kindPrimRep), then extract the PrimRep
 from the RuntimeRep (in runtimeRepPrimRep).

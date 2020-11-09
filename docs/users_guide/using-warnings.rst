@@ -14,37 +14,44 @@ of warnings.
 To turn off an individual warning ``-W<wflag>``, use ``-Wno-<wflag>``.
 To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
 
-By default, you get a standard set of warnings which are
-generally likely to indicate bugs in your program. These are:
 
-.. hlist::
-    :columns: 3
+.. ghc-flag:: -Wdefault
+    :shortdesc: enable default flags
+    :type: dynamic
+    :category:
 
-    * :ghc-flag:`-Woverlapping-patterns`
-    * :ghc-flag:`-Wwarnings-deprecations`
-    * :ghc-flag:`-Wdeprecations`
-    * :ghc-flag:`-Wdeprecated-flags`
-    * :ghc-flag:`-Wunrecognised-pragmas`
-    * :ghc-flag:`-Wduplicate-exports`
-    * :ghc-flag:`-Wderiving-defaults`
-    * :ghc-flag:`-Woverflowed-literals`
-    * :ghc-flag:`-Wempty-enumerations`
-    * :ghc-flag:`-Wmissing-fields`
-    * :ghc-flag:`-Wmissing-methods`
-    * :ghc-flag:`-Wwrong-do-bind`
-    * :ghc-flag:`-Wsimplifiable-class-constraints`
-    * :ghc-flag:`-Wtyped-holes`
-    * :ghc-flag:`-Wdeferred-type-errors`
-    * :ghc-flag:`-Wpartial-type-signatures`
-    * :ghc-flag:`-Wunsupported-calling-conventions`
-    * :ghc-flag:`-Wdodgy-foreign-imports`
-    * :ghc-flag:`-Winline-rule-shadowing`
-    * :ghc-flag:`-Wunsupported-llvm-version`
-    * :ghc-flag:`-Wmissed-extra-shared-lib`
-    * :ghc-flag:`-Wtabs`
-    * :ghc-flag:`-Wunrecognised-warning-flags`
-    * :ghc-flag:`-Winaccessible-code`
-    * :ghc-flag:`-Wstar-binder`
+    By default, you get a standard set of warnings which are
+    generally likely to indicate bugs in your program. These are:
+
+    .. hlist::
+        :columns: 3
+
+        * :ghc-flag:`-Woverlapping-patterns`
+        * :ghc-flag:`-Wwarnings-deprecations`
+        * :ghc-flag:`-Wdeprecations`
+        * :ghc-flag:`-Wdeprecated-flags`
+        * :ghc-flag:`-Wunrecognised-pragmas`
+        * :ghc-flag:`-Wduplicate-exports`
+        * :ghc-flag:`-Wderiving-defaults`
+        * :ghc-flag:`-Woverflowed-literals`
+        * :ghc-flag:`-Wempty-enumerations`
+        * :ghc-flag:`-Wmissing-fields`
+        * :ghc-flag:`-Wmissing-methods`
+        * :ghc-flag:`-Wwrong-do-bind`
+        * :ghc-flag:`-Wsimplifiable-class-constraints`
+        * :ghc-flag:`-Wtyped-holes`
+        * :ghc-flag:`-Wdeferred-type-errors`
+        * :ghc-flag:`-Wpartial-type-signatures`
+        * :ghc-flag:`-Wunsupported-calling-conventions`
+        * :ghc-flag:`-Wdodgy-foreign-imports`
+        * :ghc-flag:`-Winline-rule-shadowing`
+        * :ghc-flag:`-Wunsupported-llvm-version`
+        * :ghc-flag:`-Wmissed-extra-shared-lib`
+        * :ghc-flag:`-Wtabs`
+        * :ghc-flag:`-Wunrecognised-warning-flags`
+        * :ghc-flag:`-Winaccessible-code`
+        * :ghc-flag:`-Wstar-binder`
+        * :ghc-flag:`-Woperator-whitespace-ext-conflict`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -67,6 +74,13 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wdodgy-exports`
         * :ghc-flag:`-Wdodgy-imports`
         * :ghc-flag:`-Wunbanged-strict-patterns`
+
+.. ghc-flag:: -Wextra
+    :shortdesc: alias for :ghc-flag:`-W`
+    :type: dynamic
+    :reverse: -w
+
+    Alias for :ghc-flag:`-W`
 
 .. ghc-flag:: -Wall
     :shortdesc: enable almost all warnings (details in :ref:`options-sanity`)
@@ -94,6 +108,11 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wpartial-fields`
         * :ghc-flag:`-Wmissed-specialisations`
         * :ghc-flag:`-Wall-missed-specialisations`
+        * :ghc-flag:`-Wcpp-undef`
+        * :ghc-flag:`-Wduplicate-constraints`
+        * :ghc-flag:`-Wmissing-deriving-strategies`
+        * :ghc-flag:`-Wunused-packages`
+        * :ghc-flag:`-Wunused-type-patterns`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -119,7 +138,6 @@ The following flags are simple ways to select standard "packages" of warnings:
     .. hlist::
         :columns: 3
 
-        * :ghc-flag:`-Wmissing-monadfail-instances`
         * :ghc-flag:`-Wsemigroup`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wstar-is-type`
@@ -140,6 +158,12 @@ The following flags are simple ways to select standard "packages" of warnings:
 
     Turns off all warnings, including the standard ones and those that
     :ghc-flag:`-Wall` doesn't enable.
+
+.. ghc-flag:: -Wnot
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-w`
+    :type: dynamic
+
+    Deprecated alias for :ghc-flag:`-w`
 
 These options control which warnings are considered fatal and cause compilation
 to abort.
@@ -239,12 +263,21 @@ of ``-W(no-)*``.
 
      - ``Data.List`` due to the future addition of ``Data.List.singleton`` and
        specialisation of exports to the ``[]`` type. See the
-       :ref:`mailing list
-       <https://groups.google.com/forum/#!topic/haskell-core-libraries/q3zHLmzBa5E>`
+       `mailing list <https://groups.google.com/forum/#!topic/haskell-core-libraries/q3zHLmzBa5E>`_
        for details.
 
     This warning can be addressed by either adding an explicit import list or
     using a ``qualified`` import.
+
+.. ghc-flag:: -Wprepositive-qualified-module
+    :shortdesc: Report imports with a leading/prepositive "qualified"
+    :type: dynamic
+    :reverse: -Wno-prepositive-qualified-module
+    :category:
+
+    Normally, imports are qualified prepositively: ``import qualified M``.
+    By using :extension:`ImportQualifiedPost`, the qualified keyword can be used after the module name.
+    Like so: ``import M qualified``. This will warn when the first, prepositive syntax is used.
 
 .. ghc-flag:: -Wtyped-holes
     :shortdesc: Report warnings when :ref:`typed hole <typed-holes>` errors are
@@ -397,6 +430,13 @@ of ``-W(no-)*``.
 
     This option is off by default.
 
+.. ghc-flag:: -Wmissed-specializations
+    :shortdesc: alias for :ghc-flag:`-Wmissed-specialisations`
+    :type: dynamic
+    :reverse: -Wno-missed-specializations
+
+    Alias for :ghc-flag:`-Wmissed-specialisations`
+
 .. ghc-flag:: -Wall-missed-specialisations
     :shortdesc: warn when specialisation of any overloaded function fails.
     :type: dynamic
@@ -411,6 +451,13 @@ of ``-W(no-)*``.
     :ghc-flag:`-Werror`.
 
     This option is off by default.
+
+.. ghc-flag:: -Wall-missed-specializations
+    :shortdesc: alias for :ghc-flag:`-Wall-missed-specialisations`
+    :type: dynamic
+    :reverse: -Wno-all-missed-specializations
+
+    Alias for :ghc-flag:`-Wall-missed-specialisations`
 
 .. ghc-flag:: -Wwarnings-deprecations
     :shortdesc: warn about uses of functions & types that have warnings or
@@ -545,7 +592,7 @@ of ``-W(no-)*``.
     Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
     default, but will be switched on in a future GHC release, as part of
     the `MonadFail Proposal (MFP)
-    <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
+    <https://gitlab.haskell.org/haskell/prime/-/wikis/libraries/proposals/monad-fail>`__.
 
 .. ghc-flag:: -Wsemigroup
     :shortdesc: warn when a ``Monoid`` is not ``Semigroup``, and on non-
@@ -857,8 +904,8 @@ of ``-W(no-)*``.
 
 
 .. ghc-flag:: -Wincomplete-uni-patterns
-    :shortdesc: warn when a pattern match in a lambda expression or
-        pattern binding could fail
+    :shortdesc: warn when a pattern match in a lambda expression,
+        pattern binding or a lazy pattern could fail
     :type: dynamic
     :reverse: -Wno-incomplete-uni-patterns
     :category:
@@ -870,6 +917,10 @@ of ``-W(no-)*``.
 
         h = \[] -> 2
         Just k = f y
+
+    Furthermore, this flag also applies to lazy patterns, since they are
+    syntactic sugar for pattern bindings. For example, ``f ~(Just x) = (x,x)``
+    is equivalent to ``f y = let Just x = y in (x,x)``.
 
 .. ghc-flag:: -fmax-pmcheck-models=⟨n⟩
     :shortdesc: soft limit on the number of parallel models the pattern match
@@ -1624,6 +1675,47 @@ of ``-W(no-)*``.
 
     would report that the ``P{..}`` match is unused.
 
+.. ghc-flag:: -Wredundant-bang-patterns
+    :shortdesc: Warn about redundant bang patterns.
+    :type: dynamic
+    :reverse: -Wno-redundant-bang-patterns
+    :category:
+
+    :since: 9.2.1
+
+    .. index::
+       single: redundant, warning, bang patterns
+
+    Report dead bang patterns, where dead bangs are bang patterns that under no
+    circumstances can force a thunk that wasn't already forced. Dead bangs are a
+    form of redundant bangs. The new check is performed in pattern-match coverage
+    checker along with other checks (namely, redundant and inaccessible RHSs).
+    Given ::
+
+
+        f :: Bool -> Int
+        f True = 1
+        f !x   = 2
+
+    The bang pattern on ``!x`` is dead. By the time the ``x`` in the second equation
+    is reached, ``x`` will already have been forced due to the first equation
+    (``f True = 1``). Moreover, there is no way to reach the second equation without
+    going through the first one.
+
+    Note that ``-Wredundant-bang-patterns`` will not warn about dead bangs that appear
+    on a redundant clause. That is because in that case, it is recommended to delete
+    the clause wholly, including its leading pattern match.
+
+    Dead bang patterns are redundant. But there are bang patterns which are
+    redundant that aren't dead, for example: ::
+
+
+        f !() = 0
+
+    the bang still forces the argument, before we attempt to match on ``()``. But it is
+    redundant with the forcing done by the ``()`` match. Currently such redundant bangs
+    are not considered dead, and ``-Wredundant-bang-patterns`` will not warn about them.
+
 .. ghc-flag:: -Wredundant-record-wildcards
     :shortdesc: Warn about record wildcard matches when the wildcard binds no patterns.
     :type: dynamic
@@ -1758,6 +1850,102 @@ of ``-W(no-)*``.
 
     You may want to enable this warning on a clean build or enable :ghc-flag:`-fforce-recomp`
     in order to get reliable results.
+
+.. ghc-flag:: -Winvalid-haddock
+    :shortdesc: warn when a Haddock comment occurs in an invalid position
+    :type: dynamic
+    :reverse: -Wno-invalid-haddock
+    :category:
+
+    :since: 9.0
+
+    When the ``-haddock`` option is enabled, GHC collects documentation
+    comments and associates them with declarations, function arguments, data
+    constructors, and other syntactic elements. Documentation comments in
+    invalid positions are discarded::
+
+        myValue =
+          -- | Invalid (discarded) comment in an expression
+          2 + 2
+
+    This warning informs you about discarded documentation comments.
+    It has no effect when :ghc-flag:`-haddock` is disabled.
+
+.. ghc-flag:: -Woperator-whitespace-ext-conflict
+    :shortdesc: warn on uses of infix operators that would be parsed differently
+                were a particular GHC extension enabled
+    :type: dynamic
+    :reverse: -Wno-operator-whitespace-ext-conflict
+    :category:
+
+    :since: 9.2
+
+    When :extension:`TemplateHaskell` is enabled, ``f $x`` is parsed as ``f``
+    applied to an untyped splice. But when the extension is disabled, the
+    expression is parsed as a use of the ``$`` infix operator.
+
+    To make it easy to read ``f $x`` without checking the enabled extensions,
+    one could rewrite it as ``f $ x``, which is what this warning suggests.
+
+    Currently, it detects the following cases:
+
+    * ``$x`` could mean an untyped splice under :extension:`TemplateHaskell`
+    * ``$$x`` could mean a typed splice under :extension:`TemplateHaskell`
+    * ``%m`` could mean a multiplicity annotation under :extension:`LinearTypes`
+
+    It only covers extensions that currently exist. If you want to enforce a
+    stricter policy and always require whitespace around all infix operators,
+    use :ghc-flag:`-Woperator-whitespace`.
+
+.. ghc-flag:: -Woperator-whitespace
+    :shortdesc: warn on prefix, suffix, and tight infix uses of infix operators
+    :type: dynamic
+    :reverse: -Wno-operator-whitespace
+    :category:
+
+    :since: 9.2
+
+    There are four types of infix operator occurrences, as defined by
+    `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__::
+
+      a ! b   -- a loose infix occurrence
+      a!b     -- a tight infix occurrence
+      a !b    -- a prefix occurrence
+      a! b    -- a suffix occurrence
+
+    A loose infix occurrence of any operator is always parsed as an infix
+    operator, but other occurrence types may be assigned a special meaning.
+    For example, a prefix ``!`` denotes a bang pattern, and a prefix ``$``
+    denotes a :extension:`TemplateHaskell` splice.
+
+    This warning encourages the use of loose infix occurrences of all infix
+    operators, to prevent possible conflicts with future language extensions.
+
+.. ghc-flag:: -Wauto-orphans
+    :shortdesc: *(deprecated)* Does nothing
+    :type: dynamic
+
+    Does nothing.
+
+.. ghc-flag:: -Wmissing-space-after-bang
+    :shortdesc: *(deprecated)* Does nothing
+    :type: dynamic
+
+    Does nothing.
+
+.. ghc-flag:: -Wderiving-typeable
+    :shortdesc: warn when Typeable is derived
+    :type: dynamic
+    :reverse: -Wno-deriving-typeable
+    :category:
+
+    :since: 7.10
+
+    This flag warns when ``Typeable`` is listed in a deriving clause
+    or derived with :extension:`StandaloneDeriving`.
+
+    Since GHC 7.10, ``Typeable`` is automatically derived for all types.
+    Thus, deriving ``Typeable`` yourself is redundant.
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's

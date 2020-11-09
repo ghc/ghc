@@ -156,10 +156,16 @@ reportHeapOverflow(void)
    Sleep for the given period of time.
    -------------------------------------------------------------------------- */
 
-/* Returns -1 on failure but handles EINTR internally.
- * N.B. usleep has been removed from POSIX 2008 */
+/* Returns -1 on failure but handles EINTR internally. On Windows this will
+ * only have millisecond precision. */
 int rtsSleep(Time t)
 {
+#if defined(_WIN32)
+    // N.B. we can't use nanosleep on Windows as it would incur a pthreads
+    // dependency. See #18272.
+    Sleep(TimeToMS(t));
+    return 0;
+#else
     struct timespec req;
     req.tv_sec = TimeToSeconds(t);
     req.tv_nsec = TimeToNS(t - req.tv_sec * TIME_RESOLUTION);
@@ -168,6 +174,7 @@ int rtsSleep(Time t)
         ret = nanosleep(&req, &req);
     } while (ret == -1 && errno == EINTR);
     return ret;
+#endif /* _WIN32 */
 }
 
 /* -----------------------------------------------------------------------------
@@ -350,6 +357,39 @@ int rts_isProfiled(void)
 int rts_isDynamic(void)
 {
 #if defined(DYNAMIC)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+// Provides a way for Haskell programs to tell whether they're
+// linked with the threaded runtime or not.
+int rts_isThreaded(void)
+{
+#if defined(THREADED_RTS)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+// Provides a way for Haskell programs to tell whether they're
+// linked with the debug runtime or not.
+int rts_isDebugged(void)
+{
+#if defined(DEBUG)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+// Provides a way for Haskell programs to tell whether they're
+// linked with the tracing runtime or not.
+int rts_isTracing(void)
+{
+#if defined(TRACING)
     return 1;
 #else
     return 0;

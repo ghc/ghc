@@ -10,14 +10,14 @@ module GHC.SysTools.Process where
 
 #include "HsVersions.h"
 
-import Exception
-import ErrUtils
+import GHC.Utils.Exception
+import GHC.Utils.Error
 import GHC.Driver.Session
-import FastString
-import Outputable
-import Panic
-import GhcPrelude
-import Util
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Prelude
+import GHC.Utils.Misc
 import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 
 import Control.Concurrent
@@ -33,12 +33,25 @@ import System.Process
 import GHC.SysTools.FileCleanup
 
 -- | Enable process jobs support on Windows if it can be expected to work (e.g.
--- @process >= 1.6.8.0@).
+-- @process >= 1.6.9.0@).
 enableProcessJobs :: CreateProcess -> CreateProcess
 #if defined(MIN_VERSION_process)
+#if MIN_VERSION_process(1,6,9)
 enableProcessJobs opts = opts { use_process_jobs = True }
 #else
 enableProcessJobs opts = opts
+#endif
+#else
+enableProcessJobs opts = opts
+#endif
+
+#if !MIN_VERSION_base(4,15,0)
+-- TODO: This can be dropped with GHC 8.16
+hGetContents' :: Handle -> IO String
+hGetContents' hdl = do
+  output  <- hGetContents hdl
+  _ <- evaluate $ length output
+  return output
 #endif
 
 -- Similar to System.Process.readCreateProcessWithExitCode, but stderr is
@@ -48,16 +61,22 @@ readCreateProcessWithExitCode'
     -> IO (ExitCode, String)    -- ^ stdout
 readCreateProcessWithExitCode' proc = do
     (_, Just outh, _, pid) <-
-        createProcess proc{ std_out = CreatePipe }
+        createProcess $ enableProcessJobs $ proc{ std_out = CreatePipe }
 
     -- fork off a thread to start consuming the output
-    output  <- hGetContents outh
     outMVar <- newEmptyMVar
-    _ <- forkIO $ evaluate (length output) >> putMVar outMVar ()
+    let onError :: SomeException -> IO ()
+        onError exc = putMVar outMVar (Left exc)
+    _ <- forkIO $ handle onError $ do
+      output <- hGetContents' outh
+      putMVar outMVar $ Right output
 
     -- wait on the output
-    takeMVar outMVar
+    result <- takeMVar outMVar
     hClose outh
+    output <- case result of
+      Left exc -> throwIO exc
+      Right output -> return output
 
     -- wait on the process
     ex <- waitForProcess pid
@@ -77,7 +96,7 @@ readProcessEnvWithExitCode
     -> IO (ExitCode, String, String) -- ^ (exit_code, stdout, stderr)
 readProcessEnvWithExitCode prog args env_update = do
     current_env <- getEnvironment
-    readCreateProcessWithExitCode (enableProcessJobs $ proc prog args) {
+    readCreateProcessWithExitCode (proc prog args) {
         env = Just (replaceVar env_update current_env) } ""
 
 -- Don't let gcc localize version info string, #8825
@@ -184,7 +203,7 @@ runSomethingFiltered
   :: DynFlags -> (String->String) -> String -> String -> [Option]
   -> Maybe FilePath -> Maybe [(String,String)] -> IO ()
 
-runSomethingFiltered dflags filter_fn phase_name pgm args mb_cwd mb_env = do
+runSomethingFiltered dflags filter_fn phase_name pgm args mb_cwd mb_env =
     runSomethingWith dflags phase_name pgm args $ \real_args -> do
         r <- builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env
         return (r,())
@@ -282,11 +301,11 @@ builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env = do
       case msg of
         BuildMsg msg -> do
           putLogMsg dflags NoReason SevInfo noSrcSpan
-              (defaultUserStyle dflags) msg
+              $ withPprStyle defaultUserStyle msg
           log_loop chan t
         BuildError loc msg -> do
           putLogMsg dflags NoReason SevError (mkSrcSpan loc loc)
-              (defaultUserStyle dflags) msg
+              $ withPprStyle defaultUserStyle msg
           log_loop chan t
         EOF ->
           log_loop chan  (t-1)
@@ -306,12 +325,12 @@ readerProc chan hdl filter_fn =
         loop (l:ls) in_err     =
                 case in_err of
                   Just err@(BuildError srcLoc msg)
-                    | leading_whitespace l -> do
+                    | leading_whitespace l ->
                         loop ls (Just (BuildError srcLoc (msg $$ text l)))
                     | otherwise -> do
                         writeChan chan err
                         checkError l ls
-                  Nothing -> do
+                  Nothing ->
                         checkError l ls
                   _ -> panic "readerProc/loop"
 
@@ -344,8 +363,8 @@ parseError s0 = case breakColon s0 of
 -- taking care to ignore colons in Windows drive letters (as noted in #17786).
 -- For instance,
 --
--- * @"hi.c: ABCD"@ is mapped to @Just ("hi.c", "ABCD")@
--- * @"C:\hi.c: ABCD"@ is mapped to @Just ("C:\hi.c", "ABCD")@
+-- * @"hi.c: ABCD"@ is mapped to @Just ("hi.c", \"ABCD\")@
+-- * @"C:\\hi.c: ABCD"@ is mapped to @Just ("C:\\hi.c", \"ABCD\")@
 breakColon :: String -> Maybe (String, String)
 breakColon = go []
   where

@@ -1,18 +1,20 @@
-{-# LANGUAGE CPP, DeriveFunctor, ViewPatterns, BangPatterns #-}
+{-# LANGUAGE BangPatterns  #-}
+{-# LANGUAGE CPP           #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Tc.Solver.Flatten(
    FlattenMode(..),
    flatten, flattenKind, flattenArgsNom,
-   rewriteTyVar,
+   rewriteTyVar, flattenType,
 
    unflattenWanteds
  ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Types
 import GHC.Core.TyCo.Ppr ( pprTyVar )
@@ -27,14 +29,15 @@ import GHC.Core.Coercion
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
 import GHC.Types.Basic( SwapFlag(..) )
 
-import Util
-import Bag
+import GHC.Utils.Misc
+import GHC.Data.Bag
 import Control.Monad
-import MonadUtils    ( zipWith3M )
+import GHC.Utils.Monad ( zipWith3M )
 import Data.Foldable ( foldrM )
 
 import Control.Arrow ( first )
@@ -543,6 +546,7 @@ runFlatten mode loc flav eq_rel thing_inside
 
 traceFlat :: String -> SDoc -> FlatM ()
 traceFlat herald doc = liftTcS $ traceTcS herald doc
+{-# INLINE traceFlat #-}  -- see Note [INLINE conditional tracing utilities]
 
 getFlatEnvField :: (FlattenEnv -> a) -> FlatM a
 getFlatEnvField accessor
@@ -766,7 +770,7 @@ when trying to find derived equalities arising from injectivity.
 -- If (xi, co) <- flatten mode ev ty, then co :: xi ~r ty
 -- where r is the role in @ev@. If @mode@ is 'FM_FlattenAll',
 -- then 'xi' is almost function-free (Note [Almost function-free]
--- in GHC.Tc.Types).
+-- in "GHC.Tc.Types").
 flatten :: FlattenMode -> CtEvidence -> TcType
         -> TcS (Xi, TcCoercion)
 flatten mode ev ty
@@ -825,6 +829,20 @@ flattenArgsNom ev tc tys
        ; traceTcS "flatten }" (vcat (map ppr tys'))
        ; return (tys', cos, kind_co) }
 
+-- | Flatten a type w.r.t. nominal equality. This is useful to rewrite
+-- a type w.r.t. any givens. It does not do type-family reduction. This
+-- will never emit new constraints. Call this when the inert set contains
+-- only givens.
+flattenType :: CtLoc -> TcType -> TcS TcType
+flattenType loc ty
+          -- More info about FM_SubstOnly in Note [Holes] in GHC.Tc.Types.Constraint
+  = do { (xi, _) <- runFlatten FM_SubstOnly loc Given NomEq $
+                    flatten_one ty
+                     -- use Given flavor so that it is rewritten
+                     -- only w.r.t. Givens, never Wanteds/Deriveds
+                     -- (Shouldn't matter, if only Givens are present
+                     -- anyway)
+       ; return xi }
 
 {- *********************************************************************
 *                                                                      *
@@ -939,8 +957,11 @@ faster. This doesn't seem quite worth it, yet.
 
 Note [flatten_exact_fam_app_fully performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The refactor of GRefl seems to cause performance trouble for T9872x: the allocation of flatten_exact_fam_app_fully_performance increased. See note [Generalized reflexive coercion] in GHC.Core.TyCo.Rep for more information about GRefl and #15192 for the current state.
+The refactor of GRefl seems to cause performance trouble for T9872x:
+the allocation of flatten_exact_fam_app_fully_performance
+increased. See note [Generalized reflexive coercion] in
+GHC.Core.TyCo.Rep for more information about GRefl and #15192 for the
+current state.
 
 The explicit pattern match in homogenise_result helps with T9872a, b, c.
 
@@ -1160,12 +1181,13 @@ flatten_one (TyConApp tc tys)
 --                   _ -> fmode
   = flatten_ty_con_app tc tys
 
-flatten_one ty@(FunTy _ ty1 ty2)
+flatten_one ty@(FunTy { ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
   = do { (xi1,co1) <- flatten_one ty1
        ; (xi2,co2) <- flatten_one ty2
+       ; (xi3,co3) <- setEqRel NomEq $ flatten_one mult
        ; role <- getRole
-       ; return (ty { ft_arg = xi1, ft_res = xi2 }
-                , mkFunCo role co1 co2) }
+       ; return (ty { ft_mult = xi3, ft_arg = xi1, ft_res = xi2 }
+                , mkFunCo role co3 co1 co2) }
 
 flatten_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't flatten the kind of
@@ -1184,9 +1206,11 @@ flatten_one ty@(ForAllTy {})
 flatten_one (CastTy ty g)
   = do { (xi, co) <- flatten_one ty
        ; (g', _)   <- flatten_co g
-
        ; role <- getRole
-       ; return (mkCastTy xi g', castCoercionKind co role xi ty g' g) }
+       ; return (mkCastTy xi g', castCoercionKind1 co role xi ty g') }
+         -- It makes a /big/ difference to call castCoercionKind1 not
+         -- the more general castCoercionKind2.
+         -- See Note [castCoercionKind1] in GHC.Core.Coercion
 
 flatten_one (CoercionTy co) = first mkCoercionTy <$> flatten_co co
 
@@ -1903,12 +1927,14 @@ Flatten using the fun-eqs first.
 split_pi_tys' :: Type -> ([TyCoBinder], Type, Bool)
 split_pi_tys' ty = split ty ty
   where
-  split orig_ty ty | Just ty' <- coreView ty = split orig_ty ty'
+     -- put common cases first
   split _       (ForAllTy b res) = let (bs, ty, _) = split res res
                                    in  (Named b : bs, ty, True)
-  split _       (FunTy { ft_af = af, ft_arg = arg, ft_res = res })
+  split _       (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
                                  = let (bs, ty, named) = split res res
-                                   in  (Anon af arg : bs, ty, named)
+                                   in  (Anon af (mkScaled w arg) : bs, ty, named)
+
+  split orig_ty ty | Just ty' <- coreView ty = split orig_ty ty'
   split orig_ty _                = ([], orig_ty, False)
 {-# INLINE split_pi_tys' #-}
 
@@ -1920,6 +1946,6 @@ ty_con_binders_ty_binders' = foldr go ([], False)
     go (Bndr tv (NamedTCB vis)) (bndrs, _)
       = (Named (Bndr tv vis) : bndrs, True)
     go (Bndr tv (AnonTCB af))   (bndrs, n)
-      = (Anon af (tyVarKind tv)   : bndrs, n)
+      = (Anon af (unrestricted (tyVarKind tv))   : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}

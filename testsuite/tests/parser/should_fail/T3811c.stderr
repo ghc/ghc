@@ -1,6 +1,7 @@
 
 T3811c.hs:6:10: error:
-    Illegal class instance: ‘!Show D’
-      Class instances must be of the form
-        context => C ty_1 ... ty_n
+    Illegal head of an instance declaration: ‘!Show D’
+      Instance heads must be of the form
+        C ty_1 ... ty_n
       where ‘C’ is a class
+    In an instance declaration

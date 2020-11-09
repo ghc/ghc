@@ -12,17 +12,18 @@ module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
-import GHC.Types.Basic ( Boxity(..), neverInlinePragma, SourceText(..) )
+import GHC.Types.Basic ( Boxity(..), neverInlinePragma )
+import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Iface.Env( newGlobalBinder )
 import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence ( mkWpTyApps )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import GHC.Driver.Types ( lookupId )
+import GHC.Types.TyThing ( lookupId )
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( primTyCons )
 import GHC.Builtin.Types
@@ -34,16 +35,17 @@ import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Hs
 import GHC.Driver.Session
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map
 import GHC.Settings.Constants
-import Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
-import Outputable
-import FastString ( FastString, mkFastString, fsLit )
+import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString ( FastString, mkFastString, fsLit )
 
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class (lift)
@@ -56,7 +58,7 @@ The overall plan is this:
 
 1. Generate a binding for each module p:M
    (done in GHC.Tc.Instance.Typeable by mkModIdBindings)
-       M.$trModule :: GHC.Types.Module
+       M.$trModule :: GHC.Unit.Module
        M.$trModule = Module "p" "M"
    ("tr" is short for "type representation"; see GHC.Types)
 
@@ -147,7 +149,7 @@ There are many wrinkles:
 -- entry-point of this module and is invoked by the typechecker driver in
 -- 'tcRnSrcDecls'.
 --
--- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
+-- See Note [Grand plan for Typeable] in "GHC.Tc.Instance.Typeable".
 mkTypeableBinds :: TcM TcGblEnv
 mkTypeableBinds
   = do { dflags <- getDynFlags
@@ -205,7 +207,7 @@ mkModIdRHS mod
   = do { trModuleDataCon <- tcLookupDataCon trModuleDataConName
        ; trNameLit <- mkTrNameLit
        ; return $ nlHsDataCon trModuleDataCon
-                  `nlHsApp` trNameLit (unitIdFS (moduleUnitId mod))
+                  `nlHsApp` trNameLit (unitFS (moduleUnit mod))
                   `nlHsApp` trNameLit (moduleNameFS (moduleName mod))
        }
 
@@ -265,7 +267,7 @@ todoForTyCons mod mod_id tycons = do
                        }
   where
     mod_fpr = fingerprintString $ moduleNameString $ moduleName mod
-    pkg_fpr = fingerprintString $ unitIdString $ moduleUnitId mod
+    pkg_fpr = fingerprintString $ unitString $ moduleUnit mod
 
 todoForExportedKindReps :: [(Kind, Name)] -> TcM TypeRepTodo
 todoForExportedKindReps kinds = do
@@ -346,10 +348,10 @@ mkPrimTypeableTodos
 -- The majority of the types we need here are contained in 'primTyCons'.
 -- However, not all of them: in particular unboxed tuples are absent since we
 -- don't want to include them in the original name cache. See
--- Note [Built-in syntax and the OrigNameCache] in GHC.Iface.Env for more.
+-- Note [Built-in syntax and the OrigNameCache] in "GHC.Iface.Env" for more.
 ghcPrimTypeableTyCons :: [TyCon]
 ghcPrimTypeableTyCons = concat
-    [ [ runtimeRepTyCon, vecCountTyCon, vecElemTyCon, funTyCon ]
+    [ [ runtimeRepTyCon, vecCountTyCon, vecElemTyCon ]
     , map (tupleTyCon Unboxed) [0..mAX_TUPLE_SIZE]
     , map sumTyCon [2..mAX_SUM_SIZE]
     , primTyCons
@@ -437,7 +439,9 @@ kindIsTypeable ty
   | isLiftedTypeKind ty             = True
 kindIsTypeable (TyVarTy _)          = True
 kindIsTypeable (AppTy a b)          = kindIsTypeable a && kindIsTypeable b
-kindIsTypeable (FunTy _ a b)        = kindIsTypeable a && kindIsTypeable b
+kindIsTypeable (FunTy _ w a b)      = kindIsTypeable w &&
+                                      kindIsTypeable a &&
+                                      kindIsTypeable b
 kindIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
                                    && all kindIsTypeable args
 kindIsTypeable (ForAllTy{})         = False
@@ -466,8 +470,8 @@ liftTc = KindRepM . lift
 builtInKindReps :: [(Kind, Name)]
 builtInKindReps =
     [ (star, starKindRepName)
-    , (mkVisFunTy star star, starArrStarKindRepName)
-    , (mkVisFunTys [star, star] star, starArrStarArrStarKindRepName)
+    , (mkVisFunTyMany star star, starArrStarKindRepName)
+    , (mkVisFunTysMany [star, star] star, starArrStarArrStarKindRepName)
     ]
   where
     star = liftedTypeKind
@@ -537,7 +541,7 @@ getKindRep stuff@(Stuff {..}) in_scope = go
       = do -- Place a NOINLINE pragma on KindReps since they tend to be quite
            -- large and bloat interface files.
            rep_bndr <- (`setInlinePragma` neverInlinePragma)
-                   <$> newSysLocalId (fsLit "$krep") (mkTyConTy kindRepTyCon)
+                   <$> newSysLocalId (fsLit "$krep") Many (mkTyConTy kindRepTyCon)
 
            -- do we need to tie a knot here?
            flip runStateT env $ unKindRepM $ do
@@ -591,7 +595,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
     new_kind_rep (ForAllTy (Bndr var _) ty)
       = pprPanic "mkTyConKindRepBinds(ForAllTy)" (ppr var $$ ppr ty)
 
-    new_kind_rep (FunTy _ t1 t2)
+    new_kind_rep (FunTy _ _ t1 t2)
       = do rep1 <- getKindRep stuff in_scope t1
            rep2 <- getKindRep stuff in_scope t2
            return $ nlHsDataCon kindRepFunDataCon

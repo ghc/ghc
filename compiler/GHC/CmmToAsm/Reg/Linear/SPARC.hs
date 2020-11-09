@@ -3,14 +3,15 @@
 -- | Free regs map for SPARC
 module GHC.CmmToAsm.Reg.Linear.SPARC where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.Regs
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
 import GHC.Platform.Regs
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 
 import Data.Word
@@ -37,6 +38,9 @@ data FreeRegs
 
 instance Show FreeRegs where
         show = showFreeRegs
+
+instance Outputable FreeRegs where
+        ppr = text . showFreeRegs
 
 -- | A reg map where no regs are free to be allocated.
 noFreeRegs :: FreeRegs

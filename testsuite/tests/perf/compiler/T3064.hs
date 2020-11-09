@@ -15,7 +15,6 @@ instance Applicative f => Applicative (ReaderT r f) where
   f <*> v = ReaderT $ \r -> runReaderT f r <*> runReaderT v r
 
 instance (Monad m) => Monad (ReaderT r m) where
-    return a = ReaderT $ \_ -> return a
     m >>= k  = ReaderT $ \r -> do
         a <- runReaderT m r
         runReaderT (k a) r

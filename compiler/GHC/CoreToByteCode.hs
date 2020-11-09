@@ -1,8 +1,11 @@
-{-# LANGUAGE CPP, MagicHash, RecordWildCards, BangPatterns #-}
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards            #-}
+
 {-# OPTIONS_GHC -fprof-auto-top #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -12,25 +15,27 @@ module GHC.CoreToByteCode ( UnlinkedBCO, byteCodeGen, coreExprToBCOs ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Session
+import GHC.Driver.Env
 
 import GHC.ByteCode.Instr
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 
+import GHC.Platform
+import GHC.Platform.Profile
+
 import GHC.Runtime.Interpreter
 import GHCi.FFI
 import GHCi.RemoteTypes
 import GHC.Types.Basic
-import GHC.Driver.Session
-import Outputable
-import GHC.Platform
+import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Id.Make
 import GHC.Types.Id
-import GHC.Types.Var ( updateVarType )
 import GHC.Types.ForeignCall
-import GHC.Driver.Types
 import GHC.Core.Utils
 import GHC.Core
 import GHC.Core.Ppr
@@ -41,20 +46,22 @@ import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var.Set
+import GHC.Builtin.Types ( unboxedUnitTy )
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCo.Ppr ( pprType )
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Types.Unique
-import FastString
-import Panic
+import GHC.Builtin.Uniques
+import GHC.Data.FastString
+import GHC.Utils.Panic
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
-import OrdList
-import Maybes
+import GHC.Data.OrdList
+import GHC.Data.Maybe
 import GHC.Types.Var.Env
 import GHC.Builtin.Names ( unsafeEqualityProofName )
 
@@ -64,16 +71,17 @@ import Control.Monad
 import Data.Char
 
 import GHC.Types.Unique.Supply
-import GHC.Types.Module
+import GHC.Unit.Module
 
 import Control.Exception
 import Data.Array
+import Data.Coerce (coerce)
 import Data.ByteString (ByteString)
 import Data.Map (Map)
 import Data.IntMap (IntMap)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
-import qualified FiniteMap as Map
+import qualified GHC.Data.FiniteMap as Map
 import Data.Ord
 import GHC.Stack.CCS
 import Data.Either ( partitionEithers )
@@ -240,7 +248,7 @@ ppBCEnv p
 -- Create a BCO and do a spot of peephole optimisation on the insns
 -- at the same time.
 mkProtoBCO
-   :: DynFlags
+   :: Platform
    -> name
    -> BCInstrList
    -> Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet)
@@ -251,7 +259,7 @@ mkProtoBCO
    -> Bool      -- True <=> is a return point, rather than a function
    -> [FFIInfo]
    -> ProtoBCO name
-mkProtoBCO dflags nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
+mkProtoBCO platform nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
    = ProtoBCO {
         protoBCOName = nm,
         protoBCOInstrs = maybe_with_stack_check,
@@ -270,7 +278,7 @@ mkProtoBCO dflags nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
         -- (hopefully rare) cases when the (overestimated) stack use
         -- exceeds iNTERP_STACK_CHECK_THRESH.
         maybe_with_stack_check
-           | is_ret && stack_usage < fromIntegral (aP_STACK_SPLIM dflags) = peep_d
+           | is_ret && stack_usage < fromIntegral (pc_AP_STACK_SPLIM (platformConstants platform)) = peep_d
                 -- don't do stack checks at return points,
                 -- everything is aggregated up to the top BCO
                 -- (which must be a function).
@@ -311,7 +319,7 @@ schemeTopBind :: (Id, AnnExpr Id DVarSet) -> BcM (ProtoBCO Name)
 schemeTopBind (id, rhs)
   | Just data_con <- isDataConWorkId_maybe id,
     isNullaryRepDataCon data_con = do
-    dflags <- getDynFlags
+    platform <- profilePlatform <$> getProfile
         -- Special case for the worker of a nullary data con.
         -- It'll look like this:        Nil = /\a -> Nil a
         -- If we feed it into schemeR, we'll get
@@ -320,7 +328,7 @@ schemeTopBind (id, rhs)
         -- by just re-using the single top-level definition.  So
         -- for the worker itself, we must allocate it directly.
     -- ioToBc (putStrLn $ "top level BCO")
-    emitBc (mkProtoBCO dflags (getName id) (toOL [PACK data_con 0, ENTER])
+    emitBc (mkProtoBCO platform (getName id) (toOL [PACK data_con 0, ENTER])
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
   | otherwise
@@ -379,9 +387,9 @@ schemeR_wrk
     -> BcM (ProtoBCO Name)
 schemeR_wrk fvs nm original_body (args, body)
    = do
-     dflags <- getDynFlags
+     profile <- getProfile
      let
-         platform  = targetPlatform dflags
+         platform  = profilePlatform profile
          all_args  = reverse args ++ fvs
          arity     = length all_args
          -- all_args are the args in reverse order.  We're compiling a function
@@ -400,7 +408,7 @@ schemeR_wrk fvs nm original_body (args, body)
          bitmap = mkBitmap platform bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
 
-     emitBc (mkProtoBCO dflags nm body_code (Right original_body)
+     emitBc (mkProtoBCO platform nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
 
 -- introduce break instructions for ticked expressions
@@ -410,8 +418,7 @@ schemeER_wrk d p rhs
   = do  code <- schemeE d 0 p newRhs
         cc_arr <- getCCArray
         this_mod <- moduleName <$> getCurrentModule
-        dflags <- getDynFlags
-        let platform = targetPlatform dflags
+        platform <- profilePlatform <$> getProfile
         let idOffSets = getVarOffSets platform d p fvs
         let breakInfo = CgBreakInfo
                         { cgb_vars = idOffSets
@@ -622,10 +629,10 @@ schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
           --    match = /\(r::RuntimeRep) /\(a::TYPE r).
           --            \(k :: Int -> a) \(v::T).
           --            case v of MkV n -> k n
-          -- Here (k n) :: a :: Type r, so we don't know if it's lifted
+          -- Here (k n) :: a :: TYPE r, so we don't know if it's lifted
           -- or not; but that should be fine provided we add that void arg.
 
-          id <- newId (mkVisFunTy realWorldStatePrimTy ty)
+          id <- newId (mkVisFunTyMany realWorldStatePrimTy ty)
           st <- newId realWorldStatePrimTy
           let letExp = AnnLet (AnnNonRec id (fvs, AnnLam st (emptyDVarSet, exp)))
                               (emptyDVarSet, (AnnApp (emptyDVarSet, AnnVar id)
@@ -645,7 +652,7 @@ schemeE d s p (AnnCase (_,scrut) _ _ []) = schemeE d s p scrut
 
 -- handle pairs with one void argument (e.g. state token)
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
-   | isUnboxedTupleCon dc
+   | isUnboxedTupleDataCon dc
         -- Convert
         --      case .... of x { (# V'd-thing, a #) -> ... }
         -- to
@@ -664,7 +671,7 @@ schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
 
 -- handle unit tuples
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1], rhs)])
-   | isUnboxedTupleCon dc
+   | isUnboxedTupleDataCon dc
    , typePrimRep (idType bndr) `lengthAtMost` 1
    = doCase d s p scrut bind1 [(DEFAULT, [], rhs)] (Just bndr)
 
@@ -673,7 +680,7 @@ schemeE d s p (AnnCase scrut bndr _ alt@[(DEFAULT, [], _)])
    | isUnboxedTupleType (idType bndr)
    , Just ty <- case typePrimRep (idType bndr) of
        [_]  -> Just (unwrapType (idType bndr))
-       []   -> Just voidPrimTy
+       []   -> Just unboxedUnitTy
        _    -> Nothing
        -- handles any pattern with a single non-void binder; in particular I/O
        -- monad returns (# RealWorld#, a #)
@@ -708,7 +715,7 @@ protectNNLJoinPointBind x rhs@(fvs, _)
 protectNNLJoinPointId :: Id -> Id
 protectNNLJoinPointId x
   = ASSERT( isNNLJoinPoint x )
-    updateVarType (voidPrimTy `mkVisFunTy`) x
+    updateIdTypeButNotMult (unboxedUnitTy `mkVisFunTyMany`) x
 
 {-
    Ticked Expressions
@@ -743,8 +750,8 @@ isUnliftedType check in the AnnVar case of schemeE.) Here is the strategy:
 
 1. Detect NNLJPs. This is done in isNNLJoinPoint.
 
-2. When binding an NNLJP, add a `\ (_ :: Void#) ->` to its RHS, and modify the
-   type to tack on a `Void# ->`. (Void# is written voidPrimTy within GHC.)
+2. When binding an NNLJP, add a `\ (_ :: (# #)) ->` to its RHS, and modify the
+   type to tack on a `(# #) ->`.
    Note that functions are never levity-polymorphic, so this transformation
    changes an NNLJP to a non-levity-polymorphic join point. This is done
    in protectNNLJoinPointBind, called from the AnnLet case of schemeE.
@@ -822,7 +829,7 @@ schemeT d s p app
 
    -- Case 2: Constructor application
    | Just con <- maybe_saturated_dcon
-   , isUnboxedTupleCon con
+   , isUnboxedTupleDataCon con
    = case args_r_to_l of
         [arg1,arg2] | isVAtom arg1 ->
                   unboxedTupleReturn d s p arg2
@@ -878,8 +885,8 @@ mkConAppCode orig_d _ p con args_r_to_l =
     ASSERT( args_r_to_l `lengthIs` dataConRepArity con ) app_code
   where
     app_code = do
-        dflags <- getDynFlags
-        let platform = targetPlatform dflags
+        profile <- getProfile
+        let platform = profilePlatform profile
 
         -- The args are initially in reverse order, but mkVirtHeapOffsets
         -- expects them to be left-to-right.
@@ -890,7 +897,7 @@ mkConAppCode orig_d _ p con args_r_to_l =
                 , not (isVoidRep prim_rep)
                 ]
             (_, _, args_offsets) =
-                mkVirtHeapOffsetsWithPadding dflags StdHeader non_voids
+                mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
 
             do_pushery !d (arg : args) = do
                 (push, arg_bytes) <- case arg of
@@ -999,10 +1006,11 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 
   | otherwise
   = do
-     dflags <- getDynFlags
+     profile <- getProfile
      hsc_env <- getHscEnv
      let
-        platform = targetPlatform dflags
+        platform = profilePlatform profile
+
         profiling
           | Just interp <- hsc_interp hsc_env
           = interpreterProfiled interp
@@ -1063,7 +1071,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
            -- algebraic alt with some binders
            | otherwise =
              let (tot_wds, _ptrs_wds, args_offsets) =
-                     mkVirtHeapOffsets dflags NoHeader
+                     mkVirtHeapOffsets profile NoHeader
                          [ NonVoid (bcIdPrimRep id, id)
                          | NonVoid id <- nonVoidIds real_bndrs
                          ]
@@ -1086,13 +1094,13 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 
         my_discr (DEFAULT, _, _) = NoDiscr {-shouldn't really happen-}
         my_discr (DataAlt dc, _, _)
-           | isUnboxedTupleCon dc || isUnboxedSumCon dc
+           | isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
            = multiValException
            | otherwise
            = DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))
         my_discr (LitAlt l, _, _)
-           = case l of LitNumber LitNumInt i  _  -> DiscrI (fromInteger i)
-                       LitNumber LitNumWord w _  -> DiscrW (fromInteger w)
+           = case l of LitNumber LitNumInt i  -> DiscrI (fromInteger i)
+                       LitNumber LitNumWord w -> DiscrW (fromInteger w)
                        LitFloat r   -> DiscrF (fromRational r)
                        LitDouble r  -> DiscrD (fromRational r)
                        LitChar i    -> DiscrI (ord i)
@@ -1138,7 +1146,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 
      let
          alt_bco_name = getName bndr
-         alt_bco = mkProtoBCO dflags alt_bco_name alt_final (Left alts)
+         alt_bco = mkProtoBCO platform alt_bco_name alt_final (Left alts)
                        0{-no arity-} bitmap_size bitmap True{-is alts-}
 --     trace ("case: bndr = " ++ showSDocDebug (ppr bndr) ++ "\ndepth = " ++ show d ++ "\nenv = \n" ++ showSDocDebug (ppBCEnv p) ++
 --            "\n      bitmap = " ++ show bitmap) $ do
@@ -1172,10 +1180,10 @@ generateCCall
     -> BcM BCInstrList
 generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
  = do
-     dflags <- getDynFlags
+     profile <- getProfile
 
      let
-         platform = targetPlatform dflags
+         platform = profilePlatform profile
          -- useful constants
          addr_size_b :: ByteOff
          addr_size_b = wordSize platform
@@ -1197,17 +1205,17 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
                     Just t
                      | t == arrayPrimTyCon || t == mutableArrayPrimTyCon
                        -> do rest <- pargs (d + addr_size_b) az
-                             code <- parg_ArrayishRep (fromIntegral (arrPtrsHdrSize dflags)) d p a
+                             code <- parg_ArrayishRep (fromIntegral (arrPtrsHdrSize profile)) d p a
                              return ((code,AddrRep):rest)
 
                      | t == smallArrayPrimTyCon || t == smallMutableArrayPrimTyCon
                        -> do rest <- pargs (d + addr_size_b) az
-                             code <- parg_ArrayishRep (fromIntegral (smallArrPtrsHdrSize dflags)) d p a
+                             code <- parg_ArrayishRep (fromIntegral (smallArrPtrsHdrSize profile)) d p a
                              return ((code,AddrRep):rest)
 
                      | t == byteArrayPrimTyCon || t == mutableByteArrayPrimTyCon
                        -> do rest <- pargs (d + addr_size_b) az
-                             code <- parg_ArrayishRep (fromIntegral (arrWordsHdrSize dflags)) d p a
+                             code <- parg_ArrayishRep (fromIntegral (arrWordsHdrSize profile)) d p a
                              return ((code,AddrRep):rest)
 
                     -- Default case: push taggedly, but otherwise intact.
@@ -1455,7 +1463,7 @@ maybe_is_tagToEnum_call app
            , isDataTyCon tyc
            = map (getName . dataConWorkId) (tyConDataCons tyc)
            -- NOTE: use the worker name, not the source name of
-           -- the DataCon.  See DataCon.hs for details.
+           -- the DataCon.  See "GHC.Core.DataCon" for details.
            | otherwise
            = pprPanic "maybe_is_tagToEnum_call.extract_constr_Ids" (ppr ty)
 
@@ -1619,14 +1627,14 @@ pushAtom _ _ (AnnLit lit) = do
                            wordsToBytes platform size_words)
 
      case lit of
-        LitLabel _ _ _   -> code N
-        LitFloat _       -> code F
-        LitDouble _      -> code D
-        LitChar _        -> code N
-        LitNullAddr      -> code N
-        LitString _      -> code N
-        LitRubbish       -> code N
-        LitNumber nt _ _ -> case nt of
+        LitLabel _ _ _  -> code N
+        LitFloat _      -> code F
+        LitDouble _     -> code D
+        LitChar _       -> code N
+        LitNullAddr     -> code N
+        LitString _     -> code N
+        LitRubbish      -> code N
+        LitNumber nt _  -> case nt of
           LitNumInt     -> code N
           LitNumWord    -> code N
           LitNumInt64   -> code L
@@ -1961,7 +1969,7 @@ data BcM_State
         { bcm_hsc_env :: HscEnv
         , uniqSupply  :: UniqSupply      -- for generating fresh variable names
         , thisModule  :: Module          -- current module (for breakpoints)
-        , nextlabel   :: Word16          -- for generating local labels
+        , nextlabel   :: Word32          -- for generating local labels
         , ffis        :: [FFIInfo]       -- ffi info blocks, to free later
                                          -- Should be free()d when it is GCd
         , modBreaks   :: Maybe ModBreaks -- info about breakpoints
@@ -2015,6 +2023,9 @@ instance HasDynFlags BcM where
 getHscEnv :: BcM HscEnv
 getHscEnv = BcM $ \st -> return (st, bcm_hsc_env st)
 
+getProfile :: BcM Profile
+getProfile = targetProfile <$> getDynFlags
+
 emitBc :: ([FFIInfo] -> ProtoBCO Name) -> BcM (ProtoBCO Name)
 emitBc bco
   = BcM $ \st -> return (st{ffis=[]}, bco (ffis st))
@@ -2023,17 +2034,17 @@ recordFFIBc :: RemotePtr C_ffi_cif -> BcM ()
 recordFFIBc a
   = BcM $ \st -> return (st{ffis = FFIInfo a : ffis st}, ())
 
-getLabelBc :: BcM Word16
+getLabelBc :: BcM LocalLabel
 getLabelBc
   = BcM $ \st -> do let nl = nextlabel st
                     when (nl == maxBound) $
                         panic "getLabelBc: Ran out of labels"
-                    return (st{nextlabel = nl + 1}, nl)
+                    return (st{nextlabel = nl + 1}, LocalLabel nl)
 
-getLabelsBc :: Word16 -> BcM [Word16]
+getLabelsBc :: Word32 -> BcM [LocalLabel]
 getLabelsBc n
   = BcM $ \st -> let ctr = nextlabel st
-                 in return (st{nextlabel = ctr+n}, [ctr .. ctr+n-1])
+                 in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])
 
 getCCArray :: BcM (Array BreakIndex (RemotePtr CostCentre))
 getCCArray = BcM $ \st ->
@@ -2060,7 +2071,7 @@ getTopStrings = BcM $ \st -> return (st, topStrings st)
 newId :: Type -> BcM Id
 newId ty = do
     uniq <- newUnique
-    return $ mkSysLocal tickFS uniq ty
+    return $ mkSysLocal tickFS uniq Many ty
 
 tickFS :: FastString
 tickFS = fsLit "ticked"

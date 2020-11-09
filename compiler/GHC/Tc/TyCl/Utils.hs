@@ -1,15 +1,14 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1999
 
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | Analysis functions over data types. Specifically, detecting recursive types.
 --
@@ -30,42 +29,54 @@ module GHC.Tc.TyCl.Utils(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Bind( tcValBinds )
-import GHC.Core.TyCo.Rep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
 import GHC.Tc.Utils.TcType
-import GHC.Core.Predicate
+
 import GHC.Builtin.Types( unitTy )
-import GHC.Core.Make( rEC_SEL_ERROR_ID )
+import GHC.Builtin.Uniques ( mkBuiltinUnique )
+
 import GHC.Hs
+
+import GHC.Core.TyCo.Rep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
+import GHC.Core.Multiplicity
+import GHC.Core.Predicate
+import GHC.Core.Make( rEC_SEL_ERROR_ID )
 import GHC.Core.Class
 import GHC.Core.Type
-import GHC.Driver.Types
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
+import GHC.Core.TyCon.Set
+import GHC.Core.Coercion ( ltRole )
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+import GHC.Utils.FV as FV
+
+import GHC.Data.Maybe
+import GHC.Data.Bag
+import GHC.Data.FastString
+
+import GHC.Unit.Module
+
+import GHC.Types.Basic
+import GHC.Types.SrcLoc
+import GHC.Types.SourceFile
+import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Name.Set hiding (unitFV)
 import GHC.Types.Name.Reader ( mkVarUnqual )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Core.Coercion ( ltRole )
-import GHC.Types.Basic
-import GHC.Types.SrcLoc
-import GHC.Types.Unique ( mkBuiltinUnique )
-import Outputable
-import Util
-import Maybes
-import Bag
-import FastString
-import FV
-import GHC.Types.Module
+import GHC.Types.Unique.Set
+import GHC.Types.TyThing
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -90,7 +101,7 @@ synonymTyConsOfType ty
      go (LitTy _)         = emptyNameEnv
      go (TyVarTy _)       = emptyNameEnv
      go (AppTy a b)       = go a `plusNameEnv` go b
-     go (FunTy _ a b)     = go a `plusNameEnv` go b
+     go (FunTy _ w a b)   = go w `plusNameEnv` go a `plusNameEnv` go b
      go (ForAllTy _ ty)   = go ty
      go (CastTy ty co)    = go ty `plusNameEnv` go_co co
      go (CoercionTy co)   = go_co co
@@ -124,7 +135,7 @@ synonymTyConsOfType ty
      go_co (TyConAppCo _ tc cs)   = go_tc tc `plusNameEnv` go_co_s cs
      go_co (AppCo co co')         = go_co co `plusNameEnv` go_co co'
      go_co (ForAllCo _ co co')    = go_co co `plusNameEnv` go_co co'
-     go_co (FunCo _ co co')       = go_co co `plusNameEnv` go_co co'
+     go_co (FunCo _ co_mult co co') = go_co co_mult `plusNameEnv` go_co co `plusNameEnv` go_co co'
      go_co (CoVarCo _)            = emptyNameEnv
      go_co (HoleCo {})            = emptyNameEnv
      go_co (AxiomInstCo _ _ cs)   = go_co_s cs
@@ -154,7 +165,11 @@ newtype SynCycleM a = SynCycleM {
     runSynCycleM :: SynCycleState -> Either (SrcSpan, SDoc) (a, SynCycleState) }
     deriving (Functor)
 
-type SynCycleState = NameSet
+-- TODO: TyConSet is implemented as IntMap over uniques.
+-- But we could get away with something based on IntSet
+-- since we only check membershib, but never extract the
+-- elements.
+type SynCycleState = TyConSet
 
 instance Applicative SynCycleM where
     pure x = SynCycleM $ \state -> Right (x, state)
@@ -172,22 +187,22 @@ failSynCycleM loc err = SynCycleM $ \_ -> Left (loc, err)
 
 -- | Test if a 'Name' is acyclic, short-circuiting if we've
 -- seen it already.
-checkNameIsAcyclic :: Name -> SynCycleM () -> SynCycleM ()
-checkNameIsAcyclic n m = SynCycleM $ \s ->
-    if n `elemNameSet` s
+checkTyConIsAcyclic :: TyCon -> SynCycleM () -> SynCycleM ()
+checkTyConIsAcyclic tc m = SynCycleM $ \s ->
+    if tc `elemTyConSet` s
         then Right ((), s) -- short circuit
         else case runSynCycleM m s of
-                Right ((), s') -> Right ((), extendNameSet s' n)
+                Right ((), s') -> Right ((), extendTyConSet s' tc)
                 Left err -> Left err
 
 -- | Checks if any of the passed in 'TyCon's have cycles.
--- Takes the 'UnitId' of the home package (as we can avoid
+-- Takes the 'Unit' of the home package (as we can avoid
 -- checking those TyCons: cycles never go through foreign packages) and
 -- the corresponding @LTyClDecl Name@ for each 'TyCon', so we
 -- can give better error messages.
-checkSynCycles :: UnitId -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
-checkSynCycles this_uid tcs tyclds = do
-    case runSynCycleM (mapM_ (go emptyNameSet []) tcs) emptyNameSet of
+checkSynCycles :: Unit -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
+checkSynCycles this_uid tcs tyclds =
+    case runSynCycleM (mapM_ (go emptyTyConSet []) tcs) emptyTyConSet of
         Left (loc, err) -> setSrcSpan loc $ failWithTc err
         Right _  -> return ()
   where
@@ -196,15 +211,15 @@ checkSynCycles this_uid tcs tyclds = do
 
     -- Short circuit if we've already seen this Name and concluded
     -- it was acyclic.
-    go :: NameSet -> [TyCon] -> TyCon -> SynCycleM ()
+    go :: TyConSet -> [TyCon] -> TyCon -> SynCycleM ()
     go so_far seen_tcs tc =
-        checkNameIsAcyclic (tyConName tc) $ go' so_far seen_tcs tc
+        checkTyConIsAcyclic tc $ go' so_far seen_tcs tc
 
     -- Expand type synonyms, complaining if you find the same
     -- type synonym a second time.
-    go' :: NameSet -> [TyCon] -> TyCon -> SynCycleM ()
+    go' :: TyConSet -> [TyCon] -> TyCon -> SynCycleM ()
     go' so_far seen_tcs tc
-        | n `elemNameSet` so_far
+        | tc `elemTyConSet` so_far
             = failSynCycleM (getSrcSpan (head seen_tcs)) $
                   sep [ text "Cycle in type synonym declarations:"
                       , nest 2 (vcat (map ppr_decl seen_tcs)) ]
@@ -215,11 +230,11 @@ checkSynCycles this_uid tcs tyclds = do
         -- This won't hold once we get recursive packages with Backpack,
         -- but for now it's fine.
         | not (isHoleModule mod ||
-               moduleUnitId mod == this_uid ||
+               moduleUnit mod == this_uid ||
                isInteractiveModule mod)
             = return ()
         | Just ty <- synTyConRhs_maybe tc =
-            go_ty (extendNameSet so_far (tyConName tc)) (tc:seen_tcs) ty
+            go_ty (extendTyConSet so_far tc) (tc:seen_tcs) ty
         | otherwise = return ()
       where
         n = tyConName tc
@@ -232,7 +247,7 @@ checkSynCycles this_uid tcs tyclds = do
          where
           n = tyConName tc
 
-    go_ty :: NameSet -> [TyCon] -> Type -> SynCycleM ()
+    go_ty :: TyConSet -> [TyCon] -> Type -> SynCycleM ()
     go_ty so_far seen_tcs ty =
         mapM_ (go so_far seen_tcs) (synonymTyConsOfType ty)
 
@@ -282,11 +297,13 @@ and now expand superclasses for constraint (C Id):
 Each step expands superclasses one layer, and clearly does not terminate.
 -}
 
+type ClassSet = UniqSet Class
+
 checkClassCycles :: Class -> Maybe SDoc
 -- Nothing  <=> ok
 -- Just err <=> possible cycle error
 checkClassCycles cls
-  = do { (definite_cycle, err) <- go (unitNameSet (getName cls))
+  = do { (definite_cycle, err) <- go (unitUniqSet cls)
                                      cls (mkTyVarTys (classTyVars cls))
        ; let herald | definite_cycle = text "Superclass cycle for"
                     | otherwise      = text "Potential superclass cycle for"
@@ -302,12 +319,12 @@ checkClassCycles cls
     -- NB: this code duplicates TcType.transSuperClasses, but
     --     with more error message generation clobber
     -- Make sure the two stay in sync.
-    go :: NameSet -> Class -> [Type] -> Maybe (Bool, SDoc)
+    go :: ClassSet -> Class -> [Type] -> Maybe (Bool, SDoc)
     go so_far cls tys = firstJusts $
                         map (go_pred so_far) $
                         immSuperClasses cls tys
 
-    go_pred :: NameSet -> PredType -> Maybe (Bool, SDoc)
+    go_pred :: ClassSet -> PredType -> Maybe (Bool, SDoc)
        -- Nothing <=> ok
        -- Just (True, err)  <=> definite cycle
        -- Just (False, err) <=> possible cycle
@@ -320,7 +337,7 @@ checkClassCycles cls
        | otherwise
        = Nothing
 
-    go_tc :: NameSet -> PredType -> TyCon -> [Type] -> Maybe (Bool, SDoc)
+    go_tc :: ClassSet -> PredType -> TyCon -> [Type] -> Maybe (Bool, SDoc)
     go_tc so_far pred tc tys
       | isFamilyTyCon tc
       = Just (False, hang (text "one of whose superclass constraints is headed by a type family:")
@@ -330,18 +347,16 @@ checkClassCycles cls
       | otherwise   -- Equality predicate, for example
       = Nothing
 
-    go_cls :: NameSet -> Class -> [Type] -> Maybe (Bool, SDoc)
+    go_cls :: ClassSet -> Class -> [Type] -> Maybe (Bool, SDoc)
     go_cls so_far cls tys
-       | cls_nm `elemNameSet` so_far
+       | cls `elementOfUniqSet` so_far
        = Just (True, text "one of whose superclasses is" <+> quotes (ppr cls))
        | isCTupleClass cls
        = go so_far cls tys
        | otherwise
-       = do { (b,err) <- go  (so_far `extendNameSet` cls_nm) cls tys
+       = do { (b,err) <- go  (so_far `addOneToUniqSet` cls) cls tys
           ; return (b, text "one of whose superclasses is" <+> quotes (ppr cls)
                        $$ err) }
-       where
-         cls_nm = getName cls
 
 {-
 ************************************************************************
@@ -578,8 +593,8 @@ irDataCon :: DataCon -> RoleM ()
 irDataCon datacon
   = setRoleInferenceVars univ_tvs $
     irExTyVars ex_tvs $ \ ex_var_set ->
-    mapM_ (irType ex_var_set)
-          (map tyVarKind ex_tvs ++ eqSpecPreds eq_spec ++ theta ++ arg_tys)
+      do mapM_ (irType ex_var_set) (eqSpecPreds eq_spec ++ theta ++ map scaledThing arg_tys)
+         mapM_ (markNominal ex_var_set) (map tyVarKind ex_tvs ++ map scaledMult arg_tys)  -- Field multiplicities are nominal (#18799)
       -- See Note [Role-checking data constructor arguments]
   where
     (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
@@ -599,7 +614,7 @@ irType = go
                                           lcls' = extendVarSet lcls tv
                                     ; markNominal lcls (tyVarKind tv)
                                     ; go lcls' ty }
-    go lcls (FunTy _ arg res)  = go lcls arg >> go lcls res
+    go lcls (FunTy _ w arg res)  = markNominal lcls w >> go lcls arg >> go lcls res
     go _    (LitTy {})         = return ()
       -- See Note [Coercions in role inference]
     go lcls (CastTy ty _)      = go lcls ty
@@ -635,7 +650,7 @@ markNominal lcls ty = let nvars = fvVarList (FV.delFVs lcls $ get_ty_vars ty) in
     get_ty_vars :: Type -> FV
     get_ty_vars (TyVarTy tv)      = unitFV tv
     get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionFV` get_ty_vars t2
-    get_ty_vars (FunTy _ t1 t2)   = get_ty_vars t1 `unionFV` get_ty_vars t2
+    get_ty_vars (FunTy _ w t1 t2) = get_ty_vars w `unionFV` get_ty_vars t1 `unionFV` get_ty_vars t2
     get_ty_vars (TyConApp _ tys)  = mapUnionFV get_ty_vars tys
     get_ty_vars (ForAllTy tvb ty) = tyCoFVsBndr tvb (get_ty_vars ty)
     get_ty_vars (LitTy {})        = emptyFV
@@ -760,8 +775,7 @@ addTyConsToGblEnv tyclss
     do { traceTc "tcAddTyCons" $ vcat
             [ text "tycons" <+> ppr tyclss
             , text "implicits" <+> ppr implicit_things ]
-       ; gbl_env <- tcRecSelBinds (mkRecSelBinds tyclss)
-       ; return gbl_env }
+       ; tcRecSelBinds (mkRecSelBinds tyclss) }
  where
    implicit_things = concatMap implicitTyConThings tyclss
    def_meth_ids    = mkDefaultMethodIds tyclss
@@ -784,7 +798,7 @@ mkDefaultMethodType cls _   (GenericDM dm_ty) = mkSigmaTy tv_bndrs [pred] dm_ty
    where
      pred      = mkClassPred cls (mkTyVarTys (binderVars cls_bndrs))
      cls_bndrs = tyConBinders (classTyCon cls)
-     tv_bndrs  = tyConTyVarBinders cls_bndrs
+     tv_bndrs  = tyVarSpecToBinders $ tyConInvisTVBinders cls_bndrs
      -- NB: the Class doesn't have TyConBinders; we reach into its
      --     TyCon to get those.  We /do/ need the TyConBinders because
      --     we need the correct visibility: these default methods are
@@ -877,11 +891,14 @@ mkOneRecordSelector all_cons idDetails fl
     data_tv_set= tyCoVarsOfTypes inst_tys
     is_naughty = not (tyCoVarsOfType field_ty `subVarSet` data_tv_set)
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkForAllTys data_tvbs             $
+           | otherwise  = mkForAllTys (tyVarSpecToBinders data_tvbs) $
                           mkPhiTy (conLikeStupidTheta con1) $   -- Urgh!
                           -- req_theta is empty for normal DataCon
                           mkPhiTy req_theta                 $
-                          mkVisFunTy data_ty                $
+                          mkVisFunTyMany data_ty            $
+                            -- Record selectors are always typed with Many. We
+                            -- could improve on it in the case where all the
+                            -- fields in all the constructor have multiplicity Many.
                           field_ty
 
     -- Make the binding: sel (C2 { fld = x }) = x
@@ -895,7 +912,7 @@ mkOneRecordSelector all_cons idDetails fl
     mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
                                  [L loc (mk_sel_pat con)]
                                  (L loc (HsVar noExtField (L loc field_var)))
-    mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
+    mk_sel_pat con = ConPat NoExtField (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLoc (HsRecField
                         { hsRecFieldLbl
@@ -1090,9 +1107,4 @@ Therefore, when used in the right-hand side of `unT`, GHC attempts to
 instantiate `a` with `(forall b. b -> b) -> Int`, which is impredicative.
 To make sure that GHC is OK with this, we enable ImpredicativeTypes interally
 when typechecking these HsBinds so that the user does not have to.
-
-Although ImpredicativeTypes is somewhat fragile and unpredictable in GHC right
-now, it will become robust when Quick Look impredicativity is implemented. In
-the meantime, using ImpredicativeTypes to instantiate the `a` type variable in
-recSelError's type does actually work, so its use here is benign.
 -}

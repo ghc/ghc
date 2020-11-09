@@ -214,6 +214,19 @@ by saying ``-fno-wombat``.
     to their usage sites. It also inlines simple expressions like
     literals or registers.
 
+.. ghc-flag:: -fcmm-static-pred
+    :shortdesc: Enable static control flow prediction. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-cmm-static-pred
+    :category:
+
+    :default: off but enabled with :ghc-flag:`-O`.
+
+    This enables static control flow prediction on the final Cmm
+    code. If enabled GHC will apply certain heuristics to identify
+    loops and hot code paths. This information is then used by the
+    register allocation and code layout passes.
+
 .. ghc-flag:: -fasm-shortcutting
     :shortdesc: Enable shortcutting on assembly. Implied by :ghc-flag:`-O2`.
     :type: dynamic
@@ -340,8 +353,7 @@ by saying ``-fno-wombat``.
     Make dictionaries strict.
 
 .. ghc-flag:: -fdmd-tx-dict-sel
-    :shortdesc: Use a special demand transformer for dictionary selectors.
-        Always enabled by default.
+    :shortdesc: *(deprecated)* Use a special demand transformer for dictionary selectors.
     :type: dynamic
     :reverse: -fno-dmd-tx-dict-sel
     :category:
@@ -349,6 +361,7 @@ by saying ``-fno-wombat``.
     :default: on
 
     Use a special demand transformer for dictionary selectors.
+    Behaviour is unconditionally enabled starting with 9.2
 
 .. ghc-flag:: -fdo-eta-reduction
     :shortdesc: Enable eta-reduction. Implied by :ghc-flag:`-O`.
@@ -642,14 +655,15 @@ by saying ``-fno-wombat``.
     Sets the maximal number of iterations for the simplifier.
 
 .. ghc-flag:: -fmax-worker-args=⟨n⟩
-    :shortdesc: *default: 10.* If a worker has that many arguments, none will
-        be unpacked anymore.
+    :shortdesc: *default: 10.* Maximum number of value arguments for a worker.
     :type: dynamic
     :category:
 
     :default: 10
 
-    If a worker has that many arguments, none will be unpacked anymore.
+    A function will not be split into worker and wrapper if the number of
+    value arguments of the resulting worker exceeds both that of the original
+    function and this setting.
 
 .. ghc-flag:: -fno-opt-coercion
     :shortdesc: Turn off the coercion optimiser
@@ -965,6 +979,50 @@ by saying ``-fno-wombat``.
     which returns a constrained type. For example, a type class where one
     of the methods implements a traversal.
 
+.. ghc-flag:: -finline-generics
+    :shortdesc: Annotate methods of derived Generic and Generic1 instances with
+        INLINE[1] pragmas based on heuristics. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-inline-generics
+    :category:
+
+    :default: on
+    :since: 9.2.1
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    Annotate methods of derived Generic and Generic1 instances with INLINE[1]
+    pragmas based on heuristics dependent on the size of the data type in
+    question. Improves performance of generics-based algorithms as GHC is able
+    to optimize away intermediate representation more often.
+
+.. ghc-flag:: -finline-generics-aggressively
+    :shortdesc: Annotate methods of all derived Generic and Generic1 instances
+        with INLINE[1] pragmas.
+    :type: dynamic
+    :reverse: -fno-inline-generics-aggressively
+    :category:
+
+    :default: off
+    :since: 9.2.1
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    Annotate methods of all derived Generic and Generic1 instances with
+    INLINE[1] pragmas.
+
+    This flag should only be used in modules deriving Generic instances that
+    weren't considered appropriate for INLINE[1] annotations by heuristics of
+    :ghc-flag:`-finline-generics`, yet you know that doing so would be
+    beneficial.
+
+    When enabled globally it will most likely lead to worse compile times and
+    code size blowup without runtime performance gains.
+
 .. ghc-flag:: -fsolve-constant-dicts
     :shortdesc: When solving constraints, try to eagerly solve
         super classes using available dictionaries.
@@ -1212,25 +1270,12 @@ by saying ``-fno-wombat``.
 
     How eager should the compiler be to inline functions?
 
-.. ghc-flag:: -funfolding-keeness-factor=⟨n⟩
-    :shortdesc: *default: 1.5.* Tweak unfolding settings.
-    :type: dynamic
-    :category:
-
-    :default: 1.5
-
-    .. index::
-       single: inlining, controlling
-       single: unfolding, controlling
-
-    How eager should the compiler be to inline functions?
-
 .. ghc-flag:: -funfolding-use-threshold=⟨n⟩
-    :shortdesc: *default: 60.* Tweak unfolding settings.
+    :shortdesc: *default: 80.* Tweak unfolding settings.
     :type: dynamic
     :category:
 
-    :default: 60
+    :default: 80
 
     .. index::
        single: inlining, controlling

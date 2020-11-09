@@ -3,11 +3,15 @@
  * Non-blocking / asynchronous I/O for Win32.
  *
  * (c) sof, 2002-2003.
+ *
+ * NOTE: This is the MIO manager, only used for --io-manager=posix.
+ *       For the WINIO manager see base in the GHC.Event modules.
  */
 
 #if !defined(THREADED_RTS)
 
 #include "Rts.h"
+#include "RtsUtils.h"
 #include "IOManager.h"
 #include "WorkQueue.h"
 #include "ConsoleHandler.h"
@@ -22,7 +26,7 @@
  * Internal state maintained by the IO manager.
  */
 typedef struct IOManagerState {
-    CritSection      manLock;
+    Mutex            manLock;
     WorkQueue*       workQueue;
     int              queueSize;
     int              numWorkers;
@@ -30,7 +34,7 @@ typedef struct IOManagerState {
     HANDLE           hExitEvent;
     unsigned int     requestID;
     /* fields for keeping track of active WorkItems */
-    CritSection      active_work_lock;
+    Mutex            active_work_lock;
     WorkItem*        active_work_items;
     UINT             sleepResolution;
 } IOManagerState;
@@ -65,7 +69,7 @@ IOWorkerProc(PVOID param)
         // The error code is communicated back on completion of request; reset.
         errCode = 0;
 
-        EnterCriticalSection(&iom->manLock);
+        OS_ACQUIRE_LOCK(&iom->manLock);
         /* Signal that the worker is idle.
          *
          * 'workersIdle' is used when determining whether or not to
@@ -73,7 +77,7 @@ IOWorkerProc(PVOID param)
          * (see addIORequest().)
          */
         iom->workersIdle++;
-        LeaveCriticalSection(&iom->manLock);
+        OS_RELEASE_LOCK(&iom->manLock);
 
         /*
          * A possible future refinement is to make long-term idle threads
@@ -85,19 +89,19 @@ IOWorkerProc(PVOID param)
 
         if (rc == WAIT_OBJECT_0) {
             // we received the exit event
-            EnterCriticalSection(&iom->manLock);
+            OS_ACQUIRE_LOCK(&iom->manLock);
             ioMan->numWorkers--;
-            LeaveCriticalSection(&iom->manLock);
+            OS_RELEASE_LOCK(&iom->manLock);
             return 0;
         }
 
-        EnterCriticalSection(&iom->manLock);
+        OS_ACQUIRE_LOCK(&iom->manLock);
         /* Signal that the thread is 'non-idle' and about to consume
          * a work item.
          */
         iom->workersIdle--;
         iom->queueSize--;
-        LeaveCriticalSection(&iom->manLock);
+        OS_RELEASE_LOCK(&iom->manLock);
 
         if ( rc == (WAIT_OBJECT_0 + 1) ) {
             /* work item available, fetch it. */
@@ -262,21 +266,21 @@ IOWorkerProc(PVOID param)
                 }
                 // Free the WorkItem
                 DeregisterWorkItem(iom,work);
-                free(work);
+                stgFree(work);
             } else {
                 fprintf(stderr, "unable to fetch work; fatal.\n");
                 fflush(stderr);
-                EnterCriticalSection(&iom->manLock);
+                OS_ACQUIRE_LOCK(&iom->manLock);
                 ioMan->numWorkers--;
-                LeaveCriticalSection(&iom->manLock);
+                OS_RELEASE_LOCK(&iom->manLock);
                 return 1;
             }
         } else {
             fprintf(stderr, "waiting failed (%lu); fatal.\n", rc);
             fflush(stderr);
-            EnterCriticalSection(&iom->manLock);
+            OS_ACQUIRE_LOCK(&iom->manLock);
             ioMan->numWorkers--;
-            LeaveCriticalSection(&iom->manLock);
+            OS_RELEASE_LOCK(&iom->manLock);
             return 1;
         }
     }
@@ -318,7 +322,7 @@ StartIOManager(void)
     wq = NewWorkQueue();
     if ( !wq ) return false;
 
-    ioMan = (IOManagerState*)malloc(sizeof(IOManagerState));
+    ioMan = (IOManagerState*)stgMallocBytes(sizeof(IOManagerState), "StartIOManager");
 
     if (!ioMan) {
         FreeWorkQueue(wq);
@@ -329,18 +333,18 @@ StartIOManager(void)
     hExit = CreateEvent ( NULL, true, false, NULL );
     if ( !hExit ) {
         FreeWorkQueue(wq);
-        free(ioMan);
+        stgFree(ioMan);
         return false;
     }
 
     ioMan->hExitEvent = hExit;
-    InitializeCriticalSection(&ioMan->manLock);
+    OS_INIT_LOCK(&ioMan->manLock);
     ioMan->workQueue   = wq;
     ioMan->numWorkers  = 0;
     ioMan->workersIdle = 0;
     ioMan->queueSize   = 0;
     ioMan->requestID   = 1;
-    InitializeCriticalSection(&ioMan->active_work_lock);
+    OS_INIT_LOCK(&ioMan->active_work_lock);
     ioMan->active_work_items = NULL;
     ioMan->sleepResolution = sleepResolution;
 
@@ -360,7 +364,7 @@ int
 depositWorkItem( unsigned int reqID,
                  WorkItem* wItem )
 {
-    EnterCriticalSection(&ioMan->manLock);
+    OS_ACQUIRE_LOCK(&ioMan->manLock);
 
 #if 0
     fprintf(stderr, "depositWorkItem: %d/%d\n",
@@ -397,9 +401,9 @@ depositWorkItem( unsigned int reqID,
     if ( (ioMan->workersIdle < ioMan->queueSize) ) {
         /* see if giving up our quantum ferrets out some idle threads.
          */
-        LeaveCriticalSection(&ioMan->manLock);
+        OS_RELEASE_LOCK(&ioMan->manLock);
         Sleep(0);
-        EnterCriticalSection(&ioMan->manLock);
+        OS_ACQUIRE_LOCK(&ioMan->manLock);
         if ( (ioMan->workersIdle < ioMan->queueSize) ) {
             /* No, go ahead and create another. */
             ioMan->numWorkers++;
@@ -408,7 +412,7 @@ depositWorkItem( unsigned int reqID,
             }
         }
     }
-    LeaveCriticalSection(&ioMan->manLock);
+    OS_RELEASE_LOCK(&ioMan->manLock);
 
     if (SubmitWork(ioMan->workQueue,wItem)) {
         /* Note: the work item has potentially been consumed by a worker thread
@@ -437,8 +441,7 @@ AddIORequest ( int   fd,
 {
     ASSERT(ioMan);
 
-    WorkItem* wItem    = (WorkItem*)malloc(sizeof(WorkItem));
-    if (!wItem) return 0;
+    WorkItem* wItem    = (WorkItem*)stgMallocBytes(sizeof(WorkItem), "AddIORequest");
 
     unsigned int reqID = ioMan->requestID++;
 
@@ -468,8 +471,7 @@ AddDelayRequest ( HsInt          usecs,
 {
     ASSERT(ioMan);
 
-    WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
-    if (!wItem) return false;
+    WorkItem* wItem = (WorkItem*)stgMallocBytes(sizeof(WorkItem), "AddDelayRequest");
 
     unsigned int reqID = ioMan->requestID++;
 
@@ -495,7 +497,7 @@ AddProcRequest ( void* proc,
 {
     ASSERT(ioMan);
 
-    WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
+    WorkItem* wItem = (WorkItem*)stgMallocBytes(sizeof(WorkItem), "AddProcRequest");
     if (!wItem) return false;
 
     unsigned int reqID = ioMan->requestID++;
@@ -522,24 +524,24 @@ void ShutdownIOManager ( bool wait_threads )
     if (wait_threads) {
         /* Wait for all worker threads to die. */
         for (;;) {
-            EnterCriticalSection(&ioMan->manLock);
+            OS_ACQUIRE_LOCK(&ioMan->manLock);
             num = ioMan->numWorkers;
-            LeaveCriticalSection(&ioMan->manLock);
+            OS_RELEASE_LOCK(&ioMan->manLock);
             if (num == 0)
                 break;
             Sleep(10);
         }
         FreeWorkQueue(ioMan->workQueue);
         CloseHandle(ioMan->hExitEvent);
-        DeleteCriticalSection(&ioMan->active_work_lock);
-        DeleteCriticalSection(&ioMan->manLock);
+        OS_CLOSE_LOCK(&ioMan->active_work_lock);
+        OS_CLOSE_LOCK(&ioMan->manLock);
 
         mmresult = timeEndPeriod(ioMan->sleepResolution);
         if (mmresult != MMSYSERR_NOERROR) {
             barf("timeEndPeriod failed");
         }
 
-        free(ioMan);
+        stgFree(ioMan);
         ioMan = NULL;
     }
 }
@@ -550,10 +552,10 @@ void
 RegisterWorkItem(IOManagerState* ioMan,
                  WorkItem* wi)
 {
-    EnterCriticalSection(&ioMan->active_work_lock);
+    OS_ACQUIRE_LOCK(&ioMan->active_work_lock);
     wi->link = ioMan->active_work_items;
     ioMan->active_work_items = wi;
-    LeaveCriticalSection(&ioMan->active_work_lock);
+    OS_RELEASE_LOCK(&ioMan->active_work_lock);
 }
 
 static
@@ -563,7 +565,7 @@ DeregisterWorkItem(IOManagerState* ioMan,
 {
     WorkItem *ptr, *prev;
 
-    EnterCriticalSection(&ioMan->active_work_lock);
+    OS_ACQUIRE_LOCK(&ioMan->active_work_lock);
     for(prev=NULL,ptr=ioMan->active_work_items;ptr;prev=ptr,ptr=ptr->link) {
         if (wi->requestID == ptr->requestID) {
             if (prev==NULL) {
@@ -571,13 +573,13 @@ DeregisterWorkItem(IOManagerState* ioMan,
             } else {
                 prev->link = ptr->link;
             }
-            LeaveCriticalSection(&ioMan->active_work_lock);
+            OS_RELEASE_LOCK(&ioMan->active_work_lock);
             return;
         }
     }
     fprintf(stderr, "DeregisterWorkItem: unable to locate work item %d\n",
             wi->requestID);
-    LeaveCriticalSection(&ioMan->active_work_lock);
+    OS_RELEASE_LOCK(&ioMan->active_work_lock);
 }
 
 
@@ -596,11 +598,11 @@ void
 abandonWorkRequest ( int reqID )
 {
     WorkItem *ptr;
-    EnterCriticalSection(&ioMan->active_work_lock);
+    OS_ACQUIRE_LOCK(&ioMan->active_work_lock);
     for(ptr=ioMan->active_work_items;ptr;ptr=ptr->link) {
         if (ptr->requestID == (unsigned int)reqID ) {
             ptr->abandonOp = 1;
-            LeaveCriticalSection(&ioMan->active_work_lock);
+            OS_RELEASE_LOCK(&ioMan->active_work_lock);
             return;
         }
     }
@@ -608,7 +610,7 @@ abandonWorkRequest ( int reqID )
      * finished sometime since awaitRequests() last drained the completed
      * request table; i.e., not an error.
      */
-    LeaveCriticalSection(&ioMan->active_work_lock);
+    OS_RELEASE_LOCK(&ioMan->active_work_lock);
 }
 
 #endif

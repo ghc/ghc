@@ -1,11 +1,13 @@
+{-# LANGUAGE CPP            #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeApplications #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-2006
 
 GHC.Rename.Env contains functions which convert RdrNames into Names.
 
 -}
-
-{-# LANGUAGE CPP, MultiWayIf, NamedFieldPuns #-}
 
 module GHC.Rename.Env (
         newTopSrcBinder,
@@ -15,7 +17,7 @@ module GHC.Rename.Env (
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
         lookupTypeOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
-        lookupOccRn_overloaded, lookupGlobalOccRn_overloaded, lookupExactOcc,
+        lookupOccRn_overloaded, lookupGlobalOccRn_overloaded,
 
         ChildLookupResult(..),
         lookupSubBndrOcc_helper,
@@ -31,7 +33,11 @@ module GHC.Rename.Env (
 
         -- Rebindable Syntax
         lookupSyntax, lookupSyntaxExpr, lookupSyntaxName, lookupSyntaxNames,
-        lookupIfThenElse,
+        lookupIfThenElse, lookupReboundIf,
+
+        -- QualifiedDo
+        lookupQualifiedDoExpr, lookupQualifiedDo,
+        lookupQualifiedDoName, lookupNameWithQualifier,
 
         -- Constructing usage information
         addUsedGRE, addUsedGREs, addUsedDataCons,
@@ -44,37 +50,40 @@ module GHC.Rename.Env (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
 import GHC.Iface.Env
 import GHC.Hs
 import GHC.Types.Name.Reader
-import GHC.Driver.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
-import GHC.Parser.PostProcess ( filterCTuple, setRdrNameSpace )
+import GHC.Parser.PostProcess ( setRdrNameSpace )
+import GHC.Builtin.RebindableNames
 import GHC.Builtin.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
-import GHC.Types.Module
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Warnings  ( WarningTxt, pprWarningTxtForMsg )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import ErrUtils         ( MsgDoc )
+import GHC.Utils.Error  ( MsgDoc )
 import GHC.Builtin.Names( rOOT_MAIN )
-import GHC.Types.Basic  ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )
+import GHC.Types.Basic  ( TopLevelFlag(..), TupleSort(..) )
 import GHC.Types.SrcLoc as SrcLoc
-import Outputable
+import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique.Set ( uniqSetAny )
-import Util
-import Maybes
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Data.Maybe
 import GHC.Driver.Session
-import FastString
+import GHC.Data.FastString
 import Control.Monad
-import ListSetOps       ( minusList )
+import GHC.Data.List.SetOps ( minusList )
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Rename.Unbound
 import GHC.Rename.Utils
@@ -167,7 +176,7 @@ newTopSrcBinder (L loc rdr_name)
          ; unless (this_mod == nameModule name)
                   (addErrAt loc (badOrigBinding rdr_name))
          ; return name }
-    else   -- See Note [Binders in Template Haskell] in Convert.hs
+    else   -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
       do { this_mod <- getModule
          ; externaliseName this_mod name }
 
@@ -237,16 +246,6 @@ terribly efficient, but there seems to be no better way.
 -- Can be made to not be exposed
 -- Only used unwrapped in rnAnnProvenance
 lookupTopBndrRn :: RdrName -> RnM Name
-lookupTopBndrRn n = do nopt <- lookupTopBndrRn_maybe n
-                       case nopt of
-                         Just n' -> return n'
-                         Nothing -> do traceRn "lookupTopBndrRn fail" (ppr n)
-                                       unboundName WL_LocalTop n
-
-lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
-lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
-
-lookupTopBndrRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Look up a top-level source-code binder.   We may be looking up an unqualified 'f',
 -- and there may be several imported 'f's too, which must not confuse us.
 -- For example, this is OK:
@@ -257,14 +256,8 @@ lookupTopBndrRn_maybe :: RdrName -> RnM (Maybe Name)
 --
 -- A separate function (importsFromLocalDecls) reports duplicate top level
 -- decls, so here it's safe just to choose an arbitrary one.
---
--- There should never be a qualified name in a binding position in Haskell,
--- but there can be if we have read in an external-Core file.
--- The Haskell parser checks for the illegal qualified name in Haskell
--- source files, so we don't need to do so here.
-
-lookupTopBndrRn_maybe rdr_name =
-  lookupExactOrOrig rdr_name Just $
+lookupTopBndrRn rdr_name =
+  lookupExactOrOrig rdr_name id $
     do  {  -- Check for operators in type or class declarations
            -- See Note [Type and class operator definitions]
           let occ = rdrNameOcc rdr_name
@@ -274,25 +267,19 @@ lookupTopBndrRn_maybe rdr_name =
 
         ; env <- getGlobalRdrEnv
         ; case filter isLocalGRE (lookupGRE_RdrName rdr_name env) of
-            [gre] -> return (Just (gre_name gre))
-            _     -> return Nothing  -- Ambiguous (can't happen) or unbound
+            [gre] -> return (gre_name gre)
+            _     -> do -- Ambiguous (can't happen) or unbound
+                        traceRn "lookupTopBndrRN fail" (ppr rdr_name)
+                        unboundName WL_LocalTop rdr_name
     }
 
------------------------------------------------
--- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
--- This adds an error if the name cannot be found.
-lookupExactOcc :: Name -> RnM Name
-lookupExactOcc name
-  = do { result <- lookupExactOcc_either name
-       ; case result of
-           Left err -> do { addErr err
-                          ; return name }
-           Right name' -> return name' }
+lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
+lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
 
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
--- This never adds an error, but it may return one.
+-- This never adds an error, but it may return one, see
+-- Note [Errors in lookup functions]
 lookupExactOcc_either :: Name -> RnM (Either MsgDoc Name)
--- See Note [Looking up Exact RdrNames]
 lookupExactOcc_either name
   | Just thing <- wiredInNameTyThing_maybe name
   , Just tycon <- case thing of
@@ -333,16 +320,11 @@ lookupExactOcc_either name
                             ; th_topnames <- readTcRef th_topnames_var
                             ; if name `elemNameSet` th_topnames
                               then return (Right name)
-                              else return (Left exact_nm_err)
+                              else return (Left (exactNameErr name))
                             }
                        }
            gres -> return (Left (sameNameErr gres))   -- Ugh!  See Note [Template Haskell ambiguity]
        }
-  where
-    exact_nm_err = hang (text "The exact Name" <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
-                      2 (vcat [ text "Probable cause: you used a unique Template Haskell name (NameU), "
-                              , text "perhaps via newName, but did not bind it"
-                              , text "If that's it, then -ddump-splices might be useful" ])
 
 sameNameErr :: [GlobalRdrElt] -> MsgDoc
 sameNameErr [] = panic "addSameNameErr: empty list"
@@ -429,15 +411,67 @@ lookupConstructorFields con_name
 
 
 -- In CPS style as `RnM r` is monadic
+-- Reports an error if the name is an Exact or Orig and it can't find the name
+-- Otherwise if it is not an Exact or Orig, returns k
 lookupExactOrOrig :: RdrName -> (Name -> r) -> RnM r -> RnM r
 lookupExactOrOrig rdr_name res k
+  = do { men <- lookupExactOrOrig_base rdr_name
+       ; case men of
+          FoundExactOrOrig n -> return (res n)
+          ExactOrOrigError e ->
+            do { addErr e
+               ; return (res (mkUnboundNameRdr rdr_name)) }
+          NotExactOrOrig     -> k }
+
+-- Variant of 'lookupExactOrOrig' that does not report an error
+-- See Note [Errors in lookup functions]
+-- Calls k if the name is neither an Exact nor Orig
+lookupExactOrOrig_maybe :: RdrName -> (Maybe Name -> r) -> RnM r -> RnM r
+lookupExactOrOrig_maybe rdr_name res k
+  = do { men <- lookupExactOrOrig_base rdr_name
+       ; case men of
+           FoundExactOrOrig n -> return (res (Just n))
+           ExactOrOrigError _ -> return (res Nothing)
+           NotExactOrOrig     -> k }
+
+data ExactOrOrigResult = FoundExactOrOrig Name -- ^ Found an Exact Or Orig Name
+                       | ExactOrOrigError MsgDoc -- ^ The RdrName was an Exact
+                                                 -- or Orig, but there was an
+                                                 -- error looking up the Name
+                       | NotExactOrOrig -- ^ The RdrName is neither an Exact nor
+                                        -- Orig
+
+-- Does the actual looking up an Exact or Orig name, see 'ExactOrOrigResult'
+lookupExactOrOrig_base :: RdrName -> RnM ExactOrOrigResult
+lookupExactOrOrig_base rdr_name
   | Just n <- isExact_maybe rdr_name   -- This happens in derived code
-  = res <$> lookupExactOcc n
+  = cvtEither <$> lookupExactOcc_either n
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-  = res <$> lookupOrig rdr_mod rdr_occ
-  | otherwise = k
+  = FoundExactOrOrig <$> lookupOrig rdr_mod rdr_occ
+  | otherwise = return NotExactOrOrig
+  where
+    cvtEither (Left e)  = ExactOrOrigError e
+    cvtEither (Right n) = FoundExactOrOrig n
 
 
+{- Note [Errors in lookup functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Many of these lookup functions will attach an error if it can't find the Name it
+is trying to lookup. However there are also _maybe and _either variants for many
+of these functions.
+
+These variants should *not* attach any errors, as there are
+places where we want to attempt looking up a name, but it's not the end of the
+world if we don't find it.
+
+For example, see lookupThName_maybe: It calls lookupGlobalOccRn_maybe multiple
+times for varying names in different namespaces. lookupGlobalOccRn_maybe should
+therefore never attach an error, instead just return a Nothing.
+
+For these _maybe/_either variant functions then, avoid calling further lookup
+functions that can attach errors and instead call their _maybe/_either
+counterparts.
+-}
 
 -----------------------------------------------
 -- | Look up an occurrence of a field in record construction or pattern
@@ -789,15 +823,17 @@ the encloseing instance decl, if any.
 
 Note [Looking up Exact RdrNames]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Exact RdrNames are generated by Template Haskell.  See Note [Binders
-in Template Haskell] in Convert.
+Exact RdrNames are generated by:
+
+* Template Haskell (See Note [Binders in Template Haskell] in GHC.ThToHs)
+* Derived instances (See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate)
 
 For data types and classes have Exact system Names in the binding
 positions for constructors, TyCons etc.  For example
     [d| data T = MkT Int |]
-when we splice in and Convert to HsSyn RdrName, we'll get
+when we splice in and convert to HsSyn RdrName, we'll get
     data (Exact (system Name "T")) = (Exact (system Name "MkT")) ...
-These System names are generated by Convert.thRdrName
+These System names are generated by GHC.ThToHs.thRdrName
 
 But, constructors and the like need External Names, not System Names!
 So we do the following
@@ -920,7 +956,7 @@ lookupLocalOccRn rdr_name
            Just name -> return name
            Nothing   -> unboundName WL_LocalOnly rdr_name }
 
--- lookupPromotedOccRn looks up an optionally promoted RdrName.
+-- lookupTypeOccRn looks up an optionally promoted RdrName.
 lookupTypeOccRn :: RdrName -> RnM Name
 -- see Note [Demotion]
 lookupTypeOccRn rdr_name
@@ -972,6 +1008,17 @@ lookup_demoted rdr_name
            , text "instead of"
            , quotes (ppr name) <> dot ]
 
+-- If the given RdrName can be promoted to the type level and its promoted variant is in scope,
+-- lookup_promoted returns the corresponding type-level Name.
+-- Otherwise, the function returns Nothing.
+-- See Note [Promotion] below.
+lookup_promoted :: RdrName -> RnM (Maybe Name)
+lookup_promoted rdr_name
+  | Just promoted_rdr <- promoteRdrName rdr_name
+  = lookupOccRn_maybe promoted_rdr
+  | otherwise
+  = return Nothing
+
 badVarInType :: RdrName -> RnM Name
 badVarInType rdr_name
   = do { addErr (text "Illegal promoted term variable in a type:"
@@ -1007,6 +1054,26 @@ its namespace to DataName and do a second lookup.
 
 The final result (after the renamer) will be:
   HsTyVar ("Zero", DataName)
+
+Note [Promotion]
+~~~~~~~~~~~~~~~
+When the user mentions a type constructor or a type variable in a
+term-level context, then we report that a value identifier was expected
+instead of a type-level one. That makes error messages more precise.
+Previously, such errors contained only the info that a given value was out of scope (#18740).
+We promote the namespace of RdrName and look up after that
+(see the functions promotedRdrName and lookup_promoted).
+
+In particular, we have the following error message
+  • Illegal term-level use of the type constructor ‘Int’
+      imported from ‘Prelude’ (and originally defined in ‘GHC.Types’)
+  • In the first argument of ‘id’, namely ‘Int’
+    In the expression: id Int
+    In an equation for ‘x’: x = id Int
+
+when the user writes the following declaration
+
+  x = id Int
 -}
 
 lookupOccRnX_maybe :: (RdrName -> RnM (Maybe r)) -> (Name -> r) -> RdrName
@@ -1021,42 +1088,59 @@ lookupOccRn_maybe = lookupOccRnX_maybe lookupGlobalOccRn_maybe id
 
 lookupOccRn_overloaded :: Bool -> RdrName
                        -> RnM (Maybe (Either Name [Name]))
-lookupOccRn_overloaded overload_ok
-  = lookupOccRnX_maybe global_lookup Left
-      where
-        global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
-        global_lookup n =
-          runMaybeT . msum . map MaybeT $
-            [ lookupGlobalOccRn_overloaded overload_ok n
-            , fmap Left . listToMaybe <$> lookupQualifiedNameGHCi n ]
+lookupOccRn_overloaded overload_ok rdr_name
+  = do { mb_name <- lookupOccRnX_maybe global_lookup Left rdr_name
+       ; case mb_name of
+           Nothing   -> fmap @Maybe Left <$> lookup_promoted rdr_name
+                        -- See Note [Promotion].
+                        -- We try looking up the name as a
+                        -- type constructor or type variable, if
+                        -- we failed to look up the name at the term level.
+           p         -> return p }
+
+  where
+    global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
+    global_lookup n =
+      runMaybeT . msum . map MaybeT $
+        [ lookupGlobalOccRn_overloaded overload_ok n
+        , fmap Left . listToMaybe <$> lookupQualifiedNameGHCi n ]
 
 
 
 lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Looks up a RdrName occurrence in the top-level
---   environment, including using lookupQualifiedNameGHCi
---   for the GHCi case
+-- environment, including using lookupQualifiedNameGHCi
+-- for the GHCi case, but first tries to find an Exact or Orig name.
 -- No filter function; does not report an error on failure
+-- See Note [Errors in lookup functions]
 -- Uses addUsedRdrName to record use and deprecations
 lookupGlobalOccRn_maybe rdr_name =
-  lookupExactOrOrig rdr_name Just $
-    runMaybeT . msum . map MaybeT $
-      [ fmap gre_name <$> lookupGreRn_maybe rdr_name
-      , listToMaybe <$> lookupQualifiedNameGHCi rdr_name ]
-                      -- This test is not expensive,
-                      -- and only happens for failed lookups
+  lookupExactOrOrig_maybe rdr_name id (lookupGlobalOccRn_base rdr_name)
 
 lookupGlobalOccRn :: RdrName -> RnM Name
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global
 -- environment.  Adds an error message if the RdrName is not in scope.
 -- You usually want to use "lookupOccRn" which also looks in the local
 -- environment.
-lookupGlobalOccRn rdr_name
-  = do { mb_name <- lookupGlobalOccRn_maybe rdr_name
-       ; case mb_name of
-           Just n  -> return n
-           Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
-                         ; unboundName WL_Global rdr_name } }
+lookupGlobalOccRn rdr_name =
+  lookupExactOrOrig rdr_name id $ do
+    mn <- lookupGlobalOccRn_base rdr_name
+    case mn of
+      Just n -> return n
+      Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
+                    ; unboundName WL_Global rdr_name }
+
+-- Looks up a RdrName occurence in the GlobalRdrEnv and with
+-- lookupQualifiedNameGHCi. Does not try to find an Exact or Orig name first.
+-- lookupQualifiedNameGHCi here is used when we're in GHCi and a name like
+-- 'Data.Map.elems' is typed, even if you didn't import Data.Map
+lookupGlobalOccRn_base :: RdrName -> RnM (Maybe Name)
+lookupGlobalOccRn_base rdr_name =
+  runMaybeT . msum . map MaybeT $
+    [ fmap gre_name <$> lookupGreRn_maybe rdr_name
+    , listToMaybe <$> lookupQualifiedNameGHCi rdr_name ]
+                      -- This test is not expensive,
+                      -- and only happens for failed lookups
 
 lookupInfoOccRn :: RdrName -> RnM [Name]
 -- lookupInfoOccRn is intended for use in GHCi's ":info" command
@@ -1086,7 +1170,7 @@ lookupInfoOccRn rdr_name =
 lookupGlobalOccRn_overloaded :: Bool -> RdrName
                              -> RnM (Maybe (Either Name [Name]))
 lookupGlobalOccRn_overloaded overload_ok rdr_name =
-  lookupExactOrOrig rdr_name (Just . Left) $
+  lookupExactOrOrig_maybe rdr_name (fmap Left) $
      do  { res <- lookupGreRn_helper rdr_name
          ; case res of
                 GreNotFound  -> return Nothing
@@ -1347,7 +1431,7 @@ lookupQualifiedNameGHCi rdr_name
       , is_ghci
       , gopt Opt_ImplicitImportQualified dflags   -- Enables this GHCi behaviour
       , not (safeDirectImpsReq dflags)            -- See Note [Safe Haskell and GHCi]
-      = do { res <- loadSrcInterface_maybe doc mod False Nothing
+      = do { res <- loadSrcInterface_maybe doc mod NotBoot Nothing
            ; case res of
                 Succeeded iface
                   -> return [ name
@@ -1686,6 +1770,75 @@ lookupSyntaxNames std_names
         else
           do { usr_names <- mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names
              ; return (map (HsVar noExtField . noLoc) usr_names, mkFVs usr_names) } }
+
+{-
+Note [QualifiedDo]
+~~~~~~~~~~~~~~~~~~
+QualifiedDo is implemented using the same placeholders for operation names in
+the AST that were devised for RebindableSyntax. Whenever the renamer checks
+which names to use for do syntax, it first checks if the do block is qualified
+(e.g. M.do { stmts }), in which case it searches for qualified names. If the
+qualified names are not in scope, an error is produced. If the do block is not
+qualified, the renamer does the usual search of the names which considers
+whether RebindableSyntax is enabled or not. Dealing with QualifiedDo is driven
+by the Opt_QualifiedDo dynamic flag.
+-}
+
+-- Lookup operations for a qualified do. If the context is not a qualified
+-- do, then use lookupSyntaxExpr. See Note [QualifiedDo].
+lookupQualifiedDoExpr :: HsStmtContext p -> Name -> RnM (HsExpr GhcRn, FreeVars)
+lookupQualifiedDoExpr ctxt std_name
+  = first nl_HsVar <$> lookupQualifiedDoName ctxt std_name
+
+-- Like lookupQualifiedDoExpr but for producing SyntaxExpr.
+-- See Note [QualifiedDo].
+lookupQualifiedDo
+  :: HsStmtContext p
+  -> Name
+  -> RnM (SyntaxExpr GhcRn, FreeVars)
+lookupQualifiedDo ctxt std_name
+  = first mkSyntaxExpr <$> lookupQualifiedDoExpr ctxt std_name
+
+lookupNameWithQualifier :: Name -> ModuleName -> RnM (Name, FreeVars)
+lookupNameWithQualifier std_name modName
+  = do { qname <- lookupOccRn (mkRdrQual modName (nameOccName std_name))
+       ; return (qname, unitFV qname) }
+
+-- See Note [QualifiedDo].
+lookupQualifiedDoName
+  :: HsStmtContext p
+  -> Name
+  -> RnM (Name, FreeVars)
+lookupQualifiedDoName ctxt std_name
+  = case qualifiedDoModuleName_maybe ctxt of
+      Nothing -> lookupSyntaxName std_name
+      Just modName -> lookupNameWithQualifier std_name modName
+
+
+-- Lookup a locally-rebound name for Rebindable Syntax (RS).
+--
+-- - When RS is off, 'lookupRebound' just returns 'Nothing', whatever
+--   name it is given.
+--
+-- - When RS is on, we always try to return a 'Just', and GHC errors out
+--   if no suitable name is found in the environment.
+--
+-- 'Nothing' really is "reserved" and means that rebindable syntax is off.
+lookupRebound :: FastString -> RnM (Maybe (Located Name))
+lookupRebound nameStr = do
+  rebind <- xoptM LangExt.RebindableSyntax
+  if rebind
+    -- If repetitive lookups ever become a problem perormance-wise,
+    -- we could lookup all the names we will ever care about just once
+    -- at the beginning and stick them in the environment, possibly
+    -- populating that "cache" lazily too.
+    then (\nm -> Just (L (nameSrcSpan nm) nm)) <$>
+         lookupOccRn (mkVarUnqual nameStr)
+    else pure Nothing
+
+-- | Lookup an @ifThenElse@ binding (see 'lookupRebound').
+lookupReboundIf :: RnM (Maybe (Located Name))
+lookupReboundIf = lookupRebound reboundIfSymbol
 
 -- Error messages
 

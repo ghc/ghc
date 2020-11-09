@@ -12,17 +12,17 @@
 -- #name_types#
 -- GHC uses several kinds of name internally:
 --
--- * 'OccName.OccName' represents names as strings with just a little more information:
+-- * 'GHC.Types.Name.Occurrence.OccName' represents names as strings with just a little more information:
 --   the \"namespace\" that the name came from, e.g. the namespace of value, type constructors or
 --   data constructors
 --
--- * 'RdrName.RdrName': see "RdrName#name_types"
+-- * 'GHC.Types.Name.Reader.RdrName': see "GHC.Types.Name.Reader#name_types"
 --
--- * 'Name.Name': see "Name#name_types"
+-- * 'GHC.Types.Name.Name': see "GHC.Types.Name#name_types"
 --
--- * 'Id.Id': see "Id#name_types"
+-- * 'GHC.Types.Id.Id': see "GHC.Types.Id#name_types"
 --
--- * 'Var.Var': see "Var#name_types"
+-- * 'GHC.Types.Var.Var': see "GHC.Types.Var#name_types"
 
 module GHC.Types.Name.Occurrence (
         -- * The 'NameSpace' type
@@ -52,6 +52,7 @@ module GHC.Types.Name.Occurrence (
         mkDFunOcc,
         setOccNameSpace,
         demoteOccName,
+        promoteOccName,
         HasOccName(..),
 
         -- ** Derived 'OccName's
@@ -90,7 +91,7 @@ module GHC.Types.Name.Occurrence (
         OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet,
         extendOccSetList,
         unionOccSets, unionManyOccSets, minusOccSet, elemOccSet,
-        isEmptyOccSet, intersectOccSet, intersectsOccSet,
+        isEmptyOccSet, intersectOccSet,
         filterOccSet,
 
         -- * Tidying up
@@ -101,17 +102,18 @@ module GHC.Types.Name.Occurrence (
         FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import FastString
-import FastStringEnv
-import Outputable
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
+import GHC.Utils.Outputable
 import GHC.Utils.Lexeme
-import Binary
+import GHC.Utils.Binary
 import Control.DeepSeq
 import Data.Char
 import Data.Data
@@ -207,12 +209,20 @@ pprNameSpaceBrief TcClsName = text "tc"
 
 -- demoteNameSpace lowers the NameSpace if possible.  We can not know
 -- in advance, since a TvName can appear in an HsTyVar.
--- See Note [Demotion] in GHC.Rename.Env
+-- See Note [Demotion] in GHC.Rename.Env.
 demoteNameSpace :: NameSpace -> Maybe NameSpace
 demoteNameSpace VarName = Nothing
 demoteNameSpace DataName = Nothing
 demoteNameSpace TvName = Nothing
 demoteNameSpace TcClsName = Just DataName
+
+-- promoteNameSpace promotes the NameSpace as follows.
+-- See Note [Promotion] in GHC.Rename.Env.
+promoteNameSpace :: NameSpace -> Maybe NameSpace
+promoteNameSpace DataName = Just TcClsName
+promoteNameSpace VarName = Just TvName
+promoteNameSpace TcClsName = Nothing
+promoteNameSpace TvName = Nothing
 
 {-
 ************************************************************************
@@ -238,7 +248,7 @@ instance Eq OccName where
 instance Ord OccName where
         -- Compares lexicographically, *not* by Unique of the string
     compare (OccName sp1 s1) (OccName sp2 s2)
-        = (s1  `compare` s2) `thenCmp` (sp1 `compare` sp2)
+        = (s1  `lexicalCompareFS` s2) `thenCmp` (sp1 `compare` sp2)
 
 instance Data OccName where
   -- don't traverse?
@@ -273,11 +283,8 @@ pprOccName (OccName sp occ)
   = getPprStyle $ \ sty ->
     if codeStyle sty
     then ztext (zEncodeFS occ)
-    else pp_occ <> pp_debug sty
+    else pp_occ <> whenPprDebug (braces (pprNameSpaceBrief sp))
   where
-    pp_debug sty | debugStyle sty = braces (pprNameSpaceBrief sp)
-                 | otherwise      = empty
-
     pp_occ = sdocOption sdocSuppressUniques $ \case
                True  -> text (strip_th_unique (unpackFS occ))
                False -> ftext occ
@@ -292,7 +299,7 @@ Note [Suppressing uniques in OccNames]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This is a hack to de-wobblify the OccNames that contain uniques from
 Template Haskell that have been turned into a string in the OccName.
-See Note [Unique OccNames from Template Haskell] in Convert.hs
+See Note [Unique OccNames from Template Haskell] in "GHC.ThToHs"
 
 ************************************************************************
 *                                                                      *
@@ -338,10 +345,17 @@ mkClsOccFS :: FastString -> OccName
 mkClsOccFS = mkOccNameFS clsName
 
 -- demoteOccName lowers the Namespace of OccName.
--- see Note [Demotion]
+-- See Note [Demotion] in GHC.Rename.Env.
 demoteOccName :: OccName -> Maybe OccName
 demoteOccName (OccName space name) = do
   space' <- demoteNameSpace space
+  return $ OccName space' name
+
+-- promoteOccName promotes the NameSpace of OccName.
+-- See Note [Promotion] in GHC.Rename.Env.
+promoteOccName :: OccName -> Maybe OccName
+promoteOccName (OccName space name) = do
+  space' <- promoteNameSpace space
   return $ OccName space' name
 
 -- Name spaces are related if there is a chance to mean the one when one writes
@@ -390,7 +404,7 @@ instance Uniquable OccName where
   getUnique (OccName TvName    fs) = mkTvOccUnique   fs
   getUnique (OccName TcClsName fs) = mkTcOccUnique   fs
 
-newtype OccEnv a = A (UniqFM a)
+newtype OccEnv a = A (UniqFM OccName a)
   deriving Data
 
 emptyOccEnv :: OccEnv a
@@ -452,7 +466,6 @@ minusOccSet       :: OccSet -> OccSet -> OccSet
 elemOccSet        :: OccName -> OccSet -> Bool
 isEmptyOccSet     :: OccSet -> Bool
 intersectOccSet   :: OccSet -> OccSet -> OccSet
-intersectsOccSet  :: OccSet -> OccSet -> Bool
 filterOccSet      :: (OccName -> Bool) -> OccSet -> OccSet
 
 emptyOccSet       = emptyUniqSet
@@ -466,7 +479,6 @@ minusOccSet       = minusUniqSet
 elemOccSet        = elementOfUniqSet
 isEmptyOccSet     = isEmptyUniqSet
 intersectOccSet   = intersectUniqSets
-intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
 filterOccSet      = filterUniqSet
 
 {-
@@ -597,7 +609,7 @@ isDefaultMethodOcc occ =
 
 -- | Is an 'OccName' one of a Typeable @TyCon@ or @Module@ binding?
 -- This is needed as these bindings are renamed differently.
--- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
+-- See Note [Grand plan for Typeable] in "GHC.Tc.Instance.Typeable".
 isTypeableBindOcc :: OccName -> Bool
 isTypeableBindOcc occ =
    case occNameString occ of
@@ -613,7 +625,7 @@ mkDataConWrapperOcc, mkWorkerOcc,
         mkGenR, mkGen1R,
         mkDataConWorkerOcc, mkNewTyCoOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
-        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
+        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc, mkDataTOcc, mkDataCOcc,
         mkTyConRepOcc
    :: OccName -> OccName
 
@@ -629,15 +641,18 @@ mkIPOcc             = mk_simple_deriv varName  "$i"
 mkSpecOcc           = mk_simple_deriv varName  "$s"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
 mkRepEqOcc          = mk_simple_deriv tvName   "$r"   -- In RULES involving Coercible
-mkClassDataConOcc   = mk_simple_deriv dataName "C:"     -- Data con for a class
+mkClassDataConOcc   = mk_simple_deriv dataName "C:"   -- Data con for a class
 mkNewTyCoOcc        = mk_simple_deriv tcName   "N:"   -- Coercion for newtypes
 mkInstTyCoOcc       = mk_simple_deriv tcName   "D:"   -- Coercion for type functions
 mkEqPredCoOcc       = mk_simple_deriv tcName   "$co"
 
--- Used in derived instances
+-- Used in derived instances for the names of auxilary bindings.
+-- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
 mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"
 mkTag2ConOcc        = mk_simple_deriv varName  "$tag2con_"
 mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
+mkDataTOcc          = mk_simple_deriv varName  "$t"
+mkDataCOcc          = mk_simple_deriv varName  "$c"
 
 -- TyConRepName stuff; see Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable
 mkTyConRepOcc occ = mk_simple_deriv varName prefix occ
@@ -701,16 +716,6 @@ mkDFunOcc info_str is_boot set
   where
     prefix | is_boot   = "$fx"
            | otherwise = "$f"
-
-mkDataTOcc, mkDataCOcc
-  :: OccName            -- ^ TyCon or data con string
-  -> OccSet             -- ^ avoid these Occs
-  -> OccName            -- ^ E.g. @$f3OrdMaybe@
--- data T = MkT ... deriving( Data ) needs definitions for
---      $tT   :: Data.Generics.Basics.DataType
---      $cMkT :: Data.Generics.Basics.Constr
-mkDataTOcc occ = chooseUniqueOcc VarName ("$t" ++ occNameString occ)
-mkDataCOcc occ = chooseUniqueOcc VarName ("$c" ++ occNameString occ)
 
 {-
 Sometimes we need to pick an OccName that has not already been used,
@@ -834,7 +839,7 @@ This is #12382.
 
 -}
 
-type TidyOccEnv = UniqFM Int    -- The in-scope OccNames
+type TidyOccEnv = UniqFM FastString Int    -- The in-scope OccNames
   -- See Note [TidyOccEnv]
 
 emptyTidyOccEnv :: TidyOccEnv
@@ -901,21 +906,21 @@ tidyOccName env occ@(OccName occ_sp fs)
 -}
 
 instance Binary NameSpace where
-    put_ bh VarName = do
+    put_ bh VarName =
             putByte bh 0
-    put_ bh DataName = do
+    put_ bh DataName =
             putByte bh 1
-    put_ bh TvName = do
+    put_ bh TvName =
             putByte bh 2
-    put_ bh TcClsName = do
+    put_ bh TcClsName =
             putByte bh 3
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return VarName
-              1 -> do return DataName
-              2 -> do return TvName
-              _ -> do return TcClsName
+              0 -> return VarName
+              1 -> return DataName
+              2 -> return TvName
+              _ -> return TcClsName
 
 instance Binary OccName where
     put_ bh (OccName aa ab) = do

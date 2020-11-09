@@ -1,4 +1,4 @@
-{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE InstanceSigs, TypeOperators #-}
 module Builder (
     -- * Data types
     ArMode (..), CcMode (..), ConfigurationInfo (..), GhcMode (..),
@@ -14,7 +14,10 @@ module Builder (
     applyPatch
     ) where
 
+import Control.Exception.Extra (Partial)
+import qualified Data.ByteString.Lazy.Char8 as BSL
 import Development.Shake.Classes
+import Development.Shake.Command
 import GHC.Generics
 import qualified Hadrian.Builder as H
 import Hadrian.Builder hiding (Builder)
@@ -24,10 +27,13 @@ import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
+import System.Exit
+import System.IO (stderr)
 
 import Base
 import Context
 import Oracles.Flag
+import Oracles.Setting (setting, Setting(..))
 import Packages
 
 -- | C compiler can be used in two different modes:
@@ -125,9 +131,10 @@ data Builder = Alex
              | Hpc
              | HsCpp
              | Hsc2Hs Stage
-             | Ld Stage
+             | Ld Stage --- ^ linker
              | Make FilePath
              | Makeinfo
+             | MergeObjects Stage -- ^ linker to be used to merge object files.
              | Nm
              | Objdump
              | Patch
@@ -138,6 +145,7 @@ data Builder = Alex
              | Tar TarMode
              | Unlit
              | Xelatex
+             | Makeindex  -- ^ from xelatex
              deriving (Eq, Generic, Show)
 
 instance Binary   Builder
@@ -176,7 +184,11 @@ instance H.Builder Builder where
         Autoreconf dir -> return [dir -/- "configure.ac"]
         Configure  dir -> return [dir -/- "configure"]
 
-        Ghc _ Stage0 -> includesDependencies Stage0
+        Ghc _ Stage0 -> do
+          -- Read the boot GHC version here to make sure we rebuild when it
+          -- changes (#18001).
+          _bootGhcVersion <- setting GhcVersion
+          includesDependencies Stage0
         Ghc _ stage -> do
             root <- buildRoot
             touchyPath <- programPath (vanillaContext Stage0 touchy)
@@ -214,7 +226,7 @@ instance H.Builder Builder where
             needBuilder builder
             path <- H.builderPath builder
             need [path]
-            Stdout stdout <- cmd [path] ["--no-user-package-db", "field", input, "depends"]
+            Stdout stdout <- cmd' [path] ["--no-user-package-db", "field", input, "depends"]
             return stdout
         _ -> error $ "Builder " ++ show builder ++ " can not be asked!"
 
@@ -231,7 +243,7 @@ instance H.Builder Builder where
                 echo = EchoStdout (verbosity >= Loud)
                 -- Capture stdout and write it to the output file.
                 captureStdout = do
-                    Stdout stdout <- cmd [path] buildArgs
+                    Stdout stdout <- cmd' [path] buildArgs
                     writeFileChanged output stdout
             case builder of
                 Ar Pack _ -> do
@@ -239,54 +251,65 @@ instance H.Builder Builder where
                     if useTempFile then runAr                path buildArgs
                                    else runArWithoutTempFile path buildArgs
 
-                Ar Unpack _ -> cmd echo [Cwd output] [path] buildArgs
+                Ar Unpack _ -> cmd' echo [Cwd output] [path] buildArgs
 
-                Autoreconf dir -> cmd echo [Cwd dir] ["sh", path] buildArgs
+                Autoreconf dir -> cmd' echo [Cwd dir] ["sh", path] buildArgs
 
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.
                     bash <- bashPath
                     let env = AddEnv "CONFIG_SHELL" bash
-                    cmd echo env [Cwd dir] ["sh", path] buildOptions buildArgs
+                    cmd' echo env [Cwd dir] ["sh", path] buildOptions buildArgs
 
                 GenApply -> captureStdout
 
                 GenPrimopCode -> do
                     stdin <- readFile' input
-                    Stdout stdout <- cmd (Stdin stdin) [path] buildArgs
+                    Stdout stdout <- cmd' (Stdin stdin) [path] buildArgs
                     writeFileChanged output stdout
 
                 GhcPkg Copy _ -> do
-                    Stdout pkgDesc <- cmd [path]
+                    Stdout pkgDesc <- cmd' [path]
                       [ "--expand-pkgroot"
                       , "--no-user-package-db"
                       , "describe"
                       , input -- the package name
                       ]
-                    cmd (Stdin pkgDesc) [path] (buildArgs ++ ["-"])
+                    cmd' (Stdin pkgDesc) [path] (buildArgs ++ ["-"])
 
                 GhcPkg Unregister _ -> do
-                    Exit _ <- cmd echo [path] (buildArgs ++ [input])
+                    Exit _ <- cmd' echo [path] (buildArgs ++ [input])
                     return ()
 
                 HsCpp    -> captureStdout
 
-                Make dir -> cmd echo path ["-C", dir] buildArgs
+                Make dir -> cmd' echo path ["-C", dir] buildArgs
 
                 Makeinfo -> do
-                  cmd echo [path] "--no-split" [ "-o", output] [input]
+                  cmd' echo [path] "--no-split" [ "-o", output] [input]
 
-                Xelatex -> do
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] ["makeindex"] (input -<.> "idx")
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] [path]        buildArgs
+                Xelatex   ->
+                  -- xelatex produces an incredible amount of output, almost
+                  -- all of which is useless. Suppress it unless user
+                  -- requests a loud build.
+                  if verbosity >= Loud
+                    then cmd' [Cwd output] [path] buildArgs
+                    else do (Stdouterr out, Exit code) <- cmd' [Cwd output] [path] buildArgs
+                            when (code /= ExitSuccess) $ do
+                              liftIO $ BSL.hPutStrLn stderr out
+                              putFailure "xelatex failed!"
+                              fail "xelatex failed"
 
-                Tar _ -> cmd buildOptions echo [path] buildArgs
-                _  -> cmd echo [path] buildArgs
+                Makeindex -> unit $ cmd' [Cwd output] [path] (buildArgs ++ [input])
+
+                Tar _ -> cmd' buildOptions echo [path] buildArgs
+
+                -- RunTest produces a very large amount of (colorised) output;
+                -- Don't attempt to capture it.
+                RunTest -> cmd echo [path] buildArgs
+
+                _  -> cmd' echo [path] buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- 'Objdump' is only required on OpenBSD and AIX. Add support for platform
@@ -313,6 +336,16 @@ systemBuilderPath builder = case builder of
     Happy           -> fromKey "happy"
     HsCpp           -> fromKey "hs-cpp"
     Ld _            -> fromKey "ld"
+    -- MergeObjects Stage0 is a special case in case of
+    -- cross-compiling. We're building stage1, e.g. code which will be
+    -- executed on the host and hence we need to use host's merge
+    -- objects tool and not the target merge object tool.
+    -- Note, merge object tool is usually platform linker with some
+    -- parameters. E.g. building a cross-compiler on and for x86_64
+    -- which will target ppc64 means that MergeObjects Stage0 will use
+    -- x86_64 linker and MergeObject _ will use ppc64 linker.
+    MergeObjects Stage0 -> fromKey "system-merge-objects"
+    MergeObjects _  -> fromKey "merge-objects"
     Make _          -> fromKey "make"
     Makeinfo        -> fromKey "makeinfo"
     Nm              -> fromKey "nm"
@@ -324,6 +357,7 @@ systemBuilderPath builder = case builder of
     Sphinx _        -> fromKey "sphinx-build"
     Tar _           -> fromKey "tar"
     Xelatex         -> fromKey "xelatex"
+    Makeindex       -> fromKey "makeindex"
     _               -> error $ "No entry for " ++ show builder ++ inCfg
   where
     inCfg = " in " ++ quote configFile ++ " file."
@@ -366,4 +400,9 @@ applyPatch dir patch = do
     needBuilder Patch
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
-    quietly $ cmd [Cwd dir, FileStdin file] [path, "-p0"]
+    quietly $ cmd' [Cwd dir, FileStdin file] [path, "-p0"]
+
+-- | Wrapper for 'cmd' that makes sure we include both stdout and stderr in
+--   Shake's output when any of our builder commands fail.
+cmd' :: (Partial, CmdArguments args) => args :-> Action r
+cmd' = cmd [WithStderr True, WithStdout True]

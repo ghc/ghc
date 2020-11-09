@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -13,7 +14,10 @@ module GHC.StgToCmm ( codeGen ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude as Prelude
+import GHC.Prelude as Prelude
+
+import GHC.Driver.Backend
+import GHC.Driver.Session
 
 import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
@@ -25,35 +29,43 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
+import GHC.StgToCmm.Types (ModuleLFInfos)
 
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
+import GHC.Cmm.Graph
 
 import GHC.Stg.Syntax
-import GHC.Driver.Session
-import ErrUtils
 
-import GHC.Driver.Types
 import GHC.Types.CostCentre
+import GHC.Types.HpcInfo
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.RepType
-import GHC.Core.DataCon
-import GHC.Core.TyCon
-import GHC.Types.Module
-import Outputable
-import Stream
 import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )
+import GHC.Types.Unique.FM
+import GHC.Types.Name.Env
+
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.Multiplicity
+
+import GHC.Unit.Module
+
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+
 import GHC.SysTools.FileCleanup
 
-import OrdList
-import GHC.Cmm.Graph
+import GHC.Data.Stream
+import GHC.Data.OrdList
 
 import Data.IORef
 import Control.Monad (when,void)
-import Util
+import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 
@@ -63,7 +75,8 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup ModuleLFInfos
+                                       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
@@ -105,6 +118,23 @@ codeGen dflags this_mod data_tycons
                  mapM_ (cg . cgDataCon) (tyConDataCons tycon)
 
         ; mapM_ do_tycon data_tycons
+
+        ; cg_id_infos <- cgs_binds <$> liftIO (readIORef cgref)
+
+          -- See Note [Conveying CAF-info and LFInfo between modules] in
+          -- GHC.StgToCmm.Types
+        ; let extractInfo info = (name, lf)
+                where
+                  !name = idName (cg_id info)
+                  !lf = cg_lf info
+
+              !generatedInfo
+                | gopt Opt_OmitInterfacePragmas dflags
+                = emptyNameEnv
+                | otherwise
+                = mkNameEnv (Prelude.map extractInfo (eltsUFM cg_id_infos))
+
+        ; return generatedInfo
         }
 
 ---------------------------------------------------------------
@@ -142,7 +172,7 @@ cgTopBinding dflags (StgTopStringLit id str) = do
   -- emit either a CmmString literal or dump the string in a file and emit a
   -- CmmFileEmbed literal.
   -- See Note [Embedding large binary blobs] in GHC.CmmToAsm.Ppr
-  let isNCG    = platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
+  let isNCG    = backend dflags == NCG
       isSmall  = fromIntegral (BS.length str) <= binBlobThreshold dflags
       asString = binBlobThreshold dflags == 0 || isSmall
 
@@ -153,7 +183,7 @@ cgTopBinding dflags (StgTopStringLit id str) = do
                BS.writeFile bFile str
                return bFile
   emitDecl decl
-  addBindC (litIdInfo dflags id mkLFStringLit lit)
+  addBindC (litIdInfo (targetPlatform dflags) id mkLFStringLit lit)
 
 
 cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
@@ -166,7 +196,7 @@ cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
 
 cgTopRhs dflags rec bndr (StgRhsClosure fvs cc upd_flag args body)
   = ASSERT(isEmptyDVarSet fvs)    -- There should be no free variables
-    cgTopRhsClosure dflags rec bndr cc upd_flag args body
+    cgTopRhsClosure (targetPlatform dflags) rec bndr cc upd_flag args body
 
 
 ---------------------------------------------------------------
@@ -192,38 +222,38 @@ mkModuleInit cost_centre_info this_mod hpc_info
 
 cgEnumerationTyCon :: TyCon -> FCode ()
 cgEnumerationTyCon tycon
-  = do dflags <- getDynFlags
+  = do platform <- getPlatform
        emitRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
              [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs)
-                           (tagForCon dflags con)
+                           (tagForCon platform con)
              | con <- tyConDataCons tycon]
 
 
-cgDataCon :: DataCon -> FCode ()
--- Generate the entry code, info tables, and (for niladic constructor)
+-- | Generate the entry code, info tables, and (for niladic constructor)
 -- the static closure, for a constructor.
+cgDataCon :: DataCon -> FCode ()
 cgDataCon data_con
-  = do  { dflags <- getDynFlags
+  = do  { profile <- getProfile
         ; platform <- getPlatform
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
              ptr_wds) --  #ptr_wds
-              = mkVirtConstrSizes dflags arg_reps
+              = mkVirtConstrSizes profile arg_reps
 
             nonptr_wds   = tot_wds - ptr_wds
 
             dyn_info_tbl =
-              mkDataConInfoTable dflags data_con False ptr_wds nonptr_wds
+              mkDataConInfoTable profile data_con False ptr_wds nonptr_wds
 
             -- We're generating info tables, so we don't know and care about
             -- what the actual arguments are. Using () here as the place holder.
             arg_reps :: [NonVoid PrimRep]
             arg_reps = [ NonVoid rep_ty
                        | ty <- dataConRepArgTys data_con
-                       , rep_ty <- typePrimRep ty
+                       , rep_ty <- typePrimRep (scaledThing ty)
                        , not (isVoidRep rep_ty) ]
 
-        ; emitClosureAndInfoTable dyn_info_tbl NativeDirectCall [] $
+        ; emitClosureAndInfoTable platform dyn_info_tbl NativeDirectCall [] $
             -- NB: the closure pointer is assumed *untagged* on
             -- entry to a constructor.  If the pointer is tagged,
             -- then we should not be entering it.  This assumption
@@ -233,7 +263,7 @@ cgDataCon data_con
             do { tickyEnterDynCon
                ; ldvEnter (CmmReg nodeReg)
                ; tickyReturnOldCon (length arg_reps)
-               ; void $ emitReturn [cmmOffsetB platform (CmmReg nodeReg) (tagForCon dflags data_con)]
+               ; void $ emitReturn [cmmOffsetB platform (CmmReg nodeReg) (tagForCon platform data_con)]
                }
                     -- The case continuation code expects a tagged pointer
         }

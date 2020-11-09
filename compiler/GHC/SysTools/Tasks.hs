@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 --
 -- Tasks running external programs for SysTools
@@ -8,24 +9,25 @@
 -----------------------------------------------------------------------------
 module GHC.SysTools.Tasks where
 
-import Exception
-import ErrUtils
-import GHC.Driver.Types
-import GHC.Driver.Session
-import Outputable
+import GHC.Prelude
 import GHC.Platform
-import Util
-
-import Data.List
-
-import System.IO
-import System.Process
-import GhcPrelude
+import GHC.ForeignSrcLang
 
 import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersion, parseLlvmVersion)
 
 import GHC.SysTools.Process
 import GHC.SysTools.Info
+
+import GHC.Driver.Session
+
+import GHC.Utils.Exception as Exception
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+
+import Data.List
+import System.IO
+import System.Process
 
 {-
 ************************************************************************
@@ -186,9 +188,8 @@ runClang dflags args = traceToolCommand dflags "clang" $ do
       args1 = map Option (getOpts dflags opt_a)
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
-  Exception.catch (do
-        runSomethingFiltered dflags id "Clang (Assembler)" clang args2 Nothing mb_env
-    )
+  catch
+    (runSomethingFiltered dflags id "Clang (Assembler)" clang args2 Nothing mb_env)
     (\(err :: SomeException) -> do
         errorMsg dflags $
             text ("Error running clang! you need clang installed to use the" ++
@@ -234,6 +235,7 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
                           text ("Make sure you have installed LLVM " ++
                                 llvmVersionStr supportedLlvmVersion) ]
                 return Nothing)
+
 
 
 runLink :: DynFlags -> [Option] -> IO ()
@@ -299,6 +301,20 @@ ld: warning: symbol referencing errors
     ld_postfix = tail . snd . ld_warn_break
     ld_warning_found = not . null . snd . ld_warn_break
 
+-- See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
+runMergeObjects :: DynFlags -> [Option] -> IO ()
+runMergeObjects dflags args = traceToolCommand dflags "merge-objects" $ do
+  let (p,args0) = pgm_lm dflags
+      optl_args = map Option (getOpts dflags opt_lm)
+      args2     = args0 ++ args ++ optl_args
+  -- N.B. Darwin's ld64 doesn't support response files. Consequently we only
+  -- use them on Windows where they are truly necessary.
+#if defined(mingw32_HOST_OS)
+  mb_env <- getGccEnv args2
+  runSomethingResponseFile dflags id "Merge objects" p args2 mb_env
+#else
+  runSomething dflags "Merge objects" p args2
+#endif
 
 runLibtool :: DynFlags -> [Option] -> IO ()
 runLibtool dflags args = traceToolCommand dflags "libtool" $ do
@@ -307,30 +323,28 @@ runLibtool dflags args = traceToolCommand dflags "libtool" $ do
       args2      = [Option "-static"] ++ args1 ++ args ++ linkargs
       libtool    = pgm_libtool dflags
   mb_env <- getGccEnv args2
-  runSomethingFiltered dflags id "Linker" libtool args2 Nothing mb_env
+  runSomethingFiltered dflags id "Libtool" libtool args2 Nothing mb_env
 
 runAr :: DynFlags -> Maybe FilePath -> [Option] -> IO ()
 runAr dflags cwd args = traceToolCommand dflags "ar" $ do
   let ar = pgm_ar dflags
   runSomethingFiltered dflags id "Ar" ar args cwd Nothing
 
-askAr :: DynFlags -> Maybe FilePath -> [Option] -> IO String
-askAr dflags mb_cwd args = traceToolCommand dflags "ar" $ do
-  let ar = pgm_ar dflags
-  runSomethingWith dflags "Ar" ar args $ \real_args ->
-    readCreateProcessWithExitCode' (proc ar real_args){ cwd = mb_cwd }
+askOtool :: DynFlags -> Maybe FilePath -> [Option] -> IO String
+askOtool dflags mb_cwd args = do
+  let otool = pgm_otool dflags
+  runSomethingWith dflags "otool" otool args $ \real_args ->
+    readCreateProcessWithExitCode' (proc otool real_args){ cwd = mb_cwd }
+
+runInstallNameTool :: DynFlags -> [Option] -> IO ()
+runInstallNameTool dflags args = do
+  let tool = pgm_install_name_tool dflags
+  runSomethingFiltered dflags id "Install Name Tool" tool args Nothing Nothing
 
 runRanlib :: DynFlags -> [Option] -> IO ()
 runRanlib dflags args = traceToolCommand dflags "ranlib" $ do
   let ranlib = pgm_ranlib dflags
   runSomethingFiltered dflags id "Ranlib" ranlib args Nothing Nothing
-
-runMkDLL :: DynFlags -> [Option] -> IO ()
-runMkDLL dflags args = traceToolCommand dflags "mkdll" $ do
-  let (p,args0) = pgm_dll dflags
-      args1 = args0 ++ args
-  mb_env <- getGccEnv (args0++args)
-  runSomethingFiltered dflags id "Make DLL" p args1 Nothing mb_env
 
 runWindres :: DynFlags -> [Option] -> IO ()
 runWindres dflags args = traceToolCommand dflags "windres" $ do

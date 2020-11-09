@@ -1,35 +1,35 @@
 
 <interactive>:8:4: error:
-    Couldn't match expected type ‘Ghci1.Planet’
-                with actual type ‘Planet’
-    NB: ‘Planet’ is defined at <interactive>:7:1-36
-        ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
-    In the first argument of ‘pn’, namely ‘Mercury’
-    In the expression: pn Mercury
-    In an equation for ‘it’: it = pn Mercury
+    • Couldn't match expected type ‘Ghci1.Planet’
+                  with actual type ‘Planet’
+      NB: ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
+          ‘Planet’ is defined at <interactive>:7:1-36
+    • In the first argument of ‘pn’, namely ‘Mercury’
+      In the expression: pn Mercury
+      In an equation for ‘it’: it = pn Mercury
 
 <interactive>:9:4: error:
-    Couldn't match expected type ‘Ghci1.Planet’
-                with actual type ‘Planet’
-    NB: ‘Planet’ is defined at <interactive>:7:1-36
-        ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
-    In the first argument of ‘pn’, namely ‘Venus’
-    In the expression: pn Venus
-    In an equation for ‘it’: it = pn Venus
+    • Couldn't match expected type ‘Ghci1.Planet’
+                  with actual type ‘Planet’
+      NB: ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
+          ‘Planet’ is defined at <interactive>:7:1-36
+    • In the first argument of ‘pn’, namely ‘Venus’
+      In the expression: pn Venus
+      In an equation for ‘it’: it = pn Venus
 
 <interactive>:10:4: error:
-    Couldn't match expected type ‘Ghci1.Planet’
-                with actual type ‘Planet’
-    NB: ‘Planet’ is defined at <interactive>:7:1-36
-        ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
-    In the first argument of ‘pn’, namely ‘Mars’
-    In the expression: pn Mars
-    In an equation for ‘it’: it = pn Mars
+    • Couldn't match expected type ‘Ghci1.Planet’
+                  with actual type ‘Planet’
+      NB: ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
+          ‘Planet’ is defined at <interactive>:7:1-36
+    • In the first argument of ‘pn’, namely ‘Mars’
+      In the expression: pn Mars
+      In an equation for ‘it’: it = pn Mars
 
 <interactive>:12:44: error:
-    Couldn't match expected type ‘Planet’
-                with actual type ‘Ghci1.Planet’
-    NB: ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
-        ‘Planet’ is defined at <interactive>:7:1-36
-    In the pattern: Earth
-    In an equation for ‘pn’: pn Earth = "E"
+    • Couldn't match expected type ‘Planet’
+                  with actual type ‘Ghci1.Planet’
+      NB: ‘Planet’ is defined at <interactive>:7:1-36
+          ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
+    • In the pattern: Earth
+      In an equation for ‘pn’: pn Earth = "E"

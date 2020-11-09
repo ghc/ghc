@@ -24,23 +24,23 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Bag
+import GHC.Data.Bag
 import GHC.Core.DataCon
-import FastString
+import GHC.Data.FastString
 import GHC.Hs
-import Outputable
+import GHC.Utils.Panic
 import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
-import State
+import GHC.Utils.Monad.State
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Id.Make (coerceId)
@@ -151,10 +151,10 @@ is a similar algorithm for generating `p <$ x` (for some constant `p`):
   $(coreplace 'a '(tb -> tc) x) = \(y:tb[b/a]) -> $(coreplace 'a' 'tc' (x $(replace 'a 'tb y)))
 -}
 
-gen_Functor_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Functor_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
 -- When the argument is phantom, we can use  fmap _ = coerce
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
-gen_Functor_binds loc tycon
+gen_Functor_binds loc tycon _
   | Phantom <- last (tyConRoles tycon)
   = (unitBag fmap_bind, emptyBag)
   where
@@ -165,10 +165,10 @@ gen_Functor_binds loc tycon
                                coerce_Expr]
     fmap_match_ctxt = mkPrefixFunRhs fmap_name
 
-gen_Functor_binds loc tycon
+gen_Functor_binds loc tycon tycon_args
   = (listToBag [fmap_bind, replace_bind], emptyBag)
   where
-    data_cons = tyConDataCons tycon
+    data_cons = getPossibleDataCons tycon tycon_args
     fmap_name = L loc fmap_RDR
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
@@ -557,7 +557,7 @@ deepSubtypesContaining tv
 foldDataConArgs :: FFoldType a -> DataCon -> [a]
 -- Fold over the arguments of the datacon
 foldDataConArgs ft con
-  = map foldArg (dataConOrigArgTys con)
+  = map foldArg (map scaledThing $ dataConOrigArgTys con)
   where
     foldArg
       = case getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con))) of
@@ -787,10 +787,10 @@ could surprise users if they switch to other types, but Ryan Scott seems to
 think it's okay to do it for now.
 -}
 
-gen_Foldable_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Foldable_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
 -- When the parameter is phantom, we can use foldMap _ _ = mempty
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
-gen_Foldable_binds loc tycon
+gen_Foldable_binds loc tycon _
   | Phantom <- last (tyConRoles tycon)
   = (unitBag foldMap_bind, emptyBag)
   where
@@ -801,7 +801,7 @@ gen_Foldable_binds loc tycon
                                   mempty_Expr]
     foldMap_match_ctxt = mkPrefixFunRhs foldMap_name
 
-gen_Foldable_binds loc tycon
+gen_Foldable_binds loc tycon tycon_args
   | null data_cons  -- There's no real point producing anything but
                     -- foldMap for a type with no constructors.
   = (unitBag foldMap_bind, emptyBag)
@@ -809,7 +809,7 @@ gen_Foldable_binds loc tycon
   | otherwise
   = (listToBag [foldr_bind, foldMap_bind, null_bind], emptyBag)
   where
-    data_cons = tyConDataCons tycon
+    data_cons = getPossibleDataCons tycon tycon_args
 
     foldr_bind = mkRdrFunBind (L loc foldable_foldr_RDR) eqns
     eqns = map foldr_eqn data_cons
@@ -1016,10 +1016,10 @@ removes all such types from consideration.
 See Note [Generated code for DeriveFoldable and DeriveTraversable].
 -}
 
-gen_Traversable_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Traversable_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
 -- When the argument is phantom, we can use traverse = pure . coerce
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
-gen_Traversable_binds loc tycon
+gen_Traversable_binds loc tycon _
   | Phantom <- last (tyConRoles tycon)
   = (unitBag traverse_bind, emptyBag)
   where
@@ -1031,10 +1031,10 @@ gen_Traversable_binds loc tycon
                        (nlHsApps pure_RDR [nlHsApp coerce_Expr z_Expr])]
     traverse_match_ctxt = mkPrefixFunRhs traverse_name
 
-gen_Traversable_binds loc tycon
+gen_Traversable_binds loc tycon tycon_args
   = (unitBag traverse_bind, emptyBag)
   where
-    data_cons = tyConDataCons tycon
+    data_cons = getPossibleDataCons tycon tycon_args
 
     traverse_name = L loc traverse_RDR
 

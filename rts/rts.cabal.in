@@ -97,6 +97,15 @@ library
           dbghelp
           -- for process information
           psapi
+       -- TODO: Hadrian will use this cabal file, so drop WINVER from Hadrian's configs.
+       -- Minimum supported Windows version.
+       -- These numbers can be found at:
+       --  https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
+       -- If we're compiling on windows, enforce that we only support Windows 7+
+       -- Adding this here means it doesn't have to be done in individual .c files
+       -- and also centralizes the versioning.
+       cpp-options: -D_WIN32_WINNT=0x06010000
+       cc-options: -D_WIN32_WINNT=0x06010000
     if flag(need-pthread)
        -- for pthread_getthreadid_np, pthread_create, ...
        extra-libraries: pthread
@@ -131,6 +140,7 @@ library
                       rts/EventLogWriter.h
                       rts/FileLock.h
                       rts/Flags.h
+                      rts/ForeignExports.h
                       rts/GetTime.h
                       rts/Globals.h
                       rts/Hpc.h
@@ -218,12 +228,13 @@ library
          "-Wl,-u,_base_GHCziIOziException_cannotCompactFunction_closure"
          "-Wl,-u,_base_GHCziIOziException_cannotCompactPinned_closure"
          "-Wl,-u,_base_GHCziIOziException_cannotCompactMutable_closure"
-         "-Wl,-u,_base_ControlziExceptionziBase_absentSumFieldError_closure"
+         "-Wl,-u,_base_GHCziIOPort_doubleReadException_closure"
          "-Wl,-u,_base_ControlziExceptionziBase_nonTermination_closure"
          "-Wl,-u,_base_ControlziExceptionziBase_nestedAtomically_closure"
          "-Wl,-u,_base_GHCziEventziThread_blockedOnBadFD_closure"
          "-Wl,-u,_base_GHCziConcziSync_runSparks_closure"
          "-Wl,-u,_base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         "-Wl,-u,_base_GHCziConcziIO_interruptIOManager_closure"
          "-Wl,-u,_base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
          "-Wl,-u,_base_GHCziConcziSignal_runHandlersPtr_closure"
          "-Wl,-u,_base_GHCziTopHandler_flushStdHandles_closure"
@@ -265,6 +276,10 @@ library
          "-Wl,-u,_hs_cmpxchg8"
          "-Wl,-u,_hs_cmpxchg16"
          "-Wl,-u,_hs_cmpxchg32"
+         "-Wl,-u,_hs_xchg8"
+         "-Wl,-u,_hs_xchg16"
+         "-Wl,-u,_hs_xchg32"
+         "-Wl,-u,_hs_xchg64"
          "-Wl,-u,_hs_atomicread8"
          "-Wl,-u,_hs_atomicread16"
          "-Wl,-u,_hs_atomicread32"
@@ -294,12 +309,13 @@ library
          "-Wl,-u,base_GHCziIOziException_cannotCompactFunction_closure"
          "-Wl,-u,base_GHCziIOziException_cannotCompactPinned_closure"
          "-Wl,-u,base_GHCziIOziException_cannotCompactMutable_closure"
-         "-Wl,-u,base_ControlziExceptionziBase_absentSumFieldError_closure"
+         "-Wl,-u,base_GHCziIOPort_doubleReadException_closure"
          "-Wl,-u,base_ControlziExceptionziBase_nonTermination_closure"
          "-Wl,-u,base_ControlziExceptionziBase_nestedAtomically_closure"
          "-Wl,-u,base_GHCziEventziThread_blockedOnBadFD_closure"
          "-Wl,-u,base_GHCziConcziSync_runSparks_closure"
          "-Wl,-u,base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         "-Wl,-u,base_GHCziConcziIO_interruptIOManager_closure"
          "-Wl,-u,base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
          "-Wl,-u,base_GHCziConcziSignal_runHandlersPtr_closure"
          "-Wl,-u,base_GHCziTopHandler_flushStdHandles_closure"
@@ -341,6 +357,10 @@ library
          "-Wl,-u,hs_cmpxchg8"
          "-Wl,-u,hs_cmpxchg16"
          "-Wl,-u,hs_cmpxchg32"
+         "-Wl,-u,hs_xchg8"
+         "-Wl,-u,hs_xchg16"
+         "-Wl,-u,hs_xchg32"
+         "-Wl,-u,hs_xchg64"
          "-Wl,-u,hs_atomicread8"
          "-Wl,-u,hs_atomicread16"
          "-Wl,-u,hs_atomicread32"
@@ -352,6 +372,17 @@ library
         -- This symbol is useful in gdb, but not referred to anywhere,
         -- so we need to force it to be included in the binary.
         ld-options: "-Wl,-u,findPtr"
+         -- This symbol is useful in gdb, but not referred to anywhere,
+         -- so we need to force it to be included in the binary.
+         "-Wl,-u,findPtr"
+
+    if os(windows)
+      if flag(leading-underscore)
+        ld-options:
+           "-Wl,-u,_base_GHCziEventziWindows_processRemoteCompletion_closure"
+      else
+        ld-options:
+           "-Wl,-u,base_GHCziEventziWindows_processRemoteCompletion_closure"
 
     if os(osx)
       ld-options: "-Wl,-search_paths_first"
@@ -370,9 +401,9 @@ library
                  -- AutoApply is generated
                  AutoApply.cmm
 
-    if arch(i386) || arch(powerpc) || arch(powerpc64)
+    if arch(i386) || arch(ppc) || arch(ppc64)
        asm-sources: AdjustorAsm.S
-    if arch(powerpc) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    if arch(ppc) || arch(ppc64) || arch(s390x)
        asm-sources: StgCRunAsm.S
 
     c-sources: Adjustor.c
@@ -382,6 +413,7 @@ library
                ClosureFlags.c
                Disassembler.c
                FileLock.c
+               ForeignExports.c
                Globals.c
                Hash.c
                Heap.c
@@ -483,7 +515,8 @@ library
                -- I wish we had wildcards..., this would be:
                -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
     if os(windows)
-       c-sources: win32/AsyncIO.c
+       c-sources: win32/AsyncMIO.c
+                  win32/AsyncWinIO.c
                   win32/AwaitEvent.c
                   win32/ConsoleHandler.c
                   win32/GetEnv.c

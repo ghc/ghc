@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NoStarIsType #-}
@@ -23,8 +22,8 @@ for working with type-level naturals should be defined in a separate library.
 
 module GHC.TypeNats
   ( -- * Nat Kind
-    Nat -- declared in GHC.Types in package ghc-prim
-
+    Natural -- declared in GHC.Num.Natural in package ghc-bignum
+  , Nat
     -- * Linking type and value level
   , KnownNat, natVal, natVal'
   , SomeNat(..)
@@ -38,9 +37,9 @@ module GHC.TypeNats
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), Bool(True), Ordering(..), otherwise)
-import GHC.Types( Nat )
-import GHC.Natural(Natural)
+import GHC.Base(Eq(..), Ord(..), otherwise)
+import GHC.Types
+import GHC.Num.Natural(Natural)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
 import GHC.Prim(magicDict, Proxy#)
@@ -49,6 +48,13 @@ import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
+
+-- | A type synonym for 'Natural'.
+--
+-- Prevously, this was an opaque data type, but it was changed to a type synonym
+-- @since @base-4.15.0.0@.
+
+type Nat = Natural
 --------------------------------------------------------------------------------
 
 -- | This class gives the integer associated with a type-level natural.
@@ -83,7 +89,7 @@ someNatVal n = withSNat SomeNat (SNat n) Proxy
 {- Note [NOINLINE someNatVal]
 
 `someNatVal` converts a natural number to an existentially quantified
-dictionary for `KnowNat` (aka `SomeNat`).  The existential quantification
+dictionary for `KnownNat` (aka `SomeNat`).  The existential quantification
 is very important, as it captures the fact that we don't know the type
 statically, although we do know that it exists.   Because this type is
 fully opaque, we should never be able to prove that it matches anything else.

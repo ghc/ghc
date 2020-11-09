@@ -1,9 +1,8 @@
 
 T14884.hs:4:5: error:
-    • Found hole: _ :: (a0 -> IO ()) -> [Char] -> IO ()
+    • Found hole: _ :: (a0 -> IO ()) -> String -> IO ()
       Where: ‘a0’ is an ambiguous type variable
-    • In the expression: _
-      In the expression: _ print "abc"
+    • In the expression: _ print "abc"
       In an equation for ‘x’: x = _ print "abc"
     • Relevant bindings include x :: IO () (bound at T14884.hs:4:1)
       Valid hole fits include
@@ -20,15 +19,15 @@ T14884.hs:4:5: error:
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘Data.Foldable’))
         ($) :: forall a b. (a -> b) -> a -> b
-          with ($) @'GHC.Types.LiftedRep @[Char] @(IO ())
+          with ($) @'GHC.Types.LiftedRep @String @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
         ($!) :: forall a b. (a -> b) -> a -> b
-          with ($!) @'GHC.Types.LiftedRep @[Char] @(IO ())
+          with ($!) @'GHC.Types.LiftedRep @String @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
         id :: forall a. a -> a
-          with id @([Char] -> IO ())
+          with id @(String -> IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
 
@@ -40,7 +39,7 @@ T14884.hs:4:7: error:
         instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         ...plus 23 others
         ...plus 67 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)

@@ -1,5 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RecordWildCards   #-}
 
 -- | Accessors to GHC RTS flags.
 -- Descriptions of flags can be seen in
@@ -24,10 +24,12 @@ module GHC.RTS.Flags
   , TraceFlags (..)
   , TickyFlags (..)
   , ParFlags (..)
+  , IoSubSystem (..)
   , getRTSFlags
   , getGCFlags
   , getConcFlags
   , getMiscFlags
+  , getIoManagerFlag
   , getDebugFlags
   , getCCFlags
   , getProfFlags
@@ -39,14 +41,14 @@ module GHC.RTS.Flags
 #include "Rts.h"
 #include "rts/Flags.h"
 
-import Control.Applicative
-import Control.Monad
+import Data.Functor ((<$>))
 
 import Foreign
 import Foreign.C
 
 import GHC.Base
 import GHC.Enum
+import GHC.Generics (Generic)
 import GHC.IO
 import GHC.Real
 import GHC.Show
@@ -67,6 +69,7 @@ data GiveGCStats
     | SummaryGCStats
     | VerboseGCStats
     deriving ( Show -- ^ @since 4.8.0.0
+             , Generic -- ^ @since 4.15.0.0
              )
 
 -- | @since 4.8.0.0
@@ -83,6 +86,32 @@ instance Enum GiveGCStats where
     toEnum #{const SUMMARY_GC_STATS} = SummaryGCStats
     toEnum #{const VERBOSE_GC_STATS} = VerboseGCStats
     toEnum e = errorWithoutStackTrace ("invalid enum for GiveGCStats: " ++ show e)
+
+-- | The I/O SubSystem to use in the program.
+--
+-- @since 4.9.0.0
+data IoSubSystem
+  = IoPOSIX   -- ^ Use a POSIX I/O Sub-System
+  | IoNative  -- ^ Use platform native Sub-System. For unix OSes this is the
+              --   same as IoPOSIX, but on Windows this means use the Windows
+              --   native APIs for I/O, including IOCP and RIO.
+  deriving (Eq, Show)
+
+-- | @since 4.9.0.0
+instance Enum IoSubSystem where
+    fromEnum IoPOSIX  = #{const IO_MNGR_POSIX}
+    fromEnum IoNative = #{const IO_MNGR_NATIVE}
+
+    toEnum #{const IO_MNGR_POSIX}  = IoPOSIX
+    toEnum #{const IO_MNGR_NATIVE} = IoNative
+    toEnum e = errorWithoutStackTrace ("invalid enum for IoSubSystem: " ++ show e)
+
+-- | @since 4.9.0.0
+instance Storable IoSubSystem where
+    sizeOf = sizeOf . fromEnum
+    alignment = sizeOf . fromEnum
+    peek ptr = fmap toEnum $ peek (castPtr ptr)
+    poke ptr v = poke (castPtr ptr) (fromEnum v)
 
 -- | Parameters of the garbage collector.
 --
@@ -117,6 +146,7 @@ data GCFlags = GCFlags
     , numa                  :: Bool
     , numaMask              :: Word
     } deriving ( Show -- ^ @since 4.8.0.0
+               , Generic -- ^ @since 4.15.0.0
                )
 
 -- | Parameters concerning context switching
@@ -126,6 +156,7 @@ data ConcFlags = ConcFlags
     { ctxtSwitchTime  :: RtsTime
     , ctxtSwitchTicks :: Int
     } deriving ( Show -- ^ @since 4.8.0.0
+               , Generic -- ^ @since 4.15.0.0
                )
 
 -- | Miscellaneous parameters
@@ -143,7 +174,10 @@ data MiscFlags = MiscFlags
     , linkerAlwaysPic       :: Bool
     , linkerMemBase         :: Word
       -- ^ address to ask the OS for memory for the linker, 0 ==> off
+    , ioManager             :: IoSubSystem
+    , numIoWorkerThreads    :: Word32
     } deriving ( Show -- ^ @since 4.8.0.0
+               , Generic -- ^ @since 4.15.0.0
                )
 
 -- | Flags to control debugging output & extra checking in various
@@ -168,6 +202,7 @@ data DebugFlags = DebugFlags
     , hpc            :: Bool -- ^ @c@ coverage
     , sparks         :: Bool -- ^ @r@
     } deriving ( Show -- ^ @since 4.8.0.0
+               , Generic -- ^ @since 4.15.0.0
                )
 
 -- | Should the RTS produce a cost-center summary?
@@ -180,6 +215,7 @@ data DoCostCentres
     | CostCentresAll
     | CostCentresJSON
     deriving ( Show -- ^ @since 4.8.0.0
+             , Generic -- ^ @since 4.15.0.0
              )
 
 -- | @since 4.8.0.0
@@ -205,6 +241,7 @@ data CCFlags = CCFlags
     , profilerTicks :: Int
     , msecsPerTick  :: Int
     } deriving ( Show -- ^ @since 4.8.0.0
+               , Generic -- ^ @since 4.15.0.0
                )
 
 -- | What sort of heap profile are we collecting?
@@ -220,6 +257,7 @@ data DoHeapProfile
     | HeapByLDV
     | HeapByClosureType
     deriving ( Show -- ^ @since 4.8.0.0
+             , Generic -- ^ @since 4.15.0.0
              )
 
 -- | @since 4.8.0.0
@@ -262,6 +300,7 @@ data ProfFlags = ProfFlags
     , retainerSelector         :: Maybe String
     , bioSelector              :: Maybe String
     } deriving ( Show -- ^ @since 4.8.0.0
+               , Generic -- ^ @since 4.15.0.0
                )
 
 -- | Is event tracing enabled?
@@ -272,6 +311,7 @@ data DoTrace
     | TraceEventLog  -- ^ send tracing events to the event log
     | TraceStderr    -- ^ send tracing events to @stderr@
     deriving ( Show -- ^ @since 4.8.0.0
+             , Generic -- ^ @since 4.15.0.0
              )
 
 -- | @since 4.8.0.0
@@ -299,6 +339,7 @@ data TraceFlags = TraceFlags
     , sparksFull     :: Bool -- ^ trace spark events 100% accurately
     , user           :: Bool -- ^ trace user events (emitted from Haskell code)
     } deriving ( Show -- ^ @since 4.8.0.0
+               , Generic -- ^ @since 4.15.0.0
                )
 
 -- | Parameters pertaining to ticky-ticky profiler
@@ -308,6 +349,7 @@ data TickyFlags = TickyFlags
     { showTickyStats :: Bool
     , tickyFile      :: Maybe FilePath
     } deriving ( Show -- ^ @since 4.8.0.0
+               , Generic -- ^ @since 4.15.0.0
                )
 
 -- | Parameters pertaining to parallelism
@@ -326,6 +368,7 @@ data ParFlags = ParFlags
     , setAffinity :: Bool
     }
     deriving ( Show -- ^ @since 4.8.0.0
+             , Generic -- ^ @since 4.15.0.0
              )
 
 -- | Parameters of the runtime system
@@ -342,12 +385,13 @@ data RTSFlags = RTSFlags
     , tickyFlags      :: TickyFlags
     , parFlags        :: ParFlags
     } deriving ( Show -- ^ @since 4.8.0.0
+               , Generic -- ^ @since 4.15.0.0
                )
 
 foreign import ccall "&RtsFlags" rtsFlagsPtr :: Ptr RTSFlags
 
 getRTSFlags :: IO RTSFlags
-getRTSFlags = do
+getRTSFlags =
   RTSFlags <$> getGCFlags
            <*> getConcFlags
            <*> getMiscFlags
@@ -433,6 +477,7 @@ getConcFlags = do
   ConcFlags <$> #{peek CONCURRENT_FLAGS, ctxtSwitchTime} ptr
             <*> #{peek CONCURRENT_FLAGS, ctxtSwitchTicks} ptr
 
+{-# INLINEABLE getMiscFlags #-}
 getMiscFlags :: IO MiscFlags
 getMiscFlags = do
   let ptr = (#ptr RTS_FLAGS, MiscFlags) rtsFlagsPtr
@@ -454,6 +499,40 @@ getMiscFlags = do
             <*> (toBool <$>
                   (#{peek MISC_FLAGS, linkerAlwaysPic} ptr :: IO CBool))
             <*> #{peek MISC_FLAGS, linkerMemBase} ptr
+            <*> (toEnum . fromIntegral
+                 <$> (#{peek MISC_FLAGS, ioManager} ptr :: IO Word32))
+            <*> (fromIntegral
+                 <$> (#{peek MISC_FLAGS, numIoWorkerThreads} ptr :: IO Word32))
+
+{- Note [The need for getIoManagerFlag]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   GHC supports both the new WINIO manager
+   as well as the old MIO one. In order to
+   decide which code path to take we often
+   have to inspect what the user selected at
+   RTS startup.
+
+   We could use getMiscFlags but then we end up with core containing
+   reads for all MiscFlags. These won't be eliminated at the core level
+   even if it's obvious we will only look at the ioManager part of the
+   ADT.
+
+   We could add a INLINE pragma, but that just means whatever we inline
+   into is likely to be inlined. So rather than adding a dozen pragmas
+   we expose a lean way to query this particular flag. It's not satisfying
+   but it works well enough and allows these checks to be inlined nicely.
+
+-}
+
+{-# INLINE getIoManagerFlag #-}
+-- | Needed to optimize support for different IO Managers on Windows.
+-- See Note [The need for getIoManagerFlag]
+getIoManagerFlag :: IO IoSubSystem
+getIoManagerFlag = do
+      let ptr = (#ptr RTS_FLAGS, MiscFlags) rtsFlagsPtr
+      mgrFlag <- (#{peek MISC_FLAGS, ioManager} ptr :: IO Word32)
+      return $ (toEnum . fromIntegral) mgrFlag
 
 getDebugFlags :: IO DebugFlags
 getDebugFlags = do

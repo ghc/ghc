@@ -20,17 +20,16 @@ module GHC.Types.CostCentre (
         cmpCostCentre   -- used for removing dups in a list
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Binary
+import GHC.Utils.Binary
 import GHC.Types.Var
 import GHC.Types.Name
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Unique
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
-import FastString
-import Util
+import GHC.Data.FastString
 import GHC.Types.CostCentre.State
 
 import Data.Data
@@ -95,7 +94,11 @@ cmpCostCentre (AllCafsCC  {cc_mod = m1}) (AllCafsCC  {cc_mod = m2})
 cmpCostCentre NormalCC {cc_flavour = f1, cc_mod =  m1, cc_name = n1}
               NormalCC {cc_flavour = f2, cc_mod =  m2, cc_name = n2}
     -- first key is module name, then centre name, then flavour
-  = (m1 `compare` m2) `thenCmp` (n1 `compare` n2) `thenCmp` (f1 `compare` f2)
+  = mconcat
+      [ m1 `compare` m2
+      , n1 `lexicalCompareFS` n2 -- compare lexically to avoid non-determinism
+      , f1 `compare` f2
+      ]
 
 cmpCostCentre other_1 other_2
   = let
@@ -314,7 +317,7 @@ costCentreSrcSpan :: CostCentre -> SrcSpan
 costCentreSrcSpan = cc_loc
 
 instance Binary CCFlavour where
-    put_ bh CafCC = do
+    put_ bh CafCC =
             putByte bh 0
     put_ bh (ExprCC i) = do
             putByte bh 1
@@ -328,10 +331,10 @@ instance Binary CCFlavour where
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return CafCC
+              0 -> return CafCC
               1 -> ExprCC <$> get bh
               2 -> DeclCC <$> get bh
-              _ -> HpcCC <$> get bh
+              _ -> HpcCC  <$> get bh
 
 instance Binary CostCentre where
     put_ bh (NormalCC aa ab ac _ad) = do

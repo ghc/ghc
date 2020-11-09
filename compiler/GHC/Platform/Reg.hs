@@ -8,6 +8,7 @@ module GHC.Platform.Reg (
         Reg(..),
         regPair,
         regSingle,
+        realRegSingle,
         isRealReg,      takeRealReg,
         isVirtualReg,   takeVirtualReg,
 
@@ -26,10 +27,12 @@ module GHC.Platform.Reg (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Platform.Reg.Class
 import Data.List (intersect)
 
@@ -181,7 +184,10 @@ data Reg
         deriving (Eq, Ord)
 
 regSingle :: RegNo -> Reg
-regSingle regNo         = RegReal $ RealRegSingle regNo
+regSingle regNo = RegReal (realRegSingle regNo)
+
+realRegSingle :: RegNo -> RealReg
+realRegSingle regNo = RealRegSingle regNo
 
 regPair :: RegNo -> RegNo -> Reg
 regPair regNo1 regNo2   = RegReal $ RealRegPair regNo1 regNo2

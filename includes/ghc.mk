@@ -75,6 +75,7 @@ $$(includes_$1_H_VERSION) : mk/project.mk | $$$$(dir $$$$@)/.
 	@echo "#define __GHCVERSION_H__"                                        >> $$@
 	@echo                                                                   >> $$@
 	@echo "#define __GLASGOW_HASKELL__ $$(ProjectVersionInt)"               >> $$@
+	@echo "#define __GLASGOW_HASKELL_FULL_VERSION__ \"$$(ProjectVersion)\"" >> $$@
 	@echo                                                                   >> $$@
 	@if [ -n "$$(ProjectPatchLevel1)" ]; then \
 	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ $$(ProjectPatchLevel1)" >> $$@; \
@@ -162,7 +163,7 @@ $$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)
 	@echo "#if !defined(__GHCPLATFORM_H__)"                      > $$@
 	@echo "#define __GHCPLATFORM_H__"                           >> $$@
 	@echo                                                       >> $$@
-	@echo "#define GHC_STAGE $1"                                >> $$@
+	@echo "#define GHC_STAGE ($1 + 1)"                          >> $$@
 	@echo                                                       >> $$@
 	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_$1_CPP)" >> $$@
 	@echo "#define HostPlatform_TYPE   $(HostPlatform_$1_CPP)"  >> $$@
@@ -185,6 +186,9 @@ $$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)
 	@echo "#define BUILD_VENDOR  \"$(BuildVendor_$1_CPP)\""     >> $$@
 	@echo "#define HOST_VENDOR  \"$(HostVendor_$1_CPP)\""       >> $$@
 	@echo                                                       >> $$@
+ifeq "$$(SettingsUseDistroMINGW)" "YES"
+	@echo "#define USE_INPLACE_MINGW_TOOLCHAIN 1"               >> $$@
+endif
 ifeq "$$(GhcUnregisterised)" "YES"
 	@echo "#define UnregisterisedCompiler 1"                    >> $$@
 endif
@@ -203,6 +207,7 @@ $(eval $(call includesHeaderPlatform,1))
 
 # These settings are read by GHC at runtime, so as to not cause spurious
 # rebuilds.
+# See Note [tooldir: How GHC finds mingw on Windows]
 
 includes_SETTINGS = includes/dist/build/settings
 
@@ -222,10 +227,14 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("ld supports build-id", "$(LdHasBuildId)")' >> $@
 	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
 	@echo ',("ld is GNU ld", "$(LdIsGNULd)")' >> $@
+	@echo ',("Merge objects command", "$(SettingsMergeObjectsCommand)")' >> $@
+	@echo ',("Merge objects flags", "$(SettingsMergeObjectsFlags)")' >> $@
 	@echo ',("ar command", "$(SettingsArCommand)")' >> $@
 	@echo ',("ar flags", "$(ArArgs)")' >> $@
 	@echo ',("ar supports at file", "$(ArSupportsAtFile)")' >> $@
 	@echo ',("ranlib command", "$(SettingsRanlibCommand)")' >> $@
+	@echo ',("otool command", "$(SettingsOtoolCommand)")' >> $@
+	@echo ',("install_name_tool command", "$(SettingsInstallNameToolCommand)")' >> $@
 	@echo ',("touch command", "$(SettingsTouchCommand)")' >> $@
 	@echo ',("dllwrap command", "$(SettingsDllWrapCommand)")' >> $@
 	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
@@ -247,20 +256,13 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
 	@echo ',("LLVM clang command", "$(SettingsClangCommand)")' >> $@
 	@echo
-	@echo ',("integer library", "$(INTEGER_LIBRARY)")' >> $@
+	@echo ',("bignum backend", "$(BIGNUM_BACKEND)")' >> $@
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
-	@echo ',("Use native code generator", "$(GhcWithNativeCodeGen)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Tables next to code", "$(TablesNextToCode)")' >> $@
 	@echo ',("Leading underscore", "$(LeadingUnderscore)")' >> $@
 	@echo ',("Use LibFFI", "$(UseLibFFIForAdjustors)")' >> $@
-# Note that GhcThreaded just reflects the Makefile variable setting. In
-# particular, the stage1 compiler is never actually compiled with -threaded, but
-# it will nevertheless have cGhcThreaded = True. The "+RTS --info" output will
-# show what RTS GHC is really using.
-	@echo ",(\"Use Threads\", \"$(GhcThreaded)\")" >> $@
-	@echo ",(\"Use Debugging\", \"$(GhcDebugged)\")" >> $@
 	@echo ",(\"RTS expects libdw\", \"$(GhcRtsWithLibdw)\")" >> $@
 	@echo "]" >> $@
 
@@ -271,8 +273,6 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 includes_DERIVEDCONSTANTS = includes/dist-derivedconstants/header/DerivedConstants.h
 includes_GHCCONSTANTS_HASKELL_TYPE = includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs
 includes_GHCCONSTANTS_HASKELL_VALUE = includes/dist-derivedconstants/header/platformConstants
-includes_GHCCONSTANTS_HASKELL_WRAPPERS = includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs
-includes_GHCCONSTANTS_HASKELL_EXPORTS = includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs
 
 INSTALL_LIBS += $(includes_GHCCONSTANTS_HASKELL_VALUE)
 
@@ -296,12 +296,6 @@ $(includes_GHCCONSTANTS_HASKELL_TYPE): $(deriveConstants_INPLACE) | $$(dir $$@)/
 
 $(includes_GHCCONSTANTS_HASKELL_VALUE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-value -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
-
-$(includes_GHCCONSTANTS_HASKELL_WRAPPERS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
-	$< --gen-haskell-wrappers -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
-
-$(includes_GHCCONSTANTS_HASKELL_EXPORTS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
-	$< --gen-haskell-exports -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 endif
 
 # ---------------------------------------------------------------------------
@@ -316,8 +310,6 @@ $(eval $(call all-target,includes,\
   $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION) \
   $(includes_GHCCONSTANTS_HASKELL_TYPE) \
   $(includes_GHCCONSTANTS_HASKELL_VALUE) \
-  $(includes_GHCCONSTANTS_HASKELL_WRAPPERS) \
-  $(includes_GHCCONSTANTS_HASKELL_EXPORTS) \
   $(includes_DERIVEDCONSTANTS)))
 
 install: install_includes

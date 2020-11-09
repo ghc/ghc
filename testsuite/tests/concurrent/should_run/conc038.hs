@@ -24,9 +24,9 @@ main = do
   th <- newEmptyMVar
   forkIO $ do
      putStrLn "newThread started"
-     sleepBlock 1
+     sleepBlock 2
      putStrLn "newThread back again"
-     putMVar th "1 sec later"
+     putMVar th "2 secs later"
   threadDelay 500000 >> putStrLn "mainThread"
         -- this will not be blocked in the threaded RTS
   forkIO $ (hFun 2)

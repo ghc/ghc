@@ -1,5 +1,7 @@
-{-# LANGUAGE CPP, MagicHash, RecordWildCards, BangPatterns #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -46,29 +48,60 @@ module GHC.Runtime.Eval (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Runtime.Eval.Types
-
-import GHC.Runtime.Interpreter as GHCi
-import GHC.Runtime.Interpreter.Types
-import GHCi.Message
-import GHCi.RemoteTypes
 import GHC.Driver.Monad
 import GHC.Driver.Main
+import GHC.Driver.Env
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+
+import GHC.Runtime.Eval.Types
+import GHC.Runtime.Interpreter as GHCi
+import GHC.Runtime.Interpreter.Types
+import GHC.Runtime.Heap.Inspect
+import GHC.Runtime.Context
+import GHCi.Message
+import GHCi.RemoteTypes
+import GHC.ByteCode.Types
+
+import GHC.Linker.Types
+import GHC.Linker.Loader as Loader
+
 import GHC.Hs
-import GHC.Driver.Types
+
+import GHC.Core.Predicate
 import GHC.Core.InstEnv
-import GHC.Iface.Env       ( newInteractiveBinder )
 import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core.FVs        ( orphNamesOfFamInst )
 import GHC.Core.TyCon
 import GHC.Core.Type       hiding( typeKind )
-import GHC.Types.RepType
+import qualified GHC.Core.Type as Type
+
+import GHC.Iface.Env       ( newInteractiveBinder )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
-import GHC.Core.Predicate
+
+import GHC.Builtin.Names ( toDynName, pretendNameIsInScope )
+import GHC.Builtin.Types ( isCTupleTyConName )
+
+import GHC.Data.Maybe
+import GHC.Data.FastString
+import GHC.Data.Bag
+
+import GHC.Utils.Monad
+import GHC.Utils.Panic
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+
+import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, initParserState)
+import GHC.Parser.Lexer (ParserOpts)
+import qualified GHC.Parser       as Parser (parseStmt, parseModule, parseDeclaration, parseImport)
+
+import GHC.Types.RepType
+import GHC.Types.Fixity.Env
 import GHC.Types.Var
 import GHC.Types.Id as Id
 import GHC.Types.Name      hiding ( varName )
@@ -76,28 +109,15 @@ import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Var.Env
-import GHC.ByteCode.Types
-import GHC.Runtime.Linker as Linker
-import GHC.Driver.Session
-import GHC.LanguageExtensions
+import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
-import MonadUtils
-import GHC.Types.Module
-import GHC.Builtin.Names ( toDynName, pretendNameIsInScope )
-import GHC.Builtin.Types ( isCTupleTyConName )
-import Panic
-import Maybes
-import ErrUtils
-import GHC.Types.SrcLoc
-import GHC.Runtime.Heap.Inspect
-import Outputable
-import FastString
-import Bag
-import Util
-import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, mkPStatePure)
-import GHC.Parser.Lexer (ParserFlags)
-import qualified GHC.Parser       as Parser (parseStmt, parseModule, parseDeclaration, parseImport)
+import GHC.Types.TyThing
+
+import GHC.Unit
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Home.ModInfo
 
 import System.Directory
 import Data.Dynamic
@@ -106,24 +126,20 @@ import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import StringBuffer (stringToStringBuffer)
+import GHC.Data.StringBuffer (stringToStringBuffer)
 import Control.Monad
+import Control.Monad.Catch as MC
 import Data.Array
-import Exception
+import GHC.Utils.Exception
 import Unsafe.Coerce ( unsafeCoerce )
 
 import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )
 import GHC.Tc.Utils.Zonk ( ZonkFlexi (SkolemiseFlexi) )
-
 import GHC.Tc.Utils.Env (tcGetInstEnvs)
-
 import GHC.Tc.Utils.Instantiate (instDFunType)
-import GHC.Tc.Solver (solveWanteds)
+import GHC.Tc.Solver (simplifyWantedsTcM)
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Types.Evidence
-import Data.Bifunctor (second)
-
-import GHC.Tc.Solver.Monad (runTcS)
+import GHC.Core.Class (classTyCon)
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -291,7 +307,7 @@ withVirtualCWD m = do
             setSession hsc_env{  hsc_IC = old_IC{ ic_cwd = Just virt_dir } }
             liftIO $ setCurrentDirectory orig_dir
 
-      gbracket set_cwd reset_cwd $ \_ -> m
+      MC.bracket set_cwd reset_cwd $ \_ -> m
 
 parseImportDecl :: GhcMonad m => String -> m (ImportDecl GhcPs)
 parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
@@ -373,8 +389,8 @@ handleRunStatus step expr bindings final_ids status history
     = do hsc_env <- getSession
          let final_ic = extendInteractiveContextWithIds (hsc_IC hsc_env) final_ids
              final_names = map getName final_ids
-             dl = hsc_dynLinker hsc_env
-         liftIO $ Linker.extendLinkEnv dl (zip final_names hvals)
+             dl = hsc_loader hsc_env
+         liftIO $ Loader.extendLoadedEnv dl (zip final_names hvals)
          hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
          setSession hsc_env'
          return (ExecComplete (Right final_names) allocs)
@@ -415,22 +431,22 @@ resumeExec canLogSpan step
             new_names = [ n | thing <- ic_tythings ic
                             , let n = getName thing
                             , not (n `elem` old_names) ]
-            dl        = hsc_dynLinker hsc_env
-        liftIO $ Linker.deleteFromLinkEnv dl new_names
+            dl        = hsc_loader hsc_env
+        liftIO $ Loader.deleteFromLoadedEnv dl new_names
 
         case r of
           Resume { resumeStmt = expr, resumeContext = fhv
                  , resumeBindings = bindings, resumeFinalIds = final_ids
                  , resumeApStack = apStack, resumeBreakInfo = mb_brkpt
                  , resumeSpan = span
-                 , resumeHistory = hist } -> do
+                 , resumeHistory = hist } ->
                withVirtualCWD $ do
                 status <- liftIO $ GHCi.resumeStmt hsc_env (isStep step) fhv
                 let prevHistoryLst = fromListBL 50 hist
                     hist' = case mb_brkpt of
                        Nothing -> prevHistoryLst
                        Just bi
-                         | not $canLogSpan span -> prevHistoryLst
+                         | not $ canLogSpan span -> prevHistoryLst
                          | otherwise -> mkHistory hsc_env apStack bi `consBL`
                                                         fromListBL 50 hist
                 handleRunStatus step expr bindings final_ids status hist'
@@ -510,9 +526,9 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
 
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 [exn_id]
-       dl     = hsc_dynLinker hsc_env
+       dl     = hsc_loader hsc_env
    --
-   Linker.extendLinkEnv dl [(exn_name, apStack)]
+   Loader.extendLoadedEnv dl [(exn_name, apStack)]
    return (hsc_env{ hsc_IC = ictxt1 }, [exn_name], span, "<exception thrown>")
 
 -- Just case: we stopped at a breakpoint, we have information about the location
@@ -567,11 +583,11 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 final_ids
        names  = map idName new_ids
-       dl     = hsc_dynLinker hsc_env
+       dl     = hsc_loader hsc_env
 
    let fhvs = catMaybes mb_hValues
-   Linker.extendLinkEnv dl (zip names fhvs)
-   when result_ok $ Linker.extendLinkEnv dl [(result_name, apStack_fhv)]
+   Loader.extendLoadedEnv dl (zip names fhvs)
+   when result_ok $ Loader.extendLoadedEnv dl [(result_name, apStack_fhv)]
    hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
    return (hsc_env1, if result_ok then result_name:names else names, span, decl)
   where
@@ -617,8 +633,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
            [id | id <- tmp_ids
                , not $ noSkolems id
                , (occNameFS.nameOccName.idName) id /= result_fs]
-   hsc_env' <- foldM improveTypes hsc_env (map idName incompletelyTypedIds)
-   return hsc_env'
+   foldM improveTypes hsc_env (map idName incompletelyTypedIds)
     where
      noSkolems = noFreeVarsOfType . idType
      improveTypes hsc_env@HscEnv{hsc_IC=ic} name = do
@@ -814,7 +829,7 @@ getContext = withSession $ \HscEnv{ hsc_IC=ic } ->
 -- its full top-level scope available.
 moduleIsInterpreted :: GhcMonad m => Module -> m Bool
 moduleIsInterpreted modl = withSession $ \h ->
- if moduleUnitId modl /= thisPackage (hsc_dflags h)
+ if notHomeModule (hsc_home_unit h) modl
         then return False
         else case lookupHpt (hsc_HPT h) (moduleName modl) of
                 Just details       -> return (isJust (mi_globals (hm_iface details)))
@@ -857,7 +872,7 @@ getInfo allInfo name
 
 -- | Returns all names in scope in the current interactive context
 getNamesInScope :: GhcMonad m => m [Name]
-getNamesInScope = withSession $ \hsc_env -> do
+getNamesInScope = withSession $ \hsc_env ->
   return (map gre_name (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
 
 -- | Returns all 'RdrName's in scope in the current interactive
@@ -880,14 +895,14 @@ parseName str = withSession $ \hsc_env -> liftIO $
       ; hscTcRnLookupRdrName hsc_env lrdr_name }
 
 -- | Returns @True@ if passed string is a statement.
-isStmt :: ParserFlags -> String -> Bool
+isStmt :: ParserOpts -> String -> Bool
 isStmt pflags stmt =
   case parseThing Parser.parseStmt pflags stmt of
     Lexer.POk _ _ -> True
     Lexer.PFailed _ -> False
 
 -- | Returns @True@ if passed string has an import declaration.
-hasImport :: ParserFlags -> String -> Bool
+hasImport :: ParserOpts -> String -> Bool
 hasImport pflags stmt =
   case parseThing Parser.parseModule pflags stmt of
     Lexer.POk _ thing -> hasImports thing
@@ -896,15 +911,15 @@ hasImport pflags stmt =
     hasImports = not . null . hsmodImports . unLoc
 
 -- | Returns @True@ if passed string is an import declaration.
-isImport :: ParserFlags -> String -> Bool
+isImport :: ParserOpts -> String -> Bool
 isImport pflags stmt =
   case parseThing Parser.parseImport pflags stmt of
     Lexer.POk _ _ -> True
     Lexer.PFailed _ -> False
 
 -- | Returns @True@ if passed string is a declaration but __/not a splice/__.
-isDecl :: ParserFlags -> String -> Bool
-isDecl pflags stmt = do
+isDecl :: ParserOpts -> String -> Bool
+isDecl pflags stmt =
   case parseThing Parser.parseDeclaration pflags stmt of
     Lexer.POk _ thing ->
       case unLoc thing of
@@ -912,12 +927,12 @@ isDecl pflags stmt = do
         _ -> True
     Lexer.PFailed _ -> False
 
-parseThing :: Lexer.P thing -> ParserFlags -> String -> Lexer.ParseResult thing
-parseThing parser pflags stmt = do
+parseThing :: Lexer.P thing -> ParserOpts -> String -> Lexer.ParseResult thing
+parseThing parser opts stmt = do
   let buf = stringToStringBuffer stmt
       loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
 
-  Lexer.unP parser (Lexer.mkPStatePure pflags buf loc)
+  Lexer.unP parser (Lexer.initParserState opts buf loc)
 
 getDocs :: GhcMonad m
         => Name
@@ -998,7 +1013,7 @@ exprType mode expr = withSession $ \hsc_env -> do
 
 -- | Get the kind of a  type
 typeKind  :: GhcMonad m => Bool -> String -> m (Type, Kind)
-typeKind normalise str = withSession $ \hsc_env -> do
+typeKind normalise str = withSession $ \hsc_env ->
    liftIO $ hscKcType hsc_env normalise str
 
 -- ----------------------------------------------------------------------------
@@ -1049,12 +1064,13 @@ typeKind normalise str = withSession $ \hsc_env -> do
 
 -- Find all instances that match a provided type
 getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
-getInstancesForType ty = withSession $ \hsc_env -> do
-  liftIO $ runInteractiveHsc hsc_env $ do
+getInstancesForType ty = withSession $ \hsc_env ->
+  liftIO $ runInteractiveHsc hsc_env $
     ioMsgMaybe $ runTcInteractive hsc_env $ do
       -- Bring class and instances from unqualified modules into scope, this fixes #16793.
       loadUnqualIfaces hsc_env (hsc_IC hsc_env)
       matches <- findMatchingInstances ty
+
       fmap catMaybes . forM matches $ uncurry checkForExistence
 
 -- Parse a type string and turn any holes into skolems
@@ -1068,17 +1084,43 @@ parseInstanceHead str = withSession $ \hsc_env0 -> do
   return ty
 
 -- Get all the constraints required of a dictionary binding
-getDictionaryBindings :: PredType -> TcM WantedConstraints
+getDictionaryBindings :: PredType -> TcM CtEvidence
 getDictionaryBindings theta = do
   dictName <- newName (mkDictOcc (mkVarOcc "magic"))
   let dict_var = mkVanillaGlobal dictName theta
   loc <- getCtLocM (GivenOrigin UnkSkol) Nothing
-  let wCs = mkSimpleWC [CtDerived
-          { ctev_pred = varType dict_var
-          , ctev_loc = loc
-          }]
 
-  return wCs
+  -- Generate a wanted here because at the end of constraint
+  -- solving, most derived constraints get thrown away, which in certain
+  -- cases, notably with quantified constraints makes it impossible to rule
+  -- out instances as invalid. (See #18071)
+  return CtWanted {
+    ctev_pred = varType dict_var,
+    ctev_dest = EvVarDest dict_var,
+    ctev_nosh = WDeriv,
+    ctev_loc = loc
+  }
+
+-- Find instances where the head unifies with the provided type
+findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]
+findMatchingInstances ty = do
+  ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
+  let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
+  return $ concatMap (try_cls ies) allClasses
+  where
+  {- Check that a class instance is well-kinded.
+    Since `:instances` only works for unary classes, we're looking for instances of kind
+    k -> Constraint where k is the type of the queried type.
+  -}
+  try_cls ies cls
+    | Just (_, arg_kind, res_kind) <- splitFunTy_maybe (tyConKind $ classTyCon cls)
+    , tcIsConstraintKind res_kind
+    , Type.typeKind ty `eqType` arg_kind
+    , (matches, _, _) <- lookupInstEnv True ies cls [ty]
+    = matches
+    | otherwise
+    = []
+
 
 {-
   When we've found an instance that a query matches against, we still need to
@@ -1104,19 +1146,29 @@ getDictionaryBindings theta = do
 -}
 
 checkForExistence :: ClsInst -> [DFunInstType] -> TcM (Maybe ClsInst)
-checkForExistence res mb_inst_tys = do
-  (tys, thetas) <- instDFunType (is_dfun res) mb_inst_tys
+checkForExistence clsInst mb_inst_tys = do
+  -- We want to force the solver to attempt to solve the constraints for clsInst.
+  -- Usually, this isn't a problem since there should only be a single instance
+  -- for a type. However, when we have overlapping instances, the solver will give up
+  -- since it can't decide which instance to use. To get around this restriction, instead
+  -- of asking the solver to solve a constraint for clsInst, we ask it to solve the
+  -- thetas of clsInst.
+  (tys, thetas) <- instDFunType (is_dfun clsInst) mb_inst_tys
+  wanteds <- mapM getDictionaryBindings thetas
+  -- It's important to zonk constraints after solving in order to expose things like TypeErrors
+  -- which otherwise appear as opaque type variables. (See #18262).
+  WC { wc_simple = simples, wc_impl = impls } <- simplifyWantedsTcM wanteds
 
-  wanteds <- forM thetas getDictionaryBindings
-  (residuals, _) <- second evBindMapBinds <$> runTcS (solveWanteds (unionsWC wanteds))
-
-  let all_residual_constraints = bagToList $ wc_simple residuals
-  let preds = map ctPred all_residual_constraints
-  if all isSatisfiablePred preds && (null $ wc_impl residuals)
-  then return . Just $ substInstArgs tys preds res
+  if allBag allowedSimple simples && solvedImplics impls
+  then return . Just $ substInstArgs tys (bagToList (mapBag ctPred simples)) clsInst
   else return Nothing
 
   where
+  allowedSimple :: Ct -> Bool
+  allowedSimple ct = isSatisfiablePred (ctPred ct)
+
+  solvedImplics :: Bag Implication -> Bool
+  solvedImplics impls = allBag (isSolvedStatus . ic_status) impls
 
   -- Stricter version of isTyVarClassPred that requires all TyConApps to have at least
   -- one argument or for the head to be a TyVar. The reason is that we want to ensure
@@ -1128,7 +1180,7 @@ checkForExistence res mb_inst_tys = do
       Just (_, tys@(_:_)) -> all isTyVarTy tys
       _                   -> isTyVarTy ty
 
-  empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType (idType $ is_dfun res)))
+  empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType (idType $ is_dfun clsInst)))
 
   {- Create a ClsInst with instantiated arguments and constraints.
 
@@ -1148,23 +1200,13 @@ checkForExistence res mb_inst_tys = do
     where
     (dfun_tvs, _, cls, args) = instanceSig inst
 
--- Find instances where the head unifies with the provided type
-findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]
-findMatchingInstances ty = do
-  ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
-  let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
-
-  concatMapM (\cls -> do
-    let (matches, _, _) = lookupInstEnv True ies cls [ty]
-    return matches) allClasses
-
 -----------------------------------------------------------------------------
 -- Compile an expression, run it, and deliver the result
 
 -- | Parse an expression, the parsed expression can be further processed and
 -- passed to compileParsedExpr.
 parseExpr :: GhcMonad m => String -> m (LHsExpr GhcPs)
-parseExpr expr = withSession $ \hsc_env -> do
+parseExpr expr = withSession $ \hsc_env ->
   liftIO $ runInteractiveHsc hsc_env $ hscParseExpr expr
 
 -- | Compile an expression, run it, and deliver the resulting HValue.
@@ -1232,7 +1274,7 @@ showModule mod_summary =
     withSession $ \hsc_env -> do
         interpreted <- moduleIsBootOrNotObjectLinkable mod_summary
         let dflags = hsc_dflags hsc_env
-        return (showModMsg dflags (hscTarget dflags) interpreted mod_summary)
+        return (showSDoc dflags $ showModMsg dflags interpreted mod_summary)
 
 moduleIsBootOrNotObjectLinkable :: GhcMonad m => ModSummary -> m Bool
 moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
@@ -1257,53 +1299,14 @@ obtainTermFromVal hsc_env _bound _force _ty _x = withInterp hsc_env $ \case
 
 obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
 obtainTermFromId hsc_env bound force id =  do
-  hv <- Linker.getHValue hsc_env (varName id)
-  cvObtainTerm (updEnv hsc_env) bound force (idType id) hv
- where updEnv env = env {hsc_dflags =                             -- #14828
-            xopt_set (hsc_dflags env) ImpredicativeTypes}
-         -- See Note [Setting ImpredicativeTypes for :print command]
+  hv <- Loader.loadName hsc_env (varName id)
+  cvObtainTerm hsc_env bound force (idType id) hv
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
 reconstructType :: HscEnv -> Int -> Id -> IO (Maybe Type)
 reconstructType hsc_env bound id = do
-  hv <- Linker.getHValue hsc_env (varName id)
+  hv <- Loader.loadName hsc_env (varName id)
   cvReconstructType hsc_env bound (idType id) hv
 
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
 mkRuntimeUnkTyVar name kind = mkTcTyVar name kind RuntimeUnk
-
-
-{-
-Note [Setting ImpredicativeTypes for :print command]
-
-If ImpredicativeTypes is not enabled, then `:print <term>` will fail if the
-type of <term> has nested `forall`s or `=>`s.
-This is because the GHCi debugger's internals will attempt to unify a
-metavariable with the type of <term> and then display the result, but if the
-type has nested `forall`s or `=>`s, then unification will fail.
-As a result, `:print` will bail out and the unhelpful result will be
-`<term> = (_t1::t1)` (where `t1` is a metavariable).
-
-Beware: <term> can have nested `forall`s even if its definition doesn't use
-RankNTypes! Here is an example from #14828:
-
-  class Functor f where
-    fmap :: (a -> b) -> f a -> f b
-
-Somewhat surprisingly, `:print fmap` considers the type of fmap to have
-nested foralls. This is because the GHCi debugger sees the type
-`fmap :: forall f. Functor f => forall a b. (a -> b) -> f a -> f b`.
-We could envision deeply instantiating this type to get the type
-`forall f a b. Functor f => (a -> b) -> f a -> f b`,
-but this trick wouldn't work for higher-rank types.
-
-Instead, we adopt a simpler fix: enable `ImpredicativeTypes` when using
-`:print` and friends in the GHCi debugger. This allows metavariables
-to unify with types that have nested (or higher-rank) `forall`s/`=>`s,
-which makes `:print fmap` display as
-`fmap = (_t1::forall a b. Functor f => (a -> b) -> f a -> f b)`, as expected.
-
-Although ImpredicativeTypes is a somewhat unpredictable from a type inference
-perspective, there is no danger in using it in the GHCi debugger, since all
-of the terms that the GHCi debugger deals with have already been typechecked.
--}

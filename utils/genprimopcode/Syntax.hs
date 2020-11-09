@@ -65,7 +65,7 @@ data Option
 
 -- categorises primops
 data Category
-   = Dyadic | Monadic | Compare | GenPrimOp
+   = Compare | GenPrimOp
      deriving Show
 
 -- types
@@ -155,10 +155,6 @@ sanityPrimOp def_names p
 sane_ty :: Category -> Ty -> Bool
 sane_ty Compare (TyF t1 (TyF t2 td)) 
    | t1 == t2 && td == TyApp (TyCon "Int#") []  = True
-sane_ty Monadic (TyF t1 td) 
-   | t1 == td  = True
-sane_ty Dyadic (TyF t1 (TyF t2 td))
-   | t1 == td && t2 == td  = True
 sane_ty GenPrimOp _
    = True
 sane_ty _ _

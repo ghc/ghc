@@ -26,6 +26,7 @@
 #include <io.h>
 #include <windows.h>
 #include <shfolder.h> /* SHGetFolderPathW */
+#include "win32/AsyncWinIO.h"
 #endif
 
 #if defined(openbsd_HOST_OS)
@@ -134,7 +135,7 @@
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_HasProto(atexit)                              \
-      RTS_WIN32_ONLY(SymI_NeedsProto(__chkstk_ms))       \
+      RTS_WIN32_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___environ))      \
       RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
@@ -143,11 +144,17 @@
       /* see Note [Symbols for MinGW's printf] */        \
       SymI_HasProto(_lock_file)                          \
       SymI_HasProto(_unlock_file)                        \
+      SymI_HasProto(__mingw_vsnwprintf)                  \
+      /* ^^ Need to figure out why this is needed.  */   \
       /* See Note [_iob_func symbol] */                  \
       RTS_WIN64_ONLY(SymI_HasProto_redirect(             \
          __imp___acrt_iob_func, __rts_iob_func, true))   \
       RTS_WIN32_ONLY(SymI_HasProto_redirect(             \
-         __imp____acrt_iob_func, __rts_iob_func, true))
+         __imp____acrt_iob_func, __rts_iob_func, true))  \
+      SymI_HasProto(__mingw_vsnwprintf)                  \
+      /* ^^ Need to figure out why this is needed.  */   \
+      SymI_HasProto(__mingw_vfprintf)                    \
+      /* ^^ Need to figure out why this is needed.  */
 
 #define RTS_MINGW_COMPAT_SYMBOLS                         \
       SymI_HasProto_deprecated(access)                   \
@@ -338,11 +345,15 @@
    SymI_HasProto(blockUserSignals)      \
    SymI_HasProto(unblockUserSignals)
 #else
-#define RTS_USER_SIGNALS_SYMBOLS        \
-   SymI_HasProto(ioManagerWakeup)       \
-   SymI_HasProto(sendIOManagerEvent)    \
-   SymI_HasProto(readIOManagerEvent)    \
-   SymI_HasProto(getIOManagerEvent)     \
+#define RTS_USER_SIGNALS_SYMBOLS             \
+   SymI_HasProto(registerIOCPHandle)      \
+   SymI_HasProto(getOverlappedEntries)       \
+   SymI_HasProto(completeSynchronousRequest) \
+   SymI_HasProto(registerAlertableWait)      \
+   SymI_HasProto(ioManagerWakeup)            \
+   SymI_HasProto(sendIOManagerEvent)         \
+   SymI_HasProto(readIOManagerEvent)         \
+   SymI_HasProto(getIOManagerEvent)          \
    SymI_HasProto(console_handler)
 #endif
 
@@ -633,9 +644,9 @@
       SymI_HasProto(getOrSetLibHSghcFastStringTable)                    \
       SymI_HasProto(getRTSStats)                                        \
       SymI_HasProto(getRTSStatsEnabled)                                 \
-      SymI_HasProto(getOrSetLibHSghcPersistentLinkerState)              \
-      SymI_HasProto(getOrSetLibHSghcInitLinkerDone)                     \
-      SymI_HasProto(getOrSetLibHSghcGlobalDynFlags)                     \
+      SymI_HasProto(getOrSetLibHSghcGlobalHasPprDebug)                  \
+      SymI_HasProto(getOrSetLibHSghcGlobalHasNoDebugOutput)             \
+      SymI_HasProto(getOrSetLibHSghcGlobalHasNoStateHack)               \
       SymI_HasProto(genericRaise)                                       \
       SymI_HasProto(getProgArgv)                                        \
       SymI_HasProto(getFullProgArgv)                                    \
@@ -643,7 +654,7 @@
       SymI_HasProto(freeFullProgArgv)                                   \
       SymI_HasProto(getProcessElapsedTime)                              \
       SymI_HasProto(getStablePtr)                                       \
-      SymI_HasProto(foreignExportStablePtr)                             \
+      SymI_HasProto(registerForeignExports)                             \
       SymI_HasProto(hs_init)                                            \
       SymI_HasProto(hs_init_with_rtsopts)                               \
       SymI_HasProto(hs_init_ghc)                                        \
@@ -701,12 +712,16 @@
       SymI_HasProto(stg_copySmallArrayzh)                               \
       SymI_HasProto(stg_copySmallMutableArrayzh)                        \
       SymI_HasProto(stg_casSmallArrayzh)                                \
+      SymI_HasProto(stg_copyArray_barrier)                              \
       SymI_HasProto(stg_newBCOzh)                                       \
       SymI_HasProto(stg_newByteArrayzh)                                 \
       SymI_HasProto(stg_casIntArrayzh)                                  \
       SymI_HasProto(stg_newMVarzh)                                      \
       SymI_HasProto(stg_newMutVarzh)                                    \
       SymI_HasProto(stg_newTVarzh)                                      \
+      SymI_HasProto(stg_readIOPortzh)                                   \
+      SymI_HasProto(stg_writeIOPortzh)                                  \
+      SymI_HasProto(stg_newIOPortzh)                                    \
       SymI_HasProto(stg_noDuplicatezh)                                  \
       SymI_HasProto(stg_atomicModifyMutVar2zh)                          \
       SymI_HasProto(stg_atomicModifyMutVarzuzh)                         \
@@ -732,6 +747,7 @@
       SymI_HasProto(stg_raiseUnderflowzh)                               \
       SymI_HasProto(stg_raiseOverflowzh)                                \
       SymI_HasProto(stg_raiseIOzh)                                      \
+      SymI_HasProto(stg_paniczh)                                        \
       SymI_HasProto(stg_readTVarzh)                                     \
       SymI_HasProto(stg_readTVarIOzh)                                   \
       SymI_HasProto(resumeThread)                                       \
@@ -747,6 +763,7 @@
       SymI_HasProto(rts_evalStableIOMain)                               \
       SymI_HasProto(rts_evalStableIO)                                   \
       SymI_HasProto(rts_eval_)                                          \
+      SymI_HasProto(rts_inCall)                                         \
       SymI_HasProto(rts_getBool)                                        \
       SymI_HasProto(rts_getChar)                                        \
       SymI_HasProto(rts_getDouble)                                      \
@@ -789,6 +806,9 @@
       SymI_HasProto(rtsSupportsBoundThreads)                            \
       SymI_HasProto(rts_isProfiled)                                     \
       SymI_HasProto(rts_isDynamic)                                      \
+      SymI_HasProto(rts_isThreaded)                                     \
+      SymI_HasProto(rts_isDebugged)                                     \
+      SymI_HasProto(rts_isTracing)                                      \
       SymI_HasProto(rts_setInCallCapability)                            \
       SymI_HasProto(rts_enableThreadAllocationLimit)                    \
       SymI_HasProto(rts_disableThreadAllocationLimit)                   \

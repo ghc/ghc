@@ -30,15 +30,14 @@
 
 module Main (main) where
 
-import qualified GHC.PackageDb as GhcPkg
-import GHC.PackageDb (BinaryStringRep(..))
+import qualified GHC.Unit.Database as GhcPkg
+import GHC.Unit.Database hiding (mkMungePathUrl)
 import GHC.HandleEncoding
 import GHC.BaseDir (getBaseDir)
-import GHC.Settings.Platform (getTargetPlatform)
-import GHC.Settings.Utils (maybeReadFuzzy)
-import GHC.Platform (platformMini)
-import GHC.Platform.Host (cHostPlatformMini)
+import GHC.Settings.Utils (getTargetArchOS, maybeReadFuzzy)
+import GHC.Platform.Host (hostPlatformArchOS)
 import GHC.UniqueSubdir (uniqueSubdir)
+import qualified GHC.Data.ShortText as ST
 import GHC.Version ( cProjectVersion )
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Data.Graph as Graph
@@ -50,11 +49,12 @@ import Distribution.Package hiding (installedUnitId)
 import Distribution.Text
 import Distribution.Version
 import Distribution.Backpack
+import Distribution.Pretty (Pretty (..))
 import Distribution.Types.UnqualComponentName
 import Distribution.Types.LibraryName
 import Distribution.Types.MungedPackageName
 import Distribution.Types.MungedPackageId
-import Distribution.Simple.Utils (fromUTF8BS, toUTF8BS, writeUTF8File, readUTF8File)
+import Distribution.Simple.Utils (toUTF8BS, writeUTF8File, readUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
@@ -67,6 +67,7 @@ import Prelude
 import System.Console.GetOpt
 import qualified Control.Exception as Exception
 import Data.Maybe
+import Data.Bifunctor
 
 import Data.Char ( toLower )
 import Control.Monad
@@ -501,7 +502,7 @@ runit verbosity cli nonopts = do
         checkConsistency verbosity cli
 
     ["dump"] -> do
-        dumpPackages verbosity cli (fromMaybe False mexpand_pkgroot)
+        dumpUnits verbosity cli (fromMaybe False mexpand_pkgroot)
 
     ["recache"] -> do
         recache verbosity cli
@@ -643,11 +644,11 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
           -- See Note [Settings File] about this file, and why we need GHC to share it with us.
           let settingsFile = top_dir </> "settings"
           exists_settings_file <- doesFileExist settingsFile
-          targetPlatformMini <- case exists_settings_file of
+          targetArchOS <- case exists_settings_file of
             False -> do
               warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
               warn "cannot know target platform so guessing target == host (native compiler)."
-              pure cHostPlatformMini
+              pure hostPlatformArchOS
             True -> do
               settingsStr <- readFile settingsFile
               mySettings <- case maybeReadFuzzy settingsStr of
@@ -655,10 +656,10 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
                 -- It's excusable to not have a settings file (for now at
                 -- least) but completely inexcusable to have a malformed one.
                 Nothing -> die $ "Can't parse settings file " ++ show settingsFile
-              case getTargetPlatform settingsFile mySettings of
-                Right platform -> pure $ platformMini platform
+              case getTargetArchOS settingsFile mySettings of
+                Right archOS -> pure archOS
                 Left e -> die e
-          let subdir = uniqueSubdir targetPlatformMini
+          let subdir = uniqueSubdir targetArchOS
               dir = appdir </> subdir
           r <- lookForPackageDBIn dir
           case r of
@@ -964,10 +965,7 @@ mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } =
     -- files and "package.conf.d" dirs) the pkgroot is the parent directory
     -- ${pkgroot}/package.conf  or  ${pkgroot}/package.conf.d/
 
--- TODO: This code is duplicated in compiler/main/Packages.hs
-mungePackagePaths :: FilePath -> FilePath
-                  -> InstalledPackageInfo -> InstalledPackageInfo
--- Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
+-- | Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
 -- (http://www.haskell.org/pipermail/libraries/2009-May/011772.html)
 -- Paths/URLs can be relative to ${pkgroot} or ${pkgrooturl}.
 -- The "pkgroot" is the directory containing the package database.
@@ -975,7 +973,10 @@ mungePackagePaths :: FilePath -> FilePath
 -- Also perform a similar substitution for the older GHC-specific
 -- "$topdir" variable. The "topdir" is the location of the ghc
 -- installation (obtained from the -B option).
+mungePackagePaths :: FilePath -> FilePath
+                  -> InstalledPackageInfo -> InstalledPackageInfo
 mungePackagePaths top_dir pkgroot pkg =
+   -- TODO: similar code is duplicated in GHC.Unit.Database
     pkg {
       importDirs  = munge_paths (importDirs pkg),
       includeDirs = munge_paths (includeDirs pkg),
@@ -983,13 +984,17 @@ mungePackagePaths top_dir pkgroot pkg =
       libraryDynDirs = munge_paths (libraryDynDirs pkg),
       frameworkDirs = munge_paths (frameworkDirs pkg),
       haddockInterfaces = munge_paths (haddockInterfaces pkg),
-                     -- haddock-html is allowed to be either a URL or a file
+      -- haddock-html is allowed to be either a URL or a file
       haddockHTMLs = munge_paths (munge_urls (haddockHTMLs pkg))
     }
   where
     munge_paths = map munge_path
     munge_urls  = map munge_url
+    (munge_path,munge_url) = mkMungePathUrl top_dir pkgroot
 
+mkMungePathUrl :: FilePath -> FilePath -> (FilePath -> FilePath, FilePath -> FilePath)
+mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
+   where
     munge_path p
       | Just p' <- stripVarPrefix "${pkgroot}" p = pkgroot ++ p'
       | Just p' <- stripVarPrefix "$topdir"    p = top_dir ++ p'
@@ -1015,7 +1020,6 @@ mungePackagePaths top_dir pkgroot pkg =
                               Just [] -> Just []
                               Just cs@(c : _) | isPathSeparator c -> Just cs
                               _ -> Nothing
-
 
 -- -----------------------------------------------------------------------------
 -- Workaround for old single-file style package dbs
@@ -1272,7 +1276,7 @@ updateDBCache verbosity db db_stack = do
     let definitelyBrokenPackages =
           nub
             . sort
-            . map (unPackageName . GhcPkg.packageName . fst)
+            . map (unPackageName . GhcPkg.unitPackageName . fst)
             . filter snd
             $ pkgsGhcCacheFormat
     when (definitelyBrokenPackages /= []) $ do
@@ -1297,7 +1301,8 @@ updateDBCache verbosity db db_stack = do
   when (verbosity > Normal) $
       infoLn ("writing cache " ++ filename)
 
-  GhcPkg.writePackageDb filename (map fst pkgsGhcCacheFormat) pkgsCabalFormat
+  let d = fmap (fromPackageCacheFormat . fst) pkgsGhcCacheFormat
+  GhcPkg.writePackageDb filename d pkgsCabalFormat
     `catchIO` \e ->
       if isPermissionError e
       then die $ filename ++ ": you don't have permission to modify this file"
@@ -1306,12 +1311,11 @@ updateDBCache verbosity db db_stack = do
   case packageDbLock db of
     GhcPkg.DbOpenReadWrite lock -> GhcPkg.unlockPackageDb lock
 
-type PackageCacheFormat = GhcPkg.InstalledPackageInfo
+type PackageCacheFormat = GhcPkg.GenericUnitInfo
                             ComponentId
                             PackageIdentifier
                             PackageName
                             UnitId
-                            OpenUnitId
                             ModuleName
                             OpenModule
 
@@ -1353,89 +1357,74 @@ recomputeValidAbiDeps :: [InstalledPackageInfo]
                       -> PackageCacheFormat
                       -> (PackageCacheFormat, Bool)
 recomputeValidAbiDeps db pkg =
-  (pkg { GhcPkg.abiDepends = newAbiDeps }, abiDepsUpdated)
+  (pkg { GhcPkg.unitAbiDepends = newAbiDeps }, abiDepsUpdated)
   where
     newAbiDeps =
-      catMaybes . flip map (GhcPkg.abiDepends pkg) $ \(k, _) ->
+      catMaybes . flip map (GhcPkg.unitAbiDepends pkg) $ \(k, _) ->
         case filter (\d -> installedUnitId d == k) db of
-          [x] -> Just (k, unAbiHash (abiHash x))
+          [x] -> Just (k, ST.pack $ unAbiHash (abiHash x))
           _   -> Nothing
     abiDepsUpdated =
-      GhcPkg.abiDepends pkg /= newAbiDeps
+      GhcPkg.unitAbiDepends pkg /= newAbiDeps
+
+
+-- | Convert from PackageCacheFormat to DbUnitInfo (the format used in
+-- Ghc.PackageDb to store into the database)
+fromPackageCacheFormat :: PackageCacheFormat -> GhcPkg.DbUnitInfo
+fromPackageCacheFormat = GhcPkg.mapGenericUnitInfo
+     mkUnitId' mkComponentId' mkPackageIdentifier' mkPackageName' mkModuleName' mkModule'
+   where
+     displayBS :: Pretty a => a -> BS.ByteString
+     displayBS            = toUTF8BS . display
+     mkPackageIdentifier' = displayBS
+     mkPackageName'       = displayBS
+     mkComponentId'       = displayBS
+     mkUnitId'            = displayBS
+     mkModuleName'        = displayBS
+     mkInstUnitId' i      = case i of
+       IndefFullUnitId cid insts -> DbInstUnitId (mkComponentId' cid)
+                                                 (fmap (bimap mkModuleName' mkModule') (Map.toList insts))
+       DefiniteUnitId uid        -> DbUnitId (mkUnitId' (unDefUnitId uid))
+     mkModule' m = case m of
+       OpenModule uid n -> DbModule (mkInstUnitId' uid) (mkModuleName' n)
+       OpenModuleVar n  -> DbModuleVar  (mkModuleName' n)
 
 convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
-    GhcPkg.InstalledPackageInfo {
+    GhcPkg.GenericUnitInfo {
        GhcPkg.unitId             = installedUnitId pkg,
-       GhcPkg.componentId        = installedComponentId pkg,
-       GhcPkg.instantiatedWith   = instantiatedWith pkg,
-       GhcPkg.sourcePackageId    = sourcePackageId pkg,
-       GhcPkg.packageName        = packageName pkg,
-       GhcPkg.packageVersion     = Version.Version (versionNumbers (packageVersion pkg)) [],
-       GhcPkg.sourceLibName      =
+       GhcPkg.unitInstanceOf     = installedComponentId pkg,
+       GhcPkg.unitInstantiations = instantiatedWith pkg,
+       GhcPkg.unitPackageId      = sourcePackageId pkg,
+       GhcPkg.unitPackageName    = packageName pkg,
+       GhcPkg.unitPackageVersion = Version.Version (versionNumbers (packageVersion pkg)) [],
+       GhcPkg.unitComponentName  =
          fmap (mkPackageName . unUnqualComponentName) (libraryNameString $ sourceLibName pkg),
-       GhcPkg.depends            = depends pkg,
-       GhcPkg.abiDepends         = map (\(AbiDependency k v) -> (k,unAbiHash v)) (abiDepends pkg),
-       GhcPkg.abiHash            = unAbiHash (abiHash pkg),
-       GhcPkg.importDirs         = importDirs pkg,
-       GhcPkg.hsLibraries        = hsLibraries pkg,
-       GhcPkg.extraLibraries     = extraLibraries pkg,
-       GhcPkg.extraGHCiLibraries = extraGHCiLibraries pkg,
-       GhcPkg.libraryDirs        = libraryDirs pkg,
-       GhcPkg.libraryDynDirs     = libraryDynDirs pkg,
-       GhcPkg.frameworks         = frameworks pkg,
-       GhcPkg.frameworkDirs      = frameworkDirs pkg,
-       GhcPkg.ldOptions          = ldOptions pkg,
-       GhcPkg.ccOptions          = ccOptions pkg,
-       GhcPkg.includes           = includes pkg,
-       GhcPkg.includeDirs        = includeDirs pkg,
-       GhcPkg.haddockInterfaces  = haddockInterfaces pkg,
-       GhcPkg.haddockHTMLs       = haddockHTMLs pkg,
-       GhcPkg.exposedModules     = map convertExposed (exposedModules pkg),
-       GhcPkg.hiddenModules      = hiddenModules pkg,
-       GhcPkg.indefinite         = indefinite pkg,
-       GhcPkg.exposed            = exposed pkg,
-       GhcPkg.trusted            = trusted pkg
+       GhcPkg.unitDepends        = depends pkg,
+       GhcPkg.unitAbiDepends     = map (\(AbiDependency k v) -> (k,ST.pack $ unAbiHash v)) (abiDepends pkg),
+       GhcPkg.unitAbiHash        = ST.pack $ unAbiHash (abiHash pkg),
+       GhcPkg.unitImportDirs     = map ST.pack $ importDirs pkg,
+       GhcPkg.unitLibraries      = map ST.pack $ hsLibraries pkg,
+       GhcPkg.unitExtDepLibsSys  = map ST.pack $ extraLibraries pkg,
+       GhcPkg.unitExtDepLibsGhc  = map ST.pack $ extraGHCiLibraries pkg,
+       GhcPkg.unitLibraryDirs    = map ST.pack $ libraryDirs pkg,
+       GhcPkg.unitLibraryDynDirs = map ST.pack $ libraryDynDirs pkg,
+       GhcPkg.unitExtDepFrameworks = map ST.pack $ frameworks pkg,
+       GhcPkg.unitExtDepFrameworkDirs = map ST.pack $ frameworkDirs pkg,
+       GhcPkg.unitLinkerOptions  = map ST.pack $ ldOptions pkg,
+       GhcPkg.unitCcOptions      = map ST.pack $ ccOptions pkg,
+       GhcPkg.unitIncludes       = map ST.pack $ includes pkg,
+       GhcPkg.unitIncludeDirs    = map ST.pack $ includeDirs pkg,
+       GhcPkg.unitHaddockInterfaces = map ST.pack $ haddockInterfaces pkg,
+       GhcPkg.unitHaddockHTMLs   = map ST.pack $ haddockHTMLs pkg,
+       GhcPkg.unitExposedModules = map convertExposed (exposedModules pkg),
+       GhcPkg.unitHiddenModules  = hiddenModules pkg,
+       GhcPkg.unitIsIndefinite   = indefinite pkg,
+       GhcPkg.unitIsExposed      = exposed pkg,
+       GhcPkg.unitIsTrusted      = trusted pkg
     }
   where
     convertExposed (ExposedModule n reexport) = (n, reexport)
-
-instance GhcPkg.BinaryStringRep ComponentId where
-  fromStringRep = mkComponentId . fromStringRep
-  toStringRep   = toStringRep . display
-
-instance GhcPkg.BinaryStringRep PackageName where
-  fromStringRep = mkPackageName . fromStringRep
-  toStringRep   = toStringRep . display
-
-instance GhcPkg.BinaryStringRep PackageIdentifier where
-  fromStringRep = fromMaybe (error "BinaryStringRep PackageIdentifier")
-                . simpleParse . fromStringRep
-  toStringRep = toStringRep . display
-
-instance GhcPkg.BinaryStringRep ModuleName where
-  fromStringRep = ModuleName.fromString . fromStringRep
-  toStringRep   = toStringRep . display
-
-instance GhcPkg.BinaryStringRep String where
-  fromStringRep = fromUTF8BS
-  toStringRep   = toUTF8BS
-
-instance GhcPkg.BinaryStringRep UnitId where
-  fromStringRep = mkUnitId . fromStringRep
-  toStringRep   = toStringRep . display
-
-instance GhcPkg.DbUnitIdModuleRep UnitId ComponentId OpenUnitId ModuleName OpenModule where
-  fromDbModule (GhcPkg.DbModule uid mod_name) = OpenModule uid mod_name
-  fromDbModule (GhcPkg.DbModuleVar mod_name) = OpenModuleVar mod_name
-  toDbModule (OpenModule uid mod_name) = GhcPkg.DbModule uid mod_name
-  toDbModule (OpenModuleVar mod_name) = GhcPkg.DbModuleVar mod_name
-  fromDbUnitId (GhcPkg.DbUnitId cid insts) = IndefFullUnitId cid (Map.fromList insts)
-  fromDbUnitId (GhcPkg.DbInstalledUnitId uid)
-    = DefiniteUnitId (unsafeMkDefUnitId uid)
-  toDbUnitId (IndefFullUnitId cid insts) = GhcPkg.DbUnitId cid (Map.toList insts)
-  toDbUnitId (DefiniteUnitId def_uid)
-    = GhcPkg.DbInstalledUnitId (unDefUnitId def_uid)
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
@@ -1667,8 +1656,8 @@ describePackage verbosity my_flags pkgarg expand_pkgroot = do
   doDump expand_pkgroot [ (pkg, locationAbsolute db)
                         | (db, pkgs) <- dbs, pkg <- pkgs ]
 
-dumpPackages :: Verbosity -> [Flag] -> Bool -> IO ()
-dumpPackages verbosity my_flags expand_pkgroot = do
+dumpUnits :: Verbosity -> [Flag] -> Bool -> IO ()
+dumpUnits verbosity my_flags expand_pkgroot = do
   (_, GhcPkg.DbOpenReadOnly, flag_db_stack) <-
     getPkgDatabases verbosity GhcPkg.DbOpenReadOnly
       False{-use user-} True{-use cache-} expand_pkgroot my_flags

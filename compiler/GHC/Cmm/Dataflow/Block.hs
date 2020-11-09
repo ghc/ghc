@@ -38,7 +38,7 @@ module GHC.Cmm.Dataflow.Block
     , replaceLastNode
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 -- -----------------------------------------------------------------------------
 -- Shapes: Open and Closed
@@ -46,7 +46,7 @@ import GhcPrelude
 -- | Used at the type level to indicate "open" vs "closed" structure.
 data Extensibility
   -- | An "open" structure with a unique, unnamed control-flow edge flowing in
-  -- or out. "Fallthrough" and concatenation are permitted at an open point.
+  -- or out. \"Fallthrough\" and concatenation are permitted at an open point.
   = Open
   -- | A "closed" structure which supports control transfer only through the use
   -- of named labels---no "fallthrough" is permitted. The number of control-flow

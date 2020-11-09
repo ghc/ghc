@@ -4,6 +4,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
 
+{-# OPTIONS -fno-warn-name-shadowing #-}
+
 -- | Get information on modules, expressions, and identifiers
 module GHCi.UI.Info
     ( ModInfo(..)
@@ -18,6 +20,7 @@ module GHCi.UI.Info
 
 import           Control.Exception
 import           Control.Monad
+import           Control.Monad.Catch as MC
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Maybe
@@ -34,12 +37,13 @@ import           System.Directory
 import qualified GHC.Core.Utils
 import           GHC.HsToCore
 import           GHC.Driver.Session (HasDynFlags(..))
-import           FastString
+import           GHC.Data.FastString
 import           GHC
 import           GHC.Driver.Monad
+import           GHC.Driver.Ppr
 import           GHC.Types.Name
 import           GHC.Types.Name.Set
-import           Outputable
+import           GHC.Utils.Outputable
 import           GHC.Types.SrcLoc
 import           GHC.Tc.Utils.Zonk
 import           GHC.Types.Var
@@ -190,7 +194,7 @@ resolveNameFromModule infos name = do
      modL <- maybe (throwE $ "No module for" <+> ppr name) return $
              nameModule_maybe name
 
-     info <- maybe (throwE (ppr (moduleUnitId modL) <> ":" <>
+     info <- maybe (throwE (ppr (moduleUnit modL) <> ":" <>
                             ppr modL)) return $
              M.lookup (moduleName modL) infos
 
@@ -270,7 +274,7 @@ collectInfo ms loaded = do
             foldM (go df) ms invalidated
   where
     go df m name = do { info <- getModInfo name; return (M.insert name info m) }
-                   `gcatch`
+                   `MC.catch`
                    (\(e :: SomeException) -> do
                          liftIO $ putStrLn
                                 $ showSDocForUser df alwaysQualify
@@ -340,14 +344,15 @@ processAllTypeCheckedModule tcm = do
         mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
             | otherwise                              = Nothing
 
-        unwrapVar (XExpr (HsWrap _ var)) = var
-        unwrapVar e'                     = e'
+        unwrapVar (XExpr (WrapExpr (HsWrap _ var))) = var
+        unwrapVar e'                                = e'
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
     getTypeLPat :: LPat GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLPat (L spn pat) =
         pure (Just (getMaybeId pat,spn,hsPatType pat))
       where
+        getMaybeId :: Pat GhcTc -> Maybe Id
         getMaybeId (VarPat _ (L _ vid)) = Just vid
         getMaybeId _                        = Nothing
 

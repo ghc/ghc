@@ -3,7 +3,7 @@
              RankNTypes, RoleAnnotations, ScopedTypeVariables,
              MagicHash, KindSignatures, PolyKinds, TypeApplications, DataKinds,
              GADTs, UnboxedTuples, UnboxedSums, TypeInType,
-             Trustworthy #-}
+             Trustworthy, DeriveFunctor #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 
@@ -31,8 +31,14 @@ module Language.Haskell.TH.Syntax
 import Data.Data hiding (Fixity(..))
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
+import GHC.IO.Unsafe    ( unsafeDupableInterleaveIO )
 import Control.Monad (liftM)
 import Control.Monad.IO.Class (MonadIO (..))
+import Control.Monad.Fix (MonadFix (..))
+import Control.Applicative (liftA2)
+import Control.Exception (BlockedIndefinitelyOnMVar (..), catch, throwIO)
+import Control.Exception.Base (FixIOException (..))
+import Control.Concurrent.MVar (newEmptyMVar, readMVar, putMVar)
 import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper, ord )
 import Data.Int
@@ -45,12 +51,15 @@ import GHC.Generics     ( Generic )
 import GHC.Types        ( Int(..), Word(..), Char(..), Double(..), Float(..),
                           TYPE, RuntimeRep(..) )
 import GHC.Prim         ( Int#, Word#, Char#, Double#, Float#, Addr# )
+import GHC.Ptr          ( Ptr, plusPtr )
 import GHC.Lexeme       ( startsVarSym, startsVarId )
 import GHC.ForeignSrcLang.Type
 import Language.Haskell.TH.LanguageExtensions
 import Numeric.Natural
 import Prelude
 import Foreign.ForeignPtr
+import Foreign.C.String
+import Foreign.C.Types
 
 -----------------------------------------------------
 --
@@ -122,8 +131,7 @@ class (MonadIO m, MonadFail m) => Quasi m where
 -----------------------------------------------------
 
 instance Quasi IO where
-  qNewName s = do { n <- atomicModifyIORef' counter (\x -> (x + 1, x))
-                  ; pure (mkNameU s n) }
+  qNewName = newNameIO
 
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
   qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
@@ -149,6 +157,13 @@ instance Quasi IO where
   qPutQ _               = badIO "putQ"
   qIsExtEnabled _       = badIO "isExtEnabled"
   qExtsEnabled          = badIO "extsEnabled"
+
+instance Quote IO where
+  newName = newNameIO
+
+newNameIO :: String -> IO Name
+newNameIO s = do { n <- atomicModifyIORef' counter (\x -> (x + 1, x))
+                 ; pure (mkNameU s n) }
 
 badIO :: String -> IO a
 badIO op = do   { qReport True ("Can't do `" ++ op ++ "' in the IO monad")
@@ -196,6 +211,31 @@ instance Applicative Q where
   pure x = Q (pure x)
   Q f <*> Q x = Q (f <*> x)
   Q m *> Q n = Q (m *> n)
+
+-- | @since 2.17.0.0
+instance Semigroup a => Semigroup (Q a) where
+  (<>) = liftA2 (<>)
+
+-- | @since 2.17.0.0
+instance Monoid a => Monoid (Q a) where
+  mempty = pure mempty
+
+-- | If the function passed to 'mfix' inspects its argument,
+-- the resulting action will throw a 'FixIOException'.
+--
+-- @since 2.17.0.0
+instance MonadFix Q where
+  -- We use the same blackholing approach as in fixIO.
+  -- See Note [Blackholing in fixIO] in System.IO in base.
+  mfix k = do
+    m <- runIO newEmptyMVar
+    ans <- runIO (unsafeDupableInterleaveIO
+             (readMVar m `catch` \BlockedIndefinitelyOnMVar ->
+                                    throwIO FixIOException))
+    result <- k ans
+    runIO (putMVar m result)
+    return result
+
 
 -----------------------------------------------------
 --
@@ -301,6 +341,8 @@ newtype TExp (a :: TYPE (r :: RuntimeRep)) = TExp
 --     • In the Template Haskell quotation [|| "foo" ||]
 --       In the expression: [|| "foo" ||]
 --       In the Template Haskell splice $$([|| "foo" ||])
+--
+-- Levity-polymorphic since /template-haskell-2.16.0.0/.
 
 -- | Discard the type annotation and produce a plain Template Haskell
 -- expression
@@ -333,6 +375,63 @@ be inferred (#8459).  Consider
 
 The splice will evaluate to (MkAge 3) and you can't add that to
 4::Int. So you can't coerce a (TExp Age) to a (TExp Int). -}
+
+-- Code constructor
+
+type role Code representational nominal   -- See Note [Role of TExp]
+newtype Code m (a :: TYPE (r :: RuntimeRep)) = Code
+  { examineCode :: m (TExp a) -- ^ Underlying monadic value
+  }
+
+-- | Unsafely convert an untyped code representation into a typed code
+-- representation.
+unsafeCodeCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m .
+                      Quote m => m Exp -> Code m a
+unsafeCodeCoerce m = Code (unsafeTExpCoerce m)
+
+-- | Lift a monadic action producing code into the typed 'Code'
+-- representation
+liftCode :: forall (r :: RuntimeRep) (a :: TYPE r) m . m (TExp a) -> Code m a
+liftCode = Code
+
+-- | Extract the untyped representation from the typed representation
+unTypeCode :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m
+           => Code m a -> m Exp
+unTypeCode = unTypeQ . examineCode
+
+-- | Modify the ambient monad used during code generation. For example, you
+-- can use `hoistCode` to handle a state effect:
+-- @
+--  handleState :: Code (StateT Int Q) a -> Code Q a
+--  handleState = hoistCode (flip runState 0)
+-- @
+hoistCode :: forall m n (r :: RuntimeRep) (a :: TYPE r) . Monad m
+          => (forall x . m x -> n x) -> Code m a -> Code n a
+hoistCode f (Code a) = Code (f a)
+
+
+-- | Variant of (>>=) which allows effectful computations to be injected
+-- into code generation.
+bindCode :: forall m a (r :: RuntimeRep) (b :: TYPE r) . Monad m
+         => m a -> (a -> Code m b) -> Code m b
+bindCode q k = liftCode (q >>= examineCode . k)
+
+-- | Variant of (>>) which allows effectful computations to be injected
+-- into code generation.
+bindCode_ :: forall m a (r :: RuntimeRep) (b :: TYPE r) . Monad m
+          => m a -> Code m b -> Code m b
+bindCode_ q c = liftCode ( q >> examineCode c)
+
+-- | A useful combinator for embedding monadic actions into 'Code'
+-- @
+-- myCode :: ... => Code m a
+-- myCode = joinCode $ do
+--   x <- someSideEffect
+--   return (makeCodeWith x)
+-- @
+joinCode :: forall m (r :: RuntimeRep) (a :: TYPE r) . Monad m
+         => m (Code m a) -> Code m a
+joinCode = flip bindCode id
 
 ----------------------------------------------------
 -- Packaged versions for the programmer, hiding the Quasi-ness
@@ -718,107 +817,107 @@ class Lift (t :: TYPE r) where
   -- a splice.
   lift :: Quote m => t -> m Exp
   default lift :: (r ~ 'LiftedRep, Quote m) => t -> m Exp
-  lift = unTypeQ . liftTyped
+  lift = unTypeCode . liftTyped
 
   -- | Turn a value into a Template Haskell typed expression, suitable for use
   -- in a typed splice.
   --
   -- @since 2.16.0.0
-  liftTyped :: Quote m => t -> m (TExp t)
+  liftTyped :: Quote m => t -> Code m t
 
 
 -- If you add any instances here, consider updating test th/TH_Lift
 instance Lift Integer where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL x))
 
 instance Lift Int where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 -- | @since 2.16.0.0
 instance Lift Int# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntPrimL (fromIntegral (I# x))))
 
 instance Lift Int8 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Int16 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Int32 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Int64 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 -- | @since 2.16.0.0
 instance Lift Word# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (WordPrimL (fromIntegral (W# x))))
 
 instance Lift Word where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word8 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word16 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word32 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word64 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Natural where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Integral a => Lift (Ratio a) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (RationalL (toRational x)))
 
 instance Lift Float where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (RationalL (toRational x)))
 
 -- | @since 2.16.0.0
 instance Lift Float# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (FloatPrimL (toRational (F# x))))
 
 instance Lift Double where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (RationalL (toRational x)))
 
 -- | @since 2.16.0.0
 instance Lift Double# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (DoublePrimL (toRational (D# x))))
 
 instance Lift Char where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (CharL x))
 
 -- | @since 2.16.0.0
 instance Lift Char# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (CharPrimL (C# x)))
 
 instance Lift Bool where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
 
   lift True  = return (ConE trueName)
   lift False = return (ConE falseName)
@@ -828,24 +927,24 @@ instance Lift Bool where
 --
 -- @since 2.16.0.0
 instance Lift Addr# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = return (LitE (StringPrimL (map (fromIntegral . ord) (unpackCString# x))))
 
 instance Lift a => Lift (Maybe a) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
 
   lift Nothing  = return (ConE nothingName)
   lift (Just x) = liftM (ConE justName `AppE`) (lift x)
 
 instance (Lift a, Lift b) => Lift (Either a b) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
 
   lift (Left x)  = liftM (ConE leftName  `AppE`) (lift x)
   lift (Right y) = liftM (ConE rightName `AppE`) (lift y)
 
 instance Lift a => Lift [a] where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift xs = do { xs' <- mapM lift xs; return (ListE xs') }
 
 liftString :: Quote m => String -> m Exp
@@ -854,7 +953,7 @@ liftString s = return (LitE (StringL s))
 
 -- | @since 2.15.0.0
 instance Lift a => Lift (NonEmpty a) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
 
   lift (x :| xs) = do
     x' <- lift x
@@ -863,77 +962,77 @@ instance Lift a => Lift (NonEmpty a) where
 
 -- | @since 2.15.0.0
 instance Lift Void where
-  liftTyped = pure . absurd
+  liftTyped = liftCode . absurd
   lift = pure . absurd
 
 instance Lift () where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift () = return (ConE (tupleDataName 0))
 
 instance (Lift a, Lift b) => Lift (a, b) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b)
     = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b]
 
 instance (Lift a, Lift b, Lift c) => Lift (a, b, c) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b, c)
     = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b, lift c]
 
 instance (Lift a, Lift b, Lift c, Lift d) => Lift (a, b, c, d) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b, c, d)
     = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b, lift c, lift d]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e)
       => Lift (a, b, c, d, e) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b, c, d, e)
     = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b
                                               , lift c, lift d, lift e ]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
       => Lift (a, b, c, d, e, f) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b, c, d, e, f)
     = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
                                               , lift d, lift e, lift f ]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
       => Lift (a, b, c, d, e, f, g) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b, c, d, e, f, g)
     = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
                                               , lift d, lift e, lift f, lift g ]
 
 -- | @since 2.16.0.0
 instance Lift (# #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# #) = return (ConE (unboxedTupleTypeName 0))
 
 -- | @since 2.16.0.0
 instance (Lift a) => Lift (# a #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b) => Lift (# a, b #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a, lift b]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c)
       => Lift (# a, b, c #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b, c #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a, lift b, lift c]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d)
       => Lift (# a, b, c, d #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b, c, d #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b
                                                      , lift c, lift d ]
@@ -941,7 +1040,7 @@ instance (Lift a, Lift b, Lift c, Lift d)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e)
       => Lift (# a, b, c, d, e #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b, c, d, e #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b
                                                      , lift c, lift d, lift e ]
@@ -949,7 +1048,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
       => Lift (# a, b, c, d, e, f #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b, c, d, e, f #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
                                                      , lift d, lift e, lift f ]
@@ -957,7 +1056,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
       => Lift (# a, b, c, d, e, f, g #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b, c, d, e, f, g #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
                                                      , lift d, lift e, lift f
@@ -965,7 +1064,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b) => Lift (# a | b #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 2
@@ -974,7 +1073,7 @@ instance (Lift a, Lift b) => Lift (# a | b #) where
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c)
       => Lift (# a | b | c #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 3
@@ -984,7 +1083,7 @@ instance (Lift a, Lift b, Lift c)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d)
       => Lift (# a | b | c | d #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 4
@@ -995,7 +1094,7 @@ instance (Lift a, Lift b, Lift c, Lift d)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e)
       => Lift (# a | b | c | d | e #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 5
@@ -1007,7 +1106,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
       => Lift (# a | b | c | d | e | f #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 6
@@ -1020,7 +1119,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
       => Lift (# a | b | c | d | e | f | g #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | | | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 7
@@ -1055,6 +1154,9 @@ rightName = mkNameG DataName "base" "Data.Either" "Right"
 nonemptyName :: Name
 nonemptyName = mkNameG DataName "base" "GHC.Base" ":|"
 
+oneName, manyName :: Name
+oneName  = mkNameG DataName "ghc-prim" "GHC.Types" "One"
+manyName = mkNameG DataName "ghc-prim" "GHC.Types" "Many"
 -----------------------------------------------------
 --
 --              Generic Lift implementations
@@ -1569,7 +1671,7 @@ mk_tup_name n space boxed
     withParens thing
       | boxed     = "("  ++ thing ++ ")"
       | otherwise = "(#" ++ thing ++ "#)"
-    tup_occ | n == 1    = if boxed then "Unit" else "Unit#"
+    tup_occ | n == 1    = if boxed then "Solo" else "Solo#"
             | otherwise = withParens (replicate n_commas ',')
     n_commas = n - 1
     tup_mod  = mkModName "GHC.Tuple"
@@ -1868,7 +1970,45 @@ data Bytes = Bytes
    -- , bytesInitialized :: Bool -- ^ False: only use `bytesSize` to allocate
    --                            --   an uninitialized region
    }
-   deriving (Eq,Ord,Data,Generic,Show)
+   deriving (Data,Generic)
+
+-- We can't derive Show instance for Bytes because we don't want to show the
+-- pointer value but the actual bytes (similarly to what ByteString does). See
+-- #16457.
+instance Show Bytes where
+   show b = unsafePerformIO $ withForeignPtr (bytesPtr b) $ \ptr ->
+               peekCStringLen ( ptr `plusPtr` fromIntegral (bytesOffset b)
+                              , fromIntegral (bytesSize b)
+                              )
+
+-- We can't derive Eq and Ord instances for Bytes because we don't want to
+-- compare pointer values but the actual bytes (similarly to what ByteString
+-- does).  See #16457
+instance Eq Bytes where
+   (==) = eqBytes
+
+instance Ord Bytes where
+   compare = compareBytes
+
+eqBytes :: Bytes -> Bytes -> Bool
+eqBytes a@(Bytes fp off len) b@(Bytes fp' off' len')
+  | len /= len'              = False    -- short cut on length
+  | fp == fp' && off == off' = True     -- short cut for the same bytes
+  | otherwise                = compareBytes a b == EQ
+
+compareBytes :: Bytes -> Bytes -> Ordering
+compareBytes (Bytes _   _    0)    (Bytes _   _    0)    = EQ  -- short cut for empty Bytes
+compareBytes (Bytes fp1 off1 len1) (Bytes fp2 off2 len2) =
+    unsafePerformIO $
+      withForeignPtr fp1 $ \p1 ->
+      withForeignPtr fp2 $ \p2 -> do
+        i <- memcmp (p1 `plusPtr` fromIntegral off1)
+                    (p2 `plusPtr` fromIntegral off2)
+                    (fromIntegral (min len1 len2))
+        return $! (i `compare` 0) <> (len1 `compare` len2)
+
+foreign import ccall unsafe "memcmp"
+  memcmp :: Ptr a -> Ptr b -> CSize -> IO CInt
 
 
 -- | Pattern in Haskell given in @{}@
@@ -1958,8 +2098,10 @@ data Exp
   | MultiIfE [(Guard, Exp)]            -- ^ @{ if | g1 -> e1 | g2 -> e2 }@
   | LetE [Dec] Exp                     -- ^ @{ let { x=e1; y=e2 } in e3 }@
   | CaseE Exp [Match]                  -- ^ @{ case e of m1; m2 }@
-  | DoE [Stmt]                         -- ^ @{ do { p <- e1; e2 }  }@
-  | MDoE [Stmt]                        -- ^ @{ mdo { x <- e1 y; y <- e2 x; } }@
+  | DoE (Maybe ModName) [Stmt]         -- ^ @{ do { p <- e1; e2 }  }@ or a qualified do if
+                                       -- the module name is present
+  | MDoE (Maybe ModName) [Stmt]        -- ^ @{ mdo { x <- e1 y; y <- e2 x; } }@ or a qualified
+                                       -- mdo if the module name is present
   | CompE [Stmt]                       -- ^ @{ [ (x,y) | x <- xs, y <- ys ] }@
       --
       -- The result expression of the comprehension is
@@ -2018,19 +2160,19 @@ data Range = FromR Exp | FromThenR Exp Exp
 data Dec
   = FunD Name [Clause]            -- ^ @{ f p1 p2 = b where decs }@
   | ValD Pat Body [Dec]           -- ^ @{ p = b where decs }@
-  | DataD Cxt Name [TyVarBndr]
+  | DataD Cxt Name [TyVarBndr ()]
           (Maybe Kind)            -- Kind signature (allowed only for GADTs)
           [Con] [DerivClause]
                                   -- ^ @{ data Cxt x => T x = A x | B (T x)
                                   --       deriving (Z,W)
                                   --       deriving stock Eq }@
-  | NewtypeD Cxt Name [TyVarBndr]
+  | NewtypeD Cxt Name [TyVarBndr ()]
              (Maybe Kind)         -- Kind signature
              Con [DerivClause]    -- ^ @{ newtype Cxt x => T x = A (B x)
                                   --       deriving (Z,W Q)
                                   --       deriving stock Eq }@
-  | TySynD Name [TyVarBndr] Type  -- ^ @{ type T x = (x,x) }@
-  | ClassD Cxt Name [TyVarBndr]
+  | TySynD Name [TyVarBndr ()] Type -- ^ @{ type T x = (x,x) }@
+  | ClassD Cxt Name [TyVarBndr ()]
          [FunDep] [Dec]           -- ^ @{ class Eq a => Ord a where ds }@
   | InstanceD (Maybe Overlap) Cxt Type [Dec]
                                   -- ^ @{ instance {\-\# OVERLAPS \#-\}
@@ -2046,18 +2188,18 @@ data Dec
   | PragmaD Pragma                -- ^ @{ {\-\# INLINE [1] foo \#-\} }@
 
   -- | data families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
-  | DataFamilyD Name [TyVarBndr]
+  | DataFamilyD Name [TyVarBndr ()]
                (Maybe Kind)
          -- ^ @{ data family T a b c :: * }@
 
-  | DataInstD Cxt (Maybe [TyVarBndr]) Type
+  | DataInstD Cxt (Maybe [TyVarBndr ()]) Type
              (Maybe Kind)         -- Kind signature
              [Con] [DerivClause]  -- ^ @{ data instance Cxt x => T [x]
                                   --       = A x | B (T x)
                                   --       deriving (Z,W)
                                   --       deriving stock Eq }@
 
-  | NewtypeInstD Cxt (Maybe [TyVarBndr]) Type -- Quantified type vars
+  | NewtypeInstD Cxt (Maybe [TyVarBndr ()]) Type -- Quantified type vars
                  (Maybe Kind)      -- Kind signature
                  Con [DerivClause] -- ^ @{ newtype instance Cxt x => T [x]
                                    --        = A (B x)
@@ -2170,7 +2312,7 @@ type PatSynType = Type
 -- @TypeFamilyHead@ is defined to be the elements of the declaration
 -- between @type family@ and @where@.
 data TypeFamilyHead =
-  TypeFamilyHead Name [TyVarBndr] FamilyResultSig (Maybe InjectivityAnn)
+  TypeFamilyHead Name [TyVarBndr ()] FamilyResultSig (Maybe InjectivityAnn)
   deriving( Show, Eq, Ord, Data, Generic )
 
 -- | One equation of a type family instance or closed type family. The
@@ -2190,7 +2332,7 @@ data TypeFamilyHead =
 --            ('AppT' ('AppKindT' ('ConT' ''Foo) ('VarT' k)) ('VarT' a))
 --            ('VarT' a)
 -- @
-data TySynEqn = TySynEqn (Maybe [TyVarBndr]) Type Type
+data TySynEqn = TySynEqn (Maybe [TyVarBndr ()]) Type Type
   deriving( Show, Eq, Ord, Data, Generic )
 
 data FunDep = FunDep [Name] [Name]
@@ -2200,7 +2342,7 @@ data Foreign = ImportF Callconv Safety String Name Type
              | ExportF Callconv        String Name Type
          deriving( Show, Eq, Ord, Data, Generic )
 
--- keep Callconv in sync with module ForeignCall in ghc/compiler/prelude/ForeignCall.hs
+-- keep Callconv in sync with module ForeignCall in ghc/compiler/GHC/Types/ForeignCall.hs
 data Callconv = CCall | StdCall | CApi | Prim | JavaScript
           deriving( Show, Eq, Ord, Data, Generic )
 
@@ -2210,7 +2352,7 @@ data Safety = Unsafe | Safe | Interruptible
 data Pragma = InlineP         Name Inline RuleMatch Phases
             | SpecialiseP     Name Type (Maybe Inline) Phases
             | SpecialiseInstP Type
-            | RuleP           String (Maybe [TyVarBndr]) [RuleBndr] Exp Exp Phases
+            | RuleP           String (Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases
             | AnnP            AnnTarget Exp
             | LineP           Int String
             | CompleteP       [Name] (Maybe Name)
@@ -2299,7 +2441,7 @@ data DecidedStrictness = DecidedLazy
 data Con = NormalC Name [BangType]       -- ^ @C Int a@
          | RecC Name [VarBangType]       -- ^ @C { v :: Int, w :: a }@
          | InfixC BangType Name BangType -- ^ @Int :+ a@
-         | ForallC [TyVarBndr] Cxt Con   -- ^ @forall a. Eq a => C [a]@
+         | ForallC [TyVarBndr Specificity] Cxt Con -- ^ @forall a. Eq a => C [a]@
          | GadtC [Name] [BangType]
                  Type                    -- See Note [GADT return type]
                                          -- ^ @C :: a -> b -> T b Int@
@@ -2368,8 +2510,8 @@ data PatSynArgs
   | RecordPatSyn [Name]        -- ^ @pattern P { {x,y,z} } = p@
   deriving( Show, Eq, Ord, Data, Generic )
 
-data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> => \<type\>@
-          | ForallVisT [TyVarBndr] Type   -- ^ @forall \<vars\> -> \<type\>@
+data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ctxt\> => \<type\>@
+          | ForallVisT [TyVarBndr ()] Type  -- ^ @forall \<vars\> -> \<type\>@
           | AppT Type Type                -- ^ @T a b@
           | AppKindT Type Kind            -- ^ @T \@k t@
           | SigT Type Kind                -- ^ @t :: k@
@@ -2387,6 +2529,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> => \<t
           | UnboxedTupleT Int             -- ^ @(\#,\#), (\#,,\#), etc.@
           | UnboxedSumT SumArity          -- ^ @(\#|\#), (\#||\#), etc.@
           | ArrowT                        -- ^ @->@
+          | MulArrowT                     -- ^ @FUN@
           | EqualityT                     -- ^ @~@
           | ListT                         -- ^ @[]@
           | PromotedTupleT Int            -- ^ @'(), '(,), '(,,), etc.@
@@ -2399,14 +2542,18 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> => \<t
           | ImplicitParamT String Type    -- ^ @?x :: t@
       deriving( Show, Eq, Ord, Data, Generic )
 
-data TyVarBndr = PlainTV  Name            -- ^ @a@
-               | KindedTV Name Kind       -- ^ @(a :: k)@
+data Specificity = SpecifiedSpec          -- ^ @a@
+                 | InferredSpec           -- ^ @{a}@
       deriving( Show, Eq, Ord, Data, Generic )
+
+data TyVarBndr flag = PlainTV  Name flag      -- ^ @a@
+                    | KindedTV Name flag Kind -- ^ @(a :: k)@
+      deriving( Show, Eq, Ord, Data, Generic, Functor )
 
 -- | Type family result signature
 data FamilyResultSig = NoSig              -- ^ no signature
                      | KindSig  Kind      -- ^ @k@
-                     | TyVarSig TyVarBndr -- ^ @= r, = (r :: k)@
+                     | TyVarSig (TyVarBndr ()) -- ^ @= r, = (r :: k)@
       deriving( Show, Eq, Ord, Data, Generic )
 
 -- | Injectivity annotation

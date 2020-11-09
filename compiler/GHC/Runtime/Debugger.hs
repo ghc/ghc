@@ -1,5 +1,3 @@
-{-# LANGUAGE MagicHash #-}
-
 -----------------------------------------------------------------------------
 --
 -- GHCi Interactive debugging commands
@@ -14,32 +12,40 @@
 
 module GHC.Runtime.Debugger (pprintClosureCommand, showTerm, pprTypeAndContents) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Runtime.Linker
-import GHC.Runtime.Heap.Inspect
+import GHC
 
-import GHC.Runtime.Interpreter
-import GHCi.RemoteTypes
+import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Driver.Monad
-import GHC.Driver.Types
-import GHC.Types.Id
+import GHC.Driver.Env
+
+import GHC.Linker.Loader
+
+import GHC.Runtime.Heap.Inspect
+import GHC.Runtime.Interpreter
+import GHC.Runtime.Context
+
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Iface.Env    ( newInteractiveBinder )
+import GHC.Core.Type
+
+import GHC.Utils.Outputable
+import GHC.Utils.Error
+import GHC.Utils.Monad
+import GHC.Utils.Exception
+
+import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var hiding ( varName )
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
-import GHC.Core.Type
-import GHC
-import Outputable
-import GHC.Core.Ppr.TyThing
-import ErrUtils
-import MonadUtils
-import GHC.Driver.Session
-import Exception
+import GHC.Types.TyThing.Ppr
+import GHC.Types.TyThing
 
 import Control.Monad
+import Control.Monad.Catch as MC
 import Data.List ( (\\) )
 import Data.Maybe
 import Data.IORef
@@ -74,8 +80,8 @@ pprintClosureCommand bindThings force str = do
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: GhcMonad m => TCvSubst -> Id -> m (TCvSubst, Term)
    go subst id = do
-       let id_ty' = substTy subst (idType id)
-           id'    = id `setIdType` id_ty'
+       let id' = updateIdTypeAndMult (substTy subst) id
+           id_ty' = idType id'
        term_    <- GHC.obtainTermFromId maxBound force id'
        term     <- tidyTermTyVars term_
        term'    <- if bindThings
@@ -126,8 +132,8 @@ bindSuspensions t = do
       let ids = [ mkVanillaGlobal name ty
                 | (name,ty) <- zip names tys]
           new_ic = extendInteractiveContextWithIds ictxt ids
-          dl = hsc_dynLinker hsc_env
-      liftIO $ extendLinkEnv dl (zip names fhvs)
+          dl = hsc_loader hsc_env
+      liftIO $ extendLoadedEnv dl (zip names fhvs)
       setSession hsc_env {hsc_IC = new_ic }
       return t'
      where
@@ -177,13 +183,13 @@ showTerm term = do
                       -- XXX: this tries to disable logging of errors
                       -- does this still do what it is intended to do
                       -- with the changed error handling and logging?
-           let noop_log _ _ _ _ _ _ = return ()
+           let noop_log _ _ _ _ _ = return ()
                expr = "Prelude.return (Prelude.show " ++
                          showPpr dflags bname ++
                       ") :: Prelude.IO Prelude.String"
-               dl   = hsc_dynLinker hsc_env
-           _ <- GHC.setSessionDynFlags dflags{log_action=noop_log}
-           txt_ <- withExtendedLinkEnv dl
+               dl   = hsc_loader hsc_env
+           GHC.setSessionDynFlags dflags{log_action=noop_log}
+           txt_ <- withExtendedLoadedEnv dl
                                        [(bname, fhv)]
                                        (GHC.compileExprRemote expr)
            let myprec = 10 -- application precedence. TODO Infix constructors
@@ -192,7 +198,7 @@ showTerm term = do
              return $ Just $ cparen (prec >= myprec && needsParens txt)
                                     (text txt)
             else return Nothing
-         `gfinally` do
+         `MC.finally` do
            setSession hsc_env
            GHC.setSessionDynFlags dflags
   cPprShowable prec NewtypeWrap{ty=new_ty,wrapped_term=t} =
@@ -228,7 +234,7 @@ pprTypeAndContents id = do
       let depthBound = 100
       -- If the value is an exception, make sure we catch it and
       -- show the exception, rather than propagating the exception out.
-      e_term <- gtry $ GHC.obtainTermFromId depthBound False id
+      e_term <- MC.try $ GHC.obtainTermFromId depthBound False id
       docs_term <- case e_term of
                       Right term -> showTerm term
                       Left  exn  -> return (text "*** Exception:" <+>

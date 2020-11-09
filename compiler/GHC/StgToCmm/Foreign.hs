@@ -13,12 +13,17 @@ module GHC.StgToCmm.Foreign (
   emitSaveThreadState,
   saveThreadState,
   emitLoadThreadState,
+  emitSaveRegs,
+  emitRestoreRegs,
   loadThreadState,
   emitOpenNursery,
   emitCloseNursery,
  ) where
 
-import GhcPrelude hiding( succ, (<*>) )
+import GHC.Prelude hiding( succ, (<*>) )
+
+import GHC.Platform
+import GHC.Platform.Profile
 
 import GHC.Stg.Syntax
 import GHC.StgToCmm.Prof (storeCurCCS, ccsType)
@@ -32,21 +37,21 @@ import GHC.Cmm.BlockId (newBlockId)
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Graph
+import GHC.Cmm.CallConv
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 import GHC.Types.ForeignCall
-import GHC.Driver.Session
-import GHC.Platform
-import Maybes
-import Outputable
+import GHC.Data.Maybe
+import GHC.Utils.Panic
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
+import GHC.Unit.Types
 
 import GHC.Core.TyCo.Rep
 import GHC.Builtin.Types.Prim
-import Util (zipEqual)
+import GHC.Utils.Misc (zipEqual)
 
 import Control.Monad
 
@@ -74,6 +79,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
               | otherwise            = Nothing
 
               -- ToDo: this might not be correct for 64-bit API
+              -- This is correct for the PowerPC ELF ABI version 1 and 2.
             arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType platform arg)
                                      (platformWordSizeInBytes platform)
         ; cmm_args <- getFCallArgs stg_args typ
@@ -86,7 +92,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                      -> let labelSource
                                 = case mPkgId of
                                         Nothing         -> ForeignLabelInThisPackage
-                                        Just pkgId      -> ForeignLabelInPackage pkgId
+                                        Just pkgId      -> ForeignLabelInPackage (toUnitId pkgId)
                             size = call_size cmm_args
                         in  ( unzip cmm_args
                             , CmmLit (CmmLabel
@@ -212,8 +218,8 @@ emitForeignCall
         -> FCode ReturnKind
 emitForeignCall safety results target args
   | not (playSafe safety) = do
-    dflags <- getDynFlags
-    let (caller_save, caller_load) = callerSaveVolatileRegs dflags
+    platform <- getPlatform
+    let (caller_save, caller_load) = callerSaveVolatileRegs platform
     emit caller_save
     target' <- load_target_into_temp target
     args' <- mapM maybe_assign_temp args
@@ -222,13 +228,13 @@ emitForeignCall safety results target args
     return AssignedDirectly
 
   | otherwise = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
     updfr_off <- getUpdFrameOff
     target' <- load_target_into_temp target
     args' <- mapM maybe_assign_temp args
     k <- newBlockId
-    let (off, _, copyout) = copyInOflow dflags NativeReturn (Young k) results []
+    let (off, _, copyout) = copyInOflow profile NativeReturn (Young k) results []
        -- see Note [safe foreign call convention]
     tscope <- getTickScope
     emit $
@@ -256,7 +262,7 @@ load_target_into_temp other_target@(PrimTarget _) =
 -- What we want to do here is create a new temporary for the foreign
 -- call argument if it is not safe to use the expression directly,
 -- because the expression mentions caller-saves GlobalRegs (see
--- Note [Register Parameter Passing]).
+-- Note [Register parameter passing]).
 --
 -- However, we can't pattern-match on the expression here, because
 -- this is used in a loop by GHC.Cmm.Parser, and testing the expression
@@ -279,40 +285,69 @@ maybe_assign_temp e = do
 
 emitSaveThreadState :: FCode ()
 emitSaveThreadState = do
-  dflags <- getDynFlags
-  code <- saveThreadState dflags
+  profile <- getProfile
+  code <- saveThreadState profile
   emit code
 
 -- | Produce code to save the current thread state to @CurrentTSO@
-saveThreadState :: MonadUnique m => DynFlags -> m CmmAGraph
-saveThreadState dflags = do
-  let platform = targetPlatform dflags
+saveThreadState :: MonadUnique m => Profile -> m CmmAGraph
+saveThreadState profile = do
+  let platform = profilePlatform profile
   tso <- newTemp (gcWord platform)
-  close_nursery <- closeNursery dflags tso
-  pure $ catAGraphs [
-    -- tso = CurrentTSO;
-    mkAssign (CmmLocal tso) currentTSOExpr,
-    -- tso->stackobj->sp = Sp;
-    mkStore (cmmOffset platform
-                       (CmmLoad (cmmOffset platform
-                                           (CmmReg (CmmLocal tso))
-                                           (tso_stackobj dflags))
-                                (bWord platform))
-                       (stack_SP dflags))
-            spExpr,
-    close_nursery,
-    -- and save the current cost centre stack in the TSO when profiling:
-    if gopt Opt_SccProfilingOn dflags then
-        mkStore (cmmOffset platform (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) cccsExpr
-      else mkNop
+  close_nursery <- closeNursery profile tso
+  pure $ catAGraphs
+   [ -- tso = CurrentTSO;
+     mkAssign (CmmLocal tso) currentTSOExpr
+
+   , -- tso->stackobj->sp = Sp;
+     mkStore (cmmOffset platform
+                        (CmmLoad (cmmOffset platform
+                                            (CmmReg (CmmLocal tso))
+                                            (tso_stackobj profile))
+                                 (bWord platform))
+                        (stack_SP profile))
+             spExpr
+
+    , close_nursery
+
+    , -- and save the current cost centre stack in the TSO when profiling:
+      if profileIsProfiling profile
+         then mkStore (cmmOffset platform (CmmReg (CmmLocal tso)) (tso_CCCS profile)) cccsExpr
+         else mkNop
     ]
+
+
+
+-- | Save STG registers
+--
+-- STG registers must be saved around a C call, just in case the STG
+-- register is mapped to a caller-saves machine register.  Normally we
+-- don't need to worry about this the code generator has already
+-- loaded any live STG registers into variables for us, but in
+-- hand-written low-level Cmm code where we don't know which registers
+-- are live, we might have to save them all.
+emitSaveRegs :: FCode ()
+emitSaveRegs = do
+   platform <- getPlatform
+   let regs = realArgRegsCover platform
+       save = catAGraphs (map (callerSaveGlobalReg platform) regs)
+   emit save
+
+-- | Restore STG registers (see 'emitSaveRegs')
+emitRestoreRegs :: FCode ()
+emitRestoreRegs = do
+   platform <- getPlatform
+   let regs    = realArgRegsCover platform
+       restore = catAGraphs (map (callerRestoreGlobalReg platform) regs)
+   emit restore
+
 
 emitCloseNursery :: FCode ()
 emitCloseNursery = do
-  dflags <- getDynFlags
-  platform <- getPlatform
+  profile <- getProfile
+  let platform = profilePlatform profile
   tso <- newTemp (bWord platform)
-  code <- closeNursery dflags tso
+  code <- closeNursery profile tso
   emit $ mkAssign (CmmLocal tso) currentTSOExpr <*> code
 
 {- |
@@ -336,24 +371,24 @@ Closing the nursery corresponds to the following code:
   cn->free = Hp + WDS(1);
 @
 -}
-closeNursery :: MonadUnique m => DynFlags -> LocalReg -> m CmmAGraph
-closeNursery df tso = do
-  let tsoreg  = CmmLocal tso
-      platform = targetPlatform df
+closeNursery :: MonadUnique m => Profile -> LocalReg -> m CmmAGraph
+closeNursery profile tso = do
+  let tsoreg   = CmmLocal tso
+      platform = profilePlatform profile
   cnreg      <- CmmLocal <$> newTemp (bWord platform)
   pure $ catAGraphs [
     mkAssign cnreg currentNurseryExpr,
 
     -- CurrentNursery->free = Hp+1;
-    mkStore (nursery_bdescr_free df cnreg) (cmmOffsetW platform hpExpr 1),
+    mkStore (nursery_bdescr_free platform cnreg) (cmmOffsetW platform hpExpr 1),
 
     let alloc =
            CmmMachOp (mo_wordSub platform)
               [ cmmOffsetW platform hpExpr 1
-              , CmmLoad (nursery_bdescr_start df cnreg) (bWord platform)
+              , CmmLoad (nursery_bdescr_start platform cnreg) (bWord platform)
               ]
 
-        alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit df)
+        alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
     in
 
     -- tso->alloc_limit += alloc
@@ -364,51 +399,51 @@ closeNursery df tso = do
 
 emitLoadThreadState :: FCode ()
 emitLoadThreadState = do
-  dflags <- getDynFlags
-  code <- loadThreadState dflags
+  profile <- getProfile
+  code <- loadThreadState profile
   emit code
 
 -- | Produce code to load the current thread state from @CurrentTSO@
-loadThreadState :: MonadUnique m => DynFlags -> m CmmAGraph
-loadThreadState dflags = do
-  let platform = targetPlatform dflags
+loadThreadState :: MonadUnique m => Profile -> m CmmAGraph
+loadThreadState profile = do
+  let platform = profilePlatform profile
   tso <- newTemp (gcWord platform)
   stack <- newTemp (gcWord platform)
-  open_nursery <- openNursery dflags tso
+  open_nursery <- openNursery profile tso
   pure $ catAGraphs [
     -- tso = CurrentTSO;
     mkAssign (CmmLocal tso) currentTSOExpr,
     -- stack = tso->stackobj;
-    mkAssign (CmmLocal stack) (CmmLoad (cmmOffset platform (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) (bWord platform)),
+    mkAssign (CmmLocal stack) (CmmLoad (cmmOffset platform (CmmReg (CmmLocal tso)) (tso_stackobj profile)) (bWord platform)),
     -- Sp = stack->sp;
-    mkAssign spReg (CmmLoad (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_SP dflags)) (bWord platform)),
+    mkAssign spReg (CmmLoad (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_SP profile)) (bWord platform)),
     -- SpLim = stack->stack + RESERVED_STACK_WORDS;
-    mkAssign spLimReg (cmmOffsetW platform (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_STACK dflags))
-                                (rESERVED_STACK_WORDS dflags)),
+    mkAssign spLimReg (cmmOffsetW platform (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_STACK profile))
+                                (pc_RESERVED_STACK_WORDS (platformConstants platform))),
     -- HpAlloc = 0;
     --   HpAlloc is assumed to be set to non-zero only by a failed
     --   a heap check, see HeapStackCheck.cmm:GC_GENERIC
     mkAssign hpAllocReg (zeroExpr platform),
     open_nursery,
     -- and load the current cost centre stack from the TSO when profiling:
-    if gopt Opt_SccProfilingOn dflags
+    if profileIsProfiling profile
        then storeCurCCS
               (CmmLoad (cmmOffset platform (CmmReg (CmmLocal tso))
-                 (tso_CCCS dflags)) (ccsType platform))
+                 (tso_CCCS profile)) (ccsType platform))
        else mkNop
    ]
 
 
 emitOpenNursery :: FCode ()
 emitOpenNursery = do
-  dflags <- getDynFlags
-  platform <- getPlatform
+  profile <- getProfile
+  let platform = profilePlatform profile
   tso <- newTemp (bWord platform)
-  code <- openNursery dflags tso
+  code <- openNursery profile tso
   emit $ mkAssign (CmmLocal tso) currentTSOExpr <*> code
 
 {- |
-@openNursery dflags tso@ produces code to open the nursery. A local register
+@openNursery profile tso@ produces code to open the nursery. A local register
 holding the value of @CurrentTSO@ is expected for efficiency.
 
 Opening the nursery corresponds to the following code:
@@ -435,10 +470,10 @@ Opening the nursery corresponds to the following code:
    HpLim = bdstart + CurrentNursery->blocks*BLOCK_SIZE_W - 1;
 @
 -}
-openNursery :: MonadUnique m => DynFlags -> LocalReg -> m CmmAGraph
-openNursery dflags tso = do
-  let tsoreg =  CmmLocal tso
-      platform = targetPlatform dflags
+openNursery :: MonadUnique m => Profile -> LocalReg -> m CmmAGraph
+openNursery profile tso = do
+  let tsoreg   = CmmLocal tso
+      platform = profilePlatform profile
   cnreg      <- CmmLocal <$> newTemp (bWord platform)
   bdfreereg  <- CmmLocal <$> newTemp (bWord platform)
   bdstartreg <- CmmLocal <$> newTemp (bWord platform)
@@ -449,12 +484,12 @@ openNursery dflags tso = do
   -- stg_returnToStackTop in rts/StgStartup.cmm.
   pure $ catAGraphs [
      mkAssign cnreg currentNurseryExpr,
-     mkAssign bdfreereg  (CmmLoad (nursery_bdescr_free dflags cnreg)  (bWord platform)),
+     mkAssign bdfreereg  (CmmLoad (nursery_bdescr_free platform cnreg)  (bWord platform)),
 
      -- Hp = CurrentNursery->free - 1;
      mkAssign hpReg (cmmOffsetW platform (CmmReg bdfreereg) (-1)),
 
-     mkAssign bdstartreg (CmmLoad (nursery_bdescr_start dflags cnreg) (bWord platform)),
+     mkAssign bdstartreg (CmmLoad (nursery_bdescr_start platform cnreg) (bWord platform)),
 
      -- HpLim = CurrentNursery->start +
      --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
@@ -464,8 +499,8 @@ openNursery dflags tso = do
              (cmmOffset platform
                (CmmMachOp (mo_wordMul platform) [
                  CmmMachOp (MO_SS_Conv W32 (wordWidth platform))
-                   [CmmLoad (nursery_bdescr_blocks dflags cnreg) b32],
-                 mkIntExpr platform (bLOCK_SIZE dflags)
+                   [CmmLoad (nursery_bdescr_blocks platform cnreg) b32],
+                 mkIntExpr platform (pc_BLOCK_SIZE (platformConstants platform))
                 ])
                (-1)
              )
@@ -475,7 +510,7 @@ openNursery dflags tso = do
      let alloc =
            CmmMachOp (mo_wordSub platform) [CmmReg bdfreereg, CmmReg bdstartreg]
 
-         alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit dflags)
+         alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
      in
 
      -- tso->alloc_limit += alloc
@@ -486,24 +521,24 @@ openNursery dflags tso = do
    ]
 
 nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks
-  :: DynFlags -> CmmReg -> CmmExpr
-nursery_bdescr_free   dflags cn =
-  cmmOffset (targetPlatform dflags) (CmmReg cn) (oFFSET_bdescr_free dflags)
-nursery_bdescr_start  dflags cn =
-  cmmOffset (targetPlatform dflags) (CmmReg cn) (oFFSET_bdescr_start dflags)
-nursery_bdescr_blocks dflags cn =
-  cmmOffset (targetPlatform dflags) (CmmReg cn) (oFFSET_bdescr_blocks dflags)
+  :: Platform -> CmmReg -> CmmExpr
+nursery_bdescr_free   platform cn =
+  cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_free (platformConstants platform))
+nursery_bdescr_start  platform cn =
+  cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_start (platformConstants platform))
+nursery_bdescr_blocks platform cn =
+  cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_blocks (platformConstants platform))
 
-tso_stackobj, tso_CCCS, tso_alloc_limit, stack_STACK, stack_SP :: DynFlags -> ByteOff
-tso_stackobj dflags = closureField dflags (oFFSET_StgTSO_stackobj dflags)
-tso_alloc_limit dflags = closureField dflags (oFFSET_StgTSO_alloc_limit dflags)
-tso_CCCS     dflags = closureField dflags (oFFSET_StgTSO_cccs dflags)
-stack_STACK  dflags = closureField dflags (oFFSET_StgStack_stack dflags)
-stack_SP     dflags = closureField dflags (oFFSET_StgStack_sp dflags)
+tso_stackobj, tso_CCCS, tso_alloc_limit, stack_STACK, stack_SP :: Profile -> ByteOff
+tso_stackobj    profile = closureField profile (pc_OFFSET_StgTSO_stackobj    (profileConstants profile))
+tso_alloc_limit profile = closureField profile (pc_OFFSET_StgTSO_alloc_limit (profileConstants profile))
+tso_CCCS        profile = closureField profile (pc_OFFSET_StgTSO_cccs        (profileConstants profile))
+stack_STACK     profile = closureField profile (pc_OFFSET_StgStack_stack     (profileConstants profile))
+stack_SP        profile = closureField profile (pc_OFFSET_StgStack_sp        (profileConstants profile))
 
 
-closureField :: DynFlags -> ByteOff -> ByteOff
-closureField dflags off = off + fixedHdrSize dflags
+closureField :: Profile -> ByteOff -> ByteOff
+closureField profile off = off + fixedHdrSize profile
 
 -- Note [Unlifted boxed arguments to foreign calls]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -571,8 +606,8 @@ getFCallArgs args typ
       = return Nothing
       | otherwise
       = do { cmm <- getArgAmode (NonVoid arg)
-           ; dflags <- getDynFlags
-           ; return (Just (add_shim dflags typ cmm, hint)) }
+           ; profile <- getProfile
+           ; return (Just (add_shim profile typ cmm, hint)) }
       where
         arg_ty   = stgArgType arg
         arg_reps = typePrimRep arg_ty
@@ -588,14 +623,14 @@ data StgFArgType
   | StgByteArrayType
 
 -- See Note [Unlifted boxed arguments to foreign calls]
-add_shim :: DynFlags -> StgFArgType -> CmmExpr -> CmmExpr
-add_shim dflags ty expr = case ty of
-  StgPlainType -> expr
-  StgArrayType -> cmmOffsetB platform expr (arrPtrsHdrSize dflags)
-  StgSmallArrayType -> cmmOffsetB platform expr (smallArrPtrsHdrSize dflags)
-  StgByteArrayType -> cmmOffsetB platform expr (arrWordsHdrSize dflags)
+add_shim :: Profile -> StgFArgType -> CmmExpr -> CmmExpr
+add_shim profile ty expr = case ty of
+  StgPlainType      -> expr
+  StgArrayType      -> cmmOffsetB platform expr (arrPtrsHdrSize profile)
+  StgSmallArrayType -> cmmOffsetB platform expr (smallArrPtrsHdrSize profile)
+  StgByteArrayType  -> cmmOffsetB platform expr (arrWordsHdrSize profile)
   where
-    platform = targetPlatform dflags
+    platform = profilePlatform profile
 
 -- From a function, extract information needed to determine
 -- the offset of each argument when used as a C FFI argument.
@@ -634,4 +669,3 @@ typeToStgFArgType typ
   -- a type in a foreign function signature with a representationally
   -- equivalent newtype.
   tycon = tyConAppTyCon (unwrapType typ)
-

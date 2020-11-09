@@ -40,12 +40,13 @@ module GHC.Types.Id.Make (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Core.Opt.ConstantFold
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
@@ -53,8 +54,10 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Core.Make
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Utils   ( mkCast, mkDefaultCase )
-import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
+import GHC.Core.SimpleOpt
 import GHC.Types.Literal
+import GHC.Types.SourceText
 import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Types.Name.Set
@@ -66,16 +69,20 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.TyThing
 import GHC.Core
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Types.Unique.Supply
 import GHC.Builtin.Names
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
-import Util
+import GHC.Utils.Misc
 import GHC.Driver.Session
-import Outputable
-import FastString
-import ListSetOps
+import GHC.Driver.Ppr
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
+import GHC.Data.List.SetOps
 import GHC.Types.Var (VarBndr(Bndr))
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -114,13 +121,14 @@ Note [ghcPrimIds (aka pseudoops)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The ghcPrimIds
 
-  * Are exported from GHC.Prim
+  * Are exported from GHC.Prim (see ghcPrimExports, used in ghcPrimInterface)
+    See Note [GHC.Prim] in primops.txt.pp for the remaining items in GHC.Prim.
 
   * Can't be defined in Haskell, and hence no Haskell binding site,
     but have perfectly reasonable unfoldings in Core
 
   * Either have a CompulsoryUnfolding (hence always inlined), or
-        of an EvaldUnfolding and void representation (e.g. void#)
+        of an EvaldUnfolding and void representation (e.g. realWorldPrimId)
 
   * Are (or should be) defined in primops.txt.pp as 'pseudoop'
     Reason: that's how we generate documentation for them
@@ -137,7 +145,17 @@ The magicIds
   * May or may not have a CompulsoryUnfolding.
 
   * But have some special behaviour that can't be done via an
-    unfolding from an interface file
+    unfolding from an interface file.
+
+  * May have IdInfo that differs from what would be imported from GHC.Magic.hi.
+    For example, 'lazy' gets a lazy strictness signature, per Note [lazyId magic].
+
+  The two remaining identifiers in GHC.Magic, runRW# and inline, are not listed
+  in magicIds: they have special behavior but they can be known-key and
+  not wired-in.
+  runRW#: see Note [Simplification of runRW#] in Prep, runRW# code in
+  Simplifier, Note [Linting of runRW#].
+  inline: see Note [inlineId magic]
 -}
 
 wiredInIds :: [Id]
@@ -369,6 +387,45 @@ in wrap_unf in mkDataConRep, and the lack of a binding happens in
 GHC.Iface.Tidy.getTyConImplicitBinds, where we say that a newtype has no
 implicit bindings.
 
+Note [Records and linear types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+All the fields, in a record constructor, are linear, because there is no syntax
+to specify the type of record field. There will be (see the proposal
+https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0111-linear-types.rst#records-and-projections
+), but it isn't implemented yet.
+
+Projections of records can't be linear:
+
+  data Foo = MkFoo { a :: A, b :: B }
+
+If we had
+
+  a :: Foo %1 -> A
+
+We could write
+
+  bad :: A %1 -> B %1 -> A
+  bad x y = a (MkFoo { a=x, b=y })
+
+There is an exception: if `b` (more generally all the fields besides `a`) is
+unrestricted, then is perfectly possible to have a linear projection. Such a
+linear projection has as simple definition.
+
+  data Bar = MkBar { c :: C, d # Many :: D }
+
+  c :: Bar %1 -> C
+  c MkBar{ c=x, d=_} = x
+
+The `# Many` syntax, for records, does not exist yet. But there is one important
+special case which already happens: when there is a single field (usually a
+newtype).
+
+  newtype Baz = MkBaz { unbaz :: E }
+
+unbaz could be linear. And, in fact, it is linear in the proposal design.
+
+However, this hasn't been implemented yet.
+
 ************************************************************************
 *                                                                      *
 \subsection{Dictionary selectors}
@@ -389,6 +446,18 @@ Then the top-level type for op is
               forall b. Ord b =>
               a -> b -> b
 
+Note [Type classes and linear types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Constraints, in particular type classes, don't have attached linearity
+information. Implicitly, they are all unrestricted. See the linear types proposal,
+https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0111-linear-types.rst .
+
+When translating to core `C => ...` is always translated to an unrestricted
+arrow `C # Many -> ...`.
+
+Therefore there is no loss of generality if we make all selectors unrestricted.
+
 -}
 
 mkDictSelId :: Name          -- Name of one of the *value* selectors
@@ -406,9 +475,10 @@ mkDictSelId name clas
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
-    sel_ty = mkForAllTys tyvars $
-             mkInvisFunTy (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
-             getNth arg_tys val_index
+    sel_ty = mkInvisForAllTys tyvars $
+             mkInvisFunTyMany (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
+             scaledThing (getNth arg_tys val_index)
+               -- See Note [Type classes and linear types]
 
     base_info = noCafIdInfo
                 `setArityInfo`          1
@@ -419,6 +489,7 @@ mkDictSelId name clas
     info | new_tycon
          = base_info `setInlinePragInfo` alwaysInlinePragma
                      `setUnfoldingInfo`  mkInlineUnfoldingWithArity 1
+                                           defaultSimpleOpts
                                            (mkDictSelRhs clas val_index)
                    -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
                    -- for why alwaysInlinePragma
@@ -463,7 +534,7 @@ mkDictSelRhs clas val_index
     the_arg_id     = getNth arg_ids val_index
     pred           = mkClassPred clas (mkTyVarTys tyvars)
     dict_id        = mkTemplateLocal 1 pred
-    arg_ids        = mkTemplateLocalsNum 2 arg_tys
+    arg_ids        = mkTemplateLocalsNum 2 (map scaledThing arg_tys)
 
     rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars)
                                                    (Var dict_id)
@@ -527,13 +598,13 @@ mkDataConWorkId wkr_name data_con
                   `setInlinePragInfo`     dataConWrapperInlinePragma
                   `setUnfoldingInfo`      newtype_unf
                   `setLevityInfoWithType` wkr_ty
-    id_arg1      = mkTemplateLocal 1 (head arg_tys)
+    id_arg1      = mkScaledTemplateLocal 1 (head arg_tys)
     res_ty_args  = mkTyCoVarTys univ_tvs
     newtype_unf  = ASSERT2( isVanillaDataCon data_con &&
                             isSingleton arg_tys
                           , ppr data_con  )
                               -- Note [Newtype datacons]
-                   mkCompulsoryUnfolding $
+                   mkCompulsoryUnfolding defaultSimpleOpts $
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 
@@ -655,7 +726,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                         | otherwise    = topDmd
 
              wrap_prag = dataConWrapperInlinePragma
-                         `setInlinePragmaActivation` activeDuringFinal
+                         `setInlinePragmaActivation` activateDuringFinal
                          -- See Note [Activation for data constructor wrappers]
 
              -- The wrapper will usually be inlined (see wrap_unf), so its
@@ -666,9 +737,9 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- See Note [Inline partially-applied constructor wrappers]
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
-             wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding wrap_rhs
+             wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding defaultSimpleOpts wrap_rhs
                         -- See Note [Compulsory newtype unfolding]
-                      | otherwise        = mkInlineUnfolding wrap_rhs
+                      | otherwise        = mkInlineUnfolding defaultSimpleOpts wrap_rhs
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
                         wrapFamInstBody tycon res_ty_args $
@@ -689,13 +760,13 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     res_ty_args  = substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec)) univ_tvs
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
-    wrap_ty      = dataConUserType data_con
+    wrap_ty      = dataConWrapperType data_con
     ev_tys       = eqSpecPreds eq_spec ++ theta
-    all_arg_tys  = ev_tys ++ orig_arg_tys
+    all_arg_tys  = (map unrestricted ev_tys) ++ orig_arg_tys
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
-    wrap_arg_tys = theta ++ orig_arg_tys
+    wrap_arg_tys = (map unrestricted theta) ++ orig_arg_tys
     wrap_arity   = count isCoVar ex_tvs + length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
@@ -704,8 +775,10 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     new_tycon = isNewTyCon tycon
     arg_ibangs
       | new_tycon
-      = ASSERT( isSingleton orig_arg_tys )
-        [HsLazy] -- See Note [HsImplBangs for newtypes]
+      = map (const HsLazy) orig_arg_tys -- See Note [HsImplBangs for newtypes]
+                                        -- orig_arg_tys should be a singleton, but
+                                        -- if a user declared a wrong newtype we
+                                        -- detect this later (see test T2334A)
       | otherwise
       = case mb_bangs of
           Nothing    -> zipWith (dataConSrcToImplBang dflags fam_envs)
@@ -914,9 +987,9 @@ case of a newtype constructor, we simply hardcode its dcr_bangs field to
 -}
 
 -------------------------
-newLocal :: Type -> UniqSM Var
-newLocal ty = do { uniq <- getUniqueM
-                 ; return (mkSysLocalOrCoVar (fsLit "dt") uniq ty) }
+newLocal :: Scaled Type -> UniqSM Var
+newLocal (Scaled w ty) = do { uniq <- getUniqueM
+                            ; return (mkSysLocalOrCoVar (fsLit "dt") uniq w ty) }
                  -- We should not have "OrCoVar" here, this is a bug (#17545)
 
 
@@ -928,7 +1001,7 @@ newLocal ty = do { uniq <- getUniqueM
 dataConSrcToImplBang
    :: DynFlags
    -> FamInstEnvs
-   -> Type
+   -> Scaled Type
    -> HsSrcBang
    -> HsImplBang
 
@@ -945,17 +1018,17 @@ dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
 
 dataConSrcToImplBang dflags fam_envs arg_ty
                      (HsSrcBang _ unpk_prag SrcStrict)
-  | isUnliftedType arg_ty
+  | isUnliftedType (scaledThing arg_ty)
   = HsLazy  -- For !Int#, say, use HsLazy
             -- See Note [Data con wrappers and unlifted types]
 
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
           -- Don't unpack if we aren't optimising; rather arbitrarily,
           -- we use -fomit-iface-pragmas as the indication
-  , let mb_co   = topNormaliseType_maybe fam_envs arg_ty
+  , let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
-        arg_ty' = case mb_co of { Just (_,ty) -> ty; Nothing -> arg_ty }
-  , isUnpackableType dflags fam_envs arg_ty'
+        arg_ty' = case mb_co of { Just (_,ty) -> scaledSet arg_ty ty; Nothing -> arg_ty }
+  , isUnpackableType dflags fam_envs (scaledThing arg_ty')
   , (rep_tys, _) <- dataConArgUnpack arg_ty'
   , case unpk_prag of
       NoSrcUnpack ->
@@ -974,9 +1047,9 @@ dataConSrcToImplBang dflags fam_envs arg_ty
 -- | Wrappers/Workers and representation following Unpack/Strictness
 -- decisions
 dataConArgRep
-  :: Type
+  :: Scaled Type
   -> HsImplBang
-  -> ([(Type,StrictnessMark)] -- Rep types
+  -> ([(Scaled Type,StrictnessMark)] -- Rep types
      ,(Unboxer,Boxer))
 
 dataConArgRep arg_ty HsLazy
@@ -989,9 +1062,9 @@ dataConArgRep arg_ty (HsUnpack Nothing)
   | (rep_tys, wrappers) <- dataConArgUnpack arg_ty
   = (rep_tys, wrappers)
 
-dataConArgRep _ (HsUnpack (Just co))
+dataConArgRep (Scaled w _) (HsUnpack (Just co))
   | let co_rep_ty = coercionRKind co
-  , (rep_tys, wrappers) <- dataConArgUnpack co_rep_ty
+  , (rep_tys, wrappers) <- dataConArgUnpack (Scaled w co_rep_ty)
   = (rep_tys, wrapCo co co_rep_ty wrappers)
 
 
@@ -1000,14 +1073,14 @@ wrapCo :: Coercion -> Type -> (Unboxer, Boxer) -> (Unboxer, Boxer)
 wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
   = (unboxer, boxer)
   where
-    unboxer arg_id = do { rep_id <- newLocal rep_ty
+    unboxer arg_id = do { rep_id <- newLocal (Scaled (idMult arg_id) rep_ty)
                         ; (rep_ids, rep_fn) <- unbox_rep rep_id
                         ; let co_bind = NonRec rep_id (Var arg_id `Cast` co)
                         ; return (rep_ids, Let co_bind . rep_fn) }
     boxer = Boxer $ \ subst ->
             do { (rep_ids, rep_expr)
                     <- case box_rep of
-                         UnitBox -> do { rep_id <- newLocal (TcType.substTy subst rep_ty)
+                         UnitBox -> do { rep_id <- newLocal (linear $ TcType.substTy subst rep_ty)
                                        ; return ([rep_id], Var rep_id) }
                          Boxer boxer -> boxer subst
                ; let sco = substCoUnchecked subst co
@@ -1025,28 +1098,30 @@ unitBoxer = UnitBox
 
 -------------------------
 dataConArgUnpack
-   :: Type
-   ->  ( [(Type, StrictnessMark)]   -- Rep types
+   :: Scaled Type
+   ->  ( [(Scaled Type, StrictnessMark)]   -- Rep types
        , (Unboxer, Boxer) )
 
-dataConArgUnpack arg_ty
+dataConArgUnpack (Scaled arg_mult arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
   , Just con <- tyConSingleAlgDataCon_maybe tc
       -- NB: check for an *algebraic* data type
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
-  , let rep_tys = dataConInstArgTys con tc_args
+  , let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
   = ASSERT( null (dataConExTyCoVars con) )
       -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
        do { rep_ids <- mapM newLocal rep_tys
+          ; let r_mult = idMult arg_id
+          ; let rep_ids' = map (scaleIdBy r_mult) rep_ids
           ; let unbox_fn body
                   = mkSingleAltCase (Var arg_id) arg_id
-                             (DataAlt con) rep_ids body
+                             (DataAlt con) rep_ids' body
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
-       do { rep_ids <- mapM (newLocal . TcType.substTyUnchecked subst) rep_tys
+       do { rep_ids <- mapM (newLocal . TcType.substScaledTyUnchecked subst) rep_tys
           ; return (rep_ids, Var (dataConWorkId con)
                              `mkTyApps` (substTysUnchecked subst tc_args)
                              `mkVarApps` rep_ids ) } ) )
@@ -1078,7 +1153,7 @@ isUnpackableType dflags fam_envs ty
          dc_name = getName con
          dcs' = dcs `extendNameSet` dc_name
 
-    ok_arg dcs (ty, bang)
+    ok_arg dcs (Scaled _ ty, bang)
       = not (attempt_unpack bang) || ok_ty dcs norm_ty
       where
         norm_ty = topNormaliseType fam_envs ty
@@ -1237,7 +1312,7 @@ mkPrimOpId prim_op
   = id
   where
     (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig prim_op
-    ty   = mkSpecForAllTys tyvars (mkVisFunTys arg_tys res_ty)
+    ty   = mkSpecForAllTys tyvars (mkVisFunTysMany arg_tys res_ty)
     name = mkWiredInName gHC_PRIM (primOpOcc prim_op)
                          (mkPrimOpIdUnique (primOpTag prim_op))
                          (AnId id) UserSyntax
@@ -1245,8 +1320,8 @@ mkPrimOpId prim_op
 
     -- PrimOps don't ever construct a product, but we want to preserve bottoms
     cpr
-      | isBotDiv (snd (splitStrictSig strict_sig)) = botCpr
-      | otherwise                                  = topCpr
+      | isDeadEndDiv (snd (splitStrictSig strict_sig)) = botCpr
+      | otherwise                                      = topCpr
 
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
@@ -1342,12 +1417,12 @@ These Ids can't be defined in Haskell.  They could be defined in
 unfoldings in the wired-in GHC.Prim interface file, but we'd have to
 ensure that they were definitely, definitely inlined, because there is
 no curried identifier for them.  That's what mkCompulsoryUnfolding
-does.  If we had a way to get a compulsory unfolding from an interface
-file, we could do that, but we don't right now.
+does. Alternatively, we could add the definitions to mi_decls of ghcPrimIface
+but it's not clear if this would be simpler.
 
-The type variables we use here are "open" type variables: this means
-they can unify with both unlifted and lifted types.  Hence we provide
-another gun with which to shoot yourself in the foot.
+coercionToken# is not listed in ghcPrimIds, since its type uses (~#)
+which is not supposed to be used in expressions (GHC throws an assertion
+failure when trying.)
 -}
 
 nullAddrName, seqName,
@@ -1362,6 +1437,7 @@ magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDict
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 
+-- Names listed in magicIds; see Note [magicIds]
 lazyIdName, oneShotName, noinlineIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
@@ -1372,7 +1448,7 @@ proxyHashId :: Id
 proxyHashId
   = pcMiscPrelId proxyName ty
        (noCafIdInfo `setUnfoldingInfo` evaldUnfolding -- Note [evaldUnfoldings]
-                    `setNeverLevPoly`  ty )
+                    `setNeverLevPoly`  ty)
   where
     -- proxy# :: forall {k} (a:k). Proxy# k a
     --
@@ -1381,7 +1457,7 @@ proxyHashId
     [kv,tv] = mkTemplateKiTyVars [liftedTypeKind] id
     kv_ty   = mkTyVarTy kv
     tv_ty   = mkTyVarTy tv
-    ty      = mkInvForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty
+    ty      = mkInfForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty
 
 ------------------------------------------------
 nullAddrId :: Id
@@ -1391,7 +1467,7 @@ nullAddrId :: Id
 nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding (Lit nullAddrLit)
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts (Lit nullAddrLit)
                        `setNeverLevPoly`   addrPrimTy
 
 ------------------------------------------------
@@ -1399,7 +1475,7 @@ seqId :: Id     -- See Note [seqId magic]
 seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
 
     inline_prag
          = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter
@@ -1411,9 +1487,9 @@ seqId = pcMiscPrelId seqName ty info
 
     -- seq :: forall (r :: RuntimeRep) a (b :: TYPE r). a -> b -> b
     ty  =
-      mkInvForAllTy runtimeRep2TyVar
+      mkInfForAllTy runtimeRep2TyVar
       $ mkSpecForAllTys [alphaTyVar, openBetaTyVar]
-      $ mkVisFunTy alphaTy (mkVisFunTy openBetaTy openBetaTy)
+      $ mkVisFunTyMany alphaTy (mkVisFunTyMany openBetaTy openBetaTy)
 
     [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
     rhs = mkLams ([runtimeRep2TyVar, alphaTyVar, openBetaTyVar, x, y]) $
@@ -1424,23 +1500,23 @@ lazyId :: Id    -- See Note [lazyId magic]
 lazyId = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo `setNeverLevPoly` ty
-    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTy alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
 noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
     info = noCafIdInfo `setNeverLevPoly` ty
-    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTy alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
 oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
     ty  = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
                           , openAlphaTyVar, openBetaTyVar ]
-                          (mkVisFunTy fun_ty fun_ty)
-    fun_ty = mkVisFunTy openAlphaTy openBetaTy
+                          (mkVisFunTyMany fun_ty fun_ty)
+    fun_ty = mkVisFunTyMany openAlphaTy openBetaTy
     [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
     x' = setOneShotLambda x  -- Here is the magic bit!
     rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
@@ -1462,15 +1538,15 @@ coerceId :: Id
 coerceId = pcMiscPrelId coerceName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
     eqRTy     = mkTyConApp coercibleTyCon [ tYPE r , a, b ]
     eqRPrimTy = mkTyConApp eqReprPrimTyCon [ tYPE r, tYPE r, a, b ]
-    ty        = mkForAllTys [ Bndr rv Inferred
-                            , Bndr av Specified
-                            , Bndr bv Specified
-                            ] $
-                mkInvisFunTy eqRTy $
-                mkVisFunTy a b
+    ty        = mkInvisForAllTys [ Bndr rv InferredSpec
+                                 , Bndr av SpecifiedSpec
+                                 , Bndr bv SpecifiedSpec
+                                 ] $
+                mkInvisFunTyMany eqRTy $
+                mkVisFunTyMany a b
 
     bndrs@[rv,av,bv] = mkTemplateKiTyVar runtimeRepTy
                         (\r -> [tYPE r, tYPE r])
@@ -1479,7 +1555,7 @@ coerceId = pcMiscPrelId coerceName ty info
 
     [eqR,x,eq] = mkTemplateLocals [eqRTy, a, eqRPrimTy]
     rhs = mkLams (bndrs ++ [eqR, x]) $
-          mkWildCase (Var eqR) eqRTy b $
+          mkWildCase (Var eqR) (unrestricted eqRTy) b $
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (mkCoVarCo eq))]
 
 {-
@@ -1490,7 +1566,7 @@ Note [seqId magic]
 a) Its fixity is set in GHC.Iface.Load.ghcPrimIface
 
 b) It has quite a bit of desugaring magic.
-   See GHC.HsToCore.Utils.hs Note [Desugaring seq (1)] and (2) and (3)
+   See GHC.HsToCore.Utils Note [Desugaring seq] (1) and (2) and (3)
 
 c) There is some special rule handing: Note [User-defined RULES for seq]
 
@@ -1538,7 +1614,7 @@ See also: Note [User-defined RULES for seq] in GHC.Core.Opt.Simplify.
 
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~
-lazy :: forall a?. a? -> a?   (i.e. works for unboxed types too)
+lazy :: forall a. a -> a
 
 'lazy' is used to make sure that a sub-expression, and its free variables,
 are truly used call-by-need, with no code motion.  Key examples:
@@ -1556,7 +1632,7 @@ are truly used call-by-need, with no code motion.  Key examples:
 Implementing 'lazy' is a bit tricky:
 
 * It must not have a strictness signature: by being a built-in Id,
-  all the info about lazyId comes from here, not from GHC.Base.hi.
+  all the info about lazyId comes from here, not from GHC.Magic.hi.
   This is important, because the strictness analyser will spot it as
   strict!
 
@@ -1674,7 +1750,7 @@ definition in Core.  The rewrite rule works as follows:
   f (x `cast` co a) y
 
 The `co` coercion is the newtype-coercion extracted from the type-class.
-The type class is obtain by looking at the type of wrap.
+The type class is obtained by looking at the type of wrap.
 
 
 -------------------------------------------------------------
@@ -1699,19 +1775,26 @@ inlined.
 realWorldPrimId :: Id   -- :: State# RealWorld
 realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
                      (noCafIdInfo `setUnfoldingInfo` evaldUnfolding    -- Note [evaldUnfoldings]
-                                  `setOneShotInfo` stateHackOneShot
-                                  `setNeverLevPoly` realWorldStatePrimTy)
+                                  `setOneShotInfo`   stateHackOneShot
+                                  `setNeverLevPoly`  realWorldStatePrimTy)
 
 voidPrimId :: Id     -- Global constant :: Void#
-voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy
-                (noCafIdInfo `setUnfoldingInfo` evaldUnfolding     -- Note [evaldUnfoldings]
-                             `setNeverLevPoly`  voidPrimTy)
+                     -- The type Void# is now the same as (# #) (ticket #18441),
+                     -- this identifier just signifies the (# #) datacon
+                     -- and is kept for backwards compatibility.
+                     -- We cannot define it in normal Haskell, since it's
+                     -- a top-level unlifted value.
+voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
+                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding defaultSimpleOpts rhs
+                             `setNeverLevPoly`  unboxedUnitTy)
+    where rhs = Var (dataConWorkId unboxedUnitDataCon)
+
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
-voidArgId = mkSysLocal (fsLit "void") voidArgIdKey voidPrimTy
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Many unboxedUnitTy
 
-coercionTokenId :: Id         -- :: () ~ ()
-coercionTokenId -- See Note [Coercion tokens] in CoreToStg.hs
+coercionTokenId :: Id         -- :: () ~# ()
+coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"
   = pcMiscPrelId coercionTokenName
                  (mkTyConApp eqPrimTyCon [liftedTypeKind, liftedTypeKind, unitTy, unitTy])
                  noCafIdInfo
@@ -1719,8 +1802,3 @@ coercionTokenId -- See Note [Coercion tokens] in CoreToStg.hs
 pcMiscPrelId :: Name -> Type -> IdInfo -> Id
 pcMiscPrelId name ty info
   = mkVanillaGlobalWithInfo name ty info
-    -- We lie and say the thing is imported; otherwise, we get into
-    -- a mess with dependency analysis; e.g., core2stg may heave in
-    -- random calls to GHCbase.unpackPS__.  If GHCbase is the module
-    -- being compiled, then it's just a matter of luck if the definition
-    -- will be in "the right place" to be in scope.

@@ -9,16 +9,15 @@ module GHC.Settings.IO
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Settings.Platform
 import GHC.Settings.Utils
 
-import Config
-import CliOption
-import Fingerprint
+import GHC.Settings.Config
+import GHC.Utils.CliOption
+import GHC.Utils.Fingerprint
 import GHC.Platform
-import Outputable
+import GHC.Utils.Panic
 import GHC.Settings
 import GHC.SysTools.BaseDir
 
@@ -71,14 +70,13 @@ initSettings top_dir = do
   -- just partially applying those functions and throwing 'Left's; they're
   -- written in a very portable style to keep ghc-boot light.
   let getSetting key = either pgmError pure $
-        getFilePathSetting0 top_dir settingsFile mySettings key
+        getRawFilePathSetting top_dir settingsFile mySettings key
       getToolSetting :: String -> ExceptT SettingsError m String
       getToolSetting key = expandToolDir mtool_dir <$> getSetting key
       getBooleanSetting :: String -> ExceptT SettingsError m Bool
       getBooleanSetting key = either pgmError pure $
-        getBooleanSetting0 settingsFile mySettings key
+        getRawBooleanSetting settingsFile mySettings key
   targetPlatformString <- getSetting "target platform string"
-  tablesNextToCode <- getBooleanSetting "Tables next to code"
   myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
   -- On Windows, mingw is distributed with GHC,
   -- so we look in TopDir/../mingw/bin,
@@ -93,7 +91,7 @@ initSettings top_dir = do
   cpp_prog <- getToolSetting "Haskell CPP command"
   cpp_args_str <- getSetting "Haskell CPP flags"
 
-  platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings
+  platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings platformConstants
 
   let unreg_cc_args = if platformUnregisterised platform
                       then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
@@ -117,6 +115,8 @@ initSettings top_dir = do
   windres_path <- getToolSetting "windres command"
   libtool_path <- getToolSetting "libtool command"
   ar_path <- getToolSetting "ar command"
+  otool_path <- getToolSetting "otool command"
+  install_name_tool_path <- getToolSetting "install_name_tool command"
   ranlib_path <- getToolSetting "ranlib command"
 
   -- TODO this side-effect doesn't belong here. Reading and parsing the settings
@@ -139,6 +139,8 @@ initSettings top_dir = do
         as_args  = map Option cc_args
         ld_prog  = cc_prog
         ld_args  = map Option (cc_args ++ words cc_link_args_str)
+  ld_r_prog <- getToolSetting "Merge objects command"
+  ld_r_args <- getSetting "Merge objects flags"
 
   llvmTarget <- getSetting "LLVM target"
 
@@ -149,27 +151,10 @@ initSettings top_dir = do
 
   let iserv_prog = libexec "ghc-iserv"
 
-  integerLibrary <- getSetting "integer library"
-  integerLibraryType <- case integerLibrary of
-    "integer-gmp" -> pure IntegerGMP
-    "integer-simple" -> pure IntegerSimple
-    _ -> pgmError $ unwords
-      [ "Entry for"
-      , show "integer library"
-      , "must be one of"
-      , show "integer-gmp"
-      , "or"
-      , show "integer-simple"
-      ]
-
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
-  ghcWithNativeCodeGen <- getBooleanSetting "Use native code generator"
   ghcWithSMP <- getBooleanSetting "Support SMP"
   ghcRTSWays <- getSetting "RTS ways"
-  leadingUnderscore <- getBooleanSetting "Leading underscore"
   useLibFFI <- getBooleanSetting "Use LibFFI"
-  ghcThreaded <- getBooleanSetting "Use Threads"
-  ghcDebugged <- getBooleanSetting "Use Debugging"
   ghcRtsWithLibdw <- getBooleanSetting "RTS expects libdw"
 
   return $ Settings
@@ -200,11 +185,14 @@ initSettings top_dir = do
       , toolSettings_pgm_c   = cc_prog
       , toolSettings_pgm_a   = (as_prog, as_args)
       , toolSettings_pgm_l   = (ld_prog, ld_args)
+      , toolSettings_pgm_lm  = (ld_r_prog, map Option $ words ld_r_args)
       , toolSettings_pgm_dll = (mkdll_prog,mkdll_args)
       , toolSettings_pgm_T   = touch_path
       , toolSettings_pgm_windres = windres_path
       , toolSettings_pgm_libtool = libtool_path
       , toolSettings_pgm_ar = ar_path
+      , toolSettings_pgm_otool = otool_path
+      , toolSettings_pgm_install_name_tool = install_name_tool_path
       , toolSettings_pgm_ranlib = ranlib_path
       , toolSettings_pgm_lo  = (lo_prog,[])
       , toolSettings_pgm_lc  = (lc_prog,[])
@@ -218,6 +206,7 @@ initSettings top_dir = do
       , toolSettings_opt_cxx     = cxx_args
       , toolSettings_opt_a       = []
       , toolSettings_opt_l       = []
+      , toolSettings_opt_lm      = []
       , toolSettings_opt_windres = []
       , toolSettings_opt_lcc     = []
       , toolSettings_opt_lo      = []
@@ -230,17 +219,10 @@ initSettings top_dir = do
     , sTargetPlatform = platform
     , sPlatformMisc = PlatformMisc
       { platformMisc_targetPlatformString = targetPlatformString
-      , platformMisc_integerLibrary = integerLibrary
-      , platformMisc_integerLibraryType = integerLibraryType
       , platformMisc_ghcWithInterpreter = ghcWithInterpreter
-      , platformMisc_ghcWithNativeCodeGen = ghcWithNativeCodeGen
       , platformMisc_ghcWithSMP = ghcWithSMP
       , platformMisc_ghcRTSWays = ghcRTSWays
-      , platformMisc_tablesNextToCode = tablesNextToCode
-      , platformMisc_leadingUnderscore = leadingUnderscore
       , platformMisc_libFFI = useLibFFI
-      , platformMisc_ghcThreaded = ghcThreaded
-      , platformMisc_ghcDebugged = ghcDebugged
       , platformMisc_ghcRtsWithLibdw = ghcRtsWithLibdw
       , platformMisc_llvmTarget = llvmTarget
       }
@@ -248,4 +230,40 @@ initSettings top_dir = do
     , sPlatformConstants = platformConstants
 
     , sRawSettings    = settingsList
+    }
+
+getTargetPlatform
+  :: FilePath     -- ^ Settings filepath (for error messages)
+  -> RawSettings  -- ^ Raw settings file contents
+  -> PlatformConstants -- ^ Platform constants
+  -> Either String Platform
+getTargetPlatform settingsFile settings constants = do
+  let
+    getBooleanSetting = getRawBooleanSetting settingsFile settings
+    readSetting :: (Show a, Read a) => String -> Either String a
+    readSetting = readRawSetting settingsFile settings
+
+  targetArchOS <- getTargetArchOS settingsFile settings
+  targetWordSize <- readSetting "target word size"
+  targetWordBigEndian <- getBooleanSetting "target word big endian"
+  targetLeadingUnderscore <- getBooleanSetting "Leading underscore"
+  targetUnregisterised <- getBooleanSetting "Unregisterised"
+  targetHasGnuNonexecStack <- getBooleanSetting "target has GNU nonexec stack"
+  targetHasIdentDirective <- getBooleanSetting "target has .ident directive"
+  targetHasSubsectionsViaSymbols <- getBooleanSetting "target has subsections via symbols"
+  crossCompiling <- getBooleanSetting "cross compiling"
+  tablesNextToCode <- getBooleanSetting "Tables next to code"
+
+  pure $ Platform
+    { platformArchOS    = targetArchOS
+    , platformWordSize  = targetWordSize
+    , platformByteOrder = if targetWordBigEndian then BigEndian else LittleEndian
+    , platformUnregisterised = targetUnregisterised
+    , platformHasGnuNonexecStack = targetHasGnuNonexecStack
+    , platformHasIdentDirective = targetHasIdentDirective
+    , platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
+    , platformIsCrossCompiling = crossCompiling
+    , platformLeadingUnderscore = targetLeadingUnderscore
+    , platformTablesNextToCode  = tablesNextToCode
+    , platformConstants = constants
     }

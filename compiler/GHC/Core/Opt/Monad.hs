@@ -48,27 +48,35 @@ module GHC.Core.Opt.Monad (
     dumpIfSet_dyn
   ) where
 
-import GhcPrelude hiding ( read )
+import GHC.Prelude hiding ( read )
+
+import GHC.Driver.Session
+import GHC.Driver.Env
 
 import GHC.Core
-import GHC.Driver.Types
-import GHC.Types.Module
-import GHC.Driver.Session
+import GHC.Core.Unfold
+
 import GHC.Types.Basic  ( CompilerPhase(..) )
 import GHC.Types.Annotations
-
-import IOEnv hiding     ( liftIO, failM, failWithM )
-import qualified IOEnv  ( liftIO )
 import GHC.Types.Var
-import Outputable
-import FastString
-import ErrUtils( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
+import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
-import MonadUtils
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
+
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Error ( Severity(..), DumpFormat (..), dumpAction, dumpOptionsFromFlag )
+import GHC.Utils.Monad
+
+import GHC.Data.FastString
+import GHC.Data.IOEnv hiding     ( liftIO, failM, failWithM )
+import qualified GHC.Data.IOEnv  as IOEnv
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.External
+
 import Data.Bifunctor ( bimap )
-import ErrUtils (dumpAction)
 import Data.List (intersperse, groupBy, sortBy)
 import Data.Ord
 import Data.Dynamic
@@ -78,7 +86,7 @@ import qualified Data.Map.Strict as MapStrict
 import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
-import Panic (throwGhcException, GhcException(..))
+import GHC.Utils.Panic (throwGhcException, GhcException(..), panic)
 
 {-
 ************************************************************************
@@ -155,14 +163,25 @@ pprPassDetails _ = Outputable.empty
 
 data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
   = SimplMode
-        { sm_names      :: [String] -- Name(s) of the phase
+        { sm_names      :: [String]       -- ^ Name(s) of the phase
         , sm_phase      :: CompilerPhase
-        , sm_dflags     :: DynFlags -- Just for convenient non-monadic
-                                    -- access; we don't override these
-        , sm_rules      :: Bool     -- Whether RULES are enabled
-        , sm_inline     :: Bool     -- Whether inlining is enabled
-        , sm_case_case  :: Bool     -- Whether case-of-case is enabled
-        , sm_eta_expand :: Bool     -- Whether eta-expansion is enabled
+        , sm_uf_opts    :: !UnfoldingOpts -- ^ Unfolding options
+        , sm_rules      :: !Bool          -- ^ Whether RULES are enabled
+        , sm_inline     :: !Bool          -- ^ Whether inlining is enabled
+        , sm_case_case  :: !Bool          -- ^ Whether case-of-case is enabled
+        , sm_eta_expand :: !Bool          -- ^ Whether eta-expansion is enabled
+        , sm_pre_inline :: !Bool          -- ^ Whether pre-inlining is enabled
+        , sm_dflags     :: DynFlags
+            -- Just for convenient non-monadic access; we don't override these.
+            --
+            -- Used for:
+            --    - target platform (for `exprIsDupable` and `mkDupableAlt`)
+            --    - Opt_DictsCheap and Opt_PedanticBottoms general flags
+            --    - rules options (initRuleOpts)
+            --    - verbose_core2core, dump_inlinings, dump_rule_rewrites/firings
+            --    - traceAction, dumpAction
+            --    - inlineCheck
+            --    - touchDumpFile (generatedDumps, etc.)
         }
 
 instance Outputable SimplMode where
@@ -399,7 +418,7 @@ EtaExpansion:
     fail = \void. (\s. (e |> g) s) |> sym g      where g :: IO () ~ S -> (S,())
   --> Next iteration of simplify
     fail1 = \void. \s. (e |> g) s
-    fail = fail1 |> Void#->sym g
+    fail = fail1 |> Void# -> sym g
   And now inline 'fail'
 
 CaseMerge:
@@ -527,7 +546,7 @@ cmpEqTick :: Tick -> Tick -> Ordering
 cmpEqTick (PreInlineUnconditionally a)  (PreInlineUnconditionally b)    = a `compare` b
 cmpEqTick (PostInlineUnconditionally a) (PostInlineUnconditionally b)   = a `compare` b
 cmpEqTick (UnfoldingDone a)             (UnfoldingDone b)               = a `compare` b
-cmpEqTick (RuleFired a)                 (RuleFired b)                   = a `compare` b
+cmpEqTick (RuleFired a)                 (RuleFired b)                   = a `uniqCompareFS` b
 cmpEqTick (EtaExpansion a)              (EtaExpansion b)                = a `compare` b
 cmpEqTick (EtaReduction a)              (EtaReduction b)                = a `compare` b
 cmpEqTick (BetaReduction a)             (BetaReduction b)               = a `compare` b
@@ -778,10 +797,10 @@ msg sev reason doc
                      SevWarning -> err_sty
                      SevDump    -> dump_sty
                      _          -> user_sty
-             err_sty  = mkErrStyle dflags unqual
-             user_sty = mkUserStyle dflags unqual AllTheWay
-             dump_sty = mkDumpStyle dflags unqual
-       ; liftIO $ putLogMsg dflags reason sev loc sty doc }
+             err_sty  = mkErrStyle unqual
+             user_sty = mkUserStyle unqual AllTheWay
+             dump_sty = mkDumpStyle unqual
+       ; liftIO $ putLogMsg dflags reason sev loc (withPprStyle sty doc) }
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()
@@ -824,5 +843,5 @@ dumpIfSet_dyn flag str fmt doc
   = do { dflags <- getDynFlags
        ; unqual <- getPrintUnqualified
        ; when (dopt flag dflags) $ liftIO $ do
-         let sty = mkDumpStyle dflags unqual
+         let sty = mkDumpStyle unqual
          dumpAction dflags sty (dumpOptionsFromFlag flag) str fmt doc }

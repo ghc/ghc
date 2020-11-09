@@ -3,7 +3,10 @@ module GHC.Cmm.LayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
 
-import GhcPrelude hiding ((<*>))
+import GHC.Prelude hiding ((<*>))
+
+import GHC.Platform
+import GHC.Platform.Profile
 
 import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs, newTemp  ) -- XXX layering violation
 import GHC.StgToCmm.Foreign    ( saveThreadState, loadThreadState ) -- XXX layering violation
@@ -25,14 +28,14 @@ import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Types.Unique.Supply
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.Unique.FM
-import Util
+import GHC.Utils.Misc
 
-import GHC.Platform
 import GHC.Driver.Session
-import FastString
-import Outputable hiding ( isEmpty )
+import GHC.Data.FastString
+import GHC.Utils.Outputable hiding ( isEmpty )
+import GHC.Utils.Panic
 import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
@@ -224,7 +227,7 @@ data StackMap = StackMap
  ,  sm_ret_off :: ByteOff
        -- ^ Number of words of stack that we do not describe with an info
        -- table, because it contains an update frame.
- ,  sm_regs :: UniqFM (LocalReg,StackLoc)
+ ,  sm_regs :: UniqFM LocalReg (LocalReg,StackLoc)
        -- ^ regs on the stack
  }
 
@@ -243,8 +246,10 @@ cmmLayoutStack dflags procpoints entry_args
   = do
     -- We need liveness info. Dead assignments are removed later
     -- by the sinking pass.
-    let liveness = cmmLocalLiveness dflags graph
+    let liveness = cmmLocalLiveness platform graph
         blocks = revPostorder graph
+        profile  = targetProfile dflags
+        platform = profilePlatform profile
 
     (final_stackmaps, _final_high_sp, new_blocks) <-
           mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks) ->
@@ -252,8 +257,8 @@ cmmLayoutStack dflags procpoints entry_args
                    rec_stackmaps rec_high_sp blocks
 
     blocks_with_reloads <-
-        insertReloadsAsNeeded dflags procpoints final_stackmaps entry new_blocks
-    new_blocks' <- mapM (lowerSafeForeignCall dflags) blocks_with_reloads
+        insertReloadsAsNeeded platform procpoints final_stackmaps entry new_blocks
+    new_blocks' <- mapM (lowerSafeForeignCall profile) blocks_with_reloads
     return (ofBlockList entry new_blocks', final_stackmaps)
 
 -- -----------------------------------------------------------------------------
@@ -357,10 +362,9 @@ isGcJump _something_else = False
 
 -- This doesn't seem right somehow.  We need to find out whether this
 -- proc will push some update frame material at some point, so that we
--- can avoid using that area of the stack for spilling.  The
--- updfr_space field of the CmmProc *should* tell us, but it doesn't
--- (I think maybe it gets filled in later when we do proc-point
--- splitting).
+-- can avoid using that area of the stack for spilling. Ideally we would
+-- capture this information in the CmmProc (e.g. in CmmStackInfo; see #18232
+-- for details on one ill-fated attempt at this).
 --
 -- So we'll just take the max of all the cml_ret_offs.  This could be
 -- unnecessarily pessimistic, but probably not in the code we
@@ -447,26 +451,25 @@ handleLastNode
 
 handleLastNode dflags procpoints liveness cont_info stackmaps
                stack0@StackMap { sm_sp = sp0 } tscp middle last
- = case last of
-    --  At each return / tail call,
-    --  adjust Sp to point to the last argument pushed, which
-    --  is cml_args, after popping any other junk from the stack.
-    CmmCall{ cml_cont = Nothing, .. } -> do
-      let sp_off = sp0 - cml_args
-      return ([], sp_off, last, [], mapEmpty)
+  = case last of
+      --  At each return / tail call,
+      --  adjust Sp to point to the last argument pushed, which
+      --  is cml_args, after popping any other junk from the stack.
+      CmmCall{ cml_cont = Nothing, .. } -> do
+        let sp_off = sp0 - cml_args
+        return ([], sp_off, last, [], mapEmpty)
 
-    --  At each CmmCall with a continuation:
-    CmmCall{ cml_cont = Just cont_lbl, .. } ->
-       return $ lastCall cont_lbl cml_args cml_ret_args cml_ret_off
+      --  At each CmmCall with a continuation:
+      CmmCall{ cml_cont = Just cont_lbl, .. } ->
+        return $ lastCall cont_lbl cml_args cml_ret_args cml_ret_off
 
-    CmmForeignCall{ succ = cont_lbl, .. } -> do
-       return $ lastCall cont_lbl (platformWordSizeInBytes platform) ret_args ret_off
-            -- one word of args: the return address
+      CmmForeignCall{ succ = cont_lbl, .. } ->
+        return $ lastCall cont_lbl (platformWordSizeInBytes platform) ret_args ret_off
+              -- one word of args: the return address
 
-    CmmBranch {}     ->  handleBranches
-    CmmCondBranch {} ->  handleBranches
-    CmmSwitch {}     ->  handleBranches
-
+      CmmBranch {}     ->  handleBranches
+      CmmCondBranch {} ->  handleBranches
+      CmmSwitch {}     ->  handleBranches
   where
      platform = targetPlatform dflags
      -- Calls and ForeignCalls are handled the same way:
@@ -1019,7 +1022,7 @@ setInfoTableStackMap platform stackmaps (CmmProc top_info@TopInfo{..} l v g)
     get_liveness :: BlockId -> Liveness
     get_liveness lbl
       = case mapLookup lbl stackmaps of
-          Nothing -> pprPanic "setInfoTableStackMap" (ppr lbl <+> ppr info_tbls)
+          Nothing -> pprPanic "setInfoTableStackMap" (ppr lbl <+> pdoc platform info_tbls)
           Just sm -> stackMapToLiveness platform sm
 
 setInfoTableStackMap _ _ d = d
@@ -1041,30 +1044,29 @@ stackMapToLiveness platform StackMap{..} =
 -- -----------------------------------------------------------------------------
 
 insertReloadsAsNeeded
-    :: DynFlags
+    :: Platform
     -> ProcPointSet
     -> LabelMap StackMap
     -> BlockId
     -> [CmmBlock]
     -> UniqSM [CmmBlock]
-insertReloadsAsNeeded dflags procpoints final_stackmaps entry blocks = do
+insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks =
     toBlockList . fst <$>
         rewriteCmmBwd liveLattice rewriteCC (ofBlockList entry blocks) mapEmpty
   where
     rewriteCC :: RewriteFun CmmLocalLive
     rewriteCC (BlockCC e_node middle0 x_node) fact_base0 = do
         let entry_label = entryLabel e_node
-            platform = targetPlatform dflags
             stackmap = case mapLookup entry_label final_stackmaps of
                 Just sm -> sm
                 Nothing -> panic "insertReloadsAsNeeded: rewriteCC: stackmap"
 
             -- Merge the liveness from successor blocks and analyse the last
             -- node.
-            joined = gen_kill dflags x_node $!
+            joined = gen_kill platform x_node $!
                          joinOutFacts liveLattice x_node fact_base0
             -- What is live at the start of middle0.
-            live_at_middle0 = foldNodesBwdOO (gen_kill dflags) middle0 joined
+            live_at_middle0 = foldNodesBwdOO (gen_kill platform) middle0 joined
 
             -- If this is a procpoint we need to add the reloads, but only if
             -- they're actually live. Furthermore, nothing is live at the entry
@@ -1132,18 +1134,18 @@ expecting them (see Note [safe foreign call convention]). Note also
 that safe foreign call is replace by an unsafe one in the Cmm graph.
 -}
 
-lowerSafeForeignCall :: DynFlags -> CmmBlock -> UniqSM CmmBlock
-lowerSafeForeignCall dflags block
+lowerSafeForeignCall :: Profile -> CmmBlock -> UniqSM CmmBlock
+lowerSafeForeignCall profile block
   | (entry@(CmmEntry _ tscp), middle, CmmForeignCall { .. }) <- blockSplit block
   = do
-    let platform = targetPlatform dflags
+    let platform = profilePlatform profile
     -- Both 'id' and 'new_base' are KindNonPtr because they're
     -- RTS-only objects and are not subject to garbage collection
     id <- newTemp (bWord platform)
     new_base <- newTemp (cmmRegType platform baseReg)
-    let (caller_save, caller_load) = callerSaveVolatileRegs dflags
-    save_state_code <- saveThreadState dflags
-    load_state_code <- loadThreadState dflags
+    let (caller_save, caller_load) = callerSaveVolatileRegs platform
+    save_state_code <- saveThreadState profile
+    load_state_code <- loadThreadState profile
     let suspend = save_state_code  <*>
                   caller_save <*>
                   mkMiddle (callSuspendThread platform id intrbl)
@@ -1156,7 +1158,7 @@ lowerSafeForeignCall dflags block
                   load_state_code
 
         (_, regs, copyout) =
-             copyOutOflow dflags NativeReturn Jump (Young succ)
+             copyOutOflow profile NativeReturn Jump (Young succ)
                             (map (CmmReg . CmmLocal) res)
                             ret_off []
 
@@ -1165,7 +1167,7 @@ lowerSafeForeignCall dflags block
         -- received an exception during the call, then the stack might be
         -- different.  Hence we continue by jumping to the top stack frame,
         -- not by jumping to succ.
-        jump = CmmCall { cml_target    = entryCode dflags $
+        jump = CmmCall { cml_target    = entryCode platform $
                                          CmmLoad spExpr (bWord platform)
                        , cml_cont      = Just succ
                        , cml_args_regs = regs

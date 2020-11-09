@@ -16,16 +16,17 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Bag
+import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Core.Class
 import GHC.Core.DataCon
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Tc.Utils.Instantiate
-import Outputable
-import Pair
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.Pair
 import GHC.Builtin.Names
 import GHC.Tc.Deriv.Utils
 import GHC.Tc.Utils.Env
@@ -46,7 +47,7 @@ import GHC.Tc.Validity (validDerivPred)
 import GHC.Tc.Utils.Unify (buildImplicationFor, checkConstraints)
 import GHC.Builtin.Types (typeToTypeKind)
 import GHC.Core.Unify (tcUnifyTy)
-import Util
+import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Set
 
@@ -186,10 +187,10 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
                             dataConInstOrigArgTys data_con all_rep_tc_args
                        -- No constraints for unlifted types
                        -- See Note [Deriving and unboxed types]
-                     , not (isUnliftedType arg_ty)
+                     , not (isUnliftedType (irrelevantMult arg_ty))
                      , let orig = DerivOriginDC data_con arg_n wildcard
                      , preds_and_mbSubst
-                         <- get_arg_constraints orig arg_t_or_k arg_ty
+                         <- get_arg_constraints orig arg_t_or_k (irrelevantMult arg_ty)
                      ]
                    preds = concat predss
                    -- If the constraints require a subtype to be of kind
@@ -260,9 +261,7 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
            -- substitute each type variable with its counterpart in the derived
            -- instance. rep_tc_args lists each of these counterpart types in
            -- the same order as the type variables.
-           all_rep_tc_args
-             = rep_tc_args ++ map mkTyVarTy
-                                  (drop (length rep_tc_args) rep_tc_tvs)
+           all_rep_tc_args = tyConInstArgTys rep_tc rep_tc_args
 
                -- Stupid constraints
            stupid_constraints
@@ -369,8 +368,7 @@ inferConstraintsAnyclass
                     ; return (mkThetaOrigin (mkDerivOrigin wildcard) TypeLevel
                                 meth_tvs dm_tvs meth_theta (tau_eq:dm_theta)) }
 
-       ; theta_origins <- lift $ mapM do_one_meth gen_dms
-       ; return theta_origins }
+       ; lift $ mapM do_one_meth gen_dms }
 
 -- Like 'inferConstraints', but used only for @GeneralizedNewtypeDeriving@ and
 -- @DerivingVia@. Since both strategies generate code involving 'coerce', the
@@ -465,8 +463,7 @@ and them simplify them in simplifyInstanceContexts; see
 Note [Simplifying the instance context].
 
 In the functor-like case, we may need to unify some kind variables with * in
-order for the generated instance to be well-kinded. An example from
-#10524:
+order for the generated instance to be well-kinded. An example from #10524:
 
   newtype Compose (f :: k2 -> *) (g :: k1 -> k2) (a :: k1)
     = Compose (f (g a)) deriving Functor

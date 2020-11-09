@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE NamedFieldPuns #-}
 -- | The CompPipeline monad and associated ops
 --
 -- Defined in separate module so that it can safely be imported from Hooks
@@ -11,15 +10,23 @@ module GHC.Driver.Pipeline.Monad (
   , pipeStateDynFlags, pipeStateModIface
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import MonadUtils
-import Outputable
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
+
 import GHC.Driver.Session
 import GHC.Driver.Phases
-import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Driver.Env
+
 import GHC.SysTools.FileCleanup (TempFileLifetime)
+
+import GHC.Types.SourceFile
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Status
 
 import Control.Monad
 

@@ -3,7 +3,7 @@
 -- NB: this module is SOURCE-imported by DynFlags, and should primarily
 --     refer to *types*, rather than *code*
 
-{-# LANGUAGE CPP, RankNTypes #-}
+{-# LANGUAGE CPP, RankNTypes, TypeFamilies #-}
 
 module GHC.Driver.Hooks
    ( Hooks
@@ -11,6 +11,7 @@ module GHC.Driver.Hooks
    , lookupHook
    , getHooked
      -- the hooks:
+   , DsForeignsHook
    , dsForeignsHook
    , tcForeignImportsHook
    , tcForeignExportsHook
@@ -28,35 +29,48 @@ module GHC.Driver.Hooks
    )
 where
 
-import GhcPrelude
+import GHC.Prelude
 
+import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Pipeline.Monad
-import GHC.Driver.Types
+
 import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr
-import OrdList
-import GHC.Tc.Types
-import Bag
+import GHC.Hs.Extension
+
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Id
-import GHC.Core
-import GHCi.RemoteTypes
 import GHC.Types.SrcLoc
-import GHC.Core.Type
-import System.Process
 import GHC.Types.Basic
-import GHC.Types.Module
-import GHC.Core.TyCon
 import GHC.Types.CostCentre
+import GHC.Types.Meta
+import GHC.Types.HpcInfo
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Home.ModInfo
+
+import GHC.Core
+import GHC.Core.TyCon
+import GHC.Core.Type
+
+import GHC.Tc.Types
 import GHC.Stg.Syntax
-import Stream
+import GHC.StgToCmm.Types (ModuleLFInfos)
 import GHC.Cmm
-import GHC.Hs.Extension
+
+import GHCi.RemoteTypes
+
+import GHC.Data.Stream
+import GHC.Data.Bag
 
 import Data.Maybe
+import qualified Data.Kind
+import System.Process
 
 {-
 ************************************************************************
@@ -88,13 +102,36 @@ emptyHooks = Hooks
   , cmmToRawCmmHook        = Nothing
   }
 
+{- Note [The Decoupling Abstract Data Hack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The "Abstract Data" idea is due to Richard Eisenberg in
+https://gitlab.haskell.org/ghc/ghc/-/merge_requests/1957, where the pattern is
+described in more detail.
+
+Here we use it as a temporary measure to break the dependency from the Parser on
+the Desugarer until the parser is free of DynFlags. We introduced a nullary type
+family @DsForeignsook@, whose single definition is in GHC.HsToCore.Types, where
+we instantiate it to
+
+   [LForeignDecl GhcTc] -> DsM (ForeignStubs, OrdList (Id, CoreExpr))
+
+In doing so, the Hooks module (which is an hs-boot dependency of DynFlags) can
+be decoupled from its use of the DsM definition in GHC.HsToCore.Types. Since
+both DsM and the definition of @ForeignsHook@ live in the same module, there is
+virtually no difference for plugin authors that want to write a foreign hook.
+-}
+
+-- See Note [The Decoupling Abstract Data Hack]
+type family DsForeignsHook :: Data.Kind.Type
+
 data Hooks = Hooks
-  { dsForeignsHook         :: Maybe ([LForeignDecl GhcTc]
-                           -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))
+  { dsForeignsHook         :: Maybe DsForeignsHook
+  -- ^ Actual type:
+  -- @Maybe ([LForeignDecl GhcTc] -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))@
   , tcForeignImportsHook   :: Maybe ([LForeignDecl GhcRn]
                           -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt))
   , tcForeignExportsHook   :: Maybe ([LForeignDecl GhcRn]
-            -> TcM (LHsBinds GhcTcId, [LForeignDecl GhcTcId], Bag GlobalRdrElt))
+            -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt))
   , hscFrontendHook        :: Maybe (ModSummary -> Hsc FrontendResult)
   , hscCompileCoreExprHook ::
                Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue)
@@ -109,7 +146,7 @@ data Hooks = Hooks
                                                           -> IO (Maybe HValue))
   , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
   , stgToCmmHook           :: Maybe (DynFlags -> Module -> [TyCon] -> CollectedCCs
-                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ())
+                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos)
   , cmmToRawCmmHook        :: forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
                                  -> IO (Stream IO RawCmmGroup a))
   }

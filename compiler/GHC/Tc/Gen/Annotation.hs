@@ -10,20 +10,25 @@
 -- | Typechecking annotations
 module GHC.Tc.Gen.Annotation ( tcAnnotations, annCtxt ) where
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Session
+import GHC.Driver.Env
 
 import {-# SOURCE #-} GHC.Tc.Gen.Splice ( runAnnotation )
-import GHC.Types.Module
-import GHC.Driver.Session
-import Control.Monad ( when )
+import GHC.Tc.Utils.Monad
+
+import GHC.Unit.Module
 
 import GHC.Hs
+
+import GHC.Utils.Outputable
+
 import GHC.Types.Name
 import GHC.Types.Annotations
-import GHC.Tc.Utils.Monad
 import GHC.Types.SrcLoc
-import Outputable
-import GHC.Driver.Types
+
+import Control.Monad ( when )
 
 -- Some platforms don't support the interpreter, and compilation on those
 -- platforms shouldn't fail just due to annotations

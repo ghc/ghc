@@ -56,7 +56,8 @@ import GHC.IO.Encoding
 import GHC.IO.Buffer
 import GHC.IO.BufferedIO ( BufferedIO )
 import GHC.IO.Device as IODevice
-import GHC.IO.Handle.FD
+import GHC.IO.StdHandles
+import GHC.IO.SubSystem
 import GHC.IO.Handle.Lock
 import GHC.IO.Handle.Types
 import GHC.IO.Handle.Internals
@@ -120,10 +121,12 @@ hFileSize handle =
       SemiClosedHandle          -> ioe_semiclosedHandle
       _ -> do flushWriteBuffer handle_
               r <- IODevice.getSize dev
+              debugIO $ "hFileSize: " ++ show r ++ " " ++ show handle
               if r /= -1
-                 then return r
-                 else ioException (IOError Nothing InappropriateType "hFileSize"
-                                   "not a regular file" Nothing Nothing)
+                then return r
+                else ioException (IOError Nothing InappropriateType "hFileSize"
+                                  "not a regular file" Nothing Nothing)
+
 
 
 -- | 'hSetFileSize' @hdl@ @size@ truncates the physical file with handle @hdl@ to @size@ bytes.
@@ -234,10 +237,11 @@ hSetBuffering handle mode =
                 case mode of
 #if !defined(mingw32_HOST_OS)
         -- 'raw' mode under win32 is a bit too specialised (and troublesome
-        -- for most common uses), so simply disable its use here.
+        -- for most common uses), so simply disable its use here when not using
+        -- WinIO.
                   NoBuffering -> IODevice.setRaw haDevice True
 #else
-                  NoBuffering -> return ()
+                  NoBuffering -> return () <!> IODevice.setRaw haDevice True
 #endif
                   _           -> IODevice.setRaw haDevice False
 
@@ -262,7 +266,7 @@ hSetBuffering handle mode =
 -- the encoding.
 --
 hSetEncoding :: Handle -> TextEncoding -> IO ()
-hSetEncoding hdl encoding = do
+hSetEncoding hdl encoding =
   withAllHandles__ "hSetEncoding" hdl $ \h_@Handle__{..} -> do
     flushCharBuffer h_
     closeTextCodecs h_
@@ -402,22 +406,36 @@ hSeek :: Handle -> SeekMode -> Integer -> IO ()
 hSeek handle mode offset =
     wantSeekableHandle "hSeek" handle $ \ handle_@Handle__{..} -> do
     debugIO ("hSeek " ++ show (mode,offset))
-    buf <- readIORef haCharBuffer
+    cbuf <- readIORef haCharBuffer
+    bbuf <- readIORef haByteBuffer
+    debugIO $ "hSeek - bbuf:" ++ summaryBuffer bbuf
+    debugIO $ "hSeek - cbuf:" ++ summaryBuffer cbuf
 
-    if isWriteBuffer buf
+    if isWriteBuffer cbuf
         then do flushWriteBuffer handle_
-                IODevice.seek haDevice mode offset
+                new_offset <- IODevice.seek haDevice mode offset
+                -- buffer has been updated, need to re-read it
+                bbuf1 <- readIORef haByteBuffer
+                let bbuf2 = bbuf1{ bufOffset = fromIntegral new_offset }
+                debugIO $ "hSeek - seek:: " ++ show offset ++
+                          " - " ++ show new_offset
+                debugIO $ "hSeek - wr flush bbuf1:" ++ summaryBuffer bbuf2
+                writeIORef haByteBuffer bbuf2
         else do
 
-    let r = bufL buf; w = bufR buf
+    let r = bufL cbuf; w = bufR cbuf
     if mode == RelativeSeek && isNothing haDecoder &&
        offset >= 0 && offset < fromIntegral (w - r)
-        then writeIORef haCharBuffer buf{ bufL = r + fromIntegral offset }
+        then writeIORef haCharBuffer cbuf{ bufL = r + fromIntegral offset }
         else do
 
     flushCharReadBuffer handle_
     flushByteReadBuffer handle_
-    IODevice.seek haDevice mode offset
+    -- read the updated values
+    bbuf2 <- readIORef haByteBuffer
+    new_offset <- IODevice.seek haDevice mode offset
+    debugIO $ "hSeek after: " ++ show new_offset
+    writeIORef haByteBuffer bbuf2{ bufOffset = fromIntegral new_offset }
 
 
 -- | Computation 'hTell' @hdl@ returns the current position of the
@@ -433,13 +451,18 @@ hTell :: Handle -> IO Integer
 hTell handle =
     wantSeekableHandle "hGetPosn" handle $ \ handle_@Handle__{..} -> do
 
-      posn <- IODevice.tell haDevice
+      -- TODO: Guard these on Windows
+      posn <- if ioSubSystem == IoNative
+                         then (fromIntegral . bufOffset) `fmap` readIORef haByteBuffer
+                         else IODevice.tell haDevice
 
       -- we can't tell the real byte offset if there are buffered
       -- Chars, so must flush first:
       flushCharBuffer handle_
 
       bbuf <- readIORef haByteBuffer
+      debugIO ("hTell bbuf (elems=" ++ show (bufferElems bbuf) ++ ")"
+               ++ summaryBuffer bbuf)
 
       let real_posn
            | isWriteBuffer bbuf = posn + fromIntegral (bufferElems bbuf)
@@ -448,7 +471,7 @@ hTell handle =
       cbuf <- readIORef haCharBuffer
       debugIO ("\nhGetPosn: (posn, real_posn) = " ++ show (posn, real_posn))
       debugIO ("   cbuf: " ++ summaryBuffer cbuf ++
-            "   bbuf: " ++ summaryBuffer bbuf)
+               "   bbuf: " ++ summaryBuffer bbuf)
 
       return real_posn
 
@@ -556,7 +579,7 @@ hGetEcho handle = do
 -- | Is the handle connected to a terminal?
 
 hIsTerminalDevice :: Handle -> IO Bool
-hIsTerminalDevice handle = do
+hIsTerminalDevice handle =
     withHandle_ "hIsTerminalDevice" handle $ \ Handle__{..} -> do
      case haType of
        ClosedHandle -> ioe_closedHandle
@@ -618,7 +641,7 @@ hSetNewlineMode handle NewlineMode{ inputNL=i, outputNL=o } =
 -- before the handle is duplicated.
 
 hDuplicate :: Handle -> IO Handle
-hDuplicate h@(FileHandle path m) = do
+hDuplicate h@(FileHandle path m) =
   withHandle_' "hDuplicate" h m $ \h_ ->
       dupHandle path h Nothing h_ (Just handleFinalizer)
 hDuplicate h@(DuplexHandle path r w) = do
@@ -644,10 +667,10 @@ dupHandle filepath h other_side h_@Handle__{..} mb_finalizer = do
        new_dev <- IODevice.dup haDevice
        dupHandle_ new_dev filepath other_side h_ mb_finalizer
     Just r  ->
-       withHandle_' "dupHandle" h r $ \Handle__{haDevice=dev} -> do
+       withHandle_' "dupHandle" h r $ \Handle__{haDevice=dev} ->
          dupHandle_ dev filepath other_side h_ mb_finalizer
 
-dupHandle_ :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
+dupHandle_ :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
            -> FilePath
            -> Maybe (MVar Handle__)
            -> Handle__
@@ -674,19 +697,19 @@ This can be used to retarget the standard Handles, for example:
 -}
 
 hDuplicateTo :: Handle -> Handle -> IO ()
-hDuplicateTo h1@(FileHandle path m1) h2@(FileHandle _ m2)  = do
+hDuplicateTo h1@(FileHandle path m1) h2@(FileHandle _ m2) =
  withHandle__' "hDuplicateTo" h2 m2 $ \h2_ -> do
    try $ flushWriteBuffer h2_
-   withHandle_' "hDuplicateTo" h1 m1 $ \h1_ -> do
+   withHandle_' "hDuplicateTo" h1 m1 $ \h1_ ->
      dupHandleTo path h1 Nothing h2_ h1_ (Just handleFinalizer)
 hDuplicateTo h1@(DuplexHandle path r1 w1) h2@(DuplexHandle _ r2 w2)  = do
  withHandle__' "hDuplicateTo" h2 w2  $ \w2_ -> do
    try $ flushWriteBuffer w2_
-   withHandle_' "hDuplicateTo" h1 w1 $ \w1_ -> do
+   withHandle_' "hDuplicateTo" h1 w1 $ \w1_ ->
      dupHandleTo path h1 Nothing w2_ w1_ (Just handleFinalizer)
  withHandle__' "hDuplicateTo" h2 r2  $ \r2_ -> do
    try $ flushWriteBuffer r2_
-   withHandle_' "hDuplicateTo" h1 r1 $ \r1_ -> do
+   withHandle_' "hDuplicateTo" h1 r1 $ \r1_ ->
      dupHandleTo path h1 (Just w1) r2_ r1_ Nothing
 hDuplicateTo h1 _ =
   ioe_dupHandlesNotCompatible h1

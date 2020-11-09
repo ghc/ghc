@@ -6,9 +6,9 @@ module Main where
 
 import System.IO
 import GHC
-import MonadUtils
-import Outputable
-import Bag (filterBag,isEmptyBag)
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
+import GHC.Data.Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
 
@@ -39,7 +39,7 @@ main = do
         = not (isEmptyBag (filterBag isDataCon bs))
       isDataCon (L l (f@FunBind {}))
         | (MG _ (L _ (m:_)) _) <- fun_matches f,
-          ((L _ (c@ConPatOut{})):_)<-hsLMatchPats m,
+          ((L _ (c@ConPat{})):_)<-hsLMatchPats m,
           (L l _)<-pat_con c
         = isGoodSrcSpan l       -- Check that the source location is a good one
       isDataCon _

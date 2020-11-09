@@ -1,6 +1,6 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE MagicHash         #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy       #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -95,19 +95,19 @@ module Control.Exception.Base (
         -- * Calls for GHC runtime
         recSelError, recConError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
-        absentError, absentSumFieldError, typeError,
+        absentError, typeError,
         nonTermination, nestedAtomically,
   ) where
 
-import GHC.Base
-import GHC.IO hiding (bracket,finally,onException)
-import GHC.IO.Exception
-import GHC.Exception
-import GHC.Show
+import           GHC.Base
+import           GHC.Exception
+import           GHC.IO           hiding (bracket, finally, onException)
+import           GHC.IO.Exception
+import           GHC.Show
 -- import GHC.Exception hiding ( Exception )
-import GHC.Conc.Sync
+import           GHC.Conc.Sync
 
-import Data.Either
+import           Data.Either
 
 -----------------------------------------------------------------------------
 -- Catching exceptions
@@ -398,7 +398,3 @@ nonTermination = toException NonTermination
 -- GHC's RTS calls this
 nestedAtomically :: SomeException
 nestedAtomically = toException NestedAtomically
-
--- Introduced by unarise for unused unboxed sum fields
-absentSumFieldError :: a
-absentSumFieldError = absentError " in unboxed sum."#

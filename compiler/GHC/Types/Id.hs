@@ -11,19 +11,19 @@
 -- #name_types#
 -- GHC uses several kinds of name internally:
 --
--- * 'OccName.OccName': see "OccName#name_types"
+-- * 'GHC.Types.Name.Occurrence.OccName': see "GHC.Types.Name.Occurrence#name_types"
 --
--- * 'RdrName.RdrName': see "RdrName#name_types"
+-- * 'GHC.Types.Name.Reader.RdrName': see "GHC.Types.Name.Reader#name_types"
 --
--- * 'Name.Name': see "Name#name_types"
+-- * 'GHC.Types.Name.Name': see "GHC.Types.Name#name_types"
 --
--- * 'Id.Id' represents names that not only have a 'Name.Name' but also a
---   'GHC.Core.TyCo.Rep.Type' and some additional details (a 'IdInfo.IdInfo' and
---   one of 'Var.LocalIdDetails' or 'IdInfo.GlobalIdDetails') that are added,
---   modified and inspected by various compiler passes. These 'Var.Var' names
---   may either be global or local, see "Var#globalvslocal"
+-- * 'GHC.Types.Id.Id' represents names that not only have a 'GHC.Types.Name.Name' but also a
+--   'GHC.Core.TyCo.Rep.Type' and some additional details (a 'GHC.Types.Id.Info.IdInfo' and
+--   one of LocalIdDetails or GlobalIdDetails) that are added,
+--   modified and inspected by various compiler passes. These 'GHC.Types.Var.Var' names
+--   may either be global or local, see "GHC.Types.Var#globalvslocal"
 --
--- * 'Var.Var': see "Var#name_types"
+-- * 'GHC.Types.Var.Var': see "GHC.Types.Var#name_types"
 
 module GHC.Types.Id (
         -- * The main types
@@ -40,21 +40,24 @@ module GHC.Types.Id (
         mkSysLocal, mkSysLocalM, mkSysLocalOrCoVar, mkSysLocalOrCoVarM,
         mkUserLocal, mkUserLocalOrCoVar,
         mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
+        mkScaledTemplateLocal,
         mkWorkerId,
 
         -- ** Taking an Id apart
-        idName, idType, idUnique, idInfo, idDetails,
+        idName, idType, idMult, idScaledType, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
+        recordSelectorTyCon_maybe,
 
         -- ** Modifying an Id
-        setIdName, setIdUnique, GHC.Types.Id.setIdType,
+        setIdName, setIdUnique, GHC.Types.Id.setIdType, setIdMult,
+        updateIdTypeButNotMult, updateIdTypeAndMult, updateIdTypeAndMultM,
         setIdExported, setIdNotExported,
         globaliseId, localiseId,
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
         zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
         zapIdUsedOnceInfo, zapIdTailCallInfo,
         zapFragileIdInfo, zapIdStrictness, zapStableUnfolding,
-        transferPolyIdInfo,
+        transferPolyIdInfo, scaleIdBy, scaleVarBy,
 
         -- ** Predicates on Ids
         isImplicitId, isDeadBinder,
@@ -70,7 +73,7 @@ module GHC.Types.Id (
         isDataConWrapId, isDataConWrapId_maybe,
         isDataConId_maybe,
         idDataCon,
-        isConLikeId, isBottomingId, idIsFrom,
+        isConLikeId, isDeadEndId, idIsFrom,
         hasNoBinding,
 
         -- ** Join variables
@@ -92,7 +95,7 @@ module GHC.Types.Id (
         idCallArity, idFunRepArity,
         idUnfolding, realIdUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
-        idCafInfo,
+        idCafInfo, idLFInfo_maybe,
         idOneShotInfo, idStateHackOneShotInfo,
         idOccInfo,
         isNeverLevPolyId,
@@ -105,6 +108,7 @@ module GHC.Types.Id (
         setIdSpecialisation,
         setIdCafInfo,
         setIdOccInfo, zapIdOccInfo,
+        setIdLFInfo,
 
         setIdDemandInfo,
         setIdStrictness,
@@ -118,9 +122,8 @@ module GHC.Types.Id (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Driver.Session
 import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
                  isCompulsoryUnfolding, Unfolding( NoUnfolding ) )
 
@@ -132,7 +135,8 @@ import GHC.Types.Var( Id, CoVar, JoinId,
             InId,  InVar,
             OutId, OutVar,
             idInfo, idDetails, setIdDetails, globaliseId,
-            isId, isLocalId, isGlobalId, isExportedId )
+            isId, isLocalId, isGlobalId, isExportedId,
+            setIdMult, updateIdTypeAndMult, updateIdTypeButNotMult, updateIdTypeAndMultM)
 import qualified GHC.Types.Var as Var
 
 import GHC.Core.Type
@@ -142,17 +146,24 @@ import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Name
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Core.Class
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.ForeignCall
-import Maybes
+import GHC.Data.Maybe
 import GHC.Types.SrcLoc
-import Outputable
 import GHC.Types.Unique
+import GHC.Builtin.Uniques (mkBuiltinUnique)
 import GHC.Types.Unique.Supply
-import FastString
-import Util
+import GHC.Data.FastString
+import GHC.Core.Multiplicity
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.GlobalVars
+
+import GHC.Driver.Ppr
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfolding`,
@@ -190,6 +201,22 @@ idUnique  = Var.varUnique
 idType   :: Id -> Kind
 idType    = Var.varType
 
+idMult :: Id -> Mult
+idMult = Var.varMult
+
+idScaledType :: Id -> Scaled Type
+idScaledType id = Scaled (idMult id) (idType id)
+
+scaleIdBy :: Mult -> Id -> Id
+scaleIdBy m id = setIdMult id (m `mkMultMul` idMult id)
+
+-- | Like 'scaleIdBy', but skips non-Ids. Useful for scaling
+-- a mixed list of ids and tyvars.
+scaleVarBy :: Mult -> Var -> Var
+scaleVarBy m id
+  | isId id   = scaleIdBy m id
+  | otherwise = id
+
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName
 
@@ -214,7 +241,7 @@ localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
   = id
   | otherwise
-  = Var.mkLocalVar (idDetails id) (localiseName name) (idType id) (idInfo id)
+  = Var.mkLocalVar (idDetails id) (localiseName name) (Var.varMult id) (idType id) (idInfo id)
   where
     name = idName id
 
@@ -255,7 +282,7 @@ substitution (which changes the free type variables) is more common.
 Anyway, we removed it in March 2008.
 -}
 
--- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
+-- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var.Var#globalvslocal"
 mkGlobalId :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalId = Var.mkGlobalVar
 
@@ -268,27 +295,32 @@ mkVanillaGlobalWithInfo :: Name -> Type -> IdInfo -> Id
 mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 
--- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
-mkLocalId :: HasDebugCallStack => Name -> Type -> Id
-mkLocalId name ty = ASSERT( not (isCoVarType ty) )
-                    mkLocalIdWithInfo name ty vanillaIdInfo
+-- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var#globalvslocal"
+mkLocalId :: HasDebugCallStack => Name -> Mult -> Type -> Id
+mkLocalId name w ty = ASSERT( not (isCoVarType ty) )
+                      mkLocalIdWithInfo name w ty vanillaIdInfo
 
 -- | Make a local CoVar
 mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
   = ASSERT( isCoVarType ty )
-    Var.mkLocalVar CoVarId name ty vanillaIdInfo
+    Var.mkLocalVar CoVarId name Many ty vanillaIdInfo
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
-mkLocalIdOrCoVar :: Name -> Type -> Id
-mkLocalIdOrCoVar name ty
-  | isCoVarType ty = mkLocalCoVar name ty
-  | otherwise      = mkLocalId    name ty
+mkLocalIdOrCoVar :: Name -> Mult -> Type -> Id
+mkLocalIdOrCoVar name w ty
+  -- We should ASSERT(eqType w Many) in the isCoVarType case.
+  -- However, currently this assertion does not hold.
+  -- In tests with -fdefer-type-errors, such as T14584a,
+  -- we create a linear 'case' where the scrutinee is a coercion
+  -- (see castBottomExpr). This problem is covered by #17291.
+  | isCoVarType ty = mkLocalCoVar name   ty
+  | otherwise      = mkLocalId    name w ty
 
     -- proper ids only; no covars!
-mkLocalIdWithInfo :: HasDebugCallStack => Name -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name ty info = ASSERT( not (isCoVarType ty) )
-                                 Var.mkLocalVar VanillaId name ty info
+mkLocalIdWithInfo :: HasDebugCallStack => Name -> Mult -> Type -> IdInfo -> Id
+mkLocalIdWithInfo name w ty info = ASSERT( not (isCoVarType ty) )
+                                   Var.mkLocalVar VanillaId name w ty info
         -- Note [Free type variables]
 
 -- | Create a local 'Id' that is marked as exported.
@@ -305,31 +337,31 @@ mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaId
 
 -- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal")
 -- that are created by the compiler out of thin air
-mkSysLocal :: FastString -> Unique -> Type -> Id
-mkSysLocal fs uniq ty = ASSERT( not (isCoVarType ty) )
-                        mkLocalId (mkSystemVarName uniq fs) ty
+mkSysLocal :: FastString -> Unique -> Mult -> Type -> Id
+mkSysLocal fs uniq w ty = ASSERT( not (isCoVarType ty) )
+                        mkLocalId (mkSystemVarName uniq fs) w ty
 
 -- | Like 'mkSysLocal', but checks to see if we have a covar type
-mkSysLocalOrCoVar :: FastString -> Unique -> Type -> Id
-mkSysLocalOrCoVar fs uniq ty
-  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) ty
+mkSysLocalOrCoVar :: FastString -> Unique -> Mult -> Type -> Id
+mkSysLocalOrCoVar fs uniq w ty
+  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) w ty
 
-mkSysLocalM :: MonadUnique m => FastString -> Type -> m Id
-mkSysLocalM fs ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq ty))
+mkSysLocalM :: MonadUnique m => FastString -> Mult -> Type -> m Id
+mkSysLocalM fs w ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq w ty))
 
-mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Type -> m Id
-mkSysLocalOrCoVarM fs ty
-  = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq ty))
+mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Mult -> Type -> m Id
+mkSysLocalOrCoVarM fs w ty
+  = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq w ty))
 
--- | Create a user local 'Id'. These are local 'Id's (see "Var#globalvslocal") with a name and location that the user might recognize
-mkUserLocal :: OccName -> Unique -> Type -> SrcSpan -> Id
-mkUserLocal occ uniq ty loc = ASSERT( not (isCoVarType ty) )
-                              mkLocalId (mkInternalName uniq occ loc) ty
+-- | Create a user local 'Id'. These are local 'Id's (see "GHC.Types.Var#globalvslocal") with a name and location that the user might recognize
+mkUserLocal :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
+mkUserLocal occ uniq w ty loc = ASSERT( not (isCoVarType ty) )
+                                mkLocalId (mkInternalName uniq occ loc) w ty
 
 -- | Like 'mkUserLocal', but checks if we have a coercion type
-mkUserLocalOrCoVar :: OccName -> Unique -> Type -> SrcSpan -> Id
-mkUserLocalOrCoVar occ uniq ty loc
-  = mkLocalIdOrCoVar (mkInternalName uniq occ loc) ty
+mkUserLocalOrCoVar :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
+mkUserLocalOrCoVar occ uniq w ty loc
+  = mkLocalIdOrCoVar (mkInternalName uniq occ loc) w ty
 
 {-
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -340,11 +372,14 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ty
+  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) Many ty
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id
-mkTemplateLocal i ty = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) ty
+mkTemplateLocal i ty = mkScaledTemplateLocal i (unrestricted ty)
+
+mkScaledTemplateLocal :: Int -> Scaled Type -> Id
+mkScaledTemplateLocal i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) w ty
    -- "OrCoVar" since this is used in a superclass selector,
    -- and "~" and "~~" have coercion "superclasses".
 
@@ -404,10 +439,15 @@ That is what is happening in, say tidy_insts in GHC.Iface.Tidy.
 -- | If the 'Id' is that for a record selector, extract the 'sel_tycon'. Panic otherwise.
 recordSelectorTyCon :: Id -> RecSelParent
 recordSelectorTyCon id
-  = case Var.idDetails id of
-        RecSelId { sel_tycon = parent } -> parent
+  = case recordSelectorTyCon_maybe id of
+        Just parent -> parent
         _ -> panic "recordSelectorTyCon"
 
+recordSelectorTyCon_maybe :: Id -> Maybe RecSelParent
+recordSelectorTyCon_maybe id
+  = case Var.idDetails id of
+        RecSelId { sel_tycon = parent } -> Just parent
+        _ -> Nothing
 
 isRecordSelector        :: Id -> Bool
 isNaughtyRecordSelector :: Id -> Bool
@@ -515,22 +555,14 @@ hasNoBinding :: Id -> Bool
 -- ^ Returns @True@ of an 'Id' which may not have a
 -- binding, even though it is defined in this module.
 
--- Data constructor workers used to be things of this kind, but
--- they aren't any more.  Instead, we inject a binding for
--- them at the CorePrep stage.
---
--- 'PrimOpId's also used to be of this kind. See Note [Primop wrappers] in GHC.Builtin.PrimOps.
--- for the history of this.
---
--- Note that CorePrep currently eta expands things no-binding things and this
--- can cause quite subtle bugs. See Note [Eta expansion of hasNoBinding things
--- in CorePrep] in CorePrep for details.
---
--- EXCEPT: unboxed tuples, which definitely have no binding
+-- Data constructor workers used to be things of this kind, but they aren't any
+-- more.  Instead, we inject a binding for them at the CorePrep stage. The
+-- exception to this is unboxed tuples and sums datacons, which definitely have
+-- no binding
 hasNoBinding id = case Var.idDetails id of
-                        PrimOpId _       -> False   -- See Note [Primop wrappers] in GHC.Builtin.PrimOps
+                        PrimOpId _       -> True    -- See Note [Eta expanding primops] in GHC.Builtin.PrimOps
                         FCallId _        -> True
-                        DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
+                        DataConWorkId dc -> isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
                         _                -> isCompulsoryUnfolding (idUnfolding id)
                                             -- See Note [Levity-polymorphic Ids]
 
@@ -637,10 +669,11 @@ setIdCallArity id arity = modifyIdInfo (`setCallArityInfo` arity) id
 idFunRepArity :: Id -> RepArity
 idFunRepArity x = countFunRepArgs (idArity x) (idType x)
 
--- | Returns true if an application to n args would diverge
-isBottomingId :: Var -> Bool
-isBottomingId v
-  | isId v    = isBottomingSig (idStrictness v)
+-- | Returns true if an application to n args diverges or throws an exception
+-- See Note [Dead ends] in "GHC.Types.Demand".
+isDeadEndId :: Var -> Bool
+isDeadEndId v
+  | isId v    = isDeadEndSig (idStrictness v)
   | otherwise = False
 
 -- | Accesses the 'Id''s 'strictnessInfo'.
@@ -732,6 +765,15 @@ setIdCafInfo :: Id -> CafInfo -> Id
 setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
 
         ---------------------------------
+        -- Lambda form info
+
+idLFInfo_maybe :: Id -> Maybe LambdaFormInfo
+idLFInfo_maybe = lfInfo . idInfo
+
+setIdLFInfo :: Id -> LambdaFormInfo -> Id
+setIdLFInfo id lf = modifyIdInfo (`setLFInfo` lf) id
+
+        ---------------------------------
         -- Occurrence INFO
 idOccInfo :: Id -> OccInfo
 idOccInfo id = occInfo (idInfo id)
@@ -779,7 +821,7 @@ idOneShotInfo :: Id -> OneShotInfo
 idOneShotInfo id = oneShotInfo (idInfo id)
 
 -- | Like 'idOneShotInfo', but taking the Horrible State Hack in to account
--- See Note [The state-transformer hack] in GHC.Core.Arity
+-- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
 idStateHackOneShotInfo :: Id -> OneShotInfo
 idStateHackOneShotInfo id
     | isStateHackType (idType id) = stateHackOneShot
@@ -789,7 +831,7 @@ idStateHackOneShotInfo id
 -- This one is the "business end", called externally.
 -- It works on type variables as well as Ids, returning True
 -- Its main purpose is to encapsulate the Horrible State Hack
--- See Note [The state-transformer hack] in GHC.Core.Arity
+-- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
 isOneShotBndr :: Var -> Bool
 isOneShotBndr var
   | isTyVar var                              = True
@@ -807,7 +849,7 @@ typeOneShot ty
 
 isStateHackType :: Type -> Bool
 isStateHackType ty
-  | hasNoStateHack unsafeGlobalDynFlags
+  | unsafeHasNoStateHack
   = False
   | otherwise
   = case tyConAppTyCon_maybe ty of
@@ -958,7 +1000,7 @@ transferPolyIdInfo old_id abstract_wrt new_id
     new_occ_info    = zapOccTailCallInfo old_occ_info
 
     old_strictness  = strictnessInfo old_info
-    new_strictness  = increaseStrictSigArity arity_increase old_strictness
+    new_strictness  = prependArgsStrictSig arity_increase old_strictness
     old_cpr         = cprInfo old_info
 
     transfer new_info = new_info `setArityInfo` new_arity

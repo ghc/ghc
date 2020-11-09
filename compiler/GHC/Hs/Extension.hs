@@ -1,38 +1,35 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE EmptyDataDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-                                      -- in module GHC.Hs.Extension
-{-# LANGUAGE UndecidableSuperClasses #-}  -- for IsPass; see Note [NoGhcTc]
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}      -- for pprIfTc, etc.
+{-# LANGUAGE AllowAmbiguousTypes     #-}      -- for pprIfTc, etc.
+{-# LANGUAGE ConstraintKinds         #-}
+{-# LANGUAGE DataKinds               #-}
+{-# LANGUAGE DeriveDataTypeable      #-}
+{-# LANGUAGE EmptyCase               #-}
+{-# LANGUAGE EmptyDataDeriving       #-}
+{-# LANGUAGE FlexibleContexts        #-}
+{-# LANGUAGE FlexibleInstances       #-}
+{-# LANGUAGE GADTs                   #-}
+{-# LANGUAGE MultiParamTypeClasses   #-}
+{-# LANGUAGE RankNTypes              #-}
+{-# LANGUAGE ScopedTypeVariables     #-}
+{-# LANGUAGE TypeApplications        #-}
+{-# LANGUAGE TypeFamilyDependencies  #-}
+{-# LANGUAGE UndecidableSuperClasses #-} -- for IsPass; see Note [NoGhcTc]
+{-# LANGUAGE UndecidableInstances    #-} -- Wrinkle in Note [Trees That Grow]
+                                         -- in module GHC.Hs.Extension
 
 module GHC.Hs.Extension where
 
 -- This module captures the type families to precisely identify the extension
 -- points for GHC.Hs syntax
 
-import GhcPrelude
+import GHC.Prelude
 
 import Data.Data hiding ( Fixity )
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
-import Outputable
-import GHC.Types.SrcLoc (Located)
+import GHC.Utils.Outputable
+import GHC.Types.SrcLoc (Located, unLoc, noLoc)
+import GHC.Utils.Panic
 
 import Data.Kind
 
@@ -168,9 +165,58 @@ noExtCon x = case x of {}
 
 -- | GHC's L prefixed variants wrap their vanilla variant in this type family,
 -- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
--- interested in location information can define this instance as @f p@.
-type family XRec p (f :: Type -> Type) = r | r -> p f
-type instance XRec (GhcPass p) f = Located (f (GhcPass p))
+-- interested in location information can define this as
+-- @type instance XRec NoLocated a = a@.
+-- See Note [XRec and SrcSpans in the AST]
+type family XRec p a = r | r -> a
+
+type instance XRec (GhcPass p) a = Located a
+
+{-
+Note [XRec and SrcSpans in the AST]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+XRec is meant to replace most of the uses of `Located` in the AST. It is another
+extension point meant to make it easier for non-GHC applications to reuse the
+AST for their own purposes, and not have to deal the hassle of (perhaps) useless
+SrcSpans everywhere.
+
+instead of `Located (HsExpr p)` or similar types, we will now have `XRec p
+(HsExpr p)`
+
+XRec allows annotating certain points in the AST with extra information. This
+maybe be source spans (for GHC), nothing (for TH), types (for HIE files), api
+annotations (for exactprint) or anything else.
+
+This should hopefully bring us one step closer to sharing the AST between GHC
+and TH.
+
+We use the `UnXRec`, `MapXRec` and `WrapXRec` type classes to aid us in writing
+pass-polymorphic code that deals with `XRec`s
+-}
+
+-- | We can strip off the XRec to access the underlying data.
+-- See Note [XRec and SrcSpans in the AST]
+class UnXRec p where
+  unXRec :: XRec p a -> a
+
+-- | We can map over the underlying type contained in an @XRec@ while preserving
+-- the annotation as is.
+-- See Note [XRec and SrcSpans in the AST]
+class MapXRec p where
+  mapXRec :: (a -> b) -> XRec p a -> XRec p b
+
+-- | The trivial wrapper that carries no additional information
+-- @noLoc@ for @GhcPass p@
+-- See Note [XRec and SrcSpans in the AST]
+class WrapXRec p where
+  wrapXRec :: a -> XRec p a
+
+instance UnXRec (GhcPass p) where
+  unXRec = unLoc
+instance MapXRec (GhcPass p) where
+  mapXRec = fmap
+instance WrapXRec (GhcPass p) where
+  wrapXRec = noLoc
 
 {-
 Note [NoExtCon and strict fields]
@@ -197,7 +243,7 @@ NoExtCon. But since (1) the field is strict and (2) NoExtCon is an empty data
 type, there is no possible way to reach the right-hand side of the XHsDecl
 case. As a result, the coverage checker concludes that the XHsDecl case is
 inaccessible, so it can be removed.
-(See Note [Strict argument type constraints] in GHC.HsToCore.PmCheck.Oracle for
+(See Note [Strict argument type constraints] in GHC.HsToCore.Pmc.Solver for
 more on how this works.)
 
 Bottom line: if you add a TTG extension constructor that uses NoExtCon, make
@@ -222,10 +268,9 @@ data Pass = Parsed | Renamed | Typechecked
          deriving (Data)
 
 -- Type synonyms as a shorthand for tagging
-type GhcPs   = GhcPass 'Parsed      -- Old 'RdrName' type param
-type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
-type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
-type GhcTcId = GhcTc                -- Old 'TcId' type param
+type GhcPs   = GhcPass 'Parsed      -- Output of parser
+type GhcRn   = GhcPass 'Renamed     -- Output of renamer
+type GhcTc   = GhcPass 'Typechecked -- Output of typechecker
 
 -- | Allows us to check what phase we're in at GHC's runtime.
 -- For example, this class allows us to write
@@ -258,7 +303,7 @@ type family IdGhcP pass where
   IdGhcP 'Renamed     = Name
   IdGhcP 'Typechecked = Id
 
-type LIdP p = Located (IdP p)
+type LIdP p = XRec p (IdP p)
 
 -- | Marks that a field uses the GhcRn variant even when the pass
 -- parameter is GhcTc. Useful for storing HsTypes in GHC.Hs.Exprs, say, because
@@ -282,11 +327,11 @@ type family XHsIPBinds       x x'
 type family XEmptyLocalBinds x x'
 type family XXHsLocalBindsLR x x'
 
--- ValBindsLR type families
+-- HsValBindsLR type families
 type family XValBinds    x x'
 type family XXValBindsLR x x'
 
--- HsBindsLR type families
+-- HsBindLR type families
 type family XFunBind    x x'
 type family XPatBind    x x'
 type family XVarBind    x x'
@@ -398,6 +443,12 @@ type family XCHsDerivingClause      x
 type family XXHsDerivingClause      x
 
 -- -------------------------------------
+-- DerivClauseTys type families
+type family XDctSingle       x
+type family XDctMulti        x
+type family XXDerivClauseTys x
+
+-- -------------------------------------
 -- ConDecl type families
 type family XConDeclGADT   x
 type family XConDeclH98    x
@@ -414,7 +465,7 @@ type family XCClsInstDecl      x
 type family XXClsInstDecl      x
 
 -- -------------------------------------
--- ClsInstDecl type families
+-- InstDecl type families
 type family XClsInstD      x
 type family XDataFamInstD  x
 type family XTyFamInstD    x
@@ -435,7 +486,7 @@ type family XCDefaultDecl      x
 type family XXDefaultDecl      x
 
 -- -------------------------------------
--- DefaultDecl type families
+-- ForeignDecl type families
 type family XForeignImport     x
 type family XForeignExport     x
 type family XXForeignDecl      x
@@ -462,7 +513,7 @@ type family XWarnings        x
 type family XXWarnDecls      x
 
 -- -------------------------------------
--- AnnDecl type families
+-- WarnDecl type families
 type family XWarning        x
 type family XXWarnDecl      x
 
@@ -519,32 +570,34 @@ type family XBinTick        x
 type family XPragE          x
 type family XXExpr          x
 
+-- -------------------------------------
+-- HsPragE type families
 type family XSCC            x
-type family XCoreAnn        x
-type family XTickPragma     x
 type family XXPragE         x
--- ---------------------------------------------------------------------
 
+
+-- -------------------------------------
+-- AmbiguousFieldOcc type families
 type family XUnambiguous        x
 type family XAmbiguous          x
 type family XXAmbiguousFieldOcc x
 
--- ----------------------------------------------------------------------
-
+-- -------------------------------------
+-- HsTupArg type families
 type family XPresent  x
 type family XMissing  x
 type family XXTupArg  x
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- HsSplice type families
 type family XTypedSplice   x
 type family XUntypedSplice x
 type family XQuasiQuote    x
 type family XSpliced       x
 type family XXSplice       x
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- HsBracket type families
 type family XExpBr      x
 type family XPatBr      x
 type family XDecBrL     x
@@ -554,33 +607,33 @@ type family XVarBr      x
 type family XTExpBr     x
 type family XXBracket   x
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- HsCmdTop type families
 type family XCmdTop  x
 type family XXCmdTop x
 
 -- -------------------------------------
-
+-- MatchGroup type families
 type family XMG           x b
 type family XXMatchGroup  x b
 
 -- -------------------------------------
-
+-- Match type families
 type family XCMatch  x b
 type family XXMatch  x b
 
 -- -------------------------------------
-
+-- GRHSs type families
 type family XCGRHSs  x b
 type family XXGRHSs  x b
 
 -- -------------------------------------
-
+-- GRHS type families
 type family XCGRHS  x b
 type family XXGRHS  x b
 
 -- -------------------------------------
-
+-- StmtLR type families
 type family XLastStmt        x x' b
 type family XBindStmt        x x' b
 type family XApplicativeStmt x x' b
@@ -591,27 +644,28 @@ type family XTransStmt       x x' b
 type family XRecStmt         x x' b
 type family XXStmtLR         x x' b
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- HsCmd type families
 type family XCmdArrApp  x
 type family XCmdArrForm x
 type family XCmdApp     x
 type family XCmdLam     x
 type family XCmdPar     x
 type family XCmdCase    x
+type family XCmdLamCase x
 type family XCmdIf      x
 type family XCmdLet     x
 type family XCmdDo      x
 type family XCmdWrap    x
 type family XXCmd       x
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- ParStmtBlock type families
 type family XParStmtBlock  x x'
 type family XXParStmtBlock x x'
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------------
+-- ApplicativeArg type families
 type family XApplicativeArgOne   x
 type family XApplicativeArgMany  x
 type family XXApplicativeArg     x
@@ -641,6 +695,8 @@ type family XHsFloatPrim x
 type family XHsDoublePrim x
 type family XXLit x
 
+-- -------------------------------------
+-- HsOverLit type families
 type family XOverLit  x
 type family XXOverLit x
 
@@ -669,26 +725,40 @@ type family XXPat      x
 -- =====================================================================
 -- Type families for the HsTypes type families
 
+
+-- -------------------------------------
+-- LHsQTyVars type families
 type family XHsQTvs       x
 type family XXLHsQTyVars  x
 
 -- -------------------------------------
-
+-- LHsQTyVisVars type families
 type family XHsQTVisvs       x
 type family XXLHsQTyVisVars  x
 
 -- -------------------------------------
-
-type family XHsIB              x b
-type family XXHsImplicitBndrs  x b
+-- HsOuterTyVarBndrs type families
+type family XHsOuterImplicit    x
+type family XHsOuterExplicit    x flag
+type family XXHsOuterTyVarBndrs x
 
 -- -------------------------------------
+-- HsSigType type families
+type family XHsSig      x
+type family XXHsSigType x
 
+-- -------------------------------------
+-- HsWildCardBndrs type families
 type family XHsWC              x b
 type family XXHsWildCardBndrs  x b
 
 -- -------------------------------------
+-- HsPatSigType type families
+type family XHsPS x
+type family XXHsPatSigType x
 
+-- -------------------------------------
+-- HsType type families
 type family XForAllTy        x
 type family XQualTy          x
 type family XTyVar           x
@@ -714,35 +784,43 @@ type family XWildCardTy      x
 type family XXType           x
 
 -- ---------------------------------------------------------------------
+-- HsForAllTelescope type families
+type family XHsForAllVis        x
+type family XHsForAllInvis      x
+type family XXHsForAllTelescope x
 
+-- ---------------------------------------------------------------------
+-- HsTyVarBndr type families
 type family XUserTyVar   x
 type family XKindedTyVar x
 type family XXTyVarBndr  x
 
 -- ---------------------------------------------------------------------
-
+-- HsTyVarTermBndr
 type family XHsTyVarVisBndr   x
 type family XHsTyVarInvisBndr x
 type family XXTyVarTermBndr   x
 
 -- ---------------------------------------------------------------------
-
+-- ConDeclField type families
 type family XConDeclField  x
 type family XXConDeclField x
 
 -- ---------------------------------------------------------------------
-
+-- FieldOcc type families
 type family XCFieldOcc x
 type family XXFieldOcc x
 
 -- =====================================================================
 -- Type families for the HsImpExp type families
 
+-- -------------------------------------
+-- ImportDecl type families
 type family XCImportDecl       x
 type family XXImportDecl       x
 
 -- -------------------------------------
-
+-- IE type families
 type family XIEVar             x
 type family XIEThingAbs        x
 type family XIEThingAll        x

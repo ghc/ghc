@@ -1,5 +1,12 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE LambdaCase #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -25,7 +32,7 @@ module GHC.Cmm.DebugBlock (
   UnwindExpr(..), toUnwindExpr
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Cmm.BlockId
@@ -33,12 +40,13 @@ import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Core
-import FastString      ( nilFS, mkFastString )
-import GHC.Types.Module
-import Outputable
+import GHC.Data.FastString ( nilFS, mkFastString )
+import GHC.Unit.Module
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Cmm.Ppr.Expr ( pprExpr )
 import GHC.Types.SrcLoc
-import Util            ( seqList )
+import GHC.Utils.Misc      ( seqList )
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
@@ -70,19 +78,20 @@ data DebugBlock =
   , dblBlocks     :: ![DebugBlock] -- ^ Nested blocks
   }
 
-instance Outputable DebugBlock where
-  ppr blk = (if | dblProcedure blk == dblLabel blk
+instance OutputableP env CLabel => OutputableP env DebugBlock where
+  pdoc env blk =
+            (if | dblProcedure blk == dblLabel blk
                 -> text "proc"
                 | dblHasInfoTbl blk
                 -> text "pp-blk"
                 | otherwise
                 -> text "blk") <+>
-            ppr (dblLabel blk) <+> parens (ppr (dblCLabel blk)) <+>
+            ppr (dblLabel blk) <+> parens (pdoc env (dblCLabel blk)) <+>
             (maybe empty ppr (dblSourceTick blk)) <+>
             (maybe (text "removed") ((text "pos " <>) . ppr)
                    (dblPosition blk)) <+>
-            (ppr (dblUnwind blk)) $+$
-            (if null (dblBlocks blk) then empty else nest 4 (ppr (dblBlocks blk)))
+            (pdoc env (dblUnwind blk)) $+$
+            (if null (dblBlocks blk) then empty else nest 4 (pdoc env (dblBlocks blk)))
 
 -- | Intermediate data structure holding debug-relevant context information
 -- about a block.
@@ -109,7 +118,9 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
               -- recover by copying ticks below.
               scp' | SubScope _ scp' <- scp      = scp'
                    | CombinedScope scp' _ <- scp = scp'
+#if __GLASGOW_HASKELL__ <= 810
                    | otherwise                   = panic "findP impossible"
+#endif
 
       scopeMap = foldr (uncurry insertMulti) Map.empty childScopes
 
@@ -395,7 +406,7 @@ The flow of unwinding information through the compiler is a bit convoluted:
    (by the Dwarf module) and emitted in the final object.
 
 See also:
-  Note [Unwinding information in the NCG] in AsmCodeGen,
+  Note [Unwinding information in the NCG] in "GHC.CmmToAsm",
   Note [Unwind pseudo-instruction in Cmm],
   Note [Debugging DWARF unwinding info].
 
@@ -460,7 +471,7 @@ symbols for gdb if you obtain it through a package manager.
 
 Keep in mind that the current release of GDB has an instruction pointer handling
 heuristic that works well for C-like languages, but doesn't always work for
-Haskell. See Note [Info Offset] in Dwarf.Types for more details.
+Haskell. See Note [Info Offset] in "GHC.CmmToAsm.Dwarf.Types" for more details.
 
 Note [Unwind pseudo-instruction in Cmm]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -485,12 +496,12 @@ LOC this information will end up in is Y.
 -- | A label associated with an 'UnwindTable'
 data UnwindPoint = UnwindPoint !CLabel !UnwindTable
 
-instance Outputable UnwindPoint where
-  ppr (UnwindPoint lbl uws) =
-      braces $ ppr lbl<>colon
+instance OutputableP env CLabel => OutputableP env UnwindPoint where
+  pdoc env (UnwindPoint lbl uws) =
+      braces $ pdoc env lbl <> colon
       <+> hsep (punctuate comma $ map pprUw $ Map.toList uws)
     where
-      pprUw (g, expr) = ppr g <> char '=' <> ppr expr
+      pprUw (g, expr) = ppr g <> char '=' <> pdoc env expr
 
 -- | Maps registers to expressions that yield their "old" values
 -- further up the stack. Most interesting for the stack pointer @Sp@,
@@ -509,19 +520,23 @@ data UnwindExpr = UwConst !Int                  -- ^ literal value
                 | UwTimes UnwindExpr UnwindExpr
                 deriving (Eq)
 
-instance Outputable UnwindExpr where
-  pprPrec _ (UwConst i)     = ppr i
-  pprPrec _ (UwReg g 0)     = ppr g
-  pprPrec p (UwReg g x)     = pprPrec p (UwPlus (UwReg g 0) (UwConst x))
-  pprPrec _ (UwDeref e)     = char '*' <> pprPrec 3 e
-  pprPrec _ (UwLabel l)     = pprPrec 3 l
-  pprPrec p (UwPlus e0 e1)  | p <= 0
-                            = pprPrec 0 e0 <> char '+' <> pprPrec 0 e1
-  pprPrec p (UwMinus e0 e1) | p <= 0
-                            = pprPrec 1 e0 <> char '-' <> pprPrec 1 e1
-  pprPrec p (UwTimes e0 e1) | p <= 1
-                            = pprPrec 2 e0 <> char '*' <> pprPrec 2 e1
-  pprPrec _ other           = parens (pprPrec 0 other)
+instance OutputableP env CLabel => OutputableP env UnwindExpr where
+  pdoc = pprUnwindExpr 0
+
+pprUnwindExpr :: OutputableP env CLabel => Rational -> env -> UnwindExpr -> SDoc
+pprUnwindExpr p env = \case
+  UwConst i     -> ppr i
+  UwReg g 0     -> ppr g
+  UwReg g x     -> pprUnwindExpr p env (UwPlus (UwReg g 0) (UwConst x))
+  UwDeref e     -> char '*' <> pprUnwindExpr 3 env e
+  UwLabel l     -> pdoc env l
+  UwPlus e0 e1
+   | p <= 0     -> pprUnwindExpr 0 env e0 <> char '+' <> pprUnwindExpr 0 env e1
+  UwMinus e0 e1
+   | p <= 0     -> pprUnwindExpr 1 env e0 <> char '-' <> pprUnwindExpr 1 env e1
+  UwTimes e0 e1
+   | p <= 1     -> pprUnwindExpr 2 env e0 <> char '*' <> pprUnwindExpr 2 env e1
+  other         -> parens (pprUnwindExpr 0 env other)
 
 -- | Conversion of Cmm expressions to unwind expressions. We check for
 -- unsupported operator usages and simplify the expression as far as
@@ -545,5 +560,5 @@ toUnwindExpr platform e@(CmmMachOp op [e1, e2])   =
     (MO_Mul{}, u1,        u2       ) -> UwTimes u1 u2
     _otherwise -> pprPanic "Unsupported operator in unwind expression!"
                            (pprExpr platform e)
-toUnwindExpr _ e
-  = pprPanic "Unsupported unwind expression!" (ppr e)
+toUnwindExpr platform e
+  = pprPanic "Unsupported unwind expression!" (pdoc platform e)

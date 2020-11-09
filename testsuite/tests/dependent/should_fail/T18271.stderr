@@ -1,0 +1,5 @@
+
+T18271.hs:7:19: error:
+    Illegal visible, dependent quantification in the type of a term
+    (GHC does not yet support this)
+    In a deriving declaration

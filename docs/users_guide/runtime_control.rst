@@ -81,11 +81,11 @@ command line to go to the program (and not the RTS), use a
 the program, while ``--`` will.
 
 As always, for RTS options that take ⟨size⟩s: If the last character of
-⟨size⟩ is a K or k, multiply by 1000; if an M or m, by 1,000,000; if a G
-or G, by 1,000,000,000. (And any wraparound in the counters is *your*
+⟨size⟩ is a K or k, multiply by 1024; if an M or m, by 1024*1024; if a G
+or G, by 1024^3. (And any wraparound in the counters is *your*
 fault!)
 
-Giving a ``+RTS -?`` RTS option option will print out the RTS
+Giving a ``+RTS -?`` RTS option will print out the RTS
 options actually available in your program (which vary, depending on how
 you compiled).
 
@@ -183,6 +183,13 @@ Event log output
 Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
 ⟨flags⟩`) is written through a custom :c:type:`EventLogWriter`:
 
+.. The size_t declaration below is simply to ensure that the build doesn't fail with an
+   undefined reference target warning as Sphinx doesn't know about size_t.
+
+.. c:type:: size_t
+
+   :hidden:
+
 .. c:type:: EventLogWriter
 
     A sink of event-log data.
@@ -196,10 +203,16 @@ Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
         Hands buffered event log data to your event log writer. Return true on success.
         Required for a custom :c:type:`EventLogWriter`.
 
+        Note that this function may be called by multiple threads
+        simultaneously.
+
     .. c:member:: void flushEventLog(void)
 
         Flush buffers (if any) of your custom :c:type:`EventLogWriter`. This can
         be ``NULL``.
+
+        Note that this function may be called by multiple threads
+        simultaneously.
 
     .. c:member:: void stopEventLogWriter(void)
 
@@ -314,8 +327,10 @@ Miscellaneous RTS options
     an object, the linker will probably fail with an error message when the
     problem is detected.
 
-    On some platforms where PIC is always the case, e.g. x86_64 MacOS X, this
-    flag is enabled by default.
+    On some platforms where PIC is always the case, e.g. macOS and OpenBSD on
+    x86_64, and macOS and Linux on aarch64 this flag is enabled by default.
+    One repercussion of this is that referenced system libraries also need to be
+    compiled with ``-fPIC`` if we need to load them in the runtime linker.
 
 .. rts-flag:: -xm ⟨address⟩
 
@@ -367,10 +382,20 @@ collection. Hopefully, you won't need any of these in normal operation,
 but there are several things that can be tweaked for maximum
 performance.
 
+.. rts-flag:: --copying-gc
+
+    :default: on
+    :since: 8.10.2
+    :reverse: --nonmoving-gc
+
+    Uses the generational copying garbage collector for all generations.
+    This is the default.
+
 .. rts-flag:: --nonmoving-gc
 
     :default: off
     :since: 8.10.1
+    :reverse: --copying-gc
 
     .. index::
        single: concurrent mark and sweep
@@ -1161,6 +1186,10 @@ When the program is linked with the :ghc-flag:`-eventlog` option
 
     - ``g`` — GC events, including GC start/stop. Enabled by default.
 
+    - ``n`` — non-moving garbage collector (see :rts-flag:`--nonmoving-gc`)
+      events including start and end of the concurrent mark and census
+      information to characterise heap fragmentation. Disabled by default.
+
     - ``p`` — parallel sparks (sampled). Enabled by default.
 
     - ``f`` — parallel sparks (fully accurate). Disabled by default.
@@ -1186,9 +1215,8 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     accurate mode every spark event is logged individually. The latter
     has a higher runtime overhead and is not enabled by default.
 
-    The format of the log file is described by the header
-    ``EventLogFormat.h`` that comes with GHC, and it can be parsed in
-    Haskell using the
+    The format of the log file is described in this users guide in
+    :ref:`eventlog-encodings` It can be parsed in Haskell using the
     `ghc-events <http://hackage.haskell.org/package/ghc-events>`__
     library. To dump the contents of a ``.eventlog`` file as text, use
     the tool ``ghc-events show`` that comes with the
@@ -1234,7 +1262,7 @@ recommended for everyday use!
 
 .. rts-flag:: -B
 
-    Sound the bell at the start of each (major) garbage collection.
+    Sound the bell at the start of each garbage collection.
 
     Oddly enough, people really do use this option! Our pal in Durham
     (England), Paul Callaghan, writes: “Some people here use it for a

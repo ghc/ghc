@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP          #-}
+{-# LANGUAGE BangPatterns #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The University of Glasgow, 1994-2006
 
@@ -5,63 +10,71 @@
 Core pass to saturate constructors and PrimOps
 -}
 
-{-# LANGUAGE BangPatterns, CPP, MultiWayIf #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
-module GHC.CoreToStg.Prep (
-      corePrepPgm, corePrepExpr, cvtLitInteger, cvtLitNatural,
-      lookupMkIntegerName, lookupIntegerSDataConName,
-      lookupMkNaturalName, lookupNaturalSDataConName
-  ) where
+module GHC.CoreToStg.Prep
+   ( corePrepPgm
+   , corePrepExpr
+   , mkConvertNumLiteral
+   )
+where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
 import GHC.Platform
+import GHC.Platform.Ways
 
-import GHC.Core.Opt.OccurAnal
+import GHC.Driver.Session
+import GHC.Driver.Env
+import GHC.Driver.Ppr
 
-import GHC.Driver.Types
+import GHC.Tc.Utils.Env
+import GHC.Unit
+
 import GHC.Builtin.Names
-import GHC.Types.Id.Make ( realWorldPrimId )
+import GHC.Builtin.Types
+
 import GHC.Core.Utils
-import GHC.Core.Arity
+import GHC.Core.Opt.Arity
 import GHC.Core.FVs
 import GHC.Core.Opt.Monad ( CoreToDo(..) )
 import GHC.Core.Lint    ( endPassIO )
 import GHC.Core
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
-import GHC.Types.Literal
 import GHC.Core.Coercion
-import GHC.Tc.Utils.Env
 import GHC.Core.TyCon
+import GHC.Core.DataCon
+import GHC.Core.Opt.OccurAnal
+
+import GHC.Data.Maybe
+import GHC.Data.OrdList
+import GHC.Data.FastString
+
+import GHC.Utils.Error
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+import GHC.Utils.Monad  ( mapAccumLM )
+
 import GHC.Types.Demand
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Builtin.Types
-import GHC.Core.DataCon
+import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Types.Basic
-import GHC.Types.Module
-import GHC.Types.Unique.Supply
-import Maybes
-import OrdList
-import ErrUtils
-import GHC.Driver.Session
-import GHC.Driver.Ways
-import Util
-import Outputable
-import FastString
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
-import Data.Bits
-import MonadUtils       ( mapAccumLM )
-import Control.Monad
+import GHC.Types.Literal
+import GHC.Types.TyThing
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
+import GHC.Types.Unique.Supply
+
+import Data.Bits
+import Data.List        ( unfoldr )
+import Control.Monad
 import qualified Data.Set as S
 
 {-
@@ -71,7 +84,7 @@ import qualified Data.Set as S
 
 The goal of this pass is to prepare for code generation.
 
-1.  Saturate constructor applications.
+1.  Saturate constructor and primop applications.
 
 2.  Convert to A-normal form; that is, function arguments
     are always variables.
@@ -115,19 +128,14 @@ The goal of this pass is to prepare for code generation.
 9.  Replace (lazy e) by e.  See Note [lazyId magic] in GHC.Types.Id.Make
     Also replace (noinline e) by e.
 
-10. Convert (LitInteger i t) into the core representation
-    for the Integer i. Normally this uses mkInteger, but if
-    we are using the integer-gmp implementation then there is a
-    special case where we use the S# constructor for Integers that
-    are in the range of Int.
+10. Convert bignum literals (LitNatural and LitInteger) into their
+    core representation.
 
-11. Same for LitNatural.
-
-12. Uphold tick consistency while doing this: We move ticks out of
+11. Uphold tick consistency while doing this: We move ticks out of
     (non-type) applications where we can, and make sure that we
     annotate according to scoping rules when floating.
 
-13. Collect cost centres (including cost centres in unfoldings) if we're in
+12. Collect cost centres (including cost centres in unfoldings) if we're in
     profiling mode. We have to do this here beucase we won't have unfoldings
     after this pass (see `zapUnfolding` and Note [Drop unfoldings and rules].
 
@@ -182,7 +190,7 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
                (text "CorePrep"<+>brackets (ppr this_mod))
                (const ()) $ do
     us <- mkSplitUniqSupply 's'
-    initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
+    initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
 
     let cost_centres
           | WayProf `S.member` ways dflags
@@ -204,14 +212,15 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
   where
     dflags = hsc_dflags hsc_env
 
-corePrepExpr :: DynFlags -> HscEnv -> CoreExpr -> IO CoreExpr
-corePrepExpr dflags hsc_env expr =
+corePrepExpr :: HscEnv -> CoreExpr -> IO CoreExpr
+corePrepExpr hsc_env expr = do
+    let dflags = hsc_dflags hsc_env
     withTiming dflags (text "CorePrep [expr]") (const ()) $ do
-    us <- mkSplitUniqSupply 's'
-    initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
-    let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
-    dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
-    return new_expr
+      us <- mkSplitUniqSupply 's'
+      initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
+      let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
+      dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
+      return new_expr
 
 corePrepTopBinds :: CorePrepEnv -> [CoreBind] -> UniqSM Floats
 -- Note [Floating out of top level bindings]
@@ -571,12 +580,10 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 
 cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
 cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
-cpeRhsE env (Lit (LitNumber LitNumInteger i _))
-    = cpeRhsE env (cvtLitInteger (targetPlatform (cpe_dynFlags env)) (getMkIntegerId env)
-                   (cpe_integerSDataCon env) i)
-cpeRhsE env (Lit (LitNumber LitNumNatural i _))
-    = cpeRhsE env (cvtLitNatural (targetPlatform (cpe_dynFlags env)) (getMkNaturalId env)
-                   (cpe_naturalSDataCon env) i)
+cpeRhsE env expr@(Lit (LitNumber nt i))
+   = case cpe_convertNumLit env nt i of
+      Nothing -> return (emptyFloats, expr)
+      Just e  -> cpeRhsE env e
 cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
 cpeRhsE env expr@(App {}) = cpeApp env expr
@@ -650,46 +657,6 @@ cpeRhsE env (Case scrut bndr ty alts)
             ; rhs' <- cpeBodyNF env2 rhs
             ; return (con, bs', rhs') }
 
-cvtLitInteger :: Platform -> Id -> Maybe DataCon -> Integer -> CoreExpr
--- Here we convert a literal Integer to the low-level
--- representation. Exactly how we do this depends on the
--- library that implements Integer.  If it's GMP we
--- use the S# data constructor for small literals.
--- See Note [Integer literals] in GHC.Types.Literal
-cvtLitInteger platform _ (Just sdatacon) i
-  | platformInIntRange platform i -- Special case for small integers
-    = mkConApp sdatacon [Lit (mkLitInt platform i)]
-
-cvtLitInteger platform mk_integer _ i
-    = mkApps (Var mk_integer) [isNonNegative, ints]
-  where isNonNegative = if i < 0 then mkConApp falseDataCon []
-                                 else mkConApp trueDataCon  []
-        ints = mkListExpr intTy (f (abs i))
-        f 0 = []
-        f x = let low  = x .&. mask
-                  high = x `shiftR` bits
-              in mkConApp intDataCon [Lit (mkLitInt platform low)] : f high
-        bits = 31
-        mask = 2 ^ bits - 1
-
-cvtLitNatural :: Platform -> Id -> Maybe DataCon -> Integer -> CoreExpr
--- Here we convert a literal Natural to the low-level
--- representation.
--- See Note [Natural literals] in GHC.Types.Literal
-cvtLitNatural platform _ (Just sdatacon) i
-  | platformInWordRange platform i -- Special case for small naturals
-    = mkConApp sdatacon [Lit (mkLitWord platform i)]
-
-cvtLitNatural platform mk_natural _ i
-    = mkApps (Var mk_natural) [words]
-  where words = mkListExpr wordTy (f i)
-        f 0 = []
-        f x = let low  = x .&. mask
-                  high = x `shiftR` bits
-              in mkConApp wordDataCon [Lit (mkLitWord platform low)] : f high
-        bits = 32
-        mask = 2 ^ bits - 1
-
 -- ---------------------------------------------------------------------------
 --              CpeBody: produces a result satisfying CpeBody
 -- ---------------------------------------------------------------------------
@@ -760,16 +727,10 @@ data ArgInfo = CpeApp  CoreArg
              | CpeCast Coercion
              | CpeTick (Tickish Id)
 
-{- Note [runRW arg]
-~~~~~~~~~~~~~~~~~~~
-If we got, say
-   runRW# (case bot of {})
-which happened in #11291, we do /not/ want to turn it into
-   (case bot of {}) realWorldPrimId#
-because that gives a panic in CoreToStg.myCollectArgs, which expects
-only variables in function position.  But if we are sure to make
-runRW# strict (which we do in GHC.Types.Id.Make), this can't happen
--}
+instance Outputable ArgInfo where
+  ppr (CpeApp arg) = text "app" <+> ppr arg
+  ppr (CpeCast co) = text "cast" <+> ppr co
+  ppr (CpeTick tick) = text "tick" <+> ppr tick
 
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- May return a CpeRhs because of saturating primops
@@ -823,14 +784,19 @@ cpeApp top_env expr
         -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
-    cpe_app env (Var f) [CpeApp _runtimeRep@Type{}, CpeApp _type@Type{}, CpeApp arg] 1
+    cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest) n
         | f `hasKey` runRWKey
+        -- N.B. While it may appear that n == 1 in the case of runRW#
+        -- applications, keep in mind that we may have applications that return
+        , n >= 1
         -- See Note [runRW magic]
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this
         -- is why we return a CorePrepEnv as well)
         = case arg of
-            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
-            _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
+            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body rest (n-2)
+            _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest) (n-1)
+             -- TODO: What about casts?
+
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
@@ -901,7 +867,7 @@ cpeApp top_env expr
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-            (arg_ty, res_ty) =
+            (_, arg_ty, res_ty) =
               case splitFunTy_maybe fun_ty of
                 Just as -> as
                 Nothing -> pprPanic "cpeBody" (ppr fun_ty $$ ppr expr)
@@ -952,15 +918,160 @@ optimization (right before lowering to STG, in CorePrep), we can ensure that
 no further floating will occur. This allows us to safely inline things like
 @runST@, which are otherwise needlessly expensive (see #10678 and #5916).
 
-'runRW' is defined (for historical reasons) in GHC.Magic, with a NOINLINE
-pragma.  It is levity-polymorphic.
+'runRW' has a variety of quirks:
+
+ * 'runRW' is known-key with a NOINLINE definition in
+   GHC.Magic. This definition is used in cases where runRW is curried.
+
+ * In addition to its normal Haskell definition in GHC.Magic, we give it
+   a special late inlining here in CorePrep and GHC.CoreToByteCode, avoiding
+   the incorrect sharing due to float-out noted above.
+
+ * It is levity-polymorphic:
 
     runRW# :: forall (r1 :: RuntimeRep). (o :: TYPE r)
            => (State# RealWorld -> (# State# RealWorld, o #))
-                              -> (# State# RealWorld, o #)
+           -> (# State# RealWorld, o #)
 
-It needs no special treatment in GHC except this special inlining here
-in CorePrep (and in GHC.CoreToByteCode).
+ * It has some special simplification logic to allow unboxing of results when
+   runRW# appears in a strict context. See Note [Simplification of runRW#]
+   below.
+
+ * Since its body is inlined, we allow runRW#'s argument to contain jumps to
+   join points. That is, the following is allowed:
+
+    join j x = ...
+    in runRW# @_ @_ (\s -> ... jump j 42 ...)
+
+   The Core Linter knows about this. See Note [Linting of runRW#] in
+   GHC.Core.Lint for details.
+
+   The occurrence analyser and SetLevels also know about this, as described in
+   Note [Simplification of runRW#].
+
+Other relevant Notes:
+
+ * Note [Simplification of runRW#] below, describing a transformation of runRW
+   applications in strict contexts performed by the simplifier.
+ * Note [Linting of runRW#] in GHC.Core.Lint
+ * Note [runRW arg] below, describing a non-obvious case where the
+   late-inlining could go wrong.
+
+
+ Note [runRW arg]
+~~~~~~~~~~~~~~~~~~~
+Consider the Core program (from #11291),
+
+   runRW# (case bot of {})
+
+The late inlining logic in cpe_app would transform this into:
+
+   (case bot of {}) realWorldPrimId#
+
+Which would rise to a panic in CoreToStg.myCollectArgs, which expects only
+variables in function position.
+
+However, as runRW#'s strictness signature captures the fact that it will call
+its argument this can't happen: the simplifier will transform the bottoming
+application into simply (case bot of {}).
+
+Note that this reasoning does *not* apply to non-bottoming continuations like:
+
+    hello :: Bool -> Int
+    hello n =
+      runRW# (
+          case n of
+            True -> \s -> 23
+            _    -> \s -> 10)
+
+Why? The difference is that (case bot of {}) is considered by okCpeArg to be
+trivial, consequently cpeArg (which the catch-all case of cpe_app calls on both
+the function and the arguments) will forgo binding it to a variable. By
+contrast, in the non-bottoming case of `hello` above  the function will be
+deemed non-trivial and consequently will be case-bound.
+
+
+Note [Simplification of runRW#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the program,
+
+    case runRW# (\s -> I# 42#) of
+      I# n# -> f n#
+
+There is no reason why we should allocate an I# constructor given that we
+immediately destructure it.
+
+To avoid this the simplifier has a special transformation rule, specific to
+runRW#, that pushes a strict context into runRW#'s continuation.  See the
+`runRW#` guard in `GHC.Core.Opt.Simplify.rebuildCall`.  That is, it transforms
+
+    K[ runRW# @r @ty cont ]
+              ~>
+    runRW# @r @ty (\s -> K[cont s])
+
+This has a few interesting implications. Consider, for instance, this program:
+
+    join j = ...
+    in case runRW# @r @ty cont of
+         result -> jump j result
+
+Performing the transform described above would result in:
+
+    join j x = ...
+    in runRW# @r @ty (\s ->
+         case cont of in
+           result -> jump j result
+       )
+
+If runRW# were a "normal" function this call to join point j would not be
+allowed in its continuation argument. However, since runRW# is inlined (as
+described in Note [runRW magic] above), such join point occurences are
+completely fine. Both occurrence analysis (see the runRW guard in occAnalApp)
+and Core Lint (see the App case of lintCoreExpr) have special treatment for
+runRW# applications. See Note [Linting of runRW#] for details on the latter.
+
+Moreover, it's helpful to ensure that runRW's continuation isn't floated out
+For instance, if we have
+
+    runRW# (\s -> do_something)
+
+where do_something contains only top-level free variables, we may be tempted to
+float the argument to the top-level. However, we must resist this urge as since
+doing so would then require that runRW# produce an allocation and call, e.g.:
+
+    let lvl = \s -> do_somethign
+    in
+    ....(runRW# lvl)....
+
+whereas without floating the inlining of the definition of runRW would result
+in straight-line code. Consequently, GHC.Core.Opt.SetLevels.lvlApp has special
+treatment for runRW# applications, ensure the arguments are not floated as
+MFEs.
+
+
+Other considered designs
+------------------------
+
+One design that was rejected was to *require* that runRW#'s continuation be
+headed by a lambda. However, this proved to be quite fragile. For instance,
+SetLevels is very eager to float bottoming expressions. For instance given
+something of the form,
+
+    runRW# @r @ty (\s -> case expr of x -> undefined)
+
+SetLevels will see that the body the lambda is bottoming and will consequently
+float it to the top-level (assuming expr has no free coercion variables which
+prevent this). We therefore end up with
+
+    runRW# @r @ty (\s -> lvl s)
+
+Which the simplifier will beta reduce, leaving us with
+
+    runRW# @r @ty lvl
+
+Breaking our desired invariant. Ultimately we decided to simply accept that
+the continuation may not be a manifest lambda.
+
 
 -- ---------------------------------------------------------------------------
 --      CpeArg: produces a result satisfying CpeArg
@@ -1011,15 +1122,6 @@ cpExprIsTrivial e
   | otherwise
   = exprIsTrivial e
 
-isUnsafeEqualityProof :: CoreExpr -> Bool
--- See (U3) and (U4) in
--- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
-isUnsafeEqualityProof e
-  | Var v `App` Type _ `App` Type _ `App` Type _ <- e
-  = idName v == unsafeEqualityProofName
-  | otherwise
-  = False
-
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
        -> CoreArg -> Type -> UniqSM (Floats, CpeArg)
@@ -1067,15 +1169,11 @@ maybeSaturate deals with eta expanding to saturate things that can't deal with
 unsaturated applications (identified by 'hasNoBinding', currently just
 foreign calls and unboxed tuple/sum constructors).
 
-Note that eta expansion in CorePrep is very fragile due to the "prediction" of
-CAFfyness made during tidying (see Note [CAFfyness inconsistencies due to eta
-expansion in CorePrep] in GHC.Iface.Tidy for details.  We previously saturated primop
+Historical Note: Note that eta expansion in CorePrep used to be very fragile
+due to the "prediction" of CAFfyness that we used to make during tidying.
+We previously saturated primop
 applications here as well but due to this fragility (see #16846) we now deal
 with this another way, as described in Note [Primop wrappers] in GHC.Builtin.PrimOps.
-
-It's quite likely that eta expansion of constructor applications will
-eventually break in a similar way to how primops did. We really should
-eliminate this case as well.
 -}
 
 maybeSaturate :: Id -> CpeApp -> Int -> UniqSM CpeRhs
@@ -1136,7 +1234,7 @@ After ANFing we get
 and now we do NOT want eta expansion to give
                 f = /\a -> \ y -> (let s = h 3 in g s) y
 
-Instead GHC.Core.Arity.etaExpand gives
+Instead GHC.Core.Opt.Arity.etaExpand gives
                 f = /\a -> \y -> let s = h 3 in g s y
 
 -}
@@ -1181,7 +1279,7 @@ tryEtaReducePrep bndrs expr@(App _ _)
     ok _    _         = False
 
     -- We can't eta reduce something which must be saturated.
-    ok_to_eta_reduce (Var f) = not (hasNoBinding f)
+    ok_to_eta_reduce (Var f) = not (hasNoBinding f) && not (isLinearType (idType f))
     ok_to_eta_reduce _       = False -- Safe. ToDo: generalise
 
 
@@ -1453,72 +1551,107 @@ data CorePrepEnv
         --      3. To let us inline trivial RHSs of non top-level let-bindings,
         --      see Note [lazyId magic], Note [Inlining in CorePrep]
         --      and Note [CorePrep inlines trivial CoreExpr not Id] (#12076)
-        , cpe_mkIntegerId     :: Id
-        , cpe_mkNaturalId     :: Id
-        , cpe_integerSDataCon :: Maybe DataCon
-        , cpe_naturalSDataCon :: Maybe DataCon
+
+        , cpe_convertNumLit   :: LitNumType -> Integer -> Maybe CoreExpr
+        -- ^ Convert some numeric literals (Integer, Natural) into their
+        -- final Core form
     }
 
-lookupMkIntegerName :: DynFlags -> HscEnv -> IO Id
-lookupMkIntegerName dflags hsc_env
-    = guardIntegerUse dflags $ liftM tyThingId $
-      lookupGlobal hsc_env mkIntegerName
+-- | Create a function that converts Bignum literals into their final CoreExpr
+mkConvertNumLiteral
+   :: HscEnv
+   -> IO (LitNumType -> Integer -> Maybe CoreExpr)
+mkConvertNumLiteral hsc_env = do
+   let
+      dflags   = hsc_dflags hsc_env
+      platform = targetPlatform dflags
+      home_unit = hsc_home_unit hsc_env
+      guardBignum act
+         | isHomeUnitInstanceOf home_unit primUnitId
+         = return $ panic "Bignum literals are not supported in ghc-prim"
+         | isHomeUnitInstanceOf home_unit bignumUnitId
+         = return $ panic "Bignum literals are not supported in ghc-bignum"
+         | otherwise = act
 
-lookupMkNaturalName :: DynFlags -> HscEnv -> IO Id
-lookupMkNaturalName dflags hsc_env
-    = guardNaturalUse dflags $ liftM tyThingId $
-      lookupGlobal hsc_env mkNaturalName
+      lookupBignumId n      = guardBignum (tyThingId <$> lookupGlobal hsc_env n)
 
--- See Note [The integer library] in GHC.Builtin.Names
-lookupIntegerSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
-lookupIntegerSDataConName dflags hsc_env = case integerLibrary dflags of
-    IntegerGMP -> guardIntegerUse dflags $ liftM (Just . tyThingDataCon) $
-                  lookupGlobal hsc_env integerSDataConName
-    IntegerSimple -> return Nothing
+   -- The lookup is done here but the failure (panic) is reported lazily when we
+   -- try to access the `bigNatFromWordList` function.
+   --
+   -- If we ever get built-in ByteArray# literals, we could avoid the lookup by
+   -- directly using the Integer/Natural wired-in constructors for big numbers.
 
-lookupNaturalSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
-lookupNaturalSDataConName dflags hsc_env = case integerLibrary dflags of
-    IntegerGMP -> guardNaturalUse dflags $ liftM (Just . tyThingDataCon) $
-                  lookupGlobal hsc_env naturalSDataConName
-    IntegerSimple -> return Nothing
+   bignatFromWordListId <- lookupBignumId bignatFromWordListName
 
--- | Helper for 'lookupMkIntegerName', 'lookupIntegerSDataConName'
-guardIntegerUse :: DynFlags -> IO a -> IO a
-guardIntegerUse dflags act
-  | thisPackage dflags == primUnitId
-  = return $ panic "Can't use Integer in ghc-prim"
-  | thisPackage dflags == integerUnitId
-  = return $ panic "Can't use Integer in integer-*"
-  | otherwise = act
+   let
+      convertNumLit nt i = case nt of
+         LitNumInteger -> Just (convertInteger i)
+         LitNumNatural -> Just (convertNatural i)
+         _             -> Nothing
 
--- | Helper for 'lookupMkNaturalName', 'lookupNaturalSDataConName'
---
--- Just like we can't use Integer literals in `integer-*`, we can't use Natural
--- literals in `base`. If we do, we get interface loading error for GHC.Natural.
-guardNaturalUse :: DynFlags -> IO a -> IO a
-guardNaturalUse dflags act
-  | thisPackage dflags == primUnitId
-  = return $ panic "Can't use Natural in ghc-prim"
-  | thisPackage dflags == integerUnitId
-  = return $ panic "Can't use Natural in integer-*"
-  | thisPackage dflags == baseUnitId
-  = return $ panic "Can't use Natural in base"
-  | otherwise = act
+      convertInteger i
+         | platformInIntRange platform i -- fit in a Int#
+         = mkConApp integerISDataCon [Lit (mkLitInt platform i)]
 
-mkInitialCorePrepEnv :: DynFlags -> HscEnv -> IO CorePrepEnv
-mkInitialCorePrepEnv dflags hsc_env
-    = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
-         mkNaturalId <- lookupMkNaturalName dflags hsc_env
-         integerSDataCon <- lookupIntegerSDataConName dflags hsc_env
-         naturalSDataCon <- lookupNaturalSDataConName dflags hsc_env
-         return $ CPE {
-                      cpe_dynFlags = dflags,
-                      cpe_env = emptyVarEnv,
-                      cpe_mkIntegerId = mkIntegerId,
-                      cpe_mkNaturalId = mkNaturalId,
-                      cpe_integerSDataCon = integerSDataCon,
-                      cpe_naturalSDataCon = naturalSDataCon
-                  }
+         | otherwise -- build a BigNat and embed into IN or IP
+         = let con = if i > 0 then integerIPDataCon else integerINDataCon
+           in mkBigNum con (convertBignatPrim (abs i))
+
+      convertNatural i
+         | platformInWordRange platform i -- fit in a Word#
+         = mkConApp naturalNSDataCon [Lit (mkLitWord platform i)]
+
+         | otherwise --build a BigNat and embed into NB
+         = mkBigNum naturalNBDataCon (convertBignatPrim i)
+
+      -- we can't simply generate:
+      --
+      --    NB (bigNatFromWordList# [W# 10, W# 20])
+      --
+      -- using `mkConApp` because it isn't in ANF form. Instead we generate:
+      --
+      --    case bigNatFromWordList# [W# 10, W# 20] of ba { DEFAULT -> NB ba }
+      --
+      -- via `mkCoreApps`
+
+      mkBigNum con ba = mkCoreApps (Var (dataConWorkId con)) [ba]
+
+      convertBignatPrim i =
+         let
+            target    = targetPlatform dflags
+
+            -- ByteArray# literals aren't supported (yet). Were they supported,
+            -- we would use them directly. We would need to handle
+            -- wordSize/endianness conversion between host and target
+            -- wordSize  = platformWordSize platform
+            -- byteOrder = platformByteOrder platform
+
+            -- For now we build a list of Words and we produce
+            -- `bigNatFromWordList# list_of_words`
+
+            words = mkListExpr wordTy (reverse (unfoldr f i))
+               where
+                  f 0 = Nothing
+                  f x = let low  = x .&. mask
+                            high = x `shiftR` bits
+                        in Just (mkConApp wordDataCon [Lit (mkLitWord platform low)], high)
+                  bits = platformWordSizeInBits target
+                  mask = 2 ^ bits - 1
+
+         in mkApps (Var bignatFromWordListId) [words]
+
+
+   return convertNumLit
+
+
+mkInitialCorePrepEnv :: HscEnv -> IO CorePrepEnv
+mkInitialCorePrepEnv hsc_env = do
+   convertNumLit <- mkConvertNumLiteral hsc_env
+   return $ CPE
+      { cpe_dynFlags = hsc_dflags hsc_env
+      , cpe_env = emptyVarEnv
+      , cpe_convertNumLit = convertNumLit
+      }
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
 extendCorePrepEnv cpe id id'
@@ -1538,12 +1671,6 @@ lookupCorePrepEnv cpe id
   = case lookupVarEnv (cpe_env cpe) id of
         Nothing  -> Var id
         Just exp -> exp
-
-getMkIntegerId :: CorePrepEnv -> Id
-getMkIntegerId = cpe_mkIntegerId
-
-getMkNaturalId :: CorePrepEnv -> Id
-getMkNaturalId = cpe_mkNaturalId
 
 ------------------------------------------------------------------------------
 -- Cloning binders
@@ -1616,7 +1743,7 @@ newVar :: Type -> UniqSM Id
 newVar ty
  = seqType ty `seq` do
      uniq <- getUniqueM
-     return (mkSysLocalOrCoVar (fsLit "sat") uniq ty)
+     return (mkSysLocalOrCoVar (fsLit "sat") uniq Many ty)
 
 
 ------------------------------------------------------------------------------

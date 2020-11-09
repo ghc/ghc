@@ -26,7 +26,7 @@ except:
 # TextIO is missing on some older Pythons.
 if 'TextIO' not in globals():
     try:
-        TextIO = typing.TextIO
+        from typing import TextIO
     except ImportError:
         TextIO = None # type: ignore
 else:

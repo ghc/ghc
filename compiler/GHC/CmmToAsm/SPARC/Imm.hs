@@ -7,12 +7,13 @@ module GHC.CmmToAsm.SPARC.Imm (
 
 where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm
 import GHC.Cmm.CLabel
 
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- | An immediate value.
 --      Not all of these are directly representable by the machine.

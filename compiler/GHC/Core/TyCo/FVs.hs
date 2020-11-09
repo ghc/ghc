@@ -43,7 +43,7 @@ module GHC.Core.TyCo.FVs
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type (coreView, partitionInvisibleTypes)
 
@@ -51,13 +51,13 @@ import Data.Monoid as DM ( Endo(..), All(..) )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Types.Var
-import FV
+import GHC.Utils.FV
 
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import Util
-import Panic
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 {-
 %************************************************************************
@@ -441,7 +441,7 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
 closeOverKinds :: TyCoVarSet -> TyCoVarSet
 -- For each element of the input set,
 -- add the deep free variables of its kind
-closeOverKinds vs = nonDetFoldVarSet do_one vs vs
+closeOverKinds vs = nonDetStrictFoldVarSet do_one vs vs
   where
     do_one v acc = appEndo (deep_ty (varType v)) acc
 
@@ -523,14 +523,14 @@ closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
--- Note [Deterministic FV] in FV.
+-- Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
 
 -- | `tyCoFVsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
--- Note [Deterministic FV] in FV.
+-- Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfTypeList :: Type -> [TyCoVar]
 -- See Note [Free variables of types]
 tyCoVarsOfTypeList ty = fvVarList $ tyCoFVsOfType ty
@@ -554,10 +554,10 @@ tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 -- make the function quadratic.
 -- It's exported, so that it can be composed with
 -- other functions that compute free variables.
--- See Note [FV naming conventions] in FV.
+-- See Note [FV naming conventions] in "GHC.Utils.FV".
 --
 -- Eta-expanded because that makes it run faster (apparently)
--- See Note [FV eta expansion] in FV for explanation.
+-- See Note [FV eta expansion] in "GHC.Utils.FV" for explanation.
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
@@ -570,7 +570,7 @@ tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
 tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
-tyCoFVsOfType (FunTy _ arg res)  f bound_vars acc = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
+tyCoFVsOfType (FunTy _ w arg res)  f bound_vars acc = (tyCoFVsOfType w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
 tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
 tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
@@ -617,8 +617,8 @@ tyCoFVsOfCo (AppCo co arg) fv_cand in_scope acc
   = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
 tyCoFVsOfCo (ForAllCo tv kind_co co) fv_cand in_scope acc
   = (tyCoFVsVarBndr tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfCo kind_co) fv_cand in_scope acc
-tyCoFVsOfCo (FunCo _ co1 co2)    fv_cand in_scope acc
-  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
+tyCoFVsOfCo (FunCo _ w co1 co2)    fv_cand in_scope acc
+  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2 `unionFV` tyCoFVsOfCo w) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
   = tyCoFVsOfCoVar v fv_cand in_scope acc
 tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
@@ -655,7 +655,7 @@ tyCoFVsOfCos (co:cos) fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOf
 
 -- | Given a covar and a coercion, returns True if covar is almost devoid in
 -- the coercion. That is, covar can only appear in Refl and GRefl.
--- See last wrinkle in Note [Unused coercion variable in ForAllCo] in GHC.Core.Coercion
+-- See last wrinkle in Note [Unused coercion variable in ForAllCo] in "GHC.Core.Coercion"
 almostDevoidCoVarOfCo :: CoVar -> Coercion -> Bool
 almostDevoidCoVarOfCo cv co =
   almost_devoid_co_var_of_co co cv
@@ -672,8 +672,9 @@ almost_devoid_co_var_of_co (AppCo co arg) cv
 almost_devoid_co_var_of_co (ForAllCo v kind_co co) cv
   = almost_devoid_co_var_of_co kind_co cv
   && (v == cv || almost_devoid_co_var_of_co co cv)
-almost_devoid_co_var_of_co (FunCo _ co1 co2) cv
-  = almost_devoid_co_var_of_co co1 cv
+almost_devoid_co_var_of_co (FunCo _ w co1 co2) cv
+  = almost_devoid_co_var_of_co w cv
+  && almost_devoid_co_var_of_co co1 cv
   && almost_devoid_co_var_of_co co2 cv
 almost_devoid_co_var_of_co (CoVarCo v) cv = v /= cv
 almost_devoid_co_var_of_co (HoleCo h)  cv = (coHoleCoVar h) /= cv
@@ -723,8 +724,9 @@ almost_devoid_co_var_of_type (LitTy {}) _ = True
 almost_devoid_co_var_of_type (AppTy fun arg) cv
   = almost_devoid_co_var_of_type fun cv
   && almost_devoid_co_var_of_type arg cv
-almost_devoid_co_var_of_type (FunTy _ arg res) cv
-  = almost_devoid_co_var_of_type arg cv
+almost_devoid_co_var_of_type (FunTy _ w arg res) cv
+  = almost_devoid_co_var_of_type w cv
+  && almost_devoid_co_var_of_type arg cv
   && almost_devoid_co_var_of_type res cv
 almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
   = almost_devoid_co_var_of_type (varType v) cv
@@ -775,16 +777,16 @@ almost_devoid_co_var_of_types (ty:tys) cv
 -- See @Note [When does a tycon application need an explicit kind signature?]@.
 injectiveVarsOfType :: Bool   -- ^ Should we look under injective type families?
                               -- See Note [Coverage condition for injective type families]
-                              -- in GHC.Tc.Instance.Family.
+                              -- in "GHC.Tc.Instance.Family".
                     -> Type -> FV
 injectiveVarsOfType look_under_tfs = go
   where
-    go ty                 | Just ty' <- coreView ty
-                          = go ty'
-    go (TyVarTy v)        = unitFV v `unionFV` go (tyVarKind v)
-    go (AppTy f a)        = go f `unionFV` go a
-    go (FunTy _ ty1 ty2)  = go ty1 `unionFV` go ty2
-    go (TyConApp tc tys)  =
+    go ty                  | Just ty' <- coreView ty
+                           = go ty'
+    go (TyVarTy v)         = unitFV v `unionFV` go (tyVarKind v)
+    go (AppTy f a)         = go f `unionFV` go a
+    go (FunTy _ w ty1 ty2) = go w `unionFV` go ty1 `unionFV` go ty2
+    go (TyConApp tc tys)   =
       case tyConInjectivityInfo tc of
         Injective inj
           |  look_under_tfs || not (isTypeFamilyTyCon tc)
@@ -810,7 +812,7 @@ injectiveVarsOfType look_under_tfs = go
 -- See @Note [When does a tycon application need an explicit kind signature?]@.
 injectiveVarsOfTypes :: Bool -- ^ look under injective type families?
                              -- See Note [Coverage condition for injective type families]
-                             -- in GHC.Tc.Instance.Family.
+                             -- in "GHC.Tc.Instance.Family".
                      -> [Type] -> FV
 injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under_tfs)
 
@@ -829,7 +831,7 @@ injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under
 --   * In the kind of a bound variable in a forall
 --   * In a coercion
 --   * In a Specified or Inferred argument to a function
--- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep
+-- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
 invisibleVarsOfType :: Type -> FV
 invisibleVarsOfType = go
   where
@@ -837,7 +839,7 @@ invisibleVarsOfType = go
                           = go ty'
     go (TyVarTy v)        = go (tyVarKind v)
     go (AppTy f a)        = go f `unionFV` go a
-    go (FunTy _ ty1 ty2)  = go ty1 `unionFV` go ty2
+    go (FunTy _ w ty1 ty2) = go w `unionFV` go ty1 `unionFV` go ty2
     go (TyConApp tc tys)  = tyCoFVsOfTypes invisibles `unionFV`
                             invisibleVarsOfTypes visibles
       where (invisibles, visibles) = partitionInvisibleTypes tc tys
@@ -933,7 +935,7 @@ types/kinds are fully settled and zonked.
 --
 -- It is also meant to be stable: that is, variables should not
 -- be reordered unnecessarily. This is specified in Note [ScopedSort]
--- See also Note [Ordering of implicit variables] in GHC.Rename.HsType
+-- See also Note [Ordering of implicit variables] in "GHC.Rename.HsType"
 
 scopedSort :: [TyCoVar] -> [TyCoVar]
 scopedSort = go [] []

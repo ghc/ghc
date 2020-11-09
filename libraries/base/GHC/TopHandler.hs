@@ -1,10 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
-           , MagicHash
-           , UnboxedTuples
-           , UnliftedFFITypes
-  #-}
+{-# LANGUAGE UnliftedFFITypes #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -40,8 +39,8 @@ import GHC.Base
 import GHC.Conc hiding (throwTo)
 import GHC.Real
 import GHC.IO
-import GHC.IO.Handle.FD
 import GHC.IO.Handle
+import GHC.IO.StdHandles
 import GHC.IO.Exception
 import GHC.Weak
 

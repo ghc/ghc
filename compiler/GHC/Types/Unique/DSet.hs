@@ -4,7 +4,7 @@
 -- Specialised deterministic sets, for things with @Uniques@
 --
 -- Based on 'UniqDFM's (as you would expect).
--- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why we need it.
+-- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" for explanation why we need it.
 --
 -- Basically, the things need to be in class 'Uniquable'.
 
@@ -26,7 +26,7 @@ module GHC.Types.Unique.DSet (
         unionUniqDSets, unionManyUniqDSets,
         minusUniqDSet, uniqDSetMinusUniqSet,
         intersectUniqDSets, uniqDSetIntersectUniqSet,
-        foldUniqDSet,
+        nonDetStrictFoldUniqDSet,
         elementOfUniqDSet,
         filterUniqDSet,
         sizeUniqDSet,
@@ -37,9 +37,9 @@ module GHC.Types.Unique.DSet (
         mapUniqDSet
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Outputable
+import GHC.Utils.Outputable
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique
@@ -52,7 +52,7 @@ import qualified Data.Semigroup as Semi
 -- Beyond preserving invariants, we may also want to 'override' typeclass
 -- instances.
 
-newtype UniqDSet a = UniqDSet {getUniqDSet' :: UniqDFM a}
+newtype UniqDSet a = UniqDSet {getUniqDSet' :: UniqDFM a a}
                    deriving (Data, Semi.Semigroup, Monoid)
 
 emptyUniqDSet :: UniqDSet a
@@ -81,25 +81,28 @@ unionUniqDSets :: UniqDSet a -> UniqDSet a -> UniqDSet a
 unionUniqDSets (UniqDSet s) (UniqDSet t) = UniqDSet (plusUDFM s t)
 
 unionManyUniqDSets :: [UniqDSet a] -> UniqDSet a
-unionManyUniqDSets [] = emptyUniqDSet
-unionManyUniqDSets sets = foldr1 unionUniqDSets sets
+unionManyUniqDSets []     = emptyUniqDSet
+unionManyUniqDSets (x:xs) = foldl' unionUniqDSets x xs
 
 minusUniqDSet :: UniqDSet a -> UniqDSet a -> UniqDSet a
 minusUniqDSet (UniqDSet s) (UniqDSet t) = UniqDSet (minusUDFM s t)
 
-uniqDSetMinusUniqSet :: UniqDSet a -> UniqSet b -> UniqDSet a
+uniqDSetMinusUniqSet :: UniqDSet a -> UniqSet a -> UniqDSet a
 uniqDSetMinusUniqSet xs ys
   = UniqDSet (udfmMinusUFM (getUniqDSet xs) (getUniqSet ys))
 
 intersectUniqDSets :: UniqDSet a -> UniqDSet a -> UniqDSet a
 intersectUniqDSets (UniqDSet s) (UniqDSet t) = UniqDSet (intersectUDFM s t)
 
-uniqDSetIntersectUniqSet :: UniqDSet a -> UniqSet b -> UniqDSet a
+uniqDSetIntersectUniqSet :: UniqDSet a -> UniqSet a -> UniqDSet a
 uniqDSetIntersectUniqSet xs ys
   = UniqDSet (udfmIntersectUFM (getUniqDSet xs) (getUniqSet ys))
 
-foldUniqDSet :: (a -> b -> b) -> b -> UniqDSet a -> b
-foldUniqDSet c n (UniqDSet s) = foldUDFM c n s
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldUniqDSet :: (a -> b -> b) -> b -> UniqDSet a -> b
+nonDetStrictFoldUniqDSet f acc (UniqDSet s) = nonDetStrictFoldUDFM f acc s
 
 elementOfUniqDSet :: Uniquable a => a -> UniqDSet a -> Bool
 elementOfUniqDSet k = elemUDFM k . getUniqDSet
@@ -131,7 +134,7 @@ mapUniqDSet f = mkUniqDSet . map f . uniqDSetToList
 instance Eq (UniqDSet a) where
   UniqDSet a == UniqDSet b = equalKeysUDFM a b
 
-getUniqDSet :: UniqDSet a -> UniqDFM a
+getUniqDSet :: UniqDSet a -> UniqDFM a a
 getUniqDSet = getUniqDSet'
 
 instance Outputable a => Outputable (UniqDSet a) where

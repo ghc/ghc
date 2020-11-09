@@ -7,7 +7,7 @@ BottomFromInnerLambda.f: <S(S),1*U(U)>
 
 
 ==================== Cpr signatures ====================
-BottomFromInnerLambda.$trModule: m1
+BottomFromInnerLambda.$trModule:
 BottomFromInnerLambda.expensive: m1
 BottomFromInnerLambda.f:
 

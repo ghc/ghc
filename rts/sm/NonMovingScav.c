@@ -31,6 +31,11 @@ nonmovingScavengeOne (StgClosure *q)
         gct->eager_promotion = saved_eager_promotion;
         if (gct->failed_to_evac) {
             mvar->header.info = &stg_MVAR_DIRTY_info;
+
+            // Note [Dirty flags in the non-moving collector] in NonMoving.c
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mvar->head);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mvar->tail);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mvar->value);
         } else {
             mvar->header.info = &stg_MVAR_CLEAN_info;
         }
@@ -46,6 +51,10 @@ nonmovingScavengeOne (StgClosure *q)
         gct->eager_promotion = saved_eager_promotion;
         if (gct->failed_to_evac) {
             tvar->header.info = &stg_TVAR_DIRTY_info;
+
+            // Note [Dirty flags in the non-moving collector] in NonMoving.c
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) tvar->current_value);
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) tvar->first_watch_queue_entry);
         } else {
             tvar->header.info = &stg_TVAR_CLEAN_info;
         }
@@ -160,16 +169,21 @@ nonmovingScavengeOne (StgClosure *q)
     }
 
     case MUT_VAR_CLEAN:
-    case MUT_VAR_DIRTY:
+    case MUT_VAR_DIRTY: {
+        StgMutVar *mv = (StgMutVar *) p;
         gct->eager_promotion = false;
-        evacuate(&((StgMutVar *)p)->var);
+        evacuate(&mv->var);
         gct->eager_promotion = saved_eager_promotion;
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+
+            // Note [Dirty flags in the non-moving collector] in NonMoving.c
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mv->var);
         } else {
             ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
         }
         break;
+    }
 
     case BLOCKING_QUEUE:
     {

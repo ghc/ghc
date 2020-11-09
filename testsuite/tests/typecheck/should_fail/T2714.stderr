@@ -1,13 +1,14 @@
 
-T2714.hs:8:5: error:
+T2714.hs:8:7: error:
     • Couldn't match type ‘c’ with ‘f0 (a -> b)’
+      Expected: c -> a
+        Actual: f0 (a -> b) -> f0 b
       ‘c’ is a rigid type variable bound by
-        the type signature for:
-          f :: ((a -> b) -> b) -> forall c. c -> a
-        at T2714.hs:8:1-9
-      Expected type: ((a -> b) -> b) -> c -> a
-        Actual type: ((a -> b) -> b) -> f0 (a -> b) -> f0 b
-    • In the expression: ffmap
-      In an equation for ‘f’: f = ffmap
+        a type expected by the context:
+          forall c. c -> a
+        at T2714.hs:8:1-13
+    • In the expression: ffmap x
+      In an equation for ‘f’: f x = ffmap x
     • Relevant bindings include
+        x :: (a -> b) -> b (bound at T2714.hs:8:3)
         f :: ((a -> b) -> b) -> forall c. c -> a (bound at T2714.hs:8:1)

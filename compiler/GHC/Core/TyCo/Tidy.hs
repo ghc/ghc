@@ -18,7 +18,7 @@ module GHC.Core.TyCo.Tidy
         tidyTyCoVarBinder, tidyTyCoVarBinders
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
@@ -26,7 +26,7 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import Util (seqList)
+import GHC.Utils.Misc (seqList)
 
 import Data.List (mapAccumL)
 
@@ -52,8 +52,7 @@ tidyVarBndr tidy_env@(occ_env, subst) var
       (occ_env', occ') -> ((occ_env', subst'), var')
         where
           subst' = extendVarEnv subst var var'
-          var'   = setVarType (setVarName var name') type'
-          type'  = tidyType tidy_env (varType var)
+          var'   = updateVarType (tidyType tidy_env) (setVarName var name')
           name'  = tidyNameOcc name occ'
           name   = varName var
 
@@ -134,9 +133,10 @@ tidyType env (TyVarTy tv)          = TyVarTy (tidyTyCoVarOcc env tv)
 tidyType env (TyConApp tycon tys)  = let args = tidyTypes env tys
                                      in args `seqList` TyConApp tycon args
 tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env ty@(FunTy _ arg res)  = let { !arg' = tidyType env arg
-                                         ; !res' = tidyType env res }
-                                     in ty { ft_arg = arg', ft_res = res' }
+tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
+                                           ; !arg' = tidyType env arg
+                                           ; !res' = tidyType env res }
+                                       in ty { ft_mult = w', ft_arg = arg', ft_res = res' }
 tidyType env (ty@(ForAllTy{}))     = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
   where
     (tvs, vis, body_ty) = splitForAllTys' ty
@@ -146,7 +146,7 @@ tidyType env (CoercionTy co)      = CoercionTy $! (tidyCo env co)
 
 
 -- The following two functions differ from mkForAllTys and splitForAllTys in that
--- they expect/preserve the ArgFlag argument. These belong to types/Type.hs, but
+-- they expect/preserve the ArgFlag argument. These belong to "GHC.Core.Type", but
 -- how should they be named?
 mkForAllTys' :: [(TyCoVar, ArgFlag)] -> Type -> Type
 mkForAllTys' tvvs ty = foldr strictMkForAllTy ty tvvs
@@ -208,7 +208,7 @@ tidyCo env@(_, subst) co
                                where (envp, tvp) = tidyVarBndr env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
-    go (FunCo r co1 co2)     = (FunCo r $! go co1) $! go co2
+    go (FunCo r w co1 co2)   = ((FunCo r $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = case lookupVarEnv subst cv of
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'

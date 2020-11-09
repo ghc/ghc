@@ -14,7 +14,7 @@ module GHC.Tc.Gen.Sig(
        TcSigFun,
 
        isPartialSig, hasCompleteSig, tcIdSigName, tcSigInfoName,
-       completeSigPolyId_maybe,
+       completeSigPolyId_maybe, isCompleteHsSig,
 
        tcTySigs, tcUserTypeSig, completeSigFromId,
        tcInstSig,
@@ -25,34 +25,40 @@ module GHC.Tc.Gen.Sig(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Hs
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
+import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Zonk
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity ( checkValidType )
 import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
-import GHC.Tc.Utils.Instantiate( topInstantiate )
+import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
 import GHC.Core.Type ( mkTyVarBinders )
+import GHC.Core.Multiplicity
 
 import GHC.Driver.Session
-import GHC.Types.Var ( TyVar, tyVarKind )
+import GHC.Driver.Backend
+import GHC.Driver.Ppr
+import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
 import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import GHC.Builtin.Names( mkUnboundName )
 import GHC.Types.Basic
-import GHC.Types.Module( getModule )
+import GHC.Unit.Module( getModule )
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
-import Util( singleton )
-import Maybes( orElse )
+import GHC.Utils.Misc as Utils ( singleton )
+import GHC.Data.Maybe( orElse )
 import Data.Maybe( mapMaybe )
 import Control.Monad( unless )
 
@@ -99,21 +105,8 @@ especially on value bindings.  Here's an overview.
   unification variables is correct because we are in tcMonoBinds.
 
 
-Note [Scoped tyvars]
-~~~~~~~~~~~~~~~~~~~~
-The -XScopedTypeVariables flag brings lexically-scoped type variables
-into scope for any explicitly forall-quantified type variables:
-        f :: forall a. a -> a
-        f x = e
-Then 'a' is in scope inside 'e'.
-
-However, we do *not* support this
-  - For pattern bindings e.g
-        f :: forall a. a->a
-        (f,g) = e
-
 Note [Binding scoped type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The type variables *brought into lexical scope* by a type signature
 may be a subset of the *quantified type variables* of the signatures,
 for two reasons:
@@ -224,7 +217,12 @@ tcUserTypeSig loc hs_sig_ty mb_name
   = do { sigma_ty <- tcHsSigWcType ctxt_F hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $
-         CompleteSig { sig_bndr  = mkLocalId name sigma_ty
+         CompleteSig { sig_bndr  = mkLocalId name Many sigma_ty
+                                   -- We use `Many' as the multiplicity here,
+                                   -- as if this identifier corresponds to
+                                   -- anything, it is a top-level
+                                   -- definition. Which are all unrestricted in
+                                   -- the current implementation.
                      , sig_ctxt  = ctxt_T
                      , sig_loc   = loc } }
                        -- Location of the <type> in   f :: <type>
@@ -254,19 +252,23 @@ completeSigFromId ctxt id
                 , sig_loc  = getSrcSpan id }
 
 isCompleteHsSig :: LHsSigWcType GhcRn -> Bool
--- ^ If there are no wildcards, return a LHsSigType
-isCompleteHsSig (HsWC { hswc_ext  = wcs
-                      , hswc_body = HsIB { hsib_body = hs_ty } })
-   = null wcs && no_anon_wc hs_ty
+-- ^ If there are no wildcards, return a LHsSigWcType
+isCompleteHsSig (HsWC { hswc_ext = wcs, hswc_body = hs_sig_ty })
+   = null wcs && no_anon_wc_sig_ty hs_sig_ty
 
-no_anon_wc :: LHsType GhcRn -> Bool
-no_anon_wc lty = go lty
+no_anon_wc_sig_ty :: LHsSigType GhcRn -> Bool
+no_anon_wc_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body}))
+  =  all no_anon_wc_tvb (hsOuterExplicitBndrs outer_bndrs)
+  && no_anon_wc_ty body
+
+no_anon_wc_ty :: LHsType GhcRn -> Bool
+no_anon_wc_ty lty = go lty
   where
     go (L _ ty) = case ty of
       HsWildCardTy _                 -> False
       HsAppTy _ ty1 ty2              -> go ty1 && go ty2
       HsAppKindTy _ ty ki            -> go ty && go ki
-      HsFunTy _ ty1 ty2              -> go ty1 && go ty2
+      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go (arrowToHsType w)
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
       HsSumTy _ tys                  -> gos tys
@@ -279,8 +281,8 @@ no_anon_wc lty = go lty
       HsRecTy _ flds                 -> gos $ map (cd_fld_type . unLoc) flds
       HsExplicitListTy _ _ tys       -> gos tys
       HsExplicitTupleTy _ tys        -> gos tys
-      HsForAllTy { hst_bndrs = bndrs
-                 , hst_body = ty } -> no_anon_wc_bndrs bndrs
+      HsForAllTy { hst_tele = tele
+                 , hst_body = ty } -> no_anon_wc_tele tele
                                         && go ty
       HsQualTy { hst_ctxt = L _ ctxt
                , hst_body = ty }  -> gos ctxt && go ty
@@ -293,11 +295,15 @@ no_anon_wc lty = go lty
 
     gos = all go
 
-no_anon_wc_bndrs :: [LHsTyVarBndr GhcRn] -> Bool
-no_anon_wc_bndrs ltvs = all (go . unLoc) ltvs
-  where
-    go (UserTyVar _ _)      = True
-    go (KindedTyVar _ _ ki) = no_anon_wc ki
+no_anon_wc_tele :: HsForAllTelescope GhcRn -> Bool
+no_anon_wc_tele tele = case tele of
+  HsForAllVis   { hsf_vis_bndrs   = ltvs } -> all no_anon_wc_tvb ltvs
+  HsForAllInvis { hsf_invis_bndrs = ltvs } -> all no_anon_wc_tvb ltvs
+
+no_anon_wc_tvb :: LHsTyVarBndr flag GhcRn -> Bool
+no_anon_wc_tvb (L _ tvb) = case tvb of
+  UserTyVar _ _ _      -> True
+  KindedTyVar _ _ _ ki -> no_anon_wc_ty ki
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -349,40 +355,34 @@ Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
 
 * After we kind-check the pieces and convert to Types, we do kind generalisation.
 
-Note [solveEqualities in tcPatSynSig]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Report unsolved equalities in tcPatSynSig]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's important that we solve /all/ the equalities in a pattern
 synonym signature, because we are going to zonk the signature to
 a Type (not a TcType), in GHC.Tc.TyCl.PatSyn.tc_patsyn_finish, and that
 fails if there are un-filled-in coercion variables mentioned
 in the type (#15694).
 
-The best thing is simply to use solveEqualities to solve all the
-equalites, rather than leaving them in the ambient constraints
-to be solved later.  Pattern synonyms are top-level, so there's
-no problem with completely solving them.
-
-(NB: this solveEqualities wraps newImplicitTKBndrs, which itself
-does a solveLocalEqualities; so solveEqualities isn't going to
-make any further progress; it'll just report any unsolved ones,
-and fail, as it should.)
+So we solve all the equalities we can, and report any unsolved ones,
+rather than leaving them in the ambient constraints to be solved
+later.  Pattern synonyms are top-level, so there's no problem with
+completely solving them.
 -}
 
 tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
 -- See Note [Pattern synonym signatures]
 -- See Note [Recipe for checking a signature] in GHC.Tc.Gen.HsType
-tcPatSynSig name sig_ty
-  | HsIB { hsib_ext = implicit_hs_tvs
-         , hsib_body = hs_ty }  <- sig_ty
-  , (univ_hs_tvs, hs_req,  hs_ty1)     <- splitLHsSigmaTyInvis hs_ty
-  , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
-  = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
-       ; (implicit_tvs, (univ_tvs, (ex_tvs, (req, prov, body_ty))))
-           <- pushTcLevelM_   $
-              solveEqualities $ -- See Note [solveEqualities in tcPatSynSig]
-              bindImplicitTKBndrs_Skol implicit_hs_tvs $
-              bindExplicitTKBndrs_Skol univ_hs_tvs     $
-              bindExplicitTKBndrs_Skol ex_hs_tvs       $
+tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty}))
+  | (hs_req, hs_ty1) <- splitLHsQualTy hs_ty
+  , (ex_hs_tvbndrs, hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
+  = do { traceTc "tcPatSynSig 1" (ppr sig_ty)
+
+       ; let skol_info = DataConSkol name
+       ; (tclvl, wanted, (outer_bndrs, (ex_bndrs, (req, prov, body_ty))))
+           <- pushLevelAndSolveEqualitiesX "tcPatSynSig"           $
+                     -- See Note [solveEqualities in tcPatSynSig]
+              tcOuterTKBndrs skol_info hs_outer_bndrs $
+              tcExplicitTKBndrs ex_hs_tvbndrs         $
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; body_ty <- tcHsOpenType hs_body_ty
@@ -390,76 +390,66 @@ tcPatSynSig name sig_ty
                      -- e.g. pattern Zero <- 0#   (#12094)
                  ; return (req, prov, body_ty) }
 
-       ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvs
-                                                 req ex_tvs prov body_ty
+       ; let implicit_tvs :: [TcTyVar]
+             univ_bndrs   :: [TcInvisTVBinder]
+             (implicit_tvs, univ_bndrs) = case outer_bndrs of
+               HsOuterImplicit{hso_ximplicit = implicit_tvs} -> (implicit_tvs, [])
+               HsOuterExplicit{hso_xexplicit = univ_bndrs}   -> ([], univ_bndrs)
+
+       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
+       ; let implicit_bndrs = mkTyVarBinders SpecifiedSpec implicit_tvs
 
        -- Kind generalisation
-       ; kvs <- kindGeneralizeAll ungen_patsyn_ty
+       ; let ungen_patsyn_ty = build_patsyn_type implicit_bndrs univ_bndrs
+                                                 req ex_bndrs prov body_ty
        ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
+       ; kvs <- kindGeneralizeAll ungen_patsyn_ty
+       ; reportUnsolvedEqualities skol_info kvs tclvl wanted
+               -- See Note [Report unsolved equalities in tcPatSynSig]
 
        -- These are /signatures/ so we zonk to squeeze out any kind
-       -- unification variables.  Do this after kindGeneralize which may
+       -- unification variables.  Do this after kindGeneralizeAll which may
        -- default kind variables to *.
-       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
-       ; univ_tvs     <- mapM zonkTyCoVarKind univ_tvs
-       ; ex_tvs       <- mapM zonkTyCoVarKind ex_tvs
-       ; req          <- zonkTcTypes req
-       ; prov         <- zonkTcTypes prov
-       ; body_ty      <- zonkTcType  body_ty
-
-       -- Skolems have TcLevels too, though they're used only for debugging.
-       -- If you don't do this, the debugging checks fail in GHC.Tc.TyCl.PatSyn.
-       -- Test case: patsyn/should_compile/T13441
-{-
-       ; tclvl <- getTcLevel
-       ; let env0                  = mkEmptyTCvSubst $ mkInScopeSet $ mkVarSet kvs
-             (env1, implicit_tvs') = promoteSkolemsX tclvl env0 implicit_tvs
-             (env2, univ_tvs')     = promoteSkolemsX tclvl env1 univ_tvs
-             (env3, ex_tvs')       = promoteSkolemsX tclvl env2 ex_tvs
-             req'                  = substTys env3 req
-             prov'                 = substTys env3 prov
-             body_ty'              = substTy  env3 body_ty
--}
-      ; let implicit_tvs' = implicit_tvs
-            univ_tvs'     = univ_tvs
-            ex_tvs'       = ex_tvs
-            req'          = req
-            prov'         = prov
-            body_ty'      = body_ty
+       ; (ze, kv_bndrs)       <- zonkTyVarBinders (mkTyVarBinders InferredSpec kvs)
+       ; (ze, implicit_bndrs) <- zonkTyVarBindersX ze implicit_bndrs
+       ; (ze, univ_bndrs)     <- zonkTyVarBindersX ze univ_bndrs
+       ; (ze, ex_bndrs)       <- zonkTyVarBindersX ze ex_bndrs
+       ; req          <- zonkTcTypesToTypesX ze req
+       ; prov         <- zonkTcTypesToTypesX ze prov
+       ; body_ty      <- zonkTcTypeToTypeX   ze body_ty
 
        -- Now do validity checking
        ; checkValidType ctxt $
-         build_patsyn_type kvs implicit_tvs' univ_tvs' req' ex_tvs' prov' body_ty'
+         build_patsyn_type implicit_bndrs univ_bndrs req ex_bndrs prov body_ty
 
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here
-       ; let (arg_tys, _) = tcSplitFunTys body_ty'
-       ; mapM_ (checkForLevPoly empty) arg_tys
+       ; let (arg_tys, _) = tcSplitFunTys body_ty
+       ; mapM_ (checkForLevPoly empty . scaledThing) arg_tys
 
        ; traceTc "tcTySig }" $
-         vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs'
-              , text "kvs" <+> ppr_tvs kvs
-              , text "univ_tvs" <+> ppr_tvs univ_tvs'
-              , text "req" <+> ppr req'
-              , text "ex_tvs" <+> ppr_tvs ex_tvs'
-              , text "prov" <+> ppr prov'
-              , text "body_ty" <+> ppr body_ty' ]
+         vcat [ text "kvs"          <+> ppr_tvs (binderVars kv_bndrs)
+              , text "implicit_tvs" <+> ppr_tvs (binderVars implicit_bndrs)
+              , text "univ_tvs"     <+> ppr_tvs (binderVars univ_bndrs)
+              , text "req" <+> ppr req
+              , text "ex_tvs" <+> ppr_tvs (binderVars ex_bndrs)
+              , text "prov" <+> ppr prov
+              , text "body_ty" <+> ppr body_ty ]
        ; return (TPSI { patsig_name = name
-                      , patsig_implicit_bndrs = mkTyVarBinders Inferred  kvs ++
-                                                mkTyVarBinders Specified implicit_tvs'
-                      , patsig_univ_bndrs     = univ_tvs'
-                      , patsig_req            = req'
-                      , patsig_ex_bndrs       = ex_tvs'
-                      , patsig_prov           = prov'
-                      , patsig_body_ty        = body_ty' }) }
+                      , patsig_implicit_bndrs = kv_bndrs ++ implicit_bndrs
+                      , patsig_univ_bndrs     = univ_bndrs
+                      , patsig_req            = req
+                      , patsig_ex_bndrs       = ex_bndrs
+                      , patsig_prov           = prov
+                      , patsig_body_ty        = body_ty }) }
   where
     ctxt = PatSynCtxt name
 
-    build_patsyn_type kvs imp univ req ex prov body
-      = mkInvForAllTys kvs $
-        mkSpecForAllTys (imp ++ univ) $
+    build_patsyn_type implicit_bndrs univ_bndrs req ex_bndrs prov body
+      = mkInvisForAllTys implicit_bndrs $
+        mkInvisForAllTys univ_bndrs $
         mkPhiTy req $
-        mkSpecForAllTys ex $
+        mkInvisForAllTys ex_bndrs $
         mkPhiTy prov $
         body
 
@@ -479,7 +469,7 @@ tcInstSig :: TcIdSigInfo -> TcM TcIdSigInst
 -- Instantiate a type signature; only used with plan InferGen
 tcInstSig sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
-    do { (tv_prs, theta, tau) <- tcInstType newMetaTyVarTyVars poly_id
+    do { (tv_prs, theta, tau) <- tcInstTypeBndrs poly_id
               -- See Note [Pattern bindings and complete signatures]
 
        ; return (TISI { sig_inst_sig   = sig
@@ -542,7 +532,7 @@ lookupPragEnv :: TcPragEnv -> Name -> [LSig GhcRn]
 lookupPragEnv prag_fn n = lookupNameEnv prag_fn n `orElse` []
 
 extendPragEnv :: TcPragEnv -> (Name, LSig GhcRn) -> TcPragEnv
-extendPragEnv prag_fn (n, sig) = extendNameEnv_Acc (:) singleton prag_fn n sig
+extendPragEnv prag_fn (n, sig) = extendNameEnv_Acc (:) Utils.singleton prag_fn n sig
 
 ---------------
 mkPragEnv :: [LSig GhcRn] -> LHsBinds GhcRn -> TcPragEnv
@@ -662,8 +652,6 @@ Note that
   * The RHS of f_spec, <poly_rhs> has a *copy* of 'binds', so that it
     can fully specialise it.
 
-
-
 From the TcSpecPrag, in GHC.HsToCore.Binds we generate a binding for f_spec and a RULE:
 
    f_spec :: Int -> b -> Int
@@ -676,12 +664,13 @@ delicate, but works.
 
 Some wrinkles
 
-1. We don't use full-on tcSubType, because that does co and contra
-   variance and that in turn will generate too complex a LHS for the
-   RULE.  So we use a single invocation of skolemise /
-   topInstantiate in tcSpecWrapper.  (Actually I think that even
-   the "deeply" stuff may be too much, because it introduces lambdas,
-   though I think it can be made to work without too much trouble.)
+1. In tcSpecWrapper, rather than calling tcSubType, we directly call
+   skolemise/instantiate.  That is mainly because of wrinkle (2).
+
+   Historical note: in the past, tcSubType did co/contra stuff, which
+   could generate too complex a LHS for the RULE, which was another
+   reason for not using tcSubType.  But that reason has gone away
+   with simple subsumption (#17775).
 
 2. We need to take care with type families (#5821).  Consider
       type instance F Int = Bool
@@ -702,14 +691,14 @@ Some wrinkles
 
   So we simply do this:
     - Generate a constraint to check that the specialised type (after
-      skolemiseation) is equal to the instantiated function type.
+      skolemisation) is equal to the instantiated function type.
     - But *discard* the evidence (coercion) for that constraint,
       so that we ultimately generate the simpler code
           f_spec :: Int -> F Int
           f_spec = <f rhs> Int dNumInt
 
           RULE: forall d. f Int d = f_spec
-      You can see this discarding happening in
+      You can see this discarding happening in tcSpecPrag
 
 3. Note that the HsWrapper can transform *any* function with the right
    type prefix
@@ -777,7 +766,7 @@ tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper
 -- See Note [Handling SPECIALISE pragmas], wrinkle 1
 tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
-               <- tcSkolemise ctxt spec_ty $ \ _ spec_tau ->
+               <- tcSkolemise ctxt spec_ty $ \ spec_tau ->
                   do { (inst_wrap, tau) <- topInstantiate orig poly_ty
                      ; _ <- unifyType Nothing spec_tau tau
                             -- Deliberately ignore the evidence
@@ -809,17 +798,21 @@ tcImpPrags prags
     -- we don't want complaints about lack of INLINABLE pragmas
     not_specialising dflags
       | not (gopt Opt_Specialise dflags) = True
-      | otherwise = case hscTarget dflags of
-                      HscNothing -> True
-                      HscInterpreted -> True
-                      _other         -> False
+      | otherwise = case backend dflags of
+                      NoBackend   -> True
+                      Interpreter -> True
+                      _other      -> False
 
 tcImpSpec :: (Name, Sig GhcRn) -> TcM [TcSpecPrag]
 tcImpSpec (name, prag)
  = do { id <- tcLookupId name
-      ; unless (isAnyInlinePragma (idInlinePragma id))
-               (addWarnTc NoReason (impSpecErr name))
-      ; tcSpecPrag id prag }
+      ; if isAnyInlinePragma (idInlinePragma id)
+        then tcSpecPrag id prag
+        else do { addWarnTc NoReason (impSpecErr name)
+                ; return [] } }
+      -- If there is no INLINE/INLINABLE pragma there will be no unfolding. In
+      -- that case, just delete the SPECIALISE pragma altogether, lest the
+      -- desugarer fall over because it can't find the unfolding. See #18118.
 
 impSpecErr :: Name -> SDoc
 impSpecErr name

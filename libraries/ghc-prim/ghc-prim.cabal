@@ -1,6 +1,6 @@
-cabal-version:  2.1
+cabal-version:  2.2
 name:           ghc-prim
-version:        0.6.1
+version:        0.7.0
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD-3-Clause
 license-file:   LICENSE
@@ -46,6 +46,8 @@ Library
         GHC.IntWord64
         GHC.Magic
         GHC.Prim.Ext
+        GHC.Prim.Panic
+        GHC.Prim.Exception
         GHC.PrimopWrappers
         GHC.Tuple
         GHC.Types
@@ -66,6 +68,11 @@ Library
         -- user32: provides access to apis to modify user components (UI etc)
         --         on Windows. Required because of mingw32.
         extra-libraries: user32, mingw32, mingwex
+
+    if os(linux)
+        -- we need libm, but for musl and other's we might need libc, as libm
+        -- is just an empty shell.
+        extra-libraries: c, m
 
     c-sources:
         cbits/atomic.c

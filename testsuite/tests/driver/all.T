@@ -195,7 +195,7 @@ test('T8101b', normal, multimod_compile,
 test('T10600', normal, compile_fail, ['-fno-code'])
 
 # Should not panic when compiling cmm file together with -outputdir.
-test('T9050', cmm_src, compile, ['-outputdir=.'])
+test('T9050', cmm_src, compile, ['-outputdir=. -no-hs-main'])
 
 test('write_interface_oneshot', [extra_files(['A011.hs'])], makefile_test, [])
 
@@ -258,9 +258,11 @@ test('T12752pass', normal, compile, ['-DSHOULD_PASS=1 -Wcpp-undef'])
 
 test('T12955', normal, makefile_test, [])
 
-test('T12971', [when(opsys('mingw32'), expect_broken(17945)), ignore_stdout], makefile_test, [])
+test('T12971', [when(opsys('mingw32'), fragile(17945)), ignore_stdout], makefile_test, [])
 test('json', normal, compile_fail, ['-ddump-json'])
 test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddump-json'])
+test('T16167', exit_code(1), run_command, 
+     ['{compiler} -x hs -e ":set prog T16167.hs" -ddump-json T16167.hs'])
 test('T13604', [], makefile_test, [])
 test('T13604a', [], makefile_test, [])
 # omitting hpc and profasm because they affect the
@@ -279,3 +281,5 @@ test('T16737',
 
 test('T17143', exit_code(1), run_command, ['{compiler} T17143.hs -S -fno-code'])
 test('T17786', unless(opsys('mingw32'), skip), makefile_test, [])
+test('T18369', normal, compile, ['-O'])
+test('FullGHCVersion', normal, compile_and_run, ['-package ghc-boot'])

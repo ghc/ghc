@@ -1,4 +1,8 @@
-{-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE BangPatterns, CPP, DeriveFunctor #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -16,23 +20,25 @@ module GHC.CmmToAsm.Reg.Graph.Stats (
         countSRMs, addSRM
 ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import qualified GraphColor as Color
+import qualified GHC.Data.Graph.Color as Color
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Reg.Graph.Spill
 import GHC.CmmToAsm.Reg.Graph.SpillCost
 import GHC.CmmToAsm.Reg.Graph.TrivColorable
-import GHC.CmmToAsm.Instr
-import GHC.Platform.Reg.Class
-import GHC.Platform.Reg
 import GHC.CmmToAsm.Reg.Target
-import GHC.Platform
+import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Types
 
-import Outputable
+import GHC.Platform
+import GHC.Platform.Reg
+import GHC.Platform.Reg.Class
+
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import State
+import GHC.Utils.Outputable
+import GHC.Utils.Monad.State
 
 -- | Holds interesting statistics from the register allocator.
 data RegAllocStats statics instr
@@ -64,7 +70,7 @@ data RegAllocStats statics instr
         , raGraph       :: Color.Graph VirtualReg RegClass RealReg
 
           -- | The regs that were coalesced.
-        , raCoalesced   :: UniqFM VirtualReg
+        , raCoalesced   :: UniqFM VirtualReg VirtualReg
 
           -- | Spiller stats.
         , raSpillStats  :: SpillStats
@@ -88,7 +94,7 @@ data RegAllocStats statics instr
         , raGraphColored  :: Color.Graph VirtualReg RegClass RealReg
 
           -- | Regs that were coalesced.
-        , raCoalesced     :: UniqFM VirtualReg
+        , raCoalesced     :: UniqFM VirtualReg VirtualReg
 
           -- | Code with coalescings applied.
         , raCodeCoalesced :: [LiveCmmDecl statics instr]
@@ -108,15 +114,16 @@ data RegAllocStats statics instr
           -- | Target platform
         , raPlatform    :: !Platform
         }
+        deriving (Functor)
 
 
-instance (Outputable statics, Outputable instr)
+instance (OutputableP Platform statics, OutputableP Platform instr)
        => Outputable (RegAllocStats statics instr) where
 
  ppr (s@RegAllocStatsStart{})
     =      text "#  Start"
         $$ text "#  Native code with liveness information."
-        $$ ppr (raLiveCmm s)
+        $$ pdoc (raPlatform s) (raLiveCmm s)
         $$ text ""
         $$ text "#  Initial register conflict graph."
         $$ Color.dotGraph
@@ -131,7 +138,7 @@ instance (Outputable statics, Outputable instr)
            text "#  Spill"
 
         $$ text "#  Code with liveness information."
-        $$ ppr (raCode s)
+        $$ pdoc (raPlatform s) (raCode s)
         $$ text ""
 
         $$ (if (not $ isNullUFM $ raCoalesced s)
@@ -145,14 +152,14 @@ instance (Outputable statics, Outputable instr)
         $$ text ""
 
         $$ text "#  Code with spills inserted."
-        $$ ppr (raSpilled s)
+        $$ pdoc (raPlatform s) (raSpilled s)
 
 
  ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) })
     =      text "#  Colored"
 
         $$ text "#  Code with liveness information."
-        $$ ppr (raCode s)
+        $$ pdoc (raPlatform s) (raCode s)
         $$ text ""
 
         $$ text "#  Register conflict graph (colored)."
@@ -171,19 +178,19 @@ instance (Outputable statics, Outputable instr)
                 else empty)
 
         $$ text "#  Native code after coalescings applied."
-        $$ ppr (raCodeCoalesced s)
+        $$ pdoc (raPlatform s) (raCodeCoalesced s)
         $$ text ""
 
         $$ text "#  Native code after register allocation."
-        $$ ppr (raPatched s)
+        $$ pdoc (raPlatform s) (raPatched s)
         $$ text ""
 
         $$ text "#  Clean out unneeded spill/reloads."
-        $$ ppr (raSpillClean s)
+        $$ pdoc (raPlatform s) (raSpillClean s)
         $$ text ""
 
         $$ text "#  Final code, after rewriting spill/rewrite pseudo instrs."
-        $$ ppr (raFinal s)
+        $$ pdoc (raPlatform s) (raFinal s)
         $$ text ""
         $$  text "#  Score:"
         $$ (text "#          spills  inserted: " <> int spills)
@@ -242,7 +249,7 @@ pprStatsLifetimes stats
         $$ text "\n")
 
 
-binLifetimeCount :: UniqFM (VirtualReg, Int) -> UniqFM (Int, Int)
+binLifetimeCount :: UniqFM VirtualReg (VirtualReg, Int) -> UniqFM Int (Int, Int)
 binLifetimeCount fm
  = let  lifes   = map (\l -> (l, (l, 1)))
                 $ map snd

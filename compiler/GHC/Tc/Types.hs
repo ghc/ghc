@@ -1,15 +1,17 @@
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE ExistentialQuantification  #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 {-
 (c) The University of Glasgow 2006-2012
 (c) The GRASP Project, Glasgow University, 1992-2002
 
 -}
 
-{-# LANGUAGE CPP, DeriveFunctor, ExistentialQuantification, GeneralizedNewtypeDeriving,
-             ViewPatterns #-}
-
 -- | Various types used during typechecking.
 --
--- Please see GHC.Tc.Utils.Monad as well for operations on these types. You probably
+-- Please see "GHC.Tc.Utils.Monad" as well for operations on these types. You probably
 -- want to import it, instead of this module.
 --
 -- All the monads exported here are built on top of the same IOEnv monad. The
@@ -45,12 +47,7 @@ module GHC.Tc.Types(
         IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
         SelfBootInfo(..),
-        pprTcTyThingCategory, pprPECategory, CompleteMatch(..),
-
-        -- Desugaring types
-        DsM, DsLclEnv(..), DsGblEnv(..),
-        DsMetaEnv, DsMetaVal(..), CompleteMatchMap,
-        mkCompleteMatchMap, extendCompleteMatchMap,
+        pprTcTyThingCategory, pprPECategory, CompleteMatch, CompleteMatches,
 
         -- Template Haskell
         ThStage(..), SpliceType(..), PendingStuff(..),
@@ -79,30 +76,41 @@ module GHC.Tc.Types(
 
         -- Role annotations
         RoleAnnotEnv, emptyRoleAnnotEnv, mkRoleAnnotEnv,
-        lookupRoleAnnot, getRoleAnnots
+        lookupRoleAnnot, getRoleAnnots,
+
+        -- Linting
+        lintGblEnv
   ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
+import GHC.Driver.Env
+import GHC.Driver.Session
+
 import GHC.Hs
-import GHC.Driver.Types
-import GHC.Tc.Types.Evidence
-import GHC.Core.Type
-import GHC.Core.TyCon  ( TyCon, tyConKind )
-import GHC.Core.PatSyn ( PatSyn )
-import GHC.Types.Id         ( idType, idName )
-import GHC.Types.FieldLabel ( FieldLabel )
+
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
-import GHC.Types.Annotations
+import GHC.Tc.Types.Evidence
+import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
+
+import GHC.Core.Type
+import GHC.Core.TyCon  ( TyCon, tyConKind )
+import GHC.Core.PatSyn ( PatSyn )
+import GHC.Core.Lint   ( lintAxioms )
+import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Deltas)
-import IOEnv
+
+import GHC.Types.Id         ( idType, idName )
+import GHC.Types.FieldLabel ( FieldLabel )
+import GHC.Types.Fixity.Env
+import GHC.Types.Annotations
+import GHC.Types.CompleteMatch
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -110,25 +118,36 @@ import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Types.Module
+import GHC.Types.TypeEnv
+import GHC.Types.TyThing
+import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
-import ErrUtils
 import GHC.Types.Unique.FM
 import GHC.Types.Basic
-import Bag
-import GHC.Driver.Session
-import Outputable
-import ListSetOps
-import Fingerprint
-import Util
-import GHC.Builtin.Names ( isUnboundName )
 import GHC.Types.CostCentre.State
+import GHC.Types.HpcInfo
+
+import GHC.Data.IOEnv
+import GHC.Data.Bag
+import GHC.Data.List.SetOps
+
+import GHC.Unit
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.Imported
+import GHC.Unit.Module.ModDetails
+
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Fingerprint
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+
+import GHC.Builtin.Names ( isUnboundName )
 
 import Control.Monad (ap)
 import Data.Set      ( Set )
 import qualified Data.Set as S
-
 import Data.List ( sort )
 import Data.Map ( Map )
 import Data.Dynamic  ( Dynamic )
@@ -137,20 +156,18 @@ import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
 
-import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
-
 import qualified Language.Haskell.TH as TH
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
 -- to refine the identities of a hole while we are renaming interfaces
--- (see 'GHC.Iface.Rename').  Specifically, a 'NameShape' for
+-- (see "GHC.Iface.Rename").  Specifically, a 'NameShape' for
 -- 'ns_module_name' @A@, defines a mapping from @{A.T}@
 -- (for some 'OccName' @T@) to some arbitrary other 'Name'.
 --
 -- The most intruiging thing about a 'NameShape', however, is
 -- how it's constructed.  A 'NameShape' is *implied* by the
 -- exported 'AvailInfo's of the implementor of an interface:
--- if an implementor of signature @<H>@ exports @M.T@, you implicitly
+-- if an implementor of signature @\<H>@ exports @M.T@, you implicitly
 -- define a substitution from @{H.T}@ to @M.T@.  So a 'NameShape'
 -- is computed from the list of 'AvailInfo's that are exported
 -- by the implementation of a module, or successively merged
@@ -185,7 +202,6 @@ type TcRn       = TcRnIf TcGblEnv TcLclEnv    -- Type inference
 type IfM lcl    = TcRnIf IfGblEnv lcl         -- Iface stuff
 type IfG        = IfM ()                      --    Top level
 type IfL        = IfM IfLclEnv                --    Nested
-type DsM        = TcRnIf DsGblEnv DsLclEnv    -- Desugaring
 
 -- TcRn is the type-checking and renaming monad: the main monad that
 -- most type-checking takes place in.  The global environment is
@@ -262,7 +278,7 @@ data IfLclEnv
         -- Whether or not the IfaceDecl came from a boot
         -- file or not; we'll use this to choose between
         -- NoUnfolding and BootUnfolding
-        if_boot :: Bool,
+        if_boot :: IsBootInterface,
 
         -- The field is used only for error reporting
         -- if (say) there's a Lint error in it
@@ -287,58 +303,6 @@ data IfLclEnv
 {-
 ************************************************************************
 *                                                                      *
-                Desugarer monad
-*                                                                      *
-************************************************************************
-
-Now the mondo monad magic (yes, @DsM@ is a silly name)---carry around
-a @UniqueSupply@ and some annotations, which
-presumably include source-file location information:
--}
-
-data DsGblEnv
-        = DsGblEnv
-        { ds_mod          :: Module             -- For SCC profiling
-        , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
-        , ds_unqual  :: PrintUnqualified
-        , ds_msgs    :: IORef Messages          -- Warning messages
-        , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
-                                                -- possibly-imported things
-        , ds_complete_matches :: CompleteMatchMap
-           -- Additional complete pattern matches
-        , ds_cc_st   :: IORef CostCentreState
-           -- Tracking indices for cost centre annotations
-        }
-
-instance ContainsModule DsGblEnv where
-    extractModule = ds_mod
-
-data DsLclEnv = DsLclEnv {
-        dsl_meta    :: DsMetaEnv,        -- Template Haskell bindings
-        dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
-
-        -- See Note [Note [Type and Term Equality Propagation] in Check.hs
-        -- The set of reaching values Deltas is augmented as we walk inwards,
-        -- refined through each pattern match in turn
-        dsl_deltas  :: Deltas
-     }
-
--- Inside [| |] brackets, the desugarer looks
--- up variables in the DsMetaEnv
-type DsMetaEnv = NameEnv DsMetaVal
-
-data DsMetaVal
-   = DsBound Id         -- Bound by a pattern inside the [| |].
-                        -- Will be dynamically alpha renamed.
-                        -- The Id has type THSyntax.Var
-
-   | DsSplice (HsExpr GhcTc) -- These bindings are introduced by
-                             -- the PendingSplices on a HsBracketOut
-
-
-{-
-************************************************************************
-*                                                                      *
                 Global typechecker environment
 *                                                                      *
 ************************************************************************
@@ -348,7 +312,7 @@ data DsMetaVal
 -- module. Currently one always gets a 'FrontendTypecheck', since running the
 -- frontend involves typechecking a program. hs-sig merges are not handled here.
 --
--- This data type really should be in GHC.Driver.Types, but it needs
+-- This data type really should be in GHC.Driver.Env, but it needs
 -- to have a TcGblEnv which is only defined here.
 data FrontendResult
         = FrontendTypecheck TcGblEnv
@@ -381,7 +345,7 @@ data FrontendResult
 --
 --            if I have a Module, this_mod, in hand representing the module
 --            currently being compiled,
---            then moduleUnitId this_mod == thisPackage dflags
+--            then moduleUnit this_mod == thisPackage dflags
 --
 --      - For any code involving Names, we want semantic modules.
 --        See lookupIfaceTop in GHC.Iface.Env, mkIface and addFingerprints
@@ -418,7 +382,7 @@ data TcGblEnv
 
         tcg_fix_env   :: FixityEnv,     -- ^ Just for things in this module
         tcg_field_env :: RecFieldEnv,   -- ^ Just for things in this module
-                                        -- See Note [The interactive package] in GHC.Driver.Types
+                                        -- See Note [The interactive package] in "GHC.Runtime.Context"
 
         tcg_type_env :: TypeEnv,
           -- ^ Global type env for the module we are compiling now.  All
@@ -429,7 +393,7 @@ data TcGblEnv
           --  move to the global envt during zonking)
           --
           -- NB: for what "things in this module" means, see
-          -- Note [The interactive package] in GHC.Driver.Types
+          -- Note [The interactive package] in "GHC.Runtime.Context"
 
         tcg_type_env_var :: TcRef TypeEnv,
                 -- Used only to initialise the interface-file
@@ -476,7 +440,7 @@ data TcGblEnv
           --      (tcRnExports)
           --    - imp_mods is used to compute usage info (mkIfaceTc, deSugar)
           --    - imp_trust_own_pkg is used for Safe Haskell in interfaces
-          --      (mkIfaceTc, as well as in GHC.Driver.Main)
+          --      (mkIfaceTc, as well as in "GHC.Driver.Main")
           --    - To create the Dependencies field in interface (mkDependencies)
 
           -- These three fields track unused bindings and imports
@@ -486,7 +450,7 @@ data TcGblEnv
         tcg_keep      :: TcRef NameSet,
 
         tcg_th_used :: TcRef Bool,
-          -- ^ @True@ <=> Template Haskell syntax used.
+          -- ^ @True@ \<=> Template Haskell syntax used.
           --
           -- We need this so that we can generate a dependency on the
           -- Template Haskell package, because the desugarer is going
@@ -495,7 +459,7 @@ data TcGblEnv
           -- mutable variable.
 
         tcg_th_splice_used :: TcRef Bool,
-          -- ^ @True@ <=> A Template Haskell splice was used.
+          -- ^ @True@ \<=> A Template Haskell splice was used.
           --
           -- Splices disable recompilation avoidance (see #481)
 
@@ -522,7 +486,7 @@ data TcGblEnv
                 -- voluminous and are needed if you want to report unused imports
 
         tcg_rn_decls :: Maybe (HsGroup GhcRn),
-          -- ^ Renamed decls, maybe.  @Nothing@ <=> Don't retain renamed
+          -- ^ Renamed decls, maybe.  @Nothing@ \<=> Don't retain renamed
           -- decls.
 
         tcg_dependent_files :: TcRef [FilePath], -- ^ dependencies from addDependentFile
@@ -552,8 +516,9 @@ data TcGblEnv
 
         -- Things defined in this module, or (in GHCi)
         -- in the declarations for a single GHCi command.
-        -- For the latter, see Note [The interactive package] in GHC.Driver.Types
-        tcg_tr_module :: Maybe Id,   -- Id for $trModule :: GHC.Types.Module
+        -- For the latter, see Note [The interactive package] in
+        -- GHC.Runtime.Context
+        tcg_tr_module :: Maybe Id,   -- Id for $trModule :: GHC.Unit.Module
                                              -- for which every module has a top-level defn
                                              -- except in GHCi in which case we have Nothing
         tcg_binds     :: LHsBinds GhcTc,     -- Value bindings in this module
@@ -596,7 +561,7 @@ data TcGblEnv
         tcg_static_wc :: TcRef WantedConstraints,
           -- ^ Wanted constraints of static forms.
         -- See Note [Constraints in static forms].
-        tcg_complete_matches :: [CompleteMatch],
+        tcg_complete_matches :: !CompleteMatches,
 
         -- ^ Tracking indices for cost centre annotations
         tcg_cc_st   :: TcRef CostCentreState
@@ -714,7 +679,7 @@ We gather three sorts of usage information
       The tcg_keep field is used in two distinct ways:
 
       * Desugar.addExportFlagsAndRules.  Where things like (a-c) are locally
-        defined, we should give them an an Exported flag, so that the
+        defined, we should give them an Exported flag, so that the
         simplifier does not discard them as dead code, and so that they are
         exposed in the interface file (but not to export to the user).
 
@@ -749,7 +714,8 @@ data TcLclEnv           -- Changes as we move inside an expression
   = TcLclEnv {
         tcl_loc        :: RealSrcSpan,     -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_tclvl      :: TcLevel,         -- Birthplace for new unification variables
+        tcl_in_gen_code :: Bool,           -- See Note [Rebindable syntax and HsExpansion]
+        tcl_tclvl      :: TcLevel,
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
         tcl_th_bndrs   :: ThBindEnv,       -- and binder info
@@ -774,6 +740,9 @@ data TcLclEnv           -- Changes as we move inside an expression
 
         tcl_env  :: TcTypeEnv,    -- The local type environment:
                                   -- Ids and TyVars defined in this module
+
+        tcl_usage :: TcRef UsageEnv, -- Required multiplicity of bindings is accumulated here.
+
 
         tcl_bndrs :: TcBinderStack,   -- Used for reporting relevant bindings,
                                       -- and for tidying types
@@ -1055,7 +1024,7 @@ data ArrowCtxt   -- Note [Escaping the arrow scope]
 
 -- | A typecheckable thing available in a local context.  Could be
 -- 'AGlobal' 'TyThing', but also lexically scoped variables, etc.
--- See 'GHC.Tc.Utils.Env' for how to retrieve a 'TyThing' given a 'Name'.
+-- See "GHC.Tc.Utils.Env" for how to retrieve a 'TyThing' given a 'Name'.
 data TcTyThing
   = AGlobal TyThing             -- Used only in the return type of a lookup
 
@@ -1108,9 +1077,9 @@ instance Outputable TcTyThing where     -- Debugging only
 -- | IdBindingInfo describes how an Id is bound.
 --
 -- It is used for the following purposes:
--- a) for static forms in GHC.Tc.Gen.Expr.checkClosedInStaticForm and
+-- a) for static forms in 'GHC.Tc.Gen.Expr.checkClosedInStaticForm' and
 -- b) to figure out when a nested binding can be generalised,
---    in GHC.Tc.Gen.Bind.decideGeneralisationPlan.
+--    in 'GHC.Tc.Gen.Bind.decideGeneralisationPlan'.
 --
 data IdBindingInfo -- See Note [Meaning of IdBindingInfo and ClosedTypeId]
     = NotLetBound
@@ -1167,7 +1136,7 @@ For (static e) to be valid, we need for every 'x' free in 'e',
 that x's binding is floatable to the top level.  Specifically:
    * x's RhsNames must be empty
    * x's type has no free variables
-See Note [Grand plan for static forms] in StaticPtrTable.hs.
+See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
 This test is made in GHC.Tc.Gen.Expr.checkClosedInStaticForm.
 Actually knowing x's RhsNames (rather than just its emptiness
 or otherwise) is just so we can produce better error messages
@@ -1332,15 +1301,15 @@ data ImportAvails
           --      = ModuleEnv [ImportedModsVal],
           -- ^ Domain is all directly-imported modules
           --
-          -- See the documentation on ImportedModsVal in GHC.Driver.Types for the
-          -- meaning of the fields.
+          -- See the documentation on ImportedModsVal in
+          -- "GHC.Unit.Module.Imported" for the meaning of the fields.
           --
           -- We need a full ModuleEnv rather than a ModuleNameEnv here,
           -- because we might be importing modules of the same name from
           -- different packages. (currently not the case, but might be in the
           -- future).
 
-        imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
+        imp_dep_mods :: ModuleNameEnv ModuleNameWithIsBoot,
           -- ^ Home-package modules needed by the module being compiled
           --
           -- It doesn't matter whether any of these dependencies
@@ -1350,12 +1319,12 @@ data ImportAvails
           -- compiling M might not need to consult X.hi, but X
           -- is still listed in M's dependencies.
 
-        imp_dep_pkgs :: Set InstalledUnitId,
+        imp_dep_pkgs :: Set UnitId,
           -- ^ Packages needed by the module being compiled, whether directly,
           -- or via other modules in this package, or via modules imported
           -- from other packages.
 
-        imp_trust_pkgs :: Set InstalledUnitId,
+        imp_trust_pkgs :: Set UnitId,
           -- ^ This is strictly a subset of imp_dep_pkgs and records the
           -- packages the current module needs to trust for Safe Haskell
           -- compilation to succeed. A package is required to be trusted if
@@ -1364,13 +1333,13 @@ data ImportAvails
           -- where True for the bool indicates the package is required to be
           -- trusted is the more logical  design, doing so complicates a lot
           -- of code not concerned with Safe Haskell.
-          -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
+          -- See Note [Tracking Trust Transitively] in "GHC.Rename.Names"
 
         imp_trust_own_pkg :: Bool,
           -- ^ Do we require that our own package is trusted?
           -- This is to handle efficiently the case where a Safe module imports
           -- a Trustworthy module that resides in the same package as it.
-          -- See Note [Trust Own Package] in GHC.Rename.Names
+          -- See Note [Trust Own Package] in "GHC.Rename.Names"
 
         imp_orphs :: [Module],
           -- ^ Orphan modules below us in the import tree (and maybe including
@@ -1381,15 +1350,15 @@ data ImportAvails
           -- including us for imported modules)
       }
 
-mkModDeps :: [(ModuleName, IsBootInterface)]
-          -> ModuleNameEnv (ModuleName, IsBootInterface)
+mkModDeps :: [ModuleNameWithIsBoot]
+          -> ModuleNameEnv ModuleNameWithIsBoot
 mkModDeps deps = foldl' add emptyUFM deps
-               where
-                 add env elt@(m,_) = addToUFM env m elt
+  where
+    add env elt = addToUFM env (gwib_mod elt) elt
 
 modDepsElts
-  :: ModuleNameEnv (ModuleName, IsBootInterface)
-  -> [(ModuleName, IsBootInterface)]
+  :: ModuleNameEnv ModuleNameWithIsBoot
+  -> [ModuleNameWithIsBoot]
 modDepsElts = sort . nonDetEltsUFM
   -- It's OK to use nonDetEltsUFM here because sorting by module names
   -- restores determinism
@@ -1426,9 +1395,10 @@ plusImportAvails
                    imp_orphs         = orphs1 `unionLists` orphs2,
                    imp_finsts        = finsts1 `unionLists` finsts2 }
   where
-    plus_mod_dep r1@(m1, boot1) r2@(m2, boot2)
-      | ASSERT2( m1 == m2, (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
-        boot1 = r2
+    plus_mod_dep r1@(GWIB { gwib_mod = m1, gwib_isBoot = boot1 })
+                 r2@(GWIB {gwib_mod = m2, gwib_isBoot = boot2})
+      | ASSERT2( m1 == m2, (ppr m1 <+> ppr m2) $$ (ppr (boot1 == IsBoot) <+> ppr (boot2 == IsBoot)))
+        boot1 == IsBoot = r2
       | otherwise = r1
       -- If either side can "see" a non-hi-boot interface, use that
       -- Reusing existing tuples saves 10% of allocations on test
@@ -1451,8 +1421,8 @@ data WhereFrom
                                         -- See Note [Care with plugin imports] in GHC.Iface.Load
 
 instance Outputable WhereFrom where
-  ppr (ImportByUser is_boot) | is_boot     = text "{- SOURCE -}"
-                             | otherwise   = empty
+  ppr (ImportByUser IsBoot)                = text "{- SOURCE -}"
+  ppr (ImportByUser NotBoot)               = empty
   ppr ImportBySystem                       = text "{- SYSTEM -}"
   ppr ImportByPlugin                       = text "{- PLUGIN -}"
 
@@ -1516,7 +1486,7 @@ sig_extra_cts is Nothing.
 data TcIdSigInst
   = TISI { sig_inst_sig :: TcIdSigInfo
 
-         , sig_inst_skols :: [(Name, TcTyVar)]
+         , sig_inst_skols :: [(Name, InvisTVBinder)]
                -- Instantiated type and kind variables, TyVarTvs
                -- The Name is the Name that the renamer chose;
                --   but the TcTyVar may come from instantiating
@@ -1602,12 +1572,12 @@ Here we get
 data TcPatSynInfo
   = TPSI {
         patsig_name           :: Name,
-        patsig_implicit_bndrs :: [TyVarBinder], -- Implicitly-bound kind vars (Inferred) and
-                                                -- implicitly-bound type vars (Specified)
+        patsig_implicit_bndrs :: [InvisTVBinder], -- Implicitly-bound kind vars (Inferred) and
+                                                  -- implicitly-bound type vars (Specified)
           -- See Note [The pattern-synonym signature splitting rule] in GHC.Tc.TyCl.PatSyn
-        patsig_univ_bndrs     :: [TyVar],       -- Bound by explicit user forall
+        patsig_univ_bndrs     :: [InvisTVBinder], -- Bound by explicit user forall
         patsig_req            :: TcThetaType,
-        patsig_ex_bndrs       :: [TyVar],       -- Bound by explicit user forall
+        patsig_ex_bndrs       :: [InvisTVBinder], -- Bound by explicit user forall
         patsig_prov           :: TcThetaType,
         patsig_body_ty        :: TcSigmaType
     }
@@ -1733,3 +1703,17 @@ lookupRoleAnnot = lookupNameEnv
 getRoleAnnots :: [Name] -> RoleAnnotEnv -> [LRoleAnnotDecl GhcRn]
 getRoleAnnots bndrs role_env
   = mapMaybe (lookupRoleAnnot role_env) bndrs
+
+{- *********************************************************************
+*                                                                      *
+                  Linting a TcGblEnv
+*                                                                      *
+********************************************************************* -}
+
+-- | Check the 'TcGblEnv' for consistency. Currently, only checks
+-- axioms, but should check other aspects, too.
+lintGblEnv :: DynFlags -> TcGblEnv -> TcM ()
+lintGblEnv dflags tcg_env =
+  liftIO $ lintAxioms dflags (text "TcGblEnv axioms") axioms
+  where
+    axioms = typeEnvCoAxioms (tcg_type_env tcg_env)

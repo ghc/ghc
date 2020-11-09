@@ -3,9 +3,14 @@
 -- Note [Implementing unsafeCoerce]
 {-# OPTIONS_GHC -fno-strictness #-}
 
-{-# LANGUAGE Unsafe, NoImplicitPrelude, MagicHash, GADTs, TypeApplications,
-             ScopedTypeVariables, TypeOperators, KindSignatures, PolyKinds,
-             StandaloneKindSignatures, DataKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE Unsafe #-}
 
 module Unsafe.Coerce
   ( unsafeCoerce, unsafeCoerceUnlifted, unsafeCoerceAddr
@@ -16,13 +21,11 @@ module Unsafe.Coerce
 
 import GHC.Arr (amap) -- For amap/unsafeCoerce rule
 import GHC.Base
-import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
-import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
+import GHC.Num.Integer () -- See Note [Depend on GHC.Num.Integer] in GHC.Base
 
 import GHC.Types
 
 {- Note [Implementing unsafeCoerce]
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The implementation of unsafeCoerce is surprisingly subtle.
 This Note describes the moving parts.  You will find more
@@ -107,6 +110,11 @@ several ways
     unsafeEqualityProof to f.  As (U5) says, it is implemented as
     UnsafeRefl so all is good.
 
+    NB: Don't discard the case if the case-binder is used
+           case unsafeEqualityProof of wild_xx { UnsafeRefl ->
+           ...wild_xx...
+        That rarely happens, but see #18227.
+
 (U3) In GHC.CoreToStg.Prep.cpeRhsE, if we see
        let x = case unsafeEqualityProof ... of
                  UnsafeRefl -> K e
@@ -126,8 +134,12 @@ several ways
      Flaoting the case is OK here, even though it broardens the
      scope, becuase we are done with simplification.
 
-(U4) GHC.CoreToStg.Prep.cpeExprIsTrivial anticipated the
+(U4) GHC.CoreToStg.Prep.cpeExprIsTrivial anticipates the
      upcoming discard of unsafeEqualityProof.
+
+(U4a) Ditto GHC.Core.Unfold.inlineBoringOk we want to treat
+      the RHS of unsafeCoerce as very small; see
+      Note [Inline unsafeCoerce] in that module.
 
 (U5) The definition of unsafeEqualityProof in Unsafe.Coerce
      looks very strange:
@@ -161,7 +173,7 @@ several ways
      to simplify the ase when the two tpyes are equal.
 
 (U8) The is a super-magic RULE in GHC.base
-         map cocerce = coerce
+         map coerce = coerce
      (see Note [Getting the map/coerce RULE to work] in CoreOpt)
      But it's all about turning coerce into a cast, and unsafeCoerce
      no longer does that.  So we need a separate map/unsafeCoerce
@@ -265,7 +277,7 @@ unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 --      are the same  -- but the proof of that relies on the complex, trusted
 --      implementation of @Typeable@.
 --
---   4. The "reflection trick", which takes advantanage of the fact that in
+--   4. The "reflection trick", which takes advantage of the fact that in
 --      @class C a where { op :: ty }@, we can safely coerce between @C a@ and @ty@
 --      (which have different kinds!) because it's really just a newtype.
 --      Note: there is /no guarantee, at all/ that this behavior will be supported
@@ -301,4 +313,4 @@ unsafeCoerce# = error "GHC internal error: unsafeCoerce# not unfolded"
 
 -- unsafeCoerce version of the amap/coerce rule defined in GHC.Arr
 "amap/unsafeCoerce" amap unsafeCoerce = unsafeCoerce
-#-}
+ #-}

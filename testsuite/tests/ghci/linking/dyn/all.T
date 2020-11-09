@@ -30,10 +30,12 @@ test('T10458',
      ghci_script, ['T10458.script'])
 
 test('T11072gcc', [extra_files(['A.c', 'T11072.hs']),
+                   expect_broken(18718),
                    unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
      makefile_test, ['compile_libAS_impl_gcc'])
 
 test('T11072msvc', [extra_files(['A.c', 'T11072.hs', 'libAS.def', 'i686/', 'x86_64/']),
+                    expect_broken(18718),
                     unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
      makefile_test, ['compile_libAS_impl_msvc'])
 
@@ -52,6 +54,6 @@ test('T3372',
       unless(config.have_RTS_linker, skip),
       # Concurrent GHC sessions is fragile on Windows since we must lock the
       # package database even for read-only access.
-      # See Note [Locking package database on Windows] in GHC.PackageDb
+      # See Note [Locking package database on Windows] in GHC.Unit.Database
       when(opsys('mingw32'), fragile(16773))],
      compile_and_run, ['-package ghc'])

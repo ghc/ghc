@@ -301,7 +301,7 @@ subexpression elimination pass.
     Rules are filtered by the user provided string, a rule is kept if a prefix
     of its name matches the string.
     The pass then checks whether any of these rules could apply to
-    the program but which didn't file for some reason. For example, specifying
+    the program but which didn't fire for some reason. For example, specifying
     ``-drule-check=SPEC`` will check whether there are any applications which
     might be subject to a rule created by specialisation.
 
@@ -387,7 +387,7 @@ STG representation
 
 These flags dump various phases of GHC's STG pipeline.
 
-.. ghc-flag:: -ddump-stg
+.. ghc-flag:: -ddump-stg-from-core
     :shortdesc: Show CoreToStg output
     :type: dynamic
 
@@ -410,6 +410,14 @@ These flags dump various phases of GHC's STG pipeline.
     :type: dynamic
 
     Show the output of the last STG pass before we generate Cmm.
+
+.. ghc-flag:: -ddump-stg
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-ddump-stg-from-core`
+    :type: dynamic
+
+    Alias for :ghc-flag:`-ddump-stg-from-core`. Deprecated in favor of more explicit
+    flags: :ghc-flag:`-ddump-stg-from-core`, :ghc-flag:`-ddump-stg-final`, etc.
+
 
 C-\\- representation
 ~~~~~~~~~~~~~~~~~~~~
@@ -836,6 +844,16 @@ Checking for consistency
 
     Turn on heavyweight intra-pass sanity-checking within GHC, at Core
     level. (It checks GHC's sanity, not yours.)
+
+.. ghc-flag:: -dlinear-core-lint
+    :shortdesc: Turn on internal sanity checking
+    :type: dynamic
+
+    Turn on linearity checking in GHC. Currently, some optimizations
+    in GHC might not preserve linearity and they valid programs might
+    fail Linear Core Lint.
+    In the near future, this option will be removed and folded into
+    normal Core Lint.
 
 .. ghc-flag:: -dstg-lint
     :shortdesc: STG pass sanity checking

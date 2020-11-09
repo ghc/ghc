@@ -27,8 +27,8 @@ module GHC.Core (
         mkLet, mkLets, mkLetNonRec, mkLetRec, mkLams,
         mkApps, mkTyApps, mkCoApps, mkVarApps, mkTyArg,
 
-        mkIntLit, mkIntLitInt,
-        mkWordLit, mkWordLitWord,
+        mkIntLit, mkIntLitWrap,
+        mkWordLit, mkWordLitWrap,
         mkWord64LitWord64, mkInt64LitInt64,
         mkCharLit, mkStringLit,
         mkFloatLit, mkFloatLitFloat,
@@ -99,7 +99,7 @@ module GHC.Core (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Platform
 
 import GHC.Types.CostCentre
@@ -112,13 +112,17 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env( NameEnv, emptyNameEnv )
 import GHC.Types.Literal
 import GHC.Core.DataCon
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Basic
-import Outputable
-import Util
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
-import Binary
+
+import GHC.Utils.Binary
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+
+import GHC.Driver.Ppr
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -144,10 +148,10 @@ These data types are the heart of the compiler
 -- We get from Haskell source to this Core language in a number of stages:
 --
 -- 1. The source code is parsed into an abstract syntax tree, which is represented
---    by the data type 'GHC.Hs.Expr.HsExpr' with the names being 'RdrName.RdrNames'
+--    by the data type 'GHC.Hs.Expr.HsExpr' with the names being 'GHC.Types.Name.Reader.RdrNames'
 --
--- 2. This syntax tree is /renamed/, which attaches a 'Unique.Unique' to every 'RdrName.RdrName'
---    (yielding a 'Name.Name') to disambiguate identifiers which are lexically identical.
+-- 2. This syntax tree is /renamed/, which attaches a 'GHC.Types.Unique.Unique' to every 'GHC.Types.Name.Reader.RdrName'
+--    (yielding a 'GHC.Types.Name.Name') to disambiguate identifiers which are lexically identical.
 --    For example, this program:
 --
 -- @
@@ -164,7 +168,7 @@ These data types are the heart of the compiler
 --    But see Note [Shadowing] below.
 --
 -- 3. The resulting syntax tree undergoes type checking (which also deals with instantiating
---    type class arguments) to yield a 'GHC.Hs.Expr.HsExpr' type that has 'Id.Id' as it's names.
+--    type class arguments) to yield a 'GHC.Hs.Expr.HsExpr' type that has 'GHC.Types.Id.Id' as it's names.
 --
 -- 4. Finally the syntax tree is /desugared/ from the expressive 'GHC.Hs.Expr.HsExpr' type into
 --    this 'Expr' type, which has far fewer constructors and hence is easier to perform
@@ -209,8 +213,8 @@ These data types are the heart of the compiler
 --    This is used to implement @newtype@s (a @newtype@ constructor or
 --    destructor just becomes a 'Cast' in Core) and GADTs.
 --
--- *  Notes. These allow general information to be added to expressions
---    in the syntax tree
+-- *  Ticks. These are used to represent all the source annotation we
+--    support: profiling SCCs, HPC ticks, and GHCi breakpoints.
 --
 -- *  A type: this should only show up at the top level of an Arg
 --
@@ -345,9 +349,10 @@ We have one literal, a literal Integer, that is lifted, and we don't
 allow in a LitAlt, because LitAlt cases don't do any evaluation. Also
 (see #5603) if you say
     case 3 of
-      S# x -> ...
-      J# _ _ -> ...
-(where S#, J# are the constructors for Integer) we don't want the
+      IS x -> ...
+      IP _ -> ...
+      IN _ -> ...
+(where IS, IP, IN are the constructors for Integer) we don't want the
 simplifier calling findAlt with argument (LitAlt 3).  No no.  Integer
 literals are an opaque encoding of an algebraic data type, not of
 an unlifted literal, like all the others.
@@ -518,6 +523,10 @@ checked by Core Lint.
 7. The type of the scrutinee must be the same as the type
    of the case binder, obviously.  Checked in lintCaseExpr.
 
+8. The multiplicity of the binders in constructor patterns must be the
+   multiplicity of the corresponding field /scaled by the multiplicity of the
+   case binder/. Checked in lintCoreAlt.
+
 Note [Core type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow a /non-recursive/, /non-top-level/ let to bind type and
@@ -533,7 +542,7 @@ substitutions until the next run of the simplifier.
      case (eq_sel d) of (co :: a ~# b) -> blah
   where eq_sel :: (a~b) -> (a~#b)
 
-  Or even even
+  Or even
       case (df @Int) of (co :: a ~# b) -> blah
   Which is very exotic, and I think never encountered; but see
   Note [Equality superclasses in quantified constraints]
@@ -568,10 +577,6 @@ Note [Core let goal]
 * The simplifier tries to ensure that if the RHS of a let is a constructor
   application, its arguments are trivial, so that the constructor can be
   inlined vigorously.
-
-Note [Type let]
-~~~~~~~~~~~~~~~
-See #type_let#
 
 Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -793,15 +798,18 @@ and case-of-case] in GHC.Core.Opt.Simplify):
   in
     jump j z w
 
-The body of the join point now returns a Bool, so the label `j` has to have its
-type updated accordingly. Inconvenient though this may be, it has the advantage
-that 'GHC.Core.Utils.exprType' can still return a type for any expression, including
-a jump.
+The body of the join point now returns a Bool, so the label `j` has to
+have its type updated accordingly, which is done by
+GHC.Core.Opt.Simplify.Env.adjustJoinPointType. Inconvenient though
+this may be, it has the advantage that 'GHC.Core.Utils.exprType' can
+still return a type for any expression, including a jump.
 
-This differs from the paper (see Note [Invariants on join points]). In the
-paper, we instead give j the type `Int -> Bool -> forall a. a`. Then each jump
-carries the "return type" as a parameter, exactly the way other non-returning
-functions like `error` work:
+Relationship to the paper
+
+This plan differs from the paper (see Note [Invariants on join
+points]). In the paper, we instead give j the type `Int -> Bool ->
+forall a. a`. Then each jump carries the "return type" as a parameter,
+exactly the way other non-returning functions like `error` work:
 
   case (join
           j :: Int -> Bool -> forall a. a
@@ -960,10 +968,10 @@ data Tickish id =
     { breakpointId     :: !Int
     , breakpointFVs    :: [id]  -- ^ the order of this list is important:
                                 -- it matches the order of the lists in the
-                                -- appropriate entry in GHC.Driver.Types.ModBreaks.
+                                -- appropriate entry in 'GHC.ByteCode.Types.ModBreaks'.
                                 --
                                 -- Careful about substitution!  See
-                                -- Note [substTickish] in GHC.Core.Subst.
+                                -- Note [substTickish] in "GHC.Core.Subst".
     }
 
   -- | A source note.
@@ -1291,7 +1299,7 @@ Orphan-hood is computed
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Transformation rules}
+\subsection{Rewrite rules}
 *                                                                      *
 ************************************************************************
 
@@ -1333,7 +1341,7 @@ data CoreRule
 
         -- Rough-matching stuff
         -- see comments with InstEnv.ClsInst( is_cls, is_rough )
-        ru_fn    :: Name,               -- ^ Name of the 'Id.Id' at the head of this rule
+        ru_fn    :: Name,               -- ^ Name of the 'GHC.Types.Id.Id' at the head of this rule
         ru_rough :: [Maybe Name],       -- ^ Name at the head of each argument to the left hand side
 
         -- Proper-matching stuff
@@ -1350,7 +1358,7 @@ data CoreRule
         ru_auto :: Bool,   -- ^ @True@  <=> this rule is auto-generated
                            --               (notably by Specialise or SpecConstr)
                            --   @False@ <=> generated at the user's behest
-                           -- See Note [Trimming auto-rules] in GHC.Iface.Tidy
+                           -- See Note [Trimming auto-rules] in "GHC.Iface.Tidy"
                            -- for the sole purpose of this field.
 
         ru_origin :: !Module,   -- ^ 'Module' the rule was defined in, used
@@ -1424,14 +1432,14 @@ ruleActivation :: CoreRule -> Activation
 ruleActivation (BuiltinRule { })       = AlwaysActive
 ruleActivation (Rule { ru_act = act }) = act
 
--- | The 'Name' of the 'Id.Id' at the head of the rule left hand side
+-- | The 'Name' of the 'GHC.Types.Id.Id' at the head of the rule left hand side
 ruleIdName :: CoreRule -> Name
 ruleIdName = ru_fn
 
 isLocalRule :: CoreRule -> Bool
 isLocalRule = ru_local
 
--- | Set the 'Name' of the 'Id.Id' at the head of the rule left hand side
+-- | Set the 'Name' of the 'GHC.Types.Id.Id' at the head of the rule left hand side
 setRuleIdName :: Name -> CoreRule -> CoreRule
 setRuleIdName nm ru = ru { ru_fn = nm }
 
@@ -1447,13 +1455,13 @@ The @Unfolding@ type is declared here to avoid numerous loops
 
 -- | Records the /unfolding/ of an identifier, which is approximately the form the
 -- identifier would have if we substituted its definition in for the identifier.
--- This type should be treated as abstract everywhere except in GHC.Core.Unfold
+-- This type should be treated as abstract everywhere except in "GHC.Core.Unfold"
 data Unfolding
   = NoUnfolding        -- ^ We have no information about the unfolding.
 
   | BootUnfolding      -- ^ We have no information about the unfolding, because
                        -- this 'Id' came from an @hi-boot@ file.
-                       -- See Note [Inlining and hs-boot files] in GHC.CoreToIface
+                       -- See Note [Inlining and hs-boot files] in "GHC.CoreToIface"
                        -- for what this is used for.
 
   | OtherCon [AltCon]  -- ^ It ain't one of these constructors.
@@ -1538,7 +1546,7 @@ data UnfoldingSource
 
   | InlineCompulsory   -- Something that *has* no binding, so you *must* inline it
                        -- Only a few primop-like things have this property
-                       -- (see MkId.hs, calls to mkCompulsoryUnfolding).
+                       -- (see "GHC.Types.Id.Make", calls to mkCompulsoryUnfolding).
                        -- Inline absolutely always, however boring the context.
 
 
@@ -1969,23 +1977,25 @@ mkTyArg ty
 
 -- | Create a machine integer literal expression of type @Int#@ from an @Integer@.
 -- If you want an expression of type @Int@ use 'GHC.Core.Make.mkIntExpr'
-mkIntLit      :: Platform -> Integer -> Expr b
--- | Create a machine integer literal expression of type @Int#@ from an @Int@.
--- If you want an expression of type @Int@ use 'GHC.Core.Make.mkIntExpr'
-mkIntLitInt   :: Platform -> Int     -> Expr b
+mkIntLit :: Platform -> Integer -> Expr b
+mkIntLit platform n = Lit (mkLitInt platform n)
 
-mkIntLit    platform n = Lit (mkLitInt platform n)
-mkIntLitInt platform n = Lit (mkLitInt platform (toInteger n))
+-- | Create a machine integer literal expression of type @Int#@ from an
+-- @Integer@, wrapping if necessary.
+-- If you want an expression of type @Int@ use 'GHC.Core.Make.mkIntExpr'
+mkIntLitWrap :: Platform -> Integer -> Expr b
+mkIntLitWrap platform n = Lit (mkLitIntWrap platform n)
 
 -- | Create a machine word literal expression of type  @Word#@ from an @Integer@.
 -- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
-mkWordLit     :: Platform -> Integer -> Expr b
--- | Create a machine word literal expression of type  @Word#@ from a @Word@.
--- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
-mkWordLitWord :: Platform -> Word -> Expr b
+mkWordLit :: Platform -> Integer -> Expr b
+mkWordLit platform w = Lit (mkLitWord platform w)
 
-mkWordLit     platform w = Lit (mkLitWord platform w)
-mkWordLitWord platform w = Lit (mkLitWord platform (toInteger w))
+-- | Create a machine word literal expression of type  @Word#@ from an
+-- @Integer@, wrapping if necessary.
+-- If you want an expression of type @Word@ use 'GHC.Core.Make.mkWordExpr'
+mkWordLitWrap :: Platform -> Integer -> Expr b
+mkWordLitWrap platform w = Lit (mkLitWordWrap platform w)
 
 mkWord64LitWord64 :: Word64 -> Expr b
 mkWord64LitWord64 w = Lit (mkLitWord64 (toInteger w))
@@ -2050,12 +2060,14 @@ mkLetRec :: [(b, Expr b)] -> Expr b -> Expr b
 mkLetRec [] body = body
 mkLetRec bs body = Let (Rec bs) body
 
--- | Create a binding group where a type variable is bound to a type. Per "GHC.Core#type_let",
+-- | Create a binding group where a type variable is bound to a type.
+-- Per Note [Core type and coercion invariant],
 -- this can only be used to bind something in a non-recursive @let@ expression
 mkTyBind :: TyVar -> Type -> CoreBind
 mkTyBind tv ty      = NonRec tv (Type ty)
 
--- | Create a binding group where a type variable is bound to a type. Per "GHC.Core#type_let",
+-- | Create a binding group where a type variable is bound to a type.
+-- Per Note [Core type and coercion invariant],
 -- this can only be used to bind something in a non-recursive @let@ expression
 mkCoBind :: CoVar -> Coercion -> CoreBind
 mkCoBind cv co      = NonRec cv (Coercion co)

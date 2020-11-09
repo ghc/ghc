@@ -1,5 +1,7 @@
-{-# LANGUAGE CPP, DeriveFunctor, GADTs, PatternSynonyms #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE CPP           #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GADTs         #-}
+{-# LANGUAGE LambdaCase    #-}
 
 -----------------------------------------------------------------------------
 --
@@ -19,14 +21,15 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.CmmToC (
-        writeC
-  ) where
+module GHC.CmmToC
+   ( cmmToC
+   )
+where
 
 #include "HsVersions.h"
 
 -- Cmm stuff
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
@@ -42,13 +45,15 @@ import GHC.Cmm.Switch
 -- Utils
 import GHC.CmmToAsm.CPrim
 import GHC.Driver.Session
-import FastString
-import Outputable
+import GHC.Driver.Ppr
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
-import Util
+import GHC.Utils.Misc
 
 -- The rest
 import Data.ByteString (ByteString)
@@ -59,17 +64,10 @@ import Data.Char
 import Data.List (intersperse)
 import Data.Map (Map)
 import Data.Word
-import System.IO
 import qualified Data.Map as Map
 import Control.Monad (ap)
 import qualified Data.Array.Unsafe as U ( castSTUArray )
 import Data.Array.ST
-
--- --------------------------------------------------------------------------
--- Top level
-
-writeC :: DynFlags -> Handle -> RawCmmGroup -> IO ()
-writeC dflags handle cmm = printForC dflags handle (pprC dflags cmm $$ blankLine)
 
 -- --------------------------------------------------------------------------
 -- Now do some real work
@@ -77,27 +75,27 @@ writeC dflags handle cmm = printForC dflags handle (pprC dflags cmm $$ blankLine
 -- for fun, we could call cmmToCmm over the tops...
 --
 
-pprC :: DynFlags -> RawCmmGroup -> SDoc
-pprC dflags tops = vcat $ intersperse blankLine $ map (pprTop dflags) tops
+cmmToC :: Platform -> RawCmmGroup -> SDoc
+cmmToC platform tops = (vcat $ intersperse blankLine $ map (pprTop platform) tops) $$ blankLine
 
 --
 -- top level procs
 --
-pprTop :: DynFlags -> RawCmmDecl -> SDoc
-pprTop dflags = \case
+pprTop :: Platform -> RawCmmDecl -> SDoc
+pprTop platform = \case
   (CmmProc infos clbl _in_live_regs graph) ->
     (case mapLookup (g_entry graph) infos of
        Nothing -> empty
        Just (CmmStaticsRaw info_clbl info_dat) ->
            pprDataExterns platform info_dat $$
-           pprWordArray dflags info_is_in_rodata info_clbl info_dat) $$
+           pprWordArray platform info_is_in_rodata info_clbl info_dat) $$
     (vcat [
            blankLine,
            extern_decls,
            (if (externallyVisibleCLabel clbl)
-                    then mkFN_ else mkIF_) (ppr clbl) <+> lbrace,
+                    then mkFN_ else mkIF_) (pprCLabel platform CStyle clbl) <+> lbrace,
            nest 8 temp_decls,
-           vcat (map (pprBBlock dflags) blocks),
+           vcat (map (pprBBlock platform) blocks),
            rbrace ]
     )
     where
@@ -114,22 +112,25 @@ pprTop dflags = \case
   (CmmData section (CmmStaticsRaw lbl [CmmString str])) ->
     pprExternDecl platform lbl $$
     hcat [
-      pprLocalness lbl, pprConstness (isSecConstant section), text "char ", ppr lbl,
+      pprLocalness lbl, pprConstness (isSecConstant section), text "char ", pprCLabel platform CStyle lbl,
       text "[] = ", pprStringInCStyle str, semi
     ]
 
   (CmmData section (CmmStaticsRaw lbl [CmmUninitialised size])) ->
     pprExternDecl platform lbl $$
     hcat [
-      pprLocalness lbl, pprConstness (isSecConstant section), text "char ", ppr lbl,
+      pprLocalness lbl, pprConstness (isSecConstant section), text "char ", pprCLabel platform CStyle lbl,
       brackets (int size), semi
     ]
 
   (CmmData section (CmmStaticsRaw lbl lits)) ->
     pprDataExterns platform lits $$
-    pprWordArray dflags (isSecConstant section) lbl lits
+    pprWordArray platform (isSecConstant section) lbl lits
   where
-    platform = targetPlatform dflags
+    isSecConstant section = case sectionProtection section of
+      ReadOnlySection -> True
+      WriteProtectedSection -> True
+      _ -> False
 
 -- --------------------------------------------------------------------------
 -- BasicBlocks are self-contained entities: they always end in a jump.
@@ -138,10 +139,10 @@ pprTop dflags = \case
 -- as many jumps as possible into fall throughs.
 --
 
-pprBBlock :: DynFlags -> CmmBlock -> SDoc
-pprBBlock dflags block =
+pprBBlock :: Platform -> CmmBlock -> SDoc
+pprBBlock platform block =
   nest 4 (pprBlockId (entryLabel block) <> colon) $$
-  nest 8 (vcat (map (pprStmt dflags) (blockToList nodes)) $$ pprStmt dflags last)
+  nest 8 (vcat (map (pprStmt platform) (blockToList nodes)) $$ pprStmt platform last)
  where
   (_, nodes, last)  = blockSplit block
 
@@ -149,19 +150,17 @@ pprBBlock dflags block =
 -- Info tables. Just arrays of words.
 -- See codeGen/ClosureInfo, and nativeGen/PprMach
 
-pprWordArray :: DynFlags -> Bool -> CLabel -> [CmmStatic] -> SDoc
-pprWordArray dflags is_ro lbl ds
+pprWordArray :: Platform -> Bool -> CLabel -> [CmmStatic] -> SDoc
+pprWordArray platform is_ro lbl ds
   = -- TODO: align closures only
     pprExternDecl platform lbl $$
     hcat [ pprLocalness lbl, pprConstness is_ro, text "StgWord"
-         , space, ppr lbl, text "[]"
+         , space, pprCLabel platform CStyle lbl, text "[]"
          -- See Note [StgWord alignment]
          , pprAlignment (wordWidth platform)
          , text "= {" ]
-    $$ nest 8 (commafy (pprStatics dflags ds))
+    $$ nest 8 (commafy (pprStatics platform ds))
     $$ text "};"
-  where
-    platform = targetPlatform dflags
 
 pprAlignment :: Width -> SDoc
 pprAlignment words =
@@ -199,9 +198,8 @@ pprConstness is_ro | is_ro = text "const "
 -- Statements.
 --
 
-pprStmt :: DynFlags -> CmmNode e x -> SDoc
-
-pprStmt dflags stmt =
+pprStmt :: Platform -> CmmNode e x -> SDoc
+pprStmt platform stmt =
     case stmt of
     CmmEntry{}   -> empty
     CmmComment _ -> empty -- (hang (text "/*") 3 (ftext s)) $$ ptext (sLit "*/")
@@ -213,19 +211,18 @@ pprStmt dflags stmt =
     CmmTick _ -> empty
     CmmUnwind{} -> empty
 
-    CmmAssign dest src -> pprAssign dflags dest src
+    CmmAssign dest src -> pprAssign platform dest src
 
     CmmStore  dest src
         | typeWidth rep == W64 && wordWidth platform /= W64
         -> (if isFloatType rep then text "ASSIGN_DBL"
                                else ptext (sLit ("ASSIGN_Word64"))) <>
-           parens (mkP_ <> pprExpr1 dflags dest <> comma <> pprExpr dflags src) <> semi
+           parens (mkP_ <> pprExpr1 platform dest <> comma <> pprExpr platform src) <> semi
 
         | otherwise
-        -> hsep [ pprExpr dflags (CmmLoad dest rep), equals, pprExpr dflags src <> semi ]
+        -> hsep [ pprExpr platform (CmmLoad dest rep), equals, pprExpr platform src <> semi ]
         where
           rep = cmmExprType platform src
-          platform = targetPlatform dflags
 
     CmmUnsafeForeignCall target@(ForeignTarget fn conv) results args ->
         fnCall
@@ -233,29 +230,28 @@ pprStmt dflags stmt =
         (res_hints, arg_hints) = foreignTargetHints target
         hresults = zip results res_hints
         hargs    = zip args arg_hints
-        platform = targetPlatform dflags
 
         ForeignConvention cconv _ _ ret = conv
 
-        cast_fn = parens (cCast dflags (pprCFunType platform (char '*') cconv hresults hargs) fn)
+        cast_fn = parens (cCast platform (pprCFunType platform (char '*') cconv hresults hargs) fn)
 
         -- See wiki:commentary/compiler/backends/ppr-c#prototypes
         fnCall =
             case fn of
               CmmLit (CmmLabel lbl)
                 | StdCallConv <- cconv ->
-                    pprCall dflags (ppr lbl) cconv hresults hargs
+                    pprCall platform (pprCLabel platform CStyle lbl) cconv hresults hargs
                         -- stdcall functions must be declared with
                         -- a function type, otherwise the C compiler
                         -- doesn't add the @n suffix to the label.  We
                         -- can't add the @n suffix ourselves, because
                         -- it isn't valid C.
                 | CmmNeverReturns <- ret ->
-                    pprCall dflags cast_fn cconv hresults hargs <> semi
+                    pprCall platform cast_fn cconv hresults hargs <> semi
                 | not (isMathFun lbl) ->
-                    pprForeignCall dflags (ppr lbl) cconv hresults hargs
+                    pprForeignCall platform (pprCLabel platform CStyle lbl) cconv hresults hargs
               _ ->
-                    pprCall dflags cast_fn cconv hresults hargs <> semi
+                    pprCall platform cast_fn cconv hresults hargs <> semi
                         -- for a dynamic call, no declaration is necessary.
 
     CmmUnsafeForeignCall (PrimTarget MO_Touch) _results _args -> empty
@@ -278,28 +274,27 @@ pprStmt dflags stmt =
           -- builtins (see bug #5967).
           | Just _align <- machOpMemcpyishAlign op
           = (text ";EFF_(" <> fn <> char ')' <> semi) $$
-            pprForeignCall dflags fn cconv hresults hargs
+            pprForeignCall platform fn cconv hresults hargs
           | otherwise
-          = pprCall dflags fn cconv hresults hargs
+          = pprCall platform fn cconv hresults hargs
 
     CmmBranch ident               -> pprBranch ident
-    CmmCondBranch expr yes no _   -> pprCondBranch dflags expr yes no
-    CmmCall { cml_target = expr } -> mkJMP_ (pprExpr dflags expr) <> semi
-    CmmSwitch arg ids             -> pprSwitch dflags arg ids
+    CmmCondBranch expr yes no _   -> pprCondBranch platform expr yes no
+    CmmCall { cml_target = expr } -> mkJMP_ (pprExpr platform expr) <> semi
+    CmmSwitch arg ids             -> pprSwitch platform arg ids
 
-    _other -> pprPanic "PprC.pprStmt" (ppr stmt)
+    _other -> pprPanic "PprC.pprStmt" (pdoc platform stmt)
 
 type Hinted a = (a, ForeignHint)
 
-pprForeignCall :: DynFlags -> SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual]
+pprForeignCall :: Platform -> SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual]
                -> SDoc
-pprForeignCall dflags fn cconv results args = fn_call
+pprForeignCall platform fn cconv results args = fn_call
   where
-    platform = targetPlatform dflags
     fn_call = braces (
                  pprCFunType platform (char '*' <> text "ghcFunPtr") cconv results args <> semi
               $$ text "ghcFunPtr" <+> equals <+> cast_fn <> semi
-              $$ pprCall dflags (text "ghcFunPtr") cconv results args <> semi
+              $$ pprCall platform (text "ghcFunPtr") cconv results args <> semi
              )
     cast_fn = parens (parens (pprCFunType platform (char '*') cconv results args) <> fn)
 
@@ -322,9 +317,9 @@ pprBranch ident = text "goto" <+> pprBlockId ident <> semi
 
 -- ---------------------------------------------------------------------
 -- conditional branches to local labels
-pprCondBranch :: DynFlags -> CmmExpr -> BlockId -> BlockId -> SDoc
-pprCondBranch dflags expr yes no
-        = hsep [ text "if" , parens(pprExpr dflags expr) ,
+pprCondBranch :: Platform -> CmmExpr -> BlockId -> BlockId -> SDoc
+pprCondBranch platform expr yes no
+        = hsep [ text "if" , parens (pprExpr platform expr) ,
                         text "goto", pprBlockId yes <> semi,
                         text "else goto", pprBlockId no <> semi ]
 
@@ -333,23 +328,22 @@ pprCondBranch dflags expr yes no
 --
 -- we find the fall-through cases
 --
-pprSwitch :: DynFlags -> CmmExpr -> SwitchTargets -> SDoc
-pprSwitch dflags e ids
-  = (hang (text "switch" <+> parens ( pprExpr dflags e ) <+> lbrace)
+pprSwitch :: Platform -> CmmExpr -> SwitchTargets -> SDoc
+pprSwitch platform e ids
+  = (hang (text "switch" <+> parens ( pprExpr platform e ) <+> lbrace)
                 4 (vcat ( map caseify pairs ) $$ def)) $$ rbrace
   where
     (pairs, mbdef) = switchTargetsFallThrough ids
-    platform = targetPlatform dflags
 
     -- fall through case
     caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
         where
         do_fallthrough ix =
-                 hsep [ text "case" , pprHexVal dflags ix (wordWidth platform) <> colon ,
+                 hsep [ text "case" , pprHexVal platform ix (wordWidth platform) <> colon ,
                         text "/* fall through */" ]
 
         final_branch ix =
-                hsep [ text "case" , pprHexVal dflags ix (wordWidth platform) <> colon ,
+                hsep [ text "case" , pprHexVal platform ix (wordWidth platform) <> colon ,
                        text "goto" , (pprBlockId ident) <> semi ]
 
     caseify (_     , _    ) = panic "pprSwitch: switch with no cases!"
@@ -371,30 +365,28 @@ pprSwitch dflags e ids
 --
 -- (similar invariants apply to the rest of the pretty printer).
 
-pprExpr :: DynFlags -> CmmExpr -> SDoc
-pprExpr dflags e = case e of
-    CmmLit lit      -> pprLit dflags lit
-    CmmLoad e ty    -> pprLoad dflags e ty
+pprExpr :: Platform -> CmmExpr -> SDoc
+pprExpr platform e = case e of
+    CmmLit lit      -> pprLit platform lit
+    CmmLoad e ty    -> pprLoad platform e ty
     CmmReg reg      -> pprCastReg reg
     CmmRegOff reg 0 -> pprCastReg reg
 
     -- CmmRegOff is an alias of MO_Add
     CmmRegOff reg i -> pprCastReg reg <> char '+' <>
-                       pprHexVal dflags (fromIntegral i) (wordWidth platform)
+                       pprHexVal platform (fromIntegral i) (wordWidth platform)
 
-    CmmMachOp mop args -> pprMachOpApp dflags mop args
+    CmmMachOp mop args -> pprMachOpApp platform mop args
 
     CmmStackSlot _ _   -> panic "pprExpr: CmmStackSlot not supported!"
-  where
-    platform = targetPlatform dflags
 
 
-pprLoad :: DynFlags -> CmmExpr -> CmmType -> SDoc
-pprLoad dflags e ty
+pprLoad :: Platform -> CmmExpr -> CmmType -> SDoc
+pprLoad platform e ty
   | width == W64, wordWidth platform /= W64
   = (if isFloatType ty then text "PK_DBL"
                        else text "PK_Word64")
-    <> parens (mkP_ <> pprExpr1 dflags e)
+    <> parens (mkP_ <> pprExpr1 platform e)
 
   | otherwise
   = case e of
@@ -410,34 +402,33 @@ pprLoad dflags e ty
         --       (For tagging to work, I had to avoid unaligned loads. --ARY)
                         -> pprAsPtrReg r <> brackets (ppr (off `shiftR` wordShift platform))
 
-        _other -> cLoad dflags e ty
+        _other -> cLoad platform e ty
   where
     width = typeWidth ty
-    platform = targetPlatform dflags
 
-pprExpr1 :: DynFlags -> CmmExpr -> SDoc
-pprExpr1 dflags e = case e of
-   CmmLit lit  -> pprLit1 dflags lit
-   CmmReg _reg -> pprExpr dflags e
-   _           -> parens (pprExpr dflags e)
+pprExpr1 :: Platform -> CmmExpr -> SDoc
+pprExpr1 platform e = case e of
+   CmmLit lit  -> pprLit1 platform lit
+   CmmReg _reg -> pprExpr platform e
+   _           -> parens (pprExpr platform e)
 
 -- --------------------------------------------------------------------------
 -- MachOp applications
 
-pprMachOpApp :: DynFlags -> MachOp -> [CmmExpr] -> SDoc
+pprMachOpApp :: Platform -> MachOp -> [CmmExpr] -> SDoc
 
-pprMachOpApp dflags op args
+pprMachOpApp platform op args
   | isMulMayOfloOp op
-  = text "mulIntMayOflo" <> parens (commafy (map (pprExpr dflags) args))
+  = text "mulIntMayOflo" <> parens (commafy (map (pprExpr platform) args))
   where isMulMayOfloOp (MO_U_MulMayOflo _) = True
         isMulMayOfloOp (MO_S_MulMayOflo _) = True
         isMulMayOfloOp _ = False
 
-pprMachOpApp dflags mop args
+pprMachOpApp platform mop args
   | Just ty <- machOpNeedsCast mop
-  = ty <> parens (pprMachOpApp' dflags mop args)
+  = ty <> parens (pprMachOpApp' platform mop args)
   | otherwise
-  = pprMachOpApp' dflags mop args
+  = pprMachOpApp' platform mop args
 
 -- Comparisons in C have type 'int', but we want type W_ (this is what
 -- resultRepOfMachOp says).  The other C operations inherit their type
@@ -447,8 +438,8 @@ machOpNeedsCast mop
   | isComparisonMachOp mop = Just mkW_
   | otherwise              = Nothing
 
-pprMachOpApp' :: DynFlags -> MachOp -> [CmmExpr] -> SDoc
-pprMachOpApp' dflags mop args
+pprMachOpApp' :: Platform -> MachOp -> [CmmExpr] -> SDoc
+pprMachOpApp' platform mop args
  = case args of
     -- dyadic
     [x,y] -> pprArg x <+> pprMachOp_for_C platform mop <+> pprArg y
@@ -459,11 +450,10 @@ pprMachOpApp' dflags mop args
     _     -> panic "PprC.pprMachOp : machop with wrong number of args"
 
   where
-    platform = targetPlatform dflags
         -- Cast needed for signed integer ops
-    pprArg e | signedOp    mop = cCast dflags (machRep_S_CType platform (typeWidth (cmmExprType platform e))) e
-             | needsFCasts mop = cCast dflags (machRep_F_CType (typeWidth (cmmExprType platform e))) e
-             | otherwise       = pprExpr1 dflags e
+    pprArg e | signedOp    mop = cCast platform (machRep_S_CType platform (typeWidth (cmmExprType platform e))) e
+             | needsFCasts mop = cCast platform (machRep_F_CType (typeWidth (cmmExprType platform e))) e
+             | otherwise       = pprExpr1 platform e
     needsFCasts (MO_F_Eq _)   = False
     needsFCasts (MO_F_Ne _)   = False
     needsFCasts (MO_F_Neg _)  = True
@@ -473,9 +463,9 @@ pprMachOpApp' dflags mop args
 -- --------------------------------------------------------------------------
 -- Literals
 
-pprLit :: DynFlags -> CmmLit -> SDoc
-pprLit dflags lit = case lit of
-    CmmInt i rep      -> pprHexVal dflags i rep
+pprLit :: Platform -> CmmLit -> SDoc
+pprLit platform lit = case lit of
+    CmmInt i rep      -> pprHexVal platform i rep
 
     CmmFloat f w       -> parens (machRep_F_CType w) <> str
         where d = fromRational f :: Double
@@ -499,40 +489,39 @@ pprLit dflags lit = case lit of
         -> mkW_ <> pprCLabelAddr clbl1 <> char '+' <> int i
 
     where
-        pprCLabelAddr lbl = char '&' <> ppr lbl
+        pprCLabelAddr lbl = char '&' <> pprCLabel platform CStyle lbl
 
-pprLit1 :: DynFlags -> CmmLit -> SDoc
-pprLit1 dflags lit = case lit of
-   (CmmLabelOff _ _)         -> parens (pprLit dflags lit)
-   (CmmLabelDiffOff _ _ _ _) -> parens (pprLit dflags lit)
-   (CmmFloat _ _)            -> parens (pprLit dflags lit)
-   _                         -> pprLit dflags lit
+pprLit1 :: Platform -> CmmLit -> SDoc
+pprLit1 platform lit = case lit of
+   (CmmLabelOff _ _)         -> parens (pprLit platform lit)
+   (CmmLabelDiffOff _ _ _ _) -> parens (pprLit platform lit)
+   (CmmFloat _ _)            -> parens (pprLit platform lit)
+   _                         -> pprLit platform lit
 
 -- ---------------------------------------------------------------------------
 -- Static data
 
-pprStatics :: DynFlags -> [CmmStatic] -> [SDoc]
-pprStatics dflags = pprStatics'
+pprStatics :: Platform -> [CmmStatic] -> [SDoc]
+pprStatics platform = pprStatics'
   where
-    platform    = targetPlatform dflags
     pprStatics' = \case
       [] -> []
       (CmmStaticLit (CmmFloat f W32) : rest)
         -- odd numbers of floats are padded to a word by mkVirtHeapOffsetsWithPadding
         | wordWidth platform == W64, CmmStaticLit (CmmInt 0 W32) : rest' <- rest
-        -> pprLit1 dflags (floatToWord platform f) : pprStatics' rest'
+        -> pprLit1 platform (floatToWord platform f) : pprStatics' rest'
         -- adjacent floats aren't padded but combined into a single word
         | wordWidth platform == W64, CmmStaticLit (CmmFloat g W32) : rest' <- rest
-        -> pprLit1 dflags (floatPairToWord platform f g) : pprStatics' rest'
+        -> pprLit1 platform (floatPairToWord platform f g) : pprStatics' rest'
         | wordWidth platform == W32
-        -> pprLit1 dflags (floatToWord platform f) : pprStatics' rest
+        -> pprLit1 platform (floatToWord platform f) : pprStatics' rest
         | otherwise
         -> pprPanic "pprStatics: float" (vcat (map ppr' rest))
           where ppr' (CmmStaticLit l) = ppr (cmmLitType platform l)
                 ppr' _other           = text "bad static!"
 
       (CmmStaticLit (CmmFloat f W64) : rest)
-        -> map (pprLit1 dflags) (doubleToWords platform f) ++ pprStatics' rest
+        -> map (pprLit1 platform) (doubleToWords platform f) ++ pprStatics' rest
 
       (CmmStaticLit (CmmInt i W64) : rest)
         | wordWidth platform == W32
@@ -561,15 +550,15 @@ pprStatics dflags = pprStatics'
         -> pprPanic "pprStatics: cannot emit a non-word-sized static literal" (ppr w)
 
       (CmmStaticLit lit : rest)
-        -> pprLit1 dflags lit : pprStatics' rest
+        -> pprLit1 platform lit : pprStatics' rest
 
       (other : _)
-        -> pprPanic "pprStatics: other" (pprStatic dflags other)
+        -> pprPanic "pprStatics: other" (pprStatic platform other)
 
-pprStatic :: DynFlags -> CmmStatic -> SDoc
-pprStatic dflags s = case s of
+pprStatic :: Platform -> CmmStatic -> SDoc
+pprStatic platform s = case s of
 
-    CmmStaticLit lit   -> nest 4 (pprLit dflags lit)
+    CmmStaticLit lit   -> nest 4 (pprLit platform lit)
     CmmUninitialised i -> nest 4 (mkC_ <> brackets (int i))
 
     -- these should be inlined, like the old .hc
@@ -831,6 +820,7 @@ pprCallishMachOp_for_C mop
         (MO_Ctz w)      -> ptext (sLit $ ctzLabel w)
         (MO_AtomicRMW w amop) -> ptext (sLit $ atomicRMWLabel w amop)
         (MO_Cmpxchg w)  -> ptext (sLit $ cmpxchgLabel w)
+        (MO_Xchg w)     -> ptext (sLit $ xchgLabel w)
         (MO_AtomicRead w)  -> ptext (sLit $ atomicReadLabel w)
         (MO_AtomicWrite w) -> ptext (sLit $ atomicWriteLabel w)
         (MO_UF_Conv w)  -> ptext (sLit $ word2FloatLabel w)
@@ -876,7 +866,7 @@ mkP_  = text "(P_)"        -- StgWord*
 --
 -- Generating assignments is what we're all about, here
 --
-pprAssign :: DynFlags -> CmmReg -> CmmExpr -> SDoc
+pprAssign :: Platform -> CmmReg -> CmmExpr -> SDoc
 
 -- dest is a reg, rhs is a reg
 pprAssign _ r1 (CmmReg r2)
@@ -884,11 +874,10 @@ pprAssign _ r1 (CmmReg r2)
    = hcat [ pprAsPtrReg r1, equals, pprAsPtrReg r2, semi ]
 
 -- dest is a reg, rhs is a CmmRegOff
-pprAssign dflags r1 (CmmRegOff r2 off)
+pprAssign platform r1 (CmmRegOff r2 off)
    | isPtrReg r1 && isPtrReg r2 && (off `rem` platformWordSizeInBytes platform == 0)
    = hcat [ pprAsPtrReg r1, equals, pprAsPtrReg r2, op, int off', semi ]
   where
-        platform = targetPlatform dflags
         off1 = off `shiftR` wordShift platform
 
         (op,off') | off >= 0  = (char '+', off1)
@@ -897,10 +886,10 @@ pprAssign dflags r1 (CmmRegOff r2 off)
 -- dest is a reg, rhs is anything.
 -- We can't cast the lvalue, so we have to cast the rhs if necessary.  Casting
 -- the lvalue elicits a warning from new GCC versions (3.4+).
-pprAssign dflags r1 r2
-  | isFixedPtrReg r1             = mkAssign (mkP_ <> pprExpr1 dflags r2)
-  | Just ty <- strangeRegType r1 = mkAssign (parens ty <> pprExpr1 dflags r2)
-  | otherwise                    = mkAssign (pprExpr dflags r2)
+pprAssign platform r1 r2
+  | isFixedPtrReg r1             = mkAssign (mkP_ <> pprExpr1 platform r2)
+  | Just ty <- strangeRegType r1 = mkAssign (parens ty <> pprExpr1 platform r2)
+  | otherwise                    = mkAssign (pprExpr platform r2)
     where mkAssign x = if r1 == CmmGlobal BaseReg
                        then text "ASSIGN_BaseReg" <> parens x <> semi
                        else pprReg r1 <> text " = " <> x <> semi
@@ -999,8 +988,8 @@ pprLocalReg (LocalReg uniq _) = char '_' <> ppr uniq
 -- -----------------------------------------------------------------------------
 -- Foreign Calls
 
-pprCall :: DynFlags -> SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual] -> SDoc
-pprCall dflags ppr_fn cconv results args
+pprCall :: Platform -> SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual] -> SDoc
+pprCall platform ppr_fn cconv results args
   | not (is_cishCC cconv)
   = panic $ "pprCall: unknown calling convention"
 
@@ -1008,8 +997,6 @@ pprCall dflags ppr_fn cconv results args
   =
     ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi
   where
-     platform = targetPlatform dflags
-
      ppr_assign []           rhs = rhs
      ppr_assign [(one,hint)] rhs
          = pprLocalReg one <> text " = "
@@ -1017,12 +1004,12 @@ pprCall dflags ppr_fn cconv results args
      ppr_assign _other _rhs = panic "pprCall: multiple results"
 
      pprArg (expr, AddrHint)
-        = cCast dflags (text "void *") expr
+        = cCast platform (text "void *") expr
         -- see comment by machRepHintCType below
      pprArg (expr, SignedHint)
-        = cCast dflags (machRep_S_CType platform $ typeWidth $ cmmExprType platform expr) expr
+        = cCast platform (machRep_S_CType platform $ typeWidth $ cmmExprType platform expr) expr
      pprArg (expr, _other)
-        = pprExpr dflags expr
+        = pprExpr platform expr
 
      pprUnHint AddrHint   rep = parens (machRepCType platform rep)
      pprUnHint SignedHint rep = parens (machRepCType platform rep)
@@ -1062,7 +1049,7 @@ pprExternDecl platform lbl
   | not (needsCDecl lbl) = empty
   | Just sz <- foreignLabelStdcallInfo lbl = stdcall_decl sz
   | otherwise =
-        hcat [ visibility, label_type lbl , lparen, ppr lbl, text ");"
+        hcat [ visibility, label_type lbl , lparen, pprCLabel platform CStyle lbl, text ");"
              -- occasionally useful to see label type
              -- , text "/* ", pprDebugCLabel lbl, text " */"
              ]
@@ -1085,7 +1072,7 @@ pprExternDecl platform lbl
   -- we must generate an appropriate prototype for it, so that the C compiler will
   -- add the @n suffix to the label (#2276)
   stdcall_decl sz =
-        text "extern __attribute__((stdcall)) void " <> ppr lbl
+        text "extern __attribute__((stdcall)) void " <> pprCLabel platform CStyle lbl
         <> parens (commafy (replicate (sz `quot` platformWordSizeInBytes platform) (machRep_U_CType platform (wordWidth platform))))
         <> semi
 
@@ -1154,18 +1141,18 @@ te_Reg _            = return ()
 -- ---------------------------------------------------------------------
 -- C types for MachReps
 
-cCast :: DynFlags -> SDoc -> CmmExpr -> SDoc
-cCast dflags ty expr = parens ty <> pprExpr1 dflags expr
+cCast :: Platform -> SDoc -> CmmExpr -> SDoc
+cCast platform ty expr = parens ty <> pprExpr1 platform expr
 
-cLoad :: DynFlags -> CmmExpr -> CmmType -> SDoc
-cLoad dflags expr rep
+cLoad :: Platform -> CmmExpr -> CmmType -> SDoc
+cLoad platform expr rep
     = if bewareLoadStoreAlignment (platformArch platform)
       then let decl = machRepCType platform rep <+> text "x" <> semi
                struct = text "struct" <+> braces (decl)
                packed_attr = text "__attribute__((packed))"
                cast = parens (struct <+> packed_attr <> char '*')
-           in parens (cast <+> pprExpr1 dflags expr) <> text "->x"
-      else char '*' <> parens (cCast dflags (machRepPtrCType platform rep) expr)
+           in parens (cast <+> pprExpr1 platform expr) <> text "->x"
+      else char '*' <> parens (cCast platform (machRepPtrCType platform rep) expr)
     where -- On these platforms, unaligned loads are known to cause problems
           bewareLoadStoreAlignment ArchAlpha    = True
           bewareLoadStoreAlignment ArchMipseb   = True
@@ -1178,7 +1165,6 @@ cLoad dflags expr rep
           -- on unknown arches
           bewareLoadStoreAlignment ArchUnknown  = True
           bewareLoadStoreAlignment _            = False
-          platform = targetPlatform dflags
 
 isCmmWordType :: Platform -> CmmType -> Bool
 -- True of GcPtrReg/NonGcReg of native word size
@@ -1340,8 +1326,8 @@ commafy :: [SDoc] -> SDoc
 commafy xs = hsep $ punctuate comma xs
 
 -- Print in C hex format: 0x13fa
-pprHexVal :: DynFlags -> Integer -> Width -> SDoc
-pprHexVal dflags w rep
+pprHexVal :: Platform -> Integer -> Width -> SDoc
+pprHexVal platform w rep
   | w < 0     = parens (char '-' <>
                     text "0x" <> intToDoc (-w) <> repsuffix rep)
   | otherwise =     text "0x" <> intToDoc   w  <> repsuffix rep
@@ -1352,10 +1338,12 @@ pprHexVal dflags w rep
         -- times values are unsigned.  This also helps eliminate occasional
         -- warnings about integer overflow from gcc.
 
+      constants = platformConstants platform
+
       repsuffix W64 =
-               if cINT_SIZE       dflags == 8 then char 'U'
-          else if cLONG_SIZE      dflags == 8 then text "UL"
-          else if cLONG_LONG_SIZE dflags == 8 then text "ULL"
+               if pc_CINT_SIZE       constants == 8 then char 'U'
+          else if pc_CLONG_SIZE      constants == 8 then text "UL"
+          else if pc_CLONG_LONG_SIZE constants == 8 then text "ULL"
           else panic "pprHexVal: Can't find a 64-bit type"
       repsuffix _ = char 'U'
 

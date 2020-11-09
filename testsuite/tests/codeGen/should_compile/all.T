@@ -6,6 +6,8 @@ test('cg005', only_ways(['optasm']), compile, [''])
 test('cg006', normal, compile, [''])
 test('cg007', normal, compile, [''])
 test('cg008', normal, compile, [''])
+# 009/010 have their own all.T file
+test('cg011', normal, compile, [''])
 
 test('T1916', normal, compile, [''])
 test('T2388', normal, compile, [''])
@@ -19,15 +21,15 @@ test('massive_array',
      [ when(arch('i386'), omit_ways(llvm_ways)) ],
      compile, ['-fPIC'])
 test('T7237', normal, compile, [''])
-test('T7574', [cmm_src, omit_ways(llvm_ways)], compile, [''])
+test('T7574', [cmm_src, omit_ways(llvm_ways)], compile, ['-no-hs-main'])
 test('T8205', normal, compile, ['-O0'])
 test('T9155', normal, compile, ['-O2'])
 test('T9303', normal, compile, ['-O2'])
-test('T9329', [when(unregisterised(), expect_broken(15467)), cmm_src], compile, [''])
+test('T9329', [when(unregisterised(), expect_broken(15467)), cmm_src], compile, ['-no-hs-main'])
 
 test('debug', normal, makefile_test, [])
 test('T9964', normal, compile, ['-O'])
-test('T10518', [cmm_src], compile, [''])
+test('T10518', [cmm_src], compile, ['-no-hs-main'])
 test('T10667', normal, compile, ['-g'])
 test('T12115', normal, compile, [''])
 test('T12355', normal, compile, [''])
@@ -87,3 +89,17 @@ test('T14373d', [],
 
 test('T17648', normal, makefile_test, [])
 test('T17904', normal, compile, ['-O'])
+test('T18227A', normal, compile, [''])
+test('T18227B', normal, compile, [''])
+
+# runRW#-related
+test('T18291', normal, compile, ['-O0'])
+test('T18397', normal, compile, ['-O0'])
+
+test('T15570',
+   when(unregisterised(), skip),
+   compile, ['-Wno-overflowed-literals'])
+   # skipped with CmmToC because it generates a warning:
+   #   warning: integer constant is so large that it is unsigned
+
+test('T18614', normal, compile, [''])

@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 -- | Pretty-printing types and coercions.
 module GHC.Core.TyCo.Ppr
   (
@@ -20,23 +22,19 @@ module GHC.Core.TyCo.Ppr
         pprCo, pprParendCo,
 
         debugPprType,
-
-        -- * Pretty-printing 'TyThing's
-        pprTyThingCategory, pprShortTyThing,
   ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.CoreToIface
    ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
    , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercionX )
 
 import {-# SOURCE #-} GHC.Core.DataCon
-   ( dataConFullSig , dataConUserTyVarBinders
-   , DataCon )
+   ( dataConFullSig , dataConUserTyVarBinders, DataCon )
 
-import {-# SOURCE #-} GHC.Core.Type
-   ( isLiftedTypeKind )
+import GHC.Core.Type ( pickyIsLiftedTypeKind, pattern One, pattern Many,
+                       splitForAllTysReq, splitForAllTysInvis )
 
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
@@ -50,7 +48,8 @@ import GHC.Iface.Type
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Basic ( PprPrec(..), topPrec, sigPrec, opPrec
                        , funPrec, appPrec, maybeParen )
 
@@ -77,7 +76,7 @@ See Note [Precedence in types] in GHC.Types.Basic.
 --------------------------------------------------------
 -- When pretty-printing types, we convert to IfaceType,
 --   and pretty-print that.
--- See Note [Pretty printing via Iface syntax] in GHC.Core.Ppr.TyThing
+-- See Note [Pretty printing via Iface syntax] in GHC.Types.TyThing.Ppr
 --------------------------------------------------------
 
 pprType, pprParendType, pprTidiedType :: Type -> SDoc
@@ -93,7 +92,8 @@ pprPrecType = pprPrecTypeX emptyTidyEnv
 pprPrecTypeX :: TidyEnv -> PprPrec -> Type -> SDoc
 pprPrecTypeX env prec ty
   = getPprStyle $ \sty ->
-    if debugStyle sty           -- Use debugPprType when in
+    getPprDebug $ \debug ->
+    if debug                    -- Use debugPprType when in
     then debug_ppr_ty prec ty   -- when in debug-style
     else pprPrecIfaceType prec (tidyToIfaceTypeStyX env ty sty)
     -- NB: debug-style is used for -dppr-debug
@@ -170,7 +170,8 @@ pprSigmaType = pprIfaceSigmaType ShowForAllWhen . tidyToIfaceType
 pprForAll :: [TyCoVarBinder] -> SDoc
 pprForAll tvs = pprIfaceForAll (map toIfaceForAllBndr tvs)
 
--- | Print a user-level forall; see Note [When to print foralls] in this module.
+-- | Print a user-level forall; see @Note [When to print foralls]@ in
+-- "GHC.Iface.Type".
 pprUserForAll :: [TyCoVarBinder] -> SDoc
 pprUserForAll = pprUserIfaceForAll . map toIfaceForAllBndr
 
@@ -189,10 +190,34 @@ pprTyVar :: TyVar -> SDoc
 -- pprIfaceTvBndr is minimal, and the loss of uniques etc in
 -- debug printing is disastrous
 pprTyVar tv
-  | isLiftedTypeKind kind = ppr tv
-  | otherwise             = parens (ppr tv <+> dcolon <+> ppr kind)
+  | pickyIsLiftedTypeKind kind = ppr tv  -- See Note [Suppressing * kinds]
+  | otherwise                  = parens (ppr tv <+> dcolon <+> ppr kind)
   where
     kind = tyVarKind tv
+
+{- Note [Suppressing * kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally we want to print
+      forall a. a->a
+not   forall (a::*). a->a
+or    forall (a::Type). a->a
+That is, for brevity we suppress a kind ascription of '*' (or Type).
+
+But what if the kind is (Const Type x)?
+   type Const p q = p
+
+Then (Const Type x) is just a long way of saying Type.  But it may be
+jolly confusing to suppress the 'x'.  Suppose we have (polykinds/T18451a)
+   foo :: forall a b (c :: Const Type b). Proxy '[a, c]
+
+Then this error message
+    • These kind and type variables: a b (c :: Const Type b)
+      are out of dependency order. Perhaps try this ordering:
+        (b :: k) (a :: Const (*) b) (c :: Const (*) b)
+would be much less helpful if we suppressed the kind ascription on 'a'.
+
+Hence the use of pickyIsLiftedTypeKind.
+-}
 
 -----------------
 debugPprType :: Type -> SDoc
@@ -211,13 +236,18 @@ debug_ppr_ty _ (LitTy l)
 debug_ppr_ty _ (TyVarTy tv)
   = ppr tv  -- With -dppr-debug we get (tv :: kind)
 
-debug_ppr_ty prec (FunTy { ft_af = af, ft_arg = arg, ft_res = res })
+debug_ppr_ty prec ty@(FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
   = maybeParen prec funPrec $
-    sep [debug_ppr_ty funPrec arg, arrow <+> debug_ppr_ty prec res]
+    sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]
   where
-    arrow = case af of
-              VisArg   -> text "->"
-              InvisArg -> text "=>"
+    arr = case af of
+            VisArg   -> case mult of
+                          One -> lollipop
+                          Many -> arrow
+                          w -> mulArrow (ppr w)
+            InvisArg -> case mult of
+                          Many -> darrow
+                          _ -> pprPanic "unexpected multiplicity" (ppr ty)
 
 debug_ppr_ty prec (TyConApp tc tys)
   | null tys  = ppr tc
@@ -237,39 +267,36 @@ debug_ppr_ty prec (CastTy ty co)
 debug_ppr_ty _ (CoercionTy co)
   = parens (text "CO" <+> ppr co)
 
-debug_ppr_ty prec ty@(ForAllTy {})
-  | (tvs, body) <- split ty
+-- Invisible forall:  forall {k} (a :: k). t
+debug_ppr_ty prec t
+  | (bndrs, body) <- splitForAllTysInvis t
+  , not (null bndrs)
   = maybeParen prec funPrec $
-    hang (text "forall" <+> fsep (map ppr tvs) <> dot)
-         -- The (map ppr tvs) will print kind-annotated
-         -- tvs, because we are (usually) in debug-style
-       2 (ppr body)
+    sep [ text "forall" <+> fsep (map ppr_bndr bndrs) <> dot,
+          ppr body ]
   where
-    split ty | ForAllTy tv ty' <- ty
-             , (tvs, body) <- split ty'
-             = (tv:tvs, body)
-             | otherwise
-             = ([], ty)
+    -- (ppr tv) will print the binder kind-annotated
+    -- when in debug-style
+    ppr_bndr (Bndr tv InferredSpec)  = braces (ppr tv)
+    ppr_bndr (Bndr tv SpecifiedSpec) = ppr tv
+
+-- Visible forall:  forall x y -> t
+debug_ppr_ty prec t
+  | (bndrs, body) <- splitForAllTysReq t
+  , not (null bndrs)
+  = maybeParen prec funPrec $
+    sep [ text "forall" <+> fsep (map ppr_bndr bndrs) <+> arrow,
+          ppr body ]
+  where
+    -- (ppr tv) will print the binder kind-annotated
+    -- when in debug-style
+    ppr_bndr (Bndr tv ()) = ppr tv
+
+-- Impossible case: neither visible nor invisible forall.
+debug_ppr_ty _ ForAllTy{}
+  = panic "debug_ppr_ty: neither splitForAllTysInvis nor splitForAllTysReq returned any binders"
 
 {-
-Note [When to print foralls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Mostly we want to print top-level foralls when (and only when) the user specifies
--fprint-explicit-foralls.  But when kind polymorphism is at work, that suppresses
-too much information; see #9018.
-
-So I'm trying out this rule: print explicit foralls if
-  a) User specifies -fprint-explicit-foralls, or
-  b) Any of the quantified type variables has a kind
-     that mentions a kind variable
-
-This catches common situations, such as a type siguature
-     f :: m a
-which means
-      f :: forall k. forall (m :: k->*) (a :: k). m a
-We really want to see both the "forall k" and the kind signatures
-on m and a.  The latter comes from pprTCvBndr.
-
 Note [Infix type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 With TypeOperators you can say
@@ -299,10 +326,10 @@ pprDataConWithArgs :: DataCon -> SDoc
 pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
   where
     (_univ_tvs, _ex_tvs, _eq_spec, theta, arg_tys, _res_ty) = dataConFullSig dc
-    user_bndrs = dataConUserTyVarBinders dc
+    user_bndrs = tyVarSpecToBinders $ dataConUserTyVarBinders dc
     forAllDoc  = pprUserForAll user_bndrs
     thetaDoc   = pprThetaArrowTy theta
-    argsDoc    = hsep (fmap pprParendType arg_tys)
+    argsDoc    = hsep (fmap pprParendType (map scaledThing arg_tys))
 
 
 pprTypeApp :: TyCon -> [Type] -> SDoc
@@ -314,7 +341,7 @@ pprTypeApp tc tys
 ------------------
 -- | Display all kind information (with @-fprint-explicit-kinds@) when the
 -- provided 'Bool' argument is 'True'.
--- See @Note [Kind arguments in error messages]@ in GHC.Tc.Errors.
+-- See @Note [Kind arguments in error messages]@ in "GHC.Tc.Errors".
 pprWithExplicitKindsWhen :: Bool -> SDoc -> SDoc
 pprWithExplicitKindsWhen b
   = updSDocContext $ \ctx ->

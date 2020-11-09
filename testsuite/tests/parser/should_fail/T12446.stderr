@@ -1,0 +1,4 @@
+
+T12446.hs:3:5: error:
+    Illegal visible type application ‘@(_ ~ _)’
+      Perhaps you intended to use TypeApplications

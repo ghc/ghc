@@ -47,21 +47,27 @@ module GHC.Driver.Plugins (
     , mapPlugins, withPlugins, withPlugins_
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Core.Opt.Monad ( CoreToDo, CoreM )
+import GHC.Driver.Env
+import GHC.Driver.Session
+import GHC.Driver.Monad
+import GHC.Driver.Phases
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModSummary
+
 import qualified GHC.Tc.Types
 import GHC.Tc.Types ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR )
+
+import GHC.Core.Opt.Monad ( CoreToDo, CoreM )
 import GHC.Hs
-import GHC.Driver.Session
-import GHC.Driver.Types
-import GHC.Driver.Monad
-import GHC.Driver.Phases
-import GHC.Types.Module ( ModuleName, Module(moduleName))
-import Fingerprint
+import GHC.Utils.Fingerprint
+import GHC.Utils.Outputable (Outputable(..), text, (<+>))
+
 import Data.List (sort)
-import Outputable (Outputable(..), text, (<+>))
 
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
@@ -104,7 +110,7 @@ data Plugin = Plugin {
   , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
                             -> Hsc HsParsedModule
     -- ^ Modify the module when it is parsed. This is called by
-    -- GHC.Driver.Main when the parsing is successful.
+    -- "GHC.Driver.Main" when the parsing is successful.
   , renamedResultAction :: [CommandLineOption] -> TcGblEnv
                                 -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
     -- ^ Modify each group after it is renamed. This is called after each
@@ -119,7 +125,7 @@ data Plugin = Plugin {
   , interfaceLoadAction :: forall lcl . [CommandLineOption] -> ModIface
                                           -> IfM lcl ModIface
     -- ^ Modify an interface that have been loaded. This is called by
-    -- GHC.Iface.Load when an interface is successfully loaded. Not applied to
+    -- "GHC.Iface.Load" when an interface is successfully loaded. Not applied to
     -- the loading of the plugin interface. Tools that rely on information from
     -- modules other than the currently compiled one should implement this
     -- function.

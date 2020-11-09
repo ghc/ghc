@@ -39,7 +39,7 @@ superclass of ``C``.)
 With the extension that adds a :ref:`kind of
 constraints <constraint-kind>`, you can write more exotic superclass
 definitions. The superclass cycle check is even more liberal in these
-case. For example, this is OK: ::
+cases. For example, this is OK: ::
 
       class A cls c where
         meth :: cls c => c -> c

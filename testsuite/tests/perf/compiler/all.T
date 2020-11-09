@@ -106,7 +106,7 @@ test('T5642',
 
 test('T5837',
      [ only_ways(['normal']),
-      collect_compiler_stats('bytes allocated',2)
+      collect_compiler_stats('bytes allocated',5)
       ],
       compile, ['-freduction-depth=50'])
 
@@ -178,6 +178,8 @@ test('T10370',
      compile,
      [''])
 
+test('T11068', normal, makefile_test, ['T11068'])
+
 test('T10547',
      [ collect_compiler_stats('bytes allocated', 4),
      ],
@@ -201,7 +203,7 @@ test('T12425',
 
 test('T12234',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated', 1),
+       collect_compiler_stats('bytes allocated', 2),
      ],
      compile,
      [''])
@@ -234,9 +236,14 @@ test('T12707',
      compile,
      [''])
 
+# This test is meant to test regressions involving the
+# pattern match checker. Any regression there will show
+# up massively, but otherwise it hardly allocates. So we
+# are slightly more generous with the allocation threshold
+# to avoid spurious errors.
 test('T12150',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated', 1)
+       collect_compiler_stats('bytes allocated', 2)
      ],
     compile,
      [''])
@@ -341,6 +348,11 @@ test ('T15164',
       ],
       compile,
       ['-v0 -O'])
+test('T15630',
+      [collect_compiler_stats()
+      ],
+      compile,
+      ['-O2'])
 
 # See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_186960
 test ('WWRec',
@@ -350,8 +362,71 @@ test ('WWRec',
       ['-v0 -O'])
 
 test('T16190',
-      [req_th, collect_compiler_stats()],
+      [ req_th,
+        unless(have_ncg(), skip), # T16190 tests a NCG feature
+        collect_compiler_stats('bytes allocated',20)
+      ],
       multimod_compile,
       ['T16190.hs', '-v0'])
 
-test('T16473', normal, makefile_test, ['T16473'])
+# Run this program. If specialisation fails, it'll start to allocate much more
+test ('T16473',
+      [ collect_stats('bytes allocated',5)
+      , only_ways(['normal'])
+      ],
+      compile_and_run,
+      ['-O2 -flate-specialise'])
+
+test('T17516',
+      [ collect_compiler_stats('bytes allocated', 5),
+        extra_clean(['T17516A.hi', 'T17516A.o'])
+      ],
+      multimod_compile,
+      ['T17516', '-O -v0'])
+
+
+test ('T18304',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+
+test ('T18282',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+test ('T18140',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+test('T10421',
+    [ only_ways(['normal']),
+      collect_compiler_stats('bytes allocated', 1)
+    ],
+    multimod_compile,
+    ['T10421', '-v0 -O'])
+test('T10421a',
+    [ only_ways(['normal']),
+      collect_compiler_stats('bytes allocated', 10)
+    ],
+    multimod_compile,
+    ['T10421a', '-v0 -O'])
+test ('T13253',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+test ('T13253-spj',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+test ('T18223',
+      [ collect_compiler_stats('bytes allocated',2)
+      , compile_timeout_multiplier(2)
+        # needed for the unregistered build (#18795)
+      ],
+      compile,
+      ['-v0 -O'])

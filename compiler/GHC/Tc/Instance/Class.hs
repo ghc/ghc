@@ -11,37 +11,43 @@ module GHC.Tc.Instance.Class (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Session
+
 
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Instantiate(instDFunType, tcInstType)
 import GHC.Tc.Instance.Typeable
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
-import GHC.Core.Predicate
-import GHC.Rename.Env( addUsedGRE )
-import GHC.Types.Name.Reader( lookupGRE_FieldLabel )
-import GHC.Core.InstEnv
-import GHC.Tc.Utils.Instantiate( instDFunType )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
+import GHC.Rename.Env( addUsedGRE )
 
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.Names
 
-import GHC.Types.Id
-import GHC.Core.Type
-import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
-
+import GHC.Types.Name.Reader( lookupGRE_FieldLabel )
+import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name, pprDefinedAt )
 import GHC.Types.Var.Env ( VarEnv )
+import GHC.Types.Id
+
+import GHC.Core.Predicate
+import GHC.Core.InstEnv
+import GHC.Core.Type
+import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
-import GHC.Driver.Session
-import Outputable
-import Util( splitAtList, fstOf3 )
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc( splitAtList, fstOf3 )
+
 import Data.Maybe
 
 {- *******************************************************************
@@ -60,14 +66,14 @@ data AssocInstInfo
   | InClsInst { ai_class    :: Class
               , ai_tyvars   :: [TyVar]      -- ^ The /scoped/ tyvars of the instance
                                             -- Why scoped?  See bind_me in
-                                            -- GHC.Tc.Validity.checkConsistentFamInst
+                                            -- 'GHC.Tc.Validity.checkConsistentFamInst'
               , ai_inst_env :: VarEnv Type  -- ^ Maps /class/ tyvars to their instance types
                 -- See Note [Matching in the consistent-instantiation check]
     }
 
 isNotAssociated :: AssocInstInfo -> Bool
-isNotAssociated NotAssociated  = True
-isNotAssociated (InClsInst {}) = False
+isNotAssociated (NotAssociated {}) = True
+isNotAssociated (InClsInst {})     = False
 
 
 {- *******************************************************************
@@ -259,12 +265,12 @@ Note [KnownNat & KnownSymbol and EvLit]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A part of the type-level literals implementation are the classes
 "KnownNat" and "KnownSymbol", which provide a "smart" constructor for
-defining singleton values.  Here is the key stuff from GHC.TypeLits
+defining singleton values.  Here is the key stuff from GHC.TypeNats
 
   class KnownNat (n :: Nat) where
     natSing :: SNat n
 
-  newtype SNat (n :: Nat) = SNat Integer
+  newtype SNat (n :: Nat) = SNat Natural
 
 Conceptually, this class has infinitely many instances:
 
@@ -291,11 +297,11 @@ Also note that `natSing` and `SNat` are never actually exposed from the
 library---they are just an implementation detail.  Instead, users see
 a more convenient function, defined in terms of `natSing`:
 
-  natVal :: KnownNat n => proxy n -> Integer
+  natVal :: KnownNat n => proxy n -> Natural
 
 The reason we don't use this directly in the class is that it is simpler
-and more efficient to pass around an integer rather than an entire function,
-especially when the `KnowNat` evidence is packaged up in an existential.
+and more efficient to pass around a Natural rather than an entire function,
+especially when the `KnownNat` evidence is packaged up in an existential.
 
 The story for kind `Symbol` is analogous:
   * class KnownSymbol
@@ -354,9 +360,7 @@ matchKnownNat :: DynFlags
                            -- See Note [Shortcut solving: overlap]
               -> Class -> [Type] -> TcM ClsInstResult
 matchKnownNat _ _ clas [ty]     -- clas = KnownNat
-  | Just n <- isNumLitTy ty = do
-        et <- mkNaturalExpr n
-        makeLitDict clas ty et
+  | Just n <- isNumLitTy ty  = makeLitDict clas ty (mkNaturalExpr n)
 matchKnownNat df sc clas tys = matchInstEnv df sc clas tys
  -- See Note [Fabricating Evidence for Literals in Backpack] for why
  -- this lookup into the instance environment is required.
@@ -388,10 +392,9 @@ makeLitDict clas ty et
     | Just (_, co_dict) <- tcInstNewTyCon_maybe (classTyCon clas) [ty]
           -- co_dict :: KnownNat n ~ SNat n
     , [ meth ]   <- classMethods clas
-    , Just tcRep <- tyConAppTyCon_maybe -- SNat
-                      $ funResultTy         -- SNat n
-                      $ dropForAlls         -- KnownNat n => SNat n
-                      $ idType meth         -- forall n. KnownNat n => SNat n
+    , Just tcRep <- tyConAppTyCon_maybe (classMethodTy meth)
+                    -- If the method type is forall n. KnownNat n => SNat n
+                    -- then tcRep is SNat
     , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
           -- SNat n ~ Integer
     , let ev_tm = mkEvCast et (mkTcSymCo (mkTcTransCo co_dict co_rep))
@@ -419,10 +422,10 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | isJust (tcSplitPredFunTy_maybe t) = return NoInstance   -- Qualified type
 
   -- Now cases that do work
-  | k `eqType` typeNatKind                 = doTyLit knownNatClassName         t
+  | k `eqType` naturalTy                   = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
   | tcIsConstraintKind t                   = doTyConApp clas t constraintKindTyCon []
-  | Just (arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t arg ret
+  | Just (mult,arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t mult arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
   | Just (f,kt)   <- splitAppTy_maybe t    = doTyApp    clas t f kt
@@ -430,15 +433,15 @@ matchTypeable clas [k,t]  -- clas = Typeable
 matchTypeable _ _ = return NoInstance
 
 -- | Representation for a type @ty@ of the form @arg -> ret@.
-doFunTy :: Class -> Type -> Type -> Type -> TcM ClsInstResult
-doFunTy clas ty arg_ty ret_ty
+doFunTy :: Class -> Type -> Mult -> Type -> Type -> TcM ClsInstResult
+doFunTy clas ty mult arg_ty ret_ty
   = return $ OneInst { cir_new_theta = preds
                      , cir_mk_ev     = mk_ev
                      , cir_what      = BuiltinInstance }
   where
-    preds = map (mk_typeable_pred clas) [arg_ty, ret_ty]
-    mk_ev [arg_ev, ret_ev] = evTypeable ty $
-                             EvTypeableTrFun (EvExpr arg_ev) (EvExpr ret_ev)
+    preds = map (mk_typeable_pred clas) [mult, arg_ty, ret_ty]
+    mk_ev [mult_ev, arg_ev, ret_ev] = evTypeable ty $
+                        EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
     mk_ev _ = panic "GHC.Tc.Solver.Interact.doFunTy"
 
 
@@ -549,7 +552,7 @@ have this instance, implemented here by doTyLit:
       instance KnownNat n => Typeable (n :: Nat) where
          typeRep = typeNatTypeRep @n
 where
-   Data.Typeable.Internals.typeNatTypeRep :: KnownNat a => TypeRep a
+   Data.Typeable.Internal.typeNatTypeRep :: KnownNat a => TypeRep a
 
 Ultimately typeNatTypeRep uses 'natSing' from KnownNat to get a
 runtime value 'n'; it turns it into a string with 'show' and uses
@@ -685,7 +688,7 @@ matchHasField dflags short_cut clas tys
                          -- the HasField x r a dictionary.  The preds will
                          -- typically be empty, but if the datatype has a
                          -- "stupid theta" then we have to include it here.
-                   ; let theta = mkPrimEqPred sel_ty (mkVisFunTy r_ty a_ty) : preds
+                   ; let theta = mkPrimEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
                          -- type (r -> a), then use the newtype coercion to cast

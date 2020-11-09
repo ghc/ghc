@@ -35,20 +35,20 @@ Example result:
 Now `t` is no longer in a recursive function, and good things happen!
 -}
 
-import GhcPrelude
+import GHC.Prelude
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core
 import GHC.Core.Utils
-import State
-import GHC.Types.Unique
+import GHC.Utils.Monad.State
+import GHC.Builtin.Uniques
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.FVs
-import FastString
+import GHC.Data.FastString
 import GHC.Core.Type
-import Util( mapSnd )
+import GHC.Utils.Misc( mapSnd )
 
 import Data.Bifunctor
 import Control.Monad
@@ -116,7 +116,7 @@ exitifyRec in_scope pairs
     -- Which are the recursive calls?
     recursive_calls = mkVarSet $ map fst pairs
 
-    (pairs',exits) = (`runState` []) $ do
+    (pairs',exits) = (`runState` []) $
         forM ann_pairs $ \(x,rhs) -> do
             -- go past the lambdas of the join point
             let (args, body) = collectNAnnBndrs (idJoinArity x) rhs
@@ -265,7 +265,7 @@ mkExitJoinId in_scope ty join_arity = do
                          `extendInScopeSet` exit_id_tmpl -- just cosmetics
     return (uniqAway avoid exit_id_tmpl)
   where
-    exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique ty
+    exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique Many ty
                     `asJoinId` join_arity
 
 addExit :: InScopeSet -> JoinArity -> CoreExpr -> ExitifyM JoinId

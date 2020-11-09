@@ -29,7 +29,7 @@ module GHC.Rename.Bind (
    HsSigCtxt(..)
    ) where
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr, rnStmts )
 
@@ -43,23 +43,25 @@ import GHC.Rename.Fixity
 import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, extendTyVarEnvFVRn
                         , checkDupRdrNames, warnUnusedLocalBinds
                         , checkUnusedRecordWildcard
-                        , checkDupAndShadowedNames, bindLocalNamesFV )
+                        , checkDupAndShadowedNames, bindLocalNamesFV
+                        , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Driver.Session
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader ( RdrName, rdrNameOcc )
 import GHC.Types.SrcLoc as SrcLoc
-import ListSetOps       ( findDupsEq )
-import GHC.Types.Basic  ( RecFlag(..), TypeOrKind(..) )
-import Digraph          ( SCC(..) )
-import Bag
-import Util
-import Outputable
+import GHC.Data.List.SetOps    ( findDupsEq )
+import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
+import GHC.Data.Graph.Directed ( SCC(..) )
+import GHC.Data.Bag
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique.Set
-import Maybes           ( orElse )
-import OrdList
+import GHC.Data.Maybe          ( orElse )
+import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -869,8 +871,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        -- Rename the bindings RHSs.  Again there's an issue about whether the
        -- type variables from the class/instance head are in scope.
        -- Answer no in Haskell 2010, but yes if you have -XScopedTypeVariables
-       ; scoped_tvs  <- xoptM LangExt.ScopedTypeVariables
-       ; (binds'', bind_fvs) <- maybe_extend_tyvar_env scoped_tvs $
+       ; (binds'', bind_fvs) <- bindSigTyVarsFV ktv_names $
               do { binds_w_dus <- mapBagM (rnLBind (mkScopedTvFn other_sigs')) binds'
                  ; let bind_fvs = foldr (\(_,_,fv1) fv2 -> fv1 `plusFV` fv2)
                                            emptyFVs binds_w_dus
@@ -878,19 +879,13 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
 
        ; return ( binds'', spec_inst_prags' ++ other_sigs'
                 , sig_fvs `plusFV` sip_fvs `plusFV` bind_fvs) }
-  where
-    -- For the method bindings in class and instance decls, we extend
-    -- the type variable environment iff -XScopedTypeVariables
-    maybe_extend_tyvar_env scoped_tvs thing_inside
-       | scoped_tvs = extendTyVarEnvFVRn ktv_names thing_inside
-       | otherwise  = thing_inside
 
 rnMethodBindLHS :: Bool -> Name
                 -> LHsBindLR GhcPs GhcPs
                 -> LHsBindsLR GhcRn GhcPs
                 -> RnM (LHsBindsLR GhcRn GhcPs)
 rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
-  = setSrcSpan loc $ do
+  = setSrcSpan loc $
     do { sel_name <- wrapLocM (lookupInstDeclBndr cls (text "method")) name
                      -- We use the selector name as the binder
        ; let bind' = bind { fun_id = sel_name, fun_ext = noExtField }
@@ -962,7 +957,7 @@ renameSig _ (IdSig _ x)
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
-        ; (new_ty, fvs) <- rnHsSigWcType BindUnlessForall doc ty
+        ; (new_ty, fvs) <- rnHsSigWcType doc ty
         ; return (TypeSig noExtField new_vs new_ty, fvs) }
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
@@ -978,8 +973,18 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
                           <+> quotes (ppr v1))
 
 renameSig _ (SpecInstSig _ src ty)
-  = do  { (new_ty, fvs) <- rnHsSigType SpecInstSigCtx TypeLevel ty
+  = do  { checkInferredVars doc inf_msg ty
+        ; (new_ty, fvs) <- rnHsSigType doc TypeLevel ty
+          -- Check if there are any nested `forall`s or contexts, which are
+          -- illegal in the type of an instance declaration (see
+          -- Note [No nested foralls or contexts in instance types] in
+          -- GHC.Hs.Type).
+        ; addNoNestedForallsContextsErr doc (text "SPECIALISE instance type")
+            (getLHsInstDeclHead new_ty)
         ; return (SpecInstSig noExtField src new_ty,fvs) }
+  where
+    doc = SpecInstSigCtx
+    inf_msg = Just (text "Inferred type variables are not allowed")
 
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
 -- so, in the top-level case (when mb_names is Nothing)
@@ -1029,7 +1034,7 @@ renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
        new_mty  <- traverse lookupLocatedOccRn mty
 
        this_mod <- fmap tcg_mod getGblEnv
-       unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $ do
+       unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $
          -- Why 'any'? See Note [Orphan COMPLETE pragmas]
          addErrCtxt (text "In" <+> ppr sig) $ failWithTc orphanError
 
@@ -1168,20 +1173,20 @@ rnMatch :: Outputable (body GhcPs) => HsMatchContext GhcRn
         -> RnM (LMatch GhcRn (Located (body GhcRn)), FreeVars)
 rnMatch ctxt rnBody = wrapLocFstM (rnMatch' ctxt rnBody)
 
+-- Note that there are no local fixity decls for matches
 rnMatch' :: Outputable (body GhcPs) => HsMatchContext GhcRn
          -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
          -> Match GhcPs (Located (body GhcPs))
          -> RnM (Match GhcRn (Located (body GhcRn)), FreeVars)
-rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
-  = do  { -- Note that there are no local fixity decls for matches
-        ; rnPats ctxt pats      $ \ pats' -> do
+rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss }) =
+  rnPats ctxt pats $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt, mf) of
-                      (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })
-                                            -> mf { mc_fun = L lf funid }
-                      _                     -> ctxt
+                      (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ }) ->
+                           mf { mc_fun = L lf funid }
+                      _ -> ctxt
         ; return (Match { m_ext = noExtField, m_ctxt = mf', m_pats = pats'
-                        , m_grhss = grhss'}, grhss_fvs ) }}
+                        , m_grhss = grhss'}, grhss_fvs ) }
 
 emptyCaseErr :: HsMatchContext GhcRn -> SDoc
 emptyCaseErr ctxt = hang (text "Empty list of alternatives in" <+> pp_ctxt)

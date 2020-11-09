@@ -28,9 +28,7 @@ test('print020', [extra_files(['../HappyTest.hs']),
                   omit_ways(['ghci-ext'])], ghci_script, ['print020.script'])
 
 test('print021', normal, ghci_script, ['print021.script'])
-test('print022',
-     [when(arch('powerpc64'), expect_broken(14455))],
-     ghci_script, ['print022.script'])
+test('print022', normal, ghci_script, ['print022.script'])
 test('print023', extra_files(['../Test.hs']), ghci_script, ['print023.script'])
 test('print024', extra_files(['../Test.hs']), ghci_script, ['print024.script'])
 test('print025', normal, ghci_script, ['print025.script'])
@@ -45,7 +43,7 @@ test('print033', normal, ghci_script, ['print033.script'])
 test('print034', extra_files(['../GADT.hs', '../Test.hs']), ghci_script, ['print034.script'])
 test('print035', extra_files(['../Unboxed.hs']), ghci_script, ['print035.script'])
 test('print036', expect_broken(9046), ghci_script, ['print036.script'])
-test('print037', when(llvm_build() and integer_gmp(),
+test('print037', when(llvm_build(),
                       fragile_for(16205, ['ghci-ext']))
                , ghci_script
                , ['print037.script'])
@@ -109,6 +107,7 @@ test('T1620', extra_files(['T1620/', 'T1620/T1620.hs']),
               ghci_script, ['T1620.script'])
 test('T2740', normal, ghci_script, ['T2740.script'])
 test('T2950', normal, ghci_script, ['T2950.script'])
+test('T3000', normal, ghci_script, ['T3000.script'])
 
 test('getargs', extra_files(['../getargs.hs']), ghci_script, ['getargs.script'])
 test('T7386', normal, ghci_script, ['T7386.script'])

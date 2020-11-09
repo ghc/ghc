@@ -3,11 +3,13 @@
 # Make sure that the script exits if Hadrian fails to build
 set -euo pipefail
 
+STACK="${STACK:-stack}"
+
 # Make sure Hadrian is up-to-date
 cd hadrian
-stack build --no-library-profiling ${HADRIAN_NIX:+--nix}
+$STACK build --no-library-profiling ${HADRIAN_NIX:+--nix}
 
 # Run Hadrian in the top-level GHC directory
-stack exec hadrian -- \
+$STACK exec hadrian -- \
     --directory ".."  \
     "$@"

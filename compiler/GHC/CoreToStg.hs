@@ -15,12 +15,12 @@ module GHC.CoreToStg ( coreToStg ) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
-import GHC.Core.Arity   ( manifestArity )
+import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Stg.Syntax
 
 import GHC.Core.Type
@@ -32,26 +32,29 @@ import GHC.Types.Id.Info
 import GHC.Core.DataCon
 import GHC.Types.CostCentre
 import GHC.Types.Var.Env
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name   ( isExternalName, nameModule_maybe )
 import GHC.Types.Basic  ( Arity )
 import GHC.Builtin.Types ( unboxedUnitDataCon, unitDataConId )
 import GHC.Types.Literal
-import Outputable
-import MonadUtils
-import FastString
-import Util
+import GHC.Utils.Outputable
+import GHC.Utils.Monad
+import GHC.Data.FastString
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Driver.Session
-import GHC.Driver.Ways
+import GHC.Platform.Ways
+import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Types.Demand    ( isUsedOnce )
-import GHC.Builtin.PrimOps ( PrimCall(..), primOpWrapperId )
+import GHC.Builtin.PrimOps ( PrimCall(..) )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 import GHC.Builtin.Names   ( unsafeEqualityProofName )
 
-import Data.List.NonEmpty (nonEmpty, toList)
-import Data.Maybe    (fromMaybe)
 import Control.Monad (ap)
+import Data.List.NonEmpty (nonEmpty, toList)
+import Data.Maybe (fromMaybe)
+import Data.Tuple (swap)
 import qualified Data.Set as Set
 
 -- Note [Live vs free]
@@ -307,14 +310,10 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
 
         -- generate StgTopBindings and CAF cost centres created for CAFs
         (ccs', stg_rhss)
-          = initCts dflags env' $ do
-               mapAccumLM (\ccs rhs -> do
-                            (rhs', ccs') <-
-                              coreToTopStgRhs dflags ccs this_mod rhs
-                            return (ccs', rhs'))
-                          ccs
-                          pairs
-
+          = initCts dflags env' $
+              mapAccumLM (\ccs rhs -> swap <$> coreToTopStgRhs dflags ccs this_mod rhs)
+                         ccs
+                         pairs
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
     (env', ccs', bind)
@@ -372,8 +371,8 @@ coreToStgExpr
 
 -- No LitInteger's or LitNatural's should be left by the time this is called.
 -- CorePrep should have converted them all to a real core representation.
-coreToStgExpr (Lit (LitNumber LitNumInteger _ _)) = panic "coreToStgExpr: LitInteger"
-coreToStgExpr (Lit (LitNumber LitNumNatural _ _)) = panic "coreToStgExpr: LitNatural"
+coreToStgExpr (Lit (LitNumber LitNumInteger _)) = panic "coreToStgExpr: LitInteger"
+coreToStgExpr (Lit (LitNumber LitNumNatural _)) = panic "coreToStgExpr: LitNatural"
 coreToStgExpr (Lit l)      = return (StgLit l)
 coreToStgExpr (App (Lit LitRubbish) _some_unlifted_type)
   -- We lower 'LitRubbish' to @()@ here, which is much easier than doing it in
@@ -435,14 +434,17 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
     let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
     -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     case scrut2 of
-      StgApp id [] | idName id == unsafeEqualityProofName ->
+      StgApp id [] | idName id == unsafeEqualityProofName
+                   , isDeadBinder bndr ->
+        -- We can only discard the case if the case-binder is dead
+        -- It usually is, but see #18227
         case alts2 of
           [(_, [_co], rhs)] ->
             return rhs
           _ ->
             pprPanic "coreToStgExpr" $
               text "Unexpected unsafe equality case expression:" $$ ppr e0 $$
-              text "STG:" $$ ppr stg
+              text "STG:" $$ pprStgExpr panicStgPprOpts stg
       _ -> return stg
   where
     vars_alt :: (AltCon, [Var], CoreExpr) -> CtsM (AltCon, [Var], StgExpr)
@@ -462,10 +464,8 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
         rhs2 <- coreToStgExpr rhs
         return (con, binders', rhs2)
 
-coreToStgExpr (Let bind body) = do
-    coreToStgLet bind body
-
-coreToStgExpr e = pprPanic "coreToStgExpr" (ppr e)
+coreToStgExpr (Let bind body) = coreToStgLet bind body
+coreToStgExpr e               = pprPanic "coreToStgExpr" (ppr e)
 
 mkStgAltType :: Id -> [CoreAlt] -> AltType
 mkStgAltType bndr alts
@@ -539,12 +539,10 @@ coreToStgApp f args ticks = do
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
-                -- As described in Note [Primop wrappers] in GHC.Builtin.PrimOps, here we
-                -- turn unsaturated primop applications into applications of
-                -- the primop's wrapper.
-                PrimOpId op
-                  | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
-                  | otherwise    -> StgApp (primOpWrapperId op) args'
+                -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
+                -- we require that primop applications be saturated.
+                PrimOpId op      -> ASSERT( saturated )
+                                    StgOpApp (StgPrimOp op) args' res_ty
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
@@ -696,7 +694,7 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
   , -- Dynamic StgConApps are updatable
     not (isDllConApp dflags this_mod con args)
   = -- CorePrep does this right, but just to make sure
-    ASSERT2( not (isUnboxedTupleCon con || isUnboxedSumCon con)
+    ASSERT2( not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con)
            , ppr bndr $$ ppr con $$ ppr args)
     ( StgRhsCon dontCareCCS con args, ccs )
 

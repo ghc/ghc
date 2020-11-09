@@ -8,18 +8,18 @@ module GHC.Iface.Recomp.Flags (
       , fingerprintHpcFlags
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Binary
+import GHC.Utils.Binary
 import GHC.Driver.Session
-import GHC.Driver.Types
-import GHC.Types.Module
+import GHC.Unit.Module
 import GHC.Types.Name
-import Fingerprint
+import GHC.Types.SafeHaskell
+import GHC.Utils.Fingerprint
 import GHC.Iface.Recomp.Binary
--- import Outputable
+-- import GHC.Utils.Outputable
 
-import qualified EnumSet
+import GHC.Data.EnumSet as EnumSet
 import System.FilePath (normalise)
 
 -- | Produce a fingerprint of a @DynFlags@ value. We only base
@@ -34,9 +34,9 @@ fingerprintDynFlags :: DynFlags -> Module
                     -> IO Fingerprint
 
 fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
-    let mainis   = if mainModIs == this_mod then Just mainFunIs else Nothing
+    let mainis   = if mainModIs dflags == this_mod then Just mainFunIs else Nothing
                       -- see #5878
-        -- pkgopts  = (thisPackage dflags, sort $ packageFlags dflags)
+        -- pkgopts  = (homeUnit home_unit, sort $ packageFlags dflags)
         safeHs   = setSafeMode safeHaskell
         -- oflags   = sort $ filter filterOFlags $ flags dflags
 
@@ -55,7 +55,7 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
         paths = [ hcSuf ]
 
         -- -fprof-auto etc.
-        prof = if gopt Opt_SccProfilingOn dflags then fromEnum profAuto else 0
+        prof = if sccProfilingEnabled dflags then fromEnum profAuto else 0
 
         -- Ticky
         ticky =

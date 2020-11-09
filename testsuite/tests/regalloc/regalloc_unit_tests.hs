@@ -23,28 +23,29 @@ module Main where
 import qualified GHC.CmmToAsm.Reg.Graph.Stats as Color
 import qualified GHC.CmmToAsm.Reg.Linear.Base as Linear
 import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
+import qualified GHC.CmmToAsm.X86 as X86
 import GHC.Driver.Main
 import GHC.StgToCmm.CgUtils
 import GHC.CmmToAsm
 import GHC.CmmToAsm.Config
-import GHC.CmmToAsm.Monad as NCGConfig
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Parser
 import GHC.Cmm.Info
 import GHC.Cmm
-import GHC.Types.Module
+import GHC.Parser.Errors.Ppr
+import GHC.Unit.Module
 import GHC.Cmm.DebugBlock
 import GHC
 import GHC.Driver.Monad
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
-import ErrUtils
-import Outputable
+import GHC.Utils.Error
+import GHC.Utils.Outputable
 import GHC.Types.Basic
 
-import Stream (collect, yield)
+import GHC.Data.Stream as Stream (collect, yield)
 
 import Data.Typeable
 import Data.Maybe
@@ -105,11 +106,13 @@ compileCmmForRegAllocStats ::
     IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
 compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
-    let ncgImpl = ncgImplF (NCGConfig.initConfig dflags)
+    let ncgImpl = ncgImplF (initNCGConfig dflags)
     hscEnv <- newHscEnv dflags
 
     -- parse the cmm file and output any warnings or errors
-    ((warningMsgs, errorMsgs), parsedCmm) <- parseCmmFile dflags cmmFile
+    (warnings, errors, parsedCmm) <- parseCmmFile dflags cmmFile
+    let warningMsgs = fmap pprWarning warnings
+        errorMsgs   = fmap pprError errors
 
     -- print parser errors or warnings
     mapM_ (printBagOfErrors dflags) [warningMsgs, errorMsgs]
@@ -143,7 +146,7 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
           dwarfFileIds = emptyUFM
           dbgMap = debugToMap []
           thisMod = mkModule
-                        (stringToUnitId . show . uniqFromSupply $ usc)
+                        (stringToUnit . show . uniqFromSupply $ usc)
                         (mkModuleName . show . uniqFromSupply $ usd)
           thisModLoc = ModLocation Nothing (cmmFile ++ ".hi") (cmmFile ++ ".o") (cmmFile ++ ".hie")
 
@@ -175,7 +178,7 @@ runTests dflags us = testGraphNoSpills dflags noSpillsCmmFile us >>= \res ->
 testGraphNoSpills :: DynFlags -> FilePath -> UniqSupply -> IO Bool
 testGraphNoSpills dflags' path us = do
         colorStats <- fst . concatTupledMaybes <$>
-                        compileCmmForRegAllocStats dflags path x86NcgImpl us
+                        compileCmmForRegAllocStats dflags path X86.ncgX86 us
 
         assertIO "testGraphNoSpills: color stats should not be empty"
                         $ not (null colorStats)

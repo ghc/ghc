@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE PatternSynonyms #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -47,11 +52,19 @@
   The simplifier tries to get rid of occurrences of x, in favour of wild,
   in the hope that there will only be one remaining occurrence of x, namely
   the scrutinee of the case, and we can inline it.
+
+  This can only work if @wild@ is an unrestricted binder. Indeed, even with the
+  extended typing rule (in the linter) for case expressions, if
+       case x of wild # 1 { p -> e}
+  is well-typed, then
+       case x of wild # 1 { p -> e[wild\x] }
+  is only well-typed if @e[wild\x] = e@ (that is, if @wild@ is not used in @e@
+  at all). In which case, it is, of course, pointless to do the substitution
+  anyway. So for a linear binder (and really anything which isn't unrestricted),
+  doing this substitution would either produce ill-typed terms or be the
+  identity.
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.SetLevels (
         setLevels,
 
@@ -64,7 +77,9 @@ module GHC.Core.Opt.SetLevels (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Ppr
 
 import GHC.Core
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
@@ -73,8 +88,9 @@ import GHC.Core.Utils   ( exprType, exprIsHNF
                         , exprIsTopLevelBindable
                         , isExprLevPoly
                         , collectMakeStaticArgs
+                        , mkLamTypes
                         )
-import GHC.Core.Arity   ( exprBotStrictness_maybe )
+import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe )
 import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
 import GHC.Core.Make    ( sortQuantVars )
@@ -83,27 +99,31 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Types.Unique.Set   ( nonDetFoldUniqSet )
+import GHC.Types.Unique.Set   ( nonDetStrictFoldUniqSet )
 import GHC.Types.Unique.DSet  ( getUniqDSet )
 import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
-import GHC.Types.Demand       ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
+import GHC.Types.Demand       ( StrictSig, Demand, isStrictDmd, splitStrictSig, prependArgsStrictSig )
 import GHC.Types.Cpr          ( mkCprSig, botCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
-import GHC.Core.Type    ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
+import GHC.Types.Unique       ( hasKey )
+import GHC.Core.Type    ( Type, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
+import GHC.Core.Multiplicity     ( pattern Many )
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 import GHC.Core.DataCon ( dataConOrigResTy )
 import GHC.Builtin.Types
+import GHC.Builtin.Names      ( runRWKey )
 import GHC.Types.Unique.Supply
-import Util
-import Outputable
-import FastString
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.FastString
 import GHC.Types.Unique.DFM
-import FV
+import GHC.Utils.FV
 import Data.Maybe
-import MonadUtils       ( mapAccumLM )
+import GHC.Utils.Monad  ( mapAccumLM )
 
 {-
 ************************************************************************
@@ -293,7 +313,7 @@ lvlTopBind env (Rec pairs)
 lvl_top :: LevelEnv -> RecFlag -> Id -> CoreExpr -> LvlM LevelledExpr
 lvl_top env is_rec bndr rhs
   = lvlRhs env is_rec
-           (isBottomingId bndr)
+           (isDeadEndId bndr)
            Nothing  -- Not a join point
            (freeVars rhs)
 
@@ -399,8 +419,14 @@ lvlNonTailExpr env expr
 lvlApp :: LevelEnv
        -> CoreExprWithFVs
        -> (CoreExprWithFVs, [CoreExprWithFVs]) -- Input application
-        -> LvlM LevelledExpr                   -- Result expression
+       -> LvlM LevelledExpr                    -- Result expression
 lvlApp env orig_expr ((_,AnnVar fn), args)
+  -- Try to ensure that runRW#'s continuation isn't floated out.
+  -- See Note [Simplification of runRW#].
+  | fn `hasKey` runRWKey
+  = do { args' <- mapM (lvlExpr env) args
+       ; return (foldl' App (lookupVar env fn) args') }
+
   | floatOverSat env   -- See Note [Floating over-saturated applications]
   , arity > 0
   , arity < n_val_args
@@ -469,6 +495,7 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
   , exprIsHNF (deTagExpr scrut')  -- See Note [Check the output scrutinee for exprIsHNF]
   , not (isTopLvl dest_lvl)       -- Can't have top-level cases
   , not (floatTopLvlOnly env)     -- Can float anywhere
+  , Many <- idMult case_bndr     -- See Note [Floating linear case]
   =     -- Always float the case if possible
         -- Unlike lets we don't insist that it escapes a value lambda
     do { (env1, (case_bndr' : bs')) <- cloneCaseBndrs env dest_lvl (case_bndr : bs)
@@ -538,6 +565,18 @@ Things to note:
    If we floated the cases out we could eliminate one of them.
 
  * We only do this with a single-alternative case
+
+
+Note [Floating linear case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Linear case can't be floated past case branches:
+    case u of { p1 -> case[1] v of { C x -> ...x...}; p2 -> ... }
+Is well typed, but
+    case[1] v of { C x -> case u of { p1 -> ...x...; p2 -> ... }}
+Will not be, because of how `x` is used in one alternative but not the other.
+
+It is not easy to float this linear cases precisely, so, instead, we elect, for
+the moment, to simply not float linear case.
 
 
 Note [Setting levels when floating single-alternative cases]
@@ -624,8 +663,8 @@ lvlMFE env strict_ctxt e@(_, AnnCase {})
 lvlMFE env strict_ctxt ann_expr
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
-  || anyDVarSet isJoinId fvs   -- If there is a free join, don't float
-                               -- See Note [Free join points]
+  || hasFreeJoin env fvs   -- If there is a free join, don't float
+                           -- See Note [Free join points]
   || isExprLevPoly expr
          -- We can't let-bind levity polymorphic expressions
          -- See Note [Levity polymorphism invariants] in GHC.Core
@@ -702,7 +741,7 @@ lvlMFE env strict_ctxt ann_expr
     join_arity_maybe = Nothing
 
     is_mk_static = isJust (collectMakeStaticArgs expr)
-        -- Yuk: See Note [Grand plan for static forms] in main/StaticPtrTable
+        -- Yuk: See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
 
         -- A decision to float entails let-binding this thing, and we only do
         -- that if we'll escape a value lambda, or will go to the top level.
@@ -720,6 +759,14 @@ lvlMFE env strict_ctxt ann_expr
     saves_alloc =  isTopLvl dest_lvl
                 && floatConsts env
                 && (not strict_ctxt || is_bot || exprIsHNF expr)
+
+hasFreeJoin :: LevelEnv -> DVarSet -> Bool
+-- Has a free join point which is not being floated to top level.
+-- (In the latter case it won't be a join point any more.)
+-- Not treating top-level ones specially had a massive effect
+-- on nofib/minimax/Prog.prog
+hasFreeJoin env fvs
+  = not (maxFvLevel isJoinId env fvs == tOP_LEVEL)
 
 isBottomThunk :: Maybe (Arity, s) -> Bool
 -- See Note [Bottoming floats] (2)
@@ -837,9 +884,8 @@ float a boxed version
 and replace the original (f x) with
    case (case y of I# r -> r) of r -> blah
 
-Being able to float unboxed expressions is sometimes important; see
-#12603.  I'm not sure how /often/ it is important, but it's
-not hard to achieve.
+Being able to float unboxed expressions is sometimes important; see #12603.
+I'm not sure how /often/ it is important, but it's not hard to achieve.
 
 We only do it for a fixed collection of types for which we have a
 convenient boxing constructor (see boxingDataCon_maybe).  In
@@ -943,7 +989,7 @@ Id, *immediately*, for three reasons:
     Lint complains unless the scrutinee of such a case is clearly bottom.
 
     This was reported in #11290.   But since the whole bottoming-float
-    thing is based on the cheap-and-cheerful exprIsBottom, I'm not sure
+    thing is based on the cheap-and-cheerful exprIsDeadEnd, I'm not sure
     that it'll nail all such cases.
 
 Note [Bottoming floats: eta expansion] c.f Note [Bottoming floats]
@@ -952,6 +998,9 @@ Tiresomely, though, the simplifier has an invariant that the manifest
 arity of the RHS should be the same as the arity; but we can't call
 etaExpand during GHC.Core.Opt.SetLevels because it works over a decorated form of
 CoreExpr.  So we do the eta expansion later, in GHC.Core.Opt.FloatOut.
+But we should only eta-expand if the RHS doesn't already have the right
+exprArity, otherwise we get unnecessary top-level bindings if the RHS was
+trivial after the next run of the Simplifier.
 
 Note [Case MFEs]
 ~~~~~~~~~~~~~~~~
@@ -983,7 +1032,7 @@ annotateBotStr id n_extra mb_str
   = case mb_str of
       Nothing           -> id
       Just (arity, sig) -> id `setIdArity`      (arity + n_extra)
-                              `setIdStrictness` (increaseStrictSigArity n_extra sig)
+                              `setIdStrictness` (prependArgsStrictSig n_extra sig)
                               `setIdCprInfo`    mkCprSig (arity + n_extra) botCpr
 
 notWorthFloating :: CoreExpr -> [Var] -> Bool
@@ -1036,8 +1085,8 @@ Note [Floating applications to coercions]
 We don’t float out variables applied only to type arguments, since the
 extra binding would be pointless: type arguments are completely erased.
 But *coercion* arguments aren’t (see Note [Coercion tokens] in
-CoreToStg.hs and Note [Count coercion arguments in boring contexts] in
-CoreUnfold.hs), so we still want to float out variables applied only to
+"GHC.CoreToStg" and Note [Count coercion arguments in boring contexts] in
+"GHC.Core.Unfold"), so we still want to float out variables applied only to
 coercion arguments.
 
 Note [Escaping a value lambda]
@@ -1469,8 +1518,8 @@ isFunction (_, AnnLam b e) | isId b    = True
 isFunction _                           = False
 
 countFreeIds :: DVarSet -> Int
-countFreeIds = nonDetFoldUDFM add 0 . getUniqDSet
-  -- It's OK to use nonDetFoldUDFM here because we're just counting things.
+countFreeIds = nonDetStrictFoldUDFM add 0 . getUniqDSet
+  -- It's OK to use nonDetStrictFoldUDFM here because we're just counting things.
   where
     add :: Var -> Int -> Int
     add v n | isId v    = n+1
@@ -1568,6 +1617,7 @@ extendCaseBndrEnv :: LevelEnv
                   -> LevelEnv
 extendCaseBndrEnv le@(LE { le_subst = subst, le_env = id_env })
                   case_bndr (Var scrut_var)
+    | Many <- varMult case_bndr
   = le { le_subst   = extendSubstWithVar subst case_bndr scrut_var
        , le_env     = add_id id_env (case_bndr, scrut_var) }
 extendCaseBndrEnv env _ _ = env
@@ -1581,12 +1631,14 @@ placeJoinCeiling le@(LE { le_ctxt_lvl = lvl })
 
 maxFvLevel :: (Var -> Bool) -> LevelEnv -> DVarSet -> Level
 maxFvLevel max_me env var_set
-  = foldDVarSet (maxIn max_me env) tOP_LEVEL var_set
+  = nonDetStrictFoldDVarSet (maxIn max_me env) tOP_LEVEL var_set
+    -- It's OK to use a non-deterministic fold here because maxIn commutes.
 
 maxFvLevel' :: (Var -> Bool) -> LevelEnv -> TyCoVarSet -> Level
 -- Same but for TyCoVarSet
 maxFvLevel' max_me env var_set
-  = nonDetFoldUniqSet (maxIn max_me env) tOP_LEVEL var_set
+  = nonDetStrictFoldUniqSet (maxIn max_me env) tOP_LEVEL var_set
+    -- It's OK to use a non-deterministic fold here because maxIn commutes.
 
 maxIn :: (Var -> Bool) -> LevelEnv -> InVar -> Level -> Level
 maxIn max_me (LE { le_lvl_env = lvl_env, le_env = id_env }) in_var lvl
@@ -1669,7 +1721,7 @@ newPolyBndrs dest_lvl
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $ -- Note [transferPolyIdInfo] in GHC.Types.Id
                              transfer_join_info bndr $
-                             mkSysLocal (mkFastString str) uniq poly_ty
+                             mkSysLocal (mkFastString str) uniq (idMult bndr) poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (GHC.Core.Subst.substTy subst (idType bndr))
@@ -1699,12 +1751,12 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
     rhs_ty        = exprType de_tagged_rhs
 
     mk_id uniq rhs_ty
-      -- See Note [Grand plan for static forms] in StaticPtrTable.
+      -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
       | is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocal (mkFastString "lvl") uniq rhs_ty
+      = mkSysLocal (mkFastString "lvl") uniq Many rhs_ty
 
 -- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])

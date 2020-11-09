@@ -10,14 +10,14 @@ test('IOError001', [omit_ways(['ghci']), set_stdin('IOError001.hs')],
 test('IOError002',      normal, compile_and_run, [''])
 test('finalization001', normal, compile_and_run, [''])
 test('hClose001', [], compile_and_run, [''])
-test('hClose002', [], compile_and_run, [''])
+test('hClose002', [normalise_win32_io_errors], compile_and_run, [''])
 test('hClose003',       reqlib('unix'), compile_and_run, ['-package unix'])
 test('hFileSize001',    normal, compile_and_run, [''])
 test('hFileSize002', [omit_ways(['ghci'])], compile_and_run, [''])
 test('hFlush001', [], compile_and_run, [''])
 
-test('hGetBuffering001', 
-	[omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')], 
+test('hGetBuffering001',
+	[omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')],
 	compile_and_run, [''])
 
 test('hGetContentsS001', normal, compile_and_run, [''])
@@ -47,7 +47,7 @@ test('hSeek004', [], compile_and_run, ['-cpp'])
 test('hSetBuffering002', set_stdin('hSetBuffering002.hs'), compile_and_run, [''])
 
 test('hSetBuffering003',
-    [omit_ways(['ghci']), set_stdin('hSetBuffering003.hs')], 
+    [omit_ways(['ghci']), set_stdin('hSetBuffering003.hs')],
 	compile_and_run, [''])
 
 test('hSetBuffering004', set_stdin('hSetBuffering004.hs'), compile_and_run, [''])
@@ -61,13 +61,14 @@ test('misc001', [extra_run_opts('misc001.hs misc001.out')], compile_and_run,
      [''])
 
 test('openFile001',  normal, compile_and_run, [''])
-test('openFile002',  exit_code(1), compile_and_run, [''])
-test('openFile003', [], compile_and_run, [''])
+test('openFile002',  [exit_code(1), normalise_win32_io_errors], compile_and_run, [''])
+test('openFile003', [normalise_win32_io_errors], compile_and_run, [''])
 test('openFile004', [], compile_and_run, [''])
 test('openFile005', [], compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
 test('openFile007', [], compile_and_run, [''])
 test('openFile008', cmd_prefix('ulimit -n 2048; '), compile_and_run, [''])
+test('openFile009', [], compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
 test('readFile001', [], compile_and_run, [''])
@@ -86,7 +87,8 @@ test('hGetBuf001',
      compile_and_run, ['-package unix'])
 
 # As discussed in #16819, this test is racy in a threaded environment.
-test('hDuplicateTo001', [omit_ways(concurrent_ways)], compile_and_run, [''])
+test('hDuplicateTo001', [omit_ways(concurrent_ways),
+                         when(opsys('mingw32'), skip)], compile_and_run, [''])
 
 test('countReaders001', [], compile_and_run, [''])
 
@@ -130,7 +132,10 @@ test('T4144', normal, compile_and_run, [''])
 
 test('encodingerror001', normal, compile_and_run, [''])
 
-test('T4808', [fragile_for(16909, concurrent_ways), exit_code(1)], compile_and_run, [''])
+# Requires use of the FD interface which is not supported under WINIO
+test('T4808', [when(opsys('mingw32'), skip)
+              ,fragile_for(16909, concurrent_ways), exit_code(1)]
+              , compile_and_run, [''])
 test('T4895', normal, compile_and_run, [''])
 test('T7853', normal, compile_and_run, [''])
 # Tests ability to perform >32-bit IO operations
@@ -144,3 +149,4 @@ test('T17414',
       high_memory_usage],
      compile_and_run, [''])
 test('T17510', expect_broken(17510), compile_and_run, [''])
+test('bytestringread001', extra_run_opts('test.data'), compile_and_run, [''])

@@ -775,7 +775,7 @@ each case:
     package/field-n
 
 To read an interface file from an external tool without linking to GHC, the format
-is described at `Extensible Interface Files<https://gitlab.haskell.org/ghc/ghc/wikis/Extensible-Interface-Files>`_.
+is described at `Extensible Interface Files <https://gitlab.haskell.org/ghc/ghc/wikis/Extensible-Interface-Files>`_.
 
 Source plugin example
 ^^^^^^^^^^^^^^^^^^^^^
@@ -800,8 +800,8 @@ displayed.
     import GHC.Hs.Decls
     import GHC.Hs.Expr
     import GHC.Hs.ImpExp
-    import Avail
-    import Outputable
+    import GHC.Types.Avail
+    import GHC.Utils.Outputable
     import GHC.Hs.Doc
 
     plugin :: Plugin
@@ -854,7 +854,7 @@ When you compile a simple module that contains Template Haskell splice
 
     a = ()
 
-$(return [])
+    $(return [])
 
 with the compiler flags ``-fplugin SourcePlugin`` it will give the following
 output:
@@ -865,16 +865,12 @@ output:
     module A where
     a = ()
     $(return [])
-    interface loaded: Prelude
-    interface loaded: GHC.Float
-    interface loaded: GHC.Base
+    typeCheckPlugin (rn): a = ()
     interface loaded: Language.Haskell.TH.Lib.Internal
-    interface loaded: Language.Haskell.TH.Syntax
-    interface loaded: GHC.Types
     meta: return []
-    interface loaded: GHC.Integer.Type
     typeCheckPlugin (rn):
-    Just a = ()
+    typeCheckPlugin (rn):
+    Nothing
     typeCheckPlugin (tc):
     {$trModule = Module (TrNameS "main"#) (TrNameS "A"#), a = ()}
 
@@ -936,8 +932,8 @@ at error generation.
     hfPlugin :: [CommandLineOption] -> Maybe HoleFitPlugin
 
 
-Where ``fromPureHFPlugin :: HoleFitPlugin -> HoleFitPluginR`` is a convencience
-function provided in the ``TcHoleErrors`` module, for defining plugins that do
+Where ``fromPureHFPlugin :: HoleFitPlugin -> HoleFitPluginR`` is a convenience
+function provided in the ``GHC.Tc.Errors.Hole`` module, for defining plugins that do
 not require internal state.
 
 
@@ -986,7 +982,7 @@ spent on searching for valid hole fits, after which new searches are aborted.
 
     import GHC.Plugins hiding ((<>))
 
-    import TcHoleErrors
+    import GHC.Tc.Errors.Hole
 
     import Data.List (stripPrefix, sortOn)
 

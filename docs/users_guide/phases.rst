@@ -73,6 +73,14 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the linker.
 
+.. ghc-flag:: -pgmlm ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the linker when merging object files
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the linker when merging object files (e.g. when generating
+    joined objects for loading into GHCi).
+
 .. ghc-flag:: -pgmdll ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the DLL generator
     :type: dynamic
@@ -86,6 +94,24 @@ given compilation phase:
     :category: phase-programs
 
     Use ⟨cmd⟩ as the pre-processor (with :ghc-flag:`-F` only).
+
+.. ghc-flag:: -pgmotool ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the program to inspect mach-o dylibs on macOS
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the program to inspect mach-o dynamic libraries and
+    executables to read the dynamic library dependencies.  We will compute
+    the necessary ``runpath``s to embed for the dependencies based on the
+    result of the ``otool`` call.
+
+.. ghc-flag:: -pgminstall_name_tool ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the program to inject ``runpath`` into mach-o dylibs on macOS
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the program to inject ``runpath``s into mach-o dynamic
+    libraries and executables.  As detected by the ``otool`` call.
 
 .. ghc-flag:: -pgmwindres ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the program for embedding manifests on Windows.
@@ -154,6 +180,20 @@ the following flags:
 
     Pass ⟨option⟩ to the C compiler.
 
+.. ghc-flag:: -pgmc-supports-no-pie
+    :shortdesc: Indicate that the C compiler supports ``-no-pie``
+    :type: dynamic
+    :category: phase-options
+
+    When ``-pgmc`` is used, GHC by default will never pass the ``-no-pie``
+    command line flag. The rationale is that it is not known whether the
+    specified compiler will support it. This flag can be used to indicate
+    that ``-no-pie`` is supported. It has to be passed after ``-pgmc``.
+
+    This flag is not neccessary when ``-pgmc`` is not used, since GHC
+    remembers whether the default C compiler supports ``-no-pie`` in
+    an internal settings file.
+
 .. ghc-flag:: -optcxx ⟨option⟩
     :shortdesc: pass ⟨option⟩ to the C++ compiler
     :type: dynamic
@@ -188,6 +228,14 @@ the following flags:
     :category: phase-options
 
     Pass ⟨option⟩ to the linker.
+
+.. ghc-flag:: -optlm ⟨option⟩
+    :shortdesc: pass ⟨option⟩ to the linker when merging object files.
+    :type: dynamic
+    :category: phase-options
+
+    Pass ⟨option⟩ to the linker when merging object files. In the case of a
+    standard ``ld``-style linker this should generally include the ``-r`` flag.
 
 .. ghc-flag:: -optdll ⟨option⟩
     :shortdesc: pass ⟨option⟩ to the DLL generator
@@ -331,6 +379,13 @@ defined by your local GHC installation, the following trick is useful:
     NB. This macro is set when pre-processing both Haskell source and C
     source, including the C source generated from a Haskell module (i.e.
     ``.hs``, ``.lhs``, ``.c`` and ``.hc`` files).
+
+``__GLASGOW_HASKELL_FULL_VERSION__``
+    .. index::
+       single: __GLASGOW_HASKELL_FULL_VERSION__
+       This macro exposes the full version string.
+       For instance: ``__GLASGOW_HASKELL_FULL_VERSION__==8.11.0.20200319``.
+       Its value comes from the ``ProjectVersion`` Autotools variable.
 
 ``__GLASGOW_HASKELL_PATCHLEVEL1__``; \ ``__GLASGOW_HASKELL_PATCHLEVEL2__``
     .. index::
@@ -652,6 +707,19 @@ Options affecting code generation
     and ``-dynhisuf`` are the counterparts of ``-o``, ``-osuf``, and
     ``-hisuf`` respectively, but applying to the dynamic compilation.
 
+.. ghc-flag:: -split-objs
+    :shortdesc: Split generated object files into smaller files
+    :type: dynamic
+    :category: codegen
+
+    When using this option, the object file is split into many smaller objects.
+    This feature is used when building libraries, so that a program statically
+    linked against the library will pull in less of the library.
+
+    Since this uses platform specific techniques, it may not be available on
+    all target platforms. See the :ghc-flag:`--print-object-splitting-supported`
+    flag to check whether your GHC supports object splitting.
+
 .. _options-linker:
 
 Options affecting linking
@@ -728,6 +796,8 @@ for example).
     :type: dynamic
     :category: linking
 
+    :implies: :ghc-flag:`-flink-rts`
+
     Link all passed files into a static library suitable for linking.
     To control the name, use the :ghc-flag:`-o ⟨file⟩` option
     as usual. The default name is ``liba.a``.
@@ -780,8 +850,8 @@ for example).
 
     This flag tells GHC to link against shared Haskell libraries. This
     flag only affects the selection of dependent libraries, not the form
-    of the current target (see -shared). See :ref:`using-shared-libs` on
-    how to create them.
+    of the current target (see :ghc-flag:`-shared`).
+    See :ref:`using-shared-libs` on how to create them.
 
     Note that this option also has an effect on code generation (see
     above).
@@ -807,7 +877,8 @@ for example).
 
     When creating shared objects for Haskell packages, the shared object
     must be named properly, so that GHC recognizes the shared object
-    when linked against this package. See shared object name mangling.
+    when linking against this package.
+    See :ref:`shared object name mangling <building-packages>` for details.
 
 .. ghc-flag:: -dynload
     :shortdesc: Selects one of a number of modes for finding shared libraries at runtime.
@@ -817,6 +888,23 @@ for example).
     This flag selects one of a number of modes for finding shared
     libraries at runtime. See :ref:`finding-shared-libs` for a
     description of each mode.
+
+.. ghc-flag:: -flink-rts
+    :shortdesc: Link the runtime when generating a shared or static library
+    :type: dynamic
+    :category: linking
+
+    When linking shared libraries (:ghc-flag:`-shared`) GHC does not
+    automatically link the RTS.  This is to allow choosing the RTS flavour
+    (:ghc-flag:`-threaded`, :ghc-flag:`-eventlog`, etc) when linking an
+    executable. 
+    However when the shared library is the intended product it is useful to be
+    able to reverse this default. See :ref:`shared-libraries-c-api` for an
+    usage example.
+
+    When linking a static library (:ghc-flag:`-staticlib`) GHC links the RTS
+    automatically, you can reverse this behaviour by reversing this flag:
+    ``-fno-link-rts``.
 
 .. ghc-flag:: -main-is ⟨thing⟩
     :shortdesc: Set main module and function
@@ -954,7 +1042,7 @@ for example).
 
     This option affects the processing of RTS control options given
     either on the command line or via the :envvar:`GHCRTS` environment
-    variable. There are three possibilities:
+    variable. There are five possibilities:
 
     ``-rtsopts=none``
         Disable all processing of RTS options. If ``+RTS`` appears
@@ -1152,6 +1240,7 @@ for example).
 .. ghc-flag:: -pie
     :shortdesc: Instruct the linker to produce a position-independent executable.
     :type: dynamic
+    :reverse: -no-pie
     :category: linking
 
     :since: 8.2.2
@@ -1173,7 +1262,16 @@ for example).
     Also, you may need to use the :ghc-flag:`-rdynamic` flag to ensure that
     that symbols are not dropped from your PIE objects.
 
-.. ghc-flag:: -keep-cafs
+.. ghc-flag:: -no-pie
+    :shortdesc: Don't instruct the linker to produce a position-independent executable.
+    :type: dynamic
+    :reverse: -pie
+    :category: linking
+
+    If required, the C compiler will still produce a PIE. Otherwise, this is the default.
+    Refer to -pie for more information about PIEs.
+
+.. ghc-flag:: -fkeep-cafs
     :shortdesc: Do not garbage-collect CAFs (top-level expressions) at runtime
     :type: dynamic
     :category: linking

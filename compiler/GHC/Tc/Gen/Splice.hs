@@ -1,23 +1,21 @@
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE InstanceSigs           #-}
+{-# LANGUAGE MultiWayIf             #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TupleSections          #-}
+{-# LANGUAGE TypeFamilies           #-}
+
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TupleSections #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | Template Haskell splices
 module GHC.Tc.Gen.Splice(
@@ -34,90 +32,100 @@ module GHC.Tc.Gen.Splice(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Plugins
+import GHC.Driver.Main
+import GHC.Driver.Session
+import GHC.Driver.Env
+import GHC.Driver.Hooks
 
 import GHC.Hs
-import GHC.Types.Annotations
-import GHC.Driver.Finder
-import GHC.Types.Name
+
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-
-import Outputable
 import GHC.Tc.Gen.Expr
-import GHC.Types.SrcLoc
-import GHC.Builtin.Names.TH
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
-import GHC.Core.Coercion( etaExpandCoAxBranch )
-import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.Zonk
+import GHC.Tc.Solver
+import GHC.Tc.Utils.TcMType
+import GHC.Tc.Gen.HsType
+import GHC.Tc.Instance.Family
+import GHC.Tc.Utils.Instantiate
 
-import Control.Monad
+import GHC.Core.Multiplicity
+import GHC.Core.Coercion( etaExpandCoAxBranch )
+import GHC.Core.Type as Type
+import GHC.Core.TyCo.Rep as TyCoRep
+import GHC.Core.FamInstEnv
+import GHC.Core.InstEnv as InstEnv
+
+import GHC.Builtin.Names.TH
+import GHC.Builtin.Names
+import GHC.Builtin.Types
+
+import GHC.ThToHs
+import GHC.HsToCore.Expr
+import GHC.HsToCore.Monad
+import GHC.IfaceToCore
+import GHC.Iface.Load
 
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Interpreter.Types
-import GHC.Driver.Main
-        -- These imports are the reason that GHC.Tc.Gen.Splice
-        -- is very high up the module hierarchy
+
 import GHC.Rename.Splice( traceSplice, SpliceInfo(..))
-import GHC.Types.Name.Reader
-import GHC.Driver.Types
-import GHC.ThToHs
 import GHC.Rename.Expr
 import GHC.Rename.Env
 import GHC.Rename.Utils  ( HsDocContext(..) )
 import GHC.Rename.Fixity ( lookupFixityRn_help )
 import GHC.Rename.HsType
-import GHC.Tc.Utils.Zonk
-import GHC.Tc.Solver
-import GHC.Core.Type as Type
-import GHC.Types.Name.Set
-import GHC.Tc.Utils.TcMType
-import GHC.Tc.Gen.HsType
-import GHC.IfaceToCore
-import GHC.Core.TyCo.Rep as TyCoRep
-import GHC.Tc.Instance.Family
-import GHC.Core.FamInstEnv
-import GHC.Core.InstEnv as InstEnv
-import GHC.Tc.Utils.Instantiate
-import GHC.Types.Name.Env
-import GHC.Builtin.Names
-import GHC.Builtin.Types
-import GHC.Types.Name.Occurrence as OccName
-import GHC.Driver.Hooks
-import GHC.Types.Var
-import GHC.Types.Module
-import GHC.Iface.Load
+
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Core.DataCon as DataCon
-import GHC.Tc.Types.Evidence
+
+import GHC.Types.SrcLoc
+import GHC.Types.Name.Env
+import GHC.Types.Name.Set
+import GHC.Types.Name.Reader
+import GHC.Types.Name.Occurrence as OccName
+import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.HsToCore.Expr
-import GHC.HsToCore.Monad
-import GHC.Serialized
-import ErrUtils
-import Util
 import GHC.Types.Unique
 import GHC.Types.Var.Set
-import Data.List        ( find )
-import Data.Maybe
-import FastString
-import GHC.Types.Basic as BasicTypes hiding( SuccessFlag(..) )
-import Maybes( MaybeErr(..) )
-import GHC.Driver.Session
-import Panic
+import GHC.Types.Meta
+import GHC.Types.Basic hiding( SuccessFlag(..) )
+import GHC.Types.Fixity as Hs
+import GHC.Types.Annotations
+import GHC.Types.Name
+import GHC.Serialized
+
+import GHC.Unit.Finder
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Deps
+
+import GHC.Utils.Error
+import GHC.Utils.Misc
+import GHC.Utils.Panic as Panic
 import GHC.Utils.Lexeme
-import qualified EnumSet
-import GHC.Driver.Plugins
-import Bag
+import GHC.Utils.Outputable
+
+import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
+
+import GHC.Data.Bag
+import GHC.Data.FastString
+import GHC.Data.Maybe( MaybeErr(..) )
+import qualified GHC.Data.EnumSet as EnumSet
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
@@ -129,9 +137,12 @@ import GHC.Desugar      ( AnnotationWrapper(..) )
 import Unsafe.Coerce    ( unsafeCoerce )
 #endif
 
+import Control.Monad
 import Control.Exception
 import Data.Binary
 import Data.Binary.Get
+import Data.List        ( find )
+import Data.Maybe
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic  ( fromDynamic, toDyn )
@@ -148,10 +159,10 @@ import Data.Proxy    ( Proxy (..) )
 ************************************************************************
 -}
 
-tcTypedBracket   :: HsExpr GhcRn -> HsBracket GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
+tcTypedBracket   :: HsExpr GhcRn -> HsBracket GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcUntypedBracket :: HsExpr GhcRn -> HsBracket GhcRn -> [PendingRnSplice] -> ExpRhoType
-                 -> TcM (HsExpr GhcTcId)
-tcSpliceExpr     :: HsSplice GhcRn  -> ExpRhoType -> TcM (HsExpr GhcTcId)
+                 -> TcM (HsExpr GhcTc)
+tcSpliceExpr     :: HsSplice GhcRn  -> ExpRhoType -> TcM (HsExpr GhcTc)
         -- None of these functions add constraints to the LIE
 
 -- runQuasiQuoteExpr :: HsQuasiQuote RdrName -> RnM (LHsExpr RdrName)
@@ -189,12 +200,14 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
        -- Throw away the typechecked expression but return its type.
        -- We'll typecheck it again when we splice it in somewhere
        ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var wrapper)) $
+                                tcScalingUsage Many $
+                                -- Scale by Many, TH lifting is currently nonlinear (#18465)
                                 tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
        ; let rep = getRuntimeRep expr_ty
        ; meta_ty <- tcTExpTy m_var expr_ty
        ; ps' <- readMutVar ps_ref
-       ; texpco <- tcLookupId unsafeTExpCoerceName
+       ; texpco <- tcLookupId unsafeCodeCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
                        (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
@@ -236,7 +249,7 @@ tcUntypedBracket rn_expr brack ps res_ty
 -- | A type variable with kind * -> * named "m"
 mkMetaTyVar :: TcM TyVar
 mkMetaTyVar =
-  newNamedFlexiTyVar (fsLit "m") (mkVisFunTy liftedTypeKind liftedTypeKind)
+  newNamedFlexiTyVar (fsLit "m") (mkVisFunTyMany liftedTypeKind liftedTypeKind)
 
 
 -- | For a type 'm', emit the constraint 'Quote m'.
@@ -286,7 +299,8 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
   = do { meta_ty <- tcMetaTy meta_ty_name
          -- Expected type of splice, e.g. m Exp
        ; let expected_type = mkAppTy m_var meta_ty
-       ; expr' <- tcCheckExpr expr expected_type
+       ; expr' <- tcScalingUsage Many $ tcCheckPolyExpr expr expected_type
+                  -- Scale by Many, TH lifting is currently nonlinear (#18465)
        ; return (PendingTcSplice splice_name expr') }
   where
      meta_ty_name = case flavour of
@@ -300,9 +314,9 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
 tcTExpTy :: TcType -> TcType -> TcM TcType
 tcTExpTy m_ty exp_ty
   = do { unless (isTauTy exp_ty) $ addErr (err_msg exp_ty)
-       ; texp <- tcLookupTyCon tExpTyConName
+       ; codeCon <- tcLookupTyCon codeTyConName
        ; let rep = getRuntimeRep exp_ty
-       ; return (mkAppTy m_ty (mkTyConApp texp [rep, exp_ty])) }
+       ; return (mkTyConApp codeCon [rep, m_ty, exp_ty]) }
   where
     err_msg ty
       = vcat [ text "Illegal polytype:" <+> ppr ty
@@ -551,7 +565,7 @@ We only produce warnings for TH splices when the user requests so
 (-fenable-th-splice-warnings). There are multiple reasons:
 
   * It's not clear that the user that compiles a splice is the author of the code
-    that produces the warning. Think of the situation where she just splices in
+    that produces the warning. Think of the situation where they just splice in
     code from a third-party library that produces incomplete pattern matches.
     In this scenario, the user isn't even able to fix that warning.
   * Gathering information for producing the warnings (pattern-match check
@@ -567,8 +581,8 @@ For correct pattern-match warnings it's crucial that we annotate the Origin
 consistently (#17270). In the future we could offer the Origin as part of the
 TH AST. That would enable us to give quotes from the current module get
 FromSource origin, and/or third library authors to tag certain parts of
-generated code as FromSource to enable warnings. That effort is tracked in
-#14838.
+generated code as FromSource to enable warnings.
+That effort is tracked in #14838.
 -}
 
 {-
@@ -616,16 +630,22 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) spl
        ; meta_exp_ty <- tcTExpTy m_var res_ty
        ; expr' <- setStage pop_stage $
                   setConstraintVar lie_var $
-                  tcLExpr expr (mkCheckExpType meta_exp_ty)
-       ; untypeq <- tcLookupId unTypeQName
+                  tcCheckMonoExpr expr meta_exp_ty
+       ; untype_code <- tcLookupId unTypeCodeName
        ; let expr'' = mkHsApp
                         (mkLHsWrap (applyQuoteWrapper q)
-                          (nlHsTyApp untypeq [rep, res_ty])) expr'
+                          (nlHsTyApp untype_code [rep, res_ty])) expr'
        ; ps <- readMutVar ps_var
        ; writeMutVar ps_var (PendingTcSplice splice_name expr'' : ps)
 
        -- The returned expression is ignored; it's in the pending splices
-       ; return (panic "tcSpliceExpr") }
+       -- But we still return a plausible expression
+       --   (a) in case we print it in debug messages, and
+       --   (b) because we test whether it is tagToEnum in Tc.Gen.Expr.tcApp
+       ; return (HsSpliceE noExtField $
+                 HsSpliced noExtField (ThModFinalizers []) $
+                 HsSplicedExpr (unLoc expr'')) }
+
 
 tcNestedSplice _ _ splice_name _ _
   = pprPanic "tcNestedSplice: rename stage found" (ppr splice_name)
@@ -639,7 +659,7 @@ tcTopSplice expr res_ty
        -- Top level splices must still be of type Q (TExp a)
        ; meta_exp_ty <- tcTExpTy q_type res_ty
        ; q_expr <- tcTopSpliceExpr Typed $
-                          tcLExpr expr (mkCheckExpType meta_exp_ty)
+                   tcCheckMonoExpr expr meta_exp_ty
        ; lcl_env <- getLclEnv
        ; let delayed_splice
               = DelayedSplice lcl_env expr res_ty q_expr
@@ -676,7 +696,7 @@ runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
             captureConstraints $
               addErrCtxt (spliceResultDoc zonked_q_expr) $ do
                 { (exp3, _fvs) <- rnLExpr expr2
-                ; tcLExpr exp3 (mkCheckExpType zonked_ty)}
+                ; tcCheckMonoExpr exp3 zonked_ty }
        ; ev <- simplifyTop wcs
        ; return $ unLoc (mkHsDictLet (EvBinds ev) res)
        }
@@ -709,7 +729,7 @@ tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
 -- Note that set the level to Splice, regardless of the original level,
 -- before typechecking the expression.  For example:
 --      f x = $( ...$(g 3) ... )
--- The recursive call to tcCheckExpr will simply expand the
+-- The recursive call to tcCheckPolyExpr will simply expand the
 -- inner escape before dealing with the outer one
 
 tcTopSpliceExpr isTypedSplice tc_action
@@ -1087,7 +1107,7 @@ instance TH.Quasi TcM where
                         RealSrcSpan s _ -> return s
                  ; return (TH.Loc { TH.loc_filename = unpackFS (srcSpanFile r)
                                   , TH.loc_module   = moduleNameString (moduleName m)
-                                  , TH.loc_package  = unitIdString (moduleUnitId m)
+                                  , TH.loc_package  = unitString (moduleUnit m)
                                   , TH.loc_start = (srcSpanStartLine r, srcSpanStartCol r)
                                   , TH.loc_end = (srcSpanEndLine   r, srcSpanEndCol   r) }) }
 
@@ -1423,14 +1443,20 @@ reifyInstances th_nm th_tys
                              -- must error before proceeding to typecheck the
                              -- renamed type, as that will result in GHC
                              -- internal errors (#13837).
-               bindLRdrNames tv_rdrs $ \ tv_names ->
+               rnImplicitBndrs Nothing tv_rdrs $ \ tv_names ->
                do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
                   ; return ((tv_names, rn_ty), fvs) }
-        ; (_tvs, ty)
-            <- pushTcLevelM_   $
-               solveEqualities $ -- Avoid error cascade if there are unsolved
-               bindImplicitTKBndrs_Skol tv_names $
-               fst <$> tcLHsType rn_ty
+
+        ; (tclvl, wanted, (tvs, ty))
+            <- pushLevelAndSolveEqualitiesX "reifyInstances"  $
+               bindImplicitTKBndrs_Skol tv_names              $
+               tcInferLHsType rn_ty
+
+        ; tvs <- zonkAndScopedSort tvs
+
+        -- Avoid error cascade if there are unsolved
+        ; reportUnsolvedEqualities ReifySkol tvs tclvl wanted
+
         ; ty <- zonkTcTypeToType ty
                 -- Substitute out the meta type variables
                 -- In particular, the type might have kind
@@ -1612,7 +1638,7 @@ reifyThing (AGlobal (AConLike (RealDataCon dc)))
 
 reifyThing (AGlobal (AConLike (PatSynCon ps)))
   = do { let name = reifyName ps
-       ; ty <- reifyPatSynType (patSynSig ps)
+       ; ty <- reifyPatSynType (patSynSigBndr ps)
        ; return (TH.PatSynI name ty) }
 
 reifyThing (ATcId {tct_id = id})
@@ -1667,7 +1693,7 @@ reifyTyCon tc
                    Just name ->
                      let thName   = reifyName name
                          injAnnot = tyConInjectivityInfo tc
-                         sig = TH.TyVarSig (TH.KindedTV thName kind')
+                         sig = TH.TyVarSig (TH.KindedTV thName () kind')
                          inj = case injAnnot of
                                  NotInjective -> Nothing
                                  Injective ms ->
@@ -1731,7 +1757,7 @@ reifyDataCon isGadtDataCon tys dc
              (ex_tvs, theta, arg_tys)
                  = dataConInstSig dc tys
              -- used for GADTs data constructors
-             g_user_tvs' = dataConUserTyVars dc
+             g_user_tvs' = dataConUserTyVarBinders dc
              (g_univ_tvs, _, g_eq_spec, g_theta', g_arg_tys', g_res_ty')
                  = dataConFullSig dc
              (srcUnpks, srcStricts)
@@ -1747,9 +1773,9 @@ reifyDataCon isGadtDataCon tys dc
               -- See Note [Freshen reified GADT constructors' universal tyvars]
            <- freshenTyVarBndrs $
               filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
-       ; let (tvb_subst, g_user_tvs) = substTyVarBndrs univ_subst g_user_tvs'
+       ; let (tvb_subst, g_user_tvs) = subst_tv_binders univ_subst g_user_tvs'
              g_theta   = substTys tvb_subst g_theta'
-             g_arg_tys = substTys tvb_subst g_arg_tys'
+             g_arg_tys = substTys tvb_subst (map scaledThing g_arg_tys')
              g_res_ty  = substTy  tvb_subst g_res_ty'
 
        ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
@@ -1780,14 +1806,23 @@ reifyDataCon isGadtDataCon tys dc
        ; let (ex_tvs', theta') | isGadtDataCon = (g_user_tvs, g_theta)
                                | otherwise     = ASSERT( all isTyVar ex_tvs )
                                                  -- no covars for haskell syntax
-                                                 (ex_tvs, theta)
+                                                 (map mk_specified ex_tvs, theta)
              ret_con | null ex_tvs' && null theta' = return main_con
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'
-                         ; ex_tvs'' <- reifyTyVars ex_tvs'
+                         ; ex_tvs'' <- reifyTyVarBndrs ex_tvs'
                          ; return (TH.ForallC ex_tvs'' cxt main_con) }
        ; ASSERT( r_arg_tys `equalLength` dcdBangs )
          ret_con }
+  where
+    mk_specified tv = Bndr tv SpecifiedSpec
+
+    subst_tv_binders subst tv_bndrs =
+      let tvs            = binderVars tv_bndrs
+          flags          = map binderArgFlag tv_bndrs
+          (subst', tvs') = substTyVarBndrs subst tvs
+          tv_bndrs'      = map (\(tv,fl) -> Bndr tv fl) (zip tvs' flags)
+      in (subst', tv_bndrs')
 
 {-
 Note [Freshen reified GADT constructors' universal tyvars]
@@ -1862,9 +1897,9 @@ reifyClass cls
       = (n, map bndrName args)
     tfNames d = pprPanic "tfNames" (text (show d))
 
-    bndrName :: TH.TyVarBndr -> TH.Name
-    bndrName (TH.PlainTV n)    = n
-    bndrName (TH.KindedTV n _) = n
+    bndrName :: TH.TyVarBndr flag -> TH.Name
+    bndrName (TH.PlainTV n _)    = n
+    bndrName (TH.KindedTV n _ _) = n
 
 ------------------------------
 -- | Annotate (with TH.SigT) a type if the first parameter is True
@@ -2098,25 +2133,32 @@ reifyType ty@(AppTy {})     = do
     filter_out_invisible_args ty_head ty_args =
       filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
                    ty_args
-reifyType ty@(FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
+reifyType ty@(FunTy { ft_af = af, ft_mult = Many, ft_arg = t1, ft_res = t2 })
   | InvisArg <- af = reify_for_all Inferred ty  -- Types like ((?x::Int) => Char -> Char)
-  | otherwise      = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
+  | otherwise      = do { [r1,r2] <- reifyTypes [t1,t2]
+                        ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
+reifyType ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
+  | InvisArg <- af = noTH (sLit "linear invisible argument") (ppr ty)
+  | otherwise      = do { [rm,r1,r2] <- reifyTypes [tm,t1,t2]
+                        ; return (TH.MulArrowT `TH.AppT` rm `TH.AppT` r1 `TH.AppT` r2) }
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
 reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)
 
 reify_for_all :: TyCoRep.ArgFlag -> TyCoRep.Type -> TcM TH.Type
 -- Arg of reify_for_all is always ForAllTy or a predicate FunTy
-reify_for_all argf ty = do
-  tvs' <- reifyTyVars tvs
-  case argToForallVisFlag argf of
-    ForallVis   -> do phi' <- reifyType phi
-                      pure $ TH.ForallVisT tvs' phi'
-    ForallInvis -> do let (cxt, tau) = tcSplitPhiTy phi
-                      cxt' <- reifyCxt cxt
-                      tau' <- reifyType tau
-                      pure $ TH.ForallT tvs' cxt' tau'
-  where
-    (tvs, phi) = tcSplitForAllTysSameVis argf ty
+reify_for_all argf ty
+  | isVisibleArgFlag argf
+  = do let (req_bndrs, phi) = tcSplitForAllTysReq ty
+       tvbndrs' <- reifyTyVarBndrs req_bndrs
+       phi' <- reifyType phi
+       pure $ TH.ForallVisT tvbndrs' phi'
+  | otherwise
+  = do let (inv_bndrs, phi) = tcSplitForAllTysInvis ty
+       tvbndrs' <- reifyTyVarBndrs inv_bndrs
+       let (cxt, tau) = tcSplitPhiTy phi
+       cxt' <- reifyCxt cxt
+       tau' <- reifyType tau
+       pure $ TH.ForallT tvbndrs' cxt' tau'
 
 reifyTyLit :: TyCoRep.TyLit -> TcM TH.TyLit
 reifyTyLit (NumTyLit n) = return (TH.NumTyLit n)
@@ -2126,14 +2168,14 @@ reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType
 
 reifyPatSynType
-  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type) -> TcM TH.Type
+  :: ([InvisTVBinder], ThetaType, [InvisTVBinder], ThetaType, [Scaled Type], Type) -> TcM TH.Type
 -- reifies a pattern synonym's type and returns its *complete* type
 -- signature; see NOTE [Pattern synonym signatures and Template
 -- Haskell]
 reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
-  = do { univTyVars' <- reifyTyVars univTyVars
+  = do { univTyVars' <- reifyTyVarBndrs univTyVars
        ; req'        <- reifyCxt req
-       ; exTyVars'   <- reifyTyVars exTyVars
+       ; exTyVars'   <- reifyTyVarBndrs exTyVars
        ; prov'       <- reifyCxt prov
        ; tau'        <- reifyType (mkVisFunTys argTys resTy)
        ; return $ TH.ForallT univTyVars' req'
@@ -2148,18 +2190,33 @@ reifyCxt   = mapM reifyType
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 
-reifyTyVars :: [TyVar] -> TcM [TH.TyVarBndr]
-reifyTyVars tvs = mapM reify_tv tvs
+class ReifyFlag flag flag' | flag -> flag' where
+    reifyFlag :: flag -> flag'
+
+instance ReifyFlag () () where
+    reifyFlag () = ()
+
+instance ReifyFlag Specificity TH.Specificity where
+    reifyFlag SpecifiedSpec = TH.SpecifiedSpec
+    reifyFlag InferredSpec  = TH.InferredSpec
+
+reifyTyVars :: [TyVar] -> TcM [TH.TyVarBndr ()]
+reifyTyVars = reifyTyVarBndrs . map mk_bndr
+  where
+    mk_bndr tv = Bndr tv ()
+
+reifyTyVarBndrs :: ReifyFlag flag flag'
+                => [VarBndr TyVar flag] -> TcM [TH.TyVarBndr flag']
+reifyTyVarBndrs = mapM reify_tvbndr
   where
     -- even if the kind is *, we need to include a kind annotation,
     -- in case a poly-kind would be inferred without the annotation.
     -- See #8953 or test th/T8953
-    reify_tv tv = TH.KindedTV name <$> reifyKind kind
-      where
-        kind = tyVarKind tv
-        name = reifyName tv
+    reify_tvbndr (Bndr tv fl) = TH.KindedTV (reifyName tv)
+                                            (reifyFlag fl)
+                                            <$> reifyKind (tyVarKind tv)
 
-reifyTyVarsToMaybe :: [TyVar] -> TcM (Maybe [TH.TyVarBndr])
+reifyTyVarsToMaybe :: [TyVar] -> TcM (Maybe [TH.TyVarBndr ()])
 reifyTyVarsToMaybe []  = pure Nothing
 reifyTyVarsToMaybe tys = Just <$> reifyTyVars tys
 
@@ -2179,7 +2236,7 @@ reify_tc_app tc tys
                                             else TH.TupleT arity
          | tc `hasKey` constraintKindTyConKey
                                           = TH.ConstraintT
-         | tc `hasKey` funTyConKey        = TH.ArrowT
+         | tc `hasKey` unrestrictedFunTyConKey = TH.ArrowT
          | tc `hasKey` listTyConKey       = TH.ListT
          | tc `hasKey` nilDataConKey      = TH.PromotedNilT
          | tc `hasKey` consDataConKey     = TH.PromotedConsT
@@ -2216,7 +2273,7 @@ reifyName thing
   where
     name    = getName thing
     mod     = ASSERT( isExternalName name ) nameModule name
-    pkg_str = unitIdString (moduleUnitId mod)
+    pkg_str = unitString (moduleUnit mod)
     mod_str = moduleNameString (moduleName mod)
     occ_str = occNameString occ
     occ     = nameOccName name
@@ -2234,7 +2291,7 @@ reifyFieldLabel fl
   where
     name    = flSelector fl
     mod     = ASSERT( isExternalName name ) nameModule name
-    pkg_str = unitIdString (moduleUnitId mod)
+    pkg_str = unitString (moduleUnit mod)
     mod_str = moduleNameString (moduleName mod)
     occ_str = unpackFS (flLabel fl)
 
@@ -2250,10 +2307,10 @@ reifyFixity name
   = do { (found, fix) <- lookupFixityRn_help name
        ; return (if found then Just (conv_fix fix) else Nothing) }
     where
-      conv_fix (BasicTypes.Fixity _ i d) = TH.Fixity i (conv_dir d)
-      conv_dir BasicTypes.InfixR = TH.InfixR
-      conv_dir BasicTypes.InfixL = TH.InfixL
-      conv_dir BasicTypes.InfixN = TH.InfixN
+      conv_fix (Hs.Fixity _ i d) = TH.Fixity i (conv_dir d)
+      conv_dir Hs.InfixR = TH.InfixR
+      conv_dir Hs.InfixL = TH.InfixL
+      conv_dir Hs.InfixN = TH.InfixN
 
 reifyUnpackedness :: DataCon.SrcUnpackedness -> TH.SourceUnpackedness
 reifyUnpackedness NoSrcUnpack = TH.NoSourceUnpackedness
@@ -2283,7 +2340,7 @@ reifyTypeOfThing th_name = do
     AGlobal (AConLike (RealDataCon dc)) ->
       reifyType (idType (dataConWrapId dc))
     AGlobal (AConLike (PatSynCon ps)) ->
-      reifyPatSynType (patSynSig ps)
+      reifyPatSynType (patSynSigBndr ps)
     ATcId{tct_id = id} -> zonkTcType (idType id) >>= reifyType
     ATyVar _ tctv -> zonkTcTyVar tctv >>= reifyType
     -- Impossible cases, supposedly:
@@ -2296,7 +2353,7 @@ lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget
 lookupThAnnLookup (TH.AnnLookupName th_nm) = fmap NamedTarget (lookupThName th_nm)
 lookupThAnnLookup (TH.AnnLookupModule (TH.Module pn mn))
   = return $ ModuleTarget $
-    mkModule (stringToUnitId $ TH.pkgString pn) (mkModuleName $ TH.modString mn)
+    mkModule (stringToUnit $ TH.pkgString pn) (mkModuleName $ TH.modString mn)
 
 reifyAnnotations :: Data a => TH.AnnLookup -> TcM [a]
 reifyAnnotations th_name
@@ -2310,13 +2367,13 @@ reifyAnnotations th_name
 
 ------------------------------
 modToTHMod :: Module -> TH.Module
-modToTHMod m = TH.Module (TH.PkgName $ unitIdString  $ moduleUnitId m)
+modToTHMod m = TH.Module (TH.PkgName $ unitString  $ moduleUnit m)
                          (TH.ModName $ moduleNameString $ moduleName m)
 
 reifyModule :: TH.Module -> TcM TH.ModuleInfo
 reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
   this_mod <- getModule
-  let reifMod = mkModule (stringToUnitId pkgString) (mkModuleName mString)
+  let reifMod = mkModule (stringToUnit pkgString) (mkModuleName mString)
   if (reifMod == this_mod) then reifyThisModule else reifyFromIface reifMod
     where
       reifyThisModule = do
@@ -2326,10 +2383,10 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
       reifyFromIface reifMod = do
         iface <- loadInterfaceForModule (text "reifying module from TH for" <+> ppr reifMod) reifMod
         let usages = [modToTHMod m | usage <- mi_usages iface,
-                                     Just m <- [usageToModule (moduleUnitId reifMod) usage] ]
+                                     Just m <- [usageToModule (moduleUnit reifMod) usage] ]
         return $ TH.ModuleInfo usages
 
-      usageToModule :: UnitId -> Usage -> Maybe Module
+      usageToModule :: Unit -> Usage -> Maybe Module
       usageToModule _ (UsageFile {}) = Nothing
       usageToModule this_pkg (UsageHomeModule { usg_mod_name = mn }) = Just $ mkModule this_pkg mn
       usageToModule _ (UsagePackageModule { usg_mod = m }) = Just m

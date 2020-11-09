@@ -1,6 +1,5 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP          #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -14,7 +13,7 @@ module GHC.Rename.Splice (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -27,9 +26,10 @@ import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
 import GHC.Rename.Unbound ( isUnboundName )
 import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
-import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, SourceText(..) )
-import Outputable
-import GHC.Types.Module
+import GHC.Types.Basic    ( TopLevelFlag, isTopLevel )
+import GHC.Types.SourceText ( SourceText(..) )
+import GHC.Utils.Outputable
+import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import GHC.Rename.HsType ( rnLHsType )
 
@@ -37,18 +37,18 @@ import Control.Monad    ( unless, when )
 
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 
-import GHC.Tc.Utils.Env     ( checkWellStaged )
-import GHC.Builtin.Names.TH ( liftName )
+import GHC.Tc.Utils.Env     ( checkWellStaged, tcMetaTy )
 
 import GHC.Driver.Session
-import FastString
-import ErrUtils         ( dumpIfSet_dyn_printer, DumpFormat (..) )
-import GHC.Tc.Utils.Env ( tcMetaTy )
+import GHC.Data.FastString
+import GHC.Utils.Error  ( dumpIfSet_dyn_printer, DumpFormat (..) )
+import GHC.Utils.Panic
 import GHC.Driver.Hooks
-import GHC.Builtin.Names.TH ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
-                            , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
+import GHC.Builtin.Names.TH ( decsQTyConName, expQTyConName, liftName
+                            , patQTyConName, quoteDecName, quoteExpName
+                            , quotePatName, quoteTypeName, typeQTyConName)
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr   ( tcCheckExpr )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr   ( tcCheckPolyExpr )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice
     ( runMetaD
     , runMetaE
@@ -111,6 +111,8 @@ rnBracket e br_body
             False -> do { traceRn "Renaming untyped TH bracket" empty
                         ; ps_var <- newMutVar []
                         ; (body', fvs_e) <-
+                          -- See Note [Rebindable syntax and Template Haskell]
+                          unsetXOptM LangExt.RebindableSyntax $
                           setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
                                    rn_bracket cur_stage br_body
                         ; pendings <- readMutVar ps_var
@@ -324,7 +326,7 @@ runRnSplice flavour run_meta ppr_res splice
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
        ; zonked_q_expr <- zonkTopLExpr =<<
                             tcTopSpliceExpr Untyped
-                              (tcCheckExpr the_expr meta_exp_ty)
+                              (tcCheckPolyExpr the_expr meta_exp_ty)
 
              -- Run the expression
        ; mod_finalizers_ref <- newTcRef []
@@ -489,6 +491,67 @@ to try and
     expressions before splicy expressions,
  b) explain to TH users which expressions are/not available to reify at any
     given point.
+
+-}
+
+{- Note [Rebindable syntax and Template Haskell]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When processing Template Haskell quotes with Rebindable Syntax (RS) enabled,
+there are two possibilities: apply the RS rules to the quotes or don't.
+
+One might expect that with {-# LANGUAGE RebindableSyntax #-} at the top of a
+module, any 'if' expression would end up being turned into a call to whatever
+'ifThenElse' function is in scope, regardless of whether the said if expression
+appears in "normal" Haskell code or in a TH quote. This however comes with its
+problems. Consider the following code:
+
+  {-# LANGUAGE TemplateHaskell, RebindableSyntax #-}
+
+  module X where
+
+  import Prelude ( Monad(..), Bool(..), print, ($) )
+  import Language.Haskell.TH.Syntax
+
+  $( do stuff <- [| if True then 10 else 15 |]
+        runIO $ print stuff
+        return [] )
+
+If we apply the RS rules, then GHC would complain about not having suitable
+fromInteger/ifThenElse functions in scope. But this quote is just a bit of
+Haskell syntax that has yet to be used, or, to put it differently, placed
+(spliced) in some context where the said functions might be available. More
+generally, untyped TH quotes are meant to work with yet-unbound identifiers.
+This tends to show that untyped TH and Rebindable Syntax overall don't play
+well together. Users still have the option to splice "normal" if expressions
+into modules where RS is enabled, to turn them into applications of
+an 'ifThenElse' function of their choice.
+
+Typed TH (TTH) quotes, on the other hand, come with different constraints. They
+don't quite have this "delayed" nature: we typecheck them while processing
+them, and TTH users expect RS to Just Work in their quotes, exactly like it does
+outside of the quotes. There, we do not have to accept unbound identifiers and
+we can apply the RS rules both in the typechecking and desugaring of the quotes
+without triggering surprising/bad behaviour for users. For instance, the
+following code is expected to be rejected (because of the lack of suitable
+'fromInteger'/'ifThenElse' functions in scope):
+
+  {-# LANGUAGE TemplateHaskell, RebindableSyntax #-}
+
+  module X where
+
+  import Prelude ( Monad(..), Bool(..), print, ($) )
+  import Language.Haskell.TH.Syntax
+
+  $$( do stuff <- [|| if True then 10 else 15 ||]
+         runIO $ print stuff
+         return [] )
+
+The conclusion is that even if RS is enabled for a given module, GHC disables it
+when processing untyped TH quotes from that module, to avoid the aforementioned
+problems, but keeps it on while processing typed TH quotes.
+
+This note and approach originated in #18102.
 
 -}
 
@@ -867,7 +930,7 @@ A thing can have a bind_lvl of outerLevel, but have an internal name:
    foo = [d| op = 3
              bop = op + 1 |]
 Here the bind_lvl of 'op' is (bogusly) outerLevel, even though it is
-bound inside a bracket.  That is because we don't even even record
+bound inside a bracket.  That is because we don't even record
 binding levels for top-level things; the binding levels are in the
 LocalRdrEnv.
 

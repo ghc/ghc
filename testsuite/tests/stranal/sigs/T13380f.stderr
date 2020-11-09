@@ -1,0 +1,33 @@
+
+==================== Strictness signatures ====================
+T13380f.$trModule:
+T13380f.f: <S,1*U(U)><S,1*U(U)><L,U>
+T13380f.g: <S,1*U(U)><L,1*U(U)><L,U>
+T13380f.h: <S,1*U(U)><L,1*U(U)><L,U>
+T13380f.interruptibleCall: <L,U>
+T13380f.safeCall: <L,U>
+T13380f.unsafeCall: <L,U>
+
+
+
+==================== Cpr signatures ====================
+T13380f.$trModule:
+T13380f.f:
+T13380f.g:
+T13380f.h:
+T13380f.interruptibleCall:
+T13380f.safeCall:
+T13380f.unsafeCall:
+
+
+
+==================== Strictness signatures ====================
+T13380f.$trModule:
+T13380f.f: <S,1*U(U)><S,1*U(U)><L,U>
+T13380f.g: <S,1*U(U)><L,1*U(U)><L,U>
+T13380f.h: <S,1*U(U)><L,1*U(U)><L,U>
+T13380f.interruptibleCall: <L,U>
+T13380f.safeCall: <L,U>
+T13380f.unsafeCall: <L,U>
+
+

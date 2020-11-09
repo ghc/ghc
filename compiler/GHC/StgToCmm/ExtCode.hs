@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TupleSections #-}
 -- | Our extended FCode monad.
 
 -- We add a mapping from names to CmmExpr, to support local variable names in
@@ -32,12 +33,16 @@ module GHC.StgToCmm.ExtCode (
         emit, emitLabel, emitAssign, emitStore,
         getCode, getCodeR, getCodeScoped,
         emitOutOfLine,
-        withUpdFrameOff, getUpdFrameOff
+        withUpdFrameOff, getUpdFrameOff,
+        getProfile, getPlatform, getPtrOpts
 )
 
 where
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Platform
+import GHC.Platform.Profile
 
 import qualified GHC.StgToCmm.Monad as F
 import GHC.StgToCmm.Monad (FCode, newUnique)
@@ -45,11 +50,12 @@ import GHC.StgToCmm.Monad (FCode, newUnique)
 import GHC.Cmm
 import GHC.Cmm.CLabel
 import GHC.Cmm.Graph
+import GHC.Cmm.Info
 
 import GHC.Cmm.BlockId
 import GHC.Driver.Session
-import FastString
-import GHC.Types.Module
+import GHC.Data.FastString
+import GHC.Unit.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
@@ -61,11 +67,11 @@ data Named
         = VarN CmmExpr          -- ^ Holds CmmLit(CmmLabel ..) which gives the label type,
                                 --      eg, RtsLabel, ForeignLabel, CmmLabel etc.
 
-        | FunN   UnitId      -- ^ A function name from this package
-        | LabelN BlockId                -- ^ A blockid of some code or data.
+        | FunN   UnitId         -- ^ A function name from this unit
+        | LabelN BlockId        -- ^ A blockid of some code or data.
 
 -- | An environment of named things.
-type Env        = UniqFM Named
+type Env        = UniqFM FastString Named
 
 -- | Local declarations that are in scope during code generation.
 type Decls      = [(FastString,Named)]
@@ -98,9 +104,16 @@ instance MonadUnique CmmParse where
     return (decls, u)
 
 instance HasDynFlags CmmParse where
-    getDynFlags = EC (\_ _ d -> do dflags <- getDynFlags
-                                   return (d, dflags))
+    getDynFlags = EC (\_ _ d -> (d,) <$> getDynFlags)
 
+getProfile :: CmmParse Profile
+getProfile = EC (\_ _ d -> (d,) <$> F.getProfile)
+
+getPlatform :: CmmParse Platform
+getPlatform = EC (\_ _ d -> (d,) <$> F.getPlatform)
+
+getPtrOpts :: CmmParse PtrOpts
+getPtrOpts = EC (\_ _ d -> (d,) <$> F.getPtrOpts)
 
 -- | Takes the variable declarations and imports from the monad
 --      and makes an environment, which is looped back into the computation.
@@ -162,10 +175,10 @@ newLabel name = do
    addLabel name (mkBlockId u)
    return (mkBlockId u)
 
--- | Add add a local function to the environment.
+-- | Add a local function to the environment.
 newFunctionName
         :: FastString   -- ^ name of the function
-        -> UnitId    -- ^ package of the current module
+        -> UnitId       -- ^ package of the current module
         -> ExtCode
 
 newFunctionName name pkg = addDecl name (FunN pkg)
@@ -204,7 +217,7 @@ lookupName name = do
   return $
      case lookupUFM env name of
         Just (VarN e)   -> e
-        Just (FunN pkg) -> CmmLit (CmmLabel (mkCmmCodeLabel pkg          name))
+        Just (FunN uid) -> CmmLit (CmmLabel (mkCmmCodeLabel uid       name))
         _other          -> CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId name))
 
 

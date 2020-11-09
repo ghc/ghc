@@ -9,7 +9,7 @@ module GHC.CmmToLlvm.Data (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
@@ -17,11 +17,10 @@ import GHC.CmmToLlvm.Base
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
-import GHC.Driver.Session
 import GHC.Platform
 
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Panic
 import qualified Data.ByteString as BS
 
 -- ----------------------------------------------------------------------------
@@ -43,7 +42,7 @@ linkage lbl = if externallyVisibleCLabel lbl
 
 -- | Pass a CmmStatic section to an equivalent Llvm code.
 genLlvmData :: (Section, RawCmmStatics) -> LlvmM LlvmData
--- See note [emit-time elimination of static indirections] in CLabel.
+-- See note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
 genLlvmData (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
@@ -71,7 +70,7 @@ genLlvmData (sec, CmmStaticsRaw lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs
     lmsec <- llvmSection sec
-    platform <- getLlvmPlatform
+    platform <- getPlatform
     let types   = map getStatType static
 
         strucTy = LMStruct types
@@ -83,7 +82,8 @@ genLlvmData (sec, CmmStaticsRaw lbl xs) = do
                             Section CString _ -> if (platformArch platform == ArchS390X)
                                                     then Just 2 else Just 1
                             _                 -> Nothing
-        const          = if isSecConstant sec then Constant else Global
+        const          = if sectionProtection sec == ReadOnlySection
+                            then Constant else Global
         varDef         = LMGlobalVar label tyAlias link lmsec align const
         globDef        = LMGlobal varDef struct
 
@@ -112,9 +112,9 @@ llvmSectionType p t = case t of
 -- | Format a Cmm Section into a LLVM section name
 llvmSection :: Section -> LlvmM LMSection
 llvmSection (Section t suffix) = do
-  dflags <- getDynFlags
-  let splitSect = gopt Opt_SplitSections dflags
-      platform  = targetPlatform dflags
+  opts <- getLlvmOpts
+  let splitSect = llvmOptsSplitSections opts
+      platform  = llvmOptsPlatform opts
   if not splitSect
   then return Nothing
   else do

@@ -1,12 +1,13 @@
+{-# LANGUAGE CPP           #-}
+{-# LANGUAGE DeriveFunctor #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 \section{Tidying up Core}
 -}
-
-{-# LANGUAGE CPP, DeriveFunctor, ViewPatterns #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Iface.Tidy (
        mkBootModDetailsTc, tidyProgram
@@ -14,12 +15,18 @@ module GHC.Iface.Tidy (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Session
+import GHC.Driver.Backend
+import GHC.Driver.Ppr
+import GHC.Driver.Env
 
 import GHC.Tc.Types
-import GHC.Driver.Session
+
 import GHC.Core
 import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Core.FVs
 import GHC.Core.Tidy
 import GHC.Core.Opt.Monad
@@ -29,36 +36,48 @@ import GHC.Core.Lint
 import GHC.Core.Rules
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
-import GHC.Core.Arity   ( exprArity, exprBotStrictness_maybe )
-import StaticPtrTable
+import GHC.Core.Opt.Arity   ( exprArity, exprBotStrictness_maybe )
+import GHC.Core.InstEnv
+import GHC.Core.Type     ( tidyTopType )
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.Class
+
+import GHC.Iface.Tidy.StaticPtrTable
+import GHC.Iface.Env
+
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Monad
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc( filterOut )
+import GHC.Utils.Panic
+import qualified GHC.Utils.Error as Err
+
+import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Make ( mkDictSelRhs )
 import GHC.Types.Id.Info
-import GHC.Core.InstEnv
-import GHC.Core.Type     ( tidyTopType )
-import GHC.Types.Demand  ( appIsBottom, isTopSig, isBottomingSig )
+import GHC.Types.Demand  ( appIsDeadEnd, isTopSig, isDeadEndSig )
 import GHC.Types.Cpr     ( mkCprSig, botCpr )
 import GHC.Types.Basic
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Name.Set
 import GHC.Types.Name.Cache
+import GHC.Types.Name.Ppr
 import GHC.Types.Avail
-import GHC.Iface.Env
-import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Monad
-import GHC.Core.DataCon
-import GHC.Core.TyCon
-import GHC.Core.Class
-import GHC.Types.Module
-import GHC.Driver.Types
-import Maybes
 import GHC.Types.Unique.Supply
-import Outputable
-import Util( filterOut )
-import qualified ErrUtils as Err
+import GHC.Types.TypeEnv
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.Deps
+
+import GHC.Data.Maybe
 
 import Control.Monad
 import Data.Function
@@ -139,7 +158,7 @@ mkBootModDetailsTc hsc_env
                   tcg_patsyns          = pat_syns,
                   tcg_insts            = insts,
                   tcg_fam_insts        = fam_insts,
-                  tcg_complete_matches = complete_sigs,
+                  tcg_complete_matches = complete_matches,
                   tcg_mod              = this_mod
                 }
   = -- This timing isn't terribly useful since the result isn't forced, but
@@ -147,13 +166,13 @@ mkBootModDetailsTc hsc_env
     Err.withTiming dflags
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
-    return (ModDetails { md_types         = type_env'
-                       , md_insts         = insts'
-                       , md_fam_insts     = fam_insts
-                       , md_rules         = []
-                       , md_anns          = []
-                       , md_exports       = exports
-                       , md_complete_sigs = complete_sigs
+    return (ModDetails { md_types            = type_env'
+                       , md_insts            = insts'
+                       , md_fam_insts        = fam_insts
+                       , md_rules            = []
+                       , md_anns             = []
+                       , md_exports          = exports
+                       , md_complete_matches = complete_matches
                        })
   where
     dflags = hsc_dflags hsc_env
@@ -217,7 +236,7 @@ globaliseAndTidyBootId :: Id -> Id
 --     * VanillaIdInfo (makes a conservative assumption about arity)
 --     * BootUnfolding (see Note [Inlining and hs-boot files] in GHC.CoreToIface)
 globaliseAndTidyBootId id
-  = globaliseId id `setIdType`      tidyTopType (idType id)
+  = updateIdTypeAndMult tidyTopType (globaliseId id)
                    `setIdUnfolding` BootUnfolding
 
 {-
@@ -342,22 +361,22 @@ three places this is actioned:
 -}
 
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
-tidyProgram hsc_env  (ModGuts { mg_module    = mod
-                              , mg_exports   = exports
-                              , mg_rdr_env   = rdr_env
-                              , mg_tcs       = tcs
-                              , mg_insts     = cls_insts
-                              , mg_fam_insts = fam_insts
-                              , mg_binds     = binds
-                              , mg_patsyns   = patsyns
-                              , mg_rules     = imp_rules
-                              , mg_anns      = anns
-                              , mg_complete_sigs = complete_sigs
-                              , mg_deps      = deps
-                              , mg_foreign   = foreign_stubs
-                              , mg_foreign_files = foreign_files
-                              , mg_hpc_info  = hpc_info
-                              , mg_modBreaks = modBreaks
+tidyProgram hsc_env  (ModGuts { mg_module           = mod
+                              , mg_exports          = exports
+                              , mg_rdr_env          = rdr_env
+                              , mg_tcs              = tcs
+                              , mg_insts            = cls_insts
+                              , mg_fam_insts        = fam_insts
+                              , mg_binds            = binds
+                              , mg_patsyns          = patsyns
+                              , mg_rules            = imp_rules
+                              , mg_anns             = anns
+                              , mg_complete_matches = complete_matches
+                              , mg_deps             = deps
+                              , mg_foreign          = foreign_stubs
+                              , mg_foreign_files    = foreign_files
+                              , mg_hpc_info         = hpc_info
+                              , mg_modBreaks        = modBreaks
                               })
 
   = Err.withTiming dflags
@@ -365,7 +384,10 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                    (const ()) $
     do  { let { omit_prags = gopt Opt_OmitInterfacePragmas dflags
               ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
-              ; print_unqual = mkPrintUnqualified dflags rdr_env
+              ; print_unqual = mkPrintUnqualified
+                                 (unitState dflags)
+                                 (hsc_home_unit hsc_env)
+                                 rdr_env
               ; implicit_binds = concatMap getImplicitBinds tcs
               }
 
@@ -375,18 +397,20 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; let { (trimmed_binds, trimmed_rules)
                     = findExternalRules omit_prags binds imp_rules unfold_env }
 
+        ; let uf_opts = unfoldingOpts dflags
         ; (tidy_env, tidy_binds)
-                 <- tidyTopBinds hsc_env unfold_env tidy_occ_env trimmed_binds
+                 <- tidyTopBinds uf_opts unfold_env tidy_occ_env trimmed_binds
 
-          -- See Note [Grand plan for static forms] in StaticPtrTable.
+          -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
              sptCreateStaticBinds hsc_env mod tidy_binds
-        ; let { spt_init_code = sptModuleInitCode mod spt_entries
+        ; let { platform = targetPlatform (hsc_dflags hsc_env)
+              ; spt_init_code = sptModuleInitCode platform mod spt_entries
               ; add_spt_init_code =
-                  case hscTarget dflags of
+                  case backend dflags of
                     -- If we are compiling for the interpreter we will insert
                     -- any necessary SPT entries dynamically
-                    HscInterpreted -> id
+                    Interpreter -> id
                     -- otherwise add a C stub to do so
                     _              -> (`appendStubC` spt_init_code)
 
@@ -437,7 +461,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
             Err.dumpIfSet_dyn dflags Opt_D_dump_rules
               (showSDoc dflags (ppr CoreTidy <+> text "rules"))
               Err.FormatText
-              (pprRulesForUser dflags tidy_rules)
+              (pprRulesForUser tidy_rules)
 
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds
@@ -459,13 +483,13 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                            cg_modBreaks = modBreaks,
                            cg_spt_entries = spt_entries },
 
-                   ModDetails { md_types     = tidy_type_env,
-                                md_rules     = tidy_rules,
-                                md_insts     = tidy_cls_insts,
-                                md_fam_insts = fam_insts,
-                                md_exports   = exports,
-                                md_anns      = anns,      -- are already tidy
-                                md_complete_sigs = complete_sigs
+                   ModDetails { md_types            = tidy_type_env,
+                                md_rules            = tidy_rules,
+                                md_insts            = tidy_cls_insts,
+                                md_fam_insts        = fam_insts,
+                                md_exports          = exports,
+                                md_anns             = anns,      -- are already tidy
+                                md_complete_matches = complete_matches
                               })
         }
   where
@@ -571,7 +595,7 @@ Oh: two other reasons for injecting them late:
 There is one sort of implicit binding that is injected still later,
 namely those for data constructor workers. Reason (I think): it's
 really just a code generation trick.... binding itself makes no sense.
-See Note [Data constructor workers] in CorePrep.
+See Note [Data constructor workers] in "GHC.CoreToStg.Prep".
 -}
 
 getImplicitBinds :: TyCon -> [CoreBind]
@@ -726,7 +750,7 @@ addExternal omit_prags expose_all id
     show_unfold    = show_unfolding unfolding
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
-    bottoming_fn   = isBottomingSig (strictnessInfo idinfo)
+    bottoming_fn   = isDeadEndSig (strictnessInfo idinfo)
 
         -- Stuff to do with the Id's unfolding
         -- We leave the unfolding there even if there is a worker
@@ -1102,43 +1126,41 @@ tidyTopName mod nc_var maybe_ref occ_env id
 --
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
-tidyTopBinds :: HscEnv
+tidyTopBinds :: UnfoldingOpts
              -> UnfoldEnv
              -> TidyOccEnv
              -> CoreProgram
              -> IO (TidyEnv, CoreProgram)
 
-tidyTopBinds hsc_env unfold_env init_occ_env binds
+tidyTopBinds uf_opts unfold_env init_occ_env binds
   = do let result = tidy init_env binds
        seqBinds (snd result) `seq` return result
        -- This seqBinds avoids a spike in space usage (see #13564)
   where
-    dflags = hsc_dflags hsc_env
-
     init_env = (init_occ_env, emptyVarEnv)
 
-    tidy = mapAccumL (tidyTopBind dflags unfold_env)
+    tidy = mapAccumL (tidyTopBind uf_opts unfold_env)
 
 ------------------------
-tidyTopBind  :: DynFlags
+tidyTopBind  :: UnfoldingOpts
              -> UnfoldEnv
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind dflags unfold_env
+tidyTopBind uf_opts unfold_env
             (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 name' (bndr, rhs)
+    (bndr', rhs') = tidyTopPair uf_opts show_unfold tidy_env2 name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind dflags unfold_env (occ_env, subst1) (Rec prs)
+tidyTopBind uf_opts unfold_env (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
-    prs' = [ tidyTopPair dflags show_unfold tidy_env2 name' (id,rhs)
+    prs' = [ tidyTopPair uf_opts show_unfold tidy_env2 name' (id,rhs)
            | (id,rhs) <- prs,
              let (name',show_unfold) =
                     expectJust "tidyTopBind" $ lookupVarEnv unfold_env id
@@ -1150,7 +1172,7 @@ tidyTopBind dflags unfold_env (occ_env, subst1) (Rec prs)
     bndrs = map fst prs
 
 -----------------------------------------------------------
-tidyTopPair :: DynFlags
+tidyTopPair :: UnfoldingOpts
             -> Bool  -- show unfolding
             -> TidyEnv  -- The TidyEnv is used to tidy the IdInfo
                         -- It is knot-tied: don't look at it!
@@ -1163,14 +1185,14 @@ tidyTopPair :: DynFlags
         -- group, a variable late in the group might be mentioned
         -- in the IdInfo of one early in the group
 
-tidyTopPair dflags show_unfold rhs_tidy_env name' (bndr, rhs)
+tidyTopPair uf_opts show_unfold rhs_tidy_env name' (bndr, rhs)
   = (bndr1, rhs1)
   where
     bndr1    = mkGlobalId details name' ty' idinfo'
     details  = idDetails bndr   -- Preserve the IdDetails
     ty'      = tidyTopType (idType bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
-    idinfo'  = tidyTopIdInfo dflags rhs_tidy_env name' rhs rhs1 (idInfo bndr)
+    idinfo'  = tidyTopIdInfo uf_opts rhs_tidy_env name' rhs rhs1 (idInfo bndr)
                              show_unfold
 
 -- tidyTopIdInfo creates the final IdInfo for top-level
@@ -1180,9 +1202,9 @@ tidyTopPair dflags show_unfold rhs_tidy_env name' (bndr, rhs)
 --      Indeed, CorePrep must eta expand where necessary to make
 --      the manifest arity equal to the claimed arity.
 --
-tidyTopIdInfo :: DynFlags -> TidyEnv -> Name -> CoreExpr -> CoreExpr
+tidyTopIdInfo :: UnfoldingOpts -> TidyEnv -> Name -> CoreExpr -> CoreExpr
               -> IdInfo -> Bool -> IdInfo
-tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
+tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
   | not is_external     -- For internal Ids (not externally visible)
   = vanillaIdInfo       -- we only need enough info for code generation
                         -- Arity and strictness info are enough;
@@ -1229,7 +1251,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
 
     _bottom_hidden id_sig = case mb_bot_str of
                                   Nothing         -> False
-                                  Just (arity, _) -> not (appIsBottom id_sig arity)
+                                  Just (arity, _) -> not (appIsDeadEnd id_sig arity)
 
     --------- Unfolding ------------
     unf_info = unfoldingInfo idinfo
@@ -1239,7 +1261,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
       | otherwise
       = minimal_unfold_info
     minimal_unfold_info = zapUnfolding unf_info
-    unf_from_rhs = mkFinalUnfolding dflags InlineRhs final_sig tidy_rhs
+    unf_from_rhs = mkFinalUnfolding uf_opts InlineRhs final_sig tidy_rhs
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
     --     marked NOINLINE or something like that

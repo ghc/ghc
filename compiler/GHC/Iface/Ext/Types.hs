@@ -1,29 +1,35 @@
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveTraversable          #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+
 {-
 Types for the .hie file format are defined here.
 
 For more information see https://gitlab.haskell.org/ghc/ghc/wikis/hie-files
 -}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
+
 module GHC.Iface.Ext.Types where
 
-import GhcPrelude
+import GHC.Prelude
 
-import Config
-import Binary
-import FastString                 ( FastString )
+import GHC.Settings.Config
+import GHC.Utils.Binary
+import GHC.Data.FastString
+import GHC.Builtin.Utils
 import GHC.Iface.Type
-import GHC.Types.Module           ( ModuleName, Module )
-import GHC.Types.Name             ( Name )
-import Outputable hiding ( (<>) )
-import GHC.Types.SrcLoc           ( RealSrcSpan )
+import GHC.Unit.Module            ( ModuleName, Module )
+import GHC.Types.Name
+import GHC.Utils.Outputable hiding ( (<>) )
+import GHC.Types.SrcLoc
 import GHC.Types.Avail
-import qualified Outputable as O ( (<>) )
+import GHC.Types.Unique
+import qualified GHC.Utils.Outputable as O ( (<>) )
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import qualified Data.Array as A
 import qualified Data.Map as M
@@ -33,6 +39,8 @@ import Data.Data                  ( Typeable, Data )
 import Data.Semigroup             ( Semigroup(..) )
 import Data.Word                  ( Word8 )
 import Control.Applicative        ( (<|>) )
+import Data.Coerce                ( coerce  )
+import Data.Function              ( on )
 
 type Span = RealSrcSpan
 
@@ -136,7 +144,7 @@ data HieType a
   | HAppTy a (HieArgs a)
   | HTyConApp IfaceTyCon (HieArgs a)
   | HForAllTy ((Name, a),ArgFlag) a
-  | HFunTy  a a
+  | HFunTy a a a
   | HQualTy a a           -- ^ type with constraint: @t1 => t2@ (see 'IfaceDFunTy')
   | HLitTy IfaceTyLit
   | HCastTy a
@@ -164,8 +172,9 @@ instance Binary (HieType TypeIndex) where
     putByte bh 3
     put_ bh bndr
     put_ bh a
-  put_ bh (HFunTy a b) = do
+  put_ bh (HFunTy w a b) = do
     putByte bh 4
+    put_ bh w
     put_ bh a
     put_ bh b
   put_ bh (HQualTy a b) = do
@@ -187,7 +196,7 @@ instance Binary (HieType TypeIndex) where
       1 -> HAppTy <$> get bh <*> get bh
       2 -> HTyConApp <$> get bh <*> get bh
       3 -> HForAllTy <$> get bh <*> get bh
-      4 -> HFunTy <$> get bh <*> get bh
+      4 -> HFunTy <$> get bh <*> get bh <*> get bh
       5 -> HQualTy <$> get bh <*> get bh
       6 -> HLitTy <$> get bh
       7 -> HCastTy <$> get bh
@@ -204,9 +213,18 @@ instance Binary (HieArgs TypeIndex) where
   put_ bh (HieArgs xs) = put_ bh xs
   get bh = HieArgs <$> get bh
 
--- | Mapping from filepaths (represented using 'FastString') to the
--- corresponding AST
-newtype HieASTs a = HieASTs { getAsts :: (M.Map FastString (HieAST a)) }
+
+-- A HiePath is just a lexical FastString. We use a lexical FastString to avoid
+-- non-determinism when printing or storing HieASTs which are sorted by their
+-- HiePath.
+type HiePath = LexicalFastString
+
+{-# COMPLETE HiePath #-}
+pattern HiePath :: FastString -> HiePath
+pattern HiePath fs = LexicalFastString fs
+
+-- | Mapping from filepaths to the corresponding AST
+newtype HieASTs a = HieASTs { getAsts :: M.Map HiePath (HieAST a) }
   deriving (Functor, Foldable, Traversable)
 
 instance Binary (HieASTs TypeIndex) where
@@ -222,17 +240,16 @@ instance Outputable a => Outputable (HieASTs a) where
         , rest
         ]
 
-
 data HieAST a =
   Node
-    { nodeInfo :: NodeInfo a
+    { sourcedNodeInfo :: SourcedNodeInfo a
     , nodeSpan :: Span
     , nodeChildren :: [HieAST a]
     } deriving (Functor, Foldable, Traversable)
 
 instance Binary (HieAST TypeIndex) where
   put_ bh ast = do
-    put_ bh $ nodeInfo ast
+    put_ bh $ sourcedNodeInfo ast
     put_ bh $ nodeSpan ast
     put_ bh $ nodeChildren ast
 
@@ -247,13 +264,67 @@ instance Outputable a => Outputable (HieAST a) where
       header = text "Node@" O.<> ppr sp O.<> ":" <+> ppr ni
       rest = vcat (map ppr ch)
 
+
+-- | NodeInfos grouped by source
+newtype SourcedNodeInfo a = SourcedNodeInfo { getSourcedNodeInfo :: (M.Map NodeOrigin (NodeInfo a)) }
+  deriving (Functor, Foldable, Traversable)
+
+instance Binary (SourcedNodeInfo TypeIndex) where
+  put_ bh asts = put_ bh $ M.toAscList $ getSourcedNodeInfo asts
+  get bh = SourcedNodeInfo <$> fmap M.fromDistinctAscList (get bh)
+
+instance Outputable a => Outputable (SourcedNodeInfo a) where
+  ppr (SourcedNodeInfo asts) = M.foldrWithKey go "" asts
+    where
+      go k a rest = vcat $
+        [ "Source: " O.<> ppr k
+        , ppr a
+        , rest
+        ]
+
+-- | Source of node info
+data NodeOrigin
+  = SourceInfo
+  | GeneratedInfo
+    deriving (Eq, Enum, Ord)
+
+instance Outputable NodeOrigin where
+  ppr SourceInfo = text "From source"
+  ppr GeneratedInfo = text "generated by ghc"
+
+instance Binary NodeOrigin where
+  put_ bh b = putByte bh (fromIntegral (fromEnum b))
+  get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
+
+-- | A node annotation
+data NodeAnnotation = NodeAnnotation
+   { nodeAnnotConstr :: !FastString -- ^ name of the AST node constructor
+   , nodeAnnotType   :: !FastString -- ^ name of the AST node Type
+   }
+   deriving (Eq)
+
+instance Ord NodeAnnotation where
+   compare (NodeAnnotation c0 t0) (NodeAnnotation c1 t1)
+      = mconcat [uniqCompareFS c0 c1, uniqCompareFS t0 t1]
+
+instance Outputable NodeAnnotation where
+   ppr (NodeAnnotation c t) = ppr (c,t)
+
+instance Binary NodeAnnotation where
+  put_ bh (NodeAnnotation c t) = do
+    put_ bh c
+    put_ bh t
+  get bh = NodeAnnotation
+    <$> get bh
+    <*> get bh
+
 -- | The information stored in one AST node.
 --
 -- The type parameter exists to provide flexibility in representation of types
 -- (see Note [Efficient serialization of redundant type info]).
 data NodeInfo a = NodeInfo
-    { nodeAnnotations :: S.Set (FastString,FastString)
-    -- ^ (name of the AST node constructor, name of the AST node Type)
+    { nodeAnnotations :: S.Set NodeAnnotation
+    -- ^ Annotations
 
     , nodeType :: [a]
     -- ^ The Haskell types of this node, if any.
@@ -314,7 +385,7 @@ instance Monoid (IdentifierDetails a) where
 instance Binary (IdentifierDetails TypeIndex) where
   put_ bh dets = do
     put_ bh $ identType dets
-    put_ bh $ S.toAscList $ identInfo dets
+    put_ bh $ S.toList $ identInfo dets
   get bh =  IdentifierDetails
     <$> get bh
     <*> fmap S.fromDistinctAscList (get bh)
@@ -363,6 +434,14 @@ data ContextInfo
 
   -- | Record field
   | RecField RecFieldContext (Maybe Span)
+  -- | Constraint/Dictionary evidence variable binding
+  | EvidenceVarBind
+      EvVarSource  -- ^ how did this bind come into being
+      Scope        -- ^ scope over which the value is bound
+      (Maybe Span) -- ^ span of the binding site
+
+  -- | Usage of evidence variable
+  | EvidenceVarUse
     deriving (Eq, Ord)
 
 instance Outputable ContextInfo where
@@ -385,10 +464,16 @@ instance Outputable ContextInfo where
      <+> ppr sc1 <+> "," <+> ppr sc2
  ppr (RecField ctx sp) =
    text "record field" <+> ppr ctx <+> pprBindSpan sp
+ ppr (EvidenceVarBind ctx sc sp) =
+   text "evidence variable" <+> ppr ctx
+     $$ "with scope:" <+> ppr sc
+     $$ pprBindSpan sp
+ ppr (EvidenceVarUse) =
+   text "usage of evidence variable"
 
 pprBindSpan :: Maybe Span -> SDoc
 pprBindSpan Nothing = text ""
-pprBindSpan (Just sp) = text "at:" <+> ppr sp
+pprBindSpan (Just sp) = text "bound at:" <+> ppr sp
 
 instance Binary ContextInfo where
   put_ bh Use = putByte bh 0
@@ -422,6 +507,12 @@ instance Binary ContextInfo where
     put_ bh a
     put_ bh b
   put_ bh MatchBind = putByte bh 9
+  put_ bh (EvidenceVarBind a b c) = do
+    putByte bh 10
+    put_ bh a
+    put_ bh b
+    put_ bh c
+  put_ bh EvidenceVarUse = putByte bh 11
 
   get bh = do
     (t :: Word8) <- get bh
@@ -436,7 +527,68 @@ instance Binary ContextInfo where
       7 -> TyVarBind <$> get bh <*> get bh
       8 -> RecField <$> get bh <*> get bh
       9 -> return MatchBind
+      10 -> EvidenceVarBind <$> get bh <*> get bh <*> get bh
+      11 -> return EvidenceVarUse
       _ -> panic "Binary ContextInfo: invalid tag"
+
+data EvVarSource
+  = EvPatternBind -- ^ bound by a pattern match
+  | EvSigBind -- ^ bound by a type signature
+  | EvWrapperBind -- ^ bound by a hswrapper
+  | EvImplicitBind -- ^ bound by an implicit variable
+  | EvInstBind { isSuperInst :: Bool, cls :: Name } -- ^ Bound by some instance of given class
+  | EvLetBind EvBindDeps -- ^ A direct let binding
+  deriving (Eq,Ord)
+
+instance Binary EvVarSource where
+  put_ bh EvPatternBind = putByte bh 0
+  put_ bh EvSigBind = putByte bh 1
+  put_ bh EvWrapperBind = putByte bh 2
+  put_ bh EvImplicitBind = putByte bh 3
+  put_ bh (EvInstBind b cls) = do
+    putByte bh 4
+    put_ bh b
+    put_ bh cls
+  put_ bh (EvLetBind deps) = do
+    putByte bh 5
+    put_ bh deps
+
+  get bh = do
+    (t :: Word8) <- get bh
+    case t of
+      0 -> pure EvPatternBind
+      1 -> pure EvSigBind
+      2 -> pure EvWrapperBind
+      3 -> pure EvImplicitBind
+      4 -> EvInstBind <$> get bh <*> get bh
+      5 -> EvLetBind <$> get bh
+      _ -> panic "Binary EvVarSource: invalid tag"
+
+instance Outputable EvVarSource where
+  ppr EvPatternBind = text "bound by a pattern"
+  ppr EvSigBind = text "bound by a type signature"
+  ppr EvWrapperBind = text "bound by a HsWrapper"
+  ppr EvImplicitBind = text "bound by an implicit variable binding"
+  ppr (EvInstBind False cls) = text "bound by an instance of class" <+> ppr cls
+  ppr (EvInstBind True cls) = text "bound due to a superclass of " <+> ppr cls
+  ppr (EvLetBind deps) = text "bound by a let, depending on:" <+> ppr deps
+
+-- | Eq/Ord instances compare on the converted HieName,
+-- as non-exported names may have different uniques after
+-- a roundtrip
+newtype EvBindDeps = EvBindDeps { getEvBindDeps :: [Name] }
+  deriving Outputable
+
+instance Eq EvBindDeps where
+  (==) = coerce ((==) `on` map toHieName)
+
+instance Ord EvBindDeps where
+  compare = coerce (compare `on` map toHieName)
+
+instance Binary EvBindDeps where
+  put_ bh (EvBindDeps xs) = put_ bh xs
+  get bh = EvBindDeps <$> get bh
+
 
 -- | Types of imports and exports
 data IEType
@@ -587,3 +739,46 @@ instance Binary TyVarScope where
       0 -> ResolvedScopes <$> get bh
       1 -> UnresolvedScope <$> get bh <*> get bh
       _ -> panic "Binary TyVarScope: invalid tag"
+
+-- | `Name`'s get converted into `HieName`'s before being written into @.hie@
+-- files. See 'toHieName' and 'fromHieName' for logic on how to convert between
+-- these two types.
+data HieName
+  = ExternalName !Module !OccName !SrcSpan
+  | LocalName !OccName !SrcSpan
+  | KnownKeyName !Unique
+  deriving (Eq)
+
+instance Ord HieName where
+  compare (ExternalName a b c) (ExternalName d e f) = compare (a,b) (d,e) `thenCmp` leftmost_smallest c f
+    -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
+  compare (LocalName a b) (LocalName c d) = compare a c `thenCmp` leftmost_smallest b d
+    -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
+  compare (KnownKeyName a) (KnownKeyName b) = nonDetCmpUnique a b
+    -- Not actually non deterministic as it is a KnownKey
+  compare ExternalName{} _ = LT
+  compare LocalName{} ExternalName{} = GT
+  compare LocalName{} _ = LT
+  compare KnownKeyName{} _ = GT
+
+instance Outputable HieName where
+  ppr (ExternalName m n sp) = text "ExternalName" <+> ppr m <+> ppr n <+> ppr sp
+  ppr (LocalName n sp) = text "LocalName" <+> ppr n <+> ppr sp
+  ppr (KnownKeyName u) = text "KnownKeyName" <+> ppr u
+
+hieNameOcc :: HieName -> OccName
+hieNameOcc (ExternalName _ occ _) = occ
+hieNameOcc (LocalName occ _) = occ
+hieNameOcc (KnownKeyName u) =
+  case lookupKnownKeyName u of
+    Just n -> nameOccName n
+    Nothing -> pprPanic "hieNameOcc:unknown known-key unique"
+                        (ppr (unpkUnique u))
+
+toHieName :: Name -> HieName
+toHieName name
+  | isKnownKeyName name = KnownKeyName (nameUnique name)
+  | isExternalName name = ExternalName (nameModule name)
+                                       (nameOccName name)
+                                       (nameSrcSpan name)
+  | otherwise = LocalName (nameOccName name) (nameSrcSpan name)

@@ -508,7 +508,7 @@ makeGot(ObjectCode * oc) {
 
     if(got_slots > 0) {
         oc->info->got_size =  got_slots * sizeof(void*);
-        oc->info->got_start = mmap(NULL, oc->info->got_size,
+        oc->info->got_start = mmapForLinker(oc->info->got_size,
                                    PROT_READ | PROT_WRITE,
                                    MAP_ANON | MAP_PRIVATE,
                                    -1, 0);
@@ -678,7 +678,7 @@ relocateSection(ObjectCode* oc, int curSection)
 {
     Section * sect = &oc->sections[curSection];
 
-    IF_DEBUG(linker, debugBelch("relocateSection %d, info: %x\n", curSection, sect->info));
+    IF_DEBUG(linker, debugBelch("relocateSection %d, info: %p\n", curSection, (void*)sect->info));
 
     // empty sections (without segments), won't have their info filled.
     // there is no relocation to be done for them.
@@ -1114,7 +1114,7 @@ ocBuildSegments_MachO(ObjectCode *oc)
         return 1;
     }
 
-    mem = mmapForLinker(size_compound, MAP_ANON, -1, 0);
+    mem = mmapForLinker(size_compound, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
     if (NULL == mem) return 0;
 
     IF_DEBUG(linker, debugBelch("ocBuildSegments: allocating %d segments\n", n_activeSegments));

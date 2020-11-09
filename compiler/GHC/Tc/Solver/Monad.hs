@@ -15,7 +15,7 @@ module GHC.Tc.Solver.Monad (
     getWorkList, updWorkListTcS, pushLevelNoWorkList,
 
     -- The TcS monad
-    TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
+    TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds, runTcSInerts,
     failTcS, warnTcS, addErrTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS, setEvBindsTcS,
@@ -55,7 +55,7 @@ module GHC.Tc.Solver.Monad (
     tcLookupClass, tcLookupId,
 
     -- Inerts
-    InertSet(..), InertCans(..),
+    InertSet(..), InertCans(..), emptyInert,
     updInertTcS, updInertCans, updInertDicts, updInertIrreds,
     getNoGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertGivens,
@@ -127,9 +127,9 @@ module GHC.Tc.Solver.Monad (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import GHC.Driver.Types
+import GHC.Driver.Env
 
 import qualified GHC.Tc.Utils.Instantiate as TcM
 import GHC.Core.InstEnv
@@ -148,23 +148,25 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Unify
 
-import ErrUtils
+import GHC.Utils.Error
 import GHC.Tc.Types.Evidence
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Tc.Errors   ( solverDepthErrorTcS )
 
 import GHC.Types.Name
-import GHC.Types.Module ( HasModule, getModule )
+import GHC.Types.TyThing
+import GHC.Unit.Module ( HasModule, getModule )
 import GHC.Types.Name.Reader ( GlobalRdrEnv, GlobalRdrElt )
 import qualified GHC.Rename.Env as TcM
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import Outputable
-import Bag
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Data.Bag as Bag
 import GHC.Types.Unique.Supply
-import Util
+import GHC.Utils.Misc
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
@@ -173,16 +175,17 @@ import GHC.Core.Predicate
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
-import Maybes
+import GHC.Core.TyCon.Env
+import GHC.Data.Maybe
 
 import GHC.Core.Map
 import Control.Monad
-import MonadUtils
+import GHC.Utils.Monad
 import Data.IORef
 import Data.List ( partition, mapAccumL )
 
 #if defined(DEBUG)
-import Digraph
+import GHC.Data.Graph.Directed
 import GHC.Types.Unique.Set
 #endif
 
@@ -198,7 +201,7 @@ import GHC.Types.Unique.Set
 
 Note [WorkList priorities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A WorkList contains canonical and non-canonical items (of all flavors).
+A WorkList contains canonical and non-canonical items (of all flavours).
 Notice that each Ct now has a simplification depth. We may
 consider using this depth for prioritization as well in the future.
 
@@ -728,7 +731,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- failure.
               --
               -- ^ See Note [Safe Haskell Overlapping Instances Implementation]
-              -- in GHC.Tc.Solver
+              -- in "GHC.Tc.Solver"
 
        , inert_irreds :: Cts
               -- Irreducible predicates that cannot be made canonical,
@@ -1298,7 +1301,7 @@ This is triggered by test case typecheck/should_compile/SplitWD.
 
 Note [Examples of how Derived shadows helps completeness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#10009, a very nasty example:
+Ticket #10009, a very nasty example:
 
     f :: (UnF (F b) ~ b) => F b -> ()
 
@@ -1653,8 +1656,7 @@ add_item ics item@(CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys })
 
 add_item _ item
   = pprPanic "upd_inert set: can't happen! Inserting " $
-    ppr item   -- Can't be CNonCanonical, CHoleCan,
-               -- because they only land in inert_irreds
+    ppr item   -- Can't be CNonCanonical because they only land in inert_irreds
 
 bumpUnsolvedCount :: CtEvidence -> Int -> Int
 bumpUnsolvedCount ev n | isWanted ev = n+1
@@ -1823,7 +1825,7 @@ kickOutAfterUnification new_tv
        ; setInertCans ics2
        ; return n_kicked }
 
--- See Wrinkle (2b) in Note [Equalities with incompatible kinds] in TcCanonical
+-- See Wrinkle (2b) in Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
 kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
 kickOutAfterFillingCoercionHole hole
   = do { ics <- getInertCans
@@ -1895,10 +1897,6 @@ really want to rewrite the insoluble to [Int] ~ [[Int]].  Now it can
 be decomposed.  Otherwise we end up with a "Can't match [Int] ~
 [[Int]]" which is true, but a bit confusing because the outer type
 constructors match.
-
-Similarly, if we have a CHoleCan, we'd like to rewrite it with any
-Givens, to give as informative an error messasge as possible
-(#12468, #11325).
 
 Hence:
  * In the main simplifier loops in GHC.Tc.Solver (solveWanteds,
@@ -2182,7 +2180,7 @@ getNoGivenEqs tclvl skol_tvs
 -- | Returns Given constraints that might,
 -- potentially, match the given pred. This is used when checking to see if a
 -- Given might overlap with an instance. See Note [Instance and Given overlap]
--- in GHC.Tc.Solver.Interact.
+-- in "GHC.Tc.Solver.Interact"
 matchableGivens :: CtLoc -> PredType -> InertSet -> Cts
 matchableGivens loc_w pred_w (IS { inert_cans = inert_cans })
   = filterBag matchable_given all_relevant_givens
@@ -2318,7 +2316,7 @@ very same implication" as the equuality constraint.
                            MkS -> [y,z])
           in ...
 
-From the type signature for `g`, we get `y::a` .  Then when when we
+From the type signature for `g`, we get `y::a` .  Then when we
 encounter the `\z`, we'll assign `z :: alpha[1]`, say.  Next, from the
 body of the lambda we'll get
 
@@ -2352,8 +2350,6 @@ removeInertCt is ct =
     CQuantCan {}     -> panic "removeInertCt: CQuantCan"
     CIrredCan {}     -> panic "removeInertCt: CIrredEvCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
-    CHoleCan {}      -> panic "removeInertCt: CHoleCan"
-
 
 lookupFlatCache :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtFlavour))
 lookupFlatCache fam_tc tys
@@ -2363,10 +2359,8 @@ lookupFlatCache fam_tc tys
                              lookup_flats flat_cache]) }
   where
     lookup_inerts inert_funeqs
-      | Just (CFunEqCan { cc_ev = ctev, cc_fsk = fsk, cc_tyargs = xis })
+      | Just (CFunEqCan { cc_ev = ctev, cc_fsk = fsk })
            <- findFunEq inert_funeqs fam_tc tys
-      , tys `eqTypes` xis   -- The lookup might find a near-match; see
-                            -- Note [Use loose types in inert set]
       = Just (ctEvCoercion ctev, mkTyVarTy fsk, ctEvFlavour ctev)
       | otherwise = Nothing
 
@@ -2383,16 +2377,14 @@ lookupInInerts loc pty
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
 
--- | Look up a dictionary inert. NB: the returned 'CtEvidence' might not
--- match the input exactly. Note [Use loose types in inert set].
+-- | Look up a dictionary inert.
 lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
 lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
   = case findDict dicts loc cls tys of
       Just ct -> Just (ctEvidence ct)
       _       -> Nothing
 
--- | Look up a solved inert. NB: the returned 'CtEvidence' might not
--- match the input exactly. See Note [Use loose types in inert set].
+-- | Look up a solved inert.
 lookupSolvedDict :: InertSet -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
 -- Returns just if exactly this predicate type exists in the solved.
 lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
@@ -2418,16 +2410,28 @@ foldIrreds k irreds z = foldr k z irreds
 
 Note [Use loose types in inert set]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Say we know (Eq (a |> c1)) and we need (Eq (a |> c2)). One is clearly
-solvable from the other. So, we do lookup in the inert set using
-loose types, which omit the kind-check.
+Whenever we are looking up an inert dictionary (CDictCan) or function
+equality (CFunEqCan), we use a TcAppMap, which uses the Unique of the
+class/type family tycon and then a trie which maps the arguments. This
+trie does *not* need to match the kinds of the arguments; this Note
+explains why.
 
-We must be careful when using the result of a lookup because it may
-not match the requested info exactly!
+Consider the types ty0 = (T ty1 ty2 ty3 ty4) and ty0' = (T ty1' ty2' ty3' ty4'),
+where ty4 and ty4' have different kinds. Let's further assume that both types
+ty0 and ty0' are well-typed. Because the kind of T is closed, it must be that
+one of the ty1..ty3 does not match ty1'..ty3' (and that the kind of the fourth
+argument to T is dependent on whichever one changed). Since we are matching
+all arguments, during the inert-set lookup, we know that ty1..ty3 do indeed
+match ty1'..ty3'. Therefore, the kind of ty4 and ty4' must match, too --
+without ever looking at it.
+
+Accordingly, we use LooseTypeMap, which skips the kind check when looking
+up a type. I (Richard E) believe this is just an optimization, and that
+looking at kinds would be harmless.
 
 -}
 
-type TcAppMap a = UniqDFM (ListMap LooseTypeMap a)
+type TcAppMap a = UniqDFM Unique (ListMap LooseTypeMap a)
     -- Indexed by tycon then the arg types, using "loose" matching, where
     -- we don't require kind equality. This allows, for example, (a |> co)
     -- to match (a).
@@ -2533,8 +2537,7 @@ emptyDictMap = emptyTcAppMap
 
 findDict :: DictMap a -> CtLoc -> Class -> [Type] -> Maybe a
 findDict m loc cls tys
-  | isCTupleClass cls
-  , any hasIPPred tys   -- See Note [Tuples hiding implicit parameters]
+  | hasIPSuperClasses cls tys -- See Note [Tuples hiding implicit parameters]
   = Nothing
 
   | Just {} <- isCallStackPred cls tys
@@ -2546,7 +2549,7 @@ findDict m loc cls tys
 
 findDictsByClass :: DictMap a -> Class -> Bag a
 findDictsByClass m cls
-  | Just tm <- lookupUDFM m cls = foldTM consBag tm emptyBag
+  | Just tm <- lookupUDFM_Directly m (getUnique cls) = foldTM consBag tm emptyBag
   | otherwise                  = emptyBag
 
 delDict :: DictMap a -> Class -> [Type] -> DictMap a
@@ -2557,7 +2560,7 @@ addDict m cls tys item = insertTcApp m (getUnique cls) tys item
 
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
-  = addToUDFM m cls (foldr add emptyTM items)
+  = addToUDFM_Directly m (getUnique cls) (foldr add emptyTM items)
   where
     add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
     add ct _ = pprPanic "addDictsByClass" (ppr ct)
@@ -2607,8 +2610,8 @@ findFunEqsByTyCon :: FunEqMap a -> TyCon -> [a]
 -- We use this to check for derived interactions with built-in type-function
 -- constructors.
 findFunEqsByTyCon m tc
-  | Just tm <- lookupUDFM m tc = foldTM (:) tm []
-  | otherwise                 = []
+  | Just tm <- lookupUDFM m (getUnique tc) = foldTM (:) tm []
+  | otherwise                              = []
 
 foldFunEqs :: (a -> b -> b) -> FunEqMap a -> b -> b
 foldFunEqs = foldTcAppMap
@@ -2639,17 +2642,17 @@ delFunEq :: FunEqMap a -> TyCon -> [Type] -> FunEqMap a
 delFunEq m tc tys = delTcApp m (getUnique tc) tys
 
 ------------------------------
-type ExactFunEqMap a = UniqFM (ListMap TypeMap a)
+type ExactFunEqMap a = TyConEnv (ListMap TypeMap a)
 
 emptyExactFunEqs :: ExactFunEqMap a
 emptyExactFunEqs = emptyUFM
 
 findExactFunEq :: ExactFunEqMap a -> TyCon -> [Type] -> Maybe a
-findExactFunEq m tc tys = do { tys_map <- lookupUFM m (getUnique tc)
+findExactFunEq m tc tys = do { tys_map <- lookupUFM m tc
                              ; lookupTM tys tys_map }
 
 insertExactFunEq :: ExactFunEqMap a -> TyCon -> [Type] -> a -> ExactFunEqMap a
-insertExactFunEq m tc tys val = alterUFM alter_tm m (getUnique tc)
+insertExactFunEq m tc tys val = alterUFM alter_tm m tc
   where alter_tm mb_tm = Just (insertTM tys val (mb_tm `orElse` emptyTM))
 
 {-
@@ -2740,6 +2743,7 @@ panicTcS doc = pprPanic "GHC.Tc.Solver.Canonical" doc
 
 traceTcS :: String -> SDoc -> TcS ()
 traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
+{-# INLINE traceTcS #-}  -- see Note [INLINE conditional tracing utilities]
 
 runTcPluginTcS :: TcPluginM a -> TcS a
 runTcPluginTcS m = wrapTcS . runTcPluginM m =<< getTcEvBindsVar
@@ -2758,6 +2762,7 @@ bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
 csTraceTcS :: SDoc -> TcS ()
 csTraceTcS doc
   = wrapTcS $ csTraceTcM (return doc)
+{-# INLINE csTraceTcS #-}  -- see Note [INLINE conditional tracing utilities]
 
 traceFireTcS :: CtEvidence -> SDoc -> TcS ()
 -- Dump a rule-firing trace
@@ -2770,6 +2775,7 @@ traceFireTcS ev doc
                                     text "d:" <> ppr (ctLocDepth (ctEvLoc ev)))
                        <+> doc <> colon)
                      4 (ppr ev)) }
+{-# INLINE traceFireTcS #-}  -- see Note [INLINE conditional tracing utilities]
 
 csTraceTcM :: TcM SDoc -> TcM ()
 -- Constraint-solver tracing, -ddump-cs-trace
@@ -2782,33 +2788,47 @@ csTraceTcM mk_doc
                        (dumpOptionsFromFlag Opt_D_dump_cs_trace)
                        "" FormatText
                        msg }) }
+{-# INLINE csTraceTcM #-}  -- see Note [INLINE conditional tracing utilities]
 
 runTcS :: TcS a                -- What to run
        -> TcM (a, EvBindMap)
 runTcS tcs
   = do { ev_binds_var <- TcM.newTcEvBinds
-       ; res <- runTcSWithEvBinds ev_binds_var tcs
+       ; res <- runTcSWithEvBinds ev_binds_var True tcs
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
        ; return (res, ev_binds) }
-
 -- | This variant of 'runTcS' will keep solving, even when only Deriveds
 -- are left around. It also doesn't return any evidence, as callers won't
 -- need it.
 runTcSDeriveds :: TcS a -> TcM a
 runTcSDeriveds tcs
   = do { ev_binds_var <- TcM.newTcEvBinds
-       ; runTcSWithEvBinds ev_binds_var tcs }
+       ; runTcSWithEvBinds ev_binds_var True tcs }
 
 -- | This can deal only with equality constraints.
 runTcSEqualities :: TcS a -> TcM a
 runTcSEqualities thing_inside
   = do { ev_binds_var <- TcM.newNoTcEvBinds
-       ; runTcSWithEvBinds ev_binds_var thing_inside }
+       ; runTcSWithEvBinds ev_binds_var True thing_inside }
+
+-- | A variant of 'runTcS' that takes and returns an 'InertSet' for
+-- later resumption of the 'TcS' session. Crucially, it doesn't
+-- 'unflattenGivens' when done.
+runTcSInerts :: InertSet -> TcS a -> TcM (a, InertSet)
+runTcSInerts inerts tcs = do
+  ev_binds_var <- TcM.newTcEvBinds
+  -- Passing False here to prohibit unflattening
+  runTcSWithEvBinds ev_binds_var False $ do
+    setTcSInerts inerts
+    a <- tcs
+    new_inerts <- getTcSInerts
+    return (a, new_inerts)
 
 runTcSWithEvBinds :: EvBindsVar
+                  -> Bool       -- ^ Unflatten types afterwards? Don't if you want to reuse the InertSet.
                   -> TcS a
                   -> TcM a
-runTcSWithEvBinds ev_binds_var tcs
+runTcSWithEvBinds ev_binds_var unflatten tcs
   = do { unified_var <- TcM.newTcRef 0
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef emptyInert
@@ -2826,7 +2846,7 @@ runTcSWithEvBinds ev_binds_var tcs
        ; when (count > 0) $
          csTraceTcM $ return (text "Constraint solver steps =" <+> int count)
 
-       ; unflattenGivens inert_var
+       ; when unflatten $ unflattenGivens inert_var
 
 #if defined(DEBUG)
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
@@ -2860,7 +2880,7 @@ checkForCyclicBinds ev_binds_map
             -- It's OK to use nonDetEltsUFM here as
             -- stronglyConnCompFromEdgedVertices is still deterministic even
             -- if the edges are in nondeterministic order as explained in
-            -- Note [Deterministic SCC] in Digraph.
+            -- Note [Deterministic SCC] in GHC.Data.Graph.Directed.
 #endif
 
 ----------------------------
@@ -3235,7 +3255,7 @@ newFlattenSkolem flav loc tc xis
       | otherwise  -- Generate a [WD] for both Wanted and Derived
                    -- See Note [No Derived CFunEqCans]
       = do { fmv <- wrapTcS (TcM.newFmvTyVar fam_ty)
-              -- See (2a) in TcCanonical
+              -- See (2a) in "GHC.Tc.Solver.Canonical"
               -- Note [Equalities with incompatible kinds]
            ; (ev, hole_co) <- newWantedEq_SI NoBlockSubst WDeriv loc Nominal
                                              fam_ty (mkTyVarTy fmv)
@@ -3596,8 +3616,7 @@ emitNewDerivedEq loc role ty1 ty2
 
 newDerivedNC :: CtLoc -> TcPredType -> TcS CtEvidence
 newDerivedNC loc pred
-  = do { -- checkReductionDepth loc pred
-       ; return (CtDerived { ctev_pred = pred, ctev_loc = loc }) }
+  = return $ CtDerived { ctev_pred = pred, ctev_loc = loc }
 
 -- --------- Check done in GHC.Tc.Solver.Interact.selectNewWorkItem???? ---------
 -- | Checks if the depth of the given location is too much. Fails if

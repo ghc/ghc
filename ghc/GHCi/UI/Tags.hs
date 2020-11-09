@@ -13,17 +13,17 @@ module GHCi.UI.Tags (
   createETagsFileCmd
 ) where
 
-import Exception
+import GHC.Utils.Exception
 import GHC
 import GHCi.UI.Monad
-import Outputable
+import GHC.Utils.Outputable
 
 -- ToDo: figure out whether we need these, and put something appropriate
 -- into the GHC API instead
 import GHC.Types.Name (nameOccName)
 import GHC.Types.Name.Occurrence (pprOccName)
 import GHC.Core.ConLike
-import MonadUtils
+import GHC.Utils.Monad
 
 import Control.Monad
 import Data.Function
@@ -31,7 +31,8 @@ import Data.List
 import Data.Maybe
 import Data.Ord
 import GHC.Driver.Phases
-import Panic
+import GHC.Driver.Ppr
+import GHC.Utils.Panic
 import Prelude
 import System.Directory
 import System.IO
@@ -94,7 +95,7 @@ listModuleTags m = do
        dflags <- getDynFlags
        mb_print_unqual <- GHC.mkPrintUnqualifiedForModule mInfo
        let unqual = fromMaybe GHC.alwaysQualify mb_print_unqual
-       let names = fromMaybe [] $GHC.modInfoTopLevelScope mInfo
+       let names = fromMaybe [] $ GHC.modInfoTopLevelScope mInfo
        let localNames = filter ((m==) . nameModule) names
        mbTyThings <- mapM GHC.lookupName localNames
        return $! [ tagInfo dflags unqual exported kind name realLoc
@@ -152,11 +153,11 @@ collateAndWriteTags CTagsWithLineNumbers file tagInfos = do
 -- ctags style with the Ex expression being a regex searching the line, Vim et al
 collateAndWriteTags CTagsWithRegExes file tagInfos = do -- ctags style, Vim et al
   tagInfoGroups <- makeTagGroupsWithSrcInfo tagInfos
-  let tags = unlines $ sort $ map showCTag $concat tagInfoGroups
+  let tags = unlines $ sort $ map showCTag $ concat tagInfoGroups
   tryIO (writeTagsSafely file tags)
 
 collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
-  tagInfoGroups <- makeTagGroupsWithSrcInfo $filter tagExported tagInfos
+  tagInfoGroups <- makeTagGroupsWithSrcInfo $ filter tagExported tagInfos
   let tagGroups = map processGroup tagInfoGroups
   tryIO (writeTagsSafely file $ concat tagGroups)
 
@@ -175,7 +176,7 @@ makeTagGroupsWithSrcInfo tagInfos = do
   where
     addTagSrcInfo [] = throwGhcException (CmdLineError "empty tag file group??")
     addTagSrcInfo group@(tagInfo:_) = do
-      file <- readFile $tagFile tagInfo
+      file <- readFile $ tagFile tagInfo
       let sortedGroup = sortBy (comparing tagLine) group
       return $ perFile sortedGroup 1 0 $ lines file
 
@@ -196,7 +197,7 @@ showCTag ti =
   where
     tagCmd =
       case tagSrcInfo ti of
-        Nothing -> show $tagLine ti
+        Nothing -> show $ tagLine ti
         Just (srcLine,_) -> "/^"++ foldr escapeSlashes [] srcLine ++"$/"
 
       where

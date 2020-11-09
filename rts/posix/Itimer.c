@@ -48,7 +48,7 @@
 #define USE_PTHREAD_FOR_ITIMER
 #endif
 
-#if defined(freebsd_HOST_OS) && defined(THREADED_RTS)
+#if defined(freebsd_HOST_OS)
 #define USE_PTHREAD_FOR_ITIMER
 #endif
 

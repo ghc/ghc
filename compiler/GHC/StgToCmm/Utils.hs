@@ -23,6 +23,7 @@ module GHC.StgToCmm.Utils (
         tagToClosure, mkTaggedObjectLoad,
 
         callerSaves, callerSaveVolatileRegs, get_GlobalReg_addr,
+        callerSaveGlobalReg, callerRestoreGlobalReg,
 
         cmmAndWord, cmmOrWord, cmmNegate, cmmEqWord, cmmNeWord,
         cmmUGtWord, cmmSubWord, cmmMulWord, cmmAddWord, cmmUShrWord,
@@ -38,7 +39,6 @@ module GHC.StgToCmm.Utils (
 
         addToMem, addToMemE, addToMemLblE, addToMemLbl,
         newStringCLit, newByteStringCLit,
-        blankWord,
 
         -- * Update remembered set operations
         whenUpdRemSetEnabled,
@@ -48,7 +48,7 @@ module GHC.StgToCmm.Utils (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.StgToCmm.Monad
@@ -67,15 +67,16 @@ import GHC.Types.Id.Info
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Runtime.Heap.Layout
-import GHC.Types.Module
+import GHC.Unit
 import GHC.Types.Literal
-import Digraph
-import Util
+import GHC.Data.Graph.Directed
+import GHC.Utils.Misc
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply (MonadUnique(..))
 import GHC.Driver.Session
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.RepType
 import GHC.Types.CostCentre
 
@@ -104,10 +105,10 @@ mkSimpleLit platform = \case
    (LitChar   c)                -> CmmInt (fromIntegral (ord c))
                                           (wordWidth platform)
    LitNullAddr                  -> zeroCLit platform
-   (LitNumber LitNumInt i _)    -> CmmInt i (wordWidth platform)
-   (LitNumber LitNumInt64 i _)  -> CmmInt i W64
-   (LitNumber LitNumWord i _)   -> CmmInt i (wordWidth platform)
-   (LitNumber LitNumWord64 i _) -> CmmInt i W64
+   (LitNumber LitNumInt i)      -> CmmInt i (wordWidth platform)
+   (LitNumber LitNumInt64 i)    -> CmmInt i W64
+   (LitNumber LitNumWord i)     -> CmmInt i (wordWidth platform)
+   (LitNumber LitNumWord64 i)   -> CmmInt i W64
    (LitFloat r)                 -> CmmFloat r W32
    (LitDouble r)                -> CmmFloat r W64
    (LitLabel fs ms fod)
@@ -197,9 +198,9 @@ emitRtsCallGen
    -> Bool -- True <=> CmmSafe call
    -> FCode ()
 emitRtsCallGen res lbl args safe
-  = do { dflags <- getDynFlags
+  = do { platform <- targetPlatform <$> getDynFlags
        ; updfr_off <- getUpdFrameOff
-       ; let (caller_save, caller_load) = callerSaveVolatileRegs dflags
+       ; let (caller_save, caller_load) = callerSaveVolatileRegs platform
        ; emit caller_save
        ; call updfr_off
        ; emit caller_load }
@@ -242,16 +243,14 @@ emitRtsCallGen res lbl args safe
 -- here, as we don't have liveness information.  And really, we
 -- shouldn't be doing the workaround at this point in the pipeline, see
 -- Note [Register parameter passing] and the ToDo on CmmCall in
--- cmm/CmmNode.hs.  Right now the workaround is to avoid inlining across
--- unsafe foreign calls in rewriteAssignments, but this is strictly
+-- "GHC.Cmm.Node".  Right now the workaround is to avoid inlining across
+-- unsafe foreign calls in GHC.Cmm.Sink, but this is strictly
 -- temporary.
-callerSaveVolatileRegs :: DynFlags -> (CmmAGraph, CmmAGraph)
-callerSaveVolatileRegs dflags = (caller_save, caller_load)
+callerSaveVolatileRegs :: Platform -> (CmmAGraph, CmmAGraph)
+callerSaveVolatileRegs platform = (caller_save, caller_load)
   where
-    platform = targetPlatform dflags
-
-    caller_save = catAGraphs (map callerSaveGlobalReg    regs_to_save)
-    caller_load = catAGraphs (map callerRestoreGlobalReg regs_to_save)
+    caller_save = catAGraphs (map (callerSaveGlobalReg    platform) regs_to_save)
+    caller_load = catAGraphs (map (callerRestoreGlobalReg platform) regs_to_save)
 
     system_regs = [ Sp,SpLim,Hp,HpLim,CCCS,CurrentTSO,CurrentNursery
                     {- ,SparkHd,SparkTl,SparkBase,SparkLim -}
@@ -259,12 +258,14 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
 
     regs_to_save = filter (callerSaves platform) system_regs
 
-    callerSaveGlobalReg reg
-        = mkStore (get_GlobalReg_addr dflags reg) (CmmReg (CmmGlobal reg))
+callerSaveGlobalReg :: Platform -> GlobalReg -> CmmAGraph
+callerSaveGlobalReg platform reg
+    = mkStore (get_GlobalReg_addr platform reg) (CmmReg (CmmGlobal reg))
 
-    callerRestoreGlobalReg reg
-        = mkAssign (CmmGlobal reg)
-                   (CmmLoad (get_GlobalReg_addr dflags reg) (globalRegType platform reg))
+callerRestoreGlobalReg :: Platform -> GlobalReg -> CmmAGraph
+callerRestoreGlobalReg platform reg
+    = mkAssign (CmmGlobal reg)
+               (CmmLoad (get_GlobalReg_addr platform reg) (globalRegType platform reg))
 
 
 -------------------------------------------------------------------------
@@ -363,7 +364,7 @@ emitMultiAssign []    []    = return ()
 emitMultiAssign [reg] [rhs] = emitAssign (CmmLocal reg) rhs
 emitMultiAssign regs rhss   = do
   platform <- getPlatform
-  ASSERT2( equalLength regs rhss, ppr regs $$ ppr rhss )
+  ASSERT2( equalLength regs rhss, ppr regs $$ pdoc platform rhss )
     unscramble platform ([1..] `zip` (regs `zip` rhss))
 
 unscramble :: Platform -> [Vrtx] -> FCode ()
@@ -496,7 +497,7 @@ emitCmmLitSwitch scrut  branches deflt = do
 
     -- We find the necessary type information in the literals in the branches
     let signed = case head branches of
-                    (LitNumber nt _ _, _) -> litNumIsSigned nt
+                    (LitNumber nt _, _) -> litNumIsSigned nt
                     _ -> False
 
     let range | signed    = (platformMinInt platform, platformMaxInt platform)
@@ -607,7 +608,7 @@ whenUpdRemSetEnabled code = do
 -- remembered set.
 emitUpdRemSetPush :: CmmExpr   -- ^ value of pointer which was overwritten
                   -> FCode ()
-emitUpdRemSetPush ptr = do
+emitUpdRemSetPush ptr =
     emitRtsCall
       rtsUnitId
       (fsLit "updateRemembSetPushClosure_")
@@ -617,7 +618,7 @@ emitUpdRemSetPush ptr = do
 
 emitUpdRemSetPushThunk :: CmmExpr -- ^ the thunk
                        -> FCode ()
-emitUpdRemSetPushThunk ptr = do
+emitUpdRemSetPushThunk ptr =
     emitRtsCall
       rtsUnitId
       (fsLit "updateRemembSetPushThunk_")

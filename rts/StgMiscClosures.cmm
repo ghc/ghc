@@ -15,8 +15,8 @@
 import pthread_mutex_lock;
 import ghczmprim_GHCziTypes_Czh_info;
 import ghczmprim_GHCziTypes_Izh_info;
-import EnterCriticalSection;
-import LeaveCriticalSection;
+import AcquireSRWLockExclusive;
+import ReleaseSRWLockExclusive;
 
 /* ----------------------------------------------------------------------------
    Stack underflow
@@ -31,14 +31,14 @@ INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME,
     W_ new_tso;
     W_ ret_off;
 
-    SAVE_STGREGS
+    SAVE_REGS();
 
     SAVE_THREAD_STATE();
     (ret_off) = foreign "C" threadStackUnderflow(MyCapability() "ptr",
                                                  CurrentTSO);
     LOAD_THREAD_STATE();
 
-    RESTORE_STGREGS
+    RESTORE_REGS();
 
     jump %ENTRY_CODE(Sp(ret_off)) [*]; // NB. all registers live!
 }
@@ -504,7 +504,7 @@ CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
 /* ----------------------------------------------------------------------------
    SRTs
 
-   See Note [SRTs] in compiler/cmm/CmmBuildInfoTable.hs
+   See Note [SRTs] in compiler/GHC/Cmm/Info/Build.hs
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_SRT_1, 1, 0, 0, CONSTR_1_0, "SRT_1", "SRT_1")

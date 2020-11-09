@@ -1,10 +1,12 @@
 module LinkerUnload (init) where
 
 import GHC
+import GHC.Unit.State
 import GHC.Driver.Session
-import GHC.Runtime.Linker as Linker
+import GHC.Driver.Backend
+import qualified GHC.Linker.Loader as Loader
 import System.Environment
-import MonadUtils ( MonadIO(..) )
+import GHC.Utils.Monad ( MonadIO(..) )
 
 foreign export ccall loadPackages :: IO ()
 
@@ -13,8 +15,8 @@ loadPackages = do
   [libdir] <- getArgs
   runGhc (Just libdir) $ do
     dflags <- getSessionDynFlags
-    let dflags' = dflags { hscTarget = HscNothing
-                         , ghcLink  = LinkInMemory }
-    pkgs <- setSessionDynFlags dflags'
+    let dflags' = dflags { backend = NoBackend
+                         , ghcLink = LinkInMemory }
+    setSessionDynFlags dflags'
     hsc_env <- getSession
-    liftIO $ Linker.linkPackages hsc_env pkgs
+    liftIO $ Loader.loadPackages hsc_env (preloadUnits (unitState dflags'))

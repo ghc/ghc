@@ -1,9 +1,13 @@
 
 FD3.hs:15:15: error:
-    • Occurs check: cannot construct the infinite type: a ~ (String, a)
+    • Couldn't match type ‘a’ with ‘(String, a)’
         arising from a functional dependency between:
           constraint ‘MkA (String, a) a’ arising from a use of ‘mkA’
           instance ‘MkA a1 a1’ at FD3.hs:12:10-16
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          translate :: forall a. (String, a) -> A a
+        at FD3.hs:14:1-31
     • In the expression: mkA a
       In an equation for ‘translate’: translate a = mkA a
     • Relevant bindings include

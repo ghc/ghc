@@ -623,14 +623,14 @@
 #define mutArrPtrCardUp(i)   (((i) + mutArrCardMask) >> MUT_ARR_PTRS_CARD_BITS)
 #define mutArrPtrsCardWords(n) ROUNDUP_BYTES_TO_WDS(mutArrPtrCardUp(n))
 
-#if defined(PROFILING) || (!defined(THREADED_RTS) && defined(DEBUG))
+#if defined(PROFILING) || defined(DEBUG)
 #define OVERWRITING_CLOSURE_SIZE(c, size) foreign "C" overwritingClosureSize(c "ptr", size)
 #define OVERWRITING_CLOSURE(c) foreign "C" overwritingClosure(c "ptr")
-#define OVERWRITING_CLOSURE_OFS(c,n) foreign "C" overwritingClosureOfs(c "ptr", n)
+#define OVERWRITING_CLOSURE_MUTABLE(c, off) foreign "C" overwritingMutableClosureOfs(c "ptr", off)
 #else
 #define OVERWRITING_CLOSURE_SIZE(c, size) /* nothing */
 #define OVERWRITING_CLOSURE(c) /* nothing */
-#define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
+#define OVERWRITING_CLOSURE_MUTABLE(c, off) /* nothing */
 #endif
 
 // Memory barriers.
@@ -652,7 +652,7 @@
    -------------------------------------------------------------------------- */
 
 #if defined(TICKY_TICKY)
-#define TICK_BUMP_BY(ctr,n) CLong[ctr] = CLong[ctr] + n
+#define TICK_BUMP_BY(ctr,n) W_[ctr] = W_[ctr] + n
 #else
 #define TICK_BUMP_BY(ctr,n) /* nothing */
 #endif
@@ -660,7 +660,11 @@
 #define TICK_BUMP(ctr)      TICK_BUMP_BY(ctr,1)
 
 #define TICK_ENT_DYN_IND()              TICK_BUMP(ENT_DYN_IND_ctr)
-#define TICK_ENT_DYN_THK()              TICK_BUMP(ENT_DYN_THK_ctr)
+// ENT_DYN_THK_ctr doesn't exist anymore. Could be ENT_DYN_THK_SINGLE_ctr or
+// ENT_DYN_THK_MANY_ctr
+// #define TICK_ENT_DYN_THK()              TICK_BUMP(ENT_DYN_THK_ctr)
+#define TICK_ENT_DYN_THK()
+
 #define TICK_ENT_VIA_NODE()             TICK_BUMP(ENT_VIA_NODE_ctr)
 #define TICK_ENT_STATIC_IND()           TICK_BUMP(ENT_STATIC_IND_ctr)
 #define TICK_ENT_PERM_IND()             TICK_BUMP(ENT_PERM_IND_ctr)
@@ -738,75 +742,6 @@
 #define TICK_ALLOC_HEAP_NOCTR(bytes)            \
     TICK_BUMP(ALLOC_RTS_ctr);                   \
     TICK_BUMP_BY(ALLOC_RTS_tot,bytes)
-
-/* -----------------------------------------------------------------------------
-   Saving and restoring STG registers
-
-   STG registers must be saved around a C call, just in case the STG
-   register is mapped to a caller-saves machine register.  Normally we
-   don't need to worry about this the code generator has already
-   loaded any live STG registers into variables for us, but in
-   hand-written low-level Cmm code where we don't know which registers
-   are live, we might have to save them all.
-   -------------------------------------------------------------------------- */
-
-#define SAVE_STGREGS                            \
-    W_ r1, r2, r3,  r4,  r5,  r6,  r7,  r8;     \
-    F_ f1, f2, f3, f4, f5, f6;                  \
-    D_ d1, d2, d3, d4, d5, d6;                  \
-    L_ l1;                                      \
-                                                \
-    r1 = R1;                                    \
-    r2 = R2;                                    \
-    r3 = R3;                                    \
-    r4 = R4;                                    \
-    r5 = R5;                                    \
-    r6 = R6;                                    \
-    r7 = R7;                                    \
-    r8 = R8;                                    \
-                                                \
-    f1 = F1;                                    \
-    f2 = F2;                                    \
-    f3 = F3;                                    \
-    f4 = F4;                                    \
-    f5 = F5;                                    \
-    f6 = F6;                                    \
-                                                \
-    d1 = D1;                                    \
-    d2 = D2;                                    \
-    d3 = D3;                                    \
-    d4 = D4;                                    \
-    d5 = D5;                                    \
-    d6 = D6;                                    \
-                                                \
-    l1 = L1;
-
-
-#define RESTORE_STGREGS                         \
-    R1 = r1;                                    \
-    R2 = r2;                                    \
-    R3 = r3;                                    \
-    R4 = r4;                                    \
-    R5 = r5;                                    \
-    R6 = r6;                                    \
-    R7 = r7;                                    \
-    R8 = r8;                                    \
-                                                \
-    F1 = f1;                                    \
-    F2 = f2;                                    \
-    F3 = f3;                                    \
-    F4 = f4;                                    \
-    F5 = f5;                                    \
-    F6 = f6;                                    \
-                                                \
-    D1 = d1;                                    \
-    D2 = d2;                                    \
-    D3 = d3;                                    \
-    D4 = d4;                                    \
-    D5 = d5;                                    \
-    D6 = d6;                                    \
-                                                \
-    L1 = l1;
 
 /* -----------------------------------------------------------------------------
    Misc junk

@@ -1,14 +1,11 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
-           , BangPatterns
-           , MagicHash
-           , UnboxedTuples
-           , UnliftedFFITypes
-           , StandaloneDeriving
-           , RankNTypes
-  #-}
-{-# OPTIONS_GHC -Wno-missing-signatures #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -33,6 +30,7 @@
 -- #not-home
 module GHC.Conc.Sync
         ( ThreadId(..)
+        , showThreadId
 
         -- * Forking and suchlike
         , forkIO
@@ -102,7 +100,7 @@ import Data.Maybe
 
 import GHC.Base
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
-import {-# SOURCE #-} GHC.IO.Handle.FD ( stdout )
+import {-# SOURCE #-} GHC.IO.StdHandles ( stdout )
 import GHC.Int
 import GHC.IO
 import GHC.IO.Encoding.UTF8
@@ -150,6 +148,9 @@ instance Show ThreadId where
    showsPrec d t = showParen (d >= 11) $
         showString "ThreadId " .
         showsPrec d (getThreadId (id2TSO t))
+
+showThreadId :: ThreadId -> String
+showThreadId = show
 
 foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> CInt
 
@@ -496,7 +497,7 @@ labelThread (ThreadId t) str =
      case labelThread# t p s of s1 -> (# s1, () #)
 
 --      Nota Bene: 'pseq' used to be 'seq'
---                 but 'seq' is now defined in PrelGHC
+--                 but 'seq' is now defined in GHC.Prim
 --
 -- "pseq" is defined a bit weirdly (see below)
 --
@@ -538,6 +539,8 @@ data BlockReason
         -- ^blocked in 'retry' in an STM transaction
   | BlockedOnForeignCall
         -- ^currently in a foreign call
+  | BlockedOnIOCompletion
+        -- ^currently blocked on an I/O Completion port
   | BlockedOnOther
         -- ^blocked on some other resource.  Without @-threaded@,
         -- I\/O and 'Control.Concurrent.threadDelay' show up as
@@ -576,6 +579,7 @@ threadStatus (ThreadId t) = IO $ \s ->
      mk_stat 11 = ThreadBlocked BlockedOnForeignCall
      mk_stat 12 = ThreadBlocked BlockedOnException
      mk_stat 14 = ThreadBlocked BlockedOnMVar -- possibly: BlockedOnMVarRead
+     mk_stat 15 = ThreadBlocked BlockedOnIOCompletion
      -- NB. these are hardcoded in rts/PrimOps.cmm
      mk_stat 16 = ThreadFinished
      mk_stat 17 = ThreadDied

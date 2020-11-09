@@ -1,0 +1,4 @@
+
+T18251f.hs:3:5: error:
+    Parse error in pattern: x
+    In a function binding for the ‘!’ operator.

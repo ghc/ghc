@@ -9,4 +9,4 @@ T5331.hs:11:16: warning: [-Wunused-foralls (in -Wextra)]
 
 T5331.hs:13:13: warning: [-Wunused-foralls (in -Wextra)]
     Unused quantified type variable ‘a’
-    In the type ‘forall a. Int’
+    In the type signature for ‘f’

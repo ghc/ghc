@@ -1,34 +1,38 @@
 module GHC.Core.DataCon where
 
-import GhcPrelude
-import GHC.Types.Var( TyVar, TyCoVar, TyVarBinder )
-import GHC.Types.Name( Name, NamedThing )
+import GHC.Prelude
+import {-# SOURCE #-} GHC.Types.Var( Id, TyVar, TyCoVar, InvisTVBinder )
+import {-# SOURCE #-} GHC.Types.Name( Name, NamedThing )
 import {-# SOURCE #-} GHC.Core.TyCon( TyCon )
 import GHC.Types.FieldLabel ( FieldLabel )
 import GHC.Types.Unique ( Uniquable )
-import Outputable ( Outputable, OutputableBndr )
+import GHC.Utils.Outputable ( Outputable, OutputableBndr )
 import GHC.Types.Basic (Arity)
-import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, ThetaType )
+import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, ThetaType, Scaled )
 
 data DataCon
 data DataConRep
 data EqSpec
 
 dataConName      :: DataCon -> Name
+dataConWorkId    :: DataCon -> Id
 dataConTyCon     :: DataCon -> TyCon
 dataConExTyCoVars :: DataCon -> [TyCoVar]
 dataConUserTyVars :: DataCon -> [TyVar]
-dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
+dataConUserTyVarBinders :: DataCon -> [InvisTVBinder]
 dataConSourceArity  :: DataCon -> Arity
 dataConFieldLabels :: DataCon -> [FieldLabel]
-dataConInstOrigArgTys  :: DataCon -> [Type] -> [Type]
+dataConInstOrigArgTys  :: DataCon -> [Type] -> [Scaled Type]
 dataConStupidTheta :: DataCon -> ThetaType
 dataConFullSig :: DataCon
-               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Type], Type)
-isUnboxedSumCon :: DataCon -> Bool
+               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Scaled Type], Type)
+isUnboxedSumDataCon :: DataCon -> Bool
 
 instance Eq DataCon
 instance Uniquable DataCon
 instance NamedThing DataCon
 instance Outputable DataCon
 instance OutputableBndr DataCon
+
+dataConWrapId :: DataCon -> Id
+promoteDataCon :: DataCon -> TyCon

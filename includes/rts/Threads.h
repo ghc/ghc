@@ -23,6 +23,10 @@
 //
 StgTSO *createThread (Capability *cap, W_ stack_size);
 
+// precondition:
+//   (*cap)->running_task != NULL
+//   (*cap)->running_task must be a bound task (e.g. newBoundTask() has been
+//                        called on that thread).
 void scheduleWaitThread (/* in    */ StgTSO *tso,
                          /* out   */ HaskellObj* ret,
                          /* inout */ Capability **cap);

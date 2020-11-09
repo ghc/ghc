@@ -1,5 +1,5 @@
 module Package08e where
 import GHC.Hs.MyTypes
-import GHC.Hs.Types
+import GHC.Hs.Type
 import GHC.Hs.Utils
 import GHC.Types.Unique.FM

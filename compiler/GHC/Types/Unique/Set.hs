@@ -25,8 +25,9 @@ module GHC.Types.Unique.Set (
         delOneFromUniqSet, delOneFromUniqSet_Directly, delListFromUniqSet,
         delListFromUniqSet_Directly,
         unionUniqSets, unionManyUniqSets,
-        minusUniqSet, uniqSetMinusUFM,
+        minusUniqSet, uniqSetMinusUFM, uniqSetMinusUDFM,
         intersectUniqSets,
+        disjointUniqSets,
         restrictUniqSetToUFM,
         uniqSetAny, uniqSetAll,
         elementOfUniqSet,
@@ -42,16 +43,16 @@ module GHC.Types.Unique.Set (
         unsafeUFMToUniqSet,
         nonDetEltsUniqSet,
         nonDetKeysUniqSet,
-        nonDetFoldUniqSet,
-        nonDetFoldUniqSet_Directly
+        nonDetStrictFoldUniqSet,
     ) where
 
-import GhcPrelude
+import GHC.Prelude
 
+import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import Data.Coerce
-import Outputable
+import GHC.Utils.Outputable
 import Data.Data
 import qualified Data.Semigroup as Semi
 
@@ -62,7 +63,7 @@ import qualified Data.Semigroup as Semi
 -- It means that to implement mapUniqSet you have to update
 -- both the keys and the values.
 
-newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a}
+newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a a}
                   deriving (Data, Semi.Semigroup, Monoid)
 
 emptyUniqSet :: UniqSet a
@@ -105,11 +106,17 @@ minusUniqSet (UniqSet s) (UniqSet t) = UniqSet (minusUFM s t)
 intersectUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 intersectUniqSets (UniqSet s) (UniqSet t) = UniqSet (intersectUFM s t)
 
-restrictUniqSetToUFM :: UniqSet a -> UniqFM b -> UniqSet a
+disjointUniqSets :: UniqSet a -> UniqSet a -> Bool
+disjointUniqSets (UniqSet s) (UniqSet t) = disjointUFM s t
+
+restrictUniqSetToUFM :: UniqSet key -> UniqFM key b -> UniqSet key
 restrictUniqSetToUFM (UniqSet s) m = UniqSet (intersectUFM s m)
 
-uniqSetMinusUFM :: UniqSet a -> UniqFM b -> UniqSet a
+uniqSetMinusUFM :: UniqSet key -> UniqFM key b -> UniqSet key
 uniqSetMinusUFM (UniqSet s) t = UniqSet (minusUFM s t)
+
+uniqSetMinusUDFM :: UniqSet key -> UniqDFM key b -> UniqSet key
+uniqSetMinusUDFM (UniqSet s) t = UniqSet (ufmMinusUDFM s t)
 
 elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
 elementOfUniqSet a (UniqSet s) = elemUFM a s
@@ -138,7 +145,9 @@ sizeUniqSet (UniqSet s) = sizeUFM s
 isEmptyUniqSet :: UniqSet a -> Bool
 isEmptyUniqSet (UniqSet s) = isNullUFM s
 
-lookupUniqSet :: Uniquable a => UniqSet b -> a -> Maybe b
+-- | What's the point you might ask? We might have changed an object
+-- without it's key changing. In which case this lookup makes sense.
+lookupUniqSet :: Uniquable key => UniqSet key -> key -> Maybe key
 lookupUniqSet (UniqSet s) k = lookupUFM s k
 
 lookupUniqSet_Directly :: UniqSet a -> Unique -> Maybe a
@@ -159,14 +168,8 @@ nonDetKeysUniqSet = nonDetKeysUFM . getUniqSet'
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
-nonDetFoldUniqSet :: (elt -> a -> a) -> a -> UniqSet elt -> a
-nonDetFoldUniqSet c n (UniqSet s) = nonDetFoldUFM c n s
-
--- See Note [Deterministic UniqFM] to learn about nondeterminism.
--- If you use this please provide a justification why it doesn't introduce
--- nondeterminism.
-nonDetFoldUniqSet_Directly:: (Unique -> elt -> a -> a) -> a -> UniqSet elt -> a
-nonDetFoldUniqSet_Directly f n (UniqSet s) = nonDetFoldUFM_Directly f n s
+nonDetStrictFoldUniqSet :: (elt -> a -> a) -> a -> UniqSet elt -> a
+nonDetStrictFoldUniqSet c n (UniqSet s) = nonDetStrictFoldUFM c n s
 
 -- See Note [UniqSet invariant]
 mapUniqSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b
@@ -177,13 +180,13 @@ mapUniqSet f = mkUniqSet . map f . nonDetEltsUniqSet
 instance Eq (UniqSet a) where
   UniqSet a == UniqSet b = equalKeysUFM a b
 
-getUniqSet :: UniqSet a -> UniqFM a
+getUniqSet :: UniqSet a -> UniqFM a a
 getUniqSet = getUniqSet'
 
 -- | 'unsafeUFMToUniqSet' converts a @'UniqFM' a@ into a @'UniqSet' a@
 -- assuming, without checking, that it maps each 'Unique' to a value
 -- that has that 'Unique'. See Note [UniqSet invariant].
-unsafeUFMToUniqSet :: UniqFM a -> UniqSet a
+unsafeUFMToUniqSet :: UniqFM  a a -> UniqSet a
 unsafeUFMToUniqSet = UniqSet
 
 instance Outputable a => Outputable (UniqSet a) where

@@ -101,6 +101,11 @@ time when you are working on a feature that affects both Stage1 and Stage2
 compilers, but may lead to incorrect build results. To unfreeze Stage1 GHC
 simply drop the `--freeze1` flag and Hadrian will rebuild all out-of-date files.
 
+* `--freeze2`: just like `--freeze1` but tell Hadrian to additionally freeze
+Stage2 GHC.
+
+* `--skip-depends`: skips rebuilding Haskell module dependency files.
+
 * `--integer-simple`: build GHC using the `integer-simple` integer library
 (instead of `integer-gmp`).
 
@@ -254,6 +259,19 @@ $ ./configure [--prefix=PATH] && make install
 ```
 
 workflow, for now.
+
+### Building and installing GHC
+
+You can get Hadrian to build _and_ install a binary distribution in one go
+with the following command:
+
+``` sh
+$ build install --prefix=/some/absolute/path
+```
+
+This builds everything that would be shipped in a bindist, without creating
+the archive, and just runs `./configure --prefix=PATH` and `make install`
+to get GHC installed installed at `/some/absolute/path`.
 
 #### Building Stage3
 

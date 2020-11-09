@@ -9,7 +9,7 @@ Wired-in knowledge about primitive types
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | This module defines TyCons that can't be expressed in Haskell.
---   They are all, therefore, wired-in TyCons.  C.f module GHC.Builtin.Types
+--   They are all, therefore, wired-in TyCons.  C.f module "GHC.Builtin.Types"
 module GHC.Builtin.Types.Prim(
         mkPrimTyConName, -- For implicit parameters in GHC.Builtin.Types only
 
@@ -26,12 +26,15 @@ module GHC.Builtin.Types.Prim(
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep1Ty, runtimeRep2Ty,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
 
+        multiplicityTyVar,
+
         -- Kind constructors...
         tYPETyCon, tYPETyConName,
 
         -- Kinds
         tYPE, primRepToRuntimeRep,
 
+        functionWithMultiplicity,
         funTyCon, funTyConName,
         unexposedPrimTyCons, exposedPrimTyCons, primTyCons,
 
@@ -42,7 +45,6 @@ module GHC.Builtin.Types.Prim(
         floatPrimTyCon,         floatPrimTy, floatPrimTyConName,
         doublePrimTyCon,        doublePrimTy, doublePrimTyConName,
 
-        voidPrimTyCon,          voidPrimTy,
         statePrimTyCon,         mkStatePrimTy,
         realWorldTyCon,         realWorldTy, realWorldStatePrimTy,
 
@@ -59,6 +61,7 @@ module GHC.Builtin.Types.Prim(
         mutVarPrimTyCon, mkMutVarPrimTy,
 
         mVarPrimTyCon,                  mkMVarPrimTy,
+        ioPortPrimTyCon,                mkIOPortPrimTy,
         tVarPrimTyCon,                  mkTVarPrimTy,
         stablePtrPrimTyCon,             mkStablePtrPrimTy,
         stableNamePrimTyCon,            mkStableNamePrimTy,
@@ -90,7 +93,7 @@ module GHC.Builtin.Types.Prim(
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
@@ -108,16 +111,19 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , mkPromotedListTy )
+  , mkPromotedListTy, multiplicityTy )
 
 import GHC.Types.Var    ( TyVar, mkTyVar )
 import GHC.Types.Name
+import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Core.TyCon
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Builtin.Names
-import FastString
-import Outputable
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
                          -- import loops which show up if you import Type instead
 
@@ -134,7 +140,7 @@ import Data.Char
 primTyCons :: [TyCon]
 primTyCons = unexposedPrimTyCons ++ exposedPrimTyCons
 
--- | Primitive 'TyCon's that are defined in "GHC.Prim" but not exposed.
+-- | Primitive 'TyCon's that are defined in GHC.Prim but not exposed.
 -- It's important to keep these separate as we don't want users to be able to
 -- write them (see #15209) or see them in GHCi's @:browse@ output
 -- (see #12023).
@@ -145,7 +151,7 @@ unexposedPrimTyCons
     , eqPhantPrimTyCon
     ]
 
--- | Primitive 'TyCon's that are defined in, and exported from, "GHC.Prim".
+-- | Primitive 'TyCon's that are defined in, and exported from, GHC.Prim.
 exposedPrimTyCons :: [TyCon]
 exposedPrimTyCons
   = [ addrPrimTyCon
@@ -168,6 +174,7 @@ exposedPrimTyCons
     , mutableArrayArrayPrimTyCon
     , smallMutableArrayPrimTyCon
     , mVarPrimTyCon
+    , ioPortPrimTyCon
     , tVarPrimTyCon
     , mutVarPrimTyCon
     , realWorldTyCon
@@ -175,7 +182,6 @@ exposedPrimTyCons
     , stableNamePrimTyCon
     , compactPrimTyCon
     , statePrimTyCon
-    , voidPrimTyCon
     , proxyPrimTyCon
     , threadIdPrimTyCon
     , wordPrimTyCon
@@ -185,6 +191,7 @@ exposedPrimTyCons
     , word64PrimTyCon
 
     , tYPETyCon
+    , funTyCon
 
 #include "primop-vector-tycons.hs-incl"
     ]
@@ -193,18 +200,18 @@ mkPrimTc :: FastString -> Unique -> TyCon -> Name
 mkPrimTc fs unique tycon
   = mkWiredInName gHC_PRIM (mkTcOccFS fs)
                   unique
-                  (ATyCon tycon)        -- Relevant TyCon
+                  (mkATyCon tycon)        -- Relevant TyCon
                   UserSyntax
 
 mkBuiltInPrimTc :: FastString -> Unique -> TyCon -> Name
 mkBuiltInPrimTc fs unique tycon
   = mkWiredInName gHC_PRIM (mkTcOccFS fs)
                   unique
-                  (ATyCon tycon)        -- Relevant TyCon
+                  (mkATyCon tycon)        -- Relevant TyCon
                   BuiltInSyntax
 
 
-charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
+charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, ioPortPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
@@ -220,7 +227,6 @@ addrPrimTyConName             = mkPrimTc (fsLit "Addr#") addrPrimTyConKey addrPr
 floatPrimTyConName            = mkPrimTc (fsLit "Float#") floatPrimTyConKey floatPrimTyCon
 doublePrimTyConName           = mkPrimTc (fsLit "Double#") doublePrimTyConKey doublePrimTyCon
 statePrimTyConName            = mkPrimTc (fsLit "State#") statePrimTyConKey statePrimTyCon
-voidPrimTyConName             = mkPrimTc (fsLit "Void#") voidPrimTyConKey voidPrimTyCon
 proxyPrimTyConName            = mkPrimTc (fsLit "Proxy#") proxyPrimTyConKey proxyPrimTyCon
 eqPrimTyConName               = mkPrimTc (fsLit "~#") eqPrimTyConKey eqPrimTyCon
 eqReprPrimTyConName           = mkBuiltInPrimTc (fsLit "~R#") eqReprPrimTyConKey eqReprPrimTyCon
@@ -228,13 +234,14 @@ eqPhantPrimTyConName          = mkBuiltInPrimTc (fsLit "~P#") eqPhantPrimTyConKe
 realWorldTyConName            = mkPrimTc (fsLit "RealWorld") realWorldTyConKey realWorldTyCon
 arrayPrimTyConName            = mkPrimTc (fsLit "Array#") arrayPrimTyConKey arrayPrimTyCon
 byteArrayPrimTyConName        = mkPrimTc (fsLit "ByteArray#") byteArrayPrimTyConKey byteArrayPrimTyCon
-arrayArrayPrimTyConName           = mkPrimTc (fsLit "ArrayArray#") arrayArrayPrimTyConKey arrayArrayPrimTyCon
+arrayArrayPrimTyConName       = mkPrimTc (fsLit "ArrayArray#") arrayArrayPrimTyConKey arrayArrayPrimTyCon
 smallArrayPrimTyConName       = mkPrimTc (fsLit "SmallArray#") smallArrayPrimTyConKey smallArrayPrimTyCon
 mutableArrayPrimTyConName     = mkPrimTc (fsLit "MutableArray#") mutableArrayPrimTyConKey mutableArrayPrimTyCon
 mutableByteArrayPrimTyConName = mkPrimTc (fsLit "MutableByteArray#") mutableByteArrayPrimTyConKey mutableByteArrayPrimTyCon
 mutableArrayArrayPrimTyConName= mkPrimTc (fsLit "MutableArrayArray#") mutableArrayArrayPrimTyConKey mutableArrayArrayPrimTyCon
 smallMutableArrayPrimTyConName= mkPrimTc (fsLit "SmallMutableArray#") smallMutableArrayPrimTyConKey smallMutableArrayPrimTyCon
 mutVarPrimTyConName           = mkPrimTc (fsLit "MutVar#") mutVarPrimTyConKey mutVarPrimTyCon
+ioPortPrimTyConName           = mkPrimTc (fsLit "IOPort#") ioPortPrimTyConKey ioPortPrimTyCon
 mVarPrimTyConName             = mkPrimTc (fsLit "MVar#") mVarPrimTyConKey mVarPrimTyCon
 tVarPrimTyConName             = mkPrimTc (fsLit "TVar#") tVarPrimTyConKey tVarPrimTyCon
 stablePtrPrimTyConName        = mkPrimTc (fsLit "StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
@@ -385,6 +392,9 @@ openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
 
+multiplicityTyVar :: TyVar
+multiplicityTyVar = mkTemplateTyVars (repeat multiplicityTy) !! 13  -- selects 'n'
+
 {-
 ************************************************************************
 *                                                                      *
@@ -394,18 +404,35 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 -}
 
 funTyConName :: Name
-funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
+funTyConName = mkPrimTyConName (fsLit "FUN") funTyConKey funTyCon
 
--- | The @(->)@ type constructor.
+-- | The @FUN@ type constructor.
 --
 -- @
--- (->) :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
---         TYPE rep1 -> TYPE rep2 -> *
+-- FUN :: forall (m :: Multiplicity) ->
+--        forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+--        TYPE rep1 -> TYPE rep2 -> *
 -- @
+--
+-- The runtime representations quantification is left inferred. This
+-- means they cannot be specified with @-XTypeApplications@.
+--
+-- This is a deliberate choice to allow future extensions to the
+-- function arrow. To allow visible application a type synonym can be
+-- defined:
+--
+-- @
+-- type Arr :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
+--             TYPE rep1 -> TYPE rep2 -> Type
+-- type Arr = FUN 'Many
+-- @
+--
 funTyCon :: TyCon
 funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
-    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
+    -- See also unrestrictedFunTyCon
+    tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar
+               , mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
                ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
                                              , tYPE runtimeRep2Ty
@@ -450,7 +477,7 @@ The 'rr' parameter tells us how the value is represented at runtime.
 Generally speaking, you can't be polymorphic in 'rr'.  E.g
    f :: forall (rr:RuntimeRep) (a:TYPE rr). a -> [a]
    f = /\(rr:RuntimeRep) (a:rr) \(a:rr). ...
-This is no good: we could not generate code code for 'f', because the
+This is no good: we could not generate code for 'f', because the
 calling convention for 'f' varies depending on whether the argument is
 a a Int, Int#, or Float#.  (You could imagine generating specialised
 code, one for each instantiation of 'rr', but we don't do that.)
@@ -521,13 +548,17 @@ mkPrimTyConName = mkPrimTcName BuiltInSyntax
 
 mkPrimTcName :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
 mkPrimTcName built_in_syntax occ key tycon
-  = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (ATyCon tycon) built_in_syntax
+  = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (mkATyCon tycon) built_in_syntax
 
 -----------------------------
 -- | Given a RuntimeRep, applies TYPE to it.
 -- see Note [TYPE and RuntimeRep]
 tYPE :: Type -> Type
 tYPE rr = TyConApp tYPETyCon [rr]
+
+-- Given a Multiplicity, applies FUN to it.
+functionWithMultiplicity :: Type -> Type
+functionWithMultiplicity mul = TyConApp funTyCon [mul]
 
 {-
 ************************************************************************
@@ -868,12 +899,6 @@ realWorldStatePrimTy = mkStatePrimTy realWorldTy        -- State# RealWorld
 -- so they are defined in \tr{GHC.Builtin.Types}, not here.
 
 
-voidPrimTy :: Type
-voidPrimTy = TyConApp voidPrimTyCon []
-
-voidPrimTyCon :: TyCon
-voidPrimTyCon    = pcPrimTyCon voidPrimTyConName [] VoidRep
-
 mkProxyPrimTy :: Type -> Type -> Type
 mkProxyPrimTy k ty = TyConApp proxyPrimTyCon [k, ty]
 
@@ -980,7 +1005,22 @@ mkMutVarPrimTy s elt        = TyConApp mutVarPrimTyCon [s, elt]
 {-
 ************************************************************************
 *                                                                      *
+\subsection[TysPrim-io-port-var]{The synchronizing I/O Port type}
+*                                                                      *
+************************************************************************
+-}
+
+ioPortPrimTyCon :: TyCon
+ioPortPrimTyCon = pcPrimTyCon ioPortPrimTyConName [Nominal, Representational] UnliftedRep
+
+mkIOPortPrimTy :: Type -> Type -> Type
+mkIOPortPrimTy s elt          = TyConApp ioPortPrimTyCon [s, elt]
+
+{-
+************************************************************************
+*                                                                      *
    The synchronizing variable type
+\subsection[TysPrim-synch-var]{The synchronizing variable type}
 *                                                                      *
 ************************************************************************
 -}

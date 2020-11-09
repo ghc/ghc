@@ -461,6 +461,7 @@ static HsInt loadArchive_ (pathchar *path)
         /* TODO: Stop relying on file extensions to determine input formats.
                  Instead try to match file headers. See #13103.  */
         isObject = (thisFileNameSize >= 2 && strncmp(fileName + thisFileNameSize - 2, ".o"  , 2) == 0)
+                || (thisFileNameSize >= 3 && strncmp(fileName + thisFileNameSize - 3, ".lo" , 3) == 0)
                 || (thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".p_o", 4) == 0)
                 || (thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".obj", 4) == 0);
 
@@ -482,13 +483,13 @@ static HsInt loadArchive_ (pathchar *path)
         DEBUG_LOG("\tisObject = %d\n", isObject);
 
         if (isObject) {
-            char *archiveMemberName;
+            pathchar *archiveMemberName;
 
             DEBUG_LOG("Member is an object file...loading...\n");
 
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
             if (RTS_LINKER_USE_MMAP)
-                image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1, 0);
+                image = mmapForLinker(memberSize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
             else {
                 /* See loadObj() */
                 misalignment = machoGetMisalignment(f);
@@ -514,10 +515,11 @@ static HsInt loadArchive_ (pathchar *path)
                 }
             }
 
-            archiveMemberName = stgMallocBytes(pathlen(path) + thisFileNameSize + 3,
+            int size = pathlen(path) + thisFileNameSize + 3;
+            archiveMemberName = stgMallocBytes(size * pathsize,
                                                "loadArchive(file)");
-            sprintf(archiveMemberName, "%" PATH_FMT "(%.*s)",
-                    path, (int)thisFileNameSize, fileName);
+            pathprintf(archiveMemberName, size, WSTR("%" PATH_FMT "(%.*s)"),
+                       path, (int)thisFileNameSize, fileName);
 
             oc = mkOc(path, image, memberSize, false, archiveMemberName
                      , misalignment);
@@ -546,7 +548,7 @@ while reading filename from `%" PATH_FMT "'", path);
             }
             DEBUG_LOG("Found GNU-variant file index\n");
 #if RTS_LINKER_USE_MMAP
-            gnuFileIndex = mmapForLinker(memberSize + 1, MAP_ANONYMOUS, -1, 0);
+            gnuFileIndex = mmapForLinker(memberSize + 1, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
 #else
             gnuFileIndex = stgMallocBytes(memberSize + 1, "loadArchive(image)");
 #endif

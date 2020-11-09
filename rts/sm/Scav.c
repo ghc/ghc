@@ -129,6 +129,7 @@ scavengeTSO (StgTSO *tso)
         || tso->why_blocked == BlockedOnMVarRead
         || tso->why_blocked == BlockedOnBlackHole
         || tso->why_blocked == BlockedOnMsgThrowTo
+        || tso->why_blocked == BlockedOnIOCompletion
         || tso->why_blocked == NotBlocked
         ) {
         evacuate(&tso->block_info.closure);
@@ -434,7 +435,7 @@ scavenge_block (bdescr *bd)
   saved_eager_promotion = gct->eager_promotion;
   gct->failed_to_evac = false;
 
-  ws = &gct->gens[bd->gen->no];
+  ws = &gct->gens[bd->gen_no];
 
   p = bd->u.scan;
 

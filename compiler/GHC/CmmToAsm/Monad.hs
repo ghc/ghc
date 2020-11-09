@@ -16,7 +16,6 @@ module GHC.CmmToAsm.Monad (
 
         NatM, -- instance Monad
         initNat,
-        initConfig,
         addImportNat,
         addNodeBetweenNat,
         addImmediateSuccessorNat,
@@ -34,7 +33,7 @@ module GHC.CmmToAsm.Monad (
         getNewRegPairNat,
         getPicBaseMaybeNat,
         getPicBaseNat,
-        getDynFlags,
+        getCfgWeights,
         getModLoc,
         getFileId,
         getDebugBlock,
@@ -46,32 +45,32 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Cmm.DebugBlock
-import FastString       ( FastString )
+import GHC.Data.FastString      ( FastString )
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique         ( Unique )
-import GHC.Driver.Session
-import GHC.Types.Module
+import GHC.Unit.Module
 
 import Control.Monad    ( ap )
 
-import GHC.CmmToAsm.Instr
-import Outputable (SDoc, pprPanic, ppr)
-import GHC.Cmm (RawCmmDecl, RawCmmStatics)
+import GHC.Utils.Outputable (SDoc, ppr)
+import GHC.Utils.Panic      (pprPanic)
 import GHC.CmmToAsm.CFG
+import GHC.CmmToAsm.CFG.Weight
 
 data NcgImpl statics instr jumpDest = NcgImpl {
     ncgConfig                 :: !NCGConfig,
@@ -93,11 +92,11 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     extractUnwindPoints       :: [instr] -> [UnwindPoint],
     -- ^ given the instruction sequence of a block, produce a list of
     -- the block's 'UnwindPoint's
-    -- See Note [What is this unwinding business?] in Debug
+    -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
     -- and Note [Unwinding information in the NCG] in this module.
     invertCondBranches        :: Maybe CFG -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
-    -- ^ Turn the sequence of `jcc l1; jmp l2` into `jncc l2; <block_l1>`
+    -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@
     -- when possible.
     }
 
@@ -107,7 +106,6 @@ data NatM_State
                 natm_delta       :: Int,
                 natm_imports     :: [(CLabel)],
                 natm_pic         :: Maybe Reg,
-                natm_dflags      :: DynFlags,
                 natm_config      :: NCGConfig,
                 natm_this_module :: Module,
                 natm_modloc      :: ModLocation,
@@ -119,7 +117,7 @@ data NatM_State
         -- generated instructions. So instead we update the CFG as we go.
         }
 
-type DwarfFiles = UniqFM (FastString, Int)
+type DwarfFiles = UniqFM FastString (FastString, Int)
 
 newtype NatM result = NatM (NatM_State -> (result, NatM_State))
     deriving (Functor)
@@ -127,69 +125,22 @@ newtype NatM result = NatM (NatM_State -> (result, NatM_State))
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
 
-mkNatM_State :: UniqSupply -> Int -> DynFlags -> Module -> ModLocation ->
+mkNatM_State :: UniqSupply -> Int -> NCGConfig -> Module -> ModLocation ->
                 DwarfFiles -> LabelMap DebugBlock -> CFG -> NatM_State
-mkNatM_State us delta dflags this_mod
+mkNatM_State us delta config this_mod
         = \loc dwf dbg cfg ->
                 NatM_State
                         { natm_us = us
                         , natm_delta = delta
                         , natm_imports = []
                         , natm_pic = Nothing
-                        , natm_dflags = dflags
-                        , natm_config = initConfig dflags
+                        , natm_config = config
                         , natm_this_module = this_mod
                         , natm_modloc = loc
                         , natm_fileid = dwf
                         , natm_debug_map = dbg
                         , natm_cfg = cfg
                         }
-
--- | Initialize the native code generator configuration from the DynFlags
-initConfig :: DynFlags -> NCGConfig
-initConfig dflags = NCGConfig
-   { ncgPlatform              = targetPlatform dflags
-   , ncgUnitId                = thisPackage dflags
-   , ncgProcAlignment         = cmmProcAlignment dflags
-   , ncgDebugLevel            = debugLevel dflags
-   , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
-   , ncgPIC                   = positionIndependent dflags
-   , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
-   , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
-   , ncgSplitSections         = gopt Opt_SplitSections dflags
-   , ncgSpillPreallocSize     = rESERVED_C_STACK_BYTES dflags
-   , ncgRegsIterative         = gopt Opt_RegsIterative dflags
-   , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
-
-     -- With -O1 and greater, the cmmSink pass does constant-folding, so
-     -- we don't need to do it again in the native code generator.
-   , ncgDoConstantFolding     = optLevel dflags < 1
-
-   , ncgDumpRegAllocStages    = dopt Opt_D_dump_asm_regalloc_stages dflags
-   , ncgDumpAsmStats          = dopt Opt_D_dump_asm_stats dflags
-   , ncgDumpAsmConflicts      = dopt Opt_D_dump_asm_conflicts dflags
-   , ncgBmiVersion            = case platformArch (targetPlatform dflags) of
-                                 ArchX86_64 -> bmiVersion dflags
-                                 ArchX86    -> bmiVersion dflags
-                                 _          -> Nothing
-
-     -- We Assume  SSE1 and SSE2 operations are available on both
-     -- x86 and x86_64. Historically we didn't default to SSE2 and
-     -- SSE1 on x86, which results in defacto nondeterminism for how
-     -- rounding behaves in the associated x87 floating point instructions
-     -- because variations in the spill/fpu stack placement of arguments for
-     -- operations would change the precision and final result of what
-     -- would otherwise be the same expressions with respect to single or
-     -- double precision IEEE floating point computations.
-   , ncgSseVersion =
-      let v | sseVersion dflags < Just SSE2 = Just SSE2
-            | otherwise                     = sseVersion dflags
-      in case platformArch (targetPlatform dflags) of
-            ArchX86_64 -> v
-            ArchX86    -> v
-            _          -> Nothing
-   }
-
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m
@@ -237,13 +188,12 @@ getUniqueNat = NatM $ \ st ->
     case takeUniqFromSupply $ natm_us st of
     (uniq, us') -> (uniq, st {natm_us = us'})
 
-instance HasDynFlags NatM where
-    getDynFlags = NatM $ \ st -> (natm_dflags st, st)
-
-
 getDeltaNat :: NatM Int
 getDeltaNat = NatM $ \ st -> (natm_delta st, st)
 
+-- | Get CFG edge weights
+getCfgWeights :: NatM Weights
+getCfgWeights = NatM $ \ st -> (ncgCfgWeights (natm_config st), st)
 
 setDeltaNat :: Int -> NatM ()
 setDeltaNat delta = NatM $ \ st -> ((), st {natm_delta = delta})
@@ -265,9 +215,8 @@ updateCfgNat f
 -- | Record that we added a block between `from` and `old`.
 addNodeBetweenNat :: BlockId -> BlockId -> BlockId -> NatM ()
 addNodeBetweenNat from between to
- = do   df <- getDynFlags
-        let jmpWeight = fromIntegral . uncondWeight .
-                        cfgWeightInfo $ df
+ = do   weights <- getCfgWeights
+        let jmpWeight = fromIntegral (uncondWeight weights)
         updateCfgNat (updateCfg jmpWeight from between to)
   where
     -- When transforming A -> B to A -> A' -> B
@@ -287,8 +236,8 @@ addNodeBetweenNat from between to
 --   block -> X to `succ` -> X
 addImmediateSuccessorNat :: BlockId -> BlockId -> NatM ()
 addImmediateSuccessorNat block succ = do
-   dflags <- getDynFlags
-   updateCfgNat (addImmediateSuccessor dflags block succ)
+   weights <- getCfgWeights
+   updateCfgNat (addImmediateSuccessor weights block succ)
 
 getBlockIdNat :: NatM BlockId
 getBlockIdNat

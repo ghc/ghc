@@ -75,8 +75,7 @@ test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', [extra_files(['Cgrun067A.hs'])], compile_and_run, [''])
 test('cgrun068', reqlib('random'), compile_and_run, [''])
 test('cgrun069',
-     [when(unregisterised(), expect_broken(15467)),
-      omit_ways(['ghci'])],
+     [ omit_ways(['ghci'])],
      multi_compile_and_run,
      ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
 test('cgrun070', normal, compile_and_run, [''])
@@ -90,6 +89,8 @@ test('cgrun076', normal, compile_and_run, [''])
 test('cgrun077', [when(have_cpu_feature('bmi2'), extra_hc_opts('-mbmi2'))], compile_and_run, [''])
 test('cgrun078', omit_ways(['ghci']), compile_and_run, [''])
 test('cgrun079', normal, compile_and_run, [''])
+test('cgrun080', normal, compile_and_run, [''])
+test('cas_int', normal, compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
 test('T1861', extra_run_opts('0'), compile_and_run, [''])
@@ -205,3 +206,6 @@ test('T15892',
 test('T16617', normal, compile_and_run, [''])
 test('T16449_2', exit_code(0), compile_and_run, [''])
 test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])
+
+test('T17920', cmm_src, compile_and_run, [''])
+test('T18527', normal, compile_and_run, ['T18527FFI.c'])

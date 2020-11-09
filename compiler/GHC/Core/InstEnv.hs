@@ -31,26 +31,30 @@ module GHC.Core.InstEnv (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Tc.Utils.TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
 import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
-import GHC.Types.Module
+import GHC.Unit.Module.Env
+import GHC.Unit.Types
 import GHC.Core.Class
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Set
+import GHC.Types.Unique (getUnique)
 import GHC.Core.Unify
-import Outputable
-import ErrUtils
 import GHC.Types.Basic
 import GHC.Types.Unique.DFM
-import Util
 import GHC.Types.Id
 import Data.Data        ( Data )
 import Data.Maybe       ( isJust, isNothing )
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Error
+import GHC.Utils.Panic
 
 {-
 ************************************************************************
@@ -230,7 +234,7 @@ pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)
 
 instanceHead :: ClsInst -> ([TyVar], Class, [Type])
--- Returns the head, using the fresh tyavs from the ClsInst
+-- Returns the head, using the fresh tyvars from the ClsInst
 instanceHead (ClsInst { is_tvs = tvs, is_tys = tys, is_dfun = dfun })
    = (tvs, cls, tys)
    where
@@ -385,7 +389,16 @@ Testing with nofib and validate detected no difference between UniqFM and
 UniqDFM. See also Note [Deterministic UniqFM]
 -}
 
-type InstEnv = UniqDFM ClsInstEnv      -- Maps Class to instances for that class
+-- Internally it's safe to indexable this map by
+-- by @Class@, the classes @Name@, the classes @TyCon@
+-- or it's @Unique@.
+-- This is since:
+-- getUnique cls == getUnique (className cls) == getUnique (classTyCon cls)
+--
+-- We still use Class as key type as it's both the common case
+-- and conveys the meaning better. But the implementation of
+--InstEnv is a bit more lax internally.
+type InstEnv = UniqDFM Class ClsInstEnv      -- Maps Class to instances for that class
   -- See Note [InstEnv determinism]
 
 -- | 'InstEnvs' represents the combination of the global type class instance
@@ -453,11 +466,11 @@ classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = 
                 Nothing            -> []
 
 -- | Checks for an exact match of ClsInst in the instance environment.
--- We use this when we do signature checking in GHC.Tc.Module
+-- We use this when we do signature checking in "GHC.Tc.Module"
 memberInstEnv :: InstEnv -> ClsInst -> Bool
 memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
     maybe False (\(ClsIE items) -> any (identicalDFunType ins_item) items)
-          (lookupUDFM inst_env cls_nm)
+          (lookupUDFM_Directly inst_env (getUnique cls_nm))
  where
   identicalDFunType cls1 cls2 =
     eqType (varType (is_dfun cls1)) (varType (is_dfun cls2))
@@ -467,13 +480,13 @@ extendInstEnvList inst_env ispecs = foldl' extendInstEnv inst_env ispecs
 
 extendInstEnv :: InstEnv -> ClsInst -> InstEnv
 extendInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = addToUDFM_C add inst_env cls_nm (ClsIE [ins_item])
+  = addToUDFM_C_Directly add inst_env (getUnique cls_nm) (ClsIE [ins_item])
   where
     add (ClsIE cur_insts) _ = ClsIE (ins_item : cur_insts)
 
 deleteFromInstEnv :: InstEnv -> ClsInst -> InstEnv
 deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = adjustUDFM adjust inst_env cls_nm
+  = adjustUDFM_Directly adjust inst_env (getUnique cls_nm)
   where
     adjust (ClsIE items) = ClsIE (filterOut (identicalClsInstHead ins_item) items)
 
@@ -674,7 +687,7 @@ in this case by a little known `optimization' that was disabled in
 an instance declaration.  In this case, it silently inserts the `C
 [a]', and everything happens to work out.
 
-(See `basicTypes/MkId:mkDictFunId' for the code in question.  Search for
+(See `GHC.Types.Id.Make.mkDictFunId' for the code in question.  Search for
 `Mark Jones', although Mark claims no credit for the `optimization' in
 question, and would rather it stopped being called the `Mark Jones
 optimization' ;-)
@@ -835,8 +848,8 @@ lookupInstEnv :: Bool              -- Check Safe Haskell overlap restrictions
               -> Class -> [Type]   -- What we are looking for
               -> ClsInstLookupResult
 -- ^ See Note [Rules for instance lookup]
--- ^ See Note [Safe Haskell Overlapping Instances] in GHC.Tc.Solver
--- ^ See Note [Safe Haskell Overlapping Instances Implementation] in GHC.Tc.Solver
+-- ^ See Note [Safe Haskell Overlapping Instances] in "GHC.Tc.Solver"
+-- ^ See Note [Safe Haskell Overlapping Instances Implementation] in "GHC.Tc.Solver"
 lookupInstEnv check_overlap_safe
               (InstEnvs { ie_global = pkg_ie
                         , ie_local = home_ie

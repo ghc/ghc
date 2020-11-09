@@ -8,7 +8,7 @@
 
 module GHC.Core.Opt.Simplify.Env (
         -- * The simplifier mode
-        setMode, getMode, updMode, seDynFlags,
+        setMode, getMode, updMode, seDynFlags, seUnfoldingOpts,
 
         -- * Environments
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
@@ -45,28 +45,33 @@ module GHC.Core.Opt.Simplify.Env (
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad        ( SimplMode(..) )
 import GHC.Core
 import GHC.Core.Utils
+import GHC.Core.Multiplicity     ( scaleScaled )
+import GHC.Core.Unfold
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import OrdList
+import GHC.Data.OrdList
 import GHC.Types.Id as Id
 import GHC.Core.Make            ( mkWildValBinder )
 import GHC.Driver.Session       ( DynFlags )
+import GHC.Driver.Ppr
 import GHC.Builtin.Types
+import GHC.Core.TyCo.Rep        ( TyCoBinder(..) )
 import qualified GHC.Core.Type as Type
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
 import GHC.Types.Basic
-import MonadUtils
-import Outputable
-import Util
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
 import Data.List (mapAccumL)
@@ -276,7 +281,7 @@ mkSimplEnv mode
         -- The top level "enclosing CC" is "SUBSUMED".
 
 init_in_scope :: InScopeSet
-init_in_scope = mkInScopeSet (unitVarSet (mkWildValBinder unitTy))
+init_in_scope = mkInScopeSet (unitVarSet (mkWildValBinder Many unitTy))
               -- See Note [WildCard binders]
 
 {-
@@ -304,6 +309,10 @@ getMode env = seMode env
 
 seDynFlags :: SimplEnv -> DynFlags
 seDynFlags env = sm_dflags (seMode env)
+
+seUnfoldingOpts :: SimplEnv -> UnfoldingOpts
+seUnfoldingOpts env = sm_uf_opts (seMode env)
+
 
 setMode :: SimplMode -> SimplEnv -> SimplEnv
 setMode mode env = env { seMode = mode }
@@ -587,7 +596,7 @@ addJoinFlts :: JoinFloats -> JoinFloats -> JoinFloats
 addJoinFlts = appOL
 
 mkRecFloats :: SimplFloats -> SimplFloats
--- Flattens the floats from env2 into a single Rec group,
+-- Flattens the floats into a single Rec group,
 -- They must either all be lifted LetFloats or all JoinFloats
 mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs ff
                                 , sfJoinFloats = jbs
@@ -724,6 +733,8 @@ changed!!
 That's why we pass res_ty into simplNonRecJoinBndr, and substIdBndr
 takes a (Just res_ty) argument so that it knows to do the type-changing
 thing.
+
+See also Note [Scaling join point arguments].
 -}
 
 simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
@@ -739,24 +750,14 @@ simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 simplBinder env bndr
   | isTyVar bndr  = do  { let (env', tv) = substTyVarBndr env bndr
                         ; seqTyVar tv `seq` return (env', tv) }
-  | otherwise     = do  { let (env', id) = substIdBndr Nothing env bndr
+  | otherwise     = do  { let (env', id) = substIdBndr env bndr
                         ; seqId id `seq` return (env', id) }
 
 ---------------
 simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- A non-recursive let binder
 simplNonRecBndr env id
-  = do  { let (env1, id1) = substIdBndr Nothing env id
-        ; seqId id1 `seq` return (env1, id1) }
-
----------------
-simplNonRecJoinBndr :: SimplEnv -> OutType -> InBndr
-                    -> SimplM (SimplEnv, OutBndr)
--- A non-recursive let binder for a join point;
--- context being pushed inward may change the type
--- See Note [Return type for join points]
-simplNonRecJoinBndr env res_ty id
-  = do  { let (env1, id1) = substIdBndr (Just res_ty) env id
+  = do  { let (env1, id1) = substIdBndr env id
         ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
@@ -764,31 +765,20 @@ simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders
 simplRecBndrs env@(SimplEnv {}) ids
   = ASSERT(all (not . isJoinId) ids)
-    do  { let (env1, ids1) = mapAccumL (substIdBndr Nothing) env ids
+    do  { let (env1, ids1) = mapAccumL substIdBndr env ids
         ; seqIds ids1 `seq` return env1 }
 
----------------
-simplRecJoinBndrs :: SimplEnv -> OutType -> [InBndr] -> SimplM SimplEnv
--- Recursive let binders for join points;
--- context being pushed inward may change types
--- See Note [Return type for join points]
-simplRecJoinBndrs env@(SimplEnv {}) res_ty ids
-  = ASSERT(all isJoinId ids)
-    do  { let (env1, ids1) = mapAccumL (substIdBndr (Just res_ty)) env ids
-        ; seqIds ids1 `seq` return env1 }
 
 ---------------
-substIdBndr :: Maybe OutType -> SimplEnv -> InBndr -> (SimplEnv, OutBndr)
+substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
 -- Might be a coercion variable
-substIdBndr new_res_ty env bndr
+substIdBndr env bndr
   | isCoVar bndr  = substCoVarBndr env bndr
-  | otherwise     = substNonCoVarIdBndr new_res_ty env bndr
+  | otherwise     = substNonCoVarIdBndr env bndr
 
 ---------------
 substNonCoVarIdBndr
-   :: Maybe OutType -- New result type, if a join binder
-                    -- See Note [Return type for join points]
-   -> SimplEnv
+   :: SimplEnv
    -> InBndr    -- Env and binder to transform
    -> (SimplEnv, OutBndr)
 -- Clone Id if necessary, substitute its type
@@ -808,25 +798,28 @@ substNonCoVarIdBndr
 -- Similar to GHC.Core.Subst.substIdBndr, except that
 --      the type of id_subst differs
 --      all fragile info is zapped
-substNonCoVarIdBndr new_res_ty
-                    env@(SimplEnv { seInScope = in_scope
-                                  , seIdSubst = id_subst })
-                    old_id
+substNonCoVarIdBndr env id = subst_id_bndr env id (\x -> x)
+
+subst_id_bndr :: SimplEnv
+              -> InBndr    -- Env and binder to transform
+              -> (OutId -> OutId)  -- Adjust the type
+              -> (SimplEnv, OutBndr)
+subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
+              old_id adjust_type
   = ASSERT2( not (isCoVar old_id), ppr old_id )
     (env { seInScope = in_scope `extendInScopeSet` new_id,
            seIdSubst = new_subst }, new_id)
+    -- It's important that both seInScope and seIdSubst are updated with
+    -- the new_id, /after/ applying adjust_type. That's why adjust_type
+    -- is done here.  If we did adjust_type in simplJoinBndr (the only
+    -- place that gives a non-identity adjust_type) we'd have to fiddle
+    -- afresh with both seInScope and seIdSubst
   where
-    id1    = uniqAway in_scope old_id
-    id2    = substIdType env id1
-
-    id3    | Just res_ty <- new_res_ty
-           = id2 `setIdType` setJoinResTy (idJoinArity id2) res_ty (idType id2)
-                             -- See Note [Return type for join points]
-           | otherwise
-           = id2
-
-    new_id = zapFragileIdInfo id3       -- Zaps rules, worker-info, unfolding
-                                        -- and fragile OccInfo
+    id1  = uniqAway in_scope old_id
+    id2  = substIdType env id1
+    id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
+                                      -- and fragile OccInfo
+    new_id = adjust_type id3
 
         -- Extend the substitution if the unique has changed,
         -- or there's some useful occurrence information
@@ -852,7 +845,7 @@ seqIds (id:ids) = seqId id `seq` seqIds ids
 {-
 Note [Arity robustness]
 ~~~~~~~~~~~~~~~~~~~~~~~
-We *do* transfer the arity from from the in_id of a let binding to the
+We *do* transfer the arity from the in_id of a let binding to the
 out_id.  This is important, so that the arity of an Id is visible in
 its own RHS.  For example:
         f = \x. ....g (\y. f y)....
@@ -886,6 +879,100 @@ that's what stops the Id getting inlined infinitely, in the body of
 the letrec.
 -}
 
+
+{- *********************************************************************
+*                                                                      *
+                Join points
+*                                                                      *
+********************************************************************* -}
+
+simplNonRecJoinBndr :: SimplEnv -> InBndr
+                    -> Mult -> OutType
+                    -> SimplM (SimplEnv, OutBndr)
+
+-- A non-recursive let binder for a join point;
+-- context being pushed inward may change the type
+-- See Note [Return type for join points]
+simplNonRecJoinBndr env id mult res_ty
+  = do { let (env1, id1) = simplJoinBndr mult res_ty env id
+       ; seqId id1 `seq` return (env1, id1) }
+
+simplRecJoinBndrs :: SimplEnv -> [InBndr]
+                  -> Mult -> OutType
+                  -> SimplM SimplEnv
+-- Recursive let binders for join points;
+-- context being pushed inward may change types
+-- See Note [Return type for join points]
+simplRecJoinBndrs env@(SimplEnv {}) ids mult res_ty
+  = ASSERT(all isJoinId ids)
+    do  { let (env1, ids1) = mapAccumL (simplJoinBndr mult res_ty) env ids
+        ; seqIds ids1 `seq` return env1 }
+
+---------------
+simplJoinBndr :: Mult -> OutType
+              -> SimplEnv -> InBndr
+              -> (SimplEnv, OutBndr)
+simplJoinBndr mult res_ty env id
+  = subst_id_bndr env id (adjustJoinPointType mult res_ty)
+
+---------------
+adjustJoinPointType :: Mult
+                    -> Type     -- New result type
+                    -> Id       -- Old join-point Id
+                    -> Id       -- Adjusted jont-point Id
+-- (adjustJoinPointType mult new_res_ty join_id) does two things:
+--
+--   1. Set the return type of the join_id to new_res_ty
+--      See Note [Return type for join points]
+--
+--   2. Adjust the multiplicity of arrows in join_id's type, as
+--      directed by 'mult'. See Note [Scaling join point arguments]
+--
+-- INVARIANT: If any of the first n binders are foralls, those tyvars
+-- cannot appear in the original result type. See isValidJoinPointType.
+adjustJoinPointType mult new_res_ty join_id
+  = ASSERT( isJoinId join_id )
+    setIdType join_id new_join_ty
+  where
+    orig_ar = idJoinArity join_id
+    orig_ty = idType join_id
+
+    new_join_ty = go orig_ar orig_ty
+
+    go 0 _  = new_res_ty
+    go n ty | Just (arg_bndr, res_ty) <- splitPiTy_maybe ty
+            = mkPiTy (scale_bndr arg_bndr) $
+              go (n-1) res_ty
+            | otherwise
+            = pprPanic "adjustJoinPointType" (ppr orig_ar <+> ppr orig_ty)
+
+    scale_bndr (Anon af t) = Anon af (scaleScaled mult t)
+    scale_bndr b@(Named _) = b
+
+{- Note [Scaling join point arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a join point which is linear in its variable, in some context E:
+
+E[join j :: a %1 -> a
+       j x = x
+  in case v of
+       A -> j 'x'
+       B -> <blah>]
+
+The simplifier changes to:
+
+join j :: a %1 -> a
+     j x = E[x]
+in case v of
+     A -> j 'x'
+     B -> E[<blah>]
+
+If E uses its argument in a nonlinear way (e.g. a case['Many]), then
+this is wrong: the join point has to change its type to a -> a.
+Otherwise, we'd get a linearity error.
+
+See also Note [Return type for join points] and Note [Join points and case-of-case].
+-}
 
 {-
 ************************************************************************
@@ -927,12 +1014,15 @@ substCo env co = Coercion.substCo (getTCvSubst env) co
 ------------------
 substIdType :: SimplEnv -> Id -> Id
 substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env }) id
-  |  (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
-  || noFreeVarsOfType old_ty
+  | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
+    || no_free_vars
   = id
-  | otherwise = Id.setIdType id (Type.substTy (TCvSubst in_scope tv_env cv_env) old_ty)
+  | otherwise = Id.updateIdTypeAndMult (Type.substTyUnchecked subst) id
                 -- The tyCoVarsOfType is cheaper than it looks
                 -- because we cache the free tyvars of the type
                 -- in a Note in the id's type itself
   where
+    no_free_vars = noFreeVarsOfType old_ty && noFreeVarsOfType old_w
+    subst = TCvSubst in_scope tv_env cv_env
     old_ty = idType id
+    old_w  = varMult id

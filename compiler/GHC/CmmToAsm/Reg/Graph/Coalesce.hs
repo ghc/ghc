@@ -3,15 +3,15 @@ module GHC.CmmToAsm.Reg.Graph.Coalesce (
         regCoalesce,
         slurpJoinMovs
 ) where
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 
 import GHC.Cmm
-import Bag
-import Digraph
+import GHC.Data.Bag
+import GHC.Data.Graph.Directed
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
@@ -44,7 +44,7 @@ regCoalesce code
 -- | Add a v1 = v2 register renaming to the map.
 --   The register with the lowest lexical name is set as the
 --   canonical version.
-buildAlloc :: UniqFM Reg -> (Reg, Reg) -> UniqFM Reg
+buildAlloc :: UniqFM Reg Reg -> (Reg, Reg) -> UniqFM Reg Reg
 buildAlloc fm (r1, r2)
  = let  rmin    = min r1 r2
         rmax    = max r1 r2
@@ -53,7 +53,7 @@ buildAlloc fm (r1, r2)
 
 -- | Determine the canonical name for a register by following
 --   v1 = v2 renamings in this map.
-sinkReg :: UniqFM Reg -> Reg -> Reg
+sinkReg :: UniqFM Reg Reg -> Reg -> Reg
 sinkReg fm r
  = case lookupUFM fm r of
         Nothing -> r

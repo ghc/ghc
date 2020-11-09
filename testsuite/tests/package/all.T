@@ -1,7 +1,7 @@
 hide_all = '-hide-all-packages -XNoImplicitPrelude '
 incr_containers = '-package "containers (Data.Map as Map, Data.Set)" '
 inc_containers = '-package containers '
-incr_ghc = '-package "ghc (GHC.Hs.Types as GHC.Hs.MyTypes, GHC.Hs.Utils)" '
+incr_ghc = '-package "ghc (GHC.Hs.Type as GHC.Hs.MyTypes, GHC.Hs.Utils)" '
 inc_ghc = '-package ghc '
 hide_ghc = '-hide-package ghc '
 

@@ -12,11 +12,15 @@ def normalise_quotes (str):
 #--------------------------------------
 # Test functions
 #--------------------------------------
+test('SystemInfoTest', normal, compile_and_run, [''])
 test('readFloat', exit_code(1), compile_and_run, [''])
 test('enumDouble', normal, compile_and_run, [''])
 test('enumRatio', normal, compile_and_run, [''])
 test('enumNumeric', normal, compile_and_run, [''])
-test('tempfiles', normal, compile_and_run, [''])
+# N.B. the tempfile format is slightly different than this test expects on
+# Windows *except* if using WinIO. The `when` clause below can be removed
+# after WinIO becomes the default.
+test('tempfiles', when(opsys('mingw32'), only_ways(['winio'])), compile_and_run, [''])
 test('fixed', normal, compile_and_run, [''])
 test('quotOverflow', normal, compile_and_run, [''])
 test('assert', exit_code(1), compile_and_run, ['-fno-ignore-asserts'])
@@ -40,7 +44,7 @@ test('take001', extra_run_opts('1'), compile_and_run, [''])
 test('inits', normal, compile_and_run, [''])
 test('genericNegative001', extra_run_opts('-1'), compile_and_run, [''])
 test('ix001', normal, compile_and_run, [''])
-test('isValidNatural', reqlib('integer-gmp'), compile_and_run, [''])
+test('isValidNatural', normal, compile_and_run, [''])
 
 # need to add -K64m to the compiler opts, so that GHCi gets it too
 test('ioref001',
@@ -253,6 +257,7 @@ test('T15349', [exit_code(1), expect_broken_for(15349, ['ghci'])], compile_and_r
 test('T16111', exit_code(1), compile_and_run, [''])
 test('T16943a', normal, compile_and_run, [''])
 test('T16943b', normal, compile_and_run, [''])
-# This frequently times out with integer-simple
-test('T17499', [when(integer_simple(), skip), collect_stats('bytes allocated',5)],
-     compile_and_run, ['-O -w'])
+test('T17499', [collect_stats('bytes allocated',5)], compile_and_run, ['-O -w'])
+test('T16643', normal, compile_and_run, [''])
+test('clamp', normal, compile_and_run, [''])
+test('T18642', extra_run_opts('+RTS -T -RTS'), compile_and_run, ['-O2'])

@@ -21,13 +21,14 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Format
 
-import Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique
 import GHC.Platform
 

@@ -12,42 +12,59 @@ where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
+
+import GHC.Driver.Backend
+import GHC.Driver.Env
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), pluginRecompile', plugins )
 
 import GHC.Iface.Syntax
 import GHC.Iface.Recomp.Binary
 import GHC.Iface.Load
 import GHC.Iface.Recomp.Flags
 
-import GHC.Types.Annotations
 import GHC.Core
 import GHC.Tc.Utils.Monad
 import GHC.Hs
-import GHC.Driver.Types
-import GHC.Driver.Finder
-import GHC.Driver.Session
+
+import GHC.Data.Graph.Directed
+import GHC.Data.Maybe
+import GHC.Data.FastString
+
+import GHC.Utils.Error
+import GHC.Utils.Panic
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Misc as Utils hiding ( eqListBy )
+import GHC.Utils.Binary
+import GHC.Utils.Fingerprint
+import GHC.Utils.Exception
+
+import GHC.Types.Annotations
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Module
-import ErrUtils
-import Digraph
 import GHC.Types.SrcLoc
-import Outputable
 import GHC.Types.Unique
-import Util             hiding ( eqListBy )
-import Maybes
-import Binary
-import Fingerprint
-import Exception
 import GHC.Types.Unique.Set
-import GHC.Driver.Packages
+import GHC.Types.Fixity.Env
+import GHC.Types.SourceFile
+
+import GHC.Unit.External
+import GHC.Unit.Finder
+import GHC.Unit.State
+import GHC.Unit.Home
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.Warnings
+import GHC.Unit.Module.Deps
 
 import Control.Monad
 import Data.Function
 import Data.List (find, sortBy, sort)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), pluginRecompile', plugins )
 
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
@@ -169,7 +186,7 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
             -- If the source has changed and we're in interactive mode,
             -- avoid reading an interface; just return the one we might
             -- have been supplied with.
-            True | not (isObjectTarget $ hscTarget dflags) ->
+            True | not (backendProducesObject $ backend dflags) ->
                 return (MustCompile, maybe_iface)
 
             -- Try and read the old interface for the current module
@@ -209,10 +226,10 @@ checkVersions hsc_env mod_summary iface
   = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
 
-       -- readIface will have verified that the InstalledUnitId matches,
+       -- readIface will have verified that the UnitId matches,
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
-       ; if moduleUnitId (mi_module iface) /= thisPackage (hsc_dflags hsc_env)
+       ; if not (isHomeModule home_unit (mi_module iface))
             then return (RecompBecause "-this-unit-id changed", Nothing) else do {
        ; recomp <- checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
@@ -246,13 +263,14 @@ checkVersions hsc_env mod_summary iface
        -- all the dependent modules should be in the HPT already, so it's
        -- quite redundant
        ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
-       ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
+       ; recomp <- checkList [checkModUsage (homeUnitAsUnit home_unit) u
+                             | u <- mi_usages iface]
        ; return (recomp, Just iface)
     }}}}}}}}}}
   where
-    this_pkg = thisPackage (hsc_dflags hsc_env)
+    home_unit = hsc_home_unit hsc_env
     -- This is a bit of a hack really
-    mod_deps :: ModuleNameEnv (ModuleName, IsBootInterface)
+    mod_deps :: ModuleNameEnv ModuleNameWithIsBoot
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
 
 -- | Check if any plugins are requesting recompilation
@@ -265,7 +283,7 @@ checkPlugins hsc iface = liftIO $ do
     pluginRecompileToRecompileRequired old_fingerprint new_fingerprint pr
 
 fingerprintPlugins :: HscEnv -> IO Fingerprint
-fingerprintPlugins hsc_env = do
+fingerprintPlugins hsc_env =
   fingerprintPlugins' $ plugins (hsc_dflags hsc_env)
 
 fingerprintPlugins' :: [PluginWithArgs] -> IO Fingerprint
@@ -303,7 +321,7 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
     -- time or when we go from one recompilation strategy to another: (force ->
     -- no-force, maybe-recomp -> no-force, no-force -> maybe-recomp etc.)
     --
-    -- For example when we go from from ForceRecomp to NoForceRecomp
+    -- For example when we go from ForceRecomp to NoForceRecomp
     -- recompilation is triggered since the old impure plugins could have
     -- changed the build output which is now back to normal.
     = RecompBecause "Plugins changed"
@@ -329,10 +347,11 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
 -- implementing module has changed.
 checkHsig :: ModSummary -> ModIface -> IfG RecompileRequired
 checkHsig mod_summary iface = do
-    dflags <- getDynFlags
-    let outer_mod = ms_mod mod_summary
-        inner_mod = canonicalizeHomeModule dflags (moduleName outer_mod)
-    MASSERT( moduleUnitId outer_mod == thisPackage dflags )
+    hsc_env <- getTopEnv
+    let home_unit = hsc_home_unit hsc_env
+        outer_mod = ms_mod mod_summary
+        inner_mod = homeModuleNameInstantiation home_unit (moduleName outer_mod)
+    MASSERT( isHomeModule home_unit outer_mod )
     case inner_mod == mi_semantic_module iface of
         True -> up_to_date (text "implementing module unchanged")
         False -> return (RecompBecause "implementing module changed")
@@ -403,9 +422,9 @@ checkMergedSignatures mod_summary iface = do
     dflags <- getDynFlags
     let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_usages iface ]
         new_merged = case Map.lookup (ms_mod_name mod_summary)
-                                     (requirementContext (pkgState dflags)) of
+                                     (requirementContext (unitState dflags)) of
                         Nothing -> []
-                        Just r -> sort $ map (indefModuleToModule dflags) r
+                        Just r -> sort $ map (instModuleToModule (unitState dflags)) r
     if old_merged == new_merged
         then up_to_date (text "signatures to merge in unchanged" $$ ppr new_merged)
         else return (RecompBecause "signatures to merge in changed")
@@ -429,7 +448,7 @@ checkMergedSignatures mod_summary iface = do
 -- Returns (RecompBecause <textual reason>) if recompilation is required.
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
- = do
+ =
    checkList $
      [ checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
      , do
@@ -446,16 +465,15 @@ checkDependencies hsc_env summary iface
    prev_dep_mods = dep_mods (mi_deps iface)
    prev_dep_plgn = dep_plgins (mi_deps iface)
    prev_dep_pkgs = dep_pkgs (mi_deps iface)
-
-   this_pkg = thisPackage (hsc_dflags hsc_env)
+   home_unit     = hsc_home_unit hsc_env
 
    dep_missing (mb_pkg, L _ mod) = do
      find_res <- liftIO $ findImportedModule hsc_env mod (mb_pkg)
      let reason = moduleNameString mod ++ " changed"
      case find_res of
         Found _ mod
-          | pkg == this_pkg
-           -> if moduleName mod `notElem` map fst prev_dep_mods ++ prev_dep_plgn
+          | isHomeUnit home_unit pkg
+           -> if moduleName mod `notElem` map gwib_mod prev_dep_mods ++ prev_dep_plgn
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " not among previous dependencies"
@@ -463,7 +481,7 @@ checkDependencies hsc_env summary iface
                  else
                          return UpToDate
           | otherwise
-           -> if toInstalledUnitId pkg `notElem` (map fst prev_dep_pkgs)
+           -> if toUnitId pkg `notElem` (map fst prev_dep_pkgs)
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " is from package " <> quotes (ppr pkg) <>
@@ -471,14 +489,16 @@ checkDependencies hsc_env summary iface
                          return (RecompBecause reason)
                  else
                          return UpToDate
-           where pkg = moduleUnitId mod
+           where pkg = moduleUnit mod
         _otherwise  -> return (RecompBecause reason)
 
-   old_deps = Set.fromList $ map fst $ filter (not . snd) prev_dep_mods
+   projectNonBootNames = map gwib_mod . filter ((== NotBoot) . gwib_isBoot)
+   old_deps = Set.fromList
+     $ projectNonBootNames prev_dep_mods
    isOldHomeDeps = flip Set.member old_deps
    checkForNewHomeDependency (L _ mname) = do
      let
-       mod = mkModule this_pkg mname
+       mod = mkHomeModule home_unit mname
        str_mname = moduleNameString mname
        reason = str_mname ++ " changed"
      -- We only want to look at home modules to check if any new home dependency
@@ -489,7 +509,7 @@ checkDependencies hsc_env summary iface
        then return (UpToDate, [])
        else do
          mb_result <- getFromModIface "need mi_deps for" mod $ \imported_iface -> do
-           let mnames = mname:(map fst $ filter (not . snd) $
+           let mnames = mname:(map gwib_mod $ filter ((== NotBoot) . gwib_isBoot) $
                  dep_mods $ mi_deps imported_iface)
            case find (not . isOldHomeDeps) mnames of
              Nothing -> return (UpToDate, mnames)
@@ -561,7 +581,7 @@ getFromModIface doc_msg mod getter
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
-checkModUsage :: UnitId -> Usage -> IfG RecompileRequired
+checkModUsage :: Unit -> Usage -> IfG RecompileRequired
 checkModUsage _this_pkg UsagePackageModule{
                                 usg_mod = mod,
                                 usg_mod_hash = old_mod_hash }
@@ -598,8 +618,7 @@ checkModUsage this_pkg UsageHomeModule{
        recompile <- checkModuleFingerprint reason old_mod_hash new_mod_hash
        if not (recompileRequired recompile)
          then return UpToDate
-         else do
-
+         else
            -- CHECK EXPORT LIST
            checkMaybeHash reason maybe_old_export_hash new_export_hash
                (text "  Export list changed") $ do
@@ -615,14 +634,14 @@ checkModUsage this_pkg UsageHomeModule{
 checkModUsage _this_pkg UsageFile{ usg_file_path = file,
                                    usg_file_hash = old_hash } =
   liftIO $
-    handleIO handle $ do
+    handleIO handler $ do
       new_hash <- getFileHash file
       if (old_hash /= new_hash)
          then return recomp
          else return UpToDate
  where
-   recomp = RecompBecause (file ++ " changed")
-   handle =
+   recomp  = RecompBecause (file ++ " changed")
+   handler =
 #if defined(DEBUG)
        \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
 #else
@@ -766,7 +785,7 @@ addFingerprints hsc_env iface0
                    -- used to construct the edges and
                    -- stronglyConnCompFromEdgedVertices is deterministic
                    -- even with non-deterministic order of edges as
-                   -- explained in Note [Deterministic SCC] in Digraph.
+                   -- explained in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
           where getParent :: OccName -> OccName
                 getParent occ = lookupOccEnv parent_map occ `orElse` occ
 
@@ -854,7 +873,7 @@ addFingerprints hsc_env iface0
        extend_hash_env :: OccEnv (OccName,Fingerprint)
                        -> (Fingerprint,IfaceDecl)
                        -> IO (OccEnv (OccName,Fingerprint))
-       extend_hash_env env0 (hash,d) = do
+       extend_hash_env env0 (hash,d) =
           return (foldr (\(b,fp) env -> extendOccEnv env b (b,fp)) env0
                  (ifaceDeclFingerprints hash d))
 
@@ -1073,11 +1092,11 @@ getOrphanHashes hsc_env mods = do
 
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
- = Deps { dep_mods   = sortBy (compare `on` (moduleNameFS.fst)) (dep_mods d),
+ = Deps { dep_mods   = sortBy (lexicalCompareFS `on` (moduleNameFS . gwib_mod)) (dep_mods d),
           dep_pkgs   = sortBy (compare `on` fst) (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d),
-          dep_plgins = sortBy (compare `on` moduleNameFS) (dep_plgins d) }
+          dep_plgins = sortBy (lexicalCompareFS `on` moduleNameFS) (dep_plgins d) }
 
 {-
 ************************************************************************
@@ -1330,7 +1349,7 @@ mkOrphMap get_key decls
   where
     go (non_orphs, orphs) d
         | NotOrphan occ <- get_key d
-        = (extendOccEnv_Acc (:) singleton non_orphs occ d, orphs)
+        = (extendOccEnv_Acc (:) Utils.singleton non_orphs occ d, orphs)
         | otherwise = (non_orphs, d:orphs)
 
 -- -----------------------------------------------------------------------------
@@ -1346,11 +1365,11 @@ mkHashFun
         -> (Name -> IO Fingerprint)
 mkHashFun hsc_env eps name
   | isHoleModule orig_mod
-  = lookup (mkModule (thisPackage dflags) (moduleName orig_mod))
+  = lookup (mkHomeModule home_unit (moduleName orig_mod))
   | otherwise
   = lookup orig_mod
   where
-      dflags = hsc_dflags hsc_env
+      home_unit = hsc_home_unit hsc_env
       hpt = hsc_HPT hsc_env
       pit = eps_PIT eps
       occ = nameOccName name
@@ -1359,14 +1378,18 @@ mkHashFun hsc_env eps name
         MASSERT2( isExternalName name, ppr name )
         iface <- case lookupIfaceByModule hpt pit mod of
                   Just iface -> return iface
-                  Nothing -> do
+                  Nothing ->
                       -- This can occur when we're writing out ifaces for
                       -- requirements; we didn't do any /real/ typechecking
                       -- so there's no guarantee everything is loaded.
                       -- Kind of a heinous hack.
-                      iface <- initIfaceLoad hsc_env . withException
-                            $ loadInterface (text "lookupVers2") mod ImportBySystem
-                      return iface
+                      initIfaceLoad hsc_env . withException
+                          $ withoutDynamicNow
+                            -- For some unknown reason, we need to reset the
+                            -- dynamicNow bit, otherwise only dynamic
+                            -- interfaces are looked up and some tests fail
+                            -- (e.g. T16219).
+                          $ loadInterface (text "lookupVers2") mod ImportBySystem
         return $ snd (mi_hash_fn (mi_final_exts iface) occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
 

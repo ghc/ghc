@@ -64,6 +64,7 @@ categories = {
     'coverage': 'Program coverage',
     'cpp': 'C pre-processor',
     'debugging': 'Debugging the compiler',
+    'extended-interface-files': 'Extended interface files',
     'interactive': 'Interactive mode',
     'interface-files': 'Interface files',
     'keep-intermediates': 'Keeping intermediate files',
@@ -255,14 +256,16 @@ class LanguageExtension(GenericFlag):
     # Invert the flag
     @staticmethod
     def _noname(name):
-        if name[:2] == "No":
+        # We check isupper() so that NondecreasingIndentation
+        # is not counted as "No-ndecreasingIndentation"
+        if name[:2] == "No" and name[2].isupper():
           return name[2:]
         else:
           return "No%s" % name
 
     @staticmethod
     def _onname(name):
-        if name[:2] == "No":
+        if name[:2] == "No" and name[2].isupper():
           return name[2:]
         else:
           return name
