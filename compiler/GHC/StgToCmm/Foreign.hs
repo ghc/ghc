@@ -625,12 +625,11 @@ getFCallArgs args typ
       | otherwise
       = do { cmm <- getArgAmode (NonVoid arg)
            ; profile <- getProfile
-           ; platform <- getPlatform
-           ; return (Just (add_shim profile typ cmm, hint platform)) }
+           ; return (Just (add_shim profile typ cmm, hint)) }
       where
-        arg_ty    = stgArgType arg
-        arg_reps  = typePrimRep arg_ty
-        hint plat = typeForeignHint plat arg_ty
+        arg_ty   = stgArgType arg
+        arg_reps = typePrimRep arg_ty
+        hint     = typeForeignHint arg_ty
 
 -- The minimum amount of information needed to determine
 -- the offset to apply to an argument to a foreign call.
