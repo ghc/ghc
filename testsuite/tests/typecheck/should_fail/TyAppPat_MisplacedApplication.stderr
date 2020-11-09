@@ -1,0 +1,3 @@
+
+TyAppPat_MisplacedApplication.hs:9:6: error:
+    Parse error in pattern: MkT x

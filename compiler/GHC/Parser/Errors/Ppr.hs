@@ -263,9 +263,6 @@ pp_err = \case
    ErrIfTheElseInPat
       -> text "(if ... then ... else ...)-syntax in pattern"
 
-   ErrTypeAppInPat
-      -> text "Type applications in patterns are not yet supported"
-
    ErrLambdaCaseInPat
       -> text "(\\case ...)-syntax in pattern"
 
@@ -607,6 +604,8 @@ pp_hint = \case
          $$ if opIsAt fun
                then perhaps_as_pat
                else empty
+   TypeApplicationsInPatternsOnlyDataCons ->
+     text "Type applications in patterns are only allowed on data constructors."
 
 perhaps_as_pat :: SDoc
 perhaps_as_pat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
