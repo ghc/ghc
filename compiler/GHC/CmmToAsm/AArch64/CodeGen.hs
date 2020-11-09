@@ -129,7 +129,7 @@ basicBlockCodeGen
                 , [NatCmmDecl RawCmmStatics Instr])
 
 basicBlockCodeGen block = do
-  -- config <- getConfig
+  config <- getConfig
   -- do
   --   traceM $ "-- --------------------------- basicBlockCodeGen --------------------------- --\n"
   --         ++ showSDocUnsafe (ppr block)
@@ -139,7 +139,7 @@ basicBlockCodeGen block = do
 
       header_comment_instr = unitOL $ MULTILINE_COMMENT (
           text "-- --------------------------- basicBlockCodeGen --------------------------- --\n"
-          $+$ ppr block
+          $+$ pdoc (ncgPlatform config) block
           )
   -- Generate location directive
   dbg <- getDebugBlock (entryLabel block)
@@ -279,7 +279,7 @@ stmtToInstrs bid stmt = do
 
       CmmUnwind _regs -> return nilOL
 
-      _ -> pprPanic "stmtToInstrs: statement should have been cps'd away" (ppr stmt)
+      _ -> pprPanic "stmtToInstrs: statement should have been cps'd away" (pdoc platform stmt)
 
 jumpRegs :: Platform -> [GlobalReg] -> [Reg]
 jumpRegs = undefined
@@ -374,7 +374,9 @@ getFloatReg expr = do
     Any II64 code -> do
       tmp <- getNewRegNat FF64
       return (tmp, FF64, code tmp)
-    Any _w _code -> pprPanic "can't do getFloatReg on" (ppr expr)
+    Any _w _code -> do
+      config <- getConfig
+      pprPanic "can't do getFloatReg on" (pdoc (ncgPlatform config) expr)
     -- can't do much for fixed.
     Fixed rep reg code ->
       return (reg, rep, code)
@@ -479,8 +481,8 @@ getRegister' config plat expr
           (op, imm_code) <- litToImm' lit
           return (Any (floatFormat w) (\dst -> imm_code `snocOL` ANN (text $ show expr) (MOV (OpReg w dst) op)))
 
-        CmmFloat _f W8  -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (ppr expr)
-        CmmFloat _f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (ppr expr)
+        CmmFloat _f W8  -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (pdoc plat expr)
+        CmmFloat _f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (pdoc plat expr)
         CmmFloat f W32 -> do
           let word = castFloatToWord32 (fromRational f) :: Word32
               half0 = fromIntegral (fromIntegral word :: Word16)
@@ -505,8 +507,8 @@ getRegister' config plat expr
                                                       , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half3) SLSL 48)
                                                       , MOV (OpReg W64 dst) (OpReg W64 tmp)
                                                       ]))
-        CmmFloat _f _w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (ppr expr)
-        CmmVec _ -> pprPanic "getRegister' (CmmLit:CmmVec): " (ppr expr)
+        CmmFloat _f _w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (pdoc plat expr)
+        CmmVec _ -> pprPanic "getRegister' (CmmLit:CmmVec): " (pdoc plat expr)
         CmmLabel _lbl -> do
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit
@@ -528,15 +530,15 @@ getRegister' config plat expr
           (off_r, _off_format, off_code) <- getSomeReg $ CmmLit (CmmInt (fromIntegral off) width)
           return (Any format (\dst -> imm_code `appOL` off_code `snocOL` LDR format (OpReg (formatToWidth format) dst) op `snocOL` ADD (OpReg width dst) (OpReg width dst) (OpReg width off_r)))
 
-        CmmLabelDiffOff _ _ _ _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (ppr expr)
-        CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (ppr expr)
-        CmmHighStackMark -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (ppr expr)
+        CmmLabelDiffOff _ _ _ _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
+        CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
+        CmmHighStackMark -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
     CmmLoad mem rep -> do
       Amode addr addr_code <- getAmode plat mem
       let format = cmmTypeFormat rep
       return (Any format (\dst -> addr_code `snocOL` LDR format (OpReg (formatToWidth format) dst) (OpAddr addr)))
     CmmStackSlot _ _
-      -> pprPanic "getRegister' (CmmStackSlot): " (ppr expr)
+      -> pprPanic "getRegister' (CmmStackSlot): " (pdoc plat expr)
     CmmReg reg
       -> return (Fixed (cmmTypeFormat (cmmRegType plat reg))
                        (getRegisterReg plat reg)
@@ -577,7 +579,7 @@ getRegister' config plat expr
         -- Conversions
         MO_XX_Conv _from to -> swizzleRegisterRep (intFormat to) <$> getRegister e
 
-        _ -> pprPanic "getRegister' (monadic CmmMachOp):" (ppr expr)
+        _ -> pprPanic "getRegister' (monadic CmmMachOp):" (pdoc plat expr)
       where toImm W8 =  (OpImm (ImmInt 7))
             toImm W16 = (OpImm (ImmInt 15))
             toImm W32 = (OpImm (ImmInt 31))
@@ -725,7 +727,7 @@ getRegister' config plat expr
           intOp w (\d x y -> toOL [ SDIV t x y, MSUB d t y x ])
 
         -- Unsigned multiply/divide
-        MO_U_MulMayOflo _w -> unsupported expr
+        MO_U_MulMayOflo _w -> unsupportedP plat expr
         MO_U_Quot w -> intOp w (\d x y -> unitOL $ UDIV d x y)
         MO_U_Rem w  -> withTempIntReg w $ \t ->
           intOp w (\d x y -> toOL [ UDIV t x y, MSUB d t y x ])
@@ -773,13 +775,16 @@ getRegister' config plat expr
 
         -- XXX
 
-        op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ (pprMachOp op) <+> text "in" <+> (ppr expr)
+        op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
     CmmMachOp _op _xs
-      -> pprPanic "getRegister' (variadic CmmMachOp): " (ppr expr)
+      -> pprPanic "getRegister' (variadic CmmMachOp): " (pdoc plat expr)
 
   where
     unsupported :: Outputable a => a -> b
     unsupported op = pprPanic "Unsupported op:" (ppr op)
+
+    unsupportedP :: OutputableP env a => env -> a -> b
+    unsupportedP platform op = pprPanic "Unsupported op:" (pdoc platform op)
 
     is12bit :: Integer -> Bool
     is12bit i = (-1 `shiftL` 11) <= i && i < (1 `shiftL` 11)
@@ -1307,7 +1312,6 @@ genCCall target dest_regs arg_regs bid = do
     -- No mor regs left to pass. Must pass on stack.
     passArguments pack [] [] ((r, format, hint, code_r):args) stackSpace accumRegs accumCode = do
       let w = formatToWidth format
-          -- w = hintToWidth hint
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
           stackCode = code_r `snocOL` (ANN (text $ "Pass argument (size " ++ show w ++ ") on the stack: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
@@ -1316,7 +1320,6 @@ genCCall target dest_regs arg_regs bid = do
     -- Still have fpRegs left, but want to pass a GP argument. Must be passed on the stack then.
     passArguments pack [] fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
       let w = formatToWidth format
-          -- w = hintToWidth hint
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
           stackCode = code_r `snocOL` (ANN (text $ "Pass argument (size " ++ show w ++ ") on the stack: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
@@ -1325,7 +1328,6 @@ genCCall target dest_regs arg_regs bid = do
     -- Still have gpRegs left, but want to pass a FP argument. Must be passed on the stack then.
     passArguments pack gpRegs [] ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isFloatFormat format = do
       let w = formatToWidth format
-          -- w = hintToWidth hint
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
           stackCode = code_r `snocOL` (ANN (text $ "Pass argument (size " ++ show w ++ ") on the stack: " ++ show r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
@@ -1335,8 +1337,12 @@ genCCall target dest_regs arg_regs bid = do
 
     readResults :: [Reg] -> [Reg] -> [LocalReg] -> [Reg]-> InstrBlock -> NatM ([Reg], InstrBlock)
     readResults _ _ [] accumRegs accumCode = return (accumRegs, accumCode)
-    readResults [] _ _ _ _ = pprPanic "genCCall, out of gp registers when reading results" (ppr target)
-    readResults _ [] _ _ _ = pprPanic "genCCall, out of fp registers when reading results" (ppr target)
+    readResults [] _ _ _ _ = do
+      platform <- getPlatform
+      pprPanic "genCCall, out of gp registers when reading results" (pdoc platform target)
+    readResults _ [] _ _ _ = do
+      platform <- getPlatform
+      pprPanic "genCCall, out of fp registers when reading results" (pdoc platform target)
     readResults (gpReg:gpRegs) (fpReg:fpRegs) (dst:dsts) accumRegs accumCode = do
       -- gp/fp reg -> dst
       platform <- getPlatform
