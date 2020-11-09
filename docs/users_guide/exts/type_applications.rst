@@ -308,7 +308,7 @@ a GADT data constructor as in the following example::
 In this example, the case in ``test``` is binding an existential variable introduced
 by ``Foo`` that otherwise could not be named and used.
 
-It's possible to bind variables to any part of the type arguments to a constructor though,
+It's possible to bind variables to any part of the type arguments to a constructor;
 there is no need for them to be existential. In addition, it's possible to "match" against
 part of the type argument using type constructors.
 
