@@ -409,7 +409,7 @@ cvtDec (TH.PatSynD nm args dir pat)
        ; returnJustL $ Hs.ValD noExtField $ PatSynBind noExtField $
            PSB noExtField nm' args' pat' dir' }
   where
-    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon <$> mapM vNameL args
+    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon noTypeArgs <$> mapM vNameL args
     cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameL a1 <*> vNameL a2
     cvtArgs (TH.RecordPatSyn sels)
       = do { sels' <- mapM vNameL sels
@@ -578,7 +578,7 @@ cvtConstr :: TH.Con -> CvtM (LConDecl GhcPs)
 cvtConstr (NormalC c strtys)
   = do  { c'   <- cNameL c
         ; tys' <- mapM cvt_arg strtys
-        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon (map hsLinear tys')) }
+        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon noTypeArgs (map hsLinear tys')) }
 
 cvtConstr (RecC c varstrtys)
   = do  { c'    <- cNameL c
@@ -1292,12 +1292,14 @@ cvtp (UnboxedSumP p alt arity)
                        = do { p' <- cvtPat p
                             ; unboxedSumChecks alt arity
                             ; return $ SumPat noExtField p' alt arity }
-cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
+cvtp (ConP s ts ps)    = do { s' <- cNameL s
+                            ; ps' <- cvtPats ps
+                            ; ts' <- mapM cvtType ts
                             ; let pps = map (parenthesizePat appPrec) ps'
                             ; return $ ConPat
                                 { pat_con_ext = noExtField
                                 , pat_con = s'
-                                , pat_args = PrefixCon pps
+                                , pat_args = PrefixCon (map mkHsPatSigType ts') pps
                                 }
                             }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
