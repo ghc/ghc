@@ -72,7 +72,7 @@ import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
-import Data.Void                  ( Void )
+import Data.Void                  ( Void, absurd )
 import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
@@ -596,7 +596,7 @@ class HasType a where
   getTypeNode :: a -> HieM [HieAST Type]
 
 instance ToHie Void where
-  toHie _ = return []
+  toHie v = absurd v
 
 instance (ToHie a) => ToHie [a] where
   toHie = concatMapM toHie
