@@ -17,7 +17,7 @@ spliceExp2 :: [Int]
 spliceExp2 = $(conE '[])
 
 splicePat1 :: (Int, Int) -> ()
-splicePat1 $(conP '(,) [litP (integerL 1), litP (integerL 1)]) = ()
+splicePat1 $(conP '(,) [] [litP (integerL 1), litP (integerL 1)]) = ()
 
 splicePat2 :: [Int] -> ()
-splicePat2 $(conP '[] []) = ()
+splicePat2 $(conP '[] [] []) = ()

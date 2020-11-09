@@ -3943,6 +3943,7 @@ Result works fine, but it may eventually bite us.
 
 tcHsPatSigType :: UserTypeCtxt
                -> HsPatSigType GhcRn          -- The type signature
+               -> ContextKind                -- What kind is expected
                -> TcM ( [(Name, TcTyVar)]     -- Wildcards
                       , [(Name, TcTyVar)]     -- The new bit of type environment, binding
                                               -- the scoped type variables
@@ -3957,6 +3958,7 @@ tcHsPatSigType :: UserTypeCtxt
 tcHsPatSigType ctxt
   (HsPS { hsps_ext  = HsPSRn { hsps_nwcs = sig_wcs, hsps_imp_tvs = sig_ns }
         , hsps_body = hs_ty })
+  ctxt_kind
   = addSigCtxt ctxt hs_ty $
     do { sig_tkv_prs <- mapM new_implicit_tv sig_ns
        ; mode <- mkHoleMode TypeLevel HM_Sig
@@ -3967,7 +3969,7 @@ tcHsPatSigType ctxt
                  -- and c.f #16033
                bindNamedWildCardBinders sig_wcs $ \ wcs ->
                tcExtendNameTyVarEnv sig_tkv_prs $
-               do { ek     <- newOpenTypeKind
+               do { ek     <- newExpectedKind ctxt_kind
                   ; sig_ty <- tc_lhs_type mode hs_ty ek
                   ; return (wcs, sig_ty) }
 
