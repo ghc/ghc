@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE ViewPatterns         #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -45,7 +46,7 @@ module GHC.Hs.Type (
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
-        HsConDetails(..),
+        HsConDetails(..), noTypeArgs,
 
         FieldOcc(..), LFieldOcc, mkFieldOcc,
         AmbiguousFieldOcc(..), mkAmbiguousFieldOcc,
@@ -101,10 +102,11 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc ( count )
+import GHC.Parser.Annotation
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
-import GHC.Parser.Annotation
+import Data.Void
 
 {-
 ************************************************************************
@@ -409,21 +411,23 @@ emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 
 -- | Haskell Implicit Binders
 data HsImplicitBndrs pass thing   -- See Note [HsType binders]
-  = HsIB { hsib_ext  :: XHsIB pass thing -- after renamer: [Name]
-                                         -- Implicitly-bound kind & type vars
-                                         -- Order is important; see
-                                         -- Note [Ordering of implicit variables]
-                                         -- in GHC.Rename.HsType
-
-         , hsib_body :: thing            -- Main payload (type or list of types)
-    }
+  = HsIB
+      { hsib_ext  :: XHsIB pass thing
+        -- ^ after renamer: [Name]
+        -- Implicitly-bound kind & type vars
+        -- Order is important; see
+        -- Note [Ordering of implicit variables]
+        -- in GHC.Rename.HsType
+      , hsib_body :: thing
+        -- ^ Main payload (type or list of types)
+      }
   | XHsImplicitBndrs !(XXHsImplicitBndrs pass thing)
 
-type instance XHsIB              GhcPs _ = NoExtField
-type instance XHsIB              GhcRn _ = [Name]
-type instance XHsIB              GhcTc _ = [Name]
+type instance XHsIB GhcPs _ = NoExtField
+type instance XHsIB GhcRn _ = [Name]
+type instance XHsIB GhcTc _ = [Name]
 
-type instance XXHsImplicitBndrs  (GhcPass _) _ = NoExtCon
+type instance XXHsImplicitBndrs (GhcPass _) _ = NoExtCon
 
 -- | Haskell Wildcard Binders
 data HsWildCardBndrs pass thing
@@ -441,11 +445,18 @@ data HsWildCardBndrs pass thing
     }
   | XHsWildCardBndrs !(XXHsWildCardBndrs pass thing)
 
-type instance XHsWC              GhcPs b = NoExtField
-type instance XHsWC              GhcRn b = [Name]
-type instance XHsWC              GhcTc b = [Name]
+instance IsPass p => Functor (HsWildCardBndrs (GhcPass p)) where
+  fmap f (HsWC { hswc_ext = x, hswc_body = body })
+    = case ghcPass @p of
+        GhcPs -> HsWC { hswc_ext = x, hswc_body = f body }
+        GhcRn -> HsWC { hswc_ext = x, hswc_body = f body }
+        GhcTc -> HsWC { hswc_ext = x, hswc_body = f body }
 
-type instance XXHsWildCardBndrs  (GhcPass _) b = NoExtCon
+type instance XHsWC GhcPs _ = NoExtField
+type instance XHsWC GhcRn _ = [Name]
+type instance XHsWC GhcTc _ = [Name]
+
+type instance XXHsWildCardBndrs (GhcPass _) _ = NoExtCon
 
 -- | Types that can appear in pattern signatures, as well as the signatures for
 -- term-level binders in RULES.
@@ -1118,17 +1129,21 @@ instance OutputableBndrId p
 -- a separate data type entirely (see 'HsConDeclGADTDetails' in
 -- "GHC.Hs.Decls"). This is because GADT constructors cannot be declared with
 -- infix syntax, unlike the concepts above (#18844).
-data HsConDetails arg rec
-  = PrefixCon [arg]             -- C p1 p2 p3
+data HsConDetails tyarg arg rec
+  = PrefixCon [tyarg] [arg]     -- C @t1 @t2 p1 p2 p3
   | RecCon    rec               -- C { x = p1, y = p2 }
   | InfixCon  arg arg           -- p1 `C` p2
   deriving Data
 
-instance (Outputable arg, Outputable rec)
-         => Outputable (HsConDetails arg rec) where
-  ppr (PrefixCon args) = text "PrefixCon" <+> ppr args
-  ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
-  ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
+-- | An empty list that can be used to indicate that there are no type arguments allowed in cases where HsConDetails is applied to Void.
+noTypeArgs :: [Void]
+noTypeArgs = []
+
+instance (Outputable tyarg, Outputable arg, Outputable rec)
+         => Outputable (HsConDetails tyarg arg rec) where
+  ppr (PrefixCon tyargs args) = text "PrefixCon:" <+> hsep (map (\t -> text "@" <> ppr t) tyargs) <+> ppr args
+  ppr (RecCon rec)            = text "RecCon:" <+> ppr rec
+  ppr (InfixCon l r)          = text "InfixCon:" <+> ppr [l, r]
 
 {-
 Note [ConDeclField passs]

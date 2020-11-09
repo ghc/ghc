@@ -53,6 +53,7 @@ import GHC.Builtin.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
+import GHC.Core.Type
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
@@ -66,7 +67,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
-import Control.Monad  ( when )
+import Control.Monad
 import GHC.Data.List.SetOps ( getNth )
 
 {-
@@ -554,7 +555,7 @@ Fortunately that's what matchExpectedFunTySigma returns anyway.
 
 ------------------------
 -- Data constructors
-  ConPat NoExtField con arg_pats ->
+  ConPat _ con arg_pats ->
     tcConPat penv con pat_ty arg_pats thing_inside
 
 ------------------------
@@ -736,7 +737,7 @@ tcPatSig :: Bool                    -- True <=> pattern binding
                  HsWrapper)         -- Coercion due to unification with actual ty
                                     -- Of shape:  res_ty ~ sig_ty
 tcPatSig in_pat_bind sig res_ty
- = do  { (sig_wcs, sig_tvs, sig_ty) <- tcHsPatSigType PatSigCtxt sig
+ = do  { (sig_wcs, sig_tvs, sig_ty) <- tcHsPatSigType PatSigCtxt sig OpenKind
         -- sig_tvs are the type variables free in 'sig',
         -- and not already in scope. These are the ones
         -- that should be brought into scope
@@ -881,19 +882,15 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys)
         ; checkExistentials ex_tvs all_arg_tys penv
 
-        ; tenv <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
+        ; tenv1 <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
                   -- NB: Do not use zipTvSubst!  See #14154
                   -- We want to create a well-kinded substitution, so
                   -- that the instantiated type is well-kinded
 
-        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv ex_tvs
+        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv1 ex_tvs
                      -- Get location from monad, not from ex_tvs
 
-        ; let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
-              -- pat_ty' is type of the actual constructor application
-              -- pat_ty' /= pat_ty iff coi /= IdCo
-
-              arg_tys' = substScaledTys tenv arg_tys
+        ; let arg_tys' = substScaledTys tenv arg_tys
               pat_mult = scaledMult pat_ty_scaled
               arg_tys_scaled = map (scaleScaled pat_mult) arg_tys'
 
@@ -910,7 +907,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
           then do { -- The common case; no class bindings etc
                     -- (see Note [Arrows and patterns])
                     (arg_pats', res) <- tcConArgs (RealDataCon data_con) arg_tys_scaled
-                                                  penv arg_pats thing_inside
+                                                  tenv penv arg_pats thing_inside
                   ; let res_pat = ConPat { pat_con = header
                                          , pat_args = arg_pats'
                                          , pat_con_ext = ConPatTc
@@ -946,7 +943,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         ; given <- newEvVars theta'
         ; (ev_binds, (arg_pats', res))
              <- checkConstraints skol_info ex_tvs' given $
-                tcConArgs (RealDataCon data_con) arg_tys_scaled penv arg_pats thing_inside
+                tcConArgs (RealDataCon data_con) arg_tys_scaled tenv penv arg_pats thing_inside
 
         ; let res_pat = ConPat
                 { pat_con   = header
@@ -1005,7 +1002,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; traceTc "checkConstraints {" Outputable.empty
         ; (ev_binds, (arg_pats', res))
              <- checkConstraints skol_info ex_tvs' prov_dicts' $
-                tcConArgs (PatSynCon pat_syn) arg_tys_scaled penv arg_pats thing_inside
+                tcConArgs (PatSynCon pat_syn) arg_tys_scaled tenv penv arg_pats thing_inside
 
         ; traceTc "checkConstraints }" (ppr ev_binds)
         ; let res_pat = ConPat { pat_con   = L con_span $ PatSynCon pat_syn
@@ -1111,17 +1108,32 @@ Suppose (coi, tys) = matchExpectedConType data_tc pat_ty
    error messages; it's a purely internal thing
 -}
 
-tcConArgs :: ConLike -> [Scaled TcSigmaType]
+tcConArgs :: ConLike
+          -> [Scaled TcSigmaType]
+          -> TCvSubst            -- Instantiating substitution for constructor type
           -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
-
-tcConArgs con_like arg_tys penv con_args thing_inside = case con_args of
-  PrefixCon arg_pats -> do
+tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
+  PrefixCon type_args arg_pats -> do
         { checkTc (con_arity == no_of_args)     -- Check correct arity
                   (arityErr (text "constructor") con_like con_arity no_of_args)
+
+        ; let con_binders = conLikeUserTyVarBinders con_like
+        ; checkTc (type_args `leLength` con_binders)
+                  (conTyArgArityErr con_like (length con_binders) (length type_args))
+
         ; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
-        ; (arg_pats', res) <- tcMultiple tcConArg penv pats_w_tys
-                                              thing_inside
-        ; return (PrefixCon arg_pats', res) }
+        ; (type_args', (arg_pats', res))
+            <- tcMultiple tcConTyArg penv type_args $
+               tcMultiple tcConArg penv pats_w_tys thing_inside
+
+          -- This unification is straight from Figure 7 of
+          -- "Type Variables in Patterns", Haskell'18
+        ; _ <- zipWithM (unifyType Nothing) type_args' (substTyVars tenv $
+                                                        binderVars con_binders)
+          -- OK to drop coercions here. These unifications are all about
+          -- guiding inference based on a user-written type annotation
+
+        ; return (PrefixCon type_args arg_pats', res) }
     where
       con_arity  = conLikeArity con_like
       no_of_args = length arg_pats
@@ -1176,6 +1188,22 @@ tcConArgs con_like arg_tys penv con_args thing_inside = case con_args of
           -- dataConFieldLabels will be empty (and each field in the pattern
           -- will generate an error below).
 
+tcConTyArg :: Checker (HsPatSigType GhcRn) TcType
+tcConTyArg penv rn_ty thing_inside
+  = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt rn_ty AnyKind
+               -- AnyKind is a bit suspect: it really should be the kind gotten
+               -- from instantiating the constructor type. But this would be
+               -- hard to get right, because earlier type patterns might influence
+               -- the kinds of later patterns. In any case, it all gets checked
+               -- by the calls to unifyType in tcConArgs, which will also unify
+               -- kinds.
+       ; when (not (null sig_ibs) && inPatBind penv) $
+           addErr (text "Binding type variables is not allowed in pattern bindings")
+       ; result <- tcExtendNameTyVarEnv sig_wcs $
+                   tcExtendNameTyVarEnv sig_ibs $
+                   thing_inside
+       ; return (arg_ty, result) }
+
 tcConArg :: Checker (LPat GhcRn, Scaled TcSigmaType) (LPat GhcTc)
 tcConArg penv (arg_pat, Scaled arg_mult arg_ty)
   = tc_lpat (Scaled arg_mult (mkCheckExpType arg_ty)) penv arg_pat
@@ -1196,6 +1224,14 @@ addDataConStupidTheta data_con inst_tys
          -- NB: inst_tys can be longer than the univ tyvars
          --     because the constructor might have existentials
     inst_theta = substTheta tenv stupid_theta
+
+conTyArgArityErr :: ConLike
+                 -> Int   -- expected # of arguments
+                 -> Int   -- actual # of arguments
+                 -> SDoc
+conTyArgArityErr con_like expected_number actual_number
+  = text "Too many type arguments in constructor pattern for" <+> quotes (ppr con_like) $$
+    text "Expected no more than" <+> ppr expected_number <> semi <+> text "got" <+> ppr actual_number
 
 {-
 Note [Arrows and patterns]
