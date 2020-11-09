@@ -655,14 +655,10 @@ pprCallishMachOp mo = text (show mo)
 
 callishMachOpHints :: CallishMachOp -> ([ForeignHint], [ForeignHint])
 callishMachOpHints op = case op of
-  --  void * memcpy(void *restrict dst, const void *restrict src, size_t n);
-  MO_Memcpy _  -> ([], [AddrHint, AddrHint, NoHint W64])
-  -- void * memset(void *b, int c, size_t len);
-  MO_Memset _  -> ([], [AddrHint, SignedHint W32, NoHint W64])
-  -- void * memmove(void *dst, const void *src, size_t len);
-  MO_Memmove _ -> ([], [AddrHint, AddrHint, NoHint W64])
-  --  int memcmp(const void *s1, const void *s2, size_t n);
-  MO_Memcmp _  -> ([], [AddrHint, AddrHint, NoHint W64])
+  MO_Memcpy _  -> ([], [AddrHint,AddrHint,NoHint])
+  MO_Memset _  -> ([], [AddrHint,NoHint,NoHint])
+  MO_Memmove _ -> ([], [AddrHint,AddrHint,NoHint])
+  MO_Memcmp _  -> ([], [AddrHint, AddrHint, NoHint])
   _            -> ([],[])
   -- empty lists indicate NoHint
 
