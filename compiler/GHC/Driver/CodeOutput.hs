@@ -353,11 +353,12 @@ to a position in the source. The prime example is being able to map a THUNK to
 a specific place in the source program, the mapping is usually quite precise because
 a fresh info table is created for each distinct THUNK.
 
-There are two parts to the implementation
+There are three parts to the implementation
 
-1. The SourceNote information is used in order to give a source location to
+1. In CoreToStg, the SourceNote information is used in order to give a source location to
 some specific closures.
-2. During code generation, a mapping from the info table to the statically
+2. In StgToCmm, the actually used info tables are recorded.
+3. During code generation, a mapping from the info table to the statically
 determined location is emitted which can then be queried at runtime by
 various tools.
 
@@ -373,6 +374,9 @@ During the CoreToStg phase, this map is populated whenever something is turned i
 a StgRhsClosure or an StgConApp. The current source position is recorded
 depending on the location indicated by the surrounding SourceNote.
 
+The functions which add information to the map are `recordStgIdPosition` and
+`incDc`.
+
 When the -fdistinct-constructor-tables` flag is turned on then every
 usage of a data constructor gets its own distinct info table. This is orchestrated
 in `coreToStgExpr` where an incrementing number is used to distinguish each
@@ -382,10 +386,16 @@ occurrence of a data constructor.
 
 The info tables which are actually used in the generated program are recorded during the
 conversion from STG to Cmm. The used info tables are recorded in the `emitProc` function.
+All the used info tables are recorded in the `cgs_used_info` field. This step
+is necessary because when the information about names is collected in the previous
+phase it's unpredictable about which names will end up needing info tables. If
+you don't record which ones are actually used then you end up generating code
+which references info tables which don't exist.
 
 -- Code Generation
 
-After the mapping has been collected during compilation, a C stub is generated which
+The output of these two phases is combined together during code generation.
+A C stub is generated which
 creates the static map from info table pointer to the information about where that
 info table was created from. This is created by `ipInitCode` in the same manner as a
 C stub is generated for cost centres.
