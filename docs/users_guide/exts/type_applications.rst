@@ -350,7 +350,7 @@ which is more restricted than what it would be without the application::
 
 For more information and detail regarding type applications in patterns, see the paper
 `Type variables in patterns <https://arxiv.org/pdf/1806.03476>`__ by Eisenberg, Breitner
-and Jones. Relative to that paper, the implementation in GHC for now at least makes one
+and Peyton Jones. Relative to that paper, the implementation in GHC for now at least makes one
 additional conservative restriction, that type variables occurring in patterns must not
 already be in scope, and so are always new variables that only bind whatever type is
 matched, rather than ever referring to a variable from an outer scope. Type wildcards
