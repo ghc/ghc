@@ -1018,6 +1018,11 @@ mkTyConApp tycon tys
   -- avoid reboxing every time `mkTyConApp` is called.
   = ASSERT2( null tys, ppr tycon $$ ppr tys )
     manyDataConTy
+  -- See Note [Prefer Type over TYPE 'LiftedPtrRep] in GHC.BuiltIn.Types.Prim.
+  | tycon == tYPETyCon
+  , [rep] <- tys
+  = tYPE rep
+  -- The catch-all case
   | otherwise
   = TyConApp tycon tys
 
