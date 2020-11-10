@@ -52,6 +52,7 @@ module GHC.Core.TyCo.Rep (
         mkVisFunTyMany, mkVisFunTysMany,
         mkInvisFunTyMany, mkInvisFunTysMany,
         mkTyConApp,
+        tYPE,
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -90,8 +91,9 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import GHC.Builtin.Names ( liftedTypeKindTyConKey, manyDataConKey )
-import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, manyDataConTy )
+import GHC.Builtin.Names ( liftedTypeKindTyConKey, liftedRepDataConKey, manyDataConKey, tYPETyConKey )
+import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, liftedTypeKind, manyDataConTy )
+import {-# SOURCE #-} GHC.Builtin.Types.Prim ( tYPETyCon )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import GHC.Types.Unique ( hasKey )
 import GHC.Utils.Outputable
@@ -1018,13 +1020,45 @@ mkTyConApp tycon tys
   -- avoid reboxing every time `mkTyConApp` is called.
   = ASSERT2( null tys, ppr tycon $$ ppr tys )
     manyDataConTy
-  -- See Note [Prefer Type over TYPE 'LiftedPtrRep] in GHC.BuiltIn.Types.Prim.
-  | tycon == tYPETyCon
+  -- See Note [Prefer Type over TYPE 'LiftedPtrRep].
+  | tycon `hasKey` tYPETyConKey
   , [rep] <- tys
   = tYPE rep
   -- The catch-all case
   | otherwise
   = TyConApp tycon tys
+
+-- Note [Prefer Type over TYPE 'LiftedPtrRep]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The Core of nearly any program will have numerous occurrences of
+-- @TYPE 'LiftedPtrRep@ floating about. Consequently, we try hard to ensure
+-- that operations on such types are efficient:
+--
+--   * Instead of representing the lifted kind as
+--     @TyConApp tYPETyCon [liftedRepDataCon]@ we rather prefer to
+--     use the 'GHC.Types.Type' type synonym (available in GHC as
+--     'TysPrim.liftedTypeKind'). Note only is this a smaller AST but it also
+--     guarantees sharing on the heap.
+--
+--   * To avoid allocating 'TyConApp' constructors 'TysPrim.tYPE'
+--     catches the lifted case and uses `liftedTypeKind` instead of building an
+--     application.
+--
+--   * Similarly, 'Type.mkTyConApp' catches applications of TYPE and
+--     handles them using 'TysPrim.tYPE', ensuring that it benefits from the
+--     optimisation described above.
+--
+--   * Since 'liftedTypeKind' is a nullary type synonym application,
+--     it benefits from the optimisation described in Note [Comparing nullary
+--     type synonyms] in "GHC.Core.Type".
+
+-- | Given a RuntimeRep, applies TYPE to it.
+-- see Note [TYPE and RuntimeRep]
+tYPE :: Type -> Type
+tYPE (TyConApp tc [])
+  | tc `hasKey` liftedRepDataConKey = liftedTypeKind  -- TYPE 'LiftedPtrRep
+tYPE rr = TyConApp tYPETyCon [rr]
 
 -- This is a single, global definition of the type `Type`
 -- Defined here so it is only allocated once.
