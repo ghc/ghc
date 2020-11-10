@@ -364,18 +364,17 @@ faster. This doesn't seem quite worth it, yet.
 
 Note [flatten_exact_fam_app_fully performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The refactor of GRefl seems to cause performance trouble for T9872x:
-the allocation of flatten_exact_fam_app_fully_performance
-increased. See note [Generalized reflexive coercion] in
-GHC.Core.TyCo.Rep for more information about GRefl and #15192 for the
-current state.
-
-The explicit pattern match in homogenise_result helps with T9872a, b, c.
-
-Still, it increases the expected allocation of T9872d by ~2%.
-
-TODO: a step-by-step replay of the refactor to analyze the performance.
-
+Once we've got a flat rhs, we extend the flat-cache to record
+the result. Doing so can save lots of work when the same redex shows up more
+than once. Note that we record the link from the redex all the way to its
+*final* value, not just the single step reduction. Interestingly, adding to the
+flat-cache for the first reduction *doubles* the allocations
+for the T9872a test. However, using the flat-cache in
+the later reduction is a similar gain. I (Richard E) don't currently
+(Dec '14 nor Nov '20) have any knowledge as to *why* these facts are true.
+Perhaps the first use of the flat-cache doesn't add much, because we didn't
+need to reduce in the arguments (and instance lookup is similar to cache
+lookup).
 -}
 
 {-# INLINE flatten_args_tc #-}
@@ -766,7 +765,7 @@ flatten_fam_app tc tys  -- Can be over-saturated
          ; flatten_app_ty_args xi1 co1 tys_rest }
 
 -- the [TcType] exactly saturate the TyCon
--- See note [flatten_exact_fam_app_fully performance]
+-- See Note [flatten_exact_fam_app_fully performance]
 flatten_exact_fam_app_fully :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
 flatten_exact_fam_app_fully tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
@@ -774,14 +773,15 @@ flatten_exact_fam_app_fully tc tys
        -- Step 1. Try to reduce without reducing arguments first.
        ; result1 <- try_to_reduce tc tys
        ; case result1 of
-         { Just (co, xi) -> finish (xi, co)
+         { Just (co, xi) -> do { (xi2, co2) <- bumpDepth $ flatten_one xi
+                               ; return (xi2, co2 `mkTcTransCo` co) }
          ; Nothing ->
 
         -- That didn't work. So reduce the arguments.
     do { (xis, cos, kind_co) <- flatten_args_tc tc (repeat Nominal) tys
            -- kind_co :: tcTypeKind(F xis) ~N tcTypeKind(F tys)
 
-       ; eq_rel  <- getEqRel
+       ; eq_rel <- getEqRel
        ; let role    = eqRelRole eq_rel
              args_co = mkTyConAppCo role tc cos
            -- args_co :: F xis ~r F tys
@@ -791,14 +791,7 @@ flatten_exact_fam_app_fully tc tys
                --   assume co :: xi ~r F xis, co is homogeneous
                --   then xi' :: tcTypeKind(F tys)
                --   and co' :: xi' ~r F tys, which is homogeneous
-             homogenise xi co = (casted_xi, final_co)
-               where
-                 casted_xi = xi `mkCastTy` kind_co
-                   -- casted_xi :: tcTypeKind(F tys)
-                 homo_co   = mkTcGReflLeftCo role xi kind_co
-                   -- homo_co :: casted_xi ~r xi
-
-                 final_co  = homo_co `mkTcTransCo` co `mkTcTransCo` args_co
+             homogenise xi co = homogenise_result xi (co `mkTcTransCo` args_co) role kind_co
 
        ; result2 <- liftTcS $ lookupFamAppInert tc xis
        ; flavour <- getFlavour
@@ -807,7 +800,8 @@ flatten_exact_fam_app_fully tc tys
              -- co :: F xis ~ir xi
 
              | fr `eqCanRewriteFR` (flavour, eq_rel) ->
-                 do { traceFlat "flatten/flat-cache hit" (ppr tc <+> ppr xis $$ ppr xi)
+                 do { traceFlat "rewrite family application with inert"
+                                (ppr tc <+> ppr xis $$ ppr xi)
                     ; finish (homogenise xi downgraded_co) }
              where
                inert_role    = eqRelRole inert_eq_rel
@@ -832,7 +826,10 @@ flatten_exact_fam_app_fully tc tys
                          ; let final_co = fully_co `mkTcTransCo` co
                          ; eq_rel <- getEqRel
                          ; flavour <- getFlavour
-                         ; when (eq_rel == NomEq && flavour /= Derived) $ -- the cache only wants Nominal eqs
+                         ; when (eq_rel == NomEq && flavour /= Derived) $
+                             -- the cache only wants Nominal eqs
+                             -- and Wanteds can rewrite Deriveds; the cache
+                             -- has only Givens
                            liftTcS $ extendFamAppCache tc tys (final_co, fully)
                          ; return (fully, final_co) }
 
@@ -846,210 +843,19 @@ try_to_reduce tc tys
   where
     downgrade :: Maybe (TcCoercionN, TcType) -> FlatM (Maybe (TcCoercion, TcType))
     downgrade Nothing = return Nothing
-    downgrade (Just (co, xi))
+    downgrade result@(Just (co, xi))
       = do { traceFlat "Eager T.F. reduction success" $
              vcat [ ppr tc, ppr tys, ppr xi
                   , ppr co <+> dcolon <+> ppr (coercionKind co)
                   ]
-           ; role <- getRole
-           ; return (Just (tcDowngradeRole role Nominal co, xi)) }
+           ; eq_rel <- getEqRel
+              -- manually doing it this way avoids allocation in the vastly
+              -- common NomEq case
+           ; case eq_rel of
+               NomEq  -> return result
+               ReprEq -> return (Just (mkSubCo co, xi)) }
 
-{- "RAE"
-  -- See Note [Reduce type family applications eagerly]
-     -- the following tcTypeKind should never be evaluated, as it's just used in
-     -- casting, and casts by refl are dropped
-  = do { mOut <- try_to_reduce_nocache tc tys
-       ; case mOut of
-           Just out -> pure out
-           Nothing -> do
-               { -- First, flatten the arguments
-               ; (xis, cos, kind_co)
-                   <- setEqRel NomEq $  -- just do this once, instead of for
-                                        -- each arg
-                      flatten_args_tc tc (repeat Nominal) tys
-                      -- kind_co :: tcTypeKind(F xis) ~N tcTypeKind(F tys)
-               ; eq_rel   <- getEqRel
-               ; cur_fr <- getFlavourRole
-               ; let role   = eqRelRole eq_rel
-                     ret_co = mkTyConAppCo role tc cos
-                      -- ret_co :: F xis ~ F tys; might be heterogeneous
-
-                -- Now, look in the inerts and the cache
-               ; mb_ct <- liftTcS $ lookupFamApp tc xis
-               ; dflags <- getDynFlags
-               ; loc <- getLoc
-               ; case mb_ct of
-                   Just (co, rhs_ty, inert_fr@(_, inert_eq_rel))  -- co :: F xis ~ rhs_ty
-                     | inert_fr `eqCanRewriteFR` cur_fr
-                        -- See Note [Runaway Derived rewriting]
-                     , let reduction_ok | (Derived, _) <- cur_fr
-                                        = not (subGoalDepthExceeded dflags
-                                                 (bumpSubGoalDepth (ctLocDepth loc)))
-                                        | otherwise
-                                        = True
-                     , reduction_ok
-                     ->  -- Usable hit in the flat-cache
-                        do { traceFlat "flatten/flat-cache hit" $
-                               (ppr tc <+> ppr xis $$ ppr rhs_ty)
-                           ; (rhs_xi, rhs_co) <- flatten_one rhs_ty
-                                  -- There may be more work to do on the rhs:
-                                  -- flatten it
-                                  -- rhs_co :: rhs_xi ~ rhs_ty
-                           ; let xi  = rhs_xi `mkCastTy` kind_co
-                                 co' = mkTcCoherenceLeftCo role rhs_xi kind_co rhs_co
-                                       `mkTransCo`
-                                       tcDowngradeRole role (eqRelRole inert_eq_rel)
-                                                            (mkTcSymCo co)
-                                       `mkTransCo` ret_co
-                           ; return (xi, co')
-                           }
-
-
-                   -- Try to reduce the family application right now
-                   -- See Note [Reduce type family applications eagerly]
-                   _ -> do { mOut <- try_to_reduce tc
-                                                   xis
-                                                   kind_co
-                                                   (`mkTransCo` ret_co)
-                           ; case mOut of
-                               Just out -> pure out
-                               Nothing -> do
-                                 { traceFlat "flatten/flat-cache miss" $
-                                     ppr tc <+> ppr xis
-                                 ; let uncasted_ty = mkTyConApp tc xis
-                                       casted_ty   = uncasted_ty `mkCastTy` kind_co
-                                       final_co    = mkTcCoherenceLeftCo role uncasted_ty
-                                                       kind_co ret_co
-                                 ; return ( casted_ty, final_co )
-                                 }
-                           }
-               }
-        }
-
-  where
-
-    -- try_to_reduce and try_to_reduce_nocache (below) could be unified into
-    -- a more general definition, but it was observed that separating them
-    -- gives better performance (lower allocation numbers in T9872x).
-
-    try_to_reduce :: TyCon   -- F, family tycon
-                  -> [Type]  -- args, not necessarily flattened
-                  -> CoercionN -- kind_co :: tcTypeKind(F args) ~N
-                               --            tcTypeKind(F orig_args)
-                               -- where
-                               -- orig_args is what was passed to the outer
-                               -- function
-                  -> (   Coercion     -- :: (xi |> kind_co) ~ F args
-                      -> Coercion )   -- what to return from outer function
-                  -> FlatM (Maybe (Xi, Coercion))
-    try_to_reduce tc tys kind_co update_co
-      = do { checkStackDepth (mkTyConApp tc tys)
-           ; mb_match <- liftTcS $ matchFam tc tys
-           ; case mb_match of
-                 -- NB: norm_co will always be homogeneous. All type families
-                 -- are homogeneous.
-               Just (norm_co, norm_ty)
-                 -> do { traceFlat "Eager T.F. reduction success" $
-                         vcat [ ppr tc, ppr tys, ppr norm_ty
-                              , ppr norm_co <+> dcolon
-                                            <+> ppr (coercionKind norm_co)
-                              ]
-                       ; (xi, final_co) <- bumpDepth $ flatten_one norm_ty
-                       ; eq_rel <- getEqRel
-                       ; let co = maybeTcSubCo eq_rel norm_co
-                                   `mkTransCo` mkSymCo final_co
-                           -- NB: only extend cache with nominal equalities
-                       ; when (eq_rel == NomEq) $
-                         liftTcS $ extendFamAppCache tc tys (co, xi)
-                       ; let role = eqRelRole eq_rel
-                             xi' = xi `mkCastTy` kind_co
-                             co' = update_co $
-                                   mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
-                       ; return $ Just (xi', co') }
-               Nothing -> pure Nothing }
-
-    try_to_reduce_nocache :: TyCon   -- F, family tycon
-                          -> [Type]  -- args, not necessarily flattened
-                          -> FlatM (Maybe (Xi, Coercion))
-    try_to_reduce_nocache tc tys
-      = do { checkStackDepth (mkTyConApp tc tys)
-           ; mb_match <- liftTcS $ matchFam tc tys
-           ; case mb_match of
-                 -- NB: norm_co will always be homogeneous. All type families
-                 -- are homogeneous.
-               Just (norm_co, norm_ty)
-                 -> do { (xi, final_co) <- bumpDepth $ flatten_one norm_ty
-                       ; eq_rel <- getEqRel
-                       ; let co  = mkSymCo (maybeTcSubCo eq_rel norm_co
-                                            `mkTransCo` mkSymCo final_co)
-                       ; return $ Just (xi, co) }
-               Nothing -> pure Nothing }
--}
-
-{- Note [Reduce type family applications eagerly]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-"RAE": Update Note.
-
-If we come across a type-family application like (Append (Cons x Nil) t),
-then, rather than flattening to a skolem etc, we may as well just reduce
-it on the spot to (Cons x t).  This saves a lot of intermediate steps.
-Examples that are helped are tests T9872, and T5321Fun.
-
-Performance testing indicates that it's best to try this *twice*, once
-before flattening arguments and once after flattening arguments.
-Adding the extra reduction attempt before flattening arguments cut
-the allocation amounts for the T9872{a,b,c} tests by half.
-
-An example of where the early reduction appears helpful:
-
-  type family Last x where
-    Last '[x]     = x
-    Last (h ': t) = Last t
-
-  workitem: (x ~ Last '[1,2,3,4,5,6])
-
-Flattening the argument never gets us anywhere, but trying to flatten
-it at every step is quadratic in the length of the list. Reducing more
-eagerly makes simplifying the right-hand type linear in its length.
-
-Testing also indicated that the early reduction should *not* use the
-flat-cache, but that the later reduction *should*. (Although the
-effect was not large.)  Hence the Bool argument to try_to_reduce.  To
-me (SLPJ) this seems odd; I get that eager reduction usually succeeds;
-and if don't use the cache for eager reduction, we will miss most of
-the opportunities for using it at all.  More exploration would be good
-here.
-
-At the end, once we've got a flat rhs, we extend the flatten-cache to record
-the result. Doing so can save lots of work when the same redex shows up more
-than once. Note that we record the link from the redex all the way to its
-*final* value, not just the single step reduction. Interestingly, using the
-flat-cache for the first reduction resulted in an increase in allocations
-of about 3% for the four T9872x tests. However, using the flat-cache in
-the later reduction is a similar gain. I (Richard E) don't currently (Dec '14)
-have any knowledge as to *why* these facts are true.
-
-Note [Runaway Derived rewriting]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-"RAE": Remove. We do occurs-checking now.
-
-Suppose we have
-  [WD] F a ~ T (F a)
-We *don't* want to fall into a hole using that to rewrite a Derived
-  [D] F a ~ Int
-because that produces an unhelpful error about a reduction stack overflow.
-Instead, when we've reached the reduction stack limit on a Derived, just stop.
-Either the program will be accepted if all the Wanteds are solved (good),
-or a Wanted will not be solved, and will be reported (also good).
-
-There is a tiny chance that continuing to try to reduce the Derived would
-yield fruit, and there is no way for the user to know this is the case
-(or to increase the reduction stack limit). But I see no easy way of
-communicating this. Since Deriveds are likely going to be short-lived
-at this point, it's not worth thinking about further.
-
-This arose in typecheck/should_fail/T13320.
-
+{-
 ************************************************************************
 *                                                                      *
              Flattening a type variable
