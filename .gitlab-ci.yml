@@ -53,6 +53,7 @@ ghc-linters:
 .validate-hadrian:
   allow_failure: true
   script:
+    - rm -Rf hadrian; git checkout .
     - git clean -xdf && git submodule foreach git clean -xdf
     - bash .circleci/prepare-system.sh
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
@@ -86,6 +87,7 @@ validate-x86_64-linux-deb8-hadrian:
   variables:
     TEST_TYPE: test
   before_script:
+    - rm -Rf hadrian; git checkout .
     - git clean -xdf && git submodule foreach git clean -xdf
   script:
     - ./boot
@@ -120,6 +122,7 @@ validate-x86_64-darwin:
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
   before_script:
+    - rm -Rf hadrian; git checkout .
     - git clean -xdf && git submodule foreach git clean -xdf
     - python .gitlab/fix-submodules.py
     - git submodule sync --recursive
@@ -148,6 +151,7 @@ validate-x86_64-darwin:
   tags:
     - x86_64-linux
   before_script:
+    - rm -Rf hadrian; git checkout .
     - git clean -xdf && git submodule foreach git clean -xdf
     - python3 .gitlab/fix-submodules.py
     - git submodule sync --recursive
@@ -372,6 +376,7 @@ validate-x86_64-linux-fedora27:
 
 .validate-windows:
   before_script:
+    - rm -Rf hadrian; git checkout .
     - git clean -xdf
     - git submodule foreach git clean -xdf
 
