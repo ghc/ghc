@@ -59,6 +59,13 @@ import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 
 import Data.Char        ( chr, ord )
 
+-- | Should we enable overflow checks for construction functions?
+-- We do this in 32-bit compilers (since the Unique space is quite small on
+-- such platforms) and DEBUG compilers (just in case).
+tagOverflowChecks :: Bool
+tagOverflowChecks = is32Bit || debugIsOn
+  where is32Bit = finiteBitSize (0 :: Int) < 64
+
 {-
 ************************************************************************
 *                                                                      *
@@ -114,8 +121,23 @@ mkUniqueGrimily = MkUnique
 {-# INLINE getKey #-}
 getKey (MkUnique x) = x
 
-incrUnique (MkUnique i) = MkUnique (i + 1)
-stepUnique (MkUnique i) n = MkUnique (i + n)
+incrUnique u@(MkUnique i)
+  | overflowed u r = error $ "incrUnique: Unique overflow: " ++ show i
+  | otherwise      = r
+  where r = MkUnique (i + 1)
+
+stepUnique u@(MkUnique i) n
+  | overflowed u r = error $ "stepUnique: Unique overflow: " ++ show i
+  | otherwise      = r
+  where r = MkUnique (i + n)
+
+overflowed :: Unique -> Unique -> Bool
+overflowed (MkUnique i) (MkUnique i')
+  | tagOverflowChecks
+  = (i .&. tagMask) /= (i' .&. tagMask)
+  | otherwise
+  = False
+{-# INLINE overflowed #-}
 
 mkLocalUnique :: Int -> Unique
 mkLocalUnique i = mkUnique 'X' i
@@ -129,10 +151,14 @@ maxLocalUnique = mkLocalUnique uniqueMask
 -- newTagUnique changes the "domain" of a unique to a different char
 newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
 
--- | How many bits are devoted to the unique index (as opposed to the class
+-- | Mask of the bits devoted to the unique index (as opposed to the class
 -- character).
 uniqueMask :: Int
 uniqueMask = (1 `shiftL` uNIQUE_BITS) - 1
+
+-- | Mask of the bits of the tag character.
+tagMask :: Int
+tagMask = complement uniqueMask
 
 -- pop the Char in the top 8 bits of the Unique(Supply)
 
@@ -145,8 +171,8 @@ mkUnique :: Char -> Int -> Unique       -- Builds a unique from pieces
 mkUnique c i
   = MkUnique (tag .|. bits)
   where
-    tag  = ord c `shiftL` uNIQUE_BITS
-    bits = i .&. uniqueMask
+    !tag  = ord c `shiftL` uNIQUE_BITS
+    !bits = i .&. uniqueMask
 
 unpkUnique (MkUnique u)
   = let
