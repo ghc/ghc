@@ -376,7 +376,6 @@ import qualified GHC.LanguageExtensions as LangExt
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
-
 -- | Used to differentiate the scope an include needs to apply to.
 -- We have to split the include paths to avoid accidentally forcing recursive
 -- includes since -I overrides the system search paths. See #14312.
@@ -3417,6 +3416,7 @@ fFlagsDeps = [
   flagSpec "error-spans"                      Opt_ErrorSpans,
   flagSpec "excess-precision"                 Opt_ExcessPrecision,
   flagSpec "expose-all-unfoldings"            Opt_ExposeAllUnfoldings,
+  flagSpec "expose-internal-symbols"          Opt_ExposeInternalSymbols,
   flagSpec "external-dynamic-refs"            Opt_ExternalDynamicRefs,
   flagSpec "external-interpreter"             Opt_ExternalInterpreter,
   flagSpec "flat-cache"                       Opt_FlatCache,
@@ -4419,7 +4419,13 @@ setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
 
 setDebugLevel :: Maybe Int -> DynP ()
-setDebugLevel mb_n = upd (\dfs -> dfs{ debugLevel = mb_n `orElse` 2 })
+setDebugLevel mb_n =
+  upd (\dfs -> exposeSyms $ dfs{ debugLevel = n })
+  where
+    n = mb_n `orElse` 2
+    exposeSyms
+      | n > 2     = setGeneralFlag' Opt_ExposeInternalSymbols
+      | otherwise = id
 
 data PkgDbRef
   = GlobalPkgDb

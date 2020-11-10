@@ -90,6 +90,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         -- special case for code without info table:
         pprSectionAlign config (Section Text lbl) $$
         pprProcAlignment config $$
+        pprProcLabel config lbl $$
         pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock config top_info) blocks) $$
         (if ncgDwarfEnabled config
@@ -99,6 +100,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
     Just (CmmStaticsRaw info_lbl _) ->
       pprSectionAlign config (Section Text info_lbl) $$
       pprProcAlignment config $$
+      pprProcLabel config lbl $$
       (if platformHasSubsectionsViaSymbols platform
           then pdoc platform (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
@@ -113,6 +115,15 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> pdoc platform (mkDeadStripPreventer info_lbl)
        else empty) $$
       pprSizeDecl platform info_lbl
+
+-- | Output an internal proc label. See Note [Internal proc labels] in CLabel.
+pprProcLabel :: NCGConfig -> CLabel -> SDoc
+pprProcLabel config lbl
+  | ncgExposeInternalSymbols config
+  , Just lbl' <- ppInternalProcLabel (ncgThisModule config) lbl
+  = lbl' <> char ':'
+  | otherwise
+  = empty
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: Platform -> CLabel -> SDoc
