@@ -31,6 +31,7 @@ import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
 
 import GHC.Utils.Misc
+import GHC.Data.Maybe
 import Control.Monad
 import GHC.Utils.Monad ( zipWith3M )
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -748,7 +749,6 @@ so those families can get reduced.
 
 flatten_fam_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
   --   flatten_fam_app            can be over-saturated
-  --   flatten_exact_fam_app       is exactly saturated
   --   flatten_exact_fam_app_fully lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
 flatten_fam_app tc tys  -- Can be over-saturated
@@ -769,6 +769,92 @@ flatten_fam_app tc tys  -- Can be over-saturated
 -- See note [flatten_exact_fam_app_fully performance]
 flatten_exact_fam_app_fully :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
 flatten_exact_fam_app_fully tc tys
+  = do { checkStackDepth (mkTyConApp tc tys)
+
+       -- Step 1. Try to reduce without reducing arguments first.
+       ; result1 <- try_to_reduce tc tys
+       ; case result1 of
+         { Just (co, xi) -> finish (xi, co)
+         ; Nothing ->
+
+        -- That didn't work. So reduce the arguments.
+    do { (xis, cos, kind_co) <- flatten_args_tc tc (repeat Nominal) tys
+           -- kind_co :: tcTypeKind(F xis) ~N tcTypeKind(F tys)
+
+       ; eq_rel  <- getEqRel
+       ; let role    = eqRelRole eq_rel
+             args_co = mkTyConAppCo role tc cos
+           -- args_co :: F xis ~r F tys
+
+             homogenise :: TcType -> TcCoercion -> (TcType, TcCoercion)
+               -- in (xi', co') = homogenise xi co
+               --   assume co :: xi ~r F xis, co is homogeneous
+               --   then xi' :: tcTypeKind(F tys)
+               --   and co' :: xi' ~r F tys, which is homogeneous
+             homogenise xi co = (casted_xi, final_co)
+               where
+                 casted_xi = xi `mkCastTy` kind_co
+                   -- casted_xi :: tcTypeKind(F tys)
+                 homo_co   = mkTcGReflLeftCo role xi kind_co
+                   -- homo_co :: casted_xi ~r xi
+
+                 final_co  = homo_co `mkTcTransCo` co `mkTcTransCo` args_co
+
+       ; result2 <- liftTcS $ lookupFamAppInert tc xis
+       ; flavour <- getFlavour
+       ; case result2 of
+         { Just (co, xi, fr@(_, inert_eq_rel))
+             -- co :: F xis ~ir xi
+
+             | fr `eqCanRewriteFR` (flavour, eq_rel) ->
+                 do { traceFlat "flatten/flat-cache hit" (ppr tc <+> ppr xis $$ ppr xi)
+                    ; finish (homogenise xi downgraded_co) }
+             where
+               inert_role    = eqRelRole inert_eq_rel
+               role          = eqRelRole eq_rel
+               downgraded_co = tcDowngradeRole role inert_role (mkTcSymCo co)
+                 -- downgraded_co :: xi ~r F xis
+
+         ; _ ->
+
+         -- inert didn't work. Try to reduce again
+    do { result3 <- try_to_reduce tc xis
+       ; case result3 of
+           Just (co, xi) -> finish (homogenise xi co)
+           Nothing       -> return (homogenise reduced (mkTcReflCo role reduced))
+             where
+               reduced = mkTyConApp tc xis }}}}}
+  where
+      -- call this if the above attempts made progress.
+      -- This recursively flattens the result and then adds to the cache
+    finish :: (Xi, Coercion) -> FlatM (Xi, Coercion)
+    finish (xi, co) = do { (fully, fully_co) <- bumpDepth $ flatten_one xi
+                         ; let final_co = fully_co `mkTcTransCo` co
+                         ; eq_rel <- getEqRel
+                         ; flavour <- getFlavour
+                         ; when (eq_rel == NomEq && flavour /= Derived) $ -- the cache only wants Nominal eqs
+                           liftTcS $ extendFamAppCache tc tys (final_co, fully)
+                         ; return (fully, final_co) }
+
+-- Returned coercion is output ~r input, where r is the role in the FlatM monad
+try_to_reduce :: TyCon -> [TcType] -> FlatM (Maybe (TcCoercion, TcType))
+try_to_reduce tc tys
+  = do { flavour <- getFlavour
+       ; result <- liftTcS $ firstJustsM [ lookupFamAppCache flavour tc tys
+                                         , matchFam tc tys ]
+       ; downgrade result }
+  where
+    downgrade :: Maybe (TcCoercionN, TcType) -> FlatM (Maybe (TcCoercion, TcType))
+    downgrade Nothing = return Nothing
+    downgrade (Just (co, xi))
+      = do { traceFlat "Eager T.F. reduction success" $
+             vcat [ ppr tc, ppr tys, ppr xi
+                  , ppr co <+> dcolon <+> ppr (coercionKind co)
+                  ]
+           ; role <- getRole
+           ; return (Just (tcDowngradeRole role Nominal co, xi)) }
+
+{- "RAE"
   -- See Note [Reduce type family applications eagerly]
      -- the following tcTypeKind should never be evaluated, as it's just used in
      -- casting, and casts by refl are dropped
@@ -872,9 +958,8 @@ flatten_exact_fam_app_fully tc tys
                        ; eq_rel <- getEqRel
                        ; let co = maybeTcSubCo eq_rel norm_co
                                    `mkTransCo` mkSymCo final_co
-                       ; flavour <- getFlavour
-                           -- NB: only extend cache with nominal, given equalities
-                       ; when (eq_rel == NomEq && flavour == Given) $
+                           -- NB: only extend cache with nominal equalities
+                       ; when (eq_rel == NomEq) $
                          liftTcS $ extendFamAppCache tc tys (co, xi)
                        ; let role = eqRelRole eq_rel
                              xi' = xi `mkCastTy` kind_co
@@ -899,9 +984,12 @@ flatten_exact_fam_app_fully tc tys
                                             `mkTransCo` mkSymCo final_co)
                        ; return $ Just (xi, co) }
                Nothing -> pure Nothing }
+-}
 
 {- Note [Reduce type family applications eagerly]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"RAE": Update Note.
+
 If we come across a type-family application like (Append (Cons x Nil) t),
 then, rather than flattening to a skolem etc, we may as well just reduce
 it on the spot to (Cons x t).  This saves a lot of intermediate steps.
@@ -943,6 +1031,8 @@ have any knowledge as to *why* these facts are true.
 
 Note [Runaway Derived rewriting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"RAE": Remove. We do occurs-checking now.
+
 Suppose we have
   [WD] F a ~ T (F a)
 We *don't* want to fall into a hole using that to rewrite a Derived
