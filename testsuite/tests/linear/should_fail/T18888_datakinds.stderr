@@ -1,5 +1,5 @@
 
-T18888_datakinds.hs:5:9:
-     Expected kind ‘GHC.Types.Multiplicity’,
-        but ‘001’ has kind ‘GHC.Num.Natural.Natural’
-     In the type signature: f :: a %001 -> b
+T18888_datakinds.hs:5:9: error:
+    • Expected kind ‘GHC.Types.Multiplicity’,
+        but ‘001’ has kind ‘GHC.Types.Nat’
+    • In the type signature: f :: a %001 -> b
