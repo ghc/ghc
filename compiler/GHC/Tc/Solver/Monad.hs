@@ -406,6 +406,9 @@ data InertSet
        , inert_famapp_cache :: FunEqMap (TcCoercion, TcType)
               -- If    F tys :-> (co, rhs, flav),
               -- then  co :: rhs ~ F tys
+              -- all evidence is from instances or Givens
+              -- (We have no way of "kicking out" from the cache, so putting
+              --  wanteds here means we can end up solving a Wanted with itself. Bad)
               --
               -- Some entries in the cache might have arisen from Wanteds, and
               -- so this should be used only for rewriting Wanteds.
@@ -2385,11 +2388,15 @@ lookupFamAppInert fam_tc tys
       | otherwise = Nothing
 
 lookupFamAppCache :: CtFlavour -> TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
-lookupFamAppCache Given _ _ = return Nothing
-  -- the famapp_cache contains some wanteds. Not appropriate to rewrite a Given.
 lookupFamAppCache _ fam_tc tys
   = do { IS { inert_famapp_cache = famapp_cache } <- getTcSInerts
-       ; return (findFunEq famapp_cache fam_tc tys) }
+       ; case findFunEq famapp_cache fam_tc tys of
+           result@(Just (co, ty)) ->
+             do { traceTcS "famapp_cache hit" (vcat [ ppr (mkTyConApp fam_tc tys)
+                                                    , ppr ty
+                                                    , ppr co ])
+                ; return result }
+           Nothing -> return Nothing }
 
 lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet?
