@@ -1125,7 +1125,7 @@ by saying ``-fno-wombat``.
     available parameter registers on x86_64.
 
 .. ghc-flag:: -fstrictness
-    :shortdesc: Turn on strictness analysis.
+    :shortdesc: Turn on demand analysis.
         Implied by :ghc-flag:`-O`. Implies :ghc-flag:`-fworker-wrapper`
     :type: dynamic
     :reverse: -fno-strictness
@@ -1133,23 +1133,158 @@ by saying ``-fno-wombat``.
 
     :default: on
 
-    Switch on the strictness analyser. The implementation is described in the
-    paper `Theory and Practice of Demand Analysis in Haskell
-    <https://www.microsoft.com/en-us/research/wp-content/uploads/2017/03/demand-jfp-draft.pdf>`__.
+    Turn on demand analysis.
 
-    The strictness analyser figures out when arguments and variables in
-    a function can be treated 'strictly' (that is they are always
-    evaluated in the function at some point). This allow GHC to apply
-    certain optimisations such as unboxing that otherwise don't apply as
-    they change the semantics of the program when applied to lazy
-    arguments.
+    A *Demand* describes an evaluation context of an expression.  *Demand
+    analysis* tries to find out what demands a function puts on its arguments
+    when called: If an argument is scrutinised on every code path, the function
+    is strict in that argument and GHC is free to use the more efficient
+    call-by-value calling convention, as well as pass parameters unboxed.
+
+    Apart from *strictness analysis*, demand analysis also performs *usage
+    analysis*: Where *strict* translates to "evaluated at least once", usage
+    analysis asks whether arguments and bindings are "evaluated at most once"
+    or not at all ("evaluated at most zero times"), e.g. *absent*. For the
+    former, GHC may use call-by-name instead of call-by-need, effectively
+    turning thunks into non-memoised functions. For the latter, no code needs
+    to be generated at all: An absent argument can simply be replaced by a
+    dummy value at the call site or omitted altogether.
+
+    The worker/wrapper transformation (:ghc-flag:`-fworker-wrapper`) is
+    reponsible for exploiting unboxing opportunities and replacing absent
+    arguments by dummies. For arugments that can't be unboxed, opportunities
+    for call-by-value and call-by-name are exploited in CorePrep when
+    translating to STG.
+
+    It's not only interesting to look at how often a binding is *evaluated*,
+    but also how often a function *is called*. If a function is called at most
+    once, we may freely eta-expand it, even if doing so destroys shared work
+    if the function was called multiple times. This information translates
+    into ``OneShotInfo`` annotations that the Simplifier acts on.
+
+    **Notation**
+
+    So demand analysis is about conservatively inferring lower and upper
+    bounds about how many times something is evaluated/called. We call the
+    "how many times" part a *cardinality*. In the compiler and debug output
+    we differentiate the following cardinality intervals as approximations
+    to cardinality:
+
+    +----------+------------------------------+--------+---------------------------------------+
+    | Interval | Set of denoted cardinalities | Syntax | Explanation tying syntax to semantics |
+    +==========+==============================+========+=======================================+
+    | [1,0]    | {}                           | ``B``  | bottom element                        |
+    +----------+------------------------------+--------+---------------------------------------+
+    | [0,0]    | {0}                          | ``A``  | absent                                |
+    +----------+------------------------------+--------+---------------------------------------+
+    | [0,1]    | {0,1}                        | ``1``  | used at most once                     |
+    +----------+------------------------------+--------+---------------------------------------+
+    | [0,ω]    | {0,1,ω}                      | ``U``  | top element, no information,          |
+    |          |                              |        | used at least 0, at most many times   |
+    +----------+------------------------------+--------+---------------------------------------+
+    | [1,1]    | {1}                          | ``S``  | strict, used exactly once             |
+    +----------+------------------------------+--------+---------------------------------------+
+    | [1,ω]    | {1,ω}                        | ``M``  | strict, used possibly many times      |
+    +----------+------------------------------+--------+---------------------------------------+
+
+    Note that it's never interesting to differentiate between a cardinality
+    of 2 and 3, or even 4232123. We just approximate the >1 case with ω,
+    standing for "many times".
+
+    Apart from the cardinality describing *how often* an argument is evaluated,
+    a demand also carries a *sub-demand*, describing *how deep* something
+    is evaluated beyond a simple ``seq``-like evaluation.
+
+    This is the full syntax for cardinalities, demands and sub-demands in BNF:
+
+    .. code-block::
+
+      card ::= B | A | 1 | U | S | M    semantics as in the table above
+
+      d    ::= card sd                  card = how often, sd = how deep
+            |  card                     abbreviation: Same as "card card"
+
+      sd   ::= card                     polymorphic sub-demand, card at every level
+            |  P(d,d,..)                product sub-demand
+            |  Ccard(sd)                call sub-demand
+
+    For example, ``fst`` is strict in its argument, and also in the first
+    component of the argument.  It will not evaluate the argument's second
+    component. That is expressed by the demand ``SP(SU,A)``. The ``P`` is for
+    "product sub-demand", which has a *demand* for each product field. The
+    notation ``SU`` just says "evaluated strictly (``S``), with everything
+    nested inside evaluated according to ``U``" -- e.g., no information,
+    because that would depend on the evaluation context of the call site of
+    ``fst``. The role of ``U`` in ``SU`` is that of a *polymorphic* sub-demand,
+    being semantically equivalent to the sub-demand ``P(UP(..))``, which we
+    simply abbreviate by the (consequently overloaded) cardinality notation
+    ``U``.
+
+    For another example, the expression ``x + 1`` evaluates ``x`` according to
+    demand ``SP(U)``. We have seen single letters stand for cardinalities and
+    polymorphic sub-demands, but what does the single letter ``U`` mean for a
+    *demand*? Such a single letter demand simply expands to a cardinality and
+    a polymorphic sub-demand of the same letter: E.g. ``U`` is equivalent to
+    ``UU`` by expansion of the single letter demand, which is equivalent to
+    ``UP(UP(..))``, so ``U``\s all the way down. It is always clear from
+    context whether we talk about about a cardinality, sub-demand or demand.
+
+    **Demand signatures**
+
+    We summarise a function's demand properties in its *demand signature*.
+    This is the general syntax:
+
+    .. code-block::
+
+     {x->dx,y->dy,z->dz...}<d1><d2><d3>...<dn>div
+             ^              ^   ^   ^      ^   ^
+             |              |   |   |      |   |
+             |              \---+---+------/   |
+             |                  |              |
+        demand on free        demand on      divergence
+          variables           arguments      information
+      (omitted if empty)                     (omitted if
+                                           no information)
+
+    We summarise ``fst``'s demand properties in its *demand signature*
+    ``<SP(SU,A)>``, which just says "If ``fst`` is applied to one argument,
+    that argument is evaluated according to ``SP(SU,A)``". For another
+    example, the demand signature of ``seq`` would be ``<SA>`` and that of
+    ``+`` would be ``<SP(U)><SP(U)>``.
+
+    If not omitted, the divergence information can be ``b`` (surely diverges)
+    or ``x`` (surely diverges or throws a precise exception).  For example,
+    ``error`` has demand signature ``<M>b`` and ``throwIO`` (which is the
+    only way to throw precise exceptions) has demand signature ``<_><U><U>x``
+    (leaving out the complicated demand on the ``Exception`` dictionary).
+
+    **Call sub-demands**
+
+    Consider ``maybe``:
+
+    .. code-block::
+
+     maybe :: b -> (a -> b) -> Maybe a -> b
+     maybe n _ Nothing  = n
+     maybe _ s (Just a) = s a
+
+    We give it demand signature ``<U><1C1(U)><SU>``.  The ``C1(U)`` is a *call
+    sub-demand* that says "Called at most once, where the result is used
+    according to ``U``". The expression ``f `seq` f 1 2`` puts ``f`` under
+    demand ``MCS(U)`` and serves as an example where the upper bound on
+    evaluation cardinality doesn't conincide with that of the call cardinality.
+
+    Cardinality is always relative to the enclosing call cardinality, so
+    ``g 1 2 + g 3 4`` puts ``g`` under demand ``MCM(CS(U))``, which says
+    "called multiple times (``M``), but every time it is called with one
+    argument, it is applied exactly once to another argument (``S``)".
 
 .. ghc-flag:: -fstrictness-before=⟨n⟩
-    :shortdesc: Run an additional strictness analysis before simplifier phase ⟨n⟩
+    :shortdesc: Run an additional demand analysis before simplifier phase ⟨n⟩
     :type: dynamic
     :category:
 
-    Run an additional strictness analysis before simplifier phase ⟨n⟩.
+    Run an additional demand analysis before simplifier phase ⟨n⟩.
 
 .. ghc-flag:: -funbox-small-strict-fields
     :shortdesc: Flatten strict constructor fields with a pointer-sized
@@ -1295,14 +1430,20 @@ by saying ``-fno-wombat``.
     potential inlining.
 
 .. ghc-flag:: -fworker-wrapper
-    :shortdesc: Enable the worker-wrapper transformation.
+    :shortdesc: Enable the worker/wrapper transformation.
     :type: dynamic
     :category:
 
-    Enable the worker-wrapper transformation after a strictness
-    analysis pass. Implied by :ghc-flag:`-O`, and by :ghc-flag:`-fstrictness`.
+    Enable the worker/wrapper transformation after a demand analysis pass.
+
+    Exploits strictness and absence information by unboxing strict arguments
+    and replacing absent fields by dummy values in a wrapper function that
+    will inline in all relevant scenarios and thus expose a specialised,
+    unboxed calling convention of the worker function.
+
+    Implied by :ghc-flag:`-O`, and by :ghc-flag:`-fstrictness`.
     Disabled by :ghc-flag:`-fno-strictness`. Enabling :ghc-flag:`-fworker-wrapper`
-    while strictness analysis is disabled (by :ghc-flag:`-fno-strictness`)
+    while demand analysis is disabled (by :ghc-flag:`-fno-strictness`)
     has no effect.
 
 .. ghc-flag:: -fbinary-blob-threshold=⟨n⟩
