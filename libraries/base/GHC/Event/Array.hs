@@ -142,13 +142,17 @@ unsafeLoad (Array ref) load = do
 
 -- | Reads n elements from the pointer and copies them
 -- into the array.
-unsafeCopyFromBuffer :: Array a -> Ptr a -> Int -> IO ()
+unsafeCopyFromBuffer :: Storable a => Array a -> Ptr a -> Int -> IO ()
 unsafeCopyFromBuffer (Array ref) sptr n =
     readIORef ref >>= \(AC es _ cap) ->
-    CHECK_BOUNDS("unsafeCopyFromBuffer", cap, n-1)
+    CHECK_BOUNDS("unsafeCopyFromBuffer", cap, n)
     withForeignPtr es $ \pdest -> do
-      _ <- memcpy pdest sptr (fromIntegral n)
+      let size = sizeOfPtr sptr undefined
+      _ <- memcpy pdest sptr (fromIntegral $ n * size)
       writeIORef ref (AC es n cap)
+  where
+    sizeOfPtr :: Storable a => Ptr a -> a -> Int
+    sizeOfPtr _ a = sizeOf a
 
 ensureCapacity :: Storable a => Array a -> Int -> IO ()
 ensureCapacity (Array ref) c = do

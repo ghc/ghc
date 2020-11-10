@@ -203,9 +203,6 @@ static CONDITION_VARIABLE threadIOWait;
 static uint32_t num_callbacks = 32;
 /* Buffer for I/O request information.  */
 static OVERLAPPED_ENTRY *entries;
-/* Number of I/O calls verified to have completed in the last round by the
-   Haskell I/O Manager.  */
-static uint32_t num_last_completed;
 
 /* Notify the Haskell side of this many new finished requests */
 static uint32_t num_notify;
@@ -325,32 +322,25 @@ void completeSynchronousRequest (void)
    * MSSEC is the maximum amount of time in milliseconds that an alertable wait
       should be done for before the haskell side requested to be notified of progress.
    * NUM_REQ is the total overall number of outstanding I/O requests.
-   * pending_service indicates that there might be still a outstanding service
-     request queued and therefore we shouldn't unblock the runner quite yet.
-
-   `pending_service` is needed in case we cancel an IO operation. We don't want this
-   to result in two processRemoteCompletion threads being queued. As this is both harder
-   to reason about and bad for performance. So we only reset outstanding_service_requests
-   if no service is pending.
 
    */
 
-void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_req, bool pending_service)
+void registerAlertableWait (bool has_timeout, DWORD mssec)
 {
   ASSERT(completionPortHandle != INVALID_HANDLE_VALUE);
   AcquireSRWLockExclusive (&wio_runner_lock);
 
   bool interrupt = false;
 
-  if (num_req == 0 && !has_timeout) {
+  if (mssec == 0 && !has_timeout) {
     timeout = INFINITE;
   }
   else if(has_timeout) {
     timeout = mssec;
   }
-  outstanding_service_requests = pending_service;
+  outstanding_service_requests = false;
 
-  //Resize queue if required
+  /* Resize queue if required.  */
   if (queue_full)
   {
     num_callbacks *= 2;
@@ -365,7 +355,7 @@ void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_req, boo
   /* If the new timeout is earlier than the old one we have to reschedule the
      wait.  Do this by interrupting the current operation and setting the new
      timeout, since it must be the shortest one in the queue.  */
-  if (timeout > mssec)
+  if (timeout > mssec && mssec > 0)
     {
       timeout = mssec;
       interrupt = true;
@@ -373,9 +363,9 @@ void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_req, boo
 
   ReleaseSRWLockExclusive (&wio_runner_lock);
 
-  // Since we call registerAlertableWait only after
-  // processing I/O requests it's always desireable to wake
-  // up the runner here.
+  /* Since we call registerAlertableWait only after
+     processing I/O requests it's always desireable to wake
+     up the runner here.  */
   WakeConditionVariable (&wakeEvent);
 
   if (interrupt) {
@@ -394,7 +384,7 @@ void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_req, boo
          registerAlertableWait call.  */
 OVERLAPPED_ENTRY* getOverlappedEntries (uint32_t *num)
 {
-  *num = num_last_completed;
+  *num = num_notify;
   return entries;
 }
 
@@ -428,8 +418,8 @@ void awaitAsyncRequests (bool wait)
 static void notifyScheduler(uint32_t num) {
   AcquireSRWLockExclusive (&wio_runner_lock);
   ASSERT(!canQueueIOThread);
-  canQueueIOThread = true;
   num_notify = num;
+  canQueueIOThread = true;
   WakeConditionVariable(&threadIOWait);
   ReleaseSRWLockExclusive (&wio_runner_lock);
 }
@@ -454,7 +444,6 @@ bool queueIOThread()
   if(canQueueIOThread)
   {
       ASSERT(!outstanding_service_requests);
-      num_last_completed = num_notify;
       outstanding_service_requests = true;
       canQueueIOThread = false;
       Capability *cap = &MainCapability;

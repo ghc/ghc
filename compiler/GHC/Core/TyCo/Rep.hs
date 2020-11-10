@@ -1125,18 +1125,10 @@ data Coercion
 
   -- These ones mirror the shape of types
   = -- Refl :: _ -> N
+    -- A special case reflexivity for a very common case: Nominal reflexivity
+    -- If you need Representational, use (GRefl Representational ty MRefl)
+    --                               not (SubCo (Refl ty))
     Refl Type  -- See Note [Refl invariant]
-          -- Invariant: applications of (Refl T) to a bunch of identity coercions
-          --            always show up as Refl.
-          -- For example  (Refl T) (Refl a) (Refl b) shows up as (Refl (T a b)).
-
-          -- Applications of (Refl T) to some coercions, at least one of
-          -- which is NOT the identity, show up as TyConAppCo.
-          -- (They may not be fully saturated however.)
-          -- ConAppCo coercions (like all coercions other than Refl)
-          -- are NEVER the identity.
-
-          -- Use (GRefl Representational ty MRefl), not (SubCo (Refl ty))
 
   -- GRefl :: "e" -> _ -> Maybe N -> e
   -- See Note [Generalized reflexive coercion]
@@ -1245,26 +1237,30 @@ instance Outputable MCoercion where
   ppr MRefl    = text "MRefl"
   ppr (MCo co) = text "MCo" <+> ppr co
 
-{-
-Note [Refl invariant]
-~~~~~~~~~~~~~~~~~~~~~
-Invariant 1:
+{- Note [Refl invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Invariant 1: Refl lifting
+        Refl (similar for GRefl r ty MRefl) is always lifted as far as possible.
+    For example
+        (Refl T) (Refl a) (Refl b) is normalised (by mkAPpCo) to  (Refl (T a b)).
 
-Coercions have the following invariant
-     Refl (similar for GRefl r ty MRefl) is always lifted as far as possible.
+    You might think that a consequences is:
+         Every identity coercion has Refl at the root
 
-You might think that a consequences is:
-     Every identity coercions has Refl at the root
+    But that's not quite true because of coercion variables.  Consider
+         g         where g :: Int~Int
+         Left h    where h :: Maybe Int ~ Maybe Int
+    etc.  So the consequence is only true of coercions that
+    have no coercion variables.
 
-But that's not quite true because of coercion variables.  Consider
-     g         where g :: Int~Int
-     Left h    where h :: Maybe Int ~ Maybe Int
-etc.  So the consequence is only true of coercions that
-have no coercion variables.
+Invariant 2: TyConAppCo
+   An application of (Refl T) to some coercions, at least one of which is
+   NOT the identity, is normalised to TyConAppCo.  (They may not be
+   fully saturated however.)  TyConAppCo coercions (like all coercions
+   other than Refl) are NEVER the identity.
 
 Note [Generalized reflexive coercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 GRefl is a generalized reflexive coercion (see #15192). It wraps a kind
 coercion, which might be reflexive (MRefl) or any coercion (MCo co). The typing
 rules for GRefl:

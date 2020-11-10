@@ -40,7 +40,8 @@ module GHC.Core.Coercion (
         mkAxiomInstCo, mkProofIrrelCo,
         downgradeRole, mkAxiomRuleCo,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
-        mkKindCo, castCoercionKind, castCoercionKindI,
+        mkKindCo,
+        castCoercionKind, castCoercionKind1, castCoercionKind2,
         mkFamilyTyConAppCo,
 
         mkHeteroCoercionType,
@@ -1487,24 +1488,44 @@ instCoercions g ws
            ; return (piResultTy <$> g_tys <*> w_tys, g') }
 
 -- | Creates a new coercion with both of its types casted by different casts
--- @castCoercionKind g r t1 t2 h1 h2@, where @g :: t1 ~r t2@,
+-- @castCoercionKind2 g r t1 t2 h1 h2@, where @g :: t1 ~r t2@,
 -- has type @(t1 |> h1) ~r (t2 |> h2)@.
 -- @h1@ and @h2@ must be nominal.
-castCoercionKind :: Coercion -> Role -> Type -> Type
+castCoercionKind2 :: Coercion -> Role -> Type -> Type
                  -> CoercionN -> CoercionN -> Coercion
-castCoercionKind g r t1 t2 h1 h2
+castCoercionKind2 g r t1 t2 h1 h2
   = mkCoherenceRightCo r t2 h2 (mkCoherenceLeftCo r t1 h1 g)
+
+-- | @castCoercionKind1 g r t1 t2 h@ = @coercionKind g r t1 t2 h h@
+-- That is, it's a specialised form of castCoercionKind, where the two
+--          kind coercions are identical
+-- @castCoercionKind1 g r t1 t2 h@, where @g :: t1 ~r t2@,
+-- has type @(t1 |> h) ~r (t2 |> h)@.
+-- @h@ must be nominal.
+-- See Note [castCoercionKind1]
+castCoercionKind1 :: Coercion -> Role -> Type -> Type
+                  -> CoercionN -> Coercion
+castCoercionKind1 g r t1 t2 h
+  = case g of
+      Refl {} -> ASSERT( r == Nominal ) -- Refl is always Nominal
+                 mkNomReflCo (mkCastTy t2 h)
+      GRefl _ _ mco -> case mco of
+           MRefl       -> mkReflCo r (mkCastTy t2 h)
+           MCo kind_co -> GRefl r (mkCastTy t1 h) $
+                          MCo (mkSymCo h `mkTransCo` kind_co `mkTransCo` h)
+      _ -> castCoercionKind2 g r t1 t2 h h
 
 -- | Creates a new coercion with both of its types casted by different casts
 -- @castCoercionKind g h1 h2@, where @g :: t1 ~r t2@,
 -- has type @(t1 |> h1) ~r (t2 |> h2)@.
 -- @h1@ and @h2@ must be nominal.
 -- It calls @coercionKindRole@, so it's quite inefficient (which 'I' stands for)
--- Use @castCoercionKind@ instead if @t1@, @t2@, and @r@ are known beforehand.
-castCoercionKindI :: Coercion -> CoercionN -> CoercionN -> Coercion
-castCoercionKindI g h1 h2
-  = mkCoherenceRightCo r t2 h2 (mkCoherenceLeftCo r t1 h1 g)
-  where (Pair t1 t2, r) = coercionKindRole g
+-- Use @castCoercionKind2@ instead if @t1@, @t2@, and @r@ are known beforehand.
+castCoercionKind :: Coercion -> CoercionN -> CoercionN -> Coercion
+castCoercionKind g h1 h2
+  = castCoercionKind2 g r t1 t2 h1 h2
+  where
+    (Pair t1 t2, r) = coercionKindRole g
 
 mkFamilyTyConAppCo :: TyCon -> [CoercionN] -> CoercionN
 -- ^ Given a family instance 'TyCon' and its arg 'Coercion's, return the
@@ -1565,6 +1586,23 @@ mkCoCast c g
     -- g2 :: t1 ~# t2
     (tc, _) = splitTyConApp (coercionLKind g)
     co_list = decomposeCo (tyConArity tc) g (tyConRolesRepresentational tc)
+
+{- Note [castCoercionKind1]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+castCoercionKind1 deals with the very important special case of castCoercionKind2
+where the two kind coercions are identical.  In that case we can exploit the
+situation where the main coercion is reflexive, via the special cases for Refl
+and GRefl.
+
+This is important when flattening  (ty |> co). We flatten ty, yielding
+   fco :: ty ~ ty'
+and now we want a coercion xco between
+   xco :: (ty |> co) ~ (ty' |> co)
+That's exactly what castCoercionKind1 does.  And it's very very common for
+fco to be Refl.  In that case we do NOT want to get some terrible composition
+of mkLeftCoherenceCo and mkRightCoherenceCo, which is what castCoercionKind2
+has to do in its full generality.  See #18413.
+-}
 
 {-
 %************************************************************************
@@ -1941,8 +1979,8 @@ ty_co_subst !lc role ty
          else pprPanic "ty_co_subst: covar is not almost devoid" (ppr t)
     go r ty@(LitTy {})     = ASSERT( r == Nominal )
                              mkNomReflCo ty
-    go r (CastTy ty co)    = castCoercionKindI (go r ty) (substLeftCo lc co)
-                                                         (substRightCo lc co)
+    go r (CastTy ty co)    = castCoercionKind (go r ty) (substLeftCo lc co)
+                                                        (substRightCo lc co)
     go r (CoercionTy co)   = mkProofIrrelCo r kco (substLeftCo lc co)
                                                   (substRightCo lc co)
       where kco = go Nominal (coercionType co)
