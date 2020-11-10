@@ -91,7 +91,7 @@ module GHC.Tc.Solver.Monad (
     foldIrreds,
 
     -- The flattening cache
-    lookupFamApp, extendFamAppCache,
+    lookupFamAppInert, lookupFamAppCache, extendFamAppCache,
     pprKicked,
 
     -- Inert function equalities
@@ -189,6 +189,7 @@ import Data.List ( partition, mapAccumL )
 import qualified Data.Semigroup as S
 import Data.List.NonEmpty ( NonEmpty(..), cons, toList, nonEmpty )
 import qualified Data.List.NonEmpty as NE
+import Control.Arrow ( first )
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
@@ -404,13 +405,15 @@ data InertSet
 
        , inert_famapp_cache :: FunEqMap (TcCoercion, TcType)
               -- If    F tys :-> (co, rhs, flav),
-              -- then  co :: F tys ~ rhs
-              --       flav is [G]
+              -- then  co :: rhs ~ F tys
+              --
+              -- Some entries in the cache might have arisen from Wanteds, and
+              -- so this should be used only for rewriting Wanteds.
               --
               -- Just a hash-cons cache for use when reducing family applications
               -- only
               --
-              -- Only nominal, Given equalities end up in here (along with
+              -- Only nominal equalities end up in here (along with
               -- top-level instances)
 
        , inert_solved_dicts   :: DictMap CtEvidence
@@ -2368,13 +2371,12 @@ removeInertCt is ct =
     CIrredCan {}     -> panic "removeInertCt: CIrredEvCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
 
--- | Looks up a family application in both the inerts and the famapp-cache
-lookupFamApp :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtFlavourRole))
-lookupFamApp fam_tc tys
-  = do { IS { inert_famapp_cache = famapp_cache
-            , inert_cans = IC { inert_funeqs = inert_funeqs } } <- getTcSInerts
-       ; return (firstJusts [lookup_inerts inert_funeqs,
-                             lookup_famapps famapp_cache]) }
+-- | Looks up a family application in the inerts; returned coercion
+-- is oriented input ~ output
+lookupFamAppInert :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtFlavourRole))
+lookupFamAppInert fam_tc tys
+  = do { IS { inert_cans = IC { inert_funeqs = inert_funeqs } } <- getTcSInerts
+       ; return (lookup_inerts inert_funeqs) }
   where
     lookup_inerts inert_funeqs
       | Just (EqualCtList (CEqCan { cc_ev = ctev, cc_rhs = rhs } :| _))
@@ -2382,11 +2384,12 @@ lookupFamApp fam_tc tys
       = Just (ctEvCoercion ctev, rhs, ctEvFlavourRole ctev)
       | otherwise = Nothing
 
-    lookup_famapps famapp_cache
-      | Just (co, rhs) <- findFunEq famapp_cache fam_tc tys
-      = Just (co, rhs, (Given, NomEq))
-      | otherwise = Nothing
-
+lookupFamAppCache :: CtFlavour -> TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
+lookupFamAppCache Given _ _ = return Nothing
+  -- the famapp_cache contains some wanteds. Not appropriate to rewrite a Given.
+lookupFamAppCache _ fam_tc tys
+  = do { IS { inert_famapp_cache = famapp_cache } <- getTcSInerts
+       ; return (findFunEq famapp_cache fam_tc tys) }
 
 lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet?
@@ -3209,6 +3212,7 @@ zonkTyCoVarKind tv = wrapTcS (TcM.zonkTyCoVarKind tv)
 
 ----------------------------
 extendFamAppCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
+-- NB: co :: rhs ~ F tys, to match expectations of flattener
 extendFamAppCache tc xi_args stuff@(_, ty)
   = do { dflags <- getDynFlags
        ; when (gopt Opt_FamAppCache dflags) $
@@ -3489,8 +3493,8 @@ checkReductionDepth loc ty
          solverDepthErrorTcS loc ty }
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe (CoercionN, TcType))
--- Given (F tys) return (ty, co), where co :: F tys ~N ty
-matchFam tycon args = wrapTcS $ matchFamTcM tycon args
+-- Given (F tys) return (ty, co), where co :: ty ~N F tys
+matchFam tycon args = fmap (fmap (first mkTcSymCo)) $ wrapTcS $ matchFamTcM tycon args
 
 matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (CoercionN, TcType))
 -- Given (F tys) return (ty, co), where co :: F tys ~N ty
