@@ -47,7 +47,7 @@ Compiler
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
 
 ``ghc`` library
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 - The ``con_args`` field of ``ConDeclGADT`` has been renamed to ``con_g_args``.
   This is because the type of ``con_g_args`` is now different from the type of
