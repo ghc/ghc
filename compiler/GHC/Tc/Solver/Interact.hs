@@ -1071,6 +1071,8 @@ shortCutSolver dflags ev_w ev_i
 
                        ; lift $ traceTcS "shortCutSolver: found instance" (ppr preds)
                        ; loc' <- lift $ checkInstanceOK loc what pred
+                       ; lift $ checkReductionDepth loc' pred
+
 
                        ; evc_vs <- mapM (new_wanted_cached loc' solved_dicts') preds
                                   -- Emit work for subgoals but use our local cache
@@ -1939,35 +1941,36 @@ chooseInstance work_item
                         , cir_mk_ev     = mk_ev })
   = do { traceTcS "doTopReact/found instance for" $ ppr ev
        ; deeper_loc <- checkInstanceOK loc what pred
-       ; if isDerived ev then finish_derived deeper_loc theta
-                         else finish_wanted  deeper_loc theta mk_ev }
+       ; if isDerived ev
+         then -- Use type-class instances for Deriveds, in the hope
+              -- of generating some improvements
+              -- C.f. Example 3 of Note [The improvement story]
+              -- It's easy because no evidence is involved
+           do { dflags <- getDynFlags
+              ; unless (subGoalDepthExceeded dflags (ctLocDepth deeper_loc)) $
+                emitNewDeriveds deeper_loc theta
+                  -- If we have a runaway Derived, let's not issue a
+                  -- "reduction stack overflow" error, which is not particularly
+                  -- friendly. Instead, just drop the Derived.
+              ; traceTcS "finish_derived" (ppr (ctl_depth deeper_loc))
+              ; stopWith ev "Dict/Top (solved derived)" }
+
+         else -- wanted
+           do { checkReductionDepth deeper_loc pred
+              ; evb <- getTcEvBindsVar
+              ; if isCoEvBindsVar evb
+                then continueWith work_item
+                  -- See Note [Instances in no-evidence implications]
+
+                else
+           do { evc_vars <- mapM (newWanted deeper_loc) theta
+              ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
+              ; emitWorkNC (freshGoals evc_vars)
+              ; stopWith ev "Dict/Top (solved wanted)" }}}
   where
      ev         = ctEvidence work_item
      pred       = ctEvPred ev
      loc        = ctEvLoc ev
-
-     finish_wanted :: CtLoc -> [TcPredType]
-                   -> ([EvExpr] -> EvTerm) -> TcS (StopOrContinue Ct)
-      -- Precondition: evidence term matches the predicate workItem
-     finish_wanted loc theta mk_ev
-        = do { evb <- getTcEvBindsVar
-             ; if isCoEvBindsVar evb
-               then -- See Note [Instances in no-evidence implications]
-                    continueWith work_item
-               else
-          do { evc_vars <- mapM (newWanted loc) theta
-             ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
-             ; emitWorkNC (freshGoals evc_vars)
-             ; stopWith ev "Dict/Top (solved wanted)" } }
-
-     finish_derived loc theta
-       = -- Use type-class instances for Deriveds, in the hope
-         -- of generating some improvements
-         -- C.f. Example 3 of Note [The improvement story]
-         -- It's easy because no evidence is involved
-         do { emitNewDeriveds loc theta
-            ; traceTcS "finish_derived" (ppr (ctl_depth loc))
-            ; stopWith ev "Dict/Top (solved derived)" }
 
 chooseInstance work_item lookup_res
   = pprPanic "chooseInstance" (ppr work_item $$ ppr lookup_res)
@@ -1975,11 +1978,11 @@ chooseInstance work_item lookup_res
 checkInstanceOK :: CtLoc -> InstanceWhat -> TcPredType -> TcS CtLoc
 -- Check that it's OK to use this insstance:
 --    (a) the use is well staged in the Template Haskell sense
---    (b) we have not recursed too deep
 -- Returns the CtLoc to used for sub-goals
+-- Probably also want to call checkReductionDepth, but this function
+-- does not do so to enable special handling for Deriveds in chooseInstance
 checkInstanceOK loc what pred
   = do { checkWellStagedDFun loc what pred
-       ; checkReductionDepth deeper_loc pred
        ; return deeper_loc }
   where
      deeper_loc = zap_origin (bumpCtLocDepth loc)
