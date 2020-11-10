@@ -147,7 +147,7 @@ Where:
   ``(forall a. a)`` and ``(Eq a => a)`` are legal.
 - ``ctype`` is a ``btype`` that has no restrictions on an outermost
   ``forall``/``=>``, so ``forall a. a`` and ``Eq a => a`` are legal ``ctype``\s.
-- ``arg_type`` is a type that is not allowed to have ``forall``s or ``=>``\s
+- ``arg_type`` is a type that is not allowed to have ``forall``\s or ``=>``\s
 - ``prefix_cls_tycon`` is a class type constructor written prefix (e.g.,
   ``Show`` or ``(&&&)``), while ``infix_cls_tycon`` is a class type constructor
   written infix (e.g., ``\`Show\``` or ``&&&``).
