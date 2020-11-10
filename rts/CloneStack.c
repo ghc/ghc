@@ -18,10 +18,12 @@
 
 #if defined(DEBUG)
 #include "sm/Sanity.h"
+#include "Printer.h"
 #endif
 
 static StgStack* cloneStackChunk(Capability* capability, const StgStack* stack)
 {
+  printf("CLONE_STACK_CHUNK");
   StgWord spOffset = stack->sp - stack->stack;
   StgWord closureSizeBytes = sizeof(StgStack) + (stack->stack_size * sizeof(StgWord));
 
@@ -29,12 +31,20 @@ static StgStack* cloneStackChunk(Capability* capability, const StgStack* stack)
 
   memcpy(newStackClosure, stack, closureSizeBytes);
 
+  printf("spOffset: %d", spOffset);
+  debugBelch("spOffset: %d", spOffset);
+  debugBelch("sp: %p\n", stack->sp);
+  debugBelch("sp: %p\n", stack->stack);
+  debugBelch("sp: %p\n", newStackClosure->stack);
   newStackClosure->sp = newStackClosure->stack + spOffset;
   // The new stack is not on the mutable list; clear the dirty flag such that
   // we don't claim that it is.
   newStackClosure->dirty = 0;
 
 #if defined(DEBUG)
+  printStack(stack);
+  checkClosure((StgClosure*) stack);
+  printStack(newStackClosure);
   checkClosure((StgClosure*) newStackClosure);
 #endif
 
@@ -44,6 +54,7 @@ static StgStack* cloneStackChunk(Capability* capability, const StgStack* stack)
 StgStack* cloneStack(Capability* capability, const StgStack* stack)
 {
   StgStack *top_stack = cloneStackChunk(capability, stack);
+  debugBelch("COPIED TOP: %p", stack);
   StgStack *last_stack = top_stack;
   while (true) {
     // check whether the stack ends in an underflow frame
@@ -51,6 +62,8 @@ StgStack* cloneStack(Capability* capability, const StgStack* stack)
     StgUnderflowFrame *underFlowFrame = ((StgUnderflowFrame *) top);
     StgUnderflowFrame *frame = underFlowFrame--;
     if (frame->info == &stg_stack_underflow_frame_info) {
+      printf("HAS UNDERFLOW");
+      debugBelch("COPying UNDERFLOW: %p", frame->next_chunk);
       StgStack *s = cloneStackChunk(capability, frame->next_chunk);
       frame->next_chunk = s;
       last_stack = s;

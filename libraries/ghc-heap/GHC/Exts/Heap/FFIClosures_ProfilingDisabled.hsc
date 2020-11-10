@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GADTs #-}
 
 module GHC.Exts.Heap.FFIClosures_ProfilingDisabled where
 
@@ -15,7 +17,10 @@ import Foreign
 import GHC.Exts
 import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
 import GHC.Exts.Heap.ProfInfo.Types
-import GHC.Exts.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..))
+import GHC.Exts.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..), Box(..))
+import GHC.Exts.Heap.ClosureTypes
+import GHC.Exts.Heap.InfoTable
+import GHC.Exts.Heap.Constants
 
 data TSOFields = TSOFields {
     tso_what_next :: WhatNext,
@@ -107,8 +112,9 @@ data StackFields = StackFields {
 #if __GLASGOW_HASKELL__ >= 810
     stack_marking :: Word8,
 #endif
-    stack_sp :: Addr##
-}
+    stack_sp :: Ptr (),
+    stack_stack :: Ptr ()
+} deriving Show
 
 -- | Get non-closure fields from @StgStack_@ (@TSO.h@)
 peekStackFields :: Ptr a -> IO StackFields
@@ -119,6 +125,7 @@ peekStackFields ptr = do
     marking' <- (#peek struct StgStack_, marking) ptr
 #endif
     Ptr sp' <- (#peek struct StgStack_, sp) ptr
+    Ptr stack <- (#peek struct StgStack_, stack) ptr
 
     -- TODO decode the stack.
 
@@ -128,6 +135,82 @@ peekStackFields ptr = do
 #if __GLASGOW_HASKELL__ >= 810
         stack_marking = marking',
 #endif
-        stack_sp = sp'
+        stack_sp = Ptr sp',
+        stack_stack = Ptr stack
     }
+
+
+data GenStackFrame c = StackFrame StgStackInfoTable (GenStackPayload c) deriving Show
+
+type StackFrame = GenStackFrame Box
+
+data GenStackPayload c = StackPayload [PointerOrData c] deriving Show
+
+peekStack :: Ptr a -> IO [StackFrame]
+peekStack p = do
+  print p
+  fields <- peekStackFields p
+  print fields
+  print (startStack p)
+  let end = (startStack p `plusPtr` (8 * (fromIntegral $ stack_size fields)))
+  print end
+  print (stack_sp fields >= end)
+  print (stack_sp fields `minusPtr` end)
+  stackWorker (castPtr p) (stack_sp fields) end
+
+startStack = (#ptr StgStack, stack)
+
+--peekStackFrame :: Ptr a -> IO StackFrame
+--peekStackFrame = _
+
+stackWorker :: Ptr () -> Ptr a -> Ptr a -> IO [StackFrame]
+stackWorker c stackStart stackEnd
+  | stackStart >= stackEnd = return []
+  | otherwise = do
+      print ("start", stackStart)
+      print ("togo", stackStart `minusPtr` stackEnd)
+      -- StgRetInfoTable
+      itblPtr <- (#peek struct StgClosure_, header.info) stackStart
+      print ("itblPtr", itblPtr `plusPtr` (2 * negate wORD_SIZE))
+
+      let itblPtr' = itblPtr `plusPtr` (2 * negate wORD_SIZE)
+      (ty :: HalfWord) <- ((#peek StgRetInfoTable, i.type) itblPtr')
+      print ty
+      itbl <- peekStackItbl ((#ptr StgRetInfoTable, i) itblPtr')
+      print ("itbl", itbl)
+      (ps, next) <-
+        case tipe itbl of
+          STOP_FRAME -> small_bitmap stackStart itbl
+          CATCH_FRAME -> small_bitmap stackStart itbl
+          CATCH_STM_FRAME -> small_bitmap stackStart itbl
+          CATCH_RETRY_FRAME -> small_bitmap stackStart itbl
+          ATOMICALLY_FRAME -> small_bitmap stackStart itbl
+          RET_SMALL -> small_bitmap stackStart itbl
+          _ -> getLine >> undefined
+      print ps
+      print next
+      more_frames <- stackWorker c next stackEnd
+      return $ (StackFrame itbl (StackPayload ps)) : more_frames
+  where
+    small_bitmap start itbl = do
+      let BM pords = layout itbl
+      collectPointers (start `plusPtr` wORD_SIZE) pords
+
+    collectPointers :: Ptr a -> [PointerOrData ()] -> IO ([PointerOrData Box], Ptr a)
+    collectPointers p [] = return ([], p)
+    collectPointers p (pord:pords) = do
+      (pord', p') <- collectPointer p pord
+      (xs, p'') <- collectPointers p' pords
+      return $ (pord' : xs, p'')
+
+    collectPointer :: Ptr a -> PointerOrData () -> IO (PointerOrData Box, Ptr a)
+    collectPointer p pord = do
+      pord' <- traverse (const (pointerPtrToBox (castPtr p))) pord
+      return (pord', p `plusPtr` (wORD_SIZE))
+
+
+    pointerPtrToBox :: Ptr (Ptr a) -> IO Box
+    pointerPtrToBox p = do
+      Ptr p' <- peek p
+      return (Box (unsafeCoerce## p'))
 

@@ -20,6 +20,7 @@ import Foreign.C
 import GHC.Ptr
 import GHC.Exts
 import GHC.Exts.Heap
+import GHC.Exts.Heap.InfoTable.Types
 import Data.ByteString (ByteString)
 import Control.Monad.Fail
 import qualified Data.ByteString as BS
@@ -48,8 +49,8 @@ mkConInfoTable tables_next_to_code ptr_words nonptr_words tag ptrtag con_desc = 
                  entry = if tables_next_to_code
                          then Nothing
                          else Just entry_addr,
-                 ptrs  = fromIntegral ptr_words,
-                 nptrs = fromIntegral nonptr_words,
+                 layout  = Payload (fromIntegral ptr_words)
+                                   (fromIntegral nonptr_words),
                  tipe  = CONSTR,
                  srtlen = fromIntegral tag,
                  code  = code'

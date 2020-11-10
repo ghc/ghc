@@ -31,6 +31,7 @@ import GHCi.BreakArray
 
 import GHC.LanguageExtensions
 import qualified GHC.Exts.Heap as Heap
+import qualified GHC.Exts.Heap.InfoTable.Types as Heap
 import GHC.ForeignSrcLang
 import GHC.Fingerprint
 import Control.Concurrent
@@ -460,7 +461,11 @@ instance Binary Heap.WhyBlocked
 instance Binary Heap.TsoFlags
 #endif
 
-instance Binary Heap.StgInfoTable
+instance Binary (Heap.StgInfoTable_ a)
+instance Binary (Heap.Layout a) where
+  put = undefined
+  get = undefined
+  -- TODO
 instance Binary Heap.ClosureType
 instance Binary Heap.PrimType
 instance Binary a => Binary (Heap.GenClosure a)

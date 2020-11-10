@@ -1,6 +1,19 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
 module GHC.Exts.Heap.InfoTable.Types
-    ( StgInfoTable(..)
+    ( StgInfoTable_(..)
+    , StgInfoTable
+    , StgStackInfoTable
+    , PointerOrData(..)
+    , toPointerOrData
+    , Layout(..)
     , EntryFunPtr
     , HalfWord
     , ItblCodes
@@ -27,14 +40,30 @@ type HalfWord = Word16
 
 type EntryFunPtr = FunPtr (Ptr () -> IO (Ptr ()))
 
+data LayoutType = Pointers | Bitmap | LargeBitmap
+
+data Layout (a :: LayoutType) where
+  Payload :: { ptrs :: HalfWord, nptrs :: HalfWord } -> Layout Pointers
+  BM :: [PointerOrData ()] -> Layout Bitmap
+
+data PointerOrData p = Pointer p | Data deriving (Show, Traversable, Foldable, Functor)
+
+toPointerOrData :: Bool -> PointerOrData ()
+toPointerOrData True = Pointer ()
+toPointerOrData False = Data
+
+deriving instance Show (Layout a)
+
 -- | This is a somewhat faithful representation of an info table. See
 -- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/storage/InfoTables.h>
 -- for more details on this data structure.
-data StgInfoTable = StgInfoTable {
+data StgInfoTable_ a = StgInfoTable {
    entry  :: Maybe EntryFunPtr, -- Just <=> not TABLES_NEXT_TO_CODE
-   ptrs   :: HalfWord,
-   nptrs  :: HalfWord,
+   layout :: Layout a,
    tipe   :: ClosureType,
    srtlen :: HalfWord,
    code   :: Maybe ItblCodes -- Just <=> TABLES_NEXT_TO_CODE
   } deriving (Show, Generic)
+
+type StgInfoTable = StgInfoTable_ Pointers
+type StgStackInfoTable = StgInfoTable_ Bitmap

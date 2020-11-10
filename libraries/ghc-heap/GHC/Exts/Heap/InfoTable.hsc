@@ -1,7 +1,9 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 module GHC.Exts.Heap.InfoTable
     ( module GHC.Exts.Heap.InfoTable.Types
     , itblSize
     , peekItbl
+    , peekStackItbl
     , pokeItbl
     ) where
 
@@ -14,6 +16,8 @@ import GHC.Exts.Heap.Constants
 import Data.Maybe
 #endif
 import Foreign
+import Debug.Trace
+
 
 -------------------------------------------------------------------------
 -- Profiling specific code
@@ -41,8 +45,7 @@ peekItbl a0 = do
   srtlen' <- (#peek struct StgInfoTable_, srt) a0
   return StgInfoTable
     { entry  = entry'
-    , ptrs   = ptrs'
-    , nptrs  = nptrs'
+    , layout = Payload ptrs' nptrs'
     , tipe   = toEnum (fromIntegral (tipe' :: HalfWord))
     , srtlen = srtlen'
     , code   = Nothing
@@ -53,8 +56,8 @@ pokeItbl a0 itbl = do
 #if !defined(TABLES_NEXT_TO_CODE)
   (#poke StgInfoTable, entry) a0 (fromJust (entry itbl))
 #endif
-  (#poke StgInfoTable, layout.payload.ptrs) a0 (ptrs itbl)
-  (#poke StgInfoTable, layout.payload.nptrs) a0 (nptrs itbl)
+  (#poke StgInfoTable, layout.payload.ptrs) a0 (ptrs (layout itbl))
+  (#poke StgInfoTable, layout.payload.nptrs) a0 (nptrs (layout itbl))
   (#poke StgInfoTable, type) a0 (toHalfWord (fromEnum (tipe itbl)))
   (#poke StgInfoTable, srt) a0 (srtlen itbl)
 #if defined(TABLES_NEXT_TO_CODE)
@@ -71,3 +74,40 @@ pokeItbl a0 itbl = do
 -- | Size in bytes of a standard InfoTable
 itblSize :: Int
 itblSize = (#size struct StgInfoTable_)
+
+peekStackItbl :: Ptr StgInfoTable -> IO StgStackInfoTable
+peekStackItbl a0 = do
+#if !defined(TABLES_NEXT_TO_CODE)
+  let ptr = a0 `plusPtr` (negate wORD_SIZE)
+  entry' <- Just <$> (#peek struct StgInfoTable_, entry) ptr
+#else
+  let ptr = a0
+      entry' = Nothing
+#endif
+  bitmap'   <- (#peek StgRetInfoTable, i.layout.bitmap) ptr
+  tipe'   <- (#peek StgRetInfoTable, i.type) ptr
+  srtlen' <- (#peek StgRetInfoTable, i.srt) a0
+  return StgInfoTable
+    { entry  = entry'
+    , layout   = BM (bitmapBits bitmap')
+    , tipe   = toEnum (fromIntegral (tipe' :: HalfWord))
+    , srtlen = srtlen'
+    , code   = Nothing
+    }
+
+
+bitmapSize ::  Word -> Int
+bitmapSize w = fromIntegral (w .&. bITMAP_SIZE_MASK)
+
+bITMAP_SIZE_MASK :: Word
+bITMAP_SIZE_MASK = 0x3f
+bITMAP_BITS_SHIFT :: Int
+bITMAP_BITS_SHIFT = 6
+
+-- True = Pointer
+-- False = Data
+bitmapBits :: Word -> [PointerOrData ()]
+bitmapBits w = reverse (map (toPointerOrData . testBit bs) [0..k-1])
+  where
+    k = traceShowId (bitmapSize w)
+    bs = w `shiftR` bITMAP_BITS_SHIFT

@@ -62,6 +62,7 @@ import GHC.Utils.Outputable as Ppr
 import GHC.Utils.Panic
 import GHC.Char
 import GHC.Exts.Heap
+import GHC.Exts.Heap.InfoTable.Types
 import GHC.Runtime.Heap.Layout ( roundUpTo )
 import GHC.IO (throwIO)
 

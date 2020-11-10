@@ -10,6 +10,7 @@
 {-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UnliftedFFITypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-|
 Module      :  GHC.Exts.Heap
@@ -34,7 +35,10 @@ module GHC.Exts.Heap (
     , getClosureDataFromHeapRep
 
     -- * Info Table types
-    , StgInfoTable(..)
+    , StgInfoTable_(..)
+    , StgInfoTable
+    , StgStackInfoTable
+    , Layout(..)
     , EntryFunPtr
     , HalfWord
     , ItblCodes
@@ -56,7 +60,11 @@ module GHC.Exts.Heap (
     , Box(..)
     , asBox
     , areBoxesEqual
+
+    -- * Stacks
+    , getCurrentStackData
     ) where
+
 
 import Prelude
 import GHC.Exts.Heap.Closures
@@ -69,6 +77,7 @@ import GHC.Exts.Heap.InfoTableProf
 import GHC.Exts.Heap.InfoTable
 #endif
 import GHC.Exts.Heap.Utils
+import GHC.Stack.CloneStack
 import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 
 import Control.Monad
@@ -76,6 +85,7 @@ import Data.Bits
 import Foreign
 import GHC.Exts
 import GHC.Int
+import GHC.IO(IO(..))
 import GHC.Word
 
 #include "ghcconfig.h"
@@ -385,3 +395,17 @@ getClosureDataFromHeapRep decodeStackClosures heapRep infoTablePtr pts = do
 -- | Like 'getClosureData', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
+
+getCurrentStackData :: IO [FFIClosures.StackFrame]
+getCurrentStackData = do
+  StackSnapshot stack_snapshot <- cloneMyStack
+  let stack_addr :: Ptr () = Ptr (unsafeCoerce# stack_snapshot)
+  res <- FFIClosures.peekStack stack_addr
+  IO (\s -> case touch# stack_snapshot s of
+                s' -> (# s', () #) )
+  return res
+
+
+
+
+

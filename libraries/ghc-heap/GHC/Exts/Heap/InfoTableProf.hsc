@@ -38,8 +38,7 @@ peekItbl a0 = do
   srtlen' <- (#peek struct StgInfoTable_, srt) a0
   return StgInfoTable
     { entry  = entry'
-    , ptrs   = ptrs'
-    , nptrs  = nptrs'
+    , layout = Payload ptrs' nptrs'
     , tipe   = toEnum (fromIntegral (tipe' :: HalfWord))
     , srtlen = srtlen'
     , code   = Nothing
@@ -50,8 +49,8 @@ pokeItbl a0 itbl = do
 #if !defined(TABLES_NEXT_TO_CODE)
   (#poke StgInfoTable, entry) a0 (fromJust (entry itbl))
 #endif
-  (#poke StgInfoTable, layout.payload.ptrs) a0 (ptrs itbl)
-  (#poke StgInfoTable, layout.payload.nptrs) a0 (nptrs itbl)
+  (#poke StgInfoTable, layout.payload.ptrs) a0 (ptrs (layout itbl))
+  (#poke StgInfoTable, layout.payload.nptrs) a0 (nptrs (layout itbl))
   (#poke StgInfoTable, type) a0 (fromEnum (tipe itbl))
   (#poke StgInfoTable, srt) a0 (srtlen itbl)
 #if defined(TABLES_NEXT_TO_CODE)
