@@ -13,7 +13,8 @@ import Data.Coerce (coerce)
 
 import GHC.Prelude
 import GHC.Data.Bag
-import {-# SOURCE #-} GHC.Driver.Errors.Types (GhcError)
+import GHC.Driver.Errors.Types (GhcError)
+import GHC.Driver.Errors.Ppr ()
 import GHC.Types.Error
 import GHC.Utils.Monad
 import GHC.Utils.Panic
@@ -31,7 +32,7 @@ throwErrors :: MonadIO io => ErrorMessages GhcError -> io a
 throwErrors = liftIO . throwIO . mkSrcErr . coerce
 
 throwOneError :: MonadIO io => ErrMsg GhcError -> io a
-throwOneError = throwErrors . ErrorMessages . unitBag
+throwOneError = throwErrors . mkErrorMessages . unitBag
 
 -- | A source error is an error that is caused by one or more errors in the
 -- source code.  A 'SourceError' is thrown by many functions in the
@@ -52,7 +53,7 @@ throwOneError = throwErrors . ErrorMessages . unitBag
 newtype SourceError = SourceError (ErrorMessages GhcError)
 
 instance Show SourceError where
-  show (SourceError (ErrorMessages msgs)) = unlines . map showErrMsg . bagToList $ msgs
+  show (SourceError msgs) = unlines . map showErrMsg . bagToList . getErrorMessages $ msgs
 
 instance Exception SourceError
 

@@ -148,7 +148,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Types.SourceFile
 import GHC.Types.TyThing.Ppr ( pprTyThingInContext )
-import GHC.Types.Error ( ErrorMessages(..), WarningMessages(..) )
+import GHC.Types.Error ( mkErrorMessages, mkWarningMessages )
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Unit.External
@@ -204,7 +204,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
           tcRnModuleTcRnM hsc_env mod_sum parsedModule pair
 
   | otherwise
-  = return ((mempty, ErrorMessages $ unitBag err_msg), Nothing)
+  = return ((mempty, mkErrorMessages $ unitBag err_msg), Nothing)
 
   where
     hsc_src = ms_hsc_src mod_sum
@@ -3118,7 +3118,7 @@ runTypecheckerPlugin sum hsc_env gbl_env = do
 
 mark_plugin_unsafe :: DynFlags -> TcM ()
 mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
-  recordUnsafeInfer (WarningMessages pluginUnsafe)
+  recordUnsafeInfer (mkWarningMessages pluginUnsafe)
   where
     unsafeText = "Use of plugins makes the module unsafe"
     pluginUnsafe = unitBag ( mkPlainWarnMsg noSrcSpan (Outputable.text unsafeText) )

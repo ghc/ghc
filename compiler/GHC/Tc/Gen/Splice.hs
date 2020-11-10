@@ -109,11 +109,8 @@ import GHC.Types.Var.Set
 import GHC.Types.Meta
 import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Types.Fixity as Hs
-import GHC.Types.Annotations
-import GHC.Types.Name
 import GHC.Serialized
 
-import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
@@ -126,7 +123,6 @@ import GHC.Utils.Outputable
 
 import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
 
-import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
 import qualified GHC.Data.EnumSet as EnumSet
@@ -1290,7 +1286,7 @@ runTH ty fhv = do
 -- See Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 runRemoteTH
   :: IServInstance
-  -> [Messages TcRnError] --  saved from nested calls to qRecover
+  -> [Messages TcRnWarning TcRnError] --  saved from nested calls to qRecover
   -> TcM ()
 runRemoteTH iserv recovers = do
   THMsg msg <- liftIO $ readIServ iserv getTHMessage
@@ -1310,7 +1306,7 @@ runRemoteTH iserv recovers = do
       -- keep the warnings only if there were no errors
       writeTcRef v $ if caught_error
         then prev_msgs
-        else (prev_warns `unionBags` warn_msgs, prev_errs)
+        else (prev_warns `mappend` warn_msgs, prev_errs)
       runRemoteTH iserv rest
     _other -> do
       r <- handleTHMessage msg

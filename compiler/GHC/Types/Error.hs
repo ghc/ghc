@@ -5,8 +5,8 @@
 
 module GHC.Types.Error
    ( Messages
-   , WarningMessages(..)
-   , ErrorMessages(..)
+   , WarningMessages
+   , ErrorMessages
    , ErrMsg (..)
    , WarnMsg
    , ErrDoc (..)
@@ -14,13 +14,30 @@ module GHC.Types.Error
    , Severity (..)
    , RenderableDiagnostic (..)
    , showErrMsg
+   -- * Manipulating 'ErrorMessages' and 'WarningMessages'
    , mapMessages
+   , bimapMessages
    , unionMessages
+   , consError
+   , snocError
+   , consWarning
    , errDoc
    , mapErrDoc
    , pprMessageBag
+   -- * Constructing individual errors
+   , mkErrMsg
+   , mkPlainErrMsg
+   , mkErr
+   , mkLongErrMsg
+   , mkWarnMsg
+   , mkPlainWarnMsg
+   , mkLongWarnMsg
+   -- * Constructing bags of errors and messages
+   , mkWarningMessages
+   , mkErrorMessages
    , mkLocMessage
    , mkLocMessageAnn
+   -- * Accessors
    , getErrorMessages
    , getWarningMessages
    , getSeverityColour
@@ -32,6 +49,7 @@ module GHC.Types.Error
 
    -- * Promoting and demoting a warnings/errors
    , promoteWarningsToErrors
+   , demoteErrorsToWarnings
    )
 where
 
@@ -109,6 +127,11 @@ data ErrDoc = ErrDoc {
 instance RenderableDiagnostic ErrDoc where
   renderDiagnostic = id
 
+mkWarningMessages :: Bag (ErrMsg w) -> WarningMessages w
+mkWarningMessages = WarningMessages
+
+mkErrorMessages :: Bag (ErrMsg e) -> ErrorMessages e
+mkErrorMessages = ErrorMessages
 
 mapMessages :: (e -> e') -> Messages w e -> Messages w e'
 mapMessages f (ws, es) = bimapMessages id f (ws, es)
@@ -119,6 +142,18 @@ bimapMessages f g (ws, es) = (fmap f ws, fmap g es)
 unionMessages :: Messages w e -> Messages w e -> Messages w e
 unionMessages (coerce -> warns1, coerce -> errs1) (coerce -> warns2, coerce -> errs2) =
   (WarningMessages $ warns1 `unionBags` warns2, ErrorMessages $ errs1 `unionBags` errs2)
+
+-- | Prepend an error at the beginning of the 'ErrorMessages'.
+consError :: ErrMsg e -> ErrorMessages e -> ErrorMessages e
+consError e (ErrorMessages errs) = ErrorMessages (e `consBag` errs)
+
+-- | Prepend a warning at the beginning of the 'WarningMessages'.
+consWarning :: ErrMsg e -> WarningMessages e -> WarningMessages e
+consWarning w (WarningMessages warns) = WarningMessages (w `consBag` warns)
+
+-- | Append an error at the end of the 'ErrorMessages'.
+snocError :: ErrorMessages e -> ErrMsg e -> ErrorMessages e
+snocError (ErrorMessages errs) e = ErrorMessages (errs `snocBag` e)
 
 errDoc :: [MsgDoc] -> [MsgDoc] -> [MsgDoc] -> ErrDoc
 errDoc = ErrDoc
@@ -319,3 +354,36 @@ makeIntoError reason err = err
 promoteWarningsToErrors :: (w -> e) -> WarningMessages w -> ErrorMessages e
 promoteWarningsToErrors toError (WarningMessages warns) = ErrorMessages (mapBag (fmap toError) warns)
 
+demoteErrorsToWarnings :: (e -> w) -> ErrorMessages e -> WarningMessages w
+demoteErrorsToWarnings toWarning (ErrorMessages errs) = WarningMessages (mapBag (fmap toWarning) errs)
+
+--
+-- Creating ErrMsg(s)
+--
+
+mk_err_msg
+  :: RenderableDiagnostic e
+  => Severity -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+mk_err_msg sev locn print_unqual err
+ = ErrMsg { errMsgSpan = locn
+          , errMsgContext = print_unqual
+          , errMsgDiagnostic = err
+          , errMsgSeverity = sev
+          , errMsgReason = NoReason }
+
+mkErr :: RenderableDiagnostic e => SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+mkErr = mk_err_msg SevError
+
+mkLongErrMsg, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg ErrDoc
+-- ^ A long (multi-line) error message
+mkErrMsg, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> MsgDoc            -> ErrMsg ErrDoc
+-- ^ A short (one-line) error message
+mkPlainErrMsg, mkPlainWarnMsg :: SrcSpan ->                     MsgDoc            -> ErrMsg ErrDoc
+-- ^ Variant that doesn't care about qualified/unqualified names
+
+mkLongErrMsg   locn unqual msg extra = mk_err_msg SevError   locn unqual        (ErrDoc [msg] [] [extra])
+mkErrMsg       locn unqual msg       = mk_err_msg SevError   locn unqual        (ErrDoc [msg] [] [])
+mkPlainErrMsg  locn        msg       = mk_err_msg SevError   locn alwaysQualify (ErrDoc [msg] [] [])
+mkLongWarnMsg  locn unqual msg extra = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [extra])
+mkWarnMsg      locn unqual msg       = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [])
+mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify (ErrDoc [msg] [] [])

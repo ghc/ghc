@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -41,7 +42,7 @@ import GHC.Types.Var
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Shape
-import GHC.Types.Error (ErrorMessages(..))
+import GHC.Types.Error ( mkErrorMessages, getErrorMessages )
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -77,9 +78,9 @@ tcRnModExports x y = do
 failWithRn :: SDoc -> ShIfM a
 failWithRn doc = do
     errs_var <- fmap sh_if_errs getGblEnv
-    (ErrorMessages errs) <- readTcRef errs_var
+    (getErrorMessages -> errs) <- readTcRef errs_var
     -- TODO: maybe associate this with a source location?
-    writeTcRef errs_var (ErrorMessages $ errs `snocBag` (fmap TcRnErrorDoc $ mkPlainErrMsg noSrcSpan doc))
+    writeTcRef errs_var (mkErrorMessages $ errs `snocBag` (fmap TcRnErrorDoc $ mkPlainErrMsg noSrcSpan doc))
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to

@@ -3,6 +3,7 @@
 {-# LANGUAGE ExplicitForAll    #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -189,7 +190,11 @@ import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
-import GHC.Types.Error (ErrorMessages(..), WarningMessages(..))
+import GHC.Types.Error ( mkErrorMessages
+                       , mkWarningMessages
+                       , getWarningMessages
+                       , getErrorMessages
+                       )
 import GHC.Types.Fixity.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -1023,8 +1028,8 @@ reportError :: ErrMsg TcRnError -> TcRn ()
 reportError err
   = do { traceTc "Adding error:" (pprLocErrMsg err) ;
          errs_var <- getErrsVar ;
-         (warns, ErrorMessages errs) <- readTcRef errs_var ;
-         writeTcRef errs_var (warns, ErrorMessages $ errs `snocBag` err) }
+         (warns, getErrorMessages -> errs) <- readTcRef errs_var ;
+         writeTcRef errs_var (warns, mkErrorMessages $ errs `snocBag` err) }
 
 reportWarning :: WarnReason -> ErrMsg ErrDoc -> TcRn ()
 reportWarning reason err
@@ -1035,8 +1040,8 @@ reportWarning reason err
 
        ; traceTc "Adding warning:" (pprLocErrMsg warn)
        ; errs_var <- getErrsVar
-       ; (WarningMessages warns, errs) <- readTcRef errs_var
-       ; writeTcRef errs_var (WarningMessages $ warns `snocBag` warn, errs) }
+       ; (getWarningMessages -> warns, errs) <- readTcRef errs_var
+       ; writeTcRef errs_var (mkWarningMessages $ warns `snocBag` warn, errs) }
 
 
 -----------------------

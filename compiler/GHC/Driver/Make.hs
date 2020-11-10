@@ -48,18 +48,17 @@ import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
-import GHC.Driver.Errors.Types (GhcError(..), ghcErrorRawErrDoc)
+import GHC.Driver.Errors ( printBagOfErrors )
+import GHC.Driver.Errors.Types ( GhcError(..), ghcErrorRawErrDoc, GhcWarning(..) )
 import GHC.Driver.Main
 
 import GHC.Parser.Header
-import GHC.Parser.Errors.Ppr
 
 import GHC.Utils.Error
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 
-import GHC.Data.Bag        ( mapBag, unitBag, listToBag, unionManyBags, isEmptyBag )
-import GHC.Types.Basic
+import GHC.Data.Bag        ( unitBag, listToBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
@@ -74,6 +73,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import GHC.Types.Basic
+import GHC.Types.Error ( getErrorMessages, mkErrorMessages, mkWarningMessages )
 import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
@@ -115,7 +115,6 @@ import Data.Foldable (toList)
 import Data.Maybe
 import Data.Ord ( comparing )
 import Data.Time
-import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
 import System.IO        ( fixIO )
@@ -150,7 +149,7 @@ depanal :: GhcMonad m =>
         -> m ModuleGraph
 depanal excluded_mods allow_dup_roots = do
     (errs, mod_graph) <- depanalE excluded_mods allow_dup_roots
-    if isEmptyBag errs
+    if noErrors errs
       then pure mod_graph
       else throwErrors errs
 
@@ -163,7 +162,7 @@ depanalE :: GhcMonad m =>     -- New for #17459
 depanalE excluded_mods allow_dup_roots = do
     hsc_env <- getSession
     (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
-    if isEmptyBag errs
+    if noErrors errs
       then do
         warnMissingHomeModules hsc_env mod_graph
         setSession hsc_env { hsc_mod_graph = mod_graph }
@@ -213,7 +212,7 @@ depanalPartial excluded_mods allow_dup_roots = do
     let
            (errs, mod_summaries) = partitionEithers mod_summariesE
            mod_graph = mkModuleGraph mod_summaries
-    return (unionManyBags errs, mod_graph)
+    return (mconcat errs, mod_graph)
 
 -- Note [Missing home modules]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -232,7 +231,7 @@ depanalPartial excluded_mods allow_dup_roots = do
 warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
 warnMissingHomeModules hsc_env mod_graph =
     when (wopt Opt_WarnMissingHomeModules dflags && not (null missing)) $
-        logWarnings (listToBag [warn])
+        logWarnings (fmap GhcWarningRaw . mkWarningMessages $ listToBag [warn])
   where
     dflags = hsc_dflags hsc_env
     targets = map targetId (hsc_targets hsc_env)
@@ -313,7 +312,7 @@ load how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph
     warnUnusedPackages
-    if isEmptyBag errs
+    if noErrors errs
       then pure success
       else throwErrors errs
 
@@ -355,7 +354,7 @@ warnUnusedPackages = do
                    , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
 
     when (wopt Opt_WarnUnusedPackages dflags && not (null unusedArgs)) $
-      logWarnings (listToBag [warn])
+      logWarnings (fmap GhcWarningRaw . mkWarningMessages $ listToBag [warn])
 
     where
         packageArg (ExposePackage _ arg _) = Just arg
@@ -1317,7 +1316,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
         old_hpt <- readIORef old_hpt_var
 
         let logger err = printBagOfErrors lcl_dflags $
-              mapBag (fmap renderError) (srcErrorMessages err)
+              getErrorMessages (srcErrorMessages err)
 
         -- Limit the number of parallel compiles.
         let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
@@ -2090,14 +2089,16 @@ warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   dflags <- getDynFlags
   when (wopt Opt_WarnUnusedImports dflags)
-    (logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs)))
+    (logWarnings (fmap GhcWarningRaw $
+                  mkWarningMessages $
+                  listToBag (concatMap (check dflags . flattenSCC) sccs)))
   where check dflags ms =
            let mods_in_this_cycle = map ms_mod_name ms in
            [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
                              unLoc i `notElem`  mods_in_this_cycle ]
 
         warn :: DynFlags -> Located ModuleName -> WarnMsg
-        warn dflags (L loc mod) =
+        warn _dflags (L loc mod) =
            mkPlainErrMsg loc
                 (text "Warning: {-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))
@@ -2164,7 +2165,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag . fmap ghcErrorRawErrDoc $
+                    else return $ Left $ fmap ghcErrorRawErrDoc . mkErrorMessages . unitBag $
                          mkPlainErrMsg noSrcSpan $
                          text "can't find file:" <+> text file
         getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
@@ -2583,7 +2584,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ unitBag . fmap ghcErrorRawErrDoc $
+                throwE $ fmap ghcErrorRawErrDoc . mkErrorMessages . unitBag $
                 mkPlainErrMsg pi_mod_name_loc $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
@@ -2596,7 +2597,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ unitBag . fmap ghcErrorRawErrDoc $ mkPlainErrMsg pi_mod_name_loc $
+            in throwE $ fmap ghcErrorRawErrDoc . mkErrorMessages . unitBag $ mkPlainErrMsg pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2699,7 +2700,7 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
   (pi_srcimps, pi_theimps, L pi_mod_name_loc pi_mod_name)
-      <- withExceptT (mapBag (error "adinapoli")) . ExceptT $ do
+      <- withExceptT (fmap GhcErrorPs) . ExceptT $ do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
           getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
@@ -2752,18 +2753,18 @@ noModError dflags loc wanted_mod err
     cannotFindModule dflags wanted_mod err
 
 noHsFileErr :: DynFlags -> SrcSpan -> String -> ErrorMessages GhcError
-noHsFileErr dflags loc path
-  = unitBag . fmap ghcErrorRawErrDoc $ mkPlainErrMsg loc $
+noHsFileErr _dflags loc path
+  = fmap ghcErrorRawErrDoc . mkErrorMessages . unitBag $ mkPlainErrMsg loc $
         text "Can't find" <+> text path
 
 moduleNotFoundErr :: DynFlags -> ModuleName -> ErrorMessages GhcError
-moduleNotFoundErr dflags mod
-  = unitBag . fmap ghcErrorRawErrDoc $ mkPlainErrMsg noSrcSpan $
+moduleNotFoundErr _dflags mod
+  = fmap ghcErrorRawErrDoc . mkErrorMessages . unitBag $ mkPlainErrMsg noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: DynFlags -> [ModSummary] -> IO ()
 multiRootsErr _      [] = panic "multiRootsErr"
-multiRootsErr dflags summs@(summ1:_)
+multiRootsErr _dflags summs@(summ1:_)
   = throwOneError . fmap ghcErrorRawErrDoc $ mkPlainErrMsg noSrcSpan $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>

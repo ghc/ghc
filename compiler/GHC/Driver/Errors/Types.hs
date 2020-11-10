@@ -8,28 +8,45 @@ module GHC.Driver.Errors.Types (
   , ghcErrorRawErrDoc
   ) where
 
-import GHC.Driver.Session (DynFlags)
-import GHC.Parser.Errors.Ppr ()
-import GHC.Parser.Errors.Ppr ()
-import GHC.Prelude (String)
-import GHC.Tc.Errors.Types (DsError, TcRnError(..))
-import GHC.Types.Error (ErrDoc, RenderableDiagnostic, renderDiagnostic, errDoc)
-import GHC.Unit.Finder (FindResult, cannotFindModule)
-import GHC.Unit.Module.Name (ModuleName)
-import GHC.Unit.Types (UnitId, Module)
-import GHC.Utils.Outputable
+import GHC.Driver.Session ( DynFlags )
+import GHC.Prelude ( String )
+import GHC.Tc.Errors.Types ( DsError, TcRnError(..) )
+import GHC.Types.Error ( ErrDoc )
+import GHC.Unit.Finder.Types ( FindResult )
+import GHC.Unit.Module.Name ( ModuleName )
+import GHC.Unit.Types ( UnitId, Module )
+import qualified GHC.Driver.CmdLine as CmdLine
 import qualified GHC.Parser.Errors as Parser
 
+-- | The umbrella type that encompasses all the different warnings that GHC might raise during the
+-- different compilation stages.
 data GhcWarning
   = GhcWarningPs  Parser.Warning
+    -- ^ A warning raised during the the parsing phase.
+  | GhcWarningCmdLine CmdLine.Warn
   | GhcWarningRaw ErrDoc
+    -- ^ The escape hatch to convert an 'ErrDoc' into a 'GhcWarning'. Same caveats applies as for a
+    -- 'GhcErrorRaw'.
 
+-- | The umbrella type that encompasses all the different errors that GHC might raise during the
+-- different compilation stages.
 data GhcError
   = GhcErrorPs Parser.Error
+    -- ^ An error that happens in the parsing phase.
   | GhcErrorTcRn TcRnError
+    -- ^ An error that happens in the typecheck/renaming phase.
   | GhcErrorDs DsError
+    -- ^ An error that happens in the desugaring phase.
   | GhcErrorDriver DriverError
+    -- ^ An error that happens in the driver.
+  | GhcFatalWarning GhcWarning
+    -- ^ A 'GhcWarning' that is considered fatal, so it has to be treated as an error. Whether or not a
+    -- 'GhcWarning' has to be considered an error is a decision that happens towards the top of the
+    -- compilation pipeline, and is driven by the 'DynFlags' settings (e.g. if \"-Werror\" is enabled).
   | GhcErrorRaw ErrDoc
+    -- ^ The escape hatch to convert an 'ErrDoc' into a 'GhcError'. Use with care (ideally, don't)
+    -- as an 'ErrDoc' is a very lossy representation of an error, which IDEs will have a harder time to
+    -- digest.
 
 ghcErrorRawErrDoc :: ErrDoc -> GhcError
 ghcErrorRawErrDoc = GhcErrorRaw
@@ -42,29 +59,3 @@ data DriverError
   | DriverCantLoadIfaceForSafe Module
   | DriverError ErrDoc
 
-instance RenderableDiagnostic GhcWarning where
-  renderDiagnostic (GhcWarningPs w)  = renderDiagnostic w
-  renderDiagnostic (GhcWarningRaw d) = d
-
-instance RenderableDiagnostic GhcError where
-  renderDiagnostic (GhcErrorPs e)     = renderDiagnostic e
-  renderDiagnostic (GhcErrorTcRn e)   = renderDiagnostic e
-  renderDiagnostic (GhcErrorDs e)     = renderDiagnostic e
-  renderDiagnostic (GhcErrorDriver e) = renderDiagnostic e
-  renderDiagnostic (GhcErrorRaw d)    = d
-
-instance RenderableDiagnostic DriverError where
-  renderDiagnostic (DriverError d) = d
-  renderDiagnostic (DriverCannotFindModule dflags m res) =
-    errDoc [cannotFindModule dflags m res] [] []
-  renderDiagnostic (DriverNotAnExpression str) =
-    errDoc [text "not an expression:" <+> quotes (text str)] [] []
-  renderDiagnostic DriverParseErrorImport =
-    errDoc [text "parse error in import declaration"] [] []
-  renderDiagnostic (DriverPkgRequiredTrusted pkg) =
-    errDoc [ text "The package (" <> ppr pkg <> text ") is required" <>
-             text " to be trusted but it isn't!" ] [] []
-  renderDiagnostic (DriverCantLoadIfaceForSafe m) =
-    errDoc [ text "Can't load the interface file for" <+> ppr m
-          <> text ", to check that it can be safely imported" ]
-           [] []

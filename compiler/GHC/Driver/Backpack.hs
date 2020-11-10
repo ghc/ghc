@@ -21,8 +21,6 @@ module GHC.Driver.Backpack (doBackpack) where
 
 import GHC.Prelude
 
-import GHC.Data.Bag (mapBag)
-
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
 import GHC.Driver.Config
@@ -32,13 +30,13 @@ import GHC.Driver.Ppr
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Env
+import GHC.Driver.Errors ( handleFlagWarnings )
 import GHC.Driver.Errors.Types (GhcError(..), ghcErrorRawErrDoc)
 
 import GHC.Parser
 import GHC.Parser.Header
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
-import GHC.Parser.Errors.Ppr
 
 import GHC hiding (Failed, Succeeded)
 import GHC.Tc.Utils.Monad
@@ -102,7 +100,7 @@ doBackpack [src_filename] = do
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (initParserState (initParserOpts dflags) buf loc) of
-        PFailed pst -> throwErrors (error "adinapoli") -- $ mapBag (fmap GhcErrorPs) (getErrorMessages pst)
+        PFailed pst -> throwErrors (GhcErrorPs <$> getErrorMessages pst)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
@@ -743,7 +741,6 @@ summariseDecl :: PackageName
 summariseDecl pn hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
 summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
     = do hsc_env <- getSession
-         let dflags = hsc_dflags hsc_env
          -- TODO: this looks for modules in the wrong place
          r <- liftIO $ summariseModule hsc_env
                          Map.empty -- GHC API recomp not supported

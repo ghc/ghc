@@ -40,21 +40,20 @@ import GHC.Hs
 import GHC.Unit.Module
 import GHC.Builtin.Names
 
-import GHC.Types.Error (ErrorMessages(..))
+import GHC.Types.Error ( mkErrorMessages )
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
 
 import GHC.Utils.Error
 import GHC.Utils.Misc
-import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Monad
 import GHC.Utils.Exception as Exception
 
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
-import GHC.Data.Bag         ( Bag, isEmptyBag, emptyBag, listToBag, unitBag, mapBag )
+import GHC.Data.Bag         ( listToBag, unitBag )
 import GHC.Data.FastString
 
 import Control.Monad
@@ -75,7 +74,7 @@ getImports :: ParserOpts   -- ^ Parser options
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
            -> IO (Either
-               (Bag Parser.Error)
+               (ErrorMessages Parser.Error)
                ([(Maybe FastString, Located ModuleName)],
                 [(Maybe FastString, Located ModuleName)],
                 Located ModuleName))
@@ -88,13 +87,12 @@ getImports popts implicit_prelude buf filename source_filename = do
         -- assuming we're not logging warnings here as per below
       return $ Left $ Lexer.getErrorMessages pst
     POk pst rdr_module -> fmap Right $ do
-      let (_warns, errs) = Lexer.getMessages pst
+      let msgs@(_warns, errs) = Lexer.getMessages pst
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
-          ms = (emptyBag, errs)
       -- logWarnings warns
-      if not (isEmptyBag errs)
-        then throwIO $ mkSrcErr (ErrorMessages $ mapBag toGhcErrorMsg errs)
+      if errorsFound msgs
+        then throwIO $ mkSrcErr (GhcErrorPs <$> errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -311,9 +309,8 @@ getOptions' dflags toks
 checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
 checkProcessArgsResult flags
   = when (notNull flags) $
-      liftIO $ throwIO $ mkSrcErr $ ErrorMessages (listToBag $ map mkMsg flags)
-    where mkMsg (L loc flag) = toGhcErrorMsg
-                             $ Parser.Error (ErrUnknownOptionsFlag flag) noHints loc
+      liftIO $ throwIO $ mkSrcErr $ fmap GhcErrorPs $ mkErrorMessages (listToBag $ map mkMsg flags)
+    where mkMsg (L loc flag) = mkParserErr loc (ErrUnknownOptionsFlag flag)
 
 -----------------------------------------------------------------------------
 
@@ -330,11 +327,11 @@ checkExtension dflags (L l ext)
 
 languagePragParseError :: SrcSpan -> a
 languagePragParseError loc =
-  throwPsError $ Parser.Error ErrLanguagePragmaParseError noHints loc
+  throwPsError $ mkParserErr loc ErrLanguagePragmaParseError
 
 unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
 unsupportedExtnError dflags loc unsup =
-    throwPsError $ Parser.Error (ErrUnsupportedExtension unsup suggestions) noHints loc
+    throwPsError $ mkParserErr loc (ErrUnsupportedExtension unsup suggestions)
   where
      supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
      suggestions = fuzzyMatch unsup supported
@@ -342,22 +339,18 @@ unsupportedExtnError dflags loc unsup =
 
 optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages Parser.Warning Parser.Error
 optionsErrorMsgs unhandled_flags flags_lines _filename
-  = (mempty, ErrorMessages $ listToBag (map mkMsg unhandled_flags_lines))
+  = (mempty, mkErrorMessages $ listToBag (map mkMsg unhandled_flags_lines))
   where unhandled_flags_lines :: [Located String]
         unhandled_flags_lines = [ L l f
                                 | f <- unhandled_flags
                                 , L l f' <- flags_lines
                                 , f == f' ]
-        mkMsg (L flagSpan flag) =
-            GHC.Utils.Error.mkErr flagSpan alwaysQualify
-                                  $ Parser.Error (ErrUnknownOptionsFlag flag) noHints flagSpan
+        mkMsg (L flagSpan flag) = mkParserErr flagSpan (ErrUnknownOptionsFlag flag)
 
 optionsParseError :: String -> SrcSpan -> a     -- #15053
 optionsParseError str loc =
-  throwPsError $ Parser.Error (ErrOptionsGhcParseError str) noHints loc
+  throwPsError $ mkParserErr loc (ErrOptionsGhcParseError str)
 
-toGhcErrorMsg :: Parser.Error -> ErrMsg GhcError
-toGhcErrorMsg e = GhcErrorPs <$> mkErr (errLoc e) alwaysQualify e
-
-throwPsError :: Parser.Error -> a                -- #15053
-throwPsError = throw . mkSrcErr . ErrorMessages . unitBag . toGhcErrorMsg
+throwPsError :: ErrMsg Parser.Error -> a        -- #15053
+throwPsError =
+  throw . mkSrcErr . mkErrorMessages . unitBag . fmap GhcErrorPs

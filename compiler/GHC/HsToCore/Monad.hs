@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
 
@@ -106,7 +107,11 @@ import GHC.Types.Name.Ppr
 import GHC.Types.Literal ( mkLitString )
 import GHC.Types.CostCentre.State
 import GHC.Types.TyThing
-import GHC.Types.Error ( ErrorMessages(..), WarningMessages(..) )
+import GHC.Types.Error ( mkErrorMessages
+                       , getErrorMessages
+                       , mkWarningMessages
+                       , getWarningMessages
+                       )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error
@@ -453,7 +458,7 @@ warnDs reason warn
        ; loc <- getSrcSpanDs
        ; let msg = makeIntoWarning reason $
                    mkWarnMsg loc (ds_unqual env) warn
-       ; updMutVar (ds_msgs env) (\ (WarningMessages w,e) -> (WarningMessages $ w `snocBag` msg, e)) }
+       ; updMutVar (ds_msgs env) (\ (getWarningMessages -> w,e) -> (mkWarningMessages $ w `snocBag` msg, e)) }
 
 -- | Emit a warning only if the correct WarnReason is set in the DynFlags
 warnIfSetDs :: WarningFlag -> SDoc -> DsM ()
@@ -466,7 +471,7 @@ errDs err
   = do  { env <- getGblEnv
         ; loc <- getSrcSpanDs
         ; let msg = fmap TcRnErrorDoc $ mkErrMsg loc (ds_unqual env) err
-        ; updMutVar (ds_msgs env) (\ (w, ErrorMessages e) -> (w, ErrorMessages $ e `snocBag` msg)) }
+        ; updMutVar (ds_msgs env) (\ (w, getErrorMessages -> e) -> (w, mkErrorMessages $ e `snocBag` msg)) }
 
 -- | Issue an error, but return the expression for (), so that we can continue
 -- reporting errors.

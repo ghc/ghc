@@ -28,7 +28,7 @@ import GHC.Prelude
 import GHC.Utils.Monad
 import GHC.Driver.Session
 import GHC.Driver.Env
-import GHC.Driver.Errors ()
+import GHC.Driver.Errors ( printOrThrowWarnings, printBagOfErrors )
 import GHC.Driver.Errors.Types (GhcWarning)
 
 import GHC.Utils.Exception

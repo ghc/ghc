@@ -14,8 +14,11 @@ import GHC.Unit.Module.Name
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 
--- NOTE(adn) Investigate this.
+-- NOTE(adinapoli) Investigate this.
 type DsError = TcRnError
+
+-- FIXME(adinapoli) Turn into a proper data type.
+type TcRnWarning = ErrDoc
 
 data TcRnError
   = TcRnErrorDoc ErrDoc

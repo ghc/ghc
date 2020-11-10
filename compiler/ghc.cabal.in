@@ -380,7 +380,9 @@ Library
         GHC.Driver.CodeOutput
         GHC.Driver.Config
         GHC.Driver.Env
+        GHC.Driver.Env.Types
         GHC.Driver.Errors
+        GHC.Driver.Errors.Ppr
         GHC.Driver.Errors.Types
         GHC.Driver.Flags
         GHC.Driver.Hooks
@@ -464,6 +466,7 @@ Library
         GHC.Parser.CharClass
         GHC.Parser.Errors
         GHC.Parser.Errors.Ppr
+        GHC.Parser.Errors.Types
         GHC.Parser.Header
         GHC.Parser.Lexer
         GHC.Parser.PostProcess

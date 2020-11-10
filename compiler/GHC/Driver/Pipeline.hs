@@ -51,7 +51,7 @@ import GHC.Driver.Main
 import GHC.Driver.Env hiding ( Hsc )
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Config
-import GHC.Driver.Errors (GhcError(..), ghcErrorRawErrDoc)
+import GHC.Driver.Errors (GhcError(..), ghcErrorRawErrDoc, handleFlagWarnings)
 import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -62,7 +62,6 @@ import GHC.Platform.Ways
 import GHC.Platform.ArchOS
 
 import GHC.Parser.Header
-import GHC.Parser.Errors.Ppr
 
 import GHC.SysTools
 import GHC.SysTools.ExtraObj
@@ -81,7 +80,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Settings
 import GHC.Runtime.Linker.Types
 
-import GHC.Data.Bag            ( unitBag, mapBag )
+import GHC.Data.Bag            ( unitBag )
 import GHC.Data.FastString     ( mkFastString )
 import GHC.Data.StringBuffer   ( hGetStringBuffer, hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
@@ -90,6 +89,7 @@ import GHC.Iface.Make          ( mkFullIface )
 import GHC.Iface.UpdateIdInfos ( updateModDetailsIdInfos )
 
 import GHC.Types.Basic       ( SuccessFlag(..) )
+import GHC.Types.Error       ( mkErrorMessages )
 import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -149,7 +149,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   return (dflags, fp)
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
-    handler (ProgramError msg) = return $ Left $ unitBag $
+    handler (ProgramError msg) = return $ Left $ mkErrorMessages $ unitBag $
       fmap ghcErrorRawErrDoc $ mkPlainErrMsg srcspan $
         text msg
     handler ex = throwGhcExceptionIO ex
@@ -1154,7 +1154,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                 popts = initParserOpts dflags
             eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
-              Left errs -> throwErrors (error "adinapoli") -- (mapBag (fmap GhcErrorPs) errs)
+              Left errs -> throwErrors (GhcErrorPs <$> errs)
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 
