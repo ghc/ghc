@@ -15,13 +15,10 @@ import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Benchmark
 import Settings.Flavours.Development
 import Settings.Flavours.GhcInGhci
-import Settings.Flavours.Llvm
 import Settings.Flavours.Performance
-import Settings.Flavours.Profiled
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
-import Settings.Flavours.ThreadSanitizer
 import Settings.Flavours.Validate
 
 import Control.Monad.Except
