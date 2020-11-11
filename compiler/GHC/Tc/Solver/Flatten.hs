@@ -991,8 +991,6 @@ split_pi_tys' ty = split ty ty
   split orig_ty _                = ([], orig_ty, False)
 {-# INLINE split_pi_tys' #-}
 
-
-
 -- | Like 'tyConBindersTyCoBinders' but you also get a 'Bool' which is true iff
 -- there is at least one named binder.
 ty_con_binders_ty_binders' :: [TyConBinder] -> ([TyCoBinder], Bool)

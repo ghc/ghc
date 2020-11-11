@@ -1189,6 +1189,11 @@ tc_hs_type _ rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
   = do { checkWiredInTyCon typeSymbolKindCon
        ; checkExpectedKind rn_ty (mkStrLitTy s) typeSymbolKind exp_kind }
 
+--------- Wildcards
+
+tc_hs_type mode ty@(HsWildCardTy _)        ek
+  = tcAnonWildCardOcc NoExtraConstraint mode ty ek
+
 --------- Potentially kind-polymorphic types: call the "up" checker
 -- See Note [Future-proofing the type checker]
 tc_hs_type mode ty@(HsTyVar {})            ek = tc_infer_hs_type_ek mode ty ek
@@ -1197,9 +1202,6 @@ tc_hs_type mode ty@(HsAppKindTy{})         ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsOpTy {})             ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsKindSig {})          ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(XHsType (NHsCoreTy{})) ek = tc_infer_hs_type_ek mode ty ek
-
-tc_hs_type mode ty@(HsWildCardTy _)        ek
-  = tcAnonWildCardOcc NoExtraConstraint mode ty ek
 
 {-
 Note [Variable Specificity and Forall Visibility]
