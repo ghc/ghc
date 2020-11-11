@@ -815,7 +815,8 @@ flatten_exact_fam_app_fully tc tys
     do { result3 <- try_to_reduce tc xis
        ; case result3 of
            Just (co, xi) -> finish (homogenise xi co)
-           Nothing       -> return (homogenise reduced (mkTcReflCo role reduced))
+           Nothing       -> -- we have made no progress at all
+                            return (homogenise reduced (mkTcReflCo role reduced))
              where
                reduced = mkTyConApp tc xis }}}}}
   where
