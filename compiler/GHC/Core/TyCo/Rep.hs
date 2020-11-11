@@ -64,6 +64,9 @@ module GHC.Core.TyCo.Rep (
         -- * Functions over coercions
         pickLR,
 
+        -- * Synonyms
+        liftedTypeKindTyConApp,
+
         -- ** Analyzing types
         TyCoFolder(..), foldTyCo,
 
