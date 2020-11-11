@@ -639,26 +639,26 @@ findRhsArity :: DynFlags -> Id -> CoreExpr -> Arity -> ArityType
 --      so it is safe to expand e  ==>  (\x1..xn. e x1 .. xn)
 --  (b) if is_bot=True, then e applied to n args is guaranteed bottom
 findRhsArity dflags bndr rhs old_arity
-  = go (step botArityType)
+  = go 0 botArityType
       -- We always do one step, but usually that produces a result equal to
       -- old_arity, and then we stop right away, because old_arity is assumed
       -- to be sound. In other words, arities should never decrease.
       -- Result: the common case is that there is just one iteration
   where
-    go :: ArityType -> ArityType
-    go cur_atype@(AT oss div)
-      | not (isDeadEndDiv div)              -- the "stop right away" case
-      , length oss <= old_arity = cur_atype -- from above
-      | new_atype == cur_atype  = cur_atype
-      | otherwise =
-#if defined(DEBUG)
-                    pprTrace "Exciting arity"
-                       (vcat [ ppr bndr <+> ppr cur_atype <+> ppr new_atype
-                             , ppr rhs])
-#endif
-                    go new_atype
+    go :: Int -> ArityType -> ArityType
+    go !n cur_at@(AT oss div)
+      | not (isDeadEndDiv div)           -- the "stop right away" case
+      , length oss <= old_arity = cur_at -- from above
+      | next_at == cur_at       = cur_at
+      | otherwise               =
+         -- Warn if more than 2 iterations. Why 2? See Note [Exciting arity]
+         WARN( debugIsOn && n > 2, text "Exciting arity"
+                                   $$ nest 2 (
+                                        ppr bndr <+> ppr cur_at <+> ppr next_at
+                                        $$ ppr rhs) )
+         go (n+1) next_at
       where
-        new_atype = step cur_atype
+        next_at = step cur_at
 
     step :: ArityType -> ArityType
     step at = -- pprTrace "step" (ppr bndr <+> ppr at <+> ppr (arityType env rhs)) $
@@ -705,6 +705,30 @@ until it finds a stable arity type. Two wrinkles
   tail call to @acc@ in the True branch has sufficient arity.  This is done
   by the 'am_sigs' field in 'FindRhsArity', and 'lookupSigEnv' in the Var case
   of 'arityType'.
+
+Note [Exciting Arity]
+~~~~~~~~~~~~~~~~~~~~~
+The fixed-point iteration in 'findRhsArity' stabilises very quickly in almost
+all cases. To get notified of cases where we need an usual number of iterations,
+we emit a warning in debug mode, so that we can investigate and make sure that
+we really can't do better. It's a gross hack, but catches real bugs (#18870).
+
+Now, which number is "unusual"? We pick n > 2. Here's a pretty common and
+expected example that takes two iterations and would ruin the specificity
+of the warning (from T18937):
+
+  f :: [Int] -> Int -> Int
+  f []     = id
+  f (x:xs) = let y = sum [0..x]
+             in \z -> f xs (y + z)
+
+Fixed-point iteration starts with arity type ⊥ for f. After the first
+iteration, we get arity type \??.T, e.g. arity 2, because we unconditionally
+'floatIn' the let-binding (see its bottom case).  After the second iteration,
+we get arity type \?.T, e.g. arity 1, because now we are no longer allowed
+to floatIn the non-cheap let-binding.  Which is all perfectly benign, but
+means we do two iterations (well, actually 3 'step's to detect we are stable)
+and don't want to emit the warning.
 
 Note [Eta expanding through dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
