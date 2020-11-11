@@ -5,7 +5,6 @@ module Settings.Flavours.Llvm (
   quickLlvmFlavour,
 ) where
 
-import Expression
 import Flavour
 
 import Settings.Flavours.Benchmark
@@ -22,8 +21,5 @@ quickLlvmFlavour       = mkLlvmFlavour quickFlavour
 
 -- | Turn a flavour into an LLVM flavour
 mkLlvmFlavour :: Flavour -> Flavour
-mkLlvmFlavour flav = flav
-    { name = name flav ++ "-llvm"
-    , args = mconcat [ args flav
-                     , builder Ghc ? arg "-fllvm" ]
-    }
+mkLlvmFlavour flav = viaLlvmBackend $ flav
+    { name = name flav ++ "-llvm" }
