@@ -8,6 +8,7 @@ module Flavour
   , splitSections, splitSectionsIf
   , enableThreadSanitizer
   , enableDebugInfo, enableTickyGhc
+  , viaLlvmBackend
   ) where
 
 import Expression
@@ -84,6 +85,7 @@ flavourTransformers = M.fromList
     , "ticky_ghc" =: enableTickyGhc
     , "split_sections" =: splitSections
     , "thread_sanitizer" =: enableThreadSanitizer
+    , "llvm" =: viaLlvmBackend
     ]
   where (=:) = (,)
 
@@ -191,3 +193,7 @@ enableThreadSanitizer = addArgs $ mconcat
     , builder (Cabal Flags) ? arg "thread-sanitizer"
     , builder  RunTest ? arg "--config=have_thread_sanitizer=True"
     ]
+
+-- | Use the LLVM backend in stages 1 and later.
+viaLlvmBackend :: Flavour -> Flavour
+viaLlvmBackend = addArgs $ notStage0 ? builder Ghc ? arg "-fllvm"
