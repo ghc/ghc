@@ -332,9 +332,31 @@ Compiler options for profiling
     Without a :ghc-flag:`-prof` option, your ``SCC``\ s are ignored; so you can
     compile ``SCC``-laden code without changing it.
 
+.. ghc-flag:: -fno-prof-count-entries
+    :shortdesc: Do not collect entry counts
+    :type: dynamic
+    :reverse: -fprof-count-entries
+    :category:
+
+    Tells GHC not to collect information about how often functions are
+    entered at runtime (the "entries" column of the time profile), for
+    this module. This tends to make the profiled code run faster, and
+    hence closer to the speed of the unprofiled code, because GHC is
+    able to optimise more aggressively if it doesn't have to maintain
+    correct entry counts. This option can be useful if you aren't
+    interested in the entry counts (for example, if you only intend to
+    do heap profiling).
+
+
 There are a few other profiling-related compilation options. Use them
 *in addition to* :ghc-flag:`-prof`. These do not have to be used consistently
 for all modules in a program.
+
+Automatically placing cost-centres
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+GHC has a number of flags for automatically inserting cost-centres into the
+compiled program.
 
 .. ghc-flag:: -fprof-auto
     :shortdesc: Auto-add ``SCC``\\ s to all bindings not marked INLINE
@@ -342,9 +364,9 @@ for all modules in a program.
     :reverse: -fno-prof-auto
     :category:
 
-    *All* bindings not marked INLINE, whether exported or not, top level
-    or nested, will be given automatic ``SCC`` annotations. Functions
-    marked INLINE must be given a cost centre manually.
+    *All* bindings not marked :pragma:`INLINE`, whether exported or not, top
+    level or nested, will be given automatic ``SCC`` annotations. Functions
+    marked :pragma:`INLINE` must be given a cost centre manually.
 
 .. ghc-flag:: -fprof-auto-top
     :shortdesc: Auto-add ``SCC``\\ s to all top-level bindings not marked INLINE
@@ -356,11 +378,11 @@ for all modules in a program.
        single: cost centres; automatically inserting
 
     GHC will automatically add ``SCC`` annotations for all top-level
-    bindings not marked INLINE. If you want a cost centre on an INLINE
-    function, you have to add it manually.
+    bindings not marked :pragma:`INLINE`. If you want a cost centre on an
+    :pragma:`INLINE` function, you have to add it manually.
 
 .. ghc-flag:: -fprof-auto-exported
-    :shortdesc: Auto-add ``SCC``\\ s to all exported bindings not marked INLINE
+    :shortdesc: Auto-add ``SCC``\\ s to all exported bindings not marked :pragma:`INLINE`
     :type: dynamic
     :reverse: -fno-prof-auto
     :category:
@@ -369,8 +391,8 @@ for all modules in a program.
        single: cost centres; automatically inserting
 
     GHC will automatically add ``SCC`` annotations for all exported
-    functions not marked INLINE. If you want a cost centre on an INLINE
-    function, you have to add it manually.
+    functions not marked :pragma:`INLINE`. If you want a cost centre on an
+    :pragma:`INLINE` function, you have to add it manually.
 
 .. ghc-flag:: -fprof-auto-calls
     :shortdesc: Auto-add ``SCC``\\ s to all call sites
@@ -392,41 +414,7 @@ for all modules in a program.
 
     The costs of all CAFs in a module are usually attributed to one
     "big" CAF cost-centre. With this option, all CAFs get their own
-    cost-centre. An “if all else fails” option…
-
-.. ghc-flag:: -fno-prof-auto
-    :shortdesc: Disables any previous :ghc-flag:`-fprof-auto`,
-        :ghc-flag:`-fprof-auto-top`, or :ghc-flag:`-fprof-auto-exported` options.
-    :type: dynamic
-    :reverse: -fprof-auto
-    :category:
-
-    Disables any previous :ghc-flag:`-fprof-auto`, :ghc-flag:`-fprof-auto-top`, or
-    :ghc-flag:`-fprof-auto-exported` options.
-
-.. ghc-flag:: -fno-prof-cafs
-    :shortdesc: Disables any previous :ghc-flag:`-fprof-cafs` option.
-    :type: dynamic
-    :reverse: -fprof-cafs
-    :category:
-
-    Disables any previous :ghc-flag:`-fprof-cafs` option.
-
-.. ghc-flag:: -fno-prof-count-entries
-    :shortdesc: Do not collect entry counts
-    :type: dynamic
-    :reverse: -fprof-count-entries
-    :category:
-
-    Tells GHC not to collect information about how often functions are
-    entered at runtime (the "entries" column of the time profile), for
-    this module. This tends to make the profiled code run faster, and
-    hence closer to the speed of the unprofiled code, because GHC is
-    able to optimise more aggressively if it doesn't have to maintain
-    correct entry counts. This option can be useful if you aren't
-    interested in the entry counts (for example, if you only intend to
-    do heap profiling).
-
+    cost-centre. An "if all else fails" option…
 
 .. ghc-flag:: -auto-all
     :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fprof-auto`
