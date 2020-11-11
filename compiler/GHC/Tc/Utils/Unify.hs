@@ -1976,7 +1976,8 @@ checkTyFamEq dflags fun_tc fun_args ty
   = inline checkTypeEq dflags YesTypeFamilies (TyFamLHS fun_tc fun_args) ty
     -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
 
-checkTypeEq :: DynFlags -> AreTypeFamiliesOK -> CanEqLHS -> TcType -> MetaTyVarUpdateResult ()
+checkTypeEq :: DynFlags -> AreTypeFamiliesOK -> CanEqLHS -> TcType
+            -> MetaTyVarUpdateResult ()
 -- Checks the invariants for CEqCan.   In particular:
 --   (a) a forall type (forall a. blah)
 --   (b) a predicate type (c => ty)
@@ -1987,13 +1988,7 @@ checkTypeEq :: DynFlags -> AreTypeFamiliesOK -> CanEqLHS -> TcType -> MetaTyVarU
 -- For (a), (b), and (c) we check only the top level of the type, NOT
 -- inside the kinds of variables it mentions.  For (d) we look deeply
 -- in coercions when the LHS is a tyvar (but skip coercions for type family
--- LHSs), and for (e) we do look in the kinds of course.
---
--- Why skip coercions for type families? Because we don't rewrite type family
--- applications in coercions, so there's no point in looking there. On the
--- other hand, we must check for type variables, lest we mutably create an
--- infinite structure during unification.
-
+-- LHSs), and for (e) see Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
 checkTypeEq dflags ty_fam_ok lhs ty
   = go ty
   where
