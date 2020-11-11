@@ -80,7 +80,7 @@ module GHC.Core.Coercion (
         -- ** Free variables
         tyCoVarsOfCo, tyCoVarsOfCos, coVarsOfCo,
         tyCoFVsOfCo, tyCoFVsOfCos, tyCoVarsOfCoDSet,
-        coercionSize,
+        coercionSize, anyFreeVarsOfCo,
 
         -- ** Substitution
         CvSubstEnv, emptyCvSubstEnv,

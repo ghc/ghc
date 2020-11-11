@@ -16,11 +16,11 @@ module GHC.Data.TrieMap(
    -- * Maps over 'Literal's
    LiteralMap,
    -- * 'TrieMap' class
-   TrieMap(..), insertTM, deleteTM, foldMapTM,
+   TrieMap(..), insertTM, deleteTM, foldMapTM, isEmptyTM,
 
    -- * Things helpful for adding additional Instances.
    (>.>), (|>), (|>>), XT,
-   foldMaybe,
+   foldMaybe, filterMaybe,
    -- * Map for leaf compression
    GenMap,
    lkG, xtG, mapG, fdG,
@@ -72,8 +72,7 @@ class TrieMap m where
    lookupTM :: forall b. Key m -> m b -> Maybe b
    alterTM  :: forall b. Key m -> XT b -> m b -> m b
    mapTM    :: (a->b) -> m a -> m b
-
-   foldTMWithKey :: (Key m -> a -> b -> b) -> m a -> b -> b
+   filterTM :: (a -> Bool) -> m a -> m a
 
    foldTM   :: (a -> b -> b) -> m a -> b -> b
       -- The unusual argument order here makes
@@ -88,6 +87,10 @@ deleteTM k m = alterTM k (\_ -> Nothing) m
 
 foldMapTM :: (TrieMap m, Monoid r) => (a -> r) -> m a -> r
 foldMapTM f m = foldTM (\ x r -> f x S.<> r) m mempty
+
+-- This looks inefficient.
+isEmptyTM :: TrieMap m => m a -> Bool
+isEmptyTM m = foldTM (\ _ _ -> False) m True
 
 ----------------------
 -- Recall that
@@ -128,6 +131,7 @@ instance TrieMap IntMap.IntMap where
   alterTM = xtInt
   foldTM k m z = IntMap.foldr k z m
   mapTM f m = IntMap.map f m
+  filterTM f m = IntMap.filter f m
 
 xtInt :: Int -> XT a -> IntMap.IntMap a -> IntMap.IntMap a
 xtInt k f m = IntMap.alter f k m
@@ -139,6 +143,7 @@ instance Ord k => TrieMap (Map.Map k) where
   alterTM k f m = Map.alter f k m
   foldTM k m z = Map.foldr k z m
   mapTM f m = Map.map f m
+  filterTM f m = Map.filter f m
 
 
 {-
@@ -215,6 +220,7 @@ instance forall key. Uniquable key => TrieMap (UniqDFM key) where
   alterTM k f m = alterUDFM f m k
   foldTM k m z = foldUDFM k z m
   mapTM f m = mapUDFM f m
+  filterTM f m = filterUDFM f m
 
 {-
 ************************************************************************
@@ -236,6 +242,7 @@ instance TrieMap m => TrieMap (MaybeMap m) where
    alterTM  = xtMaybe alterTM
    foldTM   = fdMaybe
    mapTM    = mapMb
+   filterTM = ftMaybe
 
 instance TrieMap m => Foldable (MaybeMap m) where
   foldMap = foldMapTM
@@ -258,6 +265,19 @@ fdMaybe :: TrieMap m => (a -> b -> b) -> MaybeMap m a -> b -> b
 fdMaybe k m = foldMaybe k (mm_nothing m)
             . foldTM k (mm_just m)
 
+ftMaybe :: TrieMap m => (a -> Bool) -> MaybeMap m a -> MaybeMap m a
+ftMaybe f (MM { mm_nothing = mn, mm_just = mj })
+  = MM { mm_nothing = filterMaybe f mn, mm_just = filterTM f mj }
+
+foldMaybe :: (a -> b -> b) -> Maybe a -> b -> b
+foldMaybe _ Nothing  b = b
+foldMaybe k (Just a) b = k a b
+
+filterMaybe :: (a -> Bool) -> Maybe a -> Maybe a
+filterMaybe _ Nothing = Nothing
+filterMaybe f input@(Just x) | f x       = input
+                             | otherwise = Nothing
+
 {-
 ************************************************************************
 *                                                                      *
@@ -277,6 +297,7 @@ instance TrieMap m => TrieMap (ListMap m) where
    alterTM  = xtList alterTM
    foldTM   = fdList
    mapTM    = mapList
+   filterTM = ftList
 
 instance TrieMap m => Foldable (ListMap m) where
   foldMap = foldMapTM
@@ -303,9 +324,9 @@ fdList :: forall m a b. TrieMap m
 fdList k m = foldMaybe k          (lm_nil m)
            . foldTM    (fdList k) (lm_cons m)
 
-foldMaybe :: (a -> b -> b) -> Maybe a -> b -> b
-foldMaybe _ Nothing  b = b
-foldMaybe k (Just a) b = k a b
+ftList :: TrieMap m => (a -> Bool) -> ListMap m a -> ListMap m a
+ftList f (LM { lm_nil = mnil, lm_cons = mcons })
+  = LM { lm_nil = filterMaybe f mnil, lm_cons = mapTM (filterTM f) mcons }
 
 {-
 ************************************************************************
@@ -367,6 +388,7 @@ instance (Eq (Key m), TrieMap m) => TrieMap (GenMap m) where
    alterTM  = xtG
    foldTM   = fdG
    mapTM    = mapG
+   filterTM = ftG
 
 instance (Eq (Key m), TrieMap m) => Foldable (GenMap m) where
   foldMap = foldMapTM
@@ -419,3 +441,13 @@ fdG :: TrieMap m => (a -> b -> b) -> GenMap m a -> b -> b
 fdG _ EmptyMap = \z -> z
 fdG k (SingletonMap _ v) = \z -> k v z
 fdG k (MultiMap m) = foldTM k m
+
+{-# INLINEABLE ftG #-}
+ftG :: TrieMap m => (a -> Bool) -> GenMap m a -> GenMap m a
+ftG _ EmptyMap = EmptyMap
+ftG f input@(SingletonMap _ v)
+  | f v       = input
+  | otherwise = EmptyMap
+ftG f (MultiMap m) = MultiMap (filterTM f m)
+  -- we don't have enough information to reconstruct the key to make
+  -- a SingletonMap
