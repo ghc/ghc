@@ -2169,7 +2169,8 @@ Why?, for example:
 - For CIrredCan we want to see if a constraint is insoluble with insolubleWC
 
 On the other hand, we change CEqCan to CNonCanonical, because of all of
-CEqCan's invariants, which can break during zonking. Besides, the constraint
+CEqCan's invariants, which can break during zonking. (Example: a ~R alpha, where
+we have alpha := N Int, where N is a newtype.) Besides, the constraint
 will be canonicalised again, so there is little benefit in keeping the
 CEqCan structure.
 

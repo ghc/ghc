@@ -802,6 +802,7 @@ Proof.  By property (R2), with f1=f2
 Definition [Generalised substitution]
 A "generalised substitution" S is a set of triples (t0 -f-> t), where
   t0 is a type variable or an exactly-saturated type family application
+    (that is, t0 is a CanEqLHS)
   t is a type
   f is a flavour
 such that
@@ -876,7 +877,7 @@ Main Theorem [Stability under extension]
                 AND (K3) See Note [K3: completeness of solving]
                     { (K3a) If the role of fs is nominal: s /= t0
                       (K3b) If the role of fs is representational:
-                            s is not of form (a t1 .. tn) } }
+                            s is not of form (t0 t1 .. tn) } }
 
 
 Conditions (T1-T3) are established by the canonicaliser
@@ -1148,6 +1149,9 @@ Additional notes:
     * efficiency: silly to process the same thing twice
     * inert_dicts is a finite map keyed by
       the type; it's inconvenient for it to map to TWO constraints
+
+Another example requiring Deriveds is in
+Note [Put touchable variables on the left] in GHC.Tc.Solver.Canonical.
 
 Note [Splitting WD constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1774,7 +1778,7 @@ kick_out_rewritable new_fr new_lhs
             && fr_can_rewrite_ty eq_rel rhs_ty    -- (K2d)
             -- (K2c) is guaranteed by the first guard of keep_eq
 
-        kick_out_for_completeness
+        kick_out_for_completeness  -- (K3) and Note [K3: completeness of solving]
           = case (eq_rel, new_lhs) of
               (NomEq, _)  -> rhs_ty `eqType` canEqLHSType new_lhs
               (ReprEq, TyVarLHS new_tv) -> isTyVarHead new_tv rhs_ty
@@ -1815,6 +1819,8 @@ kickOutAfterFillingCoercionHole hole filled_co
 
        ; setInertCans ics' }
   where
+    holes_of_co = coercionHolesOfCo filled_co
+
     kick_out :: InertCans -> (WorkList, InertCans)
     kick_out ics@(IC { inert_irreds = irreds })
       = let (to_kick, to_keep) = partitionBagWith kick_ct irreds
@@ -1830,7 +1836,7 @@ kickOutAfterFillingCoercionHole hole filled_co
     kick_ct ct@(CIrredCan { cc_status = BlockedCIS holes })
       | hole `elementOfUniqSet` holes
       = let new_holes = holes `delOneFromUniqSet` hole
-                              `unionUniqSets` coercionHolesOfCo filled_co
+                              `unionUniqSets` holes_of_co
             updated_ct = ct { cc_status = BlockedCIS new_holes }
         in
         if isEmptyUniqSet new_holes
@@ -2238,14 +2244,15 @@ We must determine whether a Given might later match a Wanted. We
 definitely need to account for the possibility that any metavariable
 in the Wanted might be arbitrarily instantiated. We do *not* want
 to allow skolems in the Given to be instantiated. But what about
-type family applications?
+type family applications? (Examples are below the explanation.)
 
 To allow flexibility in how type family applications unify we use
-the Core flattener. See Note [Flattening] in GHC.Core.Unify.
+the Core flattener. See
+Note [Flattening type-family applications when matching instances] in GHC.Core.Unify.
 This is *distinct* from the flattener in GHC.Tc.Solver.Flatten.
 The Core flattener replaces all type family applications with
 fresh variables. The next question: should we allow these fresh
-variables in the domian of a unifying substitution?
+variables in the domain of a unifying substitution?
 
 A type family application that mentions only skolems is settled: any
 skolems would have been rewritten w.r.t. Givens by now. These type
@@ -2255,6 +2262,30 @@ So, if the original type family application contains a metavariable,
 we use BindMe to tell the unifier to allow it in the substitution.
 On the other hand, a type family application with only skolems is
 considered rigid.
+
+Examples:
+    [G] C a
+    [W] C alpha
+  This easily might match later.
+
+    [G] C a
+    [W] C (F alpha)
+  This might match later, too, but we need to flatten the (F alpha)
+  to a fresh variable so that the unifier can connect the two.
+
+    [G] C (F alpha)
+    [W] C a
+  This also might match later. Again, we will need to flatten to
+  find this out. (Surprised about a metavariable in a Given? See
+  #18929.)
+
+    [G] C (F a)
+    [W] C a
+  This won't match later. We're not going to get new Givens that
+  can inform the F a, and so this is a no-go.
+
+This treatment fixes #18910 and is tested in
+typecheck/should_compile/InstanceGivenOverlap{,2}
 
 Note [When does an implication have given equalities?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3599,7 +3630,7 @@ breakTyVarCycle loc = go
     go ty@(Rep.ForAllTy {})   = return ty  -- See Detail (1) of Note
     go ty@(Rep.CoercionTy {}) = return ty  -- See Detail (2) of Note
 
--- | Filli in CycleBreakerTvs with the variables they stand for.
+-- | Fill in CycleBreakerTvs with the variables they stand for.
 -- See Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical.
 restoreTyVarCycles :: InertSet -> TcM ()
 restoreTyVarCycles is
@@ -3609,6 +3640,7 @@ restoreTyVarCycles is
 -- Unwrap a type synonym only when either:
 --   The type synonym is forgetful, or
 --   the type synonym mentions a type family in its expansion
+-- See Note [Flattening synonyms] in GHC.Tc.Solver.Flatten.
 flattenView :: TcType -> Maybe TcType
 flattenView ty@(Rep.TyConApp tc _)
   | isForgetfulSynTyCon tc || (isTypeSynonymTyCon tc && not (isFamFreeTyCon tc))

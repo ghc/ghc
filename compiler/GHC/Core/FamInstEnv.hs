@@ -428,7 +428,8 @@ Here is how we do it:
 apart(target, pattern) = not (unify(flatten(target), pattern))
 
 where flatten (implemented in flattenTys, below) converts all type-family
-applications into fresh variables. (See Note [Flattening] in GHC.Core.Unify.)
+applications into fresh variables. (See
+Note [Flattening type-family applications when matching instances] in GHC.Core.Unify.)
 
 Note [Compatibility]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1176,7 +1177,8 @@ findBranch branches target_tys
                         , cab_incomps = incomps }) = branch
             in_scope = mkInScopeSet (unionVarSets $
                             map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
-            -- See Note [Flattening] in GHC.Core.Unify
+            -- See Note [Flattening type-family applications when matching instances]
+            -- in GHC.Core.Unify
             flattened_target = flattenTys in_scope target_tys
         in case tcMatchTys tpl_lhs target_tys of
         Just subst -- matching worked. now, check for apartness.
@@ -1193,11 +1195,11 @@ findBranch branches target_tys
 -- (POPL '14). This should be used when determining if an equation
 -- ('CoAxBranch') of a closed type family can be used to reduce a certain target
 -- type family application.
-apartnessCheck :: [Type]     -- ^ /flattened/ target arguments. Make sure
-                             -- they're flattened! See Note [Flattening]
-                             -- in GHC.Core.Unify
-                             -- (NB: This "flat" is a different
-                             -- "flat" than is used in GHC.Tc.Solver.Flatten.)
+apartnessCheck :: [Type]
+  -- ^ /flattened/ target arguments. Make sure they're flattened! See
+  -- Note [Flattening type-family applications when matching instances]
+  -- in GHC.Core.Unify. (NB: This "flat" is a different
+ -- "flat" than is used in GHC.Tc.Solver.Flatten.)
                -> CoAxBranch -- ^ the candidate equation we wish to use
                              -- Precondition: this matches the target
                -> Bool       -- ^ True <=> equation can fire

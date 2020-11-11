@@ -1019,29 +1019,21 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Decompose FunTy: (s -> t) and (c => t)
 -- NB: don't decompose (Int -> blah) ~ (Show a => blah)
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
-           (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) ps_ty1
-           (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) ps_ty2
-  | Just ty1a_rep <- getRuntimeRep_maybe ty1a  -- getRutimeRep_maybe:
+           (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
+           (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
+  | af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
+  , Just ty1a_rep <- getRuntimeRep_maybe ty1a  -- getRutimeRep_maybe:
   , Just ty1b_rep <- getRuntimeRep_maybe ty1b  -- see Note [Decomposing FunTy]
   , Just ty2a_rep <- getRuntimeRep_maybe ty2a
   , Just ty2b_rep <- getRuntimeRep_maybe ty2b
-  = if af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
-    then canDecomposableTyConAppOK ev eq_rel funTyCon
+  = canDecomposableTyConAppOK ev eq_rel funTyCon
                               [am1, ty1a_rep, ty1b_rep, ty1a, ty1b]
                               [am2, ty2a_rep, ty2b_rep, ty2a, ty2b]
-    else canEqHardFailure ev ps_ty1 ps_ty2
-      -- in the "else" case, we don't want to fall through, because the TyConApp
-      -- case may trigger, giving a worse error
 
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already
--- We still have to handle the FunTy case separately, just to avoid decomposing
--- (Int -> blah) and (Show a => blah).
-can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
-    -- use tcSplit to avoid splitting (Eq a => Bool)
-  | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
-  , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
-  , not (isTypeFamilyTyCon tc1)
+can_eq_nc' _flat _rdr_env _envs ev eq_rel (TyConApp tc1 tys1) _ (TyConApp tc2 tys2) _
+  | not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
@@ -2040,7 +2032,7 @@ See also #10715, which induced this addition.
 
 Note [Put touchable variables on the left]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#10009, a very nasty example:
+Ticket #10009, a very nasty example:
 
     f :: (UnF (F b) ~ b) => F b -> ()
 
@@ -2085,7 +2077,7 @@ in a Given. On the other hand, the original LHS mentioned only variables
 that appear in Givens. We thus choose to put variables that can appear
 in Wanteds on the left.
 
-#12526 is another good example of this in action.
+Ticket #12526 is another good example of this in action.
 
 -}
 
@@ -2530,17 +2522,18 @@ Wrinkles:
      tales of destruction.
 
      So, we have an invariant on CEqCan (TyEq:H) that the RHS does not have
-     any coercion holes. This is checked in metaTyVarUpdateOK. We also
+     any coercion holes. This is checked in checkTypeEq. Any equalities that
+     have such an RHS are turned in CIrredCans with a BlockedCIS status. We also
      must be sure to kick out any constraints that mention coercion holes
-     when those holes get filled in.
+     when those holes get filled in, so that the unification step can now proceed.
 
      (2a) We must now absolutely make sure to kick out any constraints that
-          mention a newly-filled-in coercion hole. This is done in
-          kickOutAfterFillingCoercionHole. But we only kick out when the
-          filling coercion contains no coercion holes. This extra check
-          avoids needless work when rewriting evidence (which fills coercion
-          holes) and aids efficiency. It also can avoid a loop in the solver
-          that would otherwise arise in this case:
+          mention a newly-filled-in coercion hole -- if there are no more
+          remaining coercion holes. This is done in
+          kickOutAfterFillingCoercionHole. The extra check that there are no
+          more remaining holes avoids needless work when rewriting evidence
+          (which fills coercion holes) and aids efficiency. It also can avoid
+          a loop in the solver that would otherwise arise in this case:
                [W] w1 :: (ty1 :: F a) ~ (ty2 :: s)
           After canonicalisation, we discover that this equality is heterogeneous.
           So we emit
@@ -2551,11 +2544,14 @@ Wrinkles:
           and forth, as it goes through canEqTyVarFunEq. We thus get
           co_abc := sym co_abd, and then co_abd := sym co_abe, with
                [W] co_abe :: F a ~ s
-          right back where we started. But all this filling in would,
-          naively, cause kicking w2 out. Which, when it got processed,
+          right back where we started. (At this point, we're in canEqCanLHSFinish,
+          so we're not looping.) But all this filling in would,
+          naively, cause w2 to be kicked out. Which, when it got processed,
           would get this whole chain going again. The solution is to
           kick out a blocked constraint only when the result of filling
           in the blocking coercion involves no further blocking coercions.
+          Alternatively, we could be careful not to do unnecessary swaps during
+          canonicalisation, but that seems hard to do, in general.
 
      (2b) Consider this case:
              [G] co_given :: k1 ~ k2
@@ -2592,8 +2588,8 @@ Wrinkles:
      cast appears opposite a tyvar. This is implemented in the cast case
      of can_eq_nc'.
 
- (4) Reporting an error for a constraint that is blocked only because
-     of wrinkle (2) is hard: what would we say to users? And we don't
+ (4) Reporting an error for a constraint that is blocked with status BlockedCIS
+     is hard: what would we say to users? And we don't
      really need to report, because if a constraint is blocked, then
      there is unsolved wanted blocking it; that unsolved wanted will
      be reported. We thus push such errors to the bottom of the queue
@@ -2671,7 +2667,25 @@ In order to solve the Wanted, we must use the Given to rewrite `a` to
 Maybe (F a). But note that the Given has an occurs-check failure, and
 so we can't straightforwardly add the Given to the inert set.
 
-Instead, we detect this scenario by the following characteristics:
+The key idea is to replace the (F a) in the RHS of the Given with a
+fresh variable, which we'll call a CycleBreakerTv, or cbv. Then, emit
+a new Given to connect cbv with F a. So our situation becomes
+
+  instance C (Maybe b)
+  [G] a ~ Maybe cbv
+  [G] F a ~ cbv
+  [W] C a
+
+Note the orientation of the second Given. The type family ends up
+on the left; see commentary on canEqTyVarFunEq, which decides how to
+orient such cases. No special treatment for CycleBreakerTvs is
+necessary. This scenario is now easily soluble, by using the first
+Given to rewrite the Wanted, which can now be solved.
+
+(The first Given actually also rewrites the second one. This causes
+no trouble.)
+
+More generally, we detect this scenario by the following characteristics:
  - a Given CEqCan constraint
  - with a tyvar on its LHS
  - with a soluble occurs-check failure
@@ -2689,16 +2703,24 @@ after we're done running the solver (in nestImplicTcS and runTcSWithEvBinds).
 This is done by restoreTyVarCycles, which uses the inert_cycle_breakers field in
 InertSet, which contains the pairings invented in breakTyVarCycle.
 
-In our example, we start with
+That is:
 
-  [G] a ~ Maybe (F a)
+We transform
+  [G] g : a ~ ...(F a)...
+to
+  [G] (Refl a) : F a ~ cbv      -- CEqCan
+  [G] g        : a ~ ...cbv...  -- CEqCan
 
-We then change this to become
-
-  [G] a ~ Maybe cbv
-  [G] F a ~ cbv
-
-and set cbv := F a after we're done solving.
+Note that
+* `cbv` is a fresh cycle breaker variable.
+* `cbv` is a is a meta-tyvar, but it is completely untouchable.
+* We track the cycle-breaker variables in inert_cycle_breakers in InertSet
+* We eventually fill in the cycle-breakers, with `cbv := F a`.
+  No one else fills in cycle-breakers!
+* This fill-in is done when solving is complete, by restoreTyVarCycles
+  in nestImplicTcS and runTcSWithEvBinds.
+* The evidence for the new `F a ~ cbv` constraint is Refl, because we know this fill-in is
+  ultimately going to happen.
 
 There are drawbacks of this approach:
 
@@ -2749,14 +2771,26 @@ Details:
      The temporary ill-kinded type hurts no one, and avoiding this would
      be quite painfully difficult.
 
+     Specifically, this detail does not contravene the Purely Kinded Type Invariant
+     (Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType).
+     The PKTI says that we can call typeKind on any type, without failure.
+     It would be violated if we, say, replaced a kind (a -> b) with a kind c,
+     because an arrow kind might be consulted in piResultTys. Here, we are
+     replacing one opaque type like (F a b c) with another, cbv (opaque in
+     that we never assume anything about its structure, like that it has a
+     result type or a RuntimeRep argument).
+
  (4) The evidence for the produced Givens is all just reflexive, because
      we will eventually set the cycle-breaker variable to be the type family,
      and then, after the zonk, all will be well.
 
  (5) The approach here is inefficient. For instance, we could choose to
-     affect only type family applications that mention the offending variable.
-     We could try to detect cases like a ~ (F a, F a) and use the same
-     tyvar to replace F a. (Cf. Note [Flattening] in GHC.Core.Unify, which
+     affect only type family applications that mention the offending variable:
+     in a ~ (F b, G a), we need to replace only G a, not F b. Furthermore,
+     we could try to detect cases like a ~ (F a, F a) and use the same
+     tyvar to replace F a. (Cf.
+     Note [Flattening type-family applications when matching instances]
+     in GHC.Core.Unify, which
      goes to this extra effort.) There may be other opportunities for
      improvement. However, this is really a very small corner case, always
      tickled by a user-written Given. The investment to craft a clever,
@@ -2768,7 +2802,9 @@ Details:
      evidence itself. As in Detail (4), we don't need to change the
      evidence term (as in e.g. rewriteEqEvidence) because the cycle
      breaker variables are all zonked away by the time we examine the
-     evidence.
+     evidence. That is, we must set the ctev_pred of the ctEvidence.
+     This is implemented in canEqCanLHSFinish, with a reference to
+     this detail.
 
  (7) We don't wish to apply this magic to CycleBreakerTvs themselves.
      Consider this, from typecheck/should_compile/ContextStack2:
@@ -2801,7 +2837,11 @@ Details:
      unchecked, this will end up breaking cycles again, looping ad
      infinitum (and resulting in a context-stack reduction error,
      not an outright loop). The solution is easy: don't break cycles
-     if the var is already a CycleBreakerTv. This makes sense, because
+     if the var is already a CycleBreakerTv. Instead, we mark this
+     final Given as a CIrredCan with an OtherCIS status (it's not
+     insoluble).
+
+     Not breaking cycles fursther makes sense, because
      we only want to break cycles for user-written loopy Givens, and
      a CycleBreakerTv certainly isn't user-written.
 
