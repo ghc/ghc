@@ -2659,7 +2659,8 @@ FamInstEnv, and so lives here.
 
 Note [simplifyArgsWorker]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Invariant (F2) of Note [Flattening] says that flattening is homogeneous.
+Invariant (F2) of Note [Flattening] in GHC.Tc.Solver.Flatten says that
+flattening is homogeneous.
 This causes some trouble when flattening a function applied to a telescope
 of arguments, perhaps with dependency. For example, suppose
 

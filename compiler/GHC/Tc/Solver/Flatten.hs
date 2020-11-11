@@ -362,7 +362,7 @@ If we need to make this yet more performant, a possible way forward is to
 duplicate the flattener code for the nominal case, and make that case
 faster. This doesn't seem quite worth it, yet.
 
-Note [flatten_exact_fam_app_fully performance]
+Note [flatten_exact_fam_app performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Once we've got a flat rhs, we extend the famapp-cache to record
 the result. Doing so can save lots of work when the same redex shows up more
@@ -727,15 +727,22 @@ keeps types smaller. But we need to take care.
 Suppose
    type Syn a = Int
    type instance F Bool = Syn (F Bool)
+   [G] F Bool ~ Syn (F Bool)
 
-If we don't expand the synonym, we'll fall into an unnecessary loop.
+If we don't expand the synonym, we'll get a spurious occurs-check
+failure. This is normally what occCheckExpand takes care of, but
+the LHS is a type family application, and occCheckExpand (already
+complex enough as it is) does not know how to expand to avoid
+a type family application.
 
 In addition, expanding the forgetful synonym like this
-will generally yield a *smaller* type. We thus expand forgetful
+will generally yield a *smaller* type. To wit, if we spot
+S ( ... F tys ... ), where S is forgetful, we don't want to bother
+doing hard work simplifying (F tys). We thus expand forgetful
 synonyms, but not others.
 
-One nice consequence is that we never have to occCheckExpand flattened
-types, as any forgetful synonyms are already expanded.
+isForgetfulSynTyCon returns True more often than it needs to, so
+we err on the side of more expansion.
 
 We also, of course, must expand type synonyms that mention type families,
 so those families can get reduced.
@@ -745,11 +752,63 @@ so those families can get reduced.
              Flattening a type-family application
 *                                                                      *
 ************************************************************************
+
+Note [How to normalise a family application]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given an exactly saturated family application, how should we normalise it?
+This Note spells out the algorithm and its reasoning.
+
+STEP 1. Try the famapp-cache. If we get a cache hit, jump to FINISH.
+
+STEP 2. Try top-level instances. Note that we haven't simplified the arguments
+  yet. Example:
+    type instance F (Maybe a) = Int
+    target: F (Maybe (G Bool))
+  Instead of first trying to simplify (G Bool), we use the instance first. This
+  avoids the work of simplifying G Bool.
+
+  If an instance is found, jump to FINISH.
+
+STEP 3. Flatten all arguments. This might expose more information so that we
+  can use a top-level instance.
+
+  Continue to the next step.
+
+STEP 4. Try the inerts. Note that we try the inerts *after* flattening the
+  arguments, because the inerts will have flattened LHSs.
+
+  If an inert is found, jump to FINISH.
+
+STEP 5. Try the famapp-cache again. Now that we've revealed more information
+  in the arguments, the cache might be helpful.
+
+  If we get a cache hit, jump to FINISH.
+
+STEP 6. Try top-level instances, which might trigger now that we know more
+  about the argumnents.
+
+  If an instance is found, jump to FINISH.
+
+STEP 7. No progress to be made. Return what we have. (Do not do FINISH.)
+
+FINISH 1. We've made a reduction, but the new type may still have more
+  work to do. So flatten the new type.
+
+FINISH 2. Add the result to the famapp-cache, connecting the type we started
+  with to the one we ended with.
+
+Because STEP 1/2 and STEP 5/6 happen the same way, they are abstracted into
+try_to_reduce.
+
+FINISH is naturally implemented in `finish`. But, Note [flatten_exact_fam_app performance]
+tells us that we should not add to the famapp-cache after STEP 1/2. So `finish`
+is inlined in that case, and only FINISH 1 is performed.
+
 -}
 
 flatten_fam_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
   --   flatten_fam_app            can be over-saturated
-  --   flatten_exact_fam_app_fully lifts out the application to top level
+  --   flatten_exact_fam_app      lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
 flatten_fam_app tc tys  -- Can be over-saturated
     = ASSERT2( tys `lengthAtLeast` tyConArity tc
@@ -760,26 +819,27 @@ flatten_fam_app tc tys  -- Can be over-saturated
                  -- in which case the remaining arguments should
                  -- be dealt with by AppTys
       do { let (tys1, tys_rest) = splitAt (tyConArity tc) tys
-         ; (xi1, co1) <- flatten_exact_fam_app_fully tc tys1
+         ; (xi1, co1) <- flatten_exact_fam_app tc tys1
                -- co1 :: xi1 ~ F tys1
 
          ; flatten_app_ty_args xi1 co1 tys_rest }
 
 -- the [TcType] exactly saturate the TyCon
-flatten_exact_fam_app_fully :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
-flatten_exact_fam_app_fully tc tys
+-- See Note [How to normalise a family application]
+flatten_exact_fam_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
+flatten_exact_fam_app tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
 
-       -- Step 1. Try to reduce without reducing arguments first.
+       -- STEP 1/2. Try to reduce without reducing arguments first.
        ; result1 <- try_to_reduce tc tys
        ; case result1 of
              -- Don't use `finish`;
-             -- See Note [flatten_exact_fam_app_fully performance]
+             -- See Note [flatten_exact_fam_app performance]
          { Just (co, xi) -> do { (xi2, co2) <- bumpDepth $ flatten_one xi
                                ; return (xi2, co2 `mkTcTransCo` co) }
          ; Nothing ->
 
-        -- That didn't work. So reduce the arguments.
+        -- That didn't work. So reduce the arguments, in STEP 3.
     do { (xis, cos, kind_co) <- flatten_args_tc tc (repeat Nominal) tys
            -- kind_co :: tcTypeKind(F xis) ~N tcTypeKind(F tys)
 
@@ -795,6 +855,7 @@ flatten_exact_fam_app_fully tc tys
                --   and co' :: xi' ~r F tys, which is homogeneous
              homogenise xi co = homogenise_result xi (co `mkTcTransCo` args_co) role kind_co
 
+         -- STEP 4: try the inerts
        ; result2 <- liftTcS $ lookupFamAppInert tc xis
        ; flavour <- getFlavour
        ; case result2 of
@@ -813,11 +874,11 @@ flatten_exact_fam_app_fully tc tys
 
          ; _ ->
 
-         -- inert didn't work. Try to reduce again
+         -- inert didn't work. Try to reduce again, in STEP 5/6.
     do { result3 <- try_to_reduce tc xis
        ; case result3 of
            Just (co, xi) -> finish (homogenise xi co)
-           Nothing       -> -- we have made no progress at all
+           Nothing       -> -- we have made no progress at all: STEP 7.
                             return (homogenise reduced (mkTcReflCo role reduced))
              where
                reduced = mkTyConApp tc xis }}}}}
@@ -825,10 +886,13 @@ flatten_exact_fam_app_fully tc tys
       -- call this if the above attempts made progress.
       -- This recursively flattens the result and then adds to the cache
     finish :: (Xi, Coercion) -> FlatM (Xi, Coercion)
-    finish (xi, co) = do { (fully, fully_co) <- bumpDepth $ flatten_one xi
+    finish (xi, co) = do { -- flatten the result: FINISH 1
+                           (fully, fully_co) <- bumpDepth $ flatten_one xi
                          ; let final_co = fully_co `mkTcTransCo` co
                          ; eq_rel <- getEqRel
                          ; flavour <- getFlavour
+
+                           -- extend the cache: FINISH 2
                          ; when (eq_rel == NomEq && flavour /= Derived) $
                              -- the cache only wants Nominal eqs
                              -- and Wanteds can rewrite Deriveds; the cache
@@ -837,12 +901,15 @@ flatten_exact_fam_app_fully tc tys
                          ; return (fully, final_co) }
 
 -- Returned coercion is output ~r input, where r is the role in the FlatM monad
+-- See Note [How to normalise a family application]
 try_to_reduce :: TyCon -> [TcType] -> FlatM (Maybe (TcCoercion, TcType))
 try_to_reduce tc tys
-  = do { result <- liftTcS $ firstJustsM [ lookupFamAppCache tc tys
-                                         , matchFam tc tys ]
+  = do { result <- liftTcS $ firstJustsM [ lookupFamAppCache tc tys  -- STEP 5
+                                         , matchFam tc tys ]         -- STEP 6
        ; downgrade result }
   where
+    -- The result above is always Nominal. We might want a Representational
+    -- coercion; this downgrades (and prints, out of convenience).
     downgrade :: Maybe (TcCoercionN, TcType) -> FlatM (Maybe (TcCoercion, TcType))
     downgrade Nothing = return Nothing
     downgrade result@(Just (co, xi))

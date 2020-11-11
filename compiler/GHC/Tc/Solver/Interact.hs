@@ -2096,7 +2096,7 @@ The partial solution is that:
 The end effect is that, much as we do for overlapping instances, we
 delay choosing a class instance if there is a possibility of another
 instance OR a given to match our constraint later on. This fixes
-#4981 and #5002.
+tickets #4981 and #5002.
 
 Other notes:
 

@@ -821,8 +821,11 @@ data TyCon
                                  --          any type synonym families (data families
                                  --          are fine), again after expanding any
                                  --          nested synonyms
-        synIsForgetful :: Bool   -- True <=> at least one argument is not mentioned
-                                 --          in the RHS
+        synIsForgetful :: Bool   -- True <=  at least one argument is not mentioned
+                                 --          in the RHS (or is mentioned only under
+                                 --          forgetful synonyms)
+                                 -- Test is conservative, so True does not guarantee
+                                 -- forgetfulness.
     }
 
   -- | Represents families (both type and data)
@@ -2056,7 +2059,11 @@ isFamFreeTyCon (SynonymTyCon { synIsFamFree = fam_free }) = fam_free
 isFamFreeTyCon (FamilyTyCon { famTcFlav = flav })         = isDataFamFlav flav
 isFamFreeTyCon _                                          = True
 
--- | Is this a forgetful type synonym?
+-- | Is this a forgetful type synonym? If this is a type synonym whose
+-- RHS does not mention one (or more) of its bound variables, returns
+-- True. Thus, False means that all bound variables appear on the RHS;
+-- True may not mean anything, as the test to set this flag is
+-- conservative.
 isForgetfulSynTyCon :: TyCon -> Bool
 isForgetfulSynTyCon (SynonymTyCon { synIsForgetful = forget }) = forget
 isForgetfulSynTyCon _                                          = False

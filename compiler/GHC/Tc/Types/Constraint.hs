@@ -113,6 +113,36 @@ import qualified Data.Semigroup ( (<>) )
 *   These are the constraints the low-level simplifier works with      *
 *                                                                      *
 ************************************************************************
+
+Note [CEqCan occurs check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+A CEqCan relates a CanEqLHS (a type variable or type family applications) on
+its left to an arbitrary type on its right. It is used for rewriting, in the
+flattener. Because it is used for rewriting, it would be disastrous if the RHS
+were to mention the LHS: this would cause a loop in rewriting.
+
+We thus perform an occurs-check. There is, of course, some subtlety:
+
+* For type variables, the occurs-check looks deeply. This is because
+  a CEqCan over a meta-variable is also used to inform unification,
+  in GHC.Tc.Solver.Interact.solveByUnification. If the LHS appears
+  anywhere, at all, in the RHS, unification will create an infinite
+  structure, which is bad.
+
+* For type family applications, the occurs-check is shallow; it looks
+  only in places where we might rewrite. (Specifically, it does not
+  look in kinds or coercions.) An occurrence of the LHS in, say, an
+  RHS coercion is OK, as we do not rewrite in coercions. No loop to
+  be found.
+
+  You might also worry about the possibility that a type family
+  application LHS doesn't exactly appear in the RHS, but something
+  that reduces to the LHS does. Yet that can't happen: the RHS is
+  already inert, with all type family redexes reduced. So a simple
+  syntactic check is just fine.
+
+The occurs check is performed in GHC.Tc.Utils.Unify.checkTypeEq.
+
 -}
 
 -- | A 'Xi'-type is one that has been fully rewritten with respect
@@ -157,8 +187,7 @@ data Ct
        --   * See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.Monad
        --   * Many are checked in checkTypeEq in GHC.Tc.Utils.Unify
        --   * (TyEq:OC) lhs does not occur in rhs (occurs check)
-       --       (skips coercions if the lhs is a type family application, because
-       --        we don't rewrite type families in coercions)
+       --               Note [CEqCan occurs check]
        --   * (TyEq:F) rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
        --   * (TyEq:K) tcTypeKind lhs `tcEqKind` tcTypeKind rhs; Note [Ct kind invariant]
@@ -243,6 +272,8 @@ data HoleSort = ExprHole Id
                  -- ^ A hole in a type (PartialTypeSignatures)
               | ConstraintHole
                  -- ^ A hole in a constraint, like @f :: (_, Eq a) => ...
+                 -- Differentiated from TypeHole because a ConstraintHole
+                 -- is simplified differently. See GHC.Tc.Solver.simplifyHoles.
 
 instance Outputable Hole where
   ppr (Hole { hole_sort = ExprHole id
@@ -1141,8 +1172,9 @@ data ImplicStatus
   | IC_Unsolved   -- Neither of the above; might go either way
 
 -- | Does this implication have Given equalities?
--- See Note [When does an implication have given equalities?] in GHC.Tc.Solver.Monad
--- and Note [Suppress redundant givens during error reporting] in GHC.Tc.Errors
+-- See Note [When does an implication have given equalities?] in GHC.Tc.Solver.Monad,
+-- which also explains why we need three options here. Also, see
+-- Note [Suppress redundant givens during error reporting] in GHC.Tc.Errors
 data HasGivenEqs
   = NoGivenEqs      -- definitely no given equalities
   | LocalGivenEqs   -- might have Given equalities that affect only local skolems
