@@ -364,6 +364,11 @@ compiled program.
     :category:
 
     Automatically enclose all occurrences of the named function in an ``SCC``.
+    Note that these cost-centres are added late in compilation (after
+    simplification) and consequently the names may be slightly different than
+    they appear in the source program (e.g. a call to ``f`` may inlined with
+    its wrapper, resulting in an occurrence of its worker, ``$wf``).
+
     In addition to plain module-qualified names (e.g. ``Data.List.map``),
     ⟨name⟩ also accepts a small globbing language using ``*`` as a wildcard
     symbol:

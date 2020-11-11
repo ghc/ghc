@@ -72,7 +72,8 @@ doExpr :: Env -> CoreExpr -> M CoreExpr
 doExpr env e@(Var v)
   | needsCallSiteCostCentre env v = do
     let nameDoc :: SDoc
-        nameDoc = hcat (punctuate dot (map ppr (parents env))) <> parens (text "calling " <> ppr v)
+        nameDoc = withUserStyle alwaysQualify DefaultDepth $
+          hcat (punctuate dot (map ppr (parents env))) <> parens (text "calling " <> ppr v)
 
         ccName :: CcName
         ccName = mkFastString $ showSDoc (dflags env) nameDoc
