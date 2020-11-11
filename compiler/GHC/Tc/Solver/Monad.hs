@@ -1606,7 +1606,7 @@ kickOutRewritable new_fr new_lhs ics
                     not (null kicked_given_ev_vars)) $
               do { traceTcS "Given(s) have been kicked out; drop from famapp-cache"
                             (ppr kicked_given_ev_vars)
-                 ; dropFamAppCache (mkVarSet kicked_given_ev_vars) }
+                 ; dropFromFamAppCache (mkVarSet kicked_given_ev_vars) }
 
             ; csTraceTcS $
               hang (text "Kick out, lhs =" <+> ppr new_lhs)
@@ -2422,22 +2422,14 @@ lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
 
 ---------------------------
 lookupFamAppCache :: CtFlavour -> TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
-lookupFamAppCache flav fam_tc tys
-  = do { inerts@(IS { inert_famapp_cache = famapp_cache }) <- getTcSInerts
+lookupFamAppCache _ fam_tc tys
+  = do { IS { inert_famapp_cache = famapp_cache } <- getTcSInerts
        ; case findFunEq famapp_cache fam_tc tys of
            result@(Just (co, ty)) ->
              do { traceTcS "famapp_cache hit" (vcat [ ppr (mkTyConApp fam_tc tys)
                                                     , ppr ty
                                                     , ppr co ])
-
-                ; case flav of
-                    Given -> do { traceTcS "RAE GIVEN CACHE HIT" $
-                                  vcat [ ppr (mkTyConApp fam_tc tys)
-                                       , ppr ty
-                                       , ppr co
-                                       , ppr inerts ]
-                                ; return Nothing }
-                    _ -> return result }
+                ; return result }
            Nothing -> return Nothing }
 
 extendFamAppCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
@@ -2454,9 +2446,13 @@ extendFamAppCache tc xi_args stuff@(_, ty)
 -- Remove entries from the cache whose evidence mentions variables in the
 -- supplied set
 dropFromFamAppCache :: VarSet -> TcS ()
-dromFromFamAppCache varset
+dropFromFamAppCache varset
   = do { inerts@(IS { inert_famapp_cache = famapp_cache }) <- getTcSInerts
-       ;
+       ; let filtered = filterTcAppMap check famapp_cache
+       ; setTcSInerts $ inerts { inert_famapp_cache = filtered } }
+  where
+    check :: (TcCoercion, TcType) -> Bool
+    check (co, _) = not (anyFreeVarsOfCo (`elemVarSet` varset) co)
 
 {- *********************************************************************
 *                                                                      *
@@ -2529,11 +2525,15 @@ alterTcApp m tc tys upd = alterDTyConEnv alter_tm m tc
     alter_tm :: Maybe (ListMap LooseTypeMap a) -> Maybe (ListMap LooseTypeMap a)
     alter_tm m_elt = Just (alterTM tys upd (m_elt `orElse` emptyTM))
 
-filterTcAppMap :: (a -> Bool) -> TcAppMap a -> TcAppMap a
+filterTcAppMap :: forall a. (a -> Bool) -> TcAppMap a -> TcAppMap a
 filterTcAppMap f m = mapMaybeDTyConEnv one_tycon m
   where
     one_tycon :: ListMap LooseTypeMap a -> Maybe (ListMap LooseTypeMap a)
-    one_tycon tm =
+    one_tycon tm
+      | isEmptyTM filtered_tm = Nothing
+      | otherwise             = Just filtered_tm
+      where
+        filtered_tm = filterTM f tm
 
 tcAppMapToBag :: TcAppMap a -> Bag a
 tcAppMapToBag m = foldTcAppMap consBag m emptyBag
@@ -2630,16 +2630,7 @@ addDictsByClass m cls items
     add ct _ = pprPanic "addDictsByClass" (ppr ct)
 
 filterDicts :: (Ct -> Bool) -> DictMap Ct -> DictMap Ct
-filterDicts f m = mapDTyConEnv do_tm m
-  where
-    do_tm tm = foldTM insert_mb tm emptyTM
-    insert_mb ct tm
-       | f ct      = insertTM tys ct tm
-       | otherwise = tm
-       where
-         tys = case ct of
-                CDictCan  { cc_tyargs = tys } -> tys
-                _ -> pprPanic "filterTcAppMap" (ppr ct)
+filterDicts f m = filterTcAppMap f m
 
 partitionDicts :: (Ct -> Bool) -> DictMap Ct -> (Bag Ct, DictMap Ct)
 partitionDicts f m = foldTcAppMap k m (emptyBag, emptyDicts)

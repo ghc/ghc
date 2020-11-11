@@ -116,6 +116,7 @@ instance TrieMap CoreMap where
     alterTM k f (CoreMap m) = CoreMap (alterTM (deBruijnize k) f m)
     foldTM k (CoreMap m) = foldTM k m
     mapTM f (CoreMap m) = CoreMap (mapTM f m)
+    filterTM f (CoreMap m) = CoreMap (filterTM f m)
 
 -- | @CoreMapG a@ is a map from @DeBruijn CoreExpr@ to @a@.  The extended
 -- key makes it suitable for recursive traversal, since it can track binders,
@@ -197,6 +198,7 @@ instance TrieMap CoreMapX where
    alterTM  = xtE
    foldTM   = fdE
    mapTM    = mapE
+   filterTM = ftE
 
 --------------------------
 mapE :: (a->b) -> CoreMapX a -> CoreMapX b
@@ -212,6 +214,20 @@ mapE f (CM { cm_var = cvar, cm_lit = clit
        , cm_lam = mapTM (mapTM f) clam, cm_letn = mapTM (mapTM (mapTM f)) cletn
        , cm_letr = mapTM (mapTM (mapTM f)) cletr, cm_case = mapTM (mapTM f) ccase
        , cm_ecase = mapTM (mapTM f) cecase, cm_tick = mapTM (mapTM f) ctick }
+
+ftE :: (a->Bool) -> CoreMapX a -> CoreMapX a
+ftE f (CM { cm_var = cvar, cm_lit = clit
+          , cm_co = cco, cm_type = ctype
+          , cm_cast = ccast , cm_app = capp
+          , cm_lam = clam, cm_letn = cletn
+          , cm_letr = cletr, cm_case = ccase
+          , cm_ecase = cecase, cm_tick = ctick })
+  = CM { cm_var = filterTM f cvar, cm_lit = filterTM f clit
+       , cm_co = filterTM f cco, cm_type = filterTM f ctype
+       , cm_cast = mapTM (filterTM f) ccast, cm_app = mapTM (filterTM f) capp
+       , cm_lam = mapTM (filterTM f) clam, cm_letn = mapTM (mapTM (filterTM f)) cletn
+       , cm_letr = mapTM (mapTM (filterTM f)) cletr, cm_case = mapTM (filterTM f) ccase
+       , cm_ecase = mapTM (filterTM f) cecase, cm_tick = mapTM (filterTM f) ctick }
 
 --------------------------
 lookupCoreMap :: CoreMap a -> CoreExpr -> Maybe a
@@ -330,6 +346,7 @@ instance TrieMap AltMap where
    alterTM  = xtA emptyCME
    foldTM   = fdA
    mapTM    = mapA
+   filterTM = ftA
 
 instance Eq (DeBruijn CoreAlt) where
   D env1 a1 == D env2 a2 = go a1 a2 where
@@ -347,6 +364,12 @@ mapA f (AM { am_deflt = adeflt, am_data = adata, am_lit = alit })
   = AM { am_deflt = mapTM f adeflt
        , am_data = mapTM (mapTM f) adata
        , am_lit = mapTM (mapTM f) alit }
+
+ftA :: (a->Bool) -> AltMap a -> AltMap a
+ftA f (AM { am_deflt = adeflt, am_data = adata, am_lit = alit })
+  = AM { am_deflt = filterTM f adeflt
+       , am_data = mapTM (filterTM f) adata
+       , am_lit = mapTM (filterTM f) alit }
 
 lkA :: CmEnv -> CoreAlt -> AltMap a -> Maybe a
 lkA env (DEFAULT,    _, rhs)  = am_deflt >.> lkG (D env rhs)
