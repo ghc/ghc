@@ -216,6 +216,10 @@ The supported transformers are listed below:
         <td><code>thread_sanitizer</code></td>
         <td>Build the runtime system with ThreadSanitizer support</td>
     </tr>
+    <tr>
+        <td><code>llvm</code></td>
+        <td>Use GHC's LLVM backend (`-fllvm`) for all stage1+ compilation.</td>
+    </tr>
 </table>
 
 ## Ways
