@@ -2421,8 +2421,8 @@ lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
       _       -> Nothing
 
 ---------------------------
-lookupFamAppCache :: CtFlavour -> TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
-lookupFamAppCache _ fam_tc tys
+lookupFamAppCache :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
+lookupFamAppCache fam_tc tys
   = do { IS { inert_famapp_cache = famapp_cache } <- getTcSInerts
        ; case findFunEq famapp_cache fam_tc tys of
            result@(Just (co, ty)) ->
