@@ -90,6 +90,7 @@ instance TrieMap CoercionMap where
    alterTM k f (CoercionMap m) = CoercionMap (alterTM (deBruijnize k) f m)
    foldTM k    (CoercionMap m) = foldTM k m
    mapTM f     (CoercionMap m) = CoercionMap (mapTM f m)
+   filterTM f  (CoercionMap m) = CoercionMap (filterTM f m)
 
 type CoercionMapG = GenMap CoercionMapX
 newtype CoercionMapX a = CoercionMapX (TypeMapX a)
@@ -101,6 +102,7 @@ instance TrieMap CoercionMapX where
   alterTM  = xtC
   foldTM f (CoercionMapX core_tm) = foldTM f core_tm
   mapTM f (CoercionMapX core_tm)  = CoercionMapX (mapTM f core_tm)
+  filterTM f (CoercionMapX core_tm) = CoercionMapX (filterTM f core_tm)
 
 instance Eq (DeBruijn Coercion) where
   D env1 co1 == D env2 co2
@@ -176,6 +178,7 @@ instance TrieMap TypeMapX where
    alterTM  = xtT
    foldTM   = fdT
    mapTM    = mapT
+   filterTM = filterT
 
 instance Eq (DeBruijn Type) where
   env_t@(D env t) == env_t'@(D env' t')
@@ -289,6 +292,18 @@ fdT k m = foldTM k (tm_var m)
         . foldTyLit k (tm_tylit m)
         . foldMaybe k (tm_coerce m)
 
+filterT :: (a -> Bool) -> TypeMapX a -> TypeMapX a
+filterT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
+              , tm_funty = tfunty, tm_forall = tforall, tm_tylit = tlit
+              , tm_coerce = tcoerce })
+  = TM { tm_var    = filterTM f tvar
+       , tm_app    = mapTM (filterTM f) tapp
+       , tm_tycon  = filterTM f ttycon
+       , tm_funty  = mapTM (mapTM (filterTM f)) tfunty
+       , tm_forall = mapTM (filterTM f) tforall
+       , tm_tylit  = filterTM f tlit
+       , tm_coerce = filterMaybe f tcoerce }
+
 ------------------------
 data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
                       , tlm_string :: UniqFM  FastString a
@@ -301,6 +316,7 @@ instance TrieMap TyLitMap where
    alterTM  = xtTyLit
    foldTM   = foldTyLit
    mapTM    = mapTyLit
+   filterTM = filterTyLit
 
 emptyTyLitMap :: TyLitMap a
 emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUFM }
@@ -325,6 +341,10 @@ foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
 foldTyLit l m = flip (foldUFM l) (tlm_string m)
               . flip (Map.foldr l)   (tlm_number m)
 
+filterTyLit :: (a -> Bool) -> TyLitMap a -> TyLitMap a
+filterTyLit f (TLM { tlm_number = tn, tlm_string = ts })
+  = TLM { tlm_number = Map.filter f tn, tlm_string = filterUFM f ts }
+
 -------------------------------------------------
 -- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this
 -- is the type you want. The keys in this map may have different kinds.
@@ -348,6 +368,7 @@ instance TrieMap TypeMap where
     alterTM k f m = xtTT (deBruijnize k) f m
     foldTM k (TypeMap m) = foldTM (foldTM k) m
     mapTM f (TypeMap m) = TypeMap (mapTM (mapTM f) m)
+    filterTM f (TypeMap m) = TypeMap (mapTM (filterTM f) m)
 
 foldTypeMap :: (a -> b -> b) -> b -> TypeMap a -> b
 foldTypeMap k z m = foldTM k m z
@@ -388,6 +409,7 @@ instance TrieMap LooseTypeMap where
   alterTM k f (LooseTypeMap m) = LooseTypeMap (alterTM (deBruijnize k) f m)
   foldTM f (LooseTypeMap m) = foldTM f m
   mapTM f (LooseTypeMap m) = LooseTypeMap (mapTM f m)
+  filterTM f (LooseTypeMap m) = LooseTypeMap (filterTM f m)
 
 {-
 ************************************************************************
@@ -462,6 +484,7 @@ instance TrieMap BndrMap where
    alterTM  = xtBndr emptyCME
    foldTM   = fdBndrMap
    mapTM    = mapBndrMap
+   filterTM = ftBndrMap
 
 mapBndrMap :: (a -> b) -> BndrMap a -> BndrMap b
 mapBndrMap f (BndrMap tm) = BndrMap (mapTM (mapTM f) tm)
@@ -483,6 +506,8 @@ xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
 xtBndr env v xt (BndrMap tymap)  =
   BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (D env <$> varMultMaybe v) xt))
 
+ftBndrMap :: (a -> Bool) -> BndrMap a -> BndrMap a
+ftBndrMap f (BndrMap tm) = BndrMap (mapTM (filterTM f) tm)
 
 --------- Variable occurrence -------------
 data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable
@@ -495,6 +520,7 @@ instance TrieMap VarMap where
    alterTM  = xtVar emptyCME
    foldTM   = fdVar
    mapTM    = mapVar
+   filterTM = ftVar
 
 mapVar :: (a->b) -> VarMap a -> VarMap b
 mapVar f (VM { vm_bvar = bv, vm_fvar = fv })
@@ -519,6 +545,10 @@ lkDFreeVar var env = lookupDVarEnv env var
 
 xtDFreeVar :: Var -> XT a -> DVarEnv a -> DVarEnv a
 xtDFreeVar v f m = alterDVarEnv f m v
+
+ftVar :: (a -> Bool) -> VarMap a -> VarMap a
+ftVar f (VM { vm_bvar = bv, vm_fvar = fv })
+  = VM { vm_bvar = filterTM f bv, vm_fvar = filterTM f fv }
 
 -------------------------------------------------
 lkDNamed :: NamedThing n => n -> DNameEnv a -> Maybe a
