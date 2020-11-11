@@ -364,17 +364,18 @@ faster. This doesn't seem quite worth it, yet.
 
 Note [flatten_exact_fam_app_fully performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Once we've got a flat rhs, we extend the flat-cache to record
+Once we've got a flat rhs, we extend the famapp-cache to record
 the result. Doing so can save lots of work when the same redex shows up more
 than once. Note that we record the link from the redex all the way to its
-*final* value, not just the single step reduction. Interestingly, adding to the
-flat-cache for the first reduction *doubles* the allocations
-for the T9872a test. However, using the flat-cache in
-the later reduction is a similar gain. I (Richard E) don't currently
-(Dec '14 nor Nov '20) have any knowledge as to *why* these facts are true.
-Perhaps the first use of the flat-cache doesn't add much, because we didn't
-need to reduce in the arguments (and instance lookup is similar to cache
-lookup).
+*final* value, not just the single step reduction.
+
+If we can reduce the family application right away (the first call
+to try_to_reduce), we do *not* add to the cache. There are two possibilities
+here: 1) we just read the result from the cache, or 2) we used one type
+family instance. In either case, recording the result in the cache doesn't
+save much effort the next time around. And adding to the cache here is
+actually disastrous: it more than doubles the allocations for T9872a. So
+we skip adding to the cache here.
 -}
 
 {-# INLINE flatten_args_tc #-}
@@ -765,7 +766,6 @@ flatten_fam_app tc tys  -- Can be over-saturated
          ; flatten_app_ty_args xi1 co1 tys_rest }
 
 -- the [TcType] exactly saturate the TyCon
--- See Note [flatten_exact_fam_app_fully performance]
 flatten_exact_fam_app_fully :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
 flatten_exact_fam_app_fully tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
@@ -773,6 +773,8 @@ flatten_exact_fam_app_fully tc tys
        -- Step 1. Try to reduce without reducing arguments first.
        ; result1 <- try_to_reduce tc tys
        ; case result1 of
+             -- Don't use `finish`;
+             -- See Note [flatten_exact_fam_app_fully performance]
          { Just (co, xi) -> do { (xi2, co2) <- bumpDepth $ flatten_one xi
                                ; return (xi2, co2 `mkTcTransCo` co) }
          ; Nothing ->
