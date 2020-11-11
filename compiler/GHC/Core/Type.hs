@@ -434,6 +434,9 @@ expandSynTyConApp_maybe tc tys
           rhs' = substTy (mkTvSubstPrs (tvs `zip` tys)) rhs
   | otherwise
   = Nothing
+-- Without this INLINE the call to expandSynTyConApp_maybe in coreView
+-- will result in an avoidable allocation.
+{-# INLINE expandSynTyConApp_maybe #-}
 
 {-# INLINE coreFullView #-}
 coreFullView :: Type -> Type
