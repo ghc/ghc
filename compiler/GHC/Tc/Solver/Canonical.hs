@@ -2476,18 +2476,18 @@ canEqOK dflags eq_rel lhs rhs
                  -- are not generally insoluble
 
   where
-    good_rhs       = kinds_match && not bad_newtype
+    good_rhs    = kinds_match && not bad_newtype
 
-    lhs_kind       = canEqLHSKind lhs
-    rhs_kind       = tcTypeKind rhs
+    lhs_kind    = canEqLHSKind lhs
+    rhs_kind    = tcTypeKind rhs
 
-    kinds_match    = lhs_kind `tcEqType` rhs_kind
+    kinds_match = lhs_kind `tcEqType` rhs_kind
 
-    bad_newtype    | ReprEq <- eq_rel
-                   , Just tc <- tyConAppTyCon_maybe rhs
-                   = isNewTyCon tc
-                   | otherwise
-                   = False
+    bad_newtype | ReprEq <- eq_rel
+                , Just tc <- tyConAppTyCon_maybe rhs
+                = isNewTyCon tc
+                | otherwise
+                = False
 
 {- Note [Equalities with incompatible kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
