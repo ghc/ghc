@@ -96,7 +96,13 @@ enableTickyGhc =
       [ builder (Ghc CompileHs) ? ticky
       , builder (Ghc LinkHs) ? ticky
       ]
-    ticky = arg "-ticky" <> arg "-ticky-allocd"
+    ticky = mconcat
+      [ arg "-ticky"
+      , arg "-ticky-allocd"
+      -- You generally need STG dumps to interpret ticky profiles
+      , arg "-ddump-to-file"
+      , arg "-ddump-stg-final"
+      ]
 
 -- | Transform the input 'Flavour' so as to build with
 --   @-split-sections@ whenever appropriate. You can
