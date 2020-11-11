@@ -75,11 +75,9 @@ flavour = do
     let flavours = hadrianFlavours ++ userFlavours
         (_settingErrs, tweak) = applySettings kvs
 
-    return $
-      case filter (\fl -> name fl == flavourName) flavours of
-        []  -> error $ "Unknown build flavour: " ++ flavourName
-        [f] -> tweak f
-        _   -> error $ "Multiple build flavours named " ++ flavourName
+    case parseFlavour flavours flavourTransformers flavourName of
+      Left err -> fail err
+      Right f -> return $ tweak f
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.
