@@ -73,6 +73,8 @@ class TrieMap m where
    alterTM  :: forall b. Key m -> XT b -> m b -> m b
    mapTM    :: (a->b) -> m a -> m b
 
+   foldTMWithKey :: (Key m -> a -> b -> b) -> m a -> b -> b
+
    foldTM   :: (a -> b -> b) -> m a -> b -> b
       -- The unusual argument order here makes
       -- it easy to compose calls to foldTM;
