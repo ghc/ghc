@@ -1594,6 +1594,20 @@ kickOutRewritable new_fr new_lhs ics
 
        ; unless (n_kicked == 0) $
          do { updWorkListTcS (appendWorkList kicked_out)
+
+              -- The famapp-cache contains Given evidence from the inert set.
+              -- If we're kicking out Givens, we need to remove this evidence
+              -- from the cache, too.
+            ; let kicked_given_ev_vars =
+                    [ ev_var | ct <- wl_eqs kicked_out
+                             , CtGiven { ctev_evar = ev_var } <- [ctEvidence ct] ]
+            ; when (new_fr `eqCanRewriteFR` (Given, NomEq) &&
+                   -- if this isn't true, no use looking through the constraints
+                    not (null kicked_given_ev_vars)) $
+              do { traceTcS "Given(s) have been kicked out; drop from famapp-cache"
+                            (ppr kicked_given_ev_vars)
+                 ; dropFamAppCache (mkVarSet kicked_given_ev_vars) }
+
             ; csTraceTcS $
               hang (text "Kick out, lhs =" <+> ppr new_lhs)
                  2 (vcat [ text "n-kicked =" <+> int n_kicked
@@ -2381,17 +2395,6 @@ lookupFamAppInert fam_tc tys
       = Just (ctEvCoercion ctev, rhs, ctEvFlavourRole ctev)
       | otherwise = Nothing
 
-lookupFamAppCache :: CtFlavour -> TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
-lookupFamAppCache _ fam_tc tys
-  = do { IS { inert_famapp_cache = famapp_cache } <- getTcSInerts
-       ; case findFunEq famapp_cache fam_tc tys of
-           result@(Just (co, ty)) ->
-             do { traceTcS "famapp_cache hit" (vcat [ ppr (mkTyConApp fam_tc tys)
-                                                    , ppr ty
-                                                    , ppr co ])
-                ; return result }
-           Nothing -> return Nothing }
-
 lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet?
 lookupInInerts loc pty
@@ -2416,6 +2419,44 @@ lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
   = case findDict solved loc cls tys of
       Just ev -> Just ev
       _       -> Nothing
+
+---------------------------
+lookupFamAppCache :: CtFlavour -> TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
+lookupFamAppCache flav fam_tc tys
+  = do { inerts@(IS { inert_famapp_cache = famapp_cache }) <- getTcSInerts
+       ; case findFunEq famapp_cache fam_tc tys of
+           result@(Just (co, ty)) ->
+             do { traceTcS "famapp_cache hit" (vcat [ ppr (mkTyConApp fam_tc tys)
+                                                    , ppr ty
+                                                    , ppr co ])
+
+                ; case flav of
+                    Given -> do { traceTcS "RAE GIVEN CACHE HIT" $
+                                  vcat [ ppr (mkTyConApp fam_tc tys)
+                                       , ppr ty
+                                       , ppr co
+                                       , ppr inerts ]
+                                ; return Nothing }
+                    _ -> return result }
+           Nothing -> return Nothing }
+
+extendFamAppCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
+-- NB: co :: rhs ~ F tys, to match expectations of flattener
+extendFamAppCache tc xi_args stuff@(_, ty)
+  = do { dflags <- getDynFlags
+       ; when (gopt Opt_FamAppCache dflags) $
+    do { traceTcS "extendFamAppCache" (vcat [ ppr tc <+> ppr xi_args
+                                            , ppr ty ])
+            -- 'co' can be bottom, in the case of derived items
+       ; updInertTcS $ \ is@(IS { inert_famapp_cache = fc }) ->
+            is { inert_famapp_cache = insertFunEq fc tc xi_args stuff } } }
+
+-- Remove entries from the cache whose evidence mentions variables in the
+-- supplied set
+dropFromFamAppCache :: VarSet -> TcS ()
+dromFromFamAppCache varset
+  = do { inerts@(IS { inert_famapp_cache = famapp_cache }) <- getTcSInerts
+       ;
 
 {- *********************************************************************
 *                                                                      *
@@ -2488,18 +2529,11 @@ alterTcApp m tc tys upd = alterDTyConEnv alter_tm m tc
     alter_tm :: Maybe (ListMap LooseTypeMap a) -> Maybe (ListMap LooseTypeMap a)
     alter_tm m_elt = Just (alterTM tys upd (m_elt `orElse` emptyTM))
 
-filterTcAppMap :: (Ct -> Bool) -> TcAppMap Ct -> TcAppMap Ct
-filterTcAppMap f m
-  = mapDTyConEnv do_tm m
+filterTcAppMap :: (a -> Bool) -> TcAppMap a -> TcAppMap a
+filterTcAppMap f m = mapMaybeDTyConEnv one_tycon m
   where
-    do_tm tm = foldTM insert_mb tm emptyTM
-    insert_mb ct tm
-       | f ct      = insertTM tys ct tm
-       | otherwise = tm
-       where
-         tys = case ct of
-                CDictCan  { cc_tyargs = tys } -> tys
-                _ -> pprPanic "filterTcAppMap" (ppr ct)
+    one_tycon :: ListMap LooseTypeMap a -> Maybe (ListMap LooseTypeMap a)
+    one_tycon tm =
 
 tcAppMapToBag :: TcAppMap a -> Bag a
 tcAppMapToBag m = foldTcAppMap consBag m emptyBag
@@ -2596,7 +2630,16 @@ addDictsByClass m cls items
     add ct _ = pprPanic "addDictsByClass" (ppr ct)
 
 filterDicts :: (Ct -> Bool) -> DictMap Ct -> DictMap Ct
-filterDicts f m = filterTcAppMap f m
+filterDicts f m = mapDTyConEnv do_tm m
+  where
+    do_tm tm = foldTM insert_mb tm emptyTM
+    insert_mb ct tm
+       | f ct      = insertTM tys ct tm
+       | otherwise = tm
+       where
+         tys = case ct of
+                CDictCan  { cc_tyargs = tys } -> tys
+                _ -> pprPanic "filterTcAppMap" (ppr ct)
 
 partitionDicts :: (Ct -> Bool) -> DictMap Ct -> (Bag Ct, DictMap Ct)
 partitionDicts f m = foldTcAppMap k m (emptyBag, emptyDicts)
@@ -3212,17 +3255,6 @@ zonkTyCoVarKind :: TcTyCoVar -> TcS TcTyCoVar
 zonkTyCoVarKind tv = wrapTcS (TcM.zonkTyCoVarKind tv)
 
 ----------------------------
-extendFamAppCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
--- NB: co :: rhs ~ F tys, to match expectations of flattener
-extendFamAppCache tc xi_args stuff@(_, ty)
-  = do { dflags <- getDynFlags
-       ; when (gopt Opt_FamAppCache dflags) $
-    do { traceTcS "extendFamAppCache" (vcat [ ppr tc <+> ppr xi_args
-                                            , ppr ty ])
-            -- 'co' can be bottom, in the case of derived items
-       ; updInertTcS $ \ is@(IS { inert_famapp_cache = fc }) ->
-            is { inert_famapp_cache = insertFunEq fc tc xi_args stuff } } }
-
 pprKicked :: Int -> SDoc
 pprKicked 0 = empty
 pprKicked n = parens (int n <+> text "kicked out")

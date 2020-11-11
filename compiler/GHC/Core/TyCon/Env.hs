@@ -29,7 +29,7 @@ module GHC.Core.TyCon.Env (
         emptyDTyConEnv, isEmptyDTyConEnv,
         lookupDTyConEnv,
         delFromDTyConEnv, filterDTyConEnv,
-        mapDTyConEnv,
+        mapDTyConEnv, mapMaybeDTyConEnv,
         adjustDTyConEnv, alterDTyConEnv, extendDTyConEnv, foldDTyConEnv
     ) where
 
@@ -130,6 +130,9 @@ filterDTyConEnv = filterUDFM
 
 mapDTyConEnv :: (a -> b) -> DTyConEnv a -> DTyConEnv b
 mapDTyConEnv = mapUDFM
+
+mapMaybeDTyConEnv :: (a -> Maybe b) -> DTyConEnv a -> DTyConEnv b
+mapMaybeDTyConEnv = mapMaybeUDFM
 
 adjustDTyConEnv :: (a -> a) -> DTyConEnv a -> TyCon -> DTyConEnv a
 adjustDTyConEnv = adjustUDFM
