@@ -404,20 +404,14 @@ data InertSet
               -- Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical
 
        , inert_famapp_cache :: FunEqMap (TcCoercion, TcType)
-              -- If    F tys :-> (co, rhs, flav),
-              -- then  co :: rhs ~ F tys
-              -- all evidence is from instances or Givens
-              -- (We have no way of "kicking out" from the cache, so putting
-              --  wanteds here means we can end up solving a Wanted with itself. Bad)
-              --
-              -- Some entries in the cache might have arisen from Wanteds, and
-              -- so this should be used only for rewriting Wanteds.
-              --
               -- Just a hash-cons cache for use when reducing family applications
               -- only
               --
-              -- Only nominal equalities end up in here (along with
-              -- top-level instances)
+              -- If    F tys :-> (co, rhs, flav),
+              -- then  co :: rhs ~N F tys
+              -- all evidence is from instances or Givens; no coercion holes here
+              -- (We have no way of "kicking out" from the cache, so putting
+              --  wanteds here means we can end up solving a Wanted with itself. Bad)
 
        , inert_solved_dicts   :: DictMap CtEvidence
               -- All Wanteds, of form ev :: C t1 .. tn
