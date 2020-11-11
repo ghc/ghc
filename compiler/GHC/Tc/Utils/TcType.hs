@@ -1223,7 +1223,7 @@ tcSplitForAllTy_maybe (ForAllTy tv ty) = ASSERT( isTyVarBinder tv ) Just (tv, ty
 tcSplitForAllTy_maybe _                = Nothing
 
 -- | Like 'tcSplitPiTys', but splits off only named binders,
--- returning just the tycovars.
+-- returning just the tyvars.
 tcSplitForAllTys :: Type -> ([TyVar], Type)
 tcSplitForAllTys ty
   = ASSERT( all isTyVar (fst sty) ) sty
@@ -1286,9 +1286,9 @@ tcSplitPhiTy ty
 
 -- | Split a sigma type into its parts.
 tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
-tcSplitSigmaTy ty = case tcSplitForAllTys ty of
-                        (tvs, rho) -> case tcSplitPhiTy rho of
-                                        (theta, tau) -> (tvs, theta, tau)
+tcSplitSigmaTy ty = case tcSplitForAllTysInvis ty of
+                        (tvbs, rho) -> case tcSplitPhiTy rho of
+                                         (theta, tau) -> (binderVars tvbs, theta, tau)
 
 -- | Split a sigma type into its parts, going underneath as many @ForAllTy@s
 -- as possible. For example, given this type synonym:
@@ -1469,10 +1469,10 @@ tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
 -- the latter specifically stops at PredTy arguments,
 -- and we don't want to do that here
 tcSplitDFunTy ty
-  = case tcSplitForAllTys ty   of { (tvs, rho)    ->
-    case splitFunTys rho       of { (theta, tau)  ->
-    case tcSplitDFunHead tau   of { (clas, tys)   ->
-    (tvs, map scaledThing theta, clas, tys) }}}
+  = case tcSplitForAllTysInvis ty of { (tvbs, rho)    ->
+    case splitFunTys rho          of { (theta, tau)  ->
+    case tcSplitDFunHead tau      of { (clas, tys)   ->
+    (binderVars tvbs, map scaledThing theta, clas, tys) }}}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead = getClassPredTys
@@ -1489,9 +1489,9 @@ tcSplitMethodTy :: Type -> ([TyVar], PredType, Type)
 -- tcSplitMethodTy just peels off the outer forall and
 -- that first predicate
 tcSplitMethodTy ty
-  | (sel_tyvars,sel_rho) <- tcSplitForAllTys ty
+  | (sel_tvbs,sel_rho) <- tcSplitForAllTysInvis ty
   , Just (first_pred, local_meth_ty) <- tcSplitPredFunTy_maybe sel_rho
-  = (sel_tyvars, first_pred, local_meth_ty)
+  = (binderVars sel_tvbs, first_pred, local_meth_ty)
   | otherwise
   = pprPanic "tcSplitMethodTy" (ppr ty)
 

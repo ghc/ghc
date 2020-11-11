@@ -223,9 +223,9 @@ check_inst sig_inst = do
         skol_info = InstSkol
         -- Based off of tcSplitDFunTy
         (tvs, theta, pred) =
-           case tcSplitForAllTys ty of { (tvs, rho)   ->
-           case splitFunTys rho     of { (theta, pred) ->
-           (tvs, theta, pred) }}
+           case tcSplitForAllTysInvis ty of { (tvbs, rho)   ->
+           case splitFunTys rho          of { (theta, pred) ->
+           (binderVars tvbs, theta, pred) }}
         origin = InstProvidedOrigin (tcg_semantic_mod tcg_env) sig_inst
     (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
     (tclvl,cts) <- pushTcLevelM $ do

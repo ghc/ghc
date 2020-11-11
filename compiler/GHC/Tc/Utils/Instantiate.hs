@@ -464,8 +464,9 @@ tcInstType inst_tyvars id
              subst'  = extendTCvInScopeSet subst (tyCoVarsOfType rho)
        ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
   where
-    (tyvars, rho) = tcSplitForAllTys (idType id)
-    (theta, tau)  = tcSplitPhiTy rho
+    (tvbs, rho)  = tcSplitForAllTysInvis (idType id)
+    (theta, tau) = tcSplitPhiTy rho
+    tyvars       = binderVars tvbs
 
 tcInstTypeBndrs :: Id -> TcM ([(Name, InvisTVBinder)], TcThetaType, TcType)
                      -- (type vars, preds (incl equalities), rho)

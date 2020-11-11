@@ -316,7 +316,7 @@ dsPrimCall :: Id -> Coercion -> ForeignCall
 dsPrimCall fn_id co fcall = do
     let
         ty                   = coercionLKind co
-        (tvs, fun_ty)        = tcSplitForAllTys ty
+        (tvbs, fun_ty)       = tcSplitForAllTysInvis ty
         (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
 
     args <- newSysLocalsDs arg_tys  -- no FFI levity-polymorphism
@@ -325,7 +325,7 @@ dsPrimCall fn_id co fcall = do
     dflags <- getDynFlags
     let
         call_app = mkFCall dflags ccall_uniq fcall (map Var args) io_res_ty
-        rhs      = mkLams tvs (mkLams args call_app)
+        rhs      = mkLams (binderVars tvbs) (mkLams args call_app)
         rhs'     = Cast rhs co
     return ([(fn_id, rhs')], empty, empty)
 
@@ -472,7 +472,7 @@ dsFExportDynamic id co0 cconv = do
     ccall_adj <- dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])
         -- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
 
-    let io_app = mkLams tvs                  $
+    let io_app = mkLams (binderVars tvbs)    $
                  Lam cback                   $
                  mkApps (Var bindIOId)
                         [ Type stable_ptr_ty
@@ -489,7 +489,7 @@ dsFExportDynamic id co0 cconv = do
 
  where
   ty                       = coercionLKind co0
-  (tvs,sans_foralls)       = tcSplitForAllTys ty
+  (tvbs,sans_foralls)      = tcSplitForAllTysInvis ty
   ([Scaled arg_mult arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
