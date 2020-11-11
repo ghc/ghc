@@ -9,6 +9,8 @@ module Flavour
   , enableThreadSanitizer
   , enableDebugInfo, enableTickyGhc
   , viaLlvmBackend
+  , enableProfiledGhc
+  , disableDynamicGhcPrograms
   ) where
 
 import Expression
@@ -86,6 +88,8 @@ flavourTransformers = M.fromList
     , "split_sections" =: splitSections
     , "thread_sanitizer" =: enableThreadSanitizer
     , "llvm" =: viaLlvmBackend
+    , "profiled_ghc" =: enableProfiledGhc
+    , "no_dynamic_ghc" =: disableDynamicGhcPrograms
     ]
   where (=:) = (,)
 
@@ -197,3 +201,13 @@ enableThreadSanitizer = addArgs $ mconcat
 -- | Use the LLVM backend in stages 1 and later.
 viaLlvmBackend :: Flavour -> Flavour
 viaLlvmBackend = addArgs $ notStage0 ? builder Ghc ? arg "-fllvm"
+
+-- | Build the GHC executable with profiling enabled. It is also recommended
+-- that you use this with @'dynamicGhcPrograms' = False@ since GHC does not
+-- support loading of profiled libraries with the dynamically-linker.
+enableProfiledGhc :: Flavour -> Flavour
+enableProfiledGhc flavour = flavour { ghcProfiled = True }
+
+-- | Disable 'dynamicGhcPrograms'.
+disableDynamicGhcPrograms :: Flavour -> Flavour
+disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
