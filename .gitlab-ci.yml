@@ -309,14 +309,16 @@ hadrian-ghc-in-ghci:
     - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
   variables:
     GHC_FLAGS: -Werror
+  cache:
+    key: lint
+    paths:
+      - cabal-cache
 
 lint-base:
   extends: .lint-params
   script:
     - hadrian/build -c -j stage1:lib:base
     - hadrian/build -j lint:base
-  cache:
-    key: lint
 
 ############################################################
 # Validation via Pipelines (make)
