@@ -174,6 +174,50 @@ In addition to the above, there are LLVM variants for the flavours `quick`,
 is an additional `-fllvm` flag in `hsDefault` when the stage0 compiler is GHC.
 See `src/Settings/Flavours/Llvm.hs` for details.
 
+## Flavour transformers
+
+Each of the flavours described above is intended as a starting-point for
+configuring your GHC build. In addition, Hadrian supports a number of "flavour
+transformers" which modify the configuration in various ways.
+
+These can be appended to the flavour name passed via the `--flavour`
+command-line flag, separated by the `+` character. For instance,
+
+```
+hadrian --flavour=perf+thread_sanitizer
+```
+
+The supported transformers are listed below:
+
+<table>
+    <tr>
+        <th>Transformer name</th>
+        <th>Effect</th>
+    </tr>
+    <tr>
+        <td><code>werror</code></td>
+        <td>Use the `-Werror` flag for all stage1+ compilation.</td>
+    </tr>
+    <tr>
+        <td><code>debug_info</code></td>
+        <td>Enable production of native debugging information (via GHC/GCC's `-g3`)
+            during stage1+ compilations.</td>
+    </tr>
+    <tr>
+        <td><code>ticky_ghc</code></td>
+        <td>Compile the GHC executable with Ticky-Ticky profiler support.</td>
+    </tr>
+    <tr>
+        <td><code>split_sections</code></td>
+        <td>Enable section splitting for all libraries (except for the GHC
+            library due to the long linking times that this causes).</td>
+    </tr>
+    <tr>
+        <td><code>thread_sanitizer</code></td>
+        <td>Build the runtime system with ThreadSanitizer support</td>
+    </tr>
+</table>
+
 ## Ways
 
 Libraries and GHC can be built in different _ways_, e.g. with or without profiling
