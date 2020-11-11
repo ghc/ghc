@@ -839,8 +839,7 @@ flatten_exact_fam_app_fully tc tys
 -- Returned coercion is output ~r input, where r is the role in the FlatM monad
 try_to_reduce :: TyCon -> [TcType] -> FlatM (Maybe (TcCoercion, TcType))
 try_to_reduce tc tys
-  = do { flavour <- getFlavour
-       ; result <- liftTcS $ firstJustsM [ lookupFamAppCache flavour tc tys
+  = do { result <- liftTcS $ firstJustsM [ lookupFamAppCache tc tys
                                          , matchFam tc tys ]
        ; downgrade result }
   where
