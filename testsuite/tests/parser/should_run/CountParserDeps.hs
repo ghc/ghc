@@ -29,12 +29,8 @@ main = do
   [libdir] <- getArgs
   modules <- parserDeps libdir
   let num = sizeUniqSet modules
-      max_num = 234
-      min_num = max_num - 10 -- so that we don't forget to change the number
-                             -- when the number of dependencies decreases
-  -- putStrLn $ "Found " ++ show num ++ " parser module dependencies"
-  -- forM_ (map moduleNameString $ nonDetEltsUniqSet modules) putStrLn
-  unless (num <= max_num && num >= min_num) $ exitWith (ExitFailure num)
+  putStrLn $ "Found " ++ show num ++ " parser module dependencies"
+  forM_ (map moduleNameString $ nonDetEltsUniqSet modules) putStrLn
 
 parserDeps :: FilePath -> IO (UniqSet ModuleName)
 parserDeps libdir =
