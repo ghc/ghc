@@ -2058,13 +2058,19 @@ checkTypeEq dflags ty_fam_ok lhs ty
      -- no bother about impredicativity in coercions, as they're
      -- inferred
     go_co co | not (gopt Opt_DeferTypeErrors dflags)
-             , badCoercionHoleCo co            = MTVU_HoleBlocker
-        -- Wrinkle (4b) in "GHC.Tc.Solver.Canonical" Note [Equalities with incompatible kinds]
+             , hasCoercionHoleCo co
+             = MTVU_HoleBlocker  -- Wrinkle (2) in GHC.Tc.Solver.Canonical
+        -- See GHC.Tc.Solver.Canonical Note [Equalities with incompatible kinds]
+        -- Wrinkle (2) about this case in general, Wrinkle (4b) about the check for
+        -- deferred type errors.
 
              | TyVarLHS tv <- lhs
-             , tv `elemVarSet` tyCoVarsOfCo co = MTVU_Occurs
+             , tv `elemVarSet` tyCoVarsOfCo co
+             = MTVU_Occurs
+
         -- Don't check coercions for type families; see commentary at top of function
-             | otherwise                       = ok
+             | otherwise
+             = ok
 
     good_tc :: TyCon -> Bool
     good_tc
