@@ -1989,6 +1989,11 @@ checkTypeEq :: DynFlags -> AreTypeFamiliesOK -> CanEqLHS -> TcType
 -- inside the kinds of variables it mentions.  For (d) we look deeply
 -- in coercions when the LHS is a tyvar (but skip coercions for type family
 -- LHSs), and for (e) see Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
+--
+-- checkTypeEq is called from
+--    * checkTyFamEq, checkTyVarEq (which inline it to specialise away the
+--      case-analysis on 'lhs'
+--    * checkEqCanLHSFinish, which does not know the form of 'lhs'
 checkTypeEq dflags ty_fam_ok lhs ty
   = go ty
   where
@@ -2047,13 +2052,14 @@ checkTypeEq dflags ty_fam_ok lhs ty
       -- this slightly peculiar way of defining this means
       -- we don't have to evaluate this `case` at every tyconapp
     go_tc = case lhs of
-      TyVarLHS {} -> \ tc tys -> if good_tc tc
-                                 then mapM go tys >> ok
-                                 else MTVU_Bad
+      TyVarLHS {} -> \ tc tys ->
+        if | good_tc tc -> mapM go tys >> ok
+           | otherwise  -> MTVU_Bad
       TyFamLHS fam_tc fam_args -> \ tc tys ->
         if | tcEqTyConApps fam_tc fam_args tc tys -> MTVU_Occurs
            | good_tc tc                           -> mapM go tys >> ok
            | otherwise                            -> MTVU_Bad
+
 
      -- no bother about impredicativity in coercions, as they're
      -- inferred
