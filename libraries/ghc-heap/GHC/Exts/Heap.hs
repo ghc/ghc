@@ -82,12 +82,14 @@ class HasHeapRep (a :: TYPE rep) where
 instance HasHeapRep (a :: TYPE ('BoxedRep 'Lifted)) where
 #else
 instance HasHeapRep (a :: TYPE 'LiftedRep) where
+#endif
     getClosureData = getClosureDataFromHeapObject
 
 #if __GLASGOW_HASKELL__ >= 901
 instance HasHeapRep (a :: TYPE ('BoxedRep 'Unlifted)) where
 #else
 instance HasHeapRep (a :: TYPE 'UnliftedRep) where
+#endif
     getClosureData x = getClosureDataFromHeapObject (unsafeCoerce# x)
 
 instance Int# ~ a => HasHeapRep (a :: TYPE 'IntRep) where

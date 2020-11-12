@@ -6,6 +6,7 @@ interfacePlugin: GHC.Float
 interfacePlugin: GHC.Base
 interfacePlugin: Language.Haskell.TH.Syntax
 typeCheckPlugin (rn)
+interfacePlugin: GHC.Prim
 typeCheckPlugin (tc)
 interfacePlugin: GHC.Num.BigNat
 parsePlugin(a)

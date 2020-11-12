@@ -129,9 +129,9 @@ Rule fired: Class op fmap (BUILTIN)
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 52, types: 101, coercions: 17, joins: 0/1}
+  = {terms: 52, types: 102, coercions: 17, joins: 0/1}
 
--- RHS size: {terms: 37, types: 84, coercions: 17, joins: 0/1}
+-- RHS size: {terms: 37, types: 85, coercions: 17, joins: 0/1}
 mapMaybeRule
   :: forall a b. Rule IO a b -> Rule IO (Maybe a) (Maybe b)
 [GblId,

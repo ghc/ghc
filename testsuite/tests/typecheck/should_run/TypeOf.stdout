@@ -20,5 +20,5 @@ Proxy * *
 Proxy * *
 Proxy * *
 Proxy RuntimeRep ('BoxedRep 'Lifted)
-Proxy (Nat,Symbol) ('(,) Nat Symbol 1 "hello")
+Proxy (Natural,Symbol) ('(,) Natural Symbol 1 "hello")
 Proxy (* -> * -> Constraint) ((~~) * *)

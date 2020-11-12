@@ -94,10 +94,6 @@ import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 
-#if __GLASGOW_HASKELL__ >= 811
-import GHC.Exts (Levity(..))
-#endif
-
 type BinArray = ForeignPtr Word8
 
 

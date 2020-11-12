@@ -19,6 +19,9 @@ import GHC.Prelude
 import GHC.Utils.Binary
 
 import GHC.Exts (TYPE, RuntimeRep(..), VecCount(..), VecElem(..))
+#if __GLASGOW_HASKELL__ >= 901
+import GHC.Exts (Levity(Lifted, Unlifted))
+#endif
 import GHC.Serialized
 
 import Foreign
@@ -112,7 +115,7 @@ instance Binary RuntimeRep where
     put_ bh (VecRep a b)    = putByte bh 0 >> put_ bh a >> put_ bh b
     put_ bh (TupleRep reps) = putByte bh 1 >> put_ bh reps
     put_ bh (SumRep reps)   = putByte bh 2 >> put_ bh reps
-#if __GLASGOW_HASKELL__ >= 910
+#if __GLASGOW_HASKELL__ >= 901
     put_ bh (BoxedRep Lifted)   = putByte bh 3
     put_ bh (BoxedRep Unlifted) = putByte bh 4
 #else
@@ -141,7 +144,7 @@ instance Binary RuntimeRep where
           0  -> VecRep <$> get bh <*> get bh
           1  -> TupleRep <$> get bh
           2  -> SumRep <$> get bh
-#if __GLASGOW_HASKELL__ >= 910
+#if __GLASGOW_HASKELL__ >= 901
           3  -> pure (BoxedRep Lifted)
           4  -> pure (BoxedRep Unlifted)
 #else

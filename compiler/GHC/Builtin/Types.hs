@@ -1430,7 +1430,7 @@ runtimeRepTy = mkTyConTy runtimeRepTyCon
 liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
                                        [] liftedTypeKind [] rhs
-  where rhs = TyCoRep.TyConApp tYPETyCon (mkTyConApp liftedRepTyCon [])
+  where rhs = TyCoRep.TyConApp tYPETyCon [mkTyConApp liftedRepTyCon []]
 liftedRepTyCon = buildSynTyCon
   liftedRepTyConName [] runtimeRepTy [] liftedRepTy
 
