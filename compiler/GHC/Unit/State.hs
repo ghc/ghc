@@ -1,6 +1,7 @@
 -- (c) The University of Glasgow, 2006
 
 {-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | Unit manipulation
 module GHC.Unit.State (
@@ -9,6 +10,7 @@ module GHC.Unit.State (
         -- * Reading the package config, and processing cmdline args
         UnitState(..),
         UnitDatabase (..),
+        UnitErr (..),
         emptyUnitState,
         initUnits,
         readUnitDatabases,
@@ -39,12 +41,9 @@ module GHC.Unit.State (
         UnusableUnitReason(..),
         pprReason,
 
-        -- * Inspecting the set of packages in scope
-        getUnitIncludePath,
-        getUnitExtraCcOpts,
-        getPreloadUnitsAnd,
-
-        collectIncludeDirs,
+        closeUnitDeps,
+        closeUnitDeps',
+        mayThrowUnitErr,
 
         -- * Module hole substitution
         ShHoleSubst,
@@ -73,19 +72,23 @@ where
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+
 import GHC.Platform
-import GHC.Unit.Home
+import GHC.Platform.Ways
+
 import GHC.Unit.Database
 import GHC.Unit.Info
 import GHC.Unit.Ppr
 import GHC.Unit.Types
 import GHC.Unit.Module
-import GHC.Driver.Session
-import GHC.Platform.Ways
+import GHC.Unit.Home
+
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
+
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
@@ -94,7 +97,7 @@ import GHC.Data.Maybe
 import System.Environment ( getEnv )
 import GHC.Data.FastString
 import qualified GHC.Data.ShortText as ST
-import GHC.Utils.Error  ( debugTraceMsg, MsgDoc, dumpIfSet_dyn,
+import GHC.Utils.Error  ( debugTraceMsg, dumpIfSet_dyn,
                           withTiming, DumpFormat (..) )
 import GHC.Utils.Exception
 
@@ -342,8 +345,8 @@ data UnitConfig = UnitConfig
    , unitConfigFlagsPlugins :: [PackageFlag]       -- ^ Plugins exposed units
    }
 
-initUnitConfig :: DynFlags -> UnitConfig
-initUnitConfig dflags =
+initUnitConfig :: DynFlags -> Maybe [UnitDatabase UnitId] -> UnitConfig
+initUnitConfig dflags cached_dbs =
    let !hu_id             = homeUnitId_ dflags
        !hu_instanceof     = homeUnitInstanceOf_ dflags
        !hu_instantiations = homeUnitInstantiations_ dflags
@@ -376,7 +379,7 @@ initUnitConfig dflags =
       , unitConfigHideAll        = gopt Opt_HideAllPackages dflags
       , unitConfigHideAllPlugins = gopt Opt_HideAllPluginPackages dflags
 
-      , unitConfigDBCache      = unitDatabases dflags
+      , unitConfigDBCache      = cached_dbs
       , unitConfigFlagsDB      = packageDBFlags dflags
       , unitConfigFlagsExposed = packageFlags dflags
       , unitConfigFlagsIgnored = ignorePackageFlags dflags
@@ -573,27 +576,55 @@ listUnitInfo state = Map.elems (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: DynFlags -> IO DynFlags
-initUnits dflags = do
+initUnits :: DynFlags -> Maybe [UnitDatabase UnitId] -> IO ([UnitDatabase UnitId], UnitState, HomeUnit)
+initUnits dflags cached_dbs = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
   let ctx     = initSDocContext dflags defaultUserStyle -- SDocContext used to render exception messages
   let printer = debugTraceMsg dflags                    -- printer for trace messages
 
-  (state,dbs) <- withTiming dflags (text "initializing unit database")
+  (unit_state,dbs) <- withTiming dflags (text "initializing unit database")
                    forceUnitInfoMap
-                   (mkUnitState ctx printer (initUnitConfig dflags))
+                 $ mkUnitState ctx printer (initUnitConfig dflags cached_dbs)
 
-  dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Module Map"
-    FormatText (pprModuleMap (moduleNameProvidersMap state))
+  dumpIfSet_dyn dflags Opt_D_dump_mod_map "Module Map"
+    FormatText (updSDocContext (\ctx -> ctx {sdocLineLength = 200})
+                $ pprModuleMap (moduleNameProvidersMap unit_state))
 
-  let dflags'  = dflags
-                  { unitDatabases = Just dbs -- databases are cached and never read again
-                  , unitState     = state
-                  }
-      dflags'' = upd_wired_in_home_instantiations dflags'
+  let home_unit = mkHomeUnit unit_state
+                             (homeUnitId_ dflags)
+                             (homeUnitInstanceOf_ dflags)
+                             (homeUnitInstantiations_ dflags)
 
-  return dflags''
+  return (dbs,unit_state,home_unit)
+
+mkHomeUnit
+    :: UnitState
+    -> UnitId                 -- ^ Home unit id
+    -> Maybe UnitId           -- ^ Home unit instance of
+    -> [(ModuleName, Module)] -- ^ Home unit instantiations
+    -> HomeUnit
+mkHomeUnit unit_state hu_id hu_instanceof hu_instantiations_ =
+    let
+        -- Some wired units can be used to instantiate the home unit. We need to
+        -- replace their unit keys with their wired unit ids.
+        wmap              = wireMap unit_state
+        hu_instantiations = map (fmap (upd_wired_in_mod wmap)) hu_instantiations_
+    in case (hu_instanceof, hu_instantiations) of
+      (Nothing,[]) -> DefiniteHomeUnit hu_id Nothing
+      (Nothing, _) -> throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
+      (Just _, []) -> throwGhcException $ CmdLineError ("Use of -this-component-id requires -instantiated-with")
+      (Just u, is)
+         -- detect fully indefinite units: all their instantiations are hole
+         -- modules and the home unit id is the same as the instantiating unit
+         -- id (see Note [About units] in GHC.Unit)
+         | all (isHoleModule . snd) is && u == hu_id
+         -> IndefiniteHomeUnit u is
+         -- otherwise it must be that we (fully) instantiate an indefinite unit
+         -- to make it definite.
+         -- TODO: error when the unit is partially instantiated??
+         | otherwise
+         -> DefiniteHomeUnit hu_id (Just (u, is))
 
 -- -----------------------------------------------------------------------------
 -- Reading the unit database(s)
@@ -759,30 +790,28 @@ mungeDynLibFields pkg =
 -- -trust and -distrust.
 
 applyTrustFlag
-   :: SDocContext
-   -> UnitPrecedenceMap
+   :: UnitPrecedenceMap
    -> UnusableUnits
    -> [UnitInfo]
    -> TrustFlag
-   -> IO [UnitInfo]
-applyTrustFlag ctx prec_map unusable pkgs flag =
+   -> MaybeErr UnitErr [UnitInfo]
+applyTrustFlag prec_map unusable pkgs flag =
   case flag of
     -- we trust all matching packages. Maybe should only trust first one?
     -- and leave others the same or set them untrusted
     TrustPackage str ->
        case selectPackages prec_map (PackageArg str) pkgs unusable of
-         Left ps       -> trustFlagErr ctx flag ps
-         Right (ps,qs) -> return (map trust ps ++ qs)
+         Left ps       -> Failed (TrustFlagErr flag ps)
+         Right (ps,qs) -> Succeeded (map trust ps ++ qs)
           where trust p = p {unitIsTrusted=True}
 
     DistrustPackage str ->
        case selectPackages prec_map (PackageArg str) pkgs unusable of
-         Left ps       -> trustFlagErr ctx flag ps
-         Right (ps,qs) -> return (distrustAllUnits ps ++ qs)
+         Left ps       -> Failed (TrustFlagErr flag ps)
+         Right (ps,qs) -> Succeeded (distrustAllUnits ps ++ qs)
 
 applyPackageFlag
-   :: SDocContext
-   -> UnitPrecedenceMap
+   :: UnitPrecedenceMap
    -> UnitInfoMap
    -> PreloadUnitClosure
    -> UnusableUnits
@@ -790,15 +819,15 @@ applyPackageFlag
            -- any previously exposed packages with the same name
    -> [UnitInfo]
    -> VisibilityMap           -- Initially exposed
-   -> PackageFlag               -- flag to apply
-   -> IO VisibilityMap        -- Now exposed
+   -> PackageFlag             -- flag to apply
+   -> MaybeErr UnitErr VisibilityMap -- Now exposed
 
-applyPackageFlag ctx prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
+applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
   case flag of
     ExposePackage _ arg (ModRenaming b rns) ->
        case findPackages prec_map pkg_map closure arg pkgs unusable of
-         Left ps         -> packageFlagErr ctx flag ps
-         Right (p:_) -> return vm'
+         Left ps     -> Failed (PackageFlagErr flag ps)
+         Right (p:_) -> Succeeded vm'
           where
            n = fsPackageName p
 
@@ -861,9 +890,8 @@ applyPackageFlag ctx prec_map pkg_map closure unusable no_hide_others pkgs vm fl
 
     HidePackage str ->
        case findPackages prec_map pkg_map closure (PackageArg str) pkgs unusable of
-         Left ps  -> packageFlagErr ctx flag ps
-         Right ps -> return vm'
-          where vm' = foldl' (flip Map.delete) vm (map mkUnit ps)
+         Left ps  -> Failed (PackageFlagErr flag ps)
+         Right ps -> Succeeded $ foldl' (flip Map.delete) vm (map mkUnit ps)
 
 -- | Like 'selectPackages', but doesn't return a list of unmatched
 -- packages.  Furthermore, any packages it returns are *renamed*
@@ -969,34 +997,6 @@ compareByPreference prec_map pkg pkg'
 
 comparing :: Ord a => (t -> a) -> t -> t -> Ordering
 comparing f a b = f a `compare` f b
-
-packageFlagErr :: SDocContext
-               -> PackageFlag
-               -> [(UnitInfo, UnusableUnitReason)]
-               -> IO a
-packageFlagErr ctx flag reasons
-  = packageFlagErr' ctx (pprFlag flag) reasons
-
-trustFlagErr :: SDocContext
-             -> TrustFlag
-             -> [(UnitInfo, UnusableUnitReason)]
-             -> IO a
-trustFlagErr ctx flag reasons
-  = packageFlagErr' ctx (pprTrustFlag flag) reasons
-
-packageFlagErr' :: SDocContext
-               -> SDoc
-               -> [(UnitInfo, UnusableUnitReason)]
-               -> IO a
-packageFlagErr' ctx flag_doc reasons
-  = throwGhcExceptionIO (CmdLineError (renderWithContext ctx $ err))
-  where err = text "cannot satisfy " <> flag_doc <>
-                (if null reasons then Outputable.empty else text ": ") $$
-              nest 4 (ppr_reasons $$
-                      text "(use -v for more information)")
-        ppr_reasons = vcat (map ppr_reason reasons)
-        ppr_reason (p, reason) =
-            pprReason (ppr (unitId p) <+> text "is") reason
 
 pprFlag :: PackageFlag -> SDoc
 pprFlag flag = case flag of
@@ -1116,17 +1116,6 @@ findWiredInUnits printer prec_map pkgs vis_map = do
 --
 -- For instance, base-4.9.0.0 will be rewritten to just base, to match
 -- what appears in GHC.Builtin.Names.
-
--- | Some wired units can be used to instantiate the home unit. We need to
--- replace their unit keys with their wired unit ids.
-upd_wired_in_home_instantiations :: DynFlags -> DynFlags
-upd_wired_in_home_instantiations dflags = dflags { homeUnitInstantiations_ = wiredInsts }
-   where
-      state        = unitState dflags
-      wiringMap    = wireMap state
-      unwiredInsts = homeUnitInstantiations_ dflags
-      wiredInsts   = map (fmap (upd_wired_in_mod wiringMap)) unwiredInsts
-
 
 upd_wired_in_mod :: WiringMap -> Module -> Module
 upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap uid) m
@@ -1482,7 +1471,8 @@ mkUnitState ctx printer cfg = do
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
-  pkgs1 <- foldM (applyTrustFlag ctx prec_map unusable)
+  pkgs1 <- mayThrowUnitErr
+            $ foldM (applyTrustFlag prec_map unusable)
                  (Map.elems pkg_map2) (reverse (unitConfigFlagsTrusted cfg))
   let prelim_pkg_db = mkUnitInfoMap pkgs1
 
@@ -1540,7 +1530,8 @@ mkUnitState ctx printer cfg = do
   -- -hide-package).  This needs to know about the unusable packages, since if a
   -- user tries to enable an unusable package, we should let them know.
   --
-  vis_map2 <- foldM (applyPackageFlag ctx prec_map prelim_pkg_db emptyUniqSet unusable
+  vis_map2 <- mayThrowUnitErr
+                $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
                         (unitConfigHideAll cfg) pkgs1)
                             vis_map1 other_flags
 
@@ -1568,7 +1559,8 @@ mkUnitState ctx printer cfg = do
                         -- won't work.
                         | otherwise = vis_map2
                 plugin_vis_map2
-                    <- foldM (applyPackageFlag ctx prec_map prelim_pkg_db emptyUniqSet unusable
+                    <- mayThrowUnitErr
+                        $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
                                 hide_plugin_pkgs pkgs1)
                              plugin_vis_map1
                              (reverse (unitConfigFlagsPlugins cfg))
@@ -1614,8 +1606,9 @@ mkUnitState ctx printer cfg = do
       preload3 = ordNub $ (basicLinkedUnits ++ preload1)
 
   -- Close the preload packages with their dependencies
-  let dep_preload_err = closeUnitDeps pkg_db (zip (map toUnitId preload3) (repeat Nothing))
-  dep_preload <- throwErr ctx dep_preload_err
+  dep_preload <- mayThrowUnitErr
+                    $ closeUnitDeps pkg_db
+                    $ zip (map toUnitId preload3) (repeat Nothing)
 
   let mod_map1 = mkModuleNameProvidersMap ctx cfg pkg_db emptyUniqSet vis_map
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
@@ -1635,7 +1628,6 @@ mkUnitState ctx printer cfg = do
          , requirementContext           = req_ctx
          , allowVirtualUnits            = unitConfigAllowVirtual cfg
          }
-
   return (state, raw_dbs)
 
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
@@ -1775,30 +1767,6 @@ addListTo = foldl' merge
 mkModMap :: Unit -> ModuleName -> ModuleOrigin -> Map Module ModuleOrigin
 mkModMap pkg mod = Map.singleton (mkModule pkg mod)
 
--- -----------------------------------------------------------------------------
--- Extracting information from the packages in scope
-
--- Many of these functions take a list of packages: in those cases,
--- the list is expected to contain the "dependent packages",
--- i.e. those packages that were found to be depended on by the
--- current module/program.  These can be auto or non-auto packages, it
--- doesn't really matter.  The list is always combined with the list
--- of preload (command-line) packages to determine which packages to
--- use.
-
--- | Find all the include directories in these and the preload packages
-getUnitIncludePath :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
-getUnitIncludePath ctx unit_state home_unit pkgs =
-  collectIncludeDirs `fmap` getPreloadUnitsAnd ctx unit_state home_unit pkgs
-
-collectIncludeDirs :: [UnitInfo] -> [FilePath]
-collectIncludeDirs ps = map ST.unpack $ ordNub (filter (not . ST.null) (concatMap unitIncludeDirs ps))
-
--- | Find all the C-compiler options in these and the preload packages
-getUnitExtraCcOpts :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
-getUnitExtraCcOpts ctx unit_state home_unit pkgs = do
-  ps <- getPreloadUnitsAnd ctx unit_state home_unit pkgs
-  return $ map ST.unpack (concatMap unitCcOptions ps)
 
 -- -----------------------------------------------------------------------------
 -- Package Utils
@@ -1923,39 +1891,15 @@ listVisibleModuleNames state =
     map fst (filter visible (Map.toList (moduleNameProvidersMap state)))
   where visible (_, ms) = any originVisible (Map.elems ms)
 
--- | Lookup 'UnitInfo' for every preload unit from the UnitState, for every unit
--- used to instantiate the home unit, and for every unit explicitly passed in
--- the given list of UnitId.
-getPreloadUnitsAnd :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [UnitInfo]
-getPreloadUnitsAnd ctx unit_state home_unit ids0 =
-  let
-      ids      = ids0 ++ inst_ids
-      inst_ids
-         -- An indefinite package will have insts to HOLE,
-         -- which is not a real package. Don't look it up.
-         -- Fixes #14525
-         | isHomeUnitIndefinite home_unit = []
-         | otherwise = map (toUnitId . moduleUnit . snd) (homeUnitInstantiations home_unit)
-      pkg_map = unitInfoMap unit_state
-      preload = preloadUnits unit_state
-  in do
-  all_pkgs <- throwErr ctx (closeUnitDeps' pkg_map preload (ids `zip` repeat Nothing))
-  return (map (unsafeLookupUnitId unit_state) all_pkgs)
-
-throwErr :: SDocContext -> MaybeErr MsgDoc a -> IO a
-throwErr ctx m = case m of
-   Failed e    -> throwGhcExceptionIO (CmdLineError (renderWithContext ctx e))
-   Succeeded r -> return r
-
 -- | Takes a list of UnitIds (and their "parent" dependency, used for error
 -- messages), and returns the list with dependencies included, in reverse
 -- dependency order (a units appears before those it depends on).
-closeUnitDeps :: UnitInfoMap -> [(UnitId,Maybe UnitId)] -> MaybeErr MsgDoc [UnitId]
+closeUnitDeps :: UnitInfoMap -> [(UnitId,Maybe UnitId)] -> MaybeErr UnitErr [UnitId]
 closeUnitDeps pkg_map ps = closeUnitDeps' pkg_map [] ps
 
 -- | Similar to closeUnitDeps but takes a list of already loaded units as an
 -- additional argument.
-closeUnitDeps' :: UnitInfoMap -> [UnitId] -> [(UnitId,Maybe UnitId)] -> MaybeErr MsgDoc [UnitId]
+closeUnitDeps' :: UnitInfoMap -> [UnitId] -> [(UnitId,Maybe UnitId)] -> MaybeErr UnitErr [UnitId]
 closeUnitDeps' pkg_map current_ids ps = foldM (add_unit pkg_map) current_ids ps
 
 -- | Add a UnitId and those it depends on (recursively) to the given list of
@@ -1968,16 +1912,11 @@ closeUnitDeps' pkg_map current_ids ps = foldM (add_unit pkg_map) current_ids ps
 add_unit :: UnitInfoMap
             -> [UnitId]
             -> (UnitId,Maybe UnitId)
-            -> MaybeErr MsgDoc [UnitId]
+            -> MaybeErr UnitErr [UnitId]
 add_unit pkg_map ps (p, mb_parent)
   | p `elem` ps = return ps     -- Check if we've already added this unit
   | otherwise   = case lookupUnitId' pkg_map p of
-      Nothing -> Failed $
-                   (ftext (fsLit "unknown package:") <+> ppr p)
-                   <> case mb_parent of
-                         Nothing     -> Outputable.empty
-                         Just parent -> space <> parens (text "dependency of"
-                                                  <+> ftext (unitIdFS parent))
+      Nothing   -> Failed (CloseUnitErr p mb_parent)
       Just info -> do
          -- Add the unit's dependents also
          ps' <- foldM add_unit_key ps (unitDepends info)
@@ -1985,6 +1924,44 @@ add_unit pkg_map ps (p, mb_parent)
         where
           add_unit_key ps key
             = add_unit pkg_map ps (key, Just p)
+
+data UnitErr
+  = CloseUnitErr !UnitId !(Maybe UnitId)
+  | PackageFlagErr !PackageFlag ![(UnitInfo,UnusableUnitReason)]
+  | TrustFlagErr   !TrustFlag   ![(UnitInfo,UnusableUnitReason)]
+
+mayThrowUnitErr :: MaybeErr UnitErr a -> IO a
+mayThrowUnitErr = \case
+    Failed e    -> throwGhcExceptionIO
+                    $ CmdLineError
+                    $ renderWithContext defaultSDocContext
+                    $ withPprStyle defaultUserStyle
+                    $ ppr e
+    Succeeded a -> return a
+
+instance Outputable UnitErr where
+    ppr = \case
+        CloseUnitErr p mb_parent
+            -> (ftext (fsLit "unknown unit:") <+> ppr p)
+               <> case mb_parent of
+                     Nothing     -> Outputable.empty
+                     Just parent -> space <> parens (text "dependency of"
+                                              <+> ftext (unitIdFS parent))
+        PackageFlagErr flag reasons
+            -> flag_err (pprFlag flag) reasons
+
+        TrustFlagErr flag reasons
+            -> flag_err (pprTrustFlag flag) reasons
+      where
+        flag_err flag_doc reasons =
+            text "cannot satisfy "
+            <> flag_doc
+            <> (if null reasons then Outputable.empty else text ": ")
+            $$ nest 4 (vcat (map ppr_reason reasons) $$
+                      text "(use -v for more information)")
+
+        ppr_reason (p, reason) =
+            pprReason (ppr (unitId p) <+> text "is") reason
 
 -- -----------------------------------------------------------------------------
 
