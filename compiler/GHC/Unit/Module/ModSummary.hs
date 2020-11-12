@@ -44,8 +44,8 @@ import Data.Time
 
 -- | Enrichment of 'ModSummary' with backpack dependencies
 data ExtendedModSummary = ExtendedModSummary
-  { emsModSummary :: {-# UNPACK #-} !ModSummary
-  , emsInstantiatedUnits :: ![InstantiatedUnit]
+  { emsModSummary :: ModSummary
+  , emsInstantiatedUnits :: [InstantiatedUnit]
   -- ^ Extra backpack deps
   -- NB: This is sometimes left empty in situations where the instantiated units
   -- would not be used. See call sites of 'extendModSummaryNoDeps'.
