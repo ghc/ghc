@@ -1506,7 +1506,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -----------------  Convert to STG ------------------
         (stg_binds, (caf_ccs, caf_cc_stacks))
             <- {-# SCC "CoreToStg" #-}
-               myCoreToStg dflags this_mod prepd_binds
+               myCoreToStg hsc_env this_mod prepd_binds
 
         let cost_centre_info = (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
             platform = targetPlatform dflags
@@ -1575,7 +1575,7 @@ hscInteractive hsc_env cgguts location = do
 
     (stg_binds, _caf_ccs__caf_cc_stacks)
       <- {-# SCC "CoreToStg" #-}
-          myCoreToStg dflags this_mod prepd_binds
+          myCoreToStg hsc_env this_mod prepd_binds
     -----------------  Generate byte code ------------------
     comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
@@ -1697,17 +1697,17 @@ doCodeGen hsc_env this_mod data_tycons
 
     return (Stream.mapM dump2 pipeline_stream)
 
-myCoreToStg :: DynFlags -> Module -> CoreProgram
+myCoreToStg :: HscEnv -> Module -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
                   , CollectedCCs )  -- CAF cost centre info (declared and used)
-myCoreToStg dflags this_mod prepd_binds = do
+myCoreToStg hsc_env this_mod prepd_binds = do
     let (stg_binds, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
-           coreToStg dflags this_mod prepd_binds
+           coreToStg (hsc_dflags hsc_env) this_mod prepd_binds
 
     stg_binds2
         <- {-# SCC "Stg2Stg" #-}
-           stg2stg dflags this_mod stg_binds
+           stg2stg hsc_env this_mod stg_binds
 
     return (stg_binds2, cost_centre_info)
 
@@ -1849,7 +1849,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 
     (stg_binds, _caf_ccs__caf_cc_stacks)
         <- {-# SCC "CoreToStg" #-}
-           liftIO $ myCoreToStg (hsc_dflags hsc_env) this_mod prepd_binds
+           liftIO $ myCoreToStg hsc_env this_mod prepd_binds
 
     {- Generate byte code -}
     cbc <- liftIO $ byteCodeGen hsc_env this_mod
@@ -2015,7 +2015,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
          ; lintInteractiveExpr (text "hscCompileExpr") hsc_env prepd_expr
 
          ; ([StgTopLifted (StgNonRec _ stg_expr)], _) <-
-             myCoreToStg (hsc_dflags hsc_env)
+             myCoreToStg hsc_env
                          (icInteractiveModule (hsc_IC hsc_env))
                          [NonRec unitDataConId prepd_expr]
 
