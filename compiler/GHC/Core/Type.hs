@@ -1981,6 +1981,8 @@ buildSynTyCon name binders res_kind roles rhs
     is_fam_free  = isFamFreeTy rhs
     is_forgetful = any (not . (`elemVarSet` tyCoVarsOfType rhs) . binderVar) binders ||
                    uniqSetAny isForgetfulSynTyCon (tyConsOfType rhs)
+         -- NB: This is allowed to be conservative, returning True more often
+         -- than it should. See comments on GHC.Core.TyCon.isForgetfulSynTyCon
 
 {-
 ************************************************************************

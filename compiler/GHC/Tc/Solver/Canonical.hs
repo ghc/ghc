@@ -50,7 +50,7 @@ import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Monad
 import Control.Monad
-import Data.Maybe ( isJust )
+import Data.Maybe ( isJust, isNothing )
 import Data.List  ( zip4 )
 import GHC.Types.Basic
 
@@ -108,26 +108,6 @@ canonicalize (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
   = canForAll ev pend_sc
 
 canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
-{- "RAE"  | BlockedCIS holes <- status
-  , isEmptyUniqSet holes
-    -- this would be a CEqCan if it weren't for the blocking hole, but that
-    -- block has been removed. Warp straight to canEqCanLHSHomo.
-    -- See Wrinkle (2b) of Note [Equalities with incompatible kinds]
-  = do { pred_ty <- zonkTcType (ctEvPred ev) -- zonk to remove the filled-in coercion
-                                             -- hole. Could flatten, but why bother?
-       ; case classifyPredType pred_ty of
-           EqPred eq_rel ty1 ty2
-             | Just lhs <- canEqLHS_maybe ty1
-             -> canEqCanLHSHomo ev eq_rel NotSwapped lhs ty1 ty2 ty2
-
-            -- the work item was indeed kicked out because the blocking coercion
-            -- hole got filled in. But perhaps an intervening work item unified
-            -- a variable in the LHS. We're not in the looping case of Wrinkle (2b),
-            -- so just go via the general path
-           _ -> canIrred status ev }
-            -- NB: The Irred is /not/ insoluble, so the special case below
-            -- for insolubles (the direct call to canEqNC) does not apply.
--}
   | EqPred eq_rel ty1 ty2 <- classifyPredType (ctEvPred ev)
   = -- For insolubles (all of which are equalities), do /not/ flatten the arguments
     -- In #14350 doing so led entire-unnecessary and ridiculously large
@@ -999,10 +979,10 @@ can_eq_nc' _flat rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 
 -- Then, get rid of casts
 can_eq_nc' flat _rdr_env _envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
-  | not (isTyVarTy ty2)  -- See (3) in Note [Equalities with incompatible kinds]
+  | isNothing (canEqLHS_maybe ty2)  -- See (3) in Note [Equalities with incompatible kinds]
   = canEqCast flat ev eq_rel NotSwapped ty1 co1 ty2 ps_ty2
 can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
-  | not (isTyVarTy ty1)  -- See (3) in Note [Equalities with incompatible kinds]
+  | isNothing (canEqLHS_maybe ty1)  -- See (3) in Note [Equalities with incompatible kinds]
   = canEqCast flat ev eq_rel IsSwapped ty2 co2 ty1 ps_ty1
 
 ----------------------
@@ -2565,25 +2545,6 @@ Wrinkles:
           Alternatively, we could be careful not to do unnecessary swaps during
           canonicalisation, but that seems hard to do, in general.
 
-     (2b) Consider this case:
-             [G] co_given :: k1 ~ k2
-             [W] w :: (alpha :: k1) ~ (T a b c :: k2)
-          Processing the Wanted, we will eventually get to canEqCanLHSHetero,
-          which will produce
-             [W] co_abc :: k2 ~ k1
-          leaving the Wanted to become
-             [W] w2 :: alpha ~ (T a b c |> co_abc)
-          When co_abc gets picked off the work list, it will get solved,
-          kicking out w2. But canonicalising w2 strips off the cast (toward the
-          top of can_eq_nc') and then the process repeats.
-
-          Instead, when we're canonicalising something that was made into
-          an Irred only because of a blocking coercion (that is, with BlockedCIS),
-          we just jump straight to canEqCanLHSHomo. You might think we can go
-          straight to canEqCanLHSFinish, but there's a chance that a blocking
-          coercion hole interfered with the checkTyVarEq call in canEqTyVarFunEq,
-          so we have to start above that call.
-
  (3) Suppose we have [W] (a :: k1) ~ (rhs :: k2). We duly follow the
      algorithm detailed here, producing [W] co :: k2 ~ k1, and adding
      [W] (a :: k1) ~ ((rhs |> co) :: k1) to the irreducibles. Some time
@@ -2594,7 +2555,9 @@ Wrinkles:
      is heterogeneous again, and the process repeats.
 
      To avoid this, we don't strip casts off a type if the other type
-     in the equality is a tyvar. And this is an improvement regardless:
+     in the equality is a CanEqLHS (the scenario above can happen with a
+     type family, too. testcase: typecheck/should_compile/T13822).
+     And this is an improvement regardless:
      because tyvars can, generally, unify with casted types, there's no
      reason to go through the work of stripping off the cast when the
      cast appears opposite a tyvar. This is implemented in the cast case
