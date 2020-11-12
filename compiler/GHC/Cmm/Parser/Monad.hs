@@ -32,7 +32,7 @@ import GHC.Types.SrcLoc
 import GHC.Unit.Types
 import GHC.Unit.Home
 
-newtype PD a = PD { unPD :: DynFlags -> PState -> ParseResult a }
+newtype PD a = PD { unPD :: DynFlags -> HomeUnit -> PState -> ParseResult a }
 
 instance Functor PD where
   fmap = liftM
@@ -45,7 +45,7 @@ instance Monad PD where
   (>>=) = thenPD
 
 liftP :: P a -> PD a
-liftP (P f) = PD $ \_ s -> f s
+liftP (P f) = PD $ \_ _ s -> f s
 
 failMsgPD :: (SrcSpan -> Error) -> PD a
 failMsgPD = liftP . failMsgP
@@ -54,13 +54,13 @@ returnPD :: a -> PD a
 returnPD = liftP . return
 
 thenPD :: PD a -> (a -> PD b) -> PD b
-(PD m) `thenPD` k = PD $ \d s ->
-        case m d s of
-                POk s1 a         -> unPD (k a) d s1
+(PD m) `thenPD` k = PD $ \d hu s ->
+        case m d hu s of
+                POk s1 a   -> unPD (k a) d hu s1
                 PFailed s1 -> PFailed s1
 
 instance HasDynFlags PD where
-   getDynFlags = PD $ \d s -> POk s d
+   getDynFlags = PD $ \d _ s -> POk s d
 
 getProfile :: PD Profile
 getProfile = targetProfile <$> getDynFlags
@@ -79,6 +79,4 @@ getPtrOpts = do
 
 -- | Return the UnitId of the home-unit. This is used to create labels.
 getHomeUnitId :: PD UnitId
-getHomeUnitId = do
-   dflags <- getDynFlags
-   pure (homeUnitId (mkHomeUnitFromFlags dflags))
+getHomeUnitId = PD $ \_ hu s -> POk s (homeUnitId hu)
