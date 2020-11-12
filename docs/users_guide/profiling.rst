@@ -373,7 +373,7 @@ compiled program.
     ⟨name⟩ also accepts a small globbing language using ``*`` as a wildcard
     symbol:
 
-    .. code-block::
+    .. code-block:: none
 
         pattern    := <module> '.' <identifier>
         module     := '*'
