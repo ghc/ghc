@@ -624,8 +624,9 @@ checkBrokenTablesNextToCode' dflags
 -- (packageFlags dflags).
 setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setSessionDynFlags dflags0 = do
-  dflags1 <- checkNewDynFlags dflags0
-  dflags <- liftIO $ initUnits dflags1
+  dflags <- checkNewDynFlags dflags0
+  hsc_env <- getSession
+  (dbs,unit_state,home_unit) <- liftIO $ initUnits dflags (hsc_unit_dbs hsc_env)
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -665,7 +666,9 @@ setSessionDynFlags dflags0 = do
                          , hsc_interp = hsc_interp h <|> interp
                            -- we only update the interpreter if there wasn't
                            -- already one set up
-                         , hsc_home_unit = mkHomeUnitFromFlags dflags
+                         , hsc_home_unit = home_unit
+                         , hsc_units     = unit_state
+                         , hsc_unit_dbs  = Just dbs
                          }
   invalidateModSummaryCache
 
@@ -692,10 +695,16 @@ setProgramDynFlags_ invalidate_needed dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags_prev <- getProgramDynFlags
   let changed = packageFlagsChanged dflags_prev dflags'
-  dflags'' <- if changed
-               then liftIO $ initUnits dflags'
-               else return dflags'
-  modifySession $ \h -> h{ hsc_dflags = dflags'' }
+  if changed
+    then do
+        hsc_env <- getSession
+        (dbs,unit_state,home_unit) <- liftIO $ initUnits dflags' (hsc_unit_dbs hsc_env)
+        modifySession $ \h -> h{ hsc_dflags    = dflags'
+                               , hsc_units     = unit_state
+                               , hsc_unit_dbs  = Just dbs
+                               , hsc_home_unit = home_unit
+                               }
+    else modifySession $ \h -> h{ hsc_dflags = dflags' }
   when invalidate_needed $ invalidateModSummaryCache
   return changed
 
@@ -1291,11 +1300,7 @@ getInsts = withSession $ \hsc_env ->
 
 getPrintUnqual :: GhcMonad m => m PrintUnqualified
 getPrintUnqual = withSession $ \hsc_env -> do
-  let dflags = hsc_dflags hsc_env
-  return $ icPrintUnqual
-               (unitState dflags)
-               (hsc_home_unit hsc_env)
-               (hsc_IC hsc_env)
+  return $ icPrintUnqual (hsc_unit_env hsc_env) (hsc_IC hsc_env)
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
@@ -1390,10 +1395,7 @@ mkPrintUnqualifiedForModule :: GhcMonad m =>
                                ModuleInfo
                             -> m (Maybe PrintUnqualified) -- XXX: returns a Maybe X
 mkPrintUnqualifiedForModule minf = withSession $ \hsc_env -> do
-  let dflags          = hsc_dflags hsc_env
-      mk_print_unqual = mkPrintUnqualified
-                           (unitState dflags)
-                           (hsc_home_unit hsc_env)
+  let mk_print_unqual = mkPrintUnqualified (hsc_unit_env hsc_env)
   return (fmap mk_print_unqual (minf_rdr_env minf))
 
 modInfoLookupName :: GhcMonad m =>
@@ -1620,14 +1622,14 @@ showRichTokenStream ts = go startLoc ts ""
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
-  let dflags = hsc_dflags hsc_env
-      home_unit = hsc_home_unit hsc_env
+  let dflags     = hsc_dflags hsc_env
+      home_unit  = hsc_home_unit hsc_env
   case maybe_pkg of
     Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
         Found _ m -> return m
-        err       -> throwOneError $ noModError dflags noSrcSpan mod_name err
+        err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
     _otherwise -> do
       home <- lookupLoadedHomeModule mod_name
       case home of
@@ -1637,7 +1639,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
            case res of
              Found loc m | not (isHomeModule home_unit m) -> return m
                          | otherwise -> modNotLoadedError dflags m loc
-             err -> throwOneError $ noModError dflags noSrcSpan mod_name err
+             err -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
 
 modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
 modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc dflags $
@@ -1662,7 +1664,7 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
       res <- findExposedPackageModule hsc_env mod_name Nothing
       case res of
         Found _ m -> return m
-        err       -> throwOneError $ noModError (hsc_dflags hsc_env) noSrcSpan mod_name err
+        err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
 
 lookupLoadedHomeModule :: GhcMonad m => ModuleName -> m (Maybe Module)
 lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->
