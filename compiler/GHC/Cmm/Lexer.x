@@ -362,8 +362,8 @@ alexGetByte (loc,s)
         s'   = stepOn s
 
 getInput :: PD AlexInput
-getInput = PD $ \_ s@PState{ loc=l, buffer=b } -> POk s (l,b)
+getInput = PD $ \_ _ s@PState{ loc=l, buffer=b } -> POk s (l,b)
 
 setInput :: AlexInput -> PD ()
-setInput (l,b) = PD $ \_ s -> POk s{ loc=l, buffer=b } ()
+setInput (l,b) = PD $ \_ _ s -> POk s{ loc=l, buffer=b } ()
 }
