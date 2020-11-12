@@ -42,6 +42,7 @@ module GHC.Tc.Utils.Instantiate (
 import GHC.Prelude
 
 import GHC.Driver.Session
+import GHC.Driver.Env
 
 import GHC.Builtin.Types  ( heqDataCon, eqDataCon, integerTyConName )
 import GHC.Builtin.Names
@@ -975,7 +976,7 @@ dupInstErr ispec dup_ispec
 
 addClsInstsErr :: SDoc -> [ClsInst] -> TcRn ()
 addClsInstsErr herald ispecs = do
-   unit_state <- unitState <$> getDynFlags
+   unit_state <- hsc_units <$> getTopEnv
    setSrcSpan (getSrcSpan (head sorted)) $
       addErr $ pprWithUnitState unit_state $ (hang herald 2 (pprInstances sorted))
  where

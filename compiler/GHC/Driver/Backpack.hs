@@ -56,6 +56,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Error
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Finder
@@ -69,6 +70,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Maybe
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
+import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.Data.ShortText as ST
 
 import Data.List ( partition )
@@ -103,8 +105,8 @@ doBackpack [src_filename] = do
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
-            let pkgstate = unitState dflags
-            let bkp = renameHsUnits pkgstate (bkpPackageNameMap pkgname_bkp) pkgname_bkp
+            hsc_env <- getSession
+            let bkp = renameHsUnits (hsc_units hsc_env) (bkpPackageNameMap pkgname_bkp) pkgname_bkp
             initBkpM src_filename bkp $
                 forM_ (zip [1..] bkp) $ \(i, lunit) -> do
                     let comp_name = unLoc (hsunitName (unLoc lunit))
@@ -170,61 +172,67 @@ withBkpSession cid insts deps session_type do_this = do
                  -- Special case when package is definite
                  , not (null insts) = sub_comp (key_base p) </> uid_str
                  | otherwise = sub_comp (key_base p)
-    withTempSession (overHscDynFlags (\dflags ->
-      -- If we're type-checking an indefinite package, we want to
-      -- turn on interface writing.  However, if the user also
-      -- explicitly passed in `-fno-code`, we DON'T want to write
-      -- interfaces unless the user also asked for `-fwrite-interface`.
-      -- See Note [-fno-code mode]
-      (case session_type of
-        -- Make sure to write interfaces when we are type-checking
-        -- indefinite packages.
-        TcSession | backend dflags /= NoBackend
-                  -> flip gopt_set Opt_WriteInterface
-                  | otherwise -> id
-        CompSession -> id
-        ExeSession -> id) $
-      dflags {
-        backend   = case session_type of
-                        TcSession -> NoBackend
-                        _ -> backend dflags,
-        homeUnitInstantiations_ = insts,
-                                 -- if we don't have any instantiation, don't
-                                 -- fill `homeUnitInstanceOfId` as it makes no
-                                 -- sense (we're not instantiating anything)
-        homeUnitInstanceOf_   = if null insts then Nothing else Just (indefUnit cid),
-        homeUnitId_ =
-            case session_type of
+
+        mk_temp_env hsc_env = hsc_env
+            { hsc_dflags   = mk_temp_dflags (hsc_units hsc_env) (hsc_dflags hsc_env)
+            }
+        mk_temp_dflags unit_state dflags = dflags
+            { backend = case session_type of
+                            TcSession -> NoBackend
+                            _         -> backend dflags
+            , homeUnitInstantiations_ = insts
+                                     -- if we don't have any instantiation, don't
+                                     -- fill `homeUnitInstanceOfId` as it makes no
+                                     -- sense (we're not instantiating anything)
+            , homeUnitInstanceOf_   = if null insts then Nothing else Just (indefUnit cid)
+            , homeUnitId_ = case session_type of
                 TcSession -> newUnitId cid Nothing
                 -- No hash passed if no instances
                 _ | null insts -> newUnitId cid Nothing
-                  | otherwise  -> newUnitId cid (Just (mkInstantiatedUnitHash cid insts)),
-        -- Setup all of the output directories according to our hierarchy
-        objectDir   = Just (outdir objectDir),
-        hiDir       = Just (outdir hiDir),
-        stubDir     = Just (outdir stubDir),
-        -- Unset output-file for non exe builds
-        outputFile_  = if session_type == ExeSession
-                        then outputFile_ dflags
-                        else Nothing,
-        dynOutputFile_ = if session_type == ExeSession
-                        then dynOutputFile_ dflags
-                        else Nothing,
-        -- Clear the import path so we don't accidentally grab anything
-        importPaths = [],
-        -- Synthesized the flags
-        packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let state = unitState dflags
-              uid = unwireUnit state (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)
-          in ExposePackage
-            (showSDoc dflags
-                (text "-unit-id" <+> ppr uid <+> ppr rn))
-            (UnitIdArg uid) rn) deps
-      } )) $ do
-        dflags <- getSessionDynFlags
-        -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()
-        setSessionDynFlags dflags -- calls initUnits
-        do_this
+                  | otherwise  -> newUnitId cid (Just (mkInstantiatedUnitHash cid insts))
+
+
+            -- If we're type-checking an indefinite package, we want to
+            -- turn on interface writing.  However, if the user also
+            -- explicitly passed in `-fno-code`, we DON'T want to write
+            -- interfaces unless the user also asked for `-fwrite-interface`.
+            -- See Note [-fno-code mode]
+            , generalFlags = case session_type of
+                -- Make sure to write interfaces when we are type-checking
+                -- indefinite packages.
+                TcSession
+                  | backend dflags /= NoBackend
+                  -> EnumSet.insert Opt_WriteInterface (generalFlags dflags)
+                _ -> generalFlags dflags
+
+            -- Setup all of the output directories according to our hierarchy
+            , objectDir   = Just (outdir objectDir)
+            , hiDir       = Just (outdir hiDir)
+            , stubDir     = Just (outdir stubDir)
+            -- Unset output-file for non exe builds
+            , outputFile_ = case session_type of
+                ExeSession -> outputFile_ dflags
+                _          -> Nothing
+            , dynOutputFile_ = case session_type of
+                ExeSession -> dynOutputFile_ dflags
+                _          -> Nothing
+            -- Clear the import path so we don't accidentally grab anything
+            , importPaths = []
+            -- Synthesize the flags
+            , packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
+              let uid = unwireUnit unit_state
+                        $ improveUnit unit_state
+                        $ renameHoleUnit unit_state (listToUFM insts) uid0
+              in ExposePackage
+                (showSDoc dflags
+                    (text "-unit-id" <+> ppr uid <+> ppr rn))
+                (UnitIdArg uid) rn) deps
+            }
+    withTempSession mk_temp_env $ do
+      dflags <- getSessionDynFlags
+      -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()
+      setSessionDynFlags dflags -- calls initUnits
+      do_this
 
 withBkpExeSession :: [(Unit, ModRenaming)] -> BkpM a -> BkpM a
 withBkpExeSession deps do_this =
@@ -278,11 +286,11 @@ buildUnit session cid insts lunit = do
     -- any object files.
     let deps_w_rns = hsunitDeps (session == TcSession) (unLoc lunit)
         raw_deps = map fst deps_w_rns
-    dflags <- getDynFlags
+    hsc_env <- getSession
     -- The compilation dependencies are just the appropriately filled
     -- in unit IDs which must be compiled before we can compile.
     let hsubst = listToUFM insts
-        deps0 = map (renameHoleUnit (unitState dflags) hsubst) raw_deps
+        deps0 = map (renameHoleUnit (hsc_units hsc_env) hsubst) raw_deps
 
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
@@ -293,9 +301,8 @@ buildUnit session cid insts lunit = do
             TcSession -> return ()
             _ -> compileInclude (length deps0) (i, dep)
 
-    dflags <- getDynFlags
     -- IMPROVE IT
-    let deps = map (improveUnit (unitState dflags)) deps0
+    let deps = map (improveUnit (hsc_units hsc_env)) deps0
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc
@@ -324,7 +331,7 @@ buildUnit session cid insts lunit = do
                       $ home_mod_infos
             getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
-            state     = unitState (hsc_dflags hsc_env)
+            state     = hsc_units hsc_env
 
         let compat_fs = unitIdFS (indefUnit cid)
             compat_pn = PackageName compat_fs
@@ -380,7 +387,7 @@ buildUnit session cid insts lunit = do
             }
 
 
-    addPackage conf
+    addUnit conf
     case mb_old_eps of
         Just old_eps -> updateEpsGhc_ (const old_eps)
         _ -> return ()
@@ -400,22 +407,33 @@ compileExe lunit = do
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
 
 -- | Register a new virtual unit database containing a single unit
-addPackage :: GhcMonad m => UnitInfo -> m ()
-addPackage pkg = do
-    dflags <- GHC.getSessionDynFlags
-    case unitDatabases dflags of
-        Nothing -> panic "addPackage: called too early"
-        Just dbs -> do
+addUnit :: GhcMonad m => UnitInfo -> m ()
+addUnit u = do
+    hsc_env <- getSession
+    newdbs <- case hsc_unit_dbs hsc_env of
+        Nothing  -> panic "addUnit: called too early"
+        Just dbs ->
          let newdb = UnitDatabase
-               { unitDatabasePath  = "(in memory " ++ showSDoc dflags (ppr (unitId pkg)) ++ ")"
-               , unitDatabaseUnits = [pkg]
+               { unitDatabasePath  = "(in memory " ++ showSDoc (hsc_dflags hsc_env) (ppr (unitId u)) ++ ")"
+               , unitDatabaseUnits = [u]
                }
-         GHC.setSessionDynFlags (dflags { unitDatabases = Just (dbs ++ [newdb]) })
+         in return (dbs ++ [newdb]) -- added at the end because ordering matters
+    (dbs,unit_state,home_unit) <- liftIO $ initUnits (hsc_dflags hsc_env) (Just newdbs)
+    let unit_env = UnitEnv
+          { ue_platform  = targetPlatform (hsc_dflags hsc_env)
+          , ue_namever   = ghcNameVersion (hsc_dflags hsc_env)
+          , ue_home_unit = home_unit
+          , ue_units     = unit_state
+          }
+    setSession $ hsc_env
+        { hsc_unit_dbs = Just dbs
+        , hsc_unit_env = unit_env
+        }
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()
 compileInclude n (i, uid) = do
     hsc_env <- getSession
-    let pkgs = unitState (hsc_dflags hsc_env)
+    let pkgs = hsc_units hsc_env
     msgInclude (i, n) uid
     -- Check if we've compiled it already
     case uid of
@@ -469,10 +487,6 @@ getBkpEnv = getEnv
 getBkpLevel :: BkpM Int
 getBkpLevel = bkp_level `fmap` getBkpEnv
 
--- | Apply a function on 'DynFlags' on an 'HscEnv'
-overHscDynFlags :: (DynFlags -> DynFlags) -> HscEnv -> HscEnv
-overHscDynFlags f hsc_env = hsc_env { hsc_dflags = f (hsc_dflags hsc_env) }
-
 -- | Run a 'BkpM' computation, with the nesting level bumped one.
 innerBkpM :: BkpM a -> BkpM a
 innerBkpM do_this =
@@ -522,7 +536,7 @@ mkBackpackMsg = do
     level <- getBkpLevel
     return $ \hsc_env mod_index recomp mod_summary ->
       let dflags = hsc_dflags hsc_env
-          state = unitState dflags
+          state = hsc_units hsc_env
           showMsg msg reason =
             backpackProgressMsg level dflags $ pprWithUnitState state $
                 showModuleIndex mod_index <>
@@ -557,8 +571,9 @@ msgTopPackage (i,n) (HsComponentId (PackageName fs_pn) _) = do
 msgUnitId :: Unit -> BkpM ()
 msgUnitId pk = do
     dflags <- getDynFlags
+    hsc_env <- getSession
     level <- getBkpLevel
-    let state = unitState dflags
+    let state = hsc_units hsc_env
     liftIO . backpackProgressMsg level dflags
         $ pprWithUnitState state
         $ text "Instantiating "
@@ -568,8 +583,9 @@ msgUnitId pk = do
 msgInclude :: (Int,Int) -> Unit -> BkpM ()
 msgInclude (i,n) uid = do
     dflags <- getDynFlags
+    hsc_env <- getSession
     level <- getBkpLevel
-    let state = unitState dflags
+    let state = hsc_units hsc_env
     liftIO . backpackProgressMsg level dflags
         $ pprWithUnitState state
         $ showModuleIndex (i, n) <> text "Including "

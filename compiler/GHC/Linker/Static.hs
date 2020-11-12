@@ -15,13 +15,13 @@ import GHC.SysTools
 import GHC.SysTools.Ar
 import GHC.SysTools.FileCleanup
 
+import GHC.Unit.Env
 import GHC.Unit.Types
 import GHC.Unit.Info
 import GHC.Unit.State
 
 import GHC.Utils.Monad
 import GHC.Utils.Misc
-import GHC.Utils.Outputable
 
 import GHC.Linker.MacOS
 import GHC.Linker.Unit
@@ -62,16 +62,16 @@ it is supported by both gcc and clang. Anecdotally nvcc supports
 -Xlinker, but not -Wl.
 -}
 
-linkBinary :: DynFlags -> [FilePath] -> [UnitId] -> IO ()
+linkBinary :: DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
 linkBinary = linkBinary' False
 
-linkBinary' :: Bool -> DynFlags -> [FilePath] -> [UnitId] -> IO ()
-linkBinary' staticLink dflags o_files dep_units = do
-    let platform = targetPlatform dflags
+linkBinary' :: Bool -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkBinary' staticLink dflags unit_env o_files dep_units = do
+    let platform   = ue_platform unit_env
+        unit_state = ue_units unit_env
         toolSettings' = toolSettings dflags
         verbFlags = getVerbFlags dflags
         output_fn = exeFileName platform staticLink (outputFile dflags)
-        home_unit = mkHomeUnitFromFlags dflags
 
     -- get the full list of packages to link with, by combining the
     -- explicit packages with the auto packages and all of their
@@ -81,12 +81,8 @@ linkBinary' staticLink dflags o_files dep_units = do
                       then return output_fn
                       else do d <- getCurrentDirectory
                               return $ normalise (d </> output_fn)
-    pkg_lib_paths <- getUnitLibraryPath
-                        (initSDocContext dflags defaultUserStyle)
-                        (unitState dflags)
-                        home_unit
-                        (ways dflags)
-                        dep_units
+    pkgs <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_units)
+    let pkg_lib_paths     = collectLibraryDirs (ways dflags) pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
@@ -124,7 +120,7 @@ linkBinary' staticLink dflags o_files dep_units = do
     pkg_lib_path_opts <-
       if gopt Opt_SingleLibFolder dflags
       then do
-        libs <- getLibs dflags dep_units
+        libs <- getLibs dflags unit_env dep_units
         tmpDir <- newTempDir dflags
         sequence_ [ copyFile lib (tmpDir </> basename)
                   | (lib, basename) <- libs]
@@ -140,8 +136,8 @@ linkBinary' staticLink dflags o_files dep_units = do
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
-    extraLinkObj <- mkExtraObjToLinkIntoBinary dflags
-    noteLinkObjs <- mkNoteObjsToLinkIntoBinary dflags dep_units
+    extraLinkObj <- mkExtraObjToLinkIntoBinary dflags unit_state
+    noteLinkObjs <- mkNoteObjsToLinkIntoBinary dflags unit_env dep_units
 
     let
       (pre_hs_libs, post_hs_libs)
@@ -154,7 +150,7 @@ linkBinary' staticLink dflags o_files dep_units = do
         = ([],[])
 
     pkg_link_opts <- do
-        (package_hs_libs, extra_libs, other_flags) <- getUnitLinkOpts dflags dep_units
+        (package_hs_libs, extra_libs, other_flags) <- getUnitLinkOpts dflags unit_env dep_units
         return $ if staticLink
             then package_hs_libs -- If building an executable really means making a static
                                  -- library (e.g. iOS), then we only keep the -l options for
@@ -176,7 +172,7 @@ linkBinary' staticLink dflags o_files dep_units = do
                  -- that defines the symbol."
 
     -- frameworks
-    pkg_framework_opts <- getUnitFrameworkOpts dflags platform dep_units
+    pkg_framework_opts <- getUnitFrameworkOpts unit_env dep_units
     let framework_opts = getFrameworkOpts dflags platform
 
         -- probably _stub.o files
@@ -273,13 +269,12 @@ linkBinary' staticLink dflags o_files dep_units = do
 -- | Linking a static lib will not really link anything. It will merely produce
 -- a static archive of all dependent static libraries. The resulting library
 -- will still need to be linked with any remaining link flags.
-linkStaticLib :: DynFlags -> [String] -> [UnitId] -> IO ()
-linkStaticLib dflags o_files dep_units = do
-  let platform = targetPlatform dflags
+linkStaticLib :: DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
+linkStaticLib dflags unit_env o_files dep_units = do
+  let platform  = ue_platform unit_env
       extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
       modules = o_files ++ extra_ld_inputs
       output_fn = exeFileName platform True (outputFile dflags)
-      home_unit = mkHomeUnitFromFlags dflags
 
   full_output_fn <- if isAbsolute output_fn
                     then return output_fn
@@ -288,11 +283,7 @@ linkStaticLib dflags o_files dep_units = do
   output_exists <- doesFileExist full_output_fn
   (when output_exists) $ removeFile full_output_fn
 
-  pkg_cfgs_init <- getPreloadUnitsAnd
-                     (initSDocContext dflags defaultUserStyle)
-                     (unitState dflags)
-                     home_unit
-                     dep_units
+  pkg_cfgs_init <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_units)
 
   let pkg_cfgs
         | gopt Opt_LinkRts dflags

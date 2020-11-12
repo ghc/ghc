@@ -773,7 +773,7 @@ dumpOptTcRn flag title fmt doc =
 dumpTcRn :: Bool -> DumpOptions -> String -> DumpFormat -> SDoc -> TcRn ()
 dumpTcRn useUserStyle dumpOpt title fmt doc = do
   dflags <- getDynFlags
-  printer <- getPrintUnqualified dflags
+  printer <- getPrintUnqualified
   real_doc <- wrapDocLoc doc
   let sty = if useUserStyle
               then mkUserStyle printer AllTheWay
@@ -792,19 +792,17 @@ wrapDocLoc doc = do
     else
       return doc
 
-getPrintUnqualified :: DynFlags -> TcRn PrintUnqualified
-getPrintUnqualified dflags
+getPrintUnqualified :: TcRn PrintUnqualified
+getPrintUnqualified
   = do { rdr_env <- getGlobalRdrEnv
        ; hsc_env <- getTopEnv
-       ; let unit_state = unitState dflags
-       ; let home_unit  = hsc_home_unit hsc_env
-       ; return $ mkPrintUnqualified unit_state home_unit rdr_env }
+       ; return $ mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env }
 
 -- | Like logInfoTcRn, but for user consumption
 printForUserTcRn :: SDoc -> TcRn ()
 printForUserTcRn doc
   = do { dflags <- getDynFlags
-       ; printer <- getPrintUnqualified dflags
+       ; printer <- getPrintUnqualified
        ; liftIO (printOutputForUser dflags printer doc) }
 
 {-
@@ -998,16 +996,16 @@ discardWarnings thing_inside
 mkLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ErrMsg
 mkLongErrAt loc msg extra
   = do { dflags <- getDynFlags ;
-         printer <- getPrintUnqualified dflags ;
-         unit_state <- unitState <$> getDynFlags ;
+         printer <- getPrintUnqualified ;
+         unit_state <- hsc_units <$> getTopEnv ;
          let msg' = pprWithUnitState unit_state msg in
          return $ mkLongErrMsg dflags loc printer msg' extra }
 
 mkErrDocAt :: SrcSpan -> ErrDoc -> TcRn ErrMsg
 mkErrDocAt loc errDoc
   = do { dflags <- getDynFlags ;
-         printer <- getPrintUnqualified dflags ;
-         unit_state <- unitState <$> getDynFlags ;
+         printer <- getPrintUnqualified ;
+         unit_state <- hsc_units <$> getTopEnv ;
          let f = pprWithUnitState unit_state
              errDoc' = mapErrDoc f errDoc
          in
@@ -1519,7 +1517,7 @@ add_warn reason msg extra_info
 add_warn_at :: WarnReason -> SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 add_warn_at reason loc msg extra_info
   = do { dflags <- getDynFlags ;
-         printer <- getPrintUnqualified dflags ;
+         printer <- getPrintUnqualified ;
          let { warn = mkLongWarnMsg dflags loc printer
                                     msg extra_info } ;
          reportWarning reason warn }

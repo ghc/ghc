@@ -1744,13 +1744,13 @@ checkMain :: Bool  -- False => no 'module M(..) where' header at all
           -> TcM TcGblEnv
 -- If we are in module Main, check that 'main' is defined and exported.
 checkMain explicit_mod_hdr export_ies
- = do   { dflags  <- getDynFlags
+ = do   { hsc_env  <- getTopEnv
         ; tcg_env <- getGblEnv
-        ; check_main dflags tcg_env explicit_mod_hdr export_ies }
+        ; check_main hsc_env tcg_env explicit_mod_hdr export_ies }
 
-check_main :: DynFlags -> TcGblEnv -> Bool -> Maybe (Located [LIE GhcPs])
+check_main :: HscEnv -> TcGblEnv -> Bool -> Maybe (Located [LIE GhcPs])
            -> TcM TcGblEnv
-check_main dflags tcg_env explicit_mod_hdr export_ies
+check_main hsc_env tcg_env explicit_mod_hdr export_ies
  | mod /= main_mod
  = traceTc "checkMain not" (ppr main_mod <+> ppr mod) >>
    return tcg_env
@@ -1791,8 +1791,9 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
               addAmbiguousNameErr main_fn          -- issue error msg
               return tcg_env
   where
+    dflags      = hsc_dflags hsc_env
     mod         = tcg_mod tcg_env
-    main_mod    = mainModIs dflags
+    main_mod    = mainModIs hsc_env
     main_mod_nm = moduleName main_mod
     main_fn     = getMainFun dflags
     occ_main_fn = occName main_fn
@@ -2880,7 +2881,7 @@ rnDump rn = dumpOptTcRn Opt_D_dump_rn "Renamer" FormatHaskell (ppr rn)
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
  = do { dflags <- getDynFlags ;
-        unit_state <- unitState <$> getDynFlags ;
+        unit_state <- hsc_units <$> getTopEnv ;
 
         -- Dump short output if -ddump-types or -ddump-tc
         when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)

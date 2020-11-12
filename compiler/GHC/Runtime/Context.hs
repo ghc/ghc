@@ -23,6 +23,7 @@ import {-# SOURCE #-} GHC.Driver.Plugins
 import GHC.Runtime.Eval.Types ( Resume )
 
 import GHC.Unit
+import GHC.Unit.Env
 
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv ( ClsInst, identicalClsInstHead )
@@ -289,9 +290,9 @@ icInScopeTTs :: InteractiveContext -> [TyThing]
 icInScopeTTs = ic_tythings
 
 -- | Get the PrintUnqualified function based on the flags and this InteractiveContext
-icPrintUnqual :: UnitState -> HomeUnit -> InteractiveContext -> PrintUnqualified
-icPrintUnqual unit_state home_unit InteractiveContext{ ic_rn_gbl_env = grenv } =
-    mkPrintUnqualified unit_state home_unit grenv
+icPrintUnqual :: UnitEnv -> InteractiveContext -> PrintUnqualified
+icPrintUnqual unit_env InteractiveContext{ ic_rn_gbl_env = grenv } =
+    mkPrintUnqualified unit_env grenv
 
 -- | extendInteractiveContext is called with new TyThings recently defined to update the
 -- InteractiveContext to include them.  Ids are easily removed when shadowed,

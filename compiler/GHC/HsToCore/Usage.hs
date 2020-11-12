@@ -37,8 +37,6 @@ import GHC.Unit.Module.Imported
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
-import GHC.Linker.Unit
-
 import GHC.Data.Maybe
 
 import Control.Monad (filterM)
@@ -186,12 +184,12 @@ mkPluginUsage hsc_env pluginModule
     LookupFound _ pkg -> do
     -- The plugin is from an external package:
     -- search for the library files containing the plugin.
-      let searchPaths = collectLibraryPaths (ways dflags) [pkg]
+      let searchPaths = collectLibraryDirs (ways dflags) [pkg]
           useDyn = WayDyn `elem` ways dflags
           suffix = if useDyn then platformSOExt platform else "a"
           libLocs = [ searchPath </> "lib" ++ libLoc <.> suffix
                     | searchPath <- searchPaths
-                    , libLoc     <- packageHsLibs dflags pkg
+                    , libLoc     <- unitHsLibs (ghcNameVersion dflags) (ways dflags) pkg
                     ]
           -- we also try to find plugin library files by adding WayDyn way,
           -- if it isn't already present (see trac #15492)
@@ -202,7 +200,7 @@ mkPluginUsage hsc_env pluginModule
                 let dflags'  = dflags { targetWays_ = addWay WayDyn (targetWays_ dflags) }
                     dlibLocs = [ searchPath </> platformHsSOName platform dlibLoc
                                | searchPath <- searchPaths
-                               , dlibLoc    <- packageHsLibs dflags' pkg
+                               , dlibLoc    <- unitHsLibs (ghcNameVersion dflags') (ways dflags') pkg
                                ]
                 in libLocs ++ dlibLocs
       files <- filterM doesFileExist paths
@@ -228,7 +226,7 @@ mkPluginUsage hsc_env pluginModule
   where
     dflags   = hsc_dflags hsc_env
     platform = targetPlatform dflags
-    pkgs     = unitState dflags
+    pkgs     = hsc_units hsc_env
     pNm      = moduleName $ mi_module pluginModule
     pPkg     = moduleUnit $ mi_module pluginModule
     deps     = map gwib_mod $

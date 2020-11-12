@@ -25,6 +25,7 @@ import qualified GHC.CmmToAsm.Reg.Linear.Base as Linear
 import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
 import qualified GHC.CmmToAsm.X86 as X86
 import GHC.Driver.Main
+import GHC.Driver.Env
 import GHC.StgToCmm.CgUtils
 import GHC.CmmToAsm
 import GHC.CmmToAsm.Config
@@ -110,7 +111,7 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
     hscEnv <- newHscEnv dflags
 
     -- parse the cmm file and output any warnings or errors
-    (warnings, errors, parsedCmm) <- parseCmmFile dflags cmmFile
+    (warnings, errors, parsedCmm) <- parseCmmFile dflags (hsc_home_unit hscEnv) cmmFile
     let warningMsgs = fmap pprWarning warnings
         errorMsgs   = fmap pprError errors
 

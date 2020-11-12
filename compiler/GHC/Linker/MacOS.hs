@@ -1,8 +1,6 @@
 module GHC.Linker.MacOS
    ( runInjectRPaths
-   , getUnitFrameworks
    , getUnitFrameworkOpts
-   , getUnitFrameworkPath
    , getFrameworkOpts
    , loadFramework
    )
@@ -16,17 +14,13 @@ import GHC.Driver.Env
 
 import GHC.Unit.Types
 import GHC.Unit.State
-import GHC.Unit.Home
+import GHC.Unit.Env
 
 import GHC.SysTools.Tasks
 
 import GHC.Runtime.Interpreter (loadDLL)
 
-import GHC.Utils.Outputable
 import GHC.Utils.Exception
-import GHC.Utils.Misc (ordNub )
-
-import qualified GHC.Data.ShortText as ST
 
 import Data.List
 import Control.Monad (join, forM, filterM)
@@ -67,26 +61,15 @@ runInjectRPaths dflags lib_paths dylib = do
     [] -> return ()
     _  -> runInstallNameTool dflags $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
 
-getUnitFrameworkOpts :: DynFlags -> Platform -> [UnitId] -> IO [String]
-getUnitFrameworkOpts dflags platform dep_packages
-  | platformUsesFrameworks platform = do
-    pkg_framework_path_opts <- do
-        pkg_framework_paths <- getUnitFrameworkPath
-                                 (initSDocContext dflags defaultUserStyle)
-                                 (unitState dflags)
-                                 (mkHomeUnitFromFlags dflags)
-                                 dep_packages
-        return $ map ("-F" ++) pkg_framework_paths
-
-    pkg_framework_opts <- do
-        pkg_frameworks <- getUnitFrameworks
-                              (initSDocContext dflags defaultUserStyle)
-                              (unitState dflags)
-                              (mkHomeUnitFromFlags dflags)
-                              dep_packages
-        return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
-
-    return (pkg_framework_path_opts ++ pkg_framework_opts)
+getUnitFrameworkOpts :: UnitEnv -> [UnitId] -> IO [String]
+getUnitFrameworkOpts unit_env dep_packages
+  | platformUsesFrameworks (ue_platform unit_env) = do
+        ps <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_packages)
+        let pkg_framework_path_opts = map ("-F" ++) (collectFrameworksDirs ps)
+            pkg_framework_opts      = concat [ ["-framework", fw]
+                                             | fw <- collectFrameworks ps
+                                             ]
+        return (pkg_framework_path_opts ++ pkg_framework_opts)
 
   | otherwise = return []
 
@@ -102,19 +85,6 @@ getFrameworkOpts dflags platform
     -- reverse because they're added in reverse order from the cmd line:
     framework_opts = concat [ ["-framework", fw]
                             | fw <- reverse frameworks ]
-
-
--- | Find all the package framework paths in these and the preload packages
-getUnitFrameworkPath :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
-getUnitFrameworkPath ctx unit_state home_unit pkgs = do
-  ps <- getPreloadUnitsAnd ctx unit_state home_unit pkgs
-  return $ map ST.unpack (ordNub (filter (not . ST.null) (concatMap unitExtDepFrameworkDirs ps)))
-
--- | Find all the package frameworks in these and the preload packages
-getUnitFrameworks :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
-getUnitFrameworks ctx unit_state home_unit pkgs = do
-  ps <- getPreloadUnitsAnd ctx unit_state home_unit pkgs
-  return $ map ST.unpack (concatMap unitExtDepFrameworks ps)
 
 
 {-

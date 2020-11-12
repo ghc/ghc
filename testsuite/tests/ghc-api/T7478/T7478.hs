@@ -11,6 +11,7 @@ import qualified GHC.Utils.Outputable as GHC
 import qualified GHC.Driver.Ppr as GHC
 import GHC.Driver.Monad (liftIO)
 import GHC.Utils.Outputable (PprStyle, queryQual)
+import GHC.Unit.State
 
 compileInGhc :: [FilePath]          -- ^ Targets
              -> (String -> IO ())   -- ^ handler for each SevOutput message
@@ -43,7 +44,7 @@ compileInGhc targets handlerOutput = do
         _ -> error "fileFromTarget: not a known target"
 
     collectSrcError handlerOutput flags _ SevOutput _srcspan msg
-      = handlerOutput $ GHC.showSDocForUser flags alwaysQualify msg
+      = handlerOutput $ GHC.showSDocForUser flags emptyUnitState alwaysQualify msg
     collectSrcError _ _ _ _ _ _
       = return ()
 

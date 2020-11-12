@@ -235,12 +235,16 @@ import Data.Bifunctor (first, bimap)
 
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
-    let home_unit = mkHomeUnitFromFlags dflags
-    eps_var <- newIORef (initExternalPackageState home_unit)
+    -- we don't store the unit databases and the unit state to still
+    -- allow `setSessionDynFlags` to be used to set unit db flags.
+    eps_var <- newIORef (initExternalPackageState (homeUnitId_ dflags))
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
     emptyLoader <- uninitializedLoader
+    -- FIXME: it's sad that we have so many "unitialized" fields filled with
+    -- empty stuff or lazy panics. We should have two kinds of HscEnv
+    -- (initialized or not) instead and less fields that are mutable over time.
     return HscEnv {  hsc_dflags         = dflags
                   ,  hsc_targets        = []
                   ,  hsc_mod_graph      = emptyMG
@@ -252,9 +256,10 @@ newHscEnv dflags = do
                   ,  hsc_type_env_var   = Nothing
                   ,  hsc_interp         = Nothing
                   ,  hsc_loader         = emptyLoader
-                  ,  hsc_home_unit      = home_unit
+                  ,  hsc_unit_env       = panic "hsc_unit_env not initialized"
                   ,  hsc_plugins        = []
                   ,  hsc_static_plugins = []
+                  ,  hsc_unit_dbs       = Nothing
                   }
 
 -- -----------------------------------------------------------------------------
@@ -1258,6 +1263,7 @@ hscCheckSafe' m l = do
   where
     isModSafe :: HomeUnit -> Module -> SrcSpan -> Hsc (Bool, Set UnitId)
     isModSafe home_unit m l = do
+        hsc_env <- getHscEnv
         dflags <- getDynFlags
         iface <- lookup' m
         case iface of
@@ -1273,7 +1279,7 @@ hscCheckSafe' m l = do
                     -- check module is trusted
                     safeM = trust `elem` [Sf_Safe, Sf_SafeInferred, Sf_Trustworthy]
                     -- check package is trusted
-                    safeP = packageTrusted dflags home_unit trust trust_own_pkg m
+                    safeP = packageTrusted dflags (hsc_units hsc_env) home_unit trust trust_own_pkg m
                     -- pkg trust reqs
                     pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
                     -- warn if Safe module imports Safe-Inferred module.
@@ -1293,7 +1299,7 @@ hscCheckSafe' m l = do
                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
-                    state = unitState dflags
+                    state = hsc_units hsc_env
                     inferredImportWarn = unitBag
                         $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
                         $ mkWarnMsg dflags l (pkgQual state)
@@ -1318,17 +1324,17 @@ hscCheckSafe' m l = do
     -- modules are trusted without requiring that their package is trusted. For
     -- trustworthy modules, modules in the home package are trusted but
     -- otherwise we check the package trust flag.
-    packageTrusted :: DynFlags -> HomeUnit -> SafeHaskellMode -> Bool -> Module -> Bool
-    packageTrusted _ _ Sf_None      _ _ = False -- shouldn't hit these cases
-    packageTrusted _ _ Sf_Ignore    _ _ = False -- shouldn't hit these cases
-    packageTrusted _ _ Sf_Unsafe    _ _ = False -- prefer for completeness.
-    packageTrusted dflags _ _ _ _
-        | not (packageTrustOn dflags) = True
-    packageTrusted _ _ Sf_Safe  False _ = True
-    packageTrusted _ _ Sf_SafeInferred False _ = True
-    packageTrusted dflags home_unit _ _ m
-        | isHomeModule home_unit m = True
-        | otherwise = unitIsTrusted $ unsafeLookupUnit (unitState dflags) (moduleUnit m)
+    packageTrusted :: DynFlags -> UnitState -> HomeUnit -> SafeHaskellMode -> Bool -> Module -> Bool
+    packageTrusted dflags unit_state home_unit safe_mode trust_own_pkg mod =
+        case safe_mode of
+            Sf_None      -> False -- shouldn't hit these cases
+            Sf_Ignore    -> False -- shouldn't hit these cases
+            Sf_Unsafe    -> False -- prefer for completeness.
+            _ | not (packageTrustOn dflags)     -> True
+            Sf_Safe | not trust_own_pkg         -> True
+            Sf_SafeInferred | not trust_own_pkg -> True
+            _ | isHomeModule home_unit mod      -> True
+            _ -> unitIsTrusted $ unsafeLookupUnit unit_state (moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
@@ -1349,8 +1355,9 @@ hscCheckSafe' m l = do
 checkPkgTrust :: Set UnitId -> Hsc ()
 checkPkgTrust pkgs = do
     dflags <- getDynFlags
+    hsc_env <- getHscEnv
     let errors = S.foldr go [] pkgs
-        state  = unitState dflags
+        state  = hsc_units hsc_env
         go pkg acc
             | unitIsTrusted $ unsafeLookupUnitId state pkg
             = acc
@@ -1542,7 +1549,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
             (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
                 <- {-# SCC "codeOutput" #-}
-                  codeOutput dflags this_mod output_filename location
+                  codeOutput dflags (hsc_units hsc_env) this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
             return (output_filename, stub_c_exists, foreign_fps, cg_infos)
 
@@ -1575,7 +1582,7 @@ hscInteractive hsc_env cgguts location = do
     comp_bc <- byteCodeGen hsc_env this_mod prepd_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs dflags this_mod location foreign_stubs
+        <- outputForeignStubs dflags (hsc_units hsc_env) this_mod location foreign_stubs
     return (istub_c_exists, comp_bc, spt_entries)
 
 ------------------------------
@@ -1588,7 +1595,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     cmm <- ioMsgMaybe
                $ do
                   (warns,errs,cmm) <- withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
-                                       $ parseCmmFile dflags filename
+                                       $ parseCmmFile dflags home_unit filename
                   return ((fmap pprWarning warns, fmap pprError errs), cmm)
     liftIO $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
@@ -1611,7 +1618,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
             FormatCMM (pdoc platform cmmgroup)
         rawCmms <- lookupHook (\x -> cmmToRawCmmHook x)
                      (\dflgs _ -> cmmToRawCmm dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
-        _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
+        _ <- codeOutput dflags (hsc_units hsc_env) cmm_mod output_filename no_loc NoStubs [] []
              rawCmms
         return ()
   where

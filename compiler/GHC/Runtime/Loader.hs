@@ -32,7 +32,7 @@ import GHC.Runtime.Interpreter ( wormhole, withInterp )
 import GHC.Runtime.Interpreter.Types
 
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
-import GHC.Iface.Load          ( loadPluginInterface )
+import GHC.Iface.Load          ( loadPluginInterface, cannotFindModule )
 import GHC.Rename.Names ( gresFromAvails )
 import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
 
@@ -50,7 +50,7 @@ import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                                , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
                                , gre_name, mkRdrQual )
 
-import GHC.Unit.Finder         ( findPluginModule, cannotFindModule, FindResult(..) )
+import GHC.Unit.Finder         ( findPluginModule, FindResult(..) )
 import GHC.Unit.Module   ( Module, ModuleName )
 import GHC.Unit.Module.ModIface
 
@@ -273,7 +273,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                         _     -> panic "lookupRdrNameInModule"
 
                 Nothing -> throwCmdLineErrorS dflags $ hsep [text "Could not determine the exports of the module", ppr mod_name]
-        err -> throwCmdLineErrorS dflags $ cannotFindModule dflags mod_name err
+        err -> throwCmdLineErrorS dflags $ cannotFindModule hsc_env mod_name err
   where
     dflags = hsc_dflags hsc_env
     doc = text "contains a name used in an invocation of lookupRdrNameInModule"

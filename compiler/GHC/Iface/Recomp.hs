@@ -377,7 +377,7 @@ checkHie mod_summary = do
 checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
 checkFlagHash hsc_env iface = do
     let old_hash = mi_flag_hash (mi_final_exts iface)
-    new_hash <- liftIO $ fingerprintDynFlags (hsc_dflags hsc_env)
+    new_hash <- liftIO $ fingerprintDynFlags hsc_env
                                              (mi_module iface)
                                              putNameLiterally
     case old_hash == new_hash of
@@ -420,12 +420,12 @@ checkHpcHash hsc_env iface = do
 -- If the -unit-id flags change, this can change too.
 checkMergedSignatures :: ModSummary -> ModIface -> IfG RecompileRequired
 checkMergedSignatures mod_summary iface = do
-    dflags <- getDynFlags
+    unit_state <- hsc_units <$> getTopEnv
     let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_usages iface ]
         new_merged = case Map.lookup (ms_mod_name mod_summary)
-                                     (requirementContext (unitState dflags)) of
+                                     (requirementContext unit_state) of
                         Nothing -> []
-                        Just r -> sort $ map (instModuleToModule (unitState dflags)) r
+                        Just r -> sort $ map (instModuleToModule unit_state) r
     if old_merged == new_merged
         then up_to_date (text "signatures to merge in unchanged" $$ ppr new_merged)
         else return (RecompBecause "signatures to merge in changed")
@@ -1061,7 +1061,7 @@ addFingerprints hsc_env iface0
    --   - (some of) dflags
    -- it returns two hashes, one that shouldn't change
    -- the abi hash and one that should
-   flag_hash <- fingerprintDynFlags dflags this_mod putNameLiterally
+   flag_hash <- fingerprintDynFlags hsc_env this_mod putNameLiterally
 
    opt_hash <- fingerprintOptFlags dflags putNameLiterally
 

@@ -19,7 +19,6 @@ module GHC.Tc.Utils.Backpack (
 import GHC.Prelude
 
 import GHC.Driver.Env
-import GHC.Driver.Session
 import GHC.Driver.Ppr
 
 import GHC.Types.Basic (TypeOrKind(..))
@@ -291,7 +290,7 @@ findExtraSigImports' hsc_env HsigFile modname =
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
                 (mkModule (VirtUnit iuid) mod_name)))
   where
-    unit_state = unitState (hsc_dflags hsc_env)
+    unit_state = hsc_units hsc_env
     reqs = requirementMerges unit_state modname
 
 findExtraSigImports' _ _ _ = return emptyUniqDSet
@@ -360,7 +359,7 @@ tcRnCheckUnit hsc_env uid =
    initTc hsc_env
           HsigFile -- bogus
           False
-          (mainModIs dflags)
+          (mainModIs hsc_env)
           (realSrcLocSpan (mkRealSrcLoc (fsLit loc_str) 0 0)) -- bogus
     $ checkUnit uid
   where
@@ -522,7 +521,6 @@ mergeSignatures
     -- file, which is guaranteed to exist, see
     -- Note [Blank hsigs for all requirements]
     hsc_env <- getTopEnv
-    dflags  <- getDynFlags
 
     -- Copy over some things from the original TcGblEnv that
     -- we want to preserve
@@ -552,7 +550,7 @@ mergeSignatures
     let outer_mod  = tcg_mod tcg_env
         inner_mod  = tcg_semantic_mod tcg_env
         mod_name   = moduleName (tcg_mod tcg_env)
-        unit_state = unitState dflags
+        unit_state = hsc_units hsc_env
         home_unit  = hsc_home_unit hsc_env
 
     -- STEP 1: Figure out all of the external signature interfaces
@@ -928,9 +926,8 @@ impl_msg unit_state impl_mod (Module req_uid req_mod_name)
 -- explicitly.)
 checkImplements :: Module -> InstantiatedModule -> TcRn TcGblEnv
 checkImplements impl_mod req_mod@(Module uid mod_name) = do
-  dflags <- getDynFlags
   hsc_env <- getTopEnv
-  let unit_state = unitState dflags
+  let unit_state = hsc_units hsc_env
       home_unit  = hsc_home_unit hsc_env
   addErrCtxt (impl_msg unit_state impl_mod req_mod) $ do
     let insts = instUnitInsts uid

@@ -43,9 +43,7 @@ import Data.Maybe
 -- unit identifier) with `homeUnitMap`.
 --
 -- TODO: this isn't implemented yet. UnitKeys are still converted too early into
--- UnitIds in GHC.Unit.State.readUnitDataBase and wiring of home unit
--- instantiations is done inplace in DynFlags by
--- GHC.Unit.State.upd_wired_in_home_instantiations.
+-- UnitIds in GHC.Unit.State.readUnitDataBase
 data GenHomeUnit u
    = DefiniteHomeUnit UnitId (Maybe (u, GenInstantiations u))
       -- ^ Definite home unit (i.e. that we can compile).

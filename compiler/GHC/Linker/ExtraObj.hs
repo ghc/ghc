@@ -20,33 +20,36 @@ module GHC.Linker.ExtraObj
    )
 where
 
+import GHC.Prelude
+import GHC.Platform
+
+import GHC.Unit
+import GHC.Unit.Env
+import GHC.Unit.State
+
 import GHC.Utils.Asm
 import GHC.Utils.Error
+import GHC.Utils.Misc
+import GHC.Utils.Outputable as Outputable
+
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Unit.State
-import GHC.Platform
-import GHC.Utils.Outputable as Outputable
+
 import GHC.Types.SrcLoc ( noSrcSpan )
-import GHC.Unit
-import GHC.SysTools.Elf
-import GHC.Utils.Misc
-import GHC.Prelude
 import qualified GHC.Data.ShortText as ST
 
-import Control.Monad
-import Data.Maybe
-
-import Control.Monad.IO.Class
-
+import GHC.SysTools.Elf
 import GHC.SysTools.FileCleanup
 import GHC.SysTools.Tasks
 import GHC.SysTools.Info
 import GHC.Linker.Unit
-import GHC.Linker.MacOS
 
-mkExtraObj :: DynFlags -> Suffix -> String -> IO FilePath
-mkExtraObj dflags extn xs
+import Control.Monad.IO.Class
+import Control.Monad
+import Data.Maybe
+
+mkExtraObj :: DynFlags -> UnitState -> Suffix -> String -> IO FilePath
+mkExtraObj dflags unit_state extn xs
  = do cFile <- newTempName dflags TFL_CurrentModule extn
       oFile <- newTempName dflags TFL_GhcSession "o"
       writeFile cFile xs
@@ -61,14 +64,12 @@ mkExtraObj dflags extn xs
                     else asmOpts ccInfo)
       return oFile
     where
-      pkgs = unitState dflags
-
       -- Pass a different set of options to the C compiler depending one whether
       -- we're compiling C or assembler. When compiling C, we pass the usual
       -- set of include directories and PIC flags.
       cOpts = map Option (picCCOpts dflags)
                     ++ map (FileOption "-I" . ST.unpack)
-                            (unitIncludeDirs $ unsafeLookupUnit pkgs rtsUnit)
+                            (unitIncludeDirs $ unsafeLookupUnit unit_state rtsUnit)
 
       -- When compiling assembler code, we drop the usual C options, and if the
       -- compiler is Clang, we add an extra argument to tell Clang to ignore
@@ -86,15 +87,15 @@ mkExtraObj dflags extn xs
 --
 -- On Windows, when making a shared library we also may need a DllMain.
 --
-mkExtraObjToLinkIntoBinary :: DynFlags -> IO FilePath
-mkExtraObjToLinkIntoBinary dflags = do
+mkExtraObjToLinkIntoBinary :: DynFlags -> UnitState -> IO FilePath
+mkExtraObjToLinkIntoBinary dflags unit_state = do
   when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $
      putLogMsg dflags NoReason SevInfo noSrcSpan
          $ withPprStyle defaultUserStyle
          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
           text "    Call hs_init_ghc() from your main() function to set these options.")
 
-  mkExtraObj dflags "c" (showSDoc dflags main)
+  mkExtraObj dflags unit_state "c" (showSDoc dflags main)
   where
     main
       | gopt Opt_NoHsMain dflags = Outputable.empty
@@ -152,53 +153,52 @@ mkExtraObjToLinkIntoBinary dflags = do
 -- this was included as inline assembly in the main.c file but this
 -- is pretty fragile. gas gets upset trying to calculate relative offsets
 -- that span the .note section (notably .text) when debug info is present
-mkNoteObjsToLinkIntoBinary :: DynFlags -> [UnitId] -> IO [FilePath]
-mkNoteObjsToLinkIntoBinary dflags dep_packages = do
-   link_info <- getLinkInfo dflags dep_packages
+mkNoteObjsToLinkIntoBinary :: DynFlags -> UnitEnv -> [UnitId] -> IO [FilePath]
+mkNoteObjsToLinkIntoBinary dflags unit_env dep_packages = do
+   link_info <- getLinkInfo dflags unit_env dep_packages
 
    if (platformSupportsSavingLinkOpts (platformOS platform ))
-     then fmap (:[]) $ mkExtraObj dflags "s" (showSDoc dflags (link_opts link_info))
+     then fmap (:[]) $ mkExtraObj dflags unit_state "s" (showSDoc dflags (link_opts link_info))
      else return []
 
   where
-    platform = targetPlatform dflags
-    link_opts info = hcat [
-      -- "link info" section (see Note [LinkInfo section])
-      makeElfNote platform ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info,
+    unit_state = ue_units unit_env
+    platform   = ue_platform unit_env
+    link_opts info = hcat
+        [ -- "link info" section (see Note [LinkInfo section])
+          makeElfNote platform ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info
 
-      -- ALL generated assembly must have this section to disable
-      -- executable stacks.  See also
-      -- "GHC.CmmToAsm" for another instance
-      -- where we need to do this.
-      if platformHasGnuNonexecStack platform
-        then text ".section .note.GNU-stack,\"\","
-             <> sectionType platform "progbits" <> char '\n'
-        else Outputable.empty
-      ]
+        -- ALL generated assembly must have this section to disable
+        -- executable stacks.  See also
+        -- "GHC.CmmToAsm" for another instance
+        -- where we need to do this.
+        , if platformHasGnuNonexecStack platform
+            then text ".section .note.GNU-stack,\"\","
+                 <> sectionType platform "progbits" <> char '\n'
+            else Outputable.empty
+        ]
 
 -- | Return the "link info" string
 --
 -- See Note [LinkInfo section]
-getLinkInfo :: DynFlags -> [UnitId] -> IO String
-getLinkInfo dflags dep_packages = do
-   package_link_opts <- getUnitLinkOpts dflags dep_packages
-   let unit_state = unitState dflags
-       home_unit  = mkHomeUnitFromFlags dflags
-       ctx        = initSDocContext dflags defaultUserStyle
-   pkg_frameworks <- if platformUsesFrameworks (targetPlatform dflags)
-                     then getUnitFrameworks ctx unit_state home_unit dep_packages
-                     else return []
-   let extra_ld_inputs = ldInputs dflags
-   let
-      link_info = (package_link_opts,
-                   pkg_frameworks,
-                   rtsOpts dflags,
-                   rtsOptsEnabled dflags,
-                   gopt Opt_NoHsMain dflags,
-                   map showOpt extra_ld_inputs,
-                   getOpts dflags opt_l)
-   --
-   return (show link_info)
+getLinkInfo :: DynFlags -> UnitEnv -> [UnitId] -> IO String
+getLinkInfo dflags unit_env dep_packages = do
+    package_link_opts <- getUnitLinkOpts dflags unit_env dep_packages
+    pkg_frameworks <- if not (platformUsesFrameworks (ue_platform unit_env))
+      then return []
+      else do
+         ps <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_packages)
+         return (collectFrameworks ps)
+    let link_info =
+             ( package_link_opts
+             , pkg_frameworks
+             , rtsOpts dflags
+             , rtsOptsEnabled dflags
+             , gopt Opt_NoHsMain dflags
+             , map showOpt (ldInputs dflags)
+             , getOpts dflags opt_l
+             )
+    return (show link_info)
 
 platformSupportsSavingLinkOpts :: OS -> Bool
 platformSupportsSavingLinkOpts os
@@ -216,9 +216,9 @@ ghcLinkInfoNoteName = "GHC link info"
 
 -- Returns 'False' if it was, and we can avoid linking, because the
 -- previous binary was linked with "the same options".
-checkLinkInfo :: DynFlags -> [UnitId] -> FilePath -> IO Bool
-checkLinkInfo dflags pkg_deps exe_file
- | not (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
+checkLinkInfo :: DynFlags -> UnitEnv -> [UnitId] -> FilePath -> IO Bool
+checkLinkInfo dflags unit_env pkg_deps exe_file
+ | not (platformSupportsSavingLinkOpts (platformOS (ue_platform unit_env)))
  -- ToDo: Windows and OS X do not use the ELF binary format, so
  -- readelf does not work there.  We need to find another way to do
  -- this.
@@ -227,7 +227,7 @@ checkLinkInfo dflags pkg_deps exe_file
                 -- time so we leave it as-is.
  | otherwise
  = do
-   link_info <- getLinkInfo dflags pkg_deps
+   link_info <- getLinkInfo dflags unit_env pkg_deps
    debugTraceMsg dflags 3 $ text ("Link info: " ++ link_info)
    m_exe_link_info <- readElfNoteAsString dflags exe_file
                           ghcLinkInfoSectionName ghcLinkInfoNoteName

@@ -666,6 +666,7 @@ Library
         GHC.Types.Var.Env
         GHC.Types.Var.Set
         GHC.Unit
+        GHC.Unit.Env
         GHC.Unit.External
         GHC.Unit.Finder
         GHC.Unit.Finder.Types

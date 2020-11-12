@@ -10,8 +10,10 @@ module GHC.Iface.Recomp.Flags (
 
 import GHC.Prelude
 
-import GHC.Utils.Binary
 import GHC.Driver.Session
+import GHC.Driver.Env
+
+import GHC.Utils.Binary
 import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.SafeHaskell
@@ -29,12 +31,13 @@ import System.FilePath (normalise)
 -- NB: The 'Module' parameter is the 'Module' recorded by the
 -- *interface* file, not the actual 'Module' according to our
 -- 'DynFlags'.
-fingerprintDynFlags :: DynFlags -> Module
+fingerprintDynFlags :: HscEnv -> Module
                     -> (BinHandle -> Name -> IO ())
                     -> IO Fingerprint
 
-fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
-    let mainis   = if mainModIs dflags == this_mod then Just mainFunIs else Nothing
+fingerprintDynFlags hsc_env this_mod nameio =
+    let dflags@DynFlags{..} = hsc_dflags hsc_env
+        mainis   = if mainModIs hsc_env == this_mod then Just mainFunIs else Nothing
                       -- see #5878
         -- pkgopts  = (homeUnit home_unit, sort $ packageFlags dflags)
         safeHs   = setSafeMode safeHaskell

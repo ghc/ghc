@@ -35,6 +35,8 @@ where
 
 import GHC.Prelude
 
+import GHC.Settings
+
 import GHC.Platform
 import GHC.Platform.Ways
 
@@ -69,6 +71,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Error
 
+import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
@@ -280,14 +283,13 @@ initLoaderState hsc_env = do
 reallyInitLoaderState :: HscEnv -> IO LoaderState
 reallyInitLoaderState hsc_env = do
   -- Initialise the linker state
-  let dflags = hsc_dflags hsc_env
-      pls0 = emptyLS
+  let pls0 = emptyLS
 
   -- (a) initialise the C dynamic linker
   initObjLinker hsc_env
 
   -- (b) Load packages from the command-line (Note [preload packages])
-  pls <- loadPackages' hsc_env (preloadUnits (unitState dflags)) pls0
+  pls <- loadPackages' hsc_env (preloadUnits (hsc_units hsc_env)) pls0
 
   -- steps (c), (d) and (e)
   loadCmdLineLibs' hsc_env pls
@@ -911,8 +913,9 @@ loadObjects hsc_env pls objs = do
 dynLoadObjs :: HscEnv -> LoaderState -> [FilePath] -> IO LoaderState
 dynLoadObjs _       pls                           []   = return pls
 dynLoadObjs hsc_env pls@LoaderState{..} objs = do
+    let unit_env = hsc_unit_env hsc_env
     let dflags = hsc_dflags hsc_env
-    let platform = targetPlatform dflags
+    let platform = ue_platform unit_env
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
     let minus_big_ls = [ lib | Option ('-':'L':lib) <- ldInputs dflags ]
     (soFile, libPath , libName) <-
@@ -962,7 +965,7 @@ dynLoadObjs hsc_env pls@LoaderState{..} objs = do
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib dflags2 objs pkgs_loaded
+    linkDynLib dflags2 unit_env objs pkgs_loaded
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime dflags TFL_GhcSession [soFile]
@@ -1250,9 +1253,6 @@ loadPackages' hsc_env new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs' }
   where
-     dflags = hsc_dflags hsc_env
-     pkgstate = unitState dflags
-
      link :: [UnitId] -> [UnitId] -> IO [UnitId]
      link pkgs new_pkgs =
          foldM link_one pkgs new_pkgs
@@ -1261,7 +1261,7 @@ loadPackages' hsc_env new_pks pls = do
         | new_pkg `elem` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupUnitId pkgstate new_pkg
+        | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
         = do {  -- Link dependents first
                pkgs' <- link pkgs (unitDepends pkg_cfg)
                 -- Now link the package itself
@@ -1522,7 +1522,7 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
                     , "lib" ++ lib <.> "dll.a", lib <.> "dll.a"
                     ]
 
-     hs_dyn_lib_name = lib ++ '-':programName dflags ++ projectVersion dflags
+     hs_dyn_lib_name = lib ++ dynLibSuffix (ghcNameVersion dflags)
      hs_dyn_lib_file = platformHsSOName platform hs_dyn_lib_name
 
      so_name     = platformSOName platform lib

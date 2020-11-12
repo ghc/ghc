@@ -27,6 +27,7 @@ import GHC.Core.PatSyn
 import GHC.Data.Maybe
 import GHC.Utils.Misc (capitalise)
 import GHC.Data.FastString (fsLit)
+import GHC.Driver.Env
 
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
@@ -172,7 +173,8 @@ tcRnExports explicit_mod exports
        -- thing (especially via 'module Foo' export item)
    do   {
         ; dflags <- getDynFlags
-        ; let is_main_mod = mainModIs dflags == this_mod
+        ; hsc_env <- getTopEnv
+        ; let is_main_mod = mainModIs hsc_env == this_mod
         ; let default_main = case mainFunIs dflags of
                  Just main_fun
                      | is_main_mod -> mkUnqual varName (fsLit main_fun)
