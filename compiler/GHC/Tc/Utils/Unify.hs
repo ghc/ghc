@@ -1434,7 +1434,7 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
   where
     go dflags cur_lvl
       | canSolveByUnification cur_lvl tv1 ty2
-           -- See Note [Prevent unification with type families] about the False:
+           -- See Note [Prevent unification with type families] about the NoTypeFamilies:
       , MTVU_OK ty2' <- metaTyVarUpdateOK dflags NoTypeFamilies tv1 ty2
       = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
@@ -1676,6 +1676,9 @@ before expanding the type family.
 It would be lovely in the future to revisit this problem and remove this
 extra, unnecessary check. But we retain it for now as it seems to work
 better in practice.
+
+Revisited in Nov '20, along with removing flattening variables. Problem
+is still present, and the solution (NoTypeFamilies) is still the same.
 
 Note [Refactoring hazard: metaTyVarUpdateOK]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
