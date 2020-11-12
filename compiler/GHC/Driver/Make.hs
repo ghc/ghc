@@ -55,6 +55,7 @@ import GHC.Driver.Main
 import GHC.Parser.Header
 import GHC.Parser.Errors.Ppr
 
+import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
 
 import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
@@ -329,7 +330,7 @@ warnUnusedPackages = do
     eps <- liftIO $ hscEPS hsc_env
 
     let dflags = hsc_dflags hsc_env
-        state  = unitState dflags
+        state  = hsc_units  hsc_env
         pit = eps_PIT eps
 
     let loadedPackages
@@ -569,12 +570,13 @@ load' how_much mHscMessage mod_graph = do
           let ofile = outputFile dflags
           let no_hs_main = gopt Opt_NoHsMain dflags
           let
-            main_mod = mainModIs dflags
+            main_mod = mainModIs hsc_env
             a_root_is_Main = mgElemModule mod_graph main_mod
             do_linking = a_root_is_Main || no_hs_main || ghcLink dflags == LinkDynLib || ghcLink dflags == LinkStaticLib
 
           -- link everything together
-          linkresult <- liftIO $ link (ghcLink dflags) dflags do_linking (hsc_HPT hsc_env1)
+          unit_env <- hsc_unit_env <$> getSession
+          linkresult <- liftIO $ link (ghcLink dflags) dflags unit_env do_linking (hsc_HPT hsc_env1)
 
           if ghcLink dflags == LinkBinary && isJust ofile && not do_linking
              then do
@@ -632,7 +634,8 @@ load' how_much mHscMessage mod_graph = do
           ASSERT( just_linkables ) do
 
           -- Link everything together
-          linkresult <- liftIO $ link (ghcLink dflags) dflags False hpt5
+          unit_env <- hsc_unit_env <$> getSession
+          linkresult <- liftIO $ link (ghcLink dflags) dflags unit_env False hpt5
 
           modifySession $ \hsc_env -> hsc_env{ hsc_HPT = hpt5 }
           loadFinish Failed linkresult
@@ -691,7 +694,7 @@ guessOutputFile = modifySession $ \env ->
         !mod_graph = hsc_mod_graph env
         mainModuleSrcPath :: Maybe String
         mainModuleSrcPath = do
-            ms <- mgLookupModule mod_graph (mainModIs dflags)
+            ms <- mgLookupModule mod_graph (mainModIs env)
             ml_hs_file (ms_location ms)
         name = fmap dropExtension mainModuleSrcPath
 
@@ -998,7 +1001,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
 
-    when (not (null (instantiatedUnitsToCheck dflags))) $
+    when (not (null (instantiatedUnitsToCheck (hsc_units hsc_env)))) $
       throwGhcException (ProgramError "Backpack typechecking not supported with -j")
 
     -- The bits of shared state we'll be using:
@@ -1413,9 +1416,9 @@ upsweep
        --  3. A list of modules which succeeded loading.
 
 upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
-   dflags <- getSessionDynFlags
+   hsc_env <- getSession
    (res, done) <- upsweep' old_hpt emptyMG sccs 1 (length sccs)
-                           (instantiatedUnitsToCheck dflags) done_holes
+                           (instantiatedUnitsToCheck (hsc_units hsc_env)) done_holes
    return (res, reverse $ mgModSummaries done)
  where
   done_holes = emptyUniqSet
@@ -1562,9 +1565,9 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
 --
 -- Use explicit (instantiated) units as roots and also return their
 -- instantiations that are themselves instantiations and so on recursively.
-instantiatedUnitsToCheck :: DynFlags -> [Unit]
-instantiatedUnitsToCheck dflags =
-  nubSort $ concatMap goUnit (explicitUnits (unitState dflags))
+instantiatedUnitsToCheck :: UnitState -> [Unit]
+instantiatedUnitsToCheck unit_state =
+  nubSort $ concatMap goUnit (explicitUnits unit_state)
  where
   goUnit HoleUnit         = []
   goUnit (RealUnit _)     = []
@@ -2740,10 +2743,10 @@ withDeferredDiagnostics f = do
       (\_ -> setLogAction (log_action dflags) >> printDeferredDiagnostics)
       (\_ -> f)
 
-noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> ErrMsg
+noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> ErrMsg
 -- ToDo: we don't have a proper line number for this error
-noModError dflags loc wanted_mod err
-  = mkPlainErrMsg dflags loc $ cannotFindModule dflags wanted_mod err
+noModError hsc_env loc wanted_mod err
+  = mkPlainErrMsg (hsc_dflags hsc_env) loc $ cannotFindModule hsc_env wanted_mod err
 
 noHsFileErr :: DynFlags -> SrcSpan -> String -> ErrorMessages
 noHsFileErr dflags loc path

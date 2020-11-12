@@ -244,6 +244,7 @@ import GHC.Parser.Errors
 import GHC.Types.CostCentre
 import GHC.Types.ForeignCall
 import GHC.Unit.Module
+import GHC.Unit.Home
 import GHC.Types.Literal
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
@@ -1104,7 +1105,7 @@ isPtrGlobalReg (VanillaReg _ VGcPtr) = True
 isPtrGlobalReg _                     = False
 
 happyError :: PD a
-happyError = PD $ \_ s -> unP srcParseFail s
+happyError = PD $ \_ _ s -> unP srcParseFail s
 
 -- -----------------------------------------------------------------------------
 -- Statement-level macros
@@ -1447,8 +1448,8 @@ initEnv profile = listToUFM [
   ]
   where platform = profilePlatform profile
 
-parseCmmFile :: DynFlags -> FilePath -> IO (Bag Warning, Bag Error, Maybe CmmGroup)
-parseCmmFile dflags filename = do
+parseCmmFile :: DynFlags -> HomeUnit -> FilePath -> IO (Bag Warning, Bag Error, Maybe CmmGroup)
+parseCmmFile dflags home_unit filename = do
   buf <- hGetStringBuffer filename
   let
         init_loc = mkRealSrcLoc (mkFastString filename) 1 1
@@ -1456,7 +1457,7 @@ parseCmmFile dflags filename = do
         init_state = (initParserState opts buf init_loc) { lex_state = [0] }
                 -- reset the lex_state: the Lexer monad leaves some stuff
                 -- in there we don't want.
-  case unPD cmmParse dflags init_state of
+  case unPD cmmParse dflags home_unit init_state of
     PFailed pst -> do
         let (warnings,errors) = getMessages pst
         return (warnings, errors, Nothing)
