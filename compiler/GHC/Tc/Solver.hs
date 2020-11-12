@@ -2050,9 +2050,7 @@ simplifyHoles = mapBagM simpl_hole
   where
     simpl_hole :: Hole -> TcS Hole
 
-     -- do not simplify an extra-constraints wildcard. These holes
-     -- are filled with already-simplified constraints in
-     -- chooseInferredQuantifiers (choose_psig_context)
+     -- See Note [Do not simplify ConstraintHoles]
     simpl_hole h@(Hole { hole_sort = ConstraintHole }) = return h
 
      -- other wildcards should be simplified for printing
@@ -2101,6 +2099,41 @@ test T12227.
 
 But we don't get to discard all redundant equality superclasses, alas;
 see #15205.
+
+Note [Do not simplify ConstraintHoles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before printing the inferred value for a type hole (a _ wildcard in
+a partial type signature), we simplify it w.r.t. any Givens. This
+makes for an easier-to-understand diagnostic for the user.
+
+However, we do not wish to do this for extra-constraint holes. Here is
+the example for why (partial-sigs/should_compile/T12844):
+
+  bar :: _ => FooData rngs
+  bar = foo
+
+  data FooData rngs
+
+  class Foo xs where foo :: (Head xs ~ '(r,r')) => FooData xs
+
+  type family Head (xs :: [k]) where Head (x ': xs) = x
+
+GHC correctly infers that the extra-constraints wildcard on `bar`
+should be (Head rngs ~ '(r, r'), Foo rngs). It then adds this constraint
+as a Given on the implication constraint for `bar`. The Hole for
+the _ is stored within the implication's WantedConstraints.
+When simplifyHoles is called, that constraint is already assumed as
+a Given. Simplifying with respect to it turns it into
+('(r, r') ~ '(r, r'), Foo rngs), which is disastrous.
+
+Furthermore, there is no need to simplify here: extra-constraints wildcards
+are filled in with the output of the solver, in chooseInferredQuantifiers
+(choose_psig_context), so they are already simplified. (Contrast to normal
+type holes, which are just bound to a meta-variable.) Avoiding the poor output
+is simple: just don't simplify extra-constraints wildcards.
+
+This is the only reason we need to track ConstraintHole separately
+from TypeHole in HoleSort.
 
 Note [Tracking redundant constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -300,7 +300,11 @@ initTcDsForSolver thing_inside
        ; let DsGblEnv { ds_mod = mod
                       , ds_fam_inst_env = fam_inst_env
                       , ds_gbl_rdr_env  = rdr_env }      = gbl
-                          -- this is *the* use of ds_gbl_rdr_env
+       -- This is *the* use of ds_gbl_rdr_env:
+       -- Make sure the solver (used by the pattern-match overlap checker) has
+       -- access to the GlobalRdrEnv and FamInstEnv for the module, so that it
+       -- knows how to reduce type families, and which newtypes it can unwrap.
+
 
              DsLclEnv { dsl_loc = loc }                  = lcl
 

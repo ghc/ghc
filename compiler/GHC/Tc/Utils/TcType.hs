@@ -857,6 +857,10 @@ any_rewritable :: Bool    -- Ignore casts and coercions
 -- ORing the results of the predicates above together
 -- Do not look inside casts and coercions if 'ignore_cos' is True
 -- See Note [anyRewritableTyVar must be role-aware]
+--
+-- This looks like it should use foldTyCo, but that function is
+-- role-agnostic, and this one must be role-aware. We could make
+-- foldTyCon role-aware, but that may slow down more common usages.
 {-# INLINE any_rewritable #-} -- this allows specialization of predicates
 any_rewritable ignore_cos role tv_pred tc_pred should_expand
   = go role emptyVarSet
