@@ -1344,6 +1344,9 @@ splitTyConApp_maybe = repSplitTyConApp_maybe . coreFullView
 -- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
 -- type before using this function.
 --
+-- This does *not* split types headed with (=>), as that's not a TyCon in the
+-- type-checker.
+--
 -- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
 tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.

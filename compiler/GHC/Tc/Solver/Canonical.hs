@@ -2312,8 +2312,6 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
 -- guaranteed that tyVarKind lhs == typeKind rhs, for (TyEq:K)
 -- (TyEq:N) is checked in can_eq_nc', and (TyEq:TV) is handled in canEqTyVarHomo
 
-    -- this next line checks also for coercion holes; see
-    -- Note [Equalities with incompatible kinds]
   = do { dflags <- getDynFlags
        ; new_ev <- rewriteEqEvidence ev swapped lhs_ty rhs rewrite_co1 rewrite_co2
 
@@ -2321,6 +2319,8 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
      -- equalities, in case have  x ~ (y :: ..x...)
      -- #12593
      -- guarantees (TyEq:OC), (TyEq:F), and (TyEq:H)
+    -- this next line checks also for coercion holes (TyEq:H); see
+    -- Note [Equalities with incompatible kinds]
        ; case canEqOK dflags eq_rel lhs rhs of
            CanEqOK ->
              do { traceTcS "canEqOK" (ppr lhs $$ ppr rhs)
@@ -2692,6 +2692,10 @@ Note that
 * We track the cycle-breaker variables in inert_cycle_breakers in InertSet
 * We eventually fill in the cycle-breakers, with `cbv := F a`.
   No one else fills in cycle-breakers!
+* In inert_cycle_breakers, we remember the (cbv, F a) pair; that is, we
+  remember the /original/ type.  The [G] F a ~ cbv constraint may be rewritten
+  by other givens (eg if we have another [G] a ~ (b,c), but at the end we
+  still fill in with cbv := F a
 * This fill-in is done when solving is complete, by restoreTyVarCycles
   in nestImplicTcS and runTcSWithEvBinds.
 * The evidence for the new `F a ~ cbv` constraint is Refl, because we know this fill-in is
@@ -2738,6 +2742,8 @@ Details:
 
  (2) Our goal here is to avoid loops in rewriting. We can thus skip looking
      in coercions, as we don't rewrite in coercions.
+     (There is no worry about unifying a meta-variable here: this Note is
+      only about Givens.)
 
  (3) As we're substituting, we can build ill-kinded
      types. For example, if we have Proxy (F a) b, where (b :: F a), then
@@ -2819,6 +2825,10 @@ Details:
      Not breaking cycles fursther makes sense, because
      we only want to break cycles for user-written loopy Givens, and
      a CycleBreakerTv certainly isn't user-written.
+
+NB: This same situation (an equality like b ~ Maybe (F b)) can arise with
+Wanteds, but we have no concrete case incentivising special treatment. It
+would just be a CIrredCan.
 
 -}
 

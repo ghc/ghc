@@ -273,7 +273,8 @@ data HoleSort = ExprHole Id
               | ConstraintHole
                  -- ^ A hole in a constraint, like @f :: (_, Eq a) => ...
                  -- Differentiated from TypeHole because a ConstraintHole
-                 -- is simplified differently. See GHC.Tc.Solver.simplifyHoles.
+                 -- is simplified differently. See
+                 -- Note [Do not simplify ConstraintHoles] in GHC.Tc.Solver.
 
 instance Outputable Hole where
   ppr (Hole { hole_sort = ExprHole id
