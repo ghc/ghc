@@ -122,7 +122,7 @@ module GHC.Core.Coercion (
 
         simplifyArgsWorker,
 
-        badCoercionHole, badCoercionHoleCo,
+        hasCoercionHoleTy, hasCoercionHoleCo,
         HoleSet, coercionHolesOfType, coercionHolesOfCo
        ) where
 
@@ -3050,9 +3050,9 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
 %************************************************************************
 -}
 
-bad_co_hole_ty :: Type -> Monoid.Any
-bad_co_hole_co :: Coercion -> Monoid.Any
-(bad_co_hole_ty, _, bad_co_hole_co, _)
+has_co_hole_ty :: Type -> Monoid.Any
+has_co_hole_co :: Coercion -> Monoid.Any
+(has_co_hole_ty, _, has_co_hole_co, _)
   = foldTyCo folder ()
   where
     folder = TyCoFolder { tcf_view  = const Nothing
@@ -3065,15 +3065,13 @@ bad_co_hole_co :: Coercion -> Monoid.Any
     const2 :: a -> b -> c -> a
     const2 x _ _ = x
 
--- | Is there a blocking coercion hole in this type? See
--- "GHC.Tc.Solver.Canonical" Note [Equalities with incompatible kinds]
-badCoercionHole :: Type -> Bool
-badCoercionHole = Monoid.getAny . bad_co_hole_ty
+-- | Is there a coercion hole in this type?
+hasCoercionHoleTy :: Type -> Bool
+hasCoercionHoleTy = Monoid.getAny . has_co_hole_ty
 
--- | Is there a blocking coercion hole in this coercion? See
--- GHC.Tc.Solver.Canonical Note [Equalities with incompatible kinds]
-badCoercionHoleCo :: Coercion -> Bool
-badCoercionHoleCo = Monoid.getAny . bad_co_hole_co
+-- | Is there a coercion hole in this coercion?
+hasCoercionHoleCo :: Coercion -> Bool
+hasCoercionHoleCo = Monoid.getAny . has_co_hole_co
 
 -- | A set of 'CoercionHole's
 type HoleSet = UniqSet CoercionHole

@@ -43,7 +43,6 @@ import GHC.Builtin.Types ( anyTypeOfKind )
 import GHC.Driver.Session( DynFlags )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
-import GHC.Types.Unique.Set
 import GHC.Hs.Type( HsIPName(..) )
 
 import GHC.Data.Pair
@@ -109,7 +108,7 @@ canonicalize (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
   = canForAll ev pend_sc
 
 canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
-  | BlockedCIS holes <- status
+{- "RAE"  | BlockedCIS holes <- status
   , isEmptyUniqSet holes
     -- this would be a CEqCan if it weren't for the blocking hole, but that
     -- block has been removed. Warp straight to canEqCanLHSHomo.
@@ -128,7 +127,7 @@ canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
            _ -> canIrred status ev }
             -- NB: The Irred is /not/ insoluble, so the special case below
             -- for insolubles (the direct call to canEqNC) does not apply.
-
+-}
   | EqPred eq_rel ty1 ty2 <- classifyPredType (ctEvPred ev)
   = -- For insolubles (all of which are equalities), do /not/ flatten the arguments
     -- In #14350 doing so led entire-unnecessary and ridiculously large
@@ -1034,7 +1033,7 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel
 -- NB: we have expanded type synonyms already
 can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
   | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
-  , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2  --
+  , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
    -- we want to catch e.g. Maybe Int ~ (Int -> Int) here for better
    -- error messages; hence no direct match on TyConApp
   , not (isTypeFamilyTyCon tc1)
@@ -2506,8 +2505,17 @@ where
   noDerived G = G
   noDerived _ = W
 
-For Wanted/Derived, the [X] constraint is "blocked" (not CEqCan, is CIrred)
-until the k1~k2 constraint solved: Wrinkle (2).
+For reasons described in Wrinkle (2) below, we want the [X] constraint to be "blocked";
+that is, it should be put aside, and not used to rewrite any other constraint,
+until the kind-equality on which it depends (namely 'co' above) is solved.
+To achieve this
+* The [X] constraint is a CIrredCan
+* With a cc_status of BlockedCIS bchs
+* Where 'bchs' is the set of "blocking coercion holes".  The blocking coercion
+  holes are the free coercion holes of [X]'s type
+* When all the blocking coercion holes in the CIrredCan are filled (solved),
+  we convert [X] to a CNonCanonical and put it in the work list.
+All this is described in more detail in Wrinkle (2).
 
 Wrinkles:
 
@@ -2527,8 +2535,8 @@ Wrinkles:
 
      So, we have an invariant on CEqCan (TyEq:H) that the RHS does not have
      any coercion holes. This is checked in checkTypeEq. Any equalities that
-     have such an RHS are turned in CIrredCans with a BlockedCIS status. We also
-     must be sure to kick out any constraints that mention coercion holes
+     have such an RHS are turned into CIrredCans with a BlockedCIS status. We also
+     must be sure to kick out any such CIrredCan constraints that mention coercion holes
      when those holes get filled in, so that the unification step can now proceed.
 
      (2a) We must now absolutely make sure to kick out any constraints that
