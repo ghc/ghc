@@ -33,6 +33,8 @@ import Data.List
 import GHC.Data.FastString
 import GHC.SysTools.FileCleanup
 
+import GHC.Iface.Load (cannotFindModule)
+
 import GHC.Unit.Module
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Graph
@@ -279,7 +281,7 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
             fail ->
                 let dflags = hsc_dflags hsc_env
                 in throwOneError $ mkPlainErrMsg dflags srcloc $
-                        cannotFindModule dflags imp fail
+                        cannotFindModule hsc_env imp fail
         }
 
 -----------------------------

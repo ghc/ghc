@@ -24,6 +24,7 @@ where
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Driver.Session
+import {-# SOURCE #-} GHC.Unit.State
 
 import GHC.Utils.Exception
 import GHC.Utils.Misc
@@ -31,7 +32,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.GlobalVars
 import GHC.Utils.Ppr       ( Mode(..) )
-import {-# SOURCE #-} GHC.Unit.State
 
 import System.IO ( Handle )
 import Control.Monad.IO.Class
@@ -47,12 +47,11 @@ showPprUnsafe :: Outputable a => a -> String
 showPprUnsafe a = renderWithContext defaultSDocContext (ppr a)
 
 -- | Allows caller to specify the PrintUnqualified to use
-showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
-showSDocForUser dflags unqual doc = renderWithContext (initSDocContext dflags sty) doc'
+showSDocForUser :: DynFlags -> UnitState -> PrintUnqualified -> SDoc -> String
+showSDocForUser dflags unit_state unqual doc = renderWithContext (initSDocContext dflags sty) doc'
    where
-      sty        = mkUserStyle unqual AllTheWay
-      unit_state = unitState dflags
-      doc'       = pprWithUnitState unit_state doc
+      sty  = mkUserStyle unqual AllTheWay
+      doc' = pprWithUnitState unit_state doc
 
 showSDocDump :: SDocContext -> SDoc -> String
 showSDocDump ctx d = renderWithContext ctx (withPprStyle defaultDumpStyle d)
