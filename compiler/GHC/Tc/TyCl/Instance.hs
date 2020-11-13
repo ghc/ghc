@@ -950,7 +950,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
     tc_kind_sig (Just hs_kind)
       = do { sig_kind <- tcLHsKindSig data_ctxt hs_kind
            ; lvl <- getTcLevel
-           ; let (tvs, inner_kind) = tcSplitForAllTyVars sig_kind
+           ; let (tvs, inner_kind) = tcSplitForAllInvisTyVars sig_kind
            ; (subst, _tvs') <- tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
            ; return (substTy subst inner_kind) }
