@@ -140,7 +140,12 @@ void ocProtectExtras(ObjectCode* oc)
      * non-executable.
      */
   } else if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
-    mmapForLinkerMarkExecutable(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
+    // XXX   I'm not sure how this is supposed to work.
+    // XXX
+    // XXX   oc->symbol_extras would need to be assigned on page boundaries, and mmaped
+    // XXX   but this is not guaranteed in any form or fashion?
+    // XXX
+    // mmapForLinkerMarkExecutable(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
   } else {
     /*
      * The symbol extras were allocated via m32. They will be protected when

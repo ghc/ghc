@@ -297,7 +297,7 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
                                relTab->sectionHeader->sh_link,
                                ELF64_R_SYM((Elf64_Xword)rel->r_info));
 
-            assert(symbol != NULL);
+            assert(0x0 != symbol);
 
             /* decode implicit addend */
             int64_t addend = decodeAddendAarch64(targetSection, rel);
@@ -324,6 +324,7 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
                                ELF64_R_SYM((Elf64_Xword)rel->r_info));
 
             assert(0x0 != symbol);
+            assert(0x0 != symbol->addr);
 
             /* take explicit addend */
             int64_t addend = rel->r_addend;
