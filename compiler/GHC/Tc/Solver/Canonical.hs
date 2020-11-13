@@ -1015,7 +1015,8 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
   | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
   , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
    -- we want to catch e.g. Maybe Int ~ (Int -> Int) here for better
-   -- error messages; hence no direct match on TyConApp
+   -- error messages rather than decomposing into AppTys;
+   -- hence no direct match on TyConApp
   , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
