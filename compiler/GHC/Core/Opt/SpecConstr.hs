@@ -971,7 +971,7 @@ decreaseSpecCount env n_specs
 ---------------------------------------------------
 -- See Note [Forcing specialisation]
 forceSpecBndr :: ScEnv -> Var    -> Bool
-forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTys . varType $ var
+forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTyCoVars . varType $ var
 
 forceSpecFunTy :: ScEnv -> Type -> Bool
 forceSpecFunTy env = any (forceSpecArgTy env) . map scaledThing . fst . splitFunTys

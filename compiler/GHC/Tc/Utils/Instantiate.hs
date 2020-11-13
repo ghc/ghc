@@ -464,7 +464,7 @@ tcInstType inst_tyvars id
              subst'  = extendTCvInScopeSet subst (tyCoVarsOfType rho)
        ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
   where
-    (tyvars, rho) = tcSplitForAllTys (idType id)
+    (tyvars, rho) = tcSplitForAllTyVars (idType id)
     (theta, tau)  = tcSplitPhiTy rho
 
 tcInstTypeBndrs :: Id -> TcM ([(Name, InvisTVBinder)], TcThetaType, TcType)
@@ -480,7 +480,7 @@ tcInstTypeBndrs id
              subst'  = extendTCvInScopeSet subst (tyCoVarsOfType rho)
        ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
   where
-    (tyvars, rho) = splitForAllTysInvis (idType id)
+    (tyvars, rho) = splitForAllInvisTVBinders (idType id)
     (theta, tau)  = tcSplitPhiTy rho
 
     inst_invis_bndr :: TCvSubst -> InvisTVBinder

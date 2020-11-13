@@ -554,7 +554,7 @@ tcHsDeriv hs_ty
   = do { ty <- checkNoErrs $  -- Avoid redundant error report
                               -- with "illegal deriving", below
                tcTopLHsType DerivClauseCtxt hs_ty
-       ; let (tvs, pred)    = splitForAllTys ty
+       ; let (tvs, pred)    = splitForAllTyCoVars ty
              (kind_args, _) = splitFunTys (tcTypeKind pred)
        ; case getClassPredTys_maybe pred of
            Just (cls, tys) -> return (tvs, cls, tys, map scaledThing kind_args)
@@ -583,7 +583,7 @@ tcDerivStrategy mb_lds
     tc_deriv_strategy NewtypeStrategy  = boring_case NewtypeStrategy
     tc_deriv_strategy (ViaStrategy ty) = do
       ty' <- checkNoErrs $ tcTopLHsType DerivClauseCtxt ty
-      let (via_tvs, via_pred) = splitForAllTys ty'
+      let (via_tvs, via_pred) = splitForAllTyCoVars ty'
       pure (ViaStrategy via_pred, via_tvs)
 
     boring_case :: ds -> TcM (ds, [TyVar])

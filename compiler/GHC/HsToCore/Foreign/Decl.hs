@@ -212,7 +212,7 @@ dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
 dsFCall fn_id co fcall mDeclHeader = do
     let
         ty                   = coercionLKind co
-        (tv_bndrs, rho)      = tcSplitForAllVarBndrs ty
+        (tv_bndrs, rho)      = tcSplitForAllTyVarBinders ty
         (arg_tys, io_res_ty) = tcSplitFunTys rho
 
     args <- newSysLocalsDs arg_tys  -- no FFI levity-polymorphism
@@ -316,7 +316,7 @@ dsPrimCall :: Id -> Coercion -> ForeignCall
 dsPrimCall fn_id co fcall = do
     let
         ty                   = coercionLKind co
-        (tvs, fun_ty)        = tcSplitForAllTys ty
+        (tvs, fun_ty)        = tcSplitForAllTyVars ty
         (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
 
     args <- newSysLocalsDs arg_tys  -- no FFI levity-polymorphism
@@ -489,7 +489,7 @@ dsFExportDynamic id co0 cconv = do
 
  where
   ty                       = coercionLKind co0
-  (tvs,sans_foralls)       = tcSplitForAllTys ty
+  (tvs,sans_foralls)       = tcSplitForAllTyVars ty
   ([Scaled arg_mult arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
