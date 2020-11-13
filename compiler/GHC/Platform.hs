@@ -109,7 +109,7 @@ platformOS platform = case platformArchOS platform of
 
 isARM :: Arch -> Bool
 isARM (ArchARM {}) = True
-isARM ArchARM64    = True
+isARM ArchAArch64  = True
 isARM _ = False
 
 -- | This predicate tells us whether the platform is 32-bit.
@@ -232,4 +232,3 @@ platformSOExt platform
       OSDarwin  -> "dylib"
       OSMinGW32 -> "dll"
       _         -> "so"
-

@@ -225,9 +225,9 @@ linkBinary' staticLink dflags o_files dep_units = do
                              (platformOS platform == OSDarwin) &&
                              case platformArch platform of
                                ArchX86 -> True
-                               ArchX86_64 -> True
-                               ArchARM {} -> True
-                               ArchARM64  -> True
+                               ArchX86_64  -> True
+                               ArchARM {}  -> True
+                               ArchAArch64 -> True
                                _ -> False
                           then ["-Wl,-no_compact_unwind"]
                           else [])
@@ -339,4 +339,3 @@ exeFileName platform staticLink output_fn
            else "a.out"
  where s <?.> ext | null (takeExtension s) = s <.> ext
                   | otherwise              = s
-
