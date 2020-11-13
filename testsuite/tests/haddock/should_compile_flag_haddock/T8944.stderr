@@ -7,5 +7,5 @@ data F = F () " Comment for the first argument" ()
 
 
 
-T8944.hs:4:1: warning: [-Winvalid-haddock]
+T8944.hs:4:1: warning: [-Winvalid-haddock (in -Wall)]
     A Haddock comment cannot appear in this position and will be ignored.
