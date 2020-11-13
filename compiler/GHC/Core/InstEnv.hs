@@ -41,7 +41,6 @@ import GHC.Unit.Types
 import GHC.Core.Class
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Types.Var.Env
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Unique (getUnique)
@@ -836,13 +835,10 @@ lookupInstEnv' ie vis_mods cls tys
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
                 -- See Note [Template tyvars are fresh]
-        let in_scope      = mkInScopeSet (tpl_tv_set `unionVarSet` tys_tv_set)
-            flattened_tys = flattenTys in_scope tys in
-              -- NB: important to flatten here. Otherwise, it looks like
-              -- instance C Int cannot match a target [W] C (F Bool).
-              -- See Note [Flattening type-family applications when matching instances]
-              -- in GHC.Core.Unify.
-        case tcUnifyTysFG instanceBindFun tpl_tys flattened_tys of
+        case tcUnifyTysFG instanceBindFun tpl_tys tys of
+          -- We consider MaybeApart to be a case where the instance might
+          -- apply in the future. This covers an instance like C Int and
+          -- a target like [W] C (F a), where F is a type family.
             SurelyApart -> find ms us        rest
             _           -> find ms (item:us) rest
       where
