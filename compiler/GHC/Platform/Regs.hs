@@ -1,4 +1,3 @@
-
 module GHC.Platform.Regs
        (callerSaves, activeStgRegs, haveRegBase, globalRegMaybe, freeReg)
        where
@@ -10,7 +9,7 @@ import GHC.Platform
 import GHC.Platform.Reg
 
 import qualified GHC.Platform.ARM        as ARM
-import qualified GHC.Platform.AArch64      as AArch64
+import qualified GHC.Platform.AArch64    as AArch64
 import qualified GHC.Platform.PPC        as PPC
 import qualified GHC.Platform.S390X      as S390X
 import qualified GHC.Platform.SPARC      as SPARC
