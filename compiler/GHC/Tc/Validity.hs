@@ -924,7 +924,7 @@ forAllTyErr env rank ty
      , vcat [ hang herald 2 (ppr_tidy env ty)
             , suggestion ] )
   where
-    (tvs, _theta, _tau) = tcSplitSigmaTy ty
+    (tvs, _rho) = tcSplitForAllTyVars ty
     herald | null tvs  = text "Illegal qualified type:"
            | otherwise = text "Illegal polymorphic type:"
     suggestion = case rank of
