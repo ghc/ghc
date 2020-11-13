@@ -4148,7 +4148,8 @@ minusWallOpts
         Opt_WarnMissingPatternSynonymSignatures,
         Opt_WarnUnusedRecordWildcards,
         Opt_WarnRedundantRecordWildcards,
-        Opt_WarnStarIsType
+        Opt_WarnStarIsType,
+        Opt_WarnInvalidHaddock
       ]
 
 -- | Things you get with -Weverything, i.e. *all* known warnings flags

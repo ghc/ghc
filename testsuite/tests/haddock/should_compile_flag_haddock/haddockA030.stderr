@@ -9,6 +9,6 @@ data A
 
 
 
-haddockA030.hs:7:5: warning: [-Winvalid-haddock]
+haddockA030.hs:7:5: warning: [-Winvalid-haddock (in -Wall)]
     Multiple Haddock comments for a single entity are not allowed.
     The extraneous comment will be ignored.
