@@ -863,17 +863,7 @@ splitApps = go []
 -- even worse! We have to construct several different TyCons by hand
 -- so that we can build the fingerprint for TYPE ('BoxedRep 'LiftedRep).
 -- If we call `typeRep @('BoxedRep 'LiftedRep)` while trying to compute
--- the fingerprint of `TYPE ('BoxedRep 'LiftedRep)`, we get a loop since
--- that invocacion of `typeRep` leads to:
---
--- * fpTYPELiftedRep (starting point)
--- * typeRep @('BoxedRep 'LiftedRep)
--- * mkTrApp (applied to 'BoxedRep and 'LiftedRep, attempts TYPE shortcut)
--- * eqTypeRep (second argument is trTYPE, let's pursue this)
--- * sameTypeRep (second argument is trTYPE)
--- * typeRepFingerprint (argument is trTYPE, matches TrFun case)
--- * Dang, I have to think about this more tomorrow. The
---   loop is real, but it evades me right now.
+-- the fingerprint of `TYPE ('BoxedRep 'LiftedRep)`, we get a loop.
 --
 -- The ticket to find a better way to deal with this is
 -- #14480.
