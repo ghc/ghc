@@ -60,7 +60,7 @@ module GHC.Tc.Utils.TcType (
   -- These are important because they do not look through newtypes
   getTyVar,
   tcSplitForAllTyVarBinder_maybe,
-  tcSplitForAllTyVars, tcSplitSomeForAllTyVars,
+  tcSplitForAllTyVars, tcSplitForAllInvisTyVars, tcSplitSomeForAllTyVars,
   tcSplitForAllReqTVBinders, tcSplitForAllInvisTVBinders,
   tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllTyVarBinders,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
@@ -1223,11 +1223,16 @@ tcSplitForAllTyVarBinder_maybe (ForAllTy tv ty) = ASSERT( isTyVarBinder tv ) Jus
 tcSplitForAllTyVarBinder_maybe _                = Nothing
 
 -- | Like 'tcSplitPiTys', but splits off only named binders,
--- returning just the tycovars.
+-- returning just the tyvars.
 tcSplitForAllTyVars :: Type -> ([TyVar], Type)
 tcSplitForAllTyVars ty
   = ASSERT( all isTyVar (fst sty) ) sty
   where sty = splitForAllTyCoVars ty
+
+-- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Invisible'
+-- type variable binders.
+tcSplitForAllInvisTyVars :: Type -> ([TyVar], Type)
+tcSplitForAllInvisTyVars ty = tcSplitSomeForAllTyVars isInvisibleArgFlag ty
 
 -- | Like 'tcSplitForAllTyVars', but only splits a 'ForAllTy' if @argf_pred argf@
 -- is 'True', where @argf@ is the visibility of the @ForAllTy@'s binder and
@@ -1284,9 +1289,11 @@ tcSplitPhiTy ty
           Just (pred, ty) -> split ty (pred:ts)
           Nothing         -> (reverse ts, ty)
 
--- | Split a sigma type into its parts.
+-- | Split a sigma type into its parts. This only splits /invisible/ type
+-- variable binders, as these are the only forms of binder that the typechecker
+-- will implicitly instantiate.
 tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
-tcSplitSigmaTy ty = case tcSplitForAllTyVars ty of
+tcSplitSigmaTy ty = case tcSplitForAllInvisTyVars ty of
                         (tvs, rho) -> case tcSplitPhiTy rho of
                                         (theta, tau) -> (tvs, theta, tau)
 
@@ -1469,9 +1476,9 @@ tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
 -- the latter specifically stops at PredTy arguments,
 -- and we don't want to do that here
 tcSplitDFunTy ty
-  = case tcSplitForAllTyVars ty of { (tvs, rho)    ->
-    case splitFunTys rho        of { (theta, tau)  ->
-    case tcSplitDFunHead tau    of { (clas, tys)   ->
+  = case tcSplitForAllInvisTyVars ty of { (tvs, rho)    ->
+    case splitFunTys rho             of { (theta, tau)  ->
+    case tcSplitDFunHead tau         of { (clas, tys)   ->
     (tvs, map scaledThing theta, clas, tys) }}}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
@@ -1489,7 +1496,7 @@ tcSplitMethodTy :: Type -> ([TyVar], PredType, Type)
 -- tcSplitMethodTy just peels off the outer forall and
 -- that first predicate
 tcSplitMethodTy ty
-  | (sel_tyvars,sel_rho) <- tcSplitForAllTyVars ty
+  | (sel_tyvars,sel_rho) <- tcSplitForAllInvisTyVars ty
   , Just (first_pred, local_meth_ty) <- tcSplitPredFunTy_maybe sel_rho
   = (sel_tyvars, first_pred, local_meth_ty)
   | otherwise
