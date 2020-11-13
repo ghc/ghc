@@ -610,11 +610,11 @@ Currently there are nine different uses of 'VarBndr':
 
 * Var.InvisTVBinder = VarBndr TyVar Specificity
   Specialised form of TyVarBinder, when ArgFlag = Invisible s
-  See GHC.Core.Type.splitForAllTysInvis
+  See GHC.Core.Type.splitForAllInvisTVBinders
 
 * Var.ReqTVBinder = VarBndr TyVar ()
   Specialised form of TyVarBinder, when ArgFlag = Required
-  See GHC.Core.Type.splitForAllTysReq
+  See GHC.Core.Type.splitForAllReqTVBinders
   This one is barely used
 
 * TyCon.TyConBinder = VarBndr TyVar TyConBndrVis

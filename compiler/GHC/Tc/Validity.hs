@@ -254,11 +254,11 @@ checkUserTypeError :: Type -> TcM ()
 checkUserTypeError = check
   where
   check ty
-    | Just msg     <- userTypeError_maybe ty  = fail_with msg
-    | Just (_,ts)  <- splitTyConApp_maybe ty  = mapM_ check ts
-    | Just (t1,t2) <- splitAppTy_maybe ty     = check t1 >> check t2
-    | Just (_,t1)  <- splitForAllTy_maybe ty  = check t1
-    | otherwise                               = return ()
+    | Just msg     <- userTypeError_maybe ty      = fail_with msg
+    | Just (_,ts)  <- splitTyConApp_maybe ty      = mapM_ check ts
+    | Just (t1,t2) <- splitAppTy_maybe ty         = check t1 >> check t2
+    | Just (_,t1)  <- splitForAllTyCoVar_maybe ty = check t1
+    | otherwise                                   = return ()
 
   fail_with msg = do { env0 <- tcInitTidyEnv
                      ; let (env1, tidy_msg) = tidyOpenType env0 msg
@@ -751,7 +751,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
 
         ; checkEscapingKind env' tvbs' theta tau }
   where
-    (tvbs, phi)   = tcSplitForAllVarBndrs ty
+    (tvbs, phi)   = tcSplitForAllTyVarBinders ty
     (theta, tau)  = tcSplitPhiTy phi
     (env', tvbs') = tidyTyCoVarBinders env tvbs
 
@@ -1056,7 +1056,7 @@ case, but this can lead to bugs. Imagine you have this scenario (from #15954):
 If the rank-n case came first, then in the process of checking for `forall`s
 or contexts, we would expand away `B A` to `forall x. x -> x`. This is because
 the functions that split apart `forall`s/contexts
-(tcSplitForAllVarBndrs/tcSplitPhiTy) expand type synonyms! If `B A` is expanded
+(tcSplitForAllTyVarBinders/tcSplitPhiTy) expand type synonyms! If `B A` is expanded
 away to `forall x. x -> x` before the actually validity checks occur, we will
 have completely obfuscated the fact that we had an unsaturated application of
 the `A` type synonym.

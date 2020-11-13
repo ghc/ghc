@@ -434,7 +434,7 @@ mkWWargs subst fun_ty demands
                   apply_or_bind_then work_fn_args (varToCoreExpr id),
                   res_ty) }
 
-  | Just (tv, fun_ty') <- splitForAllTy_maybe fun_ty
+  | Just (tv, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
   = do  { uniq <- getUniqueM
         ; let (subst', tv') = cloneTyVarBndr subst tv uniq
                 -- See Note [Freshen WW arguments]
@@ -1026,7 +1026,7 @@ findTypeShape fam_envs ty
        | Just (tc, tc_args)  <- splitTyConApp_maybe ty
        = go_tc rec_tc tc tc_args
 
-       | Just (_, ty') <- splitForAllTy_maybe ty
+       | Just (_, ty') <- splitForAllTyCoVar_maybe ty
        = go rec_tc ty'
 
        | otherwise

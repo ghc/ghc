@@ -139,13 +139,13 @@ tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
                                        in ty { ft_mult = w', ft_arg = arg', ft_res = res' }
 tidyType env (ty@(ForAllTy{}))     = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
   where
-    (tvs, vis, body_ty) = splitForAllTys' ty
+    (tvs, vis, body_ty) = splitForAllTyCoVars' ty
     (env', tvs') = tidyVarBndrs env tvs
 tidyType env (CastTy ty co)       = (CastTy $! tidyType env ty) $! (tidyCo env co)
 tidyType env (CoercionTy co)      = CoercionTy $! (tidyCo env co)
 
 
--- The following two functions differ from mkForAllTys and splitForAllTys in that
+-- The following two functions differ from mkForAllTys and splitForAllTyCoVars in that
 -- they expect/preserve the ArgFlag argument. These belong to "GHC.Core.Type", but
 -- how should they be named?
 mkForAllTys' :: [(TyCoVar, ArgFlag)] -> Type -> Type
@@ -153,8 +153,8 @@ mkForAllTys' tvvs ty = foldr strictMkForAllTy ty tvvs
   where
     strictMkForAllTy (tv,vis) ty = (ForAllTy $! ((Bndr $! tv) $! vis)) $! ty
 
-splitForAllTys' :: Type -> ([TyCoVar], [ArgFlag], Type)
-splitForAllTys' ty = go ty [] []
+splitForAllTyCoVars' :: Type -> ([TyCoVar], [ArgFlag], Type)
+splitForAllTyCoVars' ty = go ty [] []
   where
     go (ForAllTy (Bndr tv vis) ty) tvs viss = go ty (tv:tvs) (vis:viss)
     go ty                          tvs viss = (reverse tvs, reverse viss, ty)

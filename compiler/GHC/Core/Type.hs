@@ -48,11 +48,11 @@ module GHC.Core.Type (
         mkSpecForAllTy, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
         mkInfForAllTy, mkInfForAllTys,
-        splitForAllTys,
-        splitForAllTysReq, splitForAllTysInvis,
-        splitForAllVarBndrs,
-        splitForAllTy_maybe, splitForAllTy,
-        splitForAllTy_ty_maybe, splitForAllTy_co_maybe,
+        splitForAllTyCoVars,
+        splitForAllReqTVBinders, splitForAllInvisTVBinders,
+        splitForAllTyCoVarBinders,
+        splitForAllTyCoVar_maybe, splitForAllTyCoVar,
+        splitForAllTyVar_maybe, splitForAllCoVar_maybe,
         splitPiTy_maybe, splitPiTy, splitPiTys,
         mkTyConBindersPreferAnon,
         mkPiTy, mkPiTys,
@@ -1552,8 +1552,8 @@ mkTyConBindersPreferAnon vars inner_tkvs = ASSERT( all isTyVar vars)
 -- | Take a ForAllTy apart, returning the list of tycovars and the result type.
 -- This always succeeds, even if it returns only an empty list. Note that the
 -- result type returned may have free variables that were bound by a forall.
-splitForAllTys :: Type -> ([TyCoVar], Type)
-splitForAllTys ty = split ty ty []
+splitForAllTyCoVars :: Type -> ([TyCoVar], Type)
+splitForAllTyCoVars ty = split ty ty []
   where
     split _       (ForAllTy (Bndr tv _) ty)    tvs = split ty ty (tv:tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
@@ -1561,38 +1561,38 @@ splitForAllTys ty = split ty ty []
 
 -- | Splits the longest initial sequence of ForAllTys' that satisfy
 -- @argf_pred@, returning the binders transformed by @argf_pred@
-splitSomeForAllTys :: (ArgFlag -> Maybe af) -> Type -> ([VarBndr TyCoVar af], Type)
-splitSomeForAllTys argf_pred ty = split ty ty []
+splitSomeForAllTyCoVarBndrs :: (ArgFlag -> Maybe af) -> Type -> ([VarBndr TyCoVar af], Type)
+splitSomeForAllTyCoVarBndrs argf_pred ty = split ty ty []
   where
     split _ (ForAllTy (Bndr tcv argf) ty) tvs
       | Just argf' <- argf_pred argf               = split ty ty (Bndr tcv argf' : tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
--- | Like 'splitForAllTys', but only splits 'ForAllTy's with 'Required' type
+-- | Like 'splitForAllTyCoVars', but only splits 'ForAllTy's with 'Required' type
 -- variable binders. Furthermore, each returned tyvar is annotated with '()'.
-splitForAllTysReq :: Type -> ([ReqTVBinder], Type)
-splitForAllTysReq ty = splitSomeForAllTys argf_pred ty
+splitForAllReqTVBinders :: Type -> ([ReqTVBinder], Type)
+splitForAllReqTVBinders ty = splitSomeForAllTyCoVarBndrs argf_pred ty
   where
     argf_pred :: ArgFlag -> Maybe ()
     argf_pred Required       = Just ()
     argf_pred (Invisible {}) = Nothing
 
--- | Like 'splitForAllTys', but only splits 'ForAllTy's with 'Invisible' type
+-- | Like 'splitForAllTyCoVars', but only splits 'ForAllTy's with 'Invisible' type
 -- variable binders. Furthermore, each returned tyvar is annotated with its
 -- 'Specificity'.
-splitForAllTysInvis :: Type -> ([InvisTVBinder], Type)
-splitForAllTysInvis ty = splitSomeForAllTys argf_pred ty
+splitForAllInvisTVBinders :: Type -> ([InvisTVBinder], Type)
+splitForAllInvisTVBinders ty = splitSomeForAllTyCoVarBndrs argf_pred ty
   where
     argf_pred :: ArgFlag -> Maybe Specificity
     argf_pred Required         = Nothing
     argf_pred (Invisible spec) = Just spec
 
--- | Like splitForAllTys, but split only for tyvars.
+-- | Like 'splitForAllTyCoVars', but split only for tyvars.
 -- This always succeeds, even if it returns only an empty list. Note that the
 -- result type returned may have free variables that were bound by a forall.
-splitTyVarForAllTys :: Type -> ([TyVar], Type)
-splitTyVarForAllTys ty = split ty ty []
+splitForAllTyVars :: Type -> ([TyVar], Type)
+splitForAllTyVars ty = split ty ty []
   where
     split _ (ForAllTy (Bndr tv _) ty) tvs | isTyVar tv = split ty ty (tv:tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty     = split orig_ty ty' tvs
@@ -1636,10 +1636,10 @@ isFunTy ty
   | otherwise                   = False
 
 -- | Take a forall type apart, or panics if that is not possible.
-splitForAllTy :: Type -> (TyCoVar, Type)
-splitForAllTy ty
-  | Just answer <- splitForAllTy_maybe ty = answer
-  | otherwise                             = pprPanic "splitForAllTy" (ppr ty)
+splitForAllTyCoVar :: Type -> (TyCoVar, Type)
+splitForAllTyCoVar ty
+  | Just answer <- splitForAllTyCoVar_maybe ty = answer
+  | otherwise                                  = pprPanic "splitForAllTyCoVar" (ppr ty)
 
 -- | Drops all ForAllTys
 dropForAlls :: Type -> Type
@@ -1651,23 +1651,23 @@ dropForAlls ty = go ty
 
 -- | Attempts to take a forall type apart, but only if it's a proper forall,
 -- with a named binder
-splitForAllTy_maybe :: Type -> Maybe (TyCoVar, Type)
-splitForAllTy_maybe ty
+splitForAllTyCoVar_maybe :: Type -> Maybe (TyCoVar, Type)
+splitForAllTyCoVar_maybe ty
   | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty = Just (tv, inner_ty)
   | otherwise                                        = Nothing
 
--- | Like splitForAllTy_maybe, but only returns Just if it is a tyvar binder.
-splitForAllTy_ty_maybe :: Type -> Maybe (TyCoVar, Type)
-splitForAllTy_ty_maybe ty
+-- | Like 'splitForAllTyCoVar_maybe', but only returns Just if it is a tyvar binder.
+splitForAllTyVar_maybe :: Type -> Maybe (TyCoVar, Type)
+splitForAllTyVar_maybe ty
   | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty
   , isTyVar tv
   = Just (tv, inner_ty)
 
   | otherwise = Nothing
 
--- | Like splitForAllTy_maybe, but only returns Just if it is a covar binder.
-splitForAllTy_co_maybe :: Type -> Maybe (TyCoVar, Type)
-splitForAllTy_co_maybe ty
+-- | Like 'splitForAllTyCoVar_maybe', but only returns Just if it is a covar binder.
+splitForAllCoVar_maybe :: Type -> Maybe (TyCoVar, Type)
+splitForAllCoVar_maybe ty
   | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty
   , isCoVar tv
   = Just (tv, inner_ty)
@@ -1702,14 +1702,14 @@ splitPiTys ty = split ty ty []
     split orig_ty _                bs = (reverse bs, orig_ty)
 
 -- | Like 'splitPiTys' but split off only /named/ binders
---   and returns TyCoVarBinders rather than TyCoBinders
-splitForAllVarBndrs :: Type -> ([TyCoVarBinder], Type)
-splitForAllVarBndrs ty = split ty ty []
+--   and returns 'TyCoVarBinder's rather than 'TyCoBinder's
+splitForAllTyCoVarBinders :: Type -> ([TyCoVarBinder], Type)
+splitForAllTyCoVarBinders ty = split ty ty []
   where
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split _       (ForAllTy b res) bs = split res res (b:bs)
     split orig_ty _                bs = (reverse bs, orig_ty)
-{-# INLINE splitForAllVarBndrs #-}
+{-# INLINE splitForAllTyCoVarBinders #-}
 
 invisibleTyBndrCount :: Type -> Int
 -- Returns the number of leading invisible forall'd binders in the type
@@ -2114,7 +2114,7 @@ isValidJoinPointType arity ty
     valid_under tvs arity ty
       | arity == 0
       = tvs `disjointVarSet` tyCoVarsOfType ty
-      | Just (t, ty') <- splitForAllTy_maybe ty
+      | Just (t, ty') <- splitForAllTyCoVar_maybe ty
       = valid_under (tvs `extendVarSet` t) (arity-1) ty'
       | Just (_, _, res_ty) <- splitFunTy_maybe ty
       = valid_under tvs (arity-1) res_ty
@@ -2497,7 +2497,7 @@ typeKind ty@(ForAllTy {})
       Nothing -> pprPanic "typeKind"
                   (ppr ty $$ ppr tvs $$ ppr body <+> dcolon <+> ppr body_kind)
   where
-    (tvs, body) = splitTyVarForAllTys ty
+    (tvs, body) = splitForAllTyVars ty
     body_kind   = typeKind body
 
 ---------------------------------------------
@@ -2542,7 +2542,7 @@ tcTypeKind ty@(ForAllTy {})
       Nothing -> pprPanic "tcTypeKind"
                   (ppr ty $$ ppr tvs $$ ppr body <+> dcolon <+> ppr body_kind)
   where
-    (tvs, body) = splitTyVarForAllTys ty
+    (tvs, body) = splitForAllTyVars ty
     body_kind = tcTypeKind body
 
 

@@ -1240,7 +1240,7 @@ checkCaseLinearity ue case_bndr var_w bndr = do
 -----------------
 lintTyApp :: LintedType -> LintedType -> LintM LintedType
 lintTyApp fun_ty arg_ty
-  | Just (tv,body_ty) <- splitForAllTy_maybe fun_ty
+  | Just (tv,body_ty) <- splitForAllTyCoVar_maybe fun_ty
   = do  { lintTyKind tv arg_ty
         ; in_scope <- getInScope
         -- substTy needs the set of tyvars in scope to avoid generating
@@ -2172,7 +2172,7 @@ lintCoercion co@(TransCo co1 co2)
 lintCoercion the_co@(NthCo r0 n co)
   = do { co' <- lintCoercion co
        ; let (Pair s t, r) = coercionKindRole co'
-       ; case (splitForAllTy_maybe s, splitForAllTy_maybe t) of
+       ; case (splitForAllTyCoVar_maybe s, splitForAllTyCoVar_maybe t) of
          { (Just _, Just _)
              -- works for both tyvar and covar
              | n == 0
@@ -2214,7 +2214,7 @@ lintCoercion (InstCo co arg)
 
        ; lintRole arg Nominal (coercionRole arg')
 
-      ; case (splitForAllTy_ty_maybe t1, splitForAllTy_ty_maybe t2) of
+      ; case (splitForAllTyVar_maybe t1, splitForAllTyVar_maybe t2) of
          -- forall over tvar
          { (Just (tv1,_), Just (tv2,_))
              | typeKind s1 `eqType` tyVarKind tv1
@@ -2223,7 +2223,7 @@ lintCoercion (InstCo co arg)
              | otherwise
              -> failWithL (text "Kind mis-match in inst coercion1" <+> ppr co)
 
-         ; _ -> case (splitForAllTy_co_maybe t1, splitForAllTy_co_maybe t2) of
+         ; _ -> case (splitForAllCoVar_maybe t1, splitForAllCoVar_maybe t2) of
          -- forall over covar
          { (Just (cv1, _), Just (cv2, _))
              | typeKind s1 `eqType` varType cv1
