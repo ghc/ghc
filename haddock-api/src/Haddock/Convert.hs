@@ -230,7 +230,7 @@ synifyTyCon prr _coax tc
       | otherwise = noLoc $ KindedTyVar noExtField () (noLoc (getName fakeTyVar)) (synifyKindSig realKind)
 
     conKind = defaultType prr (tyConKind tc)
-    tyVarKinds = fst . splitFunTys . snd . splitPiTysInvisible $ conKind
+    tyVarKinds = fst . splitFunTys . snd . splitInvisPiTys $ conKind
 
 synifyTyCon _prr _coax tc
   | Just flav <- famTyConFlav_maybe tc
