@@ -46,8 +46,8 @@ bool needStubForRelaAarch64(Elf_Rela * rela) {
 bool
 makeStubAarch64(Stub * s) {
     // We (the linker) may corrupt registers x16 (IP0) and x17 (IP1) [AAPCS64]
-    // and the condition flags, according to the "ELF for the ARM64
-    // Architecture".
+    // and the condition flags, according to the "ELF for the ARM 64-bit
+    // Architecture (AArch64)".
     //
     // [Special purpose regs]
     // X16 and X17 are IP0 and IP1, intra-procedure-call temporary registers.

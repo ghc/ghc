@@ -3954,6 +3954,15 @@ validHoleFitsImpliedGFlags
 default_PIC :: Platform -> [GeneralFlag]
 default_PIC platform =
   case (platformOS platform, platformArch platform) of
+    -- For AArch64, we need to always have PIC enabled.  The relocation model
+    -- on AArch64 does not permit arbitrary relocations.  Under ASLR, we can't
+    -- control much how far apart symbols are in memory for our in-memory static
+    -- linker;  and thus need to ensure we get sufficiently capable relocations.
+    -- This requires PIC on AArch64, and ExternalDynamicRefs on Linux as on top
+    -- of that.  Subsequently we expect all code on aarch64/linux (and macOS) to
+    -- be built with -fPIC.
+    (OSDarwin,  ArchAArch64) -> [Opt_PIC]
+    (OSLinux,   ArchAArch64) -> [Opt_PIC, Opt_ExternalDynamicRefs]
     (OSDarwin, ArchX86_64) -> [Opt_PIC]
     (OSOpenBSD, ArchX86_64) -> [Opt_PIC] -- Due to PIE support in
                                          -- OpenBSD since 5.3 release
