@@ -109,7 +109,7 @@ import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Dwarf
 import GHC.CmmToAsm.Config
-import GHC.ArchmToAsm.Types
+import GHC.CmmToAsm.Types
 import GHC.Cmm.DebugBlock
 
 import GHC.Cmm.BlockId
