@@ -576,7 +576,7 @@ mkArgInfo env fun rules n_val_args call_cont
     add_type_strictness fun_ty dmds
       | null dmds = []
 
-      | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty
+      | Just (_, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
       = add_type_strictness fun_ty' dmds     -- Look through foralls
 
       | Just (_, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info

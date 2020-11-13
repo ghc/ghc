@@ -427,8 +427,8 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
     -- Invariant:  co :: subst1(k2) ~ subst2(k2)
 
     go acc_arg_cos (subst1,k1) co (subst2,k2) (ty:tys)
-      | Just (a, t1) <- splitForAllTy_maybe k1
-      , Just (b, t2) <- splitForAllTy_maybe k2
+      | Just (a, t1) <- splitForAllTyCoVar_maybe k1
+      , Just (b, t2) <- splitForAllTyCoVar_maybe k2
         -- know     co :: (forall a:s1.t1) ~ (forall b:s2.t2)
         --    function :: forall a:s1.t1   (the function is not passed to decomposePiCos)
         --           a :: s1
@@ -1029,7 +1029,7 @@ mkNthCo r n co
 
     go r 0 co
       | Just (ty, _) <- isReflCo_maybe co
-      , Just (tv, _) <- splitForAllTy_maybe ty
+      , Just (tv, _) <- splitForAllTyCoVar_maybe ty
       = -- works for both tyvar and covar
         ASSERT( r == Nominal )
         mkNomReflCo (varType tv)
@@ -1080,8 +1080,8 @@ mkNthCo r n co
     good_call
       -- If the Coercion passed in is between forall-types, then the Int must
       -- be 0 and the role must be Nominal.
-      | Just (_tv1, _) <- splitForAllTy_maybe ty1
-      , Just (_tv2, _) <- splitForAllTy_maybe ty2
+      | Just (_tv1, _) <- splitForAllTyCoVar_maybe ty1
+      , Just (_tv2, _) <- splitForAllTyCoVar_maybe ty2
       = n == 0 && r == Nominal
 
       -- If the Coercion passed in is between T tys and T tys', then the Int
@@ -1140,7 +1140,7 @@ nthCoRole n co
   | Just (tc, _) <- splitTyConApp_maybe lty
   = nthRole r tc n
 
-  | Just _ <- splitForAllTy_maybe lty
+  | Just _ <- splitForAllTyCoVar_maybe lty
   = Nominal
 
   | otherwise
@@ -2330,7 +2330,7 @@ go_nth d ty
     args `getNth` d
 
   | d == 0
-  , Just (tv,_) <- splitForAllTy_maybe ty
+  , Just (tv,_) <- splitForAllTyCoVar_maybe ty
   = tyVarKind tv
 
   | otherwise

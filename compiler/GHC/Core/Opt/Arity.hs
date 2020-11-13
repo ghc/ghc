@@ -145,7 +145,7 @@ typeArity ty
   = go initRecTc ty
   where
     go rec_nts ty
-      | Just (_, ty')  <- splitForAllTy_maybe ty
+      | Just (_, ty')  <- splitForAllTyCoVar_maybe ty
       = go rec_nts ty'
 
       | Just (_,arg,res) <- splitFunTy_maybe ty
@@ -1417,7 +1417,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 
     go n oss@(one_shot:oss1) subst ty eis       -- See Note [exprArity invariant]
        ----------- Forall types  (forall a. ty)
-       | Just (tcv,ty') <- splitForAllTy_maybe ty
+       | Just (tcv,ty') <- splitForAllTyCoVar_maybe ty
        , (subst', tcv') <- Type.substVarBndr subst tcv
        , let oss' | isTyVar tcv = oss
                   | otherwise   = oss1
@@ -1785,7 +1785,7 @@ etaBodyForJoinPoint need_args body
     go 0 _  _     rev_bs e
       = (reverse rev_bs, e)
     go n ty subst rev_bs e
-      | Just (tv, res_ty) <- splitForAllTy_maybe ty
+      | Just (tv, res_ty) <- splitForAllTyCoVar_maybe ty
       , let (subst', tv') = substVarBndr subst tv
       = go (n-1) res_ty subst' (tv' : rev_bs) (e `App` varToCoreExpr tv')
       | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty

@@ -2148,12 +2148,12 @@ reify_for_all :: TyCoRep.ArgFlag -> TyCoRep.Type -> TcM TH.Type
 -- Arg of reify_for_all is always ForAllTy or a predicate FunTy
 reify_for_all argf ty
   | isVisibleArgFlag argf
-  = do let (req_bndrs, phi) = tcSplitForAllTysReq ty
+  = do let (req_bndrs, phi) = tcSplitForAllReqTVBinders ty
        tvbndrs' <- reifyTyVarBndrs req_bndrs
        phi' <- reifyType phi
        pure $ TH.ForallVisT tvbndrs' phi'
   | otherwise
-  = do let (inv_bndrs, phi) = tcSplitForAllTysInvis ty
+  = do let (inv_bndrs, phi) = tcSplitForAllInvisTVBinders ty
        tvbndrs' <- reifyTyVarBndrs inv_bndrs
        let (cxt, tau) = tcSplitPhiTy phi
        cxt' <- reifyCxt cxt

@@ -335,7 +335,7 @@ opt_co4 env _sym rep r (NthCo _r n co)
 
   | Just (ty, _) <- isReflCo_maybe co
   , n == 0
-  , Just (tv, _) <- splitForAllTy_maybe ty
+  , Just (tv, _) <- splitForAllTyCoVar_maybe ty
       -- works for both tyvar and covar
   = liftCoSubst (chooseRole rep r) env (varType tv)
 
@@ -531,8 +531,8 @@ opt_univ env sym prov role oty1 oty2
 
   -- can't optimize the AppTy case because we can't build the kind coercions.
 
-  | Just (tv1, ty1) <- splitForAllTy_ty_maybe oty1
-  , Just (tv2, ty2) <- splitForAllTy_ty_maybe oty2
+  | Just (tv1, ty1) <- splitForAllTyVar_maybe oty1
+  , Just (tv2, ty2) <- splitForAllTyVar_maybe oty2
       -- NB: prov isn't interesting here either
   = let k1   = tyVarKind tv1
         k2   = tyVarKind tv2
@@ -544,8 +544,8 @@ opt_univ env sym prov role oty1 oty2
     in
     mkForAllCo tv1' eta' (opt_univ env' sym prov' role ty1 ty2')
 
-  | Just (cv1, ty1) <- splitForAllTy_co_maybe oty1
-  , Just (cv2, ty2) <- splitForAllTy_co_maybe oty2
+  | Just (cv1, ty1) <- splitForAllCoVar_maybe oty1
+  , Just (cv2, ty2) <- splitForAllCoVar_maybe oty2
       -- NB: prov isn't interesting here either
   = let k1    = varType cv1
         k2    = varType cv2
@@ -1121,7 +1121,7 @@ etaForAllCo_ty_maybe co
   = Just (tv, kind_co, r)
 
   | Pair ty1 ty2  <- coercionKind co
-  , Just (tv1, _) <- splitForAllTy_ty_maybe ty1
+  , Just (tv1, _) <- splitForAllTyVar_maybe ty1
   , isForAllTy_ty ty2
   , let kind_co = mkNthCo Nominal 0 co
   = Just ( tv1, kind_co
@@ -1137,7 +1137,7 @@ etaForAllCo_co_maybe co
   = Just (cv, kind_co, r)
 
   | Pair ty1 ty2  <- coercionKind co
-  , Just (cv1, _) <- splitForAllTy_co_maybe ty1
+  , Just (cv1, _) <- splitForAllCoVar_maybe ty1
   , isForAllTy_co ty2
   = let kind_co  = mkNthCo Nominal 0 co
         r        = coVarRole cv1

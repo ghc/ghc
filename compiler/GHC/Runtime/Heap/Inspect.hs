@@ -1389,4 +1389,4 @@ quantifyType ty = ( filter isTyVar $
                     tyCoVarsOfTypeWellScoped rho
                   , rho)
   where
-    (_tvs, rho) = tcSplitForAllTys ty
+    (_tvs, rho) = tcSplitForAllTyVars ty

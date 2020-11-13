@@ -215,7 +215,7 @@ module GHC (
         FamInst,
 
         -- ** Types and Kinds
-        Type, splitForAllTys, funResultTy,
+        Type, splitForAllTyCoVars, funResultTy,
         pprParendType, pprTypeApp,
         Kind,
         PredType,
