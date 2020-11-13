@@ -536,14 +536,16 @@ withTiming' dflags what force_result prtimings action
               logInfo dflags $ withPprStyle defaultUserStyle $
                 text "***" <+> what <> colon
             let ctx = initDefaultSDocContext dflags
-            eventBegins ctx what
             alloc0 <- liftIO getAllocationCounter
             start <- liftIO getCPUTime
+            eventBegins ctx what
+            recordAllocs alloc0
             !r <- action
             () <- pure $ force_result r
             eventEnds ctx what
             end <- liftIO getCPUTime
             alloc1 <- liftIO getAllocationCounter
+            recordAllocs alloc1
             -- recall that allocation counter counts down
             let alloc = alloc0 - alloc1
                 time = realToFrac (end - start) * 1e-9
@@ -569,12 +571,19 @@ withTiming' dflags what force_result prtimings action
      else action
 
     where whenPrintTimings = liftIO . when (prtimings == PrintTimings)
+
+          recordAllocs alloc = do
+            liftIO $ traceMarkerIO $ "GHC:allocs:" ++ show alloc
+
           eventBegins ctx w = do
-            whenPrintTimings $ traceMarkerIO (eventBeginsDoc ctx w)
-            liftIO $ traceEventIO (eventBeginsDoc ctx w)
+            let doc = eventBeginsDoc ctx w
+            whenPrintTimings $ traceMarkerIO doc
+            liftIO $ traceEventIO doc
+
           eventEnds ctx w = do
-            whenPrintTimings $ traceMarkerIO (eventEndsDoc ctx w)
-            liftIO $ traceEventIO (eventEndsDoc ctx w)
+            let doc = eventEndsDoc ctx w
+            whenPrintTimings $ traceMarkerIO doc
+            liftIO $ traceEventIO doc
 
           eventBeginsDoc ctx w = showSDocOneLine ctx $ text "GHC:started:" <+> w
           eventEndsDoc   ctx w = showSDocOneLine ctx $ text "GHC:finished:" <+> w
