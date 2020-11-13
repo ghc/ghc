@@ -59,10 +59,10 @@ module GHC.Tc.Utils.TcType (
   -- Splitters
   -- These are important because they do not look through newtypes
   getTyVar,
-  tcSplitForAllTy_maybe,
-  tcSplitForAllTys, tcSplitSomeForAllTys,
-  tcSplitForAllTysReq, tcSplitForAllTysInvis,
-  tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllVarBndrs,
+  tcSplitForAllTyVarBinder_maybe,
+  tcSplitForAllTyVars, tcSplitSomeForAllTyVars,
+  tcSplitForAllReqTVBinders, tcSplitForAllInvisTVBinders,
+  tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllTyVarBinders,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
   tcSplitFunTysN,
@@ -1217,24 +1217,24 @@ tcSplitPiTy_maybe ty
     isMaybeTyBinder (Just (t,_)) = isTyBinder t
     isMaybeTyBinder _            = True
 
-tcSplitForAllTy_maybe :: Type -> Maybe (TyVarBinder, Type)
-tcSplitForAllTy_maybe ty | Just ty' <- tcView ty = tcSplitForAllTy_maybe ty'
-tcSplitForAllTy_maybe (ForAllTy tv ty) = ASSERT( isTyVarBinder tv ) Just (tv, ty)
-tcSplitForAllTy_maybe _                = Nothing
+tcSplitForAllTyVarBinder_maybe :: Type -> Maybe (TyVarBinder, Type)
+tcSplitForAllTyVarBinder_maybe ty | Just ty' <- tcView ty = tcSplitForAllTyVarBinder_maybe ty'
+tcSplitForAllTyVarBinder_maybe (ForAllTy tv ty) = ASSERT( isTyVarBinder tv ) Just (tv, ty)
+tcSplitForAllTyVarBinder_maybe _                = Nothing
 
 -- | Like 'tcSplitPiTys', but splits off only named binders,
 -- returning just the tycovars.
-tcSplitForAllTys :: Type -> ([TyVar], Type)
-tcSplitForAllTys ty
+tcSplitForAllTyVars :: Type -> ([TyVar], Type)
+tcSplitForAllTyVars ty
   = ASSERT( all isTyVar (fst sty) ) sty
-  where sty = splitForAllTys ty
+  where sty = splitForAllTyCoVars ty
 
--- | Like 'tcSplitForAllTys', but only splits a 'ForAllTy' if @argf_pred argf@
+-- | Like 'tcSplitForAllTyVars', but only splits a 'ForAllTy' if @argf_pred argf@
 -- is 'True', where @argf@ is the visibility of the @ForAllTy@'s binder and
 -- @argf_pred@ is a predicate over visibilities provided as an argument to this
 -- function.
-tcSplitSomeForAllTys :: (ArgFlag -> Bool) -> Type -> ([TyVar], Type)
-tcSplitSomeForAllTys argf_pred ty
+tcSplitSomeForAllTyVars :: (ArgFlag -> Bool) -> Type -> ([TyVar], Type)
+tcSplitSomeForAllTyVars argf_pred ty
   = split ty ty []
   where
     split _ (ForAllTy (Bndr tv argf) ty) tvs
@@ -1242,22 +1242,22 @@ tcSplitSomeForAllTys argf_pred ty
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
--- | Like 'tcSplitForAllTys', but only splits 'ForAllTy's with 'Required' type
+-- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Required' type
 -- variable binders. All split tyvars are annotated with '()'.
-tcSplitForAllTysReq :: Type -> ([TcReqTVBinder], Type)
-tcSplitForAllTysReq ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
-  where sty = splitForAllTysReq ty
+tcSplitForAllReqTVBinders :: Type -> ([TcReqTVBinder], Type)
+tcSplitForAllReqTVBinders ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
+  where sty = splitForAllReqTVBinders ty
 
--- | Like 'tcSplitForAllTys', but only splits 'ForAllTy's with 'Invisible' type
+-- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Invisible' type
 -- variable binders. All split tyvars are annotated with their 'Specificity'.
-tcSplitForAllTysInvis :: Type -> ([TcInvisTVBinder], Type)
-tcSplitForAllTysInvis ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
-  where sty = splitForAllTysInvis ty
+tcSplitForAllInvisTVBinders :: Type -> ([TcInvisTVBinder], Type)
+tcSplitForAllInvisTVBinders ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
+  where sty = splitForAllInvisTVBinders ty
 
--- | Like 'tcSplitForAllTys', but splits off only named binders.
-tcSplitForAllVarBndrs :: Type -> ([TyVarBinder], Type)
-tcSplitForAllVarBndrs ty = ASSERT( all isTyVarBinder (fst sty)) sty
-  where sty = splitForAllVarBndrs ty
+-- | Like 'tcSplitForAllTyVars', but splits off only named binders.
+tcSplitForAllTyVarBinders :: Type -> ([TyVarBinder], Type)
+tcSplitForAllTyVarBinders ty = ASSERT( all isTyVarBinder (fst sty)) sty
+  where sty = splitForAllTyCoVarBinders ty
 
 -- | Is this a ForAllTy with a named binder?
 tcIsForAllTy :: Type -> Bool
@@ -1286,7 +1286,7 @@ tcSplitPhiTy ty
 
 -- | Split a sigma type into its parts.
 tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
-tcSplitSigmaTy ty = case tcSplitForAllTys ty of
+tcSplitSigmaTy ty = case tcSplitForAllTyVars ty of
                         (tvs, rho) -> case tcSplitPhiTy rho of
                                         (theta, tau) -> (tvs, theta, tau)
 
@@ -1469,9 +1469,9 @@ tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
 -- the latter specifically stops at PredTy arguments,
 -- and we don't want to do that here
 tcSplitDFunTy ty
-  = case tcSplitForAllTys ty   of { (tvs, rho)    ->
-    case splitFunTys rho       of { (theta, tau)  ->
-    case tcSplitDFunHead tau   of { (clas, tys)   ->
+  = case tcSplitForAllTyVars ty of { (tvs, rho)    ->
+    case splitFunTys rho        of { (theta, tau)  ->
+    case tcSplitDFunHead tau    of { (clas, tys)   ->
     (tvs, map scaledThing theta, clas, tys) }}}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
@@ -1489,7 +1489,7 @@ tcSplitMethodTy :: Type -> ([TyVar], PredType, Type)
 -- tcSplitMethodTy just peels off the outer forall and
 -- that first predicate
 tcSplitMethodTy ty
-  | (sel_tyvars,sel_rho) <- tcSplitForAllTys ty
+  | (sel_tyvars,sel_rho) <- tcSplitForAllTyVars ty
   , Just (first_pred, local_meth_ty) <- tcSplitPredFunTy_maybe sel_rho
   = (sel_tyvars, first_pred, local_meth_ty)
   | otherwise

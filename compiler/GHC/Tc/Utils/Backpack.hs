@@ -223,8 +223,8 @@ check_inst sig_inst = do
         skol_info = InstSkol
         -- Based off of tcSplitDFunTy
         (tvs, theta, pred) =
-           case tcSplitForAllTys ty of { (tvs, rho)   ->
-           case splitFunTys rho     of { (theta, pred) ->
+           case tcSplitForAllTyVars ty of { (tvs, rho)    ->
+           case splitFunTys rho        of { (theta, pred) ->
            (tvs, theta, pred) }}
         origin = InstProvidedOrigin (tcg_semantic_mod tcg_env) sig_inst
     (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize

@@ -346,7 +346,7 @@ resultWrapper result_ty
 
   -- The type might contain foralls (eg. for dummy type arguments,
   -- referring to 'Ptr a' is legal).
-  | Just (tyvar, rest) <- splitForAllTy_maybe result_ty
+  | Just (tyvar, rest) <- splitForAllTyCoVar_maybe result_ty
   = do { (maybe_ty, wrapper) <- resultWrapper rest
        ; return (maybe_ty, \e -> Lam tyvar (wrapper e)) }
 

@@ -496,7 +496,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
               -- See Note [Associated data family instances and di_scoped_tvs].
               tv_skol_env = mkVarEnv $ map swap tv_skol_prs
               n_inferred = countWhile ((== Inferred) . binderArgFlag) $
-                           fst $ splitForAllVarBndrs dfun_ty
+                           fst $ splitForAllTyCoVarBinders dfun_ty
               visible_skol_tvs = drop n_inferred skol_tvs
 
         ; traceTc "tcLocalInstDecl 1" (ppr dfun_ty $$ ppr (invisibleTyBndrCount dfun_ty) $$ ppr skol_tvs)
@@ -950,7 +950,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
     tc_kind_sig (Just hs_kind)
       = do { sig_kind <- tcLHsKindSig data_ctxt hs_kind
            ; lvl <- getTcLevel
-           ; let (tvs, inner_kind) = tcSplitForAllTys sig_kind
+           ; let (tvs, inner_kind) = tcSplitForAllTyVars sig_kind
            ; (subst, _tvs') <- tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
            ; return (substTy subst inner_kind) }

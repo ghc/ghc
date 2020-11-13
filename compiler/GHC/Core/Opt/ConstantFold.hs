@@ -1181,7 +1181,7 @@ unsafeEqualityProofRule
   = do { [Type rep, Type t1, Type t2] <- getArgs
        ; guard (t1 `eqType` t2)
        ; fn <- getFunction
-       ; let (_, ue) = splitForAllTys (idType fn)
+       ; let (_, ue) = splitForAllTyCoVars (idType fn)
              tc      = tyConAppTyCon ue  -- tycon:    UnsafeEquality
              (dc:_)  = tyConDataCons tc  -- data con: UnsafeRefl
              -- UnsafeRefl :: forall (r :: RuntimeRep) (a :: TYPE r).
