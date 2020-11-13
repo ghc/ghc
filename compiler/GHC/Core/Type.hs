@@ -76,7 +76,7 @@ module GHC.Core.Type (
         coAxNthLHS,
         stripCoercionTy,
 
-        splitPiTysInvisible, splitPiTysInvisibleN,
+        splitInvisPiTys, splitInvisPiTysN,
         invisibleTyBndrCount,
         filterOutInvisibleTypes, filterOutInferredTypes,
         partitionInvisibleTypes, partitionInvisibles,
@@ -1559,7 +1559,7 @@ splitForAllTyCoVars ty = split ty ty []
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
--- | Splits the longest initial sequence of ForAllTys' that satisfy
+-- | Splits the longest initial sequence of 'ForAllTy's that satisfy
 -- @argf_pred@, returning the binders transformed by @argf_pred@
 splitSomeForAllTyCoVarBndrs :: (ArgFlag -> Maybe af) -> Type -> ([VarBndr TyCoVar af], Type)
 splitSomeForAllTyCoVarBndrs argf_pred ty = split ty ty []
@@ -1716,12 +1716,12 @@ invisibleTyBndrCount :: Type -> Int
 -- Includes invisible predicate arguments; e.g. for
 --    e.g.  forall {k}. (k ~ *) => k -> k
 -- returns 2 not 1
-invisibleTyBndrCount ty = length (fst (splitPiTysInvisible ty))
+invisibleTyBndrCount ty = length (fst (splitInvisPiTys ty))
 
--- Like splitPiTys, but returns only *invisible* binders, including constraints
--- Stops at the first visible binder
-splitPiTysInvisible :: Type -> ([TyCoBinder], Type)
-splitPiTysInvisible ty = split ty ty []
+-- | Like 'splitPiTys', but returns only *invisible* binders, including constraints.
+-- Stops at the first visible binder.
+splitInvisPiTys :: Type -> ([TyCoBinder], Type)
+splitInvisPiTys ty = split ty ty []
    where
     split _ (ForAllTy b res) bs
       | Bndr _ vis <- b
@@ -1732,11 +1732,11 @@ splitPiTysInvisible ty = split ty ty []
       | Just ty' <- coreView ty  = split orig_ty ty' bs
     split orig_ty _          bs  = (reverse bs, orig_ty)
 
-splitPiTysInvisibleN :: Int -> Type -> ([TyCoBinder], Type)
--- Same as splitPiTysInvisible, but stop when
---   - you have found 'n' TyCoBinders,
+splitInvisPiTysN :: Int -> Type -> ([TyCoBinder], Type)
+-- ^ Same as 'splitInvisPiTys', but stop when
+--   - you have found @n@ 'TyCoBinder's,
 --   - or you run out of invisible binders
-splitPiTysInvisibleN n ty = split n ty ty []
+splitInvisPiTysN n ty = split n ty ty []
    where
     split n orig_ty ty bs
       | n == 0                  = (reverse bs, orig_ty)

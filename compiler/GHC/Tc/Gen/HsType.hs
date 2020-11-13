@@ -2568,13 +2568,13 @@ kcCheckDeclHeader_sig kisig name flav
     split_invis :: Kind -> Maybe Kind -> ([TyCoBinder], Kind)
     split_invis sig_ki Nothing =
       -- instantiate all invisible binders
-      splitPiTysInvisible sig_ki
+      splitInvisPiTys sig_ki
     split_invis sig_ki (Just res_ki) =
       -- subtraction a la checkExpectedKind
       let n_res_invis_bndrs = invisibleTyBndrCount res_ki
           n_sig_invis_bndrs = invisibleTyBndrCount sig_ki
           n_inst = n_sig_invis_bndrs - n_res_invis_bndrs
-      in splitPiTysInvisibleN n_inst sig_ki
+      in splitInvisPiTysN n_inst sig_ki
 
 -- A quantifier from a kind signature zipped with a user-written binder for it.
 data ZippedBinder =
