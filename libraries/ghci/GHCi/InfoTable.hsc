@@ -69,7 +69,7 @@ data Arch = ArchSPARC
           | ArchX86_64
           | ArchAlpha
           | ArchARM
-          | ArchARM64
+          | ArchAArch64
           | ArchPPC64
           | ArchPPC64LE
           | ArchS390X
@@ -102,7 +102,7 @@ mArch =
 #elif defined(arm_HOST_ARCH)
        Just ArchARM
 #elif defined(aarch64_HOST_ARCH)
-       Just ArchARM64
+       Just ArchAArch64
 #elif defined(powerpc64_HOST_ARCH)
        Just ArchPPC64
 #elif defined(powerpc64le_HOST_ARCH)
@@ -214,7 +214,7 @@ mkJumpToAddr' platform a = case platform of
                 , 0x11, 0xff, 0x2f, 0xe1
                 , byte0 w32, byte1 w32, byte2 w32, byte3 w32]
 
-    ArchARM64 { } ->
+    ArchAArch64 { } ->
         -- Generates:
         --
         --      ldr     x1, label
