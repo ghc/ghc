@@ -1127,20 +1127,20 @@
 
 
 
-T17544.hs:19:1: warning: [-Winvalid-haddock]
+T17544.hs:19:1: warning: [-Winvalid-haddock (in -Wall)]
     A Haddock comment cannot appear in this position and will be ignored.
 
-T17544.hs:26:6: warning: [-Winvalid-haddock]
+T17544.hs:26:6: warning: [-Winvalid-haddock (in -Wall)]
     A Haddock comment cannot appear in this position and will be ignored.
 
-T17544.hs:32:5: warning: [-Winvalid-haddock]
+T17544.hs:32:5: warning: [-Winvalid-haddock (in -Wall)]
     A Haddock comment cannot appear in this position and will be ignored.
 
-T17544.hs:38:4: warning: [-Winvalid-haddock]
+T17544.hs:38:4: warning: [-Winvalid-haddock (in -Wall)]
     A Haddock comment cannot appear in this position and will be ignored.
 
-T17544.hs:44:3: warning: [-Winvalid-haddock]
+T17544.hs:44:3: warning: [-Winvalid-haddock (in -Wall)]
     A Haddock comment cannot appear in this position and will be ignored.
 
-T17544.hs:50:2: warning: [-Winvalid-haddock]
+T17544.hs:50:2: warning: [-Winvalid-haddock (in -Wall)]
     A Haddock comment cannot appear in this position and will be ignored.
