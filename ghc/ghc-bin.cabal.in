@@ -91,6 +91,8 @@ Executable ghc
     if flag(threaded)
       ghc-options: -threaded
 
+    ghc-options: -eventlog
+
     Other-Extensions:
         CPP
         NondecreasingIndentation
