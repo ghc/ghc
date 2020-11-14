@@ -166,7 +166,7 @@ nativeCodeGen dflags this_mod modLoc h us cmms
       ArchSPARC64   -> panic "nativeCodeGen: No NCG for SPARC64"
       ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
       ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
-      ArchARM64     -> panic "nativeCodeGen: No NCG for ARM64"
+      ArchAArch64   -> panic "nativeCodeGen: No NCG for AArch64"
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
@@ -1187,9 +1187,9 @@ initNCGConfig dflags this_mod = NCGConfig
             ArchX86    -> v
             _          -> Nothing
 
-   , ncgDwarfEnabled        = debugLevel dflags > 0
+   , ncgDwarfEnabled        = debugLevel dflags >  0
    , ncgDwarfUnwindings     = debugLevel dflags >= 1
-   , ncgDwarfStripBlockInfo = debugLevel dflags < 2 -- We strip out block information when running with -g0 or -g1.
    , ncgExposeInternalSymbols = gopt Opt_ExposeInternalSymbols dflags
+   , ncgDwarfStripBlockInfo = debugLevel dflags <  2 -- We strip out block information when running with -g0 or -g1.
+   , ncgDwarfSourceNotes    = debugLevel dflags >= 3 -- We produce GHC-specific source-note DIEs only with -g3
    }
-

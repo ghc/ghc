@@ -69,7 +69,7 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
       | Just clas <- tyConClass_maybe tc
       -> ClassPred clas tys
 
-    _ | (tvs, rho) <- splitForAllTys ev_ty
+    _ | (tvs, rho) <- splitForAllTyCoVars ev_ty
       , (theta, pred) <- splitFunTys rho
       , not (null tvs && null theta)
       -> ForAllPred tvs (map scaledThing theta) pred

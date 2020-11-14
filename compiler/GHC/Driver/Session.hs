@@ -3842,8 +3842,8 @@ default_PIC platform =
     -- This requires PIC on AArch64, and ExternalDynamicRefs on Linux as on top
     -- of that.  Subsequently we expect all code on aarch64/linux (and macOS) to
     -- be built with -fPIC.
-    (OSDarwin,  ArchARM64)   -> [Opt_PIC]
-    (OSLinux,   ArchARM64)   -> [Opt_PIC, Opt_ExternalDynamicRefs]
+    (OSDarwin,  ArchAArch64) -> [Opt_PIC]
+    (OSLinux,   ArchAArch64) -> [Opt_PIC, Opt_ExternalDynamicRefs]
     (OSOpenBSD, ArchX86_64)  -> [Opt_PIC] -- Due to PIE support in
                                          -- OpenBSD since 5.3 release
                                          -- (1 May 2013) we need to

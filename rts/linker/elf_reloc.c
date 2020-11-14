@@ -4,7 +4,7 @@
 
 #if defined(OBJFORMAT_ELF)
 
-/* we currently only use this abstraction for elf/arm64 */
+/* we currently only use this abstraction for elf/aarch64 */
 #if defined(aarch64_HOST_ARCH)
 
 bool

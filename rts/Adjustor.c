@@ -99,7 +99,7 @@ freeHaskellFunctionPtr(void* ptr)
 {
     ffi_closure *cl;
 
-#if defined(ios_HOST_OS)
+#if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
     cl = execToWritable(ptr);
 #else
     cl = (ffi_closure*)ptr;
