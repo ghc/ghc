@@ -471,7 +471,7 @@ instance Outputable CtOrigin where
   ppr = pprCtOrigin
 
 ctoHerald :: SDoc
-ctoHerald = text "arising from"
+ctoHerald = text "required by"
 
 -- | Extract a suitable CtOrigin from a HsExpr
 lexprCtOrigin :: LHsExpr GhcRn -> CtOrigin
