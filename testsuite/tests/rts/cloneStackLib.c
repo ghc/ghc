@@ -1,6 +1,7 @@
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "rts/Messages.h"
+#include <string.h>
 
 
 void expectStacksToBeEqual(StgStack *clonedStack, StgTSO *tso) {
@@ -52,4 +53,59 @@ void expectClosureTypes(StgStack *stack, unsigned int types[], size_t typesSize)
             barf("Wrong closure type on stack! Expected %u but got %u in position %i", types[i], info->type, i);
         }
     }
+}
+
+// Count all (#I 1) closures of the RET_BIG closure's payload.
+static int countOnes(StgPtr spBottom, StgPtr payload,
+                     StgLargeBitmap *large_bitmap, uint32_t size) {
+  StgWord bmp;
+  uint32_t i, j;
+  int ones = 0;
+
+  i = 0;
+  for (bmp = 0; i < size; bmp++) {
+    StgWord bitmap = large_bitmap->bitmap[bmp];
+    j = 0;
+    for (; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1) {
+      if ((bitmap & 1) == 0) {
+        const StgClosure *closure = UNTAG_CLOSURE((StgClosure *)payload[i]);
+        const StgInfoTable *info = get_itbl(closure);
+
+        switch (info->type) {
+        case CONSTR_0_1: {
+          StgConInfoTable *con_info = get_con_itbl(closure);
+          if (strcmp(GET_CON_DESC(con_info), "ghc-prim:GHC.Types.I#") == 0 &&
+              closure->payload[0] == 1) {
+            ones++;
+          }
+          break;
+        }
+        default: {
+          break;
+        }
+        }
+      }
+    }
+  }
+
+  return ones;
+}
+
+void expectSixtyFourOnesInRetBigFrame(StgStack *stack) {
+  StgPtr sp = stack->sp;
+  StgPtr spBottom = stack->stack + stack->stack_size;
+
+  for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
+    const StgInfoTable *info = get_itbl((StgClosure *)sp);
+
+    if (info->type == RET_BIG) {
+      StgLargeBitmap *bitmap = GET_LARGE_BITMAP(info);
+      int ones = countOnes(spBottom, (StgPtr)((StgClosure *)sp)->payload,
+                           bitmap, bitmap->size);
+
+      if (ones != 64) {
+        barf("Expected 64 ones, got %i!", ones);
+      }
+    }
+  }
 }
