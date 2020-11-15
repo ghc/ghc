@@ -339,14 +339,18 @@ compileOne' m_tc_result mHscMessage
        current_dir = takeDirectory basename
        old_paths   = includePaths dflags2
        !prevailing_dflags = hsc_dflags hsc_env0
+       loadAsByteCode
+         | Just (Target _ obj _) <- findTarget summary (hsc_targets hsc_env0)
+         , not obj
+         = True
+         | otherwise = False
        -- Figure out which backend we're using
        (bcknd, dflags3)
          -- #8042: When module was loaded with `*` prefix in ghci, but DynFlags
          -- suggest to generate object code (which may happen in case -fobject-code
          -- was set), force it to generate byte-code. This is NOT transitive and
          -- only applies to direct targets.
-         | Just (Target _ obj _) <- findTarget summary (hsc_targets hsc_env0)
-         , not obj
+         | loadAsByteCode
          = (Interpreter, dflags2 { backend = Interpreter })
          | otherwise
          = (backend dflags, dflags2)
@@ -362,7 +366,10 @@ compileOne' m_tc_result mHscMessage
        -- -fforce-recomp should also work with --make
        force_recomp = gopt Opt_ForceRecomp dflags
        source_modified
-         | force_recomp = SourceModified
+         -- #8042: Usually pre-compiled code is preferred to be loaded in ghci
+         -- if available. So, if the "*" prefix was used, force recompilation
+         -- to make sure byte-code is loaded.
+         | force_recomp || loadAsByteCode = SourceModified
          | otherwise = source_modified0
 
        always_do_basic_recompilation_check = case bcknd of
