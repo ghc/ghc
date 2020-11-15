@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP        #-}
 {-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -22,31 +22,31 @@ module GHC.Tc.Types.Origin (
 
 #include "HsVersions.h"
 
-import GHC.Prelude
+import           GHC.Prelude
 
-import GHC.Tc.Utils.TcType
+import           GHC.Tc.Utils.TcType
 
-import GHC.Hs
+import           GHC.Hs
 
-import GHC.Core.DataCon
-import GHC.Core.ConLike
-import GHC.Core.TyCon
-import GHC.Core.InstEnv
-import GHC.Core.PatSyn
-import GHC.Core.Multiplicity ( scaledThing )
+import           GHC.Core.ConLike
+import           GHC.Core.DataCon
+import           GHC.Core.InstEnv
+import           GHC.Core.Multiplicity (scaledThing)
+import           GHC.Core.PatSyn
+import           GHC.Core.TyCon
 
-import GHC.Unit.Module
-import GHC.Types.Id
-import GHC.Types.Name
-import GHC.Types.Name.Reader
-import GHC.Types.Basic
-import GHC.Types.SrcLoc
+import           GHC.Types.Basic
+import           GHC.Types.Id
+import           GHC.Types.Name
+import           GHC.Types.Name.Reader
+import           GHC.Types.SrcLoc
+import           GHC.Unit.Module
 
-import GHC.Data.FastString
+import           GHC.Data.FastString
 
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Driver.Ppr
+import           GHC.Driver.Ppr
+import           GHC.Utils.Outputable
+import           GHC.Utils.Panic
 
 {- *********************************************************************
 *                                                                      *
@@ -471,7 +471,7 @@ instance Outputable CtOrigin where
   ppr = pprCtOrigin
 
 ctoHerald :: SDoc
-ctoHerald = text "arising from"
+ctoHerald = text "required by"
 
 -- | Extract a suitable CtOrigin from a HsExpr
 lexprCtOrigin :: LHsExpr GhcRn -> CtOrigin
@@ -535,7 +535,7 @@ grhssCtOrigin (GRHSs { grhssGRHSs = lgrhss }) = lGRHSCtOrigin lgrhss
 -- | Extract a suitable CtOrigin from a list of guarded RHSs
 lGRHSCtOrigin :: [LGRHS GhcRn (LHsExpr GhcRn)] -> CtOrigin
 lGRHSCtOrigin [L _ (GRHS _ _ (L _ e))] = exprCtOrigin e
-lGRHSCtOrigin _ = Shouldn'tHappenOrigin "multi-way GRHS"
+lGRHSCtOrigin _                        = Shouldn'tHappenOrigin "multi-way GRHS"
 
 pprCtOrigin :: CtOrigin -> SDoc
 -- "arising from ..."
