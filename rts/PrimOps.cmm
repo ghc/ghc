@@ -1740,9 +1740,25 @@ loop:
     // There are readMVar/takeMVar(s) waiting: wake up the first one
 
     tso = StgMVarTSOQueue_tso(q);
-    StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
-    if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
+    q = StgMVarTSOQueue_link(q);
+    StgMVar_head(mvar) = q;
+    if (q == stg_END_TSO_QUEUE_closure) {
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
+    } else {
+        if (info == stg_MVAR_CLEAN_info) {
+            //
+            // Resolve #18919.
+            // It might suffice to just set:
+            //
+            //    info = stg_MVAR_DIRTY_info
+            //
+            // None of the objects are losing or gaining liveness, but the
+            // new queue head might now be in a younger generation, which
+            // requires the MVar to become dirty.
+            //
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr",
+                             StgMVar_value(mvar) "ptr");
+        }
     }
 
     ASSERT(StgTSO_block_info(tso) == mvar);
@@ -1767,10 +1783,8 @@ loop:
 
     // If it was a readMVar, then we can still do work,
     // so loop back. (XXX: This could take a while)
-    if (why_blocked == BlockedOnMVarRead) {
-        q = StgMVarTSOQueue_link(q);
+    if (why_blocked == BlockedOnMVarRead)
         goto loop;
-    }
 
     ASSERT(why_blocked == BlockedOnMVar);
 
@@ -1825,9 +1839,25 @@ loop:
     // There are takeMVar(s) waiting: wake up the first one
 
     tso = StgMVarTSOQueue_tso(q);
-    StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
-    if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
+    q = StgMVarTSOQueue_link(q);
+    StgMVar_head(mvar) = q;
+    if (q == stg_END_TSO_QUEUE_closure) {
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
+    } else {
+        if (info == stg_MVAR_CLEAN_info) {
+            //
+            // Resolve #18919.
+            // It might suffice to just set:
+            //
+            //    info = stg_MVAR_DIRTY_info
+            //
+            // None of the objects are losing or gaining livenss, but the
+            // new queue head might now be in a younger generation, which
+            // requires the MVar to become dirty.
+            //
+            ccall dirty_MVAR(BaseReg "ptr", mvar "ptr",
+                             StgMVar_value(mvar) "ptr");
+        }
     }
 
     ASSERT(StgTSO_block_info(tso) == mvar);
@@ -1852,10 +1882,8 @@ loop:
 
     // If it was a readMVar, then we can still do work,
     // so loop back. (XXX: This could take a while)
-    if (why_blocked == BlockedOnMVarRead) {
-        q = StgMVarTSOQueue_link(q);
+    if (why_blocked == BlockedOnMVarRead)
         goto loop;
-    }
 
     ASSERT(why_blocked == BlockedOnMVar);
 
