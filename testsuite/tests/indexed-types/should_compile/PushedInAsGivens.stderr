@@ -24,7 +24,7 @@ PushedInAsGivens.hs:10:31: error:
 PushedInAsGivens.hs:11:15: error:
     • Couldn't match type: F Int
                      with: [a]
-        arising from a use of ‘foo’
+        required by a use of ‘foo’
     • In the expression: foo y
       In the expression: (y, foo y)
       In the expression:

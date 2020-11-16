@@ -1,6 +1,6 @@
 
 T16627.hs:11:15: error:
-    • No instance for (Typeable r1) arising from a use of ‘typeRep’
+    • No instance for (Typeable r1) required by a use of ‘typeRep’
     • In the first argument of ‘mkTrApp’, namely ‘typeRep’
       In the first argument of ‘mkTrApp’, namely ‘typeRep `mkTrApp` a’
       In the expression: typeRep `mkTrApp` a `mkTrApp` b

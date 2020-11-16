@@ -5,9 +5,9 @@ B.hs:4:1: warning: [-Wmissing-signatures (in -Wall)]
 
 B.hs:5:13: warning: [-Wtype-defaults (in -Wall)]
     • Defaulting the following constraints to type ‘Integer’
-        (Num a0) arising from the literal ‘1’ at B.hs:5:13
+        (Num a0) required by the literal ‘1’ at B.hs:5:13
         (Enum a0)
-          arising from the arithmetic sequence ‘1 .. 23 * 2’ at B.hs:5:12-20
+          required by the arithmetic sequence ‘1 .. 23 * 2’ at B.hs:5:12-20
     • In the expression: 1
       In the first argument of ‘length’, namely ‘[1 .. 23 * 2]’
       In the first argument of ‘(-)’, namely ‘length [1 .. 23 * 2]’
@@ -21,9 +21,9 @@ B.hs:4:1: warning: [-Wmissing-signatures (in -Wall)]
 
 B.hs:5:13: warning: [-Wtype-defaults (in -Wall)]
     • Defaulting the following constraints to type ‘Integer’
-        (Num a0) arising from the literal ‘1’ at B.hs:5:13
+        (Num a0) required by the literal ‘1’ at B.hs:5:13
         (Enum a0)
-          arising from the arithmetic sequence ‘1 .. 23 * 2’ at B.hs:5:12-20
+          required by the arithmetic sequence ‘1 .. 23 * 2’ at B.hs:5:12-20
     • In the expression: 1
       In the first argument of ‘length’, namely ‘[1 .. 23 * 2]’
       In the first argument of ‘(-)’, namely ‘length [1 .. 23 * 2]’

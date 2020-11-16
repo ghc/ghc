@@ -1,7 +1,7 @@
 
 MonadFailErrors.hs:14:5: error:
     • Could not deduce (MonadFail m)
-        arising from a do statement
+        required by a do statement
         with the failable pattern ‘Just x’
       from the context: Monad m
         bound by the type signature for:
@@ -22,7 +22,7 @@ MonadFailErrors.hs:14:5: error:
 
 MonadFailErrors.hs:28:5: error:
     • No instance for (MonadFail Identity)
-        arising from a do statement
+        required by a do statement
         with the failable pattern ‘Just x’
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:
@@ -35,7 +35,7 @@ MonadFailErrors.hs:28:5: error:
 
 MonadFailErrors.hs:49:5: error:
     • No instance for (MonadFail ((->) r))
-        arising from a do statement
+        required by a do statement
         with the failable pattern ‘Just x’
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:

@@ -1,7 +1,7 @@
 
 Linear17.hs:17:3: error:
     • Couldn't match type ‘'Many’ with ‘'One’
-        arising from multiplicity of ‘x’
+        required by multiplicity of ‘x’
     • In a stmt of a 'do' block: x <- ()
       In the expression:
         do x <- ()
@@ -18,7 +18,7 @@ Linear17.hs:17:3: error:
 
 Linear17.hs:25:6: error:
     • Couldn't match type ‘'Many’ with ‘'One’
-        arising from multiplicity of ‘z’
+        required by multiplicity of ‘z’
     • In the pattern: (y, z)
       In a stmt of a 'do' block: (y, z) <- ((), x)
       In the expression:
@@ -29,7 +29,7 @@ Linear17.hs:25:6: error:
 
 Linear17.hs:30:3: error:
     • Couldn't match type ‘'Many’ with ‘'One’
-        arising from multiplicity of ‘x’
+        required by multiplicity of ‘x’
     • In a stmt of a 'do' block: x <- ()
       In the expression:
         do x <- ()

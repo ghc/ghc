@@ -1,6 +1,6 @@
 
 T12522a.hs:23:26: error:
-    • Ambiguous type variable ‘a0’ arising from a use of ‘show’
+    • Ambiguous type variable ‘a0’ required by a use of ‘show’
       prevents the constraint ‘(Show a0)’ from being solved.
       Relevant bindings include
         n :: a0 (bound at T12522a.hs:23:15)

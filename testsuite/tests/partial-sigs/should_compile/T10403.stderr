@@ -22,7 +22,7 @@ T10403.hs:19:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • In the type signature: h2 :: _
 
 T10403.hs:22:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Ambiguous type variable ‘f0’ arising from a use of ‘fmap’
+    • Ambiguous type variable ‘f0’ required by a use of ‘fmap’
       prevents the constraint ‘(Functor f0)’ from being solved.
       Relevant bindings include
         b :: f0 a (bound at T10403.hs:22:6)

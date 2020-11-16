@@ -1,6 +1,6 @@
 
 LinearErrOrigin.hs:7:7: error:
-    • Couldn't match type ‘p’ with ‘q’ arising from multiplicity of ‘x’
+    • Couldn't match type ‘p’ with ‘q’ required by multiplicity of ‘x’
       ‘p’ is a rigid type variable bound by
         the type signature for:
           foo :: forall a b (p :: GHC.Types.Multiplicity)

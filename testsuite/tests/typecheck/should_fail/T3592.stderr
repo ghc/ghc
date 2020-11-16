@@ -11,7 +11,7 @@ T3592.hs:8:5: error:
         f :: T a -> String (bound at T3592.hs:8:1)
 
 T3592.hs:11:7: error:
-    • No instance for (Show a) arising from a use of ‘show’
+    • No instance for (Show a) required by a use of ‘show’
       Possible fix:
         add (Show a) to the context of
           the type signature for:

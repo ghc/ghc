@@ -1,6 +1,6 @@
 
 tcfail218.hs:16:5: error:
-    • Overlapping instances for C [a] Bool arising from a use of ‘foo’
+    • Overlapping instances for C [a] Bool required by a use of ‘foo’
       Matching instances:
         instance C [a] b -- Defined at tcfail218.hs:8:29
         instance C [Int] Bool -- Defined at tcfail218.hs:7:29

@@ -4,7 +4,7 @@ T515.lhs:6:3: warning: [-Wmissing-signatures (in -Wall)]
 
 T515.lhs:6:7: warning: [-Wtype-defaults (in -Wall)]
      Defaulting the following constraint to type ‘Integer’
-        Num p0 arising from the literal ‘1’
+        Num p0 required by the literal ‘1’
      In the expression: 1
       In an equation for ‘a’: a = 1
 
@@ -13,6 +13,6 @@ T515.lhs:7:3: warning: [-Wmissing-signatures (in -Wall)]
 
 T515.lhs:7:7: warning: [-Wtype-defaults (in -Wall)]
      Defaulting the following constraint to type ‘Integer’
-        Num p0 arising from the literal ‘2’
+        Num p0 required by the literal ‘2’
      In the expression: 2
       In an equation for ‘b’: b = 2

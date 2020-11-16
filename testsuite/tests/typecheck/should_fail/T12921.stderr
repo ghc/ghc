@@ -1,6 +1,6 @@
 
 T12921.hs:4:1: error:
-    • Ambiguous type variable ‘p0’ arising from an annotation
+    • Ambiguous type variable ‘p0’ required by an annotation
       prevents the constraint ‘(Data.Data.Data p0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘p0’ should be.
       These potential instances exist:
@@ -17,7 +17,7 @@ T12921.hs:4:1: error:
         {-# ANN module "HLint: ignore Reduce duplication" #-}
 
 T12921.hs:4:16: error:
-    • Ambiguous type variable ‘p0’ arising from the literal ‘"HLint: ignore Reduce duplication"’
+    • Ambiguous type variable ‘p0’ required by the literal ‘"HLint: ignore Reduce duplication"’
       prevents the constraint ‘(Data.String.IsString
                                   p0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘p0’ should be.

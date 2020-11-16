@@ -2,7 +2,7 @@
 T1496.hs:10:32: error:
     • Couldn't match representation of type: c Int
                                with that of: c Moo
-        arising from the coercion of the method ‘isInt’
+        required by the coercion of the method ‘isInt’
           from type ‘forall (c :: * -> *). c Int -> c Int’
             to type ‘forall (c :: * -> *). c Int -> c Moo’
       NB: We cannot know what roles the parameters to ‘c’ have;

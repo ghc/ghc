@@ -1,7 +1,7 @@
 
 drvfail007.hs:4:38: error:
     No instance for (Eq (Int -> Int))
-      arising from the first field of ‘Foo’ (type ‘Int -> Int’)
+      required by the first field of ‘Foo’ (type ‘Int -> Int’)
       (maybe you haven't applied a function to enough arguments?)
     Possible fix:
       use a standalone 'deriving instance' declaration,

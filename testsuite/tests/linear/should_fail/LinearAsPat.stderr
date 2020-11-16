@@ -1,5 +1,5 @@
 
 LinearAsPat.hs:6:12: error:
     • Couldn't match type ‘'Many’ with ‘'One’
-        arising from a non-linear pattern
+        required by a non-linear pattern
     • In an equation for ‘shouldFail’: shouldFail x@True = x

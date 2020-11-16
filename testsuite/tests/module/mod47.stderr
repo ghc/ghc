@@ -1,7 +1,7 @@
 
 mod47.hs:6:10:
     Could not deduce (Num a)
-      arising from the superclasses of an instance declaration
+      required by the superclasses of an instance declaration
     from the context: (Eq a, Enum a)
       bound by the instance declaration at mod47.hs:6:10-34
     Possible fix:

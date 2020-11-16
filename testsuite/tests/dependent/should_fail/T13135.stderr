@@ -1,7 +1,7 @@
 
 T13135.hs:60:10: error:
     • No instance for (Constr :<: Constr)
-        arising from a use of ‘smartSym’
+        required by a use of ‘smartSym’
     • In the expression: smartSym sym
       In an equation for ‘arrLen’:
           arrLen

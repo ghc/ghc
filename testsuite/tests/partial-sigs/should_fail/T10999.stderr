@@ -17,7 +17,7 @@ T10999.hs:5:17: error:
       In the type signature: f :: _ => () -> _
 
 T10999.hs:8:28: error:
-    • Ambiguous type variable ‘b0’ arising from a use of ‘f’
+    • Ambiguous type variable ‘b0’ required by a use of ‘f’
       prevents the constraint ‘(Ord b0)’ from being solved.
       Relevant bindings include g :: [b0] (bound at T10999.hs:8:1)
       Probable fix: use a type annotation to specify what ‘b0’ should be.

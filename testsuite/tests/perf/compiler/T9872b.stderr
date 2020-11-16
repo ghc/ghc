@@ -18,7 +18,7 @@ T9872b.hs:19:8:
                                 'Cube 'R 'G 'W 'R 'B 'R, 'Cube 'B 'W 'R 'G 'G 'W],
                              '[ 'Cube 'G 'B 'B 'R 'W 'G, 'Cube 'R 'G 'R 'W 'B 'W,
                                 'Cube 'R 'W 'G 'B 'R 'R, 'Cube 'W 'R 'W 'G 'G 'B]]))
-      arising from a use of ‘print’
+      required by a use of ‘print’
     In the expression: print (Proxy :: Proxy (Solutions Cubes))
     In an equation for ‘main’:
         main = print (Proxy :: Proxy (Solutions Cubes))

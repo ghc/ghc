@@ -1,7 +1,7 @@
 
 deriving-via-fail.hs:9:34: error:
     • Couldn't match representation of type ‘a’ with that of ‘b’
-        arising from the coercion of the method ‘showsPrec’
+        required by the coercion of the method ‘showsPrec’
           from type ‘Int -> Identity b -> ShowS’
             to type ‘Int -> Foo1 a -> ShowS’
       ‘a’ is a rigid type variable bound by
@@ -20,7 +20,7 @@ deriving-via-fail.hs:12:12: error:
 
 deriving-via-fail.hs:15:20: error:
     • Couldn't match representation of type ‘a’ with that of ‘Foo3’
-        arising from the coercion of the method ‘==’
+        required by the coercion of the method ‘==’
           from type ‘a -> a -> Bool’ to type ‘Foo3 -> Foo3 -> Bool’
       ‘a’ is a rigid type variable bound by
         the deriving clause for ‘Eq Foo3’

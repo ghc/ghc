@@ -1,8 +1,8 @@
 
 FD3.hs:15:15: error:
     • Couldn't match type ‘a’ with ‘(String, a)’
-        arising from a functional dependency between:
-          constraint ‘MkA (String, a) a’ arising from a use of ‘mkA’
+        required by a functional dependency between:
+          constraint ‘MkA (String, a) a’ required by a use of ‘mkA’
           instance ‘MkA a1 a1’ at FD3.hs:12:10-16
       ‘a’ is a rigid type variable bound by
         the type signature for:

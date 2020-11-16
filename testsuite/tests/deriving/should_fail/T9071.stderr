@@ -3,5 +3,5 @@
 
 T9071.hs:7:37: error:
     Couldn't match kind ‘* -> *’ with ‘*’
-      arising from the first field of ‘F’ (type ‘Mu (K a)’)
+      required by the first field of ‘F’ (type ‘Mu (K a)’)
     When deriving the instance for (Functor F)
