@@ -117,7 +117,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
            runBc hsc_env us this_mod mb_modBreaks (mkVarEnv stringPtrs) $ do
              prepd_binds <- mapM bcPrepBind lifted_binds
              let flattened_binds =
-                   concatMap (flattenBind . annBindingFreeVars) prepd_binds
+                   concatMap (flattenBind . annBindingFreeVars) (reverse prepd_binds)
              mapM schemeTopBind flattened_binds
 
         when (notNull ffis)
