@@ -17,7 +17,7 @@ module GHC.Types.Demand (
     -- * Demands
     Card(..), Demand(..), SubDemand(Prod), mkProd, viewProd,
     -- ** Algebra
-    absDmd, topDmd, botDmd, seqDmd,
+    absDmd, topDmd, botDmd, seqDmd, topSubDmd,
     -- *** Least upper bound
     lubCard, lubDmd, lubSubDmd,
     -- *** Plus
@@ -29,7 +29,7 @@ module GHC.Types.Demand (
     isAbsDmd, isUsedOnceDmd, isStrUsedDmd,
     isTopDmd, isSeqDmd, isWeakDmd,
     -- ** Special demands
-    evalDmd, cleanEvalDmd, cleanEvalProdDmd,
+    evalDmd,
     -- *** Demands used in PrimOp signatures
     lazyApply1Dmd, lazyApply2Dmd, strictOnceApply1Dmd, strictManyApply1Dmd,
     -- ** Other @Demand@ operations
@@ -311,7 +311,7 @@ polyDmd C_10 = C_10 :* poly10
 -- 'SubDemand's when possible. Note that this degrades boxity information! E.g. a
 -- polymorphic demand will never unbox.
 mkProd :: [Demand] -> SubDemand
-mkProd [] = botSubDmd
+mkProd [] = seqSubDmd
 mkProd ds@(n:*sd : _)
   | want_to_simplify n, all (== polyDmd n) ds = sd
   | otherwise                                 = Prod ds
@@ -456,13 +456,7 @@ isWeakDmd dmd@(n :* _) = not (isStrict n) && is_plus_idem_dmd dmd
     is_plus_idem_sub_dmd (Call n _) = is_plus_idem_card n -- See Note [Call demands are relative]
 
 evalDmd :: Demand
-evalDmd = C_1N :* cleanEvalDmd
-
-cleanEvalDmd :: SubDemand
-cleanEvalDmd = topSubDmd
-
-cleanEvalProdDmd :: Arity -> SubDemand
-cleanEvalProdDmd n = Prod (replicate n topDmd)
+evalDmd = C_1N :* topSubDmd
 
 -- | First argument of 'GHC.Exts.maskAsyncExceptions#': @SCS(U)@.
 -- Called exactly once.
@@ -558,7 +552,9 @@ addCaseBndrDmd (n :* sd) alt_dmds
   | isAbs n   = alt_dmds
   | otherwise = zipWith plusDmd ds alt_dmds -- fuse ds!
   where
-    Just ds = viewProd (length alt_dmds) sd -- Guaranteed not to be a call
+    sd' | isStrict n = sd
+        | otherwise  = multSubDmd C_01 sd
+    Just ds = viewProd (length alt_dmds) sd' -- Guaranteed not to be a call
 
 argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
 -- ^ See Note [Computing one-shot info]
@@ -578,7 +574,7 @@ argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
 argOneShots :: Demand          -- ^ depending on saturation
             -> [OneShotInfo]
 -- ^ See Note [Computing one-shot info]
-argOneShots (_ :* sd) = go sd
+argOneShots (n :* sd) = go (multSubDmd n sd) -- See Note [Call demands are relative]
   where
     go (Call n sd)
       | isUsedOnce n = OneShotLam    : go sd
