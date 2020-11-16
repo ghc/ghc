@@ -893,13 +893,6 @@ mkConAppCode
     -> DataCon                  -- The data constructor
     -> [StgArg]                 -- Args, in *reverse* order
     -> BcM BCInstrList
-mkConAppCode _ _ _ con []       -- Nullary constructor
-  = do -- XXX assert?
-      -- ASSERT( isNullaryRepDataCon con )
-      return (unitOL (PUSH_G (getName (dataConWorkId con))))
-        -- Instead of doing a PACK, which would allocate a fresh
-        -- copy of this constructor, use the single shared version.
-
 mkConAppCode orig_d _ p con args =
     -- XXX this assert fails, but the code seems to work
     -- maybe only non-voids? or bigger-than-one reps?
