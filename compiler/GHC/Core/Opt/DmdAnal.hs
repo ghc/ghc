@@ -78,12 +78,12 @@ dmdAnalTopBind env (NonRec id rhs)
   = ( extendAnalEnv TopLevel env id sig
     , NonRec (setIdStrictness id sig) rhs')
   where
-    ( _, sig, rhs') = dmdAnalRhsLetDown Nothing env cleanEvalDmd id rhs
+    ( _, sig, rhs') = dmdAnalRhsLetDown Nothing env topSubDmd id rhs
 
 dmdAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
   where
-    (env', _, pairs')  = dmdFix TopLevel env cleanEvalDmd pairs
+    (env', _, pairs')  = dmdFix TopLevel env topSubDmd pairs
                 -- We get two iterations automatically
                 -- c.f. the NonRec case above
 
@@ -263,7 +263,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
 dmdAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
         (alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd case_bndr) alts
-        (scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
+        (scrut_ty, scrut')   = dmdAnal env topSubDmd scrut
         (alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
                                -- NB: Base case is botDmdType, for empty case alternatives
                                --     This is a unit for lubDmdType, and the right result
@@ -668,7 +668,7 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
 -- a call demand of @rhs_arity@
 -- See Historical Note [Product demands for function body]
 mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> SubDemand
-mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity cleanEvalDmd
+mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity topSubDmd
 
 -- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
 -- whether we should process the binding up (body before rhs) or down (rhs
