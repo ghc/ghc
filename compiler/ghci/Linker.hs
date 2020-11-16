@@ -1692,7 +1692,7 @@ with the OS:
 > dlopen() the path, which will correctly check for the library in the
 > cache. (62986286)
 
-(https://developer.apple.com/documentation/macos-release-notes/macos-big-sur-11-beta-release-notes/)
+(https://developer.apple.com/documentation/macos-release-notes/macos-big-sur-11_0_1-release-notes/)
 
 Therefore, the previous method of checking whether a library exists
 before attempting to load it makes GHC.Runtime.Linker.loadFramework
