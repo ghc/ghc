@@ -811,16 +811,7 @@ loop:
         mvar->tail = (StgMVarTSOQueue*)&stg_END_TSO_QUEUE_closure;
     } else {
         if (info == &stg_MVAR_CLEAN_info) {
-            //
             // Resolve #18919.
-            // It might suffice to just set:
-            //
-            //    info = &stg_MVAR_DIRTY_info
-            //
-            // None of the objects are losing or gaining livenss, but the
-            // new queue head might now be in a younger generation, which
-            // requires the MVar to become dirty.
-            //
             dirty_MVAR(&cap->r, (StgClosure*)mvar, mvar->value);
         }
     }
