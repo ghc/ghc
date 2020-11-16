@@ -25,7 +25,6 @@ import GHC.Hs   hiding (collectPatBinders, collectPatsBinders,
                         collectLStmtsBinders, collectLStmtBinders,
                         collectStmtBinders )
 import GHC.Tc.Utils.Zonk
-import qualified GHC.Hs.Utils as HsUtils
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types (newtypes etc), and sometimes not
@@ -1280,5 +1279,15 @@ collectLStmtBinders :: LStmt GhcTc body -> [Id]
 collectLStmtBinders = collectStmtBinders . unLoc
 
 collectStmtBinders :: Stmt GhcTc body -> [Id]
-collectStmtBinders (RecStmt { recS_later_ids = later_ids }) = later_ids
-collectStmtBinders stmt = HsUtils.collectStmtBinders stmt
+collectStmtBinders (BindStmt _ pat _)      = collectPatBinders pat
+collectStmtBinders (LetStmt _  binds)      = collectLocalBinders (unLoc binds)
+collectStmtBinders (BodyStmt {})           = []
+collectStmtBinders (LastStmt {})           = []
+collectStmtBinders (ParStmt _ xs _ _)      = collectLStmtsBinders
+                                    $ [s | ParStmtBlock _ ss _ _ <- xs, s <- ss]
+collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
+collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
+collectStmtBinders (ApplicativeStmt _ args _) = concatMap collectArgBinders args
+ where
+  collectArgBinders (_, ApplicativeArgOne { app_arg_pattern = pat }) = collectPatBinders pat
+  collectArgBinders (_, ApplicativeArgMany { bv_pattern = pat }) = collectPatBinders pat
