@@ -1512,27 +1512,16 @@ noinlineId = pcMiscPrelId noinlineIdName ty info
     info = noCafIdInfo `setNeverLevPoly` ty
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
-impossibleId :: Id -- TODO: See Note [absentError magic]
-impossibleId = --  pcMiscPrelId
-    -- pprTrace "fooInfoImp" (ppr info) $
-      mkVanillaGlobalWithInfo impossibleIdName ty info
-  -- setIdStrictness
-  -- setStrictnessInfo
+impossibleId :: Id -- See Note [impossibleId magic]
+impossibleId =
+    mkVanillaGlobalWithInfo impossibleIdName ty info
   where
     info = (vanillaIdInfo
                      `setStrictnessInfo` mkClosedStrictSig [] Absent
                      `setCprInfo` mkCprSig 0 botCpr
                      `setArityInfo` 0
                      `setCafInfo` NoCafRefs)
-    -- info = noCafIdInfo `setNeverLevPoly` ty
-    --                    `setStrictnessInfo` strict_sig
-    --                    `setInlinePragInfo`  neverInlinePragma
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
-    -- -- I assume it doesn't matter what we put as argument demand.
-    -- -- We will terminate anyway
-    -- strict_sig = mkClosedStrictSig [dmd, dmd] Absent
-
-    -- dmd = JD { sd = strBot, ud = useBot }
 
 oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info
@@ -1703,6 +1692,30 @@ specifies that it is strict in its argument. We considered fixing this this by a
 special case to the demand analyser to address #16588. However, the special
 case seemed like a large and expensive hammer to address a rare case and
 consequently we rather opted to use a more minimal solution.
+
+Note [impossibleId magic]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We want to give absentError a special strictness signature.
+We do so by implementing it via a magic function (impossible) here.
+
+Why do we do this? Tag inference - See Note [Tag Inferrence - The basic idea]
+in GHC.STG.InferTags - relies critically on being able to reenter closures in
+order to tag them. Reentering a closure is always legal *except* in the case
+of absentError. In which case it will kill the program. We solve this as follows:
+
+If the use and definition site is the same the inference can just look at the
+functions key to check for absentError, just like the simplifier does.
+
+But if definition and use site are different modules the rhs might not be exposed.
+We solve this by giving `impossible` the "Absent" divergence property. In turn any
+binding that is a direct (or indirect) call to `impossible` will get the same
+property. And we can just check bindings for this during tag inference and things
+work out.
+
+These bindings are also constructed by the compiler itself. So their shape is fairly
+predictable and we can be sure that demand analysis will deal with them properly.
+
 
 Note [The oneShot function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
