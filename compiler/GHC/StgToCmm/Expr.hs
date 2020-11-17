@@ -55,8 +55,9 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Driver.Ppr (pprTraceM, showPprUnsafe)
+import GHC.Driver.Session
 
-import Control.Monad ( unless, void )
+import Control.Monad ( unless, void, when )
 import Control.Arrow ( first )
 import Data.List     ( partition )
 
@@ -931,6 +932,7 @@ emitTagAssertion onWhat fun = do
 cgIdApp :: AppEnters -> Id -> [StgArg] -> FCode ReturnKind
 cgIdApp strict fun_id args = do
     platform       <- getPlatform
+    dflags         <- getDynFlags
     fun_info       <- getCgIdInfo fun_id
     self_loop_info <- getSelfLoop
     call_opts      <- getCallOpts
@@ -957,9 +959,9 @@ cgIdApp strict fun_id args = do
                 tickyTagged
                 -- pprTraceM "WHNF:" (ppr fun_id <+> ppr args )
               assertTag =
-                -- return ()
-                -- if (gopt Opt_DoTagInferenceChecks dflags) then
-                emitTagAssertion (showPprUnsafe (ppr fun_id <+> pprExpr platform fun)) fun
+                -- TODO: Move into platform
+                when (gopt Opt_DoTagInferenceChecks dflags) $
+                  emitTagAssertion (showPprUnsafe (ppr fun_id <+> pprExpr platform fun)) fun
 
         EnterIt -> ASSERT( null args )  -- Discarding arguments
                    emitEnter fun
