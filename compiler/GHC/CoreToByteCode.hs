@@ -37,8 +37,6 @@ import GHC.Types.Name
 import GHC.Types.Id.Make
 import GHC.Types.Id
 import GHC.Types.ForeignCall
-import GHC.Core.Utils
-import GHC.Driver.Env
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
