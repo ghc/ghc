@@ -44,9 +44,6 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 
-import GHC.Types.Unique
-import GHC.Builtin.Names
-
 {-
 ************************************************************************
 *                                                                      *

@@ -40,8 +40,7 @@ import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Utils.Outputable
 import GHC.Core (AltCon(..))
-import GHC.Unit.Types --Module
-import GHC.Types.Var.Set
+import GHC.Unit.Types (Module)
 import GHC.Core.TyCon (tyConDataCons)
 import GHC.Core.Type
 import GHC.Types.Unique.Supply
@@ -57,7 +56,6 @@ import GHC.Builtin.Types.Prim (addrPrimTy)
 import GHC.Types.Demand ( Divergence ( Absent ), splitStrictSig )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Utils.Misc
 -- import GHC.Utils.Monad.State -- See Note [Useless Bangs]
 import GHC.Data.Maybe
@@ -95,13 +93,11 @@ import GHC.IO (IO(..))
 -- import System.Mem (getAllocationCounter)
 
 -- import Data.Array.IArray as U
-import Data.Array.MArray as M
+-- import Data.Array.MArray as M
 import Data.Array.IO as IOA
 import Data.IORef
 
-import GHC.Core.FamInstEnv (FamInstEnv)
-
-import GHC.Exts (oneShot, dataToTag#)
+import GHC.Exts (oneShot)
 import GHC.Utils.Panic
 import GHC.Driver.Ppr (pprTraceM)
 {-
@@ -1293,16 +1289,6 @@ data FlowNode
 #endif
     }
 
--- Node descriptions, we omit this field for performance reasons
--- unless we are debugging. When the field is omitted these become
--- no-ops
-set_desc :: FlowNode -> SDoc -> FlowNode
-#if defined(WITH_NODE_DESC)
-set_desc n desc = n { _node_desc = desc}
-#else
-set_desc n _ = n
-#endif
-
 node_desc :: FlowNode -> SDoc
 #if defined(WITH_NODE_DESC)
 node_desc n = _node_desc n
@@ -1483,9 +1469,9 @@ mkOutConLattice con outer fields
     conCount = length (tyConDataCons $ dataConTyCon con)
 
 {-# NOINLINE findTags #-}
-findTags :: DynFlags -> Module -> FamInstEnv -> [StgTopBinding] -> ([TgStgTopBinding], [(Id,EnterLattice)])
+findTags :: DynFlags -> Module -> [StgTopBinding] -> ([TgStgTopBinding], [(Id,EnterLattice)])
 -- findTags this_mod us binds = passTopBinds binds
-findTags dflags this_mod inst_env binds =
+findTags dflags this_mod binds =
     let state = FlowState {
             fs_idNodeMap = mempty,
             fs_uqNodeMap = emptyUFM,
@@ -1520,7 +1506,7 @@ addConstantNodes = do
 
 
 mkConstNode :: NodeId -> EnterLattice -> SDoc -> FlowNode
-mkConstNode id !val desc =
+mkConstNode id !val _desc =
     FlowNode
     { node_id = id
     , node_inputs = []
@@ -1528,7 +1514,7 @@ mkConstNode id !val desc =
     , node_result = val
     , node_update = (return $! val)
 #if defined(WITH_NODE_DESC)
-    , _node_desc = desc
+    , _node_desc = _desc
 #endif
 
     }
@@ -1752,7 +1738,7 @@ nodesTopBinds this_mod binds = do
         = extendVarEnv env v <$!> mkUniqueId
 
 nodesTop :: Module -> SynContext -> StgTopBinding -> AM InferStgTopBinding
-nodesTop _this_mod ctxt (StgTopStringLit v str) = return (StgTopStringLit v str)
+nodesTop _this_mod _ctxt (StgTopStringLit v str) = return (StgTopStringLit v str)
     -- String literals (and unlifted ids in general) are never entered.
     -- There is also no nested information so we can represent them all
     -- with a single preallocted data flow node. The ids are mapped to this
@@ -3068,8 +3054,8 @@ rewriteApp _ _ = panic "Impossible"
 ----------------------------------------------
 -- Deal with exporting tagging information
 
-exportTaggedness :: [(Id,NodeId)] -> AM [(Id, EnterLattice)]
-exportTaggedness xs = mapMaybeM export xs
+_exportTaggedness :: [(Id,NodeId)] -> AM [(Id, EnterLattice)]
+_exportTaggedness xs = mapMaybeM export xs
     where
         export (v,nid)
             | isInternalName (idName v)
