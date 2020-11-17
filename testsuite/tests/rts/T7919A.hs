@@ -41,7 +41,7 @@ largeStep =
   funD
     stepName
     [clause
-      [conP dataName [] (map (\ i -> varP (varName "i" i)) [1..size])]
+      [conP dataName (map (\ i -> varP (varName "i" i)) [1..size])]
       (normalB
         (letE
           (map (\ i -> valD (varP (varName "j" i)) (normalB [| $(varE (varName "i" i)) + $(varE $ varName "i" (i * 3 + 1)) |]) []) [1..size])
