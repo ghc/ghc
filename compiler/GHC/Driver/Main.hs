@@ -1312,7 +1312,7 @@ checkPkgTrust pkgs = do
             | otherwise
             = (:acc)
               $ mkErr noSrcSpan (pkgQual state)
-                      (GhcErrorDriver $ DriverPkgRequiredTrusted pkg)
+                      (GhcErrorDriver $ DriverPkgRequiredTrusted dflags pkg)
     case errors of
         [] -> return ()
         _  -> (liftIO . throwIO . mkSrcErr . mkErrorMessages . listToBag) errors
