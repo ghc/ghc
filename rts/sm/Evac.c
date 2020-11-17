@@ -58,14 +58,14 @@
 #define MAX_THUNK_SELECTOR_DEPTH 16
 
 static void eval_thunk_selector (StgClosure **q, StgSelector *p, bool);
-STATIC_INLINE void evacuate_large(StgPtr p);
+STATIC_DEBUG void evacuate_large(StgPtr p);
 
 /* -----------------------------------------------------------------------------
    Allocate some space in which to copy an object.
    -------------------------------------------------------------------------- */
 
 /* size is in words */
-STATIC_INLINE StgPtr
+STATIC_DEBUG StgPtr
 alloc_for_copy (uint32_t size, uint32_t gen_no)
 {
     ASSERT(gen_no < RtsFlags.GcFlags.generations);
@@ -135,7 +135,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
    -------------------------------------------------------------------------- */
 
 /* size is in words */
-STATIC_INLINE GNUC_ATTR_HOT void
+STATIC_DEBUG GNUC_ATTR_HOT void
 copy_tag(StgClosure **p, const StgInfoTable *info,
          StgClosure *src, uint32_t size, uint32_t gen_no, StgWord tag)
 {
@@ -194,7 +194,7 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
 }
 
 #if defined(PARALLEL_GC) && !defined(PROFILING)
-STATIC_INLINE void
+STATIC_DEBUG void
 copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
          StgClosure *src, uint32_t size, uint32_t gen_no, StgWord tag)
 {
@@ -283,7 +283,7 @@ spin:
 
 
 /* Copy wrappers that don't tag the closure after copying */
-STATIC_INLINE GNUC_ATTR_HOT void
+STATIC_DEBUG GNUC_ATTR_HOT void
 copy(StgClosure **p, const StgInfoTable *info,
      StgClosure *src, uint32_t size, uint32_t gen_no)
 {
@@ -383,7 +383,7 @@ evacuate_large(StgPtr p)
      - link_field must be STATIC_LINK(q)
    ------------------------------------------------------------------------- */
 
-STATIC_INLINE void
+STATIC_DEBUG void
 evacuate_static_object (StgClosure **link_field, StgClosure *q)
 {
     if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
@@ -422,7 +422,7 @@ evacuate_static_object (StgClosure **link_field, StgClosure *q)
    It is assumed that objects in the struct live in the same generation
    as the struct itself all the time.
    ------------------------------------------------------------------------- */
-STATIC_INLINE void
+STATIC_DEBUG void
 evacuate_compact (StgPtr p)
 {
     StgCompactNFData *str;

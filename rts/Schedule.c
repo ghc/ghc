@@ -636,7 +636,7 @@ scheduleFindWork (Capability **pcap)
 }
 
 #if defined(THREADED_RTS)
-STATIC_INLINE bool
+STATIC_DEBUG bool
 shouldYieldCapability (Capability *cap, Task *task, bool didGcLast)
 {
     // we need to yield this capability to someone else if..
@@ -2400,7 +2400,7 @@ deleteAllThreads ()
    Locks required: sched_mutex
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE void
+STATIC_DEBUG void
 suspendTask (Capability *cap, Task *task)
 {
     InCall *incall;
@@ -2416,7 +2416,7 @@ suspendTask (Capability *cap, Task *task)
     cap->n_suspended_ccalls++;
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 recoverSuspendedTask (Capability *cap, Task *task)
 {
     InCall *incall;

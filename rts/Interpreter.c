@@ -145,7 +145,7 @@
 #define SpW(n)       (*(StgWord*)(Sp_plusW(n)))
 #define SpB(n)       (*(StgWord*)(Sp_plusB(n)))
 
-STATIC_INLINE StgPtr
+STATIC_DEBUG StgPtr
 allocate_NONUPD (Capability *cap, int n_words)
 {
     return allocate(cap, stg_max(sizeofW(StgHeader)+MIN_PAYLOAD_SIZE, n_words));
@@ -243,7 +243,7 @@ void interp_shutdown ( void )
 // Build a zero-argument PAP with the current CCS
 // See Note [Evaluating functions with profiling] in Apply.cmm
 //
-STATIC_INLINE
+STATIC_DEBUG
 StgClosure * newEmptyPAP (Capability *cap,
                           StgClosure *tagged_obj, // a FUN or a BCO
                           uint32_t arity)
@@ -260,7 +260,7 @@ StgClosure * newEmptyPAP (Capability *cap,
 // Make an exact copy of a PAP, except that we combine the current CCS with the
 // CCS in the PAP.  See Note [Evaluating functions with profiling] in Apply.cmm
 //
-STATIC_INLINE
+STATIC_DEBUG
 StgClosure * copyPAP  (Capability *cap, StgPAP *oldpap)
 {
     uint32_t size = PAP_sizeW(oldpap->n_args);

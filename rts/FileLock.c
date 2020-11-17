@@ -34,14 +34,14 @@ static HashTable *key_hash;
 static Mutex file_lock_mutex;
 #endif
 
-STATIC_INLINE int cmpLocks(StgWord w1, StgWord w2)
+STATIC_DEBUG int cmpLocks(StgWord w1, StgWord w2)
 {
     Lock *l1 = (Lock *)w1;
     Lock *l2 = (Lock *)w2;
     return (l1->device == l2->device && l1->inode == l2->inode);
 }
 
-STATIC_INLINE int hashLock(const HashTable *table, StgWord w)
+STATIC_DEBUG int hashLock(const HashTable *table, StgWord w)
 {
     Lock *l = (Lock *)w;
     StgWord key = l->inode ^ (l->inode >> 32) ^ l->device ^ (l->device >> 32);

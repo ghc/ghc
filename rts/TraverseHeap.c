@@ -137,7 +137,7 @@ static inline void debug(const char *s, ...)
  * Invariants:
  *  currentStack->link == s.
  * -------------------------------------------------------------------------- */
-STATIC_INLINE void
+STATIC_DEBUG void
 newStackBlock( traverseState *ts, bdescr *bd )
 {
     ts->currentStack = bd;
@@ -152,7 +152,7 @@ newStackBlock( traverseState *ts, bdescr *bd )
  * Invariants:
  *   s->link == currentStack.
  * -------------------------------------------------------------------------- */
-STATIC_INLINE void
+STATIC_DEBUG void
 returnToOldStack( traverseState *ts, bdescr *bd )
 {
     ts->currentStack = bd;
@@ -207,7 +207,7 @@ getTraverseStackMaxSize(traverseState *ts)
 /**
  * Returns true if the whole stack is empty.
  **/
-STATIC_INLINE bool
+STATIC_DEBUG bool
 isEmptyWorkStack( traverseState *ts )
 {
     return (ts->firstStack == ts->currentStack) && ts->stackTop == ts->stackLimit;
@@ -235,7 +235,7 @@ traverseWorkStackBlocks(traverseState *ts)
  *
  *   payload[] begins with ptrs pointers followed by non-pointers.
  */
-STATIC_INLINE void
+STATIC_DEBUG void
 init_ptrs( stackPos *info, uint32_t ptrs, StgPtr payload )
 {
     info->type              = posTypePtrs;
@@ -247,7 +247,7 @@ init_ptrs( stackPos *info, uint32_t ptrs, StgPtr payload )
 /**
  * Find the next object from *info.
  */
-STATIC_INLINE StgClosure *
+STATIC_DEBUG StgClosure *
 find_ptrs( stackPos *info )
 {
     if (info->next.ptrs.pos < info->next.ptrs.ptrs) {
@@ -260,7 +260,7 @@ find_ptrs( stackPos *info )
 /**
  *  Initializes *info from SRT information stored in *infoTable.
  */
-STATIC_INLINE void
+STATIC_DEBUG void
 init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
 {
     info->type = posTypeSRT;
@@ -271,7 +271,7 @@ init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
     }
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
 {
     info->type = posTypeSRT;
@@ -285,7 +285,7 @@ init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
 /**
  * Find the next object from *info.
  */
-STATIC_INLINE StgClosure *
+STATIC_DEBUG StgClosure *
 find_srt( stackPos *info )
 {
     StgClosure *c;
@@ -378,7 +378,7 @@ traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData 
  * Note: When pushing onto the stack we only really push one 'stackElement'
  * representing all children onto the stack. See traversePop()
  */
-STATIC_INLINE void
+STATIC_DEBUG void
 traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosure **first_child)
 {
     stackElement se;
@@ -667,7 +667,7 @@ popStackElement(traverseState *ts) {
  *
  *    It is okay to call this function even when the work-stack is empty.
  */
-STATIC_INLINE void
+STATIC_DEBUG void
 traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
 {
     stackElement *se;
@@ -914,7 +914,7 @@ traverseLargeBitmap (traverseState *ts, StgPtr p, StgLargeBitmap *large_bitmap,
     }
 }
 
-STATIC_INLINE StgPtr
+STATIC_DEBUG StgPtr
 traverseSmallBitmap (traverseState *ts, StgPtr p, uint32_t size, StgWord bitmap,
                      StgClosure *c, stackData data)
 {
@@ -1051,7 +1051,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
 /**
  * Call traversePushClosure for each of the children of a PAP/AP
  */
-STATIC_INLINE StgPtr
+STATIC_DEBUG StgPtr
 traversePAP (traverseState *ts,
                     StgClosure *pap,    /* NOT tagged */
                     stackData data,

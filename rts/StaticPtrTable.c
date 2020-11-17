@@ -21,14 +21,14 @@ static Mutex spt_lock;
 #endif
 
 /// Hash function for the SPT.
-STATIC_INLINE int hashFingerprint(const HashTable *table, StgWord key) {
+STATIC_DEBUG int hashFingerprint(const HashTable *table, StgWord key) {
   const StgWord64* ptr = (StgWord64*) key;
   // Take half of the key to compute the hash.
   return hashWord(table, *(ptr + 1));
 }
 
 /// Comparison function for the SPT.
-STATIC_INLINE int compareFingerprint(StgWord a, StgWord b) {
+STATIC_DEBUG int compareFingerprint(StgWord a, StgWord b) {
   const StgWord64* ptra = (StgWord64*) a;
   const StgWord64* ptrb = (StgWord64*) b;
   return *ptra == *ptrb && *(ptra + 1) == *(ptrb + 1);

@@ -439,7 +439,7 @@ freeStorage (bool free_heap)
 
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE StgInd *
+STATIC_DEBUG StgInd *
 lockCAF (StgRegTable *reg, StgIndStatic *caf)
 {
     const StgInfoTable *orig_info;
@@ -690,7 +690,7 @@ allocNursery (uint32_t node, bdescr *tail, W_ blocks)
     return &bd[0];
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 assignNurseryToCapability (Capability *cap, uint32_t n)
 {
     ASSERT(n < n_nurseries);
@@ -899,7 +899,7 @@ move_STACK (StgStack *src, StgStack *dest)
     dest->sp = (StgPtr)dest->sp + diff;
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 accountAllocation(Capability *cap, W_ n)
 {
     TICK_ALLOC_HEAP_NOCTR(WDS(n));

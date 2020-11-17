@@ -58,7 +58,7 @@ bool isInherentlyUsed( StgHalfWord closure_type )
  * closure.  Returns the size of the closure, including the profiling
  * header portion, so that the caller can find the next closure.
  * ----------------------------------------------------------------------- */
-STATIC_INLINE uint32_t
+STATIC_DEBUG uint32_t
 processHeapClosureForDead( const StgClosure *c )
 {
     uint32_t size;

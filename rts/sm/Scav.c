@@ -284,7 +284,7 @@ static StgPtr scavenge_mut_arr_ptrs_marked (StgMutArrPtrs *a)
     return (StgPtr)a + mut_arr_ptrs_sizeW(a);
 }
 
-STATIC_INLINE StgPtr
+STATIC_DEBUG StgPtr
 scavenge_small_bitmap (StgPtr p, StgWord size, StgWord bitmap)
 {
     while (size > 0) {
@@ -303,7 +303,7 @@ scavenge_small_bitmap (StgPtr p, StgWord size, StgWord bitmap)
    in PAPs.
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE StgPtr
+STATIC_DEBUG StgPtr
 scavenge_arg_block (const StgFunInfoTable *fun_info, StgClosure **args)
 {
     StgPtr p;
@@ -331,7 +331,7 @@ scavenge_arg_block (const StgFunInfoTable *fun_info, StgClosure **args)
     return p;
 }
 
-STATIC_INLINE GNUC_ATTR_HOT StgPtr
+STATIC_DEBUG GNUC_ATTR_HOT StgPtr
 scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
 {
     StgPtr p;

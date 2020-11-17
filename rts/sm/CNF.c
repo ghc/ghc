@@ -441,7 +441,7 @@ compactResize (Capability *cap, StgCompactNFData *str, StgWord new_size)
     compactAppendBlock(cap, str, aligned_size);
 }
 
-STATIC_INLINE bool
+STATIC_DEBUG bool
 has_room_for  (bdescr *bd, StgWord sizeW)
 {
     return (bd->free < bd->start + BLOCK_SIZE_W * BLOCKS_PER_MBLOCK
@@ -645,7 +645,7 @@ StgWord shouldCompact (StgCompactNFData *str, StgClosure *p)
    -------------------------------------------------------------------------- */
 
 #if defined(DEBUG)
-STATIC_INLINE void
+STATIC_DEBUG void
 check_object_in_compact (StgCompactNFData *str, StgClosure *p)
 {
     bdescr *bd;
@@ -780,7 +780,7 @@ void verifyCompact (StgCompactNFData *str USED_IF_DEBUG)
    Fixing up pointers
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE bool
+STATIC_DEBUG bool
 any_needs_fixup(StgCompactNFDataBlock *block)
 {
     // ->next pointers are always valid, even if some blocks were
@@ -824,7 +824,7 @@ spew_failing_pointer(StgWord *fixup_table, uint32_t count, StgWord address)
 }
 #endif
 
-STATIC_INLINE StgCompactNFDataBlock *
+STATIC_DEBUG StgCompactNFDataBlock *
 find_pointer(StgWord *fixup_table, uint32_t count, StgClosure *q)
 {
     StgWord address = (W_)q;

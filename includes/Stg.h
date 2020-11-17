@@ -128,7 +128,7 @@
 /*
  * 'Portable' inlining:
  * INLINE_HEADER is for inline functions in header files (macros)
- * STATIC_INLINE is for inline functions in source files
+ * STATIC_DEBUG is for inline functions in source files
  * EXTERN_INLINE is for functions that we want to inline sometimes
  * (we also compile a static version of the function; see Inlines.c)
  */
@@ -140,7 +140,7 @@
 // The problem, however, is with 'extern inline' whose semantics significantly
 // differs between gnu90 and C99
 #define INLINE_HEADER static inline
-#define STATIC_INLINE static inline
+#define STATIC_DEBUG static inline
 
 // Figure out whether `__attributes__((gnu_inline))` is needed
 // to force gnu90-style 'external inline' semantics.

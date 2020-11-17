@@ -58,7 +58,7 @@ void printObj( StgClosure *obj )
     printClosure(obj);
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 printStdObjHdr( const StgClosure *obj, char* tag )
 {
     debugBelch("%s(",tag);

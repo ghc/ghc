@@ -66,7 +66,7 @@ static const char *saved_locale = NULL;
 static locale_t prof_locale = 0, saved_locale = 0;
 #endif
 
-STATIC_INLINE void
+STATIC_DEBUG void
 init_prof_locale( void )
 {
 #if !defined(mingw32_HOST_OS)
@@ -80,7 +80,7 @@ init_prof_locale( void )
 #endif
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 free_prof_locale( void )
 {
 #if !defined(mingw32_HOST_OS)
@@ -91,7 +91,7 @@ free_prof_locale( void )
 #endif
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 set_prof_locale( void )
 {
 #if defined(mingw32_HOST_OS)
@@ -103,7 +103,7 @@ set_prof_locale( void )
 #endif
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 restore_locale( void )
 {
 #if defined(mingw32_HOST_OS)
@@ -154,7 +154,7 @@ typedef struct _counter {
     struct _counter *next;
 } counter;
 
-STATIC_INLINE void
+STATIC_DEBUG void
 initLDVCtr( counter *ctr )
 {
     ctr->c.ldv.prim = 0;
@@ -248,7 +248,7 @@ closureIdentity( const StgClosure *p )
  * Profiling type predicates
  * ----------------------------------------------------------------------- */
 #if defined(PROFILING)
-STATIC_INLINE bool
+STATIC_DEBUG bool
 doingLDVProfiling( void )
 {
     return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV
@@ -344,7 +344,7 @@ LDV_recordDead( const StgClosure *c, uint32_t size )
  * Initialize censuses[era];
  * ----------------------------------------------------------------------- */
 
-STATIC_INLINE void
+STATIC_DEBUG void
 initEra(Census *census)
 {
     // N.B. When not LDV profiling we reinitialise the same Census over
@@ -368,7 +368,7 @@ initEra(Census *census)
     census->drag_total = 0;
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 freeEra(Census *census)
 {
     arenaFree(census->arena);

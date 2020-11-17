@@ -55,7 +55,7 @@ stableNameUnlock(void)
  * Initialising the table
  * -------------------------------------------------------------------------- */
 
-STATIC_INLINE void
+STATIC_DEBUG void
 initSnEntryFreeList(snEntry *table, uint32_t n, snEntry *free)
 {
   snEntry *p;

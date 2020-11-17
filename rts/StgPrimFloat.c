@@ -51,7 +51,7 @@
 /** #15271: Some large ratios are converted into double incorrectly.
   * This occurs when StgInt has 64 bits and C int has 32 bits, where wrapping
   * occurs and an incorrect signed value is passed into ldexp */
-STATIC_INLINE int
+STATIC_DEBUG int
 truncExponent(I_ e)
 {
 #if INT_MAX < STG_INT_MAX

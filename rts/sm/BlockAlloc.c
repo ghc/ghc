@@ -188,7 +188,7 @@ void initBlockAllocator(void)
    Accounting
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE
+STATIC_DEBUG
 void recordAllocatedBlocks(uint32_t node, uint32_t n)
 {
     n_alloc_blocks += n;
@@ -198,7 +198,7 @@ void recordAllocatedBlocks(uint32_t node, uint32_t n)
     }
 }
 
-STATIC_INLINE
+STATIC_DEBUG
 void recordFreedBlocks(uint32_t node, uint32_t n)
 {
     ASSERT(n_alloc_blocks >= n);
@@ -210,13 +210,13 @@ void recordFreedBlocks(uint32_t node, uint32_t n)
    Allocation
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE bdescr *
+STATIC_DEBUG bdescr *
 tail_of (bdescr *bd)
 {
     return bd + bd->blocks - 1;
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 initGroup(bdescr *head)
 {
   head->free   = head->start;
@@ -248,7 +248,7 @@ initGroup(bdescr *head)
 #endif
 
 // log base 2 (floor), needs to support up to (2^NUM_FREE_LISTS)-1
-STATIC_INLINE uint32_t
+STATIC_DEBUG uint32_t
 log_2(W_ n)
 {
     ASSERT(n > 0 && n < (1<<NUM_FREE_LISTS));
@@ -268,7 +268,7 @@ log_2(W_ n)
 }
 
 // log base 2 (ceiling), needs to support up to (2^NUM_FREE_LISTS)-1
-STATIC_INLINE uint32_t
+STATIC_DEBUG uint32_t
 log_2_ceil(W_ n)
 {
     ASSERT(n > 0 && n < (1<<NUM_FREE_LISTS));
@@ -286,7 +286,7 @@ log_2_ceil(W_ n)
 #endif
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 free_list_insert (uint32_t node, bdescr *bd)
 {
     uint32_t ln;
@@ -300,7 +300,7 @@ free_list_insert (uint32_t node, bdescr *bd)
 // After splitting a group, the last block of each group must have a
 // tail that points to the head block, to keep our invariants for
 // coalescing.
-STATIC_INLINE void
+STATIC_DEBUG void
 setup_tail (bdescr *bd)
 {
     bdescr *tail;
@@ -609,7 +609,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
     return bd;
 }
 
-STATIC_INLINE
+STATIC_DEBUG
 uint32_t nodeWithLeastBlocks (void)
 {
     uint32_t node = 0, i;
@@ -733,7 +733,7 @@ allocBlockOnNode_lock(uint32_t node)
    De-Allocation
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE bdescr *
+STATIC_DEBUG bdescr *
 coalesce_mblocks (bdescr *p)
 {
     bdescr *q;

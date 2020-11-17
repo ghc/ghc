@@ -586,7 +586,7 @@ char** getUTF8Args(int* argc)
 }
 #endif
 
-STATIC_INLINE bool strequal(const char *a, const char * b)
+STATIC_DEBUG bool strequal(const char *a, const char * b)
 {
     return(strcmp(a, b) == 0);
 }

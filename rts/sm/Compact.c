@@ -31,8 +31,8 @@
 
 // Turn off inlining when debugging - it obfuscates things
 #if defined(DEBUG)
-# undef  STATIC_INLINE
-# define STATIC_INLINE static
+# undef  STATIC_DEBUG
+# define STATIC_DEBUG static
 #endif
 
 /* ----------------------------------------------------------------------------
@@ -69,13 +69,13 @@
     pointer.
    ------------------------------------------------------------------------- */
 
-STATIC_INLINE W_
+STATIC_DEBUG W_
 UNTAG_PTR(W_ p)
 {
     return p & ~TAG_MASK;
 }
 
-STATIC_INLINE W_
+STATIC_DEBUG W_
 GET_PTR_TAG(W_ p)
 {
     return p & TAG_MASK;
@@ -124,7 +124,7 @@ get_iptr_tag(StgInfoTable *iptr)
     }
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 thread (StgClosure **p)
 {
     StgClosure *q0  = *p;
@@ -155,9 +155,9 @@ thread_root (void *user STG_UNUSED, StgClosure **p)
 
 // This version of thread() takes a (void *), used to circumvent
 // warnings from gcc about pointer punning and strict aliasing.
-STATIC_INLINE void thread_ (void *p) { thread((StgClosure **)p); }
+STATIC_DEBUG void thread_ (void *p) { thread((StgClosure **)p); }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 unthread( const P_ p, W_ free, W_ tag )
 {
     W_ q = *p;
@@ -193,7 +193,7 @@ loop:
 // The info pointer is also tagged with the appropriate pointer tag
 // for this closure, which should be attached to the pointer
 // subsequently passed to unthread().
-STATIC_INLINE StgInfoTable*
+STATIC_DEBUG StgInfoTable*
 get_threaded_info( P_ p )
 {
     W_ q = (W_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
@@ -217,7 +217,7 @@ loop:
 
 // A word-aligned memmove will be faster for small objects than libc's or gcc's.
 // Remember, the two regions *might* overlap, but: to <= from.
-STATIC_INLINE void
+STATIC_DEBUG void
 move(P_ to, P_ from, W_ size)
 {
     for(; size > 0; --size) {
@@ -263,7 +263,7 @@ thread_static( StgClosure* p )
   }
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 thread_large_bitmap( P_ p, StgLargeBitmap *large_bitmap, W_ size )
 {
     W_ b = 0;
@@ -283,7 +283,7 @@ thread_large_bitmap( P_ p, StgLargeBitmap *large_bitmap, W_ size )
     }
 }
 
-STATIC_INLINE P_
+STATIC_DEBUG P_
 thread_small_bitmap (P_ p, W_ size, W_ bitmap)
 {
     while (size > 0) {
@@ -297,7 +297,7 @@ thread_small_bitmap (P_ p, W_ size, W_ bitmap)
     return p;
 }
 
-STATIC_INLINE P_
+STATIC_DEBUG P_
 thread_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 {
     W_ bitmap;
@@ -395,7 +395,7 @@ thread_stack(P_ p, P_ stack_end)
     }
 }
 
-STATIC_INLINE P_
+STATIC_DEBUG P_
 thread_PAP_payload (StgClosure *fun, StgClosure **payload, W_ size)
 {
     StgFunInfoTable *fun_info =
@@ -427,7 +427,7 @@ thread_PAP_payload (StgClosure *fun, StgClosure **payload, W_ size)
     return p;
 }
 
-STATIC_INLINE P_
+STATIC_DEBUG P_
 thread_PAP (StgPAP *pap)
 {
     P_ p = thread_PAP_payload(pap->fun, pap->payload, pap->n_args);
@@ -435,7 +435,7 @@ thread_PAP (StgPAP *pap)
     return p;
 }
 
-STATIC_INLINE P_
+STATIC_DEBUG P_
 thread_AP (StgAP *ap)
 {
     P_ p = thread_PAP_payload(ap->fun, ap->payload, ap->n_args);
@@ -443,7 +443,7 @@ thread_AP (StgAP *ap)
     return p;
 }
 
-STATIC_INLINE P_
+STATIC_DEBUG P_
 thread_AP_STACK (StgAP_STACK *ap)
 {
     thread(&ap->fun);
@@ -618,7 +618,7 @@ update_fwd_large( bdescr *bd )
 }
 
 // ToDo: too big to inline
-static /* STATIC_INLINE */ P_
+static /* STATIC_DEBUG */ P_
 thread_obj (const StgInfoTable *info, P_ p)
 {
     switch (info->type) {

@@ -113,7 +113,7 @@ endRetainerProfiling( void )
  * In addition we mark all mutable objects as a retainers, the reason for
  * that decision is lost in time.
  * -------------------------------------------------------------------------- */
-STATIC_INLINE bool
+STATIC_DEBUG bool
 isRetainer( const StgClosure *c )
 {
     switch (get_itbl(c)->type) {
@@ -231,7 +231,7 @@ isRetainer( const StgClosure *c )
  *  Invariants:
  *    *c must be a retainer.
  * -------------------------------------------------------------------------- */
-STATIC_INLINE retainer
+STATIC_DEBUG retainer
 getRetainerFrom( StgClosure *c )
 {
     ASSERT(isRetainer(c));
@@ -246,7 +246,7 @@ getRetainerFrom( StgClosure *c )
  *    c != NULL
  *    s != NULL
  * -------------------------------------------------------------------------- */
-STATIC_INLINE void
+STATIC_DEBUG void
 associate( StgClosure *c, RetainerSet *s )
 {
     // StgWord has the same size as pointers, so the following type

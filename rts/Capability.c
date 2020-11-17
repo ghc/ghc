@@ -81,7 +81,7 @@ Capability * rts_unsafeGetMyCapability (void)
 }
 
 #if defined(THREADED_RTS)
-STATIC_INLINE bool
+STATIC_DEBUG bool
 globalWorkToDo (void)
 {
     return RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING
@@ -199,7 +199,7 @@ anySparks (void)
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-STATIC_INLINE void
+STATIC_DEBUG void
 newReturningTask (Capability *cap, Task *task)
 {
     ASSERT_LOCK_HELD(&cap->lock);
@@ -218,7 +218,7 @@ newReturningTask (Capability *cap, Task *task)
     ASSERT_RETURNING_TASKS(cap,task);
 }
 
-STATIC_INLINE Task *
+STATIC_DEBUG Task *
 popReturningTask (Capability *cap)
 {
     ASSERT_LOCK_HELD(&cap->lock);

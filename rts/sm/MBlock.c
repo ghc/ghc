@@ -440,7 +440,7 @@ markHeapUnalloced(void *p)
 
 #if SIZEOF_VOID_P == 4
 
-STATIC_INLINE
+STATIC_DEBUG
 void * mapEntryToMBlock(uint32_t i)
 {
     return (void *)((StgWord)i << MBLOCK_SHIFT);

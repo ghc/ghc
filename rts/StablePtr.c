@@ -138,7 +138,7 @@ stablePtrUnlock(void)
  * Initialising the table
  * -------------------------------------------------------------------------- */
 
-STATIC_INLINE void
+STATIC_DEBUG void
 initSpEntryFreeList(spEntry *table, uint32_t n, spEntry *free)
 {
   spEntry *p;
@@ -245,7 +245,7 @@ exitStablePtrTable(void)
 #endif
 }
 
-STATIC_INLINE void
+STATIC_DEBUG void
 freeSpEntry(spEntry *sp)
 {
     RELAXED_STORE(&sp->addr, (P_)stable_ptr_free);

@@ -51,7 +51,7 @@ RetainerSet rs_MANY = {
 /* -----------------------------------------------------------------------------
  * calculate the size of a RetainerSet structure
  * -------------------------------------------------------------------------- */
-STATIC_INLINE size_t
+STATIC_DEBUG size_t
 sizeofRetainerSet( int elems )
 {
     return (sizeof(RetainerSet) + elems * sizeof(retainer));

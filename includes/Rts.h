@@ -37,10 +37,13 @@ extern "C" {
 #include "HsFFI.h"
 #include "RtsAPI.h"
 
-// Turn off inlining when debugging - it obfuscates things
+// Functions with "static inline" behave just like as if they had no
+// keywords for the purpose of inlining.
+// So we can use this to make a inline function less likely to inline
+// when debugging. Helpful since inlining obfuscates things
 #if defined(DEBUG)
-# undef  STATIC_INLINE
-# define STATIC_INLINE static
+# undef  STATIC_DEBUG
+# define STATIC_DEBUG static
 #endif
 
 #include "rts/Types.h"

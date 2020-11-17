@@ -419,7 +419,7 @@ void nonmovingFinishFlush(Task *task)
  * Pushing to either the mark queue or remembered set
  *********************************************************/
 
-STATIC_INLINE void
+STATIC_DEBUG void
 push (MarkQueue *q, const MarkQueueEnt *ent)
 {
     // Are we at the end of the block?
@@ -670,7 +670,7 @@ void updateRemembSetPushClosure_(StgRegTable *reg, struct StgClosure_ *p)
     updateRemembSetPushClosure(regTableToCapability(reg), p);
 }
 
-STATIC_INLINE bool needs_upd_rem_set_mark(StgClosure *p)
+STATIC_DEBUG bool needs_upd_rem_set_mark(StgClosure *p)
 {
     // TODO: Deduplicate with mark_closure
     bdescr *bd = Bdescr((StgPtr) p);
@@ -690,7 +690,7 @@ STATIC_INLINE bool needs_upd_rem_set_mark(StgClosure *p)
 }
 
 /* Set the mark bit; only to be called *after* we have fully marked the closure */
-STATIC_INLINE void finish_upd_rem_set_mark(StgClosure *p)
+STATIC_DEBUG void finish_upd_rem_set_mark(StgClosure *p)
 {
     bdescr *bd = Bdescr((StgPtr) p);
     if (bd->flags & BF_LARGE) {
