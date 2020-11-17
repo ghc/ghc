@@ -26,7 +26,7 @@ import GHC.Stg.Lift     ( stgLiftLams )
 import GHC.Unit.Module ( Module )
 
 import GHC.Driver.Session
-import GHC.Driver.Types     ( HscEnv(..) )
+import GHC.Driver.Env   ( HscEnv(..) )
 import GHC.Utils.Error
 import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
