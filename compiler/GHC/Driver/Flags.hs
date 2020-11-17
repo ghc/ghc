@@ -130,6 +130,7 @@ data GeneralFlag
    | Opt_NoLlvmMangler                  -- hidden flag
    | Opt_FastLlvm                       -- hidden flag
    | Opt_NoTypeableBinds
+
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
    | Opt_ShowWarnGroups                 -- Show the group a warning belongs to
    | Opt_HideSourcePaths                -- Hide module source/object paths
@@ -204,7 +205,6 @@ data GeneralFlag
 
    -- Inference flags
    | Opt_DoTagInferenceChecks
-   | Opt_StgCSR
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!

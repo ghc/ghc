@@ -485,7 +485,7 @@ data CallMethod
 
   | InferedReturnIt     -- Same as ReturnIt but based on tag inference.
                         -- See Note [Tag Inferrence - The basic idea] in
-                        -- GHC.Stg.InferTags.
+                        -- GHC.Stg.InferTags
 
   | SlowCall            -- Unknown fun, or known fun with
                         -- too few args.

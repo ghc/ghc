@@ -1674,7 +1674,6 @@ doCodeGen hsc_env this_mod data_tycons
             lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
 
-
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one
         -- CmmGroup on input may produce many CmmGroups on output due

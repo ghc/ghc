@@ -2703,9 +2703,8 @@ doCaseToLet :: OutExpr          -- Scrutinee
 -- The situation is         case scrut of b { DEFAULT -> body }
 -- Can we transform thus?   let { b = scrut } in body
 doCaseToLet scrut case_bndr
-  | -- pprTrace "doCaseToLet:" (ppr (scrut, case_bndr)) $
-    isTyCoVar case_bndr    -- Respect CoreSyn
-  = isTyCoArg scrut        -- Note [CoreSyn type and coercion invariant]
+  | isTyCoVar case_bndr    -- Respect GHC.Core
+  = isTyCoArg scrut        -- Note [Core type and coercion invariant]
 
   | isUnliftedType (idType case_bndr)
   = exprOkForSpeculation scrut

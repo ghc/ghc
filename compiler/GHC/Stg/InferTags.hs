@@ -2484,36 +2484,28 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
 {-  Note [Let/ Data Flow]
     ~~~~~~~~~~~~~~~~~~~~
 
-This is rather simple:
-We bind the result of the RHS to the variable which binds the rhs.
+This is rather simple. For a construct like:
+
+    expr@(let x = rhs in body)
+
+We bind the result of the rhs to the variable (x) which binds it.
+The result of the whole expression is equivalent to the result of
+the `body` expression.
 
 The variable can be referenced from the body or the rhs itself
-for let recs. The overall result of the let expression
-is the result of the body.
-
-        +-------+
-    +-> +  rhs  |
-    |   +---+---+
-            |
-    ^       | result available
-            | via the bindings id
-    |       v
-        +---+----+
-    +-- +  var   |
-        +---+----+
-            v
-        +---+----+    +----------+
-        |  body  | == | let node |
-        +--------+    +----------+
+for let recs.
 
 That is for a let expression of the form
 
-    letExpr@(let var = body in rhs)
+    letExpr@(let var = rhs in body)
 
 We have only the constraints that:
 
-1) enterInfo(var) = enterInfo(body)
-2) enterInfo(letExpr) = enterInfo(rhs)
+1) enterInfo(var) = enterInfo(rhs)
+2) enterInfo(letExpr) = enterInfo(body)
+
+Implementation wise the body/rhs can reference the data flow node
+for the bound variable in the SynContext.
 
 -}
 
@@ -2538,6 +2530,9 @@ nodeLetNoEscape _ _ _ = panic "Impossible"
 Information from the constructor (strict fields)
 and arguments is used to determine the result.
 
+The information from both the constructor and the given arguments "flow"
+into the final node to determine the result.
+
 +-----+       +------+
 | con |       | args |
 +--+--+       +--+---+
@@ -2554,11 +2549,9 @@ we determine the enterInfo of the rhs based on the fact that it's a RhsClosure.
 In other contexts it's enterInfo will never be used by another node.
 
 So if we have an ConApp expression of the form: app@(Con arg1 arg2 ... argn) we
-solve these constraints:
+solve the constraint:
 
-1) Enterinfo for the overall expression:
-
-    MaybeEnter < fieldInfo(arg1), fieldInfo(arg1), ... , fieldInfo(argn) >
+    enterInfo(app) == MaybeEnter < fieldInfo(arg1), fieldInfo(arg2), ... , fieldInfo(argn) >
 
     where fieldInfo(arg_n) is defined as:
 
@@ -2589,8 +2582,8 @@ Example:
 
 
     Here we get enterInfo(app) = MaybeEnter   < NeverEnter,   MaybeEnter>
-                                  ^ from ConApp  ^ Strict field   ^ enterInfo(thunk_y)
-
+                                  ^from ConApp  ^from strict field  ^from enterInfo(thunk_y)
+                                                 invariant.
 -}
 nodeConApp :: HasDebugCallStack => Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do

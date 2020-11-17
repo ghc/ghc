@@ -559,8 +559,6 @@ tickyUntagged e     = do
     ifTicky $ bumpTickyCounter (fsLit "TAG_UNTAGGED_pred")
     ifTicky $ bumpTickyCounterByE (fsLit "TAG_UNTAGGED_miss") e
 
-
-
 -- -----------------------------------------------------------------------------
 -- Ticky utils
 

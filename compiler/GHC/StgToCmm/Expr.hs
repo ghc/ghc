@@ -293,7 +293,7 @@ Hence: two basic plans for
         ...code for alts...
         ...no heap check...
 
-{- Note [Handle gc for evaluated scrutinees]
+   Note [Handle gc for evaluated scrutinees]
 
    ------ Plan C: special case when ---------
 
@@ -338,7 +338,6 @@ Hence: two basic plans for
    TODO: Investigate what is required to instead create a shared return
    point for all the GC calls in the alts.
 
--}
 -}
 
 
@@ -561,7 +560,7 @@ isSimpleScrut :: CgStgExpr -> AltType -> FCode Bool
 isSimpleScrut (StgOpApp op args _) _         = isSimpleOp op args
 isSimpleScrut (StgLit _)           _         = return True       -- case 1# of { 0# -> ..; ... }
 isSimpleScrut (StgApp _ _ [])    (PrimAlt _) = return True       -- case x# of { 0# -> ..; ... }
-isSimpleScrut (StgApp NoEnter _ [])   _ = return True       -- case !x of { ... }
+isSimpleScrut (StgApp NoEnter _ [])   _      = return True       -- case !x of { ... }
 isSimpleScrut _                    _         = return False
 
 isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
@@ -943,7 +942,7 @@ cgIdApp strict fun_id args = do
         n_args      = length args
         v_args      = length $ filter (isVoidTy . stgArgType) args
     case getCallMethod call_opts fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info strict of
-        -- A value in WHNF, so we can just return it.
+        -- A value in WHNF & tagged, so we can just return it.
         ReturnIt
           | isVoidTy (idType fun_id) -> emitReturn []
           | otherwise                -> emitReturn [fun]
@@ -1163,7 +1162,6 @@ emitEnter fun = do
            mkLabel lret tscope <*>
            copyin
        ; return (ReturnedTo lret off)
-
        }
   }
 

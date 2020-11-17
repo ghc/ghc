@@ -19,7 +19,7 @@ module GHC.StgToCmm.Env (
         bindArgToReg, idToReg,
         getArgAmode, getNonVoidArgAmodes,
         getCgIdInfo,
-        maybeLetNoEscape
+        maybeLetNoEscape,
     ) where
 
 #include "HsVersions.h"
@@ -141,7 +141,6 @@ getCgIdInfo id
 
                 -- Should be imported; make up a CgIdInfo for it
           let name = idName id
-
         ; if isExternalName name then
               let ext_lbl
                       | isUnliftedType (idType id) =
@@ -150,7 +149,8 @@ getCgIdInfo id
                           ASSERT( idType id `eqType` addrPrimTy )
                           mkBytesLabel name
                       | otherwise = mkClosureLabel name $ idCafInfo id
-              in return $ litIdInfo platform id (mkLFImported id) (CmmLabel ext_lbl)
+              in return $
+                  litIdInfo platform id (mkLFImported id) (CmmLabel ext_lbl)
           else
               cgLookupPanic id -- Bug
         }}}

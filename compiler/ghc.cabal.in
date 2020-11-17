@@ -529,6 +529,7 @@ Library
         GHC.Stg.Stats
         GHC.Stg.Subst
         GHC.Stg.Syntax
+        GHC.Stg.Utils
         GHC.StgToCmm
         GHC.StgToCmm.ArgRep
         GHC.StgToCmm.Bind

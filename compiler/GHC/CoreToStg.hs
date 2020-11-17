@@ -502,7 +502,7 @@ coreToStgApp f args ticks = do
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
                 -- we require that primop applications be saturated.
-                PrimOpId op
+                PrimOpId op   -- TODO: Are calls guaranteed to be saturated already here?
                   | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
                   | otherwise    -> StgApp MayEnter (primOpWrapperId op) args'
 

@@ -898,10 +898,10 @@ instance Outputable TypeShape where
 --                  |
 --            ExnOrDiv (nip)
 --                  |
---                  |
 --            Diverges (ni)
--- @
+--                  |
 --             Absent (i)
+-- @
 --
 -- As you can see, we don't distinguish __n__ and __i__.
 -- See Note [Precise exceptions and strictness analysis] for why __p__ is so
@@ -2070,7 +2070,7 @@ instance Binary Divergence where
   put_ bh Dunno    = putByte bh 0
   put_ bh ExnOrDiv = putByte bh 1
   put_ bh Diverges = putByte bh 2
-  put_ bh Absent = putByte bh 3
+  put_ bh Absent   = putByte bh 3
 
   get bh = do { h <- getByte bh
               ; case h of

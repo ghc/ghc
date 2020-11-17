@@ -3400,7 +3400,6 @@ fFlagsDeps = [
   flagSpec "cmm-static-pred"                  Opt_CmmStaticPred,
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,
-  flagSpec "stg-csr"                          Opt_StgCSR,
   flagSpec "stg-lift-lams"                    Opt_StgLiftLams,
   flagSpec "cpr-anal"                         Opt_CprAnal,
   flagSpec "defer-diagnostics"                Opt_DeferDiagnostics,
@@ -3998,7 +3997,6 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CmmStaticPred)
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_StgCSE)
-    , ([1,2],   Opt_StgCSR)
     , ([2],     Opt_StgLiftLams)
 
     , ([1,2],   Opt_EnableRewriteRules)
