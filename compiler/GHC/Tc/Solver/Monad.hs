@@ -1780,9 +1780,9 @@ kick_out_rewritable new_fr new_lhs
 
         kick_out_for_completeness  -- (K3) and Note [K3: completeness of solving]
           = case (eq_rel, new_lhs) of
-              (NomEq, _)  -> rhs_ty `eqType` canEqLHSType new_lhs
-              (ReprEq, TyVarLHS new_tv) -> isTyVarHead new_tv rhs_ty
-              (ReprEq, TyFamLHS new_tf new_tf_args)
+              (NomEq, _)  -> rhs_ty `eqType` canEqLHSType new_lhs     -- (K3a)
+              (ReprEq, TyVarLHS new_tv) -> isTyVarHead new_tv rhs_ty  -- (K3b)
+              (ReprEq, TyFamLHS new_tf new_tf_args)                   -- (K3b)
                 | Just (rhs_tc, rhs_tc_args) <- tcSplitTyConApp_maybe rhs_ty
                 , tcEqTyConApps new_tf new_tf_args rhs_tc rhs_tc_args
                   -> True

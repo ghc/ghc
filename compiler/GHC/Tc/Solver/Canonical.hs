@@ -2520,26 +2520,27 @@ Wrinkles:
      must be sure to kick out any such CIrredCan constraints that mention coercion holes
      when those holes get filled in, so that the unification step can now proceed.
 
-     (2a) We must now absolutely make sure to kick out any constraints that
-          mention a newly-filled-in coercion hole -- if there are no more
-          remaining coercion holes. This is done in
-          kickOutAfterFillingCoercionHole. The extra check that there are no
-          more remaining holes avoids needless work when rewriting evidence
-          (which fills coercion holes) and aids efficiency. It also can avoid
-          a loop in the solver that would otherwise arise in this case:
+     (2a) We must now kick out any constraints that mention a newly-filled-in
+          coercion hole, but only if there are no more remaining coercion
+          holes. This is done in kickOutAfterFillingCoercionHole. The extra
+          check that there are no more remaining holes avoids needless work
+          when rewriting evidence (which fills coercion holes) and aids
+          efficiency.
+
+          Moreover, kicking out when there are remaining unfilled holes can
+          cause a loop in the solver in this case:
                [W] w1 :: (ty1 :: F a) ~ (ty2 :: s)
           After canonicalisation, we discover that this equality is heterogeneous.
           So we emit
                [W] co_abc :: F a ~ s
           and preserve the original as
-               [W] w2 :: (ty1 |> co_abc) ~ ty2
-          Then, co_abc comes becomes the work item. It gets swapped back
-          and forth, as it goes through canEqTyVarFunEq. We thus get
+               [W] w2 :: (ty1 |> co_abc) ~ ty2    (blocked on co_abc)
+          Then, co_abc comes becomes the work item. It gets swapped in
+          canEqCanLHS2 and then back again in canEqTyVarFunEq. We thus get
           co_abc := sym co_abd, and then co_abd := sym co_abe, with
                [W] co_abe :: F a ~ s
-          right back where we started. (At this point, we're in canEqCanLHSFinish,
-          so we're not looping.) But all this filling in would,
-          naively, cause w2 to be kicked out. Which, when it got processed,
+          This process has filled in co_abc. Suppose w2 were kicked out.
+          When it gets processed,
           would get this whole chain going again. The solution is to
           kick out a blocked constraint only when the result of filling
           in the blocking coercion involves no further blocking coercions.

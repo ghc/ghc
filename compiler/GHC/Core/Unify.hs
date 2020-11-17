@@ -1244,6 +1244,7 @@ data BindFlag
 
   | Skolem      -- This type variable is a skolem constant
                 -- Don't bind it; it only matches itself
+                -- These variables are SurelyApart from other types
   deriving Eq
 
 {-
