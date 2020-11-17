@@ -387,9 +387,8 @@ recSelError              s = throw (RecSelError ("No match in record selector "
                                                  ++ unpackCStringUtf8# s))  -- No location info unfortunately
 runtimeError             s = errorWithoutStackTrace (unpackCStringUtf8# s)                   -- No location info unfortunately
 
--- We don't inline absentError to preserve it's built in magic strictness information.
--- The nice thing is that it's beneficial anyway. The code is "never" executed so not
--- inlining is even beneficial as it decreases code size!
+-- No point in inlining absentError. It would both make it harder to spot absentError
+-- applications and hurt performance as it's only executed in the error case.
 {-# NOINLINE absentError #-}
 absentError              s = impossible $ errorWithoutStackTrace ("Oops!  Entered absent arg " ++ unpackCStringUtf8# s)
 

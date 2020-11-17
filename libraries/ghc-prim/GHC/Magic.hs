@@ -4,7 +4,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS -O #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -62,11 +61,7 @@ inline x = x
 noinline :: a -> a
 noinline x = x
 
--- | It's impossible that (impossible x) will be evaluated unless
--- there is a compiler bug.
---
--- Only used to encode strictiness signature for absentError
--- TODO: Explain better.
+-- | Only used to implement absentError (See Note [impossibleId magic]).
 {-# NOINLINE impossible #-}
 impossible :: a -> a
 impossible x = x
