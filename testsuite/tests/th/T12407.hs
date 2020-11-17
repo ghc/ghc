@@ -11,7 +11,7 @@ $(do let ubxTup = conT (unboxedTupleTypeName 2) `appT` conT ''Int
      y <- newName "y"
 
      [d| f :: $(ubxTup) -> $(ubxTup)
-         f $(conP (unboxedTupleDataName 2) [] [varP x, varP y])
+         f $(conP (unboxedTupleDataName 2) [varP x, varP y])
              = $(conE (unboxedTupleDataName 2) `appE` varE x
                                                `appE` varE y)
       |])

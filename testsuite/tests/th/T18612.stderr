@@ -7,7 +7,7 @@ T18612.hs:(10,7)-(11,75): Splicing type
       `appT` (conT ''Identity `appT` (tupleT 1 `appT` (tupleT 0)))
   ======>
     Identity (Solo ()) -> Identity (Solo ())
-T18612.hs:12:4-39: Splicing pattern
-    conP 'Identity [] [tupP [tupP []]] ======> Identity (Solo())
-T18612.hs:12:44-81: Splicing expression
+T18612.hs:12:4-36: Splicing pattern
+    conP 'Identity [tupP [tupP []]] ======> Identity (Solo())
+T18612.hs:12:41-78: Splicing expression
     conE 'Identity `appE` tupE [tupE []] ======> Identity (Solo ())
