@@ -1176,6 +1176,12 @@ data ImplicStatus
 -- See Note [When does an implication have given equalities?] in GHC.Tc.Solver.Monad,
 -- which also explains why we need three options here. Also, see
 -- Note [Suppress redundant givens during error reporting] in GHC.Tc.Errors
+--
+--                  Stops floating  |   Suppresses Givens in errors
+--                  -----------------------------------------------
+--  NoGivenEqs         NO           |         YES
+--  LocalGivenEqs      NO           |         NO
+--  MaybeGivenEqs      YES          |         NO
 data HasGivenEqs
   = NoGivenEqs      -- definitely no given equalities
   | LocalGivenEqs   -- might have Given equalities that affect only local skolems
