@@ -58,7 +58,7 @@
 #define MAX_THUNK_SELECTOR_DEPTH 16
 
 static void eval_thunk_selector (StgClosure **q, StgSelector *p, bool);
-STATIC_DEBUG void evacuate_large(StgPtr p);
+NOINLINE static void evacuate_large(StgPtr p);
 
 /* -----------------------------------------------------------------------------
    Allocate some space in which to copy an object.
@@ -135,7 +135,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
    -------------------------------------------------------------------------- */
 
 /* size is in words */
-STATIC_DEBUG GNUC_ATTR_HOT void
+ALWAYS_INLINE STATIC_DEBUG GNUC_ATTR_HOT void
 copy_tag(StgClosure **p, const StgInfoTable *info,
          StgClosure *src, uint32_t size, uint32_t gen_no, StgWord tag)
 {
@@ -283,7 +283,7 @@ spin:
 
 
 /* Copy wrappers that don't tag the closure after copying */
-STATIC_DEBUG GNUC_ATTR_HOT void
+ALWAYS_INLINE GNUC_ATTR_HOT static inline void
 copy(StgClosure **p, const StgInfoTable *info,
      StgClosure *src, uint32_t size, uint32_t gen_no)
 {
@@ -301,7 +301,7 @@ copy(StgClosure **p, const StgInfoTable *info,
    that has been evacuated, or unset otherwise.
    -------------------------------------------------------------------------- */
 
-static void
+NOINLINE static void
 evacuate_large(StgPtr p)
 {
   bdescr *bd;

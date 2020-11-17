@@ -46,6 +46,11 @@ extern "C" {
 # define STATIC_DEBUG static
 #endif
 
+// Fine grained inlining control helpers.
+#define ALWAYS_INLINE __attribute__((always_inline))
+#define NOINLINE      __attribute__((noinline))
+
+
 #include "rts/Types.h"
 #include "rts/Time.h"
 
