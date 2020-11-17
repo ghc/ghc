@@ -55,7 +55,7 @@ data DriverError
   = DriverCannotFindModule DynFlags ModuleName FindResult
   | DriverNotAnExpression String
   | DriverParseErrorImport
-  | DriverPkgRequiredTrusted UnitId
+  | DriverPkgRequiredTrusted DynFlags UnitId
   | DriverCantLoadIfaceForSafe Module
   | DriverError ErrDoc
 
