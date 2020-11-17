@@ -3,10 +3,14 @@
 
 module GHC.Driver.Errors.Ppr () where
 
+import GHC.Prelude
+
+import GHC.Driver.Session ( unitState )
 import GHC.Driver.Errors.Types
 import GHC.Parser.Errors.Ppr ()
 import GHC.Types.Error ( RenderableDiagnostic, renderDiagnostic, errDoc )
 import GHC.Unit.Finder ( cannotFindModule )
+import GHC.Unit.State  ( pprWithUnitState )
 import GHC.Utils.Outputable
 
 instance RenderableDiagnostic GhcWarning where
@@ -30,9 +34,12 @@ instance RenderableDiagnostic DriverError where
     errDoc [text "not an expression:" <+> quotes (text str)] [] []
   renderDiagnostic DriverParseErrorImport =
     errDoc [text "parse error in import declaration"] [] []
-  renderDiagnostic (DriverPkgRequiredTrusted pkg) =
-    errDoc [ text "The package (" <> ppr pkg <> text ") is required" <>
-             text " to be trusted but it isn't!" ] [] []
+  renderDiagnostic (DriverPkgRequiredTrusted dflags pkg) =
+    errDoc [ pprWithUnitState (unitState dflags) $
+               text "The package ("
+                  <> ppr pkg
+                  <> text ") is required to be trusted but it isn't!"
+           ] [] []
   renderDiagnostic (DriverCantLoadIfaceForSafe m) =
     errDoc [ text "Can't load the interface file for" <+> ppr m
           <> text ", to check that it can be safely imported" ]
