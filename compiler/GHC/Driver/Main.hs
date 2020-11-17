@@ -155,6 +155,7 @@ import GHC.Stg.Pipeline ( stg2stg )
 
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
+import GHC.Builtin.Types ( unitDataConId )
 
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)

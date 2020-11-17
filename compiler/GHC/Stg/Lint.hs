@@ -42,7 +42,7 @@ import GHC.Prelude
 import GHC.Stg.Syntax
 
 import GHC.Driver.Session
-import GHC.Driver.Types     ( HscEnv(..) )
+import GHC.Driver.Env       ( HscEnv(..) )
 import GHC.Core.Lint        ( interactiveInScope )
 import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
