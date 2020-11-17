@@ -7,6 +7,6 @@ T13776.hs:14:15-75: Splicing expression
   ======>
     ((,) 1) 1
 T13776.hs:17:15-24: Splicing expression conE '[] ======> []
-T13776.hs:20:13-65: Splicing pattern
-    conP '(,) [] [litP (integerL 1), litP (integerL 1)] ======> (,) 1 1
-T13776.hs:23:13-28: Splicing pattern conP '[] [] [] ======> []
+T13776.hs:20:13-62: Splicing pattern
+    conP '(,) [litP (integerL 1), litP (integerL 1)] ======> (,) 1 1
+T13776.hs:23:13-25: Splicing pattern conP '[] [] ======> []

@@ -1065,7 +1065,7 @@ bindHsOuterTyVarBndrs :: OutputableBndrFlag flag
 bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
   case outer_bndrs of
     HsOuterImplicit{} ->
-      rnImplicitBndrs mb_cls implicit_vars $ \implicit_vars' ->
+      rnImplicitTvOccs mb_cls implicit_vars $ \implicit_vars' ->
         thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
     HsOuterExplicit{hso_bndrs = exp_bndrs} ->
       -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
