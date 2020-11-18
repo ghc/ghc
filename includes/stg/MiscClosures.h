@@ -479,6 +479,7 @@ RTS_FUN_DECL(stg_writeTVarzh);
 
 RTS_FUN_DECL(stg_unpackClosurezh);
 RTS_FUN_DECL(stg_closureSizzezh);
+RTS_FUN_DECL(stg_whereFromzh);
 RTS_FUN_DECL(stg_getApStackValzh);
 RTS_FUN_DECL(stg_getSparkzh);
 RTS_FUN_DECL(stg_numSparkszh);
