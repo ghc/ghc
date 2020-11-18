@@ -67,6 +67,7 @@ import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import GHC.Settings.Config
 import GHC.Driver.Session hiding (projectVersion, verbosity)
+import GHC.Driver.Env
 import GHC.Utils.Error
 import GHC.Unit
 import GHC.Utils.Panic (handleGhcException)
@@ -471,10 +472,10 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
   -- that may need to be re-linked: Haddock doesn't do any
   -- dynamic or static linking at all!
   _ <- setSessionDynFlags dynflags''
-  hscenv <- GHC.getSession
-  dynflags''' <- liftIO (GHC.Runtime.Loader.initializePlugins hscenv dynflags'')
-  _ <- setSessionDynFlags dynflags'''
-  ghcActs dynflags'''
+  hsc_env <- GHC.getSession
+  hsc_env'' <- liftIO (GHC.Runtime.Loader.initializePlugins hsc_env)
+  _ <- GHC.setSession hsc_env''
+  ghcActs (hsc_dflags hsc_env'')
   where
 
     -- ignore sublists of flags that start with "+RTS" and end in "-RTS"
