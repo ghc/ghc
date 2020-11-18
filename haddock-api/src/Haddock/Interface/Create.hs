@@ -47,6 +47,7 @@ import GHC.Types.SourceFile
 import GHC.Core.ConLike (ConLike(..))
 import GHC
 import GHC.Driver.Ppr
+import GHC.Driver.Env
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -67,11 +68,12 @@ import GHC.Unit.Module.Warnings
 -- To do this, we need access to already processed modules in the topological
 -- sort. That's what's in the 'IfaceMap'.
 createInterface :: TypecheckedModule
+                -> UnitState
                 -> [Flag]       -- Boolean flags
                 -> IfaceMap     -- Locally processed modules
                 -> InstIfaceMap -- External, already installed interfaces
                 -> ErrMsgGhc Interface
-createInterface tm flags modMap instIfaceMap = do
+createInterface tm unit_state flags modMap instIfaceMap = do
 
   let ms             = pm_mod_summary . tm_parsed_module $ tm
       mi             = moduleInfo tm
@@ -84,7 +86,7 @@ createInterface tm flags modMap instIfaceMap = do
       !instances     = modInfoInstances mi
       !fam_instances = md_fam_insts md
       !exportedNames = modInfoExportsWithSelectors mi
-      (pkgNameFS, _) = modulePackageInfo dflags flags (Just mdl)
+      (pkgNameFS, _) = modulePackageInfo unit_state flags (Just mdl)
       pkgName        = fmap (unpackFS . (\(PackageName n) -> n)) pkgNameFS
 
       (TcGblEnv { tcg_rdr_env = gre
@@ -164,8 +166,7 @@ createInterface tm flags modMap instIfaceMap = do
         | otherwise = exportItems
       !prunedExportItems = seqList prunedExportItems' `seq` prunedExportItems'
 
-  let !aliases =
-        mkAliasMap (unitState dflags) $ tm_renamed_source tm
+  let !aliases = mkAliasMap unit_state $ tm_renamed_source tm
 
   modWarn <- liftErrMsg (moduleWarning dflags gre warnings)
 

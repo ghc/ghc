@@ -159,10 +159,11 @@ processModule verbosity modsum flags modMap instIfaceMap = do
     IsBoot ->
       return Nothing
     NotBoot -> do
+      unit_state <- hsc_units <$> getSession
       out verbosity verbose "Creating interface..."
       (interface, msgs) <- {-# SCC createIterface #-}
                           withTimingD "createInterface" (const ()) $ do
-                            runWriterGhc $ createInterface tm flags modMap instIfaceMap
+                            runWriterGhc $ createInterface tm unit_state flags modMap instIfaceMap
 
       -- We need to keep track of which modules were somehow in scope so that when
       -- Haddock later looks for instances, it also looks in these modules too.
@@ -170,7 +171,7 @@ processModule verbosity modsum flags modMap instIfaceMap = do
       -- See https://github.com/haskell/haddock/issues/469.
       hsc_env <- getSession
       let new_rdr_env = tcg_rdr_env . fst . GHC.tm_internals_ $ tm
-          home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+          home_unit = hsc_home_unit hsc_env
           !mods = mkModuleSet [ nameModule name
                               | gre <- globalRdrEnvElts new_rdr_env
                               , let name = gre_name gre
