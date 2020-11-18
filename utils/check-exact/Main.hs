@@ -6,9 +6,9 @@ import GHC hiding (moduleName)
 import GHC.Driver.Ppr
 import GHC.Driver.Session
 import GHC.Hs.Dump
-import GHC.Types.SourceText
+-- import GHC.Types.SourceText
 -- import GHC.Hs.Exact hiding (ExactPrint())
-import GHC.Utils.Outputable hiding (space)
+-- import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
@@ -21,7 +21,6 @@ import ExactPrint
 tt :: IO ()
 -- tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
 tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
-  -- "Test.hs"
  -- "../../testsuite/tests/printer/Ppr001.hs"
  -- "../../testsuite/tests/printer/Ppr002.hs"
  -- "../../testsuite/tests/printer/Ppr003.hs"
@@ -29,6 +28,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/Ppr005.hs"
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs"
  -- "../../testsuite/tests/printer/Ppr006.hs"
+ -- "../../testsuite/tests/printer/Ppr006a.hs"
  -- "../../testsuite/tests/printer/Ppr007.hs"
  -- "../../testsuite/tests/printer/Ppr008.hs"
  -- "../../testsuite/tests/hiefile/should_compile/hie008.hs"
@@ -106,7 +106,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/Test16230.hs"
  -- "../../testsuite/tests/printer/AnnotationLet.hs"
  -- "../../testsuite/tests/printer/AnnotationTuple.hs"
-  -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs"
+ -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs"
  -- "../../testsuite/tests/hiefile/should_compile/Scopes.hs"
  -- "../../testsuite/tests/printer/Ppr053.hs"
  -- "../../testsuite/tests/printer/Ppr054.hs"

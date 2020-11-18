@@ -655,10 +655,7 @@
              (WildPat
               (NoExtField)))]
            (GRHSs
-            (ApiAnn
-             { KindSigs.hs:23:9-12 }
-             (AddApiAnn AnnEqual { KindSigs.hs:23:9 })
-             [])
+            (NoExtField)
             [(L
               { KindSigs.hs:23:9-12 }
               (GRHS
@@ -1104,10 +1101,7 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (ApiAnn
-             { KindSigs.hs:35:6-11 }
-             (AddApiAnn AnnEqual { KindSigs.hs:35:6 })
-             [])
+            (NoExtField)
             [(L
               { KindSigs.hs:35:6-11 }
               (GRHS

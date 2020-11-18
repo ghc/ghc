@@ -34,7 +34,7 @@
                  (NoSrcStrict))
                 []
                 (GRHSs
-                 (ApiAnnNotUsed)
+                 (NoExtField)
                  [(L
                    { DumpRenamedAst.hs:26:6-23 }
                    (GRHS

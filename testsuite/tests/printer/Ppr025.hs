@@ -7,6 +7,9 @@ operator = describe "Operators on ProcessA"$
         it "acts like local variable with hold." $
           do
             let
+                foo = bar $
+                  do
+                    return 4
                 pa = proc evx ->
                   do
                     (\evy -> hold 10 -< evy)

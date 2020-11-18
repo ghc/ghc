@@ -148,7 +148,7 @@ type LHsDecl p = XRec p (HsDecl p)
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-type instance Anno (HsDecl (GhcPass p)) = SrcSpanAnnA
+type instance Anno (HsDecl (GhcPass _)) = SrcSpanAnnA
 
 -- | A Haskell Declaration
 data HsDecl p

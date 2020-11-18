@@ -1759,8 +1759,11 @@ binds   ::  { Located (HsLocalBinds GhcPs) }
                                          -- May have implicit parameters
                                                 -- No type declarations
         : decllist          {% do { val_binds <- cvBindGroup (unLoc $ snd $ unLoc $1)
-                                  ; return (sL1 $1
-                                              $ HsValBinds (ApiAnn (glR $1) (fst $ unLoc $1) []) val_binds) } }
+                                  ; cs <- getCommentsFor (gl $1)
+                                  ; if (isNilOL (unLoc $ snd $ unLoc $1))
+                                    then return (sL1 $1 $ HsValBinds (ApiAnn (glR $1) (AnnList Nothing Nothing [] []) cs) val_binds)
+                                    else return (sL1 $1
+                                              $ HsValBinds (ApiAnn (glR $1) (fst $ unLoc $1) cs) val_binds) } }
                                   -- ; return (L (SrcSpanAnn (ApiAnn (glR $1) (fst $ unLoc $1) []) (gl $1))
                                   --             $ HsValBinds (ApiAnn (glR $1) (AnnList Nothing Nothing [] []) []) val_binds) } }
 
@@ -2158,9 +2161,9 @@ tyop :: { LocatedN RdrName }
         : qtyconop                      { $1 }
         | tyvarop                       { $1 }
         | SIMPLEQUOTE qconop            {% amsrn (sLL $1 (reLoc $>) (unLoc $2))
-                                                 (NameAnnQuote (glR $1) (gNA $2) []) }
+                                                 (NameAnnQuote (glR $1) (gl $2) []) }
         | SIMPLEQUOTE varop             {% amsrn (sLL $1 (reLoc $>) (unLoc $2))
-                                                 (NameAnnQuote (glR $1) (gNA $2) []) }
+                                                 (NameAnnQuote (glR $1) (gl $2) []) }
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       {% acsa (\cs -> sL1a (reLocN $1) (HsTyVar (ApiAnn (glNR $1) [] cs) NotPromoted $1)) }      -- Not including unit tuples
@@ -2486,10 +2489,10 @@ rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
         : '=' exp wherebinds    {% runPV (unECP $2) >>= \ $2 ->
                                   do { let loc = (comb3 $1 (reLoc $2) (adaptWhereBinds $3))
                                      ; acs (\cs ->
-                                       sL loc (GRHSs (ApiAnn (rs loc) (mj AnnEqual $1) cs) (unguardedRHS (ApiAnn (rs loc) (GrhsAnn Nothing (mj AnnEqual $1)) []) loc $2)
+                                       sL loc (GRHSs NoExtField (unguardedRHS (ApiAnn (rs loc) (GrhsAnn Nothing (mj AnnEqual $1)) cs) loc $2)
                                                       (unLoc $ (adaptWhereBinds $3)))) } }
         | gdrhs wherebinds      { sL (comb2 $1 (adaptWhereBinds $>))
-                                    (GRHSs noAnn (reverse (unLoc $1)) (unLoc $ (adaptWhereBinds $2))) }
+                                    (GRHSs noExtField (reverse (unLoc $1)) (unLoc $ (adaptWhereBinds $2))) }
 
 gdrhs :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
         : gdrhs gdrh            { sLL $1 $> ($2 : unLoc $1) }
@@ -2755,7 +2758,7 @@ aexp    :: { ECP }
                                          $ Match { m_ext = ApiAnn (glR $1) [mj AnnLam $1] cs
                                                  , m_ctxt = LambdaExpr
                                                  , m_pats = $2:$3
-                                                 , m_grhss = unguardedGRHSs $5 (ApiAnn (glR $4) (mu AnnRarrow $4) []) }])) }
+                                                 , m_grhss = unguardedGRHSs (comb2 $4 (reLoc $5)) $5 (ApiAnn (glR $4) (GrhsAnn Nothing (mu AnnRarrow $4)) []) }])) }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
                                            mkHsLetPV (comb2A $1 $>) (unLoc $2) $4
@@ -3181,7 +3184,7 @@ alt     :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
 
 alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }
         : ralt wherebinds           { $1 >>= \alt ->
-                                      return $ sLL alt (adaptWhereBinds $>) (GRHSs noAnn (unLoc alt) (unLoc $ adaptWhereBinds $2)) }
+                                      return $ sLL alt (adaptWhereBinds $>) (GRHSs noExtField (unLoc alt) (unLoc $ adaptWhereBinds $2)) }
 
 ralt :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
         : '->' exp            { unECP $2 >>= \ $2 ->
@@ -4092,10 +4095,6 @@ glAR = realSrcSpan . getLocA
 glNR :: LocatedN a -> RealSrcSpan
 glNR = realSrcSpan . getLocA
 
-gNA :: LocatedN a -> ApiAnn' NameAnn
-gNA (L (SrcSpanAnn an _) _) = an
-
-
 acs :: MonadP m => (ApiAnnComments -> Located a) -> m (Located a)
 acs a = do
   let (L l _) = a []
@@ -4210,7 +4209,9 @@ addTrailingCommaA  la span = addTrailingAnnA la span AddCommaAnn
 
 addTrailingAnnA :: MonadP m => LocatedA a -> SrcSpan -> (RealSrcSpan -> TrailingAnn) -> m (LocatedA a)
 addTrailingAnnA (L (SrcSpanAnn anns l) a) ss ta = do
-  cs <- getCommentsFor l
+  -- cs <- getCommentsFor l
+  let cs = []
+  -- AZ:TODO: generalise updating comments into an annotation
   let
     anns' = if isZeroWidthSpan ss
               then anns
@@ -4236,7 +4237,8 @@ addTrailingAnnL (L (SrcSpanAnn anns l) a) ta = do
 -- Mostly use to add AnnComma, special case it to NOP if adding a zero-width annotation
 addTrailingCommaN :: MonadP m => LocatedN a -> SrcSpan -> m (LocatedN a)
 addTrailingCommaN (L (SrcSpanAnn anns l) a) span = do
-  cs <- getCommentsFor l
+  -- cs <- getCommentsFor l
+  let cs = []
   -- AZ:TODO: generalise updating comments into an annotation
   let anns' = if isZeroWidthSpan span
                 then anns

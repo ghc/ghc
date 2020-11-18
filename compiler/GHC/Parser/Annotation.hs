@@ -498,6 +498,13 @@ defined.
 -- AnnKeywordId elements. Note: we may reduce the usage of
 -- AnnKeywordId, and use locations only, as captured in that
 -- structure.
+--
+-- The spacing between the items under the scope of a given ApiAnn' is
+-- derived from the original 'anchor'.  But there is no requirement
+-- that the items included in the sub-element have a "matching"
+-- location in their relative anchors. This allows us to freely move
+-- elements around, and stitch together new AST fragments out of old
+-- ones, and have them still printed out in a reasonable way.
 data ApiAnn' ann
   = ApiAnn { anchor   :: RealSrcSpan -- ^ Base location for the start of
                                      -- the syntactic element holding the
@@ -513,6 +520,9 @@ data ApiAnn' ann
 
 type ApiAnn = ApiAnn' [AddApiAnn]
 type ApiAnnComments = [RealLocated AnnotationComment]
+
+-- +| Relative positions, row then column
+-- newtype DeltaPos = DP (Int,Int) deriving (Show,Eq,Ord,Typeable,Data)
 
 data NoApiAnns = NoApiAnns
   deriving (Data,Eq,Ord)
@@ -710,7 +720,7 @@ data NameAnn
       }
   | NameAnnQuote {
       nann_quote     :: RealSrcSpan,
-      nann_quoted    :: ApiAnn' NameAnn,
+      nann_quoted    :: SrcSpanAnnName,
       nann_trailing  :: [TrailingAnn]
       }
   | NameAnnTrailing {

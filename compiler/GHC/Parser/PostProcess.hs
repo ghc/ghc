@@ -433,8 +433,9 @@ annBinds _ (EmptyLocalBinds x) = (EmptyLocalBinds x)
 
 add_where :: AddApiAnn -> ApiAnn' AnnList -> ApiAnn' AnnList
 add_where an@(AddApiAnn _ rs) (ApiAnn a (AnnList o c r t) cs)
-  = (ApiAnn (combineRealSrcSpans rs a) (AnnList o c (an:r) t) cs)
-add_where (AddApiAnn _ _) ApiAnnNotUsed = panic "add_where"
+  = ApiAnn (combineRealSrcSpans rs a) (AnnList o c (an:r) t) cs
+add_where an@(AddApiAnn _ rs) ApiAnnNotUsed
+  = ApiAnn rs (AnnList Nothing Nothing [an] []) []
 
 {- **********************************************************************
 
@@ -1036,8 +1037,8 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
 
   -- no need for anns, returning original
   -- check _anns _t = return (L (noAnnSrcSpan l) [orig_t])
-  check (opi,cpi,csi) _t =
-                 return (L (SrcSpanAnn (ApiAnn (realSrcSpan l) (AnnContext Nothing opi cpi) csi) l) [orig_t])
+  check (opi,cpi,csi) t =
+                 return (L (SrcSpanAnn (ApiAnn (realSrcSpan l) (AnnContext Nothing opi cpi) csi) l) [t])
 
 checkImportDecl :: Maybe RealSrcSpan
                 -> Maybe RealSrcSpan
