@@ -294,8 +294,8 @@ stgCseTopLvlRhs :: InScopeSet -> InStgRhs -> OutStgRhs
 stgCseTopLvlRhs in_scope (StgRhsClosure ext ccs upd args body)
     = let body' = stgCseExpr (initEnv in_scope) body
       in  StgRhsClosure ext ccs upd args body'
-stgCseTopLvlRhs _ (StgRhsCon ccs dataCon args)
-    = StgRhsCon ccs dataCon args
+stgCseTopLvlRhs _ (StgRhsCon ccs dataCon mu ticks args)
+    = StgRhsCon ccs dataCon mu ticks args
 
 ------------------------------
 -- The actual AST traversal --
@@ -330,11 +330,11 @@ stgCseExpr env (StgCase scrut bndr ty alts)
 
 -- A constructor application.
 -- To be removed by a variable use when found in the CSE environment
-stgCseExpr env (StgConApp dataCon args tys)
+stgCseExpr env (StgConApp dataCon n args tys)
     | Just bndr' <- envLookup dataCon args' env
     = StgApp bndr' []
     | otherwise
-    = StgConApp dataCon args' tys
+    = StgConApp dataCon n args' tys
   where args' = substArgs env args
 
 -- Let bindings
@@ -399,7 +399,7 @@ stgCsePairs env0 ((b,e):pairs)
 -- The RHS of a binding.
 -- If it is a constructor application, either short-cut it or extend the environment
 stgCseRhs :: CseEnv -> OutId -> InStgRhs -> (Maybe (OutId, OutStgRhs), CseEnv)
-stgCseRhs env bndr (StgRhsCon ccs dataCon args)
+stgCseRhs env bndr (StgRhsCon ccs dataCon mu ticks args)
     | Just other_bndr <- envLookup dataCon args' env
     , not (isWeakLoopBreaker (idOccInfo bndr)) -- See Note [Care with loop breakers]
     = let env' = addSubst bndr other_bndr env
@@ -407,7 +407,7 @@ stgCseRhs env bndr (StgRhsCon ccs dataCon args)
     | otherwise
     = let env' = addDataCon bndr dataCon args' env
             -- see note [Case 1: CSEing allocated closures]
-          pair = (bndr, StgRhsCon ccs dataCon args')
+          pair = (bndr, StgRhsCon ccs dataCon mu ticks args')
       in (Just pair, env')
   where args' = substArgs env args
 

@@ -45,7 +45,7 @@ module GHC.StgToCmm.Utils (
         emitUpdRemSetPush,
         emitUpdRemSetPushThunk,
 
-        convertClosureMap
+        convertClosureMap, convertDCMap
   ) where
 
 #include "HsVersions.h"
@@ -649,3 +649,13 @@ convertClosureMap defns this_mod denv =
     (ty, ss, l) <- lookupUniqMap denv n
     return (InfoProvEnt cl cn ty (this_mod, ss, l))) defns
 
+-- | Convert source information about data constructors into entries suitable
+-- for placing into the info table provenance table.
+convertDCMap :: Module -> DCMap -> [InfoProvEnt]
+convertDCMap this_mod (UniqMap denv) =
+  concatMap (\(dc, ns) -> mapMaybe (\(k, mss) ->
+      case mss of
+        Nothing -> Nothing
+        Just (ss, l) -> Just $
+          InfoProvEnt (mkConInfoTableLabel (dataConName dc) (UsageSite this_mod k))
+                       0 "" (this_mod, ss, l)) ns) (nonDetEltsUFM denv)
