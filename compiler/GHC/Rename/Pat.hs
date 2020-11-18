@@ -751,7 +751,7 @@ rnHsRecUpdFields flds
            ; sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Expr
-                      do  { mb <- lookupGlobalOccRn_overloaded_pat overload_ok lbl
+                      do  { mb <- lookupGlobalOccRn_overloaded_sel overload_ok lbl
                           ; case mb of
                               Nothing ->
                                 do { addErr

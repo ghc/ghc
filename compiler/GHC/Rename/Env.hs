@@ -16,7 +16,7 @@ module GHC.Rename.Env (
         lookupTypeOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
         LookupOccRnOverloadedResult(..),
-        lookupGlobalOccRn_overloaded_pat,
+        lookupGlobalOccRn_overloaded_sel,
         lookupOccRn_overloaded_expr,
 
         ChildLookupResult(..),
@@ -1202,10 +1202,10 @@ generates @$sel:foo:MkT@.
 -- | Look up a variable or record selectors.
 -- It MAY find a selector function with NoFieldSelectors.
 -- See Note [NoFieldSelectors]
-lookupGlobalOccRn_overloaded_pat :: DuplicateRecordFields
+lookupGlobalOccRn_overloaded_sel :: DuplicateRecordFields
   -> RdrName
   -> RnM (Maybe LookupOccRnOverloadedResult)
-lookupGlobalOccRn_overloaded_pat overload_ok rdr_name =
+lookupGlobalOccRn_overloaded_sel overload_ok rdr_name =
   lookupExactOrOrig_maybe rdr_name (fmap LookupOccRnUnique) $ runMaybeT $ msum
     [ MaybeT $ do
       { res <- lookupGreRn_helper rdr_name
