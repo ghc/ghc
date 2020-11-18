@@ -21,7 +21,7 @@ T7360.$WFoo3
 
 -- RHS size: {terms: 5, types: 2, coercions: 0, joins: 0/0}
 fun1 [InlPrag=NOINLINE] :: Foo -> ()
-[GblId, Arity=1, Str=<SU>, Unf=OtherCon []]
+[GblId, Arity=1, Str=<SA>, Unf=OtherCon []]
 fun1 = \ (x :: Foo) -> case x of { __DEFAULT -> GHC.Tuple.() }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
