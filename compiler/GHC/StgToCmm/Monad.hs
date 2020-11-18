@@ -58,9 +58,8 @@ module GHC.StgToCmm.Monad (
         -- more localised access to monad state
         CgIdInfo(..),
         getBinds, setBinds,
-
         -- out of general friendliness, we also export ...
-        CgInfoDownwards(..), CgState(..)        -- non-abstract
+        CgInfoDownwards(..), CgState(..) -- non-abstract
     ) where
 
 import GHC.Prelude hiding( sequence, succ )
@@ -314,7 +313,11 @@ data CgState
 
      cgs_hp_usg  :: HeapUsage,
 
-     cgs_uniqs :: UniqSupply }
+     cgs_uniqs :: UniqSupply
+     }
+-- If you are wondering why you have to be careful forcing CgState then
+-- the reason is the knot-tying in 'getHeapUsage'. This problem is tracked
+-- in #19245
 
 data HeapUsage   -- See Note [Virtual and real heap pointers]
   = HeapUsage {
@@ -378,8 +381,8 @@ addCodeBlocksFrom :: CgState -> CgState -> CgState
 -- (The cgs_stmts will often be empty, but not always; see codeOnly)
 s1 `addCodeBlocksFrom` s2
   = s1 { cgs_stmts = cgs_stmts s1 CmmGraph.<*> cgs_stmts s2,
-         cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2 }
-
+         cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2
+       }
 
 -- The heap high water mark is the larger of virtHp and hwHp.  The latter is
 -- only records the high water marks of forked-off branches, so to find the
