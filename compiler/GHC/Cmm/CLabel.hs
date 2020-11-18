@@ -80,16 +80,10 @@ module GHC.Cmm.CLabel (
         mkRtsApFastLabel,
         mkPrimCallLabel,
         mkForeignLabel,
-        addLabelSize,
-
-        foreignLabelStdcallInfo,
-        isBytesLabel,
-        isForeignLabel,
-        isSomeRODataLabel,
-        isStaticClosureLabel,
-        mkCCLabel, mkCCSLabel,
-
-        mkIPELabel, InfoTableEnt(..),
+        mkCCLabel,
+        mkCCSLabel,
+        mkIPELabel,
+        InfoTableEnt(..),
 
         mkDynamicLinkerLabel,
         mkPicBaseLabel,
@@ -112,6 +106,10 @@ module GHC.Cmm.CLabel (
         isIdLabel,
         isTickyLabel,
         hasHaskellName,
+        isBytesLabel,
+        isForeignLabel,
+        isSomeRODataLabel,
+        isStaticClosureLabel,
 
         -- * Conversions
         toClosureLbl,
@@ -125,7 +123,9 @@ module GHC.Cmm.CLabel (
         pprCLabel,
 
         -- * Others
-        dynamicLinkerLabelInfo
+        dynamicLinkerLabelInfo,
+        addLabelSize,
+        foreignLabelStdcallInfo
     ) where
 
 #include "HsVersions.h"
