@@ -276,10 +276,11 @@ sizeof_ccs_words platform
 
 initInfoTableProv ::  InfoTableProvMap -> Module -> FCode ()
 -- Emit the declarations
-initInfoTableProv (InfoTableProvMap clmap) this_mod
+initInfoTableProv (InfoTableProvMap dcmap clmap) this_mod
   = do
        infos <- getUsedInfo
-       let ents = convertClosureMap infos this_mod clmap
+       let ents = convertDCMap this_mod dcmap ++
+                    convertClosureMap infos this_mod clmap
        --pprTraceM "UsedInfo" (ppr (length infos))
        --pprTraceM "initInfoTable" (ppr (length ents))
        mapM_ emitInfoTableProv ents
