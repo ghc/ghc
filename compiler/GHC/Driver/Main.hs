@@ -178,6 +178,9 @@ import GHC.Unit.Module.Deps
 import GHC.Unit.Module.Status
 import GHC.Unit.Home.ModInfo
 
+import GHC.Utils.Error
+import Data.IORef
+
 import GHC.Types.Id
 import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
@@ -185,6 +188,7 @@ import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env       ( emptyTidyEnv )
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Types.Unique.Supply
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
@@ -198,7 +202,6 @@ import GHC.Types.HpcInfo
 
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
-import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Exception
 import GHC.Utils.Misc
@@ -213,7 +216,6 @@ import Data.Data hiding (Fixity, TyCon)
 import Data.Maybe       ( fromJust )
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
-import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
 import System.IO (fixIO)
@@ -1510,19 +1512,21 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                        corePrepPgm hsc_env this_mod location
                                    core_binds data_tycons
         -----------------  Convert to STG ------------------
-        (stg_binds, (caf_ccs, caf_cc_stacks))
+        (stg_binds, denv, (caf_ccs, caf_cc_stacks))
             <- {-# SCC "CoreToStg" #-}
-               myCoreToStg dflags this_mod prepd_binds
+               myCoreToStg dflags this_mod location prepd_binds
 
-        let cost_centre_info = (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
+        let cost_centre_info =
+              (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
             platform = targetPlatform dflags
             prof_init
-               | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info
-               | otherwise = empty
-            foreign_stubs = foreign_stubs0 `appendStubC` prof_init
+              | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info
+              | otherwise = empty
 
         ------------------  Code generation ------------------
-
+        -- This IORef records which info tables are used during
+        -- code generation.
+        lref <- newIORef []
         -- The back-end is streamed: each top-level function goes
         -- from Stg all the way to asm before dealing with the next
         -- top-level function, so showPass isn't very useful here.
@@ -1532,9 +1536,9 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                    (text "CodeGen"<+>brackets (ppr this_mod))
                    (const ()) $ do
             cmms <- {-# SCC "StgToCmm" #-}
-                            doCodeGen hsc_env this_mod data_tycons
+                            doCodeGen hsc_env this_mod denv data_tycons
                                 cost_centre_info
-                                stg_binds hpc_info
+                                stg_binds hpc_info lref
 
             ------------------  Code output -----------------------
             rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
@@ -1547,11 +1551,16 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                   return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
+            let foreign_stubs = do
+                  used_info <- readIORef lref
+                  let ip_init = ipInitCode used_info dflags this_mod denv
+                  return $ foreign_stubs0 `appendStubC` prof_init `appendStubC` ip_init
+
+            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, caf_infos)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags (hsc_units hsc_env) this_mod output_filename location
-                  foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps, cg_infos)
+                  foreign_files dependencies foreign_stubs rawcmms1
+            return (output_filename, stub_c_exists, foreign_fps, caf_infos)
 
 
 hscInteractive :: HscEnv
@@ -1618,7 +1627,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
             FormatCMM (pdoc platform cmmgroup)
         rawCmms <- lookupHook (\x -> cmmToRawCmmHook x)
                      (\dflgs _ -> cmmToRawCmm dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
-        _ <- codeOutput dflags (hsc_units hsc_env) cmm_mod output_filename no_loc NoStubs [] []
+        _ <- codeOutput dflags (hsc_units hsc_env) cmm_mod output_filename no_loc [] [] (return NoStubs)
              rawCmms
         return ()
   where
@@ -1647,16 +1656,17 @@ This reduces residency towards the end of the CodeGen phase significantly
 (5-10%).
 -}
 
-doCodeGen   :: HscEnv -> Module -> [TyCon]
+doCodeGen   :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
+            -> IORef [CmmInfoTable]
             -> IO (Stream IO CmmGroupSRTs CgInfos)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
-doCodeGen hsc_env this_mod data_tycons
-              cost_centre_info stg_binds hpc_info = do
+doCodeGen hsc_env this_mod denv data_tycons
+              cost_centre_info stg_binds hpc_info lref = do
     let dflags = hsc_dflags hsc_env
         platform = targetPlatform dflags
 
@@ -1667,8 +1677,8 @@ doCodeGen hsc_env this_mod data_tycons
     let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
-            lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod data_tycons
-                           cost_centre_info stg_binds_w_fvs hpc_info
+            lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod denv data_tycons
+                           cost_centre_info stg_binds_w_fvs hpc_info lref
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one
@@ -1699,19 +1709,20 @@ doCodeGen hsc_env this_mod data_tycons
 
     return (Stream.mapM dump2 pipeline_stream)
 
-myCoreToStg :: DynFlags -> Module -> CoreProgram
+myCoreToStg :: DynFlags -> Module -> ModLocation -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
+                  , InfoTableProvMap
                   , CollectedCCs )  -- CAF cost centre info (declared and used)
-myCoreToStg dflags this_mod prepd_binds = do
-    let (stg_binds, cost_centre_info)
+myCoreToStg dflags this_mod ml prepd_binds = do
+    let (stg_binds, denv, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
-           coreToStg dflags this_mod prepd_binds
+           coreToStg dflags this_mod ml prepd_binds
 
     stg_binds2
         <- {-# SCC "Stg2Stg" #-}
            stg2stg dflags this_mod stg_binds
 
-    return (stg_binds2, cost_centre_info)
+    return (stg_binds2, denv, cost_centre_info)
 
 
 {- **********************************************************************
