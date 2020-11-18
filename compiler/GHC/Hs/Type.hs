@@ -1120,7 +1120,7 @@ data HsType pass
 
   -- For adding new constructors via Trees that Grow
   | XHsType
-      (XXType pass)
+      !(XXType pass)
 
 data NewHsTypeX
   = NHsCoreTy Type -- An escape hatch for tunnelling a *closed*

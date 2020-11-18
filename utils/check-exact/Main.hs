@@ -6,9 +6,9 @@ import GHC hiding (moduleName)
 import GHC.Driver.Ppr
 import GHC.Driver.Session
 import GHC.Hs.Dump
-import GHC.Types.SourceText
+-- import GHC.Types.SourceText
 -- import GHC.Hs.Exact hiding (ExactPrint())
-import GHC.Utils.Outputable hiding (space)
+-- import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
@@ -21,7 +21,6 @@ import ExactPrint
 tt :: IO ()
 -- tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
 tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
-  -- "Test.hs"
  -- "../../testsuite/tests/printer/Ppr001.hs"
  -- "../../testsuite/tests/printer/Ppr002.hs"
  -- "../../testsuite/tests/printer/Ppr003.hs"
@@ -29,6 +28,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/Ppr005.hs"
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs"
  -- "../../testsuite/tests/printer/Ppr006.hs"
+ -- "../../testsuite/tests/printer/Ppr006a.hs"
  -- "../../testsuite/tests/printer/Ppr007.hs"
  -- "../../testsuite/tests/printer/Ppr008.hs"
  -- "../../testsuite/tests/hiefile/should_compile/hie008.hs"
@@ -67,7 +67,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/Ppr042.hs"
  -- "../../testsuite/tests/printer/Ppr043.hs"
  -- "../../testsuite/tests/printer/Ppr044.hs"
- -- "../../testsuite/tests/printer/Ppr045.hs"
+ "../../testsuite/tests/printer/Ppr045.hs"
  -- "../../testsuite/tests/printer/Ppr046.hs"
  -- Not tested, the GENERATED pragma is getting removed "../../testsuite/tests/printer/Ppr047.hs"
  -- "../../testsuite/tests/printer/Ppr048.hs"
@@ -111,7 +111,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/Ppr053.hs"
  -- "../../testsuite/tests/printer/Ppr054.hs"
  -- "../../testsuite/tests/printer/Ppr055.hs"
- "../../testsuite/tests/hiefile/should_run/PatTypes.hs"
+ -- "../../testsuite/tests/hiefile/should_run/PatTypes.hs"
 
 -- exact = ppr
 
