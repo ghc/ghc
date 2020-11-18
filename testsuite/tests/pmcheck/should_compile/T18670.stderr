@@ -1,4 +1,5 @@
 
 T18670.hs:16:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘f’: Patterns not matched: TBool _
+    In an equation for ‘f’:
+        Patterns of type  ‘T a’, ‘a :~: Int’ not matched: TBool _

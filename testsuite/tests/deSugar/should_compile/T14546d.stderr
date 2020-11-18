@@ -6,4 +6,4 @@ T14546d.hs:3:10: warning: [-Wmissing-methods (in -Wdefault)]
 
 T14546d.hs:7:5: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: 3
+    In a case alternative: Patterns of type  ‘D’ not matched: 3
