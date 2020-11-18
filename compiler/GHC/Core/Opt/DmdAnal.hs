@@ -225,15 +225,27 @@ dmdAnal' env dmd (Lam var body)
     in
     (multDmdType n lam_ty, Lam var' body')
 
-dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
-  -- Only one alternative with a product constructor
-  | let tycon = dataConTyCon dc
-  , isJust (isDataProductTyCon_maybe tycon)
+dmdAnal' env dmd (Case scrut case_bndr ty [(alt, bndrs, rhs)])
+  -- Only one alternative.
+  -- If it's a DataAlt, it should be a product constructor.
+  | is_non_sum_alt alt
   = let
         (rhs_ty, rhs')           = dmdAnal env dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
-        id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
+        -- The peelDmd below will lazify the relative sub-demands if the
+        -- case_bndr_dmd had lazy evaluation cardinality
+        case_bndr_sd             = peelDmd case_bndr_dmd
+        -- Compute demand on the scrutinee
+        (bndrs', scrut_sd)
+          | DataAlt _ <- alt
+          , id_dmds <- addCaseBndrDmd case_bndr_sd dmds
+          -- See Note [Demand on scrutinee of a product case]
+          = (setBndrsDemandInfo bndrs id_dmds, mkProd id_dmds)
+          | otherwise
+          -- __DEFAULT and literal alts. Simply add demands and discard the
+          -- evaluation cardinality, as we evaluate the scrutinee exactly once.
+          = ASSERT( null bndrs ) (bndrs, case_bndr_sd)
         fam_envs                 = ae_fam_envs env
         alt_ty3
           -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
@@ -242,23 +254,21 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
           | otherwise
           = alt_ty2
 
-        -- Compute demand on the scrutinee
-        -- See Note [Demand on scrutinee of a product case]
-        scrut_dmd          = mkProd id_dmds
-        (scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
+        (scrut_ty, scrut') = dmdAnal env scrut_sd scrut
         res_ty             = alt_ty3 `plusDmdType` toPlusDmdArg scrut_ty
         case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
-        bndrs'             = setBndrsDemandInfo bndrs id_dmds
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
 --                                   , text "case_bndr_dmd" <+> ppr (idDemandInfo case_bndr')
---                                   , text "id_dmds" <+> ppr id_dmds
---                                   , text "scrut_dmd" <+> ppr scrut_dmd
+--                                   , text "scrut_sd" <+> ppr scrut_sd
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_ty" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
-    (res_ty, Case scrut' case_bndr' ty [(DataAlt dc, bndrs', rhs')])
+    (res_ty, Case scrut' case_bndr' ty [(alt, bndrs', rhs')])
+    where
+      is_non_sum_alt (DataAlt dc) = isJust $ isDataProductTyCon_maybe $ dataConTyCon dc
+      is_non_sum_alt _            = True
 
 dmdAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
@@ -384,7 +394,7 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
   , (rhs_ty, rhs') <- dmdAnal env dmd rhs
   , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
   , let case_bndr_dmd = findIdDemand alt_ty case_bndr
-        id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
+        id_dmds       = addCaseBndrDmd (peelDmd case_bndr_dmd) dmds
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
 {-

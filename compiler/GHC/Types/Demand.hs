@@ -35,7 +35,7 @@ module GHC.Types.Demand (
     -- ** Other @Demand@ operations
     oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, mkWorkerDemand,
     peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
-    addCaseBndrDmd,
+    peelDmd, addCaseBndrDmd,
     -- ** Extracting one-shot information
     argOneShots, argsOneShots, saturatedByOneShots,
 
@@ -515,6 +515,13 @@ strictifyDictDmd ty (n :* Prod ds)
       = Nothing
 strictifyDictDmd _  dmd = dmd
 
+-- | Peels the evaluation cardinality of a 'Demand' and multiplies it with the relative parts of TODO
+peelDmd :: Demand -> SubDemand
+peelDmd (n :* sd)
+  | isAbs n    = seqSubDmd
+  | isStrict n = sd
+  | otherwise  = C_01 `multSubDmd` sd
+
 -- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @CS(d)@.
 mkCallDmd :: SubDemand -> SubDemand
 mkCallDmd sd = Call C_11 sd
@@ -544,17 +551,15 @@ mkWorkerDemand n = C_01 :* go n
   where go 0 = topSubDmd
         go n = Call C_01 $ go (n-1)
 
-addCaseBndrDmd :: Demand    -- On the case binder
+addCaseBndrDmd :: SubDemand -- On the case binder
                -> [Demand]  -- On the components of the constructor
                -> [Demand]  -- Final demands for the components of the constructor
--- See Note [Demand on case-alternative binders]
-addCaseBndrDmd (n :* sd) alt_dmds
+addCaseBndrDmd (Poly n) alt_dmds
   | isAbs n   = alt_dmds
-  | otherwise = zipWith plusDmd ds alt_dmds -- fuse ds!
+-- See Note [Demand on case-alternative binders]
+addCaseBndrDmd sd       alt_dmds = zipWith plusDmd ds alt_dmds -- fuse ds!
   where
-    sd' | isStrict n = sd
-        | otherwise  = multSubDmd C_01 sd
-    Just ds = viewProd (length alt_dmds) sd' -- Guaranteed not to be a call
+    Just ds = viewProd (length alt_dmds) sd -- Guaranteed not to be a call
 
 argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
 -- ^ See Note [Computing one-shot info]
