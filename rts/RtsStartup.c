@@ -32,6 +32,7 @@
 #include "StaticPtrTable.h"
 #include "Hash.h"
 #include "Profiling.h"
+#include "IPE.h"
 #include "ProfHeap.h"
 #include "Timer.h"
 #include "Globals.h"
@@ -369,6 +370,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #if defined(PROFILING)
     initProfiling();
 #endif
+    dumpIPEToEventLog();
     initHeapProfiling();
 
     /* start the virtual timer 'subsystem'. */

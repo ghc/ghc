@@ -2902,6 +2902,8 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "fprof-callers"
          (HasArg setCallerCcFilters)
 
+  , make_ord_flag defGhcFlag "finfo-table-map"
+      (NoArg (setGeneralFlag Opt_InfoTableMap))
         ------ Compiler flags -----------------------------------------------
 
   , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend NCG))

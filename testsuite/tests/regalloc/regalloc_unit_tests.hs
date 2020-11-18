@@ -46,6 +46,7 @@ import GHC.Driver.Errors
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Types.Basic
+import GHC.Unit.Home
 
 import GHC.Data.Stream as Stream (collect, yield)
 
@@ -112,7 +113,8 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
     hscEnv <- newHscEnv dflags
 
     -- parse the cmm file and output any warnings or errors
-    (warnings, errors, parsedCmm) <- parseCmmFile dflags (hsc_home_unit hscEnv) cmmFile
+    let fake_mod = mkHomeModule (hsc_home_unit hscEnv) (mkModuleName "fake")
+    (warnings, errors, parsedCmm) <- parseCmmFile dflags fake_mod (hsc_home_unit hscEnv) cmmFile
     let warningMsgs = fmap pprWarning warnings
         errorMsgs   = fmap pprError errors
 
@@ -120,7 +122,7 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
     mapM_ (printBagOfErrors dflags) [warningMsgs, errorMsgs]
 
     let initTopSRT = emptySRT thisMod
-    cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fromJust parsedCmm
+    cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fst $ fromJust parsedCmm
 
     rawCmms <- cmmToRawCmm dflags (Stream.yield cmmGroup)
 

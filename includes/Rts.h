@@ -241,6 +241,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/PrimFloat.h"
 #include "rts/Main.h"
 #include "rts/Profiling.h"
+#include "rts/IPE.h"
 #include "rts/StaticPtrTable.h"
 #include "rts/Libdw.h"
 #include "rts/LibdwPool.h"

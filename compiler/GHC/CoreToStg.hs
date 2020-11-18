@@ -22,6 +22,7 @@ import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Stg.Syntax
+import GHC.Stg.Debug
 
 import GHC.Core.Type
 import GHC.Types.RepType
@@ -46,6 +47,7 @@ import GHC.Driver.Session
 import GHC.Platform.Ways
 import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
+import GHC.Types.IPE
 import GHC.Types.Demand    ( isUsedOnceDmd )
 import GHC.Builtin.PrimOps ( PrimCall(..) )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
@@ -226,13 +228,20 @@ import qualified Data.Set as Set
 -- Setting variable info: top-level, binds, RHSs
 -- --------------------------------------------------------------
 
-coreToStg :: DynFlags -> Module -> CoreProgram
-          -> ([StgTopBinding], CollectedCCs)
-coreToStg dflags this_mod pgm
-  = (pgm', final_ccs)
+
+coreToStg :: DynFlags -> Module -> ModLocation -> CoreProgram
+          -> ([StgTopBinding], InfoTableProvMap, CollectedCCs)
+coreToStg dflags this_mod ml pgm
+  = (pgm'', denv, final_ccs)
   where
     (_, (local_ccs, local_cc_stacks), pgm')
       = coreTopBindsToStg dflags this_mod emptyVarEnv emptyCollectedCCs pgm
+
+    -- See Note [Mapping Info Tables to Source Positions]
+    (!pgm'', !denv) =
+        if gopt Opt_InfoTableMap dflags
+          then collectDebugInformation dflags ml pgm'
+          else (pgm', emptyInfoTableProvMap)
 
     prof = WayProf `Set.member` ways dflags
 

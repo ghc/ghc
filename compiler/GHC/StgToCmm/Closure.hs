@@ -97,6 +97,7 @@ import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Unit.Module
 
 import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
