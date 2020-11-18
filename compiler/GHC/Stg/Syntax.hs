@@ -437,6 +437,7 @@ important):
         DataCon         -- Constructor. Never an unboxed tuple or sum, as those
                         -- are not allocated.
         (Maybe Int)
+        [Tickish Id]
         [StgArg]        -- Args
 
 -- | Used as a data type index for the stgSyn AST
@@ -483,7 +484,7 @@ stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   = ASSERT( all isId bndrs ) length bndrs
   -- The arity never includes type parameters, but they should have gone by now
-stgRhsArity (StgRhsCon _ _ _ _) = 0
+stgRhsArity (StgRhsCon _ _ _ _ _) = 0
 
 {-
 ************************************************************************
@@ -818,5 +819,5 @@ pprStgRhs opts rhs = case rhs of
                     ])
               4 (pprStgExpr opts body)
 
-   StgRhsCon cc con mid args
-      -> hcat [ ppr cc, space, ppr mid, ppr con, text "! ", brackets (sep (map pprStgArg args))]
+   StgRhsCon cc con mid ticks args
+      -> hcat [ ppr cc, space, ppr mid, ppr ticks, ppr con, text "! ", brackets (sep (map pprStgArg args))]

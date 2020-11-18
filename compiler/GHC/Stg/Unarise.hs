@@ -293,9 +293,9 @@ unariseRhs rho (StgRhsClosure ext ccs update_flag args expr)
        expr' <- unariseExpr rho' expr
        return (StgRhsClosure ext ccs update_flag args1 expr')
 
-unariseRhs rho (StgRhsCon ccs con mu args)
+unariseRhs rho (StgRhsCon ccs con mu ts args)
   = ASSERT(not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
-    return (StgRhsCon ccs con mu (unariseConArgs rho args))
+    return (StgRhsCon ccs con mu ts (unariseConArgs rho args))
 
 --------------------------------------------------------------------------------
 

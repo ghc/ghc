@@ -22,6 +22,7 @@ import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Stg.Syntax
+import GHC.Stg.Debug
 
 import GHC.Core.Type
 import GHC.Types.RepType
@@ -33,7 +34,7 @@ import GHC.Core.DataCon
 import GHC.Types.CostCentre
 import GHC.Types.Var.Env
 import GHC.Unit.Module
-import GHC.Types.Name   ( getName, getOccName, occNameString, nameSrcSpan, isExternalName, nameModule_maybe )
+import GHC.Types.Name   ( isExternalName, nameModule_maybe )
 import GHC.Types.Basic  ( Arity )
 import GHC.Builtin.Types ( unboxedUnitDataCon, unitDataConId )
 import GHC.Types.Literal
@@ -52,12 +53,10 @@ import GHC.Builtin.Names   ( unsafeEqualityProofName )
 import GHC.Data.Maybe
 
 import Data.List.NonEmpty (nonEmpty, toList)
-import Control.Monad (when, ap)
+import Control.Monad (ap)
 import qualified Data.Set as Set
 import Control.Monad.Trans.RWS
-import GHC.Types.Unique.Map
 import GHC.Types.SrcLoc
-import Control.Applicative
 
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -233,10 +232,15 @@ import Control.Applicative
 coreToStg :: DynFlags -> Module -> ModLocation -> CoreProgram
           -> ([StgTopBinding], InfoTableProvMap, CollectedCCs)
 coreToStg dflags this_mod ml pgm
-  = (pgm', denv, final_ccs)
+  = (pgm'', denv, final_ccs)
   where
-    (_, denv, (local_ccs, local_cc_stacks), pgm')
+    (_, _, (local_ccs, local_cc_stacks), pgm')
       = coreTopBindsToStg dflags this_mod ml emptyVarEnv emptyInfoTableProvMap emptyCollectedCCs pgm
+
+    (!pgm'', !denv) =
+        if gopt Opt_InfoTableMap dflags
+          then collectDebugInformation dflags ml pgm'
+          else (pgm', emptyInfoTableProvMap)
 
     prof = WayProf `Set.member` ways dflags
 
@@ -344,14 +348,6 @@ coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
              stg_arity =
                stgRhsArity stg_rhs
 
-       ; modLoc <- ctsModLocation
-       ; let
-            thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
-            best_span = quickSourcePos thisFile new_rhs
-       ; case stg_rhs of
-            StgRhsClosure {} ->
-              recordStgIdPosition bndr best_span (((, occNameString (getOccName bndr))) <$> (srcSpanToRealSrcSpan (nameSrcSpan (getName bndr))))
-            _ -> return ()
        ; return (ASSERT2( arity_ok stg_arity, mk_arity_msg stg_arity) stg_rhs,
                  ccs') }
   where
@@ -425,7 +421,7 @@ coreToStgExpr (Tick tick expr)
   = do let k = case tick of
                 HpcTick{}    -> id
                 ProfNote{}   -> id
-                SourceNote ss fp -> withSpan (ss, fp)
+                SourceNote ss fp -> id
                 Breakpoint{} -> panic "coreToStgExpr: breakpoint should not happen"
        expr2 <- k (coreToStgExpr expr)
        return (StgTick tick expr2)
@@ -555,8 +551,8 @@ coreToStgApp f args ticks = do
     app <- case idDetails f of
                 DataConWorkId dc
                   | saturated    -> do
-                      u <- incDc dc
-                      return $ StgConApp dc u args' --(Just u) args'
+--                      u <- incDc dc
+                      return $ StgConApp dc Nothing args' --(Just u) args'
                         (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
@@ -696,22 +692,18 @@ coreToStgRhs :: (Id,CoreExpr)
 coreToStgRhs (bndr, rhs) = do
     new_rhs <- coreToStgExpr rhs
     modLoc <- ctsModLocation
+    let new_stg_rhs = (mkStgRhs bndr new_rhs)
+    {-
     let
         thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
         best_span = quickSourcePos thisFile new_rhs
-    let new_stg_rhs = (mkStgRhs bndr new_rhs)
     case new_stg_rhs of
       StgRhsClosure {} ->
         recordStgIdPosition bndr best_span (((, occNameString (getOccName bndr))) <$> (srcSpanToRealSrcSpan (nameSrcSpan (getName bndr))))
       _ -> return ()
+      -}
     return new_stg_rhs
 
-
-quickSourcePos :: FastString -> StgExpr -> Maybe (RealSrcSpan, String)
-quickSourcePos cur_mod (StgTick (SourceNote ss m) e)
-  | srcSpanFile ss == cur_mod = Just (ss, m)
-  | otherwise = quickSourcePos cur_mod e
-quickSourcePos _ _ = Nothing
 
 -- Generate a top-level RHS. Any new cost centres generated for CAFs will be
 -- appended to `CollectedCCs` argument.
@@ -733,7 +725,7 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
   = -- CorePrep does this right, but just to make sure
     ASSERT2( not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con)
            , ppr bndr $$ ppr con $$ ppr args)
-    ( StgRhsCon dontCareCCS con n args, ccs )
+    ( StgRhsCon dontCareCCS con n ticks args, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | gopt Opt_AutoSccsOnIndividualCafs dflags
@@ -749,7 +741,7 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
     , ccs )
 
   where
-    unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
+    (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
              | otherwise                      = Updatable
@@ -783,15 +775,15 @@ mkStgRhs bndr rhs
                   ReEntrant -- ignored for LNE
                   [] rhs
 
-  | StgConApp con mu args _ <- unticked_rhs
-  = StgRhsCon currentCCS con mu args
+  | (ts, StgConApp con mu args _) <- unticked_rhs
+  = StgRhsCon currentCCS con mu ts args
 
   | otherwise
   = StgRhsClosure noExtFieldSilent
                   currentCCS
                   upd_flag [] rhs
   where
-    unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
+    unticked_rhs = stripStgTicksTop (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
              | otherwise                      = Updatable
@@ -940,28 +932,6 @@ lookupBinding env v = case lookupVarEnv env v of
                         Just xx -> xx
                         Nothing -> ASSERT2( isGlobalId v, ppr v ) ImportBound
 
-incDc :: DataCon -> CtsM (Maybe Int)
-incDc dc | isUnboxedTupleDataCon dc = return Nothing
-incDc dc | isUnboxedSumDataCon dc = return Nothing
-incDc dc = CtsM $ \dflags _ _ -> if not (gopt Opt_DistinctConstructorTables dflags) then return Nothing else do
-          env <- get
-          cc <- ask
-          let dcMap' = alterUniqMap (maybe (Just [(0, cc)]) (\xs@((k, _):_) -> Just ((k + 1, cc) : xs))) (provDC env) dc
-          put (env { provDC = dcMap' })
-          let r = lookupUniqMap dcMap' dc
-          return (fst . head <$> r)
-
-recordStgIdPosition :: Id -> Maybe (RealSrcSpan, String) -> Maybe (RealSrcSpan, String) -> CtsM ()
-recordStgIdPosition id best_span ss = CtsM $ \dflags _ _ -> when (gopt Opt_InfoTableMap dflags) $ do
-  cc <- ask
-  let tyString = showPpr dflags (idType id)
-  --pprTraceM "recordStgIdPosition" (ppr id $$ ppr cc $$ ppr ss)
-  case best_span <|> ss <|> cc of
-    Nothing -> return ()
-    Just (rss, d) -> modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (tyString, rss, d)})
-
-withSpan :: (RealSrcSpan, String) -> CtsM a -> CtsM a
-withSpan s (CtsM act) = CtsM (\a b c -> local (const $ Just s) (act a b c))
 
 ctsModLocation :: CtsM ModLocation
 ctsModLocation = CtsM (\_ ml _ -> return ml)

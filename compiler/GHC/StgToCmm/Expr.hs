@@ -158,7 +158,7 @@ cgLetNoEscapeRhsBody
     -> FCode (CgIdInfo, FCode ())
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure _ cc _upd args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
-cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con mn args)
+cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con mn _ts args)
   = cgLetNoEscapeClosure bndr local_cc cc []
       (StgConApp con mn args (pprPanic "cgLetNoEscapeRhsBody" $
                            text "StgRhsCon doesn't have type args"))

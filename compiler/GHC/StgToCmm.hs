@@ -198,7 +198,7 @@ cgTopBinding dflags (StgTopStringLit id str) = do
 cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...
 
-cgTopRhs dflags _rec bndr (StgRhsCon _cc con mn args)
+cgTopRhs dflags _rec bndr (StgRhsCon _cc con mn _ts args)
   = cgTopRhsCon dflags bndr con mn (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
