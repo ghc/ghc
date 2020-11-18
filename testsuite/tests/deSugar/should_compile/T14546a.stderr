@@ -33,7 +33,7 @@ T14546a.hs:21:7: warning: [-Woverlapping-patterns (in -Wdefault)]
 
 T14546a.hs:23:4: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: 0
+    In a case alternative: Patterns of type  ‘Integer’ not matched: 0
 
 T14546a.hs:24:7: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
@@ -45,7 +45,7 @@ T14546a.hs:25:7: warning: [-Woverlapping-patterns (in -Wdefault)]
 
 T14546a.hs:27:4: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: 3
+    In a case alternative: Patterns of type  ‘Integer’ not matched: 3
 
 T14546a.hs:28:7: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
