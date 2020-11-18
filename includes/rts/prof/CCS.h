@@ -73,20 +73,6 @@ typedef struct CostCentreStack_ {
 } CostCentreStack;
 
 
-typedef struct InfoProv_{
-    char * table_name;
-    char * closure_desc;
-    char * ty_desc;
-    char * label;
-    char * module;
-    char * srcloc;
-} InfoProv;
-
-typedef struct InfoProvEnt_ {
-    StgInfoTable * info;
-    InfoProv prov;
-    struct InfoProvEnt_ *link;
-} InfoProvEnt;
 
 
 /* -----------------------------------------------------------------------------
@@ -193,7 +179,6 @@ void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
 CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
 
 extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
-extern InfoProvEnt * RTS_VAR(IPE_LIST);               // registered IP list
 
 /* -----------------------------------------------------------------------------
  * Declaring Cost Centres & Cost Centre Stacks.

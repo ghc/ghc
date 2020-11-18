@@ -961,8 +961,6 @@ dumpCensus( Census *census )
             break;
         case HEAP_BY_INFO_TABLE:
             fprintf(hp_file, "%p", ctr->identity);
-            // TODO now all the types in this mode are just THUNK closures so
-            // don't really need to add any more info
             char str[100];
             sprintf(str, "%p", ctr->identity);
             traceHeapProfSampleString(0, str, count * sizeof(W_));
