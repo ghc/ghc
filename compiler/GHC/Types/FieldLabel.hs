@@ -70,6 +70,7 @@ module GHC.Types.FieldLabel
    , mkFieldLabelOccs
    , DuplicateRecordFields(..)
    , FieldSelectors(..)
+   , shouldMangleSelectorNames
    )
 where
 
@@ -167,5 +168,9 @@ mkFieldLabelOccs lbl dc is_overloaded has_sel
                , flSelector = sel_occ, flHasFieldSelector = has_sel }
   where
     str     = ":" ++ unpackFS lbl ++ ":" ++ occNameString dc
-    sel_occ | is_overloaded == DuplicateRecordFields || has_sel == NoFieldSelectors = mkRecFldSelOcc str
+    sel_occ | shouldMangleSelectorNames is_overloaded has_sel = mkRecFldSelOcc str
             | otherwise     = mkVarOccFS lbl
+
+shouldMangleSelectorNames :: DuplicateRecordFields -> FieldSelectors -> Bool
+shouldMangleSelectorNames is_overloaded has_sel
+    = is_overloaded == DuplicateRecordFields || has_sel == NoFieldSelectors
