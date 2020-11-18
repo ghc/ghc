@@ -19,7 +19,7 @@ import GHC.Prelude as Prelude
 import GHC.Driver.Backend
 import GHC.Driver.Session
 
-import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
+import GHC.StgToCmm.Prof (initInfoTableProv, initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Bind
@@ -39,6 +39,7 @@ import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Types.HpcInfo
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -64,22 +65,24 @@ import GHC.Data.Stream
 import GHC.Data.OrdList
 
 import Data.IORef
-import Control.Monad (when,void)
+import Control.Monad (forM_, when,void)
 import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
+import GHC.Types.Unique.Map
+
 
 codeGen :: DynFlags
         -> Module
+        -> InfoTableProvMap
         -> [TyCon]
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ModuleLFInfos
-                                       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup ([CmmInfoTable], ModuleLFInfos)       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen dflags this_mod data_tycons
+codeGen dflags this_mod ip_map@(InfoTableProvMap _) data_tycons
         cost_centre_info stg_binds hpc_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
@@ -105,7 +108,8 @@ codeGen dflags this_mod data_tycons
         ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
 
         ; mapM_ (cg . cgTopBinding dflags) stg_binds
-
+        ; cgs <- liftIO (readIORef  cgref)
+        ; cg (initInfoTableProv ip_map this_mod)
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
                 -- (say) PrelBase_True_closure, which is defined in
@@ -134,7 +138,7 @@ codeGen dflags this_mod data_tycons
                 | otherwise
                 = mkNameEnv (Prelude.map extractInfo (eltsUFM cg_id_infos))
 
-        ; return generatedInfo
+        ; return (cgs_used_info cgs, generatedInfo)
         }
 
 ---------------------------------------------------------------
