@@ -10,6 +10,9 @@ module GHC.StgToCmm.Prof (
         initCostCentres, ccType, ccsType,
         mkCCostCentre, mkCCostCentreStack,
 
+        -- infoTablePRov
+        initInfoTableProv,
+
         -- Cost-centre Profiling
         dynProfHdr, profDynAlloc, profAlloc, staticProfHdr, initUpdFrameProf,
         enterCostCentreThunk, enterCostCentreFun,
@@ -41,6 +44,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Data.FastString
 import GHC.Unit.Module as Module
 import GHC.Utils.Outputable
@@ -269,6 +273,50 @@ sizeof_ccs_words platform
   where
    (ws,ms) = pc_SIZEOF_CostCentreStack (platformConstants platform) `divMod` platformWordSizeInBytes platform
 
+
+initInfoTableProv ::  InfoTableProvMap -> Module -> FCode ()
+-- Emit the declarations
+initInfoTableProv (InfoTableProvMap clmap) this_mod
+  = do
+       infos <- getUsedInfo
+       let ents = convertClosureMap infos this_mod clmap
+       --pprTraceM "UsedInfo" (ppr (length infos))
+       --pprTraceM "initInfoTable" (ppr (length ents))
+       mapM_ emitInfoTableProv ents
+
+--- Info Table Prov stuff
+emitInfoTableProv :: InfoProvEnt  -> FCode ()
+emitInfoTableProv ip = do
+  { dflags <- getDynFlags
+  ; let (mod, src, label) = infoTableProv ip
+  ; platform <- getPlatform
+                        -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
+  ; label <- newByteStringCLit (bytesFS $ mkFastString label)
+  ; modl  <- newByteStringCLit (bytesFS $ moduleNameFS
+                                        $ moduleName
+                                        $ mod)
+
+  ; ty_string  <- newByteStringCLit (bytesFS (mkFastString (infoTableType ip)))
+  ; loc <- newByteStringCLit $ bytesFS $ mkFastString $
+                   showPpr dflags src
+           -- XXX going via FastString to get UTF-8 encoding is silly
+  ; table_name <- newByteStringCLit $ bytesFS $ mkFastString $
+                    showPpr dflags (pprCLabel platform CStyle (infoTablePtr ip))
+
+  ; closure_type <- newByteStringCLit $ bytesFS $ mkFastString $
+                    showPpr dflags (text $ show $ infoProvEntClosureType ip)
+  ; let
+     lits = [ CmmLabel (infoTablePtr ip), -- Info table pointer
+              table_name,     -- char *table_name
+              closure_type,   -- char *closure_desc -- Filled in from the InfoTable
+              ty_string,      -- char *ty_string
+              label,          -- char *label,
+              modl,           -- char *module,
+              loc,            -- char *srcloc,
+              zero platform   -- struct _InfoProvEnt *link
+            ]
+  ; emitDataLits (mkIPELabel ip) lits
+  }
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack
 

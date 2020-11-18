@@ -538,6 +538,7 @@
 #define RTS_PROF_SYMBOLS                        \
       SymI_HasProto(CCS_DONT_CARE)              \
       SymI_HasProto(CC_LIST)                    \
+      SymI_HasProto(IPE_LIST)                    \
       SymI_HasProto(stg_restore_cccs_info)      \
       SymI_HasProto(enterFunCCS)                \
       SymI_HasProto(pushCostCentre)             \
@@ -999,6 +1000,8 @@
       SymI_HasProto(cas)                                                \
       SymI_HasProto(_assertFail)                                        \
       SymI_HasProto(keepCAFs)                                           \
+      SymI_HasProto(registerInfoProvList)                               \
+      SymI_HasProto(lookupIPE)                                          \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
