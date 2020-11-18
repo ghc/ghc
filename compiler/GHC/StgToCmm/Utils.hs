@@ -44,6 +44,8 @@ module GHC.StgToCmm.Utils (
         whenUpdRemSetEnabled,
         emitUpdRemSetPush,
         emitUpdRemSetPushThunk,
+
+        convertInfoProvMap, cmmInfoTableToInfoProvEnt
   ) where
 
 #include "HsVersions.h"
@@ -79,6 +81,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.RepType
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
@@ -86,7 +89,9 @@ import qualified Data.Map as M
 import Data.Char
 import Data.List (sortBy)
 import Data.Ord
-
+import GHC.Types.Unique.Map
+import Data.Maybe
+import GHC.Driver.Ppr
 
 -------------------------------------------------------------------------
 --
@@ -631,3 +636,32 @@ emitUpdRemSetPushThunk ptr =
       [(CmmReg (CmmGlobal BaseReg), AddrHint),
        (ptr, AddrHint)]
       False
+
+-- | A bare bones InfoProvEnt for things which don't have a good source location
+cmmInfoTableToInfoProvEnt :: Module -> CmmInfoTable -> InfoProvEnt
+cmmInfoTableToInfoProvEnt this_mod cmit =
+    let cl = cit_lbl cmit
+        cn  = rtsClosureType (cit_rep cmit)
+    in InfoProvEnt cl cn "" this_mod Nothing
+
+-- | Convert source information collected about identifiers in 'GHC.STG.Debug'
+-- to entries suitable for placing into the info table provenenance table.
+convertInfoProvMap :: DynFlags -> [CmmInfoTable] -> Module -> InfoTableProvMap -> [InfoProvEnt]
+convertInfoProvMap dflags defns this_mod (InfoTableProvMap denv) =
+  map (\cmit ->
+    let cl = cit_lbl cmit
+        cn  = rtsClosureType (cit_rep cmit)
+
+        tyString :: Outputable a => a -> String
+        tyString t = showPpr dflags t
+
+        lookupClosureMap :: Maybe InfoProvEnt
+        lookupClosureMap = case hasHaskellName cl >>= lookupUniqMap denv of
+                                Just (ty, ss, l) -> Just (InfoProvEnt cl cn (tyString ty) this_mod (Just (ss, l)))
+                                Nothing -> Nothing
+
+        -- This catches things like prim closure types and anything else which doesn't have a
+        -- source location
+        simpleFallback = cmmInfoTableToInfoProvEnt this_mod cmit
+
+    in fromMaybe simpleFallback lookupClosureMap) defns
