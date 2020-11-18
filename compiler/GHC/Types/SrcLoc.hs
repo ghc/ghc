@@ -51,6 +51,7 @@ module GHC.Types.SrcLoc (
         pprUserRealSpan, pprUnhelpfulSpanReason,
         pprUserSpan,
         unhelpfulSpanFS,
+        srcSpanToRealSrcSpan,
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
@@ -615,6 +616,10 @@ realSrcSpanEnd s = mkRealSrcLoc (srcSpanFile s)
 srcSpanFileName_maybe :: SrcSpan -> Maybe FastString
 srcSpanFileName_maybe (RealSrcSpan s _) = Just (srcSpanFile s)
 srcSpanFileName_maybe (UnhelpfulSpan _) = Nothing
+
+srcSpanToRealSrcSpan :: SrcSpan -> Maybe RealSrcSpan
+srcSpanToRealSrcSpan (RealSrcSpan ss _) = Just ss
+srcSpanToRealSrcSpan _ = Nothing
 
 {-
 ************************************************************************
