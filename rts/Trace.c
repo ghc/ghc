@@ -663,7 +663,6 @@ void traceHeapProfCostCentre(StgWord32 ccID,
     }
 }
 
-
 // This one is for .hp samples
 void traceHeapProfSampleCostCentre(StgWord8 profile_id,
                                    CostCentreStack *stack, StgWord residency)

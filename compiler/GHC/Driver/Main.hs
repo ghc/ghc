@@ -1468,6 +1468,8 @@ hscGenHardCode hsc_env cgguts location output_filename = do
               | otherwise = empty
 
         ------------------  Code generation ------------------
+        -- This IORef records which info tables are used during
+        -- code generation.
         lref <- newIORef []
         -- The back-end is streamed: each top-level function goes
         -- from Stg all the way to asm before dealing with the next

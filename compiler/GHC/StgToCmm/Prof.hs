@@ -344,7 +344,6 @@ bumpSccCount platform ccs
   = addToMem (rEP_CostCentreStack_scc_count platform)
          (cmmOffsetB platform ccs (pc_OFFSET_CostCentreStack_scc_count (platformConstants platform))) 1
 
-
 -----------------------------------------------------------------------------
 --
 --                Lag/drag/void stuff

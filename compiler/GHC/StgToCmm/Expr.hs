@@ -82,7 +82,7 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con mn args _)= cgConApp con mn args
-cgExpr (StgTick t e)         = cgTick t (cgExpr e)
+cgExpr (StgTick t e)         = cgTick t >> cgExpr e
 cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
                                emitReturn [CmmLit cmm_lit]
 
@@ -1084,12 +1084,12 @@ emitEnter fun = do
 -- | Generate Cmm code for a tick. Depending on the type of Tickish,
 -- this will either generate actual Cmm instrumentation code, or
 -- simply pass on the annotation as a @CmmTickish@.
-cgTick :: Tickish Id -> FCode a -> FCode a
-cgTick tick k
+cgTick :: Tickish Id -> FCode ()
+cgTick tick
   = do { platform <- getPlatform
        ; case tick of
-           ProfNote   cc t p -> emitSetCCC cc t p >> k
-           HpcTick    m n    -> emit (mkTickBox platform m n) >> k
-           SourceNote s n    -> emitTick (SourceNote s n) >> k
-           _other            -> k
+           ProfNote   cc t p -> emitSetCCC cc t p
+           HpcTick    m n    -> emit (mkTickBox platform m n)
+           SourceNote s n    -> emitTick (SourceNote s n)
+           _other            -> return ()
        }

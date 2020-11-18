@@ -189,7 +189,7 @@ buildDynCon' _ binder mn actually_bound ccs con args
           ; profile <- getProfile
           ; let platform = profilePlatform profile
                 (tot_wds, ptr_wds, args_w_offsets)
-                    = mkVirtConstrOffsets profile (addArgReps args)
+                   = mkVirtConstrOffsets profile (addArgReps args)
                 nonptr_wds = tot_wds - ptr_wds
                 info_tbl = mkDataConInfoTable profile con ((modu,) <$> mn) False
                                 ptr_wds nonptr_wds
@@ -310,8 +310,6 @@ precomputedStaticConInfo_maybe dflags binder con []
   | isNullaryRepDataCon con
   = Just $ litIdInfo (targetPlatform dflags) binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) NoCafRefs))
- -- = Just $ litIdInfo dflags binder (mkConLFInfo con)
- --               (CmmLabel (mkClosureLabel (idName binder) NoCafRefs))
 precomputedStaticConInfo_maybe dflags binder con [arg]
   -- Int/Char values with existing closures in the RTS
   | intClosure || charClosure
