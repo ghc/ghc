@@ -799,6 +799,11 @@ following RTS options select which break-down to use:
     Biographical profiling is described in more detail below
     (:ref:`biography-prof`).
 
+.. rts-flag:: -hi
+
+    Break down the graph by the address of the info table of a closure. This
+    profiling mode is intended to be used with :ghc-flag:`-finfo-table-map`.
+
 .. rts-flag:: -l
     :noindex:
 
