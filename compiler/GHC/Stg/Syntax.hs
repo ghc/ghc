@@ -25,11 +25,13 @@ module GHC.Stg.Syntax (
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
 
-        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
+        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape, XConApp,
         NoExtFieldSilent, noExtFieldSilent,
         OutputablePass,
 
         UpdateFlag(..), isUpdatable,
+
+        ConstructorNumber(..),
 
         -- a set of synonyms for the vanilla parameterisation
         StgTopBinding, StgBinding, StgExpr, StgRhs, StgAlt,
@@ -244,6 +246,7 @@ literals.
         -- StgConApp is vital for returning unboxed tuples or sums
         -- which can't be let-bound
   | StgConApp   DataCon
+                (XConApp pass)
                 [StgArg] -- Saturated
                 [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
 
@@ -434,6 +437,8 @@ important):
                         -- from static closure.
         DataCon         -- Constructor. Never an unboxed tuple or sum, as those
                         -- are not allocated.
+        ConstructorNumber
+        [Tickish Id]
         [StgArg]        -- Args
 
 -- | Used as a data type index for the stgSyn AST
@@ -472,6 +477,20 @@ type family XLet (pass :: StgPass)
 type instance XLet 'Vanilla = NoExtFieldSilent
 type instance XLet 'CodeGen = NoExtFieldSilent
 
+type family XConApp (pass :: StgPass)
+type instance XConApp 'Vanilla =  ConstructorNumber
+type instance XConApp 'CodeGen = ConstructorNumber
+
+-- | When `-fdistinct-constructor-tables` is turned on then
+-- each usage of a constructor is given an unique number and
+-- an info table is generated for each different constructor.
+data ConstructorNumber =
+      NoNumber | Numbered Int
+
+instance Outputable ConstructorNumber where
+  ppr NoNumber = empty
+  ppr (Numbered n) = text "#" <> ppr n
+
 type family XLetNoEscape (pass :: StgPass)
 type instance XLetNoEscape 'Vanilla = NoExtFieldSilent
 type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
@@ -480,7 +499,7 @@ stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   = ASSERT( all isId bndrs ) length bndrs
   -- The arity never includes type parameters, but they should have gone by now
-stgRhsArity (StgRhsCon _ _ _) = 0
+stgRhsArity (StgRhsCon _ _ _ _ _) = 0
 
 {-
 ************************************************************************
@@ -642,6 +661,7 @@ likes terminators instead...  Ditto for case alternatives.
 
 type OutputablePass pass =
   ( Outputable (XLet pass)
+  , Outputable (XConApp pass)
   , Outputable (XLetNoEscape pass)
   , Outputable (XRhsClosure pass)
   , OutputableBndr (BinderP pass)
@@ -707,7 +727,7 @@ pprStgExpr opts e = case e of
    StgLit lit           -> ppr lit
                            -- general case
    StgApp func args     -> hang (ppr func) 4 (interppSP args)
-   StgConApp con args _ -> hsep [ ppr con, brackets (interppSP args) ]
+   StgConApp con n args _ -> hsep [ ppr con, ppr n, brackets (interppSP args) ]
    StgOpApp op args _   -> hsep [ pprStgOp op, brackets (interppSP args)]
    StgLam bndrs body    -> let ppr_list = brackets . fsep . punctuate comma
                            in sep [ char '\\' <+> ppr_list (map (pprBndr LambdaBind) (toList bndrs))
@@ -815,5 +835,9 @@ pprStgRhs opts rhs = case rhs of
                     ])
               4 (pprStgExpr opts body)
 
-   StgRhsCon cc con args
-      -> hcat [ ppr cc, space, ppr con, text "! ", brackets (sep (map pprStgArg args))]
+   StgRhsCon cc con mid _ticks args
+      -> hcat [ ppr cc, space
+              , case mid of
+                  NoNumber -> empty
+                  Numbered n -> hcat [ppr n, space]
+              , ppr con, text "! ", brackets (sep (map pprStgArg args))]
