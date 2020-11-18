@@ -1491,8 +1491,8 @@ flattenBindsAndSigs
 flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
   -- 'cmpBufSpan' is safe here with the following assumptions:
   --
-  -- * 'LHsDecl' produced by 'decl_cls' in Parser.y always have a 'BufSpan'
-  -- * 'partitionBindsAndSigs' does not discard this 'BufSpan'
+  -- . 'LHsDecl' produced by 'decl_cls' in Parser.y always have a 'BufSpan'
+  -- . 'partitionBindsAndSigs' does not discard this 'BufSpan'
   mergeListsBy cmpBufSpan [
     mapLL (\b -> ValD noExtField b) (bagToList all_bs),
     mapLL (\s -> SigD noExtField s) all_ss,
