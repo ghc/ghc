@@ -89,14 +89,17 @@ tcProc :: LPat GhcRn -> LHsCmdTop GhcRn         -- proc pat -> expr
        -> ExpRhoType                            -- Expected type of whole proc expression
        -> TcM (LPat GhcTc, LHsCmdTop GhcTc, TcCoercion)
 
-tcProc pat cmd exp_ty
-  = newArrowScope $
-    do  { exp_ty <- expTypeToType exp_ty  -- no higher-rank stuff with arrows
+tcProc pat cmd@(L _ (HsCmdTop names _)) exp_ty
+  = do  { exp_ty <- expTypeToType exp_ty  -- no higher-rank stuff with arrows
         ; (co, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty
         ; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
+        -- start with the names as they are used to desugar the proc itself
+        -- See #17423
+        ; names' <- mapM (tcSyntaxName ProcOrigin arr_ty) names
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-        ; (pat', cmd') <- tcCheckPat ProcExpr pat (unrestricted arg_ty) $
-                          tcCmdTop cmd_env cmd (unitTy, res_ty)
+        ; (pat', cmd') <- newArrowScope
+                          $ tcCheckPat ProcExpr pat (unrestricted arg_ty)
+                          $ tcCmdTop cmd_env names' cmd (unitTy, res_ty)
         ; let res_co = mkTcTransCo co
                          (mkTcAppCo co1 (mkTcNomReflCo res_ty))
         ; return (pat', cmd', res_co) }
@@ -115,7 +118,7 @@ type CmdArgType = TcTauType                  -- carg_type, a nested tuple
 
 data CmdEnv
   = CmdEnv {
-        cmd_arr :: TcType -- arrow type constructor, of kind *->*->*
+        cmd_arr :: TcType -- ^ Arrow type constructor, of kind *->*->*
     }
 
 mkCmdArrTy :: CmdEnv -> TcTauType -> TcTauType -> TcTauType
@@ -123,15 +126,15 @@ mkCmdArrTy env t1 t2 = mkAppTys (cmd_arr env) [t1, t2]
 
 ---------------------------------------
 tcCmdTop :: CmdEnv
+         -> CmdSyntaxTable GhcTc -- ^ Type-checked Arrow class methods (arr, (>>>), ...)
          -> LHsCmdTop GhcRn
          -> CmdType
          -> TcM (LHsCmdTop GhcTc)
 
-tcCmdTop env (L loc (HsCmdTop names cmd)) cmd_ty@(cmd_stk, res_ty)
+tcCmdTop env names (L loc (HsCmdTop _names cmd)) cmd_ty@(cmd_stk, res_ty)
   = setSrcSpan loc $
-    do  { cmd'   <- tcCmd env cmd cmd_ty
-        ; names' <- mapM (tcSyntaxName ProcOrigin (cmd_arr env)) names
-        ; return (L loc $ HsCmdTop (CmdTopTc cmd_stk res_ty names') cmd') }
+    do  { cmd' <- tcCmd env cmd cmd_ty
+        ; return (L loc $ HsCmdTop (CmdTopTc cmd_stk res_ty names) cmd') }
 
 ----------------------------------------
 tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTc)
@@ -319,12 +322,13 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
 
   where
     tc_cmd_arg :: LHsCmdTop GhcRn -> TcM (LHsCmdTop GhcTc, TcType)
-    tc_cmd_arg cmd
+    tc_cmd_arg cmd@(L _ (HsCmdTop names _))
        = do { arr_ty <- newFlexiTyVarTy arrowTyConKind
             ; stk_ty <- newFlexiTyVarTy liftedTypeKind
             ; res_ty <- newFlexiTyVarTy liftedTypeKind
+            ; names' <- mapM (tcSyntaxName ProcOrigin arr_ty) names
             ; let env' = env { cmd_arr = arr_ty }
-            ; cmd' <- tcCmdTop env' cmd (stk_ty, res_ty)
+            ; cmd' <- tcCmdTop env' names' cmd (stk_ty, res_ty)
             ; return (cmd',  mkCmdArrTy env' (mkPairTy alphaTy stk_ty) res_ty) }
 
 -----------------------------------------------------------------
