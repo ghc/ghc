@@ -53,9 +53,9 @@ collectStgRhs bndr (StgRhsClosure ext cc us bs e)= do
   e' <- collectExpr e
   recordInfo bndr e'
   return $ StgRhsClosure ext cc us bs e'
-collectStgRhs _bndr (StgRhsCon cc dc args) = do
-  --n' <- incDc dc ticks
-  return (StgRhsCon cc dc args)
+collectStgRhs _bndr (StgRhsCon cc dc _mn ticks args) = do
+  n' <- incDc dc ticks
+  return (StgRhsCon cc dc n' ticks args)
 
 
 recordInfo :: Id -> StgExpr -> M ()
@@ -71,9 +71,9 @@ collectExpr = go
   where
     go (StgApp occ as) = return $ StgApp occ as
     go (StgLit lit) = return $ StgLit lit
-    go (StgConApp dc as tys) = do
---      n' <- incDc dc []
-      return (StgConApp dc as tys)
+    go (StgConApp dc _mn as tys) = do
+      n' <- incDc dc []
+      return (StgConApp dc n' as tys)
     go (StgOpApp op as ty) = return (StgOpApp op as ty)
     go (StgLam bs e) =  StgLam bs <$> collectExpr e
     go (StgCase scrut bndr ty alts) =
@@ -117,3 +117,21 @@ recordStgIdPosition id best_span ss = do
     case best_span <|> cc <|> ss of
       Nothing -> return ()
       Just (rss, d) -> modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (tyString, rss, d)})
+
+incDc :: DataCon -> [Tickish Id] -> M (Maybe Int)
+incDc dc _ | isUnboxedTupleDataCon dc = return Nothing
+incDc dc _ | isUnboxedSumDataCon dc = return Nothing
+incDc dc ts = do
+  dflags <- asks rDynFlags
+  if not (gopt Opt_DistinctConstructorTables dflags) then return Nothing else do
+          env <- get
+          mcc <- asks rSpan
+          let best_span = selectTick ts <|> mcc
+          let dcMap' = alterUniqMap (maybe (Just [(0, best_span)]) (\xs@((k, _):_) -> Just ((k + 1, best_span) : xs))) (provDC env) dc
+          put (env { provDC = dcMap' })
+          let r = lookupUniqMap dcMap' dc
+          return (fst . head <$> r)
+
+selectTick :: [Tickish Id] -> Maybe (RealSrcSpan, String)
+selectTick [] = Nothing
+selectTick (SourceNote rss d : ts ) = selectTick ts <|> Just (rss, d)

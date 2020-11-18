@@ -126,7 +126,7 @@ expr env = go
     go (StgApp occ as)
       = (StgApp occ as, unionDVarSet (args env as) (mkFreeVarSet env [occ]))
     go (StgLit lit) = (StgLit lit, emptyDVarSet)
-    go (StgConApp dc as tys) = (StgConApp dc as tys, args env as)
+    go (StgConApp dc n as tys) = (StgConApp dc n as tys, args env as)
     go (StgOpApp op as ty) = (StgOpApp op as ty, args env as)
     go StgLam{} = pprPanic "StgFVs: StgLam" empty
     go (StgCase scrut bndr ty alts) = (StgCase scrut' bndr ty alts', fvs)
@@ -159,7 +159,7 @@ rhs env (StgRhsClosure _ ccs uf bndrs body)
     -- See Note [Tracking local binders]
     (body', body_fvs) = expr (addLocals bndrs env) body
     fvs = delDVarSetList body_fvs bndrs
-rhs env (StgRhsCon ccs dc as) = (StgRhsCon ccs dc as, args env as)
+rhs env (StgRhsCon ccs dc mu ts as) = (StgRhsCon ccs dc mu ts as, args env as)
 
 alt :: Env -> StgAlt -> (CgStgAlt, DIdSet)
 alt env (con, bndrs, e) = ((con, bndrs, e'), fvs)
