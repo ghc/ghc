@@ -6,9 +6,9 @@ import GHC hiding (moduleName)
 import GHC.Driver.Ppr
 import GHC.Driver.Session
 import GHC.Hs.Dump
-import GHC.Types.SourceText
+-- import GHC.Types.SourceText
 -- import GHC.Hs.Exact hiding (ExactPrint())
-import GHC.Utils.Outputable hiding (space)
+-- import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
@@ -21,7 +21,6 @@ import ExactPrint
 tt :: IO ()
 -- tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
 tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
-  -- "Test.hs"
  -- "../../testsuite/tests/printer/Ppr001.hs"
  -- "../../testsuite/tests/printer/Ppr002.hs"
  -- "../../testsuite/tests/printer/Ppr003.hs"

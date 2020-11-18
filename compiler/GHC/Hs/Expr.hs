@@ -1925,8 +1925,7 @@ data GRHSs p body
     }
   | XGRHSs !(XXGRHSs p body)
 
-                    -- MatchContext dependent, as per 'matchSeparator'
-type instance XCGRHSs (GhcPass _) b = ApiAnn' AddApiAnn
+type instance XCGRHSs (GhcPass _) b = NoExtField
 
 type instance XXGRHSs (GhcPass _) b = NoExtCon
 

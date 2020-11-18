@@ -2486,10 +2486,10 @@ rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
         : '=' exp wherebinds    {% runPV (unECP $2) >>= \ $2 ->
                                   do { let loc = (comb3 $1 (reLoc $2) (adaptWhereBinds $3))
                                      ; acs (\cs ->
-                                       sL loc (GRHSs (ApiAnn (rs loc) (mj AnnEqual $1) cs) (unguardedRHS (ApiAnn (rs loc) (GrhsAnn Nothing (mj AnnEqual $1)) []) loc $2)
+                                       sL loc (GRHSs NoExtField (unguardedRHS (ApiAnn (rs loc) (GrhsAnn Nothing (mj AnnEqual $1)) cs) loc $2)
                                                       (unLoc $ (adaptWhereBinds $3)))) } }
         | gdrhs wherebinds      { sL (comb2 $1 (adaptWhereBinds $>))
-                                    (GRHSs noAnn (reverse (unLoc $1)) (unLoc $ (adaptWhereBinds $2))) }
+                                    (GRHSs noExtField (reverse (unLoc $1)) (unLoc $ (adaptWhereBinds $2))) }
 
 gdrhs :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
         : gdrhs gdrh            { sLL $1 $> ($2 : unLoc $1) }
@@ -2755,7 +2755,7 @@ aexp    :: { ECP }
                                          $ Match { m_ext = ApiAnn (glR $1) [mj AnnLam $1] cs
                                                  , m_ctxt = LambdaExpr
                                                  , m_pats = $2:$3
-                                                 , m_grhss = unguardedGRHSs $5 (ApiAnn (glR $4) (mu AnnRarrow $4) []) }])) }
+                                                 , m_grhss = unguardedGRHSs $5 (ApiAnn (glR $4) (GrhsAnn Nothing (mu AnnRarrow $4)) []) }])) }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
                                            mkHsLetPV (comb2A $1 $>) (unLoc $2) $4
@@ -3181,7 +3181,7 @@ alt     :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
 
 alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }
         : ralt wherebinds           { $1 >>= \alt ->
-                                      return $ sLL alt (adaptWhereBinds $>) (GRHSs noAnn (unLoc alt) (unLoc $ adaptWhereBinds $2)) }
+                                      return $ sLL alt (adaptWhereBinds $>) (GRHSs noExtField (unLoc alt) (unLoc $ adaptWhereBinds $2)) }
 
 ralt :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
         : '->' exp            { unECP $2 >>= \ $2 ->
