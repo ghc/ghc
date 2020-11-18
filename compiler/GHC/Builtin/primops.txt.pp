@@ -3094,6 +3094,17 @@ primop  ClearCCSOp "clearCCS#" GenPrimOp
    out_of_line = True
 
 ------------------------------------------------------------------------
+section "Info Table Origin"
+------------------------------------------------------------------------
+primop WhereFromOp "whereFrom#" GenPrimOp
+   a -> State# s -> (# State# s, Addr# #)
+   { Returns the {\tt InfoProvEnt } for the info table of the given object
+     (value is {\tt NULL} if the table does not exist or there is no information
+     about the closure).}
+   with
+   out_of_line = True
+
+------------------------------------------------------------------------
 section "Etc"
         {Miscellaneous built-ins}
 ------------------------------------------------------------------------

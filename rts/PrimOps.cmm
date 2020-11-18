@@ -2434,6 +2434,15 @@ stg_closureSizzezh (P_ clos)
     return (len);
 }
 
+stg_whereFromzh (P_ clos)
+{
+    P_ ipe;
+    W_ info;
+    info = GET_INFO(UNTAG(clos));
+    (ipe) = foreign "C" lookupIPE(info "ptr");
+    return (ipe);
+}
+
 /* -----------------------------------------------------------------------------
    Thread I/O blocking primitives
    -------------------------------------------------------------------------- */
