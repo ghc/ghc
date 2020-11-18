@@ -2901,7 +2901,8 @@ dynamic_flags_deps = [
         -- Caller-CC
   , make_ord_flag defGhcFlag "fprof-callers"
          (HasArg setCallerCcFilters)
-
+  , make_ord_flag defGhcFlag "fdistinct-constructor-tables"
+      (NoArg (setGeneralFlag Opt_DistinctConstructorTables))
   , make_ord_flag defGhcFlag "finfo-table-map"
       (NoArg (setGeneralFlag Opt_InfoTableMap))
         ------ Compiler flags -----------------------------------------------
