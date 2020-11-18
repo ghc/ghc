@@ -20,6 +20,7 @@ module GHC.Stack.CCS (
     -- * Call stacks
     currentCallStack,
     whoCreated,
+    whereFrom,
 
     -- * Internals
     CostCentreStack,
@@ -135,3 +136,48 @@ whoCreated obj = do
 renderStack :: [String] -> String
 renderStack strs =
   "CallStack (from -prof):" ++ concatMap ("\n  "++) (reverse strs)
+
+-- Static Closure Information
+
+data InfoProv
+data InfoProvEnt
+
+-- | Get the 'InfoProvEnv' associated with the given value.
+getIPE :: a -> IO (Ptr InfoProvEnt)
+getIPE obj = IO $ \s ->
+   case whereFrom## obj s of
+     (## s', addr ##) -> (## s', Ptr addr ##)
+
+ipeProv :: Ptr InfoProvEnt -> Ptr InfoProv
+ipeProv p = (#ptr InfoProvEnt, prov) p
+
+ipName, ipDesc, ipLabel, ipModule, ipSrcLoc, ipTyDesc :: Ptr InfoProv -> IO CString
+ipName p   =  (# peek InfoProv, table_name) p
+ipDesc p   =  (# peek InfoProv, closure_desc) p
+ipLabel p  =  (# peek InfoProv, label) p
+ipModule p =  (# peek InfoProv, module) p
+ipSrcLoc p =  (# peek InfoProv, srcloc) p
+ipTyDesc p =  (# peek InfoProv, ty_desc) p
+
+infoProvToStrings :: Ptr InfoProv -> IO [String]
+infoProvToStrings infop = do
+  name <- GHC.peekCString utf8 =<< ipName infop
+  desc <- GHC.peekCString utf8 =<< ipDesc infop
+  ty_desc <- GHC.peekCString utf8 =<< ipTyDesc infop
+  label <- GHC.peekCString utf8 =<< ipLabel infop
+  mod <- GHC.peekCString utf8 =<< ipModule infop
+  loc <- GHC.peekCString utf8 =<< ipSrcLoc infop
+  return [name, desc, ty_desc, label, mod, loc]
+
+-- TODO: Add structured output of whereFrom
+
+whereFrom :: a -> IO [String]
+whereFrom obj = do
+  ipe <- getIPE obj
+  -- The primop returns the null pointer in two situations at the moment
+  -- 1. The lookup fails for whatever reason
+  -- 2. Profiling is not enabled.
+  -- It would be good to distinguish between these two cases somehow.
+  if ipe == nullPtr
+    then return []
+    else infoProvToStrings (ipeProv ipe)
