@@ -802,8 +802,9 @@ following RTS options select which break-down to use:
 
 .. rts-flag:: -hi
 
-    Break down the graph by the address of the info table of a closure. This
-    profiling mode is intended to be used with :ghc-flag:`-finfo-table-map`.
+    Break down the graph by the address of the info table of a closure. For this
+    to produce useful output the program must have been compiled with
+    :ghc-flag:`-finfo-table-map`.
 
 .. rts-flag:: -l
     :noindex:

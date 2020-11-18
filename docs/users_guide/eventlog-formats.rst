@@ -598,6 +598,24 @@ A variable-length packet produced once for each cost centre,
 
      * bit 0: is the cost-centre a CAF?
 
+Info Table Provenance definitions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A message which describes an approximate source position for
+info tables. See :ghc-flag:`-finfo-table-map` for more information.
+
+.. event-type:: IPE
+
+   :tag: 169
+   :length: fixed
+   :field Word64: info table address
+   :field String: table name
+   :field String: closure type
+   :field String: type
+   :field String: source position label
+   :field String: source position module
+   :field String: source position location
+
 
 Sample event types
 ^^^^^^^^^^^^^^^^^^

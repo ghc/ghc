@@ -524,6 +524,7 @@ Library
         GHC.Settings.Constants
         GHC.Settings.IO
         GHC.Stg.CSE
+        GHC.Stg.Debug
         GHC.Stg.DepAnal
         GHC.Stg.FVs
         GHC.Stg.Lift
@@ -635,6 +636,7 @@ Library
         GHC.Types.ForeignStubs
         GHC.Types.HpcInfo
         GHC.Types.Id
+        GHC.Types.IPE
         GHC.Types.Id.Info
         GHC.Types.Id.Make
         GHC.Types.Literal

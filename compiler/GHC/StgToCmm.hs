@@ -19,7 +19,7 @@ import GHC.Prelude as Prelude
 import GHC.Driver.Backend
 import GHC.Driver.Session
 
-import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
+import GHC.StgToCmm.Prof (initInfoTableProv, initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Bind
@@ -39,6 +39,7 @@ import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Types.HpcInfo
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -64,41 +65,56 @@ import GHC.SysTools.FileCleanup
 import GHC.Data.Stream
 import GHC.Data.OrdList
 
-import Data.IORef
 import Control.Monad (when,void)
 import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
+import Data.Maybe
+import Data.IORef
+
+data CodeGenState = CodeGenState { codegen_used_info :: !(OrdList CmmInfoTable)
+                                 , codegen_state :: !CgState }
+
 
 codeGen :: Logger
         -> DynFlags
         -> Module
+        -> InfoTableProvMap
         -> [TyCon]
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ModuleLFInfos
-                                       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup (SDoc, ModuleLFInfos)       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen logger dflags this_mod data_tycons
+codeGen logger dflags this_mod ip_map@(InfoTableProvMap _) data_tycons
         cost_centre_info stg_binds hpc_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
-              -- we would need to add a state monad layer.
-        ; cgref <- liftIO $ newIORef =<< initC
-        ; let cg :: FCode () -> Stream IO CmmGroup ()
+              -- we would need to add a state monad layer which regresses
+              -- allocations by 0.5-2%.
+        ; cgref <- liftIO $ initC >>= \s -> newIORef (CodeGenState mempty s)
+        ; let cg :: FCode a -> Stream IO CmmGroup a
               cg fcode = do
-                cmm <- liftIO . withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
-                         st <- readIORef cgref
+                (a, cmm) <- liftIO . withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
+                         CodeGenState ts st <- readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
-                         writeIORef cgref $! st'{ cgs_tops = nilOL,
-                                                  cgs_stmts = mkNop }
+                         -- This is observed by the #3294 test
+                         let !used_info
+                                | gopt Opt_InfoTableMap dflags = toOL (mapMaybe topInfoTable (snd a)) `mappend` ts
+                                | otherwise = mempty
+                         writeIORef cgref $!
+                                    CodeGenState used_info
+                                      (st'{ cgs_tops = nilOL,
+                                            cgs_stmts = mkNop
+                                          })
+
                          return a
                 yield cmm
+                return a
 
                -- Note [codegen-split-init] the cmm_init block must come
                -- FIRST.  This is because when -split-objs is on we need to
@@ -107,7 +123,6 @@ codeGen logger dflags this_mod data_tycons
         ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
 
         ; mapM_ (cg . cgTopBinding logger dflags) stg_binds
-
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
                 -- (say) PrelBase_True_closure, which is defined in
@@ -121,7 +136,11 @@ codeGen logger dflags this_mod data_tycons
 
         ; mapM_ do_tycon data_tycons
 
-        ; cg_id_infos <- cgs_binds <$> liftIO (readIORef cgref)
+        ; final_state <- liftIO (readIORef cgref)
+        ; let cg_id_infos = cgs_binds . codegen_state $ final_state
+              used_info = fromOL . codegen_used_info $ final_state
+
+        ; !foreign_stub <- cg (initInfoTableProv used_info ip_map this_mod)
 
           -- See Note [Conveying CAF-info and LFInfo between modules] in
           -- GHC.StgToCmm.Types
@@ -136,7 +155,7 @@ codeGen logger dflags this_mod data_tycons
                 | otherwise
                 = mkNameEnv (Prelude.map extractInfo (eltsUFM cg_id_infos))
 
-        ; return generatedInfo
+        ; return (foreign_stub, generatedInfo)
         }
 
 ---------------------------------------------------------------

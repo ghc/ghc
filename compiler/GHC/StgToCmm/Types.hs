@@ -20,6 +20,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Utils.Outputable
 
+
 {-
 Note [Conveying CAF-info and LFInfo between modules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -86,6 +87,8 @@ data CgInfos = CgInfos
       -- either not exported of CAFFY.
   , cgLFInfos :: !ModuleLFInfos
       -- ^ LambdaFormInfos of exported closures in the current module.
+  , cgIPEStub :: !SDoc
+      -- ^ The C stub which is used for IPE information
   }
 
 --------------------------------------------------------------------------------
