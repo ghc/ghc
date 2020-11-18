@@ -77,7 +77,9 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
       /* N.B. We currently can't mark symbol extras as non-executable in this
        * case. */
       size_t n = roundUpToPage(oc->fileSize);
-      bssSize = roundUpToAlign(bssSize, 8);
+      // round bssSize up to the nearest page size since we need to ensure that
+      // symbol_extras is aligned to a page boundary so it can be mprotect'd.
+      bssSize = roundUpToPage(bssSize);
       size_t allocated_size = n + bssSize + extras_size;
       void *new = mmapForLinker(allocated_size, MAP_ANONYMOUS, -1, 0);
       if (new) {
