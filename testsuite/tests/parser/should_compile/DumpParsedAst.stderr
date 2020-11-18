@@ -748,10 +748,7 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (ApiAnn
-             { DumpParsedAst.hs:19:6-23 }
-             (AddApiAnn AnnEqual { DumpParsedAst.hs:19:6 })
-             [])
+            (NoExtField)
             [(L
               { DumpParsedAst.hs:19:6-23 }
               (GRHS

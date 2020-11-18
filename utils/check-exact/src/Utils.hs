@@ -37,6 +37,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Driver.Ppr
+import GHC.Data.FastString
 -- import GHC.Types.Var
 -- import GHC.Types.Name.Occurrence
 
@@ -163,6 +164,22 @@ ss2pos ss = (srcSpanStartLine ss,srcSpanStartCol ss)
 
 ss2posEnd :: RealSrcSpan -> Pos
 ss2posEnd ss = (srcSpanEndLine ss,srcSpanEndCol ss)
+
+ss2range :: SrcSpan -> (Pos,Pos)
+ss2range ss = (ss2pos $ rs ss, ss2posEnd $ rs ss)
+
+rs2range :: RealSrcSpan -> (Pos,Pos)
+rs2range ss = (ss2pos ss, ss2posEnd ss)
+
+rs :: SrcSpan -> RealSrcSpan
+rs (RealSrcSpan s _) = s
+rs _ = badRealSrcSpan
+
+badRealSrcSpan :: RealSrcSpan
+badRealSrcSpan = mkRealSrcSpan bad bad
+  where
+    bad = mkRealSrcLoc (fsLit "ghc-exactprint-nospan") 0 0
+
 
 -- srcSpanEndColumn :: SrcSpan -> Int
 -- srcSpanEndColumn (RealSrcSpan s) = srcSpanEndCol s

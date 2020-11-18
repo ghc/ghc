@@ -177,7 +177,7 @@ mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
 mkSimpleMatch ctxt pats rhs
   = L loc $
     Match { m_ext = noAnn, m_ctxt = ctxt, m_pats = pats
-          , m_grhss = unguardedGRHSs rhs noAnn }
+          , m_grhss = unguardedGRHSs (locA loc) rhs noAnn }
   where
     loc = case pats of
                 []      -> getLoc rhs
@@ -185,16 +185,16 @@ mkSimpleMatch ctxt pats rhs
 
 unguardedGRHSs :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ SrcSpan
-               => LocatedA (body (GhcPass p)) -> ApiAnn' AddApiAnn
+               => SrcSpan -> LocatedA (body (GhcPass p)) -> ApiAnn' GrhsAnn
                -> GRHSs (GhcPass p) (LocatedA (body (GhcPass p)))
-unguardedGRHSs rhs@(L loc _) ann
-  = GRHSs ann (unguardedRHS noAnn (locA loc) rhs) emptyLocalBinds
+unguardedGRHSs loc rhs an
+  = GRHSs noExtField (unguardedRHS an loc rhs) emptyLocalBinds
 
 unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ SrcSpan
              => ApiAnn' GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
              -> [LGRHS (GhcPass p) (LocatedA (body (GhcPass p)))]
-unguardedRHS ann loc rhs = [L loc (GRHS ann [] rhs)]
+unguardedRHS an loc rhs = [L loc (GRHS an [] rhs)]
 
 type AnnoBody p body
   = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ NoExtField
@@ -907,7 +907,7 @@ mkMatch ctxt pats expr binds
   = noLocA (Match { m_ext   = noAnn
                   , m_ctxt  = ctxt
                   , m_pats  = map paren pats
-                  , m_grhss = GRHSs noAnn (unguardedRHS noAnn noSrcSpan expr) binds })
+                  , m_grhss = GRHSs noExtField (unguardedRHS noAnn noSrcSpan expr) binds })
   where
     paren :: LPat (GhcPass p) -> LPat (GhcPass p)
     paren lp@(L l p)

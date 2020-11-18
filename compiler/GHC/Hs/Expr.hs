@@ -1925,10 +1925,9 @@ data GRHSs p body
     }
   | XGRHSs !(XXGRHSs p body)
 
-                    -- MatchContext dependent, as per 'matchSeparator'
-type instance XCGRHSs (GhcPass _) b = ApiAnn' AddApiAnn
+type instance XCGRHSs (GhcPass _) _ = NoExtField
 
-type instance XXGRHSs (GhcPass _) b = NoExtCon
+type instance XXGRHSs (GhcPass _) _ = NoExtCon
 
 -- | Located Guarded Right-Hand Side
 type LGRHS id body = XRec id (GRHS id body)
@@ -1943,11 +1942,11 @@ data GRHS p body = GRHS (XCGRHS p body)
                         body           -- Right hand side
                   | XGRHS !(XXGRHS p body)
 
-type instance XCGRHS (GhcPass _) b = ApiAnn' GrhsAnn
+type instance XCGRHS (GhcPass _) _ = ApiAnn' GrhsAnn
                                    -- Location of matchSeparator
                                    -- TODO:AZ does this belong on the GRHS, or GRHSs?
 
-type instance XXGRHS (GhcPass _) b = NoExtCon
+type instance XXGRHS (GhcPass _) _ = NoExtCon
 
 data GrhsAnn
   = GrhsAnn {

@@ -114,10 +114,7 @@
                  (Unqual
                   {OccName: x}))))))]
            (GRHSs
-            (ApiAnn
-             { InTreeAnnotations1.hs:4:21-31 }
-             (AddApiAnn AnnEqual { InTreeAnnotations1.hs:4:21 })
-             [])
+            (NoExtField)
             [(L
               { InTreeAnnotations1.hs:4:21-31 }
               (GRHS
@@ -366,10 +363,7 @@
                      (False)))]
                   (Nothing)))))))]
            (GRHSs
-            (ApiAnn
-             { InTreeAnnotations1.hs:8:37-43 }
-             (AddApiAnn AnnEqual { InTreeAnnotations1.hs:8:37 })
-             [])
+            (NoExtField)
             [(L
               { InTreeAnnotations1.hs:8:37-43 }
               (GRHS
