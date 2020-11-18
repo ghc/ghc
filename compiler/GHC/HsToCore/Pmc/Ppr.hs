@@ -136,26 +136,13 @@ checkRefuts x = do
 
 -- | Pretty print a variable, but remember to prettify the names of the variables
 -- that refer to neg-literals. The ones that cannot be shown are printed as
--- underscores. Even with a type signature, if it's not too noisy.
+-- underscores.
 pprPmVar :: PprPrec -> Id -> PmPprM SDoc
--- Type signature is "too noisy" by my definition if it needs to parenthesize.
--- I like           "not matched: _ :: Proxy (DIdEnv (Id, SDoc))",
--- but I don't like "not matched: (_ :: stuff) (_:_) (_ :: Proxy (DIdEnv (Id, SDoc)))"
--- The useful information in the latter case is the constructor that we missed,
--- not the types of the wildcards in the places that aren't matched as a result.
 pprPmVar prec x = do
   nabla <- ask
   case lookupSolution nabla x of
     Just (PACA alt _tvs args) -> pprPmAltCon prec alt args
-    Nothing                   -> fromMaybe typed_wildcard <$> checkRefuts x
-      where
-        -- if we have no info about the parameter and would just print a
-        -- wildcard, also show its type.
-        typed_wildcard
-          | prec <= sigPrec
-          = underscore <+> text "::" <+> ppr (idType x)
-          | otherwise
-          = underscore
+    Nothing                   -> fromMaybe underscore <$> checkRefuts x
 
 pprPmAltCon :: PprPrec -> PmAltCon -> [Id] -> PmPprM SDoc
 pprPmAltCon _prec (PmAltLit l)      _    = pure (ppr l)

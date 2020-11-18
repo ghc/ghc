@@ -13,4 +13,5 @@ T18572.hs:12:1: warning: [-Woverlapping-patterns (in -Wdefault)]
 
 T18572.hs:12:1: warning: [-Wincomplete-uni-patterns]
     Pattern match(es) are non-exhaustive
-    In a pattern binding: Patterns not matched: SFalse
+    In a pattern binding:
+        Patterns of type  ‘SBool 'False’ not matched: SFalse
