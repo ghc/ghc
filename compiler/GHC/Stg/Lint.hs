@@ -148,7 +148,7 @@ checkNoCurrentCCS rhs = do
       StgRhsClosure _ ccs _ _ _
          | isCurrentCCS ccs
          -> addErrL (text "Top-level StgRhsClosure with CurrentCCS" $$ rhs')
-      StgRhsCon ccs _ _
+      StgRhsCon ccs _ _ _ _
          | isCurrentCCS ccs
          -> addErrL (text "Top-level StgRhsCon with CurrentCCS" $$ rhs')
       _ -> return ()
@@ -163,7 +163,7 @@ lintStgRhs (StgRhsClosure _ _ _ binders expr)
       addInScopeVars binders $
         lintStgExpr expr
 
-lintStgRhs rhs@(StgRhsCon _ con args) = do
+lintStgRhs rhs@(StgRhsCon _ con _ _ args) = do
     when (isUnboxedTupleDataCon con || isUnboxedSumDataCon con) $ do
       opts <- getStgPprOpts
       addErrL (text "StgRhsCon is an unboxed tuple or sum application" $$
@@ -179,7 +179,7 @@ lintStgExpr (StgApp fun args) = do
     lintStgVar fun
     mapM_ lintStgArg args
 
-lintStgExpr app@(StgConApp con args _arg_tys) = do
+lintStgExpr app@(StgConApp con _n args _arg_tys) = do
     -- unboxed sums should vanish during unarise
     lf <- getLintFlags
     when (lf_unarised lf && isUnboxedSumDataCon con) $ do

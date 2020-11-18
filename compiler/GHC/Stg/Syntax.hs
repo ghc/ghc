@@ -244,6 +244,10 @@ literals.
         -- StgConApp is vital for returning unboxed tuples or sums
         -- which can't be let-bound
   | StgConApp   DataCon
+                (Maybe Int)
+                -- When `-fdistinct-info-tables` is turned on then
+                -- each usage of a DataCon gets an increasing identifier
+                -- which is used for debugging purposes.
                 [StgArg] -- Saturated
                 [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
 
@@ -434,6 +438,8 @@ important):
                         -- from static closure.
         DataCon         -- Constructor. Never an unboxed tuple or sum, as those
                         -- are not allocated.
+        (Maybe Int)
+        [Tickish Id]
         [StgArg]        -- Args
 
 -- | Used as a data type index for the stgSyn AST
@@ -480,7 +486,7 @@ stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   = ASSERT( all isId bndrs ) length bndrs
   -- The arity never includes type parameters, but they should have gone by now
-stgRhsArity (StgRhsCon _ _ _) = 0
+stgRhsArity (StgRhsCon _ _ _ _ _) = 0
 
 {-
 ************************************************************************
@@ -707,7 +713,7 @@ pprStgExpr opts e = case e of
    StgLit lit           -> ppr lit
                            -- general case
    StgApp func args     -> hang (ppr func) 4 (interppSP args)
-   StgConApp con args _ -> hsep [ ppr con, brackets (interppSP args) ]
+   StgConApp con n args _ -> hsep [ ppr con, ppr n, brackets (interppSP args) ]
    StgOpApp op args _   -> hsep [ pprStgOp op, brackets (interppSP args)]
    StgLam bndrs body    -> let ppr_list = brackets . fsep . punctuate comma
                            in sep [ char '\\' <+> ppr_list (map (pprBndr LambdaBind) (toList bndrs))
@@ -815,5 +821,5 @@ pprStgRhs opts rhs = case rhs of
                     ])
               4 (pprStgExpr opts body)
 
-   StgRhsCon cc con args
-      -> hcat [ ppr cc, space, ppr con, text "! ", brackets (sep (map pprStgArg args))]
+   StgRhsCon cc con mid ticks args
+      -> hcat [ ppr cc, space, ppr mid, ppr ticks, ppr con, text "! ", brackets (sep (map pprStgArg args))]
