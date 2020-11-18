@@ -18,6 +18,8 @@ module GHC.Cmm.CLabel (
         NeedExternDecl (..),
         ForeignLabelSource(..),
         DynamicLinkerLabelInfo(..),
+        ConInfoTableLocation(..),
+        getConInfoTableLocation,
 
         -- * Constructors
         mkClosureLabel,
@@ -107,6 +109,7 @@ module GHC.Cmm.CLabel (
         isIdLabel,
         isTickyLabel,
         hasHaskellName,
+        hasIdLabelInfo,
         isBytesLabel,
         isForeignLabel,
         isSomeRODataLabel,
@@ -450,8 +453,18 @@ data IdLabelInfo
 
   | RednCounts          -- ^ Label of place to keep Ticky-ticky  info for this Id
 
-  | ConEntry            -- ^ Constructor entry point
-  | ConInfoTable        -- ^ Corresponding info table
+  | ConEntry ConInfoTableLocation
+  -- ^ Constructor entry point, when `-fdistinct-info-tables` is enabled then
+  -- each usage of a constructor will be given a unique number and a fresh info
+  -- table will be created in the module where the constructor is used. The
+  -- argument is used to keep track of which info table a usage of a constructor
+  -- should use. When the argument is 'Nothing' then it uses the info table which
+  -- is defined in the module where the datatype is declared, this is the usual case.
+  -- When it is (Just (m, k)) it will use the kth info table defined in module m. The
+  -- point of this inefficiency is so that you can work out where allocations of data
+  -- constructors are coming from when you are debugging.
+
+  | ConInfoTable ConInfoTableLocation        -- ^ Corresponding info table
 
   | ClosureTable        -- ^ Table of closures for Enum tycons
 
@@ -463,6 +476,19 @@ data IdLabelInfo
 
   deriving (Eq, Ord)
 
+-- | Which module is the info table from, and which number was it.
+data ConInfoTableLocation = UsageSite Module Int
+                          | DefinitionSite
+                              deriving (Eq, Ord)
+
+instance Outputable ConInfoTableLocation where
+  ppr (UsageSite m n) = text "Loc(" <> ppr n <> text "):" <+> ppr m
+  ppr DefinitionSite = empty
+
+getConInfoTableLocation :: IdLabelInfo -> Maybe ConInfoTableLocation
+getConInfoTableLocation (ConInfoTable ci) = Just ci
+getConInfoTableLocation _ = Nothing
+
 instance Outputable IdLabelInfo where
   ppr Closure    = text "Closure"
   ppr InfoTable  = text "InfoTable"
@@ -473,10 +499,8 @@ instance Outputable IdLabelInfo where
   ppr LocalEntry      = text "LocalEntry"
 
   ppr RednCounts      = text "RednCounts"
-  ppr ConEntry        = text "ConEntry"
-  ppr ConInfoTable    = text "ConInfoTable"
---  ppr (ConEntry mn) = text "ConEntry" <+> ppr mn
---  ppr (ConInfoTable mn) = text "ConInfoTable" <+> ppr mn
+  ppr (ConEntry mn) = text "ConEntry" <+> ppr mn
+  ppr (ConInfoTable mn) = text "ConInfoTable" <+> ppr mn
   ppr ClosureTable = text "ClosureTable"
   ppr Bytes        = text "Bytes"
   ppr BlockInfoTable  = text "BlockInfoTable"
@@ -544,13 +568,15 @@ mkClosureLabel              :: Name -> CafInfo -> CLabel
 mkInfoTableLabel            :: Name -> CafInfo -> CLabel
 mkEntryLabel                :: Name -> CafInfo -> CLabel
 mkClosureTableLabel         :: Name -> CafInfo -> CLabel
-mkConInfoTableLabel         :: Name -> CafInfo -> CLabel
+mkConInfoTableLabel         :: Name -> ConInfoTableLocation -> CLabel
 mkBytesLabel                :: Name -> CLabel
 mkClosureLabel name         c     = IdLabel name c Closure
 mkInfoTableLabel name       c     = IdLabel name c InfoTable
 mkEntryLabel name           c     = IdLabel name c Entry
 mkClosureTableLabel name    c     = IdLabel name c ClosureTable
-mkConInfoTableLabel name    c     = IdLabel name c ConInfoTable
+-- Special case for the normal 'DefinitionSite' case so that the 'ConInfoTable' application can be floated to a CAF.
+mkConInfoTableLabel name DefinitionSite = IdLabel name NoCafRefs (ConInfoTable DefinitionSite)
+mkConInfoTableLabel name k = IdLabel name NoCafRefs (ConInfoTable k)
 mkBytesLabel name                 = IdLabel name NoCafRefs Bytes
 
 mkBlockInfoTableLabel :: Name -> CafInfo -> CLabel
@@ -706,7 +732,7 @@ isStaticClosureLabel _lbl = False
 isSomeRODataLabel :: CLabel -> Bool
 -- info table defined in haskell (.hs)
 isSomeRODataLabel (IdLabel _ _ ClosureTable) = True
-isSomeRODataLabel (IdLabel _ _ ConInfoTable) = True
+isSomeRODataLabel (IdLabel _ _ ConInfoTable {}) = True
 isSomeRODataLabel (IdLabel _ _ InfoTable) = True
 isSomeRODataLabel (IdLabel _ _ LocalInfoTable) = True
 isSomeRODataLabel (IdLabel _ _ BlockInfoTable) = True
@@ -718,13 +744,13 @@ isSomeRODataLabel _lbl = False
 isInfoTableLabel :: CLabel -> Bool
 isInfoTableLabel (IdLabel _ _ InfoTable)      = True
 isInfoTableLabel (IdLabel _ _ LocalInfoTable) = True
-isInfoTableLabel (IdLabel _ _ ConInfoTable)   = True
+isInfoTableLabel (IdLabel _ _ ConInfoTable {})   = True
 isInfoTableLabel (IdLabel _ _ BlockInfoTable) = True
 isInfoTableLabel _                            = False
 
 -- | Whether label is points to constructor info table
 isConInfoTableLabel :: CLabel -> Bool
-isConInfoTableLabel (IdLabel _ _ ConInfoTable)   = True
+isConInfoTableLabel (IdLabel _ _ ConInfoTable {})   = True
 isConInfoTableLabel _                            = False
 
 -- | Get the label size field from a ForeignLabel
@@ -827,7 +853,8 @@ toSlowEntryLbl platform lbl = case lbl of
 toEntryLbl :: Platform -> CLabel -> CLabel
 toEntryLbl platform lbl = case lbl of
    IdLabel n c LocalInfoTable    -> IdLabel n c LocalEntry
-   IdLabel n c ConInfoTable      -> IdLabel n c ConEntry
+   IdLabel n c (ConInfoTable k)  -> IdLabel n c (ConEntry k)
+
    IdLabel n _ BlockInfoTable    -> mkLocalBlockLabel (nameUnique n)
                    -- See Note [Proc-point local block entry-point].
    IdLabel n c _                 -> IdLabel n c Entry
@@ -838,7 +865,8 @@ toEntryLbl platform lbl = case lbl of
 toInfoLbl :: Platform -> CLabel -> CLabel
 toInfoLbl platform lbl = case lbl of
    IdLabel n c LocalEntry      -> IdLabel n c LocalInfoTable
-   IdLabel n c ConEntry        -> IdLabel n c ConInfoTable
+   IdLabel n c (ConEntry k)    -> IdLabel n c (ConInfoTable k)
+
    IdLabel n c _               -> IdLabel n c InfoTable
    CmmLabel m ext str CmmEntry -> CmmLabel m ext str CmmInfo
    CmmLabel m ext str CmmRet   -> CmmLabel m ext str CmmRetInfo
@@ -847,6 +875,10 @@ toInfoLbl platform lbl = case lbl of
 hasHaskellName :: CLabel -> Maybe Name
 hasHaskellName (IdLabel n _ _) = Just n
 hasHaskellName _               = Nothing
+
+hasIdLabelInfo :: CLabel -> Maybe IdLabelInfo
+hasIdLabelInfo (IdLabel _ _ l) = Just l
+hasIdLabelInfo _ = Nothing
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel's referent itself refer to a CAF?
@@ -1459,8 +1491,16 @@ ppIdFlavor x = pp_cSEP <> case x of
    LocalEntry       -> text "entry"
    Slow             -> text "slow"
    RednCounts       -> text "ct"
-   ConEntry         -> text "con_entry"
-   ConInfoTable     -> text "con_info"
+   ConEntry loc      ->
+      case loc of
+        DefinitionSite -> text "con_entry"
+        UsageSite m n ->
+          ppr m <> pp_cSEP <> ppr n <> pp_cSEP <> text "con_entry"
+   ConInfoTable k   ->
+    case k of
+      DefinitionSite -> text "con_info"
+      UsageSite m n ->
+        ppr m <> pp_cSEP <> ppr n <> pp_cSEP <> text "con_info"
    ClosureTable     -> text "closure_tbl"
    Bytes            -> text "bytes"
    BlockInfoTable   -> text "info"

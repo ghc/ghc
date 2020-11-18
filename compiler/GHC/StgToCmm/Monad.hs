@@ -91,7 +91,6 @@ import Control.Monad
 import Data.List (mapAccumL)
 
 
-
 --------------------------------------------------------
 -- The FCode monad and its types
 --
