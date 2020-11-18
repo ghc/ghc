@@ -197,6 +197,9 @@ closureIdentity( const StgClosure *p )
             return closure_type_names[info->type];
         }
     }
+    case HEAP_BY_INFO_TABLE: {
+        return get_itbl(p);
+        }
 
     default:
         barf("closureIdentity");
@@ -904,6 +907,12 @@ dumpCensus( Census *census )
             fprintf(hp_file, "%s", (char *)ctr->identity);
             traceHeapProfSampleString(0, (char *)ctr->identity,
                                       count * sizeof(W_));
+            break;
+        case HEAP_BY_INFO_TABLE:
+            fprintf(hp_file, "%p", ctr->identity);
+            char str[100];
+            sprintf(str, "%p", ctr->identity);
+            traceHeapProfSampleString(0, str, count * sizeof(W_));
             break;
 #if defined(PROFILING)
         case HEAP_BY_CCS:
