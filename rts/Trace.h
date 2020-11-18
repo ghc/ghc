@@ -66,14 +66,16 @@ enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
 #define DEBUG_sparks      RtsFlags.DebugFlags.sparks
 #define DEBUG_compact     RtsFlags.DebugFlags.compact
 
-// events
-extern int TRACE_sched;
-extern int TRACE_gc;
-extern int TRACE_spark_sampled;
-extern int TRACE_spark_full;
-/* extern int TRACE_user; */  // only used in Trace.c
-extern int TRACE_cap;
-extern int TRACE_nonmoving_gc;
+// Event-enabled flags
+// These semantically booleans but we use a dense packing to minimize their
+// cache impact.
+extern uint8_t TRACE_sched;
+extern uint8_t TRACE_gc;
+extern uint8_t TRACE_nonmoving_gc;
+extern uint8_t TRACE_spark_sampled;
+extern uint8_t TRACE_spark_full;
+extern uint8_t TRACE_cap;
+/* extern uint8_t TRACE_user; */  // only used in Trace.c
 
 // -----------------------------------------------------------------------------
 // Posting events

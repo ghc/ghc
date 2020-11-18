@@ -29,13 +29,13 @@
 #endif
 
 // events
-int TRACE_sched;
-int TRACE_gc;
-int TRACE_nonmoving_gc;
-int TRACE_spark_sampled;
-int TRACE_spark_full;
-int TRACE_user;
-int TRACE_cap;
+uint8_t TRACE_sched;
+uint8_t TRACE_gc;
+uint8_t TRACE_nonmoving_gc;
+uint8_t TRACE_spark_sampled;
+uint8_t TRACE_spark_full;
+uint8_t TRACE_user;
+uint8_t TRACE_cap;
 
 #if defined(THREADED_RTS)
 static Mutex trace_utx;
