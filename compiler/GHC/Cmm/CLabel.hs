@@ -83,7 +83,7 @@ module GHC.Cmm.CLabel (
         mkCCLabel,
         mkCCSLabel,
         mkIPELabel,
-        InfoTableEnt(..),
+        InfoProvEnt(..),
 
         mkDynamicLinkerLabel,
         mkPicBaseLabel,
@@ -253,7 +253,7 @@ data CLabel
 
   | CC_Label  CostCentre
   | CCS_Label CostCentreStack
-  | IPE_Label InfoTableEnt
+  | IPE_Label InfoProvEnt
 
 
   -- | These labels are generated and used inside the NCG only.
@@ -735,19 +735,16 @@ mkBitmapLabel   :: Unique -> CLabel
 mkBitmapLabel   uniq            = LargeBitmapLabel uniq
 
 
-data InfoTableEnt = InfoTableEnt { infoTablePtr :: !CLabel
-                                 , infoTableEntClosureType :: !Int
-                                 , infoTableType :: !String
-                                 , infoTableProv :: !(Module, RealSrcSpan, String) }
-                                 deriving (Eq, Ord)
-
---instance Outputable InfoTableEnt where
---  ppr (InfoTableEnt l ct p) = pdoc (undefined :: Platform) l <> colon <> ppr ct <> colon <> ppr p
+data InfoProvEnt = InfoProvEnt { infoTablePtr :: !CLabel
+                               , infoProvEntClosureType :: !Int
+                               , infoTableType :: !String
+                               , infoTableProv :: !(Module, RealSrcSpan, String) }
+                               deriving (Eq, Ord)
 
 -- Constructing Cost Center Labels
 mkCCLabel  :: CostCentre      -> CLabel
 mkCCSLabel :: CostCentreStack -> CLabel
-mkIPELabel :: InfoTableEnt -> CLabel
+mkIPELabel :: InfoProvEnt -> CLabel
 mkCCLabel           cc          = CC_Label cc
 mkCCSLabel          ccs         = CCS_Label ccs
 mkIPELabel          ipe         = IPE_Label ipe
@@ -1393,7 +1390,7 @@ pprCLabel platform sty lbl =
 
    CC_Label cc   -> maybe_underscore $ ppr cc
    CCS_Label ccs -> maybe_underscore $ ppr ccs
-   (IPE_Label (InfoTableEnt l _ _ (m, _, _))) -> pprCode CStyle (pdoc platform l) <> text "_" <> ppr m <> text "_ipe"
+   (IPE_Label (InfoProvEnt l _ _ (m, _, _))) -> pprCode CStyle (pdoc platform l) <> text "_" <> ppr m <> text "_ipe"
 
 
    CmmLabel _ _ fs CmmCode     -> maybe_underscore $ ftext fs

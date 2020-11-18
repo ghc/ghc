@@ -286,7 +286,7 @@ initInfoTableProv (InfoTableProvMap dcmap clmap) this_mod
        mapM_ emitInfoTableProv ents
 
 --- Info Table Prov stuff
-emitInfoTableProv :: InfoTableEnt  -> FCode ()
+emitInfoTableProv :: InfoProvEnt  -> FCode ()
 emitInfoTableProv ip = do
   { dflags <- getDynFlags
   ; let (mod, src, label) = infoTableProv ip
@@ -305,7 +305,7 @@ emitInfoTableProv ip = do
                     showPpr dflags (pprCLabel platform CStyle (infoTablePtr ip))
 
   ; closure_type <- newByteStringCLit $ bytesFS $ mkFastString $
-                    showPpr dflags (text $ show $ infoTableEntClosureType ip)
+                    showPpr dflags (text $ show $ infoProvEntClosureType ip)
   ; let
      lits = [ CmmLabel (infoTablePtr ip), -- Info table pointer
               table_name,     -- char *table_name
