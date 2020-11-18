@@ -166,6 +166,7 @@ library
                       rts/Parallel.h
                       rts/PrimFloat.h
                       rts/Profiling.h
+                      rts/IPE.h
                       rts/Signals.h
                       rts/SpinLock.h
                       rts/StableName.h
@@ -446,6 +447,7 @@ library
                ProfilerReport.c
                ProfilerReportJson.c
                Profiling.c
+               IPE.c
                Proftimer.c
                RaiseAsync.c
                RetainerProfile.c
