@@ -381,7 +381,10 @@ reportWarnings dflags ctx@(DsMatchContext kind loc) vars
       case vars of -- See #11245
            [] -> text "Guards do not cover entire pattern space"
            _  -> let us = map (\nabla -> pprUncovered nabla vars) nablas
-                 in  hang (text "Patterns not matched:") 4
+                     pp_tys = pprQuotedList $ map idType vars
+                 in  hang
+                       (text "Patterns of type" <+> pp_tys <+> text "not matched:")
+                       4
                        (vcat (take maxPatterns us) $$ dots maxPatterns us)
 
     approx_msg = vcat
