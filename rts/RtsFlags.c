@@ -1380,6 +1380,10 @@ error = true;
                     OPTION_UNSAFE;
                     RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
                     break;
+                  case 'i':
+                    OPTION_UNSAFE;
+                    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_INFO_TABLE;
+                    break;
                   default:
                     OPTION_SAFE;
                     PROFILING_BUILD_ONLY();
@@ -2121,6 +2125,7 @@ static bool read_heap_profiling_flag(const char *arg)
     case 'd':
     case 'Y':
     case 'y':
+    case 'i':
     case 'R':
     case 'r':
     case 'B':
@@ -2200,6 +2205,9 @@ static bool read_heap_profiling_flag(const char *arg)
         case 'Y':
         case 'y':
             RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
+            break;
+        case 'i':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_INFO_TABLE;
             break;
         case 'R':
         case 'r':
