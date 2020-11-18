@@ -2269,7 +2269,7 @@ reifyName thing
 -- See Note [Reifying field labels]
 reifyFieldLabel :: FieldLabel -> TH.Name
 reifyFieldLabel fl
-  | flIsOverloaded fl == DuplicateRecordFields
+  | flHasDuplicateRecordFields fl == DuplicateRecordFields
               = TH.Name (TH.mkOccName occ_str) (TH.NameQ (TH.mkModName mod_str))
   | otherwise = TH.mkNameG_v pkg_str mod_str occ_str
   where

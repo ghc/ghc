@@ -647,7 +647,7 @@ tc_patsyn_finish lname dir is_infix lpat'
 
          -- TODO: Make this have the proper information
        ; let mkFieldLabel name = FieldLabel { flLabel = occNameFS (nameOccName name)
-                                            , flIsOverloaded = NoDuplicateRecordFields
+                                            , flHasDuplicateRecordFields = NoDuplicateRecordFields
                                             , flHasFieldSelector = NoFieldSelectors  -- TODO correct?
                                             , flSelector = name }
              field_labels' = map mkFieldLabel field_labels

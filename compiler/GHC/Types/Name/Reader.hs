@@ -645,7 +645,7 @@ gresFromAvail prov_fn avail
           Just is -> GRE { gre_name = n, gre_par = mkParent n avail
                          , gre_lcl = False, gre_imp = [is] }
 
-    mk_fld_gre (FieldLabel { flLabel = lbl, flIsOverloaded = is_overloaded
+    mk_fld_gre (FieldLabel { flLabel = lbl, flHasDuplicateRecordFields = is_overloaded
                            , flSelector = n, flHasFieldSelector = has_sel })
       = case prov_fn n of  -- Nothing => bound locally
                            -- Just is => imported from 'is'
@@ -759,11 +759,11 @@ mkFieldLabel :: Name -> Maybe FastString -> FieldSelectors -> FieldLabel
 mkFieldLabel me mb_lbl has_sel =
           case mb_lbl of
                  Nothing  -> FieldLabel { flLabel = occNameFS (nameOccName me)
-                                        , flIsOverloaded = NoDuplicateRecordFields
+                                        , flHasDuplicateRecordFields = NoDuplicateRecordFields
                                         , flHasFieldSelector = has_sel
                                         , flSelector = me }
                  Just lbl -> FieldLabel { flLabel = lbl
-                                        , flIsOverloaded = DuplicateRecordFields
+                                        , flHasDuplicateRecordFields = DuplicateRecordFields
                                         , flHasFieldSelector = has_sel
                                         , flSelector = me }
 

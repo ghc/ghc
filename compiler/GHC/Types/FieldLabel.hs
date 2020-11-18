@@ -14,7 +14,7 @@ In the normal case (with NoDuplicateRecordFields), a datatype like
 has
 
     FieldLabel { flLabel        = "foo"
-               , flIsOverloaded = False
+               , flHasDuplicateRecordFields = False
                , flSelector     = foo }.
 
 In particular, the Name of the selector has the same string
@@ -22,7 +22,7 @@ representation as the label.  If DuplicateRecordFields
 is enabled, however, the same declaration instead gives
 
     FieldLabel { flLabel        = "foo"
-               , flIsOverloaded = True
+               , flHasDuplicateRecordFields = True
                , flSelector     = $sel:foo:MkT }.
 
 Now the name of the selector ($sel:foo:MkT) does not match the label of
@@ -130,7 +130,7 @@ type FieldLabel = FieldLbl Name
 -- | Fields in an algebraic record type
 data FieldLbl a = FieldLabel {
       flLabel        :: FieldLabelString, -- ^ User-visible label of the field
-      flIsOverloaded :: DuplicateRecordFields,             -- ^ Was DuplicateRecordFields on
+      flHasDuplicateRecordFields :: DuplicateRecordFields,             -- ^ Was DuplicateRecordFields on
                                           --   in the defining module for this datatype?
       flHasFieldSelector :: FieldSelectors,
       -- ^ Was FieldSelectors enabled in the defining module for this datatype?
@@ -163,7 +163,7 @@ instance Binary a => Binary (FieldLbl a) where
 -- See Note [Why selector names include data constructors].
 mkFieldLabelOccs :: FieldLabelString -> OccName -> DuplicateRecordFields -> FieldSelectors -> FieldLbl OccName
 mkFieldLabelOccs lbl dc is_overloaded has_sel
-  = FieldLabel { flLabel = lbl, flIsOverloaded = is_overloaded
+  = FieldLabel { flLabel = lbl, flHasDuplicateRecordFields = is_overloaded
                , flSelector = sel_occ, flHasFieldSelector = has_sel }
   where
     str     = ":" ++ unpackFS lbl ++ ":" ++ occNameString dc

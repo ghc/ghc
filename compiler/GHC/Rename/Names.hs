@@ -1622,7 +1622,7 @@ getMinimalImports = mapM mk_minimal
               = all (`elem` ns) avail_occs
                     && all (`elem` fld_lbls) (map flLabel avail_flds)
 
-          all_non_overloaded = all (\f -> flIsOverloaded f == NoDuplicateRecordFields)
+          all_non_overloaded = all (\f -> flHasDuplicateRecordFields f == NoDuplicateRecordFields)
 
 printMinimalImports :: HscSource -> [ImportDeclUsage] -> RnM ()
 -- See Note [Printing minimal imports]
