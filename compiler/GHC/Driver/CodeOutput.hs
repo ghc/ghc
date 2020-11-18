@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
