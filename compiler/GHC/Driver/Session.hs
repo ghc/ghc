@@ -2947,6 +2947,8 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "fno-prof-auto"
       (noArg (\d -> d { profAuto = NoProfAuto } ))
 
+  , make_ord_flag defGhcFlag "finfo-table-map"
+      (NoArg (setGeneralFlag Opt_InfoTableMap))
         ------ Compiler flags -----------------------------------------------
 
   , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend NCG))
