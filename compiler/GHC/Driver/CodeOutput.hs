@@ -10,6 +10,7 @@ module GHC.Driver.CodeOutput
    ( codeOutput
    , outputForeignStubs
    , profilingInitCode
+   , ipInitCode
    )
 where
 
@@ -36,6 +37,7 @@ import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
 
 import GHC.SysTools.FileCleanup
+
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -68,7 +70,7 @@ codeOutput :: DynFlags
            -> Module
            -> FilePath
            -> ModLocation
-           -> ForeignStubs
+           -> (a -> ForeignStubs)
            -> [(ForeignSrcLang, FilePath)]
            -- ^ additional files to be compiled with the C compiler
            -> [UnitId]
@@ -78,7 +80,7 @@ codeOutput :: DynFlags
                   [(ForeignSrcLang, FilePath)]{-foreign_fps-},
                   a)
 
-codeOutput dflags unit_state this_mod filenm location foreign_stubs foreign_fps pkg_deps
+codeOutput dflags unit_state this_mod filenm location genForeignStubs foreign_fps pkg_deps
   cmm_stream
   =
     do  {
@@ -105,7 +107,6 @@ codeOutput dflags unit_state this_mod filenm location foreign_stubs foreign_fps 
                 ; return cmm
                 }
 
-        ; stubs_exist <- outputForeignStubs dflags unit_state this_mod location foreign_stubs
         ; a <- case backend dflags of
                  NCG         -> outputAsm dflags this_mod location filenm
                                           linted_cmm_stream
@@ -113,6 +114,8 @@ codeOutput dflags unit_state this_mod filenm location foreign_stubs foreign_fps 
                  LLVM        -> outputLlvm dflags filenm linted_cmm_stream
                  Interpreter -> panic "codeOutput: Interpreter"
                  NoBackend   -> panic "codeOutput: NoBackend"
+        ; let stubs = genForeignStubs a
+        ; stubs_exist <- outputForeignStubs dflags unit_state this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
@@ -221,9 +224,14 @@ outputForeignStubs dflags unit_state mod location stubs
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
-               let rts_pkg = unsafeLookupUnitId unit_state rtsUnitId in
-               concatMap mk_include (unitIncludes rts_pkg)
-            mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
+               let mrts_pkg = lookupUnitId unit_state rtsUnitId
+                   mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
+               in case mrts_pkg of
+                    Just rts_pkg -> concatMap mk_include (unitIncludes rts_pkg)
+                    -- This case only happens when compiling foreign stub for the rts
+                    -- library itself. The only time we do this at the moment is for
+                    -- IPE information for the RTS info tables
+                    Nothing -> ""
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
@@ -310,3 +318,108 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
                          | cc <- ccs
                          ] ++ [text "NULL"])
       <> semi
+
+-- | Generate code to initialise info pointer origin
+-- See note [Mapping Info Tables to Source Positions]
+ipInitCode :: DynFlags -> Module -> [InfoProvEnt] -> SDoc
+ipInitCode dflags this_mod ents
+ = if not (gopt Opt_InfoTableMap dflags)
+    then empty
+    else withPprStyle (PprCode CStyle) $ vcat
+    $  map emit_ipe_decl ents
+    ++ [emit_ipe_list ents]
+    ++ [ text "static void ip_init_" <> ppr this_mod
+            <> text "(void) __attribute__((constructor));"
+       , text "static void ip_init_" <> ppr this_mod <> text "(void)"
+       , braces (vcat
+                 [ text "registerInfoProvList" <> parens local_ipe_list_label <> semi
+                 ])
+       ]
+ where
+   platform = targetPlatform dflags
+   emit_ipe_decl ipe =
+       text "extern InfoProvEnt" <+> ipe_lbl <> text "[];"
+     where ipe_lbl = pprCLabel platform CStyle (mkIPELabel ipe)
+   local_ipe_list_label = text "local_ipe_" <> ppr this_mod
+   emit_ipe_list ipes =
+      text "static InfoProvEnt *" <> local_ipe_list_label <> text "[] ="
+      <+> braces (vcat $ [ pprCLabel platform CStyle (mkIPELabel ipe) <> comma
+                         | ipe <- ipes
+                         ] ++ [text "NULL"])
+      <> semi
+
+
+{-
+Note [Mapping Info Tables to Source Positions]
+
+This note describes what the `-finfo-table-map` flag achieves.
+
+When debugging memory issues it is very useful to be able to map a specific closure
+to a position in the source. The prime example is being able to map a THUNK to
+a specific place in the source program, the mapping is usually quite precise because
+a fresh info table is created for each distinct THUNK.
+
+There are three parts to the implementation
+
+1. In CoreToStg, the SourceNote information is used in order to give a source location to
+some specific closures.
+2. In StgToCmm, the actually used info tables are recorded.
+3. During code generation, a mapping from the info table to the statically
+determined location is emitted which can then be queried at runtime by
+various tools.
+
+-- Giving Source Locations to Closures
+
+At the moment thunk and constructor closures are added to the map. This information
+is collected in the `InfoTableProvMap` which provides a mapping from:
+
+1. Data constructors to a list of where they are used.
+2. `Name`s and where they originate from.
+
+During the CoreToStg phase, this map is populated whenever something is turned into
+a StgRhsClosure or an StgConApp. The current source position is recorded
+depending on the location indicated by the surrounding SourceNote.
+
+The functions which add information to the map are `recordStgIdPosition` and
+`incDc`.
+
+When the -fdistinct-constructor-tables` flag is turned on then every
+usage of a data constructor gets its own distinct info table. This is orchestrated
+in `coreToStgExpr` where an incrementing number is used to distinguish each
+occurrence of a data constructor.
+
+-- StgToCmm
+
+The info tables which are actually used in the generated program are recorded during the
+conversion from STG to Cmm. The used info tables are recorded in the `emitProc` function.
+All the used info tables are recorded in the `cgs_used_info` field. This step
+is necessary because when the information about names is collected in the previous
+phase it's unpredictable about which names will end up needing info tables. If
+you don't record which ones are actually used then you end up generating code
+which references info tables which don't exist.
+
+-- Code Generation
+
+The output of these two phases is combined together during code generation.
+A C stub is generated which
+creates the static map from info table pointer to the information about where that
+info table was created from. This is created by `ipInitCode` in the same manner as a
+C stub is generated for cost centres.
+
+This information can be consumed in two ways.
+
+1. The complete mapping is emitted into the eventlog so that external tools such
+as eventlog2html can use the information with the heap profile by info table mode.
+2. The `lookupIPE` function can be used via the `whereFrom#` primop to introspect
+information about a closure in a running Haskell program.
+
+Note [Distinct Info Tables for Constructors]
+
+In the old times, each usage of a data constructor used the same info table.
+This made it impossible to distinguish which actual usuage of a data constructor was
+contributing primarily to the allocation in a program. Using the `-fdistinct-info-tables` flag you
+can cause code generation to generate a distinct info table for each usage of
+a constructor. Then, when inspecting the heap you can see precisely which usage of a constructor
+was responsible for each allocation.
+
+-}
