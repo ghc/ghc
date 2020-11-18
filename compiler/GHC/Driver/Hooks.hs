@@ -46,6 +46,7 @@ import GHC.Types.Id
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Types.Meta
 import GHC.Types.HpcInfo
 
@@ -67,6 +68,7 @@ import GHCi.RemoteTypes
 
 import GHC.Data.Stream
 import GHC.Data.Bag
+import Data.IORef
 
 import Data.Maybe
 import qualified Data.Kind
@@ -145,8 +147,8 @@ data Hooks = Hooks
   , getValueSafelyHook     :: Maybe (HscEnv -> Name -> Type
                                                           -> IO (Maybe HValue))
   , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
-  , stgToCmmHook           :: Maybe (DynFlags -> Module -> [TyCon] -> CollectedCCs
-                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos)
+  , stgToCmmHook           :: Maybe (DynFlags -> Module -> InfoTableProvMap -> [TyCon] -> CollectedCCs
+                                 -> [CgStgTopBinding] -> HpcInfo -> IORef [CmmInfoTable] -> Stream IO CmmGroup ModuleLFInfos)
   , cmmToRawCmmHook        :: forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
                                  -> IO (Stream IO RawCmmGroup a))
   }
