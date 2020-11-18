@@ -657,7 +657,7 @@ gresFromAvail prov_fn avail
         -- Mangle selector names when one or more of 'DuplicateRecordFields' or 'NoFieldSelectors'
         -- is enabled in order to avoid name clash.
         -- See Note [NoFieldSelectors] in GHC.Rename.Env
-        mb_lbl | is_overloaded == DuplicateRecordFields || has_sel == NoFieldSelectors = Just lbl
+        mb_lbl | shouldMangleSelectorNames is_overloaded has_sel = Just lbl
                | otherwise     = Nothing
 
 
