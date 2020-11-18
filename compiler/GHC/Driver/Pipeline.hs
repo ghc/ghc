@@ -1378,7 +1378,9 @@ runPhase (RealPhase Cmm) input_fn = do
        let next_phase = hscPostBackendPhase HsSrcFile (backend dflags)
        output_fn <- phaseOutputFilename next_phase
        PipeState{hsc_env} <- getPipeState
-       liftIO $ hscCompileCmmFile hsc_env input_fn output_fn
+       mstub <- liftIO $ hscCompileCmmFile hsc_env input_fn output_fn
+       stub_o <- liftIO (mapM (compileStub hsc_env) mstub)
+       setForeignOs (maybeToList stub_o)
        return (RealPhase next_phase, output_fn)
 
 -----------------------------------------------------------------------------

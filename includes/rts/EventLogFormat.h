@@ -142,6 +142,7 @@
 #define EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN   166
 #define EVENT_PROF_SAMPLE_COST_CENTRE      167
 #define EVENT_PROF_BEGIN                   168
+#define EVENT_IPE                          169
 
 #define EVENT_USER_BINARY_MSG              181
 

@@ -1,4 +1,4 @@
-Found 238 Language.Haskell.Syntax module dependencies
+Found 240 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -156,6 +156,7 @@ GHC.Types.Fixity.Env
 GHC.Types.ForeignCall
 GHC.Types.ForeignStubs
 GHC.Types.HpcInfo
+GHC.Types.IPE
 GHC.Types.Id
 GHC.Types.Id.Info
 GHC.Types.Id.Make
@@ -181,6 +182,7 @@ GHC.Types.Unique
 GHC.Types.Unique.DFM
 GHC.Types.Unique.DSet
 GHC.Types.Unique.FM
+GHC.Types.Unique.Map
 GHC.Types.Unique.Set
 GHC.Types.Unique.Supply
 GHC.Types.Var
