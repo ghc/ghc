@@ -132,15 +132,16 @@ typedef struct _COST_CENTRE_FLAGS {
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _PROFILING_FLAGS {
     uint32_t doHeapProfile;
-# define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
-# define HEAP_BY_CCS		1
-# define HEAP_BY_MOD		2
-# define HEAP_BY_DESCR		4
-# define HEAP_BY_TYPE		5
+# define NO_HEAP_PROFILING      0	/* N.B. Used as indexes into arrays */
+# define HEAP_BY_CCS            1
+# define HEAP_BY_MOD            2
+# define HEAP_BY_DESCR          4
+# define HEAP_BY_TYPE           5
 # define HEAP_BY_RETAINER       6
 # define HEAP_BY_LDV            7
 
 # define HEAP_BY_CLOSURE_TYPE   8
+# define HEAP_BY_INFO_TABLE     9
 
     Time        heapProfileInterval; /* time between samples */
     uint32_t    heapProfileIntervalTicks; /* ticks between samples (derived) */
