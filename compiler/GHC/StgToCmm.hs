@@ -82,7 +82,7 @@ codeGen :: DynFlags
         -> Stream IO CmmGroup ([CmmInfoTable], ModuleLFInfos)       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen dflags this_mod ip_map@(InfoTableProvMap _) data_tycons
+codeGen dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_tycons
         cost_centre_info stg_binds hpc_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
@@ -96,8 +96,12 @@ codeGen dflags this_mod ip_map@(InfoTableProvMap _) data_tycons
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
+                         -- This is observed by the #3294 test
+                         let !used_info = cgs_used_info st'
                          writeIORef cgref $! st'{ cgs_tops = nilOL,
-                                                  cgs_stmts = mkNop }
+                                                  cgs_stmts = mkNop,
+                                                  cgs_used_info = used_info
+                                                  }
                          return a
                 yield cmm
 
@@ -108,8 +112,6 @@ codeGen dflags this_mod ip_map@(InfoTableProvMap _) data_tycons
         ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
 
         ; mapM_ (cg . cgTopBinding dflags) stg_binds
-        ; cgs <- liftIO (readIORef  cgref)
-        ; cg (initInfoTableProv ip_map this_mod)
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
                 -- (say) PrelBase_True_closure, which is defined in
@@ -119,11 +121,18 @@ codeGen dflags this_mod ip_map@(InfoTableProvMap _) data_tycons
                 -- enumeration type Note that the closure pointers are
                 -- tagged.
                  when (isEnumerationTyCon tycon) $ cg (cgEnumerationTyCon tycon)
-                 mapM_ (cg . cgDataCon) (tyConDataCons tycon)
+                 -- Emit normal info_tables, for data constructors defined in this module.
+                 mapM_ (cg . cgDataCon DefinitionSite) (tyConDataCons tycon)
 
         ; mapM_ do_tycon data_tycons
 
         ; cg_id_infos <- cgs_binds <$> liftIO (readIORef cgref)
+
+        -- Emit special info tables for everything used in this module
+        -- This will only do something if  `-fdistinct-info-tables` is turned on.
+        ; mapM_ (\(dc, ns) -> forM_ ns $ \(k, _ss) -> cg (cgDataCon (UsageSite this_mod k) dc)) (nonDetEltsUFM denv)
+
+        ; cg (initInfoTableProv ip_map this_mod)
 
           -- See Note [Conveying CAF-info and LFInfo between modules] in
           -- GHC.StgToCmm.Types
@@ -138,7 +147,8 @@ codeGen dflags this_mod ip_map@(InfoTableProvMap _) data_tycons
                 | otherwise
                 = mkNameEnv (Prelude.map extractInfo (eltsUFM cg_id_infos))
 
-        ; return (cgs_used_info cgs, generatedInfo)
+        ; cgs <- liftIO (readIORef  cgref)
+        ; return (cgUsedInfo cgs, generatedInfo)
         }
 
 ---------------------------------------------------------------
@@ -193,8 +203,8 @@ cgTopBinding dflags (StgTopStringLit id str) = do
 cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...
 
-cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
-  = cgTopRhsCon dflags bndr con (assertNonVoidStgArgs args)
+cgTopRhs dflags _rec bndr (StgRhsCon _cc con mn _ts args)
+  = cgTopRhsCon dflags bndr con mn (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
@@ -233,11 +243,12 @@ cgEnumerationTyCon tycon
              | con <- tyConDataCons tycon]
 
 
--- | Generate the entry code, info tables, and (for niladic constructor)
+cgDataCon :: ConInfoTableLocation -> DataCon -> FCode ()
+-- Generate the entry code, info tables, and (for niladic constructor)
 -- the static closure, for a constructor.
-cgDataCon :: DataCon -> FCode ()
-cgDataCon data_con
-  = do  { profile <- getProfile
+cgDataCon mn data_con
+  = do  { MASSERT( not (isUnboxedTupleDataCon data_con || isUnboxedSumDataCon data_con) )
+        ; profile <- getProfile
         ; platform <- getPlatform
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
@@ -247,7 +258,7 @@ cgDataCon data_con
             nonptr_wds   = tot_wds - ptr_wds
 
             dyn_info_tbl =
-              mkDataConInfoTable profile data_con False ptr_wds nonptr_wds
+              mkDataConInfoTable profile data_con mn False ptr_wds nonptr_wds
 
             -- We're generating info tables, so we don't know and care about
             -- what the actual arguments are. Using () here as the place holder.

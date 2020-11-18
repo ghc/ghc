@@ -58,7 +58,7 @@ module GHC.StgToCmm.Monad (
         -- more localised access to monad state
         CgIdInfo(..),
         getBinds, setBinds,
-        getUsedInfo,
+        getUsedInfo, cgUsedInfo, addUsedInfo,
         -- out of general friendliness, we also export ...
         CgInfoDownwards(..), CgState(..)        -- non-abstract
     ) where
@@ -87,9 +87,11 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import qualified Data.Set as S
 
 import Control.Monad
 import Data.List
+import Data.Coerce
 
 
 
@@ -316,9 +318,24 @@ data CgState
 
      cgs_uniqs :: UniqSupply,
      -- | These are IDs which have an info table
-     cgs_used_info :: [CmmInfoTable]
+     -- , this should really be strict, to avoid a thunk build-up
+     -- but it causes an infinite loop so it is forced afterwards.
+     cgs_used_info :: S.Set (CmmInfoTableWithOrd)
      }
 
+cgUsedInfo :: CgState -> [CmmInfoTable]
+cgUsedInfo = coerce . S.toList . cgs_used_info
+
+addUsedInfo :: CmmInfoTable -> CgState -> CgState
+addUsedInfo cmm cg = cg { cgs_used_info = CmmInfoTableWithOrd cmm `S.insert` cgs_used_info cg}
+
+newtype CmmInfoTableWithOrd = CmmInfoTableWithOrd CmmInfoTable
+
+instance Ord CmmInfoTableWithOrd where
+  compare  (CmmInfoTableWithOrd cmm1) (CmmInfoTableWithOrd cmm2) = compare (cit_lbl cmm1) (cit_lbl cmm2)
+
+instance Eq CmmInfoTableWithOrd where
+  cmm1 == cmm2 = compare cmm1 cmm2 == EQ
 data HeapUsage   -- See Note [Virtual and real heap pointers]
   = HeapUsage {
         virtHp :: VirtualHpOffset,       -- Virtual offset of highest-allocated word
@@ -368,7 +385,7 @@ initCgState uniqs
               , cgs_binds  = emptyVarEnv
               , cgs_hp_usg = initHpUsage
               , cgs_uniqs  = uniqs
-              , cgs_used_info = [] }
+              , cgs_used_info = S.empty }
 
 stateIncUsage :: CgState -> CgState -> CgState
 -- stateIncUsage@ e1 e2 incorporates in e1
@@ -383,7 +400,7 @@ addCodeBlocksFrom :: CgState -> CgState -> CgState
 s1 `addCodeBlocksFrom` s2
   = s1 { cgs_stmts = cgs_stmts s1 CmmGraph.<*> cgs_stmts s2,
          cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2,
-         cgs_used_info = cgs_used_info s1 ++ cgs_used_info s2
+         cgs_used_info = cgs_used_info s1 `S.union` cgs_used_info s2
        }
 
 -- The heap high water mark is the larger of virtHp and hwHp.  The latter is
@@ -438,7 +455,7 @@ setRealHp new_realHp
         ; setHpUsage (hp_usage {realHp = new_realHp}) }
 
 getUsedInfo :: FCode [CmmInfoTable]
-getUsedInfo = cgs_used_info <$> getState
+getUsedInfo = cgUsedInfo <$> getState
 
 getBinds :: FCode CgBindings
 getBinds = do
@@ -817,8 +834,8 @@ emitProc mb_info lbl live blocks offset do_layout
         ; dflags <- getDynFlags
         ; let new_info
                 | gopt Opt_InfoTableMap dflags
-                    = maybe (cgs_used_info state) (: cgs_used_info state) mb_info
-                | otherwise = []
+                    = maybe (cgs_used_info state) (\i -> CmmInfoTableWithOrd i `S.insert` cgs_used_info state) mb_info
+                | otherwise = S.empty
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block
                            , cgs_used_info = new_info } }
 

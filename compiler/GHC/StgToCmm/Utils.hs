@@ -45,7 +45,7 @@ module GHC.StgToCmm.Utils (
         emitUpdRemSetPush,
         emitUpdRemSetPushThunk,
 
-        convertClosureMap
+        convertInfoProvMap
   ) where
 
 #include "HsVersions.h"
@@ -91,8 +91,12 @@ import Data.List
 import Data.Ord
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.FM
-import Data.Maybe
 import GHC.Core.DataCon
+import GHC.Driver.Ppr
+import GHC.Data.Maybe
+import qualified Data.List.NonEmpty as NE
+import Control.Monad ( when )
+
 
 -------------------------------------------------------------------------
 --
@@ -295,7 +299,18 @@ emitRODataLits :: CLabel -> [CmmLit] -> FCode ()
 emitRODataLits lbl lits = emitDecl (mkRODataLits lbl lits)
 
 emitDataCon :: CLabel -> CmmInfoTable -> CostCentreStack -> [CmmLit] -> FCode ()
-emitDataCon lbl itbl ccs payload = emitDecl (CmmData (Section Data lbl) (CmmStatics lbl itbl ccs payload))
+emitDataCon lbl itbl ccs payload = do
+  addUsedDataConInfo itbl
+  emitDecl (CmmData (Section Data lbl) (CmmStatics lbl itbl ccs payload))
+
+addUsedDataConInfo :: CmmInfoTable -> FCode ()
+addUsedDataConInfo cmm_itbl
+  = do  { dflags <- getDynFlags
+        ; when (gopt Opt_InfoTableMap dflags) $ do {
+          ; state <- getState
+          ; setState $ addUsedInfo cmm_itbl state } }
+
+
 
 newStringCLit :: String -> FCode CmmLit
 -- Make a global definition for the string,
@@ -640,12 +655,26 @@ emitUpdRemSetPushThunk ptr =
 
 -- | Convert source information collected about identifiers in 'GHC.STG.Debug'
 -- to entries suitable for placing into the info table provenenance table.
-convertClosureMap :: [CmmInfoTable] -> Module -> ClosureMap -> [InfoProvEnt]
-convertClosureMap defns this_mod denv =
-  mapMaybe (\cmit -> do
+convertInfoProvMap :: DynFlags -> [CmmInfoTable] -> Module -> InfoTableProvMap -> [InfoProvEnt]
+convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv) =
+  mapMaybe (\cmit ->
     let cl = cit_lbl cmit
         cn  = rtsClosureType (cit_rep cmit)
-    n <- hasHaskellName cl
-    (ty, ss, l) <- lookupUniqMap denv n
-    return (InfoProvEnt cl cn ty (this_mod, ss, l))) defns
 
+        tyString :: Outputable a => a -> String
+        tyString t = showPpr dflags t
+
+        lookupClosureMap, lookupDataConMap :: Maybe InfoProvEnt
+        lookupClosureMap = case hasHaskellName cl >>= lookupUniqMap denv of
+                                Just (ty, ss, l) -> Just (InfoProvEnt cl cn (tyString ty) (this_mod, ss, l))
+                                Nothing -> Nothing
+
+        lookupDataConMap = do
+            UsageSite _ n <- hasIdLabelInfo cl >>= getConInfoTableLocation
+            -- This is a bit grimy, relies on the DataCon and Name having the same Unique, which they do
+            (dc, ns) <- (hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique)
+            -- Lookup is linear but lists will be small (< 100)
+            (ss, l) <- lookup n (NE.toList ns)
+            return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) (this_mod, ss, l)
+
+    in lookupDataConMap `firstJust` lookupClosureMap) defns
