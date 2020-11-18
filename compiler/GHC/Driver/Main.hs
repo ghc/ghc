@@ -163,6 +163,19 @@ import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 
+import GHC.Unit
+import GHC.Unit.External
+import GHC.Unit.State
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.Graph
+import GHC.Unit.Module.Imported
+import GHC.Unit.Module.Deps
+import GHC.Unit.Module.Status
+import GHC.Unit.Home.ModInfo
+
 import GHC.Utils.Error
 import Data.IORef
 
@@ -210,19 +223,6 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
-import GHC.Unit.Module.ModGuts
-import GHC.Unit.Module.ModSummary
-import GHC.Unit.Module
-import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.ModDetails
-import GHC.Unit.Module.Status
-import GHC.Unit.Module.Imported
-import GHC.Unit.Module.Graph
-import GHC.Unit.Home.ModInfo
-import GHC.Unit.Home
-import GHC.Unit.State
-import GHC.Unit.Module.Deps
-import GHC.Unit.External
 
 #include "HsVersions.h"
 
