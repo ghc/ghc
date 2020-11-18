@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor, TupleSections #-}
+{-# LANGUAGE CPP, DeriveFunctor #-}
 
 --
 -- (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
@@ -49,14 +49,14 @@ import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Types.Demand    ( isUsedOnce )
 import GHC.Builtin.PrimOps ( PrimCall(..) )
+import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 import GHC.Builtin.Names   ( unsafeEqualityProofName )
-import GHC.Data.Maybe
 
-import Data.List.NonEmpty (nonEmpty, toList)
 import Control.Monad (ap)
+import Data.List.NonEmpty (nonEmpty, toList)
+import Data.Maybe (fromMaybe)
+import Data.Tuple (swap)
 import qualified Data.Set as Set
-import Control.Monad.Trans.RWS
-import GHC.Types.SrcLoc
 
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -234,8 +234,8 @@ coreToStg :: DynFlags -> Module -> ModLocation -> CoreProgram
 coreToStg dflags this_mod ml pgm
   = (pgm'', denv, final_ccs)
   where
-    (_, _, (local_ccs, local_cc_stacks), pgm')
-      = coreTopBindsToStg dflags this_mod ml emptyVarEnv emptyInfoTableProvMap emptyCollectedCCs pgm
+    (_, (local_ccs, local_cc_stacks), pgm')
+      = coreTopBindsToStg dflags this_mod emptyVarEnv emptyCollectedCCs pgm
 
     (!pgm'', !denv) =
         if gopt Opt_InfoTableMap dflags
@@ -257,49 +257,45 @@ coreToStg dflags this_mod ml pgm
 coreTopBindsToStg
     :: DynFlags
     -> Module
-    -> ModLocation
     -> IdEnv HowBound           -- environment for the bindings
-    -> InfoTableProvMap
     -> CollectedCCs
     -> CoreProgram
-    -> (IdEnv HowBound, InfoTableProvMap,CollectedCCs, [StgTopBinding])
+    -> (IdEnv HowBound, CollectedCCs, [StgTopBinding])
 
-coreTopBindsToStg _      _  _    env denv ccs []
-  = (env, denv, ccs, [])
-coreTopBindsToStg dflags this_mod ml env denv ccs (b:bs)
-  = (env2, denv2, ccs2, b':bs')
+coreTopBindsToStg _      _        env ccs []
+  = (env, ccs, [])
+coreTopBindsToStg dflags this_mod env ccs (b:bs)
+  = (env2, ccs2, b':bs')
   where
-        (env1, denv1, ccs1, b' ) =
-          coreTopBindToStg dflags this_mod ml env denv ccs b
-        (env2, denv2, ccs2, bs') =
-          coreTopBindsToStg dflags this_mod ml env1 denv1 ccs1 bs
+        (env1, ccs1, b' ) =
+          coreTopBindToStg dflags this_mod env ccs b
+        (env2, ccs2, bs') =
+          coreTopBindsToStg dflags this_mod env1 ccs1 bs
 
 coreTopBindToStg
         :: DynFlags
         -> Module
-        -> ModLocation
         -> IdEnv HowBound
-        -> InfoTableProvMap
         -> CollectedCCs
         -> CoreBind
-        -> (IdEnv HowBound, InfoTableProvMap, CollectedCCs, StgTopBinding)
+        -> (IdEnv HowBound, CollectedCCs, StgTopBinding)
 
-coreTopBindToStg _ _ _ env dcenv ccs (NonRec id e)
+coreTopBindToStg _ _ env ccs (NonRec id e)
   | Just str <- exprIsTickedString_maybe e
   -- top-level string literal
   -- See Note [Core top-level string literals] in GHC.Core
   = let
         env' = extendVarEnv env id how_bound
         how_bound = LetBound TopLet 0
-    in (env', dcenv, ccs, StgTopStringLit id str)
+    in (env', ccs, StgTopStringLit id str)
 
-coreTopBindToStg dflags this_mod ml env dcenv ccs (NonRec id rhs)
+coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
   = let
         env'      = extendVarEnv env id how_bound
         how_bound = LetBound TopLet $! manifestArity rhs
 
-        ((stg_rhs, ccs'), denv) =
-            initCts dflags ml env dcenv $
+        (stg_rhs, ccs') =
+            initCts dflags env $
               coreToTopStgRhs dflags ccs this_mod (id,rhs)
 
         bind = StgTopLifted $ StgNonRec id stg_rhs
@@ -308,9 +304,9 @@ coreTopBindToStg dflags this_mod ml env dcenv ccs (NonRec id rhs)
       --     as well as 'id', but that led to a black hole
       --     where printing the assertion error tripped the
       --     assertion again!
-    (env', denv, ccs', bind)
+    (env', ccs', bind)
 
-coreTopBindToStg dflags this_mod ml env dcenv ccs (Rec pairs)
+coreTopBindToStg dflags this_mod env ccs (Rec pairs)
   = ASSERT( not (null pairs) )
     let
         binders = map fst pairs
@@ -320,18 +316,14 @@ coreTopBindToStg dflags this_mod ml env dcenv ccs (Rec pairs)
         env' = extendVarEnvList env extra_env'
 
         -- generate StgTopBindings and CAF cost centres created for CAFs
-        ((ccs', stg_rhss), dcenv')
-          = initCts dflags ml env' dcenv $ do
-               mapAccumLM (\ccs rhs -> do
-                            (rhs', ccs') <-
-                              coreToTopStgRhs dflags ccs this_mod rhs
-                            return (ccs', rhs'))
-                          ccs
-                          pairs
-
+        (ccs', stg_rhss)
+          = initCts dflags env' $
+              mapAccumLM (\ccs rhs -> swap <$> coreToTopStgRhs dflags ccs this_mod rhs)
+                         ccs
+                         pairs
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
-    (env', dcenv', ccs', bind)
+    (env', ccs', bind)
 
 coreToTopStgRhs
         :: DynFlags
@@ -418,12 +410,12 @@ coreToStgExpr expr@(Lam _ _)
     return result_expr
 
 coreToStgExpr (Tick tick expr)
-  = do let k = case tick of
-                HpcTick{}    -> id
-                ProfNote{}   -> id
-                SourceNote ss fp -> id
-                Breakpoint{} -> panic "coreToStgExpr: breakpoint should not happen"
-       expr2 <- k (coreToStgExpr expr)
+  = do case tick of
+         HpcTick{}    -> return ()
+         ProfNote{}   -> return ()
+         SourceNote{} -> return ()
+         Breakpoint{} -> panic "coreToStgExpr: breakpoint should not happen"
+       expr2 <- coreToStgExpr expr
        return (StgTick tick expr2)
 
 coreToStgExpr (Cast expr _)
@@ -548,32 +540,30 @@ coreToStgApp f args ticks = do
         saturated = f_arity <= n_val_args
 
         res_ty = exprType (mkApps (Var f) args)
-    app <- case idDetails f of
+        app = case idDetails f of
                 DataConWorkId dc
-                  | saturated    -> do
---                      u <- incDc dc
-                      return $ StgConApp dc Nothing args' --(Just u) args'
-                        (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
+                  | saturated    -> StgConApp dc Nothing args'
+                                      (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
                 -- we require that primop applications be saturated.
                 PrimOpId op      -> ASSERT( saturated )
-                                    return $ StgOpApp (StgPrimOp op) args' res_ty
+                                    StgOpApp (StgPrimOp op) args' res_ty
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
                                           PrimCallConv _))
                                  -> ASSERT( saturated )
-                                    return $ StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) args' res_ty
+                                    StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) args' res_ty
 
                 -- A regular foreign call.
                 FCallId call     -> ASSERT( saturated )
-                                    return $ StgOpApp (StgFCallOp call (idType f)) args' res_ty
+                                    StgOpApp (StgFCallOp call (idType f)) args' res_ty
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
-                _other           -> return $ StgApp f args'
-    let
+                _other           -> StgApp f args'
+
         tapp = foldr StgTick app (ticks ++ ticks')
 
     -- Forcing these fixes a leak in the code generator, noticed while
@@ -609,7 +599,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
         stg_arg = case arg'' of
                        StgApp v []        -> StgVarArg v
-                       StgConApp con _n [] _ -> StgVarArg (dataConWorkId con)
+                       StgConApp con _ [] _ -> StgVarArg (dataConWorkId con)
                        StgLit lit         -> StgLitArg lit
                        _                  -> pprPanic "coreToStgArgs" (ppr arg)
 
@@ -691,19 +681,7 @@ coreToStgRhs :: (Id,CoreExpr)
 
 coreToStgRhs (bndr, rhs) = do
     new_rhs <- coreToStgExpr rhs
-    modLoc <- ctsModLocation
-    let new_stg_rhs = (mkStgRhs bndr new_rhs)
-    {-
-    let
-        thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
-        best_span = quickSourcePos thisFile new_rhs
-    case new_stg_rhs of
-      StgRhsClosure {} ->
-        recordStgIdPosition bndr best_span (((, occNameString (getOccName bndr))) <$> (srcSpanToRealSrcSpan (nameSrcSpan (getName bndr))))
-      _ -> return ()
-      -}
-    return new_stg_rhs
-
+    return (mkStgRhs bndr new_rhs)
 
 -- Generate a top-level RHS. Any new cost centres generated for CAFs will be
 -- appended to `CollectedCCs` argument.
@@ -719,13 +697,13 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
                     (toList bndrs) body
     , ccs )
 
-  | StgConApp con n args _ <- unticked_rhs
+  | StgConApp con mn args _ <- unticked_rhs
   , -- Dynamic StgConApps are updatable
     not (isDllConApp dflags this_mod con args)
   = -- CorePrep does this right, but just to make sure
     ASSERT2( not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con)
            , ppr bndr $$ ppr con $$ ppr args)
-    ( StgRhsCon dontCareCCS con n ticks args, ccs )
+    ( StgRhsCon dontCareCCS con mn ticks args, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | gopt Opt_AutoSccsOnIndividualCafs dflags
@@ -775,15 +753,15 @@ mkStgRhs bndr rhs
                   ReEntrant -- ignored for LNE
                   [] rhs
 
-  | (ts, StgConApp con mu args _) <- unticked_rhs
-  = StgRhsCon currentCCS con mu ts args
+  | StgConApp con mn args _ <- unticked_rhs
+  = StgRhsCon currentCCS con mn ticks args
 
   | otherwise
   = StgRhsClosure noExtFieldSilent
                   currentCCS
                   upd_flag [] rhs
   where
-    unticked_rhs = stripStgTicksTop (not . tickishIsCode) rhs
+    (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
              | otherwise                      = Updatable
@@ -849,9 +827,8 @@ isPAP env _               = False
 
 newtype CtsM a = CtsM
     { unCtsM :: DynFlags -- Needed for checking for bad coercions in coreToStgArgs
-             -> ModLocation
              -> IdEnv HowBound
-             -> RWS (Maybe (RealSrcSpan, String)) () InfoTableProvMap a
+             -> a
     }
     deriving (Functor)
 
@@ -887,10 +864,8 @@ data LetInfo
 
 -- The std monad functions:
 
-initCts :: DynFlags -> ModLocation -> IdEnv HowBound -> InfoTableProvMap -> CtsM a -> (a, InfoTableProvMap)
-initCts dflags ml env u m =
-  let (a, d, ()) = runRWS (unCtsM m dflags ml env) Nothing u
-  in (a, d)
+initCts :: DynFlags -> IdEnv HowBound -> CtsM a -> a
+initCts dflags env m = unCtsM m dflags env
 
 
 
@@ -898,14 +873,11 @@ initCts dflags ml env u m =
 {-# INLINE returnCts #-}
 
 returnCts :: a -> CtsM a
-returnCts e = CtsM $ \_ _ _ -> return  e
+returnCts e = CtsM $ \_ _ -> e
 
 thenCts :: CtsM a -> (a -> CtsM b) -> CtsM b
-thenCts m k = CtsM $ \dflags ml env
-  -> do
-    a <- (unCtsM m dflags ml env)
-    unCtsM (k a) dflags ml env
-
+thenCts m k = CtsM $ \dflags env
+  -> unCtsM (k (unCtsM m dflags env)) dflags env
 
 instance Applicative CtsM where
     pure = returnCts
@@ -915,26 +887,22 @@ instance Monad CtsM where
     (>>=)  = thenCts
 
 instance HasDynFlags CtsM where
-    getDynFlags = CtsM $ \dflags _ _ -> return dflags
+    getDynFlags = CtsM $ \dflags _ -> dflags
 
 -- Functions specific to this monad:
 
 extendVarEnvCts :: [(Id, HowBound)] -> CtsM a -> CtsM a
 extendVarEnvCts ids_w_howbound expr
-   =    CtsM $   \dflags ml env
-   -> unCtsM expr dflags ml (extendVarEnvList env ids_w_howbound)
+   =    CtsM $   \dflags env
+   -> unCtsM expr dflags (extendVarEnvList env ids_w_howbound)
 
 lookupVarCts :: Id -> CtsM HowBound
-lookupVarCts v = CtsM $ \_ _ env -> return $ lookupBinding env v
+lookupVarCts v = CtsM $ \_ env -> lookupBinding env v
 
 lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
                         Just xx -> xx
                         Nothing -> ASSERT2( isGlobalId v, ppr v ) ImportBound
-
-
-ctsModLocation :: CtsM ModLocation
-ctsModLocation = CtsM (\_ ml _ -> return ml)
 
 getAllCAFsCC :: Module -> (CostCentre, CostCentreStack)
 getAllCAFsCC this_mod =
