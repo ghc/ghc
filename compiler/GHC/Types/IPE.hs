@@ -1,10 +1,11 @@
-module GHC.Types.IPE(ClosureMap, InfoTableProvMap(..)
+module GHC.Types.IPE(DCMap, ClosureMap, InfoTableProvMap(..)
                     , emptyInfoTableProvMap) where
 
 import GHC.Prelude
 
 import GHC.Types.Name
 import GHC.Types.SrcLoc
+import GHC.Core.DataCon
 
 import GHC.Types.Unique.Map
 
@@ -14,8 +15,13 @@ type ClosureMap = UniqMap
                                         Name  -- The binding
                                         (String, RealSrcSpan, String) -- The best approximate source position.
 
+-- | A map storing all the different uses of a specific data constructor and the
+-- approximate source position that usage arose from.
+type DCMap = UniqMap DataCon [(Int, Maybe (RealSrcSpan, String))]
+
 data InfoTableProvMap = InfoTableProvMap
-                          { provClosure :: ClosureMap }
+                          { provDC :: DCMap
+                          , provClosure :: ClosureMap }
 
 emptyInfoTableProvMap :: InfoTableProvMap
-emptyInfoTableProvMap = InfoTableProvMap emptyUniqMap
+emptyInfoTableProvMap = InfoTableProvMap emptyUniqMap emptyUniqMap

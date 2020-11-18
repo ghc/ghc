@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
@@ -62,9 +63,10 @@ import Data.Char
 cgTopRhsCon :: DynFlags
             -> Id               -- Name of thing bound to this RHS
             -> DataCon          -- Id
+            -> Maybe Int
             -> [NonVoid StgArg] -- Args
             -> (CgIdInfo, FCode ())
-cgTopRhsCon dflags id con args
+cgTopRhsCon dflags id con mn args
   | Just static_info <- precomputedStaticConInfo_maybe dflags id con args
   , let static_code | isInternalName name = pure ()
                     | otherwise           = gen_code
@@ -129,7 +131,7 @@ cgTopRhsCon dflags id con args
              -- we're not really going to emit an info table, so having
              -- to make a CmmInfoTable is a bit overkill, but mkStaticClosureFields
              -- needs to poke around inside it.
-            info_tbl = mkDataConInfoTable profile con True ptr_wds nonptr_wds
+            info_tbl = mkDataConInfoTable profile con ((this_mod,) <$> mn) True ptr_wds nonptr_wds
 
 
         ; payload <- mapM mk_payload (fix_padding nv_args_w_offsets)
@@ -138,6 +140,10 @@ cgTopRhsCon dflags id con args
                 --      TODO (osa): Why?
 
                 -- BUILD THE OBJECT
+                --
+            -- We're generating info tables, so we don't know and care about
+            -- what the actual arguments are. Using () here as the place holder.
+
         ; emitDataCon closure_label info_tbl dontCareCCS payload }
 
 
@@ -147,6 +153,7 @@ cgTopRhsCon dflags id con args
 
 buildDynCon :: Id                 -- Name of the thing to which this constr will
                                   -- be bound
+            -> Maybe Int
             -> Bool               -- is it genuinely bound to that name, or just
                                   -- for profiling?
             -> CostCentreStack    -- Where to grab cost centre from;
@@ -155,13 +162,14 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
             -> [NonVoid StgArg]   -- Its args
             -> FCode (CgIdInfo, FCode CmmAGraph)
                -- Return details about how to find it and initialization code
-buildDynCon binder actually_bound cc con args
+buildDynCon binder mn actually_bound cc con args
     = do dflags <- getDynFlags
-         buildDynCon' dflags binder actually_bound cc con args
+         buildDynCon' dflags binder mn actually_bound cc con args
 
 
 buildDynCon' :: DynFlags
-             -> Id -> Bool
+             -> Id -> Maybe Int
+             -> Bool
              -> CostCentreStack
              -> DataCon
              -> [NonVoid StgArg]
@@ -178,13 +186,13 @@ the addr modes of the args is that we may be in a "knot", and
 premature looking at the args will cause the compiler to black-hole!
 -}
 
-buildDynCon' dflags binder _ _cc con args
+buildDynCon' dflags binder _ _ _cc con args
   | Just cgInfo <- precomputedStaticConInfo_maybe dflags binder con args
   -- , pprTrace "noCodeLocal:" (ppr (binder,con,args,cgInfo)) True
   = return (cgInfo, return mkNop)
 
 -------- buildDynCon': the general case -----------
-buildDynCon' _ binder actually_bound ccs con args
+buildDynCon' _ binder mn actually_bound ccs con args
   = do  { (id_info, reg) <- rhsIdInfo binder lf_info
         ; return (id_info, gen_code reg)
         }
@@ -192,12 +200,13 @@ buildDynCon' _ binder actually_bound ccs con args
   lf_info = mkConLFInfo con
 
   gen_code reg
-    = do  { profile <- getProfile
+    = do  { modu <- getModuleName
+          ; profile <- getProfile
           ; let platform = profilePlatform profile
                 (tot_wds, ptr_wds, args_w_offsets)
-                  = mkVirtConstrOffsets profile (addArgReps args)
+                   = mkVirtConstrOffsets profile (addArgReps args)
                 nonptr_wds = tot_wds - ptr_wds
-                info_tbl = mkDataConInfoTable profile con False
+                info_tbl = mkDataConInfoTable profile con ((modu,) <$> mn) False
                                 ptr_wds nonptr_wds
           ; let ticky_name | actually_bound = Just binder
                            | otherwise = Nothing

@@ -543,7 +543,7 @@ coreToStgApp f args ticks = do
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
-                  | saturated    -> StgConApp dc args'
+                  | saturated    -> StgConApp dc Nothing args'
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
@@ -600,7 +600,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
         stg_arg = case arg'' of
                        StgApp v []        -> StgVarArg v
-                       StgConApp con [] _ -> StgVarArg (dataConWorkId con)
+                       StgConApp con _ [] _ -> StgVarArg (dataConWorkId con)
                        StgLit lit         -> StgLitArg lit
                        _                  -> pprPanic "coreToStgArgs" (ppr arg)
 
@@ -698,13 +698,13 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
                     (toList bndrs) body
     , ccs )
 
-  | StgConApp con args _ <- unticked_rhs
+  | StgConApp con mn args _ <- unticked_rhs
   , -- Dynamic StgConApps are updatable
     not (isDllConApp dflags this_mod con args)
   = -- CorePrep does this right, but just to make sure
     ASSERT2( not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con)
            , ppr bndr $$ ppr con $$ ppr args)
-    ( StgRhsCon dontCareCCS con args, ccs )
+    ( StgRhsCon dontCareCCS con mn ticks args, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | gopt Opt_AutoSccsOnIndividualCafs dflags
@@ -720,7 +720,7 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
     , ccs )
 
   where
-    unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
+    (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry
              | otherwise                         = Updatable
@@ -754,15 +754,15 @@ mkStgRhs bndr rhs
                   ReEntrant -- ignored for LNE
                   [] rhs
 
-  | StgConApp con args _ <- unticked_rhs
-  = StgRhsCon currentCCS con args
+  | StgConApp con mn args _ <- unticked_rhs
+  = StgRhsCon currentCCS con mn ticks args
 
   | otherwise
   = StgRhsClosure noExtFieldSilent
                   currentCCS
                   upd_flag [] rhs
   where
-    unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
+    (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry
              | otherwise                         = Updatable
