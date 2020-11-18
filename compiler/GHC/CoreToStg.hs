@@ -47,6 +47,7 @@ import GHC.Driver.Session
 import GHC.Platform.Ways
 import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
+import GHC.Types.IPE
 import GHC.Types.Demand    ( isUsedOnce )
 import GHC.Builtin.PrimOps ( PrimCall(..) )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )

@@ -46,6 +46,7 @@ import GHC.Types.Id
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Types.Meta
 import GHC.Types.HpcInfo
 

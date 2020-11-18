@@ -624,6 +624,7 @@ Library
         GHC.Types.ForeignStubs
         GHC.Types.HpcInfo
         GHC.Types.Id
+        GHC.Types.IPE
         GHC.Types.Id.Info
         GHC.Types.Id.Make
         GHC.Types.Literal

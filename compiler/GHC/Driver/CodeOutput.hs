@@ -51,6 +51,7 @@ import GHC.Unit.Finder      ( mkStubPaths )
 
 import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Types.ForeignStubs
 import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 

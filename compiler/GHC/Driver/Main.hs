@@ -173,6 +173,7 @@ import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env       ( emptyTidyEnv )
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Types.Unique.Supply
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc

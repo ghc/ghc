@@ -39,6 +39,7 @@ import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Types.HpcInfo
 import GHC.Types.Id
 import GHC.Types.Id.Info

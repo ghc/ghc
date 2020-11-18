@@ -11,7 +11,7 @@ import GHC.Stg.Syntax
 
 import GHC.Types.Id
 import GHC.Core.DataCon
-import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Unit.Module
 import GHC.Types.Name   ( getName, getOccName, occNameString, nameSrcSpan)
 import GHC.Data.FastString

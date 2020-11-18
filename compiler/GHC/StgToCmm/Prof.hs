@@ -44,6 +44,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Data.FastString
 import GHC.Unit.Module as Module
 import GHC.Utils.Outputable

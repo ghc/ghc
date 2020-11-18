@@ -81,6 +81,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.RepType
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
