@@ -1592,6 +1592,7 @@ emitPrimOp dflags primop = case primop of
   NewBCOOp -> alwaysExternal
   UnpackClosureOp -> alwaysExternal
   ClosureSizeOp -> alwaysExternal
+  WhereFromOp   -> alwaysExternal
   GetApStackValOp -> alwaysExternal
   ClearCCSOp -> alwaysExternal
   TraceEventOp -> alwaysExternal
