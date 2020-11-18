@@ -125,7 +125,7 @@ statBinding top (StgRec pairs)
 
 statRhs :: Bool -> (Id, StgRhs) -> StatEnv
 
-statRhs top (_, StgRhsCon _ _ _)
+statRhs top (_, StgRhsCon _ _ _ _ _)
   = countOne (ConstructorBinds top)
 
 statRhs top (_, StgRhsClosure _ _ u _ body)
@@ -149,7 +149,7 @@ statExpr :: StgExpr -> StatEnv
 
 statExpr (StgApp _ _)     = countOne Applications
 statExpr (StgLit _)       = countOne Literals
-statExpr (StgConApp _ _ _)= countOne ConstructorApps
+statExpr (StgConApp _ _ _ _)= countOne ConstructorApps
 statExpr (StgOpApp _ _ _) = countOne PrimitiveApps
 statExpr (StgTick _ e)    = statExpr e
 
