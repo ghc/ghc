@@ -97,7 +97,6 @@ import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Unit.Module
 
 import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
@@ -905,8 +904,8 @@ getTyLitDescription l =
 --   CmmInfoTable-related things
 --------------------------------------
 
-mkDataConInfoTable :: Profile -> DataCon -> Bool -> Int -> Int -> CmmInfoTable
-mkDataConInfoTable profile data_con is_static ptr_wds nonptr_wds
+mkDataConInfoTable :: Profile -> DataCon -> ConInfoTableLocation -> Bool -> Int -> Int -> CmmInfoTable
+mkDataConInfoTable profile data_con mn is_static ptr_wds nonptr_wds
  = CmmInfoTable { cit_lbl  = info_lbl
                 , cit_rep  = sm_rep
                 , cit_prof = prof
@@ -914,7 +913,7 @@ mkDataConInfoTable profile data_con is_static ptr_wds nonptr_wds
                 , cit_clo  = Nothing }
  where
    name = dataConName data_con
-   info_lbl = mkConInfoTableLabel name NoCafRefs
+   info_lbl = mkConInfoTableLabel name mn -- NoCAFRefs
    sm_rep = mkHeapRep profile is_static ptr_wds nonptr_wds cl_type
    cl_type = Constr (dataConTagZ data_con) (dataConIdentity data_con)
                   -- We keep the *zero-indexed* tag in the srt_len field
