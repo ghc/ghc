@@ -8,6 +8,18 @@ test('heapprof002',
 
 test('T11489', [req_profiling], makefile_test, ['T11489'])
 
+test('staticcallstack001',
+     [ omit_ways(['ghci-ext-prof']), # produces a different stack
+     ], compile_and_run,
+     ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])
+
+test('staticcallstack002',
+     [ omit_ways(['ghci-ext-prof']), # produces a different stack
+     ], compile_and_run,
+     ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])
+
+
+
 # Below this line, run tests only with profiling ways.
 setTestOpts(req_profiling)
 setTestOpts(extra_ways(['prof', 'ghci-ext-prof']))
