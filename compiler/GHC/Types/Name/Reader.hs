@@ -59,6 +59,7 @@ module GHC.Types.Name.Reader (
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, isNoFieldSelectorGRE, greLabel,
         unQualOK, qualSpecOK, unQualSpecOK,
+        getFieldLabelGRE,
         pprNameProvenance,
         Parent(..), greParent_maybe,
         ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
@@ -746,6 +747,11 @@ gresToAvailInfo gres
               NoParent    -> AvailTC m (name:ns) fls -- Not sure this ever happens
               ParentIs {} -> AvailTC m (insertChildIntoChildren m ns name) fls
               FldParent _ mb_lbl has_sel -> AvailTC m ns (mkFieldLabel name mb_lbl has_sel : fls)
+
+getFieldLabelGRE :: GlobalRdrElt -> Maybe FieldLabel
+getFieldLabelGRE (GRE { gre_name = name, gre_par = FldParent _ mb_lbl has_sel })
+  = Just $! mkFieldLabel name mb_lbl has_sel
+getFieldLabelGRE _ = Nothing
 
 availFromGRE :: GlobalRdrElt -> AvailInfo
 availFromGRE (GRE { gre_name = me, gre_par = parent })

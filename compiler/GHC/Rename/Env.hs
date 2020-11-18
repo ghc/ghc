@@ -1125,14 +1125,14 @@ data LookupOccRnOverloadedResult
   = LookupOccRnUnique Name
   -- ^ non-selector name uniquely refers to x
   -- or there is a name clash
-  | LookupOccRnSelectors (NE.NonEmpty Name)
+  | LookupOccRnSelectors (NE.NonEmpty FieldLabel)
   -- ^ name refers to one or more record selectors;
   -- If DuplicateRecordFields is disabled, this list will be
   -- a singleton.
 
 nameFromLookupOccRnOverloadedResult :: LookupOccRnOverloadedResult -> [Name]
 nameFromLookupOccRnOverloadedResult (LookupOccRnUnique x) = [x]
-nameFromLookupOccRnOverloadedResult (LookupOccRnSelectors xs) = NE.toList xs
+nameFromLookupOccRnOverloadedResult (LookupOccRnSelectors xs) = map flSelector $ NE.toList xs
 
 instance Outputable LookupOccRnOverloadedResult where
   ppr (LookupOccRnUnique x) = text "LookupOccRnUnique " <> ppr x
@@ -1148,15 +1148,15 @@ lookupGlobalOccRn_resolve
   -> RnM (Maybe LookupOccRnOverloadedResult)
 lookupGlobalOccRn_resolve overload_ok rdr_name res = case res of
   GreNotFound  -> return Nothing
-  OneNameMatch gre -> do
-    let wrapper = if isRecFldGRE gre then LookupOccRnSelectors . pure else LookupOccRnUnique
-    return $ Just $ wrapper $ gre_name gre
-  MultipleNames gres_
-    | gre : gres' <- NE.filter isRecFldGRE gres_
-    , overload_ok == DuplicateRecordFields || null gres' ->
+  OneNameMatch gre -> return $ Just $ case getFieldLabelGRE gre of
+    Nothing -> LookupOccRnUnique $ gre_name gre
+    Just f -> LookupOccRnSelectors $ pure f
+  MultipleNames gres
+    | fld : flds <- mapMaybe getFieldLabelGRE $ NE.toList gres
+    , overload_ok == DuplicateRecordFields || null flds ->
     -- Don't record usage for ambiguous selectors
     -- until we know which is meant
-    return $ Just $ LookupOccRnSelectors $ fmap gre_name $ gre NE.:| gres'
+    return $ Just $ LookupOccRnSelectors $ fld NE.:| flds
   MultipleNames gres  -> do
     addNameClashErrRn rdr_name gres
     return $ Just $ LookupOccRnUnique $ gre_name (NE.head gres)
@@ -1458,12 +1458,12 @@ lookupQualifiedNameGHCi rdr_name
     availNames' :: AvailInfo -> [LookupOccRnOverloadedResult]
     availNames' (Avail n) = [LookupOccRnUnique n]
     availNames' (AvailTC _ ns fs) = map LookupOccRnUnique ns
-      ++ map (LookupOccRnSelectors . pure . flSelector) fs
+      ++ map (LookupOccRnSelectors . pure) fs
 
     -- obtain a list of LookupOccRnOverloadedResult matching the given OccName
     check :: OccName -> LookupOccRnOverloadedResult -> [LookupOccRnOverloadedResult]
     check occ (LookupOccRnUnique n) = [ LookupOccRnUnique n | nameOccName n == occ]
-    check occ (LookupOccRnSelectors xs) = case NE.filter ((==occ) . nameOccName) xs of
+    check occ (LookupOccRnSelectors xs) = case NE.filter ((==occNameFS occ) . flLabel) xs of
       [] -> []
       x : xs -> [LookupOccRnSelectors $ x NE.:| xs]
 

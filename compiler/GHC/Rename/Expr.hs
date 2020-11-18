@@ -49,6 +49,7 @@ import GHC.Driver.Session
 import GHC.Builtin.Names
 
 import GHC.Types.Basic
+import GHC.Types.FieldLabel (flSelector)
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -135,10 +136,10 @@ rnExpr (HsVar _ (L l v))
               | otherwise
               -> finishHsVar (L l name) ;
             Just (LookupOccRnSelectors (s NE.:| [])) ->
-              return ( HsRecFld noExtField (Unambiguous s (L l v) ), unitFV s) ;
+              return ( HsRecFld noExtField (Unambiguous (flSelector s) (L l v) ), unitFV (flSelector s)) ;
            Just (LookupOccRnSelectors fs@(_ NE.:| _:_)) ->
               return ( HsRecFld noExtField (Ambiguous noExtField (L l v))
-                     , mkFVs $ NE.toList fs); } }
+                     , mkFVs $ NE.toList $ fmap flSelector fs); } }
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)

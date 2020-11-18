@@ -768,13 +768,13 @@ rnHsRecUpdFields flds
 
            ; let fvs' = case sel of
                           Just (LookupOccRnUnique sel_name) -> fvs `addOneFV` sel_name
-                          Just (LookupOccRnSelectors (sel_name NE.:| [])) -> fvs `addOneFV` sel_name
+                          Just (LookupOccRnSelectors (fld NE.:| [])) -> fvs `addOneFV` flSelector fld
                           _       -> fvs
                  lbl' = case sel of
                           Just (LookupOccRnUnique sel_name) ->
                                      L loc (Unambiguous sel_name   (L loc lbl))
-                          Just (LookupOccRnSelectors (sel_name NE.:| [])) ->
-                                     L loc (Unambiguous sel_name   (L loc lbl))
+                          Just (LookupOccRnSelectors (fld NE.:| [])) ->
+                                     L loc (Unambiguous (flSelector fld) (L loc lbl))
                           _ -> L loc (Ambiguous   noExtField (L loc lbl))
 
            ; return (L l (HsRecField { hsRecFieldLbl = lbl'
