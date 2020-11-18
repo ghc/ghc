@@ -132,6 +132,7 @@ data GeneralFlag
    | Opt_FastLlvm                       -- hidden flag
    | Opt_NoTypeableBinds
 
+   | Opt_DistinctConstructorTables
    | Opt_InfoTableMap
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
