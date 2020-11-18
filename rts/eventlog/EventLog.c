@@ -104,6 +104,7 @@ char *EventDesc[] = {
   [EVENT_HACK_BUG_T9003]      = "Empty event for bug #9003",
   [EVENT_HEAP_PROF_BEGIN]     = "Start of heap profile",
   [EVENT_HEAP_PROF_COST_CENTRE]   = "Cost center definition",
+  [EVENT_IPE]                     = "Info Table Source Position",
   [EVENT_HEAP_PROF_SAMPLE_BEGIN]  = "Start of heap profile sample",
   [EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN]  = "Start of heap profile (biographical) sample",
   [EVENT_HEAP_PROF_SAMPLE_END]    = "End of heap profile sample",
@@ -431,6 +432,9 @@ init_event_types(void)
             break;
 
         case EVENT_HEAP_PROF_COST_CENTRE:
+            eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+        case EVENT_IPE:
             eventTypes[t].size = EVENT_SIZE_DYNAMIC;
             break;
 
@@ -1473,6 +1477,37 @@ void postProfBegin(void)
     RELEASE_LOCK(&eventBufMutex);
 }
 #endif /* PROFILING */
+
+void postIPE(StgWord64 info,
+             const char *table_name,
+             const char *closure_desc,
+             const char *ty_desc,
+             const char *label,
+             const char *module,
+             const char *srcloc)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    StgWord table_name_len = strlen(table_name);
+    StgWord closure_desc_len = strlen(closure_desc);
+    StgWord ty_desc_len = strlen(ty_desc);
+    StgWord label_len = strlen(label);
+    StgWord module_len = strlen(module);
+    StgWord srcloc_len = strlen(srcloc);
+    // 8 for the info word
+    // 5 for the number of strings in the payload as postString adds 1 to the length
+    StgWord len = 8+table_name_len+closure_desc_len+ty_desc_len+label_len+module_len+srcloc_len+5;
+    ensureRoomForVariableEvent(&eventBuf, len);
+    postEventHeader(&eventBuf, EVENT_IPE);
+    postPayloadSize(&eventBuf, len);
+    postWord64(&eventBuf, info);
+    postString(&eventBuf, table_name);
+    postString(&eventBuf, closure_desc);
+    postString(&eventBuf, ty_desc);
+    postString(&eventBuf, label);
+    postString(&eventBuf, module);
+    postString(&eventBuf, srcloc);
+    RELEASE_LOCK(&eventBufMutex);
+}
 
 void printAndClearEventBuf (EventsBuf *ebuf)
 {

@@ -10,7 +10,7 @@
 --
 -- Key preservation is right-biased.
 module GHC.Types.Unique.Map (
-    UniqMap,
+    UniqMap(..),
     emptyUniqMap,
     isNullUniqMap,
     unitUniqMap,

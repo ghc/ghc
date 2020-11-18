@@ -58,7 +58,7 @@ module GHC.StgToCmm.Monad (
         -- more localised access to monad state
         CgIdInfo(..),
         getBinds, setBinds,
-
+        getUsedInfo,
         -- out of general friendliness, we also export ...
         CgInfoDownwards(..), CgState(..)        -- non-abstract
     ) where
@@ -314,7 +314,10 @@ data CgState
 
      cgs_hp_usg  :: HeapUsage,
 
-     cgs_uniqs :: UniqSupply }
+     cgs_uniqs :: UniqSupply,
+     -- | These are IDs which have an info table
+     cgs_used_info :: [CmmInfoTable]
+     }
 
 data HeapUsage   -- See Note [Virtual and real heap pointers]
   = HeapUsage {
@@ -364,7 +367,8 @@ initCgState uniqs
               , cgs_tops   = nilOL
               , cgs_binds  = emptyVarEnv
               , cgs_hp_usg = initHpUsage
-              , cgs_uniqs  = uniqs }
+              , cgs_uniqs  = uniqs
+              , cgs_used_info = [] }
 
 stateIncUsage :: CgState -> CgState -> CgState
 -- stateIncUsage@ e1 e2 incorporates in e1
@@ -378,8 +382,9 @@ addCodeBlocksFrom :: CgState -> CgState -> CgState
 -- (The cgs_stmts will often be empty, but not always; see codeOnly)
 s1 `addCodeBlocksFrom` s2
   = s1 { cgs_stmts = cgs_stmts s1 CmmGraph.<*> cgs_stmts s2,
-         cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2 }
-
+         cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2,
+         cgs_used_info =  (cgs_used_info s1) ++ (cgs_used_info s2)
+                          }
 
 -- The heap high water mark is the larger of virtHp and hwHp.  The latter is
 -- only records the high water marks of forked-off branches, so to find the
@@ -431,6 +436,9 @@ setRealHp ::  VirtualHpOffset -> FCode ()
 setRealHp new_realHp
   = do  { hp_usage <- getHpUsage
         ; setHpUsage (hp_usage {realHp = new_realHp}) }
+
+getUsedInfo :: FCode [CmmInfoTable]
+getUsedInfo = cgs_used_info <$> getState
 
 getBinds :: FCode CgBindings
 getBinds = do
@@ -806,7 +814,13 @@ emitProc mb_info lbl live blocks offset do_layout
               proc_block = CmmProc tinfo lbl live blks
 
         ; state <- getState
-        ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
+        ; dflags <- getDynFlags
+        ; let new_info
+                | gopt Opt_InfoTableMap dflags
+                    = maybe (cgs_used_info state) (: cgs_used_info state) mb_info
+                | otherwise = []
+        ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block
+                           , cgs_used_info = new_info } }
 
 getCmm :: FCode () -> FCode CmmGroup
 -- Get all the CmmTops (there should be no stmts)
