@@ -593,22 +593,21 @@ getCallMethod opts name id (LFThunk _ _ updatable std_form_info is_fun)
     DirectEntry (thunkEntryLabel (profilePlatform (co_profile opts)) name (idCafInfo id) std_form_info
                 updatable) 0
 
--- Imported Ids
-getCallMethod _ _name _ (LFUnknown True) n_args _v_args _cg_locs _self_loop_info appEnterInfo
+-- Imported(Unknown) Ids
+getCallMethod opts name _ (LFUnknown might_be_a_function) n_args _v_args _cg_locs _self_loop_info appEnterInfo
   | n_args == 0
   , appEnterInfo == NoEnter
+  -- When profiling we enter functions to update the SCC so we
+  -- can't use the inferted enterInfo here.
+  -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
+  , not (profileIsProfiling (co_profile opts) && might_be_a_function)
   = InferedReturnIt
 
-  | otherwise = SlowCall
-
-getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info appEnterInfo
-  | n_args == 0
-  , appEnterInfo == NoEnter
-  = InferedReturnIt
+  | might_be_a_function = SlowCall
 
   | otherwise =
-    ASSERT2( n_args == 0, ppr name <+> ppr n_args )
-    EnterIt   -- Not a function
+      ASSERT2( n_args == 0, ppr name <+> ppr n_args )
+      EnterIt   -- Not a function
 
 
 getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs)
