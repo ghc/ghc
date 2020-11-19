@@ -649,6 +649,7 @@ extendGlobalRdrEnvRn avails new_fixities
         -- except cases where *both* GREs are DuplicateRecordFields (#17965),
         -- or *one of them* is NoFieldSelectors.
         -- See Note [NoFieldSelectors] in GHC.Rename.Env
+        -- See Note [addNameClashErrRn] in GHC.Rename.Utils
         isDupGRE gre' = isLocalGRE gre'
                 && not (isOverloadedRecFldGRE gre && isOverloadedRecFldGRE gre')
                 && not (isNoFieldSelectorGRE gre || isNoFieldSelectorGRE gre')
