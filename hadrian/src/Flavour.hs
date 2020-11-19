@@ -80,9 +80,11 @@ werror = addArgs (builder Ghc ? notStage0 ? arg "-Werror")
 
 -- | Build C and Haskell objects with debugging information.
 enableDebugInfo :: Flavour -> Flavour
-enableDebugInfo = addArgs $ mconcat
-    [ builder (Ghc CompileHs) ? notStage0 ? arg "-g3"
-    , builder (Cc CompileC) ? notStage0 ? arg "-g3"
+enableDebugInfo = addArgs $ notStage0 ? mconcat
+    [ builder (Ghc CompileHs) ? arg "-g3"
+    , builder (Cc CompileC) ? arg "-g3"
+    , builder (Cabal Setup) ? arg "--disable-library-stripping"
+    , builder (Cabal Setup) ? arg "--disable-executable-stripping"
     ]
 
 -- | Enable the ticky-ticky profiler in stage2 GHC
