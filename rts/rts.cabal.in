@@ -168,6 +168,8 @@ library
                       ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                       -- ^ from include
                       DerivedConstants.h ffi.h ffitarget.h
+                      rts/EventLogConstants.h
+                      rts/EventTypes.h
                       -- ^ generated
                       rts/Adjustor.h
                       rts/ExecPage.h

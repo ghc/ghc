@@ -43,6 +43,8 @@ rtsDependencies = do
     let headers =
             [ "ghcautoconf.h", "ghcplatform.h"
             , "DerivedConstants.h"
+            , "rts" -/- "EventTypes.h"
+            , "rts" -/- "EventLogConstants.h"
             ]
             ++ libffiHeaderFiles
     pure $ ((rtsPath -/- "include") -/-) <$> headers
@@ -133,6 +135,15 @@ generatePackageCode context@(Context stage pkg _) = do
         root -/- "**" -/- dir -/- "include/ghcautoconf.h" %> go generateGhcAutoconfH
         root -/- "**" -/- dir -/- "include/ghcplatform.h" %> go generateGhcPlatformH
         root -/- "**" -/- dir -/- "include/DerivedConstants.h" %> genPlatformConstantsHeader context
+        root -/- "**" -/- dir -/- "include/rts/EventLogConstants.h" %> genEventTypes "--event-types-defines"
+        root -/- "**" -/- dir -/- "include/rts/EventTypes.h" %> genEventTypes "--event-types-array"
+
+genEventTypes :: String -> FilePath -> Action ()
+genEventTypes flag file = do
+    need ["rts" -/- "gen_event_types.py"]
+    runBuilder Python
+      ["rts" -/- "gen_event_types.py", flag, file]
+      [] []
 
 genPrimopCode :: Context -> FilePath -> Action ()
 genPrimopCode context@(Context stage _pkg _) file = do

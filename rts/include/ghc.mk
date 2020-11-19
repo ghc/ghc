@@ -249,6 +249,8 @@ $(includes_SETTINGS) : rts/include/Makefile | $$(dir $$@)/.
 # Make DerivedConstants.h for the compiler
 
 includes_DERIVEDCONSTANTS = rts/dist-install/build/include/DerivedConstants.h
+includes_EVENTLOG_CONSTANTS = rts/dist-install/build/include/rts/EventLogConstants.h
+includes_EVENT_TYPES = rts/dist-install/build/include/rts/EventTypes.h
 
 DERIVE_CONSTANTS_FLAGS_FOR_HEADER += --gcc-program "$(CC)"
 DERIVE_CONSTANTS_FLAGS_FOR_HEADER += $(addprefix --gcc-flag$(space),$(includes_CC_OPTS) -fcommon)
@@ -263,9 +265,21 @@ $(includes_DERIVEDCONSTANTS):           $$(includes_H_FILES) $$(rts_H_FILES)
 
 $(includes_DERIVEDCONSTANTS): $(deriveConstants_INPLACE) $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) | $$(dir $$@)/.
 	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS_FOR_HEADER)
+
+$(includes_EVENTLOG_CONSTANTS): rts/gen_event_types.py
+	mkdir -p $(dir $@)
+	${PYTHON} $< --event-types-defines=$@
+
+$(includes_EVENT_TYPES): rts/gen_event_types.py
+	mkdir -p $(dir $@)
+	${PYTHON} $< --event-types-array=$@
+
+includes/EventLog.h : $(includes_EVENTLOG_CONSTANTS) $(includes_EVENT_TYPES)
 endif
 
 includes_dist-install_H_FILES_GENERATED += $(includes_DERIVEDCONSTANTS)
+includes_dist-install_H_FILES_GENERATED += $(includes_EVENTLOG_CONSTANTS)
+includes_dist-install_H_FILES_GENERATED += $(includes_EVENT_TYPES)
 
 # ---------------------------------------------------------------------------
 # Install all header files

@@ -17,11 +17,6 @@
 
 #if defined(TRACING)
 
-/*
- * Descriptions of EventTags for events.
- */
-extern char *EventTagDesc[];
-
 extern bool eventlog_enabled;
 
 void initEventLogging(void);
