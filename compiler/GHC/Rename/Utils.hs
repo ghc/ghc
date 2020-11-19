@@ -498,6 +498,26 @@ wildcardDoc herald =
     $$ nest 2 (text "Possible fix" <> colon <+> text "omit the"
                                             <+> quotes (text ".."))
 
+{-
+Note [addNameClashErrRn]
+
+Why can't we omit a name clash error when one is a record selector but another is not?
+Because the renamer might accept a program incorrectly when NoFieldSelectors is enabled.
+Consider the following code
+
+    data A = A { foo :: Int }
+    data B = B { foo :: Int }
+    foo = 42
+
+When renaming an expression
+
+    (A 0) { foo = 1 }
+
+foo can be A's foo as well B's foo, so this is ambiguous.
+If @any isRecFldGRE gres@ were @all isRecFldGRE gres@, the first conditon passes because of @foo = 42@
+and addNameClashErrRn would not produce any errors.
+-}
+
 addNameClashErrRn :: RdrName -> NE.NonEmpty GlobalRdrElt -> RnM ()
 addNameClashErrRn rdr_name gres
   | all isLocalGRE gres && not (any isRecFldGRE gres)
