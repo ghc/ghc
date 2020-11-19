@@ -1,0 +1,20 @@
+
+T18960b.hs:11:7: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘((), String)’ not matched:
+            P ((), [])
+            P ((), (p : P _)) where p is not one of {'h'}
+            P ((), ['h'])
+            P ((), ('h' : p : P _)) where p is not one of {'e'}
+            ...
+
+T18960b.hs:18:7: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘((), String)’ not matched:
+            P ((), [])
+            P ((), (p : P _)) where p is not one of {'h'}
+            P ((), ['h'])
+            P ((), ('h' : p : P _)) where p is not one of {'e'}
+            ...
