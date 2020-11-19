@@ -316,7 +316,7 @@ data CgState
 
      cgs_uniqs :: UniqSupply,
      -- | These are IDs which have an info table
-     cgs_used_info :: [CmmInfoTable]
+     cgs_used_info :: ![CmmInfoTable]
      }
 
 data HeapUsage   -- See Note [Virtual and real heap pointers]
