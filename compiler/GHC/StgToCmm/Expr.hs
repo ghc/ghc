@@ -54,8 +54,7 @@ import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Driver.Ppr (pprTraceM, showPprUnsafe)
-import GHC.Driver.Session
+import GHC.Driver.Ppr ( {- pprTraceM, -} showPprUnsafe)
 
 import Control.Monad ( unless, void, when )
 import Control.Arrow ( first )
@@ -921,7 +920,7 @@ emitTagAssertion onWhat fun = do
   { platform <- getPlatform
   ; lret <- newBlockId
   ; lfault <- newBlockId
-  ; pprTraceM "emitTagAssertion" (text onWhat)
+  -- ; pprTraceM "emitTagAssertion" (text onWhat)
   ; emit $ mkCbranch (cmmIsTagged platform fun)
                      lret lfault Nothing
   ; emitLabel lfault
@@ -960,7 +959,7 @@ cgIdApp strict fun_id args = do
                 -- pprTraceM "WHNF:" (ppr fun_id <+> ppr args )
               assertTag =
                 -- TODO: Move into platform
-                when (gopt Opt_DoTagInferenceChecks dflags) $
+                -- when (gopt Opt_DoTagInferenceChecks dflags) $
                   emitTagAssertion (showPprUnsafe (ppr fun_id <+> pprExpr platform fun)) fun
 
         EnterIt -> ASSERT( null args )  -- Discarding arguments
