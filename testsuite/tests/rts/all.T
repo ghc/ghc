@@ -359,6 +359,7 @@ test('T14497', [omit_ways(['profasm']), multi_cpu_race], compile_and_run, ['-O']
 test('T14695', [normal, ignore_stderr], makefile_test, ['T14695'])
 test('T14702', [ ignore_stdout
                , when(unregisterised(), skip)
+               , when(opsys('mingw32'), fragile(18953))
                , only_ways(['threaded1', 'threaded2'])
                , extra_run_opts('+RTS -A32m -N8 -T -RTS')
                ]
