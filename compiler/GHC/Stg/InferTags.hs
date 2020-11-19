@@ -963,8 +963,19 @@ combineFieldInfos (FieldsSum c1 fs1)  (FieldsSum c2 fs2)
     | c1 /= c2  = FieldsUntyped $ combineFieldsUntyped fs1 fs2
     | otherwise = FieldsSum c1 $
                   zipWithEqual "SumInfo:combine" combineLattices fs1 fs2
-combineFieldInfos (FieldsProd fs1) (FieldsProd fs2) =
-    FieldsProd $ zipWithEqual "ProdInfo:combine" combineLattices fs1 fs2
+combineFieldInfos (FieldsProd fs1) (FieldsProd fs2)
+    | l1 == l2 = FieldsProd $ combined
+    -- We might combine different types. See Note [Combining Branches]
+    | otherwise = FieldsProd $ combined ++ tail
+    where
+        combined = zipWith combineLattices fs1 fs2
+        tail
+          | l1 < l2 = drop l1 fs2
+          | l1 > l2 = drop l2 fs1
+          | otherwise = panic "combineFieldInfos: impossible"
+        !l1 = length fs1
+        !l2 = length fs2
+
 
 -- untyped v untyped
 combineFieldInfos (FieldsUntyped fs1) (FieldsUntyped fs2) =
@@ -2849,7 +2860,7 @@ solveConstraints dflags = do
   where
     iterate :: [FlowNode] -> (NodeArray,FlagArray) -> Int -> AM ()
     iterate xs (arr, doneFlags) n = do
-        pprTraceM "Iterate - Remaining:" $ ppr (length xs)
+        pprTraceM "Pass:" $ (ppr (length xs)) <+> text "nodes remaining."
         !change <- liftIO $ newIORef False
         !xs' <- runUpdates change False xs
         progress <- liftIO $ readIORef change
