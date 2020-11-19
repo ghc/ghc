@@ -165,7 +165,7 @@ else
     then
         hadrian/build --help > /dev/null
         cd hadrian
-        hadrian_cmd=$(cabal new-exec -- which hadrian)
+        hadrian_cmd=$(cabal new-exec -- which hadrian | grep 'hadrian$')
     else
         if [ $no_clean -eq 0 ]; then
             rm -rf hadrian/.stack-work
