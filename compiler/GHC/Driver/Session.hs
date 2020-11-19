@@ -235,9 +235,8 @@ import GHC.Unit.Home
 import GHC.Unit.Types
 import GHC.Unit.Parser
 import GHC.Unit.Module
-import {-# SOURCE #-} GHC.Driver.Plugins
-import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Builtin.Names ( mAIN_NAME )
+import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
@@ -263,6 +262,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
 import GHC.Settings
 import GHC.CmmToAsm.CFG.Weight
+import {-# SOURCE #-} GHC.Core.Opt.CallerCC
 
 import GHC.Types.Error
 import {-# SOURCE #-} GHC.Utils.Error
@@ -560,18 +560,6 @@ data DynFlags = DynFlags {
   frontendPluginOpts    :: [String],
     -- ^ the @-ffrontend-opt@ flags given on the command line, in *reverse*
     -- order that they're specified on the command line.
-  cachedPlugins         :: [LoadedPlugin],
-    -- ^ plugins dynamically loaded after processing arguments. What will be
-    -- loaded here is directed by pluginModNames. Arguments are loaded from
-    -- pluginModNameOpts. The purpose of this field is to cache the plugins so
-    -- they don't have to be loaded each time they are needed.  See
-    -- 'GHC.Runtime.Loader.initializePlugins'.
-  staticPlugins            :: [StaticPlugin],
-    -- ^ static plugins which do not need dynamic loading. These plugins are
-    -- intended to be added by GHC API users directly to this list.
-    --
-    -- To add dynamically loaded plugins through the GHC API see
-    -- 'addPluginModuleName' instead.
 
   -- GHC API hooks
   hooks                 :: Hooks,
@@ -699,6 +687,7 @@ data DynFlags = DynFlags {
 
   -- | what kind of {-# SCC #-} to add automatically
   profAuto              :: ProfAuto,
+  callerCcFilters       :: [CallerCcFilter],
 
   interactivePrint      :: Maybe String,
 
@@ -1218,8 +1207,6 @@ defaultDynFlags mySettings llvmConfig =
         pluginModNames          = [],
         pluginModNameOpts       = [],
         frontendPluginOpts      = [],
-        cachedPlugins           = [],
-        staticPlugins           = [],
         hooks                   = emptyHooks,
 
         outputFile_             = Nothing,
@@ -1313,6 +1300,7 @@ defaultDynFlags mySettings llvmConfig =
         canUseColor = False,
         colScheme = Col.defaultScheme,
         profAuto = NoProfAuto,
+        callerCcFilters = [],
         interactivePrint = Nothing,
         nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum",
         sseVersion = Nothing,
@@ -1875,7 +1863,7 @@ clearPluginModuleNames :: DynFlags -> DynFlags
 clearPluginModuleNames d =
     d { pluginModNames = []
       , pluginModNameOpts = []
-      , cachedPlugins = [] }
+      }
 
 addPluginModuleNameOption :: String -> DynFlags -> DynFlags
 addPluginModuleNameOption optflag d = d { pluginModNameOpts = (mkModuleName m, option) : (pluginModNameOpts d) }
@@ -2946,6 +2934,10 @@ dynamic_flags_deps = [
       (noArg (\d -> d { profAuto = ProfAutoCalls } ))
   , make_ord_flag defGhcFlag "fno-prof-auto"
       (noArg (\d -> d { profAuto = NoProfAuto } ))
+
+        -- Caller-CC
+  , make_ord_flag defGhcFlag "fprof-callers"
+         (HasArg setCallerCcFilters)
 
         ------ Compiler flags -----------------------------------------------
 
@@ -4547,6 +4539,12 @@ checkOptLevel n dflags
      = Left "-O conflicts with --interactive; -O ignored."
    | otherwise
      = Right dflags
+
+setCallerCcFilters :: String -> DynP ()
+setCallerCcFilters arg =
+  case parseCallerCcFilter arg of
+    Right filt -> upd $ \d -> d { callerCcFilters = filt : callerCcFilters d }
+    Left err -> addErr err
 
 setMainIs :: String -> DynP ()
 setMainIs arg
