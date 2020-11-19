@@ -108,11 +108,11 @@ typedef struct _EventsBuf {
   EventCapNo capno; // which capability this buffer belongs to, or -1
 } EventsBuf;
 
-EventsBuf *capEventBuf; // one EventsBuf for each Capability
+static EventsBuf *capEventBuf; // one EventsBuf for each Capability
 
-EventsBuf eventBuf; // an EventsBuf not associated with any Capability
+static EventsBuf eventBuf; // an EventsBuf not associated with any Capability
 #if defined(THREADED_RTS)
-Mutex eventBufMutex; // protected by this mutex
+static Mutex eventBufMutex; // protected by this mutex
 #endif
 
 char *EventDesc[] = {
