@@ -3,9 +3,11 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# OPTIONS_GHC -fno-state-hack -ddump-simpl -ddump-to-file #-}
+-- {-# OPTIONS_GHC -fno-state-hack #-}
     -- This -fno-state-hack is important
     -- See Note [Optimising the unique supply]
+--{-# OPTIONS_GHC -ddump-simpl -ddump-stg -ddump-to-file -O2 #-}
+{-# OPTIONS_GHC -O2 #-}
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
@@ -49,9 +51,9 @@ import GHC.Utils.Monad
 import Control.Monad
 import Data.Bits
 import Data.Char
-import GHC.Exts( inline, Ptr(..) )
+import GHC.Exts( Ptr(..), noDuplicate# )
 #if MIN_VERSION_GLASGOW_HASKELL(9,0,0,0)
-import GHC.Exts( Int(..), word2Int#, fetchAddWordAddr# )
+import GHC.Exts( Int(..), word2Int#, fetchAddWordAddr#, plusWord#, readWordOffAddr# )
 #if defined(DEBUG)
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -218,25 +220,28 @@ mkSplitUniqSupply :: Char -> IO UniqSupply
 -- See Note [How the unique supply works]
 -- See Note [Optimising the unique supply]
 mkSplitUniqSupply c
-  = mk_supply
+  = unsafeDupableInterleaveIO (IO mk_supply)
+
   where
-     !mask = ord c `shiftL` uNIQUE_BITS
+     !mask = ord c `unsafeShiftL` uNIQUE_BITS
 
         -- Here comes THE MAGIC: see Note [How the unique supply works]
         -- This is one of the most hammered bits in the whole compiler
         -- See Note [Optimising the unique supply]
         -- NB: Use unsafeInterleaveIO for thread-safety.
-     mk_supply = multiShotIO $
-                 unsafeInterleaveIO $
-                 genSym      >>= \ u ->
-                 mk_supply   >>= \ s1 ->
-                 mk_supply   >>= \ s2 ->
-                 return (MkSplitUniqSupply (mask .|. u) s1 s2)
+     mk_supply s0 =
+        case noDuplicate# s0 of { s1 -> -- avoid concurrent evaluation
+        case unIO genSym s1 of { (# s2, u #) ->
+        -- defer IO computations
+        case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s2 of { (# s3, x #) ->
+        case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s3 of { (# s4, y #) ->
+        (# s4, MkSplitUniqSupply (mask .|. u) x y #)
+        }}}}
 
-multiShotIO :: IO a -> IO a
-{-# INLINE multiShotIO #-}
--- See Note [multiShotIO]
-multiShotIO (IO m) = IO (\s -> inline m s)
+-- multiShotIO :: IO a -> IO a
+-- {-# INLINE multiShotIO #-}
+-- -- See Note [multiShotIO]
+-- multiShotIO (IO m) = IO (\s -> inline m s)
 
 #if !MIN_VERSION_GLASGOW_HASKELL(9,0,0,0)
 foreign import ccall unsafe "genSym" genSym :: IO Int
@@ -246,7 +251,7 @@ genSym = do
     let !mask = (1 `unsafeShiftL` uNIQUE_BITS) - 1
     let !(Ptr counter) = ghc_unique_counter
     let !(Ptr inc_ptr) = ghc_unique_inc
-    v <- IO $ \s0 -> case readWordOffAddr# inc_ptr 0# s0 of
+    u <- IO $ \s0 -> case readWordOffAddr# inc_ptr 0# s0 of
         (# s1, inc #) -> case fetchAddWordAddr# counter inc s1 of
             (# s2, val #) ->
                 let !u = I# (word2Int# (val `plusWord#` inc)) .&. mask
