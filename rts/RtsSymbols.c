@@ -643,7 +643,7 @@
       SymI_HasProto(freeFullProgArgv)                                   \
       SymI_HasProto(getProcessElapsedTime)                              \
       SymI_HasProto(getStablePtr)                                       \
-      SymI_HasProto(foreignExportStablePtr)                             \
+      SymI_HasProto(registerForeignExports)                             \
       SymI_HasProto(hs_init)                                            \
       SymI_HasProto(hs_init_with_rtsopts)                               \
       SymI_HasProto(hs_init_ghc)                                        \
