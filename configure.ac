@@ -321,7 +321,7 @@ AC_MSG_CHECKING(whether target supports tables next to code)
 case "$Unregisterised" in
     NO)
         case "$TargetArch" in
-            ia64|powerpc64|powerpc64le|s390x|riscv64)
+            ia64|powerpc64|powerpc64le|s390x)
                 TablesNextToCodeDefault=NO
                 AC_MSG_RESULT([no])
                 ;;
