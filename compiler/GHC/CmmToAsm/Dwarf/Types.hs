@@ -178,7 +178,8 @@ pprDwarfInfoOpen platform haveSrc (DwarfCompileUnit _ name producer compDir lowL
   $$ pprString producer
   $$ pprData4 dW_LANG_Haskell
   $$ pprString compDir
-  $$ pprWord platform (pdoc platform lowLabel)
+     -- Offset due to Note [Info Offset]
+  $$ pprWord platform (pdoc platform lowLabel <> text "-1")
   $$ pprWord platform (pdoc platform highLabel)
   $$ if haveSrc
      then sectionOffset platform (ptext lineLbl) (ptext dwarfLineLabel)
@@ -189,7 +190,8 @@ pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label parent) =
   $$ pprString name
   $$ pprLabelString platform label
   $$ pprFlag (externallyVisibleCLabel label)
-  $$ pprWord platform (pdoc platform label)
+     -- Offset due to Note [Info Offset]
+  $$ pprWord platform (pdoc platform label <> text "-1")
   $$ pprWord platform (pdoc platform $ mkAsmTempProcEndLabel label)
   $$ pprByte 1
   $$ pprByte dW_OP_call_frame_cfa
@@ -256,7 +258,10 @@ pprDwarfARanges platform arngs unitU =
      $$ pprWord platform (char '0')
 
 pprDwarfARange :: Platform -> DwarfARange -> SDoc
-pprDwarfARange platform arng = pprWord platform (pdoc platform $ dwArngStartLabel arng) $$ pprWord platform length
+pprDwarfARange platform arng =
+    -- Offset due to Note [Info offset].
+    pprWord platform (pdoc platform (dwArngStartLabel arng) <> text "-1")
+    $$ pprWord platform length
   where
     length = pdoc platform (dwArngEndLabel arng)
              <> char '-' <> pdoc platform (dwArngStartLabel arng)
@@ -356,7 +361,7 @@ pprFrameProc platform frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
         fdeEndLabel = mkAsmTempDerivedLabel procLbl (fsLit "_fde_end")
         procEnd     = mkAsmTempProcEndLabel procLbl
         ifInfo str  = if hasInfo then text str else empty
-                      -- see [Note: Info Offset]
+                      -- see Note [Info Offset]
     in vcat [ whenPprDebug $ text "# Unwinding for" <+> pdoc platform procLbl <> colon
             , pprData4' (pdoc platform fdeEndLabel <> char '-' <> pdoc platform fdeLabel)
             , pdoc platform fdeLabel <> colon
@@ -398,7 +403,7 @@ pprFrameBlock platform (DwarfFrameBlock hasInfo uws0) =
 
         in if oldUws == uws
              then (empty, oldUws)
-             else let -- see [Note: Info Offset]
+             else let -- see Note [Info Offset]
                       needsOffset = firstDecl && hasInfo
                       lblDoc = pdoc platform lbl <>
                                if needsOffset then text "-1" else empty
@@ -407,6 +412,7 @@ pprFrameBlock platform (DwarfFrameBlock hasInfo uws0) =
                   in (doc, uws)
 
 -- Note [Info Offset]
+-- ~~~~~~~~~~~~~~~~~~
 --
 -- GDB was pretty much written with C-like programs in mind, and as a
 -- result they assume that once you have a return address, it is a
@@ -425,6 +431,14 @@ pprFrameBlock platform (DwarfFrameBlock hasInfo uws0) =
 -- Note that this will not prevent GDB from failing to look-up the
 -- correct function name for the frame, as that uses the symbol table,
 -- which we can not manipulate as easily.
+--
+-- We apply this offset in several places:
+--
+--  * unwind information in .debug_frames
+--  * the subprogram and lexical_block DIEs in .debug_info
+--  * the ranges in .debug_aranges
+--
+-- In the latter two cases we apply the offset unconditionally.
 --
 -- There's a GDB patch to address this at [1]. At the moment of writing
 -- it's not merged, so I recommend building GDB with the patch if you

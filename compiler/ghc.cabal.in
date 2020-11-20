@@ -63,7 +63,7 @@ Library
                    process    >= 1   && < 1.7,
                    bytestring >= 0.9 && < 0.11,
                    binary     == 0.8.*,
-                   time       >= 1.4 && < 1.10,
+                   time       >= 1.4 && < 1.12,
                    containers >= 0.6.2.1 && < 0.7,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.5,
@@ -71,6 +71,7 @@ Library
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
                    exceptions == 0.10.*,
+                   parsec,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
@@ -301,6 +302,7 @@ Library
         GHC.Core.Multiplicity
         GHC.Core.Opt.Arity
         GHC.Core.Opt.CallArity
+        GHC.Core.Opt.CallerCC
         GHC.Core.Opt.ConstantFold
         GHC.Core.Opt.CprAnal
         GHC.Core.Opt.CSE
