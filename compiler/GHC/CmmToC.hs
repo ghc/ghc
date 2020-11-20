@@ -533,21 +533,29 @@ pprStatics platform = pprStatics'
            where r = i .&. 0xffffffff
                  q = i `shiftR` 32
 
-      (CmmStaticLit (CmmInt a W32) : CmmStaticLit (CmmInt b W32) : rest)
-        | wordWidth platform == W64
-        -> case platformByteOrder platform of
-             BigEndian    -> pprStatics' (CmmStaticLit (CmmInt ((shiftL a 32) .|. b) W64) : rest)
-             LittleEndian -> pprStatics' (CmmStaticLit (CmmInt ((shiftL b 32) .|. a) W64) : rest)
+      -- Merge non-word-sized literals into words
+      things@(CmmStaticLit (CmmInt a w) : rest)
+        | wordWidth platform /= w
+        -> pprLit1 platform lit : pprStatics' rest'
+        where
+          n_lits = widthInBytes w `div` widthInBytes (wordWidth platform)
+          (lits, rest') = takeWords (n_lits-1) [a] rest
+          swizzle = case platformByteOrder platform of
+                      BigEndian    -> id
+                      LittleEndian -> reverse
+          shift = widthInBits w
+          word = foldl' (\acc n -> (acc `shiftL` shift) .|. n) 0 (swizzle lits)
+          lit = CmmInt word (wordWidth platform)
 
-      (CmmStaticLit (CmmInt a W16) : CmmStaticLit (CmmInt b W16) : rest)
-        | wordWidth platform == W32
-        -> case platformByteOrder platform of
-             BigEndian    -> pprStatics' (CmmStaticLit (CmmInt ((shiftL a 16) .|. b) W32) : rest)
-             LittleEndian -> pprStatics' (CmmStaticLit (CmmInt ((shiftL b 16) .|. a) W32) : rest)
+          takeWords :: Int -> [Integer] -> [CmmStatic] -> ([Integer], [CmmStatic])
+          takeWords 0 acc rest'                  = (acc, rest')
+          takeWords n acc (CmmStaticLit (CmmInt a w') : rest')
+            | w' == w                            = takeWords (n-1) (a:acc) rest'
+            | otherwise                          = pprPanic "CmmToC(pprStatic'): Mixed width literals" err_doc
+          takeWords _ _   (_ : _)                = pprPanic "CmmToC(pprStatic'): Mixed literals" err_doc
+          takeWords _ _   []                     = pprPanic "CmmToC(pprStatic'): Ran out of literals" err_doc
 
-      (CmmStaticLit (CmmInt _ w) : _)
-        | w /= wordWidth platform
-        -> pprPanic "pprStatics: cannot emit a non-word-sized static literal" (ppr w)
+          err_doc = hsep $ map (pprStatic platform) things
 
       (CmmStaticLit lit : rest)
         -> pprLit1 platform lit : pprStatics' rest
