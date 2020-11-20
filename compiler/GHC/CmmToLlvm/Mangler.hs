@@ -43,7 +43,7 @@ llvmFixupAsm logger dflags f1 f2 = {-# SCC "llvm_mangler" #-}
 
 -- | These are the rewrites that the mangler will perform
 rewrites :: [Rewrite]
-rewrites = [rewriteSymType, rewriteAVX]
+rewrites = [rewriteSymType, rewriteAVX, rewriteCall]
 
 type Rewrite = DynFlags -> B.ByteString -> Maybe B.ByteString
 
@@ -106,6 +106,27 @@ rewriteAVX dflags s
     isX86_64 = platformArch (targetPlatform dflags) == ArchX86_64
     isVmovdqa = B.isPrefixOf (B.pack "vmovdqa")
     isVmovap = B.isPrefixOf (B.pack "vmovap")
+
+-- | This rewrites (tail) calls to avoid creating PLT entries for
+-- functions on riscv64. The replacement will load the address from the
+-- GOT, which is resolved to point to the real address of the function.
+rewriteCall :: Rewrite
+rewriteCall dflags l
+  | not isRISCV64 = Nothing
+  | isCall l      = Just $ replaceCall "call" "jalr" "ra" l
+  | isTail l      = Just $ replaceCall "tail" "jr" "t1" l
+  | otherwise     = Nothing
+  where
+    isRISCV64 = platformArch (targetPlatform dflags) == ArchRISCV64
+    isCall = B.isPrefixOf (B.pack "call\t")
+    isTail = B.isPrefixOf (B.pack "tail\t")
+
+    replaceCall call jump reg l =
+        appendInsn (jump ++ "\t" ++ reg) $ removePlt $
+        replaceOnce (B.pack call) (B.pack ("la\t" ++ reg ++ ",")) l
+      where
+        removePlt = replaceOnce (B.pack "@plt") (B.pack "")
+        appendInsn i = (`B.append` B.pack ("\n\t" ++ i))
 
 -- | @replaceOnce match replace bs@ replaces the first occurrence of the
 -- substring @match@ in @bs@ with @replace@.
