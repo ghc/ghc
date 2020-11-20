@@ -255,6 +255,7 @@ validate-x86_64-linux-deb9-unreg-hadrian:
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
+    HADRIAN_ARGS: "*.genapply.cabal.configure.opts+=--flags=unregisterised"
     TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
 
 hadrian-ghc-in-ghci:
