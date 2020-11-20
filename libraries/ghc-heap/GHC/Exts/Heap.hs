@@ -190,9 +190,7 @@ getClosureDataFromHeapRep heapRep infoTablePtr pts = do
     case tipe itbl of
         t | t >= CONSTR && t <= CONSTR_NOCAF -> do
             (p, m, n) <- dataConNames infoTablePtr
-            if m == "GHC.ByteCode.Instr" && n == "BreakInfo"
-              then pure $ UnsupportedClosure itbl
-              else pure $ ConstrClosure itbl pts npts p m n
+            pure $ ConstrClosure itbl pts npts p m n
 
         t | t >= THUNK && t <= THUNK_STATIC -> do
             pure $ ThunkClosure itbl pts npts
