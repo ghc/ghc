@@ -4,11 +4,10 @@
 --     refer to *types*, rather than *code*
 
 {-# LANGUAGE CPP #-}
-module Hooks ( Hooks(..)
+module Hooks ( Hooks
              , emptyHooks
              , lookupHook
              , getHooked
-             {-
                -- the hooks:
              , dsForeignsHook
              , tcForeignImportsHook
@@ -23,7 +22,6 @@ module Hooks ( Hooks(..)
              , getValueSafelyHook
              , createIservProcessHook
              , findInstalledHomeModuleHook
-             -}
              ) where
 
 import GhcPrelude
