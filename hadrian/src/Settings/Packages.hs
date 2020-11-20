@@ -57,6 +57,7 @@ packageArgs = do
             [ arg "--disable-library-for-ghci"
             , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
             , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
+            , flag GhcUnregisterised ? arg "--ghc-option=-optc-DNO_REGS"
             , notM targetSupportsSMP ? arg "--ghc-option=-DNOSMP"
             , notM targetSupportsSMP ? arg "--ghc-option=-optc-DNOSMP"
             -- When building stage 1 or later, use thread-safe RTS functions if
