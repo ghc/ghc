@@ -1,24 +1,25 @@
 {-# LANGUAGE BangPatterns #-}
 import Data.Time.Clock
 
+import Data.Int
 import System.Exit
 
-data A = ANothing | AJust {-# UNPACK #-} !Int
+data A = ANothing | AJust {-# UNPACK #-} !Int64
 data B = BNothing | BJust {-# UNPACK #-} !A
 data C = CNothing | CJust {-# UNPACK #-} !B
 data D = DNothing | DJust {-# UNPACK #-} !C
 
 data Unlayered = Unlayered {-# UNPACK #-} !D
 
-data Layered = Layered !(Maybe (Maybe (Maybe (Maybe Int))))
+data Layered = Layered !(Maybe (Maybe (Maybe (Maybe Int64))))
 
-makeUnlayered :: Int -> [Unlayered]
+makeUnlayered :: Int64 -> [Unlayered]
 makeUnlayered n = Unlayered . DJust . CJust . BJust . AJust <$> [1..n]
 
-makeLayered :: Int -> [Layered]
+makeLayered :: Int64 -> [Layered]
 makeLayered n = Layered . Just . Just . Just . Just <$> [1..n]
 
-sumUnlayered :: [Unlayered] -> Int
+sumUnlayered :: [Unlayered] -> Int64
 sumUnlayered = go 0
  where
   go !n [] = n
@@ -26,7 +27,7 @@ sumUnlayered = go 0
     Unlayered (DJust (CJust (BJust (AJust i)))) -> go (n+i) ws
     Unlayered _ -> go n ws
 
-sumLayered :: [Layered] -> Int
+sumLayered :: [Layered] -> Int64
 sumLayered = go 0
  where
   go !n [] = n
