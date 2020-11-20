@@ -552,6 +552,15 @@ LLVM code generator
 
     LLVM code from the :ref:`LLVM code generator <llvm-code-gen>`
 
+C code generator
+~~~~~~~~~~~~~~~~
+
+.. ghc-flag:: -ddump-c-backend
+    :shortdesc: Dump C code produced by the C (unregisterised) backend.
+    :type: dynamic
+
+    :shortdesc: Dump C code produced by the C (unregisterised) backend.
+
 Native code generator
 ~~~~~~~~~~~~~~~~~~~~~
 
