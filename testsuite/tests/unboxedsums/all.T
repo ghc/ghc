@@ -30,6 +30,7 @@ test('unpack_sums_3', omit_ways(['ghci']), compile_and_run, ['-O'])
 test('unpack_sums_4', omit_ways(['ghci']), compile_and_run, ['-O'])
 test('unpack_sums_5', omit_ways(['ghci']), compile, ['-O'])
 test('unpack_sums_6', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('unpack_sums_7', [], makefile_test, [])
 
 # TODO: Need to run this in --slow mode only
 # test('sum_api_annots',
