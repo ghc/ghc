@@ -26,4 +26,4 @@ Executable genapply
                    pretty
 
     if flag(unregisterised)
-        Cpp-Options: -DNO_REGS
+        Cpp-Options: -DNO_REGS -optc-DNO_REGS
