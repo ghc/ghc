@@ -306,6 +306,10 @@ typedef struct _ObjectCode {
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
+
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+extern Mutex dl_mutex;
+#endif
 #endif
 
 /* Type of the initializer */
