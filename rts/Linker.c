@@ -2030,6 +2030,12 @@ static void * loadNativeObj_ELF (pathchar *path, char **errmsg)
    loaded_objects = nc;
 
    retval = nc->dlopen_handle;
+
+#if defined(PROFILING)
+  // collect any new cost centres that were defined in the loaded object.
+  refreshProfilingCCSs();
+#endif
+
    goto success;
 
 dl_iterate_phdr_fail:
