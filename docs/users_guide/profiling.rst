@@ -1681,11 +1681,27 @@ Using “ticky-ticky” profiling (for implementors)
    single: ticky-ticky profiling
 
 .. ghc-flag:: -ticky
-    :shortdesc: :ref:`Turn on ticky-ticky profiling <ticky-ticky>`
+    :shortdesc: Turn on :ref:`ticky-ticky profiling <ticky-ticky>`
     :type: dynamic
     :category:
 
-    Enable ticky-ticky profiling.
+    Enable ticky-ticky profiling. By default this only tracks the allocations
+    *by* each closure type. See :ghc-flag:`-ticky-allocd` to keep track of
+    allocations *of* each closure type as well.
+
+.. ghc-flag:: -ticky-allocd
+    :shortdesc: Track the number of times each closure type is allocated.
+    :type: dynamic
+    :category:
+
+    Keep track of how much each closure type is allocated.
+
+.. ghc-flag:: -ticky-dyn-thunk
+    :shortdesc: Track allocations of dynamic thunks
+    :type: dynamic
+    :category:
+
+    Track allocations of dynamic thunks.
 
 Because ticky-ticky profiling requires a certain familiarity with GHC
 internals, we have moved the documentation to the GHC developers wiki.
