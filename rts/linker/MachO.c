@@ -277,7 +277,7 @@ resolveImports(
             addr = (SymbolAddr*) (symbol->nlist->n_value);
             IF_DEBUG(linker, debugBelch("resolveImports: undefined external %s has value %p\n", symbol->name, addr));
         } else {
-            addr = lookupDependentSymbol(symbol->name, oc);
+            addr = lookupSymbol_(symbol->name);
             IF_DEBUG(linker, debugBelch("resolveImports: looking up %s, %p\n", symbol->name, addr));
         }
 
@@ -611,12 +611,12 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                 uint64_t value = 0;
                 if(symbol->nlist->n_type & N_EXT) {
                     /* external symbols should be able to be
-                     * looked up via the lookupDependentSymbol function.
+                     * looked up via the lookupSymbol_ function.
                      * Either through the global symbol hashmap
                      * or asking the system, if not found
                      * in the symbol hashmap
                      */
-                    value = (uint64_t)lookupDependentSymbol((char*)symbol->name, oc);
+                    value = (uint64_t)lookupSymbol_((char*)symbol->name);
                     if(!value)
                         barf("Could not lookup symbol: %s!", symbol->name);
                 } else {
@@ -656,7 +656,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                 uint64_t pc = (uint64_t)section->start + ri->r_address;
                 uint64_t value = 0;
                 if(symbol->nlist->n_type & N_EXT) {
-                    value = (uint64_t)lookupDependentSymbol((char*)symbol->name, oc);
+                    value = (uint64_t)lookupSymbol_((char*)symbol->name);
                     if(!value)
                         barf("Could not lookup symbol: %s!", symbol->name);
                 } else {
@@ -850,7 +850,7 @@ relocateSection(
                     // symtab, or it is undefined, meaning dlsym must be used
                     // to resolve it.
 
-                    addr = lookupDependentSymbol(nm, oc);
+                    addr = lookupSymbol_(nm);
                     IF_DEBUG(linker, debugBelch("relocateSection: looked up %s, "
                                                 "external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n", nm));
                     IF_DEBUG(linker, debugBelch("               : addr = %p\n", addr));
@@ -902,7 +902,7 @@ relocateSection(
                 IF_DEBUG(linker, debugBelch("relocateSection, defined external symbol %s, relocated address %p\n", nm, (void *)value));
             }
             else {
-                addr = lookupDependentSymbol(nm, oc);
+                addr = lookupSymbol_(nm);
                 if (addr == NULL)
                 {
                      errorBelch("\nlookupSymbol failed in relocateSection (relocate external)\n"
@@ -1423,7 +1423,7 @@ ocGetNames_MachO(ObjectCode* oc)
                 if(oc->info->nlist[i].n_type & N_EXT)
                 {
                     if (   (oc->info->nlist[i].n_desc & N_WEAK_DEF)
-                        && lookupDependentSymbol(nm, oc)) {
+                        && lookupSymbol_(nm)) {
                         // weak definition, and we already have a definition
                         IF_DEBUG(linker, debugBelch("    weak: %s\n", nm));
                     }
@@ -1581,7 +1581,7 @@ ocResolve_MachO(ObjectCode* oc)
                  * have the address.
                  */
                 if(NULL == symbol->addr) {
-                    symbol->addr = lookupDependentSymbol((char*)symbol->name, oc);
+                    symbol->addr = lookupSymbol_((char*)symbol->name);
                     if(NULL == symbol->addr)
                         barf("Failed to lookup symbol: %s", symbol->name);
                 } else {
