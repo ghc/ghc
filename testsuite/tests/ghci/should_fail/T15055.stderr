@@ -1,6 +1,9 @@
 
 <no location info>: error:
     Could not load module ‘GHC’
-    It is a member of the hidden package ‘ghc-8.5’.
+    It is a member of the hidden package ‘ghc-9.1.0.20201022’.
+    You can run ‘:set -package ghc’ to expose it.
+    (Note: this unloads all the modules in the current scope.)
+    It is a member of the hidden package ‘ghc-9.1.0.20201120’.
     You can run ‘:set -package ghc’ to expose it.
     (Note: this unloads all the modules in the current scope.)
