@@ -64,7 +64,6 @@
 #  include "linker/Elf.h"
 #  include <regex.h>    // regex is already used by dlopen() so this is OK
                         // to use here without requiring an additional lib
-#  include <link.h>
 #elif defined(OBJFORMAT_PEi386)
 #  include "linker/PEi386.h"
 #  include <windows.h>
@@ -170,8 +169,6 @@ Mutex linker_mutex;
 
 /* Generic wrapper function to try and Resolve and RunInit oc files */
 int ocTryLoad( ObjectCode* oc );
-
-static void freeNativeCode_ELF (ObjectCode *nc);
 
 /* Link objects into the lower 2Gb on x86_64 and AArch64.  GHC assumes the
  * small memory model on this architecture (see gcc docs,
@@ -387,7 +384,7 @@ static void *dl_prog_handle;
 static regex_t re_invalid;
 static regex_t re_realso;
 #if defined(THREADED_RTS)
-static Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
+Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
 #endif
 #endif
 
@@ -1838,7 +1835,7 @@ HsInt purgeObj (pathchar *path)
     return r;
 }
 
-static OStatus getObjectLoadStatus_ (pathchar *path)
+OStatus getObjectLoadStatus_ (pathchar *path)
 {
     for (ObjectCode *o = objects; o; o = o->next) {
        if (0 == pathcmp(o->fileName, path)) {
@@ -1927,132 +1924,6 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
                        start, (void*)((StgWord)start + size),
                        size, kind ));
 }
-
-
-#  if defined(OBJFORMAT_ELF)
-static int loadNativeObjCb_(struct dl_phdr_info *info,
-    size_t _size GNUC3_ATTRIBUTE(__unused__), void *data) {
-  ObjectCode* nc = (ObjectCode*) data;
-
-  // This logic mimicks _dl_addr_inside_object from glibc
-  // For reference:
-  // int
-  // internal_function
-  // _dl_addr_inside_object (struct link_map *l, const ElfW(Addr) addr)
-  // {
-  //   int n = l->l_phnum;
-  //   const ElfW(Addr) reladdr = addr - l->l_addr;
-  //
-  //   while (--n >= 0)
-  //     if (l->l_phdr[n].p_type == PT_LOAD
-  //         && reladdr - l->l_phdr[n].p_vaddr >= 0
-  //         && reladdr - l->l_phdr[n].p_vaddr < l->l_phdr[n].p_memsz)
-  //       return 1;
-  //   return 0;
-  // }
-
-  if ((void*) info->dlpi_addr == nc->l_addr) {
-    int n = info->dlpi_phnum;
-    while (--n >= 0) {
-      if (info->dlpi_phdr[n].p_type == PT_LOAD) {
-        NativeCodeRange* ncr =
-          stgMallocBytes(sizeof(NativeCodeRange), "loadNativeObjCb_");
-        ncr->start = (void*) ((char*) nc->l_addr + info->dlpi_phdr[n].p_vaddr);
-        ncr->end = (void*) ((char*) ncr->start + info->dlpi_phdr[n].p_memsz);
-
-        ncr->next = nc->nc_ranges;
-        nc->nc_ranges = ncr;
-      }
-    }
-  }
-  return 0;
-}
-
-static void copyErrmsg(char** errmsg_dest, char* errmsg) {
-  if (errmsg == NULL) errmsg = "loadNativeObj_ELF: unknown error";
-  *errmsg_dest = stgMallocBytes(strlen(errmsg)+1, "loadNativeObj_ELF");
-  strcpy(*errmsg_dest, errmsg);
-}
-
-// need dl_mutex
-static void freeNativeCode_ELF (ObjectCode *nc) {
-  dlclose(nc->dlopen_handle);
-
-  NativeCodeRange *ncr = nc->nc_ranges;
-  while (ncr) {
-    NativeCodeRange* last_ncr = ncr;
-    ncr = ncr->next;
-    stgFree(last_ncr);
-  }
-}
-
-static void * loadNativeObj_ELF (pathchar *path, char **errmsg)
-{
-   ObjectCode* nc;
-   void *hdl, *retval;
-
-   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF %" PATH_FMT "\n", path));
-
-   retval = NULL;
-   ACQUIRE_LOCK(&dl_mutex);
-
-   nc = mkOc(DYNAMIC_OBJECT, path, NULL, 0, true, NULL, 0);
-
-   foreignExportsLoadingObject(nc);
-   hdl = dlopen(path, RTLD_NOW|RTLD_LOCAL);
-   foreignExportsFinishedLoadingObject();
-   if (hdl == NULL) {
-     /* dlopen failed; save the message in errmsg */
-     copyErrmsg(errmsg, dlerror());
-     goto dlopen_fail;
-   }
-
-   struct link_map *map;
-   if (dlinfo(hdl, RTLD_DI_LINKMAP, &map) == -1) {
-     /* dlinfo failed; save the message in errmsg */
-     copyErrmsg(errmsg, dlerror());
-     goto dlinfo_fail;
-   }
-
-   nc->l_addr = (void*) map->l_addr;
-   nc->dlopen_handle = hdl;
-   hdl = NULL; // pass handle ownership to nc
-
-   dl_iterate_phdr(loadNativeObjCb_, nc);
-   if (!nc->nc_ranges) {
-     copyErrmsg(errmsg, "dl_iterate_phdr failed to find obj");
-     goto dl_iterate_phdr_fail;
-   }
-
-   insertOCSectionIndices(nc);
-
-   nc->next_loaded_object = loaded_objects;
-   loaded_objects = nc;
-
-   retval = nc->dlopen_handle;
-
-#if defined(PROFILING)
-  // collect any new cost centres that were defined in the loaded object.
-  refreshProfilingCCSs();
-#endif
-
-   goto success;
-
-dl_iterate_phdr_fail:
-   // already have dl_mutex
-   freeNativeCode_ELF(nc);
-dlinfo_fail:
-   if (hdl) dlclose(hdl);
-dlopen_fail:
-success:
-
-   RELEASE_LOCK(&dl_mutex);
-   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF result=%p\n", retval));
-
-   return retval;
-}
-
-#  endif
 
 #define UNUSED(x) (void)(x)
 

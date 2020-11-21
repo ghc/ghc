@@ -15,15 +15,20 @@
 
 #include "RtsUtils.h"
 #include "RtsSymbolInfo.h"
+#include "CheckUnload.h"
+#include "LinkerInternals.h"
 #include "linker/Elf.h"
 #include "linker/CacheFlush.h"
 #include "linker/M32Alloc.h"
 #include "linker/SymbolExtras.h"
+#include "ForeignExports.h"
+#include "Profiling.h"
 #include "sm/OSMem.h"
 #include "GetEnv.h"
 #include "linker/util.h"
 #include "linker/elf_util.h"
 
+#include <link.h>
 #include <stdlib.h>
 #include <string.h>
 #if defined(HAVE_SYS_STAT_H)
@@ -1943,6 +1948,143 @@ int ocRunInit_ELF( ObjectCode *oc )
    freeProgEnvv(envc, envv);
    return 1;
 }
+
+/*
+ * Shared object loading
+ */
+
+static int loadNativeObjCb_(struct dl_phdr_info *info,
+    size_t _size GNUC3_ATTRIBUTE(__unused__), void *data) {
+  ObjectCode* nc = (ObjectCode*) data;
+
+  // This logic mimicks _dl_addr_inside_object from glibc
+  // For reference:
+  // int
+  // internal_function
+  // _dl_addr_inside_object (struct link_map *l, const ElfW(Addr) addr)
+  // {
+  //   int n = l->l_phnum;
+  //   const ElfW(Addr) reladdr = addr - l->l_addr;
+  //
+  //   while (--n >= 0)
+  //     if (l->l_phdr[n].p_type == PT_LOAD
+  //         && reladdr - l->l_phdr[n].p_vaddr >= 0
+  //         && reladdr - l->l_phdr[n].p_vaddr < l->l_phdr[n].p_memsz)
+  //       return 1;
+  //   return 0;
+  // }
+
+  if ((void*) info->dlpi_addr == nc->l_addr) {
+    int n = info->dlpi_phnum;
+    while (--n >= 0) {
+      if (info->dlpi_phdr[n].p_type == PT_LOAD) {
+        NativeCodeRange* ncr =
+          stgMallocBytes(sizeof(NativeCodeRange), "loadNativeObjCb_");
+        ncr->start = (void*) ((char*) nc->l_addr + info->dlpi_phdr[n].p_vaddr);
+        ncr->end = (void*) ((char*) ncr->start + info->dlpi_phdr[n].p_memsz);
+
+        ncr->next = nc->nc_ranges;
+        nc->nc_ranges = ncr;
+      }
+    }
+  }
+  return 0;
+}
+
+static void copyErrmsg(char** errmsg_dest, char* errmsg) {
+  if (errmsg == NULL) errmsg = "loadNativeObj_ELF: unknown error";
+  *errmsg_dest = stgMallocBytes(strlen(errmsg)+1, "loadNativeObj_ELF");
+  strcpy(*errmsg_dest, errmsg);
+}
+
+// need dl_mutex
+void freeNativeCode_ELF (ObjectCode *nc) {
+  dlclose(nc->dlopen_handle);
+
+  NativeCodeRange *ncr = nc->nc_ranges;
+  while (ncr) {
+    NativeCodeRange* last_ncr = ncr;
+    ncr = ncr->next;
+    stgFree(last_ncr);
+  }
+}
+
+void * loadNativeObj_ELF (pathchar *path, char **errmsg)
+{
+   ObjectCode* nc;
+   void *hdl, *retval;
+
+   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF %" PATH_FMT "\n", path));
+
+   retval = NULL;
+   ACQUIRE_LOCK(&dl_mutex);
+
+   /* Loading the same object multiple times will lead to chaos
+    * as we will have two ObjectCodes but one underlying dlopen
+    * handle. Fail if this happens.
+    */
+   if (getObjectLoadStatus_(path) != OBJECT_NOT_LOADED) {
+     copyErrmsg(errmsg, "loadNativeObj_ELF: Already loaded");
+     goto dlopen_fail;
+   }
+
+   nc = mkOc(DYNAMIC_OBJECT, path, NULL, 0, true, NULL, 0);
+
+   foreignExportsLoadingObject(nc);
+   hdl = dlopen(path, RTLD_NOW|RTLD_LOCAL);
+   foreignExportsFinishedLoadingObject();
+   if (hdl == NULL) {
+     /* dlopen failed; save the message in errmsg */
+     copyErrmsg(errmsg, dlerror());
+     goto dlopen_fail;
+   }
+
+   struct link_map *map;
+   if (dlinfo(hdl, RTLD_DI_LINKMAP, &map) == -1) {
+     /* dlinfo failed; save the message in errmsg */
+     copyErrmsg(errmsg, dlerror());
+     goto dlinfo_fail;
+   }
+
+   nc->l_addr = (void*) map->l_addr;
+   nc->dlopen_handle = hdl;
+   hdl = NULL; // pass handle ownership to nc
+
+   dl_iterate_phdr(loadNativeObjCb_, nc);
+   if (!nc->nc_ranges) {
+     copyErrmsg(errmsg, "dl_iterate_phdr failed to find obj");
+     goto dl_iterate_phdr_fail;
+   }
+
+   insertOCSectionIndices(nc);
+
+   nc->next_loaded_object = loaded_objects;
+   loaded_objects = nc;
+
+   retval = nc->dlopen_handle;
+
+#if defined(PROFILING)
+  // collect any new cost centres that were defined in the loaded object.
+  refreshProfilingCCSs();
+#endif
+
+   goto success;
+
+dl_iterate_phdr_fail:
+   // already have dl_mutex
+   freeNativeCode_ELF(nc);
+dlinfo_fail:
+   if (hdl) dlclose(hdl);
+dlopen_fail:
+success:
+
+   RELEASE_LOCK(&dl_mutex);
+
+   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF result=%p\n", retval));
+
+   return retval;
+}
+
 
 /*
  * PowerPC & X86_64 ELF specifics
