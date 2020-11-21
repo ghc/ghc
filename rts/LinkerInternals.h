@@ -306,6 +306,10 @@ typedef struct _ObjectCode {
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
+
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+extern Mutex dl_mutex;
+#endif
 #endif
 
 /* Type of the initializer */
@@ -388,6 +392,7 @@ resolveSymbolAddr (pathchar* buffer, int size,
 #endif
 
 HsInt isAlreadyLoaded( pathchar *path );
+OStatus getObjectLoadStatus_ (pathchar *path);
 HsInt loadOc( ObjectCode* oc );
 ObjectCode* mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
                   bool mapped, pathchar *archiveMemberName,
