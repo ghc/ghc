@@ -2027,6 +2027,15 @@ static void * loadNativeObj_ELF (pathchar *path, char **errmsg)
    retval = NULL;
    ACQUIRE_LOCK(&dl_mutex);
 
+   /* Loading the same object multiple times will lead to chaos
+    * as we will have two ObjectCodes but one underlying dlopen
+    * handle. Fail if this happens.
+    */
+   if (getObjectLoadStatus_(path) != OBJECT_NOT_LOADED) {
+     copyErrmsg(errmsg, "loadNativeObj_ELF: Already loaded");
+     goto dlopen_fail;
+   }
+
    nc = mkOc(DYNAMIC_OBJECT, path, NULL, 0, true, NULL, 0);
 
    foreignExportsLoadingObject(nc);
