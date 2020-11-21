@@ -100,16 +100,6 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O2</td>
   </tr>
   <tr>
-    <th>prof</td>
-    <td>-O0<br>-H64m</td>
-    <td>-O0<br>-H64m</td>
-    <td></td>
-    <td>-O</td>
-    <td>-O2</td>
-    <td>-O</td>
-    <td>-O</td>
-  </tr>
-  <tr>
     <th>bench</td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
@@ -166,13 +156,66 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
 </table>
 
-### LLVM variants
+## Flavour transformers
 
-In addition to the above, there are LLVM variants for the flavours `quick`,
-`prof`, `perf` and `bench`, available by appending a `-llvm` suffix (i.e.,
-`quick-llvm` for the LLVM variant of `quick`). These differ only in that there
-is an additional `-fllvm` flag in `hsDefault` when the stage0 compiler is GHC.
-See `src/Settings/Flavours/Llvm.hs` for details.
+Each of the flavours described above is intended as a starting-point for
+configuring your GHC build. In addition, Hadrian supports a number of "flavour
+transformers" which modify the configuration in various ways.
+
+These can be appended to the flavour name passed via the `--flavour`
+command-line flag, separated by the `+` character. For instance,
+
+```
+hadrian --flavour=perf+thread_sanitizer
+```
+
+The supported transformers are listed below:
+
+<table>
+    <tr>
+        <th>Transformer name</th>
+        <th>Effect</th>
+    </tr>
+    <tr>
+        <td><code>werror</code></td>
+        <td>Use the `-Werror` flag for all stage1+ compilation.</td>
+    </tr>
+    <tr>
+        <td><code>debug_info</code></td>
+        <td>Enable production of native debugging information (via GHC/GCC's `-g3`)
+            during stage1+ compilations.</td>
+    </tr>
+    <tr>
+        <td><code>ticky_ghc</code></td>
+        <td>Compile the GHC executable with Ticky-Ticky profiler support.</td>
+    </tr>
+    <tr>
+        <td><code>split_sections</code></td>
+        <td>Enable section splitting for all libraries (except for the GHC
+            library due to the long linking times that this causes).</td>
+    </tr>
+    <tr>
+        <td><code>thread_sanitizer</code></td>
+        <td>Build the runtime system with ThreadSanitizer support</td>
+    </tr>
+    <tr>
+        <td><code>llvm</code></td>
+        <td>Use GHC's LLVM backend (`-fllvm`) for all stage1+ compilation.</td>
+    </tr>
+    <tr>
+        <td><code>profiled_ghc</code></td>
+        <td>Build the GHC executable with cost-centre profiling support.
+            It is that you use this in conjunction with `no_dynamic_ghc` since
+            GHC does not It is support loading of profiled libraries with the
+            dynamically-linker.</td>
+    </tr>
+    <tr>
+        <td><code>no_dynamic_ghc</code></td>
+        <td>Linked GHC against the statically-linked RTS. This causes GHC to
+            default to loading static rather than dynamic library when,
+            e.g., loading libraries during TemplateHaskell evaluations.</td>
+    </tr>
+</table>
 
 ## Ways
 
@@ -184,7 +227,6 @@ information. The following table lists ways that are built in different flavours
         <th rowspan="2">Flavour</th>
         <th colspan="2">Library ways</th>
         <th colspan="2">RTS ways</th>
-        <th colspan="2">Profiled GHC</th>
     </tr>
     <tr>
         <th>stage0</th>
@@ -195,7 +237,7 @@ information. The following table lists ways that are built in different flavours
         <th>stage1+</th>
     </tr>
     <tr>
-    <th>default<br>perf<br>prof<br>devel1<br>devel2<br>perf-llvm<br>prof-llvm</td>
+    <th>default<br>perf<br>prof<br>devel1<br>devel2</td>
     <td>vanilla</td>
     <td>vanilla<br>profiling<br>dynamic</td>
     <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
@@ -208,11 +250,9 @@ information. The following table lists ways that are built in different flavours
         <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
         <br>loggingDynamic<br>threadedLoggingDynamic
     </td>
-    <td>Only in<br>prof<br>flavour</td>
-    <td>Only in<br>prof<br>flavour</td>
 </tr>
 <tr>
-    <th>quick<br>quick-llvm<br>quick-validate<br>quick-debug</th>
+    <th>quick<br>quick-validate<br>quick-debug</th>
     <td>vanilla</td>
     <td>vanilla<br>dynamic</td>
     <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
@@ -223,8 +263,6 @@ information. The following table lists ways that are built in different flavours
         <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
         <br>loggingDynamic<br>threadedLoggingDynamic
     </td>
-    <td>No</td>
-    <td>No</td>
 </tr>
 <tr>
     <th>quickest<br>bench</th>
@@ -232,7 +270,5 @@ information. The following table lists ways that are built in different flavours
     <td>vanilla</td>
     <td>vanilla<br>threaded</td>
     <td>vanilla<br>threaded</td>
-    <td>No</td>
-    <td>No</td>
 </tr>
 </table>

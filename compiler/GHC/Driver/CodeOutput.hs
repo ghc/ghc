@@ -138,7 +138,13 @@ outputC dflags filenm cmm_stream packages =
       hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
       hPutStr h "#include \"Stg.h\"\n"
       let platform = targetPlatform dflags
-          writeC = printForC dflags h . cmmToC platform
+          writeC cmm = do
+            let doc = cmmToC platform cmm
+            dumpIfSet_dyn dflags Opt_D_dump_c_backend
+                          "C backend output"
+                          FormatC
+                          doc
+            printForC dflags h doc
       Stream.consume cmm_stream writeC
 
 {-

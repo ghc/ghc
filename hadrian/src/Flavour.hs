@@ -1,16 +1,27 @@
 module Flavour
   ( Flavour (..), werror
   , DocTargets, DocTarget(..)
+  , parseFlavour
     -- * Flavour transformers
+  , flavourTransformers
   , addArgs
   , splitSections, splitSectionsIf
   , enableThreadSanitizer
   , enableDebugInfo, enableTickyGhc
+  , viaLlvmBackend
+  , enableProfiledGhc
+  , disableDynamicGhcPrograms
   ) where
 
 import Expression
 import Data.Set (Set)
+import Data.Map (Map)
+import qualified Data.Map as M
 import Packages
+
+import Text.Parsec.Prim as P
+import Text.Parsec.Combinator as P
+import Text.Parsec.Char as P
 
 -- Please update doc/{flavours.md, user-settings.md} when changing this file.
 -- | 'Flavour' is a collection of build settings that fully define a GHC build.
@@ -69,6 +80,49 @@ type DocTargets = Set DocTarget
 data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan | SphinxInfo
   deriving (Eq, Ord, Show, Bounded, Enum)
 
+flavourTransformers :: Map String (Flavour -> Flavour)
+flavourTransformers = M.fromList
+    [ "werror" =: werror
+    , "debug_info" =: enableDebugInfo
+    , "ticky_ghc" =: enableTickyGhc
+    , "split_sections" =: splitSections
+    , "thread_sanitizer" =: enableThreadSanitizer
+    , "llvm" =: viaLlvmBackend
+    , "profiled_ghc" =: enableProfiledGhc
+    , "no_dynamic_ghc" =: disableDynamicGhcPrograms
+    ]
+  where (=:) = (,)
+
+type Parser = Parsec String ()
+
+parseFlavour :: [Flavour]  -- ^ base flavours
+             -> Map String (Flavour -> Flavour) -- ^ modifiers
+             -> String
+             -> Either String Flavour
+parseFlavour baseFlavours transformers str =
+    case P.runParser parser () "" str of
+      Left perr -> Left $ "error parsing flavour specifier: " ++ show perr
+      Right f -> Right f
+  where
+    parser :: Parser Flavour
+    parser = do
+      base <- baseFlavour
+      transs <- P.many flavourTrans
+      return $ foldr ($) base transs
+
+    baseFlavour :: Parser Flavour
+    baseFlavour =
+        P.choice [ f <$ P.string (name f)
+                 | f <- baseFlavours
+                 ]
+
+    flavourTrans :: Parser (Flavour -> Flavour)
+    flavourTrans = do
+        void $ P.char '+'
+        P.choice [ trans <$ P.string nm
+                 | (nm, trans) <- M.toList transformers
+                 ]
+
 -- | Add arguments to the 'args' of a 'Flavour'.
 addArgs :: Args -> Flavour -> Flavour
 addArgs args' fl = fl { args = args fl <> args' }
@@ -96,7 +150,13 @@ enableTickyGhc =
       [ builder (Ghc CompileHs) ? ticky
       , builder (Ghc LinkHs) ? ticky
       ]
-    ticky = arg "-ticky" <> arg "-ticky-allocd"
+    ticky = mconcat
+      [ arg "-ticky"
+      , arg "-ticky-allocd"
+      -- You generally need STG dumps to interpret ticky profiles
+      , arg "-ddump-to-file"
+      , arg "-ddump-stg-final"
+      ]
 
 -- | Transform the input 'Flavour' so as to build with
 --   @-split-sections@ whenever appropriate. You can
@@ -128,3 +188,17 @@ enableThreadSanitizer = addArgs $ mconcat
     , builder (Cabal Flags) ? arg "thread-sanitizer"
     , builder  RunTest ? arg "--config=have_thread_sanitizer=True"
     ]
+
+-- | Use the LLVM backend in stages 1 and later.
+viaLlvmBackend :: Flavour -> Flavour
+viaLlvmBackend = addArgs $ notStage0 ? builder Ghc ? arg "-fllvm"
+
+-- | Build the GHC executable with profiling enabled. It is also recommended
+-- that you use this with @'dynamicGhcPrograms' = False@ since GHC does not
+-- support loading of profiled libraries with the dynamically-linker.
+enableProfiledGhc :: Flavour -> Flavour
+enableProfiledGhc flavour = flavour { ghcProfiled = True }
+
+-- | Disable 'dynamicGhcPrograms'.
+disableDynamicGhcPrograms :: Flavour -> Flavour
+disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
