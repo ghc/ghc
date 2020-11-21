@@ -54,7 +54,7 @@ FILE *prof_file;
 // List of all cost centres. Used for reporting.
 CostCentre      *CC_LIST  = NULL;
 // All cost centre stacks temporarily appear here, to be able to make CCS_MAIN a
-// parent of all cost centres stacks (done in initProfiling2()).
+// parent of all cost centres stacks (done in refreshProfilingCCSs()).
 static CostCentreStack *CCS_LIST = NULL;
 
 #if defined(THREADED_RTS)
