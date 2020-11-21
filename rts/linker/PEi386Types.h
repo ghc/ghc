@@ -7,10 +7,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-/* Some forward declares.  */
-struct Section;
-
-
 struct SectionFormatInfo {
     char* name;
     size_t alignment;

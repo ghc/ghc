@@ -20,8 +20,34 @@ void printLoadedObjects(void);
 
 #include "BeginPrivate.h"
 
+/* Which object file format are we targeting? */
+#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) \
+|| defined(linux_android_HOST_OS) \
+|| defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) \
+|| defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) \
+|| defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
+#  define OBJFORMAT_ELF
+#elif defined(mingw32_HOST_OS)
+#  define OBJFORMAT_PEi386
+#elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#  define OBJFORMAT_MACHO
+#endif
+
 typedef void SymbolAddr;
 typedef char SymbolName;
+typedef struct _ObjectCode ObjectCode;
+typedef struct _Section    Section;
+
+#if defined(OBJFORMAT_ELF)
+#  include "linker/ElfTypes.h"
+#elif defined(OBJFORMAT_PEi386)
+#  include "linker/PEi386Types.h"
+#elif defined(OBJFORMAT_MACHO)
+#  include "linker/MachOTypes.h"
+#else
+#  error "Unknown OBJECT_FORMAT for HOST_OS"
+#endif
+
 
 /* Hold extended information about a symbol in case we need to resolve it at a
    late stage.  */
@@ -102,26 +128,24 @@ typedef enum {
  * and always refer to it with the 'struct' qualifier.
  */
 
-typedef
-   struct _Section {
-      void*    start;              /* actual start of section in memory */
-      StgWord  size;               /* actual size of section in memory */
-      SectionKind kind;
-      SectionAlloc alloc;
+struct _Section {
+  void*    start;              /* actual start of section in memory */
+  StgWord  size;               /* actual size of section in memory */
+  SectionKind kind;
+  SectionAlloc alloc;
 
-      /*
-       * The following fields are relevant for SECTION_MMAP sections only
-       */
-      StgWord mapped_offset;      /* offset from the image of mapped_start */
-      void* mapped_start;         /* start of mmap() block */
-      StgWord mapped_size;        /* size of mmap() block */
+  /*
+   * The following fields are relevant for SECTION_MMAP sections only
+   */
+  StgWord mapped_offset;      /* offset from the image of mapped_start */
+  void* mapped_start;         /* start of mmap() block */
+  StgWord mapped_size;        /* size of mmap() block */
 
-      /* A customizable type to augment the Section type.
-       * See Note [No typedefs for customizable types]
-       */
-      struct SectionFormatInfo* info;
-   }
-   Section;
+  /* A customizable type to augment the Section type.
+   * See Note [No typedefs for customizable types]
+   */
+  struct SectionFormatInfo* info;
+};
 
 typedef
    struct _ProddableBlock {
@@ -175,7 +199,7 @@ typedef enum {
 /* Top-level structure for an object module.  One of these is allocated
  * for each object file in use.
  */
-typedef struct _ObjectCode {
+struct _ObjectCode {
     OStatus    status;
     pathchar  *fileName;
     int        fileSize;     /* also mapped image size when using mmap() */
@@ -295,7 +319,7 @@ typedef struct _ObjectCode {
 
     /* virtual memory ranges of loaded code */
     NativeCodeRange *nc_ranges;
-} ObjectCode;
+};
 
 #define OC_INFORMATIVE_FILENAME(OC)             \
     ( (OC)->archiveMemberName ?                 \
@@ -306,6 +330,10 @@ typedef struct _ObjectCode {
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
+
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+extern Mutex dl_mutex;
+#endif
 #endif
 
 /* Type of the initializer */
@@ -388,6 +416,7 @@ resolveSymbolAddr (pathchar* buffer, int size,
 #endif
 
 HsInt isAlreadyLoaded( pathchar *path );
+OStatus getObjectLoadStatus_ (pathchar *path);
 HsInt loadOc( ObjectCode* oc );
 ObjectCode* mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
                   bool mapped, pathchar *archiveMemberName,
@@ -401,24 +430,6 @@ void freeSegments(ObjectCode *oc);
    e.g. OS X (before Sierra), OpenBSD etc */
 #if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
 #define MAP_ANONYMOUS MAP_ANON
-#endif
-
-/* Which object file format are we targeting? */
-#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) \
-|| defined(linux_android_HOST_OS) \
-|| defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) \
-|| defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) \
-|| defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
-#  define OBJFORMAT_ELF
-#  include "linker/ElfTypes.h"
-#elif defined(mingw32_HOST_OS)
-#  define OBJFORMAT_PEi386
-#  include "linker/PEi386Types.h"
-#elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
-#  define OBJFORMAT_MACHO
-#  include "linker/MachOTypes.h"
-#else
-#error "Unknown OBJECT_FORMAT for HOST_OS"
 #endif
 
 /* In order to simplify control flow a bit, some references to mmap-related
