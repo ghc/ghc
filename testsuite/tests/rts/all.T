@@ -283,12 +283,6 @@ test('linker_unload',
       when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259))],
      run_command, ['$MAKE -s --no-print-directory linker_unload'])
 
-test('linker_unload_native',
-     [extra_files(['LinkerUnload.hs', 'Test.hs']),
-      extra_clean(['Test.o','Test.hi','Test.so','Test2.so','Test.a','linker_unload_native'])],
-     run_command,
-     ['$MAKE -s --no-print-directory linker_unload_native'])
-
 test('T8209', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
