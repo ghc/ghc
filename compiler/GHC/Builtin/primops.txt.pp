@@ -2974,7 +2974,7 @@ primop KeepAliveOp "keepAlive#" GenPrimOp
    o -> State# RealWorld -> (State# RealWorld -> p) -> p
    { TODO. }
    with
-   strictness = { \ _arity -> mkClosedStrictSig [topDmd, topDmd, strictApply1Dmd] topDiv }
+   strictness = { \ _arity -> mkClosedStrictSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
 
 
 ------------------------------------------------------------------------
