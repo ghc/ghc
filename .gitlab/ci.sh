@@ -45,6 +45,7 @@ Environment variables affecting both build systems:
 
   VERBOSE           Set to non-empty for verbose build output
   MSYSTEM           (Windows-only) Which platform to build form (MINGW64 or MINGW32).
+  ONLY_TESTS        Select a subset of tests to run
 
 Environment variables determining build configuration of Make system:
 
@@ -430,10 +431,15 @@ function determine_metric_baseline() {
 }
 
 function test_make() {
+  local args=(
+    "THREADS=$cores"
+    "JUNIT_FILE=../../junit.xml"
+  )
+  if [[ -n "$ONLY_TESTS" ]]; then
+    args+=( "TEST=$ONLY_TESTS" )
+  fi
   run "$MAKE" test_bindist TEST_PREP=YES
-  run "$MAKE" V=0 test \
-    THREADS="$cores" \
-    JUNIT_FILE=../../junit.xml
+  run "$MAKE" V=0 test "${args[@]}"
 }
 
 function build_hadrian() {
@@ -450,6 +456,11 @@ function build_hadrian() {
 }
 
 function test_hadrian() {
+  local tests=""
+  if [[ -n "$ONLY_TESTS" ]]; then
+    tests="--only=$ONLY_TESTS"
+  fi
+
   cd _build/bindist/ghc-*/
   run ./configure --prefix="$TOP"/_build/install
   run "$MAKE" install
@@ -458,7 +469,8 @@ function test_hadrian() {
   run_hadrian \
     test \
     --summary-junit=./junit.xml \
-    --test-compiler="$TOP"/_build/install/bin/ghc
+    --test-compiler="$TOP"/_build/install/bin/ghc \
+    "$tests"
 }
 
 function cabal_test() {
@@ -498,13 +510,15 @@ function clean() {
 function run_hadrian() {
   if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
   if [ -n "$VERBOSE" ]; then HADRIAN_ARGS="$HADRIAN_ARGS -V"; fi
-  run hadrian/build-cabal \
-    --flavour="$BUILD_FLAVOUR" \
-    -j"$cores" \
-    --broken-test="$BROKEN_TESTS" \
-    --bignum=$BIGNUM_BACKEND \
-    $HADRIAN_ARGS \
-    $@
+  local args=(
+    "--flavour=$BUILD_FLAVOUR"
+    "-j$cores"
+    "--broken-test=$BROKEN_TESTS"
+    "--bignum=$BIGNUM_BACKEND"
+    "${HADRIAN_ARGS[@]}"
+    "$@"
+  )
+  run hadrian/build-cabal "${args[@]}"
 }
 
 # A convenience function to allow debugging in the CI environment.
