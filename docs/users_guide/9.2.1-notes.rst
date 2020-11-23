@@ -50,7 +50,7 @@ Language
 * Previously, ``-XUndecidableInstances`` accidentally implied ``-XFlexibleContexts``.
   This is now fixed, but it means that some programs will newly require
   ``-XFlexibleContexts``.
-        
+
 Compiler
 ~~~~~~~~
 
@@ -79,6 +79,12 @@ Compiler
   that the compiler automatically insert cost-centres on all call-sites of
   the named function.
 
+- A new debugging facility, :ghc-flag:`-finfo-table-map`, which embeds a mapping
+  from the address of an info table to information about that info table, including
+  an approximate source position. :ghc-flag:`-fdistinct-constructor-tables` is
+  also useful with this flag to give each usage of a data constructor its own
+  unique info table so they can be distinguished in gdb and heap profiles.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -88,9 +94,14 @@ Runtime system
   Moreover, we now correctly account for the size of the array, meaning that
   space lost to fragmentation is no longer counted as live data.
 
-
 - The :rts-flag:`-h` flag has been deprecated, use either :rts-flag:`-hc` or
   :rts-flag:`-hT` explicitly, as appropiate.
+
+- A new heap profiling mode, :rts-flag:`-hi`, profile by info table allows for
+  fine-grain banding by the info table address of a closure. The profiling
+  mode is intended to be used with :ghc-flag:`-finfo-table-map` and can best
+  be consumed with ``eventlog2html``. This profiling mode does not require a
+  profiling build.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
