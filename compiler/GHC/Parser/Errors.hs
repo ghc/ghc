@@ -5,6 +5,7 @@ module GHC.Parser.Errors
      module GHC.Parser.Errors.Types
    -- * Constructing errors and messages
    , mkParserErr
+   , mkParserErrNoHints
    , mkParserWarn
    )
 where
@@ -21,8 +22,11 @@ import GHC.Utils.Outputable (alwaysQualify)
 --
 
 -- | Builds a new 'ErrMsg' out of a parser 'Error'.
-mkParserErr :: SrcSpan -> Error -> ErrMsg Error
-mkParserErr span = mkErr span alwaysQualify
+mkParserErr :: SrcSpan -> ErrorDesc -> [Hint] -> ErrMsg Error
+mkParserErr span desc hints = mkErr span alwaysQualify (Error desc hints)
+
+mkParserErrNoHints :: SrcSpan -> ErrorDesc -> ErrMsg Error
+mkParserErrNoHints span desc = mkParserErr span desc noHints
 
 -- | Builds a new 'ErrMsg' out of a parser 'Warning'.
 mkParserWarn :: SrcSpan -> Warning -> ErrMsg Warning

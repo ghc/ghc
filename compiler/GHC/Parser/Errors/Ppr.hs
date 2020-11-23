@@ -118,259 +118,218 @@ pprWarning = \case
            OperatorWhitespaceOccurrence_Suffix -> errDoc [ mk_msg "suffix" ] [] []
            OperatorWhitespaceOccurrence_TightInfix -> errDoc [ mk_msg "tight infix" ] [] []
 
-{-
-pprError err = mkParserErr (errLoc err) $ vcat
-   (pp_err (errDesc err) : map pp_hint (errHints err))
--}
 
-pprError :: Parser.Error -> ErrDoc
-pprError = \case
+pprError :: Error -> ErrDoc
+pprError err =
+  errDoc [ vcat (pp_err_desc (errDesc err) : map pp_hint (errHints err)) ] [] []
+
+pp_err_desc :: ErrorDesc -> MsgDoc
+pp_err_desc = \case
    ErrParseRaw e
       -> e
 
    ErrLambdaCase
-      -> errDoc [ text "Illegal lambda-case (use LambdaCase)" ] [] []
+      -> text "Illegal lambda-case (use LambdaCase)"
 
    ErrNumUnderscores reason
-      -> errDoc [ text $ case reason of
+      -> text $ case reason of
             NumUnderscore_Integral -> "Use NumericUnderscores to allow underscores in integer literals"
             NumUnderscore_Float    -> "Use NumericUnderscores to allow underscores in floating literals"
-            ] [] []
 
    ErrPrimStringInvalidChar
-      -> errDoc [ text "primitive string literal must contain only characters <= \'\\xFF\'" ] [] []
+      -> text "primitive string literal must contain only characters <= \'\\xFF\'"
 
    ErrMissingBlock
-      -> errDoc [ text "Missing block" ] [] []
+      -> text "Missing block"
 
    ErrLexer err kind
-      -> errDoc [ hcat
-           [ text $ case err of
-              LexError               -> "lexical error"
-              LexUnknownPragma       -> "unknown pragma"
-              LexErrorInPragma       -> "lexical error in pragma"
-              LexNumEscapeRange      -> "numeric escape sequence out of range"
-              LexStringCharLit       -> "lexical error in string/character literal"
-              LexStringCharLitEOF    -> "unexpected end-of-file in string/character literal"
-              LexUnterminatedComment -> "unterminated `{-'"
-              LexUnterminatedOptions -> "unterminated OPTIONS pragma"
-              LexUnterminatedQQ      -> "unterminated quasiquotation"
+      -> hcat
+         [ text $ case err of
+            LexError               -> "lexical error"
+            LexUnknownPragma       -> "unknown pragma"
+            LexErrorInPragma       -> "lexical error in pragma"
+            LexNumEscapeRange      -> "numeric escape sequence out of range"
+            LexStringCharLit       -> "lexical error in string/character literal"
+            LexStringCharLitEOF    -> "unexpected end-of-file in string/character literal"
+            LexUnterminatedComment -> "unterminated `{-'"
+            LexUnterminatedOptions -> "unterminated OPTIONS pragma"
+            LexUnterminatedQQ      -> "unterminated quasiquotation"
 
 
-           , text $ case kind of
-              LexErrKind_EOF    -> " at end of input"
-              LexErrKind_UTF8   -> " (UTF-8 decoding error)"
-              LexErrKind_Char c -> " at character " ++ show c
-           ]
-         ] [] []
+         , text $ case kind of
+            LexErrKind_EOF    -> " at end of input"
+            LexErrKind_UTF8   -> " (UTF-8 decoding error)"
+            LexErrKind_Char c -> " at character " ++ show c
+         ]
 
    ErrSuffixAT
-      -> errDoc [ text "Suffix occurrence of @. For an as-pattern, remove the leading whitespace." ] [] []
+      -> text "Suffix occurrence of @. For an as-pattern, remove the leading whitespace."
 
-   ErrParse token hints
+   ErrParse token
       | null token
-      -> errDoc [ text "parse error (possibly incorrect indentation or mismatched brackets)" ] [] []
+      -> text "parse error (possibly incorrect indentation or mismatched brackets)"
 
       | otherwise
-      -> errDoc [
-             vcat $
-               (text "parse error on input" <+> quotes (text token)) : map pp_hint hints
-           ] [] []
+      -> text "parse error on input" <+> quotes (text token)
 
    ErrCmmLexer
-      -> errDoc [ text "Cmm lexical error" ] [] []
+      -> text "Cmm lexical error"
 
    ErrUnsupportedBoxedSumExpr s
-      -> errDoc [
-           hang (text "Boxed sums not supported:") 2
-                (pprSumOrTuple Boxed s)
-           ] [] []
+      -> hang (text "Boxed sums not supported:") 2
+              (pprSumOrTuple Boxed s)
 
    ErrUnsupportedBoxedSumPat s
-      -> errDoc [
-           hang (text "Boxed sums not supported:") 2
-                (pprSumOrTuple Boxed s)
-           ] [] []
+      -> hang (text "Boxed sums not supported:") 2
+              (pprSumOrTuple Boxed s)
 
    ErrUnexpectedQualifiedConstructor v
-      -> errDoc [
-           hang (text "Expected an unqualified type constructor:") 2
-                (ppr v)
-           ] [] []
+      -> hang (text "Expected an unqualified type constructor:") 2
+              (ppr v)
 
    ErrTupleSectionInPat
-      -> errDoc [ text "Tuple section in pattern context" ] [] []
+      -> text "Tuple section in pattern context"
 
    ErrIllegalBangPattern e
-      -> errDoc [ text "Illegal bang-pattern (use BangPatterns):" $$ ppr e ] [] []
+      -> text "Illegal bang-pattern (use BangPatterns):" $$ ppr e
 
    ErrOpFewArgs (StarIsType star_is_type) op
-      -> errDoc [
-           text "Operator applied to too few arguments:" <+> ppr op
-           $$ starInfo star_is_type op
-           ] [] []
+      -> text "Operator applied to too few arguments:" <+> ppr op
+         $$ starInfo star_is_type op
 
    ErrImportQualifiedTwice
-      -> errDoc [ text "Multiple occurrences of 'qualified'" ] [] []
+      -> text "Multiple occurrences of 'qualified'"
 
    ErrImportPostQualified
-      -> errDoc [ text "Found" <+> quotes (text "qualified")
-                  <+> text "in postpositive position. "
-                $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
-                ] [] []
+      -> text "Found" <+> quotes (text "qualified")
+          <+> text "in postpositive position. "
+         $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
 
    ErrIllegalExplicitNamespace
-      -> errDoc [ text "Illegal keyword 'type' (use ExplicitNamespaces to enable)" ] [] []
+      -> text "Illegal keyword 'type' (use ExplicitNamespaces to enable)"
 
    ErrVarForTyCon name
-      -> errDoc [
-             text "Expecting a type constructor but found a variable,"
-               <+> quotes (ppr name) <> text "."
-             $$ if isSymOcc $ rdrNameOcc name
-                then text "If" <+> quotes (ppr name) <+> text "is a type constructor"
-                      <+> text "then enable ExplicitNamespaces and use the 'type' keyword."
-                else empty
-           ] [] []
+      -> text "Expecting a type constructor but found a variable,"
+           <+> quotes (ppr name) <> text "."
+         $$ if isSymOcc $ rdrNameOcc name
+            then text "If" <+> quotes (ppr name) <+> text "is a type constructor"
+                  <+> text "then enable ExplicitNamespaces and use the 'type' keyword."
+            else empty
 
    ErrIllegalPatSynExport
-      -> errDoc [ text "Illegal export form (use PatternSynonyms to enable)" ] [] []
+      -> text "Illegal export form (use PatternSynonyms to enable)"
 
    ErrMalformedEntityString
-      -> errDoc [ text "Malformed entity string" ] [] []
+      -> text "Malformed entity string"
 
    ErrDotsInRecordUpdate
-      -> errDoc [ text "You cannot use `..' in a record update" ] [] []
+      -> text "You cannot use `..' in a record update"
 
    ErrPrecedenceOutOfRange i
-      -> errDoc [ text "Precedence out of range: " <> int i ] [] []
+      -> text "Precedence out of range: " <> int i
 
    ErrInvalidDataCon t
-      -> errDoc [
-           hang (text "Cannot parse data constructor in a data/newtype declaration:") 2
-                (ppr t)
-           ] [] []
+      -> hang (text "Cannot parse data constructor in a data/newtype declaration:") 2
+              (ppr t)
 
    ErrInvalidInfixDataCon lhs tc rhs
-      -> errDoc [
-           hang (text "Cannot parse an infix data constructor in a data/newtype declaration:") 2
-                (ppr lhs <+> ppr tc <+> ppr rhs)
-           ] [] []
+      -> hang (text "Cannot parse an infix data constructor in a data/newtype declaration:")
+            2 (ppr lhs <+> ppr tc <+> ppr rhs)
 
    ErrUnpackDataCon
-      -> errDoc [ text "{-# UNPACK #-} cannot be applied to a data constructor." ] [] []
+      -> text "{-# UNPACK #-} cannot be applied to a data constructor."
 
    ErrUnexpectedKindAppInDataCon lhs ki
-      -> errDoc [
-           hang (text "Unexpected kind application in a data/newtype declaration:") 2
-                (ppr lhs <+> text "@" <> ppr ki)
-           ] [] []
+      -> hang (text "Unexpected kind application in a data/newtype declaration:") 2
+              (ppr lhs <+> text "@" <> ppr ki)
 
    ErrInvalidRecordCon p
-      -> errDoc [ text "Not a record constructor:" <+> ppr p ] [] []
+      -> text "Not a record constructor:" <+> ppr p
 
    ErrIllegalUnboxedStringInPat lit
-      -> errDoc [ text "Illegal unboxed string literal in pattern:" $$ ppr lit ] [] []
+      -> text "Illegal unboxed string literal in pattern:" $$ ppr lit
 
    ErrDoNotationInPat
-      -> errDoc [ text "do-notation in pattern" ] [] []
+      -> text "do-notation in pattern"
 
    ErrIfTheElseInPat
-      -> errDoc [ text "(if ... then ... else ...)-syntax in pattern" ] [] []
+      -> text "(if ... then ... else ...)-syntax in pattern"
 
    ErrTypeAppInPat
-      -> errDoc [ text "Type applications in patterns are not yet supported" ] [] []
+      -> text "Type applications in patterns are not yet supported"
 
    ErrLambdaCaseInPat
-      -> errDoc [ text "(\\case ...)-syntax in pattern" ] [] []
+      -> text "(\\case ...)-syntax in pattern"
 
    ErrCaseInPat
-      -> errDoc [ text "(case ... of ...)-syntax in pattern" ] [] []
+      -> text "(case ... of ...)-syntax in pattern"
 
    ErrLetInPat
-      -> errDoc [ text "(let ... in ...)-syntax in pattern" ] [] []
+      -> text "(let ... in ...)-syntax in pattern"
 
    ErrLambdaInPat
-      -> errDoc [
-              text "Lambda-syntax in pattern."
-           $$ text "Pattern matching on functions is not possible."
-           ] [] []
+      -> text "Lambda-syntax in pattern."
+         $$ text "Pattern matching on functions is not possible."
 
    ErrArrowExprInPat e
-      -> errDoc [ text "Expression syntax in pattern:" <+> ppr e ] [] []
+      -> text "Expression syntax in pattern:" <+> ppr e
 
    ErrArrowCmdInPat c
-      -> errDoc [ text "Command syntax in pattern:" <+> ppr c ] [] []
+      -> text "Command syntax in pattern:" <+> ppr c
 
    ErrArrowCmdInExpr c
-      -> errDoc [
-           vcat [ text "Arrow command found where an expression was expected:"
-                , nest 2 (ppr c)
-                ]
-           ] [] []
+      -> vcat
+         [ text "Arrow command found where an expression was expected:"
+         , nest 2 (ppr c)
+         ]
 
    ErrViewPatInExpr a b
-      -> errDoc [
-           sep [ text "View pattern in expression context:"
-               , nest 4 (ppr a <+> text "->" <+> ppr b)
-               ]
-           ] [] []
+      -> sep [ text "View pattern in expression context:"
+             , nest 4 (ppr a <+> text "->" <+> ppr b)
+             ]
 
    ErrTypeAppWithoutSpace v e
-      -> errDoc [
-           sep [ text "@-pattern in expression context:"
-               , nest 4 (pprPrefixOcc v <> text "@" <> ppr e)
-               ]
-           $$ text "Type application syntax requires a space before '@'"
-           ] [] []
+      -> sep [ text "@-pattern in expression context:"
+             , nest 4 (pprPrefixOcc v <> text "@" <> ppr e)
+             ]
+         $$ text "Type application syntax requires a space before '@'"
 
 
    ErrLazyPatWithoutSpace e
-      -> errDoc [
-           sep [ text "Lazy pattern in expression context:"
-               , nest 4 (text "~" <> ppr e)
-               ]
-           $$ text "Did you mean to add a space after the '~'?"
-           ] [] []
+      -> sep [ text "Lazy pattern in expression context:"
+             , nest 4 (text "~" <> ppr e)
+             ]
+         $$ text "Did you mean to add a space after the '~'?"
 
    ErrBangPatWithoutSpace e
-      -> errDoc [
-           sep [ text "Bang pattern in expression context:"
-               , nest 4 (text "!" <> ppr e)
-               ]
-           $$ text "Did you mean to add a space after the '!'?"
-           ] [] []
+      -> sep [ text "Bang pattern in expression context:"
+             , nest 4 (text "!" <> ppr e)
+             ]
+         $$ text "Did you mean to add a space after the '!'?"
 
    ErrUnallowedPragma prag
-      -> errDoc [
-           hang (text "A pragma is not allowed in this position:") 2
-                (ppr prag)
-           ] [] []
+      -> hang (text "A pragma is not allowed in this position:") 2
+              (ppr prag)
 
    ErrQualifiedDoInCmd m
-      -> errDoc [ hang (text "Parse error in command:") 2 $
-                  text "Found a qualified" <+> ppr m <> text ".do block in a command, but"
-                  $$ text "qualified 'do' is not supported in commands."
-           ] [] []
+      -> hang (text "Parse error in command:") 2 $
+            text "Found a qualified" <+> ppr m <> text ".do block in a command, but"
+            $$ text "qualified 'do' is not supported in commands."
 
    ErrParseErrorInCmd s
-      -> errDoc [
-           hang (text "Parse error in command:") 2 s
-           ] [] []
+      -> hang (text "Parse error in command:") 2 s
 
-   ErrParseErrorInPat s hints
-      -> errDoc [
-             vcat $ (text "Parse error in pattern:" <+> s) : map pp_hint hints
-           ] [] []
+   ErrParseErrorInPat s
+      -> text "Parse error in pattern:" <+> s
+
 
    ErrInvalidInfixHole
-      -> errDoc [ text "Invalid infix hole, expected an infix operator" ] [] []
+      -> text "Invalid infix hole, expected an infix operator"
 
    ErrSemiColonsInCondExpr c st t se e
-      -> errDoc [
-             text "Unexpected semi-colons in conditional:"
-             $$ nest 4 expr
-             $$ text "Perhaps you meant to use DoAndIfThenElse?"
-           ] [] []
+      -> text "Unexpected semi-colons in conditional:"
+         $$ nest 4 expr
+         $$ text "Perhaps you meant to use DoAndIfThenElse?"
          where
             pprOptSemi True  = semi
             pprOptSemi False = empty
@@ -379,11 +338,9 @@ pprError = \case
                    text "else" <+> ppr e
 
    ErrSemiColonsInCondCmd c st t se e
-      -> errDoc [
-             text "Unexpected semi-colons in conditional:"
-             $$ nest 4 expr
-             $$ text "Perhaps you meant to use DoAndIfThenElse?"
-           ] [] []
+      -> text "Unexpected semi-colons in conditional:"
+         $$ nest 4 expr
+         $$ text "Perhaps you meant to use DoAndIfThenElse?"
          where
             pprOptSemi True  = semi
             pprOptSemi False = empty
@@ -393,167 +350,136 @@ pprError = \case
 
 
    ErrAtInPatPos
-      -> errDoc [
-             text "Found a binding for the"
-             <+> quotes (text "@")
-             <+> text "operator in a pattern position."
-             $$ perhaps_as_pat
-            ] [] []
+      -> text "Found a binding for the"
+         <+> quotes (text "@")
+         <+> text "operator in a pattern position."
+         $$ perhaps_as_pat
 
    ErrLambdaCmdInFunAppCmd a
-      -> errDoc [ pp_unexpected_fun_app (text "lambda command") a ] [] []
+      -> pp_unexpected_fun_app (text "lambda command") a
 
    ErrCaseCmdInFunAppCmd a
-      -> errDoc [ pp_unexpected_fun_app (text "case command") a ] [] []
+      -> pp_unexpected_fun_app (text "case command") a
 
    ErrIfCmdInFunAppCmd a
-      -> errDoc [ pp_unexpected_fun_app (text "if command") a ] [] []
+      -> pp_unexpected_fun_app (text "if command") a
 
    ErrLetCmdInFunAppCmd a
-      -> errDoc [ pp_unexpected_fun_app (text "let command") a ] [] []
+      -> pp_unexpected_fun_app (text "let command") a
 
    ErrDoCmdInFunAppCmd a
-      -> errDoc [ pp_unexpected_fun_app (text "do command") a ] [] []
+      -> pp_unexpected_fun_app (text "do command") a
 
    ErrDoInFunAppExpr m a
-      -> errDoc [ pp_unexpected_fun_app (prependQualified m (text "do block")) a ] [] []
+      -> pp_unexpected_fun_app (prependQualified m (text "do block")) a
 
    ErrMDoInFunAppExpr m a
-      -> errDoc [ pp_unexpected_fun_app (prependQualified m (text "mdo block")) a ] [] []
+      -> pp_unexpected_fun_app (prependQualified m (text "mdo block")) a
 
    ErrLambdaInFunAppExpr a
-      -> errDoc [ pp_unexpected_fun_app (text "lambda expression") a ] [] []
+      -> pp_unexpected_fun_app (text "lambda expression") a
 
    ErrCaseInFunAppExpr a
-      -> errDoc [ pp_unexpected_fun_app (text "case expression") a ] [] []
+      -> pp_unexpected_fun_app (text "case expression") a
 
    ErrLambdaCaseInFunAppExpr a
-      -> errDoc [ pp_unexpected_fun_app (text "lambda-case expression") a ] [] []
+      -> pp_unexpected_fun_app (text "lambda-case expression") a
 
    ErrLetInFunAppExpr a
-      -> errDoc [ pp_unexpected_fun_app (text "let expression") a ] [] []
+      -> pp_unexpected_fun_app (text "let expression") a
 
    ErrIfInFunAppExpr a
-      -> errDoc [ pp_unexpected_fun_app (text "if expression") a ] [] []
+      -> pp_unexpected_fun_app (text "if expression") a
 
    ErrProcInFunAppExpr a
-      -> errDoc [ pp_unexpected_fun_app (text "proc expression") a ] [] []
+      -> pp_unexpected_fun_app (text "proc expression") a
 
    ErrMalformedTyOrClDecl ty
-      -> errDoc [
-             text "Malformed head of type or class declaration:"
-             <+> ppr ty
-           ] [] []
+      -> text "Malformed head of type or class declaration:"
+         <+> ppr ty
 
    ErrIllegalWhereInDataDecl
-      -> errDoc [
-             vcat
-               [ text "Illegal keyword 'where' in data declaration"
-               , text "Perhaps you intended to use GADTs or a similar language"
-               , text "extension to enable syntax: data T where"
-               ]
-          ] [] []
+      -> vcat
+            [ text "Illegal keyword 'where' in data declaration"
+            , text "Perhaps you intended to use GADTs or a similar language"
+            , text "extension to enable syntax: data T where"
+            ]
 
    ErrIllegalTraditionalRecordSyntax s
-      -> errDoc [
-             text "Illegal record syntax (use TraditionalRecordSyntax):"
-             <+> s
-           ] [] []
+      -> text "Illegal record syntax (use TraditionalRecordSyntax):"
+         <+> s
 
    ErrParseErrorOnInput occ
-      -> errDoc [ text "parse error on input" <+> ftext (occNameFS occ) ] [] []
+      -> text "parse error on input" <+> ftext (occNameFS occ)
 
    ErrIllegalDataTypeContext c
-      -> errDoc [
-            text "Illegal datatype context (use DatatypeContexts):"
-            <+> pprLHsContext c
-           ] [] []
+      -> text "Illegal datatype context (use DatatypeContexts):"
+         <+> pprLHsContext c
 
    ErrMalformedDecl what for
-      -> errDoc [
-             text "Malformed" <+> what
-             <+> text "declaration for" <+> quotes (ppr for)
-           ] [] []
+      -> text "Malformed" <+> what
+         <+> text "declaration for" <+> quotes (ppr for)
 
    ErrUnexpectedTypeAppInDecl ki what for
-      -> errDoc [
-           vcat [ text "Unexpected type application"
-                  <+> text "@" <> ppr ki
-                , text "In the" <+> what
-                  <+> text "declaration for"
-                  <+> quotes (ppr for)
-                ]
-           ] [] []
+      -> vcat [ text "Unexpected type application"
+                <+> text "@" <> ppr ki
+              , text "In the" <+> what
+                <+> text "declaration for"
+                <+> quotes (ppr for)
+              ]
 
    ErrNotADataCon name
-      -> errDoc [ text "Not a data constructor:" <+> quotes (ppr name) ] [] []
+      -> text "Not a data constructor:" <+> quotes (ppr name)
 
    ErrRecordSyntaxInPatSynDecl pat
-      -> errDoc [
-             text "record syntax not supported for pattern synonym declarations:"
-             $$ ppr pat
-           ] [] []
+      -> text "record syntax not supported for pattern synonym declarations:"
+         $$ ppr pat
 
    ErrEmptyWhereInPatSynDecl patsyn_name
-      -> errDoc [
-             text "pattern synonym 'where' clause cannot be empty"
-             $$ text "In the pattern synonym declaration for: "
-                <+> ppr (patsyn_name)
-           ] [] []
+      -> text "pattern synonym 'where' clause cannot be empty"
+         $$ text "In the pattern synonym declaration for: "
+            <+> ppr (patsyn_name)
 
    ErrInvalidWhereBindInPatSynDecl patsyn_name decl
-      -> errDoc [
-             text "pattern synonym 'where' clause must bind the pattern synonym's name"
-             <+> quotes (ppr patsyn_name) $$ ppr decl
-           ] [] []
+      -> text "pattern synonym 'where' clause must bind the pattern synonym's name"
+         <+> quotes (ppr patsyn_name) $$ ppr decl
 
    ErrNoSingleWhereBindInPatSynDecl _patsyn_name decl
-      -> errDoc [
-             text "pattern synonym 'where' clause must contain a single binding:"
-             $$ ppr decl
-           ] [] []
+      -> text "pattern synonym 'where' clause must contain a single binding:"
+         $$ ppr decl
 
    ErrDeclSpliceNotAtTopLevel d
-      -> errDoc [
-             hang (text "Declaration splices are allowed only"
+      -> hang (text "Declaration splices are allowed only"
                <+> text "at the top level:")
-             2 (ppr d)
-           ] [] []
+           2 (ppr d)
 
    ErrInferredTypeVarNotAllowed
-      -> errDoc [ text "Inferred type variables are not allowed here" ] [] []
+      -> text "Inferred type variables are not allowed here"
 
    ErrIllegalRoleName role nearby
-      -> errDoc [ text "Illegal role name" <+> quotes (ppr role)
-                  $$ case nearby of
-                      []  -> empty
-                      [r] -> text "Perhaps you meant" <+> quotes (ppr r)
-                      -- will this last case ever happen??
-                      _   -> hang (text "Perhaps you meant one of these:")
-                                  2 (pprWithCommas (quotes . ppr) nearby)
-                ] [] []
+      -> text "Illegal role name" <+> quotes (ppr role)
+         $$ case nearby of
+             []  -> empty
+             [r] -> text "Perhaps you meant" <+> quotes (ppr r)
+             -- will this last case ever happen??
+             _   -> hang (text "Perhaps you meant one of these:")
+                         2 (pprWithCommas (quotes . ppr) nearby)
 
    ErrMultipleNamesInStandaloneKindSignature vs
-      -> errDoc [
-           vcat [ hang (text "Standalone kind signatures do not support multiple names at the moment:")
-                  2 (pprWithCommas ppr vs)
-                , text "See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details."
-                ]
-           ] [] []
+      -> vcat [ hang (text "Standalone kind signatures do not support multiple names at the moment:")
+                2 (pprWithCommas ppr vs)
+              , text "See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details."
+              ]
 
    ErrIllegalImportBundleForm
-      -> errDoc [
-             text "Illegal import form, this syntax can only be used to bundle"
-             $+$ text "pattern synonyms with types in module exports."
-           ] [] []
+      -> text "Illegal import form, this syntax can only be used to bundle"
+         $+$ text "pattern synonyms with types in module exports."
 
    ErrInvalidTypeSignature lhs
-      -> errDoc [
-             text "Invalid type signature:"
-             <+> ppr lhs
-             <+> text ":: ..."
-             $$ text hint
-           ] [] []
+      -> text "Invalid type signature:"
+         <+> ppr lhs
+         <+> text ":: ..."
+         $$ text hint
          where
          hint | foreign_RDR `looks_like` lhs
               = "Perhaps you meant to use ForeignFunctionInterface?"
@@ -577,25 +503,23 @@ pprError = \case
          pattern_RDR = mkUnqual varName (fsLit "pattern")
 
    ErrUnexpectedTypeInDecl t what tc tparms equals_or_where
-      -> errDoc [
-             vcat [ text "Unexpected type" <+> quotes (ppr t)
-                  , text "In the" <+> what
-                    <+> ptext (sLit "declaration for") <+> quotes tc'
-                  , vcat[ (text "A" <+> what
-                           <+> ptext (sLit "declaration should have form"))
-                  , nest 2
-                    (what
-                     <+> tc'
-                     <+> hsep (map text (takeList tparms allNameStrings))
-                     <+> equals_or_where) ] ]
-            ] [] []
+      -> vcat [ text "Unexpected type" <+> quotes (ppr t)
+              , text "In the" <+> what
+                <+> ptext (sLit "declaration for") <+> quotes tc'
+              , vcat[ (text "A" <+> what
+                       <+> ptext (sLit "declaration should have form"))
+              , nest 2
+                (what
+                 <+> tc'
+                 <+> hsep (map text (takeList tparms allNameStrings))
+                 <+> equals_or_where) ] ]
           where
             -- Avoid printing a constraint tuple in the error message. Print
             -- a plain old tuple instead (since that's what the user probably
             -- wrote). See #14907
             tc' = ppr $ filterCTuple tc
 
-   ErrCmmParser cmm_err -> let mk msg = errDoc [msg] [] [] in mk $ case cmm_err of
+   ErrCmmParser cmm_err -> case cmm_err of
       CmmUnknownPrimitive name     -> text "unknown primitive" <+> ftext name
       CmmUnknownMacro fun          -> text "unknown macro" <+> ftext fun
       CmmUnknownCConv cconv        -> text "unknown calling convention:" <+> text cconv
@@ -603,13 +527,13 @@ pprError = \case
       CmmUnrecognisedHint hint     -> text "unrecognised hint:" <+> text hint
 
    ErrExpectedHyphen
-      -> errDoc [ text "Expected a hyphen" ] [] []
+      -> text "Expected a hyphen"
 
    ErrSpaceInSCC
-      -> errDoc [ text "Spaces are not allowed in SCCs" ] [] []
+      -> text "Spaces are not allowed in SCCs"
 
    ErrEmptyDoubleQuotes th_on
-      -> errDoc [ if th_on then vcat (msg ++ th_msg) else vcat msg ] [] []
+      -> if th_on then vcat (msg ++ th_msg) else vcat msg
          where
             msg    = [ text "Parser error on `''`"
                      , text "Character literals may not be empty"
@@ -619,69 +543,57 @@ pprError = \case
                      ]
 
    ErrInvalidPackageName pkg
-      -> errDoc [
-             vcat
-                [ text "Parse error" <> colon <+> quotes (ftext pkg)
-                , text "Version number or non-alphanumeric" <+>
-                  text "character in package name"
-                ]
-          ] [] []
+      -> vcat
+            [ text "Parse error" <> colon <+> quotes (ftext pkg)
+            , text "Version number or non-alphanumeric" <+>
+              text "character in package name"
+            ]
 
    ErrInvalidRuleActivationMarker
-      -> errDoc [ text "Invalid rule activation marker" ] [] []
+      -> text "Invalid rule activation marker"
 
    ErrLinearFunction
-      -> errDoc [ text "Enable LinearTypes to allow linear functions" ] [] []
+      -> text "Enable LinearTypes to allow linear functions"
 
    ErrMultiWayIf
-      -> errDoc [ text "Multi-way if-expressions need MultiWayIf turned on" ] [] []
+      -> text "Multi-way if-expressions need MultiWayIf turned on"
 
    ErrExplicitForall is_unicode
-      -> errDoc [
-           vcat [ text "Illegal symbol" <+> quotes (forallSym is_unicode) <+> text "in type"
-                , text "Perhaps you intended to use RankNTypes or a similar language"
-                , text "extension to enable explicit-forall syntax:" <+>
-                  forallSym is_unicode <+> text "<tvs>. <type>"
-                ]
-           ] [] []
+      -> vcat
+         [ text "Illegal symbol" <+> quotes (forallSym is_unicode) <+> text "in type"
+         , text "Perhaps you intended to use RankNTypes or a similar language"
+         , text "extension to enable explicit-forall syntax:" <+>
+           forallSym is_unicode <+> text "<tvs>. <type>"
+         ]
          where
           forallSym True  = text "∀"
           forallSym False = text "forall"
 
    ErrIllegalQualifiedDo qdoDoc
-      -> errDoc [
-           vcat [ text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
-                , text "Perhaps you intended to use QualifiedDo"
-                ]
-           ] [] []
+      -> vcat
+         [ text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
+         , text "Perhaps you intended to use QualifiedDo"
+         ]
 
-   ErrUnsupportedExtension ext sug
-       -> errDoc [ text "Unsupported extension: " <> text ext $$ suggestions ] [] []
-          where
-            suggestions
-              | null sug  = GHC.Utils.Outputable.empty
-              | otherwise = text "Perhaps you meant" <+>
-                  quotedListWithOr (map text sug)
+   ErrUnsupportedExtension ext
+       -> text "Unsupported extension: " <> text ext
 
    ErrUnknownOptionsFlag flag
-       -> errDoc [ text "unknown flag in {-# OPTIONS_GHC #-} pragma:" <+> text flag ] [] []
+       -> text "unknown flag in {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
    ErrLanguagePragmaParseError
-       -> errDoc [
-            vcat [ text "Cannot parse LANGUAGE pragma"
-                 , text "Expecting comma-separated list of language options,"
-                 , text "each starting with a capital letter"
-                 , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}") ]
-            ] [] []
+       -> vcat [ text "Cannot parse LANGUAGE pragma"
+               , text "Expecting comma-separated list of language options,"
+               , text "each starting with a capital letter"
+               , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}")
+               ]
 
    ErrOptionsGhcParseError inp
-       -> errDoc [
-            vcat [ text "Error while parsing OPTIONS_GHC pragma."
-                 , text "Expecting whitespace-separated list of GHC options."
-                 , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
-                 , text ("Input was: " ++ show inp)
-                 ]
-            ] [] []
+       -> vcat [ text "Error while parsing OPTIONS_GHC pragma."
+               , text "Expecting whitespace-separated list of GHC options."
+               , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
+               , text ("Input was: " ++ show inp)
+               ]
 
 pp_unexpected_fun_app :: Outputable a => SDoc -> a -> SDoc
 pp_unexpected_fun_app e a =
@@ -708,6 +620,13 @@ pp_hint = \case
                then perhaps_as_pat
                else empty
 
+   SuggestExtensions sug
+     -> suggestions
+          where
+            suggestions
+              | null sug  = GHC.Utils.Outputable.empty
+              | otherwise = text "Perhaps you meant" <+>
+                  quotedListWithOr (map text sug)
+
 perhaps_as_pat :: SDoc
 perhaps_as_pat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
-
