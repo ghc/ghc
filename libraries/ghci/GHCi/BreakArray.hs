@@ -32,18 +32,18 @@ import Control.Monad
 import Data.Word
 import GHC.Word
 
-import GHC.Exts hiding (extendWord8#, narrowWord8#)
+import GHC.Exts hiding (word8ToWord#, wordToWord8#)
 import GHC.IO ( IO(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 
 #if MIN_VERSION_base(4,16,0)
-import GHC.Base (extendWord8#, narrowWord8#)
+import GHC.Base (word8ToWord#, wordToWord8#)
 #else
-narrowWord8#, extendWord8# :: Word# -> Word#
-narrowWord8# w = w
-extendWord8# w = w
-{-# INLINE narrowWord8# #-}
-{-# INLINE extendWord8# #-}
+wordToWord8#, word8ToWord# :: Word# -> Word#
+wordToWord8# w = w
+word8ToWord# w = w
+{-# INLINE wordToWord8# #-}
+{-# INLINE word8ToWord# #-}
 #endif
 
 data BreakArray = BA (MutableByteArray# RealWorld)
@@ -106,7 +106,7 @@ newBreakArray entries@(I# sz) = do
     case breakOff of
         W8# off -> do
            let loop n | isTrue# (n ==# sz) = return ()
-                      | otherwise = do writeBA# array n (extendWord8# off); loop (n +# 1#)
+                      | otherwise = do writeBA# array n (word8ToWord# off); loop (n +# 1#)
            loop 0#
     return $ BA array
 
@@ -115,11 +115,11 @@ writeBA# array i word = IO $ \s ->
     case writeWord8Array# array i word s of { s -> (# s, () #) }
 
 writeBreakArray :: BreakArray -> Int -> Word8 -> IO ()
-writeBreakArray (BA array) (I# i) (W8# word) = writeBA# array i (extendWord8# word)
+writeBreakArray (BA array) (I# i) (W8# word) = writeBA# array i (word8ToWord# word)
 
 readBA# :: MutableByteArray# RealWorld -> Int# -> IO Word8
 readBA# array i = IO $ \s ->
-    case readWord8Array# array i s of { (# s, c #) -> (# s, W8# (narrowWord8# c) #) }
+    case readWord8Array# array i s of { (# s, c #) -> (# s, W8# (wordToWord8# c) #) }
 
 readBreakArray :: BreakArray -> Int -> IO Word8
 readBreakArray (BA array) (I# i) = readBA# array i
