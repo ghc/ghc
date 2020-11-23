@@ -2,9 +2,9 @@
 T14059b.hs:23:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘wibble’:
-        Patterns not matched: p where p is not one of {STrue}
+        Patterns of type ‘Sing z’ not matched: SFalse
 
 T14059b.hs:26:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘wobble’:
-        Patterns not matched: p where p is not one of {STooGoodToBeTrue}
+        Patterns of type ‘Sing z’ not matched: SFalse
