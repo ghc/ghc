@@ -29,6 +29,7 @@ module GHC.Exts.Heap (
     , PrimType(..)
     , HasHeapRep(getClosureData)
     , getClosureDataFromHeapRep
+    , getClosureDataFromHeapRepPrim
 
     -- * Info Table types
     , StgInfoTable(..)
@@ -152,26 +153,34 @@ getClosureDataFromHeapObject x = do
                 STACK -> pure $ UnsupportedClosure infoTable
                 _ -> getClosureDataFromHeapRep heapRep infoTablePtr ptrList
 
+
 -- | Convert an unpacked heap object, to a `GenClosure b`. The inputs to this
 -- function can be generated from a heap object using `unpackClosure#`.
-getClosureDataFromHeapRep
-    :: ByteArray#
+getClosureDataFromHeapRep :: ByteArray# -> Ptr StgInfoTable -> [b] -> IO (GenClosure b)
+getClosureDataFromHeapRep heapRep infoTablePtr pts = do
+  itbl <- peekItbl infoTablePtr
+  getClosureDataFromHeapRepPrim (dataConNames infoTablePtr) itbl heapRep pts
+
+getClosureDataFromHeapRepPrim
+    :: IO (String, String, String)
+    -- ^ A continuation used to decode the constructor description field,
+    -- in ghc-debug this code can lead to segfaults because dataConNames
+    -- will dereference a random part of memory.
+    -> StgInfoTable
+    -- ^ The `StgInfoTable` of the closure, extracted from the heap
+    -- representation.
+    -> ByteArray#
     -- ^ Heap representation of the closure as returned by `unpackClosure#`.
     -- This includes all of the object including the header, info table
     -- pointer, pointer data, and non-pointer data. The ByteArray# may be
     -- pinned or unpinned.
-    -> Ptr StgInfoTable
-    -- ^ Pointer to the `StgInfoTable` of the closure, extracted from the heap
-    -- representation. The info table must not be movable by GC i.e. must be in
-    -- pinned or off-heap memory.
     -> [b]
     -- ^ Pointers in the payload of the closure, extracted from the heap
     -- representation as returned by `collect_pointers()` in `Heap.c`. The type
     -- `b` is some representation of a pointer e.g. `Any` or `Ptr Any`.
     -> IO (GenClosure b)
     -- ^ Heap representation of the closure.
-getClosureDataFromHeapRep heapRep infoTablePtr pts = do
-    itbl <- peekItbl infoTablePtr
+getClosureDataFromHeapRepPrim getConDesc itbl heapRep pts = do
     let -- heapRep as a list of words.
         rawHeapWords :: [Word]
         rawHeapWords = [W# (indexWordArray# heapRep i) | I# i <- [0.. end] ]
@@ -189,7 +198,7 @@ getClosureDataFromHeapRep heapRep infoTablePtr pts = do
         npts = drop (closureTypeHeaderSize (tipe itbl) + length pts) rawHeapWords
     case tipe itbl of
         t | t >= CONSTR && t <= CONSTR_NOCAF -> do
-            (p, m, n) <- dataConNames infoTablePtr
+            (p, m, n) <- getConDesc
             pure $ ConstrClosure itbl pts npts p m n
 
         t | t >= THUNK && t <= THUNK_STATIC -> do
