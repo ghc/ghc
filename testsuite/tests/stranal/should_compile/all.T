@@ -58,3 +58,7 @@ test('T18122',  [ grep_errmsg(r'wfoo =') ], compile, ['-ddump-simpl'])
 
 # We care about the call demand on $wg
 test('T18903',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-simpl -dsuppress-uniques'])
+# We care about the call demand on $wg1 and $wg2
+test('T18894',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-stranal -dsuppress-uniques'])
+# We care about the Arity 2 on eta, as a result of the annotated Dmd
+test('T18894b',  [ grep_errmsg(r'Arity=2') ], compile, ['-ddump-stranal -dsuppress-uniques -fno-call-arity -dppr-cols=200'])

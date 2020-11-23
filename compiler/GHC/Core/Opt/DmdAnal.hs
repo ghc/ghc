@@ -37,6 +37,7 @@ import GHC.Core.Type
 import GHC.Core.FVs      ( exprFreeIds, ruleRhsFreeIds )
 import GHC.Core.Coercion ( Coercion, coVarsOfCo )
 import GHC.Core.FamInstEnv
+import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Maybe         ( isJust )
@@ -64,28 +65,55 @@ data DmdAnalOpts = DmdAnalOpts
 --
 -- Note: use `seqBinds` on the result to avoid leaks due to lazyness (cf Note
 -- [Stamp out space leaks in demand analysis])
-dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> CoreProgram -> CoreProgram
-dmdAnalProgram opts fam_envs binds = binds_plus_dmds
-   where
-      env             = emptyAnalEnv opts fam_envs
-      binds_plus_dmds = snd $ mapAccumL dmdAnalTopBind env binds
-
--- Analyse a (group of) top-level binding(s)
-dmdAnalTopBind :: AnalEnv
-               -> CoreBind
-               -> (AnalEnv, CoreBind)
-dmdAnalTopBind env (NonRec id rhs)
-  = ( extendAnalEnv TopLevel env id sig
-    , NonRec (setIdStrictness id sig) rhs')
+dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
+dmdAnalProgram opts fam_envs rules binds
+  = snd $ go (emptyAnalEnv opts fam_envs) binds
   where
-    ( _, sig, rhs') = dmdAnalRhsLetDown Nothing env topSubDmd id rhs
+    -- See Note [Analysing top-level bindings]
+    -- and Note [Why care for top-level demand annotations?]
+    go _   []     = (nopDmdType, [])
+    go env (b:bs) = cons_up $ dmdAnalBind TopLevel env topSubDmd b anal_body
+      where
+        anal_body env'
+          | (body_ty, bs') <- go env' bs
+          = (add_exported_uses env' body_ty (bindersOf b), bs')
 
-dmdAnalTopBind env (Rec pairs)
-  = (env', Rec pairs')
-  where
-    (env', _, pairs')  = dmdFix TopLevel env topSubDmd pairs
-                -- We get two iterations automatically
-                -- c.f. the NonRec case above
+    cons_up :: (a, b, [b]) -> (a, [b])
+    cons_up (dmd_ty, b', bs') = (dmd_ty, b':bs')
+
+    add_exported_uses :: AnalEnv -> DmdType -> [Id] -> DmdType
+    add_exported_uses env = foldl' (add_exported_use env)
+
+    -- | If @e@ is denoted by @dmd_ty@, then @add_exported_use _ dmd_ty id@
+    -- corresponds to the demand type of @(id, e)@, but is a lot more direct.
+    -- See Note [Analysing top-level bindings].
+    add_exported_use :: AnalEnv -> DmdType -> Id -> DmdType
+    add_exported_use env dmd_ty id
+      | isExportedId id || elemVarSet id rule_fvs
+      -- See Note [Absence analysis for stable unfoldings and RULES]
+      = dmd_ty `plusDmdType` fst (dmdAnalStar env topDmd (Var id))
+      | otherwise
+      = dmd_ty
+
+    rule_fvs :: IdSet
+    rule_fvs = foldr (unionVarSet . ruleRhsFreeIds) emptyVarSet rules
+
+-- | We attach useful (e.g. not 'topDmd') 'idDemandInfo' to top-level bindings
+-- that satisfy this function.
+--
+-- Basically, we want to know how top-level *functions* are *used*
+-- (e.g. called). The information will always be lazy.
+-- Any other top-level bindings are boring.
+--
+-- See also Note [Why care for top-level demand annotations?].
+isInterestingTopLevelFn :: Id -> Bool
+-- SG tried to set this to True and got a +2% ghc/alloc regression in T5642
+-- (which is dominated by the Simplifier) at no gain in analysis precision.
+-- If there was a gain, that regression might be acceptable.
+-- Plus, we could use LetUp for thunks and share some code with local let
+-- bindings.
+isInterestingTopLevelFn id =
+  typeArity (idType id) `lengthExceeds` 0
 
 {- Note [Stamp out space leaks in demand analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -105,8 +133,80 @@ generation would hold on to an extra copy of the Core program, via
 unforced thunks in demand or strictness information; and it is the
 most memory-intensive part of the compilation process, so this added
 seqBinds makes a big difference in peak memory usage.
--}
 
+Note [Analysing top-level bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a CoreProgram like
+  e1 = ...
+  n1 = ...
+  e2 = \a b -> ... fst (n1 a b) ...
+  n2 = \c d -> ... snd (e2 c d) ...
+  ...
+where e* are exported, but n* are not.
+Intuitively, we can see that @n1@ is only ever called with two arguments
+and in every call site, the first component of the result of the call
+is evaluated. Thus, we'd like it to have idDemandInfo @UCU(C1(P(SU,A))@.
+NB: We may *not* give e2 a similar annotation, because it is exported and
+external callers might use it in arbitrary ways, expressed by 'topDmd'.
+This can then be exploited by Nested CPR and eta-expansion,
+see Note [Why care for top-level demand annotations?].
+
+How do we get this result? Answer: By analysing the program as if it was a let
+expression of this form:
+  let e1 = ... in
+  let n1 = ... in
+  let e2 = ... in
+  let n2 = ... in
+  (e1,e2, ...)
+E.g. putting all bindings in nested lets and returning all exported binders in a tuple.
+Of course, we will not actually build that CoreExpr! Instead we faithfully
+simulate analysis of said expression by adding the free variable 'DmdEnv'
+of @e*@'s strictness signatures to the 'DmdType' we get from analysing the
+nested bindings.
+
+And even then the above form blows up analysis performance in T10370:
+If @e1@ uses many free variables, we'll unnecessarily carry their demands around
+with us from the moment we analyse the pair to the moment we bubble back up to
+the binding for @e1@. So instead we analyse as if we had
+  let e1 = ... in
+  (e1, let n1 = ... in
+  (    let e2 = ... in
+  (e2, let n2 = ... in
+  (    ...))))
+That is, a series of right-nested pairs, where the @fst@ are the exported
+binders of the last enclosing let binding and @snd@ continues the nested
+lets.
+
+Variables occuring free in RULE RHSs are to be handled the same as exported Ids.
+See also Note [Absence analysis for stable unfoldings and RULES].
+
+Note [Why care for top-level demand annotations?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reading Note [Analysing top-level bindings], you might think that we go through
+quite some trouble to get useful demands for top-level bindings. They can never
+be strict, for example, so why bother?
+
+First, we get to eta-expand top-level bindings that we weren't able to
+eta-expand before without Call Arity. From T18894b:
+  module T18894b (f) where
+  eta :: Int -> Int -> Int
+  eta x = if fst (expensive x) == 13 then \y -> ... else \y -> ...
+  f m = ... eta m 2 ... eta 2 m ...
+Since only @f@ is exported, we see all call sites of @eta@ and can eta-expand to
+arity 2.
+
+The call demands we get for some top-level bindings will also allow Nested CPR
+to unbox deeper. From T18894:
+  module T18894 (h) where
+  g m n = (2 * m, 2 `div` n)
+  {-# NOINLINE g #-}
+  h :: Int -> Int
+  h m = ... snd (g m 2) ... uncurry (+) (g 2 m) ...
+Only @h@ is exported, hence we see that @g@ is always called in contexts were we
+also force the division in the second component of the pair returned by @g@.
+This allows Nested CPR to evalute the division eagerly and return an I# in its
+position.
+-}
 
 {-
 ************************************************************************
@@ -114,7 +214,103 @@ seqBinds makes a big difference in peak memory usage.
 \subsection{The analyser itself}
 *                                                                      *
 ************************************************************************
+-}
 
+-- | Analyse a binding group and its \"body\", e.g. where it is in scope.
+--
+-- It calls a function that knows how to analyse this \"body\" given
+-- an 'AnalEnv' with updated demand signatures for the binding group
+-- (reflecting their 'idStrictnessInfo') and expects to receive a
+-- 'DmdType' in return, which it uses to annotate the binding group with their
+-- 'idDemandInfo'.
+dmdAnalBind
+  :: TopLevelFlag
+  -> AnalEnv
+  -> SubDemand                 -- ^ Demand put on the "body"
+                               --   (important for join points)
+  -> CoreBind
+  -> (AnalEnv -> (DmdType, a)) -- ^ How to analyse the "body", e.g.
+                               --   where the binding is in scope
+  -> (DmdType, CoreBind, a)
+dmdAnalBind top_lvl env dmd bind anal_body = case bind of
+  NonRec id rhs
+    | useLetUp top_lvl id
+    -> dmdAnalBindLetUp   top_lvl env     id rhs anal_body
+  _ -> dmdAnalBindLetDown top_lvl env dmd bind   anal_body
+
+-- | Annotates uninteresting top level functions ('isInterestingTopLevelFn')
+-- with 'topDmd', the rest with the given demand.
+setBindIdDemandInfo :: TopLevelFlag -> Id -> Demand -> Id
+setBindIdDemandInfo top_lvl id dmd = setIdDemandInfo id $ case top_lvl of
+  TopLevel | not (isInterestingTopLevelFn id) -> topDmd
+  _                                           -> dmd
+
+-- | Let bindings can be processed in two ways:
+-- Down (RHS before body) or Up (body before RHS).
+-- This function handles the up variant.
+--
+-- It is very simple. For  let x = rhs in body
+--   * Demand-analyse 'body' in the current environment
+--   * Find the demand, 'rhs_dmd' placed on 'x' by 'body'
+--   * Demand-analyse 'rhs' in 'rhs_dmd'
+--
+-- This is used for a non-recursive local let without manifest lambdas (see
+-- 'useLetUp').
+--
+-- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
+dmdAnalBindLetUp :: TopLevelFlag -> AnalEnv -> Id -> CoreExpr -> (AnalEnv -> (DmdType, a)) -> (DmdType, CoreBind, a)
+dmdAnalBindLetUp top_lvl env id rhs anal_body = (final_ty, NonRec id' rhs', body')
+  where
+    (body_ty, body')   = anal_body env
+    (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
+    id'                = setBindIdDemandInfo top_lvl id id_dmd
+    (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
+    final_ty           = body_ty' `plusDmdType` rhs_ty
+
+-- | Let bindings can be processed in two ways:
+-- Down (RHS before body) or Up (body before RHS).
+-- This function handles the down variant.
+--
+-- It computes a demand signature (by means of 'dmdAnalRhsSig') and uses
+-- that at call sites in the body.
+--
+-- It is used for toplevel definitions, recursive definitions and local
+-- non-recursive definitions that have manifest lambdas (cf. 'useLetUp').
+-- Local non-recursive definitions without a lambda are handled with LetUp.
+--
+-- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
+dmdAnalBindLetDown :: TopLevelFlag -> AnalEnv -> SubDemand -> CoreBind -> (AnalEnv -> (DmdType, a)) -> (DmdType, CoreBind, a)
+dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
+  NonRec id rhs
+    | (env', lazy_fv, id1, rhs1) <-
+        dmdAnalRhsSig top_lvl NonRecursive env dmd id rhs
+    -> do_rest env' lazy_fv [(id1, rhs1)] (uncurry NonRec . only)
+  Rec pairs
+    | (env', lazy_fv, pairs') <- dmdFix top_lvl env dmd pairs
+    -> do_rest env' lazy_fv pairs' Rec
+  where
+    do_rest env' lazy_fv pairs1 build_bind = (final_ty, build_bind pairs2, body')
+      where
+        (body_ty, body')        = anal_body env'
+        -- see Note [Lazy and unleashable free variables]
+        dmd_ty                  = addLazyFVs body_ty lazy_fv
+        (!final_ty, id_dmds)    = findBndrsDmds env' dmd_ty (map fst pairs1)
+        pairs2                  = zipWith do_one pairs1 id_dmds
+        do_one (id', rhs') dmd  = (setBindIdDemandInfo top_lvl id' dmd, rhs')
+        -- If the actual demand is better than the vanilla call
+        -- demand, you might think that we might do better to re-analyse
+        -- the RHS with the stronger demand.
+        -- But (a) That seldom happens, because it means that *every* path in
+        --         the body of the let has to use that stronger demand
+        -- (b) It often happens temporarily in when fixpointing, because
+        --     the recursive function at first seems to place a massive demand.
+        --     But we don't want to go to extra work when the function will
+        --     probably iterate to something less demanding.
+        -- In practice, all the times the actual demand on id2 is more than
+        -- the vanilla call demand seem to be due to (b).  So we don't
+        -- bother to re-analyse the RHS.
+
+{-
 Note [Ensure demand is strict]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's important not to analyse e with a lazy demand because
@@ -295,60 +491,11 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty alts')
 
--- Let bindings can be processed in two ways:
--- Down (RHS before body) or Up (body before RHS).
--- The following case handle the up variant.
---
--- It is very simple. For  let x = rhs in body
---   * Demand-analyse 'body' in the current environment
---   * Find the demand, 'rhs_dmd' placed on 'x' by 'body'
---   * Demand-analyse 'rhs' in 'rhs_dmd'
---
--- This is used for a non-recursive local let without manifest lambdas.
--- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
-dmdAnal' env dmd (Let (NonRec id rhs) body)
-  | useLetUp id
-  = (final_ty, Let (NonRec id' rhs') body')
+dmdAnal' env dmd (Let bind body)
+  = (final_ty, Let bind' body')
   where
-    (body_ty, body')   = dmdAnal env dmd body
-    (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
-    id'                = setIdDemandInfo id id_dmd
-
-    (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
-    final_ty           = body_ty' `plusDmdType` rhs_ty
-
-dmdAnal' env dmd (Let (NonRec id rhs) body)
-  = (body_ty2, Let (NonRec id2 rhs') body')
-  where
-    (lazy_fv, sig, rhs') = dmdAnalRhsLetDown Nothing env dmd id rhs
-    id1                  = setIdStrictness id sig
-    env1                 = extendAnalEnv NotTopLevel env id sig
-    (body_ty, body')     = dmdAnal env1 dmd body
-    (body_ty1, id2)      = annotateBndr env body_ty id1
-    body_ty2             = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
-
-        -- If the actual demand is better than the vanilla call
-        -- demand, you might think that we might do better to re-analyse
-        -- the RHS with the stronger demand.
-        -- But (a) That seldom happens, because it means that *every* path in
-        --         the body of the let has to use that stronger demand
-        -- (b) It often happens temporarily in when fixpointing, because
-        --     the recursive function at first seems to place a massive demand.
-        --     But we don't want to go to extra work when the function will
-        --     probably iterate to something less demanding.
-        -- In practice, all the times the actual demand on id2 is more than
-        -- the vanilla call demand seem to be due to (b).  So we don't
-        -- bother to re-analyse the RHS.
-
-dmdAnal' env dmd (Let (Rec pairs) body)
-  = let
-        (env', lazy_fv, pairs') = dmdFix NotTopLevel env dmd pairs
-        (body_ty, body')        = dmdAnal env' dmd body
-        body_ty1                = deleteFVs body_ty (map fst pairs)
-        body_ty2                = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
-    in
-    body_ty2 `seq`
-    (body_ty2,  Let (Rec pairs') body')
+    (final_ty, bind', body') = dmdAnalBind NotTopLevel env dmd bind go'
+    go' env'                 = dmdAnal env' dmd body
 
 -- | A simple, syntactic analysis of whether an expression MAY throw a precise
 -- exception when evaluated. It's always sound to return 'True'.
@@ -582,9 +729,17 @@ dmdTransform env var dmd
   | Just (sig, top_lvl) <- lookupSigEnv env var
   , let fn_ty = dmdTransformSig sig dmd
   = -- pprTrace "dmdTransform:LetDown" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
-    if isTopLevel top_lvl
-    then fn_ty   -- Don't record demand on top-level things
-    else addVarDmd fn_ty var (C_11 :* dmd)
+    case top_lvl of
+      NotTopLevel -> addVarDmd fn_ty var (C_11 :* dmd)
+      TopLevel
+        | isInterestingTopLevelFn var
+        -- Top-level things will be used multiple times or not at
+        -- all anyway, hence the multDmd below: It means we don't
+        -- have to track whether @var@ is used strictly or at most
+        -- once, because ultimately it never will.
+        -> addVarDmd fn_ty var (C_0N `multDmd` (C_11 :* dmd)) -- discard strictness
+        | otherwise
+        -> fn_ty -- don't bother tracking; just annotate with 'topDmd' later
   -- Everything else:
   --   * Local let binders for which we use LetUp (cf. 'useLetUp')
   --   * Lambda binders
@@ -599,45 +754,45 @@ dmdTransform env var dmd
 *                                                                      *
 ********************************************************************* -}
 
--- Let bindings can be processed in two ways:
--- Down (RHS before body) or Up (body before RHS).
--- dmdAnalRhsLetDown implements the Down variant:
---  * assuming a demand of <L,U>
+-- | @dmdAnalRhsSig@ analyses the given RHS to compute a demand signature
+-- for the LetDown rule. It works as follows:
+--
+--  * assuming a demand of <U>
 --  * looking at the definition
 --  * determining a strictness signature
 --
--- It is used for toplevel definition, recursive definitions and local
--- non-recursive definitions that have manifest lambdas.
--- Local non-recursive definitions without a lambda are handled with LetUp.
---
--- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
-dmdAnalRhsLetDown
-  :: Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
+-- Since it assumed a demand of <U>, the resulting signature is applicable at
+-- any call site.
+dmdAnalRhsSig
+  :: TopLevelFlag
+  -> RecFlag
   -> AnalEnv -> SubDemand
   -> Id -> CoreExpr
-  -> (DmdEnv, StrictSig, CoreExpr)
+  -> (AnalEnv, DmdEnv, Id, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
-dmdAnalRhsLetDown rec_flag env let_dmd id rhs
-  = -- pprTrace "dmdAnalRhsLetDown" (ppr id $$ ppr let_dmd $$ ppr sig $$ ppr lazy_fv) $
-    (lazy_fv, sig, rhs')
+dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
+  = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr sig $$ ppr lazy_fv) $
+    (env', lazy_fv, id', rhs')
   where
     rhs_arity = idArity id
+    -- See Note [Demand signatures are computed for a threshold demand based on idArity]
     rhs_dmd -- See Note [Demand analysis for join points]
             -- See Note [Invariants on join points] invariant 2b, in GHC.Core
             --     rhs_arity matches the join arity of the join point
             | isJoinId id
             = mkCallDmds rhs_arity let_dmd
             | otherwise
-            -- NB: rhs_arity
-            -- See Note [Demand signatures are computed for a threshold demand based on idArity]
-            = mkRhsDmd env rhs_arity rhs
+            = mkCallDmds rhs_arity topSubDmd
 
     (rhs_dmd_ty, rhs') = dmdAnal env rhs_dmd rhs
     DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
 
     sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
+
+    id' = id `setIdStrictness` sig
+    env' = extendAnalEnv top_lvl env id' sig
 
     -- See Note [Aggregated demand for cardinality]
     -- FIXME: That Note doesn't explain the following lines at all. The reason
@@ -651,8 +806,8 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
     --        we'd have to do an additional iteration. reuseEnv makes sure that
     --        we never get used-once info for FVs of recursive functions.
     rhs_fv1 = case rec_flag of
-                Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
-                Nothing -> rhs_fv
+                Recursive    -> reuseEnv rhs_fv
+                NonRecursive -> rhs_fv
 
     rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` extra_fvs
     -- Find the RHS free vars of the unfoldings and RULES
@@ -668,13 +823,6 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
             , Just unf_body <- maybeUnfoldingTemplate unf
             = exprFreeIds unf_body
             | otherwise = emptyVarSet
-
--- | @mkRhsDmd env rhs_arity rhs@ creates a 'SubDemand' for
--- unleashing on the given function's @rhs@, by creating
--- a call demand of @rhs_arity@
--- See Historical Note [Product demands for function body]
-mkRhsDmd :: AnalEnv -> Arity -> CoreExpr -> SubDemand
-mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity topSubDmd
 
 -- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
 -- whether we should process the binding up (body before rhs) or down (rhs
@@ -720,8 +868,8 @@ mkRhsDmd _env rhs_arity _rhs = mkCallDmds rhs_arity topSubDmd
 --   * For a more convincing example with join points, see Note [Demand analysis
 --     for join points].
 --
-useLetUp :: Var -> Bool
-useLetUp f = idArity f == 0 && not (isJoinId f)
+useLetUp :: TopLevelFlag -> Var -> Bool
+useLetUp top_lvl f = isNotTopLevel top_lvl && idArity f == 0 && not (isJoinId f)
 
 {- Note [Demand analysis for join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -939,8 +1087,6 @@ dmdFix :: TopLevelFlag
 dmdFix top_lvl env let_dmd orig_pairs
   = loop 1 initial_pairs
   where
-    bndrs = map fst orig_pairs
-
     -- See Note [Initialising strictness]
     initial_pairs | ae_virgin env = [(setIdStrictness id botSig, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
@@ -990,10 +1136,8 @@ dmdFix top_lvl env let_dmd orig_pairs
           = -- pprTrace "my_downRhs" (ppr id $$ ppr (idStrictness id) $$ ppr sig) $
             ((env', lazy_fv'), (id', rhs'))
           where
-            (lazy_fv1, sig, rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
-            lazy_fv'              = plusVarEnv_C plusDmd lazy_fv lazy_fv1
-            env'                  = extendAnalEnv top_lvl env id sig
-            id'                   = setIdStrictness id sig
+            (env', lazy_fv1, id', rhs') = dmdAnalRhsSig top_lvl Recursive env let_dmd id rhs
+            lazy_fv'                    = plusVarEnv_C plusDmd lazy_fv lazy_fv1
 
     zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
@@ -1090,7 +1234,7 @@ addLazyFVs dmd_ty lazy_fvs
         -- demand with the bottom coming up from 'error'
         --
         -- I got a loop in the fixpointer without this, due to an interaction
-        -- with the lazy_fv filtering in dmdAnalRhsLetDown.  Roughly, it was
+        -- with the lazy_fv filtering in dmdAnalRhsSig.  Roughly, it was
         --      letrec f n x
         --          = letrec g y = x `fatbar`
         --                         letrec h z = z + ...g...
@@ -1155,10 +1299,6 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
 
     main_ty = addDemand dmd dmd_ty'
     (dmd_ty', dmd) = findBndrDmd env arg_of_dfun dmd_ty id
-
-deleteFVs :: DmdType -> [Var] -> DmdType
-deleteFVs (DmdType fvs dmds res) bndrs
-  = DmdType (delVarEnvList fvs bndrs) dmds res
 
 {-
 Note [NOINLINE and strictness]

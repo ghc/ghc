@@ -1,0 +1,404 @@
+
+==================== Demand analysis ====================
+Result size of Demand analysis
+  = {terms: 177, types: 97, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+$trModule = "T18894"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18894.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18894.$trModule = GHC.Types.Module $trModule $trModule
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 0#
+
+-- RHS size: {terms: 36, types: 16, coercions: 0, joins: 0/0}
+g2 [InlPrag=NOINLINE, Dmd=UCU(CS(P(1P(U),SP(U))))]
+  :: Int -> Int -> (Int, Int)
+[LclId,
+ Arity=2,
+ Str=<UP(U)><SP(SU)>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20 20] 161 20}]
+g2
+  = \ (m [Dmd=UP(U)] :: Int) (ds [Dmd=SP(SU)] :: Int) ->
+      case ds of { GHC.Types.I# ds [Dmd=SU] ->
+      case ds of ds [Dmd=1U] {
+        __DEFAULT ->
+          (case m of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.*# 2# y) },
+           case ds of wild {
+             __DEFAULT ->
+               case GHC.Classes.divInt# 2# wild of ww4 { __DEFAULT ->
+               GHC.Types.I# ww4
+               };
+             -1# -> GHC.Types.I# -2#;
+             0# -> case GHC.Real.divZeroError of wild [Dmd=B] { }
+           });
+        1# -> (m, lvl)
+      }
+      }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 2#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 2#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 0#
+
+-- RHS size: {terms: 36, types: 19, coercions: 0, joins: 0/0}
+h2 :: Int -> Int
+[LclIdX,
+ Arity=1,
+ Str=<SP(MU)>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 162 10}]
+h2
+  = \ (ds [Dmd=SP(MU)] :: Int) ->
+      case ds of wild [Dmd=UP(U)] { GHC.Types.I# ds [Dmd=MU] ->
+      case ds of ds {
+        __DEFAULT ->
+          case GHC.Prim.remInt# ds 2# of {
+            __DEFAULT ->
+              case g2 wild lvl of { (ds1 [Dmd=A], y [Dmd=SU]) -> y };
+            0# ->
+              case g2 lvl wild of { (x [Dmd=SP(U)], ds [Dmd=SP(U)]) ->
+              case x of { GHC.Types.I# x ->
+              case ds of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.+# x y) }
+              }
+              }
+          };
+        1# -> lvl
+      }
+      }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 15#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 0#
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+lvl :: (Int, Int)
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = (lvl, lvl)
+
+-- RHS size: {terms: 30, types: 11, coercions: 0, joins: 0/0}
+g1 [InlPrag=NOINLINE, Dmd=UCU(P(UP(U),UP(U)))] :: Int -> (Int, Int)
+[LclId,
+ Arity=1,
+ Str=<SP(SU)>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 141 10}]
+g1
+  = \ (ds [Dmd=SP(SU)] :: Int) ->
+      case ds of { GHC.Types.I# ds [Dmd=SU] ->
+      case ds of ds {
+        __DEFAULT ->
+          (GHC.Types.I# (GHC.Prim.*# 2# ds),
+           case ds of wild {
+             __DEFAULT ->
+               case GHC.Classes.divInt# 2# wild of ww4 { __DEFAULT ->
+               GHC.Types.I# ww4
+               };
+             -1# -> GHC.Types.I# -2#;
+             0# -> case GHC.Real.divZeroError of wild [Dmd=B] { }
+           });
+        1# -> lvl
+      }
+      }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 0#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+lvl :: (Int, Int)
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
+lvl = g1 (GHC.Types.I# 2#)
+
+-- RHS size: {terms: 28, types: 18, coercions: 0, joins: 0/0}
+h1 :: Int -> Int
+[LclIdX,
+ Arity=1,
+ Str=<SP(MU)>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 111 10}]
+h1
+  = \ (ds [Dmd=SP(MU)] :: Int) ->
+      case ds of wild [Dmd=1P(1U)] { GHC.Types.I# ds [Dmd=MU] ->
+      case ds of {
+        __DEFAULT ->
+          case g1 wild of { (x [Dmd=SP(U)], ds [Dmd=SP(U)]) ->
+          case x of { GHC.Types.I# x ->
+          case ds of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.+# x y) }
+          }
+          };
+        1# -> lvl;
+        2# -> case lvl of { (ds1 [Dmd=A], y [Dmd=SU]) -> y }
+      }
+      }
+
+
+
+
+==================== Demand analysis ====================
+Result size of Demand analysis
+  = {terms: 171, types: 120, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+$trModule = "T18894"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18894.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T18894.$trModule = GHC.Types.Module $trModule $trModule
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 0#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# -2#
+
+-- RHS size: {terms: 32, types: 18, coercions: 0, joins: 0/0}
+$wg2 [InlPrag=NOINLINE, Dmd=UCU(CS(P(1P(U),SP(U))))]
+  :: Int -> GHC.Prim.Int# -> (# Int, Int #)
+[LclId,
+ Arity=2,
+ Str=<UP(U)><SU>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20 30] 121 20}]
+$wg2
+  = \ (w [Dmd=UP(U)] :: Int) (ww [Dmd=SU] :: GHC.Prim.Int#) ->
+      case ww of ds {
+        __DEFAULT ->
+          (# case w of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.*# 2# y) },
+             case ds of {
+               __DEFAULT ->
+                 case GHC.Classes.divInt# 2# ds of ww4 { __DEFAULT ->
+                 GHC.Types.I# ww4
+                 };
+               -1# -> lvl;
+               0# -> case GHC.Real.divZeroError of wild [Dmd=B] { }
+             } #);
+        1# -> (# w, lvl #)
+      }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 2#
+
+-- RHS size: {terms: 34, types: 21, coercions: 0, joins: 0/0}
+$wh2 [InlPrag=[2], Dmd=UCU(U)] :: GHC.Prim.Int# -> Int
+[LclId,
+ Arity=1,
+ Str=<SU>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [30] 162 10}]
+$wh2
+  = \ (ww [Dmd=SU] :: GHC.Prim.Int#) ->
+      case ww of ds {
+        __DEFAULT ->
+          case GHC.Prim.remInt# ds 2# of {
+            __DEFAULT ->
+              case $wg2 (GHC.Types.I# ds) 2# of
+              { (# ww [Dmd=A], ww [Dmd=SU] #) ->
+              ww
+              };
+            0# ->
+              case $wg2 lvl ds of { (# ww [Dmd=SP(U)], ww [Dmd=SP(U)] #) ->
+              case ww of { GHC.Types.I# x ->
+              case ww of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.+# x y) }
+              }
+              }
+          };
+        1# -> lvl
+      }
+
+-- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+h2 [InlPrag=[2]] :: Int -> Int
+[LclIdX,
+ Arity=1,
+ Str=<SP(SU)>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once1!] :: Int) ->
+                 case w of { GHC.Types.I# ww [Occ=Once1, Dmd=MU] -> $wh2 ww }}]
+h2
+  = \ (w [Dmd=SP(SU)] :: Int) ->
+      case w of { GHC.Types.I# ww [Dmd=SU] -> $wh2 ww }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# 15#
+
+-- RHS size: {terms: 28, types: 15, coercions: 0, joins: 0/0}
+$wg1 [InlPrag=NOINLINE, Dmd=UCU(P(UP(U),UP(U)))]
+  :: GHC.Prim.Int# -> (# Int, Int #)
+[LclId,
+ Arity=1,
+ Str=<SU>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [30] 111 20}]
+$wg1
+  = \ (ww [Dmd=SU] :: GHC.Prim.Int#) ->
+      case ww of ds {
+        __DEFAULT ->
+          (# GHC.Types.I# (GHC.Prim.*# 2# ds),
+             case ds of {
+               __DEFAULT ->
+                 case GHC.Classes.divInt# 2# ds of ww4 { __DEFAULT ->
+                 GHC.Types.I# ww4
+                 };
+               -1# -> lvl;
+               0# -> case GHC.Real.divZeroError of wild [Dmd=B] { }
+             } #);
+        1# -> (# lvl, lvl #)
+      }
+
+-- RHS size: {terms: 7, types: 9, coercions: 0, joins: 0/0}
+lvl :: (Int, Int)
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 40 10}]
+lvl = case $wg1 2# of { (# ww, ww #) -> (ww, ww) }
+
+-- RHS size: {terms: 25, types: 18, coercions: 0, joins: 0/0}
+$wh1 [InlPrag=[2], Dmd=UCU(U)] :: GHC.Prim.Int# -> Int
+[LclId,
+ Arity=1,
+ Str=<SU>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [50] 101 10}]
+$wh1
+  = \ (ww [Dmd=SU] :: GHC.Prim.Int#) ->
+      case ww of ds [Dmd=1U] {
+        __DEFAULT ->
+          case $wg1 ds of { (# ww [Dmd=SP(U)], ww [Dmd=SP(U)] #) ->
+          case ww of { GHC.Types.I# x ->
+          case ww of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.+# x y) }
+          }
+          };
+        1# -> lvl;
+        2# -> case lvl of { (ds1 [Dmd=A], y [Dmd=SU]) -> y }
+      }
+
+-- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+h1 [InlPrag=[2]] :: Int -> Int
+[LclIdX,
+ Arity=1,
+ Str=<SP(SU)>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once1!] :: Int) ->
+                 case w of { GHC.Types.I# ww [Occ=Once1, Dmd=MU] -> $wh1 ww }}]
+h1
+  = \ (w [Dmd=SP(SU)] :: Int) ->
+      case w of { GHC.Types.I# ww [Dmd=SU] -> $wh1 ww }
+
+
+
