@@ -101,6 +101,9 @@ latex_elements = {
 \setmonofont{DejaVu Sans Mono}
 \setlength{\tymin}{45pt}
 
+% Dynamic section number spacing. Fixes #18554
+\renewcommand{\numberline}[1]{#1~}
+
 % Avoid a torrent of over-full \hbox warnings
 \usepackage{microtype}
 \hbadness=99999
