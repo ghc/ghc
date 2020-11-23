@@ -81,6 +81,7 @@ The allocator manages two kinds of allocations:
 
  * small allocations, which are allocated into a set of "nursery" pages
    (recorded in m32_allocator_t.pages; the size of the set is <= M32_MAX_PAGES)
+
  * large allocations are those larger than a page and are mapped directly
 
 Each page (or the first page of a large allocation) begins with a m32_page_t
@@ -126,7 +127,9 @@ code accordingly).
 To avoid unnecessary mapping/unmapping we maintain a global list of free pages
 (which can grow up to M32_MAX_FREE_PAGE_POOL_SIZE long). Pages on this list
 have the usual m32_page_t header and are linked together with
-m32_page_t.free_page.next.
+m32_page_t.free_page.next. When run out of free pages we allocate a chunk of
+M32_MAP_PAGES to both avoid fragmenting our address space and amortize the
+runtime cost of the mapping.
 
 The allocator is *not* thread-safe.
 
@@ -139,7 +142,12 @@ The allocator is *not* thread-safe.
  * M32 ALLOCATOR (see Note [M32 Allocator]
  ***************************************************************************/
 
+/* How many open pages each allocator will keep around? */
 #define M32_MAX_PAGES 32
+/* How many pages should we map at once when re-filling the free page pool? */
+#define M32_MAP_PAGES 32
+/* Upper bound on the number of pages to keep in the free page pool */
+#define M32_MAX_FREE_PAGE_POOL_SIZE 64
 
 /**
  * Page header
@@ -204,7 +212,6 @@ struct m32_allocator_t {
  *
  * We keep a small pool of free pages around to avoid fragmentation.
  */
-#define M32_MAX_FREE_PAGE_POOL_SIZE 16
 struct m32_page_t *m32_free_page_pool = NULL;
 unsigned int m32_free_page_pool_size = 0;
 // TODO
@@ -250,18 +257,33 @@ m32_release_page(struct m32_page_t *page)
 static struct m32_page_t *
 m32_alloc_page(void)
 {
-  if (m32_free_page_pool_size > 0) {
-    struct m32_page_t *page = m32_free_page_pool;
-    m32_free_page_pool = page->free_page.next;
-    m32_free_page_pool_size --;
-    return page;
-  } else {
-    struct m32_page_t *page = mmapForLinker(getPageSize(), PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
-    if (page > (struct m32_page_t *) 0xffffffff) {
+  if (m32_free_page_pool_size == 0) {
+    /*
+     * Free page pool is empty; refill it with a new batch of M32_MAP_PAGES
+     * pages.
+     */
+    const size_t pgsz = getPageSize();
+    char *chunk = mmapForLinker(pgsz * M32_MAP_PAGES, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+    if (chunk > (char *) 0xffffffff) {
       barf("m32_alloc_page: failed to get allocation in lower 32-bits");
     }
-    return page;
+
+#define GET_PAGE(i) ((struct m32_page_t *) (chunk + (i) * pgsz))
+    for (int i=0; i < M32_MAP_PAGES; i++) {
+      struct m32_page_t *page = GET_PAGE(i);
+      page->free_page.next = GET_PAGE(i+1);
+    }
+
+    GET_PAGE(M32_MAP_PAGES-1)->free_page.next = m32_free_page_pool;
+    m32_free_page_pool = (struct m32_page_t *) chunk;
+    m32_free_page_pool_size += M32_MAP_PAGES;
+#undef GET_PAGE
   }
+
+  struct m32_page_t *page = m32_free_page_pool;
+  m32_free_page_pool = page->free_page.next;
+  m32_free_page_pool_size --;
+  return page;
 }
 
 /**
@@ -276,19 +298,6 @@ m32_allocator_new(bool executable)
     stgMallocBytes(sizeof(m32_allocator), "m32_new_allocator");
   memset(alloc, 0, sizeof(struct m32_allocator_t));
   alloc->executable = executable;
-
-  // Preallocate the initial M32_MAX_PAGES to ensure that they don't
-  // fragment the memory.
-  size_t pgsz = getPageSize();
-  char* bigchunk = mmapForLinker(pgsz * M32_MAX_PAGES, PROT_READ | PROT_WRITE, MAP_ANONYMOUS,-1,0);
-  if (bigchunk == NULL)
-      barf("m32_allocator_init: Failed to map");
-
-  int i;
-  for (i=0; i<M32_MAX_PAGES; i++) {
-     alloc->pages[i] = (struct m32_page_t *) (bigchunk + i*pgsz);
-     alloc->pages[i]->current_size = sizeof(struct m32_page_t);
-  }
   return alloc;
 }
 
@@ -350,7 +359,9 @@ m32_allocator_push_filled_list(struct m32_page_t **head, struct m32_page_t *page
 void
 m32_allocator_flush(m32_allocator *alloc) {
    for (int i=0; i<M32_MAX_PAGES; i++) {
-     if (alloc->pages[i]->current_size == sizeof(struct m32_page_t)) {
+     if (alloc->pages[i] == NULL) {
+       continue;
+     } else if (alloc->pages[i]->current_size == sizeof(struct m32_page_t)) {
        // the page is empty, free it
        m32_release_page(alloc->pages[i]);
      } else {
