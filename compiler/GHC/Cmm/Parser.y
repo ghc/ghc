@@ -918,7 +918,7 @@ getLit _ = panic "invalid literal" -- TODO messy failure
 nameToMachOp :: FastString -> PD (Width -> MachOp)
 nameToMachOp name =
   case lookupUFM machOps name of
-        Nothing -> failMsgPD $ flip mkParserErr (ErrCmmParser (CmmUnknownPrimitive name))
+        Nothing -> failMsgPD $ flip mkParserErrNoHints (ErrCmmParser (CmmUnknownPrimitive name))
         Just m  -> return m
 
 exprOp :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse CmmExpr)
@@ -1080,12 +1080,12 @@ parseSafety :: String -> PD Safety
 parseSafety "safe"   = return PlaySafe
 parseSafety "unsafe" = return PlayRisky
 parseSafety "interruptible" = return PlayInterruptible
-parseSafety str      = failMsgPD $ flip mkParserErr (ErrCmmParser (CmmUnrecognisedSafety str))
+parseSafety str      = failMsgPD $ flip mkParserErrNoHints (ErrCmmParser (CmmUnrecognisedSafety str))
 
 parseCmmHint :: String -> PD ForeignHint
 parseCmmHint "ptr"    = return AddrHint
 parseCmmHint "signed" = return SignedHint
-parseCmmHint str      = failMsgPD $ flip mkParserErr (ErrCmmParser (CmmUnrecognisedHint str))
+parseCmmHint str      = failMsgPD $ flip mkParserErrNoHints (ErrCmmParser (CmmUnrecognisedHint str))
 
 -- labels are always pointers, so we might as well infer the hint
 inferCmmHint :: CmmExpr -> ForeignHint
@@ -1112,7 +1112,7 @@ happyError = PD $ \_ s -> unP srcParseFail s
 stmtMacro :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse ())
 stmtMacro fun args_code = do
   case lookupUFM stmtMacros fun of
-    Nothing -> failMsgPD $ flip mkParserErr (ErrCmmParser (CmmUnknownMacro fun))
+    Nothing -> failMsgPD $ flip mkParserErrNoHints (ErrCmmParser (CmmUnknownMacro fun))
     Just fcode -> return $ do
         args <- sequence args_code
         code (fcode args)
@@ -1215,7 +1215,7 @@ foreignCall conv_string results_code expr_code args_code safety ret
   = do  conv <- case conv_string of
           "C"       -> return CCallConv
           "stdcall" -> return StdCallConv
-          _         -> failMsgPD $ flip mkParserErr (ErrCmmParser (CmmUnknownCConv conv_string))
+          _         -> failMsgPD $ flip mkParserErrNoHints (ErrCmmParser (CmmUnknownCConv conv_string))
         return $ do
           platform <- getPlatform
           results <- sequence results_code
@@ -1293,7 +1293,7 @@ primCall results_code name args_code
   = do
     platform <- PD.getPlatform
     case lookupUFM (callishMachOps platform) name of
-        Nothing -> failMsgPD $ flip mkParserErr (ErrCmmParser (CmmUnknownPrimitive name))
+        Nothing -> failMsgPD $ flip mkParserErrNoHints (ErrCmmParser (CmmUnknownPrimitive name))
         Just f  -> return $ do
                 results <- sequence results_code
                 args <- sequence args_code

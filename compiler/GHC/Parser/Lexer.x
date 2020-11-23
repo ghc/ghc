@@ -1111,7 +1111,7 @@ hopefully_open_brace span buf len
                  Layout prev_off _ : _ -> prev_off < offset
                  _                     -> True
       if isOK then pop_and open_brace span buf len
-              else addFatalError $ mkParserErr (mkSrcSpanPs span) ErrMissingBlock
+              else addFatalError $ mkParserErrNoHints (mkSrcSpanPs span) ErrMissingBlock
 
 pop_and :: Action -> Action
 pop_and act span buf len = do _ <- popLexState
@@ -1493,7 +1493,7 @@ errBrace :: AlexInput -> RealSrcSpan -> P a
 errBrace (AI end _) span =
   failLocMsgP (realSrcSpanStart span)
               (psRealLoc end)
-              (flip mkParserErr (ErrLexer LexUnterminatedComment LexErrKind_EOF))
+              (flip mkParserErrNoHints (ErrLexer LexUnterminatedComment LexErrKind_EOF))
 
 open_brace, close_brace :: Action
 open_brace span _str _len = do
@@ -1552,7 +1552,7 @@ varid span buf len =
           lambdaCase <- getBit LambdaCaseBit
           unless lambdaCase $ do
             pState <- getPState
-            addError $ mkParserErr (mkSrcSpanPs (last_loc pState)) ErrLambdaCase
+            addError $ mkParserErrNoHints (mkSrcSpanPs (last_loc pState)) ErrLambdaCase
           return ITlcase
         _ -> return ITcase
       maybe_layout keyword
@@ -1616,7 +1616,7 @@ varsym_prefix = sym $ \span exts s ->
 -- See Note [Whitespace-sensitive operator parsing]
 varsym_suffix :: Action
 varsym_suffix = sym $ \span _ s ->
-  if | s == fsLit "@" -> failMsgP (flip mkParserErr ErrSuffixAT)
+  if | s == fsLit "@" -> failMsgP (flip mkParserErrNoHints ErrSuffixAT)
      | otherwise ->
          do { addWarning Opt_WarnOperatorWhitespace $
                 mkParserWarn (mkSrcSpanPs span)
@@ -1677,7 +1677,7 @@ tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
   let src = lexemeToString buf len
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
-    addError $ mkParserErr (mkSrcSpanPs (last_loc pState)) (ErrNumUnderscores NumUnderscore_Integral)
+    addError $ mkParserErrNoHints (mkSrcSpanPs (last_loc pState)) (ErrNumUnderscores NumUnderscore_Integral)
   return $ L span $ itint (SourceText src)
        $! transint $ parseUnsignedInteger
        (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
@@ -1718,7 +1718,7 @@ tok_frac drop f span buf len = do
   let src = lexemeToString buf (len-drop)
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
-    addError $ mkParserErr (mkSrcSpanPs (last_loc pState)) (ErrNumUnderscores NumUnderscore_Float)
+    addError $ mkParserErrNoHints (mkSrcSpanPs (last_loc pState)) (ErrNumUnderscores NumUnderscore_Float)
   return (L span $! (f $! src))
 
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
@@ -1891,7 +1891,7 @@ lex_string_prag mkTok span _buf _len
           err (AI end _) =
             failLocMsgP (realSrcSpanStart (psRealSpan span))
                         (psRealLoc end)
-                        (flip mkParserErr (ErrLexer LexUnterminatedOptions LexErrKind_EOF))
+                        (flip mkParserErrNoHints (ErrLexer LexUnterminatedOptions LexErrKind_EOF))
 
 
 -- -----------------------------------------------------------------------------
@@ -1929,7 +1929,7 @@ lex_string s = do
                 setInput i
                 when (any (> '\xFF') s') $ do
                   pState <- getPState
-                  let err = mkParserErr (mkSrcSpanPs (last_loc pState)) ErrPrimStringInvalidChar
+                  let err = mkParserErrNoHints (mkSrcSpanPs (last_loc pState)) ErrPrimStringInvalidChar
                   addError err
                 return (ITprimstring (SourceText s') (unsafeMkByteString s'))
               _other ->
@@ -2192,7 +2192,7 @@ quasiquote_error :: RealSrcLoc -> P a
 quasiquote_error start = do
   (AI end buf) <- getInput
   reportLexError start (psRealLoc end) buf
-    (\k -> flip mkParserErr (ErrLexer LexUnterminatedQQ k))
+    (\k -> flip mkParserErrNoHints (ErrLexer LexUnterminatedQQ k))
 
 -- -----------------------------------------------------------------------------
 -- Warnings
@@ -2915,7 +2915,7 @@ srcParseErr
   -> Int                -- length of the previous token
   -> SrcSpan
   -> ErrMsg Error
-srcParseErr options buf len loc = mkParserErr loc (ErrParse token suggests)
+srcParseErr options buf len loc = mkParserErr loc (ErrParse token) suggests
   where
    token = lexemeToString (offsetBytes (-len) buf) len
    pattern = decodePrevNChars 8 buf
@@ -2950,7 +2950,7 @@ lexError e = do
   loc <- getRealSrcLoc
   (AI end buf) <- getInput
   reportLexError loc (psRealLoc end) buf
-    (\k -> flip mkParserErr (ErrLexer e k))
+    (\k -> flip mkParserErrNoHints (ErrLexer e k))
 
 -- -----------------------------------------------------------------------------
 -- This is the top-level function: called from the parser each time a
@@ -3198,7 +3198,7 @@ lexToken = do
         return (L span ITeof)
     AlexError (AI loc2 buf) ->
         reportLexError (psRealLoc loc1) (psRealLoc loc2) buf
-          (\k -> flip mkParserErr (ErrLexer LexError k))
+          (\k -> flip mkParserErrNoHints (ErrLexer LexError k))
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
