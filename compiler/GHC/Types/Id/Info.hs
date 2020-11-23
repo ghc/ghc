@@ -650,7 +650,7 @@ zapUsageInfo info = Just (info {demandInfo = zapUsageDemand (demandInfo info)})
 zapUsageEnvInfo :: IdInfo -> Maybe IdInfo
 zapUsageEnvInfo info
     | hasDemandEnvSig (strictnessInfo info)
-    = Just (info {strictnessInfo = zapUsageEnvSig (strictnessInfo info)})
+    = Just (info {strictnessInfo = zapDmdEnvSig (strictnessInfo info)})
     | otherwise
     = Nothing
 

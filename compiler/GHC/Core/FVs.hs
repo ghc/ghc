@@ -525,12 +525,11 @@ ruleLhsFVIds (Rule { ru_bndrs = bndrs, ru_args = args })
   = filterFV isLocalId $ addBndrs bndrs (exprs_fvs args)
 
 ruleRhsFreeIds :: CoreRule -> VarSet
--- ^ This finds all locally-defined free Ids on the left hand side of a rule
+-- ^ This finds all locally-defined free Ids on the right hand side of a rule
 -- and returns them as a non-deterministic set
 ruleRhsFreeIds (BuiltinRule {}) = emptyVarSet
-ruleRhsFreeIds (Rule { ru_bndrs = bndrs, ru_args = args })
-  = fvVarSet $ filterFV isLocalId $
-     addBndrs bndrs $ exprs_fvs args
+ruleRhsFreeIds (Rule { ru_bndrs = bndrs, ru_rhs = rhs })
+  = fvVarSet $ filterFV isLocalId $ addBndrs bndrs $ expr_fvs rhs
 
 {-
 Note [Rule free var hack]  (Not a hack any more)
