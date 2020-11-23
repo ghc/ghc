@@ -710,7 +710,11 @@ ocGetNames_ELF ( ObjectCode* oc )
                * address might be out of range for sections that are mmaped.
                */
               alloc = SECTION_MMAP;
-              start = mmapForLinker(size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+              start = mmapAnonForLinker(size);
+              if (start == NULL) {
+                barf("failed to mmap memory for bss. "
+                     "errno = %d", errno);
+              }
               mapped_start = start;
               mapped_offset = 0;
               mapped_size = roundUpToPage(size);
@@ -753,9 +757,9 @@ ocGetNames_ELF ( ObjectCode* oc )
           unsigned nstubs = numberOfStubsForSection(oc, i);
           unsigned stub_space = STUB_SIZE * nstubs;
 
-          void * mem = mmapForLinker(size+stub_space, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
+          void * mem = mmapAnonForLinker(size+stub_space);
 
-          if( mem == MAP_FAILED ) {
+          if( mem == NULL ) {
               barf("failed to mmap allocated memory to load section %d. "
                    "errno = %d", i, errno);
           }
@@ -862,11 +866,10 @@ ocGetNames_ELF ( ObjectCode* oc )
       }
       void * common_mem = NULL;
       if(common_size > 0) {
-          common_mem = mmapForLinker(common_size,
-                            PROT_READ | PROT_WRITE,
-                            MAP_ANON | MAP_PRIVATE,
-                            -1, 0);
-          ASSERT(common_mem != NULL);
+          common_mem = mmapAnonForLinker(common_size);
+          if (common_mem == NULL) {
+            barf("ocGetNames_ELF: Failed to allocate memory for SHN_COMMONs");
+          }
       }
 
       //TODO: we ignore local symbols anyway right? So we can use the

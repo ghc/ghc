@@ -1060,7 +1060,7 @@ mmap_again:
                fixed = MAP_FIXED;
                goto mmap_again;
 #else
-               errorBelch("loadObj: failed to mmap() memory below 2Gb; "
+               errorBelch("mmapForLinker: failed to mmap() memory below 2Gb; "
                           "asked for %lu bytes at %p. "
                           "Try specifying an address with +RTS -xm<addr> -RTS",
                           size, map_addr);
@@ -1119,6 +1119,16 @@ mmap_again:
 
    return result;
 }
+
+/*
+ * Map read/write pages in low memory. Returns NULL on failure.
+ */
+void *
+mmapAnonForLinker (size_t bytes)
+{
+  return mmapForLinker (bytes, PROT_READ|PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+}
+
 
 /* Note [Memory protection in the linker]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
