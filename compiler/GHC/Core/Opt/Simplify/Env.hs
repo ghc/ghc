@@ -598,11 +598,10 @@ addJoinFlts = appOL
 mkRecFloats :: SimplFloats -> SimplFloats
 -- Flattens the floats into a single Rec group,
 -- They must either all be lifted LetFloats or all JoinFloats
-mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs ff
+mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs _ff
                                 , sfJoinFloats = jbs
                                 , sfInScope    = in_scope })
-  = ASSERT2( case ff of { FltLifted -> True; _ -> False }, ppr (fromOL bs) )
-    ASSERT2( isNilOL bs || isNilOL jbs, ppr floats )
+  = ASSERT2( isNilOL bs || isNilOL jbs, ppr floats )
     SimplFloats { sfLetFloats  = floats'
                 , sfJoinFloats = jfloats'
                 , sfInScope    = in_scope }

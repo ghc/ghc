@@ -66,6 +66,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic
+import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Supply ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
@@ -499,7 +500,7 @@ doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
                                        doPass exitifyProgram
 
 doCorePass CoreDoDemand              = {-# SCC "DmdAnal" #-}
-                                       doPassDFM dmdAnal
+                                       doPassDFRM dmdAnal
 
 doCorePass CoreDoCpr                 = {-# SCC "CprAnal" #-}
                                        doPassDFM cprAnalProgram
@@ -581,6 +582,13 @@ doPassDFM do_pass guts = do
     p_fam_env <- getPackageFamInstEnv
     let fam_envs = (p_fam_env, mg_fam_inst_env guts)
     doPassM (liftIO . do_pass dflags fam_envs) guts
+
+doPassDFRM :: (DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram) -> ModGuts -> CoreM ModGuts
+doPassDFRM do_pass guts = do
+    dflags <- getDynFlags
+    p_fam_env <- getPackageFamInstEnv
+    let fam_envs = (p_fam_env, mg_fam_inst_env guts)
+    doPassM (liftIO . do_pass dflags fam_envs (mg_rules guts)) guts
 
 doPassDFU :: (DynFlags -> FamInstEnvs -> UniqSupply -> CoreProgram -> CoreProgram) -> ModGuts -> CoreM ModGuts
 doPassDFU do_pass guts = do
@@ -1095,13 +1103,13 @@ transferIdInfo exported_id local_id
 
 
 
-dmdAnal :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
-dmdAnal dflags fam_envs binds = do
+dmdAnal :: DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
+dmdAnal dflags fam_envs rules binds = do
   let opts = DmdAnalOpts
                { dmd_strict_dicts = gopt Opt_DictsStrict dflags
                }
-      binds_plus_dmds = dmdAnalProgram opts fam_envs binds
+      binds_plus_dmds = dmdAnalProgram opts fam_envs rules binds
   Err.dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
-    dumpIdInfoOfProgram (ppr . strictnessInfo) binds_plus_dmds
+    dumpIdInfoOfProgram (ppr . zapDmdEnvSig . strictnessInfo) binds_plus_dmds
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_dmds `seq` return binds_plus_dmds

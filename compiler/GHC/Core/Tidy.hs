@@ -21,7 +21,7 @@ import GHC.Core
 import GHC.Core.Seq ( seqUnfolding )
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Demand ( zapUsageEnvSig )
+import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Core.Type     ( tidyType, tidyVarBndr )
 import GHC.Core.Coercion ( tidyCo )
 import GHC.Types.Var
@@ -206,7 +206,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
         new_info = vanillaIdInfo
                     `setOccInfo`        occInfo old_info
                     `setArityInfo`      arityInfo old_info
-                    `setStrictnessInfo` zapUsageEnvSig (strictnessInfo old_info)
+                    `setStrictnessInfo` zapDmdEnvSig (strictnessInfo old_info)
                     `setDemandInfo`     demandInfo old_info
                     `setInlinePragInfo` inlinePragInfo old_info
                     `setUnfoldingInfo`  new_unf
