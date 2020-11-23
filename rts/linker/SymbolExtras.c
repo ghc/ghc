@@ -85,7 +85,7 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
       if (new) {
           memcpy(new, oc->image, oc->fileSize);
           if (oc->imageMapped) {
-              munmap(oc->image, n);
+              munmapForLinker(oc->image, n, "ocAllocateExtras");
           }
           oc->image = new;
           oc->imageMapped = true;
