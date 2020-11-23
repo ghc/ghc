@@ -114,13 +114,13 @@ void _assertFail(const char *filename, unsigned int linenum)
    GNUC3_ATTRIBUTE(__noreturn__);
 
 #define CHECK(predicate)                        \
-        if (predicate)                          \
+        if (RTS_LIKELY(predicate))              \
             /*null*/;                           \
         else                                    \
             _assertFail(__FILE__, __LINE__)
 
 #define CHECKM(predicate, msg, ...)             \
-        if (predicate)                          \
+        if (RTS_LIKELY(predicate))              \
             /*null*/;                           \
         else                                    \
             barf(msg, ##__VA_ARGS__)
