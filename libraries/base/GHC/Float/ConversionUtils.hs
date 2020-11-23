@@ -36,7 +36,7 @@ default ()
 -- Double mantissae have 53 bits, too much for Int#
 elim64# :: Int64# -> Int# -> (# Integer, Int# #)
 elim64# n e =
-    case zeroCount (narrowInt8# (int64ToInt# n) of
+    case zeroCount (intToInt8# (int64ToInt# n) of
       t | isTrue# (e <=# t) -> (# integerFromInt64# (uncheckedIShiftRA64# n e), 0# #)
         | isTrue# (t <# 8#) -> (# integerFromInt64# (uncheckedIShiftRA64# n t), e -# t #)
         | otherwise         -> elim64# (uncheckedIShiftRA64# n 8#) (e -# 8#)
@@ -57,13 +57,13 @@ elimZerosInteger m e = elim64# (TO64 m) e
 
 elimZerosInt# :: Int# -> Int# -> (# Integer, Int# #)
 elimZerosInt# n e =
-    case zeroCount (narrowInt8# n) of
+    case zeroCount (intToInt8# n) of
       t | isTrue# (e <=# t) -> (# IS (uncheckedIShiftRA# n e), 0# #)
         | isTrue# (t <# 8#) -> (# IS (uncheckedIShiftRA# n t), e -# t #)
         | otherwise         -> elimZerosInt# (uncheckedIShiftRA# n 8#) (e -# 8#)
 
 -- | Number of trailing zero bits in a byte
 zeroCount :: Int8# -> Int#
-zeroCount i = extendInt8# (indexInt8OffAddr# arr (extendInt8# i))
+zeroCount i = int8ToInt# (indexInt8OffAddr# arr (int8ToInt# i))
   where
     arr = "\8\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\4\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\5\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\4\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\6\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\4\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\5\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\4\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\7\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\4\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\5\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\4\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\6\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\4\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\5\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0\4\0\1\0\2\0\1\0\3\0\1\0\2\0\1\0"#

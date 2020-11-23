@@ -288,8 +288,8 @@ section "Int8#"
 
 primtype Int8#
 
-primop Int8ExtendOp "extendInt8#" GenPrimOp Int8# -> Int#
-primop Int8NarrowOp "narrowInt8#" GenPrimOp Int# -> Int8#
+primop Int8ToIntOp "int8ToInt#" GenPrimOp Int8# -> Int#
+primop IntToInt8Op "intToInt8#" GenPrimOp Int# -> Int8#
 
 primop Int8NegOp "negateInt8#" GenPrimOp Int8# -> Int8#
 
@@ -329,8 +329,8 @@ section "Word8#"
 
 primtype Word8#
 
-primop Word8ExtendOp "extendWord8#" GenPrimOp Word8# -> Word#
-primop Word8NarrowOp "narrowWord8#" GenPrimOp Word# -> Word8#
+primop Word8ToWordOp "word8ToWord#" GenPrimOp Word8# -> Word#
+primop WordToWord8Op "wordToWord8#" GenPrimOp Word# -> Word8#
 
 primop Word8NotOp "notWord8#" GenPrimOp Word8# -> Word8#
 
@@ -370,8 +370,8 @@ section "Int16#"
 
 primtype Int16#
 
-primop Int16ExtendOp "extendInt16#" GenPrimOp Int16# -> Int#
-primop Int16NarrowOp "narrowInt16#" GenPrimOp Int# -> Int16#
+primop Int16ToIntOp "int16ToInt#" GenPrimOp Int16# -> Int#
+primop IntToInt16Op "intToInt16#" GenPrimOp Int# -> Int16#
 
 primop Int16NegOp "negateInt16#" GenPrimOp Int16# -> Int16#
 
@@ -411,8 +411,8 @@ section "Word16#"
 
 primtype Word16#
 
-primop Word16ExtendOp "extendWord16#" GenPrimOp Word16# -> Word#
-primop Word16NarrowOp "narrowWord16#" GenPrimOp Word# -> Word16#
+primop Word16ToWordOp "word16ToWord#" GenPrimOp Word16# -> Word#
+primop WordToWord16Op "wordToWord16#" GenPrimOp Word# -> Word16#
 
 primop Word16NotOp "notWord16#" GenPrimOp Word16# -> Word16#
 
@@ -452,8 +452,8 @@ section "Int32#"
 
 primtype Int32#
 
-primop Int32ExtendOp "extendInt32#" GenPrimOp Int32# -> Int#
-primop Int32NarrowOp "narrowInt32#" GenPrimOp Int# -> Int32#
+primop Int32ToIntOp "int32ToInt#" GenPrimOp Int32# -> Int#
+primop IntToInt32Op "intToInt32#" GenPrimOp Int# -> Int32#
 
 ------------------------------------------------------------------------
 section "Word32#"
@@ -462,8 +462,8 @@ section "Word32#"
 
 primtype Word32#
 
-primop Word32ExtendOp "extendWord32#" GenPrimOp Word32# -> Word#
-primop Word32NarrowOp "narrowWord32#" GenPrimOp Word# -> Word32#
+primop Word32ToWordOp "word32ToWord#" GenPrimOp Word32# -> Word#
+primop WordToWord32Op "wordToWord32#" GenPrimOp Word# -> Word32#
 
 #if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------
