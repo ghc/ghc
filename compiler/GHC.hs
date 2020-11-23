@@ -343,7 +343,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Module
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family
-import GHC.Tc.Errors.Types ( TcRnError(..), TcRnWarning )
+import GHC.Tc.Errors.Types as TcRn ( Error(..), Warning )
 
 import GHC.SysTools.FileCleanup
 import GHC.SysTools
@@ -1452,7 +1452,7 @@ getNameToInstancesIndex :: GhcMonad m
                      -- if it is visible from at least one module in the list.
   -> Maybe [Module]  -- ^ modules to load. If this is not specified, we load
                      -- modules for everything that is in scope unqualified.
-  -> m (Messages TcRnWarning TcRnError, Maybe (NameEnv ([ClsInst], [FamInst])))
+  -> m (Messages TcRn.Warning TcRn.Error, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
   liftIO $ runTcInteractive hsc_env $

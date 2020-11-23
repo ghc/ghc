@@ -574,6 +574,7 @@ Library
         GHC.Tc.Errors.Hole
         GHC.Tc.Errors.Hole.FitTypes
         GHC.Tc.Errors.Types
+        GHC.Tc.Errors.Ppr
         GHC.Tc.Gen.Annotation
         GHC.Tc.Gen.App
         GHC.Tc.Gen.Arrow
