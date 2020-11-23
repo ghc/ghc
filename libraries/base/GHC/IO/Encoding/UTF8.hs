@@ -283,8 +283,8 @@ ord4 c = assert (n >= 0x10000) (x1,x2,x3,x4)
 chr2       :: Word8 -> Word8 -> Char
 chr2 (W8# x1#) (W8# x2#) = C# (chr# (z1# +# z2#))
     where
-      !y1# = word2Int# (extendWord8# x1#)
-      !y2# = word2Int# (extendWord8# x2#)
+      !y1# = word2Int# (word8ToWord# x1#)
+      !y2# = word2Int# (word8ToWord# x2#)
       !z1# = uncheckedIShiftL# (y1# -# 0xC0#) 6#
       !z2# = y2# -# 0x80#
 {-# INLINE chr2 #-}
@@ -292,9 +292,9 @@ chr2 (W8# x1#) (W8# x2#) = C# (chr# (z1# +# z2#))
 chr3          :: Word8 -> Word8 -> Word8 -> Char
 chr3 (W8# x1#) (W8# x2#) (W8# x3#) = C# (chr# (z1# +# z2# +# z3#))
     where
-      !y1# = word2Int# (extendWord8# x1#)
-      !y2# = word2Int# (extendWord8# x2#)
-      !y3# = word2Int# (extendWord8# x3#)
+      !y1# = word2Int# (word8ToWord# x1#)
+      !y2# = word2Int# (word8ToWord# x2#)
+      !y3# = word2Int# (word8ToWord# x3#)
       !z1# = uncheckedIShiftL# (y1# -# 0xE0#) 12#
       !z2# = uncheckedIShiftL# (y2# -# 0x80#) 6#
       !z3# = y3# -# 0x80#
@@ -304,10 +304,10 @@ chr4             :: Word8 -> Word8 -> Word8 -> Word8 -> Char
 chr4 (W8# x1#) (W8# x2#) (W8# x3#) (W8# x4#) =
     C# (chr# (z1# +# z2# +# z3# +# z4#))
     where
-      !y1# = word2Int# (extendWord8# x1#)
-      !y2# = word2Int# (extendWord8# x2#)
-      !y3# = word2Int# (extendWord8# x3#)
-      !y4# = word2Int# (extendWord8# x4#)
+      !y1# = word2Int# (word8ToWord# x1#)
+      !y2# = word2Int# (word8ToWord# x2#)
+      !y3# = word2Int# (word8ToWord# x3#)
+      !y4# = word2Int# (word8ToWord# x4#)
       !z1# = uncheckedIShiftL# (y1# -# 0xF0#) 18#
       !z2# = uncheckedIShiftL# (y2# -# 0x80#) 12#
       !z3# = uncheckedIShiftL# (y3# -# 0x80#) 6#
