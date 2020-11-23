@@ -1788,42 +1788,28 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 bool
 ocAllocateExtras_PEi386 ( ObjectCode* oc )
 {
-   /* If the ObjectCode was unloaded we don't need a trampoline, it's likely
-      an import library so we're discarding it earlier.  */
-   if (!oc->info)
-     return false;
+    /* If the ObjectCode was unloaded we don't need a trampoline, it's likely
+       an import library so we're discarding it earlier.  */
+    if (!oc->info)
+      return false;
 
-   const int mask = default_alignment - 1;
-   size_t origin  = oc->info->trampoline;
-   oc->symbol_extras
-     = (SymbolExtra*)((uintptr_t)(oc->info->image + origin + mask) & ~mask);
-   oc->first_symbol_extra = 0;
-   COFF_HEADER_INFO *info = oc->info->ch_info;
-   oc->n_symbol_extras    = info->numberOfSymbols;
+    // These are allocated on-demand from m32 by makeSymbolExtra_PEi386
+    oc->first_symbol_extra = 0;
+    oc->n_symbol_extras    = 0;
+    oc->symbol_extras      = NULL;
 
-   return true;
+    return true;
 }
 
 static size_t
-makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index, size_t s, char* symbol )
+makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index STG_UNUSED, size_t s, char* symbol STG_UNUSED )
 {
-    unsigned int curr_thunk;
-    SymbolExtra *extra;
-    curr_thunk = oc->first_symbol_extra + index;
-    if (index >= oc->n_symbol_extras) {
-      IF_DEBUG(linker, debugBelch("makeSymbolExtra first:%d, num:%lu, member:%" PATH_FMT ", index:%llu\n", curr_thunk, oc->n_symbol_extras, oc->archiveMemberName, index));
-      barf("Can't allocate thunk for `%s' in `%" PATH_FMT "' with member `%" PATH_FMT "'", symbol, oc->fileName, oc->archiveMemberName);
-    }
+    SymbolExtra *extra = m32_alloc(oc->rx_m32, sizeof(SymbolExtra), 8);
 
-    extra = oc->symbol_extras + curr_thunk;
-
-    if (!extra->addr)
-    {
-        // jmp *-14(%rip)
-        static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
-        extra->addr = (uint64_t)s;
-        memcpy(extra->jumpIsland, jmp, 6);
-    }
+    // jmp *-14(%rip)
+    static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
+    extra->addr = (uint64_t)s;
+    memcpy(extra->jumpIsland, jmp, 6);
 
     return (size_t)extra->jumpIsland;
 }

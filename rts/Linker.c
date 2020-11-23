@@ -1206,8 +1206,9 @@ void munmapForLinker (void *addr, size_t bytes, const char *caller)
  * Note that the m32 allocator handles protection of its allocations. For this
  * reason the caller to m32_alloc() must tell the allocator whether the
  * allocation needs to be executable. The caller must then ensure that they
- * call m32_flush() after they are finished filling the region, which will
- * cause the allocator to change the protection bits to PROT_READ|PROT_EXEC.
+ * call m32_allocator_flush() after they are finished filling the region, which
+ * will cause the allocator to change the protection bits to
+ * PROT_READ|PROT_EXEC.
  *
  */
 
