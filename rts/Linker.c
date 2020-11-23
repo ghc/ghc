@@ -1018,7 +1018,38 @@ resolveSymbolAddr (pathchar* buffer, int size,
 #endif /* OBJFORMAT_PEi386 */
 }
 
-#if RTS_LINKER_USE_MMAP
+#if defined(mingw32_HOST_OS)
+
+//
+// Returns NULL on failure.
+//
+void *
+mmapAnonForLinker (size_t bytes)
+{
+  return VirtualAlloc(NULL, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+}
+
+void
+munmapForLinker (void *addr, size_t bytes, const char *caller)
+{
+  if (VirtualFree(addr, 0, MEM_RELEASE) == 0) {
+    sysErrorBelch("munmapForLinker: %s: Failed to unmap %zd bytes at %p",
+                  caller, bytes, addr);
+  }
+}
+
+void
+mmapForLinkerMarkExecutable(void *start, size_t len)
+{
+  DWORD old;
+  if (VirtualProtect(start, len, PAGE_EXECUTE_READ, &old) == 0) {
+    sysErrorBelch("mmapForLinkerMarkExecutable: failed to protect %zd bytes at %p",
+                  len, start);
+    ASSERT(false);
+  }
+}
+
+#elif RTS_LINKER_USE_MMAP
 
 /* -----------------------------------------------------------------------------
    Occationally we depend on mmap'd region being close to already mmap'd regions.
