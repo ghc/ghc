@@ -444,11 +444,8 @@ makeGot(ObjectCode * oc) {
 
     if(got_slots > 0) {
         oc->info->got_size =  got_slots * sizeof(void*);
-        oc->info->got_start = mmapForLinker(oc->info->got_size,
-                                   PROT_READ | PROT_WRITE,
-                                   MAP_ANON | MAP_PRIVATE,
-                                   -1, 0);
-        if( oc->info->got_start == MAP_FAILED ) {
+        oc->info->got_start = mmapAnonForLinker(oc->info->got_size);
+        if( oc->info->got_start == NULL ) {
             barf("MAP_FAILED. errno=%d", errno );
             return EXIT_FAILURE;
         }
@@ -1060,7 +1057,7 @@ ocBuildSegments_MachO(ObjectCode *oc)
         return 1;
     }
 
-    mem = mmapForLinker(size_compound, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
+    mem = mmapAnonForLinker(size_compound);
     if (NULL == mem) return 0;
 
     IF_DEBUG(linker, debugBelch("ocBuildSegments: allocating %d segments\n", n_activeSegments));
