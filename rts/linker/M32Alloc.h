@@ -8,19 +8,17 @@
 
 #pragma once
 
-#if RTS_LINKER_USE_MMAP == 1
-#include <fcntl.h>
-#include <sys/mman.h>
-
-#if defined(HAVE_UNISTD_H)
-#include <unistd.h>
-#endif
-
+/*
+ * We use the m32 allocator for symbol extras on Windows and other mmap-using
+ * platforms.
+ */
+#if RTS_LINKER_USE_MMAP
+#define NEED_M32 1
 #endif
 
 #include "BeginPrivate.h"
 
-#if RTS_LINKER_USE_MMAP
+#if defined(NEED_M32)
 #define M32_NO_RETURN    /* Nothing */
 #else
 #define M32_NO_RETURN    GNUC3_ATTRIBUTE(__noreturn__)

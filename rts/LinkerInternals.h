@@ -138,6 +138,14 @@ typedef struct _Segment {
 #define NEED_SYMBOL_EXTRAS 1
 #endif
 
+/*
+ * We use the m32 allocator for symbol extras on Windows and other mmap-using
+ * platforms.
+ */
+#if RTS_LINKER_USE_MMAP
+#define NEED_M32 1
+#endif
+
 /* Jump Islands are sniplets of machine code required for relative
  * address relocations on the PowerPC, x86_64 and ARM.
  */
@@ -261,7 +269,7 @@ typedef struct _ObjectCode {
        require extra information.*/
     HashTable *extraInfos;
 
-#if RTS_LINKER_USE_MMAP == 1
+#if defined(NEED_M32)
     /* The m32 allocators used for allocating small sections and symbol extras
      * during loading. We have two: one for (writeable) data and one for
      * (read-only/executable) code. */

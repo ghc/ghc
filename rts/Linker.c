@@ -45,6 +45,8 @@
 #include <sys/types.h>
 #endif
 
+#include <fcntl.h>
+#include <unistd.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1256,13 +1258,13 @@ void freeObjectCode (ObjectCode *oc)
                     munmap(oc->sections[i].mapped_start,
                            oc->sections[i].mapped_size);
                     break;
+#endif
                 case SECTION_M32:
                     IF_DEBUG(zero_on_gc,
                         memset(oc->sections[i].start,
                             0x00, oc->sections[i].size));
                     // Freed by m32_allocator_free
                     break;
-#endif
                 case SECTION_MALLOC:
                     IF_DEBUG(zero_on_gc,
                         memset(oc->sections[i].start,
@@ -1305,7 +1307,7 @@ void freeObjectCode (ObjectCode *oc)
     ocDeinit_ELF(oc);
 #endif
 
-#if RTS_LINKER_USE_MMAP == 1
+#if defined(NEED_M32)
     m32_allocator_free(oc->rx_m32);
     m32_allocator_free(oc->rw_m32);
 #endif
@@ -1381,7 +1383,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->mark              = object_code_mark_bit;
    oc->dependencies      = allocHashSet();
 
-#if RTS_LINKER_USE_MMAP
+#if defined(NEED_M32)
    oc->rw_m32 = m32_allocator_new(false);
    oc->rx_m32 = m32_allocator_new(true);
 #endif
@@ -1716,7 +1718,7 @@ int ocTryLoad (ObjectCode* oc) {
 
     // We have finished loading and relocating; flush the m32 allocators to
     // setup page protections.
-#if RTS_LINKER_USE_MMAP
+#if defined(NEED_M32)
     m32_allocator_flush(oc->rx_m32);
     m32_allocator_flush(oc->rw_m32);
 #endif

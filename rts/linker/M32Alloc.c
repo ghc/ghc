@@ -24,25 +24,25 @@ Note [Compile Time Trickery]
 
 This file implements two versions of each of the `m32_*` functions. At the top
 of the file there is the real implementation (compiled in when
-`RTS_LINKER_USE_MMAP` is true) and a dummy implementation that exists only to
+`NEED_M32` is true) and a dummy implementation that exists only to
 satisfy the compiler and which should never be called. If any of these dummy
 implementations are called the program will abort.
 
 The rationale for this is to allow the calling code to be written without using
-the C pre-processor (CPP) `#if` hackery. The value of `RTS_LINKER_USE_MMAP` is
-known at compile time, code like:
+the C pre-processor (CPP) `#if` hackery. The value of `NEED_M32` is
+known at compile time, allowing code like:
 
-    if (RTS_LINKER_USE_MMAP)
+    if (NEED_M32)
         m32_allocator_init();
 
-will be compiled to call to `m32_allocator_init` if  `RTS_LINKER_USE_MMAP` is
-true and will be optimised awat to nothing if `RTS_LINKER_USE_MMAP` is false.
-However, regardless of the value of `RTS_LINKER_USE_MMAP` the compiler will
+will be compiled to call to `m32_allocator_init` if  `NEED_M32` is
+true and will be optimised away to nothing if `NEED_M32` is false.
+However, regardless of the value of `NEED_M32` the compiler will
 still check the call for syntax and correct function parameter types.
 
 */
 
-#if RTS_LINKER_USE_MMAP == 1
+#if defined(NEED_M32)
 
 /*
 
@@ -468,7 +468,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
    return (char*)page + ROUND_UP(sizeof(struct m32_page_t),alignment);
 }
 
-#elif RTS_LINKER_USE_MMAP == 0
+#else
 
 // The following implementations of these functions should never be called. If
 // they are, there is a bug at the call site.
@@ -498,9 +498,5 @@ m32_alloc(m32_allocator *alloc STG_UNUSED,
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }
-
-#else
-
-#error RTS_LINKER_USE_MMAP should be either `0` or `1`.
 
 #endif
