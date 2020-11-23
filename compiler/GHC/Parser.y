@@ -788,7 +788,7 @@ HYPHEN :: { [AddAnn] }
       | PREFIX_MINUS { [mj AnnMinus $1 ] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "-")
                    then return [mj AnnMinus $1]
-                   else do { addError $ mkParserErr (getLoc $1) ErrExpectedHyphen
+                   else do { addError $ mkParserErrNoHints (getLoc $1) ErrExpectedHyphen
                            ; return [] } }
 
 
@@ -1085,7 +1085,7 @@ maybe_safe :: { ([AddAnn],Bool) }
 maybe_pkg :: { ([AddAnn],Maybe StringLiteral) }
         : STRING  {% do { let { pkgFS = getSTRING $1 }
                         ; unless (looksLikePackageName (unpackFS pkgFS)) $
-                             addError $ mkParserErr (getLoc $1) (ErrInvalidPackageName pkgFS)
+                             addError $ mkParserErrNoHints (getLoc $1) (ErrInvalidPackageName pkgFS)
                         ; return ([mj AnnPackageName $1], Just (StringLiteral (getSTRINGs $1) pkgFS)) } }
         | {- empty -}                           { ([],Nothing) }
 
@@ -1786,7 +1786,7 @@ rule_activation_marker :: { [AddAnn] }
       : PREFIX_TILDE { [mj AnnTilde $1] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "~")
                    then return [mj AnnTilde $1]
-                   else do { addError $ mkParserErr (getLoc $1) ErrInvalidRuleActivationMarker
+                   else do { addError $ mkParserErrNoHints (getLoc $1) ErrInvalidRuleActivationMarker
                            ; return [] } }
 
 rule_explicit_activation :: { ([AddAnn]
@@ -3833,7 +3833,7 @@ getSCC :: Located Token -> P FastString
 getSCC lt = do let s = getSTRING lt
                -- We probably actually want to be more restrictive than this
                if ' ' `elem` unpackFS s
-                   then addFatalError $ mkParserErr (getLoc lt) ErrSpaceInSCC
+                   then addFatalError $ mkParserErrNoHints (getLoc lt) ErrSpaceInSCC
                    else return s
 
 -- Utilities for combining source spans
@@ -3918,7 +3918,7 @@ fileSrcSpan = do
 hintLinear :: MonadP m => SrcSpan -> m ()
 hintLinear span = do
   linearEnabled <- getBit LinearTypesBit
-  unless linearEnabled $ addError $ mkParserErr span ErrLinearFunction
+  unless linearEnabled $ addError $ mkParserErrNoHints span ErrLinearFunction
 
 -- Does this look like (a %m)?
 looksLikeMult :: LHsType GhcPs -> Located RdrName -> LHsType GhcPs -> Bool
@@ -3937,7 +3937,7 @@ looksLikeMult ty1 l_op ty2
 hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
   mwiEnabled <- getBit MultiWayIfBit
-  unless mwiEnabled $ addError $ mkParserErr span ErrMultiWayIf
+  unless mwiEnabled $ addError $ mkParserErrNoHints span ErrMultiWayIf
 
 -- Hint about explicit-forall
 hintExplicitForall :: Located Token -> P ()
@@ -3945,7 +3945,7 @@ hintExplicitForall tok = do
     forall   <- getBit ExplicitForallBit
     rulePrag <- getBit InRulePragBit
     unless (forall || rulePrag) $
-      addError $ mkParserErr (getLoc tok) (ErrExplicitForall (isUnicode tok))
+      addError $ mkParserErrNoHints (getLoc tok) (ErrExplicitForall (isUnicode tok))
 
 -- Hint about qualified-do
 hintQualifiedDo :: Located Token -> P ()
@@ -3953,7 +3953,7 @@ hintQualifiedDo tok = do
     qualifiedDo   <- getBit QualifiedDoBit
     case maybeQDoDoc of
       Just qdoDoc | not qualifiedDo ->
-        addError $ mkParserErr (getLoc tok) (ErrIllegalQualifiedDo qdoDoc)
+        addError $ mkParserErrNoHints (getLoc tok) (ErrIllegalQualifiedDo qdoDoc)
       _ -> return ()
   where
     maybeQDoDoc = case unLoc tok of
@@ -3967,7 +3967,7 @@ hintQualifiedDo tok = do
 reportEmptyDoubleQuotes :: SrcSpan -> P a
 reportEmptyDoubleQuotes span = do
     thQuotes <- getBit ThQuotesBit
-    addFatalError $ mkParserErr span (ErrEmptyDoubleQuotes thQuotes)
+    addFatalError $ mkParserErrNoHints span (ErrEmptyDoubleQuotes thQuotes)
 
 {-
 %************************************************************************
