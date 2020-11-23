@@ -58,7 +58,7 @@ module GHC.StgToCmm.Monad (
         -- more localised access to monad state
         CgIdInfo(..),
         getBinds, setBinds,
-        getUsedInfo, addUsedInfo,
+        getUsedInfo,
         -- out of general friendliness, we also export ...
         CgInfoDownwards(..), CgState(..)        -- non-abstract
     ) where
@@ -385,9 +385,6 @@ s1 `addCodeBlocksFrom` s2
          cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2,
          cgs_used_info =  (cgs_used_info s1) ++ (cgs_used_info s2)
                           }
-
-addUsedInfo :: CmmInfoTable -> CgState -> CgState
-addUsedInfo cl cg = cg { cgs_used_info  = cl : cgs_used_info cg }
 
 -- The heap high water mark is the larger of virtHp and hwHp.  The latter is
 -- only records the high water marks of forked-off branches, so to find the
