@@ -42,7 +42,7 @@ still check the call for syntax and correct function parameter types.
 
 */
 
-#if RTS_LINKER_USE_MMAP == 1
+#if defined(NEED_M32)
 
 /*
 
@@ -448,7 +448,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
    return (char*)page + ROUND_UP(sizeof(struct m32_page_t),alignment);
 }
 
-#elif RTS_LINKER_USE_MMAP == 0
+#else
 
 // The following implementations of these functions should never be called. If
 // they are, there is a bug at the call site.
@@ -478,9 +478,5 @@ m32_alloc(m32_allocator *alloc STG_UNUSED,
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }
-
-#else
-
-#error RTS_LINKER_USE_MMAP should be either `0` or `1`.
 
 #endif
