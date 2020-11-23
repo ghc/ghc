@@ -173,7 +173,7 @@ typedef struct _Segment {
  * We use the m32 allocator for symbol extras on Windows and other mmap-using
  * platforms.
  */
-#if RTS_LINKER_USE_MMAP
+#if RTS_LINKER_USE_MMAP || defined(mingw32_HOST_ARCH)
 #define NEED_M32 1
 #endif
 
