@@ -1147,12 +1147,12 @@ emitPrimOp dflags primop = case primop of
   AddrEqOp       -> \args -> opTranslate args (mo_wordEq platform)
   AddrNeOp       -> \args -> opTranslate args (mo_wordNe platform)
 
-  AndOp          -> \args -> opTranslate args (mo_wordAnd platform)
-  OrOp           -> \args -> opTranslate args (mo_wordOr platform)
-  XorOp          -> \args -> opTranslate args (mo_wordXor platform)
-  NotOp          -> \args -> opTranslate args (mo_wordNot platform)
-  SllOp          -> \args -> opTranslate args (mo_wordShl platform)
-  SrlOp          -> \args -> opTranslate args (mo_wordUShr platform)
+  WordAndOp      -> \args -> opTranslate args (mo_wordAnd platform)
+  WordOrOp       -> \args -> opTranslate args (mo_wordOr platform)
+  WordXorOp      -> \args -> opTranslate args (mo_wordXor platform)
+  WordNotOp      -> \args -> opTranslate args (mo_wordNot platform)
+  WordSllOp      -> \args -> opTranslate args (mo_wordShl platform)
+  WordSrlOp      -> \args -> opTranslate args (mo_wordUShr platform)
 
   AddrRemOp      -> \args -> opTranslate args (mo_wordURem platform)
 
@@ -1169,13 +1169,13 @@ emitPrimOp dflags primop = case primop of
   IntGtOp        -> \args -> opTranslate args (mo_wordSGt platform)
   IntLtOp        -> \args -> opTranslate args (mo_wordSLt platform)
 
-  AndIOp         -> \args -> opTranslate args (mo_wordAnd platform)
-  OrIOp          -> \args -> opTranslate args (mo_wordOr platform)
-  XorIOp         -> \args -> opTranslate args (mo_wordXor platform)
-  NotIOp         -> \args -> opTranslate args (mo_wordNot platform)
-  ISllOp         -> \args -> opTranslate args (mo_wordShl platform)
-  ISraOp         -> \args -> opTranslate args (mo_wordSShr platform)
-  ISrlOp         -> \args -> opTranslate args (mo_wordUShr platform)
+  IntAndOp       -> \args -> opTranslate args (mo_wordAnd platform)
+  IntOrOp        -> \args -> opTranslate args (mo_wordOr platform)
+  IntXorOp       -> \args -> opTranslate args (mo_wordXor platform)
+  IntNotOp       -> \args -> opTranslate args (mo_wordNot platform)
+  IntSllOp       -> \args -> opTranslate args (mo_wordShl platform)
+  IntSraOp       -> \args -> opTranslate args (mo_wordSShr platform)
+  IntSrlOp       -> \args -> opTranslate args (mo_wordUShr platform)
 
 -- Native word unsigned ops
 

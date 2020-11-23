@@ -135,24 +135,24 @@ primOpRules nm = \case
                                          retLit zeroi
                                     , equalArgs >> retLit zeroi
                                     , equalArgs >> retLit zeroi ]
-   AndIOp      -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
+   IntAndOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
                                     , idempotent
                                     , zeroElem zeroi ]
-   OrIOp       -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
+   IntOrOp     -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
                                     , idempotent
                                     , identityPlatform zeroi ]
-   XorIOp      -> mkPrimOpRule nm 2 [ binaryLit (intOp2 xor)
+   IntXorOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 xor)
                                     , identityPlatform zeroi
                                     , equalArgs >> retLit zeroi ]
-   NotIOp      -> mkPrimOpRule nm 1 [ unaryLit complementOp
-                                    , inversePrimOp NotIOp ]
+   IntNotOp    -> mkPrimOpRule nm 1 [ unaryLit complementOp
+                                    , inversePrimOp IntNotOp ]
    IntNegOp    -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , inversePrimOp IntNegOp ]
-   ISllOp      -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftL)
+   IntSllOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftL)
                                     , rightIdentityPlatform zeroi ]
-   ISraOp      -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftR)
+   IntSraOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftR)
                                     , rightIdentityPlatform zeroi ]
-   ISrlOp      -> mkPrimOpRule nm 2 [ shiftRule LitNumInt shiftRightLogical
+   IntSrlOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt shiftRightLogical
                                     , rightIdentityPlatform zeroi ]
 
    -- Word operations
@@ -183,19 +183,19 @@ primOpRules nm = \case
                                          guard (l == onew platform)
                                          retLit zerow
                                     , equalArgs >> retLit zerow ]
-   AndOp       -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
+   WordAndOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
                                     , idempotent
                                     , zeroElem zerow ]
-   OrOp        -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
+   WordOrOp    -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
                                     , idempotent
                                     , identityPlatform zerow ]
-   XorOp       -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
+   WordXorOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
                                     , identityPlatform zerow
                                     , equalArgs >> retLit zerow ]
-   NotOp       -> mkPrimOpRule nm 1 [ unaryLit complementOp
-                                    , inversePrimOp NotOp ]
-   SllOp       -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
-   SrlOp       -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogical ]
+   WordNotOp   -> mkPrimOpRule nm 1 [ unaryLit complementOp
+                                    , inversePrimOp WordNotOp ]
+   WordSllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   WordSrlOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogical ]
 
    -- coercions
 
@@ -204,16 +204,16 @@ primOpRules nm = \case
    Int32ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
    Int8NarrowOp   -> mkPrimOpRule nm 1 [ liftLit narrowInt8Lit
                                        , subsumedByPrimOp Int8NarrowOp
-                                       , narrowSubsumesAnd AndIOp Int8NarrowOp 8 ]
+                                       , narrowSubsumesAnd IntAndOp Int8NarrowOp 8 ]
    Int16NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowInt16Lit
                                        , subsumedByPrimOp Int8NarrowOp
                                        , subsumedByPrimOp Int16NarrowOp
-                                       , narrowSubsumesAnd AndIOp Int16NarrowOp 16 ]
+                                       , narrowSubsumesAnd IntAndOp Int16NarrowOp 16 ]
    Int32NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowInt32Lit
                                        , subsumedByPrimOp Int8NarrowOp
                                        , subsumedByPrimOp Int16NarrowOp
                                        , subsumedByPrimOp Int32NarrowOp
-                                       , narrowSubsumesAnd AndIOp Int32NarrowOp 32 ]
+                                       , narrowSubsumesAnd IntAndOp Int32NarrowOp 32 ]
 
    Word8ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
                                        , extendNarrowPassthrough Word8NarrowOp 0xFF
@@ -226,16 +226,16 @@ primOpRules nm = \case
                                        ]
    Word8NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowWord8Lit
                                        , subsumedByPrimOp Word8NarrowOp
-                                       , narrowSubsumesAnd AndOp Word8NarrowOp 8 ]
+                                       , narrowSubsumesAnd WordAndOp Word8NarrowOp 8 ]
    Word16NarrowOp -> mkPrimOpRule nm 1 [ liftLit narrowWord16Lit
                                        , subsumedByPrimOp Word8NarrowOp
                                        , subsumedByPrimOp Word16NarrowOp
-                                       , narrowSubsumesAnd AndOp Word16NarrowOp 16 ]
+                                       , narrowSubsumesAnd WordAndOp Word16NarrowOp 16 ]
    Word32NarrowOp -> mkPrimOpRule nm 1 [ liftLit narrowWord32Lit
                                        , subsumedByPrimOp Word8NarrowOp
                                        , subsumedByPrimOp Word16NarrowOp
                                        , subsumedByPrimOp Word32NarrowOp
-                                       , narrowSubsumesAnd AndOp Word32NarrowOp 32 ]
+                                       , narrowSubsumesAnd WordAndOp Word32NarrowOp 32 ]
 
 
    WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform wordToIntLit
@@ -246,34 +246,34 @@ primOpRules nm = \case
                                        , subsumedByPrimOp Narrow8IntOp
                                        , Narrow8IntOp `subsumesPrimOp` Narrow16IntOp
                                        , Narrow8IntOp `subsumesPrimOp` Narrow32IntOp
-                                       , narrowSubsumesAnd AndIOp Narrow8IntOp 8 ]
+                                       , narrowSubsumesAnd IntAndOp Narrow8IntOp 8 ]
    Narrow16IntOp  -> mkPrimOpRule nm 1 [ liftLit narrow16IntLit
                                        , subsumedByPrimOp Narrow8IntOp
                                        , subsumedByPrimOp Narrow16IntOp
                                        , Narrow16IntOp `subsumesPrimOp` Narrow32IntOp
-                                       , narrowSubsumesAnd AndIOp Narrow16IntOp 16 ]
+                                       , narrowSubsumesAnd IntAndOp Narrow16IntOp 16 ]
    Narrow32IntOp  -> mkPrimOpRule nm 1 [ liftLit narrow32IntLit
                                        , subsumedByPrimOp Narrow8IntOp
                                        , subsumedByPrimOp Narrow16IntOp
                                        , subsumedByPrimOp Narrow32IntOp
                                        , removeOp32
-                                       , narrowSubsumesAnd AndIOp Narrow32IntOp 32 ]
+                                       , narrowSubsumesAnd IntAndOp Narrow32IntOp 32 ]
    Narrow8WordOp  -> mkPrimOpRule nm 1 [ liftLit narrow8WordLit
                                        , subsumedByPrimOp Narrow8WordOp
                                        , Narrow8WordOp `subsumesPrimOp` Narrow16WordOp
                                        , Narrow8WordOp `subsumesPrimOp` Narrow32WordOp
-                                       , narrowSubsumesAnd AndOp Narrow8WordOp 8 ]
+                                       , narrowSubsumesAnd WordAndOp Narrow8WordOp 8 ]
    Narrow16WordOp -> mkPrimOpRule nm 1 [ liftLit narrow16WordLit
                                        , subsumedByPrimOp Narrow8WordOp
                                        , subsumedByPrimOp Narrow16WordOp
                                        , Narrow16WordOp `subsumesPrimOp` Narrow32WordOp
-                                       , narrowSubsumesAnd AndOp Narrow16WordOp 16 ]
+                                       , narrowSubsumesAnd WordAndOp Narrow16WordOp 16 ]
    Narrow32WordOp -> mkPrimOpRule nm 1 [ liftLit narrow32WordLit
                                        , subsumedByPrimOp Narrow8WordOp
                                        , subsumedByPrimOp Narrow16WordOp
                                        , subsumedByPrimOp Narrow32WordOp
                                        , removeOp32
-                                       , narrowSubsumesAnd AndOp Narrow32WordOp 32 ]
+                                       , narrowSubsumesAnd WordAndOp Narrow32WordOp 32 ]
    OrdOp          -> mkPrimOpRule nm 1 [ liftLit charToIntLit
                                        , inversePrimOp ChrOp ]
    ChrOp          -> mkPrimOpRule nm 1 [ do [Lit lit] <- getArgs
@@ -529,8 +529,8 @@ shiftRule :: LitNumType  -- Type of the result, either LitNumInt or LitNumWord
           -> RuleM CoreExpr
 -- Shifts take an Int; hence third arg of op is Int
 -- Used for shift primops
---    ISllOp, ISraOp, ISrlOp :: Int#  -> Int#  -> Int#
---    SllOp, SrlOp           :: Word# -> Int# -> Word#
+--    IntSllOp, IntSraOp, IntSrlOp :: Int# -> Int# -> Int#
+--    SllOp, SrlOp                 :: Word# -> Int# -> Word#
 shiftRule lit_num_ty shift_op
   = do { platform <- getPlatform
        ; [e1, Lit (LitNumber LitNumInt shift_len)] <- getArgs
@@ -754,7 +754,7 @@ extendNarrowPassthrough :: PrimOp -> Integer -> RuleM CoreExpr
 extendNarrowPassthrough narrow_primop n = do
   [Var primop_id `App` x] <- getArgs
   matchPrimOpId narrow_primop primop_id
-  return (Var (mkPrimOpId AndOp) `App` x `App` Lit (LitNumber LitNumWord n))
+  return (Var (mkPrimOpId WordAndOp) `App` x `App` Lit (LitNumber LitNumWord n))
 
 -- | narrow subsumes bitwise `and` with full mask (cf #16402):
 --
@@ -851,7 +851,7 @@ transform the invalid shift into an "obviously incorrect" value.
 
 There are two cases:
 
-- Shifting fixed-width things: the primops ISll, Sll, etc
+- Shifting fixed-width things: the primops IntSll, Sll, etc
   These are handled by shiftRule.
 
   We are happy to shift by any amount up to wordSize but no more.
@@ -1381,7 +1381,7 @@ builtinRules enableBignumRules
           [arg, Lit (LitNumber LitNumInt d)] <- getArgs
           Just n <- return $ exactLog2 d
           platform <- getPlatform
-          return $ Var (mkPrimOpId ISraOp) `App` arg `App` mkIntVal platform n
+          return $ Var (mkPrimOpId IntSraOp) `App` arg `App` mkIntVal platform n
         ],
 
      mkBasicRule modIntName 2 $ msum
@@ -1391,7 +1391,7 @@ builtinRules enableBignumRules
           [arg, Lit (LitNumber LitNumInt d)] <- getArgs
           Just _ <- return $ exactLog2 d
           platform <- getPlatform
-          return $ Var (mkPrimOpId AndIOp)
+          return $ Var (mkPrimOpId IntAndOp)
             `App` arg `App` mkIntVal platform (d - 1)
         ]
      ]
@@ -2365,8 +2365,8 @@ adjustDyadicRight op lit
          IntAddOp  -> Just (\y -> y-lit      )
          WordSubOp -> Just (\y -> y+lit      )
          IntSubOp  -> Just (\y -> y+lit      )
-         XorOp     -> Just (\y -> y `xor` lit)
-         XorIOp    -> Just (\y -> y `xor` lit)
+         WordXorOp -> Just (\y -> y `xor` lit)
+         IntXorOp  -> Just (\y -> y `xor` lit)
          _         -> Nothing
 
 adjustDyadicLeft :: Integer -> PrimOp -> Maybe (Integer -> Integer)
@@ -2377,8 +2377,8 @@ adjustDyadicLeft lit op
          IntAddOp  -> Just (\y -> y-lit      )
          WordSubOp -> Just (\y -> lit-y      )
          IntSubOp  -> Just (\y -> lit-y      )
-         XorOp     -> Just (\y -> y `xor` lit)
-         XorIOp    -> Just (\y -> y `xor` lit)
+         WordXorOp -> Just (\y -> y `xor` lit)
+         IntXorOp  -> Just (\y -> y `xor` lit)
          _         -> Nothing
 
 
@@ -2386,8 +2386,8 @@ adjustUnary :: PrimOp -> Maybe (Integer -> Integer)
 -- Given (op x) return a function 'f' s.t.  f (op x) = x
 adjustUnary op
   = case op of
-         NotOp     -> Just (\y -> complement y)
-         NotIOp    -> Just (\y -> complement y)
+         WordNotOp -> Just (\y -> complement y)
+         IntNotOp  -> Just (\y -> complement y)
          IntNegOp  -> Just (\y -> negate y    )
          _         -> Nothing
 
