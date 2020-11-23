@@ -127,6 +127,7 @@ setEqRel new_eq_rel thing_inside
     if new_eq_rel == fe_eq_rel env
     then runFlatM thing_inside env
     else runFlatM thing_inside (env { fe_eq_rel = new_eq_rel })
+{-# INLINE setEqRel #-}
 
 -- | Make sure that flattening actually produces a coercion (in other
 -- words, make sure our flavour is not Derived)
@@ -251,7 +252,7 @@ flattenArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion], Tc
 flattenArgsNom ev tc tys
   = do { traceTcS "flatten_args {" (vcat (map ppr tys))
        ; (tys', cos, kind_co)
-           <- runFlattenCtEv ev (flatten_args_tc tc (repeat Nominal) tys)
+           <- runFlattenCtEv ev (flatten_args_tc tc Nothing tys)
        ; traceTcS "flatten }" (vcat (map ppr tys'))
        ; return (tys', cos, kind_co) }
 
@@ -381,7 +382,8 @@ we skip adding to the cache here.
 {-# INLINE flatten_args_tc #-}
 flatten_args_tc
   :: TyCon         -- T
-  -> [Role]        -- Role r
+  -> Maybe [Role]  -- Nothing: ambient role is Nominal; all args are Nominal
+                   -- Otherwise: no assumptions; use roles provided
   -> [Type]        -- Arg types [t1,..,tn]
   -> FlatM ( [Xi]  -- List of flattened args [x1,..,xn]
                    -- 1-1 corresp with [t1,..,tn]
@@ -406,7 +408,8 @@ flatten_args_tc tc = flatten_args all_bndrs any_named_bndrs inner_ki emptyVarSet
 flatten_args :: [TyCoBinder] -> Bool -- Binders, and True iff any of them are
                                      -- named.
              -> Kind -> TcTyCoVarSet -- function kind; kind's free vars
-             -> [Role] -> [Type]     -- these are in 1-to-1 correspondence
+             -> Maybe [Role] -> [Type]    -- these are in 1-to-1 correspondence
+                                          -- Nothing: use all Nominal
              -> FlatM ([Xi], [Coercion], CoercionN)
 -- Coercions :: Xi ~ Type, at roles given
 -- Third coercion :: tcTypeKind(fun xis) ~N tcTypeKind(fun tys)
@@ -419,15 +422,12 @@ flatten_args orig_binders
              any_named_bndrs
              orig_inner_ki
              orig_fvs
-             orig_roles
+             orig_m_roles
              orig_tys
-  = if any_named_bndrs
-    then flatten_args_slow orig_binders
-                           orig_inner_ki
-                           orig_fvs
-                           orig_roles
-                           orig_tys
-    else flatten_args_fast orig_binders orig_inner_ki orig_roles orig_tys
+  = case (orig_m_roles, any_named_bndrs) of
+      (Nothing, False) -> flatten_args_fast orig_binders orig_inner_ki orig_tys
+      _ -> flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
+        where orig_roles = fromMaybe (repeat Nominal) orig_m_roles
 
 {-# INLINE flatten_args_fast #-}
 -- | fast path flatten_args, in which none of the binders are named and
@@ -437,59 +437,29 @@ flatten_args orig_binders
 -- The T9872 test cases are good witnesses of this fact.
 flatten_args_fast :: [TyCoBinder]
                   -> Kind
-                  -> [Role]
                   -> [Type]
                   -> FlatM ([Xi], [Coercion], CoercionN)
-flatten_args_fast orig_binders orig_inner_ki orig_roles orig_tys
-  = fmap finish (iterate orig_tys orig_roles orig_binders)
+flatten_args_fast orig_binders orig_inner_ki orig_tys
+  = fmap finish (iterate orig_tys orig_binders)
   where
 
     iterate :: [Type]
-            -> [Role]
             -> [TyCoBinder]
             -> FlatM ([Xi], [Coercion], [TyCoBinder])
-    iterate (ty:tys) (role:roles) (_:binders) = do
-      (xi, co) <- go role ty
-      (xis, cos, binders) <- iterate tys roles binders
+    iterate (ty:tys) (_:binders) = do
+      (xi, co) <- flatten_one ty
+      (xis, cos, binders) <- iterate tys binders
       pure (xi : xis, co : cos, binders)
-    iterate [] _ binders = pure ([], [], binders)
-    iterate _ _ _ = pprPanic
+    iterate [] binders = pure ([], [], binders)
+    iterate _ _ = pprPanic
         "flatten_args wandered into deeper water than usual" (vcat [])
            -- This debug information is commented out because leaving it in
            -- causes a ~2% increase in allocations in T9872{a,c,d}.
            {-
              (vcat [ppr orig_binders,
                     ppr orig_inner_ki,
-                    ppr (take 10 orig_roles), -- often infinite!
                     ppr orig_tys])
            -}
-
-    {-# INLINE go #-}
-    go :: Role
-       -> Type
-       -> FlatM (Xi, Coercion)
-    go role ty
-      = case role of
-          -- In the slow path we bind the Xi and Coercion from the recursive
-          -- call and then use it such
-          --
-          --   let kind_co = mkTcSymCo $ mkReflCo Nominal (tyBinderType binder)
-          --       casted_xi = xi `mkCastTy` kind_co
-          --       casted_co = xi |> kind_co ~r xi ; co
-          --
-          -- but this isn't necessary:
-          --   mkTcSymCo (Refl a b) = Refl a b,
-          --   mkCastTy x (Refl _ _) = x
-          --   mkTcGReflLeftCo _ ty (Refl _ _) `mkTransCo` co = co
-          --
-          -- Also, no need to check isAnonTyCoBinder or isNamedBinder, since
-          -- we've already established that they're all anonymous.
-          Nominal          -> setEqRel NomEq  $ flatten_one ty
-          Representational -> setEqRel ReprEq $ flatten_one ty
-          Phantom          -> -- See Note [Phantoms in the flattener]
-                              do { ty <- liftTcS $ zonkTcType ty
-                                 ; return (ty, mkReflCo Phantom ty) }
-
 
     {-# INLINE finish #-}
     finish :: ([Xi], [Coercion], [TyCoBinder]) -> ([Xi], [Coercion], CoercionN)
@@ -671,7 +641,9 @@ flatten_app_ty_args fun_xi fun_co arg_tys
 flatten_ty_con_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
 flatten_ty_con_app tc tys
   = do { role <- getRole
-       ; (xis, cos, kind_co) <- flatten_args_tc tc (tyConRolesX role tc) tys
+       ; let m_roles | Nominal <- role = Nothing
+                     | otherwise       = Just $ tyConRolesX role tc
+       ; (xis, cos, kind_co) <- flatten_args_tc tc m_roles tys
        ; let tyconapp_xi = mkTyConApp tc xis
              tyconapp_co = mkTyConAppCo role tc cos
        ; return (homogenise_result tyconapp_xi tyconapp_co role kind_co) }
@@ -704,13 +676,13 @@ flatten_vector ki roles tys
                                   any_named_bndrs
                                   inner_ki
                                   fvs
-                                  (repeat Nominal)
+                                  Nothing
                                   tys
            ReprEq -> flatten_args bndrs
                                   any_named_bndrs
                                   inner_ki
                                   fvs
-                                  roles
+                                  (Just roles)
                                   tys
        }
   where
@@ -840,10 +812,14 @@ flatten_exact_fam_app tc tys
          ; Nothing ->
 
         -- That didn't work. So reduce the arguments, in STEP 3.
-    do { (xis, cos, kind_co) <- flatten_args_tc tc (repeat Nominal) tys
+    do { eq_rel <- getEqRel
+           -- checking eq_rel == NomEq saves ~0.5% in T9872a
+       ; (xis, cos, kind_co) <- if eq_rel == NomEq
+                                then flatten_args_tc tc Nothing tys
+                                else setEqRel NomEq $
+                                     flatten_args_tc tc Nothing tys
            -- kind_co :: tcTypeKind(F xis) ~N tcTypeKind(F tys)
 
-       ; eq_rel <- getEqRel
        ; let role    = eqRelRole eq_rel
              args_co = mkTyConAppCo role tc cos
            -- args_co :: F xis ~r F tys
