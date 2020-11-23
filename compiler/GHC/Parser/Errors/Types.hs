@@ -9,6 +9,7 @@ module GHC.Parser.Errors.Types
    , OperatorWhitespaceOccurrence(..)
    , NumUnderscoreReason(..)
    , Error(..)
+   , ErrorDesc(..)
    , LexErr(..)
    , CmmParserError(..)
    , LexErrKind(..)
@@ -19,7 +20,6 @@ module GHC.Parser.Errors.Types
 where
 
 import GHC.Prelude
-import GHC.Types.Error (ErrDoc)
 import GHC.Types.Name.Reader (RdrName)
 import GHC.Types.Name.Occurrence (OccName)
 import GHC.Parser.Types
@@ -85,15 +85,20 @@ noHints :: [Hint]
 noHints = mempty
 
 -- NOTE [Parsing Errors]
--- The 'Error' type is already quite big and we might hit the 256-type-constructors-limit fairly soon.
+-- The 'ErrorDesc' type is already quite big and we might hit the 256-type-constructors-limit fairly soon.
 -- It might be nice thinking about splitting this further into "categories", to make this big type a bit
 -- more manageable.
 
+data Error = Error
+   { errDesc  :: !ErrorDesc   -- ^ Error description
+   , errHints :: ![Hint]      -- ^ Hints
+   }
+
 -- | This type collects all the different errors that can arise during the parsing stage.
 -- For some of them, we return also a list of 'Hint's. See also NOTE [Parsing Errors].
-data Error
-   = ErrParseRaw !ErrDoc
-       -- ^ The \"escape hatch\" which can be used to turn any 'ErrDoc' into an 'Error'.
+data ErrorDesc
+   = ErrParseRaw !SDoc
+       -- ^ The \"escape hatch\" which can be used to turn any 'SDoc' into an 'Error'.
        -- This is meant to capture all those instances where we want to emit errors in a structured
        -- way using a domain-specific error hierarchy. The typical example would be emitting errors in
        -- a Plugin.
@@ -116,8 +121,8 @@ data Error
    | ErrSuffixAT
       -- ^ Suffix occurence of `@`
 
-   | ErrParse !String [Hint]
-      -- ^ Parse errors, with hints, if any.
+   | ErrParse !String
+      -- ^ Parse errors
 
    | ErrCmmLexer
       -- ^ Cmm lexer error
@@ -385,11 +390,11 @@ data Error
       --
       -- TODO: distinguish errors without using SDoc
 
-   | ErrParseErrorInPat !SDoc [Hint]
+   | ErrParseErrorInPat !SDoc
       -- ^ Parse error in pattern
       --
       -- TODO: distinguish errors without using SDoc
-  | ErrUnsupportedExtension String [String]
+  | ErrUnsupportedExtension String
       -- ^ The given extension is not supported
   | ErrUnknownOptionsFlag String
       -- ^ Unknown GHC_OPTIONS flag
@@ -414,6 +419,7 @@ data Hint
    | SuggestLetInDo
    | SuggestPatternSynonyms
    | SuggestInfixBindMaybeAtPat !RdrName
+   | SuggestExtensions [String]
 
 data LexErrKind
    = LexErrKind_EOF        -- ^ End of input

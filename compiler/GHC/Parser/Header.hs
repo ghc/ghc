@@ -310,7 +310,7 @@ checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
 checkProcessArgsResult flags
   = when (notNull flags) $
       liftIO $ throwIO $ mkSrcErr $ fmap GhcErrorPs $ mkErrorMessages (listToBag $ map mkMsg flags)
-    where mkMsg (L loc flag) = mkParserErr loc (ErrUnknownOptionsFlag flag)
+    where mkMsg (L loc flag) = mkParserErrNoHints loc (ErrUnknownOptionsFlag flag)
 
 -----------------------------------------------------------------------------
 
@@ -327,11 +327,11 @@ checkExtension dflags (L l ext)
 
 languagePragParseError :: SrcSpan -> a
 languagePragParseError loc =
-  throwPsError $ mkParserErr loc ErrLanguagePragmaParseError
+  throwPsError $ mkParserErrNoHints loc ErrLanguagePragmaParseError
 
 unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
 unsupportedExtnError dflags loc unsup =
-    throwPsError $ mkParserErr loc (ErrUnsupportedExtension unsup suggestions)
+    throwPsError $ mkParserErr loc (ErrUnsupportedExtension unsup) [SuggestExtensions suggestions]
   where
      supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
      suggestions = fuzzyMatch unsup supported
@@ -345,11 +345,11 @@ optionsErrorMsgs unhandled_flags flags_lines _filename
                                 | f <- unhandled_flags
                                 , L l f' <- flags_lines
                                 , f == f' ]
-        mkMsg (L flagSpan flag) = mkParserErr flagSpan (ErrUnknownOptionsFlag flag)
+        mkMsg (L flagSpan flag) = mkParserErrNoHints flagSpan (ErrUnknownOptionsFlag flag)
 
 optionsParseError :: String -> SrcSpan -> a     -- #15053
 optionsParseError str loc =
-  throwPsError $ mkParserErr loc (ErrOptionsGhcParseError str)
+  throwPsError $ mkParserErrNoHints loc (ErrOptionsGhcParseError str)
 
 throwPsError :: ErrMsg Parser.Error -> a        -- #15053
 throwPsError =
