@@ -49,7 +49,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <assert.h>
 #include <fs_rts.h>
 
 #if defined(HAVE_SYS_STAT_H)
@@ -867,12 +866,11 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
         */
         IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s with dlsym\n",
                                     lbl));
-        ASSERT(lbl[0] == '_');
+        CHECK(lbl[0] == '_');
         return internal_dlsym(lbl + 1);
 
 #       else
-        ASSERT(false);
-        return NULL;
+#       error No OBJFORMAT_* macro set
 #       endif
     } else {
         if (dependent) {
@@ -1956,7 +1954,7 @@ HsInt unloadNativeObj (void *handle)
             n_unloaded_objects += 1;
 
             // dynamic objects have no symbols
-            ASSERT(nc->symbols == NULL);
+            CHECK(nc->symbols == NULL);
             freeOcStablePtrs(nc);
 
             // Remove object code from root set

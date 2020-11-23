@@ -136,10 +136,10 @@ verifyGot(ObjectCode * oc) {
         for(size_t i=0; i < symTab->n_symbols; i++) {
             ElfSymbol * symbol = &symTab->symbols[i];
             if(symbol->got_addr) {
-                ASSERT((void*)(*(void**)symbol->got_addr)
-                       == (void*)symbol->addr);
+                CHECK((void*)(*(void**)symbol->got_addr)
+                      == (void*)symbol->addr);
             }
-            ASSERT(0 == ((uintptr_t)symbol->addr & 0xffff000000000000));
+            CHECK(0 == ((uintptr_t)symbol->addr & 0xffff000000000000));
         }
     }
     return EXIT_SUCCESS;

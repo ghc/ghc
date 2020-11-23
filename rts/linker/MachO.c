@@ -250,7 +250,6 @@ resolveImports(
                        "%s: unknown symbol `%s'", oc->fileName, symbol->name);
             return 0;
         }
-        ASSERT(addr);
 
         checkProddableBlock(oc,
                             ((void**)(oc->image + sect->offset)) + i,
@@ -794,7 +793,7 @@ relocateSection(ObjectCode* oc, int curSection)
             IF_DEBUG(linker, debugBelch("               : value = %p\n", (void *)symbol->nlist->n_value));
 
             if ((symbol->nlist->n_type & N_TYPE) == N_SECT) {
-                ASSERT(symbol->addr != NULL);
+                CHECK(symbol->addr != NULL);
                 value = (uint64_t) symbol->addr;
                 IF_DEBUG(linker, debugBelch("relocateSection, defined external symbol %s, relocated address %p\n",
                                             nm, (void *)value));
@@ -896,29 +895,29 @@ relocateSection(ObjectCode* oc, int curSection)
         {
             if((int32_t)(value - baseValue) != (int64_t)(value - baseValue))
             {
-                ASSERT(reloc->r_extern);
+                CHECK(reloc->r_extern);
                 value = (uint64_t) &makeSymbolExtra(oc, reloc->r_symbolnum, value)
                                         -> jumpIsland;
             }
-            ASSERT((int32_t)(value - baseValue) == (int64_t)(value - baseValue));
+            CHECK((int32_t)(value - baseValue) == (int64_t)(value - baseValue));
             type = X86_64_RELOC_SIGNED;
         }
 
         switch(type)
         {
             case X86_64_RELOC_UNSIGNED:
-                ASSERT(!reloc->r_pcrel);
+                CHECK(!reloc->r_pcrel);
                 thing += value;
                 break;
             case X86_64_RELOC_SIGNED:
             case X86_64_RELOC_SIGNED_1:
             case X86_64_RELOC_SIGNED_2:
             case X86_64_RELOC_SIGNED_4:
-                ASSERT(reloc->r_pcrel);
+                CHECK(reloc->r_pcrel);
                 thing += value - baseValue;
                 break;
             case X86_64_RELOC_SUBTRACTOR:
-                ASSERT(!reloc->r_pcrel);
+                CHECK(!reloc->r_pcrel);
                 thing -= value;
                 break;
             default:

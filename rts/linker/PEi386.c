@@ -1599,7 +1599,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           barf ("Could not allocate any heap memory from private heap.");
       }
 
-      ASSERT(section.size == 0 || section.info->virtualSize == 0);
+      CHECK(section.size == 0 || section.info->virtualSize == 0);
       sz = section.size;
       if (sz < section.info->virtualSize) sz = section.info->virtualSize;
 
@@ -2037,7 +2037,7 @@ ocRunInit_PEi386 ( ObjectCode *oc )
   getProgEnvv(&envc, &envv);
 
   Section section = *oc->info->init;
-  ASSERT(SECTIONKIND_INIT_ARRAY == section.kind);
+  CHECK(SECTIONKIND_INIT_ARRAY == section.kind);
 
   uint8_t *init_startC = section.start;
   init_t *init_start   = (init_t*)init_startC;
