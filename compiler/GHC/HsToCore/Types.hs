@@ -14,7 +14,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
 import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
-import GHC.Tc.Errors.Types (DsError)
+import GHC.Tc.Errors.Types (DsError, DsWarning)
 import GHC.HsToCore.Pmc.Types (Nablas)
 import GHC.Core (CoreExpr)
 import GHC.Core.FamInstEnv
@@ -44,7 +44,7 @@ data DsGblEnv
   { ds_mod          :: Module             -- For SCC profiling
   , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
   , ds_unqual  :: PrintUnqualified
-  , ds_msgs    :: IORef (Messages ErrDoc DsError) -- Warning messages
+  , ds_msgs    :: IORef (Messages DsWarning DsError) -- Warning messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                           -- possibly-imported things
   , ds_complete_matches :: CompleteMatches

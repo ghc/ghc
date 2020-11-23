@@ -17,7 +17,8 @@ module GHC.Tc.Errors(
 import GHC.Prelude
 
 import GHC.Tc.Types
-import GHC.Tc.Errors.Types
+import GHC.Tc.Errors.Types as TcRn
+import GHC.Tc.Errors.Ppr ()
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
@@ -484,13 +485,13 @@ warnRedundantConstraints ctxt env info ev_vars
    addErrCtxt (text "In" <+> ppr info) $
    do { env <- getLclEnv
       ; msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning (Reason Opt_WarnRedundantConstraints) $ fmap renderDiagnostic msg }
+      ; reportWarning (Reason Opt_WarnRedundantConstraints) $ fmap (WarnTcRnRaw . renderDiagnostic) msg }
 
  | otherwise  -- But for InstSkol there already *is* a surrounding
               -- "In the instance declaration for Eq [a]" context
               -- and we don't want to say it twice. Seems a bit ad-hoc
  = do { msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning (Reason Opt_WarnRedundantConstraints) (fmap renderDiagnostic msg) }
+      ; reportWarning (Reason Opt_WarnRedundantConstraints) (fmap (WarnTcRnRaw . renderDiagnostic) msg) }
  where
    doc = text "Redundant constraint" <> plural redundant_evs <> colon
          <+> pprEvVarTheta redundant_evs
@@ -510,7 +511,7 @@ warnRedundantConstraints ctxt env info ev_vars
 reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [TcTyVar] -> TcM ()
 reportBadTelescope ctxt env (ForAllSkol _ telescope) skols
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt env)
-       ; msg <- mkErrDocAt loc (TcRnBadTelescope telescope sorted_tvs context)
+       ; msg <- mkErrDocAt loc (TcRn.ErrBadTelescope telescope sorted_tvs context)
        ; reportError msg }
   where
     loc = RealSrcSpan (tcl_loc env) Nothing
@@ -739,7 +740,7 @@ mkUserTypeErrorReporter ctxt
                       ; maybeReportError ctxt err
                       ; addDeferredBinding ctxt err ct }
 
-mkUserTypeError :: ReportErrCtxt -> Ct -> TcM (ErrMsg TcRnError)
+mkUserTypeError :: ReportErrCtxt -> Ct -> TcM (ErrMsg TcRn.Error)
 mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                         $ important
                         $ pprUserTypeErrorTy
@@ -768,7 +769,7 @@ mkGivenErrorReporter ctxt cts
        ; err <- mkEqErr_help dflags ctxt report ct' ty1 ty2
 
        ; traceTc "mkGivenErrorReporter" (ppr ct)
-       ; reportWarning (Reason Opt_WarnInaccessibleCode) (fmap renderDiagnostic err) }
+       ; reportWarning (Reason Opt_WarnInaccessibleCode) (fmap (WarnTcRnRaw . renderDiagnostic) err) }
   where
     (ct : _ )  = cts    -- Never empty
     (ty1, ty2) = getEqPredTys (ctPred ct)
@@ -815,7 +816,7 @@ pattern match which binds some equality constraints.  If we
 find one, we report the insoluble Given.
 -}
 
-mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRnError))
+mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRn.Error))
                              -- Make error message for a group
                 -> Reporter  -- Deal with lots of constraints
 -- Group together errors from same location,
@@ -824,7 +825,7 @@ mkGroupReporter mk_err ctxt cts
   = mapM_ (reportGroup mk_err ctxt . toList) (equivClasses cmp_loc cts)
 
 -- Like mkGroupReporter, but doesn't actually print error messages
-mkSuppressReporter :: (ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRnError)) -> Reporter
+mkSuppressReporter :: (ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRn.Error)) -> Reporter
 mkSuppressReporter mk_err ctxt cts
   = mapM_ (suppressGroup mk_err ctxt . toList) (equivClasses cmp_loc cts)
 
@@ -842,7 +843,7 @@ cmp_loc ct1 ct2 = get ct1 `compare` get ct2
              -- Reduce duplication by reporting only one error from each
              -- /starting/ location even if the end location differs
 
-reportGroup :: (ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRnError)) -> Reporter
+reportGroup :: (ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRn.Error)) -> Reporter
 reportGroup mk_err ctxt cts =
   ASSERT( not (null cts))
   do { err <- mk_err ctxt cts
@@ -861,13 +862,13 @@ reportGroup mk_err ctxt cts =
 
 -- like reportGroup, but does not actually report messages. It still adds
 -- -fdefer-type-errors bindings, though.
-suppressGroup :: (ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRnError)) -> Reporter
+suppressGroup :: (ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRn.Error)) -> Reporter
 suppressGroup mk_err ctxt cts
  = do { err <- mk_err ctxt cts
       ; traceTc "Suppressing errors for" (ppr cts)
       ; mapM_ (addDeferredBinding ctxt err) cts }
 
-maybeReportHoleError :: ReportErrCtxt -> Hole -> ErrMsg TcRnError -> TcM ()
+maybeReportHoleError :: ReportErrCtxt -> Hole -> ErrMsg TcRn.Error -> TcM ()
 maybeReportHoleError ctxt hole err
   | isOutOfScopeHole hole
   -- Always report an error for out-of-scope variables
@@ -877,7 +878,8 @@ maybeReportHoleError ctxt hole err
   = -- If deferring, report a warning only if -Wout-of-scope-variables is on
     case cec_out_of_scope_holes ctxt of
       HoleError -> reportError err
-      HoleWarn  -> reportWarning (Reason Opt_WarnDeferredOutOfScopeVariables) (fmap renderDiagnostic err)
+      HoleWarn  ->
+        reportWarning (Reason Opt_WarnDeferredOutOfScopeVariables) (fmap (WarnTcRnRaw . renderDiagnostic) err)
       HoleDefer -> return ()
 
 -- Unlike maybeReportError, these "hole" errors are
@@ -891,7 +893,8 @@ maybeReportHoleError ctxt (Hole { hole_sort = TypeHole }) err
     -- only if -fwarn-partial-type-signatures is on
     case cec_type_holes ctxt of
        HoleError -> reportError err
-       HoleWarn  -> reportWarning (Reason Opt_WarnPartialTypeSignatures) $ fmap renderDiagnostic err
+       HoleWarn  ->
+         reportWarning (Reason Opt_WarnPartialTypeSignatures) $ fmap (WarnTcRnRaw . renderDiagnostic) err
        HoleDefer -> return ()
 
 maybeReportHoleError ctxt hole@(Hole { hole_sort = ExprHole _ }) err
@@ -902,10 +905,11 @@ maybeReportHoleError ctxt hole@(Hole { hole_sort = ExprHole _ }) err
     ASSERT( not (isOutOfScopeHole hole) )
     case cec_expr_holes ctxt of
        HoleError -> reportError err
-       HoleWarn  -> reportWarning (Reason Opt_WarnTypedHoles) $ fmap renderDiagnostic err
+       HoleWarn  ->
+         reportWarning (Reason Opt_WarnTypedHoles) $ fmap (WarnTcRnRaw . renderDiagnostic) err
        HoleDefer -> return ()
 
-maybeReportError :: ReportErrCtxt -> ErrMsg TcRnError -> TcM ()
+maybeReportError :: ReportErrCtxt -> ErrMsg TcRn.Error -> TcM ()
 -- Report the error and/or make a deferred binding for it
 maybeReportError ctxt err
   | cec_suppress ctxt    -- Some worse error has occurred;
@@ -914,10 +918,10 @@ maybeReportError ctxt err
   | otherwise
   = case cec_defer_type_errors ctxt of
       TypeDefer       -> return ()
-      TypeWarn reason -> reportWarning reason $ fmap renderDiagnostic err
+      TypeWarn reason -> reportWarning reason $ fmap (WarnTcRnRaw . renderDiagnostic) err
       TypeError       -> reportError err
 
-addDeferredBinding :: ReportErrCtxt -> ErrMsg TcRnError -> Ct -> TcM ()
+addDeferredBinding :: ReportErrCtxt -> ErrMsg TcRn.Error -> Ct -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
 addDeferredBinding ctxt err ct
   | deferringAnyBindings ctxt
@@ -940,13 +944,13 @@ addDeferredBinding ctxt err ct
   = return ()
 
 mkErrorTerm :: DynFlags -> Type  -- of the error term
-            -> ErrMsg TcRnError -> EvTerm
+            -> ErrMsg TcRn.Error -> EvTerm
 mkErrorTerm dflags ty err = evDelayedError ty err_fs
   where
     err_msg = pprLocErrMsg err
     err_fs  = mkFastString $ showSDoc dflags $
               err_msg $$ text "(deferred type error)"
-maybeAddDeferredHoleBinding :: ReportErrCtxt -> ErrMsg TcRnError -> Hole -> TcM ()
+maybeAddDeferredHoleBinding :: ReportErrCtxt -> ErrMsg TcRn.Error -> Hole -> TcM ()
 maybeAddDeferredHoleBinding ctxt err (Hole { hole_sort = ExprHole ev_id })
 -- Only add bindings for holes in expressions
 -- not for holes in partial type signatures
@@ -1030,15 +1034,15 @@ pprWithArising (ct:cts)
     ppr_one ct' = hang (parens (pprType (ctPred ct')))
                      2 (pprCtLoc (ctLoc ct'))
 
-mkErrorMsgFromCt :: ReportErrCtxt -> Ct -> Report -> TcM (ErrMsg TcRnError)
+mkErrorMsgFromCt :: ReportErrCtxt -> Ct -> Report -> TcM (ErrMsg TcRn.Error)
 mkErrorMsgFromCt ctxt ct report
   = mkErrorReport ctxt (ctLocEnv (ctLoc ct)) report
 
-mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM (ErrMsg TcRnError)
+mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM (ErrMsg TcRn.Error)
 mkErrorReport ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
        ; mkErrDocAt (RealSrcSpan (tcl_loc tcl_env) Nothing)
-            (TcRnErrorDoc $ errDoc important [context] (relevant_bindings ++ valid_subs))
+            (ErrTcRnRaw $ errDoc important [context] (relevant_bindings ++ valid_subs))
        }
 
 type UserGiven = Implication
@@ -1135,7 +1139,7 @@ solve it.
 ************************************************************************
 -}
 
-mkIrredErr :: ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRnError)
+mkIrredErr :: ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRn.Error)
 mkIrredErr ctxt cts
   = do { (ctxt, binds_msg, ct1) <- relevantBindings True ctxt ct1
        ; let orig = ctOrigin ct1
@@ -1146,7 +1150,7 @@ mkIrredErr ctxt cts
     (ct1:_) = cts
 
 ----------------
-mkHoleError :: [Ct] -> ReportErrCtxt -> Hole -> TcM (ErrMsg TcRnError)
+mkHoleError :: [Ct] -> ReportErrCtxt -> Hole -> TcM (ErrMsg TcRn.Error)
 mkHoleError _tidy_simples _ctxt hole@(Hole { hole_occ = occ
                                            , hole_ty = hole_ty
                                            , hole_loc = ct_loc })
@@ -1158,7 +1162,7 @@ mkHoleError _tidy_simples _ctxt hole@(Hole { hole_occ = occ
        ; hpt <- getHpt
        ; let suggestions = unknownNameSuggestions dflags hpt curr_mod rdr_env (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ)
        ; mkErrDocAt (RealSrcSpan (tcl_loc lcl_env) Nothing) $
-           TcRnOutOfScopeHole
+           TcRn.ErrOutOfScopeHole
              occ
              hole_ty
              suggestions }
@@ -1278,7 +1282,7 @@ givenConstraintsMsg ctxt =
             2 (vcat $ map pprConstraint constraints)
 
 ----------------
-mkIPErr :: ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRnError)
+mkIPErr :: ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRn.Error)
 mkIPErr ctxt cts
   = do { (ctxt, binds_msg, ct1) <- relevantBindings True ctxt ct1
        ; let orig    = ctOrigin ct1
@@ -1355,11 +1359,11 @@ any more.  So we don't assert that it is.
 
 -- Don't have multiple equality errors from the same location
 -- E.g.   (Int,Bool) ~ (Bool,Int)   one error will do!
-mkEqErr :: ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRnError)
+mkEqErr :: ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRn.Error)
 mkEqErr ctxt (ct:_) = mkEqErr1 ctxt ct
 mkEqErr _ [] = panic "mkEqErr"
 
-mkEqErr1 :: ReportErrCtxt -> Ct -> TcM (ErrMsg TcRnError)
+mkEqErr1 :: ReportErrCtxt -> Ct -> TcM (ErrMsg TcRn.Error)
 mkEqErr1 ctxt ct   -- Wanted or derived;
                    -- givens handled in mkGivenErrorReporter
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
@@ -1425,7 +1429,7 @@ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
 
 mkEqErr_help :: DynFlags -> ReportErrCtxt -> Report
              -> Ct
-             -> TcType -> TcType -> TcM (ErrMsg TcRnError)
+             -> TcType -> TcType -> TcM (ErrMsg TcRn.Error)
 mkEqErr_help dflags ctxt report ct ty1 ty2
   | Just (tv1, _) <- tcGetCastedTyVar_maybe ty1
   = mkTyVarEqErr dflags ctxt report ct tv1 ty2
@@ -1436,7 +1440,7 @@ mkEqErr_help dflags ctxt report ct ty1 ty2
 
 reportEqErr :: ReportErrCtxt -> Report
             -> Ct
-            -> TcType -> TcType -> TcM (ErrMsg TcRnError)
+            -> TcType -> TcType -> TcM (ErrMsg TcRn.Error)
 reportEqErr ctxt report ct ty1 ty2
   = mkErrorMsgFromCt ctxt ct (mconcat [misMatch, report, eqInfo])
   where
@@ -1445,7 +1449,7 @@ reportEqErr ctxt report ct ty1 ty2
 
 mkTyVarEqErr, mkTyVarEqErr'
   :: DynFlags -> ReportErrCtxt -> Report -> Ct
-             -> TcTyVar -> TcType -> TcM (ErrMsg TcRnError)
+             -> TcTyVar -> TcType -> TcM (ErrMsg TcRn.Error)
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr dflags ctxt report ct tv1 ty2
   = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
@@ -1645,7 +1649,7 @@ pp_givens givens
 -- always be another unsolved wanted around, which will ordinarily suppress
 -- this message. But this can still be printed out with -fdefer-type-errors
 -- (sigh), so we must produce a message.
-mkBlockedEqErr :: ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRnError)
+mkBlockedEqErr :: ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRn.Error)
 mkBlockedEqErr ctxt (ct:_) = mkErrorMsgFromCt ctxt ct report
   where
     report = important msg
@@ -2249,7 +2253,7 @@ Warn of loopy local equalities that were dropped.
 ************************************************************************
 -}
 
-mkDictErr :: ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRnError)
+mkDictErr :: ReportErrCtxt -> [Ct] -> TcM (ErrMsg TcRn.Error)
 mkDictErr ctxt cts
   = ASSERT( not (null cts) )
     do { inst_envs <- tcGetInstEnvs

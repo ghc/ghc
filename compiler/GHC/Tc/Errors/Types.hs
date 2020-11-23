@@ -1,6 +1,5 @@
 module GHC.Tc.Errors.Types where
 
-import GHC.Core.TyCo.Ppr
 import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Prelude
@@ -14,62 +13,37 @@ import GHC.Unit.Module.Name
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 
--- NOTE(adinapoli) Investigate this.
-type DsError = TcRnError
+-- FIXME(adinapoli) Untangle this.
+type DsError   = Error
+type DsWarning = Warning
 
--- FIXME(adinapoli) Turn into a proper data type.
-type TcRnWarning = ErrDoc
+-- FIXME(adinapoli) Convert free-text warnings into structured values.
+data Warning
+  = WarnTcRnRaw ErrDoc
+  -- | WarnTypedHoles
+  -- | WarnPartialTypeSignatures
+  -- | WarnDeferredOutOfScopeVariables
+  -- | WarnInaccessibleCode
+  -- | WarnRedundantConstraints
 
-data TcRnError
-  = TcRnErrorDoc ErrDoc
+data Error
+  = ErrTcRnRaw ErrDoc
 
   -- Errors thrown in GHC.Tc.Errors
-  | TcRnBadTelescope
+  | ErrBadTelescope
       [LHsTyVarBndr Specificity GhcRn] -- telescope
       [TyCoVar] -- sorted tyvars (in a correct order)
       SDoc      -- context
-  | TcRnOutOfScope
+  | ErrOutOfScope
       RdrName -- name tried
       OutOfScopeSuggestions -- similar name, import, etc suggestions
       SDoc -- extra contents (see 'unboundNameX')
       SDoc -- context lines
-  | TcRnOutOfScopeHole
+  | ErrOutOfScopeHole
       OccName -- out of scope name
       TcType  -- type of the hole
       OutOfScopeSuggestions -- similar name, import, etc suggestions
 
-tcRnErrorDoc :: TcRnError -> ErrDoc
-tcRnErrorDoc (TcRnErrorDoc d) = d
-tcRnErrorDoc (TcRnBadTelescope telescope sorted_tvs context) =
-  errDoc [m] [context] []
-
-  where m = hang (text "These kind and type variables:" <+> sep (map ppr telescope)
-               $$ text "are out of dependency order. Perhaps try this ordering:")
-            2 (pprTyVars sorted_tvs)
-tcRnErrorDoc (TcRnOutOfScope tried_rdr_name suggs contextlines extra) =
-  errDoc [m $$ suggestions $$ extra] [] [contextlines]
-
-  where m = hang (text "Not in scope:")
-               2 (what <+> quotes (ppr tried_rdr_name))
-
-        what = pprNonVarNameSpace (occNameSpace (rdrNameOcc tried_rdr_name))
-
-        suggestions = pprOutOfScopeSuggestions (rdrNameOcc tried_rdr_name) suggs
-tcRnErrorDoc (TcRnOutOfScopeHole occ ty suggs) =
-  errDoc [m] [] [suggestions]
-
-  where herald | isDataOcc occ = text "Data constructor not in scope:"
-               | otherwise     = text "Variable not in scope:"
-        m | isTyVarTy ty = hang herald 2 (ppr occ)
-          | otherwise    = hang herald 2 (pp_occ_with_type occ ty)
-
-        pp_occ_with_type :: OccName -> Type -> SDoc
-        pp_occ_with_type occ hole_ty = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType hole_ty)
-
-        suggestions = pprOutOfScopeSuggestions occ suggs
-
-instance RenderableDiagnostic TcRnError where
-  renderDiagnostic = tcRnErrorDoc
 
 type HowInScope = Either SrcSpan ImpDeclSpec
      -- Left loc    =>  locally bound at loc
