@@ -40,6 +40,18 @@ Compiler
 - GHCi's ``:kind!`` command now expands through type synonyms in addition to type
   families. See :ghci-cmd:`:kind`.
 
+- A new debugging facility, :ghc-flag:`-finfo-table-map`, which embeds a mapping
+  from the address of an info table to information about that info table, including
+  an approximate source position. :ghc-flag:`-fdistinct-constructor-tables` is
+  also useful with this flag to give each usage of a data constructor its own
+  unique info table so they can be distinguished in gdb and heap profiles.
+
+- A new heap profiling mode, :ghc-flag:`-hi`, profile by info table allows for
+  fine-grain banding by the info table address of a closure. The profiling
+  mode is intended to be used with :ghc-flag:`-finfo-table-map` and can best
+  be consumed with ``eventlog2html``. This profiling mode does not require a
+  profiling build.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
