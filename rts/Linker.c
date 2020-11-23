@@ -1177,6 +1177,16 @@ void mmapForLinkerMarkExecutable(void *start, size_t len)
        barf("mmapForLinkerMarkExecutable: mprotect: %s\n", strerror(errno));
     }
 }
+
+void mmapForLinkerMarkReadWrite(void *start, size_t len)
+{
+    IF_DEBUG(linker,
+             debugBelch("mmapForLinkerMarkReadWrite: unprotecting %" FMT_Word
+                        " bytes starting at %p\n", (W_)len, start));
+    if (mprotect(start, len, PROT_READ|PROT_WRITE) == -1) {
+       barf("mmapForLinkerMarkReadWrite: mprotect: %s\n", strerror(errno));
+    }
+}
 #endif
 
 /*

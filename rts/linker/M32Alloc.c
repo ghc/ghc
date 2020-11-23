@@ -234,12 +234,14 @@ munmapForLinker (void * addr, size_t size)
 static void
 m32_release_page(struct m32_page_t *page)
 {
+  const size_t pgsz = getPageSize();
   if (m32_free_page_pool_size < M32_MAX_FREE_PAGE_POOL_SIZE) {
+    mmapForLinkerMarkReadWrite(page, pgsz;
     page->free_page.next = m32_free_page_pool;
     m32_free_page_pool = page;
     m32_free_page_pool_size ++;
   } else {
-    munmapForLinker((void *) page, getPageSize());
+    munmapForLinker((void *) page, pgsz);
   }
 }
 

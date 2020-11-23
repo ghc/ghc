@@ -336,6 +336,7 @@ SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo);
 
 void *mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset);
 void mmapForLinkerMarkExecutable (void *start, size_t len);
+void mmapForLinkerMarkReadWrite(void *start, size_t len);
 
 void addProddableBlock ( ObjectCode* oc, void* start, int size );
 void checkProddableBlock (ObjectCode *oc, void *addr, size_t size );
