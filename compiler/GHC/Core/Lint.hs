@@ -623,14 +623,6 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
                || exprIsTickedString rhs)
            (badBndrTyMsg binder (text "unlifted"))
 
-        -- Check that if the binder is top-level or recursive, it's not
-        -- demanded. Primitive string literals are exempt as there is no
-        -- computation to perform, see Note [Core top-level string literals].
-       ; checkL (not (isStrictId binder)
-            || (isNonRec rec_flag && not (isTopLevel top_lvl))
-            || exprIsTickedString rhs)
-           (mkStrictMsg binder)
-
         -- Check that if the binder is at the top level and has type Addr#,
         -- that it is a string literal, see
         -- Note [Core top-level string literals].
@@ -3121,7 +3113,7 @@ badBndrTyMsg binder what
 
 mkStrictMsg :: Id -> MsgDoc
 mkStrictMsg binder
-  = vcat [hsep [text "Recursive or top-level binder has strict demand info:",
+  = vcat [hsep [text "Recursive or top-level thunk has strict demand info:",
                      ppr binder],
               hsep [text "Binder's demand info:", ppr (idDemandInfo binder)]
              ]
