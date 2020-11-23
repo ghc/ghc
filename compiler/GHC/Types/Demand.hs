@@ -73,7 +73,7 @@ module GHC.Types.Demand (
     seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
     -- * Zapping usage information
-    zapUsageDemand, zapUsageEnvSig, zapUsedOnceDemand, zapUsedOnceSig
+    zapUsageDemand, zapDmdEnvSig, zapUsedOnceDemand, zapUsedOnceSig
   ) where
 
 #include "HsVersions.h"
@@ -367,7 +367,7 @@ lubSubDmd _          _         = topSubDmd
 
 -- | Denotes '∪' on 'Demand'.
 lubDmd :: Demand -> Demand -> Demand
-lubDmd (n1 :* sd1) (n2 :* sd2) = lubCard n1   n2   :* lubSubDmd sd1       sd2
+lubDmd (n1 :* sd1) (n2 :* sd2) = lubCard n1 n2 :* lubSubDmd sd1 sd2
 
 -- | Denotes '+' on 'SubDemand'.
 plusSubDmd :: SubDemand -> SubDemand -> SubDemand
@@ -1571,9 +1571,9 @@ This is weird, so I'm not worried about whether this optimises brilliantly; but
 it should not fall over.
 -}
 
-zapUsageEnvSig :: StrictSig -> StrictSig
--- Remove the usage environment from the demand
-zapUsageEnvSig (StrictSig (DmdType _ ds r)) = mkClosedStrictSig ds r
+-- | Remove the demand environment from the signature.
+zapDmdEnvSig :: StrictSig -> StrictSig
+zapDmdEnvSig (StrictSig (DmdType _ ds r)) = mkClosedStrictSig ds r
 
 zapUsageDemand :: Demand -> Demand
 -- Remove the usage info, but not the strictness info, from the demand

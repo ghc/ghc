@@ -484,7 +484,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
   | is_fun && is_eta_exp
   = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
 
-  | is_thunk                                   -- See Note [Thunk splitting]
+  | isNonRec is_rec, is_thunk                        -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
 
   | otherwise
@@ -777,6 +777,10 @@ Notice that x certainly has the CPR property now!
 In fact, splitThunk uses the function argument w/w splitting
 function, so that if x's demand is deeper (say U(U(L,L),L))
 then the splitting will go deeper too.
+
+NB: For recursive thunks, the Simplifier is unable to float `x-rhs` out of
+`x*`'s RHS, because `x*` occurs freely in `x-rhs`, and will just change it
+back to the original definition, so we just split non-recursive thunks.
 -}
 
 -- See Note [Thunk splitting]
