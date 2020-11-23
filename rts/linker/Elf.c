@@ -30,6 +30,7 @@
 
 #include <link.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #if defined(HAVE_SYS_STAT_H)
 #include <sys/stat.h>
