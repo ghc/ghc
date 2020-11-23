@@ -484,7 +484,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
   | is_fun && is_eta_exp
   = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
 
-  | is_thunk                                   -- See Note [Thunk splitting]
+  | isNonRec is_rec, is_thunk                        -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
 
   | otherwise
