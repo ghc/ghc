@@ -10,7 +10,6 @@
 #include "ghcconfig.h"
 #include "veh_excn.h"
 #include "LinkerInternals.h"
-#include <assert.h>
 #include <stdbool.h>
 #include <dbghelp.h>
 #include <shellapi.h>
@@ -195,7 +194,7 @@ void __register_hs_exception_handler( void )
         __hs_handle = AddVectoredContinueHandler(CALL_LAST,
                                                  __hs_exception_handler);
         // should the handler not be registered this will return a null.
-        assert(__hs_handle);
+        CHECK(__hs_handle);
 
         // Register for an exception filter to ensure the continue handler gets
         // hit if no one handled the exception.
