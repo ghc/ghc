@@ -42,9 +42,11 @@ import GHC.Driver.Monad
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
+import GHC.Driver.Errors (printBagOfErrors)
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Types.Basic
+import GHC.Types.Error (getWarningMessages,getErrorMessages)
 
 import GHC.Data.Stream as Stream (collect, yield)
 
@@ -112,11 +114,11 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
 
     -- parse the cmm file and output any warnings or errors
     (warnings, errors, parsedCmm) <- parseCmmFile dflags cmmFile
-    let warningMsgs = fmap pprWarning warnings
-        errorMsgs   = fmap pprError errors
+    let warningMsgs = getWarningMessages (renderDiagnostic <$> warnings)
+        errorMsgs   = getErrorMessages   (renderDiagnostic <$> errors)
 
     -- print parser errors or warnings
-    mapM_ (printBagOfErrors dflags) [warningMsgs, mapBag (fmap renderError) errorMsgs]
+    mapM_ (printBagOfErrors dflags) [warningMsgs, errorMsgs]
 
     let initTopSRT = emptySRT thisMod
     cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fromJust parsedCmm
