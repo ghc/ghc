@@ -263,8 +263,8 @@ m32_alloc_page(void)
      * pages.
      */
     const size_t pgsz = getPageSize();
-    char *chunk = mmapForLinker(pgsz * M32_MAP_PAGES, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
-    if (chunk > (char *) 0xffffffff) {
+    uint8_t *chunk = mmapAnonForLinker(pgsz * M32_MAP_PAGES);
+    if (chunk > (uint8_t *) 0xffffffff) {
       barf("m32_alloc_page: failed to get allocation in lower 32-bits");
     }
 
@@ -407,7 +407,14 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
    if (m32_is_large_object(size,alignment)) {
       // large object
       size_t alsize = ROUND_UP(sizeof(struct m32_page_t), alignment);
-      struct m32_page_t *page = mmapForLinker(alsize+size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS,-1,0);
+      struct m32_page_t *page = mmapAnonForLinker(alsize+size);
+      if (page == NULL) {
+          sysErrorBelch("m32_alloc: Failed to map pages for %zd bytes", size);
+          return NULL;
+      } else if (page > (struct m32_page_t *) 0xffffffff) {
+          debugBelch("m32_alloc: warning: Allocation of %zd bytes resulted in pages above 4GB (%p)",
+                     size, page);
+      }
       page->filled_page.size = alsize + size;
       m32_allocator_push_filled_list(&alloc->unprotected_list, (struct m32_page_t *) page);
       return (char*) page + alsize;
