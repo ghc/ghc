@@ -1005,7 +1005,7 @@ buildCompGraph (scc:sccs) = case scc of
 -- We need to treat boot modules specially when building compilation graphs,
 -- since they break cycles. Regular source files and signature files are treated
 -- equivalently.
-data BuildModule = BuildModule_Unit InstantiatedUnit | BuildModule_Module ModuleWithIsBoot
+data BuildModule = BuildModule_Unit {-# UNPACK #-} !InstantiatedUnit | BuildModule_Module {-# UNPACK #-} !ModuleWithIsBoot
   deriving (Eq, Ord)
 
 -- | Tests if an 'HscSource' is a boot file, primarily for constructing elements
@@ -2167,7 +2167,7 @@ modNodeMapElems (ModNodeMap m) = Map.elems m
 modNodeMapLookup :: ModNodeKey -> ModNodeMap a -> Maybe a
 modNodeMapLookup k (ModNodeMap m) = Map.lookup k m
 
-data NodeKey = NodeKey_Unit InstantiatedUnit | NodeKey_Module ModNodeKey
+data NodeKey = NodeKey_Unit {-# UNPACK #-} !InstantiatedUnit | NodeKey_Module {-# UNPACK #-} !ModNodeKey
   deriving (Eq, Ord)
 
 newtype NodeMap a = NodeMap { unNodeMap :: Map.Map NodeKey a }
