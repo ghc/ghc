@@ -462,7 +462,7 @@ makeGot(ObjectCode * oc) {
 
 void
 freeGot(ObjectCode * oc) {
-    munmap(oc->info->got_start, oc->info->got_size);
+    munmapForLinker(oc->info->got_start, oc->info->got_size, "freeGot");
     oc->info->got_start = NULL;
     oc->info->got_size = 0;
 }

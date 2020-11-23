@@ -613,7 +613,7 @@ fail:
         stgFree(fileName);
     if (gnuFileIndex != NULL) {
 #if RTS_LINKER_USE_MMAP
-        munmap(gnuFileIndex, gnuFileIndexSize + 1);
+        munmapForLinker(gnuFileIndex, gnuFileIndexSize + 1, "loadArchive_");
 #else
         stgFree(gnuFileIndex);
 #endif

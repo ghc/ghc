@@ -210,25 +210,6 @@ unsigned int m32_free_page_pool_size = 0;
 // TODO
 
 /**
- * Wrapper for `unmap` that handles error cases.
- * This is the real implementation. There is another dummy implementation below.
- * See the note titled "Compile Time Trickery" at the top of this file.
- */
-static void
-munmapForLinker (void * addr, size_t size)
-{
-   IF_DEBUG(linker,
-            debugBelch("m32_alloc: Unmapping %zu bytes at %p\n",
-                       size, addr));
-
-   int r = munmap(addr,size);
-   if (r == -1) {
-      // Should we abort here?
-      sysErrorBelch("munmap");
-   }
-}
-
-/**
  * Free a page or, if possible, place it in the free page pool.
  */
 static void
@@ -239,7 +220,7 @@ m32_release_page(struct m32_page_t *page)
     m32_free_page_pool = page;
     m32_free_page_pool_size ++;
   } else {
-    munmapForLinker((void *) page, getPageSize());
+    munmapForLinker((void *) page, getPageSize(), "m32_release_page");
   }
 }
 
@@ -301,7 +282,7 @@ m32_allocator_unmap_list(struct m32_page_t *head)
 {
   while (head != NULL) {
     struct m32_page_t *next = m32_filled_page_get_next(head);
-    munmapForLinker((void *) head, head->filled_page.size);
+    munmapForLinker((void *) head, head->filled_page.size, "m32_allocator_unmap_list");
     head = next;
   }
 }
@@ -319,7 +300,7 @@ void m32_allocator_free(m32_allocator *alloc)
   const size_t pgsz = getPageSize();
   for (int i=0; i < M32_MAX_PAGES; i++) {
     if (alloc->pages[i]) {
-      munmapForLinker(alloc->pages[i], pgsz);
+      munmapForLinker(alloc->pages[i], pgsz, "m32_allocator_free");
     }
   }
 
