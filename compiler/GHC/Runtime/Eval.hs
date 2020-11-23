@@ -1066,7 +1066,7 @@ typeKind normalise str = withSession $ \hsc_env ->
 getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
 getInstancesForType ty = withSession $ \hsc_env ->
   liftIO $ runInteractiveHsc hsc_env $
-    ioMsgMaybe . wrappingErrors GhcErrorTcRn $ runTcInteractive hsc_env $ do
+    ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $ runTcInteractive hsc_env $ do
       -- Bring class and instances from unqualified modules into scope, this fixes #16793.
       loadUnqualIfaces hsc_env (hsc_IC hsc_env)
       matches <- findMatchingInstances ty
@@ -1079,7 +1079,7 @@ parseInstanceHead str = withSession $ \hsc_env0 -> do
   (ty, _) <- liftIO $ runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+    ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $
       tcRnType hsc_env SkolemiseFlexi True ty
 
   return ty
