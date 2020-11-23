@@ -364,7 +364,7 @@ void osBindMBlocksToNode(
 {
 #if HAVE_LIBNUMA
     int ret;
-    StgWord mask = 0;
+    unsigned long mask = 0;
     mask |= 1 << node;
     if (RtsFlags.GcFlags.numa) {
         ret = mbind(addr, (unsigned long)size,
