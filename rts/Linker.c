@@ -1152,6 +1152,14 @@ mmapAnonForLinker (size_t bytes)
   return mmapForLinker (bytes, PROT_READ|PROT_WRITE, MAP_ANONYMOUS, -1, 0);
 }
 
+void munmapForLinker (void *addr, size_t bytes, const char *caller)
+{
+  int r = munmap(addr, bytes);
+  if (r == -1) {
+    // Should we abort here?
+    sysErrorBelch("munmap: %s", caller);
+  }
+}
 
 /* Note [Memory protection in the linker]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1238,7 +1246,7 @@ freePreloadObjectFile (ObjectCode *oc)
 #else
 
     if (RTS_LINKER_USE_MMAP && oc->imageMapped) {
-        munmap(oc->image, oc->fileSize);
+        munmapForLinker(oc->image, oc->fileSize, "freePreloadObjectFile");
     }
     else {
         stgFree(oc->image);
@@ -1286,8 +1294,10 @@ void freeObjectCode (ObjectCode *oc)
                 switch(oc->sections[i].alloc){
 #if RTS_LINKER_USE_MMAP
                 case SECTION_MMAP:
-                    munmap(oc->sections[i].mapped_start,
-                           oc->sections[i].mapped_size);
+                    munmapForLinker(
+                        oc->sections[i].mapped_start,
+                        oc->sections[i].mapped_size,
+                        "freeObjectCode");
                     break;
                 case SECTION_M32:
                     // Freed by m32_allocator_free
@@ -2176,7 +2186,7 @@ void freeSegments (ObjectCode *oc)
                 continue;
             } else {
 #if RTS_LINKER_USE_MMAP
-                CHECKM(0 == munmap(s->start, s->size), "freeSegments: failed to unmap memory");
+                munmapForLinker(s->start, s->size, "freeSegments");
 #else
                 stgFree(s->start);
 #endif
