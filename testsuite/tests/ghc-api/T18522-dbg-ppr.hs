@@ -4,8 +4,10 @@ module Main where
 
 import Language.Haskell.TH (runQ)
 import GHC.Types.Basic
+import GHC.Types.Error
 import GHC.ThToHs
 import GHC.Driver.Session
+import GHC.Driver.Errors (printBagOfErrors)
 import GHC.Core.TyCo.Ppr
 import GHC.Utils.Outputable
 import GHC.Tc.Module
@@ -45,7 +47,7 @@ main = do
         tcRnType hsc_env SkolemiseFlexi True hs_t
       case mres of
         Nothing -> do
-          printBagOfErrors dflags warnings
-          printBagOfErrors dflags errors
+          printBagOfErrors dflags (getWarningMessages warnings)
+          printBagOfErrors dflags (getErrorMessages errors)
         Just (t, _) -> do
           putStrLn $ showSDoc dflags (debugPprType t)
