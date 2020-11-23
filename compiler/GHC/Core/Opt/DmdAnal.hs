@@ -65,32 +65,41 @@ data DmdAnalOpts = DmdAnalOpts
 --
 -- Note: use `seqBinds` on the result to avoid leaks due to lazyness (cf Note
 -- [Stamp out space leaks in demand analysis])
-dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> CoreProgram -> CoreProgram
-dmdAnalProgram opts fam_envs binds = binds_plus_dmds
+dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
+dmdAnalProgram opts fam_envs rules binds = binds_plus_dmds
    where
       env             = emptyAnalEnv opts fam_envs
+      rule_fvs        = foldr (unionVarSet . ruleRhsFreeIds) emptyVarSet rules
       binds_plus_dmds = snd $ go env nopDmdType binds
 
       go _   dmd_ty []     = (dmd_ty, [])
       go env dmd_ty (b:bs) = case b of
         NonRec id rhs
-          | (env', lazy_fvs, id', rhs') <- dmdAnalRhsLetDown TopLevel Nothing env topSubDmd id rhs
+          | (env', lazy_fvs, id', rhs') <- dmdAnalRhsLetDown TopLevel NonRecursive env topSubDmd id rhs
           , (dmd_ty', bs') <- go env' (add_exported_use env' dmd_ty id') bs
           , (dmd_ty'', id_dmd) <- findBndrDmd env' False (dmd_ty' `addLazyFVs` lazy_fvs) id'
-          , let id'' = id' `setIdDemandInfo` if isInterestingTopLevelFn id' then id_dmd else topDmd
+          , let id'' = annotate_id_dmd id' id_dmd
           -> (dmd_ty'', NonRec id'' rhs' : bs')
         Rec pairs
           | (env', lazy_fvs, pairs') <- dmdFix TopLevel env topSubDmd pairs
           , let ids' = map fst pairs'
           , (dmd_ty', bs') <- go env' (add_exported_uses env' dmd_ty ids') bs
           , (dmd_ty'', id_dmds) <- findBndrsDmds env' (dmd_ty' `addLazyFVs` lazy_fvs) ids'
-          , let ids'' = zipWith (\id' id_dmd -> id' `setIdDemandInfo` if isInterestingTopLevelFn id' then id_dmd else topDmd) ids' id_dmds
+          , let ids'' = zipWith annotate_id_dmd ids' id_dmds
           , let pairs'' = zipWith (\id'' (_, rhs') -> (id'', rhs')) ids'' pairs'
           -> (dmd_ty'', Rec pairs'' : bs')
 
+      annotate_id_dmd id dmd
+        | isInterestingTopLevelFn id, not (id `elemVarSet` rule_fvs)
+        -- See Note [Absence analysis for stable unfoldings and RULES]
+        = id `setIdDemandInfo` dmd
+        | otherwise
+        = id `setIdDemandInfo` topDmd
+
       add_exported_uses env = foldl' (add_exported_use env)
       add_exported_use env dmd_ty id
-        | isExportedId id = dmd_ty `plusDmdType` fst (dmdAnalStar env topDmd (Var id))
+        | isExportedId id || not (isInterestingTopLevelFn id)
+        = dmd_ty `plusDmdType` fst (dmdAnalStar env topDmd (Var id))
         | otherwise       = dmd_ty
 
 {- Note [Stamp out space leaks in demand analysis]
@@ -326,7 +335,7 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 rhs') body')
   where
-    (env1, lazy_fv, id1, rhs') = dmdAnalRhsLetDown NotTopLevel Nothing env dmd id rhs
+    (env1, lazy_fv, id1, rhs') = dmdAnalRhsLetDown NotTopLevel NonRecursive env dmd id rhs
     (body_ty, body')     = dmdAnal env1 dmd body
     (body_ty1, id2)      = annotateBndr env body_ty id1
     body_ty2             = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
@@ -348,8 +357,8 @@ dmdAnal' env dmd (Let (Rec pairs) body)
   = let
         (env', lazy_fv, pairs') = dmdFix NotTopLevel env dmd pairs
         (body_ty, body')        = dmdAnal env' dmd body
-        body_ty1                = deleteFVs body_ty (map fst pairs)
-        body_ty2                = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
+        body_ty1                = addLazyFVs body_ty lazy_fv -- see Note [Lazy and unleashable free variables]
+        body_ty2                = deleteFVs body_ty1 (map fst pairs) -- TODO: We could annotate idDemandInfo here
     in
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
@@ -565,7 +574,8 @@ strict in |y|.
 -- (e.g. called), but aren't interested in whether they were called strictly
 -- or not. Other top-level bindings are boring.
 isInterestingTopLevelFn :: Id -> Bool
-isInterestingTopLevelFn id = typeArity (idType id) `lengthExceeds` 0
+isInterestingTopLevelFn id =
+  typeArity (idType id) `lengthExceeds` 0
 
 dmdTransform :: AnalEnv         -- ^ The strictness environment
              -> Id              -- ^ The function
@@ -630,7 +640,7 @@ dmdTransform env var dmd
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
 dmdAnalRhsLetDown
   :: TopLevelFlag
-  -> Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
+  -> RecFlag
   -> AnalEnv -> SubDemand
   -> Id -> CoreExpr
   -> (AnalEnv, DmdEnv, Id, CoreExpr)
@@ -671,8 +681,8 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
     --        we'd have to do an additional iteration. reuseEnv makes sure that
     --        we never get used-once info for FVs of recursive functions.
     rhs_fv1 = case rec_flag of
-                Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
-                Nothing -> rhs_fv
+                Recursive    -> reuseEnv rhs_fv
+                NonRecursive -> rhs_fv
 
     rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` extra_fvs
     -- Find the RHS free vars of the unfoldings and RULES
@@ -952,8 +962,6 @@ dmdFix :: TopLevelFlag
 dmdFix top_lvl env let_dmd orig_pairs
   = loop 1 initial_pairs
   where
-    bndrs = map fst orig_pairs
-
     -- See Note [Initialising strictness]
     initial_pairs | ae_virgin env = [(setIdStrictness id botSig, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
@@ -1003,7 +1011,7 @@ dmdFix top_lvl env let_dmd orig_pairs
           = -- pprTrace "my_downRhs" (ppr id $$ ppr (idStrictness id) $$ ppr sig) $
             ((env', lazy_fv'), (id', rhs'))
           where
-            (env', lazy_fv1, id', rhs') = dmdAnalRhsLetDown top_lvl (Just bndrs) env let_dmd id rhs
+            (env', lazy_fv1, id', rhs') = dmdAnalRhsLetDown top_lvl Recursive env let_dmd id rhs
             lazy_fv'                    = plusVarEnv_C plusDmd lazy_fv lazy_fv1
 
     zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
