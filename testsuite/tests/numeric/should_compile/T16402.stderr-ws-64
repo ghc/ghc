@@ -28,7 +28,7 @@ smallWord_foo = smallWord_bar
 -- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 smallInt_bar
   = \ x ->
-      case x of { I64# x# -> I64# (extendInt16# (narrowInt16# x#)) }
+      case x of { I64# x# -> I64# (int16ToInt# (intToInt16# x#)) }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 smallInt_foo = smallInt_bar
