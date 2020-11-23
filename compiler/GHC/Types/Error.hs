@@ -21,6 +21,7 @@ module GHC.Types.Error
    , consError
    , snocError
    , consWarning
+   , snocWarning
    , errDoc
    , mapErrDoc
    , pprMessageBag
@@ -147,13 +148,17 @@ unionMessages (coerce -> warns1, coerce -> errs1) (coerce -> warns2, coerce -> e
 consError :: ErrMsg e -> ErrorMessages e -> ErrorMessages e
 consError e (ErrorMessages errs) = ErrorMessages (e `consBag` errs)
 
+-- | Append an error at the end of the 'ErrorMessages'.
+snocError :: ErrorMessages e -> ErrMsg e -> ErrorMessages e
+snocError (ErrorMessages errs) e = ErrorMessages (errs `snocBag` e)
+
 -- | Prepend a warning at the beginning of the 'WarningMessages'.
 consWarning :: ErrMsg e -> WarningMessages e -> WarningMessages e
 consWarning w (WarningMessages warns) = WarningMessages (w `consBag` warns)
 
--- | Append an error at the end of the 'ErrorMessages'.
-snocError :: ErrorMessages e -> ErrMsg e -> ErrorMessages e
-snocError (ErrorMessages errs) e = ErrorMessages (errs `snocBag` e)
+-- | Append a warning at the end of the 'WarningMessages'.
+snocWarning :: WarningMessages w -> ErrMsg w -> WarningMessages w
+snocWarning (WarningMessages warns) w = WarningMessages (warns `snocBag` w)
 
 errDoc :: [MsgDoc] -> [MsgDoc] -> [MsgDoc] -> ErrDoc
 errDoc = ErrDoc

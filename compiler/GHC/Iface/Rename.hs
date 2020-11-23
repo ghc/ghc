@@ -22,7 +22,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Tc.Errors.Types
+import GHC.Tc.Errors.Types as TcRn
 import GHC.Tc.Utils.Monad
 
 import GHC.Iface.Syntax
@@ -42,7 +42,7 @@ import GHC.Types.Var
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Shape
-import GHC.Types.Error ( mkErrorMessages, getErrorMessages )
+import GHC.Types.Error ( snocError )
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -50,13 +50,11 @@ import GHC.Utils.Misc
 import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 
-import GHC.Data.Bag
-
 import qualified Data.Traversable as T
 
 import Data.IORef
 
-tcRnMsgMaybe :: IO (Either (ErrorMessages TcRnError) a) -> TcM a
+tcRnMsgMaybe :: IO (Either (ErrorMessages TcRn.Error) a) -> TcM a
 tcRnMsgMaybe do_this = do
     r <- liftIO $ do_this
     case r of
@@ -78,9 +76,9 @@ tcRnModExports x y = do
 failWithRn :: SDoc -> ShIfM a
 failWithRn doc = do
     errs_var <- fmap sh_if_errs getGblEnv
-    (getErrorMessages -> errs) <- readTcRef errs_var
+    errs <- readTcRef errs_var
     -- TODO: maybe associate this with a source location?
-    writeTcRef errs_var (mkErrorMessages $ errs `snocBag` (fmap TcRnErrorDoc $ mkPlainErrMsg noSrcSpan doc))
+    writeTcRef errs_var (errs `snocError` (fmap ErrTcRnRaw $ mkPlainErrMsg noSrcSpan doc))
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to
@@ -104,7 +102,7 @@ failWithRn doc = do
 -- should be Foo.T; then we'll also rename this (this is used
 -- when loading an interface to merge it into a requirement.)
 rnModIface :: HscEnv -> [(ModuleName, Module)] -> Maybe NameShape
-           -> ModIface -> IO (Either (ErrorMessages TcRnError) ModIface)
+           -> ModIface -> IO (Either (ErrorMessages TcRn.Error) ModIface)
 rnModIface hsc_env insts nsubst iface =
     initRnIface hsc_env iface insts nsubst $ do
         mod <- rnModule (mi_module iface)
@@ -128,7 +126,7 @@ rnModIface hsc_env insts nsubst iface =
 
 -- | Rename just the exports of a 'ModIface'.  Useful when we're doing
 -- shaping prior to signature merging.
-rnModExports :: HscEnv -> [(ModuleName, Module)] -> ModIface -> IO (Either (ErrorMessages TcRnError) [AvailInfo])
+rnModExports :: HscEnv -> [(ModuleName, Module)] -> ModIface -> IO (Either (ErrorMessages TcRn.Error) [AvailInfo])
 rnModExports hsc_env insts iface
     = initRnIface hsc_env iface insts Nothing
     $ mapM rnAvailInfo (mi_exports iface)
@@ -189,7 +187,7 @@ rnDepModules sel deps = do
 
 -- | Run a computation in the 'ShIfM' monad.
 initRnIface :: HscEnv -> ModIface -> [(ModuleName, Module)] -> Maybe NameShape
-            -> ShIfM a -> IO (Either (ErrorMessages TcRnError) a)
+            -> ShIfM a -> IO (Either (ErrorMessages TcRn.Error) a)
 initRnIface hsc_env iface insts nsubst do_this = do
     errs_var <- newIORef mempty
     let dflags = hsc_dflags hsc_env
@@ -227,7 +225,7 @@ data ShIfEnv = ShIfEnv {
         -- list to determine the renaming.
         sh_if_shape :: Maybe NameShape,
         -- Mutable reference to keep track of errors (similar to 'tcl_errs')
-        sh_if_errs :: IORef (ErrorMessages TcRnError)
+        sh_if_errs :: IORef (ErrorMessages TcRn.Error)
     }
 
 getHoleSubst :: ShIfM ShHoleSubst

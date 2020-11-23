@@ -1454,7 +1454,8 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
      [] _ _ uids_to_check _
    = do hsc_env <- getSession
         liftIO . runHsc hsc_env $
-          mapM_ (ioMsgMaybe . wrappingErrors GhcErrorTcRn . tcRnCheckUnit hsc_env) uids_to_check
+          mapM_ (ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn
+                            . tcRnCheckUnit hsc_env) uids_to_check
         return (Succeeded, done)
 
   upsweep' _old_hpt done
@@ -1486,7 +1487,8 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                 = addOneToUniqSet done_holes (ms_mod_name mod)
                 | otherwise = done_holes
         liftIO . runHsc hsc_env $
-          mapM_ (ioMsgMaybe . wrappingErrors GhcErrorTcRn . tcRnCheckUnit hsc_env) ready_uids
+          mapM_ (ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn
+                            . tcRnCheckUnit hsc_env) ready_uids
 
         -- Remove unwanted tmp files between compilations
         liftIO (cleanup hsc_env)

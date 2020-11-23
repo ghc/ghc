@@ -2,28 +2,37 @@
 module GHC.Driver.Errors.Types (
     GhcError(..)
   , GhcWarning(..)
-  , DriverError(..)
+  , DriverError(..)   -- TODO(adinapoli) Naming consistency.
+  , DriverWarning(..)
 
   -- * Converting an ErrDoc into a GhcError in a lossy way
   , ghcErrorRawErrDoc
   ) where
 
+import GHC.Core.InstEnv ( ClsInst )
 import GHC.Driver.Session ( DynFlags )
 import GHC.Prelude ( String )
-import GHC.Tc.Errors.Types ( DsError, TcRnError(..) )
-import GHC.Types.Error ( ErrDoc )
+import GHC.Tc.Errors.Ppr ()
+import GHC.Types.Error ( ErrDoc, WarningMessages )
 import GHC.Unit.Finder.Types ( FindResult )
 import GHC.Unit.Module.Name ( ModuleName )
 import GHC.Unit.Types ( UnitId, Module )
 import qualified GHC.Driver.CmdLine as CmdLine
 import qualified GHC.Parser.Errors as Parser
+import qualified GHC.Tc.Errors.Types as TcRn
 
 -- | The umbrella type that encompasses all the different warnings that GHC might raise during the
--- different compilation stages.
+-- various compilation stages.
 data GhcWarning
   = GhcWarningPs  Parser.Warning
     -- ^ A warning raised during the the parsing phase.
+  | GhcWarningTcRn TcRn.Warning
+    -- ^ A warning raised during the the typechecking/renaming phase.
+  | GhcWarningDs   TcRn.DsWarning
+    -- ^ A warning raised during desugaring.
   | GhcWarningCmdLine CmdLine.Warn
+  | GhcWarningDriver DriverWarning
+    -- ^ A warning raised in the driver.
   | GhcWarningRaw ErrDoc
     -- ^ The escape hatch to convert an 'ErrDoc' into a 'GhcWarning'. Same caveats applies as for a
     -- 'GhcErrorRaw'.
@@ -33,9 +42,9 @@ data GhcWarning
 data GhcError
   = GhcErrorPs Parser.Error
     -- ^ An error that happens in the parsing phase.
-  | GhcErrorTcRn TcRnError
+  | GhcErrorTcRn TcRn.Error
     -- ^ An error that happens in the typecheck/renaming phase.
-  | GhcErrorDs DsError
+  | GhcErrorDs TcRn.Error
     -- ^ An error that happens in the desugaring phase.
   | GhcErrorDriver DriverError
     -- ^ An error that happens in the driver.
@@ -59,3 +68,7 @@ data DriverError
   | DriverCantLoadIfaceForSafe Module
   | DriverError ErrDoc
 
+type Reasons = WarningMessages TcRn.Warning
+
+data DriverWarning
+  = WarnModuleInferredUnsafe DynFlags ModuleName [ClsInst] Reasons

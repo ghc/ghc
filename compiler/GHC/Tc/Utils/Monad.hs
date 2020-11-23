@@ -155,7 +155,7 @@ import GHC.Prelude
 
 import GHC.Builtin.Names
 
-import GHC.Tc.Errors.Types
+import GHC.Tc.Errors.Types as TcRn
 import GHC.Tc.Types     -- Re-export all
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
@@ -191,9 +191,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import GHC.Types.Error ( mkErrorMessages
-                       , mkWarningMessages
-                       , getWarningMessages
                        , getErrorMessages
+                       , snocWarning
                        )
 import GHC.Types.Fixity.Env
 import GHC.Types.Name.Reader
@@ -238,7 +237,7 @@ initTc :: HscEnv
        -> Module
        -> RealSrcSpan
        -> TcM r
-       -> IO (Messages ErrDoc TcRnError, Maybe r)
+       -> IO (Messages TcRn.Warning TcRn.Error, Maybe r)
                 -- Nothing => error thrown by the thing inside
                 -- (error messages should have been printed already)
 
@@ -360,7 +359,7 @@ initTcWithGbl :: HscEnv
               -> TcGblEnv
               -> RealSrcSpan
               -> TcM r
-              -> IO (Messages ErrDoc TcRnError, Maybe r)
+              -> IO (Messages TcRn.Warning TcRn.Error, Maybe r)
 initTcWithGbl hsc_env gbl_env loc do_this
  = do { lie_var      <- newIORef emptyWC
       ; errs_var     <- newIORef (mempty, mempty)
@@ -406,7 +405,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
       ; return (msgs, final_res)
       }
 
-initTcInteractive :: HscEnv -> TcM a -> IO (Messages ErrDoc TcRnError, Maybe a)
+initTcInteractive :: HscEnv -> TcM a -> IO (Messages TcRn.Warning TcRn.Error, Maybe a)
 -- Initialise the type checker monad for use in GHCi
 initTcInteractive hsc_env thing_inside
   = initTc hsc_env HsSrcFile False
@@ -939,10 +938,10 @@ wrapLocM_ fn (L loc a) = setSrcSpan loc (fn a)
 
 -- Reporting errors
 
-getErrsVar :: TcRn (TcRef (Messages ErrDoc TcRnError))
+getErrsVar :: TcRn (TcRef (Messages TcRn.Warning TcRn.Error))
 getErrsVar = do { env <- getLclEnv; return (tcl_errs env) }
 
-setErrsVar :: TcRef (Messages ErrDoc TcRnError) -> TcRn a -> TcRn a
+setErrsVar :: TcRef (Messages TcRn.Warning TcRn.Error) -> TcRn a -> TcRn a
 setErrsVar v = updLclEnv (\ env -> env { tcl_errs =  v })
 
 addErr :: MsgDoc -> TcRn ()
@@ -954,7 +953,7 @@ failWith msg = addErr msg >> failM
 failAt :: SrcSpan -> MsgDoc -> TcRn a
 failAt loc msg = addErrAt loc msg >> failM
 
-addTcRnErr :: SrcSpan -> (SDoc -> TcRnError) -> TcRn ()
+addTcRnErr :: SrcSpan -> (SDoc -> TcRn.Error) -> TcRn ()
 addTcRnErr loc err = do { ctxt <- getErrCtxt
                         ; tidy_env <- tcInitTidyEnv
                         ; err_info <- mkErrInfo tidy_env ctxt
@@ -980,7 +979,7 @@ checkErr :: Bool -> MsgDoc -> TcRn ()
 -- Add the error if the bool is False
 checkErr ok msg = unless ok (addErr msg)
 
-addMessages :: Messages ErrDoc TcRnError -> TcRn ()
+addMessages :: Messages TcRn.Warning TcRn.Error -> TcRn ()
 addMessages msgs1
   = do { errs_var <- getErrsVar ;
          msgs0 <- readTcRef errs_var ;
@@ -1017,26 +1016,26 @@ mkLongErrAt loc msg extra
          let msg' = pprWithUnitState unit_state msg in
          return $ mkLongErrMsg loc printer msg' extra }
 
-mkErrDocAt :: SrcSpan -> TcRnError -> TcRn (ErrMsg TcRnError)
+mkErrDocAt :: SrcSpan -> TcRn.Error -> TcRn (ErrMsg TcRn.Error)
 mkErrDocAt loc err
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
          return $ mkErr loc printer err }
 
 addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
-addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError . fmap TcRnErrorDoc
+addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError . fmap ErrTcRnRaw
 
-reportErrors :: [ErrMsg TcRnError] -> TcM ()
+reportErrors :: [ErrMsg TcRn.Error] -> TcM ()
 reportErrors = mapM_ reportError
 
-reportError :: ErrMsg TcRnError -> TcRn ()
+reportError :: ErrMsg TcRn.Error -> TcRn ()
 reportError err
   = do { traceTc "Adding error:" (pprLocErrMsg err) ;
          errs_var <- getErrsVar ;
          (warns, getErrorMessages -> errs) <- readTcRef errs_var ;
          writeTcRef errs_var (warns, mkErrorMessages $ errs `snocBag` err) }
 
-reportWarning :: WarnReason -> ErrMsg ErrDoc -> TcRn ()
+reportWarning :: WarnReason -> ErrMsg TcRn.Warning -> TcRn ()
 reportWarning reason err
   = do { let warn = makeIntoWarning reason err
                     -- 'err' was built by mkLongErrMsg or something like that,
@@ -1045,8 +1044,8 @@ reportWarning reason err
 
        ; traceTc "Adding warning:" (pprLocErrMsg warn)
        ; errs_var <- getErrsVar
-       ; (getWarningMessages -> warns, errs) <- readTcRef errs_var
-       ; writeTcRef errs_var (mkWarningMessages $ warns `snocBag` warn, errs) }
+       ; (warns, errs) <- readTcRef errs_var
+       ; writeTcRef errs_var (warns `snocWarning` warn, errs) }
 
 
 -----------------------
@@ -1206,7 +1205,7 @@ capture_constraints thing_inside
        ; lie <- readTcRef lie_var
        ; return (res, lie) }
 
-capture_messages :: TcM r -> TcM (r, Messages ErrDoc TcRnError)
+capture_messages :: TcM r -> TcM (r, Messages TcRn.Warning TcRn.Error)
 -- capture_messages simply captures and returns the
 --                  errors arnd warnings generated by thing_inside
 -- Precondition: thing_inside must not throw an exception!
@@ -1376,7 +1375,7 @@ foldAndRecoverM f acc (x:xs) =
                                 Just acc' -> foldAndRecoverM f acc' xs  }
 
 -----------------------
-tryTc :: TcRn a -> TcRn (Maybe a, Messages ErrDoc TcRnError)
+tryTc :: TcRn a -> TcRn (Maybe a, Messages TcRn.Warning TcRn.Error)
 -- (tryTc m) executes m, and returns
 --      Just r,  if m succeeds (returning r)
 --      Nothing, if m fails
@@ -1529,7 +1528,7 @@ add_warn_at reason loc msg extra_info
          printer <- getPrintUnqualified dflags ;
          let { warn = mkLongWarnMsg loc printer
                                     msg extra_info } ;
-         reportWarning reason warn }
+         reportWarning reason (WarnTcRnRaw <$> warn) }
 
 
 {-
@@ -1937,7 +1936,7 @@ addModFinalizersWithLclEnv mod_finalizers
 -- | Mark that safe inference has failed
 -- See Note [Safe Haskell Overlapping Instances Implementation]
 -- although this is used for more than just that failure case.
-recordUnsafeInfer :: WarningMessages ErrDoc -> TcM ()
+recordUnsafeInfer :: WarningMessages TcRn.Warning -> TcM ()
 recordUnsafeInfer warns =
     getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) (False, warns)
 

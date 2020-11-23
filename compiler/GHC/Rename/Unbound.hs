@@ -23,11 +23,12 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 
-import GHC.Tc.Errors.Types ( OutOfScopeSuggestions(..)
+import GHC.Tc.Errors.Types as TcRn (
+                             OutOfScopeSuggestions(..)
                            , NameSuggestions(..)
                            , ImportSuggestion(..)
                            , ExtensionSuggestion(..)
-                           , TcRnError(..)
+                           , Error(..)
                            , noOutOfScopeSuggestions
                            )
 import GHC.Tc.Utils.Monad
@@ -79,10 +80,11 @@ unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
 unboundNameX where_look rdr_name extra
   = do  { dflags <- getDynFlags
         ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
+              err = notInScopeErr rdr_name $$ extra
         ; loc <- getSrcSpanM
         ; if not show_helpful_errors
           then addTcRnErr loc
-                 (TcRnOutOfScope rdr_name noOutOfScopeSuggestions extra)
+                 (TcRn.ErrOutOfScope rdr_name noOutOfScopeSuggestions err)
           else do { local_env  <- getLocalRdrEnv
                   ; global_env <- getGlobalRdrEnv
                   ; impInfo <- getImports
@@ -91,7 +93,7 @@ unboundNameX where_look rdr_name extra
                   ; let suggestions = unknownNameSuggestions_ where_look
                           dflags hpt currmod global_env local_env impInfo
                           rdr_name
-                  ; addTcRnErr loc (TcRnOutOfScope rdr_name suggestions extra) }
+                  ; addTcRnErr loc (TcRn.ErrOutOfScope rdr_name suggestions err) }
         ; return (mkUnboundNameRdr rdr_name) }
 
 notInScopeErr :: RdrName -> SDoc

@@ -84,7 +84,7 @@ module GHC.Driver.Main
     , oneShotMsg
     , dumpIfaceStats
     , ioMsgMaybe
-    , wrappingErrors
+    , wrappingMessages
     , showModuleIndex
     , hscAddSptEntries
     ) where
@@ -98,6 +98,7 @@ import GHC.Driver.Env
 import GHC.Driver.Errors ( GhcWarning(..)
                          , GhcError(..)
                          , DriverError(..)
+                         , DriverWarning(..)
                          , ghcErrorRawErrDoc
                          , printOrThrowWarnings
                          , printBagOfErrors
@@ -154,6 +155,7 @@ import GHC.Parser
 import GHC.Parser.Lexer as Lexer
 
 import GHC.Tc.Module
+import GHC.Tc.Errors.Types as TcRn
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
 
@@ -346,21 +348,20 @@ ioMsgMaybe ioA = do
         Nothing -> throwErrors errs
         Just r  -> ASSERT( noErrors errs ) return r
 
--- FIXME(adinapoli) This should take and yield a 'GhcWarning'.
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
-ioMsgMaybe' :: IO (Messages ErrDoc e, Maybe a) -> Hsc (Maybe a)
+ioMsgMaybe' :: IO (Messages GhcWarning e, Maybe a) -> Hsc (Maybe a)
 ioMsgMaybe' ioA = do
     ((warns,_errs), mb_r) <- liftIO $ ioA
-    logWarnings (GhcWarningRaw <$> warns)
+    logWarnings warns
     return mb_r
 
--- FIXME(adinapoli) This should take and yield a 'GhcWarning'.
-wrappingErrors
-  :: (e -> GhcError)
-  -> IO (Messages ErrDoc e, Maybe a)
+wrappingMessages
+  :: (w -> GhcWarning)
+  -> (e -> GhcError)
+  -> IO (Messages w e, Maybe a)
   -> IO (Messages GhcWarning GhcError, Maybe a)
-wrappingErrors f = fmap (\(e, ma) -> (bimapMessages GhcWarningRaw f e, ma))
+wrappingMessages f g = fmap (\(e, ma) -> (bimapMessages f g e, ma))
 
 -- -----------------------------------------------------------------------------
 -- | Lookup things in the compiler's environment
@@ -369,13 +370,13 @@ hscTcRnLookupRdrName :: HscEnv -> Located RdrName -> IO [Name]
 hscTcRnLookupRdrName hsc_env0 rdr_name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
-       ; ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+       ; ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $
          tcRnLookupRdrName hsc_env rdr_name }
 
 hscTcRcLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
 hscTcRcLookupName hsc_env0 name = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
-  ioMsgMaybe' $ tcRnLookupName hsc_env name
+  ioMsgMaybe' . wrappingMessages GhcWarningTcRn GhcErrorTcRn $ tcRnLookupName hsc_env name
       -- ignore errors: the only error we're likely to get is
       -- "name not found", and the Maybe in the return type
       -- is used to indicate that.
@@ -385,24 +386,24 @@ hscTcRnGetInfo :: HscEnv -> Name
 hscTcRnGetInfo hsc_env0 name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
-       ; ioMsgMaybe' $ tcRnGetInfo hsc_env name }
+       ; ioMsgMaybe' . wrappingMessages GhcWarningTcRn GhcErrorTcRn $ tcRnGetInfo hsc_env name }
 
 hscIsGHCiMonad :: HscEnv -> String -> IO Name
 hscIsGHCiMonad hsc_env name
-  = runHsc hsc_env $ ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+  = runHsc hsc_env $ ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $
     isGHCiMonad hsc_env name
 
 hscGetModuleInterface :: HscEnv -> Module -> IO ModIface
 hscGetModuleInterface hsc_env0 mod = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
-  ioMsgMaybe . wrappingErrors GhcErrorTcRn $ getModuleInterface hsc_env mod
+  ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $ getModuleInterface hsc_env mod
 
 -- -----------------------------------------------------------------------------
 -- | Rename some import declarations
 hscRnImportDecls :: HscEnv -> [LImportDecl GhcPs] -> IO GlobalRdrEnv
 hscRnImportDecls hsc_env0 import_decls = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
-  ioMsgMaybe . wrappingErrors GhcErrorTcRn $ tcRnImportDecls hsc_env import_decls
+  ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $ tcRnImportDecls hsc_env import_decls
 
 -- -----------------------------------------------------------------------------
 -- | parse a file, returning the abstract syntax
@@ -563,7 +564,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
     MASSERT( isHomeModule home_unit outer_mod )
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
-        then ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+        then ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $
              tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
          do hpm <- case mb_rdr_module of
@@ -572,7 +573,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
             tc_result0 <- tcRnModule' mod_summary keep_rn' hpm
             if hsc_src == HsigFile
                 then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 Nothing
-                        ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+                        ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
     -- TODO are we extracting anything when we merely instantiate a signature?
@@ -596,7 +597,7 @@ tcRnModule' sum save_rn_syntax mod = do
         warnMissingSafeHaskellMode
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
-               ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+               ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $
                    tcRnModule hsc_env sum
                      save_rn_syntax mod
 
@@ -609,7 +610,7 @@ tcRnModule' sum save_rn_syntax mod = do
     if not (safeHaskellOn dflags)
          || (safeInferOn dflags && not allSafeOK)
       -- if safe Haskell off or safe infer failed, mark unsafe
-      then markUnsafeInfer tcg_res (GhcWarningRaw <$> whyUnsafe)
+      then markUnsafeInfer tcg_res whyUnsafe
 
       -- module (could be) safe, throw warning if needed
       else do
@@ -619,7 +620,7 @@ tcRnModule' sum save_rn_syntax mod = do
             case wopt Opt_WarnSafe dflags of
               True
                 | safeHaskell dflags == Sf_Safe -> return ()
-                | otherwise -> (logWarnings $
+                | otherwise -> (logWarnings $ -- TODO(adinapoli) Move as driver warnings.
                     fmap GhcWarningRaw $ mkWarningMessages $ unitBag $
                     makeIntoWarning (Reason Opt_WarnSafe) $
                     mkPlainWarnMsg (warnSafeOnLoc dflags) $
@@ -649,7 +650,7 @@ hscDesugar hsc_env mod_summary tc_result =
 hscDesugar' :: ModLocation -> TcGblEnv -> Hsc ModGuts
 hscDesugar' mod_location tc_result = do
     hsc_env <- getHscEnv
-    r <- ioMsgMaybe . wrappingErrors GhcErrorDs $
+    r <- ioMsgMaybe . wrappingMessages GhcWarningDs GhcErrorDs $
       {-# SCC "deSugar" #-}
       deSugar hsc_env mod_location tc_result
 
@@ -1146,7 +1147,7 @@ hscCheckSafeImports tcg_env = do
                 -- SafeInferred: user defined RULES, so not safe
               | safeInferOn dflags && not (null $ tcg_rules tcg_env')
               -> markUnsafeInfer tcg_env' $
-                   fmap GhcWarningRaw $ mkWarningMessages $ warns dflags (tcg_rules tcg_env')
+                   fmap TcRn.WarnTcRnRaw $ mkWarningMessages $ warns dflags (tcg_rules tcg_env')
 
                 -- Trustworthy OR SafeInferred: with no RULES
               | otherwise
@@ -1212,7 +1213,8 @@ checkSafeImports tcg_env
           True -> do
             let infPassed = noWarnings infErrs
             tcg_env' <- case (not infPassed) of
-              True  -> markUnsafeInfer tcg_env infErrs
+              -- FIXME(adinapoli): we are losing precision here.
+              True  -> markUnsafeInfer tcg_env (fmap (WarnTcRnRaw . renderDiagnostic) infErrs)
               False -> return tcg_env
             when (packageTrustOn dflags) $ checkPkgTrust pkgReqs
             let newTrust = pkgTrustReqs dflags safePkgs infPkgs infPassed
@@ -1414,14 +1416,14 @@ checkPkgTrust pkgs = do
 -- may call it on modules using Trustworthy or Unsafe flags so as to allow
 -- warning flags for safety to function correctly. See Note [Safe Haskell
 -- Inference].
-markUnsafeInfer :: TcGblEnv -> WarningMessages GhcWarning -> Hsc TcGblEnv
-markUnsafeInfer tcg_env (fmap renderDiagnostic -> whyUnsafe) = do  --FIXME(adinapoli) To not render in a lossy way here.
+markUnsafeInfer :: TcGblEnv -> WarningMessages TcRn.Warning -> Hsc TcGblEnv
+markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
     when (wopt Opt_WarnUnsafe dflags)
-         (logWarnings $ fmap GhcWarningRaw $ mkWarningMessages
+         (logWarnings $ fmap GhcWarningDriver $ mkWarningMessages
                       $ unitBag $ makeIntoWarning (Reason Opt_WarnUnsafe) $
-                        mkPlainWarnMsg (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
+                        mkErr (warnUnsafeOnLoc dflags) alwaysQualify (whyUnsafe' dflags))
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
     -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other
@@ -1433,29 +1435,8 @@ markUnsafeInfer tcg_env (fmap renderDiagnostic -> whyUnsafe) = do  --FIXME(adina
 
   where
     wiped_trust   = (tcg_imports tcg_env) { imp_trust_pkgs = S.empty }
-    pprMod        = ppr $ moduleName $ tcg_mod tcg_env
-    whyUnsafe' df = vcat [ quotes pprMod <+> text "has been inferred as unsafe!"
-                         , text "Reason:"
-                         , nest 4 $ (vcat $ badFlags df) $+$
-                                    (vcat $ pprErrMsgBagWithLoc (getWarningMessages whyUnsafe)) $+$
-                                    (vcat $ badInsts $ tcg_insts tcg_env)
-                         ]
-    badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer
-    badFlag df (str,loc,on,_)
-        | on df     = [mkLocMessage SevOutput (loc df) $
-                            text str <+> text "is not allowed in Safe Haskell"]
-        | otherwise = []
-    badInsts insts = concatMap badInst insts
-
-    checkOverlap (NoOverlap _) = False
-    checkOverlap _             = True
-
-    badInst ins | checkOverlap (overlapMode (is_flag ins))
-                = [mkLocMessage SevOutput (nameSrcSpan $ getName $ is_dfun ins) $
-                      ppr (overlapMode $ is_flag ins) <+>
-                      text "overlap mode isn't allowed in Safe Haskell"]
-                | otherwise = []
-
+    whyUnsafe' df = WarnModuleInferredUnsafe df (moduleName $ tcg_mod tcg_env)
+                                             (tcg_insts tcg_env) whyUnsafe
 
 -- | Figure out the final correct safe haskell mode
 hscGetSafeMode :: TcGblEnv -> Hsc SafeHaskellMode
@@ -1797,11 +1778,11 @@ hscParsedStmt :: HscEnv
                     , FixityEnv))
 hscParsedStmt hsc_env stmt = runInteractiveHsc hsc_env $ do
   -- Rename and typecheck it
-  (ids, tc_expr, fix_env) <- ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+  (ids, tc_expr, fix_env) <- ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $
     tcRnStmt hsc_env stmt
 
   -- Desugar it
-  ds_expr <- ioMsgMaybe . wrappingErrors GhcErrorDs $
+  ds_expr <- ioMsgMaybe . wrappingMessages GhcWarningDs GhcErrorDs $
     deSugarExpr hsc_env tc_expr
   liftIO (lintInteractiveExpr (text "desugar expression") hsc_env ds_expr)
   handleWarnings
@@ -1844,7 +1825,7 @@ hscParsedDecls :: HscEnv -> [LHsDecl GhcPs] -> IO ([TyThing], InteractiveContext
 hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     {- Rename and typecheck it -}
     hsc_env <- getHscEnv
-    tc_gblenv <- ioMsgMaybe . wrappingErrors GhcErrorTcRn $ tcRnDeclsi hsc_env decls
+    tc_gblenv <- ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $ tcRnDeclsi hsc_env decls
 
     {- Grab the new instances -}
     -- We grab the whole environment because of the overlapping that may have
@@ -1959,7 +1940,7 @@ hscTcExpr :: HscEnv
 hscTcExpr hsc_env0 mode expr = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
   parsed_expr <- hscParseExpr expr
-  ioMsgMaybe . wrappingErrors GhcErrorTcRn $ tcRnExpr hsc_env mode parsed_expr
+  ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $ tcRnExpr hsc_env mode parsed_expr
 
 -- | Find the kind of a type, after generalisation
 hscKcType
@@ -1970,7 +1951,7 @@ hscKcType
 hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+    ioMsgMaybe . wrappingMessages GhcWarningTcRn GhcErrorTcRn $
       tcRnType hsc_env DefaultFlexi normalise ty
 
 hscParseExpr :: String -> Hsc (LHsExpr GhcPs)
