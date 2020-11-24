@@ -18,6 +18,7 @@ import GHC.Types.Error
 import GHC.Types.Name ( Name )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
+import GHC.Unit.State ( pprWithUnitState )
 import GHC.Utils.Outputable
 
 instance RenderableDiagnostic TcRn.Error where
@@ -68,6 +69,9 @@ pprError :: TcRn.Error -> ErrDoc
 pprError = \case
   ErrTcRnRaw d ->
     d
+
+  ErrorTcRnWithUnitState unit_state err ->
+    mapErrDoc (pprWithUnitState unit_state) $ pprError err
 
   ErrBadTelescope telescope sorted_tvs context ->
     errDoc [m] [context] []

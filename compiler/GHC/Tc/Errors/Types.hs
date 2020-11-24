@@ -9,6 +9,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Unit.Module.Name
+import GHC.Unit.State ( UnitState )
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 
@@ -27,6 +28,10 @@ data Warning
 
 data Error
   = ErrTcRnRaw ErrDoc
+
+  -- See 'mkErrDocAt' in 'GHC.Tc.Utils.Monad', where we need the 'UnitState'
+  -- to render the 'Unit' properly.
+  | ErrorTcRnWithUnitState UnitState Error
 
   -- Errors thrown in GHC.Tc.Errors
   | ErrBadTelescope

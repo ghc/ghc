@@ -304,16 +304,6 @@ logWarningsReportErrors msgs@(warns,errs) = do
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
--- handleWarningsThrowErrors :: Messages GhcError -> Hsc a
--- handleWarningsThrowErrors (warns, errs) = do
---     logWarnings warns
---     dflags <- getDynFlags
---     (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
---     liftIO $ printBagOfErrors dflags wWarns
---     throwErrors (unionBags errs $ mapBag (fmap ghcErrorRawErrDoc) wErrs)
-
--- | Log warnings and throw errors, assuming the messages
--- contain at least one error (e.g. coming from PFailed)
 handleWarningsThrowErrors :: Messages GhcWarning GhcError -> Hsc a
 handleWarningsThrowErrors (warns, errs) = do
     logWarnings warns
