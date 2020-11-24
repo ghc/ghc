@@ -1,4 +1,4 @@
-Found 235 parser module dependencies
+Found 244 parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -80,6 +80,10 @@ GHC.Driver.Backend
 GHC.Driver.Backpack.Syntax
 GHC.Driver.CmdLine
 GHC.Driver.Env
+GHC.Driver.Env.Types
+GHC.Driver.Errors
+GHC.Driver.Errors.Ppr
+GHC.Driver.Errors.Types
 GHC.Driver.Flags
 GHC.Driver.Hooks
 GHC.Driver.Monad
@@ -109,6 +113,8 @@ GHC.Parser
 GHC.Parser.Annotation
 GHC.Parser.CharClass
 GHC.Parser.Errors
+GHC.Parser.Errors.Ppr
+GHC.Parser.Errors.Types
 GHC.Parser.Lexer
 GHC.Parser.PostProcess
 GHC.Parser.PostProcess.Haddock
@@ -142,6 +148,8 @@ GHC.SysTools.BaseDir
 GHC.SysTools.FileCleanup
 GHC.SysTools.Terminal
 GHC.Tc.Errors.Hole.FitTypes
+GHC.Tc.Errors.Ppr
+GHC.Tc.Errors.Types
 GHC.Tc.Types
 GHC.Tc.Types.Constraint
 GHC.Tc.Types.Evidence
@@ -194,6 +202,7 @@ GHC.Types.Var.Env
 GHC.Types.Var.Set
 GHC.Unit
 GHC.Unit.External
+GHC.Unit.Finder
 GHC.Unit.Finder.Types
 GHC.Unit.Home
 GHC.Unit.Home.ModInfo
