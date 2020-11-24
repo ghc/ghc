@@ -5,10 +5,3 @@ UnliftedNewtypesInstanceFail.hs:13:3: error:
         but ‘Bar Bool’ has kind ‘TYPE 'IntRep’
     • In the newtype instance declaration for ‘Bar’
       In the instance declaration for ‘Foo Bool’
-
-UnliftedNewtypesInstanceFail.hs:14:17: error:
-    • Couldn't match kind ‘'WordRep’ with ‘'IntRep’
-      Expected kind ‘TYPE 'IntRep’, but ‘Word#’ has kind ‘TYPE 'WordRep’
-    • In the type ‘Word#’
-      In the definition of data constructor ‘BarBoolC’
-      In the newtype instance declaration for ‘Bar’

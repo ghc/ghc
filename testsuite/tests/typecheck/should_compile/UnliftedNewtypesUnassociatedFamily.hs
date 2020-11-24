@@ -4,6 +4,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE GADTs #-}
 
 module UnliftedNewtypesUnassociatedFamily where
 
@@ -20,7 +21,14 @@ newtype instance DFT ('TupleRep '[ 'IntRep, 'WordRep])
 data instance DFT 'LiftedRep = MkDFT4 | MkDFT5
 
 data family DF :: TYPE (r :: RuntimeRep)
-newtype instance DF = MkDF1 Int#
-newtype instance DF = MkDF2 Word#
-newtype instance DF = MkDF3 (# Int#, Word# #)
+
+newtype instance DF :: TYPE 'IntRep where
+  MkDF1 :: Int# -> DF
+
+newtype instance DF :: TYPE 'WordRep where
+  MkDF2 :: Word# -> DF
+
+newtype instance DF :: TYPE ('TupleRep '[ 'IntRep, 'WordRep ]) where
+  MkDF3 :: (# Int#, Word# #) -> DF
+
 data instance DF = MkDF4 | MkDF5
