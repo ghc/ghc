@@ -66,7 +66,7 @@ showSDocDebug dflags d = renderWithContext ctx d
 
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> Depth -> SDoc -> IO ()
 printForUser dflags handle unqual depth doc
-  = printSDocLn ctx PageMode handle doc
+  = printSDocLn ctx (PageMode False) handle doc
     where ctx = initSDocContext dflags (mkUserStyle unqual depth)
 
 -- | Like 'printSDocLn' but specialized with 'LeftMode' and
