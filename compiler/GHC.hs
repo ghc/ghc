@@ -383,6 +383,7 @@ import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Finder
@@ -661,14 +662,19 @@ setSessionDynFlags dflags0 = do
       return Nothing
 #endif
 
+  let unit_env = UnitEnv
+        { ue_platform  = targetPlatform dflags
+        , ue_namever   = ghcNameVersion dflags
+        , ue_home_unit = home_unit
+        , ue_units     = unit_state
+        }
   modifySession $ \h -> h{ hsc_dflags = dflags
                          , hsc_IC = (hsc_IC h){ ic_dflags = dflags }
                          , hsc_interp = hsc_interp h <|> interp
                            -- we only update the interpreter if there wasn't
                            -- already one set up
-                         , hsc_home_unit = home_unit
-                         , hsc_units     = unit_state
-                         , hsc_unit_dbs  = Just dbs
+                         , hsc_unit_env = unit_env
+                         , hsc_unit_dbs = Just dbs
                          }
   invalidateModSummaryCache
 
@@ -699,10 +705,15 @@ setProgramDynFlags_ invalidate_needed dflags = do
     then do
         hsc_env <- getSession
         (dbs,unit_state,home_unit) <- liftIO $ initUnits dflags' (hsc_unit_dbs hsc_env)
-        modifySession $ \h -> h{ hsc_dflags    = dflags'
-                               , hsc_units     = unit_state
-                               , hsc_unit_dbs  = Just dbs
-                               , hsc_home_unit = home_unit
+        let unit_env = UnitEnv
+              { ue_platform  = targetPlatform dflags'
+              , ue_namever   = ghcNameVersion dflags'
+              , ue_home_unit = home_unit
+              , ue_units     = unit_state
+              }
+        modifySession $ \h -> h{ hsc_dflags   = dflags'
+                               , hsc_unit_dbs = Just dbs
+                               , hsc_unit_env = unit_env
                                }
     else modifySession $ \h -> h{ hsc_dflags = dflags' }
   when invalidate_needed $ invalidateModSummaryCache

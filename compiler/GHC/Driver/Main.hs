@@ -237,12 +237,14 @@ newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
     -- we don't store the unit databases and the unit state to still
     -- allow `setSessionDynFlags` to be used to set unit db flags.
-    (_dbs,_unit_state,home_unit) <- liftIO $ initUnits dflags Nothing
-    eps_var <- newIORef (initExternalPackageState home_unit)
+    eps_var <- newIORef (initExternalPackageState (homeUnitId_ dflags))
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
     emptyLoader <- uninitializedLoader
+    -- FIXME: it's sad that we have so many "unitialized" fields filled with
+    -- empty stuff or lazy panics. We should have two kinds of HscEnv
+    -- (initialized or not) instead and less fields that are mutable over time.
     return HscEnv {  hsc_dflags         = dflags
                   ,  hsc_targets        = []
                   ,  hsc_mod_graph      = emptyMG
@@ -254,10 +256,9 @@ newHscEnv dflags = do
                   ,  hsc_type_env_var   = Nothing
                   ,  hsc_interp         = Nothing
                   ,  hsc_loader         = emptyLoader
-                  ,  hsc_home_unit      = home_unit
+                  ,  hsc_unit_env       = panic "hsc_unit_env not initialized"
                   ,  hsc_plugins        = []
                   ,  hsc_static_plugins = []
-                  ,  hsc_units          = emptyUnitState
                   ,  hsc_unit_dbs       = Nothing
                   }
 

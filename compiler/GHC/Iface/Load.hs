@@ -957,8 +957,8 @@ readIface wanted_mod file_path
 *********************************************************
 -}
 
-initExternalPackageState :: HomeUnit -> ExternalPackageState
-initExternalPackageState home_unit
+initExternalPackageState :: UnitId -> ExternalPackageState
+initExternalPackageState home_unit_id
   = EPS {
       eps_is_boot          = emptyUFM,
       eps_PIT              = emptyPackageIfaceTable,
@@ -977,9 +977,9 @@ initExternalPackageState home_unit
     }
     where
       enableBignumRules
-         | isHomeUnitInstanceOf home_unit primUnitId   = EnableBignumRules False
-         | isHomeUnitInstanceOf home_unit bignumUnitId = EnableBignumRules False
-         | otherwise                                   = EnableBignumRules True
+         | home_unit_id == primUnitId   = EnableBignumRules False
+         | home_unit_id == bignumUnitId = EnableBignumRules False
+         | otherwise                    = EnableBignumRules True
       builtinRules' = builtinRules enableBignumRules
 
 {-

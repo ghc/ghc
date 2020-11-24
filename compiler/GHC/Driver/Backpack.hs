@@ -56,6 +56,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Error
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Finder
@@ -418,10 +419,15 @@ addUnit u = do
                }
          in return (dbs ++ [newdb]) -- added at the end because ordering matters
     (dbs,unit_state,home_unit) <- liftIO $ initUnits (hsc_dflags hsc_env) (Just newdbs)
+    let unit_env = UnitEnv
+          { ue_platform  = targetPlatform (hsc_dflags hsc_env)
+          , ue_namever   = ghcNameVersion (hsc_dflags hsc_env)
+          , ue_home_unit = home_unit
+          , ue_units     = unit_state
+          }
     setSession $ hsc_env
-        { hsc_unit_dbs  = Just dbs
-        , hsc_home_unit = home_unit
-        , hsc_units     = unit_state
+        { hsc_unit_dbs = Just dbs
+        , hsc_unit_env = unit_env
         }
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()

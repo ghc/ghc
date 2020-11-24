@@ -4,7 +4,8 @@
 module GHC.Driver.Env
    ( Hsc(..)
    , HscEnv (..)
-   , hsc_unit_env
+   , hsc_home_unit
+   , hsc_units
    , runHsc
    , mkInteractiveHscEnv
    , runInteractiveHsc
@@ -182,9 +183,6 @@ data HscEnv
         , hsc_loader :: Loader
                 -- ^ Loader (dynamic linker)
 
-        , hsc_home_unit :: !HomeUnit
-                -- ^ Home-unit
-
         , hsc_plugins :: ![LoadedPlugin]
                 -- ^ plugins dynamically loaded after processing arguments. What
                 -- will be loaded here is directed by DynFlags.pluginModNames.
@@ -211,23 +209,19 @@ data HscEnv
                 -- Usually we don't reload the databases from disk if they are
                 -- cached, even if the database flags changed!
 
-        , hsc_units :: !UnitState
-                -- ^ Consolidated unit database built by 'initUnits' from the
-                -- unit databases cached in 'hsc_unit_dbs' and flags
-                -- ('-ignore-package', etc.) from DynFlags.
+        , hsc_unit_env :: UnitEnv
+                -- ^ Unit environment (unit state, home unit, etc.).
                 --
-                -- It also contains mapping from module names to actual Modules.
+                -- Initialized from the databases cached in 'hsc_unit_dbs' and
+                -- from the DynFlags.
  }
 
 
--- | Return UnitEnv for the target
-hsc_unit_env :: HscEnv -> UnitEnv
-hsc_unit_env hsc_env = UnitEnv
-    { ue_platform  = targetPlatform (hsc_dflags hsc_env)
-    , ue_namever   = ghcNameVersion (hsc_dflags hsc_env)
-    , ue_home_unit = hsc_home_unit hsc_env
-    , ue_units     = hsc_units hsc_env
-    }
+hsc_home_unit :: HscEnv -> HomeUnit
+hsc_home_unit = ue_home_unit . hsc_unit_env
+
+hsc_units :: HscEnv -> UnitState
+hsc_units = ue_units . hsc_unit_env
 
 {-
 
