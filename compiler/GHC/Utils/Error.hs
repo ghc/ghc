@@ -327,7 +327,8 @@ dumpSDocWithStyle sty dflags dumpOpt hdr doc =
                                 $$ blankLine
                                 $$ doc
                         return $ mkDumpDoc hdr d
-        defaultLogActionHPrintDoc dflags handle (withPprStyle sty doc')
+        -- When we dump to files we use UTF8. Which allows ascii spaces.
+        defaultLogActionHPrintDoc dflags True handle (withPprStyle sty doc')
 
     -- write the dump to stdout
     writeDump Nothing = do
