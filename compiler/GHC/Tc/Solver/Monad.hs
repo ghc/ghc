@@ -1008,7 +1008,7 @@ now reduced to reflexivity.
 The solution here is to kick out representational inerts whenever the
 tyvar of a work item is "exposed", where exposed means being at the
 head of the top-level application chain (a t1 .. tn).  See
-TcType.isTyVarHead. This is encoded in (K3b).
+is_can_eq_lhs_head. This is encoded in (K3b).
 
 Beware: if we make this test succeed too often, we kick out too much,
 and the solver might loop.  Consider (#14363)
@@ -1779,17 +1779,32 @@ kick_out_rewritable new_fr new_lhs
             -- (K2c) is guaranteed by the first guard of keep_eq
 
         kick_out_for_completeness  -- (K3) and Note [K3: completeness of solving]
-          = case (eq_rel, new_lhs) of
-              (NomEq, _)  -> rhs_ty `eqType` canEqLHSType new_lhs     -- (K3a)
-              (ReprEq, TyVarLHS new_tv) -> isTyVarHead new_tv rhs_ty  -- (K3b)
-              (ReprEq, TyFamLHS new_tf new_tf_args)                   -- (K3b)
-                | Just (rhs_tc, rhs_tc_args) <- tcSplitTyConApp_maybe rhs_ty
-                , tcEqTyConApps new_tf new_tf_args rhs_tc rhs_tc_args
-                  -> True
-                | otherwise
-                  -> False
+          = case eq_rel of
+              NomEq  -> rhs_ty `eqType` canEqLHSType new_lhs -- (K3a)
+              ReprEq -> is_can_eq_lhs_head new_lhs rhs_ty    -- (K3b)
 
     kick_out_eq ct = pprPanic "keep_eq" (ppr ct)
+
+    is_can_eq_lhs_head (TyVarLHS tv) = go
+      where
+        go (Rep.TyVarTy tv')   = tv == tv'
+        go (Rep.AppTy fun _)   = go fun
+        go (Rep.CastTy ty _)   = go ty
+        go (Rep.TyConApp {})   = False
+        go (Rep.LitTy {})      = False
+        go (Rep.ForAllTy {})   = False
+        go (Rep.FunTy {})      = False
+        go (Rep.CoercionTy {}) = False
+    is_can_eq_lhs_head (TyFamLHS fun_tc fun_args) = go
+      where
+        go (Rep.TyVarTy {})       = False
+        go (Rep.AppTy {})         = False  -- no TyConApp to the left of an AppTy
+        go (Rep.CastTy ty _)      = go ty
+        go (Rep.TyConApp tc args) = tcEqTyConApps fun_tc fun_args tc args
+        go (Rep.LitTy {})         = False
+        go (Rep.ForAllTy {})      = False
+        go (Rep.FunTy {})         = False
+        go (Rep.CoercionTy {})    = False
 
 kickOutAfterUnification :: TcTyVar -> TcS Int
 kickOutAfterUnification new_tv
