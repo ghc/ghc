@@ -710,8 +710,11 @@ canIrred ev
        ; case classifyPredType (ctEvPred new_ev) of
            ClassPred cls tys     -> canClassNC new_ev cls tys
            EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
-           ForAllPred {}         -> pprPanic "rewriting revealed a ForAllTy"
-                                             (ppr ev)
+           ForAllPred tvs th p   -> -- this is highly suspect; Quick Look
+                                    -- should never leave a meta-var filled
+                                    -- in with a polytype. This is #18987.
+                                    do traceTcS "canEvNC:forall" (ppr pred)
+                                       canForAllNC ev tvs th p
            IrredPred {}          -> continueWith $
                                     mkIrredCt OtherCIS new_ev } }
 
