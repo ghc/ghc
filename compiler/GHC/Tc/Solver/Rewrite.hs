@@ -781,10 +781,9 @@ rewrite_exact_fam_app tc tys
        -- STEP 1/2. Try to reduce without reducing arguments first.
        ; result1 <- try_to_reduce tc tys
        ; case result1 of
-             -- Don't use `finish`;
+             -- Don't use the cache;
              -- See Note [rewrite_exact_fam_app performance]
-         { Just (co, xi) -> do { (xi2, co2) <- bumpDepth $ rewrite_one xi
-                               ; return (xi2, co2 `mkTcTransCo` co) }
+         { Just (co, xi) -> finish False (xi, co)
          ; Nothing ->
 
         -- That didn't work. So reduce the arguments, in STEP 3.
@@ -817,7 +816,7 @@ rewrite_exact_fam_app tc tys
              | fr `eqCanRewriteFR` (flavour, eq_rel) ->
                  do { traceRewriteM "rewrite family application with inert"
                                 (ppr tc <+> ppr xis $$ ppr xi)
-                    ; finish (homogenise xi downgraded_co) }
+                    ; finish True (homogenise xi downgraded_co) }
              where
                inert_role    = eqRelRole inert_eq_rel
                role          = eqRelRole eq_rel
@@ -829,7 +828,7 @@ rewrite_exact_fam_app tc tys
          -- inert didn't work. Try to reduce again, in STEP 5/6.
     do { result3 <- try_to_reduce tc xis
        ; case result3 of
-           Just (co, xi) -> finish (homogenise xi co)
+           Just (co, xi) -> finish True (homogenise xi co)
            Nothing       -> -- we have made no progress at all: STEP 7.
                             return (homogenise reduced (mkTcReflCo role reduced))
              where
@@ -837,20 +836,22 @@ rewrite_exact_fam_app tc tys
   where
       -- call this if the above attempts made progress.
       -- This recursively rewrites the result and then adds to the cache
-    finish :: (Xi, Coercion) -> RewriteM (Xi, Coercion)
-    finish (xi, co) = do { -- rewrite the result: FINISH 1
-                           (fully, fully_co) <- bumpDepth $ rewrite_one xi
-                         ; let final_co = fully_co `mkTcTransCo` co
-                         ; eq_rel <- getEqRel
-                         ; flavour <- getFlavour
+    finish :: Bool  -- add to the cache?
+           -> (Xi, Coercion) -> RewriteM (Xi, Coercion)
+    finish use_cache (xi, co)
+      = do { -- rewrite the result: FINISH 1
+             (fully, fully_co) <- bumpDepth $ rewrite_one xi
+           ; let final_co = fully_co `mkTcTransCo` co
+           ; eq_rel <- getEqRel
+           ; flavour <- getFlavour
 
-                           -- extend the cache: FINISH 2
-                         ; when (eq_rel == NomEq && flavour /= Derived) $
-                             -- the cache only wants Nominal eqs
-                             -- and Wanteds can rewrite Deriveds; the cache
-                             -- has only Givens
-                           liftTcS $ extendFamAppCache tc tys (final_co, fully)
-                         ; return (fully, final_co) }
+             -- extend the cache: FINISH 2
+           ; when (use_cache && eq_rel == NomEq && flavour /= Derived) $
+             -- the cache only wants Nominal eqs
+             -- and Wanteds can rewrite Deriveds; the cache
+             -- has only Givens
+             liftTcS $ extendFamAppCache tc tys (final_co, fully)
+           ; return (fully, final_co) }
     {-# INLINE finish #-}
 
 -- Returned coercion is output ~r input, where r is the role in the RewriteM monad
