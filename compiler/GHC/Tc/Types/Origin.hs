@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -11,7 +13,7 @@ module GHC.Tc.Types.Origin (
   UserTypeCtxt(..), pprUserTypeCtxt, isSigMaybe,
 
   -- SkolemInfo
-  SkolemInfo(..), pprSigSkolInfo, pprSkolInfo,
+  SkolemInfo(..), pprSigSkolInfo, pprSkolInfo, RenderableTyVarBndr(..),
 
   -- CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -29,7 +31,6 @@ import GHC.Tc.Utils.TcType
 import GHC.Hs
 
 import GHC.Types.Id
-import GHC.Types.Var (Specificity)
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
@@ -167,6 +168,14 @@ isSigMaybe _                = Nothing
 ************************************************************************
 -}
 
+data RenderableTyVarBndr where
+  RenderableTyVarBndr :: forall flag pass.
+                      ( OutputableBndrFlag flag
+                      , Outputable (LHsTyVarBndr flag pass)
+                      )
+                      => LHsTyVarBndr flag pass
+                      -> RenderableTyVarBndr
+
 -- SkolemInfo gives the origin of *given* constraints
 --   a) type variables are skolemised
 --   b) an implication constraint is generated
@@ -185,7 +194,7 @@ data SkolemInfo
                  -- hence, we have less info
 
   | ForAllSkol  -- Bound by a user-written "forall".
-       [LHsTyVarBndr Specificity GhcRn]
+       [RenderableTyVarBndr]
        -- Shows just the binders, used when reporting a bad telescope
                    -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
 
@@ -245,7 +254,8 @@ pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
-pprSkolInfo (ForAllSkol tvs)  = text "an explicit forall" <+> fsep (map ppr tvs)
+pprSkolInfo (ForAllSkol tvs)  = text "an explicit forall"
+                                 <+> fsep (map (\(RenderableTyVarBndr b) -> ppr b) tvs)
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
                                  <+> pprWithCommas ppr ips
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)

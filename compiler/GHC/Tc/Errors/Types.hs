@@ -1,9 +1,8 @@
 module GHC.Tc.Errors.Types where
 
-import GHC.Hs.Extension
-import GHC.Hs.Type
 import GHC.Prelude
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.Origin ( RenderableTyVarBndr )
 import GHC.Types.Error
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
@@ -31,7 +30,7 @@ data Error
 
   -- Errors thrown in GHC.Tc.Errors
   | ErrBadTelescope
-      [LHsTyVarBndr Specificity GhcRn] -- telescope
+      [RenderableTyVarBndr] -- telescope
       [TyCoVar] -- sorted tyvars (in a correct order)
       SDoc      -- context
   | ErrOutOfScope

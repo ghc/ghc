@@ -13,6 +13,7 @@ import GHC.Core.Type ( isTyVarTy )
 import GHC.Data.FastString ( sLit )
 import GHC.Prelude
 import GHC.Tc.Errors.Types as TcRn
+import GHC.Tc.Types.Origin ( RenderableTyVarBndr(..) )
 import GHC.Types.Error
 import GHC.Types.Name ( Name )
 import GHC.Types.Name.Occurrence
@@ -70,7 +71,8 @@ pprError = \case
 
   ErrBadTelescope telescope sorted_tvs context ->
     errDoc [m] [context] []
-      where m = hang (text "These kind and type variables:" <+> sep (map ppr telescope)
+      where m = hang (text "These kind and type variables:"
+                  <+> sep (map (\(RenderableTyVarBndr b) -> ppr b) telescope)
                    $$ text "are out of dependency order. Perhaps try this ordering:")
                 2 (pprTyVars sorted_tvs)
 
