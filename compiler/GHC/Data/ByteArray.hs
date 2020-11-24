@@ -77,10 +77,15 @@ unsafeMutableByteArrayContents :: MutableByteArray -> Ptr a
 unsafeMutableByteArrayContents = unsafeByteArrayContents . unsafeCoerce
 
 withByteArrayContents :: ByteArray -> (Ptr a -> IO b) -> IO b
+#if MIN_VERSION_base(4,15,0)
+withByteArrayContents (ByteArray ba) f =
+  IO $ \s -> keepAlive# ba s (unIO (f (Ptr (byteArrayContents# ba))))
+#else
 withByteArrayContents (ByteArray ba) f = do
   r <- f $ Ptr (byteArrayContents# ba)
   IO $ \s -> case touch# ba s of s' -> (# s', () #)
   return r
+#endif
 
 newMutableByteArray :: Int -> IO MutableByteArray
 newMutableByteArray (I# size) = IO $ \s ->
