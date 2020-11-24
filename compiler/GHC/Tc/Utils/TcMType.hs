@@ -986,7 +986,6 @@ writeMetaTyVarRef tyvar ref ty
        ; MASSERT2( isFlexi meta_details, double_upd_msg meta_details )
 
        -- Check for level OK
-       -- See Note [Level check when unifying]
        ; MASSERT2( level_check_ok, level_check_msg )
 
        -- Check Kinds ok
@@ -1006,22 +1005,6 @@ writeMetaTyVarRef tyvar ref ty
 
     double_upd_msg details = hang (text "Double update of meta tyvar")
                                 2 (ppr tyvar $$ ppr details)
-
-{- Note [Level check when unifying]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When unifying
-     alpha:lvl := ty
-we expect that the TcLevel of 'ty' will be <= lvl.
-However, during unflatting we do
-     fuv:l := ty:(l+1)
-which is usually wrong; hence the check isFmmvTyVar in level_check_ok.
-See Note [TcLevel assignment] in GHC.Tc.Utils.TcType.
--}
-
-{-
-% Generating fresh variables for pattern match check
--}
-
 
 {-
 ************************************************************************
@@ -2174,7 +2157,7 @@ we have alpha := N Int, where N is a newtype.) Besides, the constraint
 will be canonicalised again, so there is little benefit in keeping the
 CEqCan structure.
 
-NB: Constraints are always re-flattened etc by the canonicaliser in
+NB: Constraints are always rewritten etc by the canonicaliser in
 @GHC.Tc.Solver.Canonical@ even if they come in as CDictCan. Only canonical constraints that
 are actually in the inert set carry all the guarantees. So it is okay if zonkCt
 creates e.g. a CDictCan where the cc_tyars are /not/ fully reduced.
