@@ -1365,7 +1365,7 @@ defaultFatalMessager = hPutStrLn stderr
 jsonLogAction :: LogAction
 jsonLogAction dflags reason severity srcSpan msg
   =
-    defaultLogActionHPutStrDoc dflags stdout
+    defaultLogActionHPutStrDoc dflags True stdout
       (withPprStyle (PprCode CStyle) (doc $$ text ""))
     where
       str = renderWithContext (initSDocContext dflags defaultUserStyle) msg
@@ -1388,9 +1388,9 @@ defaultLogAction dflags reason severity srcSpan msg
       SevWarning     -> printWarns
       SevError       -> printWarns
     where
-      printOut   = defaultLogActionHPrintDoc  dflags stdout
-      printErrs  = defaultLogActionHPrintDoc  dflags stderr
-      putStrSDoc = defaultLogActionHPutStrDoc dflags stdout
+      printOut   = defaultLogActionHPrintDoc  dflags False stdout
+      printErrs  = defaultLogActionHPrintDoc  dflags False stderr
+      putStrSDoc = defaultLogActionHPutStrDoc dflags False stdout
       -- Pretty print the warning flag, if any (#10752)
       message = mkLocMessageAnn flagMsg severity srcSpan msg
 
@@ -1430,16 +1430,19 @@ defaultLogAction dflags reason severity srcSpan msg
           | otherwise = ""
 
 -- | Like 'defaultLogActionHPutStrDoc' but appends an extra newline.
-defaultLogActionHPrintDoc :: DynFlags -> Handle -> SDoc -> IO ()
-defaultLogActionHPrintDoc dflags h d
- = defaultLogActionHPutStrDoc dflags h (d $$ text "")
+defaultLogActionHPrintDoc :: DynFlags -> Bool -> Handle -> SDoc -> IO ()
+defaultLogActionHPrintDoc dflags asciiSpace h d
+ = defaultLogActionHPutStrDoc dflags asciiSpace h (d $$ text "")
 
-defaultLogActionHPutStrDoc :: DynFlags -> Handle -> SDoc -> IO ()
-defaultLogActionHPutStrDoc dflags h d
+-- | The boolean arguments let's the pretty printer know if it can optimize indent
+-- by writing ascii ' ' characters without going through decoding.
+defaultLogActionHPutStrDoc :: DynFlags -> Bool -> Handle -> SDoc -> IO ()
+defaultLogActionHPutStrDoc dflags asciiSpace h d
   -- Don't add a newline at the end, so that successive
   -- calls to this log-action can output all on the same line
-  = printSDoc ctx Pretty.PageMode h d
-    where ctx = initSDocContext dflags defaultUserStyle
+  = printSDoc ctx (Pretty.PageMode asciiSpace) h d
+    where
+      ctx = initSDocContext dflags defaultUserStyle
 
 newtype FlushOut = FlushOut (IO ())
 
