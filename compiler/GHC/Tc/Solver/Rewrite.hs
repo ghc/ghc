@@ -1023,6 +1023,6 @@ ty_con_binders_ty_binders' = foldr go ([], False)
     go (Bndr tv (NamedTCB vis)) (bndrs, _)
       = (Named (Bndr tv vis) : bndrs, True)
     go (Bndr tv (AnonTCB af))   (bndrs, n)
-      = (Anon af (unrestricted (tyVarKind tv))   : bndrs, n)
+      = (Anon af (tymult (tyVarKind tv)) : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}
