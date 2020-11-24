@@ -172,7 +172,7 @@ ppLaTeXModule _title odir iface = do
 
       body = processExports exports
   --
-  writeUtf8File (odir </> moduleLaTeXFile mdl) (fullRender PageMode 80 1 txtPrinter "" tex)
+  writeUtf8File (odir </> moduleLaTeXFile mdl) (fullRender (PageMode True) 80 1 txtPrinter "" tex)
 
 -- | Prints out an entry in a module export list.
 exportListItem :: ExportItem DocNameI -> LaTeX
