@@ -76,10 +76,7 @@ pprError = \case
 
   ErrOutOfScope tried_rdr_name suggs contextlines extra ->
     errDoc [notInScopeErr tried_rdr_name $$ suggestions $$ extra] [] [contextlines]
-      where m = hang (text "Not in scope:")
-                   2 (what <+> quotes (ppr tried_rdr_name))
-            what = pprNonVarNameSpace (occNameSpace (rdrNameOcc tried_rdr_name))
-            suggestions = pprOutOfScopeSuggestions (rdrNameOcc tried_rdr_name) suggs
+      where suggestions = pprOutOfScopeSuggestions (rdrNameOcc tried_rdr_name) suggs
 
   ErrOutOfScopeHole occ ty suggs ->
     errDoc [m] [] [suggestions]
