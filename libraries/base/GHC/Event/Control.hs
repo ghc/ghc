@@ -124,6 +124,10 @@ newControl shouldRegister = allocaArray 2 $ \fds -> do
 -- the RTS, then *BEFORE* the wakeup file is closed, we must call
 -- c_setIOManagerWakeupFd (-1), so that the RTS does not try to use the wakeup
 -- file after it has been closed.
+--
+-- Note, however, that even if we do the above, this function is still racy
+-- since we do not synchronize between here and ioManagerWakeup.
+-- ioManagerWakeup ignores failures that arise from this case.
 closeControl :: Control -> IO ()
 closeControl w = do
   _ <- atomicSwapIORef (controlIsDead w) True
