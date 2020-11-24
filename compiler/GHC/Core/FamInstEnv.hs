@@ -1319,7 +1319,7 @@ topNormaliseType_maybe env ty
     tyFamStepper :: NormaliseStepper (Coercion, MCoercionN)
     tyFamStepper rec_nts tc tys  -- Try to step a type/data family
       = case topReduceTyFamApp_maybe env tc tys of
-          Just (co, rhs, res_co) -> NS_Step rec_nts rhs (co, MCo res_co)
+          Just (co, rhs, res_co) -> NS_Step rec_nts rhs (co, res_co)
           _                      -> NS_Done
 
 ---------------
@@ -1365,14 +1365,14 @@ normalise_tc_app tc tys
     assemble_result :: Role       -- r, ambient role in NormM monad
                     -> Type       -- nty, result type, possibly of changed kind
                     -> Coercion   -- orig_ty ~r nty, possibly heterogeneous
-                    -> CoercionN  -- typeKind(orig_ty) ~N typeKind(nty)
+                    -> MCoercionN -- typeKind(orig_ty) ~N typeKind(nty)
                     -> (Coercion, Type)   -- (co :: orig_ty ~r nty_casted, nty_casted)
                                           -- where nty_casted has same kind as orig_ty
     assemble_result r nty orig_to_nty kind_co
       = ( final_co, nty_old_kind )
       where
-        nty_old_kind = nty `mkCastTy` mkSymCo kind_co
-        final_co     = mkCoherenceRightCo r nty (mkSymCo kind_co) orig_to_nty
+        nty_old_kind = nty `mkCastTyMCo` mkSymMCo kind_co
+        final_co     = mkCoherenceRightMCo r nty (mkSymMCo kind_co) orig_to_nty
 
 ---------------
 -- | Try to simplify a type-family application, by *one* step
@@ -1381,7 +1381,7 @@ normalise_tc_app tc tys
 --         res_co :: typeKind(F tys) ~ typeKind(rhs)
 -- Type families and data families; always Representational role
 topReduceTyFamApp_maybe :: FamInstEnvs -> TyCon -> [Type]
-                        -> Maybe (Coercion, Type, Coercion)
+                        -> Maybe (Coercion, Type, MCoercion)
 topReduceTyFamApp_maybe envs fam_tc arg_tys
   | isFamilyTyCon fam_tc   -- type families and data families
   , Just (co, rhs) <- reduceTyFamApp_maybe envs role fam_tc ntys
@@ -1394,7 +1394,7 @@ topReduceTyFamApp_maybe envs fam_tc arg_tys
                               normalise_tc_args fam_tc arg_tys
 
 normalise_tc_args :: TyCon -> [Type]             -- tc tys
-                  -> NormM (Coercion, [Type], CoercionN)
+                  -> NormM (Coercion, [Type], MCoercionN)
                   -- (co, new_tys), where
                   -- co :: tc tys ~ tc new_tys; might not be homogeneous
                   -- res_co :: typeKind(tc tys) ~N typeKind(tc new_tys)
@@ -1477,14 +1477,14 @@ normalise_type ty
                     ; role <- getRole
                     ; let nty = mkAppTys nfun nargs
                           nco = mkAppCos fun_co args_cos
-                          nty_casted = nty `mkCastTy` mkSymCo res_co
-                          final_co = mkCoherenceRightCo role nty (mkSymCo res_co) nco
+                          nty_casted = nty `mkCastTyMCo` mkSymMCo res_co
+                          final_co = mkCoherenceRightMCo role nty (mkSymMCo res_co) nco
                     ; return (final_co, nty_casted) } }
 
 normalise_args :: Kind    -- of the function
                -> [Role]  -- roles at which to normalise args
                -> [Type]  -- args
-               -> NormM ([Coercion], [Type], Coercion)
+               -> NormM ([Coercion], [Type], MCoercion)
 -- returns (cos, xis, res_co), where each xi is the normalised
 -- version of the corresponding type, each co is orig_arg ~ xi,
 -- and the res_co :: kind(f orig_args) ~ kind(f xis)
@@ -1494,7 +1494,7 @@ normalise_args :: Kind    -- of the function
 normalise_args fun_ki roles args
   = do { normed_args <- zipWithM normalise1 roles args
        ; let (xis, cos, res_co) = simplifyArgsWorker ki_binders inner_ki fvs roles normed_args
-       ; return (map mkSymCo cos, xis, mkSymCo res_co) }
+       ; return (map mkSymCo cos, xis, mkSymMCo res_co) }
   where
     (ki_binders, inner_ki) = splitPiTys fun_ki
     fvs = tyCoVarsOfTypes args

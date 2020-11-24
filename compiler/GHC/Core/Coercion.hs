@@ -70,8 +70,9 @@ module GHC.Core.Coercion (
 
         isGReflCo, isReflCo, isReflCo_maybe, isGReflCo_maybe, isReflexiveCo, isReflexiveCo_maybe,
         isReflCoVar_maybe, isGReflMCo, mkGReflLeftMCo, mkGReflRightMCo,
+        mkCoherenceRightMCo,
 
-        coToMCo, mkTransMCo, mkTransMCoL, mkCastTyMCo, mkSymMCo,
+        coToMCo, mkTransMCo, mkTransMCoL, mkCastTyMCo, mkSymMCo, isReflMCo,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -351,6 +352,15 @@ mkGReflLeftMCo r ty (MCo co) = mkGReflLeftCo r ty co
 mkGReflRightMCo :: Role -> Type -> MCoercionN -> Coercion
 mkGReflRightMCo r ty MRefl    = mkReflCo r ty
 mkGReflRightMCo r ty (MCo co) = mkGReflRightCo r ty co
+
+-- | Like 'mkCoherenceRightCo', but with an 'MCoercion'
+mkCoherenceRightMCo :: Role -> Type -> MCoercionN -> Coercion -> Coercion
+mkCoherenceRightMCo _ _  MRefl    co2 = co2
+mkCoherenceRightMCo r ty (MCo co) co2 = mkCoherenceRightCo r ty co co2
+
+isReflMCo :: MCoercion -> Bool
+isReflMCo MRefl = True
+isReflMCo _     = False
 
 {-
 %************************************************************************
@@ -2939,7 +2949,7 @@ simplifyArgsWorker :: [TyCoBinder] -> Kind
                    -> [(Type, Coercion)] -- flattened type arguments, arg
                                          -- each comes with the coercion used to flatten it,
                                          -- with co :: flattened_type ~ original_type
-                   -> ([Type], [Coercion], CoercionN)
+                   -> ([Type], [Coercion], MCoercionN)
 -- Returns (xis, cos, res_co), where each co :: xi ~ arg,
 -- and res_co :: kind (f xis) ~ kind (f tys), where f is the function applied to the args
 -- Precondition: if f :: forall bndrs. inner_ki (where bndrs and inner_ki are passed in),
@@ -2961,14 +2971,15 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
        -> Kind        -- Unsubsted result kind of function (not a Pi-type)
        -> [Role]      -- Roles at which to flatten these ...
        -> [(Type, Coercion)]  -- flattened arguments, with their flattening coercions
-       -> ([Type], [Coercion], CoercionN)
+       -> ([Type], [Coercion], MCoercionN)
     go acc_xis acc_cos !lc binders inner_ki _ []
         -- The !lc makes the function strict in the lifting context
         -- which means GHC can unbox that pair.  A modest win.
       = (reverse acc_xis, reverse acc_cos, kind_co)
       where
         final_kind = mkPiTys binders inner_ki
-        kind_co = liftCoSubst Nominal lc final_kind
+        kind_co | noFreeVarsOfType final_kind = MRefl
+                | otherwise                   = MCo $ liftCoSubst Nominal lc final_kind
 
     go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) ((xi,co):args)
       = -- By Note [Flattening] in GHC.Tc.Solver.Flatten invariant (F2),
@@ -3024,7 +3035,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
             (xis_out, cos_out, res_co_out)
               = go acc_xis acc_cos zapped_lc bndrs new_inner roles casted_args
         in
-        (xis_out, cos_out, res_co_out `mkTransCo` res_co)
+        (xis_out, cos_out, res_co_out `mkTransMCoL` res_co)
 
     go _ _ _ _ _ _ _ = panic
         "simplifyArgsWorker wandered into deeper water than usual"

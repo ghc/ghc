@@ -238,14 +238,14 @@ flattenKind loc flav ty
        ; return (ty', co) }
 
 -- See Note [Flattening]
-flattenArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion], TcCoercionN)
+flattenArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion])
 -- Externally-callable, hence runFlatten
 -- Flatten a vector of types all at once; in fact they are
 -- always the arguments of type family or class, so
 --      ctEvFlavour ev = Nominal
 -- and we want to flatten all at nominal role
 -- The kind passed in is the kind of the type family or class, call it T
--- The last coercion returned has type (tcTypeKind(T xis) ~N tcTypeKind(T tys))
+-- The kind of T args must be constant (i.e. not depend on the args)
 --
 -- For Derived constraints the returned coercion may be undefined
 -- because flattening may use a Derived equality ([D] a ~ ty)
@@ -253,8 +253,9 @@ flattenArgsNom ev tc tys
   = do { traceTcS "flatten_args {" (vcat (map ppr tys))
        ; (tys', cos, kind_co)
            <- runFlattenCtEv ev (flatten_args_tc tc Nothing tys)
+       ; MASSERT( isReflMCo kind_co )
        ; traceTcS "flatten }" (vcat (map ppr tys'))
-       ; return (tys', cos, kind_co) }
+       ; return (tys', cos) }
 
 -- | Flatten a type w.r.t. nominal equality. This is useful to rewrite
 -- a type w.r.t. any givens. It does not do type-family reduction. This
@@ -390,7 +391,7 @@ flatten_args_tc
            , [Coercion]  -- List of arg coercions [co1,..,con]
                          -- 1-1 corresp with [t1,..,tn]
                          --    coi :: xi ~r ti
-           , CoercionN)  -- Result coercion, rco
+           , MCoercionN) -- Result coercion, rco
                          --    rco : (T t1..tn) ~N (T (x1 |> co1) .. (xn |> con))
 flatten_args_tc tc = flatten_args all_bndrs any_named_bndrs inner_ki emptyVarSet
   -- NB: TyCon kinds are always closed
@@ -410,7 +411,7 @@ flatten_args :: [TyCoBinder] -> Bool -- Binders, and True iff any of them are
              -> Kind -> TcTyCoVarSet -- function kind; kind's free vars
              -> Maybe [Role] -> [Type]    -- these are in 1-to-1 correspondence
                                           -- Nothing: use all Nominal
-             -> FlatM ([Xi], [Coercion], CoercionN)
+             -> FlatM ([Xi], [Coercion], MCoercionN)
 -- Coercions :: Xi ~ Type, at roles given
 -- Third coercion :: tcTypeKind(fun xis) ~N tcTypeKind(fun tys)
 -- That is, the third coercion relates the kind of some function (whose kind is
@@ -438,7 +439,7 @@ flatten_args orig_binders
 flatten_args_fast :: [TyCoBinder]
                   -> Kind
                   -> [Type]
-                  -> FlatM ([Xi], [Coercion], CoercionN)
+                  -> FlatM ([Xi], [Coercion], MCoercionN)
 flatten_args_fast orig_binders orig_inner_ki orig_tys
   = fmap finish (iterate orig_tys orig_binders)
   where
@@ -462,18 +463,18 @@ flatten_args_fast orig_binders orig_inner_ki orig_tys
            -}
 
     {-# INLINE finish #-}
-    finish :: ([Xi], [Coercion], [TyCoBinder]) -> ([Xi], [Coercion], CoercionN)
+    finish :: ([Xi], [Coercion], [TyCoBinder]) -> ([Xi], [Coercion], MCoercionN)
     finish (xis, cos, binders) = (xis, cos, kind_co)
       where
-        final_kind = mkPiTys binders orig_inner_ki
-        kind_co    = mkNomReflCo final_kind
+        _final_kind = mkPiTys binders orig_inner_ki
+        kind_co     = MRefl
 
 {-# INLINE flatten_args_slow #-}
 -- | Slow path, compared to flatten_args_fast, because this one must track
 -- a lifting context.
 flatten_args_slow :: [TyCoBinder] -> Kind -> TcTyCoVarSet
                   -> [Role] -> [Type]
-                  -> FlatM ([Xi], [Coercion], CoercionN)
+                  -> FlatM ([Xi], [Coercion], MCoercionN)
 flatten_args_slow binders inner_ki fvs roles tys
 -- Arguments used dependently must be flattened with proper coercions, but
 -- we're not guaranteed to get a proper coercion when flattening with the
@@ -652,15 +653,12 @@ flatten_ty_con_app tc tys
 homogenise_result :: Xi              -- a flattened type
                   -> Coercion        -- :: xi ~r original ty
                   -> Role            -- r
-                  -> CoercionN       -- kind_co :: tcTypeKind(xi) ~N tcTypeKind(ty)
+                  -> MCoercionN      -- kind_co :: tcTypeKind(xi) ~N tcTypeKind(ty)
                   -> (Xi, Coercion)  -- (xi |> kind_co, (xi |> kind_co)
                                      --   ~r original ty)
-homogenise_result xi co r kind_co
-  -- the explicit pattern match here improves the performance of T9872a, b, c by
-  -- ~2%
-  | isGReflCo kind_co = (xi `mkCastTy` kind_co, co)
-  | otherwise         = (xi `mkCastTy` kind_co
-                        , (mkSymCo $ GRefl r xi (MCo kind_co)) `mkTransCo` co)
+homogenise_result xi co _ MRefl = (xi, co)
+homogenise_result xi co r mco@(MCo kind_co)
+  = (xi `mkCastTy` kind_co, (mkSymCo $ GRefl r xi mco) `mkTransCo` co)
 {-# INLINE homogenise_result #-}
 
 -- Flatten a vector (list of arguments).
@@ -668,7 +666,7 @@ flatten_vector :: Kind   -- of the function being applied to these arguments
                -> [Role] -- If we're flatten w.r.t. ReprEq, what roles do the
                          -- args have?
                -> [Type] -- the args to flatten
-               -> FlatM ([Xi], [Coercion], CoercionN)
+               -> FlatM ([Xi], [Coercion], MCoercionN)
 flatten_vector ki roles tys
   = do { eq_rel <- getEqRel
        ; case eq_rel of
@@ -686,7 +684,7 @@ flatten_vector ki roles tys
                                   tys
        }
   where
-    (bndrs, inner_ki, any_named_bndrs) = split_pi_tys' ki
+    (bndrs, inner_ki, any_named_bndrs) = split_pi_tys' ki  -- "RAE" fix
     fvs                                = tyCoVarsOfType ki
 {-# INLINE flatten_vector #-}
 
