@@ -2146,7 +2146,7 @@ getHasGivenEqs tclvl
     check_local_given_tv_eq :: Ct -> HasGivenEqs
     check_local_given_tv_eq (CEqCan { cc_lhs = TyVarLHS tv, cc_ev = ev})
       | given_here ev
-      = if is_outer_var tv then MaybeGivenEqs else LocalGivenEqs
+      = if is_outer_var tv then MaybeGivenEqs else NoGivenEqs
         -- See Note [Let-bound skolems]
       | otherwise
       = NoGivenEqs
