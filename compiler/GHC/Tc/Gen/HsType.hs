@@ -3056,11 +3056,7 @@ tcExplicitTKBndrsX skol_mode bndrs thing_inside
                 bindExplicitTKBndrsX skol_mode bndrs $
                 thing_inside
 
-       -- NOTE(adinapoli) In order to be able to pretty-print the 'ForAllSkol'
-       -- later we need to pick a concrete instantiation of 'flag', because
-       -- now 'ForAllSkol' doesn't store an 'SDoc' anymore, but a proper
-       -- '[LHsTyVarBndr flag GhcRn]'.
-       ; let skol_info = ForAllSkol (map (mapLoc (setHsTyVarBndrFlag InferredSpec)) bndrs)
+       ; let skol_info = ForAllSkol (map RenderableTyVarBndr bndrs)
              -- Notice that we use ForAllSkol here, ignoring the enclosing
              -- skol_info unlike tc_implicit_tk_bndrs, because the bad-telescope
              -- test applies only to ForAllSkol
