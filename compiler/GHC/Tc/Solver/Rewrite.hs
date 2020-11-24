@@ -851,6 +851,7 @@ rewrite_exact_fam_app tc tys
                              -- has only Givens
                            liftTcS $ extendFamAppCache tc tys (final_co, fully)
                          ; return (fully, final_co) }
+    {-# INLINE finish #-}
 
 -- Returned coercion is output ~r input, where r is the role in the RewriteM monad
 -- See Note [How to normalise a family application]
