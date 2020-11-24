@@ -66,41 +66,42 @@ data DmdAnalOpts = DmdAnalOpts
 -- Note: use `seqBinds` on the result to avoid leaks due to lazyness (cf Note
 -- [Stamp out space leaks in demand analysis])
 dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
-dmdAnalProgram opts fam_envs rules binds = binds_plus_dmds
+dmdAnalProgram opts fam_envs rules binds = snd $ go (emptyAnalEnv opts fam_envs) binds
    where
-      env             = emptyAnalEnv opts fam_envs
-      rule_fvs        = foldr (unionVarSet . ruleRhsFreeIds) emptyVarSet rules
-      binds_plus_dmds = snd $ go env nopDmdType binds
-
-      go _   dmd_ty []     = (dmd_ty, [])
-      go env dmd_ty (b:bs) = case b of
+      go _   []     = (nopDmdType, [])
+      go env (b:bs) = case b of
         NonRec id rhs
           | (env', lazy_fvs, id', rhs') <- dmdAnalRhsLetDown TopLevel NonRecursive env topSubDmd id rhs
-          , (dmd_ty', bs') <- go env' (add_exported_use env' dmd_ty id') bs
-          , (dmd_ty'', id_dmd) <- findBndrDmd env' False (dmd_ty' `addLazyFVs` lazy_fvs) id'
+          , (dmd_ty', bs') <- go env' bs
+          , let !dmd_ty'' = add_exported_use env' dmd_ty' id' `addLazyFVs` lazy_fvs
+          , (dmd_ty''', id_dmd) <- findBndrDmd env' False dmd_ty'' id'
           , let id'' = annotate_id_dmd id' id_dmd
-          -> (dmd_ty'', NonRec id'' rhs' : bs')
+          -> (dmd_ty''', NonRec id'' rhs' : bs')
         Rec pairs
           | (env', lazy_fvs, pairs') <- dmdFix TopLevel env topSubDmd pairs
           , let ids' = map fst pairs'
-          , (dmd_ty', bs') <- go env' (add_exported_uses env' dmd_ty ids') bs
-          , (dmd_ty'', id_dmds) <- findBndrsDmds env' (dmd_ty' `addLazyFVs` lazy_fvs) ids'
+          , (dmd_ty', bs') <- go env' bs
+          , let !dmd_ty'' = add_exported_uses env' dmd_ty' ids' `addLazyFVs` lazy_fvs
+          , (dmd_ty''', id_dmds) <- findBndrsDmds env' dmd_ty'' ids'
           , let ids'' = zipWith annotate_id_dmd ids' id_dmds
           , let pairs'' = zipWith (\id'' (_, rhs') -> (id'', rhs')) ids'' pairs'
-          -> (dmd_ty'', Rec pairs'' : bs')
+          -> (dmd_ty''', Rec pairs'' : bs')
 
       annotate_id_dmd id dmd
-        | isInterestingTopLevelFn id, not (id `elemVarSet` rule_fvs)
-        -- See Note [Absence analysis for stable unfoldings and RULES]
+        | isInterestingTopLevelFn id
         = id `setIdDemandInfo` dmd
         | otherwise
         = id `setIdDemandInfo` topDmd
 
       add_exported_uses env = foldl' (add_exported_use env)
       add_exported_use env dmd_ty id
-        | isExportedId id || not (isInterestingTopLevelFn id)
+        | isExportedId id || elemVarSet id rule_fvs
+        -- See Note [Absence analysis for stable unfoldings and RULES]
         = dmd_ty `plusDmdType` fst (dmdAnalStar env topDmd (Var id))
         | otherwise       = dmd_ty
+
+      rule_fvs = foldr (unionVarSet . ruleRhsFreeIds) emptyVarSet rules
+
 
 {- Note [Stamp out space leaks in demand analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
