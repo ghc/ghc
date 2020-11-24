@@ -817,6 +817,9 @@ rewrite_exact_fam_app tc tys
                  do { traceRewriteM "rewrite family application with inert"
                                 (ppr tc <+> ppr xis $$ ppr xi)
                     ; finish True (homogenise xi downgraded_co) }
+               -- this will sometimes duplicate an inert in the cache,
+               -- but avoiding doing so had no impact on performance, and
+               -- it seems easier not to weed out that special case
              where
                inert_role    = eqRelRole inert_eq_rel
                role          = eqRelRole eq_rel
