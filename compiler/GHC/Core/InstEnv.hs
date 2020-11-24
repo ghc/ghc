@@ -1044,7 +1044,9 @@ isOverlappableTyVar, and the use of Skolem in instanceBindFun, above, means
 that these will be treated as fresh constants in the unification algorithm
 during instance lookup. Without this treatment, GHC would complain, saying
 that the choice of instance depended on the instantiation of 'a'; but of
-course it isn't *going* to be instantiated.
+course it isn't *going* to be instantiated. Note that it is necessary that
+the unification algorithm returns SurelyApart for these super-skolems
+for GHC to be able to commit to another instance.
 
 We do this only for super skolems.  For example we reject
         g :: forall a => [a] -> Int

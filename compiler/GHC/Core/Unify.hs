@@ -363,32 +363,6 @@ types are apart. This has practical consequences for the ability for closed
 type family applications to reduce. See test case
 indexed-types/should_compile/Overlap14.
 
-Note [Unification with skolems]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we discover that two types unify if and only if a skolem variable is
-substituted, we can't properly unify the types. Perhaps surprisingly,
-we say that these types are SurelyApart. This is to allow an example
-like the following:
-
-  class C a b where
-    meth :: a -> b -> ()
-
-  instance C a a where ...
-  instance C a Int where
-    meth = meth   -- a bit silly, but this is meant to be a small example
-
-NB: No -XOverlappingInstances or overlapp(ing|able|ed) pragmas.
-
-The recursive call within the definition of `meth` is actually ambiguous:
-if the instance variable `a` becomes Int, then the first instance would
-match. But this is silly, because if `a` were Int, then we would never
-have ended up in the second instance in the first place.
-
-We thus say that an unbindable variable is SurelyApart from other
-types. This allows us to accept the program above.
-
-See also Note [Binding when looking up instances] in GHC.Core.InstEnv.
-
 -}
 
 -- | Simple unification of two types; all type variables are bindable
@@ -1193,12 +1167,12 @@ uUnrefined env tv1' ty2 ty2' kco
              -- How could this happen? If we're only matching and if
              -- we're comparing forall-bound variables.
 
-           _ -> surelyApart -- See Note [Unification with skolems]
+           _ -> surelyApart
   }}}}
 
 uUnrefined env tv1' ty2 _ kco -- ty2 is not a type variable
   = case tvBindFlag env tv1' of
-      Skolem -> surelyApart  -- See Note [Unification with skolems]
+      Skolem -> surelyApart
       BindMe -> bindTv env tv1' (ty2 `mkCastTy` mkSymCo kco)
 
 bindTv :: UMEnv -> OutTyVar -> Type -> UM ()
@@ -1242,6 +1216,8 @@ data BindFlag
   | Skolem      -- This type variable is a skolem constant
                 -- Don't bind it; it only matches itself
                 -- These variables are SurelyApart from other types
+                -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
+                -- for why it must be SurelyApart.
   deriving Eq
 
 {-
