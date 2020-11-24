@@ -449,6 +449,7 @@ tryToInline platform live node assigs = go usages node emptyLRegSet assigs
                         || l `elemLRegSet` skipped
                         || not (okToInline platform rhs node)
 
+        -- How often is l used in the current node.
         l_usages = lookupUFM usages l
         l_live   = l `elemRegSet` live
 
@@ -554,10 +555,16 @@ addUsage m r = addToUFM_C (+) m r 1
 
 regsUsedIn :: LRegSet -> CmmExpr -> Bool
 regsUsedIn ls _ | nullLRegSet ls = False
-regsUsedIn ls e = wrapRecExpf f e False
-  where f (CmmReg (CmmLocal l))      _ | l `elemLRegSet` ls = True
-        f (CmmRegOff (CmmLocal l) _) _ | l `elemLRegSet` ls = True
-        f _ z = z
+regsUsedIn ls e = go ls e False
+  where use :: LRegSet -> CmmExpr -> Bool -> Bool
+        use ls (CmmReg (CmmLocal l))      _ | l `elemLRegSet` ls = True
+        use ls (CmmRegOff (CmmLocal l) _) _ | l `elemLRegSet` ls = True
+        use _ls _ z = z
+
+        go :: LRegSet -> CmmExpr -> Bool -> Bool
+        go ls (CmmMachOp _ es) z = foldr (go ls) z es
+        go ls (CmmLoad addr _) z = go ls addr z
+        go ls e                z = use ls e z
 
 -- we don't inline into CmmUnsafeForeignCall if the expression refers
 -- to global registers.  This is a HACK to avoid global registers
