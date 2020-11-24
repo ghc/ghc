@@ -83,7 +83,7 @@ module GHC.Tc.Utils.TcType (
   isIntegerTy, isNaturalTy,
   isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
+  isPredTy, isTyVarClassPred, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
   isRigidTy,
 
@@ -2135,18 +2135,6 @@ is_tc :: Unique -> Type -> Bool
 is_tc uniq ty = case tcSplitTyConApp_maybe ty of
                         Just (tc, _) -> uniq == getUnique tc
                         Nothing      -> False
-
--- | Does the given tyvar appear at the head of a chain of applications
---     (a t1 ... tn)
-isTyVarHead :: TcTyVar -> TcType -> Bool
-isTyVarHead tv (TyVarTy tv')   = tv == tv'
-isTyVarHead tv (AppTy fun _)   = isTyVarHead tv fun
-isTyVarHead tv (CastTy ty _)   = isTyVarHead tv ty
-isTyVarHead _ (TyConApp {})    = False
-isTyVarHead _  (LitTy {})      = False
-isTyVarHead _  (ForAllTy {})   = False
-isTyVarHead _  (FunTy {})      = False
-isTyVarHead _  (CoercionTy {}) = False
 
 
 {- Note [AppTy and ReprEq]
