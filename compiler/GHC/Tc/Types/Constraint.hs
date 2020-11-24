@@ -1182,8 +1182,29 @@ data ImplicStatus
 --  NoGivenEqs         NO           |         YES
 --  LocalGivenEqs      NO           |         NO
 --  MaybeGivenEqs      YES          |         NO
+--
+-- Examples:
+--
+--  NoGivenEqs:      Eq a => ...
+--                   (Show a, Num a) => ...
+--                   forall a. a ~ Either Int Bool => ...
+--                      See Note [Let-bound skolems] in GHC.Tc.Solver.Monad for
+--                      that last one
+--
+--  LocalGivenEqs:   forall a b. F a ~ G b => ...
+--                   forall a. F a ~ Int => ...
+--
+--  MaybeGivenEqs:   (a ~ b) => ...
+--                   forall a. F a ~ b => ...
+--
+-- The check is conservative. A MaybeGivenEqs might not have any equalities.
+-- A LocalGivenEqs might local equalities, but it definitely does not have non-local
+-- equalities. A NoGivenEqs definitely does not have equalities (except let-bound
+-- skolems).
+
 data HasGivenEqs
-  = NoGivenEqs      -- definitely no given equalities
+  = NoGivenEqs      -- definitely no given equalities,
+                    -- except by Note [Let-bound skolems] in GHC.Tc.Solver.Monad
   | LocalGivenEqs   -- might have Given equalities that affect only local skolems
                     -- e.g. forall a b. (a ~ F b) => ...; definitely no others
   | MaybeGivenEqs   -- might have any kind of Given equalities; no floating out
