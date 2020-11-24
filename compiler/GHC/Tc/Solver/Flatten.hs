@@ -426,7 +426,7 @@ flatten_args orig_binders
              orig_m_roles
              orig_tys
   = case (orig_m_roles, any_named_bndrs) of
-      (Nothing, False) -> flatten_args_fast orig_binders orig_inner_ki orig_tys
+      (Nothing, False) -> flatten_args_fast orig_tys
       _ -> flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
         where orig_roles = fromMaybe (repeat Nominal) orig_m_roles
 
@@ -436,38 +436,23 @@ flatten_args orig_binders
 -- There are many bang patterns in here. It's been observed that they
 -- greatly improve performance of an optimized build.
 -- The T9872 test cases are good witnesses of this fact.
-flatten_args_fast :: [TyCoBinder]
-                  -> Kind
-                  -> [Type]
+flatten_args_fast :: [Type]
                   -> FlatM ([Xi], [Coercion], MCoercionN)
-flatten_args_fast orig_binders orig_inner_ki orig_tys
-  = fmap finish (iterate orig_tys orig_binders)
+flatten_args_fast orig_tys
+  = fmap finish (iterate orig_tys)
   where
 
     iterate :: [Type]
-            -> [TyCoBinder]
-            -> FlatM ([Xi], [Coercion], [TyCoBinder])
-    iterate (ty:tys) (_:binders) = do
-      (xi, co) <- flatten_one ty
-      (xis, cos, binders) <- iterate tys binders
-      pure (xi : xis, co : cos, binders)
-    iterate [] binders = pure ([], [], binders)
-    iterate _ _ = pprPanic
-        "flatten_args wandered into deeper water than usual" (vcat [])
-           -- This debug information is commented out because leaving it in
-           -- causes a ~2% increase in allocations in T9872{a,c,d}.
-           {-
-             (vcat [ppr orig_binders,
-                    ppr orig_inner_ki,
-                    ppr orig_tys])
-           -}
+            -> FlatM ([Xi], [Coercion])
+    iterate (ty:tys) = do
+      (xi, co)   <- flatten_one ty
+      (xis, cos) <- iterate tys
+      pure (xi : xis, co : cos)
+    iterate [] = pure ([], [])
 
     {-# INLINE finish #-}
-    finish :: ([Xi], [Coercion], [TyCoBinder]) -> ([Xi], [Coercion], MCoercionN)
-    finish (xis, cos, binders) = (xis, cos, kind_co)
-      where
-        _final_kind = mkPiTys binders orig_inner_ki
-        kind_co     = MRefl
+    finish :: ([Xi], [Coercion]) -> ([Xi], [Coercion], MCoercionN)
+    finish (xis, cos) = (xis, cos, MRefl)
 
 {-# INLINE flatten_args_slow #-}
 -- | Slow path, compared to flatten_args_fast, because this one must track
