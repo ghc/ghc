@@ -832,6 +832,9 @@ rewrite_exact_fam_app tc tys
     do { result3 <- try_to_reduce tc xis
        ; case result3 of
            Just (co, xi) -> finish True (homogenise xi co)
+            -- We could add an item to the cache relating F xis to the final result,
+            -- where xis is the result of STEP 3. But testing showed that this
+            -- leads to 10-20% regressions in the T9872x tests, so we don't do it.
            Nothing       -> -- we have made no progress at all: STEP 7.
                             return (homogenise reduced (mkTcReflCo role reduced))
              where
