@@ -342,7 +342,7 @@ def append_perf_stat(stats: List[PerfStat],
 #
 
 # Max number of ancestor commits to search when compiling a baseline performance metric.
-BaselineSearchDepth = 75
+BaselineSearchDepth = 1000
 
 # (isCalculated, best fit ci test_env or None)
 BestFitCiTestEnv = (False, None) # type: Tuple[bool, Optional[TestEnv]]
