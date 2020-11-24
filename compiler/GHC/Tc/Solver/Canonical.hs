@@ -92,32 +92,20 @@ last time through, so we can skip the classification step.
 canonicalize :: Ct -> TcS (StopOrContinue Ct)
 canonicalize (CNonCanonical { cc_ev = ev })
   = {-# SCC "canNC" #-}
-    case classifyPredType pred of
-      ClassPred cls tys     -> do traceTcS "canEvNC:cls" (ppr cls <+> ppr tys)
-                                  canClassNC ev cls tys
-      EqPred eq_rel ty1 ty2 -> do traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)
-                                  canEqNC    ev eq_rel ty1 ty2
-      IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr pred)
-                                  canIrred OtherCIS ev
-      ForAllPred tvs th p   -> do traceTcS "canEvNC:forall" (ppr pred)
-                                  canForAllNC ev tvs th p
-  where
-    pred = ctEvPred ev
+    canNC ev
 
 canonicalize (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
   = canForAll ev pend_sc
 
-canonicalize (CIrredCan { cc_ev = ev, cc_status = status })
-  | EqPred eq_rel ty1 ty2 <- classifyPredType (ctEvPred ev)
-  = -- For insolubles (all of which are equalities), do /not/ rewrite the arguments
+canonicalize (CIrredCan { cc_ev = ev })
+  = canNC ev
+    -- Instead of rewriting the evidence before classifying, it's possible we
+    -- can make progress without the rewrite. Try this first.
+    -- For insolubles (all of which are equalities), do /not/ rewrite the arguments
     -- In #14350 doing so led entire-unnecessary and ridiculously large
     -- type function expansion.  Instead, canEqNC just applies
     -- the substitution to the predicate, and may do decomposition;
     --    e.g. a ~ [a], where [G] a ~ [Int], can decompose
-    canEqNC ev eq_rel ty1 ty2
-
-  | otherwise
-  = canIrred status ev
 
 canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
                        , cc_tyargs = xis, cc_pend_sc = pend_sc })
@@ -130,6 +118,20 @@ canonicalize (CEqCan { cc_ev     = ev
                      , cc_eq_rel = eq_rel })
   = {-# SCC "canEqLeafTyVarEq" #-}
     canEqNC ev eq_rel (canEqLHSType lhs) rhs
+
+canNC :: CtEvidence -> TcS (StopOrContinue Ct)
+canNC ev =
+  case classifyPredType pred of
+      ClassPred cls tys     -> do traceTcS "canEvNC:cls" (ppr cls <+> ppr tys)
+                                  canClassNC ev cls tys
+      EqPred eq_rel ty1 ty2 -> do traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)
+                                  canEqNC    ev eq_rel ty1 ty2
+      IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr pred)
+                                  canIrred ev
+      ForAllPred tvs th p   -> do traceTcS "canEvNC:forall" (ppr pred)
+                                  canForAllNC ev tvs th p
+  where
+    pred = ctEvPred ev
 
 {-
 ************************************************************************
@@ -694,24 +696,24 @@ See also Note [Evidence for quantified constraints] in GHC.Core.Predicate.
 ************************************************************************
 -}
 
-canIrred :: CtIrredStatus -> CtEvidence -> TcS (StopOrContinue Ct)
+canIrred :: CtEvidence -> TcS (StopOrContinue Ct)
 -- Precondition: ty not a tuple and no other evidence form
-canIrred status ev
+canIrred ev
   = do { let pred = ctEvPred ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr pred)
        ; (xi,co) <- rewrite ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
 
     do { -- Re-classify, in case rewriting has improved its shape
-         -- Code is like the CNonCanonical case of canonicalize, except
+         -- Code is like the canNC, except
          -- that the IrredPred branch stops work
        ; case classifyPredType (ctEvPred new_ev) of
            ClassPred cls tys     -> canClassNC new_ev cls tys
            EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
-           ForAllPred tvs th p   -> do traceTcS "canEvNC:forall" (ppr pred)
-                                       canForAllNC ev tvs th p
+           ForAllPred {}         -> pprPanic "rewriting revealed a ForAllTy"
+                                             (ppr ev)
            IrredPred {}          -> continueWith $
-                                    mkIrredCt status new_ev } }
+                                    mkIrredCt OtherCIS new_ev } }
 
 {- *********************************************************************
 *                                                                      *
