@@ -50,8 +50,11 @@ allocNew(uint32_t n) {
     alloc_rec* rec;
     rec = (alloc_rec*)stgMallocBytes(sizeof(alloc_rec),"getMBlocks: allocNew");
     rec->size = ((W_)n+1)*MBLOCK_SIZE;
+    // N.B. We use MEM_TOP_DOWN here to ensure that we leave the bottom of the
+    // address space available for the linker and libraries, which in general
+    // want to live in low memory. See #18991.
     rec->base =
-        VirtualAlloc(NULL, rec->size, MEM_RESERVE, PAGE_READWRITE);
+        VirtualAlloc(NULL, rec->size, MEM_RESERVE | MEM_TOP_DOWN, PAGE_READWRITE);
     if(rec->base==0) {
         stgFree((void*)rec);
         rec=0;
