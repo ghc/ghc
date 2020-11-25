@@ -1668,8 +1668,7 @@ least in some cases. But it's disastrous for test case perf/compiler/T3064.
 Here is the problem: Suppose we have (F ty) where we also have [G] F ty ~ a.
 What do we do? Do we reduce F? Or do we use the given? Hard to know what's
 best. GHC reduces. This is a disaster for T3064, where the type's size
-spirals out of control during reduction. (We're not helped by the fact that
-the flattener re-flattens all the arguments every time around.) If we prevent
+spirals out of control during reduction. If we prevent
 unification with type families, then the solver happens to use the equality
 before expanding the type family.
 

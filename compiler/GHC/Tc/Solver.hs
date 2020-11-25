@@ -43,7 +43,7 @@ import GHC.Tc.Errors
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Solver.Interact
 import GHC.Tc.Solver.Canonical   ( makeSuperClasses, solveCallStack )
-import GHC.Tc.Solver.Flatten     ( flattenType )
+import GHC.Tc.Solver.Rewrite     ( rewriteType )
 import GHC.Tc.Utils.Unify        ( buildTvImplication )
 import GHC.Tc.Utils.TcMType as TcM
 import GHC.Tc.Utils.Monad   as TcM
@@ -802,7 +802,7 @@ tcNormalise inerts ty
   = do { norm_loc <- getCtLocM PatCheckOrigin Nothing
        ; (res, _new_inerts) <- runTcSInerts inerts $
              do { traceTcS "tcNormalise {" (ppr inerts)
-                ; ty' <- flattenType norm_loc ty
+                ; ty' <- rewriteType norm_loc ty
                 ; traceTcS "tcNormalise }" (ppr ty')
                 ; pure ty' }
        ; return res }
@@ -844,7 +844,7 @@ if some local equalities are solved for. See "Wrinkle: Local equalities"
 in Note [Type normalisation] in "GHC.HsToCore.Pmc".
 
 To accomplish its stated goal, tcNormalise first initialises the solver monad
-with the given InertCans, then uses flattenType to simplify the desired type
+with the given InertCans, then uses rewriteType to simplify the desired type
 with respect to the Givens in the InertCans.
 
 ***********************************************************************************
@@ -2057,7 +2057,7 @@ simplifyHoles = mapBagM simpl_hole
      -- we must do so here, and not in the error-message generation
      -- code, because we have all the givens already set up
     simpl_hole h@(Hole { hole_ty = ty, hole_loc = loc })
-      = do { ty' <- flattenType loc ty
+      = do { ty' <- rewriteType loc ty
            ; return (h { hole_ty = ty' }) }
 
 {- Note [Delete dead Given evidence bindings]
@@ -2120,7 +2120,8 @@ the example for why (partial-sigs/should_compile/T12844):
 
 GHC correctly infers that the extra-constraints wildcard on `bar`
 should be (Head rngs ~ '(r, r'), Foo rngs). It then adds this constraint
-as a Given on the implication constraint for `bar`. The Hole for
+as a Given on the implication constraint for `bar`. (This implication is
+created by mkResidualConstraints in simplifyInfer.) The Hole for
 the _ is stored within the implication's WantedConstraints.
 When simplifyHoles is called, that constraint is already assumed as
 a Given. Simplifying with respect to it turns it into
@@ -2134,6 +2135,9 @@ is simple: just don't simplify extra-constraints wildcards.
 
 This is the only reason we need to track ConstraintHole separately
 from TypeHole in HoleSort.
+
+See also Note [Extra-constraint holes in partial type signatures]
+in GHC.Tc.Gen.HsType.
 
 Note [Tracking redundant constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2550,7 +2554,7 @@ floatEqualities skols given_ids ev_binds_var has_given_eqs
        ; binds   <- TcS.getTcEvBindsMap ev_binds_var
 
        -- Now we can pick the ones to float
-       -- The constraints are un-flattened and de-canonicalised
+       -- The constraints are de-canonicalised
        ; let (candidate_eqs, no_float_cts) = partitionBag is_float_eq_candidate simples
 
              seed_skols = mkVarSet skols     `unionVarSet`

@@ -117,8 +117,8 @@ import qualified Data.Semigroup ( (<>) )
 Note [CEqCan occurs check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 A CEqCan relates a CanEqLHS (a type variable or type family applications) on
-its left to an arbitrary type on its right. It is used for rewriting, in the
-flattener. Because it is used for rewriting, it would be disastrous if the RHS
+its left to an arbitrary type on its right. It is used for rewriting.
+Because it is used for rewriting, it would be disastrous if the RHS
 were to mention the LHS: this would cause a loop in rewriting.
 
 We thus perform an occurs-check. There is, of course, some subtlety:
@@ -146,8 +146,8 @@ The occurs check is performed in GHC.Tc.Utils.Unify.checkTypeEq.
 -}
 
 -- | A 'Xi'-type is one that has been fully rewritten with respect
--- to the inert set; that is, it has been flattened by the algorithm
--- in GHC.Tc.Solver.Flatten. (Historical note: 'Xi', for years and years,
+-- to the inert set; that is, it has been rewritten by the algorithm
+-- in GHC.Tc.Solver.Rewrite. (Historical note: 'Xi', for years and years,
 -- meant that a type was type-family-free. It does *not* mean this
 -- any more.)
 type Xi = TcType
@@ -257,7 +257,7 @@ data Hole
          , hole_loc  :: CtLoc    -- ^ Where hole was written
          }
            -- For the hole_loc, we usually only want the TcLclEnv stored within.
-           -- Except when we flatten, where we need a whole location. And this
+           -- Except when we rewrite, where we need a whole location. And this
            -- might get reported to the user if reducing type families in a
            -- hole type loops.
 
@@ -298,7 +298,7 @@ data CtIrredStatus
   | BlockedCIS HoleSet
                    -- this constraint is blocked on the coercion hole(s) listed
                    -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
-                   -- Wrinkle (4a). Why store the HoleSet? See Wrinkle (2a) of that
+                   -- Wrinkle (4a). Why store the HoleSet? See Wrinkle (2) of that
                    -- same Note.
                    -- INVARIANT: A BlockedCIS is a homogeneous equality whose
                    --   left hand side can fit in a CanEqLHS.
@@ -527,19 +527,19 @@ tyCoFVsOfCts = foldr (unionFV . tyCoFVsOfCt) emptyFV
 -- | Returns free variables of WantedConstraints as a non-deterministic
 -- set. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfWC :: WantedConstraints -> TyCoVarSet
--- Only called on *zonked* things, hence no need to worry about flatten-skolems
+-- Only called on *zonked* things
 tyCoVarsOfWC = fvVarSet . tyCoFVsOfWC
 
 -- | Returns free variables of WantedConstraints as a deterministically
 -- ordered list. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfWCList :: WantedConstraints -> [TyCoVar]
--- Only called on *zonked* things, hence no need to worry about flatten-skolems
+-- Only called on *zonked* things
 tyCoVarsOfWCList = fvVarList . tyCoFVsOfWC
 
 -- | Returns free variables of WantedConstraints as a composable FV
 -- computation. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoFVsOfWC :: WantedConstraints -> FV
--- Only called on *zonked* things, hence no need to worry about flatten-skolems
+-- Only called on *zonked* things
 tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_holes = holes })
   = tyCoFVsOfCts simple `unionFV`
     tyCoFVsOfBag tyCoFVsOfImplic implic `unionFV`
@@ -548,7 +548,7 @@ tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_holes = holes })
 -- | Returns free variables of Implication as a composable FV computation.
 -- See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoFVsOfImplic :: Implication -> FV
--- Only called on *zonked* things, hence no need to worry about flatten-skolems
+-- Only called on *zonked* things
 tyCoFVsOfImplic (Implic { ic_skols = skols
                         , ic_given = givens
                         , ic_wanted = wanted })
