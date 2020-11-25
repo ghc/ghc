@@ -1,0 +1,17 @@
+
+T12466a.hs:26:18: warning: [-Winaccessible-code (in -Wdefault)]
+    • Couldn't match type ‘a’ with ‘Gcd a b’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          dividesGcd :: forall (a :: Nat) (b :: Nat) (c :: Nat).
+                        (Divides a b, Divides a c) :- Divides a (Gcd b c)
+        at T12466a.hs:25:1-77
+      Inaccessible code in
+        a type expected by the context:
+          (a ~ Gcd a b, a ~ Gcd a c) => Dict (a ~ Gcd a (Gcd b c))
+    • In the first argument of ‘Sub’, namely ‘axiom’
+      In the expression: Sub axiom
+      In an equation for ‘dividesGcd’: dividesGcd = Sub axiom
+    • Relevant bindings include
+        dividesGcd :: (Divides a b, Divides a c) :- Divides a (Gcd b c)
+          (bound at T12466a.hs:26:1)
