@@ -66,6 +66,8 @@ void      initStats0(void);
 void      initStats1(void);
 void      resetChildProcessStats(void);
 
+double    mut_user_time(void);
+
 void      statDescribeGens( void );
 
 Time      stat_getElapsedGCTime(void);
