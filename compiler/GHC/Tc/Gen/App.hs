@@ -86,17 +86,43 @@ Some notes relative to the paper
   a polytype.
 
 * When QL is done, we don't need to turn the un-filled-in
-  instantiation variables into unification variables -- they already
-  are!
-
-  Moreover, all filled-in occurrences of instantiation variables
-  have been zonked away (see "Crucial step" in tcValArgs), and
-  so the rest of the type checker never sees a meta-type variable
-  filled in with a polytype.  For the rest of the typechecker,
-  a meta type variable stands (only) for a monotype.
+  instantiation variables into unification variables -- they
+  already /are/ unification varibles!  See also
+  Note [Instantiation variables are short lived].
 
 * We cleverly avoid the quadratic cost of QL, alluded to in the paper.
   See Note [Quick Look at value arguments]
+
+Note [Instantiation variables are short lived]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+By the time QL is done, all filled-in occurrences of instantiation
+variables have been zonked away (see "Crucial step" in tcValArgs),
+and so the constraint /generator/ never subsequently sees a meta-type
+variable filled in with a polytype -- a meta type variable stands
+(only) for a monotype.  See Section 4.3 "Applications and instantiation"
+of the paper.
+
+However, the constraint /solver/ can see a meta-type-variable filled
+in with a polytype (#18987). Suppose
+  f :: forall a. Dict a => [a] -> [a]
+  xs :: [forall b. b->b]
+and consider the call (f xs).  QL will
+* Instantiate f, with a := kappa, where kappa is an instantiation variable
+* Emit a constraint (Dict kappa), via instantiateSigma, called from tcInstFun
+* Do QL on the argument, to discover kappa := forall b. b->b
+
+But by the time the third step has happened, the constraint has been
+emitted into the monad.  The constraint solver will later find it, and
+rewrite it to (Dict (forall b. b->b)). That's fine -- the constraint
+solver does no implicit instantiation (which is what makes it so
+tricky to have foralls hiding inside unification variables), so there
+is no difficulty with allowing those filled-in kappa's to persist.
+(We could find them and zonk them away, but that would cost code and
+execution time, for no purpose.)
+
+Since the constraint solver does not do implicit instantiation (as the
+constraint generator does), the fact that a unification variable might
+stand for a polytype does not matter.
 -}
 
 
@@ -263,6 +289,15 @@ tcApp rn_expr exp_res_ty
        -- Typecheck the value arguments
        ; tc_args <- tcValArgs do_ql tc_fun inst_args
 
+       -- Zonk the result type, to ensure that we substitute out
+       -- any filled-in instantiation variable before calling tcWrapResultMono
+       -- In the Check case, this isn't really necessary, becuase tcWrapResultMono
+       -- just drops to tcUnify; but in the Infer case a filled-in instantiation
+       -- variable might perhaps escape into the constraint generator. The safe
+       -- thing to do is to any instantaition variables away.
+       -- See Note [Instantiation variables are short lived]
+       ; app_res_rho <- zonkQuickLook do_ql app_res_rho
+
        -- Special case for tagToEnum#
        ; if isTagToEnum rn_fun
          then tcTagToEnum rn_expr tc_fun tc_args app_res_rho exp_res_ty
@@ -272,11 +307,29 @@ tcApp rn_expr exp_res_ty
        ; let tc_expr = rebuild tc_fun tc_args
 
        -- Wrap the result
-       -- NB: app_res_ty may be a polytype, via zonkQuickLook
        ; addFunResCtxt tc_fun tc_args app_res_rho exp_res_ty $
-         tcWrapResult rn_expr tc_expr app_res_rho exp_res_ty } }
+         tcWrapResultMono rn_expr tc_expr app_res_rho exp_res_ty } }
 
 --------------------
+wantQuickLook :: HsExpr GhcRn -> TcM Bool
+-- GHC switches on impredicativity all the time for ($)
+wantQuickLook (HsVar _ f) | unLoc f `hasKey` dollarIdKey = return True
+wantQuickLook _                                          = xoptM LangExt.ImpredicativeTypes
+
+zonkQuickLook :: Bool -> TcType -> TcM TcType
+-- After all Quick Look unifications are done, zonk to ensure that all
+-- instantation variables are substituted away
+--
+-- So far as the paper is concerned, this step applies
+-- the poly-substitution Theta, learned by QL, so that we
+-- "see" the polymorphism in that type
+--
+-- In implementation terms this ensures that no unification variable
+-- linger on that have been filled in with a polytype
+zonkQuickLook do_ql ty
+  | do_ql     = zonkTcType ty
+  | otherwise = return ty
+
 -- zonkArg is used *only* during debug-tracing, to make it easier to
 -- see what is going on.  For that reason, it is not a full zonk: add
 -- more if you need it.
@@ -287,18 +340,13 @@ zonkArg eva@(EValArg { eva_arg_ty = Scaled m ty })
 zonkArg arg = return arg
 
 
-wantQuickLook :: HsExpr GhcRn -> TcM Bool
--- GHC switches on impredicativity all the time for ($)
-wantQuickLook (HsVar _ f) | unLoc f `hasKey` dollarIdKey = return True
-wantQuickLook _                                          = xoptM LangExt.ImpredicativeTypes
-
 
 ----------------
 tcValArgs :: Bool                    -- Quick-look on?
           -> HsExpr GhcTc            -- The function (for error messages)
           -> [HsExprArg 'TcpInst]    -- Actual argument
           -> TcM [HsExprArg 'TcpTc]  -- Resulting argument
-tcValArgs quick_look fun args
+tcValArgs do_ql fun args
   = go 1 args
   where
     go _ [] = return []
@@ -321,8 +369,8 @@ tcValArgs quick_look fun args
              --                     (:) :: forall p. p->[p]->[p]
              -- Then Theta = [p :-> forall a. a->a], and we want
              -- to check 'e' with expected type (forall a. a->a)
-             arg_ty <- if quick_look then zonkTcType arg_ty
-                                     else return arg_ty
+             -- See Note [Instantiation variables are short lived]
+             arg_ty <- zonkQuickLook do_ql arg_ty
 
              -- Now check the argument
            ; arg' <- addErrCtxt (funAppCtxt fun (eValArgExpr arg) n) $
@@ -1062,7 +1110,7 @@ tcTagToEnum expr fun args app_res_ty res_ty
 
     vanilla_result
       = do { let expr' = rebuildPrefixApps fun args
-           ; tcWrapResult expr expr' app_res_ty res_ty }
+           ; tcWrapResultMono expr expr' app_res_ty res_ty }
 
     check_enumeration ty' tc
       | isEnumerationTyCon tc = return ()
