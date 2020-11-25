@@ -341,10 +341,6 @@ GHC #12785.
 type TcCoVar = CoVar    -- Used only during type inference
 type TcType = Type      -- A TcType can have mutable type variables
 type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
-        -- Invariant on ForAllTy in TcTypes:
-        --      forall a. T
-        -- a cannot occur inside a MutTyVar in T; that is,
-        -- T is "flattened" before quantifying over a
 
 type TcTyVarBinder     = TyVarBinder
 type TcInvisTVBinder   = InvisTVBinder
@@ -1647,7 +1643,7 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
     -- sometimes hard to know directly because @ty@ might have some casts
     -- obscuring the FunTy. And 'splitAppTy' is difficult because we can't
     -- always extract a RuntimeRep (see Note [xyz]) if the kind of the arg or
-    -- res is unzonked/unflattened. Thus this function, which handles this
+    -- res is unzonked. Thus this function, which handles this
     -- corner case.
     eqFunTy :: RnEnv2 -> Mult -> Type -> Type -> Type -> Bool
                -- Last arg is /not/ FunTy

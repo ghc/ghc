@@ -201,7 +201,7 @@ runTcPluginsGiven
        ; updInertIrreds (\irreds -> extendCtsList irreds insols)
        ; return (pluginNewCts p) } } }
 
--- | Given a bag of (flattened, zonked) wanteds, invoke the plugins on
+-- | Given a bag of (rewritten, zonked) wanteds, invoke the plugins on
 -- them and produce an updated bag of wanteds (possibly with some new
 -- work) and a bag of insolubles.  The boolean indicates whether
 -- 'solveSimpleWanteds' should feed the updated wanteds back into the
@@ -862,7 +862,7 @@ Suppose we have (#13943)
   instance {-# OVERLAPPABLE #-} (Take (n - 1)) => Take n where ..
 
 And we have [W] Take 3.  That only matches one instance so we get
-[W] Take (3-1).  Really we should now flatten to reduce the (3-1) to 2, and
+[W] Take (3-1).  Really we should now rewrite to reduce the (3-1) to 2, and
 so on -- but that is reproducing yet more of the solver.  Sigh.  For now,
 we just give up (remember all this is just an optimisation).
 

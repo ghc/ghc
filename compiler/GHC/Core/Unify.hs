@@ -692,10 +692,7 @@ unifier It does /not/ work up to ~.
 
 The algorithm implemented here is rather delicate, and we depend on it
 to uphold certain properties. This is a summary of these required
-properties. Any reference to "flattening" refers to the flattening
-algorithm in GHC.Core.Unify (See
-Note [Flattening type-family applications when matching instances] in GHC.Core.Unify),
-not the flattening algorithm in the solver.
+properties.
 
 Notation:
  θ,φ    substitutions

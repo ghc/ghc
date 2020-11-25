@@ -90,7 +90,7 @@ module GHC.Tc.Solver.Monad (
     -- Irreds
     foldIrreds,
 
-    -- The flattening cache
+    -- The family application cache
     lookupFamAppInert, lookupFamAppCache, extendFamAppCache,
     pprKicked,
 
@@ -124,7 +124,7 @@ module GHC.Tc.Solver.Monad (
                                              -- if the whole instance matcher simply belongs
                                              -- here
 
-    breakTyVarCycle, flattenView
+    breakTyVarCycle, rewriterView
 ) where
 
 #include "HsVersions.h"
@@ -1193,7 +1193,7 @@ old inert, because a [D] can rewrite a [WD].
   inert: [D] F v ~ alpha (CEqCan)
 
 Can't make progress on this work item either (although GHC tries by
-decomposing the cast and reflattening... but that doesn't make a difference),
+decomposing the cast and rewriting... but that doesn't make a difference),
 which is still hetero. Emit a new kind equality and add to inert set. But,
 critically, we split the Irred.
 
@@ -1215,7 +1215,7 @@ We decompose the cast, yielding
 
   [D] a ~ beta
 
-We then flatten the kinds. The lhs kind is F v, which flattens to alpha.
+We then rewrite the kinds. The lhs kind is F v, which flattens to alpha.
 
   co' :: F v ~ alpha
   [D] (a |> co') ~ beta
@@ -1782,7 +1782,7 @@ kickOutAfterUnification new_tv
        ; setInertCans ics2
        ; return n_kicked }
 
--- See Wrinkle (2a) in Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+-- See Wrinkle (2) in Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
 kickOutAfterFillingCoercionHole :: CoercionHole -> Coercion -> TcS ()
 kickOutAfterFillingCoercionHole hole filled_co
   = do { ics <- getInertCans
@@ -2230,7 +2230,6 @@ type family applications? (Examples are below the explanation.)
 To allow flexibility in how type family applications unify we use
 the Core flattener. See
 Note [Flattening type-family applications when matching instances] in GHC.Core.Unify.
-This is *distinct* from the flattener in GHC.Tc.Solver.Flatten.
 The Core flattener replaces all type family applications with
 fresh variables. The next question: should we allow these fresh
 variables in the domain of a unifying substitution?
@@ -2445,7 +2444,7 @@ lookupFamAppCache fam_tc tys
            Nothing -> return Nothing }
 
 extendFamAppCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
--- NB: co :: rhs ~ F tys, to match expectations of flattener
+-- NB: co :: rhs ~ F tys, to match expectations of rewriter
 extendFamAppCache tc xi_args stuff@(_, ty)
   = do { dflags <- getDynFlags
        ; when (gopt Opt_FamAppCache dflags) $
@@ -2728,7 +2727,6 @@ data TcSEnv
 
       tcs_inerts    :: IORef InertSet, -- Current inert set
 
-      -- The main work-list and the flattening worklist
       -- See Note [WorkList priorities] and
       tcs_worklist  :: IORef WorkList -- Current worklist
     }
@@ -3577,7 +3575,7 @@ breakTyVarCycle :: CtLoc
 -- This could be considerably more efficient. See Detail (5) of Note.
 breakTyVarCycle loc = go
   where
-    go ty | Just ty' <- flattenView ty = go ty'
+    go ty | Just ty' <- rewriterView ty = go ty'
     go (Rep.TyConApp tc tys)
       | isTypeFamilyTyCon tc
       = do { let (fun_args, extra_args) = splitAt (tyConArity tc) tys
@@ -3621,9 +3619,9 @@ restoreTyVarCycles is
 -- Unwrap a type synonym only when either:
 --   The type synonym is forgetful, or
 --   the type synonym mentions a type family in its expansion
--- See Note [Flattening synonyms] in GHC.Tc.Solver.Flatten.
-flattenView :: TcType -> Maybe TcType
-flattenView ty@(Rep.TyConApp tc _)
+-- See Note [Rewriting synonyms] in GHC.Tc.Solver.Rewrite.
+rewriterView :: TcType -> Maybe TcType
+rewriterView ty@(Rep.TyConApp tc _)
   | isForgetfulSynTyCon tc || (isTypeSynonymTyCon tc && not (isFamFreeTyCon tc))
   = tcView ty
-flattenView _other = Nothing
+rewriterView _other = Nothing

@@ -1650,7 +1650,7 @@ where the two kind coercions are identical.  In that case we can exploit the
 situation where the main coercion is reflexive, via the special cases for Refl
 and GRefl.
 
-This is important when flattening  (ty |> co). We flatten ty, yielding
+This is important when rewriting  (ty |> co). We rewrite ty, yielding
    fco :: ty ~ ty'
 and now we want a coercion xco between
    xco :: (ty |> co) ~ (ty' |> co)
@@ -2664,19 +2664,19 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
 %*                                                                      *
 %************************************************************************
 
-The function below morally belongs in GHC.Tc.Solver.Flatten, but it is used also in
+The function below morally belongs in GHC.Tc.Solver.Rewrite, but it is used also in
 FamInstEnv, and so lives here.
 
 Note [simplifyArgsWorker]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Invariant (F2) of Note [Flattening] in GHC.Tc.Solver.Flatten says that
-flattening is homogeneous.
-This causes some trouble when flattening a function applied to a telescope
+Invariant (F2) of Note [Rewriting] in GHC.Tc.Solver.Rewrite says that
+rewriting is homogeneous.
+This causes some trouble when rewriting a function applied to a telescope
 of arguments, perhaps with dependency. For example, suppose
 
   type family F :: forall (j :: Type) (k :: Type). Maybe j -> Either j k -> Bool -> [k]
 
-and we wish to flatten the args of (with kind applications explicit)
+and we wish to rewrite the args of (with kind applications explicit)
 
   F a b (Just a c) (Right a b d) False
 
@@ -2692,7 +2692,7 @@ where all variables are skolems and
   [G] cco :: c ~ fc
   [G] dco :: d ~ fd
 
-The first step is to flatten all the arguments. This is done before calling
+The first step is to rewrite all the arguments. This is done before calling
 simplifyArgsWorker. We start from
 
   a
@@ -2713,26 +2713,26 @@ where
   co6 :: Maybe fa ~ Maybe a
   co7 :: Either fa fb ~ Either a b
 
-We now process the flattened args in left-to-right order. The first two args
-need no further processing. But now consider the third argument. Let f3 = the flattened
+We now process the rewritten args in left-to-right order. The first two args
+need no further processing. But now consider the third argument. Let f3 = the rewritten
 result, Just fa (fc |> aco) |> co6.
-This f3 flattened argument has kind (Maybe a), due to
+This f3 rewritten argument has kind (Maybe a), due to
 (F2). And yet, when we build the application (F fa fb ...), we need this
 argument to have kind (Maybe fa), not (Maybe a). We must cast this argument.
 The coercion to use is
 determined by the kind of F: we see in F's kind that the third argument has
 kind Maybe j. Critically, we also know that the argument corresponding to j
-(in our example, a) flattened with a coercion co1. We can thus know the
+(in our example, a) rewrote with a coercion co1. We can thus know the
 coercion needed for the 3rd argument is (Maybe (sym co1)), thus building
 (f3 |> Maybe (sym co1))
 
 More generally, we must use the Lifting Lemma, as implemented in
 Coercion.liftCoSubst. As we work left-to-right, any variable that is a
 dependent parameter (j and k, in our example) gets mapped in a lifting context
-to the coercion that is output from flattening the corresponding argument (co1
-and co2, in our example). Then, after flattening later arguments, we lift the
+to the coercion that is output from rewriting the corresponding argument (co1
+and co2, in our example). Then, after rewriting later arguments, we lift the
 kind of these arguments in the lifting context that we've be building up.
-This coercion is then used to keep the result of flattening well-kinded.
+This coercion is then used to keep the result of rewriting well-kinded.
 
 Working through our example, this is what happens:
 
@@ -2748,7 +2748,7 @@ Working through our example, this is what happens:
 
   4. Lifting the kind (Either j k) with our LC
      yields co9 :: Either fa fb ~ Either a b. Use (f4 |> sym co9) as the 4th
-     argument to F, where f4 is the flattened form of argument 4, written above.
+     argument to F, where f4 is the rewritten form of argument 4, written above.
 
   5. We lift Bool with our LC, getting <Bool>;
      casting has no effect.
@@ -2789,14 +2789,14 @@ Here is an example.
   co :: (forall j. j -> Type) ~ (forall (j :: Star). (j |> axStar) -> Star)
   co = forall (j :: sym axStar). (<j> -> sym axStar)
 
-  We are flattening:
+  We are rewriting:
   a (forall (j :: Star). (j |> axStar) -> Star)   -- 1
     (Proxy |> co)                                 -- 2
     (bo |> sym axStar)                            -- 3
     (NoWay |> sym bc)                             -- 4
       :: Star
 
-First, we flatten all the arguments (before simplifyArgsWorker), like so:
+First, we rewrite all the arguments (before simplifyArgsWorker), like so:
 
     (forall j. j -> Type, co1 :: (forall j. j -> Type) ~
                                  (forall (j :: Star). (j |> axStar) -> Star))  -- 1
@@ -2808,7 +2808,7 @@ Then we do the process described in Note [simplifyArgsWorker].
 
 1. Lifting Type (the kind of the first arg) gives us a reflexive coercion, so we
    don't use it. But we do build a lifting context [k -> co1] (where co1 is a
-   result of flattening an argument, written above).
+   result of rewriting an argument, written above).
 
 2. Lifting k gives us co1, so the second argument becomes (Proxy |> co |> sym co1).
    This is not a dependent argument, so we don't extend the lifting context.
@@ -2827,10 +2827,10 @@ to instantiate any kind parameters. Look at the type of co1. If we just
 decomposed it, we would end up with coercions whose types include j, which is
 out of scope here. Accordingly, decomposePiCos takes a list of types whose
 kinds are the *right-hand* types in the decomposed coercion. (See comments on
-decomposePiCos.) Because the flattened types have unflattened kinds (because
-flattening is homogeneous), passing the list of flattened types to decomposePiCos
+decomposePiCos.) Because the rewritten types have unrewritten kinds (because
+rewriting is homogeneous), passing the list of rewritten types to decomposePiCos
 just won't do: later arguments' kinds won't be as expected. So we need to get
-the *unflattened* types to pass to decomposePiCos. We can do this easily enough
+the *unrewritten* types to pass to decomposePiCos. We can do this easily enough
 by taking the kind of the argument coercions, passed in originally.
 
 (Alternative 1: We could re-engineer decomposePiCos to deal with this situation.
@@ -2842,7 +2842,7 @@ behavior into simplifyArgsWorker. This would work, I think, but then all of the
 complication of decomposePiCos would end up layered on top of all the complication
 here. Please, no.)
 
-(Alternative 3: We could pass the unflattened arguments into simplifyArgsWorker
+(Alternative 3: We could pass the unrewritten arguments into simplifyArgsWorker
 so that we don't have to recreate them. But that would complicate the interface
 of this function to handle a very dark, dark corner case. Better to keep our
 demons to ourselves here instead of exposing them to callers. This decision is
@@ -2863,7 +2863,7 @@ to get
                            == bo ~ bo
   res_co :: Type ~ Star
 
-We then use these casts on (the flattened) (3) and (4) to get
+We then use these casts on (the rewritten) (3) and (4) to get
 
   (Bool |> sym axStar |> co5 :: Type)   -- (C3)
   (False |> sym bc |> co6    :: bo)     -- (C4)
@@ -2884,9 +2884,9 @@ it.
 
 This recursive call returns ([Bool, False], [...], Refl). The Bool and False
 are the correct arguments we wish to return. But we must be careful about the
-result coercion: our new, flattened application will have kind Type, but we
+result coercion: our new, rewritten application will have kind Type, but we
 want to make sure that the result coercion casts this back to Star. (Why?
-Because we started with an application of kind Star, and flattening is homogeneous.)
+Because we started with an application of kind Star, and rewriting is homogeneous.)
 
 So, we have to twiddle the result coercion appropriately.
 
@@ -2930,7 +2930,7 @@ be an application of a variable. Here is the example:
       k :: Type
       x :: k
 
-  flatten (f @Type @((->) k) x)
+  rewrite (f @Type @((->) k) x)
 
 After instantiating [a |-> Type, b |-> ((->) k)], we see that `b (Any @a)`
 is `k -> Any @a`, and thus the third argument of `x :: k` is well-kinded.
@@ -2938,7 +2938,7 @@ is `k -> Any @a`, and thus the third argument of `x :: k` is well-kinded.
 -}
 
 
--- This is shared between the flattener and the normaliser in GHC.Core.FamInstEnv.
+-- This is shared between the rewriter and the normaliser in GHC.Core.FamInstEnv.
 -- See Note [simplifyArgsWorker]
 {-# INLINE simplifyArgsWorker #-}
 simplifyArgsWorker :: [TyCoBinder] -> Kind
@@ -2946,15 +2946,15 @@ simplifyArgsWorker :: [TyCoBinder] -> Kind
                        -- list of binders can be shorter or longer than the list of args
                    -> TyCoVarSet   -- free vars of the args
                    -> [Role]   -- list of roles, r
-                   -> [(Type, Coercion)] -- flattened type arguments, arg
-                                         -- each comes with the coercion used to flatten it,
-                                         -- with co :: flattened_type ~ original_type
+                   -> [(Type, Coercion)] -- rewritten type arguments, arg
+                                         -- each comes with the coercion used to rewrite it,
+                                         -- with co :: rewritten_type ~ original_type
                    -> ([Type], [Coercion], MCoercionN)
 -- Returns (xis, cos, res_co), where each co :: xi ~ arg,
 -- and res_co :: kind (f xis) ~ kind (f tys), where f is the function applied to the args
 -- Precondition: if f :: forall bndrs. inner_ki (where bndrs and inner_ki are passed in),
--- then (f orig_tys) is well kinded. Note that (f flattened_tys) might *not* be well-kinded.
--- Massaging the flattened_tys in order to make (f flattened_tys) well-kinded is what this
+-- then (f orig_tys) is well kinded. Note that (f rewritten_tys) might *not* be well-kinded.
+-- Massaging the rewritten_tys in order to make (f rewritten_tys) well-kinded is what this
 -- function is all about. That is, (f xis), where xis are the returned arguments, *is*
 -- well kinded.
 simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
@@ -2966,11 +2966,11 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
     go :: [Type]      -- Xis accumulator, in reverse order
        -> [Coercion]  -- Coercions accumulator, in reverse order
                       -- These are in 1-to-1 correspondence
-       -> LiftingContext  -- mapping from tyvars to flattening coercions
+       -> LiftingContext  -- mapping from tyvars to rewriting coercions
        -> [TyCoBinder]    -- Unsubsted binders of function's kind
        -> Kind        -- Unsubsted result kind of function (not a Pi-type)
-       -> [Role]      -- Roles at which to flatten these ...
-       -> [(Type, Coercion)]  -- flattened arguments, with their flattening coercions
+       -> [Role]      -- Roles at which to rewrite these ...
+       -> [(Type, Coercion)]  -- rewritten arguments, with their rewriting coercions
        -> ([Type], [Coercion], MCoercionN)
     go acc_xis acc_cos !lc binders inner_ki _ []
         -- The !lc makes the function strict in the lifting context
@@ -2982,10 +2982,10 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
                 | otherwise                   = MCo $ liftCoSubst Nominal lc final_kind
 
     go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) ((xi,co):args)
-      = -- By Note [Flattening] in GHC.Tc.Solver.Flatten invariant (F2),
+      = -- By Note [Rewriting] in GHC.Tc.Solver.Rewrite invariant (F2),
          -- tcTypeKind(xi) = tcTypeKind(ty). But, it's possible that xi will be
          -- used as an argument to a function whose kind is different, if
-         -- earlier arguments have been flattened to new types. We thus
+         -- earlier arguments have been rewritten to new types. We thus
          -- need a coercion (kind_co :: old_kind ~ new_kind).
          --
          -- The bangs here have been observed to improve performance
@@ -3014,8 +3014,8 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
     go acc_xis acc_cos lc [] inner_ki roles args
       = let co1 = liftCoSubst Nominal lc inner_ki
             co1_kind              = coercionKind co1
-            unflattened_tys       = map (coercionRKind . snd) args
-            (arg_cos, res_co)     = decomposePiCos co1 co1_kind unflattened_tys
+            unrewritten_tys       = map (coercionRKind . snd) args
+            (arg_cos, res_co)     = decomposePiCos co1 co1_kind unrewritten_tys
             casted_args           = ASSERT2( equalLength args arg_cos
                                            , ppr args $$ ppr arg_cos )
                                     [ (casted_xi, casted_co)
@@ -3029,8 +3029,8 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
                -- ... -> k, that k will be substituted to perhaps reveal more
                -- binders.
             zapped_lc             = zapLiftingContext lc
-            Pair flattened_kind _ = co1_kind
-            (bndrs, new_inner)    = splitPiTys flattened_kind
+            Pair rewritten_kind _ = co1_kind
+            (bndrs, new_inner)    = splitPiTys rewritten_kind
 
             (xis_out, cos_out, res_co_out)
               = go acc_xis acc_cos zapped_lc bndrs new_inner roles casted_args
@@ -3041,8 +3041,8 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
         "simplifyArgsWorker wandered into deeper water than usual"
            -- This debug information is commented out because leaving it in
            -- causes a ~2% increase in allocations in T9872d.
-           -- That's independent of the analogous case in flatten_args_fast
-           -- in GHC.Tc.Solver.Flatten:
+           -- That's independent of the analogous case in rewrite_args_fast
+           -- in GHC.Tc.Solver.Rewrite:
            -- each of these causes a 2% increase on its own, so commenting them
            -- both out gives a 4% decrease in T9872d.
            {-
