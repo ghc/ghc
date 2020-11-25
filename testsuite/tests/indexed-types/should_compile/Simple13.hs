@@ -21,7 +21,7 @@ foo p = same p (mkf p)
   [G] g : a ~ [F a]
   [W] w : a ~ [F a]
 
----> 
+--->
   g' = g;[x]                g'=aq4
   [G] g'  : a ~ [fsk]       g=aqW
   [W] x : F a ~ fsk         x=aq3
@@ -36,7 +36,7 @@ foo p = same p (mkf p)
       w = g' ; w2
   [W] w2 : [fsk] ~ [F a]
 
-  --> decompose 
+  --> decompose
        w2 = [w3]
    [W] w3 : fsk ~ F a
 
@@ -44,5 +44,5 @@ foo p = same p (mkf p)
 
 cycle is
    aq3 = Sym (F aq4) ; aq5    x = Sym (F g') ; x2
-   aq4 = apw ; aq3            g' = 
+   aq4 = apw ; aq3            g' =
 -}
