@@ -88,6 +88,7 @@ typedef struct _GC_FLAGS {
 
     bool numa;                   /* Use NUMA */
     StgWord numaMask;
+    bool hugepages;              /* Enable hugepages support */
 } GC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */
