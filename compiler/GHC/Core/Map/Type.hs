@@ -8,6 +8,9 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module GHC.Core.Map.Type (
+     -- * Re-export generic interface
+   TrieMap(..),
+
      -- * Maps over 'Type's
    TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap, foldTypeMap,
    LooseTypeMap,
@@ -45,6 +48,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable
 
+import GHC.Data.Maybe
 import GHC.Utils.Panic
 
 import qualified Data.Map    as Map
@@ -86,6 +90,7 @@ instance TrieMap CoercionMap where
    alterTM k f (CoercionMap m) = CoercionMap (alterTM (deBruijnize k) f m)
    foldTM k    (CoercionMap m) = foldTM k m
    mapTM f     (CoercionMap m) = CoercionMap (mapTM f m)
+   filterTM f  (CoercionMap m) = CoercionMap (filterTM f m)
 
 type CoercionMapG = GenMap CoercionMapX
 newtype CoercionMapX a = CoercionMapX (TypeMapX a)
@@ -97,6 +102,7 @@ instance TrieMap CoercionMapX where
   alterTM  = xtC
   foldTM f (CoercionMapX core_tm) = foldTM f core_tm
   mapTM f (CoercionMapX core_tm)  = CoercionMapX (mapTM f core_tm)
+  filterTM f (CoercionMapX core_tm) = CoercionMapX (filterTM f core_tm)
 
 instance Eq (DeBruijn Coercion) where
   D env1 co1 == D env2 co2
@@ -135,6 +141,12 @@ data TypeMapX a
   = TM { tm_var    :: VarMap a
        , tm_app    :: TypeMapG (TypeMapG a)
        , tm_tycon  :: DNameEnv a
+
+         -- only InvisArg arrows here
+       , tm_funty  :: TypeMapG (TypeMapG (TypeMapG a))
+                       -- keyed on the argument, result rep, and result
+                       -- constraints are never linear-restricted and are always lifted
+
        , tm_forall :: TypeMapG (BndrMap a) -- See Note [Binders] in GHC.Core.Map.Expr
        , tm_tylit  :: TyLitMap a
        , tm_coerce :: Maybe a
@@ -142,10 +154,12 @@ data TypeMapX a
     -- Note that there is no tyconapp case; see Note [Equality on AppTys] in GHC.Core.Type
 
 -- | Squeeze out any synonyms, and change TyConApps to nested AppTys. Why the
--- last one? See Note [Equality on AppTys] in "GHC.Core.Type"
+-- last one? See Note [Equality on AppTys] in GHC.Core.Type
 --
 -- Note, however, that we keep Constraint and Type apart here, despite the fact
 -- that they are both synonyms of TYPE 'LiftedRep (see #11715).
+--
+-- We also keep (Eq a => a) as a FunTy, distinct from ((->) (Eq a) a).
 trieMapView :: Type -> Maybe Type
 trieMapView ty
   -- First check for TyConApps that need to be expanded to
@@ -164,6 +178,7 @@ instance TrieMap TypeMapX where
    alterTM  = xtT
    foldTM   = fdT
    mapTM    = mapT
+   filterTM = filterT
 
 instance Eq (DeBruijn Type) where
   env_t@(D env t) == env_t'@(D env' t')
@@ -184,8 +199,11 @@ instance Eq (DeBruijn Type) where
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
-        (FunTy _ w1 t1 t2, FunTy _ w1' t1' t2')
-            -> D env w1 == D env w1' && D env t1 == D env' t1' && D env t2 == D env' t2'
+        (FunTy v1 w1 t1 t2, FunTy v1' w1' t1' t2')
+            -> v1 == v1' &&
+               D env w1 == D env w1' &&
+               D env t1 == D env' t1' &&
+               D env t2 == D env' t2'
         (TyConApp tc tys, TyConApp tc' tys')
             -> tc == tc' && D env tys == D env' tys'
         (LitTy l, LitTy l')
@@ -205,17 +223,19 @@ emptyT :: TypeMapX a
 emptyT = TM { tm_var  = emptyTM
             , tm_app  = emptyTM
             , tm_tycon  = emptyDNameEnv
+            , tm_funty  = emptyTM
             , tm_forall = emptyTM
             , tm_tylit  = emptyTyLitMap
             , tm_coerce = Nothing }
 
 mapT :: (a->b) -> TypeMapX a -> TypeMapX b
 mapT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
-           , tm_forall = tforall, tm_tylit = tlit
+           , tm_funty = tfunty, tm_forall = tforall, tm_tylit = tlit
            , tm_coerce = tcoerce })
   = TM { tm_var    = mapTM f tvar
        , tm_app    = mapTM (mapTM f) tapp
        , tm_tycon  = mapTM f ttycon
+       , tm_funty  = mapTM (mapTM (mapTM f)) tfunty
        , tm_forall = mapTM (mapTM f) tforall
        , tm_tylit  = mapTM f tlit
        , tm_coerce = fmap f tcoerce }
@@ -233,6 +253,11 @@ lkT (D env ty) m = go ty m
     go (LitTy l)                   = tm_tylit  >.> lkTyLit l
     go (ForAllTy (Bndr tv _) ty)   = tm_forall >.> lkG (D (extendCME env tv) ty)
                                                >=> lkBndr env tv
+    go (FunTy InvisArg _ arg res)
+      | Just res_rep <- getRuntimeRep_maybe res
+                                   = tm_funty >.> lkG (D env arg)
+                                              >=> lkG (D env res_rep)
+                                              >=> lkG (D env res)
     go ty@(FunTy {})               = pprPanic "lkT FunTy" (ppr ty)
     go (CastTy t _)                = go t
     go (CoercionTy {})             = tm_coerce
@@ -245,6 +270,10 @@ xtT (D env (TyVarTy v))       f m = m { tm_var    = tm_var m |> xtVar env v f }
 xtT (D env (AppTy t1 t2))     f m = m { tm_app    = tm_app m |> xtG (D env t1)
                                                             |>> xtG (D env t2) f }
 xtT (D _   (TyConApp tc []))  f m = m { tm_tycon  = tm_tycon m |> xtDNamed tc f }
+xtT (D env (FunTy InvisArg _ t1 t2)) f m = m { tm_funty = tm_funty m |> xtG (D env t1)
+                                                                    |>> xtG (D env t2_rep)
+                                                                    |>> xtG (D env t2) f }
+  where t2_rep = expectJust "xtT FunTy InvisArg" (getRuntimeRep_maybe t2)
 xtT (D _   (LitTy l))         f m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 xtT (D env (CastTy t _))      f m = xtT (D env t) f m
 xtT (D _   (CoercionTy {}))   f m = m { tm_coerce = tm_coerce m |> f }
@@ -258,9 +287,22 @@ fdT :: (a -> b -> b) -> TypeMapX a -> b -> b
 fdT k m = foldTM k (tm_var m)
         . foldTM (foldTM k) (tm_app m)
         . foldTM k (tm_tycon m)
+        . foldTM (foldTM (foldTM k)) (tm_funty m)
         . foldTM (foldTM k) (tm_forall m)
         . foldTyLit k (tm_tylit m)
         . foldMaybe k (tm_coerce m)
+
+filterT :: (a -> Bool) -> TypeMapX a -> TypeMapX a
+filterT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
+              , tm_funty = tfunty, tm_forall = tforall, tm_tylit = tlit
+              , tm_coerce = tcoerce })
+  = TM { tm_var    = filterTM f tvar
+       , tm_app    = mapTM (filterTM f) tapp
+       , tm_tycon  = filterTM f ttycon
+       , tm_funty  = mapTM (mapTM (filterTM f)) tfunty
+       , tm_forall = mapTM (filterTM f) tforall
+       , tm_tylit  = filterTM f tlit
+       , tm_coerce = filterMaybe f tcoerce }
 
 ------------------------
 data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
@@ -274,6 +316,7 @@ instance TrieMap TyLitMap where
    alterTM  = xtTyLit
    foldTM   = foldTyLit
    mapTM    = mapTyLit
+   filterTM = filterTyLit
 
 emptyTyLitMap :: TyLitMap a
 emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUFM }
@@ -298,6 +341,10 @@ foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
 foldTyLit l m = flip (foldUFM l) (tlm_string m)
               . flip (Map.foldr l)   (tlm_number m)
 
+filterTyLit :: (a -> Bool) -> TyLitMap a -> TyLitMap a
+filterTyLit f (TLM { tlm_number = tn, tlm_string = ts })
+  = TLM { tlm_number = Map.filter f tn, tlm_string = filterUFM f ts }
+
 -------------------------------------------------
 -- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this
 -- is the type you want. The keys in this map may have different kinds.
@@ -321,6 +368,7 @@ instance TrieMap TypeMap where
     alterTM k f m = xtTT (deBruijnize k) f m
     foldTM k (TypeMap m) = foldTM (foldTM k) m
     mapTM f (TypeMap m) = TypeMap (mapTM (mapTM f) m)
+    filterTM f (TypeMap m) = TypeMap (mapTM (filterTM f) m)
 
 foldTypeMap :: (a -> b -> b) -> b -> TypeMap a -> b
 foldTypeMap k z m = foldTM k m z
@@ -361,6 +409,7 @@ instance TrieMap LooseTypeMap where
   alterTM k f (LooseTypeMap m) = LooseTypeMap (alterTM (deBruijnize k) f m)
   foldTM f (LooseTypeMap m) = foldTM f m
   mapTM f (LooseTypeMap m) = LooseTypeMap (mapTM f m)
+  filterTM f (LooseTypeMap m) = LooseTypeMap (filterTM f m)
 
 {-
 ************************************************************************
@@ -435,6 +484,7 @@ instance TrieMap BndrMap where
    alterTM  = xtBndr emptyCME
    foldTM   = fdBndrMap
    mapTM    = mapBndrMap
+   filterTM = ftBndrMap
 
 mapBndrMap :: (a -> b) -> BndrMap a -> BndrMap b
 mapBndrMap f (BndrMap tm) = BndrMap (mapTM (mapTM f) tm)
@@ -456,6 +506,8 @@ xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
 xtBndr env v xt (BndrMap tymap)  =
   BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (D env <$> varMultMaybe v) xt))
 
+ftBndrMap :: (a -> Bool) -> BndrMap a -> BndrMap a
+ftBndrMap f (BndrMap tm) = BndrMap (mapTM (filterTM f) tm)
 
 --------- Variable occurrence -------------
 data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable
@@ -468,6 +520,7 @@ instance TrieMap VarMap where
    alterTM  = xtVar emptyCME
    foldTM   = fdVar
    mapTM    = mapVar
+   filterTM = ftVar
 
 mapVar :: (a->b) -> VarMap a -> VarMap b
 mapVar f (VM { vm_bvar = bv, vm_fvar = fv })
@@ -492,6 +545,10 @@ lkDFreeVar var env = lookupDVarEnv env var
 
 xtDFreeVar :: Var -> XT a -> DVarEnv a -> DVarEnv a
 xtDFreeVar v f m = alterDVarEnv f m v
+
+ftVar :: (a -> Bool) -> VarMap a -> VarMap a
+ftVar f (VM { vm_bvar = bv, vm_fvar = fv })
+  = VM { vm_bvar = filterTM f bv, vm_fvar = filterTM f fv }
 
 -------------------------------------------------
 lkDNamed :: NamedThing n => n -> DNameEnv a -> Maybe a

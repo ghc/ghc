@@ -298,12 +298,19 @@ initTcDsForSolver thing_inside
        ; hsc_env    <- getTopEnv
 
        ; let DsGblEnv { ds_mod = mod
-                      , ds_fam_inst_env = fam_inst_env } = gbl
+                      , ds_fam_inst_env = fam_inst_env
+                      , ds_gbl_rdr_env  = rdr_env }      = gbl
+       -- This is *the* use of ds_gbl_rdr_env:
+       -- Make sure the solver (used by the pattern-match overlap checker) has
+       -- access to the GlobalRdrEnv and FamInstEnv for the module, so that it
+       -- knows how to reduce type families, and which newtypes it can unwrap.
+
 
              DsLclEnv { dsl_loc = loc }                  = lcl
 
        ; liftIO $ initTc hsc_env HsSrcFile False mod loc $
-         updGblEnv (\tc_gbl -> tc_gbl { tcg_fam_inst_env = fam_inst_env }) $
+         updGblEnv (\tc_gbl -> tc_gbl { tcg_fam_inst_env = fam_inst_env
+                                      , tcg_rdr_env      = rdr_env }) $
          thing_inside }
 
 mkDsEnvs :: UnitState -> HomeUnit -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
@@ -318,6 +325,7 @@ mkDsEnvs unit_state home_unit mod rdr_env type_env fam_inst_env msg_var cc_st_va
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
+                           , ds_gbl_rdr_env  = rdr_env
                            , ds_if_env  = (if_genv, if_lenv)
                            , ds_unqual  = mkPrintUnqualified unit_state home_unit rdr_env
                            , ds_msgs    = msg_var

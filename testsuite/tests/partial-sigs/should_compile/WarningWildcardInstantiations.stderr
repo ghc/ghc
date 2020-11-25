@@ -2,7 +2,7 @@ TYPE SIGNATURES
   bar :: forall {t} {w}. t -> (t -> w) -> w
   foo :: forall {a}. (Show a, Enum a) => a -> String
 Dependent modules: []
-Dependent packages: [base-4.14.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
+Dependent packages: [base-4.15.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
 
 WarningWildcardInstantiations.hs:5:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_a’ standing for ‘a’
@@ -12,7 +12,7 @@ WarningWildcardInstantiations.hs:5:14: warning: [-Wpartial-type-signatures (in -
     • In the type signature: foo :: (Show _a, _) => _a -> _
 
 WarningWildcardInstantiations.hs:5:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Enum a’
+    • Found extra-constraints wildcard standing for ‘Enum a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of foo :: (Show a, Enum a) => a -> String
                at WarningWildcardInstantiations.hs:6:1-21

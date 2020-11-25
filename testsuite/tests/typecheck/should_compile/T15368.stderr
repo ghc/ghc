@@ -15,8 +15,8 @@ T15368.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
         trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)
 
 T15368.hs:11:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type: F b a
-                     with: F b0 a0
+    • Couldn't match type: F b0 a0
+                     with: F b a
       Expected: (F a b, F b a)
         Actual: (F a b, F b0 a0)
       NB: ‘F’ is a non-injective type family

@@ -898,6 +898,8 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv ex_tvs
                      -- Get location from monad, not from ex_tvs
                      -- This freshens: See Note [Freshen existentials]
+                     -- Why "super"? See Note [Binding when lookup up instances]
+                     -- in GHC.Core.InstEnv.
 
         ; let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
               -- pat_ty' is type of the actual constructor application

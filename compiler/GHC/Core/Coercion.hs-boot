@@ -30,7 +30,7 @@ mkInstCo :: Coercion -> Coercion -> Coercion
 mkGReflCo :: Role -> Type -> MCoercionN -> Coercion
 mkNomReflCo :: Type -> Coercion
 mkKindCo :: Coercion -> Coercion
-mkSubCo :: Coercion -> Coercion
+mkSubCo :: HasDebugCallStack => Coercion -> Coercion
 mkProofIrrelCo :: Role -> Coercion -> Coercion -> Coercion -> Coercion
 mkAxiomRuleCo :: CoAxiomRule -> [Coercion] -> Coercion
 

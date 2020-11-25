@@ -26,11 +26,11 @@ module GHC.Core.TyCon.Env (
 
         DTyConEnv,
 
-        emptyDTyConEnv,
+        emptyDTyConEnv, isEmptyDTyConEnv,
         lookupDTyConEnv,
         delFromDTyConEnv, filterDTyConEnv,
-        mapDTyConEnv,
-        adjustDTyConEnv, alterDTyConEnv, extendDTyConEnv,
+        mapDTyConEnv, mapMaybeDTyConEnv,
+        adjustDTyConEnv, alterDTyConEnv, extendDTyConEnv, foldDTyConEnv
     ) where
 
 #include "HsVersions.h"
@@ -116,6 +116,9 @@ type DTyConEnv a = UniqDFM TyCon a
 emptyDTyConEnv :: DTyConEnv a
 emptyDTyConEnv = emptyUDFM
 
+isEmptyDTyConEnv :: DTyConEnv a -> Bool
+isEmptyDTyConEnv = isNullUDFM
+
 lookupDTyConEnv :: DTyConEnv a -> TyCon -> Maybe a
 lookupDTyConEnv = lookupUDFM
 
@@ -128,6 +131,9 @@ filterDTyConEnv = filterUDFM
 mapDTyConEnv :: (a -> b) -> DTyConEnv a -> DTyConEnv b
 mapDTyConEnv = mapUDFM
 
+mapMaybeDTyConEnv :: (a -> Maybe b) -> DTyConEnv a -> DTyConEnv b
+mapMaybeDTyConEnv = mapMaybeUDFM
+
 adjustDTyConEnv :: (a -> a) -> DTyConEnv a -> TyCon -> DTyConEnv a
 adjustDTyConEnv = adjustUDFM
 
@@ -136,3 +142,6 @@ alterDTyConEnv = alterUDFM
 
 extendDTyConEnv :: DTyConEnv a -> TyCon -> a -> DTyConEnv a
 extendDTyConEnv = addToUDFM
+
+foldDTyConEnv :: (elt -> a -> a) -> a -> DTyConEnv elt -> a
+foldDTyConEnv = foldUDFM

@@ -263,7 +263,7 @@ data GeneralFlag
    | Opt_RPath
    | Opt_RelativeDynlibPaths
    | Opt_Hpc
-   | Opt_FlatCache
+   | Opt_FamAppCache
    | Opt_ExternalInterpreter
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros

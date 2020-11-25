@@ -65,7 +65,7 @@ SplicesUsed.hs:16:2: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • In the type signature: foo :: _ => _
 
 SplicesUsed.hs:16:2: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Eq a’
+    • Found extra-constraints wildcard standing for ‘Eq a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of foo :: Eq a => a -> a -> Bool
                at SplicesUsed.hs:16:2-11
