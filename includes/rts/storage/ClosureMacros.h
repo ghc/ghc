@@ -520,11 +520,15 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 #if defined(PROFILING) || defined(DEBUG)
 #define OVERWRITING_CLOSURE(c) \
     overwritingClosure(c)
+#define OVERWRITING_CLOSURE_SIZE(c, size) \
+    overwritingClosureSize(c, size)
 #define OVERWRITING_CLOSURE_MUTABLE(c, off) \
     overwritingMutableClosureOfs(c, off)
 #else
 #define OVERWRITING_CLOSURE(c) \
     do { (void) sizeof(c); } while(0)
+#define OVERWRITING_CLOSURE_SIZE(c, size) \
+    do { (void) sizeof(c); (void) sizeof(size); } while(0)
 #define OVERWRITING_CLOSURE_MUTABLE(c, off) \
     do { (void) sizeof(c); (void) sizeof(off); } while(0)
 #endif
