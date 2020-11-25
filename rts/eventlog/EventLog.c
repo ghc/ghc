@@ -1490,7 +1490,8 @@ static void postTickyCounterDef(EventsBuf *eb, StgEntCounter *p)
     ensureRoomForVariableEvent(eb, len);
     postEventHeader(eb, EVENT_TICKY_COUNTER_DEF);
     postPayloadSize(eb, len);
-    postWord64(eb, (uint64_t) p);
+
+    postWord64(eb, (uint64_t)((uintptr_t) p));
     postWord16(eb, (uint16_t) p->arity);
     postString(eb, p->arg_kinds);
     postString(eb, p->str);
@@ -1514,7 +1515,7 @@ static void postTickyCounterSample(EventsBuf *eb, StgEntCounter *p)
 
     ensureRoomForEvent(eb, EVENT_TICKY_COUNTER_SAMPLE);
     postEventHeader(eb, EVENT_TICKY_COUNTER_SAMPLE);
-    postWord64(eb, (uint64_t) p);
+    postWord64(eb, (uint64_t)((uintptr_t) p));
     postWord64(eb, p->entry_count);
     postWord64(eb, p->allocs);
     postWord64(eb, p->allocd);
