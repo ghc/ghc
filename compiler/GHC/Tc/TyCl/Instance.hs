@@ -1869,7 +1869,7 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
         -- we want to print out the full source code if there's an error
         -- because otherwise the user won't see the code at all
     add_meth_ctxt thing
-      | is_derived = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys) thing
+      | is_derived = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys) (setDeriving thing)
       | otherwise  = thing
 
 tcMethodBodyHelp :: HsSigFun -> Id -> TcId
@@ -2087,7 +2087,7 @@ mkDefMethBind dfun_id clas sel_id dm_name
        -- See Note [Default methods in instances]
 
 ----------------------
-derivBindCtxt :: Id -> Class -> [Type ] -> SDoc
+derivBindCtxt :: Id -> Class -> [Type] -> SDoc
 derivBindCtxt sel_id clas tys
    = vcat [ text "When typechecking the code for" <+> quotes (ppr sel_id)
           , nest 2 (text "in a derived instance for"
