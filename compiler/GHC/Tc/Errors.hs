@@ -66,7 +66,7 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
 
-import Control.Monad    ( when )
+import Control.Monad    ( when, unless )
 import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 
@@ -596,8 +596,13 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
     report1 = [ ("custom_error", unblocked is_user_type_error, True,  mkUserTypeErrorReporter)
-
-              , given_eq_spec
+              , -- See Note [Given warnings]
+                -- Don't bother doing this if -Winaccessible-code isn't enabled.
+                -- See Note [Avoid -Winaccessible-code when deriving] in GHC.Tc.TyCl.Instance.
+                -- False means don't suppress subsequent errors, because these are warnings anyway.
+                if any ic_warn_inaccessible (cec_encl ctxt)
+                   then ("insoluble1a", is_given_eq, False, mkGivenWarningReporter)
+                   else ("insoluble1b", is_given_eq, False, ignoreGivenWarningReporter)
               , ("insoluble2",   unblocked utterly_wrong,  True, mkGroupReporter mkEqErr)
               , ("skolem eq1",   unblocked very_wrong,     True, mkSkolReporter)
               , ("skolem eq2",   unblocked skolem_eq,      True, mkSkolReporter)
@@ -663,29 +668,6 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
 
     is_irred _ (IrredPred {}) = True
     is_irred _ _              = False
-
-    given_eq_spec  -- See Note [Given errors]
-      | has_gadt_match (cec_encl ctxt)
-      = ("insoluble1a", is_given_eq, True,  mkGivenErrorReporter)
-      | otherwise
-      = ("insoluble1b", is_given_eq, False, ignoreErrorReporter)
-          -- False means don't suppress subsequent errors
-          -- Reason: we don't report all given errors
-          --         (see mkGivenErrorReporter), and we should only suppress
-          --         subsequent errors if we actually report this one!
-          --         #13446 is an example
-
-    -- See Note [Given errors]
-    has_gadt_match [] = False
-    has_gadt_match (implic : implics)
-      | PatSkol {} <- ic_info implic
-      , not (ic_no_eqs implic)
-      , ic_warn_inaccessible implic
-          -- Don't bother doing this if -Winaccessible-code isn't enabled.
-          -- See Note [Avoid -Winaccessible-code when deriving] in GHC.Tc.TyCl.Instance.
-      = True
-      | otherwise
-      = has_gadt_match implics
 
 ---------------
 isSkolemTy :: TcLevel -> Type -> Bool
@@ -754,13 +736,13 @@ mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                             Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
 
 
-mkGivenErrorReporter :: Reporter
--- See Note [Given errors]
-mkGivenErrorReporter ctxt cts
+mkGivenWarningReporter :: Reporter
+-- See Note [Given warnings]
+mkGivenWarningReporter ctxt cts
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
        ; dflags <- getDynFlags
        ; let (implic:_) = cec_encl ctxt
-                 -- Always non-empty when mkGivenErrorReporter is called
+                 -- Always non-empty when mkGivenWarningReporter is called
              ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))
                    -- For given constraints we overwrite the env (and hence src-loc)
                    -- with one from the immediately-enclosing implication.
@@ -773,21 +755,23 @@ mkGivenErrorReporter ctxt cts
 
        ; err <- mkEqErr_help dflags ctxt report ct' ty1 ty2
 
-       ; traceTc "mkGivenErrorReporter" (ppr ct)
-       ; reportWarning (Reason Opt_WarnInaccessibleCode) err }
+       ; traceTc "mkGivenWarningReporter" (ppr ct)
+       ; unless (tcl_deriving (ctLocEnv (ctLoc ct))) $
+           reportWarning (Reason Opt_WarnInaccessibleCode) err
+       }
   where
     (ct : _ )  = cts    -- Never empty
     (ty1, ty2) = getEqPredTys (ctPred ct)
 
-ignoreErrorReporter :: Reporter
+ignoreGivenWarningReporter :: Reporter
 -- Discard Given errors that don't come from
 -- a pattern match; maybe we should warn instead?
-ignoreErrorReporter ctxt cts
-  = do { traceTc "mkGivenErrorReporter no" (ppr cts $$ ppr (cec_encl ctxt))
+ignoreGivenWarningReporter ctxt cts
+  = do { traceTc "mkGivenWarningReporter no" (ppr cts $$ ppr (cec_encl ctxt))
        ; return () }
 
 
-{- Note [Given errors]
+{- Note [Given warnings]
 ~~~~~~~~~~~~~~~~~~~~~~
 Given constraints represent things for which we have (or will have)
 evidence, so they aren't errors.  But if a Given constraint is
@@ -807,18 +791,25 @@ warn about that.  A classic case is
 We'd like to point out that the T3 match is inaccessible. It
 will have a Given constraint [G] Int ~ Bool.
 
-But we don't want to report ALL insoluble Given constraints.  See Trac
-#12466 for a long discussion.  For example, if we aren't careful
-we'll complain about
-   f :: ((Int ~ Bool) => a -> a) -> Int
-which arguably is OK.  It's more debatable for
-   g :: (Int ~ Bool) => Int -> Int
-but it's tricky to distinguish these cases so we don't report
-either.
+It's possible that we now over-report some Given constraints.
 
-The bottom line is this: has_gadt_match looks for an enclosing
-pattern match which binds some equality constraints.  If we
-find one, we report the insoluble Given.
+For example, consider the following two functions:
+   f :: (Int ~ Bool) => Int -> Int
+   g :: ((Int ~ Bool) => a -> a) -> Int
+While f cannot be used at all, and essentially must be dead code,
+the function g could be used, as it only requires a function which
+demands an absurd premise. That is, f requires something that is
+impossible, while g merely requires something that is unnecessary.
+
+However, it's tricky to distinguish these two cases due to the way
+that the constraint solver is written. Since this is now just a
+warning though, little harm should be caused by reporting it in
+all cases.
+
+See Trac #12466 for a long discussion in the context when this was
+still an error. In Trac #11066 it became a warning only. In
+discussing issue #17543, it was found that we would like the warning
+in a broader range of cases again.
 -}
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
@@ -1374,7 +1365,7 @@ mkEqErr _ [] = panic "mkEqErr"
 
 mkEqErr1 :: ReportErrCtxt -> Ct -> TcM ErrMsg
 mkEqErr1 ctxt ct   -- Wanted or derived;
-                   -- givens handled in mkGivenErrorReporter
+                   -- givens handled in mkGivenWarningReporter
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
        ; rdr_env <- getGlobalRdrEnv
        ; fam_envs <- tcGetFamInstEnvs

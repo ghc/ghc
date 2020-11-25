@@ -763,12 +763,15 @@ expression, to print a different context line or skip one
 altogether.
 
 Whenever we 'setSrcSpan' a 'generatedSrcSpan', we update a field in
-TcLclEnv called 'tcl_in_gen_code', setting it to True, which indicates that we
-entered generated code, i.e code fabricated by the compiler when rebinding some
-syntax. If someone tries to push some error context line while that field is set
-to True, the pushing won't actually happen and the context line is just dropped.
+TcLclEnv called 'tcl_provenance', setting it to RebindableSyntaxCP, which
+indicates that we entered generated code, i.e code fabricated by the compiler
+when rebinding some syntax. The function tcl_rebindable_syntax will produce True
+when this is the case. If someone tries to push some error context line
+while that field is set to RebindableSyntaxCP, the pushing won't actually
+happen and the context line is just dropped.
+
 Once we 'setSrcSpan' a real span (for an expression that was in the original
-source code), we set 'tcl_in_gen_code' back to False, indicating that we
+source code), we set 'tcl_provenance' back to whatever it was prior, indicating that we
 "emerged from the generated code tunnel", and that the expressions we will be
 processing are relevant to report in context lines again.
 
