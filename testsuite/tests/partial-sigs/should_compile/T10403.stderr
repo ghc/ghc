@@ -1,6 +1,6 @@
 
 T10403.hs:15:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Functor f’
+    • Found extra-constraints wildcard standing for ‘Functor f’
       Where: ‘f’ is a rigid type variable bound by
                the inferred type of h1 :: Functor f => (a -> a1) -> f a -> H f
                at T10403.hs:17:1-41

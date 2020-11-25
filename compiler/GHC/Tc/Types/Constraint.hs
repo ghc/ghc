@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -9,12 +9,12 @@ module GHC.Tc.Types.Constraint (
         QCInst(..), isPendingScInst,
 
         -- Canonical constraints
-        Xi, Ct(..), Cts, CtIrredStatus(..), emptyCts, andCts, andManyCts, pprCts,
+        Xi, Ct(..), Cts, CtIrredStatus(..), HoleSet,
+        emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
-        isEmptyCts, isCTyEqCan, isCFunEqCan,
+        isEmptyCts,
         isPendingScDict, superClassesMightHelp, getPendingWantedScs,
-        isCDictCan_Maybe, isCFunEqCan_maybe,
-        isCNonCanonical, isWantedCt, isDerivedCt, isGivenCt,
+        isWantedCt, isDerivedCt, isGivenCt,
         isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         ctEvId, mkTcEqPredLikeEv,
@@ -24,6 +24,9 @@ module GHC.Tc.Types.Constraint (
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
+
+        CanEqLHS(..), canEqLHS_maybe, canEqLHSKind, canEqLHSType,
+        eqCanEqLHS,
 
         Hole(..), HoleSort(..), isOutOfScopeHole,
 
@@ -37,6 +40,7 @@ module GHC.Tc.Types.Constraint (
 
         Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
+        HasGivenEqs(..),
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
@@ -48,7 +52,7 @@ module GHC.Tc.Types.Constraint (
         -- CtEvidence
         CtEvidence(..), TcEvDest(..),
         mkKindLoc, toKindLoc, mkGivenLoc,
-        isWanted, isGiven, isDerived, isGivenOrWDeriv,
+        isWanted, isGiven, isDerived,
         ctEvRole,
 
         wrapType,
@@ -57,7 +61,6 @@ module GHC.Tc.Types.Constraint (
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
         eqCanRewrite, eqCanRewriteFR, eqMayRewriteFR,
         eqCanDischargeFR,
-        funEqCanDischarge, funEqCanDischargeF,
 
         -- Pretty printing
         pprEvVarTheta,
@@ -100,6 +103,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 
 import Control.Monad ( msum )
+import qualified Data.Semigroup ( (<>) )
 
 {-
 ************************************************************************
@@ -109,28 +113,54 @@ import Control.Monad ( msum )
 *   These are the constraints the low-level simplifier works with      *
 *                                                                      *
 ************************************************************************
+
+Note [CEqCan occurs check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+A CEqCan relates a CanEqLHS (a type variable or type family applications) on
+its left to an arbitrary type on its right. It is used for rewriting, in the
+flattener. Because it is used for rewriting, it would be disastrous if the RHS
+were to mention the LHS: this would cause a loop in rewriting.
+
+We thus perform an occurs-check. There is, of course, some subtlety:
+
+* For type variables, the occurs-check looks deeply. This is because
+  a CEqCan over a meta-variable is also used to inform unification,
+  in GHC.Tc.Solver.Interact.solveByUnification. If the LHS appears
+  anywhere, at all, in the RHS, unification will create an infinite
+  structure, which is bad.
+
+* For type family applications, the occurs-check is shallow; it looks
+  only in places where we might rewrite. (Specifically, it does not
+  look in kinds or coercions.) An occurrence of the LHS in, say, an
+  RHS coercion is OK, as we do not rewrite in coercions. No loop to
+  be found.
+
+  You might also worry about the possibility that a type family
+  application LHS doesn't exactly appear in the RHS, but something
+  that reduces to the LHS does. Yet that can't happen: the RHS is
+  already inert, with all type family redexes reduced. So a simple
+  syntactic check is just fine.
+
+The occurs check is performed in GHC.Tc.Utils.Unify.checkTypeEq.
+
 -}
 
--- The syntax of xi (ξ) types:
--- xi ::= a | T xis | xis -> xis | ... | forall a. tau
--- Two important notes:
---      (i) No type families, unless we are under a ForAll
---      (ii) Note that xi types can contain unexpanded type synonyms;
---           however, the (transitive) expansions of those type synonyms
---           will not contain any type functions, unless we are under a ForAll.
--- We enforce the structure of Xi types when we flatten (GHC.Tc.Solver.Canonical)
-
-type Xi = Type       -- In many comments, "xi" ranges over Xi
+-- | A 'Xi'-type is one that has been fully rewritten with respect
+-- to the inert set; that is, it has been flattened by the algorithm
+-- in GHC.Tc.Solver.Flatten. (Historical note: 'Xi', for years and years,
+-- meant that a type was type-family-free. It does *not* mean this
+-- any more.)
+type Xi = TcType
 
 type Cts = Bag Ct
 
 data Ct
   -- Atomic canonical constraints
-  = CDictCan {  -- e.g.  Num xi
+  = CDictCan {  -- e.g.  Num ty
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
 
       cc_class  :: Class,
-      cc_tyargs :: [Xi],   -- cc_tyargs are function-free, hence Xi
+      cc_tyargs :: [Xi],   -- cc_tyargs are rewritten w.r.t. inerts, so Xi
 
       cc_pend_sc :: Bool   -- See Note [The superclass story] in GHC.Tc.Solver.Canonical
                            -- True <=> (a) cc_class has superclasses
@@ -144,8 +174,7 @@ data Ct
 
         -- For the might-be-soluble case, the ctev_pred of the evidence is
         -- of form   (tv xi1 xi2 ... xin)   with a tyvar at the head
-        --      or   (tv1 ~ ty2)   where the CTyEqCan  kind invariant (TyEq:K) fails
-        --      or   (F tys ~ ty)  where the CFunEqCan kind invariant fails
+        --      or   (lhs1 ~ ty2)  where the CEqCan    kind invariant (TyEq:K) fails
         -- See Note [CIrredCan constraints]
 
         -- The definitely-insoluble case is for things like
@@ -153,48 +182,30 @@ data Ct
         --    a ~ [a]         occurs check
     }
 
-  | CTyEqCan {  -- tv ~ rhs
+  | CEqCan {  -- CanEqLHS ~ rhs
        -- Invariants:
        --   * See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.Monad
-       --   * (TyEq:OC) tv not in deep tvs(rhs)   (occurs check)
-       --   * (TyEq:F) If tv is a TauTv, then rhs has no foralls
+       --   * Many are checked in checkTypeEq in GHC.Tc.Utils.Unify
+       --   * (TyEq:OC) lhs does not occur in rhs (occurs check)
+       --               Note [CEqCan occurs check]
+       --   * (TyEq:F) rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
-       --   * (TyEq:K) tcTypeKind ty `tcEqKind` tcTypeKind tv; Note [Ct kind invariant]
-       --   * (TyEq:AFF) rhs (perhaps under the one cast) is *almost function-free*,
-       --       See Note [Almost function-free]
+       --   * (TyEq:K) tcTypeKind lhs `tcEqKind` tcTypeKind rhs; Note [Ct kind invariant]
        --   * (TyEq:N) If the equality is representational, rhs has no top-level newtype
-       --     See Note [No top-level newtypes on RHS of representational
-       --     equalities] in GHC.Tc.Solver.Canonical
-       --   * (TyEq:TV) If rhs (perhaps under the cast) is also a tv, then it is oriented
+       --     See Note [No top-level newtypes on RHS of representational equalities]
+       --     in GHC.Tc.Solver.Canonical. (Applies only when constructor of newtype is
+       --     in scope.)
+       --   * (TyEq:TV) If rhs (perhaps under a cast) is also CanEqLHS, then it is oriented
        --     to give best chance of
        --     unification happening; eg if rhs is touchable then lhs is too
-       --     See "GHC.Tc.Solver.Canonical" Note [Canonical orientation for tyvar/tyvar equality constraints]
-       --   * (TyEq:H) The RHS has no blocking coercion holes. See "GHC.Tc.Solver.Canonical"
+       --     Note [TyVar/TyVar orientation] in GHC.Tc.Utils.Unify
+       --   * (TyEq:H) The RHS has no blocking coercion holes. See GHC.Tc.Solver.Canonical
        --     Note [Equalities with incompatible kinds], wrinkle (2)
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
-      cc_tyvar  :: TcTyVar,
-      cc_rhs    :: TcType,     -- Not necessarily function-free (hence not Xi)
-                               -- See invariants above
+      cc_lhs    :: CanEqLHS,
+      cc_rhs    :: Xi,         -- See invariants above
 
       cc_eq_rel :: EqRel       -- INVARIANT: cc_eq_rel = ctEvEqRel cc_ev
-    }
-
-  | CFunEqCan {  -- F xis ~ fsk
-       -- Invariants:
-       --   * isTypeFamilyTyCon cc_fun
-       --   * tcTypeKind (F xis) = tyVarKind fsk; Note [Ct kind invariant]
-       --   * always Nominal role
-      cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
-      cc_fun    :: TyCon,       -- A type function
-
-      cc_tyargs :: [Xi],        -- cc_tyargs are function-free (hence Xi)
-        -- Either under-saturated or exactly saturated
-        --    *never* over-saturated (because if so
-        --    we should have decomposed)
-
-      cc_fsk    :: TcTyVar  -- [G]  always a FlatSkolTv
-                            -- [W], [WD], or [D] always a FlatMetaTv
-        -- See Note [The flattening story] in GHC.Tc.Solver.Flatten
     }
 
   | CNonCanonical {        -- See Note [NonCanonical Semantics] in GHC.Tc.Solver.Monad
@@ -205,6 +216,18 @@ data Ct
       -- NB: I expect to make more of the cases in Ct
       --     look like this, with the payload in an
       --     auxiliary type
+
+------------
+-- | A 'CanEqLHS' is a type that can appear on the left of a canonical
+-- equality: a type variable or exactly-saturated type family application.
+data CanEqLHS
+  = TyVarLHS TcTyVar
+  | TyFamLHS TyCon  -- ^ of the family
+             [Xi]   -- ^ exactly saturating the family
+
+instance Outputable CanEqLHS where
+  ppr (TyVarLHS tv)              = ppr tv
+  ppr (TyFamLHS fam_tc fam_args) = ppr (mkTyConApp fam_tc fam_args)
 
 ------------
 data QCInst  -- A much simplified version of ClsInst
@@ -247,35 +270,44 @@ data HoleSort = ExprHole Id
                  -- will be an erroring expression for -fdefer-type-errors.
               | TypeHole
                  -- ^ A hole in a type (PartialTypeSignatures)
+              | ConstraintHole
+                 -- ^ A hole in a constraint, like @f :: (_, Eq a) => ...
+                 -- Differentiated from TypeHole because a ConstraintHole
+                 -- is simplified differently. See
+                 -- Note [Do not simplify ConstraintHoles] in GHC.Tc.Solver.
 
 instance Outputable Hole where
   ppr (Hole { hole_sort = ExprHole id
             , hole_occ  = occ
             , hole_ty   = ty })
     = parens $ (braces $ ppr occ <> colon <> ppr id) <+> dcolon <+> ppr ty
-  ppr (Hole { hole_sort = TypeHole
+  ppr (Hole { hole_sort = _other
             , hole_occ  = occ
             , hole_ty   = ty })
     = braces $ ppr occ <> colon <> ppr ty
 
 instance Outputable HoleSort where
-  ppr (ExprHole id) = text "ExprHole:" <> ppr id
-  ppr TypeHole      = text "TypeHole"
+  ppr (ExprHole id)  = text "ExprHole:" <> ppr id
+  ppr TypeHole       = text "TypeHole"
+  ppr ConstraintHole = text "CosntraintHole"
 
 ------------
 -- | Used to indicate extra information about why a CIrredCan is irreducible
 data CtIrredStatus
   = InsolubleCIS   -- this constraint will never be solved
-  | BlockedCIS     -- this constraint is blocked on a coercion hole
-                   -- The hole will appear in the ctEvPred of the constraint with this status
-                   -- See Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
-                   -- Wrinkle (4a)
+  | BlockedCIS HoleSet
+                   -- this constraint is blocked on the coercion hole(s) listed
+                   -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+                   -- Wrinkle (4a). Why store the HoleSet? See Wrinkle (2a) of that
+                   -- same Note.
+                   -- INVARIANT: A BlockedCIS is a homogeneous equality whose
+                   --   left hand side can fit in a CanEqLHS.
   | OtherCIS
 
 instance Outputable CtIrredStatus where
-  ppr InsolubleCIS = text "(insoluble)"
-  ppr BlockedCIS   = text "(blocked)"
-  ppr OtherCIS     = text "(soluble)"
+  ppr InsolubleCIS       = text "(insoluble)"
+  ppr (BlockedCIS holes) = parens (text "blocked on" <+> ppr holes)
+  ppr OtherCIS           = text "(soluble)"
 
 {- Note [CIrredCan constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -308,60 +340,10 @@ during constraint solving. See Note [Evidence field of CtEvidence].
 
 Note [Ct kind invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-CTyEqCan and CFunEqCan both require that the kind of the lhs matches the kind
-of the rhs. This is necessary because both constraints are used for substitutions
+CEqCan requires that the kind of the lhs matches the kind
+of the rhs. This is necessary because these constraints are used for substitutions
 during solving. If the kinds differed, then the substitution would take a well-kinded
 type to an ill-kinded one.
-
-Note [Almost function-free]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A type is *almost function-free* if it has no type functions (something that
-responds True to isTypeFamilyTyCon), except (possibly)
- * under a forall, or
- * in a coercion (either in a CastTy or a CercionTy)
-
-The RHS of a CTyEqCan must be almost function-free, invariant (TyEq:AFF).
-This is for two reasons:
-
-1. There cannot be a top-level function. If there were, the equality should
-   really be a CFunEqCan, not a CTyEqCan.
-
-2. Nested functions aren't too bad, on the other hand. However, consider this
-   scenario:
-
-     type family F a = r | r -> a
-
-     [D] F ty1 ~ fsk1
-     [D] F ty2 ~ fsk2
-     [D] fsk1 ~ [G Int]
-     [D] fsk2 ~ [G Bool]
-
-     type instance G Int = Char
-     type instance G Bool = Char
-
-   If it was the case that fsk1 = fsk2, then we could unifty ty1 and ty2 --
-   good! They don't look equal -- but if we aggressively reduce that G Int and
-   G Bool they would become equal. The "almost function free" makes sure that
-   these redexes are exposed.
-
-   Note that this equality does *not* depend on casts or coercions, and so
-   skipping these forms is OK. In addition, the result of a type family cannot
-   be a polytype, so skipping foralls is OK, too. We skip foralls because we
-   want the output of the flattener to be almost function-free. See Note
-   [Flattening under a forall] in GHC.Tc.Solver.Flatten.
-
-   As I (Richard E) write this, it is unclear if the scenario pictured above
-   can happen -- I would expect the G Int and G Bool to be reduced. But
-   perhaps it can arise somehow, and maintaining almost function-free is cheap.
-
-Historical note: CTyEqCans used to require only condition (1) above: that no
-type family was at the top of an RHS. But work on #16512 suggested that the
-injectivity checks were not complete, and adding the requirement that functions
-do not appear even in a nested fashion was easy (it was already true, but
-unenforced).
-
-The almost-function-free property is checked by isAlmostFunctionFree in GHC.Tc.Utils.TcType.
-The flattener (in GHC.Tc.Solver.Flatten) produces types that are almost function-free.
 
 Note [Holes]
 ~~~~~~~~~~~~
@@ -377,10 +359,7 @@ user describing the bit that is left out.
 When a hole is encountered, a new entry of type Hole is added to the ambient
 WantedConstraints. The type (hole_ty) of the hole is then simplified during
 solving (with respect to any Givens in surrounding implications). It is
-reported with all the other errors in GHC.Tc.Errors. No type family reduction
-is done on hole types; this is purely because we think it will produce
-better error messages not to reduce type families. This is why the
-GHC.Tc.Solver.Flatten.flattenType function uses FM_SubstOnly.
+reported with all the other errors in GHC.Tc.Errors.
 
 For expression holes, the user has the option of deferring errors until runtime
 with -fdefer-type-errors. In this case, the hole actually has evidence: this
@@ -459,8 +438,7 @@ instance Outputable Ct where
   ppr ct = ppr (ctEvidence ct) <+> parens pp_sort
     where
       pp_sort = case ct of
-         CTyEqCan {}      -> text "CTyEqCan"
-         CFunEqCan {}     -> text "CFunEqCan"
+         CEqCan {}        -> text "CEqCan"
          CNonCanonical {} -> text "CNonCanonical"
          CDictCan { cc_pend_sc = pend_sc }
             | pend_sc   -> text "CDictCan(psc)"
@@ -469,6 +447,40 @@ instance Outputable Ct where
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
             | otherwise -> text "CQuantCan"
+
+-----------------------------------
+-- | Is a type a canonical LHS? That is, is it a tyvar or an exactly-saturated
+-- type family application?
+-- Does not look through type synonyms.
+canEqLHS_maybe :: Xi -> Maybe CanEqLHS
+canEqLHS_maybe xi
+  | Just tv <- tcGetTyVar_maybe xi
+  = Just $ TyVarLHS tv
+
+  | Just (tc, args) <- tcSplitTyConApp_maybe xi
+  , isTypeFamilyTyCon tc
+  , args `lengthIs` tyConArity tc
+  = Just $ TyFamLHS tc args
+
+  | otherwise
+  = Nothing
+
+-- | Convert a 'CanEqLHS' back into a 'Type'
+canEqLHSType :: CanEqLHS -> TcType
+canEqLHSType (TyVarLHS tv) = mkTyVarTy tv
+canEqLHSType (TyFamLHS fam_tc fam_args) = mkTyConApp fam_tc fam_args
+
+-- | Retrieve the kind of a 'CanEqLHS'
+canEqLHSKind :: CanEqLHS -> TcKind
+canEqLHSKind (TyVarLHS tv) = tyVarKind tv
+canEqLHSKind (TyFamLHS fam_tc fam_args) = piResultTys (tyConKind fam_tc) fam_args
+
+-- | Are two 'CanEqLHS's equal?
+eqCanEqLHS :: CanEqLHS -> CanEqLHS -> Bool
+eqCanEqLHS (TyVarLHS tv1) (TyVarLHS tv2) = tv1 == tv2
+eqCanEqLHS (TyFamLHS fam_tc1 fam_args1) (TyFamLHS fam_tc2 fam_args2)
+  = tcEqTyConApps fam_tc1 fam_args1 fam_tc2 fam_args2
+eqCanEqLHS _ _ = False
 
 {-
 ************************************************************************
@@ -704,26 +716,6 @@ isGivenCt = isGiven . ctEvidence
 
 isDerivedCt :: Ct -> Bool
 isDerivedCt = isDerived . ctEvidence
-
-isCTyEqCan :: Ct -> Bool
-isCTyEqCan (CTyEqCan {})  = True
-isCTyEqCan _              = False
-
-isCDictCan_Maybe :: Ct -> Maybe Class
-isCDictCan_Maybe (CDictCan {cc_class = cls })  = Just cls
-isCDictCan_Maybe _              = Nothing
-
-isCFunEqCan_maybe :: Ct -> Maybe (TyCon, [Type])
-isCFunEqCan_maybe (CFunEqCan { cc_fun = tc, cc_tyargs = xis }) = Just (tc, xis)
-isCFunEqCan_maybe _ = Nothing
-
-isCFunEqCan :: Ct -> Bool
-isCFunEqCan (CFunEqCan {}) = True
-isCFunEqCan _ = False
-
-isCNonCanonical :: Ct -> Bool
-isCNonCanonical (CNonCanonical {}) = True
-isCNonCanonical _ = False
 
 {- Note [Custom type errors in constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1116,8 +1108,7 @@ data Implication
                                  --   (order does not matter)
                                  -- See Invariant (GivenInv) in GHC.Tc.Utils.TcType
 
-      ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
-                                 -- False <=> ic_givens might have equalities
+      ic_given_eqs :: HasGivenEqs,  -- Are there Given equalities here?
 
       ic_warn_inaccessible :: Bool,
                                  -- True  <=> -Winaccessible-code is enabled
@@ -1164,7 +1155,7 @@ implicationPrototype
             , ic_skols      = []
             , ic_given      = []
             , ic_wanted     = emptyWC
-            , ic_no_eqs     = False
+            , ic_given_eqs  = MaybeGivenEqs
             , ic_status     = IC_Unsolved
             , ic_need_inner = emptyVarSet
             , ic_need_outer = emptyVarSet }
@@ -1181,9 +1172,47 @@ data ImplicStatus
 
   | IC_Unsolved   -- Neither of the above; might go either way
 
+-- | Does this implication have Given equalities?
+-- See Note [When does an implication have given equalities?] in GHC.Tc.Solver.Monad,
+-- which also explains why we need three options here. Also, see
+-- Note [Suppress redundant givens during error reporting] in GHC.Tc.Errors
+--
+--                  Stops floating  |   Suppresses Givens in errors
+--                  -----------------------------------------------
+--  NoGivenEqs         NO           |         YES
+--  LocalGivenEqs      NO           |         NO
+--  MaybeGivenEqs      YES          |         NO
+--
+-- Examples:
+--
+--  NoGivenEqs:      Eq a => ...
+--                   (Show a, Num a) => ...
+--                   forall a. a ~ Either Int Bool => ...
+--                      See Note [Let-bound skolems] in GHC.Tc.Solver.Monad for
+--                      that last one
+--
+--  LocalGivenEqs:   forall a b. F a ~ G b => ...
+--                   forall a. F a ~ Int => ...
+--
+--  MaybeGivenEqs:   (a ~ b) => ...
+--                   forall a. F a ~ b => ...
+--
+-- The check is conservative. A MaybeGivenEqs might not have any equalities.
+-- A LocalGivenEqs might local equalities, but it definitely does not have non-local
+-- equalities. A NoGivenEqs definitely does not have equalities (except let-bound
+-- skolems).
+data HasGivenEqs
+  = NoGivenEqs      -- definitely no given equalities,
+                    -- except by Note [Let-bound skolems] in GHC.Tc.Solver.Monad
+  | LocalGivenEqs   -- might have Given equalities that affect only local skolems
+                    -- e.g. forall a b. (a ~ F b) => ...; definitely no others
+  | MaybeGivenEqs   -- might have any kind of Given equalities; no floating out
+                    -- is possible.
+  deriving Eq
+
 instance Outputable Implication where
   ppr (Implic { ic_tclvl = tclvl, ic_skols = skols
-              , ic_given = given, ic_no_eqs = no_eqs
+              , ic_given = given, ic_given_eqs = given_eqs
               , ic_wanted = wanted, ic_status = status
               , ic_binds = binds
               , ic_need_inner = need_in, ic_need_outer = need_out
@@ -1191,7 +1220,7 @@ instance Outputable Implication where
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
                , text "Skolems =" <+> pprTyVars skols
-               , text "No-eqs =" <+> ppr no_eqs
+               , text "Given-eqs =" <+> ppr given_eqs
                , text "Status =" <+> ppr status
                , hang (text "Given =")  2 (pprEvVars given)
                , hang (text "Wanted =") 2 (ppr wanted)
@@ -1211,6 +1240,25 @@ checkTelescopeSkol :: SkolemInfo -> Bool
 -- See Note [Checking telescopes]
 checkTelescopeSkol (ForAllSkol {}) = True
 checkTelescopeSkol _               = False
+
+instance Outputable HasGivenEqs where
+  ppr NoGivenEqs    = text "NoGivenEqs"
+  ppr LocalGivenEqs = text "LocalGivenEqs"
+  ppr MaybeGivenEqs = text "MaybeGivenEqs"
+
+-- Used in GHC.Tc.Solver.Monad.getHasGivenEqs
+instance Semigroup HasGivenEqs where
+  NoGivenEqs <> other = other
+  other <> NoGivenEqs = other
+
+  MaybeGivenEqs <> _other = MaybeGivenEqs
+  _other <> MaybeGivenEqs = MaybeGivenEqs
+
+  LocalGivenEqs <> LocalGivenEqs = LocalGivenEqs
+
+-- Used in GHC.Tc.Solver.Monad.getHasGivenEqs
+instance Monoid HasGivenEqs where
+  mempty = NoGivenEqs
 
 {- Note [Checking telescopes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1420,7 +1468,7 @@ data TcEvDest
 
   | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence
               -- HoleDest is always used for type-equalities
-              -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep"
+              -- See Note [Coercion holes] in GHC.Core.TyCo.Rep
 
 data CtEvidence
   = CtGiven    -- Truly given, not depending on subgoals
@@ -1536,9 +1584,7 @@ Constraints come in four flavours:
 
 * [WD] Wanted WDeriv: a single constraint that represents
                       both [W] and [D]
-  We keep them paired as one both for efficiency, and because
-  when we have a finite map  F tys -> CFunEqCan, it's inconvenient
-  to have two CFunEqCans in the range
+  We keep them paired as one both for efficiency
 
 The ctev_nosh field of a Wanted distinguishes between [W] and [WD]
 
@@ -1560,11 +1606,6 @@ data ShadowInfo
   | WOnly    -- [W] It has a separate derived shadow
              -- See Note [The improvement story and derived shadows] in GHC.Tc.Solver.Monad
   deriving( Eq )
-
-isGivenOrWDeriv :: CtFlavour -> Bool
-isGivenOrWDeriv Given           = True
-isGivenOrWDeriv (Wanted WDeriv) = True
-isGivenOrWDeriv _               = False
 
 instance Outputable CtFlavour where
   ppr Given           = text "[G]"
@@ -1591,17 +1632,15 @@ ctFlavourRole :: Ct -> CtFlavourRole
 -- Uses short-cuts to role for special cases
 ctFlavourRole (CDictCan { cc_ev = ev })
   = (ctEvFlavour ev, NomEq)
-ctFlavourRole (CTyEqCan { cc_ev = ev, cc_eq_rel = eq_rel })
+ctFlavourRole (CEqCan { cc_ev = ev, cc_eq_rel = eq_rel })
   = (ctEvFlavour ev, eq_rel)
-ctFlavourRole (CFunEqCan { cc_ev = ev })
-  = (ctEvFlavour ev, NomEq)
 ctFlavourRole ct
   = ctEvFlavourRole (ctEvidence ct)
 
 {- Note [eqCanRewrite]
 ~~~~~~~~~~~~~~~~~~~~~~
-(eqCanRewrite ct1 ct2) holds if the constraint ct1 (a CTyEqCan of form
-tv ~ ty) can be used to rewrite ct2.  It must satisfy the properties of
+(eqCanRewrite ct1 ct2) holds if the constraint ct1 (a CEqCan of form
+lhs ~ ty) can be used to rewrite ct2.  It must satisfy the properties of
 a can-rewrite relation, see Definition [Can-rewrite relation] in
 GHC.Tc.Solver.Monad.
 
@@ -1667,47 +1706,11 @@ eqMayRewriteFR (Wanted WDeriv, NomEq) (Wanted WDeriv, NomEq) = True
 eqMayRewriteFR (Derived,       NomEq) (Wanted WDeriv, NomEq) = True
 eqMayRewriteFR fr1 fr2 = eqCanRewriteFR fr1 fr2
 
------------------
-{- Note [funEqCanDischarge]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have two CFunEqCans with the same LHS:
-    (x1:F ts ~ f1) `funEqCanDischarge` (x2:F ts ~ f2)
-Can we drop x2 in favour of x1, either unifying
-f2 (if it's a flatten meta-var) or adding a new Given
-(f1 ~ f2), if x2 is a Given?
-
-Answer: yes if funEqCanDischarge is true.
--}
-
-funEqCanDischarge
-  :: CtEvidence -> CtEvidence
-  -> ( SwapFlag   -- NotSwapped => lhs can discharge rhs
-                  -- Swapped    => rhs can discharge lhs
-     , Bool)      -- True <=> upgrade non-discharded one
-                  --          from [W] to [WD]
--- See Note [funEqCanDischarge]
-funEqCanDischarge ev1 ev2
-  = ASSERT2( ctEvEqRel ev1 == NomEq, ppr ev1 )
-    ASSERT2( ctEvEqRel ev2 == NomEq, ppr ev2 )
-    -- CFunEqCans are all Nominal, hence asserts
-    funEqCanDischargeF (ctEvFlavour ev1) (ctEvFlavour ev2)
-
-funEqCanDischargeF :: CtFlavour -> CtFlavour -> (SwapFlag, Bool)
-funEqCanDischargeF Given           _               = (NotSwapped, False)
-funEqCanDischargeF _               Given           = (IsSwapped,  False)
-funEqCanDischargeF (Wanted WDeriv) _               = (NotSwapped, False)
-funEqCanDischargeF _               (Wanted WDeriv) = (IsSwapped,  True)
-funEqCanDischargeF (Wanted WOnly)  (Wanted WOnly)  = (NotSwapped, False)
-funEqCanDischargeF (Wanted WOnly)  Derived         = (NotSwapped, True)
-funEqCanDischargeF Derived         (Wanted WOnly)  = (IsSwapped,  True)
-funEqCanDischargeF Derived         Derived         = (NotSwapped, False)
-
-
 {- Note [eqCanDischarge]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have two identical CTyEqCan equality constraints
+Suppose we have two identical CEqCan equality constraints
 (i.e. both LHS and RHS are the same)
-      (x1:a~t) `eqCanDischarge` (xs:a~t)
+      (x1:lhs~t) `eqCanDischarge` (xs:lhs~t)
 Can we just drop x2 in favour of x1?
 
 Answer: yes if eqCanDischarge is true.

@@ -828,18 +828,22 @@ lookupInstEnv' ie vis_mods cls tys
       = find ms us rest
 
       | otherwise
-      = ASSERT2( tyCoVarsOfTypes tys `disjointVarSet` tpl_tv_set,
+      = ASSERT2( tys_tv_set `disjointVarSet` tpl_tv_set,
                  (ppr cls <+> ppr tys <+> ppr all_tvs) $$
                  (ppr tpl_tvs <+> ppr tpl_tys)
                 )
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
                 -- See Note [Template tyvars are fresh]
-        case tcUnifyTys instanceBindFun tpl_tys tys of
-            Just _   -> find ms (item:us) rest
-            Nothing  -> find ms us        rest
+        case tcUnifyTysFG instanceBindFun tpl_tys tys of
+          -- We consider MaybeApart to be a case where the instance might
+          -- apply in the future. This covers an instance like C Int and
+          -- a target like [W] C (F a), where F is a type family.
+            SurelyApart -> find ms us        rest
+            _           -> find ms (item:us) rest
       where
         tpl_tv_set = mkVarSet tpl_tvs
+        tys_tv_set = tyCoVarsOfTypes tys
 
 ---------------
 -- This is the common way to call this function.
@@ -1023,20 +1027,28 @@ When looking up in the instance environment, or family-instance environment,
 we are careful about multiple matches, as described above in
 Note [Overlapping instances]
 
-The key_tys can contain skolem constants, and we can guarantee that those
+The target tys can contain skolem constants. For existentials and instance variables,
+we can guarantee that those
 are never going to be instantiated to anything, so we should not involve
-them in the unification test.  Example:
+them in the unification test. These are called "super skolems". Example:
         class Foo a where { op :: a -> Int }
         instance Foo a => Foo [a]       -- NB overlap
         instance Foo [Int]              -- NB overlap
         data T = forall a. Foo a => MkT a
         f :: T -> Int
         f (MkT x) = op [x,x]
-The op [x,x] means we need (Foo [a]).  Without the filterVarSet we'd
-complain, saying that the choice of instance depended on the instantiation
-of 'a'; but of course it isn't *going* to be instantiated.
+The op [x,x] means we need (Foo [a]). This `a` will never be instantiated, and
+so it is a super skolem. (See the use of tcInstSuperSkolTyVarsX in
+GHC.Tc.Gen.Pat.tcDataConPat.) Super skolems respond True to
+isOverlappableTyVar, and the use of Skolem in instanceBindFun, above, means
+that these will be treated as fresh constants in the unification algorithm
+during instance lookup. Without this treatment, GHC would complain, saying
+that the choice of instance depended on the instantiation of 'a'; but of
+course it isn't *going* to be instantiated. Note that it is necessary that
+the unification algorithm returns SurelyApart for these super-skolems
+for GHC to be able to commit to another instance.
 
-We do this only for isOverlappableTyVar skolems.  For example we reject
+We do this only for super skolems.  For example we reject
         g :: forall a => [a] -> Int
         g x = op x
 on the grounds that the correct instance depends on the instantiation of 'a'

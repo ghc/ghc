@@ -42,8 +42,7 @@ module GHC.Tc.Utils.TcType (
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
-  isFskTyVar, isFmvTyVar, isFlattenTyVar,
-  isAmbiguousTyVar, metaTyVarRef, metaTyVarInfo,
+  isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar,
@@ -78,14 +77,15 @@ module GHC.Tc.Utils.TcType (
   -- Again, newtypes are opaque
   eqType, eqTypes, nonDetCmpType, nonDetCmpTypes, eqTypeX,
   pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
+  tcEqTyConApps,
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isNaturalTy,
   isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
+  isPredTy, isTyVarClassPred, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
-  isRigidTy, isAlmostFunctionFree,
+  isRigidTy,
 
   ---------------------------------
   -- Misc type manipulators
@@ -107,7 +107,7 @@ module GHC.Tc.Utils.TcType (
 
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
-  anyRewritableTyVar,
+  anyRewritableTyVar, anyRewritableTyFamApp, anyRewritableCanEqLHS,
 
   ---------------------------------
   -- Foreign import and export
@@ -554,29 +554,22 @@ data MetaInfo
                    --   unified with a type, only with a type variable
                    -- See Note [Signature skolems]
 
-   | FlatMetaTv    -- A flatten meta-tyvar
-                   -- It is a meta-tyvar, but it is always untouchable, with level 0
-                   -- See Note [The flattening story] in GHC.Tc.Solver.Flatten
-
-   | FlatSkolTv    -- A flatten skolem tyvar
-                   -- Just like FlatMetaTv, but is completely "owned" by
-                   --   its Given CFunEqCan.
-                   -- It is filled in /only/ by unflattenGivens
-                   -- See Note [The flattening story] in GHC.Tc.Solver.Flatten
-
    | RuntimeUnkTv  -- A unification variable used in the GHCi debugger.
                    -- It /is/ allowed to unify with a polytype, unlike TauTv
+
+   | CycleBreakerTv  -- Used to fix occurs-check problems in Givens
+                     -- See Note [Type variable cycles in Givens] in
+                     -- GHC.Tc.Solver.Canonical
 
 instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
 
 instance Outputable MetaInfo where
-  ppr TauTv         = text "tau"
-  ppr TyVarTv       = text "tyv"
-  ppr FlatMetaTv    = text "fmv"
-  ppr FlatSkolTv    = text "fsk"
-  ppr RuntimeUnkTv  = text "rutv"
+  ppr TauTv          = text "tau"
+  ppr TyVarTv        = text "tyv"
+  ppr RuntimeUnkTv   = text "rutv"
+  ppr CycleBreakerTv = text "cbv"
 
 {- *********************************************************************
 *                                                                      *
@@ -615,7 +608,7 @@ Note [TcLevel and untouchable type variables]
 
 * A unification variable is *touchable* if its level number
   is EQUAL TO that of its immediate parent implication,
-  and it is a TauTv or TyVarTv (but /not/ FlatMetaTv or FlatSkolTv)
+  and it is a TauTv or TyVarTv (but /not/ CycleBreakerTv)
 
 Note [WantedInv]
 ~~~~~~~~~~~~~~~~
@@ -854,27 +847,41 @@ isTyFamFree :: Type -> Bool
 -- ^ Check that a type does not contain any type family applications.
 isTyFamFree = null . tcTyFamInsts
 
-anyRewritableTyVar :: Bool    -- Ignore casts and coercions
-                   -> EqRel   -- Ambient role
-                   -> (EqRel -> TcTyVar -> Bool)
-                   -> TcType -> Bool
--- (anyRewritableTyVar ignore_cos pred ty) returns True
---    if the 'pred' returns True of any free TyVar in 'ty'
+any_rewritable :: Bool    -- Ignore casts and coercions
+               -> EqRel   -- Ambient role
+               -> (EqRel -> TcTyVar -> Bool)           -- check tyvar
+               -> (EqRel -> TyCon -> [TcType] -> Bool) -- check type family
+               -> (TyCon -> Bool)                      -- expand type synonym?
+               -> TcType -> Bool
+-- Checks every tyvar and tyconapp (not including FunTys) within a type,
+-- ORing the results of the predicates above together
 -- Do not look inside casts and coercions if 'ignore_cos' is True
 -- See Note [anyRewritableTyVar must be role-aware]
-anyRewritableTyVar ignore_cos role pred ty
-  = go role emptyVarSet ty
+--
+-- This looks like it should use foldTyCo, but that function is
+-- role-agnostic, and this one must be role-aware. We could make
+-- foldTyCon role-aware, but that may slow down more common usages.
+{-# INLINE any_rewritable #-} -- this allows specialization of predicates
+any_rewritable ignore_cos role tv_pred tc_pred should_expand
+  = go role emptyVarSet
   where
-    -- NB: No need to expand synonyms, because we can find
-    -- all free variables of a synonym by looking at its
-    -- arguments
-
     go_tv rl bvs tv | tv `elemVarSet` bvs = False
-                    | otherwise           = pred rl tv
+                    | otherwise           = tv_pred rl tv
+
+    go rl bvs ty@(TyConApp tc tys)
+      | isTypeSynonymTyCon tc
+      , should_expand tc
+      , Just ty' <- tcView ty   -- should always match
+      = go rl bvs ty'
+
+      | tc_pred rl tc tys
+      = True
+
+      | otherwise
+      = go_tc rl bvs tc tys
 
     go rl bvs (TyVarTy tv)       = go_tv rl bvs tv
     go _ _     (LitTy {})        = False
-    go rl bvs (TyConApp tc tys)  = go_tc rl bvs tc tys
     go rl bvs (AppTy fun arg)    = go rl bvs fun || go NomEq bvs arg
     go rl bvs (FunTy _ w arg res)  = go NomEq bvs arg_rep || go NomEq bvs res_rep ||
                                      go rl bvs arg || go rl bvs res || go NomEq bvs w
@@ -897,6 +904,36 @@ anyRewritableTyVar ignore_cos role pred ty
       | otherwise  = anyVarSet (go_tv rl bvs) (tyCoVarsOfCo co)
       -- We don't have an equivalent of anyRewritableTyVar for coercions
       -- (at least not yet) so take the free vars and test them
+
+anyRewritableTyVar :: Bool     -- Ignore casts and coercions
+                   -> EqRel    -- Ambient role
+                   -> (EqRel -> TcTyVar -> Bool)  -- check tyvar
+                   -> TcType -> Bool
+anyRewritableTyVar ignore_cos role pred
+  = any_rewritable ignore_cos role pred
+      (\ _ _ _ -> False) -- don't check tyconapps
+      (\ _ -> False)     -- don't expand synonyms
+    -- NB: No need to expand synonyms, because we can find
+    -- all free variables of a synonym by looking at its
+    -- arguments
+
+anyRewritableTyFamApp :: EqRel   -- Ambient role
+                      -> (EqRel -> TyCon -> [TcType] -> Bool) -- check tyconapp
+                          -- should return True only for type family applications
+                      -> TcType -> Bool
+  -- always ignores casts & coercions
+anyRewritableTyFamApp role check_tyconapp
+  = any_rewritable True role (\ _ _ -> False) check_tyconapp (not . isFamFreeTyCon)
+
+-- This version is used by shouldSplitWD. It *does* look in casts
+-- and coercions, and it always expands type synonyms whose RHSs mention
+-- type families.
+anyRewritableCanEqLHS :: EqRel   -- Ambient role
+                      -> (EqRel -> TcTyVar -> Bool)            -- check tyvar
+                      -> (EqRel -> TyCon -> [TcType] -> Bool)  -- check type family
+                      -> TcType -> Bool
+anyRewritableCanEqLHS role check_tyvar check_tyconapp
+  = any_rewritable False role check_tyvar check_tyconapp (not . isFamFreeTyCon)
 
 {- Note [anyRewritableTyVar must be role-aware]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -969,7 +1006,7 @@ isTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
 isTouchableMetaTyVar ctxt_tclvl tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   , MetaTv { mtv_tclvl = tv_tclvl, mtv_info = info } <- tcTyVarDetails tv
-  , not (isFlattenInfo info)
+  , isTouchableInfo info
   = ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
              ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl )
     tv_tclvl `sameDepthAs` ctxt_tclvl
@@ -980,7 +1017,7 @@ isFloatedTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
 isFloatedTouchableMetaTyVar ctxt_tclvl tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   , MetaTv { mtv_tclvl = tv_tclvl, mtv_info = info } <- tcTyVarDetails tv
-  , not (isFlattenInfo info)
+  , isTouchableInfo info
   = tv_tclvl `strictlyDeeperThan` ctxt_tclvl
 
   | otherwise = False
@@ -989,8 +1026,7 @@ isImmutableTyVar :: TyVar -> Bool
 isImmutableTyVar tv = isSkolemTyVar tv
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
-  isMetaTyVar, isAmbiguousTyVar,
-  isFmvTyVar, isFskTyVar, isFlattenTyVar :: TcTyVar -> Bool
+  isMetaTyVar, isAmbiguousTyVar, isCycleBreakerTyVar :: TcTyVar -> Bool
 
 isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
@@ -1001,25 +1037,6 @@ isTyConableTyVar tv
         MetaTv { mtv_info = TyVarTv } -> False
         _                             -> True
   | otherwise = True
-
-isFmvTyVar tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
-        MetaTv { mtv_info = FlatMetaTv } -> True
-        _                                -> False
-
-isFskTyVar tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
-        MetaTv { mtv_info = FlatSkolTv } -> True
-        _                                -> False
-
--- | True of both given and wanted flatten-skolems (fmv and fsk)
-isFlattenTyVar tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
-        MetaTv { mtv_info = info } -> isFlattenInfo info
-        _                          -> False
 
 isSkolemTyVar tv
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
@@ -1054,6 +1071,14 @@ isAmbiguousTyVar tv
         _             -> False
   | otherwise = False
 
+isCycleBreakerTyVar tv
+  | isTyVar tv -- See Note [Coercion variables in free variable lists]
+  , MetaTv { mtv_info = CycleBreakerTv } <- tcTyVarDetails tv
+  = True
+
+  | otherwise
+  = False
+
 isMetaTyVarTy :: TcType -> Bool
 isMetaTyVarTy (TyVarTy tv) = isMetaTyVar tv
 isMetaTyVarTy _            = False
@@ -1064,10 +1089,10 @@ metaTyVarInfo tv
       MetaTv { mtv_info = info } -> info
       _ -> pprPanic "metaTyVarInfo" (ppr tv)
 
-isFlattenInfo :: MetaInfo -> Bool
-isFlattenInfo FlatMetaTv = True
-isFlattenInfo FlatSkolTv = True
-isFlattenInfo _          = False
+isTouchableInfo :: MetaInfo -> Bool
+isTouchableInfo info
+  | CycleBreakerTv <- info = False
+  | otherwise              = True
 
 metaTyVarTcLevel :: TcTyVar -> TcLevel
 metaTyVarTcLevel tv
@@ -1540,7 +1565,15 @@ pickyEqType :: TcType -> TcType -> Bool
 -- This ignores kinds and coercions, because this is used only for printing.
 pickyEqType ty1 ty2 = tc_eq_type True False ty1 ty2
 
-
+-- | Check whether two TyConApps are the same; if the number of arguments
+-- are different, just checks the common prefix of arguments.
+tcEqTyConApps :: TyCon -> [Type] -> TyCon -> [Type] -> Bool
+tcEqTyConApps tc1 args1 tc2 args2
+  = tc1 == tc2 &&
+    and (zipWith tcEqTypeNoKindCheck args1 args2)
+    -- No kind check necessary: if both arguments are well typed, then
+    -- any difference in the kinds of later arguments would show up
+    -- as differences in earlier (dependent) arguments
 
 -- | Real worker for 'tcEqType'. No kind check!
 tc_eq_type :: Bool          -- ^ True <=> do not expand type synonyms
@@ -2114,18 +2147,6 @@ is_tc uniq ty = case tcSplitTyConApp_maybe ty of
                         Just (tc, _) -> uniq == getUnique tc
                         Nothing      -> False
 
--- | Does the given tyvar appear at the head of a chain of applications
---     (a t1 ... tn)
-isTyVarHead :: TcTyVar -> TcType -> Bool
-isTyVarHead tv (TyVarTy tv')   = tv == tv'
-isTyVarHead tv (AppTy fun _)   = isTyVarHead tv fun
-isTyVarHead tv (CastTy ty _)   = isTyVarHead tv ty
-isTyVarHead _ (TyConApp {})    = False
-isTyVarHead _  (LitTy {})      = False
-isTyVarHead _  (ForAllTy {})   = False
-isTyVarHead _  (FunTy {})      = False
-isTyVarHead _  (CoercionTy {}) = False
-
 
 {- Note [AppTy and ReprEq]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2146,24 +2167,6 @@ isRigidTy ty
   | isForAllTy ty                           = True
   | otherwise                               = False
 
-
--- | Is this type *almost function-free*? See Note [Almost function-free]
--- in "GHC.Tc.Types"
-isAlmostFunctionFree :: TcType -> Bool
-isAlmostFunctionFree ty | Just ty' <- tcView ty = isAlmostFunctionFree ty'
-isAlmostFunctionFree (TyVarTy {})    = True
-isAlmostFunctionFree (AppTy ty1 ty2) = isAlmostFunctionFree ty1 &&
-                                       isAlmostFunctionFree ty2
-isAlmostFunctionFree (TyConApp tc args)
-  | isTypeFamilyTyCon tc = False
-  | otherwise            = all isAlmostFunctionFree args
-isAlmostFunctionFree (ForAllTy bndr _) = isAlmostFunctionFree (binderType bndr)
-isAlmostFunctionFree (FunTy _ w ty1 ty2) = isAlmostFunctionFree w &&
-                                           isAlmostFunctionFree ty1 &&
-                                           isAlmostFunctionFree ty2
-isAlmostFunctionFree (LitTy {})        = True
-isAlmostFunctionFree (CastTy ty _)     = isAlmostFunctionFree ty
-isAlmostFunctionFree (CoercionTy {})   = True
 
 {-
 ************************************************************************

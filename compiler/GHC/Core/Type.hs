@@ -29,7 +29,7 @@ module GHC.Core.Type (
         mkAppTy, mkAppTys, splitAppTy, splitAppTys, repSplitAppTys,
         splitAppTy_maybe, repSplitAppTy_maybe, tcRepSplitAppTy_maybe,
 
-        mkVisFunTy, mkInvisFunTy,
+        mkFunTy, mkVisFunTy, mkInvisFunTy,
         mkVisFunTys,
         mkVisFunTyMany, mkInvisFunTyMany,
         mkVisFunTysMany, mkInvisFunTysMany,
@@ -155,6 +155,7 @@ module GHC.Core.Type (
         coVarsOfType,
         coVarsOfTypes,
 
+        anyFreeVarsOfType, anyFreeVarsOfTypes,
         noFreeVarsOfType,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
@@ -1343,11 +1344,19 @@ splitTyConApp_maybe = repSplitTyConApp_maybe . coreFullView
 -- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
 -- type before using this function.
 --
+-- This does *not* split types headed with (=>), as that's not a TyCon in the
+-- type-checker.
+--
 -- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
 tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.
 tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
-tcSplitTyConApp_maybe ty                         = repSplitTyConApp_maybe ty
+tcSplitTyConApp_maybe (TyConApp tc tys)          = Just (tc, tys)
+tcSplitTyConApp_maybe (FunTy VisArg w arg res)
+  | Just arg_rep <- getRuntimeRep_maybe arg
+  , Just res_rep <- getRuntimeRep_maybe res
+  = Just (funTyCon, [w, arg_rep, res_rep, arg, res])
+tcSplitTyConApp_maybe _ = Nothing
 
 -------------------
 repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
@@ -1358,7 +1367,7 @@ repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- have enough info to extract the runtime-rep arguments that
 -- the funTyCon requires.  This will usually be true;
 -- but may be temporarily false during canonicalization:
---     see Note [FunTy and decomposing tycon applications] in "GHC.Tc.Solver.Canonical"
+--     see Note [Decomposing FunTy] in GHC.Tc.Solver.Canonical
 --
 repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy _ w arg res)
@@ -1966,13 +1975,17 @@ isCoVarType ty
 
 buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
               -> [Role] -> KnotTied Type -> TyCon
--- This function is here beucase here is where we have
+-- This function is here because here is where we have
 --   isFamFree and isTauTy
 buildSynTyCon name binders res_kind roles rhs
-  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free
+  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free is_forgetful
   where
-    is_tau      = isTauTy rhs
-    is_fam_free = isFamFreeTy rhs
+    is_tau       = isTauTy rhs
+    is_fam_free  = isFamFreeTy rhs
+    is_forgetful = any (not . (`elemVarSet` tyCoVarsOfType rhs) . binderVar) binders ||
+                   uniqSetAny isForgetfulSynTyCon (tyConsOfType rhs)
+         -- NB: This is allowed to be conservative, returning True more often
+         -- than it should. See comments on GHC.Core.TyCon.isForgetfulSynTyCon
 
 {-
 ************************************************************************

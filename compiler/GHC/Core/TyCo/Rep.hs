@@ -37,7 +37,7 @@ module GHC.Core.TyCo.Rep (
         -- * Coercions
         Coercion(..),
         UnivCoProvenance(..),
-        CoercionHole(..), BlockSubstFlag(..), coHoleCoVar, setCoHoleCoVar,
+        CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
         MCoercion(..), MCoercionR, MCoercionN,
 
@@ -93,7 +93,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Builtin.Names ( liftedTypeKindTyConKey, manyDataConKey )
 import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, manyDataConTy )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
-import GHC.Types.Unique ( hasKey )
+import GHC.Types.Unique ( hasKey, Uniquable(..) )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
@@ -1588,14 +1588,8 @@ data CoercionHole
   = CoercionHole { ch_co_var  :: CoVar
                        -- See Note [CoercionHoles and coercion free variables]
 
-                 , ch_blocker :: BlockSubstFlag  -- should this hole block substitution?
-                                                 -- See (2a) in TcCanonical
-                                                 -- Note [Equalities with incompatible kinds]
                  , ch_ref     :: IORef (Maybe Coercion)
                  }
-
-data BlockSubstFlag = YesBlockSubst
-                    | NoBlockSubst
 
 coHoleCoVar :: CoercionHole -> CoVar
 coHoleCoVar = ch_co_var
@@ -1612,9 +1606,8 @@ instance Data.Data CoercionHole where
 instance Outputable CoercionHole where
   ppr (CoercionHole { ch_co_var = cv }) = braces (ppr cv)
 
-instance Outputable BlockSubstFlag where
-  ppr YesBlockSubst = text "YesBlockSubst"
-  ppr NoBlockSubst  = text "NoBlockSubst"
+instance Uniquable CoercionHole where
+  getUnique (CoercionHole { ch_co_var = cv }) = getUnique cv
 
 {- Note [Phantom coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

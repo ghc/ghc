@@ -8,7 +8,7 @@ InstantiatedNamedWildcardsInConstraints.hs:4:14: error:
     • In the type signature: foo :: (Enum _a, _) => _a -> (String, b)
 
 InstantiatedNamedWildcardsInConstraints.hs:4:18: error:
-    • Found type wildcard ‘_’ standing for ‘Show b’
+    • Found extra-constraints wildcard standing for ‘Show b’
       Where: ‘b’ is a rigid type variable bound by
                the inferred type of foo :: (Enum b, Show b) => b -> (String, b)
                at InstantiatedNamedWildcardsInConstraints.hs:4:1-40

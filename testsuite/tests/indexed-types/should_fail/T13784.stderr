@@ -15,7 +15,7 @@ T13784.hs:29:28: error:
 
 T13784.hs:33:24: error:
     • Couldn't match type: Product (a : as0)
-                     with: (b, Product (Divide b (a : as)))
+                     with: (b, Product (a : Divide b as))
       Expected: (b, Product (Divide b (a : as)))
         Actual: Product (a1 : as0)
     • In the expression: a :* divide as

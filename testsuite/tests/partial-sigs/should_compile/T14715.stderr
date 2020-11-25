@@ -1,6 +1,7 @@
 
 T14715.hs:13:53: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Reduce (LiftOf zq) zq’
+    • Found extra-constraints wildcard standing for
+        ‘Reduce (LiftOf zq) zq’
       Where: ‘zq’ is a rigid type variable bound by
                the inferred type of
                  bench_mulPublic :: (z ~ LiftOf zq, Reduce (LiftOf zq) zq) =>

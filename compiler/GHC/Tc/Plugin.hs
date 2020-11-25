@@ -80,7 +80,6 @@ import GHC.Core.Class
 import GHC.Driver.Env
 import GHC.Utils.Outputable
 import GHC.Core.Type
-import GHC.Core.Coercion   ( BlockSubstFlag(..) )
 import GHC.Types.Id
 import GHC.Core.InstEnv
 import GHC.Data.FastString
@@ -181,7 +180,7 @@ newEvVar = unsafeTcPluginTcM . TcM.newEvVar
 
 -- | Create a fresh coercion hole.
 newCoercionHole :: PredType -> TcPluginM CoercionHole
-newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole YesBlockSubst
+newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole
 
 -- | Bind an evidence variable.  This must not be invoked from
 -- 'tcPluginInit' or 'tcPluginStop', or it will panic.
