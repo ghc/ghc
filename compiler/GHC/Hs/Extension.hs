@@ -557,6 +557,9 @@ type family XDo             x
 type family XExplicitList   x
 type family XRecordCon      x
 type family XRecordUpd      x
+type family XGetField       x
+type family XProjection     x
+type family XRecordDotUpd   x
 type family XExprWithTySig  x
 type family XArithSeq       x
 type family XBracket        x
