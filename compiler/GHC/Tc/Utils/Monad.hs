@@ -61,7 +61,8 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles,
 
   -- * Error management
-  getSrcSpanM, setSrcSpan, addLocM, inGeneratedCode,
+  getSrcSpanM, setSrcSpan, addLocM,
+  withProvenance,
   wrapLocM, wrapLocFstM, wrapLocSndM,wrapLocM_,
   getErrsVar, setErrsVar,
   addErr,
@@ -85,6 +86,7 @@ module GHC.Tc.Utils.Monad(
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
   addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM,
+  setDeriving,
 
   -- * Error message generation (type checker)
   addErrTc,
@@ -364,7 +366,8 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_errs       = errs_var,
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
-                tcl_in_gen_code = False,
+                tcl_provenance = OtherCP,
+                tcl_reason     = OtherTR,
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,
@@ -901,19 +904,19 @@ getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) 
 inGeneratedCode :: TcRn Bool
 inGeneratedCode = tcl_in_gen_code <$> getLclEnv
 
+withProvenance :: CodeProvenance -> TcRn a -> TcRn a
+withProvenance p = updLclEnv (\env -> setCodeProvenance p env)
+
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- See Note [Error contexts in generated code]
--- for the tcl_in_gen_code manipulation
-setSrcSpan (RealSrcSpan loc _) thing_inside
-  = updLclEnv (\env -> env { tcl_loc = loc, tcl_in_gen_code = False })
-              thing_inside
-
+-- for the provenance manipulation
+setSrcSpan (RealSrcSpan loc _) thing_inside =
+  updLclEnv (\env -> env { tcl_loc = loc }) $
+    withProvenance OtherCP thing_inside
 setSrcSpan loc@(UnhelpfulSpan _) thing_inside
-  | isGeneratedSrcSpan loc
-  = updLclEnv (\env -> env { tcl_in_gen_code = True }) thing_inside
-
-  | otherwise
-  = thing_inside
+  | isGeneratedSrcSpan loc =
+    withProvenance RebindableSyntaxCP thing_inside
+  | otherwise = thing_inside
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
@@ -1187,6 +1190,8 @@ setCtLocM (CtLoc { ctl_env = lcl }) thing_inside
                            , tcl_ctxt  = tcl_ctxt lcl })
               thing_inside
 
+setDeriving :: TcM a -> TcM a
+setDeriving = updLclEnv (\e -> setCodeProvenance DerivingCP e)
 
 {- *********************************************************************
 *                                                                      *
