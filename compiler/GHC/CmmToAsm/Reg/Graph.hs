@@ -278,7 +278,8 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                         , raCoalesced   = rmCoalesce
                         , raSpillStats  = spillStats
                         , raSpillCosts  = spillCosts
-                        , raSpilled     = code_spilled }
+                        , raSpilled     = code_spilled
+                        , raPlatform    = platform }
 
                 -- Bundle up all the register allocator statistics.
                 --   .. but make sure to drop them on the floor if they're not
