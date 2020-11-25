@@ -5,6 +5,7 @@
 {-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE LambdaCase        #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -15,6 +16,7 @@
 -- Functions over HsSyn specialised to RdrName.
 
 module GHC.Parser.PostProcess (
+        mkGetField, mkProjection, isGetField, Fbind(..), -- RecordDot
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
         mkHsDo, mkSpliceDecl,
@@ -27,7 +29,7 @@ module GHC.Parser.PostProcess (
         mkFamDecl,
         mkInlinePragma,
         mkPatSynMatchGroup,
-        mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
+        mkRecConstrOrUpdate,
         mkTyClD, mkInstD,
         mkRdrRecordCon, mkRdrRecordUpd,
         setRdrNameSpace,
@@ -135,6 +137,7 @@ import GHC.Data.Maybe
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Parser.Annotation
+import Data.Either
 import Data.List
 import Data.Foldable
 import GHC.Driver.Flags ( WarningFlag(..) )
@@ -148,6 +151,22 @@ import Data.Kind       ( Type )
 
 #include "HsVersions.h"
 
+data Fbind b = Fbind (LHsRecField GhcPs (Located b))
+             | Pbind (LHsProjUpdate GhcPs (Located b))
+
+fbindsToEithers :: [Fbind b]
+                -> [Either
+                      (LHsRecField GhcPs (Located b))
+                      (LHsProjUpdate GhcPs (Located b))
+                   ]
+fbindsToEithers = fmap fbindToEither
+  where
+    fbindToEither :: Fbind b
+                  -> Either
+                       (LHsRecField GhcPs (Located b))
+                       (LHsProjUpdate GhcPs (Located b))
+    fbindToEither (Fbind x) = Left x
+    fbindToEither (Pbind x) = Right x
 
 {- **********************************************************************
 
@@ -1267,6 +1286,8 @@ class b ~ (Body b) GhcPs => DisambECP b where
   ecpFromCmd' :: LHsCmd GhcPs -> PV (Located b)
   -- | Return an expression without ambiguity, or fail in a non-expression context.
   ecpFromExp' :: LHsExpr GhcPs -> PV (Located b)
+  -- | This can only be satified by expressions.
+  mkHsProjUpdatePV :: SrcSpan -> [Located FastString] -> Located b -> PV (LHsProjUpdate GhcPs (Located b))
   -- | Disambiguate "\... -> ..." (lambda)
   mkHsLamPV :: SrcSpan -> MatchGroup GhcPs (Located b) -> PV (Located b)
   -- | Disambiguate "let ... in ..."
@@ -1323,10 +1344,11 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkHsSplicePV :: Located (HsSplice GhcPs) -> PV (Located b)
   -- | Disambiguate "f { a = b, ... }" syntax (record construction and record updates)
   mkHsRecordPV ::
+    Bool -> -- Is RecordDotSyntax in effect?
     SrcSpan ->
     SrcSpan ->
     Located b ->
-    ([LHsRecField GhcPs (Located b)], Maybe SrcSpan) ->
+    ([Fbind b], Maybe SrcSpan) ->
     PV (Located b)
   -- | Disambiguate "-a" (negation)
   mkHsNegAppPV :: SrcSpan -> Located b -> PV (Located b)
@@ -1344,7 +1366,6 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkSumOrTuplePV :: SrcSpan -> Boxity -> SumOrTuple b -> PV (Located b)
   -- | Validate infixexp LHS to reject unwanted {-# SCC ... #-} pragmas
   rejectPragmaPV :: Located b -> PV ()
-
 
 {- Note [UndecidableSuperClasses for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1394,6 +1415,7 @@ instance DisambECP (HsCmd GhcPs) where
   type Body (HsCmd GhcPs) = HsCmd
   ecpFromCmd' = return
   ecpFromExp' (L l e) = cmdFail l (ppr e)
+  mkHsProjUpdatePV l _ _ = addFatalError $ Error ErrRecordDotSyntaxInvalid [] l
   mkHsLamPV l mg = return $ L l (HsCmdLam noExtField mg)
   mkHsLetPV l bs e = return $ L l (HsCmdLet noExtField bs e)
   type InfixOp (HsCmd GhcPs) = HsExpr GhcPs
@@ -1424,8 +1446,11 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsExplicitListPV l xs = cmdFail l $
     brackets (fsep (punctuate comma (map ppr xs)))
   mkHsSplicePV (L l sp) = cmdFail l (ppr sp)
-  mkHsRecordPV l _ a (fbinds, ddLoc) = cmdFail l $
-    ppr a <+> ppr (mk_rec_fields fbinds ddLoc)
+  mkHsRecordPV _ l _ a (fbinds, ddLoc) = do
+    let (fs, ps) = partitionEithers $ fbindsToEithers fbinds
+    if not (null ps)
+      then addFatalError $ Error ErrRecordDotSyntaxInvalid [] l
+      else cmdFail l $ ppr a <+> ppr (mk_rec_fields fs ddLoc)
   mkHsNegAppPV l a = cmdFail l (text "-" <> ppr a)
   mkHsSectionR_PV l op c = cmdFail l $
     let pp_op = fromMaybe (panic "cannot print infix operator")
@@ -1451,6 +1476,7 @@ instance DisambECP (HsExpr GhcPs) where
     addError $ Error (ErrArrowCmdInExpr c) [] l
     return (L l hsHoleExpr)
   ecpFromExp' = return
+  mkHsProjUpdatePV l fields arg = return $ mkProjUpdate l fields arg
   mkHsLamPV l mg = return $ L l (HsLam noExtField mg)
   mkHsLetPV l bs c = return $ L l (HsLet noExtField bs c)
   type InfixOp (HsExpr GhcPs) = HsExpr GhcPs
@@ -1480,8 +1506,8 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsTySigPV l a sig = return $ L l (ExprWithTySig noExtField a (hsTypeToHsSigWcType sig))
   mkHsExplicitListPV l xs = return $ L l (ExplicitList noExtField Nothing xs)
   mkHsSplicePV sp = return $ mapLoc (HsSpliceE noExtField) sp
-  mkHsRecordPV l lrec a (fbinds, ddLoc) = do
-    r <- mkRecConstrOrUpdate a lrec (fbinds, ddLoc)
+  mkHsRecordPV dot l lrec a (fbinds, ddLoc) = do
+    r <- mkRecConstrOrUpdate dot a lrec (fbinds, ddLoc)
     checkRecordSyntax (L l r)
   mkHsNegAppPV l a = return $ L l (NegApp noExtField a noSyntaxExpr)
   mkHsSectionR_PV l op e = return $ L l (SectionR noExtField op e)
@@ -1509,6 +1535,7 @@ instance DisambECP (PatBuilder GhcPs) where
   ecpFromExp' (L l e)    = addFatalError $ Error (ErrArrowExprInPat e) [] l
   mkHsLamPV l _          = addFatalError $ Error ErrLambdaInPat [] l
   mkHsLetPV l _ _        = addFatalError $ Error ErrLetInPat [] l
+  mkHsProjUpdatePV l _ _ = addFatalError $ Error ErrRecordDotSyntaxInvalid [] l
   type InfixOp (PatBuilder GhcPs) = RdrName
   superInfixOp m = m
   mkHsOpAppPV l p1 op p2 = return $ L l $ PatBuilderOpApp p1 op p2
@@ -1534,9 +1561,13 @@ instance DisambECP (PatBuilder GhcPs) where
     ps <- traverse checkLPat xs
     return (L l (PatBuilderPat (ListPat noExtField ps)))
   mkHsSplicePV (L l sp) = return $ L l (PatBuilderPat (SplicePat noExtField sp))
-  mkHsRecordPV l _ a (fbinds, ddLoc) = do
-    r <- mkPatRec a (mk_rec_fields fbinds ddLoc)
-    checkRecordSyntax (L l r)
+  mkHsRecordPV _ l _ a (fbinds, ddLoc) = do
+    let (fs, ps) = partitionEithers $ fbindsToEithers fbinds
+    if not (null ps)
+     then addFatalError $ Error ErrRecordDotSyntaxInvalid [] l
+     else do
+       r <- mkPatRec a (mk_rec_fields fs ddLoc)
+       checkRecordSyntax (L l r)
   mkHsNegAppPV l (L lp p) = do
     lit <- case p of
       PatBuilderOverLit pos_lit -> return (L lp pos_lit)
@@ -2132,17 +2163,50 @@ checkPrecP (L l (_,i)) (L _ ol)
                                    , getRdrName unrestrictedFunTyCon ]
 
 mkRecConstrOrUpdate
-        :: LHsExpr GhcPs
+        :: Bool
+        -> LHsExpr GhcPs
         -> SrcSpan
-        -> ([LHsRecField GhcPs (LHsExpr GhcPs)], Maybe SrcSpan)
+        -> ([Fbind (HsExpr GhcPs)], Maybe SrcSpan)
         -> PV (HsExpr GhcPs)
-
-mkRecConstrOrUpdate (L l (HsVar _ (L _ c))) _ (fs,dd)
+mkRecConstrOrUpdate _ (L l (HsVar _ (L _ c))) _lrec (fbinds,dd)
   | isRdrDataCon c
-  = return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd))
-mkRecConstrOrUpdate exp _ (fs,dd)
+  = do
+      let (fs, ps) = partitionEithers $ fbindsToEithers fbinds
+      if not (null ps)
+        then addFatalError $ Error ErrRecordDotSyntaxInvalid [] (getLoc (head ps))
+        else return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd))
+mkRecConstrOrUpdate dot exp _ (fs,dd)
   | Just dd_loc <- dd = addFatalError $ Error ErrDotsInRecordUpdate [] dd_loc
-  | otherwise = return (mkRdrRecordUpd exp (map (fmap mk_rec_upd_field) fs))
+  | otherwise = mkRdrRecordDotUpd dot exp fs
+
+mkRdrRecordDotUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> PV (HsExpr GhcPs)
+mkRdrRecordDotUpd dot exp@(L _ _) fbinds =
+  if not dot
+    then do
+      let (fs, ps) = partitionEithers $ fbindsToEithers fbinds
+      if not (null ps)
+      then
+        -- If RecordDotSyntax is not enabled (as indicated by the
+        -- value of 'dot'), then the lexer can't ever issue an ITproj
+        -- token and so this case is refuted.
+        panic "mkRdrRecordUpd': The impossible happened!"
+      else return $ mkRdrRecordUpd exp (map (fmap mk_rec_upd_field) fs)
+  else
+     let updates = toProjUpdates fbinds
+         setField = noLoc $ foldl' fieldUpdate (unLoc exp) updates
+     in return RecordDotUpd {
+                  rdupd_ext = noExtField
+                , rdupd_expr = exp
+                , rdupd_upds = updates
+                , rdupd_setField = setField }
+  where
+    toProjUpdates :: [Fbind (HsExpr GhcPs)] -> [LHsRecUpdProj GhcPs]
+    toProjUpdates = map (\case { Pbind p -> p
+                               ; Fbind f -> recUpdFieldToProjUpdate (fmap mk_rec_upd_field f)
+                        })
+
+    fieldUpdate :: HsExpr GhcPs -> LHsRecUpdProj GhcPs -> HsExpr GhcPs
+    fieldUpdate acc lpu =  unLoc $ (mkProjUpdateSetField lpu) (noLoc acc)
 
 mkRdrRecordUpd :: LHsExpr GhcPs -> [LHsRecUpdField GhcPs] -> HsExpr GhcPs
 mkRdrRecordUpd exp flds
@@ -2629,3 +2693,132 @@ mkMultTy u tok t = (HsExplicitMult u t, AddAnn AnnPercent (getLoc tok))
 starSym :: Bool -> String
 starSym True = "★"
 starSym False = "*"
+
+-----------------------------------------
+-- Bits and pieces for RecordDotSyntax.
+
+mkParen :: LHsExpr GhcPs -> LHsExpr GhcPs
+mkParen = noLoc . HsPar noExtField
+
+mkVar :: String -> LHsExpr GhcPs
+mkVar = noLoc . HsVar noExtField . noLoc . mkRdrUnqual . mkVarOcc
+
+mkApp :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
+mkApp x = noLoc . HsApp noExtField x
+
+mkOpApp :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
+mkOpApp x op = noLoc . OpApp noExtField x op
+
+mkAppType :: LHsExpr GhcPs -> GenLocated SrcSpan (HsType (NoGhcTc GhcPs)) -> LHsExpr GhcPs
+mkAppType expr = noLoc . HsAppType noExtField expr . HsWC noExtField
+
+mkSelector :: FastString -> LHsType GhcPs
+mkSelector = noLoc . HsTyLit noExtField . HsStrTy NoSourceText
+
+get_field, set_field :: LHsExpr GhcPs
+get_field = mkVar "getField"
+set_field = mkVar "setField"
+
+-- Test if the expression is a 'getField @"..."' expression.
+isGetField :: LHsExpr GhcPs -> Bool
+isGetField (L _ GetField{}) = True
+isGetField _ = False
+
+zPat :: LPat GhcPs
+zVar, circ :: LHsExpr GhcPs
+zPat = noLoc $ VarPat noExtField (noLoc $ mkRdrUnqual (mkVarOcc "z"))
+zVar = noLoc $ HsVar  noExtField (noLoc $ mkRdrUnqual (mkVarOcc "z"))
+circ = noLoc $ HsVar  noExtField (noLoc $ mkRdrUnqual (mkVarOcc "."))
+
+-- mkProj' fieldS calculates a projection.
+-- e.g. .x = mkProj' x = \z -> z.x = \z -> (getField @field x)
+--      .x.y = mkProj' [.x, .y] = (.y) . (.x) = (\z -> z.y) . (\z -> z.x)
+mkProj :: [Located FastString] -> LHsExpr GhcPs
+mkProj (field : fieldS) = foldl' f (proj field) fieldS
+  where
+    f acc field = (mkParen . mkOpApp (proj field) circ) acc
+
+    proj f =
+      let body = mkGet zVar f
+          grhs = noLoc $ GRHS noExtField [] body
+          ghrss = GRHSs noExtField [grhs] (noLoc (EmptyLocalBinds noExtField))
+          m = noLoc $ Match {m_ext=noExtField, m_ctxt=LambdaExpr, m_pats=[zPat], m_grhss=ghrss} in
+      mkParen (noLoc $ HsLam noExtField MG {mg_ext=noExtField, mg_alts=noLoc [m], mg_origin=Generated})
+mkProj [] = panic "mkProj': The impossible happened"
+
+-- mkGet arg field calcuates a get_field @field arg expression.
+-- e.g. z.x = mkGet z x = get_field @x z
+mkGet :: LHsExpr GhcPs -> Located FastString -> LHsExpr GhcPs
+mkGet arg field = head $ mkGet' [arg] field
+mkGet' :: [LHsExpr GhcPs] -> Located FastString -> [LHsExpr GhcPs]
+mkGet' l@(r : _) (L _ field) = get_field `mkAppType` mkSelector field `mkApp` mkParen r : l
+mkGet' [] _ = panic "mkGet' : The impossible has happened!"
+
+mkGetField :: SrcSpan -> LHsExpr GhcPs -> Located FastString -> LHsExpr GhcPs
+mkGetField loc arg field =
+  L loc GetField {
+      gf_ext = noExtField
+    , gf_expr = arg
+    , gf_field = field
+    , gf_getField = mkGet arg field
+    }
+
+mkProjection :: SrcSpan -> [Located FastString] -> LHsExpr GhcPs
+mkProjection _ [] = panic "mkProjection: The impossible has happened!"
+mkProjection loc flds =
+  L loc Projection {
+      proj_ext = noExtField
+    , proj_flds = flds
+    , proj_proj = mkProj flds
+    }
+
+-- e.g. foo.bar.baz.quux = 1
+mkProjUpdate :: SrcSpan -> [Located FastString] -> LHsExpr GhcPs -> LHsProjUpdate GhcPs (LHsExpr GhcPs)
+mkProjUpdate _ [] _ = panic "mkProjUpdate: The impossible has happened!"
+mkProjUpdate loc flds arg =
+  L loc ProjUpdate {
+      pu_flds = flds
+    , pu_arg = arg
+    }
+
+-- mkSet a field b calculates a set_field @field expression.
+-- e.g mkSet a field b = set_field @"field" a b (read as "set field 'field' on a to b").
+mkSet :: LHsExpr GhcPs -> Located FastString -> LHsExpr GhcPs -> LHsExpr GhcPs
+mkSet a (L _ field) b = set_field `mkAppType` mkSelector field `mkApp` a `mkApp` b
+
+-- mkProjUpdateSetField calculates functions representing dot notation record updates.
+mkProjUpdateSetField :: LHsProjUpdate GhcPs (LHsExpr GhcPs) -> (LHsExpr GhcPs -> LHsExpr GhcPs)
+mkProjUpdateSetField (L _ (ProjUpdate { pu_flds = flds, pu_arg = arg } ))
+  = let {
+      ; final = last flds  -- quux
+      ; fields = init flds   -- [foo, bar, baz]
+      ; getters = \a -> foldl' mkGet' [a] fields  -- Ordered from deep to shallow.
+          -- [getField@"baz"(getField@"bar"(getField@"foo" a), getField@"bar"(getField@"foo" a), getField@"foo" a, a]
+      ; zips = \a -> (final, head (getters a)) : zip (reverse fields) (tail (getters a)) -- Ordered from deep to shallow.
+          -- [("quux", getField@"baz"(getField@"bar"(getField@"foo" a)), ("baz", getField@"bar"(getField@"foo" a)), ("bar", getField@"foo" a), ("foo", a)]
+      }
+    in (\a -> foldl' mkSet' arg (zips a))
+          -- setField@"foo" (a) (setField@"bar" (getField @"foo" (a))(setField@"baz" (getField @"bar" (getField @"foo" (a)))(setField@"quux" (getField @"baz" (getField @"bar" (getField @"foo" (a))))(quux))))
+    where
+      mkSet' :: LHsExpr GhcPs -> (Located FastString, LHsExpr GhcPs) -> LHsExpr GhcPs
+      mkSet' acc (field, g) = mkSet (mkParen g) field (mkParen acc)
+
+-- Transform a regular record field update into a projection update.
+recUpdFieldToProjUpdate :: LHsRecUpdField GhcPs -> LHsRecUpdProj GhcPs
+recUpdFieldToProjUpdate (L l (HsRecField occ arg _)) =
+  mkProjUpdate l [L loc (fsLit f)] (val arg)
+  where
+    (loc, f) = field occ
+
+    val :: LHsExpr GhcPs -> LHsExpr GhcPs
+    val arg = if isPun arg then mkVar $ snd (field occ) else arg
+
+    isPun :: LHsExpr GhcPs -> Bool
+    isPun = \case
+      L _ (HsVar _ (L _ p)) -> p == pun_RDR
+      _ -> False
+
+    field :: Located (AmbiguousFieldOcc GhcPs) -> (SrcSpan, String)
+    field = \case
+        L _ (Ambiguous _ (L loc lbl)) ->  (loc, occNameString . rdrNameOcc $ lbl)
+        L _ (Unambiguous _ (L loc lbl)) -> (loc, occNameString . rdrNameOcc $ lbl)
