@@ -128,7 +128,7 @@ tcPolyExprNC (L loc expr) res_ty
   where -- See Note [Rebindable syntax and HsExpansion), which describes
         -- the logic behind this location/context tweaking.
         set_loc_and_ctxt l e m = do
-          inGenCode <- inGeneratedCode
+          inGenCode <- inRebindableSyntax
           if inGenCode && not (isGeneratedSrcSpan l)
             then setSrcSpan l $
                  addExprCtxt e m
