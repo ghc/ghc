@@ -148,6 +148,9 @@ data ErrorDesc
    | ErrDotsInRecordUpdate
       -- ^ Dots used in record update
 
+   | ErrRecordDotSyntaxInvalid
+      -- ^ Invalid use of record-dot-syntax
+
    | ErrPrecedenceOutOfRange !Int
       -- ^ Precedence out of range
 
@@ -334,6 +337,9 @@ data ErrorDesc
 
    | ErrExpectedHyphen
       -- ^ Expected a hyphen
+
+   | ErrNamedFieldPunsNotEnabled
+      -- ^ Named field puns should be enabled
 
    | ErrSpaceInSCC
       -- ^ Found a space in a SCC

@@ -233,6 +233,9 @@ pp_err = \case
    ErrDotsInRecordUpdate
       -> text "You cannot use `..' in a record update"
 
+   ErrRecordDotSyntaxInvalid
+      -> text "Use of RecordDotSyntax `.' not valid."
+
    ErrPrecedenceOutOfRange i
       -> text "Precedence out of range: " <> int i
 
@@ -537,6 +540,9 @@ pp_err = \case
    ErrExpectedHyphen
       -> text "Expected a hyphen"
 
+   ErrNamedFieldPunsNotEnabled
+      -> text "For this to work enable NamedFieldPuns"
+
    ErrSpaceInSCC
       -> text "Spaces are not allowed in SCCs"
 
@@ -610,4 +616,3 @@ pp_hint = \case
 
 perhaps_as_pat :: SDoc
 perhaps_as_pat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
-

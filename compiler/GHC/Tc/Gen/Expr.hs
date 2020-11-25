@@ -930,6 +930,17 @@ tcExpr (ArithSeq _ witness seq) res_ty
 {-
 ************************************************************************
 *                                                                      *
+                Record dot syntax
+*                                                                      *
+************************************************************************
+-}
+tcExpr (GetField _ _ _ (L _ g)) res_ty = tcExpr g res_ty
+tcExpr (Projection _ _ (L _ p)) res_ty = tcExpr p res_ty
+tcExpr (RecordDotUpd _ _ _ (L _ s)) res_ty = tcExpr s res_ty
+
+{-
+************************************************************************
+*                                                                      *
                 Template Haskell
 *                                                                      *
 ************************************************************************
