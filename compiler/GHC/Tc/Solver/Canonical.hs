@@ -2828,6 +2828,10 @@ Details:
      final Given as a CIrredCan with an OtherCIS status (it's not
      insoluble).
 
+     NB: When filling in CycleBreakerTvs, we fill them in with what
+     they originally stood for (e.g. cbv1 := TF a, cbv2 := TF Int),
+     not what may be in a rewritten constraint.
+
      Not breaking cycles fursther makes sense, because
      we only want to break cycles for user-written loopy Givens, and
      a CycleBreakerTv certainly isn't user-written.
