@@ -2120,7 +2120,8 @@ the example for why (partial-sigs/should_compile/T12844):
 
 GHC correctly infers that the extra-constraints wildcard on `bar`
 should be (Head rngs ~ '(r, r'), Foo rngs). It then adds this constraint
-as a Given on the implication constraint for `bar`. The Hole for
+as a Given on the implication constraint for `bar`. (This implication is
+created by mkResidualConstraints in simplifyInfer.) The Hole for
 the _ is stored within the implication's WantedConstraints.
 When simplifyHoles is called, that constraint is already assumed as
 a Given. Simplifying with respect to it turns it into
@@ -2134,6 +2135,9 @@ is simple: just don't simplify extra-constraints wildcards.
 
 This is the only reason we need to track ConstraintHole separately
 from TypeHole in HoleSort.
+
+See also Note [Extra-constraint holes in partial type signatures]
+in GHC.Tc.Gen.HsType.
 
 Note [Tracking redundant constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

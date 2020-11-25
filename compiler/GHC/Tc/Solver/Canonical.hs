@@ -2524,38 +2524,39 @@ Wrinkles:
      must be sure to kick out any such CIrredCan constraints that mention coercion holes
      when those holes get filled in, so that the unification step can now proceed.
 
-     (2a) We must now kick out any constraints that mention a newly-filled-in
-          coercion hole, but only if there are no more remaining coercion
-          holes. This is done in kickOutAfterFillingCoercionHole. The extra
-          check that there are no more remaining holes avoids needless work
-          when rewriting evidence (which fills coercion holes) and aids
-          efficiency.
+     The kicking out is done in kickOutAfterFillingCoercionHole.
 
-          Moreover, kicking out when there are remaining unfilled holes can
-          cause a loop in the solver in this case:
-               [W] w1 :: (ty1 :: F a) ~ (ty2 :: s)
-          After canonicalisation, we discover that this equality is heterogeneous.
-          So we emit
-               [W] co_abc :: F a ~ s
-          and preserve the original as
-               [W] w2 :: (ty1 |> co_abc) ~ ty2    (blocked on co_abc)
-          Then, co_abc comes becomes the work item. It gets swapped in
-          canEqCanLHS2 and then back again in canEqTyVarFunEq. We thus get
-          co_abc := sym co_abd, and then co_abd := sym co_abe, with
-               [W] co_abe :: F a ~ s
-          This process has filled in co_abc. Suppose w2 were kicked out.
-          When it gets processed,
-          would get this whole chain going again. The solution is to
-          kick out a blocked constraint only when the result of filling
-          in the blocking coercion involves no further blocking coercions.
-          Alternatively, we could be careful not to do unnecessary swaps during
-          canonicalisation, but that seems hard to do, in general.
+     However, we must be careful: we kick out only when no coercion holes are
+     left. The holes in the type are stored in the BlockedCIS CtIrredStatus.
+     The extra check that there are no more remaining holes avoids
+     needless work when rewriting evidence (which fills coercion holes) and
+     aids efficiency.
+
+     Moreover, kicking out when there are remaining unfilled holes can
+     cause a loop in the solver in this case:
+          [W] w1 :: (ty1 :: F a) ~ (ty2 :: s)
+     After canonicalisation, we discover that this equality is heterogeneous.
+     So we emit
+          [W] co_abc :: F a ~ s
+     and preserve the original as
+          [W] w2 :: (ty1 |> co_abc) ~ ty2    (blocked on co_abc)
+     Then, co_abc comes becomes the work item. It gets swapped in
+     canEqCanLHS2 and then back again in canEqTyVarFunEq. We thus get
+     co_abc := sym co_abd, and then co_abd := sym co_abe, with
+          [W] co_abe :: F a ~ s
+     This process has filled in co_abc. Suppose w2 were kicked out.
+     When it gets processed,
+     would get this whole chain going again. The solution is to
+     kick out a blocked constraint only when the result of filling
+     in the blocking coercion involves no further blocking coercions.
+     Alternatively, we could be careful not to do unnecessary swaps during
+     canonicalisation, but that seems hard to do, in general.
 
  (3) Suppose we have [W] (a :: k1) ~ (rhs :: k2). We duly follow the
      algorithm detailed here, producing [W] co :: k2 ~ k1, and adding
      [W] (a :: k1) ~ ((rhs |> co) :: k1) to the irreducibles. Some time
      later, we solve co, and fill in co's coercion hole. This kicks out
-     the irreducible as described in (2a).
+     the irreducible as described in (2).
      But now, during canonicalization, we see the cast
      and remove it, in canEqCast. By the time we get into canEqCanLHS, the equality
      is heterogeneous again, and the process repeats.
@@ -2832,9 +2833,10 @@ Details:
      they originally stood for (e.g. cbv1 := TF a, cbv2 := TF Int),
      not what may be in a rewritten constraint.
 
-     Not breaking cycles fursther makes sense, because
-     we only want to break cycles for user-written loopy Givens, and
-     a CycleBreakerTv certainly isn't user-written.
+     Not breaking cycles further (which would mean changing TF cbv1 to cbv3
+     and TF cbv2 to cbv4) makes sense, because we only want to break cycles
+     for user-written loopy Givens, and a CycleBreakerTv certainly isn't
+     user-written.
 
 NB: This same situation (an equality like b ~ Maybe (F b)) can arise with
 Wanteds, but we have no concrete case incentivising special treatment. It

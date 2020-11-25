@@ -1817,7 +1817,7 @@ kickOutAfterUnification new_tv
        ; setInertCans ics2
        ; return n_kicked }
 
--- See Wrinkle (2a) in Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+-- See Wrinkle (2) in Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
 kickOutAfterFillingCoercionHole :: CoercionHole -> Coercion -> TcS ()
 kickOutAfterFillingCoercionHole hole filled_co
   = do { ics <- getInertCans
