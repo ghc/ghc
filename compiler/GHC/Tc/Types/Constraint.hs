@@ -1201,7 +1201,6 @@ data ImplicStatus
 -- A LocalGivenEqs might local equalities, but it definitely does not have non-local
 -- equalities. A NoGivenEqs definitely does not have equalities (except let-bound
 -- skolems).
-
 data HasGivenEqs
   = NoGivenEqs      -- definitely no given equalities,
                     -- except by Note [Let-bound skolems] in GHC.Tc.Solver.Monad
