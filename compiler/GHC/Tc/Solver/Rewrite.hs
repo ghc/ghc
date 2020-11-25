@@ -897,6 +897,11 @@ data RewriteTvResult
       -- ^ The tyvar rewrites to a not-necessarily rewritten other type.
       -- co :: new type ~r old type, where the role is determined by
       -- the RewriteEnv
+      --
+      -- With Quick Look, the returned TcType can be a polytype;
+      -- that is, in the constraint solver, a unification variable
+      -- can contain a polytype.  See GHC.Tc.Gen.App
+      -- Note [Instantiation variables are short lived]
 
 rewriteTyVar :: TyVar -> RewriteM (Xi, Coercion)
 rewriteTyVar tv
