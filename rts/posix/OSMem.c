@@ -484,7 +484,16 @@ osTryReserveHeapMemory (W_ len, void *hint)
        because we need memory which is MBLOCK_SIZE aligned,
        and then we discard what we don't need */
 
-    base = my_mmap(hint, len + MBLOCK_SIZE, MEM_RESERVE);
+#if defined(MAP_HUGETLB)
+    const bool hugepages = RtsFlags.GcFlags.hugepages ? MEM_HUGETLB : 0;
+#else
+    const bool hugepages = 0;
+#endif
+    base = my_mmap(hint, len + MBLOCK_SIZE, MEM_RESERVE | hugepages);
+
+    // If failed then try again without hugepages
+    if (base == NULL && hugepages)
+        base = my_mmap(hint, len + MBLOCK_SIZE, MEM_RESERVE);
     if (base == NULL)
         return NULL;
 
@@ -643,6 +652,18 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
 
 void osCommitMemory(void *at, W_ size)
 {
+#if defined(MAP_HUGETLB)
+    // Try committing with hugepages, if available.
+    if (RtsFlags.GcFlags.hugepages
+        && ((uintptr_t) at & (HUGEPAGE_SIZE - 1) == 0)
+        && (size & (HUGEPAGE_SIZE - 1) == 0)) {
+        void *r = my_mmap(at, size, MEM_COMMIT | MEM_HUGETLB);
+        if (r != NULL) {
+            return r;
+        }
+    }
+#endif
+
     void *r = my_mmap(at, size, MEM_COMMIT);
     if (r == NULL) {
         barf("Unable to commit %" FMT_Word " bytes of memory", size);
