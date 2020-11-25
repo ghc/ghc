@@ -79,7 +79,10 @@ data RegAllocStats statics instr
         , raSpillCosts  :: SpillCostInfo
 
           -- | Code with spill instructions added.
-        , raSpilled     :: [LiveCmmDecl statics instr] }
+        , raSpilled     :: [LiveCmmDecl statics instr]
+
+          -- | Target platform
+        , raPlatform    = platform }
 
 
         -- a successful coloring
