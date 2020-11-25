@@ -145,6 +145,8 @@ fi
 
 echo "using THREADS=${threads}" >&2
 
+configure_cmd="./configure"
+
 if [ "$use_hadrian" = "NO" ]
 then
     make="gmake"
@@ -173,6 +175,7 @@ else
         hadrian/build-stack --help > /dev/null
         cd hadrian
         hadrian_cmd=$(stack exec -- which hadrian)
+        configure_cmd="stack --stack-yaml hadrian/stack.yaml exec -- ./configure"
     fi
     cd ..
     # TODO: define a hadrian Flavour that mimics
@@ -199,7 +202,7 @@ if [ $testsuite_only -eq 0 ]; then
         INSTDIR="$thisdir/inst"
 
         python3 ./boot --validate
-        ./configure --prefix="$INSTDIR" $config_args
+        $configure_cmd --prefix="$INSTDIR" $config_args
     fi
 
     if [ "$use_hadrian" = "NO" ]
