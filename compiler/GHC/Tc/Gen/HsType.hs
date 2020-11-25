@@ -1189,6 +1189,11 @@ tc_hs_type _ rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
   = do { checkWiredInTyCon typeSymbolKindCon
        ; checkExpectedKind rn_ty (mkStrLitTy s) typeSymbolKind exp_kind }
 
+--------- Wildcards
+
+tc_hs_type mode ty@(HsWildCardTy _)        ek
+  = tcAnonWildCardOcc NoExtraConstraint mode ty ek
+
 --------- Potentially kind-polymorphic types: call the "up" checker
 -- See Note [Future-proofing the type checker]
 tc_hs_type mode ty@(HsTyVar {})            ek = tc_infer_hs_type_ek mode ty ek
@@ -1197,7 +1202,6 @@ tc_hs_type mode ty@(HsAppKindTy{})         ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsOpTy {})             ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsKindSig {})          ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(XHsType (NHsCoreTy{})) ek = tc_infer_hs_type_ek mode ty ek
-tc_hs_type mode ty@(HsWildCardTy _)        ek = tcAnonWildCardOcc mode ty ek
 
 {-
 Note [Variable Specificity and Forall Visibility]
@@ -2071,8 +2075,9 @@ newNamedWildTyVar _name   -- Currently ignoring the "_x" wildcard name used in t
        ; return tyvar }
 
 ---------------------------
-tcAnonWildCardOcc :: TcTyMode -> HsType GhcRn -> Kind -> TcM TcType
-tcAnonWildCardOcc (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) })
+tcAnonWildCardOcc :: IsExtraConstraint
+                  -> TcTyMode -> HsType GhcRn -> Kind -> TcM TcType
+tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) })
                   ty exp_kind
     -- hole_lvl: see Note [Checking partial type signatures]
     --           esp the bullet on nested forall types
@@ -2086,7 +2091,7 @@ tcAnonWildCardOcc (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) })
 
        ; traceTc "tcAnonWildCardOcc" (ppr hole_lvl <+> ppr emit_holes)
        ; when emit_holes $
-         emitAnonTypeHole wc_tv
+         emitAnonTypeHole is_extra wc_tv
          -- Why the 'when' guard?
          -- See Note [Wildcards in visible kind application]
 
@@ -2107,7 +2112,7 @@ tcAnonWildCardOcc (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) })
                      HM_FamPat  -> False
                      HM_VTA     -> False
 
-tcAnonWildCardOcc mode ty _
+tcAnonWildCardOcc _ mode ty _
 -- mode_holes is Nothing.  Should not happen, because renamer
 -- should already have rejected holes in unexpected places
   = pprPanic "tcWildCardOcc" (ppr mode $$ ppr ty)
@@ -3805,7 +3810,7 @@ tcPartialContext mode hs_theta
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
   , L wc_loc ty@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
   = do { wc_tv_ty <- setSrcSpan wc_loc $
-                     tcAnonWildCardOcc mode ty constraintKind
+                     tcAnonWildCardOcc YesExtraConstraint mode ty constraintKind
        ; theta <- mapM (tc_lhs_pred mode) hs_theta1
        ; return (theta, Just wc_tv_ty) }
   | otherwise

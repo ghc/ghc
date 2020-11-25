@@ -25,7 +25,7 @@ module GHC.Tc.Utils.TcMType (
   newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
   newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
   newAnonMetaTyVar, cloneMetaTyVar,
-  newFmvTyVar, newFskTyVar,
+  newCycleBreakerTyVar,
 
   newMultiplicityVar,
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
@@ -183,7 +183,7 @@ newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
 -- Deals with both equality and non-equality predicates
 newWanted orig t_or_k pty
   = do loc <- getCtLocM orig t_or_k
-       d <- if isEqPrimPred pty then HoleDest  <$> newCoercionHole YesBlockSubst pty
+       d <- if isEqPrimPred pty then HoleDest  <$> newCoercionHole pty
                                 else EvVarDest <$> newEvVar pty
        return $ CtWanted { ctev_dest = d
                          , ctev_pred = pty
@@ -199,8 +199,8 @@ newWanteds orig = mapM (newWanted orig Nothing)
 
 cloneWanted :: Ct -> TcM Ct
 cloneWanted ct
-  | ev@(CtWanted { ctev_dest = HoleDest old_hole, ctev_pred = pty }) <- ctEvidence ct
-  = do { co_hole <- newCoercionHole (ch_blocker old_hole) pty
+  | ev@(CtWanted { ctev_pred = pty }) <- ctEvidence ct
+  = do { co_hole <- newCoercionHole pty
        ; return (mkNonCanonical (ev { ctev_dest = HoleDest co_hole })) }
   | otherwise
   = return ct
@@ -250,7 +250,7 @@ emitDerivedEqs origin pairs
 -- | Emits a new equality constraint
 emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coercion
 emitWantedEq origin t_or_k role ty1 ty2
-  = do { hole <- newCoercionHole YesBlockSubst pty
+  = do { hole <- newCoercionHole pty
        ; loc <- getCtLocM origin (Just t_or_k)
        ; emitSimple $ mkNonCanonical $
          CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
@@ -323,16 +323,12 @@ newImplication
 ************************************************************************
 -}
 
-newCoercionHole :: BlockSubstFlag  -- should the presence of this hole block substitution?
-                                   -- See sub-wrinkle in TcCanonical
-                                   -- Note [Equalities with incompatible kinds]
-                -> TcPredType -> TcM CoercionHole
-newCoercionHole blocker pred_ty
+newCoercionHole :: TcPredType -> TcM CoercionHole
+newCoercionHole pred_ty
   = do { co_var <- newEvVar pred_ty
-       ; traceTc "New coercion hole:" (ppr co_var <+> ppr blocker)
+       ; traceTc "New coercion hole:" (ppr co_var)
        ; ref <- newMutVar Nothing
-       ; return $ CoercionHole { ch_co_var = co_var, ch_blocker = blocker
-                               , ch_ref = ref } }
+       ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
 
 -- | Put a value in a coercion hole
 fillCoercionHole :: CoercionHole -> Coercion -> TcM ()
@@ -805,11 +801,10 @@ influences the way it is tidied; see TypeRep.tidyTyVarBndr.
 metaInfoToTyVarName :: MetaInfo -> FastString
 metaInfoToTyVarName  meta_info =
   case meta_info of
-       TauTv        -> fsLit "t"
-       FlatMetaTv   -> fsLit "fmv"
-       FlatSkolTv   -> fsLit "fsk"
-       TyVarTv      -> fsLit "a"
-       RuntimeUnkTv -> fsLit "r"
+       TauTv          -> fsLit "t"
+       TyVarTv        -> fsLit "a"
+       RuntimeUnkTv   -> fsLit "r"
+       CycleBreakerTv -> fsLit "b"
 
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 newAnonMetaTyVar mi = newNamedAnonMetaTyVar (metaInfoToTyVarName mi) mi
@@ -875,19 +870,13 @@ cloneAnonMetaTyVar info tv kind
         ; traceTc "cloneAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar))
         ; return tyvar }
 
-newFskTyVar :: TcType -> TcM TcTyVar
-newFskTyVar fam_ty
-  = do { details <- newMetaDetails FlatSkolTv
-       ; name <- newMetaTyVarName (fsLit "fsk")
-       ; return (mkTcTyVar name (tcTypeKind fam_ty) details) }
-
-newFmvTyVar :: TcType -> TcM TcTyVar
--- Very like newMetaTyVar, except sets mtv_tclvl to one less
--- so that the fmv is untouchable.
-newFmvTyVar fam_ty
-  = do { details <- newMetaDetails FlatMetaTv
-       ; name <- newMetaTyVarName (fsLit "s")
-       ; return (mkTcTyVar name (tcTypeKind fam_ty) details) }
+-- Make a new CycleBreakerTv. See Note [Type variable cycles in Givens]
+-- in GHC.Tc.Solver.Canonical.
+newCycleBreakerTyVar :: TcKind -> TcM TcTyVar
+newCycleBreakerTyVar kind
+  = do { details <- newMetaDetails CycleBreakerTv
+       ; name <- newMetaTyVarName (fsLit "cbv")
+       ; return (mkTcTyVar name kind details) }
 
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info
@@ -2179,18 +2168,16 @@ Why?, for example:
 
 - For CIrredCan we want to see if a constraint is insoluble with insolubleWC
 
-On the other hand, we change CTyEqCan to CNonCanonical, because of all of
-CTyEqCan's invariants, which can break during zonking. Besides, the constraint
+On the other hand, we change CEqCan to CNonCanonical, because of all of
+CEqCan's invariants, which can break during zonking. (Example: a ~R alpha, where
+we have alpha := N Int, where N is a newtype.) Besides, the constraint
 will be canonicalised again, so there is little benefit in keeping the
-CTyEqCan structure.
-
-NB: we do not expect to see any CFunEqCans, because zonkCt is only
-called on unflattened constraints.
+CEqCan structure.
 
 NB: Constraints are always re-flattened etc by the canonicaliser in
 @GHC.Tc.Solver.Canonical@ even if they come in as CDictCan. Only canonical constraints that
 are actually in the inert set carry all the guarantees. So it is okay if zonkCt
-creates e.g. a CDictCan where the cc_tyars are /not/ function free.
+creates e.g. a CDictCan where the cc_tyars are /not/ fully reduced.
 -}
 
 zonkCt :: Ct -> TcM Ct
@@ -2200,7 +2187,7 @@ zonkCt ct@(CDictCan { cc_ev = ev, cc_tyargs = args })
        ; args' <- mapM zonkTcType args
        ; return $ ct { cc_ev = ev', cc_tyargs = args' } }
 
-zonkCt (CTyEqCan { cc_ev = ev })
+zonkCt (CEqCan { cc_ev = ev })
   = mkNonCanonical <$> zonkCtEvidence ev
 
 zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_status flag
@@ -2208,10 +2195,7 @@ zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_status flag
        ; return (ct { cc_ev = ev' }) }
 
 zonkCt ct
-  = ASSERT( not (isCFunEqCan ct) )
-  -- We do not expect to see any CFunEqCans, because zonkCt is only called on
-  -- unflattened constraints.
-    do { fl' <- zonkCtEvidence (ctEvidence ct)
+  = do { fl' <- zonkCtEvidence (ctEvidence ct)
        ; return (mkNonCanonical fl') }
 
 zonkCtEvidence :: CtEvidence -> TcM CtEvidence

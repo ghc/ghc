@@ -24,7 +24,7 @@ module GHC.Core.Unify (
         liftCoMatch,
 
         -- The core flattening algorithm
-        flattenTys
+        flattenTys, flattenTysX
    ) where
 
 #include "HsVersions.h"
@@ -363,12 +363,6 @@ types are apart. This has practical consequences for the ability for closed
 type family applications to reduce. See test case
 indexed-types/should_compile/Overlap14.
 
-Note [Unification with skolems]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we discover that two types unify if and only if a skolem variable is
-substituted, we can't properly unify the types. But, that skolem variable
-may later be instantiated with a unifyable type. So, we return maybeApart
-in these cases.
 -}
 
 -- | Simple unification of two types; all type variables are bindable
@@ -699,8 +693,9 @@ unifier It does /not/ work up to ~.
 The algorithm implemented here is rather delicate, and we depend on it
 to uphold certain properties. This is a summary of these required
 properties. Any reference to "flattening" refers to the flattening
-algorithm in GHC.Core.FamInstEnv (See Note [Flattening] in GHC.Core.Unify), not
-the flattening algorithm in the solver.
+algorithm in GHC.Core.Unify (See
+Note [Flattening type-family applications when matching instances] in GHC.Core.Unify),
+not the flattening algorithm in the solver.
 
 Notation:
  θ,φ    substitutions
@@ -983,9 +978,11 @@ unify_ty env ty1 (TyVarTy tv2) kco
   = uVar (umSwapRn env) tv2 ty1 (mkSymCo kco)
 
 unify_ty env ty1 ty2 _kco
+ -- NB: This keeps Constraint and Type distinct, as it should for use in the
+ -- type-checker.
   | Just (tc1, tys1) <- mb_tc_app1
   , Just (tc2, tys2) <- mb_tc_app2
-  , tc1 == tc2 || (tcIsLiftedTypeKind ty1 && tcIsLiftedTypeKind ty2)
+  , tc1 == tc2
   = if isInjectiveTyCon tc1 Nominal
     then unify_tys env tys1 tys2
     else do { let inj | isTypeFamilyTyCon tc1
@@ -1033,6 +1030,16 @@ unify_ty env (AppTy ty1a ty1b) ty2 _kco
 unify_ty env ty1 (AppTy ty2a ty2b) _kco
   | Just (ty1a, ty1b) <- tcRepSplitAppTy_maybe ty1
   = unify_ty_app env ty1a [ty1b] ty2a [ty2b]
+
+  -- tcSplitTyConApp won't split a (=>), so we handle this separately.
+unify_ty env (FunTy InvisArg _w1 arg1 res1) (FunTy InvisArg _w2 arg2 res2) _kco
+   -- Look at result representations, but arg representations would be redundant
+   -- as anything that can appear to the left of => is lifted.
+   -- And anything that can appear to the left of => is unrestricted, so skip the
+   -- multiplicities.
+  | Just res_rep1 <- getRuntimeRep_maybe res1
+  , Just res_rep2 <- getRuntimeRep_maybe res2
+  = unify_tys env [res_rep1, arg1, res1] [res_rep2, arg2, res2]
 
 unify_ty _ (LitTy x) (LitTy y) _kco | x == y = return ()
 
@@ -1163,12 +1170,12 @@ uUnrefined env tv1' ty2 ty2' kco
              -- How could this happen? If we're only matching and if
              -- we're comparing forall-bound variables.
 
-           _ -> maybeApart -- See Note [Unification with skolems]
+           _ -> surelyApart
   }}}}
 
 uUnrefined env tv1' ty2 _ kco -- ty2 is not a type variable
   = case tvBindFlag env tv1' of
-      Skolem -> maybeApart  -- See Note [Unification with skolems]
+      Skolem -> surelyApart
       BindMe -> bindTv env tv1' (ty2 `mkCastTy` mkSymCo kco)
 
 bindTv :: UMEnv -> OutTyVar -> Type -> UM ()
@@ -1211,6 +1218,9 @@ data BindFlag
 
   | Skolem      -- This type variable is a skolem constant
                 -- Don't bind it; it only matches itself
+                -- These variables are SurelyApart from other types
+                -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
+                -- for why it must be SurelyApart.
   deriving Eq
 
 {-
@@ -1616,8 +1626,8 @@ pushRefl co =
 *                                                                      *
 ************************************************************************
 
-Note [Flattening]
-~~~~~~~~~~~~~~~~~
+Note [Flattening type-family applications when matching instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As described in "Closed type families with overlapping equations"
 http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/axioms-extended.pdf
 we need to flatten core types before unifying them, when checking for "surely-apart"
@@ -1645,6 +1655,15 @@ willing to give up on), but for substitutivity. If we have (F x x), we
 can see that (F x x) can reduce to Double. So, it had better be the
 case that (F blah blah) can reduce to Double, no matter what (blah)
 is!  Flattening as done below ensures this.
+
+We also use this flattening operation to check for class instances.
+If we have
+  instance C (Maybe b)
+  instance {-# OVERLAPPING #-} C (Maybe Bool)
+  [W] C (Maybe (F a))
+we want to know that the second instance might match later. So we
+flatten the (F a) in the target before trying to unify with instances.
+(This is done in GHC.Core.InstEnv.lookupInstEnv'.)
 
 The algorithm works by building up a TypeMap TyVar, mapping
 type family applications to fresh variables. This mapping must
@@ -1758,11 +1777,11 @@ flattenTys is defined here because of module dependencies.
 -}
 
 data FlattenEnv
-  = FlattenEnv { fe_type_map :: TypeMap TyVar
+  = FlattenEnv { fe_type_map :: TypeMap (TyVar, TyCon, [Type])
                  -- domain: exactly-saturated type family applications
-                 -- range: fresh variables
+                 -- range: (fresh variable, type family tycon, args)
                , fe_in_scope :: InScopeSet }
-                 -- See Note [Flattening]
+                 -- See Note [Flattening type-family applications when matching instances]
 
 emptyFlattenEnv :: InScopeSet -> FlattenEnv
 emptyFlattenEnv in_scope
@@ -1773,13 +1792,29 @@ updateInScopeSet :: FlattenEnv -> (InScopeSet -> InScopeSet) -> FlattenEnv
 updateInScopeSet env upd = env { fe_in_scope = upd (fe_in_scope env) }
 
 flattenTys :: InScopeSet -> [Type] -> [Type]
--- See Note [Flattening]
--- NB: the returned types may mention fresh type variables,
---     arising from the flattening.  We don't return the
---     mapping from those fresh vars to the ty-fam
---     applications they stand for (we could, but no need)
-flattenTys in_scope tys
-  = snd $ coreFlattenTys emptyTvSubstEnv (emptyFlattenEnv in_scope) tys
+-- See Note [Flattening type-family applications when matching instances]
+flattenTys in_scope tys = fst (flattenTysX in_scope tys)
+
+flattenTysX :: InScopeSet -> [Type] -> ([Type], TyVarEnv (TyCon, [Type]))
+-- See Note [Flattening type-family applications when matching instances]
+-- NB: the returned types mention the fresh type variables
+--     in the domain of the returned env, whose range includes
+--     the original type family applications. Building a substitution
+--     from this information and applying it would yield the original
+--     types -- almost. The problem is that the original type might
+--     have something like (forall b. F a b); the returned environment
+--     can't really sensibly refer to that b. So it may include a locally-
+--     bound tyvar in its range. Currently, the only usage of this env't
+--     checks whether there are any meta-variables in it
+--     (in GHC.Tc.Solver.Monad.mightMatchLater), so this is all OK.
+flattenTysX in_scope tys
+  = let (env, result) = coreFlattenTys emptyTvSubstEnv (emptyFlattenEnv in_scope) tys in
+    (result, build_env (fe_type_map env))
+  where
+    build_env :: TypeMap (TyVar, TyCon, [Type]) -> TyVarEnv (TyCon, [Type])
+    build_env env_in
+      = foldTM (\(tv, tc, tys) env_out -> extendVarEnv env_out tv (tc, tys))
+               env_in emptyVarEnv
 
 coreFlattenTys :: TvSubstEnv -> FlattenEnv
                -> [Type] -> (FlattenEnv, [Type])
@@ -1841,7 +1876,7 @@ coreFlattenCo subst env co
     (env1, kind') = coreFlattenTy subst env (coercionType co)
     covar         = mkFlattenFreshCoVar (fe_in_scope env1) kind'
     -- Add the covar to the FlattenEnv's in-scope set.
-    -- See Note [Flattening], wrinkle 2A.
+    -- See Note [Flattening type-family applications when matching instances], wrinkle 2A.
     env2          = updateInScopeSet env1 (flip extendInScopeSet covar)
 
 coreFlattenVarBndr :: TvSubstEnv -> FlattenEnv
@@ -1849,7 +1884,7 @@ coreFlattenVarBndr :: TvSubstEnv -> FlattenEnv
 coreFlattenVarBndr subst env tv
   = (env2, subst', tv')
   where
-    -- See Note [Flattening], wrinkle 2B.
+    -- See Note [Flattening type-family applications when matching instances], wrinkle 2B.
     kind          = varType tv
     (env1, kind') = coreFlattenTy subst env kind
     tv'           = uniqAway (fe_in_scope env1) (setVarType tv kind')
@@ -1862,26 +1897,30 @@ coreFlattenTyFamApp :: TvSubstEnv -> FlattenEnv
                     -> (FlattenEnv, Type)
 coreFlattenTyFamApp tv_subst env fam_tc fam_args
   = case lookupTypeMap type_map fam_ty of
-      Just tv -> (env', mkAppTys (mkTyVarTy tv) leftover_args')
-      Nothing -> let tyvar_name = mkFlattenFreshTyName fam_tc
-                     tv         = uniqAway in_scope $
-                                  mkTyVar tyvar_name (typeKind fam_ty)
+      Just (tv, _, _) -> (env', mkAppTys (mkTyVarTy tv) leftover_args')
+      Nothing ->
+        let tyvar_name = mkFlattenFreshTyName fam_tc
+            tv         = uniqAway in_scope $
+                         mkTyVar tyvar_name (typeKind fam_ty)
 
-                     ty'   = mkAppTys (mkTyVarTy tv) leftover_args'
-                     env'' = env' { fe_type_map = extendTypeMap type_map fam_ty tv
-                                  , fe_in_scope = extendInScopeSet in_scope tv }
-                 in (env'', ty')
+            ty'   = mkAppTys (mkTyVarTy tv) leftover_args'
+            env'' = env' { fe_type_map = extendTypeMap type_map fam_ty
+                                                       (tv, fam_tc, sat_fam_args)
+                         , fe_in_scope = extendInScopeSet in_scope tv }
+        in (env'', ty')
   where
     arity = tyConArity fam_tc
     tcv_subst = TCvSubst (fe_in_scope env) tv_subst emptyVarEnv
     (sat_fam_args, leftover_args) = ASSERT( arity <= length fam_args )
                                     splitAt arity fam_args
     -- Apply the substitution before looking up an application in the
-    -- environment. See Note [Flattening], wrinkle 1.
+    -- environment. See Note [Flattening type-family applications when matching instances],
+    -- wrinkle 1.
     -- NB: substTys short-cuts the common case when the substitution is empty.
     sat_fam_args' = substTys tcv_subst sat_fam_args
     (env', leftover_args') = coreFlattenTys tv_subst env leftover_args
-    -- `fam_tc` may be over-applied to `fam_args` (see Note [Flattening],
+    -- `fam_tc` may be over-applied to `fam_args` (see
+    -- Note [Flattening type-family applications when matching instances]
     -- wrinkle 3), so we split it into the arguments needed to saturate it
     -- (sat_fam_args') and the rest (leftover_args')
     fam_ty = mkTyConApp fam_tc sat_fam_args'

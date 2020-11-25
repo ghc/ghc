@@ -20,4 +20,4 @@ data family D (a :: TYPE r) :: TYPE r
 newtype instance D a = MkWordD Word#
 
 newtype instance D a :: TYPE (KindOf a) where
-  MkIntD :: forall (a :: TYPE 'IntRep). Int# -> D a
+  MkIntD :: forall a. Int# -> D a

@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 
@@ -36,7 +37,8 @@ module GHC.Tc.Utils.Unify (
   matchExpectedFunKind,
   matchActualFunTySigma, matchActualFunTysRho,
 
-  metaTyVarUpdateOK, occCheckForErrors, MetaTyVarUpdateResult(..)
+  metaTyVarUpdateOK, occCheckForErrors, MetaTyVarUpdateResult(..),
+  checkTyVarEq, checkTyFamEq, checkTypeEq, AreTypeFamiliesOK(..)
 
   ) where
 
@@ -73,6 +75,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
+import GHC.Exts      ( inline )
 import Control.Monad
 import Control.Arrow ( second )
 
@@ -949,7 +952,7 @@ buildTvImplication skol_info skol_tvs tclvl wanted
 
        ; return (implic { ic_tclvl     = tclvl
                         , ic_skols     = skol_tvs
-                        , ic_no_eqs    = True
+                        , ic_given_eqs = NoGivenEqs
                         , ic_wanted    = wanted
                         , ic_binds     = ev_binds
                         , ic_info      = skol_info }) }
@@ -1431,7 +1434,8 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
   where
     go dflags cur_lvl
       | canSolveByUnification cur_lvl tv1 ty2
-      , MTVU_OK ty2' <- metaTyVarUpdateOK dflags tv1 ty2
+           -- See Note [Prevent unification with type families] about the NoTypeFamilies:
+      , MTVU_OK ty2' <- metaTyVarUpdateOK dflags NoTypeFamilies tv1 ty2
       = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
@@ -1498,20 +1502,19 @@ lhsPriority tv
       RuntimeUnk  -> 0
       SkolemTv {} -> 0
       MetaTv { mtv_info = info } -> case info of
-                                     FlatSkolTv   -> 1
-                                     TyVarTv      -> 2
-                                     TauTv        -> 3
-                                     FlatMetaTv   -> 4
-                                     RuntimeUnkTv -> 5
+                                     CycleBreakerTv -> 0
+                                     TyVarTv        -> 1
+                                     TauTv          -> 2
+                                     RuntimeUnkTv   -> 3
 
 {- Note [TyVar/TyVar orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Given (a ~ b), should we orient the CTyEqCan as (a~b) or (b~a)?
+Given (a ~ b), should we orient the CEqCan as (a~b) or (b~a)?
 This is a surprisingly tricky question! This is invariant (TyEq:TV).
 
-The question is answered by swapOverTyVars, which is use
+The question is answered by swapOverTyVars, which is used
   - in the eager unifier, in GHC.Tc.Utils.Unify.uUnfilledVar1
-  - in the constraint solver, in GHC.Tc.Solver.Canonical.canEqTyVarHomo
+  - in the constraint solver, in GHC.Tc.Solver.Canonical.canEqCanLHS2
 
 First note: only swap if you have to!
    See Note [Avoid unnecessary swaps]
@@ -1531,25 +1534,23 @@ So we look for a positive reason to swap, using a three-step test:
         looks for meta tyvars on the left
 
   Tie-breaking rules for MetaTvs:
-  - FlatMetaTv = 4: always put on the left.
-        See Note [Fmv Orientation Invariant]
+  - CycleBreakerTv: This is essentially a stand-in for another type;
+       it's untouchable and should have the same priority as a skolem: 0.
 
-        NB: FlatMetaTvs always have the current level, never an
-        outer one.  So nothing can be deeper than a FlatMetaTv.
+  - TyVarTv: These can unify only with another tyvar, but we can't unify
+       a TyVarTv with a TauTv, because then the TyVarTv could (transitively)
+       get a non-tyvar type. So give these a low priority: 1.
 
-  - TauTv = 3: if we have  tyv_tv ~ tau_tv,
-       put tau_tv on the left because there are fewer
-       restrictions on updating TauTvs.  Or to say it another
-       way, then we won't lose the TyVarTv flag
+  - TauTv: This is the common case; we want these on the left so that they
+       can be written to: 2.
 
-  - TyVarTv = 2: remember, flat-skols are *only* updated by
-       the unflattener, never unified, so TyVarTvs come next
-
-  - FlatSkolTv = 1: put on the left in preference to a SkolemTv.
-       See Note [Eliminate flat-skols]
+  - RuntimeUnkTv: These aren't really meta-variables used in type inference,
+       but just a convenience in the implementation of the GHCi debugger.
+       Eagerly write to these: 3. See Note [RuntimeUnkTv] in
+       GHC.Runtime.Heap.Inspect.
 
 * Names. If the level and priority comparisons are all
-  equal, try to eliminate a TyVars with a System Name in
+  equal, try to eliminate a TyVar with a System Name in
   favour of ones with a Name derived from a user type signature
 
 * Age.  At one point in the past we tried to break any remaining
@@ -1601,64 +1602,6 @@ Wanteds and Givens, but either way, deepest wins!  Simple.
 
 See #15009 for an further analysis of why "deepest on the left"
 is a good plan.
-
-Note [Fmv Orientation Invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   * We always orient a constraint
-        fmv ~ alpha
-     with fmv on the left, even if alpha is
-     a touchable unification variable
-
-Reason: doing it the other way round would unify alpha:=fmv, but that
-really doesn't add any info to alpha.  But a later constraint alpha ~
-Int might unlock everything.  Comment:9 of #12526 gives a detailed
-example.
-
-WARNING: I've gone to and fro on this one several times.
-I'm now pretty sure that unifying alpha:=fmv is a bad idea!
-So orienting with fmvs on the left is a good thing.
-
-This example comes from IndTypesPerfMerge. (Others include
-T10226, T10009.)
-    From the ambiguity check for
-      f :: (F a ~ a) => a
-    we get:
-          [G] F a ~ a
-          [WD] F alpha ~ alpha, alpha ~ a
-
-    From Givens we get
-          [G] F a ~ fsk, fsk ~ a
-
-    Now if we flatten we get
-          [WD] alpha ~ fmv, F alpha ~ fmv, alpha ~ a
-
-    Now, if we unified alpha := fmv, we'd get
-          [WD] F fmv ~ fmv, [WD] fmv ~ a
-    And now we are stuck.
-
-So instead the Fmv Orientation Invariant puts the fmv on the
-left, giving
-      [WD] fmv ~ alpha, [WD] F alpha ~ fmv, [WD] alpha ~ a
-
-    Now we get alpha:=a, and everything works out
-
-Note [Eliminate flat-skols]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have  [G] Num (F [a])
-then we flatten to
-     [G] Num fsk
-     [G] F [a] ~ fsk
-where fsk is a flatten-skolem (FlatSkolTv). Suppose we have
-      type instance F [a] = a
-then we'll reduce the second constraint to
-     [G] a ~ fsk
-and then replace all uses of 'a' with fsk.  That's bad because
-in error messages instead of saying 'a' we'll say (F [a]).  In all
-places, including those where the programmer wrote 'a' in the first
-place.  Very confusing!  See #7862.
-
-Solution: re-orient a~fsk to fsk~a, so that we preferentially eliminate
-the fsk.
 
 Note [Avoid unnecessary swaps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1734,8 +1677,11 @@ It would be lovely in the future to revisit this problem and remove this
 extra, unnecessary check. But we retain it for now as it seems to work
 better in practice.
 
-Note [Refactoring hazard: checkTauTvUpdate]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Revisited in Nov '20, along with removing flattening variables. Problem
+is still present, and the solution (NoTypeFamilies) is still the same.
+
+Note [Refactoring hazard: metaTyVarUpdateOK]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 I (Richard E.) have a sad story about refactoring this code, retained here
 to prevent others (or a future me!) from falling into the same traps.
 
@@ -1957,7 +1903,7 @@ occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
 --   a) the given variable occurs in the given type.
 --   b) there is a forall in the type (unless we have -XImpredicativeTypes)
 occCheckForErrors dflags tv ty
-  = case mtvu_check dflags True tv ty of
+  = case checkTyVarEq dflags YesTypeFamilies tv ty of
       MTVU_OK _        -> MTVU_OK ()
       MTVU_Bad         -> MTVU_Bad
       MTVU_HoleBlocker -> MTVU_HoleBlocker
@@ -1966,16 +1912,24 @@ occCheckForErrors dflags tv ty
                             Just _  -> MTVU_OK ()
 
 ----------------
+data AreTypeFamiliesOK = YesTypeFamilies
+                       | NoTypeFamilies
+                       deriving Eq
+
+instance Outputable AreTypeFamiliesOK where
+  ppr YesTypeFamilies = text "YesTypeFamilies"
+  ppr NoTypeFamilies  = text "NoTypeFamilies"
+
 metaTyVarUpdateOK :: DynFlags
+                  -> AreTypeFamiliesOK   -- allow type families in RHS?
                   -> TcTyVar             -- tv :: k1
                   -> TcType              -- ty :: k2
                   -> MetaTyVarUpdateResult TcType        -- possibly-expanded ty
 -- (metaTyVarUpdateOK tv ty)
 -- Checks that the equality tv~ty is OK to be used to rewrite
--- other equalities.  Equivalently, checks the conditions for CTyEqCan
+-- other equalities.  Equivalently, checks the conditions for CEqCan
 --       (a) that tv doesn't occur in ty (occurs check)
---       (b) that ty does not have any foralls
---           (in the impredicative case), or type functions
+--       (b) that ty does not have any foralls or (perhaps) type functions
 --       (c) that ty does not have any blocking coercion holes
 --           See Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
 --
@@ -2000,12 +1954,10 @@ metaTyVarUpdateOK :: DynFlags
 -- we return Nothing, leaving it to the later constraint simplifier to
 -- sort matters out.
 --
--- See Note [Refactoring hazard: checkTauTvUpdate]
+-- See Note [Refactoring hazard: metaTyVarUpdateOK]
 
-metaTyVarUpdateOK dflags tv ty
-  = case mtvu_check dflags False tv ty of
-         -- False <=> type families not ok
-         -- See Note [Prevent unification with type families]
+metaTyVarUpdateOK dflags ty_fam_ok tv ty
+  = case checkTyVarEq dflags ty_fam_ok tv ty of
       MTVU_OK _        -> MTVU_OK ty
       MTVU_Bad         -> MTVU_Bad          -- forall, predicate, type function
       MTVU_HoleBlocker -> MTVU_HoleBlocker  -- coercion hole
@@ -2013,20 +1965,40 @@ metaTyVarUpdateOK dflags tv ty
                             Just expanded_ty -> MTVU_OK expanded_ty
                             Nothing          -> MTVU_Occurs
 
-mtvu_check :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
--- Checks the invariants for CTyEqCan.   In particular:
+checkTyVarEq :: DynFlags -> AreTypeFamiliesOK -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
+checkTyVarEq dflags ty_fam_ok tv ty
+  = inline checkTypeEq dflags ty_fam_ok (TyVarLHS tv) ty
+    -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
+
+checkTyFamEq :: DynFlags
+             -> TyCon     -- type function
+             -> [TcType]  -- args, exactly saturated
+             -> TcType    -- RHS
+             -> MetaTyVarUpdateResult ()
+checkTyFamEq dflags fun_tc fun_args ty
+  = inline checkTypeEq dflags YesTypeFamilies (TyFamLHS fun_tc fun_args) ty
+    -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
+
+checkTypeEq :: DynFlags -> AreTypeFamiliesOK -> CanEqLHS -> TcType
+            -> MetaTyVarUpdateResult ()
+-- Checks the invariants for CEqCan.   In particular:
 --   (a) a forall type (forall a. blah)
 --   (b) a predicate type (c => ty)
 --   (c) a type family; see Note [Prevent unification with type families]
 --   (d) a blocking coercion hole
---   (e) an occurrence of the type variable (occurs check)
+--   (e) an occurrence of the LHS (occurs check)
 --
 -- For (a), (b), and (c) we check only the top level of the type, NOT
 -- inside the kinds of variables it mentions.  For (d) we look deeply
--- in coercions, and for (e) we do look in the kinds of course.
-
-mtvu_check dflags ty_fam_ok tv ty
-  = fast_check ty
+-- in coercions when the LHS is a tyvar (but skip coercions for type family
+-- LHSs), and for (e) see Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
+--
+-- checkTypeEq is called from
+--    * checkTyFamEq, checkTyVarEq (which inline it to specialise away the
+--      case-analysis on 'lhs'
+--    * checkEqCanLHSFinish, which does not know the form of 'lhs'
+checkTypeEq dflags ty_fam_ok lhs ty
+  = go ty
   where
     ok :: MetaTyVarUpdateResult ()
     ok = MTVU_OK ()
@@ -2035,53 +2007,82 @@ mtvu_check dflags ty_fam_ok tv ty
     -- unification variables that can unify with a polytype
     -- or a TyCon that would usually be disallowed by bad_tc
     -- See Note [RuntimeUnkTv] in GHC.Runtime.Heap.Inspect
-    ghci_tv = case tcTyVarDetails tv of
-                MetaTv { mtv_info = RuntimeUnkTv } -> True
-                _                                  -> False
+    ghci_tv
+      | TyVarLHS tv <- lhs
+      , MetaTv { mtv_info = RuntimeUnkTv } <- tcTyVarDetails tv
+      = True
 
-    fast_check :: TcType -> MetaTyVarUpdateResult ()
-    fast_check (TyVarTy tv')
-      | tv == tv' = MTVU_Occurs
-      | otherwise = fast_check_occ (tyVarKind tv')
-           -- See Note [Occurrence checking: look inside kinds]
-           -- in GHC.Core.Type
+      | otherwise
+      = False
 
-    fast_check (TyConApp tc tys)
-      | bad_tc tc, not ghci_tv = MTVU_Bad
-      | otherwise              = mapM fast_check tys >> ok
-    fast_check (LitTy {})      = ok
-    fast_check (FunTy{ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
+    go :: TcType -> MetaTyVarUpdateResult ()
+    go (TyVarTy tv')           = go_tv tv'
+    go (TyConApp tc tys)       = go_tc tc tys
+    go (LitTy {})              = ok
+    go (FunTy{ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
       | InvisArg <- af
       , not ghci_tv            = MTVU_Bad
-      | otherwise              = fast_check w   >> fast_check a >> fast_check r
-    fast_check (AppTy fun arg) = fast_check fun >> fast_check arg
-    fast_check (CastTy ty co)  = fast_check ty  >> fast_check_co co
-    fast_check (CoercionTy co) = fast_check_co co
-    fast_check (ForAllTy (Bndr tv' _) ty)
+      | otherwise              = go w   >> go a >> go r
+    go (AppTy fun arg) = go fun >> go arg
+    go (CastTy ty co)  = go ty  >> go_co co
+    go (CoercionTy co) = go_co co
+    go (ForAllTy (Bndr tv' _) ty)
        | not ghci_tv = MTVU_Bad
-       | tv == tv'   = ok
-       | otherwise = do { fast_check_occ (tyVarKind tv')
-                        ; fast_check_occ ty }
-       -- Under a forall we look only for occurrences of
-       -- the type variable
+       | otherwise   = case lhs of
+           TyVarLHS tv | tv == tv' -> ok
+                       | otherwise -> do { go_occ tv (tyVarKind tv')
+                                         ; go ty }
+           _                       -> go ty
+
+    go_tv :: TcTyVar -> MetaTyVarUpdateResult ()
+      -- this slightly peculiar way of defining this means
+      -- we don't have to evaluate this `case` at every variable
+      -- occurrence
+    go_tv = case lhs of
+      TyVarLHS tv -> \ tv' -> if tv == tv'
+                              then MTVU_Occurs
+                              else go_occ tv (tyVarKind tv')
+      TyFamLHS {} -> \ _tv' -> ok
+           -- See Note [Occurrence checking: look inside kinds] in GHC.Core.Type
 
      -- For kinds, we only do an occurs check; we do not worry
      -- about type families or foralls
      -- See Note [Checking for foralls]
-    fast_check_occ k | tv `elemVarSet` tyCoVarsOfType k = MTVU_Occurs
-                     | otherwise                        = ok
+    go_occ tv k | tv `elemVarSet` tyCoVarsOfType k = MTVU_Occurs
+                | otherwise                        = ok
+
+    go_tc :: TyCon -> [TcType] -> MetaTyVarUpdateResult ()
+      -- this slightly peculiar way of defining this means
+      -- we don't have to evaluate this `case` at every tyconapp
+    go_tc = case lhs of
+      TyVarLHS {} -> \ tc tys ->
+        if | good_tc tc -> mapM go tys >> ok
+           | otherwise  -> MTVU_Bad
+      TyFamLHS fam_tc fam_args -> \ tc tys ->
+        if | tcEqTyConApps fam_tc fam_args tc tys -> MTVU_Occurs
+           | good_tc tc                           -> mapM go tys >> ok
+           | otherwise                            -> MTVU_Bad
+
 
      -- no bother about impredicativity in coercions, as they're
      -- inferred
-    fast_check_co co | not (gopt Opt_DeferTypeErrors dflags)
-                     , badCoercionHoleCo co            = MTVU_HoleBlocker
-        -- Wrinkle (4b) in "GHC.Tc.Solver.Canonical" Note [Equalities with incompatible kinds]
+    go_co co | not (gopt Opt_DeferTypeErrors dflags)
+             , hasCoercionHoleCo co
+             = MTVU_HoleBlocker  -- Wrinkle (2) in GHC.Tc.Solver.Canonical
+        -- See GHC.Tc.Solver.Canonical Note [Equalities with incompatible kinds]
+        -- Wrinkle (2) about this case in general, Wrinkle (4b) about the check for
+        -- deferred type errors.
 
-                     | tv `elemVarSet` tyCoVarsOfCo co = MTVU_Occurs
-                     | otherwise                       = ok
+             | TyVarLHS tv <- lhs
+             , tv `elemVarSet` tyCoVarsOfCo co
+             = MTVU_Occurs
 
-    bad_tc :: TyCon -> Bool
-    bad_tc tc
-      | not (isTauTyCon tc)                  = True
-      | not (ty_fam_ok || isFamFreeTyCon tc) = True
-      | otherwise                            = False
+        -- Don't check coercions for type families; see commentary at top of function
+             | otherwise
+             = ok
+
+    good_tc :: TyCon -> Bool
+    good_tc
+      | ghci_tv   = \ _tc -> True
+      | otherwise = \ tc  -> isTauTyCon tc &&
+                             (ty_fam_ok == YesTypeFamilies || isFamFreeTyCon tc)

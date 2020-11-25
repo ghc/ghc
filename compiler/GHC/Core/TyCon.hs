@@ -56,7 +56,7 @@ module GHC.Core.TyCon(
         mustBeSaturated,
         isPromotedDataCon, isPromotedDataCon_maybe,
         isKindTyCon, isLiftedTypeKindTyConName,
-        isTauTyCon, isFamFreeTyCon,
+        isTauTyCon, isFamFreeTyCon, isForgetfulSynTyCon,
 
         isDataTyCon, isProductTyCon, isDataProductTyCon_maybe,
         isDataSumTyCon_maybe,
@@ -817,10 +817,15 @@ data TyCon
         synIsTau     :: Bool,   -- True <=> the RHS of this synonym does not
                                  --          have any foralls, after expanding any
                                  --          nested synonyms
-        synIsFamFree  :: Bool    -- True <=> the RHS of this synonym does not mention
+        synIsFamFree  :: Bool,   -- True <=> the RHS of this synonym does not mention
                                  --          any type synonym families (data families
                                  --          are fine), again after expanding any
                                  --          nested synonyms
+        synIsForgetful :: Bool   -- True <=  at least one argument is not mentioned
+                                 --          in the RHS (or is mentioned only under
+                                 --          forgetful synonyms)
+                                 -- Test is conservative, so True does not guarantee
+                                 -- forgetfulness.
     }
 
   -- | Represents families (both type and data)
@@ -1779,20 +1784,21 @@ mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
 
 -- | Create a type synonym 'TyCon'
 mkSynonymTyCon :: Name -> [TyConBinder] -> Kind   -- ^ /result/ kind
-               -> [Role] -> Type -> Bool -> Bool -> TyCon
-mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free
+               -> [Role] -> Type -> Bool -> Bool -> Bool -> TyCon
+mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free is_forgetful
   = SynonymTyCon {
-        tyConName    = name,
-        tyConUnique  = nameUnique name,
-        tyConBinders = binders,
-        tyConResKind = res_kind,
-        tyConKind    = mkTyConKind binders res_kind,
-        tyConArity   = length binders,
-        tyConTyVars  = binderVars binders,
-        tcRoles      = roles,
-        synTcRhs     = rhs,
-        synIsTau     = is_tau,
-        synIsFamFree = is_fam_free
+        tyConName      = name,
+        tyConUnique    = nameUnique name,
+        tyConBinders   = binders,
+        tyConResKind   = res_kind,
+        tyConKind      = mkTyConKind binders res_kind,
+        tyConArity     = length binders,
+        tyConTyVars    = binderVars binders,
+        tcRoles        = roles,
+        synTcRhs       = rhs,
+        synIsTau       = is_tau,
+        synIsFamFree   = is_fam_free,
+        synIsForgetful = is_forgetful
     }
 
 -- | Create a type family 'TyCon'
@@ -2046,10 +2052,21 @@ isTauTyCon :: TyCon -> Bool
 isTauTyCon (SynonymTyCon { synIsTau = is_tau }) = is_tau
 isTauTyCon _                                    = True
 
+-- | Is this tycon neither a type family nor a synonym that expands
+-- to a type family?
 isFamFreeTyCon :: TyCon -> Bool
 isFamFreeTyCon (SynonymTyCon { synIsFamFree = fam_free }) = fam_free
 isFamFreeTyCon (FamilyTyCon { famTcFlav = flav })         = isDataFamFlav flav
 isFamFreeTyCon _                                          = True
+
+-- | Is this a forgetful type synonym? If this is a type synonym whose
+-- RHS does not mention one (or more) of its bound variables, returns
+-- True. Thus, False means that all bound variables appear on the RHS;
+-- True may not mean anything, as the test to set this flag is
+-- conservative.
+isForgetfulSynTyCon :: TyCon -> Bool
+isForgetfulSynTyCon (SynonymTyCon { synIsForgetful = forget }) = forget
+isForgetfulSynTyCon _                                          = False
 
 -- As for newtypes, it is in some contexts important to distinguish between
 -- closed synonyms and synonym families, as synonym families have no unique
@@ -2118,7 +2135,7 @@ isClosedSynFamilyTyConWithAxiom_maybe
   (FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon mb}) = mb
 isClosedSynFamilyTyConWithAxiom_maybe _               = Nothing
 
--- | @'tyConInjectivityInfo' tc@ returns @'Injective' is@ is @tc@ is an
+-- | @'tyConInjectivityInfo' tc@ returns @'Injective' is@ if @tc@ is an
 -- injective tycon (where @is@ states for which 'tyConBinders' @tc@ is
 -- injective), or 'NotInjective' otherwise.
 tyConInjectivityInfo :: TyCon -> Injectivity
