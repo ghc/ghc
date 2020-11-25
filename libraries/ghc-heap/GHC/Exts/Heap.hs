@@ -27,8 +27,12 @@ module GHC.Exts.Heap (
     , GenClosure(..)
     , ClosureType(..)
     , PrimType(..)
+    , WhatNext(..)
+    , WhyBlocked(..)
+    , TsoFlags(..)
     , HasHeapRep(getClosureData)
     , getClosureDataFromHeapRep
+    , getClosureDataFromHeapRepPrim
 
     -- * Info Table types
     , StgInfoTable(..)
@@ -38,6 +42,12 @@ module GHC.Exts.Heap (
     , itblSize
     , peekItbl
     , pokeItbl
+
+    -- * Cost Centre (profiling) types
+    , StgTSOProfInfo(..)
+    , IndexTable(..)
+    , CostCentre(..)
+    , CostCentreStack(..)
 
      -- * Closure inspection
     , getBoxedClosureData
@@ -53,12 +63,14 @@ import Prelude
 import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Constants
+import GHC.Exts.Heap.ProfInfo.Types
 #if defined(PROFILING)
 import GHC.Exts.Heap.InfoTableProf
 #else
 import GHC.Exts.Heap.InfoTable
 #endif
 import GHC.Exts.Heap.Utils
+import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 
 import Control.Monad
 import Data.Bits
@@ -152,26 +164,34 @@ getClosureDataFromHeapObject x = do
                 STACK -> pure $ UnsupportedClosure infoTable
                 _ -> getClosureDataFromHeapRep heapRep infoTablePtr ptrList
 
+
 -- | Convert an unpacked heap object, to a `GenClosure b`. The inputs to this
 -- function can be generated from a heap object using `unpackClosure#`.
-getClosureDataFromHeapRep
-    :: ByteArray#
+getClosureDataFromHeapRep :: ByteArray# -> Ptr StgInfoTable -> [b] -> IO (GenClosure b)
+getClosureDataFromHeapRep heapRep infoTablePtr pts = do
+  itbl <- peekItbl infoTablePtr
+  getClosureDataFromHeapRepPrim (dataConNames infoTablePtr) itbl heapRep pts
+
+getClosureDataFromHeapRepPrim
+    :: IO (String, String, String)
+    -- ^ A continuation used to decode the constructor description field,
+    -- in ghc-debug this code can lead to segfaults because dataConNames
+    -- will dereference a random part of memory.
+    -> StgInfoTable
+    -- ^ The `StgInfoTable` of the closure, extracted from the heap
+    -- representation.
+    -> ByteArray#
     -- ^ Heap representation of the closure as returned by `unpackClosure#`.
     -- This includes all of the object including the header, info table
     -- pointer, pointer data, and non-pointer data. The ByteArray# may be
     -- pinned or unpinned.
-    -> Ptr StgInfoTable
-    -- ^ Pointer to the `StgInfoTable` of the closure, extracted from the heap
-    -- representation. The info table must not be movable by GC i.e. must be in
-    -- pinned or off-heap memory.
     -> [b]
     -- ^ Pointers in the payload of the closure, extracted from the heap
     -- representation as returned by `collect_pointers()` in `Heap.c`. The type
     -- `b` is some representation of a pointer e.g. `Any` or `Ptr Any`.
     -> IO (GenClosure b)
     -- ^ Heap representation of the closure.
-getClosureDataFromHeapRep heapRep infoTablePtr pts = do
-    itbl <- peekItbl infoTablePtr
+getClosureDataFromHeapRepPrim getConDesc itbl heapRep pts = do
     let -- heapRep as a list of words.
         rawHeapWords :: [Word]
         rawHeapWords = [W# (indexWordArray# heapRep i) | I# i <- [0.. end] ]
@@ -189,10 +209,8 @@ getClosureDataFromHeapRep heapRep infoTablePtr pts = do
         npts = drop (closureTypeHeaderSize (tipe itbl) + length pts) rawHeapWords
     case tipe itbl of
         t | t >= CONSTR && t <= CONSTR_NOCAF -> do
-            (p, m, n) <- dataConNames infoTablePtr
-            if m == "GHC.ByteCode.Instr" && n == "BreakInfo"
-              then pure $ UnsupportedClosure itbl
-              else pure $ ConstrClosure itbl pts npts p m n
+            (p, m, n) <- getConDesc
+            pure $ ConstrClosure itbl pts npts p m n
 
         t | t >= THUNK && t <= THUNK_STATIC -> do
             pure $ ThunkClosure itbl pts npts
@@ -323,6 +341,45 @@ getClosureDataFromHeapRep heapRep infoTablePtr pts = do
                 , finalizer = pts !! 3
                 , link = pts !! 4
                 }
+        TSO | [ u_lnk, u_gbl_lnk, tso_stack, u_trec, u_blk_ex, u_bq] <- pts
+                -> withArray rawHeapWords (\ptr -> do
+                    fields <- FFIClosures.peekTSOFields ptr
+                    pure $ TSOClosure
+                        { info = itbl
+                        , link = u_lnk
+                        , global_link = u_gbl_lnk
+                        , tsoStack = tso_stack
+                        , trec = u_trec
+                        , blocked_exceptions = u_blk_ex
+                        , bq = u_bq
+                        , what_next = FFIClosures.tso_what_next fields
+                        , why_blocked = FFIClosures.tso_why_blocked fields
+                        , flags = FFIClosures.tso_flags fields
+                        , threadId = FFIClosures.tso_threadId fields
+                        , saved_errno = FFIClosures.tso_saved_errno fields
+                        , tso_dirty = FFIClosures.tso_dirty fields
+                        , alloc_limit = FFIClosures.tso_alloc_limit fields
+                        , tot_stack_size = FFIClosures.tso_tot_stack_size fields
+                        , prof = FFIClosures.tso_prof fields
+                        })
+            | otherwise
+                -> fail $ "Expected 6 ptr arguments to TSO, found "
+                        ++ show (length pts)
+        STACK
+            | [] <- pts
+            -> withArray rawHeapWords (\ptr -> do
+                            fields <- FFIClosures.peekStackFields ptr
+                            pure $ StackClosure
+                                { info = itbl
+                                , stack_size = FFIClosures.stack_size fields
+                                , stack_dirty = FFIClosures.stack_dirty fields
+#if __GLASGOW_HASKELL__ >= 811
+                                , stack_marking = FFIClosures.stack_marking fields
+#endif
+                                })
+            | otherwise
+                -> fail $ "Expected 0 ptr argument to STACK, found "
+                    ++ show (length pts)
 
         _ ->
             pure $ UnsupportedClosure itbl

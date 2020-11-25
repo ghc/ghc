@@ -58,7 +58,7 @@
 #define MAX_THUNK_SELECTOR_DEPTH 16
 
 static void eval_thunk_selector (StgClosure **q, StgSelector *p, bool);
-STATIC_INLINE void evacuate_large(StgPtr p);
+ATTR_NOINLINE static void evacuate_large(StgPtr p);
 
 /* -----------------------------------------------------------------------------
    Allocate some space in which to copy an object.
@@ -134,8 +134,13 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
    The evacuate() code
    -------------------------------------------------------------------------- */
 
-/* size is in words */
-STATIC_INLINE GNUC_ATTR_HOT void
+/* size is in words
+
+   We want to *always* inline this as often the size of the closure is static,
+   which allows unrolling of the copy loop.
+
+ */
+ATTR_ALWAYS_INLINE GNUC_ATTR_HOT static inline void
 copy_tag(StgClosure **p, const StgInfoTable *info,
          StgClosure *src, uint32_t size, uint32_t gen_no, StgWord tag)
 {
@@ -194,7 +199,7 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
 }
 
 #if defined(PARALLEL_GC) && !defined(PROFILING)
-STATIC_INLINE void
+ATTR_ALWAYS_INLINE static inline void
 copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
          StgClosure *src, uint32_t size, uint32_t gen_no, StgWord tag)
 {
@@ -231,7 +236,7 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
  * pointer of an object, but reserve some padding after it.  This is
  * used to optimise evacuation of TSOs.
  */
-static bool
+ATTR_ALWAYS_INLINE static inline bool
 copyPart(StgClosure **p, StgClosure *src, uint32_t size_to_reserve,
          uint32_t size_to_copy, uint32_t gen_no)
 {
@@ -283,7 +288,7 @@ spin:
 
 
 /* Copy wrappers that don't tag the closure after copying */
-STATIC_INLINE GNUC_ATTR_HOT void
+ATTR_ALWAYS_INLINE GNUC_ATTR_HOT static inline void
 copy(StgClosure **p, const StgInfoTable *info,
      StgClosure *src, uint32_t size, uint32_t gen_no)
 {
@@ -301,7 +306,7 @@ copy(StgClosure **p, const StgInfoTable *info,
    that has been evacuated, or unset otherwise.
    -------------------------------------------------------------------------- */
 
-static void
+ATTR_NOINLINE static void
 evacuate_large(StgPtr p)
 {
   bdescr *bd;

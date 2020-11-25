@@ -37,11 +37,16 @@ extern "C" {
 #include "HsFFI.h"
 #include "RtsAPI.h"
 
-// Turn off inlining when debugging - it obfuscates things
+// Disencourage gcc from inlining when debugging - it obfuscates things
 #if defined(DEBUG)
 # undef  STATIC_INLINE
 # define STATIC_INLINE static
 #endif
+
+// Fine grained inlining control helpers.
+#define ATTR_ALWAYS_INLINE __attribute__((always_inline))
+#define ATTR_NOINLINE      __attribute__((noinline))
+
 
 #include "rts/Types.h"
 #include "rts/Time.h"
@@ -114,13 +119,13 @@ void _assertFail(const char *filename, unsigned int linenum)
    GNUC3_ATTRIBUTE(__noreturn__);
 
 #define CHECK(predicate)                        \
-        if (predicate)                          \
+        if (RTS_LIKELY(predicate))              \
             /*null*/;                           \
         else                                    \
             _assertFail(__FILE__, __LINE__)
 
 #define CHECKM(predicate, msg, ...)             \
-        if (predicate)                          \
+        if (RTS_LIKELY(predicate))              \
             /*null*/;                           \
         else                                    \
             barf(msg, ##__VA_ARGS__)

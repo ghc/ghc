@@ -32,7 +32,7 @@ import Data.Binary.Get
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Unsafe as B
 import GHC.Exts
-import GHC.Exts.Heap
+import qualified GHC.Exts.Heap as Heap
 import GHC.Stack
 import Foreign hiding (void)
 import Foreign.C
@@ -93,8 +93,8 @@ run m = case m of
     toRemotePtr <$> mkConInfoTable tc ptrs nptrs tag ptrtag desc
   StartTH -> startTH
   GetClosure ref -> do
-    clos <- getClosureData =<< localRef ref
-    mapM (\(Box x) -> mkRemoteRef (HValue x)) clos
+    clos <- Heap.getClosureData =<< localRef ref
+    mapM (\(Heap.Box x) -> mkRemoteRef (HValue x)) clos
   Seq ref -> doSeq ref
   ResumeSeq ref -> resumeSeq ref
   _other -> error "GHCi.Run.run"
