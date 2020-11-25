@@ -185,17 +185,19 @@ findToolDir
   :: FilePath -- ^ topdir
   -> IO (Maybe FilePath)
 #if defined(mingw32_HOST_OS) && !defined(USE_INPLACE_MINGW_TOOLCHAIN)
-findToolDir top_dir = go 0 (top_dir </> "..")
+findToolDir top_dir = go 0 (top_dir </> "..") []
   where maxDepth = 3
-        go :: Int -> FilePath -> IO (Maybe FilePath)
-        go k path
+        go :: Int -> FilePath -> [FilePath] -> IO (Maybe FilePath)
+        go k path tried
           | k == maxDepth = throwGhcExceptionIO $
-              InstallationError "could not detect mingw toolchain"
+              InstallationError $ "could not detect mingw toolchain in the following paths: " ++ show tried
           | otherwise = do
-              oneLevel <- doesDirectoryExist (path </> "mingw")
+              let try = path </> "mingw"
+              let tried = tried ++ [try]
+              oneLevel <- doesDirectoryExist try
               if oneLevel
                 then return (Just path)
-                else go (k+1) (path </> "..")
+                else go (k+1) (path </> "..") tried
 #else
 findToolDir _ = return Nothing
 #endif
