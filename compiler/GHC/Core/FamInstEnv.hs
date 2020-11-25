@@ -1198,8 +1198,7 @@ findBranch branches target_tys
 apartnessCheck :: [Type]
   -- ^ /flattened/ target arguments. Make sure they're flattened! See
   -- Note [Flattening type-family applications when matching instances]
-  -- in GHC.Core.Unify. (NB: This "flat" is a different
- -- "flat" than is used in GHC.Tc.Solver.Flatten.)
+  -- in GHC.Core.Unify.
                -> CoAxBranch -- ^ the candidate equation we wish to use
                              -- Precondition: this matches the target
                -> Bool       -- ^ True <=> equation can fire
@@ -1459,14 +1458,14 @@ normalise_type ty
     go_app_tys :: Type   -- function
                -> [Type] -- args
                -> NormM (Coercion, Type)
-    -- cf. GHC.Tc.Solver.Flatten.flatten_app_ty_args
+    -- cf. GHC.Tc.Solver.Rewrite.rewrite_app_ty_args
     go_app_tys (AppTy ty1 ty2) tys = go_app_tys ty1 (ty2 : tys)
     go_app_tys fun_ty arg_tys
       = do { (fun_co, nfun) <- go fun_ty
            ; case tcSplitTyConApp_maybe nfun of
                Just (tc, xis) ->
                  do { (second_co, nty) <- go (mkTyConApp tc (xis ++ arg_tys))
-                   -- flatten_app_ty_args avoids redundantly processing the xis,
+                   -- rewrite_app_ty_args avoids redundantly processing the xis,
                    -- but that's a much more performance-sensitive function.
                    -- This type normalisation is not called in a loop.
                     ; return (mkAppCos fun_co (map mkNomReflCo arg_tys) `mkTransCo` second_co, nty) }
@@ -1490,7 +1489,7 @@ normalise_args :: Kind    -- of the function
 -- and the res_co :: kind(f orig_args) ~ kind(f xis)
 -- NB: The xis might *not* have the same kinds as the input types,
 -- but the resulting application *will* be well-kinded
--- cf. GHC.Tc.Solver.Flatten.flatten_args_slow
+-- cf. GHC.Tc.Solver.Rewrite.rewrite_args_slow
 normalise_args fun_ki roles args
   = do { normed_args <- zipWithM normalise1 roles args
        ; let (xis, cos, res_co) = simplifyArgsWorker ki_binders inner_ki fvs roles normed_args
@@ -1499,7 +1498,7 @@ normalise_args fun_ki roles args
     (ki_binders, inner_ki) = splitPiTys fun_ki
     fvs = tyCoVarsOfTypes args
 
-    -- flattener conventions are different from ours
+    -- rewriter conventions are different from ours
     impedance_match :: NormM (Coercion, Type) -> NormM (Type, Coercion)
     impedance_match action = do { (co, ty) <- action
                                 ; return (ty, mkSymCo co) }
