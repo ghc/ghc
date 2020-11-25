@@ -82,7 +82,8 @@ data RegAllocStats statics instr
         , raSpilled     :: [LiveCmmDecl statics instr]
 
           -- | Target platform
-        , raPlatform    = platform }
+        , raPlatform    :: !Platform
+        }
 
 
         -- a successful coloring
