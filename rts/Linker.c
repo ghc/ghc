@@ -171,6 +171,10 @@ Mutex linker_mutex;
 /* Generic wrapper function to try and Resolve and RunInit oc files */
 int ocTryLoad( ObjectCode* oc );
 
+#if defined(OBJFORMAT_ELF)
+static void freeNativeCode_ELF (ObjectCode *nc);
+#endif
+
 /* Link objects into the lower 2Gb on x86_64 and AArch64.  GHC assumes the
  * small memory model on this architecture (see gcc docs,
  * -mcmodel=small).
