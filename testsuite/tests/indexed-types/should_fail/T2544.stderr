@@ -1,13 +1,13 @@
 
-T2544.hs:19:18: error:
-    • Couldn't match type: IxMap i0
-                     with: IxMap l
-      Expected: IxMap l [Int]
-        Actual: IxMap i0 [Int]
+T2544.hs:19:12: error:
+    • Couldn't match type: IxMap i1
+                     with: IxMap r
+      Expected: IxMap (l :|: r) [Int]
+        Actual: BiApp (IxMap i0) (IxMap i1) [Int]
       NB: ‘IxMap’ is a non-injective type family
-      The type variable ‘i0’ is ambiguous
-    • In the first argument of ‘BiApp’, namely ‘empty’
-      In the expression: BiApp empty empty
+      The type variable ‘i1’ is ambiguous
+    • In the expression: BiApp empty empty
       In an equation for ‘empty’: empty = BiApp empty empty
+      In the instance declaration for ‘Ix (l :|: r)’
     • Relevant bindings include
         empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:19:4)

@@ -258,13 +258,13 @@ floatKindEqualities wc = float_wc emptyVarSet wc
            | otherwise        = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
 
     float_implic :: TcTyCoVarSet -> Implication -> Maybe (Bag Ct, Bag Hole)
-    float_implic trapping_tvs (Implic { ic_wanted = wanted, ic_no_eqs = no_eqs
+    float_implic trapping_tvs (Implic { ic_wanted = wanted, ic_given_eqs = given_eqs
                                       , ic_skols = skols, ic_status = status })
       | isInsolubleStatus status
       = Nothing   -- A short cut /plus/ we must keep track of IC_BadTelescope
       | otherwise
       = do { (simples, holes) <- float_wc new_trapping_tvs wanted
-           ; when (not (isEmptyBag simples) && not no_eqs) $
+           ; when (not (isEmptyBag simples) && given_eqs /= NoGivenEqs) $
              Nothing
                  -- If there are some constraints to float out, but we can't
                  -- because we don't float out past local equalities
@@ -938,7 +938,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        ; psig_theta_vars <- mapM TcM.newEvVar psig_theta
        ; wanted_transformed_incl_derivs
             <- setTcLevel rhs_tclvl $
-               runTcSWithEvBinds ev_binds_var True $
+               runTcSWithEvBinds ev_binds_var $
                do { let loc         = mkGivenLoc rhs_tclvl UnkSkol $
                                       env_lcl tc_env
                         psig_givens = mkGivens loc psig_theta_vars
@@ -1025,13 +1025,13 @@ mkResidualConstraints rhs_tclvl ev_binds_var
                      then return emptyBag
                      else do implic1 <- newImplication
                              return $ unitBag $
-                                      implic1  { ic_tclvl  = rhs_tclvl
-                                               , ic_skols  = qtvs
-                                               , ic_given  = full_theta_vars
-                                               , ic_wanted = inner_wanted
-                                               , ic_binds  = ev_binds_var
-                                               , ic_no_eqs = False
-                                               , ic_info   = skol_info }
+                                      implic1  { ic_tclvl     = rhs_tclvl
+                                               , ic_skols     = qtvs
+                                               , ic_given     = full_theta_vars
+                                               , ic_wanted    = inner_wanted
+                                               , ic_binds     = ev_binds_var
+                                               , ic_given_eqs = MaybeGivenEqs
+                                               , ic_info      = skol_info }
 
         ; return (emptyWC { wc_simple = outer_simple
                           , wc_impl   = implics })}
@@ -1641,7 +1641,7 @@ simplifyWantedsTcM :: [CtEvidence] -> TcM WantedConstraints
 -- Solve the specified Wanted constraints
 -- Discard the evidence binds
 -- Discards all Derived stuff in result
--- Postcondition: fully zonked and unflattened constraints
+-- Postcondition: fully zonked
 simplifyWantedsTcM wanted
   = do { traceTc "simplifyWantedsTcM {" (ppr wanted)
        ; (result, _) <- runTcS (solveWantedsAndDrop (mkSimpleWC wanted))
@@ -1810,7 +1810,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
        -- ; when debugIsOn check_tc_level
 
          -- Solve the nested constraints
-       ; (no_given_eqs, given_insols, residual_wanted)
+       ; (has_given_eqs, given_insols, residual_wanted)
             <- nestImplicTcS ev_binds_var tclvl $
                do { let loc    = mkGivenLoc tclvl info (ic_env imp)
                         givens = mkGivens loc given_ids
@@ -1821,16 +1821,16 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                         -- we want to retain derived equalities so we can float
                         -- them out in floatEqualities
 
-                  ; (no_eqs, given_insols) <- getNoGivenEqs tclvl skols
-                        -- Call getNoGivenEqs /after/ solveWanteds, because
+                  ; (has_eqs, given_insols) <- getHasGivenEqs tclvl
+                        -- Call getHasGivenEqs /after/ solveWanteds, because
                         -- solveWanteds can augment the givens, via expandSuperClasses,
                         -- to reveal given superclass equalities
 
-                  ; return (no_eqs, given_insols, residual_wanted) }
+                  ; return (has_eqs, given_insols, residual_wanted) }
 
        ; (floated_eqs, residual_wanted)
              <- floatEqualities skols given_ids ev_binds_var
-                                no_given_eqs residual_wanted
+                                has_given_eqs residual_wanted
 
        ; traceTcS "solveImplication 2"
            (ppr given_insols $$ ppr residual_wanted)
@@ -1838,13 +1838,13 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
              -- Don't lose track of the insoluble givens,
              -- which signal unreachable code; put them in ic_wanted
 
-       ; res_implic <- setImplicationStatus (imp { ic_no_eqs = no_given_eqs
+       ; res_implic <- setImplicationStatus (imp { ic_given_eqs = has_given_eqs
                                                  , ic_wanted = final_wanted })
 
        ; evbinds <- TcS.getTcEvBindsMap ev_binds_var
        ; tcvs    <- TcS.getTcEvTyCoVars ev_binds_var
        ; traceTcS "solveImplication end }" $ vcat
-             [ text "no_given_eqs =" <+> ppr no_given_eqs
+             [ text "has_given_eqs =" <+> ppr has_given_eqs
              , text "floated_eqs =" <+> ppr floated_eqs
              , text "res_implic =" <+> ppr res_implic
              , text "implication evbinds =" <+> ppr (evBindMapBinds evbinds)
@@ -2049,6 +2049,13 @@ simplifyHoles :: Bag Hole -> TcS (Bag Hole)
 simplifyHoles = mapBagM simpl_hole
   where
     simpl_hole :: Hole -> TcS Hole
+
+     -- See Note [Do not simplify ConstraintHoles]
+    simpl_hole h@(Hole { hole_sort = ConstraintHole }) = return h
+
+     -- other wildcards should be simplified for printing
+     -- we must do so here, and not in the error-message generation
+     -- code, because we have all the givens already set up
     simpl_hole h@(Hole { hole_ty = ty, hole_loc = loc })
       = do { ty' <- flattenType loc ty
            ; return (h { hole_ty = ty' }) }
@@ -2092,6 +2099,41 @@ test T12227.
 
 But we don't get to discard all redundant equality superclasses, alas;
 see #15205.
+
+Note [Do not simplify ConstraintHoles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before printing the inferred value for a type hole (a _ wildcard in
+a partial type signature), we simplify it w.r.t. any Givens. This
+makes for an easier-to-understand diagnostic for the user.
+
+However, we do not wish to do this for extra-constraint holes. Here is
+the example for why (partial-sigs/should_compile/T12844):
+
+  bar :: _ => FooData rngs
+  bar = foo
+
+  data FooData rngs
+
+  class Foo xs where foo :: (Head xs ~ '(r,r')) => FooData xs
+
+  type family Head (xs :: [k]) where Head (x ': xs) = x
+
+GHC correctly infers that the extra-constraints wildcard on `bar`
+should be (Head rngs ~ '(r, r'), Foo rngs). It then adds this constraint
+as a Given on the implication constraint for `bar`. The Hole for
+the _ is stored within the implication's WantedConstraints.
+When simplifyHoles is called, that constraint is already assumed as
+a Given. Simplifying with respect to it turns it into
+('(r, r') ~ '(r, r'), Foo rngs), which is disastrous.
+
+Furthermore, there is no need to simplify here: extra-constraints wildcards
+are filled in with the output of the solver, in chooseInferredQuantifiers
+(choose_psig_context), so they are already simplified. (Contrast to normal
+type holes, which are just bound to a meta-variable.) Avoiding the poor output
+is simple: just don't simplify extra-constraints wildcards.
+
+This is the only reason we need to track ConstraintHole separately
+from TypeHole in HoleSort.
 
 Note [Tracking redundant constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2268,7 +2310,7 @@ approximateWC float_past_equalities wc
         concatMapBag (float_implic trapping_tvs) implics
     float_implic :: TcTyCoVarSet -> Implication -> Cts
     float_implic trapping_tvs imp
-      | float_past_equalities || ic_no_eqs imp
+      | float_past_equalities || ic_given_eqs imp == NoGivenEqs
       = float_wc new_trapping_tvs (ic_wanted imp)
       | otherwise   -- Take care with equalities
       = emptyCts    -- See (1) under Note [ApproximateWC]
@@ -2475,7 +2517,7 @@ no evidence for a fundep equality), but equality superclasses do matter (since
 they carry evidence).
 -}
 
-floatEqualities :: [TcTyVar] -> [EvId] -> EvBindsVar -> Bool
+floatEqualities :: [TcTyVar] -> [EvId] -> EvBindsVar -> HasGivenEqs
                 -> WantedConstraints
                 -> TcS (Cts, WantedConstraints)
 -- Main idea: see Note [Float Equalities out of Implications]
@@ -2493,16 +2535,17 @@ floatEqualities :: [TcTyVar] -> [EvId] -> EvBindsVar -> Bool
 -- Subtleties: Note [Float equalities from under a skolem binding]
 --             Note [Skolem escape]
 --             Note [What prevents a constraint from floating]
-floatEqualities skols given_ids ev_binds_var no_given_eqs
+floatEqualities skols given_ids ev_binds_var has_given_eqs
                 wanteds@(WC { wc_simple = simples })
-  | not no_given_eqs  -- There are some given equalities, so don't float
+  | MaybeGivenEqs <- has_given_eqs  -- There are some given equalities, so don't float
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
 
   | otherwise
-  = do { -- First zonk: the inert set (from whence they came) is fully
-         -- zonked, but unflattening may have filled in unification
-         -- variables, and we /must/ see them.  Otherwise we may float
-         -- constraints that mention the skolems!
+  = do { -- First zonk: the inert set (from whence they came) is not
+         -- necessarily fully zonked; equalities are not kicked out
+         -- if a unification cannot make progress. See Note
+         -- [inert_eqs: the inert equalities] in GHC.Tc.Solver.Monad, which
+         -- describes how the inert set might not actually be inert.
          simples <- TcS.zonkSimples simples
        ; binds   <- TcS.getTcEvBindsMap ev_binds_var
 
@@ -2629,10 +2672,9 @@ happen.  In particular, float out equalities that are:
      of error messages.
 
   NB: generally we won't see (ty ~ alpha), with alpha on the right because
-  of Note [Unification variables on the left] in GHC.Tc.Utils.Unify.
-  But if we start with (F tys ~ alpha), it will orient as (fmv ~ alpha),
-  and unflatten back to (F tys ~ alpha). So we must look for alpha on
-  the right too.  Example T4494.
+  of Note [Unification variables on the left] in GHC.Tc.Utils.Unify,
+  but if we have (F tys ~ alpha) and alpha is untouchable, then it will
+  appear on the right.  Example T4494.
 
 * Nominal.  No point in floating (alpha ~R# ty), because we do not
   unify representational equalities even if alpha is touchable.

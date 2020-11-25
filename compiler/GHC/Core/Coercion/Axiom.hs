@@ -584,9 +584,21 @@ instance Outputable CoAxiomRule where
 -- Type checking of built-in families
 data BuiltInSynFamily = BuiltInSynFamily
   { sfMatchFam      :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+    -- Does this reduce on the given arguments?
+    -- If it does, returns (CoAxiomRule, types to instantiate the rule at, rhs type)
+    -- That is: mkAxiomRuleCo coax (zipWith mkReflCo (coaxrAsmpRoles coax) ts)
+    --              :: F tys ~r rhs,
+    -- where the r in the output is coaxrRole of the rule. It is up to the
+    -- caller to ensure that this role is appropriate.
+
   , sfInteractTop   :: [Type] -> Type -> [TypeEqn]
+    -- If given these type arguments and RHS, returns the equalities that
+    -- are guaranteed to hold.
+
   , sfInteractInert :: [Type] -> Type ->
                        [Type] -> Type -> [TypeEqn]
+    -- If given one set of arguments and result, and another set of arguments
+    -- and result, returns the equalities that are guaranteed to hold.
   }
 
 -- Provides default implementations that do nothing.

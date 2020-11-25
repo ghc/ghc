@@ -111,7 +111,7 @@ module GHC.Tc.Utils.Monad(
   getTcLevel, setTcLevel, isTouchableTcM,
   getLclTypeEnv, setLclTypeEnv,
   traceTcConstraints,
-  emitNamedTypeHole, emitAnonTypeHole,
+  emitNamedTypeHole, IsExtraConstraint(..), emitAnonTypeHole,
 
   -- * Template Haskell context
   recordThUse, recordThSpliceUse,
@@ -1779,16 +1779,26 @@ traceTcConstraints msg
          hang (text (msg ++ ": LIE:")) 2 (ppr lie)
        }
 
-emitAnonTypeHole :: TcTyVar -> TcM ()
-emitAnonTypeHole tv
+data IsExtraConstraint = YesExtraConstraint
+                       | NoExtraConstraint
+
+instance Outputable IsExtraConstraint where
+  ppr YesExtraConstraint = text "YesExtraConstraint"
+  ppr NoExtraConstraint  = text "NoExtraConstraint"
+
+emitAnonTypeHole :: IsExtraConstraint
+                 -> TcTyVar -> TcM ()
+emitAnonTypeHole extra_constraints tv
   = do { ct_loc <- getCtLocM (TypeHoleOrigin occ) Nothing
-       ; let hole = Hole { hole_sort = TypeHole
+       ; let hole = Hole { hole_sort = sort
                          , hole_occ  = occ
                          , hole_ty   = mkTyVarTy tv
                          , hole_loc  = ct_loc }
        ; emitHole hole }
   where
     occ = mkTyVarOcc "_"
+    sort | YesExtraConstraint <- extra_constraints = ConstraintHole
+         | otherwise                               = TypeHole
 
 emitNamedTypeHole :: (Name, TcTyVar) -> TcM ()
 emitNamedTypeHole (name, tv)

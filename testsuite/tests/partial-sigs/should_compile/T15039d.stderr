@@ -50,7 +50,8 @@ T15039d.hs:33:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
         ex6 :: Dict (Coercible @(*) a b) -> () (bound at T15039d.hs:33:1)
 
 T15039d.hs:35:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Coercible @(*) a b’
+    • Found extra-constraints wildcard standing for
+        ‘Coercible @(*) a b’
       Where: ‘a’, ‘b’ are rigid type variables bound by
                the inferred type of ex7 :: Coercible @(*) a b => Coercion @{*} a b
                at T15039d.hs:35:1-44

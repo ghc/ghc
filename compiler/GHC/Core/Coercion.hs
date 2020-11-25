@@ -13,8 +13,8 @@
 --
 module GHC.Core.Coercion (
         -- * Main data type
-        Coercion, CoercionN, CoercionR, CoercionP, MCoercion(..), MCoercionR,
-        UnivCoProvenance, CoercionHole(..), BlockSubstFlag(..),
+        Coercion, CoercionN, CoercionR, CoercionP, MCoercion(..), MCoercionN, MCoercionR,
+        UnivCoProvenance, CoercionHole(..),
         coHoleCoVar, setCoHoleCoVar,
         LeftOrRight(..),
         Var, CoVar, TyCoVar,
@@ -69,8 +69,10 @@ module GHC.Core.Coercion (
         pickLR,
 
         isGReflCo, isReflCo, isReflCo_maybe, isGReflCo_maybe, isReflexiveCo, isReflexiveCo_maybe,
-        isReflCoVar_maybe, isGReflMCo,
-        coToMCo, mkTransMCo, mkTransMCoL,
+        isReflCoVar_maybe, isGReflMCo, mkGReflLeftMCo, mkGReflRightMCo,
+        mkCoherenceRightMCo,
+
+        coToMCo, mkTransMCo, mkTransMCoL, mkCastTyMCo, mkSymMCo, isReflMCo,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -79,7 +81,7 @@ module GHC.Core.Coercion (
         -- ** Free variables
         tyCoVarsOfCo, tyCoVarsOfCos, coVarsOfCo,
         tyCoFVsOfCo, tyCoFVsOfCos, tyCoVarsOfCoDSet,
-        coercionSize,
+        coercionSize, anyFreeVarsOfCo,
 
         -- ** Substitution
         CvSubstEnv, emptyCvSubstEnv,
@@ -121,7 +123,8 @@ module GHC.Core.Coercion (
 
         simplifyArgsWorker,
 
-        badCoercionHole, badCoercionHoleCo
+        hasCoercionHoleTy, hasCoercionHoleCo,
+        HoleSet, coercionHolesOfType, coercionHolesOfCo
        ) where
 
 #include "HsVersions.h"
@@ -154,6 +157,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -331,6 +335,32 @@ mkTransMCoL :: MCoercion -> Coercion -> MCoercion
 mkTransMCoL MRefl     co2 = MCo co2
 mkTransMCoL (MCo co1) co2 = MCo (mkTransCo co1 co2)
 
+-- | Get the reverse of an 'MCoercion'
+mkSymMCo :: MCoercion -> MCoercion
+mkSymMCo MRefl    = MRefl
+mkSymMCo (MCo co) = MCo (mkSymCo co)
+
+-- | Cast a type by an 'MCoercion'
+mkCastTyMCo :: Type -> MCoercion -> Type
+mkCastTyMCo ty MRefl    = ty
+mkCastTyMCo ty (MCo co) = ty `mkCastTy` co
+
+mkGReflLeftMCo :: Role -> Type -> MCoercionN -> Coercion
+mkGReflLeftMCo r ty MRefl    = mkReflCo r ty
+mkGReflLeftMCo r ty (MCo co) = mkGReflLeftCo r ty co
+
+mkGReflRightMCo :: Role -> Type -> MCoercionN -> Coercion
+mkGReflRightMCo r ty MRefl    = mkReflCo r ty
+mkGReflRightMCo r ty (MCo co) = mkGReflRightCo r ty co
+
+-- | Like 'mkCoherenceRightCo', but with an 'MCoercion'
+mkCoherenceRightMCo :: Role -> Type -> MCoercionN -> Coercion -> Coercion
+mkCoherenceRightMCo _ _  MRefl    co2 = co2
+mkCoherenceRightMCo r ty (MCo co) co2 = mkCoherenceRightCo r ty co co2
+
+isReflMCo :: MCoercion -> Bool
+isReflMCo MRefl = True
+isReflMCo _     = False
 
 {-
 %************************************************************************
@@ -1219,7 +1249,7 @@ mkKindCo co
   | otherwise
   = KindCo co
 
-mkSubCo :: Coercion -> Coercion
+mkSubCo :: HasDebugCallStack => Coercion -> Coercion
 -- Input coercion is Nominal, result is Representational
 -- see also Note [Role twiddling functions]
 mkSubCo (Refl ty) = GRefl Representational ty MRefl
@@ -1674,6 +1704,11 @@ data NormaliseStepResult ev
   | NS_Step RecTcChecker Type ev    -- ^ We stepped, yielding new bits;
                                     -- ^ ev is evidence;
                                     -- Usually a co :: old type ~ new type
+
+instance Outputable ev => Outputable (NormaliseStepResult ev) where
+  ppr NS_Done           = text "NS_Done"
+  ppr NS_Abort          = text "NS_Abort"
+  ppr (NS_Step _ ty ev) = sep [text "NS_Step", ppr ty, ppr ev]
 
 mapStepResult :: (ev1 -> ev2)
               -> NormaliseStepResult ev1 -> NormaliseStepResult ev2
@@ -2634,7 +2669,8 @@ FamInstEnv, and so lives here.
 
 Note [simplifyArgsWorker]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Invariant (F2) of Note [Flattening] says that flattening is homogeneous.
+Invariant (F2) of Note [Flattening] in GHC.Tc.Solver.Flatten says that
+flattening is homogeneous.
 This causes some trouble when flattening a function applied to a telescope
 of arguments, perhaps with dependency. For example, suppose
 
@@ -2913,7 +2949,7 @@ simplifyArgsWorker :: [TyCoBinder] -> Kind
                    -> [(Type, Coercion)] -- flattened type arguments, arg
                                          -- each comes with the coercion used to flatten it,
                                          -- with co :: flattened_type ~ original_type
-                   -> ([Type], [Coercion], CoercionN)
+                   -> ([Type], [Coercion], MCoercionN)
 -- Returns (xis, cos, res_co), where each co :: xi ~ arg,
 -- and res_co :: kind (f xis) ~ kind (f tys), where f is the function applied to the args
 -- Precondition: if f :: forall bndrs. inner_ki (where bndrs and inner_ki are passed in),
@@ -2935,14 +2971,15 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
        -> Kind        -- Unsubsted result kind of function (not a Pi-type)
        -> [Role]      -- Roles at which to flatten these ...
        -> [(Type, Coercion)]  -- flattened arguments, with their flattening coercions
-       -> ([Type], [Coercion], CoercionN)
+       -> ([Type], [Coercion], MCoercionN)
     go acc_xis acc_cos !lc binders inner_ki _ []
         -- The !lc makes the function strict in the lifting context
         -- which means GHC can unbox that pair.  A modest win.
       = (reverse acc_xis, reverse acc_cos, kind_co)
       where
         final_kind = mkPiTys binders inner_ki
-        kind_co = liftCoSubst Nominal lc final_kind
+        kind_co | noFreeVarsOfType final_kind = MRefl
+                | otherwise                   = MCo $ liftCoSubst Nominal lc final_kind
 
     go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) ((xi,co):args)
       = -- By Note [Flattening] in GHC.Tc.Solver.Flatten invariant (F2),
@@ -2998,7 +3035,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
             (xis_out, cos_out, res_co_out)
               = go acc_xis acc_cos zapped_lc bndrs new_inner roles casted_args
         in
-        (xis_out, cos_out, res_co_out `mkTransCo` res_co)
+        (xis_out, cos_out, res_co_out `mkTransMCoL` res_co)
 
     go _ _ _ _ _ _ _ = panic
         "simplifyArgsWorker wandered into deeper water than usual"
@@ -3024,31 +3061,40 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
 %************************************************************************
 -}
 
-bad_co_hole_ty :: Type -> Monoid.Any
-bad_co_hole_co :: Coercion -> Monoid.Any
-(bad_co_hole_ty, _, bad_co_hole_co, _)
+has_co_hole_ty :: Type -> Monoid.Any
+has_co_hole_co :: Coercion -> Monoid.Any
+(has_co_hole_ty, _, has_co_hole_co, _)
   = foldTyCo folder ()
   where
     folder = TyCoFolder { tcf_view  = const Nothing
                         , tcf_tyvar = const2 (Monoid.Any False)
                         , tcf_covar = const2 (Monoid.Any False)
-                        , tcf_hole  = const hole
+                        , tcf_hole  = const2 (Monoid.Any True)
                         , tcf_tycobinder = const2
                         }
 
     const2 :: a -> b -> c -> a
     const2 x _ _ = x
 
-    hole :: CoercionHole -> Monoid.Any
-    hole (CoercionHole { ch_blocker = YesBlockSubst }) = Monoid.Any True
-    hole _                                             = Monoid.Any False
+-- | Is there a coercion hole in this type?
+hasCoercionHoleTy :: Type -> Bool
+hasCoercionHoleTy = Monoid.getAny . has_co_hole_ty
 
--- | Is there a blocking coercion hole in this type? See
--- "GHC.Tc.Solver.Canonical" Note [Equalities with incompatible kinds]
-badCoercionHole :: Type -> Bool
-badCoercionHole = Monoid.getAny . bad_co_hole_ty
+-- | Is there a coercion hole in this coercion?
+hasCoercionHoleCo :: Coercion -> Bool
+hasCoercionHoleCo = Monoid.getAny . has_co_hole_co
 
--- | Is there a blocking coercion hole in this coercion? See
--- GHC.Tc.Solver.Canonical Note [Equalities with incompatible kinds]
-badCoercionHoleCo :: Coercion -> Bool
-badCoercionHoleCo = Monoid.getAny . bad_co_hole_co
+-- | A set of 'CoercionHole's
+type HoleSet = UniqSet CoercionHole
+
+-- | Extract out all the coercion holes from a given type
+coercionHolesOfType :: Type -> UniqSet CoercionHole
+coercionHolesOfCo   :: Coercion -> UniqSet CoercionHole
+(coercionHolesOfType, _, coercionHolesOfCo, _) = foldTyCo folder ()
+  where
+    folder = TyCoFolder { tcf_view  = const Nothing  -- don't look through synonyms
+                        , tcf_tyvar = \ _ _ -> mempty
+                        , tcf_covar = \ _ _ -> mempty
+                        , tcf_hole  = const unitUniqSet
+                        , tcf_tycobinder = \ _ _ _ -> ()
+                        }
