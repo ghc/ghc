@@ -314,10 +314,6 @@ threadPaused(Capability *cap, StgTSO *tso)
                 continue;
             }
 
-            // zero out the slop so that the sanity checker can tell
-            // where the next closure is.
-            OVERWRITING_CLOSURE(bh);
-
             // an EAGER_BLACKHOLE or CAF_BLACKHOLE gets turned into a
             // BLACKHOLE here.
 #if defined(THREADED_RTS)
@@ -345,10 +341,15 @@ threadPaused(Capability *cap, StgTSO *tso)
                     // overwrite to the update remembered set.
                     // N.B. We caught the WHITEHOLE case above.
                     updateRemembSetPushThunkEager(cap,
-                                                 THUNK_INFO_PTR_TO_STRUCT(bh_info),
-                                                 (StgThunk *) bh);
+                                                  THUNK_INFO_PTR_TO_STRUCT(bh_info),
+                                                  (StgThunk *) bh);
                 }
             }
+
+            // zero out the slop so that the sanity checker can tell
+            // where the next closure is. N.B. We mustn't do this until we have
+            // pushed the free variables to the update remembered set above.
+            OVERWRITING_CLOSURE_SIZE(bh, closure_sizeW_(bh, INFO_PTR_TO_STRUCT(bh_info)));
 
             // The payload of the BLACKHOLE points to the TSO
             RELAXED_STORE(&((StgInd *)bh)->indirectee, (StgClosure *)tso);
