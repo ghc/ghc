@@ -211,6 +211,32 @@ rnExpr (NegApp _ e _)
        ; return (final_e, fv_e `plusFV` fv_neg) }
 
 ------------------------------------------
+-- Record dot syntax
+rnExpr (GetField x e f g)
+  = do { (e', _) <- rnLExpr e
+       ; (g', fv) <- rnLExpr g
+       ; return (GetField x e' f g', fv)
+       }
+
+rnExpr (Projection x fs p)
+  = do { (p', fv) <- rnLExpr p
+       ; return (Projection x fs p', fv)
+       }
+
+rnExpr (RecordDotUpd x e us f)
+  = do { (e', _) <- rnLExpr e
+       ; us' <- map fst <$> mapM rnRecUpdProj us
+       ; (f', fv) <- rnLExpr f
+       ; return (RecordDotUpd x e' us' f', fv)
+       }
+  where
+    rnRecUpdProj :: LHsRecUpdProj GhcPs -> RnM (LHsRecUpdProj GhcRn, FreeVars)
+    rnRecUpdProj (L l (ProjUpdate fs arg)) = do
+      (arg', fv) <- rnLExpr arg
+      return $ (L l (ProjUpdate { pu_flds = fs, pu_arg = arg' }), fv)
+
+
+------------------------------------------
 -- Template Haskell extensions
 rnExpr e@(HsBracket _ br_body) = rnBracket e br_body
 

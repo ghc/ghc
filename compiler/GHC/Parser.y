@@ -39,6 +39,9 @@ module GHC.Parser
    )
 where
 
+import Debug.Trace
+import Data.Proxy
+
 -- base
 import Control.Monad    ( unless, liftM, when, (<=<) )
 import GHC.Exts
@@ -64,7 +67,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS )
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOcc, occNameString)
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Fixity
@@ -641,6 +644,8 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '-<<'          { L _ (ITLarrowtail _) }            -- for arrow notation
  '>>-'          { L _ (ITRarrowtail _) }            -- for arrow notation
  '.'            { L _ ITdot }
+ PREFIX_PROJ    { L _ (ITproj True) }               -- RecordDotSyntax
+ TIGHT_INFIX_PROJ { L _ (ITproj False) }            -- RecordDotSyntax
  PREFIX_AT      { L _ ITtypeApp }
  PREFIX_PERCENT { L _ ITpercent }                   -- for linear types
 
@@ -2711,6 +2716,22 @@ fexp    :: { ECP }
                                         fmap ecpFromExp $
                                         ams (sLL $1 $> $ HsStatic noExtField $2)
                                             [mj AnnStatic $1] }
+
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
+        | fexp TIGHT_INFIX_PROJ field
+            {% runPV (unECP $1) >>= \ $1 ->
+               -- Suppose lhs is an application term e.g. 'f a'
+               -- and rhs is '.b'. Usually we want the parse 'f
+               -- (a.b)' rather than '(f a).b.'. However, if lhs
+               -- is a projection 'r.a' (say) then we want the
+               -- parse '(r.a).b'.
+               fmap ecpFromExp $ ams (case $1 of
+                   L _ (HsApp _ f arg) | not $ isGetField f ->
+                     let l = comb2 arg $3 in
+                     L (getLoc f `combineSrcSpans` l)
+                       (HsApp noExtField f (mkGetField l arg $3))
+                   _ -> mkGetField (comb2 $1 $>) $1 $3) [mj AnnDot $2] }
+
         | aexp                       { $1 }
 
 aexp    :: { ECP }
@@ -2800,10 +2821,12 @@ aexp    :: { ECP }
 
 aexp1   :: { ECP }
         : aexp1 '{' fbinds '}' { ECP $
-                                  unECP $1 >>= \ $1 ->
-                                  $3 >>= \ $3 ->
-                                  amms (mkHsRecordPV (comb2 $1 $>) (comb2 $2 $4) $1 (snd $3))
-                                       (moc $2:mcc $4:(fst $3)) }
+                                   getBit RecordDotSyntaxBit >>= \ dot ->
+                                   unECP $1 >>= \ $1 ->
+                                   $3 >>= \ $3 ->
+                                   amms (mkHsRecordPV dot (comb2 $1 $>) (comb2 $2 $4) $1 (snd $3))
+                                        (moc $2:mcc $4:(fst $3))
+                               }
         | aexp2                { $1 }
 
 aexp2   :: { ECP }
@@ -2831,6 +2854,14 @@ aexp2   :: { ECP }
                                            $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Boxed (snd $2))
                                                 ((mop $1:fst $2) ++ [mcp $3]) }
+
+        -- This case is only possible when 'RecordDotSyntax' is enabled.
+        | '(' projection ')'            { ECP $
+                                            let (loc, (anns, fIELDS)) = $2
+                                                span = combineSrcSpans (combineSrcSpans (getLoc $1) loc) (getLoc $3)
+                                                expr = mkProjection span (reverse fIELDS)
+                                            in amms (ecpFromExp' expr) ([mop $1] ++ reverse anns ++ [mcp $3])
+                                        }
 
         | '(#' texp '#)'                { ECP $
                                            unECP $2 >>= \ $2 ->
@@ -2880,6 +2911,14 @@ aexp2   :: { ECP }
                                      ams (sLL $1 $> $ HsCmdArrForm noExtField $2 Prefix
                                                           Nothing (reverse $3))
                                          [mu AnnOpenB $1,mu AnnCloseB $4] }
+
+projection :: { (SrcSpan, ([AddAnn], [Located FastString])) }
+projection
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parsing.Lexer
+        : projection TIGHT_INFIX_PROJ field
+             { let (loc, (anns, fs)) = $1 in
+               (combineSrcSpans (combineSrcSpans loc (gl $2)) (gl $3), (mj AnnDot $2 : anns, $3 : fs)) }
+        | PREFIX_PROJ field { (comb2 $1 $2, ([mj AnnDot $1], [$2])) }
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { mapLoc (HsSpliceE noExtField) $1 }
@@ -3297,32 +3336,62 @@ qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (Located b)) }
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction
 
-fbinds  :: { forall b. DisambECP b => PV ([AddAnn],([LHsRecField GhcPs (Located b)], Maybe SrcSpan)) }
+fbinds  :: { forall b. DisambECP b => PV ([AddAnn],([Fbind b], Maybe SrcSpan)) }
         : fbinds1                       { $1 }
         | {- empty -}                   { return ([],([], Nothing)) }
 
-fbinds1 :: { forall b. DisambECP b => PV ([AddAnn],([LHsRecField GhcPs (Located b)], Maybe SrcSpan)) }
+fbinds1 :: { forall b. DisambECP b => PV ([AddAnn],([Fbind b], Maybe SrcSpan)) }
         : fbind ',' fbinds1
                  { $1 >>= \ $1 ->
                    $3 >>= \ $3 ->
-                   addAnnotation (gl $1) AnnComma (gl $2) >>
+                   let gl' = \case { Fbind (L l _) -> l;  Pbind (L l _) -> l } in
+                   addAnnotation (gl' $1) AnnComma (gl $2) >>
                    return (case $3 of (ma,(flds, dd)) -> (ma,($1 : flds, dd))) }
         | fbind                         { $1 >>= \ $1 ->
                                           return ([],([$1], Nothing)) }
         | '..'                          { return ([mj AnnDotdot $1],([],   Just (getLoc $1))) }
 
-fbind   :: { forall b. DisambECP b => PV (LHsRecField GhcPs (Located b)) }
+fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         : qvar '=' texp  { unECP $3 >>= \ $3 ->
-                           ams  (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) $3 False)
-                                [mj AnnEqual $2] }
+                           fmap Fbind $ return (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) $3 False)
+                            -- ams (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) $3 False) [mj AnnEqual $2]
+                          }
                         -- RHS is a 'texp', allowing view patterns (#6038)
                         -- and, incidentally, sections.  Eg
                         -- f (R { x = show -> s }) = ...
 
         | qvar          { placeHolderPunRhs >>= \rhs ->
-                          return $ sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) rhs True }
+                          fmap Fbind $ return (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) rhs True)
+                        }
                         -- In the punning case, use a place-holder
                         -- The renamer fills in the final value
+
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
+        | field TIGHT_INFIX_PROJ fieldToUpdate '=' texp
+                        { do
+                            $5 <- unECP $5
+                            fmap Pbind $ mkHsProjUpdatePV (comb2 $1 $5) ($1 : reverse $3) $5
+                        }
+
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
+        | field TIGHT_INFIX_PROJ fieldToUpdate
+                        { do
+                            let top = $1
+                                fields = top : reverse $3
+                                final = last fields
+                                l = comb2 top final
+                            puns <- getBit RecordPunsBit
+                            when (not puns) $
+                              addError $ Error ErrNamedFieldPunsNotEnabled [] l
+                            var <- mkHsVarPV (noLoc (mkRdrUnqual . mkVarOcc . unpackFS . unLoc $ final))
+                            fmap Pbind $ mkHsProjUpdatePV l fields var
+                        }
+
+fieldToUpdate :: { [Located FastString] }
+fieldToUpdate
+        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        : fieldToUpdate TIGHT_INFIX_PROJ field { $3 : $1 }
+        | field { [$1] }
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
@@ -3616,6 +3685,10 @@ qvar    :: { Located RdrName }
 -- We've inlined qvarsym here so that the decision about
 -- whether it's a qvar or a var can be postponed until
 -- *after* we see the close paren.
+
+field :: { Located FastString  }
+      : VARID { sL1 $1 $! getVARID $1 }
+      | QVARID { sL1 $1 $! snd $ getQVARID $1 }
 
 qvarid :: { Located RdrName }
         : varid               { $1 }
