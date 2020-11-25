@@ -3939,6 +3939,8 @@ more.  So I use a HACK:
 
 Result works fine, but it may eventually bite us.
 
+See also Note [Do not simplify ConstraintHoles] in GHC.Tc.Solver for
+information about how these are printed.
 
 ************************************************************************
 *                                                                      *

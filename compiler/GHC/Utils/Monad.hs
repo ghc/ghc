@@ -88,9 +88,7 @@ zipWith4M f xs ys ws zs = sequenceA (zipWith4 f xs ys ws zs)
 
 zipWithAndUnzipM :: Monad m
                  => (a -> b -> m (c, d)) -> [a] -> [b] -> m ([c], [d])
-{-# INLINABLE zipWithAndUnzipM #-}
--- See Note [flatten_args performance] in GHC.Tc.Solver.Flatten for why this
--- pragma is essential.
+{-# INLINABLE zipWithAndUnzipM #-}  -- this allows specialization to a given monad
 zipWithAndUnzipM f (x:xs) (y:ys)
   = do { (c, d) <- f x y
        ; (cs, ds) <- zipWithAndUnzipM f xs ys

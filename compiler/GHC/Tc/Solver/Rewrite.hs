@@ -4,9 +4,9 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module GHC.Tc.Solver.Flatten(
-   flatten, flattenKind, flattenArgsNom,
-   flattenType
+module GHC.Tc.Solver.Rewrite(
+   rewrite, rewriteKind, rewriteArgsNom,
+   rewriteType
  ) where
 
 #include "HsVersions.h"
@@ -41,127 +41,127 @@ import Control.Arrow ( first )
 {-
 ************************************************************************
 *                                                                      *
-*                FlattenEnv & FlatM
-*             The flattening environment & monad
+*                RewriteEnv & RewriteM
+*             The rewriting environment & monad
 *                                                                      *
 ************************************************************************
 -}
 
-data FlattenEnv
-  = FE { fe_loc     :: !CtLoc             -- See Note [Flattener CtLoc]
+data RewriteEnv
+  = FE { fe_loc     :: !CtLoc             -- See Note [Rewriter CtLoc]
        , fe_flavour :: !CtFlavour
-       , fe_eq_rel  :: !EqRel             -- See Note [Flattener EqRels]
+       , fe_eq_rel  :: !EqRel             -- See Note [Rewriter EqRels]
        }
 
--- | The 'FlatM' monad is a wrapper around 'TcS' with a 'FlattenEnv'
-newtype FlatM a
-  = FlatM { runFlatM :: FlattenEnv -> TcS a }
+-- | The 'RewriteM' monad is a wrapper around 'TcS' with a 'RewriteEnv'
+newtype RewriteM a
+  = RewriteM { runRewriteM :: RewriteEnv -> TcS a }
   deriving (Functor)
 
-instance Monad FlatM where
-  m >>= k  = FlatM $ \env ->
-             do { a  <- runFlatM m env
-                ; runFlatM (k a) env }
+instance Monad RewriteM where
+  m >>= k  = RewriteM $ \env ->
+             do { a  <- runRewriteM m env
+                ; runRewriteM (k a) env }
 
-instance Applicative FlatM where
-  pure x = FlatM $ const (pure x)
+instance Applicative RewriteM where
+  pure x = RewriteM $ const (pure x)
   (<*>) = ap
 
-instance HasDynFlags FlatM where
+instance HasDynFlags RewriteM where
   getDynFlags = liftTcS getDynFlags
 
-liftTcS :: TcS a -> FlatM a
+liftTcS :: TcS a -> RewriteM a
 liftTcS thing_inside
-  = FlatM $ const thing_inside
+  = RewriteM $ const thing_inside
 
 -- convenient wrapper when you have a CtEvidence describing
--- the flattening operation
-runFlattenCtEv :: CtEvidence -> FlatM a -> TcS a
-runFlattenCtEv ev
-  = runFlatten (ctEvLoc ev) (ctEvFlavour ev) (ctEvEqRel ev)
+-- the rewriting operation
+runRewriteCtEv :: CtEvidence -> RewriteM a -> TcS a
+runRewriteCtEv ev
+  = runRewrite (ctEvLoc ev) (ctEvFlavour ev) (ctEvEqRel ev)
 
--- Run thing_inside (which does the flattening)
-runFlatten :: CtLoc -> CtFlavour -> EqRel -> FlatM a -> TcS a
-runFlatten loc flav eq_rel thing_inside
-  = runFlatM thing_inside fmode
+-- Run thing_inside (which does the rewriting)
+runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS a
+runRewrite loc flav eq_rel thing_inside
+  = runRewriteM thing_inside fmode
   where
     fmode = FE { fe_loc  = loc
                , fe_flavour = flav
                , fe_eq_rel = eq_rel }
 
-traceFlat :: String -> SDoc -> FlatM ()
-traceFlat herald doc = liftTcS $ traceTcS herald doc
-{-# INLINE traceFlat #-}  -- see Note [INLINE conditional tracing utilities]
+traceRewriteM :: String -> SDoc -> RewriteM ()
+traceRewriteM herald doc = liftTcS $ traceTcS herald doc
+{-# INLINE traceRewriteM #-}  -- see Note [INLINE conditional tracing utilities]
 
-getFlatEnvField :: (FlattenEnv -> a) -> FlatM a
-getFlatEnvField accessor
-  = FlatM $ \env -> return (accessor env)
+getRewriteEnvField :: (RewriteEnv -> a) -> RewriteM a
+getRewriteEnvField accessor
+  = RewriteM $ \env -> return (accessor env)
 
-getEqRel :: FlatM EqRel
-getEqRel = getFlatEnvField fe_eq_rel
+getEqRel :: RewriteM EqRel
+getEqRel = getRewriteEnvField fe_eq_rel
 
-getRole :: FlatM Role
+getRole :: RewriteM Role
 getRole = eqRelRole <$> getEqRel
 
-getFlavour :: FlatM CtFlavour
-getFlavour = getFlatEnvField fe_flavour
+getFlavour :: RewriteM CtFlavour
+getFlavour = getRewriteEnvField fe_flavour
 
-getFlavourRole :: FlatM CtFlavourRole
+getFlavourRole :: RewriteM CtFlavourRole
 getFlavourRole
   = do { flavour <- getFlavour
        ; eq_rel <- getEqRel
        ; return (flavour, eq_rel) }
 
-getLoc :: FlatM CtLoc
-getLoc = getFlatEnvField fe_loc
+getLoc :: RewriteM CtLoc
+getLoc = getRewriteEnvField fe_loc
 
-checkStackDepth :: Type -> FlatM ()
+checkStackDepth :: Type -> RewriteM ()
 checkStackDepth ty
   = do { loc <- getLoc
        ; liftTcS $ checkReductionDepth loc ty }
 
--- | Change the 'EqRel' in a 'FlatM'.
-setEqRel :: EqRel -> FlatM a -> FlatM a
+-- | Change the 'EqRel' in a 'RewriteM'.
+setEqRel :: EqRel -> RewriteM a -> RewriteM a
 setEqRel new_eq_rel thing_inside
-  = FlatM $ \env ->
+  = RewriteM $ \env ->
     if new_eq_rel == fe_eq_rel env
-    then runFlatM thing_inside env
-    else runFlatM thing_inside (env { fe_eq_rel = new_eq_rel })
+    then runRewriteM thing_inside env
+    else runRewriteM thing_inside (env { fe_eq_rel = new_eq_rel })
 {-# INLINE setEqRel #-}
 
--- | Make sure that flattening actually produces a coercion (in other
+-- | Make sure that rewriting actually produces a coercion (in other
 -- words, make sure our flavour is not Derived)
 -- Note [No derived kind equalities]
-noBogusCoercions :: FlatM a -> FlatM a
+noBogusCoercions :: RewriteM a -> RewriteM a
 noBogusCoercions thing_inside
-  = FlatM $ \env ->
+  = RewriteM $ \env ->
     -- No new thunk is made if the flavour hasn't changed (note the bang).
     let !env' = case fe_flavour env of
           Derived -> env { fe_flavour = Wanted WDeriv }
           _       -> env
     in
-    runFlatM thing_inside env'
+    runRewriteM thing_inside env'
 
-bumpDepth :: FlatM a -> FlatM a
-bumpDepth (FlatM thing_inside)
-  = FlatM $ \env -> do
-      -- bumpDepth can be called a lot during flattening so we force the
+bumpDepth :: RewriteM a -> RewriteM a
+bumpDepth (RewriteM thing_inside)
+  = RewriteM $ \env -> do
+      -- bumpDepth can be called a lot during rewriting so we force the
       -- new env to avoid accumulating thunks.
       { let !env' = env { fe_loc = bumpCtLocDepth (fe_loc env) }
       ; thing_inside env' }
 
 {-
-Note [Flattener EqRels]
+Note [Rewriter EqRels]
 ~~~~~~~~~~~~~~~~~~~~~~~
-When flattening, we need to know which equality relation -- nominal
+When rewriting, we need to know which equality relation -- nominal
 or representation -- we should be respecting. The only difference is
 that we rewrite variables by representational equalities when fe_eq_rel
-is ReprEq, and that we unwrap newtypes when flattening w.r.t.
+is ReprEq, and that we unwrap newtypes when rewriting w.r.t.
 representational equality.
 
-Note [Flattener CtLoc]
+Note [Rewriter CtLoc]
 ~~~~~~~~~~~~~~~~~~~~~~
-The flattener does eager type-family reduction.
+The rewriter does eager type-family reduction.
 Type families might loop, and we
 don't want GHC to do so. A natural solution is to have a bounded depth
 to these processes. A central difficulty is that such a solution isn't
@@ -169,8 +169,8 @@ quite compositional. For example, say it takes F Int 10 steps to get to Bool.
 How many steps does it take to get from F Int -> F Int to Bool -> Bool?
 10? 20? What about getting from Const Char (F Int) to Char? 11? 1? Hard to
 know and hard to track. So, we punt, essentially. We store a CtLoc in
-the FlattenEnv and just update the environment when recurring. In the
-TyConApp case, where there may be multiple type families to flatten,
+the RewriteEnv and just update the environment when recurring. In the
+TyConApp case, where there may be multiple type families to rewrite,
 we just copy the current CtLoc into each branch. If any branch hits the
 stack limit, then the whole thing fails.
 
@@ -179,15 +179,15 @@ will be essentially impossible. So, the official recommendation if a
 stack limit is hit is to disable the check entirely. Otherwise, there
 will be baffling, unpredictable errors.
 
-Note [Phantoms in the flattener]
+Note [Phantoms in the rewriter]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
 
 data Proxy p = Proxy
 
-and we're flattening (Proxy ty) w.r.t. ReprEq. Then, we know that `ty`
+and we're rewriting (Proxy ty) w.r.t. ReprEq. Then, we know that `ty`
 is really irrelevant -- it will be ignored when solving for representational
-equality later on. So, we omit flattening `ty` entirely. This may
+equality later on. So, we omit rewriting `ty` entirely. This may
 violate the expectation of "xi"s for a bit, but the canonicaliser will
 soon throw out the phantoms when decomposing a TyConApp. (Or, the
 canonicaliser will emit an insoluble, in which case we get
@@ -205,66 +205,63 @@ changes the flavour from Derived just for this purpose.
 
 {- *********************************************************************
 *                                                                      *
-*      Externally callable flattening functions                        *
+*      Externally callable rewriting functions                         *
 *                                                                      *
-*  They are all wrapped in runFlatten, so their                        *
-*  flattening work gets put into the work list                         *
-*                                                                      *
-*********************************************************************
+************************************************************************
 -}
 
--- | See Note [Flattening].
--- If (xi, co) <- flatten mode ev ty, then co :: xi ~r ty
+-- | See Note [Rewriting].
+-- If (xi, co) <- rewrite mode ev ty, then co :: xi ~r ty
 -- where r is the role in @ev@.
-flatten :: CtEvidence -> TcType
+rewrite :: CtEvidence -> TcType
         -> TcS (Xi, TcCoercion)
-flatten ev ty
-  = do { traceTcS "flatten {" (ppr ty)
-       ; (ty', co) <- runFlattenCtEv ev (flatten_one ty)
-       ; traceTcS "flatten }" (ppr ty')
+rewrite ev ty
+  = do { traceTcS "rewrite {" (ppr ty)
+       ; (ty', co) <- runRewriteCtEv ev (rewrite_one ty)
+       ; traceTcS "rewrite }" (ppr ty')
        ; return (ty', co) }
 
--- specialized to flattening kinds: never Derived, always Nominal
+-- specialized to rewriting kinds: never Derived, always Nominal
 -- See Note [No derived kind equalities]
--- See Note [Flattening]
-flattenKind :: CtLoc -> CtFlavour -> TcType -> TcS (Xi, TcCoercionN)
-flattenKind loc flav ty
-  = do { traceTcS "flattenKind {" (ppr flav <+> ppr ty)
+-- See Note [Rewriting]
+rewriteKind :: CtLoc -> CtFlavour -> TcType -> TcS (Xi, TcCoercionN)
+rewriteKind loc flav ty
+  = do { traceTcS "rewriteKind {" (ppr flav <+> ppr ty)
        ; let flav' = case flav of
                        Derived -> Wanted WDeriv  -- the WDeriv/WOnly choice matters not
                        _       -> flav
-       ; (ty', co) <- runFlatten loc flav' NomEq (flatten_one ty)
-       ; traceTcS "flattenKind }" (ppr ty' $$ ppr co) -- co is never a panic
+       ; (ty', co) <- runRewrite loc flav' NomEq (rewrite_one ty)
+       ; traceTcS "rewriteKind }" (ppr ty' $$ ppr co) -- co is never a panic
        ; return (ty', co) }
 
--- See Note [Flattening]
-flattenArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion])
--- Externally-callable, hence runFlatten
--- Flatten a vector of types all at once; in fact they are
+-- See Note [Rewriting]
+rewriteArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion])
+-- Externally-callable, hence runRewrite
+-- Rewrite a vector of types all at once; in fact they are
 -- always the arguments of type family or class, so
 --      ctEvFlavour ev = Nominal
--- and we want to flatten all at nominal role
+-- and we want to rewrite all at nominal role
 -- The kind passed in is the kind of the type family or class, call it T
 -- The kind of T args must be constant (i.e. not depend on the args)
 --
 -- For Derived constraints the returned coercion may be undefined
--- because flattening may use a Derived equality ([D] a ~ ty)
-flattenArgsNom ev tc tys
-  = do { traceTcS "flatten_args {" (vcat (map ppr tys))
+-- because rewriting may use a Derived equality ([D] a ~ ty)
+rewriteArgsNom ev tc tys
+  = do { traceTcS "rewrite_args {" (vcat (map ppr tys))
        ; (tys', cos, kind_co)
-           <- runFlattenCtEv ev (flatten_args_tc tc Nothing tys)
+           <- runRewriteCtEv ev (rewrite_args_tc tc Nothing tys)
        ; MASSERT( isReflMCo kind_co )
-       ; traceTcS "flatten }" (vcat (map ppr tys'))
+       ; traceTcS "rewrite }" (vcat (map ppr tys'))
        ; return (tys', cos) }
 
--- | Flatten a type w.r.t. nominal equality. This is useful to rewrite
+-- | Rewrite a type w.r.t. nominal equality. This is useful to rewrite
 -- a type w.r.t. any givens. It does not do type-family reduction. This
 -- will never emit new constraints. Call this when the inert set contains
 -- only givens.
-flattenType :: CtLoc -> TcType -> TcS TcType
-flattenType loc ty
-  = do { (xi, _) <- runFlatten loc Given NomEq $
-                    flatten_one ty
+rewriteType :: CtLoc -> TcType -> TcS TcType
+rewriteType loc ty
+  = do { (xi, _) <- runRewrite loc Given NomEq $
+                    rewrite_one ty
                      -- use Given flavor so that it is rewritten
                      -- only w.r.t. Givens, never Wanteds/Deriveds
                      -- (Shouldn't matter, if only Givens are present
@@ -273,13 +270,13 @@ flattenType loc ty
 
 {- *********************************************************************
 *                                                                      *
-*           The main flattening functions
+*           The main rewriting functions
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [Flattening]
+{- Note [Rewriting]
 ~~~~~~~~~~~~~~~~~~~~
-  flatten ty  ==>   (xi, co)
+  rewrite ty  ==>   (xi, co)
     where
       xi has no reducible type functions
          has no skolems that are mapped in the inert set
@@ -291,13 +288,13 @@ Key invariants:
   (F1) tcTypeKind(xi) succeeds and returns a fully zonked kind
   (F2) tcTypeKind(xi) `eqType` zonk(tcTypeKind(ty))
 
-Note that it is flatten's job to try to reduce *every type function it sees*.
+Note that it is rewrite's job to try to reduce *every type function it sees*.
 
-Flattening also:
+Rewriting also:
   * zonks, removing any metavariables, and
   * applies the substitution embodied in the inert set
 
-Because flattening zonks and the returned coercion ("co" above) is also
+Because rewriting zonks and the returned coercion ("co" above) is also
 zonked, it's possible that (co :: xi ~ ty) isn't quite true. So, instead,
 we can rely on this fact:
 
@@ -308,37 +305,33 @@ type may or may not be ty, however: if ty has unzonked filled-in metavariables,
 then the right-hand type of co will be the zonk-equal to ty.
 It is for this reason that we
 occasionally have to explicitly zonk, when (co :: xi ~ ty) is important
-even before we zonk the whole program. For example, see the FTRNotFollowed
-case in flattenTyVar.
+even before we zonk the whole program. For example, see the RTRNotFollowed
+case in rewriteTyVar.
 
-Why have these invariants on flattening? Because we sometimes use tcTypeKind
+Why have these invariants on rewriting? Because we sometimes use tcTypeKind
 during canonicalisation, and we want this kind to be zonked (e.g., see
 GHC.Tc.Solver.Canonical.canEqCanLHS).
 
-Flattening is always homogeneous. That is, the kind of the result of flattening is
+Rewriting is always homogeneous. That is, the kind of the result of rewriting is
 always the same as the kind of the input, modulo zonking. More formally:
 
   (F2) tcTypeKind(xi) `eqType` zonk(tcTypeKind(ty))
 
-This invariant means that the kind of a flattened type might not itself be flat.
-
-Recall that in comments we use alpha[flat = ty] to represent a
-flattening skolem variable alpha which has been generated to stand in
-for ty.
+This invariant means that the kind of a rewritten type might not itself be rewritten.
 
 Note that we prefer to leave type synonyms unexpanded when possible,
-so when the flattener encounters one, it first asks whether its
+so when the rewriter encounters one, it first asks whether its
 transitive expansion contains any type function applications or is
 forgetful -- that is, omits one or more type variables in its RHS.  If so,
 it expands the synonym and proceeds; if not, it simply returns the
-unexpanded synonym. See also Note [Flattening synonyms].
+unexpanded synonym. See also Note [Rewriting synonyms].
 
-Note [flatten_args performance]
+Note [rewrite_args performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In programs with lots of type-level evaluation, flatten_args becomes
+In programs with lots of type-level evaluation, rewrite_args becomes
 part of a tight loop. For example, see test perf/compiler/T9872a, which
-calls flatten_args a whopping 7,106,808 times. It is thus important
-that flatten_args be efficient.
+calls rewrite_args a whopping 7,106,808 times. It is thus important
+that rewrite_args be efficient.
 
 Performance testing showed that the current implementation is indeed
 efficient. It's critically important that zipWithAndUnzipM be
@@ -349,8 +342,8 @@ it. On test T9872a, here are the allocation stats (Dec 16, 2014):
  * Specialized, uninlined:       6,639,253,488 bytes allocated in the heap
  * Specialized, inlined:         6,281,539,792 bytes allocated in the heap
 
-To improve performance even further, flatten_args_nom is split off
-from flatten_args, as nominal equality is the common case. This would
+To improve performance even further, rewrite_args_nom is split off
+from rewrite_args, as nominal equality is the common case. This would
 be natural to write using mapAndUnzipM, but even inlined, that function
 is not as performant as a hand-written loop.
 
@@ -361,12 +354,12 @@ If you make any change here, pay close attention to the T9872{a,b,c} tests
 and T5321Fun.
 
 If we need to make this yet more performant, a possible way forward is to
-duplicate the flattener code for the nominal case, and make that case
+duplicate the rewriter code for the nominal case, and make that case
 faster. This doesn't seem quite worth it, yet.
 
-Note [flatten_exact_fam_app performance]
+Note [rewrite_exact_fam_app performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Once we've got a flat rhs, we extend the famapp-cache to record
+Once we've got a rewritten rhs, we extend the famapp-cache to record
 the result. Doing so can save lots of work when the same redex shows up more
 than once. Note that we record the link from the redex all the way to its
 *final* value, not just the single step reduction.
@@ -380,20 +373,20 @@ actually disastrous: it more than doubles the allocations for T9872a. So
 we skip adding to the cache here.
 -}
 
-{-# INLINE flatten_args_tc #-}
-flatten_args_tc
+{-# INLINE rewrite_args_tc #-}
+rewrite_args_tc
   :: TyCon         -- T
   -> Maybe [Role]  -- Nothing: ambient role is Nominal; all args are Nominal
                    -- Otherwise: no assumptions; use roles provided
   -> [Type]        -- Arg types [t1,..,tn]
-  -> FlatM ( [Xi]  -- List of flattened args [x1,..,xn]
+  -> RewriteM ( [Xi]  -- List of rewritten args [x1,..,xn]
                    -- 1-1 corresp with [t1,..,tn]
            , [Coercion]  -- List of arg coercions [co1,..,con]
                          -- 1-1 corresp with [t1,..,tn]
                          --    coi :: xi ~r ti
            , MCoercionN) -- Result coercion, rco
                          --    rco : (T t1..tn) ~N (T (x1 |> co1) .. (xn |> con))
-flatten_args_tc tc = flatten_args all_bndrs any_named_bndrs inner_ki emptyVarSet
+rewrite_args_tc tc = rewrite_args all_bndrs any_named_bndrs inner_ki emptyVarSet
   -- NB: TyCon kinds are always closed
   where
     (bndrs, named)
@@ -405,47 +398,47 @@ flatten_args_tc tc = flatten_args all_bndrs any_named_bndrs inner_ki emptyVarSet
     !any_named_bndrs                     = named || inner_named
     -- NB: Those bangs there drop allocations in T9872{a,c,d} by 8%.
 
-{-# INLINE flatten_args #-}
-flatten_args :: [TyCoBinder] -> Bool -- Binders, and True iff any of them are
+{-# INLINE rewrite_args #-}
+rewrite_args :: [TyCoBinder] -> Bool -- Binders, and True iff any of them are
                                      -- named.
              -> Kind -> TcTyCoVarSet -- function kind; kind's free vars
              -> Maybe [Role] -> [Type]    -- these are in 1-to-1 correspondence
                                           -- Nothing: use all Nominal
-             -> FlatM ([Xi], [Coercion], MCoercionN)
+             -> RewriteM ([Xi], [Coercion], MCoercionN)
 -- Coercions :: Xi ~ Type, at roles given
 -- Third coercion :: tcTypeKind(fun xis) ~N tcTypeKind(fun tys)
 -- That is, the third coercion relates the kind of some function (whose kind is
 -- passed as the first parameter) instantiated at xis to the kind of that
--- function instantiated at the tys. This is useful in keeping flattening
+-- function instantiated at the tys. This is useful in keeping rewriting
 -- homoegeneous. The list of roles must be at least as long as the list of
 -- types.
-flatten_args orig_binders
+rewrite_args orig_binders
              any_named_bndrs
              orig_inner_ki
              orig_fvs
              orig_m_roles
              orig_tys
   = case (orig_m_roles, any_named_bndrs) of
-      (Nothing, False) -> flatten_args_fast orig_tys
-      _ -> flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
+      (Nothing, False) -> rewrite_args_fast orig_tys
+      _ -> rewrite_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
         where orig_roles = fromMaybe (repeat Nominal) orig_m_roles
 
-{-# INLINE flatten_args_fast #-}
--- | fast path flatten_args, in which none of the binders are named and
+{-# INLINE rewrite_args_fast #-}
+-- | fast path rewrite_args, in which none of the binders are named and
 -- therefore we can avoid tracking a lifting context.
 -- There are many bang patterns in here. It's been observed that they
 -- greatly improve performance of an optimized build.
 -- The T9872 test cases are good witnesses of this fact.
-flatten_args_fast :: [Type]
-                  -> FlatM ([Xi], [Coercion], MCoercionN)
-flatten_args_fast orig_tys
+rewrite_args_fast :: [Type]
+                  -> RewriteM ([Xi], [Coercion], MCoercionN)
+rewrite_args_fast orig_tys
   = fmap finish (iterate orig_tys)
   where
 
     iterate :: [Type]
-            -> FlatM ([Xi], [Coercion])
+            -> RewriteM ([Xi], [Coercion])
     iterate (ty:tys) = do
-      (xi, co)   <- flatten_one ty
+      (xi, co)   <- rewrite_one ty
       (xis, cos) <- iterate tys
       pure (xi : xis, co : cos)
     iterate [] = pure ([], [])
@@ -454,16 +447,16 @@ flatten_args_fast orig_tys
     finish :: ([Xi], [Coercion]) -> ([Xi], [Coercion], MCoercionN)
     finish (xis, cos) = (xis, cos, MRefl)
 
-{-# INLINE flatten_args_slow #-}
--- | Slow path, compared to flatten_args_fast, because this one must track
+{-# INLINE rewrite_args_slow #-}
+-- | Slow path, compared to rewrite_args_fast, because this one must track
 -- a lifting context.
-flatten_args_slow :: [TyCoBinder] -> Kind -> TcTyCoVarSet
+rewrite_args_slow :: [TyCoBinder] -> Kind -> TcTyCoVarSet
                   -> [Role] -> [Type]
-                  -> FlatM ([Xi], [Coercion], MCoercionN)
-flatten_args_slow binders inner_ki fvs roles tys
--- Arguments used dependently must be flattened with proper coercions, but
--- we're not guaranteed to get a proper coercion when flattening with the
--- "Derived" flavour. So we must call noBogusCoercions when flattening arguments
+                  -> RewriteM ([Xi], [Coercion], MCoercionN)
+rewrite_args_slow binders inner_ki fvs roles tys
+-- Arguments used dependently must be rewritten with proper coercions, but
+-- we're not guaranteed to get a proper coercion when rewriting with the
+-- "Derived" flavour. So we must call noBogusCoercions when rewriting arguments
 -- corresponding to binders that are dependent. However, we might legitimately
 -- have *more* arguments than binders, in the case that the inner_ki is a variable
 -- that gets instantiated with a Π-type. We conservatively choose not to produce
@@ -471,76 +464,76 @@ flatten_args_slow binders inner_ki fvs roles tys
 -- a Derived rewriting a Derived. The solution would be to generate evidence for
 -- Deriveds, thus avoiding this whole noBogusCoercions idea. See also
 -- Note [No derived kind equalities]
-  = do { flattened_args <- zipWith3M fl (map isNamedBinder binders ++ repeat True)
+  = do { rewritten_args <- zipWith3M fl (map isNamedBinder binders ++ repeat True)
                                         roles tys
-       ; return (simplifyArgsWorker binders inner_ki fvs roles flattened_args) }
+       ; return (simplifyArgsWorker binders inner_ki fvs roles rewritten_args) }
   where
     {-# INLINE fl #-}
     fl :: Bool   -- must we ensure to produce a real coercion here?
                   -- see comment at top of function
-       -> Role -> Type -> FlatM (Xi, Coercion)
+       -> Role -> Type -> RewriteM (Xi, Coercion)
     fl True  r ty = noBogusCoercions $ fl1 r ty
     fl False r ty =                    fl1 r ty
 
     {-# INLINE fl1 #-}
-    fl1 :: Role -> Type -> FlatM (Xi, Coercion)
+    fl1 :: Role -> Type -> RewriteM (Xi, Coercion)
     fl1 Nominal ty
       = setEqRel NomEq $
-        flatten_one ty
+        rewrite_one ty
 
     fl1 Representational ty
       = setEqRel ReprEq $
-        flatten_one ty
+        rewrite_one ty
 
     fl1 Phantom ty
-    -- See Note [Phantoms in the flattener]
+    -- See Note [Phantoms in the rewriter]
       = do { ty <- liftTcS $ zonkTcType ty
            ; return (ty, mkReflCo Phantom ty) }
 
 ------------------
-flatten_one :: TcType -> FlatM (Xi, Coercion)
--- Flatten a type to get rid of type function applications, returning
+rewrite_one :: TcType -> RewriteM (Xi, Coercion)
+-- Rewrite a type to get rid of type function applications, returning
 -- the new type-function-free type, and a collection of new equality
--- constraints.  See Note [Flattening] for more detail.
+-- constraints.  See Note [Rewriting] for more detail.
 --
 -- Postcondition: Coercion :: Xi ~ TcType
--- The role on the result coercion matches the EqRel in the FlattenEnv
+-- The role on the result coercion matches the EqRel in the RewriteEnv
 
-flatten_one ty
-  | Just ty' <- flattenView ty  -- See Note [Flattening synonyms]
-  = flatten_one ty'
+rewrite_one ty
+  | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
+  = rewrite_one ty'
 
-flatten_one xi@(LitTy {})
+rewrite_one xi@(LitTy {})
   = do { role <- getRole
        ; return (xi, mkReflCo role xi) }
 
-flatten_one (TyVarTy tv)
-  = flattenTyVar tv
+rewrite_one (TyVarTy tv)
+  = rewriteTyVar tv
 
-flatten_one (AppTy ty1 ty2)
-  = flatten_app_tys ty1 [ty2]
+rewrite_one (AppTy ty1 ty2)
+  = rewrite_app_tys ty1 [ty2]
 
-flatten_one (TyConApp tc tys)
+rewrite_one (TyConApp tc tys)
   -- If it's a type family application, try to reduce it
   | isTypeFamilyTyCon tc
-  = flatten_fam_app tc tys
+  = rewrite_fam_app tc tys
 
   -- For * a normal data type application
   --     * data family application
-  -- we just recursively flatten the arguments.
+  -- we just recursively rewrite the arguments.
   | otherwise
-  = flatten_ty_con_app tc tys
+  = rewrite_ty_con_app tc tys
 
-flatten_one ty@(FunTy { ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
-  = do { (xi1,co1) <- flatten_one ty1
-       ; (xi2,co2) <- flatten_one ty2
-       ; (xi3,co3) <- setEqRel NomEq $ flatten_one mult
+rewrite_one ty@(FunTy { ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
+  = do { (xi1,co1) <- rewrite_one ty1
+       ; (xi2,co2) <- rewrite_one ty2
+       ; (xi3,co3) <- setEqRel NomEq $ rewrite_one mult
        ; role <- getRole
        ; return (ty { ft_mult = xi3, ft_arg = xi1, ft_res = xi2 }
                 , mkFunCo role co3 co1 co2) }
 
-flatten_one ty@(ForAllTy {})
--- TODO (RAE): This is inadequate, as it doesn't flatten the kind of
+rewrite_one ty@(ForAllTy {})
+-- TODO (RAE): This is inadequate, as it doesn't rewrite the kind of
 -- the bound tyvar. Doing so will require carrying around a substitution
 -- and the usual substTyVarBndr-like silliness. Argh.
 
@@ -548,56 +541,56 @@ flatten_one ty@(ForAllTy {})
 -- applications inside the forall involve the bound type variables.
   = do { let (bndrs, rho) = tcSplitForAllTyVarBinders ty
              tvs           = binderVars bndrs
-       ; (rho', co) <- flatten_one rho
+       ; (rho', co) <- rewrite_one rho
        ; return (mkForAllTys bndrs rho', mkHomoForAllCos tvs co) }
 
-flatten_one (CastTy ty g)
-  = do { (xi, co) <- flatten_one ty
-       ; (g', _)  <- flatten_co g
+rewrite_one (CastTy ty g)
+  = do { (xi, co) <- rewrite_one ty
+       ; (g', _)  <- rewrite_co g
        ; role <- getRole
        ; return (mkCastTy xi g', castCoercionKind1 co role xi ty g') }
          -- It makes a /big/ difference to call castCoercionKind1 not
          -- the more general castCoercionKind2.
          -- See Note [castCoercionKind1] in GHC.Core.Coercion
 
-flatten_one (CoercionTy co) = first mkCoercionTy <$> flatten_co co
+rewrite_one (CoercionTy co) = first mkCoercionTy <$> rewrite_co co
 
--- | "Flatten" a coercion. Really, just zonk it so we can uphold
--- (F1) of Note [Flattening]
-flatten_co :: Coercion -> FlatM (Coercion, Coercion)
-flatten_co co
+-- | "Rewrite" a coercion. Really, just zonk it so we can uphold
+-- (F1) of Note [Rewriting]
+rewrite_co :: Coercion -> RewriteM (Coercion, Coercion)
+rewrite_co co
   = do { co <- liftTcS $ zonkCo co
        ; env_role <- getRole
        ; let co' = mkTcReflCo env_role (mkCoercionTy co)
        ; return (co, co') }
 
--- flatten (nested) AppTys
-flatten_app_tys :: Type -> [Type] -> FlatM (Xi, Coercion)
+-- rewrite (nested) AppTys
+rewrite_app_tys :: Type -> [Type] -> RewriteM (Xi, Coercion)
 -- commoning up nested applications allows us to look up the function's kind
 -- only once. Without commoning up like this, we would spend a quadratic amount
 -- of time looking up functions' types
-flatten_app_tys (AppTy ty1 ty2) tys = flatten_app_tys ty1 (ty2:tys)
-flatten_app_tys fun_ty arg_tys
-  = do { (fun_xi, fun_co) <- flatten_one fun_ty
-       ; flatten_app_ty_args fun_xi fun_co arg_tys }
+rewrite_app_tys (AppTy ty1 ty2) tys = rewrite_app_tys ty1 (ty2:tys)
+rewrite_app_tys fun_ty arg_tys
+  = do { (fun_xi, fun_co) <- rewrite_one fun_ty
+       ; rewrite_app_ty_args fun_xi fun_co arg_tys }
 
--- Given a flattened function (with the coercion produced by flattening) and
--- a bunch of unflattened arguments, flatten the arguments and apply.
--- The coercion argument's role matches the role stored in the FlatM monad.
+-- Given a rewritten function (with the coercion produced by rewriting) and
+-- a bunch of unrewritten arguments, rewrite the arguments and apply.
+-- The coercion argument's role matches the role stored in the RewriteM monad.
 --
 -- The bang patterns used here were observed to improve performance. If you
 -- wish to remove them, be sure to check for regeressions in allocations.
-flatten_app_ty_args :: Xi -> Coercion -> [Type] -> FlatM (Xi, Coercion)
-flatten_app_ty_args fun_xi fun_co []
-  -- this will be a common case when called from flatten_fam_app, so shortcut
+rewrite_app_ty_args :: Xi -> Coercion -> [Type] -> RewriteM (Xi, Coercion)
+rewrite_app_ty_args fun_xi fun_co []
+  -- this will be a common case when called from rewrite_fam_app, so shortcut
   = return (fun_xi, fun_co)
-flatten_app_ty_args fun_xi fun_co arg_tys
+rewrite_app_ty_args fun_xi fun_co arg_tys
   = do { (xi, co, kind_co) <- case tcSplitTyConApp_maybe fun_xi of
            Just (tc, xis) ->
              do { let tc_roles  = tyConRolesRepresentational tc
                       arg_roles = dropList xis tc_roles
                 ; (arg_xis, arg_cos, kind_co)
-                    <- flatten_vector (tcTypeKind fun_xi) arg_roles arg_tys
+                    <- rewrite_vector (tcTypeKind fun_xi) arg_roles arg_tys
 
                   -- Here, we have fun_co :: T xi1 xi2 ~ ty
                   -- and we need to apply fun_co to the arg_cos. The problem is
@@ -616,7 +609,7 @@ flatten_app_ty_args fun_xi fun_co arg_tys
                 ; return (app_xi, app_co, kind_co) }
            Nothing ->
              do { (arg_xis, arg_cos, kind_co)
-                    <- flatten_vector (tcTypeKind fun_xi) (repeat Nominal) arg_tys
+                    <- rewrite_vector (tcTypeKind fun_xi) (repeat Nominal) arg_tys
                 ; let arg_xi = mkAppTys fun_xi arg_xis
                       arg_co = mkAppCos fun_co arg_cos
                 ; return (arg_xi, arg_co, kind_co) }
@@ -624,18 +617,18 @@ flatten_app_ty_args fun_xi fun_co arg_tys
        ; role <- getRole
        ; return (homogenise_result xi co role kind_co) }
 
-flatten_ty_con_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
-flatten_ty_con_app tc tys
+rewrite_ty_con_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
+rewrite_ty_con_app tc tys
   = do { role <- getRole
        ; let m_roles | Nominal <- role = Nothing
                      | otherwise       = Just $ tyConRolesX role tc
-       ; (xis, cos, kind_co) <- flatten_args_tc tc m_roles tys
+       ; (xis, cos, kind_co) <- rewrite_args_tc tc m_roles tys
        ; let tyconapp_xi = mkTyConApp tc xis
              tyconapp_co = mkTyConAppCo role tc cos
        ; return (homogenise_result tyconapp_xi tyconapp_co role kind_co) }
 
--- Make the result of flattening homogeneous (Note [Flattening] (F2))
-homogenise_result :: Xi              -- a flattened type
+-- Make the result of rewriting homogeneous (Note [Rewriting] (F2))
+homogenise_result :: Xi              -- a rewritten type
                   -> Coercion        -- :: xi ~r original ty
                   -> Role            -- r
                   -> MCoercionN      -- kind_co :: tcTypeKind(xi) ~N tcTypeKind(ty)
@@ -646,22 +639,22 @@ homogenise_result xi co r mco@(MCo kind_co)
   = (xi `mkCastTy` kind_co, (mkSymCo $ GRefl r xi mco) `mkTransCo` co)
 {-# INLINE homogenise_result #-}
 
--- Flatten a vector (list of arguments).
-flatten_vector :: Kind   -- of the function being applied to these arguments
-               -> [Role] -- If we're flatten w.r.t. ReprEq, what roles do the
+-- Rewrite a vector (list of arguments).
+rewrite_vector :: Kind   -- of the function being applied to these arguments
+               -> [Role] -- If we're rewrite w.r.t. ReprEq, what roles do the
                          -- args have?
-               -> [Type] -- the args to flatten
-               -> FlatM ([Xi], [Coercion], MCoercionN)
-flatten_vector ki roles tys
+               -> [Type] -- the args to rewrite
+               -> RewriteM ([Xi], [Coercion], MCoercionN)
+rewrite_vector ki roles tys
   = do { eq_rel <- getEqRel
        ; case eq_rel of
-           NomEq  -> flatten_args bndrs
+           NomEq  -> rewrite_args bndrs
                                   any_named_bndrs
                                   inner_ki
                                   fvs
                                   Nothing
                                   tys
-           ReprEq -> flatten_args bndrs
+           ReprEq -> rewrite_args bndrs
                                   any_named_bndrs
                                   inner_ki
                                   fvs
@@ -671,10 +664,10 @@ flatten_vector ki roles tys
   where
     (bndrs, inner_ki, any_named_bndrs) = split_pi_tys' ki  -- "RAE" fix
     fvs                                = tyCoVarsOfType ki
-{-# INLINE flatten_vector #-}
+{-# INLINE rewrite_vector #-}
 
 {-
-Note [Flattening synonyms]
+Note [Rewriting synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Not expanding synonyms aggressively improves error messages, and
 keeps types smaller. But we need to take care.
@@ -704,7 +697,7 @@ so those families can get reduced.
 
 ************************************************************************
 *                                                                      *
-             Flattening a type-family application
+             Rewriting a type-family application
 *                                                                      *
 ************************************************************************
 
@@ -724,13 +717,13 @@ STEP 2. Try top-level instances. Note that we haven't simplified the arguments
 
   If an instance is found, jump to FINISH.
 
-STEP 3. Flatten all arguments. This might expose more information so that we
+STEP 3. Rewrite all arguments. This might expose more information so that we
   can use a top-level instance.
 
   Continue to the next step.
 
-STEP 4. Try the inerts. Note that we try the inerts *after* flattening the
-  arguments, because the inerts will have flattened LHSs.
+STEP 4. Try the inerts. Note that we try the inerts *after* rewriting the
+  arguments, because the inerts will have rewritten LHSs.
 
   If an inert is found, jump to FINISH.
 
@@ -747,7 +740,7 @@ STEP 6. Try top-level instances, which might trigger now that we know more
 STEP 7. No progress to be made. Return what we have. (Do not do FINISH.)
 
 FINISH 1. We've made a reduction, but the new type may still have more
-  work to do. So flatten the new type.
+  work to do. So rewrite the new type.
 
 FINISH 2. Add the result to the famapp-cache, connecting the type we started
   with to the one we ended with.
@@ -755,17 +748,17 @@ FINISH 2. Add the result to the famapp-cache, connecting the type we started
 Because STEP 1/2 and STEP 5/6 happen the same way, they are abstracted into
 try_to_reduce.
 
-FINISH is naturally implemented in `finish`. But, Note [flatten_exact_fam_app performance]
+FINISH is naturally implemented in `finish`. But, Note [rewrite_exact_fam_app performance]
 tells us that we should not add to the famapp-cache after STEP 1/2. So `finish`
 is inlined in that case, and only FINISH 1 is performed.
 
 -}
 
-flatten_fam_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
-  --   flatten_fam_app            can be over-saturated
-  --   flatten_exact_fam_app      lifts out the application to top level
+rewrite_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
+  --   rewrite_fam_app            can be over-saturated
+  --   rewrite_exact_fam_app      lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
-flatten_fam_app tc tys  -- Can be over-saturated
+rewrite_fam_app tc tys  -- Can be over-saturated
     = ASSERT2( tys `lengthAtLeast` tyConArity tc
              , ppr tc $$ ppr (tyConArity tc) $$ ppr tys)
 
@@ -774,22 +767,22 @@ flatten_fam_app tc tys  -- Can be over-saturated
                  -- in which case the remaining arguments should
                  -- be dealt with by AppTys
       do { let (tys1, tys_rest) = splitAt (tyConArity tc) tys
-         ; (xi1, co1) <- flatten_exact_fam_app tc tys1
+         ; (xi1, co1) <- rewrite_exact_fam_app tc tys1
                -- co1 :: xi1 ~ F tys1
 
-         ; flatten_app_ty_args xi1 co1 tys_rest }
+         ; rewrite_app_ty_args xi1 co1 tys_rest }
 
 -- the [TcType] exactly saturate the TyCon
 -- See Note [How to normalise a family application]
-flatten_exact_fam_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
-flatten_exact_fam_app tc tys
+rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
+rewrite_exact_fam_app tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
 
        -- STEP 1/2. Try to reduce without reducing arguments first.
        ; result1 <- try_to_reduce tc tys
        ; case result1 of
              -- Don't use the cache;
-             -- See Note [flatten_exact_fam_app performance]
+             -- See Note [rewrite_exact_fam_app performance]
          { Just (co, xi) -> finish False (xi, co)
          ; Nothing ->
 
@@ -797,9 +790,9 @@ flatten_exact_fam_app tc tys
     do { eq_rel <- getEqRel
            -- checking eq_rel == NomEq saves ~0.5% in T9872a
        ; (xis, cos, kind_co) <- if eq_rel == NomEq
-                                then flatten_args_tc tc Nothing tys
+                                then rewrite_args_tc tc Nothing tys
                                 else setEqRel NomEq $
-                                     flatten_args_tc tc Nothing tys
+                                     rewrite_args_tc tc Nothing tys
            -- kind_co :: tcTypeKind(F xis) ~N tcTypeKind(F tys)
 
        ; let role    = eqRelRole eq_rel
@@ -821,7 +814,7 @@ flatten_exact_fam_app tc tys
              -- co :: F xis ~ir xi
 
              | fr `eqCanRewriteFR` (flavour, eq_rel) ->
-                 do { traceFlat "rewrite family application with inert"
+                 do { traceRewriteM "rewrite family application with inert"
                                 (ppr tc <+> ppr xis $$ ppr xi)
                     ; finish True (homogenise xi downgraded_co) }
                -- this will sometimes duplicate an inert in the cache,
@@ -845,12 +838,12 @@ flatten_exact_fam_app tc tys
                reduced = mkTyConApp tc xis }}}}}
   where
       -- call this if the above attempts made progress.
-      -- This recursively flattens the result and then adds to the cache
+      -- This recursively rewrites the result and then adds to the cache
     finish :: Bool  -- add to the cache?
-           -> (Xi, Coercion) -> FlatM (Xi, Coercion)
+           -> (Xi, Coercion) -> RewriteM (Xi, Coercion)
     finish use_cache (xi, co)
-      = do { -- flatten the result: FINISH 1
-             (fully, fully_co) <- bumpDepth $ flatten_one xi
+      = do { -- rewrite the result: FINISH 1
+             (fully, fully_co) <- bumpDepth $ rewrite_one xi
            ; let final_co = fully_co `mkTcTransCo` co
            ; eq_rel <- getEqRel
            ; flavour <- getFlavour
@@ -864,9 +857,9 @@ flatten_exact_fam_app tc tys
            ; return (fully, final_co) }
     {-# INLINE finish #-}
 
--- Returned coercion is output ~r input, where r is the role in the FlatM monad
+-- Returned coercion is output ~r input, where r is the role in the RewriteM monad
 -- See Note [How to normalise a family application]
-try_to_reduce :: TyCon -> [TcType] -> FlatM (Maybe (TcCoercion, TcType))
+try_to_reduce :: TyCon -> [TcType] -> RewriteM (Maybe (TcCoercion, TcType))
 try_to_reduce tc tys
   = do { result <- liftTcS $ firstJustsM [ lookupFamAppCache tc tys  -- STEP 5
                                          , matchFam tc tys ]         -- STEP 6
@@ -874,10 +867,10 @@ try_to_reduce tc tys
   where
     -- The result above is always Nominal. We might want a Representational
     -- coercion; this downgrades (and prints, out of convenience).
-    downgrade :: Maybe (TcCoercionN, TcType) -> FlatM (Maybe (TcCoercion, TcType))
+    downgrade :: Maybe (TcCoercionN, TcType) -> RewriteM (Maybe (TcCoercion, TcType))
     downgrade Nothing = return Nothing
     downgrade result@(Just (co, xi))
-      = do { traceFlat "Eager T.F. reduction success" $
+      = do { traceRewriteM "Eager T.F. reduction success" $
              vcat [ ppr tc, ppr tys, ppr xi
                   , ppr co <+> dcolon <+> ppr (coercionKind co)
                   ]
@@ -891,61 +884,61 @@ try_to_reduce tc tys
 {-
 ************************************************************************
 *                                                                      *
-             Flattening a type variable
+             Rewriting a type variable
 *                                                                      *
 ********************************************************************* -}
 
--- | The result of flattening a tyvar "one step".
-data FlattenTvResult
-  = FTRNotFollowed
+-- | The result of rewriting a tyvar "one step".
+data RewriteTvResult
+  = RTRNotFollowed
       -- ^ The inert set doesn't make the tyvar equal to anything else
 
-  | FTRFollowed TcType Coercion
-      -- ^ The tyvar flattens to a not-necessarily flat other type.
+  | RTRFollowed TcType Coercion
+      -- ^ The tyvar rewrites to a not-necessarily rewritten other type.
       -- co :: new type ~r old type, where the role is determined by
-      -- the FlattenEnv
+      -- the RewriteEnv
 
-flattenTyVar :: TyVar -> FlatM (Xi, Coercion)
-flattenTyVar tv
-  = do { mb_yes <- flatten_tyvar1 tv
+rewriteTyVar :: TyVar -> RewriteM (Xi, Coercion)
+rewriteTyVar tv
+  = do { mb_yes <- rewrite_tyvar1 tv
        ; case mb_yes of
-           FTRFollowed ty1 co1  -- Recur
-             -> do { (ty2, co2) <- flatten_one ty1
-                   -- ; traceFlat "flattenTyVar2" (ppr tv $$ ppr ty2)
+           RTRFollowed ty1 co1  -- Recur
+             -> do { (ty2, co2) <- rewrite_one ty1
+                   -- ; traceRewriteM "rewriteTyVar2" (ppr tv $$ ppr ty2)
                    ; return (ty2, co2 `mkTransCo` co1) }
 
-           FTRNotFollowed   -- Done, but make sure the kind is zonked
-                            -- Note [Flattening] invariant (F0) and (F1)
+           RTRNotFollowed   -- Done, but make sure the kind is zonked
+                            -- Note [Rewriting] invariant (F0) and (F1)
              -> do { tv' <- liftTcS $ updateTyVarKindM zonkTcType tv
                    ; role <- getRole
                    ; let ty' = mkTyVarTy tv'
                    ; return (ty', mkTcReflCo role ty') } }
 
-flatten_tyvar1 :: TcTyVar -> FlatM FlattenTvResult
--- "Flattening" a type variable means to apply the substitution to it
+rewrite_tyvar1 :: TcTyVar -> RewriteM RewriteTvResult
+-- "Rewriting" a type variable means to apply the substitution to it
 -- Specifically, look up the tyvar in
 --   * the internal MetaTyVar box
 --   * the inerts
--- See also the documentation for FlattenTvResult
+-- See also the documentation for RewriteTvResult
 
-flatten_tyvar1 tv
+rewrite_tyvar1 tv
   = do { mb_ty <- liftTcS $ isFilledMetaTyVar_maybe tv
        ; case mb_ty of
-           Just ty -> do { traceFlat "Following filled tyvar"
+           Just ty -> do { traceRewriteM "Following filled tyvar"
                              (ppr tv <+> equals <+> ppr ty)
                          ; role <- getRole
-                         ; return (FTRFollowed ty (mkReflCo role ty)) } ;
-           Nothing -> do { traceFlat "Unfilled tyvar" (pprTyVar tv)
+                         ; return (RTRFollowed ty (mkReflCo role ty)) } ;
+           Nothing -> do { traceRewriteM "Unfilled tyvar" (pprTyVar tv)
                          ; fr <- getFlavourRole
-                         ; flatten_tyvar2 tv fr } }
+                         ; rewrite_tyvar2 tv fr } }
 
-flatten_tyvar2 :: TcTyVar -> CtFlavourRole -> FlatM FlattenTvResult
+rewrite_tyvar2 :: TcTyVar -> CtFlavourRole -> RewriteM RewriteTvResult
 -- The tyvar is not a filled-in meta-tyvar
 -- Try in the inert equalities
 -- See Definition [Applying a generalised substitution] in GHC.Tc.Solver.Monad
--- See Note [Stability of flattening] in GHC.Tc.Solver.Monad
+-- See Note [Stability of rewriting] in GHC.Tc.Solver.Monad
 
-flatten_tyvar2 tv fr@(_, eq_rel)
+rewrite_tyvar2 tv fr@(_, eq_rel)
   = do { ieqs <- liftTcS $ getInertEqs
        ; case lookupDVarEnv ieqs tv of
            Just (EqualCtList (ct :| _))   -- If the first doesn't work,
@@ -954,7 +947,7 @@ flatten_tyvar2 tv fr@(_, eq_rel)
                       , cc_rhs = rhs_ty, cc_eq_rel = ct_eq_rel } <- ct
              , let ct_fr = (ctEvFlavour ctev, ct_eq_rel)
              , ct_fr `eqCanRewriteFR` fr  -- This is THE key call of eqCanRewriteFR
-             -> do { traceFlat "Following inert tyvar"
+             -> do { traceRewriteM "Following inert tyvar"
                         (ppr tv <+>
                          equals <+>
                          ppr rhs_ty $$ ppr ctev)
@@ -967,12 +960,12 @@ flatten_tyvar2 tv fr@(_, eq_rel)
                             (NomEq, NomEq)  -> rewrite_co1
                             (NomEq, ReprEq) -> mkSubCo rewrite_co1
 
-                    ; return (FTRFollowed rhs_ty rewrite_co) }
+                    ; return (RTRFollowed rhs_ty rewrite_co) }
                     -- NB: ct is Derived then fmode must be also, hence
                     -- we are not going to touch the returned coercion
                     -- so ctEvCoercion is fine.
 
-           _other -> return FTRNotFollowed }
+           _other -> return RTRNotFollowed }
 
 {-
 Note [An alternative story for the inert substitution]
@@ -986,7 +979,7 @@ We used (GHC 7.8) to have this story for the inert substitution inert_eqs
  * They are *inert* in the weaker sense that there is no infinite chain of
    (i1 `eqCanRewrite` i2), (i2 `eqCanRewrite` i3), etc
 
-This means that flattening must be recursive, but it does allow
+This means that rewriting must be recursive, but it does allow
   [G] a ~ [b]
   [G] b ~ Maybe c
 
@@ -998,7 +991,7 @@ only if (a) the work item can rewrite the inert AND
 This is significantly harder to think about. It can save a LOT of work
 in occurs-check cases, but we don't care about them much.  #5837
 is an example, but it causes trouble only with the old (pre-Fall 2020)
-flattening story. It is unclear if there is any gain w.r.t. to
+rewriting story. It is unclear if there is any gain w.r.t. to
 the new story.
 
 -}

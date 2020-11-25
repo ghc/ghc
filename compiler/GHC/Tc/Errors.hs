@@ -2736,15 +2736,11 @@ Consider (C (Maybe (F x))), where F is a type function, and we have
 instances
                 C (Maybe Int) and C (Maybe a)
 Since (F x) might turn into Int, this is an overlap situation, and
-indeed (because of flattening) the main solver will have refrained
+indeed the main solver will have refrained
 from solving.  But by the time we get to error message generation, we've
 un-flattened the constraint.  So we must *re*-flatten it before looking
 up in the instance environment, lest we only report one matching
 instance when in fact there are two.
-
-Re-flattening is pretty easy, because we don't need to keep track of
-evidence.  We don't re-use the code in GHC.Tc.Solver.Canonical because that's in
-the TcS monad, and we are in TcM here.
 
 Note [Kind arguments in error messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
