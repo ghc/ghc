@@ -531,7 +531,12 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
                                        , text "Suppress =" <+> ppr (cec_suppress ctxt)
                                        , text "tidy_cts =" <+> ppr tidy_cts
                                        , text "tidy_holes = " <+> ppr tidy_holes ])
-
+         -- Determine if we're meant to include warnings about inaccessible code.
+       ; warn_inaccessible_flag <- woptM Opt_WarnInaccessibleCode
+       ; let should_warn :: Bool
+             should_warn
+               | (_ : _) <- cec_encl ctxt = warn_inaccessible_flag
+               | otherwise                = False   -- there won't be Givens, anyway
          -- First, deal with any out-of-scope errors:
        ; let (out_of_scope, other_holes) = partition isOutOfScopeHole tidy_holes
                -- don't suppress out-of-scope errors
@@ -548,7 +553,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
        ; reportHoles tidy_cts ctxt_for_insols other_holes
           -- holes never suppress
 
-       ; (ctxt1, cts1) <- tryReporters ctxt_for_insols report1 tidy_cts
+       ; (ctxt1, cts1) <- tryReporters ctxt_for_insols (report1 should_warn) tidy_cts
 
          -- Now all the other constraints.  We suppress errors here if
          -- any of the first batch failed, or if the enclosing context
@@ -577,22 +582,28 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
     -- (see GHC.Tc.Utils.insolubleCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("custom_error", unblocked is_user_type_error, True,  mkUserTypeErrorReporter)
+    report1 should_warn =
+      [ ("custom_error", unblocked is_user_type_error, True,  mkUserTypeErrorReporter)
+        , -- See Note [Given warnings]
+          -- Don't bother doing this if -Winaccessible-code isn't enabled.
+          -- See Note [Avoid -Winaccessible-code when deriving] in GHC.Tc.TyCl.Instance.
+          -- False means don't suppress subsequent errors, because these are warnings anyway.
+          if should_warn
+             then ("insoluble1a", is_given_eq, False, mkGivenWarningReporter)
+             else ("insoluble1b", is_given_eq, False, ignoreGivenWarningReporter)
+        , ("insoluble2",   unblocked utterly_wrong,  True, mkGroupReporter mkEqErr)
+        , ("skolem eq1",   unblocked very_wrong,     True, mkSkolReporter)
+        , ("skolem eq2",   unblocked skolem_eq,      True, mkSkolReporter)
+        , ("non-tv eq",    unblocked non_tv_eq,      True, mkSkolReporter)
 
-              , given_eq_spec
-              , ("insoluble2",   unblocked utterly_wrong,  True, mkGroupReporter mkEqErr)
-              , ("skolem eq1",   unblocked very_wrong,     True, mkSkolReporter)
-              , ("skolem eq2",   unblocked skolem_eq,      True, mkSkolReporter)
-              , ("non-tv eq",    unblocked non_tv_eq,      True, mkSkolReporter)
-
-                  -- The only remaining equalities are alpha ~ ty,
-                  -- where alpha is untouchable; and representational equalities
-                  -- Prefer homogeneous equalities over hetero, because the
-                  -- former might be holding up the latter.
-                  -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
-              , ("Homo eqs",      unblocked is_homo_equality, True,  mkGroupReporter mkEqErr)
-              , ("Other eqs",     unblocked is_equality,      True,  mkGroupReporter mkEqErr)
-              , ("Blocked eqs",   is_equality,           False, mkSuppressReporter mkBlockedEqErr)]
+            -- The only remaining equalities are alpha ~ ty,
+            -- where alpha is untouchable; and representational equalities
+            -- Prefer homogeneous equalities over hetero, because the
+            -- former might be holding up the latter.
+            -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+        , ("Homo eqs",      unblocked is_homo_equality, True,  mkGroupReporter mkEqErr)
+        , ("Other eqs",     unblocked is_equality,      True,  mkGroupReporter mkEqErr)
+        , ("Blocked eqs",   is_equality,           False, mkSuppressReporter mkBlockedEqErr)]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
@@ -645,29 +656,6 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
 
     is_irred _ (IrredPred {}) = True
     is_irred _ _              = False
-
-    given_eq_spec  -- See Note [Given errors]
-      | has_gadt_match (cec_encl ctxt)
-      = ("insoluble1a", is_given_eq, True,  mkGivenErrorReporter)
-      | otherwise
-      = ("insoluble1b", is_given_eq, False, ignoreErrorReporter)
-          -- False means don't suppress subsequent errors
-          -- Reason: we don't report all given errors
-          --         (see mkGivenErrorReporter), and we should only suppress
-          --         subsequent errors if we actually report this one!
-          --         #13446 is an example
-
-    -- See Note [Given errors]
-    has_gadt_match [] = False
-    has_gadt_match (implic : implics)
-      | PatSkol {} <- ic_info implic
-      , ic_given_eqs implic /= NoGivenEqs
-      , ic_warn_inaccessible implic
-          -- Don't bother doing this if -Winaccessible-code isn't enabled.
-          -- See Note [Avoid -Winaccessible-code when deriving] in GHC.Tc.TyCl.Instance.
-      = True
-      | otherwise
-      = has_gadt_match implics
 
 ---------------
 isSkolemTy :: TcLevel -> Type -> Bool
@@ -795,41 +783,47 @@ mkUserTypeError ct = important
                        Just msg -> msg
                        Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
 
-mkGivenErrorReporter :: Reporter
--- See Note [Given errors]
-mkGivenErrorReporter ctxt cts
+mkGivenWarningReporter :: Reporter
+-- See Note [Given warnings]
+mkGivenWarningReporter ctxt cts
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
-       ; let (implic:_) = cec_encl ctxt
-                 -- Always non-empty when mkGivenErrorReporter is called
-             ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))
-                   -- For given constraints we overwrite the env (and hence src-loc)
-                   -- with one from the immediately-enclosing implication.
-                   -- See Note [Inaccessible code]
+       ; let env = ctLocEnv (ctLoc ct)
+       ; unless (inDeriving env || inAmbiguityCheck env) $
+          do { let (implic:_) = cec_encl ctxt
+                       -- Always non-empty when mkGivenWarningReporter is called
+                   ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))
+                         -- For given constraints we overwrite the env (and hence src-loc)
+                         -- with one from the immediately-enclosing implication.
+                         -- See Note [Inaccessible code]
+                   givens = ic_given implic
+                   inaccessible_msg = vcat
+                      [ hang (text "Unsatisfiable constraint" <> plural givens
+                              <+> pprEvVarTheta givens <+> text "in")
+                             2 (ppr (ic_info implic))
+                      , text "This may result in inaccessible code." ]
+                   report = important inaccessible_msg `mappend`
+                            mk_relevant_bindings binds_msg
 
-             inaccessible_msg = hang (text "Inaccessible code in")
-                                   2 (ppr (ic_info implic))
-             report = important inaccessible_msg `mappend`
-                      mk_relevant_bindings binds_msg
+             ; report <- mkEqErr_help ctxt report ct' ty1 ty2
+             ; err <- mkErrorReport (WarningWithFlag Opt_WarnInaccessibleCode) ctxt
+                                    (ctLocEnv (ctLoc ct')) report
 
-       ; report <- mkEqErr_help ctxt report ct' ty1 ty2
-       ; err <- mkErrorReport (WarningWithFlag Opt_WarnInaccessibleCode) ctxt
-                              (ctLocEnv (ctLoc ct')) report
-
-       ; traceTc "mkGivenErrorReporter" (ppr ct)
-       ; reportDiagnostic err }
+             ; traceTc "mkGivenWarningReporter" (ppr ct)
+             ; reportDiagnostic err
+             }
+       }
   where
     (ct : _ )  = cts    -- Never empty
     (ty1, ty2) = getEqPredTys (ctPred ct)
 
-ignoreErrorReporter :: Reporter
--- Discard Given errors that don't come from
--- a pattern match; maybe we should warn instead?
-ignoreErrorReporter ctxt cts
-  = do { traceTc "mkGivenErrorReporter no" (ppr cts $$ ppr (cec_encl ctxt))
+ignoreGivenWarningReporter :: Reporter
+-- Discard Given warnings that don't come from a pattern match
+ignoreGivenWarningReporter ctxt cts
+  = do { traceTc "mkGivenWarningReporter no" (ppr cts $$ ppr (cec_encl ctxt))
        ; return () }
 
 
-{- Note [Given errors]
+{- Note [Given warnings]
 ~~~~~~~~~~~~~~~~~~~~~~
 Given constraints represent things for which we have (or will have)
 evidence, so they aren't errors.  But if a Given constraint is
@@ -849,18 +843,25 @@ warn about that.  A classic case is
 We'd like to point out that the T3 match is inaccessible. It
 will have a Given constraint [G] Int ~ Bool.
 
-But we don't want to report ALL insoluble Given constraints.  See Trac
-#12466 for a long discussion.  For example, if we aren't careful
-we'll complain about
-   f :: ((Int ~ Bool) => a -> a) -> Int
-which arguably is OK.  It's more debatable for
-   g :: (Int ~ Bool) => Int -> Int
-but it's tricky to distinguish these cases so we don't report
-either.
+It's possible that we now over-report some Given constraints.
 
-The bottom line is this: has_gadt_match looks for an enclosing
-pattern match which binds some equality constraints.  If we
-find one, we report the insoluble Given.
+For example, consider the following two functions:
+   f :: (Int ~ Bool) => Int -> Int
+   g :: ((Int ~ Bool) => a -> a) -> Int
+While f cannot be used at all, and essentially must be dead code,
+the function g could be used, as it only requires a function which
+demands an absurd premise. That is, f requires something that is
+impossible, while g merely requires something that is unnecessary.
+
+However, it's tricky to distinguish these two cases due to the way
+that the constraint solver is written. Since this is now just a
+warning though, little harm should be caused by reporting it in
+all cases.
+
+See #12466 for a long discussion in the context when this was
+still an error. In #11066 it became a warning only. In
+discussing issue #17543, it was found that we would like the warning
+in a broader range of cases again.
 -}
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM Report)
@@ -1451,7 +1452,7 @@ mkEqErr _ [] = panic "mkEqErr"
 
 mkEqErr1 :: ReportErrCtxt -> Ct -> TcM Report
 mkEqErr1 ctxt ct   -- Wanted or derived;
-                   -- givens handled in mkGivenErrorReporter
+                   -- givens handled in mkGivenWarningReporter
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
        ; rdr_env <- getGlobalRdrEnv
        ; fam_envs <- tcGetFamInstEnvs
