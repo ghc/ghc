@@ -191,8 +191,8 @@ Mutex concurrent_coll_finished_lock;
  * === Other references ===
  *
  * Apart from the design document in docs/storage/nonmoving-gc and the Ueno
- * 2016 paper (TODO citation) from which it drew inspiration, there are a
- * variety of other relevant Notes scattered throughout the tree:
+ * 2016 paper [ueno 2016] from which it drew inspiration, there are a variety
+ * of other relevant Notes scattered throughout the tree:
  *
  *  - Note [Concurrent non-moving collection] (NonMoving.c) describes
  *    concurrency control of the nonmoving collector
@@ -231,6 +231,11 @@ Mutex concurrent_coll_finished_lock;
  *  - Note [Dirty flags in the non-moving collector] (NonMoving.c) describes
  *    how we use the DIRTY flags associated with MUT_VARs and TVARs to improve
  *    barrier efficiency.
+ *
+ * [ueno 2016]:
+ *   Katsuhiro Ueno and Atsushi Ohori. 2016. A fully concurrent garbage
+ *   collector for functional programs on multicore processors. SIGPLAN Not. 51,
+ *   9 (September 2016), 421–433. DOI:https://doi.org/10.1145/3022670.2951944
  *
  *
  * Note [Concurrent non-moving collection]
