@@ -336,7 +336,7 @@ check_target:
         }
 
         // nobody else can wake up this TSO after we claim the message
-        doneWithMsgThrowTo(m);
+        doneWithMsgThrowTo(cap, m);
 
         raiseAsync(cap, target, msg->exception, false, NULL);
         return THROWTO_SUCCESS;
@@ -577,7 +577,7 @@ maybePerformBlockedException (Capability *cap, StgTSO *tso)
 
         throwToSingleThreaded(cap, msg->target, msg->exception);
         source = msg->source;
-        doneWithMsgThrowTo(msg);
+        doneWithMsgThrowTo(cap, msg);
         tryWakeupThread(cap, source);
         return 1;
     }
@@ -599,7 +599,7 @@ awakenBlockedExceptionQueue (Capability *cap, StgTSO *tso)
         i = lockClosure((StgClosure *)msg);
         if (i != &stg_MSG_NULL_info) {
             source = msg->source;
-            doneWithMsgThrowTo(msg);
+            doneWithMsgThrowTo(cap, msg);
             tryWakeupThread(cap, source);
         } else {
             unlockClosure((StgClosure *)msg,i);
@@ -696,7 +696,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       // ASSERT(m->header.info == &stg_WHITEHOLE_info);
 
       // unlock and revoke it at the same time
-      doneWithMsgThrowTo(m);
+      doneWithMsgThrowTo(cap, m);
       break;
   }
 
