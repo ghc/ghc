@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wincomplete-uni-patterns -Wincomplete-patterns -fforce-recomp #-}
+{-# OPTIONS_GHC -fforce-recomp #-}
 {-# LANGUAGE DataKinds, KindSignatures, GADTs #-}
 
 module T18572 where
