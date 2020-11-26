@@ -204,6 +204,10 @@ Mutex concurrent_coll_finished_lock;
  *  - Note [Aging under the non-moving collector] (NonMoving.c) describes how
  *    we accommodate aging
  *
+ *  - Note [Non-moving GC: Marking evacuated objects] (Evac.c) describes how
+ *    non-moving objects reached by evacuate() are marked, which is necessary
+ *    due to aging.
+ *
  *  - Note [Large objects in the non-moving collector] (NonMovingMark.c)
  *    describes how we track large objects.
  *
@@ -317,6 +321,8 @@ Mutex concurrent_coll_finished_lock;
  *
  *     The non-moving collector will come to C in the mark queue and mark it.
  *
+ * The implementation details of this are described in Note [Non-moving GC:
+ * Marking evacuated objects] in Evac.c.
  *
  * Note [Deadlock detection under the non-moving collector]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
