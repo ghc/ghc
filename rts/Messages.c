@@ -97,7 +97,7 @@ loop:
         case THROWTO_SUCCESS: {
             // this message is done
             StgTSO *source = t->source;
-            doneWithMsgThrowTo(t);
+            doneWithMsgThrowTo(cap, t);
             tryWakeupThread(cap, source);
             break;
         }
