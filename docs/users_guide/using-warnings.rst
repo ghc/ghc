@@ -94,8 +94,6 @@ The following flags are simple ways to select standard "packages" of warnings:
     .. hlist::
         :columns: 3
 
-        * :ghc-flag:`-Wincomplete-uni-patterns`
-        * :ghc-flag:`-Wincomplete-record-updates`
         * :ghc-flag:`-Wmonomorphism-restriction`
         * :ghc-flag:`-Wimplicit-prelude`
         * :ghc-flag:`-Wmissing-local-signatures`
