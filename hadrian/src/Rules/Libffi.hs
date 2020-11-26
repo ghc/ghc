@@ -190,7 +190,7 @@ libffiRules = do
         removeDirectory libffiPath
         tarball <- needLibfffiArchive libffiPath
         -- Go from 'libffi-3.99999+git20171002+77e130c.tar.gz' to 'libffi-3.99999'
-        let libname = takeWhile (/= '+') $ takeFileName tarball
+        let libname = takeWhile (/= '+') $ fromJust $ stripExtension "tar.gz" $ takeFileName tarball
 
         -- Move extracted directory to libffiPath.
         root <- buildRoot
