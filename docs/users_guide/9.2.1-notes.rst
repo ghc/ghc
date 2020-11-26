@@ -87,7 +87,7 @@ Compiler
   also useful with this flag to give each usage of a data constructor its own
   unique info table so they can be distinguished in gdb and heap profiles.
 
-- A new heap profiling mode, :ghc-flag:`-hi`, profile by info table allows for
+- A new heap profiling mode, :rts-flag:`-hi`, profile by info table allows for
   fine-grain banding by the info table address of a closure. The profiling
   mode is intended to be used with :ghc-flag:`-finfo-table-map` and can best
   be consumed with ``eventlog2html``. This profiling mode does not require a
