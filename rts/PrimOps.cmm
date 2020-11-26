@@ -227,6 +227,21 @@ stg_shrinkSmallMutableArrayzh ( gcptr mba, W_ new_size )
 {
    ASSERT(new_size <= StgSmallMutArrPtrs_ptrs(mba));
 
+   IF_NONMOVING_WRITE_BARRIER_ENABLED {
+     // Ensure that the elements we are about to shrink out of existence
+     // remain visible to the non-moving collector.
+     W_ p, end;
+     p = mba + SIZEOF_StgSmallMutArrPtrs + WDS(new_size);
+     end = mba + SIZEOF_StgSmallMutArrPtrs + WDS(StgSmallMutArrPtrs_ptrs(mba));
+again:
+     ccall updateRemembSetPushClosure_(BaseReg "ptr",
+                                       W_[p] "ptr");
+     if (p < end) {
+       p = p + SIZEOF_W;
+       goto again;
+     }
+   }
+
    OVERWRITING_CLOSURE_MUTABLE(mba, (BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) +
                                      new_size));
    StgSmallMutArrPtrs_ptrs(mba) = new_size;
