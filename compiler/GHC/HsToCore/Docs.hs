@@ -118,7 +118,7 @@ user-written. This lets us relate Names (from ClsInsts) to comments
 getMainDeclBinder :: CollectPass (GhcPass p) => HsDecl (GhcPass p) -> [IdP (GhcPass p)]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
 getMainDeclBinder (ValD _ d) =
-  case collectHsBindBinders d of
+  case collectHsBindBinders CollNoDictBinders d of
     []       -> []
     (name:_) -> [name]
 getMainDeclBinder (SigD _ d) = sigNameNoLoc d
