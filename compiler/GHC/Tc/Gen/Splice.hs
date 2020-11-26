@@ -1153,7 +1153,7 @@ instance TH.Quasi TcM where
     where
       checkTopDecl :: HsDecl GhcPs -> TcM ()
       checkTopDecl (ValD _ binds)
-        = mapM_ bindName (collectHsBindBinders binds)
+        = mapM_ bindName (collectHsBindBinders CollNoDictBinders binds)
       checkTopDecl (SigD _ _)
         = return ()
       checkTopDecl (AnnD _ _)
