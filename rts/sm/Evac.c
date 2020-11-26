@@ -505,6 +505,7 @@ evacuate_compact (StgPtr p)
     bd->flags |= BF_EVACUATED;
     if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_RELAXED);
+      markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) str);
     }
     initBdescr(bd, new_gen, new_gen->to);
 
@@ -694,7 +695,9 @@ loop:
           // We may have evacuated the block to the nonmoving generation. If so
           // we need to make sure it is added to the mark queue since the only
           // reference to it may be from the moving heap.
-          if (major_gc && flags & BF_NONMOVING && !deadlock_detect_gc) {
+          //
+          // N.B. evaculate_large might have set BF_NONMOVING.
+          if (major_gc && bd->flags & BF_NONMOVING && !deadlock_detect_gc) {
               markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
           }
           return;
@@ -1014,6 +1017,10 @@ evacuate_BLACKHOLE(StgClosure **p)
     // See #14497.
     if (flags & BF_LARGE) {
         evacuate_large((P_)q);
+        // N.B. evacuate_large might have evacuated to the non-moving
+        // generation.
+        if (bd->flags & BF_NONMOVING)
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
         return;
     }
     if (flags & BF_EVACUATED) {
