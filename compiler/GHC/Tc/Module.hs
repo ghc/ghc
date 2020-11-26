@@ -1493,7 +1493,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
             ; fo_fvs = foldr (\gre fvs -> fvs `addOneFV` greMangledName gre)
                                 emptyFVs fo_gres
 
-            ; sig_names = mkNameSet (collectHsValBinders hs_val_binds)
+            ; sig_names = mkNameSet (collectHsValBinders CollNoDictBinders hs_val_binds)
                           `minusNameSet` getTypeSigNames val_sigs
 
                 -- Extend the GblEnv with the (as yet un-zonked)
@@ -2363,8 +2363,8 @@ tcUserStmt rdr_stmt@(L loc _)
        ; opt_pr_flag <- goptM Opt_PrintBindResult
        ; let print_result_plan
                | opt_pr_flag                         -- The flag says "print result"
-               , [v] <- collectLStmtBinders gi_stmt  -- One binder
-                           =  [mk_print_result_plan gi_stmt v]
+               , [v] <- collectLStmtBinders CollNoDictBinders gi_stmt  -- One binder
+               = [mk_print_result_plan gi_stmt v]
                | otherwise = []
 
         -- The plans are:
@@ -2414,7 +2414,7 @@ tcGhciStmts stmts
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty]
             tc_io_stmts = tcStmtsAndThen GhciStmtCtxt tcDoStmt stmts
                                          (mkCheckExpType io_ret_ty)
-            names = collectLStmtsBinders stmts
+            names = collectLStmtsBinders CollNoDictBinders stmts
 
         -- OK, we're ready to typecheck the stmts
       ; traceTc "GHC.Tc.Module.tcGhciStmts: tc stmts" empty
