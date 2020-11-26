@@ -1061,8 +1061,8 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
            ; return (ApplicativeArgMany x stmts' ret' pat' ctxt) }
 
     get_arg_bndrs :: ApplicativeArg GhcTc -> [Id]
-    get_arg_bndrs (ApplicativeArgOne { app_arg_pattern = pat }) = collectPatBinders pat
-    get_arg_bndrs (ApplicativeArgMany { bv_pattern =  pat }) = collectPatBinders pat
+    get_arg_bndrs (ApplicativeArgOne { app_arg_pattern = pat }) = collectDefaultPatBinders pat
+    get_arg_bndrs (ApplicativeArgMany { bv_pattern =  pat })    = collectDefaultPatBinders pat
 
 {- Note [ApplicativeDo and constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

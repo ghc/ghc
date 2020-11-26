@@ -2363,8 +2363,8 @@ tcUserStmt rdr_stmt@(L loc _)
        ; opt_pr_flag <- goptM Opt_PrintBindResult
        ; let print_result_plan
                | opt_pr_flag                         -- The flag says "print result"
-               , [v] <- collectLStmtBinders gi_stmt  -- One binder
-                           =  [mk_print_result_plan gi_stmt v]
+               , [v] <- collectDefaultLStmtBinders gi_stmt  -- One binder
+               = [mk_print_result_plan gi_stmt v]
                | otherwise = []
 
         -- The plans are:
@@ -2414,7 +2414,7 @@ tcGhciStmts stmts
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty]
             tc_io_stmts = tcStmtsAndThen GhciStmtCtxt tcDoStmt stmts
                                          (mkCheckExpType io_ret_ty)
-            names = collectLStmtsBinders stmts
+            names = collectDefaultLStmtsBinders stmts
 
         -- OK, we're ready to typecheck the stmts
       ; traceTc "GHC.Tc.Module.tcGhciStmts: tc stmts" empty

@@ -471,7 +471,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
                 -- Keep locally-defined Names
                 -- As well as dependency analysis, we need these for the
                 -- MonoLocalBinds test in GHC.Tc.Gen.Bind.decideGeneralisationPlan
-              bndrs = collectPatBinders pat
+              bndrs = collectDefaultPatBinders pat
               bind' = bind { pat_rhs  = grhss'
                            , pat_ext = fvs' }
 

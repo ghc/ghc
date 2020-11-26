@@ -28,6 +28,7 @@ just attach noSrcSpan to everything.
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -90,10 +91,19 @@ module GHC.Hs.Utils(
   collectLocalBinders, collectHsValBinders, collectHsBindListBinders,
   collectHsIdBinders,
   collectHsBindsBinders, collectHsBindBinders, collectMethodBinders,
+
   collectPatBinders, collectPatsBinders,
   collectLStmtsBinders, collectStmtsBinders,
   collectLStmtBinders, collectStmtBinders,
   CollectPass(..),
+
+  collectDefaultPatBinders, collectDefaultPatsBinders,
+  collectDefaultLStmtsBinders, collectDefaultStmtsBinders,
+  collectDefaultLStmtBinders, collectDefaultStmtBinders,
+
+  collectArrowPatBinders, collectArrowPatsBinders,
+  collectArrowLStmtsBinders, collectArrowStmtsBinders,
+  collectArrowLStmtBinders, collectArrowStmtBinders,
 
   hsLTyClDeclBinders, hsTyClForeignBinders,
   hsPatSynSelectors, getPatSynBinds,
@@ -1010,48 +1020,108 @@ collectMethodBinders binds = foldr (get . unXRec @idL) [] binds
        -- Someone else complains about non-FunBinds
 
 ----------------- Statements --------------------------
+--
+collectDefaultLStmtsBinders
+  :: (CollectPass (GhcPass idL))
+  => [LStmtLR (GhcPass idL) (GhcPass idR) body]
+  -> [IdP (GhcPass idL)]
+collectDefaultLStmtsBinders = collectLStmtsBinders collect_lpat
+
+collectDefaultStmtsBinders
+  :: (CollectPass (GhcPass idL))
+  => [StmtLR (GhcPass idL) (GhcPass idR) body]
+  -> [IdP (GhcPass idL)]
+collectDefaultStmtsBinders = collectStmtsBinders collect_lpat
+
+collectDefaultLStmtBinders
+  :: (CollectPass (GhcPass idL))
+  => LStmtLR (GhcPass idL) (GhcPass idR) body
+  -> [IdP (GhcPass idL)]
+collectDefaultLStmtBinders = collectLStmtBinders collect_lpat
+
+collectDefaultStmtBinders
+  :: (CollectPass (GhcPass idL))
+  => StmtLR (GhcPass idL) (GhcPass idR) body
+  -> [IdP (GhcPass idL)]
+collectDefaultStmtBinders = collectStmtBinders collect_lpat
+
+
+
+collectArrowLStmtsBinders :: [LStmt GhcTc body] -> [Id]
+collectArrowLStmtsBinders = collectLStmtsBinders collect_lpat_arrows
+
+collectArrowStmtsBinders :: [Stmt GhcTc body] -> [Id]
+collectArrowStmtsBinders = collectStmtsBinders collect_lpat_arrows
+
+collectArrowLStmtBinders :: LStmt GhcTc body -> [Id]
+collectArrowLStmtBinders = collectLStmtBinders collect_lpat_arrows
+
+collectArrowStmtBinders :: Stmt GhcTc body -> [Id]
+collectArrowStmtBinders = collectStmtBinders collect_lpat_arrows
+
+
 collectLStmtsBinders :: (CollectPass (GhcPass idL))
-                     => [LStmtLR (GhcPass idL) (GhcPass idR) body]
+                     => CollectLPat (GhcPass idL)
+                     -> [LStmtLR (GhcPass idL) (GhcPass idR) body]
                      -> [IdP (GhcPass idL)]
-collectLStmtsBinders = concatMap collectLStmtBinders
+collectLStmtsBinders col_pat= concatMap (collectLStmtBinders col_pat)
 
 collectStmtsBinders :: (CollectPass (GhcPass idL))
-                    => [StmtLR (GhcPass idL) (GhcPass idR) body]
+                    => CollectLPat (GhcPass idL)
+                    -> [StmtLR (GhcPass idL) (GhcPass idR) body]
                     -> [IdP (GhcPass idL)]
-collectStmtsBinders = concatMap collectStmtBinders
+collectStmtsBinders col_pat = concatMap (collectStmtBinders col_pat)
 
 collectLStmtBinders :: (CollectPass (GhcPass idL))
-                    => LStmtLR (GhcPass idL) (GhcPass idR) body
+                    => CollectLPat (GhcPass idL)
+                    -> LStmtLR (GhcPass idL) (GhcPass idR) body
                     -> [IdP (GhcPass idL)]
-collectLStmtBinders = collectStmtBinders . unLoc
+collectLStmtBinders col_pat = collectStmtBinders col_pat . unLoc
 
-collectStmtBinders :: (CollectPass (GhcPass idL))
-                   => StmtLR (GhcPass idL) (GhcPass idR) body
-                   -> [IdP (GhcPass idL)]
+collectStmtBinders
+  :: (CollectPass (GhcPass idL))
+  => CollectLPat (GhcPass idL)
+  -> StmtLR (GhcPass idL) (GhcPass idR) body
+  -> [IdP (GhcPass idL)]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
-collectStmtBinders (BindStmt _ pat _)      = collectPatBinders pat
-collectStmtBinders (LetStmt _  binds)      = collectLocalBinders (unLoc binds)
-collectStmtBinders (BodyStmt {})           = []
-collectStmtBinders (LastStmt {})           = []
-collectStmtBinders (ParStmt _ xs _ _)      = collectLStmtsBinders
-                                    $ [s | ParStmtBlock _ ss _ _ <- xs, s <- ss]
-collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
-collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
-collectStmtBinders (ApplicativeStmt _ args _) = concatMap collectArgBinders args
- where
-  collectArgBinders (_, ApplicativeArgOne { app_arg_pattern = pat }) = collectPatBinders pat
-  collectArgBinders (_, ApplicativeArgMany { bv_pattern = pat }) = collectPatBinders pat
-  collectArgBinders (_, XApplicativeArg {}) = []
+collectStmtBinders col_pat = \case
+    BindStmt _ pat _ -> collectPatBinders col_pat pat
+    LetStmt _  binds -> collectLocalBinders (unLoc binds)
+    BodyStmt {}      -> []
+    LastStmt {}      -> []
+    ParStmt _ xs _ _ -> collectLStmtsBinders col_pat
+                        $ [s | ParStmtBlock _ ss _ _ <- xs, s <- ss]
+    TransStmt { trS_stmts = stmts } -> collectLStmtsBinders col_pat stmts
+    RecStmt { recS_stmts = ss }     -> collectLStmtsBinders col_pat ss
+    ApplicativeStmt _ args _        -> concatMap collectArgBinders args
+        where
+         collectArgBinders (_, ApplicativeArgOne { app_arg_pattern = pat }) = collectPatBinders col_pat pat
+         collectArgBinders (_, ApplicativeArgMany { bv_pattern = pat }) = collectPatBinders col_pat pat
 
 
 ----------------- Patterns --------------------------
-collectPatBinders :: CollectPass p => LPat p -> [IdP p]
-collectPatBinders pat = collect_lpat pat []
+collectDefaultPatBinders :: CollectPass p => LPat p -> [IdP p]
+collectDefaultPatBinders = collectPatBinders collect_lpat
 
-collectPatsBinders :: CollectPass p => [LPat p] -> [IdP p]
-collectPatsBinders pats = foldr collect_lpat [] pats
+collectDefaultPatsBinders :: CollectPass p => [LPat p] -> [IdP p]
+collectDefaultPatsBinders = collectPatsBinders collect_lpat
+
+collectArrowPatBinders :: LPat GhcTc -> [Id]
+collectArrowPatBinders = collectPatBinders collect_lpat_arrows
+
+collectArrowPatsBinders :: [LPat GhcTc] -> [Id]
+collectArrowPatsBinders = collectPatsBinders collect_lpat_arrows
+
+collectPatBinders :: CollectPass p => CollectLPat p -> LPat p -> [IdP p]
+collectPatBinders col_pat pat = col_pat pat []
+
+collectPatsBinders :: CollectPass p => CollectLPat p -> [LPat p] -> [IdP p]
+collectPatsBinders col_pat pats = foldr col_pat [] pats
 
 -------------
+
+type CollectLPat p = LPat p -> [IdP p] -> [IdP p]
+
 collect_lpat :: forall pass. (CollectPass pass)
              => LPat pass -> [IdP pass] -> [IdP pass]
 collect_lpat p bndrs = collect_pat (unXRec @pass p) bndrs
@@ -1061,26 +1131,62 @@ collect_pat :: forall p. CollectPass p
             -> [IdP p]
             -> [IdP p]
 collect_pat pat bndrs = case pat of
-  (VarPat _ var)          -> unXRec @p var : bndrs
-  (WildPat _)             -> bndrs
-  (LazyPat _ pat)         -> collect_lpat pat bndrs
-  (BangPat _ pat)         -> collect_lpat pat bndrs
-  (AsPat _ a pat)         -> unXRec @p a : collect_lpat pat bndrs
-  (ViewPat _ _ pat)       -> collect_lpat pat bndrs
-  (ParPat _ pat)          -> collect_lpat pat bndrs
-  (ListPat _ pats)        -> foldr collect_lpat bndrs pats
-  (TuplePat _ pats _)     -> foldr collect_lpat bndrs pats
-  (SumPat _ pat _ _)      -> collect_lpat pat bndrs
-  (ConPat {pat_args=ps})  -> foldr collect_lpat bndrs (hsConPatArgs ps)
+  VarPat _ var          -> unXRec @p var : bndrs
+  WildPat _             -> bndrs
+  LazyPat _ pat         -> collect_lpat pat bndrs
+  BangPat _ pat         -> collect_lpat pat bndrs
+  AsPat _ a pat         -> unXRec @p a : collect_lpat pat bndrs
+  ViewPat _ _ pat       -> collect_lpat pat bndrs
+  ParPat _ pat          -> collect_lpat pat bndrs
+  ListPat _ pats        -> foldr collect_lpat bndrs pats
+  TuplePat _ pats _     -> foldr collect_lpat bndrs pats
+  SumPat _ pat _ _      -> collect_lpat pat bndrs
+  LitPat _ _            -> bndrs
+  NPat {}               -> bndrs
+  NPlusKPat _ n _ _ _ _ -> unXRec @p n : bndrs
+  SigPat _ pat _        -> collect_lpat pat bndrs
+  XPat ext              -> collectXXPat (Proxy @p) ext bndrs
+  -- the following cases are not the same as in collect_lpat_arrows
+  SplicePat _ (HsSpliced _ _ (HsSplicedPat pat))
+                        -> collect_pat pat bndrs
+  SplicePat _ _         -> bndrs
   -- See Note [Dictionary binders in ConPatOut]
-  (LitPat _ _)            -> bndrs
-  (NPat {})               -> bndrs
-  (NPlusKPat _ n _ _ _ _) -> unXRec @p n : bndrs
-  (SigPat _ pat _)        -> collect_lpat pat bndrs
-  (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
-                          -> collect_pat pat bndrs
-  (SplicePat _ _)         -> bndrs
-  (XPat ext)              -> collectXXPat (Proxy @p) ext bndrs
+  ConPat {pat_args=ps}  -> foldr collect_lpat bndrs (hsConPatArgs ps)
+
+collect_lpat_arrows :: LPat GhcTc -> [Id] -> [Id]
+-- See Note [Dictionary binders in ConPatOut]
+collect_lpat_arrows (L _ p) bndrs = case p of
+  VarPat _ var          -> unLoc var : bndrs
+  WildPat _             -> bndrs
+  LazyPat _ pat         -> collect_lpat_arrows pat bndrs
+  BangPat _ pat         -> collect_lpat_arrows pat bndrs
+  AsPat _ a pat         -> unLoc a : collect_lpat_arrows pat bndrs
+  ViewPat _ _ pat       -> collect_lpat_arrows pat bndrs
+  ParPat _ pat          -> collect_lpat_arrows pat bndrs
+  ListPat _ pats        -> foldr collect_lpat_arrows bndrs pats
+  TuplePat _ pats _     -> foldr collect_lpat_arrows bndrs pats
+  SumPat _ pat _ _      -> collect_lpat_arrows pat bndrs
+  LitPat _ _            -> bndrs
+  NPat {}               -> bndrs
+  NPlusKPat _ n _ _ _ _ -> unLoc n : bndrs
+  SigPat _ pat _        -> collect_lpat_arrows pat bndrs
+  XPat (CoPat _ pat _)  -> collect_lpat_arrows (noLoc pat) bndrs
+  -- the following cases are not the same as in collect_lpat
+  SplicePat {}          -> pprPanic "collect_lpat_arrows" (ppr p)
+  ConPat {pat_args=ps}
+    -- See Note [Dictionary binders in ConPatOut]
+    -> foldr collect_lpat_arrows bndrs (hsConPatArgs ps)
+       ++ collectEvBinders (cpt_binds (pat_con_ext p))
+
+collectEvBinders :: TcEvBinds -> [Id]
+collectEvBinders (EvBinds bs)   = foldr add_ev_bndr [] bs
+collectEvBinders (TcEvBinds {}) = panic "ToDo: collectEvBinders"
+
+add_ev_bndr :: EvBind -> [Id] -> [Id]
+add_ev_bndr (EvBind { eb_lhs = b }) bs | isId b    = b:bs
+                                       | otherwise = bs
+  -- A worry: what about coercion variable binders??
+
 
 -- | This class specifies how to collect variable identifiers from extension patterns in the given pass.
 -- Consumers of the GHC API that define their own passes should feel free to implement instances in order
@@ -1099,31 +1205,76 @@ instance IsPass p => CollectPass (GhcPass p) where
       GhcPs -> noExtCon ext
 
 {-
-Note [Dictionary binders in ConPatOut] See also same Note in GHC.HsToCore.Arrows
+Note [Dictionary binders in ConPatOut]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Do *not* gather (a) dictionary and (b) dictionary bindings as binders
-of a ConPatOut pattern.  For most calls it doesn't matter, because
-it's pre-typechecker and there are no ConPatOuts.  But it does matter
-more in the desugarer; for example, GHC.HsToCore.Utils.mkSelectorBinds uses
-collectPatBinders.  In a lazy pattern, for example f ~(C x y) = ...,
-we want to generate bindings for x,y but not for dictionaries bound by
-C.  (The type checker ensures they would not be used.)
 
-Desugaring of arrow case expressions needs these bindings (see GHC.HsToCore.Arrows
-and arrowcase1), but SPJ (Jan 2007) says it's safer for it to use its
-own pat-binder-collector:
+Should we collect dictionary binders in ConPatOut? It depends!
 
-Here's the problem.  Consider
+Two families of functions are provided: collectDefault*Binders and
+collectArrow*Binders.
 
-data T a where
-   C :: Num a => a -> Int -> T a
+1. Pre-typechecker there are no ConPatOuts. Use collectDefault*Binders functions
+   which are not specialized for the GhcTc pass.
 
-f ~(C (n+1) m) = (n,m)
+2. In the desugarer, most the time we don't want to collect evidence binders, so
+   we also use collectDefault*Binders functions.
 
-Here, the pattern (C (n+1)) binds a hidden dictionary (d::Num a),
-and *also* uses that dictionary to match the (n+1) pattern.  Yet, the
-variables bound by the lazy pattern are n,m, *not* the dictionary d.
-So in mkSelectorBinds in GHC.HsToCore.Utils, we want just m,n as the variables bound.
+   Example of why it matters:
+
+   In a lazy pattern, for example f ~(C x y) = ..., we want to generate bindings
+   for x,y but not for dictionaries bound by C.
+   (The type checker ensures they would not be used.)
+
+   Here's the problem.  Consider
+
+        data T a where
+           C :: Num a => a -> Int -> T a
+
+        f ~(C (n+1) m) = (n,m)
+
+   Here, the pattern (C (n+1)) binds a hidden dictionary (d::Num a),
+   and *also* uses that dictionary to match the (n+1) pattern.  Yet, the
+   variables bound by the lazy pattern are n,m, *not* the dictionary d.
+   So in mkSelectorBinds in GHC.HsToCore.Utils, we want just m,n as the
+   variables bound.
+
+   So in this case, we do *not* gather (a) dictionary and (b) dictionary
+   bindings as binders of a ConPatOut pattern.
+
+
+3. On the other hand, desugaring of arrows needs evidence bindings and uses
+   collectArrow*Binders functions.
+
+   Consider
+
+        h :: (ArrowChoice a, Arrow a) => Int -> a (Int,Int) Int
+        h x = proc (y,z) -> case compare x y of
+                        GT -> returnA -< z+x
+
+   The type checker turns the case into
+
+        case compare x y of
+          GT { $dNum_123 = $dNum_Int } -> returnA -< (+) $dNum_123 z x
+
+   That is, it attaches the $dNum_123 binding to a ConPatOut in scope.
+
+   During desugaring, evidence binders must be collected because their sets are
+   intersected with free variable sets of subsequent commands to create
+   (minimal) command environments.  Failing to do it properly leads to bugs
+   (e.g., #18950).
+
+   Note: attaching evidence binders to existing ConPatOut may be suboptimal for
+   arrows.  In the example above we would prefer to generate:
+
+        case compare x y of
+          GT -> returnA -< let $dNum_123 = $dNum_Int in (+) $dNum_123 z x
+
+   So that the evidence isn't passed into the command environment. This issue
+   doesn't arise with desugaring of non-arrow code because the simplifier can
+   freely float and inline let-expressions created for evidence binders. But
+   with arrow desugaring, the simplifier would have to see through the command
+   environment tuple which is more complicated.
+
 -}
 
 hsGroupBinders :: HsGroup GhcRn -> [Name]
@@ -1398,7 +1549,7 @@ lPatImplicits = hs_lpat
     details :: Located Name -> HsConPatDetails GhcRn -> [(SrcSpan, [Name])]
     details _ (PrefixCon ps)   = hs_lpats ps
     details n (RecCon fs)      =
-      [(err_loc, collectPatsBinders implicit_pats) | Just{} <- [rec_dotdot fs] ]
+      [(err_loc, collectDefaultPatsBinders implicit_pats) | Just{} <- [rec_dotdot fs] ]
         ++ hs_lpats explicit_pats
 
       where implicit_pats = map (hsRecFieldArg . unLoc) implicit

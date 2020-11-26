@@ -265,7 +265,7 @@ first generate a polymorphic definition and then just apply the wrapper at the e
 data M a
 
 repTopP :: LPat GhcRn -> MetaM (Core (M TH.Pat))
-repTopP pat = do { ss <- mkGenSyms (collectPatBinders pat)
+repTopP pat = do { ss <- mkGenSyms (collectDefaultPatBinders pat)
                  ; pat' <- addBinds ss (repLP pat)
                  ; wrapGenSyms ss pat' }
 
@@ -1618,7 +1618,7 @@ repE e                     = notHandled "Expression form" (ppr e)
 repMatchTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Match))
 repMatchTup (L _ (Match { m_pats = [p]
                         , m_grhss = GRHSs _ guards (L _ wheres) })) =
-  do { ss1 <- mkGenSyms (collectPatBinders p)
+  do { ss1 <- mkGenSyms (collectDefaultPatBinders p)
      ; addBinds ss1 $ do {
      ; p1 <- repLP p
      ; (ss2,ds) <- repBinds wheres
@@ -1631,7 +1631,7 @@ repMatchTup _ = panic "repMatchTup: case alt with more than one arg"
 repClauseTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Clause))
 repClauseTup (L _ (Match { m_pats = ps
                          , m_grhss = GRHSs _ guards (L _ wheres) })) =
-  do { ss1 <- mkGenSyms (collectPatsBinders ps)
+  do { ss1 <- mkGenSyms (collectDefaultPatsBinders ps)
      ; addBinds ss1 $ do {
        ps1 <- repLPs ps
      ; (ss2,ds) <- repBinds wheres
@@ -1714,7 +1714,7 @@ repLSts stmts = repSts (map unLoc stmts)
 repSts :: [Stmt GhcRn (LHsExpr GhcRn)] -> MetaM ([GenSymBind], [Core (M TH.Stmt)])
 repSts (BindStmt _ p e : ss) =
    do { e2 <- repLE e
-      ; ss1 <- mkGenSyms (collectPatBinders p)
+      ; ss1 <- mkGenSyms (collectDefaultPatBinders p)
       ; addBinds ss1 $ do {
       ; p1 <- repLP p;
       ; (ss2,zs) <- repSts ss
@@ -1749,7 +1749,7 @@ repSts [LastStmt _ e _ _]
        ; z <- repNoBindSt e2
        ; return ([], [z]) }
 repSts (stmt@RecStmt{} : ss)
-  = do { let binders = collectLStmtsBinders (recS_stmts stmt)
+  = do { let binders = collectDefaultLStmtsBinders (recS_stmts stmt)
        ; ss1 <- mkGenSyms binders
        -- Bring all of binders in the recursive group into scope for the
        -- whole group.
@@ -1971,7 +1971,7 @@ repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
 repLambda (L _ (Match { m_pats = ps
                       , m_grhss = GRHSs _ [L _ (GRHS _ [] e)]
                                               (L _ (EmptyLocalBinds _)) } ))
- = do { let bndrs = collectPatsBinders ps ;
+ = do { let bndrs = collectDefaultPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (
                 do { xs <- repLPs ps; body <- repLE e; repLam xs body })

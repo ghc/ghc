@@ -1231,7 +1231,7 @@ tcMonoBinds is_rec sig_fn no_gen
 
                 , mbis ) }
   where
-    bndrs = collectPatBinders pat
+    bndrs = collectDefaultPatBinders pat
 
 -- GENERAL CASE
 tcMonoBinds _ sig_fn no_gen binds
@@ -1393,7 +1393,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
 
         ; return (TcPatBind mbis pat' grhss pat_ty) }
   where
-    bndr_names = collectPatBinders pat
+    bndr_names = collectDefaultPatBinders pat
     (nosig_names, sig_names) = partitionWith find_sig bndr_names
 
     find_sig :: Name -> Either Name (Name, TcIdSigInfo)
@@ -1710,7 +1710,7 @@ isClosedBndrGroup type_env binds
          in [(f, open_fvs)]
     bindFvs (PatBind { pat_lhs = pat, pat_ext = fvs })
        = let open_fvs = get_open_fvs fvs
-         in [(b, open_fvs) | b <- collectPatBinders pat]
+         in [(b, open_fvs) | b <- collectDefaultPatBinders pat]
     bindFvs _
        = []
 

@@ -370,7 +370,7 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
     patvar_tickss <- case simplePatId of
       Just{} -> return initial_patvar_tickss
       Nothing -> do
-        let patvars = map getOccString (collectPatBinders lhs)
+        let patvars = map getOccString (collectDefaultPatBinders lhs)
         patvar_ticks <- mapM (\v -> bindTick density v pos fvs) patvars
         return
           (zipWith mbCons patvar_ticks
@@ -662,7 +662,7 @@ addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
 addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats
                                                , m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders pats) $ do
+  bindLocals (collectDefaultPatsBinders pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
     return $ match { m_grhss = gRHSs' }
 
@@ -704,7 +704,7 @@ addTickLStmts isGuard stmts = do
 addTickLStmts' :: (Maybe (Bool -> BoxLabel)) -> [ExprLStmt GhcTc] -> TM a
                -> TM ([ExprLStmt GhcTc], a)
 addTickLStmts' isGuard lstmts res
-  = bindLocals (collectLStmtsBinders lstmts) $
+  = bindLocals (collectDefaultLStmtsBinders lstmts) $
     do { lstmts' <- mapM (liftL (addTickStmt isGuard)) lstmts
        ; a <- res
        ; return (lstmts', a) }
@@ -915,7 +915,7 @@ addTickCmdMatchGroup mg@(MG { mg_alts = (L l matches) }) = do
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders pats) $ do
+  bindLocals (collectDefaultPatsBinders pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
     return $ match { m_grhss = gRHSs' }
 
@@ -950,7 +950,7 @@ addTickLCmdStmts' lstmts res
         a <- res
         return (lstmts', a)
   where
-        binders = collectLStmtsBinders lstmts
+        binders = collectDefaultLStmtsBinders lstmts
 
 addTickCmdStmt :: Stmt GhcTc (LHsCmd GhcTc) -> TM (Stmt GhcTc (LHsCmd GhcTc))
 addTickCmdStmt (BindStmt x pat c) =
