@@ -341,7 +341,7 @@ rnPats ctxt pats thing_inside
           --    complain *twice* about duplicates e.g. f (x,x) = ...
           --
           -- See note [Don't report shadowing for pattern synonyms]
-        ; let bndrs = collectPatsBinders pats'
+        ; let bndrs = collectPatsBinders CollNoDictBinders pats'
         ; addErrCtxt doc_pat $
           if isPatSynCtxt ctxt
              then checkDupNames bndrs
@@ -596,7 +596,7 @@ rnHsRecPatsAndThen mk (L _ con)
     loc = maybe noSrcSpan getLoc dd
 
     -- Get the arguments of the implicit binders
-    implicit_binders fs (unLoc -> n) = collectPatsBinders implicit_pats
+    implicit_binders fs (unLoc -> n) = collectPatsBinders CollNoDictBinders implicit_pats
       where
         implicit_pats = map (hsRecFieldArg . unLoc) (drop n fs)
 

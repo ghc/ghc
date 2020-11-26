@@ -722,7 +722,7 @@ mkSelectorBinds ticks pat val_expr
            -- Strip the bangs before looking for case (A) or (B)
            -- The incoming pattern may well have a bang on it
 
-    binders = collectPatBinders pat'
+    binders = collectPatBinders CollNoDictBinders pat'
     ticks'  = ticks ++ repeat []
 
     local_binders = map localiseId binders      -- See Note [Localise pattern binders]
