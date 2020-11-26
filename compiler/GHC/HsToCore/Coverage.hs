@@ -370,7 +370,7 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
     patvar_tickss <- case simplePatId of
       Just{} -> return initial_patvar_tickss
       Nothing -> do
-        let patvars = map getOccString (collectPatBinders lhs)
+        let patvars = map getOccString (collectPatBinders CollNoDictBinders lhs)
         patvar_ticks <- mapM (\v -> bindTick density v pos fvs) patvars
         return
           (zipWith mbCons patvar_ticks
@@ -572,7 +572,7 @@ addTickHsExpr (HsMultiIf ty alts)
        ; alts' <- mapM (liftL $ addTickGRHS isOneOfMany False) alts
        ; return $ HsMultiIf ty alts' }
 addTickHsExpr (HsLet x (L l binds) e) =
-        bindLocals (collectLocalBinders binds) $
+        bindLocals (collectLocalBinders CollNoDictBinders binds) $
           liftM2 (HsLet x . L l)
                   (addTickHsLocalBinds binds) -- to think about: !patterns.
                   (addTickLHsExprLetBody e)
@@ -662,7 +662,7 @@ addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
 addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats
                                                , m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders pats) $ do
+  bindLocals (collectPatsBinders CollNoDictBinders pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
     return $ match { m_grhss = gRHSs' }
 
@@ -674,7 +674,7 @@ addTickGRHSs isOneOfMany isLambda (GRHSs x guarded (L l local_binds)) =
     guarded' <- mapM (liftL (addTickGRHS isOneOfMany isLambda)) guarded
     return $ GRHSs x guarded' (L l local_binds')
   where
-    binders = collectLocalBinders local_binds
+    binders = collectLocalBinders CollNoDictBinders local_binds
 
 addTickGRHS :: Bool -> Bool -> GRHS GhcTc (LHsExpr GhcTc)
             -> TM (GRHS GhcTc (LHsExpr GhcTc))
@@ -704,7 +704,7 @@ addTickLStmts isGuard stmts = do
 addTickLStmts' :: (Maybe (Bool -> BoxLabel)) -> [ExprLStmt GhcTc] -> TM a
                -> TM ([ExprLStmt GhcTc], a)
 addTickLStmts' isGuard lstmts res
-  = bindLocals (collectLStmtsBinders lstmts) $
+  = bindLocals (collectLStmtsBinders CollNoDictBinders lstmts) $
     do { lstmts' <- mapM (liftL (addTickStmt isGuard)) lstmts
        ; a <- res
        ; return (lstmts', a) }
@@ -878,7 +878,7 @@ addTickHsCmd (HsCmdIf x cnd e1 c2 c3) =
                 (addTickLHsCmd c2)
                 (addTickLHsCmd c3)
 addTickHsCmd (HsCmdLet x (L l binds) c) =
-        bindLocals (collectLocalBinders binds) $
+        bindLocals (collectLocalBinders CollNoDictBinders binds) $
           liftM2 (HsCmdLet x . L l)
                    (addTickHsLocalBinds binds) -- to think about: !patterns.
                    (addTickLHsCmd c)
@@ -915,7 +915,7 @@ addTickCmdMatchGroup mg@(MG { mg_alts = (L l matches) }) = do
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders pats) $ do
+  bindLocals (collectPatsBinders CollNoDictBinders pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
     return $ match { m_grhss = gRHSs' }
 
@@ -926,7 +926,7 @@ addTickCmdGRHSs (GRHSs x guarded (L l local_binds)) =
     guarded' <- mapM (liftL addTickCmdGRHS) guarded
     return $ GRHSs x guarded' (L l local_binds')
   where
-    binders = collectLocalBinders local_binds
+    binders = collectLocalBinders CollNoDictBinders local_binds
 
 addTickCmdGRHS :: GRHS GhcTc (LHsCmd GhcTc) -> TM (GRHS GhcTc (LHsCmd GhcTc))
 -- The *guards* are *not* Cmds, although the body is
@@ -950,7 +950,7 @@ addTickLCmdStmts' lstmts res
         a <- res
         return (lstmts', a)
   where
-        binders = collectLStmtsBinders lstmts
+        binders = collectLStmtsBinders CollNoDictBinders lstmts
 
 addTickCmdStmt :: Stmt GhcTc (LHsCmd GhcTc) -> TM (Stmt GhcTc (LHsCmd GhcTc))
 addTickCmdStmt (BindStmt x pat c) =
