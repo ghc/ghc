@@ -921,8 +921,8 @@ ocGetNames_ELF ( ObjectCode* oc )
                    CHECK(common_used <= common_size);
 
                    IF_DEBUG(linker,
-                            debugBelch("COMMON symbol, size %ld name %s allocated at %p\n",
-                                       symbol->elf_sym->st_size, nm, symbol->addr));
+                            debugBelch("COMMON symbol, size %llu name %s allocated at %p\n",
+                                       (long long unsigned int) symbol->elf_sym->st_size, nm, symbol->addr));
 
                    /* Pointless to do addProddableBlock() for this area,
                       since the linker should never poke around in it. */
