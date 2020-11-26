@@ -109,6 +109,8 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
             //
             // However, if we are in a deadlock detection GC then we disable aging
             // so there is no need.
+            //
+            // See Note [Non-moving GC: Marking evacuated objects].
             if (major_gc && !deadlock_detect_gc)
                 markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) to);
             return to;
@@ -133,6 +135,52 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
 /* -----------------------------------------------------------------------------
    The evacuate() code
    -------------------------------------------------------------------------- */
+
+/*
+ * Note [Non-moving GC: Marking evacuated objects]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * When the non-moving collector is in use we must be careful to ensure that any
+ * references to objects in the non-moving generation from younger generations
+ * are pushed to the mark queue.
+ *
+ * In particular we need to ensure that we handle newly-promoted objects are
+ * correctly marked. For instance, consider this case:
+ *
+ *     generation 0                          generation 1
+ *    ──────────────                        ──────────────
+ *
+ *                                            ┌───────┐
+ *      ┌───────┐                             │   A   │
+ *      │   B   │ ◁────────────────────────── │       │
+ *      │       │ ──┬─────────────────┐       └───────┘
+ *      └───────┘   ┆        after GC │
+ *                  ┆                 │
+ *      ┌───────┐   ┆ before GC       │       ┌───────┐
+ *      │   C   │ ◁┄┘                 └─────▷ │   C'  │
+ *      │       │                             │       │
+ *      └───────┘                             └───────┘
+ *
+ *
+ * In this case object C started off in generation 0 and was evacuated into
+ * generation 1 during the preparatory GC. However, the only reference to C'
+ * is from B, which lives in the generation 0 (via aging); this reference will
+ * not be visible to the concurrent non-moving collector (which can only
+ * traverse the generation 1 heap). Consequently, upon evacuating C we need to
+ * ensure that C' is added to the update remembered set as we know that it will
+ * continue to be reachable via B (which is assumed to be reachable as it lives
+ * in a younger generation).
+ *
+ * Where this happens depends upon the type of the object (e.g. C'):
+ *
+ *  - In the case of "normal" small heap-allocated objects this happens in
+ *    alloc_for_copy.
+ *  - In the case of compact region this happens in evacuate_compact.
+ *  - In the case of large objects this happens in evacuate_large.
+ *
+ * See also Note [Aging under the non-moving collector] in NonMoving.c.
+ *
+ */
 
 /* size is in words
 
@@ -356,6 +404,9 @@ evacuate_large(StgPtr p)
   __atomic_fetch_or(&bd->flags, BF_EVACUATED, __ATOMIC_ACQ_REL);
   if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_ACQ_REL);
+
+      // See Note [Non-moving GC: Marking evacuated objects].
+      markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) p);
   }
   initBdescr(bd, new_gen, new_gen->to);
 
@@ -510,6 +561,9 @@ evacuate_compact (StgPtr p)
     bd->flags |= BF_EVACUATED;
     if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_RELAXED);
+
+      // See Note [Non-moving GC: Marking evacuated objects].
+      markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) str);
     }
     initBdescr(bd, new_gen, new_gen->to);
 
@@ -695,13 +749,6 @@ loop:
        */
       if (flags & BF_LARGE) {
           evacuate_large((P_)q);
-
-          // We may have evacuated the block to the nonmoving generation. If so
-          // we need to make sure it is added to the mark queue since the only
-          // reference to it may be from the moving heap.
-          if (major_gc && flags & BF_NONMOVING && !deadlock_detect_gc) {
-              markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
-          }
           return;
       }
 
