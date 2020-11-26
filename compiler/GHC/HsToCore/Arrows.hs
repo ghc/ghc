@@ -21,9 +21,7 @@ import GHC.HsToCore.Match
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Monad
 
-import GHC.Hs   hiding (collectPatBinders, collectPatsBinders,
-                        collectLStmtsBinders, collectLStmtBinders,
-                        collectStmtBinders )
+import GHC.Hs
 import GHC.Tc.Utils.Zonk
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
@@ -319,7 +317,7 @@ dsProcExpr
         -> DsM CoreExpr
 dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
     (meth_binds, meth_ids) <- mkCmdEnv ids
-    let locals = mkVarSet (collectPatBinders pat)
+    let locals = mkVarSet (collectPatBinders CollWithDictBinders pat)
     (core_cmd, _free_vars, env_ids)
        <- dsfixCmd meth_ids locals unitTy cmd_ty cmd
     let env_ty = mkBigCoreVarTupTy env_ids
@@ -608,7 +606,7 @@ dsCmd ids local_vars stack_ty res_ty
 dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@(L _ binds) body)
                                                                     env_ids = do
     let
-        defined_vars = mkVarSet (collectLocalBinders binds)
+        defined_vars = mkVarSet (collectLocalBinders CollWithDictBinders binds)
         local_vars' = defined_vars `unionVarSet` local_vars
 
     (core_body, _free_vars, env_ids')
@@ -745,7 +743,7 @@ dsCmdLam :: DsCmdEnv            -- arrow combinators
          -> DsM (CoreExpr,      -- desugared expression
                  DIdSet)        -- subset of local vars that occur free
 dsCmdLam ids local_vars stack_ty res_ty pats body env_ids = do
-    let pat_vars = mkVarSet (collectPatsBinders pats)
+    let pat_vars = mkVarSet (collectPatsBinders CollWithDictBinders pats)
     let local_vars' = pat_vars `unionVarSet` local_vars
         (pat_tys, stack_ty') = splitTypeAt (length pats) stack_ty
     (core_body, free_vars, env_ids')
@@ -812,7 +810,7 @@ dsCmdDo ids local_vars res_ty [L loc (LastStmt _ body _ _)] env_ids = do
         env_ids')
 
 dsCmdDo ids local_vars res_ty (stmt:stmts) env_ids = do
-    let bound_vars  = mkVarSet (collectLStmtBinders stmt)
+    let bound_vars  = mkVarSet (collectLStmtBinders CollWithDictBinders stmt)
     let local_vars' = bound_vars `unionVarSet` local_vars
     (core_stmts, _, env_ids') <- trimInput (dsCmdDo ids local_vars' res_ty stmts)
     (core_stmt, fv_stmt) <- dsCmdLStmt ids local_vars env_ids' stmt env_ids
@@ -888,7 +886,7 @@ dsCmdStmt ids local_vars out_ids (BodyStmt c_ty cmd _ _) env_ids = do
 dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
     let pat_ty = hsLPatType pat
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy pat_ty cmd
-    let pat_vars = mkVarSet (collectPatBinders pat)
+    let pat_vars = mkVarSet (collectPatBinders CollWithDictBinders pat)
     let
         env_ids2 = filterOut (`elemVarSet` pat_vars) out_ids
         env_ty2 = mkBigCoreVarTupTy env_ids2
@@ -1125,7 +1123,7 @@ dsCmdStmts ids local_vars out_ids [stmt] env_ids
   = dsCmdLStmt ids local_vars out_ids stmt env_ids
 
 dsCmdStmts ids local_vars out_ids (stmt:stmts) env_ids = do
-    let bound_vars  = mkVarSet (collectLStmtBinders stmt)
+    let bound_vars  = mkVarSet (collectLStmtBinders CollWithDictBinders stmt)
     let local_vars' = bound_vars `unionVarSet` local_vars
     (core_stmts, _fv_stmts, env_ids') <- dsfixCmdStmts ids local_vars' out_ids stmts
     (core_stmt, fv_stmt) <- dsCmdLStmt ids local_vars env_ids' stmt env_ids
@@ -1160,12 +1158,12 @@ leavesMatch :: LMatch GhcTc (Located (body GhcTc))
 leavesMatch (L _ (Match { m_pats = pats
                         , m_grhss = GRHSs _ grhss (L _ binds) }))
   = let
-        defined_vars = mkVarSet (collectPatsBinders pats)
+        defined_vars = mkVarSet (collectPatsBinders CollWithDictBinders pats)
                         `unionVarSet`
-                       mkVarSet (collectLocalBinders binds)
+                       mkVarSet (collectLocalBinders CollWithDictBinders binds)
     in
     [(body,
-      mkVarSet (collectLStmtsBinders stmts)
+      mkVarSet (collectLStmtsBinders CollWithDictBinders stmts)
         `unionVarSet` defined_vars)
     | L _ (GRHS _ stmts body) <- grhss]
 
@@ -1204,90 +1202,3 @@ foldb f xs = foldb f (fold_pairs xs)
     fold_pairs [] = []
     fold_pairs [x] = [x]
     fold_pairs (x1:x2:xs) = f x1 x2:fold_pairs xs
-
-{-
-Note [Dictionary binders in ConPatOut] See also same Note in GHC.Hs.Utils
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The following functions to collect value variables from patterns are
-copied from GHC.Hs.Utils, with one change: we also collect the dictionary
-bindings (cpt_binds) from ConPatOut.  We need them for cases like
-
-h :: Arrow a => Int -> a (Int,Int) Int
-h x = proc (y,z) -> case compare x y of
-                GT -> returnA -< z+x
-
-The type checker turns the case into
-
-                case compare x y of
-                  GT { p77 = plusInt } -> returnA -< p77 z x
-
-Here p77 is a local binding for the (+) operation.
-
-See comments in GHC.Hs.Utils for why the other version does not include
-these bindings.
--}
-
-collectPatBinders :: LPat GhcTc -> [Id]
-collectPatBinders pat = collectl pat []
-
-collectPatsBinders :: [LPat GhcTc] -> [Id]
-collectPatsBinders pats = foldr collectl [] pats
-
----------------------
-collectl :: LPat GhcTc -> [Id] -> [Id]
--- See Note [Dictionary binders in ConPatOut]
-collectl (L _ pat) bndrs
-  = go pat
-  where
-    go (VarPat _ (L _ var))       = var : bndrs
-    go (WildPat _)                = bndrs
-    go (LazyPat _ pat)            = collectl pat bndrs
-    go (BangPat _ pat)            = collectl pat bndrs
-    go (AsPat _ (L _ a) pat)      = a : collectl pat bndrs
-    go (ParPat _ pat)             = collectl pat bndrs
-
-    go (ListPat _ pats)           = foldr collectl bndrs pats
-    go (TuplePat _ pats _)        = foldr collectl bndrs pats
-    go (SumPat _ pat _ _)         = collectl pat bndrs
-
-    go (ConPat { pat_args = ps
-               , pat_con_ext = ConPatTc { cpt_binds = ds }}) =
-                                    collectEvBinders ds
-                                    ++ foldr collectl bndrs (hsConPatArgs ps)
-    go (LitPat _ _)               = bndrs
-    go (NPat {})                  = bndrs
-    go (NPlusKPat _ (L _ n) _ _ _ _) = n : bndrs
-
-    go (SigPat _ pat _)           = collectl pat bndrs
-    go (XPat (CoPat _ pat _))     = collectl (noLoc pat) bndrs
-    go (ViewPat _ _ pat)          = collectl pat bndrs
-    go p@(SplicePat {})           = pprPanic "collectl/go" (ppr p)
-
-collectEvBinders :: TcEvBinds -> [Id]
-collectEvBinders (EvBinds bs)   = foldr add_ev_bndr [] bs
-collectEvBinders (TcEvBinds {}) = panic "ToDo: collectEvBinders"
-
-add_ev_bndr :: EvBind -> [Id] -> [Id]
-add_ev_bndr (EvBind { eb_lhs = b }) bs | isId b    = b:bs
-                                       | otherwise = bs
-  -- A worry: what about coercion variable binders??
-
-collectLStmtsBinders :: [LStmt GhcTc body] -> [Id]
-collectLStmtsBinders = concatMap collectLStmtBinders
-
-collectLStmtBinders :: LStmt GhcTc body -> [Id]
-collectLStmtBinders = collectStmtBinders . unLoc
-
-collectStmtBinders :: Stmt GhcTc body -> [Id]
-collectStmtBinders (BindStmt _ pat _)      = collectPatBinders pat
-collectStmtBinders (LetStmt _  binds)      = collectLocalBinders (unLoc binds)
-collectStmtBinders (BodyStmt {})           = []
-collectStmtBinders (LastStmt {})           = []
-collectStmtBinders (ParStmt _ xs _ _)      = collectLStmtsBinders
-                                    $ [s | ParStmtBlock _ ss _ _ <- xs, s <- ss]
-collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
-collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
-collectStmtBinders (ApplicativeStmt _ args _) = concatMap collectArgBinders args
- where
-  collectArgBinders (_, ApplicativeArgOne { app_arg_pattern = pat }) = collectPatBinders pat
-  collectArgBinders (_, ApplicativeArgMany { bv_pattern = pat }) = collectPatBinders pat
