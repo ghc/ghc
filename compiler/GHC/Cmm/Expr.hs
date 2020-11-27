@@ -53,14 +53,14 @@ import GHC.Types.Basic (Alignment, mkAlignment, alignmentOf)
 -----------------------------------------------------------------------------
 
 data CmmExpr
-  = CmmLit CmmLit               -- Literal
+  = CmmLit !CmmLit               -- Literal
   | CmmLoad !CmmExpr !CmmType   -- Read memory location
   | CmmReg !CmmReg              -- Contents of register
   | CmmMachOp MachOp [CmmExpr]  -- Machine operation (+, -, *, etc.)
   | CmmStackSlot Area {-# UNPACK #-} !Int
                                 -- addressing expression of a stack slot
                                 -- See Note [CmmStackSlot aliasing]
-  | CmmRegOff !CmmReg Int
+  | CmmRegOff !CmmReg !Int
         -- CmmRegOff reg i
         --        ** is shorthand only, meaning **
         -- CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt (fromIntegral i) rep)]
@@ -173,16 +173,16 @@ Now, the assignments of y go away,
 -}
 
 data CmmLit
-  = CmmInt !Integer  Width
+  = CmmInt !Integer  !Width
         -- Interpretation: the 2's complement representation of the value
         -- is truncated to the specified size.  This is easier than trying
         -- to keep the value within range, because we don't know whether
         -- it will be used as a signed or unsigned value (the CmmType doesn't
         -- distinguish between signed & unsigned).
-  | CmmFloat  Rational Width
+  | CmmFloat  Rational !Width
   | CmmVec [CmmLit]                     -- Vector literal
   | CmmLabel    CLabel                  -- Address of label
-  | CmmLabelOff CLabel Int              -- Address of label + byte offset
+  | CmmLabelOff CLabel !Int              -- Address of label + byte offset
 
         -- Due to limitations in the C backend, the following
         -- MUST ONLY be used inside the info table indicated by label2
@@ -191,7 +191,7 @@ data CmmLit
         -- Don't use it at all unless tablesNextToCode.
         -- It is also used inside the NCG during when generating
         -- position-independent code.
-  | CmmLabelDiffOff CLabel CLabel Int Width -- label1 - label2 + offset
+  | CmmLabelDiffOff CLabel CLabel !Int !Width -- label1 - label2 + offset
         -- In an expression, the width just has the effect of MO_SS_Conv
         -- from wordWidth to the desired width.
         --
