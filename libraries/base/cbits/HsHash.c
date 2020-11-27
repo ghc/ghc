@@ -20,18 +20,17 @@
 #define XXH_IMPLEMENTATION   /* access definitions */
 #include "HsHash.h"
 
-XXH_errorcode inline
-__hsbase_hash_init (XXH3_state_t* statePtr) {
-  return XXH3_128bits_reset (statePtr);
+// Returns 0 on success.
+int __hsbase_hash_init (XXH3_state_t* statePtr) {
+  return XXH3_128bits_reset (statePtr) != XXH_OK;
 }
 
-XXH_errorcode inline
-__hsbase_hash_update (XXH3_state_t* state, const void* input, size_t len) {
-  return XXH3_128bits_update (state, input, len);
+// Returns 0 on success.
+int __hsbase_hash_update (XXH3_state_t* state, const void* input, size_t len) {
+  return XXH3_128bits_update (state, input, len) != XXH_OK;
 }
 
-void inline
-__hsbase_hash_final (const XXH3_state_t* state, XXH128_hash_t *res) {
+void  __hsbase_hash_final (const XXH3_state_t* state, XXH128_hash_t *res) {
   *res = XXH3_128bits_digest (state);
 }
 
