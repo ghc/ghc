@@ -17,7 +17,6 @@ module GHC.Runtime.Eval (
         Resume(..), History(..),
         execStmt, execStmt', ExecOptions(..), execOptions, ExecResult(..), resumeExec,
         runDecls, runDeclsWithLocation, runParsedDecls,
-        isStmt, hasImport, isImport, isDecl,
         parseImportDecl, SingleStep(..),
         abandon, abandonAll,
         getResumeContext,
@@ -26,7 +25,6 @@ module GHC.Runtime.Eval (
         getHistoryModule,
         back, forward,
         setContext, getContext,
-        availsToGlobalRdrEnv,
         getNamesInScope,
         getRdrNamesInScope,
         moduleIsInterpreted,
@@ -96,17 +94,12 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 
-import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, initParserState)
-import GHC.Parser.Lexer (ParserOpts)
-import qualified GHC.Parser       as Parser (parseStmt, parseModule, parseDeclaration, parseImport)
-
 import GHC.Types.RepType
 import GHC.Types.Fixity.Env
 import GHC.Types.Var
 import GHC.Types.Id as Id
 import GHC.Types.Name      hiding ( varName )
 import GHC.Types.Name.Set
-import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
@@ -126,7 +119,6 @@ import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import GHC.Data.StringBuffer (stringToStringBuffer)
 import Control.Monad
 import Control.Monad.Catch as MC
 import Data.Array
@@ -796,17 +788,6 @@ findGlobalRdrEnv hsc_env imports
       Left err -> Left (mod, err)
       Right env -> Right env
 
-availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
-availsToGlobalRdrEnv mod_name avails
-  = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) avails)
-  where
-      -- We're building a GlobalRdrEnv as if the user imported
-      -- all the specified modules into the global interactive module
-    imp_spec = ImpSpec { is_decl = decl, is_item = ImpAll}
-    decl = ImpDeclSpec { is_mod = mod_name, is_as = mod_name,
-                         is_qual = False,
-                         is_dloc = srcLocSpan interactiveSrcLoc }
-
 mkTopLevEnv :: HomePackageTable -> ModuleName -> Either String GlobalRdrEnv
 mkTopLevEnv hpt modl
   = case lookupHpt hpt modl of
@@ -892,45 +873,6 @@ parseName str = withSession $ \hsc_env -> liftIO $
    do { lrdr_name <- hscParseIdentifier hsc_env str
       ; hscTcRnLookupRdrName hsc_env lrdr_name }
 
--- | Returns @True@ if passed string is a statement.
-isStmt :: ParserOpts -> String -> Bool
-isStmt pflags stmt =
-  case parseThing Parser.parseStmt pflags stmt of
-    Lexer.POk _ _ -> True
-    Lexer.PFailed _ -> False
-
--- | Returns @True@ if passed string has an import declaration.
-hasImport :: ParserOpts -> String -> Bool
-hasImport pflags stmt =
-  case parseThing Parser.parseModule pflags stmt of
-    Lexer.POk _ thing -> hasImports thing
-    Lexer.PFailed _ -> False
-  where
-    hasImports = not . null . hsmodImports . unLoc
-
--- | Returns @True@ if passed string is an import declaration.
-isImport :: ParserOpts -> String -> Bool
-isImport pflags stmt =
-  case parseThing Parser.parseImport pflags stmt of
-    Lexer.POk _ _ -> True
-    Lexer.PFailed _ -> False
-
--- | Returns @True@ if passed string is a declaration but __/not a splice/__.
-isDecl :: ParserOpts -> String -> Bool
-isDecl pflags stmt =
-  case parseThing Parser.parseDeclaration pflags stmt of
-    Lexer.POk _ thing ->
-      case unLoc thing of
-        SpliceD _ _ -> False
-        _ -> True
-    Lexer.PFailed _ -> False
-
-parseThing :: Lexer.P thing -> ParserOpts -> String -> Lexer.ParseResult thing
-parseThing parser opts stmt = do
-  let buf = stringToStringBuffer stmt
-      loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
-
-  Lexer.unP parser (Lexer.initParserState opts buf loc)
 
 getDocs :: GhcMonad m
         => Name

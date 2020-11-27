@@ -325,6 +325,7 @@ import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
 import GHC.Parser.Errors.Ppr
+import GHC.Parser.Utils
 
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
@@ -1346,6 +1347,18 @@ getPackageModuleInfo hsc_env mdl
                         minf_safe      = getSafeMode $ mi_trust iface,
                         minf_modBreaks = emptyModBreaks
                 }))
+
+availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
+availsToGlobalRdrEnv mod_name avails
+  = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) avails)
+  where
+      -- We're building a GlobalRdrEnv as if the user imported
+      -- all the specified modules into the global interactive module
+    imp_spec = ImpSpec { is_decl = decl, is_item = ImpAll}
+    decl = ImpDeclSpec { is_mod = mod_name, is_as = mod_name,
+                         is_qual = False,
+                         is_dloc = srcLocSpan interactiveSrcLoc }
+
 
 getHomeModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getHomeModuleInfo hsc_env mdl =
