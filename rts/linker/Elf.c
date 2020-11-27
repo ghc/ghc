@@ -2065,7 +2065,7 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
      goto dlopen_fail;
    }
 
-   nc = mkOc(DYNAMIC_OBJECT, path, NULL, 0, true, NULL, 0);
+   nc = mkOc(DYNAMIC_OBJECT, path, NULL, 0, false, NULL, 0);
 
    foreignExportsLoadingObject(nc);
    hdl = dlopen(path, RTLD_NOW|RTLD_LOCAL);
