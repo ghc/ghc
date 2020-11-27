@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module GHC.Cmm.Sink (
      cmmSink
   ) where
@@ -23,6 +24,8 @@ import qualified Data.IntSet as IntSet
 import Data.List (partition)
 import qualified Data.Set as Set
 import Data.Maybe
+
+import GHC.Exts (inline)
 
 -- Compact sets for membership tests of local variables.
 
@@ -403,7 +406,7 @@ dropAssignments platform should_drop state assigs
 -- inlining opens up opportunities for doing so.
 
 tryToInline
-   :: Platform
+   :: forall x. Platform
    -> LocalRegSet               -- set of registers live after this
                                 -- node.  We cannot inline anything
                                 -- that is live after the node, unless
@@ -437,13 +440,14 @@ tryToInline platform live node assigs = go usages node emptyLRegSet assigs
         dont_inline        = keep node  -- don't inline the assignment, keep it
         inline_and_keep    = keep inl_node -- inline the assignment, keep it
 
+        keep :: CmmNode O x -> (CmmNode O x, Assignments)
         keep node' = (final_node, a : rest')
           where (final_node, rest') = go usages' node' (insertLRegSet l skipped) rest
+
+                -- Avoid discarding of assignments to vars on the rhs.
+                -- See Note [Keeping assignemnts mentioned in skipped RHSs]
                 usages' = foldLocalRegsUsed platform (\m r -> addToUFM m r 2)
                                             usages rhs
-                -- we must not inline anything that is mentioned in the RHS
-                -- of a binding that we have already skipped, so we set the
-                -- usages of the regs on the RHS to 2.
 
         cannot_inline = skipped `regsUsedIn` rhs -- Note [dependent assignments]
                         || l `elemLRegSet` skipped
@@ -467,6 +471,25 @@ tryToInline platform live node assigs = go usages node emptyLRegSet assigs
         inl_exp (CmmMachOp op args) = cmmMachOpFold platform op args
         inl_exp other = other
 
+{- Note [Keeping assignemnts mentioned in skipped RHSs]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    If we have to assignments: [z = y, y = e1] and we skip
+    z we *must* retain the assignment y = e1. This is because
+    we might inline "z = y" into another node later on so we
+    must ensure y is still defined at this point.
+
+    If we dropped the assignment of "y = e1" then we would end up
+    referencing a variable which hasn't been mentioned after
+    inlining.
+
+    We use a hack to do this, which is setting all regs used on the
+    RHS to two uses. Since we only discard assignments to variables
+    which are used once or never this prevents discarding of the
+    assignment. It still allows inlining should e1 be a trivial rhs
+    however.
+
+-}
 
 {- Note [improveConditional]
 
@@ -610,18 +633,34 @@ conflicts platform (r, rhs, addr) node
   -- (7) otherwise, no conflict
   | otherwise = False
 
+{- Note [Inlining foldRegsDefd]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   foldRegsDefd is, after optimization, *not* a small function so
+   it's only marked INLINEABLE, but not INLINE.
+
+   However in some specific cases we call it *very* often making it
+   important to avoid the overhead of allocating the folding function.
+
+   So we simply force inlining via the magic inline function.
+   For T3294 this improves allocation with -O by ~1%.
+
+-}
+
 -- Returns True if node defines any global registers that are used in the
 -- Cmm expression
 globalRegistersConflict :: Platform -> CmmExpr -> CmmNode e x -> Bool
 globalRegistersConflict platform expr node =
-    foldRegsDefd platform (\b r -> b || regUsedIn platform (CmmGlobal r) expr)
+    -- See Note [Inlining foldRegsDefd]
+    inline foldRegsDefd platform (\b r -> b || regUsedIn platform (CmmGlobal r) expr)
                  False node
 
 -- Returns True if node defines any local registers that are used in the
 -- Cmm expression
 localRegistersConflict :: Platform -> CmmExpr -> CmmNode e x -> Bool
 localRegistersConflict platform expr node =
-    foldRegsDefd platform (\b r -> b || regUsedIn platform (CmmLocal  r) expr)
+    -- See Note [Inlining foldRegsDefd]
+    inline foldRegsDefd platform (\b r -> b || regUsedIn platform (CmmLocal  r) expr)
                  False node
 
 -- Note [Sinking and calls]
