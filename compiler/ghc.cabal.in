@@ -480,6 +480,7 @@ Library
         GHC.Parser.PostProcess
         GHC.Parser.PostProcess.Haddock
         GHC.Parser.Types
+        GHC.Parser.Utils
         GHC.Platform
         GHC.Platform.ARM
         GHC.Platform.AArch64
