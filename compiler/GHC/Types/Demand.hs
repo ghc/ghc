@@ -55,6 +55,7 @@ module GHC.Types.Demand (
     PlusDmdArg, mkPlusDmdArg, toPlusDmdArg,
     -- ** Other operations
     peelFV, findIdDemand, addDemand, splitDmdTy, deferAfterPreciseException,
+    keepAliveDmdType,
 
     -- * Demand signatures
     StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
@@ -1191,6 +1192,11 @@ findIdDemand (DmdType fv _ res) id
 -- See Note [Precise exceptions and strictness analysis]
 deferAfterPreciseException :: DmdType -> DmdType
 deferAfterPreciseException = lubDmdType exnDmdType
+
+-- | See 'keepAliveDmdEnv'.
+keepAliveDmdType :: DmdType -> VarSet -> DmdType
+keepAliveDmdType (DmdType fvs ds res) vars =
+  DmdType (fvs `keepAliveDmdEnv` vars) ds res
 
 {-
 Note [Demand type Divergence]
