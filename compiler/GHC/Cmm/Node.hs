@@ -318,6 +318,7 @@ foreignTargetHints target
 -- Instances of register and slot users / definers
 
 instance UserOfRegs LocalReg (CmmNode e x) where
+  {-# INLINEABLE foldRegsUsed #-}
   foldRegsUsed platform f !z n = case n of
     CmmAssign _ expr -> fold f z expr
     CmmStore addr rval -> fold f (fold f z addr) rval
@@ -332,6 +333,7 @@ instance UserOfRegs LocalReg (CmmNode e x) where
           fold f z n = foldRegsUsed platform f z n
 
 instance UserOfRegs GlobalReg (CmmNode e x) where
+  {-# INLINEABLE foldRegsUsed #-}
   foldRegsUsed platform f !z n = case n of
     CmmAssign _ expr -> fold f z expr
     CmmStore addr rval -> fold f (fold f z addr) rval
@@ -348,10 +350,12 @@ instance UserOfRegs GlobalReg (CmmNode e x) where
 instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r ForeignTarget where
   -- The (Ord r) in the context is necessary here
   -- See Note [Recursive superclasses] in GHC.Tc.TyCl.Instance
+  {-# INLINEABLE foldRegsUsed #-}
   foldRegsUsed _        _ !z (PrimTarget _)      = z
   foldRegsUsed platform f !z (ForeignTarget e _) = foldRegsUsed platform f z e
 
 instance DefinerOfRegs LocalReg (CmmNode e x) where
+  {-# INLINEABLE foldRegsDefd #-}
   foldRegsDefd platform f !z n = case n of
     CmmAssign lhs _ -> fold f z lhs
     CmmUnsafeForeignCall _ fs _ -> fold f z fs
@@ -362,6 +366,7 @@ instance DefinerOfRegs LocalReg (CmmNode e x) where
           fold f z n = foldRegsDefd platform f z n
 
 instance DefinerOfRegs GlobalReg (CmmNode e x) where
+  {-# INLINEABLE foldRegsDefd #-}
   foldRegsDefd platform f !z n = case n of
     CmmAssign lhs _ -> fold f z lhs
     CmmUnsafeForeignCall tgt _ _  -> fold f z (foreignTargetRegs tgt)
