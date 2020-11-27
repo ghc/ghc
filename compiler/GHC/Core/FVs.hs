@@ -28,12 +28,13 @@ module GHC.Core.FVs (
         varTypeTyCoFVs,
         idUnfoldingVars, idFreeVars, dIdFreeVars,
         bndrRuleAndUnfoldingVarsDSet,
+        bndrRuleAndUnfoldingIds,
         idFVs,
-        idRuleVars, idRuleRhsVars, stableUnfoldingVars,
+        idRuleVars, stableUnfoldingVars,
         ruleFreeVars, rulesFreeVars,
         rulesFreeVarsDSet, mkRuleInfo,
         ruleLhsFreeIds, ruleLhsFreeIdsList,
-        ruleRhsFreeVars, ruleRhsFreeIds,
+        ruleRhsFreeVars, rulesRhsFreeIds,
 
         expr_fvs,
 
@@ -62,8 +63,6 @@ import GHC.Core
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name.Set
-import GHC.Types.Unique.Set
-import GHC.Types.Unique (Uniquable (..))
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var
@@ -76,7 +75,6 @@ import GHC.Core.FamInstEnv
 import GHC.Builtin.Types( unrestrictedFunTyConName )
 import GHC.Builtin.Types.Prim( funTyConName )
 import GHC.Data.Maybe( orElse )
-import GHC.Types.Basic( Activation )
 
 import GHC.Utils.FV as FV
 import GHC.Utils.Misc
@@ -450,86 +448,70 @@ orph_names_of_fun_ty_con _ = emptyNameSet
 ************************************************************************
 -}
 
+data RuleFVsFrom
+  = LhsOnly
+  | RhsOnly
+  | BothSides
+
+-- | Those locally-defined variables free in the left and/or right hand sides
+-- of the rule, depending on the first argument. Returns an 'FV' computation.
+ruleFVs :: RuleFVsFrom -> CoreRule -> FV
+ruleFVs !_   (BuiltinRule {}) = emptyFV
+ruleFVs from (Rule { ru_fn = _do_not_include
+                     -- See Note [Rule free var hack]
+                   , ru_bndrs = bndrs
+                   , ru_rhs = rhs, ru_args = args })
+  = filterFV isLocalVar $ addBndrs bndrs (exprs_fvs exprs)
+  where
+    exprs = case from of
+      LhsOnly   -> args
+      RhsOnly   -> [rhs]
+      BothSides -> rhs:args
+
+-- | Those locally-defined variables free in the left and/or right hand sides
+-- from several rules, depending on the first argument.
+-- Returns an 'FV' computation.
+rulesFVs :: RuleFVsFrom -> [CoreRule] -> FV
+rulesFVs from = mapUnionFV (ruleFVs from)
+
 -- | Those variables free in the right hand side of a rule returned as a
 -- non-deterministic set
 ruleRhsFreeVars :: CoreRule -> VarSet
-ruleRhsFreeVars (BuiltinRule {}) = noFVs
-ruleRhsFreeVars (Rule { ru_fn = _, ru_bndrs = bndrs, ru_rhs = rhs })
-  = fvVarSet $ filterFV isLocalVar $ addBndrs bndrs (expr_fvs rhs)
-      -- See Note [Rule free var hack]
+ruleRhsFreeVars = fvVarSet . ruleFVs RhsOnly
+
+-- | Those locally-defined free 'Id's in the right hand side of several rules
+-- returned as a non-deterministic set
+rulesRhsFreeIds :: [CoreRule] -> VarSet
+rulesRhsFreeIds = fvVarSet . filterFV isLocalId . rulesFVs RhsOnly
+
+ruleLhsFreeIds :: CoreRule -> VarSet
+-- ^ This finds all locally-defined free Ids on the left hand side of a rule
+-- and returns them as a non-deterministic set
+ruleLhsFreeIds = fvVarSet . filterFV isLocalId . ruleFVs LhsOnly
+
+ruleLhsFreeIdsList :: CoreRule -> [Var]
+-- ^ This finds all locally-defined free Ids on the left hand side of a rule
+-- and returns them as a deterministically ordered list
+ruleLhsFreeIdsList = fvVarList . filterFV isLocalId . ruleFVs LhsOnly
 
 -- | Those variables free in the both the left right hand sides of a rule
 -- returned as a non-deterministic set
 ruleFreeVars :: CoreRule -> VarSet
-ruleFreeVars = fvVarSet . ruleFVs
-
--- | Those variables free in the both the left right hand sides of a rule
--- returned as FV computation
-ruleFVs :: CoreRule -> FV
-ruleFVs (BuiltinRule {}) = emptyFV
-ruleFVs (Rule { ru_fn = _do_not_include
-                  -- See Note [Rule free var hack]
-              , ru_bndrs = bndrs
-              , ru_rhs = rhs, ru_args = args })
-  = filterFV isLocalVar $ addBndrs bndrs (exprs_fvs (rhs:args))
-
--- | Those variables free in the both the left right hand sides of rules
--- returned as FV computation
-rulesFVs :: [CoreRule] -> FV
-rulesFVs = mapUnionFV ruleFVs
+ruleFreeVars = fvVarSet . ruleFVs BothSides
 
 -- | Those variables free in the both the left right hand sides of rules
 -- returned as a deterministic set
 rulesFreeVarsDSet :: [CoreRule] -> DVarSet
-rulesFreeVarsDSet rules = fvDVarSet $ rulesFVs rules
+rulesFreeVarsDSet rules = fvDVarSet $ rulesFVs BothSides rules
+
+-- | Those variables free in both the left right hand sides of several rules
+rulesFreeVars :: [CoreRule] -> VarSet
+rulesFreeVars rules = fvVarSet $ rulesFVs BothSides rules
 
 -- | Make a 'RuleInfo' containing a number of 'CoreRule's, suitable
 -- for putting into an 'IdInfo'
 mkRuleInfo :: [CoreRule] -> RuleInfo
 mkRuleInfo rules = RuleInfo rules (rulesFreeVarsDSet rules)
-
-idRuleRhsVars :: (Activation -> Bool) -> Id -> VarSet
--- Just the variables free on the *rhs* of a rule
-idRuleRhsVars is_active id
-  = mapUnionVarSet get_fvs (idCoreRules id)
-  where
-    get_fvs (Rule { ru_fn = fn, ru_bndrs = bndrs
-                  , ru_rhs = rhs, ru_act = act })
-      | is_active act
-            -- See Note [Finding rule RHS free vars] in "GHC.Core.Opt.OccurAnal"
-      = delOneFromUniqSet_Directly fvs (getUnique fn)
-            -- Note [Rule free var hack]
-      where
-        fvs = fvVarSet $ filterFV isLocalVar $ addBndrs bndrs (expr_fvs rhs)
-    get_fvs _ = noFVs
-
--- | Those variables free in the right hand side of several rules
-rulesFreeVars :: [CoreRule] -> VarSet
-rulesFreeVars rules = mapUnionVarSet ruleFreeVars rules
-
-ruleLhsFreeIds :: CoreRule -> VarSet
--- ^ This finds all locally-defined free Ids on the left hand side of a rule
--- and returns them as a non-deterministic set
-ruleLhsFreeIds = fvVarSet . ruleLhsFVIds
-
-ruleLhsFreeIdsList :: CoreRule -> [Var]
--- ^ This finds all locally-defined free Ids on the left hand side of a rule
--- and returns them as a deterministically ordered list
-ruleLhsFreeIdsList = fvVarList . ruleLhsFVIds
-
-ruleLhsFVIds :: CoreRule -> FV
--- ^ This finds all locally-defined free Ids on the left hand side of a rule
--- and returns an FV computation
-ruleLhsFVIds (BuiltinRule {}) = emptyFV
-ruleLhsFVIds (Rule { ru_bndrs = bndrs, ru_args = args })
-  = filterFV isLocalId $ addBndrs bndrs (exprs_fvs args)
-
-ruleRhsFreeIds :: CoreRule -> VarSet
--- ^ This finds all locally-defined free Ids on the right hand side of a rule
--- and returns them as a non-deterministic set
-ruleRhsFreeIds (BuiltinRule {}) = emptyVarSet
-ruleRhsFreeIds (Rule { ru_bndrs = bndrs, ru_rhs = rhs })
-  = fvVarSet $ filterFV isLocalId $ addBndrs bndrs $ expr_fvs rhs
 
 {-
 Note [Rule free var hack]  (Not a hack any more)
@@ -585,9 +567,6 @@ freeVarsOf (fvs, _) = fvs
 -- | Extract the vars reported in a FVAnn
 freeVarsOfAnn :: FVAnn -> DIdSet
 freeVarsOfAnn fvs = fvs
-
-noFVs :: VarSet
-noFVs = emptyVarSet
 
 aFreeVar :: Var -> DVarSet
 aFreeVar = unitDVarSet
@@ -659,6 +638,9 @@ idFVs id = ASSERT( isId id)
 
 bndrRuleAndUnfoldingVarsDSet :: Id -> DVarSet
 bndrRuleAndUnfoldingVarsDSet id = fvDVarSet $ bndrRuleAndUnfoldingFVs id
+
+bndrRuleAndUnfoldingIds :: Id -> IdSet
+bndrRuleAndUnfoldingIds id = fvVarSet $ filterFV isId $ bndrRuleAndUnfoldingFVs id
 
 bndrRuleAndUnfoldingFVs :: Id -> FV
 bndrRuleAndUnfoldingFVs id
