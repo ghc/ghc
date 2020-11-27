@@ -20,6 +20,7 @@ module GHC.Fingerprint (
    ) where
 
 import GHC.IO
+import Control.Monad.Fail
 import GHC.Base
 import GHC.Num
 import GHC.List
@@ -48,8 +49,8 @@ fingerprintFingerprints fs = unsafeDupablePerformIO $
 fingerprintData :: Ptr Word8 -> Int -> IO Fingerprint
 fingerprintData buf len =
   allocaBytes (#{size XXH3_state_t}) $ \pctxt -> do
-    c_HashInit pctxt
-    c_HashUpdate pctxt buf (fromIntegral len)
+    checkError $ c_HashInit pctxt
+    checkError $ c_HashUpdate pctxt buf (fromIntegral len)
     allocaBytes 16 $ \pdigest -> do
       c_HashFinal pctxt pdigest
       peek (castPtr pdigest :: Ptr Fingerprint)
@@ -73,9 +74,9 @@ fingerprintString str = unsafeDupablePerformIO $
 getFileHash :: FilePath -> IO Fingerprint
 getFileHash path = withBinaryFile path ReadMode $ \h ->
   allocaBytes  (#{size XXH3_state_t}) $ \pctxt -> do
-    c_HashInit pctxt
+    checkError $ c_HashInit pctxt
 
-    processChunks h (\buf size -> c_HashUpdate pctxt buf (fromIntegral size))
+    processChunks h (\buf size -> checkError $ c_HashUpdate pctxt buf (fromIntegral size))
 
     allocaBytes 16 $ \pdigest -> do
       c_HashFinal pctxt pdigest
@@ -103,9 +104,14 @@ getFileHash path = withBinaryFile path ReadMode $ \h ->
 
 data HashContext
 
+checkError :: IO CInt -> IO ()
+checkError action = do
+  ret <- action
+  when (ret /= 0) $ fail "GHC.Fingerprint: xxhash failure"
+
 foreign import ccall unsafe "__hsbase_hash_init"
-   c_HashInit   :: Ptr HashContext -> IO ()
+   c_HashInit   :: Ptr HashContext -> IO CInt
 foreign import ccall unsafe "__hsbase_hash_update"
-   c_HashUpdate :: Ptr HashContext -> Ptr Word8 -> CInt -> IO ()
+   c_HashUpdate :: Ptr HashContext -> Ptr Word8 -> CInt -> IO CInt
 foreign import ccall unsafe "__hsbase_hash_final"
    c_HashFinal  :: Ptr HashContext -> Ptr Word64 -> IO ()
