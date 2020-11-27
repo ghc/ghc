@@ -5,7 +5,7 @@ Result size of Tidy Core = {terms: 52, types: 87, coercions: 0, joins: 0/0}
 Rec {
 -- RHS size: {terms: 15, types: 17, coercions: 0, joins: 0/0}
 map2 [Occ=LoopBreaker] :: forall {t} {a}. (t -> a) -> [t] -> [a]
-[GblId, Arity=2, Str=<UCU(U)><SU>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<U><SU>, Unf=OtherCon []]
 map2
   = \ (@t) (@a) (f :: t -> a) (ds :: [t]) ->
       case ds of {
