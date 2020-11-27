@@ -264,9 +264,11 @@ cmmOffset platform  e byte_off = case e of
    CmmStackSlot area off -> CmmStackSlot area (off - byte_off)
   -- note stack area offsets increase towards lower addresses
    CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt byte_off1 _rep)]
-      -> CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt (byte_off1 + toInteger byte_off) rep)]
-   _ -> CmmMachOp (MO_Add width) [e, CmmLit (CmmInt (toInteger byte_off) width)]
-         where width = cmmExprWidth platform e
+      -> let !lit_off = (byte_off1 + toInteger byte_off)
+         in CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt lit_off rep)]
+   _ -> let !width = cmmExprWidth platform e
+        in
+        CmmMachOp (MO_Add width) [e, CmmLit (CmmInt (toInteger byte_off) width)]
 
 -- Smart constructor for CmmRegOff.  Same caveats as cmmOffset above.
 cmmRegOff :: CmmReg -> Int -> CmmExpr
