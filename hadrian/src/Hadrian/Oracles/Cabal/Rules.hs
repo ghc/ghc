@@ -59,12 +59,20 @@ cabalOracle = do
                ++ quote (pkgName pkg) ++ " (" ++ show stage ++ ")..."
         -- Configure the package with the GHC corresponding to the given stage
         hcPath <- builderPath (Ghc CompileHs stage)
+        hcPkgPath <- builderPath (GhcPkg undefined stage)
+        -- N.B. the hcPath parameter of `configure` is broken when given an
+        -- empty ProgramDb. To work around this we manually construct an
+        -- appropriate ProgramDb.
+        --
+        -- We also need to pass the path to ghc-pkg, because Cabal cannot
+        -- guess it (from ghc's path) when it's for a cross-compiler (e.g.,
+        -- _build/stage0/bin/aarch64-linux-gnu-ghc-pkg).
         let progDb = userSpecifyPath "ghc" hcPath
-                     $ addKnownProgram ghcProgram emptyProgramDb
+                     $ addKnownProgram ghcProgram
+                     $ userSpecifyPath "ghc-pkg" hcPkgPath
+                     $ addKnownProgram ghcPkgProgram
+                     $ emptyProgramDb
         (compiler, maybePlatform, _pkgdb) <- liftIO $
-            -- N.B. the hcPath parameter of `configure` is broken when given an
-            -- empty ProgramDb. To work around this we manually construct an
-            -- appropriate ProgramDb.
             configure silent Nothing Nothing progDb
         let platform = fromMaybe (error msg) maybePlatform
             msg      = "PackageConfiguration oracle: cannot detect platform"
