@@ -34,7 +34,7 @@ import GHC.Types.Id
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.FVs      ( exprFreeIds, ruleRhsFreeIds )
+import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds )
 import GHC.Core.Coercion ( Coercion, coVarsOfCo )
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.Arity ( typeArity )
@@ -96,7 +96,7 @@ dmdAnalProgram opts fam_envs rules binds
       = dmd_ty
 
     rule_fvs :: IdSet
-    rule_fvs = foldr (unionVarSet . ruleRhsFreeIds) emptyVarSet rules
+    rule_fvs = rulesRhsFreeIds rules
 
 -- | We attach useful (e.g. not 'topDmd') 'idDemandInfo' to top-level bindings
 -- that satisfy this function.
@@ -265,7 +265,10 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = (final_ty, NonRec id' rhs', body
     (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
     id'                = setBindIdDemandInfo top_lvl id id_dmd
     (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
-    final_ty           = body_ty' `plusDmdType` rhs_ty
+
+    -- See Note [Absence analysis for stable unfoldings and RULES]
+    rule_fvs           = bndrRuleAndUnfoldingIds id
+    final_ty           = body_ty' `plusDmdType` rhs_ty `keepAliveDmdType` rule_fvs
 
 -- | Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
@@ -809,20 +812,11 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
                 Recursive    -> reuseEnv rhs_fv
                 NonRecursive -> rhs_fv
 
-    rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` extra_fvs
-    -- Find the RHS free vars of the unfoldings and RULES
     -- See Note [Absence analysis for stable unfoldings and RULES]
-    extra_fvs = foldr (unionVarSet . ruleRhsFreeIds) unf_fvs $
-                idCoreRules id
+    rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` bndrRuleAndUnfoldingIds id
 
     -- See Note [Lazy and unleashable free variables]
     (lazy_fv, sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
-
-    unf = realIdUnfolding id
-    unf_fvs | isStableUnfolding unf
-            , Just unf_body <- maybeUnfoldingTemplate unf
-            = exprFreeIds unf_body
-            | otherwise = emptyVarSet
 
 -- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
 -- whether we should process the binding up (body before rhs) or down (rhs
