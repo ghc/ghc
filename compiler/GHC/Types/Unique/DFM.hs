@@ -15,8 +15,12 @@ is not deterministic.
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wall #-}
 
@@ -38,6 +42,7 @@ module GHC.Types.Unique.DFM (
         adjustUDFM_Directly,
         alterUDFM,
         mapUDFM,
+        mapMaybeUDFM,
         plusUDFM,
         plusUDFM_C,
         lookupUDFM, lookupUDFM_Directly,
@@ -121,7 +126,7 @@ data TaggedVal val =
   TaggedVal
     val
     {-# UNPACK #-} !Int -- ^ insertion time
-  deriving (Data, Functor)
+  deriving stock (Data, Functor, Foldable, Traversable)
 
 taggedFst :: TaggedVal val -> val
 taggedFst (TaggedVal v _) = v
@@ -398,6 +403,10 @@ alterUDFM f (UDFM m i) k =
 -- | Map a function over every value in a UniqDFM
 mapUDFM :: (elt1 -> elt2) -> UniqDFM key elt1 -> UniqDFM key elt2
 mapUDFM f (UDFM m i) = UDFM (M.map (fmap f) m) i
+
+mapMaybeUDFM :: forall elt1 elt2 key.
+                (elt1 -> Maybe elt2) -> UniqDFM key elt1 -> UniqDFM key elt2
+mapMaybeUDFM f (UDFM m i) = UDFM (M.mapMaybe (traverse f) m) i
 
 anyUDFM :: (elt -> Bool) -> UniqDFM key elt -> Bool
 anyUDFM p (UDFM m _i) = M.foldr ((||) . p . taggedFst) False m

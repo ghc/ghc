@@ -1,412 +1,75 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
-
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-module GHC.Core.Map (
-   -- * Maps over Core expressions
-   CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
-   -- * Maps over 'Type's
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+
+module GHC.Core.Map.Type (
+     -- * Re-export generic interface
+   TrieMap(..),
+
+     -- * Maps over 'Type's
    TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap, foldTypeMap,
    LooseTypeMap,
    -- ** With explicit scoping
    CmEnv, lookupCME, extendTypeMapWithScope, lookupTypeMapWithScope,
-   mkDeBruijnContext,
-   -- * Maps over 'Maybe' values
-   MaybeMap,
-   -- * Maps over 'List' values
-   ListMap,
-   -- * Maps over 'Literal's
-   LiteralMap,
-   -- * Map for compressing leaves. See Note [Compressed TrieMap]
-   GenMap,
-   -- * 'TrieMap' class
-   TrieMap(..), insertTM, deleteTM,
-   lkDFreeVar, xtDFreeVar,
-   lkDNamed, xtDNamed,
-   (>.>), (|>), (|>>),
- ) where
+   mkDeBruijnContext, extendCME, extendCMEs, emptyCME,
 
-#include "HsVersions.h"
+   -- * Utilities for use by friends only
+   TypeMapG, CoercionMapG,
+
+   DeBruijn(..), deBruijnize,
+
+   BndrMap, xtBndr, lkBndr,
+   VarMap, xtVar, lkVar, lkDFreeVar, xtDFreeVar,
+
+   xtDNamed, lkDNamed
+
+   ) where
+
+-- This module is separate from GHC.Core.Map.Expr to avoid a module loop
+-- between GHC.Core.Unify (which depends on this module) and GHC.Core
 
 import GHC.Prelude
 
-import GHC.Data.TrieMap
-import GHC.Core
-import GHC.Core.Coercion
-import GHC.Types.Name
 import GHC.Core.Type
+import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
-import GHC.Types.Var
-import GHC.Data.FastString(FastString)
+import GHC.Data.TrieMap
 
-import GHC.Utils.Misc
+import GHC.Data.FastString
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Unique.FM
 import GHC.Utils.Outputable
+
+import GHC.Data.Maybe
 import GHC.Utils.Panic
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
-import GHC.Types.Unique.FM
-import GHC.Types.Var.Env
-import GHC.Types.Name.Env
-import Control.Monad( (>=>) )
 
-{-
-This module implements TrieMaps over Core related data structures
-like CoreExpr or Type. It is built on the Tries from the TrieMap
-module.
-
-The code is very regular and boilerplate-like, but there is
-some neat handling of *binders*.  In effect they are deBruijn
-numbered on the fly.
-
-
--}
-
-----------------------
--- Recall that
---   Control.Monad.(>=>) :: (a -> Maybe b) -> (b -> Maybe c) -> a -> Maybe c
+import Control.Monad ( (>=>) )
 
 -- NB: Be careful about RULES and type families (#5821).  So we should make sure
 -- to specify @Key TypeMapX@ (and not @DeBruijn Type@, the reduced form)
 
--- The CoreMap makes heavy use of GenMap. However the CoreMap Types are not
--- known when defining GenMap so we can only specialize them here.
-
 {-# SPECIALIZE lkG :: Key TypeMapX     -> TypeMapG a     -> Maybe a #-}
 {-# SPECIALIZE lkG :: Key CoercionMapX -> CoercionMapG a -> Maybe a #-}
-{-# SPECIALIZE lkG :: Key CoreMapX     -> CoreMapG a     -> Maybe a #-}
-
 
 {-# SPECIALIZE xtG :: Key TypeMapX     -> XT a -> TypeMapG a -> TypeMapG a #-}
 {-# SPECIALIZE xtG :: Key CoercionMapX -> XT a -> CoercionMapG a -> CoercionMapG a #-}
-{-# SPECIALIZE xtG :: Key CoreMapX     -> XT a -> CoreMapG a -> CoreMapG a #-}
 
 {-# SPECIALIZE mapG :: (a -> b) -> TypeMapG a     -> TypeMapG b #-}
 {-# SPECIALIZE mapG :: (a -> b) -> CoercionMapG a -> CoercionMapG b #-}
-{-# SPECIALIZE mapG :: (a -> b) -> CoreMapG a     -> CoreMapG b #-}
 
 {-# SPECIALIZE fdG :: (a -> b -> b) -> TypeMapG a     -> b -> b #-}
 {-# SPECIALIZE fdG :: (a -> b -> b) -> CoercionMapG a -> b -> b #-}
-{-# SPECIALIZE fdG :: (a -> b -> b) -> CoreMapG a     -> b -> b #-}
-
-
-{-
-************************************************************************
-*                                                                      *
-                   CoreMap
-*                                                                      *
-************************************************************************
--}
-
-lkDNamed :: NamedThing n => n -> DNameEnv a -> Maybe a
-lkDNamed n env = lookupDNameEnv env (getName n)
-
-xtDNamed :: NamedThing n => n -> XT a -> DNameEnv a -> DNameEnv a
-xtDNamed tc f m = alterDNameEnv f m (getName tc)
-
-
-{-
-Note [Binders]
-~~~~~~~~~~~~~~
- * In general we check binders as late as possible because types are
-   less likely to differ than expression structure.  That's why
-      cm_lam :: CoreMapG (TypeMapG a)
-   rather than
-      cm_lam :: TypeMapG (CoreMapG a)
-
- * We don't need to look at the type of some binders, notably
-     - the case binder in (Case _ b _ _)
-     - the binders in an alternative
-   because they are totally fixed by the context
-
-Note [Empty case alternatives]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* For a key (Case e b ty (alt:alts))  we don't need to look the return type
-  'ty', because every alternative has that type.
-
-* For a key (Case e b ty []) we MUST look at the return type 'ty', because
-  otherwise (Case (error () "urk") _ Int  []) would compare equal to
-            (Case (error () "urk") _ Bool [])
-  which is utterly wrong (#6097)
-
-We could compare the return type regardless, but the wildly common case
-is that it's unnecessary, so we have two fields (cm_case and cm_ecase)
-for the two possibilities.  Only cm_ecase looks at the type.
-
-See also Note [Empty case alternatives] in GHC.Core.
--}
-
--- | @CoreMap a@ is a map from 'CoreExpr' to @a@.  If you are a client, this
--- is the type you want.
-newtype CoreMap a = CoreMap (CoreMapG a)
-
-instance TrieMap CoreMap where
-    type Key CoreMap = CoreExpr
-    emptyTM = CoreMap emptyTM
-    lookupTM k (CoreMap m) = lookupTM (deBruijnize k) m
-    alterTM k f (CoreMap m) = CoreMap (alterTM (deBruijnize k) f m)
-    foldTM k (CoreMap m) = foldTM k m
-    mapTM f (CoreMap m) = CoreMap (mapTM f m)
-
--- | @CoreMapG a@ is a map from @DeBruijn CoreExpr@ to @a@.  The extended
--- key makes it suitable for recursive traversal, since it can track binders,
--- but it is strictly internal to this module.  If you are including a 'CoreMap'
--- inside another 'TrieMap', this is the type you want.
-type CoreMapG = GenMap CoreMapX
-
--- | @CoreMapX a@ is the base map from @DeBruijn CoreExpr@ to @a@, but without
--- the 'GenMap' optimization.
-data CoreMapX a
-  = CM { cm_var   :: VarMap a
-       , cm_lit   :: LiteralMap a
-       , cm_co    :: CoercionMapG a
-       , cm_type  :: TypeMapG a
-       , cm_cast  :: CoreMapG (CoercionMapG a)
-       , cm_tick  :: CoreMapG (TickishMap a)
-       , cm_app   :: CoreMapG (CoreMapG a)
-       , cm_lam   :: CoreMapG (BndrMap a)    -- Note [Binders]
-       , cm_letn  :: CoreMapG (CoreMapG (BndrMap a))
-       , cm_letr  :: ListMap CoreMapG (CoreMapG (ListMap BndrMap a))
-       , cm_case  :: CoreMapG (ListMap AltMap a)
-       , cm_ecase :: CoreMapG (TypeMapG a)    -- Note [Empty case alternatives]
-     }
-
-instance Eq (DeBruijn CoreExpr) where
-  D env1 e1 == D env2 e2 = go e1 e2 where
-    go (Var v1) (Var v2)
-      = case (lookupCME env1 v1, lookupCME env2 v2) of
-                            (Just b1, Just b2) -> b1 == b2
-                            (Nothing, Nothing) -> v1 == v2
-                            _ -> False
-    go (Lit lit1)    (Lit lit2)      = lit1 == lit2
-    go (Type t1)    (Type t2)        = D env1 t1 == D env2 t2
-    go (Coercion co1) (Coercion co2) = D env1 co1 == D env2 co2
-    go (Cast e1 co1) (Cast e2 co2) = D env1 co1 == D env2 co2 && go e1 e2
-    go (App f1 a1)   (App f2 a2)   = go f1 f2 && go a1 a2
-    -- This seems a bit dodgy, see 'eqTickish'
-    go (Tick n1 e1)  (Tick n2 e2)  = n1 == n2 && go e1 e2
-
-    go (Lam b1 e1)  (Lam b2 e2)
-      =  D env1 (varType b1) == D env2 (varType b2)
-      && D env1 (varMultMaybe b1) == D env2 (varMultMaybe b2)
-      && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
-
-    go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
-      =  go r1 r2
-      && D (extendCME env1 v1) e1 == D (extendCME env2 v2) e2
-
-    go (Let (Rec ps1) e1) (Let (Rec ps2) e2)
-      = equalLength ps1 ps2
-      && D env1' rs1 == D env2' rs2
-      && D env1' e1  == D env2' e2
-      where
-        (bs1,rs1) = unzip ps1
-        (bs2,rs2) = unzip ps2
-        env1' = extendCMEs env1 bs1
-        env2' = extendCMEs env2 bs2
-
-    go (Case e1 b1 t1 a1) (Case e2 b2 t2 a2)
-      | null a1   -- See Note [Empty case alternatives]
-      = null a2 && go e1 e2 && D env1 t1 == D env2 t2
-      | otherwise
-      =  go e1 e2 && D (extendCME env1 b1) a1 == D (extendCME env2 b2) a2
-
-    go _ _ = False
-
-emptyE :: CoreMapX a
-emptyE = CM { cm_var = emptyTM, cm_lit = emptyTM
-            , cm_co = emptyTM, cm_type = emptyTM
-            , cm_cast = emptyTM, cm_app = emptyTM
-            , cm_lam = emptyTM, cm_letn = emptyTM
-            , cm_letr = emptyTM, cm_case = emptyTM
-            , cm_ecase = emptyTM, cm_tick = emptyTM }
-
-instance TrieMap CoreMapX where
-   type Key CoreMapX = DeBruijn CoreExpr
-   emptyTM  = emptyE
-   lookupTM = lkE
-   alterTM  = xtE
-   foldTM   = fdE
-   mapTM    = mapE
-
---------------------------
-mapE :: (a->b) -> CoreMapX a -> CoreMapX b
-mapE f (CM { cm_var = cvar, cm_lit = clit
-           , cm_co = cco, cm_type = ctype
-           , cm_cast = ccast , cm_app = capp
-           , cm_lam = clam, cm_letn = cletn
-           , cm_letr = cletr, cm_case = ccase
-           , cm_ecase = cecase, cm_tick = ctick })
-  = CM { cm_var = mapTM f cvar, cm_lit = mapTM f clit
-       , cm_co = mapTM f cco, cm_type = mapTM f ctype
-       , cm_cast = mapTM (mapTM f) ccast, cm_app = mapTM (mapTM f) capp
-       , cm_lam = mapTM (mapTM f) clam, cm_letn = mapTM (mapTM (mapTM f)) cletn
-       , cm_letr = mapTM (mapTM (mapTM f)) cletr, cm_case = mapTM (mapTM f) ccase
-       , cm_ecase = mapTM (mapTM f) cecase, cm_tick = mapTM (mapTM f) ctick }
-
---------------------------
-lookupCoreMap :: CoreMap a -> CoreExpr -> Maybe a
-lookupCoreMap cm e = lookupTM e cm
-
-extendCoreMap :: CoreMap a -> CoreExpr -> a -> CoreMap a
-extendCoreMap m e v = alterTM e (\_ -> Just v) m
-
-foldCoreMap :: (a -> b -> b) -> b -> CoreMap a -> b
-foldCoreMap k z m = foldTM k m z
-
-emptyCoreMap :: CoreMap a
-emptyCoreMap = emptyTM
-
-instance Outputable a => Outputable (CoreMap a) where
-  ppr m = text "CoreMap elts" <+> ppr (foldTM (:) m [])
-
--------------------------
-fdE :: (a -> b -> b) -> CoreMapX a -> b -> b
-fdE k m
-  = foldTM k (cm_var m)
-  . foldTM k (cm_lit m)
-  . foldTM k (cm_co m)
-  . foldTM k (cm_type m)
-  . foldTM (foldTM k) (cm_cast m)
-  . foldTM (foldTM k) (cm_tick m)
-  . foldTM (foldTM k) (cm_app m)
-  . foldTM (foldTM k) (cm_lam m)
-  . foldTM (foldTM (foldTM k)) (cm_letn m)
-  . foldTM (foldTM (foldTM k)) (cm_letr m)
-  . foldTM (foldTM k) (cm_case m)
-  . foldTM (foldTM k) (cm_ecase m)
-
--- lkE: lookup in trie for expressions
-lkE :: DeBruijn CoreExpr -> CoreMapX a -> Maybe a
-lkE (D env expr) cm = go expr cm
-  where
-    go (Var v)              = cm_var  >.> lkVar env v
-    go (Lit l)              = cm_lit  >.> lookupTM l
-    go (Type t)             = cm_type >.> lkG (D env t)
-    go (Coercion c)         = cm_co   >.> lkG (D env c)
-    go (Cast e c)           = cm_cast >.> lkG (D env e) >=> lkG (D env c)
-    go (Tick tickish e)     = cm_tick >.> lkG (D env e) >=> lkTickish tickish
-    go (App e1 e2)          = cm_app  >.> lkG (D env e2) >=> lkG (D env e1)
-    go (Lam v e)            = cm_lam  >.> lkG (D (extendCME env v) e)
-                              >=> lkBndr env v
-    go (Let (NonRec b r) e) = cm_letn >.> lkG (D env r)
-                              >=> lkG (D (extendCME env b) e) >=> lkBndr env b
-    go (Let (Rec prs) e)    = let (bndrs,rhss) = unzip prs
-                                  env1 = extendCMEs env bndrs
-                              in cm_letr
-                                 >.> lkList (lkG . D env1) rhss
-                                 >=> lkG (D env1 e)
-                                 >=> lkList (lkBndr env1) bndrs
-    go (Case e b ty as)     -- See Note [Empty case alternatives]
-               | null as    = cm_ecase >.> lkG (D env e) >=> lkG (D env ty)
-               | otherwise  = cm_case >.> lkG (D env e)
-                              >=> lkList (lkA (extendCME env b)) as
-
-xtE :: DeBruijn CoreExpr -> XT a -> CoreMapX a -> CoreMapX a
-xtE (D env (Var v))              f m = m { cm_var  = cm_var m
-                                                 |> xtVar env v f }
-xtE (D env (Type t))             f m = m { cm_type = cm_type m
-                                                 |> xtG (D env t) f }
-xtE (D env (Coercion c))         f m = m { cm_co   = cm_co m
-                                                 |> xtG (D env c) f }
-xtE (D _   (Lit l))              f m = m { cm_lit  = cm_lit m  |> alterTM l f }
-xtE (D env (Cast e c))           f m = m { cm_cast = cm_cast m |> xtG (D env e)
-                                                 |>> xtG (D env c) f }
-xtE (D env (Tick t e))           f m = m { cm_tick = cm_tick m |> xtG (D env e)
-                                                 |>> xtTickish t f }
-xtE (D env (App e1 e2))          f m = m { cm_app = cm_app m |> xtG (D env e2)
-                                                 |>> xtG (D env e1) f }
-xtE (D env (Lam v e))            f m = m { cm_lam = cm_lam m
-                                                 |> xtG (D (extendCME env v) e)
-                                                 |>> xtBndr env v f }
-xtE (D env (Let (NonRec b r) e)) f m = m { cm_letn = cm_letn m
-                                                 |> xtG (D (extendCME env b) e)
-                                                 |>> xtG (D env r)
-                                                 |>> xtBndr env b f }
-xtE (D env (Let (Rec prs) e))    f m = m { cm_letr =
-                                              let (bndrs,rhss) = unzip prs
-                                                  env1 = extendCMEs env bndrs
-                                              in cm_letr m
-                                                 |>  xtList (xtG . D env1) rhss
-                                                 |>> xtG (D env1 e)
-                                                 |>> xtList (xtBndr env1)
-                                                            bndrs f }
-xtE (D env (Case e b ty as))     f m
-                     | null as   = m { cm_ecase = cm_ecase m |> xtG (D env e)
-                                                 |>> xtG (D env ty) f }
-                     | otherwise = m { cm_case = cm_case m |> xtG (D env e)
-                                                 |>> let env1 = extendCME env b
-                                                     in xtList (xtA env1) as f }
-
--- TODO: this seems a bit dodgy, see 'eqTickish'
-type TickishMap a = Map.Map (Tickish Id) a
-lkTickish :: Tickish Id -> TickishMap a -> Maybe a
-lkTickish = lookupTM
-
-xtTickish :: Tickish Id -> XT a -> TickishMap a -> TickishMap a
-xtTickish = alterTM
-
-------------------------
-data AltMap a   -- A single alternative
-  = AM { am_deflt :: CoreMapG a
-       , am_data  :: DNameEnv (CoreMapG a)
-       , am_lit   :: LiteralMap (CoreMapG a) }
-
-instance TrieMap AltMap where
-   type Key AltMap = CoreAlt
-   emptyTM  = AM { am_deflt = emptyTM
-                 , am_data = emptyDNameEnv
-                 , am_lit  = emptyTM }
-   lookupTM = lkA emptyCME
-   alterTM  = xtA emptyCME
-   foldTM   = fdA
-   mapTM    = mapA
-
-instance Eq (DeBruijn CoreAlt) where
-  D env1 a1 == D env2 a2 = go a1 a2 where
-    go (DEFAULT, _, rhs1) (DEFAULT, _, rhs2)
-        = D env1 rhs1 == D env2 rhs2
-    go (LitAlt lit1, _, rhs1) (LitAlt lit2, _, rhs2)
-        = lit1 == lit2 && D env1 rhs1 == D env2 rhs2
-    go (DataAlt dc1, bs1, rhs1) (DataAlt dc2, bs2, rhs2)
-        = dc1 == dc2 &&
-          D (extendCMEs env1 bs1) rhs1 == D (extendCMEs env2 bs2) rhs2
-    go _ _ = False
-
-mapA :: (a->b) -> AltMap a -> AltMap b
-mapA f (AM { am_deflt = adeflt, am_data = adata, am_lit = alit })
-  = AM { am_deflt = mapTM f adeflt
-       , am_data = mapTM (mapTM f) adata
-       , am_lit = mapTM (mapTM f) alit }
-
-lkA :: CmEnv -> CoreAlt -> AltMap a -> Maybe a
-lkA env (DEFAULT,    _, rhs)  = am_deflt >.> lkG (D env rhs)
-lkA env (LitAlt lit, _, rhs)  = am_lit >.> lookupTM lit >=> lkG (D env rhs)
-lkA env (DataAlt dc, bs, rhs) = am_data >.> lkDNamed dc
-                                        >=> lkG (D (extendCMEs env bs) rhs)
-
-xtA :: CmEnv -> CoreAlt -> XT a -> AltMap a -> AltMap a
-xtA env (DEFAULT, _, rhs)    f m =
-    m { am_deflt = am_deflt m |> xtG (D env rhs) f }
-xtA env (LitAlt l, _, rhs)   f m =
-    m { am_lit   = am_lit m   |> alterTM l |>> xtG (D env rhs) f }
-xtA env (DataAlt d, bs, rhs) f m =
-    m { am_data  = am_data m  |> xtDNamed d
-                             |>> xtG (D (extendCMEs env bs) rhs) f }
-
-fdA :: (a -> b -> b) -> AltMap a -> b -> b
-fdA k m = foldTM k (am_deflt m)
-        . foldTM (foldTM k) (am_data m)
-        . foldTM (foldTM k) (am_lit m)
 
 {-
 ************************************************************************
@@ -427,6 +90,7 @@ instance TrieMap CoercionMap where
    alterTM k f (CoercionMap m) = CoercionMap (alterTM (deBruijnize k) f m)
    foldTM k    (CoercionMap m) = foldTM k m
    mapTM f     (CoercionMap m) = CoercionMap (mapTM f m)
+   filterTM f  (CoercionMap m) = CoercionMap (filterTM f m)
 
 type CoercionMapG = GenMap CoercionMapX
 newtype CoercionMapX a = CoercionMapX (TypeMapX a)
@@ -438,6 +102,7 @@ instance TrieMap CoercionMapX where
   alterTM  = xtC
   foldTM f (CoercionMapX core_tm) = foldTM f core_tm
   mapTM f (CoercionMapX core_tm)  = CoercionMapX (mapTM f core_tm)
+  filterTM f (CoercionMapX core_tm) = CoercionMapX (filterTM f core_tm)
 
 instance Eq (DeBruijn Coercion) where
   D env1 co1 == D env2 co2
@@ -476,17 +141,25 @@ data TypeMapX a
   = TM { tm_var    :: VarMap a
        , tm_app    :: TypeMapG (TypeMapG a)
        , tm_tycon  :: DNameEnv a
-       , tm_forall :: TypeMapG (BndrMap a) -- See Note [Binders]
+
+         -- only InvisArg arrows here
+       , tm_funty  :: TypeMapG (TypeMapG (TypeMapG a))
+                       -- keyed on the argument, result rep, and result
+                       -- constraints are never linear-restricted and are always lifted
+
+       , tm_forall :: TypeMapG (BndrMap a) -- See Note [Binders] in GHC.Core.Map.Expr
        , tm_tylit  :: TyLitMap a
        , tm_coerce :: Maybe a
        }
     -- Note that there is no tyconapp case; see Note [Equality on AppTys] in GHC.Core.Type
 
 -- | Squeeze out any synonyms, and change TyConApps to nested AppTys. Why the
--- last one? See Note [Equality on AppTys] in "GHC.Core.Type"
+-- last one? See Note [Equality on AppTys] in GHC.Core.Type
 --
 -- Note, however, that we keep Constraint and Type apart here, despite the fact
 -- that they are both synonyms of TYPE 'LiftedRep (see #11715).
+--
+-- We also keep (Eq a => a) as a FunTy, distinct from ((->) (Eq a) a).
 trieMapView :: Type -> Maybe Type
 trieMapView ty
   -- First check for TyConApps that need to be expanded to
@@ -505,6 +178,7 @@ instance TrieMap TypeMapX where
    alterTM  = xtT
    foldTM   = fdT
    mapTM    = mapT
+   filterTM = filterT
 
 instance Eq (DeBruijn Type) where
   env_t@(D env t) == env_t'@(D env' t')
@@ -525,8 +199,11 @@ instance Eq (DeBruijn Type) where
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
-        (FunTy _ w1 t1 t2, FunTy _ w1' t1' t2')
-            -> D env w1 == D env w1' && D env t1 == D env' t1' && D env t2 == D env' t2'
+        (FunTy v1 w1 t1 t2, FunTy v1' w1' t1' t2')
+            -> v1 == v1' &&
+               D env w1 == D env w1' &&
+               D env t1 == D env' t1' &&
+               D env t2 == D env' t2'
         (TyConApp tc tys, TyConApp tc' tys')
             -> tc == tc' && D env tys == D env' tys'
         (LitTy l, LitTy l')
@@ -546,17 +223,19 @@ emptyT :: TypeMapX a
 emptyT = TM { tm_var  = emptyTM
             , tm_app  = emptyTM
             , tm_tycon  = emptyDNameEnv
+            , tm_funty  = emptyTM
             , tm_forall = emptyTM
             , tm_tylit  = emptyTyLitMap
             , tm_coerce = Nothing }
 
 mapT :: (a->b) -> TypeMapX a -> TypeMapX b
 mapT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
-           , tm_forall = tforall, tm_tylit = tlit
+           , tm_funty = tfunty, tm_forall = tforall, tm_tylit = tlit
            , tm_coerce = tcoerce })
   = TM { tm_var    = mapTM f tvar
        , tm_app    = mapTM (mapTM f) tapp
        , tm_tycon  = mapTM f ttycon
+       , tm_funty  = mapTM (mapTM (mapTM f)) tfunty
        , tm_forall = mapTM (mapTM f) tforall
        , tm_tylit  = mapTM f tlit
        , tm_coerce = fmap f tcoerce }
@@ -574,6 +253,11 @@ lkT (D env ty) m = go ty m
     go (LitTy l)                   = tm_tylit  >.> lkTyLit l
     go (ForAllTy (Bndr tv _) ty)   = tm_forall >.> lkG (D (extendCME env tv) ty)
                                                >=> lkBndr env tv
+    go (FunTy InvisArg _ arg res)
+      | Just res_rep <- getRuntimeRep_maybe res
+                                   = tm_funty >.> lkG (D env arg)
+                                              >=> lkG (D env res_rep)
+                                              >=> lkG (D env res)
     go ty@(FunTy {})               = pprPanic "lkT FunTy" (ppr ty)
     go (CastTy t _)                = go t
     go (CoercionTy {})             = tm_coerce
@@ -586,6 +270,10 @@ xtT (D env (TyVarTy v))       f m = m { tm_var    = tm_var m |> xtVar env v f }
 xtT (D env (AppTy t1 t2))     f m = m { tm_app    = tm_app m |> xtG (D env t1)
                                                             |>> xtG (D env t2) f }
 xtT (D _   (TyConApp tc []))  f m = m { tm_tycon  = tm_tycon m |> xtDNamed tc f }
+xtT (D env (FunTy InvisArg _ t1 t2)) f m = m { tm_funty = tm_funty m |> xtG (D env t1)
+                                                                    |>> xtG (D env t2_rep)
+                                                                    |>> xtG (D env t2) f }
+  where t2_rep = expectJust "xtT FunTy InvisArg" (getRuntimeRep_maybe t2)
 xtT (D _   (LitTy l))         f m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 xtT (D env (CastTy t _))      f m = xtT (D env t) f m
 xtT (D _   (CoercionTy {}))   f m = m { tm_coerce = tm_coerce m |> f }
@@ -599,9 +287,22 @@ fdT :: (a -> b -> b) -> TypeMapX a -> b -> b
 fdT k m = foldTM k (tm_var m)
         . foldTM (foldTM k) (tm_app m)
         . foldTM k (tm_tycon m)
+        . foldTM (foldTM (foldTM k)) (tm_funty m)
         . foldTM (foldTM k) (tm_forall m)
         . foldTyLit k (tm_tylit m)
         . foldMaybe k (tm_coerce m)
+
+filterT :: (a -> Bool) -> TypeMapX a -> TypeMapX a
+filterT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
+              , tm_funty = tfunty, tm_forall = tforall, tm_tylit = tlit
+              , tm_coerce = tcoerce })
+  = TM { tm_var    = filterTM f tvar
+       , tm_app    = mapTM (filterTM f) tapp
+       , tm_tycon  = filterTM f ttycon
+       , tm_funty  = mapTM (mapTM (filterTM f)) tfunty
+       , tm_forall = mapTM (filterTM f) tforall
+       , tm_tylit  = filterTM f tlit
+       , tm_coerce = filterMaybe f tcoerce }
 
 ------------------------
 data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
@@ -615,6 +316,7 @@ instance TrieMap TyLitMap where
    alterTM  = xtTyLit
    foldTM   = foldTyLit
    mapTM    = mapTyLit
+   filterTM = filterTyLit
 
 emptyTyLitMap :: TyLitMap a
 emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUFM }
@@ -639,6 +341,10 @@ foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
 foldTyLit l m = flip (foldUFM l) (tlm_string m)
               . flip (Map.foldr l)   (tlm_number m)
 
+filterTyLit :: (a -> Bool) -> TyLitMap a -> TyLitMap a
+filterTyLit f (TLM { tlm_number = tn, tlm_string = ts })
+  = TLM { tlm_number = Map.filter f tn, tlm_string = filterUFM f ts }
+
 -------------------------------------------------
 -- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this
 -- is the type you want. The keys in this map may have different kinds.
@@ -662,6 +368,7 @@ instance TrieMap TypeMap where
     alterTM k f m = xtTT (deBruijnize k) f m
     foldTM k (TypeMap m) = foldTM (foldTM k) m
     mapTM f (TypeMap m) = TypeMap (mapTM (mapTM f) m)
+    filterTM f (TypeMap m) = TypeMap (mapTM (filterTM f) m)
 
 foldTypeMap :: (a -> b -> b) -> b -> TypeMap a -> b
 foldTypeMap k z m = foldTM k m z
@@ -702,6 +409,7 @@ instance TrieMap LooseTypeMap where
   alterTM k f (LooseTypeMap m) = LooseTypeMap (alterTM (deBruijnize k) f m)
   foldTM f (LooseTypeMap m) = foldTM f m
   mapTM f (LooseTypeMap m) = LooseTypeMap (mapTM f m)
+  filterTM f (LooseTypeMap m) = LooseTypeMap (filterTM f m)
 
 {-
 ************************************************************************
@@ -776,6 +484,7 @@ instance TrieMap BndrMap where
    alterTM  = xtBndr emptyCME
    foldTM   = fdBndrMap
    mapTM    = mapBndrMap
+   filterTM = ftBndrMap
 
 mapBndrMap :: (a -> b) -> BndrMap a -> BndrMap b
 mapBndrMap f (BndrMap tm) = BndrMap (mapTM (mapTM f) tm)
@@ -784,8 +493,6 @@ fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
 fdBndrMap f (BndrMap tm) = foldTM (foldTM f) tm
 
 
--- Note [Binders]
--- ~~~~~~~~~~~~~~
 -- We need to use 'BndrMap' for 'Coercion', 'CoreExpr' AND 'Type', since all
 -- of these data types have binding forms.
 
@@ -799,6 +506,8 @@ xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
 xtBndr env v xt (BndrMap tymap)  =
   BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (D env <$> varMultMaybe v) xt))
 
+ftBndrMap :: (a -> Bool) -> BndrMap a -> BndrMap a
+ftBndrMap f (BndrMap tm) = BndrMap (mapTM (filterTM f) tm)
 
 --------- Variable occurrence -------------
 data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable
@@ -811,6 +520,7 @@ instance TrieMap VarMap where
    alterTM  = xtVar emptyCME
    foldTM   = fdVar
    mapTM    = mapVar
+   filterTM = ftVar
 
 mapVar :: (a->b) -> VarMap a -> VarMap b
 mapVar f (VM { vm_bvar = bv, vm_fvar = fv })
@@ -835,3 +545,14 @@ lkDFreeVar var env = lookupDVarEnv env var
 
 xtDFreeVar :: Var -> XT a -> DVarEnv a -> DVarEnv a
 xtDFreeVar v f m = alterDVarEnv f m v
+
+ftVar :: (a -> Bool) -> VarMap a -> VarMap a
+ftVar f (VM { vm_bvar = bv, vm_fvar = fv })
+  = VM { vm_bvar = filterTM f bv, vm_fvar = filterTM f fv }
+
+-------------------------------------------------
+lkDNamed :: NamedThing n => n -> DNameEnv a -> Maybe a
+lkDNamed n env = lookupDNameEnv env (getName n)
+
+xtDNamed :: NamedThing n => n -> XT a -> DNameEnv a -> DNameEnv a
+xtDNamed tc f m = alterDNameEnv f m (getName tc)

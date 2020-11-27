@@ -16,7 +16,7 @@ import Data.Functor
 import Control.Exception
 
 data Attempt α = Success α
-               | ∀ e . Exception e ⇒ Failure e 
+               | ∀ e . Exception e ⇒ Failure e
 
 fromAttempt ∷ Attempt α → IO α
 fromAttempt (Success a) = return a
@@ -136,7 +136,7 @@ instance IsPeano PZero where
   peano = PZero
 
 instance IsPeano p ⇒ IsPeano (PSucc p) where
-  peano = PSucc peano 
+  peano = PSucc peano
 
 class (n ~ PSucc (PPred n)) ⇒ PHasPred n where
   type PPred n
@@ -297,4 +297,3 @@ hGetIfNth _        _                  = Nothing
 
 elem0 ∷ HNonEmpty l ⇒ HElemOf l → Maybe (HHead l)
 elem0 = hGetIfNth PZero
-

@@ -44,6 +44,10 @@ Compiler
   that the compiler automatically insert cost-centres on all call-sites of
   the named function.
 
+- There is a significant refactoring in the solver; any type-checker plugins
+  will have to be updated, as GHC no longer uses flattening skolems or
+  flattening metavariables.
+  
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 

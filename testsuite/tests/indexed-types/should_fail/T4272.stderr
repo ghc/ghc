@@ -1,17 +1,16 @@
 
-T4272.hs:15:26: error:
-    • Couldn't match type ‘a’ with ‘TermFamily a a’
-      Expected: TermFamily a (TermFamily a a)
-        Actual: TermFamily a a
+T4272.hs:15:19: error:
+    • Couldn't match expected type ‘TermFamily a a’
+                  with actual type ‘a’
       ‘a’ is a rigid type variable bound by
         the type signature for:
           laws :: forall a b. TermLike a => TermFamily a a -> b
         at T4272.hs:14:1-53
-    • In the first argument of ‘terms’, namely
-        ‘(undefined :: TermFamily a a)’
-      In the second argument of ‘prune’, namely
+    • In the second argument of ‘prune’, namely
         ‘(terms (undefined :: TermFamily a a))’
       In the expression: prune t (terms (undefined :: TermFamily a a))
+      In an equation for ‘laws’:
+          laws t = prune t (terms (undefined :: TermFamily a a))
     • Relevant bindings include
         t :: TermFamily a a (bound at T4272.hs:15:6)
         laws :: TermFamily a a -> b (bound at T4272.hs:15:1)

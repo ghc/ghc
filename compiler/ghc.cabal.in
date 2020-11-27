@@ -298,7 +298,8 @@ Library
         GHC.Core.InstEnv
         GHC.Core.Lint
         GHC.Core.Make
-        GHC.Core.Map
+        GHC.Core.Map.Expr
+        GHC.Core.Map.Type
         GHC.Core.Multiplicity
         GHC.Core.Opt.Arity
         GHC.Core.Opt.CallArity
@@ -591,7 +592,7 @@ Library
         GHC.Tc.Plugin
         GHC.Tc.Solver
         GHC.Tc.Solver.Canonical
-        GHC.Tc.Solver.Flatten
+        GHC.Tc.Solver.Rewrite
         GHC.Tc.Solver.Interact
         GHC.Tc.Solver.Monad
         GHC.Tc.TyCl

@@ -58,7 +58,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core
 import GHC.Core.FVs       (exprFreeVars)
-import GHC.Core.Map
+import GHC.Core.Map.Expr
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType)
 import GHC.Core.Make      (mkListExpr, mkCharExpr)

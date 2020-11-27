@@ -1,6 +1,6 @@
 
 ExtraConstraintsWildcardInExpressionSignature.hs:5:20: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Eq a1’
+    • Found extra-constraints wildcard standing for ‘Eq a1’
       Where: ‘a1’ is a rigid type variable bound by
                the inferred type of <expression> :: Eq a1 => a1 -> a1 -> Bool
                at ExtraConstraintsWildcardInExpressionSignature.hs:5:20-25

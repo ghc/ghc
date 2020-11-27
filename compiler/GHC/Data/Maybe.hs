@@ -16,7 +16,7 @@ module GHC.Data.Maybe (
         failME, isSuccess,
 
         orElse,
-        firstJust, firstJusts,
+        firstJust, firstJusts, firstJustsM,
         whenIsJust,
         expectJust,
         rightToMaybe,
@@ -31,6 +31,7 @@ import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Exception (catch, SomeException(..))
 import Data.Maybe
+import Data.Foldable ( foldlM )
 import GHC.Utils.Misc (HasCallStack)
 
 infixr 4 `orElse`
@@ -50,6 +51,15 @@ firstJust a b = firstJusts [a, b]
 -- @Nothing@ otherwise.
 firstJusts :: [Maybe a] -> Maybe a
 firstJusts = msum
+
+-- | Takes computations returnings @Maybes@; tries each one in order.
+-- The first one to return a @Just@ wins. Returns @Nothing@ if all computations
+-- return @Nothing@.
+firstJustsM :: (Monad m, Foldable f) => f (m (Maybe a)) -> m (Maybe a)
+firstJustsM = foldlM go Nothing where
+  go :: Monad m => Maybe a -> m (Maybe a) -> m (Maybe a)
+  go Nothing         action  = action
+  go result@(Just _) _action = return result
 
 expectJust :: HasCallStack => String -> Maybe a -> a
 {-# INLINE expectJust #-}

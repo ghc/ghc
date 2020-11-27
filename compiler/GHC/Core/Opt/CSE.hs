@@ -30,7 +30,7 @@ import GHC.Core.Type    ( tyConAppArgs )
 import GHC.Core
 import GHC.Utils.Outputable
 import GHC.Types.Basic
-import GHC.Core.Map
+import GHC.Core.Map.Expr
 import GHC.Utils.Misc   ( filterOut, equalLength, debugIsOn )
 import GHC.Utils.Panic
 import Data.List        ( mapAccumL )

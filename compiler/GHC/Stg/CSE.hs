@@ -102,7 +102,8 @@ import GHC.Types.Var.Env
 import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
 import Data.Maybe (fromMaybe)
-import GHC.Core.Map
+import GHC.Core.Map.Expr
+import GHC.Data.TrieMap
 import GHC.Types.Name.Env
 import Control.Monad( (>=>) )
 
@@ -129,6 +130,8 @@ instance TrieMap StgArgMap where
     foldTM k m = foldTM k (sam_var m) . foldTM k (sam_lit m)
     mapTM f (SAM {sam_var = varm, sam_lit = litm}) =
         SAM { sam_var = mapTM f varm, sam_lit = mapTM f litm }
+    filterTM f (SAM {sam_var = varm, sam_lit = litm}) =
+        SAM { sam_var = filterTM f varm, sam_lit = filterTM f litm }
 
 newtype ConAppMap a = CAM { un_cam :: DNameEnv (ListMap StgArgMap a) }
 
@@ -140,6 +143,7 @@ instance TrieMap ConAppMap where
         m { un_cam = un_cam m |> xtDNamed dataCon |>> alterTM args f }
     foldTM k = un_cam >.> foldTM (foldTM k)
     mapTM f  = un_cam >.> mapTM (mapTM f) >.> CAM
+    filterTM f = un_cam >.> mapTM (filterTM f) >.> CAM
 
 -----------------
 -- The CSE Env --

@@ -26,7 +26,8 @@ module GHC.Core.TyCo.FVs
         injectiveVarsOfType, injectiveVarsOfTypes,
         invisibleVarsOfType, invisibleVarsOfTypes,
 
-        -- No Free vars
+        -- Any and No Free vars
+        anyFreeVarsOfType, anyFreeVarsOfTypes, anyFreeVarsOfCo,
         noFreeVarsOfType, noFreeVarsOfTypes, noFreeVarsOfCo,
 
         -- * Well-scoped free variables
@@ -47,7 +48,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type (coreView, partitionInvisibleTypes)
 
-import Data.Monoid as DM ( Endo(..), All(..) )
+import Data.Monoid as DM ( Endo(..), Any(..) )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Types.Var
@@ -855,32 +856,43 @@ invisibleVarsOfTypes = mapUnionFV invisibleVarsOfType
 
 {- *********************************************************************
 *                                                                      *
-                 No free vars
+                 Any free vars
 *                                                                      *
 ********************************************************************* -}
 
-nfvFolder :: TyCoFolder TyCoVarSet DM.All
-nfvFolder = TyCoFolder { tcf_view = noView
-                       , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                       , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
+{-# INLINE afvFolder #-}   -- so that specialization to (const True) works
+afvFolder :: (TyCoVar -> Bool) -> TyCoFolder TyCoVarSet DM.Any
+afvFolder check_fv = TyCoFolder { tcf_view = noView
+                                , tcf_tyvar = do_tcv, tcf_covar = do_tcv
+                                , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tcv is tv = All (tv `elemVarSet` is)
-    do_hole _ _  = All True    -- I'm unsure; probably never happens
+    do_tcv is tv = Any (not (tv `elemVarSet` is) && check_fv tv)
+    do_hole _ _  = Any False    -- I'm unsure; probably never happens
     do_bndr is tv _ = is `extendVarSet` tv
 
-nfv_ty  :: Type       -> DM.All
-nfv_tys :: [Type]     -> DM.All
-nfv_co  :: Coercion   -> DM.All
-(nfv_ty, nfv_tys, nfv_co, _) = foldTyCo nfvFolder emptyVarSet
+anyFreeVarsOfType :: (TyCoVar -> Bool) -> Type -> Bool
+anyFreeVarsOfType check_fv ty = DM.getAny (f ty)
+  where (f, _, _, _) = foldTyCo (afvFolder check_fv) emptyVarSet
+
+anyFreeVarsOfTypes :: (TyCoVar -> Bool) -> [Type] -> Bool
+anyFreeVarsOfTypes check_fv tys = DM.getAny (f tys)
+  where (_, f, _, _) = foldTyCo (afvFolder check_fv) emptyVarSet
+
+anyFreeVarsOfCo :: (TyCoVar -> Bool) -> Coercion -> Bool
+anyFreeVarsOfCo check_fv co = DM.getAny (f co)
+  where (_, _, f, _) = foldTyCo (afvFolder check_fv) emptyVarSet
 
 noFreeVarsOfType :: Type -> Bool
-noFreeVarsOfType ty = DM.getAll (nfv_ty ty)
+noFreeVarsOfType ty = not $ DM.getAny (f ty)
+  where (f, _, _, _) = foldTyCo (afvFolder (const True)) emptyVarSet
 
 noFreeVarsOfTypes :: [Type] -> Bool
-noFreeVarsOfTypes tys = DM.getAll (nfv_tys tys)
+noFreeVarsOfTypes tys = not $ DM.getAny (f tys)
+  where (_, f, _, _) = foldTyCo (afvFolder (const True)) emptyVarSet
 
 noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo co = getAll (nfv_co co)
+noFreeVarsOfCo co = not $ DM.getAny (f co)
+  where (_, _, f, _) = foldTyCo (afvFolder (const True)) emptyVarSet
 
 
 {- *********************************************************************
@@ -983,4 +995,3 @@ tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
 -- | Get the free vars of types in scoped order
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
 tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
-

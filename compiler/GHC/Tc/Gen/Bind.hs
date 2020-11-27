@@ -829,8 +829,7 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
     do { fam_envs <- tcGetFamInstEnvs
        ; let (_co, mono_ty') = normaliseType fam_envs Nominal mono_ty
                -- Unification may not have normalised the type,
-               -- (see Note [Lazy flattening] in GHC.Tc.Solver.Flatten) so do it
-               -- here to make it as uncomplicated as possible.
+               -- so do it here to make it as uncomplicated as possible.
                -- Example: f :: [F Int] -> Bool
                -- should be rewritten to f :: [Char] -> Bool, if possible
                --
