@@ -34,7 +34,7 @@ module GHC.Types.Demand (
     lazyApply1Dmd, lazyApply2Dmd, strictOnceApply1Dmd, strictManyApply1Dmd,
     -- ** Other @Demand@ operations
     oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, mkWorkerDemand,
-    peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
+    peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds,
     addCaseBndrDmd,
     -- ** Extracting one-shot information
     argOneShots, argsOneShots, saturatedByOneShots,
@@ -267,9 +267,11 @@ data SubDemand
   -- with the specified cardinality at every level.
   -- Expands to 'Call' via 'viewCall' and to 'Prod' via 'viewProd'.
   --
-  -- @Poly n@ is semantically equivalent to @nP(n,n,...)@ or @Cn(Cn(..Cn(n)))@.
-  -- So @U === UP(U,U,...)@ and @U === CU(CU(..CU(U)))@,
-  --    @S === SP(S,S,...)@ and @S === CS(CS(..CS(S)))@, and so on.
+  -- @Poly n@ is semantically equivalent to @Prod [n :* Poly n, ...]@ or
+  -- @Call n (Poly n)@. 'mkCall' and 'mkProd' do these rewrites.
+  --
+  -- In Note [Demand notation]: @U === P(U,U,...)@ and @U === CU(U)@,
+  --                            @S === P(S,S,...)@ and @S === CS(S)@, and so on.
   --
   -- We only really use 'Poly' with 'C_10' (bottom), 'C_00' (absent),
   -- 'C_0N' (top) and sometimes 'C_1N', but it's simpler to treat it uniformly
@@ -278,7 +280,8 @@ data SubDemand
   -- ^ @Call n sd@ describes the evaluation context of @n@ function
   -- applications, where every individual result is evaluated according to @sd@.
   -- @sd@ is /relative/ to a single call, cf. Note [Call demands are relative].
-  -- Used only for values of function type.
+  -- Used only for values of function type. Use the smart constructor 'mkCall'
+  -- whenever possible!
   | Prod ![Demand]
   -- ^ @Prod ds@ describes the evaluation context of a case scrutinisation
   -- on an expression of product type, where the product components are
@@ -306,7 +309,7 @@ polyDmd C_1N = C_1N :* poly1N
 polyDmd C_10 = C_10 :* poly10
 
 -- | A smart constructor for 'Prod', applying rewrite rules along the semantic
--- equalities @Prod [polyDmd n, ...] === polyDmd n@, simplifying to 'Poly'
+-- equality @Prod [polyDmd n, ...] === polyDmd n@, simplifying to 'Poly'
 -- 'SubDemand's when possible. Note that this degrades boxity information! E.g. a
 -- polymorphic demand will never unbox.
 mkProd :: [Demand] -> SubDemand
@@ -335,6 +338,13 @@ viewProd _ _                             = Nothing
 {-# INLINE viewProd #-} -- we want to fuse away the replicate and the allocation
                         -- for Arity. Otherwise, #18304 bites us.
 
+-- | A smart constructor for 'Call', applying rewrite rules along the semantic
+-- equality @Call n (Poly n) === Poly n@, simplifying to 'Poly' 'SubDemand's
+-- when possible.
+mkCall :: Card -> SubDemand -> SubDemand
+mkCall n cd@(Poly m) | n == m = cd
+mkCall n cd                   = Call n cd
+
 -- | @viewCall sd@ interprets @sd@ as a 'Call', expanding 'Poly' demands as
 -- necessary.
 viewCall :: SubDemand -> Maybe (Card, SubDemand)
@@ -356,8 +366,9 @@ lubSubDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
 -- Handle Call
 lubSubDmd (Call n1 d1) (viewCall -> Just (n2, d2))
   -- See Note [Call demands are relative]
-  | isAbs n2  = Call (lubCard n1 n2) (lubSubDmd d1 botSubDmd)
-  | otherwise = Call (lubCard n1 n2) (lubSubDmd d1        d2)
+  | isAbs n1  = mkCall (lubCard n1 n2) (lubSubDmd botSubDmd d2)
+  | isAbs n2  = mkCall (lubCard n1 n2) (lubSubDmd d1 botSubDmd)
+  | otherwise = mkCall (lubCard n1 n2) (lubSubDmd d1        d2)
 -- Handle Poly
 lubSubDmd (Poly n1)  (Poly n2) = Poly (lubCard n1 n2)
 -- Make use of reflexivity (so we'll match the Prod or Call cases again).
@@ -377,8 +388,9 @@ plusSubDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
 -- Handle Call
 plusSubDmd (Call n1 d1) (viewCall -> Just (n2, d2))
   -- See Note [Call demands are relative]
-  | isAbs n2  = Call (plusCard n1 n2) (lubSubDmd d1 botSubDmd)
-  | otherwise = Call (plusCard n1 n2) (lubSubDmd d1        d2)
+  | isAbs n1  = mkCall (plusCard n1 n2) (lubSubDmd botSubDmd d2)
+  | isAbs n2  = mkCall (plusCard n1 n2) (lubSubDmd d1 botSubDmd)
+  | otherwise = mkCall (plusCard n1 n2) (lubSubDmd d1        d2)
 -- Handle Poly
 plusSubDmd (Poly n1)  (Poly n2) = Poly (plusCard n1 n2)
 -- Make use of reflexivity (so we'll match the Prod or Call cases again).
@@ -407,7 +419,7 @@ multSubDmd :: Card -> SubDemand -> SubDemand
 multSubDmd n sd
   | Just sd' <- multTrivial n seqSubDmd sd = sd'
 multSubDmd n (Poly n')    = Poly (multCard n n')
-multSubDmd n (Call n' sd) = Call (multCard n n') sd -- See Note [Call demands are relative]
+multSubDmd n (Call n' sd) = mkCall (multCard n n') sd -- See Note [Call demands are relative]
 multSubDmd n (Prod ds)    = Prod (map (multDmd n) ds)
 
 multDmd :: Card -> Demand -> Demand
@@ -457,22 +469,22 @@ evalDmd = C_1N :* topSubDmd
 -- | First argument of 'GHC.Exts.maskAsyncExceptions#': @SCS(U)@.
 -- Called exactly once.
 strictOnceApply1Dmd :: Demand
-strictOnceApply1Dmd = C_11 :* Call C_11 topSubDmd
+strictOnceApply1Dmd = C_11 :* mkCall C_11 topSubDmd
 
 -- | First argument of 'GHC.Exts.atomically#': @MCM(U)@.
 -- Called at least once, possibly many times.
 strictManyApply1Dmd :: Demand
-strictManyApply1Dmd = C_1N :* Call C_1N topSubDmd
+strictManyApply1Dmd = C_1N :* mkCall C_1N topSubDmd
 
 -- | First argument of catch#: @1C1(U)@.
 -- Evaluates its arg lazily, but then applies it exactly once to one argument.
 lazyApply1Dmd :: Demand
-lazyApply1Dmd = C_01 :* Call C_01 topSubDmd
+lazyApply1Dmd = C_01 :* mkCall C_01 topSubDmd
 
 -- | Second argument of catch#: @1C1(CS(U))@.
 -- Calls its arg lazily, but then applies it exactly once to an additional argument.
 lazyApply2Dmd :: Demand
-lazyApply2Dmd = C_01 :* Call C_01 (Call C_11 topSubDmd)
+lazyApply2Dmd = C_01 :* mkCall C_01 (mkCall C_11 topSubDmd)
 
 -- | Make a 'Demand' evaluated at-most-once.
 oneifyDmd :: Demand -> Demand
@@ -512,12 +524,12 @@ strictifyDictDmd ty (n :* Prod ds)
 strictifyDictDmd _  dmd = dmd
 
 -- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @CS(d)@.
-mkCallDmd :: SubDemand -> SubDemand
-mkCallDmd sd = Call C_11 sd
+mkCalledOnceDmd :: SubDemand -> SubDemand
+mkCalledOnceDmd sd = mkCall C_11 sd
 
--- | @mkCallDmds n d@ returns @CS(CS...(CS d))@ where there are @n@ @CS@'s.
-mkCallDmds :: Arity -> SubDemand -> SubDemand
-mkCallDmds arity sd = iterate mkCallDmd sd !! arity
+-- | @mkCalledOnceDmds n d@ returns @CS(CS...(CS d))@ where there are @n@ @CS@'s.
+mkCalledOnceDmds :: Arity -> SubDemand -> SubDemand
+mkCalledOnceDmds arity sd = iterate mkCalledOnceDmd sd !! arity
 
 -- | Peels one call level from the sub-demand, and also returns how many
 -- times we entered the lambda body.
@@ -669,7 +681,7 @@ This is needed even for non-product types, in case the case-binder
 is used but the components of the case alternative are not.
 
 Note [Don't optimise UP(U,U,...) to U]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 These two SubDemands:
    UP(U,U) (@Prod [topDmd, topDmd]@)   and   U (@topSubDmd@)
 are semantically equivalent, but we do not turn the former into
@@ -1615,8 +1627,8 @@ kill_usage kfs (n :* sd) = kill_usage_card kfs n :* kill_usage_sd kfs sd
 
 kill_usage_sd :: KillFlags -> SubDemand -> SubDemand
 kill_usage_sd kfs (Call n sd)
-  | kf_called_once kfs      = Call (lubCard C_1N n) (kill_usage_sd kfs sd)
-  | otherwise               = Call n                (kill_usage_sd kfs sd)
+  | kf_called_once kfs      = mkCall (lubCard C_1N n) (kill_usage_sd kfs sd)
+  | otherwise               = mkCall n                (kill_usage_sd kfs sd)
 kill_usage_sd kfs (Prod ds) = Prod (map (kill_usage kfs) ds)
 kill_usage_sd _   sd        = sd
 
@@ -1640,7 +1652,7 @@ trimToType (n :* sd) ts
   where
     go (Prod ds)   (TsProd tss)
       | equalLength ds tss    = Prod (zipWith trimToType ds tss)
-    go (Call n sd) (TsFun ts) = Call n (go sd ts)
+    go (Call n sd) (TsFun ts) = mkCall n (go sd ts)
     go sd@Poly{}   _          = sd
     go _           _          = topSubDmd
 
@@ -1804,7 +1816,7 @@ instance Binary SubDemand where
     h <- getByte bh
     case h of
       0 -> Poly <$> get bh
-      1 -> Call <$> get bh <*> get bh
+      1 -> mkCall <$> get bh <*> get bh
       2 -> Prod <$> get bh
       _ -> pprPanic "Binary:SubDemand" (ppr (fromIntegral h :: Int))
 

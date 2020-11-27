@@ -390,7 +390,7 @@ dmdAnal' env dmd (App fun arg)
     -- Crucially, coercions /are/ handled here, because they are
     -- value arguments (#10288)
     let
-        call_dmd          = mkCallDmd dmd
+        call_dmd          = mkCalledOnceDmd dmd
         (fun_ty, fun')    = dmdAnal env call_dmd fun
         (arg_dmd, res_ty) = splitDmdTy fun_ty
         (arg_ty, arg')    = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
@@ -782,9 +782,9 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
             -- See Note [Invariants on join points] invariant 2b, in GHC.Core
             --     rhs_arity matches the join arity of the join point
             | isJoinId id
-            = mkCallDmds rhs_arity let_dmd
+            = mkCalledOnceDmds rhs_arity let_dmd
             | otherwise
-            = mkCallDmds rhs_arity topSubDmd
+            = mkCalledOnceDmds rhs_arity topSubDmd
 
     (rhs_dmd_ty, rhs') = dmdAnal env rhs_dmd rhs
     DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
