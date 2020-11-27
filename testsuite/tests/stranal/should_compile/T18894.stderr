@@ -288,7 +288,7 @@ lvl :: Int
 lvl = GHC.Types.I# 2#
 
 -- RHS size: {terms: 34, types: 21, coercions: 0, joins: 0/0}
-$wh2 [InlPrag=[2], Dmd=UCU(U)] :: GHC.Prim.Int# -> Int
+$wh2 [InlPrag=[2]] :: GHC.Prim.Int# -> Int
 [LclId,
  Arity=1,
  Str=<SU>,
@@ -367,7 +367,7 @@ lvl :: (Int, Int)
 lvl = case $wg1 2# of { (# ww, ww #) -> (ww, ww) }
 
 -- RHS size: {terms: 25, types: 18, coercions: 0, joins: 0/0}
-$wh1 [InlPrag=[2], Dmd=UCU(U)] :: GHC.Prim.Int# -> Int
+$wh1 [InlPrag=[2]] :: GHC.Prim.Int# -> Int
 [LclId,
  Arity=1,
  Str=<SU>,
