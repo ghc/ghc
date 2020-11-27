@@ -645,6 +645,21 @@ Options affecting code generation
     interpreter, not saved to disk. This option is only useful for
     reversing the effect of :ghc-flag:`-fobject-code`.
 
+.. ghc-flag:: -fobject-code-if-unboxed
+    :shortdesc: Generate object-code for modules referencing
+        the `UnboxedTuples` or `UnboxedSums` extensions.
+    :type: dynamic
+    :reverse: -fno-object-code-if-unboxed
+
+    :default: On
+    :since: 9.0.1
+
+    GHCi generates object-code for modules referencing
+    the :extension:`UnboxedTuples` or :extension:`UnboxedSums`
+    extensions, and for their dependend modules.
+
+    Using the this flag outside GHCi has no effect.
+
 .. ghc-flag:: -fPIC
     :shortdesc: Generate position-independent code (where available)
     :type: dynamic

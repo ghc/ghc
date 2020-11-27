@@ -278,7 +278,7 @@ data GeneralFlag
    | Opt_ExposeInternalSymbols
    | Opt_KeepCAFs
    | Opt_KeepGoing
-   | Opt_ByteCode
+   | Opt_ObjectCodeIfUnboxed                           -- #18955
    | Opt_LinkRts
 
    -- output style opts

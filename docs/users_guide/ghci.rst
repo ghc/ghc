@@ -3485,14 +3485,14 @@ The interpreter can't load modules with foreign export declarations!
     turned on.
 
 Modules using unboxed tuples or sums will automatically enable :ghc-flag:`-fobject-code`
+    The bytecode interpreter doesn't support most uses of unboxed tuples or
+    sums. 
 
     .. index::
        single: unboxed tuples, sums; and GHCi
-
-    The bytecode interpreter doesn't support most uses of unboxed tuples or
-    sums, so GHCi will automatically compile these modules, and all modules
-    they depend on, to object code instead of bytecode.
-
+  
+    When the flag :ghc-flag:`-fobject-code-if-unboxed` is set, GHCi will compile
+    these modules to object code instead of bytecode.
     GHCi checks for the presence of unboxed tuples and sums in a somewhat
     conservative fashion: it simply checks to see if a module enables the
     :extension:`UnboxedTuples` or :extension:`UnboxedSums` language extensions.
@@ -3500,9 +3500,10 @@ Modules using unboxed tuples or sums will automatically enable :ghc-flag:`-fobje
     or :extension:`UnboxedSums` requires :ghc-flag:`-fobject-code`, so if you
     *really* want to compile
     :extension:`UnboxedTuples`/:extension:`UnboxedSums`-using code to
-    bytecode, you can do so explicitly by enabling the :ghc-flag:`-fbyte-code`
-    flag. If you do this, do note that bytecode interpreter will throw an error
-    if it encounters unboxed tuple/sum–related code that it cannot handle.
+    bytecode, you can do so explicitly by unsetting this flag with a
+    ``OPTIONS_GHC -fno-object-code-if-unboxed`` pragma. If you do this, do note
+    that the bytecode interpreter will throw an error if it encounters unboxed
+    tuple/sum–related code that it cannot handle.
 
     Incidentally, the previous point, that :ghc-flag:`-O` is
     incompatible with GHCi, is because the bytecode compiler can't
