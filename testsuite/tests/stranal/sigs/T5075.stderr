@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
 T5075.$trModule:
-T5075.loop: <MP(A,A,MCM(CS(U)),A,A,A,A,A)><UP(A,A,UCU(CS(U)),A,A,A,UCU(U))><U>
+T5075.loop: <MP(A,A,MCM(CS(U)),A,A,A,A,A)><UP(A,A,UCU(CS(U)),A,A,A,U)><U>
 
 
 
@@ -13,6 +13,6 @@ T5075.loop:
 
 ==================== Strictness signatures ====================
 T5075.$trModule:
-T5075.loop: <SP(A,A,MCM(CS(U)),A,A,A,A,A)><UP(A,A,UCU(CS(U)),A,A,A,UCU(U))><U>
+T5075.loop: <SP(A,A,MCM(CS(U)),A,A,A,A,A)><UP(A,A,UCU(CS(U)),A,A,A,U)><U>
 
 
