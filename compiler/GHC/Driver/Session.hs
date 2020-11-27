@@ -2954,10 +2954,7 @@ dynamic_flags_deps = [
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setBackend NoBackend))
-  , make_ord_flag defFlag "fbyte-code"
-      (noArgM $ \dflags -> do
-        setBackend Interpreter
-        pure $ gopt_set dflags Opt_ByteCode)
+  , make_ord_flag defFlag "fbyte-code"       $ NoArg $ setBackend Interpreter
   , make_ord_flag defFlag "fobject-code"     $ NoArg $ do
       dflags <- liftEwM getCmdLineState
       setBackend $ platformDefaultBackend (targetPlatform dflags)
@@ -3495,7 +3492,8 @@ fFlagsDeps = [
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
   flagSpec "keep-cafs"                        Opt_KeepCAFs,
-  flagSpec "link-rts"                         Opt_LinkRts
+  flagSpec "link-rts"                         Opt_LinkRts,
+  flagSpec "object-code-if-unboxed"           Opt_ObjectCodeIfUnboxed
   ]
   ++ fHoleFlags
 
@@ -3783,7 +3781,8 @@ defaultFlags settings
       Opt_ProfCountEntries,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
-      Opt_VersionMacros
+      Opt_VersionMacros,
+      Opt_ObjectCodeIfUnboxed
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
