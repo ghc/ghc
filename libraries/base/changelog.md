@@ -19,6 +19,9 @@
 
   * Add `singleton` function for `Data.List.NonEmpty`.
 
+  * Add `Semigroup` and `Monoid` instances for `Data.Functor.Product` and
+    `Data.Functor.Compose`.
+
 
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
