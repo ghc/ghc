@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
 module GHC.Cmm.Sink (
      cmmSink
   ) where
@@ -9,6 +10,7 @@ import GHC.Prelude
 import GHC.Cmm
 import GHC.Cmm.Opt
 import GHC.Cmm.Liveness
+import GHC.Cmm.LRegSet
 import GHC.Cmm.Utils
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Label
@@ -17,31 +19,13 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Platform.Regs
 
 import GHC.Platform
-import GHC.Types.Unique
 import GHC.Types.Unique.FM
 
 import qualified Data.IntSet as IntSet
 import Data.List (partition)
-import qualified Data.Set as Set
 import Data.Maybe
 
 import GHC.Exts (inline)
-
--- Compact sets for membership tests of local variables.
-
-type LRegSet = IntSet.IntSet
-
-emptyLRegSet :: LRegSet
-emptyLRegSet = IntSet.empty
-
-nullLRegSet :: LRegSet -> Bool
-nullLRegSet = IntSet.null
-
-insertLRegSet :: LocalReg -> LRegSet -> LRegSet
-insertLRegSet l = IntSet.insert (getKey (getUnique l))
-
-elemLRegSet :: LocalReg -> LRegSet -> Bool
-elemLRegSet l = IntSet.member (getKey (getUnique l))
 
 -- -----------------------------------------------------------------------------
 -- Sinking and inlining
@@ -170,8 +154,8 @@ type Assignments = [Assignment]
 cmmSink :: Platform -> CmmGraph -> CmmGraph
 cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
   where
-  liveness = cmmLocalLiveness platform graph
-  getLive l = mapFindWithDefault Set.empty l liveness
+  liveness = cmmLocalLivenessL platform graph
+  getLive l = mapFindWithDefault emptyLRegSet l liveness
 
   blocks = revPostorder graph
 
@@ -191,8 +175,8 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       -- Annotate the middle nodes with the registers live *after*
       -- the node.  This will help us decide whether we can inline
       -- an assignment in the current node or not.
-      live = Set.unions (map getLive succs)
-      live_middle = gen_kill platform last live
+      live = IntSet.unions (map getLive succs)
+      live_middle = gen_killL platform last live
       ann_middles = annotate platform live_middle (blockToList middle)
 
       -- Now sink and inline in this block
@@ -204,7 +188,7 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       -- one predecessor), so identify the join points and the set
       -- of registers live in them.
       (joins, nonjoins) = partition (`mapMember` join_pts) succs
-      live_in_joins = Set.unions (map getLive joins)
+      live_in_joins = IntSet.unions (map getLive joins)
 
       -- We do not want to sink an assignment into multiple branches,
       -- so identify the set of registers live in multiple successors.
@@ -213,26 +197,28 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       -- now live in multiple branches.
       init_live_sets = map getLive nonjoins
       live_in_multi live_sets r =
-         case filter (Set.member r) live_sets of
+         case filter (elemLRegSet r) live_sets of
            (_one:_two:_) -> True
            _ -> False
 
       -- Now, drop any assignments that we will not sink any further.
       (dropped_last, assigs'') = dropAssignments platform drop_if init_live_sets assigs'
 
+      drop_if :: (LocalReg, CmmExpr, AbsMem)
+                      -> [LRegSet] -> (Bool, [LRegSet])
       drop_if a@(r,rhs,_) live_sets = (should_drop, live_sets')
           where
             should_drop =  conflicts platform a final_last
                         || not (isTrivial platform rhs) && live_in_multi live_sets r
-                        || r `Set.member` live_in_joins
+                        || r `elemLRegSet` live_in_joins
 
             live_sets' | should_drop = live_sets
                        | otherwise   = map upd live_sets
 
-            upd set | r `Set.member` set = set `Set.union` live_rhs
+            upd set | r `elemLRegSet` set = set `IntSet.union` live_rhs
                     | otherwise          = set
 
-            live_rhs = foldRegsUsed platform extendRegSet emptyRegSet rhs
+            live_rhs = foldRegsUsed platform (flip insertLRegSet) emptyLRegSet rhs
 
       final_middle = foldl' blockSnoc middle' dropped_last
 
@@ -269,9 +255,9 @@ isTrivial _ _          = False
 --
 -- annotate each node with the set of registers live *after* the node
 --
-annotate :: Platform -> LocalRegSet -> [CmmNode O O] -> [(LocalRegSet, CmmNode O O)]
+annotate :: Platform -> LRegSet -> [CmmNode O O] -> [(LRegSet, CmmNode O O)]
 annotate platform live nodes = snd $ foldr ann (live,[]) nodes
-  where ann n (live,nodes) = (gen_kill platform n live, (live,n) : nodes)
+  where ann n (live,nodes) = (gen_killL platform n live, (live,n) : nodes)
 
 --
 -- Find the blocks that have multiple successors (join points)
@@ -288,13 +274,13 @@ findJoinPoints blocks = mapFilter (>1) succ_counts
 -- filter the list of assignments to remove any assignments that
 -- are not live in a continuation.
 --
-filterAssignments :: Platform -> LocalRegSet -> Assignments -> Assignments
+filterAssignments :: Platform -> LRegSet -> Assignments -> Assignments
 filterAssignments platform live assigs = reverse (go assigs [])
   where go []             kept = kept
         go (a@(r,_,_):as) kept | needed    = go as (a:kept)
                                | otherwise = go as kept
            where
-              needed = r `Set.member` live
+              needed = r `elemLRegSet` live
                        || any (conflicts platform a) (map toNode kept)
                        --  Note that we must keep assignments that are
                        -- referred to by other assignments we have
@@ -315,7 +301,7 @@ filterAssignments platform live assigs = reverse (go assigs [])
 --
 
 walk :: Platform
-     -> [(LocalRegSet, CmmNode O O)]    -- nodes of the block, annotated with
+     -> [(LRegSet, CmmNode O O)]    -- nodes of the block, annotated with
                                         -- the set of registers live *after*
                                         -- this node.
 
@@ -369,11 +355,11 @@ shouldSink _ _other = Nothing
 -- out of inlining, but the inliner will see that r is live
 -- after the instruction and choose not to inline r in the rhs.
 --
-shouldDiscard :: CmmNode e x -> LocalRegSet -> Bool
+shouldDiscard :: CmmNode e x -> LRegSet -> Bool
 shouldDiscard node live
    = case node of
        CmmAssign r (CmmReg r') | r == r' -> True
-       CmmAssign (CmmLocal r) _ -> not (r `Set.member` live)
+       CmmAssign (CmmLocal r) _ -> not (r `elemLRegSet` live)
        _otherwise -> False
 
 
@@ -407,7 +393,8 @@ dropAssignments platform should_drop state assigs
 
 tryToInline
    :: forall x. Platform
-   -> LocalRegSet               -- set of registers live after this
+   -> LRegSet               -- set of registers live after this
+  --  -> LocalRegSet               -- set of registers live after this
                                 -- node.  We cannot inline anything
                                 -- that is live after the node, unless
                                 -- it is small enough to duplicate.
@@ -418,36 +405,42 @@ tryToInline
       , Assignments             -- Remaining assignments
       )
 
-tryToInline platform live node assigs = go usages node emptyLRegSet assigs
+tryToInline platform liveAfter node assigs =
+  -- pprTrace "tryToInline assig length:" (ppr $ length assigs) $
+    go usages liveAfter node emptyLRegSet assigs
  where
   usages :: UniqFM LocalReg Int -- Maps each LocalReg to a count of how often it is used
   usages = foldLocalRegsUsed platform addUsage emptyUFM node
 
-  go _usages node _skipped [] = (node, [])
+  go :: UniqFM LocalReg Int -> LRegSet -> CmmNode O x -> LRegSet -> Assignments
+     -> (CmmNode O x, Assignments)
+  go _usages _live node _skipped [] = (node, [])
 
-  go usages node skipped (a@(l,rhs,_) : rest)
-   | cannot_inline           = dont_inline
-   | occurs_none             = discard  -- Note [discard during inlining]
-   | occurs_once             = inline_and_discard
-   | isTrivial platform rhs  = inline_and_keep
-   | otherwise               = dont_inline
+  go usages live node skipped (a@(l,rhs,_) : rest)
+   | cannot_inline            = dont_inline
+   | occurs_none              = discard  -- Note [discard during inlining]
+   | occurs_once              = inline_and_discard
+   | isTrivial platform rhs   = inline_and_keep
+   | otherwise                = dont_inline
    where
-        inline_and_discard = go usages' inl_node skipped rest
+        inline_and_discard = go usages' live inl_node skipped rest
           where usages' = foldLocalRegsUsed platform addUsage usages rhs
 
-        discard = go usages node skipped rest
+        discard = go usages live node skipped rest
 
         dont_inline        = keep node  -- don't inline the assignment, keep it
         inline_and_keep    = keep inl_node -- inline the assignment, keep it
 
         keep :: CmmNode O x -> (CmmNode O x, Assignments)
         keep node' = (final_node, a : rest')
-          where (final_node, rest') = go usages' node' (insertLRegSet l skipped) rest
+          where (final_node, rest') = go usages live' node' (insertLRegSet l skipped) rest
 
                 -- Avoid discarding of assignments to vars on the rhs.
                 -- See Note [Keeping assignemnts mentioned in skipped RHSs]
-                usages' = foldLocalRegsUsed platform (\m r -> addToUFM m r 2)
-                                            usages rhs
+                -- usages' = foldLocalRegsUsed platform (\m r -> addToUFM m r 2)
+                                            -- usages rhs
+                live' = inline foldLocalRegsUsed platform (\m r -> insertLRegSet r m)
+                                            live rhs
 
         cannot_inline = skipped `regsUsedIn` rhs -- Note [dependent assignments]
                         || l `elemLRegSet` skipped
@@ -455,7 +448,7 @@ tryToInline platform live node assigs = go usages node emptyLRegSet assigs
 
         -- How often is l used in the current node.
         l_usages = lookupUFM usages l
-        l_live   = l `elemRegSet` live
+        l_live   = l `elemLRegSet` live
 
         occurs_once = not l_live && l_usages == Just 1
         occurs_none = not l_live && l_usages == Nothing
@@ -483,9 +476,11 @@ tryToInline platform live node assigs = go usages node emptyLRegSet assigs
     referencing a variable which hasn't been mentioned after
     inlining.
 
-    We use a hack to do this, which is setting all regs used on the
-    RHS to two uses. Since we only discard assignments to variables
-    which are used once or never this prevents discarding of the
+    We use a hack to do this.
+
+    We pretend the regs from the rhs are live after the current
+    node. Since we only discard assignments to variables
+    which are dead after the current block this prevents discarding of the
     assignment. It still allows inlining should e1 be a trivial rhs
     however.
 
