@@ -80,6 +80,8 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     canShortcut               :: instr -> Maybe jumpDest,
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
+    -- | 'Module' is only for printing internal labels. See Note [Internal proc
+    -- labels] in CLabel.
     pprNatCmmDecl             :: NatCmmDecl statics instr -> SDoc,
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
@@ -107,7 +109,6 @@ data NatM_State
                 natm_imports     :: [(CLabel)],
                 natm_pic         :: Maybe Reg,
                 natm_config      :: NCGConfig,
-                natm_this_module :: Module,
                 natm_modloc      :: ModLocation,
                 natm_fileid      :: DwarfFiles,
                 natm_debug_map   :: LabelMap DebugBlock,
@@ -125,9 +126,9 @@ newtype NatM result = NatM (NatM_State -> (result, NatM_State))
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
 
-mkNatM_State :: UniqSupply -> Int -> NCGConfig -> Module -> ModLocation ->
+mkNatM_State :: UniqSupply -> Int -> NCGConfig -> ModLocation ->
                 DwarfFiles -> LabelMap DebugBlock -> CFG -> NatM_State
-mkNatM_State us delta config this_mod
+mkNatM_State us delta config
         = \loc dwf dbg cfg ->
                 NatM_State
                         { natm_us = us
@@ -135,7 +136,6 @@ mkNatM_State us delta config this_mod
                         , natm_imports = []
                         , natm_pic = Nothing
                         , natm_config = config
-                        , natm_this_module = this_mod
                         , natm_modloc = loc
                         , natm_fileid = dwf
                         , natm_debug_map = dbg
@@ -198,10 +198,11 @@ getCfgWeights = NatM $ \ st -> (ncgCfgWeights (natm_config st), st)
 setDeltaNat :: Int -> NatM ()
 setDeltaNat delta = NatM $ \ st -> ((), st {natm_delta = delta})
 
-
 getThisModuleNat :: NatM Module
-getThisModuleNat = NatM $ \ st -> (natm_this_module st, st)
+getThisModuleNat = NatM $ \ st -> (ncgThisModule $ natm_config st, st)
 
+instance HasModule NatM where
+  getModule = getThisModuleNat
 
 addImportNat :: CLabel -> NatM ()
 addImportNat imp

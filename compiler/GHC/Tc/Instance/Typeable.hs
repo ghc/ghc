@@ -407,7 +407,7 @@ mkTyConRepBinds :: TypeableStuff -> TypeRepTodo
                 -> TypeableTyCon -> KindRepM (LHsBinds GhcTc)
 mkTyConRepBinds stuff todo (TypeableTyCon {..})
   = do -- Make a KindRep
-       let (bndrs, kind) = splitForAllVarBndrs (tyConKind tycon)
+       let (bndrs, kind) = splitForAllTyCoVarBinders (tyConKind tycon)
        liftTc $ traceTc "mkTyConKindRepBinds"
                         (ppr tycon $$ ppr (tyConKind tycon) $$ ppr kind)
        let ctx = mkDeBruijnContext (map binderVar bndrs)

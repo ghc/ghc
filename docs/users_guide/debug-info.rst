@@ -14,6 +14,7 @@ useable by most UNIX debugging tools.
     :category: debugging
 
     :since: 7.10, numeric levels since 8.0
+    :implies: :ghc-flag:`-fexpose-internal-symbols` when ⟨n⟩ >= 2.
 
     Emit debug information in object code. Currently only DWARF debug
     information is supported on x86-64 and i386. Currently debug levels 0
@@ -23,7 +24,9 @@ useable by most UNIX debugging tools.
      * ``-g1``: produces stack unwinding records for top-level functions (sufficient for basic backtraces)
      * ``-g2``: produces stack unwinding records for top-level functions as well
        as inner blocks (allowing more precise backtraces than with ``-g1``).
-     * ``-g3``: same as ``-g2``.
+     * ``-g3``: produces GHC-specific DWARF information for use by more
+       sophisticated Haskell-aware debugging tools (see :ref:`dwarf-dies` for
+       details)
 
     If ⟨n⟩ is omitted, level 2 is assumed.
 
@@ -265,6 +268,7 @@ In particular GHC produces the following DWARF sections,
 ``.debug_arange``
   Address range information necessary for efficient lookup in debug information.
 
+.. _dwarf_dies:
 
 Debugging information entities
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

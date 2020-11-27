@@ -39,35 +39,28 @@ typedef struct SpinLock_
 #define IF_PROF_SPIN(x)
 #endif
 
+void acquire_spin_lock_slow_path(SpinLock * p);
+
 // acquire spin lock
 INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 {
-    do {
-        for (uint32_t i = 0; i < SPIN_COUNT; i++) {
-            StgWord32 r = cas((StgVolatilePtr)&(p->lock), 1, 0);
-            if (r != 0) return;
-            IF_PROF_SPIN(p->spin++);
-            busy_wait_nop();
-        }
-        IF_PROF_SPIN(p->yield++);
-        yieldThread();
-    } while (1);
+    StgWord32 r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+    if (RTS_UNLIKELY(r == 0))
+        acquire_spin_lock_slow_path(p);
 }
 
 // release spin lock
 INLINE_HEADER void RELEASE_SPIN_LOCK(SpinLock * p)
 {
-    write_barrier();
-    p->lock = 1;
+    RELEASE_STORE(&p->lock, 1);
 }
 
 // initialise spin lock
 INLINE_HEADER void initSpinLock(SpinLock * p)
 {
-    write_barrier();
-    p->lock = 1;
     IF_PROF_SPIN(p->spin = 0);
     IF_PROF_SPIN(p->yield = 0);
+    RELEASE_STORE(&p->lock, 1);
 }
 
 #else /* !THREADED_RTS */

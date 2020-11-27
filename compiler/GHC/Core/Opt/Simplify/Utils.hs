@@ -329,7 +329,7 @@ addCastTo ai co = ai { ai_args = CastBy co : ai_args ai }
 isStrictArgInfo :: ArgInfo -> Bool
 -- True if the function is strict in the next argument
 isStrictArgInfo (ArgInfo { ai_dmds = dmds })
-  | dmd:_ <- dmds = isStrictDmd dmd
+  | dmd:_ <- dmds = isStrUsedDmd dmd
   | otherwise     = False
 
 argInfoAppArgs :: [ArgSpec] -> [OutExpr]
@@ -576,13 +576,13 @@ mkArgInfo env fun rules n_val_args call_cont
     add_type_strictness fun_ty dmds
       | null dmds = []
 
-      | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty
+      | Just (_, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
       = add_type_strictness fun_ty' dmds     -- Look through foralls
 
       | Just (_, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
       , dmd : rest_dmds <- dmds
       , let dmd' = case isLiftedType_maybe arg_ty of
-                       Just False -> strictenDmd dmd
+                       Just False -> strictifyDmd dmd
                        _          -> dmd
       = dmd' : add_type_strictness fun_ty' rest_dmds
           -- If the type is levity-polymorphic, we can't know whether it's
@@ -1662,8 +1662,8 @@ tryEtaExpandRhs mode bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
   = do { let (join_bndrs, join_body) = collectNBinders join_arity rhs
              oss   = [idOneShotInfo id | id <- join_bndrs, isId id]
-             arity_type | exprIsDeadEnd join_body = ABot (length oss)
-                        | otherwise               = ATop oss
+             arity_type | exprIsDeadEnd join_body = mkBotArityType oss
+                        | otherwise               = mkTopArityType oss
        ; return (arity_type, rhs) }
          -- Note [Do not eta-expand join points]
          -- But do return the correct arity and bottom-ness, because

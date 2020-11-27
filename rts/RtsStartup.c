@@ -285,6 +285,13 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* Initialise libdw session pool */
     libdwPoolInit();
 
+    /* Start the "ticker" and profiling timer but don't start until the
+     * scheduler is up. However, the ticker itself needs to be initialized
+     * before the scheduler to ensure that the ticker mutex is initialized as
+     * moreCapabilities will attempt to acquire it.
+     */
+    initTimer();
+
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
      */
@@ -366,7 +373,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initHeapProfiling();
 
     /* start the virtual timer 'subsystem'. */
-    initTimer();
     startTimer();
 
 #if defined(RTS_USER_SIGNALS)
@@ -481,6 +487,17 @@ hs_exit_(bool wait_foreign)
      */
     exitTimer(true);
 
+    /*
+     * Dump the ticky counter definitions
+     * We do this at the end of execution since tickers are registered in the
+     * course of program execution.
+     */
+#if defined(TICKY_TICKY) && defined(TRACING)
+    if (RtsFlags.TraceFlags.ticky) {
+        emitTickyCounterDefs();
+    }
+#endif
+
     // set the terminal settings back to what they were
 #if !defined(mingw32_HOST_OS)
     resetTerminalSettings();
@@ -575,8 +592,9 @@ hs_exit_(bool wait_foreign)
    if (is_io_mng_native_p())
       hs_restoreConsoleCP();
 #endif
-    /* free hash table storage */
-    exitHashTable();
+
+    /* tear down statistics subsystem */
+    stat_exit();
 
     // Finally, free all our storage.  However, we only free the heap
     // memory if we have waited for foreign calls to complete;

@@ -434,7 +434,7 @@ mkWWargs subst fun_ty demands
                   apply_or_bind_then work_fn_args (varToCoreExpr id),
                   res_ty) }
 
-  | Just (tv, fun_ty') <- splitForAllTy_maybe fun_ty
+  | Just (tv, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
   = do  { uniq <- getUniqueM
         ; let (subst', tv') = cloneTyVarBndr subst tv uniq
                 -- See Note [Freshen WW arguments]
@@ -610,7 +610,7 @@ wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> Maybe ([Demand], DataCon
 wantToUnbox fam_envs has_inlineable_prag ty dmd =
   case deepSplitProductType_maybe fam_envs ty of
     Just dcac@DataConAppContext{ dcac_arg_tys = con_arg_tys }
-      | isStrictDmd dmd
+      | isStrUsedDmd dmd
       -- See Note [Unpacking arguments with product and polymorphic demands]
       , Just cs <- split_prod_dmd_arity dmd (length con_arg_tys)
       -- See Note [Do not unpack class dictionaries]
@@ -621,12 +621,11 @@ wantToUnbox fam_envs has_inlineable_prag ty dmd =
     _ -> Nothing
   where
     split_prod_dmd_arity dmd arty
-      -- For seqDmd, splitProdDmd_maybe will return Nothing (because how would
-      -- it know the arity?), but it should behave like <S, U(AAAA)>, for some
+      -- For seqDmd, it should behave like <S(AAAA)>, for some
       -- suitable arity
-      | isSeqDmd dmd = Just (replicate arty absDmd)
-      -- Otherwise splitProdDmd_maybe does the job
-      | otherwise    = splitProdDmd_maybe dmd
+      | isSeqDmd dmd        = Just (replicate arty absDmd)
+      | _ :* Prod ds <- dmd = Just ds
+      | otherwise           = Nothing
 
 unbox_one :: DynFlags -> FamInstEnvs -> Var
           -> [Demand]
@@ -1026,7 +1025,7 @@ findTypeShape fam_envs ty
        | Just (tc, tc_args)  <- splitTyConApp_maybe ty
        = go_tc rec_tc tc tc_args
 
-       | Just (_, ty') <- splitForAllTy_maybe ty
+       | Just (_, ty') <- splitForAllTyCoVar_maybe ty
        = go rec_tc ty'
 
        | otherwise

@@ -787,6 +787,26 @@ free_mega_group (bdescr *mg)
 }
 
 
+/* Note [Data races in freeGroup]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * freeGroup commits a rather serious concurrency sin in its block coalescence
+ * logic: When freeing a block it looks at bd->free of the previous/next block
+ * to see whether it is allocated. However, the free'ing thread likely does not
+ * own the previous/next block, nor do we make any attempt to synchronize with
+ * the thread that *does* own it; this makes this access a data race.
+ *
+ * The original design argued that this was correct because `bd->free` will
+ * only take a value of -1 when the block is free and thereby owned by the
+ * storage manager. However, this is nevertheless unsafe under the C11 data
+ * model, which guarantees no particular semantics for data races.
+ *
+ * We currently assume (and hope) we won't see torn values and consequently
+ * we will never see `bd->free == -1` for an allocated block which we do not
+ * own. However, this is all extremely dodgy.
+ *
+ * This is tracked as #18913.
+ */
+
 void
 freeGroup(bdescr *p)
 {
@@ -796,7 +816,7 @@ freeGroup(bdescr *p)
   // not true in multithreaded GC:
   // ASSERT_SM_LOCK();
 
-  ASSERT(p->free != (P_)-1);
+  ASSERT(RELAXED_LOAD(&p->free) != (P_)-1);
 
 #if defined(DEBUG)
   for (uint32_t i=0; i < p->blocks; i++) {
@@ -806,9 +826,9 @@ freeGroup(bdescr *p)
 
   node = p->node;
 
-  p->free = (void *)-1;  /* indicates that this block is free */
-  p->gen = NULL;
-  p->gen_no = 0;
+  RELAXED_STORE(&p->free, (void *) -1);  /* indicates that this block is free */
+  RELAXED_STORE(&p->gen, NULL);
+  RELAXED_STORE(&p->gen_no, 0);
   /* fill the block group with garbage if sanity checking is on */
   IF_DEBUG(zero_on_gc, memset(p->start, 0xaa, (W_)p->blocks * BLOCK_SIZE));
 
@@ -834,7 +854,11 @@ freeGroup(bdescr *p)
   {
       bdescr *next;
       next = p + p->blocks;
-      if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(p)) && next->free == (P_)-1)
+
+      // See Note [Data races in freeGroup].
+      TSAN_ANNOTATE_BENIGN_RACE(&next->free, "freeGroup");
+      if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(p))
+          && RELAXED_LOAD(&next->free) == (P_)-1)
       {
           p->blocks += next->blocks;
           ln = log_2(next->blocks);
@@ -855,7 +879,9 @@ freeGroup(bdescr *p)
       prev = p - 1;
       if (prev->blocks == 0) prev = prev->link; // find the head
 
-      if (prev->free == (P_)-1)
+      // See Note [Data races in freeGroup].
+      TSAN_ANNOTATE_BENIGN_RACE(&prev->free, "freeGroup");
+      if (RELAXED_LOAD(&prev->free) == (P_)-1)
       {
           ln = log_2(prev->blocks);
           dbl_link_remove(prev, &free_list[node][ln]);

@@ -14,13 +14,11 @@ import UserSettings (userFlavours, userPackages, userDefaultFlavour)
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Benchmark
 import Settings.Flavours.Development
-import Settings.Flavours.Llvm
+import Settings.Flavours.GhcInGhci
 import Settings.Flavours.Performance
-import Settings.Flavours.Profiled
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
-import Settings.Flavours.GhcInGhci
 import Settings.Flavours.Validate
 
 import Control.Monad.Except
@@ -53,11 +51,10 @@ stagePackages stage = do
 hadrianFlavours :: [Flavour]
 hadrianFlavours =
     [ benchmarkFlavour, defaultFlavour, developmentFlavour Stage1
-    , developmentFlavour Stage2, performanceFlavour, profiledFlavour
+    , developmentFlavour Stage2, performanceFlavour
     , quickFlavour, quickValidateFlavour, quickDebugFlavour
     , quickestFlavour
-    , quickCrossFlavour, benchmarkLlvmFlavour
-    , performanceLlvmFlavour, profiledLlvmFlavour, quickLlvmFlavour
+    , quickCrossFlavour
     , ghcInGhciFlavour, validateFlavour, slowValidateFlavour ]
 
 -- | This action looks up a flavour with the name given on the
@@ -73,11 +70,9 @@ flavour = do
     let flavours = hadrianFlavours ++ userFlavours
         (_settingErrs, tweak) = applySettings kvs
 
-    return $
-      case filter (\fl -> name fl == flavourName) flavours of
-        []  -> error $ "Unknown build flavour: " ++ flavourName
-        [f] -> tweak f
-        _   -> error $ "Multiple build flavours named " ++ flavourName
+    case parseFlavour flavours flavourTransformers flavourName of
+      Left err -> fail err
+      Right f -> return $ tweak f
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.

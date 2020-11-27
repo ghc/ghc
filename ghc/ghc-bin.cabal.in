@@ -59,11 +59,11 @@ Executable ghc
         -- NB: this is never built by the bootstrapping GHC+libraries
         Build-depends:
             deepseq        == 1.4.*,
-            ghc-prim       >= 0.5.0 && < 0.8,
+            ghc-prim       >= 0.5.0 && < 0.9,
             ghci           == @ProjectVersionMunged@,
             haskeline      == 0.8.*,
             exceptions     == 0.10.*,
-            time           >= 1.8 && < 1.10
+            time           >= 1.8 && < 1.12
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         Other-Modules:
             GHCi.Leak
@@ -90,6 +90,8 @@ Executable ghc
     -- disabling this flag.
     if flag(threaded)
       ghc-options: -threaded
+
+    ghc-options: -eventlog
 
     Other-Extensions:
         CPP

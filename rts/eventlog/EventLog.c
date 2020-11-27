@@ -16,6 +16,7 @@
 #include "RtsUtils.h"
 #include "Stats.h"
 #include "EventLog.h"
+#include "Schedule.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -119,7 +120,9 @@ char *EventDesc[] = {
   [EVENT_CONC_SWEEP_BEGIN]       = "Begin concurrent sweep",
   [EVENT_CONC_SWEEP_END]         = "End concurrent sweep",
   [EVENT_CONC_UPD_REM_SET_FLUSH] = "Update remembered set flushed",
-  [EVENT_NONMOVING_HEAP_CENSUS]  = "Nonmoving heap census"
+  [EVENT_NONMOVING_HEAP_CENSUS]  = "Nonmoving heap census",
+  [EVENT_TICKY_COUNTER_DEF]    = "Ticky-ticky entry counter definition",
+  [EVENT_TICKY_COUNTER_SAMPLE] = "Ticky-ticky entry counter sample",
 };
 
 // Event type.
@@ -270,8 +273,8 @@ stopEventLogWriter(void)
     }
 }
 
-void
-flushEventLog(void)
+static void
+flushEventLogWriter(void)
 {
     if (event_log_writer != NULL &&
             event_log_writer->flushEventLog != NULL) {
@@ -485,6 +488,14 @@ init_event_types(void)
 
         case EVENT_NONMOVING_HEAP_CENSUS: // (cap, blk_size, active_segs, filled_segs, live_blks)
             eventTypes[t].size = 13;
+            break;
+
+        case EVENT_TICKY_COUNTER_DEF: // (counter_id, arity, arg_kinds, name)
+            eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+
+        case EVENT_TICKY_COUNTER_SAMPLE: // (counter_id, entry_count, allocs, allocd)
+            eventTypes[t].size = 8*4;
             break;
 
         default:
@@ -1472,6 +1483,53 @@ void postProfBegin(void)
 }
 #endif /* PROFILING */
 
+#if defined(TICKY_TICKY)
+static void postTickyCounterDef(EventsBuf *eb, StgEntCounter *p)
+{
+    StgWord len = 8 + 2 + strlen(p->arg_kinds)+1 + strlen(p->str)+1;
+    ensureRoomForVariableEvent(eb, len);
+    postEventHeader(eb, EVENT_TICKY_COUNTER_DEF);
+    postPayloadSize(eb, len);
+    postWord64(eb, (uint64_t) p);
+    postWord16(eb, (uint16_t) p->arity);
+    postString(eb, p->arg_kinds);
+    postString(eb, p->str);
+}
+
+void postTickyCounterDefs(StgEntCounter *counters)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    for (StgEntCounter *p = counters; p != NULL; p = p->link) {
+        postTickyCounterDef(&eventBuf, p);
+    }
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+static void postTickyCounterSample(EventsBuf *eb, StgEntCounter *p)
+{
+    if (   p->entry_count == 0
+        && p->allocs == 0
+        && p->allocd == 0)
+        return;
+
+    ensureRoomForEvent(eb, EVENT_TICKY_COUNTER_SAMPLE);
+    postEventHeader(eb, EVENT_TICKY_COUNTER_SAMPLE);
+    postWord64(eb, (uint64_t) p);
+    postWord64(eb, p->entry_count);
+    postWord64(eb, p->allocs);
+    postWord64(eb, p->allocd);
+}
+
+void postTickyCounterSamples(StgEntCounter *counters)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    for (StgEntCounter *p = counters; p != NULL; p = p->link) {
+        postTickyCounterSample(&eventBuf, p);
+    }
+    RELEASE_LOCK(&eventBufMutex);
+}
+#endif /* TICKY_TICKY */
+
 void printAndClearEventBuf (EventsBuf *ebuf)
 {
     closeBlockMarker(ebuf);
@@ -1484,7 +1542,7 @@ void printAndClearEventBuf (EventsBuf *ebuf)
                     "printAndClearEventLog: could not flush event log\n"
                 );
             resetEventsBuf(ebuf);
-            flushEventLog();
+            flushEventLogWriter();
             return;
         }
 
@@ -1566,6 +1624,40 @@ void postEventType(EventsBuf *eb, EventType *et)
     postInt32(eb, EVENT_ET_END);
 }
 
+void flushLocalEventsBuf(Capability *cap)
+{
+    EventsBuf *eb = &capEventBuf[cap->no];
+    printAndClearEventBuf(eb);
+}
+
+// Flush all capabilities' event buffers when we already hold all capabilities.
+// Used during forkProcess.
+void flushAllCapsEventsBufs()
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    printAndClearEventBuf(&eventBuf);
+    RELEASE_LOCK(&eventBufMutex);
+
+    for (unsigned int i=0; i < n_capabilities; i++) {
+        flushLocalEventsBuf(capabilities[i]);
+    }
+    flushEventLogWriter();
+}
+
+void flushEventLog(Capability **cap USED_IF_THREADS)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    printAndClearEventBuf(&eventBuf);
+    RELEASE_LOCK(&eventBufMutex);
+
+#if defined(THREADED_RTS)
+    Task *task = getMyTask();
+    stopAllCapabilitiesWith(cap, task, SYNC_FLUSH_EVENT_LOG);
+    releaseAllCapabilities(n_capabilities, cap ? *cap : NULL, task);
+#endif
+    flushEventLogWriter();
+}
+
 #else
 
 enum EventLogStatus eventLogStatus(void)
@@ -1578,5 +1670,7 @@ bool startEventLogging(const EventLogWriter *writer STG_UNUSED) {
 }
 
 void endEventLogging(void) {}
+
+void flushEventLog(Capability **cap STG_UNUSED) {}
 
 #endif /* TRACING */

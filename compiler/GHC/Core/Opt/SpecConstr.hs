@@ -971,7 +971,7 @@ decreaseSpecCount env n_specs
 ---------------------------------------------------
 -- See Note [Forcing specialisation]
 forceSpecBndr :: ScEnv -> Var    -> Bool
-forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTys . varType $ var
+forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTyCoVars . varType $ var
 
 forceSpecFunTy :: ScEnv -> Type -> Bool
 forceSpecFunTy env = any (forceSpecArgTy env) . map scaledThing . fst . splitFunTys
@@ -1724,11 +1724,12 @@ calcSpecStrictness fn qvars pats
     go env _      _                = env
 
     go_one :: DmdEnv -> Demand -> CoreExpr -> DmdEnv
-    go_one env d   (Var v) = extendVarEnv_C bothDmd env v d
-    go_one env d e
-           | Just ds <- splitProdDmd_maybe d  -- NB: d does not have to be strict
-           , (Var _, args) <- collectArgs e = go env ds args
-    go_one env _         _ = env
+    go_one env d          (Var v) = extendVarEnv_C plusDmd env v d
+    go_one env (_n :* cd) e -- NB: _n does not have to be strict
+      | (Var _, args) <- collectArgs e
+      , Just ds <- viewProd (length args) cd
+      = go env ds args
+    go_one env _               _       = env
 
 {-
 Note [spec_usg includes rhs_usg]

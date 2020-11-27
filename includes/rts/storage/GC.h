@@ -202,7 +202,7 @@ typedef void* AdjustorExecutable;
 
 AdjustorWritable allocateExec(W_ len, AdjustorExecutable *exec_addr);
 void flushExec(W_ len, AdjustorExecutable exec_addr);
-#if defined(ios_HOST_OS)
+#if (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && (defined(ios_HOST_OS) || defined(darwin_HOST_OS))
 AdjustorWritable execToWritable(AdjustorExecutable exec);
 #endif
 void             freeExec (AdjustorExecutable p);
@@ -230,6 +230,10 @@ void revertCAFs (void);
 // (preferably use RtsConfig.keep_cafs instead)
 void setKeepCAFs (void);
 
+// Let the runtime know that all the CAFs in high mem are not
+// to be retained. Useful in conjunction with loadNativeObj
+void setHighMemDynamic (void);
+
 /* -----------------------------------------------------------------------------
    This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
    MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
@@ -247,9 +251,9 @@ extern bool keepCAFs;
 
 INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
 {
-    bd->gen     = gen;
-    bd->gen_no  = gen->no;
-    bd->dest_no = dest->no;
+    RELAXED_STORE(&bd->gen, gen);
+    RELAXED_STORE(&bd->gen_no, gen->no);
+    RELAXED_STORE(&bd->dest_no, dest->no);
 
 #if !IN_STG_CODE
     /* See Note [RtsFlags is a pointer in STG code] */

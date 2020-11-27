@@ -18,3 +18,8 @@ test('pause_and_use_rts_api',
      , extra_files(['pause_resume.c','pause_resume.h'])
      ],
      multi_compile_and_run, ['pause_and_use_rts_api', [('pause_resume.c','')], ''])
+test('list_threads_and_misc_roots',
+     [ only_ways(['threaded1', 'threaded2'])
+     , extra_files(['list_threads_and_misc_roots_c.c','list_threads_and_misc_roots_c.h'])
+     ],
+     multi_compile_and_run, ['list_threads_and_misc_roots', [('list_threads_and_misc_roots_c.c','')], ''])

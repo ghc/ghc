@@ -16,6 +16,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
+import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
 import GHC.Core.Opt.CSE  ( cseProgram )
@@ -44,6 +45,7 @@ import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
 import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
+import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
 import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
 
@@ -58,7 +60,6 @@ import GHC.Unit.Module.Env
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.Deps
 
-import GHC.Runtime.Loader -- ( initializePlugins )
 import GHC.Runtime.Context
 
 import GHC.Types.SrcLoc
@@ -67,7 +68,6 @@ import GHC.Types.Id.Info
 import GHC.Types.Basic
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Demand
 import GHC.Types.Unique.Supply ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Ppr
@@ -87,18 +87,14 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_deps    = deps
                                 , mg_rdr_env = rdr_env })
-  = do { -- make sure all plugins are loaded
-
-       ; let builtin_passes = getCoreToDo dflags
+  = do { let builtin_passes = getCoreToDo dflags
              orph_mods = mkModuleSet (mod : dep_orphs deps)
              uniq_mask = 's'
        ;
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_mask mod
                                     orph_mods print_unqual loc $
                            do { hsc_env' <- getHscEnv
-                              ; dflags' <- liftIO $ initializePlugins hsc_env'
-                                                      (hsc_dflags hsc_env')
-                              ; all_passes <- withPlugins dflags'
+                              ; all_passes <- withPlugins hsc_env'
                                                 installCoreToDos
                                                 builtin_passes
                               ; runCorePasses all_passes guts }
@@ -156,6 +152,7 @@ getCoreToDo dflags
     pre_inline_on = gopt Opt_SimplPreInlining             dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
+    profiling     = ways dflags `hasWay` WayProf
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -222,12 +219,16 @@ getCoreToDo dflags
           }
         ]
 
+    add_caller_ccs =
+        runWhen (profiling && not (null $ callerCcFilters dflags)) CoreAddCallerCcs
+
     core_todo =
      if opt_level == 0 then
        [ static_ptrs_float_outwards,
          CoreDoSimplify max_iter
              (base_mode { sm_phase = FinalPhase
                         , sm_names = ["Non-opt simplification"] })
+       , add_caller_ccs
        ]
 
      else {- opt_level >= 1 -} [
@@ -371,7 +372,9 @@ getCoreToDo dflags
         -- can become /exponentially/ more expensive. See #11731, #12996.
         runWhen (strictness || late_dmd_anal) CoreDoDemand,
 
-        maybe_rule_check FinalPhase
+        maybe_rule_check FinalPhase,
+
+        add_caller_ccs
      ]
 
     -- Remove 'CoreDoNothing' and flatten 'CoreDoPasses' for clarity.
@@ -509,6 +512,9 @@ doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
 
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
+
+doCorePass CoreAddCallerCcs          = {-# SCC "AddCallerCcs" #-}
+                                       addCallerCostCentres
 
 doCorePass CoreDoPrintCore              = observe   printCore
 doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
@@ -1096,6 +1102,6 @@ dmdAnal dflags fam_envs binds = do
                }
       binds_plus_dmds = dmdAnalProgram opts fam_envs binds
   Err.dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
-    dumpIdInfoOfProgram (pprIfaceStrictSig . strictnessInfo) binds_plus_dmds
+    dumpIdInfoOfProgram (ppr . strictnessInfo) binds_plus_dmds
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_dmds `seq` return binds_plus_dmds

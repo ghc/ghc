@@ -850,6 +850,25 @@ emitPrimOp dflags primop = case primop of
     emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
   InterlockedExchange_Word -> \[src, value] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
+
+  FetchAddAddrOp_Word -> \[addr, n] -> opIntoRegs $ \[res] ->
+    doAtomicAddrRMW res AMO_Add addr (bWord platform) n
+  FetchSubAddrOp_Word -> \[addr, n] -> opIntoRegs $ \[res] ->
+    doAtomicAddrRMW res AMO_Sub addr (bWord platform) n
+  FetchAndAddrOp_Word -> \[addr, n] -> opIntoRegs $ \[res] ->
+    doAtomicAddrRMW res AMO_And addr (bWord platform) n
+  FetchNandAddrOp_Word -> \[addr, n] -> opIntoRegs $ \[res] ->
+    doAtomicAddrRMW res AMO_Nand addr (bWord platform) n
+  FetchOrAddrOp_Word -> \[addr, n] -> opIntoRegs $ \[res] ->
+    doAtomicAddrRMW res AMO_Or addr (bWord platform) n
+  FetchXorAddrOp_Word -> \[addr, n] -> opIntoRegs $ \[res] ->
+    doAtomicAddrRMW res AMO_Xor addr (bWord platform) n
+
+  AtomicReadAddrOp_Word -> \[addr] -> opIntoRegs $ \[res] ->
+    doAtomicReadAddr res addr (bWord platform)
+  AtomicWriteAddrOp_Word -> \[addr, val] -> opIntoRegs $ \[] ->
+    doAtomicWriteAddr addr (bWord platform) val
+
   CasAddrOp_Addr -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Cmpxchg (wordWidth platform)) [dst, expected, new]
   CasAddrOp_Word -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
@@ -1040,17 +1059,17 @@ emitPrimOp dflags primop = case primop of
 
 -- Atomic read-modify-write
   FetchAddByteArrayOp_Int -> \[mba, ix, n] -> opIntoRegs $ \[res] ->
-    doAtomicRMW res AMO_Add mba ix (bWord platform) n
+    doAtomicByteArrayRMW res AMO_Add mba ix (bWord platform) n
   FetchSubByteArrayOp_Int -> \[mba, ix, n] -> opIntoRegs $ \[res] ->
-    doAtomicRMW res AMO_Sub mba ix (bWord platform) n
+    doAtomicByteArrayRMW res AMO_Sub mba ix (bWord platform) n
   FetchAndByteArrayOp_Int -> \[mba, ix, n] -> opIntoRegs $ \[res] ->
-    doAtomicRMW res AMO_And mba ix (bWord platform) n
+    doAtomicByteArrayRMW res AMO_And mba ix (bWord platform) n
   FetchNandByteArrayOp_Int -> \[mba, ix, n] -> opIntoRegs $ \[res] ->
-    doAtomicRMW res AMO_Nand mba ix (bWord platform) n
+    doAtomicByteArrayRMW res AMO_Nand mba ix (bWord platform) n
   FetchOrByteArrayOp_Int -> \[mba, ix, n] -> opIntoRegs $ \[res] ->
-    doAtomicRMW res AMO_Or mba ix (bWord platform) n
+    doAtomicByteArrayRMW res AMO_Or mba ix (bWord platform) n
   FetchXorByteArrayOp_Int -> \[mba, ix, n] -> opIntoRegs $ \[res] ->
-    doAtomicRMW res AMO_Xor mba ix (bWord platform) n
+    doAtomicByteArrayRMW res AMO_Xor mba ix (bWord platform) n
   AtomicReadByteArrayOp_Int -> \[mba, ix] -> opIntoRegs $ \[res] ->
     doAtomicReadByteArray res mba ix (bWord platform)
   AtomicWriteByteArrayOp_Int -> \[mba, ix, val] -> opIntoRegs $ \[] ->
@@ -1176,8 +1195,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Int8# signed ops
 
-  Int8Extend     -> \args -> opTranslate args (MO_SS_Conv W8 (wordWidth platform))
-  Int8Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W8)
+  Int8ExtendOp   -> \args -> opTranslate args (MO_SS_Conv W8 (wordWidth platform))
+  Int8NarrowOp   -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W8)
   Int8NegOp      -> \args -> opTranslate args (MO_S_Neg W8)
   Int8AddOp      -> \args -> opTranslate args (MO_Add W8)
   Int8SubOp      -> \args -> opTranslate args (MO_Sub W8)
@@ -1194,8 +1213,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Word8# unsigned ops
 
-  Word8Extend     -> \args -> opTranslate args (MO_UU_Conv W8 (wordWidth platform))
-  Word8Narrow     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W8)
+  Word8ExtendOp   -> \args -> opTranslate args (MO_UU_Conv W8 (wordWidth platform))
+  Word8NarrowOp   -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W8)
   Word8NotOp      -> \args -> opTranslate args (MO_Not W8)
   Word8AddOp      -> \args -> opTranslate args (MO_Add W8)
   Word8SubOp      -> \args -> opTranslate args (MO_Sub W8)
@@ -1212,8 +1231,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Int16# signed ops
 
-  Int16Extend     -> \args -> opTranslate args (MO_SS_Conv W16 (wordWidth platform))
-  Int16Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W16)
+  Int16ExtendOp   -> \args -> opTranslate args (MO_SS_Conv W16 (wordWidth platform))
+  Int16NarrowOp   -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W16)
   Int16NegOp      -> \args -> opTranslate args (MO_S_Neg W16)
   Int16AddOp      -> \args -> opTranslate args (MO_Add W16)
   Int16SubOp      -> \args -> opTranslate args (MO_Sub W16)
@@ -1230,8 +1249,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Word16# unsigned ops
 
-  Word16Extend     -> \args -> opTranslate args (MO_UU_Conv W16 (wordWidth platform))
-  Word16Narrow     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W16)
+  Word16ExtendOp   -> \args -> opTranslate args (MO_UU_Conv W16 (wordWidth platform))
+  Word16NarrowOp   -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W16)
   Word16NotOp      -> \args -> opTranslate args (MO_Not W16)
   Word16AddOp      -> \args -> opTranslate args (MO_Add W16)
   Word16SubOp      -> \args -> opTranslate args (MO_Sub W16)
@@ -1245,6 +1264,16 @@ emitPrimOp dflags primop = case primop of
   Word16LeOp       -> \args -> opTranslate args (MO_U_Le W16)
   Word16LtOp       -> \args -> opTranslate args (MO_U_Lt W16)
   Word16NeOp       -> \args -> opTranslate args (MO_Ne W16)
+
+-- Int32# signed ops
+
+  Int32ExtendOp    -> \args -> opTranslate args (MO_SS_Conv W32 (wordWidth platform))
+  Int32NarrowOp    -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W32)
+
+-- Word32# unsigned ops
+
+  Word32ExtendOp   -> \args -> opTranslate args (MO_UU_Conv W32 (wordWidth platform))
+  Word32NarrowOp   -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W32)
 
 -- Char# ops
 
@@ -2855,22 +2884,33 @@ doWriteSmallPtrArrayOp addr idx val = do
 -- | Emit an atomic modification to a byte array element. The result
 -- reg contains that previous value of the element. Implies a full
 -- memory barrier.
-doAtomicRMW :: LocalReg      -- ^ Result reg
+doAtomicByteArrayRMW
+            :: LocalReg      -- ^ Result reg
             -> AtomicMachOp  -- ^ Atomic op (e.g. add)
             -> CmmExpr       -- ^ MutableByteArray#
             -> CmmExpr       -- ^ Index
             -> CmmType       -- ^ Type of element by which we are indexing
             -> CmmExpr       -- ^ Op argument (e.g. amount to add)
             -> FCode ()
-doAtomicRMW res amop mba idx idx_ty n = do
+doAtomicByteArrayRMW res amop mba idx idx_ty n = do
     profile <- getProfile
     platform <- getPlatform
     let width = typeWidth idx_ty
         addr  = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                 width mba idx
+    doAtomicAddrRMW res amop addr idx_ty n
+
+doAtomicAddrRMW
+            :: LocalReg      -- ^ Result reg
+            -> AtomicMachOp  -- ^ Atomic op (e.g. add)
+            -> CmmExpr       -- ^ Addr#
+            -> CmmType       -- ^ Pointed value type
+            -> CmmExpr       -- ^ Op argument (e.g. amount to add)
+            -> FCode ()
+doAtomicAddrRMW res amop addr ty n = do
     emitPrimCall
         [ res ]
-        (MO_AtomicRMW width amop)
+        (MO_AtomicRMW (typeWidth ty) amop)
         [ addr, n ]
 
 -- | Emit an atomic read to a byte array that acts as a memory barrier.
@@ -2886,9 +2926,18 @@ doAtomicReadByteArray res mba idx idx_ty = do
     let width = typeWidth idx_ty
         addr  = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                 width mba idx
+    doAtomicReadAddr res addr idx_ty
+
+-- | Emit an atomic read to an address that acts as a memory barrier.
+doAtomicReadAddr
+    :: LocalReg  -- ^ Result reg
+    -> CmmExpr   -- ^ Addr#
+    -> CmmType   -- ^ Type of element by which we are indexing
+    -> FCode ()
+doAtomicReadAddr res addr ty = do
     emitPrimCall
         [ res ]
-        (MO_AtomicRead width)
+        (MO_AtomicRead (typeWidth ty))
         [ addr ]
 
 -- | Emit an atomic write to a byte array that acts as a memory barrier.
@@ -2904,9 +2953,18 @@ doAtomicWriteByteArray mba idx idx_ty val = do
     let width = typeWidth idx_ty
         addr  = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                 width mba idx
+    doAtomicWriteAddr addr idx_ty val
+
+-- | Emit an atomic write to an address that acts as a memory barrier.
+doAtomicWriteAddr
+    :: CmmExpr   -- ^ Addr#
+    -> CmmType   -- ^ Type of element by which we are indexing
+    -> CmmExpr   -- ^ Value to write
+    -> FCode ()
+doAtomicWriteAddr addr ty val = do
     emitPrimCall
         [ {- no results -} ]
-        (MO_AtomicWrite width)
+        (MO_AtomicWrite (typeWidth ty))
         [ addr, val ]
 
 doCasByteArray

@@ -44,6 +44,7 @@ module GHC.Cmm.CLabel (
         mkAsmTempLabel,
         mkAsmTempDerivedLabel,
         mkAsmTempEndLabel,
+        mkAsmTempProcEndLabel,
         mkAsmTempDieLabel,
 
         mkDirty_MUT_VAR_Label,
@@ -118,6 +119,7 @@ module GHC.Cmm.CLabel (
         LabelStyle (..),
         pprDebugCLabel,
         pprCLabel,
+        ppInternalProcLabel,
 
         -- * Others
         dynamicLinkerLabelInfo,
@@ -754,6 +756,10 @@ mkAsmTempDerivedLabel = AsmTempDerivedLabel
 mkAsmTempEndLabel :: CLabel -> CLabel
 mkAsmTempEndLabel l = mkAsmTempDerivedLabel l (fsLit "_end")
 
+-- | A label indicating the end of a procedure.
+mkAsmTempProcEndLabel :: CLabel -> CLabel
+mkAsmTempProcEndLabel l = mkAsmTempDerivedLabel l (fsLit "_proc_end")
+
 -- | Construct a label for a DWARF Debug Information Entity (DIE)
 -- describing another symbol.
 mkAsmTempDieLabel :: CLabel -> CLabel
@@ -1082,8 +1088,8 @@ isLocalCLabel this_mod lbl =
 -- that data resides in a DLL or not. [Win32 only.]
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
-labelDynamic :: NCGConfig -> Module -> CLabel -> Bool
-labelDynamic config this_mod lbl =
+labelDynamic :: NCGConfig -> CLabel -> Bool
+labelDynamic config lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _ ->
@@ -1136,6 +1142,7 @@ labelDynamic config this_mod lbl =
     externalDynamicRefs = ncgExternalDynamicRefs config
     platform = ncgPlatform config
     os = platformOS platform
+    this_mod = ncgThisModule config
     this_unit = toUnitId (moduleUnit this_mod)
 
 
@@ -1359,6 +1366,39 @@ pprCLabel platform sty lbl =
    CmmLabel _ _ fs CmmRet      -> maybe_underscore $ ftext fs <> text "_ret"
    CmmLabel _ _ fs CmmClosure  -> maybe_underscore $ ftext fs <> text "_closure"
 
+-- Note [Internal proc labels]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Some tools (e.g. the `perf` utility on Linux) rely on the symbol table
+-- for resolution of function names. To help these tools we provide the
+-- (enabled by default) -fexpose-all-symbols flag which causes GHC to produce
+-- symbols even for symbols with are internal to a module (although such
+-- symbols will have only local linkage).
+--
+-- Note that these labels are *not* referred to by code. They are strictly for
+-- diagnostics purposes.
+--
+-- To avoid confusion, it is desireable to add a module-qualifier to the
+-- symbol name. However, the Name type's Internal constructor doesn't carry
+-- knowledge of the current Module. Consequently, we have to pass this around
+-- explicitly.
+
+-- | Generate a label for a procedure internal to a module (if
+-- 'Opt_ExposeAllSymbols' is enabled).
+-- See Note [Internal proc labels].
+ppInternalProcLabel :: Module     -- ^ the current module
+                    -> CLabel
+                    -> Maybe SDoc -- ^ the internal proc label
+ppInternalProcLabel this_mod (IdLabel nm _ flavour)
+  | isInternalName nm
+  = Just
+     $ text "_" <> ppr this_mod
+    <> char '_'
+    <> ztext (zEncodeFS (occNameFS (occName nm)))
+    <> char '_'
+    <> pprUniqueAlways (getUnique nm)
+    <> ppIdFlavor flavour
+ppInternalProcLabel _ _ = Nothing
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <> case x of

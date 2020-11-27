@@ -591,6 +591,9 @@ def have_slow_bignum( ) -> bool:
 def llvm_build ( ) -> bool:
     return config.ghc_built_by_llvm
 
+def have_thread_sanitizer( ) -> bool:
+    return config.have_thread_sanitizer
+
 # ---
 
 # Note [Measuring residency]
@@ -641,6 +644,10 @@ def collect_compiler_residency(tolerance_pct: float):
 
 def high_memory_usage(name, opts):
     opts.alone = True
+
+    # ThreadSanitizer significantly increases memory footprint; skip
+    if have_thread_sanitizer():
+        opts.skip = True
 
 # If a test is for a multi-CPU race, then running the test alone
 # increases the chance that we'll actually see it.
@@ -2156,7 +2163,7 @@ def normalise_callstacks(s: str) -> str:
         s = re.sub(r'CallStack \(from -prof\):(\n  .*)*\n?', '', s)
     return s
 
-tyCon_re = re.compile(r'TyCon\s*\d+L?\#\#\s*\d+L?\#\#\s*', flags=re.MULTILINE)
+tyCon_re = re.compile(r'TyCon\s*\d+L?\#\#(64)?\s*\d+L?\#\#(64)?\s*', flags=re.MULTILINE)
 
 def normalise_type_reps(s: str) -> str:
     """ Normalise out fingerprints from Typeable TyCon representations """
@@ -2208,6 +2215,13 @@ def normalise_errmsg(s: str) -> str:
     if config.msys:
         s = re.sub('Failed to remove file (.*); error= (.*)$', '', s)
         s = re.sub('DeleteFile "(.+)": permission denied \(Access is denied\.\)(.*)$', '', s)
+
+    # filter out unsupported GNU_PROPERTY_TYPE (5), which is emitted by LLVM10
+    # and not understood by older binutils (ar, ranlib, ...)
+    s = modify_lines(s, lambda l: re.sub('^(.+)warning: (.+): unsupported GNU_PROPERTY_TYPE \(5\) type: 0xc000000(.*)$', '', l))
+
+    # filter out nix garbage, that just keeps on showing up as errors on darwin
+    s = modify_lines(s, lambda l: re.sub('^(.+)\.dylib, ignoring unexpected dylib file$','', l))
 
     return s
 
@@ -2279,6 +2293,9 @@ def normalise_output( s: str ) -> str:
     s = re.sub('([^\\s])\\.exe', '\\1', s)
     s = normalise_callstacks(s)
     s = normalise_type_reps(s)
+    # ghci outputs are pretty unstable with -fexternal-dynamic-refs, which is
+    # requires for -fPIC
+    s = re.sub('  -fexternal-dynamic-refs\n','',s)
     return s
 
 def normalise_asm( s: str ) -> str:

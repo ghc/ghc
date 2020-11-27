@@ -30,7 +30,7 @@
 #include "GC.h"
 #include "Evac.h"
 #include "NonMoving.h"
-#if defined(ios_HOST_OS)
+#if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
 #include "Hash.h"
 #endif
 
@@ -45,6 +45,7 @@ StgIndStatic  *dyn_caf_list        = NULL;
 StgIndStatic  *debug_caf_list      = NULL;
 StgIndStatic  *revertible_caf_list = NULL;
 bool           keepCAFs;
+bool           highMemDynamic;
 
 W_ large_alloc_lim;    /* GC if n_large_blocks in any nursery
                         * reaches this. */
@@ -302,7 +303,7 @@ exitStorage (void)
 {
     nonmovingExit();
     updateNurseriesStats();
-    stat_exit();
+    stat_exitReport();
 }
 
 void
@@ -445,7 +446,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     Capability *cap = regTableToCapability(reg);
     StgInd *bh;
 
-    orig_info = caf->header.info;
+    orig_info = RELAXED_LOAD(&caf->header.info);
 
 #if defined(THREADED_RTS)
     const StgInfoTable *cur_info;
@@ -501,12 +502,11 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     }
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
     SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
-    // Ensure that above writes are visible before we introduce reference as CAF indirectee.
-    write_barrier();
 
-    caf->indirectee = (StgClosure *)bh;
-    write_barrier();
-    SET_INFO((StgClosure*)caf,&stg_IND_STATIC_info);
+    // RELEASE ordering to ensure that above writes are visible before we
+    // introduce reference as CAF indirectee.
+    RELEASE_STORE(&caf->indirectee, (StgClosure *) bh);
+    SET_INFO_RELEASE((StgClosure*)caf, &stg_IND_STATIC_info);
 
     return bh;
 }
@@ -519,7 +519,7 @@ newCAF(StgRegTable *reg, StgIndStatic *caf)
     bh = lockCAF(reg, caf);
     if (!bh) return NULL;
 
-    if(keepCAFs)
+    if(keepCAFs && !(highMemDynamic && (void*) caf > (void*) 0x80000000))
     {
         // Note [dyn_caf_list]
         // If we are in GHCi _and_ we are using dynamic libraries,
@@ -571,6 +571,12 @@ void
 setKeepCAFs (void)
 {
     keepCAFs = 1;
+}
+
+void
+setHighMemDynamic (void)
+{
+    highMemDynamic = 1;
 }
 
 // An alternate version of newCAF which is used for dynamically loaded
@@ -1033,8 +1039,8 @@ allocateMightFail (Capability *cap, W_ n)
         g0->n_new_large_words += n;
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
-        bd->flags = BF_LARGE;
-        bd->free = bd->start + n;
+        RELAXED_STORE(&bd->flags, BF_LARGE);
+        RELAXED_STORE(&bd->free, bd->start + n);
         cap->total_allocated += n;
         return bd->start;
     }
@@ -1300,8 +1306,8 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
     Capability *cap = regTableToCapability(reg);
     // No barrier required here as no other heap object fields are read. See
     // note [Heap memory barriers] in SMP.h.
-    if (mvar->header.info == &stg_MUT_VAR_CLEAN_info) {
-        mvar->header.info = &stg_MUT_VAR_DIRTY_info;
+    if (RELAXED_LOAD(&mvar->header.info) == &stg_MUT_VAR_CLEAN_info) {
+        SET_INFO((StgClosure*) mvar, &stg_MUT_VAR_DIRTY_info);
         recordClosureMutated(cap, (StgClosure *) mvar);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             // See Note [Dirty flags in the non-moving collector] in NonMoving.c
@@ -1323,8 +1329,8 @@ dirty_TVAR(Capability *cap, StgTVar *p,
 {
     // No barrier required here as no other heap object fields are read. See
     // note [Heap memory barriers] in SMP.h.
-    if (p->header.info == &stg_TVAR_CLEAN_info) {
-        p->header.info = &stg_TVAR_DIRTY_info;
+    if (RELAXED_LOAD(&p->header.info) == &stg_TVAR_CLEAN_info) {
+        SET_INFO((StgClosure*) p, &stg_TVAR_DIRTY_info);
         recordClosureMutated(cap,(StgClosure*)p);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             // See Note [Dirty flags in the non-moving collector] in NonMoving.c
@@ -1341,8 +1347,8 @@ dirty_TVAR(Capability *cap, StgTVar *p,
 void
 setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure(cap, (StgClosure *) tso->_link);
@@ -1354,8 +1360,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure(cap, (StgClosure *) tso->block_info.prev);
@@ -1367,8 +1373,8 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 dirty_TSO (Capability *cap, StgTSO *tso)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
     }
 
@@ -1386,8 +1392,8 @@ dirty_STACK (Capability *cap, StgStack *stack)
         updateRemembSetPushStack(cap, stack);
     }
 
-    if (! (stack->dirty & STACK_DIRTY)) {
-        stack->dirty = STACK_DIRTY;
+    if (RELAXED_LOAD(&stack->dirty) == 0) {
+        RELAXED_STORE(&stack->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)stack);
     }
 
@@ -1562,10 +1568,13 @@ calcNeeded (bool force_major, memcount *blocks_needed)
 
     for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
         generation *gen = &generations[g];
-
         W_ blocks = gen->live_estimate ? (gen->live_estimate / BLOCK_SIZE_W) : gen->n_blocks;
-        blocks += gen->n_large_blocks
-                + gen->n_compact_blocks;
+
+        // This can race with allocate() and compactAllocateBlockInternal()
+        // but only needs to be approximate
+        TSAN_ANNOTATE_BENIGN_RACE(&gen->n_large_blocks, "n_large_blocks");
+        blocks += RELAXED_LOAD(&gen->n_large_blocks)
+                + RELAXED_LOAD(&gen->n_compact_blocks);
 
         // we need at least this much space
         needed += blocks;
@@ -1639,7 +1648,7 @@ StgWord calcTotalCompactW (void)
          should be modified to use allocateExec instead of VirtualAlloc.
    ------------------------------------------------------------------------- */
 
-#if (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && defined(ios_HOST_OS)
+#if (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && (defined(ios_HOST_OS) || defined(darwin_HOST_OS))
 #include <libkern/OSCacheControl.h>
 #endif
 
@@ -1670,7 +1679,7 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
   /* x86 doesn't need to do anything, so just suppress some warnings. */
   (void)len;
   (void)exec_addr;
-#elif (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && defined(ios_HOST_OS)
+#elif (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && (defined(ios_HOST_OS) || defined(darwin_HOST_OS))
   /* On iOS we need to use the special 'sys_icache_invalidate' call. */
   sys_icache_invalidate(exec_addr, len);
 #elif defined(__clang__)
@@ -1725,7 +1734,7 @@ void freeExec (AdjustorExecutable addr)
     RELEASE_SM_LOCK
 }
 
-#elif defined(ios_HOST_OS)
+#elif (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && (defined(ios_HOST_OS) || defined(darwin_HOST_OS))
 
 static HashTable* allocatedExecs;
 

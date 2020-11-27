@@ -450,7 +450,7 @@ tcInstFun do_ql inst_final rn_fun fun_sigma rn_args
 
     -- Rule IALL from Fig 4 of the QL paper
     go1 delta acc so_far fun_ty args
-      | (tvs,   body1) <- tcSplitSomeForAllTys (inst_fun args) fun_ty
+      | (tvs,   body1) <- tcSplitSomeForAllTyVars (inst_fun args) fun_ty
       , (theta, body2) <- tcSplitPhiTy body1
       , not (null tvs && null theta)
       = do { (inst_tvs, wrap, fun_rho) <- setSrcSpanFromArgs rn_args $
@@ -556,7 +556,7 @@ tcVTA :: TcType            -- Function type
 -- Deal with a visible type application
 -- The function type has already had its Inferred binders instantiated
 tcVTA fun_ty hs_ty
-  | Just (tvb, inner_ty) <- tcSplitForAllTy_maybe fun_ty
+  | Just (tvb, inner_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
   , binderArgFlag tvb == Specified
     -- It really can't be Inferred, because we've just
     -- instantiated those. But, oddly, it might just be Required.
@@ -969,11 +969,11 @@ findNoQuantVars fun_ty args
     go bvs fun_ty (EPrag {} : args) = go bvs fun_ty args
 
     go bvs fun_ty args@(ETypeArg {} : rest_args)
-      | (tvs,  body1) <- tcSplitSomeForAllTys (== Inferred) fun_ty
+      | (tvs,  body1) <- tcSplitSomeForAllTyVars (== Inferred) fun_ty
       , (theta, body2) <- tcSplitPhiTy body1
       , not (null tvs && null theta)
       = go (bvs `extendVarSetList` tvs) body2 args
-      | Just (_tv, res_ty) <- tcSplitForAllTy_maybe fun_ty
+      | Just (_tv, res_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
       = go bvs res_ty rest_args
       | otherwise
       = False  -- E.g. head ids @Int

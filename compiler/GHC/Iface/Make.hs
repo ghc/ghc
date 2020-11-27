@@ -193,7 +193,7 @@ mkIfaceTc hsc_env safe_mode mod_details
                     }
   = do
           let used_names = mkUsedNames tc_result
-          let pluginModules = map lpModule (cachedPlugins (hsc_dflags hsc_env))
+          let pluginModules = map lpModule (hsc_plugins hsc_env)
           let home_unit = hsc_home_unit hsc_env
           deps <- mkDependencies (homeUnitId home_unit)
                     (map mi_module pluginModules) tc_result
@@ -656,7 +656,7 @@ classToIfaceDecl env clas
                 --                op :: (?x :: String) => a -> a
                 -- and          class Baz a where
                 --                op :: (Ord a) => a -> a
-          (sel_tyvars, rho_ty) = splitForAllTys (idType sel_id)
+          (sel_tyvars, rho_ty) = splitForAllTyCoVars (idType sel_id)
           op_ty                = funResultTy rho_ty
 
     toDmSpec :: (Name, DefMethSpec Type) -> DefMethSpec IfaceType

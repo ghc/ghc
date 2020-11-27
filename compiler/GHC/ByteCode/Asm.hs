@@ -464,6 +464,12 @@ assembleI platform i = case i of
     literal (LitNumber nt i) = case nt of
       LitNumInt     -> int (fromIntegral i)
       LitNumWord    -> int (fromIntegral i)
+      LitNumInt8    -> int8 (fromIntegral i)
+      LitNumWord8   -> int8 (fromIntegral i)
+      LitNumInt16   -> int16 (fromIntegral i)
+      LitNumWord16  -> int16 (fromIntegral i)
+      LitNumInt32   -> int32 (fromIntegral i)
+      LitNumWord32  -> int32 (fromIntegral i)
       LitNumInt64   -> int64 (fromIntegral i)
       LitNumWord64  -> int64 (fromIntegral i)
       LitNumInteger -> panic "GHC.ByteCode.Asm.literal: LitNumInteger"
@@ -478,6 +484,9 @@ assembleI platform i = case i of
     float = words . mkLitF
     double = words . mkLitD platform
     int = words . mkLitI
+    int8 = words . mkLitI64 platform
+    int16 = words . mkLitI64 platform
+    int32 = words . mkLitI64 platform
     int64 = words . mkLitI64 platform
     words ws = lit (map BCONPtrWord ws)
     word w = words [w]

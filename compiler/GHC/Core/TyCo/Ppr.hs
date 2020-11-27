@@ -34,7 +34,7 @@ import {-# SOURCE #-} GHC.Core.DataCon
    ( dataConFullSig , dataConUserTyVarBinders, DataCon )
 
 import GHC.Core.Type ( pickyIsLiftedTypeKind, pattern One, pattern Many,
-                       splitForAllTysReq, splitForAllTysInvis )
+                       splitForAllReqTVBinders, splitForAllInvisTVBinders )
 
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
@@ -269,7 +269,7 @@ debug_ppr_ty _ (CoercionTy co)
 
 -- Invisible forall:  forall {k} (a :: k). t
 debug_ppr_ty prec t
-  | (bndrs, body) <- splitForAllTysInvis t
+  | (bndrs, body) <- splitForAllInvisTVBinders t
   , not (null bndrs)
   = maybeParen prec funPrec $
     sep [ text "forall" <+> fsep (map ppr_bndr bndrs) <> dot,
@@ -282,7 +282,7 @@ debug_ppr_ty prec t
 
 -- Visible forall:  forall x y -> t
 debug_ppr_ty prec t
-  | (bndrs, body) <- splitForAllTysReq t
+  | (bndrs, body) <- splitForAllReqTVBinders t
   , not (null bndrs)
   = maybeParen prec funPrec $
     sep [ text "forall" <+> fsep (map ppr_bndr bndrs) <+> arrow,
@@ -294,7 +294,7 @@ debug_ppr_ty prec t
 
 -- Impossible case: neither visible nor invisible forall.
 debug_ppr_ty _ ForAllTy{}
-  = panic "debug_ppr_ty: neither splitForAllTysInvis nor splitForAllTysReq returned any binders"
+  = panic "debug_ppr_ty: neither splitForAllInvisTVBinders nor splitForAllReqTVBinders returned any binders"
 
 {-
 Note [Infix type variables]

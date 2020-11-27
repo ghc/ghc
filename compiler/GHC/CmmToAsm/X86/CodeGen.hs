@@ -2121,12 +2121,12 @@ genCCall is32Bit (PrimTarget (MO_AtomicRMW width amop))
         -- final move should go away, because it's the last use of arg
         -- and the first use of dst_r.
         AMO_Add  -> return $ (toOL [ LOCK (XADD format (OpReg arg) (OpAddr amode))
-                                  , MOV format (OpReg arg) (OpReg dst_r)
-                                  ], bid)
+                                   , MOV format (OpReg arg) (OpReg dst_r)
+                                   ], bid)
         AMO_Sub  -> return $ (toOL [ NEGI format (OpReg arg)
-                                  , LOCK (XADD format (OpReg arg) (OpAddr amode))
-                                  , MOV format (OpReg arg) (OpReg dst_r)
-                                  ], bid)
+                                   , LOCK (XADD format (OpReg arg) (OpAddr amode))
+                                   , MOV format (OpReg arg) (OpReg dst_r)
+                                   ], bid)
         -- In these cases we need a new block id, and have to return it so
         -- that later instruction selection can reference it.
         AMO_And  -> cmpxchg_code (\ src dst -> unitOL $ AND format src dst)

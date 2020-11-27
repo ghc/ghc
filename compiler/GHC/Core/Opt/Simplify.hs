@@ -41,15 +41,15 @@ import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
-import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrictDmd
-                        , mkClosedStrictSig, topDmd, seqDmd, botDiv )
+import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrUsedDmd
+                        , mkClosedStrictSig, topDmd, seqDmd, isDeadEndDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
-import GHC.Core.Opt.Arity ( ArityType(..), arityTypeArity, isBotArityType
+import GHC.Core.Opt.Arity ( ArityType(..)
                           , pushCoTyArg, pushCoValArg
                           , idArityType, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
@@ -796,8 +796,8 @@ addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
   = new_bndr `setIdInfo` info5
   where
-    new_arity = arityTypeArity new_arity_type
-    is_bot    = isBotArityType new_arity_type
+    AT oss div = new_arity_type
+    new_arity  = length oss
 
     info1 = idInfo new_bndr `setArityInfo` new_arity
 
@@ -816,11 +816,11 @@ addLetBndrInfo new_bndr new_arity_type new_unf
           = info2
 
     -- Bottoming bindings: see Note [Bottoming bindings]
-    info4 | is_bot    = info3 `setStrictnessInfo` bot_sig
-                              `setCprInfo`        bot_cpr
-          | otherwise = info3
+    info4 | isDeadEndDiv div = info3 `setStrictnessInfo` bot_sig
+                                     `setCprInfo`        bot_cpr
+          | otherwise        = info3
 
-    bot_sig = mkClosedStrictSig (replicate new_arity topDmd) botDiv
+    bot_sig = mkClosedStrictSig (replicate new_arity topDmd) div
     bot_cpr = mkCprSig new_arity botCpr
 
      -- Zap call arity info. We have used it by now (via
@@ -2481,7 +2481,7 @@ There have been various earlier versions of this patch:
 
     scrut_is_demanded_var :: CoreExpr -> Bool
     scrut_is_demanded_var (Cast s _) = scrut_is_demanded_var s
-    scrut_is_demanded_var (Var _)    = isStrictDmd (idDemandInfo case_bndr)
+    scrut_is_demanded_var (Var _)    = isStrUsedDmd (idDemandInfo case_bndr)
     scrut_is_demanded_var _          = False
 
   This only fired if the scrutinee was a /variable/, which seems
@@ -2709,7 +2709,7 @@ doCaseToLet scrut case_bndr
 
   | otherwise  -- Scrut has a lifted type
   = exprIsHNF scrut
-    || isStrictDmd (idDemandInfo case_bndr)
+    || isStrUsedDmd (idDemandInfo case_bndr)
     -- See Note [Case-to-let for strictly-used binders]
 
 --------------------------------------------------

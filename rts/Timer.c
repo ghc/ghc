@@ -25,6 +25,15 @@
 #include "Capability.h"
 #include "RtsSignals.h"
 
+// This global counter is used to allow multiple threads to stop the
+// timer temporarily with a stopTimer()/startTimer() pair.  If
+//      timer_enabled  == 0          timer is enabled
+//      timer_disabled == N, N > 0   timer is disabled by N threads
+// When timer_enabled makes a transition to 0, we enable the timer,
+// and when it makes a transition to non-0 we disable it.
+
+static StgWord timer_disabled;
+
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
@@ -92,7 +101,9 @@ void
 handle_tick(int unused STG_UNUSED)
 {
   handleProfTick();
-  if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0) {
+  if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0
+      && SEQ_CST_LOAD(&timer_disabled) == 0)
+  {
       ticks_to_ctxt_switch--;
       if (ticks_to_ctxt_switch <= 0) {
           ticks_to_ctxt_switch = RtsFlags.ConcFlags.ctxtSwitchTicks;
@@ -106,16 +117,16 @@ handle_tick(int unused STG_UNUSED)
    * for threads that are deadlocked.  However, ensure we wait
    * at least interIdleGCWait (+RTS -Iw) between idle GCs.
    */
-  switch (recent_activity) {
+  switch (SEQ_CST_LOAD(&recent_activity)) {
   case ACTIVITY_YES:
-      recent_activity = ACTIVITY_MAYBE_NO;
+      SEQ_CST_STORE(&recent_activity, ACTIVITY_MAYBE_NO);
       idle_ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
                          RtsFlags.MiscFlags.tickInterval;
       break;
   case ACTIVITY_MAYBE_NO:
       if (idle_ticks_to_gc == 0 && inter_gc_ticks_to_gc == 0) {
           if (RtsFlags.GcFlags.doIdleGC) {
-              recent_activity = ACTIVITY_INACTIVE;
+              SEQ_CST_STORE(&recent_activity, ACTIVITY_INACTIVE);
               inter_gc_ticks_to_gc = RtsFlags.GcFlags.interIdleGCWait /
                                      RtsFlags.MiscFlags.tickInterval;
 #if defined(THREADED_RTS)
@@ -124,7 +135,7 @@ handle_tick(int unused STG_UNUSED)
               // the GC.
 #endif
           } else {
-              recent_activity = ACTIVITY_DONE_GC;
+              SEQ_CST_STORE(&recent_activity, ACTIVITY_DONE_GC);
               // disable timer signals (see #1623, #5991, #9105)
               // but only if we're not profiling (e.g. passed -h or -p RTS
               // flags). If we are profiling we need to keep the timer active
@@ -148,15 +159,6 @@ handle_tick(int unused STG_UNUSED)
   }
 }
 
-// This global counter is used to allow multiple threads to stop the
-// timer temporarily with a stopTimer()/startTimer() pair.  If
-//      timer_enabled  == 0          timer is enabled
-//      timer_disabled == N, N > 0   timer is disabled by N threads
-// When timer_enabled makes a transition to 0, we enable the timer,
-// and when it makes a transition to non-0 we disable it.
-
-static StgWord timer_disabled;
-
 void
 initTimer(void)
 {
@@ -164,7 +166,7 @@ initTimer(void)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
         initTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
     }
-    timer_disabled = 1;
+    SEQ_CST_STORE(&timer_disabled, 1);
 }
 
 void

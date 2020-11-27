@@ -307,16 +307,20 @@ hadrian-ghc-in-ghci:
     - .gitlab/ci.sh setup
     - cabal update
     - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
   variables:
     GHC_FLAGS: -Werror
+  cache:
+    key: lint
+    paths:
+      - cabal-cache
 
 lint-base:
   extends: .lint-params
   script:
     - hadrian/build -c -j stage1:lib:base
     - hadrian/build -j lint:base
-  cache:
-    key: lint
 
 ############################################################
 # Validation via Pipelines (make)
@@ -524,6 +528,14 @@ validate-x86_64-darwin:
   tags:
     - aarch64-linux
 
+.build-aarch64-linux-deb10-llvm:
+  extends: .build-aarch64-linux-deb10
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: perf-llvm
+  tags:
+    - aarch64-linux
+
 validate-aarch64-linux-deb10:
   extends: .build-aarch64-linux-deb10
   artifacts:
@@ -647,22 +659,6 @@ validate-x86_64-linux-deb9-debug:
     when: always
     expire_in: 2 week
 
-# Disabled to alleviate CI load
-.validate-x86_64-linux-deb9-llvm:
-  extends: .build-x86_64-linux-deb9
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: perf-llvm
-    TEST_ENV: "x86_64-linux-deb9-llvm"
-
-nightly-x86_64-linux-deb9-llvm:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb9
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: perf-llvm
-    TEST_ENV: "x86_64-linux-deb9-llvm"
-
 validate-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
   stage: full-build
@@ -680,6 +676,25 @@ nightly-x86_64-linux-deb9-integer-simple:
     BIGNUM_BACKEND: native
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
     TEST_TYPE: slowtest
+
+.build-x86_64-linux-deb9-tsan:
+  extends: .validate-linux-hadrian
+  stage: full-build
+  variables:
+    TEST_ENV: "x86_64-linux-deb9-tsan"
+    BUILD_FLAVOUR: "thread-sanitizer"
+    TSAN_OPTIONS: "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
+    # Haddock is large enough to make TSAN choke without massive quantities of
+    # memory.
+    HADRIAN_ARGS: "--docs=none"
+
+nightly-x86_64-linux-deb9-tsan:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb9-tsan
+
+validate-x86_64-linux-deb9-tsan:
+  extends: .build-x86_64-linux-deb9-tsan
+  when: manual
 
 validate-x86_64-linux-deb9-dwarf:
   extends: .build-x86_64-linux-deb9
@@ -718,6 +733,32 @@ nightly-x86_64-linux-deb10:
 release-x86_64-linux-deb10:
   <<: *release
   extends: .build-x86_64-linux-deb10
+
+release-x86_64-linux-deb10-dwarf:
+  <<: *release
+  extends: .build-x86_64-linux-deb10
+  variables:
+    CONFIGURE_ARGS: "--enable-dwarf-unwind"
+    BUILD_FLAVOUR: dwarf
+    TEST_ENV: "x86_64-linux-deb10-dwarf"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
+
+validate-x86_64-linux-deb10-llvm:
+  extends: .build-x86_64-linux-deb10
+  stage: full-build
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/'
+  variables:
+    BUILD_FLAVOUR: perf-llvm
+    TEST_ENV: "x86_64-linux-deb10-llvm"
+
+nightly-x86_64-linux-deb10-llvm:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb10
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: perf-llvm
+    TEST_ENV: "x86_64-linux-deb10-llvm"
 
 #################################
 # x86_64-linux-ubuntu 20.04
@@ -834,7 +875,7 @@ release-x86_64-linux-centos7:
 # x86_64-linux-fedora27
 #################################
 
-validate-x86_64-linux-fedora27:
+.build-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
@@ -843,7 +884,6 @@ validate-x86_64-linux-fedora27:
     LLC: /bin/false
     OPT: /bin/false
     TEST_ENV: "x86_64-linux-fedora27"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
   cache:
     key: linux-x86_64-fedora27
   artifacts:
@@ -851,6 +891,20 @@ validate-x86_64-linux-fedora27:
     # These are used for head.hackage jobs therefore we keep them around for
     # longer.
     expire_in: 8 week
+
+validate-x86_64-linux-fedora27:
+  extends: .build-x86_64-linux-fedora27
+  variables:
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
+
+release-x86_64-linux-fedora27-dwarf:
+  <<: *release
+  extends: .build-x86_64-linux-fedora27
+  variables:
+    CONFIGURE_ARGS: "--enable-dwarf-unwind"
+    BUILD_FLAVOUR: dwarf
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux-dwarf.tar.xz"
+    TEST_ENV: "x86_64-linux-fedora27-dwarf"
 
 ############################################################
 # Validation via Pipelines (Windows)

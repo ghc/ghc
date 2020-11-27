@@ -63,6 +63,11 @@ typedef struct {
    -------------------------------------------------------------------------- */
 
 typedef struct {
+    // If TABLES_NEXT_TO_CODE is defined, then `info` is offset by
+    // `sizeof(StgInfoTable)` and so points to the `code` field of the
+    // StgInfoTable! You may want to use `get_itbl` to get the pointer to the
+    // start of the info table. See
+    // https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/storage/heap-objects#tables_next_to_code.
     const StgInfoTable* info;
 #if defined(PROFILING)
     StgProfHeader         prof;
@@ -340,9 +345,9 @@ typedef struct StgTVarWatchQueue_ {
 
 typedef struct {
   StgHeader                  header;
-  StgClosure                *volatile current_value;
-  StgTVarWatchQueue         *volatile first_watch_queue_entry;
-  StgInt                     volatile num_updates;
+  StgClosure                *current_value; /* accessed via atomics */
+  StgTVarWatchQueue         *first_watch_queue_entry; /* accessed via atomics */
+  StgInt                     num_updates; /* accessed via atomics */
 } StgTVar;
 
 /* new_value == expected_value for read-only accesses */

@@ -334,16 +334,22 @@ subexpression elimination pass.
     its rationale.
 
 .. ghc-flag:: -ddump-stranal
-    :shortdesc: Dump strictness analyser output
+    :shortdesc: Dump demand analysis output
     :type: dynamic
 
-    Dump strictness analyser output
+    Dump demand analysis output.
+
+    See :ghc-flag:`-fstrictness` for the syntax and semantics of demand
+    annotations.
 
 .. ghc-flag:: -ddump-str-signatures
-    :shortdesc: Dump strictness signatures
+    :shortdesc: Dump top-level demand signatures
     :type: dynamic
 
-    Dump strictness signatures
+    Dump top-level demand signatures as produced by demand analysis.
+
+    See :ghc-flag:`-fstrictness` for the syntax and semantics of demand
+    annotations.
 
 .. ghc-flag:: -ddump-cpranal
     :shortdesc: Dump CPR analysis output
@@ -380,7 +386,6 @@ subexpression elimination pass.
     :type: dynamic
 
     Dump output of Core preparation pass
-
 
 STG representation
 ~~~~~~~~~~~~~~~~~~
@@ -546,6 +551,15 @@ LLVM code generator
     :implies: :ghc-flag:`-fllvm`
 
     LLVM code from the :ref:`LLVM code generator <llvm-code-gen>`
+
+C code generator
+~~~~~~~~~~~~~~~~
+
+.. ghc-flag:: -ddump-c-backend
+    :shortdesc: Dump C code produced by the C (unregisterised) backend.
+    :type: dynamic
+
+    :shortdesc: Dump C code produced by the C (unregisterised) backend.
 
 Native code generator
 ~~~~~~~~~~~~~~~~~~~~~

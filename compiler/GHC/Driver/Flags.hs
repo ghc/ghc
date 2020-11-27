@@ -49,6 +49,7 @@ data DumpFlag
    | Opt_D_dump_asm_conflicts
    | Opt_D_dump_asm_stats
    | Opt_D_dump_asm_expanded
+   | Opt_D_dump_c_backend
    | Opt_D_dump_llvm
    | Opt_D_dump_core_stats
    | Opt_D_dump_deriv
@@ -274,6 +275,7 @@ data GeneralFlag
    -- forwards all -L flags to the collect2 command without using a
    -- response file and as such breaking apart.
    | Opt_SingleLibFolder
+   | Opt_ExposeInternalSymbols
    | Opt_KeepCAFs
    | Opt_KeepGoing
    | Opt_ByteCode

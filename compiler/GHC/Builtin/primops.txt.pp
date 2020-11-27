@@ -291,8 +291,8 @@ section "Int8#"
 
 primtype Int8#
 
-primop Int8Extend "extendInt8#" GenPrimOp Int8# -> Int#
-primop Int8Narrow "narrowInt8#" GenPrimOp Int# -> Int8#
+primop Int8ExtendOp "extendInt8#" GenPrimOp Int8# -> Int#
+primop Int8NarrowOp "narrowInt8#" GenPrimOp Int# -> Int8#
 
 primop Int8NegOp "negateInt8#" GenPrimOp Int8# -> Int8#
 
@@ -332,8 +332,8 @@ section "Word8#"
 
 primtype Word8#
 
-primop Word8Extend "extendWord8#" GenPrimOp Word8# -> Word#
-primop Word8Narrow "narrowWord8#" GenPrimOp Word# -> Word8#
+primop Word8ExtendOp "extendWord8#" GenPrimOp Word8# -> Word#
+primop Word8NarrowOp "narrowWord8#" GenPrimOp Word# -> Word8#
 
 primop Word8NotOp "notWord8#" GenPrimOp Word8# -> Word8#
 
@@ -373,8 +373,8 @@ section "Int16#"
 
 primtype Int16#
 
-primop Int16Extend "extendInt16#" GenPrimOp Int16# -> Int#
-primop Int16Narrow "narrowInt16#" GenPrimOp Int# -> Int16#
+primop Int16ExtendOp "extendInt16#" GenPrimOp Int16# -> Int#
+primop Int16NarrowOp "narrowInt16#" GenPrimOp Int# -> Int16#
 
 primop Int16NegOp "negateInt16#" GenPrimOp Int16# -> Int16#
 
@@ -414,8 +414,8 @@ section "Word16#"
 
 primtype Word16#
 
-primop Word16Extend "extendWord16#" GenPrimOp Word16# -> Word#
-primop Word16Narrow "narrowWord16#" GenPrimOp Word# -> Word16#
+primop Word16ExtendOp "extendWord16#" GenPrimOp Word16# -> Word#
+primop Word16NarrowOp "narrowWord16#" GenPrimOp Word# -> Word16#
 
 primop Word16NotOp "notWord16#" GenPrimOp Word16# -> Word16#
 
@@ -447,6 +447,26 @@ primop Word16GtOp "gtWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> Int#
+
+------------------------------------------------------------------------
+section "Int32#"
+        {Operations on 32-bit integers.}
+------------------------------------------------------------------------
+
+primtype Int32#
+
+primop Int32ExtendOp "extendInt32#" GenPrimOp Int32# -> Int#
+primop Int32NarrowOp "narrowInt32#" GenPrimOp Int# -> Int32#
+
+------------------------------------------------------------------------
+section "Word32#"
+        {Operations on 32-bit unsigned integers.}
+------------------------------------------------------------------------
+
+primtype Word32#
+
+primop Word32ExtendOp "extendWord32#" GenPrimOp Word32# -> Word#
+primop Word32NarrowOp "narrowWord32#" GenPrimOp Word# -> Word32#
 
 #if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------
@@ -1669,7 +1689,7 @@ primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
 primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to subtract,
-    atomically subtract the value to the element. Returns the value of
+    atomically subtract the value from the element. Returns the value of
     the element before the operation. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True
@@ -1677,7 +1697,7 @@ primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
 primop FetchAndByteArrayOp_Int "fetchAndIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to AND,
-    atomically AND the value to the element. Returns the value of the
+    atomically AND the value into the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True
@@ -1685,7 +1705,7 @@ primop FetchAndByteArrayOp_Int "fetchAndIntArray#" GenPrimOp
 primop FetchNandByteArrayOp_Int "fetchNandIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to NAND,
-    atomically NAND the value to the element. Returns the value of the
+    atomically NAND the value into the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True
@@ -1693,7 +1713,7 @@ primop FetchNandByteArrayOp_Int "fetchNandIntArray#" GenPrimOp
 primop FetchOrByteArrayOp_Int "fetchOrIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to OR,
-    atomically OR the value to the element. Returns the value of the
+    atomically OR the value into the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True
@@ -1701,7 +1721,7 @@ primop FetchOrByteArrayOp_Int "fetchOrIntArray#" GenPrimOp
 primop FetchXorByteArrayOp_Int "fetchXorIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to XOR,
-    atomically XOR the value to the element. Returns the value of the
+    atomically XOR the value into the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True
@@ -2121,6 +2141,67 @@ primop  CasAddrOp_Word "atomicCasWordAddr#" GenPrimOp
    with has_side_effects = True
         can_fail         = True
 
+primop FetchAddAddrOp_Word "fetchAddWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to add,
+    atomically add the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchSubAddrOp_Word "fetchSubWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to subtract,
+    atomically subtract the value from the element. Returns the value of
+    the element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchAndAddrOp_Word "fetchAndWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to AND,
+    atomically AND the value into the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchNandAddrOp_Word "fetchNandWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to NAND,
+    atomically NAND the value into the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchOrAddrOp_Word "fetchOrWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to OR,
+    atomically OR the value into the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchXorAddrOp_Word "fetchXorWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> (# State# s, Word# #)
+   {Given an address, and a value to XOR,
+    atomically XOR the value into the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop  AtomicReadAddrOp_Word "atomicReadWordAddr#" GenPrimOp
+   Addr# -> State# s -> (# State# s, Word# #)
+   {Given an address, read a machine word.  Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop  AtomicWriteAddrOp_Word "atomicWriteWordAddr#" GenPrimOp
+   Addr# -> Word# -> State# s -> State# s
+   {Given an address, write a machine word. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+
 ------------------------------------------------------------------------
 section "Mutable variables"
         {Operations on MutVar\#s.}
@@ -2222,7 +2303,7 @@ section "Exceptions"
 --          DEFAULT -> case ma of MVar a -> ...
 --          0#      -> maskAsyncExceptions# (\st -> case ma of MVar a -> ...)
 -- The outer case just decides whether to mask exceptions, but we don't want
--- thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd
+-- thereby to hide the strictness in 'ma'!  Hence the use of strictOnceApply1Dmd
 -- in mask and unmask. But catch really is lazy in its first argument, see
 -- #11555. So for IO actions 'ma' we often use a wrapper around it that is
 -- head-strict in 'ma': GHC.IO.catchException.
@@ -2268,7 +2349,7 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2277,7 +2358,7 @@ primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
    out_of_line = True
    has_side_effects = True
 
@@ -2285,7 +2366,7 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2306,7 +2387,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictManyApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -3458,8 +3539,7 @@ primop PrefetchAddrOp3 "prefetchAddr3#" GenPrimOp
 
 primop PrefetchValueOp3 "prefetchValue3#" GenPrimOp
    a -> State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        has_side_effects =  True
+   with has_side_effects =  True
 ----
 
 primop PrefetchByteArrayOp2 "prefetchByteArray2#" GenPrimOp
@@ -3476,8 +3556,7 @@ primop PrefetchAddrOp2 "prefetchAddr2#" GenPrimOp
 
 primop PrefetchValueOp2 "prefetchValue2#" GenPrimOp
    a ->  State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        has_side_effects =  True
+   with has_side_effects =  True
 ----
 
 primop PrefetchByteArrayOp1 "prefetchByteArray1#" GenPrimOp
@@ -3494,8 +3573,7 @@ primop PrefetchAddrOp1 "prefetchAddr1#" GenPrimOp
 
 primop PrefetchValueOp1 "prefetchValue1#" GenPrimOp
    a -> State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        has_side_effects =  True
+   with has_side_effects =  True
 ----
 
 primop PrefetchByteArrayOp0 "prefetchByteArray0#" GenPrimOp
@@ -3512,8 +3590,7 @@ primop PrefetchAddrOp0 "prefetchAddr0#" GenPrimOp
 
 primop PrefetchValueOp0 "prefetchValue0#" GenPrimOp
    a -> State# s -> State# s
-   with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        has_side_effects =  True
+   with has_side_effects =  True
 
 ------------------------------------------------------------------------
 ---                                                                  ---

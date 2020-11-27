@@ -2,7 +2,7 @@
 KindEqualities.hs:25:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘zero’:
-        Patterns not matched:
+        Patterns of type  ‘TyRep a’ not matched:
             TyApp (TyApp _ _) TyInt
             TyApp (TyApp _ _) TyBool
             TyApp (TyApp _ _) TyMaybe
