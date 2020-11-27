@@ -115,6 +115,7 @@ import Data.Int
 import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.IntSet as IntSet
 import Data.String
 import Data.Word
 import System.IO        ( Handle )
@@ -862,6 +863,9 @@ instance (Outputable a) => Outputable (NonEmpty a) where
 
 instance (Outputable a) => Outputable (Set a) where
     ppr s = braces (fsep (punctuate comma (map ppr (Set.toList s))))
+
+instance Outputable IntSet.IntSet where
+    ppr s = braces (fsep (punctuate comma (map ppr (IntSet.toList s))))
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
