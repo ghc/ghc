@@ -363,6 +363,7 @@ instance DefinerOfRegs LocalReg CmmReg where
     foldRegsDefd _ _ z (CmmGlobal _)  = z
 
 instance UserOfRegs GlobalReg CmmReg where
+    {-# INLINEABLE foldRegsUsed #-}
     foldRegsUsed _ _ z (CmmLocal _)    = z
     foldRegsUsed _ f z (CmmGlobal reg) = f z reg
 
@@ -379,6 +380,7 @@ instance Ord r => DefinerOfRegs r r where
 instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r CmmExpr where
   -- The (Ord r) in the context is necessary here
   -- See Note [Recursive superclasses] in GHC.Tc.TyCl.Instance
+  {-# INLINEABLE foldRegsUsed #-}
   foldRegsUsed platform f !z e = expr z e
     where expr z (CmmLit _)          = z
           expr z (CmmLoad addr _)    = foldRegsUsed platform f z addr
