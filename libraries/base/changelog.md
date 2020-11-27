@@ -8,6 +8,9 @@
     in order to define instances for `Nat`. Also, different instances for `Nat` and `Natural`
     won't typecheck anymore.
 
+  * Add `Semigroup` and `Monoid` instances for `Data.Functor.Product` and
+    `Data.Functor.Compose`.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
