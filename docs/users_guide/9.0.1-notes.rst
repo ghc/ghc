@@ -260,6 +260,13 @@ GHCi
   have been removed. Hence it's now possible to use this syntax to set
   breakpoints on functions defined in nested ``where`` or ``let`` clauses.
 
+- Since GHC 8.8 modules using the extensions :extension:`UnboxedTuples`
+  or :extension:`UnboxedSums` are automatically compiled to object-code.
+  GHC 8.10 allowed to disable this feature with the flag `-fbyte-code` in an
+  ``OPTIONS_GHC`` pragma. This release replaces this with a new flag
+  `-fno-object-code-if-unboxed` to control this feature at a 
+  finer-grained level.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
