@@ -35,7 +35,7 @@ end Rec }
 
 -- RHS size: {terms: 52, types: 28, coercions: 0, joins: 0/5}
 F11.$wfib [InlPrag=[2]] :: forall {a} {p}. (a -> a -> Bool) -> (Num a, Num p) => a -> p
-[GblId, Arity=4, Str=<MCM(CS(U))><UP(A,UCU(CS(U)),A,A,A,A,UCU(U))><UP(UCU(CS(U)),A,A,A,A,A,1C1(U))><U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 460 0}]
+[GblId, Arity=4, Str=<MCM(CS(U))><UP(A,UCU(CS(U)),A,A,A,A,U)><UP(UCU(CS(U)),A,A,A,A,A,1C1(U))><U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 460 0}]
 F11.$wfib
   = \ (@a) (@p) (ww :: a -> a -> Bool) (w :: Num a) (w1 :: Num p) (w2 :: a) ->
       let {
@@ -73,7 +73,7 @@ F11.$wfib
 fib [InlPrag=[2]] :: forall {a} {p}. (Eq a, Num a, Num p) => a -> p
 [GblId,
  Arity=4,
- Str=<SP(MCM(CS(U)),A)><UP(A,UCU(CS(U)),A,A,A,A,UCU(U))><UP(UCU(CS(U)),A,A,A,A,A,UCU(U))><U>,
+ Str=<SP(MCM(CS(U)),A)><UP(A,UCU(CS(U)),A,A,A,A,U)><UP(UCU(CS(U)),A,A,A,A,A,U)><U>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@a) (@p) (w [Occ=Once1!] :: Eq a) (w1 [Occ=Once1] :: Num a) (w2 [Occ=Once1] :: Num p) (w3 [Occ=Once1] :: a) -> case w of { GHC.Classes.C:Eq ww1 [Occ=Once1] _ [Occ=Dead] -> F11.$wfib @a @p ww1 w1 w2 w3 }}]
 fib = \ (@a) (@p) (w :: Eq a) (w1 :: Num a) (w2 :: Num p) (w3 :: a) -> case w of { GHC.Classes.C:Eq ww1 ww2 -> F11.$wfib @a @p ww1 w1 w2 w3 }
