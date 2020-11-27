@@ -205,6 +205,7 @@ Library
         GHC.Cmm.Switch
         GHC.Cmm.Switch.Implement
         GHC.CmmToAsm
+        GHC.Cmm.LRegSet
         GHC.CmmToAsm.BlockLayout
         GHC.CmmToAsm.CFG
         GHC.CmmToAsm.CFG.Dominators
