@@ -22,6 +22,7 @@
 #include "linker/M32Alloc.h"
 #include "linker/SymbolExtras.h"
 #include "ForeignExports.h"
+#include "Profiling.h"
 #include "sm/OSMem.h"
 #include "GetEnv.h"
 #include "linker/util.h"
