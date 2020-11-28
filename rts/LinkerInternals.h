@@ -35,6 +35,7 @@ void printLoadedObjects(void);
 
 typedef void SymbolAddr;
 typedef char SymbolName;
+typedef struct _ObjectCode ObjectCode;
 
 #if defined(OBJFORMAT_ELF)
 #  include "linker/ElfTypes.h"
@@ -199,7 +200,7 @@ typedef enum {
 /* Top-level structure for an object module.  One of these is allocated
  * for each object file in use.
  */
-typedef struct _ObjectCode {
+struct _ObjectCode {
     OStatus    status;
     pathchar  *fileName;
     int        fileSize;     /* also mapped image size when using mmap() */
@@ -319,7 +320,7 @@ typedef struct _ObjectCode {
 
     /* virtual memory ranges of loaded code */
     NativeCodeRange *nc_ranges;
-} ObjectCode;
+};
 
 #define OC_INFORMATIVE_FILENAME(OC)             \
     ( (OC)->archiveMemberName ?                 \
