@@ -661,12 +661,13 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
 rnFamEqn :: HsDocContext
          -> AssocTyFamInfo
          -> FreeKiTyVars
-         -- ^ Kind variables from the equation's RHS to be implicitly bound
-         -- if no explicit forall.
+         -- ^ Additional kind variables to implicitly bind if there is no
+         --   explicit forall. (See the comments on @all_imp_vars@ below for a
+         --   more detailed explanation.)
          -> FamEqn GhcPs rhs
          -> (HsDocContext -> rhs -> RnM (rhs', FreeVars))
          -> RnM (FamEqn GhcRn rhs', FreeVars)
-rnFamEqn doc atfi rhs_kvars
+rnFamEqn doc atfi extra_kvars
     (FamEqn { feqn_tycon  = tycon
             , feqn_bndrs  = outer_bndrs
             , feqn_pats   = pats
@@ -679,15 +680,19 @@ rnFamEqn doc atfi rhs_kvars
          -- Note [forall-or-nothing rule] in GHC.Hs.Type), which means
          -- ignoring:
          --
-         -- - pat_kity_vars_with_dups, the variables mentioned in the LHS of
-         --   the equation, and
-         -- - rhs_kvars, the kind variables mentioned in an outermost kind
-         --   signature on the RHS of the equation. (See
-         --   Note [Implicit quantification in type synonyms] in
-         --   GHC.Rename.HsType for why these are implicitly quantified in the
-         --   absence of an explicit forall).
+         -- - pat_kity_vars, the free variables mentioned in the type patterns
+         --   on the LHS of the equation, and
+         -- - extra_kvars, which is one of the following:
+         --   * For type family instances, extra_kvars are the free kind
+         --     variables mentioned in an outermost kind signature on the RHS
+         --     of the equation.
+         --     (See Note [Implicit quantification in type synonyms] in
+         --     GHC.Rename.HsType.)
+         --   * For data family instances, extra_kvars are the free kind
+         --     variables mentioned in the explicit return kind, if one is
+         --     provided. (e.g., the `k` in `data instance T :: k -> Type`).
          --
-         -- For example:
+         -- Some examples:
          --
          -- @
          -- type family F a b
@@ -695,8 +700,20 @@ rnFamEqn doc atfi rhs_kvars
          --   -- all_imp_vars = []
          -- type instance F [(a, b)] c = a -> b -> c
          --   -- all_imp_vars = [a, b, c]
+         --
+         -- type family G :: Maybe a
+         -- type instance forall a. G = (Nothing :: Maybe a)
+         --   -- all_imp_vars = []
+         -- type instance G = (Nothing :: Maybe a)
+         --   -- all_imp_vars = [a]
+         --
+         -- data family H :: k -> Type
+         -- data instance forall k. H :: k -> Type where ...
+         --   -- all_imp_vars = []
+         -- data instance H :: k -> Type where ...
+         --   -- all_imp_vars = [k]
          -- @
-       ; let all_imp_vars = pat_kity_vars_with_dups ++ rhs_kvars
+       ; let all_imp_vars = pat_kity_vars ++ extra_kvars
 
        ; bindHsOuterTyVarBndrs doc mb_cls all_imp_vars outer_bndrs $ \rn_outer_bndrs ->
     do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
@@ -714,8 +731,7 @@ rnFamEqn doc atfi rhs_kvars
                                                   rn_outer_bndrs
 
              groups :: [NonEmpty (Located RdrName)]
-             groups = equivClasses cmpLocated $
-                      pat_kity_vars_with_dups
+             groups = equivClasses cmpLocated pat_kity_vars
        ; nms_dups <- mapM (lookupOccRn . unLoc) $
                         [ tv | (tv :| (_:_)) <- groups ]
              -- Add to the used variables
@@ -725,9 +741,23 @@ rnFamEqn doc atfi rhs_kvars
              --     of the instance decl.  See
              --     Note [Unused type variables in family instances]
        ; let nms_used = extendNameSetList rhs_fvs $
-                           inst_tvs ++ nms_dups
+                           nms_dups {- (a) -} ++ inst_head_tvs {- (b) -}
              all_nms = hsOuterTyVarNames rn_outer_bndrs'
        ; warnUnusedTypePatterns all_nms nms_used
+
+         -- For associated family instances, if a type variable from the
+         -- parent instance declaration is mentioned on the RHS of the
+         -- associated family instance but not bound on the LHS, then reject
+         -- that type variable as being out of scope.
+         -- See Note [Renaming associated types]
+       ; let lhs_bound_vars = extendNameSetList pat_fvs all_nms
+             improperly_scoped cls_tkv =
+                  cls_tkv `elemNameSet` rhs_fvs
+                    -- Mentioned on the RHS...
+               && not (cls_tkv `elemNameSet` lhs_bound_vars)
+                    -- ...but not bound on the LHS.
+             bad_tvs = filter improperly_scoped inst_head_tvs
+       ; unless (null bad_tvs) (badAssocRhs bad_tvs)
 
        ; let eqn_fvs = rhs_fvs `plusFV` pat_fvs
              -- See Note [Type family equations and occurrences]
@@ -754,12 +784,12 @@ rnFamEqn doc atfi rhs_kvars
 
     -- The type variables from the instance head, if we are dealing with an
     -- associated type family instance.
-    inst_tvs = case atfi of
-      NonAssocTyFamEqn _        -> []
-      AssocTyFamDeflt _         -> []
-      AssocTyFamInst _ inst_tvs -> inst_tvs
+    inst_head_tvs = case atfi of
+      NonAssocTyFamEqn _             -> []
+      AssocTyFamDeflt _              -> []
+      AssocTyFamInst _ inst_head_tvs -> inst_head_tvs
 
-    pat_kity_vars_with_dups = extractHsTyArgRdrKiTyVars pats
+    pat_kity_vars = extractHsTyArgRdrKiTyVars pats
              -- It is crucial that extractHsTyArgRdrKiTyVars return
              -- duplicate occurrences, since they're needed to help
              -- determine unused binders on the LHS.
@@ -769,10 +799,17 @@ rnFamEqn doc atfi rhs_kvars
     --
     --   type instance F a b c = Either a b
     --                   ^^^^^
-    lhs_loc = case map lhsTypeArgSrcSpan pats ++ map getLoc rhs_kvars of
+    lhs_loc = case map lhsTypeArgSrcSpan pats ++ map getLoc extra_kvars of
       []         -> panic "rnFamEqn.lhs_loc"
       [loc]      -> loc
       (loc:locs) -> loc `combineSrcSpans` last locs
+
+    badAssocRhs :: [Name] -> RnM ()
+    badAssocRhs ns
+      = addErr (hang (text "The RHS of an associated type declaration mentions"
+                      <+> text "out-of-scope variable" <> plural ns
+                      <+> pprWithCommas (quotes . ppr) ns)
+                   2 (text "All such variables must be bound on the LHS"))
 
 rnTyFamInstDecl :: AssocTyFamInfo
                 -> TyFamInstDecl GhcPs
@@ -829,9 +866,9 @@ rnTyFamInstEqn :: AssocTyFamInfo
                -> TyFamInstEqn GhcPs
                -> RnM (TyFamInstEqn GhcRn, FreeVars)
 rnTyFamInstEqn atfi eqn@(FamEqn { feqn_tycon = tycon, feqn_rhs = rhs })
-  = rnFamEqn (TySynCtx tycon) atfi rhs_kvs eqn rnTySyn
+  = rnFamEqn (TySynCtx tycon) atfi extra_kvs eqn rnTySyn
   where
-    rhs_kvs = extractHsTyRdrTyVarsKindVars rhs
+    extra_kvs = extractHsTyRdrTyVarsKindVars rhs
 
 rnTyFamDefltDecl :: Name
                  -> TyFamDefltDecl GhcPs
@@ -844,9 +881,9 @@ rnDataFamInstDecl :: AssocTyFamInfo
 rnDataFamInstDecl atfi (DataFamInstDecl { dfid_eqn =
                     eqn@(FamEqn { feqn_tycon = tycon
                                 , feqn_rhs   = rhs })})
-  = do { let rhs_kvs = extractDataDefnKindVars rhs
+  = do { let extra_kvs = extractDataDefnKindVars rhs
        ; (eqn', fvs) <-
-           rnFamEqn (TyDataCtx tycon) atfi rhs_kvs eqn rnDataDefn
+           rnFamEqn (TyDataCtx tycon) atfi extra_kvs eqn rnDataDefn
        ; return (DataFamInstDecl { dfid_eqn = eqn' }, fvs) }
 
 -- Renaming of the associated types in instances.
@@ -927,58 +964,131 @@ Relevant tickets: #3699, #10586, #10982 and #11451.
 
 Note [Renaming associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Check that the RHS of the decl mentions only type variables that are explicitly
-bound on the LHS.  For example, this is not ok
-   class C a b where
-      type F a x :: *
-   instance C (p,q) r where
-      type F (p,q) x = (x, r)   -- BAD: mentions 'r'
-c.f. #5515
+When renaming a type/data family instance, be it top-level or associated with
+a class, we must check that all of the type variables mentioned on the RHS are
+properly scoped. Specifically, the rule is this:
 
-Kind variables, on the other hand, are allowed to be implicitly or explicitly
-bound. As examples, this (#9574) is acceptable:
-   class Funct f where
-      type Codomain f :: *
-   instance Funct ('KProxy :: KProxy o) where
-      -- o is implicitly bound by the kind signature
-      -- of the LHS type pattern ('KProxy)
-      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
-And this (#14131) is also acceptable:
-    data family Nat :: k -> k -> *
-    -- k is implicitly bound by an invisible kind pattern
-    newtype instance Nat :: (k -> *) -> (k -> *) -> * where
-      Nat :: (forall xx. f xx -> g xx) -> Nat f g
-We could choose to disallow this, but then associated type families would not
-be able to be as expressive as top-level type synonyms. For example, this type
-synonym definition is allowed:
-    type T = (Nothing :: Maybe a)
-So for parity with type synonyms, we also allow:
-    type family   T :: Maybe a
-    type instance T = (Nothing :: Maybe a)
+  Every variable mentioned on the RHS of a type instance declaration
+  (whether associated or not) must be either
+  * Mentioned on the LHS, or
+  * Mentioned in an outermost kind signature on the RHS
+    (see Note [Implicit quantification in type synonyms])
 
-All this applies only for *instance* declarations.  In *class*
-declarations there is no RHS to worry about, and the class variables
-can all be in scope (#5862):
+Here is a simple example of something we should reject:
+
+  class C a b where
+    type F a x
+  instance C Int Bool where
+    type F Int x = z
+
+Here, `z` is mentioned on the RHS of the associated instance without being
+mentioned on the LHS, nor is `z` mentioned in an outermost kind signature. The
+renamer will reject `z` as being out of scope without much fuss.
+
+Things get slightly trickier when the instance header itself binds type
+variables. Consider this example (adapted from #5515):
+
+   instance C (p,q) z where
+      type F (p,q) x = (x, z)
+
+According to the rule above, this instance is improperly scoped. However, due
+to the way GHC's renamer works, `z` is /technically/ in scope, as GHC will
+always bring type variables from an instance header into scope over the
+associated type family instances. As a result, the renamer won't simply reject
+the `z` as being out of scope (like it would for the `type F Int x = z`
+example) unless further action is taken. It is important to reject this sort of
+thing in the renamer, because if it is allowed to make it through to the
+typechecker, unexpected shenanigans can occur (see #18021 for examples).
+
+To prevent these sorts of shenanigans, we reject programs like the one above
+with an extra validity check in rnFamEqn. For each type variable bound in the
+parent instance head, we check if it is mentioned on the RHS of the associated
+family instance but not bound on the LHS. If any of the instance-head-bound
+variables meet these criteria, we throw an error.
+(See rnFamEqn.improperly_scoped for how this is implemented.)
+
+Some additional wrinkles:
+
+* This Note only applies to *instance* declarations.  In *class* declarations
+  there is no RHS to worry about, and the class variables can all be in scope
+  (#5862):
+
     class Category (x :: k -> k -> *) where
       type Ob x :: k -> Constraint
       id :: Ob x a => x a a
       (.) :: (Ob x a, Ob x b, Ob x c) => x b c -> x a b -> x a c
-Here 'k' is in scope in the kind signature, just like 'x'.
 
-Although type family equations can bind type variables with explicit foralls,
-it need not be the case that all variables that appear on the RHS must be bound
-by a forall. For instance, the following is acceptable:
+  Here 'k' is in scope in the kind signature, just like 'x'.
 
-   class C a where
-     type T a b
-   instance C (Maybe a) where
-     type forall b. T (Maybe a) b = Either a b
+* Although type family equations can bind type variables with explicit foralls,
+  it need not be the case that all variables that appear on the RHS must be
+  bound by a forall. For instance, the following is acceptable:
 
-Even though `a` is not bound by the forall, this is still accepted because `a`
-was previously bound by the `instance C (Maybe a)` part. (see #16116).
+    class C4 a where
+      type T4 a b
+    instance C4 (Maybe a) where
+      type forall b. T4 (Maybe a) b = Either a b
 
-In each case, the function which detects improperly bound variables on the RHS
-is GHC.Tc.Validity.checkValidFamPats.
+  Even though `a` is not bound by the forall, this is still accepted because `a`
+  was previously bound by the `instance C4 (Maybe a)` part. (see #16116).
+
+* In addition to the validity check in rnFamEqn.improperly_scoped, there is an
+  additional check in GHC.Tc.Validity.checkFamPatBinders that checks each family
+  instance equation for type variables used on the RHS but not bound on the
+  LHS. This is not made redundant by rmFamEqn.improperly_scoped, as there are
+  programs that each check will reject that the other check will not catch:
+
+  - checkValidFamPats is used on all forms of family instances, whereas
+    rmFamEqn.improperly_scoped only checks associated family instances. Since
+    checkFamPatBinders occurs after typechecking, it can catch programs that
+    introduce dodgy scoping by way of type synonyms (see #7536), which is
+    impractical to accomplish in the renamer.
+  - rnFamEqn.improperly_scoped catches some programs that, if allowed to escape
+    the renamer, would accidentally be accepted by the typechecker. Here is one
+    such program (#18021):
+
+      class C5 a where
+        data family D a
+
+      instance forall a. C5 Int where
+        data instance D Int = MkD a
+
+    If this is not rejected in the renamer, the typechecker would treat this
+    program as though the `a` were existentially quantified, like so:
+
+      data instance D Int = forall a. MkD a
+
+    This is likely not what the user intended!
+
+    Here is another such program (#9574):
+
+      class Funct f where
+        type Codomain f
+      instance Funct ('KProxy :: KProxy o) where
+        type Codomain 'KProxy = NatTr (Proxy :: o -> Type)
+
+    Where:
+
+      data Proxy (a :: k) = Proxy
+      data KProxy (t :: Type) = KProxy
+      data NatTr (c :: o -> Type)
+
+    Note that the `o` in the `Codomain 'KProxy` instance should be considered
+    improperly scoped. It does not meet the criteria for being explicitly
+    quantified, as it is not mentioned by name on the LHS, nor does it meet the
+    criteria for being implicitly quantified, as it is used in a RHS kind
+    signature that is not outermost (see Note [Implicit quantification in type
+    synonyms]). However, `o` /is/ bound by the instance header, so if this
+    program is not rejected by the renamer, the typechecker would treat it as
+    though you had written this:
+
+      instance Funct ('KProxy :: KProxy o) where
+        type Codomain ('KProxy @o) = NatTr (Proxy :: o -> Type)
+
+    Although this is a valid program, it's probably a stretch too far to turn
+    `type Codomain 'KProxy = ...` into `type Codomain ('KProxy @o) = ...` here.
+    If the user really wants the latter, it is simple enough to communicate
+    their intent by mentioning `o` on the LHS by name.
 
 Note [Type family equations and occurrences]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

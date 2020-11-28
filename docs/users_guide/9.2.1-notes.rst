@@ -18,6 +18,34 @@ Language
   more restrictive than before.  See the user manual :ref:`kind-inference-data-family-instances`.
   This is a breaking change, albeit a fairly obscure one that corrects a specification bug.
 
+* GHC is stricter about checking for out-of-scope type variables on the
+  right-hand sides of associated type family instances that are not bound on
+  the left-hand side. As a result, some programs that were accidentally
+  accepted in previous versions of GHC will now be rejected, such as this
+  example: ::
+
+      class Funct f where
+        type Codomain f
+      instance Funct ('KProxy :: KProxy o) where
+        type Codomain 'KProxy = NatTr (Proxy :: o -> Type)
+
+  Where: ::
+
+      data Proxy (a :: k) = Proxy
+      data KProxy (t :: Type) = KProxy
+      data NatTr (c :: o -> Type)
+
+  GHC will now reject the ``o`` on the right-hand side of the ``Codomain``
+  instance as being out of scope, as it does not meet the requirements for
+  being explicitly bound (as it is not mentioned on the left-hand side) nor
+  implicitly bound (as it is not mentioned in an *outermost* kind signature,
+  as required by :ref:`scoping-class-params`). This program can be repaired in
+  a backwards-compatible way by mentioning ``o`` on the left-hand side: ::
+
+      instance Funct ('KProxy :: KProxy o) where
+        type Codomain ('KProxy @o) = NatTr (Proxy :: o -> Type)
+        -- Alternatively,
+        -- type Codomain ('KProxy :: KProxy o) = NatTr (Proxy :: o -> Type)
 
 Compiler
 ~~~~~~~~
@@ -52,7 +80,7 @@ Compiler
 - There is a significant refactoring in the solver; any type-checker plugins
   will have to be updated, as GHC no longer uses flattening skolems or
   flattening metavariables.
-  
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
