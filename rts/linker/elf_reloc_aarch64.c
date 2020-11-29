@@ -6,7 +6,6 @@
 #include "elf_plt.h"
 
 #include <stdlib.h>
-#include <assert.h>
 
 
 #if defined(aarch64_HOST_ARCH)
@@ -71,15 +70,15 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
             *(uint64_t*)P = (uint64_t)addend;
             break;
         case COMPAT_R_AARCH64_ABS32:
-            assert(isInt64(32, addend));
+            CHECK(isInt64(32, addend));
         case COMPAT_R_AARCH64_PREL32:
-            assert(isInt64(32, addend));
+            CHECK(isInt64(32, addend));
             *(uint32_t*)P = (uint32_t)addend;
             break;
         case COMPAT_R_AARCH64_ABS16:
-            assert(isInt64(16, addend));
+            CHECK(isInt64(16, addend));
         case COMPAT_R_AARCH64_PREL16:
-            assert(isInt64(16, addend));
+            CHECK(isInt64(16, addend));
             *(uint16_t*)P = (uint16_t)addend;
             break;
         /* static aarch64 relocations */
@@ -95,8 +94,8 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
             // imm64 = SignExtend(hi:lo:0x000,64)
             // Range is 21 bits + the 12 page relative bits
             // known to be 0. -2^32 <= X < 2^32
-            assert(isInt64(21+12, addend));
-            assert((addend & 0xfff) == 0); /* page relative */
+            CHECK(isInt64(21+12, addend));
+            CHECK((addend & 0xfff) == 0); /* page relative */
 
             *(inst_t *)P = (*(inst_t *)P & 0x9f00001f)
                         | (inst_t) (((uint64_t) addend << 17) & 0x60000000)
@@ -106,7 +105,7 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
         /* - control flow relocations */
         case COMPAT_R_AARCH64_JUMP26:   /* relocate b ... */
         case COMPAT_R_AARCH64_CALL26: { /* relocate bl ... */
-            assert(isInt64(26+2, addend)); /* X in range */
+            CHECK(isInt64(26+2, addend)); /* X in range */
             *(inst_t *)P = (*(inst_t *)P & 0xfc000000) /* keep upper 6 (32-6)
  * bits */
                          | ((uint32_t)(addend >> 2) & 0x03ffffff);
@@ -114,8 +113,8 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
         }
         case COMPAT_R_AARCH64_ADR_GOT_PAGE: {
             /* range is -2^32 <= X < 2^32 */
-            assert(isInt64(21+12, addend)); /* X in range */
-            assert((addend & 0xfff) == 0); /* page relative */
+            CHECK(isInt64(21+12, addend)); /* X in range */
+            CHECK((addend & 0xfff) == 0); /* page relative */
 
             *(inst_t *)P = (*(inst_t *)P & 0x9f00001f)
                | (inst_t)(((uint64_t)addend << 17) & 0x60000000)  // lo
@@ -149,10 +148,10 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
             FALLTHROUGH;
         case COMPAT_R_AARCH64_LD64_GOT_LO12_NC: {
             if(exp_shift == -1) {
-                assert( (addend & 7) == 0 );
+                CHECK( (addend & 7) == 0 );
                 exp_shift = 3;
             }
-            assert((addend & 0xfff) == addend);
+            CHECK((addend & 0xfff) == addend);
             int shift = 0;
             if(isLoadStore(P)) {
                 /* bits 31, 30 encode the size. */
@@ -161,7 +160,7 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
                     shift = 4;
                 }
             }
-            assert(addend == 0 || exp_shift == shift);
+            CHECK(addend == 0 || exp_shift == shift);
             *(inst_t *)P = (*(inst_t *)P & 0xffc003ff)
                | ((inst_t)(addend >> shift << 10) & 0x003ffc00);
             break;
@@ -188,12 +187,12 @@ computeAddend(Section * section, Elf_Rel * rel,
     /* Position where something is relocated */
     addr_t P = (addr_t)((uint8_t*)section->start + rel->r_offset);
 
-    assert(0x0 != P);
-    assert((uint64_t)section->start <= P);
-    assert(P <= (uint64_t)section->start + section->size);
+    CHECK(0x0 != P);
+    CHECK((uint64_t)section->start <= P);
+    CHECK(P <= (uint64_t)section->start + section->size);
     /* Address of the symbol */
     addr_t S = (addr_t) symbol->addr;
-    assert(0x0 != S);
+    CHECK(0x0 != S);
     /* GOT slot for the symbol */
     addr_t GOT_S = (addr_t) symbol->got_addr;
 
@@ -243,16 +242,16 @@ computeAddend(Section * section, Elf_Rel * rel,
                     }
                 }
 
-                assert(0 == (0xffff000000000000 & S));
+                CHECK(0 == (0xffff000000000000 & S));
                 V = S + A - P;
-                assert(isInt64(26+2, V)); /* X in range */
+                CHECK(isInt64(26+2, V)); /* X in range */
             }
             return V;
         }
-        case COMPAT_R_AARCH64_LDST128_ABS_LO12_NC: assert(0 == ((S+A) & 0x0f));
-        case COMPAT_R_AARCH64_LDST64_ABS_LO12_NC:  assert(0 == ((S+A) & 0x07));
-        case COMPAT_R_AARCH64_LDST32_ABS_LO12_NC:  assert(0 == ((S+A) & 0x03));
-        case COMPAT_R_AARCH64_LDST16_ABS_LO12_NC:  assert(0 == ((S+A) & 0x01));
+        case COMPAT_R_AARCH64_LDST128_ABS_LO12_NC: CHECK(0 == ((S+A) & 0x0f));
+        case COMPAT_R_AARCH64_LDST64_ABS_LO12_NC:  CHECK(0 == ((S+A) & 0x07));
+        case COMPAT_R_AARCH64_LDST32_ABS_LO12_NC:  CHECK(0 == ((S+A) & 0x03));
+        case COMPAT_R_AARCH64_LDST16_ABS_LO12_NC:  CHECK(0 == ((S+A) & 0x01));
         case COMPAT_R_AARCH64_LDST8_ABS_LO12_NC:
             /* type: static, class: aarch64, op: S + A */
             return (S + A) & 0xfff;
@@ -266,12 +265,12 @@ computeAddend(Section * section, Elf_Rel * rel,
             // TODO: fix this story proper, so that the transformation
             //       makes sense without resorting to: everyone else
             //       does it like this as well.
-            assert(0x0 != GOT_S);
+            CHECK(0x0 != GOT_S);
             return Page(GOT_S+A) - Page(P);
         }
         case COMPAT_R_AARCH64_LD64_GOT_LO12_NC: {
             // G(GDAT(S+A))
-            assert(0x0 != GOT_S);
+            CHECK(0x0 != GOT_S);
             return (GOT_S + A) & 0xfff;
         }
         default:
@@ -297,7 +296,7 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
                                relTab->sectionHeader->sh_link,
                                ELF64_R_SYM((Elf64_Xword)rel->r_info));
 
-            assert(0x0 != symbol);
+            CHECK(0x0 != symbol);
 
             /* decode implicit addend */
             int64_t addend = decodeAddendAarch64(targetSection, rel);
@@ -323,8 +322,8 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
                                relaTab->sectionHeader->sh_link,
                                ELF64_R_SYM((Elf64_Xword)rel->r_info));
 
-            assert(0x0 != symbol);
-            assert(0x0 != symbol->addr);
+            CHECK(0x0 != symbol);
+            CHECK(0x0 != symbol->addr);
 
             /* take explicit addend */
             int64_t addend = rel->r_addend;
