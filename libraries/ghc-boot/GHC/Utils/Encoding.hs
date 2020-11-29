@@ -142,6 +142,9 @@ utf8CharStart :: ByteArray# -> Int -> Int
 utf8CharStart = go
   where
     go arr ofs@(I# ofs#)
+      | True
+      , ofs < 0 || ofs > I# (sizeofByteArray# arr)
+      = error "utf8CharStart: overflow"
       | w >= 0x80 && w < 0xC0 = go arr (ofs - 1)
       | otherwise             = ofs
       where
