@@ -1,0 +1,246 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 311, types: 249, coercions: 4, joins: 0/0}
+
+-- RHS size: {terms: 8, types: 11, coercions: 1, joins: 0/0}
+T18982.$WExGADT :: forall e. (e ~ Int) => e %1 -> Int %1 -> ExGADT Int
+T18982.$WExGADT = \ (@e) (dt :: e ~ Int) (dt :: e) (dt :: Int) -> T18982.ExGADT @Int @e @~(<Int>_N :: Int GHC.Prim.~# Int) dt dt dt
+
+-- RHS size: {terms: 3, types: 2, coercions: 1, joins: 0/0}
+T18982.$WGADT :: Int %1 -> GADT Int
+T18982.$WGADT = \ (dt :: Int) -> T18982.GADT @Int @~(<Int>_N :: Int GHC.Prim.~# Int) dt
+
+-- RHS size: {terms: 7, types: 8, coercions: 0, joins: 0/0}
+T18982.$WEx :: forall e a. e %1 -> a %1 -> Ex a
+T18982.$WEx = \ (@e) (@a) (dt :: e) (dt :: a) -> T18982.Ex @a @e dt dt
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18982.$trModule4 :: GHC.Prim.Addr#
+T18982.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18982.$trModule3 :: GHC.Types.TrName
+T18982.$trModule3 = GHC.Types.TrNameS T18982.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18982.$trModule2 :: GHC.Prim.Addr#
+T18982.$trModule2 = "T18982"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18982.$trModule1 :: GHC.Types.TrName
+T18982.$trModule1 = GHC.Types.TrNameS T18982.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18982.$trModule :: GHC.Types.Module
+T18982.$trModule = GHC.Types.Module T18982.$trModule3 T18982.$trModule1
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep :: GHC.Types.KindRep
+$krep = GHC.Types.KindRepTyConApp GHC.Types.$tcInt (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep1 :: GHC.Types.KindRep
+$krep1 = GHC.Types.KindRepVar 1#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep2 :: GHC.Types.KindRep
+$krep2 = GHC.Types.KindRepVar 0#
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep3 :: [GHC.Types.KindRep]
+$krep3 = GHC.Types.: @GHC.Types.KindRep $krep (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep4 :: [GHC.Types.KindRep]
+$krep4 = GHC.Types.: @GHC.Types.KindRep $krep2 $krep3
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep5 :: [GHC.Types.KindRep]
+$krep5 = GHC.Types.: @GHC.Types.KindRep GHC.Types.krep$* $krep4
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep6 :: GHC.Types.KindRep
+$krep6 = GHC.Types.KindRepTyConApp GHC.Types.$tc~ $krep5
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcBox2 :: GHC.Prim.Addr#
+T18982.$tcBox2 = "Box"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcBox1 :: GHC.Types.TrName
+T18982.$tcBox1 = GHC.Types.TrNameS T18982.$tcBox2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcBox :: GHC.Types.TyCon
+T18982.$tcBox = GHC.Types.TyCon 16948648223906549518## 2491460178135962649## T18982.$trModule T18982.$tcBox1 0# GHC.Types.krep$*Arr*
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep7 :: [GHC.Types.KindRep]
+$krep7 = GHC.Types.: @GHC.Types.KindRep $krep2 (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep8 :: GHC.Types.KindRep
+$krep8 = GHC.Types.KindRepTyConApp T18982.$tcBox $krep7
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'Box1 :: GHC.Types.KindRep
+T18982.$tc'Box1 = GHC.Types.KindRepFun $krep2 $krep8
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'Box3 :: GHC.Prim.Addr#
+T18982.$tc'Box3 = "'Box"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'Box2 :: GHC.Types.TrName
+T18982.$tc'Box2 = GHC.Types.TrNameS T18982.$tc'Box3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'Box :: GHC.Types.TyCon
+T18982.$tc'Box = GHC.Types.TyCon 1412068769125067428## 8727214667407894081## T18982.$trModule T18982.$tc'Box2 1# T18982.$tc'Box1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcEx2 :: GHC.Prim.Addr#
+T18982.$tcEx2 = "Ex"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcEx1 :: GHC.Types.TrName
+T18982.$tcEx1 = GHC.Types.TrNameS T18982.$tcEx2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcEx :: GHC.Types.TyCon
+T18982.$tcEx = GHC.Types.TyCon 4376661818164435927## 18005417598910668817## T18982.$trModule T18982.$tcEx1 0# GHC.Types.krep$*Arr*
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep9 :: [GHC.Types.KindRep]
+$krep9 = GHC.Types.: @GHC.Types.KindRep $krep1 (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep10 :: GHC.Types.KindRep
+$krep10 = GHC.Types.KindRepTyConApp T18982.$tcEx $krep9
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep11 :: GHC.Types.KindRep
+$krep11 = GHC.Types.KindRepFun $krep1 $krep10
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'Ex1 :: GHC.Types.KindRep
+T18982.$tc'Ex1 = GHC.Types.KindRepFun $krep2 $krep11
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'Ex3 :: GHC.Prim.Addr#
+T18982.$tc'Ex3 = "'Ex"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'Ex2 :: GHC.Types.TrName
+T18982.$tc'Ex2 = GHC.Types.TrNameS T18982.$tc'Ex3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'Ex :: GHC.Types.TyCon
+T18982.$tc'Ex = GHC.Types.TyCon 14609381081172201359## 3077219645053200509## T18982.$trModule T18982.$tc'Ex2 2# T18982.$tc'Ex1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcGADT2 :: GHC.Prim.Addr#
+T18982.$tcGADT2 = "GADT"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcGADT1 :: GHC.Types.TrName
+T18982.$tcGADT1 = GHC.Types.TrNameS T18982.$tcGADT2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcGADT :: GHC.Types.TyCon
+T18982.$tcGADT = GHC.Types.TyCon 9243924476135839950## 5096619276488416461## T18982.$trModule T18982.$tcGADT1 0# GHC.Types.krep$*Arr*
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep12 :: GHC.Types.KindRep
+$krep12 = GHC.Types.KindRepTyConApp T18982.$tcGADT $krep3
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'GADT1 :: GHC.Types.KindRep
+T18982.$tc'GADT1 = GHC.Types.KindRepFun $krep $krep12
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'GADT3 :: GHC.Prim.Addr#
+T18982.$tc'GADT3 = "'GADT"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'GADT2 :: GHC.Types.TrName
+T18982.$tc'GADT2 = GHC.Types.TrNameS T18982.$tc'GADT3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'GADT :: GHC.Types.TyCon
+T18982.$tc'GADT = GHC.Types.TyCon 2077850259354179864## 16731205864486799217## T18982.$trModule T18982.$tc'GADT2 0# T18982.$tc'GADT1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcExGADT2 :: GHC.Prim.Addr#
+T18982.$tcExGADT2 = "ExGADT"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcExGADT1 :: GHC.Types.TrName
+T18982.$tcExGADT1 = GHC.Types.TrNameS T18982.$tcExGADT2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T18982.$tcExGADT :: GHC.Types.TyCon
+T18982.$tcExGADT = GHC.Types.TyCon 6470898418160489500## 10361108917441214060## T18982.$trModule T18982.$tcExGADT1 0# GHC.Types.krep$*Arr*
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep13 :: GHC.Types.KindRep
+$krep13 = GHC.Types.KindRepTyConApp T18982.$tcExGADT $krep3
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep14 :: GHC.Types.KindRep
+$krep14 = GHC.Types.KindRepFun $krep $krep13
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep15 :: GHC.Types.KindRep
+$krep15 = GHC.Types.KindRepFun $krep2 $krep14
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'ExGADT1 :: GHC.Types.KindRep
+T18982.$tc'ExGADT1 = GHC.Types.KindRepFun $krep6 $krep15
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'ExGADT3 :: GHC.Prim.Addr#
+T18982.$tc'ExGADT3 = "'ExGADT"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'ExGADT2 :: GHC.Types.TrName
+T18982.$tc'ExGADT2 = GHC.Types.TrNameS T18982.$tc'ExGADT3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T18982.$tc'ExGADT :: GHC.Types.TyCon
+T18982.$tc'ExGADT = GHC.Types.TyCon 8468257409157161049## 5503123603717080600## T18982.$trModule T18982.$tc'ExGADT2 1# T18982.$tc'ExGADT1
+
+-- RHS size: {terms: 11, types: 14, coercions: 0, joins: 0/0}
+T18982.$wi :: forall {a} {e}. (a GHC.Prim.~# Int) -> e -> GHC.Prim.Int# -> GHC.Prim.Int#
+T18982.$wi = \ (@a) (@e) (ww :: a GHC.Prim.~# Int) (ww1 :: e) (ww2 :: GHC.Prim.Int#) -> case ww1 of { __DEFAULT -> GHC.Prim.+# ww2 1# }
+
+-- RHS size: {terms: 15, types: 27, coercions: 1, joins: 0/0}
+i :: forall a. ExGADT a -> Int
+i = \ (@a) (w :: ExGADT a) -> case w of { ExGADT @e ww1 ww2 ww3 ww4 -> case ww4 of { GHC.Types.I# ww6 -> case T18982.$wi @a @e @~(ww1 :: a GHC.Prim.~# Int) ww3 ww6 of ww7 { __DEFAULT -> GHC.Types.I# ww7 } } }
+
+-- RHS size: {terms: 6, types: 10, coercions: 0, joins: 0/0}
+T18982.$wh :: forall {a}. (a GHC.Prim.~# Int) -> GHC.Prim.Int# -> GHC.Prim.Int#
+T18982.$wh = \ (@a) (ww :: a GHC.Prim.~# Int) (ww1 :: GHC.Prim.Int#) -> GHC.Prim.+# ww1 1#
+
+-- RHS size: {terms: 14, types: 18, coercions: 1, joins: 0/0}
+h :: forall a. GADT a -> Int
+h = \ (@a) (w :: GADT a) -> case w of { GADT ww1 ww2 -> case ww2 of { GHC.Types.I# ww4 -> case T18982.$wh @a @~(ww1 :: a GHC.Prim.~# Int) ww4 of ww5 { __DEFAULT -> GHC.Types.I# ww5 } } }
+
+-- RHS size: {terms: 9, types: 5, coercions: 0, joins: 0/0}
+T18982.$wg :: forall {e}. e -> GHC.Prim.Int# -> GHC.Prim.Int#
+T18982.$wg = \ (@e) (ww :: e) (ww1 :: GHC.Prim.Int#) -> case ww of { __DEFAULT -> GHC.Prim.+# ww1 1# }
+
+-- RHS size: {terms: 14, types: 12, coercions: 0, joins: 0/0}
+g :: Ex Int -> Int
+g = \ (w :: Ex Int) -> case w of { Ex @e ww1 ww2 -> case ww2 of { GHC.Types.I# ww4 -> case T18982.$wg @e ww1 ww4 of ww5 { __DEFAULT -> GHC.Types.I# ww5 } } }
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+T18982.$wf :: GHC.Prim.Int# -> GHC.Prim.Int#
+T18982.$wf = \ (ww :: GHC.Prim.Int#) -> GHC.Prim.+# ww 1#
+
+-- RHS size: {terms: 13, types: 8, coercions: 0, joins: 0/0}
+f :: Box Int -> Int
+f = \ (w :: Box Int) -> case w of { Box ww1 -> case ww1 of { GHC.Types.I# ww3 -> case T18982.$wf ww3 of ww4 { __DEFAULT -> GHC.Types.I# ww4 } } }
+
+
+
