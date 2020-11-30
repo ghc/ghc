@@ -23,6 +23,8 @@ import GHC.Exts.Heap
 import Data.ByteString (ByteString)
 import Control.Monad.Fail
 import qualified Data.ByteString as BS
+import GHC.Platform.Host (hostPlatformArch)
+import GHC.Platform.ArchOS
 
 -- NOTE: Must return a pointer acceptable for use in the header of a closure.
 -- If tables_next_to_code is enabled, then it must point the 'code' field.
@@ -63,59 +65,9 @@ mkConInfoTable tables_next_to_code ptr_words nonptr_words tag ptrtag con_desc = 
 funPtrToInt :: FunPtr a -> Int
 funPtrToInt (FunPtr a) = I## (addr2Int## a)
 
-data Arch = ArchSPARC
-          | ArchPPC
-          | ArchX86
-          | ArchX86_64
-          | ArchAlpha
-          | ArchARM
-          | ArchAArch64
-          | ArchPPC64
-          | ArchPPC64LE
-          | ArchS390X
- deriving Show
-
 mkJumpToAddr :: MonadFail m => EntryFunPtr-> m ItblCodes
-mkJumpToAddr ptr = do
-  arch <- case mArch of
-    Just a -> pure a
-    Nothing ->
-      -- This code must not be called. You either need to add your
-      -- architecture as a distinct case to 'Arch' and 'mArch', or use
-      -- non-TABLES_NEXT_TO_CODE mode.
-      fail "mkJumpToAddr: Unknown obscure arch is not supported with TABLES_NEXT_TO_CODE"
-  pure $ mkJumpToAddr' arch ptr
-
--- | 'Just' if it's a known OS, or 'Nothing' otherwise.
-mArch :: Maybe Arch
-mArch =
-#if defined(sparc_HOST_ARCH)
-       Just ArchSPARC
-#elif defined(powerpc_HOST_ARCH)
-       Just ArchPPC
-#elif defined(i386_HOST_ARCH)
-       Just ArchX86
-#elif defined(x86_64_HOST_ARCH)
-       Just ArchX86_64
-#elif defined(alpha_HOST_ARCH)
-       Just ArchAlpha
-#elif defined(arm_HOST_ARCH)
-       Just ArchARM
-#elif defined(aarch64_HOST_ARCH)
-       Just ArchAArch64
-#elif defined(powerpc64_HOST_ARCH)
-       Just ArchPPC64
-#elif defined(powerpc64le_HOST_ARCH)
-       Just ArchPPC64LE
-#elif defined(s390x_HOST_ARCH)
-       Just ArchS390X
-#else
-       Nothing
-#endif
-
-mkJumpToAddr' :: Arch -> EntryFunPtr -> ItblCodes
-mkJumpToAddr' platform a = case platform of
-    ArchSPARC ->
+mkJumpToAddr a = case hostPlatformArch of
+    ArchSPARC -> pure $
         -- After some consideration, we'll try this, where
         -- 0x55555555 stands in for the address to jump to.
         -- According to includes/rts/MachRegs.h, %g3 is very
@@ -137,7 +89,7 @@ mkJumpToAddr' platform a = case platform of
                    0x81C0C000,
                    0x01000000 ]
 
-    ArchPPC ->
+    ArchPPC -> pure $
         -- We'll use r12, for no particular reason.
         -- 0xDEADBEEF stands for the address:
         -- 3D80DEAD lis r12,0xDEAD
@@ -152,7 +104,7 @@ mkJumpToAddr' platform a = case platform of
                    0x618C0000 .|. lo16 w32,
                    0x7D8903A6, 0x4E800420 ]
 
-    ArchX86 ->
+    ArchX86 -> pure $
         -- Let the address to jump to be 0xWWXXYYZZ.
         -- Generate   movl $0xWWXXYYZZ,%eax  ;  jmp *%eax
         -- which is
@@ -167,7 +119,7 @@ mkJumpToAddr' platform a = case platform of
         in
             Left insnBytes
 
-    ArchX86_64 ->
+    ArchX86_64 -> pure $
         -- Generates:
         --      jmpq *.L1(%rip)
         --      .align 8
@@ -191,7 +143,7 @@ mkJumpToAddr' platform a = case platform of
         in
             Left insnBytes
 
-    ArchAlpha ->
+    ArchAlpha -> pure $
         let w64 = fromIntegral (funPtrToInt a) :: Word64
         in Right [ 0xc3800000      -- br   at, .+4
                  , 0xa79c000c      -- ldq  at, 12(at)
@@ -200,7 +152,7 @@ mkJumpToAddr' platform a = case platform of
                  , fromIntegral (w64 .&. 0x0000FFFF)
                  , fromIntegral ((w64 `shiftR` 32) .&. 0x0000FFFF) ]
 
-    ArchARM { } ->
+    ArchARM {} -> pure $
         -- Generates Arm sequence,
         --      ldr r1, [pc, #0]
         --      bx r1
@@ -214,7 +166,7 @@ mkJumpToAddr' platform a = case platform of
                 , 0x11, 0xff, 0x2f, 0xe1
                 , byte0 w32, byte1 w32, byte2 w32, byte3 w32]
 
-    ArchAArch64 { } ->
+    ArchAArch64 {} -> pure $
         -- Generates:
         --
         --      ldr     x1, label
@@ -230,7 +182,8 @@ mkJumpToAddr' platform a = case platform of
                 , 0xd61f0020
                 , fromIntegral w64
                 , fromIntegral (w64 `shiftR` 32) ]
-    ArchPPC64 ->
+
+    ArchPPC_64 ELF_V1 -> pure $
         -- We use the compiler's register r12 to read the function
         -- descriptor and the linker's register r11 as a temporary
         -- register to hold the function entry point.
@@ -256,7 +209,7 @@ mkJumpToAddr' platform a = case platform of
                   0xE96C0010,
                   0x4E800420]
 
-    ArchPPC64LE ->
+    ArchPPC_64 ELF_V2 -> pure $
         -- The ABI requires r12 to point to the function's entry point.
         -- We use the medium code model where code resides in the first
         -- two gigabytes, so loading a non-negative32 bit address
@@ -274,7 +227,7 @@ mkJumpToAddr' platform a = case platform of
                    0x618C0000 .|. lo16 w32,
                    0x7D8903A6, 0x4E800420 ]
 
-    ArchS390X ->
+    ArchS390X -> pure $
         -- Let 0xAABBCCDDEEFFGGHH be the address to jump to.
         -- The following code loads the address into scratch
         -- register r1 and jumps to it.
@@ -287,6 +240,12 @@ mkJumpToAddr' platform a = case platform of
         in Left [ 0xC0, 0x1E, byte7 w64, byte6 w64, byte5 w64, byte4 w64,
                   0xC0, 0x19, byte3 w64, byte2 w64, byte1 w64, byte0 w64,
                   0x07, 0xF1 ]
+
+    arch ->
+      -- The arch isn't supported. You either need to add your architecture as a
+      -- distinct case, or use non-TABLES_NEXT_TO_CODE mode.
+      fail $ "mkJumpToAddr: arch is not supported with TABLES_NEXT_TO_CODE ("
+             ++ show arch ++ ")"
 
 byte0 :: (Integral w) => w -> Word8
 byte0 w = fromIntegral w
