@@ -39,6 +39,7 @@ Library
     exposed-modules:
             GHC.BaseDir
             GHC.Data.ShortText
+            GHC.Data.SizedSeq
             GHC.Utils.Encoding
             GHC.LanguageExtensions
             GHC.Unit.Database

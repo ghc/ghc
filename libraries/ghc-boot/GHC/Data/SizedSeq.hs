@@ -1,5 +1,5 @@
 {-# LANGUAGE StandaloneDeriving, DeriveGeneric #-}
-module SizedSeq
+module GHC.Data.SizedSeq
   ( SizedSeq(..)
   , emptySS
   , addToSS

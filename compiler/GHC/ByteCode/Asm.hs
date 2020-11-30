@@ -41,11 +41,10 @@ import GHC.Utils.Misc
 
 import GHC.Core.TyCon
 import GHC.Data.FastString
+import GHC.Data.SizedSeq
+
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Platform
-
--- From iserv
-import SizedSeq
 
 import Control.Monad
 import Control.Monad.ST ( runST )
