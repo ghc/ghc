@@ -322,7 +322,7 @@ cprAnalBind top_lvl env id rhs
     not_strict  = not (isStrUsedDmd (idDemandInfo id))
     -- See Note [CPR for sum types]
     (_, ret_ty) = splitPiTys (idType id)
-    not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
+    not_a_prod  = isNothing (splitArgType_maybe (ae_fam_envs env) ret_ty)
     returns_sum = not (isTopLevel top_lvl) && not_a_prod
 
 isDataStructure :: Id -> CoreExpr -> Bool
@@ -425,7 +425,7 @@ nonVirgin env = env { ae_virgin = False }
 extendSigEnvForDemand :: AnalEnv -> Id -> Demand -> AnalEnv
 extendSigEnvForDemand env id dmd
   | isId id
-  , Just (_, DataConAppContext { dcac_dc = dc })
+  , Just (_, DataConPatContext { dcpc_dc = dc })
       <- wantToUnbox (ae_fam_envs env) has_inlineable_prag (idType id) dmd
   = extendSigEnv env id (CprSig (conCprType (dataConTag dc)))
   | otherwise
@@ -446,14 +446,12 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
 
     ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
 
-    tycon          = dataConTyCon dc
-    is_product     = isJust (isDataProductTyCon_maybe tycon)
-    is_sum         = isJust (isDataSumTyCon_maybe tycon)
+    is_algebraic   = isJust (tyConAlgDataCons_maybe (dataConTyCon dc))
+    no_exs         = null (dataConExTyCoVars dc)
     case_bndr_ty
-      | is_product || is_sum = conCprType  (dataConTag dc)
-      -- Any of the constructors had existentials. This is a little too
-      -- conservative (after all, we only care about the particular data con),
-      -- but there is no easy way to write is_sum and this won't happen much.
+      | is_algebraic, no_exs = conCprType (dataConTag dc)
+      -- The tycon wasn't algebraic or the datacon had existentials.
+      -- See Note [Which types are unboxed?] for why no existentials.
       | otherwise            = topCprType
 
     -- We could have much deeper CPR info here with Nested CPR, which could

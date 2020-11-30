@@ -8,7 +8,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 
 module GHC.Core.Opt.WorkWrap.Utils
    ( mkWwBodies, mkWWstr, mkWorkerArgs
-   , DataConAppContext(..), deepSplitProductType_maybe, wantToUnbox
+   , DataConPatContext(..), splitArgType_maybe, wantToUnbox
    , findTypeShape
    , isWorkerSmallEnough
    )
@@ -19,7 +19,8 @@ where
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase )
+import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase
+                        , dataConRepFSInstPat )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( JoinArity )
 import GHC.Core.DataCon
@@ -43,9 +44,11 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
+import GHC.Types.Name ( getOccFS )
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
@@ -606,53 +609,53 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
     arg_ty = idType arg
     dmd    = idDemandInfo arg
 
-wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> Maybe ([Demand], DataConAppContext)
+wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> Maybe ([Demand], DataConPatContext)
+-- See Note [Which types are unboxed?]
 wantToUnbox fam_envs has_inlineable_prag ty dmd =
-  case deepSplitProductType_maybe fam_envs ty of
-    Just dcac@DataConAppContext{ dcac_arg_tys = con_arg_tys }
+  case splitArgType_maybe fam_envs ty of
+    Just dcpc@DataConPatContext{ dcpc_dc = dc }
       | isStrUsedDmd dmd
+      , let arity = dataConRepArity dc
       -- See Note [Unpacking arguments with product and polymorphic demands]
-      , Just cs <- split_prod_dmd_arity dmd (length con_arg_tys)
+      , Just cs <- split_prod_dmd_arity dmd arity
       -- See Note [Do not unpack class dictionaries]
       , not (has_inlineable_prag && isClassPred ty)
       -- See Note [mkWWstr and unsafeCoerce]
-      , cs `equalLength` con_arg_tys
-      -> Just (cs, dcac)
+      , cs `lengthIs` arity
+      -> Just (cs, dcpc)
     _ -> Nothing
   where
-    split_prod_dmd_arity dmd arty
+    split_prod_dmd_arity dmd arity
       -- For seqDmd, it should behave like <S(AAAA)>, for some
       -- suitable arity
-      | isSeqDmd dmd        = Just (replicate arty absDmd)
+      | isSeqDmd dmd        = Just (replicate arity absDmd)
       | _ :* Prod ds <- dmd = Just ds
       | otherwise           = Nothing
 
 unbox_one :: DynFlags -> FamInstEnvs -> Var
           -> [Demand]
-          -> DataConAppContext
+          -> DataConPatContext
           -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
 unbox_one dflags fam_envs arg cs
-          DataConAppContext { dcac_dc = data_con, dcac_tys = inst_tys
-                            , dcac_arg_tys = inst_con_arg_tys
-                            , dcac_co = co }
-  = do { (uniq1:uniqs) <- getUniquesM
-        ; let   scale = scaleScaled (idMult arg)
-                scaled_inst_con_arg_tys = map (\(t,s) -> (scale t, s)) inst_con_arg_tys
-                -- See Note [Add demands for strict constructors]
-                cs'       = addDataConStrictness data_con cs
-                unpk_args = zipWith3 mk_ww_arg uniqs scaled_inst_con_arg_tys cs'
-                unbox_fn  = mkUnpackCase (Var arg) co (idMult arg) uniq1
-                                         data_con unpk_args
-                arg_no_unf = zapStableUnfolding arg
-                             -- See Note [Zap unfolding when beta-reducing]
-                             -- in GHC.Core.Opt.Simplify; and see #13890
-                rebox_fn   = Let (NonRec arg_no_unf con_app)
-                con_app    = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
-         ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False unpk_args
-         ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
-                           -- Don't pass the arg, rebox instead
-  where
-    mk_ww_arg uniq ty sub_dmd = setIdDemandInfo (mk_ww_local uniq ty) sub_dmd
+          DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
+                            , dcpc_co = co }
+  = do { (case_bndr_uniq:pat_bndrs_uniqs) <- getUniquesM
+       ; let ex_name_fss     = map getOccFS $ dataConExTyCoVars dc
+             (ex_tvs', arg_ids) =
+               dataConRepFSInstPat (ex_name_fss ++ repeat ww_prefix) pat_bndrs_uniqs (idMult arg) dc tc_args
+             -- See Note [Add demands for strict constructors]
+             cs'       = addDataConStrictness dc cs
+             arg_ids'  = zipWithEqual "unbox_one" setIdDemandInfo arg_ids cs'
+             unbox_fn  = mkUnpackCase (Var arg) co (idMult arg) case_bndr_uniq
+                                      dc (ex_tvs' ++ arg_ids')
+             arg_no_unf = zapStableUnfolding arg
+                          -- See Note [Zap unfolding when beta-reducing]
+                          -- in GHC.Core.Opt.Simplify; and see #13890
+             rebox_fn   = Let (NonRec arg_no_unf con_app)
+             con_app    = mkConApp2 dc tc_args (ex_tvs' ++ arg_ids') `mkCast` mkSymCo co
+       ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False (ex_tvs' ++ arg_ids')
+       ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
+                          -- Don't pass the arg, rebox instead
 
 ----------------------
 nop_fn :: CoreExpr -> CoreExpr
@@ -932,74 +935,68 @@ off the unpacking in mkWWstr_one (see the isClassPred test).
 Historical note: #14955 describes how I got this fix wrong the first time.
 -}
 
--- | Context for a 'DataCon' application with a hole for every field, including
--- surrounding coercions.
--- The result of 'deepSplitProductType_maybe' and 'deepSplitCprType_maybe'.
+-- | The result of 'splitArgType_maybe' and 'splitResultType_maybe'.
 --
--- Example:
---
--- > DataConAppContext Just [Int] [(Lazy, Int)] (co :: Maybe Int ~ First Int)
---
--- represents
---
--- > Just @Int (_1 :: Int) |> co :: First Int
---
--- where _1 is a hole for the first argument. The number of arguments is
--- determined by the length of @arg_tys@.
-data DataConAppContext
-  = DataConAppContext
-  { dcac_dc      :: !DataCon
-  , dcac_tys     :: ![Type]
-  , dcac_arg_tys :: ![(Scaled Type, StrictnessMark)]
-  , dcac_co      :: !Coercion
+-- Both splits
+--   * Take a type `ty`
+--   * Succeed with (DataConPatContext dc tys co)
+--     iff co :: T tys ~ ty
+--     and `dc` is the appropriate DataCon of `T`
+--     and `T` is suitable for the kind of split
+--     (differs for strictness and CPR, see Note [Which types are unboxed?])
+data DataConPatContext
+  = DataConPatContext
+  { dcpc_dc        :: !DataCon
+  , dcpc_tc_args   :: ![Type]
+  , dcpc_co        :: !Coercion
   }
 
-deepSplitProductType_maybe :: FamInstEnvs -> Type -> Maybe DataConAppContext
--- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
--- then  dc @ tys (args::arg_tys) :: rep_ty
---       co :: ty ~ rep_ty
--- Why do we return the strictness of the data-con arguments?
--- Answer: see Note [Record evaluated-ness in worker/wrapper]
-deepSplitProductType_maybe fam_envs ty
+-- | If @splitArgType_maybe ty = Just (dc, tys, co)@
+-- then @dc \@tys \@_ex_tys (_args::_arg_tys) :: tc tys@
+-- and  @co :: ty ~ tc tys@
+-- where underscore prefixes are holes, e.g. yet unspecified.
+--
+-- See Note [Which types are unboxed?].
+splitArgType_maybe :: FamInstEnvs -> Type -> Maybe DataConPatContext
+splitArgType_maybe fam_envs ty
   | let (co, ty1) = topNormaliseType_maybe fam_envs ty
                     `orElse` (mkRepReflCo ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
-  , Just con <- isDataProductTyCon_maybe tc
-  , let arg_tys = dataConInstArgTys con tc_args
-        strict_marks = dataConRepStrictness con
-  = Just DataConAppContext { dcac_dc = con
-                           , dcac_tys = tc_args
-                           , dcac_arg_tys = zipEqual "dspt" arg_tys strict_marks
-                           , dcac_co = co }
-deepSplitProductType_maybe _ _ = Nothing
+  , Just con <- tyConSingleAlgDataCon_maybe tc
+  = Just DataConPatContext { dcpc_dc      = con
+                           , dcpc_tc_args = tc_args
+                           , dcpc_co      = co }
+splitArgType_maybe _ _ = Nothing
 
-deepSplitCprType_maybe
-  :: FamInstEnvs -> ConTag -> Type -> Maybe DataConAppContext
--- If    deepSplitCprType_maybe n ty = Just (dc, tys, arg_tys, co)
--- then  dc @ tys (args::arg_tys) :: rep_ty
---       co :: ty ~ rep_ty
--- Why do we return the strictness of the data-con arguments?
--- Answer: see Note [Record evaluated-ness in worker/wrapper]
-deepSplitCprType_maybe fam_envs con_tag ty
+-- | If @splitResultType_maybe n ty = Just (dc, tys, co)@
+-- then @dc \@tys \@_ex_tys (_args::_arg_tys) :: tc tys@
+-- and  @co :: ty ~ tc tys@
+-- where underscore prefixes are holes, e.g. yet unspecified.
+-- @dc@ is the @n@th data constructor of @tc@.
+--
+-- See Note [Which types are unboxed?].
+splitResultType_maybe :: FamInstEnvs -> ConTag -> Type -> Maybe DataConPatContext
+splitResultType_maybe fam_envs con_tag ty
   | let (co, ty1) = topNormaliseType_maybe fam_envs ty
                     `orElse` (mkRepReflCo ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
-  , isDataTyCon tc
+  , isDataTyCon tc -- NB: rules out unboxed sums and pairs!
   , let cons = tyConDataCons tc
   , cons `lengthAtLeast` con_tag -- This might not be true if we import the
-                                 -- type constructor via a .hs-bool file (#8743)
+                                 -- type constructor via a .hs-boot file (#8743)
   , let con = cons `getNth` (con_tag - fIRST_TAG)
-        arg_tys = dataConInstArgTys con tc_args
-        strict_marks = dataConRepStrictness con
-  , all isLinear arg_tys
+  , null (dataConExTyCoVars con) -- no existentials;
+                                 -- See Note [Which types are unboxed?]
+                                 -- and GHC.Core.Opt.CprAnal.extendEnvForDataAlt
+                                 -- where we also check this.
+  , all isLinear (dataConInstArgTys con tc_args)
   -- Deactivates CPR worker/wrapper splits on constructors with non-linear
   -- arguments, for the moment, because they require unboxed tuple with variable
   -- multiplicity fields.
-  = Just DataConAppContext { dcac_dc = con
-                           , dcac_tys = tc_args
-                           , dcac_arg_tys = zipEqual "dspt" arg_tys strict_marks
-                           , dcac_co = co }
-deepSplitCprType_maybe _ _ _ = Nothing
+  = Just DataConPatContext { dcpc_dc = con
+                           , dcpc_tc_args = tc_args
+                           , dcpc_co = co }
+splitResultType_maybe _ _ _ = Nothing
 
 isLinear :: Scaled a -> Bool
 isLinear (Scaled w _ ) =
@@ -1035,13 +1032,16 @@ findTypeShape fam_envs ty
        | Just (_, rhs, _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
        = go rec_tc rhs
 
-       | Just con <- isDataProductTyCon_maybe tc
+       | Just con <- tyConSingleAlgDataCon_maybe tc
        , Just rec_tc <- if isTupleTyCon tc
                         then Just rec_tc
                         else checkRecTc rec_tc tc
          -- We treat tuples specially because they can't cause loops.
          -- Maybe we should do so in checkRecTc.
-       = TsProd (map (go rec_tc . scaledThing) (dataConInstArgTys con tc_args))
+         -- The use of 'dubiousDataConInstArgTys' is OK, since this
+         -- function performs no substitution at all, hence the uniques
+         -- don't matter.
+       = TsProd (map (go rec_tc) (dubiousDataConInstArgTys con tc_args))
 
        | Just (ty', _) <- instNewTyCon_maybe tc tc_args
        , Just rec_tc <- checkRecTc rec_tc tc
@@ -1050,7 +1050,55 @@ findTypeShape fam_envs ty
        | otherwise
        = TsUnk
 
-{-
+-- | Exactly 'dataConInstArgTys', but lacks the (ASSERT'ed) precondition that
+-- the 'DataCon' may not have existentials. The lack of cloning the existentials
+-- compared to 'dataConInstExAndArgVars' makes this function \"dubious\";
+-- only use it where type variables aren't substituted for!
+dubiousDataConInstArgTys :: DataCon -> [Type] -> [Type]
+dubiousDataConInstArgTys dc tc_args = arg_tys
+  where
+    univ_tvs = dataConUnivTyVars dc
+    ex_tvs   = dataConExTyCoVars dc
+    subst    = extendTCvInScopeList (zipTvSubst univ_tvs tc_args) ex_tvs
+    arg_tys  = map (substTy subst . scaledThing) (dataConRepArgTys dc)
+
+{- Note [Which types are unboxed?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Worker/wrapper will unbox
+
+  1. A strict data type argument, that
+       * is an algebraic data type (not a newtype)
+       * has a single constructor (thus is a "product")
+       * that may bind existentials
+     We can transform
+     > f (D @ex a b) = e
+     to
+     > $wf @ex a b = e
+     via 'mkWWstr'.
+
+  2. The constructed result of a function, if
+       * its type is an algebraic data type (not a newtype)
+       * (might have multiple constructors, in contrast to (1))
+       * the applied data constructor *does not* bind existentials
+     We can transform
+     > f x y = let ... in D a b
+     to
+     > $wf x y = let ... in (# a, b #)
+     via 'mkWWcpr'.
+
+     NB: We don't allow existentials for CPR W/W, because we don't have unboxed
+     dependent tuples (yet?). Otherwise, we could transform
+     > f x y = let ... in D @ex (a :: ..ex..) (b :: ..ex..)
+     to
+     > $wf x y = let ... in (# @ex, (a :: ..ex..), (b :: ..ex..) #)
+
+The respective tests are in 'splitArgType_maybe' and
+'splitResultType_maybe', respectively.
+
+Note that the data constructor /can/ have evidence arguments: equality
+constraints, type classes etc.  So it can be GADT.  These evidence
+arguments are simply value arguments, and should not get in the way.
+
 ************************************************************************
 *                                                                      *
 \subsection{CPR stuff}
@@ -1083,35 +1131,36 @@ mkWWcpr opt_CprAnal fam_envs body_ty cpr
   | otherwise
   = case asConCpr cpr of
        Nothing      -> return (False, id, id, body_ty)  -- No CPR info
-       Just con_tag | Just dcac <- deepSplitCprType_maybe fam_envs con_tag body_ty
-                    -> mkWWcpr_help dcac
+       Just con_tag | Just dcpc <- splitResultType_maybe fam_envs con_tag body_ty
+                    -> mkWWcpr_help dcpc
                     |  otherwise
                        -- See Note [non-algebraic or open body type warning]
                     -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
                        return (False, id, id, body_ty)
 
-mkWWcpr_help :: DataConAppContext
+mkWWcpr_help :: DataConPatContext
              -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
 
-mkWWcpr_help (DataConAppContext { dcac_dc = data_con, dcac_tys = inst_tys
-                                , dcac_arg_tys = arg_tys, dcac_co = co })
-  | [arg1@(arg_ty1, _)] <- arg_tys
-  , isUnliftedType (scaledThing arg_ty1)
-  , isLinear arg_ty1
+mkWWcpr_help (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
+                                , dcpc_co = co })
+  | [arg_ty]   <- dataConInstArgTys dc tc_args -- NB: No existentials!
+  , [str_mark] <- dataConRepStrictness dc
+  , isUnliftedType (scaledThing arg_ty)
+  , isLinear arg_ty
         -- Special case when there is a single result of unlifted, linear, type
         --
         -- Wrapper:     case (..call worker..) of x -> C x
         -- Worker:      case (   ..body..    ) of C x -> x
   = do { (work_uniq : arg_uniq : _) <- getUniquesM
-       ; let arg       = mk_ww_local arg_uniq arg1
-             con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` mkSymCo co
+       ; let arg_id    = mk_ww_local arg_uniq str_mark arg_ty
+             con_app   = mkConApp2 dc tc_args [arg_id] `mkCast` mkSymCo co
 
        ; return ( True
-                , \ wkr_call -> mkDefaultCase wkr_call arg con_app
-                , \ body     -> mkUnpackCase body co One work_uniq data_con [arg] (varToCoreExpr arg)
+                , \ wkr_call -> mkDefaultCase wkr_call arg_id con_app
+                , \ body     -> mkUnpackCase body co One work_uniq dc [arg_id] (varToCoreExpr arg_id)
                                 -- varToCoreExpr important here: arg can be a coercion
                                 -- Lacking this caused #10658
-                , scaledThing arg_ty1 ) }
+                , scaledThing arg_ty ) }
 
   | otherwise   -- The general case
         -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
@@ -1123,18 +1172,22 @@ mkWWcpr_help (DataConAppContext { dcac_dc = data_con, dcac_tys = inst_tys
         -- parametrised by the multiplicity of its fields. Specifically, in this
         -- instance, the multiplicity of the fields of (#,#) is chosen to be the
         -- same as those of C.
-  = do { (work_uniq : wild_uniq : uniqs) <- getUniquesM
-       ; let wrap_wild   = mk_ww_local wild_uniq (linear ubx_tup_ty,MarkedStrict)
-             args        = zipWith mk_ww_local uniqs arg_tys
-             ubx_tup_ty  = exprType ubx_tup_app
-             ubx_tup_app = mkCoreUbxTup (map (scaledThing . fst) arg_tys) (map varToCoreExpr args)
-             con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
-             tup_con     = tupleDataCon Unboxed (length arg_tys)
+  = do { (work_uniq : wild_uniq : pat_bndrs_uniqs) <- getUniquesM
+       ; let case_mult       = One -- see above
+             (_exs, arg_ids) =
+               dataConRepFSInstPat (repeat ww_prefix) pat_bndrs_uniqs case_mult dc tc_args
+             wrap_wild       = mk_ww_local wild_uniq MarkedStrict (Scaled case_mult ubx_tup_ty)
+             ubx_tup_ty      = exprType ubx_tup_app
+             ubx_tup_app     = mkCoreUbxTup (map idType arg_ids) (map varToCoreExpr arg_ids)
+             con_app         = mkConApp2 dc tc_args arg_ids `mkCast` mkSymCo co
+             tup_con         = tupleDataCon Unboxed (length arg_ids)
+
+       ; MASSERT( null _exs ) -- Should have been caught by splitResultType_maybe
 
        ; return (True
                 , \ wkr_call -> mkSingleAltCase wkr_call wrap_wild
-                                                (DataAlt tup_con) args con_app
-                , \ body     -> mkUnpackCase body co One work_uniq data_con args ubx_tup_app
+                                                (DataAlt tup_con) arg_ids con_app
+                , \ body     -> mkUnpackCase body co case_mult work_uniq dc arg_ids ubx_tup_app
                 , ubx_tup_ty ) }
 
 mkUnpackCase ::  CoreExpr -> Coercion -> Mult -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
@@ -1149,7 +1202,7 @@ mkUnpackCase scrut co mult uniq boxing_con unpk_args body
                     (DataAlt boxing_con) unpk_args body
   where
     casted_scrut = scrut `mkCast` co
-    bndr = mk_ww_local uniq (Scaled mult (exprType casted_scrut), MarkedStrict)
+    bndr = mk_ww_local uniq MarkedStrict (Scaled mult (exprType casted_scrut))
       -- An unpacking case can always be chosen linear, because the variables
       -- are always passed to a constructor. This limits the
 {-
@@ -1291,10 +1344,13 @@ mk_absent_let dflags fam_envs arg
               -- See also Note [Unique Determinism] in GHC.Types.Unique
     unlifted_rhs = mkTyApps (Lit rubbishLit) [arg_ty]
 
-mk_ww_local :: Unique -> (Scaled Type, StrictnessMark) -> Id
+ww_prefix :: FastString
+ww_prefix = fsLit "ww"
+
+mk_ww_local :: Unique -> StrictnessMark -> Scaled Type -> Id
 -- The StrictnessMark comes form the data constructor and says
 -- whether this field is strict
 -- See Note [Record evaluated-ness in worker/wrapper]
-mk_ww_local uniq (Scaled w ty,str)
+mk_ww_local uniq str (Scaled w ty)
   = setCaseBndrEvald str $
-    mkSysLocalOrCoVar (fsLit "ww") uniq w ty
+    mkSysLocalOrCoVar ww_prefix uniq w ty
