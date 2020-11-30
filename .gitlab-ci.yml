@@ -346,6 +346,7 @@ lint-base:
   extends: .lint-params
   variables:
     BUILD_FLAVOUR: default
+    BIN_DIST_NAME: ghc.tar.xz
   script:
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
