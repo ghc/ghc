@@ -90,7 +90,6 @@ executable hadrian
                        , Settings.Builders.Cc
                        , Settings.Builders.Configure
                        , Settings.Builders.DeriveConstants
-                       , Settings.Builders.GenPrimopCode
                        , Settings.Builders.Ghc
                        , Settings.Builders.GhcPkg
                        , Settings.Builders.Haddock
