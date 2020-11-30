@@ -50,10 +50,12 @@ library
     if flag(internal-interpreter)
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         exposed-modules:
+            GHCi.InfoTable
             GHCi.Run
             GHCi.CreateBCO
             GHCi.ObjLink
             GHCi.Signals
+            GHCi.StaticPtrTable
             GHCi.TH
 
     include-dirs: @FFIIncludeDir@
@@ -65,8 +67,6 @@ library
         GHCi.ResolvedBCO
         GHCi.RemoteTypes
         GHCi.FFI
-        GHCi.InfoTable
-        GHCi.StaticPtrTable
         GHCi.TH.Binary
 
     Build-Depends:
