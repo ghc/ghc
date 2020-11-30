@@ -62,11 +62,11 @@ These are in \tr{state-interface.verb} order.
 
 -- supplies:
 -- data PrimOp = ...
-#include "primop-data-decl.hs-incl"
+%primop-data-decl
 
 -- supplies
 -- primOpTag :: PrimOp -> Int
-#include "primop-tag.hs-incl"
+%primop-tag
 primOpTag _ = error "primOpTag: unknown primop"
 
 
@@ -93,7 +93,7 @@ data PrimOpVecCat = IntVec
 
 allThePrimOps :: [PrimOp]
 allThePrimOps =
-#include "primop-list.hs-incl"
+%primop-list
 
 tagToEnumKey :: Unique
 tagToEnumKey = mkPrimOpIdUnique (primOpTag TagToEnumOp)
@@ -134,7 +134,7 @@ primOpStrictness :: PrimOp -> Arity -> StrictSig
         -- See Demand.StrictnessInfo for discussion of what the results
         -- The arity should be the arity of the primop; that's why
         -- this function isn't exported.
-#include "primop-strictness.hs-incl"
+%primop-strictness
 
 {-
 ************************************************************************
@@ -145,7 +145,7 @@ primOpStrictness :: PrimOp -> Arity -> StrictSig
 -}
 
 primOpFixity :: PrimOp -> Maybe Fixity
-#include "primop-fixity.hs-incl"
+%primop-fixity
 
 {-
 ************************************************************************
@@ -158,7 +158,7 @@ See Note [GHC.Prim Docs]
 -}
 
 primOpDocs :: [(String, String)]
-#include "primop-docs.hs-incl"
+%primop-docs
 
 {-
 ************************************************************************
@@ -172,7 +172,7 @@ else, notably a type, can be constructed) for each @PrimOp@.
 -}
 
 primOpInfo :: PrimOp -> PrimOpInfo
-#include "primop-primop-info.hs-incl"
+%primop-info
 primOpInfo _ = error "primOpInfo: unknown primop"
 
 {-
@@ -296,7 +296,7 @@ perform a heap check or they block.
 -}
 
 primOpOutOfLine :: PrimOp -> Bool
-#include "primop-out-of-line.hs-incl"
+%primop-out-of-line
 
 {-
 ************************************************************************
@@ -475,10 +475,10 @@ Two main predicates on primpops test these flags:
 -}
 
 primOpHasSideEffects :: PrimOp -> Bool
-#include "primop-has-side-effects.hs-incl"
+%primop-has-side-effects
 
 primOpCanFail :: PrimOp -> Bool
-#include "primop-can-fail.hs-incl"
+%primop-can-fail
 
 primOpOkForSpeculation :: PrimOp -> Bool
   -- See Note [PrimOp can_fail and has_side_effects]
@@ -539,7 +539,7 @@ calculating unfolding sizes; see GHC.Core.Unfold.sizeExpr.
 -}
 
 primOpCodeSize :: PrimOp -> Int
-#include "primop-code-size.hs-incl"
+%primop-code-size
 
 primOpCodeSizeDefault :: Int
 primOpCodeSizeDefault = 1
@@ -717,7 +717,7 @@ reduction.
 
 {-
 commutableOp :: PrimOp -> Bool
-#include "primop-commutable.hs-incl"
+%primop-commutable
 -}
 
 -- Utils:

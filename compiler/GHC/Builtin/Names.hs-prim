@@ -2071,7 +2071,7 @@ multMulTyConKey = mkPreludeTyConUnique 199
 --      USES TyConUniques 300-399
 -----------------------------------------------------
 
-#include "primop-vector-uniques.hs-incl"
+%primop-vector-uniques
 
 {-
 ************************************************************************

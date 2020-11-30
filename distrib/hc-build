@@ -69,18 +69,6 @@ configopts=`echo $configopts | sed s/--enable-hc-boot-unregisterised//`
 # with hc bootstrapping disabled.
 HappyCmd="$PWD/distrib/fake-happy" ./configure --with-ghc="$PWD/compiler/ghc-inplace" $configopts
 
-PRIMOP_BITS="primop-data-decl.hs-incl \
-	      primop-tag.hs-incl  \
-	      primop-list.hs-incl  \
-	      primop-has-side-effects.hs-incl  \
-	      primop-out-of-line.hs-incl  \
-	      primop-commutable.hs-incl  \
-	      primop-needs-wrapper.hs-incl  \
-	      primop-can-fail.hs-incl  \
-	      primop-strictness.hs-incl  \
-	      primop-usage.hs-incl  \
-	      primop-primop-info.hs-incl"
-
 # Remove the old libraries.  Don't use make clean, because we don't
 # want to delete the .hs files generated from the .hsc files, because
 # we don't have hsc2hs built yet.
@@ -105,7 +93,7 @@ $MAKE -C libraries boot all
 # The reconfigure step updates a few files, which can lead to
 # unnecessary recompilations.  Touch a bunch of things here to avoid
 # having to recompile stuff that we've already built.
-(cd compiler; touch main/Config.hs $PRIMOP_BITS stage1/*/*.o stage1/ghc-* ghc-*)
+(cd compiler; touch main/Config.hs stage1/*/*.o stage1/ghc-* ghc-*)
 
 echo hc-build done
 echo The tree should be safe to do 'make install stage=1' in.
