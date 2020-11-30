@@ -1020,9 +1020,6 @@ mkErrDocAt :: SrcSpan -> TcRn.Error -> TcRn (ErrMsg TcRn.Error)
 mkErrDocAt loc err
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
-         -- FIXME(adinapoli) We are forced to use the escape hatch and
-         -- cast this into an 'SDoc' due to the fact we need to pretty-print
-         -- with the unit state.
          unit_state <- unitState <$> getDynFlags ;
          return $ mkErr loc printer (ErrorTcRnWithUnitState unit_state err) }
 

@@ -23,14 +23,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 
 import GHC.Tc.Errors.Ppr as Ppr
-import GHC.Tc.Errors.Types as TcRn (
-                             OutOfScopeSuggestions(..)
-                           , NameSuggestions(..)
-                           , ImportSuggestion(..)
-                           , ExtensionSuggestion(..)
-                           , Error(..)
-                           , noOutOfScopeSuggestions
-                           )
+import GHC.Tc.Errors.Types as TcRn
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
 import GHC.Utils.Outputable as Outputable
@@ -94,11 +87,6 @@ unboundNameX where_look rdr_name extra
                           rdr_name
                   ; addTcRnErr loc (TcRn.ErrOutOfScope rdr_name suggestions extra) }
         ; return (mkUnboundNameRdr rdr_name) }
-
-type HowInScope = Either SrcSpan ImpDeclSpec
-     -- Left loc    =>  locally bound at loc
-     -- Right ispec =>  imported as specified by ispec
-
 
 -- | Called from the typechecker ("GHC.Tc.Errors") when we find an unbound variable
 unknownNameSuggestions :: DynFlags

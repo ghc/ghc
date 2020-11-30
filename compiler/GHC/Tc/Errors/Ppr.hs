@@ -18,6 +18,7 @@ import GHC.Types.Error
 import GHC.Types.Name ( Name )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
 import GHC.Unit.State ( pprWithUnitState )
 import GHC.Utils.Outputable
 
@@ -95,3 +96,102 @@ pprError = \case
             pp_occ_with_type occ hole_ty = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType hole_ty)
 
             suggestions = pprOutOfScopeSuggestions occ suggs
+
+--
+-- Pretty-printing suggestions
+--
+
+pprOutOfScopeSuggestions
+  :: OccName -> OutOfScopeSuggestions -> SDoc
+pprOutOfScopeSuggestions name oos =
+  maybe empty (pprNameSuggestions name) (oosSimilarNames oos) $$
+  maybe empty ppr (oosImports oos) $$
+  maybe empty ppr (oosExtensions oos)
+
+pprNameSuggestions :: OccName -> NameSuggestions -> SDoc
+pprNameSuggestions tried_occ (NameSuggestions names) = case names of
+    [] -> empty
+    [p] -> perhaps <+> pp_item p
+    ps -> sep [ perhaps <+> text "one of these:"
+              , nest 2 (pprWithCommas pp_item ps) ]
+
+    where
+      perhaps = text "Perhaps you meant"
+
+      pp_item :: (RdrName, HowInScope) -> SDoc
+      pp_item (rdr, Left loc) = pp_ns rdr <+> quotes (ppr rdr) <+> loc' -- Locally defined
+        where loc' = case loc of
+                UnhelpfulSpan l -> parens (ppr l)
+                RealSrcSpan l _ -> parens (text "line" <+> int (srcSpanStartLine l))
+      pp_item (rdr, Right is) = pp_ns rdr <+> quotes (ppr rdr) <+>   -- Imported
+                                parens (text "imported from" <+> ppr (is_mod is))
+
+      pp_ns :: RdrName -> SDoc
+      pp_ns rdr | ns /= tried_ns = pprNameSpace ns
+                | otherwise      = empty
+        where ns = rdrNameSpace rdr
+
+      tried_ns = occNameSpace tried_occ
+
+instance Outputable ImportSuggestion where
+  ppr is = case is of
+    SuggestNoModuleImported mname ->
+      hsep [ text "No module named"
+           , quotes (ppr mname)
+           , text "is imported."
+           ]
+    SuggestModulesDoNotExport mods occ
+      | [mod] <- mods ->
+          hsep [ text "Module"
+               , quotes (ppr mod)
+               , text "does not export"
+               , quotes (ppr occ) <> dot
+               ]
+      | otherwise ->
+          hsep [ text "Neither"
+               , quotedListWithNor (map ppr mods)
+               , text "exports"
+               , quotes (ppr occ) <> dot
+               ]
+    SuggestAddNameToImportLists occ mods
+      | [(mod, imvspan)] <- mods ->
+          fsep [ text "Perhaps you want to add"
+               , quotes (ppr occ)
+               , text "to the import list"
+               , text "in the import of"
+               , quotes (ppr mod)
+               , parens (ppr imvspan) <> dot
+               ]
+      | otherwise ->
+          fsep [ text "Perhaps you want to add"
+               , quotes (ppr occ)
+               , text "to one of these import lists:"
+               ]
+          $$
+          nest 2 (vcat
+              [ quotes (ppr mod) <+> parens (ppr imvspan)
+              | (mod, imvspan) <- mods
+              ])
+    SuggestRemoveNameFromHidingLists occ mods
+      | [(mod, imvspan)] <- mods ->
+          fsep [ text "Perhaps you want to remove"
+               , quotes (ppr occ)
+               , text "from the explicit hiding list"
+               , text "in the import of"
+               , quotes (ppr mod)
+               , parens (ppr imvspan) <> dot
+               ]
+      | otherwise ->
+          fsep [ text "Perhaps you want to remove"
+               , quotes (ppr occ)
+               , text "from the hiding clauses"
+               , text "in one of these imports:"
+               ]
+          $$
+          nest 2 (vcat
+              [ quotes (ppr mod) <+> parens (ppr imvspan)
+              | (mod, imvspan) <- mods
+              ])
+
+instance Outputable ExtensionSuggestion where
+  ppr SuggestRecursiveDo = text "Perhaps you meant to use RecursiveDo"
