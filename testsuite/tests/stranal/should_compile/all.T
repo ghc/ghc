@@ -62,3 +62,5 @@ test('T18903',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-simpl -dsuppr
 test('T18894',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-stranal -dsuppress-uniques'])
 # We care about the Arity 2 on eta, as a result of the annotated Dmd
 test('T18894b',  [ grep_errmsg(r'Arity=2') ], compile, ['-ddump-stranal -dsuppress-uniques -fno-call-arity -dppr-cols=200'])
+# We care about the workers of f,g,h,i:
+test('T18982',  [ grep_errmsg(r'\$w. .*Int#$') ], compile, ['-dppr-cols=1000 -ddump-simpl -dsuppress-idinfo -dsuppress-uniques'])

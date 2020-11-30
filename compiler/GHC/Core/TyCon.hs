@@ -58,8 +58,7 @@ module GHC.Core.TyCon(
         isKindTyCon, isLiftedTypeKindTyConName,
         isTauTyCon, isFamFreeTyCon, isForgetfulSynTyCon,
 
-        isDataTyCon, isProductTyCon, isDataProductTyCon_maybe,
-        isDataSumTyCon_maybe,
+        isDataTyCon,
         isEnumerationTyCon,
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isOpenFamilyTyCon,
@@ -84,6 +83,7 @@ module GHC.Core.TyCon(
         tyConCType, tyConCType_maybe,
         tyConDataCons, tyConDataCons_maybe,
         tyConSingleDataCon_maybe, tyConSingleDataCon,
+        tyConAlgDataCons_maybe,
         tyConSingleAlgDataCon_maybe,
         tyConFamilySize,
         tyConStupidTheta,
@@ -143,7 +143,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
    , multiplicityTyCon
    , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} GHC.Core.DataCon
-   ( DataCon, dataConExTyCoVars, dataConFieldLabels
+   ( DataCon, dataConFieldLabels
    , dataConTyCon, dataConFullSig
    , isUnboxedSumDataCon )
 import GHC.Builtin.Uniques
@@ -1976,72 +1976,6 @@ unwrapNewTyConEtad_maybe (AlgTyCon { algTcRhs = NewTyCon { nt_co = co,
                            = Just (tvs, rhs, co)
 unwrapNewTyConEtad_maybe _ = Nothing
 
-isProductTyCon :: TyCon -> Bool
--- True of datatypes or newtypes that have
---   one, non-existential, data constructor
--- See Note [Product types]
-isProductTyCon tc@(AlgTyCon {})
-  = case algTcRhs tc of
-      TupleTyCon {} -> True
-      DataTyCon{ data_cons = [data_con] }
-                    -> null (dataConExTyCoVars data_con)
-      NewTyCon {}   -> True
-      _             -> False
-isProductTyCon _ = False
-
-isDataProductTyCon_maybe :: TyCon -> Maybe DataCon
--- True of datatypes (not newtypes) with
---   one, vanilla, data constructor
--- See Note [Product types]
-isDataProductTyCon_maybe (AlgTyCon { algTcRhs = rhs })
-  = case rhs of
-       DataTyCon { data_cons = [con] }
-         | null (dataConExTyCoVars con)  -- non-existential
-         -> Just con
-       TupleTyCon { data_con = con }
-         -> Just con
-       _ -> Nothing
-isDataProductTyCon_maybe _ = Nothing
-
-isDataSumTyCon_maybe :: TyCon -> Maybe [DataCon]
-isDataSumTyCon_maybe (AlgTyCon { algTcRhs = rhs })
-  = case rhs of
-      DataTyCon { data_cons = cons }
-        | cons `lengthExceeds` 1
-        , all (null . dataConExTyCoVars) cons -- FIXME(osa): Why do we need this?
-        -> Just cons
-      SumTyCon { data_cons = cons }
-        | all (null . dataConExTyCoVars) cons -- FIXME(osa): Why do we need this?
-        -> Just cons
-      _ -> Nothing
-isDataSumTyCon_maybe _ = Nothing
-
-{- Note [Product types]
-~~~~~~~~~~~~~~~~~~~~~~~
-A product type is
- * A data type (not a newtype)
- * With one, boxed data constructor
- * That binds no existential type variables
-
-The main point is that product types are amenable to unboxing for
-  * Strict function calls; we can transform
-        f (D a b) = e
-    to
-        fw a b = e
-    via the worker/wrapper transformation.  (Question: couldn't this
-    work for existentials too?)
-
-  * CPR for function results; we can transform
-        f x y = let ... in D a b
-    to
-        fw x y = let ... in (# a, b #)
-
-Note that the data constructor /can/ have evidence arguments: equality
-constraints, type classes etc.  So it can be GADT.  These evidence
-arguments are simply value arguments, and should not get in the way.
--}
-
-
 -- | Is this a 'TyCon' representing a regular H98 type synonym (@type@)?
 {-# INLINE isTypeSynonymTyCon #-}  -- See Note [Inlining coreView] in GHC.Core.Type
 isTypeSynonymTyCon :: TyCon -> Bool
@@ -2380,8 +2314,7 @@ tyConDataCons_maybe _ = Nothing
 -- | If the given 'TyCon' has a /single/ data constructor, i.e. it is a @data@
 -- type with one alternative, a tuple type or a @newtype@ then that constructor
 -- is returned. If the 'TyCon' has more than one constructor, or represents a
--- primitive or function type constructor then @Nothing@ is returned. In any
--- other case, the function panics
+-- primitive or function type constructor then @Nothing@ is returned.
 tyConSingleDataCon_maybe :: TyCon -> Maybe DataCon
 tyConSingleDataCon_maybe (AlgTyCon { algTcRhs = rhs })
   = case rhs of
@@ -2391,21 +2324,29 @@ tyConSingleDataCon_maybe (AlgTyCon { algTcRhs = rhs })
       _                             -> Nothing
 tyConSingleDataCon_maybe _           = Nothing
 
+-- | Like 'tyConSingleDataCon_maybe', but panics if 'Nothing'.
 tyConSingleDataCon :: TyCon -> DataCon
 tyConSingleDataCon tc
   = case tyConSingleDataCon_maybe tc of
       Just c  -> c
       Nothing -> pprPanic "tyConDataCon" (ppr tc)
 
+-- | Like 'tyConSingleDataCon_maybe', but returns 'Nothing' for newtypes.
 tyConSingleAlgDataCon_maybe :: TyCon -> Maybe DataCon
--- Returns (Just con) for single-constructor
--- *algebraic* data types *not* newtypes
-tyConSingleAlgDataCon_maybe (AlgTyCon { algTcRhs = rhs })
-  = case rhs of
-      DataTyCon { data_cons = [c] } -> Just c
-      TupleTyCon { data_con = c }   -> Just c
-      _                             -> Nothing
-tyConSingleAlgDataCon_maybe _        = Nothing
+tyConSingleAlgDataCon_maybe tycon
+  | isNewTyCon tycon = Nothing
+  | otherwise        = tyConSingleDataCon_maybe tycon
+
+-- | Returns @Just dcs@ if the given 'TyCon' is a @data@ type, a tuple type
+-- or a sum type with data constructors dcs. If the 'TyCon' has more than one
+-- constructor, or represents a primitive or function type constructor then
+-- @Nothing@ is returned.
+--
+-- Like 'tyConDataCons_maybe', but returns 'Nothing' for newtypes.
+tyConAlgDataCons_maybe :: TyCon -> Maybe [DataCon]
+tyConAlgDataCons_maybe tycon
+  | isNewTyCon tycon = Nothing
+  | otherwise        = tyConDataCons_maybe tycon
 
 -- | Determine the number of value constructors a 'TyCon' has. Panics if the
 -- 'TyCon' is not algebraic or a tuple
