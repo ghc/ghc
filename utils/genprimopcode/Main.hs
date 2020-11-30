@@ -13,6 +13,7 @@ import Data.Char
 import Data.List
 import Data.Maybe ( catMaybes )
 import System.Environment ( getArgs )
+import Control.Monad
 
 vecOptions :: Entry -> [(String,String,Int)]
 vecOptions i =
@@ -109,116 +110,90 @@ desugarVectorSpec i              = case vecOptions i of
     conWidth con      = error $ "conWidth: unknown type constructor " ++ con ++ "\n"
 
 main :: IO ()
-main = getArgs >>= \args ->
-       if length args /= 1 || head args `notElem` known_args
-       then error ("usage: genprimopcode command < primops.txt > ...\n"
-                   ++ "   where command is one of\n"
-                   ++ unlines (map ("            "++) known_args)
-                  )
-       else
-       do s <- getContents
-          case parse s of
-             Left err -> error ("parse error at " ++ (show err))
-             Right p_o_specs@(Info _ _)
-                -> seq (sanityTop p_o_specs) (
-                   case head args of
+main = do
+    args <- getArgs
+    when (length args /= 2) $
+        error "usage: genprimopcode primops.txt file.z > file.hs"
+    primops_src <- readFile (head args)
+    let primops = case parse primops_src of
+            Left err -> error ("parse error at " ++ (show err))
+            Right po -> seq (sanityTop po) po
 
-                      "--data-decl"
-                         -> putStr (gen_data_decl p_o_specs)
+        go l = putStrLn $ case l of
+            "%primop-data-decl"
+                -> gen_data_decl primops
+            "%primop-has-side-effects"
+                -> gen_switch_from_attribs
+                    "has_side_effects"
+                    "primOpHasSideEffects" primops
 
-                      "--has-side-effects"
-                         -> putStr (gen_switch_from_attribs
-                                       "has_side_effects"
-                                       "primOpHasSideEffects" p_o_specs)
+            "%primop-out-of-line"
+                -> gen_switch_from_attribs
+                    "out_of_line"
+                    "primOpOutOfLine" primops
 
-                      "--out-of-line"
-                         -> putStr (gen_switch_from_attribs
-                                       "out_of_line"
-                                       "primOpOutOfLine" p_o_specs)
+            "%primop-commutable"
+                -> gen_switch_from_attribs
+                    "commutable"
+                    "commutableOp" primops
 
-                      "--commutable"
-                         -> putStr (gen_switch_from_attribs
-                                       "commutable"
-                                       "commutableOp" p_o_specs)
+            "%primop-code-size"
+                -> gen_switch_from_attribs
+                    "code_size"
+                    "primOpCodeSize" primops
 
-                      "--code-size"
-                         -> putStr (gen_switch_from_attribs
-                                       "code_size"
-                                       "primOpCodeSize" p_o_specs)
+            "%primop-can-fail"
+                -> gen_switch_from_attribs
+                    "can_fail"
+                    "primOpCanFail" primops
 
-                      "--can-fail"
-                         -> putStr (gen_switch_from_attribs
-                                       "can_fail"
-                                       "primOpCanFail" p_o_specs)
+            "%primop-strictness"
+                -> gen_switch_from_attribs
+                    "strictness"
+                    "primOpStrictness" primops
 
-                      "--strictness"
-                         -> putStr (gen_switch_from_attribs
-                                       "strictness"
-                                       "primOpStrictness" p_o_specs)
+            "%primop-fixity"
+                -> gen_switch_from_attribs
+                    "fixity"
+                    "primOpFixity" primops
 
-                      "--fixity"
-                         -> putStr (gen_switch_from_attribs
-                                       "fixity"
-                                       "primOpFixity" p_o_specs)
+            "%primop-info"
+                -> gen_primop_info primops
 
-                      "--primop-primop-info"
-                         -> putStr (gen_primop_info p_o_specs)
+            "%primop-tag"
+                -> gen_primop_tag primops
 
-                      "--primop-tag"
-                         -> putStr (gen_primop_tag p_o_specs)
+            "%primop-list"
+                -> gen_primop_list primops
 
-                      "--primop-list"
-                         -> putStr (gen_primop_list p_o_specs)
+            "%primop-vector-uniques"
+                -> gen_primop_vector_uniques primops
 
-                      "--primop-vector-uniques"
-                         -> putStr (gen_primop_vector_uniques p_o_specs)
+            "%primop-vector-tys"
+                -> gen_primop_vector_tys primops
 
-                      "--primop-vector-tys"
-                         -> putStr (gen_primop_vector_tys p_o_specs)
+            "%primop-vector-tys-exports"
+                -> gen_primop_vector_tys_exports primops
 
-                      "--primop-vector-tys-exports"
-                         -> putStr (gen_primop_vector_tys_exports p_o_specs)
+            "%primop-vector-tycons"
+                -> gen_primop_vector_tycons primops
 
-                      "--primop-vector-tycons"
-                         -> putStr (gen_primop_vector_tycons p_o_specs)
+            "%primop-haskell-wrappers"
+                -> gen_wrappers primops
 
-                      "--make-haskell-wrappers"
-                         -> putStr (gen_wrappers p_o_specs)
+            "%primop-haskell-source"
+                -> gen_hs_source primops
 
-                      "--make-haskell-source"
-                         -> putStr (gen_hs_source p_o_specs)
+            "%primop-latex-doc"
+                -> gen_latex_doc primops
 
-                      "--make-latex-doc"
-                         -> putStr (gen_latex_doc p_o_specs)
+            "%primop-docs"
+                -> gen_wired_in_docs primops
 
-                      "--wired-in-docs"
-                         -> putStr (gen_wired_in_docs p_o_specs)
+            s -> s
 
-                      _ -> error "Should not happen, known_args out of sync?"
-                   )
-
-known_args :: [String]
-known_args
-   = [ "--data-decl",
-       "--has-side-effects",
-       "--out-of-line",
-       "--commutable",
-       "--code-size",
-       "--can-fail",
-       "--strictness",
-       "--fixity",
-       "--primop-primop-info",
-       "--primop-tag",
-       "--primop-list",
-       "--primop-vector-uniques",
-       "--primop-vector-tys",
-       "--primop-vector-tys-exports",
-       "--primop-vector-tycons",
-       "--make-haskell-wrappers",
-       "--make-haskell-source",
-       "--make-latex-doc",
-       "--wired-in-docs"
-     ]
+    s <- readFile (head (tail args))
+    forM_ (lines s) go
 
 ------------------------------------------------------------------
 -- Code generators -----------------------------------------------
