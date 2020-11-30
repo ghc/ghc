@@ -45,7 +45,8 @@ import           Data.Version
 import           Control.Applicative
 import           Distribution.Verbosity
 import           GHC.Data.FastString
-import           GHC ( DynFlags, Module, moduleUnit, unitState )
+import           GHC ( DynFlags, Module, moduleUnit )
+import           GHC.Unit.State
 import           Haddock.Types
 import           Haddock.Utils
 import           GHC.Unit.State
@@ -370,16 +371,16 @@ optLast xs = Just (last xs)
 --
 -- The @--package-name@ and @--package-version@ Haddock flags allow the user to
 -- specify this information manually and it is returned here if present.
-modulePackageInfo :: DynFlags
+modulePackageInfo :: UnitState
                   -> [Flag] -- ^ Haddock flags are checked as they may contain
                             -- the package name or version provided by the user
                             -- which we prioritise
                   -> Maybe Module
                   -> (Maybe PackageName, Maybe Data.Version.Version)
-modulePackageInfo _dflags _flags Nothing = (Nothing, Nothing)
-modulePackageInfo dflags flags (Just modu) =
+modulePackageInfo _unit_state _flags Nothing = (Nothing, Nothing)
+modulePackageInfo unit_state flags (Just modu) =
   ( optPackageName flags    <|> fmap unitPackageName pkgDb
   , optPackageVersion flags <|> fmap unitPackageVersion pkgDb
   )
   where
-    pkgDb = lookupUnit (unitState dflags) (moduleUnit modu)
+    pkgDb = lookupUnit unit_state (moduleUnit modu)

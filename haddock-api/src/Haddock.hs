@@ -178,6 +178,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
 
   ghc flags' $ withDir $ do
     dflags <- getDynFlags
+    unit_state <- hsc_units <$> getSession
 
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
       mIfaceFile <- readInterfaceFiles freshNameCache [(("", Nothing), path)] noChecks
@@ -195,7 +196,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
           }
 
       -- Render the interfaces.
-      liftIO $ renderStep dflags flags sinceQual qual packages ifaces
+      liftIO $ renderStep dflags unit_state flags sinceQual qual packages ifaces
 
     else do
       when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
@@ -205,7 +206,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       packages <- liftIO $ readInterfaceFiles freshNameCache (readIfaceArgs flags) noChecks
 
       -- Render even though there are no input files (usually contents/index).
-      liftIO $ renderStep dflags flags sinceQual qual packages []
+      liftIO $ renderStep dflags unit_state flags sinceQual qual packages []
 
 -- | Run the GHC action using a temporary output directory
 withTempOutputDir :: Ghc a -> Ghc a
@@ -254,9 +255,9 @@ readPackagesAndProcessModules flags files = do
     return (packages, ifaces, homeLinks)
 
 
-renderStep :: DynFlags -> [Flag] -> SinceQual -> QualOption
+renderStep :: DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOption
            -> [(DocPaths, InterfaceFile)] -> [Interface] -> IO ()
-renderStep dflags flags sinceQual nameQual pkgs interfaces = do
+renderStep dflags unit_state flags sinceQual nameQual pkgs interfaces = do
   updateHTMLXRefs pkgs
   let
     ifaceFiles = map snd pkgs
@@ -265,12 +266,12 @@ renderStep dflags flags sinceQual nameQual pkgs interfaces = do
       ((_, Just path), ifile) <- pkgs
       iface <- ifInstalledIfaces ifile
       return (instMod iface, path)
-  render dflags flags sinceQual nameQual interfaces installedIfaces extSrcMap
+  render dflags unit_state flags sinceQual nameQual interfaces installedIfaces extSrcMap
 
 -- | Render the interfaces with whatever backend is specified in the flags.
-render :: DynFlags -> [Flag] -> SinceQual -> QualOption -> [Interface]
+render :: DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOption -> [Interface]
        -> [InstalledInterface] -> Map Module FilePath -> IO ()
-render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
+render dflags unit_state flags sinceQual qual ifaces installedIfaces extSrcMap = do
 
   let
     title                = fromMaybe "" (optTitle flags)
@@ -283,7 +284,6 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
     opt_latex_style      = optLaTeXStyle     flags
     opt_source_css       = optSourceCssFile  flags
     opt_mathjax          = optMathjax        flags
-    pkgs                 = unitState dflags
     dflags'
       | unicode          = gopt_set dflags Opt_PrintUnicodeSyntax
       | otherwise        = dflags
@@ -297,7 +297,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
     pkgMod           = fmap ifaceMod (listToMaybe ifaces)
     pkgKey           = fmap moduleUnit pkgMod
     pkgStr           = fmap unitString pkgKey
-    pkgNameVer       = modulePackageInfo dflags flags pkgMod
+    pkgNameVer       = modulePackageInfo unit_state flags pkgMod
     pkgName          = fmap (unpackFS . (\(PackageName n) -> n)) (fst pkgNameVer)
     sincePkg         = case sinceQual of
                          External -> pkgName
@@ -342,7 +342,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
     -- records the *wired in* identity base.  So untranslate it
     -- so that we can service the request.
     unwire :: Module -> Module
-    unwire m = m { moduleUnit = unwireUnit (unitState dflags) (moduleUnit m) }
+    unwire m = m { moduleUnit = unwireUnit unit_state (moduleUnit m) }
 
   reexportedIfaces <- concat `fmap` (for (reexportFlags flags) $ \mod_str -> do
     let warn = hPutStrLn stderr . ("Warning: " ++)
@@ -373,7 +373,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
   when (Flag_GenContents `elem` flags) $ do
     withTiming dflags' "ppHtmlContents" (const ()) $ do
       _ <- {-# SCC ppHtmlContents #-}
-           ppHtmlContents pkgs odir title pkgStr
+           ppHtmlContents unit_state odir title pkgStr
                      themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
                      allVisibleIfaces True prologue pretty
                      sincePkg (makeContentsQual qual)
@@ -383,7 +383,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
   when (Flag_Html `elem` flags) $ do
     withTiming dflags' "ppHtml" (const ()) $ do
       _ <- {-# SCC ppHtml #-}
-           ppHtml pkgs title pkgStr visibleIfaces reexportedIfaces odir
+           ppHtml unit_state title pkgStr visibleIfaces reexportedIfaces odir
                   prologue
                   themes opt_mathjax sourceUrls' opt_wiki_urls
                   opt_contents_url opt_index_url unicode sincePkg qual
@@ -403,7 +403,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
 
             pkgVer =
               fromMaybe (makeVersion []) mpkgVer
-          in ppHoogle dflags' pkgNameStr pkgVer title (fmap _doc prologue)
+          in ppHoogle dflags' unit_state pkgNameStr pkgVer title (fmap _doc prologue)
                visibleIfaces odir
       _ -> putStrLn . unlines $
           [ "haddock: Unable to find a package providing module "
