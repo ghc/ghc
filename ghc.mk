@@ -614,11 +614,11 @@ endef
 
 PRIMOPS_TXT_STAGE1 = compiler/stage1/build/primops.txt
 
-libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $$(genprimopcode_INPLACE) $(PRIMOPS_TXT_STAGE1) | $$(dir $$@)/.
-	"$(genprimopcode_INPLACE)" --make-haskell-wrappers < $(PRIMOPS_TXT_STAGE1) >$@
+libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : libraries/ghc-prim/GHC/PrimopWrappers.hs-prim $$(genprimopcode_INPLACE) $(PRIMOPS_TXT_STAGE1) | $$(dir $$@)/.
+	"$(genprimopcode_INPLACE)" $(PRIMOPS_TXT_STAGE1) $< >$@
 
-# Required so that Haddock documents the primops.
-libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs
+libraries/ghc-prim/dist-install/build/GHC/Prim.hs : libraries/ghc-prim/GHC/Prim.hs-prim $$(genprimopcode_INPLACE) $(PRIMOPS_TXT_STAGE1) | $$(dir $$@)/.
+	"$(genprimopcode_INPLACE)" $(PRIMOPS_TXT_STAGE1) $< >$@
 
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
@@ -1228,6 +1228,11 @@ $(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Cmm/Lexer,x))
 $(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Cmm/Parser,y))
 $(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Parser/Lexer,x))
 $(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Parser,y))
+$(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Builtin/Names,hs-prim))
+$(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Builtin/PrimOps,hs-prim))
+$(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Builtin/Types/Prim,hs-prim))
+$(eval $(call sdist-ghc-file,libraries/ghc-prim,stage2,.,GHC/Prim,hs-prim))
+$(eval $(call sdist-ghc-file,libraries/ghc-prim,stage2,.,GHC/PrimopWrappers,hs-prim))
 $(eval $(call sdist-ghc-file,utils/hpc,dist-install,,HpcParser,y))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Lexer,x))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Parser,y))
@@ -1555,7 +1560,7 @@ endif
 # hsc2hs is needed, e.g. to make the .hs files for hpc.
 phase_0_builds: $(utils/hsc2hs_dist_depfile_haskell)
 phase_0_builds: $(utils/hsc2hs_dist_depfile_c_asm)
-# genprimopcode is needed to make the .hs-incl files that are in the
+# genprimopcode is needed to parse the .hs-prim files that are in the
 # ghc package.
 phase_0_builds: $(utils/genprimopcode_dist_depfile_haskell)
 phase_0_builds: $(utils/genprimopcode_dist_depfile_c_asm)
