@@ -45,39 +45,18 @@
 --
 -- * The primitives are listed in this file, primops.txt.pp.
 --   It goes through CPP, which creates primops.txt.
---   It is then consumed by the utility program genprimopcode, which produces
---   the following three types of files.
+--   It is then consumed by the utility program genprimopcode, which parses .ops
+--   files (which are Haskell files containing markers) to produce final Haskell
+--   files. It is used by:
 --
---   1. The files with extension .hs-incl.
---      They can be found by grepping for hs-incl.
---      They are #included in compiler sources.
+--      * modules defining primops and their properties (in GHC.Builtin.*)
 --
---      One of them, primop-data-decl.hs-incl, defines the PrimOp type:
---        data PrimOp
---         = IntAddOp
---         | IntSubOp
---         | CharGtOp
---         | CharGeOp
---         | ...
+--      * the dummy ghc-prim:GHC.Prim module, which is used for Haddock and
+--      contains descriptions taken from primops.txt.pp.  All definitions are
+--      replaced by placeholders.  See Note [GHC.Prim Docs] in genprimopcode.
 --
---      The remaining files define properties of the primops
---      by pattern matching, for example:
---        primOpFixity IntAddOp = Just (Fixity NoSourceText 6 InfixL)
---        primOpFixity IntSubOp = Just (Fixity NoSourceText 6 InfixL)
---        ...
---      This includes fixity, has-side-effects, commutability,
---      IDs used to generate Uniques etc.
---
---      Additionally, we pattern match on PrimOp when generating Cmm in
---      GHC/StgToCmm/Prim.hs.
---
---   2. The dummy Prim.hs file, which is used for Haddock and
---      contains descriptions taken from primops.txt.pp.
---      All definitions are replaced by placeholders.
---      See Note [GHC.Prim Docs] in genprimopcode.
---
---   3. The module PrimopWrappers.hs, which wraps every call for GHCi;
---      see Note [Primop wrappers] in GHC.Builtin.Primops for details.
+--      * the ghc-prim:GHC.PrimopWrappers module, which wraps every call for
+--      GHCi; see Note [Primop wrappers] in GHC.Builtin.Primops for details.
 --
 -- * This file does not list internal-only equality types
 --   (GHC.Builtin.Types.Prim.unexposedPrimTyCons and coercionToken#
