@@ -928,8 +928,8 @@ cond_isEnumeration _ _ rep_tc
 
 cond_isProduct :: Condition
 cond_isProduct _ _ rep_tc
-  | isProductTyCon rep_tc = IsValid
-  | otherwise             = NotValid why
+  | Just _ <- tyConSingleDataCon_maybe rep_tc = IsValid
+  | otherwise                                 = NotValid why
   where
     why = quotes (pprSourceTyCon rep_tc) <+>
           text "must have precisely one constructor"
