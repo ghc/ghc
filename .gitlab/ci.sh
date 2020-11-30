@@ -348,6 +348,11 @@ function build_make() {
   if [[ -z "$BIN_DIST_PREP_TAR_COMP" ]]; then
     fail "BIN_DIST_PREP_TAR_COMP is not set"
   fi
+  if [[ -n "$VERBOSE" ]]; then
+    MAKE_ARGS="$MAKE_ARGS V=1"
+  else
+    MAKE_ARGS="$MAKE_ARGS V=0"
+  fi
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
@@ -402,6 +407,7 @@ function clean() {
 }
 
 function run_hadrian() {
+  if [ -n "$VERBOSE" ]; then HADRIAN_ARGS="$HADRIAN_ARGS -V"; fi
   run hadrian/build.cabal.sh \
     --flavour="$FLAVOUR" \
     -j"$cores" \
