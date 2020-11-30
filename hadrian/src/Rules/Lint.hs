@@ -57,8 +57,7 @@ compiler = do
   let compilerDir    = topDir </> "compiler"
   let ghcautoconf    = stage1Lib </> "ghcautoconf.h"
   let ghcplatform    = stage1Lib </> "ghcplatform.h"
-  let pmv            = stage1Compiler </> "primop-vector-uniques.hs-incl"
-  need [ghcautoconf, ghcplatform, machDeps, hsVersions, pmv]
+  need [ghcautoconf, ghcplatform, machDeps, hsVersions]
   let include0  = topDir </> "includes"
   let include1  = stage1Lib
   let hlintYaml = topDir </> "compiler/.hlint.yaml"

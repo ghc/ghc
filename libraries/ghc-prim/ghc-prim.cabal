@@ -8,7 +8,7 @@ category:       GHC
 maintainer:     libraries@haskell.org
 bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       GHC primitives
-build-type:     Custom
+build-type:     Simple
 description:
     This package contains the primitive types and operations supplied by GHC.
 
@@ -18,9 +18,6 @@ source-repository head
     type:     git
     location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   libraries/ghc-prim
-
-custom-setup
-    setup-depends: base >= 4 && < 5, Cabal >= 1.23
 
 Library
     default-language: Haskell2010

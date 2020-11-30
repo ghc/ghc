@@ -91,7 +91,7 @@ module GHC.Builtin.Types.Prim(
         equalityTyCon,
 
         -- * SIMD
-#include "primop-vector-tys-exports.hs-incl"
+%primop-vector-tys-exports
   ) where
 
 #include "HsVersions.h"
@@ -197,7 +197,7 @@ exposedPrimTyCons
     , tYPETyCon
     , funTyCon
 
-#include "primop-vector-tycons.hs-incl"
+%primop-vector-tycons
     ]
 
 mkPrimTc :: FastString -> Unique -> TyCon -> Name
@@ -1152,4 +1152,4 @@ threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName UnliftedRep
 ************************************************************************
 -}
 
-#include "primop-vector-tys.hs-incl"
+%primop-vector-tys
