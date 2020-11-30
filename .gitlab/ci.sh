@@ -575,7 +575,7 @@ case $1 in
     test_hadrian || res=$?
     push_perf_notes
     exit $res ;;
-  run_hadrian) run_hadrian $@ ;;
+  run_hadrian) shift; run_hadrian $@ ;;
   perf_test) run_perf_test ;;
   clean) clean ;;
   shell) shell $@ ;;
