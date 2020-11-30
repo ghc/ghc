@@ -17,7 +17,7 @@ import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.ResolvedBCO
 import GHCi.RemoteTypes
 import GHCi.BreakArray
-import SizedSeq
+import GHC.Data.SizedSeq
 
 import System.IO (fixIO)
 import Control.Monad
