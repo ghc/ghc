@@ -9,7 +9,8 @@ set -e -o pipefail
 
 # Configuration:
 hackage_index_state="2020-09-14T19:30:43Z"
-MIN_HAPPY_VERSION="1.20"
+MIN_HAPPY_VERSION="1.19.10"
+MAX_HAPPY_VERSION="1.20"
 MIN_ALEX_VERSION="3.2"
 
 TOP="$(pwd)"
@@ -317,10 +318,10 @@ function setup_toolchain() {
   cabal update
 
   info "Building happy..."
-  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION"
+  run $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION && <$MAX_HAPPY_VERSION"
 
   info "Building alex..."
-  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
+  run $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
 }
 
 function cleanup_submodules() {
