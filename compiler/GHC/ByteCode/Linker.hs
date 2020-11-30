@@ -26,7 +26,6 @@ import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray
-import SizedSeq
 
 import GHC.Builtin.PrimOps
 
@@ -34,6 +33,7 @@ import GHC.Unit.Types
 import GHC.Unit.Module.Name
 
 import GHC.Data.FastString
+import GHC.Data.SizedSeq
 
 import GHC.Utils.Panic
 import GHC.Utils.Outputable

@@ -17,12 +17,12 @@ module GHC.ByteCode.Types
 import GHC.Prelude
 
 import GHC.Data.FastString
+import GHC.Data.SizedSeq
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Builtin.PrimOps
-import SizedSeq
 import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHCi.BreakArray

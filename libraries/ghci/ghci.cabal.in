@@ -68,7 +68,6 @@ library
         GHCi.InfoTable
         GHCi.StaticPtrTable
         GHCi.TH.Binary
-        SizedSeq
 
     Build-Depends:
         array            == 0.5.*,
