@@ -2,62 +2,78 @@
 # shellcheck disable=SC2230
 
 # This is the primary driver of the GitLab CI infrastructure.
+# Run `ci.sh usage` for usage information.
+
 
 set -e -o pipefail
 
 # Configuration:
-hackage_index_state="@1579718451"
-
+hackage_index_state="2020-09-14T19:30:43Z"
+MIN_HAPPY_VERSION="1.20"
 MIN_ALEX_VERSION="3.2"
 
-# Colors
-BLACK="0;30"
-GRAY="1;30"
-RED="0;31"
-LT_RED="1;31"
-BROWN="0;33"
-LT_BROWN="1;33"
-GREEN="0;32"
-LT_GREEN="1;32"
-BLUE="0;34"
-LT_BLUE="1;34"
-PURPLE="0;35"
-LT_PURPLE="1;35"
-CYAN="0;36"
-LT_CYAN="1;36"
-WHITE="1;37"
-LT_GRAY="0;37"
-
-# GitLab Pipelines log section delimiters
-# https://gitlab.com/gitlab-org/gitlab-foss/issues/14664
-start_section() {
-  name="$1"
-  echo -e "section_start:$(date +%s):$name\015\033[0K"
-}
-
-end_section() {
-  name="$1"
-  echo -e "section_end:$(date +%s):$name\015\033[0K"
-}
-
-echo_color() {
-  local color="$1"
-  local msg="$2"
-  echo -e "\033[${color}m${msg}\033[0m"
-}
-
-error() { echo_color "${RED}" "$1"; }
-warn() { echo_color "${LT_BROWN}" "$1"; }
-info() { echo_color "${LT_BLUE}" "$1"; }
-
-fail() { error "error: $1"; exit 1; }
-
-function run() {
-  info "Running $*..."
-  "$@" || ( error "$* failed"; return 1; )
-}
-
 TOP="$(pwd)"
+if [ ! -d "$TOP/.gitlab" ]; then
+  echo "This script expects to be run from the root of a ghc checkout"
+fi
+
+source $TOP/.gitlab/common.sh
+
+function usage() {
+  cat <<EOF
+$0 - GHC continuous integration driver
+
+Common Modes:
+
+  usage         Show this usage message.
+  setup         Prepare environment for a build.
+  configure     Run ./configure.
+  clean         Clean the tree
+  shell         Run an interactive shell with a configured build environment.
+
+Make build system:
+
+  build_make    Build GHC via the make build system
+  test_make     Test GHC via the make build system
+
+Hadrian build system
+  build_hadrian Build GHC via the Hadrian build system
+  test_hadrian  Test GHC via the Hadrian build system
+
+Environment variables affecting both build systems:
+
+  CROSS_TARGET      Triple of cross-compilation target.
+  VERBOSE           Set to non-empty for verbose build output
+  MSYSTEM           (Windows-only) Which platform to build form (MINGW64 or MINGW32).
+
+Environment variables determining build configuration of Make system:
+
+  BUILD_FLAVOUR     Which flavour to build.
+  BUILD_SPHINX_HTML Whether to build Sphinx HTML documentation.
+  BUILD_SPHINX_PDF  Whether to build Sphinx PDF documentation.
+  INTEGER_LIBRARY   Which integer library to use (integer-simple or integer-gmp).
+  HADDOCK_HYPERLINKED_SOURCES
+                    Whether to build hyperlinked Haddock sources.
+  TEST_TYPE         Which test rule to run.
+
+Environment variables determining build configuration of Hadrian system:
+
+  BUILD_FLAVOUR     Which flavour to build.
+
+Environment variables determining bootstrap toolchain (Linux):
+
+  GHC           Path of GHC executable to use for bootstrapping.
+  CABAL         Path of cabal-install executable to use for bootstrapping.
+  ALEX          Path of alex executable to use for bootstrapping.
+  HAPPY         Path of alex executable to use for bootstrapping.
+
+Environment variables determining bootstrap toolchain (non-Linux):
+
+  GHC_VERSION   Which GHC version to fetch for bootstrapping.
+  CABAL_INSTALL_VERSION
+                Cabal-install version to fetch for bootstrapping.
+EOF
+}
 
 function setup_locale() {
   # Musl doesn't provide locale support at all...
@@ -95,11 +111,11 @@ function setup_locale() {
 function mingw_init() {
   case "$MSYSTEM" in
     MINGW32)
-      triple="i386-unknown-mingw32"
+      target_triple="i386-unknown-mingw32"
       boot_triple="i386-unknown-mingw32" # triple of bootstrap GHC
       ;;
     MINGW64)
-      triple="x86_64-unknown-mingw32"
+      target_triple="x86_64-unknown-mingw32"
       boot_triple="x86_64-unknown-mingw32" # triple of bootstrap GHC
       ;;
     *)
@@ -154,21 +170,24 @@ function show_tool() {
 function set_toolchain_paths() {
   needs_toolchain=1
   case "$(uname)" in
-    Linux) needs_toolchain="" ;;
+    Linux) needs_toolchain="0" ;;
     *) ;;
   esac
 
-  if [[ -n "$needs_toolchain" ]]; then
+  if [[ "$needs_toolchain" = 1 ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
       HAPPY="$toolchain/bin/happy$exe"
       ALEX="$toolchain/bin/alex$exe"
   else
-      GHC="$(which ghc)"
-      CABAL="/usr/local/bin/cabal"
-      HAPPY="$HOME/.cabal/bin/happy"
-      ALEX="$HOME/.cabal/bin/alex"
+      # These are generally set by the Docker image but
+      # we provide these handy fallbacks in case the
+      # script isn't run from within a GHC CI docker image.
+      if [ -z "$GHC" ]; then GHC="$(which ghc)"; fi
+      if [ -z "$CABAL" ]; then GHC="$(which cabal)"; fi
+      if [ -z "$HAPPY" ]; then GHC="$(which happy)"; fi
+      if [ -z "$ALEX" ]; then GHC="$(which alex)"; fi
   fi
 
   export GHC
@@ -207,12 +226,12 @@ function setup() {
 }
 
 function fetch_ghc() {
-  local v="$GHC_VERSION"
-  if [[ -z "$v" ]]; then
-      fail "GHC_VERSION is not set"
-  fi
-
   if [ ! -e "$GHC" ]; then
+      local v="$GHC_VERSION"
+      if [[ -z "$v" ]]; then
+          fail "neither GHC nor GHC_VERSION are not set"
+      fi
+
       start_section "fetch GHC"
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
@@ -236,12 +255,12 @@ function fetch_ghc() {
 }
 
 function fetch_cabal() {
-  local v="$CABAL_INSTALL_VERSION"
-  if [[ -z "$v" ]]; then
-      fail "CABAL_INSTALL_VERSION is not set"
-  fi
-
   if [ ! -e "$CABAL" ]; then
+      local v="$CABAL_INSTALL_VERSION"
+      if [[ -z "$v" ]]; then
+          fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
+      fi
+
       start_section "fetch GHC"
       case "$(uname)" in
         # N.B. Windows uses zip whereas all others use .tar.xz
@@ -284,6 +303,7 @@ function setup_toolchain() {
   fetch_cabal
 
   cabal_install="$CABAL v2-install \
+    --with-compiler=$GHC \
     --index-state=$hackage_index_state \
     --installdir=$toolchain/bin \
     --overwrite-policy=always"
@@ -297,7 +317,7 @@ function setup_toolchain() {
   cabal update
 
   info "Building happy..."
-  $cabal_install happy --constraint="happy==1.19.*"
+  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION"
 
   info "Building alex..."
   $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
@@ -358,8 +378,8 @@ function configure() {
   end_section "booting"
 
   local target_args=""
-  if [[ -n "$triple" ]]; then
-    target_args="--target=$triple"
+  if [[ -n "$target_triple" ]]; then
+    target_args="--target=$target_triple"
   fi
 
   start_section "configuring"
@@ -378,6 +398,11 @@ function build_make() {
   prepare_build_mk
   if [[ -z "$BIN_DIST_PREP_TAR_COMP" ]]; then
     fail "BIN_DIST_PREP_TAR_COMP is not set"
+  fi
+  if [[ -n "$VERBOSE" ]]; then
+    MAKE_ARGS="$MAKE_ARGS V=1"
+  else
+    MAKE_ARGS="$MAKE_ARGS V=0"
   fi
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
@@ -405,6 +430,11 @@ function determine_metric_baseline() {
 }
 
 function test_make() {
+  if [ -n "$CROSS_TARGET" ]; then
+    info "Can't test cross-compiled build."
+    return
+  fi
+
   run "$MAKE" test_bindist TEST_PREP=YES
   run "$MAKE" V=0 test \
     THREADS="$cores" \
@@ -412,16 +442,24 @@ function test_make() {
 }
 
 function build_hadrian() {
-  if [ -z "$FLAVOUR" ]; then
-    fail "FLAVOUR not set"
+  if [ -z "$BUILD_FLAVOUR" ]; then
+    fail "BUILD_FLAVOUR not set"
+  fi
+  if [ -z "$BIN_DIST_NAME" ]; then
+    fail "BIN_DIST_NAME not set"
   fi
 
   run_hadrian binary-dist
 
-  mv _build/bindist/ghc*.tar.xz ghc.tar.xz
+  mv _build/bindist/ghc*.tar.xz $BIN_DIST_NAME.tar.xz
 }
 
 function test_hadrian() {
+  if [ -n "$CROSS_TARGET" ]; then
+    info "Can't test cross-compiled build."
+    return
+  fi
+
   cd _build/bindist/ghc-*/
   run ./configure --prefix="$TOP"/_build/install
   run "$MAKE" install
@@ -433,6 +471,34 @@ function test_hadrian() {
     --test-compiler="$TOP"/_build/install/bin/ghc
 }
 
+function cabal_test() {
+  if [ -z "$OUT" ]; then
+    fail "OUT not set"
+  fi
+
+  start_section "Cabal test: $OUT"
+  mkdir -p "$OUT"
+  run "$HC" \
+    -hidir tmp -odir tmp -fforce-recomp \
+    -ddump-to-file -dumpdir "$OUT/dumps" -ddump-timings \
+    +RTS --machine-readable "-t$OUT/rts.log" -RTS \
+    -package mtl -ilibraries/Cabal/Cabal libraries/Cabal/Cabal/Setup.hs \
+    $@
+  rm -Rf tmp
+  end_section "Cabal test: $OUT"
+}
+
+function run_perf_test() {
+  if [ -z "$HC" ]; then
+    fail "HC not set"
+  fi
+
+  mkdir -p out
+  OUT=out/Cabal-O0 cabal_test -O0
+  OUT=out/Cabal-O1 cabal_test -O1
+  OUT=out/Cabal-O2 cabal_test -O2
+}
+
 function clean() {
   rm -R tmp
   run "$MAKE" --quiet clean || true
@@ -441,8 +507,9 @@ function clean() {
 
 function run_hadrian() {
   if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
+  if [ -n "$VERBOSE" ]; then HADRIAN_ARGS="$HADRIAN_ARGS -V"; fi
   run hadrian/build-cabal \
-    --flavour="$FLAVOUR" \
+    --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
     --broken-test="$BROKEN_TESTS" \
     --bignum=$BIGNUM_BACKEND \
@@ -480,9 +547,15 @@ case "$(uname)" in
   *) fail "uname $(uname) is not supported" ;;
 esac
 
+if [ -n "$CROSS_TARGET" ]; then
+  info "Cross-compiling for $CROSS_TARGET..."
+  target_triple="$CROSS_TARGET"
+fi
+
 set_toolchain_paths
 
 case $1 in
+  usage) usage ;;
   setup) setup && cleanup_submodules ;;
   configure) configure ;;
   build_make) build_make ;;
@@ -503,6 +576,7 @@ case $1 in
     push_perf_notes
     exit $res ;;
   run_hadrian) run_hadrian $@ ;;
+  perf_test) run_perf_test ;;
   clean) clean ;;
   shell) shell $@ ;;
   *) fail "unknown mode $1" ;;
