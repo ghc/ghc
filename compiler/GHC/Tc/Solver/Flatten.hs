@@ -44,7 +44,7 @@ import Control.Arrow ( first )
 
 {-
 Note [The flattening story]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * A CFunEqCan is either of form
      [G] <F xis> : F xis ~ fsk   -- fsk is a FlatSkolTv
      [W]       x : F xis ~ fmv   -- fmv is a FlatMetaTv
@@ -65,7 +65,8 @@ Note [The flattening story]
 
    - A unification flatten-skolem, fmv, stands for the as-yet-unknown
      type to which (F xis) will eventually reduce.  It is filled in
-
+     by dischargeFunEq, which calls unflattenFmv; this step will
+     happen during the interaction phase, after flattening.
 
    - All fsk/fmv variables are "untouchable".  To make it simple to test,
      we simply give them TcLevel=0.  This means that in a CTyVarEq, say,
@@ -76,7 +77,7 @@ Note [The flattening story]
        a) The CFunEqCan takes a step, using an axiom
        b) By unflattenWanteds
     They are never unified in any other form of equality.
-    For example [W] ffmv ~ Int  is stuck; it does not unify with fmv.
+    For example [W] fmv ~ Int  is stuck; it does not unify with fmv.
 
 * We *never* substitute in the RHS (i.e. the fsk/fmv) of a CFunEqCan.
   That would destroy the invariant about the shape of a CFunEqCan,
