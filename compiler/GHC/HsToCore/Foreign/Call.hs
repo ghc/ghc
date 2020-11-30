@@ -195,7 +195,7 @@ unboxArg arg
        pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
   where
     arg_ty                                      = exprType arg
-    maybe_product_type                          = splitDataProductType_maybe arg_ty
+    maybe_product_type                          = splitNonExDataProductType_maybe arg_ty
     is_product_type                             = isJust maybe_product_type
     Just (_, _, data_con, scaled_data_con_arg_tys) = maybe_product_type
     data_con_arg_tys                            = map scaledThing scaled_data_con_arg_tys
@@ -353,7 +353,8 @@ resultWrapper result_ty
   -- Data types with a single constructor, which has a single arg
   -- This includes types like Ptr and ForeignPtr
   | Just (tycon, tycon_arg_tys) <- maybe_tc_app
-  , Just data_con <- isDataProductTyCon_maybe tycon  -- One constructor, no existentials
+  , Just data_con <- tyConSingleAlgDataCon_maybe tycon  -- One constructor
+  , null (dataConExTyCoVars data_con)                   -- no existentials
   , [Scaled _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
   = do { dflags <- getDynFlags
        ; let platform = targetPlatform dflags

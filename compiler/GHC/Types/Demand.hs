@@ -90,7 +90,7 @@ import GHC.Data.Maybe   ( orElse )
 
 import GHC.Core.Type    ( Type )
 import GHC.Core.TyCon   ( isNewTyCon, isClassTyCon )
-import GHC.Core.DataCon ( splitDataProductType_maybe )
+import GHC.Core.DataCon ( splitNonExDataProductType_maybe )
 import GHC.Core.Multiplicity    ( scaledThing )
 
 import GHC.Utils.Binary
@@ -512,7 +512,7 @@ strictifyDictDmd ty (n :* Prod ds)
     -- type is a non-newtype dictionary type
     as_non_newtype_dict ty
       | Just (tycon, _arg_tys, _data_con, map scaledThing -> inst_con_arg_tys)
-          <- splitDataProductType_maybe ty
+          <- splitNonExDataProductType_maybe ty
       , not (isNewTyCon tycon)
       , isClassTyCon tycon
       = Just inst_con_arg_tys

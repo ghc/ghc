@@ -771,8 +771,6 @@ isIrrefutableHsPat
          L _ (PatSynCon _pat)  -> False -- Conservative
          L _ (RealDataCon con) ->
            isJust (tyConSingleDataCon_maybe (dataConTyCon con))
-           -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
-           -- the latter is false of existentials. See #4439
            && all goL (hsConPatArgs details)
     go (LitPat {})         = False
     go (NPat {})           = False
