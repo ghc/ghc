@@ -1806,7 +1806,7 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
                | bndr <- tyConBinders tc
                , let new_loc0 | isNamedTyConBinder bndr = toKindLoc loc
                               | otherwise               = loc
-                     new_loc  | isVisibleTyConBinder bndr
+                     new_loc  | isInvisibleTyConBinder bndr
                               = updateCtLocOrigin new_loc0 toInvisibleOrigin
                               | otherwise
                               = new_loc0 ]
