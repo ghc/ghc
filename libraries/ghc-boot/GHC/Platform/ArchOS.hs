@@ -73,8 +73,8 @@ data ArmABI
 
 -- | PowerPC 64-bit ABI
 data PPC_64ABI
-   = ELF_V1
-   | ELF_V2
+   = ELF_V1 -- ^ PowerPC64
+   | ELF_V2 -- ^ PowerPC64 LE
    deriving (Read, Show, Eq)
 
 -- | Operating systems.
