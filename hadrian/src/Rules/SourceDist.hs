@@ -138,11 +138,16 @@ prepareTree dest = do
 
     -- (stage, package, input file, output file)
     alexHappyFiles =
-        [ (Stage0, compiler,      "GHC/Cmm/Parser.y",   "GHC/Cmm/Parser.hs")
-        , (Stage0, compiler,      "GHC/Cmm/Lexer.x",    "GHC/Cmm/Lexer.hs")
-        , (Stage0, compiler,      "GHC/Parser.y",       "GHC/Parser.hs")
-        , (Stage0, compiler,      "GHC/Parser/Lexer.x", "GHC/Parser/Lexer.hs")
-        , (Stage0, hpcBin,        "HpcParser.y",        "HpcParser.hs")
-        , (Stage0, genprimopcode, "Parser.y",           "Parser.hs")
-        , (Stage0, genprimopcode, "Lexer.x",            "Lexer.hs")
+        [ (Stage0, compiler,      "GHC/Cmm/Parser.y",           "GHC/Cmm/Parser.hs")
+        , (Stage0, compiler,      "GHC/Cmm/Lexer.x",            "GHC/Cmm/Lexer.hs")
+        , (Stage0, compiler,      "GHC/Parser.y",               "GHC/Parser.hs")
+        , (Stage0, compiler,      "GHC/Parser/Lexer.x",         "GHC/Parser/Lexer.hs")
+        , (Stage0, compiler,      "GHC/Builtin/PrimOps.ops",    "GHC/Builtin/PrimOps.hs")
+        , (Stage0, compiler,      "GHC/Builtin/Types/Prim.ops", "GHC/Builtin/Types/Prim.hs")
+        , (Stage0, compiler,      "GHC/Builtin/Names.ops",      "GHC/Builtin/Names.hs")
+        , (Stage0, ghcPrim,       "GHC/Prim.ops",               "GHC/Prim.hs")
+        , (Stage0, ghcPrim,       "GHC/PrimopWrappers.ops",     "GHC/PrimopWrappers.hs")
+        , (Stage0, hpcBin,        "HpcParser.y",                "HpcParser.hs")
+        , (Stage0, genprimopcode, "Parser.y",                   "Parser.hs")
+        , (Stage0, genprimopcode, "Lexer.x",                    "Lexer.hs")
         ]

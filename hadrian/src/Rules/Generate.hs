@@ -53,22 +53,10 @@ compilerDependencies = do
     mconcat [ return $ (libDir -/-) <$> derivedConstantsFiles
             , notStage0 ? return ((rtsPath -/-) <$> libffiHeaderFiles)
             , return $ fmap (ghcPath -/-)
-                  [ "primop-can-fail.hs-incl"
-                  , "primop-code-size.hs-incl"
-                  , "primop-commutable.hs-incl"
-                  , "primop-data-decl.hs-incl"
-                  , "primop-fixity.hs-incl"
-                  , "primop-has-side-effects.hs-incl"
-                  , "primop-list.hs-incl"
-                  , "primop-out-of-line.hs-incl"
-                  , "primop-primop-info.hs-incl"
-                  , "primop-strictness.hs-incl"
-                  , "primop-tag.hs-incl"
-                  , "primop-vector-tycons.hs-incl"
-                  , "primop-vector-tys-exports.hs-incl"
-                  , "primop-vector-tys.hs-incl"
-                  , "primop-vector-uniques.hs-incl"
-                  , "primop-docs.hs-incl"
+                  [ "GHC/Builtin/PrimOps.hs"
+                  , "GHC/Builtin/PrimOps.hs-boot"
+                  , "GHC/Builtin/Types/Prim.hs"
+                  , "GHC/Builtin/Names.hs"
                   , "GHC/Platform/Constants.hs"
                   ] ]
 
@@ -97,6 +85,7 @@ generatePackageCode context@(Context stage pkg _) = do
     let dir         = buildDir context
         generated f = (root -/- dir -/- "**/*.hs") ?== f && not ("//autogen/*" ?== f)
         go gen file = generate file context gen
+        gen_ops dst src = root -/- "**" -/- dir -/- dst %> genPrimopCode context src
     generated ?> \file -> do
         let unpack = fromMaybe . error $ "No generator for " ++ file ++ "."
         (src, builder) <- unpack <$> findGenerator context file
@@ -112,10 +101,14 @@ generatePackageCode context@(Context stage pkg _) = do
         when (pkg == compiler) $ do
             root -/- "**" -/- dir -/- "GHC/Platform/Constants.hs" %> genPlatformConstantsType context
             root -/- "**" -/- dir -/- "GHC/Settings/Config.hs" %> go generateConfigHs
-            root -/- "**" -/- dir -/- "*.hs-incl" %> genPrimopCode context
+            gen_ops "GHC/Builtin/Names.hs"        "compiler/GHC/Builtin/Names.ops"
+            gen_ops "GHC/Builtin/Types/Prim.hs"   "compiler/GHC/Builtin/Types/Prim.ops"
+            gen_ops "GHC/Builtin/PrimOps.hs"      "compiler/GHC/Builtin/PrimOps.ops"
+            gen_ops "GHC/Builtin/PrimOps.hs-boot" "compiler/GHC/Builtin/PrimOps.hs-boot"
+                -- we need to copy PrimOps.hs-boot (unchanged) for GHC to find it close to PrimOps.hs...
         when (pkg == ghcPrim) $ do
-            root -/- "**" -/- dir -/- "GHC/Prim.hs" %> genPrimopCode context
-            root -/- "**" -/- dir -/- "GHC/PrimopWrappers.hs" %> genPrimopCode context
+            gen_ops "GHC/Prim.hs"                 "libraries/ghc-prim/GHC/Prim.ops"
+            gen_ops "GHC/PrimopWrappers.hs"       "libraries/ghc-prim/GHC/PrimopWrappers.ops"
         when (pkg == ghcBoot) $ do
             root -/- "**" -/- dir -/- "GHC/Version.hs" %> go generateVersionHs
             root -/- "**" -/- dir -/- "GHC/Platform/Host.hs" %> go generatePlatformHostHs
@@ -139,11 +132,11 @@ generatePackageCode context@(Context stage pkg _) = do
         dir <- mdir
         copyFile (dir -/- takeFileName file) file
 
-genPrimopCode :: Context -> FilePath -> Action ()
-genPrimopCode context@(Context stage _pkg _) file = do
+genPrimopCode :: Context -> FilePath -> FilePath -> Action ()
+genPrimopCode context@(Context stage _pkg _) input file = do
     root <- buildRoot
     need [root -/- primopsTxt stage]
-    build $ target context GenPrimopCode [root -/- primopsTxt stage] [file]
+    build $ target context GenPrimopCode [root -/- primopsTxt stage, input] [file]
 
 genPlatformConstantsType :: Context -> FilePath -> Action ()
 genPlatformConstantsType context file = do

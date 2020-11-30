@@ -107,27 +107,6 @@ $(eval $(call compilerConfig,2))
 #		Generate supporting stuff for GHC/Builtin/PrimOps.hs
 #		from GHC/Builtin/primops.txt
 
-PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
-                    primop-tag.hs-incl              \
-                    primop-list.hs-incl             \
-                    primop-has-side-effects.hs-incl \
-                    primop-out-of-line.hs-incl      \
-                    primop-commutable.hs-incl       \
-                    primop-code-size.hs-incl        \
-                    primop-can-fail.hs-incl         \
-                    primop-strictness.hs-incl       \
-                    primop-fixity.hs-incl           \
-                    primop-primop-info.hs-incl      \
-                    primop-vector-uniques.hs-incl   \
-                    primop-vector-tys.hs-incl       \
-                    primop-vector-tys-exports.hs-incl \
-                    primop-vector-tycons.hs-incl    \
-                    primop-docs.hs-incl
-
-PRIMOP_BITS_STAGE1 = $(addprefix compiler/stage1/build/,$(PRIMOP_BITS_NAMES))
-PRIMOP_BITS_STAGE2 = $(addprefix compiler/stage2/build/,$(PRIMOP_BITS_NAMES))
-PRIMOP_BITS_STAGE3 = $(addprefix compiler/stage3/build/,$(PRIMOP_BITS_NAMES))
-
 define preprocessCompilerFiles
 # $1 = compiler stage (build system stage + 1)
 compiler/stage$1/build/primops.txt: \
@@ -139,43 +118,33 @@ compiler/stage$1/build/primops.txt: \
 		-I$(BUILD_$(dec$1)_INCLUDE_DIR) \
 		-x c $$< | grep -v '^#pragma GCC' > $$@
 
-compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --data-decl          < $$< > $$@
-compiler/stage$1/build/primop-tag.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --primop-tag         < $$< > $$@
-compiler/stage$1/build/primop-list.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --primop-list        < $$< > $$@
-compiler/stage$1/build/primop-has-side-effects.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --has-side-effects   < $$< > $$@
-compiler/stage$1/build/primop-out-of-line.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --out-of-line        < $$< > $$@
-compiler/stage$1/build/primop-commutable.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --commutable         < $$< > $$@
-compiler/stage$1/build/primop-code-size.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --code-size          < $$< > $$@
-compiler/stage$1/build/primop-can-fail.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --can-fail           < $$< > $$@
-compiler/stage$1/build/primop-strictness.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --strictness         < $$< > $$@
-compiler/stage$1/build/primop-fixity.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --fixity             < $$< > $$@
-compiler/stage$1/build/primop-primop-info.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --primop-primop-info < $$< > $$@
-compiler/stage$1/build/primop-vector-uniques.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --primop-vector-uniques     < $$< > $$@
-compiler/stage$1/build/primop-vector-tys.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --primop-vector-tys         < $$< > $$@
-compiler/stage$1/build/primop-vector-tys-exports.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --primop-vector-tys-exports < $$< > $$@
-compiler/stage$1/build/primop-vector-tycons.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --primop-vector-tycons      < $$< > $$@
-compiler/stage$1/build/primop-docs.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --wired-in-docs             < $$< > $$@
+compiler/stage$1/build/GHC/Builtin/PrimOps.hs: \
+		compiler/GHC/Builtin/PrimOps.ops \
+		compiler/stage$1/build/primops.txt \
+		$$$$(genprimopcode_INPLACE)
+	mkdir -p compiler/stage$1/build/GHC/Builtin
+	cp -f compiler/GHC/Builtin/PrimOps.hs-boot compiler/stage$1/build/GHC/Builtin/PrimOps.hs-boot
+	"$$(genprimopcode_INPLACE)" \
+		compiler/stage$1/build/primops.txt \
+		$$< > $$@
 
-# Usages aren't used any more; but the generator
-# can still generate them if we want them back
-compiler/stage$1/build/primop-usage.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --usage              < $$< > $$@
+compiler/stage$1/build/GHC/Builtin/Types/Prim.hs: \
+		compiler/GHC/Builtin/Types/Prim.ops \
+		compiler/stage$1/build/primops.txt \
+		$$$$(genprimopcode_INPLACE)
+	mkdir -p compiler/stage$1/build/GHC/Builtin/Types
+	"$$(genprimopcode_INPLACE)" \
+		compiler/stage$1/build/primops.txt \
+		$$< > $$@
+
+compiler/stage$1/build/GHC/Builtin/Names.hs: \
+		compiler/GHC/Builtin/Names.ops \
+		compiler/stage$1/build/primops.txt \
+		$$$$(genprimopcode_INPLACE)
+	mkdir -p compiler/stage$1/build/GHC/Builtin
+	"$$(genprimopcode_INPLACE)" \
+		compiler/stage$1/build/primops.txt \
+		$$< > $$@
 
 endef
 
