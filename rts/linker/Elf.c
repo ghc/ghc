@@ -780,7 +780,12 @@ ocGetNames_ELF ( ObjectCode* oc )
           else if (!oc->imageMapped || size < getPageSize() / 3) {
               bool executable = kind == SECTIONKIND_CODE_OR_RODATA;
               m32_allocator *allocator = executable ? oc->rx_m32 : oc->rw_m32;
-              start = m32_alloc(allocator, size, 8);
+              // align on 16 bytes. The reason being that llvm will emit see
+              // paddq statements for x86_64 under optimisation and load from
+              // RODATA sections. Specifically .rodata.cst16. However we don't
+              // handle the cst part in any way what so ever, so 16 seems
+              // better than 8.
+              start = m32_alloc(allocator, size, 16);
               if (start == NULL) goto fail;
               memcpy(start, oc->image + offset, size);
               alloc = SECTION_M32;
@@ -915,7 +920,7 @@ ocGetNames_ELF ( ObjectCode* oc )
                    symbol->addr = (SymbolAddr*)(
                            (intptr_t) oc->sections[secno].start +
                            (intptr_t) symbol->elf_sym->st_value);
-
+                   ASSERT(symbol->addr != 0x0);
                    if (ELF_ST_BIND(symbol->elf_sym->st_info) == STB_LOCAL) {
                        isLocal = true;
                        isWeak = false;
@@ -1842,6 +1847,7 @@ ocResolve_ELF ( ObjectCode* oc )
 #endif
                 ASSERT(symbol->elf_sym->st_name == 0);
                 ASSERT(symbol->elf_sym->st_value == 0);
+                ASSERT(0x0 != oc->sections[ secno ].start);
                 symbol->addr = oc->sections[ secno ].start;
             }
         }
@@ -1915,6 +1921,7 @@ int ocRunInit_ELF( ObjectCode *oc )
          init_start = (init_t*)init_startC;
          init_end = (init_t*)(init_startC + shdr[i].sh_size);
          for (init = init_start; init < init_end; init++) {
+            ASSERT(0x0 != *init);
             (*init)(argc, argv, envv);
          }
       }

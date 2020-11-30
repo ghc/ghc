@@ -145,7 +145,7 @@ typedef struct ForeignExportStablePtr_ {
     struct ForeignExportStablePtr_ *next;
 } ForeignExportStablePtr;
 
-#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(aarch64_HOST_ARCH)
 #define NEED_SYMBOL_EXTRAS 1
 #endif
 
