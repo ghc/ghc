@@ -245,7 +245,7 @@ toIfaceTyCon tc
       , Just tsort <- tupleSort tc'          = tsort
 
       | isUnboxedSumTyCon tc
-      , Just cons <- isDataSumTyCon_maybe tc = IfaceSumTyCon (length cons)
+      , Just cons <- tyConDataCons_maybe tc  = IfaceSumTyCon (length cons)
 
       | otherwise                            = IfaceNormalTyCon
 
