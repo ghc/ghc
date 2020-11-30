@@ -265,8 +265,8 @@ instance H.Builder Builder where
                 GenApply -> captureStdout
 
                 GenPrimopCode -> do
-                    stdin <- readFile' input
-                    Stdout stdout <- cmd' (Stdin stdin) [path] buildArgs
+                    let [primops_txt,input_file] = buildInputs
+                    Stdout stdout <- cmd' [path,primops_txt,input_file] buildArgs
                     writeFileChanged output stdout
 
                 GhcPkg Copy _ -> do
