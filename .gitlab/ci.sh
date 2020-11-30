@@ -442,9 +442,6 @@ function test_make() {
 }
 
 function build_hadrian() {
-  if [ -z "$BUILD_FLAVOUR" ]; then
-    fail "BUILD_FLAVOUR not set"
-  fi
   if [ -z "$BIN_DIST_NAME" ]; then
     fail "BIN_DIST_NAME not set"
   fi
@@ -506,6 +503,9 @@ function clean() {
 }
 
 function run_hadrian() {
+  if [ -z "$BUILD_FLAVOUR" ]; then
+    fail "BUILD_FLAVOUR not set"
+  fi
   if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
   if [ -n "$VERBOSE" ]; then HADRIAN_ARGS="$HADRIAN_ARGS -V"; fi
   run hadrian/build-cabal \
@@ -575,7 +575,7 @@ case $1 in
     test_hadrian || res=$?
     push_perf_notes
     exit $res ;;
-  run_hadrian) run_hadrian $@ ;;
+  run_hadrian) shift; run_hadrian $@ ;;
   perf_test) run_perf_test ;;
   clean) clean ;;
   shell) shell $@ ;;
