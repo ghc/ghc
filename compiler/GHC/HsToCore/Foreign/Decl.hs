@@ -830,7 +830,7 @@ getPrimTyOf ty
   -- Except for Bool, the types we are interested in have a single constructor
   -- with a single primitive-typed argument (see TcType.legalFEArgTyCon).
   | otherwise =
-  case splitDataProductType_maybe rep_ty of
+  case splitNonExDataProductType_maybe rep_ty of
      Just (_, _, data_con, [Scaled _ prim_ty]) ->
         ASSERT(dataConSourceArity data_con == 1)
         ASSERT2(isUnliftedType prim_ty, ppr prim_ty)

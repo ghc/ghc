@@ -737,7 +737,7 @@ is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
 is_flat_prod_pat (ConPat { pat_con  = L _ pcon
                          , pat_args = ps})
   | RealDataCon con <- pcon
-  , isProductTyCon (dataConTyCon con)
+  , Just _ <- tyConSingleDataCon_maybe (dataConTyCon con)
   = all is_triv_lpat (hsConPatArgs ps)
 is_flat_prod_pat _ = False
 

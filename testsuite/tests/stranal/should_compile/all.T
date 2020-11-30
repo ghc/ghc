@@ -60,3 +60,5 @@ test('T18122',  [ grep_errmsg(r'wfoo =') ], compile, ['-ddump-simpl'])
 test('T18903',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-simpl -dsuppress-uniques'])
 # We care about the call demand on $wg1 and $wg2
 test('T18894',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-stranal -dsuppress-uniques'])
+# We care about the workers of f,g,h,i:
+test('T18982',  [ grep_errmsg(r'\$w. .*Int#$') ], compile, ['-dppr-cols=1000 -ddump-simpl -dsuppress-idinfo -dsuppress-uniques'])
