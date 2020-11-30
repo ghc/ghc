@@ -1564,15 +1564,13 @@ promoteDataCon (MkData { dcPromoted = tc }) = tc
 -- | Extract the type constructor, type argument, data constructor and it's
 -- /representation/ argument types from a type if it is a product type.
 --
--- Precisely, we return @Just@ for any type that is all of:
+-- Precisely, we return @Just@ for any data type that is all of:
 --
 --  * Concrete (i.e. constructors visible)
---
 --  * Single-constructor
+--  * ... which has no existentials
 --
---  * Not existentially quantified
---
--- Whether the type is a @data@ type or a @newtype@
+-- Whether the type is a @data@ type or a @newtype@.
 splitDataProductType_maybe
         :: Type                         -- ^ A product type, perhaps
         -> Maybe (TyCon,                -- The type constructor
@@ -1580,13 +1578,14 @@ splitDataProductType_maybe
                   DataCon,              -- The data constructor
                   [Scaled Type])        -- Its /representation/ arg types
 
-        -- Rejecting existentials is conservative.  Maybe some things
-        -- could be made to work with them, but I'm not going to sweat
-        -- it through till someone finds it's important.
+        -- Rejecting existentials means we don't have to worry about
+        -- freshening and substituting type variables
+        -- (See "GHC.Type.Id.Make.dataConArgUnpack")
 
 splitDataProductType_maybe ty
   | Just (tycon, ty_args) <- splitTyConApp_maybe ty
-  , Just con <- isDataProductTyCon_maybe tycon
+  , Just con <- tyConSingleDataCon_maybe tycon
+  , null (dataConExTyCoVars con) -- no existentials! See above
   = Just (tycon, ty_args, con, dataConInstArgTys con ty_args)
   | otherwise
   = Nothing

@@ -426,8 +426,8 @@ dmdAnal' env dmd (Lam var body)
 
 dmdAnal' env dmd (Case scrut case_bndr ty [(alt, bndrs, rhs)])
   -- Only one alternative.
-  -- If it's a DataAlt, it should be a product constructor.
-  | is_non_sum_alt alt
+  -- If it's a DataAlt, it should be the only constructor of the type.
+  | is_single_data_alt alt
   = let
         (rhs_ty, rhs')           = dmdAnal env dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
@@ -466,8 +466,8 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(alt, bndrs, rhs)])
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty [(alt, bndrs', rhs')])
     where
-      is_non_sum_alt (DataAlt dc) = isJust $ isDataProductTyCon_maybe $ dataConTyCon dc
-      is_non_sum_alt _            = True
+      is_single_data_alt (DataAlt dc) = isJust $ tyConSingleAlgDataCon_maybe $ dataConTyCon dc
+      is_single_data_alt _            = True
 
 dmdAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
@@ -527,10 +527,11 @@ forcesRealWorld :: FamInstEnvs -> Type -> Bool
 forcesRealWorld fam_envs ty
   | ty `eqType` realWorldStatePrimTy
   = True
-  | Just DataConAppContext{ dcac_dc = dc, dcac_arg_tys = field_tys }
-      <- deepSplitProductType_maybe fam_envs ty
+  | Just DataConPatContext{ dcpc_dc = dc, dcpc_tc_args = tc_args }
+      <- splitArgType_maybe fam_envs ty
   , isUnboxedTupleDataCon dc
-  = any (\(ty,_) -> scaledThing ty `eqType` realWorldStatePrimTy) field_tys
+  , let field_tys = dataConInstArgTys dc tc_args
+  = any (eqType realWorldStatePrimTy . scaledThing) field_tys
   | otherwise
   = False
 
