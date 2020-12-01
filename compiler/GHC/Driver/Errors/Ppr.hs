@@ -59,7 +59,7 @@ instance RenderableDiagnostic GhcError where
 instance RenderableDiagnostic DriverError where
   renderDiagnostic = \case
 
-    DriverError d
+    DriverErrorRaw d
       -> d
 
     DriverCannotFindModule dflags m res
@@ -85,7 +85,7 @@ instance RenderableDiagnostic DriverError where
 
 instance RenderableDiagnostic DriverWarning where
   renderDiagnostic = \case
-    WarnModuleInferredUnsafe df modName badInsts whyUnsafe
+    DriverWarnModuleInferredUnsafe df modName badInsts whyUnsafe
       -> errDoc [ vcat [ quotes (ppr modName) <+> text "has been inferred as unsafe!"
                        , text "Reason:"
                        , nest 4 $ (vcat $ badFlags df) $+$
@@ -110,3 +110,10 @@ instance RenderableDiagnostic DriverWarning where
 
            checkOverlap (NoOverlap _) = False
            checkOverlap _             = True
+
+    DriverWarnInferredSafeImports modName
+      -> errDoc [ sep [ text "Importing Safe-Inferred module "
+                      <> ppr modName
+                      <> text " from explicitly Safe module"
+                      ]
+                ] [] []

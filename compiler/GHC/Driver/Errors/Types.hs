@@ -2,21 +2,27 @@
 module GHC.Driver.Errors.Types (
     GhcError(..)
   , GhcWarning(..)
-  , DriverError(..)   -- TODO(adinapoli) Naming consistency.
+  , DriverError(..)
   , DriverWarning(..)
+
+  -- * Constructing Driver warnings
+  , mkDriverWarn
 
   -- * Converting an ErrDoc into a GhcError in a lossy way
   , ghcErrorRawErrDoc
   ) where
 
 import GHC.Core.InstEnv ( ClsInst )
+import GHC.Driver.Flags
 import GHC.Driver.Session ( DynFlags )
 import GHC.Prelude ( String )
 import GHC.Tc.Errors.Ppr ()
-import GHC.Types.Error ( ErrDoc, WarningMessages )
+import GHC.Types.Error
+import GHC.Types.SrcLoc
 import GHC.Unit.Finder.Types ( FindResult )
 import GHC.Unit.Module.Name ( ModuleName )
 import GHC.Unit.Types ( UnitId, Module )
+import GHC.Utils.Outputable
 import qualified GHC.Driver.CmdLine as CmdLine
 import qualified GHC.Parser.Errors as Parser
 import qualified GHC.Tc.Errors.Types as TcRn
@@ -31,6 +37,7 @@ data GhcWarning
   | GhcWarningDs   !TcRn.DsWarning
     -- ^ A warning raised during desugaring.
   | GhcWarningCmdLine !CmdLine.Warn
+    -- ^ A warning raised in the cmdline.
   | GhcWarningDriver !DriverWarning
     -- ^ A warning raised in the driver.
   | GhcWarningDemotedErr !GhcError
@@ -62,15 +69,23 @@ data GhcError
 ghcErrorRawErrDoc :: ErrDoc -> GhcError
 ghcErrorRawErrDoc = GhcErrorRaw
 
+-- | An error which can arise in the driver.
 data DriverError
-  = DriverCannotFindModule DynFlags ModuleName FindResult
-  | DriverNotAnExpression String
+  = DriverCannotFindModule !DynFlags !ModuleName !FindResult
+  | DriverNotAnExpression !String
   | DriverParseErrorImport
-  | DriverPkgRequiredTrusted DynFlags UnitId
-  | DriverCantLoadIfaceForSafe Module
-  | DriverError ErrDoc
+  | DriverPkgRequiredTrusted !DynFlags !UnitId
+  | DriverCantLoadIfaceForSafe !Module
+  | DriverErrorRaw !ErrDoc
 
 type Reasons = WarningMessages TcRn.Warning
 
+-- | A warning which can arise in the driver.
 data DriverWarning
-  = WarnModuleInferredUnsafe DynFlags ModuleName [ClsInst] Reasons
+  = DriverWarnModuleInferredUnsafe !DynFlags !ModuleName [ClsInst] Reasons
+  | DriverWarnInferredSafeImports  !ModuleName
+
+-- | Construct an structured error out of the input driver 'Warning'.
+mkDriverWarn :: WarnReason -> SrcSpan -> PrintUnqualified -> DriverWarning -> ErrMsg DriverWarning
+mkDriverWarn reason loc qual warn =
+  makeIntoWarning reason (mkErr loc qual warn)

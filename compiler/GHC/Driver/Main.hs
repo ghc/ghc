@@ -103,6 +103,7 @@ import GHC.Driver.Errors ( GhcWarning(..)
                          , printOrThrowWarnings
                          , printBagOfErrors
                          , warningsToMessages
+                         , mkDriverWarn
                          )
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config
@@ -1313,28 +1314,23 @@ hscCheckSafe' m l = do
                                 && safeLanguageOn dflags
                                 && trust == Sf_SafeInferred
                                 then inferredImportWarn
-                                else mempty
+                                else emptyBag
                     -- General errors we throw but Safe errors we log
                     errs = case (safeM, safeP) of
                         (True, True ) -> emptyBag
                         (True, False) -> pkgTrustErr
                         (False, _   ) -> modTrustErr
                 in do
-                    logWarnings warns
+                    logWarnings (mkWarningMessages warns)
                     logWarnings $
                       demoteErrorsToWarnings (GhcWarningDemotedErr . GhcErrorRaw) (mkErrorMessages errs)
                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
                     state = unitState dflags
-                    inferredImportWarn = fmap GhcWarningRaw $ mkWarningMessages $ unitBag
-                        $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
-                        $ mkWarnMsg l (pkgQual state)
-                        $ sep
-                            [ text "Importing Safe-Inferred module "
-                                <> ppr (moduleName m)
-                                <> text " from explicitly Safe module"
-                            ]
+                    inferredImportWarn = unitBag . fmap GhcWarningDriver $
+                      mkDriverWarn (Reason Opt_WarnInferredSafeImports)
+                                   l (pkgQual state) (DriverWarnInferredSafeImports (moduleName m))
                     pkgTrustErr = unitBag $ mkErrMsg l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
@@ -1424,8 +1420,8 @@ markUnsafeInfer tcg_env whyUnsafe = do
 
   where
     wiped_trust   = (tcg_imports tcg_env) { imp_trust_pkgs = S.empty }
-    whyUnsafe' df = WarnModuleInferredUnsafe df (moduleName $ tcg_mod tcg_env)
-                                             (tcg_insts tcg_env) whyUnsafe
+    whyUnsafe' df = DriverWarnModuleInferredUnsafe df (moduleName $ tcg_mod tcg_env)
+                                                      (tcg_insts tcg_env) whyUnsafe
 
 -- | Figure out the final correct safe haskell mode
 hscGetSafeMode :: TcGblEnv -> Hsc SafeHaskellMode
