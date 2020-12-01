@@ -1,0 +1,62 @@
+==================== Parser AST ====================
+
+({ mod185.hs:1:1 }
+ (HsModule
+  (VirtualBraces
+   (1))
+  (Nothing)
+  (Nothing)
+  [({ mod185.hs:3:1-24 }
+    (ImportDecl
+     (NoExtField)
+     (NoSourceText)
+     ({ mod185.hs:3:8-14 }
+      {ModuleName: Prelude})
+     (Nothing)
+     (NotBoot)
+     (False)
+     (QualifiedPost)
+     (False)
+     (Nothing)
+     (Nothing)))]
+  [({ mod185.hs:5:1-24 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      ({ mod185.hs:5:1-4 }
+       (Unqual
+        {OccName: main}))
+      (MG
+       (NoExtField)
+       ({ mod185.hs:5:1-24 }
+        [({ mod185.hs:5:1-24 }
+          (Match
+           (NoExtField)
+           (FunRhs
+            ({ mod185.hs:5:1-4 }
+             (Unqual
+              {OccName: main}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExtField)
+            [({ mod185.hs:5:6-24 }
+              (GRHS
+               (NoExtField)
+               []
+               ({ mod185.hs:5:8-24 }
+                (HsVar
+                 (NoExtField)
+                 ({ mod185.hs:5:8-24 }
+                  (Qual
+                   {ModuleName: Prelude}
+                   {OccName: undefined}))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))]
+  (Nothing)
+  (Nothing)))
