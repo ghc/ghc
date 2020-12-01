@@ -59,10 +59,10 @@ data ImportDeclQualifiedStyle
 -- | Given two possible located 'qualified' tokens, compute a style
 -- (in a conforming Haskell program only one of the two can be not
 -- 'Nothing'). This is called from "GHC.Parser".
-importDeclQualifiedStyle :: Maybe (Located a)
-                         -> Maybe (Located a)
+importDeclQualifiedStyle :: Located (Maybe (Located a))
+                         -> Located (Maybe (Located a))
                          -> ImportDeclQualifiedStyle
-importDeclQualifiedStyle mPre mPost =
+importDeclQualifiedStyle (L _ mPre) (L _ mPost) =
   if isJust mPre then QualifiedPre
   else if isJust mPost then QualifiedPost else NotQualified
 

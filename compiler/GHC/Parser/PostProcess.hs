@@ -928,10 +928,10 @@ checkContext (L l orig_t)
   -- no need for anns, returning original
   check _anns _t = return ([],L l [L l orig_t])
 
-checkImportDecl :: Maybe (Located Token)
-                -> Maybe (Located Token)
+checkImportDecl :: Located (Maybe (Located Token))
+                -> Located (Maybe (Located Token))
                 -> P ()
-checkImportDecl mPre mPost = do
+checkImportDecl (L _ mPre) (L _ mPost) = do
   let whenJust mg f = maybe (pure ()) f mg
 
   importQualifiedPostEnabled <- getBit ImportQualifiedPostBit
