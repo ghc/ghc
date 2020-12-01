@@ -8,7 +8,7 @@ import GHC.TypeLits
 
 class FunctorN (n :: Nat) f (a :: *) (fa :: *) | n f a -> fa where
 
-instance FunctorN 0 f a a where
+instance {-# DYSFUNCTIONAL #-} FunctorN 0 f a a where
 
 instance FunctorN n f a (f fa)
 

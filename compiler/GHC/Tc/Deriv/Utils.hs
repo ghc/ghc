@@ -1029,7 +1029,7 @@ badCon con msg = text "Constructor" <+> quotes (ppr con) <+> msg
 newDerivClsInst :: ThetaType -> DerivSpec theta -> TcM ClsInst
 newDerivClsInst theta (DS { ds_name = dfun_name, ds_overlap = overlap_mode
                           , ds_tvs = tvs, ds_cls = clas, ds_tys = tys })
-  = newClsInst overlap_mode dfun_name tvs theta clas tys
+  = newClsInst overlap_mode False dfun_name tvs theta clas tys
 
 extendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
 -- Add new locally-defined instances; don't bother to check

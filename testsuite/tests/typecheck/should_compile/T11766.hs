@@ -15,10 +15,10 @@ instance Resolution (Wrapper a)
 class (Resolution b, Resolution d) => C a b c d | a -> b, c -> d, a d -> c, b c -> a where
   cfun :: (b -> d) -> a -> c
 
-instance {-# OVERLAPPABLE #-} (Resolution b, Resolution d, a ~ b, c ~ d) => C a b c d where
+instance {-# OVERLAPPABLE #-} {-# DYSFUNCTIONAL #-} (Resolution b, Resolution d, a ~ b, c ~ d) => C a b c d where
   cfun = ($)
 
-instance {-# OVERLAPPING #-} (C b c d e) => C (Maybe a -> b) c (Maybe a -> d) e where
+instance {-# OVERLAPPING #-} {-# DYSFUNCTIONAL #-} (C b c d e) => C (Maybe a -> b) c (Maybe a -> d) e where
   cfun f b = \x -> cfun f (b x)
 
 foo :: Maybe a -> Wrapper Bool

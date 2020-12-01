@@ -80,7 +80,7 @@ newtype KnownTyx (cls :: Type) (t :: k) (m :: Type -> Type) (a :: Type) =
   deriving (Show, Functor, Monad, MonadIO, MonadFix, MonadTrans,
             Applicative, Alternative)
 
-instance {-# OVERLAPPABLE #-} (t ~ t', Monad m) =>
+instance {-# OVERLAPPABLE #-} {-# DYSFUNCTIONAL #-} (t ~ t', Monad m) =>
   Inferable cls t (KnownTyx cls t' m)
 instance {-# OVERLAPPABLE #-} (Inferable cls t n, MonadTrans m, Monad (m n)) =>
   Inferable cls t (m n)

@@ -627,7 +627,8 @@ checkFunDeps :: InstEnvs -> ClsInst -> [ClsInst]
 -- Returns a list of the ClsInst in InstEnvs that are inconsistent
 -- with the proposed new ClsInst
 checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
-                                , is_tys = tys1, is_tcs = rough_tcs1 })
+                                , is_tys = tys1, is_tcs = rough_tcs1
+                                , is_dysfun = dysfun1 })
   | null fds
   = []
   | otherwise
@@ -640,17 +641,21 @@ checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
     (cls_tvs, fds) = classTvsFds cls
     qtv_set1       = mkVarSet qtvs1
 
-    is_inconsistent fd (ClsInst { is_tvs = qtvs2, is_tys = tys2, is_tcs = rough_tcs2 })
+    is_inconsistent fd (ClsInst { is_tvs = qtvs2, is_tys = tys2, is_tcs = rough_tcs2
+                                , is_dysfun = dysfun2 })
       | instanceCantMatch trimmed_tcs rough_tcs2
       = False
       | otherwise
       = case tcUnifyTyKis bind_fn ltys1 ltys2 of
           Nothing         -> False
           Just subst
-            -> isNothing $   -- Bogus legacy test (#10675)
-                             -- See Note [Bogus consistency check]
-               tcUnifyTyKis bind_fn (substTysUnchecked subst rtys1) (substTysUnchecked subst rtys2)
-
+            -> if dysfun1 || dysfun2
+               then isNothing $ -- Bogus legacy test (#10675)
+                 -- See Note [Bogus consistency check]
+                 tcUnifyTyKis bind_fn (substTysUnchecked subst rtys1)
+                                      (substTysUnchecked subst rtys2)
+               else -- Strict consistency test
+                 not (substTys subst rtys1 `eqTypes` substTys subst rtys2)
       where
         trimmed_tcs    = trimRoughMatchTcs cls_tvs fd rough_tcs1
         (ltys1, rtys1) = instFD fd cls_tvs tys1

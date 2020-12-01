@@ -19,7 +19,7 @@ class TypeEq type1 type2 result | type1 type2 -> result where
 instance TypeEq soleType soleType True where
     typeEq _ _ = undefined
 
-instance (TypeCast False result) => TypeEq type1 type2 result where
+instance {-# DYSFUNCTIONAL #-} (TypeCast False result) => TypeEq type1 type2 result where
     typeEq _ _ = undefined
 
 class TypeCast type1 type2 | type1 -> type2, type2 -> type1

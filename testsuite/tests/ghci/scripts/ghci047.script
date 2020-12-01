@@ -23,8 +23,8 @@ data HTrue
 data HFalse
 
 class TypeEq x y b | x y -> b
-instance {-# OVERLAPS #-} (HTrue ~ b)  => TypeEq x x b
-instance {-# OVERLAPS #-} (HTrue ~ b)  => TypeEq x x b
+instance {-# OVERLAPS #-} {-# DYSFUNCTIONAL #-} (HTrue ~ b)  => TypeEq x x b
+instance {-# OVERLAPS #-} {-# DYSFUNCTIONAL #-} (HTrue ~ b)  => TypeEq x x b
 instance {-# OVERLAPS #-} (HFalse ~ b) => TypeEq x y b
 
 type family Or a b

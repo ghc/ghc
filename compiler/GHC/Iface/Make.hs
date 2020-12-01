@@ -686,15 +686,17 @@ tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
 --------------------------
 instanceToIfaceInst :: ClsInst -> IfaceClsInst
 instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
+                             , is_dysfun = dysfun
                              , is_cls_nm = cls_name, is_cls = cls
                              , is_tcs = mb_tcs
                              , is_orphan = orph })
   = ASSERT( cls_name == className cls )
     IfaceClsInst { ifDFun    = dfun_name,
-                ifOFlag   = oflag,
-                ifInstCls = cls_name,
-                ifInstTys = map do_rough mb_tcs,
-                ifInstOrph = orph }
+                   ifOFlag   = oflag,
+                   ifInstCls = cls_name,
+                   ifInstTys = map do_rough mb_tcs,
+                   ifInstDysfun = dysfun,
+                   ifInstOrph = orph }
   where
     do_rough Nothing  = Nothing
     do_rough (Just n) = Just (toIfaceTyCon_name n)

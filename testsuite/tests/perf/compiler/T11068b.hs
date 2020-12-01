@@ -84,75 +84,65 @@ class GField (name :: Symbol) s a | name s -> a where
 instance
   ( Generic s
   , path ~ GetPathTree name (Rep s)
-  , GFieldSum name s path (Rep s) a
+  , GFieldSum path (Rep s) a
   ) => GField name s a where
   gfield = withLens
-    (lensVL (\f s -> to <$> gfieldSum @name @s @path f (from s)))
+    (lensVL (\f s -> to <$> gfieldSum @path f (from s)))
     (\get set -> lensVL $ \f s -> set s <$> f (get s))
   {-# INLINE gfield #-}
 
 data Void0
 -- | Hidden instance.
-instance a ~ Void0 => GField name Void0 a where
+instance {-# DYSFUNCTIONAL #-} a ~ Void0 => GField name Void0 a where
   gfield = lensVL id
 
-class GFieldSum (name :: Symbol) s (path :: PathTree) (g :: Type -> Type) a
-  | name g -> a where
+class GFieldSum (path :: PathTree) (g :: Type -> Type) a | path g -> a where
   gfieldSum :: LensVL' (g x) a
 
-instance
-  ( GFieldSum name s path V1 a
-  , TypeError ('Text "Type " ':<>: Quoted ('ShowType s) ':<>:
-               'Text " has no data constructors")
-  ) => GFieldSum name s path V1 a where
+instance {-# DYSFUNCTIONAL #-}
+  ( TypeError ('Text "Type has no data constructors")
+  ) => GFieldSum path V1 a where
   gfieldSum = error "unreachable"
 
 instance
-  ( GFieldSum name s path g a
-  ) => GFieldSum name s path (M1 D m g) a where
-  gfieldSum f (M1 x) = M1 <$> gfieldSum @name @s @path f x
+  ( GFieldSum path g a
+  ) => GFieldSum path (M1 D m g) a where
+  gfieldSum f (M1 x) = M1 <$> gfieldSum @path f x
 
 instance
-  ( GFieldSum name s path1 g1 a
-  , GFieldSum name s path2 g2 a
-  ) => GFieldSum name s ('PathTree path1 path2) (g1 :+: g2) a where
-  gfieldSum f (L1 x) = L1 <$> gfieldSum @name @s @path1 f x
-  gfieldSum f (R1 y) = R1 <$> gfieldSum @name @s @path2 f y
+  ( GFieldSum path1 g1 a
+  , GFieldSum path2 g2 a
+  ) => GFieldSum ('PathTree path1 path2) (g1 :+: g2) a where
+  gfieldSum f (L1 x) = L1 <$> gfieldSum @path1 f x
+  gfieldSum f (R1 y) = R1 <$> gfieldSum @path2 f y
   {-# INLINE gfieldSum #-}
 
 instance
-  ( path ~ FromMaybe
-      (TypeError
-        ('Text "Type " ':<>: Quoted ('ShowType s) ':<>:
-         'Text " doesn't have a field named " ':<>: Quoted ('Text name)))
-      mpath
-  , GFieldProd name s path g a
-  ) => GFieldSum name s ('PathLeaf mpath) (M1 C m g) a where
-  gfieldSum f (M1 x) = M1 <$> gfieldProd @name @s @path f x
+  ( path ~ FromMaybe (TypeError ('Text "No such field")) mpath
+  , GFieldProd path g a
+  ) => GFieldSum ('PathLeaf mpath) (M1 C m g) a where
+  gfieldSum f (M1 x) = M1 <$> gfieldProd @path f x
 
-class GFieldProd (name :: Symbol) s (path :: [Path]) g a | name g -> a where
+class GFieldProd (path :: [Path]) g a | path g -> a where
   gfieldProd :: LensVL' (g x) a
 
 instance
-  ( GFieldProd name s path g1 a
-  ) => GFieldProd name s ('PathLeft : path) (g1 :*: g2) a where
-  gfieldProd f (x :*: y) = (:*: y) <$> gfieldProd @name @s @path f x
+  ( GFieldProd path g1 a
+  ) => GFieldProd ('PathLeft : path) (g1 :*: g2) a where
+  gfieldProd f (x :*: y) = (:*: y) <$> gfieldProd @path f x
 
 instance
-  ( GFieldProd name s path g2 a
-  ) => GFieldProd name s ('PathRight : path) (g1 :*: g2) a where
-  gfieldProd f (x :*: y) = (x :*:) <$> gfieldProd @name @s @path f y
+  ( GFieldProd path g2 a
+  ) => GFieldProd ('PathRight : path) (g1 :*: g2) a where
+  gfieldProd f (x :*: y) = (x :*:) <$> gfieldProd @path f y
 
 instance
   ( a ~ b -- for better error message if types don't match
-  ) => GFieldProd name s '[] (M1 S ('MetaSel ('Just name) su ss ds) (Rec0 b)) a where
+  ) => GFieldProd '[] (M1 S ('MetaSel ('Just name) su ss ds) (Rec0 b)) a where
   gfieldProd f (M1 (K1 x)) = M1 . K1 <$> f x
 
 ----------------------------------------
 -- Helpers
-
-type family Quoted (s :: ErrorMessage) :: ErrorMessage where
-  Quoted s = 'Text "‘" ':<>: s ':<>: 'Text "’"
 
 data PathTree
   = PathTree PathTree PathTree
