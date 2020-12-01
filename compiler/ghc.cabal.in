@@ -384,6 +384,7 @@ Library
         GHC.Driver.CodeOutput
         GHC.Driver.Config
         GHC.Driver.Env
+        GHC.Driver.Env.Types
         GHC.Driver.Flags
         GHC.Driver.Hooks
         GHC.Driver.Main
