@@ -4015,7 +4015,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([2],     Opt_SpecConstr)
 --  , ([2],     Opt_RegsGraph)
 --   RegsGraph suffers performance regression. See #7679
---  , ([2],     Opt_StaticArgumentTransformation)
+    , ([1,2],     Opt_StaticArgumentTransformation)
 --   Static Argument Transformation needs investigation. See #9374
     ]
 
