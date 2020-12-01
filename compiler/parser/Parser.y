@@ -973,18 +973,20 @@ importdecls_semi
 importdecl :: { LImportDecl GhcPs }
         : 'import' maybe_src maybe_safe optqualified maybe_pkg modid optqualified maybeas maybeimpspec
                 {% do {
-                  ; checkImportDecl $4 $7
-                  ; ams (cL (comb4 $1 $6 (snd $8) $9) $
+                  ; let { ; mPreQual = unLoc $4
+                          ; mPostQual = unLoc $7 }
+                  ; checkImportDecl mPreQual mPostQual
+                  ; ams (cL (comb5 $1 $6 $7 (snd $8) $9) $
                       ImportDecl { ideclExt = noExtField
                                   , ideclSourceSrc = snd $ fst $2
                                   , ideclName = $6, ideclPkgQual = snd $5
                                   , ideclSource = snd $2, ideclSafe = snd $3
-                                  , ideclQualified = importDeclQualifiedStyle $4 $7
+                                  , ideclQualified = importDeclQualifiedStyle mPreQual mPostQual
                                   , ideclImplicit = False
                                   , ideclAs = unLoc (snd $8)
                                   , ideclHiding = unLoc $9 })
-                         (mj AnnImport $1 : fst (fst $2) ++ fst $3 ++ fmap (mj AnnQualified) (maybeToList $4)
-                                          ++ fst $5 ++ fmap (mj AnnQualified) (maybeToList $7) ++ fst $8)
+                         (mj AnnImport $1 : fst (fst $2) ++ fst $3 ++ fmap (mj AnnQualified) (maybeToList mPreQual)
+                                          ++ fst $5 ++ fmap (mj AnnQualified) (maybeToList mPostQual) ++ fst $8)
                   }
                 }
 
