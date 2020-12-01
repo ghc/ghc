@@ -97,6 +97,7 @@ data ClsInst
 
              , is_flag :: OverlapFlag   -- See detailed comments with
                                         -- the decl of BasicTypes.OverlapFlag
+             , is_dysfun :: Bool
              , is_orphan :: IsOrphan
     }
   deriving Data
@@ -260,15 +261,15 @@ instanceSig :: ClsInst -> ([TyVar], [Type], Class, [Type])
 -- Decomposes the DFunId
 instanceSig ispec = tcSplitDFunTy (idType (is_dfun ispec))
 
-mkLocalInstance :: DFunId -> OverlapFlag
+mkLocalInstance :: DFunId -> OverlapFlag -> Bool
                 -> [TyVar] -> Class -> [Type]
                 -> ClsInst
 -- Used for local instances, where we can safely pull on the DFunId.
 -- Consider using newClsInst instead; this will also warn if
 -- the instance is an orphan.
-mkLocalInstance dfun oflag tvs cls tys
-  = ClsInst { is_flag = oflag, is_dfun = dfun
-            , is_tvs = tvs
+mkLocalInstance dfun oflag dysfun tvs cls tys
+  = ClsInst { is_flag = oflag, is_dysfun = dysfun
+            , is_dfun = dfun , is_tvs = tvs
             , is_dfun_name = dfun_name
             , is_cls = cls, is_cls_nm = cls_name
             , is_tys = tys, is_tcs = roughMatchTcs tys
@@ -306,15 +307,16 @@ mkImportedInstance :: Name         -- ^ the name of the class
                    -> Name         -- ^ the 'Name' of the dictionary binding
                    -> DFunId       -- ^ the 'Id' of the dictionary.
                    -> OverlapFlag  -- ^ may this instance overlap?
+                   -> Bool         -- ^ is this instance dysfunctional?
                    -> IsOrphan     -- ^ is this instance an orphan?
                    -> ClsInst
 -- Used for imported instances, where we get the rough-match stuff
 -- from the interface file
 -- The bound tyvars of the dfun are guaranteed fresh, because
 -- the dfun has been typechecked out of the same interface file
-mkImportedInstance cls_nm mb_tcs dfun_name dfun oflag orphan
-  = ClsInst { is_flag = oflag, is_dfun = dfun
-            , is_tvs = tvs, is_tys = tys
+mkImportedInstance cls_nm mb_tcs dfun_name dfun oflag dysfun orphan
+  = ClsInst { is_flag = oflag, is_dysfun = dysfun
+            , is_dfun = dfun , is_tvs = tvs, is_tys = tys
             , is_dfun_name = dfun_name
             , is_cls_nm = cls_nm, is_cls = cls, is_tcs = mb_tcs
             , is_orphan = orphan }

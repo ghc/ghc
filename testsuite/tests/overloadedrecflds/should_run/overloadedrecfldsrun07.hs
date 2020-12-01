@@ -24,7 +24,7 @@ data Rec :: forall k. [(k, Type)] -> Type where
   (:>) :: Labelled x a -> Rec xs -> Rec ('(x, a) ': xs)
 infixr 5 :>
 
-instance {-# OVERLAPS #-} a ~ b => HasField foo (Rec ('(foo, a) ': xs)) b where
+instance {-# OVERLAPS #-} {-# DYSFUNCTIONAL #-} a ~ b => HasField foo (Rec ('(foo, a) ': xs)) b where
   getField ((_ := v) :> _) = v
 
 instance HasField foo (Rec xs) b => HasField foo (Rec ('(bar, a) ': xs)) b where

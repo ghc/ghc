@@ -284,11 +284,12 @@ data IfaceSrcBang
   = IfSrcBang SrcUnpackedness SrcStrictness
 
 data IfaceClsInst
-  = IfaceClsInst { ifInstCls  :: IfExtName,                -- See comments with
-                   ifInstTys  :: [Maybe IfaceTyCon],       -- the defn of ClsInst
-                   ifDFun     :: IfExtName,                -- The dfun
-                   ifOFlag    :: OverlapFlag,              -- Overlap flag
-                   ifInstOrph :: IsOrphan }                -- See Note [Orphans] in GHC.Core.InstEnv
+  = IfaceClsInst { ifInstCls    :: IfExtName,              -- See comments with
+                   ifInstTys    :: [Maybe IfaceTyCon],     -- the defn of ClsInst
+                   ifDFun       :: IfExtName,              -- The dfun
+                   ifOFlag      :: OverlapFlag,            -- Overlap flag
+                   ifInstDysfun :: Bool,                   -- Dysfunctional instance
+                   ifInstOrph   :: IsOrphan }              -- See Note [Orphans] in GHC.Core.InstEnv
         -- There's always a separate IfaceDecl for the DFun, which gives
         -- its IdInfo with its full type and version number.
         -- The instance declarations taken together have a version number,
@@ -2156,19 +2157,21 @@ instance Binary IfaceSrcBang where
          return (IfSrcBang a1 a2)
 
 instance Binary IfaceClsInst where
-    put_ bh (IfaceClsInst cls tys dfun flag orph) = do
+    put_ bh (IfaceClsInst cls tys dfun flag dysfun orph) = do
         put_ bh cls
         put_ bh tys
         put_ bh dfun
         put_ bh flag
+        put_ bh dysfun
         put_ bh orph
     get bh = do
-        cls  <- get bh
-        tys  <- get bh
-        dfun <- get bh
-        flag <- get bh
-        orph <- get bh
-        return (IfaceClsInst cls tys dfun flag orph)
+        cls    <- get bh
+        tys    <- get bh
+        dfun   <- get bh
+        flag   <- get bh
+        dysfun <- get bh
+        orph   <- get bh
+        return (IfaceClsInst cls tys dfun flag dysfun orph)
 
 instance Binary IfaceFamInst where
     put_ bh (IfaceFamInst fam tys name orph) = do
@@ -2651,8 +2654,8 @@ instance NFData IfaceFamInst where
     rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` ()
 
 instance NFData IfaceClsInst where
-  rnf (IfaceClsInst f1 f2 f3 f4 f5) =
-    f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` f5 `seq` ()
+  rnf (IfaceClsInst f1 f2 f3 f4 f5 f6) =
+    f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` f5 `seq` f6 `seq` ()
 
 instance NFData IfaceAnnotation where
   rnf (IfaceAnnotation f1 f2) = f1 `seq` f2 `seq` ()

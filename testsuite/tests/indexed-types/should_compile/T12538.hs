@@ -17,7 +17,7 @@ type family Tag a where
 class (r ~ Tag a) => TagImpl a r | a -> r where
   tag :: a -> r
 
-instance {-# OVERLAPPING #-} (r ~ Tag (Tagged t a)) => TagImpl (Tagged t a) r where
+instance {-# OVERLAPPING #-} {-# DYSFUNCTIONAL #-} (r ~ Tag (Tagged t a)) => TagImpl (Tagged t a) r where
   tag = id
 
 #if defined(WRONG)
