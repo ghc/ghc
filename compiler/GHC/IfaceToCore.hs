@@ -1691,7 +1691,7 @@ tcUnfolding toplvl name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
   = do  { mb_expr <- tcPragExpr False toplvl name if_expr
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
-                    Just expr -> mkCoreUnfolding InlineStable True expr guidance )}
+                    Just expr -> mkCoreUnfolding InlineStable TopLevel expr guidance )}
   where
     guidance = UnfWhen { ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
 

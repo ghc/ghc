@@ -1492,7 +1492,7 @@ data Unfolding
                                 -- InlinePragInfo for this Id.)
         uf_tmpl       :: CoreExpr,        -- Template; occurrence info is correct
         uf_src        :: UnfoldingSource, -- Where the unfolding came from
-        uf_is_top     :: Bool,          -- True <=> top level binding
+        uf_top_lvl    :: TopLevelFlag,  -- ^ Is this a top-level binding?
         uf_is_value   :: Bool,          -- exprIsHNF template (cached); it is ok to discard
                                         --      a `seq` on this variable
         uf_is_conlike :: Bool,          -- True <=> applicn of constructor or CONLIKE function
@@ -1510,7 +1510,7 @@ data Unfolding
   --           NB: Occurrence info is guaranteed correct:
   --               see Note [OccInfo in unfoldings and rules]
   --
-  --  uf_is_top: Is this a top level binding?
+  --  uf_top_lvl: Is this a top level binding?
   --
   --  uf_is_value: 'exprIsHNF' template (cached); it is ok to discard a 'seq' on
   --     this variable

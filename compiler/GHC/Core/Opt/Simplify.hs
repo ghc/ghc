@@ -3794,7 +3794,7 @@ mkLetUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
                -> InId -> OutExpr -> SimplM Unfolding
 mkLetUnfolding uf_opts top_lvl src id new_rhs
   = is_bottoming `seq`  -- See Note [Force bottoming field]
-    return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs)
+    return (mkUnfolding uf_opts src top_lvl is_bottoming new_rhs)
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
             --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
@@ -3802,7 +3802,6 @@ mkLetUnfolding uf_opts top_lvl src id new_rhs
             --             to expose.  (We could instead use the RHS, but currently
             --             we don't.)  The simple thing is always to have one.
   where
-    is_top_lvl   = isTopLevel top_lvl
     is_bottoming = isDeadEndId id
 
 -------------------
@@ -3853,7 +3852,7 @@ simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
                         -- A test case is #4138
                         -- But retain a previous boring_ok of True; e.g. see
                         -- the way it is set in calcUnfoldingGuidanceWithArity
-                        in return (mkCoreUnfolding src is_top_lvl expr' guide')
+                        in return (mkCoreUnfolding src top_lvl expr' guide')
                             -- See Note [Top-level flag on inline rules] in GHC.Core.Unfold
 
                   _other              -- Happens for INLINABLE things
@@ -3865,7 +3864,6 @@ simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
         | otherwise -> return noUnfolding   -- Discard unstable unfoldings
   where
     uf_opts    = seUnfoldingOpts env
-    is_top_lvl = isTopLevel top_lvl
     act        = idInlineActivation id
     unf_env    = updMode (updModeForStableUnfoldings act) env
          -- See Note [Simplifying inside stable unfoldings] in GHC.Core.Opt.Simplify.Utils

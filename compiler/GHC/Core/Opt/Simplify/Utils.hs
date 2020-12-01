@@ -1930,7 +1930,6 @@ abstractFloats uf_opts top_lvl main_tvs floats body
     do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
         ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
   where
-    is_top_lvl  = isTopLevel top_lvl
     main_tv_set = mkVarSet main_tvs
     body_floats = letFloatBinds (sfLetFloats floats)
     empty_subst = GHC.Core.Subst.mkEmptySubst (sfInScope floats)
@@ -2000,7 +1999,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
       = (poly_id `setIdUnfolding` unf, poly_rhs)
       where
         poly_rhs = mkLams tvs_here rhs
-        unf = mkUnfolding uf_opts InlineRhs is_top_lvl False poly_rhs
+        unf = mkUnfolding uf_opts InlineRhs top_lvl False poly_rhs
 
         -- We want the unfolding.  Consider
         --      let

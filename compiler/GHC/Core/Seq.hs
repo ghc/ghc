@@ -102,7 +102,7 @@ seqAlts [] = ()
 seqAlts ((c,bs,e):alts) = c `seq` seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
 
 seqUnfolding :: Unfolding -> ()
-seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
+seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_top_lvl = top,
                 uf_is_value = b1, uf_is_work_free = b2,
                 uf_expandable = b3, uf_is_conlike = b4,
                 uf_guidance = g})

@@ -46,7 +46,7 @@ mkFinalUnfolding :: UnfoldingOpts -> UnfoldingSource -> StrictSig -> CoreExpr ->
 -- simplified; so the unfolding should be occurrence-analysed
 mkFinalUnfolding opts src strict_sig expr
   = mkUnfolding opts src
-                True {- Top level -}
+                TopLevel
                 (isDeadEndSig strict_sig)
                 expr
 
@@ -58,7 +58,7 @@ mkCompulsoryUnfolding opts expr = mkCompulsoryUnfolding' (simpleOptExpr opts exp
 -- on the unfolding.
 mkCompulsoryUnfolding' :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding' expr
-  = mkCoreUnfolding InlineCompulsory True
+  = mkCoreUnfolding InlineCompulsory TopLevel
                     expr
                     (UnfWhen { ug_arity = 0    -- Arity of unfolding doesn't matter
                              , ug_unsat_ok = unSaturatedOk, ug_boring_ok = boringCxtOk })
@@ -71,7 +71,7 @@ mkCompulsoryUnfolding' expr
 
 mkSimpleUnfolding :: UnfoldingOpts -> CoreExpr -> Unfolding
 mkSimpleUnfolding opts rhs
-  = mkUnfolding opts InlineRhs False False rhs
+  = mkUnfolding opts InlineRhs TopLevel False rhs
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
@@ -82,7 +82,7 @@ mkDFunUnfolding bndrs con ops
 
 mkWwInlineRule :: SimpleOpts -> CoreExpr -> Arity -> Unfolding
 mkWwInlineRule opts expr arity
-  = mkCoreUnfolding InlineStable True
+  = mkCoreUnfolding InlineStable TopLevel
                    (simpleOptExpr opts expr)
                    (UnfWhen { ug_arity = arity, ug_unsat_ok = unSaturatedOk
                             , ug_boring_ok = boringCxtNotOk })
@@ -91,7 +91,7 @@ mkWorkerUnfolding :: SimpleOpts -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfold
 -- See Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap
 mkWorkerUnfolding opts work_fn
                   (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
-                                 , uf_is_top = top_lvl })
+                                 , uf_top_lvl = top_lvl })
   | isStableSource src
   = mkCoreUnfolding src top_lvl new_tmpl guidance
   where
@@ -107,7 +107,7 @@ mkWorkerUnfolding _ _ _ = noUnfolding
 mkInlineUnfolding :: SimpleOpts -> CoreExpr -> Unfolding
 mkInlineUnfolding opts expr
   = mkCoreUnfolding InlineStable
-                    True         -- Note [Top-level flag on inline rules]
+                    TopLevel         -- Note [Top-level flag on inline rules]
                     expr' guide
   where
     expr' = simpleOptExpr opts expr
@@ -121,7 +121,7 @@ mkInlineUnfolding opts expr
 mkInlineUnfoldingWithArity :: Arity -> SimpleOpts -> CoreExpr -> Unfolding
 mkInlineUnfoldingWithArity arity opts expr
   = mkCoreUnfolding InlineStable
-                    True         -- Note [Top-level flag on inline rules]
+                    TopLevel         -- Note [Top-level flag on inline rules]
                     expr' guide
   where
     expr' = simpleOptExpr opts expr
@@ -135,7 +135,7 @@ mkInlineUnfoldingWithArity arity opts expr
 
 mkInlinableUnfolding :: SimpleOpts -> CoreExpr -> Unfolding
 mkInlinableUnfolding opts expr
-  = mkUnfolding (so_uf_opts opts) InlineStable False False expr'
+  = mkUnfolding (so_uf_opts opts) InlineStable TopLevel False expr'
   where
     expr' = simpleOptExpr opts expr
 
@@ -165,7 +165,7 @@ specUnfolding opts spec_bndrs spec_app rule_lhs_args
 
 specUnfolding opts spec_bndrs spec_app rule_lhs_args
               (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
-                             , uf_is_top = top_lvl
+                             , uf_top_lvl = top_lvl
                              , uf_guidance = old_guidance })
  | isStableSource src  -- See Note [Specialising unfoldings]
  , UnfWhen { ug_arity     = old_arity } <- old_guidance
@@ -211,7 +211,7 @@ specUnfolding to specialise its unfolding.  Some important points:
         (which arises from INLINABLE), we discard it
 
 Note [Honour INLINE on 0-ary bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
    x = <expensive>
@@ -279,7 +279,7 @@ to arise for non-0-ary functions too, but let's wait and see.
 
 mkUnfolding :: UnfoldingOpts
             -> UnfoldingSource
-            -> Bool       -- Is top-level
+            -> TopLevelFlag
             -> Bool       -- Definitely a bottoming binding
                           -- (only relevant for top-level bindings)
             -> CoreExpr
@@ -289,19 +289,19 @@ mkUnfolding :: UnfoldingOpts
 mkUnfolding opts src top_lvl is_bottoming expr
   = mkCoreUnfolding src top_lvl expr guidance
   where
-    is_top_bottoming = top_lvl && is_bottoming
+    is_top_bottoming = isTopLevel top_lvl && is_bottoming
     guidance         = calcUnfoldingGuidance opts is_top_bottoming expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
         -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 
-mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
+mkCoreUnfolding :: UnfoldingSource -> TopLevelFlag -> CoreExpr
                 -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr guidance
   = CoreUnfolding { uf_tmpl         = occurAnalyseExpr expr,
                       -- See Note [Occurrence analysis of unfoldings]
                     uf_src          = src,
-                    uf_is_top       = top_lvl,
+                    uf_top_lvl      = top_lvl,
                     uf_is_value     = exprIsHNF        expr,
                     uf_is_conlike   = exprIsConLike    expr,
                     uf_is_work_free = exprIsWorkFree   expr,

@@ -38,7 +38,7 @@ module GHC.Types.Basic (
 
         RuleName, pprRuleName,
 
-        TopLevelFlag(..), isTopLevel, isNotTopLevel,
+        TopLevelFlag(..), isTopLevel, isNotTopLevel, boolToTopLevelFlag,
 
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         hasOverlappingFlag, hasOverlappableFlag, hasIncoherentFlag,
@@ -469,6 +469,10 @@ isNotTopLevel TopLevel    = False
 
 isTopLevel TopLevel     = True
 isTopLevel NotTopLevel  = False
+
+boolToTopLevelFlag :: Bool -> TopLevelFlag
+boolToTopLevelFlag True  = TopLevel
+boolToTopLevelFlag False = NotTopLevel
 
 instance Outputable TopLevelFlag where
   ppr TopLevel    = text "<TopLevel>"
