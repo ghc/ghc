@@ -93,6 +93,11 @@ data SimpleOpts = SimpleOpts
    { so_uf_opts :: !UnfoldingOpts   -- ^ Unfolding options
    , so_co_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
    }
+-- SG: I find the name "SimpleOpts" terrible. It's misleading in multiple ways:
+-- You'd read it and mistake it for *Simpl*Opts, options for the Simplifier.
+-- And you might mistake it for Simple*Opts*, simple options for ... what?
+-- And then SimpleOptOpts would be less missleading, but ugly because OptOpts.
+-- So why not SimpleOptConfig?
 
 -- | Default options for the Simple optimiser.
 defaultSimpleOpts :: SimpleOpts
