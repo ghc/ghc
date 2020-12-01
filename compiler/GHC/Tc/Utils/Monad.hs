@@ -1036,14 +1036,9 @@ reportError err
          (warns, getErrorMessages -> errs) <- readTcRef errs_var ;
          writeTcRef errs_var (warns, mkErrorMessages $ errs `snocBag` err) }
 
-reportWarning :: WarnReason -> ErrMsg TcRn.Warning -> TcRn ()
-reportWarning reason err
-  = do { let warn = makeIntoWarning reason err
-                    -- 'err' was built by mkLongErrMsg or something like that,
-                    -- so it's of error severity.  For a warning we downgrade
-                    -- its severity to SevWarning
-
-       ; traceTc "Adding warning:" (pprLocErrMsg warn)
+reportWarning :: ErrMsg TcRn.Warning -> TcRn ()
+reportWarning warn
+  = do { traceTc "Adding warning:" (pprLocErrMsg warn)
        ; errs_var <- getErrsVar
        ; (warns, errs) <- readTcRef errs_var
        ; writeTcRef errs_var (warns `snocWarning` warn, errs) }
@@ -1527,9 +1522,8 @@ add_warn_at :: WarnReason -> SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 add_warn_at reason loc msg extra_info
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
-         let { warn = mkLongWarnMsg loc printer
-                                    msg extra_info } ;
-         reportWarning reason (WarnTcRnRaw <$> warn) }
+         let { warn = tcRnWarnRaw msg extra_info } ;
+         reportWarning (mkTcRnWarn reason loc printer warn) }
 
 
 {-

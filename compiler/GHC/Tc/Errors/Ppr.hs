@@ -30,8 +30,11 @@ instance RenderableDiagnostic TcRn.Warning where
 
 pprWarning :: TcRn.Warning -> ErrDoc
 pprWarning = \case
-  WarnTcRnRaw e ->
-    e
+  WarnTcRnRaw e
+    -> e
+
+  WarnTcRnDemotedErr e
+    -> pprError e
 
 notInScopeErr :: RdrName -> SDoc
 notInScopeErr rdr_name

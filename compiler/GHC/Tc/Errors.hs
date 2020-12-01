@@ -53,7 +53,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name.Set
 import GHC.Data.Bag
-import GHC.Utils.Error  ( ErrMsg, errDoc, pprLocErrMsg, renderDiagnostic )
+import GHC.Utils.Error  ( ErrMsg, errDoc, pprLocErrMsg )
 import GHC.Types.Basic
 import GHC.Core.ConLike ( ConLike(..))
 import GHC.Utils.Misc
@@ -490,13 +490,13 @@ warnRedundantConstraints ctxt env info ev_vars
    addErrCtxt (text "In" <+> ppr info) $
    do { env <- getLclEnv
       ; msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning (Reason Opt_WarnRedundantConstraints) $ fmap (WarnTcRnRaw . renderDiagnostic) msg }
+      ; reportWarning $ demoteTcRnError (Reason Opt_WarnRedundantConstraints) msg }
 
  | otherwise  -- But for InstSkol there already *is* a surrounding
               -- "In the instance declaration for Eq [a]" context
               -- and we don't want to say it twice. Seems a bit ad-hoc
  = do { msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning (Reason Opt_WarnRedundantConstraints) (fmap (WarnTcRnRaw . renderDiagnostic) msg) }
+      ; reportWarning $ demoteTcRnError (Reason Opt_WarnRedundantConstraints) msg }
  where
    doc = text "Redundant constraint" <> plural redundant_evs <> colon
          <+> pprEvVarTheta redundant_evs
@@ -774,7 +774,7 @@ mkGivenErrorReporter ctxt cts
        ; err <- mkEqErr_help dflags ctxt report ct' ty1 ty2
 
        ; traceTc "mkGivenErrorReporter" (ppr ct)
-       ; reportWarning (Reason Opt_WarnInaccessibleCode) (fmap (WarnTcRnRaw . renderDiagnostic) err) }
+       ; reportWarning $ demoteTcRnError (Reason Opt_WarnInaccessibleCode) err }
   where
     (ct : _ )  = cts    -- Never empty
     (ty1, ty2) = getEqPredTys (ctPred ct)
@@ -884,7 +884,7 @@ maybeReportHoleError ctxt hole err
     case cec_out_of_scope_holes ctxt of
       HoleError -> reportError err
       HoleWarn  ->
-        reportWarning (Reason Opt_WarnDeferredOutOfScopeVariables) (fmap (WarnTcRnRaw . renderDiagnostic) err)
+        reportWarning $ demoteTcRnError (Reason Opt_WarnDeferredOutOfScopeVariables) err
       HoleDefer -> return ()
 
 -- Unlike maybeReportError, these "hole" errors are
@@ -899,7 +899,7 @@ maybeReportHoleError ctxt (Hole { hole_sort = TypeHole }) err
     case cec_type_holes ctxt of
        HoleError -> reportError err
        HoleWarn  ->
-         reportWarning (Reason Opt_WarnPartialTypeSignatures) $ fmap (WarnTcRnRaw . renderDiagnostic) err
+         reportWarning $ demoteTcRnError (Reason Opt_WarnPartialTypeSignatures) err
        HoleDefer -> return ()
 
 maybeReportHoleError ctxt hole@(Hole { hole_sort = ExprHole _ }) err
@@ -911,7 +911,7 @@ maybeReportHoleError ctxt hole@(Hole { hole_sort = ExprHole _ }) err
     case cec_expr_holes ctxt of
        HoleError -> reportError err
        HoleWarn  ->
-         reportWarning (Reason Opt_WarnTypedHoles) $ fmap (WarnTcRnRaw . renderDiagnostic) err
+         reportWarning $ demoteTcRnError (Reason Opt_WarnTypedHoles) err
        HoleDefer -> return ()
 
 maybeReportError :: ReportErrCtxt -> ErrMsg TcRn.Error -> TcM ()
@@ -923,7 +923,7 @@ maybeReportError ctxt err
   | otherwise
   = case cec_defer_type_errors ctxt of
       TypeDefer       -> return ()
-      TypeWarn reason -> reportWarning reason $ fmap (WarnTcRnRaw . renderDiagnostic) err
+      TypeWarn reason -> reportWarning $ demoteTcRnError reason err
       TypeError       -> reportError err
 
 addDeferredBinding :: ReportErrCtxt -> ErrMsg TcRn.Error -> Ct -> TcM ()

@@ -354,21 +354,27 @@ makeIntoError reason err = err
     , errMsgReason = reason }
 
 -- | \"Promotes\" plain 'WarningMessages' into 'ErrorMessages', by applying the input
--- function. The typical case when you want to do that is when \"-Werror\" is enabled,
+-- function. It also takes care of setting the 'Severity' to the correct one.
+-- The typical case when you want to do that is when \"-Werror\" is enabled,
 -- and therefore warnings need to be treated as errors.
 promoteWarningsToErrors :: (w -> e) -> WarningMessages w -> ErrorMessages e
-promoteWarningsToErrors toError (WarningMessages warns) = ErrorMessages (mapBag (fmap toError) warns)
+promoteWarningsToErrors toError (WarningMessages warns) =
+  let promote w = makeIntoError (errMsgReason w) w
+  in ErrorMessages (mapBag (fmap toError . promote) warns)
 
+-- | \"Demotes\" plain 'ErrorMessages' into 'WarningMessages', by applying the input
+-- function. It also takes care of setting the 'Severity' to the correct one.
 demoteErrorsToWarnings :: (e -> w) -> ErrorMessages e -> WarningMessages w
-demoteErrorsToWarnings toWarning (ErrorMessages errs) = WarningMessages (mapBag (fmap toWarning) errs)
+demoteErrorsToWarnings toWarning (ErrorMessages errs) =
+  let demote e = makeIntoError (errMsgReason e) e
+  in WarningMessages (mapBag (fmap toWarning . demote) errs)
 
 --
 -- Creating ErrMsg(s)
 --
 
 mk_err_msg
-  :: RenderableDiagnostic e
-  => Severity -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+  :: Severity -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
 mk_err_msg sev locn print_unqual err
  = ErrMsg { errMsgSpan = locn
           , errMsgContext = print_unqual
@@ -376,7 +382,7 @@ mk_err_msg sev locn print_unqual err
           , errMsgSeverity = sev
           , errMsgReason = NoReason }
 
-mkErr :: RenderableDiagnostic e => SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+mkErr :: SrcSpan -> PrintUnqualified -> e -> ErrMsg e
 mkErr = mk_err_msg SevError
 
 mkLongErrMsg, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg ErrDoc
