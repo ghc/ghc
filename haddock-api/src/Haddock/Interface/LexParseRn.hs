@@ -120,7 +120,7 @@ rename dflags gre = rn
 
           -- There is only one name in the environment that matches so
           -- use it.
-          [a] -> pure (DocIdentifier (gre_name a))
+          [a] -> pure (DocIdentifier (greMangledName a))
 
           -- There are multiple names available.
           gres -> ambiguous dflags x gres
@@ -182,7 +182,7 @@ ambiguous dflags x gres = do
   let noChildren = map availName (gresToAvailInfo gres)
       dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
       msg = "Warning: " ++ x_str ++ " is ambiguous. It is defined\n" ++
-            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map gre_name gres) ++
+            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map greMangledName gres) ++
             "    You may be able to disambiguate the identifier by qualifying it or\n" ++
             "    by hiding some imports.\n" ++
             "    Defaulting to " ++ x_str ++ " defined " ++ defnLoc dflt

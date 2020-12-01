@@ -293,7 +293,7 @@ mkWarningMap dflags warnings gre exps = case warnings of
     let ws' = [ (n, w)
               | (occ, w) <- ws
               , elt <- lookupGlobalRdrEnv gre occ
-              , let n = gre_name elt, n `elem` exps ]
+              , let n = greMangledName elt, n `elem` exps ]
     in M.fromList <$> traverse (bitraverse pure (parseWarning dflags gre)) ws'
 
 moduleWarning :: DynFlags -> GlobalRdrEnv -> Warnings -> ErrMsgM (Maybe (Doc Name))
@@ -693,16 +693,8 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
         constructor_names =
           filter isDataConName (availSubordinates avail)
 
--- this heavily depends on the invariants stated in Avail
-availExportsDecl :: AvailInfo -> Bool
-availExportsDecl (AvailTC ty_name names _)
-  | n : _ <- names = ty_name == n
-  | otherwise      = False
-availExportsDecl _ = True
-
 availSubordinates :: AvailInfo -> [Name]
-availSubordinates avail =
-  filter (/= availName avail) (availNamesWithSelectors avail)
+availSubordinates = map greNameMangledName . availSubordinateGreNames
 
 availNoDocs :: AvailInfo -> [(Name, DocForDecl Name)]
 availNoDocs avail =
