@@ -56,7 +56,8 @@ module GHC.Stg.Syntax (
         bindersOf, bindersOfTop, bindersOfTopBinds,
 
         -- ppr
-        StgPprOpts(..), initStgPprOpts, panicStgPprOpts,
+        StgPprOpts(..), initStgPprOpts,
+        panicStgPprOpts, shortStgPprOpts,
         pprStgArg, pprStgExpr, pprStgRhs, pprStgBinding,
         pprGenStgTopBinding, pprStgTopBinding,
         pprGenStgTopBindings, pprStgTopBindings
@@ -664,6 +665,13 @@ panicStgPprOpts :: StgPprOpts
 panicStgPprOpts = StgPprOpts
    { stgSccEnabled = True
    }
+
+-- | STG pretty-printing options used for short messages
+shortStgPprOpts :: StgPprOpts
+shortStgPprOpts = StgPprOpts
+   { stgSccEnabled = False
+   }
+
 
 pprGenStgTopBinding
   :: OutputablePass pass => StgPprOpts -> GenStgTopBinding pass -> SDoc

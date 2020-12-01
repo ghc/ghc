@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP              #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -18,6 +19,7 @@ import GHCi.RemoteTypes
 import GHCi.FFI (C_ffi_cif)
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Utils.Outputable
+import GHC.Data.FastString
 import GHC.Types.Name
 import GHC.Types.Unique
 import GHC.Types.Literal
@@ -189,51 +191,46 @@ instance Outputable a => Outputable (ProtoBCO a) where
                  , protoBCOFFIs       = ffis })
       = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity
                 <+> text (show ffis) <> colon)
-        -- XXX complete this
         $$ nest 3 (case origin of
-                      Left _alts -> text "alts" -- vcat (zipWith (<+>) (char '{' : repeat (char ';'))
-                                    --                   (map (ppr{-CoreAltShort.deAnnAlt-}) alts)) <+> char '}'
-                      Right _rhs -> text "rhs" -- ppr{-CoreExprShort-} ({-deAnnotate-} rhs)
-                      )
+                      Left alts ->
+                        vcat (zipWith (<+>) (char '{' : repeat (char ';'))
+                             (map (pprStgAltShort shortStgPprOpts) alts))
+                      Right rhs ->
+                        pprStgRhsShort shortStgPprOpts rhs
+                  )
         $$ nest 3 (text "bitmap: " <+> text (show bsize) <+> ppr bitmap)
         $$ nest 3 (vcat (map ppr instrs))
 
--- Print enough of the Core expression to enable the reader to find
--- the expression in the -ddump-prep output.  That is, we need to
+-- Print enough of the STG expression to enable the reader to find
+-- the expression in the -ddump-stg output.  That is, we need to
 -- include at least a binder.
 
-{-
-XXX complete this
-pprCgStgExprShort :: CgStgExpr -> SDoc
+pprStgExprShort :: OutputablePass pass => StgPprOpts -> GenStgExpr pass -> SDoc
+pprStgExprShort _ (StgCase _expr var _ty _alts) =
+  text "case of" <+> ppr var
+pprStgExprShort _ (StgLet _ bnd _) =
+  text "let" <+> pprStgBindShort bnd <+> text "in ..."
+pprStgExprShort _ (StgLetNoEscape _ bnd _) =
+  text "let-no-escape" <+> pprStgBindShort bnd <+> text "in ..."
+pprStgExprShort opts (StgTick _ t e) = ppr t <+> pprStgExprShort opts e
+pprStgExprShort opts e = pprStgExpr opts e
 
-pprCgStgExprShort (StgCase _expr var _ty _alts)
-  = text "case of" <+> ppr var
-pprCgStgExprShort (StgLet _xlet (StgNonRec x _) _)
-  = text "let" <+> ppr x <+> ptext (sLit ("= ... in ..."))
-pprCgStgExprShort (StgLet _xlet (StgRec bs) _)
-  = text "let {" <+> ppr (fst (head bs)) <+> ptext (sLit ("= ...; ... } in ..."))
+pprStgBindShort :: OutputablePass pass => GenStgBinding pass -> SDoc
+pprStgBindShort (StgNonRec x _) =
+  ppr x <+> text "= ..."
+pprStgBindShort (StgRec bs) =
+  char '{' <+> ppr (fst (head bs)) <+> text "= ...; ... }"
 
-pprCoreExprShort :: CoreExpr -> SDoc
-pprCoreExprShort expr@(Lam _ _)
-  = let
-        (bndrs, _) = collectBinders expr
-    in
-    char '\\' <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow <+> text "..."
+pprStgAltShort :: OutputablePass pass => StgPprOpts -> GenStgAlt pass -> SDoc
+pprStgAltShort opts (con, args, expr) =
+  ppr con <+> sep (map ppr args) <+> text "->" <+> pprStgExprShort opts expr
 
-pprCoreExprShort (Case _expr var _ty _alts)
- = text "case of" <+> ppr var
+pprStgRhsShort :: OutputablePass pass => StgPprOpts -> GenStgRhs pass -> SDoc
+pprStgRhsShort opts (StgRhsClosure ext cc upd_flag args body) =
+  hang (hsep [ char '\\' <> ppr upd_flag, brackets (interppSP args) ])
+       4 (pprStgExprShort opts body)
+pprStgRhsShort opts rhs = pprStgRhs opts rhs
 
-pprCoreExprShort (Let (NonRec x _) _) = text "let" <+> ppr x <+> ptext (sLit ("= ... in ..."))
-pprCoreExprShort (Let (Rec bs) _) = text "let {" <+> ppr (fst (head bs)) <+> ptext (sLit ("= ...; ... } in ..."))
-
-pprCoreExprShort (Tick t e) = ppr t <+> pprCoreExprShort e
-pprCoreExprShort (Cast e _) = pprCoreExprShort e <+> text "`cast` T"
-
-pprCoreExprShort e = pprCoreExpr e
-
-pprCoreAltShort :: CoreAlt -> SDoc
-pprCoreAltShort (con, args, expr) = ppr con <+> sep (map ppr args) <+> text "->" <+> pprCoreExprShort expr
--}
 
 instance Outputable BCInstr where
    ppr (STKCHECK n)          = text "STKCHECK" <+> ppr n
