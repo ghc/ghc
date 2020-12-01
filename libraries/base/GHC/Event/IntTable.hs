@@ -17,7 +17,8 @@ module GHC.Event.IntTable
 import Data.Bits ((.&.), shiftL, shiftR)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe (Maybe(..), isJust)
-import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtr, withForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtr)
+import GHC.ForeignPtr (unsafeWithForeignPtr)
 import Foreign.Storable (peek, poke)
 import GHC.Base (Monad(..), (=<<), ($), ($!), const, liftM, otherwise, when)
 import GHC.Classes (Eq(..), Ord(..))
@@ -62,7 +63,7 @@ new_ :: Int -> IO (IT a)
 new_ capacity = do
   arr <- Arr.new Empty capacity
   size <- mallocForeignPtr
-  withForeignPtr size $ \ptr -> poke ptr 0
+  unsafeWithForeignPtr size $ \ptr -> poke ptr 0
   return IT { tabArr = arr
             , tabSize = size
             }
@@ -81,7 +82,7 @@ grow oldit ref size = do
                 copyBucket (m+1) bucketNext
           copyBucket n =<< Arr.read (tabArr oldit) i
   copySlot 0 0
-  withForeignPtr (tabSize newit) $ \ptr -> poke ptr size
+  unsafeWithForeignPtr (tabSize newit) $ \ptr -> poke ptr size
   writeIORef ref newit
 
 -- | @insertWith f k v table@ inserts @k@ into @table@ with value @v@.
@@ -100,7 +101,7 @@ insertWith f k v inttable@(IntTable ref) = do
           Arr.write tabArr idx (Bucket k v' next)
           return (Just bucketValue)
         | otherwise = go bkt { bucketNext = seen } bucketNext
-      go seen _ = withForeignPtr tabSize $ \ptr -> do
+      go seen _ = unsafeWithForeignPtr tabSize $ \ptr -> do
         size <- peek ptr
         if size + 1 >= Arr.size tabArr - (Arr.size tabArr `shiftR` 2)
           then grow it ref size >> insertWith f k v inttable
@@ -139,7 +140,7 @@ updateWith f k (IntTable ref) = do
   when (isJust oldVal) $ do
     Arr.write tabArr idx newBucket
     when del $
-      withForeignPtr tabSize $ \ptr -> do
+      unsafeWithForeignPtr tabSize $ \ptr -> do
         size <- peek ptr
         poke ptr (size - 1)
   return oldVal
