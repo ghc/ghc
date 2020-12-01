@@ -2230,7 +2230,7 @@ enableCodeGenForUnboxedTuplesOrSums =
   where
     condition ms =
       unboxed_tuples_or_sums (ms_hspp_opts ms) &&
-      not (gopt Opt_ByteCode (ms_hspp_opts ms)) &&
+      gopt Opt_ObjectCodeIfUnboxed (ms_hspp_opts ms) &&
       (isBootSummary ms == NotBoot)
     unboxed_tuples_or_sums d =
       xopt LangExt.UnboxedTuples d || xopt LangExt.UnboxedSums d

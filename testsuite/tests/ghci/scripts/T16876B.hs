@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# OPTIONS_GHC -fbyte-code #-}
+{-# OPTIONS_GHC -fno-object-code-if-unboxed #-}
 module T16876B where
 
 import T16876A
