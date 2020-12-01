@@ -24,35 +24,37 @@ import qualified GHC.Tc.Errors.Types as TcRn
 -- | The umbrella type that encompasses all the different warnings that GHC might raise during the
 -- various compilation stages.
 data GhcWarning
-  = GhcWarningPs  Parser.Warning
+  = GhcWarningPs  !Parser.Warning
     -- ^ A warning raised during the the parsing phase.
-  | GhcWarningTcRn TcRn.Warning
+  | GhcWarningTcRn !TcRn.Warning
     -- ^ A warning raised during the the typechecking/renaming phase.
-  | GhcWarningDs   TcRn.DsWarning
+  | GhcWarningDs   !TcRn.DsWarning
     -- ^ A warning raised during desugaring.
-  | GhcWarningCmdLine CmdLine.Warn
-  | GhcWarningDriver DriverWarning
+  | GhcWarningCmdLine !CmdLine.Warn
+  | GhcWarningDriver !DriverWarning
     -- ^ A warning raised in the driver.
-  | GhcWarningRaw ErrDoc
+  | GhcWarningDemotedErr !GhcError
+    -- ^ An error which has been demoted to a warning.
+  | GhcWarningRaw !ErrDoc
     -- ^ The escape hatch to convert an 'ErrDoc' into a 'GhcWarning'. Same caveats applies as for a
     -- 'GhcErrorRaw'.
 
 -- | The umbrella type that encompasses all the different errors that GHC might raise during the
 -- different compilation stages.
 data GhcError
-  = GhcErrorPs Parser.Error
+  = GhcErrorPs !Parser.Error
     -- ^ An error that happens in the parsing phase.
-  | GhcErrorTcRn TcRn.Error
+  | GhcErrorTcRn !TcRn.Error
     -- ^ An error that happens in the typecheck/renaming phase.
-  | GhcErrorDs TcRn.Error
+  | GhcErrorDs !TcRn.Error
     -- ^ An error that happens in the desugaring phase.
-  | GhcErrorDriver DriverError
+  | GhcErrorDriver !DriverError
     -- ^ An error that happens in the driver.
-  | GhcFatalWarning GhcWarning
+  | GhcFatalWarning !GhcWarning
     -- ^ A 'GhcWarning' that is considered fatal, so it has to be treated as an error. Whether or not a
     -- 'GhcWarning' has to be considered an error is a decision that happens towards the top of the
     -- compilation pipeline, and is driven by the 'DynFlags' settings (e.g. if \"-Werror\" is enabled).
-  | GhcErrorRaw ErrDoc
+  | GhcErrorRaw !ErrDoc
     -- ^ The escape hatch to convert an 'ErrDoc' into a 'GhcError'. Use with care (ideally, don't)
     -- as an 'ErrDoc' is a very lossy representation of an error, which IDEs will have a harder time to
     -- digest.

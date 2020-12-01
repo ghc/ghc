@@ -26,12 +26,26 @@ import GHC.Utils.Error ( pprErrMsgBagWithLoc )
 
 instance RenderableDiagnostic GhcWarning where
   renderDiagnostic = \case
-    GhcWarningPs w      -> renderDiagnostic w
-    GhcWarningCmdLine w -> renderDiagnostic w
-    GhcWarningTcRn w    -> renderDiagnostic w
-    GhcWarningDs w      -> renderDiagnostic w
-    GhcWarningDriver w  -> renderDiagnostic w
-    GhcWarningRaw d     -> d
+    GhcWarningPs w
+      -> renderDiagnostic w
+
+    GhcWarningCmdLine w
+      -> renderDiagnostic w
+
+    GhcWarningTcRn w
+      -> renderDiagnostic w
+
+    GhcWarningDs w
+      -> renderDiagnostic w
+
+    GhcWarningDriver w
+      -> renderDiagnostic w
+
+    GhcWarningDemotedErr w
+      -> renderDiagnostic w
+
+    GhcWarningRaw d
+      -> d
 
 instance RenderableDiagnostic GhcError where
   renderDiagnostic = \case

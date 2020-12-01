@@ -1321,9 +1321,8 @@ hscCheckSafe' m l = do
                         (False, _   ) -> modTrustErr
                 in do
                     logWarnings warns
-                    -- FIXME(adinapoli) Make sure the Severity is the one we want.
-                    -- Also, it's not great that we are converting in a lossy way.
-                    logWarnings $ demoteErrorsToWarnings GhcWarningRaw (mkErrorMessages errs)
+                    logWarnings $
+                      demoteErrorsToWarnings (GhcWarningDemotedErr . GhcErrorRaw) (mkErrorMessages errs)
                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
