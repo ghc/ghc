@@ -973,18 +973,20 @@ importdecls_semi
 importdecl :: { LImportDecl GhcPs }
         : 'import' maybe_src maybe_safe optqualified maybe_pkg modid optqualified maybeas maybeimpspec
                 {% do {
-                  ; checkImportDecl $4 $7
-                  ; ams (cL (comb4 $1 $6 (snd $8) $9) $
+                  ; let { ; mPreQual = unLoc $4
+                          ; mPostQual = unLoc $7 }
+                  ; checkImportDecl mPreQual mPostQual
+                  ; ams (cL (comb5 $1 $6 $7 (snd $8) $9) $
                       ImportDecl { ideclExt = noExtField
                                   , ideclSourceSrc = snd $ fst $2
                                   , ideclName = $6, ideclPkgQual = snd $5
                                   , ideclSource = snd $2, ideclSafe = snd $3
-                                  , ideclQualified = importDeclQualifiedStyle $4 $7
+                                  , ideclQualified = importDeclQualifiedStyle mPreQual mPostQual
                                   , ideclImplicit = False
                                   , ideclAs = unLoc (snd $8)
                                   , ideclHiding = unLoc $9 })
-                         (mj AnnImport $1 : fst (fst $2) ++ fst $3 ++ fmap (mj AnnQualified) (maybeToList $4)
-                                          ++ fst $5 ++ fmap (mj AnnQualified) (maybeToList $7) ++ fst $8)
+                         (mj AnnImport $1 : fst (fst $2) ++ fst $3 ++ fmap (mj AnnQualified) (maybeToList mPreQual)
+                                          ++ fst $5 ++ fmap (mj AnnQualified) (maybeToList mPostQual) ++ fst $8)
                   }
                 }
 
@@ -1008,9 +1010,9 @@ maybe_pkg :: { ([AddAnn],Maybe StringLiteral) }
                         ; return ([mj AnnPackageName $1], Just (StringLiteral (getSTRINGs $1) pkgFS)) } }
         | {- empty -}                           { ([],Nothing) }
 
-optqualified :: { Maybe (Located Token) }
-        : 'qualified'                           { Just $1 }
-        | {- empty -}                           { Nothing }
+optqualified :: { Located (Maybe (Located Token)) }
+        : 'qualified'                           { sL1 $1 (Just $1) }
+        | {- empty -}                           { noLoc Nothing }
 
 maybeas :: { ([AddAnn],Located (Maybe (Located ModuleName))) }
         : 'as' modid                           { ([mj AnnAs $1]
@@ -3895,6 +3897,11 @@ comb4 :: (HasSrcSpan a , HasSrcSpan b , HasSrcSpan c , HasSrcSpan d) =>
 comb4 a b c d = a `seq` b `seq` c `seq` d `seq`
     (combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
                 combineSrcSpans (getLoc c) (getLoc d))
+
+comb5 :: Located a -> Located b -> Located c -> Located d -> Located e -> SrcSpan
+comb5 a b c d e = a `seq` b `seq` c `seq` d `seq` e `seq`
+    (combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
+       combineSrcSpans (getLoc c) $ combineSrcSpans (getLoc d) (getLoc e))
 
 -- strict constructor version:
 {-# INLINE sL #-}

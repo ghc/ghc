@@ -268,6 +268,7 @@ test('mod181', normal, compile, [''])
 test('mod182', normal, compile_fail, [''])
 test('mod183', normal, compile_fail, [''])
 test('mod184', normal, compile, ['-Wprepositive-qualified-module'])
+test('mod185', normal, compile, ['-ddump-parsed-ast'])
 
 test('T1148', normal, compile, [''])
 test('T1074', normal, compile, [''])
