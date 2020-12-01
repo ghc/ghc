@@ -6,6 +6,7 @@
 #include "hs_try_putmvar003_stub.h"
 
 struct callback_queue {
+    pthread_t thread;
     pthread_mutex_t lock;
     pthread_cond_t cond;
     int use_foreign_export;
@@ -54,18 +55,18 @@ typedef void* threadfunc(void *);
 struct callback_queue* mkCallbackQueue(int use_foreign_export, int n_requests)
 {
     struct callback_queue *q = malloc(sizeof(struct callback_queue));
-    pthread_t t;
     pthread_mutex_init(&q->lock, NULL);
     pthread_cond_init(&q->cond, NULL);
     q->pending = NULL;
     q->use_foreign_export = use_foreign_export;
     q->n_requests = n_requests;
-    pthread_create(&t, NULL, (threadfunc*)callback, q);
+    pthread_create(&q->thread, NULL, (threadfunc*)callback, q);
     return q;
 }
 
 void destroyCallbackQueue(struct callback_queue *q)
 {
+    pthread_join(q->thread, NULL);
     pthread_mutex_destroy(&q->lock);
     pthread_cond_destroy(&q->cond);
     free(q);

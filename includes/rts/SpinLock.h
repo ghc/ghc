@@ -38,37 +38,28 @@ typedef StgWord SpinLock;
 
 // PROF_SPIN enables counting the number of times we spin on a lock
 
+void acquire_spin_lock_slow_path(SpinLock * p);
+
 // acquire spin lock
 INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 {
-    StgWord32 r = 0;
-    uint32_t i;
-    do {
-        for (i = 0; i < SPIN_COUNT; i++) {
-            r = cas((StgVolatilePtr)&(p->lock), 1, 0);
-            if (r != 0) return;
-            p->spin++;
-            busy_wait_nop();
-        }
-        p->yield++;
-        yieldThread();
-    } while (1);
+    StgWord32 r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+    if (RTS_UNLIKELY(r == 0))
+        acquire_spin_lock_slow_path(p);
 }
 
 // release spin lock
 INLINE_HEADER void RELEASE_SPIN_LOCK(SpinLock * p)
 {
-    write_barrier();
-    p->lock = 1;
+    RELEASE_STORE(&p->lock, 1);
 }
 
 // initialise spin lock
 INLINE_HEADER void initSpinLock(SpinLock * p)
 {
-    write_barrier();
-    p->lock = 1;
     p->spin = 0;
     p->yield = 0;
+    RELEASE_STORE(&p->lock, 1);
 }
 
 #else
@@ -91,15 +82,13 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 // release spin lock
 INLINE_HEADER void RELEASE_SPIN_LOCK(SpinLock * p)
 {
-    write_barrier();
-    (*p) = 1;
+    RELEASE_STORE(&p->lock, 1);
 }
 
 // init spin lock
 INLINE_HEADER void initSpinLock(SpinLock * p)
 {
-    write_barrier();
-    (*p) = 1;
+    RELEASE_STORE(&p->lock, 1);
 }
 
 #endif /* PROF_SPIN */
