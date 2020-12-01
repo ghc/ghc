@@ -31,6 +31,12 @@ map = /\ ab -> \f -> \xs -> let map' ys = case ys of
 Notice that for a compiler that uses lambda lifting this is
 useless as map' will be transformed back to what map was.
 
+SG: We do selective lambda lifting, but only for code generation, as
+an alternative to closure conversion. And when lambda lifting fires, it
+makes sure it reduces allocation. The benefit of SAT is from being able
+to specialise for static args and the resulting simplifications! If the
+static arg is left unexploited, we actually end up with worse code.
+
 We could possibly do the same for big lambdas, but we don't as
 they will eventually be removed in later stages of the compiler,
 therefore there is no penalty in keeping them.
@@ -59,6 +65,8 @@ import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.SimpleOpt (defaultSimpleOpts)
+import GHC.Core.Unfold.Make (mkInlinableUnfolding)
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var.Env
@@ -95,16 +103,23 @@ satBind (Rec [(binder, rhs)]) interesting_ids = do
     let interesting_ids' = interesting_ids `addOneToUniqSet` binder
         (rhs_binders, rhs_body) = collectBinders rhs
     (rhs_body', sat_info_rhs_body) <- satTopLevelExpr rhs_body interesting_ids'
+    -- The following two lines intersect the SATInfo from call sites with
+    -- the order of parameters from the *definition* (sat_info_rhs_from_args)
+    -- Ex: If we have the only call site @f a v@, but the defn of @f@ is
+    -- @f a b = ...@, then @a@ is a static arg, but @v@ is not.
+    -- TODO: better names!!
     let sat_info_rhs_from_args = unitVarEnv binder (bindersToSATInfo rhs_binders)
         sat_info_rhs' = mergeIdSATInfo sat_info_rhs_from_args sat_info_rhs_body
 
+        -- I don't think the following lines are effective at guarding against
+        -- shadowing:
         shadowing = binder `elementOfUniqSet` interesting_ids
         sat_info_rhs'' = if shadowing
                         then sat_info_rhs' `delFromUFM` binder -- For safety
                         else sat_info_rhs'
 
-    bind' <- saTransformMaybe binder (lookupUFM sat_info_rhs' binder)
-                              rhs_binders rhs_body'
+    bind' <- saTransformUnfolding binder (lookupUFM sat_info_rhs' binder)
+                                  rhs_binders rhs_body'
     return (bind', sat_info_rhs'')
 satBind (Rec pairs) interesting_ids = do
     let (binders, rhss) = unzip pairs
@@ -163,7 +178,7 @@ mergeIdSATInfo = plusUFM_C mergeSATInfo
 mergeIdSATInfos :: [IdSATInfo] -> IdSATInfo
 mergeIdSATInfos = foldl' mergeIdSATInfo emptyIdSATInfo
 
-bindersToSATInfo :: [Id] -> SATInfo
+bindersToSATInfo :: [Var] -> SATInfo
 bindersToSATInfo vs = map (Static . binderToApp) vs
     where binderToApp v | isId v    = VarApp v
                         | isTyVar v = TypeApp $ mkTyVarTy v
@@ -271,6 +286,7 @@ newUnique = getUniqueM
 
 ************************************************************************
 
+SG: This is incomprehensible without giving the map example first.
 To do the transformation, the game plan is to:
 
 1. Create a small nonrecursive RHS that takes the
@@ -367,8 +383,8 @@ type argument. This is bad because it means the application sat_worker_s1aU x_a6
 is not well typed.
 -}
 
-saTransformMaybe :: Id -> Maybe SATInfo -> [Id] -> CoreExpr -> SatM CoreBind
-saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
+_saTransformMaybe :: Id -> Maybe SATInfo -> [Id] -> CoreExpr -> SatM CoreBind
+_saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
   | Just arg_staticness <- maybe_arg_staticness
   , should_transform arg_staticness
   = saTransform binder arg_staticness rhs_binders rhs_body
@@ -378,6 +394,17 @@ saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
     should_transform staticness = n_static_args > 1 -- THIS IS THE DECISION POINT
       where
         n_static_args = count isStaticValue staticness
+
+saTransformUnfolding :: Id -> Maybe SATInfo -> [Id] -> CoreExpr -> SatM CoreBind
+saTransformUnfolding binder maybe_arg_staticness rhs_binders rhs_body
+  | Just arg_staticness <- maybe_arg_staticness
+  , any isStaticValue arg_staticness
+  , not (isStableUnfolding (idUnfolding binder))
+  = do  { NonRec _binder' rhs' <- saTransform binder arg_staticness rhs_binders rhs_body
+        ; let binder' = binder `setIdUnfolding` mkInlinableUnfolding defaultSimpleOpts rhs'
+        ; return (Rec [(binder', mkLams rhs_binders rhs_body)]) }
+  | otherwise
+  = return (Rec [(binder, mkLams rhs_binders rhs_body)])
 
 saTransform :: Id -> SATInfo -> [Id] -> CoreExpr -> SatM CoreBind
 saTransform binder arg_staticness rhs_binders rhs_body
