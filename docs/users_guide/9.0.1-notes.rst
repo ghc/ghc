@@ -56,7 +56,9 @@ Highlights
 
   - GHC now relies on a new ``ghc-bignum`` package to provide Integer/Natural
     implementations. This package supports the following backends:
+
       - gmp: adapted from integer-gmp package that was used before
+
       - native: new Haskell implementation, faster than ``integer-simple`` which is
         not used anymore
 

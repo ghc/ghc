@@ -183,6 +183,10 @@ Event log output
 Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
 ⟨flags⟩`) is written through a custom :c:type:`EventLogWriter`:
 
+.. c:type:: size_t
+
+    :hidden:
+
 .. c:type:: EventLogWriter
 
     A sink of event-log data.
