@@ -1,13 +1,13 @@
 
 T15685.hs:13:24: error:
-    • Could not deduce: a ~ [k0]
-      from the context: as ~ (a1 : as1)
+    • Could not deduce: k ~ [k0]
+      from the context: as ~ (a : as1)
         bound by a pattern with constructor:
-                   Here :: forall {a1} (f :: a1 -> *) (a2 :: a1) (as :: [a1]).
-                           f a2 -> NS f (a2 : as),
+                   Here :: forall {k} (f :: k -> *) (a :: k) (as :: [k]).
+                           f a -> NS f (a : as),
                  in a pattern synonym declaration
         at T15685.hs:13:19-26
-      ‘a’ is a rigid type variable bound by
+      ‘k’ is a rigid type variable bound by
         the inferred type of HereNil :: NS f as
         at T15685.hs:13:9-15
       Possible fix: add a type signature for ‘HereNil’

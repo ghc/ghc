@@ -17,7 +17,8 @@ module GHC.Tc.TyCl (
 
         -- Functions used by GHC.Tc.TyCl.Instance to check
         -- data/type family instance declarations
-        kcConDecls, tcConDecls, dataDeclChecks, checkValidTyCon,
+        kcConDecls, tcConDecls, DataDeclInfo(..),
+        dataDeclChecks, checkValidTyCon,
         tcFamTyPats, tcTyFamInstEqn,
         tcAddTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         unravelFamInstPats, addConsistencyConstraints,
@@ -38,7 +39,7 @@ import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
                     , reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Unify( emitResidualTvConstraint )
+import GHC.Tc.Utils.Unify( unifyType, emitResidualTvConstraint )
 import GHC.Tc.Types.Constraint( emptyWC )
 import GHC.Tc.Validity
 import GHC.Tc.Utils.Zonk
@@ -130,7 +131,7 @@ Note [Check role annotations in a second pass]
 Role inference potentially depends on the types of all of the datacons declared
 in a mutually recursive group. The validity of a role annotation, in turn,
 depends on the result of role inference. Because the types of datacons might
-be ill-formed (see #7175 and Note [Checking GADT return types]) we must check
+be ill-formed (see #7175 and Note [rejigConRes]) we must check
 *all* the tycons in a group for validity before checking *any* of the roles.
 Thus, we take two passes over the resulting tycons, first checking for general
 validity and then checking for valid role annotations.
@@ -1529,27 +1530,16 @@ kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 --    result kind signature have already been dealt with
 --    by inferInitialKind, so we can ignore them here.
 
-kcTyClDecl (DataDecl { tcdLName    = (L _ name)
-                     , tcdDataDefn = defn }) tyCon
-  | HsDataDefn { dd_cons = cons@((L _ (ConDeclGADT {})) : _)
-               , dd_ctxt = (L _ [])
-               , dd_ND = new_or_data } <- defn
-  = -- See Note [Implementation of UnliftedNewtypes] STEP 2
-    kcConDecls new_or_data (tyConResKind tyCon) cons
-
-    -- hs_tvs and dd_kindSig already dealt with in inferInitialKind
-    -- This must be a GADT-style decl,
-    --        (see invariants of DataDefn declaration)
-    -- so (a) we don't need to bring the hs_tvs into scope, because the
-    --        ConDecls bind all their own variables
-    --    (b) dd_ctxt is not allowed for GADT-style decls, so we can ignore it
-
-  | HsDataDefn { dd_ctxt = ctxt
-               , dd_cons = cons
-               , dd_ND = new_or_data } <- defn
+kcTyClDecl (DataDecl { tcdLName    = (L _ name), tcdDataDefn = defn }) tycon
+  | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_ND = new_or_data } <- defn
   = bindTyClTyVars name $ \ _ _ _ ->
-    do { _ <- tcHsContext ctxt
-       ; kcConDecls new_or_data (tyConResKind tyCon) cons
+       -- NB: binding these tyvars isn't necessary for GADTs, but it does no
+       -- harm.  For GADTs, each data con brings its own tyvars into scope,
+       -- and the ones from this bindTyClTyVars are either not mentioned or
+       -- (conceivably) shadowed.
+    do { traceTc "kcTyClDecl" (ppr tycon $$ ppr (tyConTyVars tycon) $$ ppr (tyConResKind tycon))
+       ; _ <- tcHsContext ctxt
+       ; kcConDecls new_or_data (tyConResKind tycon) cons
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = rhs }) _tycon
@@ -1585,7 +1575,6 @@ kcConArgTys new_or_data res_kind arg_tys = do
   { let exp_kind = getArgExpKind new_or_data res_kind
   ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsType (getBangType ty) exp_kind
                                              tcMult mult)
-
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
   }
 
@@ -1606,13 +1595,12 @@ kcConGADTArgs new_or_data res_kind con_args = case con_args of
 
 kcConDecls :: NewOrData
            -> Kind             -- The result kind signature
+                               --   Used only in H98 case
            -> [LConDecl GhcRn] -- The data constructors
            -> TcM ()
-kcConDecls new_or_data res_kind cons
-  = mapM_ (wrapLocM_ (kcConDecl new_or_data final_res_kind)) cons
-  where
-    (_, final_res_kind) = splitPiTys res_kind
-        -- See Note [kcConDecls result kind]
+-- See Note [kcConDecls: kind-checking data type decls]
+kcConDecls new_or_data tc_res_kind cons
+  = mapM_ (wrapLocM_ (kcConDecl new_or_data tc_res_kind)) cons
 
 -- Kind check a data constructor. In additional to the data constructor,
 -- we also need to know about whether or not its corresponding type was
@@ -1623,82 +1611,77 @@ kcConDecl :: NewOrData
           -> Kind  -- Result kind of the type constructor
                    -- Usually Type but can be TYPE UnliftedRep
                    -- or even TYPE r, in the case of unlifted newtype
+                   -- Used only in H98 case
           -> ConDecl GhcRn
           -> TcM ()
-kcConDecl new_or_data res_kind (ConDeclH98
+kcConDecl new_or_data tc_res_kind (ConDeclH98
   { con_name = name, con_ex_tvs = ex_tvs
   , con_mb_cxt = ex_ctxt, con_args = args })
-  = addErrCtxt (dataConCtxtName [name]) $
+  = addErrCtxt (dataConCtxt [name]) $
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
-       ; kcConH98Args new_or_data res_kind args
+       ; kcConH98Args new_or_data tc_res_kind args
          -- We don't need to check the telescope here,
          -- because that's done in tcConDecl
        }
 
-kcConDecl new_or_data res_kind (ConDeclGADT
+kcConDecl new_or_data
+          _tc_res_kind   -- Not used in GADT case (and doesn't make sense)
+          (ConDeclGADT
     { con_names = names, con_bndrs = L _ outer_bndrs, con_mb_cxt = cxt
     , con_g_args = args, con_res_ty = res_ty })
-  = -- Even though the GADT-style data constructor's type is closed,
-    -- we must still kind-check the type, because that may influence
-    -- the inferred kind of the /type/ constructor.  Example:
-    --    data T f a where
-    --      MkT :: f a -> T f a
-    -- If we don't look at MkT we won't get the correct kind
-    -- for the type constructor T
-    addErrCtxt (dataConCtxtName names) $
+  = -- See Note [kcConDecls: kind-checking data type decls]
+    addErrCtxt (dataConCtxt names) $
     discardResult                      $
     bindOuterSigTKBndrs_Tv outer_bndrs $
-        -- Why "_Tv"?  See Note [Kind-checking for GADTs]
+        -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsMbContext cxt
-       ; kcConGADTArgs new_or_data res_kind args
-       ; _ <- tcHsOpenType res_ty
+       ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
+       ; con_res_kind <- newOpenTypeKind
+       ; _ <- tcCheckLHsType res_ty (TheKind con_res_kind)
+       ; kcConGADTArgs new_or_data con_res_kind args
+       ; traceTc "kcConDecl:GADT }" (ppr names $$ ppr con_res_kind)
        ; return () }
 
-{- Note [kcConDecls result kind]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We might have e.g.
-    data T a :: Type -> Type where ...
-or
-    newtype instance N a :: Type -> Type  where ..
-in which case, the 'res_kind' passed to kcConDecls will be
-   Type->Type
+{- Note [kcConDecls: kind-checking data type decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+kcConDecls is used when we are inferring the kind of the type
+constructor in a data type declaration.  E.g.
+    data T f a = MkT (f a)
+we want to infer the kind of 'f' and 'a'. The basic plan is described
+in Note [Inferring kinds for type declarations]; here we are doing Step 2.
 
-We must look past those arrows, or even foralls, to the Type in the
-corner, to pass to kcConDecl c.f. #16828. Hence the splitPiTys here.
+In the GADT case we may have this:
+   data T f a where
+      MkT :: forall g b. g b -> T g b
 
-I am a bit concerned about tycons with a declaration like
-   data T a :: Type -> forall k. k -> Type  where ...
+Notice that the variables f,a, and g,b are quite distinct.
+Nevertheless, the type signature for MkT must still influence the kind
+T which is (remember Step 1) something like
+  T :: kappa1 -> kappa2 -> Type
+Otherwise we'd infer the bogus kind
+  T :: forall k1 k2. k1 -> k2 -> Type.
 
-It does not have a CUSK, so kcInferDeclHeader will make a TcTyCon
-with tyConResKind of Type -> forall k. k -> Type.  Even that is fine:
-the splitPiTys will look past the forall.  But I'm bothered about
-what if the type "in the corner" mentions k?  This is incredibly
-obscure but something like this could be bad:
-   data T a :: Type -> foral k. k -> TYPE (F k) where ...
+The type signature for MkT influences the kind of T simply by
+kind-checking the result type (T g b), which will force 'f' and 'g' to
+have the same kinds. This is the call to
+    tcCheckLHsType res_ty (TheKind con_res_kind)
+Because this is the result type of an arrow, we know the kind must be
+of form (TYPE rr), and we get better error messages if we enforce that
+here (e.g. test gadt10).
 
-I bet we are not quite right here, but my brain suffered a buffer
-overflow and I thought it best to nail the common cases right now.
+For unlifted newtypes only, we must ensure that the argument kind
+and result kind are the same:
+* In the H98 case, we need the result kind of the TyCon, to unify with
+  the argument kind.
 
-Note [Recursion and promoting data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't want to allow promotion in a strongly connected component
-when kind checking.
+* In GADT syntax, this unification happens via the result kind passed
+  to kcConGADTArgs. The tycon's result kind is not used at all in the
+  GADT case.
 
-Consider:
-  data T f = K (f (K Any))
-
-When kind checking the `data T' declaration the local env contains the
-mappings:
-  T -> ATcTyCon <some initial kind>
-  K -> APromotionErr
-
-APromotionErr is only used for DataCons, and only used during type checking
-in tcTyClGroup.
-
-Note [Kind-checking for GADTs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Using TyVarTvs for kind-checking GADTs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
   data Proxy a where
@@ -1708,26 +1691,27 @@ Consider
 It seems reasonable that this should be accepted. But something very strange
 is going on here: when we're kind-checking this declaration, we need to unify
 the kind of `a` with k and j -- even though k and j's scopes are local to the type of
-MkProxy{1,2}. The best approach we've come up with is to use TyVarTvs during
-the kind-checking pass. First off, note that it's OK if the kind-checking pass
-is too permissive: we'll snag the problems in the type-checking pass later.
-(This extra permissiveness might happen with something like
+MkProxy{1,2}.
+
+In effect, we are simply gathering constraints on the shape of Proxy's
+kind, with no skolemisation or implication constraints involved at all.
+
+The best approach we've come up with is to use TyVarTvs during the
+kind-checking pass, rather than ordinary skolems. This is why we use
+the "_Tv" variant, bindOuterSigTKBndrs_Tv.
+
+Our only goal is to gather constraints on the kind of the type constructor;
+we do not certify that the data declaration is well-kinded. For example:
 
   data SameKind :: k -> k -> Type
   data Bad a where
     MkBad :: forall k1 k2 (a :: k1) (b :: k2). Bad (SameKind a b)
 
-which would be accepted if k1 and k2 were TyVarTvs. This is correctly rejected
-in the second pass, though. Test case: polykinds/TyVarTvKinds3)
-Recall that the kind-checking pass exists solely to collect constraints
-on the kinds and to power unification.
+which would be accepted by kcConDecl because k1 and k2 are
+TyVarTvs. It is correctly rejected in the second pass, tcConDecl.
+(Test case: polykinds/TyVarTvKinds3)
 
-To achieve the use of TyVarTvs, we must be careful to use specialized functions
-that produce TyVarTvs, not ordinary skolems. This is why we need
-kcExplicitTKBndrs and kcImplicitTKBndrs in GHC.Tc.Gen.HsType, separate from their
-tc... variants.
-
-The drawback of this approach is sometimes it will accept a definition that
+One drawback of this approach is sometimes it will accept a definition that
 a (hypothetical) declarative specification would likely reject. As a general
 rule, we don't want to allow polymorphic recursion without a CUSK. Indeed,
 the whole point of CUSKs is to allow polymorphic recursion. Yet, the TyVarTvs
@@ -1745,6 +1729,23 @@ way to describe exactly what declarations will be accepted and which will
 be rejected (without a CUSK). However, the accepted definitions are indeed
 well-kinded and any rejected definitions would be accepted with a CUSK,
 and so this wrinkle need not cause anyone to lose sleep.
+
+Note [Recursion and promoting data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't want to allow promotion in a strongly connected component
+when kind checking.
+
+Consider:
+  data T f = K (f (K Any))
+
+When kind checking the `data T' declaration the local env contains the
+mappings:
+  T -> ATcTyCon <some initial kind>
+  K -> APromotionErr
+
+APromotionErr is only used for DataCons, and only used during type checking
+in tcTyClGroup.
+
 
 ************************************************************************
 *                                                                      *
@@ -2782,18 +2783,14 @@ tcDataDefn err_ctxt roles_info tc_name
        ; when (isJust mb_ksig) $
          checkTc (kind_signatures) (badSigTyDecl tc_name)
 
-       ; tycon <- fixM $ \ tycon -> do
+       ; tycon <- fixM $ \ rec_tycon -> do
              { let final_bndrs = tycon_binders `chkAppend` extra_bndrs
-                   res_ty      = mkTyConApp tycon (mkTyVarTys (binderVars final_bndrs))
                    roles       = roles_info tc_name
              ; data_cons <- tcConDecls
-                              tycon
-                              new_or_data
-                              final_bndrs
-                              final_res_kind
-                              res_ty
+                              new_or_data DDataType
+                              rec_tycon final_bndrs final_res_kind
                               cons
-             ; tc_rhs    <- mk_tc_rhs hsc_src tycon data_cons
+             ; tc_rhs    <- mk_tc_rhs hsc_src rec_tycon data_cons
              ; tc_rep_nm <- newTyConRepName tc_name
              ; return (mkAlgTyCon tc_name
                                   final_bndrs
@@ -3195,36 +3192,51 @@ consUseGadtSyntax _                          = False
                  -- All constructors have same shape
 
 -----------------------------------
-tcConDecls :: KnotTied TyCon -> NewOrData
-           -> [TyConBinder] -> TcKind   -- binders and result kind of tycon
-           -> KnotTied Type -> [LConDecl GhcRn] -> TcM [DataCon]
-tcConDecls rep_tycon new_or_data tmpl_bndrs res_kind res_tmpl
-  = concatMapM $ addLocM $
-    tcConDecl rep_tycon (mkTyConTagMap rep_tycon)
-              tmpl_bndrs res_kind res_tmpl new_or_data
-    -- It's important that we pay for tag allocation here, once per TyCon,
-    -- See Note [Constructor tag allocation], fixes #14657
+data DataDeclInfo
+  = DDataType      -- data T a b = T1 a | T2 b
+  | DDataInstance  -- data instance D [a] = D1 a | D2
+       Type        --   The header D [a]
 
-tcConDecl :: KnotTied TyCon          -- Representation tycon. Knot-tied!
+mkDDHeaderTy :: DataDeclInfo -> TyCon -> [TyConBinder] -> Type
+mkDDHeaderTy dd_info rep_tycon tc_bndrs
+  = case dd_info of
+      DDataType -> mkTyConApp rep_tycon $
+                   mkTyVarTys (binderVars tc_bndrs)
+      DDataInstance header_ty -> header_ty
+
+tcConDecls :: NewOrData
+           -> DataDeclInfo
+           -> KnotTied TyCon            -- Representation TyCon
+           -> [TyConBinder]             -- Binders of representation TyCon
+           -> TcKind                    -- Result kind
+           -> [LConDecl GhcRn] -> TcM [DataCon]
+tcConDecls new_or_data dd_info rep_tycon tmpl_bndrs res_kind
+  = concatMapM $ addLocM $
+    tcConDecl new_or_data dd_info rep_tycon tmpl_bndrs res_kind
+              (mkTyConTagMap rep_tycon)
+    -- mkTyConTagMap: it's important that we pay for tag allocation here,
+    -- once per TyCon. See Note [Constructor tag allocation], fixes #14657
+
+tcConDecl :: NewOrData
+          -> DataDeclInfo
+          -> KnotTied TyCon   -- Representation tycon. Knot-tied!
+          -> [TyConBinder]    -- Binders of representation TyCon
+          -> TcKind           -- Result kind
           -> NameEnv ConTag
-          -> [TyConBinder] -> TcKind   -- tycon binders and result kind
-          -> KnotTied Type
-                 -- Return type template (T tys), where T is the family TyCon
-          -> NewOrData
           -> ConDecl GhcRn
           -> TcM [DataCon]
 
-tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
+tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
           (ConDeclH98 { con_name = lname@(L _ name)
                       , con_ex_tvs = explicit_tkv_nms
                       , con_mb_cxt = hs_ctxt
                       , con_args = hs_args })
-  = addErrCtxt (dataConCtxtName [lname]) $
+  = addErrCtxt (dataConCtxt [lname]) $
     do { -- NB: the tyvars from the declaration header are in scope
 
          -- Get hold of the existential type variables
          -- e.g. data T a = forall k (b::k) f. MkT a (f b)
-         -- Here tmpl_bndrs = {a}
+         -- Here tc_bndrs = {a}
          --      hs_qvars = HsQTvs { hsq_implicit = {k}
          --                        , hsq_explicit = {f,b} }
 
@@ -3242,29 +3254,35 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
                  }
 
 
-       ; let tmpl_tvs = binderVars tmpl_bndrs
-       ; let fake_ty  = mkSpecForAllTys tmpl_tvs $
+       ; let tc_tvs   = binderVars tc_bndrs
+             fake_ty  = mkSpecForAllTys  tc_tvs      $
                         mkInvisForAllTys exp_tvbndrs $
                         mkPhiTy ctxt $
                         mkVisFunTys arg_tys $
                         unitTy
              -- That type is a lie, of course. (It shouldn't end in ()!)
              -- And we could construct a proper result type from the info
-             -- at hand. But the result would mention only the tmpl_tvs,
+             -- at hand. But the result would mention only the univ_tvs,
              -- and so it just creates more work to do it right. Really,
              -- we're only doing this to find the right kind variables to
              -- quantify over, and this type is fine for that purpose.
 
-         -- exp_tvs have explicit, user-written binding sites
+         -- exp_tvbndrs have explicit, user-written binding sites
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
        ; kvs <- kindGeneralizeAll fake_ty
 
-       ; let skol_tvs = kvs ++ tmpl_tvs
+       ; let skol_tvs = tc_tvs ++ kvs ++ binderVars exp_tvbndrs
        ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
+             -- The skol_info claims that all the variables are bound
+             -- by the data constructor decl, whereas actually the
+             -- univ_tvs are bound by the data type decl itself.  It
+             -- would be better to have a doubly-nested implication.
+             -- But that just doesn't seem worth it.
+             -- See test dependent/should_fail/T13780a
 
-             -- Zonk to Types
+       -- Zonk to Types
        ; (ze, qkvs)          <- zonkTyBndrs kvs
        ; (ze, user_qtvbndrs) <- zonkTyVarBindersX ze exp_tvbndrs
        ; arg_tys             <- zonkScaledTcTypesToTypesX ze arg_tys
@@ -3272,15 +3290,14 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
 
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr name $$ ppr field_lbls)
-       ; let
-           univ_tvbs = tyConInvisTVBinders tmpl_bndrs
-           univ_tvs  = binderVars univ_tvbs
-           ex_tvbs   = mkTyVarBinders InferredSpec qkvs ++ user_qtvbndrs
-           ex_tvs    = binderVars ex_tvbs
-           -- For H98 datatypes, the user-written tyvar binders are precisely
-           -- the universals followed by the existentials.
-           -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
-           user_tvbs = univ_tvbs ++ ex_tvbs
+       ; let univ_tvbs = tyConInvisTVBinders tc_bndrs
+             ex_tvbs   = mkTyVarBinders InferredSpec qkvs ++ user_qtvbndrs
+             ex_tvs    = binderVars ex_tvbs
+                -- For H98 datatypes, the user-written tyvar binders are precisely
+                -- the universals followed by the existentials.
+                -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
+             user_tvbs = univ_tvbs ++ ex_tvbs
+             user_res_ty = mkDDHeaderTy dd_info rep_tycon tc_bndrs
 
        ; traceTc "tcConDecl 2" (ppr name)
        ; is_infix <- tcConIsInfixH98 name hs_args
@@ -3288,9 +3305,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
        ; fam_envs <- tcGetFamInstEnvs
        ; dc <- buildDataCon fam_envs name is_infix rep_nm
                             stricts Nothing field_lbls
-                            univ_tvs ex_tvs user_tvbs
+                            tc_tvs ex_tvs user_tvbs
                             [{- no eq_preds -}] ctxt arg_tys
-                            res_tmpl rep_tycon tag_map
+                            user_res_ty rep_tycon tag_map
                   -- NB:  we put data_tc, the type constructor gotten from the
                   --      constructor type signature into the data constructor;
                   --      that way checkValidDataCon can complain if it's wrong.
@@ -3299,14 +3316,14 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
   where
     skol_info = DataConSkol name
 
-tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
+tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   -- NB: don't use res_kind here, as it's ill-scoped. Instead,
   -- we get the res_kind by typechecking the result type.
           (ConDeclGADT { con_names = names
                        , con_bndrs = L _ outer_hs_bndrs
                        , con_mb_cxt = cxt, con_g_args = hs_args
                        , con_res_ty = hs_res_ty })
-  = addErrCtxt (dataConCtxtName names) $
+  = addErrCtxt (dataConCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let (L _ name : _) = names
 
@@ -3317,10 +3334,23 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
 
+                 -- For data instances (only), ensure that the return type,
+                 -- res_ty, is a substitution instance of the header.
+                 -- See Note [GADT return types]
+                 ; case dd_info of
+                      DDataType -> return ()
+                      DDataInstance hdr_ty ->
+                        do { (subst, _meta_tvs) <- newMetaTyVars (binderVars tc_bndrs)
+                           ; let head_shape = substTy subst hdr_ty
+                           ; discardResult $
+                             popErrCtxt $  -- Drop dataConCtxt
+                             addErrCtxt (dataConResCtxt names) $
+                             unifyType Nothing res_ty head_shape }
+
                    -- See Note [Datatype return kinds]
                  ; let exp_kind = getArgExpKind new_or_data res_kind
-
                  ; btys <- tcConGADTArgs exp_kind hs_args
+
                  ; let (arg_tys, stricts) = unzip btys
                  ; field_lbls <- lookupConstructorFields name
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
@@ -3343,9 +3373,10 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; ctxt          <- zonkTcTypesToTypesX ze ctxt
        ; res_ty        <- zonkTcTypeToTypeX   ze res_ty
 
-       ; let (univ_tvs, ex_tvs, tvbndrs', eq_preds, arg_subst)
-               = rejigConRes tmpl_bndrs res_tmpl tvbndrs res_ty
-             -- See Note [Checking GADT return types]
+       ; let res_tmpl = mkDDHeaderTy dd_info rep_tycon tc_bndrs
+             (univ_tvs, ex_tvs, tvbndrs', eq_preds, arg_subst)
+               = rejigConRes tc_bndrs res_tmpl tvbndrs res_ty
+             -- See Note [rejigConRes]
 
              ctxt'      = substTys arg_subst ctxt
              arg_tys'   = substScaledTys arg_subst arg_tys
@@ -3372,8 +3403,73 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
   where
     skol_info = DataConSkol (unLoc (head names))
 
-{- Note [GADT return kinds]
+{- Note [GADT return types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data family T :: forall k. k -> Type
+  data instance T (a :: Type) where
+    MkT :: forall b. T b
+
+What kind does `b` have in the signature for MkT?
+Since the return type must be an instance of the type in the header,
+we must have (b :: Type), but you can't tell that by looking only at
+the type of the data constructor; you have to look at the header too.
+If you wrote it out fully, it'd look like
+  data instance T @Type (a :: Type) where
+    MkT :: forall (b::Type). T @Type b
+
+We could reject the program, and expect the user to add kind
+annotations to `MkT` to restrict the signature.  But an easy and
+helpful alternative is this: simply instantiate the type from the
+header with fresh unification variables, and unify with the return
+type of `MkT`. That will force `b` to have kind `Type`.  See #8707
+and #14111.
+
+Wrikles
+* At first sight it looks as though this would completely subsume the
+  return-type check in checkValidDataCon.  But it does not. Suppose we
+  have
+     data instance T [a] where
+        MkT :: T (F (Maybe a))
+
+  where F is a type function.  Then maybe (F (Maybe a)) evaluates to
+  [a], so unifyType will succeed.  But we discard the coercion
+  returned by unifyType; and we really don't want to accept this
+  program.  The check in checkValidDataCon will, however, reject it.
+  TL;DR: keep the check in checkValidDataCon.
+
+* Consider a data type, rather than a data instance, declaration
+     data S a where { MkS :: b -> S [b]  }
+  In tcConDecl, S is knot-tied, so we don't want to unify (S alpha)
+  with (S [b]). To put it another way, unifyType should never see a
+  TcTycon.  Simple solution: do *not* do the extra unifyType for
+  data types (DDataType) only for data instances (DDataInstance); in
+  the latter the family constructor is not knot-tied so there is no
+  problem.
+
+* Consider this (from an earlier form of GHC itself):
+
+     data Pass = Parsed | ...
+     data GhcPass (c :: Pass) where
+       GhcPs :: GhcPs
+       ...
+     type GhcPs   = GhcPass 'Parsed
+
+   Now GhcPs and GhcPass are mutually recursive. If we did unifyType
+   for datatypes like GhcPass, we would not be able to expand the type
+   synonym (it'd still be a TcTyCon).  So again, we don't do unifyType
+   for data types; we leave it to checkValidDataCon.
+
+   We /do/ perform the unifyType for data /instances/, but a data
+   instance doesn't declare a new (user-visible) type constructor, so
+   there is no mutual recursion with type synonyms to worry about.
+   All good.
+
+   TL;DR we do support mutual recursion between type synonyms and
+   data type/instance declarations, as above.
+
+Note [GADT return kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    type family Star where Star = Type
    data T :: Type where
@@ -3496,8 +3592,8 @@ For example:
      (:--:) :: t1 -> t2 -> T Int
 
 
-Note [Checking GADT return types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [rejigConRes]
+~~~~~~~~~~~~~~~~~~
 There is a delicacy around checking the return types of a datacon. The
 central problem is dealing with a declaration like
 
@@ -3532,9 +3628,9 @@ errors reported in one pass.  See #7175, and #10836.
 --      TI :: forall b1 c1. (b1 ~ c1) => b1 -> :R7T b1 c1
 -- In this case orig_res_ty = T (e,e)
 
-rejigConRes :: [KnotTied TyConBinder] -> KnotTied Type    -- Template for result type; e.g.
-                                  -- data instance T [a] b c ...
-                                  --      gives template ([a,b,c], T [a] b c)
+rejigConRes :: [KnotTied TyConBinder]  -- Template for result type; e.g.
+            -> KnotTied Type           -- data instance T [a] b c ...
+                                       --      gives template ([a,b,c], T [a] b c)
             -> [InvisTVBinder]    -- The constructor's type variables (both inferred and user-written)
             -> KnotTied Type      -- res_ty
             -> ([TyVar],          -- Universal
@@ -3546,10 +3642,10 @@ rejigConRes :: [KnotTied TyConBinder] -> KnotTied Type    -- Template for result
         -- We don't check that the TyCon given in the ResTy is
         -- the same as the parent tycon, because checkValidDataCon will do it
 -- NB: All arguments may potentially be knot-tied
-rejigConRes tmpl_bndrs res_tmpl dc_tvbndrs res_ty
+rejigConRes tc_tvbndrs res_tmpl dc_tvbndrs res_ty
         -- E.g.  data T [a] b c where
         --         MkT :: forall x y z. T [(x,y)] z z
-        -- The {a,b,c} are the tmpl_tvs, and the {x,y,z} are the dc_tvs
+        -- The {a,b,c} are the tc_tvs, and the {x,y,z} are the dc_tvs
         --     (NB: unlike the H98 case, the dc_tvs are not all existential)
         -- Then we generate
         --      Univ tyvars     Eq-spec
@@ -3564,7 +3660,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_tvbndrs res_ty
         --              , [], [x,y,z]
         --              , [a~(x,y),b~z], <arg-subst> )
   | Just subst <- tcMatchTy res_tmpl res_ty
-  = let (univ_tvs, raw_eqs, kind_subst) = mkGADTVars tmpl_tvs dc_tvs subst
+  = let (univ_tvs, raw_eqs, kind_subst) = mkGADTVars tc_tvs dc_tvs subst
         raw_ex_tvs = dc_tvs `minusList` univ_tvs
         (arg_subst, substed_ex_tvs) = substTyVarBndrs kind_subst raw_ex_tvs
 
@@ -3590,11 +3686,11 @@ rejigConRes tmpl_bndrs res_tmpl dc_tvbndrs res_ty
         -- we must do *something*, not just crash.  So we do something simple
         -- albeit bogus, relying on checkValidDataCon to check the
         --  bad-result-type error before seeing that the other fields look odd
-        -- See Note [Checking GADT return types]
-  = (tmpl_tvs, dc_tvs `minusList` tmpl_tvs, dc_tvbndrs, [], emptyTCvSubst)
+        -- See Note [rejigConRes]
+  = (tc_tvs, dc_tvs `minusList` tc_tvs, dc_tvbndrs, [], emptyTCvSubst)
   where
-    dc_tvs   = binderVars dc_tvbndrs
-    tmpl_tvs = binderVars tmpl_bndrs
+    dc_tvs = binderVars dc_tvbndrs
+    tc_tvs = binderVars tc_tvbndrs
 
 {- Note [mkGADTVars]
 ~~~~~~~~~~~~~~~~~~~~
@@ -3634,7 +3730,7 @@ becomes
 
 We start off by matching (T k1 k2 a b) with (T x1 * (Proxy x1 y, z) z). We
 know this match will succeed because of the validity check (actually done
-later, but laziness saves us -- see Note [Checking GADT return types]).
+later, but laziness saves us -- see Note [rejigConRes]).
 Thus, we get
 
   subst := { k1 |-> x1, k2 |-> *, a |-> (Proxy x1 y, z), b |-> z }
@@ -4081,15 +4177,9 @@ checkFieldCompat fld con1 con2 res1 res2 fty1 fty2
 -------------------------------
 checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()
 checkValidDataCon dflags existential_ok tc con
-  = setSrcSpan (getSrcSpan con)  $
-    addErrCtxt (dataConCtxt con) $
-    do  { -- Check that the return type of the data constructor
-          -- matches the type constructor; eg reject this:
-          --   data T a where { MkT :: Bogus a }
-          -- It's important to do this first:
-          --  see Note [Checking GADT return types]
-          --  and c.f. Note [Check role annotations in a second pass]
-          let tc_tvs      = tyConTyVars tc
+  = setSrcSpan con_loc $
+    addErrCtxt (dataConCtxt [L con_loc con_name]) $
+    do  { let tc_tvs      = tyConTyVars tc
               res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
               orig_res_ty = dataConOrigResTy con
         ; traceTc "checkValidDataCon" (vcat
@@ -4098,6 +4188,18 @@ checkValidDataCon dflags existential_ok tc con
               , ppr orig_res_ty <+> dcolon <+> ppr (tcTypeKind orig_res_ty)])
 
 
+        -- Check that the return type of the data constructor
+        -- matches the type constructor; eg reject this:
+        --   data T a where { MkT :: Bogus a }
+        -- It's important to do this first:
+        --  see Note [rejigCon
+        --  and c.f. Note [Check role annotations in a second pass]
+
+        -- Check that the return type of the data constructor is an instance
+        -- of the header of the header of data decl.  This checks for
+        --      data T a where { MkT :: S a }
+        --      data instance D [a] where { MkD :: D (Maybe b) }
+        -- see Note [GADT return types]
         ; checkTc (isJust (tcMatchTyKi res_ty_tmpl orig_res_ty))
                   (badDataConTyCon con res_ty_tmpl)
             -- Note that checkTc aborts if it finds an error. This is
@@ -4205,7 +4307,9 @@ checkValidDataCon dflags existential_ok tc con
                    Just (f, _) -> ppr (tyConBinders f) ]
     }
   where
-    ctxt = ConArgCtxt (dataConName con)
+    con_name = dataConName con
+    con_loc  = nameSrcSpan con_name
+    ctxt = ConArgCtxt con_name
     is_strict = \case
       NoSrcStrict -> xopt LangExt.StrictData dflags
       bang        -> isSrcStrict bang
@@ -4869,14 +4973,17 @@ fieldTypeMisMatch field_name con1 con2
   = sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
          text "give different types for field", quotes (ppr field_name)]
 
-dataConCtxtName :: [Located Name] -> SDoc
-dataConCtxtName [con]
-   = text "In the definition of data constructor" <+> quotes (ppr con)
-dataConCtxtName con
-   = text "In the definition of data constructors" <+> interpp'SP con
+dataConCtxt :: [Located Name] -> SDoc
+dataConCtxt cons = text "In the definition of data constructor" <> plural cons
+                   <+> ppr_cons cons
 
-dataConCtxt :: Outputable a => a -> SDoc
-dataConCtxt con = text "In the definition of data constructor" <+> quotes (ppr con)
+dataConResCtxt :: [Located Name] -> SDoc
+dataConResCtxt cons = text "In the result type of data constructor" <> plural cons
+                      <+> ppr_cons cons
+
+ppr_cons :: [Located Name] -> SDoc
+ppr_cons [con] = quotes (ppr con)
+ppr_cons cons  = interpp'SP cons
 
 classOpCtxt :: Var -> Type -> SDoc
 classOpCtxt sel_id tau = sep [text "When checking the class method:",

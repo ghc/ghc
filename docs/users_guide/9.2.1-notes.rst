@@ -14,6 +14,11 @@ Language
   (Serrano et al, ICFP 2020).  More information here: :ref:`impredicative-polymorphism`.
   This replaces the old (undefined, flaky) behaviour of the :extension:`ImpredicativeTypes` extension.
 
+* Kind inference for data/newtype instance declarations is slightly
+  more restrictive than before.  See the user manual :ref:`kind-inference-data-family-instances`.
+  This is a breaking change, albeit a fairly obscure one that corrects a specification bug.
+
+
 Compiler
 ~~~~~~~~
 
