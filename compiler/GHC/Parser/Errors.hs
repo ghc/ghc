@@ -1,11 +1,11 @@
 module GHC.Parser.Errors
-   ( Warning(..)
+   ( PsWarning(..)
    , TransLayoutReason(..)
    , OperatorWhitespaceSymbol(..)
    , OperatorWhitespaceOccurrence(..)
    , NumUnderscoreReason(..)
-   , Error(..)
-   , ErrorDesc(..)
+   , PsError(..)
+   , PsErrorDesc(..)
    , LexErr(..)
    , CmmParserError(..)
    , LexErrKind(..)
@@ -30,37 +30,38 @@ import GHC.Utils.Outputable (SDoc)
 import GHC.Data.FastString
 import GHC.Unit.Module.Name
 
-data Warning
+-- | A warning that might arise during parsing.
+data PsWarning
 
      -- | Warn when tabulations are found
-   = WarnTab
+   = PsWarnTab
       { tabFirst :: !SrcSpan -- ^ First occurence of a tab
       , tabCount :: !Word    -- ^ Number of other occurences
       }
 
-   | WarnTransitionalLayout !SrcSpan !TransLayoutReason
+   | PsWarnTransitionalLayout !SrcSpan !TransLayoutReason
       -- ^ Transitional layout warnings
 
-   | WarnUnrecognisedPragma !SrcSpan
+   | PsWarnUnrecognisedPragma !SrcSpan
       -- ^ Unrecognised pragma
 
-   | WarnHaddockInvalidPos !SrcSpan
+   | PsWarnHaddockInvalidPos !SrcSpan
       -- ^ Invalid Haddock comment position
 
-   | WarnHaddockIgnoreMulti !SrcSpan
+   | PsWarnHaddockIgnoreMulti !SrcSpan
       -- ^ Multiple Haddock comment for the same entity
 
-   | WarnStarBinder !SrcSpan
+   | PsWarnStarBinder !SrcSpan
       -- ^ Found binding occurence of "*" while StarIsType is enabled
 
-   | WarnStarIsType !SrcSpan
+   | PsWarnStarIsType !SrcSpan
       -- ^ Using "*" for "Type" without StarIsType enabled
 
-   | WarnImportPreQualified !SrcSpan
+   | PsWarnImportPreQualified !SrcSpan
       -- ^ Pre qualified import with 'WarnPrepositiveQualifiedModule' enabled
 
-   | WarnOperatorWhitespaceExtConflict !SrcSpan !OperatorWhitespaceSymbol
-   | WarnOperatorWhitespace !SrcSpan !FastString !OperatorWhitespaceOccurrence
+   | PsWarnOperatorWhitespaceExtConflict !SrcSpan !OperatorWhitespaceSymbol
+   | PsWarnOperatorWhitespace !SrcSpan !FastString !OperatorWhitespaceOccurrence
 
 -- | The operator symbol in the 'WarnOperatorWhitespaceExtConflict' warning.
 data OperatorWhitespaceSymbol
@@ -78,146 +79,146 @@ data TransLayoutReason
    = TransLayout_Where -- ^ "`where' clause at the same depth as implicit layout block"
    | TransLayout_Pipe  -- ^ "`|' at the same depth as implicit layout block")
 
-data Error = Error
-   { errDesc  :: !ErrorDesc   -- ^ Error description
+data PsError = PsError
+   { errDesc  :: !PsErrorDesc   -- ^ Error description
    , errHints :: ![Hint]      -- ^ Hints
    , errLoc   :: !SrcSpan     -- ^ Error position
    }
 
-data ErrorDesc
-   = ErrLambdaCase
+data PsErrorDesc
+   = PsErrLambdaCase
       -- ^ LambdaCase syntax used without the extension enabled
 
-   | ErrNumUnderscores !NumUnderscoreReason
+   | PsErrNumUnderscores !NumUnderscoreReason
       -- ^ Underscores in literals without the extension enabled
 
-   | ErrPrimStringInvalidChar
+   | PsErrPrimStringInvalidChar
       -- ^ Invalid character in primitive string
 
-   | ErrMissingBlock
+   | PsErrMissingBlock
       -- ^ Missing block
 
-   | ErrLexer !LexErr !LexErrKind
+   | PsErrLexer !LexErr !LexErrKind
       -- ^ Lexer error
 
-   | ErrSuffixAT
+   | PsErrSuffixAT
       -- ^ Suffix occurence of `@`
 
-   | ErrParse !String
+   | PsErrParse !String
       -- ^ Parse errors
 
-   | ErrCmmLexer
+   | PsErrCmmLexer
       -- ^ Cmm lexer error
 
-   | ErrUnsupportedBoxedSumExpr !(SumOrTuple (HsExpr GhcPs))
+   | PsErrUnsupportedBoxedSumExpr !(SumOrTuple (HsExpr GhcPs))
       -- ^ Unsupported boxed sum in expression
 
-   | ErrUnsupportedBoxedSumPat !(SumOrTuple (PatBuilder GhcPs))
+   | PsErrUnsupportedBoxedSumPat !(SumOrTuple (PatBuilder GhcPs))
       -- ^ Unsupported boxed sum in pattern
 
-   | ErrUnexpectedQualifiedConstructor !RdrName
+   | PsErrUnexpectedQualifiedConstructor !RdrName
       -- ^ Unexpected qualified constructor
 
-   | ErrTupleSectionInPat
+   | PsErrTupleSectionInPat
       -- ^ Tuple section in pattern context
 
-   | ErrIllegalBangPattern !(Pat GhcPs)
+   | PsErrIllegalBangPattern !(Pat GhcPs)
       -- ^ Bang-pattern without BangPattterns enabled
 
-   | ErrOpFewArgs !StarIsType !RdrName
+   | PsErrOpFewArgs !StarIsType !RdrName
       -- ^ Operator applied to too few arguments
 
-   | ErrImportQualifiedTwice
+   | PsErrImportQualifiedTwice
       -- ^ Import: multiple occurrences of 'qualified'
 
-   | ErrImportPostQualified
+   | PsErrImportPostQualified
       -- ^ Post qualified import without 'ImportQualifiedPost'
 
-   | ErrIllegalExplicitNamespace
+   | PsErrIllegalExplicitNamespace
       -- ^ Explicit namespace keyword without 'ExplicitNamespaces'
 
-   | ErrVarForTyCon !RdrName
+   | PsErrVarForTyCon !RdrName
       -- ^ Expecting a type constructor but found a variable
 
-   | ErrIllegalPatSynExport
+   | PsErrIllegalPatSynExport
       -- ^ Illegal export form allowed by PatternSynonyms
 
-   | ErrMalformedEntityString
+   | PsErrMalformedEntityString
       -- ^ Malformed entity string
 
-   | ErrDotsInRecordUpdate
+   | PsErrDotsInRecordUpdate
       -- ^ Dots used in record update
 
-   | ErrPrecedenceOutOfRange !Int
+   | PsErrPrecedenceOutOfRange !Int
       -- ^ Precedence out of range
 
-   | ErrInvalidDataCon !(HsType GhcPs)
+   | PsErrInvalidDataCon !(HsType GhcPs)
       -- ^ Cannot parse data constructor in a data/newtype declaration
 
-   | ErrInvalidInfixDataCon !(HsType GhcPs) !RdrName !(HsType GhcPs)
+   | PsErrInvalidInfixDataCon !(HsType GhcPs) !RdrName !(HsType GhcPs)
       -- ^ Cannot parse data constructor in a data/newtype declaration
 
-   | ErrUnpackDataCon
+   | PsErrUnpackDataCon
       -- ^ UNPACK applied to a data constructor
 
-   | ErrUnexpectedKindAppInDataCon !DataConBuilder !(HsType GhcPs)
+   | PsErrUnexpectedKindAppInDataCon !DataConBuilder !(HsType GhcPs)
       -- ^ Unexpected kind application in data/newtype declaration
 
-   | ErrInvalidRecordCon !(PatBuilder GhcPs)
+   | PsErrInvalidRecordCon !(PatBuilder GhcPs)
       -- ^ Not a record constructor
 
-   | ErrIllegalUnboxedStringInPat !(HsLit GhcPs)
+   | PsErrIllegalUnboxedStringInPat !(HsLit GhcPs)
       -- ^ Illegal unboxed string literal in pattern
 
-   | ErrDoNotationInPat
+   | PsErrDoNotationInPat
       -- ^ Do-notation in pattern
 
-   | ErrIfTheElseInPat
+   | PsErrIfTheElseInPat
       -- ^ If-then-else syntax in pattern
 
-   | ErrLambdaCaseInPat
+   | PsErrLambdaCaseInPat
       -- ^ Lambda-case in pattern
 
-   | ErrCaseInPat
+   | PsErrCaseInPat
       -- ^ case..of in pattern
 
-   | ErrLetInPat
+   | PsErrLetInPat
       -- ^ let-syntax in pattern
 
-   | ErrLambdaInPat
+   | PsErrLambdaInPat
       -- ^ Lambda-syntax in pattern
 
-   | ErrArrowExprInPat !(HsExpr GhcPs)
+   | PsErrArrowExprInPat !(HsExpr GhcPs)
       -- ^ Arrow expression-syntax in pattern
 
-   | ErrArrowCmdInPat !(HsCmd GhcPs)
+   | PsErrArrowCmdInPat !(HsCmd GhcPs)
       -- ^ Arrow command-syntax in pattern
 
-   | ErrArrowCmdInExpr !(HsCmd GhcPs)
+   | PsErrArrowCmdInExpr !(HsCmd GhcPs)
       -- ^ Arrow command-syntax in expression
 
-   | ErrViewPatInExpr !(LHsExpr GhcPs) !(LHsExpr GhcPs)
+   | PsErrViewPatInExpr !(LHsExpr GhcPs) !(LHsExpr GhcPs)
       -- ^ View-pattern in expression
 
-   | ErrTypeAppWithoutSpace !RdrName !(LHsExpr GhcPs)
+   | PsErrTypeAppWithoutSpace !RdrName !(LHsExpr GhcPs)
       -- ^ Type-application without space before '@'
 
-   | ErrLazyPatWithoutSpace !(LHsExpr GhcPs)
+   | PsErrLazyPatWithoutSpace !(LHsExpr GhcPs)
       -- ^ Lazy-pattern ('~') without space after it
 
-   | ErrBangPatWithoutSpace !(LHsExpr GhcPs)
+   | PsErrBangPatWithoutSpace !(LHsExpr GhcPs)
       -- ^ Bang-pattern ('!') without space after it
 
-   | ErrUnallowedPragma !(HsPragE GhcPs)
+   | PsErrUnallowedPragma !(HsPragE GhcPs)
       -- ^ Pragma not allowed in this position
 
-   | ErrQualifiedDoInCmd !ModuleName
+   | PsErrQualifiedDoInCmd !ModuleName
       -- ^ Qualified do block in command
 
-   | ErrInvalidInfixHole
+   | PsErrInvalidInfixHole
       -- ^ Invalid infix hole, expected an infix operator
 
-   | ErrSemiColonsInCondExpr
+   | PsErrSemiColonsInCondExpr
       -- ^ Unexpected semi-colons in conditional expression
          !(HsExpr GhcPs) -- ^ conditional expr
          !Bool           -- ^ "then" semi-colon?
@@ -225,7 +226,7 @@ data ErrorDesc
          !Bool           -- ^ "else" semi-colon?
          !(HsExpr GhcPs) -- ^ "else" expr
 
-   | ErrSemiColonsInCondCmd
+   | PsErrSemiColonsInCondCmd
       -- ^ Unexpected semi-colons in conditional command
          !(HsExpr GhcPs) -- ^ conditional expr
          !Bool           -- ^ "then" semi-colon?
@@ -233,143 +234,143 @@ data ErrorDesc
          !Bool           -- ^ "else" semi-colon?
          !(HsCmd GhcPs)  -- ^ "else" expr
 
-   | ErrAtInPatPos
+   | PsErrAtInPatPos
       -- ^ @-operator in a pattern position
 
-   | ErrLambdaCmdInFunAppCmd !(LHsCmd GhcPs)
+   | PsErrLambdaCmdInFunAppCmd !(LHsCmd GhcPs)
       -- ^ Unexpected lambda command in function application
 
-   | ErrCaseCmdInFunAppCmd !(LHsCmd GhcPs)
+   | PsErrCaseCmdInFunAppCmd !(LHsCmd GhcPs)
       -- ^ Unexpected case command in function application
 
-   | ErrIfCmdInFunAppCmd !(LHsCmd GhcPs)
+   | PsErrIfCmdInFunAppCmd !(LHsCmd GhcPs)
       -- ^ Unexpected if command in function application
 
-   | ErrLetCmdInFunAppCmd !(LHsCmd GhcPs)
+   | PsErrLetCmdInFunAppCmd !(LHsCmd GhcPs)
       -- ^ Unexpected let command in function application
 
-   | ErrDoCmdInFunAppCmd !(LHsCmd GhcPs)
+   | PsErrDoCmdInFunAppCmd !(LHsCmd GhcPs)
       -- ^ Unexpected do command in function application
 
-   | ErrDoInFunAppExpr !(Maybe ModuleName) !(LHsExpr GhcPs)
+   | PsErrDoInFunAppExpr !(Maybe ModuleName) !(LHsExpr GhcPs)
       -- ^ Unexpected do block in function application
 
-   | ErrMDoInFunAppExpr !(Maybe ModuleName) !(LHsExpr GhcPs)
+   | PsErrMDoInFunAppExpr !(Maybe ModuleName) !(LHsExpr GhcPs)
       -- ^ Unexpected mdo block in function application
 
-   | ErrLambdaInFunAppExpr !(LHsExpr GhcPs)
+   | PsErrLambdaInFunAppExpr !(LHsExpr GhcPs)
       -- ^ Unexpected lambda expression in function application
 
-   | ErrCaseInFunAppExpr !(LHsExpr GhcPs)
+   | PsErrCaseInFunAppExpr !(LHsExpr GhcPs)
       -- ^ Unexpected case expression in function application
 
-   | ErrLambdaCaseInFunAppExpr !(LHsExpr GhcPs)
+   | PsErrLambdaCaseInFunAppExpr !(LHsExpr GhcPs)
       -- ^ Unexpected lambda-case expression in function application
 
-   | ErrLetInFunAppExpr !(LHsExpr GhcPs)
+   | PsErrLetInFunAppExpr !(LHsExpr GhcPs)
       -- ^ Unexpected let expression in function application
 
-   | ErrIfInFunAppExpr !(LHsExpr GhcPs)
+   | PsErrIfInFunAppExpr !(LHsExpr GhcPs)
       -- ^ Unexpected if expression in function application
 
-   | ErrProcInFunAppExpr !(LHsExpr GhcPs)
+   | PsErrProcInFunAppExpr !(LHsExpr GhcPs)
       -- ^ Unexpected proc expression in function application
 
-   | ErrMalformedTyOrClDecl !(LHsType GhcPs)
+   | PsErrMalformedTyOrClDecl !(LHsType GhcPs)
       -- ^ Malformed head of type or class declaration
 
-   | ErrIllegalWhereInDataDecl
+   | PsErrIllegalWhereInDataDecl
       -- ^ Illegal 'where' keyword in data declaration
 
-   | ErrIllegalDataTypeContext !(LHsContext GhcPs)
+   | PsErrIllegalDataTypeContext !(LHsContext GhcPs)
       -- ^ Illegal datatyp context
 
-   | ErrParseErrorOnInput !OccName
+   | PsErrParseErrorOnInput !OccName
       -- ^ Parse error on input
 
-   | ErrMalformedDecl !SDoc !RdrName
+   | PsErrMalformedDecl !SDoc !RdrName
       -- ^ Malformed ... declaration for ...
 
-   | ErrUnexpectedTypeAppInDecl !(LHsType GhcPs) !SDoc !RdrName
+   | PsErrUnexpectedTypeAppInDecl !(LHsType GhcPs) !SDoc !RdrName
       -- ^ Unexpected type application in a declaration
 
-   | ErrNotADataCon !RdrName
+   | PsErrNotADataCon !RdrName
       -- ^ Not a data constructor
 
-   | ErrRecordSyntaxInPatSynDecl !(LPat GhcPs)
+   | PsErrRecordSyntaxInPatSynDecl !(LPat GhcPs)
       -- ^ Record syntax used in pattern synonym declaration
 
-   | ErrEmptyWhereInPatSynDecl !RdrName
+   | PsErrEmptyWhereInPatSynDecl !RdrName
       -- ^ Empty 'where' clause in pattern-synonym declaration
 
-   | ErrInvalidWhereBindInPatSynDecl !RdrName !(HsDecl GhcPs)
+   | PsErrInvalidWhereBindInPatSynDecl !RdrName !(HsDecl GhcPs)
       -- ^ Invalid binding name in 'where' clause of pattern-synonym declaration
 
-   | ErrNoSingleWhereBindInPatSynDecl !RdrName !(HsDecl GhcPs)
+   | PsErrNoSingleWhereBindInPatSynDecl !RdrName !(HsDecl GhcPs)
       -- ^ Multiple bindings in 'where' clause of pattern-synonym declaration
 
-   | ErrDeclSpliceNotAtTopLevel !(SpliceDecl GhcPs)
+   | PsErrDeclSpliceNotAtTopLevel !(SpliceDecl GhcPs)
       -- ^ Declaration splice not a top-level
 
-   | ErrInferredTypeVarNotAllowed
+   | PsErrInferredTypeVarNotAllowed
       -- ^ Inferred type variables not allowed here
 
-   | ErrMultipleNamesInStandaloneKindSignature [LIdP GhcPs]
+   | PsErrMultipleNamesInStandaloneKindSignature [LIdP GhcPs]
       -- ^ Multiple names in standalone kind signatures
 
-   | ErrIllegalImportBundleForm
+   | PsErrIllegalImportBundleForm
       -- ^ Illegal import bundle form
 
-   | ErrIllegalRoleName !FastString [Role]
+   | PsErrIllegalRoleName !FastString [Role]
       -- ^ Illegal role name
 
-   | ErrInvalidTypeSignature !(LHsExpr GhcPs)
+   | PsErrInvalidTypeSignature !(LHsExpr GhcPs)
       -- ^ Invalid type signature
 
-   | ErrUnexpectedTypeInDecl !(LHsType GhcPs) !SDoc !RdrName [LHsTypeArg GhcPs] !SDoc
+   | PsErrUnexpectedTypeInDecl !(LHsType GhcPs) !SDoc !RdrName [LHsTypeArg GhcPs] !SDoc
       -- ^ Unexpected type in declaration
 
-   | ErrExpectedHyphen
+   | PsErrExpectedHyphen
       -- ^ Expected a hyphen
 
-   | ErrSpaceInSCC
+   | PsErrSpaceInSCC
       -- ^ Found a space in a SCC
 
-   | ErrEmptyDoubleQuotes !Bool-- Is TH on?
+   | PsErrEmptyDoubleQuotes !Bool-- Is TH on?
       -- ^ Found two single quotes
 
-   | ErrInvalidPackageName !FastString
+   | PsErrInvalidPackageName !FastString
       -- ^ Invalid package name
 
-   | ErrInvalidRuleActivationMarker
+   | PsErrInvalidRuleActivationMarker
       -- ^ Invalid rule activation marker
 
-   | ErrLinearFunction
+   | PsErrLinearFunction
       -- ^ Linear function found but LinearTypes not enabled
 
-   | ErrMultiWayIf
+   | PsErrMultiWayIf
       -- ^ Multi-way if-expression found but MultiWayIf not enabled
 
-   | ErrExplicitForall !Bool -- is Unicode forall?
+   | PsErrExplicitForall !Bool -- is Unicode forall?
       -- ^ Explicit forall found but no extension allowing it is enabled
 
-   | ErrIllegalQualifiedDo !SDoc
+   | PsErrIllegalQualifiedDo !SDoc
       -- ^ Found qualified-do without QualifiedDo enabled
 
-   | ErrCmmParser !CmmParserError
+   | PsErrCmmParser !CmmParserError
       -- ^ Cmm parser error
 
-   | ErrIllegalTraditionalRecordSyntax !SDoc
+   | PsErrIllegalTraditionalRecordSyntax !SDoc
       -- ^ Illegal traditional record syntax
       --
       -- TODO: distinguish errors without using SDoc
 
-   | ErrParseErrorInCmd !SDoc
+   | PsErrParseErrorInCmd !SDoc
       -- ^ Parse error in command
       --
       -- TODO: distinguish errors without using SDoc
 
-   | ErrParseErrorInPat !SDoc
+   | PsErrParseErrorInPat !SDoc
       -- ^ Parse error in pattern
       --
       -- TODO: distinguish errors without using SDoc
