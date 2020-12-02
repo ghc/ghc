@@ -2986,7 +2986,7 @@ bindOuterSigTKBndrs_Tv_M :: TcTyMode
                          -> TcM a -> TcM (HsOuterSigTyVarBndrs GhcTc, a)
 -- Do not push level; do not make implication constraint; use Tvs
 -- Two major clients of this "bind-only" path are:
---    Note [Kind-checking for GADTs] in TyCl
+--    Note [Using TyVarTvs for kind-checking GADTs] in GHC.Tc.TyCl
 --    Note [Checking partial type signatures]
 bindOuterSigTKBndrs_Tv_M mode
   = bindOuterTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = True
@@ -3299,8 +3299,8 @@ When we /must/ clone.
   When kind-checking T, we give (a :: kappa1). Then:
 
   - In kcConDecl we make a TyVarTv unification variable kappa2 for k2
-    (as described in Note [Kind-checking for GADTs], even though this
-    example is an existential)
+    (as described in Note [Using TyVarTvs for kind-checking GADTs],
+    even though this example is an existential)
   - So we get (b :: kappa2) via bindExplicitTKBndrs_Tv
   - We end up unifying kappa1 := kappa2, because of the (SameKind a b)
 

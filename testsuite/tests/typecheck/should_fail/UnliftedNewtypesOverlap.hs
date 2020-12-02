@@ -10,4 +10,4 @@ import GHC.Exts (TYPE)
 
 data family DF :: TYPE r
 data instance DF = MkDF4 | MkDF5
-newtype instance DF = MkDF6 Int
+-- newtype instance DF = MkDF6 Int
