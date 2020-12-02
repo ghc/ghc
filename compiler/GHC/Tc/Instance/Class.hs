@@ -30,7 +30,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.Names
 
-import GHC.Types.Name.Reader( lookupGRE_FieldLabel )
+import GHC.Types.Name.Reader( lookupGRE_FieldLabel, greMangledName )
 import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name, pprDefinedAt )
 import GHC.Types.Var.Env ( VarEnv )
@@ -672,6 +672,20 @@ may be solved by a user-supplied HasField instance.  Similarly, if we
 encounter a HasField constraint where the field is not a literal
 string, or does not belong to the type, then we fall back on the
 normal constraint solver behaviour.
+
+
+Note [Unused name reporting and HasField]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a HasField constraint is solved by the type-checker, we must record a use
+of the corresponding field name, as otherwise it might be reported as unused.
+See #19213.  We need to call keepAlive to add the name to the tcg_keep set,
+which accumulates names used by the constraint solver, as described by
+Note [Tracking unused binding and imports] in GHC.Tc.Types.
+
+We need to call addUsedGRE as well because there may be a deprecation warning on
+the field, which will be reported by addUsedGRE.  But calling addUsedGRE without
+keepAlive is not enough, because the field might be defined locally, and
+addUsedGRE extends tcg_used_gres with imported GREs only.
 -}
 
 -- See Note [HasField instances]
@@ -721,7 +735,9 @@ matchHasField dflags short_cut clas tys
                      -- cannot have an existentially quantified type), and
                      -- it must not be higher-rank.
                    ; if not (isNaughtyRecordSelector sel_id) && isTauTy sel_ty
-                     then do { addUsedGRE True gre
+                     then do { -- See Note [Unused name reporting and HasField]
+                               addUsedGRE True gre
+                             ; keepAlive (greMangledName gre)
                              ; return OneInst { cir_new_theta = theta
                                               , cir_mk_ev     = mk_ev
                                               , cir_what      = BuiltinInstance } }
