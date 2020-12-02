@@ -253,9 +253,9 @@ sure that any uses of it as a field are strict.
 -- | Used as a data type index for the hsSyn AST; also serves
 -- as a singleton type for Pass
 data GhcPass (c :: Pass) where
-  GhcPs :: GhcPs
-  GhcRn :: GhcRn
-  GhcTc :: GhcTc
+  GhcPs :: GhcPass 'Parsed
+  GhcRn :: GhcPass 'Renamed
+  GhcTc :: GhcPass 'Typechecked
 
 -- This really should never be entered, but the data-deriving machinery
 -- needs the instance to exist.
