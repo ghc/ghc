@@ -9,6 +9,5 @@ data Cmp a where
  deriving (Show, Eq)
 
 data family   CmpInterval (a :: Cmp k) (b :: Cmp k) :: Type
-data instance CmpInterval (V c)         Sup          = Starting c
+data instance CmpInterval (V (c :: Type)) Sup = Starting c
   deriving( Show )
-
