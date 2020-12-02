@@ -1,8 +1,7 @@
 
 T11145.hs:8:1: error:
-    • Data constructor ‘MkFuggle’ returns type ‘Fuggle
-                                                  Int (Maybe Bool)’
-        instead of an instance of its parent type ‘Fuggle
-                                                     Int (Maybe (a, b))’
-    • In the definition of data constructor ‘MkFuggle’
+    • Couldn't match type ‘Bool’ with ‘(a0, b0)’
+      Expected: Fuggle Int (Maybe (a0, b0))
+        Actual: Fuggle Int (Maybe Bool)
+    • In the result type of data constructor ‘MkFuggle’
       In the data instance declaration for ‘Fuggle’
