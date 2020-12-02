@@ -919,7 +919,7 @@ getLit _ = panic "invalid literal" -- TODO messy failure
 nameToMachOp :: FastString -> PD (Width -> MachOp)
 nameToMachOp name =
   case lookupUFM machOps name of
-        Nothing -> failMsgPD $ Error (ErrCmmParser (CmmUnknownPrimitive name)) []
+        Nothing -> failMsgPD $ PsError (PsErrCmmParser (CmmUnknownPrimitive name)) []
         Just m  -> return m
 
 exprOp :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse CmmExpr)
@@ -1081,12 +1081,12 @@ parseSafety :: String -> PD Safety
 parseSafety "safe"   = return PlaySafe
 parseSafety "unsafe" = return PlayRisky
 parseSafety "interruptible" = return PlayInterruptible
-parseSafety str      = failMsgPD $ Error (ErrCmmParser (CmmUnrecognisedSafety str)) []
+parseSafety str      = failMsgPD $ PsError (PsErrCmmParser (CmmUnrecognisedSafety str)) []
 
 parseCmmHint :: String -> PD ForeignHint
 parseCmmHint "ptr"    = return AddrHint
 parseCmmHint "signed" = return SignedHint
-parseCmmHint str      = failMsgPD $ Error (ErrCmmParser (CmmUnrecognisedHint str)) []
+parseCmmHint str      = failMsgPD $ PsError (PsErrCmmParser (CmmUnrecognisedHint str)) []
 
 -- labels are always pointers, so we might as well infer the hint
 inferCmmHint :: CmmExpr -> ForeignHint
@@ -1113,7 +1113,7 @@ happyError = PD $ \_ _ s -> unP srcParseFail s
 stmtMacro :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse ())
 stmtMacro fun args_code = do
   case lookupUFM stmtMacros fun of
-    Nothing -> failMsgPD $ Error (ErrCmmParser (CmmUnknownMacro fun)) []
+    Nothing -> failMsgPD $ PsError (PsErrCmmParser (CmmUnknownMacro fun)) []
     Just fcode -> return $ do
         args <- sequence args_code
         code (fcode args)
@@ -1216,7 +1216,7 @@ foreignCall conv_string results_code expr_code args_code safety ret
   = do  conv <- case conv_string of
           "C"       -> return CCallConv
           "stdcall" -> return StdCallConv
-          _         -> failMsgPD $ Error (ErrCmmParser (CmmUnknownCConv conv_string)) []
+          _         -> failMsgPD $ PsError (PsErrCmmParser (CmmUnknownCConv conv_string)) []
         return $ do
           platform <- getPlatform
           results <- sequence results_code
@@ -1294,7 +1294,7 @@ primCall results_code name args_code
   = do
     platform <- PD.getPlatform
     case lookupUFM (callishMachOps platform) name of
-        Nothing -> failMsgPD $ Error (ErrCmmParser (CmmUnknownPrimitive name)) []
+        Nothing -> failMsgPD $ PsError (PsErrCmmParser (CmmUnknownPrimitive name)) []
         Just f  -> return $ do
                 results <- sequence results_code
                 args <- sequence args_code
@@ -1448,7 +1448,7 @@ initEnv profile = listToUFM [
   ]
   where platform = profilePlatform profile
 
-parseCmmFile :: DynFlags -> HomeUnit -> FilePath -> IO (Bag Warning, Bag Error, Maybe CmmGroup)
+parseCmmFile :: DynFlags -> HomeUnit -> FilePath -> IO (Bag PsWarning, Bag PsError, Maybe CmmGroup)
 parseCmmFile dflags home_unit filename = do
   buf <- hGetStringBuffer filename
   let

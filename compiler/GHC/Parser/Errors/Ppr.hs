@@ -44,9 +44,9 @@ mkParserWarn flag span doc = ErrMsg
    , errMsgReason      = Reason flag
    }
 
-pprWarning :: Warning -> ErrMsg
+pprWarning :: PsWarning -> ErrMsg
 pprWarning = \case
-   WarnTab loc tc
+   PsWarnTab loc tc
       -> mkParserWarn Opt_WarnTabs loc $
           text "Tab character found here"
             <> (if tc == 1
@@ -55,7 +55,7 @@ pprWarning = \case
             <> text "."
             $+$ text "Please use spaces instead."
 
-   WarnTransitionalLayout loc reason
+   PsWarnTransitionalLayout loc reason
       -> mkParserWarn Opt_WarnAlternativeLayoutRuleTransitional loc $
             text "transitional layout will not be accepted in the future:"
             $$ text (case reason of
@@ -63,20 +63,20 @@ pprWarning = \case
                TransLayout_Pipe  -> "`|' at the same depth as implicit layout block"
             )
 
-   WarnUnrecognisedPragma loc
+   PsWarnUnrecognisedPragma loc
       -> mkParserWarn Opt_WarnUnrecognisedPragmas loc $
             text "Unrecognised pragma"
 
-   WarnHaddockInvalidPos loc
+   PsWarnHaddockInvalidPos loc
       -> mkParserWarn Opt_WarnInvalidHaddock loc $
             text "A Haddock comment cannot appear in this position and will be ignored."
 
-   WarnHaddockIgnoreMulti loc
+   PsWarnHaddockIgnoreMulti loc
       -> mkParserWarn Opt_WarnInvalidHaddock loc $
             text "Multiple Haddock comments for a single entity are not allowed." $$
             text "The extraneous comment will be ignored."
 
-   WarnStarBinder loc
+   PsWarnStarBinder loc
       -> mkParserWarn Opt_WarnStarBinder loc $
             text "Found binding occurrence of" <+> quotes (text "*")
             <+> text "yet StarIsType is enabled."
@@ -84,7 +84,7 @@ pprWarning = \case
             <+> text "modules with StarIsType,"
          $$ text "    including the definition module, you must qualify it."
 
-   WarnStarIsType loc
+   PsWarnStarIsType loc
       -> mkParserWarn Opt_WarnStarIsType loc $
              text "Using" <+> quotes (text "*")
              <+> text "(or its Unicode variant) to mean"
@@ -94,7 +94,7 @@ pprWarning = \case
           $$ text "Suggested fix: use" <+> quotes (text "Type")
            <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
 
-   WarnImportPreQualified loc
+   PsWarnImportPreQualified loc
       -> mkParserWarn Opt_WarnPrepositiveQualifiedModule loc $
             text "Found" <+> quotes (text "qualified")
              <+> text "in prepositive position"
@@ -102,7 +102,7 @@ pprWarning = \case
              <+> text "after the module name instead."
          $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
 
-   WarnOperatorWhitespaceExtConflict loc sym
+   PsWarnOperatorWhitespaceExtConflict loc sym
       -> mkParserWarn Opt_WarnOperatorWhitespaceExtConflict loc $
          let mk_prefix_msg operator_symbol extension_name syntax_meaning =
                   text "The prefix use of a" <+> quotes (text operator_symbol)
@@ -117,7 +117,7 @@ pprWarning = \case
            OperatorWhitespaceSymbol_PrefixDollarDollar -> mk_prefix_msg "$$" "TemplateHaskell" "a typed splice"
 
 
-   WarnOperatorWhitespace loc sym occ_type
+   PsWarnOperatorWhitespace loc sym occ_type
       -> mkParserWarn Opt_WarnOperatorWhitespace loc $
          let mk_msg occ_type_str =
                   text "The" <+> text occ_type_str <+> text "use of a" <+> quotes (ftext sym)
@@ -130,27 +130,27 @@ pprWarning = \case
            OperatorWhitespaceOccurrence_Suffix -> mk_msg "suffix"
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
-pprError :: Error -> ErrMsg
+pprError :: PsError -> ErrMsg
 pprError err = mkParserErr (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))
 
-pp_err :: ErrorDesc -> SDoc
+pp_err :: PsErrorDesc -> SDoc
 pp_err = \case
-   ErrLambdaCase
+   PsErrLambdaCase
       -> text "Illegal lambda-case (use LambdaCase)"
 
-   ErrNumUnderscores reason
+   PsErrNumUnderscores reason
       -> text $ case reason of
             NumUnderscore_Integral -> "Use NumericUnderscores to allow underscores in integer literals"
             NumUnderscore_Float    -> "Use NumericUnderscores to allow underscores in floating literals"
 
-   ErrPrimStringInvalidChar
+   PsErrPrimStringInvalidChar
       -> text "primitive string literal must contain only characters <= \'\\xFF\'"
 
-   ErrMissingBlock
+   PsErrMissingBlock
       -> text "Missing block"
 
-   ErrLexer err kind
+   PsErrLexer err kind
       -> hcat
          [ text $ case err of
             LexError               -> "lexical error"
@@ -170,53 +170,53 @@ pp_err = \case
             LexErrKind_Char c -> " at character " ++ show c
          ]
 
-   ErrSuffixAT
+   PsErrSuffixAT
       -> text "Suffix occurrence of @. For an as-pattern, remove the leading whitespace."
 
-   ErrParse token
+   PsErrParse token
       | null token
       -> text "parse error (possibly incorrect indentation or mismatched brackets)"
 
       | otherwise
       -> text "parse error on input" <+> quotes (text token)
 
-   ErrCmmLexer
+   PsErrCmmLexer
       -> text "Cmm lexical error"
 
-   ErrUnsupportedBoxedSumExpr s
+   PsErrUnsupportedBoxedSumExpr s
       -> hang (text "Boxed sums not supported:") 2
               (pprSumOrTuple Boxed s)
 
-   ErrUnsupportedBoxedSumPat s
+   PsErrUnsupportedBoxedSumPat s
       -> hang (text "Boxed sums not supported:") 2
               (pprSumOrTuple Boxed s)
 
-   ErrUnexpectedQualifiedConstructor v
+   PsErrUnexpectedQualifiedConstructor v
       -> hang (text "Expected an unqualified type constructor:") 2
               (ppr v)
 
-   ErrTupleSectionInPat
+   PsErrTupleSectionInPat
       -> text "Tuple section in pattern context"
 
-   ErrIllegalBangPattern e
+   PsErrIllegalBangPattern e
       -> text "Illegal bang-pattern (use BangPatterns):" $$ ppr e
 
-   ErrOpFewArgs (StarIsType star_is_type) op
+   PsErrOpFewArgs (StarIsType star_is_type) op
       -> text "Operator applied to too few arguments:" <+> ppr op
          $$ starInfo star_is_type op
 
-   ErrImportQualifiedTwice
+   PsErrImportQualifiedTwice
       -> text "Multiple occurrences of 'qualified'"
 
-   ErrImportPostQualified
+   PsErrImportPostQualified
       -> text "Found" <+> quotes (text "qualified")
           <+> text "in postpositive position. "
          $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
 
-   ErrIllegalExplicitNamespace
+   PsErrIllegalExplicitNamespace
       -> text "Illegal keyword 'type' (use ExplicitNamespaces to enable)"
 
-   ErrVarForTyCon name
+   PsErrVarForTyCon name
       -> text "Expecting a type constructor but found a variable,"
            <+> quotes (ppr name) <> text "."
          $$ if isSymOcc $ rdrNameOcc name
@@ -224,114 +224,114 @@ pp_err = \case
                   <+> text "then enable ExplicitNamespaces and use the 'type' keyword."
             else empty
 
-   ErrIllegalPatSynExport
+   PsErrIllegalPatSynExport
       -> text "Illegal export form (use PatternSynonyms to enable)"
 
-   ErrMalformedEntityString
+   PsErrMalformedEntityString
       -> text "Malformed entity string"
 
-   ErrDotsInRecordUpdate
+   PsErrDotsInRecordUpdate
       -> text "You cannot use `..' in a record update"
 
-   ErrPrecedenceOutOfRange i
+   PsErrPrecedenceOutOfRange i
       -> text "Precedence out of range: " <> int i
 
-   ErrInvalidDataCon t
+   PsErrInvalidDataCon t
       -> hang (text "Cannot parse data constructor in a data/newtype declaration:") 2
               (ppr t)
 
-   ErrInvalidInfixDataCon lhs tc rhs
+   PsErrInvalidInfixDataCon lhs tc rhs
       -> hang (text "Cannot parse an infix data constructor in a data/newtype declaration:")
             2 (ppr lhs <+> ppr tc <+> ppr rhs)
 
-   ErrUnpackDataCon
+   PsErrUnpackDataCon
       -> text "{-# UNPACK #-} cannot be applied to a data constructor."
 
-   ErrUnexpectedKindAppInDataCon lhs ki
+   PsErrUnexpectedKindAppInDataCon lhs ki
       -> hang (text "Unexpected kind application in a data/newtype declaration:") 2
               (ppr lhs <+> text "@" <> ppr ki)
 
-   ErrInvalidRecordCon p
+   PsErrInvalidRecordCon p
       -> text "Not a record constructor:" <+> ppr p
 
-   ErrIllegalUnboxedStringInPat lit
+   PsErrIllegalUnboxedStringInPat lit
       -> text "Illegal unboxed string literal in pattern:" $$ ppr lit
 
-   ErrDoNotationInPat
+   PsErrDoNotationInPat
       -> text "do-notation in pattern"
 
-   ErrIfTheElseInPat
+   PsErrIfTheElseInPat
       -> text "(if ... then ... else ...)-syntax in pattern"
 
-   ErrLambdaCaseInPat
+   PsErrLambdaCaseInPat
       -> text "(\\case ...)-syntax in pattern"
 
-   ErrCaseInPat
+   PsErrCaseInPat
       -> text "(case ... of ...)-syntax in pattern"
 
-   ErrLetInPat
+   PsErrLetInPat
       -> text "(let ... in ...)-syntax in pattern"
 
-   ErrLambdaInPat
+   PsErrLambdaInPat
       -> text "Lambda-syntax in pattern."
          $$ text "Pattern matching on functions is not possible."
 
-   ErrArrowExprInPat e
+   PsErrArrowExprInPat e
       -> text "Expression syntax in pattern:" <+> ppr e
 
-   ErrArrowCmdInPat c
+   PsErrArrowCmdInPat c
       -> text "Command syntax in pattern:" <+> ppr c
 
-   ErrArrowCmdInExpr c
+   PsErrArrowCmdInExpr c
       -> vcat
          [ text "Arrow command found where an expression was expected:"
          , nest 2 (ppr c)
          ]
 
-   ErrViewPatInExpr a b
+   PsErrViewPatInExpr a b
       -> sep [ text "View pattern in expression context:"
              , nest 4 (ppr a <+> text "->" <+> ppr b)
              ]
 
-   ErrTypeAppWithoutSpace v e
+   PsErrTypeAppWithoutSpace v e
       -> sep [ text "@-pattern in expression context:"
              , nest 4 (pprPrefixOcc v <> text "@" <> ppr e)
              ]
          $$ text "Type application syntax requires a space before '@'"
 
 
-   ErrLazyPatWithoutSpace e
+   PsErrLazyPatWithoutSpace e
       -> sep [ text "Lazy pattern in expression context:"
              , nest 4 (text "~" <> ppr e)
              ]
          $$ text "Did you mean to add a space after the '~'?"
 
-   ErrBangPatWithoutSpace e
+   PsErrBangPatWithoutSpace e
       -> sep [ text "Bang pattern in expression context:"
              , nest 4 (text "!" <> ppr e)
              ]
          $$ text "Did you mean to add a space after the '!'?"
 
-   ErrUnallowedPragma prag
+   PsErrUnallowedPragma prag
       -> hang (text "A pragma is not allowed in this position:") 2
               (ppr prag)
 
-   ErrQualifiedDoInCmd m
+   PsErrQualifiedDoInCmd m
       -> hang (text "Parse error in command:") 2 $
             text "Found a qualified" <+> ppr m <> text ".do block in a command, but"
             $$ text "qualified 'do' is not supported in commands."
 
-   ErrParseErrorInCmd s
+   PsErrParseErrorInCmd s
       -> hang (text "Parse error in command:") 2 s
 
-   ErrParseErrorInPat s
+   PsErrParseErrorInPat s
       -> text "Parse error in pattern:" <+> s
 
 
-   ErrInvalidInfixHole
+   PsErrInvalidInfixHole
       -> text "Invalid infix hole, expected an infix operator"
 
-   ErrSemiColonsInCondExpr c st t se e
+   PsErrSemiColonsInCondExpr c st t se e
       -> text "Unexpected semi-colons in conditional:"
          $$ nest 4 expr
          $$ text "Perhaps you meant to use DoAndIfThenElse?"
@@ -342,7 +342,7 @@ pp_err = \case
                    text "then" <+> ppr t <> pprOptSemi se <+>
                    text "else" <+> ppr e
 
-   ErrSemiColonsInCondCmd c st t se e
+   PsErrSemiColonsInCondCmd c st t se e
       -> text "Unexpected semi-colons in conditional:"
          $$ nest 4 expr
          $$ text "Perhaps you meant to use DoAndIfThenElse?"
@@ -354,78 +354,78 @@ pp_err = \case
                    text "else" <+> ppr e
 
 
-   ErrAtInPatPos
+   PsErrAtInPatPos
       -> text "Found a binding for the"
          <+> quotes (text "@")
          <+> text "operator in a pattern position."
          $$ perhaps_as_pat
 
-   ErrLambdaCmdInFunAppCmd a
+   PsErrLambdaCmdInFunAppCmd a
       -> pp_unexpected_fun_app (text "lambda command") a
 
-   ErrCaseCmdInFunAppCmd a
+   PsErrCaseCmdInFunAppCmd a
       -> pp_unexpected_fun_app (text "case command") a
 
-   ErrIfCmdInFunAppCmd a
+   PsErrIfCmdInFunAppCmd a
       -> pp_unexpected_fun_app (text "if command") a
 
-   ErrLetCmdInFunAppCmd a
+   PsErrLetCmdInFunAppCmd a
       -> pp_unexpected_fun_app (text "let command") a
 
-   ErrDoCmdInFunAppCmd a
+   PsErrDoCmdInFunAppCmd a
       -> pp_unexpected_fun_app (text "do command") a
 
-   ErrDoInFunAppExpr m a
+   PsErrDoInFunAppExpr m a
       -> pp_unexpected_fun_app (prependQualified m (text "do block")) a
 
-   ErrMDoInFunAppExpr m a
+   PsErrMDoInFunAppExpr m a
       -> pp_unexpected_fun_app (prependQualified m (text "mdo block")) a
 
-   ErrLambdaInFunAppExpr a
+   PsErrLambdaInFunAppExpr a
       -> pp_unexpected_fun_app (text "lambda expression") a
 
-   ErrCaseInFunAppExpr a
+   PsErrCaseInFunAppExpr a
       -> pp_unexpected_fun_app (text "case expression") a
 
-   ErrLambdaCaseInFunAppExpr a
+   PsErrLambdaCaseInFunAppExpr a
       -> pp_unexpected_fun_app (text "lambda-case expression") a
 
-   ErrLetInFunAppExpr a
+   PsErrLetInFunAppExpr a
       -> pp_unexpected_fun_app (text "let expression") a
 
-   ErrIfInFunAppExpr a
+   PsErrIfInFunAppExpr a
       -> pp_unexpected_fun_app (text "if expression") a
 
-   ErrProcInFunAppExpr a
+   PsErrProcInFunAppExpr a
       -> pp_unexpected_fun_app (text "proc expression") a
 
-   ErrMalformedTyOrClDecl ty
+   PsErrMalformedTyOrClDecl ty
       -> text "Malformed head of type or class declaration:"
          <+> ppr ty
 
-   ErrIllegalWhereInDataDecl
+   PsErrIllegalWhereInDataDecl
       -> vcat
             [ text "Illegal keyword 'where' in data declaration"
             , text "Perhaps you intended to use GADTs or a similar language"
             , text "extension to enable syntax: data T where"
             ]
 
-   ErrIllegalTraditionalRecordSyntax s
+   PsErrIllegalTraditionalRecordSyntax s
       -> text "Illegal record syntax (use TraditionalRecordSyntax):"
          <+> s
 
-   ErrParseErrorOnInput occ
+   PsErrParseErrorOnInput occ
       -> text "parse error on input" <+> ftext (occNameFS occ)
 
-   ErrIllegalDataTypeContext c
+   PsErrIllegalDataTypeContext c
       -> text "Illegal datatype context (use DatatypeContexts):"
          <+> pprLHsContext c
 
-   ErrMalformedDecl what for
+   PsErrMalformedDecl what for
       -> text "Malformed" <+> what
          <+> text "declaration for" <+> quotes (ppr for)
 
-   ErrUnexpectedTypeAppInDecl ki what for
+   PsErrUnexpectedTypeAppInDecl ki what for
       -> vcat [ text "Unexpected type application"
                 <+> text "@" <> ppr ki
               , text "In the" <+> what
@@ -433,35 +433,35 @@ pp_err = \case
                 <+> quotes (ppr for)
               ]
 
-   ErrNotADataCon name
+   PsErrNotADataCon name
       -> text "Not a data constructor:" <+> quotes (ppr name)
 
-   ErrRecordSyntaxInPatSynDecl pat
+   PsErrRecordSyntaxInPatSynDecl pat
       -> text "record syntax not supported for pattern synonym declarations:"
          $$ ppr pat
 
-   ErrEmptyWhereInPatSynDecl patsyn_name
+   PsErrEmptyWhereInPatSynDecl patsyn_name
       -> text "pattern synonym 'where' clause cannot be empty"
          $$ text "In the pattern synonym declaration for: "
             <+> ppr (patsyn_name)
 
-   ErrInvalidWhereBindInPatSynDecl patsyn_name decl
+   PsErrInvalidWhereBindInPatSynDecl patsyn_name decl
       -> text "pattern synonym 'where' clause must bind the pattern synonym's name"
          <+> quotes (ppr patsyn_name) $$ ppr decl
 
-   ErrNoSingleWhereBindInPatSynDecl _patsyn_name decl
+   PsErrNoSingleWhereBindInPatSynDecl _patsyn_name decl
       -> text "pattern synonym 'where' clause must contain a single binding:"
          $$ ppr decl
 
-   ErrDeclSpliceNotAtTopLevel d
+   PsErrDeclSpliceNotAtTopLevel d
       -> hang (text "Declaration splices are allowed only"
                <+> text "at the top level:")
            2 (ppr d)
 
-   ErrInferredTypeVarNotAllowed
+   PsErrInferredTypeVarNotAllowed
       -> text "Inferred type variables are not allowed here"
 
-   ErrIllegalRoleName role nearby
+   PsErrIllegalRoleName role nearby
       -> text "Illegal role name" <+> quotes (ppr role)
          $$ case nearby of
              []  -> empty
@@ -470,17 +470,17 @@ pp_err = \case
              _   -> hang (text "Perhaps you meant one of these:")
                          2 (pprWithCommas (quotes . ppr) nearby)
 
-   ErrMultipleNamesInStandaloneKindSignature vs
+   PsErrMultipleNamesInStandaloneKindSignature vs
       -> vcat [ hang (text "Standalone kind signatures do not support multiple names at the moment:")
                 2 (pprWithCommas ppr vs)
               , text "See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details."
               ]
 
-   ErrIllegalImportBundleForm
+   PsErrIllegalImportBundleForm
       -> text "Illegal import form, this syntax can only be used to bundle"
          $+$ text "pattern synonyms with types in module exports."
 
-   ErrInvalidTypeSignature lhs
+   PsErrInvalidTypeSignature lhs
       -> text "Invalid type signature:"
          <+> ppr lhs
          <+> text ":: ..."
@@ -507,7 +507,7 @@ pp_err = \case
          default_RDR = mkUnqual varName (fsLit "default")
          pattern_RDR = mkUnqual varName (fsLit "pattern")
 
-   ErrUnexpectedTypeInDecl t what tc tparms equals_or_where
+   PsErrUnexpectedTypeInDecl t what tc tparms equals_or_where
       -> vcat [ text "Unexpected type" <+> quotes (ppr t)
               , text "In the" <+> what
                 <+> ptext (sLit "declaration for") <+> quotes tc'
@@ -524,20 +524,20 @@ pp_err = \case
             -- wrote). See #14907
             tc' = ppr $ filterCTuple tc
 
-   ErrCmmParser cmm_err -> case cmm_err of
+   PsErrCmmParser cmm_err -> case cmm_err of
       CmmUnknownPrimitive name     -> text "unknown primitive" <+> ftext name
       CmmUnknownMacro fun          -> text "unknown macro" <+> ftext fun
       CmmUnknownCConv cconv        -> text "unknown calling convention:" <+> text cconv
       CmmUnrecognisedSafety safety -> text "unrecognised safety" <+> text safety
       CmmUnrecognisedHint hint     -> text "unrecognised hint:" <+> text hint
 
-   ErrExpectedHyphen
+   PsErrExpectedHyphen
       -> text "Expected a hyphen"
 
-   ErrSpaceInSCC
+   PsErrSpaceInSCC
       -> text "Spaces are not allowed in SCCs"
 
-   ErrEmptyDoubleQuotes th_on
+   PsErrEmptyDoubleQuotes th_on
       -> if th_on then vcat (msg ++ th_msg) else vcat msg
          where
             msg    = [ text "Parser error on `''`"
@@ -547,23 +547,23 @@ pp_err = \case
                      , text "but the type variable or constructor is missing"
                      ]
 
-   ErrInvalidPackageName pkg
+   PsErrInvalidPackageName pkg
       -> vcat
             [ text "Parse error" <> colon <+> quotes (ftext pkg)
             , text "Version number or non-alphanumeric" <+>
               text "character in package name"
             ]
 
-   ErrInvalidRuleActivationMarker
+   PsErrInvalidRuleActivationMarker
       -> text "Invalid rule activation marker"
 
-   ErrLinearFunction
+   PsErrLinearFunction
       -> text "Enable LinearTypes to allow linear functions"
 
-   ErrMultiWayIf
+   PsErrMultiWayIf
       -> text "Multi-way if-expressions need MultiWayIf turned on"
 
-   ErrExplicitForall is_unicode
+   PsErrExplicitForall is_unicode
       -> vcat
          [ text "Illegal symbol" <+> quotes (forallSym is_unicode) <+> text "in type"
          , text "Perhaps you intended to use RankNTypes or a similar language"
@@ -574,7 +574,7 @@ pp_err = \case
           forallSym True  = text "∀"
           forallSym False = text "forall"
 
-   ErrIllegalQualifiedDo qdoDoc
+   PsErrIllegalQualifiedDo qdoDoc
       -> vcat
          [ text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
          , text "Perhaps you intended to use QualifiedDo"

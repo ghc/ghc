@@ -788,7 +788,7 @@ HYPHEN :: { [AddAnn] }
       | PREFIX_MINUS { [mj AnnMinus $1 ] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "-")
                    then return [mj AnnMinus $1]
-                   else do { addError $ Error ErrExpectedHyphen [] (getLoc $1)
+                   else do { addError $ PsError PsErrExpectedHyphen [] (getLoc $1)
                            ; return [] } }
 
 
@@ -1087,7 +1087,7 @@ maybe_safe :: { ([AddAnn],Bool) }
 maybe_pkg :: { ([AddAnn],Maybe StringLiteral) }
         : STRING  {% do { let { pkgFS = getSTRING $1 }
                         ; unless (looksLikePackageName (unpackFS pkgFS)) $
-                             addError $ Error (ErrInvalidPackageName pkgFS) [] (getLoc $1)
+                             addError $ PsError (PsErrInvalidPackageName pkgFS) [] (getLoc $1)
                         ; return ([mj AnnPackageName $1], Just (StringLiteral (getSTRINGs $1) pkgFS)) } }
         | {- empty -}                           { ([],Nothing) }
 
@@ -1788,7 +1788,7 @@ rule_activation_marker :: { [AddAnn] }
       : PREFIX_TILDE { [mj AnnTilde $1] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "~")
                    then return [mj AnnTilde $1]
-                   else do { addError $ Error ErrInvalidRuleActivationMarker [] (getLoc $1)
+                   else do { addError $ PsError PsErrInvalidRuleActivationMarker [] (getLoc $1)
                            ; return [] } }
 
 rule_explicit_activation :: { ([AddAnn]
@@ -3847,7 +3847,7 @@ getSCC :: Located Token -> P FastString
 getSCC lt = do let s = getSTRING lt
                -- We probably actually want to be more restrictive than this
                if ' ' `elem` unpackFS s
-                   then addFatalError $ Error ErrSpaceInSCC [] (getLoc lt)
+                   then addFatalError $ PsError PsErrSpaceInSCC [] (getLoc lt)
                    else return s
 
 -- Utilities for combining source spans
@@ -3937,7 +3937,7 @@ fileSrcSpan = do
 hintLinear :: MonadP m => SrcSpan -> m ()
 hintLinear span = do
   linearEnabled <- getBit LinearTypesBit
-  unless linearEnabled $ addError $ Error ErrLinearFunction [] span
+  unless linearEnabled $ addError $ PsError PsErrLinearFunction [] span
 
 -- Does this look like (a %m)?
 looksLikeMult :: LHsType GhcPs -> Located RdrName -> LHsType GhcPs -> Bool
@@ -3956,14 +3956,14 @@ looksLikeMult ty1 l_op ty2
 hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
   mwiEnabled <- getBit MultiWayIfBit
-  unless mwiEnabled $ addError $ Error ErrMultiWayIf [] span
+  unless mwiEnabled $ addError $ PsError PsErrMultiWayIf [] span
 
 -- Hint about explicit-forall
 hintExplicitForall :: Located Token -> P ()
 hintExplicitForall tok = do
     forall   <- getBit ExplicitForallBit
     rulePrag <- getBit InRulePragBit
-    unless (forall || rulePrag) $ addError $ Error (ErrExplicitForall (isUnicode tok)) [] (getLoc tok)
+    unless (forall || rulePrag) $ addError $ PsError (PsErrExplicitForall (isUnicode tok)) [] (getLoc tok)
 
 -- Hint about qualified-do
 hintQualifiedDo :: Located Token -> P ()
@@ -3971,7 +3971,7 @@ hintQualifiedDo tok = do
     qualifiedDo   <- getBit QualifiedDoBit
     case maybeQDoDoc of
       Just qdoDoc | not qualifiedDo ->
-        addError $ Error (ErrIllegalQualifiedDo qdoDoc) [] (getLoc tok)
+        addError $ PsError (PsErrIllegalQualifiedDo qdoDoc) [] (getLoc tok)
       _ -> return ()
   where
     maybeQDoDoc = case unLoc tok of
@@ -3985,7 +3985,7 @@ hintQualifiedDo tok = do
 reportEmptyDoubleQuotes :: SrcSpan -> P a
 reportEmptyDoubleQuotes span = do
     thQuotes <- getBit ThQuotesBit
-    addFatalError $ Error (ErrEmptyDoubleQuotes thQuotes) [] span
+    addFatalError $ PsError (PsErrEmptyDoubleQuotes thQuotes) [] span
 
 {-
 %************************************************************************

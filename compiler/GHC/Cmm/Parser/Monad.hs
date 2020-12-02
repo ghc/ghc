@@ -47,7 +47,7 @@ instance Monad PD where
 liftP :: P a -> PD a
 liftP (P f) = PD $ \_ _ s -> f s
 
-failMsgPD :: (SrcSpan -> Error) -> PD a
+failMsgPD :: (SrcSpan -> PsError) -> PD a
 failMsgPD = liftP . failMsgP
 
 returnPD :: a -> PD a

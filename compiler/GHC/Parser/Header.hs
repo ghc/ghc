@@ -73,7 +73,7 @@ getImports :: ParserOpts   -- ^ Parser options
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
            -> IO (Either
-               (Bag Error)
+               (Bag PsError)
                ([(Maybe FastString, Located ModuleName)],
                 [(Maybe FastString, Located ModuleName)],
                 Located ModuleName))

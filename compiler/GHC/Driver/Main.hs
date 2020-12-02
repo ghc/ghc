@@ -285,7 +285,7 @@ handleWarnings = do
 
 -- | log warning in the monad, and if there are errors then
 -- throw a SourceError exception.
-logWarningsReportErrors :: (Bag Warning, Bag Error) -> Hsc ()
+logWarningsReportErrors :: (Bag PsWarning, Bag PsError) -> Hsc ()
 logWarningsReportErrors (warnings,errors) = do
     let warns = fmap pprWarning warnings
         errs  = fmap pprError   errors
@@ -294,7 +294,7 @@ logWarningsReportErrors (warnings,errors) = do
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
-handleWarningsThrowErrors :: (Bag Warning, Bag Error) -> Hsc a
+handleWarningsThrowErrors :: (Bag PsWarning, Bag PsError) -> Hsc a
 handleWarningsThrowErrors (warnings, errors) = do
     let warns = fmap pprWarning warnings
         errs  = fmap pprError   errors

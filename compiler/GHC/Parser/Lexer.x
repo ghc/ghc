@@ -353,7 +353,7 @@ $tab          { warnTab }
 }
 
 <0,option_prags> {
-  "{-#"  { warnThen Opt_WarnUnrecognisedPragmas WarnUnrecognisedPragma
+  "{-#"  { warnThen Opt_WarnUnrecognisedPragmas PsWarnUnrecognisedPragma
                     (nested_comment lexToken) }
 }
 
@@ -1103,7 +1103,7 @@ hopefully_open_brace span buf len
                  Layout prev_off _ : _ -> prev_off < offset
                  _                     -> True
       if isOK then pop_and open_brace span buf len
-              else addFatalError $ Error ErrMissingBlock [] (mkSrcSpanPs span)
+              else addFatalError $ PsError PsErrMissingBlock [] (mkSrcSpanPs span)
 
 pop_and :: Action -> Action
 pop_and act span buf len = do _ <- popLexState
@@ -1482,7 +1482,7 @@ docCommentEnd input commentAcc docType buf span = do
   commentEnd lexToken input commentAcc finalizeComment buf span
 
 errBrace :: AlexInput -> RealSrcSpan -> P a
-errBrace (AI end _) span = failLocMsgP (realSrcSpanStart span) (psRealLoc end) (Error (ErrLexer LexUnterminatedComment LexErrKind_EOF) [])
+errBrace (AI end _) span = failLocMsgP (realSrcSpanStart span) (psRealLoc end) (PsError (PsErrLexer LexUnterminatedComment LexErrKind_EOF) [])
 
 open_brace, close_brace :: Action
 open_brace span _str _len = do
@@ -1541,7 +1541,7 @@ varid span buf len =
           lambdaCase <- getBit LambdaCaseBit
           unless lambdaCase $ do
             pState <- getPState
-            addError $ Error ErrLambdaCase [] (mkSrcSpanPs (last_loc pState))
+            addError $ PsError PsErrLambdaCase [] (mkSrcSpanPs (last_loc pState))
           return ITlcase
         _ -> return ITcase
       maybe_layout keyword
@@ -1574,7 +1574,7 @@ varsym_prefix :: Action
 varsym_prefix = sym $ \span exts s ->
   let warnExtConflict errtok =
         do { addWarning Opt_WarnOperatorWhitespaceExtConflict $
-               WarnOperatorWhitespaceExtConflict (mkSrcSpanPs span) errtok
+               PsWarnOperatorWhitespaceExtConflict (mkSrcSpanPs span) errtok
            ; return (ITvarsym s) }
   in
   if | s == fsLit "@" ->
@@ -1598,17 +1598,17 @@ varsym_prefix = sym $ \span exts s ->
      | s == fsLit "~" -> return ITtilde
      | otherwise ->
          do { addWarning Opt_WarnOperatorWhitespace $
-                WarnOperatorWhitespace (mkSrcSpanPs span) s
+                PsWarnOperatorWhitespace (mkSrcSpanPs span) s
                   OperatorWhitespaceOccurrence_Prefix
             ; return (ITvarsym s) }
 
 -- See Note [Whitespace-sensitive operator parsing]
 varsym_suffix :: Action
 varsym_suffix = sym $ \span _ s ->
-  if | s == fsLit "@" -> failMsgP (Error ErrSuffixAT [])
+  if | s == fsLit "@" -> failMsgP (PsError PsErrSuffixAT [])
      | otherwise ->
          do { addWarning Opt_WarnOperatorWhitespace $
-                WarnOperatorWhitespace (mkSrcSpanPs span) s
+                PsWarnOperatorWhitespace (mkSrcSpanPs span) s
                   OperatorWhitespaceOccurrence_Suffix
             ; return (ITvarsym s) }
 
@@ -1618,7 +1618,7 @@ varsym_tight_infix = sym $ \span _ s ->
   if | s == fsLit "@" -> return ITat
      | otherwise ->
          do { addWarning Opt_WarnOperatorWhitespace $
-                WarnOperatorWhitespace (mkSrcSpanPs span) s
+                PsWarnOperatorWhitespace (mkSrcSpanPs span) s
                   OperatorWhitespaceOccurrence_TightInfix
             ;  return (ITvarsym s) }
 
@@ -1666,7 +1666,7 @@ tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
   let src = lexemeToString buf len
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
-    addError $ Error (ErrNumUnderscores NumUnderscore_Integral) [] (mkSrcSpanPs (last_loc pState))
+    addError $ PsError (PsErrNumUnderscores NumUnderscore_Integral) [] (mkSrcSpanPs (last_loc pState))
   return $ L span $ itint (SourceText src)
        $! transint $ parseUnsignedInteger
        (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
@@ -1707,7 +1707,7 @@ tok_frac drop f span buf len = do
   let src = lexemeToString buf (len-drop)
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
-    addError $ Error (ErrNumUnderscores NumUnderscore_Float) [] (mkSrcSpanPs (last_loc pState))
+    addError $ PsError (PsErrNumUnderscores NumUnderscore_Float) [] (mkSrcSpanPs (last_loc pState))
   return (L span $! (f $! src))
 
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
@@ -1877,7 +1877,7 @@ lex_string_prag mkTok span _buf _len
               = case alexGetChar i of
                   Just (c,i') | c == x    -> isString i' xs
                   _other -> False
-          err (AI end _) = failLocMsgP (realSrcSpanStart (psRealSpan span)) (psRealLoc end) (Error (ErrLexer LexUnterminatedOptions LexErrKind_EOF) [])
+          err (AI end _) = failLocMsgP (realSrcSpanStart (psRealSpan span)) (psRealLoc end) (PsError (PsErrLexer LexUnterminatedOptions LexErrKind_EOF) [])
 
 
 -- -----------------------------------------------------------------------------
@@ -1915,7 +1915,7 @@ lex_string s = do
                 setInput i
                 when (any (> '\xFF') s') $ do
                   pState <- getPState
-                  let err = Error ErrPrimStringInvalidChar [] (mkSrcSpanPs (last_loc pState))
+                  let err = PsError PsErrPrimStringInvalidChar [] (mkSrcSpanPs (last_loc pState))
                   addError err
                 return (ITprimstring (SourceText s') (unsafeMkByteString s'))
               _other ->
@@ -2178,7 +2178,7 @@ quasiquote_error :: RealSrcLoc -> P a
 quasiquote_error start = do
   (AI end buf) <- getInput
   reportLexError start (psRealLoc end) buf
-    (\k -> Error (ErrLexer LexUnterminatedQQ k) [])
+    (\k -> PsError (PsErrLexer LexUnterminatedQQ k) [])
 
 -- -----------------------------------------------------------------------------
 -- Warnings
@@ -2188,7 +2188,7 @@ warnTab srcspan _buf _len = do
     addTabWarning (psRealSpan srcspan)
     lexToken
 
-warnThen :: WarningFlag -> (SrcSpan -> Warning) -> Action -> Action
+warnThen :: WarningFlag -> (SrcSpan -> PsWarning) -> Action -> Action
 warnThen flag warning action srcspan buf len = do
     addWarning flag (warning (RealSrcSpan (psRealSpan srcspan) Nothing))
     action srcspan buf len
@@ -2248,8 +2248,8 @@ data HdkComment
 data PState = PState {
         buffer     :: StringBuffer,
         options    :: ParserOpts,
-        warnings   :: Bag Warning,
-        errors     :: Bag Error,
+        warnings   :: Bag PsWarning,
+        errors     :: Bag PsError,
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Word,             -- number of tab warnings in the file
         last_tk    :: Maybe Token,
@@ -2329,12 +2329,12 @@ thenP :: P a -> (a -> P b) -> P b
                 POk s1 a         -> (unP (k a)) s1
                 PFailed s1 -> PFailed s1
 
-failMsgP :: (SrcSpan -> Error) -> P a
+failMsgP :: (SrcSpan -> PsError) -> P a
 failMsgP f = do
   pState <- getPState
   addFatalError (f (mkSrcSpanPs (last_loc pState)))
 
-failLocMsgP :: RealSrcLoc -> RealSrcLoc -> (SrcSpan -> Error) -> P a
+failLocMsgP :: RealSrcLoc -> RealSrcLoc -> (SrcSpan -> PsError) -> P a
 failLocMsgP loc1 loc2 f =
   addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2) Nothing))
 
@@ -2786,15 +2786,15 @@ class Monad m => MonadP m where
   --   to the accumulator and parsing continues. This allows GHC to report
   --   more than one parse error per file.
   --
-  addError :: Error -> m ()
+  addError :: PsError -> m ()
 
   -- | Add a warning to the accumulator.
   --   Use 'getMessages' to get the accumulated warnings.
-  addWarning :: WarningFlag -> Warning -> m ()
+  addWarning :: WarningFlag -> PsWarning -> m ()
 
   -- | Add a fatal error. This will be the last error reported by the parser, and
   --   the parser will not produce any result, ending in a 'PFailed' state.
-  addFatalError :: Error -> m a
+  addFatalError :: PsError -> m a
 
   -- | Check if a given flag is currently set in the bitmap.
   getBit :: ExtBits -> m Bool
@@ -2840,19 +2840,19 @@ addTabWarning srcspan
 
 -- | Get a bag of the errors that have been accumulated so far.
 --   Does not take -Werror into account.
-getErrorMessages :: PState -> Bag Error
+getErrorMessages :: PState -> Bag PsError
 getErrorMessages p = errors p
 
 -- | Get the warnings and errors accumulated so far.
 --   Does not take -Werror into account.
-getMessages :: PState -> (Bag Warning, Bag Error)
+getMessages :: PState -> (Bag PsWarning, Bag PsError)
 getMessages p =
   let ws = warnings p
       -- we add the tabulation warning on the fly because
       -- we count the number of occurences of tab characters
       ws' = case tab_first p of
                Nothing -> ws
-               Just tf -> WarnTab (RealSrcSpan tf Nothing) (tab_count p)
+               Just tf -> PsWarnTab (RealSrcSpan tf Nothing) (tab_count p)
                            `consBag` ws
   in (ws', errors p)
 
@@ -2900,8 +2900,8 @@ srcParseErr
   -> StringBuffer       -- current buffer (placed just after the last token)
   -> Int                -- length of the previous token
   -> SrcSpan
-  -> Error
-srcParseErr options buf len loc = Error (ErrParse token) suggests loc
+  -> PsError
+srcParseErr options buf len loc = PsError (PsErrParse token) suggests loc
   where
    token = lexemeToString (offsetBytes (-len) buf) len
    pattern = decodePrevNChars 8 buf
@@ -2936,7 +2936,7 @@ lexError e = do
   loc <- getRealSrcLoc
   (AI end buf) <- getInput
   reportLexError loc (psRealLoc end) buf
-    (\k -> Error (ErrLexer e k) [])
+    (\k -> PsError (PsErrLexer e k) [])
 
 -- -----------------------------------------------------------------------------
 -- This is the top-level function: called from the parser each time a
@@ -3052,7 +3052,7 @@ alternativeLayoutRuleToken t
              (ITwhere, ALRLayout _ col : ls, _)
               | newLine && thisCol == col && transitional ->
                  do addWarning Opt_WarnAlternativeLayoutRuleTransitional
-                      $ WarnTransitionalLayout (mkSrcSpanPs thisLoc) TransLayout_Where
+                      $ PsWarnTransitionalLayout (mkSrcSpanPs thisLoc) TransLayout_Where
                     setALRContext ls
                     setNextToken t
                     -- Note that we use lastLoc, as we may need to close
@@ -3062,7 +3062,7 @@ alternativeLayoutRuleToken t
              (ITvbar, ALRLayout _ col : ls, _)
               | newLine && thisCol == col && transitional ->
                  do addWarning Opt_WarnAlternativeLayoutRuleTransitional
-                      $ WarnTransitionalLayout (mkSrcSpanPs thisLoc) TransLayout_Pipe
+                      $ PsWarnTransitionalLayout (mkSrcSpanPs thisLoc) TransLayout_Pipe
                     setALRContext ls
                     setNextToken t
                     -- Note that we use lastLoc, as we may need to close
@@ -3184,7 +3184,7 @@ lexToken = do
         return (L span ITeof)
     AlexError (AI loc2 buf) ->
         reportLexError (psRealLoc loc1) (psRealLoc loc2) buf
-          (\k -> Error (ErrLexer LexError k) [])
+          (\k -> PsError (PsErrLexer LexError k) [])
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
@@ -3198,7 +3198,7 @@ lexToken = do
         unless (isComment lt') (setLastTk lt')
         return lt
 
-reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> (LexErrKind -> SrcSpan -> Error) -> P a
+reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> (LexErrKind -> SrcSpan -> PsError) -> P a
 reportLexError loc1 loc2 buf f
   | atEnd buf = failLocMsgP loc1 loc2 (f LexErrKind_EOF)
   | otherwise =
