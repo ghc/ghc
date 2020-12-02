@@ -547,6 +547,7 @@ finish_ambiguous_selector lr@(L _ rdr) parent_type
            Just gre ->
 
     do { addUsedGRE True gre
+       ; keepAlive (greMangledName gre)
        ; return (greMangledName gre) } } } } }
 
 -- This field name really is ambiguous, so add a suitable "ambiguous

@@ -30,7 +30,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.Names
 
-import GHC.Types.Name.Reader( lookupGRE_FieldLabel )
+import GHC.Types.Name.Reader( lookupGRE_FieldLabel, greMangledName )
 import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name, pprDefinedAt )
 import GHC.Types.Var.Env ( VarEnv )
@@ -709,6 +709,7 @@ matchHasField dflags short_cut clas tys
                      -- it must not be higher-rank.
                    ; if not (isNaughtyRecordSelector sel_id) && isTauTy sel_ty
                      then do { addUsedGRE True gre
+                             ; keepAlive (greMangledName gre)
                              ; return OneInst { cir_new_theta = theta
                                               , cir_mk_ev     = mk_ev
                                               , cir_what      = BuiltinInstance } }

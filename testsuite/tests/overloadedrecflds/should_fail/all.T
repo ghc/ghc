@@ -37,3 +37,4 @@ test('DRFHoleFits', extra_files(['DRFHoleFits_A.hs']), multimod_compile_fail, ['
 test('DRFPartialFields', normal, compile_fail, [''])
 test('T16745', extra_files(['T16745C.hs', 'T16745B.hs']), multimod_compile_fail, ['T16745A', ''])
 test('DRF9156', normal, compile_fail, [''])
+test('DRFUnused', normal, compile_fail, [''])
