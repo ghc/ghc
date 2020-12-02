@@ -326,7 +326,7 @@ lexToken = do
     AlexEOF -> do let span = mkPsSpan loc1 loc1
                   liftP (setLastToken span 0)
                   return (L span CmmT_EOF)
-    AlexError (loc2,_) -> liftP $ failLocMsgP (psRealLoc loc1) (psRealLoc loc2) (Error ErrCmmLexer [])
+    AlexError (loc2,_) -> liftP $ failLocMsgP (psRealLoc loc1) (psRealLoc loc2) (PsError PsErrCmmLexer [])
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
