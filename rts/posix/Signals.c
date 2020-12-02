@@ -680,14 +680,10 @@ initDefaultHandlers(void)
     // install the SIGINT handler
     action.sa_handler = shutdown_handler;
     sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
+    action.sa_flags = 0; // disable SA_RESTART
     if (sigaction(SIGINT, &action, &oact) != 0) {
         sysErrorBelch("warning: failed to install SIGINT handler");
     }
-
-#if defined(HAVE_SIGINTERRUPT)
-    siginterrupt(SIGINT, 1);    // isn't this the default? --SDM
-#endif
 
     // install the SIGFPE handler
 
