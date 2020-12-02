@@ -688,9 +688,8 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in GHC.Core.FamInstEnv
        ; (qtvs, pats, res_kind, stupid_theta)
-             <- tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs
-                                    fixity hs_ctxt hs_pats m_ksig hs_cons
-                                    new_or_data
+             <- tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
+                                    hs_ctxt hs_pats m_ksig new_or_data
 
        -- Eta-reduce the axiom if possible
        -- Quite tricky: see Note [Implementing eta reduction for data families]
@@ -740,8 +739,9 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
            do { data_cons <- tcExtendTyVarEnv qtvs $
                   -- For H98 decls, the tyvars scope
                   -- over the data constructors
-                  tcConDecls rec_rep_tc new_or_data ty_binders final_res_kind
-                             orig_res_ty hs_cons
+                  tcConDecls new_or_data (DDataInstance orig_res_ty)
+                             rec_rep_tc ty_binders final_res_kind
+                             hs_cons
 
               ; rep_tc_name <- newFamInstTyConName lfam_name pats
               ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
@@ -857,7 +857,7 @@ TyVarEnv will simply be empty, and there is nothing to worry about.
 tcDataFamInstHeader
     :: AssocInstInfo -> TyCon -> HsOuterFamEqnTyVarBndrs GhcRn
     -> LexicalFixity -> LHsContext GhcRn
-    -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
+    -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn)
     -> NewOrData
     -> TcM ([TyVar], [Type], Kind, ThetaType)
 -- The "header" of a data family instance is the part other than
@@ -865,7 +865,7 @@ tcDataFamInstHeader
 --    e.g.  data instance D [a] :: * -> * where ...
 -- Here the "header" is the bit before the "where"
 tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
-                    hs_ctxt hs_pats m_ksig hs_cons new_or_data
+                    hs_ctxt hs_pats m_ksig new_or_data
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
        ; (tclvl, wanted, (scoped_tvs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
@@ -884,8 +884,8 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
                   -- Add constraints from the result signature
                   ; res_kind <- tc_kind_sig m_ksig
 
-                  -- Add constraints from the data constructors
-                  ; kcConDecls new_or_data res_kind hs_cons
+                  -- Do not add constraints from the data constructors
+                  -- See Note [Kind inference for data family instances]
 
                   -- Check that the result kind of the TyCon applied to its args
                   -- is compatible with the explicit signature (or Type, if there
@@ -1049,6 +1049,86 @@ however, so this Note aims to describe these subtleties:
   themselves.  Heavy sigh.  But not truly hard; that's what tcbVisibilities
   does.
 
+Note [Kind inference for data family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this GADT-style data type declaration, where I have used
+fresh variables in the data constructor's type, to stress that c,d are
+quite distinct from a,b.
+   data T a b where
+     MkT :: forall c d. c d -> T c d
+
+Following Note [Inferring kinds for type declarations] in GHC.Tc.TyCl,
+to infer T's kind, we initially give T :: kappa, a monomorpic kind,
+gather constraints from the header and data constructors, and conclude
+   T :: (kappa1 -> type) -> kappa1 -> Type
+Then we generalise, giving
+   T :: forall k. (k->Type) -> k -> Type
+
+Now what about a data /instance/ decl
+   data family T :: forall k. (k->Type) -> k -> Type
+
+   data instance T p Int where ...
+
+No doubt here! The poly-kinded T is instantiated with k=Type, so the
+header really looks like
+   data instance T @Type (p :: Type->Type) Int where ...
+
+But what about this?
+   data instance T p q where
+      MkT :: forall r. r Int -> T r Int
+
+So what kind do 'p' and 'q' have?  No clues from the header, but from
+the data constructor we can clearly see that (r :: Type->Type).  Does
+that mean that the the /entire data instance/ is instantiated at Type,
+like this?
+   data instance T @Type (p :: Type->Type) (q :: Type) where
+      ...
+
+Not at all! This is a /GADT/-style decl, so the kind argument might
+be specialised in this particular data constructor, thus:
+   data instance T @k (p :: k->Type) (q :: k) where
+     MkT :: forall (r :: Type -> Type).
+            r Int -> T @Type r Int
+(and perhaps specialised differently in some other data
+constructor MkT2).
+
+The key difference in this case and 'data T' at the top of this Note
+is that we have no known kind for 'data T'. We thus forbid different
+specialisations of T in its constructors, in an attempt to avoid
+inferring polymorphic recursion. In data family T, however, there is
+no problem with polymorphic recursion: we already /fully know/ T's
+kind -- that came from the family declaration, and is not influenced
+by the data instances -- and hence we /can/ specialise T's kind
+differently in different GADT data constructors.
+
+SHORT SUMMARY: in a data instance decl, it's not clear whether kind
+constraints arising from the data constructors should be considered
+local to the (GADT) data /constructor/ or should apply to the entire
+data instance.
+
+DESIGN CHOICE: in data/newtype family instance declarations, we ignore
+the /data constructor/ declarations altogether, looking only at the
+data instance /header/.
+
+Observations:
+* This choice is simple to describe, as well as simple to implment.
+  For a data/newtype instance decl, the instance kinds are influenced
+  /only/ by the header.
+
+* We could treat Haskell-98 style data-instance decls differently, by
+  taking the data constructors into account, since there are no GADT
+  issues.  But we don't, for simplicity, and because it means you can
+  understand the data type instance by looking only at the header.
+
+* Newtypes can be declared in GADT syntax, but they can't do GADT-style
+  specialisation, so like Haskell-98 definitions we could take the
+  data constructors into account.  Again we don't, for the same reason.
+
+So for now at least, we keep the simplest choice. See #18891 and !4419
+for more discussion of this issue.
+
+Kind inference for data types (Xie et al) https://arxiv.org/abs/1911.06153
+takes a slightly different approach.
 -}
 
 
