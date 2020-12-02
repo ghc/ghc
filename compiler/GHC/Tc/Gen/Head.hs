@@ -546,7 +546,9 @@ finish_ambiguous_selector lr@(L _ rdr) parent_type
            Nothing  -> failWithTc (fieldNotInType parent rdr) ;
            Just gre ->
 
+    -- See Note [Unused name reporting and HasField] in GHC.Tc.Instance.Class
     do { addUsedGRE True gre
+       ; keepAlive (greMangledName gre)
        ; return (greMangledName gre) } } } } }
 
 -- This field name really is ambiguous, so add a suitable "ambiguous

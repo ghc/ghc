@@ -676,6 +676,9 @@ We gather three sorts of usage information
           Coercible solver updates tcg_keep's TcRef whenever it
           encounters a use of `coerce` that crosses newtype boundaries.
 
+      (e) Record fields that are used to solve HasField constraints
+          (see Note [Unused name reporting and HasField] in GHC.Tc.Instance.Class)
+
       The tcg_keep field is used in two distinct ways:
 
       * Desugar.addExportFlagsAndRules.  Where things like (a-c) are locally
