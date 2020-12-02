@@ -192,9 +192,9 @@ addHaddockToModule lmod = do
 
 reportHdkWarning :: HdkWarn -> P ()
 reportHdkWarning (HdkWarnInvalidComment (L l _)) =
-  addWarning Opt_WarnInvalidHaddock $ WarnHaddockInvalidPos (mkSrcSpanPs l)
+  addWarning Opt_WarnInvalidHaddock $ PsWarnHaddockInvalidPos (mkSrcSpanPs l)
 reportHdkWarning (HdkWarnExtraComment (L l _)) =
-  addWarning Opt_WarnInvalidHaddock $ WarnHaddockIgnoreMulti l
+  addWarning Opt_WarnInvalidHaddock $ PsWarnHaddockIgnoreMulti l
 
 collectHdkWarnings :: HdkSt -> [HdkWarn]
 collectHdkWarnings HdkSt{ hdk_st_pending, hdk_st_warnings } =
