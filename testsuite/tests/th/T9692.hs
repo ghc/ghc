@@ -12,7 +12,7 @@ class C a where
         data F a (b :: k) :: Type
 
 instance C Int where
-        data F Int x = FInt x
+        data F Int (x :: Type) = FInt x
 
 $( do info <- qReify (mkName "F")
       runIO $ putStrLn $ pprint info
