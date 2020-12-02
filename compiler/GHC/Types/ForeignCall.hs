@@ -213,9 +213,10 @@ instance Outputable CCallSpec where
       gc_suf | playSafe safety = text "_GC"
              | otherwise       = empty
 
-      ppr_fun (StaticTarget st _fn mPkgId isFun)
+      ppr_fun (StaticTarget st fn mPkgId isFun)
         = text (if isFun then "__pkg_ccall"
                          else "__pkg_ccall_value")
+       <> parens (ppr fn)
        <> gc_suf
        <+> (case mPkgId of
             Nothing -> empty
