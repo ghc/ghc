@@ -61,6 +61,7 @@ import GHC.Types.FieldLabel
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Error
+import GHC.Driver.Session ( getDynFlags )
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition )
@@ -710,6 +711,7 @@ tcPatSynMatcher (L loc name) lpat
        ; cont         <- newSysLocalId (fsLit "cont")  Many cont_ty
        ; fail         <- newSysLocalId (fsLit "fail")  Many fail_ty
 
+       ; dflags       <- getDynFlags
        ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
@@ -722,7 +724,7 @@ tcPatSynMatcher (L loc name) lpat
 
              args = map nlVarPat [scrutinee, cont, fail]
              lwpat = noLoc $ WildPat pat_ty
-             cases = if isIrrefutableHsPat lpat
+             cases = if isIrrefutableHsPat dflags lpat
                      then [mkHsCaseAlt lpat  cont']
                      else [mkHsCaseAlt lpat  cont',
                            mkHsCaseAlt lwpat fail']
