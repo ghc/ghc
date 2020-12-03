@@ -79,6 +79,8 @@ import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Data.Maybe
 import GHC.Types.Name (Name)
+import GHC.Driver.Session
+import qualified GHC.LanguageExtensions as LangExt
 
 
 data ListPatTc
@@ -421,7 +423,8 @@ looksLazyPat (VarPat {})   = False
 looksLazyPat (WildPat {})  = False
 looksLazyPat _             = True
 
-isIrrefutableHsPat :: forall p. (OutputableBndrId p) => LPat (GhcPass p) -> Bool
+isIrrefutableHsPat :: forall p. (OutputableBndrId p)
+                   => DynFlags -> LPat (GhcPass p) -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
 -- in the sense of falling through to the next pattern.
 --      (NB: this is not quite the same as the (silly) defn
@@ -434,8 +437,40 @@ isIrrefutableHsPat :: forall p. (OutputableBndrId p) => LPat (GhcPass p) -> Bool
 -- tuple patterns are considered irrefutable at the renamer stage.
 --
 -- But if it returns True, the pattern is definitely irrefutable
-isIrrefutableHsPat
-  = goL
+isIrrefutableHsPat dflags =
+    isIrrefutableHsPat' (xopt LangExt.Strict dflags)
+
+{-
+Note [-XStrict and irrefutability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When -XStrict is enabled the rules for irrefutability are slightly modified.
+Specifically, the pattern in a program like
+
+    do ~(Just hi) <- expr
+
+cannot be considered irrefutable. The ~ here merely disables the bang that
+-XStrict would usually apply, rendering the program equivalent to the following
+without -XStrict
+
+    do Just hi <- expr
+
+To achieve make this pattern irrefutable with -XStrict the user would rather
+need to write
+
+    do ~(~(Just hi)) <- expr
+
+Failing to account for this resulted in #19027. To fix this isIrrefutableHsPat
+takes care to check for two the irrefutability of the inner pattern when it
+encounters a LazyPat and -XStrict is enabled.
+
+See also Note [decideBangHood] in GHC.HsToCore.Utils.
+-}
+
+isIrrefutableHsPat' :: forall p. (OutputableBndrId p)
+                    => Bool -- ^ Are we in a @-XStrict@ context?
+                            -- See Note [-XStrict and irrefutability]
+                    -> LPat (GhcPass p) -> Bool
+isIrrefutableHsPat' is_strict = goL
   where
     goL :: LPat (GhcPass p) -> Bool
     goL = go . unLoc
@@ -443,7 +478,10 @@ isIrrefutableHsPat
     go :: Pat (GhcPass p) -> Bool
     go (WildPat {})        = True
     go (VarPat {})         = True
-    go (LazyPat {})        = True
+    go (LazyPat _ p')
+      | is_strict
+      = isIrrefutableHsPat' False p'
+      | otherwise          = True
     go (BangPat _ pat)     = goL pat
     go (ParPat _ pat)      = goL pat
     go (AsPat _ _ pat)     = goL pat
