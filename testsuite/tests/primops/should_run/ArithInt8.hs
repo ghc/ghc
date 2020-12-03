@@ -150,32 +150,32 @@ addMany (I# a) (I# b) (I# c) (I# d)
         (I# e) (I# f) (I# g) (I# h)
         (I# i) (I# j) (I# k) (I# l)
         (I# m) (I# n) (I# o) (I# p)
-            = I# (extendInt8# int8)
+            = I# (int8ToInt# int8)
   where
     !int8 = addMany#
-                (narrowInt8# a) (narrowInt8# b) (narrowInt8# c) (narrowInt8# d)
-                (narrowInt8# e) (narrowInt8# f) (narrowInt8# g) (narrowInt8# h)
-                (narrowInt8# i) (narrowInt8# j) (narrowInt8# k) (narrowInt8# l)
-                (narrowInt8# m) (narrowInt8# n) (narrowInt8# o) (narrowInt8# p)
+                (intToInt8# a) (intToInt8# b) (intToInt8# c) (intToInt8# d)
+                (intToInt8# e) (intToInt8# f) (intToInt8# g) (intToInt8# h)
+                (intToInt8# i) (intToInt8# j) (intToInt8# k) (intToInt8# l)
+                (intToInt8# m) (intToInt8# n) (intToInt8# o) (intToInt8# p)
 {-# NOINLINE addMany #-}
 
 -- Convenient and also tests higher order functions on Int8#
 apply1 :: (Int8# -> Int8#) -> Int -> Int
-apply1 opToTest (I# a) = I# (extendInt8# (opToTest (narrowInt8# a)))
+apply1 opToTest (I# a) = I# (int8ToInt# (opToTest (intToInt8# a)))
 {-# NOINLINE apply1 #-}
 
 apply2 :: (Int8# -> Int8# -> Int8#) -> Int -> Int -> Int
 apply2 opToTest (I# a) (I# b) =
-    let (# sa, sb #) = (# narrowInt8# a, narrowInt8# b #)
+    let (# sa, sb #) = (# intToInt8# a, intToInt8# b #)
         r = opToTest sa sb
-    in I# (extendInt8# r)
+    in I# (int8ToInt# r)
 {-# NOINLINE apply2 #-}
 
 apply3 :: (Int8# -> Int8# -> (# Int8#, Int8# #)) -> Int -> Int -> (Int, Int)
 apply3 opToTest (I# a) (I# b) =
-    let (# sa, sb #) = (# narrowInt8# a, narrowInt8# b #)
+    let (# sa, sb #) = (# intToInt8# a, intToInt8# b #)
         (# ra, rb #) = opToTest sa sb
-    in (I# (extendInt8# ra), I# (extendInt8# rb))
+    in (I# (int8ToInt# ra), I# (int8ToInt# rb))
 {-# NOINLINE apply3 #-}
 
 instance

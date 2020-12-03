@@ -457,19 +457,19 @@ emitPrimOp dflags primop = case primop of
   IndexOffAddrOp_StablePtr -> \args -> opIntoRegs $ \res ->
     doIndexOffAddrOp   Nothing (bWord platform) res args
   IndexOffAddrOp_Int8 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_s_8ToWord platform)) b8  res args
+    doIndexOffAddrOp   Nothing b8  res args
   IndexOffAddrOp_Int16 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_s_16ToWord platform)) b16 res args
+    doIndexOffAddrOp   Nothing b16 res args
   IndexOffAddrOp_Int32 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_s_32ToWord platform)) b32 res args
+    doIndexOffAddrOp   Nothing b32 res args
   IndexOffAddrOp_Int64 -> \args -> opIntoRegs $ \res ->
     doIndexOffAddrOp   Nothing b64 res args
   IndexOffAddrOp_Word8 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_u_8ToWord platform)) b8  res args
+    doIndexOffAddrOp   Nothing b8  res args
   IndexOffAddrOp_Word16 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_u_16ToWord platform)) b16 res args
+    doIndexOffAddrOp   Nothing b16 res args
   IndexOffAddrOp_Word32 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_u_32ToWord platform)) b32 res args
+    doIndexOffAddrOp   Nothing b32 res args
   IndexOffAddrOp_Word64 -> \args -> opIntoRegs $ \res ->
     doIndexOffAddrOp   Nothing b64 res args
 
@@ -492,19 +492,19 @@ emitPrimOp dflags primop = case primop of
   ReadOffAddrOp_StablePtr -> \args -> opIntoRegs $ \res ->
     doIndexOffAddrOp   Nothing (bWord platform) res args
   ReadOffAddrOp_Int8 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_s_8ToWord platform)) b8  res args
+    doIndexOffAddrOp   Nothing b8  res args
   ReadOffAddrOp_Int16 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_s_16ToWord platform)) b16 res args
+    doIndexOffAddrOp   Nothing b16 res args
   ReadOffAddrOp_Int32 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_s_32ToWord platform)) b32 res args
+    doIndexOffAddrOp   Nothing b32 res args
   ReadOffAddrOp_Int64 -> \args -> opIntoRegs $ \res ->
     doIndexOffAddrOp   Nothing b64 res args
   ReadOffAddrOp_Word8 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_u_8ToWord platform)) b8  res args
+    doIndexOffAddrOp   Nothing b8  res args
   ReadOffAddrOp_Word16 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_u_16ToWord platform)) b16 res args
+    doIndexOffAddrOp   Nothing b16 res args
   ReadOffAddrOp_Word32 -> \args -> opIntoRegs $ \res ->
-    doIndexOffAddrOp   (Just (mo_u_32ToWord platform)) b32 res args
+    doIndexOffAddrOp   Nothing b32 res args
   ReadOffAddrOp_Word64 -> \args -> opIntoRegs $ \res ->
     doIndexOffAddrOp   Nothing b64 res args
 
@@ -527,19 +527,19 @@ emitPrimOp dflags primop = case primop of
   IndexByteArrayOp_StablePtr -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOp   Nothing (bWord platform) res args
   IndexByteArrayOp_Int8 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_s_8ToWord platform)) b8  res args
+    doIndexByteArrayOp   Nothing b8  res args
   IndexByteArrayOp_Int16 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_s_16ToWord platform)) b16  res args
+    doIndexByteArrayOp   Nothing b16  res args
   IndexByteArrayOp_Int32 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_s_32ToWord platform)) b32  res args
+    doIndexByteArrayOp   Nothing b32  res args
   IndexByteArrayOp_Int64 -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOp   Nothing b64  res args
   IndexByteArrayOp_Word8 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_u_8ToWord platform)) b8  res args
+    doIndexByteArrayOp   Nothing b8  res args
   IndexByteArrayOp_Word16 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_u_16ToWord platform)) b16  res args
+    doIndexByteArrayOp   Nothing b16  res args
   IndexByteArrayOp_Word32 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_u_32ToWord platform)) b32  res args
+    doIndexByteArrayOp   Nothing b32  res args
   IndexByteArrayOp_Word64 -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOp   Nothing b64  res args
 
@@ -562,19 +562,19 @@ emitPrimOp dflags primop = case primop of
   ReadByteArrayOp_StablePtr -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOp   Nothing (bWord platform) res args
   ReadByteArrayOp_Int8 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_s_8ToWord platform)) b8  res args
+    doIndexByteArrayOp   Nothing b8  res args
   ReadByteArrayOp_Int16 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_s_16ToWord platform)) b16  res args
+    doIndexByteArrayOp   Nothing b16  res args
   ReadByteArrayOp_Int32 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_s_32ToWord platform)) b32  res args
+    doIndexByteArrayOp   Nothing b32  res args
   ReadByteArrayOp_Int64 -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOp   Nothing b64  res args
   ReadByteArrayOp_Word8 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_u_8ToWord platform)) b8  res args
+    doIndexByteArrayOp   Nothing b8  res args
   ReadByteArrayOp_Word16 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_u_16ToWord platform)) b16  res args
+    doIndexByteArrayOp   Nothing b16  res args
   ReadByteArrayOp_Word32 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOp   (Just (mo_u_32ToWord platform)) b32  res args
+    doIndexByteArrayOp   Nothing b32  res args
   ReadByteArrayOp_Word64 -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOp   Nothing b64  res args
 
@@ -597,15 +597,15 @@ emitPrimOp dflags primop = case primop of
   IndexByteArrayOp_Word8AsStablePtr -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
   IndexByteArrayOp_Word8AsInt16 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_s_16ToWord platform)) b16 b8 res args
+    doIndexByteArrayOpAs   Nothing b16 b8 res args
   IndexByteArrayOp_Word8AsInt32 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_s_32ToWord platform)) b32 b8 res args
+    doIndexByteArrayOpAs   Nothing b32 b8 res args
   IndexByteArrayOp_Word8AsInt64 -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOpAs   Nothing b64 b8 res args
   IndexByteArrayOp_Word8AsWord16 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_u_16ToWord platform)) b16 b8 res args
+    doIndexByteArrayOpAs   Nothing b16 b8 res args
   IndexByteArrayOp_Word8AsWord32 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_u_32ToWord platform)) b32 b8 res args
+    doIndexByteArrayOpAs   Nothing b32 b8 res args
   IndexByteArrayOp_Word8AsWord64 -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOpAs   Nothing b64 b8 res args
 
@@ -628,15 +628,15 @@ emitPrimOp dflags primop = case primop of
   ReadByteArrayOp_Word8AsStablePtr -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOpAs   Nothing (bWord platform) b8 res args
   ReadByteArrayOp_Word8AsInt16 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_s_16ToWord platform)) b16 b8 res args
+    doIndexByteArrayOpAs   Nothing b16 b8 res args
   ReadByteArrayOp_Word8AsInt32 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_s_32ToWord platform)) b32 b8 res args
+    doIndexByteArrayOpAs   Nothing b32 b8 res args
   ReadByteArrayOp_Word8AsInt64 -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOpAs   Nothing b64 b8 res args
   ReadByteArrayOp_Word8AsWord16 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_u_16ToWord platform)) b16 b8 res args
+    doIndexByteArrayOpAs   Nothing b16 b8 res args
   ReadByteArrayOp_Word8AsWord32 -> \args -> opIntoRegs $ \res ->
-    doIndexByteArrayOpAs   (Just (mo_u_32ToWord platform)) b32 b8 res args
+    doIndexByteArrayOpAs   Nothing b32 b8 res args
   ReadByteArrayOp_Word8AsWord64 -> \args -> opIntoRegs $ \res ->
     doIndexByteArrayOpAs   Nothing b64 b8 res args
 
@@ -659,19 +659,19 @@ emitPrimOp dflags primop = case primop of
   WriteOffAddrOp_StablePtr -> \args -> opIntoRegs $ \res ->
     doWriteOffAddrOp Nothing (bWord platform) res args
   WriteOffAddrOp_Int8 -> \args -> opIntoRegs $ \res ->
-    doWriteOffAddrOp (Just (mo_WordTo8 platform))  b8 res args
+    doWriteOffAddrOp Nothing b8 res args
   WriteOffAddrOp_Int16 -> \args -> opIntoRegs $ \res ->
-    doWriteOffAddrOp (Just (mo_WordTo16 platform)) b16 res args
+    doWriteOffAddrOp Nothing b16 res args
   WriteOffAddrOp_Int32 -> \args -> opIntoRegs $ \res ->
-    doWriteOffAddrOp (Just (mo_WordTo32 platform)) b32 res args
+    doWriteOffAddrOp Nothing b32 res args
   WriteOffAddrOp_Int64 -> \args -> opIntoRegs $ \res ->
     doWriteOffAddrOp Nothing b64 res args
   WriteOffAddrOp_Word8 -> \args -> opIntoRegs $ \res ->
-    doWriteOffAddrOp (Just (mo_WordTo8 platform))  b8 res args
+    doWriteOffAddrOp Nothing b8 res args
   WriteOffAddrOp_Word16 -> \args -> opIntoRegs $ \res ->
-    doWriteOffAddrOp (Just (mo_WordTo16 platform)) b16 res args
+    doWriteOffAddrOp Nothing b16 res args
   WriteOffAddrOp_Word32 -> \args -> opIntoRegs $ \res ->
-    doWriteOffAddrOp (Just (mo_WordTo32 platform)) b32 res args
+    doWriteOffAddrOp Nothing b32 res args
   WriteOffAddrOp_Word64 -> \args -> opIntoRegs $ \res ->
     doWriteOffAddrOp Nothing b64 res args
 
@@ -694,19 +694,19 @@ emitPrimOp dflags primop = case primop of
   WriteByteArrayOp_StablePtr -> \args -> opIntoRegs $ \res ->
     doWriteByteArrayOp Nothing (bWord platform) res args
   WriteByteArrayOp_Int8 -> \args -> opIntoRegs $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo8 platform))  b8 res args
+    doWriteByteArrayOp Nothing b8 res args
   WriteByteArrayOp_Int16 -> \args -> opIntoRegs $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo16 platform)) b16 res args
+    doWriteByteArrayOp Nothing b16 res args
   WriteByteArrayOp_Int32 -> \args -> opIntoRegs $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b32 res args
+    doWriteByteArrayOp Nothing b32 res args
   WriteByteArrayOp_Int64 -> \args -> opIntoRegs $ \res ->
     doWriteByteArrayOp Nothing b64 res args
   WriteByteArrayOp_Word8 -> \args -> opIntoRegs $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo8 platform))  b8  res args
+    doWriteByteArrayOp Nothing b8  res args
   WriteByteArrayOp_Word16 -> \args -> opIntoRegs $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo16 platform)) b16 res args
+    doWriteByteArrayOp Nothing b16 res args
   WriteByteArrayOp_Word32 -> \args -> opIntoRegs $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b32 res args
+    doWriteByteArrayOp Nothing b32 res args
   WriteByteArrayOp_Word64 -> \args -> opIntoRegs $ \res ->
     doWriteByteArrayOp Nothing b64 res args
 
@@ -729,15 +729,15 @@ emitPrimOp dflags primop = case primop of
   WriteByteArrayOp_Word8AsStablePtr -> \args -> opIntoRegs $ \res ->
     doWriteByteArrayOp Nothing b8 res args
   WriteByteArrayOp_Word8AsInt16 -> \args -> opIntoRegs $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo16 platform)) b8 res args
+    doWriteByteArrayOp Nothing b8 res args
   WriteByteArrayOp_Word8AsInt32 -> \args -> opIntoRegs $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b8 res args
+    doWriteByteArrayOp Nothing b8 res args
   WriteByteArrayOp_Word8AsInt64 -> \args -> opIntoRegs $ \res ->
     doWriteByteArrayOp Nothing b8 res args
   WriteByteArrayOp_Word8AsWord16 -> \args -> opIntoRegs $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo16 platform)) b8 res args
+    doWriteByteArrayOp Nothing b8 res args
   WriteByteArrayOp_Word8AsWord32 -> \args -> opIntoRegs $ \res ->
-    doWriteByteArrayOp (Just (mo_WordTo32 platform)) b8 res args
+    doWriteByteArrayOp Nothing b8 res args
   WriteByteArrayOp_Word8AsWord64 -> \args -> opIntoRegs $ \res ->
     doWriteByteArrayOp Nothing b8 res args
 

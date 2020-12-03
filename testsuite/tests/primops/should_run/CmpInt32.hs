@@ -16,7 +16,7 @@ data TestInt32 = T32 Int32#
     deriving (Eq, Ord)
 
 mkT32 :: Int -> TestInt32
-mkT32 (I# a) = T32 (narrowInt32# a)
+mkT32 (I# a) = T32 (intToInt32# a)
 
 main :: IO ()
 main = do

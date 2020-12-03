@@ -3,6 +3,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 
 import GHC.Exts
+import GHC.Word (Word8(..))
 
 main :: IO ()
 main = do
@@ -28,6 +29,11 @@ main = do
     naiveStrlen "araña\NULb"# 0
 
 naiveStrlen :: Addr# -> Int -> Int
-naiveStrlen addr !n = case indexWord8OffAddr# addr 0# of
-  0## -> n
-  _ -> naiveStrlen (plusAddr# addr 1#) (n + 1)
+naiveStrlen addr !n =
+    -- TODO change back to pattern matching once we have negative literals.
+    if isTrue# (res `eqWord8#` zero)
+    then n
+    else naiveStrlen (plusAddr# addr 1#) (n + 1)
+  where
+    res = indexWord8OffAddr# addr 0#
+    W8# zero = 0

@@ -133,7 +133,7 @@ createAndUnpackTSOAndSTACKClosure = do
                 in (# s', MBA mba# #)
             forM_ [0..heapRepSize-1] $ \i@(I# i#) -> do
                 W8# w <- peekElemOff ptrHeapRep i
-                IO (\s -> (# writeWord8Array# mutHeapRepBA i# (extendWord8# w) s, () #))
+                IO (\s -> (# writeWord8Array# mutHeapRepBA i# w s, () #))
             BA heapRep <- IO $ \s -> let
                 (# s', ba# #) = unsafeFreezeByteArray# mutHeapRepBA s
                 in (# s', BA ba# #)

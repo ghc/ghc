@@ -55,17 +55,17 @@ primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
-   ByteArray# -> Int# -> Int#
+   ByteArray# -> Int# -> Int8#
    {Read a 8-bit signed integer; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
-   ByteArray# -> Int# -> Int#
+   ByteArray# -> Int# -> Int16#
    {Read a 16-bit signed integer; offset in 2-byte words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
-   ByteArray# -> Int# -> INT32
+   ByteArray# -> Int# -> Int32#
    {Read a 32-bit signed integer; offset in 4-byte words.}
    with can_fail = True
 
@@ -75,17 +75,17 @@ primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
-   ByteArray# -> Int# -> Word#
+   ByteArray# -> Int# -> Word8#
    {Read a 8-bit unsigned integer; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
-   ByteArray# -> Int# -> Word#
+   ByteArray# -> Int# -> Word16#
    {Read a 16-bit unsigned integer; offset in 2-byte words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
-   ByteArray# -> Int# -> WORD32
+   ByteArray# -> Int# -> Word32#
    {Read a 32-bit unsigned integer; offset in 4-byte words.}
    with can_fail = True
 
@@ -140,12 +140,12 @@ primop IndexByteArrayOp_Word8AsStablePtr "indexWord8ArrayAsStablePtr#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsInt16 "indexWord8ArrayAsInt16#" GenPrimOp
-   ByteArray# -> Int# -> Int#
+   ByteArray# -> Int# -> Int16#
    {Read a 16-bit signed integer; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsInt32 "indexWord8ArrayAsInt32#" GenPrimOp
-   ByteArray# -> Int# -> INT32
+   ByteArray# -> Int# -> Int32#
    {Read a 32-bit signed integer; offset in bytes.}
    with can_fail = True
 
@@ -155,12 +155,12 @@ primop IndexByteArrayOp_Word8AsInt64 "indexWord8ArrayAsInt64#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsWord16 "indexWord8ArrayAsWord16#" GenPrimOp
-   ByteArray# -> Int# -> Word#
+   ByteArray# -> Int# -> Word16#
    {Read a 16-bit unsigned integer; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsWord32 "indexWord8ArrayAsWord32#" GenPrimOp
-   ByteArray# -> Int# -> WORD32
+   ByteArray# -> Int# -> Word32#
    {Read a 32-bit unsigned integer; offset in bytes.}
    with can_fail = True
 
@@ -223,19 +223,19 @@ primop ReadByteArrayOp_StablePtr "readStablePtrArray#" GenPrimOp
         can_fail = True
 
 primop ReadByteArrayOp_Int8 "readInt8Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int8# #)
    {Read a 8-bit signed integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
 primop ReadByteArrayOp_Int16 "readInt16Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int16# #)
    {Read a 16-bit signed integer; offset in 2-byte words.}
    with has_side_effects = True
         can_fail = True
 
 primop ReadByteArrayOp_Int32 "readInt32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int32# #)
    {Read a 32-bit signed integer; offset in 4-byte words.}
    with has_side_effects = True
         can_fail = True
@@ -247,19 +247,19 @@ primop ReadByteArrayOp_Int64 "readInt64Array#" GenPrimOp
         can_fail = True
 
 primop ReadByteArrayOp_Word8 "readWord8Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word8# #)
    {Read a 8-bit unsigned integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
 primop ReadByteArrayOp_Word16 "readWord16Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word16# #)
    {Read a 16-bit unsigned integer; offset in 2-byte words.}
    with has_side_effects = True
         can_fail = True
 
 primop ReadByteArrayOp_Word32 "readWord32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word32# #)
    {Read a 32-bit unsigned integer; offset in 4-byte words.}
    with has_side_effects = True
         can_fail = True
@@ -324,13 +324,13 @@ primop ReadByteArrayOp_Word8AsStablePtr "readWord8ArrayAsStablePtr#" GenPrimOp
         can_fail = True
 
 primop ReadByteArrayOp_Word8AsInt16 "readWord8ArrayAsInt16#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int16# #)
    {Read a 16-bit signed integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
 primop ReadByteArrayOp_Word8AsInt32 "readWord8ArrayAsInt32#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int32# #)
    {Read a 32-bit signed integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
@@ -342,13 +342,13 @@ primop ReadByteArrayOp_Word8AsInt64 "readWord8ArrayAsInt64#" GenPrimOp
         can_fail = True
 
 primop ReadByteArrayOp_Word8AsWord16 "readWord8ArrayAsWord16#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word16# #)
    {Read a 16-bit unsigned integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
 primop ReadByteArrayOp_Word8AsWord32 "readWord8ArrayAsWord32#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word32# #)
    {Read a 32-bit unsigned integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
@@ -413,19 +413,19 @@ primop WriteByteArrayOp_StablePtr "writeStablePtrArray#" GenPrimOp
         can_fail = True
 
 primop WriteByteArrayOp_Int8 "writeInt8Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Int8# -> State# s -> State# s
    {Write a 8-bit signed integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
 primop WriteByteArrayOp_Int16 "writeInt16Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Int16# -> State# s -> State# s
    {Write a 16-bit signed integer; offset in 2-byte words.}
    with has_side_effects = True
         can_fail = True
 
 primop WriteByteArrayOp_Int32 "writeInt32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Int32# -> State# s -> State# s
    {Write a 32-bit signed integer; offset in 4-byte words.}
    with has_side_effects = True
         can_fail = True
@@ -437,19 +437,19 @@ primop WriteByteArrayOp_Int64 "writeInt64Array#" GenPrimOp
         can_fail = True
 
 primop WriteByteArrayOp_Word8 "writeWord8Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Word8# -> State# s -> State# s
    {Write a 8-bit unsigned integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
 primop WriteByteArrayOp_Word16 "writeWord16Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Word16# -> State# s -> State# s
    {Write a 16-bit unsigned integer; offset in 2-byte words.}
    with has_side_effects = True
         can_fail = True
 
 primop WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Word32# -> State# s -> State# s
    {Write a 32-bit unsigned integer; offset in 4-byte words.}
    with has_side_effects = True
         can_fail = True
@@ -514,13 +514,13 @@ primop WriteByteArrayOp_Word8AsStablePtr "writeWord8ArrayAsStablePtr#" GenPrimOp
         can_fail = True
 
 primop WriteByteArrayOp_Word8AsInt16 "writeWord8ArrayAsInt16#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Int16# -> State# s -> State# s
    {Write a 16-bit signed integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
 primop WriteByteArrayOp_Word8AsInt32 "writeWord8ArrayAsInt32#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Int32# -> State# s -> State# s
    {Write a 32-bit signed integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
@@ -532,13 +532,13 @@ primop WriteByteArrayOp_Word8AsInt64 "writeWord8ArrayAsInt64#" GenPrimOp
         can_fail = True
 
 primop WriteByteArrayOp_Word8AsWord16 "writeWord8ArrayAsWord16#" GenPrimOp
-   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Word16# -> State# s -> State# s
    {Write a 16-bit unsigned integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
 primop WriteByteArrayOp_Word8AsWord32 "writeWord8ArrayAsWord32#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Word32# -> State# s -> State# s
    {Write a 32-bit unsigned integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True

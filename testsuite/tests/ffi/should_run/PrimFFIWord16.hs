@@ -14,15 +14,15 @@ foreign import ccall "add_all_word16"
 
 main :: IO ()
 main = do
-    let a = narrowWord16# 0##
-        b = narrowWord16# 1##
-        c = narrowWord16# 2##
-        d = narrowWord16# 3##
-        e = narrowWord16# 4##
-        f = narrowWord16# 5##
-        g = narrowWord16# 6##
-        h = narrowWord16# 7##
-        i = narrowWord16# 8##
-        j = narrowWord16# 9##
-        x = W# (extendWord16# (add_all_word16 a b c d e f g h i j))
+    let a = wordToWord16# 0##
+        b = wordToWord16# 1##
+        c = wordToWord16# 2##
+        d = wordToWord16# 3##
+        e = wordToWord16# 4##
+        f = wordToWord16# 5##
+        g = wordToWord16# 6##
+        h = wordToWord16# 7##
+        i = wordToWord16# 8##
+        j = wordToWord16# 9##
+        x = W# (word16ToWord# (add_all_word16 a b c d e f g h i j))
     print x

@@ -16,7 +16,7 @@ data TestWord32 = T32 Word32#
     deriving (Eq, Ord)
 
 mkT32 :: Word -> TestWord32
-mkT32 (W# a) = T32 (narrowWord32# a)
+mkT32 (W# a) = T32 (wordToWord32# a)
 
 main :: IO ()
 main = do

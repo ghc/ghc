@@ -69,8 +69,8 @@ instance Eq Int8 where
     (/=) = neInt8
 
 eqInt8, neInt8 :: Int8 -> Int8 -> Bool
-eqInt8 (I8# x) (I8# y) = isTrue# ((extendInt8# x) ==# (extendInt8# y))
-neInt8 (I8# x) (I8# y) = isTrue# ((extendInt8# x) /=# (extendInt8# y))
+eqInt8 (I8# x) (I8# y) = isTrue# ((int8ToInt# x) ==# (int8ToInt# y))
+neInt8 (I8# x) (I8# y) = isTrue# ((int8ToInt# x) /=# (int8ToInt# y))
 {-# INLINE [1] eqInt8 #-}
 {-# INLINE [1] neInt8 #-}
 
@@ -86,10 +86,10 @@ instance Ord Int8 where
 {-# INLINE [1] ltInt8 #-}
 {-# INLINE [1] leInt8 #-}
 gtInt8, geInt8, ltInt8, leInt8 :: Int8 -> Int8 -> Bool
-(I8# x) `gtInt8` (I8# y) = isTrue# ((extendInt8# x) >#  (extendInt8# y))
-(I8# x) `geInt8` (I8# y) = isTrue# ((extendInt8# x) >=# (extendInt8# y))
-(I8# x) `ltInt8` (I8# y) = isTrue# ((extendInt8# x) <#  (extendInt8# y))
-(I8# x) `leInt8` (I8# y) = isTrue# ((extendInt8# x) <=# (extendInt8# y))
+(I8# x) `gtInt8` (I8# y) = isTrue# ((int8ToInt# x) >#  (int8ToInt# y))
+(I8# x) `geInt8` (I8# y) = isTrue# ((int8ToInt# x) >=# (int8ToInt# y))
+(I8# x) `ltInt8` (I8# y) = isTrue# ((int8ToInt# x) <#  (int8ToInt# y))
+(I8# x) `leInt8` (I8# y) = isTrue# ((int8ToInt# x) <=# (int8ToInt# y))
 
 -- | @since 2.01
 instance Show Int8 where
@@ -97,16 +97,16 @@ instance Show Int8 where
 
 -- | @since 2.01
 instance Num Int8 where
-    (I8# x#) + (I8# y#)    = I8# (narrowInt8# ((extendInt8# x#) +# (extendInt8# y#)))
-    (I8# x#) - (I8# y#)    = I8# (narrowInt8# ((extendInt8# x#) -# (extendInt8# y#)))
-    (I8# x#) * (I8# y#)    = I8# (narrowInt8# ((extendInt8# x#) *# (extendInt8# y#)))
-    negate (I8# x#)        = I8# (narrowInt8# (negateInt# (extendInt8# x#)))
+    (I8# x#) + (I8# y#)    = I8# (intToInt8# ((int8ToInt# x#) +# (int8ToInt# y#)))
+    (I8# x#) - (I8# y#)    = I8# (intToInt8# ((int8ToInt# x#) -# (int8ToInt# y#)))
+    (I8# x#) * (I8# y#)    = I8# (intToInt8# ((int8ToInt# x#) *# (int8ToInt# y#)))
+    negate (I8# x#)        = I8# (intToInt8# (negateInt# (int8ToInt# x#)))
     abs x | x >= 0         = x
           | otherwise      = negate x
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I8# (narrowInt8# (integerToInt# i))
+    fromInteger i          = I8# (intToInt8# (integerToInt# i))
 
 -- | @since 2.01
 instance Real Int8 where
@@ -122,9 +122,9 @@ instance Enum Int8 where
         | otherwise     = predError "Int8"
     toEnum i@(I# i#)
         | i >= fromIntegral (minBound::Int8) && i <= fromIntegral (maxBound::Int8)
-                        = I8# (narrowInt8# i#)
+                        = I8# (intToInt8# i#)
         | otherwise     = toEnumError "Int8" i (minBound::Int8, maxBound::Int8)
-    fromEnum (I8# x#)   = I# (extendInt8# x#)
+    fromEnum (I8# x#)   = I# (int8ToInt# x#)
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 
@@ -133,34 +133,34 @@ instance Integral Int8 where
     quot    x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I8# (narrowInt8# ((extendInt8# x#) `quotInt#` (extendInt8# y#)))
+        | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `quotInt#` (int8ToInt# y#)))
     rem     (I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
-        | otherwise                  = I8# (narrowInt8# ((extendInt8# x#) `remInt#` (extendInt8# y#)))
+        | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `remInt#` (int8ToInt# y#)))
     div     x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I8# (narrowInt8# ((extendInt8# x#) `divInt#` (extendInt8# y#)))
+        | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `divInt#` (int8ToInt# y#)))
     mod       (I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
-        | otherwise                  = I8# (narrowInt8# ((extendInt8# x#) `modInt#` (extendInt8# y#)))
+        | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `modInt#` (int8ToInt# y#)))
     quotRem x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (extendInt8# x#) `quotRemInt#` (extendInt8# y#) of
+        | otherwise                  = case (int8ToInt# x#) `quotRemInt#` (int8ToInt# y#) of
                                        (# q, r #) ->
-                                           (I8# (narrowInt8# q),
-                                            I8# (narrowInt8# r))
+                                           (I8# (intToInt8# q),
+                                            I8# (intToInt8# r))
     divMod  x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (extendInt8# x#) `divModInt#` (extendInt8# y#) of
+        | otherwise                  = case (int8ToInt# x#) `divModInt#` (int8ToInt# y#) of
                                        (# d, m #) ->
-                                           (I8# (narrowInt8# d),
-                                            I8# (narrowInt8# m))
-    toInteger (I8# x#)               = IS (extendInt8# x#)
+                                           (I8# (intToInt8# d),
+                                            I8# (intToInt8# m))
+    toInteger (I8# x#)               = IS (int8ToInt# x#)
 
 -- | @since 2.01
 instance Bounded Int8 where
@@ -184,34 +184,34 @@ instance Bits Int8 where
     {-# INLINE testBit #-}
     {-# INLINE popCount #-}
 
-    (I8# x#) .&.   (I8# y#)   = I8# (narrowInt8# ((extendInt8# x#) `andI#` (extendInt8# y#)))
-    (I8# x#) .|.   (I8# y#)   = I8# (narrowInt8# ((extendInt8# x#) `orI#`  (extendInt8# y#)))
-    (I8# x#) `xor` (I8# y#)   = I8# (narrowInt8# ((extendInt8# x#) `xorI#` (extendInt8# y#)))
-    complement (I8# x#)       = I8# (narrowInt8# (notI# (extendInt8# x#)))
+    (I8# x#) .&.   (I8# y#)   = I8# (intToInt8# ((int8ToInt# x#) `andI#` (int8ToInt# y#)))
+    (I8# x#) .|.   (I8# y#)   = I8# (intToInt8# ((int8ToInt# x#) `orI#`  (int8ToInt# y#)))
+    (I8# x#) `xor` (I8# y#)   = I8# (intToInt8# ((int8ToInt# x#) `xorI#` (int8ToInt# y#)))
+    complement (I8# x#)       = I8# (intToInt8# (notI# (int8ToInt# x#)))
     (I8# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#) = I8# (narrowInt8# ((extendInt8# x#) `iShiftL#` i#))
-        | otherwise           = I8# (narrowInt8# ((extendInt8# x#) `iShiftRA#` negateInt# i#))
+        | isTrue# (i# >=# 0#) = I8# (intToInt8# ((int8ToInt# x#) `iShiftL#` i#))
+        | otherwise           = I8# (intToInt8# ((int8ToInt# x#) `iShiftRA#` negateInt# i#))
     (I8# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#) = I8# (narrowInt8# ((extendInt8# x#) `iShiftL#` i#))
+        | isTrue# (i# >=# 0#) = I8# (intToInt8# ((int8ToInt# x#) `iShiftL#` i#))
         | otherwise           = overflowError
-    (I8# x#) `unsafeShiftL` (I# i#) = I8# (narrowInt8# ((extendInt8# x#) `uncheckedIShiftL#` i#))
+    (I8# x#) `unsafeShiftL` (I# i#) = I8# (intToInt8# ((int8ToInt# x#) `uncheckedIShiftL#` i#))
     (I8# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#) = I8# (narrowInt8# ((extendInt8# x#) `iShiftRA#` i#))
+        | isTrue# (i# >=# 0#) = I8# (intToInt8# ((int8ToInt# x#) `iShiftRA#` i#))
         | otherwise           = overflowError
-    (I8# x#) `unsafeShiftR` (I# i#) = I8# (narrowInt8# ((extendInt8# x#) `uncheckedIShiftRA#` i#))
+    (I8# x#) `unsafeShiftR` (I# i#) = I8# (intToInt8# ((int8ToInt# x#) `uncheckedIShiftRA#` i#))
     (I8# x#) `rotate` (I# i#)
         | isTrue# (i'# ==# 0#)
         = I8# x#
         | otherwise
-        = I8# (narrowInt8# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
+        = I8# (intToInt8# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
                                        (x'# `uncheckedShiftRL#` (8# -# i'#)))))
         where
-        !x'# = narrow8Word# (int2Word# (extendInt8# x#))
+        !x'# = narrow8Word# (int2Word# (int8ToInt# x#))
         !i'# = word2Int# (int2Word# i# `and#` 7##)
     bitSizeMaybe i            = Just (finiteBitSize i)
     bitSize i                 = finiteBitSize i
     isSigned _                = True
-    popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# (extendInt8# x#))))
+    popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# (int8ToInt# x#))))
     bit                       = bitDefault
     testBit                   = testBitDefault
 
@@ -220,13 +220,13 @@ instance FiniteBits Int8 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 8
-    countLeadingZeros  (I8# x#) = I# (word2Int# (clz8# (int2Word# (extendInt8# x#))))
-    countTrailingZeros (I8# x#) = I# (word2Int# (ctz8# (int2Word# (extendInt8# x#))))
+    countLeadingZeros  (I8# x#) = I# (word2Int# (clz8# (int2Word# (int8ToInt# x#))))
+    countTrailingZeros (I8# x#) = I# (word2Int# (ctz8# (int2Word# (int8ToInt# x#))))
 
 {-# RULES
 "fromIntegral/Int8->Int8" fromIntegral = id :: Int8 -> Int8
-"fromIntegral/a->Int8"    fromIntegral = \x -> case fromIntegral x of I# x# -> I8# (narrowInt8# x#)
-"fromIntegral/Int8->a"    fromIntegral = \(I8# x#) -> fromIntegral (I# (extendInt8# x#))
+"fromIntegral/a->Int8"    fromIntegral = \x -> case fromIntegral x of I# x# -> I8# (intToInt8# x#)
+"fromIntegral/Int8->a"    fromIntegral = \(I8# x#) -> fromIntegral (I# (int8ToInt# x#))
   #-}
 
 {-# RULES
@@ -276,8 +276,8 @@ instance Eq Int16 where
     (/=) = neInt16
 
 eqInt16, neInt16 :: Int16 -> Int16 -> Bool
-eqInt16 (I16# x) (I16# y) = isTrue# ((extendInt16# x) ==# (extendInt16# y))
-neInt16 (I16# x) (I16# y) = isTrue# ((extendInt16# x) /=# (extendInt16# y))
+eqInt16 (I16# x) (I16# y) = isTrue# ((int16ToInt# x) ==# (int16ToInt# y))
+neInt16 (I16# x) (I16# y) = isTrue# ((int16ToInt# x) /=# (int16ToInt# y))
 {-# INLINE [1] eqInt16 #-}
 {-# INLINE [1] neInt16 #-}
 
@@ -293,10 +293,10 @@ instance Ord Int16 where
 {-# INLINE [1] ltInt16 #-}
 {-# INLINE [1] leInt16 #-}
 gtInt16, geInt16, ltInt16, leInt16 :: Int16 -> Int16 -> Bool
-(I16# x) `gtInt16` (I16# y) = isTrue# ((extendInt16# x) >#  (extendInt16# y))
-(I16# x) `geInt16` (I16# y) = isTrue# ((extendInt16# x) >=# (extendInt16# y))
-(I16# x) `ltInt16` (I16# y) = isTrue# ((extendInt16# x) <#  (extendInt16# y))
-(I16# x) `leInt16` (I16# y) = isTrue# ((extendInt16# x) <=# (extendInt16# y))
+(I16# x) `gtInt16` (I16# y) = isTrue# ((int16ToInt# x) >#  (int16ToInt# y))
+(I16# x) `geInt16` (I16# y) = isTrue# ((int16ToInt# x) >=# (int16ToInt# y))
+(I16# x) `ltInt16` (I16# y) = isTrue# ((int16ToInt# x) <#  (int16ToInt# y))
+(I16# x) `leInt16` (I16# y) = isTrue# ((int16ToInt# x) <=# (int16ToInt# y))
 
 -- | @since 2.01
 instance Show Int16 where
@@ -304,16 +304,16 @@ instance Show Int16 where
 
 -- | @since 2.01
 instance Num Int16 where
-    (I16# x#) + (I16# y#)  = I16# (narrowInt16# ((extendInt16# x#) +# (extendInt16# y#)))
-    (I16# x#) - (I16# y#)  = I16# (narrowInt16# ((extendInt16# x#) -# (extendInt16# y#)))
-    (I16# x#) * (I16# y#)  = I16# (narrowInt16# ((extendInt16# x#) *# (extendInt16# y#)))
-    negate (I16# x#)       = I16# (narrowInt16# (negateInt# (extendInt16# x#)))
+    (I16# x#) + (I16# y#)  = I16# (intToInt16# ((int16ToInt# x#) +# (int16ToInt# y#)))
+    (I16# x#) - (I16# y#)  = I16# (intToInt16# ((int16ToInt# x#) -# (int16ToInt# y#)))
+    (I16# x#) * (I16# y#)  = I16# (intToInt16# ((int16ToInt# x#) *# (int16ToInt# y#)))
+    negate (I16# x#)       = I16# (intToInt16# (negateInt# (int16ToInt# x#)))
     abs x | x >= 0         = x
           | otherwise      = negate x
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I16# (narrowInt16# (integerToInt# i))
+    fromInteger i          = I16# (intToInt16# (integerToInt# i))
 
 -- | @since 2.01
 instance Real Int16 where
@@ -329,9 +329,9 @@ instance Enum Int16 where
         | otherwise     = predError "Int16"
     toEnum i@(I# i#)
         | i >= fromIntegral (minBound::Int16) && i <= fromIntegral (maxBound::Int16)
-                        = I16# (narrowInt16# i#)
+                        = I16# (intToInt16# i#)
         | otherwise     = toEnumError "Int16" i (minBound::Int16, maxBound::Int16)
-    fromEnum (I16# x#)  = I# (extendInt16# x#)
+    fromEnum (I16# x#)  = I# (int16ToInt# x#)
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 
@@ -340,34 +340,34 @@ instance Integral Int16 where
     quot    x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I16# (narrowInt16# ((extendInt16# x#) `quotInt#` (extendInt16# y#)))
+        | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `quotInt#` (int16ToInt# y#)))
     rem       (I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
-        | otherwise                  = I16# (narrowInt16# ((extendInt16# x#) `remInt#` (extendInt16# y#)))
+        | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `remInt#` (int16ToInt# y#)))
     div     x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I16# (narrowInt16# ((extendInt16# x#) `divInt#` (extendInt16# y#)))
+        | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `divInt#` (int16ToInt# y#)))
     mod       (I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
-        | otherwise                  = I16# (narrowInt16# ((extendInt16# x#) `modInt#` (extendInt16# y#)))
+        | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `modInt#` (int16ToInt# y#)))
     quotRem x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (extendInt16# x#) `quotRemInt#` (extendInt16# y#) of
+        | otherwise                  = case (int16ToInt# x#) `quotRemInt#` (int16ToInt# y#) of
                                        (# q, r #) ->
-                                           (I16# (narrowInt16# q),
-                                            I16# (narrowInt16# r))
+                                           (I16# (intToInt16# q),
+                                            I16# (intToInt16# r))
     divMod  x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (extendInt16# x#) `divModInt#` (extendInt16# y#) of
+        | otherwise                  = case (int16ToInt# x#) `divModInt#` (int16ToInt# y#) of
                                        (# d, m #) ->
-                                           (I16# (narrowInt16# d),
-                                            I16# (narrowInt16# m))
-    toInteger (I16# x#)              = IS (extendInt16# x#)
+                                           (I16# (intToInt16# d),
+                                            I16# (intToInt16# m))
+    toInteger (I16# x#)              = IS (int16ToInt# x#)
 
 -- | @since 2.01
 instance Bounded Int16 where
@@ -391,34 +391,34 @@ instance Bits Int16 where
     {-# INLINE testBit #-}
     {-# INLINE popCount #-}
 
-    (I16# x#) .&.   (I16# y#)  = I16# (narrowInt16# ((extendInt16# x#) `andI#` (extendInt16# y#)))
-    (I16# x#) .|.   (I16# y#)  = I16# (narrowInt16# ((extendInt16# x#) `orI#`  (extendInt16# y#)))
-    (I16# x#) `xor` (I16# y#)  = I16# (narrowInt16# ((extendInt16# x#) `xorI#` (extendInt16# y#)))
-    complement (I16# x#)       = I16# (narrowInt16# (notI# (extendInt16# x#)))
+    (I16# x#) .&.   (I16# y#)  = I16# (intToInt16# ((int16ToInt# x#) `andI#` (int16ToInt# y#)))
+    (I16# x#) .|.   (I16# y#)  = I16# (intToInt16# ((int16ToInt# x#) `orI#`  (int16ToInt# y#)))
+    (I16# x#) `xor` (I16# y#)  = I16# (intToInt16# ((int16ToInt# x#) `xorI#` (int16ToInt# y#)))
+    complement (I16# x#)       = I16# (intToInt16# (notI# (int16ToInt# x#)))
     (I16# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#)  = I16# (narrowInt16# ((extendInt16# x#) `iShiftL#` i#))
-        | otherwise            = I16# (narrowInt16# ((extendInt16# x#) `iShiftRA#` negateInt# i#))
+        | isTrue# (i# >=# 0#)  = I16# (intToInt16# ((int16ToInt# x#) `iShiftL#` i#))
+        | otherwise            = I16# (intToInt16# ((int16ToInt# x#) `iShiftRA#` negateInt# i#))
     (I16# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#)  = I16# (narrowInt16# ((extendInt16# x#) `iShiftL#` i#))
+        | isTrue# (i# >=# 0#)  = I16# (intToInt16# ((int16ToInt# x#) `iShiftL#` i#))
         | otherwise            = overflowError
-    (I16# x#) `unsafeShiftL` (I# i#) = I16# (narrowInt16# ((extendInt16# x#) `uncheckedIShiftL#` i#))
+    (I16# x#) `unsafeShiftL` (I# i#) = I16# (intToInt16# ((int16ToInt# x#) `uncheckedIShiftL#` i#))
     (I16# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#)  = I16# (narrowInt16# ((extendInt16# x#) `iShiftRA#` i#))
+        | isTrue# (i# >=# 0#)  = I16# (intToInt16# ((int16ToInt# x#) `iShiftRA#` i#))
         | otherwise            = overflowError
-    (I16# x#) `unsafeShiftR` (I# i#) = I16# (narrowInt16# ((extendInt16# x#) `uncheckedIShiftRA#` i#))
+    (I16# x#) `unsafeShiftR` (I# i#) = I16# (intToInt16# ((int16ToInt# x#) `uncheckedIShiftRA#` i#))
     (I16# x#) `rotate` (I# i#)
         | isTrue# (i'# ==# 0#)
         = I16# x#
         | otherwise
-        = I16# (narrowInt16# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
+        = I16# (intToInt16# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
                                          (x'# `uncheckedShiftRL#` (16# -# i'#)))))
         where
-        !x'# = narrow16Word# (int2Word# (extendInt16# x#))
+        !x'# = narrow16Word# (int2Word# (int16ToInt# x#))
         !i'# = word2Int# (int2Word# i# `and#` 15##)
     bitSizeMaybe i             = Just (finiteBitSize i)
     bitSize i                  = finiteBitSize i
     isSigned _                 = True
-    popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# (extendInt16# x#))))
+    popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# (int16ToInt# x#))))
     bit                        = bitDefault
     testBit                    = testBitDefault
 
@@ -427,15 +427,15 @@ instance FiniteBits Int16 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 16
-    countLeadingZeros  (I16# x#) = I# (word2Int# (clz16# (int2Word# (extendInt16# x#))))
-    countTrailingZeros (I16# x#) = I# (word2Int# (ctz16# (int2Word# (extendInt16# x#))))
+    countLeadingZeros  (I16# x#) = I# (word2Int# (clz16# (int2Word# (int16ToInt# x#))))
+    countTrailingZeros (I16# x#) = I# (word2Int# (ctz16# (int2Word# (int16ToInt# x#))))
 
 {-# RULES
-"fromIntegral/Word8->Int16"  fromIntegral = \(W8# x#) -> I16# (narrowInt16# (word2Int# (extendWord8# x#)))
-"fromIntegral/Int8->Int16"   fromIntegral = \(I8# x#) -> I16# (narrowInt16# (extendInt8# x#))
+"fromIntegral/Word8->Int16"  fromIntegral = \(W8# x#) -> I16# (intToInt16# (word2Int# (word8ToWord# x#)))
+"fromIntegral/Int8->Int16"   fromIntegral = \(I8# x#) -> I16# (intToInt16# (int8ToInt# x#))
 "fromIntegral/Int16->Int16"  fromIntegral = id :: Int16 -> Int16
-"fromIntegral/a->Int16"      fromIntegral = \x -> case fromIntegral x of I# x# -> I16# (narrowInt16# x#)
-"fromIntegral/Int16->a"      fromIntegral = \(I16# x#) -> fromIntegral (I# (extendInt16# x#))
+"fromIntegral/a->Int16"      fromIntegral = \x -> case fromIntegral x of I# x# -> I16# (intToInt16# x#)
+"fromIntegral/Int16->a"      fromIntegral = \(I16# x#) -> fromIntegral (I# (int16ToInt# x#))
   #-}
 
 {-# RULES
@@ -488,8 +488,8 @@ instance Eq Int32 where
     (/=) = neInt32
 
 eqInt32, neInt32 :: Int32 -> Int32 -> Bool
-eqInt32 (I32# x) (I32# y) = isTrue# ((extendInt32# x) ==# (extendInt32# y))
-neInt32 (I32# x) (I32# y) = isTrue# ((extendInt32# x) /=# (extendInt32# y))
+eqInt32 (I32# x) (I32# y) = isTrue# ((int32ToInt# x) ==# (int32ToInt# y))
+neInt32 (I32# x) (I32# y) = isTrue# ((int32ToInt# x) /=# (int32ToInt# y))
 {-# INLINE [1] eqInt32 #-}
 {-# INLINE [1] neInt32 #-}
 
@@ -505,10 +505,10 @@ instance Ord Int32 where
 {-# INLINE [1] ltInt32 #-}
 {-# INLINE [1] leInt32 #-}
 gtInt32, geInt32, ltInt32, leInt32 :: Int32 -> Int32 -> Bool
-(I32# x) `gtInt32` (I32# y) = isTrue# ((extendInt32# x) >#  (extendInt32# y))
-(I32# x) `geInt32` (I32# y) = isTrue# ((extendInt32# x) >=# (extendInt32# y))
-(I32# x) `ltInt32` (I32# y) = isTrue# ((extendInt32# x) <#  (extendInt32# y))
-(I32# x) `leInt32` (I32# y) = isTrue# ((extendInt32# x) <=# (extendInt32# y))
+(I32# x) `gtInt32` (I32# y) = isTrue# ((int32ToInt# x) >#  (int32ToInt# y))
+(I32# x) `geInt32` (I32# y) = isTrue# ((int32ToInt# x) >=# (int32ToInt# y))
+(I32# x) `ltInt32` (I32# y) = isTrue# ((int32ToInt# x) <#  (int32ToInt# y))
+(I32# x) `leInt32` (I32# y) = isTrue# ((int32ToInt# x) <=# (int32ToInt# y))
 
 -- | @since 2.01
 instance Show Int32 where
@@ -516,16 +516,16 @@ instance Show Int32 where
 
 -- | @since 2.01
 instance Num Int32 where
-    (I32# x#) + (I32# y#)  = I32# (narrowInt32# ((extendInt32# x#) +# (extendInt32# y#)))
-    (I32# x#) - (I32# y#)  = I32# (narrowInt32# ((extendInt32# x#) -# (extendInt32# y#)))
-    (I32# x#) * (I32# y#)  = I32# (narrowInt32# ((extendInt32# x#) *# (extendInt32# y#)))
-    negate (I32# x#)       = I32# (narrowInt32# (negateInt# (extendInt32# x#)))
+    (I32# x#) + (I32# y#)  = I32# (intToInt32# ((int32ToInt# x#) +# (int32ToInt# y#)))
+    (I32# x#) - (I32# y#)  = I32# (intToInt32# ((int32ToInt# x#) -# (int32ToInt# y#)))
+    (I32# x#) * (I32# y#)  = I32# (intToInt32# ((int32ToInt# x#) *# (int32ToInt# y#)))
+    negate (I32# x#)       = I32# (intToInt32# (negateInt# (int32ToInt# x#)))
     abs x | x >= 0         = x
           | otherwise      = negate x
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I32# (narrowInt32# (integerToInt# i))
+    fromInteger i          = I32# (intToInt32# (integerToInt# i))
 
 -- | @since 2.01
 instance Enum Int32 where
@@ -536,14 +536,14 @@ instance Enum Int32 where
         | x /= minBound = x - 1
         | otherwise     = predError "Int32"
 #if WORD_SIZE_IN_BITS == 32
-    toEnum (I# i#)      = I32# (narrowInt32# i#)
+    toEnum (I# i#)      = I32# (intToInt32# i#)
 #else
     toEnum i@(I# i#)
         | i >= fromIntegral (minBound::Int32) && i <= fromIntegral (maxBound::Int32)
-                        = I32# (narrowInt32# i#)
+                        = I32# (intToInt32# i#)
         | otherwise     = toEnumError "Int32" i (minBound::Int32, maxBound::Int32)
 #endif
-    fromEnum (I32# x#)  = I# (extendInt32# x#)
+    fromEnum (I32# x#)  = I# (int32ToInt# x#)
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 
@@ -552,42 +552,42 @@ instance Integral Int32 where
     quot    x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I32# (narrowInt32# ((extendInt32# x#) `quotInt#` (extendInt32# y#)))
+        | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `quotInt#` (int32ToInt# y#)))
     rem       (I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
           -- The quotRem CPU instruction fails for minBound `quotRem` -1,
           -- but minBound `rem` -1 is well-defined (0). We therefore
           -- special-case it.
         | y == (-1)                  = 0
-        | otherwise                  = I32# (narrowInt32# ((extendInt32# x#) `remInt#` (extendInt32# y#)))
+        | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `remInt#` (int32ToInt# y#)))
     div     x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I32# (narrowInt32# ((extendInt32# x#) `divInt#` (extendInt32# y#)))
+        | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `divInt#` (int32ToInt# y#)))
     mod       (I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
           -- The divMod CPU instruction fails for minBound `divMod` -1,
           -- but minBound `mod` -1 is well-defined (0). We therefore
           -- special-case it.
         | y == (-1)                  = 0
-        | otherwise                  = I32# (narrowInt32# ((extendInt32# x#) `modInt#` (extendInt32# y#)))
+        | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `modInt#` (int32ToInt# y#)))
     quotRem x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (extendInt32# x#) `quotRemInt#` (extendInt32# y#) of
+        | otherwise                  = case (int32ToInt# x#) `quotRemInt#` (int32ToInt# y#) of
                                        (# q, r #) ->
-                                           (I32# (narrowInt32# q),
-                                            I32# (narrowInt32# r))
+                                           (I32# (intToInt32# q),
+                                            I32# (intToInt32# r))
     divMod  x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (extendInt32# x#) `divModInt#` (extendInt32# y#) of
+        | otherwise                  = case (int32ToInt# x#) `divModInt#` (int32ToInt# y#) of
                                        (# d, m #) ->
-                                           (I32# (narrowInt32# d),
-                                            I32# (narrowInt32# m))
-    toInteger (I32# x#)              = IS (extendInt32# x#)
+                                           (I32# (intToInt32# d),
+                                            I32# (intToInt32# m))
+    toInteger (I32# x#)              = IS (int32ToInt# x#)
 
 -- | @since 2.01
 instance Read Int32 where
@@ -600,35 +600,35 @@ instance Bits Int32 where
     {-# INLINE testBit #-}
     {-# INLINE popCount #-}
 
-    (I32# x#) .&.   (I32# y#)  = I32# (narrowInt32# ((extendInt32# x#) `andI#` (extendInt32# y#)))
-    (I32# x#) .|.   (I32# y#)  = I32# (narrowInt32# ((extendInt32# x#) `orI#`  (extendInt32# y#)))
-    (I32# x#) `xor` (I32# y#)  = I32# (narrowInt32# ((extendInt32# x#) `xorI#` (extendInt32# y#)))
-    complement (I32# x#)       = I32# (narrowInt32# (notI# (extendInt32# x#)))
+    (I32# x#) .&.   (I32# y#)  = I32# (intToInt32# ((int32ToInt# x#) `andI#` (int32ToInt# y#)))
+    (I32# x#) .|.   (I32# y#)  = I32# (intToInt32# ((int32ToInt# x#) `orI#`  (int32ToInt# y#)))
+    (I32# x#) `xor` (I32# y#)  = I32# (intToInt32# ((int32ToInt# x#) `xorI#` (int32ToInt# y#)))
+    complement (I32# x#)       = I32# (intToInt32# (notI# (int32ToInt# x#)))
     (I32# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#)  = I32# (narrowInt32# ((extendInt32# x#) `iShiftL#` i#))
-        | otherwise            = I32# (narrowInt32# ((extendInt32# x#) `iShiftRA#` negateInt# i#))
+        | isTrue# (i# >=# 0#)  = I32# (intToInt32# ((int32ToInt# x#) `iShiftL#` i#))
+        | otherwise            = I32# (intToInt32# ((int32ToInt# x#) `iShiftRA#` negateInt# i#))
     (I32# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#)  = I32# (narrowInt32# ((extendInt32# x#) `iShiftL#` i#))
+        | isTrue# (i# >=# 0#)  = I32# (intToInt32# ((int32ToInt# x#) `iShiftL#` i#))
         | otherwise            = overflowError
     (I32# x#) `unsafeShiftL` (I# i#) =
-        I32# (narrowInt32# ((extendInt32# x#) `uncheckedIShiftL#` i#))
+        I32# (intToInt32# ((int32ToInt# x#) `uncheckedIShiftL#` i#))
     (I32# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#)  = I32# (narrowInt32# ((extendInt32# x#) `iShiftRA#` i#))
+        | isTrue# (i# >=# 0#)  = I32# (intToInt32# ((int32ToInt# x#) `iShiftRA#` i#))
         | otherwise            = overflowError
-    (I32# x#) `unsafeShiftR` (I# i#) = I32# (narrowInt32# ((extendInt32# x#) `uncheckedIShiftRA#` i#))
+    (I32# x#) `unsafeShiftR` (I# i#) = I32# (intToInt32# ((int32ToInt# x#) `uncheckedIShiftRA#` i#))
     (I32# x#) `rotate` (I# i#)
         | isTrue# (i'# ==# 0#)
         = I32# x#
         | otherwise
-        = I32# (narrowInt32# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
+        = I32# (intToInt32# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
                                          (x'# `uncheckedShiftRL#` (32# -# i'#)))))
         where
-        !x'# = narrow32Word# (int2Word# (extendInt32# x#))
+        !x'# = narrow32Word# (int2Word# (int32ToInt# x#))
         !i'# = word2Int# (int2Word# i# `and#` 31##)
     bitSizeMaybe i             = Just (finiteBitSize i)
     bitSize i                  = finiteBitSize i
     isSigned _                 = True
-    popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# (extendInt32# x#))))
+    popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# (int32ToInt# x#))))
     bit                        = bitDefault
     testBit                    = testBitDefault
 
@@ -637,17 +637,17 @@ instance FiniteBits Int32 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 32
-    countLeadingZeros  (I32# x#) = I# (word2Int# (clz32# (int2Word# (extendInt32# x#))))
-    countTrailingZeros (I32# x#) = I# (word2Int# (ctz32# (int2Word# (extendInt32# x#))))
+    countLeadingZeros  (I32# x#) = I# (word2Int# (clz32# (int2Word# (int32ToInt# x#))))
+    countTrailingZeros (I32# x#) = I# (word2Int# (ctz32# (int2Word# (int32ToInt# x#))))
 
 {-# RULES
-"fromIntegral/Word8->Int32"  fromIntegral = \(W8# x#) -> I32# (narrowInt32# (word2Int# (extendWord8# x#)))
-"fromIntegral/Word16->Int32" fromIntegral = \(W16# x#) -> I32# (narrowInt32# (word2Int# (extendWord16# x#)))
-"fromIntegral/Int8->Int32"   fromIntegral = \(I8# x#) -> I32# (narrowInt32# (extendInt8# x#))
-"fromIntegral/Int16->Int32"  fromIntegral = \(I16# x#) -> I32# (narrowInt32# (extendInt16# x#))
+"fromIntegral/Word8->Int32"  fromIntegral = \(W8# x#) -> I32# (intToInt32# (word2Int# (word8ToWord# x#)))
+"fromIntegral/Word16->Int32" fromIntegral = \(W16# x#) -> I32# (intToInt32# (word2Int# (word16ToWord# x#)))
+"fromIntegral/Int8->Int32"   fromIntegral = \(I8# x#) -> I32# (intToInt32# (int8ToInt# x#))
+"fromIntegral/Int16->Int32"  fromIntegral = \(I16# x#) -> I32# (intToInt32# (int16ToInt# x#))
 "fromIntegral/Int32->Int32"  fromIntegral = id :: Int32 -> Int32
-"fromIntegral/a->Int32"      fromIntegral = \x -> case fromIntegral x of I# x# -> I32# (narrowInt32# x#)
-"fromIntegral/Int32->a"      fromIntegral = \(I32# x#) -> fromIntegral (I# (extendInt32# x#))
+"fromIntegral/a->Int32"      fromIntegral = \x -> case fromIntegral x of I# x# -> I32# (intToInt32# x#)
+"fromIntegral/Int32->a"      fromIntegral = \(I32# x#) -> fromIntegral (I# (int32ToInt# x#))
   #-}
 
 {-# RULES

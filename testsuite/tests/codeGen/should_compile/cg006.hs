@@ -5,4 +5,4 @@ module ShouldCompile where
 import GHC.Base
 class Unboxable a where
     writeUnboxable :: MutableByteArray# RealWorld -> a -> State# RealWorld -> State# RealWorld
-    writeUnboxable arr a s  =  writeInt8Array# arr 0# (getTag 0) s
+    writeUnboxable arr a s  =  writeInt8Array# arr 0# (intToInt8# (getTag 0)) s

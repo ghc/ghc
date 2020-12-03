@@ -14,13 +14,13 @@ data Test3 = Test3 Int32# Word32#
     deriving (Show)
 
 test1 :: Test1
-test1 = Test1 (narrowInt8# 1#) (narrowWord8# 2##)
+test1 = Test1 (intToInt8# 1#) (wordToWord8# 2##)
 
 test2 :: Test2
-test2 = Test2 (narrowInt16# 1#) (narrowWord16# 2##)
+test2 = Test2 (intToInt16# 1#) (wordToWord16# 2##)
 
 test3 :: Test3
-test3 = Test3 (narrowInt32# 1#) (narrowWord32# 2##)
+test3 = Test3 (intToInt32# 1#) (wordToWord32# 2##)
 
 main :: IO ()
 main = do
