@@ -563,7 +563,11 @@ hashStr sbs@(SBS.SBS ba#) = loop 0# 0#
           -- DO NOT move this let binding! indexCharOffAddr# reads from the
           -- pointer so we need to evaluate this based on the length check
           -- above. Not doing this right caused #17909.
+#if __GLASGOW_HASKELL__ >= 901
+          !c = int8ToInt# (indexInt8Array# ba# n)
+#else
           !c = indexInt8Array# ba# n
+#endif
           !h2 = (h *# 16777619#) `xorI#` c
         in
           loop h2 (n +# 1#)

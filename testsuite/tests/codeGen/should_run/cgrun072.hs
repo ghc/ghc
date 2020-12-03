@@ -31,10 +31,10 @@ main = do putStrLn test_primop_bSwap16
           putStrLn test'_base_bSwap64
 
 bswap16 :: Word16 -> Word16
-bswap16 (W16# w#) = W16# (narrowWord16# (byteSwap16# (extendWord16# w#)))
+bswap16 (W16# w#) = W16# (wordToWord16# (byteSwap16# (word16ToWord# w#)))
 
 bswap32 :: Word32 -> Word32
-bswap32 (W32# w#) = W32# (narrowWord32# (byteSwap32# (extendWord32# w#)))
+bswap32 (W32# w#) = W32# (wordToWord32# (byteSwap32# (word32ToWord# w#)))
 
 bswap64 :: Word64 -> Word64
 bswap64 (W64# w#) = W64# (byteSwap64# w#)
