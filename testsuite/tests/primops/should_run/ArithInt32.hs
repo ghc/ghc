@@ -146,32 +146,32 @@ addMany (I# a) (I# b) (I# c) (I# d)
         (I# e) (I# f) (I# g) (I# h)
         (I# i) (I# j) (I# k) (I# l)
         (I# m) (I# n) (I# o) (I# p)
-            = I# (extendInt32# int32)
+            = I# (int32ToInt# int32)
   where
     !int32 = addMany#
-                (narrowInt32# a) (narrowInt32# b) (narrowInt32# c) (narrowInt32# d)
-                (narrowInt32# e) (narrowInt32# f) (narrowInt32# g) (narrowInt32# h)
-                (narrowInt32# i) (narrowInt32# j) (narrowInt32# k) (narrowInt32# l)
-                (narrowInt32# m) (narrowInt32# n) (narrowInt32# o) (narrowInt32# p)
+                (intToInt32# a) (intToInt32# b) (intToInt32# c) (intToInt32# d)
+                (intToInt32# e) (intToInt32# f) (intToInt32# g) (intToInt32# h)
+                (intToInt32# i) (intToInt32# j) (intToInt32# k) (intToInt32# l)
+                (intToInt32# m) (intToInt32# n) (intToInt32# o) (intToInt32# p)
 {-# NOINLINE addMany #-}
 
 -- Convenient and also tests higher order functions on Int32#
 apply1 :: (Int32# -> Int32#) -> Int -> Int
-apply1 opToTest (I# a) = I# (extendInt32# (opToTest (narrowInt32# a)))
+apply1 opToTest (I# a) = I# (int32ToInt# (opToTest (intToInt32# a)))
 {-# NOINLINE apply1 #-}
 
 apply2 :: (Int32# -> Int32# -> Int32#) -> Int -> Int -> Int
 apply2 opToTest (I# a) (I# b) =
-    let (# sa, sb #) = (# narrowInt32# a, narrowInt32# b #)
+    let (# sa, sb #) = (# intToInt32# a, intToInt32# b #)
         r = opToTest sa sb
-    in I# (extendInt32# r)
+    in I# (int32ToInt# r)
 {-# NOINLINE apply2 #-}
 
 apply3 :: (Int32# -> Int32# -> (# Int32#, Int32# #)) -> Int -> Int -> (Int, Int)
 apply3 opToTest (I# a) (I# b) =
-    let (# sa, sb #) = (# narrowInt32# a, narrowInt32# b #)
+    let (# sa, sb #) = (# intToInt32# a, intToInt32# b #)
         (# ra, rb #) = opToTest sa sb
-    in (I# (extendInt32# ra), I# (extendInt32# rb))
+    in (I# (int32ToInt# ra), I# (int32ToInt# rb))
 {-# NOINLINE apply3 #-}
 
 instance

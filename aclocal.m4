@@ -1102,10 +1102,10 @@ changequote([, ])dnl
 ])
 if test ! -f compiler/GHC/Parser/Lexer.hs || test ! -f compiler/GHC/Cmm/Lexer.hs
 then
-    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.1.7],
-      [AC_MSG_ERROR([Alex version 3.1.7 or later is required to compile GHC.])])[]
-    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-ge],[3.2.6],
-      [AC_MSG_ERROR([Alex version 3.2.5 or earlier is required to compile GHC. See GHC issue 19099 for more information.])])[]
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.2.6],
+      [AC_MSG_ERROR([Alex >= 3.2.6 && < 4 is required to compile GHC.])])[]
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-ge],[4.0.0],
+      [AC_MSG_ERROR([Alex >= 3.2.6 && < 4 is required to compile GHC.])])[]
 fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)

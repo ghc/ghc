@@ -47,13 +47,14 @@ box (MutableByteArrays x) = Box (unsafeCoerce# x)
 
 luckySingleton :: IO MutableByteArray
 luckySingleton = IO $ \s0 -> case newByteArray# 1# s0 of
-  (# s1, marr# #) -> case writeWord8Array# marr# 0# 42## s1 of
+  (# s1, marr# #) -> case writeWord8Array# marr# 0# fortyTwo s1 of
     s2 -> (# s2, MutableByteArray marr# #)
+  where W8# fortyTwo = 42
 
 readByteArray :: MutableByteArray -> Int -> IO Word8
 readByteArray (MutableByteArray b#) (I# i#) = IO $ \s0 ->
   case readWord8Array# b# i# s0 of
-    (# s1, w #) -> (# s1, W8# (narrowWord8# w) #)
+    (# s1, w #) -> (# s1, W8# w #)
 
 -- Write a mutable byte array to the array of mutable byte arrays
 -- at the given index.
