@@ -19,7 +19,6 @@ import GHCi.RemoteTypes
 import GHCi.FFI (C_ffi_cif)
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Utils.Outputable
-import GHC.Data.FastString
 import GHC.Types.Name
 import GHC.Types.Unique
 import GHC.Types.Literal
