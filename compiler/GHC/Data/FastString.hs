@@ -564,7 +564,7 @@ hashStr sbs@(SBS.SBS ba#) = loop 0# 0#
           -- pointer so we need to evaluate this based on the length check
           -- above. Not doing this right caused #17909.
 #if __GLASGOW_HASKELL__ >= 901
-          !c = extendInt8# (indexInt8Array# ba# n)
+          !c = int8ToInt# (indexInt8Array# ba# n)
 #else
           !c = indexInt8Array# ba# n
 #endif
