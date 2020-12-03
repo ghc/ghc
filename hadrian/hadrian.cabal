@@ -146,8 +146,7 @@ executable hadrian
                        , shake                >= 0.18.3  && < 0.20
                        , transformers         >= 0.4     && < 0.6
                        , unordered-containers >= 0.2.1   && < 0.3
-    build-tools:         alex  >= 3.1    && < 3.2.6
-                         -- See GHC#19099 for why we constrain alex < 3.2.6.
+    build-tools:         alex  >= 3.2.6  && < 4
                        , happy >= 1.20.0 && < 1.21
     ghc-options:       -Wall
                        -Wincomplete-record-updates

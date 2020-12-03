@@ -11,10 +11,10 @@ data Test2 = Test2 Int16# Word16#
     deriving (Show)
 
 test1 :: Test1
-test1 = Test1 (narrowInt8# 1#) (narrowWord8# 2##)
+test1 = Test1 (intToInt8# 1#) (wordToWord8# 2##)
 
 test2 :: Test2
-test2 = Test2 (narrowInt16# 1#) (narrowWord16# 2##)
+test2 = Test2 (intToInt16# 1#) (wordToWord16# 2##)
 
 main :: IO ()
 main = do
