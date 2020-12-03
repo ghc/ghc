@@ -1230,7 +1230,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
                  -- The ptr points at the header.  Advance it over the
                  -- header and then pretend this is an Addr#.
                  let code = push_fo `snocOL` SWIZZLE 0 (fromIntegral hdr_sz)
-                 return ((code, AddrRep):rest)
+                 return ((code, AddrRep) : rest)
          pargs d (aa:az) =  do (code_a, sz_a) <- pushAtom d p aa
                                rest <- pargs (d + sz_a) az
                                return ((code_a, atomPrimRep aa) : rest)
