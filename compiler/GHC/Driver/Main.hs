@@ -130,6 +130,8 @@ import GHC.Core
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Lint           ( lintInteractiveExpr )
+import GHC.Core.Multiplicity
+import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
 import GHC.Core.Opt.Pipeline
 import GHC.Core.TyCon
@@ -155,7 +157,7 @@ import GHC.Stg.Pipeline ( stg2stg )
 
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
-import GHC.Builtin.Types ( unitDataConId )
+import GHC.Builtin.Uniques ( mkPseudoUniqueE )
 
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
@@ -1711,7 +1713,6 @@ myCoreToStg hsc_env this_mod prepd_binds = do
 
     return (stg_binds2, cost_centre_info)
 
-
 {- **********************************************************************
 %*                                                                      *
 \subsection{Compiling a do-statement}
@@ -2014,10 +2015,15 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
            {- Lint if necessary -}
          ; lintInteractiveExpr (text "hscCompileExpr") hsc_env prepd_expr
 
+           {- Create a temporary binding and convert to STG -}
+         ; let bco_tmp_id = mkSysLocal (fsLit "BCO_toplevel")
+                                       (mkPseudoUniqueE 0)
+                                       Many
+                                       (exprType prepd_expr)
          ; ([StgTopLifted (StgNonRec _ stg_expr)], _) <-
              myCoreToStg hsc_env
                          (icInteractiveModule (hsc_IC hsc_env))
-                         [NonRec unitDataConId prepd_expr]
+                         [NonRec bco_tmp_id prepd_expr]
 
            {- Convert to BCOs -}
          ; bcos <- coreExprToBCOs hsc_env
