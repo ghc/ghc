@@ -1202,6 +1202,17 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
          addr_size_b :: ByteOff
          addr_size_b = wordSize platform
 
+         arrayish_rep_hdr_size :: TyCon -> Maybe Int
+         arrayish_rep_hdr_size t
+           | t == arrayPrimTyCon || t == mutableArrayPrimTyCon
+              = Just (arrPtrsHdrSize profile)
+           | t == smallArrayPrimTyCon || t == smallMutableArrayPrimTyCon
+              = Just (smallArrPtrsHdrSize profile)
+           | t == byteArrayPrimTyCon || t == mutableByteArrayPrimTyCon
+              = Just (arrWordsHdrSize profile)
+           | otherwise
+              = Nothing
+
          -- Get the args on the stack, with tags and suitably
          -- dereferenced for the CCall.  For each arg, return the
          -- depth to the first word of the bits for that arg, and the
@@ -1210,52 +1221,21 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
          pargs
              :: ByteOff -> [StgArg] -> BcM [(BCInstrList, PrimRep)]
          pargs _ [] = return []
-         -- XXX handle StgLitArg
          pargs d (aa@(StgVarArg a):az)
-            = let arg_ty = idType a
-              in case tyConAppTyCon_maybe arg_ty of
-                    -- Don't push the FO; instead push the Addr# it
-                    -- contains.
-                    Just t
-                     | t == arrayPrimTyCon || t == mutableArrayPrimTyCon
-                       -> do rest <- pargs (d + addr_size_b) az
-                             code <- parg_ArrayishRep (fromIntegral (arrPtrsHdrSize profile)) d p aa
-                             return ((code,AddrRep):rest)
-
-                     | t == smallArrayPrimTyCon || t == smallMutableArrayPrimTyCon
-                       -> do rest <- pargs (d + addr_size_b) az
-                             code <- parg_ArrayishRep (fromIntegral (smallArrPtrsHdrSize profile)) d p aa
-                             return ((code,AddrRep):rest)
-
-                     | t == byteArrayPrimTyCon || t == mutableByteArrayPrimTyCon
-                       -> do rest <- pargs (d + addr_size_b) az
-                             code <- parg_ArrayishRep (fromIntegral (arrWordsHdrSize profile)) d p aa
-                             return ((code,AddrRep):rest)
-
-                    -- Default case: push taggedly, but otherwise intact.
-                    _
-                       -> do (code_a, sz_a) <- pushAtom d p aa
-                             rest <- pargs (d + sz_a) az
-                             return ((code_a, atomPrimRep aa) : rest)
-        --- XXX remove duplication
+            | Just t      <- tyConAppTyCon_maybe (idType a)
+            , Just hdr_sz <- arrayish_rep_hdr_size t
+            -- Do magic for Ptr/Byte arrays.  Push a ptr to the array on
+            -- the stack but then advance it over the headers, so as to
+            -- point to the payload.
+            = do rest <- pargs (d + addr_size_b) az
+                 (push_fo, _) <- pushAtom d p aa
+                 -- The ptr points at the header.  Advance it over the
+                 -- header and then pretend this is an Addr#.
+                 let code = push_fo `snocOL` SWIZZLE 0 (fromIntegral hdr_sz)
+                 return ((code, AddrRep):rest)
          pargs d (aa:az) =  do (code_a, sz_a) <- pushAtom d p aa
                                rest <- pargs (d + sz_a) az
                                return ((code_a, atomPrimRep aa) : rest)
-
-         -- Do magic for Ptr/Byte arrays.  Push a ptr to the array on
-         -- the stack but then advance it over the headers, so as to
-         -- point to the payload.
-         parg_ArrayishRep
-             :: Word16
-             -> StackDepth
-             -> BCEnv
-             -> StgArg
-             -> BcM BCInstrList
-         parg_ArrayishRep hdrSize d p a
-            = do (push_fo, _) <- pushAtom d p a
-                 -- The ptr points at the header.  Advance it over the
-                 -- header and then pretend this is an Addr#.
-                 return (push_fo `snocOL` SWIZZLE 0 hdrSize)
 
      code_n_reps <- pargs d0 args_r_to_l
      let
