@@ -46,7 +46,7 @@ bytesEq (Bytes m1) (Bytes m2)
             (# s', e1 #) ->
               case readWord8Array# m2 i s' of
                 (# s'', e2 #) ->
-                  if isTrue# (eqWord# e1 e2)
+                  if isTrue# (eqWord8# e1 e2)
                     then loop (i +# 1#) s''
                     else (# s'', False #)
 
@@ -56,7 +56,7 @@ bytesUnpackChars (Bytes mba)
   | I# (sizeofMutableByteArray# mba) == 0 = []
   | otherwise = unsafePerformIO $ do
       c <- IO $ \s -> case readWord8Array# mba 0# s of
-                        (# s'', w #) -> (# s'', C# (chr# (word2Int# w)) #)
+         (# s'', w #) -> (# s'', C# (chr# (word2Int# (word8ToWord# w))) #)
       return [c]
 
 ----------------------------------------------------------------

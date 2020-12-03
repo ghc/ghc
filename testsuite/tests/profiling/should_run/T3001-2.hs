@@ -153,7 +153,7 @@ readN :: Int -> (S.ByteString -> a) -> Get a
 readN n f = fmap f $ getBytes n
 
 shiftl_w32 :: Word32 -> Int -> Word32
-shiftl_w32 (W32# w) (I# i) = W32# (narrowWord32# ((extendWord32# w) `uncheckedShiftL#`   i))
+shiftl_w32 (W32# w) (I# i) = W32# (wordToWord32# ((word32ToWord# w) `uncheckedShiftL#`   i))
 
 getPtr :: Storable a => Int -> Get a
 getPtr n = do
@@ -274,7 +274,7 @@ putWord32beB w = writeN 4 $ \p -> do
     poke (p `plusPtr` 3) (fromIntegral (w)               :: Word8)
 
 shiftr_w32 :: Word32 -> Int -> Word32
-shiftr_w32 (W32# w) (I# i) = W32# (narrowWord32# ((extendWord32# w) `uncheckedShiftRL#`   i))
+shiftr_w32 (W32# w) (I# i) = W32# (wordToWord32# ((word32ToWord# w) `uncheckedShiftRL#`   i))
 
 flush :: Builder
 flush = Builder $ \ k buf@(Buffer p o u l) ->

@@ -38,15 +38,15 @@ element_types = [
 #    element_types += [ ElementType(f"Word{n}", f"Word{n}#", f"{n}-bit unsigned integer", n // 8) ]
 
 element_types += [
-    ElementType("Int8",   "Int#",  "8-bit signed integer",  1),
-    ElementType("Int16",  "Int#",  "16-bit signed integer", 2),
-    ElementType("Int32",  "INT32", "32-bit signed integer", 4),
-    ElementType("Int64",  "INT64", "64-bit signed integer", 8),
+    ElementType("Int8",   "Int8#",  "8-bit signed integer",  1),
+    ElementType("Int16",  "Int16#", "16-bit signed integer", 2),
+    ElementType("Int32",  "Int32#", "32-bit signed integer", 4),
+    ElementType("Int64",  "INT64",  "64-bit signed integer", 8),
 
-    ElementType("Word8",  "Word#",  "8-bit unsigned integer",  1),
-    ElementType("Word16", "Word#",  "16-bit unsigned integer", 2),
-    ElementType("Word32", "WORD32", "32-bit unsigned integer", 4),
-    ElementType("Word64", "WORD64", "64-bit unsigned integer", 8),
+    ElementType("Word8",  "Word8#",  "8-bit unsigned integer",  1),
+    ElementType("Word16", "Word16#", "16-bit unsigned integer", 2),
+    ElementType("Word32", "Word32#", "32-bit unsigned integer", 4),
+    ElementType("Word64", "WORD64",  "64-bit unsigned integer", 8),
 ]
 
 def pretty_offset(n: Optional[int]) -> str:
