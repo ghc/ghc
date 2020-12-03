@@ -246,9 +246,7 @@ bcPrepExpr (StgTick tick_ty bp@Breakpoint{} rhs)
                                             [voidArgId]
                                             expr'
                              )
-          -- XXX check, is this the right place to use st?
-          letExp = StgLet noExtFieldSilent bnd (StgApp id [StgVarArg st])
-      pure letExp
+      pure $ StgLet noExtFieldSilent bnd (StgApp id [StgVarArg st])
 bcPrepExpr (StgTick tick_ty tick rhs) =
   StgTick tick_ty tick <$> bcPrepExpr rhs
 bcPrepExpr (StgLet xlet bnds expr) =
@@ -1109,7 +1107,7 @@ doCase d s p scrut bndr alts is_unboxed_tuple
         my_discr (DEFAULT, _, _) = NoDiscr {-shouldn't really happen-}
         my_discr (DataAlt dc, _, _)
            | isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
-           = NoDiscr -- XXX revert!!! multiValException
+           = multiValException
            | otherwise
            = DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))
         my_discr (LitAlt l, _, _)
