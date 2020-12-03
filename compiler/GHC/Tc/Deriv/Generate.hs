@@ -1517,8 +1517,9 @@ gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
     eqAddr_RDR  , ltAddr_RDR  , geAddr_RDR  , gtAddr_RDR  , leAddr_RDR  ,
     eqFloat_RDR , ltFloat_RDR , geFloat_RDR , gtFloat_RDR , leFloat_RDR ,
     eqDouble_RDR, ltDouble_RDR, geDouble_RDR, gtDouble_RDR, leDouble_RDR,
-    extendWord8_RDR, extendInt8_RDR,
-    extendWord16_RDR, extendInt16_RDR :: RdrName
+    word8ToWord_RDR , int8ToInt_RDR ,
+    word16ToWord_RDR, int16ToInt_RDR
+    :: RdrName
 gfoldl_RDR     = varQual_RDR  gENERICS (fsLit "gfoldl")
 gunfold_RDR    = varQual_RDR  gENERICS (fsLit "gunfold")
 toConstr_RDR   = varQual_RDR  gENERICS (fsLit "toConstr")
@@ -1595,11 +1596,11 @@ leDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "<=##")
 gtDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit ">##" )
 geDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit ">=##")
 
-extendWord8_RDR = varQual_RDR  gHC_PRIM (fsLit "extendWord8#")
-extendInt8_RDR  = varQual_RDR  gHC_PRIM (fsLit "extendInt8#")
+word8ToWord_RDR = varQual_RDR  gHC_PRIM (fsLit "word8ToWord#")
+int8ToInt_RDR   = varQual_RDR  gHC_PRIM (fsLit "int8ToInt#")
 
-extendWord16_RDR = varQual_RDR  gHC_PRIM (fsLit "extendWord16#")
-extendInt16_RDR  = varQual_RDR  gHC_PRIM (fsLit "extendInt16#")
+word16ToWord_RDR = varQual_RDR  gHC_PRIM (fsLit "word16ToWord#")
+int16ToInt_RDR   = varQual_RDR  gHC_PRIM (fsLit "int16ToInt#")
 
 
 {-
@@ -2387,16 +2388,16 @@ boxConTbl =
     , (doublePrimTy, nlHsApp (nlHsVar $ getRdrName doubleDataCon))
     , (int8PrimTy,
         nlHsApp (nlHsVar $ getRdrName intDataCon)
-        . nlHsApp (nlHsVar extendInt8_RDR))
+        . nlHsApp (nlHsVar int8ToInt_RDR))
     , (word8PrimTy,
         nlHsApp (nlHsVar $ getRdrName wordDataCon)
-        .  nlHsApp (nlHsVar extendWord8_RDR))
+        .  nlHsApp (nlHsVar word8ToWord_RDR))
     , (int16PrimTy,
         nlHsApp (nlHsVar $ getRdrName intDataCon)
-        . nlHsApp (nlHsVar extendInt16_RDR))
+        . nlHsApp (nlHsVar int16ToInt_RDR))
     , (word16PrimTy,
         nlHsApp (nlHsVar $ getRdrName wordDataCon)
-        .  nlHsApp (nlHsVar extendWord16_RDR))
+        .  nlHsApp (nlHsVar word16ToWord_RDR))
     ]
 
 
@@ -2416,10 +2417,10 @@ postfixModTbl
 
 primConvTbl :: [(Type, String)]
 primConvTbl =
-    [ (int8PrimTy, "narrowInt8#")
-    , (word8PrimTy, "narrowWord8#")
-    , (int16PrimTy, "narrowInt16#")
-    , (word16PrimTy, "narrowWord16#")
+    [ (int8PrimTy, "intToInt8#")
+    , (word8PrimTy, "wordToWord8#")
+    , (int16PrimTy, "intToInt16#")
+    , (word16PrimTy, "wordToWord16#")
     ]
 
 litConTbl :: [(Type, LHsExpr GhcPs -> LHsExpr GhcPs)]
