@@ -1708,10 +1708,11 @@ stmtTreeToStmts monad_names ctxt (StmtTreeBind before after) tail tail_fvs = do
 
 stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
    pairs <- mapM (stmtTreeArg ctxt tail_fvs) trees
+   dflags <- getDynFlags
    let (stmts', fvss) = unzip pairs
    let (need_join, tail') =
      -- See Note [ApplicativeDo and refutable patterns]
-         if any hasRefutablePattern stmts'
+         if any (hasRefutablePattern dflags) stmts'
          then (True, tail)
          else needJoin monad_names tail
 
@@ -1866,10 +1867,11 @@ of a refutable pattern, in order for the types to work out.
 
 -}
 
-hasRefutablePattern :: ApplicativeArg GhcRn -> Bool
-hasRefutablePattern (ApplicativeArgOne { app_arg_pattern = pat
-                                       , is_body_stmt = False}) = not (isIrrefutableHsPat pat)
-hasRefutablePattern _ = False
+hasRefutablePattern :: DynFlags -> ApplicativeArg GhcRn -> Bool
+hasRefutablePattern dflags (ApplicativeArgOne { app_arg_pattern = pat
+                                              , is_body_stmt = False}) =
+                                         not (isIrrefutableHsPat dflags pat)
+hasRefutablePattern _ _ = False
 
 isLetStmt :: LStmt (GhcPass a) b -> Bool
 isLetStmt (L _ LetStmt{}) = True
@@ -2156,17 +2158,18 @@ badIpBinds what binds
 monadFailOp :: LPat GhcPs
             -> HsStmtContext GhcRn
             -> RnM (FailOperator GhcRn, FreeVars)
-monadFailOp pat ctxt
-  -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
-  -- we should not need to fail.
-  | isIrrefutableHsPat pat = return (Nothing, emptyFVs)
+monadFailOp pat ctxt = do
+    dflags <- getDynFlags
+        -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
+        -- we should not need to fail.
+    if | isIrrefutableHsPat dflags pat -> return (Nothing, emptyFVs)
 
-  -- For non-monadic contexts (e.g. guard patterns, list
-  -- comprehensions, etc.) we should not need to fail, or failure is handled in
-  -- a different way. See Note [Failing pattern matches in Stmts].
-  | not (isMonadStmtContext ctxt) = return (Nothing, emptyFVs)
+        -- For non-monadic contexts (e.g. guard patterns, list
+        -- comprehensions, etc.) we should not need to fail, or failure is handled in
+        -- a different way. See Note [Failing pattern matches in Stmts].
+       | not (isMonadStmtContext ctxt) -> return (Nothing, emptyFVs)
 
-  | otherwise = getMonadFailOp ctxt
+       | otherwise -> getMonadFailOp ctxt
 
 {-
 Note [Monad fail : Rebindable syntax, overloaded strings]

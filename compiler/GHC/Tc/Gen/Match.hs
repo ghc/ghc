@@ -65,6 +65,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Driver.Session ( getDynFlags )
 
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name
@@ -947,12 +948,12 @@ tcMonadFailOp :: CtOrigin
 -- match can't fail (so the fail op is Nothing), however, it seems that the
 -- isIrrefutableHsPat test is still required here for some reason I haven't
 -- yet determined.
-tcMonadFailOp orig pat fail_op res_ty
-  | isIrrefutableHsPat pat
-  = return Nothing
-  | otherwise
-  = Just . snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
-                             (mkCheckExpType res_ty) $ \_ _ -> return ())
+tcMonadFailOp orig pat fail_op res_ty = do
+    dflags <- getDynFlags
+    if isIrrefutableHsPat dflags pat
+      then return Nothing
+      else Just . snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
+                            (mkCheckExpType res_ty) $ \_ _ -> return ())
 
 {-
 Note [Treat rebindable syntax first]
