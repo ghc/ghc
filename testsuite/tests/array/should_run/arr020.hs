@@ -20,12 +20,12 @@ newByteArray (I# n#)
 
 writeByteArray :: MutableByteArray s -> Int -> Word32 -> ST s ()
 writeByteArray (MutableByteArray mba#) (I# i#) (W32# w#)
-  = ST $ \s# -> case writeWord32Array# mba# i# (extendWord32# w#) s# of
+  = ST $ \s# -> case writeWord32Array# mba# i# w# s# of
            s'# -> (# s'#, () #)
 
 indexArray :: ByteArray Word32 -> Int -> Word32
 indexArray (ByteArray arr#) (I# i#)
-  = W32# (narrowWord32# (indexWord32Array# arr# i#))
+  = W32# (indexWord32Array# arr# i#)
 
 unsafeFreezeByteArray :: MutableByteArray s -> ST s (ByteArray e)
 unsafeFreezeByteArray (MutableByteArray mba#)
