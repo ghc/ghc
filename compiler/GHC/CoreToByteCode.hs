@@ -614,7 +614,6 @@ returnUnboxedTuple d s p es = do
 
 
 -- return a tuple that's already on the stack in the right order
-{-
 returnUnboxedTuple'
     :: StackDepth -- ^ current stack depth
     -> Sequel     -- ^ depth of sequel
@@ -638,7 +637,6 @@ returnUnboxedTuple' d s _p d_tuple t_reps = do
             `snocOL` PUSH_UBX (mkLitWord platform . fromIntegral $ mkTupleInfoSig tuple_info) 1 -- add info word
             `snocOL` PUSH_BCO tuple_bco
             `snocOL` RETURN_T) -- go
--}
 
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
@@ -646,6 +644,10 @@ schemeE
     :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
 -- Delegate tail-calls to schemeT.
 schemeE d s p (StgApp x [])
+   | isUnboxedTupleType (idType x) =
+        let d_tuple = fromMaybe (panic "CoreToByteCode.schemeE: global unboxed tuples are not supported")
+                                (lookupBCEnv_maybe x p)
+        in returnUnboxedTuple' d s p d_tuple (bcIdPrimReps x) --- XXX should this be arg reps instead?
    | isUnliftedType (idType x) = do
       platform <- profilePlatform <$> getProfile
       returnUnboxedAtom d s p (StgVarArg x) (bcIdArgRep platform x)
@@ -923,7 +925,7 @@ schemeT d s p (StgConApp con args _tys)
         [arg1,arg2] | isVAtom platform arg2 ->
                   unboxedTupleReturn d s p arg1
         -- XXX find if we can work the above cases into the general version
-        other -> returnUnboxedTuple d s p (reverse other)
+        other -> returnUnboxedTuple d s p other
 
    -- Case 3: Ordinary data constructor
    | otherwise
