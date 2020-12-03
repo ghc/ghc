@@ -8,7 +8,7 @@
 set -e -o pipefail
 
 # Configuration:
-hackage_index_state="2020-09-14T19:30:43Z"
+HACKAGE_INDEX_STATE="2020-12-21T14:48:20Z" # TODO dedup with yaml's def
 MIN_HAPPY_VERSION="1.20"
 MIN_ALEX_VERSION="3.2"
 
@@ -304,7 +304,7 @@ function setup_toolchain() {
 
   cabal_install="$CABAL v2-install \
     --with-compiler=$GHC \
-    --index-state=$hackage_index_state \
+    --index-state=$HACKAGE_INDEX_STATE \
     --installdir=$toolchain/bin \
     --overwrite-policy=always"
 
