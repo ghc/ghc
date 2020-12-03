@@ -249,9 +249,6 @@ section "The word size story."
 
 -- Define synonyms for indexing ops.
 
-#define INT32 Int#
-#define WORD32 Word#
-
 #if WORD_SIZE_IN_BITS < 64
 #define INT64 Int64#
 #define WORD64 Word64#
@@ -1906,15 +1903,15 @@ primop IndexOffAddrOp_StablePtr "indexStablePtrOffAddr#" GenPrimOp
    with can_fail = True
 
 primop IndexOffAddrOp_Int8 "indexInt8OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int#
+   Addr# -> Int# -> Int8#
    with can_fail = True
 
 primop IndexOffAddrOp_Int16 "indexInt16OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int#
+   Addr# -> Int# -> Int16#
    with can_fail = True
 
 primop IndexOffAddrOp_Int32 "indexInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT32
+   Addr# -> Int# -> Int32#
    with can_fail = True
 
 primop IndexOffAddrOp_Int64 "indexInt64OffAddr#" GenPrimOp
@@ -1922,15 +1919,15 @@ primop IndexOffAddrOp_Int64 "indexInt64OffAddr#" GenPrimOp
    with can_fail = True
 
 primop IndexOffAddrOp_Word8 "indexWord8OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word#
+   Addr# -> Int# -> Word8#
    with can_fail = True
 
 primop IndexOffAddrOp_Word16 "indexWord16OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word#
+   Addr# -> Int# -> Word16#
    with can_fail = True
 
 primop IndexOffAddrOp_Word32 "indexWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD32
+   Addr# -> Int# -> Word32#
    with can_fail = True
 
 primop IndexOffAddrOp_Word64 "indexWord64OffAddr#" GenPrimOp
@@ -1980,17 +1977,17 @@ primop ReadOffAddrOp_StablePtr "readStablePtrOffAddr#" GenPrimOp
         can_fail         = True
 
 primop ReadOffAddrOp_Int8 "readInt8OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Int# #)
+   Addr# -> Int# -> State# s -> (# State# s, Int8# #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Int16 "readInt16OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Int# #)
+   Addr# -> Int# -> State# s -> (# State# s, Int16# #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Int32 "readInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, INT32 #)
+   Addr# -> Int# -> State# s -> (# State# s, Int32# #)
    with has_side_effects = True
         can_fail         = True
 
@@ -2000,17 +1997,17 @@ primop ReadOffAddrOp_Int64 "readInt64OffAddr#" GenPrimOp
         can_fail         = True
 
 primop ReadOffAddrOp_Word8 "readWord8OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Word# #)
+   Addr# -> Int# -> State# s -> (# State# s, Word8# #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Word16 "readWord16OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Word# #)
+   Addr# -> Int# -> State# s -> (# State# s, Word16# #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Word32 "readWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, WORD32 #)
+   Addr# -> Int# -> State# s -> (# State# s, Word32# #)
    with has_side_effects = True
         can_fail         = True
 
@@ -2060,17 +2057,17 @@ primop  WriteOffAddrOp_StablePtr "writeStablePtrOffAddr#" GenPrimOp
         can_fail         = True
 
 primop  WriteOffAddrOp_Int8 "writeInt8OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int# -> State# s -> State# s
+   Addr# -> Int# -> Int8# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Int16 "writeInt16OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int# -> State# s -> State# s
+   Addr# -> Int# -> Int16# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Int32 "writeInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT32 -> State# s -> State# s
+   Addr# -> Int# -> Int32# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
@@ -2080,17 +2077,17 @@ primop  WriteOffAddrOp_Int64 "writeInt64OffAddr#" GenPrimOp
         can_fail         = True
 
 primop  WriteOffAddrOp_Word8 "writeWord8OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word# -> State# s -> State# s
+   Addr# -> Int# -> Word8# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Word16 "writeWord16OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word# -> State# s -> State# s
+   Addr# -> Int# -> Word16# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Word32 "writeWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD32 -> State# s -> State# s
+   Addr# -> Int# -> Word32# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
@@ -3265,20 +3262,20 @@ section "SIMD Vectors"
 ------------------------------------------------------------------------
 
 #define ALL_VECTOR_TYPES \
-  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
-  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
-  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,WORD32,4>,<Word64,WORD64,2> \
-  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,WORD32,8>,<Word64,WORD64,4> \
-  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,WORD32,16>,<Word64,WORD64,8> \
+  [<Int8,Int8#,16>,<Int16,Int16#,8>,<Int32,Int32#,4>,<Int64,INT64,2> \
+  ,<Int8,Int8#,32>,<Int16,Int16#,16>,<Int32,Int32#,8>,<Int64,INT64,4> \
+  ,<Int8,Int8#,64>,<Int16,Int16#,32>,<Int32,Int32#,16>,<Int64,INT64,8> \
+  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,Word32#,4>,<Word64,WORD64,2> \
+  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,Word32#,8>,<Word64,WORD64,4> \
+  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,Word32#,16>,<Word64,WORD64,8> \
   ,<Float,Float#,4>,<Double,Double#,2> \
   ,<Float,Float#,8>,<Double,Double#,4> \
   ,<Float,Float#,16>,<Double,Double#,8>]
 
 #define SIGNED_VECTOR_TYPES \
-  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
-  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
+  [<Int8,Int8#,16>,<Int16,Int16#,8>,<Int32,Int32#,4>,<Int64,INT64,2> \
+  ,<Int8,Int8#,32>,<Int16,Int16#,16>,<Int32,Int32#,8>,<Int64,INT64,4> \
+  ,<Int8,Int8#,64>,<Int16,Int16#,32>,<Int32,Int32#,16>,<Int64,INT64,8> \
   ,<Float,Float#,4>,<Double,Double#,2> \
   ,<Float,Float#,8>,<Double,Double#,4> \
   ,<Float,Float#,16>,<Double,Double#,8>]
@@ -3289,12 +3286,12 @@ section "SIMD Vectors"
   ,<Float,Float#,16>,<Double,Double#,8>]
 
 #define INT_VECTOR_TYPES \
-  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
-  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
-  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,WORD32,4>,<Word64,WORD64,2> \
-  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,WORD32,8>,<Word64,WORD64,4> \
-  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,WORD32,16>,<Word64,WORD64,8>]
+  [<Int8,Int8#,16>,<Int16,Int16#,8>,<Int32,Int32#,4>,<Int64,INT64,2> \
+  ,<Int8,Int8#,32>,<Int16,Int16#,16>,<Int32,Int32#,8>,<Int64,INT64,4> \
+  ,<Int8,Int8#,64>,<Int16,Int16#,32>,<Int32,Int32#,16>,<Int64,INT64,8> \
+  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,Word32#,4>,<Word64,WORD64,2> \
+  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,Word32#,8>,<Word64,WORD64,4> \
+  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,Word32#,16>,<Word64,WORD64,8>]
 
 primtype VECTOR
    with llvm_only = True
