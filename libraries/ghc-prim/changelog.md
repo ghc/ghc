@@ -1,3 +1,21 @@
+## 0.8.0 (edit as necessary)
+
+- Change array access primops to use type with size maxing the element size:
+
+   - `index{Int,Word}<N>Array# :: ByteArray# -> Int# -> {Int,Word}<N>#`
+   - `indexWord8ArrayAs{Int,Word}<N># :: ByteArray# -> Int# -> {Int,Word}<N>#`
+   - `read{Int,Word}<N>Array# :: MutableByteArray# s -> Int# -> State# s -> (# State# s, {Int,Word}<N># #)`
+   - `write{Int,Word}<N>Array# :: MutableByteArray# s -> Int# -> {Int,Word}<N># -> State# s -> State# s`
+   - `readWord8ArrayAs{Int,Word}<N># :: MutableByteArray# s -> Int# -> State# s -> (# State# s, {Int,Word}<N># #)`
+   - `writeWord8ArrayAs{Int,Word}<N># :: MutableByteArray# s -> Int# -> {Int,Word}<N># -> State# s -> State# s`
+
+  This was already the for the 64-bit access primops, but not the smaller ones.
+
+- Rename some numeric prim type conversion primops:
+
+   - `extend{Int,Word}<N>#` -> `extend<N>To{Int,Word}#`
+   - `narrow{Int,Word}<N>#` -> `intTo{Int,Word}<N>#`
+
 ## 0.7.0 (edit as necessary)
 
 - Shipped with GHC 9.0.1
