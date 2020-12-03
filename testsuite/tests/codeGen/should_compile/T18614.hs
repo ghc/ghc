@@ -8,4 +8,4 @@ import GHC.Exts
 main = pure ()
 
 test :: Word8# -> Word8#
-test x = x `plusWord8#` narrowWord8# 1##
+test x = x `plusWord8#` wordToWord8# 1##

@@ -12,6 +12,6 @@ x# `divInt8#` y#
     ((x# `plusInt8#` one#) `quotInt8#` y#) `subInt8#` one#
   | otherwise = x# `quotInt8#` y#
   where
-    zero# = narrowInt8# 0#
-    one# = narrowInt8# 1#
+    zero# = intToInt8# 0#
+    one# = intToInt8# 1#
 

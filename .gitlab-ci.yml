@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 0da9c4be73f2d73868f610d20352af856e8f2727
+  DOCKER_REV: 706cc974bfe7a54c5036185ddf4817d3a8fd5b0d
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh. Used for invalidation of GitLab CI cache.
@@ -15,6 +15,8 @@ variables:
   CONFIGURE_ARGS: ""
 
   GIT_SUBMODULE_STRATEGY: "recursive"
+
+  HACKAGE_INDEX_STATE: "2020-12-21T14:48:20Z"
 
 stages:
   - tool-lint      # Source linting of the tools
@@ -198,6 +200,7 @@ lint-release-changelogs:
     BUILD_FLAVOUR: "validate"
   script:
     - .gitlab/ci.sh setup
+    - "cabal update --index=$HACKAGE_INDEX_STATE"
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_hadrian
     - .gitlab/ci.sh test_hadrian
@@ -298,8 +301,8 @@ hadrian-ghc-in-ghci:
   script:
     - git clean -xdf && git submodule foreach git clean -xdf
     - .gitlab/ci.sh setup
+    - "cabal update --index=$HACKAGE_INDEX_STATE"
     - .gitlab/ci.sh configure
-    - cabal update
     - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
     # Load ghc-in-ghci then immediately exit and check the modules loaded
     - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
@@ -328,7 +331,7 @@ hadrian-ghc-in-ghci:
     - git submodule update --init --recursive
     - git checkout .gitmodules
     - .gitlab/ci.sh setup
-    - cabal update
+    - "cabal update --index=$HACKAGE_INDEX_STATE"
     - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
@@ -1168,6 +1171,8 @@ perf-nofib:
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
   tags:
     - x86_64-linux
+  before_script:
+    - "cabal update --index=$HACKAGE_INDEX_STATE"
   script:
     - root=$(pwd)/ghc
     - |
@@ -1179,7 +1184,7 @@ perf-nofib:
       popd
       rm -Rf tmp
     - export BOOT_HC=$GHC
-    - cabal update; cabal install -w "$BOOT_HC" --lib regex-compat
+    - cabal install -w "$BOOT_HC" --lib regex-compat
     - export PATH=$root/bin:$PATH
     - make -C nofib boot mode=fast -j$CPUS
     - "make -C nofib EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS 2>&1 | tee nofib.log"
