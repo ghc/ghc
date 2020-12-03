@@ -61,7 +61,7 @@ textP arr off len | len == 0  = emptyT
 {-# INLINE textP #-}
 
 unsafeChrT :: Word16 -> Char
-unsafeChrT (W16# w#) = C# (chr# (word2Int# (extendWord16# w#)))
+unsafeChrT (W16# w#) = C# (chr# (word2Int# (word16ToWord# w#)))
 {-# INLINE unsafeChrT #-}
 
 data Array = Array ByteArray#
@@ -82,7 +82,7 @@ unsafeFreeze (MArray maBA) = ST $ \s# -> (# s#, Array (unsafeCoerce# maBA) #)
 
 unsafeIndex :: Array -> Int -> Word16
 unsafeIndex (Array aBA) (I# i#) =
-    case indexWord16Array# aBA i# of r# -> (W16# (narrowWord16# r#))
+    case indexWord16Array# aBA i# of r# -> (W16# r#)
 {-# INLINE unsafeIndex #-}
 
 empty :: Array
