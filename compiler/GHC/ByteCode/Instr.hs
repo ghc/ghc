@@ -89,6 +89,9 @@ data BCInstr
    -- Push an alt continuation
    | PUSH_ALTS          (ProtoBCO Name)
    | PUSH_ALTS_UNLIFTED (ProtoBCO Name) ArgRep
+   | PUSH_ALTS_T        (ProtoBCO Name) -- continuation
+                        !TupleInfo
+                        (ProtoBCO Name) -- tuple return BCO
 
    -- Pushing 8, 16 and 32 bits of padding (for constructors).
    | PUSH_PAD8
@@ -171,8 +174,9 @@ data BCInstr
 
    -- To Infinity And Beyond
    | ENTER
-   | RETURN             -- return a lifted value
+   | RETURN            -- return a lifted value
    | RETURN_UBX ArgRep -- return an unlifted value, here's its rep
+   | RETURN_T          -- return an unboxed tuple (info already on stack)
 
    -- Breakpoints
    | BRK_FUN          Word16 Unique (RemotePtr CostCentre)
@@ -246,8 +250,13 @@ instance Outputable BCInstr where
    ppr (PUSH_PRIMOP op)      = text "PUSH_G  " <+> text "GHC.PrimopWrappers."
                                                <> ppr op
    ppr (PUSH_BCO bco)        = hang (text "PUSH_BCO") 2 (ppr bco)
+
    ppr (PUSH_ALTS bco)       = hang (text "PUSH_ALTS") 2 (ppr bco)
    ppr (PUSH_ALTS_UNLIFTED bco pk) = hang (text "PUSH_ALTS_UNLIFTED" <+> ppr pk) 2 (ppr bco)
+   ppr (PUSH_ALTS_T bco tuple_info tuple_bco) =
+                               hang (text "PUSH_ALTS_T" <+> ppr tuple_info)
+                                    2
+                                    (ppr tuple_bco $+$ ppr bco)
 
    ppr PUSH_PAD8             = text "PUSH_PAD8"
    ppr PUSH_PAD16            = text "PUSH_PAD16"
@@ -304,7 +313,10 @@ instance Outputable BCInstr where
    ppr ENTER                 = text "ENTER"
    ppr RETURN                = text "RETURN"
    ppr (RETURN_UBX pk)       = text "RETURN_UBX  " <+> ppr pk
+   ppr (RETURN_T)            = text "RETURN_T"
    ppr (BRK_FUN index uniq _cc) = text "BRK_FUN" <+> ppr index <+> ppr uniq <+> text "<cc>"
+
+
 
 -- -----------------------------------------------------------------------------
 -- The stack use, in words, of each bytecode insn.  These _must_ be
@@ -333,8 +345,14 @@ bciStackUse PUSH32_W{}            = 1  -- takes exactly 1 word
 bciStackUse PUSH_G{}              = 1
 bciStackUse PUSH_PRIMOP{}         = 1
 bciStackUse PUSH_BCO{}            = 1
-bciStackUse (PUSH_ALTS bco)       = 2 + protoBCOStackUse bco
-bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 2 + protoBCOStackUse bco
+-- XXX these don't take stack space for restoring the CCCS into account!
+bciStackUse (PUSH_ALTS bco)       = 3 + protoBCOStackUse bco
+bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 4 + protoBCOStackUse bco
+bciStackUse (PUSH_ALTS_T bco info _) =
+   -- (tuple_bco, tuple_info word, cont_bco, stg_ctoi_t)
+   -- tuple
+   -- (tuple_info, tuple_bco, stg_ret_t)
+   7 + fromIntegral (tupleSize info) + protoBCOStackUse bco
 bciStackUse (PUSH_PAD8)           = 1  -- overapproximation
 bciStackUse (PUSH_PAD16)          = 1  -- overapproximation
 bciStackUse (PUSH_PAD32)          = 1  -- overapproximation on 64bit arch
@@ -373,6 +391,7 @@ bciStackUse JMP{}                 = 0
 bciStackUse ENTER{}               = 0
 bciStackUse RETURN{}              = 0
 bciStackUse RETURN_UBX{}          = 1
+bciStackUse RETURN_T{}            = 1
 bciStackUse CCALL{}               = 0
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0
