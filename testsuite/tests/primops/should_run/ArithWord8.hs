@@ -145,34 +145,34 @@ addMany (W# a) (W# b) (W# c) (W# d)
         (W# e) (W# f) (W# g) (W# h)
         (W# i) (W# j) (W# k) (W# l)
         (W# m) (W# n) (W# o) (W# p)
-            = W# (extendWord8# word8)
+            = W# (word8ToWord# word8)
   where
     !word8 =
         addMany#
-            (narrowWord8# a) (narrowWord8# b) (narrowWord8# c) (narrowWord8# d)
-            (narrowWord8# e) (narrowWord8# f) (narrowWord8# g) (narrowWord8# h)
-            (narrowWord8# i) (narrowWord8# j) (narrowWord8# k) (narrowWord8# l)
-            (narrowWord8# m) (narrowWord8# n) (narrowWord8# o) (narrowWord8# p)
+            (wordToWord8# a) (wordToWord8# b) (wordToWord8# c) (wordToWord8# d)
+            (wordToWord8# e) (wordToWord8# f) (wordToWord8# g) (wordToWord8# h)
+            (wordToWord8# i) (wordToWord8# j) (wordToWord8# k) (wordToWord8# l)
+            (wordToWord8# m) (wordToWord8# n) (wordToWord8# o) (wordToWord8# p)
 {-# NOINLINE addMany #-}
 
 -- Convenient and also tests higher order functions on Word8#
 apply1 :: (Word8# -> Word8#) -> Word -> Word
-apply1 opToTest (W# a) = W# (extendWord8# (opToTest (narrowWord8# a)))
+apply1 opToTest (W# a) = W# (word8ToWord# (opToTest (wordToWord8# a)))
 {-# NOINLINE apply1 #-}
 
 apply2 :: (Word8# -> Word8# -> Word8#) -> Word -> Word -> Word
 apply2 opToTest (W# a) (W# b) =
-    let (# sa, sb #) = (# narrowWord8# a, narrowWord8# b #)
+    let (# sa, sb #) = (# wordToWord8# a, wordToWord8# b #)
         r = opToTest sa sb
-    in W# (extendWord8# r)
+    in W# (word8ToWord# r)
 {-# NOINLINE apply2 #-}
 
 apply3
   :: (Word8# -> Word8# -> (# Word8#, Word8# #)) -> Word -> Word -> (Word, Word)
 apply3 opToTest (W# a) (W# b) =
-    let (# sa, sb #) = (# narrowWord8# a, narrowWord8# b #)
+    let (# sa, sb #) = (# wordToWord8# a, wordToWord8# b #)
         (# ra, rb #) = opToTest sa sb
-    in (W# (extendWord8# ra), W# (extendWord8# rb))
+    in (W# (word8ToWord# ra), W# (word8ToWord# rb))
 {-# NOINLINE apply3 #-}
 
 instance
