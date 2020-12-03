@@ -334,7 +334,7 @@ wordToAddrLE# x addr = go x 0#
          = (# s, int2Word# c #)
 
          | True
-         = case writeWord8OffAddr# addr c (w `and#` 0xFF##) s of
+         = case writeWord8OffAddr# addr c (wordToWord8# w) s of
             s' -> go (w `uncheckedShiftRL#` 8#) (c +# 1#) s'
 
 -- | Write a Word to @/addr/@ in base-256 big-endian representation and
@@ -349,7 +349,7 @@ wordToAddrBE# w addr = go 0# (WORD_SIZE_IN_BITS# -# clz)
       = (# s, int2Word# c #)
 
       | True
-      , w' <- (w `uncheckedShiftRL#` (sh -# 8#)) `and#` 0xFF##
+      , w' <- wordToWord8# (w `uncheckedShiftRL#` (sh -# 8#))
       = case writeWord8OffAddr# addr c w' s of
          s' -> go (c +# 1#) (sh -# 8#) s'
 
@@ -386,7 +386,7 @@ wordFromAddrLE# n addr s0 = go 0## 0# s0
 
          | True
          = case readWord8OffAddr# addr c s of
-            (# s', b #) -> go (w `or#` (b `uncheckedShiftL#` (c `uncheckedIShiftL#` 3#)))
+            (# s', b #) -> go (w `or#` (word8ToWord# b `uncheckedShiftL#` (c `uncheckedIShiftL#` 3#)))
                               (c +# 1#)
                               s'
 
@@ -412,7 +412,7 @@ wordFromAddrBE# n addr s0 = go 0## 0# s0
 
          | True
          = case readWord8OffAddr# addr c s of
-            (# s', b #) -> go ((w `uncheckedShiftL#` 8#) `or#` b)
+            (# s', b #) -> go ((w `uncheckedShiftL#` 8#) `or#` word8ToWord# b)
                               (c +# 1#)
                               s'
 
@@ -459,7 +459,7 @@ wordToMutableByteArrayLE# x mba off = go x 0#
          = (# s, int2Word# c #)
 
          | True
-         = case writeWord8Array# mba (word2Int# off +# c) (w `and#` 0xFF##) s of
+         = case writeWord8Array# mba (word2Int# off +# c) (wordToWord8# w) s of
             s' -> go (w `uncheckedShiftRL#` 8#) (c +# 1#) s'
 
 -- | Write a Word to @/MutableByteArray/@ in base-256 big-endian representation and
@@ -476,7 +476,7 @@ wordToMutableByteArrayBE# w mba off = go 0# (WORD_SIZE_IN_BITS# -# clz)
       = (# s, int2Word# c #)
 
       | True
-      , w' <- (w `uncheckedShiftRL#` (sh -# 8#)) `and#` 0xFF##
+      , w' <- wordToWord8# (w `uncheckedShiftRL#` (sh -# 8#))
       = case writeWord8Array# mba (word2Int# off +# c) w' s of
          s' -> go (c +# 1#) (sh -# 8#) s'
 
@@ -531,7 +531,7 @@ wordFromByteArrayLE# n ba off =
 
                | True
                = case indexWord8Array# ba (word2Int# off +# c) of
-                  b -> go (w `or#` (b `uncheckedShiftL#` (c `uncheckedIShiftL#` 3#)))
+                  b -> go (w `or#` (word8ToWord# b `uncheckedShiftL#` (c `uncheckedIShiftL#` 3#)))
                           (c +# 1#)
            in go 0## 0#
 
@@ -557,7 +557,7 @@ wordFromByteArrayBE# n ba off = go 0## 0#
 
          | True
          = case indexWord8Array# ba (word2Int# off +# c) of
-            b -> go ((w `uncheckedShiftL#` 8#) `or#` b) (c +# 1#)
+            b -> go ((w `uncheckedShiftL#` 8#) `or#` word8ToWord# b) (c +# 1#)
 
 -- | Read a Word from @/ByteArray/@ in base-256 representation.
 --
