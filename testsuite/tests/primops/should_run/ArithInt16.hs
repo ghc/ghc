@@ -146,32 +146,32 @@ addMany (I# a) (I# b) (I# c) (I# d)
         (I# e) (I# f) (I# g) (I# h)
         (I# i) (I# j) (I# k) (I# l)
         (I# m) (I# n) (I# o) (I# p)
-            = I# (extendInt16# int16)
+            = I# (int16ToInt# int16)
   where
     !int16 = addMany#
-                (narrowInt16# a) (narrowInt16# b) (narrowInt16# c) (narrowInt16# d)
-                (narrowInt16# e) (narrowInt16# f) (narrowInt16# g) (narrowInt16# h)
-                (narrowInt16# i) (narrowInt16# j) (narrowInt16# k) (narrowInt16# l)
-                (narrowInt16# m) (narrowInt16# n) (narrowInt16# o) (narrowInt16# p)
+                (intToInt16# a) (intToInt16# b) (intToInt16# c) (intToInt16# d)
+                (intToInt16# e) (intToInt16# f) (intToInt16# g) (intToInt16# h)
+                (intToInt16# i) (intToInt16# j) (intToInt16# k) (intToInt16# l)
+                (intToInt16# m) (intToInt16# n) (intToInt16# o) (intToInt16# p)
 {-# NOINLINE addMany #-}
 
 -- Convenient and also tests higher order functions on Int16#
 apply1 :: (Int16# -> Int16#) -> Int -> Int
-apply1 opToTest (I# a) = I# (extendInt16# (opToTest (narrowInt16# a)))
+apply1 opToTest (I# a) = I# (int16ToInt# (opToTest (intToInt16# a)))
 {-# NOINLINE apply1 #-}
 
 apply2 :: (Int16# -> Int16# -> Int16#) -> Int -> Int -> Int
 apply2 opToTest (I# a) (I# b) =
-    let (# sa, sb #) = (# narrowInt16# a, narrowInt16# b #)
+    let (# sa, sb #) = (# intToInt16# a, intToInt16# b #)
         r = opToTest sa sb
-    in I# (extendInt16# r)
+    in I# (int16ToInt# r)
 {-# NOINLINE apply2 #-}
 
 apply3 :: (Int16# -> Int16# -> (# Int16#, Int16# #)) -> Int -> Int -> (Int, Int)
 apply3 opToTest (I# a) (I# b) =
-    let (# sa, sb #) = (# narrowInt16# a, narrowInt16# b #)
+    let (# sa, sb #) = (# intToInt16# a, intToInt16# b #)
         (# ra, rb #) = opToTest sa sb
-    in (I# (extendInt16# ra), I# (extendInt16# rb))
+    in (I# (int16ToInt# ra), I# (int16ToInt# rb))
 {-# NOINLINE apply3 #-}
 
 instance

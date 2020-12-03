@@ -73,7 +73,7 @@ smallInt_bar
       { (# ds1, ds2 #) ->
       case {__pkg_ccall ghc-prim Int#
                       -> State# RealWorld -> (# State# RealWorld, Int64# #)}
-             (extendInt16# (narrowInt16# ds2)) realWorld#
+             (int16ToInt# (intToInt16# ds2)) realWorld#
       of
       { (# ds4, ds5 #) ->
       I64# ds5
@@ -111,7 +111,7 @@ $wsmallInt_foo
       { (# ds1, ds11 #) ->
       case {__pkg_ccall ghc-prim Int#
                       -> State# RealWorld -> (# State# RealWorld, Int64# #)}
-             (extendInt16# (narrowInt16# ds11)) realWorld#
+             (int16ToInt# (intToInt16# ds11)) realWorld#
       of
       { (# ds12, ds13 #) ->
       ds13

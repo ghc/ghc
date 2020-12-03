@@ -14,15 +14,15 @@ foreign import ccall "add_all_int16"
 
 main :: IO ()
 main = do
-    let a = narrowInt16# 0#
-        b = narrowInt16# 1#
-        c = narrowInt16# 2#
-        d = narrowInt16# 3#
-        e = narrowInt16# 4#
-        f = narrowInt16# 5#
-        g = narrowInt16# 6#
-        h = narrowInt16# 7#
-        i = narrowInt16# 8#
-        j = narrowInt16# 9#
-        x = I# (extendInt16# (add_all_int16 a b c d e f g h i j))
+    let a = intToInt16# 0#
+        b = intToInt16# 1#
+        c = intToInt16# 2#
+        d = intToInt16# 3#
+        e = intToInt16# 4#
+        f = intToInt16# 5#
+        g = intToInt16# 6#
+        h = intToInt16# 7#
+        i = intToInt16# 8#
+        j = intToInt16# 9#
+        x = I# (int16ToInt# (add_all_int16 a b c d e f g h i j))
     print x
