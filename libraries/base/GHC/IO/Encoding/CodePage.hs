@@ -174,7 +174,7 @@ indexInt (ConvArray p) (I# i) = I# (indexInt16OffAddr# p i)
 
 {-# INLINE indexWord8 #-}
 indexWord8 :: ConvArray Word8 -> Int -> Word8
-indexWord8 (ConvArray p) (I# i) = W8# (narrowWord8# (indexWord8OffAddr# p i))
+indexWord8 (ConvArray p) (I# i) = W8# (wordToWord8# (indexWord8OffAddr# p i))
 
 {-# INLINE indexChar #-}
 indexChar :: ConvArray Char -> Int -> Char
