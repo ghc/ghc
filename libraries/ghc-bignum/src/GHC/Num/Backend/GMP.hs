@@ -435,11 +435,11 @@ integer_gcde a b = case runRW# io of (# _, a #) -> a
          case readInt32OffAddr# sg_ptr  0# s of { (# s, sg #) ->
          case touch# szs s of { s ->
          -- shrink x, y and g to their actual sizes and freeze them
-         let !sx = absI# ssx in
-         let !sy = absI# ssy in
+         let !sx = absI# (int32ToInt# ssx) in
+         let !sy = absI# (int32ToInt# ssy) in
          case mwaSetSize# mbx sx s of { s ->
          case mwaSetSize# mby sy s of { s ->
-         case mwaSetSize# mbg sg s of { s ->
+         case mwaSetSize# mbg (int32ToInt# sg) s of { s ->
 
          -- return x, y and g as Integer
          case unsafeFreezeByteArray# mbx s of { (# s, bx #) ->
@@ -447,8 +447,8 @@ integer_gcde a b = case runRW# io of (# _, a #) -> a
          case unsafeFreezeByteArray# mbg s of { (# s, bg #) ->
 
          (# s, (# integerFromBigNat# bg
-               ,  integerFromBigNatSign# (ssx <# 0#) bx
-               ,  integerFromBigNatSign# (ssy <# 0#) by #) #)
+               ,  integerFromBigNatSign# (int32ToInt# ssx <# 0#) bx
+               ,  integerFromBigNatSign# (int32ToInt# ssy <# 0#) by #) #)
          }}}}}}}}}}}}}}}}
 
 
