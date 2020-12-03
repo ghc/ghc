@@ -80,8 +80,8 @@ instance Eq Word8 where
     (/=) = neWord8
 
 eqWord8, neWord8 :: Word8 -> Word8 -> Bool
-eqWord8 (W8# x) (W8# y) = isTrue# ((extendWord8# x) `eqWord#` (extendWord8# y))
-neWord8 (W8# x) (W8# y) = isTrue# ((extendWord8# x) `neWord#` (extendWord8# y))
+eqWord8 (W8# x) (W8# y) = isTrue# ((word8ToWord# x) `eqWord#` (word8ToWord# y))
+neWord8 (W8# x) (W8# y) = isTrue# ((word8ToWord# x) `neWord#` (word8ToWord# y))
 {-# INLINE [1] eqWord8 #-}
 {-# INLINE [1] neWord8 #-}
 
@@ -97,10 +97,10 @@ instance Ord Word8 where
 {-# INLINE [1] ltWord8 #-}
 {-# INLINE [1] leWord8 #-}
 gtWord8, geWord8, ltWord8, leWord8 :: Word8 -> Word8 -> Bool
-(W8# x) `gtWord8` (W8# y) = isTrue# ((extendWord8# x) `gtWord#` (extendWord8# y))
-(W8# x) `geWord8` (W8# y) = isTrue# ((extendWord8# x) `geWord#` (extendWord8# y))
-(W8# x) `ltWord8` (W8# y) = isTrue# ((extendWord8# x) `ltWord#` (extendWord8# y))
-(W8# x) `leWord8` (W8# y) = isTrue# ((extendWord8# x) `leWord#` (extendWord8# y))
+(W8# x) `gtWord8` (W8# y) = isTrue# ((word8ToWord# x) `gtWord#` (word8ToWord# y))
+(W8# x) `geWord8` (W8# y) = isTrue# ((word8ToWord# x) `geWord#` (word8ToWord# y))
+(W8# x) `ltWord8` (W8# y) = isTrue# ((word8ToWord# x) `ltWord#` (word8ToWord# y))
+(W8# x) `leWord8` (W8# y) = isTrue# ((word8ToWord# x) `leWord#` (word8ToWord# y))
 
 -- | @since 2.01
 instance Show Word8 where
@@ -108,14 +108,14 @@ instance Show Word8 where
 
 -- | @since 2.01
 instance Num Word8 where
-    (W8# x#) + (W8# y#)    = W8# (narrowWord8# ((extendWord8# x#) `plusWord#` (extendWord8# y#)))
-    (W8# x#) - (W8# y#)    = W8# (narrowWord8# ((extendWord8# x#) `minusWord#` (extendWord8# y#)))
-    (W8# x#) * (W8# y#)    = W8# (narrowWord8# ((extendWord8# x#) `timesWord#` (extendWord8# y#)))
-    negate (W8# x#)        = W8# (narrowWord8# (int2Word# (negateInt# (word2Int# ((extendWord8# x#))))))
+    (W8# x#) + (W8# y#)    = W8# (wordToWord8# ((word8ToWord# x#) `plusWord#` (word8ToWord# y#)))
+    (W8# x#) - (W8# y#)    = W8# (wordToWord8# ((word8ToWord# x#) `minusWord#` (word8ToWord# y#)))
+    (W8# x#) * (W8# y#)    = W8# (wordToWord8# ((word8ToWord# x#) `timesWord#` (word8ToWord# y#)))
+    negate (W8# x#)        = W8# (wordToWord8# (int2Word# (negateInt# (word2Int# ((word8ToWord# x#))))))
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = W8# (narrowWord8# (integerToWord# i))
+    fromInteger i          = W8# (wordToWord8# (integerToWord# i))
 
 -- | @since 2.01
 instance Real Word8 where
@@ -131,36 +131,36 @@ instance Enum Word8 where
         | otherwise     = predError "Word8"
     toEnum i@(I# i#)
         | i >= 0 && i <= fromIntegral (maxBound::Word8)
-                        = W8# (narrowWord8# (int2Word# i#))
+                        = W8# (wordToWord8# (int2Word# i#))
         | otherwise     = toEnumError "Word8" i (minBound::Word8, maxBound::Word8)
-    fromEnum (W8# x#)   = I# (word2Int# (extendWord8# x#))
+    fromEnum (W8# x#)   = I# (word2Int# (word8ToWord# x#))
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 
 -- | @since 2.01
 instance Integral Word8 where
     quot    (W8# x#) y@(W8# y#)
-        | y /= 0                  = W8# (narrowWord8# ((extendWord8# x#) `quotWord#` (extendWord8# y#)))
+        | y /= 0                  = W8# (wordToWord8# ((word8ToWord# x#) `quotWord#` (word8ToWord# y#)))
         | otherwise               = divZeroError
     rem     (W8# x#) y@(W8# y#)
-        | y /= 0                  = W8# (narrowWord8# ((extendWord8# x#) `remWord#` (extendWord8# y#)))
+        | y /= 0                  = W8# (wordToWord8# ((word8ToWord# x#) `remWord#` (word8ToWord# y#)))
         | otherwise               = divZeroError
     div     (W8# x#) y@(W8# y#)
-        | y /= 0                  = W8# (narrowWord8# ((extendWord8# x#) `quotWord#` (extendWord8# y#)))
+        | y /= 0                  = W8# (wordToWord8# ((word8ToWord# x#) `quotWord#` (word8ToWord# y#)))
         | otherwise               = divZeroError
     mod     (W8# x#) y@(W8# y#)
-        | y /= 0                  = W8# (narrowWord8# ((extendWord8# x#) `remWord#` (extendWord8# y#)))
+        | y /= 0                  = W8# (wordToWord8# ((word8ToWord# x#) `remWord#` (word8ToWord# y#)))
         | otherwise               = divZeroError
     quotRem (W8# x#) y@(W8# y#)
-        | y /= 0                  = case (extendWord8# x#) `quotRemWord#` (extendWord8# y#) of
+        | y /= 0                  = case (word8ToWord# x#) `quotRemWord#` (word8ToWord# y#) of
                                     (# q, r #) ->
-                                        (W8# (narrowWord8# q), W8# (narrowWord8# r))
+                                        (W8# (wordToWord8# q), W8# (wordToWord8# r))
         | otherwise               = divZeroError
     divMod  (W8# x#) y@(W8# y#)
-        | y /= 0                  = (W8# (narrowWord8# ((extendWord8# x#) `quotWord#` (extendWord8# y#)))
-                                    ,W8# (narrowWord8# ((extendWord8# x#) `remWord#` (extendWord8# y#))))
+        | y /= 0                  = (W8# (wordToWord8# ((word8ToWord# x#) `quotWord#` (word8ToWord# y#)))
+                                    ,W8# (wordToWord8# ((word8ToWord# x#) `remWord#` (word8ToWord# y#))))
         | otherwise               = divZeroError
-    toInteger (W8# x#)            = IS (word2Int# (extendWord8# x#))
+    toInteger (W8# x#)            = IS (word2Int# (word8ToWord# x#))
 
 -- | @since 2.01
 instance Bounded Word8 where
@@ -180,32 +180,32 @@ instance Bits Word8 where
     {-# INLINE testBit #-}
     {-# INLINE popCount #-}
 
-    (W8# x#) .&.   (W8# y#)   = W8# (narrowWord8# ((extendWord8# x#) `and#` (extendWord8# y#)))
-    (W8# x#) .|.   (W8# y#)   = W8# (narrowWord8# ((extendWord8# x#) `or#`  (extendWord8# y#)))
-    (W8# x#) `xor` (W8# y#)   = W8# (narrowWord8# ((extendWord8# x#) `xor#` (extendWord8# y#)))
-    complement (W8# x#)       = W8# (narrowWord8# (not# (extendWord8# x#)))
+    (W8# x#) .&.   (W8# y#)   = W8# (wordToWord8# ((word8ToWord# x#) `and#` (word8ToWord# y#)))
+    (W8# x#) .|.   (W8# y#)   = W8# (wordToWord8# ((word8ToWord# x#) `or#`  (word8ToWord# y#)))
+    (W8# x#) `xor` (W8# y#)   = W8# (wordToWord8# ((word8ToWord# x#) `xor#` (word8ToWord# y#)))
+    complement (W8# x#)       = W8# (wordToWord8# (not# (word8ToWord# x#)))
     (W8# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#) = W8# (narrowWord8# ((extendWord8# x#) `shiftL#` i#))
-        | otherwise           = W8# (narrowWord8# ((extendWord8# x#) `shiftRL#` negateInt# i#))
+        | isTrue# (i# >=# 0#) = W8# (wordToWord8# ((word8ToWord# x#) `shiftL#` i#))
+        | otherwise           = W8# (wordToWord8# ((word8ToWord# x#) `shiftRL#` negateInt# i#))
     (W8# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#) = W8# (narrowWord8# ((extendWord8# x#) `shiftL#` i#))
+        | isTrue# (i# >=# 0#) = W8# (wordToWord8# ((word8ToWord# x#) `shiftL#` i#))
         | otherwise           = overflowError
     (W8# x#) `unsafeShiftL` (I# i#) =
-        W8# (narrowWord8# ((extendWord8# x#) `uncheckedShiftL#` i#))
+        W8# (wordToWord8# ((word8ToWord# x#) `uncheckedShiftL#` i#))
     (W8# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#) = W8# (narrowWord8# ((extendWord8# x#) `shiftRL#` i#))
+        | isTrue# (i# >=# 0#) = W8# (wordToWord8# ((word8ToWord# x#) `shiftRL#` i#))
         | otherwise           = overflowError
-    (W8# x#) `unsafeShiftR` (I# i#) = W8# (narrowWord8# ((extendWord8# x#) `uncheckedShiftRL#` i#))
+    (W8# x#) `unsafeShiftR` (I# i#) = W8# (wordToWord8# ((word8ToWord# x#) `uncheckedShiftRL#` i#))
     (W8# x#) `rotate`       (I# i#)
         | isTrue# (i'# ==# 0#) = W8# x#
-        | otherwise  = W8# (narrowWord8# (((extendWord8# x#) `uncheckedShiftL#` i'#) `or#`
-                                          ((extendWord8# x#) `uncheckedShiftRL#` (8# -# i'#))))
+        | otherwise  = W8# (wordToWord8# (((word8ToWord# x#) `uncheckedShiftL#` i'#) `or#`
+                                          ((word8ToWord# x#) `uncheckedShiftRL#` (8# -# i'#))))
         where
         !i'# = word2Int# (int2Word# i# `and#` 7##)
     bitSizeMaybe i            = Just (finiteBitSize i)
     bitSize i                 = finiteBitSize i
     isSigned _                = False
-    popCount (W8# x#)         = I# (word2Int# (popCnt8# (extendWord8# x#)))
+    popCount (W8# x#)         = I# (word2Int# (popCnt8# (word8ToWord# x#)))
     bit                       = bitDefault
     testBit                   = testBitDefault
 
@@ -214,14 +214,14 @@ instance FiniteBits Word8 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 8
-    countLeadingZeros  (W8# x#) = I# (word2Int# (clz8# (extendWord8# x#)))
-    countTrailingZeros (W8# x#) = I# (word2Int# (ctz8# (extendWord8# x#)))
+    countLeadingZeros  (W8# x#) = I# (word2Int# (clz8# (word8ToWord# x#)))
+    countTrailingZeros (W8# x#) = I# (word2Int# (ctz8# (word8ToWord# x#)))
 
 {-# RULES
 "fromIntegral/Word8->Word8"   fromIntegral = id :: Word8 -> Word8
 "fromIntegral/Word8->Integer" fromIntegral = toInteger :: Word8 -> Integer
-"fromIntegral/a->Word8"       fromIntegral = \x -> case fromIntegral x of W# x# -> W8# (narrowWord8# x#)
-"fromIntegral/Word8->a"       fromIntegral = \(W8# x#) -> fromIntegral (W# (extendWord8# x#))
+"fromIntegral/a->Word8"       fromIntegral = \x -> case fromIntegral x of W# x# -> W8# (wordToWord8# x#)
+"fromIntegral/Word8->a"       fromIntegral = \(W8# x#) -> fromIntegral (W# (word8ToWord# x#))
   #-}
 
 {-# RULES
@@ -271,8 +271,8 @@ instance Eq Word16 where
     (/=) = neWord16
 
 eqWord16, neWord16 :: Word16 -> Word16 -> Bool
-eqWord16 (W16# x) (W16# y) = isTrue# ((extendWord16# x) `eqWord#` (extendWord16# y))
-neWord16 (W16# x) (W16# y) = isTrue# ((extendWord16# x) `neWord#` (extendWord16# y))
+eqWord16 (W16# x) (W16# y) = isTrue# ((word16ToWord# x) `eqWord#` (word16ToWord# y))
+neWord16 (W16# x) (W16# y) = isTrue# ((word16ToWord# x) `neWord#` (word16ToWord# y))
 {-# INLINE [1] eqWord16 #-}
 {-# INLINE [1] neWord16 #-}
 
@@ -288,10 +288,10 @@ instance Ord Word16 where
 {-# INLINE [1] ltWord16 #-}
 {-# INLINE [1] leWord16 #-}
 gtWord16, geWord16, ltWord16, leWord16 :: Word16 -> Word16 -> Bool
-(W16# x) `gtWord16` (W16# y) = isTrue# ((extendWord16# x) `gtWord#` (extendWord16# y))
-(W16# x) `geWord16` (W16# y) = isTrue# ((extendWord16# x) `geWord#` (extendWord16# y))
-(W16# x) `ltWord16` (W16# y) = isTrue# ((extendWord16# x) `ltWord#` (extendWord16# y))
-(W16# x) `leWord16` (W16# y) = isTrue# ((extendWord16# x) `leWord#` (extendWord16# y))
+(W16# x) `gtWord16` (W16# y) = isTrue# ((word16ToWord# x) `gtWord#` (word16ToWord# y))
+(W16# x) `geWord16` (W16# y) = isTrue# ((word16ToWord# x) `geWord#` (word16ToWord# y))
+(W16# x) `ltWord16` (W16# y) = isTrue# ((word16ToWord# x) `ltWord#` (word16ToWord# y))
+(W16# x) `leWord16` (W16# y) = isTrue# ((word16ToWord# x) `leWord#` (word16ToWord# y))
 
 -- | @since 2.01
 instance Show Word16 where
@@ -299,14 +299,14 @@ instance Show Word16 where
 
 -- | @since 2.01
 instance Num Word16 where
-    (W16# x#) + (W16# y#)  = W16# (narrowWord16# ((extendWord16# x#) `plusWord#` (extendWord16# y#)))
-    (W16# x#) - (W16# y#)  = W16# (narrowWord16# ((extendWord16# x#) `minusWord#` (extendWord16# y#)))
-    (W16# x#) * (W16# y#)  = W16# (narrowWord16# ((extendWord16# x#) `timesWord#` (extendWord16# y#)))
-    negate (W16# x#)       = W16# (narrowWord16# (int2Word# (negateInt# (word2Int# (extendWord16# x#)))))
+    (W16# x#) + (W16# y#)  = W16# (wordToWord16# ((word16ToWord# x#) `plusWord#` (word16ToWord# y#)))
+    (W16# x#) - (W16# y#)  = W16# (wordToWord16# ((word16ToWord# x#) `minusWord#` (word16ToWord# y#)))
+    (W16# x#) * (W16# y#)  = W16# (wordToWord16# ((word16ToWord# x#) `timesWord#` (word16ToWord# y#)))
+    negate (W16# x#)       = W16# (wordToWord16# (int2Word# (negateInt# (word2Int# (word16ToWord# x#)))))
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = W16# (narrowWord16# (integerToWord# i))
+    fromInteger i          = W16# (wordToWord16# (integerToWord# i))
 
 -- | @since 2.01
 instance Real Word16 where
@@ -322,36 +322,36 @@ instance Enum Word16 where
         | otherwise     = predError "Word16"
     toEnum i@(I# i#)
         | i >= 0 && i <= fromIntegral (maxBound::Word16)
-                        = W16# (narrowWord16# (int2Word# i#))
+                        = W16# (wordToWord16# (int2Word# i#))
         | otherwise     = toEnumError "Word16" i (minBound::Word16, maxBound::Word16)
-    fromEnum (W16# x#)  = I# (word2Int# (extendWord16# x#))
+    fromEnum (W16# x#)  = I# (word2Int# (word16ToWord# x#))
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 
 -- | @since 2.01
 instance Integral Word16 where
     quot    (W16# x#) y@(W16# y#)
-        | y /= 0                    = W16# (narrowWord16# ((extendWord16# x#) `quotWord#` (extendWord16# y#)))
+        | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `quotWord#` (word16ToWord# y#)))
         | otherwise                 = divZeroError
     rem     (W16# x#) y@(W16# y#)
-        | y /= 0                    = W16# (narrowWord16# ((extendWord16# x#) `remWord#` (extendWord16# y#)))
+        | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `remWord#` (word16ToWord# y#)))
         | otherwise                 = divZeroError
     div     (W16# x#) y@(W16# y#)
-        | y /= 0                    = W16# (narrowWord16# ((extendWord16# x#) `quotWord#` (extendWord16# y#)))
+        | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `quotWord#` (word16ToWord# y#)))
         | otherwise                 = divZeroError
     mod     (W16# x#) y@(W16# y#)
-        | y /= 0                    = W16# (narrowWord16# ((extendWord16# x#) `remWord#` (extendWord16# y#)))
+        | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `remWord#` (word16ToWord# y#)))
         | otherwise                 = divZeroError
     quotRem (W16# x#) y@(W16# y#)
-        | y /= 0                  = case (extendWord16# x#) `quotRemWord#` (extendWord16# y#) of
+        | y /= 0                  = case (word16ToWord# x#) `quotRemWord#` (word16ToWord# y#) of
                                     (# q, r #) ->
-                                        (W16# (narrowWord16# q), W16# (narrowWord16# r))
+                                        (W16# (wordToWord16# q), W16# (wordToWord16# r))
         | otherwise                 = divZeroError
     divMod  (W16# x#) y@(W16# y#)
-        | y /= 0                    = (W16# (narrowWord16# ((extendWord16# x#) `quotWord#` (extendWord16# y#)))
-                                      ,W16# (narrowWord16# ((extendWord16# x#) `remWord#` (extendWord16# y#))))
+        | y /= 0                    = (W16# (wordToWord16# ((word16ToWord# x#) `quotWord#` (word16ToWord# y#)))
+                                      ,W16# (wordToWord16# ((word16ToWord# x#) `remWord#` (word16ToWord# y#))))
         | otherwise                 = divZeroError
-    toInteger (W16# x#)             = IS (word2Int# (extendWord16# x#))
+    toInteger (W16# x#)             = IS (word2Int# (word16ToWord# x#))
 
 -- | @since 2.01
 instance Bounded Word16 where
@@ -371,32 +371,32 @@ instance Bits Word16 where
     {-# INLINE testBit #-}
     {-# INLINE popCount #-}
 
-    (W16# x#) .&.   (W16# y#)  = W16# (narrowWord16# ((extendWord16# x#) `and#` (extendWord16# y#)))
-    (W16# x#) .|.   (W16# y#)  = W16# (narrowWord16# ((extendWord16# x#) `or#`  (extendWord16# y#)))
-    (W16# x#) `xor` (W16# y#)  = W16# (narrowWord16# ((extendWord16# x#) `xor#` (extendWord16# y#)))
-    complement (W16# x#)       = W16# (narrowWord16# (not# (extendWord16# x#)))
+    (W16# x#) .&.   (W16# y#)  = W16# (wordToWord16# ((word16ToWord# x#) `and#` (word16ToWord# y#)))
+    (W16# x#) .|.   (W16# y#)  = W16# (wordToWord16# ((word16ToWord# x#) `or#`  (word16ToWord# y#)))
+    (W16# x#) `xor` (W16# y#)  = W16# (wordToWord16# ((word16ToWord# x#) `xor#` (word16ToWord# y#)))
+    complement (W16# x#)       = W16# (wordToWord16# (not# (word16ToWord# x#)))
     (W16# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#)  = W16# (narrowWord16# ((extendWord16# x#) `shiftL#` i#))
-        | otherwise            = W16# (narrowWord16# ((extendWord16# x#) `shiftRL#` negateInt# i#))
+        | isTrue# (i# >=# 0#)  = W16# (wordToWord16# ((word16ToWord# x#) `shiftL#` i#))
+        | otherwise            = W16# (wordToWord16# ((word16ToWord# x#) `shiftRL#` negateInt# i#))
     (W16# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W16# (narrowWord16# ((extendWord16# x#) `shiftL#` i#))
+        | isTrue# (i# >=# 0#)  = W16# (wordToWord16# ((word16ToWord# x#) `shiftL#` i#))
         | otherwise            = overflowError
     (W16# x#) `unsafeShiftL` (I# i#) =
-        W16# (narrowWord16# ((extendWord16# x#) `uncheckedShiftL#` i#))
+        W16# (wordToWord16# ((word16ToWord# x#) `uncheckedShiftL#` i#))
     (W16# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W16# (narrowWord16# ((extendWord16# x#) `shiftRL#` i#))
+        | isTrue# (i# >=# 0#)  = W16# (wordToWord16# ((word16ToWord# x#) `shiftRL#` i#))
         | otherwise            = overflowError
-    (W16# x#) `unsafeShiftR` (I# i#) = W16# (narrowWord16# ((extendWord16# x#) `uncheckedShiftRL#` i#))
+    (W16# x#) `unsafeShiftR` (I# i#) = W16# (wordToWord16# ((word16ToWord# x#) `uncheckedShiftRL#` i#))
     (W16# x#) `rotate`       (I# i#)
         | isTrue# (i'# ==# 0#) = W16# x#
-        | otherwise  = W16# (narrowWord16# (((extendWord16# x#) `uncheckedShiftL#` i'#) `or#`
-                                            ((extendWord16# x#) `uncheckedShiftRL#` (16# -# i'#))))
+        | otherwise  = W16# (wordToWord16# (((word16ToWord# x#) `uncheckedShiftL#` i'#) `or#`
+                                            ((word16ToWord# x#) `uncheckedShiftRL#` (16# -# i'#))))
         where
         !i'# = word2Int# (int2Word# i# `and#` 15##)
     bitSizeMaybe i            = Just (finiteBitSize i)
     bitSize i                 = finiteBitSize i
     isSigned _                = False
-    popCount (W16# x#)        = I# (word2Int# (popCnt16# (extendWord16# x#)))
+    popCount (W16# x#)        = I# (word2Int# (popCnt16# (word16ToWord# x#)))
     bit                       = bitDefault
     testBit                   = testBitDefault
 
@@ -405,21 +405,21 @@ instance FiniteBits Word16 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 16
-    countLeadingZeros  (W16# x#) = I# (word2Int# (clz16# (extendWord16# x#)))
-    countTrailingZeros (W16# x#) = I# (word2Int# (ctz16# (extendWord16# x#)))
+    countLeadingZeros  (W16# x#) = I# (word2Int# (clz16# (word16ToWord# x#)))
+    countTrailingZeros (W16# x#) = I# (word2Int# (ctz16# (word16ToWord# x#)))
 
 -- | Reverse order of bytes in 'Word16'.
 --
 -- @since 4.7.0.0
 byteSwap16 :: Word16 -> Word16
-byteSwap16 (W16# w#) = W16# (narrowWord16# (byteSwap16# (extendWord16# w#)))
+byteSwap16 (W16# w#) = W16# (wordToWord16# (byteSwap16# (word16ToWord# w#)))
 
 {-# RULES
-"fromIntegral/Word8->Word16"   fromIntegral = \(W8# x#) -> W16# (narrowWord16# (extendWord8# x#))
+"fromIntegral/Word8->Word16"   fromIntegral = \(W8# x#) -> W16# (wordToWord16# (word8ToWord# x#))
 "fromIntegral/Word16->Word16"  fromIntegral = id :: Word16 -> Word16
 "fromIntegral/Word16->Integer" fromIntegral = toInteger :: Word16 -> Integer
-"fromIntegral/a->Word16"       fromIntegral = \x -> case fromIntegral x of W# x# -> W16# (narrowWord16# x#)
-"fromIntegral/Word16->a"       fromIntegral = \(W16# x#) -> fromIntegral (W# (extendWord16# x#))
+"fromIntegral/a->Word16"       fromIntegral = \x -> case fromIntegral x of W# x# -> W16# (wordToWord16# x#)
+"fromIntegral/Word16->a"       fromIntegral = \(W16# x#) -> fromIntegral (W# (word16ToWord# x#))
   #-}
 
 {-# RULES
@@ -505,8 +505,8 @@ instance Eq Word32 where
     (/=) = neWord32
 
 eqWord32, neWord32 :: Word32 -> Word32 -> Bool
-eqWord32 (W32# x) (W32# y) = isTrue# ((extendWord32# x) `eqWord#` (extendWord32# y))
-neWord32 (W32# x) (W32# y) = isTrue# ((extendWord32# x) `neWord#` (extendWord32# y))
+eqWord32 (W32# x) (W32# y) = isTrue# ((word32ToWord# x) `eqWord#` (word32ToWord# y))
+neWord32 (W32# x) (W32# y) = isTrue# ((word32ToWord# x) `neWord#` (word32ToWord# y))
 {-# INLINE [1] eqWord32 #-}
 {-# INLINE [1] neWord32 #-}
 
@@ -522,21 +522,21 @@ instance Ord Word32 where
 {-# INLINE [1] ltWord32 #-}
 {-# INLINE [1] leWord32 #-}
 gtWord32, geWord32, ltWord32, leWord32 :: Word32 -> Word32 -> Bool
-(W32# x) `gtWord32` (W32# y) = isTrue# ((extendWord32# x) `gtWord#` (extendWord32# y))
-(W32# x) `geWord32` (W32# y) = isTrue# ((extendWord32# x) `geWord#` (extendWord32# y))
-(W32# x) `ltWord32` (W32# y) = isTrue# ((extendWord32# x) `ltWord#` (extendWord32# y))
-(W32# x) `leWord32` (W32# y) = isTrue# ((extendWord32# x) `leWord#` (extendWord32# y))
+(W32# x) `gtWord32` (W32# y) = isTrue# ((word32ToWord# x) `gtWord#` (word32ToWord# y))
+(W32# x) `geWord32` (W32# y) = isTrue# ((word32ToWord# x) `geWord#` (word32ToWord# y))
+(W32# x) `ltWord32` (W32# y) = isTrue# ((word32ToWord# x) `ltWord#` (word32ToWord# y))
+(W32# x) `leWord32` (W32# y) = isTrue# ((word32ToWord# x) `leWord#` (word32ToWord# y))
 
 -- | @since 2.01
 instance Num Word32 where
-    (W32# x#) + (W32# y#)  = W32# (narrowWord32# ((extendWord32# x#) `plusWord#` (extendWord32# y#)))
-    (W32# x#) - (W32# y#)  = W32# (narrowWord32# ((extendWord32# x#) `minusWord#` (extendWord32# y#)))
-    (W32# x#) * (W32# y#)  = W32# (narrowWord32# ((extendWord32# x#) `timesWord#` (extendWord32# y#)))
-    negate (W32# x#)       = W32# (narrowWord32# (int2Word# (negateInt# (word2Int# (extendWord32# x#)))))
+    (W32# x#) + (W32# y#)  = W32# (wordToWord32# ((word32ToWord# x#) `plusWord#` (word32ToWord# y#)))
+    (W32# x#) - (W32# y#)  = W32# (wordToWord32# ((word32ToWord# x#) `minusWord#` (word32ToWord# y#)))
+    (W32# x#) * (W32# y#)  = W32# (wordToWord32# ((word32ToWord# x#) `timesWord#` (word32ToWord# y#)))
+    negate (W32# x#)       = W32# (wordToWord32# (int2Word# (negateInt# (word2Int# (word32ToWord# x#)))))
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = W32# (narrowWord32# (integerToWord# i))
+    fromInteger i          = W32# (wordToWord32# (integerToWord# i))
 
 -- | @since 2.01
 instance Enum Word32 where
@@ -551,19 +551,19 @@ instance Enum Word32 where
 #if WORD_SIZE_IN_BITS > 32
           && i <= fromIntegral (maxBound::Word32)
 #endif
-                        = W32# (narrowWord32# (int2Word# i#))
+                        = W32# (wordToWord32# (int2Word# i#))
         | otherwise     = toEnumError "Word32" i (minBound::Word32, maxBound::Word32)
 #if WORD_SIZE_IN_BITS == 32
     fromEnum x@(W32# x#)
         | x <= fromIntegral (maxBound::Int)
-                        = I# (word2Int# (extendWord32# x#))
+                        = I# (word2Int# (word32ToWord# x#))
         | otherwise     = fromEnumError "Word32" x
     enumFrom            = integralEnumFrom
     enumFromThen        = integralEnumFromThen
     enumFromTo          = integralEnumFromTo
     enumFromThenTo      = integralEnumFromThenTo
 #else
-    fromEnum (W32# x#)  = I# (word2Int# (extendWord32# x#))
+    fromEnum (W32# x#)  = I# (word2Int# (word32ToWord# x#))
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 #endif
@@ -571,34 +571,34 @@ instance Enum Word32 where
 -- | @since 2.01
 instance Integral Word32 where
     quot    (W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `quotWord#` (extendWord32# y#)))
+        | y /= 0                    = W32# (wordToWord32# ((word32ToWord# x#) `quotWord#` (word32ToWord# y#)))
         | otherwise                 = divZeroError
     rem     (W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `remWord#` (extendWord32# y#)))
+        | y /= 0                    = W32# (wordToWord32# ((word32ToWord# x#) `remWord#` (word32ToWord# y#)))
         | otherwise                 = divZeroError
     div     (W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `quotWord#` (extendWord32# y#)))
+        | y /= 0                    = W32# (wordToWord32# ((word32ToWord# x#) `quotWord#` (word32ToWord# y#)))
         | otherwise                 = divZeroError
     mod     (W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (narrowWord32# ((extendWord32# x#) `remWord#` (extendWord32# y#)))
+        | y /= 0                    = W32# (wordToWord32# ((word32ToWord# x#) `remWord#` (word32ToWord# y#)))
         | otherwise                 = divZeroError
     quotRem (W32# x#) y@(W32# y#)
-        | y /= 0                  = case (extendWord32# x#) `quotRemWord#` (extendWord32# y#) of
+        | y /= 0                  = case (word32ToWord# x#) `quotRemWord#` (word32ToWord# y#) of
                                     (# q, r #) ->
-                                        (W32# (narrowWord32# q), W32# (narrowWord32# r))
+                                        (W32# (wordToWord32# q), W32# (wordToWord32# r))
         | otherwise                 = divZeroError
     divMod  (W32# x#) y@(W32# y#)
-        | y /= 0                    = (W32# (narrowWord32# ((extendWord32# x#) `quotWord#` (extendWord32# y#)))
-                                      ,W32# (narrowWord32# ((extendWord32# x#) `remWord#` (extendWord32# y#))))
+        | y /= 0                    = (W32# (wordToWord32# ((word32ToWord# x#) `quotWord#` (word32ToWord# y#)))
+                                      ,W32# (wordToWord32# ((word32ToWord# x#) `remWord#` (word32ToWord# y#))))
         | otherwise                 = divZeroError
     toInteger (W32# x#)
 #if WORD_SIZE_IN_BITS == 32
         | isTrue# (i# >=# 0#)       = IS i#
-        | otherwise                 = integerFromWord# (extendWord32# x#)
+        | otherwise                 = integerFromWord# (word32ToWord# x#)
         where
-        !i# = word2Int# (extendWord32# x#)
+        !i# = word2Int# (word32ToWord# x#)
 #else
-                                    = IS (word2Int# (extendWord32# x#))
+                                    = IS (word2Int# (word32ToWord# x#))
 #endif
 
 -- | @since 2.01
@@ -608,32 +608,32 @@ instance Bits Word32 where
     {-# INLINE testBit #-}
     {-# INLINE popCount #-}
 
-    (W32# x#) .&.   (W32# y#)  = W32# (narrowWord32# ((extendWord32# x#) `and#` (extendWord32# y#)))
-    (W32# x#) .|.   (W32# y#)  = W32# (narrowWord32# ((extendWord32# x#) `or#`  (extendWord32# y#)))
-    (W32# x#) `xor` (W32# y#)  = W32# (narrowWord32# ((extendWord32# x#) `xor#` (extendWord32# y#)))
-    complement (W32# x#)       = W32# (narrowWord32# (not# (extendWord32# x#)))
+    (W32# x#) .&.   (W32# y#)  = W32# (wordToWord32# ((word32ToWord# x#) `and#` (word32ToWord# y#)))
+    (W32# x#) .|.   (W32# y#)  = W32# (wordToWord32# ((word32ToWord# x#) `or#`  (word32ToWord# y#)))
+    (W32# x#) `xor` (W32# y#)  = W32# (wordToWord32# ((word32ToWord# x#) `xor#` (word32ToWord# y#)))
+    complement (W32# x#)       = W32# (wordToWord32# (not# (word32ToWord# x#)))
     (W32# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#)  = W32# (narrowWord32# ((extendWord32# x#) `shiftL#` i#))
-        | otherwise            = W32# (narrowWord32# ((extendWord32# x#) `shiftRL#` negateInt# i#))
+        | isTrue# (i# >=# 0#)  = W32# (wordToWord32# ((word32ToWord# x#) `shiftL#` i#))
+        | otherwise            = W32# (wordToWord32# ((word32ToWord# x#) `shiftRL#` negateInt# i#))
     (W32# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W32# (narrowWord32# ((extendWord32# x#) `shiftL#` i#))
+        | isTrue# (i# >=# 0#)  = W32# (wordToWord32# ((word32ToWord# x#) `shiftL#` i#))
         | otherwise            = overflowError
     (W32# x#) `unsafeShiftL` (I# i#) =
-        W32# (narrowWord32# ((extendWord32# x#) `uncheckedShiftL#` i#))
+        W32# (wordToWord32# ((word32ToWord# x#) `uncheckedShiftL#` i#))
     (W32# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W32# (narrowWord32# ((extendWord32# x#) `shiftRL#` i#))
+        | isTrue# (i# >=# 0#)  = W32# (wordToWord32# ((word32ToWord# x#) `shiftRL#` i#))
         | otherwise            = overflowError
-    (W32# x#) `unsafeShiftR` (I# i#) = W32# (narrowWord32# ((extendWord32# x#) `uncheckedShiftRL#` i#))
+    (W32# x#) `unsafeShiftR` (I# i#) = W32# (wordToWord32# ((word32ToWord# x#) `uncheckedShiftRL#` i#))
     (W32# x#) `rotate`       (I# i#)
         | isTrue# (i'# ==# 0#) = W32# x#
-        | otherwise   = W32# (narrowWord32# (((extendWord32# x#) `uncheckedShiftL#` i'#) `or#`
-                                            ((extendWord32# x#) `uncheckedShiftRL#` (32# -# i'#))))
+        | otherwise   = W32# (wordToWord32# (((word32ToWord# x#) `uncheckedShiftL#` i'#) `or#`
+                                            ((word32ToWord# x#) `uncheckedShiftRL#` (32# -# i'#))))
         where
         !i'# = word2Int# (int2Word# i# `and#` 31##)
     bitSizeMaybe i            = Just (finiteBitSize i)
     bitSize i                 = finiteBitSize i
     isSigned _                = False
-    popCount (W32# x#)        = I# (word2Int# (popCnt32# (extendWord32# x#)))
+    popCount (W32# x#)        = I# (word2Int# (popCnt32# (word32ToWord# x#)))
     bit                       = bitDefault
     testBit                   = testBitDefault
 
@@ -642,16 +642,16 @@ instance FiniteBits Word32 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 32
-    countLeadingZeros  (W32# x#) = I# (word2Int# (clz32# (extendWord32# x#)))
-    countTrailingZeros (W32# x#) = I# (word2Int# (ctz32# (extendWord32# x#)))
+    countLeadingZeros  (W32# x#) = I# (word2Int# (clz32# (word32ToWord# x#)))
+    countTrailingZeros (W32# x#) = I# (word2Int# (ctz32# (word32ToWord# x#)))
 
 {-# RULES
-"fromIntegral/Word8->Word32"   fromIntegral = \(W8# x#) -> W32# (narrowWord32# (extendWord8# x#))
-"fromIntegral/Word16->Word32"  fromIntegral = \(W16# x#) -> W32# (narrowWord32# (extendWord16# x#))
+"fromIntegral/Word8->Word32"   fromIntegral = \(W8# x#) -> W32# (wordToWord32# (word8ToWord# x#))
+"fromIntegral/Word16->Word32"  fromIntegral = \(W16# x#) -> W32# (wordToWord32# (word16ToWord# x#))
 "fromIntegral/Word32->Word32"  fromIntegral = id :: Word32 -> Word32
 "fromIntegral/Word32->Integer" fromIntegral = toInteger :: Word32 -> Integer
-"fromIntegral/a->Word32"       fromIntegral = \x -> case fromIntegral x of W# x# -> W32# (narrowWord32# x#)
-"fromIntegral/Word32->a"       fromIntegral = \(W32# x#) -> fromIntegral (W# (extendWord32# x#))
+"fromIntegral/a->Word32"       fromIntegral = \x -> case fromIntegral x of W# x# -> W32# (wordToWord32# x#)
+"fromIntegral/Word32->a"       fromIntegral = \(W32# x#) -> fromIntegral (W# (word32ToWord# x#))
   #-}
 
 -- | @since 2.01
@@ -682,7 +682,7 @@ instance Ix Word32 where
 --
 -- @since 4.7.0.0
 byteSwap32 :: Word32 -> Word32
-byteSwap32 (W32# w#) = W32# (narrowWord32# (byteSwap32# (extendWord32# w#)))
+byteSwap32 (W32# w#) = W32# (wordToWord32# (byteSwap32# (word32ToWord# w#)))
 
 ------------------------------------------------------------------------
 -- type Word64
@@ -1052,19 +1052,19 @@ byteSwap64 (W64# w#) = W64# (byteSwap# w#)
 --
 -- @since 4.12.0.0
 bitReverse8 :: Word8 -> Word8
-bitReverse8 (W8# w#) = W8# (narrowWord8# (bitReverse8# (extendWord8# w#)))
+bitReverse8 (W8# w#) = W8# (wordToWord8# (bitReverse8# (word8ToWord# w#)))
 
 -- | Reverse the order of the bits in a 'Word16'.
 --
 -- @since 4.12.0.0
 bitReverse16 :: Word16 -> Word16
-bitReverse16 (W16# w#) = W16# (narrowWord16# (bitReverse16# (extendWord16# w#)))
+bitReverse16 (W16# w#) = W16# (wordToWord16# (bitReverse16# (word16ToWord# w#)))
 
 -- | Reverse the order of the bits in a 'Word32'.
 --
 -- @since 4.12.0.0
 bitReverse32 :: Word32 -> Word32
-bitReverse32 (W32# w#) = W32# (narrowWord32# (bitReverse32# (extendWord32# w#)))
+bitReverse32 (W32# w#) = W32# (wordToWord32# (bitReverse32# (word32ToWord# w#)))
 
 -- | Reverse the order of the bits in a 'Word64'.
 --
