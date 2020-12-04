@@ -1791,22 +1791,32 @@ docCmd "" =
 docCmd s  = do
   -- TODO: Maybe also get module headers for module names
   names <- GHC.parseName s
-  e_docss <- mapM GHC.getDocs names
-  sdocs <- mapM (either handleGetDocsFailure (pure . pprDocs)) e_docss
+  e_docss <- sequence <$> mapM GHC.getDocs names
+  sdocs <- either handleGetDocsFailure (pure . pprDocs) e_docss
   let sdocs' = vcat (intersperse (text "") sdocs)
   unqual <- GHC.getPrintUnqual
   dflags <- getDynFlags
   (liftIO . putStrLn . showSDocForUser dflags unqual) sdocs'
 
+pprDocs :: [(Maybe HsDocString, Map Int HsDocString)] -> [SDoc]
+pprDocs docs
+  | null nonEmptyDocs = pprDoc <$> take 1 docs
+  -- elide <has no documentation> if there's at least one non-empty doc (#15784)
+  | otherwise = pprDoc <$> nonEmptyDocs
+  where
+    empty (mb_decl_docs, arg_docs)
+      = isNothing mb_decl_docs && null arg_docs
+    nonEmptyDocs = filter (not . empty) docs
+
 -- TODO: also print arg docs.
-pprDocs :: (Maybe HsDocString, Map Int HsDocString) -> SDoc
-pprDocs (mb_decl_docs, _arg_docs) =
+pprDoc :: (Maybe HsDocString, Map Int HsDocString) -> SDoc
+pprDoc (mb_decl_docs, _arg_docs) =
   maybe
     (text "<has no documentation>")
     (text . unpackHDS)
     mb_decl_docs
 
-handleGetDocsFailure :: GHC.GhcMonad m => GetDocsFailure -> m SDoc
+handleGetDocsFailure :: GHC.GhcMonad m => GetDocsFailure -> m [SDoc]
 handleGetDocsFailure no_docs = do
   dflags <- getDynFlags
   let msg = showPpr dflags no_docs

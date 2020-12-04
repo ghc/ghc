@@ -13,6 +13,13 @@ data Data1 = Val1a | Val1b
 data Data2 = Val2a  -- ^ This is the haddock comment of a data value for Val2a
            | Val2b  -- ^ This is the haddock comment of a data value for Val2b
 
+-- | This is the haddock comment of a data declaration for Data3.
+newtype Data3 =
+  Data3 { getData3 :: Int }
+
+newtype Data4 =
+  -- | This is the haddock comment of a data constructor for Data4.
+  Data4 { getData4 :: Int }
 
 -- | This is the haddock comment of a function declaration for func1.
 func1 :: Int -> Int -> Int
