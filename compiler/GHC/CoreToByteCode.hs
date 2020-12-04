@@ -644,6 +644,10 @@ schemeE
     :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
 -- Delegate tail-calls to schemeT.
 schemeE d s p (StgApp x [])
+   | isUnboxedTupleType (idType x)
+   , null (filter (not . isVoidRep) (bcIdPrimReps x)) = do
+      platform <- profilePlatform <$> getProfile
+      returnUnboxedAtom d s p (StgVarArg x) (bcIdArgRep platform x)
    | isUnboxedTupleType (idType x) =
         let d_tuple = fromMaybe (panic "CoreToByteCode.schemeE: global unboxed tuples are not supported")
                                 (lookupBCEnv_maybe x p)
@@ -912,6 +916,9 @@ schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args result_ty)
 schemeT d s p (StgOpApp (StgPrimOp op) args _ty)
    = doTailCall d s p (primOpId op) (reverse args)
 
+schemeT _d _s _p (StgOpApp (StgPrimCallOp {}) _args _ty)
+   = unsupportedCConvException
+
    -- Case 2: Constructor application
 schemeT d s p (StgConApp con args _tys)
    | isUnboxedTupleDataCon con
@@ -940,7 +947,8 @@ schemeT d s p (StgConApp con args _tys)
 schemeT d s p (StgApp fn args)
    = doTailCall d s p fn (reverse args)
 
-schemeT _ _ _ _e = panic "GHC.CoreToByteCode.schemeT"
+schemeT _ _ _ e = pprPanic "GHC.CoreToByteCode.schemeT"
+                           (pprStgExpr shortStgPprOpts e)
 
 -- -----------------------------------------------------------------------------
 -- Generate code to build a constructor application,
