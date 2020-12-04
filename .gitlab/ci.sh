@@ -168,13 +168,13 @@ function show_tool() {
 }
 
 function set_toolchain_paths() {
-  needs_toolchain=1
+  needs_toolchain="1"
   case "$(uname)" in
     Linux) needs_toolchain="0" ;;
     *) ;;
   esac
 
-  if [[ "$needs_toolchain" = 1 ]]; then
+  if [[ "$needs_toolchain" = "1" ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
@@ -185,9 +185,9 @@ function set_toolchain_paths() {
       # we provide these handy fallbacks in case the
       # script isn't run from within a GHC CI docker image.
       if [ -z "$GHC" ]; then GHC="$(which ghc)"; fi
-      if [ -z "$CABAL" ]; then GHC="$(which cabal)"; fi
-      if [ -z "$HAPPY" ]; then GHC="$(which happy)"; fi
-      if [ -z "$ALEX" ]; then GHC="$(which alex)"; fi
+      if [ -z "$CABAL" ]; then CABAL="$(which cabal)"; fi
+      if [ -z "$HAPPY" ]; then HAPPY="$(which happy)"; fi
+      if [ -z "$ALEX" ]; then ALEX="$(which alex)"; fi
   fi
 
   export GHC
@@ -204,7 +204,7 @@ function setup() {
       cp -Rf cabal-cache/* "$cabal_dir"
   fi
 
-  if [[ -n "$needs_toolchain" ]]; then
+  if [[ "$needs_toolchain" = "1" ]]; then
     setup_toolchain
   fi
   case "$(uname)" in
@@ -442,9 +442,6 @@ function test_make() {
 }
 
 function build_hadrian() {
-  if [ -z "$BUILD_FLAVOUR" ]; then
-    fail "BUILD_FLAVOUR not set"
-  fi
   if [ -z "$BIN_DIST_NAME" ]; then
     fail "BIN_DIST_NAME not set"
   fi
@@ -506,6 +503,9 @@ function clean() {
 }
 
 function run_hadrian() {
+  if [ -z "$BUILD_FLAVOUR" ]; then
+    fail "BUILD_FLAVOUR not set"
+  fi
   if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
   if [ -n "$VERBOSE" ]; then HADRIAN_ARGS="$HADRIAN_ARGS -V"; fi
   run hadrian/build-cabal \
@@ -575,7 +575,7 @@ case $1 in
     test_hadrian || res=$?
     push_perf_notes
     exit $res ;;
-  run_hadrian) run_hadrian $@ ;;
+  run_hadrian) shift; run_hadrian $@ ;;
   perf_test) run_perf_test ;;
   clean) clean ;;
   shell) shell $@ ;;
