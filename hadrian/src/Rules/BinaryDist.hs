@@ -12,6 +12,7 @@ import Settings
 import Settings.Program (programContext)
 import Target
 import Utilities
+import qualified System.Directory.Extra as IO
 
 {-
 Note [Binary distributions]
@@ -142,7 +143,7 @@ bindistRules = do
         -- "--docs=.." command-line flag)
         -- Currently we embed the "docs" directory if it exists but it may
         -- contain outdated or even invalid data.
-        whenM (doesDirectoryExist (root -/- "docs")) $ do
+        whenM (liftIO (IO.doesDirectoryExist (root -/- "docs"))) $ do
           copyDirectory (root -/- "docs") bindistFilesDir
         when windowsHost $ do
           copyDirectory (root -/- "mingw") bindistFilesDir

@@ -31,7 +31,7 @@ cd ..
 tar -Jxf "$WINDOWS_BINDIST"
 mv ghc* windows
 cd inst/share/doc/ghc*/html/libraries
-mv ../../../../../../windows/doc/html/libraries/Win32-* .
+mv ../../../../../../windows/docs/html/libraries/Win32-* .
 sh gen_contents_index
 cd ..
 for i in haddock libraries users_guide
