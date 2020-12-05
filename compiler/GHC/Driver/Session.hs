@@ -867,7 +867,7 @@ opt_i dflags= toolSettings_opt_i $ toolSettings dflags
 versionedAppDir :: String -> ArchOS -> MaybeT IO FilePath
 versionedAppDir appname platform = do
   -- Make sure we handle the case the HOME isn't set (see #11678)
-  appdir <- tryMaybeT $ getAppUserDataDirectory appname
+  appdir <- tryMaybeT $ getXdgDirectory XdgData appname
   return $ appdir </> versionedFilePath platform
 
 versionedFilePath :: ArchOS -> FilePath
