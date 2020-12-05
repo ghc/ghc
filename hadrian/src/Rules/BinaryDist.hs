@@ -12,6 +12,7 @@ import Settings
 import Settings.Program (programContext)
 import Target
 import Utilities
+import qualified System.Directory.Extra as IO
 
 {-
 Note [Binary distributions]
@@ -136,13 +137,20 @@ bindistRules = do
         copyDirectory (ghcBuildDir -/- "bin") bindistFilesDir
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
+
         unless cross $ need ["docs"]
+
         -- TODO: we should only embed the docs that have been generated
         -- depending on the current settings (flavours' "ghcDocs" field and
         -- "--docs=.." command-line flag)
         -- Currently we embed the "docs" directory if it exists but it may
         -- contain outdated or even invalid data.
-        whenM (doesDirectoryExist (root -/- "docs")) $ do
+
+        -- Use the IO version of doesDirectoryExist because the Shake Action
+        -- version should not be used for directories the build system can
+        -- create. Using the Action version caused documentation to not be
+        -- included in the bindist in the past (part of the problem in #18669).
+        whenM (liftIO (IO.doesDirectoryExist (root -/- "docs"))) $ do
           copyDirectory (root -/- "docs") bindistFilesDir
         when windowsHost $ do
           copyDirectory (root -/- "mingw") bindistFilesDir
