@@ -101,6 +101,10 @@ GHCi
   :envvar:`EDITOR`, following UNIX convention.
   (:ghc-ticket:`19030`)
 
+- GHC now follows by default the XDG Base Directory Specification. If
+  ``$HOME/.ghc`` is found it will fallback to the old paths to give you
+  time to migrate. This fallback will be removed in three releases.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
