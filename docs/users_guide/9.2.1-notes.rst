@@ -75,6 +75,10 @@ Compiler
   that the compiler automatically insert cost-centres on all call-sites of
   the named function.
 
+- GHC now follows by default the XDG Base Directory Specification. If
+  `$HOME/.ghc` is found it will fallback to the old paths to give you
+  time to migrate. This fallback will stop working in three releases.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
