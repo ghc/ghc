@@ -47,6 +47,10 @@ Compiler
 - There is a significant refactoring in the solver; any type-checker plugins
   will have to be updated, as GHC no longer uses flattening skolems or
   flattening metavariables.
+
+- GHC now follows by default the XDG Base Directory Specification. If
+  `$HOME/.ghc` is found it will fallback to the old paths to give you
+  time to migrate. This fallback will stop working in three releases.
   
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
