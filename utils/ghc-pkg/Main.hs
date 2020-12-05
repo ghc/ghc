@@ -58,7 +58,7 @@ import Distribution.Simple.Utils (toUTF8BS, writeUTF8File, readUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
-import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
+import System.Directory ( getXdgDirectory, createDirectoryIfMissing,
                           getModificationTime )
 import Text.Printf
 
@@ -632,8 +632,8 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
   let no_user_db = FlagNoUserDb `elem` my_flags
 
   -- get the location of the user package database, and create it if necessary
-  -- getAppUserDataDirectory can fail (e.g. if $HOME isn't set)
-  e_appdir <- tryIO $ getAppUserDataDirectory "ghc"
+  -- getXdgDirectory can fail (e.g. if $HOME isn't set)
+  e_appdir <- tryIO $ getXdgDirectory XdgData "ghc"
 
   mb_user_conf <-
     case [ f | FlagUserConfig f <- my_flags ] of
