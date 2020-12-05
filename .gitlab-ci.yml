@@ -299,12 +299,11 @@ hadrian-ghc-in-ghci:
   tags:
     - x86_64-linux
   script:
+    - git clean -xdf && git submodule foreach git clean -xdf
     - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
     - cabal update
     - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - ./boot
-    - ./configure $CONFIGURE_ARGS
     # Load ghc-in-ghci then immediately exit and check the modules loaded
     - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
   after_script:
@@ -345,9 +344,13 @@ hadrian-ghc-in-ghci:
 
 lint-base:
   extends: .lint-params
+  variables:
+    BUILD_FLAVOUR: default
   script:
-    - hadrian/build -c -j stage1:lib:base
-    - hadrian/build -j lint:base
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh run_hadrian stage1:lib:base
+    - .gitlab/ci.sh run_hadrian lint:base
 
 ############################################################
 # Validation via Pipelines (make)
