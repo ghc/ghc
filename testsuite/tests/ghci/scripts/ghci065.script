@@ -7,6 +7,7 @@
 :doc Val2b
 :doc Data3
 :doc Data4
+:doc dupeField
 
 :doc func1
 :doc func2
