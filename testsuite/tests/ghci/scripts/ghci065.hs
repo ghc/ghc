@@ -5,6 +5,7 @@
 -- this test is constructed with simple text (without markup) only.
 --
 
+{-# LANGUAGE DuplicateRecordFields #-}
 module Test where
 
 -- | This is the haddock comment of a data declaration for Data1.
@@ -20,6 +21,18 @@ newtype Data3 =
 newtype Data4 =
   -- | This is the haddock comment of a data constructor for Data4.
   Data4 { getData4 :: Int }
+
+data DupeFields1 =
+  DF1 { dupeField :: Int -- ^ This is the first haddock comment of a duplicate record field.
+      }
+
+data DupeFields2 =
+  DF2 { dupeField :: Int -- ^ This is the second haddock comment of a duplicate record field.
+      }
+
+data DupeFields3 =
+  DF3 { dupeField :: Int -- No haddock
+      }
 
 -- | This is the haddock comment of a function declaration for func1.
 func1 :: Int -> Int -> Int
