@@ -18,7 +18,12 @@
 static bool do_prof_ticks = false;       // enable profiling ticks
 #endif
 
-static bool do_heap_prof_ticks = false;  // enable heap profiling ticks
+static bool do_heap_prof_ticks = false;  // Whether the timer is currently ticking down
+static bool heap_prof_timer_active = false;  // Whether the timer is enabled at all
+
+/* The heap_prof_timer_active flag controls whether heap profiling is enabled
+at all, once it is enabled, the `do_heap_prof_ticks` flag controls whether the
+counter is currently counting down. This is paused, for example, in Schedule.c. */
 
 // Sampling of Ticky-Ticky profiler to eventlog
 #if defined(TICKY_TICKY) && defined(TRACING)
@@ -51,16 +56,34 @@ startProfTimer( void )
 void
 stopHeapProfTimer( void )
 {
-    RELAXED_STORE(&do_heap_prof_ticks, false);
+    RELAXED_STORE(&heap_prof_timer_active, false);
+    pauseHeapProfTimer();
 }
 
 void
 startHeapProfTimer( void )
 {
+    RELAXED_STORE(&heap_prof_timer_active, true);
+    resumeHeapProfTimer();
+}
+
+void
+pauseHeapProfTimer ( void ) {
+    RELAXED_STORE(&do_heap_prof_ticks, false);
+}
+
+
+void
+resumeHeapProfTimer ( void ) {
     if (RtsFlags.ProfFlags.doHeapProfile &&
         RtsFlags.ProfFlags.heapProfileIntervalTicks > 0) {
-        do_heap_prof_ticks = true;
+        RELAXED_STORE(&do_heap_prof_ticks, true);
     }
+}
+
+void
+requestHeapCensus( void ){
+  RELAXED_STORE(&performHeapProfile, true);
 }
 
 void
@@ -70,7 +93,12 @@ initProfTimer( void )
 
     ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
 
-    startHeapProfTimer();
+    /* This might look a bit strange but the heap profile timer can
+      be toggled on/off from within Haskell by calling the startHeapProf
+      function from within Haskell */
+    if (RtsFlags.ProfFlags.startHeapProfileAtStartup){
+      startHeapProfTimer();
+    }
 }
 
 uint32_t total_ticks = 0;
@@ -99,7 +127,7 @@ handleProfTick(void)
     }
 #endif
 
-    if (RELAXED_LOAD(&do_heap_prof_ticks)) {
+    if (RELAXED_LOAD(&do_heap_prof_ticks) && RELAXED_LOAD(&heap_prof_timer_active))  {
         ticks_to_heap_profile--;
         if (ticks_to_heap_profile <= 0) {
             ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
