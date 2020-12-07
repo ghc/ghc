@@ -145,6 +145,7 @@ typedef struct _PROFILING_FLAGS {
     Time        heapProfileInterval; /* time between samples */
     uint32_t    heapProfileIntervalTicks; /* ticks between samples (derived) */
     bool        includeTSOs;
+    bool        startHeapProfileAtStartup; /* true if we start profiling from program startup */
 
 
     bool		showCCSOnException;

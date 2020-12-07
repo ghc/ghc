@@ -211,6 +211,7 @@ void initRtsFlagsDefaults(void)
 
     RtsFlags.ProfFlags.doHeapProfile      = false;
     RtsFlags.ProfFlags.heapProfileInterval = USToTime(100000); // 100ms
+    RtsFlags.ProfFlags.startHeapProfileAtStartup = true;
 
 #if defined(PROFILING)
     RtsFlags.ProfFlags.includeTSOs        = false;
@@ -390,6 +391,10 @@ usage_text[] = {
 "  -hT      Produce a heap profile grouped by closure type",
 #endif /* PROFILING */
 
+"  -i<sec>  Time between heap profile samples (seconds, default: 0.1)",
+"  --no-automatic-heap-samples  Do not start the heap profile interval timer,",
+"                               rely on the user to trigger samples from their application",
+
 #if defined(TRACING)
 "",
 "  -ol<file>  Send binary eventlog to <file> (default: <program>.eventlog)",
@@ -415,7 +420,6 @@ usage_text[] = {
 "             the initial enabled event classes are 'sgpu'",
 #endif
 
-"  -i<sec>  Time between heap profile samples (seconds, default: 0.1)",
 "",
 #if defined(TICKY_TICKY)
 "  -r<file>  Produce ticky-ticky statistics (with -rstderr for stderr)",
@@ -1078,6 +1082,12 @@ error = true;
                           RtsFlags.GcFlags.longGCSync =
                               fsecondsToTime(atof(rts_argv[arg]+16));
                       }
+                      break;
+                  }
+                  else if (strequal("no-automatic-heap-samples",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.ProfFlags.startHeapProfileAtStartup = false;
                       break;
                   }
                   else {
