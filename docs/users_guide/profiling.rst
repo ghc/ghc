@@ -459,7 +459,7 @@ compiled program.
     :type: dynamic
 
     Deprecated alias for :ghc-flag:`-fprof-auto-exported`
-    
+
 .. ghc-flag:: -caf-all
     :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fprof-cafs`
     :type: dynamic
@@ -884,6 +884,14 @@ There are three more options which relate to heap profiling:
     get 5 samples per second. This only affects heap profiling; time
     profiles are always sampled with the frequency of the RTS clock. See
     :ref:`prof-time-options` for changing that.
+
+.. rts-flag:: --no-automatic-heap-samples
+
+    :since: 9.2.1
+
+    Don't start heap profiling from the start of program execution. If this
+    option is enabled, it's expected that the user will manually start heap
+    profiling or request specific samples using functions from ``GHC.Profiling``.
 
 .. rts-flag:: -xt
 

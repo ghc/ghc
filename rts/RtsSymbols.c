@@ -985,6 +985,9 @@
       SymI_HasProto(unlockFile)                                         \
       SymI_HasProto(startProfTimer)                                     \
       SymI_HasProto(stopProfTimer)                                      \
+      SymI_HasProto(startHeapProfTimer)                                 \
+      SymI_HasProto(stopHeapProfTimer)                                  \
+      SymI_HasProto(requestHeapCensus)                                  \
       SymI_HasProto(atomic_inc)                                         \
       SymI_HasProto(atomic_dec)                                         \
       SymI_HasProto(hs_spt_lookup)                                      \
