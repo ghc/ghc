@@ -191,8 +191,8 @@ Mutex concurrent_coll_finished_lock;
  * === Other references ===
  *
  * Apart from the design document in docs/storage/nonmoving-gc and the Ueno
- * 2016 paper (TODO citation) from which it drew inspiration, there are a
- * variety of other relevant Notes scattered throughout the tree:
+ * 2016 paper [ueno 2016] from which it drew inspiration, there are a variety
+ * of other relevant Notes scattered throughout the tree:
  *
  *  - Note [Concurrent non-moving collection] (NonMoving.c) describes
  *    concurrency control of the nonmoving collector
@@ -203,6 +203,10 @@ Mutex concurrent_coll_finished_lock;
  *
  *  - Note [Aging under the non-moving collector] (NonMoving.c) describes how
  *    we accomodate aging
+ *
+ *  - Note [Non-moving GC: Marking evacuated objects] (Evac.c) describes how
+ *    non-moving objects reached by evacuate() are marked, which is necessary
+ *    due to aging.
  *
  *  - Note [Large objects in the non-moving collector] (NonMovingMark.c)
  *    describes how we track large objects.
@@ -231,6 +235,11 @@ Mutex concurrent_coll_finished_lock;
  *  - Note [Dirty flags in the non-moving collector] (NonMoving.c) describes
  *    how we use the DIRTY flags associated with MUT_VARs and TVARs to improve
  *    barrier efficiency.
+ *
+ * [ueno 2016]:
+ *   Katsuhiro Ueno and Atsushi Ohori. 2016. A fully concurrent garbage
+ *   collector for functional programs on multicore processors. SIGPLAN Not. 51,
+ *   9 (September 2016), 421–433. DOI:https://doi.org/10.1145/3022670.2951944
  *
  *
  * Note [Concurrent non-moving collection]
@@ -312,6 +321,8 @@ Mutex concurrent_coll_finished_lock;
  *
  *     The non-moving collector will come to C in the mark queue and mark it.
  *
+ * The implementation details of this are described in Note [Non-moving GC:
+ * Marking evacuated objects] in Evac.c.
  *
  * Note [Deadlock detection under the non-moving collector]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -726,7 +737,6 @@ void nonmovingStop(void)
                    "waiting for nonmoving collector thread to terminate");
         ACQUIRE_LOCK(&concurrent_coll_finished_lock);
         waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
-        joinOSThread(mark_thread);
     }
 #endif
 }

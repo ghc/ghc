@@ -380,8 +380,9 @@ interruptOSThread (OSThreadId id)
 void
 joinOSThread (OSThreadId id)
 {
-    if (pthread_join(id, NULL) != 0) {
-        sysErrorBelch("joinOSThread: error %d", errno);
+    int ret = pthread_join(id, NULL);
+    if (ret != 0) {
+        sysErrorBelch("joinOSThread: error %d", ret);
     }
 }
 

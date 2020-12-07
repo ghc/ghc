@@ -1689,13 +1689,8 @@ collect_gct_blocks (void)
 static void
 collect_pinned_object_blocks (void)
 {
-    generation *gen;
     const bool use_nonmoving = RtsFlags.GcFlags.useNonmoving;
-    if (use_nonmoving && major_gc) {
-        gen = oldest_gen;
-    } else {
-        gen = g0;
-    }
+    generation *const gen = (use_nonmoving && major_gc) ? oldest_gen : g0;
 
     for (uint32_t n = 0; n < n_capabilities; n++) {
         bdescr *last = NULL;
@@ -1720,7 +1715,7 @@ collect_pinned_object_blocks (void)
             if (gen->large_objects != NULL) {
                 gen->large_objects->u.back = last;
             }
-            g0->large_objects = RELAXED_LOAD(&capabilities[n]->pinned_object_blocks);
+            gen->large_objects = RELAXED_LOAD(&capabilities[n]->pinned_object_blocks);
             RELAXED_STORE(&capabilities[n]->pinned_object_blocks, NULL);
         }
     }
