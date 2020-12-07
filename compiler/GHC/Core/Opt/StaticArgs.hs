@@ -64,6 +64,7 @@ import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
+import GHC.Types.Basic (Staticness(..))
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Set
 import GHC.Types.Unique
@@ -88,9 +89,9 @@ doStaticArgs us binds = snd $ mapAccumL sat_bind_threaded_us us binds
 -- This means we only apply the actual SAT to Rec groups of one element,
 -- but we want to recurse into the others anyway to discover other binds
 satBind :: CoreBind -> IdSet -> SatM (CoreBind, IdSATInfo)
-satBind (NonRec binder expr) interesting_ids = do
-    (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids
-    return (NonRec binder expr', finalizeApp expr_app sat_info_expr)
+satBind (NonRec binder rhs) interesting_ids = do
+    (rhs', sat_info_rhs) <- satTopLevelExpr rhs interesting_ids
+    return (NonRec binder rhs', sat_info_rhs)
 satBind (Rec [(binder, rhs)]) interesting_ids = do
     let interesting_ids' = interesting_ids `addOneToUniqSet` binder
         (rhs_binders, rhs_body) = collectBinders rhs
@@ -113,7 +114,6 @@ satBind (Rec pairs) interesting_ids = do
     return (Rec (zipEqual "satBind" binders rhss'), mergeIdSATInfos sat_info_rhss')
 
 data App = VarApp Id | TypeApp Type | CoApp Coercion
-data Staticness a = Static a | NotStatic
 
 type IdAppInfo = (Id, SATInfo)
 
