@@ -416,7 +416,7 @@ run_thread:
     // that.
     cap->r.rCurrentTSO = t;
 
-    startHeapProfTimer();
+    resumeHeapProfTimer();
 
     // ----------------------------------------------------------------------
     // Run the current thread
@@ -534,7 +534,7 @@ run_thread:
     // ----------------------------------------------------------------------
 
     // Costs for the scheduler are assigned to CCS_SYSTEM
-    stopHeapProfTimer();
+    pauseHeapProfTimer();
 #if defined(PROFILING)
     cap->r.rCCCS = CCS_SYSTEM;
 #endif

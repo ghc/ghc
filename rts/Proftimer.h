@@ -12,9 +12,8 @@
 
 void initProfTimer      ( void );
 void handleProfTick     ( void );
-
-void stopHeapProfTimer  ( void );
-void startHeapProfTimer ( void );
+void pauseHeapProfTimer  ( void );
+void resumeHeapProfTimer ( void );
 
 extern bool performHeapProfile;
 extern bool performTickySample;
