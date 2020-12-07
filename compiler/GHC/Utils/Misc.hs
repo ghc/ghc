@@ -36,7 +36,7 @@ module GHC.Utils.Misc (
 
         dropWhileEndLE, spanEnd, last2, lastMaybe,
 
-        foldl1', foldl2, count, countWhile, all2,
+        foldl1', foldl2, ifoldr, count, countWhile, all2,
 
         lengthExceeds, lengthIs, lengthIsNot,
         lengthAtLeast, lengthAtMost, lengthLessThan,
@@ -722,6 +722,14 @@ transitiveClosure succ eq xs
 
 A combination of foldl with zip.  It works with equal length lists.
 -}
+
+-- | A fusing right-fold with index.
+ifoldr :: (Int -> a -> b -> b) -> b -> [a] -> b
+ifoldr f acc xs = foldr c z xs 0
+  where
+    c a g = oneShot (\i -> f i a $ g (i+1))
+    z = oneShot $ \(!_i) -> acc
+{-# INLINE ifoldr #-}
 
 foldl2 :: (acc -> a -> b -> acc) -> acc -> [a] -> [b] -> acc
 foldl2 _ z [] [] = z

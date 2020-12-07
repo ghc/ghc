@@ -68,6 +68,10 @@ module GHC.Types.Basic (
         TailCallInfo(..), tailCallInfo, zapOccTailCallInfo,
         isAlwaysTailCalled,
 
+        Staticness(..),
+        StaticArgs, staticArgsInfo,
+        mkStaticArgs, noStaticArgs, getStaticArgs, andStaticArgs,
+
         EP(..),
 
         DefMethSpec(..),
@@ -108,6 +112,7 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Binary
+import GHC.Utils.Misc
 import GHC.Types.SourceText
 import Data.Data
 import Data.Bits
@@ -914,7 +919,8 @@ OccInfo here, safely at the bottom
 
 -- | identifier Occurrence Information
 data OccInfo
-  = ManyOccs        { occ_tail    :: !TailCallInfo }
+  = ManyOccs        { occ_tail        :: !TailCallInfo
+                    , occ_static_args :: {-# UNPACK #-} !StaticArgs }
                         -- ^ There are many occurrences, or unknown occurrences
 
   | IAmDead             -- ^ Marks unused variables.  Sometimes useful for
@@ -923,13 +929,15 @@ data OccInfo
   | OneOcc          { occ_in_lam  :: !InsideLam
                     , occ_n_br    :: {-# UNPACK #-} !BranchCount
                     , occ_int_cxt :: !InterestingCxt
-                    , occ_tail    :: !TailCallInfo }
+                    , occ_tail    :: !TailCallInfo
+                    , occ_static_args :: {-# UNPACK #-} !StaticArgs }
                         -- ^ Occurs exactly once (per branch), not inside a rule
 
   -- | This identifier breaks a loop of mutually recursive functions. The field
   -- marks whether it is only a loop breaker due to a reference in a rule
-  | IAmALoopBreaker { occ_rules_only :: !RulesOnly
-                    , occ_tail       :: !TailCallInfo }
+  | IAmALoopBreaker { occ_rules_only  :: !RulesOnly
+                    , occ_tail        :: !TailCallInfo
+                    , occ_static_args :: {-# UNPACK #-} !StaticArgs }
                         -- Note [LoopBreaker OccInfo]
   deriving (Eq)
 
@@ -945,6 +953,41 @@ type BranchCount = Int
 oneBranch :: BranchCount
 oneBranch = 1
 
+-- | A bitvector denoting which arguments of a function are static.
+-- If index @i@ is 1, then argument @i@ is static.
+newtype StaticArgs = StaticArgs { unwrapStaticArgs :: Word }
+  deriving Eq
+
+-- | All zero bit vector; no argument is static
+noStaticArgs :: StaticArgs
+noStaticArgs = StaticArgs zeroBits
+
+-- | All one bit vector; all arguments are static
+allStaticArgs :: StaticArgs
+allStaticArgs = StaticArgs (complement zeroBits)
+
+staticArgsInfo :: OccInfo -> StaticArgs
+staticArgsInfo IAmDead = allStaticArgs -- should be a neutral element to @andStaticArgs@
+staticArgsInfo occ     = occ_static_args occ
+
+-- | The maximum number of static arguments we can express
+mAX_STATIC_ARGS :: Int
+mAX_STATIC_ARGS = 32 `min` finiteBitSize (unwrapStaticArgs noStaticArgs)
+
+mkStaticArgs :: [Staticness a] -> StaticArgs
+mkStaticArgs = StaticArgs
+             . ifoldr (\i s acc -> if isStatic s then setBit acc i else acc) zeroBits
+             . take mAX_STATIC_ARGS
+
+getStaticArgs :: StaticArgs -> [Staticness ()]
+getStaticArgs (StaticArgs n) = map (to_static . testBit n) [0..finiteBitSize n - 1]
+  where
+    to_static True  = Static ()
+    to_static False = NotStatic
+
+andStaticArgs :: StaticArgs -> StaticArgs -> StaticArgs
+andStaticArgs (StaticArgs sa1) (StaticArgs sa2) = StaticArgs $ sa1 .&. sa2
+
 {-
 Note [LoopBreaker OccInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -958,10 +1001,12 @@ See OccurAnal Note [Weak loop breakers]
 -}
 
 noOccInfo :: OccInfo
-noOccInfo = ManyOccs { occ_tail = NoTailCallInfo }
+noOccInfo = ManyOccs { occ_tail = NoTailCallInfo, occ_static_args = noStaticArgs }
 
 isNoOccInfo :: OccInfo -> Bool
-isNoOccInfo ManyOccs { occ_tail = NoTailCallInfo } = True
+isNoOccInfo ManyOccs { occ_tail = NoTailCallInfo
+                     , occ_static_args = static_args }
+  = static_args == noStaticArgs
 isNoOccInfo _ = False
 
 isManyOccs :: OccInfo -> Bool
@@ -1034,8 +1079,8 @@ instance Outputable TailCallInfo where
 
 -----------------
 strongLoopBreaker, weakLoopBreaker :: OccInfo
-strongLoopBreaker = IAmALoopBreaker False NoTailCallInfo
-weakLoopBreaker   = IAmALoopBreaker True  NoTailCallInfo
+strongLoopBreaker = IAmALoopBreaker False NoTailCallInfo noStaticArgs
+weakLoopBreaker   = IAmALoopBreaker True  NoTailCallInfo noStaticArgs
 
 isWeakLoopBreaker :: OccInfo -> Bool
 isWeakLoopBreaker (IAmALoopBreaker{}) = True
@@ -1061,25 +1106,48 @@ zapFragileOcc occ         = zapOccTailCallInfo occ
 
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07
-  ppr (ManyOccs tails)     = pprShortTailCallInfo tails
+  ppr (ManyOccs tails static_args)     = pprShortTailCallInfo tails <> pprShortStaticArgs static_args
   ppr IAmDead              = text "Dead"
-  ppr (IAmALoopBreaker rule_only tails)
-        = text "LoopBreaker" <> pp_ro <> pprShortTailCallInfo tails
+  ppr (IAmALoopBreaker rule_only tails static_args)
+        = text "LoopBreaker" <> pp_ro <> pp_tail <> pp_sas
         where
           pp_ro | rule_only = char '!'
                 | otherwise = empty
-  ppr (OneOcc inside_lam one_branch int_cxt tail_info)
-        = text "Once" <> pp_lam inside_lam <> ppr one_branch <> pp_args int_cxt <> pp_tail
+          pp_tail           = pprShortTailCallInfo tails
+          pp_sas            = pprShortStaticArgs static_args
+  ppr (OneOcc inside_lam one_branch int_cxt tail_info static_args)
+        = text "Once" <> pp_lam inside_lam <> ppr one_branch <> pp_args int_cxt <> pp_tail <> pp_sas
         where
           pp_lam IsInsideLam     = char 'L'
           pp_lam NotInsideLam    = empty
           pp_args IsInteresting  = char '!'
           pp_args NotInteresting = empty
           pp_tail                = pprShortTailCallInfo tail_info
+          pp_sas                 = pprShortStaticArgs static_args
 
 pprShortTailCallInfo :: TailCallInfo -> SDoc
 pprShortTailCallInfo (AlwaysTailCalled ar) = char 'T' <> brackets (int ar)
 pprShortTailCallInfo NoTailCallInfo        = empty
+
+pprShortStaticArgs :: StaticArgs -> SDoc
+pprShortStaticArgs static_args
+  | static_args == noStaticArgs = empty
+  | otherwise                   = char 'S' <> brackets (int n_static_args)
+  where
+    n_static_args = count isStatic (getStaticArgs static_args)
+
+data Staticness a
+  = Static a
+  | NotStatic
+  deriving Eq
+
+instance Outputable a => Outputable (Staticness a) where
+  ppr NotStatic  = text "NotStatic"
+  ppr (Static a) = text "Static" <> parens (ppr a)
+
+isStatic :: Staticness a -> Bool
+isStatic NotStatic = False
+isStatic Static{}  = True
 
 {-
 Note [TailCallInfo]
