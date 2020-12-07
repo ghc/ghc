@@ -8,6 +8,12 @@ test('heapprof002',
 
 test('T11489', [req_profiling], makefile_test, ['T11489'])
 
+test('dynamic-prof', [], compile_and_run, [''])
+
+test('dynamic-prof2', [only_ways(['normal']), extra_run_opts('+RTS -hT --no-automatic-heap-samples')], compile_and_run, [''])
+
+test('dynamic-prof3', [only_ways(['normal']), extra_run_opts('+RTS -hT --no-automatic-heap-samples')], compile_and_run, [''])
+
 # Below this line, run tests only with profiling ways.
 setTestOpts(req_profiling)
 setTestOpts(extra_ways(['prof', 'ghci-ext-prof']))
@@ -151,4 +157,7 @@ test('T15897',
 
 test('T17572', [], compile_and_run, [''])
 
+<<<<<<< HEAD
 test('TraverseHeapTest', [only_ways(['prof'])], compile_and_run, ['-debug'])
+=======
+>>>>>>> b2015ae08e... Profiling: Allow heap profiling to be controlled dynamically.
