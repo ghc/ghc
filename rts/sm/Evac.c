@@ -73,24 +73,14 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
     StgPtr to;
     gen_workspace *ws;
 
-    /* Find out where we're going, using the handy "to" pointer in
-     * the gen of the source object.  If it turns out we need to
-     * evacuate to an older generation, adjust it here (see comment
-     * by evacuate()).
-     */
-    if (gen_no < gct->evac_gen_no) {
-        if (gct->eager_promotion) {
-            gen_no = gct->evac_gen_no;
-        } else if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving) && deadlock_detect_gc) {
-            /* See Note [Deadlock detection under nonmoving collector]. */
-            gen_no = oldest_gen->no;
-        } else {
-            gct->failed_to_evac = true;
-        }
-    }
-
     if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
-        if (gen_no == oldest_gen->no) {
+        /* See Note [Deadlock detection under nonmoving collector]. */
+        const uint32_t oldest_gen_no = oldest_gen->no;
+        if (deadlock_detect_gc) {
+            gen_no = oldest_gen_no;
+        }
+
+        if (gen_no == oldest_gen_no) {
             gct->copied += size;
             to = nonmovingAllocate(gct->cap, size);
 
@@ -98,7 +88,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
             // current->todo_link == NULL means not in todo list
             struct NonmovingSegment *seg = nonmovingGetSegment(to);
             if (!seg->todo_link) {
-                gen_workspace *ws = &gct->gens[oldest_gen->no];
+                gen_workspace *ws = &gct->gens[oldest_gen_no];
                 seg->todo_link = ws->todo_seg;
                 ws->todo_seg = seg;
             }
@@ -111,9 +101,23 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
             // so there is no need.
             //
             // See Note [Non-moving GC: Marking evacuated objects].
-            if (major_gc && !deadlock_detect_gc)
+            if (major_gc && !deadlock_detect_gc) {
                 markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) to);
+            }
             return to;
+        }
+    }
+
+    /* Find out where we're going, using the handy "to" pointer in
+     * the gen of the source object.  If it turns out we need to
+     * evacuate to an older generation, adjust it here (see comment
+     * by evacuate()).
+     */
+    if (gen_no < gct->evac_gen_no) {
+        if (gct->eager_promotion) {
+            gen_no = gct->evac_gen_no;
+        } else {
+            gct->failed_to_evac = true;
         }
     }
 
