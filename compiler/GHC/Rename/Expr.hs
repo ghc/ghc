@@ -2208,13 +2208,14 @@ getMonadFailOp :: HsStmtContext p -> RnM (FailOperator GhcRn, FreeVars) -- Synta
 getMonadFailOp ctxt
  = do { xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
       ; xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags
-      ; (fail, fvs) <- reallyGetMonadFailOp xRebindableSyntax xOverloadedStrings
-      ; return (Just fail, fvs)
+      ; xNoFallibleDo <- fmap (not . xopt LangExt.FallibleDo) getDynFlags
+      ; reallyGetMonadFailOp xNoFallibleDo xRebindableSyntax xOverloadedStrings
       }
   where
     isQualifiedDo = isJust (qualifiedDoModuleName_maybe ctxt)
 
-    reallyGetMonadFailOp rebindableSyntax overloadedStrings
+    reallyGetMonadFailOp noFallibleDo rebindableSyntax overloadedStrings
+      | noFallibleDo = return (Nothing, emptyFVs)
       | (isQualifiedDo || rebindableSyntax) && overloadedStrings = do
         (failExpr, failFvs) <- lookupQualifiedDoExpr ctxt failMName
         (fromStringExpr, fromStringFvs) <- lookupSyntaxExpr fromStringName
@@ -2228,8 +2229,11 @@ getMonadFailOp ctxt
               unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLoc arg_name] body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
-        return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
-      | otherwise = lookupQualifiedDo ctxt failMName
+        return (Just failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
+      | otherwise = do
+        (failExpr, failFvs) <- lookupQualifiedDo ctxt failMName
+        return (Just failExpr, failFvs)
+
 
 -- Rebinding 'if's to 'ifThenElse' applications.
 --

@@ -368,7 +368,7 @@ reportWarnings dflags ctx@(DsMatchContext kind loc) vars
     flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
     flag_b = redundantBang dflags
-    flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag kind)
+    flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag (extensionFlags dflags) kind)
 
     maxPatterns = maxUncoveredPatterns dflags
 
