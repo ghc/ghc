@@ -47,7 +47,13 @@ Compiler
 - There is a significant refactoring in the solver; any type-checker plugins
   will have to be updated, as GHC no longer uses flattening skolems or
   flattening metavariables.
-  
+
+- The heap profiler can now be controlled from within a Haskell program using
+  functions in ``GHC.Profiling``. Profiling can be started and stopped or a heap
+  census requested at a specific point in the program.
+  There is a new RTS flag :rts-flag:`--no-automatic-heap-samples` which can be
+  used to stop heap profiling starting when a program starts.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
