@@ -570,7 +570,7 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
         // Emit events to the event log
 
         // Has to be emitted while all caps stopped for GC, but before GC_END.
-        // See trac.haskell.org/ThreadScope/wiki/RTSsummaryEvents
+        // See https://gitlab.haskell.org/ghc/ghc/-/wikis/RTSsummaryEvents
         // for a detailed design rationale of the current setup
         // of GC eventlog events.
         traceEventGcGlobalSync(cap);
