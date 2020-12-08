@@ -720,7 +720,7 @@ by saying ``-fno-wombat``.
     :reverse: -fno-omit-yields
     :category:
 
-    :default: on
+    :default: on (yields are *not* inserted)
 
     Tells GHC to omit heap checks when no allocation is
     being performed. While this improves binary sizes by about 5%, it
