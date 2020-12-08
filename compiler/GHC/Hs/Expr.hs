@@ -765,13 +765,11 @@ altogether.
 Whenever we 'setSrcSpan' a 'generatedSrcSpan', we update a field in
 TcLclEnv called 'tcl_provenance', setting it to RebindableSyntaxCP, which
 indicates that we entered generated code, i.e code fabricated by the compiler
-when rebinding some syntax. The function tcl_rebindable_syntax will produce True
-when this is the case. If someone tries to push some error context line
-while that field is set to RebindableSyntaxCP, the pushing won't actually
-happen and the context line is just dropped.
+when rebinding some syntax. Error-message context lines are not added when we're
+traversing rebindable syntax; this logic is implemented in tcPolyExprNC.
 
 Once we 'setSrcSpan' a real span (for an expression that was in the original
-source code), we set 'tcl_provenance' back to whatever it was prior, indicating that we
+source code), we set 'tcl_provenance' back to OtherCP, indicating that we
 "emerged from the generated code tunnel", and that the expressions we will be
 processing are relevant to report in context lines again.
 

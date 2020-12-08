@@ -1669,18 +1669,11 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
        ; checkMinimalDefinition
        ; checkMethBindMembership
        ; (ids, binds, mb_implics) <- set_exts exts $
-                                     unset_warnings_deriving $
                                      mapAndUnzip3M tc_item op_items
        ; return (ids, listToBag binds, listToBag (catMaybes mb_implics)) }
   where
     set_exts :: [LangExt.Extension] -> TcM a -> TcM a
     set_exts es thing = foldr setXOptM thing es
-
-    -- See Note [Avoid -Winaccessible-code when deriving]
-    unset_warnings_deriving :: TcM a -> TcM a
-    unset_warnings_deriving
-      | is_derived = unsetWOptM Opt_WarnInaccessibleCode
-      | otherwise  = id
 
     hs_sig_fn = mkHsSigFun sigs
     inst_loc  = getSrcSpan dfun_id
@@ -1815,6 +1808,14 @@ Instead, we take the much simpler approach of always disabling
    report inaccessible code to the user, on an Implication-by-Implication
    basis. If an Implication's DynFlags indicate that -Winaccessible-code was
    disabled, then don't bother reporting it. That's it!
+
+Note that either we're in a deriving, or we're not.
+* If we are, then the deriving starts at top level and all enclosing implications will
+  arise from the deriving, and won't have -Winaccessible-code.
+* If we're not, then none of the enclosing implications are from deriving, and so
+  all implications will have whatever setting the user wants.
+So we only examine the top level implication when determining whether we're
+in a deriving for that purpose. (cf. should_warn in GHC.Tc.Errors.reportWanteds)
 -}
 
 ------------------------

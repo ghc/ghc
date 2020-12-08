@@ -1,9 +1,10 @@
 
 T15558.hs:11:15: warning: [-Winaccessible-code (in -Wdefault)]
     • Couldn't match type ‘Int’ with ‘Bool’
-      Inaccessible code in
+      Unsatisfiable constraint a ~ Bool in
         a type expected by the context:
           (a ~ Bool) => ()
+      This may result in inaccessible code.
     • In the first argument of ‘MkFoo’, namely ‘()’
       In the expression: MkFoo ()
       In an equation for ‘f’: f MkT = MkFoo ()

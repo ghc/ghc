@@ -12,9 +12,10 @@ FDsFromGivens.hs:13:1: warning: [-Winaccessible-code (in -Wdefault)]
                          g1 :: forall a.
                                (C Char [a], C Char Bool) =>
                                a -> () at FDsFromGivens.hs:13:1-42
-    Inaccessible code in
+    Unsatisfiable constraints (C Char [a], C Char Bool) in
       the type signature for:
         g1 :: forall a. (C Char [a], C Char Bool) => a -> ()
+    This may result in inaccessible code.
 
 FDsFromGivens.hs:13:7: warning: [-Winaccessible-code (in -Wdefault)]
     • Couldn't match type ‘[a]’ with ‘Bool’
@@ -29,9 +30,10 @@ FDsFromGivens.hs:13:7: warning: [-Winaccessible-code (in -Wdefault)]
                            g1 :: forall a.
                                  (C Char [a], C Char Bool) =>
                                  a -> () at FDsFromGivens.hs:13:7-42
-      Inaccessible code in
+      Unsatisfiable constraints (C Char [a], C Char Bool) in
         the type signature for:
           g1 :: forall a. (C Char [a], C Char Bool) => a -> ()
+      This may result in inaccessible code.
     • In the ambiguity check for ‘g1’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature: g1 :: (C Char [a], C Char Bool) => a -> ()
