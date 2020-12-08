@@ -907,7 +907,7 @@ That is the entire point of qlUnify!   Wrinkles:
 
 * We must not make an occurs-check; we use occCheckExpand for that.
 
-* metaTyVarUpdateOK also checks for various other things, including
+* checkTypeEq also checks for various other things, including
   - foralls, and predicate types (which we want to allow here)
   - type families (relates to a very specific and exotic performance
     question, that is unlikely to bite here)
