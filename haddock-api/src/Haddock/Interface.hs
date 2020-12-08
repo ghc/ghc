@@ -182,7 +182,7 @@ processModule verbosity modsum flags modMap instIfaceMap = do
     liftIO $ mapM_ putStrLn (nub msgs)
     dflags <- getDynFlags
     let (haddockable, haddocked) = ifaceHaddockCoverage interface
-        percentage = floor (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double) :: Int
+        percentage = div (haddocked * 100) haddockable
         modString = moduleString (ifaceMod interface)
         coverageMsg = printf " %3d%% (%3d /%3d) in '%s'" percentage haddocked haddockable modString
         header = case ifaceDoc interface of
