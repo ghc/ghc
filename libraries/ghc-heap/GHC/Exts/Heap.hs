@@ -71,6 +71,7 @@ import GHC.Exts.Heap.InfoTable
 #endif
 import GHC.Exts.Heap.Utils
 import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
+import qualified GHC.Exts.Heap.ProfInfo.PeekProfInfo as PPI
 
 import Control.Monad
 import Data.Bits
@@ -170,13 +171,17 @@ getClosureDataFromHeapObject x = do
 getClosureDataFromHeapRep :: ByteArray# -> Ptr StgInfoTable -> [b] -> IO (GenClosure b)
 getClosureDataFromHeapRep heapRep infoTablePtr pts = do
   itbl <- peekItbl infoTablePtr
-  getClosureDataFromHeapRepPrim (dataConNames infoTablePtr) itbl heapRep pts
+  getClosureDataFromHeapRepPrim (dataConNames infoTablePtr) PPI.peekTopCCS itbl heapRep pts
 
 getClosureDataFromHeapRepPrim
     :: IO (String, String, String)
     -- ^ A continuation used to decode the constructor description field,
     -- in ghc-debug this code can lead to segfaults because dataConNames
     -- will dereference a random part of memory.
+    -> (Ptr a -> IO (Maybe CostCentreStack))
+    -- ^ A continuation which is used to decode a cost centre stack
+    -- In ghc-debug, this code will need to call back into the debuggee to
+    -- fetch the representation of the CCS before decoding it.
     -> StgInfoTable
     -- ^ The `StgInfoTable` of the closure, extracted from the heap
     -- representation.
@@ -191,7 +196,7 @@ getClosureDataFromHeapRepPrim
     -- `b` is some representation of a pointer e.g. `Any` or `Ptr Any`.
     -> IO (GenClosure b)
     -- ^ Heap representation of the closure.
-getClosureDataFromHeapRepPrim getConDesc itbl heapRep pts = do
+getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
     let -- heapRep as a list of words.
         rawHeapWords :: [Word]
         rawHeapWords = [W# (indexWordArray# heapRep i) | I# i <- [0.. end] ]
@@ -343,7 +348,7 @@ getClosureDataFromHeapRepPrim getConDesc itbl heapRep pts = do
                 }
         TSO | [ u_lnk, u_gbl_lnk, tso_stack, u_trec, u_blk_ex, u_bq] <- pts
                 -> withArray rawHeapWords (\ptr -> do
-                    fields <- FFIClosures.peekTSOFields ptr
+                    fields <- FFIClosures.peekTSOFields decodeCCS ptr
                     pure $ TSOClosure
                         { info = itbl
                         , link = u_lnk
