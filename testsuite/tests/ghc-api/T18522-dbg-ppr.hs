@@ -13,6 +13,7 @@ import GHC.Tc.Utils.Zonk
 import GHC.Utils.Error
 import GHC.Driver.Ppr
 import GHC.Driver.Env
+import GHC.Driver.Errors
 import GHC
 import qualified GHC.LanguageExtensions as LangExt
 
