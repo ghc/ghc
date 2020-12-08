@@ -18,6 +18,15 @@ module GHC.Types.Error
    , getSeverityColour
    , getCaretDiagnostic
    , makeIntoWarning
+   , showErrMsg
+      -- * Constructing individual errors
+   , mkErrMsg
+   , mkPlainErrMsg
+   , mkErrDoc
+   , mkLongErrMsg
+   , mkWarnMsg
+   , mkPlainWarnMsg
+   , mkLongWarnMsg
    )
 where
 
@@ -41,14 +50,14 @@ type ErrorMessages   = Bag ErrMsg
 type MsgDoc          = SDoc
 type WarnMsg         = ErrMsg
 
-
+-- | The main 'GHC' error type.
+-- There is deliberately no 'Show' instance for an 'ErrMsg', see
+-- Note [Showing ErrMsg].
 data ErrMsg = ErrMsg
    { errMsgSpan        :: SrcSpan
       -- ^ The SrcSpan is used for sorting errors into line-number order
    , errMsgContext     :: PrintUnqualified
    , errMsgDoc         :: ErrDoc
-   , errMsgShortString :: String
-      -- ^ This has the same text as errDocImportant . errMsgDoc.
    , errMsgSeverity    :: Severity
    , errMsgReason      :: WarnReason
    }
@@ -101,8 +110,25 @@ data Severity
 instance ToJson Severity where
   json s = JSString (show s)
 
-instance Show ErrMsg where
-    show em = errMsgShortString em
+-- NOTE [Showing ErrMsg]
+-- Showing an 'ErrMsg' via its 'Show' instance is something that doesn't
+-- make much sense in the optic of #18516.
+-- The 'errMsgShortString' function was added to an 'ErrMsg' with the
+-- sole purpose of writing the instance below:
+--
+-- instance Show (ErrMsg e) where
+--   show em = errMsgShortString em
+--
+-- However, errMsgShortString requires 'DynFlags' to be passed as input
+-- for rendering correctly the 'SDoc' making things even more coupled
+-- with the driver.
+-- For all these reasons we remove the 'Show' instance for 'ErrMsg' and
+-- we offer a top-level function for convenience, i.e. 'showErrMsg'.
+
+-- | Shows an 'ErrMsg'. See NOTE [Showing ErrMsg].
+showErrMsg :: ErrMsg -> String
+showErrMsg err =
+  renderWithContext defaultSDocContext (vcat (errDocImportant $ errMsgDoc err))
 
 pprMessageBag :: Bag MsgDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
@@ -238,3 +264,31 @@ makeIntoWarning reason err = err
     { errMsgSeverity = SevWarning
     , errMsgReason = reason }
 
+--
+-- Creating ErrMsg(s)
+--
+
+mk_err_msg :: Severity -> SrcSpan -> PrintUnqualified -> ErrDoc -> ErrMsg
+mk_err_msg sev locn print_unqual err
+ = ErrMsg { errMsgSpan = locn
+          , errMsgContext = print_unqual
+          , errMsgDoc = err
+          , errMsgSeverity = sev
+          , errMsgReason = NoReason }
+
+mkErrDoc :: SrcSpan -> PrintUnqualified -> ErrDoc -> ErrMsg
+mkErrDoc = mk_err_msg SevError
+
+mkLongErrMsg, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg
+-- ^ A long (multi-line) error message
+mkErrMsg, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> MsgDoc            -> ErrMsg
+-- ^ A short (one-line) error message
+mkPlainErrMsg, mkPlainWarnMsg :: SrcSpan ->                     MsgDoc            -> ErrMsg
+-- ^ Variant that doesn't care about qualified/unqualified names
+
+mkLongErrMsg   locn unqual msg extra = mk_err_msg SevError   locn unqual        (ErrDoc [msg] [] [extra])
+mkErrMsg       locn unqual msg       = mk_err_msg SevError   locn unqual        (ErrDoc [msg] [] [])
+mkPlainErrMsg  locn        msg       = mk_err_msg SevError   locn alwaysQualify (ErrDoc [msg] [] [])
+mkLongWarnMsg  locn unqual msg extra = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [extra])
+mkWarnMsg      locn unqual msg       = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [])
+mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify (ErrDoc [msg] [] [])

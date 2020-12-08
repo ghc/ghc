@@ -29,7 +29,6 @@ mkParserErr span doc = ErrMsg
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
    , errMsgDoc         = ErrDoc [doc] [] []
-   , errMsgShortString = renderWithContext defaultSDocContext doc
    , errMsgSeverity    = SevError
    , errMsgReason      = NoReason
    }
@@ -39,7 +38,6 @@ mkParserWarn flag span doc = ErrMsg
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
    , errMsgDoc         = ErrDoc [doc] [] []
-   , errMsgShortString = renderWithContext defaultSDocContext doc
    , errMsgSeverity    = SevWarning
    , errMsgReason      = Reason flag
    }
