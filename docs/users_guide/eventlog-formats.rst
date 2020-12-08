@@ -207,8 +207,60 @@ Thread and scheduling events
    :base-ref:`Control.Concurrent.setThreadLabel`).
 
 
+.. _gc-events:
+
 Garbage collector events
 ~~~~~~~~~~~~~~~~~~~~~~~~
+
+The following events mark various points of the lifecycle of a moving garbage
+collection.
+
+A typical garbage collection will look something like the following:
+
+1. A capability realizes that it needs a garbage collection (e.g. as a result
+   of running out of nursery) and requests a garbage collection.  This is
+   marked by :event-type:`REQUEST_SEQ_GC` or :event-type:`REQUEST_PAR_GC`.
+
+2. As other capabilities reach yield points and suspend execution they emit
+   :event-type:`STOP_THREAD` events.
+
+3. When all capabilities have suspended execution, collection will begin,
+   marked by a :event-type:`GC_START` event.
+
+4. As individual parallel GC threads commence with scavenging they will emit
+   :event-type:`GC_WORK` events.
+
+5. If a parallel GC thread runs out of work it will emit a
+   :event-type:`GC_IDLE` event. If it is later handed more work it will emit
+   another :event-type:`GC_WORK` event.
+
+6. Eventually when scavenging has finished a :event-type:`GC_DONE` event
+   will be emitted by each GC thread.
+
+7. A bit of book-keeping is performed.
+
+8. A :event-type:`GC_END` event will be emitted marking the end of the GC cycle.
+
+9. A :event-type:`HEAP_SIZE` event will be emitted giving the
+   cumulative heap allocations of the program until now.
+
+10. A :event-type:`GC_STATS_GHC` event will be emitted
+   containing various details of the collection and heap state.
+
+11. In the case of a major collection, a
+    :event-type:`HEAP_LIVE` event will be emitted describing
+    the current size of the live on-heap data.
+
+12. In the case of the :ghc-flag:`-threaded` RTS, a
+    :event-type:`SPARK_COUNTERS` event will be emitted giving
+    details on how many sparks have been created, evaluated, and GC'd.
+
+13. As mutator threads resume execution they will emit :event-type:`RUN_THREAD`
+    events.
+
+Note that in the case of the concurrent non-moving collector additional events
+will be emitted during the concurrent phase of collection. These are described
+in :ref:`nonmoving-gc-events`.
 
 .. event-type:: GC_START
 
@@ -685,6 +737,46 @@ These events mark various stages of the
 :rts-flag:`non-moving collection <--nonmoving-gc>` lifecycle. These are enabled
 with the ``+RTS -lg`` event-set.
 
+A typical non-moving collection cycle will look something like the following:
+
+1. The preparatory phase of collection will emit the usual events associated
+   with a moving collection. See :ref:`gc-events` for details.
+
+2. The concurrent write barrier is enabled and the concurrent mark thread is
+   started. From this point forward mutator threads may emit
+   :event-type:`CONC_UPD_REM_SET_FLUSH` events, indicating that they have
+   flushed their capability-local update remembered sets.
+
+3. Concurrent marking begins, denoted by a :event-type:`CONC_MARK_BEGIN` event.
+
+4. When the mark queue is depleted a :event-type:`CONC_MARK_END` is emitted.
+
+5. If necessary (e.g. due to weak pointer marking), the marking process will
+   continue, returning to step (3) above.
+
+6. When the collector has done as much concurrent marking as it can it will
+   enter the post-mark synchronization phase of collection, denoted by a
+   :event-type:`CONC_SYNC_BEGIN` event.
+
+7. Mutator threads will suspend execution and, if necessary, flush their update
+   remembered sets (indicated by :event-type:`CONC_UPD_REM_SET_FLUSH` events).
+
+8. The collector will do any final marking necessary (indicated by
+   :event-type:`CONC_MARK_BEGIN` and :event-type:`CONC_MARK_END` events).
+
+9. The collector will do a small amount of sweeping, disable the write barrier,
+   emit a :event-type:`CONC_SYNC_END` event, and allow mutators to resume
+
+10. The collector will begin the concurrent sweep phase, indicated by a
+    :event-type:`CONC_SWEEP_BEGIN` event.
+
+11. Once sweeping has concluded a :event-type:`CONC_SWEEP_END` event will be
+    emitted and the concurrent collector thread will terminate.
+
+12. A :event-type:`NONMOVING_HEAP_CENSUS` event will be emitted describing the
+    fragmentation state of the non-moving heap.
+
+
 .. event-type:: CONC_MARK_BEGIN
 
    :tag: 200
@@ -742,8 +834,9 @@ with the ``+RTS -lg`` event-set.
 Non-moving heap census
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The non-moving heap census events (enabled with the ``+RTS -ln`` event-set) are
-intended to provide insight into fragmentation of the non-moving heap.
+The non-moving heap census events (enabled with the :rts-flag:`+RTS -ln <-l ⟨flags⟩>`
+event-set) are intended to provide insight into fragmentation of the non-moving
+heap.
 
 .. event-type:: NONMOVING_HEAP_CENSUS
 
@@ -760,8 +853,8 @@ Ticky counters
 ~~~~~~~~~~~~~~
 
 Programs compiled with :ghc-flag:`-ticky` and :ghc-flag:`-eventlog` and invoked
-with ``+RTS -lT`` will emit periodic samples of the ticky entry counters to the
-eventlog.
+with :rts-flag:`+RTS -lT <-l ⟨flags⟩>` will emit periodic samples of the ticky
+entry counters to the eventlog.
 
 .. event-type:: TICKY_COUNTER_DEF
 
