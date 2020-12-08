@@ -163,6 +163,9 @@ extern generation * generations;
 extern generation * g0;
 extern generation * oldest_gen;
 
+typedef void(*ListBlocksCb)(void *user, bdescr *);
+void listAllBlocks(ListBlocksCb cb, void *user);
+
 /* -----------------------------------------------------------------------------
    Generic allocation
 
