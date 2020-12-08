@@ -131,7 +131,7 @@ or like this: ::
           b  -- ^ This is the documentation for the argument of type 'b'
 
 There is one edge case that is handled differently: only one ``-- ^``
-annotation occuring after the constructor and all its arguments is
+annotation occurring after the constructor and all its arguments is
 applied to the constructor, not its last argument: ::
 
     data T a b
@@ -156,8 +156,8 @@ Alternative layout styles are generally accepted by Haddock - for
 example doc comments can appear before or after the comma in separated
 lists such as the list of record fields above.
 
-In case that more than one constructor exports a field with the same
-name, the documentation attached to the first occurence of the field
+In cases where more than one constructor exports a field with the same
+name, the documentation attached to the first occurrence of the field
 will be used, even if a comment is not present. ::
 
     data T a = A { someField :: a -- ^ Doc for someField of A
@@ -165,7 +165,7 @@ will be used, even if a comment is not present. ::
              | B { someField :: a -- ^ Doc for someField of B
                  }
 
-In the above example, all occurences of ``someField`` in the
+In the above example, all occurrences of ``someField`` in the
 documentation are going to be documented with
 ``Doc for someField of A``. Note that Haddock versions 2.14.0 and before
 would join up documentation of each field and render the result. The
@@ -238,7 +238,7 @@ module documentation example and then talk about the fields. ::
 
 All fields are optional but they must be in order if they do appear.
 Multi-line fields are accepted but the consecutive lines have to start
-indented more than their label. If your label is indented one space as
+indented more than their label. If your label is indented one space, as
 is often the case with the ``--`` syntax, the consecutive lines have
 to start at two spaces at the very least. For example, above we saw a
 multiline ``Copyright`` field: ::
@@ -250,7 +250,7 @@ multiline ``Copyright`` field: ::
     ...
     -}
 
-That could equivalently be written as ::
+That could equivalently be written as: ::
 
     -- | ...
     -- Copyright:
@@ -258,14 +258,14 @@ That could equivalently be written as ::
     --  Someone Else, 2014
     -- ...
 
-or as ::
+or as: ::
 
     -- | ...
     -- Copyright: (c) Some Person, 2013
     --     Someone Else, 2014
     -- ...
 
-but not as ::
+but not as: ::
 
     -- | ...
     -- Copyright: (c) Some Person, 2013
@@ -352,7 +352,7 @@ Documentation Structure Examples
 
 We now give several examples that produce similar results and
 illustrate most of the structural markup features. The first two
-example use an export list, but the third example does not.
+examples use an export list, but the third example does not.
 
 The first example, using an export list with :ref:`section-headings`
 and inline section descriptions: ::
@@ -362,7 +362,7 @@ and inline section descriptions: ::
         --
         -- | There is a "smart" importer, 'readImage', that determines
         -- the image format from the file extension, and several
-        -- "dumb" format-specific importers that decode the file at
+        -- "dumb" format-specific importers that decode the file as
         -- the specified type.
         readImage
       , readPngImage
@@ -417,7 +417,7 @@ defined elsewhere (the ``$imageImporters``; see :ref:`named-chunks`):
     --
     -- There is a "smart" importer, 'readImage', that determines the
     -- image format from the file extension, and several "dumb"
-    -- format-specific importers that decode the file at the specified
+    -- format-specific importers that decode the file as the specified
     -- type.
 
     -- | Read an image, guessing the format from the file name.
@@ -450,7 +450,7 @@ The third example, without an export list: ::
     --
     -- There is a "smart" importer, 'readImage', that determines the
     -- image format from the file extension, and several "dumb"
-    -- format-specific importers that decode the file at the specified
+    -- format-specific importers that decode the file as the specified
     -- type.
 
     -- | Read an image, guessing the format from the file name.
@@ -522,11 +522,11 @@ create stable links, you can add an explicit anchor (see
 This will create an HTML anchor ``#g:classes`` to the section.
 
 The alternative style of placing the commas at the beginning of each
-line is also supported. e.g.: ::
+line is also supported, e.g.: ::
 
     module Foo (
       -- * Classes
-      , C(..)
+        C(..)
       -- * Types
       -- ** A data type
       , T
@@ -539,7 +539,7 @@ line is also supported. e.g.: ::
 
 When not using an export list, you may insert section headers in the
 module body. Such section headers associate with all entities
-declaried up until the next section header. For example: ::
+declared up until the next section header. For example: ::
 
     module Foo where
 
@@ -614,7 +614,7 @@ re-exporting module.
 It is often desirable to include a chunk of documentation which is not
 attached to any particular Haskell declaration, for example, when
 giving summary documentation for a group of related definitions (see
-:ref:`structure-examples`). In addition to including such documenation
+:ref:`structure-examples`). In addition to including such documentation
 chunks at the top of the file, as part of the
 :ref:`module-description`, you can also associate them with
 :ref:`section-headings`.
@@ -668,14 +668,14 @@ headings, depending on whether you are using an export list or not:
        -- Here is a large chunk of documentation which may be referred to by
        -- the name $doc.
 
-   Just like with entity declariations when not using an export list,
+   Just like with entity declarations when not using an export list,
    named chunks of documentation are associated with the preceding
    section header here, or with the implicit top-level documentation
    section if there is no preceding section header.
 
    **Warning**: the form used in the first bullet above, where the
    chunk is not named, *does not work* when you aren't using an
-   export list. For example ::
+   export list. For example: ::
 
        module Foo where
 
@@ -686,7 +686,7 @@ headings, depending on whether you are using an export list or not:
        -- | The fooifier.
        foo :: ...
 
-   will result in ``Some documentation not ...`` being attached to
+   will result in ``Some documentation not ...`` being attached to the
    *next* entity declaration, here ``foo``, in addition to any other
    documentation that next entity already has!
 
@@ -756,7 +756,7 @@ type in ``C`` will therefore point locally to ``C.T``.
 Module Attributes
 -----------------
 
-Certain attributes may be specified for each module which affects the
+Certain attributes may be specified for each module which affect the
 way that Haddock generates documentation for that module. Attributes are
 specified in a comma-separated list in an
 ``{-# OPTIONS_HADDOCK ... #-}`` pragma at the top of the module, either
@@ -807,7 +807,7 @@ Markup
 
 Haddock understands certain textual cues inside documentation
 annotations that tell it how to render the documentation. The cues (or
-“markup”) have been designed to be simple and mnemonic in ASCII so that
+“markup”) have been designed to be simple and mnemonic in ASCII so
 the programmer doesn't have to deal with heavyweight annotations when
 editing documentation comments.
 
@@ -820,8 +820,8 @@ comment.
 Special Characters
 ~~~~~~~~~~~~~~~~~~
 
-The following characters have special meanings in documentation
-comments: ``\``, ``/``, ``'``, `````, ``"``, ``@``, ``<``, ``$``, ``#``. To insert a
+The following characters have special meanings in documentation comments:
+``\``, ``/``, ``'``, `````, ``"``, ``@``, ``<``, ``$``, ``#``. To insert a
 literal occurrence of one of these special characters, precede it with a
 backslash (``\``).
 
@@ -839,7 +839,7 @@ Character References
 
 Although Haskell source files may contain any character from the Unicode
 character set, the encoding of these characters as bytes varies between
-systems, so that only source files restricted to the ASCII character set
+systems. Consequently, only source files restricted to the ASCII character set
 are portable. Other characters may be specified in character and string
 literals using Haskell character escapes. To represent such characters
 in documentation comments, Haddock supports SGML-style numeric character
@@ -926,10 +926,11 @@ If ``M.T`` is not otherwise in scope, then Haddock will simply emit a
 link pointing to the entity ``T`` exported from module ``M`` (without
 checking to see whether either ``M`` or ``M.T`` exist).
 
-Since values and types live in different namespaces in Haskell, it is
-possible for a reference such as ``'X'`` to be ambiguous. In such a case,
-Haddock defaults to pointing to the type. The ambiguity can be overcome by explicitly specifying a namespace, by way of a ``v`` (for value) or ``t``
-(for type) immediately before the link: ::
+Since values and types live in different namespaces in Haskell, it is possible
+for a reference such as ``'X'`` to be ambiguous. In such a case, Haddock
+defaults to pointing to the type. The ambiguity can be overcome by explicitly
+specifying a namespace, by way of a ``v`` (for value) or ``t`` (for type)
+immediately before the link: ::
 
     -- | An implicit reference to  'X', the type constructor
     --   An explicit reference to v'X', the data constructor
@@ -986,7 +987,7 @@ Itemized and Enumerated Lists
 
 A bulleted item is represented by preceding a paragraph with either
 “``*``” or “``-``”. A sequence of bulleted paragraphs is rendered as an
-itemized list in the generated documentation, eg.: ::
+itemized list in the generated documentation, e.g.: ::
 
     -- | This is a bulleted list:
     --
@@ -1025,7 +1026,7 @@ You can have more than one line of content in a list element: ::
 
 You can even nest whole paragraphs inside of list elements. The rules
 are 4 spaces for each indentation level. You're required to use a
-newline before such nested paragraph: ::
+newline before such nested paragraphs: ::
 
     {-|
     * Beginning of list
@@ -1112,7 +1113,7 @@ followed by the URL enclosed in regular parentheses, for example: ::
 
     [some link](http://example.com)
 
-The link text is used as a descriptive text for the URL, if the output
+The link text is used as a description for the URL if the output
 format supports it.
 
 Images
@@ -1125,8 +1126,8 @@ like this: ::
     ![image description](pathtoimage.png)
 
 If the output format supports it, the image will be rendered inside the
-documentation. The image description is used as relpacement text and/or
-image title.
+documentation. The image description is used as replacement text and/or
+an image title.
 
 Mathematics / LaTeX
 ~~~~~~~~~~~~~~~~~~~
@@ -1146,7 +1147,13 @@ the mathematics via `MathJax <https://www.mathjax.org>`__.
 Grid Tables
 ~~~~~~~~~~~
 
-Inspired by reSTs grid tables Haddock supports a complete table representation via a grid-like "ASCII art". Grid tables are described with a visual grid made up of the characters "-", "=", "|", and "+". The hyphen ("-") is used for horizontal lines (row separators). The equals sign ("=") may be used to separate optional header rows from the table body. The vertical bar ("|") is used for vertical lines (column separators). The plus sign ("+") is used for intersections of horizontal and vertical lines. ::
+Inspired by reSTs grid tables, Haddock supports a complete table representation
+via grid-like "ASCII art". Grid tables are described with a visual grid made
+up of the characters "-", "=", "|", and "+". The hyphen ("-") is used for
+horizontal lines (row separators). The equals sign ("=") may be used to
+separate optional header rows from the table body. The vertical bar ("|") is
+used for vertical lines (column separators). The plus sign ("+") is used for
+intersections of horizontal and vertical lines. ::
 
     -- | This is a grid table:
     --
@@ -1240,7 +1247,7 @@ Since
 ^^^^^
 
 ``@since`` annotation can be used to convey information about when the
-function was introduced or when it has changed in the way significant to
+function was introduced or when it has changed in a way significant to
 the user. ``@since`` is a paragraph-level element. While multiple such
 annotations are not an error, only the one to appear in the comment last
 will be used. ``@since`` has to be followed with a version number, no

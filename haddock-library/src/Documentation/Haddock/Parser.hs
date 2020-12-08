@@ -227,7 +227,7 @@ takeWhile1_ = mfilter (not . T.null) . takeWhile_
 -- DocAName "Hello world"
 anchor :: Parser (DocH mod a)
 anchor = DocAName . T.unpack <$>
-         disallowNewline ("#" *> takeWhile1_ (/= '#') <* "#")
+         ("#" *> takeWhile1_ (\x -> x /= '#' && not (isSpace x)) <* "#")
 
 -- | Monospaced strings.
 --

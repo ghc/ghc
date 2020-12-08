@@ -126,7 +126,7 @@ data DocH mod id
   | DocMathInline String
   | DocMathDisplay String
   | DocAName String
-  -- ^ A (HTML) anchor.
+  -- ^ A (HTML) anchor. It must not contain any spaces.
   | DocProperty String
   | DocExamples [Example]
   | DocHeader (Header (DocH mod id))

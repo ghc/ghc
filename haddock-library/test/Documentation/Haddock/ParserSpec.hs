@@ -289,8 +289,10 @@ spec = do
       it "parses a single word anchor" $ do
         "#foo#" `shouldParseTo` DocAName "foo"
 
-      it "parses a multi word anchor" $ do
-        "#foo bar#" `shouldParseTo` DocAName "foo bar"
+      -- Spaces are not allowed:
+      -- https://www.w3.org/TR/html51/dom.html#the-id-attribute
+      it "doesn't parse a multi word anchor" $ do
+        "#foo bar#" `shouldParseTo` "#foo bar#"
 
       it "parses a unicode anchor" $ do
         "#灼眼のシャナ#" `shouldParseTo` DocAName "灼眼のシャナ"
@@ -304,6 +306,9 @@ spec = do
 
       it "does not accept empty anchors" $ do
         "##" `shouldParseTo` "##"
+
+      it "does not accept anchors containing spaces" $ do
+        "{-# LANGUAGE GADTs #-}" `shouldParseTo` "{-# LANGUAGE GADTs #-}"
 
     context "when parsing emphasised text" $ do
       it "emphasises a word on its own" $ do

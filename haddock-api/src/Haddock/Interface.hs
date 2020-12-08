@@ -111,7 +111,7 @@ processModules verbosity modules flags extIfaces = do
   let warnings = Flag_NoWarnings `notElem` flags
   dflags <- getDynFlags
   let (interfaces'', msgs) =
-         runWriter $ mapM (renameInterface dflags links warnings) interfaces'
+         runWriter $ mapM (renameInterface dflags (ignoredSymbols flags) links warnings) interfaces'
   liftIO $ mapM_ putStrLn msgs
 
   return (interfaces'', homeLinks)
