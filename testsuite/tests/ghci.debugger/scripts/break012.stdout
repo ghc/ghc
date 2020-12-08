@@ -1,14 +1,14 @@
 Stopped in Main.g, break012.hs:5:10-18
-_result :: (p, a1 -> a1, (), a -> a -> a) = _
-a :: p = _
-b :: a2 -> a2 = _
+_result :: (a1, a2 -> a2, (), a -> a -> a) = _
+a :: a1 = _
+b :: a3 -> a3 = _
 c :: () = _
 d :: a -> a -> a = _
-a :: p
-b :: a2 -> a2
+a :: a1
+b :: a3 -> a3
 c :: ()
 d :: a -> a -> a
-a = (_t1::p)
-b = (_t2::a2 -> a2)
+a = (_t1::a1)
+b = (_t2::a3 -> a3)
 c = (_t3::())
 d = (_t4::a -> a -> a)
