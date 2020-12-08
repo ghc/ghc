@@ -1,17 +1,14 @@
 
 T7594.hs:37:12: error:
-    • Could not deduce: b ~ IO ()
-      from the context: (:&:) c0 Real a
-        bound by a type expected by the context:
-                   forall a. (:&:) c0 Real a => a -> b
-        at T7594.hs:37:12-16
-      Expected: a -> b
+    • Couldn't match type ‘b0’ with ‘IO ()’
+      Expected: a -> b0
         Actual: a -> IO ()
-      ‘b’ is a rigid type variable bound by
-        the inferred type of bar2 :: b
-        at T7594.hs:37:1-19
-      Possible fix: add a type signature for ‘bar2’
+        ‘b0’ is untouchable
+          inside the constraints: (:&:) c0 Real a
+          bound by a type expected by the context:
+                     forall a. (:&:) c0 Real a => a -> b0
+          at T7594.hs:37:12-16
     • In the first argument of ‘app’, namely ‘print’
       In the expression: app print q2
       In an equation for ‘bar2’: bar2 = app print q2
-    • Relevant bindings include bar2 :: b (bound at T7594.hs:37:1)
+    • Relevant bindings include bar2 :: b0 (bound at T7594.hs:37:1)

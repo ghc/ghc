@@ -4,9 +4,9 @@
 
 module GHC.Tc.Solver.Canonical(
      canonicalize,
-     unifyDerived,
+     unifyDerived, unifyTest, UnifyTestResult(..),
      makeSuperClasses,
-     StopOrContinue(..), stopWith, continueWith,
+     StopOrContinue(..), stopWith, continueWith, andWhenContinue,
      solveCallStack    -- For GHC.Tc.Solver
   ) where
 
@@ -51,7 +51,8 @@ import GHC.Data.Bag
 import GHC.Utils.Monad
 import Control.Monad
 import Data.Maybe ( isJust, isNothing )
-import Data.List  ( zip4 )
+import Data.List  ( zip4, partition )
+import GHC.Types.Unique.Set( nonDetEltsUniqSet )
 import GHC.Types.Basic
 
 import Data.Bifunctor ( bimap )
@@ -1885,7 +1886,7 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
                | bndr <- tyConBinders tc
                , let new_loc0 | isNamedTyConBinder bndr = toKindLoc loc
                               | otherwise               = loc
-                     new_loc  | isVisibleTyConBinder bndr
+                     new_loc  | isInvisibleTyConBinder bndr
                               = updateCtLocOrigin new_loc0 toInvisibleOrigin
                               | otherwise
                               = new_loc0 ]
@@ -2269,7 +2270,7 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 
 -- This function handles the case where one side is a tyvar and the other is
 -- a type family application. Which to put on the left?
---   If we can unify the variable, put it on the left, as this may be our only
+--   If the tyvar is a meta-tyvar, put it on the left, as this may be our only
 --   shot to unify.
 --   Otherwise, put the function on the left, because it's generally better to
 --   rewrite away function calls. This makes types smaller. And it seems necessary:
@@ -2283,17 +2284,17 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
                                             -- or (rhs |> mco) ~ lhs if swapped
                 -> EqRel -> SwapFlag
-                -> TyVar -> TcType          -- lhs, pretty lhs
-                -> TyCon -> [Xi] -> TcType  -- rhs fun, rhs args, pretty rhs
+                -> TyVar -> TcType          -- lhs (or if swapped rhs), pretty lhs
+                -> TyCon -> [Xi] -> TcType  -- rhs (or if swapped lhs) fun and args, pretty rhs
                 -> MCoercion                -- :: kind(rhs) ~N kind(lhs)
                 -> TcS (StopOrContinue Ct)
 canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
-  = do { tclvl <- getTcLevel
-       ; dflags <- getDynFlags
-       ; if | isTouchableMetaTyVar tclvl tv1
-              , MTVU_OK _ <- checkTyVarEq dflags YesTypeFamilies tv1 (ps_xi2 `mkCastTyMCo` mco)
-              -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1)
-                                                     (ps_xi2 `mkCastTyMCo` mco)
+  = do { can_unify <- unifyTest ev tv1 rhs
+       ; dflags    <- getDynFlags
+       ; if | case can_unify of { NoUnify -> False; _ -> True }
+            , MTVU_OK {} <- checkTyVarEq dflags YesTypeFamilies tv1 rhs
+            -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1) rhs
+
             | otherwise
               -> do { new_ev <- rewriteCastedEquality ev eq_rel swapped
                                   (mkTyVarTy tv1) (mkTyConApp fun_tc2 fun_args2)
@@ -2303,6 +2304,52 @@ canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
                                   (ps_xi1 `mkCastTyMCo` sym_mco) } }
   where
     sym_mco = mkTcSymMCo mco
+    rhs = ps_xi2 `mkCastTyMCo` mco
+
+data UnifyTestResult
+  = UnifySameLevel
+  | UnifyOuterLevel [TcTyVar]   -- Promote these
+                    TcLevel     -- ..to this level
+  | NoUnify
+
+instance Outputable UnifyTestResult where
+  ppr UnifySameLevel            = text "UnifySameLevel"
+  ppr (UnifyOuterLevel tvs lvl) = text "UnifyOuterLevel" <> parens (ppr lvl <+> ppr tvs)
+  ppr NoUnify                   = text "NoUnify"
+
+unifyTest :: CtEvidence -> TcTyVar -> TcType -> TcS UnifyTestResult
+unifyTest ev tv1 rhs
+  | not (isGiven ev)
+  , MetaTv { mtv_tclvl = tv_lvl, mtv_info = info } <- tcTyVarDetails tv1
+  , canSolveByUnification info rhs
+  = do { ambient_lvl  <- getTcLevel
+       ; given_eq_lvl <- getInnermostGivenEqLevel
+
+       ; if | tv_lvl `sameDepthAs` ambient_lvl
+            -> return UnifySameLevel
+
+            | tv_lvl `deeperThanOrSame` given_eq_lvl   -- No intervening given equalities
+            , all (does_not_escape tv_lvl) free_skols  -- No skolem escapes
+            -> return (UnifyOuterLevel free_metas tv_lvl)
+
+            | otherwise
+            -> return NoUnify }
+  | otherwise
+  = return NoUnify
+  where
+     fvs = nonDetEltsUniqSet $ tyCoVarsOfType rhs
+     (free_metas, free_skols) = partition is_promotable fvs
+
+     does_not_escape tv_lvl fv
+       | isTyVar fv = tv_lvl `deeperThanOrSame` tcTyVarLevel fv
+       | otherwise  = True   -- Coercion variables
+
+     is_promotable fv
+       | isTyVar fv
+       , MetaTv { mtv_info = info } <- tcTyVarDetails fv
+       = isTouchableInfo info   -- Can't promote cycle breakers
+       | otherwise
+       = False
 
 -- The RHS here is either not CanEqLHS, or it's one that we
 -- want to rewrite the LHS to (as per e.g. swapOverTyVars)

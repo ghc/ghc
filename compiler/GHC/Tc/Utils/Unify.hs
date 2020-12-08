@@ -1433,9 +1433,10 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
        ; go dflags cur_lvl }
   where
     go dflags cur_lvl
-      | canSolveByUnification cur_lvl tv1 ty2
-           -- See Note [Prevent unification with type families] about the NoTypeFamilies:
+      | isTouchableMetaTyVar cur_lvl tv1
+      , canSolveByUnification (metaTyVarInfo tv1) ty2
       , MTVU_OK ty2' <- metaTyVarUpdateOK dflags NoTypeFamilies tv1 ty2
+           -- See Note [Prevent unification with type families] about the NoTypeFamilies:
       = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
@@ -1463,6 +1464,21 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
     kind_origin = KindEqOrigin ty1 (Just ty2) origin (Just t_or_k)
 
     defer = unSwap swapped (uType_defer t_or_k origin) ty1 ty2
+
+canSolveByUnification :: MetaInfo -> TcType -> Bool
+canSolveByUnification info xi
+  = case info of
+      CycleBreakerTv -> False
+      TyVarTv -> case tcGetTyVar_maybe xi of
+                   Nothing -> False
+                   Just tv -> case tcTyVarDetails tv of
+                                 MetaTv { mtv_info = info }
+                                            -> case info of
+                                                 TyVarTv -> True
+                                                 _       -> False
+                                 SkolemTv {} -> True
+                                 RuntimeUnk  -> True
+      _ -> True
 
 swapOverTyVars :: Bool -> TcTyVar -> TcTyVar -> Bool
 swapOverTyVars is_given tv1 tv2
@@ -1616,8 +1632,8 @@ inert guy, so we get
    inert item:     c ~ a
 And now the cycle just repeats
 
-Note [Eliminate younger unification variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Historical Note [Eliminate younger unification variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given a choice of unifying
      alpha := beta   or   beta := alpha
 we try, if possible, to eliminate the "younger" one, as determined
@@ -1631,33 +1647,10 @@ This is a performance optimisation only.  It turns out to fix
 It's simple to implement (see nicer_to_update_tv2 in swapOverTyVars).
 But, to my surprise, it didn't seem to make any significant difference
 to the compiler's performance, so I didn't take it any further.  Still
-it seemed to too nice to discard altogether, so I'm leaving these
+it seemed too nice to discard altogether, so I'm leaving these
 notes.  SLPJ Jan 18.
 -}
 
--- @trySpontaneousSolve wi@ solves equalities where one side is a
--- touchable unification variable.
--- Returns True <=> spontaneous solve happened
-canSolveByUnification :: TcLevel -> TcTyVar -> TcType -> Bool
-canSolveByUnification tclvl tv xi
-  | isTouchableMetaTyVar tclvl tv
-  = case metaTyVarInfo tv of
-      TyVarTv -> is_tyvar xi
-      _       -> True
-
-  | otherwise    -- Untouchable
-  = False
-  where
-    is_tyvar xi
-      = case tcGetTyVar_maybe xi of
-          Nothing -> False
-          Just tv -> case tcTyVarDetails tv of
-                       MetaTv { mtv_info = info }
-                                   -> case info of
-                                        TyVarTv -> True
-                                        _       -> False
-                       SkolemTv {} -> True
-                       RuntimeUnk  -> True
 
 {- Note [Prevent unification with type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1955,14 +1948,36 @@ metaTyVarUpdateOK :: DynFlags
 --
 -- See Note [Refactoring hazard: metaTyVarUpdateOK]
 
-metaTyVarUpdateOK dflags ty_fam_ok tv ty
-  = case checkTyVarEq dflags ty_fam_ok tv ty of
-      MTVU_OK _        -> MTVU_OK ty
+metaTyVarUpdateOK dflags ty_fam_ok tv rhs_ty
+  = case checkTyVarEq dflags ty_fam_ok tv rhs_ty of
+      _ | bad_tyvar_tv -> MTVU_Bad
+      MTVU_OK _        -> MTVU_OK rhs_ty
       MTVU_Bad         -> MTVU_Bad          -- forall, predicate, type function
       MTVU_HoleBlocker -> MTVU_HoleBlocker  -- coercion hole
-      MTVU_Occurs      -> case occCheckExpand [tv] ty of
+      MTVU_Occurs      -> case occCheckExpand [tv] rhs_ty of
                             Just expanded_ty -> MTVU_OK expanded_ty
                             Nothing          -> MTVU_Occurs
+  where
+     bad_tyvar_tv, bad_rhs :: Bool
+
+     -- True <=> we have alpha ~ ty, where alpha is a TyVarTv
+     --          and ty is not a tyvar
+     bad_tyvar_tv | MetaTv { mtv_info = TyVarTv } <- tcTyVarDetails tv
+                  = bad_rhs
+                  | otherwise
+                  = False
+
+     -- True <=> RHS is not a tyvar, or
+     -- (if a unification variable) is not a TyVarTv
+     bad_rhs = case tcGetTyVar_maybe rhs_ty of
+        Nothing -> True
+        Just tv -> case tcTyVarDetails tv of
+                      MetaTv { mtv_info = info }
+                                  -> case info of
+                                       TyVarTv -> False
+                                       _       -> True
+                      SkolemTv {} -> False
+                      RuntimeUnk  -> False
 
 checkTyVarEq :: DynFlags -> AreTypeFamiliesOK -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 checkTyVarEq dflags ty_fam_ok tv ty

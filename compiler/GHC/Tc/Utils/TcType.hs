@@ -33,7 +33,7 @@ module GHC.Tc.Utils.TcType (
 
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
-  strictlyDeeperThan, sameDepthAs,
+  strictlyDeeperThan, deeperThanOrSame, sameDepthAs,
   tcTypeLevel, tcTyVarLevel, maxTcLevel,
   promoteSkolem, promoteSkolemX, promoteSkolemsX,
   --------------------------------
@@ -45,7 +45,7 @@ module GHC.Tc.Utils.TcType (
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
-  isTouchableMetaTyVar,
+  isTouchableInfo, isTouchableMetaTyVar,
   isFloatedTouchableMetaTyVar,
   findDupTyVarTvs, mkTyVarNamePairs,
 
@@ -678,6 +678,10 @@ pushTcLevel (TcLevel us) = TcLevel (us + 1)
 strictlyDeeperThan :: TcLevel -> TcLevel -> Bool
 strictlyDeeperThan (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
   = tv_tclvl > ctxt_tclvl
+
+deeperThanOrSame :: TcLevel -> TcLevel -> Bool
+deeperThanOrSame (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
+  = tv_tclvl >= ctxt_tclvl
 
 sameDepthAs :: TcLevel -> TcLevel -> Bool
 sameDepthAs (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)

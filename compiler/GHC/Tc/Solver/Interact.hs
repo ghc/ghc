@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -14,7 +14,6 @@ import GHC.Prelude
 import GHC.Types.Basic ( SwapFlag(..),
                          infinity, IntWithInf, intGtLimit )
 import GHC.Tc.Solver.Canonical
-import GHC.Tc.Utils.Unify( canSolveByUnification )
 import GHC.Types.Var.Set
 import GHC.Core.Type as Type
 import GHC.Core.InstEnv         ( DFunInstType )
@@ -39,6 +38,7 @@ import GHC.Tc.Types
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
+import GHC.Tc.Utils.TcMType( promoteTyVarTo )
 import GHC.Tc.Solver.Monad
 import GHC.Data.Bag
 import GHC.Utils.Monad ( concatMapM, foldlM )
@@ -430,12 +430,11 @@ interactWithInertsStage :: WorkItem -> TcS (StopOrContinue Ct)
 
 interactWithInertsStage wi
   = do { inerts <- getTcSInerts
-       ; lvl  <- getTcLevel
        ; let ics = inert_cans inerts
        ; case wi of
-             CEqCan    {} -> interactEq lvl  ics wi
-             CIrredCan {} -> interactIrred   ics wi
-             CDictCan  {} -> interactDict    ics wi
+             CEqCan    {} -> interactEq    ics wi
+             CIrredCan {} -> interactIrred ics wi
+             CDictCan  {} -> interactDict  ics wi
              _ -> pprPanic "interactWithInerts" (ppr wi) }
                 -- CNonCanonical have been canonicalised
 
@@ -1439,8 +1438,8 @@ inertsCanDischarge inerts lhs rhs fr
       | otherwise
       = False  -- Work item is fully discharged
 
-interactEq :: TcLevel -> InertCans -> Ct -> TcS (StopOrContinue Ct)
-interactEq tclvl inerts workItem@(CEqCan { cc_lhs = lhs
+interactEq :: InertCans -> Ct -> TcS (StopOrContinue Ct)
+interactEq inerts workItem@(CEqCan { cc_lhs = lhs
                                          , cc_rhs = rhs
                                          , cc_ev = ev
                                          , cc_eq_rel = eq_rel })
@@ -1465,24 +1464,42 @@ interactEq tclvl inerts workItem@(CEqCan { cc_lhs = lhs
   = do { traceTcS "Not unifying representational equality" (ppr workItem)
        ; continueWith workItem }
 
-    -- try improvement, if possible
-  | TyFamLHS fam_tc fam_args <- lhs
-  , isImprovable ev
-  = do { improveLocalFunEqs ev inerts fam_tc fam_args rhs
-       ; continueWith workItem }
-
-  | TyVarLHS tv <- lhs
-  , canSolveByUnification tclvl tv rhs
-  = do { solveByUnification ev tv rhs
-       ; n_kicked <- kickOutAfterUnification tv
-       ; return (Stop ev (text "Solved by unification" <+> pprKicked n_kicked)) }
-
   | otherwise
-  = continueWith workItem
+  = case lhs of
+       TyVarLHS tv -> tryToSolveByUnification workItem ev tv rhs
 
-interactEq _ _ wi = pprPanic "interactEq" (ppr wi)
+       TyFamLHS tc args -> do { when (isImprovable ev) $
+                                 -- Try improvement, if possible
+                                improveLocalFunEqs ev inerts tc args rhs
+                              ; continueWith workItem }
 
-solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
+interactEq _ wi = pprPanic "interactEq" (ppr wi)
+
+----------------------
+-- We have a meta-tyvar on the left, and metaTyVarUpateOK has said "yes"
+-- So try to solve by unifying.
+-- Three reasons why not:
+--    Skolem escape
+--    Given equalities (GADTs)
+--    Unifying a TyVarTv with a non-tyvar type
+tryToSolveByUnification :: Ct -> CtEvidence
+                        -> TcTyVar   -- LHS tyvar
+                        -> TcType    -- RHS
+                        -> TcS (StopOrContinue Ct)
+tryToSolveByUnification work_item ev tv rhs
+  = do { can_unify <- unifyTest ev tv rhs
+       ; traceTcS "tryToSolveByUnification" (vcat [ ppr tv <+> char '~' <+> ppr rhs
+                                                  , ppr can_unify ])
+       ; case can_unify of
+           NoUnify        -> continueWith work_item
+           UnifySameLevel -> solveByUnification ev tv rhs
+           UnifyOuterLevel free_metas tv_lvl
+             -> do { wrapTcS $ mapM_ (promoteTyVarTo tv_lvl) free_metas
+                   ; setUnificationFlag tv_lvl
+                     -- We do this only if tv_lvl < ambient_lvl
+                   ; solveByUnification ev tv rhs } }
+
+solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS (StopOrContinue Ct)
 -- Solve with the identity coercion
 -- Precondition: kind(xi) equals kind(tv)
 -- Precondition: CtEvidence is Wanted or Derived
@@ -1504,9 +1521,10 @@ solveByUnification wd tv xi
                              text "Coercion:" <+> pprEq tv_ty xi,
                              text "Left Kind is:" <+> ppr (tcTypeKind tv_ty),
                              text "Right Kind is:" <+> ppr (tcTypeKind xi) ]
-
        ; unifyTyVar tv xi
-       ; setEvBindIfWanted wd (evCoercion (mkTcNomReflCo xi)) }
+       ; setEvBindIfWanted wd (evCoercion (mkTcNomReflCo xi))
+       ; n_kicked <- kickOutAfterUnification tv
+       ; return (Stop wd (text "Solved by unification" <+> pprKicked n_kicked)) }
 
 {- Note [Avoid double unifications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
