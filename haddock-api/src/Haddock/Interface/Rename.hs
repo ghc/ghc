@@ -29,6 +29,7 @@ import TysWiredIn (eqTyCon_RDR)
 import Control.Applicative
 import Control.Arrow ( first )
 import Control.Monad hiding (mapM)
+import Data.List (intercalate)
 import qualified Data.Map as Map hiding ( Map )
 import qualified Data.Set as Set
 import Prelude hiding (mapM)
