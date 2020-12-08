@@ -53,6 +53,14 @@ Compiler
   will have to be updated, as GHC no longer uses flattening skolems or
   flattening metavariables.
   
+GHCi
+~~~~
+
+- GHCi's :ghci-cmd:`:edit` command now looks for an editor in
+  the :envvar:`VISUAL` environment variable before
+  :envvar:`EDITOR`, following UNIX convention.
+  (:ghc-ticket:`19030`)
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
