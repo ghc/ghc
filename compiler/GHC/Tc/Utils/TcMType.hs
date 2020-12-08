@@ -80,7 +80,7 @@ module GHC.Tc.Utils.TcMType (
 
   ---------------------------------
   -- Promotion, defaulting, skolemisation
-  defaultTyVar, promoteTyVar, promoteTyVarSet,
+  defaultTyVar, promoteTyVarTo, promoteTyVarSet,
   quantifyTyVars, isQuantifiableTv,
   skolemiseUnboundMetaTyVar, zonkAndSkolemise, skolemiseQuantifiedTyVar,
 
@@ -965,12 +965,18 @@ writeMetaTyVarRef tyvar ref ty
        ; writeTcRef ref (Indirect ty) }
 
   -- Everything from here on only happens if DEBUG is on
+  -- Need to zonk 'ty' because we may only recently have promoted
+  -- its free meta-tyvars (see Solver.Interact.tryToSolveByUnification)
   | otherwise
   = do { meta_details <- readMutVar ref;
        -- Zonk kinds to allow the error check to work
        ; zonked_tv_kind <- zonkTcType tv_kind
-       ; zonked_ty_kind <- zonkTcType ty_kind
-       ; let kind_check_ok = tcIsConstraintKind zonked_tv_kind
+       ; zonked_ty      <- zonkTcType ty
+       ; let zonked_ty_kind = tcTypeKind zonked_ty
+             zonked_ty_lvl  = tcTypeLevel zonked_ty
+             level_check_ok  = not (zonked_ty_lvl `strictlyDeeperThan` tv_lvl)
+             level_check_msg = ppr zonked_ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
+             kind_check_ok = tcIsConstraintKind zonked_tv_kind
                           || tcEqKind zonked_ty_kind zonked_tv_kind
              -- Hack alert! tcIsConstraintKind: see GHC.Tc.Gen.HsType
              -- Note [Extra-constraint holes in partial type signatures]
@@ -995,13 +1001,9 @@ writeMetaTyVarRef tyvar ref ty
        ; writeMutVar ref (Indirect ty) }
   where
     tv_kind = tyVarKind tyvar
-    ty_kind = tcTypeKind ty
 
     tv_lvl = tcTyVarLevel tyvar
-    ty_lvl = tcTypeLevel ty
 
-    level_check_ok  = not (ty_lvl `strictlyDeeperThan` tv_lvl)
-    level_check_msg = ppr ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
 
     double_upd_msg details = hang (text "Double update of meta tyvar")
                                 2 (ppr tyvar $$ ppr details)
@@ -2005,29 +2007,29 @@ a \/\a in the final result but all the occurrences of a will be zonked to ()
 *                                                                      *
 ********************************************************************* -}
 
-promoteTyVar :: TcTyVar -> TcM Bool
+promoteTyVarTo :: TcLevel -> TcTyVar -> TcM Bool
 -- When we float a constraint out of an implication we must restore
 -- invariant (WantedInv) in Note [TcLevel and untouchable type variables] in GHC.Tc.Utils.TcType
 -- Return True <=> we did some promotion
 -- Also returns either the original tyvar (no promotion) or the new one
 -- See Note [Promoting unification variables]
-promoteTyVar tv
-  = do { tclvl <- getTcLevel
-       ; if (isFloatedTouchableMetaTyVar tclvl tv)
-         then do { cloned_tv <- cloneMetaTyVar tv
-                 ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
-                 ; writeMetaTyVar tv (mkTyVarTy rhs_tv)
-                 ; traceTc "promoteTyVar" (ppr tv <+> text "-->" <+> ppr rhs_tv)
-                 ; return True }
-         else do { traceTc "promoteTyVar: no" (ppr tv)
-                 ; return False } }
+promoteTyVarTo tclvl tv
+  | isFloatedTouchableMetaTyVar tclvl tv
+  = do { cloned_tv <- cloneMetaTyVar tv
+       ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
+       ; writeMetaTyVar tv (mkTyVarTy rhs_tv)
+       ; traceTc "promoteTyVar" (ppr tv <+> text "-->" <+> ppr rhs_tv)
+       ; return True }
+  | otherwise
+  = do { traceTc "promoteTyVar: no" (ppr tv)
+       ; return False }
 
 -- Returns whether or not *any* tyvar is defaulted
 promoteTyVarSet :: TcTyVarSet -> TcM Bool
 promoteTyVarSet tvs
-  = do { bools <- mapM promoteTyVar (nonDetEltsUniqSet tvs)
+  = do { tclvl <- getTcLevel
+       ; bools <- mapM (promoteTyVarTo tclvl) (nonDetEltsUniqSet tvs)
          -- Non-determinism is OK because order of promotion doesn't matter
-
        ; return (or bools) }
 
 

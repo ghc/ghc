@@ -33,7 +33,7 @@ module GHC.Tc.Utils.TcType (
 
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
-  strictlyDeeperThan, sameDepthAs,
+  strictlyDeeperThan, deeperThanOrSame, sameDepthAs,
   tcTypeLevel, tcTyVarLevel, maxTcLevel,
   promoteSkolem, promoteSkolemX, promoteSkolemsX,
   --------------------------------
@@ -45,7 +45,7 @@ module GHC.Tc.Utils.TcType (
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
-  isTouchableMetaTyVar,
+  isTouchableInfo, isTouchableMetaTyVar,
   isFloatedTouchableMetaTyVar,
   findDupTyVarTvs, mkTyVarNamePairs,
 
@@ -578,9 +578,10 @@ newtype TcLevel = TcLevel Int deriving( Eq, Ord )
   -- See also Note [TcLevel assignment]
 
 {-
-Note [TcLevel and untouchable type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [TcLevel invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 * Each unification variable (MetaTv)
+  and skolem (SkolemTv)
   and each Implication
   has a level number (of type TcLevel)
 
@@ -602,9 +603,6 @@ Note [TcLevel and untouchable type variables]
                 LESS THAN OR EQUAL TO the ic_tclvl of I
                 See Note [WantedInv]
 
-* A unification variable is *touchable* if its level number
-  is EQUAL TO that of its immediate parent implication,
-  and it is a TauTv or TyVarTv (but /not/ CycleBreakerTv)
 
 Note [WantedInv]
 ~~~~~~~~~~~~~~~~
@@ -678,6 +676,10 @@ pushTcLevel (TcLevel us) = TcLevel (us + 1)
 strictlyDeeperThan :: TcLevel -> TcLevel -> Bool
 strictlyDeeperThan (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
   = tv_tclvl > ctxt_tclvl
+
+deeperThanOrSame :: TcLevel -> TcLevel -> Bool
+deeperThanOrSame (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
+  = tv_tclvl >= ctxt_tclvl
 
 sameDepthAs :: TcLevel -> TcLevel -> Bool
 sameDepthAs (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
