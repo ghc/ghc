@@ -223,7 +223,7 @@ module documentation example and then talk about the fields. ::
     {-|
     Module      : W
     Description : Short description
-    Copyright   : (c) Some Guy, 2013
+    Copyright   : (c) Some Person, 2013
                       Someone Else, 2014
     License     : GPL-3
     Maintainer  : sample@email.com
@@ -245,7 +245,7 @@ multiline ``Copyright`` field: ::
 
     {-|
     ...
-    Copyright   : (c) Some Guy, 2013
+    Copyright   : (c) Some Person, 2013
                       Someone Else, 2014
     ...
     -}
@@ -254,21 +254,21 @@ That could equivalently be written as ::
 
     -- | ...
     -- Copyright:
-    --  (c) Some Guy, 2013
+    --  (c) Some Person, 2013
     --  Someone Else, 2014
     -- ...
 
 or as ::
 
     -- | ...
-    -- Copyright: (c) Some Guy, 2013
+    -- Copyright: (c) Some Person, 2013
     --     Someone Else, 2014
     -- ...
 
 but not as ::
 
     -- | ...
-    -- Copyright: (c) Some Guy, 2013
+    -- Copyright: (c) Some Person, 2013
     -- Someone Else, 2014
     -- ...
 
@@ -965,7 +965,7 @@ underscore if you need it bold:
 Monospaced (or typewriter) text is indicated by surrounding it with
 ``@...@``. Other markup is valid inside a monospaced span: for example
 ``@'f' a b@`` will hyperlink the identifier ``f`` inside the code
-fragment, but ``@__FILE__@`` will render ``FILE`` in bold with no 
+fragment, but ``@__FILE__@`` will render ``FILE`` in bold with no
 underscores, which may not be what you had in mind.
 
 Linking to Modules
@@ -1148,8 +1148,8 @@ Grid Tables
 
 Inspired by reSTs grid tables Haddock supports a complete table representation via a grid-like "ASCII art". Grid tables are described with a visual grid made up of the characters "-", "=", "|", and "+". The hyphen ("-") is used for horizontal lines (row separators). The equals sign ("=") may be used to separate optional header rows from the table body. The vertical bar ("|") is used for vertical lines (column separators). The plus sign ("+") is used for intersections of horizontal and vertical lines. ::
 
-    -- | This is a grid table: 
-    -- 
+    -- | This is a grid table:
+    --
     -- +------------------------+------------+----------+----------+
     -- | Header row, column 1   | Header 2   | Header 3 | Header 4 |
     -- | (header rows optional) |            |          |          |
