@@ -50,6 +50,7 @@ import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
+import GHC.Driver.Errors
 import GHC.Driver.Main
 
 import GHC.Parser.Header
@@ -280,7 +281,7 @@ warnMissingHomeModules hsc_env mod_graph =
           (sep (map ppr missing))
     warn = makeIntoWarning
       (Reason Opt_WarnMissingHomeModules)
-      (mkPlainErrMsg dflags noSrcSpan msg)
+      (mkPlainErrMsg noSrcSpan msg)
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
@@ -347,7 +348,7 @@ warnUnusedPackages = do
 
     let warn = makeIntoWarning
           (Reason Opt_WarnUnusedPackages)
-          (mkPlainErrMsg dflags noSrcSpan msg)
+          (mkPlainErrMsg noSrcSpan msg)
         msg = vcat [ text "The following packages were specified" <+>
                      text "via -package or -package-id flags,"
                    , text "but were not needed for compilation:"
@@ -2086,15 +2087,15 @@ warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   dflags <- getDynFlags
   when (wopt Opt_WarnUnusedImports dflags)
-    (logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs)))
-  where check dflags ms =
+    (logWarnings (listToBag (concatMap (check . flattenSCC) sccs)))
+  where check ms =
            let mods_in_this_cycle = map ms_mod_name ms in
-           [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
-                             unLoc i `notElem`  mods_in_this_cycle ]
+           [ warn i | m <- ms, i <- ms_home_srcimps m,
+                      unLoc i `notElem`  mods_in_this_cycle ]
 
-        warn :: DynFlags -> Located ModuleName -> WarnMsg
-        warn dflags (L loc mod) =
-           mkPlainErrMsg dflags loc
+        warn :: Located ModuleName -> WarnMsg
+        warn (L loc mod) =
+           mkPlainErrMsg loc
                 (text "Warning: {-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))
 
@@ -2160,14 +2161,14 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainErrMsg dflags noSrcSpan $
+                    else return $ Left $ unitBag $ mkPlainErrMsg noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
                                            (L rootLoc modl) obj_allowed
                                            maybe_buf excl_mods
                 case maybe_summary of
-                   Nothing -> return $ Left $ moduleNotFoundErr dflags modl
+                   Nothing -> return $ Left $ moduleNotFoundErr modl
                    Just s  -> return s
 
         rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
@@ -2180,7 +2181,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         checkDuplicates root_map
            | allow_dup_roots = return ()
            | null dup_roots  = return ()
-           | otherwise       = liftIO $ multiRootsErr dflags (head dup_roots)
+           | otherwise       = liftIO $ multiRootsErr (head dup_roots)
            where
              dup_roots :: [[ModSummary]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton $ map rights $ nodeMapElts root_map
@@ -2199,7 +2200,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
           = if isSingleton summs then
                 loop ss done
             else
-                do { multiRootsErr dflags (rights summs); return Map.empty }
+                do { multiRootsErr (rights summs); return Map.empty }
           | otherwise
           = do mb_s <- summariseModule hsc_env old_summary_map
                                        is_boot wanted_mod True
@@ -2557,7 +2558,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 -- It might have been deleted since the Finder last found it
         maybe_t <- modificationTimeIfExists src_fn
         case maybe_t of
-          Nothing -> return $ Left $ noHsFileErr dflags loc src_fn
+          Nothing -> return $ Left $ noHsFileErr loc src_fn
           Just t  -> new_summary location' mod src_fn t
 
     new_summary location mod src_fn src_timestamp
@@ -2578,7 +2579,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ unitBag $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
+                throwE $ unitBag $ mkPlainErrMsg pi_mod_name_loc $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2590,7 +2591,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ unitBag $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
+            in throwE $ unitBag $ mkPlainErrMsg pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2743,21 +2744,21 @@ withDeferredDiagnostics f = do
 noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> ErrMsg
 -- ToDo: we don't have a proper line number for this error
 noModError dflags loc wanted_mod err
-  = mkPlainErrMsg dflags loc $ cannotFindModule dflags wanted_mod err
+  = mkPlainErrMsg loc $ cannotFindModule dflags wanted_mod err
 
-noHsFileErr :: DynFlags -> SrcSpan -> String -> ErrorMessages
-noHsFileErr dflags loc path
-  = unitBag $ mkPlainErrMsg dflags loc $ text "Can't find" <+> text path
+noHsFileErr :: SrcSpan -> String -> ErrorMessages
+noHsFileErr loc path
+  = unitBag $ mkPlainErrMsg loc $ text "Can't find" <+> text path
 
-moduleNotFoundErr :: DynFlags -> ModuleName -> ErrorMessages
-moduleNotFoundErr dflags mod
-  = unitBag $ mkPlainErrMsg dflags noSrcSpan $
+moduleNotFoundErr :: ModuleName -> ErrorMessages
+moduleNotFoundErr mod
+  = unitBag $ mkPlainErrMsg noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
-multiRootsErr :: DynFlags -> [ModSummary] -> IO ()
-multiRootsErr _      [] = panic "multiRootsErr"
-multiRootsErr dflags summs@(summ1:_)
-  = throwOneError $ mkPlainErrMsg dflags noSrcSpan $
+multiRootsErr :: [ModSummary] -> IO ()
+multiRootsErr [] = panic "multiRootsErr"
+multiRootsErr summs@(summ1:_)
+  = throwOneError $ mkPlainErrMsg noSrcSpan $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)

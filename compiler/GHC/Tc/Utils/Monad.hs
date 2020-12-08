@@ -1001,7 +1001,7 @@ mkLongErrAt loc msg extra
          printer <- getPrintUnqualified dflags ;
          unit_state <- unitState <$> getDynFlags ;
          let msg' = pprWithUnitState unit_state msg in
-         return $ mkLongErrMsg dflags loc printer msg' extra }
+         return $ mkLongErrMsg loc printer msg' extra }
 
 mkErrDocAt :: SrcSpan -> ErrDoc -> TcRn ErrMsg
 mkErrDocAt loc errDoc
@@ -1011,7 +1011,7 @@ mkErrDocAt loc errDoc
          let f = pprWithUnitState unit_state
              errDoc' = mapErrDoc f errDoc
          in
-         return $ mkErrDoc dflags loc printer errDoc' }
+         return $ mkErrDoc loc printer errDoc' }
 
 addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError
@@ -1520,7 +1520,7 @@ add_warn_at :: WarnReason -> SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 add_warn_at reason loc msg extra_info
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
-         let { warn = mkLongWarnMsg dflags loc printer
+         let { warn = mkLongWarnMsg loc printer
                                     msg extra_info } ;
          reportWarning reason warn }
 
