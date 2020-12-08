@@ -46,6 +46,7 @@ import GHC.Tc.Types
 
 import GHC.Driver.Main
 import GHC.Driver.Env hiding ( Hsc )
+import GHC.Driver.Errors
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Config
 import GHC.Driver.Phases
@@ -149,7 +150,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
     handler (ProgramError msg) = return $ Left $ unitBag $
-        mkPlainErrMsg (hsc_dflags hsc_env) srcspan $ text msg
+        mkPlainErrMsg srcspan $ text msg
     handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
@@ -1127,7 +1128,7 @@ runPhase (RealPhase (Cpp sf)) input_fn
        (dflags1, unhandled_flags, warns)
            <- liftIO $ parseDynamicFilePragma dflags0 src_opts
        setDynFlags dflags1
-       liftIO $ checkProcessArgsResult dflags1 unhandled_flags
+       liftIO $ checkProcessArgsResult unhandled_flags
 
        if not (xopt LangExt.Cpp dflags1) then do
            -- we have to be careful to emit warnings only once.
@@ -1148,7 +1149,7 @@ runPhase (RealPhase (Cpp sf)) input_fn
             src_opts <- liftIO $ getOptionsFromFile dflags0 output_fn
             (dflags2, unhandled_flags, warns)
                 <- liftIO $ parseDynamicFilePragma dflags0 src_opts
-            liftIO $ checkProcessArgsResult dflags2 unhandled_flags
+            liftIO $ checkProcessArgsResult unhandled_flags
             unless (gopt Opt_Pp dflags2) $
                 liftIO $ handleFlagWarnings dflags2 warns
             -- the HsPp pass below will emit warnings
@@ -1182,7 +1183,7 @@ runPhase (RealPhase (HsPp sf)) input_fn = do
         (dflags1, unhandled_flags, warns)
             <- liftIO $ parseDynamicFilePragma dflags src_opts
         setDynFlags dflags1
-        liftIO $ checkProcessArgsResult dflags1 unhandled_flags
+        liftIO $ checkProcessArgsResult unhandled_flags
         liftIO $ handleFlagWarnings dflags1 warns
 
         return (RealPhase (Hsc sf), output_fn)

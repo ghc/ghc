@@ -301,6 +301,7 @@ import GHC.Platform.Ways
 import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
                            , isSourceFilename, startPhase )
 import GHC.Driver.Env
+import GHC.Driver.Errors
 import GHC.Driver.CmdLine
 import GHC.Driver.Session hiding (WarnReason(..))
 import GHC.Driver.Backend
@@ -889,7 +890,7 @@ checkNewInteractiveDynFlags dflags0 = do
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
   then do liftIO $ printOrThrowWarnings dflags0 $ listToBag
-            [mkPlainWarnMsg dflags0 interactiveSrcSpan
+            [mkPlainWarnMsg interactiveSrcSpan
              $ text "StaticPointers is not supported in GHCi interactive expressions."]
           return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
