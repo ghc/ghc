@@ -692,8 +692,11 @@ tcCheckUsage name id_mult thing_inside
     --
     -- It works nicely in practice.
     (promote_mult, _, _, _) = mapTyCo mapper
-    mapper = TyCoMapper { tcm_tyvar = \ () tv -> do { _ <- promoteTyVar tv
-                                                    ; zonkTcTyVar tv }
+    mapper = TyCoMapper { tcm_tyvar = \ () tv -> if isMetaTyVar tv
+                                                 then do { tclvl <- getTcLevel
+                                                         ; _ <- promoteMetaTyVarTo tclvl tv
+                                                         ; zonkTcTyVar tv }
+                                                 else return (mkTyVarTy tv)
                         , tcm_covar = \ () cv -> return (mkCoVarCo cv)
                         , tcm_hole  = \ () h  -> return (mkHoleCo h)
                         , tcm_tycobinder = \ () tcv _flag -> return ((), tcv)
