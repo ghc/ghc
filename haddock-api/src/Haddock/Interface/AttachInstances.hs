@@ -1,5 +1,7 @@
 {-# LANGUAGE MagicHash, BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.AttachInstances

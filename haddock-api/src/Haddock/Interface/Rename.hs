@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 ----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.Rename

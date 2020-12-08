@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module Haddock.Backends.Hyperlinker.Parser (parse) where
 
 import Control.Applicative ( Alternative(..) )

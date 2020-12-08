@@ -70,6 +70,8 @@ library
                -Wredundant-constraints
                -Wnoncanonical-monad-instances
                -Wmissing-home-modules
+               -Wincomplete-uni-patterns
+               -Wincomplete-record-updates
 
 
   exposed-modules:
