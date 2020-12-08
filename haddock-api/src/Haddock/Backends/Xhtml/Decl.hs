@@ -536,6 +536,8 @@ ppClassDecl summary links instances fixities loc d subdocs
     -- Only the fixity relevant to the class header
     fixs = ppFixities [ f | f@(n,_) <- fixities, n == unLoc lname ] qual
 
+    nm   = tcdNameI decl
+
     hdr = ppClassHdr summary lctxt (unLoc lname) ltyvars lfds
 
     -- Associated types
@@ -794,7 +796,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl pats
   | otherwise = header_ +++ docSection curname pkg qual doc +++ constrBit +++ patternBit +++ instancesBit
 
   where
-    docname   = tcdName dataDecl
+    docname   = tcdNameI dataDecl
     curname   = Just $ getName docname
     cons      = dd_cons (tcdDataDefn dataDecl)
     isH98     = case unLoc (head cons) of

@@ -407,7 +407,7 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces = d
     exportSubs _ = []
 
     exportName :: ExportItem DocNameI -> [IdP DocNameI]
-    exportName ExportDecl { expItemDecl } = getMainDeclBinder (unLoc expItemDecl)
+    exportName ExportDecl { expItemDecl } = getMainDeclBinderI (unLoc expItemDecl)
     exportName ExportNoDecl { expItemName } = [expItemName]
     exportName _ = []
 
