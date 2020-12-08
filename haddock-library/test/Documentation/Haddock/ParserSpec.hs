@@ -431,6 +431,9 @@ spec = do
       it "accepts anchor reference syntax as DocModule" $ do
         "\"Foo#bar\"" `shouldParseTo` DocModule "Foo#bar"
 
+      it "accepts anchor with hyphen as DocModule" $ do
+        "\"Foo#bar-baz\"" `shouldParseTo` DocModule "Foo\\#bar-baz"
+
       it "accepts old anchor reference syntax as DocModule" $ do
         "\"Foo\\#bar\"" `shouldParseTo` DocModule "Foo\\#bar"
 
