@@ -1865,7 +1865,7 @@ It's distressingly delicate though:
   class constraints mentioned above.  But we may /also/ end up taking
   constraints built at some inner level, and emitting them at some
   outer level, and then breaking the TcLevel invariants
-  See Note [TcLevel and untouchable type variables] in GHC.Tc.Utils.TcType
+  See Note [TcLevel invariants] in GHC.Tc.Utils.TcType
 
 So dropMisleading has a horridly ad-hoc structure.  It keeps only
 /insoluble/ flat constraints (which are unlikely to very visibly trip
