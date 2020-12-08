@@ -1,4 +1,4 @@
-Found 237 parser module dependencies
+Found 238 parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -81,6 +81,7 @@ GHC.Driver.Backpack.Syntax
 GHC.Driver.CmdLine
 GHC.Driver.Env
 GHC.Driver.Env.Types
+GHC.Driver.Errors
 GHC.Driver.Flags
 GHC.Driver.Hooks
 GHC.Driver.Monad

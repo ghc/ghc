@@ -21,6 +21,7 @@ import GHC              (parseTargetFiles,  Ghc, GhcMonad(..), Backend (..),
 
 import GHC.Driver.CmdLine
 import GHC.Driver.Env
+import GHC.Driver.Errors
 import GHC.Driver.Phases
 import GHC.Driver.Session hiding (WarnReason(..))
 import GHC.Driver.Ppr

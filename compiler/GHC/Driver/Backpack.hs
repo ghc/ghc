@@ -30,6 +30,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Env
+import GHC.Driver.Errors
 
 import GHC.Parser
 import GHC.Parser.Header
@@ -96,7 +97,7 @@ doBackpack [src_filename] = do
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
     modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
-    liftIO $ checkProcessArgsResult dflags unhandled_flags
+    liftIO $ checkProcessArgsResult unhandled_flags
     liftIO $ handleFlagWarnings dflags warns
     -- TODO: Preprocessing not implemented
 
@@ -776,7 +777,6 @@ summariseDecl :: PackageName
 summariseDecl pn hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
 summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
     = do hsc_env <- getSession
-         let dflags = hsc_dflags hsc_env
          -- TODO: this looks for modules in the wrong place
          r <- liftIO $ summariseModule hsc_env
                          emptyModNodeMap -- GHC API recomp not supported
@@ -786,7 +786,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
-            Nothing -> throwOneError (mkPlainErrMsg dflags loc (text "module" <+> ppr modname <+> text "was not found"))
+            Nothing -> throwOneError (mkPlainErrMsg loc (text "module" <+> ppr modname <+> text "was not found"))
             Just (Left err) -> throwErrors err
             Just (Right summary) -> return summary
 

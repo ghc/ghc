@@ -21,12 +21,10 @@ module GHC.Utils.Error (
         Messages, ErrorMessages, WarningMessages,
         unionMessages,
         errorsFound, isEmptyMessages,
-        isWarnMsgFatal,
-        warningsToMessages,
 
         -- ** Formatting
         pprMessageBag, pprErrMsgBagWithLoc,
-        pprLocErrMsg, printBagOfErrors,
+        pprLocErrMsg,
         formatErrDoc,
 
         -- ** Construction
@@ -59,8 +57,7 @@ module GHC.Utils.Error (
         prettyPrintGhcErrors,
         traceCmd,
 
-        -- * Compilation errors and warnings
-        printOrThrowWarnings, handleFlagWarnings, shouldPrintWarning
+        sortMsgBag
     ) where
 
 #include "HsVersions.h"
@@ -69,13 +66,11 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import qualified GHC.Driver.CmdLine as CmdLine
 
 import GHC.Data.Bag
 import GHC.Utils.Exception
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Types.SourceError
 import GHC.Types.Error
 import GHC.Types.SrcLoc as SrcLoc
 
@@ -125,32 +120,6 @@ orValid _       v = v
 -- -----------------------------------------------------------------------------
 -- Collecting up messages for later ordering and printing.
 
-mk_err_msg :: DynFlags -> Severity -> SrcSpan -> PrintUnqualified -> ErrDoc -> ErrMsg
-mk_err_msg dflags sev locn print_unqual doc
- = ErrMsg { errMsgSpan = locn
-          , errMsgContext = print_unqual
-          , errMsgDoc = doc
-          , errMsgShortString = showSDoc dflags (vcat (errDocImportant doc))
-          , errMsgSeverity = sev
-          , errMsgReason = NoReason }
-
-mkErrDoc :: DynFlags -> SrcSpan -> PrintUnqualified -> ErrDoc -> ErrMsg
-mkErrDoc dflags = mk_err_msg dflags SevError
-
-mkLongErrMsg, mkLongWarnMsg   :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg
--- ^ A long (multi-line) error message
-mkErrMsg, mkWarnMsg           :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc            -> ErrMsg
--- ^ A short (one-line) error message
-mkPlainErrMsg, mkPlainWarnMsg :: DynFlags -> SrcSpan ->                     MsgDoc            -> ErrMsg
--- ^ Variant that doesn't care about qualified/unqualified names
-
-mkLongErrMsg   dflags locn unqual msg extra = mk_err_msg dflags SevError   locn unqual        (ErrDoc [msg] [] [extra])
-mkErrMsg       dflags locn unqual msg       = mk_err_msg dflags SevError   locn unqual        (ErrDoc [msg] [] [])
-mkPlainErrMsg  dflags locn        msg       = mk_err_msg dflags SevError   locn alwaysQualify (ErrDoc [msg] [] [])
-mkLongWarnMsg  dflags locn unqual msg extra = mk_err_msg dflags SevWarning locn unqual        (ErrDoc [msg] [] [extra])
-mkWarnMsg      dflags locn unqual msg       = mk_err_msg dflags SevWarning locn unqual        (ErrDoc [msg] [] [])
-mkPlainWarnMsg dflags locn        msg       = mk_err_msg dflags SevWarning locn alwaysQualify (ErrDoc [msg] [] [])
-
 ----------------
 emptyMessages :: Messages
 emptyMessages = (emptyBag, emptyBag)
@@ -160,27 +129,6 @@ isEmptyMessages (warns, errs) = isEmptyBag warns && isEmptyBag errs
 
 errorsFound :: DynFlags -> Messages -> Bool
 errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
-
-warningsToMessages :: DynFlags -> WarningMessages -> Messages
-warningsToMessages dflags =
-  partitionBagWith $ \warn ->
-    case isWarnMsgFatal dflags warn of
-      Nothing -> Left warn
-      Just err_reason ->
-        Right warn{ errMsgSeverity = SevError
-                  , errMsgReason = ErrReason err_reason }
-
-printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
-printBagOfErrors dflags bag_of_errors
-  = sequence_ [ let style = mkErrStyle unqual
-                    ctx   = initSDocContext dflags style
-                in putLogMsg dflags reason sev s $ withPprStyle style (formatErrDoc ctx doc)
-              | ErrMsg { errMsgSpan      = s,
-                         errMsgDoc       = doc,
-                         errMsgSeverity  = sev,
-                         errMsgReason    = reason,
-                         errMsgContext   = unqual } <- sortMsgBag (Just dflags)
-                                                                  bag_of_errors ]
 
 formatErrDoc :: SDocContext -> ErrDoc -> SDoc
 formatErrDoc ctx (ErrDoc important context supplementary)
@@ -629,17 +577,6 @@ prettyPrintGhcErrors dflags
       where
          ctx = initSDocContext dflags defaultUserStyle
 
--- | Checks if given 'WarnMsg' is a fatal warning.
-isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe (Maybe WarningFlag)
-isWarnMsgFatal dflags ErrMsg{errMsgReason = Reason wflag}
-  = if wopt_fatal wflag dflags
-      then Just (Just wflag)
-      else Nothing
-isWarnMsgFatal dflags _
-  = if gopt Opt_WarnIsError dflags
-      then Just Nothing
-      else Nothing
-
 traceCmd :: DynFlags -> String -> String -> IO a -> IO a
 -- trace the command (at two levels of verbosity)
 traceCmd dflags phase_name cmd_line action
@@ -795,44 +732,3 @@ dumpAction dflags = dump_action dflags dflags
 -- | Helper for `trace_action`
 traceAction :: TraceAction
 traceAction dflags = trace_action dflags dflags
-
-handleFlagWarnings :: DynFlags -> [CmdLine.Warn] -> IO ()
-handleFlagWarnings dflags warns = do
-  let warns' = filter (shouldPrintWarning dflags . CmdLine.warnReason)  warns
-
-      -- It would be nicer if warns :: [Located MsgDoc], but that
-      -- has circular import problems.
-      bag = listToBag [ mkPlainWarnMsg dflags loc (text warn)
-                      | CmdLine.Warn _ (L loc warn) <- warns' ]
-
-  printOrThrowWarnings dflags bag
-
--- Given a warn reason, check to see if it's associated -W opt is enabled
-shouldPrintWarning :: DynFlags -> CmdLine.WarnReason -> Bool
-shouldPrintWarning dflags CmdLine.ReasonDeprecatedFlag
-  = wopt Opt_WarnDeprecatedFlags dflags
-shouldPrintWarning dflags CmdLine.ReasonUnrecognisedFlag
-  = wopt Opt_WarnUnrecognisedWarningFlags dflags
-shouldPrintWarning _ _
-  = True
-
-
--- | Given a bag of warnings, turn them into an exception if
--- -Werror is enabled, or print them out otherwise.
-printOrThrowWarnings :: DynFlags -> Bag WarnMsg -> IO ()
-printOrThrowWarnings dflags warns = do
-  let (make_error, warns') =
-        mapAccumBagL
-          (\make_err warn ->
-            case isWarnMsgFatal dflags warn of
-              Nothing ->
-                (make_err, warn)
-              Just err_reason ->
-                (True, warn{ errMsgSeverity = SevError
-                           , errMsgReason = ErrReason err_reason
-                           }))
-          False warns
-  if make_error
-    then throwIO (mkSrcErr warns')
-    else printBagOfErrors dflags warns
-
