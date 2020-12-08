@@ -1956,9 +1956,8 @@ doLoadAndCollectInfo retain_context howmuch = do
 -- globally to all modules. This triggered #18955. This function unsets the
 -- flag from the global DynFlags before they are copied to the module-specific
 -- DynFlags.
--- This is a temporary workaround until GHC 9.0.1, which allows disabling
--- this feature at a finer-grained level by way of the
--- -fno-object-code-if-unboxed flag. See !4531.
+-- This is a temporary workaround until GHCi will support unboxed tuples and 
+-- unboxed sums.
 resetOptByteCodeIfUnboxed :: GhciMonad m => m ()
 resetOptByteCodeIfUnboxed = do
   dflags <- getDynFlags
