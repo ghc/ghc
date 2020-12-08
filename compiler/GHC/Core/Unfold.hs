@@ -51,7 +51,7 @@ import GHC.Core.DataCon
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
-import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec )
+import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec, staticArgsInfo, noStaticArgs )
 import GHC.Core.Type
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
@@ -1076,14 +1076,17 @@ instance Outputable CallCtxt where
   ppr RuleArgCtxt = text "RuleArgCtxt"
 
 callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
-  = case idUnfolding id of
-      -- idUnfolding checks for loop-breakers, returning NoUnfolding
+  = case unfoldingInfo (idInfo id) of
+      -- Don't call idUnfolding, because we want unfolding for loop-breakers
+      -- if they have static arguments
       -- Things with an INLINE pragma may have an unfolding *and*
       -- be a loop breaker  (maybe the knot is not yet untied)
         CoreUnfolding { uf_tmpl = unf_template
                       , uf_is_work_free = is_wf
                       , uf_guidance = guidance, uf_expandable = is_exp }
-          | active_unfolding -> tryUnfolding dflags id lone_variable
+          | active_unfolding
+          , isStrongLoopBreaker (idOccInfo id) ==> has_static_args id
+          -> tryUnfolding dflags id lone_variable
                                     arg_infos cont_info unf_template
                                     is_wf is_exp guidance
           | otherwise -> traceInline dflags id "Inactive unfolding:" (ppr id) Nothing
@@ -1091,6 +1094,9 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
         BootUnfolding    -> Nothing
         OtherCon {}      -> Nothing
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
+  where
+    b ==> t = not b || t
+    has_static_args id = staticArgsInfo (idOccInfo id) /= noStaticArgs
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
 traceInline :: DynFlags -> Id -> String -> SDoc -> a -> a
