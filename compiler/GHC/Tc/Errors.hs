@@ -589,6 +589,11 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
     tidy_cts   = bagToList (mapBag (tidyCt env)   simples)
     tidy_holes = bagToList (mapBag (tidyHole env) holes)
 
+    should_warn :: Bool
+    should_warn
+      | (impl : _) <- cec_encl ctxt = ic_warn_inaccessible impl
+      | otherwise                   = False   -- there won't be Givens, anyway
+
     -- report1: ones that should *not* be suppressed by
     --          an insoluble somewhere else in the tree
     -- It's crucial that anything that is considered insoluble
@@ -600,7 +605,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
                 -- Don't bother doing this if -Winaccessible-code isn't enabled.
                 -- See Note [Avoid -Winaccessible-code when deriving] in GHC.Tc.TyCl.Instance.
                 -- False means don't suppress subsequent errors, because these are warnings anyway.
-                if any ic_warn_inaccessible (cec_encl ctxt)
+                if should_warn
                    then ("insoluble1a", is_given_eq, False, mkGivenWarningReporter)
                    else ("insoluble1b", is_given_eq, False, ignoreGivenWarningReporter)
               , ("insoluble2",   unblocked utterly_wrong,  True, mkGroupReporter mkEqErr)
@@ -756,7 +761,7 @@ mkGivenWarningReporter ctxt cts
        ; err <- mkEqErr_help dflags ctxt report ct' ty1 ty2
 
        ; traceTc "mkGivenWarningReporter" (ppr ct)
-       ; unless (tcl_deriving (ctLocEnv (ctLoc ct))) $
+       ; unless (tclInDeriving (ctLocEnv (ctLoc ct))) $
            reportWarning (Reason Opt_WarnInaccessibleCode) err
        }
   where
@@ -764,8 +769,7 @@ mkGivenWarningReporter ctxt cts
     (ty1, ty2) = getEqPredTys (ctPred ct)
 
 ignoreGivenWarningReporter :: Reporter
--- Discard Given errors that don't come from
--- a pattern match; maybe we should warn instead?
+-- Discard Given warnings that don't come from a pattern match
 ignoreGivenWarningReporter ctxt cts
   = do { traceTc "mkGivenWarningReporter no" (ppr cts $$ ppr (cec_encl ctxt))
        ; return () }
@@ -806,8 +810,8 @@ that the constraint solver is written. Since this is now just a
 warning though, little harm should be caused by reporting it in
 all cases.
 
-See Trac #12466 for a long discussion in the context when this was
-still an error. In Trac #11066 it became a warning only. In
+See #12466 for a long discussion in the context when this was
+still an error. In #11066 it became a warning only. In
 discussing issue #17543, it was found that we would like the warning
 in a broader range of cases again.
 -}

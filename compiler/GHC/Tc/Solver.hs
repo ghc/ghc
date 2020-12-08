@@ -731,21 +731,19 @@ is not set.
 
 ------------------
 simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
-simplifyAmbiguityCheck ty wanteds = do
-  allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
-  if allow_ambiguous
-  then traceTc "simplifyAmbiguityCheck skipped" empty
-  else
-    do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
-       ; (final_wc, _) <- runTcS $ solveWantedsAndDrop wanteds
-             -- NB: no defaulting!  See Note [No defaulting in the ambiguity check]
-       ; traceTc "End simplifyAmbiguityCheck }" empty
-
-       ; traceTc "reportUnsolved(ambig) {" empty
-       ; discardResult $ reportUnsolved final_wc
-       ; traceTc "reportUnsolved(ambig) }" empty
-
-       ; return () }
+simplifyAmbiguityCheck ty wanteds =
+  do { allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
+     ; if allow_ambiguous
+         then traceTc "simplifyAmbiguityCheck skipped" empty
+         else do { traceTc "simplifyAmbiguityCheck {"
+                     (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
+                 ; (final_wc, _) <- runTcS $ solveWantedsAndDrop wanteds
+              -- NB: no defaulting!  See Note [No defaulting in the ambiguity check]
+                 ; traceTc "End simplifyAmbiguityCheck }" empty
+                 ; traceTc "reportUnsolved(ambig) {" empty
+                 ; discardResult $ reportUnsolved final_wc
+                 ; traceTc "reportUnsolved(ambig) }" empty
+                 ; return () } }
 
 ------------------
 simplifyInteractive :: WantedConstraints -> TcM (Bag EvBind)

@@ -61,7 +61,7 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles,
 
   -- * Error management
-  getSrcSpanM, setSrcSpan, addLocM, inRebindableSyntax,
+  getSrcSpanM, setSrcSpan, addLocM,
   withProvenance,
   wrapLocM, wrapLocFstM, wrapLocSndM,wrapLocM_,
   getErrsVar, setErrsVar,
@@ -86,7 +86,7 @@ module GHC.Tc.Utils.Monad(
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
   addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM,
-  setDeriving, inDeriving,
+  setDeriving,
 
   -- * Error message generation (type checker)
   addErrTc,
@@ -897,10 +897,6 @@ getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
 getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) }
 
--- See Note [Rebindable syntax and HsExpansion].
-inRebindableSyntax :: TcRn Bool
-inRebindableSyntax = tcl_rebindable_syntax <$> getLclEnv
-
 withProvenance :: CodeProvenance -> TcRn a -> TcRn a
 withProvenance p = updLclEnv (\env -> tclSetProvenance p env)
 
@@ -1144,7 +1140,7 @@ updCtxt :: (Bool -> [ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
 -- Helper function for the above
 -- The Bool is true if we are in generated code
 updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
-                           env { tcl_ctxt = upd (tcl_rebindable_syntax env) ctxt })
+                           env { tcl_ctxt = upd (tclInRebindableSyntax env) ctxt })
 
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt = updCtxt (\ _ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
@@ -1167,9 +1163,6 @@ setCtLocM (CtLoc { ctl_env = lcl }) thing_inside
 
 setDeriving :: TcM a -> TcM a
 setDeriving = updLclEnv (\e -> tclSetProvenance DerivingCP e)
-
-inDeriving :: TcM Bool
-inDeriving = fmap tcl_deriving getLclEnv
 
 {- *********************************************************************
 *                                                                      *

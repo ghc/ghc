@@ -27,7 +27,7 @@ module GHC.Tc.Types(
 
         -- The environment types
         Env(..),
-        TcGblEnv(..), TcLclEnv(..), tcl_rebindable_syntax, tcl_deriving, tclSetProvenance,
+        TcGblEnv(..), TcLclEnv(..), tclInRebindableSyntax, tclInDeriving, tclSetProvenance,
         CodeProvenance(..),
         setLclEnvTcLevel, getLclEnvTcLevel,
         setLclEnvLoc, getLclEnvLoc,
@@ -775,13 +775,13 @@ tclSetProvenance p e = e { tcl_provenance = update (tcl_provenance e) p }
          _ -> TemplateHaskellCP
       _ -> y
 
-tcl_rebindable_syntax :: TcLclEnv -> Bool
-tcl_rebindable_syntax (TcLclEnv { tcl_provenance = RebindableSyntaxCP }) = True
-tcl_rebindable_syntax _ = False
+tclInRebindableSyntax :: TcLclEnv -> Bool
+tclInRebindableSyntax (TcLclEnv { tcl_provenance = RebindableSyntaxCP }) = True
+tclInRebindableSyntax _ = False
 
-tcl_deriving :: TcLclEnv -> Bool
-tcl_deriving (TcLclEnv { tcl_provenance = DerivingCP }) = True
-tcl_deriving _ = False
+tclInDeriving :: TcLclEnv -> Bool
+tclInDeriving (TcLclEnv { tcl_provenance = DerivingCP }) = True
+tclInDeriving _ = False
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv
 setLclEnvTcLevel env lvl = env { tcl_tclvl = lvl }
