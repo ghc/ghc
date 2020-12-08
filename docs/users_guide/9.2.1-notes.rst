@@ -79,6 +79,14 @@ Compiler
   that the compiler automatically insert cost-centres on all call-sites of
   the named function.
 
+GHCi
+~~~~
+
+- GHCi's :ghci-cmd:`:edit` command now looks for an editor in
+  the :envvar:`VISUAL` environment variable before
+  :envvar:`EDITOR`, following UNIX convention.
+  (:ghc-ticket:`19030`)
+
 Runtime system
 ~~~~~~~~~~~~~~
 
