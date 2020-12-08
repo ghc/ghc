@@ -1,6 +1,11 @@
 
-ScopedNamedWildcardsBad.hs:8:21: error:
+ScopedNamedWildcardsBad.hs:11:15: error:
     • Couldn't match expected type ‘Bool’ with actual type ‘Char’
-    • In the first argument of ‘not’, namely ‘x’
-      In the expression: not x
-      In an equation for ‘v’: v = not x
+    • In the first argument of ‘g’, namely ‘'x'’
+      In the expression: g 'x'
+      In the expression:
+        let
+          v = not x
+          g :: _a -> _a
+          g x = x
+        in (g 'x')

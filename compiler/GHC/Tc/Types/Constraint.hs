@@ -1095,7 +1095,7 @@ Yuk!
 
 data Implication
   = Implic {   -- Invariants for a tree of implications:
-               -- see TcType Note [TcLevel and untouchable type variables]
+               -- see TcType Note [TcLevel invariants]
 
       ic_tclvl :: TcLevel,       -- TcLevel of unification variables
                                  -- allocated /inside/ this implication
@@ -1172,43 +1172,56 @@ data ImplicStatus
 
   | IC_Unsolved   -- Neither of the above; might go either way
 
--- | Does this implication have Given equalities?
--- See Note [When does an implication have given equalities?] in GHC.Tc.Solver.Monad,
--- which also explains why we need three options here. Also, see
--- Note [Suppress redundant givens during error reporting] in GHC.Tc.Errors
---
---                  Stops floating  |   Suppresses Givens in errors
---                  -----------------------------------------------
---  NoGivenEqs         NO           |         YES
---  LocalGivenEqs      NO           |         NO
---  MaybeGivenEqs      YES          |         NO
---
--- Examples:
---
---  NoGivenEqs:      Eq a => ...
---                   (Show a, Num a) => ...
---                   forall a. a ~ Either Int Bool => ...
---                      See Note [Let-bound skolems] in GHC.Tc.Solver.Monad for
---                      that last one
---
---  LocalGivenEqs:   forall a b. F a ~ G b => ...
---                   forall a. F a ~ Int => ...
---
---  MaybeGivenEqs:   (a ~ b) => ...
---                   forall a. F a ~ b => ...
---
--- The check is conservative. A MaybeGivenEqs might not have any equalities.
--- A LocalGivenEqs might local equalities, but it definitely does not have non-local
--- equalities. A NoGivenEqs definitely does not have equalities (except let-bound
--- skolems).
-data HasGivenEqs
-  = NoGivenEqs      -- definitely no given equalities,
-                    -- except by Note [Let-bound skolems] in GHC.Tc.Solver.Monad
-  | LocalGivenEqs   -- might have Given equalities that affect only local skolems
-                    -- e.g. forall a b. (a ~ F b) => ...; definitely no others
-  | MaybeGivenEqs   -- might have any kind of Given equalities; no floating out
-                    -- is possible.
+data HasGivenEqs -- See Note [HasGivenEqs]
+  = NoGivenEqs      -- Definitely no given equalities,
+                    --   except by Note [Let-bound skolems] in GHC.Tc.Solver.Monad
+  | LocalGivenEqs   -- Might have Given equalities, but only ones that affect only
+                    --   local skolems e.g. forall a b. (a ~ F b) => ...
+  | MaybeGivenEqs   -- Might have any kind of Given equalities; no floating out
+                    --   is possible.
   deriving Eq
+
+{- Note [HasGivenEqs]
+~~~~~~~~~~~~~~~~~~~~~
+The GivenEqs data type describes the Given constraints of an implication constraint:
+
+* NoGivenEqs: definitely no Given equalities, except perhaps let-bound skolems
+  which don't count: see Note [Let-bound skolems] in GHC.Tc.Solver.Monad
+  Examples: forall a. Eq a => ...
+            forall a. (Show a, Num a) => ...
+            forall a. a ~ Either Int Bool => ...  -- Let-bound skolem
+
+* LocalGivenEqs: definitely no Given equalities that would affect principal
+  types.  But may have equalities that affect only skolems of this implication
+  (and hence do not affect princial types)
+  Examples: forall a. F a ~ Int => ...
+            forall a b. F a ~ G b => ...
+
+* MaybeGivenEqs: may have Given equalities that would affect principal
+  types
+  Examples: forall. (a ~ b) => ...
+            forall a. F a ~ b => ...
+            forall a. c a => ...       -- The 'c' might be instantiated to (b ~)
+            forall a. C a b => ....
+               where class x~y => C a b
+               so there is an equality in the superclass of a Given
+
+The HasGivenEqs classifications affect two things:
+
+* Suppressing redundant givens during error reporting; see GHC.Tc.Errors
+  Note [Suppress redundant givens during error reporting]
+
+* Floating in approximateWC.
+
+Specifically, here's how it goes:
+
+                 Stops floating    |   Suppresses Givens in errors
+                 in approximateWC  |
+                 -----------------------------------------------
+ NoGivenEqs         NO             |         YES
+ LocalGivenEqs      NO             |         NO
+ MaybeGivenEqs      YES            |         NO
+-}
 
 instance Outputable Implication where
   ppr (Implic { ic_tclvl = tclvl, ic_skols = skols
