@@ -2443,9 +2443,17 @@ commonly used commands.
     Opens an editor to edit the file ⟨file⟩, or the most recently loaded
     module if ⟨file⟩ is omitted. If there were errors during the last
     loading, the cursor will be positioned at the line of the first
-    error. The editor to invoke is taken from the :envvar:`EDITOR` environment
-    variable, or a default editor on your system if :envvar:`EDITOR` is not
-    set. You can change the editor using :ghci-cmd:`:set editor`.
+    error. The editor to invoke is taken from the :envvar:`VISUAL` or
+    :envvar:`EDITOR` environment variables, or a default editor on your system
+    if neither is not set. You can change the editor using :ghci-cmd:`:set
+    editor`.
+
+.. envvar:: VISUAL
+
+    :hidden:
+
+    .. This declaration simply avoids undefined reference warnings as Sphinx
+       doesn't know about VISUAL
 
 .. ghci-cmd:: :enable; * | ⟨num⟩ ...
 
