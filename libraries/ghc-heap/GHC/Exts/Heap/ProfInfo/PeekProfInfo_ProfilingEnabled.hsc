@@ -3,6 +3,7 @@
 
 module GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled(
     peekStgTSOProfInfo
+    , peekTopCCS
 ) where
 
 #if __GLASGOW_HASKELL__ >= 811
@@ -33,15 +34,19 @@ import           Prelude
 type AddressSet = IntSet
 type AddressMap = IntMap
 
-peekStgTSOProfInfo :: Ptr a -> IO (Maybe StgTSOProfInfo)
-peekStgTSOProfInfo tsoPtr = do
+peekStgTSOProfInfo :: (Ptr b -> IO (Maybe CostCentreStack)) -> Ptr a -> IO (Maybe StgTSOProfInfo)
+peekStgTSOProfInfo decodeCCS tsoPtr = do
     cccs_ptr <- peekByteOff tsoPtr cccsOffset
-    costCenterCacheRef <- newIORef IntMap.empty
-    cccs' <- peekCostCentreStack IntSet.empty costCenterCacheRef cccs_ptr
+    cccs' <- decodeCCS cccs_ptr
 
     return $ Just StgTSOProfInfo {
         cccs = cccs'
     }
+
+peekTopCCS :: Ptr b -> IO (Maybe CostCentreStack)
+peekTopCCS cccs_ptr = do
+  costCenterCacheRef <- newIORef IntMap.empty
+  peekCostCentreStack IntSet.empty costCenterCacheRef cccs_ptr
 
 cccsOffset :: Int
 cccsOffset = (#const OFFSET_StgTSO_cccs) + (#size StgHeader)
@@ -162,4 +167,7 @@ import GHC.Exts.Heap.ProfInfo.Types
 
 peekStgTSOProfInfo :: Ptr a -> IO (Maybe StgTSOProfInfo)
 peekStgTSOProfInfo _ = return Nothing
+
+peekTopCCS :: Ptr a -> IO (Maybe CostCentreStack)
+peekTopCCS _ = return Nothing
 #endif
