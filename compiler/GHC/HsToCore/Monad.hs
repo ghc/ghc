@@ -453,9 +453,8 @@ warnDs :: WarnReason -> SDoc -> DsM ()
 warnDs reason warn
   = do { env <- getGblEnv
        ; loc <- getSrcSpanDs
-       ; dflags <- getDynFlags
        ; let msg = makeIntoWarning reason $
-                   mkWarnMsg dflags loc (ds_unqual env) warn
+                   mkWarnMsg loc (ds_unqual env) warn
        ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
 
 -- | Emit a warning only if the correct WarnReason is set in the DynFlags
@@ -468,8 +467,7 @@ errDs :: SDoc -> DsM ()
 errDs err
   = do  { env <- getGblEnv
         ; loc <- getSrcSpanDs
-        ; dflags <- getDynFlags
-        ; let msg = mkErrMsg dflags loc (ds_unqual env) err
+        ; let msg = mkErrMsg loc (ds_unqual env) err
         ; updMutVar (ds_msgs env) (\ (w,e) -> (w, e `snocBag` msg)) }
 
 -- | Issue an error, but return the expression for (), so that we can continue

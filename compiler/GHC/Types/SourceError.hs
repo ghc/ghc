@@ -49,7 +49,7 @@ throwOneError = throwErrors . unitBag
 newtype SourceError = SourceError ErrorMessages
 
 instance Show SourceError where
-  show (SourceError msgs) = unlines . map show . bagToList $ msgs
+  show (SourceError msgs) = unlines . map showErrMsg . bagToList $ msgs
 
 instance Exception SourceError
 
