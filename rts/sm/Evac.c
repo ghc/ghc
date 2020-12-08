@@ -64,48 +64,91 @@ ATTR_NOINLINE static void evacuate_large(StgPtr p);
    Allocate some space in which to copy an object.
    -------------------------------------------------------------------------- */
 
+static StgPtr
+alloc_in_nonmoving_heap (uint32_t size)
+{
+    gct->copied += size;
+    StgPtr to = nonmovingAllocate(gct->cap, size);
+
+    // Add segment to the todo list unless it's already there
+    // current->todo_link == NULL means not in todo list
+    struct NonmovingSegment *seg = nonmovingGetSegment(to);
+    if (!seg->todo_link) {
+        gen_workspace *ws = &gct->gens[oldest_gen->no];
+        seg->todo_link = ws->todo_seg;
+        ws->todo_seg = seg;
+    }
+
+    // The object which refers to this closure may have been aged (i.e.
+    // retained in a younger generation). Consequently, we must add the
+    // closure to the mark queue to ensure that it will be marked.
+    //
+    // However, if we are in a deadlock detection GC then we disable aging
+    // so there is no need.
+    //
+    // See Note [Non-moving GC: Marking evacuated objects].
+    if (major_gc && !deadlock_detect_gc) {
+        markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) to);
+    }
+    return to;
+}
+
+/* Inlined helper shared between alloc_for_copy_nonmoving and alloc_for_copy. */
+STATIC_INLINE StgPtr
+alloc_in_moving_heap (uint32_t size, uint32_t gen_no)
+{
+    gen_workspace *ws = &gct->gens[gen_no];  // zero memory references here
+
+    /* chain a new block onto the to-space for the destination gen if
+     * necessary.
+     */
+    StgPtr to = ws->todo_free;
+    ws->todo_free += size;
+    if (ws->todo_free > ws->todo_lim) {
+        to = todo_block_full(size, ws);
+    }
+    ASSERT(ws->todo_free >= ws->todo_bd->free && ws->todo_free <= ws->todo_lim);
+
+    return to;
+}
+
+/*
+ * N.B. We duplicate much of alloc_for_copy here to minimize the number of
+ * branches introduced in the moving GC path of alloc_for_copy while minimizing
+ * repeated work.
+ */
+static StgPtr
+alloc_for_copy_nonmoving (uint32_t size, uint32_t gen_no)
+{
+    /* See Note [Deadlock detection under nonmoving collector]. */
+    if (deadlock_detect_gc) {
+        return alloc_in_nonmoving_heap(size);
+    }
+
+    /* Should match logic from alloc_for_copy */
+    if (gen_no < gct->evac_gen_no) {
+        if (gct->eager_promotion) {
+            gen_no = gct->evac_gen_no;
+        } else {
+            gct->failed_to_evac = true;
+        }
+    }
+
+    if (gen_no == oldest_gen->no) {
+        return alloc_in_nonmoving_heap(size);
+    } else {
+        return alloc_in_moving_heap(size, gen_no);
+    }
+}
+
 /* size is in words */
 STATIC_INLINE StgPtr
 alloc_for_copy (uint32_t size, uint32_t gen_no)
 {
     ASSERT(gen_no < RtsFlags.GcFlags.generations);
 
-    StgPtr to;
-    gen_workspace *ws;
-
     if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
-        /* See Note [Deadlock detection under nonmoving collector]. */
-        const uint32_t oldest_gen_no = oldest_gen->no;
-        if (deadlock_detect_gc) {
-            gen_no = oldest_gen_no;
-        }
-
-        if (gen_no == oldest_gen_no) {
-            gct->copied += size;
-            to = nonmovingAllocate(gct->cap, size);
-
-            // Add segment to the todo list unless it's already there
-            // current->todo_link == NULL means not in todo list
-            struct NonmovingSegment *seg = nonmovingGetSegment(to);
-            if (!seg->todo_link) {
-                gen_workspace *ws = &gct->gens[oldest_gen_no];
-                seg->todo_link = ws->todo_seg;
-                ws->todo_seg = seg;
-            }
-
-            // The object which refers to this closure may have been aged (i.e.
-            // retained in a younger generation). Consequently, we must add the
-            // closure to the mark queue to ensure that it will be marked.
-            //
-            // However, if we are in a deadlock detection GC then we disable aging
-            // so there is no need.
-            //
-            // See Note [Non-moving GC: Marking evacuated objects].
-            if (major_gc && !deadlock_detect_gc) {
-                markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) to);
-            }
-            return to;
-        }
+        return alloc_for_copy_nonmoving(size, gen_no);
     }
 
     /* Find out where we're going, using the handy "to" pointer in
@@ -121,19 +164,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
         }
     }
 
-    ws = &gct->gens[gen_no];  // zero memory references here
-
-    /* chain a new block onto the to-space for the destination gen if
-     * necessary.
-     */
-    to = ws->todo_free;
-    ws->todo_free += size;
-    if (ws->todo_free > ws->todo_lim) {
-        to = todo_block_full(size, ws);
-    }
-    ASSERT(ws->todo_free >= ws->todo_bd->free && ws->todo_free <= ws->todo_lim);
-
-    return to;
+    return alloc_in_moving_heap(size, gen_no);
 }
 
 /* -----------------------------------------------------------------------------
