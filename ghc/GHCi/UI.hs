@@ -421,13 +421,14 @@ defFullHelpText =
 
 findEditor :: IO String
 findEditor = do
-  getEnv "EDITOR"
-    `catchIO` \_ -> do
+    getEnv "VISUAL" <|> getEnv "EDITOR" <|> defaultEditor
+  where
+    defaultEditor = do
 #if defined(mingw32_HOST_OS)
-        win <- System.Win32.getWindowsDirectory
-        return (win </> "notepad.exe")
+      win <- System.Win32.getWindowsDirectory
+      return (win </> "notepad.exe")
 #else
-        return ""
+      return ""
 #endif
 
 default_progname, default_stop :: String
