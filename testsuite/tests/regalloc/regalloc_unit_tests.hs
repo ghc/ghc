@@ -42,6 +42,7 @@ import GHC.Driver.Monad
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
+import GHC.Driver.Errors
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Types.Basic

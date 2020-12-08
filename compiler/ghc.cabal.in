@@ -385,6 +385,7 @@ Library
         GHC.Driver.Config
         GHC.Driver.Env
         GHC.Driver.Env.Types
+        GHC.Driver.Errors
         GHC.Driver.Flags
         GHC.Driver.Hooks
         GHC.Driver.Main
