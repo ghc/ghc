@@ -53,6 +53,8 @@
   box-sizing: border-box;
   border: 0.05em solid #b2d5fb;
   background: #e8f3ff;
+  max-height: 80%;
+  overflow: scroll;
 }
 
 #search-form input + #search-results {
