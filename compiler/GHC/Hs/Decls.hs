@@ -761,15 +761,13 @@ tyFamInstDeclLName :: TyFamInstDecl (GhcPass p) -> Located (IdP (GhcPass p))
 tyFamInstDeclLName (TyFamInstDecl { tfid_eqn = FamEqn { feqn_tycon = ln }})
   = ln
 
-tyClDeclLName :: TyClDecl (GhcPass p) -> Located (IdP (GhcPass p))
+tyClDeclLName :: TyClDecl pass -> Located (IdP pass)
 tyClDeclLName (FamDecl { tcdFam = fd })     = familyDeclLName fd
 tyClDeclLName (SynDecl { tcdLName = ln })   = ln
 tyClDeclLName (DataDecl { tcdLName = ln })  = ln
 tyClDeclLName (ClassDecl { tcdLName = ln }) = ln
 
--- FIXME: tcdName is commonly used by both GHC and third-party tools, so it
--- needs to be polymorphic in the pass
-tcdName :: TyClDecl (GhcPass p) -> IdP (GhcPass p)
+tcdName :: TyClDecl pass -> IdP pass
 tcdName = unLoc . tyClDeclLName
 
 tyClDeclTyVars :: TyClDecl pass -> LHsQTyVars pass
@@ -1187,10 +1185,10 @@ data FamilyInfo pass
 
 ------------- Functions over FamilyDecls -----------
 
-familyDeclLName :: FamilyDecl (GhcPass p) -> Located (IdP (GhcPass p))
+familyDeclLName :: FamilyDecl pass -> Located (IdP pass)
 familyDeclLName (FamilyDecl { fdLName = n }) = n
 
-familyDeclName :: FamilyDecl (GhcPass p) -> IdP (GhcPass p)
+familyDeclName :: FamilyDecl pass -> IdP pass
 familyDeclName = unLoc . familyDeclLName
 
 famResultKindSignature :: FamilyResultSig (GhcPass p) -> Maybe (LHsKind (GhcPass p))
