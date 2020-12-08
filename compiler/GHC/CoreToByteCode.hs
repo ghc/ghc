@@ -2067,15 +2067,6 @@ isVoidArg :: ArgRep -> Bool
 isVoidArg V = True
 isVoidArg _ = False
 
--- See bug #1257
-{-
-multiValException :: a
-multiValException = throwGhcException (ProgramError
-  ("Error: bytecode compiler can't handle unboxed tuples and sums.\n"++
-   "  Possibly due to foreign import/export decls in source.\n"++
-   "  Workaround: use -fobject-code, or compile this module to .o separately."))
--}
-
 -- | Indicate if the calling convention is supported
 isSupportedCConv :: CCallSpec -> Bool
 isSupportedCConv (CCallSpec _ cconv _) = case cconv of
