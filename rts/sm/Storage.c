@@ -321,6 +321,42 @@ freeStorage (bool free_heap)
     freeGcThreads();
 }
 
+static void
+listGenBlocks (ListBlocksCb cb, void *user, generation* gen)
+{
+    cb(user, gen->blocks);
+    cb(user, gen->large_objects);
+    cb(user, gen->compact_objects);
+    cb(user, gen->compact_blocks_in_import);
+}
+
+// Traverse all the different places that the rts stores blocks
+// and call a callback on each of them.
+void listAllBlocks (ListBlocksCb cb, void *user)
+{
+  uint32_t g, i;
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      for (i = 0; i < n_capabilities; i++) {
+          cb(user, capabilities[i]->mut_lists[g]);
+          cb(user, gc_threads[i]->gens[g].part_list);
+          cb(user, gc_threads[i]->gens[g].scavd_list);
+          cb(user, gc_threads[i]->gens[g].todo_bd);
+      }
+      listGenBlocks(cb, user, &generations[g]);
+  }
+
+  for (i = 0; i < n_nurseries; i++) {
+      cb(user, nurseries[i].blocks);
+  }
+  for (i = 0; i < n_capabilities; i++) {
+      if (capabilities[i]->pinned_object_block != NULL) {
+          cb(user, capabilities[i]->pinned_object_block);
+      }
+      cb(user, capabilities[i]->pinned_object_blocks);
+  }
+}
+
+
 /* -----------------------------------------------------------------------------
    Note [CAF management]
    ~~~~~~~~~~~~~~~~~~~~~
