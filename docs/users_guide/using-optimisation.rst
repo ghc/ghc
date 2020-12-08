@@ -1197,16 +1197,16 @@ by saying ``-fno-wombat``.
 
     This is the full syntax for cardinalities, demands and sub-demands in BNF:
 
-    .. code-block::
+    .. code-block:: none
 
-      card ::= B | A | 1 | U | S | M    semantics as in the table above
+        card ::= B | A | 1 | U | S | M    semantics as in the table above
 
-      d    ::= card sd                  card = how often, sd = how deep
-            |  card                     abbreviation: Same as "card card"
+        d    ::= card sd                  card = how often, sd = how deep
+              |  card                     abbreviation: Same as "card card"
 
-      sd   ::= card                     polymorphic sub-demand, card at every level
-            |  P(d,d,..)                product sub-demand
-            |  Ccard(sd)                call sub-demand
+        sd   ::= card                     polymorphic sub-demand, card at every level
+              |  P(d,d,..)                product sub-demand
+              |  Ccard(sd)                call sub-demand
 
     For example, ``fst`` is strict in its argument, and also in the first
     component of the argument.  It will not evaluate the argument's second
@@ -1234,17 +1234,17 @@ by saying ``-fno-wombat``.
     We summarise a function's demand properties in its *demand signature*.
     This is the general syntax:
 
-    .. code-block::
+    .. code-block:: none
 
-     {x->dx,y->dy,z->dz...}<d1><d2><d3>...<dn>div
-             ^              ^   ^   ^      ^   ^
-             |              |   |   |      |   |
-             |              \---+---+------/   |
-             |                  |              |
-        demand on free        demand on      divergence
-          variables           arguments      information
-      (omitted if empty)                     (omitted if
-                                           no information)
+         {x->dx,y->dy,z->dz...}<d1><d2><d3>...<dn>div
+                 ^              ^   ^   ^      ^   ^
+                 |              |   |   |      |   |
+                 |              \---+---+------/   |
+                 |                  |              |
+            demand on free        demand on      divergence
+              variables           arguments      information
+          (omitted if empty)                     (omitted if
+                                               no information)
 
     We summarise ``fst``'s demand properties in its *demand signature*
     ``<SP(SU,A)>``, which just says "If ``fst`` is applied to one argument,
