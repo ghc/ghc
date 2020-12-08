@@ -1941,6 +1941,7 @@ reloadModuleDefer = wrapDeferTypeErrors . reloadModule
 -- sessions.
 doLoadAndCollectInfo :: GhciMonad m => Bool -> LoadHowMuch -> m SuccessFlag
 doLoadAndCollectInfo retain_context howmuch = do
+  resetOptByteCodeIfUnboxed                                 -- #18955
   doCollectInfo <- isOptionSet CollectInfo
 
   doLoad retain_context howmuch >>= \case
@@ -1952,6 +1953,24 @@ doLoadAndCollectInfo retain_context howmuch = do
       modifyGHCiState (\st -> st { mod_infos = newInfos })
       return Succeeded
     flag -> return flag
+
+-- An `OPTIONS_GHC -fbyte-code` pragma at the beginning of a module sets the
+-- flag `Opt_ByteCodeIfUnboxed` locally for this module. This stops automatic
+-- compilation of this module to object code, if the module uses (or depends
+-- on a module using) the UnboxedSums/Tuples extensions.
+-- However a GHCi `:set -fbyte-code` command sets the flag Opt_ByteCodeIfUnboxed
+-- globally to all modules. This triggered #18955. This function unsets the
+-- flag from the global DynFlags before they are copied to the module-specific
+-- DynFlags.
+-- This is a temporary workaround until GHCi will support unboxed tuples and
+-- unboxed sums.
+resetOptByteCodeIfUnboxed :: GhciMonad m => m ()
+resetOptByteCodeIfUnboxed = do
+  dflags <- getDynFlags
+  when (gopt Opt_ByteCodeIfUnboxed dflags) $ do
+    _ <- GHC.setProgramDynFlags $ gopt_unset dflags Opt_ByteCodeIfUnboxed
+    pure ()
+  pure ()
 
 doLoad :: GhciMonad m => Bool -> LoadHowMuch -> m SuccessFlag
 doLoad retain_context howmuch = do

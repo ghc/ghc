@@ -3091,10 +3091,10 @@ dynamic_flags_deps = [
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setTarget HscNothing))
-  , make_ord_flag defFlag "fbyte-code"
-      (noArgM $ \dflags -> do
-        setTarget HscInterpreted
-        pure $ gopt_set dflags Opt_ByteCode)
+  , make_ord_flag defFlag "fbyte-code"       (NoArg ((upd $ \d ->
+      -- Enabling Opt_ByteCodeIfUnboxed is a workaround for #18955.
+      -- See the comments for resetOptByteCodeIfUnboxed for more details.
+      gopt_set d Opt_ByteCodeIfUnboxed) >> setTarget HscInterpreted))
   , make_ord_flag defFlag "fobject-code"     $ NoArg $ do
       dflags <- liftEwM getCmdLineState
       setTarget $ defaultObjectTarget dflags

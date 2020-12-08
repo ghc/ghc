@@ -273,7 +273,7 @@ data GeneralFlag
    | Opt_SingleLibFolder
    | Opt_KeepCAFs
    | Opt_KeepGoing
-   | Opt_ByteCode
+   | Opt_ByteCodeIfUnboxed
    | Opt_LinkRts
 
    -- output style opts
