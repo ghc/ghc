@@ -26,6 +26,7 @@ import GHC.Prelude
 
 import GHC.Driver.Ppr
 import GHC.Driver.Session
+import GHC.Driver.Errors ( printOrThrowWarnings )
 import {-# SOURCE #-} GHC.Driver.Plugins
 
 import GHC.Runtime.Context

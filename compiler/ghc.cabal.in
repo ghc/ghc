@@ -383,6 +383,7 @@ Library
         GHC.Driver.CodeOutput
         GHC.Driver.Config
         GHC.Driver.Env
+        GHC.Driver.Errors
         GHC.Driver.Flags
         GHC.Driver.Hooks
         GHC.Driver.Main
