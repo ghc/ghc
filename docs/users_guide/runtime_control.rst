@@ -1194,6 +1194,9 @@ When the program is linked with the :ghc-flag:`-eventlog` option
 
     - ``f`` — parallel sparks (fully accurate). Disabled by default.
 
+    - ``T`` — :ghc-flag:`ticky-ticky profiler <-ticky>` events. Disabled by
+      default.
+
     - ``u`` — user events. These are events emitted from Haskell code using
       functions such as ``Debug.Trace.traceEvent``. Enabled by default.
 
