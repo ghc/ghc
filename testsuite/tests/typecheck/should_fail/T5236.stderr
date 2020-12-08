@@ -6,9 +6,10 @@ T5236.hs:16:1: warning: [-Winaccessible-code (in -Wdefault)]
           arising from the type signature for:
                          loop :: Id A B => Bool
         instance ‘Id B B’ at T5236.hs:11:10-15
-    Inaccessible code in
+    Unsatisfiable constraint Id A B in
       the type signature for:
         loop :: Id A B => Bool
+    This may result in inaccessible code.
 
 T5236.hs:16:9: warning: [-Winaccessible-code (in -Wdefault)]
     • Couldn't match type ‘B’ with ‘A’
@@ -17,9 +18,10 @@ T5236.hs:16:9: warning: [-Winaccessible-code (in -Wdefault)]
             arising from the type signature for:
                            loop :: Id A B => Bool
           instance ‘Id B B’ at T5236.hs:11:10-15
-      Inaccessible code in
+      Unsatisfiable constraint Id A B in
         the type signature for:
           loop :: Id A B => Bool
+      This may result in inaccessible code.
     • In the ambiguity check for ‘loop’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature: loop :: Id A B => Bool

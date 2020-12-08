@@ -5,8 +5,9 @@ T7294.hs:27:1: warning: [-Woverlapping-patterns (in -Wdefault)]
 
 T7294.hs:27:5: warning: [-Winaccessible-code (in -Wdefault)]
     • Couldn't match type ‘'True’ with ‘'False’
-      Inaccessible code in
+      Unsatisfiable constraint n ~ 'Zero in
         a pattern with constructor: Nil :: forall a. Vec a 'Zero,
         in an equation for ‘nth’
+      This may result in inaccessible code.
     • In the pattern: Nil
       In an equation for ‘nth’: nth Nil _ = undefined

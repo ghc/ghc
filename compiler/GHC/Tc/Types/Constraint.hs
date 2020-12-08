@@ -1119,12 +1119,6 @@ data Implication
       ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
                                  -- False <=> ic_givens might have equalities
 
-      ic_warn_inaccessible :: Bool,
-                                 -- True  <=> -Winaccessible-code is enabled
-                                 -- at construction. See
-                                 -- Note [Avoid -Winaccessible-code when deriving]
-                                 -- in GHC.Tc.TyCl.Instance
-
       ic_env   :: TcLclEnv,
                                  -- Records the TcLClEnv at the time of creation.
                                  --
@@ -1158,7 +1152,6 @@ implicationPrototype
             , ic_binds      = panic "newImplic:binds"
             , ic_info       = panic "newImplic:info"
             , ic_env        = panic "newImplic:env"
-            , ic_warn_inaccessible = panic "newImplic:warn_inaccessible"
 
               -- The rest have sensible default values
             , ic_skols      = []
