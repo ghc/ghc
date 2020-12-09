@@ -227,11 +227,11 @@ bcPrepRHS con@StgRhsCon{} = pure con
 
 bcPrepExpr :: StgExpr -> BcM StgExpr
 -- explicitly match all constructors so we get a warning if we miss any
-bcPrepExpr (StgTick tick_ty bp@Breakpoint{} rhs)
+bcPrepExpr (StgTick mb_tty@(Just tick_ty) bp@Breakpoint{} rhs)
   | isLiftedTypeKind (typeKind tick_ty) = do
       id <- newId tick_ty
       rhs' <- bcPrepExpr rhs
-      let expr' = StgTick tick_ty bp rhs'
+      let expr' = StgTick mb_tty bp rhs'
           bnd = StgNonRec id (StgRhsClosure noExtFieldSilent
                                             CC.dontCareCCS
                                             ReEntrant
@@ -244,7 +244,7 @@ bcPrepExpr (StgTick tick_ty bp@Breakpoint{} rhs)
       id <- newId (mkVisFunTyMany realWorldStatePrimTy tick_ty)
       st <- newId realWorldStatePrimTy
       rhs' <- bcPrepExpr rhs
-      let expr' = StgTick tick_ty bp rhs'
+      let expr' = StgTick mb_tty bp rhs'
           bnd = StgNonRec id (StgRhsClosure noExtFieldSilent
                                             CC.dontCareCCS
                                             ReEntrant
@@ -499,7 +499,7 @@ schemeR_wrk fvs nm original_body (args, body)
 
 -- introduce break instructions for ticked expressions
 schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
-schemeER_wrk d p (StgTick tick_ty (Breakpoint tick_no fvs) rhs)
+schemeER_wrk d p (StgTick (Just tick_ty) (Breakpoint tick_no fvs) rhs)
   = do  code <- schemeE d 0 p rhs
         cc_arr <- getCCArray
         this_mod <- moduleName <$> getCurrentModule

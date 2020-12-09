@@ -409,7 +409,8 @@ coreToStgExpr (Tick tick expr)
          SourceNote{} -> return ()
          Breakpoint{} -> panic "coreToStgExpr: breakpoint should not happen"
        expr2 <- coreToStgExpr expr
-       return (StgTick (exprType expr) tick expr2)
+       -- It cannot be a Breakpoint, so we don't need to save the type
+       return (StgTick Nothing tick expr2)
 
 coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
@@ -557,9 +558,13 @@ coreToStgApp f args ticks = do
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
 
-        tapp = foldr (StgTick res_ty) app (ticks ++ ticks')
+        -- XXX force the type too? making res_ty strict panics
 
-    -- XXX check that this doesn't leak
+        -- Add ticks, saving the type for breakpoints (GHCi needs it)
+        add_tick tick@(Breakpoint{}) expr = StgTick (Just res_ty) tick expr
+        add_tick tick                expr = StgTick Nothing       tick expr
+        tapp = foldr add_tick app (ticks ++ ticks')
+
     -- Forcing these fixes a leak in the code generator, noticed while
     -- profiling for trac #4367
     app `seq` return tapp

@@ -384,7 +384,7 @@ Finally for @hpc@ expressions we introduce a new STG construct.
 -}
 
   | StgTick
-    Type
+    (Maybe Type)
     (Tickish Id)
     (GenStgExpr pass)       -- sub expression
 
