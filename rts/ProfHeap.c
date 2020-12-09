@@ -1103,41 +1103,21 @@ heapCensusCompactList(Census *census, bdescr *bd)
     }
 }
 
-static void
-heapCensusPinnedBlock( Census *census, bdescr *bd )
-{
-    StgWord *p = (StgWord *) bd->start;
-    while (p < bd->free) {
-        if (*(StgWord *) p == 0) {
-            p++;
-            continue;
-        }
-
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
-        const StgInfoTable *info = get_itbl((StgClosure *) p);
-        switch (info->type) {
-          case ARR_WORDS:
-            {
-              StgArrBytes *arr = (StgArrBytes *) p;
-              const size_t size = arr_words_sizeW(arr);
-              heapProfObject(census, (StgClosure *)p, size, /*prim*/ true);
-              p += size;
-              break;
-            }
-          default:
-            barf("heapCensusPinnedBlock: Unknown object: %p (info=%p, type=%d)", p, info, info->type);
-        }
-    }
-}
-
 /*
- * Take a census of the contents of a "normal" (e.g. not large, not pinned, not
- * compact) heap block.
+ * Take a census of the contents of a "normal" (e.g. not large, not compact)
+ * heap block. This can, however, handle PINNED blocks.
  */
 static void
-heapCensusNormalBlock(Census *census, bdescr *bd)
+heapCensusBlock(Census *census, bdescr *bd)
 {
     StgPtr p = bd->start;
+
+    // In the case of PINNED blocks there can be (zeroed) slop at the beginning
+    // due to object alignment.
+    if (bd->flags & BD_PINNED) {
+        while (p < bd->free && !*p) p++;
+    }
+
     while (p < bd->free) {
         const StgInfoTable *info = get_itbl((const StgClosure *)p);
         bool prim = false;
@@ -1328,11 +1308,6 @@ heapCensusChain( Census *census, bdescr *bd )
             size_t size = arr_words_sizeW((StgArrBytes *)p);
             bool prim = true;
             heapProfObject(census, (StgClosure *)p, size, prim);
-            continue;
-        }
-
-        if (bd->flags & BF_PINNED) {
-            heapCensusPinnedBlock(census, bd);
             continue;
         }
 
