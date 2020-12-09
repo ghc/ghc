@@ -1106,13 +1106,28 @@ heapCensusCompactList(Census *census, bdescr *bd)
 static void
 heapCensusPinnedBlock( Census *census, bdescr *bd )
 {
-    // HACK: pretend a pinned block is just one big ARR_WORDS
-    // owned by CCS_PINNED.  These blocks can be full of holes due
-    // to alignment constraints so we can't traverse the memory
-    // and do a proper census.
-    StgClosure arr;
-    SET_HDR(&arr, &stg_ARR_WORDS_info, CCS_PINNED);
-    heapProfObject(census, &arr, bd->blocks * BLOCK_SIZE_W, true);
+    StgWord *p = (StgWord *) bd->start;
+    while (p < bd->free) {
+        if (*(StgWord *) p == 0) {
+            p++;
+            continue;
+        }
+
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
+        const StgInfoTable *info = get_itbl((StgClosure *) p);
+        switch (info->type) {
+          case ARR_WORDS:
+            {
+              StgArrBytes *arr = (StgArrBytes *) p;
+              const size_t size = arr_words_sizeW(arr);
+              heapProfObject(census, (StgClosure *)p, size, /*prim*/ true);
+              p += size;
+              break;
+            }
+          default:
+            barf("heapCensusPinnedBlock: Unknown object: %p (info=%p, type=%d)", p, info, info->type);
+        }
+    }
 }
 
 /*
@@ -1301,11 +1316,6 @@ heapCensusChain( Census *census, bdescr *bd )
     for (; bd != NULL; bd = bd->link) {
         StgPtr p = bd->start;
 
-        if (bd->flags & BF_PINNED) {
-            heapCensusPinnedBlock(census, bd);
-            continue;
-        }
-
         // When we shrink a large ARR_WORDS, we do not adjust the free pointer
         // of the associated block descriptor, thus introducing slop at the end
         // of the object.  This slop remains after GC, violating the assumption
@@ -1318,6 +1328,11 @@ heapCensusChain( Census *census, bdescr *bd )
             size_t size = arr_words_sizeW((StgArrBytes *)p);
             bool prim = true;
             heapProfObject(census, (StgClosure *)p, size, prim);
+            continue;
+        }
+
+        if (bd->flags & BF_PINNED) {
+            heapCensusPinnedBlock(census, bd);
             continue;
         }
 
