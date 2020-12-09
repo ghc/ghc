@@ -1103,26 +1103,21 @@ heapCensusCompactList(Census *census, bdescr *bd)
     }
 }
 
-static void
-heapCensusPinnedBlock( Census *census, bdescr *bd )
-{
-    // HACK: pretend a pinned block is just one big ARR_WORDS
-    // owned by CCS_PINNED.  These blocks can be full of holes due
-    // to alignment constraints so we can't traverse the memory
-    // and do a proper census.
-    StgClosure arr;
-    SET_HDR(&arr, &stg_ARR_WORDS_info, CCS_PINNED);
-    heapProfObject(census, &arr, bd->blocks * BLOCK_SIZE_W, true);
-}
-
 /*
- * Take a census of the contents of a "normal" (e.g. not large, not pinned, not
- * compact) heap block.
+ * Take a census of the contents of a "normal" (e.g. not large, not compact)
+ * heap block. This can, however, handle PINNED blocks.
  */
 static void
-heapCensusNormalBlock(Census *census, bdescr *bd)
+heapCensusBlock(Census *census, bdescr *bd)
 {
     StgPtr p = bd->start;
+
+    // In the case of PINNED blocks there can be (zeroed) slop at the beginning
+    // due to object alignment.
+    if (bd->flags & BF_PINNED) {
+        while (p < bd->free && !*p) p++;
+    }
+
     while (p < bd->free) {
         const StgInfoTable *info = get_itbl((const StgClosure *)p);
         bool prim = false;
@@ -1299,13 +1294,6 @@ static void
 heapCensusChain( Census *census, bdescr *bd )
 {
     for (; bd != NULL; bd = bd->link) {
-        StgPtr p = bd->start;
-
-        if (bd->flags & BF_PINNED) {
-            heapCensusPinnedBlock(census, bd);
-            continue;
-        }
-
         // When we shrink a large ARR_WORDS, we do not adjust the free pointer
         // of the associated block descriptor, thus introducing slop at the end
         // of the object.  This slop remains after GC, violating the assumption
@@ -1313,15 +1301,19 @@ heapCensusChain( Census *census, bdescr *bd )
         // The slop isn't always zeroed (e.g. in non-profiling mode, cf
         // OVERWRITING_CLOSURE_OFS).
         // Consequently, we handle large ARR_WORDS objects as a special case.
-        if (bd->flags & BF_LARGE
-            && get_itbl((StgClosure *)p)->type == ARR_WORDS) {
-            size_t size = arr_words_sizeW((StgArrBytes *)p);
-            bool prim = true;
-            heapProfObject(census, (StgClosure *)p, size, prim);
-            continue;
+        if (bd->flags & BF_LARGE) {
+            StgPtr p = bd->start;
+            // There may be some initial zeros due to object alignment.
+            while (p < bd->free && !*p) p++;
+            if (get_itbl((StgClosure *)p)->type == ARR_WORDS) {
+                size_t size = arr_words_sizeW((StgArrBytes *)p);
+                bool prim = true;
+                heapProfObject(census, (StgClosure *)p, size, prim);
+                continue;
+            }
         }
 
-        heapCensusNormalBlock(census, bd);
+        heapCensusBlock(census, bd);
     }
 }
 
