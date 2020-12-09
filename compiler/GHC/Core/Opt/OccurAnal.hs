@@ -808,7 +808,7 @@ occAnalRecBind env lvl imp_rule_edges pairs body_usage
 
     bndrs    = map fst pairs
     bndr_set = mkVarSet bndrs
-    rhs_env  = env `addInScope` bndrs `addInterestingStaticArgs` pairs
+    rhs_env  = env `addInScope` bndrs
 
 
 -----------------------------
@@ -1082,10 +1082,8 @@ mk_loop_breaker :: Id -> Id
 mk_loop_breaker bndr
   = bndr `setIdOccInfo` occ'
   where
-    occ'        = strongLoopBreaker { occ_tail = tail_info
-                                  , occ_static_args = static_args }
-    tail_info   = tailCallInfo (idOccInfo bndr)
-    static_args = staticArgsInfo (idOccInfo bndr)
+    occ'      = strongLoopBreaker { occ_tail = tail_info }
+    tail_info = tailCallInfo (idOccInfo bndr)
 
 mk_non_loop_breaker :: VarSet -> Id -> Id
 -- See Note [Weak loop breakers]
@@ -1977,7 +1975,6 @@ occAnal env (Let bind body)
                      body_usage          of { (final_usage, new_binds) ->
        (final_usage, mkLets new_binds body') }}
 
-
 occAnalArgs :: OccEnv -> [CoreExpr] -> [OneShots] -> (UsageDetails, [CoreExpr])
 occAnalArgs _ [] _
   = (emptyDetails, [])
@@ -2035,7 +2032,7 @@ occAnalApp env (Var fun, args, ticks)
                       `orElse` (Var fun, fun)
                      -- See Note [The binder-swap substitution]
 
-    fun_uds = mkOneOcc env fun_id' int_cxt args
+    fun_uds = mkOneOcc fun_id' int_cxt n_args
     all_uds = fun_uds `andUDs` final_args_uds
 
     !(args_uds, args') = occAnalArgs env args one_shots
@@ -2053,6 +2050,7 @@ occAnalApp env (Var fun, args, ticks)
        -- See Note [Arguments of let-bound constructors]
 
     n_val_args = valArgCount args
+    n_args     = length args
     int_cxt    = case occ_encl env of
                    OccScrut -> IsInteresting
                    _other   | n_val_args > 0 -> IsInteresting
@@ -2219,15 +2217,12 @@ data OccEnv
            , occ_unf_act    :: Id -> Bool          -- Which Id unfoldings are active
            , occ_rule_act   :: Activation -> Bool  -- Which rules are active
              -- See Note [Finding rule RHS free vars]
-           -- lkj , occ_sat_args :: ![Staticness Var] -- It's not worth the bother
-           , occ_sat_env  :: VarEnv [Var] -- TODO shadowing of lambda binders
 
            -- See Note [The binder-swap substitution]
            , occ_bs_env  :: VarEnv (OutExpr, OutId)
            , occ_bs_rng  :: VarSet   -- Vars free in the range of occ_bs_env
                    -- Domain is Global and Local Ids
                    -- Range is just Local Ids
-                   -- FIXME: Why is this not an InScopeSet?!!
     }
 
 
@@ -2270,8 +2265,6 @@ initOccEnv
            , occ_unf_act   = \_ -> True
            , occ_rule_act  = \_ -> True
 
-           , occ_sat_env  = emptyVarEnv
-
            , occ_bs_env = emptyVarEnv
            , occ_bs_rng = emptyVarSet }
 
@@ -2280,11 +2273,9 @@ noBinderSwaps (OccEnv { occ_bs_env = bs_env }) = isEmptyVarEnv bs_env
 
 scrutCtxt :: OccEnv -> [CoreAlt] -> OccEnv
 scrutCtxt env alts
-  = env { occ_encl = encl, occ_one_shots = [] }
+  | interesting_alts =  env { occ_encl = OccScrut,   occ_one_shots = [] }
+  | otherwise        =  env { occ_encl = OccVanilla, occ_one_shots = [] }
   where
-    encl
-      | interesting_alts = OccScrut
-      | otherwise        = OccVanilla
     interesting_alts = case alts of
                          []    -> False
                          [alt] -> not (isDefaultAlt alt)
@@ -2310,18 +2301,8 @@ isRhsEnv (OccEnv { occ_encl = cxt }) = case cxt of
 addInScope :: OccEnv -> [Var] -> OccEnv
 -- See Note [The binder-swap substitution]
 addInScope env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars }) bndrs
-  | any (`elemVarSet` rng_vars) bndrs = env { occ_bs_env = emptyVarEnv, occ_sat_env = emptyVarEnv, occ_bs_rng = emptyVarSet }
+  | any (`elemVarSet` rng_vars) bndrs = env { occ_bs_env = emptyVarEnv, occ_bs_rng = emptyVarSet }
   | otherwise                         = env { occ_bs_env = swap_env `delVarEnvList` bndrs }
-
--- | Extends 'occ_sat_env' with the expected static argument binders for the
--- interesting cases (singleton recursive groups).
-addInterestingStaticArgs :: OccEnv -> [(Id, CoreExpr)] -> OccEnv
-addInterestingStaticArgs env [(fn, rhs)]
-  = env { occ_sat_env = extendVarEnv (occ_sat_env env) fn bndrs }
-  where
-    (bndrs, _body) = collectBinders rhs
-addInterestingStaticArgs env _
-  = env
 
 oneShotGroup :: OccEnv -> [CoreBndr]
              -> ( OccEnv
@@ -2374,8 +2355,8 @@ markJoinOneShots mb_join_arity bndrs
           | otherwise = b
 
 addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
-addAppCtxt env@(OccEnv { occ_one_shots = oss }) args
-  = env { occ_one_shots = replicate (valArgCount args) OneShotLam ++ oss }
+addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
+  = env { occ_one_shots = replicate (valArgCount args) OneShotLam ++ ctxt }
 
 --------------------
 transClosureFV :: VarEnv VarSet -> VarEnv VarSet
@@ -2703,24 +2684,17 @@ andUDs, orUDs
 andUDs = combineUsageDetailsWith addOccInfo
 orUDs  = combineUsageDetailsWith orOccInfo
 
-mkOneOcc :: OccEnv -> Id -> InterestingCxt -> [CoreArg] -> UsageDetails
-mkOneOcc env id int_cxt args
+mkOneOcc ::Id -> InterestingCxt -> JoinArity -> UsageDetails
+mkOneOcc id int_cxt arity
   | isLocalId id
   = emptyDetails { ud_env = unitVarEnv id occ_info }
   | otherwise
   = emptyDetails
   where
-    n_args   = length args
-    static_args
-      | Just decl_vars <- lookupVarEnv (occ_sat_env env) id
-      = mkStaticArgs $ zipWith asStaticArg decl_vars args
-      | otherwise -- not interesting for SAT
-      = noStaticArgs
-    occ_info = OneOcc { occ_in_lam      = NotInsideLam
-                      , occ_n_br        = oneBranch
-                      , occ_int_cxt     = int_cxt
-                      , occ_tail        = AlwaysTailCalled n_args
-                      , occ_static_args = static_args }
+    occ_info = OneOcc { occ_in_lam  = NotInsideLam
+                      , occ_n_br    = oneBranch
+                      , occ_int_cxt = int_cxt
+                      , occ_tail    = AlwaysTailCalled arity }
 
 addManyOccId :: UsageDetails -> Id -> UsageDetails
 -- Add the non-committal (id :-> noOccInfo) to the usage details
@@ -2974,22 +2948,16 @@ tagRecBinders lvl body_uds triples
            = ASSERT(not will_be_joins) -- Should be AlwaysTailCalled if
              Nothing                   -- we are making join points!
 
-     rhs_uds' = foldr1 andUDs rhs_udss'
-
      -- 3. Compute final usage details from adjusted RHS details
-     adj_uds   = body_uds `andUDs` rhs_uds'
+     adj_uds   = foldr andUDs body_uds rhs_udss'
 
      -- 4. Tag each binder with its adjusted details
-     bndrs'    = [ setBinderOcc (adj_occ{occ_static_args = rhs_static_args}) bndr
-                 | bndr <- bndrs
-                 , let adj_occ = lookupDetails adj_uds bndr
-                 , let rhs_static_args = staticArgsInfo (lookupDetails rhs_uds' bndr)
-                 ]
+     bndrs'    = [ setBinderOcc (lookupDetails adj_uds bndr) bndr
+                 | bndr <- bndrs ]
 
      -- 5. Drop the binders from the adjusted details and return
      usage'    = adj_uds `delDetailsList` bndrs
    in
-   pprTrace "tagRecBinders" (ppr bndrs' $$ ppr body_uds $$ ppr rhs_udss' $$ ppr adj_uds $$ ppr (map idOccInfo bndrs')) $
    (usage', bndrs')
 
 setBinderOcc :: OccInfo -> CoreBndr -> CoreBndr
@@ -3100,16 +3068,8 @@ unravels; so ignoring INLINE pragmas on recursive things isn't good
 either.
 
 See Invariant 2a of Note [Invariants on join points] in GHC.Core
--}
 
-asStaticArg :: Var -> CoreArg -> Staticness Var
-asStaticArg v arg
-  | isId v,         Var id <- arg, v == id                     = Static v
-  | isTyVar v,      Type t <- arg, mkTyVarTy v `eqType` t      = Static v
-  | isCoVar v, Coercion co <- arg, mkCoVarCo v `eqCoercion` co = Static v
-  | otherwise                                                  = NotStatic
 
-{-
 ************************************************************************
 *                                                                      *
 \subsection{Operations over OccInfo}
@@ -3120,8 +3080,7 @@ asStaticArg v arg
 markMany, markInsideLam, markNonTail :: OccInfo -> OccInfo
 
 markMany IAmDead = IAmDead
-markMany occ     = ManyOccs { occ_tail = occ_tail occ
-                            , occ_static_args = occ_static_args occ }
+markMany occ     = ManyOccs { occ_tail = occ_tail occ }
 
 markInsideLam occ@(OneOcc {}) = occ { occ_in_lam = IsInsideLam }
 markInsideLam occ             = occ
@@ -3133,36 +3092,29 @@ addOccInfo, orOccInfo :: OccInfo -> OccInfo -> OccInfo
 
 addOccInfo a1 a2  = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
                     ManyOccs { occ_tail = tailCallInfo a1 `andTailCallInfo`
-                                          tailCallInfo a2
-                             , occ_static_args = staticArgsInfo a1 `andStaticArgs`
-                                                 staticArgsInfo a2}
+                                          tailCallInfo a2 }
                                 -- Both branches are at least One
                                 -- (Argument is never IAmDead)
 
 -- (orOccInfo orig new) is used
 -- when combining occurrence info from branches of a case
 
-orOccInfo (OneOcc { occ_in_lam      = in_lam1
-                  , occ_n_br        = nbr1
-                  , occ_int_cxt     = int_cxt1
-                  , occ_tail        = tail1
-                  , occ_static_args = static_args1 })
-          (OneOcc { occ_in_lam      = in_lam2
-                  , occ_n_br        = nbr2
-                  , occ_int_cxt     = int_cxt2
-                  , occ_tail        = tail2
-                  , occ_static_args = static_args2 })
-  = OneOcc { occ_n_br        = nbr1 + nbr2
-           , occ_in_lam      = in_lam1 `mappend` in_lam2
-           , occ_int_cxt     = int_cxt1 `mappend` int_cxt2
-           , occ_tail        = tail1 `andTailCallInfo` tail2
-           , occ_static_args = static_args1 `andStaticArgs` static_args2 }
+orOccInfo (OneOcc { occ_in_lam  = in_lam1
+                  , occ_n_br    = nbr1
+                  , occ_int_cxt = int_cxt1
+                  , occ_tail    = tail1 })
+          (OneOcc { occ_in_lam  = in_lam2
+                  , occ_n_br    = nbr2
+                  , occ_int_cxt = int_cxt2
+                  , occ_tail    = tail2 })
+  = OneOcc { occ_n_br    = nbr1 + nbr2
+           , occ_in_lam  = in_lam1 `mappend` in_lam2
+           , occ_int_cxt = int_cxt1 `mappend` int_cxt2
+           , occ_tail    = tail1 `andTailCallInfo` tail2 }
 
 orOccInfo a1 a2 = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
                   ManyOccs { occ_tail = tailCallInfo a1 `andTailCallInfo`
-                                        tailCallInfo a2
-                           , occ_static_args = staticArgsInfo a1 `andStaticArgs`
-                                               staticArgsInfo a2 }
+                                        tailCallInfo a2 }
 
 andTailCallInfo :: TailCallInfo -> TailCallInfo -> TailCallInfo
 andTailCallInfo info@(AlwaysTailCalled arity1) (AlwaysTailCalled arity2)

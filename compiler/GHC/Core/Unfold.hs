@@ -51,7 +51,7 @@ import GHC.Core.DataCon
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
-import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec, staticArgsInfo, noStaticArgs )
+import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec, noStaticArgs )
 import GHC.Core.Type
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
@@ -1096,7 +1096,7 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
   where
     b ==> t = not b || t
-    has_static_args id = staticArgsInfo (idOccInfo id) /= noStaticArgs
+    has_static_args id = idStaticArgs id /= noStaticArgs
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
 traceInline :: DynFlags -> Id -> String -> SDoc -> a -> a

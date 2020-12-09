@@ -21,6 +21,7 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Utils
+import GHC.Core.Opt.StaticArgs ( saTransform )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
 import GHC.Types.SourceText
@@ -3786,8 +3787,22 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
   = simplStableUnfolding env top_lvl cont_mb id rhs_ty arity unf
   | isExitJoinId id
   = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
+  | Just static_args <- isStrongLoopBreakerWithStaticArgs id
+  , (lam_bndrs, lam_body) <- collectBinders new_rhs
+  = do  { unf_rhs <- saTransform id static_args lam_bndrs lam_body
+        ; pprTraceM "simplLetUnfolding" (ppr id $$ ppr static_args $$ ppr unf_rhs)
+        ; mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id unf_rhs }
   | otherwise
   = mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id new_rhs
+
+isStrongLoopBreakerWithStaticArgs :: Id -> Maybe [Staticness ()]
+isStrongLoopBreakerWithStaticArgs id
+  | isStrongLoopBreaker $ idOccInfo id
+  , static_args <- getStaticArgs $ idStaticArgs id
+  , notNull static_args
+  = Just static_args
+  | otherwise
+  = Nothing
 
 -------------------
 mkLetUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
@@ -3797,10 +3812,13 @@ mkLetUnfolding uf_opts top_lvl src id new_rhs
     return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs)
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
-            --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
-            --             expose the unfolding then indeed we *have* an unfolding
-            --             to expose.  (We could instead use the RHS, but currently
-            --             we don't.)  The simple thing is always to have one.
+            --         (b) They might have static arguments, in which case we
+            --             provide a non-rec unfolding that specialises for those
+            --         (c) And even without static arguments, in GHC.Iface.Tidy we
+            --             currently assume that, if we want to expose the unfolding
+            --             then indeed we *have* an unfolding to expose. (We could
+            --             instead use the RHS, but currently we don't.) The simple
+            --             thing is always to have one.
   where
     is_top_lvl   = isTopLevel top_lvl
     is_bottoming = isDeadEndId id

@@ -70,6 +70,7 @@ module GHC.Types.Unique.FM (
         isNullUFM,
         lookupUFM, lookupUFM_Directly,
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
+        delLookupUFM,
         nonDetEltsUFM, eltsUFM, nonDetKeysUFM,
         ufmToSet_Directly,
         nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM,
@@ -337,6 +338,11 @@ lookupWithDefaultUFM (UFM m) v k = M.findWithDefault v (getKey $ getUnique k) m
 
 lookupWithDefaultUFM_Directly :: UniqFM key elt -> elt -> Unique -> elt
 lookupWithDefaultUFM_Directly (UFM m) v u = M.findWithDefault v (getKey u) m
+
+delLookupUFM :: Uniquable key => UniqFM key elt -> key -> (Maybe elt, UniqFM key elt)
+delLookupUFM (UFM m) k = (mb_v, UFM m')
+  where
+    (mb_v, m') = M.updateLookupWithKey (\_key _elt -> Nothing) (getKey $ getUnique k) m
 
 eltsUFM :: UniqFM key elt -> [elt]
 eltsUFM (UFM m) = M.elems m

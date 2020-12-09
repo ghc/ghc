@@ -16,7 +16,7 @@ module GHC.Types.Var.Env (
         plusVarEnvList, alterVarEnv,
         delVarEnvList, delVarEnv,
         minusVarEnv,
-        lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
+        lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv, delLookupVarEnv,
         mapVarEnv, zipVarEnv,
         modifyVarEnv, modifyVarEnv_Directly,
         isEmptyVarEnv,
@@ -488,6 +488,7 @@ lookupVarEnv      :: VarEnv a -> Var -> Maybe a
 filterVarEnv      :: (a -> Bool) -> VarEnv a -> VarEnv a
 lookupVarEnv_NF   :: VarEnv a -> Var -> a
 lookupWithDefaultVarEnv :: VarEnv a -> a -> Var -> a
+delLookupVarEnv   :: VarEnv a -> Var -> (Maybe a, VarEnv a)
 elemVarEnv        :: Var -> VarEnv a -> Bool
 elemVarEnvByKey   :: Unique -> VarEnv a -> Bool
 disjointVarEnv    :: VarEnv a -> VarEnv a -> Bool
@@ -509,6 +510,7 @@ minusVarEnv      = minusUFM
 plusVarEnv       = plusUFM
 plusVarEnvList   = plusUFMList
 lookupVarEnv     = lookupUFM
+delLookupVarEnv  = delLookupUFM
 filterVarEnv     = filterUFM
 lookupWithDefaultVarEnv = lookupWithDefaultUFM
 mapVarEnv        = mapUFM

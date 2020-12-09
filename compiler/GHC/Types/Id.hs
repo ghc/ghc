@@ -55,7 +55,7 @@ module GHC.Types.Id (
         globaliseId, localiseId,
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
         zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
-        zapIdUsedOnceInfo, zapIdTailCallInfo,
+        zapIdUsedOnceInfo, zapIdTailCallInfo, zapIdStaticArgs,
         zapFragileIdInfo, zapIdStrictness, zapStableUnfolding,
         transferPolyIdInfo, scaleIdBy, scaleVarBy,
 
@@ -98,6 +98,7 @@ module GHC.Types.Id (
         idCafInfo, idLFInfo_maybe,
         idOneShotInfo, idStateHackOneShotInfo,
         idOccInfo,
+        idStaticArgs,
         isNeverLevPolyId,
 
         -- ** Writing 'IdInfo' fields
@@ -108,6 +109,7 @@ module GHC.Types.Id (
         setIdSpecialisation,
         setIdCafInfo,
         setIdOccInfo, zapIdOccInfo,
+        setIdStaticArgs,
         setIdLFInfo,
 
         setIdDemandInfo,
@@ -783,6 +785,15 @@ setIdOccInfo id occ_info = modifyIdInfo (`setOccInfo` occ_info) id
 
 zapIdOccInfo :: Id -> Id
 zapIdOccInfo b = b `setIdOccInfo` noOccInfo
+
+idStaticArgs :: Id -> StaticArgs
+idStaticArgs id = staticArgsInfo (idInfo id)
+
+setIdStaticArgs :: Id -> StaticArgs -> Id
+setIdStaticArgs id static_args = modifyIdInfo (`setStaticArgsInfo` static_args) id
+
+zapIdStaticArgs :: Id -> Id
+zapIdStaticArgs b = b `setIdStaticArgs` noStaticArgs
 
 {-
         ---------------------------------
