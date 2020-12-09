@@ -50,10 +50,11 @@ The previous patch, to fix polymorphic floatout demand signatures, is
 essential to make this work well!
 -}
 
-module GHC.Core.Opt.StaticArgs ( doStaticArgs ) where
+module GHC.Core.Opt.StaticArgs ( satAnalProgram, doStaticArgs, saTransform ) where
 
 import GHC.Prelude
 
+import GHC.Builtin.Names ( unboundKey )
 import GHC.Types.Var
 import GHC.Core
 import GHC.Core.Utils
@@ -64,18 +65,160 @@ import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
-import GHC.Types.Basic (Staticness(..))
+import GHC.Types.Basic ( Staticness(..), StaticArgs, mkStaticArgs, noStaticArgs, andStaticArgs )
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Set
-import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Data.FastString
+import GHC.Data.Maybe
 
 import Data.List (mapAccumL)
-import GHC.Data.FastString
+import Data.Bifunctor (second)
 
 #include "HsVersions.h"
+
+satAnalProgram :: CoreProgram -> CoreProgram
+satAnalProgram bs = map (snd . satAnalBind initSatEnv) bs
+
+-- | Lambda binders ('TyVar's, 'CoVar's and 'Id's) of a let-bound RHS, thus
+-- parameters to a function.
+type Params = [Var]
+
+data SatEnv
+  = SE
+  { se_params_env :: !(IdEnv Params)
+  -- ^ Lambda binders of interesting Id's. If a param is static, then all
+  -- occurrences must have the 'Var' listed here in its position!
+  , se_in_scope   :: !InScopeSet
+  -- ^ Needed for handling shadowing properly. See 'addInScopeVars'.
+  }
+
+initSatEnv :: SatEnv
+initSatEnv = SE emptyVarEnv emptyInScopeSet
+
+addInterestingId :: SatEnv -> Id -> Params -> SatEnv
+addInterestingId env id params =
+  env { se_params_env = extendVarEnv (se_params_env env) id params }
+
+lookupInterestingId :: SatEnv -> Id -> Maybe Params
+lookupInterestingId env id = lookupVarEnv (se_params_env env) id
+
+addInScopeVar :: SatEnv -> Var -> SatEnv
+addInScopeVar env v = addInScopeVars env [v]
+
+addInScopeVars :: SatEnv -> [Var] -> SatEnv
+addInScopeVars se vars = se { se_in_scope = in_scope', se_params_env = env' }
+  where
+    in_scope  = se_in_scope se
+    in_scope' = extendInScopeSetList in_scope vars
+    env       = se_params_env se
+    var_set   = mkVarSet vars
+    env'
+      | any (`elemInScopeSet` in_scope) vars
+      = mapVarEnv (hideShadowedParams var_set) $ delVarEnvList env vars
+      | otherwise
+      = env
+
+hideShadowedParams :: VarSet -> Params -> Params
+hideShadowedParams shadowing_vars = map_if shadowed hide_param
+  where
+    map_if :: (a -> Bool) -> (a -> a) -> [a] -> [a]
+    map_if p f       = map (\a -> if p a then f a else a)
+    shadowed param   = param `elemVarSet` shadowing_vars
+    -- unboundKey is guaranteed not to occur anywhere in the program!
+    -- See Note [Shadowed Params] TODO
+    hide_param param = param `setVarUnique` unboundKey
+
+newtype SatOccs = SO (IdEnv StaticArgs)
+
+emptySatOccs :: SatOccs
+emptySatOccs = SO emptyVarEnv
+
+addSatOccs :: SatOccs -> Id -> StaticArgs -> SatOccs
+addSatOccs (SO env) fn static_args =
+  SO $ extendVarEnv_C andStaticArgs env fn static_args
+
+combineSatOccs :: SatOccs -> SatOccs -> SatOccs
+combineSatOccs (SO a) (SO b) = SO $ plusVarEnv_C andStaticArgs a b
+
+combineSatOccsList :: [SatOccs] -> SatOccs
+combineSatOccsList occs = foldl' combineSatOccs emptySatOccs occs
+
+peelSatOccs :: SatOccs -> Id -> (StaticArgs, SatOccs)
+peelSatOccs (SO env) fn = case delLookupVarEnv env fn of
+  (mb_sa, env') -> (mb_sa `orElse` noStaticArgs, SO env')
+
+satAnalBind :: SatEnv -> CoreBind -> (SatOccs, CoreBind)
+satAnalBind env (NonRec id rhs) = (occs, NonRec id rhs')
+  where
+    (occs, rhs') = satAnalExpr (env `addInScopeVar` id) rhs
+satAnalBind env (Rec [(fn, rhs)])
+  | notNull bndrs
+  = (occs', Rec [(fn', rhs')])
+  where
+    (bndrs, rhs_body)    = collectBinders rhs
+    env'                 = addInterestingId (env `addInScopeVars` (fn:bndrs)) fn bndrs
+    (occs, rhs_body')    = satAnalExpr env' rhs_body
+    rhs'                 = mkLams bndrs rhs_body'
+    (static_args, occs') = peelSatOccs occs fn
+    fn'                  = setIdStaticArgs fn static_args
+satAnalBind env (Rec pairs) = (combineSatOccsList occss, Rec pairs')
+  where
+    ids  = map fst pairs
+    env' = env `addInScopeVars` ids
+    (occss, rhss') = mapAndUnzip (satAnalExpr env' . snd) pairs
+    pairs' = zip ids rhss'
+
+satAnalExpr :: SatEnv -> CoreExpr -> (SatOccs, CoreExpr)
+satAnalExpr _   e@(Lit _)      = (emptySatOccs, e)
+satAnalExpr _   e@(Coercion _) = (emptySatOccs, e)
+satAnalExpr _   e@(Type _)     = (emptySatOccs, e)
+satAnalExpr _   e@(Var _)      = (emptySatOccs, e) -- boring! See the App case
+satAnalExpr env (Tick t e)     = second (Tick t)      $ satAnalExpr env e
+satAnalExpr env (Cast e c)     = second (flip Cast c) $ satAnalExpr env e
+satAnalExpr env e@App{}        = uncurry (satAnalApp env) (collectArgs e)
+satAnalExpr env e@Lam{}        = (occs, mkLams bndrs body')
+  where
+    (bndrs, body) = collectBinders e
+    (occs, body') = satAnalExpr (env `addInScopeVars` bndrs) body
+satAnalExpr env (Let bnd body) = (occs, Let bnd' body')
+  where
+    (occs_bind, bnd')  = satAnalBind env bnd'
+    (occs_body, body') = satAnalExpr (env `addInScopeVars` bindersOf bnd) body
+    !occs              = combineSatOccs occs_body occs_bind
+satAnalExpr env (Case scrut bndr ty alts) = (occs, Case scrut' bndr ty alts')
+  where
+    (occs_scrut, scrut') = satAnalExpr env scrut
+    alt_env              = env `addInScopeVar` bndr
+    (occs_alts,  alts')  = mapAndUnzip (satAnalAlt alt_env) alts
+    occs                 = combineSatOccsList (occs_scrut:occs_alts)
+
+satAnalAlt :: SatEnv -> CoreAlt -> (SatOccs, CoreAlt)
+satAnalAlt env (dc, bndrs, rhs) = (occs, (dc, bndrs, rhs'))
+  where
+    (occs, rhs') = satAnalExpr (env `addInScopeVars` bndrs) rhs
+
+satAnalApp :: SatEnv -> CoreExpr -> [CoreArg] -> (SatOccs, CoreExpr)
+satAnalApp env head args = (add_static_args_info occs, expr')
+  where
+    (occs_head, head') = satAnalExpr env head
+    (occs_args, args') = mapAndUnzip (satAnalExpr env) args
+    occs               = combineSatOccsList (occs_head:occs_args)
+    expr'              = mkApps head' args'
+    add_static_args_info occs
+      | Var fn <- head, Just params <- lookupInterestingId env fn
+      = addSatOccs occs fn (mkStaticArgs $ zipWith asStaticArg params args)
+      | otherwise
+      = occs
+
+asStaticArg :: Var -> CoreArg -> Staticness ()
+asStaticArg v arg
+  | isId v,         Var id <- arg, v == id                     = Static ()
+  | isTyVar v,      Type t <- arg, mkTyVarTy v `eqType` t      = Static ()
+  | isCoVar v, Coercion co <- arg, mkCoVarCo v `eqCoercion` co = Static ()
+  | otherwise                                                  = NotStatic
 
 doStaticArgs :: UniqSupply -> CoreProgram -> CoreProgram
 doStaticArgs us binds = snd $ mapAccumL sat_bind_threaded_us us binds
@@ -261,9 +404,6 @@ type SatM result = UniqSM result
 runSAT :: UniqSupply -> SatM a -> a
 runSAT = initUs_
 
-newUnique :: SatM Unique
-newUnique = getUniqueM
-
 {-
 ************************************************************************
 
@@ -371,7 +511,8 @@ saTransformMaybe :: Id -> Maybe SATInfo -> [Id] -> CoreExpr -> SatM CoreBind
 saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
   | Just arg_staticness <- maybe_arg_staticness
   , should_transform arg_staticness
-  = saTransform binder arg_staticness rhs_binders rhs_body
+  = do  { new_rhs <- saTransform binder arg_staticness rhs_binders rhs_body
+        ; return (NonRec binder new_rhs) }
   | otherwise
   = return (Rec [(binder, mkLams rhs_binders rhs_body)])
   where
@@ -379,11 +520,12 @@ saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
       where
         n_static_args = count isStaticValue staticness
 
-saTransform :: Id -> SATInfo -> [Id] -> CoreExpr -> SatM CoreBind
+saTransform :: MonadUnique m => Id -> [Staticness a] -> [Id] -> CoreExpr -> m CoreExpr
 saTransform binder arg_staticness rhs_binders rhs_body
-  = do  { shadow_lam_bndrs <- mapM clone binders_w_staticness
-        ; uniq             <- newUnique
-        ; return (NonRec binder (mk_new_rhs uniq shadow_lam_bndrs)) }
+  = do  { MASSERT( arg_staticness `leLength` rhs_binders )
+        ; shadow_lam_bndrs <- mapM clone binders_w_staticness
+        ; uniq             <- getUniqueM
+        ; return (mk_new_rhs uniq shadow_lam_bndrs) }
   where
     -- Running example: foldr
     -- foldr \alpha \beta c n xs = e, for some e
@@ -400,7 +542,7 @@ saTransform binder arg_staticness rhs_binders rhs_body
     non_static_args = [v | (v, NotStatic) <- binders_w_staticness]
 
     clone (bndr, NotStatic) = return bndr
-    clone (bndr, _        ) = do { uniq <- newUnique
+    clone (bndr, _        ) = do { uniq <- getUniqueM
                                  ; return (setVarUnique bndr uniq) }
 
     -- new_rhs = \alpha beta c n xs ->

@@ -75,6 +75,9 @@ module GHC.Types.Id.Info (
         ppCafInfo, mayHaveCafRefs,
         cafInfo, setCafInfo,
 
+        -- ** Static arguments
+        StaticArgs, staticArgsInfo, setStaticArgsInfo,
+
         -- ** The LambdaFormInfo type
         LambdaFormInfo(..),
         lfInfo, setLFInfo,
@@ -128,6 +131,7 @@ infixl  1 `setRuleInfo`,
           `setStrictnessInfo`,
           `setCprInfo`,
           `setDemandInfo`,
+          `setStaticArgsInfo`,
           `setNeverLevPoly`,
           `setLevityInfoWithType`
 
@@ -278,6 +282,7 @@ data IdInfo
         -- 4% in some programs. See #17497 and associated MR.
         --
         -- See documentation of the getters for what these packed fields mean.
+        staticArgsInfo  :: {-# UNPACK #-} !StaticArgs,
         lfInfo          :: !(Maybe LambdaFormInfo)
     }
 
@@ -415,6 +420,9 @@ setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
 setCprInfo :: IdInfo -> CprSig -> IdInfo
 setCprInfo info cpr = cpr `seq` info { cprInfo = cpr }
 
+setStaticArgsInfo :: IdInfo -> StaticArgs -> IdInfo
+setStaticArgsInfo info sa = info { staticArgsInfo = sa }
+
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
 vanillaIdInfo
@@ -432,6 +440,7 @@ vanillaIdInfo
                                   bitfieldSetOneShotInfo NoOneShotInfo $
                                   bitfieldSetLevityInfo NoLevityInfo $
                                   emptyBitField,
+            staticArgsInfo      = noStaticArgs,
             lfInfo              = Nothing
            }
 

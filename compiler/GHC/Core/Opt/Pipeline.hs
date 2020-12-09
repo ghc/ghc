@@ -37,7 +37,7 @@ import GHC.Core.Opt.Monad
 import GHC.Core.Opt.FloatIn      ( floatInwards )
 import GHC.Core.Opt.FloatOut     ( floatOutwards )
 import GHC.Core.Opt.LiberateCase ( liberateCase )
-import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
+import GHC.Core.Opt.StaticArgs   ( doStaticArgs, satAnalProgram )
 import GHC.Core.Opt.Specialise   ( specProgram)
 import GHC.Core.Opt.SpecConstr   ( specConstrProgram)
 import GHC.Core.Opt.DmdAnal
@@ -754,9 +754,11 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
       , () <- sz `seq` ()     -- Force it
       = do {
                 -- Occurrence analysis
-           let { tagged_binds = {-# SCC "OccAnal" #-}
+           let { tagged_binds0 = {-# SCC "OccAnal" #-}
                      occurAnalysePgm this_mod active_unf active_rule rules
                                      binds
+               ; tagged_binds  = {-# SCC "SAT" #-}
+                     satAnalProgram tagged_binds0
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      FormatCore

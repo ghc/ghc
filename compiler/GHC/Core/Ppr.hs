@@ -464,6 +464,7 @@ instance Outputable IdInfo where
   ppr info = showAttributes
     [ (has_prag,         text "InlPrag=" <> pprInlineDebug prag_info)
     , (has_occ,          text "Occ=" <> ppr occ_info)
+    , (has_static_args,  text "SA=" <> ppr static_args)
     , (has_dmd,          text "Dmd=" <> ppr dmd_info)
     , (has_lbv ,         text "OS=" <> ppr lbv_info)
     , (has_arity,        text "Arity=" <> int arity)
@@ -479,6 +480,9 @@ instance Outputable IdInfo where
 
       occ_info  = occInfo info
       has_occ   = not (isManyOccs occ_info)
+
+      static_args = staticArgsInfo info
+      has_static_args = static_args /= noStaticArgs
 
       dmd_info  = demandInfo info
       has_dmd   = not $ isTopDmd dmd_info
