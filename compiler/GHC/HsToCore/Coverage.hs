@@ -1239,7 +1239,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
           count = countEntries && gopt Opt_ProfCountEntries dflags
       return $ ProfNote cc count True{-scopes-}
 
-    Breakpoints -> Breakpoint <$> addMixEntry me <*> pure ids
+    Breakpoints -> Breakpoint noExtField <$> addMixEntry me <*> pure ids
 
     SourceNotes | RealSrcSpan pos' _ <- pos ->
       return $ SourceNote pos' cc_name
