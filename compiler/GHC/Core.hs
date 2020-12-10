@@ -6,6 +6,12 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+
+
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -13,7 +19,8 @@
 module GHC.Core (
         -- * Main data types
         Expr(..), Alt(..), Bind(..), AltCon(..), Arg,
-        Tickish(..), TickishScoping(..), TickishPlacement(..),
+        GenTickish(..), Tickish, StgTickish,
+        TickishScoping(..), TickishPlacement(..),
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
 
@@ -117,6 +124,7 @@ import GHC.Unit.Module
 import GHC.Types.Basic
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
+import GHC.Hs.Extension ( NoExtField )
 
 import GHC.Utils.Binary
 import GHC.Utils.Misc
@@ -941,9 +949,22 @@ type MOutCoercion = MCoercion
 
 -- | Allows attaching extra information to points in expressions
 
+-- | Used as a data type index for the GenTickish annotations
+data TickishPass
+  = TickishCore
+  | TickishStg
+
+type family XBreakpoint (pass :: TickishPass)
+type instance XBreakpoint 'TickishCore = NoExtField
+-- | Keep track of the type of breakpoints in STG, for GHCi
+type instance XBreakpoint 'TickishStg  = Type
+
+type Tickish    = GenTickish 'TickishCore
+type StgTickish = GenTickish 'TickishStg
+
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-data Tickish id =
+data GenTickish pass id =
     -- | An @{-# SCC #-}@ profiling annotation, either automatically
     -- added by the desugarer as a result of -auto-all, or added by
     -- the user.
@@ -968,7 +989,8 @@ data Tickish id =
   -- NB. we must take account of these Ids when (a) counting free variables,
   -- and (b) substituting (don't substitute for them)
   | Breakpoint
-    { breakpointId     :: !Int
+    { breakpointExt    :: XBreakpoint pass
+    , breakpointId     :: !Int
     , breakpointFVs    :: [id]  -- ^ the order of this list is important:
                                 -- it matches the order of the lists in the
                                 -- appropriate entry in 'GHC.ByteCode.Types.ModBreaks'.
@@ -999,7 +1021,11 @@ data Tickish id =
                                 --   (uses same names as CCs)
     }
 
-  deriving (Eq, Ord, Data)
+deriving instance Eq a => Eq (GenTickish 'TickishCore a)
+deriving instance Ord a => Ord (GenTickish 'TickishCore a)
+deriving instance Data a => Data (GenTickish 'TickishCore a)
+
+deriving instance Data a => Data (GenTickish 'TickishStg a)
 
 -- | A "counting tick" (where tickishCounts is True) is one that
 -- counts evaluations in some way.  We cannot discard a counting tick,
@@ -1009,7 +1035,7 @@ data Tickish id =
 -- However, we still allow the simplifier to increase or decrease
 -- sharing, so in practice the actual number of ticks may vary, except
 -- that we never change the value from zero to non-zero or vice versa.
-tickishCounts :: Tickish id -> Bool
+tickishCounts :: GenTickish pass id -> Bool
 tickishCounts n@ProfNote{} = profNoteCount n
 tickishCounts HpcTick{}    = True
 tickishCounts Breakpoint{} = True
@@ -1078,7 +1104,7 @@ data TickishScoping =
   deriving (Eq)
 
 -- | Returns the intended scoping rule for a Tickish
-tickishScoped :: Tickish id -> TickishScoping
+tickishScoped :: GenTickish pass id -> TickishScoping
 tickishScoped n@ProfNote{}
   | profNoteScope n        = CostCentreScope
   | otherwise              = NoScope
@@ -1091,7 +1117,7 @@ tickishScoped SourceNote{} = SoftScope
 
 -- | Returns whether the tick scoping rule is at least as permissive
 -- as the given scoping rule.
-tickishScopesLike :: Tickish id -> TickishScoping -> Bool
+tickishScopesLike :: GenTickish pass id -> TickishScoping -> Bool
 tickishScopesLike t scope = tickishScoped t `like` scope
   where NoScope         `like` _               = True
         _               `like` NoScope         = False
@@ -1110,7 +1136,7 @@ tickishScopesLike t scope = tickishScoped t `like` scope
 -- @tickishCounts@. Note that in principle splittable ticks can become
 -- floatable using @mkNoTick@ -- even though there's currently no
 -- tickish for which that is the case.
-tickishFloatable :: Tickish id -> Bool
+tickishFloatable :: GenTickish pass id -> Bool
 tickishFloatable t = t `tickishScopesLike` SoftScope && not (tickishCounts t)
 
 -- | Returns @True@ for a tick that is both counting /and/ scoping and
@@ -1148,7 +1174,7 @@ mkNoScope _                               = panic "mkNoScope: Undefined split!"
 -- Here there is just no operational difference between the first and
 -- the second version. Therefore code generation should simply
 -- translate the code as if it found the latter.
-tickishIsCode :: Tickish id -> Bool
+tickishIsCode :: GenTickish pass id -> Bool
 tickishIsCode SourceNote{} = False
 tickishIsCode _tickish     = True  -- all the rest for now
 

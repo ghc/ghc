@@ -1929,7 +1929,7 @@ occAnal env (Tick tickish body)
   | tickish `tickishScopesLike` SoftScope
   = (markAllNonTail usage, Tick tickish body')
 
-  | Breakpoint _ ids <- tickish
+  | Breakpoint _ _ ids <- tickish
   = (usage_lam `andUDs` foldr addManyOcc emptyDetails ids, Tick tickish body')
     -- never substitute for any of the Ids in a Breakpoint
 
