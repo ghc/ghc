@@ -418,7 +418,7 @@ schemeR_wrk fvs nm original_body (args, body)
 -- introduce break instructions for ticked expressions
 schemeER_wrk :: StackDepth -> BCEnv -> AnnExpr' Id DVarSet -> BcM BCInstrList
 schemeER_wrk d p rhs
-  | AnnTick (Breakpoint tick_no fvs) (_annot, newRhs) <- rhs
+  | AnnTick (Breakpoint _ext tick_no fvs) (_annot, newRhs) <- rhs
   = do  code <- schemeE d 0 p newRhs
         cc_arr <- getCCArray
         this_mod <- moduleName <$> getCurrentModule
@@ -616,7 +616,7 @@ schemeE d s p (AnnLet binds (_,body)) = do
 -- call exprFreeVars on a deAnnotated expression, this may not be the
 -- best way to calculate the free vars but it seemed like the least
 -- intrusive thing to do
-schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
+schemeE d s p exp@(AnnTick (Breakpoint _ext _id _fvs) _rhs)
    | isLiftedTypeKind (typeKind ty)
    = do   id <- newId ty
           -- Todo: is emptyVarSet correct on the next line?

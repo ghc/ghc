@@ -47,7 +47,7 @@ import GHC.Prelude
 import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Types.Var.Set
-import GHC.Core    ( Tickish(Breakpoint) )
+import GHC.Core    ( GenTickish(Breakpoint) )
 import GHC.Utils.Misc
 
 import Data.Maybe ( mapMaybe )
@@ -139,8 +139,8 @@ expr env = go
       where
         (e', fvs) = go e
         fvs' = unionDVarSet (tickish tick) fvs
-        tickish (Breakpoint _ ids) = mkDVarSet ids
-        tickish _                  = emptyDVarSet
+        tickish (Breakpoint _ _ ids) = mkDVarSet ids
+        tickish _                    = emptyDVarSet
 
     go_bind dc bind body = (dc bind' body', fvs)
       where
