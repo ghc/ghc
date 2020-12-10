@@ -2819,24 +2819,6 @@ But notice that (#16322 comment:3)
   although T3 is really polymorphic-recursive too.
   Perhaps we should somehow reject that.
 
-Note [Kind-checking tyvar binders for associated types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When kind-checking the type-variable binders for associated
-   data/newtype decls
-   family decls
-we behave specially for type variables that are already in scope;
-that is, bound by the enclosing class decl.  This is done in
-kcLHsQTyVarBndrs:
-  * The use of tcImplicitQTKBndrs
-  * The tcLookupLocal_maybe code in kc_hs_tv
-
-See Note [Associated type tyvar names] in GHC.Core.Class and
-    Note [TyVar binders for associated decls] in GHC.Hs.Decls
-
-We must do the same for family instance decls, where the in-scope
-variables may be bound by the enclosing class instance decl.
-Hence the use of tcImplicitQTKBndrs in tcFamTyPatsAndGen.
-
 Note [Kind variable ordering for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 What should be the kind of `T` in the following example? (#15591)
