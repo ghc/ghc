@@ -630,7 +630,11 @@
 #else
 #define OVERWRITING_CLOSURE_SIZE(c, size) /* nothing */
 #define OVERWRITING_CLOSURE(c) /* nothing */
-#define OVERWRITING_CLOSURE_MUTABLE(c, off) /* nothing */
+/* This is used to zero slop after shrunk arrays. It is important that we do
+ * this whenever profiling is enabled as described in Note [slop on the heap]
+ * in Storage.c. */
+#define OVERWRITING_CLOSURE_MUTABLE(c, off) \
+  if (RtsFlags_ProfFlags_doHeapProfile(RtsFlags) != 0) { foreign "C" overwritingMutableClosureOfs(c "ptr", off); }
 #endif
 
 // Memory barriers.
