@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 {- |
 Non-global free variable analysis on STG terms. This pass annotates
 non-top-level closure bindings with captured variables. Global variables are not
