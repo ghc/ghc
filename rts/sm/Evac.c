@@ -441,7 +441,9 @@ evacuate_large(StgPtr p)
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_ACQ_REL);
 
       // See Note [Non-moving GC: Marking evacuated objects].
-      markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) p);
+      if (major_gc && !deadlock_detect_gc) {
+          markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) p);
+      }
   }
   initBdescr(bd, new_gen, new_gen->to);
 
@@ -598,7 +600,9 @@ evacuate_compact (StgPtr p)
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_RELAXED);
 
       // See Note [Non-moving GC: Marking evacuated objects].
-      markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) str);
+      if (major_gc && !deadlock_detect_gc) {
+          markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) str);
+      }
     }
     initBdescr(bd, new_gen, new_gen->to);
 
