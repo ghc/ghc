@@ -257,27 +257,24 @@ validate-x86_64-linux-deb9-unreg-hadrian:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
 
-validate-x86_64-linux-deb10-hadrian-cross-aarch64:
-  <<: *nightly
+.build-x86_64-linux-deb10-hadrian-cross-aarch64:
   extends: .validate-linux-hadrian
-  stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   variables:
     BIN_DIST_NAME: "ghc-x86_64-deb9-linux"
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*cross-compilation.*/'
-  variables:
     CONFIGURE_ARGS: --with-intree-gmp
     CROSS_TARGET: "aarch64-linux-gnu"
+
+validate-x86_64-linux-deb10-hadrian-cross-aarch64:
+  extends: .build-x86_64-linux-deb10-hadrian-cross-aarch64
+  stage: full-build
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*cross-compilation.*/'
 
 nightly-x86_64-linux-deb10-hadrian-cross-aarch64:
   <<: *nightly
-  extends: .validate-linux-hadrian
+  extends: .build-x86_64-linux-deb10-hadrian-cross-aarch64
   stage: full-build
-  variables:
-    CONFIGURE_ARGS: --with-intree-gmp
-    CROSS_TARGET: "aarch64-linux-gnu"
-
 
 
 ############################################################
