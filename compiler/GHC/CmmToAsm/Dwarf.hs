@@ -7,7 +7,7 @@ import GHC.Prelude
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr        ( GlobalReg(..) )
 import GHC.Settings.Config ( cProjectName, cProjectVersion )
-import GHC.Core            ( Tickish(..) )
+import GHC.Core            ( Tickish, GenTickish(..) )
 import GHC.Cmm.DebugBlock
 import GHC.Unit.Module
 import GHC.Utils.Outputable
