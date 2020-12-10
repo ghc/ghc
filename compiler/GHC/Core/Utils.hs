@@ -2168,7 +2168,7 @@ eqExpr in_scope e1 e2
       = c1 == c2 && go (rnBndrs2 env bs1 bs2) e1 e2
 
 eqTickish :: RnEnv2 -> Tickish Id -> Tickish Id -> Bool
-eqTickish env (Breakpoint lid lids) (Breakpoint rid rids)
+eqTickish env (Breakpoint _ lid lids) (Breakpoint _ rid rids)
       = lid == rid  &&  map (rnOccL env) lids == map (rnOccR env) rids
 eqTickish _ l r = l == r
 
