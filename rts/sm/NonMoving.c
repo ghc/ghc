@@ -892,6 +892,7 @@ static void nonmovingPrepareMark(void)
 // of this.
 static void nonmovingMarkWeakPtrList(MarkQueue *mark_queue, StgWeak *dead_weak_ptr_list)
 {
+    mark_trace_start_root_set("weak-ptr");
     for (StgWeak *w = oldest_gen->weak_ptr_list; w; w = w->link) {
         markQueuePushClosure_(mark_queue, (StgClosure*)w);
         // Do not mark finalizers and values here, those fields will be marked
@@ -915,6 +916,7 @@ static void nonmovingMarkWeakPtrList(MarkQueue *mark_queue, StgWeak *dead_weak_p
         markQueuePushClosure_(mark_queue, (StgClosure*)w);
         nonmovingMarkDeadWeak(mark_queue, w);
     }
+    mark_trace_end_root_set();
 }
 
 void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
@@ -944,19 +946,29 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 
     // Mark roots
     trace(TRACE_nonmoving_gc, "Marking roots for nonmoving GC");
+    mark_trace_start_root_set("CAF");
     markCAFs((evac_fn)markQueueAddRoot, mark_queue);
+    mark_trace_end_root_set();
+    mark_trace_start_root_set("cap");
     for (unsigned int n = 0; n < n_capabilities; ++n) {
         markCapability((evac_fn)markQueueAddRoot, mark_queue,
                 capabilities[n], true/*don't mark sparks*/);
     }
+    mark_trace_end_root_set();
+    mark_trace_start_root_set("sched");
     markScheduler((evac_fn)markQueueAddRoot, mark_queue);
+    mark_trace_end_root_set();
     nonmovingMarkWeakPtrList(mark_queue, *dead_weaks);
+    mark_trace_start_root_set("StablePtr");
     markStablePtrTable((evac_fn)markQueueAddRoot, mark_queue);
+    mark_trace_end_root_set();
 
     // Mark threads resurrected during moving heap scavenging
+    mark_trace_start_root_set("resurrected");
     for (StgTSO *tso = *resurrected_threads; tso != END_TSO_QUEUE; tso = tso->global_link) {
         markQueuePushClosure_(mark_queue, (StgClosure*)tso);
     }
+    mark_trace_end_root_set();
     trace(TRACE_nonmoving_gc, "Finished marking roots for nonmoving GC");
 
     // Roots marked, mark threads and weak pointers
@@ -1204,6 +1216,8 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     current_mark_queue = NULL;
     freeMarkQueue(mark_queue);
     stgFree(mark_queue);
+    mark_trace_end();
+    mark_trace_start();
 
     oldest_gen->live_estimate = nonmoving_live_words;
     oldest_gen->n_old_blocks = 0;

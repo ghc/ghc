@@ -26,6 +26,106 @@
 #include "MarkWeak.h"
 #include "sm/Storage.h"
 #include "CNF.h"
+#include <sys/stat.h>
+
+static int mark_trace_phase_n = 0;
+static int mark_trace_seq_n = 0;
+static const StgClosure *mark_trace_from = NULL;
+static FILE *mark_trace_file = NULL;
+static const char *mark_trace_root_set = NULL;
+static const StgClosure mark_trace_root_marker = {};
+
+void mark_trace_start()
+{
+    ASSERT(mark_trace_file == NULL);
+    char fname[256];
+    mkdir("mark-trace", 0755);
+    debugBelch("===== Starting GC %d\n", mark_trace_phase_n);
+    snprintf(fname, sizeof(fname), "mark-trace/%d.dot", mark_trace_phase_n);
+    mark_trace_phase_n++;
+    mark_trace_seq_n = 0;
+    mark_trace_file = fopen(fname, "w");
+    ASSERT(mark_trace_file);
+    fprintf(mark_trace_file, "digraph {\n");
+}
+
+void mark_trace_end()
+{
+    ASSERT(mark_trace_file);
+    fprintf(mark_trace_file, "}\n");
+    fclose(mark_trace_file);
+    mark_trace_file = NULL;
+}
+
+void mark_trace_start_root_set(const char* root_set)
+{
+    ASSERT(mark_trace_file);
+    fprintf(mark_trace_file, "  # start root set: %s\n", root_set);
+    mark_trace_root_set = root_set;
+    mark_trace_from = &mark_trace_root_marker;
+}
+
+void mark_trace_end_root_set()
+{
+    ASSERT(mark_trace_file);
+    fprintf(mark_trace_file, "  # end root set: %s\n", mark_trace_root_set);
+    mark_trace_root_set = NULL;
+    mark_trace_from = NULL;
+}
+
+void mark_trace_root(const StgClosure *root)
+{
+    ASSERT(mark_trace_file);
+    fprintf(mark_trace_file, "  \"%p\" [root];\n", root);
+}
+
+static void mark_trace_set_from(const StgClosure *from)
+{
+    mark_trace_from = from;
+    if (from) {
+        fprintf(mark_trace_file, "  \"%p\" [type=%s];\n",
+                from, closure_type_names[get_itbl(from)->type]);
+    }
+}
+
+static void mark_trace_edge_(const StgClosure *from, const StgClosure *to, const char *attrs)
+{
+    ASSERT(mark_trace_file);
+    fprintf(mark_trace_file, "  \"%p\" -> \"%p\" [n=%d %s];\n",
+            from, to, mark_trace_seq_n, attrs);
+    if (mark_trace_root_set) {
+      fprintf(mark_trace_file, "  \"%p\" [root_set=\"%s\"];\n",
+              from, mark_trace_root_set);
+    }
+    mark_trace_seq_n++;
+}
+
+
+static void mark_trace_edge(const StgClosure *to)
+{
+    ASSERT(mark_trace_from);
+    mark_trace_edge_(mark_trace_from, to, "");
+}
+
+static void mark_trace_srt_edge(const StgClosure *to)
+{
+    ASSERT(mark_trace_from);
+    mark_trace_edge_(mark_trace_from, to, "srt=true");
+}
+
+static void mark_trace_misc_edge(const char *from, const StgClosure *to)
+{
+    ASSERT(mark_trace_file);
+    fprintf(mark_trace_file, "  %s -> \"%p\" [n=%d];\n",
+            from, to, mark_trace_seq_n);
+    mark_trace_seq_n++;
+}
+
+static void mark_trace_upd_rem_set(const StgClosure *to)
+{
+    mark_trace_set_from(to);
+    mark_trace_misc_edge("upd_rem_set", to);
+}
 
 static bool check_in_nonmoving_heap(StgClosure *p);
 static void mark_closure (MarkQueue *queue, const StgClosure *p, StgClosure **origin);
@@ -484,6 +584,7 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
     };
     q->top->entries[q->top->head] = ent;
     q->top->head++;
+    mark_trace_root(p);
 }
 
 static inline
@@ -514,6 +615,7 @@ void push_closure (MarkQueue *q,
         }
     };
     push(q, &ent);
+    mark_trace_edge(UNTAG_CLOSURE(p));
 }
 
 static
@@ -539,7 +641,9 @@ void push_thunk_srt (MarkQueue *q, const StgInfoTable *info)
 {
     const StgThunkInfoTable *thunk_info = itbl_to_thunk_itbl(info);
     if (thunk_info->i.srt) {
-        push_closure(q, (StgClosure*)GET_SRT(thunk_info), NULL);
+        StgClosure *c = (StgClosure*)GET_SRT(thunk_info);
+        push_closure(q, c, NULL);
+        mark_trace_srt_edge(c);
     }
 }
 
@@ -548,7 +652,9 @@ void push_fun_srt (MarkQueue *q, const StgInfoTable *info)
 {
     const StgFunInfoTable *fun_info = itbl_to_fun_itbl(info);
     if (fun_info->i.srt) {
-        push_closure(q, (StgClosure*)GET_FUN_SRT(fun_info), NULL);
+        StgClosure *c = (StgClosure*)GET_FUN_SRT(fun_info);
+        push_closure(q, c, NULL);
+        mark_trace_srt_edge(c);
     }
 }
 
@@ -602,6 +708,9 @@ void updateRemembSetPushThunkEager(Capability *cap,
                                    const StgThunkInfoTable *info,
                                    StgThunk *thunk)
 {
+    mark_trace_root((StgClosure *) thunk);
+    mark_trace_set_from((StgClosure *) thunk);
+
     /* N.B. info->i.type mustn't be WHITEHOLE */
     MarkQueue *queue = &cap->upd_rem_set.queue;
     switch (info->i.type) {
@@ -650,6 +759,7 @@ void updateRemembSetPushThunkEager(Capability *cap,
         barf("updateRemembSetPushThunk: invalid thunk pushed: p=%p, type=%d",
              thunk, info->i.type);
     }
+    mark_trace_set_from(NULL);
 }
 
 void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *p)
@@ -661,7 +771,10 @@ inline void updateRemembSetPushClosure(Capability *cap, StgClosure *p)
 {
     if (check_in_nonmoving_heap(p)) {
         MarkQueue *queue = &cap->upd_rem_set.queue;
+        mark_trace_start_root_set("upd-rem-set");
         push_closure(queue, p, NULL);
+        mark_trace_upd_rem_set(p);
+        mark_trace_end_root_set();
     }
 }
 
@@ -715,13 +828,17 @@ void updateRemembSetPushTSO(Capability *cap, StgTSO *tso)
 {
     if (needs_upd_rem_set_mark((StgClosure *) tso)) {
         debugTrace(DEBUG_nonmoving_gc, "upd_rem_set: TSO %p", tso);
+        mark_trace_upd_rem_set((StgClosure *) tso);
         trace_tso(&cap->upd_rem_set.queue, tso);
         finish_upd_rem_set_mark((StgClosure *) tso);
+        mark_trace_set_from(NULL);
     }
 }
 
 void updateRemembSetPushStack(Capability *cap, StgStack *stack)
 {
+    mark_trace_upd_rem_set((StgClosure *) stack);
+
     // N.B. caller responsible for checking nonmoving_write_barrier_enabled
     if (needs_upd_rem_set_mark((StgClosure *) stack)) {
         StgWord8 marking = stack->marking;
@@ -732,7 +849,6 @@ void updateRemembSetPushStack(Capability *cap, StgStack *stack)
             debugTrace(DEBUG_nonmoving_gc, "upd_rem_set: STACK %p", stack->sp);
             trace_stack(&cap->upd_rem_set.queue, stack);
             finish_upd_rem_set_mark((StgClosure *) stack);
-            return;
         } else {
             // The concurrent GC has claimed the right to mark the stack.
             // Wait until it finishes marking before proceeding with
@@ -743,9 +859,10 @@ void updateRemembSetPushStack(Capability *cap, StgStack *stack)
 #else
                 ;
 #endif
-            return;
         }
     }
+    mark_trace_set_from(NULL);
+    mark_trace_start_root_set("upd_rem_set");
 }
 
 /*********************************************************
@@ -770,7 +887,9 @@ void markQueuePushClosure (MarkQueue *q,
 /* TODO: Do we really never want to specify the origin here? */
 void markQueueAddRoot (MarkQueue* q, StgClosure** root)
 {
+    mark_trace_start_root_set("");
     markQueuePushClosure(q, *root, NULL);
+    mark_trace_end_root_set();
 }
 
 /* Push a closure to the mark queue without origin information */
@@ -1197,6 +1316,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     StgClosure *p_next = NULL;
     StgWord tag = GET_CLOSURE_TAG(p);
     p = UNTAG_CLOSURE(p);
+    mark_trace_set_from(p);
 
 #   define PUSH_FIELD(obj, field)                                \
         markQueuePushClosure(queue,                              \
@@ -1687,10 +1807,12 @@ nonmovingMark (MarkQueue *queue)
         switch (nonmovingMarkQueueEntryType(&ent)) {
         case MARK_CLOSURE:
             mark_closure(queue, ent.mark_closure.p, ent.mark_closure.origin);
+            mark_trace_set_from(NULL);
             break;
         case MARK_ARRAY: {
             const StgMutArrPtrs *arr = (const StgMutArrPtrs *)
                 UNTAG_CLOSURE((StgClosure *) ent.mark_array.array);
+            mark_trace_set_from((StgClosure*) arr);
             StgWord start = ent.mark_array.start_index;
             StgWord end = start + MARK_ARRAY_CHUNK_LENGTH;
             if (end < arr->ptrs) {
@@ -1702,6 +1824,7 @@ nonmovingMark (MarkQueue *queue)
             for (StgWord i = start; i < end; i++) {
                 markQueuePushClosure_(queue, arr->payload[i]);
             }
+            mark_trace_set_from(NULL);
             break;
         }
         case NULL_ENTRY:
@@ -1873,9 +1996,13 @@ void nonmovingMarkDeadWeak (struct MarkQueue_ *queue, StgWeak *w)
 void nonmovingMarkLiveWeak (struct MarkQueue_ *queue, StgWeak *w)
 {
     ASSERT(nonmovingClosureMarkedThisCycle((P_)w));
+    mark_trace_misc_edge("live-weak", (StgClosure *) w);
+    mark_trace_edge_(w->key, (StgClosure *) w, "weak-key=true");
+    mark_trace_set_from((StgClosure *) w);
     markQueuePushClosure_(queue, w->value);
     markQueuePushClosure_(queue, w->finalizer);
     markQueuePushClosure_(queue, w->cfinalizers);
+    mark_trace_set_from(NULL);
 }
 
 // When we're done with marking, any weak pointers with non-marked keys will be
@@ -1924,6 +2051,7 @@ void nonmovingTidyThreads ()
 // by resurrectThreads.
 void nonmovingResurrectThreads (struct MarkQueue_ *queue, StgTSO **resurrected_threads)
 {
+    mark_trace_start_root_set("resurrected");
     StgTSO *next;
     for (StgTSO *t = nonmoving_old_threads; t != END_TSO_QUEUE; t = next) {
         next = t->global_link;
@@ -1941,6 +2069,7 @@ void nonmovingResurrectThreads (struct MarkQueue_ *queue, StgTSO **resurrected_t
             *resurrected_threads = t;
         }
     }
+    mark_trace_end_root_set();
 }
 
 #if defined(DEBUG)

@@ -191,4 +191,10 @@ void printMarkQueue(MarkQueue *q);
 
 #endif
 
+void mark_trace_start(void);
+void mark_trace_end(void);
+void mark_trace_start_root_set(const char* why);
+void mark_trace_end_root_set(void);
+void mark_trace_root(const StgClosure *root);
+
 #include "EndPrivate.h"

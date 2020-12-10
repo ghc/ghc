@@ -405,6 +405,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 
     /* Record initialization times */
     stat_endInit();
+    mark_trace_start();
 }
 
 // Compatibility interface
