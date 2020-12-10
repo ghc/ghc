@@ -2263,12 +2263,6 @@ checkFamPatBinders :: TyCon
                    -> [TcType]    -- LHS patterns
                    -> Type        -- RHS
                    -> TcM ()
--- We do these binder checks now, in tcFamTyPatsAndGen, rather
--- than later, in checkValidFamEqn, for two reasons:
---   - We have the implicitly and explicitly
---     bound type variables conveniently to hand
---   - If implicit variables are out of scope it may
---     cause a crash; notably in tcConDecl in tcDataFamInstDecl
 checkFamPatBinders fam_tc qtvs pats rhs
   = do { traceTc "checkFamPatBinders" $
          vcat [ debugPprType (mkTyConApp fam_tc pats)
