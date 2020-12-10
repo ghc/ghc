@@ -185,7 +185,7 @@ satAnalExpr env e@Lam{}        = (occs, mkLams bndrs body')
     (occs, body') = satAnalExpr (env `addInScopeVars` bndrs) body
 satAnalExpr env (Let bnd body) = (occs, Let bnd' body')
   where
-    (occs_bind, bnd')  = satAnalBind env bnd'
+    (occs_bind, bnd')  = satAnalBind env bnd
     (occs_body, body') = satAnalExpr (env `addInScopeVars` bindersOf bnd) body
     !occs              = combineSatOccs occs_body occs_bind
 satAnalExpr env (Case scrut bndr ty alts) = (occs, Case scrut' bndr ty alts')
@@ -201,12 +201,11 @@ satAnalAlt env (dc, bndrs, rhs) = (occs, (dc, bndrs, rhs'))
     (occs, rhs') = satAnalExpr (env `addInScopeVars` bndrs) rhs
 
 satAnalApp :: SatEnv -> CoreExpr -> [CoreArg] -> (SatOccs, CoreExpr)
-satAnalApp env head args = (add_static_args_info occs, expr')
+satAnalApp env head args = (add_static_args_info occs, mkApps head' args')
   where
     (occs_head, head') = satAnalExpr env head
     (occs_args, args') = mapAndUnzip (satAnalExpr env) args
     occs               = combineSatOccsList (occs_head:occs_args)
-    expr'              = mkApps head' args'
     add_static_args_info occs
       | Var fn <- head, Just params <- lookupInterestingId env fn
       = addSatOccs occs fn (mkStaticArgs $ zipWith asStaticArg params args)
@@ -521,8 +520,11 @@ saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
         n_static_args = count isStaticValue staticness
 
 saTransform :: MonadUnique m => Id -> [Staticness a] -> [Id] -> CoreExpr -> m CoreExpr
+-- Precondition: At least as many arg_staticness as rhs_binders
+-- Precondition: At least one NotStatic
 saTransform binder arg_staticness rhs_binders rhs_body
-  = do  { MASSERT( arg_staticness `leLength` rhs_binders )
+  = do  { MASSERT2( arg_staticness `leLength` rhs_binders, ppr binder $$ ppr (mkStaticArgs arg_staticness) $$ ppr rhs_binders )
+        ; MASSERT2( mkStaticArgs arg_staticness /= noStaticArgs, ppr binder $$ ppr rhs_binders )
         ; shadow_lam_bndrs <- mapM clone binders_w_staticness
         ; uniq             <- getUniqueM
         ; return (mk_new_rhs uniq shadow_lam_bndrs) }

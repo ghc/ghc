@@ -542,6 +542,7 @@ prepareBinding env top_lvl old_bndr bndr rhs
                                `setDemandInfo`     demandInfo info
                                `setInlinePragInfo` inlinePragInfo info
                                `setArityInfo`      arityInfo info
+                               `setStaticArgsInfo` staticArgsInfo info
           -- We do /not/ want to transfer OccInfo, Rules, Unfolding
           -- Note [Preserve strictness in cast w/w]
 
@@ -3787,18 +3788,18 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
   = simplStableUnfolding env top_lvl cont_mb id rhs_ty arity unf
   | isExitJoinId id
   = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
-  | Just static_args <- isStrongLoopBreakerWithStaticArgs id
-  , (lam_bndrs, lam_body) <- collectBinders new_rhs
+  | (lam_bndrs, lam_body) <- collectBinders new_rhs
+  , Just static_args <- isStrongLoopBreakerWithNStaticArgs id (length lam_bndrs)
   = do  { unf_rhs <- saTransform id static_args lam_bndrs lam_body
         ; pprTraceM "simplLetUnfolding" (ppr id $$ ppr static_args $$ ppr unf_rhs)
         ; mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id unf_rhs }
   | otherwise
   = mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id new_rhs
 
-isStrongLoopBreakerWithStaticArgs :: Id -> Maybe [Staticness ()]
-isStrongLoopBreakerWithStaticArgs id
+isStrongLoopBreakerWithNStaticArgs :: Id -> Int -> Maybe [Staticness ()]
+isStrongLoopBreakerWithNStaticArgs id n_args
   | isStrongLoopBreaker $ idOccInfo id
-  , static_args <- getStaticArgs $ idStaticArgs id
+  , static_args <- take n_args $ getStaticArgs $ idStaticArgs id
   , notNull static_args
   = Just static_args
   | otherwise
