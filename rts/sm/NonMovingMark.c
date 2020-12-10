@@ -1929,6 +1929,8 @@ void nonmovingTidyThreads ()
     }
 }
 
+// Mark threads which appear to be dead but still need to be properly torn down
+// by resurrectThreads.
 void nonmovingResurrectThreads (struct MarkQueue_ *queue, StgTSO **resurrected_threads)
 {
     StgTSO *next;
@@ -1940,6 +1942,9 @@ void nonmovingResurrectThreads (struct MarkQueue_ *queue, StgTSO **resurrected_t
         case ThreadComplete:
             continue;
         default:
+            // The thread may be, e.g., deadlocked in which case we must ensure
+            // it isn't swept since resurrectThreads will need to throw it an
+            // exception.
             markQueuePushClosure_(queue, (StgClosure*)t);
             t->global_link = *resurrected_threads;
             *resurrected_threads = t;
