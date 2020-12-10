@@ -411,6 +411,17 @@ performance.
     Note that :rts-flag:`--nonmoving-gc` cannot be used with ``-G1``,
     :rts-flag:`profiling <-hc>` nor :rts-flag:`-c`.
 
+.. rts-flag:: -w
+
+    :default: off
+    :since: a long time ago
+    :reverse: none
+
+    Uses a mark-region garbage collection strategy for the oldest-generation heap.
+    Note that this cannot be used in conjunction with heap profiling
+    (:rts-flag:`-hT`) unless linked against the profiling runtime system with
+    :ghc-flag:`-prof`.
+
 .. rts-flag:: -xn
 
     :default: off
