@@ -796,7 +796,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
 
 addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
-  = new_bndr `setIdInfo` info5
+  = new_bndr `setIdInfo` info6
   where
     AT oss div = new_arity_type
     new_arity  = length oss
@@ -804,7 +804,7 @@ addLetBndrInfo new_bndr new_arity_type new_unf
     info1 = idInfo new_bndr `setArityInfo` new_arity
 
     -- Unfolding info: Note [Setting the new unfolding]
-    info2 = info1 `setUnfoldingInfo` new_unf
+    info2 = info1 `setUnfoldingInfo`  new_unf
 
     -- Demand info: Note [Setting the demand info]
     -- We also have to nuke demand info if for some reason
@@ -830,6 +830,25 @@ addLetBndrInfo new_bndr new_arity_type new_unf
      -- information, leading to broken code later (e.g. #13479)
     info5 = zapCallArityInfo info4
 
+    -- Eta reduction might have contracted all the static arguments, in which case
+    -- we have not SAT'd the unfolding. That's easy to find out by counting the
+    -- manifest lambdas of the unfolding and trimming the static args info to as
+    -- many arguments. If there are none left, we get @noStaticArgs@, which
+    -- amounts to zapping.
+    -- Failing to zap in that case means we inline the recursive vanilla
+    -- unfolding, resulting in a loop.
+    info6
+      | let sas = idStaticArgs new_bndr
+      , sas /= noStaticArgs
+      , Just tmpl <- maybeUnfoldingTemplate new_unf
+      , (lams, _) <- collectBinders tmpl
+      , let !new_sas = mkStaticArgs $ take (length lams) $ getStaticArgs sas
+      , new_sas /= sas
+      = info5 `setStaticArgsInfo` new_sas
+      | isStableUnfolding new_unf
+      = info5 `setStaticArgsInfo` noStaticArgs -- zap SA info, otherwise we inline a recursive stable unfolding! Cf. mapUnionFV
+      | otherwise
+      = info5
 
 {- Note [Arity decrease]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3791,7 +3810,7 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
   | (lam_bndrs, lam_body) <- collectBinders new_rhs
   , Just static_args <- isStrongLoopBreakerWithNStaticArgs id (length lam_bndrs)
   = do  { unf_rhs <- saTransform id static_args lam_bndrs lam_body
-        ; pprTraceM "simplLetUnfolding" (ppr id $$ ppr static_args $$ ppr unf_rhs)
+        -- ; pprTraceM "simplLetUnfolding" (ppr id $$ ppr static_args $$ ppr unf_rhs)
         ; mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id unf_rhs }
   | otherwise
   = mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id new_rhs
