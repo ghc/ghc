@@ -952,8 +952,13 @@ accountAllocation(Capability *cap, W_ n)
  * of closures. This trick is used by the sanity checking code and the heap
  * profiler, see Note [skipping slop in the heap profiler].
  *
- * When profiling we zero:
- *  - Pinned object alignment slop, see MEMSET_IF_PROFILING_W in allocatePinned.
+ * In general we zero:
+ *  - Pinned object alignment slop, see MEMSET_SLOP_W in allocatePinned.
+ *  - Large object alignment slop, see MEMSET_SLOP_W in allocatePinned.
+ * This is necessary even in the vanilla RTS since the user may trigger a heap
+ * census via +RTS -hT even when not linking against the profiled RTS.
+ *
+ * Only when profiling we zero:
  *  - Shrunk array slop, see OVERWRITING_CLOSURE_MUTABLE.
  *
  * When performing LDV profiling or using a (single threaded) debug RTS we zero
@@ -1126,12 +1131,7 @@ allocateMightFail (Capability *cap, W_ n)
  *
  * See Note [skipping slop in the heap profiler]
  */
-#if defined(PROFILING)
-#define MEMSET_IF_PROFILING_W(p, val, len_w) memset(p, val, (len_w) * sizeof(W_))
-#else
-#define MEMSET_IF_PROFILING_W(p, val, len_w) \
-    do { (void)(p); (void)(val); (void)(len_w); } while(0)
-#endif
+#define MEMSET_SLOP_W(p, val, len_w) memset(p, val, (len_w) * sizeof(W_))
 
 /* ---------------------------------------------------------------------------
    Allocate a fixed/pinned object.
@@ -1184,9 +1184,9 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
         } else {
             Bdescr(p)->flags |= BF_PINNED;
             W_ off_w = ALIGN_WITH_OFF_W(p, alignment, align_off);
-            MEMSET_IF_PROFILING_W(p, 0, off_w);
+            MEMSET_SLOP_W(p, 0, off_w);
             p += off_w;
-            MEMSET_IF_PROFILING_W(p + n, 0, alignment_w - off_w - 1);
+            MEMSET_SLOP_W(p + n, 0, alignment_w - off_w - 1);
             return p;
         }
     }
@@ -1258,7 +1258,7 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
 
     p = bd->free;
 
-    MEMSET_IF_PROFILING_W(p, 0, off_w);
+    MEMSET_SLOP_W(p, 0, off_w);
 
     n += off_w;
     p += off_w;
