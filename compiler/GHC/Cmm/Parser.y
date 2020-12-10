@@ -224,7 +224,7 @@ import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Prof
 import GHC.StgToCmm.Bind  ( emitBlackHoleCode, emitUpdateFrame )
 
-import GHC.Core           ( Tickish(SourceNote) )
+import GHC.Core           ( GenTickish(SourceNote) )
 
 import GHC.Cmm.Opt
 import GHC.Cmm.Graph
