@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -648,7 +650,7 @@ pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
 -----------------------------------------------------
 -}
 
-instance Outputable id => Outputable (GenTickish pass id) where
+instance Outputable (XTickishId pass) => Outputable (GenTickish pass) where
   ppr (HpcTick modl ix) =
       hcat [text "hpc<",
             ppr modl, comma,
