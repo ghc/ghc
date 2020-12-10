@@ -82,7 +82,7 @@ doExpr env e@(Var v)
           top:_ -> nameSrcSpan $ varName top
           _     -> noSrcSpan
         cc = NormalCC (ExprCC ccIdx) ccName (thisModule env) span
-        tick :: Tickish Id
+        tick :: Tickish
         tick = ProfNote cc True True
     pure $ Tick tick e
   | otherwise = pure e

@@ -514,7 +514,7 @@ mkStgAltType bndr alts
 
 coreToStgApp :: Id            -- Function
              -> [CoreArg]     -- Arguments
-             -> [Tickish Id]  -- Debug ticks
+             -> [Tickish]     -- Debug ticks
              -> CtsM StgExpr
 coreToStgApp f args ticks = do
     (args', ticks') <- coreToStgArgs args
@@ -574,7 +574,7 @@ coreToStgApp f args ticks = do
 -- This is the guy that turns applications into A-normal form
 -- ---------------------------------------------------------------------------
 
-coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [StgTickish Id])
+coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [StgTickish])
 coreToStgArgs []
   = return ([], [])
 
@@ -933,7 +933,7 @@ myCollectBinders expr
 
 -- | Precondition: argument expression is an 'App', and there is a 'Var' at the
 -- head of the 'App' chain.
-myCollectArgs :: CoreExpr -> (Id, [CoreArg], [Tickish Id])
+myCollectArgs :: CoreExpr -> (Id, [CoreArg], [Tickish])
 myCollectArgs expr
   = go expr [] []
   where
