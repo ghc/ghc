@@ -709,7 +709,7 @@ nightly-x86_64-linux-deb9-integer-simple:
   stage: full-build
   variables:
     TEST_ENV: "x86_64-linux-deb9-tsan"
-    BUILD_FLAVOUR: "thread-sanitizer"
+    BUILD_FLAVOUR: "default+thread_sanitizer"
     TSAN_OPTIONS: "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
     # Haddock is large enough to make TSAN choke without massive quantities of
     # memory.
