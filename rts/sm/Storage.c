@@ -953,13 +953,18 @@ accountAllocation(Capability *cap, W_ n)
  * profiler, see Note [skipping slop in the heap profiler].
  *
  * In general we zero:
+ *
  *  - Pinned object alignment slop, see MEMSET_SLOP_W in allocatePinned.
  *  - Large object alignment slop, see MEMSET_SLOP_W in allocatePinned.
- * This is necessary even in the vanilla RTS since the user may trigger a heap
- * census via +RTS -hT even when not linking against the profiled RTS.
- *
- * Only when profiling we zero:
  *  - Shrunk array slop, see OVERWRITING_CLOSURE_MUTABLE.
+ *
+ * Note that this is necessary even in the vanilla (e.g. non-profiling) RTS
+ * since the user may trigger a heap census via +RTS -hT, which can be used
+ * even when not linking against the profiled RTS. Failing to zero slop
+ * due to array shrinking has resulted in a few nasty bugs (#17572, #9666).
+ * However, since array shrink may result in large amounts of slop (unlike
+ * alignment), we take care to only zero such slop when heap profiling or DEBUG
+ * are enabled.
  *
  * When performing LDV profiling or using a (single threaded) debug RTS we zero
  * slop even when overwriting immutable closures, see Note [zeroing slop when
