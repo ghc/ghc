@@ -561,7 +561,7 @@ toIfaceOneShot id | isId id
                   = IfaceNoOneShot
 
 ---------------------
-toIfaceTickish :: Tickish Id -> Maybe IfaceTickish
+toIfaceTickish :: Tickish -> Maybe IfaceTickish
 toIfaceTickish (ProfNote cc tick push) = Just (IfaceSCC cc tick push)
 toIfaceTickish (HpcTick modl ix)       = Just (IfaceHpcTick modl ix)
 toIfaceTickish (SourceNote src names)  = Just (IfaceSource src names)

@@ -1125,7 +1125,7 @@ specLam env bndrs body
        ; return (mkLams bndrs (wrapDictBindsE dumped_dbs body'), free_uds) }
 
 --------------
-specTickish :: SpecEnv -> Tickish Id -> Tickish Id
+specTickish :: SpecEnv -> Tickish -> Tickish
 specTickish env (Breakpoint ext ix ids)
   = Breakpoint ext ix [ id' | id <- ids, Var id' <- [specVar env id]]
   -- drop vars from the list if they have a non-variable substitution.

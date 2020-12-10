@@ -676,7 +676,7 @@ tcPolyCheck _prag_fn sig bind
   = pprPanic "tcPolyCheck" (ppr sig $$ ppr bind)
 
 funBindTicks :: SrcSpan -> TcId -> Module -> [LSig GhcRn]
-             -> TcM [Tickish TcId]
+             -> TcM [Tickish]
 funBindTicks loc fun_id mod sigs
   | (mb_cc_str : _) <- [ cc_name | L _ (SCCFunSig _ _ _ cc_name) <- sigs ]
       -- this can only be a singleton list, as duplicate pragmas are rejected

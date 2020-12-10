@@ -175,13 +175,13 @@ stgArgType (StgLitArg lit) = literalType lit
 
 
 -- | Strip ticks of a given type from an STG expression.
-stripStgTicksTop :: (StgTickish Id -> Bool) -> GenStgExpr p -> ([StgTickish Id], GenStgExpr p)
+stripStgTicksTop :: (StgTickish -> Bool) -> GenStgExpr p -> ([StgTickish], GenStgExpr p)
 stripStgTicksTop p = go []
    where go ts (StgTick t e) | p t = go (t:ts) e
          go ts other               = (reverse ts, other)
 
 -- | Strip ticks of a given type from an STG expression returning only the expression.
-stripStgTicksTopE :: (StgTickish Id -> Bool) -> GenStgExpr p -> GenStgExpr p
+stripStgTicksTopE :: (StgTickish -> Bool) -> GenStgExpr p -> GenStgExpr p
 stripStgTicksTopE p = go
    where go (StgTick t e) | p t = go e
          go other               = other
@@ -368,7 +368,7 @@ Finally for @hpc@ expressions we introduce a new STG construct.
 -}
 
   | StgTick
-    (StgTickish Id)
+    StgTickish
     (GenStgExpr pass)       -- sub expression
 
 -- END of GenStgExpr
@@ -420,7 +420,7 @@ important):
         DataCon         -- Constructor. Never an unboxed tuple or sum, as those
                         -- are not allocated.
         ConstructorNumber
-        [Tickish Id]
+        [StgTickish]
         [StgArg]        -- Args
 
 {-

@@ -1533,7 +1533,7 @@ tcIfaceExpr (IfaceTick tickish expr) = do
         return (Tick tickish' expr')
 
 -------------------------
-tcIfaceTickish :: IfaceTickish -> IfM lcl (Tickish Id)
+tcIfaceTickish :: IfaceTickish -> IfM lcl Tickish
 tcIfaceTickish (IfaceHpcTick modl ix)   = return (HpcTick modl ix)
 tcIfaceTickish (IfaceSCC  cc tick push) = return (ProfNote cc tick push)
 tcIfaceTickish (IfaceSource src name)   = return (SourceNote src name)

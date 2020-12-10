@@ -34,7 +34,7 @@ import GHC.Data.FastString
 import GHC.Types.ForeignCall
 import GHC.Utils.Outputable
 import GHC.Runtime.Heap.Layout
-import GHC.Core (Tickish)
+import GHC.Core (CmmTickish)
 import qualified GHC.Types.Unique as U
 
 import GHC.Cmm.Dataflow.Block
@@ -596,9 +596,6 @@ mapCollectSuccessors f (CmmSwitch e ids)
 mapCollectSuccessors _ n = (n, [])
 
 -- -----------------------------------------------------------------------------
-
--- | Tickish in Cmm context (annotations only)
-type CmmTickish = Tickish ()
 
 -- | Tick scope identifier, allowing us to reason about what
 -- annotations in a Cmm block should scope over. We especially take

@@ -981,7 +981,7 @@ ticks. More often than not, other references will be unfoldings of
 x_exported, and therefore carry the tick anyway.
 -}
 
-type IndEnv = IdEnv (Id, [Tickish Var]) -- Maps local_id -> exported_id, ticks
+type IndEnv = IdEnv (Id, [Tickish]) -- Maps local_id -> exported_id, ticks
 
 shortOutIndirections :: CoreProgram -> CoreProgram
 shortOutIndirections binds

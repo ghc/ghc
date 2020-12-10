@@ -731,7 +731,7 @@ rhsToBody expr = return (emptyFloats, expr)
 
 data ArgInfo = CpeApp  CoreArg
              | CpeCast Coercion
-             | CpeTick (Tickish Id)
+             | CpeTick Tickish
 
 instance Outputable ArgInfo where
   ppr (CpeApp arg) = text "app" <+> ppr arg
@@ -1369,7 +1369,7 @@ data FloatingBind
                       -- but lifted binding
 
  -- | See Note [Floating Ticks in CorePrep]
- | FloatTick (Tickish Id)
+ | FloatTick Tickish
 
 data Floats = Floats OkToSpec (OrdList FloatingBind)
 

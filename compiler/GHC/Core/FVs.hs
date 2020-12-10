@@ -6,6 +6,7 @@ Taken quite directly from the Peyton Jones/Lester paper.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | A module concerned with finding the free variables of an expression.
 module GHC.Core.FVs (
@@ -289,7 +290,7 @@ rhs_fvs (bndr, rhs) = expr_fvs rhs `unionFV`
 exprs_fvs :: [CoreExpr] -> FV
 exprs_fvs exprs = mapUnionFV expr_fvs exprs
 
-tickish_fvs :: Tickish Id -> FV
+tickish_fvs :: Tickish -> FV
 tickish_fvs (Breakpoint _ _ ids) = FV.mkFVs ids
 tickish_fvs _ = emptyFV
 

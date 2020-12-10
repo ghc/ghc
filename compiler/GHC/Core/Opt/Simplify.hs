@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
@@ -1160,7 +1161,7 @@ simplCoercion env co
 -- long as this is a non-scoping tick, to let case and application
 -- optimisations apply.
 
-simplTick :: SimplEnv -> Tickish Id -> InExpr -> SimplCont
+simplTick :: SimplEnv -> Tickish -> InExpr -> SimplCont
           -> SimplM (SimplFloats, OutExpr)
 simplTick env tickish expr cont
   -- A scoped tick turns into a continuation, so that we can spot
