@@ -4,6 +4,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module Haddock.Interface.Specialize
     ( specializeInstHead
