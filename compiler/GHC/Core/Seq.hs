@@ -21,7 +21,7 @@ import GHC.Types.Var.Set( seqDVarSet )
 import GHC.Types.Var( varType, tyVarKind )
 import GHC.Core.Type( seqType, isTyVar )
 import GHC.Core.Coercion( seqCo )
-import GHC.Types.Id( Id, idInfo )
+import GHC.Types.Id( idInfo )
 
 -- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
 -- compiler
