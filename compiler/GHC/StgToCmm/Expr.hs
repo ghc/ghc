@@ -1113,7 +1113,7 @@ emitEnter fun = do
 -- | Generate Cmm code for a tick. Depending on the type of Tickish,
 -- this will either generate actual Cmm instrumentation code, or
 -- simply pass on the annotation as a @CmmTickish@.
-cgTick :: StgTickish Id -> FCode ()
+cgTick :: StgTickish -> FCode ()
 cgTick tick
   = do { platform <- getPlatform
        ; case tick of
