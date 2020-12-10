@@ -1126,8 +1126,8 @@ specLam env bndrs body
 
 --------------
 specTickish :: SpecEnv -> Tickish Id -> Tickish Id
-specTickish env (Breakpoint ix ids)
-  = Breakpoint ix [ id' | id <- ids, Var id' <- [specVar env id]]
+specTickish env (Breakpoint ext ix ids)
+  = Breakpoint ext ix [ id' | id <- ids, Var id' <- [specVar env id]]
   -- drop vars from the list if they have a non-variable substitution.
   -- should never happen, but it's harmless to drop them anyway.
 specTickish _ other_tickish = other_tickish

@@ -290,7 +290,7 @@ exprs_fvs :: [CoreExpr] -> FV
 exprs_fvs exprs = mapUnionFV expr_fvs exprs
 
 tickish_fvs :: Tickish Id -> FV
-tickish_fvs (Breakpoint _ ids) = FV.mkFVs ids
+tickish_fvs (Breakpoint _ _ ids) = FV.mkFVs ids
 tickish_fvs _ = emptyFV
 
 {-
@@ -779,8 +779,8 @@ freeVars = go
         , AnnTick tickish expr2 )
       where
         expr2 = go expr
-        tickishFVs (Breakpoint _ ids) = mkDVarSet ids
-        tickishFVs _                  = emptyDVarSet
+        tickishFVs (Breakpoint _ _ ids) = mkDVarSet ids
+        tickishFVs _                    = emptyDVarSet
 
     go (Type ty)     = (tyCoVarsOfTypeDSet ty, AnnType ty)
     go (Coercion co) = (tyCoVarsOfCoDSet co, AnnCoercion co)
