@@ -1322,7 +1322,7 @@ Currently, it is used in GHC.Core.Rules.match, and is required to make
 -}
 
 exprIsLambda_maybe :: InScopeEnv -> CoreExpr
-                      -> Maybe (Var, CoreExpr,[Tickish Id])
+                      -> Maybe (Var, CoreExpr,[Tickish])
     -- See Note [exprIsLambda_maybe]
 
 -- The simple case: It is a lambda already
