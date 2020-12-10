@@ -1849,6 +1849,16 @@ static void normaliseRtsOpts (void)
         barf("The non-moving collector doesn't support -G1");
     }
 
+#if !defined(PROFILING) && !defined(DEBUG)
+    // The mark-region collector is incompatible with heap census unless
+    // we zero slop of blackhole'd thunks, which doesn't happen in the
+    // vanilla way. See #9666.
+    if (RtsFlags.ProfFlags.doHeapProfile && RtsFlags.GcFlags.sweep) {
+        barf("The mark-region collector can only be used with profiling\n"
+             "when linked against the profiled RTS.");
+    }
+#endif
+
     if (RtsFlags.ProfFlags.doHeapProfile != NO_HEAP_PROFILING &&
             RtsFlags.GcFlags.useNonmoving) {
         barf("The non-moving collector doesn't support profiling");
