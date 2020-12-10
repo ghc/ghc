@@ -71,7 +71,7 @@ seqExprs :: [CoreExpr] -> ()
 seqExprs [] = ()
 seqExprs (e:es) = seqExpr e `seq` seqExprs es
 
-seqTickish :: Tickish Id -> ()
+seqTickish :: Tickish -> ()
 seqTickish ProfNote{ profNoteCC = cc } = cc `seq` ()
 seqTickish HpcTick{} = ()
 seqTickish Breakpoint{ breakpointFVs = ids } = seqBndrs ids

@@ -668,7 +668,7 @@ work out well:
 -}
 -- Remark: pattern selectors only occur in unrestricted patterns so we are free
 -- to select Many as the multiplicity of every let-expression introduced.
-mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
+mkSelectorBinds :: [[Tickish]]    -- ^ ticks to add, possibly
                 -> LPat GhcTc     -- ^ The pattern
                 -> CoreExpr       -- ^ Expression to which the pattern is bound
                 -> DsM (Id,[(Id,CoreExpr)])
@@ -930,7 +930,7 @@ mk_fail_msg dflags ctx pat
 *                                                                      *
 ********************************************************************* -}
 
-mkOptTickBox :: [Tickish Id] -> CoreExpr -> CoreExpr
+mkOptTickBox :: [Tickish] -> CoreExpr -> CoreExpr
 mkOptTickBox = flip (foldr Tick)
 
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
