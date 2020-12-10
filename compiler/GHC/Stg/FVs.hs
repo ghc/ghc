@@ -47,7 +47,7 @@ import GHC.Prelude
 import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Types.Var.Set
-import GHC.Core    ( Tickish, GenTickish(Breakpoint) )
+import GHC.Core    ( GenTickish(Breakpoint) )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
