@@ -720,3 +720,6 @@ test('T17775-viewpats-d', normal, compile_fail, [''])
 test('T18118', normal, multimod_compile, ['T18118', '-v0'])
 test('T18412', normal, compile, [''])
 test('T18470', normal, compile, [''])
+
+test('T18998', normal, compile, [''])
+test('T18998b', normal, compile, [''])
