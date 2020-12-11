@@ -760,6 +760,49 @@ When we match this against D [ty], we return the instantiating types
 where the 'Nothing' indicates that 'b' can be freely instantiated.
 (The caller instantiates it to a flexi type variable, which will
  presumably later become fixed via functional dependencies.)
+
+Note [Infinitary substitution in lookup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  class C a b
+  instance C c c
+  instance C d (Maybe d)
+  [W] C e (Maybe e)
+
+You would think we could just use the second instance, because the first doesn't
+unify. But that's just ever so slightly wrong. The reason we check for unifiers
+along with matchers is that we don't want the possibility that a type variable
+instantiation could cause an instance choice to change. Yet if we have
+  type family M = Maybe M
+and choose (e |-> M), then both instances match. This is absurd, but we cannot
+rule it out. Yet, worrying about this case is awfully inconvenient to users,
+and so we pretend the problem doesn't exist, by considering a lookup that runs into
+this occurs-check issue to indicate that an instance surely does not apply (i.e.
+is like the SurelyApart case). In the brief time that we didn't treat infinitary
+substitutions specially, two tickets were filed: #19044 and #19052, both trying
+to do Real Work.
+
+Why don't we just exclude any instances that are MaybeApart? Because we might
+have a [W] C e (F e), where F is a type family. The second instance above does
+not match, but it should be included as a future possibility. Unification will
+return MaybeApart MARTypeFamily in this case.
+
+What can go wrong with this design choice? We might get incoherence -- but not
+loss of type safety. In particular, if we have [W] C M M (for the M type family
+above), then GHC might arbitrarily choose either instance, depending on how
+M reduces (or doesn't).
+
+For type families, we can't just ignore the problem (as we essentially do here),
+because doing so would give us a hole in the type safety proof (as explored in
+Section 6 of "Closed Type Families with Overlapping Equations", POPL'14). This
+possibility of an infinitary substitution manifests as closed type families that
+look like they should reduce, but don't. Users complain: #9082 and #17311. For
+open type families, we actually can have unsoundness if we don't take infinitary
+substitutions into account: #8162. But, luckily, for class instances, we just
+risk coherence -- not great, but it seems better to give users what they likely
+want. (Also, note that this problem existed for the entire decade of 201x without
+anyone noticing, so it's manifestly not ruining anyone's day.)
 -}
 
 -- |Look up an instance in the given instance environment. The given class application must match exactly
@@ -839,8 +882,10 @@ lookupInstEnv' ie vis_mods cls tys
           -- We consider MaybeApart to be a case where the instance might
           -- apply in the future. This covers an instance like C Int and
           -- a target like [W] C (F a), where F is a type family.
-            SurelyApart -> find ms us        rest
-            _           -> find ms (item:us) rest
+            SurelyApart              -> find ms us        rest
+              -- Note [Infinitary substitution in lookup]
+            MaybeApart MARInfinite _ -> find ms us        rest
+            _                        -> find ms (item:us) rest
       where
         tpl_tv_set = mkVarSet tpl_tvs
         tys_tv_set = tyCoVarsOfTypes tys

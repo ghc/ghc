@@ -18,7 +18,7 @@ module GHC.Core.Unify (
         tcUnifyTy, tcUnifyTyKi, tcUnifyTys, tcUnifyTyKis,
         tcUnifyTysFG, tcUnifyTyWithTFs,
         BindFlag(..),
-        UnifyResult, UnifyResultM(..),
+        UnifyResult, UnifyResultM(..), MaybeApartReason(..),
 
         -- Matching a type against a lifted type (coercion)
         liftCoMatch,
@@ -55,8 +55,7 @@ import GHC.Data.FastString
 
 import Data.List ( mapAccumL )
 import Control.Monad
-import Control.Applicative hiding ( empty )
-import qualified Control.Applicative
+import qualified Data.Semigroup as S
 
 {-
 
@@ -347,6 +346,46 @@ complete. This means that, sometimes, a closed type family does not reduce
 when it should. See test case indexed-types/should_fail/Overlap15 for an
 example.
 
+Note [Unificiation result]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+When unifying t1 ~ t2, we return
+* Unifiable s, if s is a substitution such that s(t1) is syntactically the
+  same as s(t2), modulo type-synonym expansion.
+* SurelyApart, if there is no substitution s such that s(t1) = s(t2),
+  where "=" includes type-family reductions.
+* MaybeApart mar s, when we aren't sure. `mar` is a MaybeApartReason.
+
+Examples
+* [a] ~ Maybe b: SurelyApart, because [] and Maybe can't unify
+* [(a,Int)] ~ [(Bool,b)]:  Unifiable
+* [F Int] ~ [Bool]: MaybeApart MARTypeFamily, because F Int might reduce to Bool (the unifier
+                    does not try this)
+* a ~ Maybe a: MaybeApart MARInfinite. Not Unifiable clearly, but not SurelyApart either; consider
+       a := Loop
+       where  type family Loop where Loop = Maybe Loop
+
+There is the possibility that two types are MaybeApart for *both* reasons:
+
+* (a, F Int) ~ (Maybe a, Bool)
+
+What reason should we use? The *only* consumer of the reason is described
+in Note [Infinitary substitution in lookup] in GHC.Core.InstEnv. The goal
+there is identify which instances might match a target later (but don't
+match now) -- except that we want to ignore the possibility of infinitary
+substitutions. So let's examine a concrete scenario:
+
+  class C a b c
+  instance C a (Maybe a) Bool
+  -- other instances, including one that will actually match
+  [W] C b b (F Int)
+
+Do we want the instance as a future possibility? No. The only way that
+instance can match is in the presence of an infinite type (infinitely
+nested Maybes). We thus say that MARInfinite takes precedence, so that
+InstEnv treats this case as an infinitary substitution case; the fact
+that a type family is involved is only incidental. We thus define
+the Semigroup instance for MaybeApartReason to prefer MARInfinite.
+
 Note [The substitution in MaybeApart]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The constructor MaybeApart carries data with it, typically a TvSubstEnv. Why?
@@ -391,8 +430,8 @@ tcUnifyTyWithTFs twoWay t1 t2
   = case tc_unify_tys (const BindMe) twoWay True False
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
                        [t1] [t2] of
-      Unifiable  (subst, _) -> Just $ maybe_fix subst
-      MaybeApart (subst, _) -> Just $ maybe_fix subst
+      Unifiable          (subst, _) -> Just $ maybe_fix subst
+      MaybeApart _reason (subst, _) -> Just $ maybe_fix subst
       -- we want to *succeed* in questionable cases. This is a
       -- pre-unification algorithm.
       SurelyApart      -> Nothing
@@ -431,35 +470,41 @@ tcUnifyTyKis bind_fn tys1 tys2
 -- This type does double-duty. It is used in the UM (unifier monad) and to
 -- return the final result. See Note [Fine-grained unification]
 type UnifyResult = UnifyResultM TCvSubst
+
+-- | See Note [Unificiation result]
 data UnifyResultM a = Unifiable a        -- the subst that unifies the types
-                    | MaybeApart a       -- the subst has as much as we know
+                    | MaybeApart MaybeApartReason
+                                 a       -- the subst has as much as we know
                                          -- it must be part of a most general unifier
                                          -- See Note [The substitution in MaybeApart]
                     | SurelyApart
                     deriving Functor
+
+-- | Why are two types 'MaybeApart'? 'MARTypeFamily' takes precedence:
+-- This is used (only) in Note [Infinitary substitution in lookup] in GHC.Core.InstEnv
+data MaybeApartReason = MARTypeFamily   -- ^ matching e.g. F Int ~? Bool
+                      | MARInfinite     -- ^ matching e.g. a ~? Maybe a
+
+instance Outputable MaybeApartReason where
+  ppr MARTypeFamily = text "MARTypeFamily"
+  ppr MARInfinite   = text "MARInfinite"
+
+instance Semigroup MaybeApartReason where
+  -- see end of Note [Unification result] for why
+  MARTypeFamily <> r = r
+  MARInfinite   <> _ = MARInfinite
 
 instance Applicative UnifyResultM where
   pure  = Unifiable
   (<*>) = ap
 
 instance Monad UnifyResultM where
-
   SurelyApart  >>= _ = SurelyApart
-  MaybeApart x >>= f = case f x of
-                         Unifiable y -> MaybeApart y
-                         other       -> other
+  MaybeApart r1 x >>= f = case f x of
+                            Unifiable y     -> MaybeApart r1 y
+                            MaybeApart r2 y -> MaybeApart (r1 S.<> r2) y
+                            SurelyApart     -> SurelyApart
   Unifiable x  >>= f = f x
-
-instance Alternative UnifyResultM where
-  empty = SurelyApart
-
-  a@(Unifiable {})  <|> _                 = a
-  _                 <|> b@(Unifiable {})  = b
-  a@(MaybeApart {}) <|> _                 = a
-  _                 <|> b@(MaybeApart {}) = b
-  SurelyApart       <|> SurelyApart       = SurelyApart
-
-instance MonadPlus UnifyResultM
 
 -- | @tcUnifyTysFG bind_tv tys1 tys2@ attepts to find a substitution @s@ (whose
 -- domain elements all respond 'BindMe' to @bind_tv@) such that
@@ -530,9 +575,9 @@ tc_unify_tys bind_fn unif inj_check match_kis rn_env tv_env cv_env tys1 tys2
     kis2 = map typeKind tys2
 
 instance Outputable a => Outputable (UnifyResultM a) where
-  ppr SurelyApart    = text "SurelyApart"
-  ppr (Unifiable x)  = text "Unifiable" <+> ppr x
-  ppr (MaybeApart x) = text "MaybeApart" <+> ppr x
+  ppr SurelyApart      = text "SurelyApart"
+  ppr (Unifiable x)    = text "Unifiable" <+> ppr x
+  ppr (MaybeApart r x) = text "MaybeApart" <+> ppr r <+> ppr x
 
 {-
 ************************************************************************
@@ -773,7 +818,7 @@ this, but we mustn't map a to anything else!)
 We thus must parameterize the algorithm over whether it's being used
 for an injectivity check (refrain from looking at non-injective arguments
 to type families) or not (do indeed look at those arguments).  This is
-implemented  by the uf_inj_tf field of UmEnv.
+implemented  by the um_inj_tf field of UMEnv.
 
 (It's all a question of whether or not to include equation (7) from Fig. 2
 of [ITF].)
@@ -994,7 +1039,7 @@ unify_ty env ty1 ty2 _kco
 
             ; unify_tys env inj_tys1 inj_tys2
             ; unless (um_inj_tf env) $ -- See (end of) Note [Specification of unification]
-              don'tBeSoSure $ unify_tys env noninj_tys1 noninj_tys2 }
+              don'tBeSoSure MARTypeFamily $ unify_tys env noninj_tys1 noninj_tys2 }
 
   | Just (tc1, _) <- mb_tc_app1
   , not (isGenerativeTyCon tc1 Nominal)
@@ -1002,7 +1047,7 @@ unify_ty env ty1 ty2 _kco
     --        because the (F ty1) behaves like a variable
     --        NB: if unifying, we have already dealt
     --            with the 'ty2 = variable' case
-  = maybeApart
+  = maybeApart MARTypeFamily
 
   | Just (tc2, _) <- mb_tc_app2
   , not (isGenerativeTyCon tc2 Nominal)
@@ -1010,7 +1055,7 @@ unify_ty env ty1 ty2 _kco
     -- E.g.   unify_ty [a] (F ty2) =  MaybeApart, when unifying (only)
     --        because the (F ty2) behaves like a variable
     --        NB: we have already dealt with the 'ty1 = variable' case
-  = maybeApart
+  = maybeApart MARTypeFamily
 
   where
     mb_tc_app1 = tcSplitTyConApp_maybe ty1
@@ -1120,7 +1165,8 @@ uVar env tv1 ty kco
                       -- this is because the range of the subst is the target
                       -- type, not the template type. So, just check for
                       -- normal type equality.
-                      guard ((ty' `mkCastTy` kco) `eqType` ty)
+                      unless ((ty' `mkCastTy` kco) `eqType` ty) $
+                      surelyApart
           Nothing  -> uUnrefined env tv1' ty ty kco } -- No, continue
 
 uUnrefined :: UMEnv
@@ -1190,7 +1236,7 @@ bindTv env tv1 ty2
         -- Make sure you include 'kco' (which ty2 does) #14846
         ; occurs <- occursCheck env tv1 free_tvs2
 
-        ; if occurs then maybeApart
+        ; if occurs then maybeApart MARInfinite
                     else extendTvEnv tv1 ty2 }
 
 occursCheck :: UMEnv -> TyVar -> VarSet -> UM Bool
@@ -1274,15 +1320,6 @@ instance Monad UM where
                   do { (state', v) <- unUM m state
                      ; unUM (k v) state' })
 
--- need this instance because of a use of 'guard' above
-instance Alternative UM where
-  empty     = UM (\_ -> Control.Applicative.empty)
-  m1 <|> m2 = UM (\state ->
-                  unUM m1 state <|>
-                  unUM m2 state)
-
-instance MonadPlus UM
-
 instance MonadFail UM where
     fail _   = UM (\_ -> SurelyApart) -- failed pattern match
 
@@ -1291,9 +1328,9 @@ initUM :: TvSubstEnv  -- subst to extend
        -> UM a -> UnifyResultM a
 initUM subst_env cv_subst_env um
   = case unUM um state of
-      Unifiable (_, subst)  -> Unifiable subst
-      MaybeApart (_, subst) -> MaybeApart subst
-      SurelyApart           -> SurelyApart
+      Unifiable (_, subst)    -> Unifiable subst
+      MaybeApart r (_, subst) -> MaybeApart r subst
+      SurelyApart             -> SurelyApart
   where
     state = UMState { um_tv_env = subst_env
                     , um_cv_env = cv_subst_env }
@@ -1333,9 +1370,7 @@ checkRnEnv :: UMEnv -> VarSet -> UM ()
 checkRnEnv env varset
   | isEmptyVarSet skol_vars           = return ()
   | varset `disjointVarSet` skol_vars = return ()
-  | otherwise                         = maybeApart
-               -- ToDo: why MaybeApart?
-               -- I think SurelyApart would be right
+  | otherwise                         = surelyApart
   where
     skol_vars = um_skols env
     -- NB: That isEmptyVarSet guard is a critical optimization;
@@ -1343,10 +1378,10 @@ checkRnEnv env varset
     -- the type, often saving quite a bit of allocation.
 
 -- | Converts any SurelyApart to a MaybeApart
-don'tBeSoSure :: UM () -> UM ()
-don'tBeSoSure um = UM $ \ state ->
+don'tBeSoSure :: MaybeApartReason -> UM () -> UM ()
+don'tBeSoSure r um = UM $ \ state ->
   case unUM um state of
-    SurelyApart -> MaybeApart (state, ())
+    SurelyApart -> MaybeApart r (state, ())
     other       -> other
 
 umRnOccL :: UMEnv -> TyVar -> TyVar
@@ -1358,8 +1393,8 @@ umRnOccR env v = rnOccR (um_rn_env env) v
 umSwapRn :: UMEnv -> UMEnv
 umSwapRn env = env { um_rn_env = rnSwap (um_rn_env env) }
 
-maybeApart :: UM ()
-maybeApart = UM (\state -> MaybeApart (state, ()))
+maybeApart :: MaybeApartReason -> UM ()
+maybeApart r = UM (\state -> MaybeApart r (state, ()))
 
 surelyApart :: UM a
 surelyApart = UM (\_ -> SurelyApart)
