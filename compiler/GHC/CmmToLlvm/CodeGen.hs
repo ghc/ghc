@@ -449,20 +449,7 @@ genCall target res args = do
   platform <- getPlatform
   runStmtsDecls $ do
 
-    -- parameter types
-    let arg_type (_, AddrHint) = i8Ptr
-        -- cast pointers to i8*. Llvm equivalent of void*
-        arg_type (expr, _) = cmmToLlvmType $ cmmExprType platform expr
-
-    -- ret type
-    let ret_type [] = LMVoid
-        ret_type [(_, AddrHint)] = i8Ptr
-        ret_type [(reg, _)]      = cmmToLlvmType $ localRegType reg
-        ret_type t = panic $ "genCall: Too many return values! Can only handle"
-                        ++ " 0 or 1, given " ++ show (length t) ++ "."
-
     -- extract Cmm call convention, and translate to LLVM call convention
-    platform <- lift $ getPlatform
     let lmconv = case target of
             ForeignTarget _ (ForeignConvention conv _ _ _) ->
               case conv of
@@ -485,6 +472,22 @@ genCall target res args = do
         The native code generator only handles StdCall and CCallConv.
     -}
 
+    -- parameter types
+    let arg_type (_, AddrHint) = (i8Ptr, [])
+        -- cast pointers to i8*. Llvm equivalent of void*
+        arg_type (expr, hint) =
+            case cmmToLlvmType $ cmmExprType platform expr of
+              ty@(LMInt n) | n < 64 && lmconv == CC_Ccc && platformCConvNeedsExtension platform
+                 -> (ty, if hint == SignedHint then [SignExt] else [ZeroExt])
+              ty -> (ty, [])
+
+    -- ret type
+    let ret_type [] = LMVoid
+        ret_type [(_, AddrHint)] = i8Ptr
+        ret_type [(reg, _)]      = cmmToLlvmType $ localRegType reg
+        ret_type t = panic $ "genCall: Too many return values! Can only handle"
+                        ++ " 0 or 1, given " ++ show (length t) ++ "."
+
     -- call attributes
     let fnAttrs | never_returns = NoReturn : llvmStdFunAttrs
                 | otherwise     = llvmStdFunAttrs
@@ -499,7 +502,7 @@ genCall target res args = do
     let ress_hints = zip res  res_hints
     let ccTy  = StdCall -- tail calls should be done through CmmJump
     let retTy = ret_type ress_hints
-    let argTy = tysToParams $ map arg_type args_hints
+    let argTy = map arg_type args_hints
     let funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
                              lmconv retTy FixedArgs argTy (llvmFunAlign platform)
 

@@ -28,6 +28,7 @@ module GHC.Platform
    , platformMaxWord
    , platformInIntRange
    , platformInWordRange
+   , platformCConvNeedsExtension
    , PlatformMisc(..)
    , SseVersion (..)
    , BmiVersion (..)
@@ -181,6 +182,15 @@ platformInIntRange platform x = x >= platformMinInt platform && x <= platformMax
 -- | Test if the given Integer is representable with a platform Word
 platformInWordRange :: Platform -> Integer -> Bool
 platformInWordRange platform x = x >= 0 && x <= platformMaxWord platform
+
+-- | For some architectures the C calling convention is that any
+-- integer shorter than 64 bits is replaced by its 64 bits
+-- representation using sign or zero extension.
+platformCConvNeedsExtension :: Platform -> Bool
+platformCConvNeedsExtension platform = case platformArch platform of
+  ArchPPC_64 _ -> True
+  ArchS390X    -> True
+  _            -> False
 
 
 --------------------------------------------------
