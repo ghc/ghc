@@ -760,6 +760,31 @@ When we match this against D [ty], we return the instantiating types
 where the 'Nothing' indicates that 'b' can be freely instantiated.
 (The caller instantiates it to a flexi type variable, which will
  presumably later become fixed via functional dependencies.)
+
+Note [Occurs-check in lookup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  class C a b
+  instance C c c
+  instance C d (Maybe d)
+  [W] C e (Maybe e)
+
+You would think we could just use the second instance, because the first doesn't
+unify. But that's just ever so slightly wrong. The reason we check for unifiers
+along with matchers is that we don't want the possibility that a type variable
+instantiation could cause an instance choice to change. Yet if we have
+  type family M = Maybe M
+and choose (e |-> M), then both instances match. This is absurd, but we cannot
+rule it out. Yet, worrying about this case is awfully inconvenient to users,
+and so we pretend the problem doesn't exist, by considering a lookup runs into
+this occurs-check issue to indicate that an instance surely does not apply (i.e.
+is like the SurelyApart case).
+
+Why don't we just exclude any instances that are MaybeApart? Because we might
+have a [W] C e (F e), where F is a type family. The second instance above does
+not match, but it should be included as a future possibility. Unification will
+return MaybeApart in this case.
 -}
 
 -- |Look up an instance in the given instance environment. The given class application must match exactly
@@ -839,8 +864,9 @@ lookupInstEnv' ie vis_mods cls tys
           -- We consider MaybeApart to be a case where the instance might
           -- apply in the future. This covers an instance like C Int and
           -- a target like [W] C (F a), where F is a type family.
-            SurelyApart -> find ms us        rest
-            _           -> find ms (item:us) rest
+            SurelyApart                 -> find ms us        rest
+            MaybeApart MAROccursCheck _ -> find ms us rest  -- Note [Occurs-check in lookup]
+            _                           -> find ms (item:us) rest
       where
         tpl_tv_set = mkVarSet tpl_tvs
         tys_tv_set = tyCoVarsOfTypes tys
