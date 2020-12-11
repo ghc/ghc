@@ -284,7 +284,7 @@ ppCall opts ct fptr args attrs = case fptr of
     where
         ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
             let tc = if ct == TailCall then text "tail " else empty
-                ppValues = hsep $ punctuate comma $ map ppCallMetaExpr args
+                ppValues = ppCallParams opts (map snd params) args
                 ppArgTy  = (ppCommaJoin $ map (ppr . fst) params) <>
                            (case argTy of
                                VarArgs   -> text ", ..."
@@ -295,10 +295,14 @@ ppCall opts ct fptr args attrs = case fptr of
                     <> fnty <+> ppName opts fptr <> lparen <+> ppValues
                     <+> rparen <+> attrDoc
 
-        -- Metadata needs to be marked as having the `metadata` type when used
-        -- in a call argument
-        ppCallMetaExpr (MetaVar v) = ppVar opts v
-        ppCallMetaExpr v           = text "metadata" <+> ppMetaExpr opts v
+        ppCallParams :: LlvmOpts -> [[LlvmParamAttr]] -> [MetaExpr] -> SDoc
+        ppCallParams opts attrs args = hsep $ punctuate comma $ zipWith ppCallMetaExpr attrs args
+         where
+          -- Metadata needs to be marked as having the `metadata` type when used
+          -- in a call argument
+          ppCallMetaExpr attrs (MetaVar v) = ppVar' attrs opts v
+          ppCallMetaExpr _ v             = text "metadata" <+> ppMetaExpr opts v
+
 
 ppMachOp :: LlvmOpts -> LlvmMachOp -> LlvmVar -> LlvmVar -> SDoc
 ppMachOp opts op left right =
@@ -546,14 +550,20 @@ ppLit opts l = case l of
       | otherwise                  -> text "undef"
 
 ppVar :: LlvmOpts -> LlvmVar -> SDoc
-ppVar opts v = case v of
-  LMLitVar x -> ppTypeLit opts x
-  x          -> ppr (getVarType x) <+> ppName opts x
+ppVar = ppVar' []
+
+ppVar' :: [LlvmParamAttr] -> LlvmOpts -> LlvmVar -> SDoc
+ppVar' attrs opts v = case v of
+  LMLitVar x -> ppTypeLit' attrs opts x
+  x          -> ppr (getVarType x) <+> ppSpaceJoin attrs <+> ppName opts x
 
 ppTypeLit :: LlvmOpts -> LlvmLit -> SDoc
-ppTypeLit opts l = case l of
+ppTypeLit = ppTypeLit' []
+
+ppTypeLit' :: [LlvmParamAttr] -> LlvmOpts -> LlvmLit -> SDoc
+ppTypeLit' attrs opts l = case l of
   LMVectorLit {} -> ppLit opts l
-  _              -> ppr (getLitType l) <+> ppLit opts l
+  _              -> ppr (getLitType l) <+> ppSpaceJoin attrs <+> ppLit opts l
 
 ppStatic :: LlvmOpts -> LlvmStatic -> SDoc
 ppStatic opts st = case st of
