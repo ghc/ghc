@@ -8,6 +8,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module GHC.Types.Name.Env (
         -- * Var, Id and TyVar environments (maps)
@@ -22,7 +23,7 @@ module GHC.Types.Name.Env (
         filterNameEnv, anyNameEnv,
         plusNameEnv, plusNameEnv_C, plusNameEnv_CD, plusNameEnv_CD2, alterNameEnv,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
-        elemNameEnv, mapNameEnv, disjointNameEnv,
+        elemNameEnv, mapNameEnv, disjointNameEnv, nonDetTraverseNameEnv,
 
         DNameEnv,
 
@@ -44,6 +45,7 @@ import GHC.Types.Name
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Data.Maybe
+import Data.Coerce
 
 {-
 ************************************************************************
@@ -120,6 +122,8 @@ filterNameEnv      :: (elt -> Bool) -> NameEnv elt -> NameEnv elt
 anyNameEnv         :: (elt -> Bool) -> NameEnv elt -> Bool
 mapNameEnv         :: (elt1 -> elt2) -> NameEnv elt1 -> NameEnv elt2
 disjointNameEnv    :: NameEnv a -> NameEnv a -> Bool
+nonDetTraverseNameEnv :: forall f a b. Applicative f
+                      => (a -> f b) -> NameEnv a -> f (NameEnv b)
 
 nameEnvElts x         = eltsUFM x
 emptyNameEnv          = emptyUFM
@@ -145,6 +149,7 @@ delListFromNameEnv x y  = delListFromUFM x y
 filterNameEnv x y       = filterUFM x y
 anyNameEnv f x          = foldUFM ((||) . f) False x
 disjointNameEnv x y     = disjointUFM x y
+nonDetTraverseNameEnv f n = fmap coerce $ traverse @(NonDetUniqFM Name) f $ coerce n
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
 

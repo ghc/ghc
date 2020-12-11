@@ -25,6 +25,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckPolyExprNC )
 import GHC.Builtin.Types (multiplicityTy)
 import GHC.Tc.Gen.Head
 import GHC.Hs
+import GHC.Tc.Utils.Env       ( tcScalingUsage )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
@@ -1087,5 +1088,3 @@ tcTagToEnum expr fun args app_res_ty res_ty
 
 tcExprPrag :: HsPragE GhcRn -> HsPragE GhcTc
 tcExprPrag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
-
-

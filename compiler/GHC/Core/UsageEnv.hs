@@ -12,6 +12,7 @@ module GHC.Core.UsageEnv
   , supUEs
   , unitUE
   , zeroUE
+  , nonDetMapUEM
   ) where
 
 import Data.Foldable
@@ -52,7 +53,9 @@ scaleUsage x   Bottom     = MUsage x
 scaleUsage x   (MUsage y) = MUsage $ mkMultMul x y
 
 -- For now, we use extra multiplicity Bottom for empty case.
-data UsageEnv = UsageEnv (NameEnv Mult) Bool
+data UsageEnv
+  = UsageEnv (NameEnv Mult)  -- ^ mapping from names to their multiplicities
+             Bool            -- ^ True <=> this is a bottom 'UsageEnv'; used for empty case
 
 unitUE :: NamedThing n => n -> Mult -> UsageEnv
 unitUE x w = UsageEnv (unitNameEnv (getName x) w) False
@@ -100,3 +103,10 @@ lookupUE (UsageEnv e has_bottom) x =
 
 instance Outputable UsageEnv where
   ppr (UsageEnv ne b) = text "UsageEnv:" <+> ppr ne <+> ppr b
+
+-- | Perform a applicative operation on all the 'Mult's in a 'UsageEnv'.
+-- The operation should *not* care about the order in which the
+-- environment is traversed.
+nonDetMapUEM :: Applicative m => (Mult -> m Mult) -> UsageEnv -> m UsageEnv
+nonDetMapUEM f (UsageEnv env is_bottom)
+  = UsageEnv <$> nonDetTraverseNameEnv f env <*> pure is_bottom

@@ -47,6 +47,9 @@ module GHC.Tc.Utils.Env(
         getTypeSigNames,
         tcExtendRecEnv,         -- For knot-tying
 
+        -- * Usage environment
+        tcCollectingUsage, tcScalingUsage, tcEmitBindingUsage,
+
         -- Tidying
         tcInitTidyEnv, tcInitOpenTidyEnv,
 
@@ -102,6 +105,7 @@ import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Coercion
 import GHC.Core.Class
 
 import GHC.Unit.Module
@@ -136,6 +140,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.IORef
 import Data.List (intercalate)
 import Control.Monad
+
+import GHC.Driver.Ppr
 
 {- *********************************************************************
 *                                                                      *
@@ -666,6 +672,67 @@ tcCheckUsage name id_mult thing_inside
                MUsage m -> tcSubMult (UsageEnvironmentOf name) m id_mult
            ; tcEmitBindingUsage (deleteUE uenv name)
            ; return wrapper }
+
+-----------------------
+-- | @tcCollectingUsage thing_inside@ runs @thing_inside@ and returns the usage
+-- information which was collected as part of the execution of
+-- @thing_inside@. Careful: @tcCollectingUsage thing_inside@ itself does not
+-- report any usage information, it's up to the caller to incorporate the
+-- returned usage information into the larger context appropriately.
+tcCollectingUsage :: TcM a -> TcM (UsageEnv,a)
+tcCollectingUsage thing_inside
+  = do { env0 <- getLclEnv
+       ; local_usage_ref <- newTcRef zeroUE
+       ; let env1 = env0 { tcl_usage = local_usage_ref }
+       ; result <- setLclEnv env1 thing_inside
+       ; local_usage <- readTcRef local_usage_ref
+       ; promoted_usage <- nonDetMapUEM promote_mult local_usage
+       ; return (promoted_usage,result) }
+  where
+    -- This is gross. The problem is in test case typecheck/should_compile/T18998:
+    --   f :: a %1-> Id n a -> Id n a
+    --   f x (MkId _) = MkId x
+    -- where MkId is a GADT constructor. Multiplicity polymorphism of constructors
+    -- invents a new multiplicity variable p[2] for the application MkId x. This
+    -- variable is at level 2, bumped because of the GADT pattern-match (MkId _).
+    -- We eventually unify the variable with One, due to the call to tcSubMult in
+    -- tcCheckUsage. But by then, we're at TcLevel 1, and so the level-check
+    -- fails.
+    --
+    -- What to do? If we did inference "for real", the sub-multiplicity constraint
+    -- would end up in the implication of the GADT pattern-match, and all would
+    -- be well. But we don't have a real sub-multiplicity constraint to put in
+    -- the implication. (Multiplicity inference works outside the usual generate-
+    -- constraints-and-solve scheme.) Here, where the multiplicity arrives, we
+    -- must promote all multiplicity variables to reflect this outer TcLevel.
+    -- It's reminiscent of floating a constraint, really, so promotion is
+    -- appropriate. The promoteTcType function works only on types of kind TYPE rr,
+    -- so we can't use it here. Thus, this dirtiness.
+    --
+    -- It works nicely in practice.
+    (promote_mult, _, _, _) = mapTyCo mapper
+    mapper = TyCoMapper { tcm_tyvar = \ () tv -> do { _ <- promoteTyVar tv
+                                                    ; zonkTcTyVar tv }
+                        , tcm_covar = \ () cv -> return (mkCoVarCo cv)
+                        , tcm_hole  = \ () h  -> return (mkHoleCo h)
+                        , tcm_tycobinder = \ () tcv _flag -> return ((), tcv)
+                        , tcm_tycon = return }
+
+-- | @tcScalingUsage mult thing_inside@ runs @thing_inside@ and scales all the
+-- usage information by @mult@.
+tcScalingUsage :: Mult -> TcM a -> TcM a
+tcScalingUsage mult thing_inside
+  = do { (usage, result) <- tcCollectingUsage thing_inside
+       ; traceTc "tcScalingUsage" (ppr mult)
+       ; tcEmitBindingUsage $ scaleUE mult usage
+       ; return result }
+
+tcEmitBindingUsage :: UsageEnv -> TcM ()
+tcEmitBindingUsage ue
+  = do { lcl_env <- getLclEnv
+       ; let usage = tcl_usage lcl_env
+       ; updTcRef usage (addUE ue) }
+
 
 {- *********************************************************************
 *                                                                      *

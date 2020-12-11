@@ -71,9 +71,6 @@ module GHC.Tc.Utils.Monad(
   addMessages,
   discardWarnings,
 
-  -- * Usage environment
-  tcCollectingUsage, tcScalingUsage, tcEmitBindingUsage,
-
   -- * Shared error message stuff: renamer and typechecker
   mkLongErrAt, mkErrDocAt, addLongErrAt, reportErrors, reportError,
   reportWarning, recoverM, mapAndRecoverM, mapAndReportM, foldAndRecoverM,
@@ -1272,36 +1269,6 @@ captureConstraints thing_inside
        ; case mb_res of
            Nothing  -> do { emitConstraints lie; failM }
            Just res -> return (res, lie) }
-
------------------------
--- | @tcCollectingUsage thing_inside@ runs @thing_inside@ and returns the usage
--- information which was collected as part of the execution of
--- @thing_inside@. Careful: @tcCollectingUsage thing_inside@ itself does not
--- report any usage information, it's up to the caller to incorporate the
--- returned usage information into the larger context appropriately.
-tcCollectingUsage :: TcM a -> TcM (UsageEnv,a)
-tcCollectingUsage thing_inside
-  = do { env0 <- getLclEnv
-       ; local_usage_ref <- newTcRef zeroUE
-       ; let env1 = env0 { tcl_usage = local_usage_ref }
-       ; result <- setLclEnv env1 thing_inside
-       ; local_usage <- readTcRef local_usage_ref
-       ; return (local_usage,result) }
-
--- | @tcScalingUsage mult thing_inside@ runs @thing_inside@ and scales all the
--- usage information by @mult@.
-tcScalingUsage :: Mult -> TcM a -> TcM a
-tcScalingUsage mult thing_inside
-  = do { (usage, result) <- tcCollectingUsage thing_inside
-       ; traceTc "tcScalingUsage" (ppr mult)
-       ; tcEmitBindingUsage $ scaleUE mult usage
-       ; return result }
-
-tcEmitBindingUsage :: UsageEnv -> TcM ()
-tcEmitBindingUsage ue
-  = do { lcl_env <- getLclEnv
-       ; let usage = tcl_usage lcl_env
-       ; updTcRef usage (addUE ue) }
 
 -----------------------
 attemptM :: TcRn r -> TcRn (Maybe r)
