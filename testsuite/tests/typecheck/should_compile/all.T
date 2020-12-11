@@ -749,3 +749,6 @@ test('TyAppPat_UniversalMulti2', normal, compile, [''])
 test('TyAppPat_UniversalMulti3', normal, compile, [''])
 test('TyAppPat_UniversalNested', normal, compile, [''])
 test('TyAppPat_Wildcard', normal, compile, [''])
+
+test('T18998', normal, compile, [''])
+test('T18998b', normal, compile, [''])

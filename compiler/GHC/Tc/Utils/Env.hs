@@ -102,6 +102,7 @@ import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Coercion
 import GHC.Core.Class
 
 import GHC.Unit.Module
@@ -663,9 +664,40 @@ tcCheckUsage name id_mult thing_inside
            ; wrapper <- case actual_u of
                Bottom -> return idHsWrapper
                Zero     -> tcSubMult (UsageEnvironmentOf name) Many id_mult
-               MUsage m -> tcSubMult (UsageEnvironmentOf name) m id_mult
+               MUsage m -> do { m <- zonkTcType m
+                              ; m <- promote_mult m
+                              ; tcSubMult (UsageEnvironmentOf name) m id_mult }
            ; tcEmitBindingUsage (deleteUE uenv name)
            ; return wrapper }
+
+    -- This is gross. The problem is in test case typecheck/should_compile/T18998:
+    --   f :: a %1-> Id n a -> Id n a
+    --   f x (MkId _) = MkId x
+    -- where MkId is a GADT constructor. Multiplicity polymorphism of constructors
+    -- invents a new multiplicity variable p[2] for the application MkId x. This
+    -- variable is at level 2, bumped because of the GADT pattern-match (MkId _).
+    -- We eventually unify the variable with One, due to the call to tcSubMult in
+    -- tcCheckUsage. But by then, we're at TcLevel 1, and so the level-check
+    -- fails.
+    --
+    -- What to do? If we did inference "for real", the sub-multiplicity constraint
+    -- would end up in the implication of the GADT pattern-match, and all would
+    -- be well. But we don't have a real sub-multiplicity constraint to put in
+    -- the implication. (Multiplicity inference works outside the usual generate-
+    -- constraints-and-solve scheme.) Here, where the multiplicity arrives, we
+    -- must promote all multiplicity variables to reflect this outer TcLevel.
+    -- It's reminiscent of floating a constraint, really, so promotion is
+    -- appropriate. The promoteTcType function works only on types of kind TYPE rr,
+    -- so we can't use it here. Thus, this dirtiness.
+    --
+    -- It works nicely in practice.
+    (promote_mult, _, _, _) = mapTyCo mapper
+    mapper = TyCoMapper { tcm_tyvar = \ () tv -> do { _ <- promoteTyVar tv
+                                                    ; zonkTcTyVar tv }
+                        , tcm_covar = \ () cv -> return (mkCoVarCo cv)
+                        , tcm_hole  = \ () h  -> return (mkHoleCo h)
+                        , tcm_tycobinder = \ () tcv _flag -> return ((), tcv)
+                        , tcm_tycon = return }
 
 {- *********************************************************************
 *                                                                      *
