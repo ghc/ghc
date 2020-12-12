@@ -147,7 +147,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     TargetVendor_CPP=`  echo "$TargetVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
     TargetOS_CPP=`      echo "$TargetOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
 
-    # we intend to pass trough --targets to llvm as is.
+    # we intend to pass trough --target to llvm as is.
     LLVMTarget_CPP=`    echo "$LlvmTarget"`
 
     echo "GHC build  : $BuildPlatform"
@@ -2104,6 +2104,10 @@ AC_DEFUN([GHC_LLVM_TARGET], [
       llvm_target_cpu="arm64"
       GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
       GHC_CONVERT_OS([$4],[$2],[llvm_target_os])
+      ;;
+    mips64el-*-linux-gnuabi64)
+      llvm_target_vendor="$3"
+      llvm_target_os="linux-gnuabi64"
       ;;
     *)
       GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
