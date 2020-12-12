@@ -170,6 +170,7 @@ nativeCodeGen dflags this_mod modLoc h us cmms
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
+      ArchMips64el  -> panic "nativeCodeGen: No NCG for mips64el"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
 

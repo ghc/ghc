@@ -1157,6 +1157,7 @@ cLoad platform expr rep
           bewareLoadStoreAlignment ArchAlpha    = True
           bewareLoadStoreAlignment ArchMipseb   = True
           bewareLoadStoreAlignment ArchMipsel   = True
+          bewareLoadStoreAlignment ArchMips64el = True
           bewareLoadStoreAlignment (ArchARM {}) = True
           bewareLoadStoreAlignment ArchAArch64  = True
           bewareLoadStoreAlignment ArchSPARC    = True

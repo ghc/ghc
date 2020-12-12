@@ -71,6 +71,10 @@
 #define MACHREGS_s390x    1
 #endif
 
+#if defined(mips64el_HOST_ARCH)
+#define MACHREGS_mips64el    1
+#endif
+
 #endif
 
 #include "MachRegs.h"

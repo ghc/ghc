@@ -51,4 +51,6 @@
 ,("armv6-unknown-freebsd-gnueabihf", ("e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64", "arm1176jzf-s", "+strict-align"))
 ,("armv7-unknown-freebsd-gnueabihf", ("e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64", "generic", "+strict-align"))
 ,("arm-unknown-nto-qnx-eabi", ("e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64", "arm7tdmi", "+strict-align"))
+,("mips64el-unknown-linux-gnuabi64", ("e-m:e-i8:8:32-i16:16:32-i64:64-n32:64-S128", "mips64r2", "-noabicalls"))
+,("mips64el-unknown-linux-gnuabin32", ("e-m:e-p:32:32-i8:8:32-i16:16:32-i64:64-n32:64-S128", "mips64r2", "-noabicalls"))
 ]

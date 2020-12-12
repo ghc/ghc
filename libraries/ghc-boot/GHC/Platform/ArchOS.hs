@@ -45,6 +45,7 @@ data Arch
    | ArchAlpha
    | ArchMipseb
    | ArchMipsel
+   | ArchMips64el
    | ArchJavaScript
    deriving (Read, Show, Eq)
 
@@ -134,6 +135,7 @@ stringEncodeArch = \case
   ArchAlpha         -> "alpha"
   ArchMipseb        -> "mipseb"
   ArchMipsel        -> "mipsel"
+  ArchMips64el      -> "mips64el"
   ArchJavaScript    -> "js"
 
 -- | See Note [Platform Syntax].

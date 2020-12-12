@@ -548,7 +548,7 @@ the stack. See Note [Overlapping global registers] for implications.
      r30    |  LR     | The Link Register
      r29    |  FP     | The Frame Pointer
    r19-r28  |         | Callee-saved registers
-     r18    |         | The Platform Register, if needed; 
+     r18    |         | The Platform Register, if needed;
             |         | or temporary register
      r17    |  IP1    | The second intra-procedure-call temporary register
      r16    |  IP0    | The first intra-procedure-call scratch register
@@ -662,6 +662,50 @@ the stack. See Note [Overlapping global registers] for implications.
 
 #define CALLER_SAVES_D5
 #define CALLER_SAVES_D6
+
+/* -----------------------------------------------------------------------------
+   The MIPS64 register mapping
+
+   We're using the N64 calling convention.
+
+   Name 	Number 	   Use 	                           Callee Saves
+   $zero 	$0 	   constant 0 	                     N/A
+   $at 	   $1 	   assembler temporary 	            No
+   $v0–$v1 	$2–$3 	values for function returns and
+                     expression evaluation 	         No
+   $a0–$a7 	$4–$11 	function arguments 	            No
+   $t4–$t7 	$12–$15 	temporaries 	                  No
+   $s0–$s7 	$16–$23 	saved temporaries 	            Yes
+   $t8–$t9 	$24–$25 	temporaries 	                  No
+   $k0–$k1 	$26–$27 	reserved for OS kernel 	         N/A
+   $gp 	   $28 	   global pointer 	               Yes
+   $sp 	   $29 	   stack pointer 	                  Yes
+   $s8 	   $30 	   frame pointer 	                  Yes
+   $ra 	   $31 	   return address 	               N/A
+
+   LLVM calling convention: Base, Sp, Hp, R1, R2, R3, R4, SpLim
+   -------------------------------------------------------------------------- */
+
+#elif defined(MACHREGS_mips64el)
+
+#define REG(x) __asm__("%" #x)
+
+#define REG_Base	16
+#define REG_Sp    17
+#define REG_Hp	   18
+#define REG_R1		19
+#define REG_R2    20
+#define REG_R3    21
+#define REG_R4    21
+#define REG_SpLim 23
+
+#define REG_F1		f20
+#define REG_F2		f22
+#define REG_F3		f24
+#define REG_F4		f26
+
+#define REG_D1		f28
+#define REG_D2		f30
 
 #else
 

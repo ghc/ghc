@@ -1009,6 +1009,7 @@ llvmOptions dflags =
     ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu)
                                  , not (any (isInfixOf "-mcpu") (getOpts dflags opt_lc)) ]
     ++ [("", "-mattr=" ++ attrs) | not (null attrs) ]
+    ++ [("", "-force-mips-long-branch") ]
 
   where target = platformMisc_llvmTarget $ platformMisc dflags
         Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets $ llvmConfig dflags)
@@ -1471,6 +1472,9 @@ runPhase (RealPhase cc_phase) input_fn dflags
                        ++ (if platformArch platform == ArchSPARC
                            then ["-mcpu=v9"]
                            else [])
+                       ++ (if platformArch platform == ArchMips64el
+                           then ["-mips64r2"]
+                           else [])
 
                        -- GCC 4.6+ doesn't like -Wimplicit when compiling C++.
                        ++ (if (cc_phase /= Ccxx && cc_phase /= Cobjcxx)
@@ -1543,6 +1547,9 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         -- This is a temporary hack.
                        ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [GHC.SysTools.Option "-mcpu=v9"]
+                           else [])
+                      ++ (if platformArch (targetPlatform dflags) == ArchMips64el
+                           then [GHC.SysTools.Option "-mips64r2"]
                            else [])
                        ++ (if any (ccInfo ==) [Clang, AppleClang, AppleClang51]
                             then [GHC.SysTools.Option "-Qunused-arguments"]
@@ -1988,6 +1995,7 @@ joinObjectFiles dflags o_files output_fn = do
                           | OSMinGW32 == osInfo
                           , not $ target32Bit (targetPlatform dflags)
                           ]
+                    ++ [GHC.SysTools.Option "-m", GHC.SysTools.Option "elf64ltsmip"]
                      ++ map GHC.SysTools.Option ld_build_id
                      ++ [ GHC.SysTools.Option "-o",
                           GHC.SysTools.FileOption "" output_fn ]

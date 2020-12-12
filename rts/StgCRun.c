@@ -970,4 +970,82 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 #endif
 
+#if defined(mips64el_HOST_ARCH)
+/* TODO: translate $n ... to registers from MachRegs.h */
+StgRegTable *
+StgRun(StgFunPtr f, StgRegTable *basereg) {
+    StgRegTable * r;
+    __asm__ volatile (
+/*        /*
+         * Save callee-saves registers on behalf of the STG code.
+         *
+        "sd $16, -8($sp)\n\t"
+        "sd $17, -16($sp)\n\t"
+        "sd $18, -24($sp)\n\t"
+        "sd $19, -32($sp)\n\t"
+        "sd $20, -40($sp)\n\t"
+        "sd $21, -48($sp)\n\t"
+        "sd $22, -56($sp)\n\t"
+        "sd $23, -64($sp)\n\t"
+
+        /* TODO: can this be combined with the expression below?*
+        "daddiu $sp, $sp, -56\n\t"
+*/
+        /*
+         * allocate some space for Stg machine's temporary storage.
+         * TODO: Does '-' work here?
+         */
+        "daddiu $sp, $sp, -%3\n\t"
+
+        /*
+         * Set BaseReg
+         * Does the pseudo-instruction move work here?
+         */
+        "move $16, %2\n\t"
+
+        /*
+         * Jump to function argument.
+         */
+        "move $25, %1\n\t"
+        "jalr $25\n\t"
+
+        ".globl " STG_RETURN "\n\t"
+        ".type " STG_RETURN ", %%function\n"
+        STG_RETURN ":\n\t"
+
+        /*
+         * Free the space we allocated
+         */
+        "daddiu $sp, $sp, %3\n\t"
+
+        /*
+         * Return the new register table, taking it from Stg's R1 (Mips64's $19).
+         */
+        "move %0, $19\n\t"
+
+/*        /*
+
+         * restore callee-saves registers.
+         *
+        /* TODO: can this be combined with the expression above?*
+        "daddiu $sp, $sp, 56\n\t"
+
+        "ld $16, -8($sp)\n\t"
+        "ld $17, -16($sp)\n\t"
+        "ld $18, -24($sp)\n\t"
+        "ld $19, -32($sp)\n\t"
+        "ld $20, -40($sp)\n\t"
+        "ld $21, -48($sp)\n\t"
+        "ld $22, -56($sp)\n\t"
+        "ld $23, -64($sp)\n\t"
+*/
+      : "=r" (r)
+      : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES) :
+      "$16", "$17", "$18", "$19", "$20", "$21", "$22", "$23",
+      "$25", "%f20","%f22","%f24","%f26", "%f28", "%f30", "memory"
+    );
+    return r;
+}
+#endif
+
 #endif /* !USE_MINIINTERPRETER */

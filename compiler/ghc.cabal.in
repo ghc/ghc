@@ -493,6 +493,7 @@ Library
         GHC.Platform.Ways
         GHC.Platform.X86
         GHC.Platform.X86_64
+        GHC.Platform.Mips64el
         GHC.Plugins
         GHC.Prelude
         GHC.Rename.Bind
