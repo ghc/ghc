@@ -459,7 +459,7 @@ check_target:
         blockedThrowTo(cap,target,msg);
         return THROWTO_BLOCKED;
 
-#if !defined(THREADEDED_RTS)
+#if !defined(THREADED_RTS)
     case BlockedOnRead:
     case BlockedOnWrite:
     case BlockedOnDelay:
