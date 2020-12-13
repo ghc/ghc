@@ -1,6 +1,9 @@
 {-# LANGUAGE PatternSynonyms, ViewPatterns #-}
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PolyKinds #-}
+
 module Scopes where
 
 -- Verify that evidence bound by patern
