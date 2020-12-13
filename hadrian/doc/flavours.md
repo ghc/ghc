@@ -247,8 +247,10 @@ The supported transformers are listed below:
 The `static` flavour does not strictly follow the groupings in the table
 above because it links all the executables statically, not just GHC
 itself, and because it passes `-optc -static` when delegating to a C
-compiler.  It also adds the `-dynamic-system-linker` cabal flag to the
-`ghc` package build and only adds static flags when building in a
+compiler.  It also turns off dynamic linking at runtime by by adding the
+`-dynamic-system-linker` cabal flag to the `ghc` package build because
+`musl` doesn't allow dynamic linking in executables that were statically
+linked against `libc`.  Static flags are only added when building in a
 non-dynamic _way_.  Some of the considerations for a static build aren't
 a great fit for the flavour system, so it's a little bit hacky.
 
