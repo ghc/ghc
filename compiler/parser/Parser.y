@@ -3898,6 +3898,11 @@ comb4 a b c d = a `seq` b `seq` c `seq` d `seq`
     (combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
                 combineSrcSpans (getLoc c) (getLoc d))
 
+comb5 :: Located a -> Located b -> Located c -> Located d -> Located e -> SrcSpan
+comb5 a b c d e = a `seq` b `seq` c `seq` d `seq` e `seq`
+    (combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
+       combineSrcSpans (getLoc c) $ combineSrcSpans (getLoc d) (getLoc e))
+
 -- strict constructor version:
 {-# INLINE sL #-}
 sL :: HasSrcSpan a => SrcSpan -> SrcSpanLess a -> a
