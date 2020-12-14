@@ -64,8 +64,6 @@ test_showBin = do
   putStrLn (show integers)
   putStrLn (showList' (map showBin integers))
 
-showBin i = showIntAtBase 2 intToDigit i
-
 showList' :: [ShowS] -> String
 showList' [] = "[]"
 showList' (x:xs) = showChar '[' . x $ showl xs ""

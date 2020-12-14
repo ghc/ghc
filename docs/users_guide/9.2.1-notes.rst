@@ -137,3 +137,6 @@ Compiler
   ``Natural``. As a consequence, one must enable ``TypeSynonymInstances``
   in order to define instances for ``Nat``.
 
+  The ``Numeric`` module recieves ``showBin`` and ``readBin`` to show and
+  read integer numbers in binary.
+
