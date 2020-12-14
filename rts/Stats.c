@@ -161,6 +161,7 @@ initStats0(void)
         .any_work = 0,
         .no_work = 0,
         .scav_find_work = 0,
+        .max_n_todo_overflow = 0,
         .init_cpu_ns = 0,
         .init_elapsed_ns = 0,
         .mutator_cpu_ns = 0,
@@ -462,7 +463,7 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
             uint32_t gen, uint32_t par_n_threads, gc_thread **gc_threads,
             W_ par_max_copied, W_ par_balanced_copied, W_ gc_spin_spin, W_ gc_spin_yield,
             W_ mut_spin_spin, W_ mut_spin_yield, W_ any_work, W_ no_work,
-            W_ scav_find_work)
+            W_ scav_find_work, W_ max_n_todo_overflow)
 {
     ACQUIRE_LOCK(&stats_mutex);
 
@@ -536,6 +537,7 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
         stats.any_work += any_work;
         stats.no_work += no_work;
         stats.scav_find_work += scav_find_work;
+        stats.max_n_todo_overflow += stg_max(max_n_todo_overflow, stats.max_n_todo_overflow);
         stats.gc_spin_spin += gc_spin_spin;
         stats.gc_spin_yield += gc_spin_yield;
         stats.mut_spin_spin += mut_spin_spin;
@@ -1168,6 +1170,8 @@ static void report_machine_readable (const RTSSummaryStats * sum)
             stats.no_work);
     MR_STAT("scav_find_work", FMT_Word64,
             stats.scav_find_work);
+    MR_STAT("max_n_todo_overflow", FMT_Word64,
+            stats.max_n_todo_overflow);
 #endif // PROF_SPIN
 #endif // THREADED_RTS
 

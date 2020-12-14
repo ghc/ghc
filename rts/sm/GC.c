@@ -238,7 +238,7 @@ GarbageCollect (uint32_t collect_gen,
   generation *gen;
   StgWord live_blocks, live_words, par_max_copied, par_balanced_copied,
       gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
-      any_work, no_work, scav_find_work;
+      any_work, no_work, scav_find_work, max_n_todo_overflow;
 #if defined(THREADED_RTS)
   gc_thread *saved_gct;
 #endif
@@ -547,6 +547,7 @@ GarbageCollect (uint32_t collect_gen,
   any_work = 0;
   no_work = 0;
   scav_find_work = 0;
+  max_n_todo_overflow = 0;
   {
       uint32_t i;
       uint64_t par_balanced_copied_acc = 0;
@@ -580,6 +581,7 @@ GarbageCollect (uint32_t collect_gen,
               any_work += RELAXED_LOAD(&thread->any_work);
               no_work += RELAXED_LOAD(&thread->no_work);
               scav_find_work += RELAXED_LOAD(&thread->scav_find_work);
+              max_n_todo_overflow = stg_max(RELAXED_LOAD(&thread->max_n_todo_overflow), max_n_todo_overflow);
 
               par_max_copied = stg_max(RELAXED_LOAD(&thread->copied), par_max_copied);
               par_balanced_copied_acc +=
@@ -998,7 +1000,7 @@ GarbageCollect (uint32_t collect_gen,
              N, n_gc_threads, gc_threads,
              par_max_copied, par_balanced_copied,
              gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
-             any_work, no_work, scav_find_work);
+             any_work, no_work, scav_find_work, max_n_todo_overflow);
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
@@ -1753,6 +1755,7 @@ init_gc_thread (gc_thread *t)
     t->any_work = 0;
     t->no_work = 0;
     t->scav_find_work = 0;
+    t->max_n_todo_overflow = 0;
 }
 
 /* -----------------------------------------------------------------------------
