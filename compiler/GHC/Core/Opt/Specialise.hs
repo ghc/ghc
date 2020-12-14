@@ -52,6 +52,7 @@ import GHC.Types.Var      ( isLocalVar )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
+import GHC.Types.SourceText
 
 import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc
@@ -1530,7 +1531,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                   = (neverInlinePragma, noUnfolding)
                         -- See Note [Specialising imported functions] in "GHC.Core.Opt.OccurAnal"
 
-                  | InlinePragma { inl_inline = Inlinable } <- inl_prag
+                  | InlinePragma { inl_inline = Inlinable (SourceText []) } <- inl_prag
                   = (inl_prag { inl_inline = NoUserInlinePrag }, noUnfolding)
 
                   | otherwise

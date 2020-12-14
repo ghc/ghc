@@ -595,8 +595,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
         work_uniq <- getUniqueM
         let work_rhs = work_fn rhs
             work_act = case fn_inline_spec of  -- See Note [Worker activation]
-                          NoInline -> inl_act fn_inl_prag
-                          _        -> inl_act wrap_prag
+                          NoInline (SourceText _ )  -> inl_act fn_inl_prag
+                          _                         -> inl_act wrap_prag
 
             work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
                                      , inl_inline = fn_inline_spec
