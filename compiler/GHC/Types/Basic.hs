@@ -83,9 +83,10 @@ module GHC.Types.Basic (
         InlineSpec(..), noUserInlineSpec,
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma,
         neverInlinePragma, dfunInlinePragma,
-        isDefaultInlinePragma,
-        isInlinePragma, isInlinablePragma, isAnyInlinePragma,
-        inlinePragmaSpec, inlinePragmaSat,
+        isDefaultInlinePragma, alwaysInlineConLikePragma,
+        isInlinePragma, isInlinablePragma, isNoInlinePragma,
+        isAnyInlinePragma,
+        inlinePragmaSpec, inlinePragmaSource, inlinePragmaSat,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
         pprInline, pprInlineDebug,
@@ -1325,9 +1326,9 @@ data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
 
 -- | Inline Specification
 data InlineSpec   -- What the user's INLINE pragma looked like
-  = Inline           -- User wrote INLINE
-  | Inlinable        -- User wrote INLINABLE
-  | NoInline         -- User wrote NOINLINE
+  = Inline    SourceText       -- User wrote INLINE
+  | Inlinable SourceText       -- User wrote INLINABLE
+  | NoInline  SourceText       -- User wrote NOINLINE
   | NoUserInlinePrag -- User did not write any of INLINE/INLINABLE/NOINLINE
                      -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
@@ -1424,11 +1425,18 @@ defaultInlinePragma = InlinePragma { inl_src = SourceText "{-# INLINE"
                                    , inl_inline = NoUserInlinePrag
                                    , inl_sat = Nothing }
 
-alwaysInlinePragma = defaultInlinePragma { inl_inline = Inline }
+alwaysInlinePragma = defaultInlinePragma { inl_inline = Inline (inlinePragmaSource $ defaultInlinePragma) }
 neverInlinePragma  = defaultInlinePragma { inl_act    = NeverActive }
+
+alwaysInlineConLikePragma = defaultInlinePragma {inl_inline =
+                                                 Inline (inlinePragmaSource $ defaultInlinePragma)
+                                                 , inl_rule = ConLike }
 
 inlinePragmaSpec :: InlinePragma -> InlineSpec
 inlinePragmaSpec = inl_inline
+
+inlinePragmaSource :: InlinePragma -> SourceText
+inlinePragmaSource = inl_src
 
 -- A DFun has an always-active inline activation so that
 -- exprIsConApp_maybe can "see" its unfolding
@@ -1445,20 +1453,25 @@ isDefaultInlinePragma (InlinePragma { inl_act = activation
 
 isInlinePragma :: InlinePragma -> Bool
 isInlinePragma prag = case inl_inline prag of
-                        Inline -> True
-                        _      -> False
+                        Inline (SourceText _ ) -> True
+                        _                      -> False
 
 isInlinablePragma :: InlinePragma -> Bool
 isInlinablePragma prag = case inl_inline prag of
-                           Inlinable -> True
-                           _         -> False
+                           Inlinable (SourceText _ ) -> True
+                           _                         -> False
+
+isNoInlinePragma :: InlinePragma -> Bool
+isNoInlinePragma prag = case inl_inline prag of
+                          NoInline (SourceText _ ) -> True
+                          _                        -> False
 
 isAnyInlinePragma :: InlinePragma -> Bool
 -- INLINE or INLINABLE
 isAnyInlinePragma prag = case inl_inline prag of
-                        Inline    -> True
-                        Inlinable -> True
-                        _         -> False
+                        Inline    (SourceText _ ) -> True
+                        Inlinable (SourceText _ ) -> True
+                        _                         -> False
 
 inlinePragmaSat :: InlinePragma -> Maybe Arity
 inlinePragmaSat = inl_sat
@@ -1524,23 +1537,27 @@ instance Binary RuleMatchInfo where
                       else return FunLike
 
 instance Outputable InlineSpec where
-   ppr Inline           = text "INLINE"
-   ppr NoInline         = text "NOINLINE"
-   ppr Inlinable        = text "INLINABLE"
+   ppr (Inline    (SourceText s))  = text "INLINE" <+> text s
+   ppr (NoInline  (SourceText s))  = text "NOINLINE" <+> text s
+   ppr (Inlinable (SourceText s))  = text "INLINABLE" <+> text s
    ppr NoUserInlinePrag = empty
 
 instance Binary InlineSpec where
-    put_ bh NoUserInlinePrag = putByte bh 0
-    put_ bh Inline           = putByte bh 1
-    put_ bh Inlinable        = putByte bh 2
-    put_ bh NoInline         = putByte bh 3
+    put_ bh NoUserInlinePrag            = putByte bh 0
+    put_ bh (Inline (SourceText s))     = do putByte bh 1
+                                             put_ bh s
+    put_ bh (Inlinable (SourceText s))  = do putByte bh 2
+                                             put_ bh s
+    put_ bh (NoInline (SourceText s))   = do putByte bh 3
+                                             put_ bh s
 
     get bh = do h <- getByte bh
+                s <- get bh
                 case h of
                   0 -> return NoUserInlinePrag
-                  1 -> return Inline
-                  2 -> return Inlinable
-                  _ -> return NoInline
+                  1 -> return (Inline (SourceText s))
+                  2 -> return (Inlinable (SourceText s))
+                  _ -> return (NoInline (SourceText s))
 
 
 instance Outputable InlinePragma where
@@ -1572,15 +1589,19 @@ pprInlineDebug = pprInline' False
 pprInline' :: Bool           -- True <=> do not display the inl_inline field
            -> InlinePragma
            -> SDoc
-pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
-                                    , inl_rule = info, inl_sat = mb_arity })
+pprInline' emptyInline (InlinePragma
+                        { inl_inline = inline,
+                          inl_act = activation,
+                          inl_rule = info,
+                          inl_sat = mb_arity })
     = pp_inl inline <> pp_act inline activation <+> pp_sat <+> pp_info
     where
       pp_inl x = if emptyInline then empty else ppr x
 
-      pp_act Inline   AlwaysActive = empty
-      pp_act NoInline NeverActive  = empty
-      pp_act _        act          = ppr act
+      pp_act (Inline    (SourceText _ ))  AlwaysActive = empty
+      pp_act (NoInline  (SourceText _ ))  NeverActive  = empty
+      pp_act (Inlinable (SourceText _ ))    act        = ppr act
+      pp_act NoUserInlinePrag               act        = ppr act
 
       pp_sat | Just ar <- mb_arity = parens (text "sat-args=" <> int ar)
              | otherwise           = empty
