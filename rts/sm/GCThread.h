@@ -183,6 +183,7 @@ typedef struct gc_thread_ {
     W_ scanned;
     W_ any_work;
     W_ scav_find_work;
+    W_ max_n_todo_overflow;
 
     Time gc_start_cpu;             // thread CPU time
     Time gc_end_cpu;               // thread CPU time
