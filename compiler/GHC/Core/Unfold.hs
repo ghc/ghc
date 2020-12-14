@@ -51,7 +51,7 @@ import GHC.Core.DataCon
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
-import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec )
+import GHC.Types.Basic  ( Arity, InlineSpec(..), isNoInlinePragma )
 import GHC.Core.Type
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
@@ -950,7 +950,7 @@ certainlyWillInline opts fn_info
 
   where
     loop_breaker = isStrongLoopBreaker (occInfo fn_info)
-    noinline     = inlinePragmaSpec (inlinePragInfo fn_info) == NoInline
+    noinline     = isNoInlinePragma (inlinePragInfo fn_info)
     fn_unf       = unfoldingInfo fn_info
 
     do_cunf :: CoreExpr -> UnfoldingGuidance -> Maybe Unfolding
