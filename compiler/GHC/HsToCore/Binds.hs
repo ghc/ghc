@@ -68,6 +68,7 @@ import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.Bag
 import GHC.Types.Basic
+import GHC.Types.SourceText
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Config
@@ -383,10 +384,10 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
 
   | otherwise
   = case inlinePragmaSpec inline_prag of
-          NoUserInlinePrag -> (gbl_id, rhs)
-          NoInline         -> (gbl_id, rhs)
-          Inlinable        -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
-          Inline           -> inline_pair
+          NoUserInlinePrag                    -> (gbl_id, rhs)
+          (NoInline         (SourceText _ ))  -> (gbl_id, rhs)
+          (Inlinable        (SourceText _ ))  -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
+          (Inline           (SourceText _ ))  -> inline_pair
 
   where
     simpl_opts    = initSimpleOpts dflags
@@ -757,8 +758,8 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
     -- no_act_spec is True if the user didn't write an explicit
     -- phase specification in the SPECIALISE pragma
     no_act_spec = case inlinePragmaSpec spec_inl of
-                    NoInline -> isNeverActive  spec_prag_act
-                    _        -> isAlwaysActive spec_prag_act
+                    (NoInline (SourceText _ )) -> isNeverActive  spec_prag_act
+                    _                          -> isAlwaysActive spec_prag_act
     rule_act | no_act_spec = inlinePragmaActivation id_inl   -- Inherit
              | otherwise   = spec_prag_act                   -- Specified by user
 
