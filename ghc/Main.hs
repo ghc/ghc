@@ -24,7 +24,6 @@ import GHC.Driver.Env
 import GHC.Driver.Phases
 import GHC.Driver.Session hiding (WarnReason(..))
 import GHC.Driver.Ppr
-import GHC.Driver.Main      ( newHscEnv )
 import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
@@ -43,7 +42,7 @@ import GHC.Runtime.Loader   ( loadFrontendPlugin )
 import GHC.Unit.Module ( ModuleName, mkModuleName )
 import GHC.Unit.Module.ModIface
 import GHC.Unit.State  ( pprUnits, pprUnitsSimple )
-import GHC.Unit.Finder ( findImportedModule, cannotFindModule, FindResult(..) )
+import GHC.Unit.Finder ( findImportedModule, FindResult(..) )
 import GHC.Unit.Types  ( IsBootInterface(..) )
 
 import GHC.Types.Basic     ( failed )
@@ -66,8 +65,7 @@ import GHC.HandleEncoding
 import GHC.Data.FastString
 import GHC.SysTools.BaseDir
 
-import GHC.Iface.Load       ( showIface )
-import GHC.Iface.Load          ( loadUserInterface )
+import GHC.Iface.Load
 import GHC.Iface.Recomp.Binary ( fingerprintBinMem )
 
 import GHC.Tc.Utils.Monad      ( initIfaceCheck )
@@ -229,8 +227,8 @@ main' postLoadMode dflags0 args flagWarnings = do
 
         ---------------- Display configuration -----------
   case verbosity dflags6 of
-    v | v == 4 -> liftIO $ dumpUnitsSimple dflags6
-      | v >= 5 -> liftIO $ dumpUnits dflags6
+    v | v == 4 -> liftIO $ dumpUnitsSimple hsc_env
+      | v >= 5 -> liftIO $ dumpUnits       hsc_env
       | otherwise -> return ()
 
   liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
@@ -242,14 +240,14 @@ main' postLoadMode dflags0 args flagWarnings = do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
     case postLoadMode of
-       ShowInterface f        -> liftIO $ doShowIface dflags6 f
+       ShowInterface f        -> liftIO $ showIface hsc_env f
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash (map fst srcs)
-       ShowPackages           -> liftIO $ showUnits dflags6
+       ShowPackages           -> liftIO $ showUnits hsc_env
        DoFrontend f           -> doFrontend f srcs
        DoBackpack             -> doBackpack (map fst srcs)
 
@@ -679,14 +677,6 @@ doMake srcs  = do
 
 
 -- ---------------------------------------------------------------------------
--- --show-iface mode
-
-doShowIface :: DynFlags -> FilePath -> IO ()
-doShowIface dflags file = do
-  hsc_env <- newHscEnv dflags
-  showIface hsc_env file
-
--- ---------------------------------------------------------------------------
 -- Various banners and verbosity output.
 
 showBanner :: PostLoadMode -> DynFlags -> IO ()
@@ -792,10 +782,10 @@ dumpFastStringStats dflags = do
   where
    x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
-showUnits, dumpUnits, dumpUnitsSimple :: DynFlags -> IO ()
-showUnits       dflags = putStrLn (showSDoc dflags (pprUnits (unitState dflags)))
-dumpUnits       dflags = putMsg dflags (pprUnits (unitState dflags))
-dumpUnitsSimple dflags = putMsg dflags (pprUnitsSimple (unitState dflags))
+showUnits, dumpUnits, dumpUnitsSimple :: HscEnv -> IO ()
+showUnits       hsc_env = putStrLn (showSDoc (hsc_dflags hsc_env) (pprUnits (hsc_units hsc_env)))
+dumpUnits       hsc_env = putMsg (hsc_dflags hsc_env) (pprUnits (hsc_units hsc_env))
+dumpUnitsSimple hsc_env = putMsg (hsc_dflags hsc_env) (pprUnitsSimple (hsc_units hsc_env))
 
 -- -----------------------------------------------------------------------------
 -- Frontend plugin support
@@ -842,7 +832,7 @@ abiHash strs = do
          case r of
            Found _ m -> return m
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $
-                          cannotFindModule dflags modname r
+                          cannotFindModule hsc_env modname r
 
   mods <- mapM find_it strs
 

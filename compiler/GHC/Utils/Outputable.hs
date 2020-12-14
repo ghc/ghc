@@ -567,7 +567,7 @@ pprCode cs d = withPprStyle (PprCode cs) d
 
 renderWithContext :: SDocContext -> SDoc -> String
 renderWithContext ctx sdoc
-  = let s = Pretty.style{ Pretty.mode       = PageMode,
+  = let s = Pretty.style{ Pretty.mode       = PageMode False,
                           Pretty.lineLength = sdocLineLength ctx }
     in Pretty.renderStyle s $ runSDoc sdoc ctx
 

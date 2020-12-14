@@ -39,7 +39,7 @@ module GHC.Driver.Session (
         DynamicTooState(..), dynamicTooState, setDynamicNow, setDynamicTooFailed,
         dynamicOutputFile,
         sccProfilingEnabled,
-        DynFlags(..), mainModIs,
+        DynFlags(..),
         outputFile, hiSuf, objectSuf, ways,
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
@@ -62,8 +62,6 @@ module GHC.Driver.Session (
         pprDynFlagsDiff,
 
         targetProfile,
-
-        mkHomeUnitFromFlags,
 
         -- ** Log output
         putLogMsg,
@@ -231,13 +229,11 @@ import GHC.Platform
 import GHC.Platform.Ways
 import GHC.Platform.Profile
 import GHC.UniqueSubdir (uniqueSubdir)
-import GHC.Unit.Home
 import GHC.Unit.Types
 import GHC.Unit.Parser
 import GHC.Unit.Module
 import GHC.Builtin.Names ( mAIN_NAME )
 import {-# SOURCE #-} GHC.Driver.Hooks
-import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Backend
@@ -593,21 +589,6 @@ data DynFlags = DynFlags {
         -- In *reverse* order that they're specified on the command line.
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
-
-  unitDatabases         :: Maybe [UnitDatabase UnitId],
-        -- ^ Stack of unit databases for the target platform.
-        --
-        -- This field is populated by `initUnits`.
-        --
-        -- 'Nothing' means the databases have never been read from disk. If
-        -- `initUnits` is called again, it doesn't reload the databases from
-        -- disk.
-
-  unitState             :: UnitState,
-        -- ^ Consolidated unit database built by 'initUnits' from the unit
-        -- databases in 'unitDatabases' and flags ('-ignore-package', etc.).
-        --
-        -- It also contains mapping from module names to actual Modules.
 
   -- Temporary files
   -- These have to be IORefs, because the defaultCleanupHandler needs to
@@ -1232,8 +1213,6 @@ defaultDynFlags mySettings llvmConfig =
         ignorePackageFlags      = [],
         trustFlags              = [],
         packageEnv              = Nothing,
-        unitDatabases           = Nothing,
-        unitState               = emptyUnitState,
         targetWays_             = defaultWays mySettings,
         splitInfo               = Nothing,
 
@@ -1365,7 +1344,7 @@ defaultFatalMessager = hPutStrLn stderr
 jsonLogAction :: LogAction
 jsonLogAction dflags reason severity srcSpan msg
   =
-    defaultLogActionHPutStrDoc dflags stdout
+    defaultLogActionHPutStrDoc dflags True stdout
       (withPprStyle (PprCode CStyle) (doc $$ text ""))
     where
       str = renderWithContext (initSDocContext dflags defaultUserStyle) msg
@@ -1388,9 +1367,9 @@ defaultLogAction dflags reason severity srcSpan msg
       SevWarning     -> printWarns
       SevError       -> printWarns
     where
-      printOut   = defaultLogActionHPrintDoc  dflags stdout
-      printErrs  = defaultLogActionHPrintDoc  dflags stderr
-      putStrSDoc = defaultLogActionHPutStrDoc dflags stdout
+      printOut   = defaultLogActionHPrintDoc  dflags False stdout
+      printErrs  = defaultLogActionHPrintDoc  dflags False stderr
+      putStrSDoc = defaultLogActionHPutStrDoc dflags False stdout
       -- Pretty print the warning flag, if any (#10752)
       message = mkLocMessageAnn flagMsg severity srcSpan msg
 
@@ -1430,16 +1409,19 @@ defaultLogAction dflags reason severity srcSpan msg
           | otherwise = ""
 
 -- | Like 'defaultLogActionHPutStrDoc' but appends an extra newline.
-defaultLogActionHPrintDoc :: DynFlags -> Handle -> SDoc -> IO ()
-defaultLogActionHPrintDoc dflags h d
- = defaultLogActionHPutStrDoc dflags h (d $$ text "")
+defaultLogActionHPrintDoc :: DynFlags -> Bool -> Handle -> SDoc -> IO ()
+defaultLogActionHPrintDoc dflags asciiSpace h d
+ = defaultLogActionHPutStrDoc dflags asciiSpace h (d $$ text "")
 
-defaultLogActionHPutStrDoc :: DynFlags -> Handle -> SDoc -> IO ()
-defaultLogActionHPutStrDoc dflags h d
+-- | The boolean arguments let's the pretty printer know if it can optimize indent
+-- by writing ascii ' ' characters without going through decoding.
+defaultLogActionHPutStrDoc :: DynFlags -> Bool -> Handle -> SDoc -> IO ()
+defaultLogActionHPutStrDoc dflags asciiSpace h d
   -- Don't add a newline at the end, so that successive
   -- calls to this log-action can output all on the same line
-  = printSDoc ctx Pretty.PageMode h d
-    where ctx = initSDocContext dflags defaultUserStyle
+  = printSDoc ctx (Pretty.PageMode asciiSpace) h d
+    where
+      ctx = initSDocContext dflags defaultUserStyle
 
 newtype FlushOut = FlushOut (IO ())
 
@@ -1666,9 +1648,6 @@ lang_set dflags lang =
             extensionFlags = flattenExtensionFlags lang (extensions dflags)
           }
 
-mainModIs :: DynFlags -> Module
-mainModIs dflags = mkHomeModule (mkHomeUnitFromFlags dflags) (mainModuleNameIs dflags)
-
 -- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()
 setLanguage l = upd (`lang_set` Just l)
@@ -1814,28 +1793,6 @@ setOutputHi      f d = d { outputHi       = f}
 
 setJsonLogAction :: DynFlags -> DynFlags
 setJsonLogAction d = d { log_action = jsonLogAction }
-
--- | Get home unit
-mkHomeUnitFromFlags :: DynFlags -> HomeUnit
-mkHomeUnitFromFlags dflags =
-   let !hu_id             = homeUnitId_ dflags
-       !hu_instanceof     = homeUnitInstanceOf_ dflags
-       !hu_instantiations = homeUnitInstantiations_ dflags
-   in case (hu_instanceof, hu_instantiations) of
-      (Nothing,[]) -> DefiniteHomeUnit hu_id Nothing
-      (Nothing, _) -> throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
-      (Just _, []) -> throwGhcException $ CmdLineError ("Use of -this-component-id requires -instantiated-with")
-      (Just u, is)
-         -- detect fully indefinite units: all their instantiations are hole
-         -- modules and the home unit id is the same as the instantiating unit
-         -- id (see Note [About units] in GHC.Unit)
-         | all (isHoleModule . snd) is && u == hu_id
-         -> IndefiniteHomeUnit u is
-         -- otherwise it must be that we (fully) instantiate an indefinite unit
-         -- to make it definite.
-         -- TODO: error when the unit is partially instantiated??
-         | otherwise
-         -> DefiniteHomeUnit hu_id (Just (u, is))
 
 parseUnitInsts :: String -> Instantiations
 parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
