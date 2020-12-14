@@ -183,6 +183,18 @@ push_todo_block(bdescr *bd, gen_workspace *ws)
         bd->link = ws->todo_overflow;
         ws->todo_overflow = bd;
         ws->n_todo_overflow++;
+
+        // In theory, if a gc thread pushes more blocks to it's todo_q than it
+        // pops, the todo_overflow list will continue to grow. Other gc threads
+        // can't steal from the todo_overflwo list, so they may be idle as the
+        // first gc thread works diligently on it's todo_overflow list. In
+        // practice this has not been observed to occur.
+        //
+        // The max_n_todo_overflow counter will allow us to observe large
+        // todo_overflow lists if they ever arise. As of now I've not observed
+        // any nonzero max_n_todo_overflow samples.
+        gct->max_n_todo_overflow =
+            stg_max(gct->max_n_todo_overflow, ws->n_todo_overflow);
     }
 
 #if defined(THREADED_RTS)
