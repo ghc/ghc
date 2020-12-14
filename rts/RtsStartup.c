@@ -201,6 +201,8 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
         stg_exit(1);
     }
 
+    x86_init_fpu();
+
     setlocale(LC_CTYPE,"");
 
     /* Initialise the stats department, phase 0 */
@@ -388,8 +390,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     else
       startupAsyncIO();
 #endif
-
-    x86_init_fpu();
 
     startupHpc();
 
