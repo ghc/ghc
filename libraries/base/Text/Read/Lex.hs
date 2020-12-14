@@ -26,6 +26,7 @@ module Text.Read.Lex
   , hsLex
   , lexChar
 
+  , readBinP
   , readIntP
   , readOctP
   , readDecP
@@ -541,6 +542,10 @@ fracExp exp mant (d:ds) = exp' `seq` mant' `seq` fracExp exp' mant' ds
     mant' = mant * 10 + fromIntegral d
 
 valDig :: (Eq a, Num a) => a -> Char -> Maybe Int
+valDig 2 c
+  | '0' <= c && c <= '1' = Just (ord c - ord '0')
+  | otherwise            = Nothing
+
 valDig 8 c
   | '0' <= c && c <= '7' = Just (ord c - ord '0')
   | otherwise            = Nothing
@@ -577,10 +582,12 @@ readIntP' base = readIntP base isDigit valDigit
   valDigit c = maybe 0     id           (valDig base c)
 {-# SPECIALISE readIntP' :: Integer -> ReadP Integer #-}
 
-readOctP, readDecP, readHexP :: (Eq a, Num a) => ReadP a
+readBinP, readOctP, readDecP, readHexP :: (Eq a, Num a) => ReadP a
+readBinP = readIntP' 2
 readOctP = readIntP' 8
 readDecP = readIntP' 10
 readHexP = readIntP' 16
+{-# SPECIALISE readBinP :: ReadP Integer #-}
 {-# SPECIALISE readOctP :: ReadP Integer #-}
 {-# SPECIALISE readDecP :: ReadP Integer #-}
 {-# SPECIALISE readHexP :: ReadP Integer #-}
