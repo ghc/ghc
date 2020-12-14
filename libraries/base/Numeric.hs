@@ -24,6 +24,7 @@ module Numeric (
 
         showIntAtBase,
         showInt,
+        showBin,
         showHex,
         showOct,
 
@@ -46,6 +47,7 @@ module Numeric (
         readSigned,
 
         readInt,
+        readBin,
         readDec,
         readOct,
         readHex,
@@ -81,6 +83,13 @@ readInt :: Num a
   -> (Char -> Int)      -- ^ a function converting a valid digit character to an 'Int'
   -> ReadS a
 readInt base isDigit valDigit = readP_to_S (L.readIntP base isDigit valDigit)
+
+-- | Read an unsigned number in binary notation.
+--
+-- >>> readBin "10011"
+-- [(19,"")]
+readBin :: (Eq a, Num a) => ReadS a
+readBin = readP_to_S L.readBinP
 
 -- | Read an unsigned number in octal notation.
 --
@@ -287,3 +296,7 @@ showHex = showIntAtBase 16 intToDigit
 -- | Show /non-negative/ 'Integral' numbers in base 8.
 showOct :: (Integral a, Show a) => a -> ShowS
 showOct = showIntAtBase 8  intToDigit
+
+-- | Show /non-negative/ 'Integral' numbers in base 2.
+showBin :: (Integral a, Show a) => a -> ShowS
+showBin = showIntAtBase 2  intToDigit
