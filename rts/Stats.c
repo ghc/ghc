@@ -160,6 +160,7 @@ initStats0(void)
         .mut_spin_yield = 0,
         .any_work = 0,
         .scav_find_work = 0,
+        .max_n_todo_overflow = 0,
         .init_cpu_ns = 0,
         .init_elapsed_ns = 0,
         .mutator_cpu_ns = 0,
@@ -460,7 +461,8 @@ void
 stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ slop,
             uint32_t gen, uint32_t par_n_threads, gc_thread **gc_threads,
             W_ par_max_copied, W_ par_balanced_copied, W_ gc_spin_spin, W_ gc_spin_yield,
-            W_ mut_spin_spin, W_ mut_spin_yield, W_ any_work, W_ scav_find_work)
+            W_ mut_spin_spin, W_ mut_spin_yield, W_ any_work, W_ scav_find_work,
+            W_ max_n_todo_overflow)
 {
     ACQUIRE_LOCK(&stats_mutex);
 
@@ -541,6 +543,7 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
             stats.gc.par_balanced_copied_bytes;
         stats.any_work += any_work;
         stats.scav_find_work += scav_find_work;
+        stats.max_n_todo_overflow += stg_max(max_n_todo_overflow, stats.max_n_todo_overflow);
         stats.gc_spin_spin += gc_spin_spin;
         stats.gc_spin_yield += gc_spin_yield;
         stats.mut_spin_spin += mut_spin_spin;
@@ -1026,6 +1029,10 @@ static void report_summary(const RTSSummaryStats* sum)
                     , col_width[0], ""
                     , col_width[1], "scav_find_work"
                     , col_width[2], stats.scav_find_work);
+        statsPrintf("%*s" "%*s" "%*" FMT_Word64 "\n"
+                    , col_width[0], ""
+                    , col_width[1], "max_n_todo_overflow"
+                    , col_width[2], stats.max_n_todo_overflow);
 #elif defined(THREADED_RTS) // THREADED_RTS && PROF_SPIN
         statsPrintf("Internal Counters require the RTS to be built "
                 "with PROF_SPIN"); // PROF_SPIN is not #defined here
@@ -1167,6 +1174,8 @@ static void report_machine_readable (const RTSSummaryStats * sum)
             stats.any_work);
     MR_STAT("scav_find_work", FMT_Word64,
             stats.scav_find_work);
+    MR_STAT("max_n_todo_overflow", FMT_Word64,
+            stats.max_n_todo_overflow);
 #endif // PROF_SPIN
 #endif // THREADED_RTS
 
@@ -1558,7 +1567,7 @@ See #13830
 */
 
 /*
-Note [Internal Counter Stats]
+Note [Internal Counters Stats]
 -----------------------------
 What do the counts at the end of a '+RTS -s --internal-counters' report mean?
 They are detailed below. Most of these counters are used by multiple threads
@@ -1596,7 +1605,6 @@ don't. We count these white-hole spins and include them in the SpinLocks table.
 If a particular loop does not yield, we put "n/a" in the table. They are named
 for the function that has the spinning loop except that several loops in the
 garbage collector accumulate into whitehole_gc.
-TODO: Should these counters be more or less granular?
 
 white-hole spin counters:
 * whitehole_gc
@@ -1604,16 +1612,17 @@ white-hole spin counters:
 * whitehole_executeMessage
 * whitehole_threadPaused
 
-
-We count the number of calls of several functions in the parallel garbage
-collector.
+We have several stats allowing us to observe the internals of the parallel
+garbage collector:
 
 Parallel garbage collector counters:
 * any_work:
     Incremented whenever a parallel GC looks for work to steal.
 * scav_find_work:
-    Called to do work when any_work return true.
-
+    Counts iterations of scavenge loop
+* max_n_todo_overflow:
+    Tracks the maximum length of todo_overflow lists in the gc_thread structre.
+    See comment in grab_local_todo_block.
 */
 
 /* -----------------------------------------------------------------------------

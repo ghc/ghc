@@ -270,6 +270,8 @@ typedef struct _RTSStats {
     // parallel GCs
   uint64_t scav_find_work;
 
+  uint64_t max_n_todo_overflow;
+
   // ----------------------------------
   // Concurrent garbage collector
 
