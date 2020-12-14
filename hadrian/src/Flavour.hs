@@ -2,7 +2,7 @@ module Flavour
   ( Flavour (..), werror
   , DocTargets, DocTarget(..)
     -- * Flavour transformers
-  , addArgs
+  , addArgs, addArgsBefore
   , splitSections, splitSectionsIf
   , enableThreadSanitizer
   , enableDebugInfo, enableTickyGhc
@@ -71,10 +71,15 @@ data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan | SphinxInfo
 addArgs :: Args -> Flavour -> Flavour
 addArgs args' fl = fl { args = args fl <> args' }
 
+addArgsBefore :: Args -> Flavour -> Flavour
+addArgsBefore args' fl = fl { args = args' <> args fl }
+
 -- | Turn on -Werror for packages built with the stage1 compiler.
 -- It mimics the CI settings so is useful to turn on when developing.
 werror :: Flavour -> Flavour
-werror = addArgs (builder Ghc ? notStage0 ? arg "-Werror")
+werror = addArgsBefore (builder Ghc ? notStage0 ? arg "-Werror")
+  -- N.B. We add this flag *before* the others to ensure that we don't override
+  -- the -Wno-error flags defined in "Settings.Warnings".
 
 -- | Build C and Haskell objects with debugging information.
 enableDebugInfo :: Flavour -> Flavour
