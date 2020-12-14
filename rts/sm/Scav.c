@@ -2058,6 +2058,48 @@ scavenge_large (gen_workspace *ws)
    is other work we can usefully be doing.
    ------------------------------------------------------------------------- */
 
+static StgWord refill_wsdeque(gen_workspace *ws)
+{
+    StgWord n_todo_overflow = ws->n_todo_overflow;
+
+    if (!RtsFlags.GcFlags.refill_wsdeques) {
+        return n_todo_overflow;
+    }
+
+    StgInt space = ws->todo_q->size - dequeElements(ws->todo_q);
+    space = stg_max(space, 0);
+
+    bdescr* temp = NULL;
+
+    for(StgInt i = 0; i < space && ws->todo_overflow != NULL; ++i) {
+        bdescr* temp2 = ws->todo_overflow;
+        ws->todo_overflow = temp2->link;
+        ws->n_todo_overflow--;
+
+        temp2->link = temp;
+        temp = temp2;
+    }
+
+    while(temp != NULL) {
+        bdescr* temp2 = temp;
+        temp = temp2->link;
+        temp2->link = NULL;
+        if(!pushWSDeque(ws->todo_q, temp2)) {
+            temp2->link = temp;
+            temp = temp2;
+            break;
+        }
+    }
+    while(temp != NULL) {
+        bdescr* temp2 = temp;
+        temp = temp2->link;
+        temp2->link = ws->todo_overflow;
+        ws->todo_overflow = temp2;
+        ws->n_todo_overflow++;
+    }
+    return n_todo_overflow;
+}
+
 static bool
 scavenge_find_work (void)
 {
@@ -2074,6 +2116,11 @@ loop:
     did_something = false;
     for (g = RtsFlags.GcFlags.generations-1; g >= 0; g--) {
         ws = &gct->gens[g];
+
+        // refill todo_q so other threads can steal
+        // this could be gated behind THREADED_RTS
+        StgWord o = refill_wsdeque(ws);
+        gct->max_n_todo_overflow = stg_max(gct->max_n_todo_overflow, o);
 
         if (ws->todo_seg != END_NONMOVING_TODO_LIST) {
             struct NonmovingSegment *seg = ws->todo_seg;

@@ -183,6 +183,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.numaMask           = 1;
     RtsFlags.GcFlags.ringBell           = false;
     RtsFlags.GcFlags.longGCSync         = 0; /* detection turned off */
+    RtsFlags.GcFlags.refill_wsdeques    = false;
 
     RtsFlags.DebugFlags.scheduler       = false;
     RtsFlags.DebugFlags.interpreter     = false;
@@ -986,6 +987,11 @@ error = true;
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;
                       RtsFlags.GcFlags.useNonmoving = true;
+                  }
+                  else if (strequal("refill-wsdeques",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.GcFlags.refill_wsdeques = true;
                   }
 #if defined(THREADED_RTS)
 #if defined(mingw32_HOST_OS)
