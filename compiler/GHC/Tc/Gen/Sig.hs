@@ -51,6 +51,7 @@ import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
 import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import GHC.Builtin.Names( mkUnboundName )
 import GHC.Types.Basic
+import GHC.Types.SourceText
 import GHC.Unit.Module( getModule )
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -551,7 +552,7 @@ mkPragEnv sigs binds
     get_sig _ = Nothing
 
     add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
-      | Inline <- inl_inline inl_prag
+      | Inline (SourceText _ )  <- inl_inline inl_prag
         -- add arity only for real INLINE pragmas, not INLINABLE
       = case lookupNameEnv ar_env n of
           Just ar -> inl_prag { inl_sat = Just ar }
