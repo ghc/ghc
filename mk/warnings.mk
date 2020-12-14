@@ -80,6 +80,8 @@ libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-redundant-constraints
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-simplifiable-class-constraints
 
+# Due to deprecation warning
+libraries/Cabal_dist-install_EXTRA_HC_OPTS += -Wno-error=deprecations
 
 # temporarily turn off unused-imports warnings for pretty
 libraries/pretty_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
