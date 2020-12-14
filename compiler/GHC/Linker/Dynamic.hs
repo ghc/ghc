@@ -16,9 +16,9 @@ import GHC.Platform.Ways
 
 import GHC.Driver.Session
 
+import GHC.Unit.Env
 import GHC.Unit.Types
 import GHC.Unit.State
-import GHC.Utils.Outputable
 import GHC.Linker.MacOS
 import GHC.Linker.Unit
 import GHC.SysTools.Tasks
@@ -26,11 +26,11 @@ import GHC.SysTools.Tasks
 import qualified Data.Set as Set
 import System.FilePath
 
-linkDynLib :: DynFlags -> [String] -> [UnitId] -> IO ()
-linkDynLib dflags0 o_files dep_packages
+linkDynLib :: DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
+linkDynLib dflags0 unit_env o_files dep_packages
  = do
-    let platform = targetPlatform dflags0
-        os = platformOS platform
+    let platform   = ue_platform unit_env
+        os         = platformOS platform
 
         -- This is a rather ugly hack to fix dynamically linked
         -- GHC on Windows. If GHC is linked with -threaded, then
@@ -47,22 +47,17 @@ linkDynLib dflags0 o_files dep_packages
         verbFlags = getVerbFlags dflags
         o_file = outputFile dflags
 
-    pkgs_with_rts <- getPreloadUnitsAnd
-               (initSDocContext dflags defaultUserStyle)
-               (unitState dflags)
-               (mkHomeUnitFromFlags dflags)
-               dep_packages
+    pkgs_with_rts <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_packages)
 
-    let pkg_lib_paths = collectLibraryPaths (ways dflags) pkgs_with_rts
+    let pkg_lib_paths = collectLibraryDirs (ways dflags) pkgs_with_rts
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
-         | ( osElfTarget (platformOS (targetPlatform dflags)) ||
-             osMachOTarget (platformOS (targetPlatform dflags)) ) &&
-           dynLibLoader dflags == SystemDependent &&
-           -- Only if we want dynamic libraries
-           WayDyn `Set.member` ways dflags &&
+         | osElfTarget os || osMachOTarget os
+         , dynLibLoader dflags == SystemDependent
+         , -- Only if we want dynamic libraries
+           WayDyn `Set.member` ways dflags
            -- Only use RPath if we explicitly asked for it
-           gopt Opt_RPath dflags
+         , gopt Opt_RPath dflags
             = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]
               -- See Note [-Xlinker -rpath vs -Wl,-rpath]
          | otherwise = ["-L" ++ l]
@@ -96,8 +91,7 @@ linkDynLib dflags0 o_files dep_packages
     let extra_ld_inputs = ldInputs dflags
 
     -- frameworks
-    pkg_framework_opts <- getUnitFrameworkOpts dflags platform
-                                              (map unitId pkgs)
+    pkg_framework_opts <- getUnitFrameworkOpts unit_env (map unitId pkgs)
     let framework_opts = getFrameworkOpts dflags platform
 
     case os of

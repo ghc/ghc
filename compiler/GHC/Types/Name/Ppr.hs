@@ -13,6 +13,7 @@ where
 import GHC.Prelude
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.State
 
 import GHC.Core.TyCon
@@ -69,12 +70,14 @@ with some holes, we should try to give the user some more useful information.
 
 -- | Creates some functions that work out the best ways to format
 -- names for the user according to a set of heuristics.
-mkPrintUnqualified :: UnitState -> HomeUnit -> GlobalRdrEnv -> PrintUnqualified
-mkPrintUnqualified unit_state home_unit env
+mkPrintUnqualified :: UnitEnv -> GlobalRdrEnv -> PrintUnqualified
+mkPrintUnqualified unit_env env
  = QueryQualify qual_name
       (mkQualModule unit_state home_unit)
       (mkQualPackage unit_state)
   where
+  unit_state = ue_units unit_env
+  home_unit  = ue_home_unit unit_env
   qual_name mod occ
         | [gre] <- unqual_gres
         , right_name gre
