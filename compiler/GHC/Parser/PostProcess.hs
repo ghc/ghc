@@ -2178,8 +2178,8 @@ mkInlinePragma src (inl, match_info) mb_act
             Just act -> act
             Nothing  -> -- No phase specified
                         case inl of
-                          NoInline -> NeverActive
-                          _other   -> AlwaysActive
+                          NoInline (SourceText _ ) -> NeverActive
+                          _other                   -> AlwaysActive
 
 -----------------------------------------------------------------------------
 -- utilities for foreign declarations
