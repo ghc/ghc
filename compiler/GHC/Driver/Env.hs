@@ -4,6 +4,8 @@
 module GHC.Driver.Env
    ( Hsc(..)
    , HscEnv (..)
+   , hsc_home_unit
+   , hsc_units
    , runHsc
    , mkInteractiveHscEnv
    , runInteractiveHsc
@@ -17,6 +19,7 @@ module GHC.Driver.Env
    , prepareAnnotations
    , lookupType
    , lookupIfaceByModule
+   , mainModIs
    )
 where
 
@@ -38,6 +41,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Deps
 import GHC.Unit.Home.ModInfo
+import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.Finder.Types
 
@@ -179,9 +183,6 @@ data HscEnv
         , hsc_loader :: Loader
                 -- ^ Loader (dynamic linker)
 
-        , hsc_home_unit :: !HomeUnit
-                -- ^ Home-unit
-
         , hsc_plugins :: ![LoadedPlugin]
                 -- ^ plugins dynamically loaded after processing arguments. What
                 -- will be loaded here is directed by DynFlags.pluginModNames.
@@ -197,7 +198,30 @@ data HscEnv
                 --
                 -- To add dynamically loaded plugins through the GHC API see
                 -- 'addPluginModuleName' instead.
+
+        , hsc_unit_dbs :: !(Maybe [UnitDatabase UnitId])
+                -- ^ Stack of unit databases for the target platform.
+                --
+                -- This field is populated with the result of `initUnits`.
+                --
+                -- 'Nothing' means the databases have never been read from disk.
+                --
+                -- Usually we don't reload the databases from disk if they are
+                -- cached, even if the database flags changed!
+
+        , hsc_unit_env :: UnitEnv
+                -- ^ Unit environment (unit state, home unit, etc.).
+                --
+                -- Initialized from the databases cached in 'hsc_unit_dbs' and
+                -- from the DynFlags.
  }
+
+
+hsc_home_unit :: HscEnv -> HomeUnit
+hsc_home_unit = ue_home_unit . hsc_unit_env
+
+hsc_units :: HscEnv -> UnitState
+hsc_units = ue_units . hsc_unit_env
 
 {-
 
@@ -391,4 +415,7 @@ lookupIfaceByModule hpt pit mod
    --     module is in the PIT, namely GHC.Prim when compiling the base package.
    -- We could eliminate (b) if we wanted, by making GHC.Prim belong to a package
    -- of its own, but it doesn't seem worth the bother.
+
+mainModIs :: HscEnv -> Module
+mainModIs hsc_env = mkHomeModule (hsc_home_unit hsc_env) (mainModuleNameIs (hsc_dflags hsc_env))
 
