@@ -51,4 +51,7 @@ ghcWarningsArgs = do
                                       , "-Wno-redundant-constraints"
                                       , "-Wno-orphans" ]
         , package win32        ? pure [ "-Wno-trustworthy-safe" ]
-        , package xhtml        ? pure [ "-Wno-unused-imports" ] ] ]
+        , package xhtml        ? pure [ "-Wno-unused-imports" ] ]
+        , mconcat
+        [ package cabal        ? pure [ "-Wno-error=deprecations" ] ]
+        ]
