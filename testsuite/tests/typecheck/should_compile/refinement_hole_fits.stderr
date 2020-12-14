@@ -67,12 +67,7 @@ refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
            (and originally defined in ‘GHC.Base’))
         ($) (_ :: [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
-          with ($) @'GHC.Types.LiftedRep @[Integer] @Integer
-          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
-        ($!) (_ :: [Integer] -> Integer)
-          where ($!) :: forall a b. (a -> b) -> a -> b
-          with ($!) @'GHC.Types.LiftedRep @[Integer] @Integer
+          with ($) @GHC.Types.LiftedRep @[Integer] @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
         return (_ :: Integer)
@@ -83,6 +78,11 @@ refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
         pure (_ :: Integer)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) [Integer]) @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        ($!) (_ :: [Integer] -> Integer)
+          where ($!) :: forall a b. (a -> b) -> a -> b
+          with ($!) @GHC.Types.LiftedRep @[Integer] @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
         id (_ :: [Integer] -> Integer)
@@ -162,12 +162,7 @@ refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
            (and originally defined in ‘GHC.Base’))
         ($) (_ :: Integer -> [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
-          with ($) @'GHC.Types.LiftedRep @Integer @([Integer] -> Integer)
-          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
-        ($!) (_ :: Integer -> [Integer] -> Integer)
-          where ($!) :: forall a b. (a -> b) -> a -> b
-          with ($!) @'GHC.Types.LiftedRep @Integer @([Integer] -> Integer)
+          with ($) @GHC.Types.LiftedRep @Integer @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
         return (_ :: [Integer] -> Integer)
@@ -178,6 +173,11 @@ refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
         pure (_ :: [Integer] -> Integer)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) Integer) @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        ($!) (_ :: Integer -> [Integer] -> Integer)
+          where ($!) :: forall a b. (a -> b) -> a -> b
+          with ($!) @GHC.Types.LiftedRep @Integer @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
         id (_ :: Integer -> [Integer] -> Integer)

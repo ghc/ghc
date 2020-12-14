@@ -1,4 +1,2 @@
 
-T18300.hs:13:1: error:
-    • Data instance has non-* return kind ‘TYPE (F Int)’
-    • In the data instance declaration for ‘T’
+T18300.hs:9:23: error: Not in scope: data constructor ‘LiftedRep’

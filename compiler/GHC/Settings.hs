@@ -9,6 +9,7 @@ module GHC.Settings
   , Platform (..)
   , PlatformMisc (..)
   -- * Accessors
+  , dynLibSuffix
   , sProgramName
   , sProjectVersion
   , sGhcUsagePath
@@ -161,6 +162,10 @@ data GhcNameVersion = GhcNameVersion
   { ghcNameVersion_programName    :: String
   , ghcNameVersion_projectVersion :: String
   }
+
+-- | Dynamic library suffix
+dynLibSuffix :: GhcNameVersion -> String
+dynLibSuffix (GhcNameVersion name ver) = '-':name ++ ver
 
 -----------------------------------------------------------------------------
 -- Accessessors from 'Settings'

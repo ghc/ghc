@@ -19,23 +19,41 @@ module GHC.Unit.Info
    , unitPackageNameString
    , unitPackageIdString
    , pprUnitInfo
+
+   , collectIncludeDirs
+   , collectExtraCcOpts
+   , collectLibraryDirs
+   , collectFrameworks
+   , collectFrameworksDirs
+   , unitHsLibs
    )
 where
 
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Platform.Ways
 
-import GHC.Unit.Database
-import Data.Version
-import Data.Bifunctor
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+
+import GHC.Types.Unique
 
 import GHC.Data.FastString
 import qualified GHC.Data.ShortText as ST
-import GHC.Utils.Outputable
+
 import GHC.Unit.Module as Module
-import GHC.Types.Unique
 import GHC.Unit.Ppr
+import GHC.Unit.Database
+
+import GHC.Settings
+
+import Data.Version
+import Data.Bifunctor
+import Data.List (isPrefixOf, stripPrefix)
+import qualified Data.Set as Set
+
 
 -- | Information about an installed unit
 --
@@ -165,3 +183,75 @@ mkUnitPprInfo ufs i = UnitPprInfo
    (unitPackageNameString i)
    (unitPackageVersion i)
    ((unpackFS . unPackageName) <$> unitComponentName i)
+
+-- | Find all the include directories in the given units
+collectIncludeDirs :: [UnitInfo] -> [FilePath]
+collectIncludeDirs ps = map ST.unpack $ ordNub (filter (not . ST.null) (concatMap unitIncludeDirs ps))
+
+-- | Find all the C-compiler options in the given units
+collectExtraCcOpts :: [UnitInfo] -> [String]
+collectExtraCcOpts ps = map ST.unpack (concatMap unitCcOptions ps)
+
+-- | Find all the library directories in the given units for the given ways
+collectLibraryDirs :: Ways -> [UnitInfo] -> [FilePath]
+collectLibraryDirs ws = ordNub . filter notNull . concatMap (libraryDirsForWay ws)
+
+-- | Find all the frameworks in the given units
+collectFrameworks :: [UnitInfo] -> [String]
+collectFrameworks ps = map ST.unpack (concatMap unitExtDepFrameworks ps)
+
+-- | Find all the package framework paths in these and the preload packages
+collectFrameworksDirs :: [UnitInfo] -> [String]
+collectFrameworksDirs ps = map ST.unpack (ordNub (filter (not . ST.null) (concatMap unitExtDepFrameworkDirs ps)))
+
+-- | Either the 'unitLibraryDirs' or 'unitLibraryDynDirs' as appropriate for the way.
+libraryDirsForWay :: Ways -> UnitInfo -> [String]
+libraryDirsForWay ws
+  | WayDyn `elem` ws = map ST.unpack . unitLibraryDynDirs
+  | otherwise        = map ST.unpack . unitLibraryDirs
+
+unitHsLibs :: GhcNameVersion -> Ways -> UnitInfo -> [String]
+unitHsLibs namever ways0 p = map (mkDynName . addSuffix . ST.unpack) (unitLibraries p)
+  where
+        ways1 = Set.filter (/= WayDyn) ways0
+        -- the name of a shared library is libHSfoo-ghc<version>.so
+        -- we leave out the _dyn, because it is superfluous
+
+        -- debug and profiled RTSs include support for -eventlog
+        ways2 | WayDebug `Set.member` ways1 || WayProf `Set.member` ways1
+              = Set.filter (/= WayTracing) ways1
+              | otherwise
+              = ways1
+
+        tag     = waysTag (fullWays ways2)
+        rts_tag = waysTag ways2
+
+        mkDynName x
+         | not (ways0 `hasWay` WayDyn) = x
+         | "HS" `isPrefixOf` x         = x ++ dynLibSuffix namever
+           -- For non-Haskell libraries, we use the name "Cfoo". The .a
+           -- file is libCfoo.a, and the .so is libfoo.so. That way the
+           -- linker knows what we mean for the vanilla (-lCfoo) and dyn
+           -- (-lfoo) ways. We therefore need to strip the 'C' off here.
+         | Just x' <- stripPrefix "C" x = x'
+         | otherwise
+            = panic ("Don't understand library name " ++ x)
+
+        -- Add _thr and other rts suffixes to packages named
+        -- `rts` or `rts-1.0`. Why both?  Traditionally the rts
+        -- package is called `rts` only.  However the tooling
+        -- usually expects a package name to have a version.
+        -- As such we will gradually move towards the `rts-1.0`
+        -- package name, at which point the `rts` package name
+        -- will eventually be unused.
+        --
+        -- This change elevates the need to add custom hooks
+        -- and handling specifically for the `rts` package for
+        -- example in ghc-cabal.
+        addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
+        addSuffix rts@"HSrts-1.0"= rts       ++ (expandTag rts_tag)
+        addSuffix other_lib      = other_lib ++ (expandTag tag)
+
+        expandTag t | null t = ""
+                    | otherwise = '_':t
+
