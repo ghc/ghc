@@ -1,0 +1,155 @@
+cabal-version:  1.18
+name:           network
+version:        3.1.1.1
+license:        BSD3
+license-file:   LICENSE
+maintainer:     Kazu Yamamoto, Evan Borden
+synopsis:       Low-level networking interface
+description:
+  This package provides a low-level networking interface.
+  .
+  === High-Level Packages
+  Other packages provide higher level interfaces:
+  .
+  * connection
+  * hookup
+  * network-simple
+  .
+  === Extended Packages
+  @network@ seeks to provide a cross-platform core for networking. As such some
+  APIs live in extended libraries. Packages in the @network@ ecosystem are
+  often prefixed with @network-@.
+  .
+  ==== @network-bsd@
+  In @network-3.0.0.0@ the @Network.BSD@ module was split off into its own
+  package, @network-bsd-3.0.0.0@.
+  .
+  ==== @network-uri@
+  In @network-2.6@ the @Network.URI@ module was split off into its own package,
+  @network-uri-2.6@. If you're using the @Network.URI@ module you can
+  automatically get it from the right package by adding this to your @.cabal@
+  file:
+  .
+  > library
+  >   build-depends: network-uri-flag
+category:       Network
+build-type:     Configure
+extra-tmp-files:
+  config.log config.status autom4te.cache network.buildinfo
+  include/HsNetworkConfig.h
+extra-source-files:
+  README.md CHANGELOG.md
+  examples/*.hs tests/*.hs config.guess config.sub install-sh
+  configure.ac configure
+  include/HsNetworkConfig.h.in include/HsNet.h include/HsNetDef.h
+  -- C sources only used on some systems
+  cbits/ancilData.c cbits/asyncAccept.c cbits/initWinSock.c
+  cbits/winSockErr.c
+homepage:       https://github.com/haskell/network
+bug-reports:    https://github.com/haskell/network/issues
+tested-with:   GHC == 7.8.4
+             , GHC == 7.10.3
+             , GHC == 8.0.2
+             , GHC == 8.2.2
+             , GHC == 8.4.4
+             , GHC == 8.6.2
+
+library
+  default-language: Haskell2010
+  exposed-modules:
+    Network.Socket
+    Network.Socket.Address
+    Network.Socket.ByteString
+    Network.Socket.ByteString.Lazy
+    Network.Socket.Internal
+  other-modules:
+    Network.Socket.Buffer
+    Network.Socket.ByteString.Internal
+    Network.Socket.ByteString.IO
+    Network.Socket.Cbits
+    Network.Socket.Fcntl
+    Network.Socket.Handle
+    Network.Socket.Imports
+    Network.Socket.If
+    Network.Socket.Info
+    Network.Socket.Name
+    Network.Socket.Options
+    Network.Socket.Shutdown
+    Network.Socket.SockAddr
+    Network.Socket.Syscall
+    Network.Socket.Types
+    Network.Socket.Unix
+
+  build-depends:
+    base >= 4.7 && < 5,
+    bytestring == 0.10.*,
+    deepseq
+
+  include-dirs: include
+  includes: HsNet.h HsNetDef.h
+  install-includes: HsNet.h HsNetDef.h
+  c-sources: cbits/HsNet.c
+  ghc-options: -Wall -fwarn-tabs
+  build-tools: hsc2hs
+
+
+  -- Add some platform specific stuff
+  if !os(windows)
+    other-modules:
+      Network.Socket.ByteString.IOVec
+      Network.Socket.ByteString.Lazy.Posix
+      Network.Socket.ByteString.MsgHdr
+    c-sources: cbits/ancilData.c
+
+  if os(solaris)
+    extra-libraries: nsl, socket
+
+  if os(windows)
+    other-modules:
+      Network.Socket.ByteString.Lazy.Windows
+    c-sources: cbits/initWinSock.c, cbits/winSockErr.c, cbits/asyncAccept.c
+    extra-libraries: ws2_32, iphlpapi
+    -- See https://github.com/haskell/network/pull/362
+    if impl(ghc >= 7.10)
+      cpp-options: -D_WIN32_WINNT=0x0600
+
+test-suite spec
+  default-language: Haskell2010
+  hs-source-dirs: tests
+  main-is: Spec.hs
+  other-modules:
+    Network.Test.Common
+    Network.SocketSpec
+    Network.Socket.ByteStringSpec
+    Network.Socket.ByteString.LazySpec
+  type: exitcode-stdio-1.0
+  ghc-options: -Wall -threaded
+  -- NB: make sure to versions of hspec and hspec-discover
+  --     that work together; easiest way is to constraint
+  --     both packages to a small enough version range.
+  build-tools: hspec-discover >= 2.6
+  build-depends:
+    base >= 4.7 && < 5,
+    bytestring,
+    directory,
+    HUnit,
+    network,
+    hspec >= 2.6
+
+test-suite doctests
+  buildable: False
+  default-language: Haskell2010
+  hs-source-dirs: tests
+  main-is: doctests.hs
+  type: exitcode-stdio-1.0
+
+  build-depends:
+    base >= 4.7 && < 5,
+    doctest >= 0.10.1,
+    network
+
+  ghc-options: -Wall
+
+source-repository head
+  type:     git
+  location: git://github.com/haskell/network.git
