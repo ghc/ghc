@@ -30,6 +30,8 @@
 SpinLock gc_alloc_block_sync;
 #endif
 
+static void push_todo_block(bdescr *bd, gen_workspace *ws);
+
 bdescr* allocGroup_sync(uint32_t n)
 {
     bdescr *bd;
@@ -127,7 +129,8 @@ steal_todo_block (uint32_t g)
     // look for work to steal
     for (n = 0; n < n_gc_threads; n++) {
         if (n == gct->thread_index) continue;
-        bd = stealWSDeque(gc_threads[n]->gens[g].todo_q);
+        q = gc_threads[n]->gens[g].todo_q;
+        bd = stealWSDeque(q);
         if (bd) {
             return bd;
         }
@@ -166,6 +169,26 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
         IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
     }
+}
+
+void
+push_todo_block(bdescr *bd, gen_workspace *ws)
+{
+    debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld",
+            bd->start, (unsigned long)(bd->free - bd->u.scan),
+            ws->gen->no, dequeElements(ws->todo_q));
+
+    ASSERT(bd->link == NULL);
+
+    if(!pushWSDeque(ws->todo_q, bd)) {
+        bd->link = ws->todo_overflow;
+        ws->todo_overflow = bd;
+        ws->n_todo_overflow++;
+    }
+
+#if defined(THREADED_RTS)
+    notifyTodoBlock();
+#endif
 }
 
 /* Note [big objects]
@@ -277,17 +300,7 @@ todo_block_full (uint32_t size, gen_workspace *ws)
         // Otherwise, push this block out to the global list.
         else
         {
-            DEBUG_ONLY( generation *gen );
-            DEBUG_ONLY( gen = ws->gen );
-            debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld",
-                  bd->start, (unsigned long)(bd->free - bd->u.scan),
-                  gen->no, dequeElements(ws->todo_q));
-
-            if (!pushWSDeque(ws->todo_q, bd)) {
-                bd->link = ws->todo_overflow;
-                ws->todo_overflow = bd;
-                ws->n_todo_overflow++;
-            }
+            push_todo_block(bd, ws);
         }
     }
 
