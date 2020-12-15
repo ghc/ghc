@@ -1237,9 +1237,9 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     nanoseconds since the start of executation of the running program.
     This is the elapsed time, not the CPU time.
 
-.. rts-flag:: -ol ⟨filename⟩
+.. rts-flag:: -ol⟨filename⟩
 
-    :default: :file:`<program>.eventlog`
+    :default: :file:`⟨program⟩.eventlog`
     :since: 8.8
 
     Sets the destination for the eventlog produced with the
