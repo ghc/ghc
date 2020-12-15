@@ -130,11 +130,21 @@ MutListScavStats mutlist_scav_stats;
  */
 gc_thread **gc_threads = NULL;
 
-#if !defined(THREADED_RTS)
+
+#if defined(THREADED_RTS)
+static Mutex gc_running_mutex;
+static Condition gc_running_cv;
+#if defined(PROF_SPIN)
+// spin and yield counts for the quasi-SpinLock in waitForGcThreads
+volatile StgWord64 waitForGcThreads_spin = 0;
+volatile StgWord64 waitForGcThreads_yield = 0;
+volatile StgWord64 whitehole_gc_spin = 0;
+#endif // PROF_SPIN
+#else // THREADED_RTS
 // Must be aligned to 64-bytes to meet stated 64-byte alignment of gen_workspace
 StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)]
     ATTRIBUTE_ALIGNED(64);
-#endif
+#endif // THREADED_RTS
 
 // Number of threads running in *this* GC.  Affects how many
 // step->todos[] lists we have to look in to find work.
@@ -143,12 +153,6 @@ uint32_t n_gc_threads;
 // For stats:
 static long copied;        // *words* copied & scavenged during this GC
 
-#if defined(PROF_SPIN) && defined(THREADED_RTS)
-// spin and yield counts for the quasi-SpinLock in waitForGcThreads
-volatile StgWord64 waitForGcThreads_spin = 0;
-volatile StgWord64 waitForGcThreads_yield = 0;
-volatile StgWord64 whitehole_gc_spin = 0;
-#endif
 
 bool work_stealing;
 
@@ -473,29 +477,20 @@ GarbageCollect (uint32_t collect_gen,
    * Repeatedly scavenge all the areas we know about until there's no
    * more scavenging to be done.
    */
+  scavenge_until_all_done();
+  shutdown_gc_threads(gct->thread_index, idle_cap);
+  // The other threads are now stopped.
 
+  // must be last...  invariant is that everything is fully
+  // scavenged at this point.
   StgWeak *dead_weak_ptr_list = NULL;
   StgTSO *resurrected_threads = END_TSO_QUEUE;
-
-  for (;;)
+  while (traverseWeakPtrList(&dead_weak_ptr_list, &resurrected_threads))
   {
+      inc_running();
       scavenge_until_all_done();
-
-      // The other threads are now stopped.  We might recurse back to
-      // here, but from now on this is the only thread.
-
-      // must be last...  invariant is that everything is fully
-      // scavenged at this point.
-      if (traverseWeakPtrList(&dead_weak_ptr_list, &resurrected_threads)) { // returns true if evaced something
-          inc_running();
-          continue;
-      }
-
-      // If we get to here, there's really nothing left to do.
-      break;
   }
 
-  shutdown_gc_threads(gct->thread_index, idle_cap);
 
   // Now see which stable names are still alive.
   gcStableNameTable();
@@ -1104,6 +1099,8 @@ initGcThreads (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
     } else {
         gc_threads = stgMallocBytes (to * sizeof(gc_thread*),
                                      "initGcThreads");
+        initMutex(&gc_running_mutex);
+        initCondition(&gc_running_cv);
     }
 
     for (i = from; i < to; i++) {
@@ -1136,7 +1133,10 @@ freeGcThreads (void)
             }
             stgFree (gc_threads[i]);
         }
+        closeCondition(&gc_running_cv);
+        closeMutex(&gc_running_mutex);
         stgFree (gc_threads);
+
 #else
         for (g = 0; g < RtsFlags.GcFlags.generations; g++)
         {
@@ -1152,7 +1152,7 @@ freeGcThreads (void)
    Start GC threads
    ------------------------------------------------------------------------- */
 
-static volatile StgWord gc_running_threads;
+static StgWord gc_running_threads;
 
 static StgWord
 inc_running (void)
@@ -1167,100 +1167,95 @@ static StgWord
 dec_running (void)
 {
     ASSERT(RELAXED_LOAD(&gc_running_threads) != 0);
-    return atomic_dec(&gc_running_threads);
-}
-
-static bool
-any_work (void)
-{
-    int g;
-    gen_workspace *ws;
-
-    NONATOMIC_ADD(&gct->any_work, 1);
-
-    write_barrier();
-
-    // scavenge objects in compacted generation
-    if (mark_stack_bd != NULL && !mark_stack_empty()) {
-        return true;
-    }
-
-    // Check for global work in any gen.  We don't need to check for
-    // local work, because we have already exited scavenge_loop(),
-    // which means there is no local work for this thread.
-    for (g = 0; g < (int)RtsFlags.GcFlags.generations; g++) {
-        ws = &gct->gens[g];
-        if (ws->todo_large_objects) return true;
-        if (!looksEmptyWSDeque(ws->todo_q)) return true;
-        if (ws->todo_overflow) return true;
-    }
-
 #if defined(THREADED_RTS)
-    if (work_stealing) {
-        uint32_t n;
-        // look for work to steal
-        for (n = 0; n < n_gc_threads; n++) {
-            if (n == gct->thread_index) continue;
-            for (g = RtsFlags.GcFlags.generations-1; g >= 0; g--) {
-                ws = &gc_threads[n]->gens[g];
-                if (!looksEmptyWSDeque(ws->todo_q)) return true;
-            }
-        }
-    }
+    ACQUIRE_LOCK(&gc_running_mutex)
 #endif
 
-    gct->no_work++;
+    StgWord r = atomic_dec(&gc_running_threads);
+
 #if defined(THREADED_RTS)
-    yieldThread();
+    if (r == 0) {
+        broadcastCondition(&gc_running_cv);
+    }
+    RELEASE_LOCK(&gc_running_mutex)
 #endif
 
-    return false;
+    return r;
 }
+
+# if defined(THREADED_RTS)
+void notify_todo_block(void) {
+    if(work_stealing && n_gc_threads != SEQ_CST_LOAD(&gc_running_threads)) {
+        signalCondition(&gc_running_cv);
+    }
+}
+#endif
+
 
 static void
 scavenge_until_all_done (void)
 {
-    DEBUG_ONLY( uint32_t r );
+#if defined(THREADED_RTS) || defined(DEBUG)
+    uint32_t r;
+#endif
 
-
-loop:
+    for(;;) {
 #if defined(THREADED_RTS)
-    if (n_gc_threads > 1) {
-        scavenge_loop();
-    } else {
-        scavenge_loop1();
-    }
-#else
-    scavenge_loop();
-#endif
-
-    collect_gct_blocks();
-
-    // scavenge_loop() only exits when there's no work to do
-
-    // This atomic decrement also serves as a full barrier to ensure that any
-    // writes we made during scavenging are visible to other threads.
-#if defined(DEBUG)
-    r = dec_running();
-#else
-    dec_running();
-#endif
-
-    traceEventGcIdle(gct->cap);
-
-    debugTrace(DEBUG_gc, "%d GC threads still running", r);
-
-    while (SEQ_CST_LOAD(&gc_running_threads) != 0) {
-        // usleep(1);
-        if (any_work()) {
-            inc_running();
-            traceEventGcWork(gct->cap);
-            goto loop;
+        if (n_gc_threads > 1) {
+            scavenge_loop();
+        } else {
+            scavenge_loop1();
         }
-        // any_work() does not remove the work from the queue, it
-        // just checks for the presence of work.  If we find any,
-        // then we increment gc_running_threads and go back to
-        // scavenge_loop() to perform any pending work.
+#else
+        scavenge_loop();
+#endif
+
+        collect_gct_blocks();
+
+        // scavenge_loop() only exits when there's no work to do
+
+        // This atomic decrement also serves as a full barrier to ensure that any
+        // writes we made during scavenging are visible to other threads.
+#if defined(THREADED_RTS) || defined(DEBUG)
+        r = dec_running();
+#else
+        dec_running();
+#endif
+
+        traceEventGcIdle(gct->cap);
+
+        debugTrace(DEBUG_gc, "%d GC threads still running", r);
+
+        // If there's no hope of stealing more work, then there's nowhere else
+        // work can come from and we are finished
+#if defined(THREADED_RTS)
+        if(n_gc_threads > 1 && work_stealing && r != 0) {
+            NONATOMIC_ADD(&gct->any_work, 1);
+            ACQUIRE_LOCK(&gc_running_mutex);
+            // this is SEQ_CST because I haven't considered if it could be
+            // weaker
+            r = SEQ_CST_LOAD(&gc_running_threads);
+            if (r != 0) {
+                waitCondition(&gc_running_cv, &gc_running_mutex);
+                // this is SEQ_CST because I haven't considered if it could be
+                // weaker
+                r = SEQ_CST_LOAD(&gc_running_threads);
+            }
+            // here, if r is 0 then all threads are finished
+            // if r > 0 then either:
+            //  - waitCondition was subject to spurious wakeup
+            //  - a worker thread just pushed a block to it's todo_q
+            // so we loop back, looking for more work.
+            RELEASE_LOCK(&gc_running_mutex);
+            if (r != 0) {
+                inc_running();
+                traceEventGcWork(gct->cap);
+                continue; // do loop
+            }
+            NONATOMIC_ADD(&gct->no_work, 1);
+        }
+#endif
+        break;
     }
 
     traceEventGcDone(gct->cap);
@@ -1394,9 +1389,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
 static void
 start_gc_threads (void)
 {
-#if defined(THREADED_RTS)
-    gc_running_threads = 0;
-#endif
+    SEQ_CST_STORE(&gc_running_threads, 0);
 }
 
 static void
@@ -1424,7 +1417,7 @@ wakeup_gc_threads (uint32_t me USED_IF_THREADS,
 
 // After GC is complete, we must wait for all GC threads to enter the
 // standby state, otherwise they may still be executing inside
-// any_work(), and may even remain awake until the next GC starts.
+// scavenge_until_all_done(), and may even remain awake until the next GC starts.
 static void
 shutdown_gc_threads (uint32_t me USED_IF_THREADS,
                      bool idle_cap[] USED_IF_THREADS)
@@ -2076,3 +2069,22 @@ bool doIdleGCWork(Capability *cap STG_UNUSED, bool all)
 {
     return runSomeFinalizers(all);
 }
+
+
+/* Note [gc_running_mutex]
+ *
+ * TODO finish and polish
+ *
+ *  - gc_running_mutex guards gc_running_threads
+ *  - gc_running_cv is associated condition variable
+ *  - scavenge_until_all_done works until there's no more work, then acquires
+ *    gc_running_mutex and waits on gc_running_cv
+ *  - on wakeup, if gc_running_threads > 0, it restarts looking for work
+ *  - gc_running_cv is signalled when a worker thread pushes a block to it's todo_q and (gc_running_threads < n_gc_threads)
+ *   - this signal is fired while gc_running_mutex is NOT held. So this signal
+ *     is a bit racy. It's ok because the next block pushed will signal again.
+ *  - gc_running_cv is broadcast when dec_running reaches 0
+ *  - the gc leader calls shutdown_gc_threads before it starts it's serial
+ *    collections, so no gc thread can observe gc_running_threads > 0 once
+ *    dec_running broadcasts.
+ * */

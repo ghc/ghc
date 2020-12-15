@@ -34,6 +34,7 @@ void    freeChain_sync(bdescr *bd);
 void    freeGroup_sync(bdescr *bd);
 
 void    push_scanned_block   (bdescr *bd, gen_workspace *ws);
+void    push_todo_block      (bdescr *bd, gen_workspace *ws);
 StgPtr  todo_block_full      (uint32_t size, gen_workspace *ws);
 StgPtr  alloc_todo_block     (gen_workspace *ws, uint32_t size);
 

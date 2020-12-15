@@ -2084,18 +2084,7 @@ static StgWord refill_wsdeque(gen_workspace *ws)
         bdescr* temp2 = temp;
         temp = temp2->link;
         temp2->link = NULL;
-        if(!pushWSDeque(ws->todo_q, temp2)) {
-            temp2->link = temp;
-            temp = temp2;
-            break;
-        }
-    }
-    while(temp != NULL) {
-        bdescr* temp2 = temp;
-        temp = temp2->link;
-        temp2->link = ws->todo_overflow;
-        ws->todo_overflow = temp2;
-        ws->n_todo_overflow++;
+        push_todo_block(temp2, ws);
     }
     return n_todo_overflow;
 }

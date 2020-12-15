@@ -123,12 +123,22 @@ steal_todo_block (uint32_t g)
 {
     uint32_t n;
     bdescr *bd;
+    WSDeque* q;
 
     // look for work to steal
     for (n = 0; n < n_gc_threads; n++) {
         if (n == gct->thread_index) continue;
-        bd = stealWSDeque(gc_threads[n]->gens[g].todo_q);
+        q = gc_threads[n]->gens[g].todo_q;
+        bd = stealWSDeque(q);
         if (bd) {
+            // TODO this commented block may be a good idea gc_running_cv is
+            // signalled when a block is pushed.  we would signal here as well,
+            // because we've stolen and there is something left to steal with
+            // the way we use (gc_running_threads < n_gc_threads) to decide
+            // whether to signal, I believe the below is uneccessary
+            // if(!looksEmptyWSDeque(q)) {
+            //     notify_todo_block();
+            // }
             return bd;
         }
     }
@@ -166,6 +176,19 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
         IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
     }
+}
+
+void
+push_todo_block(bdescr *bd, gen_workspace *ws) {
+    ASSERT(bd->link == NULL);
+    if(!pushWSDeque(ws->todo_q, bd)) {
+        bd->link = ws->todo_overflow;
+        ws->todo_overflow = bd;
+        ws->n_todo_overflow++;
+    }
+#if defined(THREADED_RTS)
+    notify_todo_block();
+#endif
 }
 
 /* Note [big objects]
@@ -277,17 +300,15 @@ todo_block_full (uint32_t size, gen_workspace *ws)
         // Otherwise, push this block out to the global list.
         else
         {
+            // TODO move this to push_todo_block? have to do something about
+            // refill_wsdeques spamming
             DEBUG_ONLY( generation *gen );
             DEBUG_ONLY( gen = ws->gen );
             debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld",
                   bd->start, (unsigned long)(bd->free - bd->u.scan),
                   gen->no, dequeElements(ws->todo_q));
 
-            if (!pushWSDeque(ws->todo_q, bd)) {
-                bd->link = ws->todo_overflow;
-                ws->todo_overflow = bd;
-                ws->n_todo_overflow++;
-            }
+            push_todo_block(bd, ws);
         }
     }
 
