@@ -20,16 +20,13 @@ liftedTypeKindTyCon :: TyCon
 
 constraintKind :: Kind
 
-runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon :: TyCon
+runtimeRepTyCon, vecCountTyCon, vecElemTyCon :: TyCon
 runtimeRepTy :: Type
 
-boxedRepDataConTyCon :: TyCon
-liftedDataConTyCon :: TyCon
-vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
+liftedRepDataConTyCon, vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
 
-liftedRepTy, unliftedRepTy :: Type
-
-intRepDataConTy,
+liftedRepDataConTy, unliftedRepDataConTy,
+  intRepDataConTy,
   int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
   wordRepDataConTy,
   word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,

@@ -98,7 +98,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
-  , liftedRepTy, unliftedRepTy
+  , liftedRepDataConTy, unliftedRepDataConTy
   , intRepDataConTy
   , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
   , wordRepDataConTy
@@ -364,7 +364,7 @@ alphaTy, betaTy, gammaTy, deltaTy :: Type
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 
 alphaTyVarsUnliftedRep :: [TyVar]
-alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (tYPE unliftedRepTy)
+alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (tYPE unliftedRepDataConTy)
 
 alphaTyVarUnliftedRep :: TyVar
 (alphaTyVarUnliftedRep:_) = alphaTyVarsUnliftedRep
@@ -451,28 +451,26 @@ Note [TYPE and RuntimeRep]
 All types that classify values have a kind of the form (TYPE rr), where
 
     data RuntimeRep     -- Defined in ghc-prim:GHC.Types
-      = BoxedRep Levity
+      = LiftedRep
+      | UnliftedRep
       | IntRep
       | FloatRep
       .. etc ..
-
-    data Levity = Lifted | Unlifted
 
     rr :: RuntimeRep
 
     TYPE :: RuntimeRep -> TYPE 'LiftedRep  -- Built in
 
 So for example:
-    Int        :: TYPE ('BoxedRep 'Lifted)
-    Array# Int :: TYPE ('BoxedRep 'Unlifted)
+    Int        :: TYPE 'LiftedRep
+    Array# Int :: TYPE 'UnliftedRep
     Int#       :: TYPE 'IntRep
     Float#     :: TYPE 'FloatRep
-    Maybe      :: TYPE ('BoxedRep 'Lifted) -> TYPE ('BoxedRep 'Lifted)
+    Maybe      :: TYPE 'LiftedRep -> TYPE 'LiftedRep
     (# , #)    :: TYPE r1 -> TYPE r2 -> TYPE (TupleRep [r1, r2])
 
 We abbreviate '*' specially:
-    type LiftedRep = 'BoxedRep 'Lifted
-    type * = TYPE LiftedRep
+    type * = TYPE 'LiftedRep
 
 The 'rr' parameter tells us how the value is represented at runtime.
 
@@ -579,8 +577,8 @@ pcPrimTyCon name roles rep
 primRepToRuntimeRep :: PrimRep -> Type
 primRepToRuntimeRep rep = case rep of
   VoidRep       -> TyConApp tupleRepDataConTyCon [mkPromotedListTy runtimeRepTy []]
-  LiftedRep     -> liftedRepTy
-  UnliftedRep   -> unliftedRepTy
+  LiftedRep     -> liftedRepDataConTy
+  UnliftedRep   -> unliftedRepDataConTy
   IntRep        -> intRepDataConTy
   Int8Rep       -> int8RepDataConTy
   Int16Rep      -> int16RepDataConTy

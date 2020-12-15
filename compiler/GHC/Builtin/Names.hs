@@ -1767,7 +1767,7 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     wordPrimTyConKey, wordTyConKey, word8PrimTyConKey, word8TyConKey,
     word16PrimTyConKey, word16TyConKey, word32PrimTyConKey, word32TyConKey,
     word64PrimTyConKey, word64TyConKey,
-    anyBoxConKey, kindConKey, boxityConKey,
+    liftedConKey, unliftedConKey, anyBoxConKey, kindConKey, boxityConKey,
     typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
     eqReprPrimTyConKey, eqPhantPrimTyConKey,
@@ -1790,6 +1790,8 @@ word32PrimTyConKey                      = mkPreludeTyConUnique 65
 word32TyConKey                          = mkPreludeTyConUnique 66
 word64PrimTyConKey                      = mkPreludeTyConUnique 67
 word64TyConKey                          = mkPreludeTyConUnique 68
+liftedConKey                            = mkPreludeTyConUnique 69
+unliftedConKey                          = mkPreludeTyConUnique 70
 anyBoxConKey                            = mkPreludeTyConUnique 71
 kindConKey                              = mkPreludeTyConUnique 72
 boxityConKey                            = mkPreludeTyConUnique 73
@@ -1805,17 +1807,15 @@ eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
 
 -- Kind constructors
-liftedTypeKindTyConKey, tYPETyConKey, liftedRepTyConKey,
-  constraintKindTyConKey, levityTyConKey, runtimeRepTyConKey,
+liftedTypeKindTyConKey, tYPETyConKey,
+  constraintKindTyConKey, runtimeRepTyConKey,
   vecCountTyConKey, vecElemTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
 tYPETyConKey                            = mkPreludeTyConUnique 88
 constraintKindTyConKey                  = mkPreludeTyConUnique 92
-levityTyConKey                          = mkPreludeTyConUnique 94
 runtimeRepTyConKey                      = mkPreludeTyConUnique 95
 vecCountTyConKey                        = mkPreludeTyConUnique 96
 vecElemTyConKey                         = mkPreludeTyConUnique 97
-liftedRepTyConKey                       = mkPreludeTyConUnique 98
 
 pluginTyConKey, frontendPluginTyConKey :: Unique
 pluginTyConKey                          = mkPreludeTyConUnique 102
@@ -2073,60 +2073,58 @@ metaDataDataConKey                      = mkPreludeDataConUnique 68
 metaConsDataConKey                      = mkPreludeDataConUnique 69
 metaSelDataConKey                       = mkPreludeDataConUnique 70
 
-vecRepDataConKey, tupleRepDataConKey, sumRepDataConKey,
-  boxedRepDataConKey :: Unique
+vecRepDataConKey, tupleRepDataConKey, sumRepDataConKey :: Unique
 vecRepDataConKey                        = mkPreludeDataConUnique 71
 tupleRepDataConKey                      = mkPreludeDataConUnique 72
 sumRepDataConKey                        = mkPreludeDataConUnique 73
-boxedRepDataConKey                      = mkPreludeDataConUnique 74
 
 -- See Note [Wiring in RuntimeRep] in GHC.Builtin.Types
--- Includes all nullary-data-constructor reps. Does not
--- include BoxedRep, VecRep, SumRep, TupleRep.
-runtimeRepSimpleDataConKeys :: [Unique]
-runtimeRepSimpleDataConKeys
-  = map mkPreludeDataConUnique [75..87]
+runtimeRepSimpleDataConKeys, unliftedSimpleRepDataConKeys, unliftedRepDataConKeys :: [Unique]
+liftedRepDataConKey :: Unique
+runtimeRepSimpleDataConKeys@(liftedRepDataConKey : unliftedSimpleRepDataConKeys)
+  = map mkPreludeDataConUnique [74..88]
 
-liftedDataConKey,unliftedDataConKey :: Unique
-liftedDataConKey = mkPreludeDataConUnique 88
-unliftedDataConKey = mkPreludeDataConUnique 89
+unliftedRepDataConKeys = vecRepDataConKey :
+                         tupleRepDataConKey :
+                         sumRepDataConKey :
+                         unliftedSimpleRepDataConKeys
 
 -- See Note [Wiring in RuntimeRep] in GHC.Builtin.Types
 -- VecCount
 vecCountDataConKeys :: [Unique]
-vecCountDataConKeys = map mkPreludeDataConUnique [90..95]
+vecCountDataConKeys = map mkPreludeDataConUnique [89..94]
 
 -- See Note [Wiring in RuntimeRep] in GHC.Builtin.Types
 -- VecElem
 vecElemDataConKeys :: [Unique]
-vecElemDataConKeys = map mkPreludeDataConUnique [96..105]
+vecElemDataConKeys = map mkPreludeDataConUnique [95..104]
 
 -- Typeable things
 kindRepTyConAppDataConKey, kindRepVarDataConKey, kindRepAppDataConKey,
     kindRepFunDataConKey, kindRepTYPEDataConKey,
     kindRepTypeLitSDataConKey, kindRepTypeLitDDataConKey
     :: Unique
-kindRepTyConAppDataConKey = mkPreludeDataConUnique 106
-kindRepVarDataConKey      = mkPreludeDataConUnique 107
-kindRepAppDataConKey      = mkPreludeDataConUnique 108
-kindRepFunDataConKey      = mkPreludeDataConUnique 109
-kindRepTYPEDataConKey     = mkPreludeDataConUnique 110
-kindRepTypeLitSDataConKey = mkPreludeDataConUnique 111
-kindRepTypeLitDDataConKey = mkPreludeDataConUnique 112
+kindRepTyConAppDataConKey = mkPreludeDataConUnique 105
+kindRepVarDataConKey      = mkPreludeDataConUnique 106
+kindRepAppDataConKey      = mkPreludeDataConUnique 107
+kindRepFunDataConKey      = mkPreludeDataConUnique 108
+kindRepTYPEDataConKey     = mkPreludeDataConUnique 109
+kindRepTypeLitSDataConKey = mkPreludeDataConUnique 110
+kindRepTypeLitDDataConKey = mkPreludeDataConUnique 111
 
 typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
-typeLitSymbolDataConKey   = mkPreludeDataConUnique 113
-typeLitNatDataConKey      = mkPreludeDataConUnique 114
+typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
+typeLitNatDataConKey      = mkPreludeDataConUnique 113
 
 -- Unsafe equality
 unsafeReflDataConKey :: Unique
-unsafeReflDataConKey      = mkPreludeDataConUnique 115
+unsafeReflDataConKey      = mkPreludeDataConUnique 114
 
 -- Multiplicity
 
 oneDataConKey, manyDataConKey :: Unique
-oneDataConKey = mkPreludeDataConUnique 116
-manyDataConKey = mkPreludeDataConUnique 117
+oneDataConKey = mkPreludeDataConUnique 115
+manyDataConKey = mkPreludeDataConUnique 116
 
 -- ghc-bignum
 integerISDataConKey, integerINDataConKey, integerIPDataConKey,
@@ -2366,16 +2364,14 @@ mkTrFunKey            = mkPreludeMiscIdUnique 510
 
 -- Representations for primitive types
 trTYPEKey
-  , trTYPE'PtrRepLiftedKey
+  ,trTYPE'PtrRepLiftedKey
   , trRuntimeRepKey
   , tr'PtrRepLiftedKey
-  , trLiftedRepKey
   :: Unique
 trTYPEKey              = mkPreludeMiscIdUnique 511
 trTYPE'PtrRepLiftedKey = mkPreludeMiscIdUnique 512
 trRuntimeRepKey        = mkPreludeMiscIdUnique 513
 tr'PtrRepLiftedKey     = mkPreludeMiscIdUnique 514
-trLiftedRepKey         = mkPreludeMiscIdUnique 515
 
 -- KindReps for common cases
 starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey :: Unique
@@ -2605,5 +2601,4 @@ pretendNameIsInScope :: Name -> Bool
 pretendNameIsInScope n
   = any (n `hasKey`)
     [ liftedTypeKindTyConKey, tYPETyConKey
-    , runtimeRepTyConKey, boxedRepDataConKey
-    , liftedDataConKey ]
+    , runtimeRepTyConKey, liftedRepDataConKey ]

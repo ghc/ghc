@@ -11,4 +11,4 @@ module T15883b where
 import GHC.Exts
 
 newtype Foo rep = MkFoo (forall (a :: TYPE rep). a)
-deriving stock instance Eq (Foo (BoxedRep Lifted))
+deriving stock instance Eq (Foo LiftedRep)
