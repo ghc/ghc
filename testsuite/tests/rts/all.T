@@ -38,6 +38,7 @@ test('derefnull',
       when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(opsys('mingw32'), [ignore_stderr, exit_code(11)]),
+      when(opsys('mingw32'), [fragile(18548)]),
       # ThreadSanitizer changes the output
       when(have_thread_sanitizer(), skip),
       # since these test are supposed to crash the
@@ -63,6 +64,7 @@ test('divbyzero',
       when(platform('powerpc64-unknown-linux'), [ignore_stdout, exit_code(0)]),
       when(platform('powerpc64le-unknown-linux'), [ignore_stdout, exit_code(0)]),
       when(opsys('mingw32'), [ignore_stderr, exit_code(8)]),
+      when(opsys('mingw32'), [fragile(18548)]),
       # The output under OS X is too unstable to readily compare
       when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(136)]),
       when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(136)]),

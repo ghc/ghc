@@ -64,6 +64,7 @@ import System.IO
 -}
 
 codeOutput :: DynFlags
+           -> UnitState
            -> Module
            -> FilePath
            -> ModLocation
@@ -77,7 +78,7 @@ codeOutput :: DynFlags
                   [(ForeignSrcLang, FilePath)]{-foreign_fps-},
                   a)
 
-codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
+codeOutput dflags unit_state this_mod filenm location foreign_stubs foreign_fps pkg_deps
   cmm_stream
   =
     do  {
@@ -104,7 +105,7 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                 ; return cmm
                 }
 
-        ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
+        ; stubs_exist <- outputForeignStubs dflags unit_state this_mod location foreign_stubs
         ; a <- case backend dflags of
                  NCG         -> outputAsm dflags this_mod location filenm
                                           linted_cmm_stream
@@ -190,10 +191,10 @@ outputLlvm dflags filenm cmm_stream =
 ************************************************************************
 -}
 
-outputForeignStubs :: DynFlags -> Module -> ModLocation -> ForeignStubs
+outputForeignStubs :: DynFlags -> UnitState -> Module -> ModLocation -> ForeignStubs
                    -> IO (Bool,         -- Header file created
                           Maybe FilePath) -- C file created
-outputForeignStubs dflags mod location stubs
+outputForeignStubs dflags unit_state mod location stubs
  = do
    let stub_h = mkStubPaths dflags (moduleName mod) location
    stub_c <- newTempName dflags TFL_CurrentModule "c"
@@ -220,7 +221,7 @@ outputForeignStubs dflags mod location stubs
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
-               let rts_pkg = unsafeLookupUnitId (unitState dflags) rtsUnitId in
+               let rts_pkg = unsafeLookupUnitId unit_state rtsUnitId in
                concatMap mk_include (unitIncludes rts_pkg)
             mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
 

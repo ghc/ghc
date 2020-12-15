@@ -136,11 +136,7 @@ deSugar hsc_env
                             })
 
   = do { let dflags = hsc_dflags hsc_env
-             home_unit = hsc_home_unit hsc_env
-             print_unqual = mkPrintUnqualified
-                              (unitState dflags)
-                              home_unit
-                              rdr_env
+             print_unqual = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env
         ; withTiming dflags
                      (text "Desugar"<+>brackets (ppr mod))
                      (const ()) $
