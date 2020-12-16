@@ -1229,6 +1229,9 @@ We do this eager erroring in candidateQTyVars, which always precedes
 generalisation, because at that moment we have a clear picture of what
 skolems are in scope within the type itself (e.g. that 'forall arg').
 
+This change is inspired by and described in Section 7.2 of "Kind Inference
+for Datatypes", POPL'20.
+
 Wrinkle:
 
 We must make absolutely sure that alpha indeed is not
