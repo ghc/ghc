@@ -365,6 +365,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
                 tcl_provenance = OtherCP,
+                tcl_reason     = OtherTR,
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,

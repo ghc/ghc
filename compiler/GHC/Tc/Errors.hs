@@ -743,26 +743,29 @@ mkGivenWarningReporter :: Reporter
 -- See Note [Given warnings]
 mkGivenWarningReporter ctxt cts
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
-       ; dflags <- getDynFlags
-       ; let (implic:_) = cec_encl ctxt
-                 -- Always non-empty when mkGivenWarningReporter is called
-             ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))
-                   -- For given constraints we overwrite the env (and hence src-loc)
-                   -- with one from the immediately-enclosing implication.
-                   -- See Note [Inaccessible code]
-             givens = ic_given implic
-             inaccessible_msg = vcat
-                [ hang (text "Unsatisfiable constraint" <> plural givens <+> pprEvVarTheta givens <+> text "in")
-                       2 (ppr (ic_info implic))
-                , text "This may result in inaccessible code." ]
-             report = important inaccessible_msg `mappend`
-                      mk_relevant_bindings binds_msg
+       ; let env = ctLocEnv (ctLoc ct)
+       ; unless (inDeriving env || inAmbiguityCheck env) $
+          do { dflags <- getDynFlags
+             ; let (implic:_) = cec_encl ctxt
+                       -- Always non-empty when mkGivenWarningReporter is called
+                   ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))
+                         -- For given constraints we overwrite the env (and hence src-loc)
+                         -- with one from the immediately-enclosing implication.
+                         -- See Note [Inaccessible code]
+                   givens = ic_given implic
+                   inaccessible_msg = vcat
+                      [ hang (text "Unsatisfiable constraint" <> plural givens
+                              <+> pprEvVarTheta givens <+> text "in")
+                             2 (ppr (ic_info implic))
+                      , text "This may result in inaccessible code." ]
+                   report = important inaccessible_msg `mappend`
+                            mk_relevant_bindings binds_msg
 
-       ; err <- mkEqErr_help dflags ctxt report ct' ty1 ty2
+             ; err <- mkEqErr_help dflags ctxt report ct' ty1 ty2
 
-       ; traceTc "mkGivenWarningReporter" (ppr ct)
-       ; unless (inDeriving (ctLocEnv (ctLoc ct))) $
-           reportWarning (Reason Opt_WarnInaccessibleCode) err
+             ; traceTc "mkGivenWarningReporter" (ppr ct)
+             ; reportWarning (Reason Opt_WarnInaccessibleCode) err
+             }
        }
   where
     (ct : _ )  = cts    -- Never empty
