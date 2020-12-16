@@ -229,7 +229,7 @@ To use an :c:type:`EventLogWriter` the RTS API provides the following functions:
 .. c:function:: bool startEventLogging(const EventLogWriter *writer)
 
    Start logging events to the given :c:type:`EventLogWriter`. Returns true on
-   success or false is another writer has already been configured.
+   success or false if another writer has already been configured.
 
 .. c:function:: void endEventLogging()
 
