@@ -11,3 +11,5 @@ updateUseThreshold      :: Int -> UnfoldingOpts -> UnfoldingOpts
 updateFunAppDiscount    :: Int -> UnfoldingOpts -> UnfoldingOpts
 updateDictDiscount      :: Int -> UnfoldingOpts -> UnfoldingOpts
 updateVeryAggressive    :: Bool -> UnfoldingOpts -> UnfoldingOpts
+updateCaseThreshold     :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateCaseScaling       :: Int -> UnfoldingOpts -> UnfoldingOpts

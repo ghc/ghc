@@ -338,6 +338,7 @@ test('T18603', normal, compile, ['-dcore-lint -O'])
 # T18649 should /not/ generate a specialisation rule
 test('T18649', normal, compile, ['-O -ddump-rules -Wno-simplifiable-class-constraints'])
 
+test('T18730', normal, multimod_compile, ['T18730_A', '-dcore-lint -O'])
 test('T18747A', normal, compile, [''])
 test('T18747B', normal, compile, [''])
 test('T18815', only_ways(['optasm']), makefile_test, ['T18815'])

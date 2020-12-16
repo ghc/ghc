@@ -254,8 +254,13 @@ checkedTick t
       [ text "When trying" <+> ppr t
       , text "To increase the limit, use -fsimpl-tick-factor=N (default 100)."
       , space
-      , text "If you need to increase the limit substantially, please file a"
-      , text "bug report and indicate the factor you needed."
+      , text "In addition try adjusting -funfolding-case-threshold=N and"
+      , text "-funfolding-case-scaling=N for the module in question."
+      , text "Using threshold=1 and scaling=5 should break most inlining loops."
+      , space
+      , text "If you need to increase the tick factor substantially, while also"
+      , text "adjusting unfolding parameters please file a bug report and"
+      , text "indicate the factor you needed."
       , space
       , text "If GHC was unable to complete compilation even"
                <+> text "with a very large factor"
