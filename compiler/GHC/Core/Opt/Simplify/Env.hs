@@ -14,7 +14,7 @@ module GHC.Core.Opt.Simplify.Env (
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
         mkSimplEnv, extendIdSubst,
         extendTvSubst, extendCvSubst,
-        zapSubstEnv, setSubstEnv,
+        zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
         setInScopeSet, modifyInScope, addNewInScopeIds,
         getSimplRules,
@@ -104,6 +104,8 @@ data SimplEnv
         -- The current set of in-scope variables
         -- They are all OutVars, and all bound in this module
       , seInScope   :: InScopeSet       -- OutVars only
+
+      , seCaseDepth :: !Int  -- Depth of multi-branch case alternatives
     }
 
 data SimplFloats
@@ -273,11 +275,12 @@ points we're substituting. -}
 
 mkSimplEnv :: SimplMode -> SimplEnv
 mkSimplEnv mode
-  = SimplEnv { seMode = mode
-             , seInScope = init_in_scope
-             , seTvSubst = emptyVarEnv
-             , seCvSubst = emptyVarEnv
-             , seIdSubst = emptyVarEnv }
+  = SimplEnv { seMode      = mode
+             , seInScope   = init_in_scope
+             , seTvSubst   = emptyVarEnv
+             , seCvSubst   = emptyVarEnv
+             , seIdSubst   = emptyVarEnv
+             , seCaseDepth = 0 }
         -- The top level "enclosing CC" is "SUBSUMED".
 
 init_in_scope :: InScopeSet
@@ -319,6 +322,9 @@ setMode mode env = env { seMode = mode }
 
 updMode :: (SimplMode -> SimplMode) -> SimplEnv -> SimplEnv
 updMode upd env = env { seMode = upd (seMode env) }
+
+bumpCaseDepth :: SimplEnv -> SimplEnv
+bumpCaseDepth env = env { seCaseDepth = seCaseDepth env + 1 }
 
 ---------------------
 extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
