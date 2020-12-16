@@ -9,17 +9,3 @@ T10715.hs:17:1: warning: [-Winaccessible-code (in -Wdefault)]
       the type signature for:
         doCoerce :: forall a. Coercible a (X a) => a -> X a
     This may result in inaccessible code.
-
-T10715.hs:17:13: warning: [-Winaccessible-code (in -Wdefault)]
-    • Couldn't match representation of type ‘a’ with that of ‘X a’
-      ‘a’ is a rigid type variable bound by
-        the type signature for:
-          doCoerce :: forall a. Coercible a (X a) => a -> X a
-        at T10715.hs:17:13-41
-      Unsatisfiable constraint Coercible a (X a) in
-        the type signature for:
-          doCoerce :: forall a. Coercible a (X a) => a -> X a
-      This may result in inaccessible code.
-    • In the ambiguity check for ‘doCoerce’
-      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-      In the type signature: doCoerce :: Coercible a (X a) => a -> X a
