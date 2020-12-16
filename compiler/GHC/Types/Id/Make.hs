@@ -1657,18 +1657,36 @@ Implementing 'lazy' is a bit tricky:
 
 Note [noinlineId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~
-noinline :: forall a. a -> a
-
 'noinline' is used to make sure that a function f is never inlined,
-e.g., as in 'noinline f x'.  Ordinarily, the identity function with NOINLINE
-could be used to achieve this effect; however, this has the unfortunate
-result of leaving a (useless) call to noinline at runtime.  So we have
-a little bit of magic to optimize away 'noinline' after we are done
-running the simplifier.
+e.g., as in 'noinline f x'.  We won't inline f because we never inline
+lone variables (see Note [Lone variables] in GHC.Core.Unfold
 
-'noinline' needs to be wired-in because it gets inserted automatically
-when we serialize an expression to the interface format. See
-Note [Inlining and hs-boot files] in GHC.CoreToIface
+You might think that we could implement noinline like this:
+   {-# NOINLINE #-}
+   noinline :: forall a. a -> a
+   noinline x = x
+
+But actually we give 'noinline' a wired-in name for three distinct reasons:
+
+1. We don't want to leave a (useless) call to noinline in the final program,
+   to be executed at runtime. So we have a little bit of magic to
+   optimize away 'noinline' after we are done running the simplifier.
+   This is done in GHC.CoreToStg.Prep.cpeApp.
+
+2. 'noinline' sometimes gets inserted automatically when we serialize an
+   expression to the interface format, in GHC.CoreToIface.toIfaceVar.
+   See Note [Inlining and hs-boot files] in GHC.CoreToIface
+
+3. Given foo :: Eq a => [a] -> Bool, the expression
+     noinline foo x xs
+   where x::Int, will naturally desugar to
+      noinline @Int (foo @Int dEqInt) x xs
+   But now it's entirely possible htat (foo @Int dEqInt) will inline foo,
+   since 'foo' is no longer a lone variable -- see #18995
+
+   Solution: in the desugarer, rewrite
+      noinline (f x y)  ==>  noinline f x y
+   This is done in GHC.HsToCore.Utils.mkCoreAppDs.
 
 Note that noinline as currently implemented can hide some simplifications since
 it hides strictness from the demand analyser. Specifically, the demand analyser

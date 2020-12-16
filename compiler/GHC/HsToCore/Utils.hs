@@ -494,6 +494,13 @@ mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg
                           -> v1        -- Note [Desugaring seq], points (2) and (3)
                    _      -> mkWildValBinder Many ty1
 
+mkCoreAppDs _ (Var f `App` Type _r) arg
+  | f `hasKey` noinlineIdKey   -- See Note [noinlineId magic] in GHC.Types.Id.Make
+  , (fun, args) <- collectArgs arg
+  , not (null args)
+  = (Var f `App` Type (exprType fun) `App` fun)
+    `mkCoreApps` args
+
 mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in GHC.Core.Make
 
 -- NB: No argument can be levity polymorphic

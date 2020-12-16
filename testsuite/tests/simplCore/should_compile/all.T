@@ -341,4 +341,4 @@ test('T18649', normal, compile, ['-O -ddump-rules -Wno-simplifiable-class-constr
 test('T18747A', normal, compile, [''])
 test('T18747B', normal, compile, [''])
 test('T18815', only_ways(['optasm']), makefile_test, ['T18815'])
-
+test('T18995', [ grep_errmsg(r'print') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
