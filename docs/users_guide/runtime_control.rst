@@ -1238,6 +1238,15 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     Sets the destination for the eventlog produced with the
     :rts-flag:`-l ⟨flags⟩` flag.
 
+.. rts-flag:: --eventlog-flush-interval=⟨seconds⟩
+
+    :default: disabled
+    :since: 9.2
+
+    When enabled, the eventlog will be flushed periodically every
+    ⟨seconds⟩. This can be useful in live-monitoring situations where the
+    eventlog is consumed in real-time by another process.
+
 .. rts-flag:: -v [⟨flags⟩]
 
     Log events as text to standard output, instead of to the
