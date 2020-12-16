@@ -130,7 +130,6 @@ import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.Pair
 import GHC.Types.Unique.Set
-import GHC.Driver.Session
 import GHC.Driver.Ppr
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Basic ( TypeOrKind(..) )
