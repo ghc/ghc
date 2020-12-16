@@ -1,0 +1,22 @@
+Restarting eventlog...
+init
+Event log started with EVENT_HEADER_BEGIN
+write
+write
+write
+write
+stop
+init
+Event log started with EVENT_HEADER_BEGIN
+write
+write
+write
+write
+stop
+init
+Event log started with EVENT_HEADER_BEGIN
+write
+write
+write
+write
+stop
