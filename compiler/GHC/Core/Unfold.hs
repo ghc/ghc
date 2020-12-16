@@ -26,7 +26,7 @@ module GHC.Core.Unfold (
         UnfoldingOpts (..), defaultUnfoldingOpts,
         updateCreationThreshold, updateUseThreshold,
         updateFunAppDiscount, updateDictDiscount,
-        updateVeryAggressive,
+        updateVeryAggressive, updateCaseScaling, updateCaseThreshold,
 
         ArgSummary(..),
 
@@ -82,6 +82,12 @@ data UnfoldingOpts = UnfoldingOpts
 
    , unfoldingVeryAggressive :: !Bool
       -- ^ Force inlining in many more cases
+
+      -- Don't consider depth up to x
+   , unfoldingCaseThreshold :: !Int
+
+      -- Penalize depth with 1/x
+   , unfoldingCaseScaling :: !Int
    }
 
 defaultUnfoldingOpts :: UnfoldingOpts
@@ -106,6 +112,13 @@ defaultUnfoldingOpts = UnfoldingOpts
       -- we'll be able to pick the right method from a dictionary
 
    , unfoldingVeryAggressive = False
+
+      -- Only apply scaling once we are deeper than threshold cases
+      -- in an RHS.
+   , unfoldingCaseThreshold = 2
+
+      -- Penalize depth with (size*depth)/scaling
+   , unfoldingCaseScaling = 30
    }
 
 -- Helpers for "GHC.Driver.Session"
@@ -124,6 +137,13 @@ updateDictDiscount n opts = opts { unfoldingDictDiscount = n }
 
 updateVeryAggressive :: Bool -> UnfoldingOpts -> UnfoldingOpts
 updateVeryAggressive n opts = opts { unfoldingVeryAggressive = n }
+
+
+updateCaseThreshold :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateCaseThreshold n opts = opts { unfoldingCaseThreshold = n }
+
+updateCaseScaling :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateCaseScaling n opts = opts { unfoldingCaseScaling = n }
 
 {-
 Note [Occurrence analysis of unfoldings]
@@ -1033,6 +1053,7 @@ StrictAnal.addStrictnessInfoToTopId
 -}
 
 callSiteInline :: DynFlags
+               -> Int                   -- Case depth
                -> Id                    -- The Id
                -> Bool                  -- True <=> unfolding is active
                -> Bool                  -- True if there are no arguments at all (incl type args)
@@ -1075,7 +1096,7 @@ instance Outputable CallCtxt where
   ppr DiscArgCtxt = text "DiscArgCtxt"
   ppr RuleArgCtxt = text "RuleArgCtxt"
 
-callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
+callSiteInline dflags !case_depth id active_unfolding lone_variable arg_infos cont_info
   = case idUnfolding id of
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and*
@@ -1083,7 +1104,7 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
         CoreUnfolding { uf_tmpl = unf_template
                       , uf_is_work_free = is_wf
                       , uf_guidance = guidance, uf_expandable = is_exp }
-          | active_unfolding -> tryUnfolding dflags id lone_variable
+          | active_unfolding -> tryUnfolding dflags case_depth id lone_variable
                                     arg_infos cont_info unf_template
                                     is_wf is_exp guidance
           | otherwise -> traceInline dflags id "Inactive unfolding:" (ppr id) Nothing
@@ -1110,10 +1131,106 @@ traceInline dflags inline_id str doc result
       = False
 {-# INLINE traceInline #-} -- see Note [INLINE conditional tracing utilities]
 
-tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
+{- Note [Avoid inlining into deeply nested cases]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider a function f like this:
+
+  f arg1 arg2 =
+    case ...
+      ... -> g arg1
+      ... -> g arg2
+
+This function is small. So should be safe to inline.
+However sometimes this doesn't quite work out like that.
+Consider this code:
+
+f1 arg1 arg2 ... = ...
+    case _foo of
+      alt1 -> ... f2 arg1 ...
+      alt2 -> ... f2 arg2 ...
+
+f2 arg1 arg2 ... = ...
+    case _foo of
+      alt1 -> ... f3 arg1 ...
+      alt2 -> ... f3 arg2 ...
+
+f3 arg1 arg2 ... = ...
+
+... repeats up to n times. And then f1 is
+applied to some arguments:
+
+foo = ... f1 <interestingArgs> ...
+
+Initially f2..fn are not interesting to inline so we don't.
+However we see that f1 is applied to interesting args.
+So it's an obvious choice to inline those:
+
+foo =
+    ...
+      case _foo of
+        alt1 -> ... f2 <interestingArg> ...
+        alt2 -> ... f2 <interestingArg> ...
+
+As a result we go and inline f2 both mentions of f2 in turn are now applied to interesting
+arguments and f2 is small:
+
+foo =
+    ...
+      case _foo of
+        alt1 -> ... case _foo of
+            alt1 -> ... f3 <interestingArg> ...
+            alt2 -> ... f3 <interestingArg> ...
+
+        alt2 -> ... case _foo of
+            alt1 -> ... f3 <interestingArg> ...
+            alt2 -> ... f3 <interestingArg> ...
+
+The same thing happens for each binding up to f_n, duplicating the amount of inlining
+done in each step. Until at some point we are either done or run out of simplifier
+ticks/RAM. This pattern happened #18730.
+
+To combat this we introduce one more heuristic when weighing inlining decision.
+We keep track of a "case-depth". Which increases each time we look inside a case
+expression with more than one alternative.
+
+We then apply a penalty to inlinings based on the case-depth at which they would
+be inlined. Bounding the number of inlinings in such a scenario.
+
+The heuristic can be tuned in two ways:
+
+* We can ignore the first n levels of case nestings for inlining decisions using
+  -funfolding-case-threshold.
+* The penalty grows linear with the depth. It's computed as size*(depth-threshold)/scaling.
+  Scaling can be set with -funfolding-case-scaling.
+
+Some guidance on setting these defaults:
+
+* A low treshold (<= 2) is needed to prevent exponential cases from spiraling out of
+  control. We picked 2 for no particular reason.
+* Scaling the penalty by any more than 30 means the reproducer from
+  T18730 won't compile even with reasonably small values of n. Instead
+  it will run out of runs/ticks. This means to positively affect the reproducer
+  a scaling <= 30 is required.
+* A scaling of >= 15 still causes a few very large regressions on some nofib benchmarks.
+  (+80% for gc/fulsom, +90% for real/ben-raytrace, +20% for spectral/fibheaps)
+* A scaling of >= 25 showed no regressions on nofib. However it showed a number of
+  (small) regression for compiler perf benchmarks.
+
+The end result is that we are settling for a scaling of 30, with a threshold of 2.
+This gives us minimal compiler perf regressions. No nofib runtime regressions and
+will still avoid this pattern sometimes. This is a "safe" default, where we err on
+the side of compiler blowup instead of risking runtime regressions.
+
+For cases where the default falls short the flag can be changed to allow more/less inlining as
+needed on a per-module basis.
+
+-}
+
+tryUnfolding :: DynFlags -> Int -> Id -> Bool -> [ArgSummary] -> CallCtxt
              -> CoreExpr -> Bool -> Bool -> UnfoldingGuidance
              -> Maybe CoreExpr
-tryUnfolding dflags id lone_variable
+tryUnfolding dflags !case_depth id lone_variable
              arg_infos cont_info unf_template
              is_wf is_exp guidance
  = case guidance of
@@ -1138,9 +1255,16 @@ tryUnfolding dflags id lone_variable
         -> traceInline dflags id str (mk_doc some_benefit extra_doc False) Nothing
         where
           some_benefit = calc_some_benefit (length arg_discounts)
-          extra_doc = text "discounted size =" <+> int discounted_size
-          discounted_size = size - discount
-          small_enough = discounted_size <= unfoldingUseThreshold uf_opts
+          extra_doc = vcat [ text "case depth =" <+> int case_depth
+                           , text "depth based penalty =" <+> int depth_penalty
+                           , text "discounted size =" <+> int adjusted_size ]
+          -- See Note [Avoid inlining into deeply nested cases]
+          depth_treshold = unfoldingCaseThreshold uf_opts
+          depth_scaling = unfoldingCaseScaling uf_opts
+          depth_penalty | case_depth <= depth_treshold = 0
+                        | otherwise       = (size * (case_depth - depth_treshold)) `div` depth_scaling
+          adjusted_size = size + depth_penalty - discount
+          small_enough = adjusted_size <= unfoldingUseThreshold uf_opts
           discount = computeDiscount arg_discounts res_discount arg_infos cont_info
 
   where

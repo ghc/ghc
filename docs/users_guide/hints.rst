@@ -368,3 +368,70 @@ discussed in the previous section. Strict functions get right down to
 business, rather than filling up the heap with closures (the system's
 notes to itself about how to evaluate something, should it eventually be
 required).
+
+.. _control-inlining:
+
+Controlling inlining via optimisation flags.
+--------------------------------------------
+
+.. index::
+    single: inlining, controlling
+    single: unfolding, controlling
+
+Inlining is one of the major optimizations GHC performs. Partially
+because inlining often allows other optimizations to be triggered.
+Sadly this is also a double edged sword. While inlining can often
+cut through runtime overheads this usually comes at the cost
+of not just program size, but also compiler performance. In
+extreme cases making it impossible to compile certain code.
+
+For this reason GHC offers various ways to tune inlining
+behaviour.
+
+Unfolding creation
+~~~~~~~~~~~~~~~~~~
+
+In order for a function from a different module to be inlined
+GHC requires the functions unfolding. The following flags can
+be used to control unfolding creation. Making their creation more
+or less likely:
+
+* :ghc-flag:`-fexpose-all-unfoldings`
+* :ghc-flag:`-funfolding-creation-threshold=⟨n⟩`
+
+Inlining decisions
+~~~~~~~~~~~~~~~~~~
+
+If a unfolding is available the following flags can impact GHC's
+decision about inlining a specific binding.
+
+* :ghc-flag:`-funfolding-use-threshold=⟨n⟩`
+* :ghc-flag:`-funfolding-case-threshold=⟨n⟩`
+* :ghc-flag:`-funfolding-case-scaling=⟨n⟩`
+* :ghc-flag:`-funfolding-dict-discount=⟨n⟩`
+* :ghc-flag:`-funfolding-fun-discount=⟨n⟩`
+
+Should the simplifier run out of ticks because of a inlining loop
+users are encouraged to try decreasing :ghc-flag:`-funfolding-case-threshold=⟨n⟩`
+or :ghc-flag:`-funfolding-case-scaling=⟨n⟩` to limit inlining into
+deeply nested expressions while allowing a higher tick factor.
+
+The defaults of these are tuned such that we don't expect regressions for most
+user programs. Using a :ghc-flag:`-funfolding-case-threshold=⟨n⟩` of 1-2 with a
+:ghc-flag:`-funfolding-case-scaling=⟨n⟩` of 15-25 can cause usually small runtime
+regressions but will prevent most inlining loops from getting out of control.
+
+In extreme cases lowering scaling and treshold further can be useful, but at that
+point it's very likely that beneficial inlining is prevented as well resulting
+in significant runtime regressions.
+
+In such cases it's recommended to move the problematic piece of code into it's own
+module and changing inline parameters for the offending module only.
+
+Inlining generics
+~~~~~~~~~~~~~~~~~
+
+There are also flags specific to the inlining of generics:
+
+:ghc-flag:`-finline-generics`
+:ghc-flag:`-finline-generics-aggressively`
