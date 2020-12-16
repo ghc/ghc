@@ -1882,7 +1882,7 @@ simplIdF env var cont
 
 completeCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 completeCall env var cont
-  | Just expr <- callSiteInline dflags var active_unf
+  | Just expr <- callSiteInline dflags case_depth var active_unf
                                 lone_variable arg_infos interesting_cont
   -- Inline the variable's RHS
   = do { checkedTick (UnfoldingDone var)
@@ -1897,7 +1897,8 @@ completeCall env var cont
        ; rebuildCall env info cont }
 
   where
-    dflags = seDynFlags env
+    dflags     = seDynFlags env
+    case_depth = seCaseDepth env
     (lone_variable, arg_infos, call_cont) = contArgs cont
     n_val_args       = length arg_infos
     interesting_cont = interestingCallContext env call_cont
@@ -2723,9 +2724,11 @@ reallyRebuildCase env scrut case_bndr alts cont
        ; rebuild env case_expr cont }
 
   | otherwise
-  = do { (floats, cont') <- mkDupableCaseCont env alts cont
-       ; case_expr <- simplAlts (env `setInScopeFromF` floats)
-                                scrut (scaleIdBy holeScaling case_bndr) (scaleAltsBy holeScaling alts) cont'
+  = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
+       ; case_expr <- simplAlts env' scrut
+                                (scaleIdBy holeScaling case_bndr)
+                                (scaleAltsBy holeScaling alts)
+                                cont'
        ; return (floats, case_expr) }
   where
     holeScaling = contHoleScaling cont
@@ -3233,10 +3236,15 @@ join points and inlining them away.  See #4930.
 
 --------------------
 mkDupableCaseCont :: SimplEnv -> [InAlt] -> SimplCont
-                  -> SimplM (SimplFloats, SimplCont)
+                  -> SimplM ( SimplFloats  -- Join points (if any)
+                            , SimplEnv     -- Use this for the alts
+                            , SimplCont)
 mkDupableCaseCont env alts cont
-  | altsWouldDup alts = mkDupableCont env cont
-  | otherwise         = return (emptyFloats env, cont)
+  | altsWouldDup alts = do { (floats, cont) <- mkDupableCont env cont
+                           ; let env' = bumpCaseDepth $
+                                        env `setInScopeFromF` floats
+                           ; return (floats, env', cont) }
+  | otherwise         = return (emptyFloats env, env, cont)
 
 altsWouldDup :: [InAlt] -> Bool -- True iff strictly > 1 non-bottom alternative
 altsWouldDup []  = False        -- See Note [Bottom alternatives]
@@ -3369,12 +3377,11 @@ mkDupableContWithDmds env _
         --              in case [...hole...] of { pi -> ji xij }
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
     do  { tick (CaseOfCase case_bndr)
-        ; (floats, alt_cont) <- mkDupableCaseCont env alts cont
+        ; (floats, alt_env, alt_cont) <- mkDupableCaseCont (se `setInScopeFromE` env) alts cont
                 -- NB: We call mkDupableCaseCont here to make cont duplicable
                 --     (if necessary, depending on the number of alts)
                 -- And this is important: see Note [Fusing case continuations]
 
-        ; let alt_env = se `setInScopeFromF` floats
         ; let cont_scaling = contHoleScaling cont
           -- See Note [Scaling in case-of-case]
         ; (alt_env', case_bndr') <- simplBinder alt_env (scaleIdBy cont_scaling case_bndr)
