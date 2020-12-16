@@ -10,14 +10,18 @@ test('RaeBlogPost', normal, compile, [''])
 test('mkGADTVars', normal, compile, [''])
 test('TypeLevelVec',normal,compile, [''])
 test('T9632', normal, compile, [''])
-# The dynamic-paper test fails in the profasm way if we don't increase
+
+# dynamic-paper used to run out of simplfier ticks because of
+# infinite inlining, but the new case-depth mechanism cuts that off,
+# so it now compiles fine.
+#
+# Historical notes: The dynamic-paper test fails in the profasm way if we don't increase
 # the simplifier tick limit. If we do, we run out of stack
 # space. If we increase the stack size enough with -K,
 # we run out of simplifier ticks again. This is
 # discussed in #11330.
-test('dynamic-paper',
-     expect_broken_for(11330, ['profasm']),
-     compile_fail, [''])
+test('dynamic-paper', normal, compile, [''])
+
 test('T11311', normal, compile, [''])
 test('T11405', normal, compile, [''])
 test('T11241', normal, compile, [''])

@@ -5,6 +5,8 @@ Considering inlining: foo
   is exp: True
   is work-free: True
   guidance IF_ARGS [0] 30 0
+  case depth = 0
+  depth based penalty = 0
   discounted size = 10
   ANSWER = YES
 Inactive unfolding: foo1
