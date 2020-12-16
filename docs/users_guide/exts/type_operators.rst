@@ -12,24 +12,11 @@ Type operators
 
     Allow the use and definition of types with operator names.
 
-In types, an operator symbol like ``(+)`` is normally treated as a type
-*variable*, just like ``a``. Thus in Haskell 98 you can say
+The language :extension:`TypeOperators` allows you to use infix operators
+in types.
 
-::
-
-    type T (+) = ((+), (+))
-    -- Just like: type T a = (a,a)
-
-    f :: T Int -> Int
-    f (x,y)= x
-
-As you can see, using operators in this way is not very useful, and
-Haskell 98 does not even allow you to write them infix.
-
-The language :extension:`TypeOperators` changes this behaviour:
-
--  Operator symbols become type *constructors* rather than type
-   *variables*.
+-  Operator symbols are *constructors* rather than type
+   *variables* (as they are in terms).
 
 -  Operator symbols in types can be written infix, both in definitions
    and uses. For example: ::
@@ -37,6 +24,12 @@ The language :extension:`TypeOperators` changes this behaviour:
        data a + b = Plus a b
        type Foo = Int + Bool
 
+-  Alphanumeric type constructors can now be written infix, using backquote
+   syntax::
+
+     x :: Int `Either` Bool
+     x = Left 5
+       
 -  There is now some potential ambiguity in import and export lists; for
    example if you write ``import M( (+) )`` do you mean the *function*
    ``(+)`` or the *type constructor* ``(+)``? The default is the former,
@@ -52,4 +45,18 @@ The language :extension:`TypeOperators` changes this behaviour:
    declarations but, as in :ref:`infix-tycons`, the function and type
    constructor share a single fixity.
 
+-  There is now potential ambiguity in the traditional syntax for
+   data constructor declarations. For example::
 
+     type a :+: b = Either a b
+     data X = Int :+: Bool :+: Char
+
+   This code wants to declare both a type-level ``:+:`` and a term-level
+   ``:+:`` (which is, generally, allowed). But we cannot tell how to
+   parenthesize the data constructor declaration in ``X``: either way
+   makes sense. We might
+   imagine that a fixity declaration could help us, but it is awkward
+   to apply the fixity declaration to the very definition of a new
+   data constructor. Instead of declaring delicate rules around this
+   issue, GHC simply rejects if the top level of a traditional-syntax
+   data constructor declaration uses two operators without parenthesizing.
