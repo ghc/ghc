@@ -25,8 +25,9 @@ void sendMessage    (Capability *from_cap, Capability *to_cap, Message *msg);
 INLINE_HEADER void
 doneWithMsgThrowTo (Capability *cap, MessageThrowTo *m)
 {
-    // The message better be locked
-    ASSERT(m->header.info == &stg_WHITEHOLE_info);
+    // The message better be locked (unless we are running single-threaded,
+    // where we are a bit more lenient (#19075).
+    ASSERT(n_capabilities == 1 || m->header.info == &stg_WHITEHOLE_info);
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
       updateRemembSetPushClosure(cap, (StgClosure *) m->link);
       updateRemembSetPushClosure(cap, (StgClosure *) m->source);
