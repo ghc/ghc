@@ -237,6 +237,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.user          = false;
     RtsFlags.TraceFlags.ticky         = false;
     RtsFlags.TraceFlags.trace_output  = NULL;
+    RtsFlags.TraceFlags.eventlogFlushTime = 0;
 #endif
 
 #if defined(PROFILING)
@@ -976,6 +977,16 @@ error = true;
                       OPTION_SAFE;
                       printRtsInfo(rtsConfig);
                       stg_exit(0);
+                  }
+                  else if (strequal("eventlog-flush-interval=",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      double intervalSeconds = parseDouble(rts_argv[arg]+26, &error);
+                      if (error) {
+                          errorBelch("bad value for --eventlog-flush-interval");
+                      }
+                      RtsFlags.TraceFlags.eventlogFlushTime =
+                          fsecondsToTime(intervalSeconds);
                   }
                   else if (strequal("copying-gc",
                                &rts_argv[arg][2])) {
@@ -1797,6 +1808,14 @@ static void normaliseRtsOpts (void)
             RtsFlags.MiscFlags.tickInterval;
     } else {
         RtsFlags.ProfFlags.heapProfileIntervalTicks = 0;
+    }
+
+    if (RtsFlags.TraceFlags.eventlogFlushTime > 0) {
+        RtsFlags.TraceFlags.eventlogFlushTicks =
+            RtsFlags.TraceFlags.eventlogFlushTime /
+            RtsFlags.MiscFlags.tickInterval;
+    } else {
+        RtsFlags.TraceFlags.eventlogFlushTicks = 0;
     }
 
     if (RtsFlags.GcFlags.stkChunkBufferSize >
