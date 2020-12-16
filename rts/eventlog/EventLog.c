@@ -579,11 +579,19 @@ eventLogStatus(void)
     }
 }
 
+/*
+ * Preconditions:
+ *  - initEventLogging has been called
+ *  - all buffers are empty
+ *
+ * N.B. the eventlog format requires that the header not be preceded by a block marker.
+ * c.f. #19078.
+ */
 static bool
 startEventLogging_(void)
 {
     initEventLogWriter();
-
+    ASSERT(eventBuf.begin == eventBuf.pos);
     postHeaderEvents();
 
     // Flush capEventBuf with header.
@@ -594,7 +602,9 @@ startEventLogging_(void)
     printAndClearEventBuf(&eventBuf);
 
     for (uint32_t c = 0; c < get_n_capabilities(); ++c) {
-        postBlockMarker(&capEventBuf[c]);
+        EventsBuf *eb = &capEventBuf[c];
+        ASSERT(eb->begin == eb->pos); // buffers must be empty
+        postBlockMarker(eb);
     }
     return true;
 }
@@ -632,6 +642,7 @@ endEventLogging(void)
     // Flush all events remaining in the buffers.
     for (uint32_t c = 0; c < n_capabilities; ++c) {
         printAndClearEventBuf(&capEventBuf[c]);
+        resetEventsBuf(&capEventBuf[c]);
     }
     printAndClearEventBuf(&eventBuf);
     resetEventsBuf(&eventBuf); // we don't want the block marker
@@ -641,6 +652,9 @@ endEventLogging(void)
 
     // Flush the end of data marker.
     printAndClearEventBuf(&eventBuf);
+
+    // Ensure the buffer is clear in case we later restart logging
+    resetEventsBuf(&eventBuf);
 
     stopEventLogWriter();
     event_log_writer = NULL;
