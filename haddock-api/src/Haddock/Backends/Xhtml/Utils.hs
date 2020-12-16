@@ -21,7 +21,8 @@ module Haddock.Backends.Xhtml.Utils (
   keyword, punctuate,
 
   braces, brackets, pabrackets, parens, parenList, ubxParenList, ubxSumList,
-  arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote, promoQuote,
+  arrow, lollipop, comma, dcolon, dot, darrow, equals, forallSymbol, quote, promoQuote,
+  multAnnotation,
   atSign,
 
   hsep, vcat,
@@ -187,12 +188,16 @@ ubxparens :: Html -> Html
 ubxparens h = toHtml "(#" <+> h <+> toHtml "#)"
 
 
-dcolon, arrow, darrow, forallSymbol, atSign :: Bool -> Html
+dcolon, arrow, lollipop, darrow, forallSymbol, atSign :: Bool -> Html
 dcolon unicode = toHtml (if unicode then "∷" else "::")
 arrow  unicode = toHtml (if unicode then "→" else "->")
+lollipop unicode = toHtml (if unicode then "⊸" else "%1 ->")
 darrow unicode = toHtml (if unicode then "⇒" else "=>")
 forallSymbol unicode = if unicode then toHtml "∀" else keyword "forall"
 atSign unicode = toHtml (if unicode then "@" else "@")
+
+multAnnotation :: Html
+multAnnotation = toHtml "%"
 
 dot :: Html
 dot = toHtml "."
