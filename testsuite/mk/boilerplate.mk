@@ -244,7 +244,7 @@ ifeq "$(ghc_config_mk)" ""
 ghc_config_mk = $(TOP)/mk/ghcconfig$(subst $(space),_,$(subst :,_,$(subst /,_,$(subst \,_,$(TEST_HC))))).mk
 
 $(ghc_config_mk) : $(TOP)/mk/ghc-config
-	$(TOP)/mk/ghc-config "$(TEST_HC)" >"$@"; if [ $$? != 0 ]; then $(RM) "$@"; exit 1; fi
+	$(TOP)/mk/ghc-config "$(TEST_HC)" >"$@"; if [ "$$?" != "0" ]; then $(RM) "$@"; exit 1; fi
 # If the ghc-config fails, remove $@, and fail
 endif
 
