@@ -743,6 +743,7 @@ mkGivenWarningReporter :: Reporter
 -- See Note [Given warnings]
 mkGivenWarningReporter ctxt cts
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
+       ; ambiguityChecking <- fmap inAmbiguityCheck getLclEnv
        ; dflags <- getDynFlags
        ; let (implic:_) = cec_encl ctxt
                  -- Always non-empty when mkGivenWarningReporter is called
@@ -761,7 +762,7 @@ mkGivenWarningReporter ctxt cts
        ; err <- mkEqErr_help dflags ctxt report ct' ty1 ty2
 
        ; traceTc "mkGivenWarningReporter" (ppr ct)
-       ; unless (inDeriving (ctLocEnv (ctLoc ct))) $
+       ; unless (inDeriving (ctLocEnv (ctLoc ct)) || ambiguityChecking) $
            reportWarning (Reason Opt_WarnInaccessibleCode) err
        }
   where
