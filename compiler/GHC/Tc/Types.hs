@@ -27,8 +27,9 @@ module GHC.Tc.Types(
 
         -- The environment types
         Env(..),
-        TcGblEnv(..), TcLclEnv(..), inRebindableSyntax, inDeriving, setCodeProvenance,
-        CodeProvenance(..),
+        TcGblEnv(..), TcLclEnv(..),
+        CodeProvenance(..), inRebindableSyntax, inDeriving, setCodeProvenance,
+        TcReason(..), inAmbiguityCheck, setReason,
         setLclEnvTcLevel, getLclEnvTcLevel,
         setLclEnvLoc, getLclEnvLoc,
         IfGblEnv(..), IfLclEnv(..),
@@ -718,12 +719,20 @@ data CodeProvenance
   | RebindableSyntaxCP -- ^ The code is the expansion of rebindable syntax.
   deriving (Eq, Ord)
 
+-- | This type indicates any distinguished parts of type checking during which we may wish
+-- to curb the generation of certain warnings or errors.
+-- Presently this is just the ambiguity check.
+data TcReason
+  = AmbiguityCheckTR -- ^ We're in the midst of an ambiguity check
+  | OtherTR          -- ^ We're checking anything else
+
 data TcLclEnv           -- Changes as we move inside an expression
                         -- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {
         tcl_loc        :: RealSrcSpan,     -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
         tcl_provenance :: CodeProvenance,  -- Where did this code come from?
+        tcl_reason     :: TcReason,        -- Are we doing an ambiguity check?
         tcl_tclvl      :: TcLevel,
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
@@ -769,6 +778,13 @@ setCodeProvenance p e = e { tcl_provenance = update (tcl_provenance e) p }
     update x y = case x of
       DerivingCP -> DerivingCP
       _ -> y
+
+setReason :: TcReason -> TcLclEnv -> TcLclEnv
+setReason r e = e { tcl_reason = r }
+
+inAmbiguityCheck :: TcLclEnv -> Bool
+inAmbiguityCheck (TcLclEnv { tcl_reason = AmbiguityCheckTR }) = True
+inAmbiguityCheck _ = False
 
 inRebindableSyntax :: TcLclEnv -> Bool
 inRebindableSyntax (TcLclEnv { tcl_provenance = RebindableSyntaxCP }) = True
