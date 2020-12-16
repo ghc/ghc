@@ -591,7 +591,7 @@ static bool
 startEventLogging_(void)
 {
     initEventLogWriter();
-
+ASSERT(eventBuf.begin == eventBuf.pos);
     postHeaderEvents();
 
     // Flush capEventBuf with header.
