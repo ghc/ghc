@@ -2841,6 +2841,11 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "funfolding-dict-discount"
       (intSuffix   (\n d -> d { unfoldingOpts = updateDictDiscount n (unfoldingOpts d)}))
 
+  , make_ord_flag defFlag "funfolding-case-threshold"
+      (intSuffix   (\n d -> d { unfoldingOpts = updateCaseThreshold n (unfoldingOpts d)}))
+  , make_ord_flag defFlag "funfolding-case-scaling"
+      (intSuffix   (\n d -> d { unfoldingOpts = updateCaseScaling n (unfoldingOpts d)}))
+
   , make_dep_flag defFlag "funfolding-keeness-factor"
       (floatSuffix (\_ d -> d))
       "-funfolding-keeness-factor is no longer respected as of GHC 9.0"
