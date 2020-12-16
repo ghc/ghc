@@ -1072,9 +1072,13 @@ ppr_mono_ty (HsForAllTy _ tele ty) unicode
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode
   = sep [ ppLContext ctxt unicode
         , ppr_mono_lty ty unicode ]
-ppr_mono_ty (HsFunTy _ _ ty1 ty2)   u
+ppr_mono_ty (HsFunTy _ mult ty1 ty2)   u
   = sep [ ppr_mono_lty ty1 u
-        , arrow u <+> ppr_mono_lty ty2 u ]
+        , arr <+> ppr_mono_lty ty2 u ]
+   where arr = case mult of
+                 HsLinearArrow _ -> lollipop u
+                 HsUnrestrictedArrow _ -> arrow u
+                 HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u <+> arrow u
 
 ppr_mono_ty (HsBangTy _ b ty)     u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
@@ -1363,13 +1367,17 @@ quote :: LaTeX -> LaTeX
 quote doc = text "\\begin{quote}" $$ doc $$ text "\\end{quote}"
 
 
-dcolon, arrow, darrow, forallSymbol, starSymbol, atSign :: Bool -> LaTeX
+dcolon, arrow, lollipop, darrow, forallSymbol, starSymbol, atSign :: Bool -> LaTeX
 dcolon unicode = text (if unicode then "∷" else "::")
 arrow  unicode = text (if unicode then "→" else "->")
+lollipop unicode = text (if unicode then "⊸" else "%1 ->")
 darrow unicode = text (if unicode then "⇒" else "=>")
 forallSymbol unicode = text (if unicode then "∀" else "forall")
 starSymbol unicode = text (if unicode then "★" else "*")
 atSign unicode = text (if unicode then "@" else "@")
+
+multAnnotation :: LaTeX
+multAnnotation = text "%"
 
 dot :: LaTeX
 dot = char '.'
