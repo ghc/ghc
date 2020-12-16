@@ -768,7 +768,10 @@ cpeApp top_env expr
             -> UniqSM (Floats, CpeRhs)
     cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args) depth
         | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
+            -- See Note [lazyId magic] in GHC.Types.Id.Make
        || f `hasKey` noinlineIdKey      -- Replace (noinline a) with a
+            -- See Note [noinlineId magic] in GHC.Types.Id.Make
+
         -- Consider the code:
         --
         --      lazy (f x) y
