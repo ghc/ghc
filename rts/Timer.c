@@ -111,6 +111,14 @@ handle_tick(int unused STG_UNUSED)
       }
   }
 
+  if (eventlog_enabled && RtsFlags.TraceFlags.eventlogFlushTicks > 0) {
+      ticks_to_eventlog_flush--;
+      if (ticks_to_eventlog_flush <= 0) {
+          ticks_to_eventlog_flush = RtsFlags.TraceFlags.eventlogFlushTicks;
+          flushEventLog(NULL);
+      }
+  }
+
   /*
    * If we've been inactive for idleGCDelayTime (set by +RTS
    * -I), tell the scheduler to wake up and do a GC, to check
