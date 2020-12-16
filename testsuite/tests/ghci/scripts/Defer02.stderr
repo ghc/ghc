@@ -62,16 +62,6 @@ Defer01.hs:46:1: warning: [-Winaccessible-code (in -Wdefault)]
         k :: (Int ~ Bool) => Int -> Bool
     This may result in inaccessible code.
 
-Defer01.hs:46:6: warning: [-Winaccessible-code (in -Wdefault)]
-    • Couldn't match type ‘Int’ with ‘Bool’
-      Unsatisfiable constraint Int ~ Bool in
-        the type signature for:
-          k :: (Int ~ Bool) => Int -> Bool
-      This may result in inaccessible code.
-    • In the ambiguity check for ‘k’
-      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-      In the type signature: k :: (Int ~ Bool) => Int -> Bool
-
 Defer01.hs:47:7: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Bool’ with actual type ‘Int’
     • In the expression: x

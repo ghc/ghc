@@ -216,12 +216,14 @@ checkAmbiguity ctxt ty
          -- can cause a cascade of further errors.  Since the free
          -- tyvars are skolemised, we can safely use tcSimplifyTop
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
-       ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
-                            captureConstraints $
-                            tcSubTypeSigma ctxt ty ty
-       ; simplifyAmbiguityCheck ty wanted
-
-       ; traceTc "Done ambiguity check for" (ppr ty) }
+       ; unless allow_ambiguous $
+          do { (_wrap, wanted) <- updLclEnv (setReason AmbiguityCheckTR) $
+                                  addErrCtxt (mk_msg allow_ambiguous) $
+                                  captureConstraints $
+                                  tcSubTypeSigma ctxt ty ty
+             ; simplifyAmbiguityCheck ty wanted
+             ; traceTc "Done ambiguity check for" (ppr ty) }
+       } 
 
   | otherwise
   = return ()
