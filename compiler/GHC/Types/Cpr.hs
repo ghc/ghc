@@ -477,8 +477,8 @@ forceTermM sd (Term tf l_sh) = do
     _ -> return l_sh -- just don't force anything
   return (Term Terminates l_sh')
 
-forceCpr :: Demand -> Cpr -> (TerminationFlag, Cpr)
-forceCpr dmd cpr = runTerminationM (idIfLazy forceCprM dmd cpr)
+forceCpr :: SubDemand -> Cpr -> (TerminationFlag, Cpr)
+forceCpr sd cpr = runTerminationM (forceCprM sd cpr)
 
 -- | 'lubTerm's the given outer @TerminationFlag@ on the @CprType@s 'ct_term'.
 bothCprType :: CprType -> TerminationFlag -> CprType
