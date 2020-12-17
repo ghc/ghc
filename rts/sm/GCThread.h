@@ -184,6 +184,7 @@ typedef struct gc_thread_ {
     W_ any_work;
     W_ no_work;
     W_ scav_find_work;
+    W_ n_evacd_roots;              // See Note [Root evacuation statistics] in GC.c.
 
     Time gc_start_cpu;             // thread CPU time
     Time gc_end_cpu;               // thread CPU time
