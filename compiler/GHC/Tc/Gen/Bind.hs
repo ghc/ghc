@@ -47,8 +47,8 @@ import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
+import GHC.Builtin.Types ( mkBoxedTupleTy )
 import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types( mkBoxedTupleTy )
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Var as Var
@@ -729,9 +729,8 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; mapM_ (checkOverloadedSig mono) sigs
 
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
-       ; (qtvs, givens, ev_binds, residual, insoluble)
+       ; (qtvs, givens, ev_binds, insoluble)
                  <- simplifyInfer tclvl infer_mode sigs name_taus wanted
-       ; emitConstraints residual
 
        ; let inferred_theta = map evVarPred givens
        ; exports <- checkNoErrs $
@@ -946,28 +945,29 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
            -- so that the Hole constraint we have already emitted
            -- (in tcHsPartialSigType) can report what filled it in.
            -- NB: my_theta already includes all the annotated constraints
-           ; let inferred_diff = [ pred
-                                 | pred <- my_theta
-                                 , all (not . (`eqType` pred)) annotated_theta ]
-           ; ctuple <- mk_ctuple inferred_diff
+           ; diff_theta <- findInferredDiff annotated_theta my_theta
 
            ; case tcGetCastedTyVar_maybe wc_var_ty of
                -- We know that wc_co must have type kind(wc_var) ~ Constraint, as it
-               -- comes from the checkExpectedKind in GHC.Tc.Gen.HsType.tcAnonWildCardOcc. So, to
-               -- make the kinds work out, we reverse the cast here.
-               Just (wc_var, wc_co) -> writeMetaTyVar wc_var (ctuple `mkCastTy` mkTcSymCo wc_co)
+               -- comes from the checkExpectedKind in GHC.Tc.Gen.HsType.tcAnonWildCardOcc.
+               -- So, to make the kinds work out, we reverse the cast here.
+               Just (wc_var, wc_co) -> writeMetaTyVar wc_var (mk_ctuple diff_theta
+                                                              `mkCastTy` mkTcSymCo wc_co)
                Nothing              -> pprPanic "chooseInferredQuantifiers 1" (ppr wc_var_ty)
 
            ; traceTc "completeTheta" $
                 vcat [ ppr sig
-                     , ppr annotated_theta, ppr inferred_theta
-                     , ppr inferred_diff ]
-           ; return (free_tvs, my_theta) }
+                     , text "annotated_theta:" <+> ppr annotated_theta
+                     , text "inferred_theta:" <+> ppr inferred_theta
+                     , text "my_theta:" <+> ppr my_theta
+                     , text "diff_theta:" <+> ppr diff_theta ]
+           ; return (free_tvs, annotated_theta ++ diff_theta) }
+             -- Return (annotated_theta ++ diff_theta)
+             -- See Note [Extra-constraints wildcards]
 
-    mk_ctuple preds = return (mkBoxedTupleTy preds)
+    mk_ctuple preds = mkBoxedTupleTy preds
        -- Hack alert!  See GHC.Tc.Gen.HsType:
        -- Note [Extra-constraint holes in partial type signatures]
-
 
 mk_impedance_match_msg :: MonoBindInfo
                        -> TcType -> TcType
@@ -1086,6 +1086,21 @@ So we make a test, one per partial signature, to check that the
 explicitly-quantified type variables have not been unified together.
 #14449 showed this up.
 
+Note [Extra-constraints wildcards]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this from #18646
+    class Foo x where
+      foo :: x
+
+    bar :: (Foo (), _) => f ()
+    bar = pure foo
+
+We get [W] Foo (), [W] Applicative f.   When we do pickCapturedPreds in
+choose_psig_context, we'll discard Foo ()!  Usually would not quantify over
+such (closed) predicates.  So my_theta will be (Applicative f). But we really
+do want to quantify over (Foo ()) -- it was speicfied by the programmer.
+Solution: always return annotated_theta (user-specified) plus the extra piece
+diff_theta.
 
 Note [Validity of inferred types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

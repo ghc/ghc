@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 module GHC.Tc.Solver(
-       simplifyInfer, InferMode(..),
+       InferMode(..), simplifyInfer, findInferredDiff,
        growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
@@ -32,10 +32,10 @@ import GHC.Prelude
 import GHC.Data.Bag
 import GHC.Core.Class ( Class, classKey, classTyCon )
 import GHC.Driver.Session
-import GHC.Types.Id   ( idType )
 import GHC.Tc.Utils.Instantiate
 import GHC.Data.List.SetOps
 import GHC.Types.Name
+import GHC.Types.Id( idType )
 import GHC.Utils.Outputable
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
@@ -897,7 +897,6 @@ simplifyInfer :: TcLevel               -- Used when generating the constraints
               -> TcM ([TcTyVar],    -- Quantify over these type variables
                       [EvVar],      -- ... and these constraints (fully zonked)
                       TcEvBinds,    -- ... binding these evidence variables
-                      WantedConstraints, -- Redidual as-yet-unsolved constraints
                       Bool)         -- True <=> the residual constraints are insoluble
 
 simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
@@ -912,7 +911,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
        ; qtkvs <- quantifyTyVars dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
-       ; return (qtkvs, [], emptyTcEvBinds, emptyWC, False) }
+       ; return (qtkvs, [], emptyTcEvBinds, False) }
 
   | otherwise
   = do { traceTc "simplifyInfer {"  $ vcat
@@ -933,18 +932,13 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        -- bindings, so we can't just revert to the input
        -- constraint.
 
-       ; tc_env          <- TcM.getEnv
-       ; ev_binds_var    <- TcM.newTcEvBinds
-       ; psig_theta_vars <- mapM TcM.newEvVar psig_theta
+       ; ev_binds_var <- TcM.newTcEvBinds
+       ; psig_evs     <- newWanteds AnnOrigin psig_theta
        ; wanted_transformed_incl_derivs
             <- setTcLevel rhs_tclvl $
                runTcSWithEvBinds ev_binds_var $
-               do { let loc         = mkGivenLoc rhs_tclvl UnkSkol $
-                                      env_lcl tc_env
-                        psig_givens = mkGivens loc psig_theta_vars
-                  ; _ <- solveSimpleGivens psig_givens
-                         -- See Note [Add signature contexts as givens]
-                  ; solveWanteds wanteds }
+               solveWanteds (mkSimpleWC psig_evs `andWC` wanteds)
+               -- psig_evs : see Note [Add signature contexts as givens]
 
        -- Find quant_pred_candidates, the predicates that
        -- we'll consider quantifying over
@@ -972,20 +966,10 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                                                      quant_pred_candidates
        ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
 
-       -- We must produce bindings for the psig_theta_vars, because we may have
-       -- used them in evidence bindings constructed by solveWanteds earlier
-       -- Easiest way to do this is to emit them as new Wanteds (#14643)
-       ; ct_loc <- getCtLocM AnnOrigin Nothing
-       ; let psig_wanted = [ CtWanted { ctev_pred = idType psig_theta_var
-                                      , ctev_dest = EvVarDest psig_theta_var
-                                      , ctev_nosh = WDeriv
-                                      , ctev_loc  = ct_loc }
-                           | psig_theta_var <- psig_theta_vars ]
-
-       -- Now construct the residual constraint
-       ; residual_wanted <- mkResidualConstraints rhs_tclvl ev_binds_var
+       -- Now emit the residual constraint
+       ; emitResidualConstraints rhs_tclvl ev_binds_var
                                  name_taus co_vars qtvs bound_theta_vars
-                                 (wanted_transformed `andWC` mkSimpleWC psig_wanted)
+                                 wanted_transformed
 
          -- All done!
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
@@ -995,30 +979,31 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
               , text "qtvs ="       <+> ppr qtvs
               , text "definite_error =" <+> ppr definite_error ]
 
-       ; return ( qtvs, bound_theta_vars, TcEvBinds ev_binds_var
-                , residual_wanted, definite_error ) }
+       ; return ( qtvs, bound_theta_vars, TcEvBinds ev_binds_var, definite_error ) }
          -- NB: bound_theta_vars must be fully zonked
   where
     partial_sigs = filter isPartialSig sigs
 
 --------------------
-mkResidualConstraints :: TcLevel -> EvBindsVar
-                      -> [(Name, TcTauType)]
-                      -> VarSet -> [TcTyVar] -> [EvVar]
-                      -> WantedConstraints -> TcM WantedConstraints
+emitResidualConstraints :: TcLevel -> EvBindsVar
+                        -> [(Name, TcTauType)]
+                        -> VarSet -> [TcTyVar] -> [EvVar]
+                        -> WantedConstraints -> TcM ()
 -- Emit the remaining constraints from the RHS.
--- See Note [Emitting the residual implication in simplifyInfer]
-mkResidualConstraints rhs_tclvl ev_binds_var
+emitResidualConstraints rhs_tclvl ev_binds_var
                         name_taus co_vars qtvs full_theta_vars wanteds
   | isEmptyWC wanteds
-  = return wanteds
+  = return ()
 
   | otherwise
   = do { wanted_simple <- TcM.zonkSimples (wc_simple wanteds)
        ; let (outer_simple, inner_simple) = partitionBag is_mono wanted_simple
              is_mono ct = isWantedCt ct && ctEvId ct `elemVarSet` co_vars
+             -- Reason for the partition:
+             -- see Note [Emitting the residual implication in simplifyInfer]
 
-        ; _ <- TcM.promoteTyVarSet (tyCoVarsOfCts outer_simple)
+-- Already done by defaultTyVarsAndSimplify
+--      ; _ <- TcM.promoteTyVarSet (tyCoVarsOfCts outer_simple)
 
         ; let inner_wanted = wanteds { wc_simple = inner_simple }
         ; implics <- if isEmptyWC inner_wanted
@@ -1033,20 +1018,49 @@ mkResidualConstraints rhs_tclvl ev_binds_var
                                                , ic_given_eqs = MaybeGivenEqs
                                                , ic_info      = skol_info }
 
-        ; return (emptyWC { wc_simple = outer_simple
-                          , wc_impl   = implics })}
+        ; emitConstraints (emptyWC { wc_simple = outer_simple
+                                   , wc_impl   = implics }) }
   where
     full_theta = map idType full_theta_vars
-    skol_info  = InferSkol [ (name, mkSigmaTy [] full_theta ty)
-                           | (name, ty) <- name_taus ]
-                 -- Don't add the quantified variables here, because
-                 -- they are also bound in ic_skols and we want them
-                 -- to be tidied uniformly
+    skol_info = InferSkol [ (name, mkSigmaTy [] full_theta ty)
+                          | (name, ty) <- name_taus ]
+    -- We don't add the quantified variables here, because they are
+    -- also bound in ic_skols and we want them to be tidied
+    -- uniformly.
 
 --------------------
 ctsPreds :: Cts -> [PredType]
 ctsPreds cts = [ ctEvPred ev | ct <- bagToList cts
                              , let ev = ctEvidence ct ]
+
+findInferredDiff :: TcThetaType -> TcThetaType -> TcM TcThetaType
+findInferredDiff annotated_theta inferred_theta
+  = pushTcLevelM_ $
+    do { lcl_env   <- TcM.getLclEnv
+       ; given_ids <- mapM TcM.newEvVar annotated_theta
+       ; wanteds   <- newWanteds AnnOrigin inferred_theta
+       ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
+             given_cts = mkGivens given_loc given_ids
+
+       ; residual <- runTcSDeriveds $
+                     do { _ <- solveSimpleGivens given_cts
+                        ; solveSimpleWanteds (listToBag (map mkNonCanonical wanteds)) }
+         -- NB: There are no meta tyvars fromn this level annotated_theta
+         -- because we have either promoted them or unified them
+         -- See `Note [Quantification and partial signatures]` Wrinkle 2
+
+       ; return (map (box_pred . ctPred) $
+                 bagToList               $
+                 wc_simple residual) }
+  where
+     box_pred :: PredType -> PredType
+     box_pred pred = case classifyPredType pred of
+                        EqPred rel ty1 ty2
+                          | Just (cls,tys) <- boxEqPred rel ty1 ty2
+                          -> mkClassPred cls tys
+                          | otherwise
+                          -> pprPanic "findInferredDiff" (ppr pred)
+                        _other -> pred
 
 {- Note [Emitting the residual implication in simplifyInfer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1074,31 +1088,30 @@ constraints out.  (NB: this set of CoVars should be closed-over-kinds.)
 
 All rather subtle; see #14584.
 
-Note [Add signature contexts as givens]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Add signature contexts as wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this (#11016):
   f2 :: (?x :: Int) => _
   f2 = ?x
+
 or this
-  f3 :: a ~ Bool => (a, _)
-  f3 = (True, False)
-or theis
-  f4 :: (Ord a, _) => a -> Bool
-  f4 x = x==x
+  class C a b | a -> b
+  g :: C p q => p -> q
+  f3 :: C Int b => _
+  f3 = g (3::Int)
 
 We'll use plan InferGen because there are holes in the type.  But:
  * For f2 we want to have the (?x :: Int) constraint floating around
    so that the functional dependencies kick in.  Otherwise the
    occurrence of ?x on the RHS produces constraint (?x :: alpha), and
    we won't unify alpha:=Int.
- * For f3 we want the (a ~ Bool) available to solve the wanted (a ~ Bool)
-   in the RHS
- * For f4 we want to use the (Ord a) in the signature to solve the Eq a
-   constraint.
 
-Solution: in simplifyInfer, just before simplifying the constraints
-gathered from the RHS, add Given constraints for the context of any
-type signatures.
+ * For f3 want the (C Int b) constraint from the partial signature
+   to meet the (C Int beta) constraint we get from the call to g; again,
+   fundeps
+
+Solution: in simplifyInfer, we add the constraints from the signature
+as extra Wanteds
 
 ************************************************************************
 *                                                                      *
@@ -1181,12 +1194,15 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
        ; psig_theta <- TcM.zonkTcTypes (concatMap sig_inst_theta psigs)
        ; let quantifiable_candidates
                = pickQuantifiablePreds (mkVarSet qtvs) candidates
-             -- NB: do /not/ run pickQuantifiablePreds over psig_theta,
-             -- because we always want to quantify over psig_theta, and not
-             -- drop any of them; e.g. CallStack constraints.  c.f #14658
 
              theta = mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
-                     (psig_theta ++ quantifiable_candidates)
+                     psig_theta ++ quantifiable_candidates
+             -- NB: add psig_theta back in here, even though it's already
+             -- part of candidates, because we always want to quantify over
+             -- psig_theta, and pickQuantifiableCandidates might have
+             -- dropped some e.g. CallStack constraints.  c.f #14658
+             --                   equalities (a ~ Bool)
+             -- Remember, this is the theta for the residual constraint
 
        ; traceTc "decideQuantification"
            (vcat [ text "infer_mode:" <+> ppr infer_mode
@@ -2123,13 +2139,13 @@ the example for why (partial-sigs/should_compile/T12844):
   type family Head (xs :: [k]) where Head (x ': xs) = x
 
 GHC correctly infers that the extra-constraints wildcard on `bar`
-should be (Head rngs ~ '(r, r'), Foo rngs). It then adds this constraint
-as a Given on the implication constraint for `bar`. (This implication is
-created by mkResidualConstraints in simplifyInfer.) The Hole for
-the _ is stored within the implication's WantedConstraints.
-When simplifyHoles is called, that constraint is already assumed as
-a Given. Simplifying with respect to it turns it into
-('(r, r') ~ '(r, r'), Foo rngs), which is disastrous.
+should be (Head rngs ~ '(r, r'), Foo rngs). It then adds this
+constraint as a Given on the implication constraint for `bar`. (This
+implication is emitted by emitResidualConstraints.) The Hole for the _
+is stored within the implication's WantedConstraints.  When
+simplifyHoles is called, that constraint is already assumed as a
+Given. Simplifying with respect to it turns it into ('(r, r') ~ '(r,
+r'), Foo rngs), which is disastrous.
 
 Furthermore, there is no need to simplify here: extra-constraints wildcards
 are filled in with the output of the solver, in chooseInferredQuantifiers
