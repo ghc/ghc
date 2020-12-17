@@ -153,9 +153,10 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
     defer fun_ty
       = do { arg_ty <- newOpenFlexiTyVarTy
            ; res_ty <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkVisFunTyMany arg_ty res_ty
+           ; mult <- newFlexiTyVarTy multiplicityTy
+           ; let unif_fun_ty = mkVisFunTy mult arg_ty res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
-           ; return (mkWpCastN co, unrestricted arg_ty, res_ty) }
+           ; return (mkWpCastN co, Scaled mult arg_ty, res_ty) }
 
     ------------
     mk_ctxt :: TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
@@ -359,12 +360,12 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     ------------
     defer :: [Scaled ExpSigmaType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
     defer acc_arg_tys n fun_ty
-      = do { more_arg_tys <- replicateM n newInferExpType
+      = do { more_arg_tys <- replicateM n (mkScaled <$> newFlexiTyVarTy multiplicityTy <*> newInferExpType)
            ; res_ty       <- newInferExpType
-           ; result       <- thing_inside (reverse acc_arg_tys ++ (map unrestricted more_arg_tys)) res_ty
-           ; more_arg_tys <- mapM readExpType more_arg_tys
+           ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
+           ; more_arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) more_arg_tys
            ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkVisFunTysMany more_arg_tys res_ty
+           ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
            ; wrap <- tcSubType AppOrigin ctx unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (wrap, result) }
