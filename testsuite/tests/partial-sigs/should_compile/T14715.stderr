@@ -3,7 +3,7 @@ T14715.hs:13:53: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for ‘Reduce z zq’
       Where: ‘z’, ‘zq’ are rigid type variables bound by
                the inferred type of
-                 bench_mulPublic :: (z ~ LiftOf zq, Reduce z zq) =>
+                 bench_mulPublic :: (LiftOf zq ~ z, Reduce z zq) =>
                                     Cyc zp -> Cyc z -> IO (zp, zq)
                at T14715.hs:13:27-33
     • In the type signature:

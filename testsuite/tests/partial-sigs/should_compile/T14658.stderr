@@ -1,0 +1,9 @@
+
+T14658.hs:9:28: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found extra-constraints wildcard standing for ‘Eq a’
+      Where: ‘a’ is a rigid type variable bound by
+               the inferred type of
+                 foo :: (?loc::CallStack, Eq a) => a -> a -> Bool
+               at T14658.hs:9:1-47
+    • In the type signature:
+        foo :: (?loc :: CallStack, _) => a -> a -> Bool
