@@ -1,0 +1,22 @@
+
+T18646.hs:9:17: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found extra-constraints wildcard standing for ‘Applicative f’
+      Where: ‘f’ is a rigid type variable bound by
+               the inferred type of bar :: (Foo (), Applicative f) => f ()
+               at T18646.hs:9:1-26
+    • In the type signature: bar :: (Foo (), _) => f ()
+
+T18646.hs:12:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found extra-constraints wildcard standing for ‘Applicative f’
+      Where: ‘f’ is a rigid type variable bound by
+               the inferred type of marie :: (Foo x, Applicative f) => f x
+               at T18646.hs:12:1-26
+    • In the type signature: marie :: (Foo x, _) => f x
+
+T18646.hs:15:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found extra-constraints wildcard standing for
+        ‘(Applicative f, Foo x)’
+      Where: ‘f’, ‘x’ are rigid type variables bound by
+               the inferred type of anne :: (Applicative f, Foo x) => f x
+               at T18646.hs:15:1-16
+    • In the type signature: anne :: _ => f x

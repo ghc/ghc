@@ -596,6 +596,7 @@ Note [TcLevel invariants]
     (GivenInv)  The level number of a unification variable appearing
                 in the 'ic_given' of an implication I should be
                 STRICTLY LESS THAN the ic_tclvl of I
+                See Note [GivenInv]
 
     (WantedInv) The level number of a unification variable appearing
                 in the 'ic_wanted' of an implication I should be
@@ -604,6 +605,47 @@ Note [TcLevel invariants]
 
 The level of a MetaTyVar also governs its untouchability.  See
 Note [Unification preconditions] in GHC.Tc.Utils.Unify.
+
+Note [TcLevel assignment]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We arrange the TcLevels like this
+
+   0   Top level
+   1   First-level implication constraints
+   2   Second-level implication constraints
+   ...etc...
+
+Note [GivenInv]
+~~~~~~~~~~~~~~~
+Invariant (GivenInv) is not essential, but it is easy to guarantee, and
+it is a useful extra piece of structure.  It ensures that the Givens of
+an implication don't change because of unifications /at the same level/
+caused by Wanteds.  (Wanteds can also cause unifications at an outer
+level, but that will iterate the entire implication; see GHC.Tc.Solver.Monad
+Note [The Unification Level Flag].)
+
+Givens can certainly contain meta-tyvars from /outer/ levels.  E.g.
+   data T a where
+     MkT :: Eq a => a -> MkT a
+
+   f x = case x of MkT y -> y && True
+
+Then we'll infer (x :: T alpha[1]).  The Givens from the implication
+arising from the pattern match will look like this:
+
+   forall[2] . Eq alpha[1] => (alpha[1] ~ Bool)
+
+But if we unify alpha (which in this case we will), we'll iterate
+the entire implication via Note [The Unification Level Flag] in
+GHC.Tc.Solver.Monad.  That isn't true of unifications at the /ambient/
+level.
+
+It would be entirely possible to weaken (GivenInv), to LESS THAN OR
+EQUAL TO, but we'd need to think carefully about
+  - kick-out for Givens
+  - GHC.Tc.Solver.Monad.isOuterTyVar
+But in fact (GivenInv) is automatically true, so we're adhering to
+it for now.  See #18929.
 
 Note [WantedInv]
 ~~~~~~~~~~~~~~~~
@@ -615,48 +657,6 @@ the constraint (C alpha[3]) disobeys WantedInv:
 
 We can unify alpha:=b in the inner implication, because 'alpha' is
 touchable; but then 'b' has excaped its scope into the outer implication.
-
-Note [Skolem escape prevention]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We only unify touchable unification variables.  Because of
-(WantedInv), there can be no occurrences of the variable further out,
-so the unification can't cause the skolems to escape. Example:
-     data T = forall a. MkT a (a->Int)
-     f x (MkT v f) = length [v,x]
-We decide (x::alpha), and generate an implication like
-      [1]forall a. (a ~ alpha[0])
-But we must not unify alpha:=a, because the skolem would escape.
-
-For the cases where we DO want to unify, we rely on floating the
-equality.   Example (with same T)
-     g x (MkT v f) = x && True
-We decide (x::alpha), and generate an implication like
-      [1]forall a. (Bool ~ alpha[0])
-We do NOT unify directly, bur rather float out (if the constraint
-does not mention 'a') to get
-      (Bool ~ alpha[0]) /\ [1]forall a.()
-and NOW we can unify alpha.
-
-The same idea of only unifying touchables solves another problem.
-Suppose we had
-   (F Int ~ uf[0])  /\  [1](forall a. C a => F Int ~ beta[1])
-In this example, beta is touchable inside the implication. The
-first solveSimpleWanteds step leaves 'uf' un-unified. Then we move inside
-the implication where a new constraint
-       uf  ~  beta
-emerges. If we (wrongly) spontaneously solved it to get uf := beta,
-the whole implication disappears but when we pop out again we are left with
-(F Int ~ uf) which will be unified by our final zonking stage and
-uf will get unified *once more* to (F Int).
-
-Note [TcLevel assignment]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-We arrange the TcLevels like this
-
-   0   Top level
-   1   First-level implication constraints
-   2   Second-level implication constraints
-   ...etc...
 -}
 
 maxTcLevel :: TcLevel -> TcLevel -> TcLevel
@@ -1859,7 +1859,7 @@ mkMinimalBySCs :: forall a. (a -> PredType) -> [a] -> [a]
 mkMinimalBySCs get_pred xs = go preds_with_scs []
  where
    preds_with_scs :: [PredWithSCs a]
-   preds_with_scs = [ (pred, pred : transSuperClasses pred, x)
+   preds_with_scs = [ (pred, implicants pred, x)
                     | x <- xs
                     , let pred = get_pred x ]
 
@@ -1877,12 +1877,28 @@ mkMinimalBySCs get_pred xs = go preds_with_scs []
                           -- Note [Remove redundant provided dicts]
      = go work_list min_preds
      | p `in_cloud` work_list || p `in_cloud` min_preds
+       -- Why look at work-list too?  Suppose work_item is Eq a,
+       -- and work-list contains Ord a
      = go work_list min_preds
      | otherwise
      = go work_list (work_item : min_preds)
 
    in_cloud :: PredType -> [PredWithSCs a] -> Bool
    in_cloud p ps = or [ p `tcEqType` p' | (_, scs, _) <- ps, p' <- scs ]
+
+   implicants pred
+     = pred : eq_extras pred ++ transSuperClasses pred
+
+   -- Combine (a ~ b) and (b ~ a); no need to have both in one context
+   -- These can arise when dealing with partial type signatures (e.g. T14715)
+   eq_extras pred
+     = case classifyPredType pred of
+         EqPred r t1 t2               -> [mkPrimEqPredRole (eqRelRole r) t2 t1]
+         ClassPred cls [k1,k2,t1,t2]
+           | cls `hasKey` heqTyConKey -> [mkClassPred cls [k2, k1, t2, t1]]
+         ClassPred cls [k,t1,t2]
+           | cls `hasKey` eqTyConKey  -> [mkClassPred cls [k, t2, t1]]
+         _ -> []
 
 transSuperClasses :: PredType -> [PredType]
 -- (transSuperClasses p) returns (p's superclasses) not including p
