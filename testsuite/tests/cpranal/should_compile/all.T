@@ -5,3 +5,5 @@ def f( name, opts ):
 setTestOpts(f)
 
 test('Cpr001', [], multimod_compile, ['Cpr001', '-v0'])
+# The following test greps for type signatures of worker functions.
+test('T18174', [ grep_errmsg(r'^T18174\.\$w\S+ ::') ], compile, ['-ddump-simpl -dsuppress-idinfo -dppr-cols=9999'])

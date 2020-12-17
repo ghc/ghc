@@ -482,7 +482,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
   | is_fun && is_eta_exp
-  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
+  = splitFun dflags fam_envs new_fn_id fn_info wrap_arg_dmds div wrap_body_sd cpr rhs
 
   | isNonRec is_rec, is_thunk                        -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
@@ -491,9 +491,9 @@ tryWW dflags fam_envs is_rec fn_id rhs
   = return [ (new_fn_id, rhs) ]
 
   where
-    uf_opts      = unfoldingOpts dflags
-    fn_info      = idInfo fn_id
-    (wrap_dmds, div) = splitStrictSig (strictnessInfo fn_info)
+    uf_opts                = unfoldingOpts dflags
+    fn_info                = idInfo fn_id
+    (wrap_arg_dmds, div)   = splitStrictSig (strictnessInfo fn_info)
 
     cpr_ty       = getCprSig (cprInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
@@ -502,13 +502,19 @@ tryWW dflags fam_envs is_rec fn_id rhs
                           , ppr fn_id <> colon <+> text "ct_arty:" <+> ppr (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
                    ct_cpr cpr_ty
 
+    -- Figure out the *least sub-demand* put on the function body by all call sites.
+    -- Sub-demand, because we can assume at least seq demand.
+    -- splitFun uses this to improve CPR info.
+    (_card1 :* fn_sd)      = demandInfo fn_info -- how the function was called
+    (_card2, wrap_body_sd) = peelManyCalls (length wrap_arg_dmds) fn_sd
+
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
         -- See Note [Zapping Used Once info WorkWrap]
 
-    is_fun     = notNull wrap_dmds || isJoinId fn_id
+    is_fun     = notNull wrap_arg_dmds || isJoinId fn_id
     -- See Note [Don't eta expand in w/w]
-    is_eta_exp = length wrap_dmds == manifestArity rhs
+    is_eta_exp = length wrap_arg_dmds == manifestArity rhs
     is_thunk   = not is_fun && not (exprIsHNF rhs) && not (isJoinId fn_id)
                             && not (isUnliftedType (idType fn_id))
 
@@ -584,12 +590,12 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> SubDemand -> Cpr -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
-splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) ) do
+splitFun dflags fam_envs fn_id fn_info wrap_arg_dmds div wrap_body_sd cpr rhs
+  = WARN( not (wrap_arg_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_arg_dmds $$ ppr cpr) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds body_cpr
+    stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_arg_dmds body_cpr
     case stuff of
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
@@ -672,10 +678,11 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 
     -- body_cpr is the CPR we w/w the body for. Note that we kill it for join points,
     -- see Note [Don't w/w join points for CPR].
-    -- Also the body expr is put under WHNF, so we may force the CPR info accordingly.
+    -- Also force the body CPR (and Termination information!) according to how
+    -- the function is used. The sub-demand on the body is in wrap_body_sd.
     body_cpr
       | isJoinId fn_id = topCpr
-      | otherwise      = snd $ forceCpr seqDmd cpr
+      | otherwise      = snd $ forceCpr wrap_body_sd cpr
     -- Even if we don't w/w join points for CPR, we might still do so for
     -- strictness. In which case a join point worker keeps its original CPR
     -- property; see Note [Don't w/w join points for CPR]. Otherwise, the worker
