@@ -4,9 +4,9 @@
 
 module GHC.Tc.Solver.Canonical(
      canonicalize,
-     unifyDerived,
+     unifyDerived, unifyTest, UnifyTestResult(..),
      makeSuperClasses,
-     StopOrContinue(..), stopWith, continueWith,
+     StopOrContinue(..), stopWith, continueWith, andWhenContinue,
      solveCallStack    -- For GHC.Tc.Solver
   ) where
 
@@ -51,7 +51,8 @@ import GHC.Data.Bag
 import GHC.Utils.Monad
 import Control.Monad
 import Data.Maybe ( isJust, isNothing )
-import Data.List  ( zip4 )
+import Data.List  ( zip4, partition )
+import GHC.Types.Unique.Set( nonDetEltsUniqSet )
 import GHC.Types.Basic
 
 import Data.Bifunctor ( bimap )
@@ -2246,10 +2247,10 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 
                -- If we have F a ~ F (F a), we want to swap.
              swap_for_occurs
-               | MTVU_OK ()  <- checkTyFamEq dflags fun_tc2 fun_args2
-                                             (mkTyConApp fun_tc1 fun_args1)
-               , MTVU_Occurs <- checkTyFamEq dflags fun_tc1 fun_args1
-                                             (mkTyConApp fun_tc2 fun_args2)
+               | CTE_OK     <- checkTyFamEq dflags fun_tc2 fun_args2
+                                            (mkTyConApp fun_tc1 fun_args1)
+               , CTE_Occurs <- checkTyFamEq dflags fun_tc1 fun_args1
+                                            (mkTyConApp fun_tc2 fun_args2)
                = True
 
                | otherwise
@@ -2274,8 +2275,8 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 
 -- This function handles the case where one side is a tyvar and the other is
 -- a type family application. Which to put on the left?
---   If we can unify the variable, put it on the left, as this may be our only
---   shot to unify.
+--   If the tyvar is a touchable meta-tyvar, put it on the left, as this may
+--   be our only shot to unify.
 --   Otherwise, put the function on the left, because it's generally better to
 --   rewrite away function calls. This makes types smaller. And it seems necessary:
 --     [W] F alpha ~ alpha
@@ -2283,22 +2284,20 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 --     [W] G alpha beta ~ Int   ( where we have type instance G a a = a )
 --   If we end up with a stuck alpha ~ F alpha, we won't be able to solve this.
 --   Test case: indexed-types/should_compile/CEqCanOccursCheck
--- It would probably work to always put the variable on the left, but we think
--- it would be less efficient.
 canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
                                             -- or (rhs |> mco) ~ lhs if swapped
                 -> EqRel -> SwapFlag
-                -> TyVar -> TcType          -- lhs, pretty lhs
-                -> TyCon -> [Xi] -> TcType  -- rhs fun, rhs args, pretty rhs
+                -> TyVar -> TcType          -- lhs (or if swapped rhs), pretty lhs
+                -> TyCon -> [Xi] -> TcType  -- rhs (or if swapped lhs) fun and args, pretty rhs
                 -> MCoercion                -- :: kind(rhs) ~N kind(lhs)
                 -> TcS (StopOrContinue Ct)
 canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
-  = do { tclvl <- getTcLevel
-       ; dflags <- getDynFlags
-       ; if | isTouchableMetaTyVar tclvl tv1
-              , MTVU_OK _ <- checkTyVarEq dflags YesTypeFamilies tv1 (ps_xi2 `mkCastTyMCo` mco)
-              -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1)
-                                                     (ps_xi2 `mkCastTyMCo` mco)
+  = do { can_unify <- unifyTest ev tv1 rhs
+       ; dflags    <- getDynFlags
+       ; if | case can_unify of { NoUnify -> False; _ -> True }
+            , CTE_OK <- checkTyVarEq dflags YesTypeFamilies tv1 rhs
+            -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1) rhs
+
             | otherwise
               -> do { new_ev <- rewriteCastedEquality ev eq_rel swapped
                                   (mkTyVarTy tv1) (mkTyConApp fun_tc2 fun_args2)
@@ -2308,6 +2307,82 @@ canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
                                   (ps_xi1 `mkCastTyMCo` sym_mco) } }
   where
     sym_mco = mkTcSymMCo mco
+    rhs = ps_xi2 `mkCastTyMCo` mco
+
+data UnifyTestResult
+  -- See Note [Solve by unification] in GHC.Tc.Solver.Interact
+  -- which points out that having UnifySameLevel is just an optimisation;
+  -- we could manage with UnifyOuterLevel alone (suitably renamed)
+  = UnifySameLevel
+  | UnifyOuterLevel [TcTyVar]   -- Promote these
+                    TcLevel     -- ..to this level
+  | NoUnify
+
+instance Outputable UnifyTestResult where
+  ppr UnifySameLevel            = text "UnifySameLevel"
+  ppr (UnifyOuterLevel tvs lvl) = text "UnifyOuterLevel" <> parens (ppr lvl <+> ppr tvs)
+  ppr NoUnify                   = text "NoUnify"
+
+unifyTest :: CtEvidence -> TcTyVar -> TcType -> TcS UnifyTestResult
+-- This is the key test for untouchability:
+-- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
+-- and Note [Solve by unification] in GHC.Tc.Solver.Interact
+unifyTest ev tv1 rhs
+  | not (isGiven ev)  -- See Note [Do not unify Givens]
+  , MetaTv { mtv_tclvl = tv_lvl, mtv_info = info } <- tcTyVarDetails tv1
+  , canSolveByUnification info rhs
+  = do { ambient_lvl  <- getTcLevel
+       ; given_eq_lvl <- getInnermostGivenEqLevel
+
+       ; if | tv_lvl `sameDepthAs` ambient_lvl
+            -> return UnifySameLevel
+
+            | tv_lvl `deeperThanOrSame` given_eq_lvl   -- No intervening given equalities
+            , all (does_not_escape tv_lvl) free_skols  -- No skolem escapes
+            -> return (UnifyOuterLevel free_metas tv_lvl)
+
+            | otherwise
+            -> return NoUnify }
+  | otherwise
+  = return NoUnify
+  where
+     (free_metas, free_skols) = partition isPromotableMetaTyVar $
+                                nonDetEltsUniqSet               $
+                                tyCoVarsOfType rhs
+
+     does_not_escape tv_lvl fv
+       | isTyVar fv = tv_lvl `deeperThanOrSame` tcTyVarLevel fv
+       | otherwise  = True
+       -- Coercion variables are not an escape risk
+       -- If an implication binds a coercion variable, it'll have equalities,
+       -- so the "intervening given equalities" test above will catch it
+       -- Coercion holes get filled with coercions, so again no problem.
+
+{- Note [Do not unify Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this GADT match
+   data T a where
+      T1 :: T Int
+      ...
+
+   f x = case x of
+           T1 -> True
+           ...
+
+So we get f :: T alpha[1] -> beta[1]
+          x :: T alpha[1]
+and from the T1 branch we get the implication
+   forall[2] (alpha[1] ~ Int) => beta[1] ~ Bool
+
+Now, clearly we don't want to unify alpha:=Int!  Yet at the moment we
+process [G] alpha[1] ~ Int, we don't have any given-equalities in the
+inert set, and hence there are no given equalities to make alpha untouchable.
+
+(NB: if it were alpha[2] ~ Int, this argument wouldn't hold.  But that
+almost never happens, and will never happen at all if we cure #18929.)
+
+Simple solution: never unify in Givens!
+-}
 
 -- The RHS here is either not CanEqLHS, or it's one that we
 -- want to rewrite the LHS to (as per e.g. swapOverTyVars)
@@ -2427,11 +2502,11 @@ canEqOK :: DynFlags -> EqRel -> CanEqLHS -> Xi -> CanEqOK
 canEqOK dflags eq_rel lhs rhs
   = ASSERT( good_rhs )
     case checkTypeEq dflags YesTypeFamilies lhs rhs of
-      MTVU_OK ()       -> CanEqOK
-      MTVU_Bad         -> CanEqNotOK OtherCIS
+      CTE_OK  -> CanEqOK
+      CTE_Bad -> CanEqNotOK OtherCIS
                  -- Violation of TyEq:F
 
-      MTVU_HoleBlocker -> CanEqNotOK (BlockedCIS holes)
+      CTE_HoleBlocker -> CanEqNotOK (BlockedCIS holes)
         where holes = coercionHolesOfType rhs
                  -- This is the case detailed in
                  -- Note [Equalities with incompatible kinds]
@@ -2440,7 +2515,7 @@ canEqOK dflags eq_rel lhs rhs
                  -- These are both a violation of TyEq:OC, but we
                  -- want to differentiate for better production of
                  -- error messages
-      MTVU_Occurs | TyVarLHS tv <- lhs
+      CTE_Occurs | TyVarLHS tv <- lhs
                   , isInsolubleOccursCheck eq_rel tv rhs -> CanEqNotOK InsolubleCIS
                  -- If we have a ~ [a], it is not canonical, and in particular
                  -- we don't want to rewrite existing inerts with it, otherwise

@@ -17,7 +17,7 @@ module GHC.Tc.Solver.Monad (
 
     -- The TcS monad
     TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds, runTcSInerts,
-    failTcS, warnTcS, addErrTcS,
+    failTcS, warnTcS, addErrTcS, wrapTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS, setEvBindsTcS,
     emitImplicationTcS, emitTvImplicationTcS,
@@ -31,6 +31,7 @@ module GHC.Tc.Solver.Monad (
     panicTcS, traceTcS,
     traceFireTcS, bumpStepCountTcS, csTraceTcS,
     wrapErrTcS, wrapWarnTcS,
+    resetUnificationFlag, setUnificationFlag,
 
     -- Evidence creation and transformation
     MaybeNew(..), freshGoals, isFresh, getEvExpr,
@@ -60,7 +61,7 @@ module GHC.Tc.Solver.Monad (
     updInertTcS, updInertCans, updInertDicts, updInertIrreds,
     getHasGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertGivens,
-    getInertInsols,
+    getInertInsols, getInnermostGivenEqLevel,
     getTcSInerts, setTcSInerts,
     matchableGivens, prohibitedSuperClassSolve, mightMatchLater,
     getUnsolvedInerts,
@@ -186,7 +187,6 @@ import Control.Monad
 import GHC.Utils.Monad
 import Data.IORef
 import Data.List ( partition, mapAccumL )
-import qualified Data.Semigroup as S
 import Data.List.NonEmpty ( NonEmpty(..), cons, toList, nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Control.Arrow ( first )
@@ -418,12 +418,14 @@ instance Outputable InertSet where
 
 emptyInertCans :: InertCans
 emptyInertCans
-  = IC { inert_eqs      = emptyDVarEnv
-       , inert_dicts    = emptyDicts
-       , inert_safehask = emptyDicts
-       , inert_funeqs   = emptyFunEqs
-       , inert_insts    = []
-       , inert_irreds   = emptyCts }
+  = IC { inert_eqs          = emptyDVarEnv
+       , inert_given_eq_lvl = topTcLevel
+       , inert_given_eqs    = False
+       , inert_dicts        = emptyDicts
+       , inert_safehask     = emptyDicts
+       , inert_funeqs       = emptyFunEqs
+       , inert_insts        = []
+       , inert_irreds       = emptyCts }
 
 emptyInert :: InertSet
 emptyInert
@@ -697,6 +699,19 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- Irreducible predicates that cannot be made canonical,
               --     and which don't interact with others (e.g.  (c a))
               -- and insoluble predicates (e.g.  Int ~ Bool, or a ~ [a])
+
+       , inert_given_eq_lvl :: TcLevel
+              -- The TcLevel of the innermost implication that has a Given
+              -- equality of the sort that make a unification variable untouchable
+              -- (see Note [Unification preconditions] in GHC.Tc.Utils.Unify).
+              -- See Note [Tracking Given equalities] below
+
+       , inert_given_eqs :: Bool
+              -- True <=> The inert Givens *at this level* (tcl_tclvl)
+              --          could includes at least one equality /other than/ a
+              --          let-bound skolem equality.
+              -- Reason: report these givens when reporting a failed equality
+              -- See Note [Tracking Given equalities]
        }
 
 type InertEqs    = DTyVarEnv EqualCtList
@@ -730,7 +745,126 @@ listToEqualCtList :: [Ct] -> Maybe EqualCtList
 -- non-empty
 listToEqualCtList cts = EqualCtList <$> nonEmpty cts
 
-{- Note [Detailed InertCans Invariants]
+{- Note [Tracking Given equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For reasons described in (UNTOUCHABLE) in GHC.Tc.Utils.Unify
+Note [Unification preconditions], we can't unify
+   alpha[2] ~ Int
+under a level-4 implication if there are any Given equalities
+bound by the implications at level 3 of 4.  To that end, the
+InertCans tracks
+
+  inert_given_eq_lvl :: TcLevel
+     -- The TcLevel of the innermost implication that has a Given
+     -- equality of the sort that make a unification variable untouchable
+     -- (see Note [Unification preconditions] in GHC.Tc.Utils.Unify).
+
+We update inert_given_eq_lvl whenever we add a Given to the
+inert set, in updateGivenEqs.
+
+Then a unification variable alpha[n] is untouchable iff
+    n < inert_given_eq_lvl
+that is, if the unification variable was born outside an
+enclosing Given equality.
+
+Exactly which constraints should trigger (UNTOUCHABLE), and hence
+should update inert_given_eq_lvl?
+
+* We do /not/ need to worry about let-bound skolems, such ast
+     forall[2] a. a ~ [b] => blah
+  See Note [Let-bound skolems]
+
+* Consider an implication
+      forall[2]. beta[1] => alpha[1] ~ Int
+  where beta is a unification variable that has already been unified
+  to () in an outer scope.  Then alpha[1] is perfectly touchable and
+  we can unify alpha := Int. So when deciding whether the givens contain
+  an equality, we should canonicalise first, rather than just looking at
+  the /original/ givens (#8644).
+
+ * However, we must take account of *potential* equalities. Consider the
+   same example again, but this time we have /not/ yet unified beta:
+      forall[2] beta[1] => ...blah...
+
+   Because beta might turn into an equality, updateGivenEqs conservatively
+   treats it as a potential equality, and updates inert_give_eq_lvl
+
+ * What about something like forall[2] a b. a ~ F b => [W] alpha[1] ~ X y z?
+
+   That Given cannot affect the Wanted, because the Given is entirely
+   *local*: it mentions only skolems bound in the very same
+   implication. Such equalities need not make alpha untouchable. (Test
+   case typecheck/should_compile/LocalGivenEqs has a real-life
+   motivating example, with some detailed commentary.)
+   Hence the 'mentionsOuterVar' test in updateGivenEqs.
+
+   However, solely to support better error messages
+   (see Note [HasGivenEqs] in GHC.Tc.Types.Constraint) we also track
+   these "local" equalities in the boolean inert_given_eqs field.
+   This field is used only to set the ic_given_eqs field to LocalGivenEqs;
+   see the function getHasGivenEqs.
+
+   Here is a simpler case that triggers this behaviour:
+
+     data T where
+       MkT :: F a ~ G b => a -> b -> T
+
+     f (MkT _ _) = True
+
+   Because of this behaviour around local equality givens, we can infer the
+   type of f. This is typecheck/should_compile/LocalGivenEqs2.
+
+ * We need not look at the equality relation involved (nominal vs
+   representational), because representational equalities can still
+   imply nominal ones. For example, if (G a ~R G b) and G's argument's
+   role is nominal, then we can deduce a ~N b.
+
+Note [Let-bound skolems]
+~~~~~~~~~~~~~~~~~~~~~~~~
+If   * the inert set contains a canonical Given CEqCan (a ~ ty)
+and  * 'a' is a skolem bound in this very implication,
+
+then:
+a) The Given is pretty much a let-binding, like
+      f :: (a ~ b->c) => a -> a
+   Here the equality constraint is like saying
+      let a = b->c in ...
+   It is not adding any new, local equality  information,
+   and hence can be ignored by has_given_eqs
+
+b) 'a' will have been completely substituted out in the inert set,
+   so we can safely discard it.
+
+For an example, see #9211.
+
+See also GHC.Tc.Utils.Unify Note [Deeper level on the left] for how we ensure
+that the right variable is on the left of the equality when both are
+tyvars.
+
+You might wonder whether the skolem really needs to be bound "in the
+very same implication" as the equuality constraint.
+Consider this (c.f. #15009):
+
+  data S a where
+    MkS :: (a ~ Int) => S a
+
+  g :: forall a. S a -> a -> blah
+  g x y = let h = \z. ( z :: Int
+                      , case x of
+                           MkS -> [y,z])
+          in ...
+
+From the type signature for `g`, we get `y::a` .  Then when we
+encounter the `\z`, we'll assign `z :: alpha[1]`, say.  Next, from the
+body of the lambda we'll get
+
+  [W] alpha[1] ~ Int                             -- From z::Int
+  [W] forall[2]. (a ~ Int) => [W] alpha[1] ~ a   -- From [y,z]
+
+Now, unify alpha := a.  Now we are stuck with an unsolved alpha~Int!
+So we must treat alpha as untouchable under the forall[2] implication.
+
+Note [Detailed InertCans Invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The InertCans represents a collection of constraints with the following properties:
 
@@ -1027,6 +1161,8 @@ instance Outputable InertCans where
   ppr (IC { inert_eqs = eqs
           , inert_funeqs = funeqs, inert_dicts = dicts
           , inert_safehask = safehask, inert_irreds = irreds
+          , inert_given_eq_lvl = ge_lvl
+          , inert_given_eqs = given_eqs
           , inert_insts = insts })
 
     = braces $ vcat
@@ -1043,6 +1179,8 @@ instance Outputable InertCans where
         text "Irreds =" <+> pprCts irreds
       , ppUnless (null insts) $
         text "Given instances =" <+> vcat (map ppr insts)
+      , text "Innermost given equalities =" <+> ppr ge_lvl
+      , text "Given eqs at this level =" <+> ppr given_eqs
       ]
     where
       folder (EqualCtList eqs) rest = nonEmptyToBag eqs `andCts` rest
@@ -1456,20 +1594,32 @@ findEq icans (TyFamLHS fun_tc fun_args)
 addInertForAll :: QCInst -> TcS ()
 -- Add a local Given instance, typically arising from a type signature
 addInertForAll new_qci
-  = do { ics <- getInertCans
-       ; insts' <- add_qci (inert_insts ics)
-       ; setInertCans (ics { inert_insts = insts' }) }
+  = do { ics  <- getInertCans
+       ; ics1 <- add_qci ics
+
+       -- Update given equalities. C.f updateGivenEqs
+       ; tclvl <- getTcLevel
+       ; let pred         = qci_pred new_qci
+             not_equality = isClassPred pred && not (isEqPred pred)
+                  -- True <=> definitely not an equality
+                  -- A qci_pred like (f a) might be an equality
+
+             ics2 | not_equality = ics1
+                  | otherwise    = ics1 { inert_given_eq_lvl = tclvl
+                                        , inert_given_eqs    = True }
+
+       ; setInertCans ics2 }
   where
-    add_qci :: [QCInst] -> TcS [QCInst]
+    add_qci :: InertCans -> TcS InertCans
     -- See Note [Do not add duplicate quantified instances]
-    add_qci qcis
+    add_qci ics@(IC { inert_insts = qcis })
       | any same_qci qcis
       = do { traceTcS "skipping duplicate quantified instance" (ppr new_qci)
-           ; return qcis }
+           ; return ics }
 
       | otherwise
       = do { traceTcS "adding new inert quantified instance" (ppr new_qci)
-           ; return (new_qci : qcis) }
+           ; return (ics { inert_insts = new_qci : qcis }) }
 
     same_qci old_qci = tcEqType (ctEvPred (qci_ev old_qci))
                                 (ctEvPred (qci_ev new_qci))
@@ -1523,7 +1673,8 @@ addInertCan ct
        ; ics <- getInertCans
        ; ct  <- maybeEmitShadow ics ct
        ; ics <- maybeKickOut ics ct
-       ; setInertCans (add_item ics ct)
+       ; tclvl <- getTcLevel
+       ; setInertCans (add_item tclvl ics ct)
 
        ; traceTcS "addInertCan }" $ empty }
 
@@ -1536,22 +1687,53 @@ maybeKickOut ics ct
   | otherwise
   = return ics
 
-add_item :: InertCans -> Ct -> InertCans
-add_item ics item@(CEqCan { cc_lhs = TyFamLHS tc tys })
-  = ics { inert_funeqs = addCanFunEq (inert_funeqs ics) tc tys item }
+add_item :: TcLevel -> InertCans -> Ct -> InertCans
+add_item tc_lvl
+         ics@(IC { inert_funeqs = funeqs, inert_eqs = eqs })
+         item@(CEqCan { cc_lhs = lhs })
+  = updateGivenEqs tc_lvl item $
+    case lhs of
+       TyFamLHS tc tys -> ics { inert_funeqs = addCanFunEq funeqs tc tys item }
+       TyVarLHS tv     -> ics { inert_eqs    = addTyEq eqs tv item }
 
-add_item ics item@(CEqCan { cc_lhs = TyVarLHS tv })
-  = ics { inert_eqs   = addTyEq (inert_eqs ics) tv item }
+add_item tc_lvl ics@(IC { inert_irreds = irreds }) item@(CIrredCan {})
+  = updateGivenEqs tc_lvl item $   -- An Irred might turn out to be an
+                                 -- equality, so we play safe
+    ics { inert_irreds = irreds `Bag.snocBag` item }
 
-add_item ics@(IC { inert_irreds = irreds }) item@(CIrredCan {})
-  = ics { inert_irreds = irreds `Bag.snocBag` item }
-
-add_item ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
+add_item _ ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
   = ics { inert_dicts = addDict (inert_dicts ics) cls tys item }
 
-add_item _ item
+add_item _ _ item
   = pprPanic "upd_inert set: can't happen! Inserting " $
     ppr item   -- Can't be CNonCanonical because they only land in inert_irreds
+
+updateGivenEqs :: TcLevel -> Ct -> InertCans -> InertCans
+-- Set the inert_given_eq_level to the current level (tclvl)
+-- if the constraint is a given equality that should prevent
+-- filling in an outer unification variable.
+-- See See Note [Tracking Given equalities]
+updateGivenEqs tclvl ct inerts@(IC { inert_given_eq_lvl = ge_lvl })
+  | not (isGivenCt ct) = inerts
+  | not_equality ct    = inerts -- See Note [Let-bound skolems]
+  | otherwise          = inerts { inert_given_eq_lvl = ge_lvl'
+                                , inert_given_eqs    = True }
+  where
+    ge_lvl' | mentionsOuterVar tclvl (ctEvidence ct)
+              -- Includes things like (c a), which *might* be an equality
+            = tclvl
+            | otherwise
+            = ge_lvl
+
+    not_equality :: Ct -> Bool
+    -- True <=> definitely not an equality of any kind
+    --          except for a let-bound skolem, which doesn't count
+    --          See Note [Let-bound skolems]
+    -- NB: no need to spot the boxed CDictCan (a ~ b) because its
+    --     superclass (a ~# b) will be a CEqCan
+    not_equality (CEqCan { cc_lhs = TyVarLHS tv }) = not (isOuterTyVar tclvl tv)
+    not_equality (CDictCan {})                     = True
+    not_equality _                                 = False
 
 -----------------------------------------
 kickOutRewritable  :: CtFlavourRole  -- Flavour/role of the equality that
@@ -1596,7 +1778,6 @@ kick_out_rewritable :: CtFlavourRole  -- Flavour/role of the equality that
 kick_out_rewritable new_fr new_lhs
                     ics@(IC { inert_eqs      = tv_eqs
                             , inert_dicts    = dictmap
-                            , inert_safehask = safehask
                             , inert_funeqs   = funeqmap
                             , inert_irreds   = irreds
                             , inert_insts    = old_insts })
@@ -1610,12 +1791,12 @@ kick_out_rewritable new_fr new_lhs
   | otherwise
   = (kicked_out, inert_cans_in)
   where
-    inert_cans_in = IC { inert_eqs      = tv_eqs_in
-                       , inert_dicts    = dicts_in
-                       , inert_safehask = safehask   -- ??
-                       , inert_funeqs   = feqs_in
-                       , inert_irreds   = irs_in
-                       , inert_insts    = insts_in }
+    -- inert_safehask stays unchanged; is that right?
+    inert_cans_in = ics { inert_eqs      = tv_eqs_in
+                        , inert_dicts    = dicts_in
+                        , inert_funeqs   = feqs_in
+                        , inert_irreds   = irs_in
+                        , inert_insts    = insts_in }
 
     kicked_out :: WorkList
     -- NB: use extendWorkList to ensure that kicked-out equalities get priority
@@ -1968,6 +2149,10 @@ updInertIrreds upd_fn
 getInertEqs :: TcS (DTyVarEnv EqualCtList)
 getInertEqs = do { inert <- getInertCans; return (inert_eqs inert) }
 
+getInnermostGivenEqLevel :: TcS TcLevel
+getInnermostGivenEqLevel = do { inert <- getInertCans
+                              ; return (inert_given_eq_lvl inert) }
+
 getInertInsols :: TcS Cts
 -- Returns insoluble equality constraints
 -- specifically including Givens
@@ -2077,63 +2262,46 @@ getUnsolvedInerts
 getHasGivenEqs :: TcLevel           -- TcLevel of this implication
                -> TcS ( HasGivenEqs -- are there Given equalities?
                       , Cts )       -- Insoluble equalities arising from givens
--- See Note [When does an implication have given equalities?]
+-- See Note [Tracking Given equalities]
 getHasGivenEqs tclvl
-  = do { inerts@(IC { inert_eqs = ieqs, inert_funeqs = funeqs, inert_irreds = irreds })
+  = do { inerts@(IC { inert_irreds       = irreds
+                    , inert_given_eqs    = given_eqs
+                    , inert_given_eq_lvl = ge_lvl })
               <- getInertCans
-       ; let has_given_eqs = foldMap check_local_given_ct irreds
-                        S.<> foldMap (lift_equal_ct_list check_local_given_tv_eq) ieqs
-                        S.<> foldMapFunEqs (lift_equal_ct_list check_local_given_ct) funeqs
-             insols = filterBag insolubleEqCt irreds
+       ; let insols = filterBag insolubleEqCt irreds
                       -- Specifically includes ones that originated in some
                       -- outer context but were refined to an insoluble by
                       -- a local equality; so do /not/ add ct_given_here.
 
+             -- See Note [HasGivenEqs] in GHC.Tc.Types.Constraint, and
+             -- Note [Tracking Given equalities] in this module
+             has_ge | ge_lvl == tclvl = MaybeGivenEqs
+                    | given_eqs       = LocalGivenEqs
+                    | otherwise       = NoGivenEqs
+
        ; traceTcS "getHasGivenEqs" $
-         vcat [ text "has_given_eqs:" <+> ppr has_given_eqs
+         vcat [ text "given_eqs:" <+> ppr given_eqs
+              , text "ge_lvl:" <+> ppr ge_lvl
+              , text "ambient level:" <+> ppr tclvl
               , text "Inerts:" <+> ppr inerts
               , text "Insols:" <+> ppr insols]
-       ; return (has_given_eqs, insols) }
-  where
-    check_local_given_ct :: Ct -> HasGivenEqs
-    check_local_given_ct ct
-      | given_here ev = if mentions_outer_var ev then MaybeGivenEqs else LocalGivenEqs
-      | otherwise     = NoGivenEqs
-      where
-        ev = ctEvidence ct
+       ; return (has_ge, insols) }
 
-    lift_equal_ct_list :: (Ct -> HasGivenEqs) -> EqualCtList -> HasGivenEqs
-    -- returns NoGivenEqs for non-singleton lists, as Given lists are always
-    -- singletons
-    lift_equal_ct_list check (EqualCtList (ct :| [])) = check ct
-    lift_equal_ct_list _     _                        = NoGivenEqs
+mentionsOuterVar :: TcLevel -> CtEvidence -> Bool
+mentionsOuterVar tclvl ev
+  = anyFreeVarsOfType (isOuterTyVar tclvl) $
+    ctEvPred ev
 
-    check_local_given_tv_eq :: Ct -> HasGivenEqs
-    check_local_given_tv_eq (CEqCan { cc_lhs = TyVarLHS tv, cc_ev = ev})
-      | given_here ev
-      = if is_outer_var tv then MaybeGivenEqs else NoGivenEqs
-        -- See Note [Let-bound skolems]
-      | otherwise
-      = NoGivenEqs
-    check_local_given_tv_eq other_ct = check_local_given_ct other_ct
-
-    given_here :: CtEvidence -> Bool
-    -- True for a Given bound by the current implication,
-    -- i.e. the current level
-    given_here ev =  isGiven ev
-                  && tclvl == ctLocLevel (ctEvLoc ev)
-
-    mentions_outer_var :: CtEvidence -> Bool
-    mentions_outer_var = anyFreeVarsOfType is_outer_var . ctEvPred
-
-    is_outer_var :: TyCoVar -> Bool
-    is_outer_var tv
-            -- NB: a meta-tv alpha[3] may end up unifying with skolem b[2],
-            -- so treat it as an "outer" var, even at level 3.
-            -- This will become redundant after fixing #18929.
-      | isTyVar tv = isTouchableMetaTyVar tclvl tv ||
-                     tclvl `strictlyDeeperThan` tcTyVarLevel tv
-      | otherwise  = False
+isOuterTyVar :: TcLevel -> TyCoVar -> Bool
+-- True of a type variable that comes from a
+-- shallower level than the ambient level (tclvl)
+isOuterTyVar tclvl tv
+  | isTyVar tv = tclvl `strictlyDeeperThan` tcTyVarLevel tv
+                 || isPromotableMetaTyVar tv
+    -- isPromotable: a meta-tv alpha[3] may end up unifying with skolem b[2],
+    -- so treat it as an "outer" var, even at level 3.
+    -- This will become redundant after fixing #18929.
+  | otherwise  = False  -- Coercion variables; doesn't much matter
 
 -- | Returns Given constraints that might,
 -- potentially, match the given pred. This is used when checking to see if a
@@ -2267,112 +2435,6 @@ Examples:
 This treatment fixes #18910 and is tested in
 typecheck/should_compile/InstanceGivenOverlap{,2}
 
-Note [When does an implication have given equalities?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider an implication
-   beta => alpha ~ Int
-where beta is a unification variable that has already been unified
-to () in an outer scope.  Then we can float the (alpha ~ Int) out
-just fine. So when deciding whether the givens contain an equality,
-we should canonicalise first, rather than just looking at the original
-givens (#8644).
-
-So we simply look at the inert, canonical Givens and see if there are
-any equalities among them, the calculation of has_given_eqs.  There
-are some wrinkles:
-
- * We must know which ones are bound in *this* implication and which
-   are bound further out.  We can find that out from the TcLevel
-   of the Given, which is itself recorded in the tcl_tclvl field
-   of the TcLclEnv stored in the Given (ev_given_here).
-
-   What about interactions between inner and outer givens?
-      - Outer given is rewritten by an inner given, then there must
-        have been an inner given equality, hence the “given-eq” flag
-        will be true anyway.
-
-      - Inner given rewritten by outer, retains its level (ie. The inner one)
-
- * We must take account of *potential* equalities, like the one above:
-      beta => ...blah...
-   If we still don't know what beta is, we conservatively treat it as potentially
-   becoming an equality. Hence including 'irreds' in the calculation or has_given_eqs.
-   Note that we can't really know what's in an irred, so any irred is considered
-   a potential equality.
-
- * What about something like forall a b. a ~ F b => [W] c ~ X y z? That Given
-   cannot affect the Wanted, because the Given is entirely *local*: it mentions
-   only skolems bound in the very same implication. Such equalities need not
-   prevent floating. (Test case typecheck/should_compile/LocalGivenEqs has a
-   real-life motivating example, with some detailed commentary.) These
-   equalities are noted with LocalGivenEqs: they do not prevent floating, but
-   they also are allowed to show up in error messages. See
-   Note [Suppress redundant givens during error reporting] in GHC.Tc.Errors.
-   The difference between what stops floating and what is suppressed from
-   error messages is why we need three options for HasGivenEqs.
-
-   There is also a simpler case that triggers this behaviour:
-
-     data T where
-       MkT :: F a ~ G b => a -> b -> T
-
-     f (MkT _ _) = True
-
-   Because of this behaviour around local equality givens, we can infer the
-   type of f. This is typecheck/should_compile/LocalGivenEqs2.
-
- * See Note [Let-bound skolems] for another wrinkle
-
- * We need not look at the equality relation involved (nominal vs representational),
-   because representational equalities can still imply nominal ones. For example,
-   if (G a ~R G b) and G's argument's role is nominal, then we can deduce a ~N b.
-
-Note [Let-bound skolems]
-~~~~~~~~~~~~~~~~~~~~~~~~
-If   * the inert set contains a canonical Given CEqCan (a ~ ty)
-and  * 'a' is a skolem bound in this very implication,
-
-then:
-a) The Given is pretty much a let-binding, like
-      f :: (a ~ b->c) => a -> a
-   Here the equality constraint is like saying
-      let a = b->c in ...
-   It is not adding any new, local equality  information,
-   and hence can be ignored by has_given_eqs
-
-b) 'a' will have been completely substituted out in the inert set,
-   so we can safely discard it.
-
-For an example, see #9211.
-
-See also GHC.Tc.Utils.Unify Note [Deeper level on the left] for how we ensure
-that the right variable is on the left of the equality when both are
-tyvars.
-
-You might wonder whether the skokem really needs to be bound "in the
-very same implication" as the equuality constraint.
-(c.f. #15009) Consider this:
-
-  data S a where
-    MkS :: (a ~ Int) => S a
-
-  g :: forall a. S a -> a -> blah
-  g x y = let h = \z. ( z :: Int
-                      , case x of
-                           MkS -> [y,z])
-          in ...
-
-From the type signature for `g`, we get `y::a` .  Then when we
-encounter the `\z`, we'll assign `z :: alpha[1]`, say.  Next, from the
-body of the lambda we'll get
-
-  [W] alpha[1] ~ Int                             -- From z::Int
-  [W] forall[2]. (a ~ Int) => [W] alpha[1] ~ a   -- From [y,z]
-
-Now, suppose we decide to float `alpha ~ a` out of the implication
-and then unify `alpha := a`.  Now we are stuck!  But if treat
-`alpha ~ Int` first, and unify `alpha := Int`, all is fine.
-But we absolutely cannot float that equality or we will get stuck.
 -}
 
 removeInertCts :: [Ct] -> InertCans -> InertCans
@@ -2552,9 +2614,6 @@ tcAppMapToBag m = foldTcAppMap consBag m emptyBag
 foldTcAppMap :: (a -> b -> b) -> TcAppMap a -> b -> b
 foldTcAppMap k m z = foldDTyConEnv (foldTM k) z m
 
-foldMapTcAppMap :: Monoid m => (a -> m) -> TcAppMap a -> m
-foldMapTcAppMap f = foldMap (foldMap f)
-
 
 {- *********************************************************************
 *                                                                      *
@@ -2688,9 +2747,6 @@ findFunEqsByTyCon m tc
 foldFunEqs :: (a -> b -> b) -> FunEqMap a -> b -> b
 foldFunEqs = foldTcAppMap
 
-foldMapFunEqs :: Monoid m => (a -> m) -> FunEqMap a -> m
-foldMapFunEqs = foldMapTcAppMap
-
 insertFunEq :: FunEqMap a -> TyCon -> [Type] -> a -> FunEqMap a
 insertFunEq m tc tys val = insertTcApp m tc tys val
 
@@ -2722,6 +2778,12 @@ data TcSEnv
       tcs_unified     :: IORef Int,
          -- The number of unification variables we have filled
          -- The important thing is whether it is non-zero
+
+      tcs_unif_lvl  :: IORef (Maybe TcLevel),
+         -- The Unification Level Flag
+         -- Outermost level at which we have unified a meta tyvar
+         -- Starts at Nothing, then (Just i), then (Just j) where j<i
+         -- See Note [The Unification Level Flag]
 
       tcs_count     :: IORef Int, -- Global step count
 
@@ -2877,8 +2939,10 @@ runTcSWithEvBinds' restore_cycles ev_binds_var tcs
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef emptyInert
        ; wl_var <- TcM.newTcRef emptyWorkList
+       ; unif_lvl_var <- TcM.newTcRef Nothing
        ; let env = TcSEnv { tcs_ev_binds      = ev_binds_var
                           , tcs_unified       = unified_var
+                          , tcs_unif_lvl      = unif_lvl_var
                           , tcs_count         = step_count
                           , tcs_inerts        = inert_var
                           , tcs_worklist      = wl_var }
@@ -2941,15 +3005,19 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
   = TcS $ \ TcSEnv { tcs_unified       = unified_var
                    , tcs_inerts        = old_inert_var
                    , tcs_count         = count
+                   , tcs_unif_lvl      = unif_lvl
                    } ->
     do { inerts <- TcM.readTcRef old_inert_var
-       ; let nest_inert = inerts { inert_cycle_breakers = [] }
-                 -- all other InertSet fields are inherited
+       ; let nest_inert = inerts { inert_cycle_breakers = []
+                                 , inert_cans = (inert_cans inerts)
+                                                   { inert_given_eqs = False } }
+                 -- All other InertSet fields are inherited
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
-       ; let nest_env = TcSEnv { tcs_ev_binds      = ref
+       ; let nest_env = TcSEnv { tcs_count         = count     -- Inherited
+                               , tcs_unif_lvl      = unif_lvl  -- Inherited
+                               , tcs_ev_binds      = ref
                                , tcs_unified       = unified_var
-                               , tcs_count         = count
                                , tcs_inerts        = new_inert_var
                                , tcs_worklist      = new_wl_var }
        ; res <- TcM.setTcLevel inner_tclvl $
@@ -3259,6 +3327,97 @@ zonkTyCoVarKind tv = wrapTcS (TcM.zonkTyCoVarKind tv)
 pprKicked :: Int -> SDoc
 pprKicked 0 = empty
 pprKicked n = parens (int n <+> text "kicked out")
+
+{- *********************************************************************
+*                                                                      *
+*              The Unification Level Flag                              *
+*                                                                      *
+********************************************************************* -}
+
+{- Note [The Unification Level Flag]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a deep tree of implication constraints
+   forall[1] a.                              -- Outer-implic
+      C alpha[1]                               -- Simple
+      forall[2] c. ....(C alpha[1])....        -- Implic-1
+      forall[2] b. ....(alpha[1] ~ Int)....    -- Implic-2
+
+The (C alpha) is insoluble until we know alpha.  We solve alpha
+by unifying alpha:=Int somewhere deep inside Implic-2. But then we
+must try to solve the Outer-implic all over again. This time we can
+solve (C alpha) both in Outer-implic, and nested inside Implic-1.
+
+When should we iterate solving a level-n implication?
+Answer: if any unification of a tyvar at level n takes place
+        in the ic_implics of that implication.
+
+* What if a unification takes place at level n-1? Then don't iterate
+  level n, because we'll iterate level n-1, and that will in turn iterate
+  level n.
+
+* What if a unification takes place at level n, in the ic_simples of
+  level n?  No need to track this, because the kick-out mechanism deals
+  with it.  (We can't drop kick-out in favour of iteration, becuase kick-out
+  works for skolem-equalities, not just unifications.)
+
+So the monad-global Unification Level Flag, kept in tcs_unif_lvl keeps
+track of
+  - Whether any unifications at all have taken place (Nothing => no unifications)
+  - If so, what is the outermost level that has seen a unification (Just lvl)
+
+The iteration done in the simplify_loop/maybe_simplify_again loop in GHC.Tc.Solver.
+
+It helpful not to iterate unless there is a chance of progress.  #8474 is
+an example:
+
+  * There's a deeply-nested chain of implication constraints.
+       ?x:alpha => ?y1:beta1 => ... ?yn:betan => [W] ?x:Int
+
+  * From the innermost one we get a [D] alpha[1] ~ Int,
+    so we can unify.
+
+  * It's better not to iterate the inner implications, but go all the
+    way out to level 1 before iterating -- because iterating level 1
+    will iterate the inner levels anyway.
+
+(In the olden days when we "floated" thse Derived constraints, this was
+much, much more important -- we got exponential behaviour, as each iteration
+produced the same Derived constraint.)
+-}
+
+
+resetUnificationFlag :: TcS Bool
+-- We are at ambient level i
+-- If the unification flag = Just i, reset it to Nothing and return True
+-- Otherwise leave it unchanged and return False
+resetUnificationFlag
+  = TcS $ \env ->
+    do { let ref = tcs_unif_lvl env
+       ; ambient_lvl <- TcM.getTcLevel
+       ; mb_lvl <- TcM.readTcRef ref
+       ; TcM.traceTc "resetUnificationFlag" $
+         vcat [ text "ambient:" <+> ppr ambient_lvl
+              , text "unif_lvl:" <+> ppr mb_lvl ]
+       ; case mb_lvl of
+           Nothing       -> return False
+           Just unif_lvl | ambient_lvl `strictlyDeeperThan` unif_lvl
+                         -> return False
+                         | otherwise
+                         -> do { TcM.writeTcRef ref Nothing
+                               ; return True } }
+
+setUnificationFlag :: TcLevel -> TcS ()
+-- (setUnificationFlag i) sets the unification level to (Just i)
+-- unless it already is (Just j) where j <= i
+setUnificationFlag lvl
+  = TcS $ \env ->
+    do { let ref = tcs_unif_lvl env
+       ; mb_lvl <- TcM.readTcRef ref
+       ; case mb_lvl of
+           Just unif_lvl | lvl `deeperThanOrSame` unif_lvl
+                         -> return ()
+           _ -> TcM.writeTcRef ref (Just lvl) }
+
 
 {- *********************************************************************
 *                                                                      *
