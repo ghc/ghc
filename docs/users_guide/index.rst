@@ -14,6 +14,7 @@ Contents:
    intro
    8.10.1-notes
    8.10.2-notes
+   8.10.3-notes
    ghci
    runghc
    usage

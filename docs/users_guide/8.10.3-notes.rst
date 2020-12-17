@@ -1,0 +1,141 @@
+.. _release-8-10-3:
+
+Release notes for version 8.10.3
+================================
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+Like previous releases in the 8.10 series, the :ghc-flag:`LLVM backend <-fllvm>`
+of this release is to be used with LLVM 9.
+
+Highlights
+----------
+
+- Numerous stability improvements on Windows.
+
+- GHC now has far more robust support for architectures with weak memory
+  ordering guarantees.
+
+- GHC can split up dynamic objects to mitigate the macOS ``RPATH`` size
+  limitation when building large projects (:ghc-ticket:`14444`).
+
+- Several significant correctness bugs in the low-latency garbage collector have
+  been fixed.  Users of :rts-flag:`--nonmoving-gc` are strongly encouraged to
+  upgrade promptly.
+
+
+Full details
+------------
+
+Compiler
+~~~~~~~~
+
+* A compiler crash triggered by a ``SPECIALISE`` pragma on a binding with
+  no unfolding has been fixed (:ghc-ticket:`18118`).
+
+* GHC now supports a command-line flag, :ghc-flag:`-pgmc-supports-no-pie`,
+  allowing the user to indicate that the C compiler supplied via
+  :ghc-flag:`-pgmc ⟨cmd⟩` supports ``-no-pie``.
+
+* A pair of flags, :ghc-flag:`-pgmlm ⟨cmd⟩` and :ghc-flag:`-optlm ⟨option⟩`,
+  allowing the user to override the linker used to be join GHCi object files
+  has been added.
+
+* A regression in the treatment of the :ghc-flag:`-fbyte-code` flag has been
+  fixed (:ghc-ticket:`18955`).
+
+- A bug in the determination of source spans of post-qualified imports has been
+  fixed :ghc-ticket:`19014`.
+
+
+Runtime system
+~~~~~~~~~~~~~~
+
+- GHC is now more careful to respect address space limits set via `ulimit``
+  when allocating its heap (:ghc-ticket:`18623`).
+
+- Numerous fixes on Windows. These include a bug in stack allocation
+  triggering Windows' stack verifier (:ghc-ticket:`18601`), various linker bugs
+  (:ghc-ticket:`15808`, :ghc-ticket:`18991`), and a bug where ``libc`` may be
+  called during image initialization resulting in undefined behavior
+  (:ghc-ticket:`18548`).
+
+- GHC's linker is now able to load macOS frameworks on Big Sur
+  (:ghc-ticket:`18446`).
+
+- A soundness bug affecting programs relying on heavy mutation of ``MVar``\ s
+  has been fixed (:ghc-ticket:`18919`).
+
+- The internal linker's code unloading logic has been reenabled and now tracks
+  object file dependencies, fixing a soundness bug (:ghc-ticket:`16525`).
+
+- A linker bug relying in the misalignment of loaded ``.rodata`` sections has
+  been fixed.
+
+
+Known issues
+------------
+
+- A long-standing bug (:ghc-ticket:`16893`) which can cause some applications
+  of ``unsafeCoerce`` to segmentation fault is only partially fixed in this
+  release. This release only avoids this issue in the uses of ``unsafeCoerce``
+  in ``Data.Typeable.Internal``, which was the proximate cause of
+  :ghc-ticket:`16893`.
+
+  However, it is possible that this bug could manifest in user-code using
+  ``unsafeCoerce`` to perform dynamic type checks. See the :ghc-ticket:`ticket
+  <16893>` for details.
+
+  We expect that this issue will be fixed in the next major release of GHC.
+
+- A long-standing bug (:ghc-ticket:`17760`) where some uses of the ``touch#``
+  primop can be dropped by the simplifier is present in this release. This bug
+  will be fixed in GHC 9.0.1. In the meantime, see the :ghc-ticket:`ticket
+  <17760>` for mitigations.
+
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
