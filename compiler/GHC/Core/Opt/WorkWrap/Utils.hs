@@ -155,11 +155,12 @@ type WwResult
      CoreExpr -> CoreExpr)  -- Worker body, lacking the original function rhs
 
 mkWwBodies :: WwOpts
-           -> VarSet         -- Free vars of RHS
+           -> VarSet         -- ^ Free vars of RHS
                              -- See Note [Freshen WW arguments]
-           -> Id             -- The original function
-           -> [Demand]       -- Strictness of original function
-           -> Cpr            -- Info about function result
+           -> Id             -- ^ The original function
+           -> [Demand]       -- ^ Strictness of original function
+                             -- (derived from 'idStrictness')
+           -> Cpr            -- ^ Info about function result
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -173,12 +174,12 @@ mkWwBodies :: WwOpts
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies opts rhs_fvs fun_id demands cpr_info
+mkWwBodies opts rhs_fvs fun_id arg_dmds cpr_info
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs empty_subst fun_ty demands
+             <- mkWWargs empty_subst fun_ty arg_dmds
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
              <- mkWWstr opts arg_ubx_strat wrap_args
 
@@ -191,7 +192,7 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
               wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
               worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
 
-        ; if isWorkerSmallEnough (wo_max_worker_args opts) (length demands) work_args
+        ; if isWorkerSmallEnough (wo_max_worker_args opts) (length arg_dmds) work_args
              && not (too_many_args_for_join_point wrap_args)
              && ((useful1 && not only_one_void_argument) || useful2)
           then return (Just (worker_args_dmds, length work_call_args,
@@ -219,7 +220,7 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
 
     -- Note [Do not split void functions]
     only_one_void_argument
-      | [d] <- demands
+      | [d] <- arg_dmds
       , Just (_, arg_ty1, _) <- splitFunTy_maybe fun_ty
       , isAbsDmd d && isVoidTy arg_ty1
       = True
@@ -250,9 +251,9 @@ isWorkerSmallEnough max_worker_args old_n_args vars
 Note [Always do CPR w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 At one time we refrained from doing CPR w/w for thunks, on the grounds that
-we might duplicate work.  But that is already handled by the demand analyser,
+we might duplicate work.  But that is already handled by CPR analysis,
 which doesn't give the CPR property if w/w might waste work: see
-Note [CPR for thunks] in GHC.Core.Opt.DmdAnal.
+Note [CPR for thunks] in GHC.Core.Opt.CprAnal.
 
 And if something *has* been given the CPR property and we don't w/w, it's
 a disaster, because then the enclosing function might say it has the CPR
@@ -1207,6 +1208,7 @@ unbox_one_result
              OrdList Var,          -- Vars returned from worker to wrapper
              CoreExpr -> CoreExpr, -- result builder of wrapper
              CoreExpr -> CoreExpr) -- result unpacker of worker
+
 -- Nothing:   There is nothing worth taking apart.
 --            On the outer level, this will prevent mkWWcpr_one from doing anything at all
 --            Otherwise it means: Use the value directly
