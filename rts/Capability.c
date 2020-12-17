@@ -68,6 +68,9 @@ uint32_t n_numa_nodes;
 // Map logical NUMA node to OS node numbers
 uint32_t numa_map[MAX_NUMA_NODES];
 
+// Number of roots that have been evacuated in this GC.
+static int n_evacd_roots;
+
 /* Let foreign code get the current Capability -- assuming there is one!
  * This is useful for unsafe foreign calls because they are called with
  * the current Capability held, but they are not passed it.
