@@ -189,7 +189,11 @@ generateRules = do
             prefix -/- constantsFile %> \file -> do
                 -- N.B. deriveConstants needs to compile programs which #include
                 -- PosixSource.h, which #include's ghcplatform.h. Fixes #18290.
-                need [prefix -/- "ghcplatform.h"]
+                need
+                    [ prefix -/- "ghcplatform.h"
+                    , prefix -/- "ghcautoconf.h"
+                    , prefix -/- "ghcversion.h"
+                    ]
                 withTempDir $ \dir -> build $
                     target (rtsContext stage) DeriveConstants [] [file, dir]
   where
