@@ -52,6 +52,13 @@ EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
 EXTERN_INLINE StgWord8 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n);
 
 /*
+ * Compare-and-swap
+ * this uses a seq_cst success memory order and a relaxed failure memory order
+ */
+EXTERN_INLINE StgWord cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n);
+
+
+/*
  * Atomic addition by the provided quantity
  *
  * atomic_inc(p, n) {
@@ -304,6 +311,17 @@ cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
 #endif
 }
 
+EXTERN_INLINE StgWord
+cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n) {
+#if defined(HAVE_C11_ATOMICS)
+    __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED);
+    return o;
+#else
+    return __sync_val_compare_and_swap(p, o, n);
+#endif
+
+}
+
 // RRN: Generalized to arbitrary increments to enable fetch-and-add in
 // Haskell code (fetchAddIntArray#).
 // PT: add-and-fetch, returns new value
@@ -454,6 +472,9 @@ load_load_barrier(void) {
 // Non-atomic addition for "approximate" counters that can be lossy
 #define NONATOMIC_ADD(ptr,val) RELAXED_STORE(ptr, RELAXED_LOAD(ptr) + val)
 
+// compare-and-swap atomic operations
+#define SEQ_CST_RELAXED_CAS(p,o,n) cas_seq_cst_relaxed(p,o,n)
+
 // Explicit fences
 //
 // These are typically necessary only in very specific cases (e.g. WSDeque)
@@ -488,6 +509,9 @@ EXTERN_INLINE void load_load_barrier () {} /* nothing */
 
 // Non-atomic addition for "approximate" counters that can be lossy
 #define NONATOMIC_ADD(ptr,val) *ptr += val
+
+// compare-and-swap atomic operations
+#define SEQ_CST_RELAXED_CAS(p,o,n) cas(p,o,n)
 
 // Fences
 #define RELEASE_FENCE()
