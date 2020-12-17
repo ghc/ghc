@@ -217,6 +217,35 @@ addMutListScavStats(const MutListScavStats *src,
 }
 #endif /* DEBUG */
 
+/* -----------------------------------------------------------------------------
+   Statistics from root evacuation
+   -------------------------------------------------------------------------- */
+
+/*
+ * Note [Root evacuation statistics]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * When diagnosing concurrent GC pauses it can often be useful
+ * to know how many GC roots we get from various sources.
+ * Consequently, track this information in each GC thread and
+ * emit eventlog events if ROOT_EVAC_STATS is #define'd.
+ *
+ * To keep track of root evacuations mark_root() bumps a
+ * counter in gc_thread, which gets zero'd after we finish
+ * evacuating each class of roots. We also bump the counter in
+ * markWeakPtrList(), since this codepath doesn't use mark_root().
+ */
+
+#if defined(DEBUG) || defined(THREADED_RTS)
+#define ROOT_EVAC_STATS
+#endif
+
+#if defined(ROOT_EVAC_STATS)
+#define TRACE_EVACD_ROOTS(label) \
+    trace(TRACE_nonmoving_gc, "root:" label ":%d", gct->n_evacd_roots); \
+    gct->n_evacd_roots = 0;
+#else
+#define TRACE_EVACD_ROOTS(label)
+#endif
 
 /* -----------------------------------------------------------------------------
    GarbageCollect: the main entry point to the garbage collector.
@@ -441,10 +470,12 @@ GarbageCollect (uint32_t collect_gen,
           }
       }
   }
+  TRACE_EVACD_ROOTS("MutList");
 
   // follow roots from the CAF list (used by GHCi)
   gct->evac_gen_no = 0;
   markCAFs(mark_root, gct);
+  TRACE_EVACD_ROOTS("CAF");
 
   // follow all the roots that the application knows about.
   gct->evac_gen_no = 0;
@@ -456,15 +487,20 @@ GarbageCollect (uint32_t collect_gen,
   } else {
       markCapability(mark_root, gct, cap, true/*don't mark sparks*/);
   }
+  TRACE_EVACD_ROOTS("Cap");
 
+  // Mark runnable threads
   markScheduler(mark_root, gct);
+  TRACE_EVACD_ROOTS("Sched");
 
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
   markWeakPtrList();
   initWeakForGC();
+  TRACE_EVACD_ROOTS("WeakPtr");
 
   // Mark the stable pointer table.
   markStablePtrTable(mark_root, gct);
+  TRACE_EVACD_ROOTS("StablePtr");
 
   // Remember old stable name addresses.
   rememberOldStableNameAddresses ();
@@ -1296,7 +1332,11 @@ gcWorkerThread (Capability *cap)
     // Every thread evacuates some roots.
     gct->evac_gen_no = 0;
     markCapability(mark_root, gct, cap, true/*prune sparks*/);
+    TRACE_EVACD_ROOTS("Cap");
+
+    // Scavenge mutable lists
     scavenge_capability_mut_lists(cap);
+    TRACE_EVACD_ROOTS("MutList");
 
     scavenge_until_all_done();
 
@@ -1753,6 +1793,7 @@ init_gc_thread (gc_thread *t)
     t->any_work = 0;
     t->no_work = 0;
     t->scav_find_work = 0;
+    t->n_evacd_roots = 0;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1774,6 +1815,9 @@ mark_root(void *user USED_IF_THREADS, StgClosure **root)
     SET_GCT(user);
 
     evacuate(root);
+#if defined(ROOT_EVAC_STATS)
+    gct->n_evacd_roots++;
+#endif
 
     SET_GCT(saved_gct);
 }
