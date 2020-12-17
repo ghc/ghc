@@ -162,8 +162,9 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                -- ex_tvs in its kind k.
                -- See Note [Type variables whose kind is captured]
 
-       ; (univ_tvs, req_dicts, ev_binds, residual, _)
-               <- simplifyInfer tclvl NoRestrictions [] named_taus wanted
+       ; ((univ_tvs, req_dicts, ev_binds, _), residual)
+               <- captureConstraints $
+                  simplifyInfer tclvl NoRestrictions [] named_taus wanted
        ; top_ev_binds <- checkNoErrs (simplifyTop residual)
        ; addTopEvBinds top_ev_binds $
 
