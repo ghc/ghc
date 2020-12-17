@@ -154,10 +154,6 @@ initStats0(void)
         .par_copied_bytes = 0,
         .cumulative_par_max_copied_bytes = 0,
         .cumulative_par_balanced_copied_bytes = 0,
-        .gc_spin_spin = 0,
-        .gc_spin_yield = 0,
-        .mut_spin_spin = 0,
-        .mut_spin_yield = 0,
         .any_work = 0,
         .scav_find_work = 0,
         .max_n_todo_overflow = 0,
@@ -460,9 +456,8 @@ stat_startGC (Capability *cap, gc_thread *gct)
 void
 stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ slop,
             uint32_t gen, uint32_t par_n_threads, gc_thread **gc_threads,
-            W_ par_max_copied, W_ par_balanced_copied, W_ gc_spin_spin, W_ gc_spin_yield,
-            W_ mut_spin_spin, W_ mut_spin_yield, W_ any_work, W_ scav_find_work,
-            W_ max_n_todo_overflow)
+            W_ par_max_copied, W_ par_balanced_copied, W_ any_work,
+            W_ scav_find_work, W_ max_n_todo_overflow)
 {
     ACQUIRE_LOCK(&stats_mutex);
 
@@ -544,10 +539,6 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
         stats.any_work += any_work;
         stats.scav_find_work += scav_find_work;
         stats.max_n_todo_overflow += stg_max(max_n_todo_overflow, stats.max_n_todo_overflow);
-        stats.gc_spin_spin += gc_spin_spin;
-        stats.gc_spin_yield += gc_spin_yield;
-        stats.mut_spin_spin += mut_spin_spin;
-        stats.mut_spin_yield += mut_spin_yield;
     }
     stats.gc_cpu_ns += stats.gc.cpu_ns;
     stats.gc_elapsed_ns += stats.gc.elapsed_ns;
@@ -968,16 +959,6 @@ static void report_summary(const RTSSummaryStats* sum)
                     , col_width[1], "gc_alloc_block_sync"
                     , col_width[2], gc_alloc_block_sync.spin
                     , col_width[3], gc_alloc_block_sync.yield);
-        statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
-                    , col_width[0], ""
-                    , col_width[1], "gc_spin"
-                    , col_width[2], stats.gc_spin_spin
-                    , col_width[3], stats.gc_spin_yield);
-        statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
-                    , col_width[0], ""
-                    , col_width[1], "mut_spin"
-                    , col_width[2], stats.mut_spin_spin
-                    , col_width[3], stats.mut_spin_yield);
         statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*s\n"
                     , col_width[0], ""
                     , col_width[1], "whitehole_gc"
@@ -1154,10 +1135,6 @@ static void report_machine_readable (const RTSSummaryStats * sum)
     MR_STAT("gc_alloc_block_sync_yield", FMT_Word64,
             gc_alloc_block_sync.yield);
     MR_STAT("gc_alloc_block_sync_spin", FMT_Word64, gc_alloc_block_sync.spin);
-    MR_STAT("gc_spin_spin", FMT_Word64, stats.gc_spin_spin);
-    MR_STAT("gc_spin_yield", FMT_Word64, stats.gc_spin_yield);
-    MR_STAT("mut_spin_spin", FMT_Word64, stats.mut_spin_spin);
-    MR_STAT("mut_spin_yield", FMT_Word64, stats.mut_spin_yield);
     MR_STAT("waitForGcThreads_spin", FMT_Word64, waitForGcThreads_spin);
     MR_STAT("waitForGcThreads_yield", FMT_Word64,
             waitForGcThreads_yield);
@@ -1587,9 +1564,6 @@ Actual SpinLocks:
 * gc_alloc_block:
     This SpinLock protects the block allocator and free list manager. See
     BlockAlloc.c.
-* gc_spin and mut_spin:
-    These SpinLocks are used to herd gc worker threads during parallel garbage
-    collection. See gcWorkerThread, wakeup_gc_threads and releaseGCThreads.
 * gen[g].sync:
     These SpinLocks, one per generation, protect the generations[g] data
     structure during garbage collection.

@@ -251,20 +251,6 @@ typedef struct _RTSStats {
   // -----------------------------------
   // Internal Counters
 
-    // The number of times a GC thread spun on its 'gc_spin' lock.
-    // Will be zero if the rts was not built with PROF_SPIN
-  uint64_t gc_spin_spin;
-    // The number of times a GC thread yielded on its 'gc_spin' lock.
-    // Will be zero if the rts was not built with PROF_SPIN
-  uint64_t gc_spin_yield;
-    // The number of times a GC thread spun on its 'mut_spin' lock.
-    // Will be zero if the rts was not built with PROF_SPIN
-  uint64_t mut_spin_spin;
-    // The number of times a GC thread yielded on its 'mut_spin' lock.
-    // Will be zero if the rts was not built with PROF_SPIN
-  uint64_t mut_spin_yield;
-    // The number of times a GC thread has checked for work across all parallel
-    // GCs
   uint64_t any_work;
     // The number of times a GC thread has iterated it's outer loop across all
     // parallel GCs

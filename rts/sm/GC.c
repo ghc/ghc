@@ -269,7 +269,6 @@ GarbageCollect (uint32_t collect_gen,
   bdescr *bd;
   generation *gen;
   StgWord live_blocks, live_words, par_max_copied, par_balanced_copied,
-      gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
       any_work, scav_find_work, max_n_todo_overflow;
 #if defined(THREADED_RTS)
   gc_thread *saved_gct;
@@ -391,7 +390,10 @@ GarbageCollect (uint32_t collect_gen,
   }
   work_stealing = RtsFlags.ParFlags.parGcLoadBalancingEnabled &&
       N >= RtsFlags.ParFlags.parGcLoadBalancingGen &&
-      n_gc_threads > 1;
+      (gc_type == SYNC_GC_PAR) &&
+      (n_gc_threads - n_gc_idle_threads) > 1;
+      // ^ if we are the only non-idle gc thread, turn off work stealing
+      //
       // It's not always a good idea to do load balancing in parallel
       // GC.  In particular, for a parallel program we don't want to
       // lose locality by moving cached data into another CPU's cache
@@ -588,10 +590,6 @@ GarbageCollect (uint32_t collect_gen,
   copied = 0;
   par_max_copied = 0;
   par_balanced_copied = 0;
-  gc_spin_spin = 0;
-  gc_spin_yield = 0;
-  mut_spin_spin = 0;
-  mut_spin_yield = 0;
   any_work = 0;
   scav_find_work = 0;
   max_n_todo_overflow = 0;
@@ -616,13 +614,6 @@ GarbageCollect (uint32_t collect_gen,
                          RELAXED_LOAD(&thread->any_work));
               debugTrace(DEBUG_gc,"   scav_find_work %ld",
                          RELAXED_LOAD(&thread->scav_find_work));
-
-#if defined(THREADED_RTS) && defined(PROF_SPIN)
-              gc_spin_spin += RELAXED_LOAD(&thread->gc_spin.spin);
-              gc_spin_yield += RELAXED_LOAD(&thread->gc_spin.yield);
-              mut_spin_spin += RELAXED_LOAD(&thread->mut_spin.spin);
-              mut_spin_yield += RELAXED_LOAD(&thread->mut_spin.yield);
-#endif
 
               any_work += RELAXED_LOAD(&thread->any_work);
               scav_find_work += RELAXED_LOAD(&thread->scav_find_work);
@@ -1044,7 +1035,6 @@ GarbageCollect (uint32_t collect_gen,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
              N, n_gc_threads, gc_threads,
              par_max_copied, par_balanced_copied,
-             gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
              any_work, scav_find_work, max_n_todo_overflow);
 
 #if defined(RTS_USER_SIGNALS)
@@ -1083,10 +1073,6 @@ new_gc_thread (uint32_t n, gc_thread *t)
 
 #if defined(THREADED_RTS)
     t->id = 0;
-    initSpinLock(&t->gc_spin);
-    initSpinLock(&t->mut_spin);
-    ACQUIRE_SPIN_LOCK(&t->gc_spin);
-    ACQUIRE_SPIN_LOCK(&t->mut_spin);
     SEQ_CST_STORE(&t->wakeup, GC_THREAD_INACTIVE);  // starts true, so we can wait for the
                           // thread to start up, see wakeup_gc_threads
 #endif
@@ -1149,6 +1135,12 @@ initGcThreads (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
     } else {
         gc_threads = stgMallocBytes (to * sizeof(gc_thread*),
                                      "initGcThreads");
+        initMutex(&gc_entry_mutex);
+        initCondition(&gc_entry_arrived_cv);
+        initCondition(&gc_entry_start_now_cv);
+        initMutex(&gc_exit_mutex);
+        initCondition(&gc_exit_arrived_cv);
+        initCondition(&gc_exit_leave_now_cv);
         initMutex(&gc_running_mutex);
         initCondition(&gc_running_cv);
     }
@@ -1185,6 +1177,12 @@ freeGcThreads (void)
         }
         closeCondition(&gc_running_cv);
         closeMutex(&gc_running_mutex);
+        closeCondition(&gc_exit_leave_now_cv);
+        closeCondition(&gc_exit_arrived_cv);
+        closeMutex(&gc_exit_mutex);
+        closeCondition(&gc_entry_start_now_cv);
+        closeCondition(&gc_entry_arrived_cv);
+        closeMutex(&gc_entry_mutex);
         stgFree (gc_threads);
 #else
         for (g = 0; g < RtsFlags.GcFlags.generations; g++)
@@ -1339,16 +1337,16 @@ gcWorkerThread (Capability *cap)
     gct->id = osThreadId();
     stat_startGCWorker (cap, gct);
 
-    // Wait until we're told to wake up
-    RELEASE_SPIN_LOCK(&gct->mut_spin);
-    // yieldThread();
-    //    Strangely, adding a yieldThread() here makes the CPU time
-    //    measurements more accurate on Linux, perhaps because it syncs
-    //    the CPU time across the multiple cores.  Without this, CPU time
-    //    is heavily skewed towards GC rather than MUT.
     SEQ_CST_STORE(&gct->wakeup, GC_THREAD_STANDING_BY);
     debugTrace(DEBUG_gc, "GC thread %d standing by...", gct->thread_index);
-    ACQUIRE_SPIN_LOCK(&gct->gc_spin);
+
+    ACQUIRE_LOCK(&gc_entry_mutex);
+    SEQ_CST_ADD(&n_gc_entered, 1);
+    signalCondition(&gc_entry_arrived_cv);
+    while(SEQ_CST_LOAD(&n_gc_entered) != 0) {
+        waitCondition(&gc_entry_start_now_cv, &gc_entry_mutex);
+    }
+    RELEASE_LOCK(&gc_entry_mutex);
 
     init_gc_thread(gct);
 
@@ -1372,15 +1370,22 @@ gcWorkerThread (Capability *cap)
 #endif
 
     // Wait until we're told to continue
-    RELEASE_SPIN_LOCK(&gct->gc_spin);
     debugTrace(DEBUG_gc, "GC thread %d waiting to continue...",
                gct->thread_index);
     stat_endGCWorker (cap, gct);
+
     // This must come *after* stat_endGCWorker since it serves to
     // synchronize us with the GC leader, which will later aggregate the
     // GC statistics  (#17964,#18717)
+    ACQUIRE_LOCK(&gc_exit_mutex);
     SEQ_CST_STORE(&gct->wakeup, GC_THREAD_WAITING_TO_CONTINUE);
-    ACQUIRE_SPIN_LOCK(&gct->mut_spin);
+    SEQ_CST_ADD(&n_gc_exited, 1);
+    signalCondition(&gc_exit_arrived_cv);
+    while(SEQ_CST_LOAD(&n_gc_exited) != 0) {
+        waitCondition(&gc_exit_leave_now_cv, &gc_exit_mutex);
+    }
+    RELEASE_LOCK(&gc_exit_mutex);
+
     debugTrace(DEBUG_gc, "GC thread %d on my way...", gct->thread_index);
 
     SET_GCT(saved_gct);
@@ -1391,56 +1396,53 @@ gcWorkerThread (Capability *cap)
 #if defined(THREADED_RTS)
 
 void
-waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
+waitForGcThreads (Capability *cap, bool idle_cap[])
 {
-    const uint32_t n_threads = n_capabilities;
+    // n_gc_threads is not valid here, we're too early
+    uint32_t n_threads = n_capabilities;
     const uint32_t me = cap->no;
-    uint32_t i, j;
-    bool retry = true;
+    uint32_t i, cur_n_gc_entered;
     Time t0, t1, t2;
 
     t0 = t1 = t2 = getProcessElapsedTime();
 
-    while(retry) {
-        for (i=0; i < n_threads; i++) {
-            if (i == me || idle_cap[i]) continue;
+    for(i = 0; i < n_capabilities; ++i) {
+        if (i == me || idle_cap[i]) {
+            --n_threads;
+        }
+    }
+
+    ASSERT(n_threads < n_capabilities); // must be less becasue we don't count ourself
+    if(n_threads == 0) { return; }
+
+    ACQUIRE_LOCK(&gc_entry_mutex);
+    while((cur_n_gc_entered = SEQ_CST_LOAD(&n_gc_entered)) != n_threads) {
+        ASSERT(cur_n_gc_entered < n_threads);
+        for(i = 0; i < n_capabilities; ++i) {
+            if (i == me || idle_cap[i]) { continue; }
             if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
                 prodCapability(capabilities[i], cap->running_task);
-            }
-        }
-        for (j=0; j < 10; j++) {
-            retry = false;
-            for (i=0; i < n_threads; i++) {
-                if (i == me || idle_cap[i]) continue;
                 write_barrier();
                 interruptCapability(capabilities[i]);
-                if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
-                    retry = true;
-                }
             }
-            if (!retry) break;
-#if defined(PROF_SPIN)
-            waitForGcThreads_yield++;
-#endif
-            yieldThread();
         }
-
+        // this 1ms timeout is not well justified. It's the shortest timeout we
+        // can use on windows. It seems to work well for me.
+        timedWaitCondition(&gc_entry_arrived_cv, &gc_entry_mutex, USToTime(1000));
         t2 = getProcessElapsedTime();
         if (RtsFlags.GcFlags.longGCSync != 0 &&
             t2 - t1 > RtsFlags.GcFlags.longGCSync) {
+            // best not to hold the mutex while we call a hook function
+            RELEASE_LOCK(&gc_entry_mutex);
+
             /* call this every longGCSync of delay */
             rtsConfig.longGCSync(cap->no, t2 - t0);
             t1 = t2;
-        }
-        if (retry) {
-#if defined(PROF_SPIN)
-            // This is a bit strange, we'll get more yields than spins.
-            // I guess that means it's not a spin-lock at all, but these
-            // numbers are still useful (I think).
-            waitForGcThreads_spin++;
-#endif
+
+            ACQUIRE_LOCK(&gc_entry_mutex);
         }
     }
+    RELEASE_LOCK(&gc_entry_mutex);
 
     if (RtsFlags.GcFlags.longGCSync != 0 &&
         t2 - t0 > RtsFlags.GcFlags.longGCSync) {
@@ -1459,17 +1461,28 @@ wakeup_gc_threads (uint32_t me USED_IF_THREADS,
 
     if (n_gc_threads == 1) return;
 
+#if defined(DEBUG)
+    StgInt num_idle = 0;
+    for(i=0; i < n_gc_threads; ++i) {
+        ASSERT(!(i==me && idle_cap[i]));
+        if (idle_cap[i]) { ++num_idle;}
+    }
+    ASSERT(num_idle == n_gc_idle_threads);
+#endif
+
+    ACQUIRE_LOCK(&gc_entry_mutex);
     for (i=0; i < n_gc_threads; i++) {
         if (i == me || idle_cap[i]) continue;
         inc_running();
         debugTrace(DEBUG_gc, "waking up gc thread %d", i);
-        if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY)
-            barf("wakeup_gc_threads");
-
+        ASSERT(SEQ_CST_LOAD(&gc_threads[i]->wakeup) == GC_THREAD_STANDING_BY);
         SEQ_CST_STORE(&gc_threads[i]->wakeup, GC_THREAD_RUNNING);
-        ACQUIRE_SPIN_LOCK(&gc_threads[i]->mut_spin);
-        RELEASE_SPIN_LOCK(&gc_threads[i]->gc_spin);
     }
+    ASSERT(SEQ_CST_LOAD(&n_gc_entered) ==
+           (StgInt)n_gc_threads - 1 - (StgInt)n_gc_idle_threads);
+    SEQ_CST_STORE(&n_gc_entered, 0);
+    broadcastCondition(&gc_entry_start_now_cv);
+    RELEASE_LOCK(&gc_entry_mutex);
 #endif
 }
 
@@ -1477,21 +1490,31 @@ wakeup_gc_threads (uint32_t me USED_IF_THREADS,
 // standby state, otherwise they may still be executing inside
 // scavenge_until_all_done(), and may even remain awake until the next GC starts.
 static void
-shutdown_gc_threads (uint32_t me USED_IF_THREADS,
-                     bool idle_cap[] USED_IF_THREADS)
+shutdown_gc_threads (uint32_t me USED_IF_THREADS USED_IF_DEBUG,
+                     bool idle_cap[] USED_IF_THREADS USED_IF_DEBUG)
 {
 #if defined(THREADED_RTS)
-    uint32_t i;
 
     if (n_gc_threads == 1) return;
 
-    for (i=0; i < n_gc_threads; i++) {
-        if (i == me || idle_cap[i]) continue;
-        while (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_WAITING_TO_CONTINUE) {
-            busy_wait_nop();
-        }
+    // we need to wait for `n_threads` threads. -1 because that's ourself
+    StgInt n_threads = (StgInt)n_gc_threads - 1 - (StgInt)n_gc_idle_threads;
+    StgInt cur_n_gc_exited;
+    ACQUIRE_LOCK(&gc_exit_mutex);
+    while((cur_n_gc_exited = SEQ_CST_LOAD(&n_gc_exited)) != n_threads) {
+        ASSERT(cur_n_gc_exited >= 0);
+        ASSERT(cur_n_gc_exited < n_threads);
+        waitCondition(&gc_exit_arrived_cv, &gc_exit_mutex);
     }
-#endif
+#if defined(DEBUG)
+    uint32_t i;
+    for (i=0; i < n_capabilities; i++) {
+        if (i == me || idle_cap[i]) continue;
+        ASSERT(SEQ_CST_LOAD(&gc_threads[i]->wakeup) == GC_THREAD_WAITING_TO_CONTINUE);
+    }
+#endif // DEBUG
+    RELEASE_LOCK(&gc_exit_mutex);
+#endif // THREADED_RTS
 }
 
 #if defined(THREADED_RTS)
@@ -1501,15 +1524,25 @@ releaseGCThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
     const uint32_t n_threads = n_capabilities;
     const uint32_t me = cap->no;
     uint32_t i;
+#if defined(DEBUG)
+    uint32_t num_idle = 0;
+    for(i=0; i < n_threads; ++i) {
+        ASSERT(!(i==me && idle_cap[i]));
+        if (idle_cap[i]) { ++num_idle;}
+    }
+#endif
+
     for (i=0; i < n_threads; i++) {
         if (i == me || idle_cap[i]) continue;
-        if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_WAITING_TO_CONTINUE)
-            barf("releaseGCThreads");
-
+        ASSERT(SEQ_CST_LOAD(&gc_threads[i]->wakeup) == GC_THREAD_WAITING_TO_CONTINUE);
         SEQ_CST_STORE(&gc_threads[i]->wakeup, GC_THREAD_INACTIVE);
-        ACQUIRE_SPIN_LOCK(&gc_threads[i]->gc_spin);
-        RELEASE_SPIN_LOCK(&gc_threads[i]->mut_spin);
     }
+
+    ACQUIRE_LOCK(&gc_exit_mutex);
+    ASSERT(SEQ_CST_LOAD(&n_gc_exited) == (StgInt)n_threads - 1 - (StgInt)num_idle);
+    SEQ_CST_STORE(&n_gc_exited, 0);
+    broadcastCondition(&gc_exit_leave_now_cv);
+    RELEASE_LOCK(&gc_exit_mutex);
 }
 #endif
 
