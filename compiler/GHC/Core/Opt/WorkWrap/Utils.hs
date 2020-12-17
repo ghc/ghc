@@ -132,11 +132,14 @@ type WwResult
 
 mkWwBodies :: DynFlags
            -> FamInstEnvs
-           -> VarSet         -- Free vars of RHS
+           -> VarSet         -- ^ Free vars of RHS
                              -- See Note [Freshen WW arguments]
-           -> Id             -- The original function
-           -> [Demand]       -- Strictness of original function
-           -> Cpr            -- Info about function result
+           -> Id             -- ^ The original function
+           -> [Demand]       -- ^ Strictness of original function
+                             -- (derived from 'idStrictness')
+           -> SubDemand      -- ^ How the function body is evaluated considering
+                             -- all call sites (derived from 'idDemandInfo')
+           -> Cpr            -- ^ Info about function result
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -150,25 +153,25 @@ mkWwBodies :: DynFlags
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
+mkWwBodies dflags fam_envs rhs_fvs fun_id arg_dmds body_sd cpr_info
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs empty_subst fun_ty demands
+             <- mkWWargs empty_subst fun_ty arg_dmds
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
              <- mkWWstr dflags fam_envs has_inlineable_prag wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
-              <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty cpr_info
+              <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty body_sd cpr_info
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
               wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
               worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
 
-        ; if isWorkerSmallEnough dflags (length demands) work_args
+        ; if isWorkerSmallEnough dflags (length arg_dmds) work_args
              && not (too_many_args_for_join_point wrap_args)
              && ((useful1 && not only_one_void_argument) || useful2)
           then return (Just (worker_args_dmds, length work_call_args,
@@ -190,7 +193,7 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
 
     -- Note [Do not split void functions]
     only_one_void_argument
-      | [d] <- demands
+      | [d] <- arg_dmds
       , Just (_, arg_ty1, _) <- splitFunTy_maybe fun_ty
       , isAbsDmd d && isVoidTy arg_ty1
       = True
@@ -1074,19 +1077,21 @@ left-to-right traversal of the result structure.
 mkWWcpr :: Bool
         -> FamInstEnvs
         -> Type                              -- function body type
+        -> SubDemand                         -- SubDemand on the function body
         -> Cpr                               -- CPR analysis results
         -> UniqSM (Bool,                     -- Is w/w'ing useful?
                    CoreExpr -> CoreExpr,     -- New wrapper
                    CoreExpr -> CoreExpr,     -- New worker
                    Type)                     -- Type of worker's body
 
-mkWWcpr opt_CprAnal fam_envs body_ty cpr
+mkWWcpr opt_CprAnal fam_envs body_ty body_sd cpr
     -- CPR explicitly turned off (or in -O0)
   | not opt_CprAnal = return (False, id, id, body_ty)
     -- CPR is turned on by default for -O and O2
   | otherwise = do
-      -- We assume WHNF, so the outer layer always terminates.
-      let (_tm, cpr') = forceCpr seqDmd cpr
+      -- All calls put the body *at least* under sub-demand 'body_sd', so force
+      -- accordingly.
+      let (_tm, cpr') = forceCpr body_sd cpr
       mb_stuff <- mkWWcpr_one_layer fam_envs body_ty cpr'
       case mb_stuff of
         Nothing -> return (False, id, id, body_ty)

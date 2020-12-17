@@ -482,7 +482,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
   | is_fun && is_eta_exp
-  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
+  = splitFun dflags fam_envs new_fn_id fn_info wrap_arg_dmds div wrap_body_sd cpr rhs
 
   | isNonRec is_rec, is_thunk                        -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
@@ -491,9 +491,11 @@ tryWW dflags fam_envs is_rec fn_id rhs
   = return [ (new_fn_id, rhs) ]
 
   where
-    uf_opts      = unfoldingOpts dflags
-    fn_info      = idInfo fn_id
-    (wrap_dmds, div) = splitStrictSig (strictnessInfo fn_info)
+    uf_opts                = unfoldingOpts dflags
+    fn_info                = idInfo fn_id
+    (wrap_arg_dmds, div)   = splitStrictSig (strictnessInfo fn_info)
+    (_card1 :* fn_sd)      = demandInfo fn_info
+    (_card2, wrap_body_sd) = peelManyCalls (length wrap_arg_dmds) fn_sd
 
     cpr_ty       = getCprSig (cprInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
@@ -506,9 +508,9 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
         -- See Note [Zapping Used Once info WorkWrap]
 
-    is_fun     = notNull wrap_dmds || isJoinId fn_id
+    is_fun     = notNull wrap_arg_dmds || isJoinId fn_id
     -- See Note [Don't eta expand in w/w]
-    is_eta_exp = length wrap_dmds == manifestArity rhs
+    is_eta_exp = length wrap_arg_dmds == manifestArity rhs
     is_thunk   = not is_fun && not (exprIsHNF rhs) && not (isJoinId fn_id)
                             && not (isUnliftedType (idType fn_id))
 
@@ -584,12 +586,12 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> SubDemand -> Cpr -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
-splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) ) do
+splitFun dflags fam_envs fn_id fn_info wrap_arg_dmds div wrap_body_sd cpr rhs
+  = WARN( not (wrap_arg_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_arg_dmds $$ ppr cpr) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr
+    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_arg_dmds wrap_body_sd use_cpr
     case stuff of
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
