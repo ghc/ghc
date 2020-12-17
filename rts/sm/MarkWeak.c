@@ -427,6 +427,7 @@ markWeakPtrList ( void )
             }
 #endif
 
+            gct->n_roots_evacd++;  // See Note [Root evacuation statistics]
             evacuate((StgClosure **)last_w);
             w = *last_w;
             last_w = &(w->link);
