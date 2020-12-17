@@ -15,6 +15,7 @@ import qualified GHC.Platform.S390X      as S390X
 import qualified GHC.Platform.SPARC      as SPARC
 import qualified GHC.Platform.X86        as X86
 import qualified GHC.Platform.X86_64     as X86_64
+import qualified GHC.Platform.Mips64el   as Mips64el
 import qualified GHC.Platform.NoRegs     as NoRegs
 
 -- | Returns 'True' if this global register is stored in a caller-saves
@@ -25,12 +26,13 @@ callerSaves platform
  | platformUnregisterised platform = NoRegs.callerSaves
  | otherwise
  = case platformArch platform of
-   ArchX86     -> X86.callerSaves
-   ArchX86_64  -> X86_64.callerSaves
-   ArchS390X   -> S390X.callerSaves
-   ArchSPARC   -> SPARC.callerSaves
-   ArchARM {}  -> ARM.callerSaves
-   ArchAArch64 -> AArch64.callerSaves
+   ArchX86      -> X86.callerSaves
+   ArchX86_64   -> X86_64.callerSaves
+   ArchS390X    -> S390X.callerSaves
+   ArchSPARC    -> SPARC.callerSaves
+   ArchARM {}   -> ARM.callerSaves
+   ArchAArch64  -> AArch64.callerSaves
+   ArchMips64el -> Mips64el.callerSaves
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
         PPC.callerSaves
@@ -47,12 +49,13 @@ activeStgRegs platform
  | platformUnregisterised platform = NoRegs.activeStgRegs
  | otherwise
  = case platformArch platform of
-   ArchX86     -> X86.activeStgRegs
-   ArchX86_64  -> X86_64.activeStgRegs
-   ArchS390X   -> S390X.activeStgRegs
-   ArchSPARC   -> SPARC.activeStgRegs
-   ArchARM {}  -> ARM.activeStgRegs
-   ArchAArch64 -> AArch64.activeStgRegs
+   ArchX86      -> X86.activeStgRegs
+   ArchX86_64   -> X86_64.activeStgRegs
+   ArchS390X    -> S390X.activeStgRegs
+   ArchSPARC    -> SPARC.activeStgRegs
+   ArchARM {}   -> ARM.activeStgRegs
+   ArchAArch64  -> AArch64.activeStgRegs
+   ArchMips64el -> Mips64el.activeStgRegs
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
         PPC.activeStgRegs
@@ -64,12 +67,13 @@ haveRegBase platform
  | platformUnregisterised platform = NoRegs.haveRegBase
  | otherwise
  = case platformArch platform of
-   ArchX86     -> X86.haveRegBase
-   ArchX86_64  -> X86_64.haveRegBase
-   ArchS390X   -> S390X.haveRegBase
-   ArchSPARC   -> SPARC.haveRegBase
-   ArchARM {}  -> ARM.haveRegBase
-   ArchAArch64 -> AArch64.haveRegBase
+   ArchX86      -> X86.haveRegBase
+   ArchX86_64   -> X86_64.haveRegBase
+   ArchS390X    -> S390X.haveRegBase
+   ArchSPARC    -> SPARC.haveRegBase
+   ArchARM {}   -> ARM.haveRegBase
+   ArchAArch64  -> AArch64.haveRegBase
+   ArchMips64el -> Mips64el.haveRegBase
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
         PPC.haveRegBase
@@ -81,12 +85,13 @@ globalRegMaybe platform
  | platformUnregisterised platform = NoRegs.globalRegMaybe
  | otherwise
  = case platformArch platform of
-   ArchX86     -> X86.globalRegMaybe
-   ArchX86_64  -> X86_64.globalRegMaybe
-   ArchS390X   -> S390X.globalRegMaybe
-   ArchSPARC   -> SPARC.globalRegMaybe
-   ArchARM {}  -> ARM.globalRegMaybe
-   ArchAArch64 -> AArch64.globalRegMaybe
+   ArchX86      -> X86.globalRegMaybe
+   ArchX86_64   -> X86_64.globalRegMaybe
+   ArchS390X    -> S390X.globalRegMaybe
+   ArchSPARC    -> SPARC.globalRegMaybe
+   ArchARM {}   -> ARM.globalRegMaybe
+   ArchAArch64  -> AArch64.globalRegMaybe
+   ArchMips64el -> Mips64el.globalRegMaybe
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
         PPC.globalRegMaybe
@@ -98,12 +103,13 @@ freeReg platform
  | platformUnregisterised platform = NoRegs.freeReg
  | otherwise
  = case platformArch platform of
-   ArchX86     -> X86.freeReg
-   ArchX86_64  -> X86_64.freeReg
-   ArchS390X   -> S390X.freeReg
-   ArchSPARC   -> SPARC.freeReg
-   ArchARM {}  -> ARM.freeReg
-   ArchAArch64 -> AArch64.freeReg
+   ArchX86      -> X86.freeReg
+   ArchX86_64   -> X86_64.freeReg
+   ArchS390X    -> S390X.freeReg
+   ArchSPARC    -> SPARC.freeReg
+   ArchARM {}   -> ARM.freeReg
+   ArchAArch64  -> AArch64.freeReg
+   ArchMips64el -> Mips64el.freeReg
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
         PPC.freeReg

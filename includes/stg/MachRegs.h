@@ -690,14 +690,14 @@ the stack. See Note [Overlapping global registers] for implications.
 
 #define REG(x) __asm__("%" #x)
 
-#define REG_Base	16
-#define REG_Sp    17
-#define REG_Hp	   18
-#define REG_R1		19
-#define REG_R2    20
-#define REG_R3    21
-#define REG_R4    21
-#define REG_SpLim 23
+#define REG_Base	s0
+#define REG_Sp    s1
+#define REG_Hp	   s2
+#define REG_R1		s3
+#define REG_R2    s4
+#define REG_R3    s5
+#define REG_R4    s6
+#define REG_SpLim s7
 
 #define REG_F1		f20
 #define REG_F2		f22
