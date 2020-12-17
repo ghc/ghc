@@ -132,11 +132,12 @@ type WwResult
 
 mkWwBodies :: DynFlags
            -> FamInstEnvs
-           -> VarSet         -- Free vars of RHS
+           -> VarSet         -- ^ Free vars of RHS
                              -- See Note [Freshen WW arguments]
-           -> Id             -- The original function
-           -> [Demand]       -- Strictness of original function
-           -> Cpr            -- Info about function result
+           -> Id             -- ^ The original function
+           -> [Demand]       -- ^ Strictness of original function
+                             -- (derived from 'idStrictness')
+           -> Cpr            -- ^ Info about function result
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -150,12 +151,12 @@ mkWwBodies :: DynFlags
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
+mkWwBodies dflags fam_envs rhs_fvs fun_id arg_dmds cpr_info
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs empty_subst fun_ty demands
+             <- mkWWargs empty_subst fun_ty arg_dmds
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
              <- mkWWstr dflags fam_envs has_inlineable_prag wrap_args
 
@@ -168,7 +169,7 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
               wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
               worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
 
-        ; if isWorkerSmallEnough dflags (length demands) work_args
+        ; if isWorkerSmallEnough dflags (length arg_dmds) work_args
              && not (too_many_args_for_join_point wrap_args)
              && ((useful1 && not only_one_void_argument) || useful2)
           then return (Just (worker_args_dmds, length work_call_args,
@@ -190,7 +191,7 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
 
     -- Note [Do not split void functions]
     only_one_void_argument
-      | [d] <- demands
+      | [d] <- arg_dmds
       , Just (_, arg_ty1, _) <- splitFunTy_maybe fun_ty
       , isAbsDmd d && isVoidTy arg_ty1
       = True
@@ -221,9 +222,9 @@ isWorkerSmallEnough dflags old_n_args vars
 Note [Always do CPR w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 At one time we refrained from doing CPR w/w for thunks, on the grounds that
-we might duplicate work.  But that is already handled by the demand analyser,
+we might duplicate work.  But that is already handled by CPR analysis,
 which doesn't give the CPR property if w/w might waste work: see
-Note [CPR for thunks] in GHC.Core.Opt.DmdAnal.
+Note [CPR for thunks] in GHC.Core.Opt.CprAnal.
 
 And if something *has* been given the CPR property and we don't w/w, it's
 a disaster, because then the enclosing function might say it has the CPR
@@ -1085,9 +1086,7 @@ mkWWcpr opt_CprAnal fam_envs body_ty cpr
   | not opt_CprAnal = return (False, id, id, body_ty)
     -- CPR is turned on by default for -O and O2
   | otherwise = do
-      -- We assume WHNF, so the outer layer always terminates.
-      let (_tm, cpr') = forceCpr seqDmd cpr
-      mb_stuff <- mkWWcpr_one_layer fam_envs body_ty cpr'
+      mb_stuff <- mkWWcpr_one_layer fam_envs body_ty cpr
       case mb_stuff of
         Nothing -> return (False, id, id, body_ty)
         Just stuff -> do
