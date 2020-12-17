@@ -56,7 +56,8 @@
 static inline bool
 cas_top(WSDeque *q, StgInt old, StgInt new)
 {
-    return (StgWord) old == cas((StgPtr) &q->top, (StgWord) old, (StgWord) new);
+    return (StgWord) old == SEQ_CST_RELAXED_CAS((StgPtr) &q->top,
+                                                (StgWord) old, (StgWord) new);
 }
 
 
