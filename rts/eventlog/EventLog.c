@@ -36,6 +36,8 @@ static const EventLogWriter *event_log_writer = NULL;
 static int flushCount;
 
 // Struct for record keeping of buffer to store event types and events.
+//
+// Invariant: The event buffer will always begin with a block-start marker.
 typedef struct _EventsBuf {
   StgInt8 *begin;
   StgInt8 *pos;
@@ -507,6 +509,10 @@ init_event_types(void)
 static void
 postHeaderEvents(void)
 {
+    // The header must appear first in the output stream, without the
+    // the block start marker we previously added in printAndClearEventBuf.
+    resetEventBuf(&eventBuf);
+
     // Write in buffer: the header begin marker.
     postInt32(&eventBuf, EVENT_HEADER_BEGIN);
 
@@ -584,18 +590,17 @@ startEventLogging_(void)
 {
     initEventLogWriter();
 
+    ACQUIRE_LOCK(&eventBufsMutex);
     postHeaderEvents();
 
-    // Flush capEventBuf with header.
     /*
      * Flush header and data begin marker to the file, thus preparing the
      * file to have events written to it.
      */
     printAndClearEventBuf(&eventBuf);
 
-    for (uint32_t c = 0; c < get_n_capabilities(); ++c) {
-        postBlockMarker(&capEventBuf[c]);
-    }
+    RELEASE_LOCK(&eventBufsMutex);
+
     return true;
 }
 
@@ -630,17 +635,17 @@ endEventLogging(void)
         return;
 
     // Flush all events remaining in the buffers.
-    for (uint32_t c = 0; c < n_capabilities; ++c) {
-        printAndClearEventBuf(&capEventBuf[c]);
-    }
-    printAndClearEventBuf(&eventBuf);
-    resetEventsBuf(&eventBuf); // we don't want the block marker
+    flushEventLog();
+
+    ACQUIRE_LOCK(&eventBufMutex);
 
     // Mark end of events (data).
     postEventTypeNum(&eventBuf, EVENT_DATA_END);
 
     // Flush the end of data marker.
     printAndClearEventBuf(&eventBuf);
+
+    RELEASE_LOCK(&eventBufMutex);
 
     stopEventLogWriter();
     event_log_writer = NULL;
@@ -1559,6 +1564,7 @@ void initEventsBuf(EventsBuf* eb, StgWord64 size, EventCapNo capno)
     eb->size = size;
     eb->marker = NULL;
     eb->capno = capno;
+    postBlockMarker(eb);
 }
 
 void resetEventsBuf(EventsBuf* eb)
