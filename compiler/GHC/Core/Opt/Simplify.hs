@@ -2173,7 +2173,8 @@ tryRules env rules fn args call_cont
           [ text "Rule:" <+> ftext (ruleName rule)
           , text "Module:" <+>  printRuleModule rule
           , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
-          , text "After: " <+> pprCoreExpr rule_rhs
+          , text "After: " <+> hang (pprCoreExpr rule_rhs) 2
+                               (sep $ map ppr $ drop (ruleArity rule) args)
           , text "Cont:  " <+> ppr call_cont ]
 
       | dopt Opt_D_dump_rule_firings dflags
