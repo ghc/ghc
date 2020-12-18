@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "rts/EventLogFormat.h"
+#include "eventlog/EventLog.h"
 #include "sm/NonMovingCensus.h"
 #include "Capability.h"
 
@@ -616,6 +616,18 @@ INLINE_HEADER void traceCapDisable(Capability *cap STG_UNUSED)
 {
     traceCapEvent(cap, EVENT_CAP_DISABLE);
     dtraceCapDisable((EventCapNo)cap->no);
+
+    // Ensure that the eventlog buffer is flushed since otherwise its events
+    // may never make it to the output stream.
+    // See Note [Eventlog concurrency].
+#if defined(TRACING)
+    if (eventlog_enabled) {
+        flushLocalEventsBuf(cap);
+    }
+# else
+    flushLocalEventsBuf(cap);
+#endif
+
 }
 
 INLINE_HEADER void traceEventThreadWakeup(Capability *cap       STG_UNUSED,
