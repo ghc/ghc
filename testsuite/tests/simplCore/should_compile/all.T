@@ -342,3 +342,4 @@ test('T18747A', normal, compile, [''])
 test('T18747B', normal, compile, [''])
 test('T18815', only_ways(['optasm']), makefile_test, ['T18815'])
 
+test('T18668', normal, compile, [''])
