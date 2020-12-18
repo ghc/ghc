@@ -32,6 +32,54 @@ bool eventlog_enabled; // protected by state_change_mutex to ensure
                        // serialisation of calls to
                        // startEventLogging/endEventLogging
 
+/* Note [Eventlog concurrency]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The eventlog is designed to handle high rates of concurrent event posting by
+ * multiple capabilities. For this reason, each capability has its own local
+ * event buffer, which is flushed when filled.
+ *
+ * Additionally, there is a single global event buffer (`eventBuf`), which is
+ * used for various administrative things (e.g. posting the header) and in
+ * cases where we want to post events yet don't hold a capability.
+ *
+ * Naturally, starting and stopping logging are a bit subtle. In particular, we
+ * need to ensure that the header is the *first* thing to appear in the event
+ * stream. To ensure that multiple threads don't race to start/stop logging we
+ * protect eventlog_enabled with state_change_mutex.
+ *
+ * Event buffers uphold the invariant that they always begin with a start-block
+ * marker. This is enforced by calls to postBlockMarker in:
+ *
+ *  - initEventsBufs (during buffer initialization)
+ *  - printAndClearEventBuf (after the buffer is filled)
+ *  - moreCapEventBufs (when the number of capabilities changes)
+ *
+ * The one place where we *don't* want a block marker is when posting the
+ * eventlog header. We achieve this by first resetting the eventlog buffer
+ * before posting the header (in postHeader).
+ *
+ * Stopping eventlogging is a bit involved:
+ *
+ *  1. first take state_change_mutex, to ensure we don't race with another
+ *     thread to stop logging.
+ *  2. disable eventlog_enabled, to ensure that no capabilities post further
+ *     events
+ *  3. request that all capabilities flush their eventlog buffers. This
+ *     achieves two things: (a) ensures that all events make it to the output
+ *     stream, and (b) serves as a memory barrier, ensuring that all
+ *     capabilities see that eventlogging is now disabled
+ *  4. wait until all capabilities have flushed.
+ *  5. post the end-of-data marker
+ *  6. stop the writer
+ *  7. release state_change_mutex
+ *
+ * Changing the number of capabilities is fairly straightforward since we hold
+ * all capabilities when the capability count is changed. The one slight corner
+ * case is that we must ensure that the buffers of any disabled capabilities are
+ * flushed, lest their events are stuck in limbo. This is achieved with a call to
+ * flushLocalEventsBuf in traceCapDisable.
+ */
+
 static const EventLogWriter *event_log_writer = NULL;
 
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
@@ -668,6 +716,7 @@ endEventLogging(void)
     RELEASE_LOCK(&state_change_mutex);
 }
 
+/* N.B. we hold all capabilities when this is called */
 void
 moreCapEventBufs (uint32_t from, uint32_t to)
 {
@@ -681,6 +730,11 @@ moreCapEventBufs (uint32_t from, uint32_t to)
 
     for (uint32_t c = from; c < to; ++c) {
         initEventsBuf(&capEventBuf[c], EVENT_LOG_SIZE, c);
+    }
+
+    // Flush the buffers of any capabilities that have been deactivated.
+    for (uint32_t c = to; c < from; ++c) {
+        printAndClearEventBuf(&capEventBuf[c]);
     }
 
     // The from == 0 already covered in initEventLogging, so we are interested
