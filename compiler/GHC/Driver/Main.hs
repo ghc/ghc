@@ -193,6 +193,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Cache ( initNameCache )
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Ppr
+import GHC.Types.TypeEnv ( typeEnvPatSyns )
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
 
@@ -1860,7 +1861,10 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     liftIO $ hscAddSptEntries hsc_env (cg_spt_entries tidy_cg)
 
     let tcs = filterOut isImplicitTyCon (mg_tcs simpl_mg)
-        patsyns = mg_patsyns simpl_mg
+
+        -- Take patsyns from mod_details, they are tidied
+        -- Previously we used mg_patsyns, which led to #19074
+        patsyns = typeEnvPatSyns $ md_types mod_details
 
         ext_ids = [ id | id <- bindersOfBinds core_binds
                        , isExternalName (idName id)
