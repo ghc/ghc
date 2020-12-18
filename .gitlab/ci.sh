@@ -217,7 +217,7 @@ function fetch_ghc() {
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
       curl "$url" > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
-      tar -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
+      $TAR -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
       case "$(uname)" in
         MSYS_*|MINGW*)
           cp -r "ghc-${GHC_VERSION}"/* "$toolchain"
@@ -268,7 +268,7 @@ function fetch_cabal() {
           esac
           echo "Fetching cabal-install from $cabal_url"
           curl "$cabal_url" > cabal.tar.xz
-          tar -xJf cabal.tar.xz
+          $TAR -xJf cabal.tar.xz
           mv cabal "$toolchain/bin"
           ;;
       esac
@@ -469,12 +469,14 @@ esac
 
 # Platform-specific environment initialization
 MAKE="make"
+TAR="tar"
 case "$(uname)" in
   MSYS_*|MINGW*) mingw_init ;;
   Darwin) boot_triple="x86_64-apple-darwin" ;;
   FreeBSD)
     boot_triple="x86_64-portbld-freebsd"
     MAKE="gmake"
+    TAR="gtar"
     ;;
   Linux) ;;
   *) fail "uname $(uname) is not supported" ;;
