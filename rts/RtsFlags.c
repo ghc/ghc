@@ -393,8 +393,9 @@ usage_text[] = {
 #endif /* PROFILING */
 
 "  -i<sec>  Time between heap profile samples (seconds, default: 0.1)",
-"  --no-automatic-heap-samples  Do not start the heap profile interval timer,",
-"                               rely on the user to trigger samples from their application",
+"  --no-automatic-heap-samples  Do not start the heap profile interval timer on start-up,",
+"                               Rather, the application will be responsible for triggering", 
+"                               heap profiler samples."
 
 #if defined(TRACING)
 "",
