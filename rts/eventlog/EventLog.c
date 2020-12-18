@@ -585,6 +585,8 @@ eventLogStatus(void)
     }
 }
 
+static bool starting_event_logging = false;
+
 static bool
 startEventLogging_(void)
 {
@@ -611,9 +613,15 @@ startEventLogging(const EventLogWriter *ev_writer)
         return false;
     }
 
-    eventlog_enabled = true;
+    if (cas(&starting_event_logging, true, false) == true) {
+        return false;
+    }
+
     event_log_writer = ev_writer;
-    return startEventLogging_();
+    bool ret = startEventLogging_();
+    eventlog_enabled = true;
+    RELAXED_STORE(&starting_event_logging, false);
+    return ret;
 }
 
 // Called during forkProcess in the child to restart the eventlog writer.
