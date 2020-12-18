@@ -27,7 +27,10 @@
 #include <unistd.h>
 #endif
 
-bool eventlog_enabled;
+Mutex state_change_mutex;
+bool eventlog_enabled; // protected by state_change_mutex to ensure
+                       // serialisation of calls to
+                       // startEventLogging/endEventLogging
 
 static const EventLogWriter *event_log_writer = NULL;
 
@@ -572,6 +575,7 @@ initEventLogging()
     initEventsBuf(&eventBuf, EVENT_LOG_SIZE, (EventCapNo)(-1));
 #if defined(THREADED_RTS)
     initMutex(&eventBufMutex);
+    initMutex(&state_change_mutex);
 #endif
 }
 
@@ -584,8 +588,6 @@ eventLogStatus(void)
         return EVENTLOG_NOT_CONFIGURED;
     }
 }
-
-static bool starting_event_logging = false;
 
 static bool
 startEventLogging_(void)
@@ -609,18 +611,19 @@ startEventLogging_(void)
 bool
 startEventLogging(const EventLogWriter *ev_writer)
 {
-    if (eventlog_enabled || event_log_writer) {
+    if (TRY_ACQUIRE_LOCK(&state_change_mutex) != 0) {
         return false;
     }
 
-    if (cas(&starting_event_logging, true, false) == true) {
+    if (eventlog_enabled || event_log_writer) {
+        RELEASE_LOCK(&state_change_mutex);
         return false;
     }
 
     event_log_writer = ev_writer;
     bool ret = startEventLogging_();
     eventlog_enabled = true;
-    RELAXED_STORE(&starting_event_logging, false);
+    RELEASE_LOCK(&state_change_mutex);
     return ret;
 }
 
@@ -639,8 +642,11 @@ restartEventLogging(void)
 void
 endEventLogging(void)
 {
-    if (!eventlog_enabled)
+    ACQUIRE_LOCK(&state_change_mutex);
+    if (!eventlog_enabled) {
+        RELEASE_LOCK(&state_change_mutex);
         return;
+    }
 
     eventlog_enabled = false;
 
@@ -659,6 +665,7 @@ endEventLogging(void)
 
     stopEventLogWriter();
     event_log_writer = NULL;
+    RELEASE_LOCK(&state_change_mutex);
 }
 
 void
