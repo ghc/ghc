@@ -31,7 +31,9 @@ cd ..
 tar -Jxf "$WINDOWS_BINDIST"
 mv ghc* windows
 cd inst/share/doc/ghc*/html/libraries
-mv ../../../../../../windows/doc/html/libraries/Win32-* .
+mv ../../../../../../windows/doc/html/libraries/Win32-* . || \ # make binary distribution
+    mv ../../../../../../windows/docs/html/libraries/Win32 . || \ # hadrian binary distribution
+    die "failed to find the Win32 package documentation"
 sh gen_contents_index
 cd ..
 for i in haddock libraries users_guide
