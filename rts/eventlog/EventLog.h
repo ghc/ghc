@@ -26,6 +26,7 @@ extern bool eventlog_enabled;
 
 void initEventLogging(void);
 void restartEventLogging(void);
+void finishCapEventLogging(void);
 void freeEventLogging(void);
 void abortEventLogging(void); // #4512 - after fork child needs to abort
 void moreCapEventBufs (uint32_t from, uint32_t to);
@@ -181,6 +182,8 @@ void postTickyCounterSamples(StgEntCounter *p);
 #endif /* TICKY_TICKY */
 
 #else /* !TRACING */
+
+INLINE_HEADER void finishCapEventLogging(void) {}
 
 INLINE_HEADER void flushLocalEventsBuf(Capability *cap STG_UNUSED)
 { /* nothing */ }
