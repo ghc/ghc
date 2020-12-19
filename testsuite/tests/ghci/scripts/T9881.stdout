@@ -19,9 +19,8 @@ instance Read Data.ByteString.Lazy.ByteString
 
 type Data.ByteString.ByteString :: *
 data Data.ByteString.ByteString
-  = Data.ByteString.Internal.PS {-# UNPACK #-}(GHC.ForeignPtr.ForeignPtr
+  = Data.ByteString.Internal.BS {-# UNPACK #-}(GHC.ForeignPtr.ForeignPtr
                                                  GHC.Word.Word8)
-                                {-# UNPACK #-}Int
                                 {-# UNPACK #-}Int
   	-- Defined in ‘Data.ByteString.Internal’
 instance Eq Data.ByteString.ByteString
