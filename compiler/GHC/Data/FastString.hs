@@ -130,7 +130,9 @@ import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Char8    as BSC
 import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short    as SBS
+#if !MIN_VERSION_bytestring(0,11,0)
 import qualified Data.ByteString.Short.Internal as SBS
+#endif
 import Foreign.C
 import System.IO
 import Data.Data

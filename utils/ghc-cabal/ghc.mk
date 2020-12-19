@@ -76,7 +76,7 @@ $(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP
 	       -ilibraries/filepath \
 	       -ilibraries/hpc \
 	       -ilibraries/mtl \
-	       -ilibraries/text \
+	       -ilibraries/text/src \
 	       libraries/text/cbits/cbits.c \
 	       -Ilibraries/text/include \
 	       -ilibraries/parsec/src \
