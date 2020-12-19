@@ -11,7 +11,7 @@ T18572.hs:12:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In a pattern binding: STrue = ...
 
-T18572.hs:12:1: warning: [-Wincomplete-uni-patterns]
+T18572.hs:12:1: warning: [-Wincomplete-uni-patterns (in -Wall)]
     Pattern match(es) are non-exhaustive
     In a pattern binding:
         Patterns of type  ‘SBool 'False’ not matched: SFalse
