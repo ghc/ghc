@@ -9,8 +9,6 @@ module Main (main) where
 
 import Data.Semigroup
 
-import Data.ByteString.Internal (inlinePerformIO)
-
 import qualified Data.ByteString      as S
 import qualified Data.ByteString.Internal      as S
 import qualified Data.ByteString.Lazy as L
@@ -27,6 +25,11 @@ import System.IO
 import Data.Char    (chr,ord)
 
 import Control.Applicative
+
+inlinePerformIO :: IO a -> a
+inlinePerformIO (IO m) = case m realWorld# of
+  (# _, r #) -> r
+{-# INLINE inlinePerformIO #-}
 
 main :: IO ()
 main = do
