@@ -213,6 +213,7 @@ packageGhcArgs = do
     pkgId   <- expr $ pkgIdentifier package
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
+            , arg "-package-env -"
             , packageDatabaseArgs
             , libraryPackage ? arg ("-this-unit-id " ++ pkgId)
             , map ("-package-id " ++) <$> getContextData depIds ]
