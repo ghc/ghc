@@ -842,7 +842,7 @@ addLetBndrInfo new_bndr new_arity_type new_unf
       , sas /= noStaticArgs
       , Just tmpl <- maybeUnfoldingTemplate new_unf
       , (lams, _) <- collectBinders tmpl
-      , let !new_sas = mkStaticArgs $ take (length lams) $ getStaticArgs sas
+      , let new_sas = takeStaticArgs (length lams) sas
       , new_sas /= sas
       = info5 `setStaticArgsInfo` new_sas
       | isStableUnfolding new_unf
