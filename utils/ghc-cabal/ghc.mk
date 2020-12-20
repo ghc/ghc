@@ -60,6 +60,7 @@ $(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP
 	       $(addprefix -optl, $(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE0)) \
 				 -O0 \
 	       -hide-all-packages \
+	       -package-env - \
 	       $(addprefix -package , $(CABAL_BUILD_DEPS)) \
 	       --make utils/ghc-cabal/Main.hs -o $@ \
 	       -no-user-package-db \
