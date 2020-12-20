@@ -120,6 +120,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$(if $$($1_$2_PROG),, \
         $$(if $$($1_PACKAGE),$$($4_THIS_UNIT_ID) $$($1_$2_COMPONENT_ID))) \
  $$(if $$($1_PACKAGE),-hide-all-packages) \
+ -package-env - \
  -i $$(if $$($1_$2_HS_SRC_DIRS),$$(foreach dir,$$($1_$2_HS_SRC_DIRS),-i$1/$$(dir)),-i$1) \
  -i$1/$2/build \
  -I$1/$2/build \
