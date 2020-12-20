@@ -1136,7 +1136,7 @@ tryUnfolding dflags id lone_variable
           enough_args = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
-        | unfoldingVeryAggressive uf_opts
+        | unfoldingVeryAggressive uf_opts || idStaticArgs id /= noStaticArgs
         -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | is_wf && some_benefit && small_enough
         -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)

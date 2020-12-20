@@ -524,6 +524,7 @@ ppIdInfo id info
     , (has_caf_info,     text "Caf=" <> ppr caf_info)
     , (has_str_info,     text "Str=" <> pprStrictness str_info)
     , (has_cpr_info,     text "Cpr=" <> ppr cpr_info)
+    , (has_sat,          text "Sat=" <> ppr sat_info)
     , (has_unf,          text "Unf=" <> ppr unf_info)
     , (not (null rules), text "RULES:" <+> vcat (map pprRule rules))
     ]   -- Inline pragma, occ, demand, one-shot info
@@ -548,6 +549,9 @@ ppIdInfo id info
 
     cpr_info = cprInfo info
     has_cpr_info = cpr_info /= topCprSig
+
+    sat_info = staticArgsInfo info
+    has_sat = sat_info /= noStaticArgs
 
     unf_info = unfoldingInfo info
     has_unf = hasSomeUnfolding unf_info
