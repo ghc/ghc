@@ -70,6 +70,7 @@ module GHC.Types.Basic (
 
         Staticness(..),
         StaticArgs, mkStaticArgs, noStaticArgs, getStaticArgs, andStaticArgs,
+        takeStaticArgs,
 
         EP(..),
 
@@ -981,6 +982,13 @@ getStaticArgs sa@(StaticArgs n)
 
 andStaticArgs :: StaticArgs -> StaticArgs -> StaticArgs
 andStaticArgs (StaticArgs sa1) (StaticArgs sa2) = StaticArgs $ sa1 .&. sa2
+
+takeStaticArgs :: Int -> StaticArgs -> StaticArgs
+takeStaticArgs n sa@(StaticArgs bitfield)
+  | n > mAX_STATIC_ARGS  = sa
+  -- Ex.: n == 8 ==> (mask == 255 == 0b11111111), which clears out static arg
+  -- flags for args > 8
+  | let mask = bit n - 1 = StaticArgs $ mask .&. bitfield
 
 instance Outputable StaticArgs where
   ppr = hcat . map pp_bit . getStaticArgs

@@ -941,7 +941,7 @@ are not the same as the edges we use for computing the Rec blocks.
 That's why we use
 
 - makeNode             for the Rec block analysis
-- makeLoopBreakerNodes for the loop breaker analysis
+- mkLoopBreakerNodes for the loop breaker analysis
 
   * Note [Finding rule RHS free vars]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1360,6 +1360,8 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
                                -- here because that is what we are setting!
     (unf_uds, unf') = occAnalUnfolding rhs_env Recursive mb_join_arity unf
     inl_uds | isStableUnfolding unf = unf_uds
+            | takeStaticArgs (length bndrs) (idStaticArgs bndr) /= noStaticArgs
+            = rhs_uds `delDetails` bndr
             | otherwise             = rhs_uds
     inl_fvs = udFreeVars bndr_set inl_uds
     -- inl_fvs: the vars that would become free if the function was inlined;
@@ -1468,11 +1470,12 @@ nodeScore env new_bndr lb_deps
   | not (isId old_bndr)     -- A type or coercion variable is never a loop breaker
   = (100, 0, False)
 
-  | old_bndr `elemVarSet` lb_deps  -- Self-recursive things are great loop breakers
-  = (0, 0, True)                   -- See Note [Self-recursion and loop breakers]
-
   | not (occ_unf_act env old_bndr) -- A binder whose inlining is inactive (e.g. has
   = (0, 0, True)                   -- a NOINLINE pragma) makes a great loop breaker
+
+  | is_self_rec          -- Self-recursive things are great loop breakers
+  , not has_static_args  -- See Note [Self-recursion and loop breakers]
+  = (0, 0, True)
 
   | exprIsTrivial rhs
   = mk_score 10  -- Practically certain to be inlined
@@ -1491,17 +1494,21 @@ nodeScore env new_bndr lb_deps
     -- so that dictionary/method recursion unravels
 
   | CoreUnfolding { uf_guidance = UnfWhen {} } <- old_unf
-  = mk_score 6
+  = mk_score 7
 
   | is_con_app rhs   -- Data types help with cases:
-  = mk_score 5       -- Note [Constructor applications]
+  = mk_score 6       -- Note [Constructor applications]
 
   | isStableUnfolding old_unf
   , can_unfold
-  = mk_score 3
+  = mk_score 4
 
   | isOneOcc (idOccInfo new_bndr)
-  = mk_score 2  -- Likely to be inlined
+  = mk_score 3  -- Likely to be inlined
+
+  | can_unfold      -- The Id has some kind of unfolding
+  , has_static_args -- and has static arguments to specialise for
+  = mk_score 2
 
   | can_unfold  -- The Id has some kind of unfolding
   = mk_score 1
@@ -1515,6 +1522,8 @@ nodeScore env new_bndr lb_deps
 
     -- is_lb: see Note [Loop breakers, node scoring, and stability]
     is_lb = isStrongLoopBreaker (idOccInfo old_bndr)
+    is_self_rec = old_bndr `elemVarSet` lb_deps
+    has_static_args = idStaticArgs old_bndr /= noStaticArgs
 
     old_unf = realIdUnfolding old_bndr
     can_unfold = canUnfold old_unf
@@ -2935,7 +2944,7 @@ tagRecBinders lvl body_uds triples
      --    join-point-hood decision
      rhs_udss' = map adjust triples
      adjust (bndr, rhs_uds, rhs_bndrs)
-       = adjustRhsUsage Recursive mb_join_arity rhs_bndrs rhs_uds
+       = adjustRhsUsage Recursive mb_join_arity rhs_bndrs rhs_uds'
        where
          -- Can't use willBeJoinId_maybe here because we haven't tagged the
          -- binder yet (the tag depends on these adjustments!)
@@ -2947,13 +2956,26 @@ tagRecBinders lvl body_uds triples
            | otherwise
            = ASSERT(not will_be_joins) -- Should be AlwaysTailCalled if
              Nothing                   -- we are making join points!
+         -- If the binder has static args, we'll inline a non-self-recursive
+         -- *specialisation*. Hence remove the occurrences of the bndr itself
+         -- from its own UsageDetails.
+         rhs_uds'
+           | takeStaticArgs (length rhs_bndrs) (idStaticArgs bndr) /= noStaticArgs
+           = rhs_uds `delDetails` bndr
+           | otherwise
+           = rhs_uds
 
      -- 3. Compute final usage details from adjusted RHS details
      adj_uds   = foldr andUDs body_uds rhs_udss'
 
      -- 4. Tag each binder with its adjusted details
-     bndrs'    = [ setBinderOcc (lookupDetails adj_uds bndr) bndr
-                 | bndr <- bndrs ]
+     bndrs'    = [ setBinderOcc occ' bndr
+                 | bndr <- bndrs
+                 , let occ  = (lookupDetails adj_uds bndr)
+                       occ'
+                         | will_be_joins || not (isAlwaysTailCalled occ) = occ
+                         | otherwise = occ { occ_tail = NoTailCallInfo }
+                 ]
 
      -- 5. Drop the binders from the adjusted details and return
      usage'    = adj_uds `delDetailsList` bndrs

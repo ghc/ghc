@@ -54,6 +54,8 @@ module GHC.Core.Opt.StaticArgs ( satAnalProgram, doStaticArgs, saTransform ) whe
 
 import GHC.Prelude
 
+#include "HsVersions.h"
+
 import GHC.Builtin.Names ( unboundKey )
 import GHC.Types.Var
 import GHC.Core
@@ -77,7 +79,7 @@ import GHC.Data.Maybe
 import Data.List (mapAccumL)
 import Data.Bifunctor (second)
 
-#include "HsVersions.h"
+-- import GHC.Driver.Ppr
 
 satAnalProgram :: CoreProgram -> CoreProgram
 satAnalProgram bs = map (snd . satAnalBind initSatEnv) bs
@@ -154,22 +156,20 @@ satAnalBind :: SatEnv -> CoreBind -> (SatOccs, CoreBind)
 satAnalBind env (NonRec id rhs) = (occs, NonRec id rhs')
   where
     (occs, rhs') = satAnalExpr (env `addInScopeVar` id) rhs
-satAnalBind env (Rec [(fn, rhs)])
-  | notNull bndrs
-  = (occs', Rec [(fn', rhs')])
-  where
-    (bndrs, rhs_body)    = collectBinders rhs
-    env'                 = addInterestingId (env `addInScopeVars` (fn:bndrs)) fn bndrs
-    (occs, rhs_body')    = satAnalExpr env' rhs_body
-    rhs'                 = mkLams bndrs rhs_body'
-    (static_args, occs') = peelSatOccs occs fn
-    fn'                  = setIdStaticArgs fn static_args
 satAnalBind env (Rec pairs) = (combineSatOccsList occss, Rec pairs')
   where
-    ids  = map fst pairs
-    env' = env `addInScopeVars` ids
-    (occss, rhss') = mapAndUnzip (satAnalExpr env' . snd) pairs
-    pairs' = zip ids rhss'
+    (occss, pairs') = mapAndUnzip anal_one pairs
+    anal_one (fn, rhs) = (occs', (fn', rhs'))
+      where
+        (bndrs, rhs_body)    = collectBinders rhs
+        env1                 = env `addInScopeVars` (fn:bndrs)
+        env2 | notNull bndrs = addInterestingId env1 fn bndrs
+             | otherwise     = env1
+        (occs, rhs_body')    = satAnalExpr env2 rhs_body
+        rhs'                 = mkLams bndrs rhs_body'
+        (static_args, occs') = peelSatOccs occs fn
+        !fn'                 = -- pprTrace "satAnalBind:set" (ppr fn $$ ppr static_args) $
+                               setIdStaticArgs fn static_args
 
 satAnalExpr :: SatEnv -> CoreExpr -> (SatOccs, CoreExpr)
 satAnalExpr _   e@(Lit _)      = (emptySatOccs, e)

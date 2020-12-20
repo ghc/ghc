@@ -3817,10 +3817,9 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
 
 isStrongLoopBreakerWithNStaticArgs :: Id -> Int -> Maybe [Staticness ()]
 isStrongLoopBreakerWithNStaticArgs id n_args
-  | isStrongLoopBreaker $ idOccInfo id
-  , static_args <- take n_args $ getStaticArgs $ idStaticArgs id
-  , notNull static_args
-  = Just static_args
+  | static_args <- takeStaticArgs n_args $ idStaticArgs id
+  , static_args /= noStaticArgs
+  = Just (getStaticArgs static_args)
   | otherwise
   = Nothing
 

@@ -754,11 +754,11 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
       , () <- sz `seq` ()     -- Force it
       = do {
                 -- Occurrence analysis
-           let { tagged_binds0 = {-# SCC "OccAnal" #-}
+           let { tagged_binds0  = {-# SCC "SAT" #-}
+                     satAnalProgram binds
+               ; tagged_binds = {-# SCC "OccAnal" #-}
                      occurAnalysePgm this_mod active_unf active_rule rules
-                                     binds
-               ; tagged_binds  = {-# SCC "SAT" #-}
-                     satAnalProgram tagged_binds0
+                                     tagged_binds0
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      FormatCore
