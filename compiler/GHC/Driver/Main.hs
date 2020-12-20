@@ -707,8 +707,11 @@ hscIncrementalFrontend
 
         compile mb_old_hash reason = do
             liftIO $ msg reason
-            (tc_result, _) <- hsc_typecheck False mod_summary Nothing
-            return $ Right (FrontendTypecheck tc_result, mb_old_hash)
+            tc_result <- do
+                let def ms = FrontendTypecheck . fst <$> hsc_typecheck False ms Nothing
+                action <- getHooked hscFrontendHook def
+                action mod_summary
+            return $ Right (tc_result, mb_old_hash)
 
         stable = case source_modified of
                      SourceUnmodifiedAndStable -> True
