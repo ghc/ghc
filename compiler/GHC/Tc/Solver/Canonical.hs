@@ -1074,7 +1074,7 @@ can_eq_nc' True _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
      -- If the type is TyConApp tc1 args1, then args1 really can't be less
      -- than tyConArity tc1. It could be *more* than tyConArity, but then we
      -- should have handled the case as an AppTy. That case only fires if
-     -- *both* sides of the equality are AppTy-like... but if one side is
+     -- _both_ sides of the equality are AppTy-like... but if one side is
      -- AppTy-like and the other isn't (and it also isn't a variable or
      -- saturated type family application, both of which are handled by
      -- can_eq_nc'), we're in a failure mode and can just fall through.
