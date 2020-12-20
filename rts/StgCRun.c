@@ -972,6 +972,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 #if defined(mips64el_HOST_ARCH)
 /* TODO: translate $n ... to registers from MachRegs.h */
+/* TODO: nop needed after JALR? */
 StgRegTable *
 StgRun(StgFunPtr f, StgRegTable *basereg) {
     StgRegTable * r;
