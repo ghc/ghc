@@ -724,7 +724,7 @@ To generate a heap profile from your program:
 1. Compile the program for profiling (:ref:`prof-compiler-options`).
 
 2. Run it with one of the heap profiling options described below (eg.
-   :rts-flag:`-h` for a basic producer profile). This generates the file
+   :rts-flag:`-hc` for a basic producer profile). This generates the file
    :file:`{prog}.hp`.
 
    If the :ref:`event log <rts-eventlog>` is enabled (with the :rts-flag:`-l ⟨flags⟩`
@@ -769,7 +769,8 @@ following RTS options select which break-down to use:
     .. note:: The meaning of the shortened :rts-flag:`-h` is dependent on whether
               your program was compiled for profiling. When compiled for profiling,
               :rts-flag:`-h` is equivalent to :rts-flag:`-hc`, but otherwise is
-              equivalent to :rts-flag:`-hT` (see :ref:`rts-profiling`).
+              equivalent to :rts-flag:`-hT` (see :ref:`rts-profiling`). The :rts-flag:`-h`
+              is deprecated and will be removed in a future release.
 
 .. rts-flag:: -hm
 
