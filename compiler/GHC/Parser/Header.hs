@@ -129,11 +129,15 @@ mkPrelImports this_mod loc implicit_prelude import_decls
   = []
   | otherwise = [preludeImportDecl]
   where
-      explicit_prelude_import
-       = notNull [ () | L _ (ImportDecl { ideclName = mod
-                                        , ideclPkgQual = Nothing })
-                          <- import_decls
-                      , unLoc mod == pRELUDE_NAME ]
+      explicit_prelude_import = any is_prelude_import import_decls
+
+      is_prelude_import (L _ decl) =
+        unLoc (ideclName decl) == pRELUDE_NAME
+        -- allow explicit "base" package qualifier (#19082, #17045)
+        && case ideclPkgQual decl of
+            Nothing -> True
+            Just b  -> sl_fs b == unitIdFS baseUnitId
+
 
       preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
