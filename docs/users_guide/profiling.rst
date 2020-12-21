@@ -885,20 +885,6 @@ There are three more options which relate to heap profiling:
     profiles are always sampled with the frequency of the RTS clock. See
     :ref:`prof-time-options` for changing that.
 
-.. rts-flag:: -xt
-
-    Include the memory occupied by threads in a heap profile. Each
-    thread takes up a small area for its thread state in addition to the
-    space allocated for its stack (stacks normally start small and then
-    grow as necessary).
-
-    This includes the main thread, so using :rts-flag:`-xt` is a good way to see
-    how much stack space the program is using.
-
-    Memory occupied by threads and their stacks is labelled as “TSO” and
-    “STACK” respectively when displaying the profile by closure
-    description or type description.
-
 .. rts-flag:: -L ⟨num⟩
 
     Sets the maximum length of a cost-centre stack name in a heap
@@ -1047,9 +1033,6 @@ reasons for this:
    to :math:`2L`, and can further be reduced by tweaking the :rts-flag:`-F
    ⟨factor⟩` option. Also add the size of the allocation area (see :rts-flag:`-A
    ⟨size⟩`).
-
--  The stack isn't counted in the heap profile by default. See the
-   RTS :rts-flag:`-xt` option.
 
 -  The program text itself, the C stack, any non-heap data (e.g. data
    allocated by foreign libraries, and data allocated by the RTS), and
