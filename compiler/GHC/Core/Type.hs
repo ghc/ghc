@@ -212,6 +212,7 @@ module GHC.Core.Type (
         substCoUnchecked, substCoWithUnchecked,
         substTyVarBndr, substTyVarBndrs, substTyVar, substTyVars,
         substVarBndr, substVarBndrs,
+        substTyCoBndr,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
         -- * Tidying type related things up for printing
