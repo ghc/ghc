@@ -15,12 +15,12 @@ then
 fi
 [ "$#" -eq 2 ] || die "Bad args. Usage: $0 [--no-clean] <Linux bindist> <Windows bindist>"
 
-LINUX_BINDIST=`realpath "$1"`
-WINDOWS_BINDIST=`realpath "$2"`
+LINUX_BINDIST=$(realpath "$1")
+WINDOWS_BINDIST=$(realpath "$2")
 
 mkdir docs
 cd docs
-INST=`pwd`/inst
+INST=$(pwd)/inst
 tar -Jxf "$LINUX_BINDIST"
 mv ghc* linux
 cd linux
@@ -46,7 +46,7 @@ do
 done
 mv index.html ../../../../..
 cd ..
-mv *.pdf ../../../..
+mv ./*.pdf ../../../..
 cd ../../../..
 [ "$NO_CLEAN" -eq 0 ] && rm -r inst
 [ "$NO_CLEAN" -eq 0 ] && rm -r windows
