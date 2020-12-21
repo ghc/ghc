@@ -67,13 +67,12 @@ import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
-import GHC.Types.Basic ( Staticness(..), StaticArgs, mkStaticArgs, noStaticArgs, andStaticArgs )
+import GHC.Types.Basic
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
 import GHC.Data.Maybe
 
 import Data.List (mapAccumL)
@@ -168,8 +167,17 @@ satAnalBind env (Rec pairs) = (combineSatOccsList occss, Rec pairs')
         (occs, rhs_body')    = satAnalExpr env2 rhs_body
         rhs'                 = mkLams bndrs rhs_body'
         (static_args, occs') = peelSatOccs occs fn
-        !fn'                 = -- pprTrace "satAnalBind:set" (ppr fn $$ ppr static_args) $
+        !fn' | allStaticAndUnliftedBody (length bndrs) static_args rhs_body = fn -- otherwise we end up with an unlifted worker body
+             | otherwise     = -- pprTrace "satAnalBind:set" (ppr fn $$ ppr static_args) $
                                setIdStaticArgs fn static_args
+
+allStaticAndUnliftedBody :: Arity -> StaticArgs -> CoreExpr -> Bool
+allStaticAndUnliftedBody arty sa body =
+  count is_static (getStaticArgs sa) == arty
+  && isUnliftedType (exprType body)
+  where
+    is_static Static{}    = True
+    is_static NotStatic{} = False
 
 satAnalExpr :: SatEnv -> CoreExpr -> (SatOccs, CoreExpr)
 satAnalExpr _   e@(Lit _)      = (emptySatOccs, e)
@@ -481,9 +489,9 @@ GHC.Base.until =
     (f_a6V :: a_aiK -> a_aiK)
     (x_a6X :: a_aiK) ->
     letrec {
-      sat_worker_s1aU :: a_aiK -> a_aiK
+      $suntil_s1aU :: a_aiK -> a_aiK
       []
-      sat_worker_s1aU =
+      $suntil_s1aU =
         \ (x_a6X :: a_aiK) ->
           let {
             sat_shadow_r17 :: forall a_a3O.
@@ -494,15 +502,15 @@ GHC.Base.until =
                 (p_a6T :: a_aiK -> GHC.Types.Bool)
                 (f_a6V :: a_aiK -> a_aiK)
                 (x_a6X :: a_aiK) ->
-                sat_worker_s1aU x_a6X } in
+                $suntil_s1aU x_a6X } in
           case p_a6T x_a6X of wild_X3y [ALWAYS Dead Nothing] {
             GHC.Types.False -> GHC.Base.until @ a_aiK p_a6T f_a6V (f_a6V x_a6X);
             GHC.Types.True -> x_a6X
           }; } in
-    sat_worker_s1aU x_a6X
+    $suntil_s1aU x_a6X
 
 Where sat_shadow has captured the type variables of x_a6X etc as it has a a_aiK
-type argument. This is bad because it means the application sat_worker_s1aU x_a6X
+type argument. This is bad because it means the application $suntil_s1aU x_a6X
 is not well typed.
 -}
 
@@ -522,6 +530,7 @@ saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
 saTransform :: MonadUnique m => Id -> [Staticness a] -> [Id] -> CoreExpr -> m CoreExpr
 -- Precondition: At least as many arg_staticness as rhs_binders
 -- Precondition: At least one NotStatic
+-- Precondition: Not all Static if rhs_body is unlifted
 saTransform binder arg_staticness rhs_binders rhs_body
   = do  { MASSERT2( arg_staticness `leLength` rhs_binders, ppr binder $$ ppr (mkStaticArgs arg_staticness) $$ ppr rhs_binders )
         ; MASSERT2( mkStaticArgs arg_staticness /= noStaticArgs, ppr binder $$ ppr rhs_binders )
@@ -548,12 +557,13 @@ saTransform binder arg_staticness rhs_binders rhs_body
                                  ; return (setVarUnique bndr uniq) }
 
     -- new_rhs = \alpha beta c n xs ->
-    --           let sat_worker = \xs -> let sat_shadow = \alpha' beta' c n xs ->
-    --                                       sat_worker xs
+    --           let $sfoldr = \xs -> let sat_shadow = \alpha' beta' c n xs ->
+    --                                       $sfoldr xs
     --                                   in e
-    --           in sat_worker xs
+    --           in $sfoldr xs
     mk_new_rhs uniq shadow_lam_bndrs
-        = mkLams rhs_binders $
+        = ASSERT2( not (isUnliftedType rec_body_ty), ppr binder $$ ppr rhs_body )
+          mkLams rhs_binders $
           Let (Rec [(rec_body_bndr, rec_body)])
           local_body
         where
@@ -564,13 +574,17 @@ saTransform binder arg_staticness rhs_binders rhs_body
 
             -- See Note [Binder type capture]
           shadow_rhs = mkLams shadow_lam_bndrs local_body
-            -- nonrec_rhs = \alpha' beta' c n xs -> sat_worker xs
+            -- nonrec_rhs = \alpha' beta' c n xs -> $sfoldr xs
 
-          rec_body_bndr = mkSysLocal (fsLit "sat_worker") uniq Many (exprType rec_body)
-            -- rec_body_bndr = sat_worker
+
+          occ_name = mkSpecOcc (getOccName binder)
+          src_span = getSrcSpan (idName binder)
+          rec_body_ty = exprType rec_body
+          rec_body_bndr = mkUserLocal occ_name uniq Many rec_body_ty src_span
+            -- rec_body_bndr = $sfoldr
 
             -- See Note [Shadow binding]; make a SysLocal
-          shadow_bndr = mkSysLocal (occNameFS (getOccName binder))
+          shadow_bndr = mkSysLocal (occNameFS occ_name)
                                    (idUnique binder)
                                    Many
                                    (exprType shadow_rhs)

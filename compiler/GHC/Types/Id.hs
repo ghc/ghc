@@ -355,7 +355,9 @@ mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Mult -> Type -> m Id
 mkSysLocalOrCoVarM fs w ty
   = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq w ty))
 
--- | Create a user local 'Id'. These are local 'Id's (see "GHC.Types.Var#globalvslocal") with a name and location that the user might recognize
+-- | Create a user local 'Id'. These are local 'Id's (see
+-- "GHC.Types.Var#globalvslocal") with a name and location
+-- that the user might recognize
 mkUserLocal :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
 mkUserLocal occ uniq w ty loc = ASSERT( not (isCoVarType ty) )
                                 mkLocalId (mkInternalName uniq occ loc) w ty

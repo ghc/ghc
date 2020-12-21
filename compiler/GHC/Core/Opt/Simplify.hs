@@ -3807,21 +3807,10 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
   = simplStableUnfolding env top_lvl cont_mb id rhs_ty arity unf
   | isExitJoinId id
   = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
-  | (lam_bndrs, lam_body) <- collectBinders new_rhs
-  , Just static_args <- isStrongLoopBreakerWithNStaticArgs id (length lam_bndrs)
-  = do  { unf_rhs <- saTransform id static_args lam_bndrs lam_body
-        -- ; pprTraceM "simplLetUnfolding" (ppr id $$ ppr static_args $$ ppr unf_rhs)
-        ; mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id unf_rhs }
+  | Just mk_unf <- mkSatUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id new_rhs
+  = mk_unf
   | otherwise
   = mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id new_rhs
-
-isStrongLoopBreakerWithNStaticArgs :: Id -> Int -> Maybe [Staticness ()]
-isStrongLoopBreakerWithNStaticArgs id n_args
-  | static_args <- takeStaticArgs n_args $ idStaticArgs id
-  , static_args /= noStaticArgs
-  = Just (getStaticArgs static_args)
-  | otherwise
-  = Nothing
 
 -------------------
 mkLetUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
@@ -3841,6 +3830,25 @@ mkLetUnfolding uf_opts top_lvl src id new_rhs
   where
     is_top_lvl   = isTopLevel top_lvl
     is_bottoming = isDeadEndId id
+
+mkSatUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
+               -> InId -> OutExpr -> Maybe (SimplM Unfolding)
+mkSatUnfolding opts top_lvl src id new_rhs
+  | (lam_bndrs, lam_body) <- collectBinders new_rhs
+  , static_args <- takeStaticArgs (length lam_bndrs) $ idStaticArgs id
+  , static_args /= noStaticArgs
+  = Just $ do  { unf_rhs <- saTransform id (getStaticArgs static_args) lam_bndrs lam_body
+               ; return (mkCoreUnfolding src is_top_lvl unf_rhs guidance) }
+  | otherwise
+  = Nothing
+  where
+    is_top_lvl = isTopLevel top_lvl
+    !is_top_bottoming = is_top_lvl && isDeadEndId id
+    guidance          = calcUnfoldingGuidance opts is_top_bottoming new_rhs
+        -- NB: we calculate the guidance from the untransformed new_rhs!
+        -- The SAT'd unfolding will introduce new let binds and lambdas that
+        -- all go away, but will be counted by 'calcUnfoldingGuidance', which
+        -- penalises SAT'd unfoldings too much.
 
 -------------------
 simplStableUnfolding :: SimplEnv -> TopLevelFlag
