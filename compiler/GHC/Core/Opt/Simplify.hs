@@ -3837,7 +3837,7 @@ mkSatUnfolding opts top_lvl src id new_rhs
   | (lam_bndrs, lam_body) <- collectBinders new_rhs
   , static_args <- takeStaticArgs (length lam_bndrs) $ idStaticArgs id
   , static_args /= noStaticArgs
-  = Just $ do  { unf_rhs <- saTransform id (getStaticArgs static_args) lam_bndrs lam_body
+  = Just $ do  { unf_rhs <- return $ saTransform id (getStaticArgs static_args) lam_bndrs lam_body
                ; return (mkCoreUnfolding src is_top_lvl unf_rhs guidance) }
   | otherwise
   = Nothing

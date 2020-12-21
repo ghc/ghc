@@ -433,7 +433,10 @@ To do the transformation, the game plan is to:
 
 3. Rebind the original function to a new one which contains
    our SATed function and just makes a call to it:
-   we call the thing making this call the local body
+   we call the thing making this call the local body.
+   In order to make 'saTransform' pure, we also give this
+   function THE SAME UNIQUE as the original one.
+   You can convince yourself below that that is fine.
 
 Example: transform this
 
@@ -467,17 +470,22 @@ as binder.  (Another alternative would be to reset the export flag.)
 Note [Binder type capture]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Notice that in the inner map (the "shadow function"), the static arguments
-are discarded -- it's as if they were underscores.  Instead, mentions
-of these arguments (notably in the types of dynamic arguments) are bound
-by the *outer* lambdas of the main function.  So we must make up fresh
-names for the static arguments so that they do not capture variables
-mentioned in the types of dynamic args.
+are discarded -- it's as if they were underscores. Instead, mentions of
+these arguments (notably in the types of dynamic arguments) are bound by
+the *outer* lambdas of the main function. So we must make use Uniques for
+the static arguments that do not capture variables mentioned in the types
+of dynamic args. If we had a 'UniqSupply', we'd just give them fresh Uniques.
+But we get by without: 'GHC.Builtin.Names.unboundKey' is a Unique that works
+perfectly well for our purposes! Remember, they are dead anyway, so they can
+shadow each other.
 
-In the map example, the shadow function must clone the static type
-argument a,b, giving a',b', to ensure that in the \(as:[a]), the 'a'
-is bound by the outer forall.  We clone f' too for consistency, but
-that doesn't matter either way because static Id arguments aren't
-mentioned in the shadow binding at all.
+In the map example, the shadow function must set the unique
+of the static type arguments a,b, giving a',b' (shadowing
+each other), to ensure that in the \(as:[a]), the 'a' is
+bound by the outer forall. We give f' 'unboundKey', too,
+for consistency, but that doesn't matter either way because
+static Id arguments aren't mentioned in the shadow binding
+at all.
 
 If we don't we get something like this:
 
@@ -511,14 +519,14 @@ GHC.Base.until =
 
 Where sat_shadow has captured the type variables of x_a6X etc as it has a a_aiK
 type argument. This is bad because it means the application $suntil_s1aU x_a6X
-is not well typed.
+is not be well typed.
 -}
 
 saTransformMaybe :: Id -> Maybe SATInfo -> [Id] -> CoreExpr -> SatM CoreBind
 saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
   | Just arg_staticness <- maybe_arg_staticness
   , should_transform arg_staticness
-  = do  { new_rhs <- saTransform binder arg_staticness rhs_binders rhs_body
+  = do  { new_rhs <- return $ saTransform binder arg_staticness rhs_binders rhs_body
         ; return (NonRec binder new_rhs) }
   | otherwise
   = return (Rec [(binder, mkLams rhs_binders rhs_body)])
@@ -527,17 +535,16 @@ saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
       where
         n_static_args = count isStaticValue staticness
 
-saTransform :: MonadUnique m => Id -> [Staticness a] -> [Id] -> CoreExpr -> m CoreExpr
+saTransform :: Id -> [Staticness a] -> [Id] -> CoreExpr -> CoreExpr
 -- Precondition: At least as many arg_staticness as rhs_binders
 -- Precondition: At least one NotStatic
 -- Precondition: Not all Static if rhs_body is unlifted
 saTransform binder arg_staticness rhs_binders rhs_body
-  = do  { MASSERT2( arg_staticness `leLength` rhs_binders, ppr binder $$ ppr (mkStaticArgs arg_staticness) $$ ppr rhs_binders )
-        ; MASSERT2( mkStaticArgs arg_staticness /= noStaticArgs, ppr binder $$ ppr rhs_binders )
-        ; shadow_lam_bndrs <- mapM clone binders_w_staticness
-        ; uniq             <- getUniqueM
-        ; return (mk_new_rhs uniq shadow_lam_bndrs) }
+  = ASSERT2( arg_staticness `leLength` rhs_binders, ppr binder $$ ppr (mkStaticArgs arg_staticness) $$ ppr rhs_binders )
+    ASSERT2( mkStaticArgs arg_staticness /= noStaticArgs, ppr binder $$ ppr rhs_binders )
+    mk_new_rhs (map mk_shadow_lam_bndr binders_w_staticness)
   where
+
     -- Running example: foldr
     -- foldr \alpha \beta c n xs = e, for some e
     -- arg_staticness = [Static TypeApp, Static TypeApp, Static VarApp, Static VarApp, NonStatic]
@@ -552,21 +559,23 @@ saTransform binder arg_staticness rhs_binders rhs_body
             -- rhs_binders_without_type_capture = [\alpha', \beta', c, n, xs]
     non_static_args = [v | (v, NotStatic) <- binders_w_staticness]
 
-    clone (bndr, NotStatic) = return bndr
-    clone (bndr, _        ) = do { uniq <- getUniqueM
-                                 ; return (setVarUnique bndr uniq) }
+    mk_shadow_lam_bndr (bndr, NotStatic) = bndr
+    mk_shadow_lam_bndr (bndr, _        ) = setVarUnique bndr unboundKey
+                                           -- See Note [Binder type capture]
 
     -- new_rhs = \alpha beta c n xs ->
     --           let $sfoldr = \xs -> let sat_shadow = \alpha' beta' c n xs ->
     --                                       $sfoldr xs
     --                                   in e
     --           in $sfoldr xs
-    mk_new_rhs uniq shadow_lam_bndrs
+    mk_new_rhs shadow_lam_bndrs
         = ASSERT2( not (isUnliftedType rec_body_ty), ppr binder $$ ppr rhs_body )
           mkLams rhs_binders $
           Let (Rec [(rec_body_bndr, rec_body)])
           local_body
         where
+          uniq = idUnique binder
+
           local_body = mkVarApps (Var rec_body_bndr) non_static_args
 
           rec_body = mkLams non_static_args $
@@ -585,7 +594,7 @@ saTransform binder arg_staticness rhs_binders rhs_body
 
             -- See Note [Shadow binding]; make a SysLocal
           shadow_bndr = mkSysLocal (occNameFS occ_name)
-                                   (idUnique binder)
+                                   uniq
                                    Many
                                    (exprType shadow_rhs)
 
