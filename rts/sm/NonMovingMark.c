@@ -737,9 +737,11 @@ void updateRemembSetPushStack(Capability *cap, StgStack *stack)
             // The concurrent GC has claimed the right to mark the stack.
             // Wait until it finishes marking before proceeding with
             // mutation.
-            while (needs_upd_rem_set_mark((StgClosure *) stack));
+            while (needs_upd_rem_set_mark((StgClosure *) stack))
 #if defined(PARALLEL_GC)
                 busy_wait_nop(); // TODO: Spinning here is unfortunate
+#else
+                ;
 #endif
             return;
         }
@@ -1927,6 +1929,8 @@ void nonmovingTidyThreads ()
     }
 }
 
+// Mark threads which appear to be dead but still need to be properly torn down
+// by resurrectThreads.
 void nonmovingResurrectThreads (struct MarkQueue_ *queue, StgTSO **resurrected_threads)
 {
     StgTSO *next;
@@ -1938,6 +1942,9 @@ void nonmovingResurrectThreads (struct MarkQueue_ *queue, StgTSO **resurrected_t
         case ThreadComplete:
             continue;
         default:
+            // The thread may be, e.g., deadlocked in which case we must ensure
+            // it isn't swept since resurrectThreads will need to throw it an
+            // exception.
             markQueuePushClosure_(queue, (StgClosure*)t);
             t->global_link = *resurrected_threads;
             *resurrected_threads = t;
