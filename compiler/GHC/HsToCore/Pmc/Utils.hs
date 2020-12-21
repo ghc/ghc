@@ -29,6 +29,7 @@ import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.HsToCore.Monad
+import qualified GHC.LanguageExtensions as LangExt
 
 tracePm :: String -> SDoc -> DsM ()
 tracePm herald doc = do
@@ -62,7 +63,10 @@ overlapping dflags _      = wopt Opt_WarnOverlappingPatterns dflags
 
 -- | Check whether the exhaustiveness checker should run (exhaustiveness only)
 exhaustive :: DynFlags -> HsMatchContext id -> Bool
-exhaustive  dflags = maybe False (`wopt` dflags) . exhaustiveWarningFlag
+exhaustive dflags hsMatchContext = maybe False id $ do
+  -- bind so that we don't do checks for syntax that doesn't have incompleteness issues.
+  warningFlag <- wopt <$> exhaustiveWarningFlag hsMatchContext <*> pure dflags
+  pure $ warningFlag || not (xopt LangExt.Incomplete dflags)
 
 -- | Check whether unnecessary bangs should be warned about
 redundantBang :: DynFlags -> Bool
