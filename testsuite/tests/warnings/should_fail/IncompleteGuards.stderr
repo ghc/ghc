@@ -1,0 +1,4 @@
+
+IncompleteGuards.hs:7:1: error:
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘myAbs’: Patterns of type ‘Int’ not matched: _

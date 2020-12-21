@@ -1,0 +1,9 @@
+
+IncompletePatterns.hs:7:1: error:
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘foo’:
+        Patterns of type ‘Maybe a’ not matched: Just _
+
+IncompletePatterns.hs:12:10: error:
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns of type ‘S’ not matched: C2 _

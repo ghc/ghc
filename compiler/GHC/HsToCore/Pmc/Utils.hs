@@ -29,6 +29,7 @@ import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.HsToCore.Monad
+import qualified GHC.LanguageExtensions as LangExt
 
 tracePm :: String -> SDoc -> DsM ()
 tracePm herald doc = do
@@ -62,7 +63,16 @@ overlapping dflags _      = wopt Opt_WarnOverlappingPatterns dflags
 
 -- | Check whether the exhaustiveness checker should run (exhaustiveness only)
 exhaustive :: DynFlags -> HsMatchContext id -> Bool
-exhaustive  dflags = maybe False (`wopt` dflags) . exhaustiveWarningFlag
+exhaustive dflags hsMatchContext = maybe False id $ do
+  -- bind so that we don't do checks for syntax that doesn't have incompleteness issues.
+  (warningFlag, deferFlag) <- exhaustiveWarningFlag hsMatchContext
+  let
+    haveWarningFlag = wopt warningFlag dflags
+    haveDeferFlag = gopt deferFlag dflags
+    languageIncomplete = xopt LangExt.Incomplete dflags
+  pure $ if languageIncomplete
+    then haveWarningFlag
+    else not haveDeferFlag
 
 -- | Check whether unnecessary bangs should be warned about
 redundantBang :: DynFlags -> Bool
@@ -71,15 +81,15 @@ redundantBang dflags = wopt Opt_WarnRedundantBangPatterns dflags
 -- | Denotes whether an exhaustiveness check is supported, and if so,
 -- via which 'WarningFlag' it's controlled.
 -- Returns 'Nothing' if check is not supported.
-exhaustiveWarningFlag :: HsMatchContext id -> Maybe WarningFlag
-exhaustiveWarningFlag (FunRhs {})   = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag CaseAlt       = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag IfAlt         = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag LambdaExpr    = Just Opt_WarnIncompleteUniPatterns
-exhaustiveWarningFlag PatBindRhs    = Just Opt_WarnIncompleteUniPatterns
-exhaustiveWarningFlag PatBindGuards = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag ProcExpr      = Just Opt_WarnIncompleteUniPatterns
-exhaustiveWarningFlag RecUpd        = Just Opt_WarnIncompletePatternsRecUpd
+exhaustiveWarningFlag :: HsMatchContext id -> Maybe (WarningFlag, GeneralFlag)
+exhaustiveWarningFlag (FunRhs {})   = Just (Opt_WarnIncompletePatterns, Opt_DeferIncompletePatterns)
+exhaustiveWarningFlag CaseAlt       = Just (Opt_WarnIncompletePatterns, Opt_DeferIncompletePatterns)
+exhaustiveWarningFlag IfAlt         = Just (Opt_WarnIncompletePatterns, Opt_DeferIncompletePatterns)
+exhaustiveWarningFlag LambdaExpr    = Just (Opt_WarnIncompleteUniPatterns, Opt_DeferIncompleteUniPatterns)
+exhaustiveWarningFlag PatBindRhs    = Just (Opt_WarnIncompleteUniPatterns, Opt_DeferIncompleteUniPatterns)
+exhaustiveWarningFlag PatBindGuards = Just (Opt_WarnIncompletePatterns, Opt_DeferIncompletePatterns)
+exhaustiveWarningFlag ProcExpr      = Just (Opt_WarnIncompleteUniPatterns, Opt_DeferIncompleteUniPatterns)
+exhaustiveWarningFlag RecUpd        = Just (Opt_WarnIncompletePatternsRecUpd, Opt_DeferIncompleteRecordUpdates)
 exhaustiveWarningFlag ThPatSplice   = Nothing
 exhaustiveWarningFlag PatSyn        = Nothing
 exhaustiveWarningFlag ThPatQuote    = Nothing
