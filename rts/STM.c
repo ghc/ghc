@@ -579,6 +579,9 @@ static void remove_watch_queue_entries_for_trec(Capability *cap,
       pq -> next_queue_entry = nq;
     } else {
       ASSERT(SEQ_CST_LOAD(&s->first_watch_queue_entry) == q);
+      IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        updateRemembSetPushClosure(&cap->upd_rem_set, s -> first_watch_queue_entry);
+      }
       SEQ_CST_STORE(&s->first_watch_queue_entry, nq);
       dirty_TVAR(cap, s, (StgClosure *) q); // we modified first_watch_queue_entry
     }
