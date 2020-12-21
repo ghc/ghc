@@ -62,6 +62,8 @@ import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var.Env
@@ -81,7 +83,7 @@ import Data.Bifunctor (second)
 -- import GHC.Driver.Ppr
 
 satAnalProgram :: CoreProgram -> CoreProgram
-satAnalProgram bs = map (snd . satAnalBind initSatEnv) bs
+satAnalProgram bs = map (snd . satAnalBind initSatEnv TopLevel) bs
 
 -- | Lambda binders ('TyVar's, 'CoVar's and 'Id's) of a let-bound RHS, thus
 -- parameters to a function.
@@ -151,11 +153,11 @@ peelSatOccs :: SatOccs -> Id -> (StaticArgs, SatOccs)
 peelSatOccs (SO env) fn = case delLookupVarEnv env fn of
   (mb_sa, env') -> (mb_sa `orElse` noStaticArgs, SO env')
 
-satAnalBind :: SatEnv -> CoreBind -> (SatOccs, CoreBind)
-satAnalBind env (NonRec id rhs) = (occs, NonRec id rhs')
+satAnalBind :: SatEnv -> TopLevelFlag -> CoreBind -> (SatOccs, CoreBind)
+satAnalBind env top_lvl (NonRec id rhs) = (occs, NonRec id rhs')
   where
     (occs, rhs') = satAnalExpr (env `addInScopeVar` id) rhs
-satAnalBind env (Rec pairs) = (combineSatOccsList occss, Rec pairs')
+satAnalBind env top_lvl (Rec pairs) = (combineSatOccsList occss, Rec pairs')
   where
     (occss, pairs') = mapAndUnzip anal_one pairs
     anal_one (fn, rhs) = (occs', (fn', rhs'))
@@ -167,9 +169,16 @@ satAnalBind env (Rec pairs) = (combineSatOccsList occss, Rec pairs')
         (occs, rhs_body')    = satAnalExpr env2 rhs_body
         rhs'                 = mkLams bndrs rhs_body'
         (static_args, occs') = peelSatOccs occs fn
-        !fn' | allStaticAndUnliftedBody (length bndrs) static_args rhs_body = fn -- otherwise we end up with an unlifted worker body
+        !fn' | allStaticAndUnliftedBody (length bndrs) static_args rhs_body
+             || (isStableUnfolding (realIdUnfolding fn) && idStaticArgs fn /= noStaticArgs)
+             = fn -- otherwise we end up with an unlifted worker body
              | otherwise     = -- pprTrace "satAnalBind:set" (ppr fn $$ ppr static_args) $
-                               setIdStaticArgs fn static_args
+                               fn `setIdStaticArgs` static_args
+                                  `setIdUnfolding` sat_unf
+        sat_unf
+          | Just unf <- mkSatUnfolding top_lvl fn rhs = unf
+          | otherwise = realIdUnfolding fn
+
 
 allStaticAndUnliftedBody :: Arity -> StaticArgs -> CoreExpr -> Bool
 allStaticAndUnliftedBody arty sa body =
@@ -193,7 +202,7 @@ satAnalExpr env e@Lam{}        = (occs, mkLams bndrs body')
     (occs, body') = satAnalExpr (env `addInScopeVars` bndrs) body
 satAnalExpr env (Let bnd body) = (occs, Let bnd' body')
   where
-    (occs_bind, bnd')  = satAnalBind env bnd
+    (occs_bind, bnd')  = satAnalBind env NotTopLevel bnd
     (occs_body, body') = satAnalExpr (env `addInScopeVars` bindersOf bnd) body
     !occs              = combineSatOccs occs_body occs_bind
 satAnalExpr env (Case scrut bndr ty alts) = (occs, Case scrut' bndr ty alts')
@@ -601,3 +610,24 @@ saTransform binder arg_staticness rhs_binders rhs_body
 isStaticValue :: Staticness App -> Bool
 isStaticValue (Static (VarApp _)) = True
 isStaticValue _                   = False
+
+mkSatUnfolding :: TopLevelFlag -> Id -> CoreExpr -> Maybe Unfolding
+mkSatUnfolding top_lvl id new_rhs
+  | (lam_bndrs, lam_body) <- collectBinders new_rhs
+  , static_args <- takeStaticArgs (length lam_bndrs) $ idStaticArgs id
+  , static_args /= noStaticArgs
+  , let unf_rhs = saTransform id (getStaticArgs static_args) lam_bndrs lam_body
+  , let unf = mkCoreUnfolding InlineStable is_top_lvl unf_rhs guidance
+  = Just unf
+  | otherwise
+  = Nothing
+  where
+    is_top_lvl = isTopLevel top_lvl
+    !is_top_bottoming = is_top_lvl && isDeadEndId id
+    opts              = defaultUnfoldingOpts
+    guidance          = calcUnfoldingGuidance opts is_top_bottoming new_rhs
+        -- NB: we calculate the guidance from the untransformed new_rhs!
+        -- The SAT'd unfolding will introduce new let binds and lambdas that
+        -- all go away, but will be counted by 'calcUnfoldingGuidance', which
+        -- penalises SAT'd unfoldings too much.
+

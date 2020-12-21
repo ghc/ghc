@@ -3807,8 +3807,6 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
   = simplStableUnfolding env top_lvl cont_mb id rhs_ty arity unf
   | isExitJoinId id
   = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
-  | Just mk_unf <- mkSatUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id new_rhs
-  = mk_unf
   | otherwise
   = mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id new_rhs
 
@@ -3820,35 +3818,14 @@ mkLetUnfolding uf_opts top_lvl src id new_rhs
     return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs)
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
-            --         (b) They might have static arguments, in which case we
-            --             provide a non-rec unfolding that specialises for those
-            --         (c) And even without static arguments, in GHC.Iface.Tidy we
-            --             currently assume that, if we want to expose the unfolding
-            --             then indeed we *have* an unfolding to expose. (We could
-            --             instead use the RHS, but currently we don't.) The simple
-            --             thing is always to have one.
+            --         (c) In GHC.Iface.Tidy we currently assume that, if we
+            --             want to expose the unfolding then indeed we *have*
+            --             an unfolding to expose. (We could instead use the
+            --             RHS, but currently we don't.) The simple thing is
+            --             always to have one.
   where
     is_top_lvl   = isTopLevel top_lvl
     is_bottoming = isDeadEndId id
-
-mkSatUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
-               -> InId -> OutExpr -> Maybe (SimplM Unfolding)
-mkSatUnfolding opts top_lvl src id new_rhs
-  | (lam_bndrs, lam_body) <- collectBinders new_rhs
-  , static_args <- takeStaticArgs (length lam_bndrs) $ idStaticArgs id
-  , static_args /= noStaticArgs
-  = Just $ do  { unf_rhs <- return $ saTransform id (getStaticArgs static_args) lam_bndrs lam_body
-               ; return (mkCoreUnfolding src is_top_lvl unf_rhs guidance) }
-  | otherwise
-  = Nothing
-  where
-    is_top_lvl = isTopLevel top_lvl
-    !is_top_bottoming = is_top_lvl && isDeadEndId id
-    guidance          = calcUnfoldingGuidance opts is_top_bottoming new_rhs
-        -- NB: we calculate the guidance from the untransformed new_rhs!
-        -- The SAT'd unfolding will introduce new let binds and lambdas that
-        -- all go away, but will be counted by 'calcUnfoldingGuidance', which
-        -- penalises SAT'd unfoldings too much.
 
 -------------------
 simplStableUnfolding :: SimplEnv -> TopLevelFlag

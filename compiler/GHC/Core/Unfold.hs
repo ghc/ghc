@@ -1076,16 +1076,11 @@ instance Outputable CallCtxt where
   ppr RuleArgCtxt = text "RuleArgCtxt"
 
 callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
-  = case unfoldingInfo (idInfo id) of
-      -- Don't call idUnfolding, because we want unfolding for loop-breakers
-      -- if they have static arguments
-      -- Things with an INLINE pragma may have an unfolding *and*
-      -- be a loop breaker  (maybe the knot is not yet untied)
+  = case idUnfolding id of
         CoreUnfolding { uf_tmpl = unf_template
                       , uf_is_work_free = is_wf
                       , uf_guidance = guidance, uf_expandable = is_exp }
           | active_unfolding
-          , isStrongLoopBreaker (idOccInfo id) ==> has_static_args id
           -> tryUnfolding dflags id lone_variable
                                     arg_infos cont_info unf_template
                                     is_wf is_exp guidance
@@ -1094,9 +1089,6 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
         BootUnfolding    -> Nothing
         OtherCon {}      -> Nothing
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
-  where
-    b ==> t = not b || t
-    has_static_args id = idStaticArgs id /= noStaticArgs
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
 traceInline :: DynFlags -> Id -> String -> SDoc -> a -> a
@@ -1136,7 +1128,7 @@ tryUnfolding dflags id lone_variable
           enough_args = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
-        | unfoldingVeryAggressive uf_opts || idStaticArgs id /= noStaticArgs
+        | unfoldingVeryAggressive uf_opts
         -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | is_wf && some_benefit && small_enough
         -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)

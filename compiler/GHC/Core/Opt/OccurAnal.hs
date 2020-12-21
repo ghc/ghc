@@ -1472,7 +1472,7 @@ nodeScore env new_bndr lb_deps
   = (0, 0, True)                   -- a NOINLINE pragma) makes a great loop breaker
 
   | is_self_rec          -- Self-recursive things are great loop breakers
-  , not has_static_args  -- See Note [Self-recursion and loop breakers]
+--  , not has_static_args  -- See Note [Self-recursion and loop breakers]
   = (0, 0, True)
 
   | exprIsTrivial rhs
