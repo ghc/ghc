@@ -81,6 +81,9 @@ Compiler
   will have to be updated, as GHC no longer uses flattening skolems or
   flattening metavariables.
 
+- The :rts-flag:`-h` flag has been deprecated, use either :rts-flag:`-hc` or
+  :rts-flag:`-hT` explicitly, as appropiate.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
