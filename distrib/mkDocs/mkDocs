@@ -28,12 +28,16 @@ cd linux
 make install
 cd ..
 [ "$NO_CLEAN" -eq 0 ] && rm -r linux
+
 tar -Jxf "$WINDOWS_BINDIST"
 mv ghc* windows
 cd inst/share/doc/ghc*/html/libraries
-mv ../../../../../../windows/doc/html/libraries/Win32-* . || \ # make binary distribution
-    mv ../../../../../../windows/docs/html/libraries/Win32 . || \ # hadrian binary distribution
+
+# try extracting the make bindist docs and then the hadrian bindist docs
+mv ../../../../../../windows/doc/html/libraries/Win32-* . || \
+    mv ../../../../../../windows/docs/html/libraries/Win32 . || \
     die "failed to find the Win32 package documentation"
+
 sh gen_contents_index
 cd ..
 for i in haddock libraries users_guide
