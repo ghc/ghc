@@ -1,0 +1,5 @@
+
+MissingMethods.hs:9:10: error:
+    • No explicit implementation for
+        ‘m2’
+    • In the instance declaration for ‘C Bool’

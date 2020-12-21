@@ -1487,12 +1487,13 @@ languageExtensions (Just Haskell98)
        LangExt.NPlusKPatterns,
        LangExt.DatatypeContexts,
        LangExt.TraditionalRecordSyntax,
-       LangExt.NondecreasingIndentation
+       LangExt.NondecreasingIndentation,
            -- strictly speaking non-standard, but we always had this
            -- on implicitly before the option was added in 7.1, and
            -- turning it off breaks code, so we're keeping it on for
            -- backwards compatibility.  Cabal uses -XHaskell98 by
            -- default unless you specify another language.
+       LangExt.Incomplete
       ]
 
 languageExtensions (Just Haskell2010)
@@ -1507,7 +1508,8 @@ languageExtensions (Just Haskell2010)
        LangExt.ForeignFunctionInterface,
        LangExt.PatternGuards,
        LangExt.DoAndIfThenElse,
-       LangExt.RelaxedPolyRec]
+       LangExt.RelaxedPolyRec,
+       LangExt.Incomplete]
 
 hasPprDebug :: DynFlags -> Bool
 hasPprDebug = dopt Opt_D_ppr_debug
@@ -3356,6 +3358,11 @@ fFlagsDeps = [
   flagSpec "defer-diagnostics"                Opt_DeferDiagnostics,
   flagSpec "defer-type-errors"                Opt_DeferTypeErrors,
   flagSpec "defer-typed-holes"                Opt_DeferTypedHoles,
+  flagSpec "defer-incomplete-patterns"        Opt_DeferIncompletePatterns,
+  flagSpec "defer-incomplete-uni-patterns"    Opt_DeferIncompleteUniPatterns,
+  flagSpec "defer-incomplete-record-updates"  Opt_DeferIncompleteRecordUpdates,
+  flagSpec "defer-missing-fields"             Opt_DeferMissingFields,
+  flagSpec "defer-missing-methods"            Opt_DeferMissingMethods,
   flagSpec "defer-out-of-scope-variables"     Opt_DeferOutOfScopeVariables,
   flagSpec "diagnostics-show-caret"           Opt_DiagnosticsShowCaret,
   flagSpec "dicts-cheap"                      Opt_DictsCheap,
@@ -3721,7 +3728,8 @@ xFlagsDeps = [
   flagSpec "UnicodeSyntax"                    LangExt.UnicodeSyntax,
   flagSpec "UnliftedFFITypes"                 LangExt.UnliftedFFITypes,
   flagSpec "UnliftedNewtypes"                 LangExt.UnliftedNewtypes,
-  flagSpec "ViewPatterns"                     LangExt.ViewPatterns
+  flagSpec "ViewPatterns"                     LangExt.ViewPatterns,
+  flagSpec "Incomplete"                       LangExt.Incomplete
   ]
 
 defaultFlags :: Settings -> [GeneralFlag]

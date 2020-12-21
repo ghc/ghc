@@ -1494,13 +1494,22 @@ checkMissingFields con_like rbinds arg_tys
         addErrTc (missingStrictFields con_like fs)
 
     warn <- woptM Opt_WarnMissingFields
-    when (warn && notNull missing_ns_fields) $ do
+    defer <- goptM Opt_DeferMissingFields
+    lang <- xoptM LangExt.Incomplete
+    let shouldFail = not lang && not defer
+    if shouldFail && notNull missing_ns_fields
+      then do
         fs <- zonk_fields missing_ns_fields
         -- It is not an error (though we may want) to omit a
         -- lazy field, because we can always use
         -- (error "Missing field f") instead.
-        warnTc (Reason Opt_WarnMissingFields) True
-             (missingFields con_like fs)
+        failIfTc True (missingFields con_like fs)
+      else if not shouldFail && warn && notNull missing_ns_fields
+        then do
+          fs <- zonk_fields missing_ns_fields
+          warnTc (Reason Opt_WarnMissingFields) True
+            missingFields con_like fs
+        else return ()
 
   where
     -- we zonk the fields to get better types in error messages (#18869)

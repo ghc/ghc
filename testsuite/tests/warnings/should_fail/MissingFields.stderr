@@ -1,0 +1,6 @@
+
+MissingFields.hs:12:18: error:
+    • Fields of ‘Rec’ not initialised: f2
+    • In the first argument of ‘print’, namely ‘Rec {f1 = 1}’
+      In the expression: print Rec {f1 = 1}
+      In an equation for ‘printRec’: printRec = print Rec {f1 = 1}

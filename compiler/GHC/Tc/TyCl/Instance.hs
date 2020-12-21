@@ -2098,7 +2098,11 @@ derivBindCtxt sel_id clas tys
 warnUnsatisfiedMinimalDefinition :: ClassMinimalDef -> TcM ()
 warnUnsatisfiedMinimalDefinition mindef
   = do { warn <- woptM Opt_WarnMissingMethods
-       ; warnTc (Reason Opt_WarnMissingMethods) warn message
+       ; defer <- goptM Opt_DeferMissingMethods
+       ; lang <- xoptM LangExt.Incomplete
+       ; let shouldFail = (not lang && not defer)
+       ; failIfTc shouldFail message
+       ; warnTc (Reason Opt_WarnMissingMethods) (warn && not shouldFail) message
        }
   where
     message = vcat [text "No explicit implementation for"
