@@ -2163,7 +2163,7 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     raiseOverflowIdKey, raiseUnderflowIdKey, raiseDivZeroIdKey
     :: Unique
 
-wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard binders]
+wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard names]
 absentErrorIdKey              = mkPreludeMiscIdUnique  1
 augmentIdKey                  = mkPreludeMiscIdUnique  2
 appendIdKey                   = mkPreludeMiscIdUnique  3

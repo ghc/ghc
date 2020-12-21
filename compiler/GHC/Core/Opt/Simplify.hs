@@ -21,7 +21,6 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Utils
-import GHC.Core.Opt.StaticArgs ( saTransform )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
 import GHC.Types.SourceText

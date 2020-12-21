@@ -56,6 +56,7 @@ import GHC.Prelude
 
 #include "HsVersions.h"
 
+import GHC.Builtin.Uniques ( mkBuiltinUnique )
 import GHC.Builtin.Names ( unboundKey )
 import GHC.Types.Var
 import GHC.Core
@@ -154,7 +155,7 @@ peelSatOccs (SO env) fn = case delLookupVarEnv env fn of
   (mb_sa, env') -> (mb_sa `orElse` noStaticArgs, SO env')
 
 satAnalBind :: SatEnv -> TopLevelFlag -> CoreBind -> (SatOccs, CoreBind)
-satAnalBind env top_lvl (NonRec id rhs) = (occs, NonRec id rhs')
+satAnalBind env _ (NonRec id rhs) = (occs, NonRec id rhs')
   where
     (occs, rhs') = satAnalExpr (env `addInScopeVar` id) rhs
 satAnalBind env top_lvl (Rec pairs) = (combineSatOccsList occss, Rec pairs')
@@ -171,6 +172,7 @@ satAnalBind env top_lvl (Rec pairs) = (combineSatOccsList occss, Rec pairs')
         (static_args, occs') = peelSatOccs occs fn
         !fn' | allStaticAndUnliftedBody (length bndrs) static_args rhs_body
              || (isStableUnfolding (realIdUnfolding fn) && idStaticArgs fn /= noStaticArgs)
+             || length pairs >= 27 -- panics in optCoercion while compiling GHC.Tc.Utils.Zonk?!!
              = fn -- otherwise we end up with an unlifted worker body
              | otherwise     = -- pprTrace "satAnalBind:set" (ppr fn $$ ppr static_args) $
                                fn `setIdStaticArgs` static_args
@@ -560,16 +562,16 @@ saTransform binder arg_staticness rhs_binders rhs_body
     -- rhs_binders = [\alpha, \beta, c, n, xs]
     -- rhs_body = e
 
-    binders_w_staticness = rhs_binders `zip` (arg_staticness ++ repeat NotStatic)
+    binders_w_staticness = zip3 rhs_binders (arg_staticness ++ repeat NotStatic) (map mkBuiltinUnique [1..])
                                         -- Any extra args are assumed NotStatic
 
     non_static_args :: [Var]
             -- non_static_args = [xs]
             -- rhs_binders_without_type_capture = [\alpha', \beta', c, n, xs]
-    non_static_args = [v | (v, NotStatic) <- binders_w_staticness]
+    non_static_args = [v | (v, NotStatic, _) <- binders_w_staticness]
 
-    mk_shadow_lam_bndr (bndr, NotStatic) = bndr
-    mk_shadow_lam_bndr (bndr, _        ) = setVarUnique bndr unboundKey
+    mk_shadow_lam_bndr (bndr, NotStatic, _   ) = bndr
+    mk_shadow_lam_bndr (bndr, _        , uniq) = setVarUnique bndr uniq
                                            -- See Note [Binder type capture]
 
     -- new_rhs = \alpha beta c n xs ->

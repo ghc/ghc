@@ -51,7 +51,7 @@ import GHC.Core.DataCon
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
-import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec, noStaticArgs )
+import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec )
 import GHC.Core.Type
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
