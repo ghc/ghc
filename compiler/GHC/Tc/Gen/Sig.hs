@@ -410,13 +410,14 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        -- These are /signatures/ so we zonk to squeeze out any kind
        -- unification variables.  Do this after kindGeneralizeAll which may
        -- default kind variables to *.
-       ; (ze, kv_bndrs)       <- zonkTyVarBinders (mkTyVarBinders InferredSpec kvs)
-       ; (ze, implicit_bndrs) <- zonkTyVarBindersX ze implicit_bndrs
-       ; (ze, univ_bndrs)     <- zonkTyVarBindersX ze univ_bndrs
-       ; (ze, ex_bndrs)       <- zonkTyVarBindersX ze ex_bndrs
-       ; req          <- zonkTcTypesToTypesX ze req
-       ; prov         <- zonkTcTypesToTypesX ze prov
-       ; body_ty      <- zonkTcTypeToTypeX   ze body_ty
+       ; ze                   <- mkEmptyZonkEnv NoFlexi
+       ; (ze, kv_bndrs)       <- zonkTyVarBinders    ze (mkTyVarBinders InferredSpec kvs)
+       ; (ze, implicit_bndrs) <- zonkTyVarBinders    ze implicit_bndrs
+       ; (ze, univ_bndrs)     <- zonkTyVarBinders    ze univ_bndrs
+       ; (ze, ex_bndrs)       <- zonkTyVarBinders    ze ex_bndrs
+       ; req                  <- zonkTcTypesToTypesX ze req
+       ; prov                 <- zonkTcTypesToTypesX ze prov
+       ; body_ty              <- zonkTcTypeToTypeX   ze body_ty
 
        -- Now do validity checking
        ; checkValidType ctxt $

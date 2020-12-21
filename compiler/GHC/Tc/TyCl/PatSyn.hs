@@ -222,7 +222,7 @@ mkProvEvidence ev_id
 dependentArgErr :: (Id, DTyCoVarSet) -> TcM ()
 -- See Note [Coercions that escape]
 dependentArgErr (arg, bad_cos)
-  = addErrTc $
+  = failWithTc $  -- fail here: otherwise we get downstream errors
     vcat [ text "Iceland Jack!  Iceland Jack! Stop torturing me!"
          , hang (text "Pattern-bound variable")
               2 (ppr arg <+> dcolon <+> ppr (idType arg))
@@ -674,11 +674,12 @@ tc_patsyn_finish lname dir is_infix lpat'
   = do { -- Zonk everything.  We are about to build a final PatSyn
          -- so there had better be no unification variables in there
 
-         (ze, univ_tvs') <- zonkTyVarBinders univ_tvs
+       ; ze              <- mkEmptyZonkEnv NoFlexi
+       ; (ze, univ_tvs') <- zonkTyVarBinders    ze univ_tvs
        ; req_theta'      <- zonkTcTypesToTypesX ze req_theta
-       ; (ze, ex_tvs')   <- zonkTyVarBindersX ze ex_tvs
+       ; (ze, ex_tvs')   <- zonkTyVarBinders    ze ex_tvs
        ; prov_theta'     <- zonkTcTypesToTypesX ze prov_theta
-       ; pat_ty'         <- zonkTcTypeToTypeX ze pat_ty
+       ; pat_ty'         <- zonkTcTypeToTypeX   ze pat_ty
        ; arg_tys'        <- zonkTcTypesToTypesX ze arg_tys
 
        ; let (env1, univ_tvs) = tidyTyCoVarBinders emptyTidyEnv univ_tvs'
