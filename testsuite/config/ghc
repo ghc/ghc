@@ -118,7 +118,7 @@ config.way_flags = {
 
 config.way_rts_flags = {
     'normal'       : [],
-    'normal_h'     : ['-h'], # works without -prof
+    'normal_h'     : ['-hT'], # works without -prof
     'g1'           : ['-G1'],
     'nursery_chunks' : ['-n32k'],
     'debug_numa'   : ['-N2', '--debug-numa=2'],
