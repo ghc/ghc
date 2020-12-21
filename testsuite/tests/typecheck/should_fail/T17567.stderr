@@ -1,0 +1,6 @@
+
+T17567.hs:7:1: error:
+    • Uninferrable type variable in
+      the type synonym right-hand side forall (a :: k0). Proxy @{k0} a:
+        k0
+    • In the type declaration for ‘T’
