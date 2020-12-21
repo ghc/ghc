@@ -1061,8 +1061,6 @@ release-x86_64-windows-integer-simple:
 doc-tarball:
   stage: packaging
   needs: [validate-x86_64-linux-deb9-debug, validate-x86_64-windows-hadrian, validate-x86_64-linux-deb9-unreg-hadrian]
-  # N.B. Documentation isn't correctly packaged in Hadrian bindists
-  allow_failure: true
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
