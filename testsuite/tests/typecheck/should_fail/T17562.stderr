@@ -1,0 +1,7 @@
+
+T17562.hs:7:1: error:
+    • Uninferrable type variable in
+      the class context ‘forall (a :: k -> k0).
+                         (a b :: k0) ~ (a c :: k0)’:
+        k0
+    • In the class declaration for ‘C’

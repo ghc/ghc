@@ -912,9 +912,10 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
        ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
 
        -- Zonk the patterns etc into the Type world
-       ; (ze, qtvs)   <- zonkTyBndrs qtvs
-       ; lhs_ty       <- zonkTcTypeToTypeX   ze lhs_ty
-       ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
+       ; ze           <- mkEmptyZonkEnv NoFlexi
+       ; (ze, qtvs)   <- zonkTyBndrsX           ze qtvs
+       ; lhs_ty       <- zonkTcTypeToTypeX      ze lhs_ty
+       ; stupid_theta <- zonkTcTypesToTypesX    ze stupid_theta
        ; master_res_kind   <- zonkTcTypeToTypeX ze master_res_kind
        ; instance_res_kind <- zonkTcTypeToTypeX ze instance_res_kind
 
