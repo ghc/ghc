@@ -44,8 +44,9 @@ module GHC.Core.TyCo.Subst
         cloneTyVarBndr, cloneTyVarBndrs,
         substVarBndr, substVarBndrs,
         substTyVarBndr, substTyVarBndrs,
-        substCoVarBndr,
+        substCoVarBndr, substTyCoBndr,
         substTyVar, substTyVars, substTyCoVars,
+        substTyCoBndr,
         substForAllCoBndr,
         substVarBndrUsing, substForAllCoBndrUsing,
         checkValidSubst, isValidTCvSubst,
@@ -1054,3 +1055,10 @@ cloneTyVarBndrs subst (t:ts)  usupply = (subst'', tv:tvs)
     (uniq, usupply') = takeUniqFromSupply usupply
     (subst' , tv )   = cloneTyVarBndr subst t uniq
     (subst'', tvs)   = cloneTyVarBndrs subst' ts usupply'
+
+substTyCoBndr :: TCvSubst -> TyCoBinder -> (TCvSubst, TyBinder)
+substTyCoBndr subst (Anon af ty)          = (subst, Anon af (substScaledTy subst ty))
+substTyCoBndr subst (Named (Bndr tv vis)) = (subst', Named (Bndr tv' vis))
+                                          where
+                                            (subst', tv') = substVarBndr subst tv
+

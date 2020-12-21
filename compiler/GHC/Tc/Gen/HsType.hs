@@ -2438,7 +2438,7 @@ kcCheckDeclHeader_sig kisig name flav
                      --               ^^^^^^^^^
                      -- We do it here because at this point the environment has been
                      -- extended with both 'implicit_tcv_prs' and 'explicit_tv_prs'.
-                   ; ctx_k <- kc_res_ki
+                   ; ctx_k    <- kc_res_ki
                    ; m_res_ki <- case ctx_k of
                                   AnyKind -> return Nothing
                                   _ -> Just <$> newExpectedKind ctx_k
@@ -2466,11 +2466,11 @@ kcCheckDeclHeader_sig kisig name flav
 
                    ; return (invis_binders, r_ki) }
 
-        -- Zonk the implicitly quantified variables.
-        ; implicit_tvs <- mapM zonkTcTyVarToTyVar implicit_tvs
-
         -- Convert each invisible TyCoBinder to TyConBinder for tyConBinders.
         ; invis_tcbs <- mapM invis_to_tcb invis_binders
+
+        -- Zonk the implicitly quantified variables.
+        ; implicit_tvs <- mapM zonkTcTyVarToTyVar implicit_tvs
 
         -- Build the final, generalized TcTyCon
         ; let tcbs            = vis_tcbs ++ invis_tcbs
@@ -2589,34 +2589,34 @@ kcCheckDeclHeader_sig kisig name flav
       in splitInvisPiTysN n_inst sig_ki
 
 -- A quantifier from a kind signature zipped with a user-written binder for it.
-data ZippedBinder =
-  ZippedBinder TyBinder (Maybe (LHsTyVarBndr () GhcRn))
+data ZippedBinder = ZippedBinder TyBinder (Maybe (LHsTyVarBndr () GhcRn))
 
 -- See Note [Arity inference in kcCheckDeclHeader_sig]
 zipBinders
-  :: Kind                      -- kind signature
-  -> [LHsTyVarBndr () GhcRn]   -- user-written binders
-  -> ([ZippedBinder],          -- zipped binders
-      [LHsTyVarBndr () GhcRn], -- remaining user-written binders
-      Kind)                    -- remainder of the kind signature
-zipBinders = zip_binders []
+  :: Kind                      -- Kind signature
+  -> [LHsTyVarBndr () GhcRn]   -- User-written binders
+  -> ( [ZippedBinder]          -- Zipped binders
+     , [LHsTyVarBndr () GhcRn] -- Leftover user-written binders
+     , Kind )                  -- Remainder of the kind signature
+zipBinders = zip_binders [] emptyTCvSubst
   where
-    zip_binders acc ki [] = (reverse acc, [], ki)
-    zip_binders acc ki (b:bs) =
-      case tcSplitPiTy_maybe ki of
-        Nothing -> (reverse acc, b:bs, ki)
-        Just (tb, ki') ->
-          let
-            (zb, bs') | zippable  = (ZippedBinder tb (Just b),  bs)
-                      | otherwise = (ZippedBinder tb Nothing, b:bs)
-            zippable =
-              case tb of
-                Named (Bndr _ (Invisible _)) -> False
-                Named (Bndr _ Required)      -> True
-                Anon InvisArg _ -> False
-                Anon VisArg   _ -> True
-          in
-            zip_binders (zb:acc) ki' bs'
+    -- subst: we substitute as we go go ensure that the resulting
+    -- binders in the [ZippedBndr] all have distinct uniques.
+    -- If not, the TyCon may get multiple binders with the same unique,
+    -- which results in chaos (see #19092,3,4)
+    -- (The incoming kind might be forall k. k -> forall k. k -> Type
+    --  where those two k's have the same unique. Without the substitution
+    --  we'd get a repeated 'k'.)
+    zip_binders acc subst ki bs
+      | (b:bs') <- bs  -- Stop as soon as 'bs' becomes empty
+      , Just (tb,ki') <- tcSplitPiTy_maybe ki
+      , let (subst', tb') = substTyCoBndr subst tb
+      = if isInvisibleBinder tb
+        then zip_binders (ZippedBinder tb' Nothing  : acc) subst' ki' bs
+        else zip_binders (ZippedBinder tb' (Just b) : acc) subst' ki' bs'
+
+      | otherwise
+      = (reverse acc, bs, substTy subst ki)
 
 tooManyBindersErr :: Kind -> [LHsTyVarBndr () GhcRn] -> SDoc
 tooManyBindersErr ki bndrs =
