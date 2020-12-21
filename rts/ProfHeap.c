@@ -1222,35 +1222,13 @@ heapCensusBlock(Census *census, bdescr *bd)
 
         case TSO:
             prim = true;
-#if defined(PROFILING)
-            if (RtsFlags.ProfFlags.includeTSOs) {
-                size = sizeofW(StgTSO);
-                break;
-            } else {
-                // Skip this TSO and move on to the next object
-                p += sizeofW(StgTSO);
-                continue;
-            }
-#else
             size = sizeofW(StgTSO);
             break;
-#endif
 
         case STACK:
             prim = true;
-#if defined(PROFILING)
-            if (RtsFlags.ProfFlags.includeTSOs) {
-                size = stack_sizeW((StgStack*)p);
-                break;
-            } else {
-                // Skip this TSO and move on to the next object
-                p += stack_sizeW((StgStack*)p);
-                continue;
-            }
-#else
             size = stack_sizeW((StgStack*)p);
             break;
-#endif
 
         case TREC_CHUNK:
             prim = true;
