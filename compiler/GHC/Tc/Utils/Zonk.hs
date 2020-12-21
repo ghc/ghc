@@ -32,10 +32,10 @@ module GHC.Tc.Utils.Zonk (
         zonkTopDecls, zonkTopExpr, zonkTopLExpr,
         zonkTopBndrs,
         ZonkEnv, ZonkFlexi(..), emptyZonkEnv, mkEmptyZonkEnv, initZonkEnv,
-        zonkTyVarBinders, zonkTyVarBindersX, zonkTyVarBinderX,
         zonkTyBndrs, zonkTyBndrsX,
-        zonkTcTypeToType,  zonkTcTypeToTypeX,
-        zonkTcTypesToTypes, zonkTcTypesToTypesX, zonkScaledTcTypesToTypesX,
+        zonkTcTypeToType,  zonkTcTypeToTypeX, zonkTcTypesToTypesX,
+        zonkScaledTcTypesToTypesX,
+        zonkTyVarBinders, zonkTyVarBinder,
         zonkTyVarOcc,
         zonkCoToCo,
         zonkEvBinds, zonkTcEvBinds,
@@ -63,7 +63,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env   ( tcLookupGlobalOnly )
 import GHC.Tc.Types.Evidence
 
-import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -283,6 +283,10 @@ There are three possibilities:
   It's a way to have a variable that is not a mutable
   unification variable, but doesn't have a binding site
   either.
+
+* NoFlexi: See Note [Error on unconstrained meta-variables]
+  in GHC.Tc.Utils.TcMType. This mode will panic on unfilled
+  meta-variables.
 -}
 
 data ZonkFlexi   -- See Note [Un-unified unification variables]
@@ -290,6 +294,9 @@ data ZonkFlexi   -- See Note [Un-unified unification variables]
   | SkolemiseFlexi  -- Skolemise unbound unification variables
                     -- See Note [Zonking the LHS of a RULE]
   | RuntimeUnkFlexi -- Used in the GHCi debugger
+  | NoFlexi         -- Panic on unfilled meta-variables
+                    -- See Note [Error on unconstrained meta-variables]
+                    -- in GHC.Tc.Utils.TcMType
 
 instance Outputable ZonkEnv where
   ppr (ZonkEnv { ze_tv_env = tv_env
@@ -438,31 +445,31 @@ zonkTyBndrsX :: ZonkEnv -> [TcTyVar] -> TcM (ZonkEnv, [TyVar])
 zonkTyBndrsX = mapAccumLM zonkTyBndrX
 
 zonkTyBndrX :: ZonkEnv -> TcTyVar -> TcM (ZonkEnv, TyVar)
+zonkTyBndrX = zonk_ty_bndr zonkTcTypeToTypeX
+
+zonk_ty_bndr :: (ZonkEnv -> TcType -> TcM Type)
+             -> ZonkEnv -> TcTyVar -> TcM (ZonkEnv, TyVar)
 -- This guarantees to return a TyVar (not a TcTyVar)
 -- then we add it to the envt, so all occurrences are replaced
 --
 -- It does not clone: the new TyVar has the sane Name
 -- as the old one.  This important when zonking the
 -- TyVarBndrs of a TyCon, whose Names may scope.
-zonkTyBndrX env tv
+zonk_ty_bndr type_zonker env tv
   = ASSERT2( isImmutableTyVar tv, ppr tv <+> dcolon <+> ppr (tyVarKind tv) )
-    do { ki <- zonkTcTypeToTypeX env (tyVarKind tv)
+    do { ki <- type_zonker env (tyVarKind tv)
                -- Internal names tidy up better, for iface files.
        ; let tv' = mkTyVar (tyVarName tv) ki
        ; return (extendTyZonkEnv env tv', tv') }
 
-zonkTyVarBinders ::  [VarBndr TcTyVar vis]
-                 -> TcM (ZonkEnv, [VarBndr TyVar vis])
-zonkTyVarBinders tvbs = initZonkEnv $ \ ze -> zonkTyVarBindersX ze tvbs
+zonkTyVarBinders :: ZonkEnv -> [VarBndr TcTyVar vis]
+                            -> TcM (ZonkEnv, [VarBndr TyVar vis])
+zonkTyVarBinders = mapAccumLM zonkTyVarBinder
 
-zonkTyVarBindersX :: ZonkEnv -> [VarBndr TcTyVar vis]
-                             -> TcM (ZonkEnv, [VarBndr TyVar vis])
-zonkTyVarBindersX = mapAccumLM zonkTyVarBinderX
-
-zonkTyVarBinderX :: ZonkEnv -> VarBndr TcTyVar vis
-                            -> TcM (ZonkEnv, VarBndr TyVar vis)
+zonkTyVarBinder :: ZonkEnv -> VarBndr TcTyVar vis
+                -> TcM (ZonkEnv, VarBndr TyVar vis)
 -- Takes a TcTyVar and guarantees to return a TyVar
-zonkTyVarBinderX env (Bndr tv vis)
+zonkTyVarBinder env (Bndr tv vis)
   = do { (env', tv') <- zonkTyBndrX env tv
        ; return (env', Bndr tv' vis) }
 
@@ -1812,21 +1819,22 @@ lookupTyVarOcc (ZonkEnv { ze_tv_env = tv_env }) tv
   = lookupVarEnv tv_env tv
 
 commitFlexi :: ZonkFlexi -> TcTyVar -> Kind -> TcM Type
--- Only monadic so we can do tc-tracing
 commitFlexi flexi tv zonked_kind
   = case flexi of
       SkolemiseFlexi  -> return (mkTyVarTy (mkTyVar name zonked_kind))
 
       DefaultFlexi
-        | isRuntimeRepTy zonked_kind
-        -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
-              ; return liftedRepTy }
-        | isMultiplicityTy zonked_kind
-        -> do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVar tv)
-              ; return manyDataConTy }
-        | otherwise
-        -> do { traceTc "Defaulting flexi tyvar to Any:" (pprTyVar tv)
-              ; return (anyTypeOfKind zonked_kind) }
+       | isRuntimeRepTy zonked_kind
+       -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
+             ; return liftedRepTy }
+
+       | isMultiplicityTy zonked_kind
+       -> do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVar tv)
+             ; return manyDataConTy }
+
+       | otherwise
+       -> do { traceTc "Defaulting flexi tyvar to Any:" (pprTyVar tv)
+             ; return (anyTypeOfKind zonked_kind) }
 
       RuntimeUnkFlexi
         -> do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVar tv)
@@ -1835,6 +1843,9 @@ commitFlexi flexi tv zonked_kind
                         -- otherwise-unconstrained unification variables are
                         -- turned into RuntimeUnks as they leave the
                         -- typechecker's monad
+
+      NoFlexi -> pprPanic "NoFlexi" (ppr tv <+> dcolon <+> ppr zonked_kind)
+
   where
      name = tyVarName tv
 
@@ -1886,9 +1897,6 @@ zonkTcTyConToTyCon tc
 -- Confused by zonking? See Note [What is zonking?] in GHC.Tc.Utils.TcMType.
 zonkTcTypeToType :: TcType -> TcM Type
 zonkTcTypeToType ty = initZonkEnv $ \ ze -> zonkTcTypeToTypeX ze ty
-
-zonkTcTypesToTypes :: [TcType] -> TcM [Type]
-zonkTcTypesToTypes tys = initZonkEnv $ \ ze -> zonkTcTypesToTypesX ze tys
 
 zonkScaledTcTypeToTypeX :: ZonkEnv -> Scaled TcType -> TcM (Scaled TcType)
 zonkScaledTcTypeToTypeX env (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX env m

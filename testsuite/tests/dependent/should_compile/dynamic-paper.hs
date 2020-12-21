@@ -128,7 +128,7 @@ gcast x = do  Refl <- eqT  (typeRep :: TypeRep a)
               return x
 
 data SameKind :: k -> k -> Type
-type CheckAppResult = SameKind AppResult AppResultNoKind
+
   --  not the most thorough check
 foo :: AppResult x -> AppResultNoKind x
 foo (App y z) = AppNoKind y z

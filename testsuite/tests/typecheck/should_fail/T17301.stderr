@@ -1,0 +1,5 @@
+
+T17301.hs:22:3: error:
+    • Uninferrable type variable (a0 :: A) in
+      type family equation right-hand side: 'MkATySing @(B a0) ('SB @a0)
+    • In the type family declaration for ‘Forget’

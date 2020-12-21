@@ -887,10 +887,10 @@ generaliseTcTyCon (tc, scoped_prs, tc_res_kind)
 
        -- Step 3: Final zonk (following kind generalisation)
        -- See Note [Swizzling the tyvars before generaliseTcTyCon]
-       ; ze <- emptyZonkEnv
-       ; (ze, inferred)        <- zonkTyBndrsX ze inferred
-       ; (ze, sorted_spec_tvs) <- zonkTyBndrsX ze sorted_spec_tvs
-       ; (ze, req_tvs)         <- zonkTyBndrsX ze req_tvs
+       ; ze <- mkEmptyZonkEnv NoFlexi
+       ; (ze, inferred)        <- zonkTyBndrsX      ze inferred
+       ; (ze, sorted_spec_tvs) <- zonkTyBndrsX      ze sorted_spec_tvs
+       ; (ze, req_tvs)         <- zonkTyBndrsX      ze req_tvs
        ; tc_res_kind           <- zonkTcTypeToTypeX ze tc_res_kind
 
        ; traceTc "generaliseTcTyCon: post zonk" $
@@ -2346,13 +2346,24 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                   ; at_stuff  <- tcClassATs class_name clas ats at_defs
                   ; return (ctxt, fds, sig_stuff, at_stuff) }
 
+       -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
+       -- Example: (typecheck/should_fail/T17562)
+       --   type C :: Type -> Type -> Constraint
+       --   class (forall a. a b ~ a c) => C b c
+       -- The kind of `a` is unconstrained.
+       ; dvs <- candidateQTyVarsOfTypes ctxt
+       ; let mk_doc tidy_env = do { (tidy_env2, ctxt) <- zonkTidyTcTypes tidy_env ctxt
+                                  ; return ( tidy_env2
+                                           , sep [ text "the class context:"
+                                                 , pprTheta ctxt ] ) }
+       ; don'tQuantifyTyVars dvs mk_doc
 
        -- The pushLevelAndSolveEqualities will report errors for any
        -- unsolved equalities, so these zonks should not encounter
        -- any unfilled coercion variables unless there is such an error
        -- The zonk also squeeze out the TcTyCons, and converts
        -- Skolems to tyvars.
-       ; ze        <- emptyZonkEnv
+       ; ze        <- mkEmptyZonkEnv NoFlexi
        ; ctxt      <- zonkTcTypesToTypesX ze ctxt
        ; sig_stuff <- mapM (zonkTcMethInfoToMethInfoX ze) sig_stuff
          -- ToDo: do we need to zonk at_stuff?
@@ -2739,7 +2750,20 @@ tcTySynRhs roles_info tc_name hs_ty
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
        ; rhs_ty <- pushLevelAndSolveEqualities skol_info (binderVars binders) $
                    tcCheckLHsType hs_ty (TheKind res_kind)
-       ; rhs_ty <- zonkTcTypeToType rhs_ty
+
+         -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
+         -- Example: (typecheck/should_fail/T17567)
+         --   type T = forall a. Proxy a
+         -- The kind of `a` is unconstrained.
+       ; dvs <- candidateQTyVarsOfType rhs_ty
+       ; let mk_doc tidy_env = do { (tidy_env2, rhs_ty) <- zonkTidyTcType tidy_env rhs_ty
+                                  ; return ( tidy_env2
+                                           , sep [ text "the type synonym right-hand side:"
+                                                 , ppr rhs_ty ] ) }
+       ; don'tQuantifyTyVars dvs mk_doc
+
+       ; ze <- mkEmptyZonkEnv NoFlexi
+       ; rhs_ty <- zonkTcTypeToTypeX ze rhs_ty
        ; let roles = roles_info tc_name
        ; return (buildSynTyCon tc_name binders res_kind roles rhs_ty) }
   where
@@ -2776,10 +2800,24 @@ tcDataDefn err_ctxt roles_info tc_name
        ; let skol_tvs = binderVars tycon_binders
        ; stupid_tc_theta <- pushLevelAndSolveEqualities skol_info skol_tvs $
                             tcHsContext ctxt
-       ; stupid_theta    <- zonkTcTypesToTypes stupid_tc_theta
-       ; kind_signatures <- xoptM LangExt.KindSignatures
 
-             -- Check that we don't use kind signatures without Glasgow extensions
+       -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
+       -- Example: (typecheck/should_fail/T17567StupidTheta)
+       --   data (forall a. a b ~ a c) => T b c
+       -- The kind of 'a' is unconstrained.
+       ; dvs <- candidateQTyVarsOfTypes stupid_tc_theta
+       ; let mk_doc tidy_env
+               = do { (tidy_env2, theta) <- zonkTidyTcTypes tidy_env stupid_tc_theta
+                    ; return ( tidy_env2
+                             , sep [ text "the datatype context:"
+                                   , pprTheta theta ] ) }
+       ; don'tQuantifyTyVars dvs mk_doc
+
+       ; ze              <- mkEmptyZonkEnv NoFlexi
+       ; stupid_theta    <- zonkTcTypesToTypesX ze stupid_tc_theta
+
+             -- Check that we don't use kind signatures without the extension
+       ; kind_signatures <- xoptM LangExt.KindSignatures
        ; when (isJust mb_ksig) $
          checkTc (kind_signatures) (badSigTyDecl tc_name)
 
@@ -3016,7 +3054,18 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
               , text "lhs_ty"     <+> ppr lhs_ty
               , text "qtvs"       <+> pprTyVars qtvs ]
 
-       ; (ze, qtvs) <- zonkTyBndrs qtvs
+       -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
+       -- Example: typecheck/should_fail/T17301
+       ; dvs_rhs <- candidateQTyVarsOfType rhs_ty
+       ; let mk_doc tidy_env
+               = do { (tidy_env2, rhs_ty) <- zonkTidyTcType tidy_env rhs_ty
+                    ; return ( tidy_env2
+                             , sep [ text "type family equation right-hand side:"
+                                   , ppr rhs_ty ] ) }
+       ; don'tQuantifyTyVars dvs_rhs mk_doc
+
+       ; ze         <- mkEmptyZonkEnv NoFlexi
+       ; (ze, qtvs) <- zonkTyBndrsX      ze qtvs
        ; lhs_ty     <- zonkTcTypeToTypeX ze lhs_ty
        ; rhs_ty     <- zonkTcTypeToTypeX ze rhs_ty
 
@@ -3283,10 +3332,11 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
              -- See test dependent/should_fail/T13780a
 
        -- Zonk to Types
-       ; (ze, qkvs)          <- zonkTyBndrs kvs
-       ; (ze, user_qtvbndrs) <- zonkTyVarBindersX ze exp_tvbndrs
+       ; ze                  <- mkEmptyZonkEnv NoFlexi
+       ; (ze, qkvs)          <- zonkTyBndrsX              ze kvs
+       ; (ze, user_qtvbndrs) <- zonkTyVarBinders          ze exp_tvbndrs
        ; arg_tys             <- zonkScaledTcTypesToTypesX ze arg_tys
-       ; ctxt                <- zonkTcTypesToTypesX ze ctxt
+       ; ctxt                <- zonkTcTypesToTypesX       ze ctxt
 
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr name $$ ppr field_lbls)
@@ -3368,10 +3418,11 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; let tvbndrs =  mkTyVarBinders InferredSpec tkvs ++ outer_tv_bndrs
 
              -- Zonk to Types
-       ; (ze, tvbndrs) <- zonkTyVarBinders       tvbndrs
+       ; ze            <- mkEmptyZonkEnv NoFlexi
+       ; (ze, tvbndrs) <- zonkTyVarBinders          ze tvbndrs
        ; arg_tys       <- zonkScaledTcTypesToTypesX ze arg_tys
-       ; ctxt          <- zonkTcTypesToTypesX ze ctxt
-       ; res_ty        <- zonkTcTypeToTypeX   ze res_ty
+       ; ctxt          <- zonkTcTypesToTypesX       ze ctxt
+       ; res_ty        <- zonkTcTypeToTypeX         ze res_ty
 
        ; let res_tmpl = mkDDHeaderTy dd_info rep_tycon tc_bndrs
              (univ_tvs, ex_tvs, tvbndrs', eq_preds, arg_subst)

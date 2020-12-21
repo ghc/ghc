@@ -83,6 +83,7 @@ module GHC.Tc.Utils.TcMType (
   defaultTyVar, promoteMetaTyVarTo, promoteTyVarSet,
   quantifyTyVars, isQuantifiableTv,
   skolemiseUnboundMetaTyVar, zonkAndSkolemise, skolemiseQuantifiedTyVar,
+  don'tQuantifyTyVars,
 
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
@@ -1294,6 +1295,29 @@ instance Outputable CandidatesQTvs where
                                              , text "dv_tvs =" <+> ppr tvs
                                              , text "dv_cvs =" <+> ppr cvs ])
 
+isEmptyCandidates :: CandidatesQTvs -> Bool
+isEmptyCandidates (DV { dv_kvs = kvs, dv_tvs = tvs })
+  = isEmptyDVarSet kvs && isEmptyDVarSet tvs
+
+-- | Extract out the kind vars (in order) and type vars (in order) from
+-- a 'CandidatesQTvs'. The lists are guaranteed to be distinct. Keeping
+-- the lists separate is important only in the -XNoPolyKinds case.
+candidateVars :: CandidatesQTvs -> ([TcTyVar], [TcTyVar])
+candidateVars (DV { dv_kvs = dep_kv_set, dv_tvs = nondep_tkv_set })
+  = (dep_kvs, nondep_tvs)
+  where
+    dep_kvs = scopedSort $ dVarSetElems dep_kv_set
+      -- scopedSort: put the kind variables into
+      --    well-scoped order.
+      --    E.g.  [k, (a::k)] not the other way round
+
+    nondep_tvs = dVarSetElems (nondep_tkv_set `minusDVarSet` dep_kv_set)
+      -- See Note [Dependent type variables]
+      -- The `minus` dep_tkvs removes any kind-level vars
+      --    e.g. T k (a::k)   Since k appear in a kind it'll
+      --    be in dv_kvs, and is dependent. So remove it from
+      --    dv_tvs which will also contain k
+      -- NB kinds of tvs are already zonked
 
 candidateKindVars :: CandidatesQTvs -> TyVarSet
 candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
@@ -1372,7 +1396,7 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
     go :: CandidatesQTvs -> TcType -> TcM CandidatesQTvs
     -- Uses accumulating-parameter style
     go dv (AppTy t1 t2)    = foldlM go dv [t1, t2]
-    go dv (TyConApp _ tys) = foldlM go dv tys
+    go dv (TyConApp tc tys) = go_tc_args dv (tyConBinders tc) tys
     go dv (FunTy _ w arg res) = foldlM go dv [w, arg, res]
     go dv (LitTy {})        = return dv
     go dv (CastTy ty co)    = do dv1 <- go dv ty
@@ -1389,6 +1413,20 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
     go dv (ForAllTy (Bndr tv _) ty)
       = do { dv1 <- collect_cand_qtvs orig_ty True bound dv (tyVarKind tv)
            ; collect_cand_qtvs orig_ty is_dep (bound `extendVarSet` tv) dv1 ty }
+
+      -- This makes sure that we default e.g. the alpha in Proxy alpha (Any alpha).
+      -- Tested in polykinds/NestedProxies.
+      -- We just might get this wrong in AppTy, but I don't think that's possible
+      -- with -XNoPolyKinds. And fixing it would be non-performant, as we'd need
+      -- to look at kinds.
+    go_tc_args dv (tc_bndr:tc_bndrs) (ty:tys)
+      = do { dv1 <- collect_cand_qtvs orig_ty (is_dep || isNamedTyConBinder tc_bndr)
+                                      bound dv ty
+           ; go_tc_args dv1 tc_bndrs tys }
+    go_tc_args dv _bndrs tys  -- _bndrs might be non-empty: undersaturation
+                              -- tys might be non-empty: oversaturation
+                              -- either way, the foldlM is correct
+      = foldlM go dv tys
 
     -----------------
     go_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
@@ -1410,7 +1448,7 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
            ; cur_lvl <- getTcLevel
            ; if |  tcTyVarLevel tv <= cur_lvl
                 -> return dv   -- this variable is from an outer context; skip
-                               -- See Note [Use level numbers ofor quantification]
+                               -- See Note [Use level numbers for quantification]
 
                 |  intersectsVarSet bound tv_kind_vars
                    -- the tyvar must not be from an outer context, but we have
@@ -1561,7 +1599,7 @@ are about to wrap in a forall.
 
 It takes these free type/kind variables (partitioned into dependent and
 non-dependent variables) skolemises metavariables with a TcLevel greater
-than the ambient level (see Note [Use level numbers of quantification]).
+than the ambient level (see Note [Use level numbers for quantification]).
 
 * This function distinguishes between dependent and non-dependent
   variables only to keep correct defaulting behavior with -XNoPolyKinds.
@@ -1637,46 +1675,21 @@ quantifyTyVars :: CandidatesQTvs   -- See Note [Dependent type variables]
 -- invariants on CandidateQTvs, we do not have to filter out variables
 -- free in the environment here. Just quantify unconditionally, subject
 -- to the restrictions in Note [quantifyTyVars].
-quantifyTyVars dvs@(DV{ dv_kvs = dep_kv_set, dv_tvs = nondep_tkv_set })
+quantifyTyVars dvs
        -- short-circuit common case
-  | isEmptyDVarSet dep_kv_set
-  , isEmptyDVarSet nondep_tkv_set
+  | isEmptyCandidates dvs
   = do { traceTc "quantifyTyVars has nothing to quantify" empty
        ; return [] }
 
   | otherwise
   = do { traceTc "quantifyTyVars {" (ppr dvs)
 
-       ; let dep_kvs = scopedSort $ dVarSetElems dep_kv_set
-              -- scopedSort: put the kind variables into
-              --    well-scoped order.
-              --    E.g.  [k, (a::k)] not the other way round
-
-             nondep_tvs = dVarSetElems (nondep_tkv_set `minusDVarSet` dep_kv_set)
-                 -- See Note [Dependent type variables]
-                 -- The `minus` dep_tkvs removes any kind-level vars
-                 --    e.g. T k (a::k)   Since k appear in a kind it'll
-                 --    be in dv_kvs, and is dependent. So remove it from
-                 --    dv_tvs which will also contain k
-                 -- NB kinds of tvs are already zonked
-
-             -- In the non-PolyKinds case, default the kind variables
-             -- to *, and zonk the tyvars as usual.  Notice that this
-             -- may make quantifyTyVars return a shorter list
-             -- than it was passed, but that's ok
-       ; poly_kinds  <- xoptM LangExt.PolyKinds
-       ; dep_kvs'    <- mapMaybeM (zonk_quant (not poly_kinds)) dep_kvs
-       ; nondep_tvs' <- mapMaybeM (zonk_quant False)            nondep_tvs
-       ; let final_qtvs = dep_kvs' ++ nondep_tvs'
-           -- Because of the order, any kind variables
-           -- mentioned in the kinds of the nondep_tvs'
-           -- now refer to the dep_kvs'
+       ; undefaulted <- defaultTyVars dvs
+       ; final_qtvs  <- mapMaybeM zonk_quant undefaulted
 
        ; traceTc "quantifyTyVars }"
-           (vcat [ text "nondep:"     <+> pprTyVars nondep_tvs
-                 , text "dep:"        <+> pprTyVars dep_kvs
-                 , text "dep_kvs'"    <+> pprTyVars dep_kvs'
-                 , text "nondep_tvs'" <+> pprTyVars nondep_tvs' ])
+           (vcat [ text "undefaulted:" <+> pprTyVars undefaulted
+                 , text "final_qtvs:"  <+> pprTyVars final_qtvs ])
 
        -- We should never quantify over coercion variables; check this
        ; let co_vars = filter isCoVar final_qtvs
@@ -1686,9 +1699,8 @@ quantifyTyVars dvs@(DV{ dv_kvs = dep_kv_set, dv_tvs = nondep_tkv_set })
   where
     -- zonk_quant returns a tyvar if it should be quantified over;
     -- otherwise, it returns Nothing. The latter case happens for
-    --    * Kind variables, with -XNoPolyKinds: don't quantify over these
-    --    * RuntimeRep variables: we never quantify over these
-    zonk_quant default_kind tkv
+    -- non-meta-tyvars
+    zonk_quant tkv
       | not (isTyVar tkv)
       = return Nothing   -- this can happen for a covar that's associated with
                          -- a coercion hole. Test case: typecheck/should_compile/T2494
@@ -1698,11 +1710,7 @@ quantifyTyVars dvs@(DV{ dv_kvs = dep_kv_set, dv_tvs = nondep_tkv_set })
                            -- kind signature, we have the class variables in
                            -- scope, and they are TyVars not TcTyVars
       | otherwise
-      = do { deflt_done <- defaultTyVar default_kind tkv
-           ; case deflt_done of
-               True  -> return Nothing
-               False -> do { tv <- skolemiseQuantifiedTyVar tkv
-                           ; return (Just tv) } }
+      = Just <$> skolemiseQuantifiedTyVar tkv
 
 isQuantifiableTv :: TcLevel   -- Level of the context, outside the quantification
                  -> TcTyVar
@@ -1812,6 +1820,24 @@ defaultTyVar default_kind tv
       where
         (_, kv') = tidyOpenTyCoVar emptyTidyEnv kv
 
+-- | Default some unconstrained type variables:
+--     RuntimeRep tyvars default to LiftedRep
+--     Multiplicity tyvars default to Many
+--     Type tyvars from dv_kvs default to Type, when -XNoPolyKinds
+--     (under -XNoPolyKinds, non-defaulting vars in dv_kvs is an error)
+defaultTyVars :: CandidatesQTvs  -- ^ all candidates for quantification
+              -> TcM [TcTyVar]   -- ^ those variables not defaulted
+defaultTyVars dvs
+  = do { poly_kinds <- xoptM LangExt.PolyKinds
+       ; defaulted_kvs <- mapM (defaultTyVar (not poly_kinds)) dep_kvs
+       ; defaulted_tvs <- mapM (defaultTyVar False)            nondep_tvs
+       ; let undefaulted_kvs = [ kv | (kv, False) <- dep_kvs    `zip` defaulted_kvs ]
+             undefaulted_tvs = [ tv | (tv, False) <- nondep_tvs `zip` defaulted_tvs ]
+       ; return (undefaulted_kvs ++ undefaulted_tvs) }
+          -- NB: kvs before tvs because tvs may depend on kvs
+  where
+    (dep_kvs, nondep_tvs) = candidateVars dvs
+
 skolemiseUnboundMetaTyVar :: TcTyVar -> TcM TyVar
 -- We have a Meta tyvar with a ref-cell inside it
 -- Skolemise it, so that we are totally out of Meta-tyvar-land
@@ -1845,6 +1871,109 @@ skolemiseUnboundMetaTyVar tv
                Flexi       -> return ()
                Indirect ty -> WARN( True, ppr tv $$ ppr ty )
                               return () }
+
+{- Note [Error on unconstrained meta-variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  type C :: Type -> Type -> Constraint
+  class (forall a. a b ~ a c) => C b c
+
+We will infer a :: Type -> kappa... but then we get no further information
+on kappa. What to do?
+
+ A. We could choose kappa := Type. But this only works when the kind of kappa
+    is Type (true in this example, but not always).
+ B. We could default to Any.
+ C. We could generalize.
+ D. We could error.
+
+We choose (D), as described in #17567. Discussion of alternatives is below.
+
+To do this, we must take an extra step before doing the final zonk to create
+e.g. a TyCon. (There is no problem in the final term-level zonk. See the
+section on alternative (B) below.) This extra step is needed only for
+constructs that do not quantify their free meta-variables, such as a class
+constraint or right-hand side of a type synonym.
+
+Specifically: before the final zonk, every construct must either call
+quantifyTyVars or don'tQuantifyTyVars. The latter issues an error
+if it is passed any free variables. (Exception: we still default
+RuntimeRep and Multiplicity variables.)
+
+Because no meta-variables remain after quantifying or erroring, we perform
+the zonk with NoFlexi, which panics upon seeing a meta-variable.
+
+Alternatives not implemented:
+
+A. As stated above, this works only sometimes. We might have a free
+   meta-variable of kind Nat, for example.
+
+B. This is what we used to do, but it caused Any to appear in error
+   messages sometimes. See #17567 for several examples. Defaulting to
+   Any during the final, whole-program zonk is OK, though, because
+   we are completely done type-checking at that point. No chance to
+   leak into an error message.
+
+C. Examine the class declaration at the top of this Note again.
+   Where should we generalize? We might imagine generalizing and
+   putting the kind variable in the forall of the quantified constraint.
+   But what if there are nested foralls? Which one should get the
+   variable? Other constructs have other problems. (For example,
+   the right-hand side of a type family instance equation may not
+   be a poly-type.)
+
+   More broadly, the GHC AST defines a set of places where it performs
+   implicit generalization. These places are marked with HsImplicitBndrs.
+   HsImplicitBndrs manages principally *lexical generalization*, offering
+   a binding site for otherwise-unbound variables. For example, a type
+   signature has a generalization site:
+
+     f :: Proxy a -> Bool
+
+   Here, the otherwise-unbound a is lexically generalized, giving us
+
+     f :: forall a. Proxy a -> Bool
+
+   Later, during type-checking, we discover that a's kind is unconstrained.
+   We thus generalize *again*, to
+
+     f :: forall {k} (a :: k). Proxy @k a -> Bool
+
+   It is this second generalization that we are concerned with here.
+   Interestingly, these two generalizations can put their variables in
+   different places: the generalizations are performed in different compiler
+   phases, and are essentially unrelated. However, it is convenient
+   for programmers to remember only one set of implicit generalization
+   sites. So, we choose to use the sasme places (those with HsImplicitBndrs)
+   for lexical generalization as for generalization of unconstrained
+   meta-variables. Accordingly, there is no generalization in a class
+   constraint, or the other constructs that call don'tQuantifyTyVars.
+-}
+
+don'tQuantifyTyVars :: CandidatesQTvs
+                    -> (TidyEnv -> TcM (TidyEnv, SDoc))
+                            -- ^ like "the class context (D a b, E foogle)"
+                    -> TcM ()
+don'tQuantifyTyVars dvs where_found
+  | isEmptyCandidates dvs
+  = traceTc "don'tQuantifyTyVars has nothing to error on" empty
+
+  | otherwise
+  = do { traceTc "don'tQuantifyTyVars" (ppr dvs)
+       ; undefaulted <- defaultTyVars dvs
+          -- could have regular TyVars here, in an associated type RHS, for example
+       ; let leftover_metas = filter isMetaTyVar undefaulted
+       ; unless (null leftover_metas) $
+         do { let (tidy_env1, tidied_tvs) = tidyOpenTyCoVars emptyTidyEnv leftover_metas
+            ; (tidy_env2, where_doc) <- where_found tidy_env1
+            ; let doc = vcat [ text "Uninferrable type variable"
+                               <> plural tidied_tvs
+                               <+> pprWithCommas pprTyVar tidied_tvs
+                               <+> text "in"
+                             , where_doc ]
+            ; failWithTcM (tidy_env2, pprWithExplicitKindsWhen True doc) }
+       ; traceTc "don'tQuantifyTyVars success" empty }
 
 {- Note [Defaulting with -XNoPolyKinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
