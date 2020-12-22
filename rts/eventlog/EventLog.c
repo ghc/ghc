@@ -1524,6 +1524,10 @@ static void postTickyCounterSample(EventsBuf *eb, StgEntCounter *p)
     postWord64(eb, p->entry_count);
     postWord64(eb, p->allocs);
     postWord64(eb, p->allocd);
+
+    p->entry_count = 0;
+    p->allocs = 0;
+    p->allocd = 0;
 }
 
 void postTickyCounterSamples(StgEntCounter *counters)
