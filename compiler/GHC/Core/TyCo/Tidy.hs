@@ -26,7 +26,7 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Utils.Misc (seqList)
+import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
 
@@ -130,8 +130,8 @@ tidyTypes env tys = map (tidyType env) tys
 tidyType :: TidyEnv -> Type -> Type
 tidyType _   (LitTy n)             = LitTy n
 tidyType env (TyVarTy tv)          = TyVarTy (tidyTyCoVarOcc env tv)
-tidyType env (TyConApp tycon tys)  = let args = tidyTypes env tys
-                                     in args `seqList` TyConApp tycon args
+tidyType env (TyConApp tycon tys)  = let args = strictMap (tidyType env) tys
+                                     in args `seq` TyConApp tycon args
 tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
 tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
                                            ; !arg' = tidyType env arg
