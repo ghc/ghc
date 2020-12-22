@@ -191,7 +191,7 @@ StgIndStatic *debug_caf_list_snapshot = (StgIndStatic*)END_OF_CAF_LIST;
  *  5. Mark thread initiates a sync
  *  6. Capabilities send their final update remembered sets and suspend execution
  *  7. Mark thread marks everything is was sent
- *  8. Mark thead allows capabilities to resume.
+ *  8. Mark thread allows capabilities to resume.
  *
  * However, this is obviously a fair amount of complexity and so far the
  * periodic eager flushing approach has been sufficient.
