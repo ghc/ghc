@@ -677,7 +677,7 @@ mkSpillInstr
     -> Instr
 
 mkSpillInstr config reg delta slot
-  = let off     = spillSlotToOffset platform slot - delta
+  = let !off     = spillSlotToOffset platform slot - delta
     in
     case targetClassOfReg platform reg of
            RcInteger   -> MOV (archWordFormat is32Bit)
@@ -696,7 +696,7 @@ mkLoadInstr
     -> Instr
 
 mkLoadInstr config reg delta slot
-  = let off     = spillSlotToOffset platform slot - delta
+  = let !off     = spillSlotToOffset platform slot - delta
     in
         case targetClassOfReg platform reg of
               RcInteger -> MOV (archWordFormat is32Bit)
