@@ -53,6 +53,7 @@ import GHC.Cmm.BlockId
 import GHC.Platform
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
+import GHC.Exts (oneShot)
 
 import Control.Monad (ap)
 
@@ -77,15 +78,15 @@ newtype RegM freeRegs a
         deriving (Functor)
 
 instance Applicative (RegM freeRegs) where
-      pure a  =  RegM $ \s -> RA_Result s a
+      pure a  =  RegM $ oneShot $ \s -> RA_Result s a
       (<*>) = ap
 
 instance Monad (RegM freeRegs) where
-  m >>= k   =  RegM $ \s -> case unReg m s of { RA_Result s a -> unReg (k a) s }
+  m >>= k   =  RegM $ oneShot $ \s -> case unReg m s of { RA_Result s a -> unReg (k a) s }
 
 -- | Get native code generator configuration
 getConfig :: RegM a NCGConfig
-getConfig = RegM $ \s -> RA_Result s (ra_config s)
+getConfig = RegM $ oneShot $ \s -> RA_Result s (ra_config s)
 
 -- | Get target platform from native code generator configuration
 getPlatform :: RegM a Platform
@@ -129,7 +130,7 @@ makeRAStats state
 spillR :: Instruction instr
        => Reg -> Unique -> RegM freeRegs (instr, Int)
 
-spillR reg temp = RegM $ \s ->
+spillR reg temp = RegM $ oneShot $ \s ->
   let (stack1,slot) = getStackSlotFor (ra_stack s) temp
       instr  = mkSpillInstr (ra_config s) reg (ra_delta s) slot
   in
@@ -139,42 +140,42 @@ spillR reg temp = RegM $ \s ->
 loadR :: Instruction instr
       => Reg -> Int -> RegM freeRegs instr
 
-loadR reg slot = RegM $ \s ->
+loadR reg slot = RegM $ oneShot $ \s ->
   RA_Result s (mkLoadInstr (ra_config s) reg (ra_delta s) slot)
 
 getFreeRegsR :: RegM freeRegs freeRegs
-getFreeRegsR = RegM $ \ s@RA_State{ra_freeregs = freeregs} ->
+getFreeRegsR = RegM $ oneShot $ \ s@RA_State{ra_freeregs = freeregs} ->
   RA_Result s freeregs
 
 setFreeRegsR :: freeRegs -> RegM freeRegs ()
-setFreeRegsR regs = RegM $ \ s ->
+setFreeRegsR regs = RegM $ oneShot $ \ s ->
   RA_Result s{ra_freeregs = regs} ()
 
 getAssigR :: RegM freeRegs (RegMap Loc)
-getAssigR = RegM $ \ s@RA_State{ra_assig = assig} ->
+getAssigR = RegM $ oneShot $ \ s@RA_State{ra_assig = assig} ->
   RA_Result s assig
 
 setAssigR :: RegMap Loc -> RegM freeRegs ()
-setAssigR assig = RegM $ \ s ->
+setAssigR assig = RegM $ oneShot $ \ s ->
   RA_Result s{ra_assig=assig} ()
 
 getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
-getBlockAssigR = RegM $ \ s@RA_State{ra_blockassig = assig} ->
+getBlockAssigR = RegM $ oneShot $ \ s@RA_State{ra_blockassig = assig} ->
   RA_Result s assig
 
 setBlockAssigR :: BlockAssignment freeRegs -> RegM freeRegs ()
-setBlockAssigR assig = RegM $ \ s ->
+setBlockAssigR assig = RegM $ oneShot $ \ s ->
   RA_Result s{ra_blockassig = assig} ()
 
 setDeltaR :: Int -> RegM freeRegs ()
-setDeltaR n = RegM $ \ s ->
+setDeltaR n = RegM $ oneShot $ \ s ->
   RA_Result s{ra_delta = n} ()
 
 getDeltaR :: RegM freeRegs Int
-getDeltaR = RegM $ \s -> RA_Result s (ra_delta s)
+getDeltaR = RegM $ oneShot $ \s -> RA_Result s (ra_delta s)
 
 getUniqueR :: RegM freeRegs Unique
-getUniqueR = RegM $ \s ->
+getUniqueR = RegM $ oneShot $ \s ->
   case takeUniqFromSupply (ra_us s) of
     (uniq, us) -> RA_Result s{ra_us = us} uniq
 
@@ -182,9 +183,9 @@ getUniqueR = RegM $ \s ->
 -- | Record that a spill instruction was inserted, for profiling.
 recordSpill :: SpillReason -> RegM freeRegs ()
 recordSpill spill
-    = RegM $ \s -> RA_Result (s { ra_spills = spill : ra_spills s }) ()
+    = RegM $ oneShot $ \s -> RA_Result (s { ra_spills = spill : ra_spills s }) ()
 
 -- | Record a created fixup block
 recordFixupBlock :: BlockId -> BlockId -> BlockId -> RegM freeRegs ()
 recordFixupBlock from between to
-    = RegM $ \s -> RA_Result (s { ra_fixups = (from,between,to) : ra_fixups s }) ()
+    = RegM $ oneShot $ \s -> RA_Result (s { ra_fixups = (from,between,to) : ra_fixups s }) ()
