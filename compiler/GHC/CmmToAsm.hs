@@ -84,6 +84,7 @@ where
 
 import GHC.Prelude
 
+import qualified GHC.CmmToAsm.X86.Instr   as X86
 import qualified GHC.CmmToAsm.X86   as X86
 import qualified GHC.CmmToAsm.PPC   as PPC
 import qualified GHC.CmmToAsm.SPARC as SPARC
@@ -696,6 +697,26 @@ cmmNativeGen dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 , ppr_raStatsColor
                 , ppr_raStatsLinear
                 , unwinds )
+
+{-# SPECIALISE cmmNativeGen
+    :: forall statics jumpDest. (OutputableP Platform statics, Outputable jumpDest)
+    => DynFlags
+    -> ModLocation
+    -> NcgImpl statics X86.Instr jumpDest
+        -> UniqSupply
+        -> DwarfFiles
+        -> LabelMap DebugBlock
+        -> RawCmmDecl                                 
+        -> Int                                         
+        -> IO   ( UniqSupply
+                , DwarfFiles
+                , [NatCmmDecl statics X86.Instr]
+                , [CLabel]                      
+                , Maybe [Color.RegAllocStats statics X86.Instr]
+                , Maybe [Linear.RegAllocStats]            
+                , LabelMap [UnwindPoint]                 
+                )
+                #-}
 
 maybeDumpCfg :: DynFlags -> Maybe CFG -> String -> SDoc -> IO ()
 maybeDumpCfg _dflags Nothing _ _ = return ()

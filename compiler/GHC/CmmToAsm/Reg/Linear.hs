@@ -113,6 +113,8 @@ import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Linear.FreeRegs
 import GHC.CmmToAsm.Reg.Linear.Stats
 import GHC.CmmToAsm.Reg.Linear.JoinToTargets
+import qualified GHC.CmmToAsm.X86 ()
+import qualified GHC.CmmToAsm.X86.Instr as X86
 import qualified GHC.CmmToAsm.Reg.Linear.PPC    as PPC
 import qualified GHC.CmmToAsm.Reg.Linear.SPARC  as SPARC
 import qualified GHC.CmmToAsm.Reg.Linear.X86    as X86
@@ -195,6 +197,7 @@ regAlloc config (CmmProc static lbl live sccs)
 regAlloc _ (CmmProc _ _ _ _)
         = panic "RegAllocLinear.regAlloc: no match"
 
+{-# SPECIALISE regAlloc :: NCGConfig -> LiveCmmDecl statics X86.Instr -> UniqSM (NatCmmDecl statics X86.Instr, Maybe Int, Maybe RegAllocStats ) #-}
 
 -- -----------------------------------------------------------------------------
 -- Linear sweep to allocate registers
