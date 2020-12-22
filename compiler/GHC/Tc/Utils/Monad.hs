@@ -897,21 +897,24 @@ inGeneratedCode :: TcRn Bool
 inGeneratedCode = tcl_in_gen_code <$> getLclEnv
 
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-setSrcSpan (RealSrcSpan loc _) thing_inside =
-  updLclEnv (\env -> env { tcl_loc = loc, tcl_in_gen_code = False })
-            thing_inside
-setSrcSpan loc@(UnhelpfulSpan _) thing_inside
-  -- See Note [Rebindable syntax and HsExpansion].
-  | isGeneratedSrcSpan loc =
-      updLclEnv (\env -> env { tcl_in_gen_code = True }) thing_inside
-  | otherwise = thing_inside
-
+setSrcSpan srcSpan thing_inside =
+    updLclEnv f thing_inside
+  where
+    f env =
+      case srcSpan of
+        RealSrcSpan loc _              -> env { tcl_loc = loc, tcl_in_gen_code = False }
+        UnhelpfulSpan _
+            -- See Note [Rebindable syntax and HsExpansion].
+          | isGeneratedSrcSpan srcSpan -> env { tcl_in_gen_code = True }
+          | otherwise                  -> env
+      
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
 wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
                                             ; return (L loc b) }
+{-# INLINE wrapLocM #-}
 
 wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
 wrapLocFstM fn (L loc a) =
