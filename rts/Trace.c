@@ -213,7 +213,7 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
             debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]" " stopped (blocked on black hole owned by thread %lu)\n",
                        cap->no, (W_)tso->id, threadLabel, (long)info2);
         } else if (info1 == StackOverflow) {
-            debugBelch("cap %d: thead %" FMT_Word "[\"%s\"]"
+            debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]"
                        " stopped (stack overflow, size %lu)\n",
                       cap->no, (W_)tso->id, threadLabel, (long)info2);
 
