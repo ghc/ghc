@@ -491,7 +491,7 @@ class  Functor f  where
     --
     -- >>> fmap show Nothing
     -- Nothing
-    -- >>> fmap show Just 3
+    -- >>> fmap show (Just 3)
     -- Just "3"
     --
     -- Convert from an @'Data.Either.Either' 'Data.Int.Int' 'Data.Int.Int'@ to an
