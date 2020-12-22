@@ -394,16 +394,13 @@ linearRA
         -> RegM freeRegs
                 ( [instr]                       --   instructions after register allocation
                 , [NatBasicBlock instr])        --   fresh blocks of fixup code.
+linearRA block_live accInstr accFixups id = go
+  where
+    go [] = do
+        return ( reverse accInstr              -- instrs need to be returned in the correct order.
+               , accFixups )                   -- it doesn't matter what order the fixup blocks are returned in.
 
-
-linearRA _          accInstr accFixup _ []
-        = return
-                ( reverse accInstr              -- instrs need to be returned in the correct order.
-                , accFixup)                     -- it doesn't matter what order the fixup blocks are returned in.
-
-
-linearRA block_live accInstr accFixups id (instr:instrs)
- = do
+    go (instr:instrs) = do
         (accInstr', new_fixups) <- raInsn block_live accInstr id instr
 
         linearRA block_live accInstr' (new_fixups ++ accFixups) id instrs
