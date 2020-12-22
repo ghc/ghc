@@ -155,7 +155,7 @@ newMetaKindVar
                     -- They may be jiggled by tidying
        ; let kv = mkTcTyVar name liftedTypeKind details
        ; traceTc "newMetaKindVar" (ppr kv)
-       ; return (mkTyVarTy kv) }
+       ; return $! mkTyVarTy kv }
 
 newMetaKindVars :: Int -> TcM [TcKind]
 newMetaKindVars n = replicateM n newMetaKindVar
@@ -176,7 +176,7 @@ newEvVars theta = mapM newEvVar theta
 newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 -- Creates new *rigid* variables for predicates
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
-                 ; return (mkLocalIdOrCoVar name Many ty) }
+                 ; return $! mkLocalIdOrCoVar name Many ty }
 
 newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
 -- Deals with both equality and non-equality predicates
@@ -200,7 +200,7 @@ cloneWanted :: Ct -> TcM Ct
 cloneWanted ct
   | ev@(CtWanted { ctev_pred = pty }) <- ctEvidence ct
   = do { co_hole <- newCoercionHole pty
-       ; return (mkNonCanonical (ev { ctev_dest = HoleDest co_hole })) }
+       ; return $! mkNonCanonical (ev { ctev_dest = HoleDest co_hole }) }
   | otherwise
   = return ct
 
@@ -289,7 +289,7 @@ emitNewExprHole occ ev_id ty
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys
   = do { name <- newSysName (mkDictOcc (getOccName cls))
-       ; return (mkLocalId name Many (mkClassPred cls tys)) }
+       ; return $! mkLocalId name Many (mkClassPred cls tys) }
 
 predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of
@@ -783,12 +783,12 @@ newMetaTyVarName :: FastString -> TcM Name
 -- GHC.Tc.Solver.Canonical.canEqTyVarTyVar (nicer_to_update_tv2)
 newMetaTyVarName str
   = do { uniq <- newUnique
-       ; return (mkSystemName uniq (mkTyVarOccFS str)) }
+       ; return $! mkSystemName uniq (mkTyVarOccFS str) }
 
 cloneMetaTyVarName :: Name -> TcM Name
 cloneMetaTyVarName name
   = do { uniq <- newUnique
-       ; return (mkSystemName uniq (nameOccName name)) }
+       ; return $! mkSystemName uniq (nameOccName name) }
          -- See Note [Name of an instantiated type variable]
 
 {- Note [Name of an instantiated type variable]
@@ -822,7 +822,7 @@ newNamedAnonMetaTyVar tyvar_name meta_info kind
 newSkolemTyVar :: Name -> Kind -> TcM TcTyVar
 newSkolemTyVar name kind
   = do { lvl <- getTcLevel
-       ; return (mkTcTyVar name kind (SkolemTv lvl False)) }
+       ; return $! mkTcTyVar name kind (SkolemTv lvl False) }
 
 newTyVarTyVar :: Name -> Kind -> TcM TcTyVar
 -- See Note [TyVarTv]
@@ -875,7 +875,7 @@ newCycleBreakerTyVar :: TcKind -> TcM TcTyVar
 newCycleBreakerTyVar kind
   = do { details <- newMetaDetails CycleBreakerTv
        ; name <- newMetaTyVarName (fsLit "cbv")
-       ; return (mkTcTyVar name kind details) }
+       ; return $! mkTcTyVar name kind details }
 
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info
@@ -1040,7 +1040,7 @@ newNamedFlexiTyVar fs kind = newNamedAnonMetaTyVar fs TauTv kind
 newFlexiTyVarTy :: Kind -> TcM TcType
 newFlexiTyVarTy kind = do
     tc_tyvar <- newFlexiTyVar kind
-    return (mkTyVarTy tc_tyvar)
+    return $! mkTyVarTy tc_tyvar
 
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
 newFlexiTyVarTys n kind = replicateM n (newFlexiTyVarTy kind)
@@ -1048,14 +1048,14 @@ newFlexiTyVarTys n kind = replicateM n (newFlexiTyVarTy kind)
 newOpenTypeKind :: TcM TcKind
 newOpenTypeKind
   = do { rr <- newFlexiTyVarTy runtimeRepTy
-       ; return (tYPE rr) }
+       ; return $! tYPE rr }
 
 -- | Create a tyvar that can be a lifted or unlifted type.
 -- Returns alpha :: TYPE kappa, where both alpha and kappa are fresh
 newOpenFlexiTyVarTy :: TcM TcType
 newOpenFlexiTyVarTy
   = do { tv <- newOpenFlexiTyVar
-       ; return (mkTyVarTy tv) }
+       ; return $! mkTyVarTy tv }
 
 newOpenFlexiTyVar :: TcM TcTyVar
 newOpenFlexiTyVar
@@ -1111,7 +1111,7 @@ newMetaTyVarTyAtLevel :: TcLevel -> TcKind -> TcM TcType
 newMetaTyVarTyAtLevel tc_lvl kind
   = do  { details <- newTauTvDetailsAtLevel tc_lvl
         ; name    <- newMetaTyVarName (fsLit "p")
-        ; return (mkTyVarTy (mkTcTyVar name kind details)) }
+        ; return $! mkTyVarTy $! mkTcTyVar name kind details }
 
 {- *********************************************************************
 *                                                                      *
@@ -1828,7 +1828,7 @@ skolemiseUnboundMetaTyVar tv
               final_tv = mkTcTyVar final_name kind details
 
         ; traceTc "Skolemising" (ppr tv <+> text ":=" <+> ppr final_tv)
-        ; writeMetaTyVar tv (mkTyVarTy final_tv)
+        ; writeMetaTyVar tv $! mkTyVarTy final_tv
         ; return final_tv }
 
   where
@@ -2015,7 +2015,7 @@ promoteTyVar tv
        ; if (isFloatedTouchableMetaTyVar tclvl tv)
          then do { cloned_tv <- cloneMetaTyVar tv
                  ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
-                 ; writeMetaTyVar tv (mkTyVarTy rhs_tv)
+                 ; writeMetaTyVar tv $! mkTyVarTy rhs_tv
                  ; traceTc "promoteTyVar" (ppr tv <+> text "-->" <+> ppr rhs_tv)
                  ; return True }
          else do { traceTc "promoteTyVar: no" (ppr tv)
@@ -2049,9 +2049,9 @@ zonkTcTypeAndFV ty
 zonkTyCoVar :: TyCoVar -> TcM TcType
 -- Works on TyVars and TcTyVars
 zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
-               | isTyVar   tv = mkTyVarTy <$> zonkTyCoVarKind tv
+               | isTyVar   tv = mkTyVarTy <$!> zonkTyCoVarKind tv
                | otherwise    = ASSERT2( isCoVar tv, ppr tv )
-                                mkCoercionTy . mkCoVarCo <$> zonkTyCoVarKind tv
+                                mkCoercionTy . mkCoVarCo <$!> zonkTyCoVarKind tv
    -- Hackily, when typechecking type and class decls
    -- we have TyVars in scope added (only) in
    -- GHC.Tc.Gen.HsType.bindTyClTyVars, but it seems
@@ -2230,7 +2230,7 @@ zonkCo      :: Coercion -> TcM Coercion
 zonkTcTypeMapper :: TyCoMapper () TcM
 zonkTcTypeMapper = TyCoMapper
   { tcm_tyvar = const zonkTcTyVar
-  , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
+  , tcm_covar = const (\cv -> mkCoVarCo <$!> zonkTyCoVarKind cv)
   , tcm_hole  = hole
   , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTyCoVarKind tv
   , tcm_tycon      = zonkTcTyCon }
@@ -2251,7 +2251,7 @@ zonkTcTyCon :: TcTyCon -> TcM TcTyCon
 zonkTcTyCon tc
  | tcTyConIsPoly tc = return tc
  | otherwise        = do { tck' <- zonkTcType (tyConKind tc)
-                         ; return (setTcTyConKind tc tck') }
+                         ; return $! (setTcTyConKind tc tck') }
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
 -- Simply look through all Flexis
@@ -2273,7 +2273,7 @@ zonkTcTyVar tv
   = zonk_kind_and_return
   where
     zonk_kind_and_return = do { z_tv <- zonkTyCoVarKind tv
-                              ; return (mkTyVarTy z_tv) }
+                              ; return $! mkTyVarTy z_tv }
 
 -- Variant that assumes that any result of zonking is still a TyVar.
 -- Should be used only on skolems and TyVarTvs
