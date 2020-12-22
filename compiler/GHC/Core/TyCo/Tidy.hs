@@ -14,7 +14,7 @@ module GHC.Core.TyCo.Tidy
         tidyTyCoVarOcc,
         tidyTopType,
         tidyKind,
-        tidyCo, tidyCos,
+        tidyCo,
         tidyTyCoVarBinder, tidyTyCoVarBinders
   ) where
 
@@ -230,6 +230,3 @@ tidyCo env@(_, subst) co
     go_prov (PhantomProv co)    = PhantomProv (go co)
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
     go_prov p@(PluginProv _)    = p
-
-tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
-tidyCos env = map (tidyCo env)
