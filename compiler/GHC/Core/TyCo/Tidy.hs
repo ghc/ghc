@@ -14,7 +14,7 @@ module GHC.Core.TyCo.Tidy
         tidyTyCoVarOcc,
         tidyTopType,
         tidyKind,
-        tidyCo, tidyCos,
+        tidyCo,
         tidyTyCoVarBinder, tidyTyCoVarBinders
   ) where
 
@@ -26,9 +26,23 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Utils.Misc (seqList)
+import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
+
+{-
+Note [Strict mapping during tidying]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since the result of tidying will be inserted into the HPT, a potentially
+long-lived structure, we generally want to avoid pieces of the old AST
+being retained by the thunks produced by tidying. For this reason we take great
+care to ensure that all pieces of the tidied AST are evaluated strictly.
+
+In the case of tidying of lists (e.g. lists of arguments) we prefer to use
+`strictMap f xs` rather than `seqList (map f xs)` as the latter will
+unnecessarily allocate a thunk, which will then be almost-immediately
+evaluated, for each list element.
+-}
 
 {-
 %************************************************************************
@@ -130,8 +144,9 @@ tidyTypes env tys = map (tidyType env) tys
 tidyType :: TidyEnv -> Type -> Type
 tidyType _   (LitTy n)             = LitTy n
 tidyType env (TyVarTy tv)          = TyVarTy (tidyTyCoVarOcc env tv)
-tidyType env (TyConApp tycon tys)  = let args = tidyTypes env tys
-                                     in args `seqList` TyConApp tycon args
+tidyType env (TyConApp tycon tys)  = let args = strictMap (tidyType env) tys
+                                         -- See Note [Strict mapping during tidying]
+                                     in args `seq` TyConApp tycon args
 tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
 tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
                                            ; !arg' = tidyType env arg
@@ -201,8 +216,9 @@ tidyCo env@(_, subst) co
 
     go (Refl ty)             = Refl (tidyType env ty)
     go (GRefl r ty mco)      = GRefl r (tidyType env ty) $! go_mco mco
-    go (TyConAppCo r tc cos) = let args = map go cos
-                               in args `seqList` TyConAppCo r tc args
+    go (TyConAppCo r tc cos) = let args = strictMap go cos
+                                   -- See Note [Strict mapping during tidying]
+                               in args `seq` TyConAppCo r tc args
     go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
     go (ForAllCo tv h co)    = ((ForAllCo $! tvp) $! (go h)) $! (tidyCo envp co)
                                where (envp, tvp) = tidyVarBndr env tv
@@ -213,8 +229,9 @@ tidyCo env@(_, subst) co
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
     go (HoleCo h)            = HoleCo h
-    go (AxiomInstCo con ind cos) = let args = map go cos
-                               in  args `seqList` AxiomInstCo con ind args
+    go (AxiomInstCo con ind cos) = let args = strictMap go cos
+                                       -- See Note [Strict mapping during tidying]
+                                   in  args `seq` AxiomInstCo con ind args
     go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co
@@ -224,12 +241,10 @@ tidyCo env@(_, subst) co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
-    go (AxiomRuleCo ax cos)  = let cos1 = tidyCos env cos
-                               in cos1 `seqList` AxiomRuleCo ax cos1
+    go (AxiomRuleCo ax cos)  = let cos1 = strictMap (tidyCo env) cos
+                                   -- See Note [Strict mapping during tidying]
+                               in cos1 `seq` AxiomRuleCo ax cos1
 
     go_prov (PhantomProv co)    = PhantomProv (go co)
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
     go_prov p@(PluginProv _)    = p
-
-tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
-tidyCos env = map (tidyCo env)
