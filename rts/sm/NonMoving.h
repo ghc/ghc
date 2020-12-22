@@ -33,6 +33,11 @@ _Static_assert(NONMOVING_SEGMENT_SIZE % BLOCK_SIZE == 0,
 // The index of a block within a segment
 typedef uint16_t nonmoving_block_idx;
 
+// A vacant block within a segment
+struct VacantBlock {
+    nonmoving_block_idx next_free;
+};
+
 // A non-moving heap segment
 struct NonmovingSegment {
     struct NonmovingSegment *link;     // for linking together segments into lists
