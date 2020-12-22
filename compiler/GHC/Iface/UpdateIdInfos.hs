@@ -45,8 +45,10 @@ updateModDetailsIdInfos cg_infos mod_details =
               } = mod_details
 
     -- type TypeEnv = NameEnv TyThing
-    ~type_env' = mapNameEnv (updateTyThingIdInfos type_env' cg_infos) type_env
-    -- Not strict!
+    type_env' = mapNameEnv (updateTyThingIdInfos type_env' cg_infos) type_env
+    -- NB: Knot-tied! The result, type_env', is passed right back into into
+    -- updateTyThingIdInfos, so that that occurrences of any Ids (e.g. in
+    -- IdInfos, etc) can be looked up in the tidied env
 
     !insts' = strictMap (updateInstIdInfos type_env' cg_infos) insts
     !rules' = strictMap (updateRuleIdInfos type_env') rules

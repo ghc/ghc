@@ -870,9 +870,9 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = name
        ; return $ AConLike . PatSynCon $ patsyn }}}
   where
      mk_doc n = text "Pattern synonym" <+> ppr n
-     tc_pr :: (IfExtName, Bool) -> IfL (Id, Bool)
+     tc_pr :: (IfExtName, Bool) -> IfL (Name, Type, Bool)
      tc_pr (nm, b) = do { id <- forkM (ppr nm) (tcIfaceExtId nm)
-                        ; return (id, b) }
+                        ; return (nm, idType id, b) }
 
 tcIfaceDecls :: Bool
           -> [(Fingerprint, IfaceDecl)]

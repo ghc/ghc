@@ -598,6 +598,7 @@ pprPat (ConPat { pat_con = con
   where
     regular :: OutputableBndr (ConLikeP (GhcPass p)) => SDoc
     regular = pprUserCon (unLoc con) details
+
 pprPat (XPat ext) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
   GhcPs -> noExtCon ext

@@ -27,7 +27,6 @@ import GHC.Unit
 import GHC.Cmm.CLabel
 
 import GHC.Core.Type
-import GHC.Core.ConLike
 import GHC.Core
 import GHC.Core.TyCon
 
@@ -514,8 +513,11 @@ addTickHsExpr e@(HsVar _ (L _ id))  = do freeVar id; return e
 addTickHsExpr e@(HsUnboundVar id _) = do freeVar id; return e
 addTickHsExpr e@(HsRecFld _ (Ambiguous id _))   = do freeVar id; return e
 addTickHsExpr e@(HsRecFld _ (Unambiguous id _)) = do freeVar id; return e
-addTickHsExpr e@(HsConLikeOut _ con)
-  | Just id <- conLikeWrapId_maybe con = do freeVar id; return e
+
+addTickHsExpr e@(HsConLikeOut {}) = return e
+  -- We used to do a freeVar on a pat-syn builder, but actually
+  -- such builders are never in the inScope env, which
+  -- doesn't include top level bindings
 addTickHsExpr e@(HsIPVar {})     = return e
 addTickHsExpr e@(HsOverLit {})   = return e
 addTickHsExpr e@(HsOverLabel{})  = return e
@@ -641,9 +643,6 @@ addTickHsExpr (XExpr (WrapExpr (HsWrap w e))) =
 addTickHsExpr (XExpr (ExpansionExpr (HsExpanded a b))) =
         liftM (XExpr . ExpansionExpr . HsExpanded a) $
               (addTickHsExpr b)
-
--- Others should never happen in expression content.
-addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
 
 addTickTupArg :: LHsTupArg GhcTc -> TM (LHsTupArg GhcTc)
 addTickTupArg (L l (Present x e))  = do { e' <- addTickLHsExpr e

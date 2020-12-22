@@ -572,7 +572,7 @@ tcExpr (HsStatic fvs expr) res_ty
 ************************************************************************
 -}
 
-tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
+tcExpr expr@(RecordCon { rcon_con = L loc con_name
                        , rcon_flds = rbinds }) res_ty
   = do  { con_like <- tcLookupConLike con_name
 
@@ -585,24 +585,21 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
               -- a data constructor.
         ; let arity = conLikeArity con_like
               Right (arg_tys, actual_res_ty) = tcSplitFunTysN arity con_tau
-        ; case conLikeWrapId_maybe con_like of {
-               Nothing -> nonBidirectionalErr (conLikeName con_like) ;
-               Just con_id ->
+        ; checkTc (conLikeHasBuilder con_like) $
+          nonBidirectionalErr (conLikeName con_like)
 
-     do { rbinds' <- tcRecordBinds con_like (map scaledThing arg_tys) rbinds
+        ; rbinds' <- tcRecordBinds con_like (map scaledThing arg_tys) rbinds
                    -- It is currently not possible for a record to have
                    -- multiplicities. When they do, `tcRecordBinds` will take
                    -- scaled types instead. Meanwhile, it's safe to take
                    -- `scaledThing` above, as we know all the multiplicities are
                    -- Many.
-        ; let rcon_tc = RecordConTc
-                           { rcon_con_like = con_like
-                           , rcon_con_expr = mkHsWrap con_wrap con_expr }
+        ; let rcon_tc = mkHsWrap con_wrap con_expr
               expr' = RecordCon { rcon_ext = rcon_tc
-                                , rcon_con_name = L loc con_id
+                                , rcon_con = L loc con_like
                                 , rcon_flds = rbinds' }
 
-        ; tcWrapResultMono expr expr' actual_res_ty res_ty } } }
+        ; tcWrapResultMono expr expr' actual_res_ty res_ty }
   where
     orig = OccurrenceOf con_name
 
@@ -829,8 +826,8 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         -- Check that we're not dealing with a unidirectional pattern
         -- synonym
-        ; unless (isJust $ conLikeWrapId_maybe con1)
-                 (nonBidirectionalErr (conLikeName con1))
+        ; checkTc (conLikeHasBuilder con1) $
+          nonBidirectionalErr (conLikeName con1)
 
         -- STEP 3    Note [Criteria for update]
         -- Check that each updated field is polymorphic; that is, its type

@@ -875,10 +875,10 @@ zonkExpr env (ExplicitList ty wit exprs)
    where zonkWit env Nothing    = return (env, Nothing)
          zonkWit env (Just fln) = second Just <$> zonkSyntaxExpr env fln
 
-zonkExpr env expr@(RecordCon { rcon_ext = ext, rcon_flds = rbinds })
-  = do  { new_con_expr <- zonkExpr env (rcon_con_expr ext)
+zonkExpr env expr@(RecordCon { rcon_ext = con_expr, rcon_flds = rbinds })
+  = do  { new_con_expr <- zonkExpr env con_expr
         ; new_rbinds   <- zonkRecFields env rbinds
-        ; return (expr { rcon_ext  = ext { rcon_con_expr = new_con_expr }
+        ; return (expr { rcon_ext  = new_con_expr
                        , rcon_flds = new_rbinds }) }
 
 zonkExpr env (RecordUpd { rupd_flds = rbinds

@@ -52,7 +52,7 @@ import GHC.Core.InstEnv
 import GHC.Builtin.Types          ( mkListTy, mkSumTy )
 import GHC.Tc.Types
 import GHC.Tc.Types.Evidence
-import GHC.Types.Var              ( Id, Var, EvId, varName, setVarName, varType, varUnique )
+import GHC.Types.Var              ( Id, Var, EvId, varName, varType, varUnique )
 import GHC.Types.Var.Env
 import GHC.Builtin.Uniques
 import GHC.Iface.Make             ( mkIfaceExports )
@@ -557,21 +557,6 @@ instance HasLoc (HsDataDefn GhcRn) where
     -- Only used for data family instances, so we only need rhs
     -- Most probably the rest will be unhelpful anyway
 
-{- Note [Real DataCon Name]
-The typechecker substitutes the conLikeWrapId for the name, but we don't want
-this showing up in the hieFile, so we replace the name in the Id with the
-original datacon name
-See also Note [Data Constructor Naming]
--}
-class HasRealDataConName p where
-  getRealDataCon :: XRecordCon p -> Located (IdP p) -> Located (IdP p)
-
-instance HasRealDataConName GhcRn where
-  getRealDataCon _ n = n
-instance HasRealDataConName GhcTc where
-  getRealDataCon RecordConTc{rcon_con_like = con} (L sp var) =
-    L sp (setVarName var (conLikeName con))
-
 -- | The main worker class
 -- See Note [Updating HieAst for changes in the GHC AST] for more information
 -- on how to add/modify instances for this.
@@ -796,7 +781,6 @@ class ( IsPass p
       , ToHie (RFContext (Located (FieldOcc (GhcPass p))))
       , ToHie (TScoped (LHsWcType (GhcPass (NoGhcTcPass p))))
       , ToHie (TScoped (LHsSigWcType (GhcPass (NoGhcTcPass p))))
-      , HasRealDataConName (GhcPass p)
       )
       => HiePass p where
   hiePass :: HiePassEv p
@@ -1127,11 +1111,15 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
       ExplicitList _ _ exprs ->
         [ toHie exprs
         ]
-      RecordCon {rcon_ext = mrealcon, rcon_con_name = name, rcon_flds = binds} ->
-        [ toHie $ C Use (getRealDataCon @(GhcPass p) mrealcon name)
-            -- See Note [Real DataCon Name]
+      RecordCon { rcon_con = con, rcon_flds = binds} ->
+        [ toHie $ C Use $ con_name
         , toHie $ RC RecFieldAssign $ binds
         ]
+        where
+          con_name :: Located Name
+          con_name = case hiePass @p of       -- Like ConPat
+                       HieRn -> con
+                       HieTc -> fmap conLikeName con
       RecordUpd {rupd_expr = expr, rupd_flds = upds}->
         [ toHie expr
         , toHie $ map (RC RecFieldAssign) upds

@@ -294,14 +294,14 @@ rnExpr (ExplicitSum x alt arity expr)
   = do { (expr', fvs) <- rnLExpr expr
        ; return (ExplicitSum x alt arity expr', fvs) }
 
-rnExpr (RecordCon { rcon_con_name = con_id
+rnExpr (RecordCon { rcon_con = con_id
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
   = do { con_lname@(L _ con_name) <- lookupLocatedOccRn con_id
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
        ; return (RecordCon { rcon_ext = noExtField
-                           , rcon_con_name = con_lname, rcon_flds = rec_binds' }
+                           , rcon_con = con_lname, rcon_flds = rec_binds' }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
     mk_hs_var l n = HsVar noExtField (L l n)

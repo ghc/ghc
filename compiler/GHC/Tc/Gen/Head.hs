@@ -771,7 +771,7 @@ tc_infer_id id_name
                    | Just (expr, ty) <- patSynBuilderOcc ps
                    -> return (expr, ty)
                    | otherwise
-                   -> nonBidirectionalErr id_name
+                   -> failWithTc (nonBidirectionalErr id_name)
 
              AGlobal (ATyCon ty_con)
                -> fail_tycon global_env ty_con
@@ -863,10 +863,9 @@ check_naughty lbl id
   | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel lbl)
   | otherwise                  = return ()
 
-nonBidirectionalErr :: Outputable name => name -> TcM a
-nonBidirectionalErr name = failWithTc $
-    text "non-bidirectional pattern synonym"
-    <+> quotes (ppr name) <+> text "used in an expression"
+nonBidirectionalErr :: Outputable name => name -> SDoc
+nonBidirectionalErr name = text "non-bidirectional pattern synonym"
+                           <+> quotes (ppr name) <+> text "used in an expression"
 
 {- Note [HsVar: naughty record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

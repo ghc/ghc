@@ -1279,7 +1279,7 @@ compileCore simplify fn = do
         gutsToCoreModule safe_mode (Right mg) = CoreModule {
           cm_module  = mg_module mg,
           cm_types   = typeEnvFromEntities (bindersOfBinds (mg_binds mg))
-                                           (mg_tcs mg)
+                                           (mg_tcs mg) (mg_patsyns mg)
                                            (mg_fam_insts mg),
           cm_binds   = mg_binds mg,
           cm_safe    = safe_mode
