@@ -32,6 +32,7 @@ import GHC.Tc.Solver.Monad as TcS
 
 import GHC.Utils.Misc
 import GHC.Data.Maybe
+import GHC.Exts (oneShot)
 import Control.Monad
 import GHC.Utils.Monad ( zipWith3M )
 import Data.List.NonEmpty ( NonEmpty(..) )
