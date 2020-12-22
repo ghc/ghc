@@ -114,7 +114,7 @@ module GHC.Core.Coercion (
         etaExpandCoAxBranch,
 
         -- * Tidying
-        tidyCo, tidyCos,
+        tidyCo,
 
         -- * Other
         promoteCoercion, buildCoercion,
