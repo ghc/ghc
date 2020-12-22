@@ -868,6 +868,13 @@ entry counters to the eventlog.
 
    Defines a ticky counter.
 
+.. event-type:: TICKY_COUNTER_BEGIN_SAMPLE
+
+   :tag: 212
+   :length: fixed
+
+   Denotes the beginning of an atomic set of ticky-ticky profiler counter samples.
+
 .. event-type:: TICKY_COUNTER_SAMPLE
 
    :tag: 211
