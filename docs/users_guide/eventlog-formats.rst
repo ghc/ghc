@@ -885,4 +885,4 @@ entry counters to the eventlog.
    :field Word64: number of times this has been allocated (words). Only
      produced for modules compiled with :ghc-flag:`-ticky-allocd`.
 
-   Records the counter statistics at a moment in time.
+   Records the number of "ticks" recorded by a ticky-ticky counter single the last sample.
