@@ -201,8 +201,8 @@ tidyCo env@(_, subst) co
 
     go (Refl ty)             = Refl (tidyType env ty)
     go (GRefl r ty mco)      = GRefl r (tidyType env ty) $! go_mco mco
-    go (TyConAppCo r tc cos) = let args = map go cos
-                               in args `seqList` TyConAppCo r tc args
+    go (TyConAppCo r tc cos) = let args = strictMap go cos
+                               in args `seq` TyConAppCo r tc args
     go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
     go (ForAllCo tv h co)    = ((ForAllCo $! tvp) $! (go h)) $! (tidyCo envp co)
                                where (envp, tvp) = tidyVarBndr env tv
@@ -213,8 +213,8 @@ tidyCo env@(_, subst) co
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
     go (HoleCo h)            = HoleCo h
-    go (AxiomInstCo con ind cos) = let args = map go cos
-                               in  args `seqList` AxiomInstCo con ind args
+    go (AxiomInstCo con ind cos) = let args = strictMap go cos
+                               in  args `seq` AxiomInstCo con ind args
     go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co
@@ -224,8 +224,8 @@ tidyCo env@(_, subst) co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
-    go (AxiomRuleCo ax cos)  = let cos1 = tidyCos env cos
-                               in cos1 `seqList` AxiomRuleCo ax cos1
+    go (AxiomRuleCo ax cos)  = let cos1 = strictMap (tidyCo env) cos
+                               in cos1 `seq` AxiomRuleCo ax cos1
 
     go_prov (PhantomProv co)    = PhantomProv (go co)
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
