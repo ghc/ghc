@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP              #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE BangPatterns     #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -766,8 +767,8 @@ zonkExpr env (HsLamCase x matches)
        return (HsLamCase x new_matches)
 
 zonkExpr env (HsApp x e1 e2)
-  = do new_e1 <- zonkLExpr env e1
-       new_e2 <- zonkLExpr env e2
+  = do !new_e1 <- zonkLExpr env e1
+       !new_e2 <- zonkLExpr env e2
        return (HsApp x new_e1 new_e2)
 
 zonkExpr env (HsAppType ty e t)
