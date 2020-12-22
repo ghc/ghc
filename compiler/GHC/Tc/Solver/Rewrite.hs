@@ -59,12 +59,12 @@ newtype RewriteM a
   deriving (Functor)
 
 instance Monad RewriteM where
-  m >>= k  = RewriteM $ \env ->
+  m >>= k  = RewriteM $ oneShot $ \env ->
              do { a  <- runRewriteM m env
                 ; runRewriteM (k a) env }
 
 instance Applicative RewriteM where
-  pure x = RewriteM $ const (pure x)
+  pure x = RewriteM $ oneShot $ \_ -> pure x
   (<*>) = ap
 
 instance HasDynFlags RewriteM where
@@ -72,7 +72,7 @@ instance HasDynFlags RewriteM where
 
 liftTcS :: TcS a -> RewriteM a
 liftTcS thing_inside
-  = RewriteM $ const thing_inside
+  = RewriteM $ oneShot $ \_ -> thing_inside
 
 -- convenient wrapper when you have a CtEvidence describing
 -- the rewriting operation
@@ -95,7 +95,7 @@ traceRewriteM herald doc = liftTcS $ traceTcS herald doc
 
 getRewriteEnvField :: (RewriteEnv -> a) -> RewriteM a
 getRewriteEnvField accessor
-  = RewriteM $ \env -> return (accessor env)
+  = RewriteM $ oneShot $ \env -> return (accessor env)
 
 getEqRel :: RewriteM EqRel
 getEqRel = getRewriteEnvField fe_eq_rel
@@ -123,7 +123,7 @@ checkStackDepth ty
 -- | Change the 'EqRel' in a 'RewriteM'.
 setEqRel :: EqRel -> RewriteM a -> RewriteM a
 setEqRel new_eq_rel thing_inside
-  = RewriteM $ \env ->
+  = RewriteM $ oneShot $ \env ->
     if new_eq_rel == fe_eq_rel env
     then runRewriteM thing_inside env
     else runRewriteM thing_inside (env { fe_eq_rel = new_eq_rel })
@@ -134,7 +134,7 @@ setEqRel new_eq_rel thing_inside
 -- Note [No derived kind equalities]
 noBogusCoercions :: RewriteM a -> RewriteM a
 noBogusCoercions thing_inside
-  = RewriteM $ \env ->
+  = RewriteM $ oneShot $ \env ->
     -- No new thunk is made if the flavour hasn't changed (note the bang).
     let !env' = case fe_flavour env of
           Derived -> env { fe_flavour = Wanted WDeriv }
@@ -144,7 +144,7 @@ noBogusCoercions thing_inside
 
 bumpDepth :: RewriteM a -> RewriteM a
 bumpDepth (RewriteM thing_inside)
-  = RewriteM $ \env -> do
+  = RewriteM $ oneShot $ \env -> do
       -- bumpDepth can be called a lot during rewriting so we force the
       -- new env to avoid accumulating thunks.
       { let !env' = env { fe_loc = bumpCtLocDepth (fe_loc env) }
