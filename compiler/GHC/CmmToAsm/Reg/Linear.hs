@@ -600,8 +600,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
                                  | src == dst   -> []
                                 _               -> [patched_instr]
 
-    let code = squashed_instr ++ w_spills ++ reverse r_spills
-                ++ clobber_saves ++ new_instrs
+    let code = concat [ squashed_instr, w_spills, reverse r_spills, clobber_saves, new_instrs ]
 
 --    pprTrace "patched-code" ((vcat $ map (docToSDoc . pprInstr) code)) $ do
 --    pprTrace "pached-fixup" ((ppr fixup_blocks)) $ do
