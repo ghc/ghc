@@ -33,6 +33,11 @@ _Static_assert(NONMOVING_SEGMENT_SIZE % BLOCK_SIZE == 0,
 // The index of a block within a segment
 typedef uint16_t nonmoving_block_idx;
 
+// A vacant block within a segment
+struct VacantBlock {
+    nonmoving_block_idx next_free;
+};
+
 // A non-moving heap segment
 struct NonmovingSegment {
     struct NonmovingSegment *link;     // for linking together segments into lists
@@ -53,6 +58,14 @@ struct NonmovingSegment {
     //
     // This allows us to mark a nonmoving closure without bringing the
     // NonmovingSegment header into cache.
+
+    // For a partially filled segment (that is, after being swept at least once)
+    // free blocks are linked to avoid searching through the bitmap in
+    // nonmovingAllocate.
+    //
+    // * for a freshly allocated NonmovingSegment bump allocation is used
+    //   to obtain a free block.
+    // * nonmovingSweepSegment chains free blocks while sweeping.
 };
 
 // This is how we mark end of todo lists. Not NULL because todo_link == NULL
