@@ -274,7 +274,7 @@ Core: https://gitlab.haskell.org/ghc/ghc/issues/11795#note_118976
 -}
 
 -- | @'replicateM' n act@ performs the action @act@ @n@ times,
--- and returns the list of results: 
+-- and returns the list of results:
 --
 -- ==== __Examples__
 -- >>> result <- replicateM 5 (pure 'a')
