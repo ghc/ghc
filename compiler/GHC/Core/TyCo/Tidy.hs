@@ -127,12 +127,22 @@ tidyTyCoVarOcc env@(_, subst) tv
 {-
 Note [Strictness in tidyType and friends]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Perhaps surprisingly, making `tidyType` strict has a rather large effect on
-performance: see #14738.  So you will see lots of strict applications ($!)
-and uses of `strictMap` in `tidyType`, `tidyTypes` and `tidyCo`.
 
-See #14738 for the performance impact -- sometimes as much as a 5%
-reduction in allocation.
+Since the result of tidying will be inserted into the HPT, a potentially
+long-lived structure, we generally want to avoid pieces of the old AST
+being retained by the thunks produced by tidying.
+
+For this reason we take great care to ensure that all pieces of the tidied AST
+are evaluated strictly.  So you will see lots of strict applications ($!) and
+uses of `strictMap` in `tidyType`, `tidyTypes` and `tidyCo`.
+
+In the case of tidying of lists (e.g. lists of arguments) we prefer to use
+`strictMap f xs` rather than `seqList (map f xs)` as the latter will
+unnecessarily allocate a thunk, which will then be almost-immediately
+evaluated, for each list element.
+
+Making `tidyType` strict has a rather large effect on performance: see #14738.
+Sometimes as much as a 5% reduction in allocation.
 -}
 
 -- | Tidy a list of Types
