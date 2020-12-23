@@ -12,25 +12,32 @@ Note [FieldLabel]
 
 This module defines the representation of FieldLabels as stored in
 TyCons.  As well as a selector name, these have some extra structure
-to support the DuplicateRecordFields extension.
+to support the DuplicateRecordFields and NoFieldSelectors extensions.
 
-In the normal case (with NoDuplicateRecordFields), a datatype like
+In the normal case (with NoDuplicateRecordFields and FieldSelectors),
+a datatype like
 
     data T = MkT { foo :: Int }
 
 has
 
-    FieldLabel { flLabel        = "foo"
-               , flIsOverloaded = False
-               , flSelector     = foo }.
+    FieldLabel { flLabel                    = "foo"
+               , flHasDuplicateRecordFields = NoDuplicateRecordFields
+               , flHasFieldSelector         = FieldSelectors
+               , flSelector                 = foo }.
 
 In particular, the Name of the selector has the same string
 representation as the label.  If DuplicateRecordFields
 is enabled, however, the same declaration instead gives
 
-    FieldLabel { flLabel        = "foo"
-               , flIsOverloaded = True
-               , flSelector     = $sel:foo:MkT }.
+    FieldLabel { flLabel                    = "foo"
+               , flHasDuplicateRecordFields = DuplicateRecordFields
+               , flHasFieldSelector         = FieldSelectors
+               , flSelector                 = $sel:foo:MkT }.
+
+Similarly, the selector name will be mangled if NoFieldSelectors is used
+(whether or not DuplicateRecordFields is enabled).  See Note [NoFieldSelectors]
+in GHC.Rename.Env.
 
 Now the name of the selector ($sel:foo:MkT) does not match the label of
 the field (foo).  We must be careful not to show the selector name to
@@ -69,6 +76,9 @@ module GHC.Types.FieldLabel
    , FieldLabel(..)
    , fieldSelectorOccName
    , fieldLabelPrintableName
+   , DuplicateRecordFields(..)
+   , FieldSelectors(..)
+   , flIsOverloaded
    )
 where
 
@@ -82,6 +92,7 @@ import GHC.Data.FastString.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 
+import Data.Bool
 import Data.Data
 
 -- | Field labels are just represented as strings;
@@ -91,13 +102,17 @@ type FieldLabelString = FastString
 -- | A map from labels to all the auxiliary information
 type FieldLabelEnv = DFastStringEnv FieldLabel
 
-
 -- | Fields in an algebraic record type; see Note [FieldLabel].
 data FieldLabel = FieldLabel {
-      flLabel        :: FieldLabelString, -- ^ User-visible label of the field
-      flIsOverloaded :: Bool,             -- ^ Was DuplicateRecordFields on
-                                          --   in the defining module for this datatype?
-      flSelector     :: Name              -- ^ Record selector function
+      flLabel :: FieldLabelString,
+      -- ^ User-visible label of the field
+      flHasDuplicateRecordFields :: DuplicateRecordFields,
+      -- ^ Was @DuplicateRecordFields@ on in the defining module for this datatype?
+      flHasFieldSelector :: FieldSelectors,
+      -- ^ Was @FieldSelectors@ enabled in the defining module for this datatype?
+      -- See Note [NoFieldSelectors] in GHC.Rename.Env
+      flSelector :: Name
+      -- ^ Record selector function
     }
   deriving (Data, Eq)
 
@@ -105,31 +120,65 @@ instance HasOccName FieldLabel where
   occName = mkVarOccFS . flLabel
 
 instance Outputable FieldLabel where
-    ppr fl = ppr (flLabel fl) <> whenPprDebug (braces (ppr (flSelector fl)))
+    ppr fl = ppr (flLabel fl) <> whenPprDebug (braces (ppr (flSelector fl))
+                                                <> ppr (flHasDuplicateRecordFields fl)
+                                                <> ppr (flHasFieldSelector fl))
+
+-- | Flag to indicate whether the DuplicateRecordFields extension is enabled.
+data DuplicateRecordFields
+    = DuplicateRecordFields   -- ^ Fields may be duplicated in a single module
+    | NoDuplicateRecordFields -- ^ Fields must be unique within a module (the default)
+  deriving (Show, Eq, Typeable, Data)
+
+instance Binary DuplicateRecordFields where
+    put_ bh f = put_ bh (f == DuplicateRecordFields)
+    get bh = bool NoDuplicateRecordFields DuplicateRecordFields <$> get bh
+
+instance Outputable DuplicateRecordFields where
+    ppr DuplicateRecordFields   = text "+dup"
+    ppr NoDuplicateRecordFields = text "-dup"
+
+
+-- | Flag to indicate whether the FieldSelectors extension is enabled.
+data FieldSelectors
+    = FieldSelectors   -- ^ Selector functions are available (the default)
+    | NoFieldSelectors -- ^ Selector functions are not available
+  deriving (Show, Eq, Typeable, Data)
+
+instance Binary FieldSelectors where
+    put_ bh f = put_ bh (f == FieldSelectors)
+    get bh = bool NoFieldSelectors FieldSelectors <$> get bh
+
+instance Outputable FieldSelectors where
+    ppr FieldSelectors   = text "+sel"
+    ppr NoFieldSelectors = text "-sel"
+
 
 -- | We need the @Binary Name@ constraint here even though there is an instance
 -- defined in "GHC.Types.Name", because the we have a SOURCE import, so the
 -- instance is not in scope.  And the instance cannot be added to Name.hs-boot
 -- because "GHC.Utils.Binary" itself depends on "GHC.Types.Name".
 instance Binary Name => Binary FieldLabel where
-    put_ bh (FieldLabel aa ab ac) = do
+    put_ bh (FieldLabel aa ab ac ad) = do
         put_ bh aa
         put_ bh ab
         put_ bh ac
+        put_ bh ad
     get bh = do
+        aa <- get bh
         ab <- get bh
         ac <- get bh
         ad <- get bh
-        return (FieldLabel ab ac ad)
+        return (FieldLabel aa ab ac ad)
 
 
 -- | Record selector OccNames are built from the underlying field name
 -- and the name of the first data constructor of the type, to support
 -- duplicate record field names.
 -- See Note [Why selector names include data constructors].
-fieldSelectorOccName :: FieldLabelString -> OccName -> Bool -> OccName
-fieldSelectorOccName lbl dc is_overloaded
-  | is_overloaded = mkRecFldSelOcc str
+fieldSelectorOccName :: FieldLabelString -> OccName -> DuplicateRecordFields -> FieldSelectors -> OccName
+fieldSelectorOccName lbl dc dup_fields_ok has_sel
+  | shouldMangleSelectorNames dup_fields_ok has_sel = mkRecFldSelOcc str
   | otherwise     = mkVarOccFS lbl
   where
     str     = ":" ++ unpackFS lbl ++ ":" ++ occNameString dc
@@ -142,3 +191,15 @@ fieldLabelPrintableName :: FieldLabel -> Name
 fieldLabelPrintableName fl
   | flIsOverloaded fl = tidyNameOcc (flSelector fl) (mkVarOccFS (flLabel fl))
   | otherwise         = flSelector fl
+
+-- | Selector name mangling should be used if either DuplicateRecordFields or
+-- NoFieldSelectors is enabled, so that the OccName of the field can be used for
+-- something else.  See Note [FieldLabel], and Note [NoFieldSelectors] in
+-- GHC.Rename.Env.
+shouldMangleSelectorNames :: DuplicateRecordFields -> FieldSelectors -> Bool
+shouldMangleSelectorNames dup_fields_ok has_sel
+    = dup_fields_ok == DuplicateRecordFields || has_sel == NoFieldSelectors
+
+flIsOverloaded :: FieldLabel -> Bool
+flIsOverloaded fl =
+    shouldMangleSelectorNames (flHasDuplicateRecordFields fl) (flHasFieldSelector fl)
