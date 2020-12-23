@@ -754,3 +754,4 @@ test('TyAppPat_Wildcard', normal, compile, [''])
 
 test('T18998', normal, compile, [''])
 test('T18998b', normal, compile, [''])
+test('T18467', normal, compile, [''])
