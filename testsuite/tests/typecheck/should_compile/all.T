@@ -764,3 +764,5 @@ test('InlinePatSyn_NoInlineBuilder', [], makefile_test, [])
 test('InlinePatSyn_NoInlineMatcher', [], makefile_test, [])
 test('InlinePatSyn_ExplicitBidiBuilder', [], makefile_test, [])
 test('InlinePatSyn_ExplicitBidiMatcher', [], makefile_test, [])
+test('T18467', normal, compile, [''])
+
