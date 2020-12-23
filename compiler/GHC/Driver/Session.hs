@@ -35,6 +35,8 @@ module GHC.Driver.Session (
         wopt_fatal, wopt_set_fatal, wopt_unset_fatal,
         xopt, xopt_set, xopt_unset,
         xopt_set_unlessExplSpec,
+        xopt_DuplicateRecordFields,
+        xopt_FieldSelectors,
         lang_set,
         DynamicTooState(..), dynamicTooState, setDynamicNow, setDynamicTooFailed,
         dynamicOutputFile,
@@ -253,6 +255,7 @@ import qualified GHC.Utils.Ppr as Pretty
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
+import qualified GHC.Types.FieldLabel as FieldLabel
 import GHC.Data.FastString
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
@@ -1485,6 +1488,7 @@ languageExtensions (Just Haskell98)
        LangExt.NPlusKPatterns,
        LangExt.DatatypeContexts,
        LangExt.TraditionalRecordSyntax,
+       LangExt.FieldSelectors,
        LangExt.NondecreasingIndentation
            -- strictly speaking non-standard, but we always had this
            -- on implicitly before the option was added in 7.1, and
@@ -1505,6 +1509,7 @@ languageExtensions (Just Haskell2010)
        LangExt.ForeignFunctionInterface,
        LangExt.PatternGuards,
        LangExt.DoAndIfThenElse,
+       LangExt.FieldSelectors,
        LangExt.RelaxedPolyRec]
 
 hasPprDebug :: DynFlags -> Bool
@@ -1640,6 +1645,16 @@ xopt_set_unlessExplSpec ext setUnset dflags =
         stripOnOff (Off x) = x
     in
         if ext `elem` referedExts then dflags else setUnset dflags ext
+
+xopt_DuplicateRecordFields :: DynFlags -> FieldLabel.DuplicateRecordFields
+xopt_DuplicateRecordFields dfs
+  | xopt LangExt.DuplicateRecordFields dfs = FieldLabel.DuplicateRecordFields
+  | otherwise                              = FieldLabel.NoDuplicateRecordFields
+
+xopt_FieldSelectors :: DynFlags -> FieldLabel.FieldSelectors
+xopt_FieldSelectors dfs
+  | xopt LangExt.FieldSelectors dfs = FieldLabel.FieldSelectors
+  | otherwise                       = FieldLabel.NoFieldSelectors
 
 lang_set :: DynFlags -> Maybe Language -> DynFlags
 lang_set dflags lang =
@@ -3607,6 +3622,7 @@ xFlagsDeps = [
   depFlagSpec' "DoRec"                        LangExt.RecursiveDo
     (deprecatedForExtension "RecursiveDo"),
   flagSpec "DuplicateRecordFields"            LangExt.DuplicateRecordFields,
+  flagSpec "FieldSelectors"                   LangExt.FieldSelectors,
   flagSpec "EmptyCase"                        LangExt.EmptyCase,
   flagSpec "EmptyDataDecls"                   LangExt.EmptyDataDecls,
   flagSpec "EmptyDataDeriving"                LangExt.EmptyDataDeriving,

@@ -73,6 +73,7 @@ import GHC.Utils.Panic
 import Control.Monad
 
 import Data.Function
+import qualified Data.List.NonEmpty as NE
 
 #include "HsVersions.h"
 
@@ -539,7 +540,7 @@ finish_ambiguous_selector lr@(L _ rdr) parent_type
           Nothing -> ambiguousSelector lr ;
           Just p  ->
 
-    do { xs <- lookupParents rdr
+    do { xs <- lookupParents WantSelectors rdr
        ; let parent = RecSelData p
        ; case lookup parent xs of {
            Nothing  -> failWithTc (fieldNotInType parent rdr) ;
@@ -561,7 +562,9 @@ addAmbiguousNameErr :: RdrName -> TcM ()
 addAmbiguousNameErr rdr
   = do { env <- getGlobalRdrEnv
        ; let gres = lookupGRE_RdrName rdr env
-       ; setErrCtxt [] $ addNameClashErrRn rdr gres}
+       ; case gres of
+         [] -> panic "addAmbiguousNameErr: not found"
+         gre : gres -> setErrCtxt [] $ addNameClashErrRn rdr $ gre NE.:| gres}
 
 -- A type signature on the argument of an ambiguous record selector or
 -- the record expression in an update must be "obvious", i.e. the
@@ -590,10 +593,12 @@ tyConOfET fam_inst_envs ty0 = tyConOf fam_inst_envs =<< checkingExpType_maybe ty
 
 -- For an ambiguous record field, find all the candidate record
 -- selectors (as GlobalRdrElts) and their parents.
-lookupParents :: RdrName -> RnM [(RecSelParent, GlobalRdrElt)]
-lookupParents rdr
+lookupParents :: FieldsOrSelectors -> RdrName -> RnM [(RecSelParent, GlobalRdrElt)]
+lookupParents fos rdr
   = do { env <- getGlobalRdrEnv
-       ; let gres = lookupGRE_RdrName rdr env
+        -- filter by isRecFldGRE because otherwise a non-selector variable with
+        -- an overlapping name can get through when NoFieldSelector is enabled
+       ; let gres = filter isRecFldGRE $ lookupGRE_RdrName' fos rdr env
        ; mapM lookupParent gres }
   where
     lookupParent :: GlobalRdrElt -> RnM (RecSelParent, GlobalRdrElt)

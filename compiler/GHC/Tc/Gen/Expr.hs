@@ -1275,7 +1275,6 @@ getFixedTyVars upd_fld_occs univ_tvs cons
                       , (tv1,tv) <- univ_tvs `zip` u_tvs
                       , tv `elemVarSet` fixed_tvs ]
 
-
 -- Disambiguate the fields in a record update.
 -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
 disambiguateRecordBinds :: LHsExpr GhcRn -> TcRhoType
@@ -1308,7 +1307,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
                                 , [(RecSelParent, GlobalRdrElt)])]
     getUpdFieldsParents
       = fmap (zip rbnds) $ mapM
-          (lookupParents . unLoc . hsRecUpdFieldRdr . unLoc)
+          (lookupParents WantFields . unLoc . hsRecUpdFieldRdr . unLoc)
           rbnds
 
     -- Given a the lists of possible parents for each field,

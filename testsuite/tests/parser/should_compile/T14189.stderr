@@ -126,7 +126,8 @@
        [({ T14189.hs:3:11 }
          (FieldLabel
           {FastString: "f"}
-          (False)
+          (NoDuplicateRecordFields)
+          (FieldSelectors)
           {Name: T14189.f}))]
        ({ T14189.hs:3:3-8 }
         (IEName
@@ -146,7 +147,8 @@
        ,(FieldGreName
          (FieldLabel
           {FastString: "f"}
-          (False)
+          (NoDuplicateRecordFields)
+          (FieldSelectors)
           {Name: T14189.f}))])])])
   (Nothing)))
 

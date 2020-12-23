@@ -8,6 +8,7 @@ module GHC.Tc.Gen.Export (tcRnExports, exports_from_avail) where
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Types.FieldLabel
 import GHC.Builtin.Names
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -22,7 +23,6 @@ import GHC.Core.TyCon
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.ConLike
-import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Data.Maybe
 import GHC.Utils.Misc (capitalise)
@@ -376,7 +376,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    -> RnM (Located Name, [LIEWrappedName Name], [Name],
                            [Located FieldLabel])
     lookup_ie_with (L l rdr) sub_rdrs
-        = do name <- lookupGlobalOccRn $ ieWrappedName rdr
+        = do name <- lookupGlobalOccRn WantFields $ ieWrappedName rdr
              (non_flds, flds) <- lookupChildrenExport name sub_rdrs
              if isUnboundName name
                 then return (L l name, [], [name], [])
@@ -387,7 +387,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     lookup_ie_all :: IE GhcPs -> LIEWrappedName RdrName
                   -> RnM (Located Name, [Name], [FieldLabel])
     lookup_ie_all ie (L l rdr) =
-          do name <- lookupGlobalOccRn $ ieWrappedName rdr
+          do name <- lookupGlobalOccRn WantFields $ ieWrappedName rdr
              let gres = findChildren kids_env name
                  (non_flds, flds) = classifyGREs gres
              addUsedKids (ieWrappedName rdr) gres

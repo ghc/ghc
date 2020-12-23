@@ -492,17 +492,59 @@ wildcardDoc herald =
     $$ nest 2 (text "Possible fix" <> colon <+> text "omit the"
                                             <+> quotes (text ".."))
 
-addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
+{-
+Note [addNameClashErrRn]
+~~~~~~~~~~~~~~~~~~~~~~~~
+In general, we do not report ambiguous occurrences at use sites where all the
+clashing names are defined locally, because the error will have been reported at
+the definition site (see Note [Reporting duplicate local declarations] in
+GHC.Rename.Names).
+
+However, when DuplicateRecordFields is enabled, it is possible to define the
+same field name multiple times, so we *do* need to report errors at use sites.
+Moreover, when NoFieldSelectors is enabled, it is possible to define a mixture
+of fields and non-fields.
+
+Consider the following code
+
+    data A = A { foo :: Int, bar :: Int }
+    data B = B { foo :: Int, bar :: Int }
+    foo = 42
+
+When renaming an expression
+
+    (A 0 0) { foo = 1, bar = 1 }
+
+the fields may refer to A or B, so the occurrences are ambiguous.
+
+With the default behaviour (NoDuplicateRecordFields, FieldSelectors) we report
+duplicate declarations for both 'foo' and 'bar', so addNameClashErrRn can skip
+the ambiguity error at the use sites.
+
+With DuplicateRecordFields (and FieldSelectors), we report a duplicate
+definition of 'foo' (because of the value binding with the same name) but an
+ambiguity error for 'bar' (it is not skipped because @all isOverloadedRecFldGRE@
+is true).
+
+With NoFieldSelectors, we report no duplicate definitions, so addNameClashErrRn
+must report ambiguity errors at use sites for both 'foo' and 'bar' (they are not
+skipped because @any isNoFieldSelectorGRE@ is true).
+-}
+
+addNameClashErrRn :: RdrName -> NE.NonEmpty GlobalRdrElt -> RnM ()
 addNameClashErrRn rdr_name gres
-  | all isLocalGRE gres && not (all isRecFldGRE gres)
-               -- If there are two or more *local* defns, we'll have reported
-  = return ()  -- that already, and we don't want an error cascade
+  | all isLocalGRE gres
+    && not (all isOverloadedRecFldGRE gres)
+    && not (any isNoFieldSelectorGRE gres)
+  -- If there are two or more *local* defns, we'll usually have reported that
+  -- already, and we don't want an error cascade; see Note [addNameClashErrRn].
+  = return ()
   | otherwise
   = addErr (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
                  , text "It could refer to"
                  , nest 3 (vcat (msg1 : msgs)) ])
   where
-    (np1:nps) = gres
+    np1 NE.:| nps = gres
     msg1 =  text "either" <+> ppr_gre np1
     msgs = [text "    or" <+> ppr_gre np | np <- nps]
     ppr_gre gre = sep [ pp_greMangledName gre <> comma

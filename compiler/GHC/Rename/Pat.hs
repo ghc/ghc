@@ -59,10 +59,10 @@ import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
-                           , checkDupNames, checkDupAndShadowedNames
-                           , unknownSubordinateErr )
+                           , checkDupNames, checkDupAndShadowedNames )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
+import GHC.Types.Avail ( greNameMangledName )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -76,12 +76,14 @@ import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
 import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
+import GHC.Driver.Session ( getDynFlags, xopt_DuplicateRecordFields )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, ap, guard, forM, unless )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ratio
+import GHC.Types.FieldLabel (DuplicateRecordFields(..))
 
 {-
 *********************************************************
@@ -749,7 +751,7 @@ rnHsRecUpdFields
     -> RnM ([LHsRecUpdField GhcRn], FreeVars)
 rnHsRecUpdFields flds
   = do { pun_ok        <- xoptM LangExt.RecordPuns
-       ; overload_ok   <- xoptM LangExt.DuplicateRecordFields
+       ; overload_ok <- xopt_DuplicateRecordFields <$> getDynFlags
        ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok) flds
        ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds
 
@@ -759,27 +761,16 @@ rnHsRecUpdFields flds
 
        ; return (flds1, plusFVs fvss) }
   where
-    doc = text "constructor field name"
-
-    rn_fld :: Bool -> Bool -> LHsRecUpdField GhcPs
+    rn_fld :: Bool -> DuplicateRecordFields -> LHsRecUpdField GhcPs
            -> RnM (LHsRecUpdField GhcRn, FreeVars)
     rn_fld pun_ok overload_ok (L l (HsRecField { hsRecFieldLbl = L loc f
                                                , hsRecFieldArg = arg
                                                , hsRecPun      = pun }))
       = do { let lbl = rdrNameAmbiguousFieldOcc f
-           ; sel <- setSrcSpan loc $
+           ; mb_sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
-                      if overload_ok
-                          then do { mb <- lookupGlobalOccRn_overloaded
-                                            overload_ok lbl
-                                  ; case mb of
-                                      Nothing ->
-                                        do { addErr
-                                               (unknownSubordinateErr doc lbl)
-                                           ; return (Right []) }
-                                      Just r  -> return r }
-                          else fmap Left $ lookupGlobalOccRn lbl
+                      lookupRecFieldOcc_update overload_ok lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                                -- Discard any module qualifier (#11662)
@@ -788,18 +779,12 @@ rnHsRecUpdFields flds
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
-           ; let fvs' = case sel of
-                          Left sel_name -> fvs `addOneFV` sel_name
-                          Right [sel_name] -> fvs `addOneFV` sel_name
-                          Right _       -> fvs
-                 lbl' = case sel of
-                          Left sel_name ->
-                                     L loc (Unambiguous sel_name   (L loc lbl))
-                          Right [sel_name] ->
-                                     L loc (Unambiguous sel_name   (L loc lbl))
-                          Right _ -> L loc (Ambiguous   noExtField (L loc lbl))
+           ; let (lbl', fvs') = case mb_sel of
+                   UnambiguousGre gname -> let sel_name = greNameMangledName gname
+                                           in (Unambiguous sel_name (L loc lbl), fvs `addOneFV` sel_name)
+                   AmbiguousFields       -> (Ambiguous   noExtField (L loc lbl), fvs)
 
-           ; return (L l (HsRecField { hsRecFieldLbl = lbl'
+           ; return (L l (HsRecField { hsRecFieldLbl = L loc lbl'
                                      , hsRecFieldArg = arg''
                                      , hsRecPun      = pun }), fvs') }
 

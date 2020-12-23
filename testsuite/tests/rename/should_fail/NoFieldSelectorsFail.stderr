@@ -1,0 +1,25 @@
+
+NoFieldSelectorsFail.hs:15:14: error:
+    Ambiguous occurrence ‘foo’
+    It could refer to
+       either the field ‘foo’, defined at NoFieldSelectorsFail.hs:10:18
+           or the field ‘foo’, defined at NoFieldSelectorsFail.hs:9:18
+
+NoFieldSelectorsFail.hs:18:15: error:
+    Ambiguous occurrence ‘foo’
+    It could refer to
+       either the field ‘foo’, defined at NoFieldSelectorsFail.hs:10:18
+           or the field ‘foo’, defined at NoFieldSelectorsFail.hs:9:18
+
+NoFieldSelectorsFail.hs:20:15: error:
+    Ambiguous occurrence ‘foo’
+    It could refer to
+       either the field ‘foo’, defined at NoFieldSelectorsFail.hs:10:18
+           or the field ‘foo’, defined at NoFieldSelectorsFail.hs:9:18
+
+NoFieldSelectorsFail.hs:24:15: error:
+    Ambiguous occurrence ‘bar’
+    It could refer to
+       either the field ‘bar’, defined at NoFieldSelectorsFail.hs:9:30
+           or ‘NoFieldSelectorsFail.bar’,
+              defined at NoFieldSelectorsFail.hs:22:1

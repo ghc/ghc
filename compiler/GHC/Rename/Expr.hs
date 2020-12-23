@@ -47,6 +47,7 @@ import GHC.Rename.Pat
 import GHC.Driver.Session
 import GHC.Builtin.Names
 
+import GHC.Types.FieldLabel
 import GHC.Types.Fixity
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -120,12 +121,13 @@ rnUnboundVar v =
           ; return (HsVar noExtField (noLoc n), emptyFVs) }
 
 rnExpr (HsVar _ (L l v))
-  = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
-       ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields v
-       ; dflags <- getDynFlags
+  = do { dflags <- getDynFlags
+       ; let overload_ok = xopt_DuplicateRecordFields dflags
+       ; mb_name <- lookupExprOccRn overload_ok v
+
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;
-           Just (Left name)
+           Just (UnambiguousGre (NormalGreName name))
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
                                        -- Note [Empty lists] in GHC.Hs.Expr
@@ -134,12 +136,12 @@ rnExpr (HsVar _ (L l v))
 
               | otherwise
               -> finishHsVar (L l name) ;
-            Just (Right [s]) ->
-              return ( HsRecFld noExtField (Unambiguous s (L l v) ), unitFV s) ;
-           Just (Right fs@(_:_:_)) ->
-              return ( HsRecFld noExtField (Ambiguous noExtField (L l v))
-                     , mkFVs fs);
-           Just (Right [])         -> panic "runExpr/HsVar" } }
+            Just (UnambiguousGre (FieldGreName fl)) ->
+              let sel_name = flSelector fl in
+              return ( HsRecFld noExtField (Unambiguous sel_name (L l v) ), unitFV sel_name) ;
+            Just AmbiguousFields ->
+              return ( HsRecFld noExtField (Ambiguous noExtField (L l v) ), emptyFVs) } }
+
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
