@@ -33,6 +33,9 @@ module GHC.Tc.Types.Evidence (
   EvCallStack(..),
   EvTypeable(..),
 
+  -- * HoleExprRef
+  HoleExprRef(..),
+
   -- * TcCoercion
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
   TcMCoercion, TcMCoercionN, TcMCoercionR,
@@ -656,6 +659,29 @@ data EvCallStack
     -- ^ @EvCsPushCall name loc stk@ represents a call to @name@, occurring at
     -- @loc@, in a calling context @stk@.
   deriving Data.Data
+
+{-
+************************************************************************
+*                                                                      *
+         Evidence for holes
+*                                                                      *
+************************************************************************
+-}
+
+-- | Where to store evidence for expression holes
+-- See Note [Holes] in GHC.Tc.Types.Constraint
+data HoleExprRef = HER (IORef EvTerm)   -- ^ where to write the erroring expression
+                       TcType           -- ^ expected type of that expression
+                       Unique           -- ^ for debug output only
+
+instance Outputable HoleExprRef where
+  ppr (HER _ _ u) = ppr u
+
+instance Data.Data HoleExprRef where
+  -- Placeholder; we can't traverse into HoleExprRef
+  toConstr _   = abstractConstr "HoleExprRef"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = Data.mkNoRepType "HoleExprRef"
 
 {-
 Note [Typeable evidence terms]

@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP              #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -731,8 +732,15 @@ zonkExpr env (HsVar x (L l id))
   = ASSERT2( isNothing (isDataConId_maybe id), ppr id )
     return (HsVar x (L l (zonkIdOcc env id)))
 
-zonkExpr env (HsUnboundVar v occ)
-  = return (HsUnboundVar (zonkIdOcc env v) occ)
+zonkExpr env (HsUnboundVar her occ)
+  = do her' <- zonk_her her
+       return (HsUnboundVar her' occ)
+  where
+    zonk_her :: HoleExprRef -> TcM HoleExprRef
+    zonk_her (HER ref ty u)
+      = do updMutVarM ref (zonkEvTerm env)
+           ty'  <- zonkTcTypeToTypeX env ty
+           return (HER ref ty' u)
 
 zonkExpr env (HsRecFld _ (Ambiguous v occ))
   = return (HsRecFld noExtField (Ambiguous (zonkIdOcc env v) occ))

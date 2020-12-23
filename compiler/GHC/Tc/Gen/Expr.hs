@@ -199,13 +199,14 @@ tcExpr e@(HsRecFld {})      res_ty = tcApp e res_ty
 -- Others might simply be variables that accidentally have no binding site
 tcExpr e@(HsUnboundVar _ occ) res_ty
   = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (#12531)
-       ; name <- newSysName occ
-       ; let ev = mkLocalId name Many ty
-       ; emitNewExprHole occ ev ty
+       ; u <- newUnique
+       ; ref <- newTcRef (pprPanic "unfilled unbound-variable evidence" (ppr u))
+       ; let her = HER ref ty u
+       ; emitNewExprHole occ her ty
        ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment
                                        -- (#18491)
        ; tcWrapResultO (UnboundOccurrenceOf occ) e
-                       (HsUnboundVar ev occ) ty res_ty }
+                       (HsUnboundVar her occ) ty res_ty }
 
 tcExpr e@(HsLit x lit) res_ty
   = do { let lit_ty = hsLitType lit

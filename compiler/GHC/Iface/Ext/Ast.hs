@@ -165,7 +165,7 @@ For subtrees in the AST that may contain symbols, the procedure is fairly
 straightforward.  If you are extending the GHC AST, you will need to provide a
 `ToHie` instance for any new types you may have introduced in the AST.
 
-Here are is an extract from the `ToHie` instance for (LHsExpr (GhcPass p)):
+Here is an extract from the `ToHie` instance for (LHsExpr (GhcPass p)):
 
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
@@ -725,6 +725,7 @@ instance HiePass p => HasType (Located (HsExpr (GhcPass p))) where
       HieTc ->
         -- Some expression forms have their type immediately available
         let tyOpt = case e' of
+              HsUnboundVar (HER _ ty _) _ -> Just ty
               HsLit _ l -> Just (hsLitType l)
               HsOverLit _ o -> Just (overLitType o)
 
@@ -764,7 +765,6 @@ instance HiePass p => HasType (Located (HsExpr (GhcPass p))) where
           skipDesugaring :: HsExpr GhcTc -> Bool
           skipDesugaring e = case e of
             HsVar{}             -> False
-            HsUnboundVar{}      -> False
             HsConLikeOut{}      -> False
             HsRecFld{}          -> False
             HsOverLabel{}       -> False
@@ -791,7 +791,6 @@ class ( IsPass p
       , Data (HsTupArg (GhcPass p))
       , Data (IPBind (GhcPass p))
       , ToHie (Context (Located (IdGhcP p)))
-      , ToHie (Context (Located (XUnboundVar (GhcPass p))))
       , ToHie (RFContext (Located (AmbiguousFieldOcc (GhcPass p))))
       , ToHie (RFContext (Located (FieldOcc (GhcPass p))))
       , ToHie (TScoped (LHsWcType (GhcPass (NoGhcTcPass p))))
@@ -1053,8 +1052,7 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
         [ toHie $ C Use (L mspan var)
              -- Patch up var location since typechecker removes it
         ]
-      HsUnboundVar var _ ->
-        [ toHie $ C Use (L mspan var) ]
+      HsUnboundVar _ _ -> []  -- there is an unbound name here, but that causes trouble
       HsConLikeOut _ con ->
         [ toHie $ C Use $ L mspan $ conLikeName con
         ]

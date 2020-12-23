@@ -275,13 +275,13 @@ emitWantedEvVars :: CtOrigin -> [TcPredType] -> TcM [EvVar]
 emitWantedEvVars orig = mapM (emitWantedEvVar orig)
 
 -- | Emit a new wanted expression hole
-emitNewExprHole :: OccName   -- of the hole
-                -> Id        -- of the evidence
+emitNewExprHole :: OccName         -- of the hole
+                -> HoleExprRef     -- where to write the erroring expression
                 -> Type -> TcM ()
-emitNewExprHole occ ev_id ty
+emitNewExprHole occ ev_ref ty
   = do { loc <- getCtLocM (ExprHoleOrigin occ) (Just TypeLevel)
-       ; let hole = Hole { hole_sort = ExprHole ev_id
-                         , hole_occ  = getOccName ev_id
+       ; let hole = Hole { hole_sort = ExprHole ev_ref
+                         , hole_occ  = occ
                          , hole_ty   = ty
                          , hole_loc  = loc }
        ; emitHole hole }
@@ -2139,8 +2139,6 @@ zonkHole :: Hole -> TcM Hole
 zonkHole hole@(Hole { hole_ty = ty })
   = do { ty' <- zonkTcType ty
        ; return (hole { hole_ty = ty' }) }
-  -- No need to zonk the Id in any ExprHole because we never look at it
-  -- until after the final zonk and desugaring
 
 {- Note [zonkCt behaviour]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
