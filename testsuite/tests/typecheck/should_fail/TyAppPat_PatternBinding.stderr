@@ -1,5 +1,5 @@
 
-TyAppPat_PatternBinding.hs:8:1: error:
+TyAppPat_PatternBinding.hs:9:1: error:
     • Binding type variables is not allowed in pattern bindings
     • In the pattern: Just @a x
       In a pattern binding: Just @a x = Just (5 :: Integer)

@@ -1,16 +1,16 @@
 
-TyAppPat_NonlinearMultiPat.hs:9:19: error:
+TyAppPat_NonlinearMultiPat.hs:10:19: error:
     Type variable ‘a’ is already in scope.
     Type applications in patterns must bind fresh variables, without shadowing.
 
-TyAppPat_NonlinearMultiPat.hs:10:18: error:
+TyAppPat_NonlinearMultiPat.hs:11:18: error:
     Type variable ‘a’ is already in scope.
     Type applications in patterns must bind fresh variables, without shadowing.
 
-TyAppPat_NonlinearMultiPat.hs:11:19: error:
+TyAppPat_NonlinearMultiPat.hs:12:19: error:
     Type variable ‘a’ is already in scope.
     Type applications in patterns must bind fresh variables, without shadowing.
 
-TyAppPat_NonlinearMultiPat.hs:12:18: error:
+TyAppPat_NonlinearMultiPat.hs:13:18: error:
     Type variable ‘a’ is already in scope.
     Type applications in patterns must bind fresh variables, without shadowing.
