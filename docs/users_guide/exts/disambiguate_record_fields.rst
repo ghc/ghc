@@ -8,9 +8,10 @@ Record field disambiguation
         Implied by :extension:`RecordWildCards`.
 
     :since: 6.8.1
+    :implied by: :extension:`RecordWildCards`, :extension:`DuplicateRecordFields`
 
-    Allow the compiler to automatically choose between identically-named
-    record selectors based on type (if the choice is unambiguous).
+    Allow the compiler to automatically choose between identically-named record
+    fields (if the choice is unambiguous).
 
 In record construction and record pattern matching it is entirely
 unambiguous which field is referred to, even if there are two different
@@ -48,6 +49,17 @@ variables in scope with the same name. This reduces the clutter of
 qualified names when you import two records from different modules that
 use the same field name.
 
+Since version 9.2.1, record fields in updates are disambiguated by ignoring
+non-field names in scope. For example, the following is accepted under
+:extension:`DisambiguateRecordFields`: ::
+
+    module Bar where
+      import M  -- imports the field x
+
+      x = ()
+
+      e r = r { x = 0 }  -- unambiguously refers to the field
+
 Some details:
 
 -  Field disambiguation can be combined with punning (see
@@ -72,5 +84,3 @@ Some details:
    name it ``M.MkS``, but the field ``x`` does not need to be qualified
    even though ``M.x`` is in scope but ``x`` is not (In effect, it is
    qualified by the constructor).
-
-

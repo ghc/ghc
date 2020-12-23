@@ -198,9 +198,9 @@ setNameGreName hsc_env mb_mod gname = case gname of
 -- | Set the 'Module' of a 'FieldSelector'
 setNameFieldSelector :: HscEnv -> Maybe Module -> FieldLabel -> IO FieldLabel
 setNameFieldSelector _ Nothing f = return f
-setNameFieldSelector hsc_env mb_mod (FieldLabel l b sel) = do
+setNameFieldSelector hsc_env mb_mod (FieldLabel l b has_sel sel) = do
     sel' <- initIfaceLoad hsc_env $ setNameModule mb_mod sel
-    return (FieldLabel l b sel')
+    return (FieldLabel l b has_sel sel')
 
 {-
 ************************************************************************

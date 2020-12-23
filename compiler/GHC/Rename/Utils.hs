@@ -492,17 +492,48 @@ wildcardDoc herald =
     $$ nest 2 (text "Possible fix" <> colon <+> text "omit the"
                                             <+> quotes (text ".."))
 
-addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
+{-
+Note [Skipping ambiguity errors at use sites of local declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general, we do not report ambiguous occurrences at use sites where all the
+clashing names are defined locally, because the error will have been reported at
+the definition site, and we want to avoid an error cascade.
+
+However, when DuplicateRecordFields is enabled, it is possible to define the
+same field name multiple times, so we *do* need to report an error at the use
+site when there is ambiguity between multiple fields. Moreover, when
+NoFieldSelectors is enabled, it is possible to define a field with the same name
+as a non-field, so again we need to report ambiguity at the use site.
+
+We can skip reporting an ambiguity error whenever defining the GREs must have
+yielded a duplicate declarations error.  More precisely, we can skip if:
+
+ * there are at least two non-fields amongst the GREs; or
+
+ * there are at least two fields amongst the GREs, and DuplicateRecordFields is
+   *disabled*; or
+
+ * there is at least one non-field, at least one field, and NoFieldSelectors is
+   *disabled*.
+
+These conditions ensure that a duplicate local declaration will have been
+reported.  See also Note [Reporting duplicate local declarations] in
+GHC.Rename.Names).
+
+-}
+
+addNameClashErrRn :: RdrName -> NE.NonEmpty GlobalRdrElt -> RnM ()
 addNameClashErrRn rdr_name gres
-  | all isLocalGRE gres && not (all isRecFldGRE gres)
-               -- If there are two or more *local* defns, we'll have reported
-  = return ()  -- that already, and we don't want an error cascade
+  | all isLocalGRE gres && can_skip
+  -- If there are two or more *local* defns, we'll usually have reported that
+  -- already, and we don't want an error cascade.
+  = return ()
   | otherwise
   = addErr (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
                  , text "It could refer to"
                  , nest 3 (vcat (msg1 : msgs)) ])
   where
-    (np1:nps) = gres
+    np1 NE.:| nps = gres
     msg1 =  text "either" <+> ppr_gre np1
     msgs = [text "    or" <+> ppr_gre np | np <- nps]
     ppr_gre gre = sep [ pp_greMangledName gre <> comma
@@ -532,6 +563,18 @@ addNameClashErrRn rdr_name gres
                 | otherwise
                 = pprPanic "addNameClassErrRn" (ppr gre $$ ppr iss)
                   -- Invariant: either 'lcl' is True or 'iss' is non-empty
+
+    -- If all the GREs are defined locally, can we skip reporting an ambiguity
+    -- error at use sites, because it will have been reported already? See
+    -- Note [Skipping ambiguity errors at use sites of local declarations]
+    can_skip = num_non_flds >= 2
+            || (num_flds >= 2 && not (isDuplicateRecFldGRE (head flds)))
+            || (num_non_flds >= 1 && num_flds >= 1
+                                  && not (isNoFieldSelectorGRE (head flds)))
+    (flds, non_flds) = NE.partition isRecFldGRE gres
+    num_flds     = length flds
+    num_non_flds = length non_flds
+
 
 shadowedNameWarn :: OccName -> [SDoc] -> SDoc
 shadowedNameWarn occ shadowed_locs
