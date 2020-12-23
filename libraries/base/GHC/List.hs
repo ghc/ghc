@@ -614,7 +614,7 @@ scanr1 f (x:xs)         =  f x q : qs
 maximum                 :: (Ord a) => [a] -> a
 {-# INLINABLE maximum #-}
 maximum []              =  errorEmptyList "maximum"
-maximum xs              =  foldl1 max xs
+maximum xs              =  foldl1' max xs
 
 -- We want this to be specialized so that with a strict max function, GHC
 -- produces good code. Note that to see if this is happending, one has to
@@ -638,7 +638,7 @@ maximum xs              =  foldl1 max xs
 minimum                 :: (Ord a) => [a] -> a
 {-# INLINABLE minimum #-}
 minimum []              =  errorEmptyList "minimum"
-minimum xs              =  foldl1 min xs
+minimum xs              =  foldl1' min xs
 
 {-# SPECIALIZE  minimum :: [Int] -> Int #-}
 {-# SPECIALIZE  minimum :: [Integer] -> Integer #-}
