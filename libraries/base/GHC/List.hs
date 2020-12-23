@@ -340,7 +340,7 @@ foldl1' _ []             =  errorEmptyList "foldl1'"
 -- * Hangs forever *
 sum                     :: (Num a) => [a] -> a
 {-# INLINE sum #-}
-sum                     =  foldl (+) 0
+sum                     =  foldl' (+) 0
 
 -- | The 'product' function computes the product of a finite list of numbers.
 --
@@ -356,7 +356,7 @@ sum                     =  foldl (+) 0
 -- * Hangs forever *
 product                 :: (Num a) => [a] -> a
 {-# INLINE product #-}
-product                 =  foldl (*) 1
+product                 =  foldl' (*) 1
 
 -- | \(\mathcal{O}(n)\). 'scanl' is similar to 'foldl', but returns a list of
 -- successive reduced values from the left:
