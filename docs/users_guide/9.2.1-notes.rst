@@ -50,7 +50,21 @@ Language
 * Previously, ``-XUndecidableInstances`` accidentally implied ``-XFlexibleContexts``.
   This is now fixed, but it means that some programs will newly require
   ``-XFlexibleContexts``.
-        
+
+* Various records-related extensions have been improved:
+
+  - A new extension :extension:`NoFieldSelectors` hides record field selector
+    functions, so it is possible to define top-level bindings with the same names.
+
+  - The :extension:`DisambiguateRecordFields` extension now works for updates.
+    An update ``expr { field = value }`` will be accepted if there is a single
+    field called ``field`` in scope, regardless of whether there are non-fields
+    in scope with the same name.
+
+  - The :extension:`DuplicateRecordFields` extension now applies to fields in
+    record pattern synonyms.  In particular, it is possible for a single module
+    to define multiple pattern synonyms using the same field names.
+
 Compiler
 ~~~~~~~~
 

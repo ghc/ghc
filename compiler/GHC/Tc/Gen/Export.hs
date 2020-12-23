@@ -8,6 +8,7 @@ module GHC.Tc.Gen.Export (tcRnExports, exports_from_avail) where
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Types.FieldLabel
 import GHC.Builtin.Names
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -22,7 +23,6 @@ import GHC.Core.TyCon
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.ConLike
-import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Data.Maybe
 import GHC.Utils.Misc (capitalise)

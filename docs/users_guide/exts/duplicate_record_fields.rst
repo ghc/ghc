@@ -33,6 +33,10 @@ Field names used as selector functions or in record updates must be unambiguous,
 either because there is only one such field in scope, or because a type
 signature is supplied, as described in the following sections.
 
+While :extension:`DuplicateRecordFields` permits multiple fields with the same
+name in a single module, it does not permit a field and a normal value binding
+to have the same name.  For that, use :extension:`NoFieldSelectors`.
+
 Selector functions
 ~~~~~~~~~~~~~~~~~~
 

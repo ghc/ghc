@@ -46,7 +46,7 @@ module GHC.Types.Name.Reader (
         GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
         lookupGlobalRdrEnv, extendGlobalRdrEnv, greOccName, shadowNames,
         pprGlobalRdrEnv, globalRdrEnvElts,
-        lookupGRE_RdrName, lookupGRE_Name,
+        lookupGRE_RdrName, lookupGRE_RdrName', lookupGRE_Name,
         lookupGRE_GreName, lookupGRE_FieldLabel,
         lookupGRE_Name_OccName,
         getGRE_NameQualifier_maybes,
@@ -58,9 +58,11 @@ module GHC.Types.Name.Reader (
         gresToAvailInfo,
         greDefinitionModule, greDefinitionSrcSpan,
         greMangledName, grePrintableName,
+        greFieldLabel,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
-        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, greFieldLabel,
+        GlobalRdrElt(..), isLocalGRE, isRecFldGRE,
+        isDuplicateRecFldGRE, isNoFieldSelectorGRE, isFieldSelectorGRE,
         unQualOK, qualSpecOK, unQualSpecOK,
         pprNameProvenance,
         GreName(..), greNameSrcSpan,
@@ -836,7 +838,15 @@ lookupGlobalRdrEnv env occ_name = case lookupOccEnv env occ_name of
                                   Just gres -> gres
 
 lookupGRE_RdrName :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
-lookupGRE_RdrName rdr_name env
+-- ^ Look for this 'RdrName' in the global environment.  Omits record fields
+-- without selector functions (see Note [NoFieldSelectors] in GHC.Rename.Env).
+lookupGRE_RdrName rdr_name env =
+    filter (not . isNoFieldSelectorGRE) (lookupGRE_RdrName' rdr_name env)
+
+lookupGRE_RdrName' :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
+-- ^ Look for this 'RdrName' in the global environment.  Includes record fields
+-- without selector functions (see Note [NoFieldSelectors] in GHC.Rename.Env).
+lookupGRE_RdrName' rdr_name env
   = case lookupOccEnv env (rdrNameOcc rdr_name) of
     Nothing   -> []
     Just gres -> pickGREs rdr_name gres
@@ -858,14 +868,14 @@ lookupGRE_GreName env gname
 lookupGRE_FieldLabel :: GlobalRdrEnv -> FieldLabel -> Maybe GlobalRdrElt
 -- ^ Look for a particular record field selector in the environment, where the
 -- selector name and field label may be different: the GlobalRdrEnv is keyed on
--- the label.  See Note [Parents for record fields] for why this happens.
+-- the label.  See Note [GreNames] for why this happens.
 lookupGRE_FieldLabel env fl
   = lookupGRE_Name_OccName env (flSelector fl) (mkVarOccFS (flLabel fl))
 
 lookupGRE_Name_OccName :: GlobalRdrEnv -> Name -> OccName -> Maybe GlobalRdrElt
 -- ^ Look for precisely this 'Name' in the environment, but with an 'OccName'
 -- that might differ from that of the 'Name'.  See 'lookupGRE_FieldLabel' and
--- Note [Parents for record fields].
+-- Note [GreNames].
 lookupGRE_Name_OccName env name occ
   = case [ gre | gre <- lookupGlobalRdrEnv env occ
                , greMangledName gre == name ] of
@@ -895,10 +905,23 @@ isLocalGRE (GRE {gre_lcl = lcl }) = lcl
 isRecFldGRE :: GlobalRdrElt -> Bool
 isRecFldGRE = isJust . greFieldLabel
 
-isOverloadedRecFldGRE :: GlobalRdrElt -> Bool
+isDuplicateRecFldGRE :: GlobalRdrElt -> Bool
 -- ^ Is this a record field defined with DuplicateRecordFields?
--- (See Note [Parents for record fields])
-isOverloadedRecFldGRE = maybe False flIsOverloaded . greFieldLabel
+-- (See Note [GreNames])
+isDuplicateRecFldGRE =
+    maybe False ((DuplicateRecordFields ==) . flHasDuplicateRecordFields) . greFieldLabel
+
+isNoFieldSelectorGRE :: GlobalRdrElt -> Bool
+-- ^ Is this a record field defined with NoFieldSelectors?
+-- (See Note [NoFieldSelectors] in GHC.Rename.Env)
+isNoFieldSelectorGRE =
+    maybe False ((NoFieldSelectors ==) . flHasFieldSelector) . greFieldLabel
+
+isFieldSelectorGRE :: GlobalRdrElt -> Bool
+-- ^ Is this a record field defined with FieldSelectors?
+-- (See Note [NoFieldSelectors] in GHC.Rename.Env)
+isFieldSelectorGRE =
+    maybe False ((FieldSelectors ==) . flHasFieldSelector) . greFieldLabel
 
 greFieldLabel :: GlobalRdrElt -> Maybe FieldLabel
 -- ^ Returns the field label of this GRE, if it has one
