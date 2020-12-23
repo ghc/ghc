@@ -1,0 +1,5 @@
+
+NFS9156.hs:4:19: error:
+    Multiple declarations of ‘f1’
+    Declared at: NFS9156.hs:3:15
+                 NFS9156.hs:4:19
