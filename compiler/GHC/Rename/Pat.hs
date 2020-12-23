@@ -78,8 +78,9 @@ import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, ap, guard, forM )
+import Control.Monad       ( when, ap, guard, forM, unless )
 import qualified Data.List.NonEmpty as NE
+import Data.Maybe
 import Data.Ratio
 
 {-
@@ -528,6 +529,7 @@ rnConPatAndThen :: NameMaker
 
 rnConPatAndThen mk con (PrefixCon tyargs pats)
   = do  { con' <- lookupConCps con
+        ; liftCps check_lang_exts
         ; tyargs' <- forM tyargs $ \t ->
             liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
         ; pats' <- rnLPatsAndThen mk pats
@@ -537,6 +539,19 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
             , pat_args = PrefixCon tyargs' pats'
             }
         }
+  where
+    check_lang_exts :: RnM ()
+    check_lang_exts = do
+      scoped_tyvars <- xoptM LangExt.ScopedTypeVariables
+      type_app      <- xoptM LangExt.TypeApplications
+      unless (scoped_tyvars && type_app) $
+        case listToMaybe tyargs of
+          Nothing    -> pure ()
+          Just tyarg -> addErr $
+            hang (text "Illegal visible type application in a pattern:"
+                    <+> quotes (char '@' <> ppr tyarg))
+               2 (text "Both ScopedTypeVariables and TypeApplications are"
+                    <+> text "required to use this feature")
 
 rnConPatAndThen mk con (InfixCon pat1 pat2)
   = do  { con' <- lookupConCps con

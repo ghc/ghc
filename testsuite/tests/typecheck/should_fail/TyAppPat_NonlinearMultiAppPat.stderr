@@ -1,4 +1,4 @@
 
-TyAppPat_NonlinearMultiAppPat.hs:12:6: error:
+TyAppPat_NonlinearMultiAppPat.hs:13:6: error:
     Type variable ‘a’ is already in scope.
     Type applications in patterns must bind fresh variables, without shadowing.
