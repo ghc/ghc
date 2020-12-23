@@ -1,5 +1,5 @@
 
-TyAppPat_TooMany.hs:4:4: error:
+TyAppPat_TooMany.hs:6:4: error:
     • Too many type arguments in constructor pattern for ‘Just’
       Expected no more than 1; got 2
     • In the pattern: Just @Int @Bool x

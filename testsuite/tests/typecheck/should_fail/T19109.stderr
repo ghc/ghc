@@ -1,0 +1,4 @@
+
+T19109.hs:5:4: error:
+    Illegal visible type application in a pattern: ‘@Int’
+      Both ScopedTypeVariables and TypeApplications are required to use this feature
