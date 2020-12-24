@@ -432,7 +432,6 @@ data CtOrigin
   | ExprHoleOrigin OccName   -- from an expression hole
   | TypeHoleOrigin OccName   -- from a type hole (partial type signature)
   | PatCheckOrigin      -- normalisation of a type during pattern-match checking
-  | UnboundOccurrenceOf OccName
   | ListOrigin          -- An overloaded list
   | BracketOrigin       -- An overloaded quotation bracket
   | StaticOrigin        -- A static form
@@ -479,7 +478,7 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
-exprCtOrigin (HsUnboundVar _ uv)  = UnboundOccurrenceOf uv
+exprCtOrigin (HsUnboundVar {})    = Shouldn'tHappenOrigin "unbound variable"
 exprCtOrigin (HsConLikeOut {})    = panic "exprCtOrigin HsConLikeOut"
 exprCtOrigin (HsRecFld _ f)       = OccurrenceOfRecSel (rdrNameAmbiguousFieldOcc f)
 exprCtOrigin (HsOverLabel _ _ l)  = OverLabelOrigin l
@@ -570,9 +569,6 @@ pprCtOrigin AssocFamPatOrigin
 pprCtOrigin (KindEqOrigin t1 Nothing _ _)
   = hang (ctoHerald <+> text "a kind equality when matching")
        2 (ppr t1)
-
-pprCtOrigin (UnboundOccurrenceOf name)
-  = ctoHerald <+> text "an undeclared identifier" <+> quotes (ppr name)
 
 pprCtOrigin (DerivOriginDC dc n _)
   = hang (ctoHerald <+> text "the" <+> speakNth n

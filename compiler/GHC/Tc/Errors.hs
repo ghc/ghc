@@ -953,17 +953,18 @@ mkErrorTerm dflags ty err = evDelayedError ty err_fs
     err_msg = pprLocErrMsg err
     err_fs  = mkFastString $ showSDoc dflags $
               err_msg $$ text "(deferred type error)"
+
 maybeAddDeferredHoleBinding :: ReportErrCtxt -> ErrMsg -> Hole -> TcM ()
-maybeAddDeferredHoleBinding ctxt err (Hole { hole_sort = ExprHole ev_id })
+maybeAddDeferredHoleBinding ctxt err (Hole { hole_sort = ExprHole (HER ref ref_ty _) })
 -- Only add bindings for holes in expressions
 -- not for holes in partial type signatures
 -- cf. addDeferredBinding
   | deferringAnyBindings ctxt
   = do { dflags <- getDynFlags
-       ; let err_tm = mkErrorTerm dflags (idType ev_id) err
-           -- NB: idType ev_id, not hole_ty. hole_ty might be rewritten.
+       ; let err_tm = mkErrorTerm dflags ref_ty err
+           -- NB: ref_ty, not hole_ty. hole_ty might be rewritten.
            -- See Note [Holes] in GHC.Tc.Types.Constraint
-       ; addTcEvBind (cec_binds ctxt) $ mkWantedEvBind ev_id err_tm }
+       ; writeMutVar ref err_tm }
   | otherwise
   = return ()
 maybeAddDeferredHoleBinding _ _ (Hole { hole_sort = TypeHole })

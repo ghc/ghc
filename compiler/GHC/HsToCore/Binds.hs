@@ -18,7 +18,7 @@ lower levels it is preserved with @let@/@letrec@s).
 
 module GHC.HsToCore.Binds
    ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec
-   , dsHsWrapper, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds, dsMkUserRule
+   , dsHsWrapper, dsEvTerm, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds, dsMkUserRule
    )
 where
 

@@ -263,11 +263,11 @@ data Hole
 
 
 -- | Used to indicate which sort of hole we have.
-data HoleSort = ExprHole Id
+data HoleSort = ExprHole HoleExprRef
                  -- ^ Either an out-of-scope variable or a "true" hole in an
                  -- expression (TypedHoles).
-                 -- The 'Id' is where to store "evidence": this evidence
-                 -- will be an erroring expression for -fdefer-type-errors.
+                 -- The HoleExprRef says where to write the
+                 -- the erroring expression for -fdefer-type-errors.
               | TypeHole
                  -- ^ A hole in a type (PartialTypeSignatures)
               | ConstraintHole
@@ -277,17 +277,17 @@ data HoleSort = ExprHole Id
                  -- Note [Do not simplify ConstraintHoles] in GHC.Tc.Solver.
 
 instance Outputable Hole where
-  ppr (Hole { hole_sort = ExprHole id
+  ppr (Hole { hole_sort = ExprHole ref
             , hole_occ  = occ
             , hole_ty   = ty })
-    = parens $ (braces $ ppr occ <> colon <> ppr id) <+> dcolon <+> ppr ty
+    = parens $ (braces $ ppr occ <> colon <> ppr ref) <+> dcolon <+> ppr ty
   ppr (Hole { hole_sort = _other
             , hole_occ  = occ
             , hole_ty   = ty })
     = braces $ ppr occ <> colon <> ppr ty
 
 instance Outputable HoleSort where
-  ppr (ExprHole id)  = text "ExprHole:" <> ppr id
+  ppr (ExprHole ref) = text "ExprHole:" <+> ppr ref
   ppr TypeHole       = text "TypeHole"
   ppr ConstraintHole = text "CosntraintHole"
 
@@ -364,14 +364,20 @@ reported with all the other errors in GHC.Tc.Errors.
 For expression holes, the user has the option of deferring errors until runtime
 with -fdefer-type-errors. In this case, the hole actually has evidence: this
 evidence is an erroring expression that prints an error and crashes at runtime.
-The ExprHole variant of holes stores the Id that will be bound to this evidence;
-during constraint generation, this Id was inserted into the expression output
-by the type checker.
+The ExprHole variant of holes stores an IORef EvTerm that will contain this evidence;
+during constraint generation, this IORef was stored in the HsUnboundVar extension
+field by the type checker. The desugarer simply dereferences to get the CoreExpr.
 
-You might think that the type of the stored Id is the same as the type of the
+Prior to fixing #17812, we used to invent an Id to hold the erroring
+expression, and then bind it during type-checking. But this does not support
+levity-polymorphic out-of-scope identifiers. See
+typecheck/should_compile/T17812. We thus use the mutable-CoreExpr approach
+described above.
+
+You might think that the type in the HoleExprRef is the same as the type of the
 hole. However, because the hole type (hole_ty) is rewritten with respect to
 givens, this might not be the case. That is, the hole_ty is always (~) to the
-type of the Id, but they might not be `eqType`. We need the type of the generated
+type of the HoleExprRef, but they might not be `eqType`. We need the type of the generated
 evidence to match what is expected in the context of the hole, and so we must
 store these types separately.
 
